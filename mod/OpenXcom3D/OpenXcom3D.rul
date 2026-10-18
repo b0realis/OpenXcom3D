@@ -1,0 +1,49 @@
+# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
+firstPerson:
+  enabled: true
+  maxViewDistance: 60   # tiles
+  combatMusic: [GMDEFEND, GMDEFBAS] # tense tracks while aliens are in sight (UFO, TFTD)
+  # Night vision in 3D (with the "Night vision needs gear" setting): wearing one of these armors
+  # or carrying one of these items gives the NIGHT VISION button. Units that see as far in the
+  # dark as by day (aliens, and armors with visibilityAtDark) always have it.
+  nightVision:
+    - STR_POWER_SUIT_UC          # UFO: alien-alloy helmets with elerium-powered optics
+    - STR_FLYING_SUIT_UC
+    - HOVERTANK_ARMOR            # UFO: alien sensor suite
+    - STR_ION_ARMOR_UC           # TFTD
+    - STR_MAGNETIC_ION_ARMOR_UC
+    - DISPLACER_ARMOR            # TFTD: the alien-tech submersible
+  # Window walls per terrain data set (record numbers in its MCD) and the sprite colours that
+  # are glass: the 3D view sees through those voxels (tinted), bullets still hit them.
+  windows:
+    - dataSet: URBAN
+      records: [2, 3, 16, 17, 33, 34, 67, 68, 79, 80]
+      glassColors: [7, 8, 9, 10, 11, 12, 13, 148, 149, 150, 151, 160, 161, 162, 163]
+  # Weather particles by terrain data set (only where the sky is open above).
+  weather:
+    - dataSet: POLAR
+      type: snow
+    - dataSet: JUNGLE
+      type: rain
+    - dataSet: DESERT
+      type: dust
+    - dataSet: MARS
+      type: dust
+
+interfaces:
+  - type: firstPerson
+    elements:
+      - id: button        # top bar buttons: Iso/3D, HUD, inventory, squad
+        color: 240        # battlescape palette grey-blue ramp (240-255)
+        color2: 128       # label colour, same as the soldier name on the original HUD
+      - id: panel         # info panel behind name and stats
+        color: 15
+        border: 244
+      - id: doom          # "DOOM MODE" marker on the panel
+        color: 32
+      - id: weapon        # weapon in hand on the panel
+        color: 144
+      - id: crosshairText # fire mode and shot info under the crosshair (recoloured live)
+        color: 144
+      - id: banner        # "hidden movement" during the alien turn
+        color: 144

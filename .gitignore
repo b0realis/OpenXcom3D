@@ -1,0 +1,7 @@
+# build outputs and game data never belong here
+build/
+*.o
+UFO/
+TFTD/
+user/
+__pycache__/
