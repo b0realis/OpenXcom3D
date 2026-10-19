@@ -21,7 +21,7 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 | ![Inside a UFO](docs/screenshots/ufo.png) | ![A heavy plasma round leaving the gun](docs/screenshots/plasma.png) |
 | ![The Skyranger](docs/screenshots/skyranger.png) | ![Terror From The Deep: on the sea floor](docs/screenshots/tftd.png) |
 | ![Dual wield](docs/screenshots/akimbo.png) | ![Signal lost](docs/screenshots/signal_lost.png) |
-| ![Terror From The Deep, an island attack: a Gillman ahead, a Deep One in a teammate's helmet camera](docs/screenshots/helmet_cam.png) | ![A rocket going off far down an alien base hall](docs/screenshots/alien_base.png) |
+| ![Terror From The Deep, an island attack: a Gillman ahead, a Deep One in a teammate's helmet camera](docs/screenshots/tftd_island.png) | ![A rocket going off far down an alien base hall](docs/screenshots/alien_base.png) |
 
 ## New in 0.8.1
 
