@@ -4,13 +4,13 @@
 
 ![Night, through a soldier's eyes](docs/screenshots/night.png)
 
-*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **0.8**.
+*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **0.8.1**.
 
 **Both games are supported:** *UFO: Enemy Unknown* and *X-COM: Terror From The Deep*.
 
 ## The goal
 
-The research and testing goal of this project was to bring the battlescape into 3D while staying **faithful to the original game**: seamless, so that it feels as if it had been introduced the day *UFO: Enemy Unknown* was released. It uses **only the original assets** — the game's own maps, voxel shapes, sprites, palette and sounds (the few new sounds, such as the hit marker's tick, are made in code) — and no modern art spins that would split the game in two. Every action still goes through the original rules: time units, energy, accuracy, reaction fire, line of sight, doors, morale. The few deliberate additions (jumping over low obstacles, free flight between levels, night vision as gear, falling off ledges, FPS-style shooting, dual wield) are settings.
+The research and testing goal of this project was to bring the battlescape into 3D while staying **faithful to the original game**: seamless, so that it feels as if it had been introduced the day *UFO: Enemy Unknown* was released. It uses **only the original assets** — the game's own maps, voxel shapes, sprites, palette and sounds (the few new sounds, such as the hit marker's tick, are made in code) — and no modern art spins that would split the game in two. Every action still goes through the original rules: time units, energy, accuracy, reaction fire, line of sight, doors, morale. The few deliberate additions (jumping over low obstacles, free flight between levels, night vision as gear, falling off ledges, FPS-style shooting, dual wield) are settings. A real-time mode will be attempted in the future, as a setting too.
 
 The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×40 pixel sprites, terrain is 16×16×24 voxels, and there are 256 colours. Good ideas for that are welcome (a few are listed in the manual, under [Known limits and ideas](OpenXcom3D_manual.md#9-known-limits-and-ideas)). Nevertheless the gameplay turned out to be quite engaging and deep: a dark UFO corridor, a door that slides open, a shape you can't make out yet, and your squad's time units ticking away.
 
@@ -21,6 +21,13 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 | ![Inside a UFO](docs/screenshots/ufo.png) | ![A heavy plasma round leaving the gun](docs/screenshots/plasma.png) |
 | ![The Skyranger](docs/screenshots/skyranger.png) | ![Terror From The Deep: on the sea floor](docs/screenshots/tftd.png) |
 | ![Dual wield](docs/screenshots/akimbo.png) | ![Signal lost](docs/screenshots/signal_lost.png) |
+
+## New in 0.8.1
+
+- **The prebuilt release runs on old and new Linux systems:** anything from 2021 on (glibc 2.34: Ubuntu 22.04, Debian 12, Fedora 35, and every rolling one such as Arch), with the system's own SDL libraries in whatever version it has. If something is missing, `play.sh` says what and how to install it.
+- **Pixel size Auto** (the new default) keeps big screens smooth: on 1920×1080 it holds 60 FPS.
+- **Everything in a hand is 3D:** grenades, medi-kits, scanners, clips are built from their inventory pictures like the weapons, half in view at the bottom of the screen; **thrown items fly as 3D objects**, tumbling along the game's arc.
+- **Grenades:** a primed one shows its fuse on the panel. In Doom mode they work in real time (one click pulls the pin, three seconds, boom, in your hand too if you wait): a first step towards a **real-time mode**, which will be attempted in the future.
 
 ## New in 0.8
 
@@ -58,7 +65,7 @@ All changes on top of it are in one file, [`openxcom3d.patch`](openxcom3d.patch)
 
 You need your own copy of the original game data (*UFO: Enemy Unknown / X-COM: UFO Defense* and/or *X-COM: Terror From The Deep*, e.g. from Steam or GOG). Nothing of it is included here.
 
-- **Prebuilt (Linux x86-64):** download the archive from the [Releases](../../releases) page, unpack it and run `python3 install.py`: it finds your game data and links it (never copies or changes it).
+- **Prebuilt (Linux x86-64, glibc 2.34 or newer):** download the archive from the [Releases](../../releases) page, unpack it and run `python3 install.py`: it finds your game data and links it (never copies or changes it), and checks that the system has the SDL libraries it needs (the manual lists them for Debian/Ubuntu, Arch and Fedora).
 - **From source:** `python3 install.py --from-source` clones OXCE at the commit above, applies the patch, builds and installs.
 
 Start a game (or a **New Battle**) and in battle press **F8** to go into 3D. Mouse to look, **WASD** to walk, left button to fire, **F8** back to the map.

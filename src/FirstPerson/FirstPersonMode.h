@@ -52,6 +52,7 @@
 #include <SDL.h>
 #include "../Battlescape/Position.h"
 #include "../Mod/RuleItem.h"
+#include "FirstPersonVoxelModel.h"
 
 namespace OpenXcom
 {
@@ -192,6 +193,8 @@ private:
 	bool canAct() const;
 	/// Doom mode (debug): refills the soldier's time units, energy and ammo.
 	void applyDoomMode(BattleUnit *unit);
+	/// Doom mode: sets off the grenades whose real-time fuse has burnt down.
+	void updateDoomFuses(Uint32 now);
 	/// Plays the tense combat track while aliens are in sight.
 	void updateMusic(Uint32 now);
 
@@ -373,6 +376,7 @@ private:
 	// =====================================================================================
 
 	std::unordered_map<const BattleUnit*, int> _chosenHand; // each soldier's chosen hand: 0 right, 1 left
+	std::unordered_map<int, Uint32> _doomFuses;             // Doom mode: grenades primed in real time (item id: when the pin was pulled)
 	BattleActionType _fireMode = BA_NONE;               // fire mode for the left mouse button
 	const BattleItem *_fireModeWeapon = nullptr;        // the weapon _fireMode was chosen for
 	Position _aimVoxel;                                 // what's under the crosshair
@@ -469,12 +473,11 @@ private:
 	MuzzleFlash _muzzleFlash = {}; // the weapon's muzzle flash
 	Uint32 _heldShotSeen = 0;      // our last shot the weapon flashed for
 	// the weapon's inventory picture, measured: its long axis, which end is the muzzle, which side is up
-	struct WeaponShape { double mean[2], along[2], across[2], stock, muzzle, minAcross, maxAcross, bore; int upSign; bool gun; }; // bore: across, where the barrel ends
+	struct WeaponShape { double mean[2], along[2], across[2], stock, muzzle, minAcross, maxAcross, bore, boxMin[2], boxMax[2]; int upSign; bool gun; }; // bore: across, where the barrel ends; box: the opaque pixels' bounds
 	WeaponShape _heldShape = {};                        // the measured shape of the weapon's picture
 	// ...and given volume: voxels, each picture pixel as deep as its distance from the outline
-	// allows (a cushion), as the faces that show (corners in picture x, y and depth)
-	struct VoxelFace { float corner[4][3]; Uint8 color; };
-	std::vector<VoxelFace> _heldFaces; // the weapon's voxel faces
+	// allows (a cushion), as the faces that show (see FirstPersonVoxelModel.h)
+	std::vector<VoxelFace> _heldFaces; // the voxel faces of the weapon (or other item) in hand
 	// a melee swing: wound up, struck in towards the crosshair, back; the view lunges with it
 	Uint32 _swingStart = 0;
 	bool _swingJolted = false; // the view has lunged for this swing already
@@ -494,7 +497,7 @@ private:
 	void updateWeaponInHand(BattleUnit *unit);
 	/// Measures the weapon's picture: its long axis, muzzle end and up side.
 	void analyzeWeapon(bool gun);
-	/// Gives the weapon's picture volume as voxels.
+	/// Gives the held picture (weapon or other item) volume as voxels.
 	void voxelizeWeapon();
 	/// How the muzzle flashes, by the damage the weapon's ammo does.
 	MuzzleFlash muzzleFlashFor(const BattleItem *weapon, const RuleItem *firedAmmo) const;
@@ -502,9 +505,11 @@ private:
 	void drawWeaponPlate(bool left, double bob[2], double kick, double dip, int shade, double tip[2]);
 	/// Draws the weapon as voxels, placed like the plate.
 	void drawWeaponVoxels(const double nearEnd[3], const double along[3], const double up[3], const double normal[3], double perPixel, int shade);
+	/// Draws the held voxel faces placed by a map from picture space to camera space.
+	void drawVoxelFaces(const double origin[3], const double stepPerX[3], const double stepPerY[3], const double stepPerDepth[3], int shade);
 	/// Fills a convex four-sided shape on the weapon surface.
 	void fillQuad(const double corners[4][2], Uint8 color);
-	/// Draws a held item that isn't a weapon (grenade, medi-kit...).
+	/// Draws a held item that isn't a weapon (grenade, medi-kit...), as voxels held up in the corner.
 	void drawHeldItem(bool left, double bob[2], double dip, int shade);
 	/// Dual wield: swaps the other hand's gun in for drawing, and back.
 	void swapOffHand();

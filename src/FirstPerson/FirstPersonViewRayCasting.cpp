@@ -821,7 +821,9 @@ void FirstPersonView::renderRows()
 	const float up[3] = { (float)_up[0], (float)_up[1], (float)_up[2] };
 
 	// With a pixel size above 1, one ray colours a block of pixels (pixelSize x pixelSize).
-	const int pixelSize = std::clamp(Options::fpsPixelSize, 1, 3);
+	// Auto (0) picks 2 for views bigger than AutoPixelMaxWidth x AutoPixelMaxHeight, else 1.
+	const bool bigView = width > AutoPixelMaxWidth || height > AutoPixelMaxHeight;
+	const int pixelSize = Options::fpsPixelSize == 0 ? (bigView ? 2 : 1) : std::clamp(Options::fpsPixelSize, 1, 3);
 	const int blockRows = (height + pixelSize - 1) / pixelSize, blockColumns = (width + pixelSize - 1) / pixelSize;
 	for (int blockRow = _rayWorkers.nextBlockRow++; blockRow < blockRows; blockRow = _rayWorkers.nextBlockRow++)
 	{

@@ -153,6 +153,7 @@ void FirstPersonMode::analyzeWeapon(bool gun)
 	WeaponShape &shape = _heldShape;
 	shape = WeaponShape();
 	shape.gun = gun;
+	_heldFaces.clear(); // a picture too small to measure gets none
 
 	// Every opaque pixel of the picture (colour 0 is transparent); too few to measure, and
 	// it's held up like an item instead.
@@ -166,9 +167,16 @@ void FirstPersonMode::analyzeWeapon(bool gun)
 		return;
 	}
 
-	// The centre of mass of the pixels.
+	// The centre of mass of the pixels, and the box they fill.
 	double meanX = 0, meanY = 0;
-	for (const auto &pixel : pixels) { meanX += pixel.first; meanY += pixel.second; }
+	shape.boxMin[0] = shape.boxMin[1] = 1e9;
+	shape.boxMax[0] = shape.boxMax[1] = -1e9;
+	for (const auto &pixel : pixels)
+	{
+		meanX += pixel.first; meanY += pixel.second;
+		shape.boxMin[0] = std::min(shape.boxMin[0], (double)pixel.first); shape.boxMax[0] = std::max(shape.boxMax[0], (double)pixel.first);
+		shape.boxMin[1] = std::min(shape.boxMin[1], (double)pixel.second); shape.boxMax[1] = std::max(shape.boxMax[1], (double)pixel.second);
+	}
 	meanX /= pixels.size(); meanY /= pixels.size();
 
 	// The long axis: the main direction of the pixels' spread around the centre (from their
@@ -236,123 +244,12 @@ void FirstPersonMode::analyzeWeapon(bool gun)
 }
 
 /**
- * Gives the weapon's picture volume, cushion style (the weapon in hand is drawn this way):
- * each picture pixel becomes a column of voxels in depth, its half depth growing with the
- * square root of its distance to the outline (one voxel at the edge, at most four), so the
- * weapon is thickest in the middle. Only the faces between a voxel and empty space are kept
- * (in _heldFaces), with corners in picture x, y and depth (depth centred on 0).
+ * Gives the held picture volume (the weapon in hand, or a grenade, a medi-kit, a clip...): its
+ * voxel model, see voxelizePicture.
  */
 void FirstPersonMode::voxelizeWeapon()
 {
-	_heldFaces.clear();
-	if (!_heldShape.gun)
-	{
-		return;
-	}
-	const int width = _heldSprite->getWidth(), height = _heldSprite->getHeight();
-	const int MaxHalfDepth = 4, fullDepth = 2 * MaxHalfDepth + 1; // in voxels
-
-	// How many steps each opaque pixel is from the outside (counting the 8 neighbours): the edge
-	// pixels are 1, found first, then a breadth-first walk goes inwards from them.
-	std::vector<int> stepsToOutside(width * height, 0);
-	std::vector<int> queue; // pixel indices (y * width + x), walked in order
-	auto solid = [&](int x, int y) { return x >= 0 && y >= 0 && x < width && y < height && _heldSprite->getPixel(x, y) != 0; };
-	for (int y = 0; y < height; ++y)
-	{
-		for (int x = 0; x < width; ++x)
-		{
-			// An edge pixel has a transparent pixel (or the picture's border) next to it.
-			if (!solid(x, y)) continue;
-			bool onEdge = false;
-			for (int offsetY = -1; offsetY <= 1 && !onEdge; ++offsetY)
-				for (int offsetX = -1; offsetX <= 1 && !onEdge; ++offsetX)
-					onEdge = !solid(x + offsetX, y + offsetY);
-			if (onEdge)
-			{
-				stepsToOutside[y * width + x] = 1;
-				queue.push_back(y * width + x);
-			}
-		}
-	}
-	for (size_t head = 0; head < queue.size(); ++head)
-	{
-		// Each opaque neighbour not reached yet is one step further in.
-		const int x = queue[head] % width, y = queue[head] / width;
-		for (int offsetY = -1; offsetY <= 1; ++offsetY)
-			for (int offsetX = -1; offsetX <= 1; ++offsetX)
-				if (solid(x + offsetX, y + offsetY) && !stepsToOutside[(y + offsetY) * width + x + offsetX])
-				{
-					stepsToOutside[(y + offsetY) * width + x + offsetX] = stepsToOutside[queue[head]] + 1;
-					queue.push_back((y + offsetY) * width + x + offsetX);
-				}
-	}
-
-	// Fill the voxel grid (width x height x fullDepth, 0 = empty, else the pixel's colour):
-	// each pixel's column reaches its half depth to either side of the middle layer.
-	std::vector<Uint8> voxels(width * height * fullDepth, 0);
-	auto voxelAt = [&](int x, int y, int z) -> Uint8 {
-		return x >= 0 && y >= 0 && z >= 0 && x < width && y < height && z < fullDepth ? voxels[(z * height + y) * width + x] : 0;
-	};
-	for (int y = 0; y < height; ++y)
-	{
-		for (int x = 0; x < width; ++x)
-		{
-			if (!stepsToOutside[y * width + x]) continue;
-			const int halfDepth = std::clamp((int)std::lround(1.2 * std::sqrt((double)stepsToOutside[y * width + x])), 1, MaxHalfDepth);
-			for (int z = MaxHalfDepth - halfDepth; z <= MaxHalfDepth + halfDepth; ++z) voxels[(z * height + y) * width + x] = _heldSprite->getPixel(x, y);
-		}
-	}
-
-	// A face for every side of a voxel that's open to the air, its corners wound so that the
-	// cross product of its first two edges points outwards (drawWeaponVoxels culls by that).
-	for (int z = 0; z < fullDepth; ++z)
-	{
-		for (int y = 0; y < height; ++y)
-		{
-			for (int x = 0; x < width; ++x)
-			{
-				const Uint8 color = voxelAt(x, y, z);
-				if (!color) continue;
-				const int voxel[3] = { x, y, z };
-
-				// The six sides: each axis, towards minus and plus.
-				for (int axis = 0; axis < 3; ++axis)
-				{
-					for (int side = -1; side <= 1; side += 2)
-					{
-						// Hidden behind a neighbouring voxel: no face.
-						int neighbour[3] = { x, y, z };
-						neighbour[axis] += side;
-						if (voxelAt(neighbour[0], neighbour[1], neighbour[2])) continue;
-
-						// The other two axes, in the order that winds the face outwards.
-						const int tangent1 = side > 0 ? (axis + 1) % 3 : (axis + 2) % 3, tangent2 = side > 0 ? (axis + 2) % 3 : (axis + 1) % 3;
-						VoxelFace face;
-						face.color = color;
-						if (axis < 2)
-						{
-							// A side face (across the picture): the picture's dark outline stays on the
-							// front and back faces, and the sides show the colour just inside it.
-							const int insideX = x - (axis == 0 ? side : 0), insideY = y - (axis == 1 ? side : 0);
-							if (solid(insideX, insideY)) face.color = _heldSprite->getPixel(insideX, insideY);
-						}
-
-						// The four corners: the voxel spans +-0.5 around its centre, the face lies on
-						// its minus or plus side, and the corners go round the two other axes.
-						for (int cornerIndex = 0; cornerIndex < 4; ++cornerIndex)
-						{
-							float cornerPos[3] = { voxel[0] - 0.5f, voxel[1] - 0.5f, voxel[2] - 0.5f - MaxHalfDepth };
-							cornerPos[axis] += side > 0 ? 1.0f : 0.0f;
-							if (cornerIndex == 1 || cornerIndex == 2) cornerPos[tangent1] += 1.0f;
-							if (cornerIndex == 2 || cornerIndex == 3) cornerPos[tangent2] += 1.0f;
-							std::copy(cornerPos, cornerPos + 3, face.corner[cornerIndex]);
-						}
-						_heldFaces.push_back(face);
-					}
-				}
-			}
-		}
-	}
+	voxelizePicture(_heldSprite, _heldFaces);
 }
 
 /**
@@ -444,7 +341,23 @@ void FirstPersonMode::drawWeaponVoxels(const double nearEnd[3], const double alo
 		const double acrossAtZero = -shape.mean[0] * shape.across[0] - shape.mean[1] * shape.across[1];
 		origin[axis] = nearEnd[axis] + (alongAtZero - shape.stock) * alongUnit + (acrossAtZero - shape.bore) * upUnit;
 	}
+	drawVoxelFaces(origin, stepPerX, stepPerY, stepPerDepth, shade);
+}
 
+/**
+ * Draws the held voxel faces (_heldFaces): each corner goes from picture space to camera space
+ * by the map given (camera point = origin + x * stepPerX + y * stepPerY + depth * stepPerDepth),
+ * and the faces that look at the eye are drawn far to near (the painter's algorithm), each
+ * darkened by how far it turns from the light.
+ * All positions are in camera space: x right, y down, z ahead, the eye at the origin.
+ * @param origin Where picture point (0, 0) at depth 0 lands.
+ * @param stepPerX One picture pixel to the right, in camera space.
+ * @param stepPerY One picture pixel down.
+ * @param stepPerDepth One voxel of depth.
+ * @param shade How much darker the surroundings make it (0 bright .. 15 dark).
+ */
+void FirstPersonMode::drawVoxelFaces(const double origin[3], const double stepPerX[3], const double stepPerY[3], const double stepPerDepth[3], int shade)
+{
 	// A mirror image (the weapon in the left hand) turns the faces' windings round: the sign of
 	// the map's determinant tells, and flips the normals back.
 	const double determinant = stepPerX[0] * (stepPerY[1] * stepPerDepth[2] - stepPerY[2] * stepPerDepth[1])
@@ -713,9 +626,11 @@ void FirstPersonMode::drawWeaponPlate(bool left, double bob[2], double kick, dou
 }
 
 /**
- * Draws anything that isn't a gun or a club (a grenade, a medi-kit, a scanner...): its
- * inventory picture three times as big, held up in the bottom corner with 40% of it below the
- * edge of the screen.
+ * Draws anything that isn't a gun or a club (a grenade, a medi-kit, a scanner...) as its voxels
+ * (its inventory picture given volume): in the bottom corner with its lower half below the
+ * edge of the screen (so no hand needs drawing), turned so its depth shows (HeldItemYaw,
+ * HeldItemPitch, HeldItemRoll), and shaded face by face like the weapon. A picture that gave no
+ * voxels is drawn flat instead, three times as big.
  * @param left Held in the left hand: drawn bottom left, clear of the info panel.
  * @param bob The step bob, in canvas pixels (sideways, down).
  * @param dip How far it's dipped down for a change of item, in canvas pixels.
@@ -723,7 +638,60 @@ void FirstPersonMode::drawWeaponPlate(bool left, double bob[2], double kick, dou
  */
 void FirstPersonMode::drawHeldItem(bool left, double bob[2], double dip, int shade)
 {
-	// Where its top left corner goes on the canvas.
+	if (!_heldFaces.empty())
+	{
+		// Its size: HeldItemScale canvas pixels per picture pixel on a 200-line canvas, in
+		// proportion on bigger ones, and a small picture (a grenade) as big as one of
+		// HeldItemMinPixels; the bob and the dip grow with the canvas.
+		const WeaponShape &shape = _heldShape;
+		const int width = _weaponInHand->getWidth(), height = _weaponInHand->getHeight();
+		const double boxWidth = shape.boxMax[0] - shape.boxMin[0] + 1.0, boxHeight = shape.boxMax[1] - shape.boxMin[1] + 1.0;
+		const double canvasScale = height / 200.0;
+		const double scale = HeldItemScale * canvasScale * std::max(1.0, HeldItemMinPixels / std::max(boxWidth, boxHeight));
+
+		// Where the middle of its box goes on the canvas: in the corner (the left hand's clear of
+		// the info panel), on the bottom edge, so the lower half is out of sight.
+		const double middleX = (left ? PanelW + 10 + boxWidth * scale / 2.0 : width - boxWidth * scale / 2.0 - 12.0 * canvasScale) + bob[0] * canvasScale;
+		const double middleY = height + (bob[1] + dip) * canvasScale;
+
+		// That point in camera space, one unit ahead of the eye (through the weapon's lens), and
+		// the camera-space length of one picture pixel there.
+		const double focalPixels = width / 2.0 * WeaponLens;
+		const double middle[3] = { (middleX - width / 2.0) / focalPixels, (middleY - height / 2.0) / focalPixels, 1.0 };
+		const double perPixel = scale / focalPixels;
+
+		// Turned: leaning in (about the view's axis), its top tipped back (about the sideways
+		// axis), then towards the screen's centre (about the upright axis); the left hand mirrors
+		// the lean and the turn. The columns of the turn are where the picture's right, down and
+		// depth end up.
+		const double degrees = Pi / 180.0;
+		const double yaw = (left ? -HeldItemYaw : HeldItemYaw) * degrees, pitch = HeldItemPitch * degrees, roll = (left ? -HeldItemRoll : HeldItemRoll) * degrees;
+		const double rollTurn[3][3] = { { std::cos(roll), -std::sin(roll), 0 }, { std::sin(roll), std::cos(roll), 0 }, { 0, 0, 1 } };
+		const double pitchTurn[3][3] = { { 1, 0, 0 }, { 0, std::cos(pitch), -std::sin(pitch) }, { 0, std::sin(pitch), std::cos(pitch) } };
+		const double yawTurn[3][3] = { { std::cos(yaw), 0, std::sin(yaw) }, { 0, 1, 0 }, { -std::sin(yaw), 0, std::cos(yaw) } };
+		double pitchRoll[3][3], turn[3][3];
+		for (int row = 0; row < 3; ++row)
+			for (int column = 0; column < 3; ++column)
+				pitchRoll[row][column] = pitchTurn[row][0] * rollTurn[0][column] + pitchTurn[row][1] * rollTurn[1][column] + pitchTurn[row][2] * rollTurn[2][column];
+		for (int row = 0; row < 3; ++row)
+			for (int column = 0; column < 3; ++column)
+				turn[row][column] = yawTurn[row][0] * pitchRoll[0][column] + yawTurn[row][1] * pitchRoll[1][column] + yawTurn[row][2] * pitchRoll[2][column];
+
+		// The map from picture space: the box's middle lands on that point.
+		const double boxMiddleX = (shape.boxMin[0] + shape.boxMax[0]) / 2.0, boxMiddleY = (shape.boxMin[1] + shape.boxMax[1]) / 2.0;
+		double stepPerX[3], stepPerY[3], stepPerDepth[3], origin[3];
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			stepPerX[axis] = turn[axis][0] * perPixel;
+			stepPerY[axis] = turn[axis][1] * perPixel;
+			stepPerDepth[axis] = turn[axis][2] * perPixel;
+			origin[axis] = middle[axis] - boxMiddleX * stepPerX[axis] - boxMiddleY * stepPerY[axis];
+		}
+		drawVoxelFaces(origin, stepPerX, stepPerY, stepPerDepth, shade);
+		return;
+	}
+
+	// The flat picture: where its top left corner goes on the canvas.
 	const int scale = 3, width = _weaponInHand->getWidth(), height = _weaponInHand->getHeight();
 	const int spriteWidth = _heldSprite->getWidth(), spriteHeight = _heldSprite->getHeight();
 	const int itemX = (left ? PanelW + 10 : width - spriteWidth * scale - 12) + (int)bob[0]; // the left hand's clear of the info panel

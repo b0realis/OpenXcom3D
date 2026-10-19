@@ -25,7 +25,7 @@ Add-on builds keep their own user and config folders, so an existing OXCE profil
 
 ### Option A: the prebuilt release (Linux x86-64)
 
-The release folder `OpenXcom3D-0.8-linux-x86_64/` contains:
+The release folder `OpenXcom3D-0.8.1-linux-x86_64/` contains:
 
 ```
 bin/openxcom              the engine (OXCE 8.7.1 + OpenXcom3D)
@@ -36,18 +36,18 @@ play.sh                   starts the game with this folder's data and profile
 install.py, README.md, OpenXcom3D_manual.md
 ```
 
-It needs these system libraries:
+It runs on old and new Linux systems alike: any with **glibc 2.34 or newer** (2021 on: Ubuntu 22.04, Debian 12, Fedora 35, RHEL 9, Mint 21, and every current Arch, Manjaro or other rolling one). It uses the system's own libraries, in whatever version the system has:
 
-- SDL 1.2 (or sdl12-compat), SDL_mixer 1.2, SDL_image 1.2 and SDL_gfx;
-- libpng, zlib, OpenGL.
+- SDL 1.2 (or sdl12-compat), SDL_image 1.2, SDL_mixer 1.2 and OpenGL;
+- SDL_gfx in any version: its library file is named differently on each system (`libSDL_gfx.so.15` on Debian and Ubuntu, `.so.16` on Arch and Fedora), so the game opens whichever is installed when it starts.
 
-On Debian/Ubuntu:
+| System | Command |
+|---|---|
+| Debian, Ubuntu, Mint | `sudo apt install libsdl1.2debian libsdl-image1.2 libsdl-mixer1.2 libsdl-gfx1.2-5` |
+| Arch, Manjaro | `sudo pacman -S sdl12-compat sdl_image sdl_mixer sdl_gfx` |
+| Fedora | `sudo dnf install sdl12-compat SDL_image SDL_mixer SDL_gfx` |
 
-```sh
-sudo apt install libsdl1.2debian libsdl-mixer1.2 libsdl-image1.2 libsdl-gfx1.2-5 libglu1-mesa
-```
-
-Package names differ a little between releases. `ldd bin/openxcom` lists anything missing.
+`play.sh` and the installer say plainly what's missing, if anything. Only the compiler's C++ runtime is built into the game (it would otherwise need a system as new as the compiler). On an older system than glibc 2.34, build it from source (option B).
 
 #### With the installer
 
@@ -76,8 +76,8 @@ python3 install.py --target ~/Games/OpenXcom3D --ufo /path/to/UFO --tftd /path/t
 1. Copy the release folder anywhere.
 2. Link your game data into its profile:
    ```sh
-   ln -s /path/to/UFO  OpenXcom3D-0.8-linux-x86_64/user/UFO
-   ln -s /path/to/TFTD OpenXcom3D-0.8-linux-x86_64/user/TFTD
+   ln -s /path/to/UFO  OpenXcom3D-0.8.1-linux-x86_64/user/UFO
+   ln -s /path/to/TFTD OpenXcom3D-0.8.1-linux-x86_64/user/TFTD
    ```
 3. Run `./play.sh`.
 
@@ -89,7 +89,7 @@ python3 install.py --target ~/Games/OpenXcom3D --ufo /path/to/UFO --tftd /path/t
 python3 install.py --from-source [--workdir ~/.cache/openxcom3d-build] [--jobs 8]
 ```
 
-1. It checks the build tools; if something is missing it prints the `apt install` line.
+1. It checks the build tools; if something is missing it prints the install command for Debian/Ubuntu, Arch or Fedora.
 2. It clones `oxce-plus` from GitHub and checks out the commit above.
 3. It applies `openxcom3d.patch` and builds with CMake (Release).
 4. It installs the result like option A.
@@ -98,9 +98,17 @@ python3 install.py --from-source [--workdir ~/.cache/openxcom3d-build] [--jobs 8
 
 #### By hand
 
+The build tools and libraries:
+
+| System | Command |
+|---|---|
+| Debian, Ubuntu, Mint | `sudo apt install git cmake g++ make pkg-config libsdl1.2-dev libsdl-mixer1.2-dev libsdl-image1.2-dev libsdl-gfx1.2-dev zlib1g-dev libglu1-mesa-dev` |
+| Arch, Manjaro | `sudo pacman -S --needed base-devel git cmake sdl12-compat sdl_image sdl_mixer sdl_gfx glu zlib` |
+| Fedora | `sudo dnf install git cmake gcc-c++ make pkgconf sdl12-compat-devel SDL_image-devel SDL_mixer-devel SDL_gfx-devel zlib-devel mesa-libGLU-devel` |
+
+Then:
+
 ```sh
-sudo apt install git cmake g++ make pkg-config libsdl1.2-dev libsdl-mixer1.2-dev \
-     libsdl-image1.2-dev libsdl-gfx1.2-dev zlib1g-dev libglu1-mesa-dev
 
 git clone --branch oxce-plus https://github.com/MeridianOXC/OpenXcom.git
 cd OpenXcom
@@ -142,7 +150,7 @@ Notes:
 
 - The default is a 1280×800 window with the battlescape at half the screen size (640×400), which keeps 60 FPS on modest machines.
 - Bigger screens work, but the game's **Battlescape scale** (video options) sets the 3D view's size. At *screen/2* (the default) a 1920×1080 screen gives a 960×540 view, twice the work of 640×400. At *screen* the view stays at 640×360 with its controls three times bigger, but the isometric map gets small.
-- **Pixel size** in 3D VIEW trades detail for speed: on a 1920×1080 screen with the default scale, pixel size 2 holds 60 FPS and looks almost the same.
+- **Pixel size** in 3D VIEW trades detail for speed. Its default, **Auto**, takes care of big screens: on a 1920×1080 screen with the default scale it draws blocks of 2, which holds 60 FPS and looks almost the same.
 
 ### Uninstalling
 
@@ -198,6 +206,7 @@ The original hotkeys still work, except for W, A, S, D and the keys above:
   - **2 clips (40)** is the spare ammo the soldier carries for that gun, anywhere in the inventory (belt, pockets, backpack, the other hand), and how many rounds they hold together. It counts every clip the gun can take by the game's rules, all kinds together (a heavy cannon's AP, HE and incendiary). **no clips** means there's nothing to reload from;
   - guns that never run out, like the lasers, show **∞**; a gun with its rounds built in shows just its count;
   - the numbers follow every round fired, in faithful and FPS-style shooting alike, and every reload, pick-up and drop. Two guns of the same kind (dual pistols) each count the same spare clips, since either could load them;
+  - a primed grenade shows **PRIMED 0**: the turns its fuse has left (in Doom mode, the seconds: **PRIMED 2.4s**);
 - time units, energy, health (with stun damage over it) and morale, as numbers and bars;
 - the armor, and DOOM MODE while that cheat is on.
 
@@ -205,8 +214,11 @@ Hovering a soldier on the top bar shows the same weapon line on their card.
 
 **Items:**
 
-- Every item works from 3D. Grenades prime and throw.
-- Medi-kit, scanner and mind probe open their menus.
+- Every item works from 3D. Medi-kit, scanner and mind probe open their menus.
+- **Anything in a hand shows in 3D**, built from its inventory picture like the weapon in hand: a grenade, a medi-kit, a scanner, a clip... sits in the bottom corner with its lower half out of sight.
+- **Throwing:** as on the isometric map, anything that isn't built in can be thrown (fire mode **throw**, the arc on the crosshair): a grenade, a clip for a squadmate, even a rifle. It flies along the game's arc as a 3D object, tumbling end over end, and lands where the game says. The game refuses a throw it can't make ("Unable to throw here!"): under a roof (inside the Skyranger, say), past the soldier's range, or with someone right in front.
+- **Priming a grenade** (fire mode **prime**): the game's own menu and timer, exactly as on the isometric map: *Prime Grenade*, then the number of turns, 0 to 23. The panel then says **PRIMED** and the turns left. A primed grenade lying on the ground goes off at the end of a turn with its fuse at 0: **0** when you end this turn, **1** at the end of the aliens' turn, **2** at the end of your next one, and so on (every side's turn counts one down). The game's option *Instant grenades* makes a 0 go off on landing instead. A primed grenade still in a hand doesn't go off.
+- **In Doom mode** grenades work in real time, like in a first-person shooter: one click in **prime** pulls the pin (no menu, no timer), and the grenade goes off **3 seconds** later wherever it is: where it landed, or in your hand if you held it too long (cook it for a shorter flight, but not too long). The panel counts the seconds down. This is the first step towards a real-time mode (see [Known limits and ideas](#9-known-limits-and-ideas)).
 - The **blaster launcher**, and psi or the mind probe aimed at no one in sight, switch to the isometric map to pick waypoints or a target, then come back.
 
 ## 4. Settings
@@ -242,12 +254,12 @@ Hovering a soldier on the top bar shows the same weapon line on their card.
 
 ### Looks
 
-- **Weapon in hand** (YES): YES: the weapon in the soldier's hand shows at the bottom right of the view, Doom style, built in 3D from its inventory picture (little cubes, thickest in the middle, the barrel on the line to the crosshair): it bobs as you walk, kicks when you fire and dips out of sight while reloading. NO: no weapon drawn.
+- **Weapon in hand** (YES): YES: the weapon in the soldier's hand shows at the bottom right of the view, Doom style, built in 3D from its inventory picture (little cubes, thickest in the middle, the barrel on the line to the crosshair): it bobs as you walk, kicks when you fire and dips out of sight while reloading. Anything else in the hand (a grenade, a medi-kit, a clip) is built the same way and sits in the bottom corner, its lower half out of sight. NO: nothing drawn.
 - **Sprite upscaling** (Smooth + detail): soldiers, aliens, items on the floor, explosions and smoke seen up close are scaled up the way pixel art scales well (xBRZ, in the game's own colours). **Smooth** rounds off the stair-stepped edges; **Smooth + detail** also sharpens the shading a little; **Off** keeps the original pixels.
 - **Muzzle flashes** (YES): YES: gunfire lights up its surroundings for a blink, and units flash when hit. Turn this off if flashing light bothers you (photosensitivity, epilepsy).
 - **Particles** (2): **0** none; **1** effects (muzzle flashes, impacts, explosions, fire, smoke); **2** everything, plus dust, fireflies, bubbles and weather.
 - **UFO lights and aura** (YES): UFOs stand out from the Earth around them. Their hulls stay still and only their lights glow (lit panels, lift pads, screens, navigation lights, found in the original animation frames), pulsing gently in a slow wave round the UFO. Each UFO casts its own two-coloured light (its hull's hue close in, its lights' hue further out) on the ground around it, its underside and its skin, strongest at night, and drifting motes, sparks and a beam of light up each grav lift wrap it. It all shows only once the UFO has been seen, so it never gives a UFO away; with Muzzle flashes off nothing pulses. The small scout's blocky hull is trimmed to its sprite's round outline (only the look: line of fire is still the game's). NO: the original animation frames (calmed, as everywhere in 3D).
-- **Pixel size** (1): **1** full detail; **2** or **3**: each ray colours a block of 2×2 or 3×3 pixels, chunkier but much faster on big screens or slow machines.
+- **Pixel size** (Auto): **Auto** gives full detail up to a 640×400 view and blocks of 2 on bigger ones (a 1920×1080 screen at the default battlescape scale makes a 960×540 view); **1** full detail; **2** or **3**: each ray colours a block of 2×2 or 3×3 pixels, chunkier but much faster on big screens or slow machines.
 
 ### Crosshair
 
@@ -259,7 +271,7 @@ Hovering a soldier on the top bar shows the same weapon line on their card.
 
 - **Alien turn in 3D** (YES): YES: stay in the 3D view during the alien turn, looking through your last soldier's eyes (HIDDEN MOVEMENT until an alien comes into sight). NO: switch back to the isometric map for the alien turn.
 - **Start battles in 3D** (NO): YES: begin each battle in the first-person view instead of the isometric map.
-- **Doom mode (debug)** (NO): a cheat for testing and fun: the selected soldier never runs out of time units or energy, and the clips loaded in the weapons in both hands are filled up again every moment (a one-round clip, like a rocket, is still used up by its shot). Insert switches it on and off in battle; DOOM MODE shows on the info panel while it's on.
+- **Doom mode (debug)** (NO): a cheat for testing and fun, and a first try at real time: the selected soldier never runs out of time units or energy, the clips loaded in the weapons in both hands are filled up again every moment (a one-round clip, like a rocket, is still used up by its shot), and grenades work in real time (one click pulls the pin, and they go off 3 seconds later wherever they are, see [Items](#3-the-top-bar-and-items)). Insert switches it on and off in battle; DOOM MODE shows on the info panel while it's on.
 - **Frame rate limit** (60): the game's own frame rate cap, the same setting as in Advanced options: 60, 75, 90, 120, 144, 165, 240 or unlimited. 60 is steady on modest machines at 1280×800; raise it for a 120 or 144 Hz screen if your computer keeps up (the frame counter shows it).
 - **Frame counter** (NO): the game's own frames-per-second counter in the top left corner (the same as F7).
 
@@ -442,8 +454,8 @@ The 3D view is drawn at the battlescape's size (the game's **Battlescape scale**
 
 | Battlescape scale | 3D view | Frame rate |
 |---|---|---|
-| *screen/2* (default) | 960×540 | 40–51 FPS, dips when turning |
-| *screen/2* + **pixel size 2** | 960×540 (480×270 rays) | steady 60 FPS, looks almost the same |
+| *screen/2* (default), pixel size **Auto** (default) | 960×540 (480×270 rays) | steady **60 FPS** (72–84 with no frame limit) |
+| *screen/2*, pixel size 1 | 960×540 | 40–51 FPS, dips when turning |
 | *screen* | 640×360, controls ×3 (small isometric map) | 55–61 FPS |
 | *original* | 320×200 | steady 60 FPS, chunky |
 
@@ -451,6 +463,7 @@ Sprite upscaling costs nothing measurable. Use **pixel size** 2 or 3 on slow mac
 
 ## 9. Known limits and ideas
 
+- **A real-time mode** will be attempted in the future: the battle running continuously instead of turn by turn, for those who want it, as a setting like everything else. Doom mode's real-time grenades are the first piece of it.
 - **The art:** soldiers and aliens are 32×40 pixel sprites seen from the side they face you, terrain is the game's 16×16×24 voxel shapes coloured from the isometric pictures, all in 256 colours. Sides the isometric art never shows are filled in (crafts and UFOs from their mirrored side). Ideas that would add resolution without changing the style: rendering the view at a higher scale, smoother voxel shading, colour sampled at the exact hit point, units given volume like the weapon in hand. Good ideas are welcome.
 - **Sound:** stereo can't tell front from back; sounds behind you are only a little quieter.
 - **Not saved:** bullet holes, scorch marks, flares and each soldier's flight toggle are gone after a quickload or when the screen is rebuilt.
@@ -485,7 +498,7 @@ To work on it: check out the commit above, `git apply openxcom3d.patch`, build (
 
 ### Code layout
 
-**`src/FirstPerson/`, about 19,200 lines**
+**`src/FirstPerson/`, about 19,800 lines**
 
 Every file starts with the project's philosophy and a description of what's in it, and every function and block is commented. The two big classes are split into one file per topic, and their headers follow the same order.
 
@@ -497,7 +510,7 @@ Every file starts with the project's philosophy and a description of what's in i
 | `FirstPersonModeCamera.cpp` | Turning by mouse and keys, free facing, turning to an enemy, following the soldier's eye |
 | `FirstPersonModeMovement.cpp` | Real-time walking (each tile through the game's own walking), doors, jumps and vaults, grav lifts, flying, falling, stopping when an enemy is spotted |
 | `FirstPersonModeShooting.cpp` | Weapons and fire modes, aiming along the game's line of fire, firing through the game's own actions, FPS-style spread and recoil, dual wield, the crosshair, flares, aiming on the map |
-| `FirstPersonModeWeaponInHand.cpp` | The weapon in the hands, made from its inventory picture (measured, then given volume as voxels), muzzle flashes, swings |
+| `FirstPersonModeWeaponInHand.cpp` | The weapon (or any other item) in the hands, made from its inventory picture (measured, then given volume as voxels), muzzle flashes, swings |
 | `FirstPersonModeHud.cpp` | Top bar, squad buttons, info panel, soldier cards with the live helmet camera, banner, enemy markers |
 | `FirstPersonModeSoldierStates.cpp` | Hurt, near misses, on fire, going down (killed, zombie, unconscious, mind control), breakdowns (panic, berserk) |
 | `FirstPersonView.h`, `FirstPersonViewShared.h` | **The renderer** (`FirstPersonView`); voxel proportions, dithering, shading and noise helpers its files share |
@@ -508,10 +521,11 @@ Every file starts with the project's philosophy and a description of what's in i
 | `FirstPersonViewSprites.cpp` | Units and items as the game's own sprites standing in the world; enemy markers |
 | `FirstPersonViewUpscaling.cpp` | Optional smoother sprites up close (xBRZ on a worker thread) |
 | `FirstPersonViewEffects.cpp` | Particles: explosions, fire, smoke, weather, UFO devices, bloom |
-| `FirstPersonViewShots.cpp` | Shots in flight, trails, beams, impacts, bullet holes and scorches, debris |
+| `FirstPersonViewShots.cpp` | Shots in flight, thrown items as tumbling voxel models, trails, beams, impacts, bullet holes and scorches, debris |
 | `FirstPersonViewFlares.cpp` | Tactical flares and their light |
 | `FirstPersonViewUfo.cpp` | UFOs ("UFO lights and aura"): steady 3D-only models of UFO parts made from their frames (lights marked, tall parts trimmed to the sprite), the UFOs found on the map, their two-coloured light as a per-tile field, the lights' pulse, the aura |
 | `FirstPersonViewScreenEffects.cpp` | On the screen itself: the hurt arc, blood, flames, colour washes, static |
+| `FirstPersonVoxelModel.{h,cpp}` | An item's inventory picture made into a voxel model (the weapon or item in hand, thrown items) |
 | `FirstPersonParticles.{h,cpp}` | The particle pool (sparks, smoke, weather...) |
 | `FirstPersonSounds.{h,cpp}` | Sounds made in code (no files): hitmarker and kill ticks, heartbeat, dry-fire click, flare hiss, near-miss whizz, melee swoosh |
 | `OptionsFirstPersonState.{h,cpp}` | 3D VIEW options tab: Settings / Controls sub-tabs, scrolling lists |
@@ -554,6 +568,13 @@ What `FirstPersonView` draws:
 | `OpenXcom.2010.vcxproj{,.filters}` | The add-on's files |
 
 ## 11. Version history
+
+### 0.8.1 (2026-10-19)
+
+- **The prebuilt release runs on old and new Linux systems**: 0.8's wouldn't start on Arch (it asked for SDL_gfx by its Debian file name) nor on systems older than the newest Ubuntu (it needed glibc 2.43). Now it needs glibc 2.34 or newer (Ubuntu 22.04, Debian 12, Fedora 35 and every newer or rolling system), uses the system's SDL libraries in whatever version is there, and opens whichever SDL_gfx is installed. Checked on Ubuntu 22.04's and Arch's own libraries. `play.sh` and the installer say what's missing and give the install command for Debian/Ubuntu, Arch or Fedora.
+- **Pixel size Auto** (new default): blocks of 2 when the 3D view is bigger than 640×400, such as on a 1920×1080 screen, which then holds 60 FPS instead of 40–51; full detail otherwise ([Settings](#4-settings), [Performance](#8-performance)).
+- **Everything in a hand is 3D**: a grenade, a medi-kit, a scanner, a clip... is built from its inventory picture like the weapon, and sits in the bottom corner with its lower half out of sight. **Thrown items fly as 3D objects**, tumbling end over end along the game's arc ([Items](#3-the-top-bar-and-items)).
+- **Grenades:** a primed one shows PRIMED and its fuse on the panel. **In Doom mode they work in real time**: one click pulls the pin, and they go off 3 seconds later wherever they are, in your hand too: the first step towards a real-time mode, which will be attempted in the future.
 
 ### 0.8 (2026-10-19)
 

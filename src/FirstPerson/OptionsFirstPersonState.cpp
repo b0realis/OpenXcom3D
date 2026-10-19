@@ -292,6 +292,11 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 			static const char *const upscaleNames[] = { "STR_FPS_UPSCALE_OFF", "STR_FPS_UPSCALE_SMOOTH", "STR_FPS_UPSCALE_DETAIL" };
 			return std::string(tr(upscaleNames[std::clamp(*option.asInt(), 0, 2)]));
 		}
+		// A pixel size of 0 is Auto (see AutoPixelMaxWidth).
+		if (option.id() == "fpsPixelSize" && *option.asInt() == 0)
+		{
+			return std::string(tr("STR_FPS_AUTO"));
+		}
 		// A frame rate limit of 0 means no limit.
 		return option.id() == "FPS" && *option.asInt() == 0 ? std::string(tr("STR_FPS_UNLIMITED")) : std::to_string(*option.asInt());
 	case OPTION_KEY:
@@ -453,10 +458,10 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		{
 			*value = std::clamp(*value + direction, 0, 6);
 		}
-		// Pixel size: 1 to 3.
+		// Pixel size: Auto (0), then 1 to 3.
 		else if (value == &Options::fpsPixelSize)
 		{
-			*value = std::clamp(*value + direction, 1, 3);
+			*value = std::clamp(*value + direction, 0, 3);
 		}
 		// Time units per level a flying soldier pays: 0 to 24.
 		else if (value == &Options::fpsFlightCost)

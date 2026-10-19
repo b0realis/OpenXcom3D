@@ -98,6 +98,7 @@ FirstPersonView::~FirstPersonView()
 {
 	// The scratch surfaces sprites are drawn through.
 	delete _spriteBuffer;
+	delete _itemPicture;
 	for (Surface *buffer : _blendBuffers) delete buffer;
 	// Tell the upscaling worker to stop (under its lock, so it can't miss the flag), wake it,
 	// and wait for it to end.

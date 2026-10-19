@@ -92,6 +92,12 @@ const double WeaponLens = 1.303;
 const double MuzzleScreen[2] = { 0.42 / WeaponLens, 0.45 / WeaponLens };
 /// How much of the line from the stock point to the muzzle the weapon in hand fills.
 const double WeaponScale = 0.9;
+/// A held item that isn't a weapon (grenade, medi-kit, scanner, clip...) is shown as voxels in
+/// the bottom corner, its lower half out of sight: 2.6 canvas pixels per picture pixel on a
+/// 200-line canvas (in proportion on bigger ones), a smaller picture than HeldItemMinPixels
+/// across shown as big as that, and turned so its depth shows (degrees, for the right hand; the
+/// left mirrors it): towards the screen's centre, its top tipped back, leaning in.
+const double HeldItemScale = 2.6, HeldItemMinPixels = 20.0, HeldItemYaw = 22.0, HeldItemPitch = -14.0, HeldItemRoll = -10.0;
 /// A weapon shorter than the rifle (whose picture is about RiflePixels long) comes out smaller:
 /// by its length to the power SizeCurve (a pistol, half a rifle's picture, at 70%), shrunk about
 /// a point GripAt of the way from the muzzle towards the stock end (so it still points at the
@@ -123,6 +129,9 @@ const int VaultMaxHeight = 14;
 
 /// A melee swing in the view: wind up, strike, back (milliseconds).
 const Uint32 SwingTime = 420;
+/// Doom mode (a first step towards a real-time mode): a grenade primed there burns for this
+/// long (milliseconds) and goes off wherever it is, as in a first-person shooter.
+const Uint32 DoomFuseTime = 3000;
 
 // ---- What happens to the soldier (milliseconds) ----
 

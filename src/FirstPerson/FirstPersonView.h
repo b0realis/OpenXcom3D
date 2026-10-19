@@ -61,6 +61,7 @@
 #include "../Battlescape/Position.h"
 #include "../Engine/InteractiveSurface.h"
 #include "FirstPersonParticles.h"
+#include "FirstPersonVoxelModel.h"
 
 namespace OpenXcom
 {
@@ -638,6 +639,12 @@ private:
 	std::vector<Scorch> _scorches;                     // the blackened patches so far
 	struct FrameClock { int frame; Uint32 since, length; };
 	std::map<const Explosion*, FrameClock> _explosionClocks; // when each explosion last changed frame, and how long frames last
+	// thrown items fly as voxel models of their inventory pictures (FirstPersonVoxelModel.h), one
+	// per kind of item, made the first time one flies, tumbling end over end
+	struct ItemModel { std::vector<VoxelFace> faces; float middle[2]; }; // middle: of the picture's opaque pixels
+	std::unordered_map<const RuleItem*, ItemModel> _itemModels;
+	Surface *_itemPicture = nullptr; // scratch surface an item's inventory picture is drawn on
+	Uint32 _thrownStart = 0;         // when the thrown item in flight left the hand
 
 	/// Follows the game's shot in flight: its start, flight and end.
 	void followShots();
@@ -649,6 +656,12 @@ private:
 	void advanceShot(Projectile *projectile);
 	/// Draws the flying projectile (or thrown item) and the explosions.
 	void drawProjectilesAndExplosions();
+	/// The voxel model of an item's kind, made from its inventory picture the first time.
+	const ItemModel &itemModel(BattleItem *item);
+	/// Draws a thrown item in flight as its voxel model, tumbling; false if it has none.
+	bool drawThrownItem(const Projectile *projectile, BattleItem *item);
+	/// Fills a convex four-sided shape on the view at one depth, behind what's nearer.
+	void fillQuadAtDepth(const double corners[4][2], Uint8 color, float depth);
 	/// How a shot looks in flight, from its ammo's damage type.
 	void trailFor(const BattleItem *ammo, Trail &trail, Uint8 &color) const;
 	/// Spawns what a shot leaves behind along the bit of its path it flew this frame.

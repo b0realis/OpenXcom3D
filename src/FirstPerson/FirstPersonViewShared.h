@@ -75,6 +75,10 @@ const int SpriteBufferSize = 64;
 /// screen pixels per sprite pixel on it is used (further away the original looks as good).
 const int UpscaleFactor = 4;
 const double UpscaleFrom = 1.6;
+/// A thrown item flies as its voxel model (its inventory picture given volume): this many voxels
+/// per picture pixel (a grenade's picture, about 12 pixels, is a third of a tile across),
+/// turning end over end this many times a second.
+const double ThrownItemScale = 0.35, ThrownItemSpin = 1.6;
 
 // ---- Timings and limits ----
 
@@ -94,6 +98,10 @@ const Uint8 UfoTileBit = 0x80, UfoSkinBit = 0x40;
 /// many can burn at once.
 const float FlareLife = 60.0f, FlareReach = 150.0f;
 const size_t FlareMax = 8;
+/// Pixel size Auto (the option at 0): views up to this size get full detail, bigger ones blocks
+/// of 2. A 1920x1080 screen at the default battlescape scale makes a 960x540 view, which ran at
+/// 40-51 FPS in a busy town; in blocks of 2 it holds 60 and looks almost the same.
+const int AutoPixelMaxWidth = 640, AutoPixelMaxHeight = 400;
 
 // ---- Proportions of the voxel world ----
 

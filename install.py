@@ -55,7 +55,7 @@ from pathlib import Path
 
 # ---- What is installed, and what it is built from ----
 
-VERSION = "0.8"
+VERSION = "0.8.1"
 # OpenXcom3D is a patch on one exact commit of OpenXcom Extended (OXCE).
 BASE_REPO = "https://github.com/MeridianOXC/OpenXcom.git"
 BASE_BRANCH = "oxce-plus"
@@ -73,6 +73,21 @@ HERE = Path(__file__).resolve().parent
 APT_PACKAGES = ["git", "cmake", "g++", "make", "pkg-config", "libsdl1.2-dev", "libsdl-mixer1.2-dev",
                 "libsdl-image1.2-dev", "libsdl-gfx1.2-dev", "zlib1g-dev", "libglu1-mesa-dev"]
 PKGCONFIG_LIBS = ["sdl", "SDL_mixer", "SDL_image", "SDL_gfx", "zlib", "gl"]
+
+# How to get what the game needs, per family of Linux systems (told apart by /etc/os-release):
+# to run the prebuilt game, and to build it from source.
+FAMILY_NAMES = {"debian": "Debian, Ubuntu, Mint", "arch": "Arch, Manjaro", "fedora": "Fedora"}
+RUN_PACKAGES = {
+    "debian": "sudo apt install libsdl1.2debian libsdl-image1.2 libsdl-mixer1.2 libsdl-gfx1.2-5",
+    "arch": "sudo pacman -S sdl12-compat sdl_image sdl_mixer sdl_gfx",
+    "fedora": "sudo dnf install sdl12-compat SDL_image SDL_mixer SDL_gfx",
+}
+BUILD_PACKAGES = {
+    "debian": "sudo apt install " + " ".join(APT_PACKAGES),
+    "arch": "sudo pacman -S --needed base-devel git cmake sdl12-compat sdl_image sdl_mixer sdl_gfx glu zlib",
+    "fedora": "sudo dnf install git cmake gcc-c++ make pkgconf sdl12-compat-devel SDL_image-devel "
+              "SDL_mixer-devel SDL_gfx-devel zlib-devel mesa-libGLU-devel",
+}
 
 # ---- Files written into the installation ----
 
@@ -95,11 +110,26 @@ options:
   FPS: 60
 """
 
-# The starter script: runs the game with this installation's data and profile.
+# The starter script: runs the game with this installation's data and profile, after saying
+# plainly what the system lacks, if anything (the release's play.sh is this one too).
 PLAY_SH = """#!/bin/sh
 # Starts OpenXcom3D with the data and the profile in this folder.
 # Extra arguments are passed on, e.g.  ./play.sh -load mysave.sav
 HERE="$(cd "$(dirname "$0")" && pwd)"
+missing=$(ldd "$HERE/bin/openxcom" 2>&1 | grep "not found" | sed 's/^[[:space:]]*//')
+if [ -n "$missing" ]; then
+	echo "OpenXcom3D can't start: this system lacks"
+	echo "$missing" | sed 's/^/  /'
+	if echo "$missing" | grep -q GLIBC_; then
+		echo "Its C library is older than glibc 2.34: build the game here with  python3 install.py --from-source"
+	else
+		echo "Install the libraries with:"
+		echo "  Debian, Ubuntu, Mint:  sudo apt install libsdl1.2debian libsdl-image1.2 libsdl-mixer1.2 libsdl-gfx1.2-5"
+		echo "  Arch, Manjaro:         sudo pacman -S sdl12-compat sdl_image sdl_mixer sdl_gfx"
+		echo "  Fedora:                sudo dnf install sdl12-compat SDL_image SDL_mixer SDL_gfx"
+	fi
+	exit 1
+fi
 exec "$HERE/bin/openxcom" -data "$HERE/data/" -user "$HERE/user/" -cfg "$HERE/user/" "$@"
 """
 
@@ -210,7 +240,67 @@ def find_game(given, kind, assume_yes):
         say("  that folder has no GEODATA/GEOGRAPH/MAPS/UFOGRAPH; try again")
 
 
+def distro_family():
+    """This system's family of Linux systems (debian, arch or fedora), or None if it's another."""
+    try:
+        with open("/etc/os-release") as release:
+            fields = dict(line.rstrip("\n").split("=", 1) for line in release if "=" in line)
+    except OSError:
+        return None
+    names = (fields.get("ID", "") + " " + fields.get("ID_LIKE", "")).replace('"', "").split()
+    for family, members in [("debian", ["debian", "ubuntu"]), ("arch", ["arch"]), ("fedora", ["fedora", "rhel", "centos"])]:
+        if any(name in members for name in names):
+            return family
+    return None
+
+
+def show_packages(commands):
+    """Says how to install what's missing: this system's command, or every family's."""
+    family = distro_family()
+    if family:
+        say("  " + commands[family])
+    else:
+        for family, command in commands.items():
+            say("  %-22s %s" % (FAMILY_NAMES[family] + ":", command))
+
+
 # ---- Getting the game: built from source, or the prebuilt release ----
+
+def check_runtime(binary):
+    """
+    Checks that this system can run the prebuilt game, and says what's missing and how to get
+    it. Returns True if nothing is missing.
+    """
+    problems = []
+    old_glibc = False
+    # The libraries the game asks for when it starts (ldd says which aren't there).
+    result = subprocess.run(["ldd", str(binary)], capture_output=True, text=True)
+    for line in (result.stdout + result.stderr).splitlines():
+        if "not found" in line:
+            problems.append(line.strip())
+            old_glibc = old_glibc or "GLIBC_" in line
+    # SDL_gfx is opened once the game runs, in whatever version is installed, so ldd can't see it.
+    library_list = ""
+    for ldconfig in [shutil.which("ldconfig"), "/sbin/ldconfig", "/usr/sbin/ldconfig"]:
+        if ldconfig and os.path.exists(ldconfig):
+            library_list = subprocess.run([ldconfig, "-p"], capture_output=True, text=True).stdout
+            break
+    if "libSDL_gfx.so" not in library_list:
+        folders = ["/usr/lib", "/usr/lib64", "/usr/lib/x86_64-linux-gnu", "/usr/local/lib"]
+        if not any(Path(folder).glob("libSDL_gfx.so*") for folder in folders if Path(folder).is_dir()):
+            problems.append("SDL_gfx (any version)")
+    if not problems:
+        return True
+    say("  this system lacks what the game needs to run:")
+    for problem in problems:
+        say("    " + problem)
+    if old_glibc:
+        say("  its C library is older than glibc 2.34: build the game here instead, with --from-source")
+    else:
+        say("  install it with:")
+        show_packages(RUN_PACKAGES)
+    return False
+
 
 def check_tools():
     """Reports what's missing to build from source; returns True if everything is there."""
@@ -228,7 +318,8 @@ def check_tools():
                 all_present = False
     # How to get what's missing.
     if not all_present:
-        say("\nOn Debian/Ubuntu these come with:\n  sudo apt install " + " ".join(APT_PACKAGES))
+        say("\nInstall them with:")
+        show_packages(BUILD_PACKAGES)
     else:
         say("  build tools and libraries: all present")
     return all_present
@@ -352,7 +443,7 @@ def main():
     parser.add_argument("--repo", default=BASE_REPO, help="OXCE repository to clone (default %(default)s)")
     parser.add_argument("--jobs", type=int, default=min(8, multiprocessing.cpu_count()), help="parallel build jobs")
     parser.add_argument("--desktop", action="store_true", help="also add a menu entry")
-    parser.add_argument("--check", action="store_true", help="only check the build tools and libraries")
+    parser.add_argument("--check", action="store_true", help="only check the build tools and libraries (and what the prebuilt game needs)")
     parser.add_argument("--yes", action="store_true", help="don't ask, use the defaults and what was given")
     args = parser.parse_args()
 
@@ -361,7 +452,10 @@ def main():
     if not sys.platform.startswith("linux"):
         fail("this installer is for Linux")
     if args.check:
-        sys.exit(0 if check_tools() else 1)
+        # The build tools, and if this is a release, what its prebuilt game needs to run.
+        found = find_release()
+        runnable = check_runtime(found[0] / "openxcom") if found else True
+        sys.exit(0 if check_tools() and runnable else 1)
 
     # Where to install, and the original games (at least one; neither may contain the install
     # folder, nor sit inside it, since their folders are never written to).
@@ -388,7 +482,10 @@ def main():
     # Install it, and say how to start.
     say("Installing into %s" % target)
     play = install(target, binary_dir, data_dir, mod_dir, ufo, tftd, args.desktop)
+    runnable = args.from_source or check_runtime(target / "bin" / "openxcom")
     say("")
+    if not runnable:
+        say("Installed, but install what's missing (above) before playing.")
     say("Done. Start the game with:\n  %s" % play)
     say("In battle press F8 (or click the 3D button at the top left) for the first-person view.")
 

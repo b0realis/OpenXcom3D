@@ -260,6 +260,24 @@ std::string FirstPersonMode::ammoLabel(const BattleUnit *unit, const BattleItem 
 	const RuleItem *rules = weapon->getRules();
 	if (rules->getBattleType() != BT_FIREARM)
 	{
+		// A primed grenade (or anything with a fuse): PRIMED and the turns its fuse has left
+		// (0: it goes off at the end of this turn, once it lies on the ground); one that goes off
+		// on landing just PRIMED.
+		if (rules->getFuseTimerType() != BFT_NONE && weapon->getFuseTimer() >= 0)
+		{
+			// Doom mode's real-time fuse: the seconds it has left, to a tenth.
+			auto doomFuse = _doomFuses.find(weapon->getId());
+			if (doomFuse != _doomFuses.end())
+			{
+				const int tenthsLeft = std::max(0, ((int)DoomFuseTime - (int)(SDL_GetTicks() - doomFuse->second)) / 100);
+				return _state->tr("STR_FPS_PRIMED_SECONDS").arg(std::to_string(tenthsLeft / 10) + "." + std::to_string(tenthsLeft % 10));
+			}
+			if (rules->getFuseTimerType() == BFT_INSTANT)
+			{
+				return _state->tr("STR_FPS_PRIMED_INSTANT");
+			}
+			return _state->tr("STR_FPS_PRIMED").arg(weapon->getFuseTimer());
+		}
 		return "";
 	}
 

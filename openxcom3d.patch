@@ -12,10 +12,10 @@ index 31faa5c79..7e45307af 100644
  if ( CHECK_CCACHE )
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..5a6398788
+index 000000000..53d043533
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,208 @@
+@@ -0,0 +1,212 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom 3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -43,6 +43,9 @@ index 000000000..5a6398788
 +  STR_FPS_DOOM: "DOOM MODE"
 +  STR_FPS_AMMO_EMPTY: "EMPTY"
 +  STR_FPS_AMMO_UNLIMITED: "∞"
++  STR_FPS_PRIMED: "PRIMED {0}"
++  STR_FPS_PRIMED_INSTANT: "PRIMED"
++  STR_FPS_PRIMED_SECONDS: "PRIMED {0}s"
 +  STR_FPS_SPARE_CLIPS_zero: "no clips"
 +  STR_FPS_SPARE_CLIPS_one: "{N} clip ({0})"
 +  STR_FPS_SPARE_CLIPS_other: "{N} clips ({0})"
@@ -63,7 +66,7 @@ index 000000000..5a6398788
 +  STR_FPS_UFO_LIGHTS: "UFO lights and aura"
 +  STR_FPS_UFO_LIGHTS_DESC: "UFOs glow: steady hulls, soft lights, coloured light, aura."
 +  STR_FPS_PIXEL_SIZE: "Pixel size"
-+  STR_FPS_PIXEL_SIZE_DESC: "1: full detail. 2 or 3: bigger pixels, faster."
++  STR_FPS_PIXEL_SIZE_DESC: "Auto: 2 for views over 640x400. 1: full detail. 2, 3: faster."
 +  STR_FPS_SOLDIER_PREVIEW: "SOLDIER CAMERA PREVIEW"
 +  STR_FPS_SOLDIER_PREVIEW_DESC: "Soldier cards on the top bar show a live helmet camera."
 +  STR_FPS_KEY_OPEN_DOOR: "Open door"
@@ -182,6 +185,7 @@ index 000000000..5a6398788
 +  STR_FPS_FRAME_LIMIT: "Frame rate limit"
 +  STR_FPS_FRAME_LIMIT_DESC: "The game's frame rate cap (as in Advanced options)."
 +  STR_FPS_UNLIMITED: "Unlimited"
++  STR_FPS_AUTO: "Auto"
 +  STR_FPS_FRAME_COUNTER: "Frame counter"
 +  STR_FPS_FRAME_COUNTER_DESC: "Frames per second, top left (as F7)."
 +  STR_FPS_CROSSHAIR: "Crosshair"
@@ -226,10 +230,10 @@ index 000000000..5a6398788
 +  STR_FPS_KEY_CLASSIC_HUD_DESC: "Shows the original bottom panel over the 3D view."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..882719994
+index 000000000..e92e24cc8
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,208 @@
+@@ -0,0 +1,212 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom 3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -257,6 +261,9 @@ index 000000000..882719994
 +  STR_FPS_DOOM: "DOOM MODE"
 +  STR_FPS_AMMO_EMPTY: "EMPTY"
 +  STR_FPS_AMMO_UNLIMITED: "∞"
++  STR_FPS_PRIMED: "PRIMED {0}"
++  STR_FPS_PRIMED_INSTANT: "PRIMED"
++  STR_FPS_PRIMED_SECONDS: "PRIMED {0}s"
 +  STR_FPS_SPARE_CLIPS_zero: "no clips"
 +  STR_FPS_SPARE_CLIPS_one: "{N} clip ({0})"
 +  STR_FPS_SPARE_CLIPS_other: "{N} clips ({0})"
@@ -277,7 +284,7 @@ index 000000000..882719994
 +  STR_FPS_UFO_LIGHTS: "UFO lights and aura"
 +  STR_FPS_UFO_LIGHTS_DESC: "UFOs glow: steady hulls, soft lights, colored light, aura."
 +  STR_FPS_PIXEL_SIZE: "Pixel size"
-+  STR_FPS_PIXEL_SIZE_DESC: "1: full detail. 2 or 3: bigger pixels, faster."
++  STR_FPS_PIXEL_SIZE_DESC: "Auto: 2 for views over 640x400. 1: full detail. 2, 3: faster."
 +  STR_FPS_SOLDIER_PREVIEW: "SOLDIER CAMERA PREVIEW"
 +  STR_FPS_SOLDIER_PREVIEW_DESC: "Soldier cards on the top bar show a live helmet camera."
 +  STR_FPS_KEY_OPEN_DOOR: "Open door"
@@ -396,6 +403,7 @@ index 000000000..882719994
 +  STR_FPS_FRAME_LIMIT: "Frame rate limit"
 +  STR_FPS_FRAME_LIMIT_DESC: "The game's frame rate cap (as in Advanced options)."
 +  STR_FPS_UNLIMITED: "Unlimited"
++  STR_FPS_AUTO: "Auto"
 +  STR_FPS_FRAME_COUNTER: "Frame counter"
 +  STR_FPS_FRAME_COUNTER_DESC: "Frames per second, top left (as F7)."
 +  STR_FPS_CROSSHAIR: "Crosshair"
@@ -495,7 +503,7 @@ index 000000000..b3f6cb075
 +        color: 144
 diff --git a/mod/OpenXcom3D/metadata.yml b/mod/OpenXcom3D/metadata.yml
 new file mode 100644
-index 000000000..27952c2e4
+index 000000000..62b04916c
 --- /dev/null
 +++ b/mod/OpenXcom3D/metadata.yml
 @@ -0,0 +1,11 @@
@@ -503,13 +511,13 @@ index 000000000..27952c2e4
 +# metadata.yml for OpenXcom3D
 +
 +name: "OpenXcom3D - First-Person View"
-+version: 0.8
++version: 0.8.1
 +description: "Adds a first-person 3D view of the battlescape (F8): mouse look, real-time movement paid with time units (WASD), firing from the crosshair, a squad bar with soldier camera cards, lights, shadows, flashlight, particles, weather, tactical flares, combat music and its own 3D View options tab. Needs the OpenXcom3D build of OXCE; on a standard OXCE build this mod reports an unsupported engine and stays off."
 +author: OpenXcom3D project
 +
 +master: "*"
 +requiredExtendedEngine: OpenXcom3D
-+requiredExtendedVersion: "0.8"
++requiredExtendedVersion: "0.8.1"
 diff --git a/src/Battlescape/BattlescapeGame.cpp b/src/Battlescape/BattlescapeGame.cpp
 index b7e1111f3..7bd979a4e 100644
 --- a/src/Battlescape/BattlescapeGame.cpp
@@ -1498,10 +1506,10 @@ index bc5f08f46..5ddf353f4 100644
  			playMovementSound();
  			if (_parent->getSave()->isPreview())
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 839f80345..317ad9242 100644
+index 839f80345..42977f789 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -441,10 +441,41 @@ set ( rapidyaml_src
+@@ -441,10 +441,42 @@ set ( rapidyaml_src
  
  )
  
@@ -1528,6 +1536,7 @@ index 839f80345..317ad9242 100644
 +    FirstPerson/FirstPersonViewTerrain.cpp
 +    FirstPerson/FirstPersonViewUfo.cpp
 +    FirstPerson/FirstPersonViewUpscaling.cpp
++    FirstPerson/FirstPersonVoxelModel.cpp
 +    FirstPerson/OptionsFirstPersonState.cpp
 +  )
 +else ()
@@ -1543,7 +1552,7 @@ index 839f80345..317ad9242 100644
      ${engine_src}
      ${geoscape_src}
      ${interface_src}
-@@ -627,7 +658,10 @@ if (WIN32)
+@@ -627,7 +659,10 @@ if (WIN32)
    set(WIN32_LIBS imagehlp dbghelp)
  endif(WIN32)
  
@@ -1727,7 +1736,7 @@ index a4c23b216..13d36e8f3 100644
  	{
  		_buttonsPressed |= SDL_BUTTON(button);
 diff --git a/src/Engine/ModInfo.cpp b/src/Engine/ModInfo.cpp
-index cca815d3e..db6c2d0e9 100644
+index cca815d3e..cff50a1dd 100644
 --- a/src/Engine/ModInfo.cpp
 +++ b/src/Engine/ModInfo.cpp
 @@ -181,6 +181,9 @@ struct EngineData
@@ -1735,7 +1744,7 @@ index cca815d3e..db6c2d0e9 100644
  const EngineData supportedEngines[] = {
  	{ OPENXCOM_VERSION_ENGINE, { OPENXCOM_VERSION_NUMBER }},
 +#ifndef OXCE_NO_FIRSTPERSON
-+	{ "OpenXcom3D", { 0, 8, 0, 0 } }, // first-person add-on, see src/FirstPerson
++	{ "OpenXcom3D", { 0, 8, 1, 0 } }, // first-person add-on, see src/FirstPerson
 +#endif
  	{ "", { 0, 0, 0, 0 } }, // assume that every engine support mods from base game, remove if its not true.
  };
@@ -1874,7 +1883,7 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..c6983ff9a
+index 000000000..0047a64f4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
 @@ -0,0 +1,311 @@
@@ -2082,7 +2091,7 @@ index 000000000..c6983ff9a
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsMuzzleFlash", &fpsMuzzleFlash, true, "STR_FPS_MUZZLE_FLASH", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsParticles", &fpsParticles, 2, "STR_FPS_PARTICLES", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsUfoLights", &fpsUfoLights, true, "STR_FPS_UFO_LIGHTS", category));
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 1, "STR_FPS_PIXEL_SIZE", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 0, "STR_FPS_PIXEL_SIZE", category));
 +	// The crosshair: shown or not, the shot info under it, and aiming at the exact point under
 +	// it (YES) or at the tile, as the original game does (NO).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshair", &fpsCrosshair, true, "STR_FPS_CROSSHAIR", category));
@@ -2344,10 +2353,10 @@ index 000000000..5d9aa7da6
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..bbbaa4fce
+index 000000000..72d4eb958
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,1596 @@
+@@ -0,0 +1,1669 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -2408,6 +2417,7 @@ index 000000000..bbbaa4fce
 +#include "FirstPersonView.h"
 +#include "RuleFirstPerson.h"
 +#include "../Battlescape/BattlescapeGame.h"
++#include "../Battlescape/ExplosionBState.h"
 +#include "../Battlescape/BattlescapeState.h"
 +#include "../Battlescape/Map.h"
 +#include "../Battlescape/Pathfinding.h"
@@ -2424,6 +2434,7 @@ index 000000000..bbbaa4fce
 +#include "../Savegame/BattleItem.h"
 +#include "../Savegame/BattleUnit.h"
 +#include "../Savegame/SavedBattleGame.h"
++#include "../Savegame/Tile.h"
 +#include "../Savegame/SavedGame.h"
 +#include "FirstPersonModeShared.h"
 +
@@ -3268,6 +3279,76 @@ index 000000000..bbbaa4fce
 +}
 +
 +/**
++ * Doom mode (a first step towards a real-time mode): a grenade primed there (pulling the pin is
++ * one click, see fire) burns for DoomFuseTime and then goes off wherever it is: where it lies,
++ * or in the hand of whoever still holds it, as in a first-person shooter; one still in the air
++ * goes off where it lands. The explosion is the game's own, as its end-of-turn fuse makes it
++ * (an ExplosionBState for a timed grenade at the grenade's tile, which also removes it). One at
++ * a time, on the player's turn, when the game isn't busy with a shot or another explosion.
++ * Leaving Doom mode stops the real-time fuses (the game's own fuse, set to 0, is still there:
++ * the grenade then goes off at the end of the turn, as usual).
++ * @param now The time, SDL ticks.
++ */
++void FirstPersonMode::updateDoomFuses(Uint32 now)
++{
++	if (_doomFuses.empty())
++	{
++		return;
++	}
++	if (!Options::fpsDoomMode)
++	{
++		_doomFuses.clear();
++		return;
++	}
++	BattlescapeGame *battleGame = _state->_battleGame;
++	if (battleGame->isBusy() || _save->getSide() != FACTION_PLAYER)
++	{
++		return;
++	}
++	for (auto entry = _doomFuses.begin(); entry != _doomFuses.end(); )
++	{
++		// The grenade, if it's still in the battle and still primed.
++		BattleItem *grenade = nullptr;
++		for (BattleItem *item : *_save->getItems())
++		{
++			if (item->getId() == entry->first)
++			{
++				grenade = item;
++				break;
++			}
++		}
++		if (!grenade || grenade->getFuseTimer() < 0)
++		{
++			entry = _doomFuses.erase(entry);
++			continue;
++		}
++		if (now - entry->second < DoomFuseTime)
++		{
++			++entry;
++			continue;
++		}
++
++		// Where it is: on the ground, or with whoever carries it (at their middle). Neither: it's
++		// in the air, and goes off where it lands.
++		const Tile *tile = grenade->getTile();
++		BattleUnit *carrier = grenade->getOwner();
++		if (!tile && carrier)
++		{
++			tile = carrier->getTile();
++		}
++		if (!tile)
++		{
++			++entry;
++			continue;
++		}
++		const Position centre = tile->getPosition().toVoxel() + Position(8, 8, -tile->getTerrainLevel() + (carrier ? carrier->getHeight() / 2 : 0));
++		_doomFuses.erase(entry);
++		battleGame->statePushBack(new ExplosionBState(battleGame, centre, BattleActionAttack::GetBeforeShoot(BA_TRIGGER_TIMED_GRENADE, carrier, grenade)));
++		return; // the next one waits for this explosion to end
++	}
++}
++
++/**
 + * Combat music (setting "Combat music"): while aliens are in sight a tenser track plays (the
 + * first of the mod's combat tracks that exists); when none has been seen for 8 seconds the
 + * battle music comes back. With the setting off, the battle music comes back at once.
@@ -3397,11 +3478,12 @@ index 000000000..bbbaa4fce
 +		return;
 +	}
 +
-+	// Doom mode (debug) tops the soldier up, on your turn.
++	// Doom mode (debug) tops the soldier up, on your turn, and its grenades burn in real time.
 +	if (playerTurn && Options::fpsDoomMode && unit->getFaction() == FACTION_PLAYER)
 +	{
 +		applyDoomMode(unit);
 +	}
++	updateDoomFuses(now);
 +
 +	// Turning with the keys, and the view's settings (they can change in the options).
 +	turnWithKeys(elapsedSeconds);
@@ -3946,10 +4028,10 @@ index 000000000..bbbaa4fce
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..43ab142d4
+index 000000000..d00f21228
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,682 @@
+@@ -0,0 +1,687 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -4004,6 +4086,7 @@ index 000000000..43ab142d4
 +#include <SDL.h>
 +#include "../Battlescape/Position.h"
 +#include "../Mod/RuleItem.h"
++#include "FirstPersonVoxelModel.h"
 +
 +namespace OpenXcom
 +{
@@ -4144,6 +4227,8 @@ index 000000000..43ab142d4
 +	bool canAct() const;
 +	/// Doom mode (debug): refills the soldier's time units, energy and ammo.
 +	void applyDoomMode(BattleUnit *unit);
++	/// Doom mode: sets off the grenades whose real-time fuse has burnt down.
++	void updateDoomFuses(Uint32 now);
 +	/// Plays the tense combat track while aliens are in sight.
 +	void updateMusic(Uint32 now);
 +
@@ -4325,6 +4410,7 @@ index 000000000..43ab142d4
 +	// =====================================================================================
 +
 +	std::unordered_map<const BattleUnit*, int> _chosenHand; // each soldier's chosen hand: 0 right, 1 left
++	std::unordered_map<int, Uint32> _doomFuses;             // Doom mode: grenades primed in real time (item id: when the pin was pulled)
 +	BattleActionType _fireMode = BA_NONE;               // fire mode for the left mouse button
 +	const BattleItem *_fireModeWeapon = nullptr;        // the weapon _fireMode was chosen for
 +	Position _aimVoxel;                                 // what's under the crosshair
@@ -4421,12 +4507,11 @@ index 000000000..43ab142d4
 +	MuzzleFlash _muzzleFlash = {}; // the weapon's muzzle flash
 +	Uint32 _heldShotSeen = 0;      // our last shot the weapon flashed for
 +	// the weapon's inventory picture, measured: its long axis, which end is the muzzle, which side is up
-+	struct WeaponShape { double mean[2], along[2], across[2], stock, muzzle, minAcross, maxAcross, bore; int upSign; bool gun; }; // bore: across, where the barrel ends
++	struct WeaponShape { double mean[2], along[2], across[2], stock, muzzle, minAcross, maxAcross, bore, boxMin[2], boxMax[2]; int upSign; bool gun; }; // bore: across, where the barrel ends; box: the opaque pixels' bounds
 +	WeaponShape _heldShape = {};                        // the measured shape of the weapon's picture
 +	// ...and given volume: voxels, each picture pixel as deep as its distance from the outline
-+	// allows (a cushion), as the faces that show (corners in picture x, y and depth)
-+	struct VoxelFace { float corner[4][3]; Uint8 color; };
-+	std::vector<VoxelFace> _heldFaces; // the weapon's voxel faces
++	// allows (a cushion), as the faces that show (see FirstPersonVoxelModel.h)
++	std::vector<VoxelFace> _heldFaces; // the voxel faces of the weapon (or other item) in hand
 +	// a melee swing: wound up, struck in towards the crosshair, back; the view lunges with it
 +	Uint32 _swingStart = 0;
 +	bool _swingJolted = false; // the view has lunged for this swing already
@@ -4446,7 +4531,7 @@ index 000000000..43ab142d4
 +	void updateWeaponInHand(BattleUnit *unit);
 +	/// Measures the weapon's picture: its long axis, muzzle end and up side.
 +	void analyzeWeapon(bool gun);
-+	/// Gives the weapon's picture volume as voxels.
++	/// Gives the held picture (weapon or other item) volume as voxels.
 +	void voxelizeWeapon();
 +	/// How the muzzle flashes, by the damage the weapon's ammo does.
 +	MuzzleFlash muzzleFlashFor(const BattleItem *weapon, const RuleItem *firedAmmo) const;
@@ -4454,9 +4539,11 @@ index 000000000..43ab142d4
 +	void drawWeaponPlate(bool left, double bob[2], double kick, double dip, int shade, double tip[2]);
 +	/// Draws the weapon as voxels, placed like the plate.
 +	void drawWeaponVoxels(const double nearEnd[3], const double along[3], const double up[3], const double normal[3], double perPixel, int shade);
++	/// Draws the held voxel faces placed by a map from picture space to camera space.
++	void drawVoxelFaces(const double origin[3], const double stepPerX[3], const double stepPerY[3], const double stepPerDepth[3], int shade);
 +	/// Fills a convex four-sided shape on the weapon surface.
 +	void fillQuad(const double corners[4][2], Uint8 color);
-+	/// Draws a held item that isn't a weapon (grenade, medi-kit...).
++	/// Draws a held item that isn't a weapon (grenade, medi-kit...), as voxels held up in the corner.
 +	void drawHeldItem(bool left, double bob[2], double dip, int shade);
 +	/// Dual wield: swaps the other hand's gun in for drawing, and back.
 +	void swapOffHand();
@@ -5012,10 +5099,10 @@ index 000000000..732689c30
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..8924dc9ba
+index 000000000..8c8a97885
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,1114 @@
+@@ -0,0 +1,1132 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -5278,6 +5365,24 @@ index 000000000..8924dc9ba
 +	const RuleItem *rules = weapon->getRules();
 +	if (rules->getBattleType() != BT_FIREARM)
 +	{
++		// A primed grenade (or anything with a fuse): PRIMED and the turns its fuse has left
++		// (0: it goes off at the end of this turn, once it lies on the ground); one that goes off
++		// on landing just PRIMED.
++		if (rules->getFuseTimerType() != BFT_NONE && weapon->getFuseTimer() >= 0)
++		{
++			// Doom mode's real-time fuse: the seconds it has left, to a tenth.
++			auto doomFuse = _doomFuses.find(weapon->getId());
++			if (doomFuse != _doomFuses.end())
++			{
++				const int tenthsLeft = std::max(0, ((int)DoomFuseTime - (int)(SDL_GetTicks() - doomFuse->second)) / 100);
++				return _state->tr("STR_FPS_PRIMED_SECONDS").arg(std::to_string(tenthsLeft / 10) + "." + std::to_string(tenthsLeft % 10));
++			}
++			if (rules->getFuseTimerType() == BFT_INSTANT)
++			{
++				return _state->tr("STR_FPS_PRIMED_INSTANT");
++			}
++			return _state->tr("STR_FPS_PRIMED").arg(weapon->getFuseTimer());
++		}
 +		return "";
 +	}
 +
@@ -7330,10 +7435,10 @@ index 000000000..e595993af
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..87a28c0d7
+index 000000000..0c9af9aa5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,223 @@
+@@ -0,0 +1,232 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -7428,6 +7533,12 @@ index 000000000..87a28c0d7
 +const double MuzzleScreen[2] = { 0.42 / WeaponLens, 0.45 / WeaponLens };
 +/// How much of the line from the stock point to the muzzle the weapon in hand fills.
 +const double WeaponScale = 0.9;
++/// A held item that isn't a weapon (grenade, medi-kit, scanner, clip...) is shown as voxels in
++/// the bottom corner, its lower half out of sight: 2.6 canvas pixels per picture pixel on a
++/// 200-line canvas (in proportion on bigger ones), a smaller picture than HeldItemMinPixels
++/// across shown as big as that, and turned so its depth shows (degrees, for the right hand; the
++/// left mirrors it): towards the screen's centre, its top tipped back, leaning in.
++const double HeldItemScale = 2.6, HeldItemMinPixels = 20.0, HeldItemYaw = 22.0, HeldItemPitch = -14.0, HeldItemRoll = -10.0;
 +/// A weapon shorter than the rifle (whose picture is about RiflePixels long) comes out smaller:
 +/// by its length to the power SizeCurve (a pistol, half a rifle's picture, at 70%), shrunk about
 +/// a point GripAt of the way from the muzzle towards the stock end (so it still points at the
@@ -7459,6 +7570,9 @@ index 000000000..87a28c0d7
 +
 +/// A melee swing in the view: wind up, strike, back (milliseconds).
 +const Uint32 SwingTime = 420;
++/// Doom mode (a first step towards a real-time mode): a grenade primed there burns for this
++/// long (milliseconds) and goes off wherever it is, as in a first-person shooter.
++const Uint32 DoomFuseTime = 3000;
 +
 +// ---- What happens to the soldier (milliseconds) ----
 +
@@ -7559,10 +7673,10 @@ index 000000000..87a28c0d7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..7b38af188
+index 000000000..6f02570ac
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,1312 @@
+@@ -0,0 +1,1333 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -8019,6 +8133,27 @@ index 000000000..7b38af188
 +			startMapAim(unit, weapon, mode, "STR_FPS_PSI_HINT");
 +			return;
 +		}
++	}
++
++	// Doom mode (a first step towards a real-time mode): pulling the pin is one click, no menu
++	// and no timer to pick: the game's own prime action with its fuse at 0 (it spends the time
++	// units Doom mode refills), and a grenade then burns DoomFuseTime in real time (see
++	// updateDoomFuses).
++	if (mode == BA_PRIME && Options::fpsDoomMode && !menuTargeting)
++	{
++		action->actor = unit;
++		action->weapon = weapon;
++		action->type = BA_PRIME;
++		action->value = 0;
++		action->targeting = false;
++		action->result.clear();
++		action->updateTU();
++		battleGame->handleNonTargetAction();
++		if (weapon->getFuseTimer() >= 0 && weapon->getRules()->getBattleType() == BT_GRENADE)
++		{
++			_doomFuses[weapon->getId()] = SDL_GetTicks();
++		}
++		return;
 +	}
 +
 +	// Medi-kit, scanner, priming...: the item's own action menu, as clicking it on the HUD.
@@ -9568,10 +9703,10 @@ index 000000000..4f12f28f4
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeWeaponInHand.cpp b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
 new file mode 100644
-index 000000000..9375ae2bc
+index 000000000..78485cc1f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
-@@ -0,0 +1,926 @@
+@@ -0,0 +1,894 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -9727,6 +9862,7 @@ index 000000000..9375ae2bc
 +	WeaponShape &shape = _heldShape;
 +	shape = WeaponShape();
 +	shape.gun = gun;
++	_heldFaces.clear(); // a picture too small to measure gets none
 +
 +	// Every opaque pixel of the picture (colour 0 is transparent); too few to measure, and
 +	// it's held up like an item instead.
@@ -9740,9 +9876,16 @@ index 000000000..9375ae2bc
 +		return;
 +	}
 +
-+	// The centre of mass of the pixels.
++	// The centre of mass of the pixels, and the box they fill.
 +	double meanX = 0, meanY = 0;
-+	for (const auto &pixel : pixels) { meanX += pixel.first; meanY += pixel.second; }
++	shape.boxMin[0] = shape.boxMin[1] = 1e9;
++	shape.boxMax[0] = shape.boxMax[1] = -1e9;
++	for (const auto &pixel : pixels)
++	{
++		meanX += pixel.first; meanY += pixel.second;
++		shape.boxMin[0] = std::min(shape.boxMin[0], (double)pixel.first); shape.boxMax[0] = std::max(shape.boxMax[0], (double)pixel.first);
++		shape.boxMin[1] = std::min(shape.boxMin[1], (double)pixel.second); shape.boxMax[1] = std::max(shape.boxMax[1], (double)pixel.second);
++	}
 +	meanX /= pixels.size(); meanY /= pixels.size();
 +
 +	// The long axis: the main direction of the pixels' spread around the centre (from their
@@ -9810,123 +9953,12 @@ index 000000000..9375ae2bc
 +}
 +
 +/**
-+ * Gives the weapon's picture volume, cushion style (the weapon in hand is drawn this way):
-+ * each picture pixel becomes a column of voxels in depth, its half depth growing with the
-+ * square root of its distance to the outline (one voxel at the edge, at most four), so the
-+ * weapon is thickest in the middle. Only the faces between a voxel and empty space are kept
-+ * (in _heldFaces), with corners in picture x, y and depth (depth centred on 0).
++ * Gives the held picture volume (the weapon in hand, or a grenade, a medi-kit, a clip...): its
++ * voxel model, see voxelizePicture.
 + */
 +void FirstPersonMode::voxelizeWeapon()
 +{
-+	_heldFaces.clear();
-+	if (!_heldShape.gun)
-+	{
-+		return;
-+	}
-+	const int width = _heldSprite->getWidth(), height = _heldSprite->getHeight();
-+	const int MaxHalfDepth = 4, fullDepth = 2 * MaxHalfDepth + 1; // in voxels
-+
-+	// How many steps each opaque pixel is from the outside (counting the 8 neighbours): the edge
-+	// pixels are 1, found first, then a breadth-first walk goes inwards from them.
-+	std::vector<int> stepsToOutside(width * height, 0);
-+	std::vector<int> queue; // pixel indices (y * width + x), walked in order
-+	auto solid = [&](int x, int y) { return x >= 0 && y >= 0 && x < width && y < height && _heldSprite->getPixel(x, y) != 0; };
-+	for (int y = 0; y < height; ++y)
-+	{
-+		for (int x = 0; x < width; ++x)
-+		{
-+			// An edge pixel has a transparent pixel (or the picture's border) next to it.
-+			if (!solid(x, y)) continue;
-+			bool onEdge = false;
-+			for (int offsetY = -1; offsetY <= 1 && !onEdge; ++offsetY)
-+				for (int offsetX = -1; offsetX <= 1 && !onEdge; ++offsetX)
-+					onEdge = !solid(x + offsetX, y + offsetY);
-+			if (onEdge)
-+			{
-+				stepsToOutside[y * width + x] = 1;
-+				queue.push_back(y * width + x);
-+			}
-+		}
-+	}
-+	for (size_t head = 0; head < queue.size(); ++head)
-+	{
-+		// Each opaque neighbour not reached yet is one step further in.
-+		const int x = queue[head] % width, y = queue[head] / width;
-+		for (int offsetY = -1; offsetY <= 1; ++offsetY)
-+			for (int offsetX = -1; offsetX <= 1; ++offsetX)
-+				if (solid(x + offsetX, y + offsetY) && !stepsToOutside[(y + offsetY) * width + x + offsetX])
-+				{
-+					stepsToOutside[(y + offsetY) * width + x + offsetX] = stepsToOutside[queue[head]] + 1;
-+					queue.push_back((y + offsetY) * width + x + offsetX);
-+				}
-+	}
-+
-+	// Fill the voxel grid (width x height x fullDepth, 0 = empty, else the pixel's colour):
-+	// each pixel's column reaches its half depth to either side of the middle layer.
-+	std::vector<Uint8> voxels(width * height * fullDepth, 0);
-+	auto voxelAt = [&](int x, int y, int z) -> Uint8 {
-+		return x >= 0 && y >= 0 && z >= 0 && x < width && y < height && z < fullDepth ? voxels[(z * height + y) * width + x] : 0;
-+	};
-+	for (int y = 0; y < height; ++y)
-+	{
-+		for (int x = 0; x < width; ++x)
-+		{
-+			if (!stepsToOutside[y * width + x]) continue;
-+			const int halfDepth = std::clamp((int)std::lround(1.2 * std::sqrt((double)stepsToOutside[y * width + x])), 1, MaxHalfDepth);
-+			for (int z = MaxHalfDepth - halfDepth; z <= MaxHalfDepth + halfDepth; ++z) voxels[(z * height + y) * width + x] = _heldSprite->getPixel(x, y);
-+		}
-+	}
-+
-+	// A face for every side of a voxel that's open to the air, its corners wound so that the
-+	// cross product of its first two edges points outwards (drawWeaponVoxels culls by that).
-+	for (int z = 0; z < fullDepth; ++z)
-+	{
-+		for (int y = 0; y < height; ++y)
-+		{
-+			for (int x = 0; x < width; ++x)
-+			{
-+				const Uint8 color = voxelAt(x, y, z);
-+				if (!color) continue;
-+				const int voxel[3] = { x, y, z };
-+
-+				// The six sides: each axis, towards minus and plus.
-+				for (int axis = 0; axis < 3; ++axis)
-+				{
-+					for (int side = -1; side <= 1; side += 2)
-+					{
-+						// Hidden behind a neighbouring voxel: no face.
-+						int neighbour[3] = { x, y, z };
-+						neighbour[axis] += side;
-+						if (voxelAt(neighbour[0], neighbour[1], neighbour[2])) continue;
-+
-+						// The other two axes, in the order that winds the face outwards.
-+						const int tangent1 = side > 0 ? (axis + 1) % 3 : (axis + 2) % 3, tangent2 = side > 0 ? (axis + 2) % 3 : (axis + 1) % 3;
-+						VoxelFace face;
-+						face.color = color;
-+						if (axis < 2)
-+						{
-+							// A side face (across the picture): the picture's dark outline stays on the
-+							// front and back faces, and the sides show the colour just inside it.
-+							const int insideX = x - (axis == 0 ? side : 0), insideY = y - (axis == 1 ? side : 0);
-+							if (solid(insideX, insideY)) face.color = _heldSprite->getPixel(insideX, insideY);
-+						}
-+
-+						// The four corners: the voxel spans +-0.5 around its centre, the face lies on
-+						// its minus or plus side, and the corners go round the two other axes.
-+						for (int cornerIndex = 0; cornerIndex < 4; ++cornerIndex)
-+						{
-+							float cornerPos[3] = { voxel[0] - 0.5f, voxel[1] - 0.5f, voxel[2] - 0.5f - MaxHalfDepth };
-+							cornerPos[axis] += side > 0 ? 1.0f : 0.0f;
-+							if (cornerIndex == 1 || cornerIndex == 2) cornerPos[tangent1] += 1.0f;
-+							if (cornerIndex == 2 || cornerIndex == 3) cornerPos[tangent2] += 1.0f;
-+							std::copy(cornerPos, cornerPos + 3, face.corner[cornerIndex]);
-+						}
-+						_heldFaces.push_back(face);
-+					}
-+				}
-+			}
-+		}
-+	}
++	voxelizePicture(_heldSprite, _heldFaces);
 +}
 +
 +/**
@@ -10018,7 +10050,23 @@ index 000000000..9375ae2bc
 +		const double acrossAtZero = -shape.mean[0] * shape.across[0] - shape.mean[1] * shape.across[1];
 +		origin[axis] = nearEnd[axis] + (alongAtZero - shape.stock) * alongUnit + (acrossAtZero - shape.bore) * upUnit;
 +	}
++	drawVoxelFaces(origin, stepPerX, stepPerY, stepPerDepth, shade);
++}
 +
++/**
++ * Draws the held voxel faces (_heldFaces): each corner goes from picture space to camera space
++ * by the map given (camera point = origin + x * stepPerX + y * stepPerY + depth * stepPerDepth),
++ * and the faces that look at the eye are drawn far to near (the painter's algorithm), each
++ * darkened by how far it turns from the light.
++ * All positions are in camera space: x right, y down, z ahead, the eye at the origin.
++ * @param origin Where picture point (0, 0) at depth 0 lands.
++ * @param stepPerX One picture pixel to the right, in camera space.
++ * @param stepPerY One picture pixel down.
++ * @param stepPerDepth One voxel of depth.
++ * @param shade How much darker the surroundings make it (0 bright .. 15 dark).
++ */
++void FirstPersonMode::drawVoxelFaces(const double origin[3], const double stepPerX[3], const double stepPerY[3], const double stepPerDepth[3], int shade)
++{
 +	// A mirror image (the weapon in the left hand) turns the faces' windings round: the sign of
 +	// the map's determinant tells, and flips the normals back.
 +	const double determinant = stepPerX[0] * (stepPerY[1] * stepPerDepth[2] - stepPerY[2] * stepPerDepth[1])
@@ -10287,9 +10335,11 @@ index 000000000..9375ae2bc
 +}
 +
 +/**
-+ * Draws anything that isn't a gun or a club (a grenade, a medi-kit, a scanner...): its
-+ * inventory picture three times as big, held up in the bottom corner with 40% of it below the
-+ * edge of the screen.
++ * Draws anything that isn't a gun or a club (a grenade, a medi-kit, a scanner...) as its voxels
++ * (its inventory picture given volume): in the bottom corner with its lower half below the
++ * edge of the screen (so no hand needs drawing), turned so its depth shows (HeldItemYaw,
++ * HeldItemPitch, HeldItemRoll), and shaded face by face like the weapon. A picture that gave no
++ * voxels is drawn flat instead, three times as big.
 + * @param left Held in the left hand: drawn bottom left, clear of the info panel.
 + * @param bob The step bob, in canvas pixels (sideways, down).
 + * @param dip How far it's dipped down for a change of item, in canvas pixels.
@@ -10297,7 +10347,60 @@ index 000000000..9375ae2bc
 + */
 +void FirstPersonMode::drawHeldItem(bool left, double bob[2], double dip, int shade)
 +{
-+	// Where its top left corner goes on the canvas.
++	if (!_heldFaces.empty())
++	{
++		// Its size: HeldItemScale canvas pixels per picture pixel on a 200-line canvas, in
++		// proportion on bigger ones, and a small picture (a grenade) as big as one of
++		// HeldItemMinPixels; the bob and the dip grow with the canvas.
++		const WeaponShape &shape = _heldShape;
++		const int width = _weaponInHand->getWidth(), height = _weaponInHand->getHeight();
++		const double boxWidth = shape.boxMax[0] - shape.boxMin[0] + 1.0, boxHeight = shape.boxMax[1] - shape.boxMin[1] + 1.0;
++		const double canvasScale = height / 200.0;
++		const double scale = HeldItemScale * canvasScale * std::max(1.0, HeldItemMinPixels / std::max(boxWidth, boxHeight));
++
++		// Where the middle of its box goes on the canvas: in the corner (the left hand's clear of
++		// the info panel), on the bottom edge, so the lower half is out of sight.
++		const double middleX = (left ? PanelW + 10 + boxWidth * scale / 2.0 : width - boxWidth * scale / 2.0 - 12.0 * canvasScale) + bob[0] * canvasScale;
++		const double middleY = height + (bob[1] + dip) * canvasScale;
++
++		// That point in camera space, one unit ahead of the eye (through the weapon's lens), and
++		// the camera-space length of one picture pixel there.
++		const double focalPixels = width / 2.0 * WeaponLens;
++		const double middle[3] = { (middleX - width / 2.0) / focalPixels, (middleY - height / 2.0) / focalPixels, 1.0 };
++		const double perPixel = scale / focalPixels;
++
++		// Turned: leaning in (about the view's axis), its top tipped back (about the sideways
++		// axis), then towards the screen's centre (about the upright axis); the left hand mirrors
++		// the lean and the turn. The columns of the turn are where the picture's right, down and
++		// depth end up.
++		const double degrees = Pi / 180.0;
++		const double yaw = (left ? -HeldItemYaw : HeldItemYaw) * degrees, pitch = HeldItemPitch * degrees, roll = (left ? -HeldItemRoll : HeldItemRoll) * degrees;
++		const double rollTurn[3][3] = { { std::cos(roll), -std::sin(roll), 0 }, { std::sin(roll), std::cos(roll), 0 }, { 0, 0, 1 } };
++		const double pitchTurn[3][3] = { { 1, 0, 0 }, { 0, std::cos(pitch), -std::sin(pitch) }, { 0, std::sin(pitch), std::cos(pitch) } };
++		const double yawTurn[3][3] = { { std::cos(yaw), 0, std::sin(yaw) }, { 0, 1, 0 }, { -std::sin(yaw), 0, std::cos(yaw) } };
++		double pitchRoll[3][3], turn[3][3];
++		for (int row = 0; row < 3; ++row)
++			for (int column = 0; column < 3; ++column)
++				pitchRoll[row][column] = pitchTurn[row][0] * rollTurn[0][column] + pitchTurn[row][1] * rollTurn[1][column] + pitchTurn[row][2] * rollTurn[2][column];
++		for (int row = 0; row < 3; ++row)
++			for (int column = 0; column < 3; ++column)
++				turn[row][column] = yawTurn[row][0] * pitchRoll[0][column] + yawTurn[row][1] * pitchRoll[1][column] + yawTurn[row][2] * pitchRoll[2][column];
++
++		// The map from picture space: the box's middle lands on that point.
++		const double boxMiddleX = (shape.boxMin[0] + shape.boxMax[0]) / 2.0, boxMiddleY = (shape.boxMin[1] + shape.boxMax[1]) / 2.0;
++		double stepPerX[3], stepPerY[3], stepPerDepth[3], origin[3];
++		for (int axis = 0; axis < 3; ++axis)
++		{
++			stepPerX[axis] = turn[axis][0] * perPixel;
++			stepPerY[axis] = turn[axis][1] * perPixel;
++			stepPerDepth[axis] = turn[axis][2] * perPixel;
++			origin[axis] = middle[axis] - boxMiddleX * stepPerX[axis] - boxMiddleY * stepPerY[axis];
++		}
++		drawVoxelFaces(origin, stepPerX, stepPerY, stepPerDepth, shade);
++		return;
++	}
++
++	// The flat picture: where its top left corner goes on the canvas.
 +	const int scale = 3, width = _weaponInHand->getWidth(), height = _weaponInHand->getHeight();
 +	const int spriteWidth = _heldSprite->getWidth(), spriteHeight = _heldSprite->getHeight();
 +	const int itemX = (left ? PanelW + 10 : width - spriteWidth * scale - 12) + (int)bob[0]; // the left hand's clear of the info panel
@@ -11208,10 +11311,10 @@ index 000000000..2292c4874
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..1d5cb801a
+index 000000000..3387ae5fd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,506 @@
+@@ -0,0 +1,507 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -11312,6 +11415,7 @@ index 000000000..1d5cb801a
 +{
 +	// The scratch surfaces sprites are drawn through.
 +	delete _spriteBuffer;
++	delete _itemPicture;
 +	for (Surface *buffer : _blendBuffers) delete buffer;
 +	// Tell the upscaling worker to stop (under its lock, so it can't miss the flag), wake it,
 +	// and wait for it to end.
@@ -11720,10 +11824,10 @@ index 000000000..1d5cb801a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..c05e5bf2b
+index 000000000..692dbce93
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,790 @@
+@@ -0,0 +1,803 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -11787,6 +11891,7 @@ index 000000000..c05e5bf2b
 +#include "../Battlescape/Position.h"
 +#include "../Engine/InteractiveSurface.h"
 +#include "FirstPersonParticles.h"
++#include "FirstPersonVoxelModel.h"
 +
 +namespace OpenXcom
 +{
@@ -12364,6 +12469,12 @@ index 000000000..c05e5bf2b
 +	std::vector<Scorch> _scorches;                     // the blackened patches so far
 +	struct FrameClock { int frame; Uint32 since, length; };
 +	std::map<const Explosion*, FrameClock> _explosionClocks; // when each explosion last changed frame, and how long frames last
++	// thrown items fly as voxel models of their inventory pictures (FirstPersonVoxelModel.h), one
++	// per kind of item, made the first time one flies, tumbling end over end
++	struct ItemModel { std::vector<VoxelFace> faces; float middle[2]; }; // middle: of the picture's opaque pixels
++	std::unordered_map<const RuleItem*, ItemModel> _itemModels;
++	Surface *_itemPicture = nullptr; // scratch surface an item's inventory picture is drawn on
++	Uint32 _thrownStart = 0;         // when the thrown item in flight left the hand
 +
 +	/// Follows the game's shot in flight: its start, flight and end.
 +	void followShots();
@@ -12375,6 +12486,12 @@ index 000000000..c05e5bf2b
 +	void advanceShot(Projectile *projectile);
 +	/// Draws the flying projectile (or thrown item) and the explosions.
 +	void drawProjectilesAndExplosions();
++	/// The voxel model of an item's kind, made from its inventory picture the first time.
++	const ItemModel &itemModel(BattleItem *item);
++	/// Draws a thrown item in flight as its voxel model, tumbling; false if it has none.
++	bool drawThrownItem(const Projectile *projectile, BattleItem *item);
++	/// Fills a convex four-sided shape on the view at one depth, behind what's nearer.
++	void fillQuadAtDepth(const double corners[4][2], Uint8 color, float depth);
 +	/// How a shot looks in flight, from its ammo's damage type.
 +	void trailFor(const BattleItem *ammo, Trail &trail, Uint8 &color) const;
 +	/// Spawns what a shot leaves behind along the bit of its path it flew this frame.
@@ -13864,10 +13981,10 @@ index 000000000..faf600cd7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..924542e2d
+index 000000000..57bfb4204
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,994 @@
+@@ -0,0 +1,996 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -14691,7 +14808,9 @@ index 000000000..924542e2d
 +	const float up[3] = { (float)_up[0], (float)_up[1], (float)_up[2] };
 +
 +	// With a pixel size above 1, one ray colours a block of pixels (pixelSize x pixelSize).
-+	const int pixelSize = std::clamp(Options::fpsPixelSize, 1, 3);
++	// Auto (0) picks 2 for views bigger than AutoPixelMaxWidth x AutoPixelMaxHeight, else 1.
++	const bool bigView = width > AutoPixelMaxWidth || height > AutoPixelMaxHeight;
++	const int pixelSize = Options::fpsPixelSize == 0 ? (bigView ? 2 : 1) : std::clamp(Options::fpsPixelSize, 1, 3);
 +	const int blockRows = (height + pixelSize - 1) / pixelSize, blockColumns = (width + pixelSize - 1) / pixelSize;
 +	for (int blockRow = _rayWorkers.nextBlockRow++; blockRow < blockRows; blockRow = _rayWorkers.nextBlockRow++)
 +	{
@@ -15697,10 +15816,10 @@ index 000000000..25faa7a8d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..bd38af108
+index 000000000..eba3874ac
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,216 @@
+@@ -0,0 +1,224 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -15778,6 +15897,10 @@ index 000000000..bd38af108
 +/// screen pixels per sprite pixel on it is used (further away the original looks as good).
 +const int UpscaleFactor = 4;
 +const double UpscaleFrom = 1.6;
++/// A thrown item flies as its voxel model (its inventory picture given volume): this many voxels
++/// per picture pixel (a grenade's picture, about 12 pixels, is a third of a tile across),
++/// turning end over end this many times a second.
++const double ThrownItemScale = 0.35, ThrownItemSpin = 1.6;
 +
 +// ---- Timings and limits ----
 +
@@ -15797,6 +15920,10 @@ index 000000000..bd38af108
 +/// many can burn at once.
 +const float FlareLife = 60.0f, FlareReach = 150.0f;
 +const size_t FlareMax = 8;
++/// Pixel size Auto (the option at 0): views up to this size get full detail, bigger ones blocks
++/// of 2. A 1920x1080 screen at the default battlescape scale makes a 960x540 view, which ran at
++/// 40-51 FPS in a busy town; in blocks of 2 it holds 60 and looks almost the same.
++const int AutoPixelMaxWidth = 640, AutoPixelMaxHeight = 400;
 +
 +// ---- Proportions of the voxel world ----
 +
@@ -15919,10 +16046,10 @@ index 000000000..bd38af108
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShots.cpp b/src/FirstPerson/FirstPersonViewShots.cpp
 new file mode 100644
-index 000000000..9dda35f11
+index 000000000..9a93657df
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShots.cpp
-@@ -0,0 +1,863 @@
+@@ -0,0 +1,1104 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -15998,9 +16125,242 @@ index 000000000..9dda35f11
 +#include "../Battlescape/Projectile.h"
 +#include "FirstPersonParticles.h"
 +#include "FirstPersonViewShared.h"
++#include "FirstPersonVoxelModel.h"
 +
 +namespace OpenXcom
 +{
++
++/**
++ * The voxel model of an item's kind (see FirstPersonVoxelModel.h): its inventory picture (from
++ * BIGOBS.PCK, as the inventory and the weapon in hand show it) given volume, made the first time
++ * it's asked for and kept. A kind with no picture gets an empty model.
++ * @param item An item of the kind.
++ * @return Its model: the faces, and the middle of the picture's opaque pixels.
++ */
++const FirstPersonView::ItemModel &FirstPersonView::itemModel(BattleItem *item)
++{
++	const RuleItem *rules = item->getRules();
++	auto found = _itemModels.find(rules);
++	if (found != _itemModels.end())
++	{
++		return found->second;
++	}
++	ItemModel &model = _itemModels[rules];
++	model.middle[0] = model.middle[1] = 0.0f;
++	SurfaceSet *inventorySprites = _game->getMod()->getSurfaceSet("BIGOBS.PCK");
++	if (!inventorySprites)
++	{
++		return model;
++	}
++
++	// The picture, drawn as the inventory draws it, then given volume.
++	if (!_itemPicture)
++	{
++		_itemPicture = new Surface(32, 48, 0, 0);
++	}
++	_itemPicture->clear();
++	rules->drawHandSprite(inventorySprites, _itemPicture, item, _save, 0);
++	voxelizePicture(_itemPicture, model.faces);
++
++	// The middle of its opaque pixels: the point that flies along the game's path.
++	int minX = INT_MAX, maxX = -1, minY = INT_MAX, maxY = -1;
++	for (int y = 0; y < _itemPicture->getHeight(); ++y)
++	{
++		for (int x = 0; x < _itemPicture->getWidth(); ++x)
++		{
++			if (!_itemPicture->getPixel(x, y)) continue;
++			minX = std::min(minX, x); maxX = std::max(maxX, x);
++			minY = std::min(minY, y); maxY = std::max(maxY, y);
++		}
++	}
++	if (maxX >= 0)
++	{
++		model.middle[0] = (minX + maxX) / 2.0f;
++		model.middle[1] = (minY + maxY) / 2.0f;
++	}
++	return model;
++}
++
++/**
++ * Draws a thrown item in flight as its voxel model, at the game's position on its path: level
++ * with the path to start with (the picture's right along it, its depth across it), turning end
++ * over end about the axis across the path (ThrownItemSpin turns a second), ThrownItemScale
++ * voxels per picture pixel. Its faces that look at the eye are drawn far to near, depth-tested
++ * against the world (walls and nearer things hide it), each darkened by how far it turns from
++ * the light above and by the light where it is (the game's, lamps, the flashlight and flares, as
++ * on units).
++ * The work is done in true proportions (heights scaled by ZScale), like the camera.
++ * @param projectile The game's projectile carrying it.
++ * @param item The item thrown.
++ * @return False if the item has no voxel model (it's then drawn as its sprite).
++ */
++bool FirstPersonView::drawThrownItem(const Projectile *projectile, BattleItem *item)
++{
++	const ItemModel &model = itemModel(item);
++	if (model.faces.empty())
++	{
++		return false;
++	}
++
++	// Where it is, and which way it flies on the level: from where it was a few steps back.
++	const Position current = projectile->getPosition(0), before = projectile->getPosition(-4);
++	const double centre[3] = { (double)current.x, (double)current.y, current.z * ZScale };
++	double path[2] = { (double)(current.x - before.x), (double)(current.y - before.y) };
++	const double pathLength = std::sqrt(path[0] * path[0] + path[1] * path[1]);
++	if (pathLength < 1e-6)
++	{
++		path[0] = 1.0; path[1] = 0.0; // straight up or down: any level direction will do
++	}
++	else
++	{
++		path[0] /= pathLength; path[1] /= pathLength;
++	}
++
++	// Its axes in the world, each one picture pixel (or voxel of depth) long: right along the
++	// path, down towards the ground, depth across the path; the first two turned end over end.
++	const double angle = (SDL_GetTicks() - _thrownStart) / 1000.0 * ThrownItemSpin * 2.0 * Pi;
++	const double along[3] = { path[0], path[1], 0.0 }, upward[3] = { 0.0, 0.0, 1.0 };
++	double stepPerX[3], stepPerY[3];
++	for (int axis = 0; axis < 3; ++axis)
++	{
++		stepPerX[axis] = (along[axis] * std::cos(angle) + upward[axis] * std::sin(angle)) * ThrownItemScale;
++		stepPerY[axis] = (along[axis] * std::sin(angle) - upward[axis] * std::cos(angle)) * ThrownItemScale;
++	}
++	const double stepPerDepth[3] = { path[1] * ThrownItemScale, -path[0] * ThrownItemScale, 0.0 };
++
++	// A mirror image turns the faces' windings round: the sign of the map's determinant tells.
++	const double determinant = stepPerX[0] * (stepPerY[1] * stepPerDepth[2] - stepPerY[2] * stepPerDepth[1])
++		- stepPerX[1] * (stepPerY[0] * stepPerDepth[2] - stepPerY[2] * stepPerDepth[0])
++		+ stepPerX[2] * (stepPerY[0] * stepPerDepth[1] - stepPerY[1] * stepPerDepth[0]);
++	const double windingSign = determinant < 0.0 ? -1.0 : 1.0;
++
++	// The light on it, as on units, and where the light comes from (above, a little to the side).
++	const float point[3] = { (float)current.x, (float)current.y, (float)current.z };
++	const int shade = (int)std::lround(std::clamp(lightAt(point[0], point[1], point[2]) - pointLight(point, nullptr, false)
++		- flareLight(point, nullptr, false) * 8.0f, 0.0f, 15.0f));
++	const double towardsLight[3] = { 0.30, -0.35, 0.89 };
++
++	// The eye in true proportions, and the view's focal length in pixels.
++	const double eye[3] = { _eye[0], _eye[1], _eye[2] * ZScale };
++	const double focalLength = (getWidth() / 2.0) / _halfFovTangent;
++
++	// Each face that shows: on the screen, with its shaded colour and its distance ahead.
++	struct Quad { float depth; double screen[4][2]; Uint8 color; };
++	std::vector<Quad> quads;
++	quads.reserve(model.faces.size() / 2);
++	for (const VoxelFace &face : model.faces)
++	{
++		// Its corners in the world, and ahead of / right of / above the eye.
++		double worldCorners[4][3], ahead[4], toRight[4], above[4];
++		bool tooClose = false;
++		for (int cornerIndex = 0; cornerIndex < 4 && !tooClose; ++cornerIndex)
++		{
++			const double pictureX = face.corner[cornerIndex][0] - model.middle[0], pictureY = face.corner[cornerIndex][1] - model.middle[1];
++			const double depth = face.corner[cornerIndex][2];
++			ahead[cornerIndex] = toRight[cornerIndex] = above[cornerIndex] = 0.0;
++			for (int axis = 0; axis < 3; ++axis)
++			{
++				worldCorners[cornerIndex][axis] = centre[axis] + pictureX * stepPerX[axis] + pictureY * stepPerY[axis] + depth * stepPerDepth[axis];
++				const double relative = worldCorners[cornerIndex][axis] - eye[axis];
++				ahead[cornerIndex] += relative * _forward[axis];
++				toRight[cornerIndex] += relative * _right[axis];
++				above[cornerIndex] += relative * _up[axis];
++			}
++			tooClose = ahead[cornerIndex] < 4.0; // right in front of the camera, as sprites
++		}
++		if (tooClose)
++		{
++			continue;
++		}
++
++		// Its outward normal and its centre: drawn only if it turns towards the eye.
++		double edge1[3], edge2[3], faceNormal[3], faceCentre[3];
++		for (int axis = 0; axis < 3; ++axis)
++		{
++			edge1[axis] = worldCorners[1][axis] - worldCorners[0][axis];
++			edge2[axis] = worldCorners[3][axis] - worldCorners[0][axis];
++			faceCentre[axis] = (worldCorners[0][axis] + worldCorners[2][axis]) * 0.5;
++		}
++		faceNormal[0] = (edge1[1] * edge2[2] - edge1[2] * edge2[1]) * windingSign;
++		faceNormal[1] = (edge1[2] * edge2[0] - edge1[0] * edge2[2]) * windingSign;
++		faceNormal[2] = (edge1[0] * edge2[1] - edge1[1] * edge2[0]) * windingSign;
++		if (faceNormal[0] * (faceCentre[0] - eye[0]) + faceNormal[1] * (faceCentre[1] - eye[1]) + faceNormal[2] * (faceCentre[2] - eye[2]) >= 0.0)
++		{
++			continue;
++		}
++
++		// Shading: up to 3 shades darker as it turns from the light, plus the light where it is
++		// (within the colour's group of 16 shades).
++		const double normalLength = std::sqrt(faceNormal[0] * faceNormal[0] + faceNormal[1] * faceNormal[1] + faceNormal[2] * faceNormal[2]);
++		const double lighting = std::max(0.0,
++			(faceNormal[0] * towardsLight[0] + faceNormal[1] * towardsLight[1] + faceNormal[2] * towardsLight[2]) / normalLength);
++		Quad quad;
++		quad.color = shadeColor(face.color, (int)std::lround((1.0 - lighting) * 3.0) + shade);
++		quad.depth = (float)((ahead[0] + ahead[2]) * 0.5);
++		for (int cornerIndex = 0; cornerIndex < 4; ++cornerIndex)
++		{
++			quad.screen[cornerIndex][0] = getWidth() / 2.0 + toRight[cornerIndex] * focalLength / ahead[cornerIndex];
++			quad.screen[cornerIndex][1] = getHeight() / 2.0 - above[cornerIndex] * focalLength / ahead[cornerIndex];
++		}
++		quads.push_back(quad);
++	}
++
++	// Far to near, each behind whatever is nearer in the world.
++	std::sort(quads.begin(), quads.end(), [](const Quad &first, const Quad &second) { return first.depth > second.depth; });
++	for (const Quad &quad : quads)
++	{
++		fillQuadAtDepth(quad.screen, quad.color, quad.depth);
++	}
++	return true;
++}
++
++/**
++ * Fills a convex quadrilateral on the view, row by row (a scanline fill): every pixel whose
++ * centre lies inside it and where nothing nearer is drawn yet, noting its depth there.
++ * @param corners The four corners on the view, in pixels, in order around the edge.
++ * @param color Palette colour to fill with.
++ * @param depth Its distance ahead of the camera (the depth buffer's measure).
++ */
++void FirstPersonView::fillQuadAtDepth(const double corners[4][2], Uint8 color, float depth)
++{
++	const int width = getWidth(), height = getHeight();
++
++	// The rows it covers: those whose pixel centres lie between its top and bottom corners.
++	double top = corners[0][1], bottom = corners[0][1];
++	for (int cornerIndex = 1; cornerIndex < 4; ++cornerIndex)
++	{
++		top = std::min(top, corners[cornerIndex][1]);
++		bottom = std::max(bottom, corners[cornerIndex][1]);
++	}
++	const int firstRow = std::max(0, (int)std::ceil(top - 0.5)), lastRow = std::min(height - 1, (int)std::floor(bottom - 0.5));
++	for (int y = firstRow; y <= lastRow; ++y)
++	{
++		// Where the row's centre line crosses the edges: the leftmost and rightmost crossing.
++		const double rowCentreY = y + 0.5;
++		double leftX = 1e9, rightX = -1e9;
++		for (int cornerIndex = 0; cornerIndex < 4; ++cornerIndex)
++		{
++			const double *edgeStart = corners[cornerIndex], *edgeEnd = corners[(cornerIndex + 1) % 4];
++			if ((edgeStart[1] <= rowCentreY && edgeEnd[1] > rowCentreY) || (edgeEnd[1] <= rowCentreY && edgeStart[1] > rowCentreY))
++			{
++				const double crossX = edgeStart[0] + (rowCentreY - edgeStart[1]) / (edgeEnd[1] - edgeStart[1]) * (edgeEnd[0] - edgeStart[0]);
++				leftX = std::min(leftX, crossX);
++				rightX = std::max(rightX, crossX);
++			}
++		}
++
++		// The pixels between the two crossings that nothing nearer covers.
++		const int firstColumn = std::max(0, (int)std::ceil(leftX - 0.5)), lastColumn = std::min(width - 1, (int)std::floor(rightX - 0.5));
++		Uint8 *screenRow = getRaw(0, y);
++		float *depthRow = &_depthBuffer[y * width];
++		for (int x = firstColumn; x <= lastColumn; ++x)
++		{
++			if (depth >= depthRow[x]) continue;
++			screenRow[x] = color;
++			depthRow[x] = depth;
++		}
++	}
++}
 +
 +/**
 + * Draws what flies and what explodes, as sprites and dots in the world: a thrown item (its own
@@ -16021,14 +16381,18 @@ index 000000000..9dda35f11
 +	{
 +		if (BattleItem *item = projectile->getItem())
 +		{
-+			// A thrown item: its sprite as the map draws it, put into the sprite buffer at
-+			// (16, 8) and stood at the item's position in the world.
-+			const Position position = projectile->getPosition();
-+			const double world[3] = { (double)position.x, (double)position.y, (double)position.z };
-+			ItemSprite itemSprite(_spriteBuffer, mod, _save, 0);
-+			_spriteBuffer->clear();
-+			itemSprite.draw(item, 16, 8, 0);
-+			drawSpriteSmooth(_spriteBuffer, 32, 34, world, 4.0, 0); // like Map: the voxel sits at sprite pixel (16, 26)
++			// A thrown item: as its voxel model, tumbling; one with no inventory picture as its
++			// sprite as the map draws it, put into the sprite buffer at (16, 8) and stood at the
++			// item's position in the world.
++			if (!drawThrownItem(projectile, item))
++			{
++				const Position position = projectile->getPosition();
++				const double world[3] = { (double)position.x, (double)position.y, (double)position.z };
++				ItemSprite itemSprite(_spriteBuffer, mod, _save, 0);
++				_spriteBuffer->clear();
++				itemSprite.draw(item, 16, 8, 0);
++				drawSpriteSmooth(_spriteBuffer, 32, 34, world, 4.0, 0); // like Map: the voxel sits at sprite pixel (16, 26)
++			}
 +		}
 +		else if (_shotTrail != TRAIL_BEAM) // beams are drawn as lines
 +		{
@@ -16648,6 +17012,10 @@ index 000000000..9dda35f11
 +	const Position firedFrom = projectile->getPosition(-100000), current = projectile->getPosition(0);
 +	float origin[3] = { (float)firedFrom.x, (float)firedFrom.y, (float)firedFrom.z };
 +	_lastProjectileThrown = projectile->getItem() != nullptr;
++	if (_lastProjectileThrown)
++	{
++		_thrownStart = SDL_GetTicks(); // it tumbles from here
++	}
 +	// Whose shot: one starting within 20 voxels of the eye is our own (and the weapon in hand
 +	// flashes); any other shot (not a thrown item; a squadmate's counts too) is taken for an
 +	// enemy's, which may whizz past us and whose origin a hit on us points back to.
@@ -20371,12 +20739,270 @@ index 000000000..d2d497d2e
 +}
 +
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
+diff --git a/src/FirstPerson/FirstPersonVoxelModel.cpp b/src/FirstPerson/FirstPersonVoxelModel.cpp
+new file mode 100644
+index 000000000..6268e274f
+--- /dev/null
++++ b/src/FirstPerson/FirstPersonVoxelModel.cpp
+@@ -0,0 +1,176 @@
++/*
++ * ==============================================================================================
++ *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
++ * ==============================================================================================
++ *
++ *  Our philosophy
++ *
++ *  - Faithful first. The 3D view should feel as if it had shipped with UFO: Enemy Unknown on
++ *    the day the game came out.
++ *  - Another camera on the same battle. The original rules decide everything: time units,
++ *    energy, accuracy, line of fire, reaction fire, doors and morale. The 3D view only shows
++ *    what the game does.
++ *  - Only the original assets: the game's own maps, voxel shapes, sprites, palette and sounds.
++ *  - Every addition is a setting. Jumping, night vision as gear, falling, FPS-style shooting
++ *    and dual wield can all be switched off.
++ *  - Light on the engine. Our code lives in this folder, the core only gets small hooks, and
++ *    without the OpenXcom3D mod nothing changes.
++ *  - Runs anywhere: a software renderer on the CPU, no graphics card needed.
++ *  - Written for people: descriptive names, and a comment for every function and every block.
++ *
++ *  Date: 2026-10-19
++ *
++ *  We wish everyone all the best and all health!
++ * ==============================================================================================
++ */
++/*
++ * Copyright 2010-2026 OpenXcom Developers.
++ *
++ * This file is part of OpenXcom.
++ *
++ * OpenXcom is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * OpenXcom is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/*
++ * FirstPersonVoxelModel.cpp: an item's inventory picture made into a voxel model (see the
++ * header).
++ */
++#include "FirstPersonVoxelModel.h"
++#include <algorithm>
++#include <cmath>
++#include "../Engine/Surface.h"
++
++namespace OpenXcom
++{
++
++/**
++ * Gives a picture volume, cushion style: each picture pixel becomes a column of voxels in
++ * depth, its half depth growing with the square root of its distance to the outline (one voxel
++ * at the edge, at most four), so the model is thickest in the middle. Only the faces between a
++ * voxel and empty space are kept, with corners in picture x, y and depth (depth centred on 0).
++ * @param picture The picture (palette colours, 0 transparent).
++ * @param faces Set to the model's faces.
++ */
++void voxelizePicture(Surface *picture, std::vector<VoxelFace> &faces)
++{
++	faces.clear();
++	const int width = picture->getWidth(), height = picture->getHeight();
++	const int MaxHalfDepth = 4, fullDepth = 2 * MaxHalfDepth + 1; // in voxels
++
++	// How many steps each opaque pixel is from the outside (counting the 8 neighbours): the edge
++	// pixels are 1, found first, then a breadth-first walk goes inwards from them.
++	std::vector<int> stepsToOutside(width * height, 0);
++	std::vector<int> queue; // pixel indices (y * width + x), walked in order
++	auto solid = [&](int x, int y) { return x >= 0 && y >= 0 && x < width && y < height && picture->getPixel(x, y) != 0; };
++	for (int y = 0; y < height; ++y)
++	{
++		for (int x = 0; x < width; ++x)
++		{
++			// An edge pixel has a transparent pixel (or the picture's border) next to it.
++			if (!solid(x, y)) continue;
++			bool onEdge = false;
++			for (int offsetY = -1; offsetY <= 1 && !onEdge; ++offsetY)
++				for (int offsetX = -1; offsetX <= 1 && !onEdge; ++offsetX)
++					onEdge = !solid(x + offsetX, y + offsetY);
++			if (onEdge)
++			{
++				stepsToOutside[y * width + x] = 1;
++				queue.push_back(y * width + x);
++			}
++		}
++	}
++	for (size_t head = 0; head < queue.size(); ++head)
++	{
++		// Each opaque neighbour not reached yet is one step further in.
++		const int x = queue[head] % width, y = queue[head] / width;
++		for (int offsetY = -1; offsetY <= 1; ++offsetY)
++			for (int offsetX = -1; offsetX <= 1; ++offsetX)
++				if (solid(x + offsetX, y + offsetY) && !stepsToOutside[(y + offsetY) * width + x + offsetX])
++				{
++					stepsToOutside[(y + offsetY) * width + x + offsetX] = stepsToOutside[queue[head]] + 1;
++					queue.push_back((y + offsetY) * width + x + offsetX);
++				}
++	}
++
++	// Fill the voxel grid (width x height x fullDepth, 0 = empty, else the pixel's colour):
++	// each pixel's column reaches its half depth to either side of the middle layer.
++	std::vector<Uint8> voxels(width * height * fullDepth, 0);
++	auto voxelAt = [&](int x, int y, int z) -> Uint8 {
++		return x >= 0 && y >= 0 && z >= 0 && x < width && y < height && z < fullDepth ? voxels[(z * height + y) * width + x] : 0;
++	};
++	for (int y = 0; y < height; ++y)
++	{
++		for (int x = 0; x < width; ++x)
++		{
++			if (!stepsToOutside[y * width + x]) continue;
++			const int halfDepth = std::clamp((int)std::lround(1.2 * std::sqrt((double)stepsToOutside[y * width + x])), 1, MaxHalfDepth);
++			for (int z = MaxHalfDepth - halfDepth; z <= MaxHalfDepth + halfDepth; ++z) voxels[(z * height + y) * width + x] = picture->getPixel(x, y);
++		}
++	}
++
++	// A face for every side of a voxel that's open to the air, its corners wound so that the
++	// cross product of its first two edges points outwards (the drawing culls by that).
++	for (int z = 0; z < fullDepth; ++z)
++	{
++		for (int y = 0; y < height; ++y)
++		{
++			for (int x = 0; x < width; ++x)
++			{
++				const Uint8 color = voxelAt(x, y, z);
++				if (!color) continue;
++				const int voxel[3] = { x, y, z };
++
++				// The six sides: each axis, towards minus and plus.
++				for (int axis = 0; axis < 3; ++axis)
++				{
++					for (int side = -1; side <= 1; side += 2)
++					{
++						// Hidden behind a neighbouring voxel: no face.
++						int neighbour[3] = { x, y, z };
++						neighbour[axis] += side;
++						if (voxelAt(neighbour[0], neighbour[1], neighbour[2])) continue;
++
++						// The other two axes, in the order that winds the face outwards.
++						const int tangent1 = side > 0 ? (axis + 1) % 3 : (axis + 2) % 3, tangent2 = side > 0 ? (axis + 2) % 3 : (axis + 1) % 3;
++						VoxelFace face;
++						face.color = color;
++						if (axis < 2)
++						{
++							// A side face (across the picture): the picture's dark outline stays on the
++							// front and back faces, and the sides show the colour just inside it.
++							const int insideX = x - (axis == 0 ? side : 0), insideY = y - (axis == 1 ? side : 0);
++							if (solid(insideX, insideY)) face.color = picture->getPixel(insideX, insideY);
++						}
++
++						// The four corners: the voxel spans +-0.5 around its centre, the face lies on
++						// its minus or plus side, and the corners go round the two other axes.
++						for (int cornerIndex = 0; cornerIndex < 4; ++cornerIndex)
++						{
++							float cornerPos[3] = { voxel[0] - 0.5f, voxel[1] - 0.5f, voxel[2] - 0.5f - MaxHalfDepth };
++							cornerPos[axis] += side > 0 ? 1.0f : 0.0f;
++							if (cornerIndex == 1 || cornerIndex == 2) cornerPos[tangent1] += 1.0f;
++							if (cornerIndex == 2 || cornerIndex == 3) cornerPos[tangent2] += 1.0f;
++							std::copy(cornerPos, cornerPos + 3, face.corner[cornerIndex]);
++						}
++						faces.push_back(face);
++					}
++				}
++			}
++		}
++	}
++}
++
++}
++
++// Thanks mom and dad! You were the ones who exposed me to my first comp.
+diff --git a/src/FirstPerson/FirstPersonVoxelModel.h b/src/FirstPerson/FirstPersonVoxelModel.h
+new file mode 100644
+index 000000000..506cc81c7
+--- /dev/null
++++ b/src/FirstPerson/FirstPersonVoxelModel.h
+@@ -0,0 +1,70 @@
++#pragma once
++/*
++ * ==============================================================================================
++ *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
++ * ==============================================================================================
++ *
++ *  Our philosophy
++ *
++ *  - Faithful first. The 3D view should feel as if it had shipped with UFO: Enemy Unknown on
++ *    the day the game came out.
++ *  - Another camera on the same battle. The original rules decide everything: time units,
++ *    energy, accuracy, line of fire, reaction fire, doors and morale. The 3D view only shows
++ *    what the game does.
++ *  - Only the original assets: the game's own maps, voxel shapes, sprites, palette and sounds.
++ *  - Every addition is a setting. Jumping, night vision as gear, falling, FPS-style shooting
++ *    and dual wield can all be switched off.
++ *  - Light on the engine. Our code lives in this folder, the core only gets small hooks, and
++ *    without the OpenXcom3D mod nothing changes.
++ *  - Runs anywhere: a software renderer on the CPU, no graphics card needed.
++ *  - Written for people: descriptive names, and a comment for every function and every block.
++ *
++ *  Date: 2026-10-19
++ *
++ *  We wish everyone all the best and all health!
++ * ==============================================================================================
++ */
++/*
++ * Copyright 2010-2026 OpenXcom Developers.
++ *
++ * This file is part of OpenXcom.
++ *
++ * OpenXcom is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * OpenXcom is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/*
++ * FirstPersonVoxelModel.h: items given volume. An item's inventory picture (the game's own,
++ * from BIGOBS.PCK) becomes a small voxel model, cushion style: each picture pixel a column of
++ * voxels in depth, deepest in the middle. The weapon or other item in the soldier's hand
++ * (FirstPersonMode) and an item thrown through the air (FirstPersonView) are drawn from it.
++ */
++#include <vector>
++#include <SDL.h>
++
++namespace OpenXcom
++{
++
++class Surface;
++
++/// One face of a voxel model, between a voxel and the air: its four corners in picture x, y and
++/// depth (depth centred on 0), wound so that the cross product of its first two edges points
++/// outwards, and its palette colour.
++struct VoxelFace { float corner[4][3]; Uint8 color; };
++
++/// Gives a picture volume: the faces of its voxel model (none for an empty picture).
++void voxelizePicture(Surface *picture, std::vector<VoxelFace> &faces);
++
++}
++
++// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..0bb19d2cd
+index 000000000..83f2f474c
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,574 @@
+@@ -0,0 +1,579 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -20671,6 +21297,11 @@ index 000000000..0bb19d2cd
 +			static const char *const upscaleNames[] = { "STR_FPS_UPSCALE_OFF", "STR_FPS_UPSCALE_SMOOTH", "STR_FPS_UPSCALE_DETAIL" };
 +			return std::string(tr(upscaleNames[std::clamp(*option.asInt(), 0, 2)]));
 +		}
++		// A pixel size of 0 is Auto (see AutoPixelMaxWidth).
++		if (option.id() == "fpsPixelSize" && *option.asInt() == 0)
++		{
++			return std::string(tr("STR_FPS_AUTO"));
++		}
 +		// A frame rate limit of 0 means no limit.
 +		return option.id() == "FPS" && *option.asInt() == 0 ? std::string(tr("STR_FPS_UNLIMITED")) : std::to_string(*option.asInt());
 +	case OPTION_KEY:
@@ -20832,10 +21463,10 @@ index 000000000..0bb19d2cd
 +		{
 +			*value = std::clamp(*value + direction, 0, 6);
 +		}
-+		// Pixel size: 1 to 3.
++		// Pixel size: Auto (0), then 1 to 3.
 +		else if (value == &Options::fpsPixelSize)
 +		{
-+			*value = std::clamp(*value + direction, 1, 3);
++			*value = std::clamp(*value + direction, 0, 3);
 +		}
 +		// Time units per level a flying soldier pays: 0 to 24.
 +		else if (value == &Options::fpsFlightCost)
@@ -21370,10 +22001,10 @@ index 2242d13f8..7fd17b1f2 100644
  	bool isManaBarEnabled() const { return _manaBattleUI; }
  	/// Is the mana trained as a primary skill (e.g. like firing accuracy)?
 diff --git a/src/OpenXcom.2010.vcxproj b/src/OpenXcom.2010.vcxproj
-index 99f24ce43..97f4b3dad 100644
+index 99f24ce43..a396ebcb4 100644
 --- a/src/OpenXcom.2010.vcxproj
 +++ b/src/OpenXcom.2010.vcxproj
-@@ -431,6 +431,27 @@
+@@ -431,6 +431,28 @@
      <ClCompile Include="Battlescape\DebriefingState.cpp" />
      <ClCompile Include="Battlescape\ExperienceOverviewState.cpp" />
      <ClCompile Include="Battlescape\Explosion.cpp" />
@@ -21397,11 +22028,12 @@ index 99f24ce43..97f4b3dad 100644
 +    <ClCompile Include="FirstPerson\FirstPersonViewTerrain.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonViewUfo.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonViewUpscaling.cpp" />
++    <ClCompile Include="FirstPerson\FirstPersonVoxelModel.cpp" />
 +    <ClCompile Include="FirstPerson\OptionsFirstPersonState.cpp" />
      <ClCompile Include="Battlescape\ExplosionBState.cpp" />
      <ClCompile Include="Battlescape\ExtendedBattlescapeLinksState.cpp" />
      <ClCompile Include="Battlescape\ExtendedInventoryLinksState.cpp" />
-@@ -910,6 +931,16 @@
+@@ -910,6 +932,17 @@
      <ClInclude Include="Battlescape\DebriefingState.h" />
      <ClInclude Include="Battlescape\ExperienceOverviewState.h" />
      <ClInclude Include="Battlescape\Explosion.h" />
@@ -21413,16 +22045,17 @@ index 99f24ce43..97f4b3dad 100644
 +    <ClInclude Include="FirstPerson\FirstPersonView.h" />
 +    <ClInclude Include="FirstPerson\FirstPersonViewRayWalk.h" />
 +    <ClInclude Include="FirstPerson\FirstPersonViewShared.h" />
++    <ClInclude Include="FirstPerson\FirstPersonVoxelModel.h" />
 +    <ClInclude Include="FirstPerson\OptionsFirstPersonState.h" />
 +    <ClInclude Include="FirstPerson\RuleFirstPerson.h" />
      <ClInclude Include="Battlescape\ExplosionBState.h" />
      <ClInclude Include="Battlescape\ExtendedBattlescapeLinksState.h" />
      <ClInclude Include="Battlescape\ExtendedInventoryLinksState.h" />
 diff --git a/src/OpenXcom.2010.vcxproj.filters b/src/OpenXcom.2010.vcxproj.filters
-index 92dbcdf0a..765c75c64 100644
+index 92dbcdf0a..358ff8f26 100644
 --- a/src/OpenXcom.2010.vcxproj.filters
 +++ b/src/OpenXcom.2010.vcxproj.filters
-@@ -329,6 +329,69 @@
+@@ -329,6 +329,72 @@
      <ClCompile Include="Battlescape\Explosion.cpp">
        <Filter>Battlescape</Filter>
      </ClCompile>
@@ -21486,13 +22119,16 @@ index 92dbcdf0a..765c75c64 100644
 +    <ClCompile Include="FirstPerson\FirstPersonViewUpscaling.cpp">
 +      <Filter>FirstPerson</Filter>
 +    </ClCompile>
++    <ClCompile Include="FirstPerson\FirstPersonVoxelModel.cpp">
++      <Filter>FirstPerson</Filter>
++    </ClCompile>
 +    <ClCompile Include="FirstPerson\OptionsFirstPersonState.cpp">
 +      <Filter>FirstPerson</Filter>
 +    </ClCompile>
      <ClCompile Include="Geoscape\ItemsArrivingState.cpp">
        <Filter>Geoscape</Filter>
      </ClCompile>
-@@ -1571,6 +1634,36 @@
+@@ -1571,6 +1637,39 @@
      <ClInclude Include="Battlescape\Explosion.h">
        <Filter>Battlescape</Filter>
      </ClInclude>
@@ -21520,6 +22156,9 @@ index 92dbcdf0a..765c75c64 100644
 +    <ClInclude Include="FirstPerson\FirstPersonViewShared.h">
 +      <Filter>FirstPerson</Filter>
 +    </ClInclude>
++    <ClInclude Include="FirstPerson\FirstPersonVoxelModel.h">
++      <Filter>FirstPerson</Filter>
++    </ClInclude>
 +    <ClInclude Include="FirstPerson\OptionsFirstPersonState.h">
 +      <Filter>FirstPerson</Filter>
 +    </ClInclude>
@@ -21529,7 +22168,7 @@ index 92dbcdf0a..765c75c64 100644
      <ClInclude Include="Basescape\TransfersState.h">
        <Filter>Basescape</Filter>
      </ClInclude>
-@@ -2731,6 +2824,9 @@
+@@ -2731,6 +2830,9 @@
      <Filter Include="Battlescape">
        <UniqueIdentifier>{f7e493ce-c074-420c-8b38-40d81b2d0509}</UniqueIdentifier>
      </Filter>

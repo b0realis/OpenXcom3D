@@ -58,6 +58,7 @@
 #include "FirstPersonView.h"
 #include "RuleFirstPerson.h"
 #include "../Battlescape/BattlescapeGame.h"
+#include "../Battlescape/ExplosionBState.h"
 #include "../Battlescape/BattlescapeState.h"
 #include "../Battlescape/Map.h"
 #include "../Battlescape/Pathfinding.h"
@@ -74,6 +75,7 @@
 #include "../Savegame/BattleItem.h"
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/SavedBattleGame.h"
+#include "../Savegame/Tile.h"
 #include "../Savegame/SavedGame.h"
 #include "FirstPersonModeShared.h"
 
@@ -918,6 +920,76 @@ void FirstPersonMode::applyDoomMode(BattleUnit *unit)
 }
 
 /**
+ * Doom mode (a first step towards a real-time mode): a grenade primed there (pulling the pin is
+ * one click, see fire) burns for DoomFuseTime and then goes off wherever it is: where it lies,
+ * or in the hand of whoever still holds it, as in a first-person shooter; one still in the air
+ * goes off where it lands. The explosion is the game's own, as its end-of-turn fuse makes it
+ * (an ExplosionBState for a timed grenade at the grenade's tile, which also removes it). One at
+ * a time, on the player's turn, when the game isn't busy with a shot or another explosion.
+ * Leaving Doom mode stops the real-time fuses (the game's own fuse, set to 0, is still there:
+ * the grenade then goes off at the end of the turn, as usual).
+ * @param now The time, SDL ticks.
+ */
+void FirstPersonMode::updateDoomFuses(Uint32 now)
+{
+	if (_doomFuses.empty())
+	{
+		return;
+	}
+	if (!Options::fpsDoomMode)
+	{
+		_doomFuses.clear();
+		return;
+	}
+	BattlescapeGame *battleGame = _state->_battleGame;
+	if (battleGame->isBusy() || _save->getSide() != FACTION_PLAYER)
+	{
+		return;
+	}
+	for (auto entry = _doomFuses.begin(); entry != _doomFuses.end(); )
+	{
+		// The grenade, if it's still in the battle and still primed.
+		BattleItem *grenade = nullptr;
+		for (BattleItem *item : *_save->getItems())
+		{
+			if (item->getId() == entry->first)
+			{
+				grenade = item;
+				break;
+			}
+		}
+		if (!grenade || grenade->getFuseTimer() < 0)
+		{
+			entry = _doomFuses.erase(entry);
+			continue;
+		}
+		if (now - entry->second < DoomFuseTime)
+		{
+			++entry;
+			continue;
+		}
+
+		// Where it is: on the ground, or with whoever carries it (at their middle). Neither: it's
+		// in the air, and goes off where it lands.
+		const Tile *tile = grenade->getTile();
+		BattleUnit *carrier = grenade->getOwner();
+		if (!tile && carrier)
+		{
+			tile = carrier->getTile();
+		}
+		if (!tile)
+		{
+			++entry;
+			continue;
+		}
+		const Position centre = tile->getPosition().toVoxel() + Position(8, 8, -tile->getTerrainLevel() + (carrier ? carrier->getHeight() / 2 : 0));
+		_doomFuses.erase(entry);
+		battleGame->statePushBack(new ExplosionBState(battleGame, centre, BattleActionAttack::GetBeforeShoot(BA_TRIGGER_TIMED_GRENADE, carrier, grenade)));
+		return; // the next one waits for this explosion to end
+	}
+}
+
+/**
  * Combat music (setting "Combat music"): while aliens are in sight a tenser track plays (the
  * first of the mod's combat tracks that exists); when none has been seen for 8 seconds the
  * battle music comes back. With the setting off, the battle music comes back at once.
@@ -1047,11 +1119,12 @@ void FirstPersonMode::think()
 		return;
 	}
 
-	// Doom mode (debug) tops the soldier up, on your turn.
+	// Doom mode (debug) tops the soldier up, on your turn, and its grenades burn in real time.
 	if (playerTurn && Options::fpsDoomMode && unit->getFaction() == FACTION_PLAYER)
 	{
 		applyDoomMode(unit);
 	}
+	updateDoomFuses(now);
 
 	// Turning with the keys, and the view's settings (they can change in the options).
 	turnWithKeys(elapsedSeconds);

@@ -73,9 +73,242 @@
 #include "../Battlescape/Projectile.h"
 #include "FirstPersonParticles.h"
 #include "FirstPersonViewShared.h"
+#include "FirstPersonVoxelModel.h"
 
 namespace OpenXcom
 {
+
+/**
+ * The voxel model of an item's kind (see FirstPersonVoxelModel.h): its inventory picture (from
+ * BIGOBS.PCK, as the inventory and the weapon in hand show it) given volume, made the first time
+ * it's asked for and kept. A kind with no picture gets an empty model.
+ * @param item An item of the kind.
+ * @return Its model: the faces, and the middle of the picture's opaque pixels.
+ */
+const FirstPersonView::ItemModel &FirstPersonView::itemModel(BattleItem *item)
+{
+	const RuleItem *rules = item->getRules();
+	auto found = _itemModels.find(rules);
+	if (found != _itemModels.end())
+	{
+		return found->second;
+	}
+	ItemModel &model = _itemModels[rules];
+	model.middle[0] = model.middle[1] = 0.0f;
+	SurfaceSet *inventorySprites = _game->getMod()->getSurfaceSet("BIGOBS.PCK");
+	if (!inventorySprites)
+	{
+		return model;
+	}
+
+	// The picture, drawn as the inventory draws it, then given volume.
+	if (!_itemPicture)
+	{
+		_itemPicture = new Surface(32, 48, 0, 0);
+	}
+	_itemPicture->clear();
+	rules->drawHandSprite(inventorySprites, _itemPicture, item, _save, 0);
+	voxelizePicture(_itemPicture, model.faces);
+
+	// The middle of its opaque pixels: the point that flies along the game's path.
+	int minX = INT_MAX, maxX = -1, minY = INT_MAX, maxY = -1;
+	for (int y = 0; y < _itemPicture->getHeight(); ++y)
+	{
+		for (int x = 0; x < _itemPicture->getWidth(); ++x)
+		{
+			if (!_itemPicture->getPixel(x, y)) continue;
+			minX = std::min(minX, x); maxX = std::max(maxX, x);
+			minY = std::min(minY, y); maxY = std::max(maxY, y);
+		}
+	}
+	if (maxX >= 0)
+	{
+		model.middle[0] = (minX + maxX) / 2.0f;
+		model.middle[1] = (minY + maxY) / 2.0f;
+	}
+	return model;
+}
+
+/**
+ * Draws a thrown item in flight as its voxel model, at the game's position on its path: level
+ * with the path to start with (the picture's right along it, its depth across it), turning end
+ * over end about the axis across the path (ThrownItemSpin turns a second), ThrownItemScale
+ * voxels per picture pixel. Its faces that look at the eye are drawn far to near, depth-tested
+ * against the world (walls and nearer things hide it), each darkened by how far it turns from
+ * the light above and by the light where it is (the game's, lamps, the flashlight and flares, as
+ * on units).
+ * The work is done in true proportions (heights scaled by ZScale), like the camera.
+ * @param projectile The game's projectile carrying it.
+ * @param item The item thrown.
+ * @return False if the item has no voxel model (it's then drawn as its sprite).
+ */
+bool FirstPersonView::drawThrownItem(const Projectile *projectile, BattleItem *item)
+{
+	const ItemModel &model = itemModel(item);
+	if (model.faces.empty())
+	{
+		return false;
+	}
+
+	// Where it is, and which way it flies on the level: from where it was a few steps back.
+	const Position current = projectile->getPosition(0), before = projectile->getPosition(-4);
+	const double centre[3] = { (double)current.x, (double)current.y, current.z * ZScale };
+	double path[2] = { (double)(current.x - before.x), (double)(current.y - before.y) };
+	const double pathLength = std::sqrt(path[0] * path[0] + path[1] * path[1]);
+	if (pathLength < 1e-6)
+	{
+		path[0] = 1.0; path[1] = 0.0; // straight up or down: any level direction will do
+	}
+	else
+	{
+		path[0] /= pathLength; path[1] /= pathLength;
+	}
+
+	// Its axes in the world, each one picture pixel (or voxel of depth) long: right along the
+	// path, down towards the ground, depth across the path; the first two turned end over end.
+	const double angle = (SDL_GetTicks() - _thrownStart) / 1000.0 * ThrownItemSpin * 2.0 * Pi;
+	const double along[3] = { path[0], path[1], 0.0 }, upward[3] = { 0.0, 0.0, 1.0 };
+	double stepPerX[3], stepPerY[3];
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		stepPerX[axis] = (along[axis] * std::cos(angle) + upward[axis] * std::sin(angle)) * ThrownItemScale;
+		stepPerY[axis] = (along[axis] * std::sin(angle) - upward[axis] * std::cos(angle)) * ThrownItemScale;
+	}
+	const double stepPerDepth[3] = { path[1] * ThrownItemScale, -path[0] * ThrownItemScale, 0.0 };
+
+	// A mirror image turns the faces' windings round: the sign of the map's determinant tells.
+	const double determinant = stepPerX[0] * (stepPerY[1] * stepPerDepth[2] - stepPerY[2] * stepPerDepth[1])
+		- stepPerX[1] * (stepPerY[0] * stepPerDepth[2] - stepPerY[2] * stepPerDepth[0])
+		+ stepPerX[2] * (stepPerY[0] * stepPerDepth[1] - stepPerY[1] * stepPerDepth[0]);
+	const double windingSign = determinant < 0.0 ? -1.0 : 1.0;
+
+	// The light on it, as on units, and where the light comes from (above, a little to the side).
+	const float point[3] = { (float)current.x, (float)current.y, (float)current.z };
+	const int shade = (int)std::lround(std::clamp(lightAt(point[0], point[1], point[2]) - pointLight(point, nullptr, false)
+		- flareLight(point, nullptr, false) * 8.0f, 0.0f, 15.0f));
+	const double towardsLight[3] = { 0.30, -0.35, 0.89 };
+
+	// The eye in true proportions, and the view's focal length in pixels.
+	const double eye[3] = { _eye[0], _eye[1], _eye[2] * ZScale };
+	const double focalLength = (getWidth() / 2.0) / _halfFovTangent;
+
+	// Each face that shows: on the screen, with its shaded colour and its distance ahead.
+	struct Quad { float depth; double screen[4][2]; Uint8 color; };
+	std::vector<Quad> quads;
+	quads.reserve(model.faces.size() / 2);
+	for (const VoxelFace &face : model.faces)
+	{
+		// Its corners in the world, and ahead of / right of / above the eye.
+		double worldCorners[4][3], ahead[4], toRight[4], above[4];
+		bool tooClose = false;
+		for (int cornerIndex = 0; cornerIndex < 4 && !tooClose; ++cornerIndex)
+		{
+			const double pictureX = face.corner[cornerIndex][0] - model.middle[0], pictureY = face.corner[cornerIndex][1] - model.middle[1];
+			const double depth = face.corner[cornerIndex][2];
+			ahead[cornerIndex] = toRight[cornerIndex] = above[cornerIndex] = 0.0;
+			for (int axis = 0; axis < 3; ++axis)
+			{
+				worldCorners[cornerIndex][axis] = centre[axis] + pictureX * stepPerX[axis] + pictureY * stepPerY[axis] + depth * stepPerDepth[axis];
+				const double relative = worldCorners[cornerIndex][axis] - eye[axis];
+				ahead[cornerIndex] += relative * _forward[axis];
+				toRight[cornerIndex] += relative * _right[axis];
+				above[cornerIndex] += relative * _up[axis];
+			}
+			tooClose = ahead[cornerIndex] < 4.0; // right in front of the camera, as sprites
+		}
+		if (tooClose)
+		{
+			continue;
+		}
+
+		// Its outward normal and its centre: drawn only if it turns towards the eye.
+		double edge1[3], edge2[3], faceNormal[3], faceCentre[3];
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			edge1[axis] = worldCorners[1][axis] - worldCorners[0][axis];
+			edge2[axis] = worldCorners[3][axis] - worldCorners[0][axis];
+			faceCentre[axis] = (worldCorners[0][axis] + worldCorners[2][axis]) * 0.5;
+		}
+		faceNormal[0] = (edge1[1] * edge2[2] - edge1[2] * edge2[1]) * windingSign;
+		faceNormal[1] = (edge1[2] * edge2[0] - edge1[0] * edge2[2]) * windingSign;
+		faceNormal[2] = (edge1[0] * edge2[1] - edge1[1] * edge2[0]) * windingSign;
+		if (faceNormal[0] * (faceCentre[0] - eye[0]) + faceNormal[1] * (faceCentre[1] - eye[1]) + faceNormal[2] * (faceCentre[2] - eye[2]) >= 0.0)
+		{
+			continue;
+		}
+
+		// Shading: up to 3 shades darker as it turns from the light, plus the light where it is
+		// (within the colour's group of 16 shades).
+		const double normalLength = std::sqrt(faceNormal[0] * faceNormal[0] + faceNormal[1] * faceNormal[1] + faceNormal[2] * faceNormal[2]);
+		const double lighting = std::max(0.0,
+			(faceNormal[0] * towardsLight[0] + faceNormal[1] * towardsLight[1] + faceNormal[2] * towardsLight[2]) / normalLength);
+		Quad quad;
+		quad.color = shadeColor(face.color, (int)std::lround((1.0 - lighting) * 3.0) + shade);
+		quad.depth = (float)((ahead[0] + ahead[2]) * 0.5);
+		for (int cornerIndex = 0; cornerIndex < 4; ++cornerIndex)
+		{
+			quad.screen[cornerIndex][0] = getWidth() / 2.0 + toRight[cornerIndex] * focalLength / ahead[cornerIndex];
+			quad.screen[cornerIndex][1] = getHeight() / 2.0 - above[cornerIndex] * focalLength / ahead[cornerIndex];
+		}
+		quads.push_back(quad);
+	}
+
+	// Far to near, each behind whatever is nearer in the world.
+	std::sort(quads.begin(), quads.end(), [](const Quad &first, const Quad &second) { return first.depth > second.depth; });
+	for (const Quad &quad : quads)
+	{
+		fillQuadAtDepth(quad.screen, quad.color, quad.depth);
+	}
+	return true;
+}
+
+/**
+ * Fills a convex quadrilateral on the view, row by row (a scanline fill): every pixel whose
+ * centre lies inside it and where nothing nearer is drawn yet, noting its depth there.
+ * @param corners The four corners on the view, in pixels, in order around the edge.
+ * @param color Palette colour to fill with.
+ * @param depth Its distance ahead of the camera (the depth buffer's measure).
+ */
+void FirstPersonView::fillQuadAtDepth(const double corners[4][2], Uint8 color, float depth)
+{
+	const int width = getWidth(), height = getHeight();
+
+	// The rows it covers: those whose pixel centres lie between its top and bottom corners.
+	double top = corners[0][1], bottom = corners[0][1];
+	for (int cornerIndex = 1; cornerIndex < 4; ++cornerIndex)
+	{
+		top = std::min(top, corners[cornerIndex][1]);
+		bottom = std::max(bottom, corners[cornerIndex][1]);
+	}
+	const int firstRow = std::max(0, (int)std::ceil(top - 0.5)), lastRow = std::min(height - 1, (int)std::floor(bottom - 0.5));
+	for (int y = firstRow; y <= lastRow; ++y)
+	{
+		// Where the row's centre line crosses the edges: the leftmost and rightmost crossing.
+		const double rowCentreY = y + 0.5;
+		double leftX = 1e9, rightX = -1e9;
+		for (int cornerIndex = 0; cornerIndex < 4; ++cornerIndex)
+		{
+			const double *edgeStart = corners[cornerIndex], *edgeEnd = corners[(cornerIndex + 1) % 4];
+			if ((edgeStart[1] <= rowCentreY && edgeEnd[1] > rowCentreY) || (edgeEnd[1] <= rowCentreY && edgeStart[1] > rowCentreY))
+			{
+				const double crossX = edgeStart[0] + (rowCentreY - edgeStart[1]) / (edgeEnd[1] - edgeStart[1]) * (edgeEnd[0] - edgeStart[0]);
+				leftX = std::min(leftX, crossX);
+				rightX = std::max(rightX, crossX);
+			}
+		}
+
+		// The pixels between the two crossings that nothing nearer covers.
+		const int firstColumn = std::max(0, (int)std::ceil(leftX - 0.5)), lastColumn = std::min(width - 1, (int)std::floor(rightX - 0.5));
+		Uint8 *screenRow = getRaw(0, y);
+		float *depthRow = &_depthBuffer[y * width];
+		for (int x = firstColumn; x <= lastColumn; ++x)
+		{
+			if (depth >= depthRow[x]) continue;
+			screenRow[x] = color;
+			depthRow[x] = depth;
+		}
+	}
+}
 
 /**
  * Draws what flies and what explodes, as sprites and dots in the world: a thrown item (its own
@@ -96,14 +329,18 @@ void FirstPersonView::drawProjectilesAndExplosions()
 	{
 		if (BattleItem *item = projectile->getItem())
 		{
-			// A thrown item: its sprite as the map draws it, put into the sprite buffer at
-			// (16, 8) and stood at the item's position in the world.
-			const Position position = projectile->getPosition();
-			const double world[3] = { (double)position.x, (double)position.y, (double)position.z };
-			ItemSprite itemSprite(_spriteBuffer, mod, _save, 0);
-			_spriteBuffer->clear();
-			itemSprite.draw(item, 16, 8, 0);
-			drawSpriteSmooth(_spriteBuffer, 32, 34, world, 4.0, 0); // like Map: the voxel sits at sprite pixel (16, 26)
+			// A thrown item: as its voxel model, tumbling; one with no inventory picture as its
+			// sprite as the map draws it, put into the sprite buffer at (16, 8) and stood at the
+			// item's position in the world.
+			if (!drawThrownItem(projectile, item))
+			{
+				const Position position = projectile->getPosition();
+				const double world[3] = { (double)position.x, (double)position.y, (double)position.z };
+				ItemSprite itemSprite(_spriteBuffer, mod, _save, 0);
+				_spriteBuffer->clear();
+				itemSprite.draw(item, 16, 8, 0);
+				drawSpriteSmooth(_spriteBuffer, 32, 34, world, 4.0, 0); // like Map: the voxel sits at sprite pixel (16, 26)
+			}
 		}
 		else if (_shotTrail != TRAIL_BEAM) // beams are drawn as lines
 		{
@@ -723,6 +960,10 @@ void FirstPersonView::beginShot(Projectile *projectile)
 	const Position firedFrom = projectile->getPosition(-100000), current = projectile->getPosition(0);
 	float origin[3] = { (float)firedFrom.x, (float)firedFrom.y, (float)firedFrom.z };
 	_lastProjectileThrown = projectile->getItem() != nullptr;
+	if (_lastProjectileThrown)
+	{
+		_thrownStart = SDL_GetTicks(); // it tumbles from here
+	}
 	// Whose shot: one starting within 20 voxels of the eye is our own (and the weapon in hand
 	// flashes); any other shot (not a thrown item; a squadmate's counts too) is taken for an
 	// enemy's, which may whizz past us and whose origin a hit on us points back to.

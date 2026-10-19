@@ -456,6 +456,27 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 		}
 	}
 
+	// Doom mode (a first step towards a real-time mode): pulling the pin is one click, no menu
+	// and no timer to pick: the game's own prime action with its fuse at 0 (it spends the time
+	// units Doom mode refills), and a grenade then burns DoomFuseTime in real time (see
+	// updateDoomFuses).
+	if (mode == BA_PRIME && Options::fpsDoomMode && !menuTargeting)
+	{
+		action->actor = unit;
+		action->weapon = weapon;
+		action->type = BA_PRIME;
+		action->value = 0;
+		action->targeting = false;
+		action->result.clear();
+		action->updateTU();
+		battleGame->handleNonTargetAction();
+		if (weapon->getFuseTimer() >= 0 && weapon->getRules()->getBattleType() == BT_GRENADE)
+		{
+			_doomFuses[weapon->getId()] = SDL_GetTicks();
+		}
+		return;
+	}
+
 	// Medi-kit, scanner, priming...: the item's own action menu, as clicking it on the HUD.
 	if ((mode == BA_USE || mode == BA_PRIME) && !menuTargeting)
 	{
