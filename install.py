@@ -40,9 +40,13 @@ Deep) are never modified: the installed profile only links to them.
 An installation looks like this:
 
   <target>/bin/openxcom        the game
+  <target>/lib/                the SDL libraries it comes with (the prebuilt release)
   <target>/data/               the engine's own data (common/, standard/)
   <target>/user/               the profile: options.cfg, the OpenXcom3D mod, links to the games
   <target>/play.sh             starts the game with that data and profile
+
+The prebuilt release needs nothing installed: only glibc 2.34 or newer (2021 on) and the
+system's own display, sound and OpenGL, which every desktop and the Steam Deck have.
 """
 
 import argparse
@@ -55,7 +59,7 @@ from pathlib import Path
 
 # ---- What is installed, and what it is built from ----
 
-VERSION = "0.8.1"
+VERSION = "0.8.2"
 # OpenXcom3D is a patch on one exact commit of OpenXcom Extended (OXCE).
 BASE_REPO = "https://github.com/MeridianOXC/OpenXcom.git"
 BASE_BRANCH = "oxce-plus"
@@ -75,12 +79,13 @@ APT_PACKAGES = ["git", "cmake", "g++", "make", "pkg-config", "libsdl1.2-dev", "l
 PKGCONFIG_LIBS = ["sdl", "SDL_mixer", "SDL_image", "SDL_gfx", "zlib", "gl"]
 
 # How to get what the game needs, per family of Linux systems (told apart by /etc/os-release):
-# to run the prebuilt game, and to build it from source.
+# to run the prebuilt game (it comes with its SDL libraries: only OpenGL could be missing, on a
+# system without graphics drivers), and to build it from source.
 FAMILY_NAMES = {"debian": "Debian, Ubuntu, Mint", "arch": "Arch, Manjaro", "fedora": "Fedora"}
 RUN_PACKAGES = {
-    "debian": "sudo apt install libsdl1.2debian libsdl-image1.2 libsdl-mixer1.2 libsdl-gfx1.2-5",
-    "arch": "sudo pacman -S sdl12-compat sdl_image sdl_mixer sdl_gfx",
-    "fedora": "sudo dnf install sdl12-compat SDL_image SDL_mixer SDL_gfx",
+    "debian": "sudo apt install libgl1",
+    "arch": "sudo pacman -S libglvnd",
+    "fedora": "sudo dnf install libglvnd-glx",
 }
 BUILD_PACKAGES = {
     "debian": "sudo apt install " + " ".join(APT_PACKAGES),
@@ -112,25 +117,115 @@ options:
 
 # The starter script: runs the game with this installation's data and profile, after saying
 # plainly what the system lacks, if anything (the release's play.sh is this one too).
-PLAY_SH = """#!/bin/sh
-# Starts OpenXcom3D with the data and the profile in this folder.
+PLAY_SH = r"""#!/bin/sh
+# Starts OpenXcom3D. Run from its folder, it plays with the data and the profile there (user/);
+# run as the AppImage, its profile is in ~/.local/share/openxcom3d. The first time, it links the
+# original games' data into the profile: a UFO or TFTD folder in this folder, next to it or in
+# the home folder, or X-COM: UFO Defense and Terror From The Deep from a Steam library.
 # Extra arguments are passed on, e.g.  ./play.sh -load mysave.sav
 HERE="$(cd "$(dirname "$0")" && pwd)"
+
+# Says something the player must know: on the terminal, and in a window when there's none
+# (started from a menu, a file manager or Steam).
+tell() {
+	echo "$1"
+	[ -t 1 ] && return
+	zenity --error --no-wrap --title=OpenXcom3D --text="$1" 2>/dev/null ||
+		kdialog --title OpenXcom3D --error "$1" 2>/dev/null || xmessage -center "$1" 2>/dev/null
+}
+
+# The profile, and where else to look for the games' data.
+if [ -n "$APPIMAGE" ] && [ -n "$APPDIR" ]; then
+	# The AppImage can't be written to: the profile is in the home folder. It gets the mod that
+	# goes with this game every time, and the starting options the first time.
+	HERE="$APPDIR"
+	PROFILE="${XDG_DATA_HOME:-$HOME/.local/share}/openxcom3d"
+	NEXT_TO="$(dirname "$APPIMAGE")"
+	mkdir -p "$PROFILE/mods/OpenXcom3D"
+	cp -R "$APPDIR/user/mods/OpenXcom3D/." "$PROFILE/mods/OpenXcom3D/"
+	[ -f "$PROFILE/options.cfg" ] || cp "$APPDIR/user/options.cfg" "$PROFILE/options.cfg"
+else
+	PROFILE="$HERE/user"
+	NEXT_TO="$(dirname "$HERE")"
+fi
+
+# What this system lacks to start the game, if anything (it comes with its SDL libraries).
 missing=$(ldd "$HERE/bin/openxcom" 2>&1 | grep "not found" | sed 's/^[[:space:]]*//')
 if [ -n "$missing" ]; then
-	echo "OpenXcom3D can't start: this system lacks"
-	echo "$missing" | sed 's/^/  /'
 	if echo "$missing" | grep -q GLIBC_; then
-		echo "Its C library is older than glibc 2.34: build the game here with  python3 install.py --from-source"
+		tell "OpenXcom3D can't start: this system's C library is older than glibc 2.34 (2021).
+Build the game here instead:  python3 install.py --from-source
+($missing)"
 	else
-		echo "Install the libraries with:"
-		echo "  Debian, Ubuntu, Mint:  sudo apt install libsdl1.2debian libsdl-image1.2 libsdl-mixer1.2 libsdl-gfx1.2-5"
-		echo "  Arch, Manjaro:         sudo pacman -S sdl12-compat sdl_image sdl_mixer sdl_gfx"
-		echo "  Fedora:                sudo dnf install sdl12-compat SDL_image SDL_mixer SDL_gfx"
+		tell "OpenXcom3D can't start: this system lacks
+$missing
+That's the OpenGL library, which comes with the graphics drivers:
+  Debian, Ubuntu, Mint:  sudo apt install libgl1
+  Arch, Manjaro:         sudo pacman -S libglvnd
+  Fedora:                sudo dnf install libglvnd-glx"
 	fi
 	exit 1
 fi
-exec "$HERE/bin/openxcom" -data "$HERE/data/" -user "$HERE/user/" -cfg "$HERE/user/" "$@"
+
+# Is this an original game's data folder? (Both games have these folders, in either case.)
+is_game() {
+	[ -d "$1" ] || return 1
+	for part in GEODATA GEOGRAPH MAPS UFOGRAPH; do
+		ls "$1" 2>/dev/null | grep -qix "$part" || return 1
+	done
+}
+
+# The Steam libraries: Steam's own folder (installed natively, as a Flatpak or as a Snap) and
+# the other ones it lists (another disk, the Steam Deck's SD card).
+steam_libraries() {
+	for steam in "$HOME/.local/share/Steam" "$HOME/.steam/steam" "$HOME/.steam/debian-installation" \
+		"$HOME/.var/app/com.valvesoftware.Steam/.local/share/Steam" "$HOME/snap/steam/common/.local/share/Steam"; do
+		[ -d "$steam/steamapps" ] || continue
+		echo "$steam"
+		sed -n 's/^[[:space:]]*"path"[[:space:]]*"\(.*\)"[[:space:]]*$/\1/p' "$steam/steamapps/libraryfolders.vdf" 2>/dev/null
+	done
+}
+
+# Links one game's data into the profile unless it's there: the game's name (UFO or TFTD) and
+# its folder in a Steam library. A link left pointing nowhere (the data moved) is replaced.
+link_game() {
+	[ -e "$PROFILE/$1" ] && return
+	{
+		echo "$HERE/$1"; echo "$NEXT_TO/$1"; echo "$HOME/$1"
+		steam_libraries | while read -r library; do echo "$library/steamapps/common/$2"; done
+	} | while read -r folder; do
+		if is_game "$folder"; then
+			ln -sfn "$folder" "$PROFILE/$1" && echo "OpenXcom3D: using the $1 data in $folder"
+			break
+		fi
+	done
+}
+link_game UFO "XCom UFO Defense/XCOM"
+link_game TFTD "X-COM Terror from the Deep/TFD"
+if [ ! -e "$PROFILE/UFO" ] && [ ! -e "$PROFILE/TFTD" ]; then
+	tell "OpenXcom3D needs the data of the original game: X-COM: UFO Defense (UFO: Enemy Unknown)
+and/or X-COM: Terror From The Deep. Install it on Steam (it is then found by itself), or
+copy the game's folder (the one with GEODATA, GEOGRAPH, MAPS and UFOGRAPH in it) to
+  $PROFILE/UFO   (or TFTD)
+and start OpenXcom3D again."
+	exit 1
+fi
+
+# A profile the game hasn't written yet (only the starting options): switch on the game that's
+# there (UFO if both), and play fullscreen on the Steam Deck.
+if [ "$(wc -l < "$PROFILE/options.cfg")" -lt 25 ]; then
+	if [ ! -e "$PROFILE/UFO" ]; then
+		awk '{ line[NR] = $0 } /id: xcom1$/ { sub(/true/, "false", line[NR-1]) } /id: xcom2$/ { sub(/false/, "true", line[NR-1]) }
+			END { for (i = 1; i <= NR; i++) print line[i] }' "$PROFILE/options.cfg" > "$PROFILE/options.cfg.new" &&
+			mv "$PROFILE/options.cfg.new" "$PROFILE/options.cfg"
+	fi
+	if grep -qs '^ID=steamos' /etc/os-release; then
+		sed 's/^  fullscreen: false/  fullscreen: true/' "$PROFILE/options.cfg" > "$PROFILE/options.cfg.new" &&
+			mv "$PROFILE/options.cfg.new" "$PROFILE/options.cfg"
+	fi
+fi
+
+exec "$HERE/bin/openxcom" -data "$HERE/data/" -user "$PROFILE/" -cfg "$PROFILE/" "$@"
 """
 
 # A desktop menu entry (with --desktop).
@@ -269,7 +364,8 @@ def show_packages(commands):
 def check_runtime(binary):
     """
     Checks that this system can run the prebuilt game, and says what's missing and how to get
-    it. Returns True if nothing is missing.
+    it. Returns True if nothing is missing. (It comes with its SDL libraries in lib/: only an old
+    glibc or a missing OpenGL library can stop it.)
     """
     problems = []
     old_glibc = False
@@ -279,16 +375,6 @@ def check_runtime(binary):
         if "not found" in line:
             problems.append(line.strip())
             old_glibc = old_glibc or "GLIBC_" in line
-    # SDL_gfx is opened once the game runs, in whatever version is installed, so ldd can't see it.
-    library_list = ""
-    for ldconfig in [shutil.which("ldconfig"), "/sbin/ldconfig", "/usr/sbin/ldconfig"]:
-        if ldconfig and os.path.exists(ldconfig):
-            library_list = subprocess.run([ldconfig, "-p"], capture_output=True, text=True).stdout
-            break
-    if "libSDL_gfx.so" not in library_list:
-        folders = ["/usr/lib", "/usr/lib64", "/usr/lib/x86_64-linux-gnu", "/usr/local/lib"]
-        if not any(Path(folder).glob("libSDL_gfx.so*") for folder in folders if Path(folder).is_dir()):
-            problems.append("SDL_gfx (any version)")
     if not problems:
         return True
     say("  this system lacks what the game needs to run:")
@@ -297,7 +383,7 @@ def check_runtime(binary):
     if old_glibc:
         say("  its C library is older than glibc 2.34: build the game here instead, with --from-source")
     else:
-        say("  install it with:")
+        say("  that's the OpenGL library (it comes with the graphics drivers); install it with:")
         show_packages(RUN_PACKAGES)
     return False
 
@@ -363,7 +449,8 @@ def build_from_source(workdir, repo, jobs):
 def find_release():
     """
     The prebuilt files: this folder if it is a release, else the release folder next to it.
-    Returns the folders of the game, its data and the OpenXcom3D mod, or None if there's none.
+    Returns the folders of the game, its data and the OpenXcom3D mod, or None if there's none
+    (the game's libraries are in lib/ next to bin/).
     """
     for folder in [HERE, HERE / "release" / RELEASE_NAME]:
         if (folder / "bin" / "openxcom").is_file() and (folder / "data" / "standard").is_dir():
@@ -377,11 +464,14 @@ def find_release():
 
 def install(target, binary_dir, data_dir, mod_dir, ufo, tftd, desktop):
     """Lays out bin/, data/, user/ (mod, links to the games, options) and play.sh in the target."""
-    # The game itself.
+    # The game itself, and the libraries the prebuilt one comes with (lib/ next to bin/; a game
+    # built from source uses the system's).
     target.mkdir(parents=True, exist_ok=True)
     (target / "bin").mkdir(exist_ok=True)
     shutil.copy2(binary_dir / "openxcom", target / "bin" / "openxcom")
     os.chmod(target / "bin" / "openxcom", 0o755)
+    if (binary_dir.parent / "lib" / "libSDL2-2.0.so.0").exists():
+        shutil.copytree(binary_dir.parent / "lib", target / "lib", dirs_exist_ok=True)
 
     # The engine's own data.
     for part in ["common", "standard"]:

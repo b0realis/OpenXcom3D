@@ -1,6 +1,6 @@
 # OpenXcom3D manual
 
-Version 0.8. OpenXcom3D is **OpenXcom Extended (OXCE)** with a first-person 3D battlescape: an engine add-on (`src/FirstPerson/`, with small hooks in the core) and a data mod (`OpenXcom3D`) that switches it on.
+Version 0.8.2. OpenXcom3D is **OpenXcom Extended (OXCE)** with a first-person 3D battlescape: an engine add-on (`src/FirstPerson/`, with small hooks in the core) and a data mod (`OpenXcom3D`) that switches it on.
 
 1. [Installing](#1-installing)
 2. [Controls](#2-controls)
@@ -21,33 +21,41 @@ You need your own copy of the original game data: *UFO: Enemy Unknown / X-COM: U
 Add-on builds keep their own user and config folders, so an existing OXCE profile is never touched:
 
 - the release's `user/` folder, when started with `play.sh`;
+- `~/.local/share/openxcom3d` for the AppImage;
 - otherwise `~/.local/share/openxcom3d` and `~/.config/openxcom3d`.
 
 ### Option A: the prebuilt release (Linux x86-64)
 
-The release folder `OpenXcom3D-0.8.1-linux-x86_64/` contains:
+Download it from the project's [Releases](https://github.com/b0realis/OpenXcom3D/releases) page, in either form:
+
+- **`OpenXcom3D-0.8.2-x86_64.AppImage`**: a single file. Make it executable (`chmod +x OpenXcom3D-0.8.2-x86_64.AppImage`, or *Properties → Permissions → executable* in a file manager) and run it. Its profile is in `~/.local/share/openxcom3d`.
+- **`OpenXcom3D-0.8.2-linux-x86_64.tar.gz`**: unpack it anywhere and run `./play.sh`. Its profile is the `user/` folder inside.
+
+**Nothing needs installing.** The game comes with its own libraries: SDL 1.2 (sdl12-compat on SDL2), SDL_image and SDL_mixer in `lib/`, with SDL_gfx built in. All it takes from the system is glibc 2.34 or newer (2021 on: Ubuntu 22.04 and newer, Debian 12, Fedora 35 and newer, RHEL 9, Mint 21, every current Arch, Manjaro or other rolling system, and SteamOS), plus the display, sound and OpenGL every desktop has. SDL opens X11 or Wayland and PulseAudio, PipeWire or ALSA when the game starts. On a system older than glibc 2.34, build it from source (option B).
+
+The archive holds:
 
 ```
 bin/openxcom              the engine (OXCE 8.7.1 + OpenXcom3D)
+lib/                      the SDL libraries it comes with
 data/common, standard     OXCE's own data
 user/mods/OpenXcom3D      the mod
 user/options.cfg          a starting profile: UFO + OpenXcom3D, 1280x800 window
-play.sh                   starts the game with this folder's data and profile
-install.py, README.md, OpenXcom3D_manual.md
+play.sh                   starts the game (finds the game data, says what's missing)
+steamdeck/                the Steam Deck controller layout, and the script that sets it
+licenses/                 the licences of the libraries in lib/
+install.py, README.md, OpenXcom3D_manual.md, openxcom3d.patch, LICENSE.txt
 ```
 
-It runs on old and new Linux systems alike: any with **glibc 2.34 or newer** (2021 on: Ubuntu 22.04, Debian 12, Fedora 35, RHEL 9, Mint 21, and every current Arch, Manjaro or other rolling one). It uses the system's own libraries, in whatever version the system has:
+#### The game data
 
-- SDL 1.2 (or sdl12-compat), SDL_image 1.2, SDL_mixer 1.2 and OpenGL;
-- SDL_gfx in any version: its library file is named differently on each system (`libSDL_gfx.so.15` on Debian and Ubuntu, `.so.16` on Arch and Fedora), so the game opens whichever is installed when it starts.
+`play.sh` (and the AppImage) finds the original games by itself the first time, and links them into the profile. It never copies or changes them. It looks, in this order, for:
 
-| System | Command |
-|---|---|
-| Debian, Ubuntu, Mint | `sudo apt install libsdl1.2debian libsdl-image1.2 libsdl-mixer1.2 libsdl-gfx1.2-5` |
-| Arch, Manjaro | `sudo pacman -S sdl12-compat sdl_image sdl_mixer sdl_gfx` |
-| Fedora | `sudo dnf install sdl12-compat SDL_image SDL_mixer SDL_gfx` |
+1. a `UFO` or `TFTD` folder already in the profile (`user/UFO`, or `~/.local/share/openxcom3d/UFO` for the AppImage);
+2. a `UFO` or `TFTD` folder in the game's folder, next to it, or in your home folder;
+3. *X-COM: UFO Defense* and *X-COM: Terror From The Deep* in a Steam library. That covers Steam itself, installed natively, as a Flatpak or as a Snap, and every other library it lists, such as a second disk or the Steam Deck's SD card.
 
-`play.sh` and the installer say plainly what's missing, if anything. Only the compiler's C++ runtime is built into the game (it would otherwise need a system as new as the compiler). On an older system than glibc 2.34, build it from source (option B).
+A game folder is the one with `GEODATA`, `GEOGRAPH`, `MAPS` and `UFOGRAPH` in it (Steam's are `XCom UFO Defense/XCOM` and `X-COM Terror from the Deep/TFD`). A new profile switches on the game that's there, UFO if both are. If neither is found, it says where to put them.
 
 #### With the installer
 
@@ -58,12 +66,12 @@ python3 install.py
 It asks for:
 
 - the install folder (default `~/Games/OpenXcom3D`);
-- the original UFO data folder (it needs `GEODATA`, `GEOGRAPH`, `MAPS`, `UFOGRAPH`);
+- the original UFO data folder;
 - the TFTD data folder.
 
 Common Steam locations are found on their own.
 
-It then copies the game, **links** (never copies or modifies) the game data folders into the profile, writes `options.cfg` and creates `play.sh`. Without asking:
+It then copies the game and its libraries, **links** the game data folders into the profile, writes `options.cfg` and creates `play.sh`. Without asking:
 
 ```sh
 python3 install.py --target ~/Games/OpenXcom3D --ufo /path/to/UFO --tftd /path/to/TFTD --yes [--desktop]
@@ -73,13 +81,50 @@ python3 install.py --target ~/Games/OpenXcom3D --ufo /path/to/UFO --tftd /path/t
 
 #### By hand
 
-1. Copy the release folder anywhere.
-2. Link your game data into its profile:
-   ```sh
-   ln -s /path/to/UFO  OpenXcom3D-0.8.1-linux-x86_64/user/UFO
-   ln -s /path/to/TFTD OpenXcom3D-0.8.1-linux-x86_64/user/TFTD
-   ```
-3. Run `./play.sh`.
+Unpack the archive anywhere and run `./play.sh`. To use game data it doesn't find, link it into the profile first:
+
+```sh
+ln -s /path/to/UFO  OpenXcom3D-0.8.2-linux-x86_64/user/UFO
+ln -s /path/to/TFTD OpenXcom3D-0.8.2-linux-x86_64/user/TFTD
+```
+
+#### Steam Deck
+
+1. In **Desktop Mode**, download the archive (or the AppImage) and unpack it, for example into `~/Games`. Run `play.sh` once; double-click it and choose *Execute*, or start it from Konsole. If *X-COM: UFO Defense* or *Terror From The Deep* is installed through Steam, it is found by itself. Otherwise copy the game's folder next to `play.sh` as `UFO` (or `TFTD`).
+2. For **Game Mode**: Steam → *Games* → *Add a Non-Steam Game to My Library* → *Browse*, set the file type to *All Files*, pick `play.sh` (or the AppImage) and add it. It's then in your library under *Non-Steam*.
+3. The **controller layout**: after adding the shortcut, run `steamdeck/add_controller_layout.sh` once in Desktop Mode (from Konsole, or double-click → *Execute*). It closes Steam for a moment, adds the layout to Steam's templates, sets it for your OpenXcom3D shortcuts (it keeps a copy of Steam's file it changes, `configset_controller_neptune.vdf.before-openxcom3d`), and starts Steam again. Back in Game Mode, OpenXcom3D uses it; it can also be picked by hand under *Edit Layout → Templates → OpenXcom3D*. Run the script again after adding another OpenXcom3D shortcut. The layout is Valve's *Keyboard (WASD) and Mouse* template with this game's keys:
+
+| Deck | Key | Does |
+|---|---|---|
+| Left stick, click | W A S D, K | walk and step sideways; kneel |
+| Right trackpad, click | mouse, left button | look (or move the cursor); click |
+| Right stick, click | mouse, left button | look more finely; click |
+| R2 / L2 | left / right mouse button | fire (click) / cancel (with a free cursor: hold to look) |
+| L1 | C | mouse look ↔ free cursor |
+| R1 | F8 | isometric map ↔ 3D |
+| A / B / X / Y | Space / R / F / I | jump / reload / next fire mode / inventory |
+| D-pad up / down | Page Up / Page Down | fly up / down, ride a grav lift |
+| D-pad right / left | Tab / G | next soldier / switch hand |
+| Left trackpad, clicked: up / right / down / left | Z / X / V / O | snap / aimed / auto shot / open the door |
+| View / Menu | Escape / H | the game's menu / classic HUD |
+| L4 / L5 | L / N | personal light / night vision |
+| R4 / R5 | T / Backspace | tactical flare / end turn |
+
+On the Deck a new profile plays fullscreen (1280×800, the Deck's own screen). Steam + X brings up the keyboard for anything else. Without the layout, Valve's *Keyboard (WASD) and Mouse* template works too, with F8 mapped to a spare button.
+
+#### If it doesn't start
+
+`play.sh` says what's wrong, in a window when it wasn't started from a terminal:
+
+- *older than glibc 2.34*: build it from source (option B);
+- *lacks libGL.so.1*: the system has no OpenGL library, which comes with the graphics drivers (`libgl1` on Debian and Ubuntu, `libglvnd` on Arch, `libglvnd-glx` on Fedora);
+- *needs the data of the original game*: see [The game data](#the-game-data).
+
+If the window closes at once with an X error about GLX, the system's OpenGL is broken. It runs without it like this:
+
+```sh
+SDL12COMPAT_OPENGL_SCALING=0 SDL_RENDER_DRIVER=software ./play.sh
+```
 
 ### Option B: build from source
 
@@ -136,7 +181,7 @@ Notes:
 
 ### Playing
 
-- Start `./play.sh`, begin a game (or **New Battle**), and in battle press **F8** or click the **3D** button at the top left.
+- Start `./play.sh` (or the AppImage), begin a game (or **New Battle**), and in battle press **F8** or click the **3D** button at the top left.
 - **Options → 3D VIEW** has the settings and the key bindings.
 - [Controls](#2-controls) below.
 
@@ -469,7 +514,7 @@ Sprite upscaling costs nothing measurable. Use **pixel size** 2 or 3 on slow mac
 - **Not saved:** bullet holes, scorch marks, flares and each soldier's flight toggle are gone after a quickload or when the screen is rebuilt.
 - **Lean and peek:** not done.
 - **The game's own messages** (e.g. "has become unconscious") pause the 3D sequences behind them until you click OK, as all battlescape animation does.
-- **Platforms:** tested on Linux only. The Windows project files list the add-on, untested.
+- **Platforms:** built and tested on Linux only (x86-64, the Steam Deck included). The Windows project files list the add-on, untested; Windows and macOS builds from the community are very welcome.
 - **Languages:** English (US and UK) only.
 
 ## 10. For developers
@@ -568,6 +613,12 @@ What `FirstPersonView` draws:
 | `OpenXcom.2010.vcxproj{,.filters}` | The add-on's files |
 
 ## 11. Version history
+
+### 0.8.2 (2026-10-19)
+
+- **Download and play:** the Linux release comes with its own libraries in `lib/`: SDL 1.2 (sdl12-compat on SDL2, which opens X11, Wayland, PulseAudio, PipeWire or ALSA when the game starts), SDL_image and SDL_mixer, with SDL_gfx built in. Nothing has to be installed on Ubuntu 22.04 and newer, Debian 12, Fedora, Arch or the Steam Deck. It is also an **AppImage**, one file, with its profile in `~/.local/share/openxcom3d`. Played on Ubuntu 22.04's and Arch's own libraries with no SDL installed, and on a Steam Deck.
+- **Finds the games by itself:** `play.sh` and the AppImage link *X-COM: UFO Defense* and *Terror From The Deep* from any Steam library (also Flatpak and Snap Steam, and other disks and SD cards Steam lists), or from a `UFO` / `TFTD` folder next to the game, and switch on the one that's there. They say what's missing in a window when there's no terminal ([The game data](#the-game-data)).
+- **Steam Deck:** a new profile plays fullscreen, and a controller layout made for the game comes with it (`steamdeck/`): the left stick walks, the right trackpad looks, L1 switches mouse look and the free cursor, R1 the isometric map and 3D ([Steam Deck](#steam-deck)).
 
 ### 0.8.1 (2026-10-19)
 

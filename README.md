@@ -4,7 +4,7 @@
 
 ![Night, through a soldier's eyes](docs/screenshots/night.png)
 
-*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **0.8.1**.
+*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **0.8.2**.
 
 **Both games are supported:** *UFO: Enemy Unknown* and *X-COM: Terror From The Deep*.
 
@@ -23,6 +23,12 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 | ![Dual wield](docs/screenshots/akimbo.png) | ![Signal lost](docs/screenshots/signal_lost.png) |
 | ![Terror From The Deep, an island attack: a Gillman ahead, a Deep One in a teammate's helmet camera](docs/screenshots/tftd_island.png) | ![A rocket going off far down an alien base hall](docs/screenshots/alien_base.png) |
 
+## New in 0.8.2
+
+- **Download and play:** the Linux release now comes with its own libraries, so nothing has to be installed. Unpack it and run `./play.sh`, or take the single-file **AppImage**. It runs on Ubuntu 22.04 and newer, Debian 12, Fedora, Arch and the **Steam Deck**; all it needs is your copy of the original game.
+- **Finds your games by itself:** *X-COM: UFO Defense* and *Terror From The Deep* in any Steam library (Steam installed as a Flatpak or a Snap too, and the Steam Deck's SD card), or a `UFO` / `TFTD` folder next to the game.
+- **Steam Deck:** fullscreen on its screen, and a controller layout made for the game: the left stick walks, the right trackpad looks, L1 switches mouse look and the free cursor, R1 the isometric map and 3D.
+
 ## New in 0.8.1
 
 - **The prebuilt release runs on old and new Linux systems:** anything from 2021 on (glibc 2.34: Ubuntu 22.04, Debian 12, Fedora 35, and every rolling one such as Arch), with the system's own SDL libraries in whatever version it has. If something is missing, `play.sh` says what and how to install it.
@@ -30,18 +36,11 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 - **Everything in a hand is 3D:** grenades, medi-kits, scanners, clips are built from their inventory pictures like the weapons, half in view at the bottom of the screen; **thrown items fly as 3D objects**, tumbling along the game's arc.
 - **Grenades:** a primed one shows its fuse on the panel. In Doom mode they work in real time (one click pulls the pin, three seconds, boom, in your hand too if you wait): a first step towards a **real-time mode**, which will be attempted in the future.
 
-## New in 0.8
-
-- **UFOs stand out:** steady hulls whose own lights glow and pulse gently, each UFO's coloured light on the ground and its hull, and an aura of drifting motes, sparks and grav-lift beams (a setting, on by default). The blinking of UFO surfaces up close is gone.
-- **Ammo on the panel:** each gun's rounds in the clip and the spare clips carried, such as `R: Rifle 17 | 2 clips (40)`, counting down with every shot in both shooting styles.
-- **Dual wield** fires both guns on every shot, as it should.
-- **Shorter option descriptions**, each on one line; the manual explains every setting in full.
-- **Faster:** on big screens the 3D view takes a third to a half less time in complex scenes.
-- Eleven small fixes; the full list is in the manual's [version history](OpenXcom3D_manual.md#11-version-history).
-
 ## Help wanted
 
-If someone in the ingenious OpenXcom community has the will to improve this further, help is very welcome: ideas for the art, other platforms (only Linux is tested), translations, play-testing, and making the code better. Issues and pull requests are open.
+If someone in the ingenious OpenXcom community has the will to improve this further, help is very welcome: ideas for the art, translations, play-testing, and making the code better. Issues and pull requests are open.
+
+**Windows and macOS builds** especially: only Linux is built and tested here. The patch applies to OXCE's own source, which builds on Windows with Visual Studio (`src/OpenXcom.2010.sln` already lists the add-on) and on macOS as usual. A build shared by someone who has the machine for it would let many more people play.
 
 ## What it is based on
 
@@ -66,7 +65,13 @@ All changes on top of it are in one file, [`openxcom3d.patch`](openxcom3d.patch)
 
 You need your own copy of the original game data (*UFO: Enemy Unknown / X-COM: UFO Defense* and/or *X-COM: Terror From The Deep*, e.g. from Steam or GOG). Nothing of it is included here.
 
-- **Prebuilt (Linux x86-64, glibc 2.34 or newer):** download the archive from the [Releases](../../releases) page, unpack it and run `python3 install.py`: it finds your game data and links it (never copies or changes it), and checks that the system has the SDL libraries it needs (the manual lists them for Debian/Ubuntu, Arch and Fedora).
+- **Linux (x86-64): download and play.** From the [Releases](../../releases) page take either:
+  - the **AppImage**: one file. Make it executable (`chmod +x`, or *Properties → Permissions*) and run it;
+  - or the **archive**: unpack it anywhere and run `./play.sh`.
+
+  Nothing needs installing: the game comes with its own libraries and runs on any Linux from 2021 on (glibc 2.34: Ubuntu 22.04 and newer, Debian 12, Fedora, Arch, the Steam Deck). The first time, it finds *X-COM: UFO Defense* and *Terror From The Deep* in your Steam library by itself. Otherwise put the game's folder next to it, named `UFO` (or `TFTD`); its data is only linked, never copied or changed. `python3 install.py` can also install it, with a menu entry.
+- **Steam Deck:** the same download, in Desktop Mode. Add `play.sh` (or the AppImage) to Steam as a non-Steam game to play in Game Mode, then run `steamdeck/add_controller_layout.sh` once: your OpenXcom3D shortcut then uses the controller layout made for it. The manual has the [steps](OpenXcom3D_manual.md#steam-deck).
+- **Windows and macOS:** no builds from us yet; see [Help wanted](#help-wanted).
 - **From source:** `python3 install.py --from-source` clones OXCE at the commit above, applies the patch, builds and installs.
 
 Start a game (or a **New Battle**) and in battle press **F8** to go into 3D. Mouse to look, **WASD** to walk, left button to fire, **F8** back to the map.
