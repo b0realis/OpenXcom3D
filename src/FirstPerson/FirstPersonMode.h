@@ -88,7 +88,7 @@ class FirstPersonMode
 	std::vector<TextButton*> _btnSquad;
 	std::vector<BattleUnit*> _squad;          // unit shown by each squad button
 	// how each squad member is: an icon replaces the number of the fallen and the turned
-	enum SquadState { SQUAD_NONE, SQUAD_READY, SQUAD_DEAD, SQUAD_UNCONSCIOUS, SQUAD_CONTROLLED };
+	enum SquadState { SQUAD_NONE, SQUAD_READY, SQUAD_DEAD, SQUAD_UNCONSCIOUS, SQUAD_CONTROLLED, SQUAD_ZOMBIE };
 	std::vector<SquadState> _squadStates;
 	std::vector<Surface*> _squadIcons;
 	std::vector<size_t> _squadSlots;          // the slots with a button, in order
@@ -204,12 +204,25 @@ class FirstPersonMode
 	float _hurtAmount;
 	BattleUnit *_deathUnit; // the soldier we were looking through went down (or was taken over): stay a moment
 	Uint32 _deathStart;
-	enum FallKind { FALL_KILLED, FALL_UNCONSCIOUS, FALL_CONTROLLED };
+	double _deathEye = 0.0;         // the eye height they fell from (a zombie gets up to about it again)
+	// on fire: the view in flames, a flare-up and a banner when the soldier catches fire
+	const BattleUnit *_burnUnit = nullptr;
+	int _lastFire = 0;
+	Uint32 _burningUntil = 0;
+	enum FallKind { FALL_KILLED, FALL_UNCONSCIOUS, FALL_CONTROLLED, FALL_PANIC, FALL_BERSERK, FALL_ZOMBIE };
 	FallKind _fallKind = FALL_KILLED;
 	bool _allLost = false;          // that was the last soldier standing
 	Text *_txtFallName = nullptr;   // whose camera it was, under the banner
 	Uint32 _afterFall = 0;          // the next soldier's view coming in out of the static or the colour
 	FallKind _afterFallKind = FALL_KILLED;
+	Uint32 _afterFallTime = 0;      // ...over this long
+	// a soldier's breakdown at the start of the turn (panic, berserk): the view washes out meanwhile
+	BattleUnit *_breakdownUnit = nullptr;
+	bool _breakdownBerserk = false;
+	Uint32 _breakdownStart = 0;     // when the view started showing it (0: not yet)
+	bool _breakdownShot = false;    // a shot was in the air last frame (each new one flashes red)
+	Uint32 _breakdownFlash = 0;
+	std::unordered_map<const BattleUnit*, std::pair<int, bool>> _brokeDown; // who broke down in which turn, berserk or not (their camera says so)
 	bool _musicTense = false;   // the combat track is playing
 	// guided missiles, psi attacks and the mind probe can be aimed on the isometric map
 	enum MapAimPhase { MAPAIM_NONE, MAPAIM_AIMING, MAPAIM_ACTING };
@@ -315,11 +328,15 @@ class FirstPersonMode
 	void updateBanner(bool playerTurn);
 	void checkSpotted(BattleUnit *unit, bool playerTurn);
 	void checkHurt(BattleUnit *unit, Uint32 now);
+	void checkBurning(BattleUnit *unit, Uint32 now);
 	void updateMusic(Uint32 now);
 	void startMapAim(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, const char *hint);
 	void updateMapAim();
 	bool creatureAt(const Position &voxel, const BattleUnit *self) const;
 	bool deathCam(Uint32 now, double dt);
+	bool breakdownCam(Uint32 now, double dt);
+	void endBreakdown(bool forget = true);
+	void showFall(FallKind kind, const std::string &title, const std::string &name);
 	TextButton *buttonAt(double x, double y) const;
 	void buttonClicked(TextButton *button, Action *action);
 	void selectUnit(BattleUnit *unit);
@@ -327,6 +344,8 @@ public:
 	/// An FPS-style shot's next round, asked for by the game (see FirstPerson::freeAimTarget).
 	static void freeAim(BattlescapeState *state, const BattleAction &action, Position &target);
 	static bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
+	/// A soldier panics or goes berserk, asked by the game (see FirstPerson::breakdown).
+	static bool breakdown(BattlescapeState *state, BattleUnit *unit);
 	void freeAimTarget(const BattleAction &action, Position &target);
 
 	/// Creates the first-person mode and adds its surfaces to the battlescape state.

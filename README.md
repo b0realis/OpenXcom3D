@@ -4,7 +4,7 @@
 
 ![Night, through a soldier's eyes](docs/screenshots/night.png)
 
-*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **0.6**.
+*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **0.7**.
 
 **Both games are supported:** *UFO: Enemy Unknown* and *X-COM: Terror From The Deep*.
 
@@ -40,7 +40,7 @@ OpenXcom3D stems from **OpenXcom Extended** at exactly this commit:
 All changes on top of it are in one file, [`openxcom3d.patch`](openxcom3d.patch) (it applies with `git apply` to a clean checkout of that commit):
 
 - [`src/FirstPerson/`](src/FirstPerson): the 3D view, an engine add-on (renderer, controller, sounds, options);
-- small hooks in the core (35 files, about 550 lines): see the patch;
+- small hooks in the core (36 files, about 560 lines): see the patch;
 - [`mod/OpenXcom3D/`](mod/OpenXcom3D): the data mod that switches it on.
 
 `src/` and `mod/` in this repository are the same files as in the patch, for reading. Built with `-DOXCE_FIRSTPERSON=OFF`, it is plain OXCE again.

@@ -795,6 +795,11 @@ double FirstPersonView::getYawDegrees() const
 	return _yaw * 180.0 / Pi;
 }
 
+double FirstPersonView::getPitchDegrees() const
+{
+	return _pitch * 180.0 / Pi;
+}
+
 void FirstPersonView::setFieldOfView(double degrees)
 {
 	_fovTan = std::tan(std::clamp(degrees, 30.0, 120.0) * Pi / 360.0);
@@ -1588,11 +1593,15 @@ void FirstPersonView::updateLook()
 			_look.redTint[i] = nearest(60 + lum * 0.85f, lum * 0.18f, lum * 0.15f);
 			_look.blueTint[i] = nearest(lum * 0.1f, lum * 0.16f, 25 + lum * 0.45f);
 			_look.orangeTint[i] = nearest(std::min(255.0f, 80 + lum * 0.9f), 30 + lum * 0.45f, lum * 0.08f);
+			_look.whiteTint[i] = nearest(std::min(255.0f, 180 + lum * 0.3f), std::min(255.0f, 180 + lum * 0.3f), std::min(255.0f, 180 + lum * 0.3f));
+			_look.greenTint[i] = nearest(15 + lum * 0.3f, 35 + lum * 0.7f, lum * 0.2f);
 			_look.flareTint[i] = nearest(std::min(255.0f, 70 + lum * 1.15f), lum * 0.32f, lum * 0.24f);
 		}
 		_look.redTint[0] = 0;
 		_look.blueTint[0] = nearest(0, 2, 18);
 		_look.orangeTint[0] = nearest(60, 24, 0);
+		_look.whiteTint[0] = nearest(185, 185, 185);
+		_look.greenTint[0] = nearest(8, 22, 4);
 		_look.flareTint[0] = 0;
 		for (int k = 0; k < 4; ++k) _look.grey[k] = nearest(30 + 60 * k, 30 + 60 * k, 30 + 60 * k);
 	}
@@ -3214,6 +3223,54 @@ void FirstPersonView::spawnEffects(float dt)
 			_particles.add(p);
 		}
 	}
+
+	// burning units: flames all over them, and smoke off the top
+	const Uint32 now = SDL_GetTicks();
+	for (const BattleUnit *unit : *_save->getUnits())
+	{
+		if (unit->getFire() <= 0 || unit->isOut() || unit == _cameraUnit || (!unit->getVisible() && !_save->getDebugMode()))
+		{
+			continue;
+		}
+		const int size = unit->getArmor()->getSize();
+		float feet[3];
+		auto glide = _glides.find(unit);
+		if (glide != _glides.end() && now - glide->second.seen < 250)
+		{
+			for (int a = 0; a < 3; ++a) feet[a] = (float)glide->second.pos[a];
+		}
+		else
+		{
+			const Position t = unit->getPosition();
+			const Tile *tile = _save->getTile(t);
+			feet[0] = t.x * 16 + 8.0f * size; feet[1] = t.y * 16 + 8.0f * size; feet[2] = t.z * 24 - (tile ? tile->getTerrainLevel() : 0);
+		}
+		if (std::abs(feet[0] - _eye[0]) > 320 || std::abs(feet[1] - _eye[1]) > 320)
+		{
+			continue;
+		}
+		const float height = (float)(unit->getHeight() + unit->getFloatHeight());
+		const int flames = (int)(dt * 45.0f * size + _particles.random());
+		for (int k = 0; k < flames; ++k)
+		{
+			P::Particle p;
+			p.pos[0] = feet[0] + _particles.random(-4, 4) * size; p.pos[1] = feet[1] + _particles.random(-4, 4) * size;
+			p.pos[2] = feet[2] + height * _particles.random(0.05f, 0.9f);
+			p.vel[0] = _particles.random(-4, 4); p.vel[1] = _particles.random(-4, 4); p.vel[2] = _particles.random(16, 36);
+			p.age = 0; p.life = _particles.random(0.35f, 0.8f); p.gravity = -12; p.drag = 0.8f;
+			p.color = _look.fire[(int)_particles.random(0, 3.99f)]; p.size = 3; p.kind = P::GLOW; p.group = P::EFFECT;
+			_particles.add(p);
+		}
+		if (_particles.random() < dt * 5.0f)
+		{
+			P::Particle p;
+			p.pos[0] = feet[0] + _particles.random(-3, 3); p.pos[1] = feet[1] + _particles.random(-3, 3); p.pos[2] = feet[2] + height + 2.0f;
+			p.vel[0] = _particles.random(-3, 3) + 2; p.vel[1] = _particles.random(-3, 3); p.vel[2] = _particles.random(6, 12);
+			p.age = 0; p.life = _particles.random(1.5f, 2.5f); p.gravity = -3; p.drag = 0.4f;
+			p.color = shadeColor(_look.smoke, (int)_particles.random(1, 4)); p.size = 5; p.kind = P::LIT; p.group = P::EFFECT;
+			_particles.add(p);
+		}
+	}
 }
 
 /**
@@ -3778,6 +3835,176 @@ void FirstPersonView::spawnPartnerEffects()
 		trailSegment(previous, _partnerHead);
 		std::swap(_trail, _partnerTrail);
 		std::swap(_trailColor, _partnerColor);
+	}
+}
+
+/**
+ * The soldier we look through is on fire: a sheet of flame rises from the bottom of the view,
+ * tall in the corners and low in the middle so you can still see ahead. Heat rises cell by cell,
+ * drifting sideways and cooling at random (the old fire effect of Doom on the PlayStation), in
+ * blocks of the 320x200 view's pixels; dark red at the tips through orange and yellow to white
+ * at the root. Embers drift up out of it, and its light flickers up from below. Over the world
+ * (the weapon in hand still in front). A flare-up (catching fire) makes it leap; put out, the
+ * last of the heat rises and dies away.
+ */
+void FirstPersonView::drawBurning()
+{
+	const Uint32 now = SDL_GetTicks();
+	const float dt = _flameTick ? std::min<Uint32>(100, now - _flameTick) / 1000.0f : 0.0f;
+	_flameTick = now;
+	_flareUp = std::max(0.0f, _flareUp - dt * 1.2f);
+	if (_onFire <= 0.0f)
+	{
+		_flareUp = 0.0f;
+		if (!_fireLit && _embers.empty()) return;
+	}
+	const int w = getWidth(), h = getHeight();
+	const int block = std::max(1, (int)std::lround(h / 200.0));
+	const int fw = (w + block - 1) / block, fh = (int)(h * 0.7) / block;
+	if (fw != _fireW || fh != _fireH)
+	{
+		_fireW = fw;
+		_fireH = fh;
+		_fireHeat.assign((size_t)fw * fh, 0);
+	}
+	auto rnd = [this]() { _fireSeed = _fireSeed * 1664525u + 1013904223u; return _fireSeed >> 8; };
+	const int MaxHeat = 48;
+	const float px = h / 200.0f; // sizes and speeds as on a 320x200 view
+	const float fierce = std::min(1.0f, _onFire * (1.0f + 1.2f * _flareUp));
+	const float flicker = 0.8f + 0.2f * std::sin(now * 0.031f) * std::sin(now * 0.017f + 1.0f);
+	// the light of the flames, from below
+	if (_onFire > 0.0f)
+	{
+		const int rows = (int)(h * 0.3f);
+		for (int y = h - rows; y < h; ++y)
+		{
+			const float glow = std::pow((y - (h - rows)) / (float)rows, 1.6f) * 0.7f * fierce * flicker;
+			Uint8 *row = getRaw(0, y);
+			for (int x = 0; x < w; ++x)
+			{
+				if (dither(x, y) < glow) row[x] = _look.orangeTint[row[x]];
+			}
+		}
+	}
+	// the flames step 50 times a second: the bottom row is fed (hotter towards the corners),
+	// every cell passes its heat up a row and a little downwind (the wind turns now and then),
+	// a little cooler; the middle cools faster, so the flames stay low there (and a flare-up
+	// cools them less)
+	const int wind = std::sin(now * 0.0005f) > 0.0f ? 1 : -1;
+	_fireStep = std::min(_fireStep + dt, 0.1f);
+	while (_fireStep >= 0.02f)
+	{
+		_fireStep -= 0.02f;
+		Uint8 *heat = _fireHeat.data();
+		Uint8 *source = heat + (size_t)(fh - 1) * fw;
+		const float t = now / 1000.0f;
+		for (int x = 0; x < fw; ++x)
+		{
+			// tongues: hot roots wandering along the bottom
+			const float cell = x * block / px;
+			const float roots = 0.5f + 0.5f * std::sin(cell * 0.21f + t * 1.7f) * std::sin(cell * 0.083f - t * 1.1f + 1.3f);
+			const float edge = std::abs(x - fw * 0.5f) / (fw * 0.5f);
+			source[x] = _onFire > 0.0f ? (Uint8)(MaxHeat * fierce * (0.3f + 0.7f * roots) * (0.65f + 0.35f * edge) * (0.85f + 0.15f * (rnd() & 255) / 255.0f)) : 0;
+		}
+		// and the sides burn up, less the higher (a thin wall of fire framing the view)
+		if (_onFire > 0.0f)
+		{
+			const int side = std::max(2, fw / 48);
+			for (int y = 0; y < fh - 1; ++y)
+			{
+				const float up = (fh - 1 - y) / (float)(fh - 1);
+				const float lick = 0.5f + 0.5f * std::sin(y * block / px * 0.12f + t * 2.3f);
+				const Uint8 feed = (Uint8)std::max(0.0f, MaxHeat * fierce * (0.9f - 1.2f * up) * (0.6f + 0.4f * lick));
+				for (int k = 0; k < side; ++k)
+				{
+					Uint8 &left = heat[y * fw + k], &right = heat[y * fw + fw - 1 - k];
+					left = std::max(left, feed);
+					right = std::max(right, feed);
+				}
+			}
+		}
+		bool lit = false;
+		for (int y = 1; y < fh; ++y)
+		{
+			for (int x = 0; x < fw; ++x)
+			{
+				const Uint8 here = heat[y * fw + x];
+				if (!here)
+				{
+					heat[(y - 1) * fw + x] = 0;
+					continue;
+				}
+				lit = true;
+				const Uint32 r = rnd();
+				const int jitter = (r & 3) == 0 ? -1 : (r & 3) == 3 ? 1 : 0;
+				const int to = std::clamp(x + jitter + (((r >> 2) & 7) == 0 ? wind : 0), 0, fw - 1);
+				const float edge = std::abs(x - fw * 0.5f) / (fw * 0.5f);
+				const float extra = (0.1f + (1.0f - edge) * (1.0f - edge) * 0.55f) * (1.0f - 0.6f * _flareUp);
+				const int cool = (int)((r >> 4) & 1) + (((r >> 8) & 255) < extra * 255.0f ? 1 : 0);
+				heat[(y - 1) * fw + to] = here > cool ? (Uint8)(here - cool) : 0;
+			}
+		}
+		_fireLit = lit || _onFire > 0.0f;
+	}
+	// drawn in blocks: white at the root, yellow, orange, dark red, wispy at the tips
+	const Uint8 ramp[5] = { shadeColor(_look.fire[3], 4), _look.fire[3], _look.fire[2], _look.fire[1], _look.fire[0] };
+	for (int y = 0; y < fh; ++y)
+	{
+		const int sy = h - (fh - y) * block;
+		for (int x = 0; x < fw; ++x)
+		{
+			const int here = _fireHeat[y * fw + x];
+			if (!here) continue;
+			const int sx = x * block;
+			if (here < 7 && dither(sx, sy) >= here / 7.0f) continue;
+			const float f = here / (float)MaxHeat * 4.0f;
+			const int band = std::min(3, (int)f);
+			const Uint8 color = dither(sx + 1, sy + 2) < f - band ? ramp[band + 1] : ramp[band];
+			for (int by = std::max(0, sy); by < std::min(h, sy + block); ++by)
+			{
+				Uint8 *row = getRaw(0, by);
+				for (int bx = sx; bx < std::min(w, sx + block); ++bx) row[bx] = color;
+			}
+		}
+	}
+	// embers drifting up out of it, twinkling
+	_emberSpawn += dt * (_onFire > 0.0f ? 30.0f * fierce : 0.0f);
+	while (_emberSpawn >= 1.0f)
+	{
+		_emberSpawn -= 1.0f;
+		if (_embers.size() >= 200) continue;
+		Ember e;
+		const float u = _particles.random(-1.0f, 1.0f);
+		e.x = w * 0.5f + (u < 0.0f ? -1.0f : 1.0f) * std::sqrt(std::abs(u)) * w * 0.5f;
+		e.y = h - _particles.random(0.05f, 0.3f) * h;
+		e.vx = _particles.random(-20.0f, 20.0f) * px;
+		e.vy = -_particles.random(50.0f, 100.0f) * px;
+		e.age = 0.0f;
+		e.life = _particles.random(0.8f, 1.8f);
+		e.phase = _particles.random(0.0f, 6.3f);
+		_embers.push_back(e);
+	}
+	const int size = std::max(1, block);
+	for (size_t i = 0; i < _embers.size();)
+	{
+		Ember &e = _embers[i];
+		e.age += dt;
+		if (e.age >= e.life)
+		{
+			e = _embers.back();
+			_embers.pop_back();
+			continue;
+		}
+		e.x += (e.vx + std::sin(e.age * 7.0f + e.phase) * 25.0f * px) * dt;
+		e.y += e.vy * dt;
+		++i;
+		if (std::sin(e.age * 30.0f + e.phase) < -0.6f) continue;
+		const Uint8 color = _look.fire[e.age < e.life * 0.5f ? 0 : e.age < e.life * 0.8f ? 1 : 2];
+		const int x0 = (int)e.x, y0 = (int)e.y;
+		for (int y = std::max(0, y0); y < std::min(h, y0 + size); ++y)
+		{
+			for (int x = std::max(0, x0); x < std::min(w, x0 + size); ++x) *getRaw(x, y) = color;
+		}
 	}
 }
 
@@ -4460,14 +4687,15 @@ void FirstPersonView::draw()
 		const int w = getWidth(), h = getHeight();
 		const float cx = w * 0.5f, cy = h * 0.5f, reach = std::sqrt(cx * cx + cy * cy);
 		const Uint8 group = _nightVision ? (Uint8)((_nightVision - 1) * 16) : 0;
-		const Uint8 *wash = _tintColor == 1 ? _look.blueTint : _tintColor == 2 ? _look.orangeTint : _look.redTint;
+		const Uint8 *wash = _tintColor == 1 ? _look.blueTint : _tintColor == 2 ? _look.orangeTint : _tintColor == 3 ? _look.whiteTint
+			: _tintColor == 4 ? _look.greenTint : _look.redTint;
 		for (int y = 0; y < h; ++y)
 		{
 			Uint8 *row = getRaw(0, y);
 			for (int x = 0; x < w; ++x)
 			{
 				if (_nightVision && row[x]) row[x] = group | (row[x] & 15);
-				if (_tint > 0.0f && dither(x, y) < _tint) row[x] = wash[row[x]];
+				if (_tint > 0.0f && dither(x, y) < _tint) row[x] = (_tintRed > 0.0f && dither(y + 1, x + 2) < _tintRed ? _look.redTint : wash)[row[x]];
 				if (_static > 0.0f)
 				{
 					_staticSeed = _staticSeed * 1664525u + 1013904223u;
@@ -4481,6 +4709,7 @@ void FirstPersonView::draw()
 			}
 		}
 	}
+	drawBurning();
 	drawHurt();
 	drawMarkers();
 	unlock();

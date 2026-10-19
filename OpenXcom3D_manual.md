@@ -1,6 +1,6 @@
 # OpenXcom3D manual
 
-Version 0.6. OpenXcom3D is **OpenXcom Extended (OXCE)** with a first-person 3D battlescape: an engine add-on (`src/FirstPerson/`, with small hooks in the core) and a data mod (`OpenXcom3D`) that switches it on.
+Version 0.7. OpenXcom3D is **OpenXcom Extended (OXCE)** with a first-person 3D battlescape: an engine add-on (`src/FirstPerson/`, with small hooks in the core) and a data mod (`OpenXcom3D`) that switches it on.
 
 1. [Installing](#1-installing)
 2. [Controls](#2-controls)
@@ -25,7 +25,7 @@ Add-on builds keep their own user and config folders, so an existing OXCE profil
 
 ### Option A: the prebuilt release (Linux x86-64)
 
-The release folder `OpenXcom3D-0.6-linux-x86_64/` contains:
+The release folder `OpenXcom3D-0.7-linux-x86_64/` contains:
 
 ```
 bin/openxcom              the engine (OXCE 8.7.1 + OpenXcom3D)
@@ -76,8 +76,8 @@ python3 install.py --target ~/Games/OpenXcom3D --ufo /path/to/UFO --tftd /path/t
 1. Copy the release folder anywhere.
 2. Link your game data into its profile:
    ```sh
-   ln -s /path/to/UFO  OpenXcom3D-0.6-linux-x86_64/user/UFO
-   ln -s /path/to/TFTD OpenXcom3D-0.6-linux-x86_64/user/TFTD
+   ln -s /path/to/UFO  OpenXcom3D-0.7-linux-x86_64/user/UFO
+   ln -s /path/to/TFTD OpenXcom3D-0.7-linux-x86_64/user/TFTD
    ```
 3. Run `./play.sh`.
 
@@ -383,7 +383,9 @@ A later mod's list replaces an earlier one.
 - When it gets tense:
   - enemy shots whizzing past you (you hear which side) with a flinch; a red arc on the screen's edge towards where a hit came from; blood on the view after a heavy hit or an alien's blow;
   - a red heartbeat at the screen edges when badly hurt;
-  - going down: killed (red, then the helmet camera dies in static), unconscious (a fade to dark blue) or mind controlled (an orange haze), each with its message, before the next soldier's view comes in;
+  - going down: killed (red, then the helmet camera dies in static), unconscious (a fade to dark blue) or mind controlled (an orange haze), each with its message, before the next soldier's view comes in; killed by a Chryssalid (or a Tentaculat), TURNED INTO A ZOMBIE: down in red, then the body gets up again, lurching in a sickly green, until the camera gives out (their squad button shows a green skull, their camera says ZOMBIE);
+  - on fire: the view in flames (a sheet of fire up from the bottom and the sides, embers drifting up, its light flickering), a BURNING banner and a flare-up when you catch fire, BURNING on the panel and the camera card; burning soldiers and aliens you see are in flames too;
+  - breaking down at the start of a turn, seen through that soldier's eyes while they do what the rules make them do: panic (YOU HAVE A MENTAL BREAKDOWN, a fade to white, the heart racing, while they freeze, or drop their weapons and run) or berserk (BERSERK, white and red, every wild shot flashing red); then they come to, and their camera says PANIC or BERSERK for the rest of the turn;
   - tenser music while aliens are in sight;
   - "ENEMY SPOTTED!" and HIDDEN MOVEMENT banners.
 
@@ -413,11 +415,11 @@ Bigger windows and full screen scale the whole 3D view and its controls up toget
 | Branch | **`oxce-plus`** |
 | Commit | **`f0134ef8065799c7723953d64b565f7832bfd782`** — 2026-09-29 15:04:49 +0200, author Meridian, "Merge remote-tracking branch 'SupSuper/master' into oxce-plus" |
 | Version string | **OpenXcom Extended 8.7.1 (v2026-09-19)** |
-| OpenXcom3D | engine add-on and mod version **0.6** (`requiredExtendedEngine: OpenXcom3D`, `requiredExtendedVersion: "0.6"`) |
+| OpenXcom3D | engine add-on and mod version **0.7** (`requiredExtendedEngine: OpenXcom3D`, `requiredExtendedVersion: "0.7"`) |
 
 `openxcom3d.patch` holds every change on top of that commit:
 
-- the core hooks: 35 files, about 550 lines;
+- the core hooks: 36 files, about 560 lines;
 - the new `src/FirstPerson/` add-on;
 - the `mod/OpenXcom3D/` data mod.
 
@@ -429,7 +431,7 @@ To work on it: check out the commit above, `git apply openxcom3d.patch`, build (
 
 ### Code layout
 
-**`src/FirstPerson/`, about 11,000 lines**
+**`src/FirstPerson/`, about 11,800 lines**
 
 | File | What |
 |---|---|
@@ -437,13 +439,13 @@ To work on it: check out the commit above, `git apply openxcom3d.patch`, build (
 | `FirstPersonView.{h,cpp}` | Renderer, 8 threads (details below) |
 | `FirstPersonParticles.{h,cpp}` | The particle pool (sparks, smoke, weather...) |
 | `FirstPersonSounds.{h,cpp}` | Sounds made in code (no files): hitmarker and kill ticks, heartbeat, dry-fire click, flare hiss |
-| `FirstPersonMode.{h,cpp}` | Controller: full-screen view, top bar, info panel, soldier cards, crosshair and fire modes, mouse look vs cursor, classic HUD, free facing, movement and doors, firing, alien turn, spotting, hurt/death feedback, doom mode |
+| `FirstPersonMode.{h,cpp}` | Controller: full-screen view, top bar, info panel, soldier cards, crosshair and fire modes, mouse look vs cursor, classic HUD, free facing, movement and doors, firing, alien turn, spotting, hurt/death feedback (killed, zombie, unconscious, mind control), breakdowns (panic, berserk), on fire, doom mode |
 | `OptionsFirstPersonState.{h,cpp}` | 3D VIEW options tab: Settings / Controls sub-tabs, scrolling lists |
 | `RuleFirstPerson.h` | `firstPerson:` ruleset section (header-only): enabled, view distance, window glass, weather |
 
 What `FirstPersonView` draws:
 - terrain from LOFT voxels with iso-sprite projection, animated frames, UFO doors cut out as they slide, doors swinging, window glass;
-- smooth light plus sun face shading, Bayer dithering and horizon haze; red wash when hurt; night vision recolouring;
+- smooth light plus sun face shading, Bayer dithering and horizon haze; colour washes (hurt, dying, unconscious, mind control, breakdown, zombie); night vision recolouring; the fire over the view of a burning soldier;
 - the outside world: ground, X-COM tape and posts; the sky;
 - billboards for units (gliding, faded right in front of the camera), floor items, projectiles and explosions;
 - particles; red numbered markers over the visible enemies.
@@ -458,6 +460,7 @@ What `FirstPersonView` draws:
 | `BattlescapeGame.h` | `BattleAction::targetVoxel` (exact aim point), `instantMove`, `freeAim` (FPS-style shot), `dualWield`/`dualWeapon`/`dualType` (dual wield) |
 | `Projectile.h` | `getAmmo()` getter (trail style from the ammo's damage type) |
 | `ProjectileFlyBState.{h,cpp}` | Uses `targetVoxel` when set (accuracy still applies); with `freeAim` asks the first-person view for each round's target; dual wield: the other gun's round fired, flown and landed with each round (like a shotgun's extra pellets), both half as accurate |
+| `BattlescapeGame.cpp` | A soldier panicking or going berserk: in 3D the first-person view shows it (`FirstPerson::breakdown`, which holds the battle as long as the box would) instead of the "has panicked" box |
 | `ExplosionBState.cpp` | FPS-style shooting: our own bullet hits play quicker (`FirstPerson::fastShots`) |
 | `Projectile.cpp` | With `freeAim`: no accuracy roll, no line-of-fire refusal, the line carried on through the target, a bullet's speed |
 | `UnitWalkBState.cpp` | `instantMove` walks take the no-animation path |
@@ -472,11 +475,19 @@ What `FirstPersonView` draws:
 | `Options.cpp` / `Options.inc.h` | `createOptionsOTHER()` → `FirstPerson::createOptions(_info)`; declarations at the end of the file |
 | `OptionsBaseState.{h,cpp}` | 3D VIEW tab via `FirstPerson::hasOptionsTab/createOptionsTab` |
 | `Mod.{h,cpp}` | Parses `firstPerson:` at the end of `Mod::loadFile` |
-| `ModInfo.cpp` | Engine row `{"OpenXcom3D", 0.6}` (add-on builds only) |
+| `ModInfo.cpp` | Engine row `{"OpenXcom3D", 0.7}` (add-on builds only) |
 | `CrossPlatform.cpp` | Add-on builds use their own user/config folders (`~/.local/share/openxcom3d`, `~/.config/openxcom3d`, `Documents/OpenXcom3D`, …). Data folders are shared with stock OXCE |
 | `OpenXcom.2010.vcxproj{,.filters}` | The add-on's files |
 
 ## 11. Version history
+
+### 0.7 (2026-10-18)
+
+- **Breakdowns in 3D**: a soldier who panics or goes berserk at the start of a turn is seen through their own eyes instead of the game's box. Panic: the view fades to white, YOU HAVE A MENTAL BREAKDOWN, a racing heart, while they freeze, or drop their weapons and run. Berserk: BERSERK, white and red throbbing with each heartbeat, every wild shot flashing red. Then they come to. Their camera card and the panel say PANIC or BERSERK for the rest of the turn. (On the isometric map the game's own box, as before.)
+- **Turned into a zombie**: a soldier killed by a Chryssalid (UFO) or a Tentaculat (TFTD) gets their own end in 3D: TURNED INTO A ZOMBIE, down in red, then up again, lurching in a sickly green, until the helmet camera gives out. A green skull on their squad button; their camera says ZOMBIE.
+- **On fire**: the soldier's view in flames, rising from the bottom and the sides (heat rising cell by cell, as in the old fire effect of Doom), with embers and the light of it; catching fire makes them leap, with a BURNING banner. Their panel and camera card say BURNING. Burning soldiers and aliens in view burn in 3D too.
+- Fixed: a soldier left behind in an earlier stage of a two-stage mission showed in the squad bar as unconscious; they have no button now.
+- Fixed: a soldier killed by an overkill showed a health of 4294... on their card.
 
 ### 0.6 (2026-10-18)
 

@@ -12,10 +12,10 @@ index 31faa5c79..7e45307af 100644
  if ( CHECK_CCACHE )
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..d95e431c5
+index 000000000..8897f1688
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,197 @@
+@@ -0,0 +1,203 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom 3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -116,6 +116,10 @@ index 000000000..d95e431c5
 +  STR_FPS_DECEASED: "DECEASED"
 +  STR_FPS_UNCONSCIOUS: "UNCONSCIOUS"
 +  STR_FPS_MIND_CONTROLLED: "MIND CONTROLLED"
++  STR_FPS_PANIC: "PANIC"
++  STR_FPS_BERSERK: "BERSERK"
++  STR_FPS_BURNING: "BURNING"
++  STR_FPS_ZOMBIE: "ZOMBIE"
 +  STR_FPS_SIGNAL_LOST: "SIGNAL LOST"
 +  STR_FPS_VAULT: "Jump over low obstacles"
 +  STR_FPS_VAULT_DESC: "Jumping (Space) while walking into something low (a fence, a table, a crate, a rock: up to waist height) takes the soldier over it. The jump itself is free: only the walk to the far side costs its normal time units. NO: jumping is just a hop and the original rules decide what blocks you."
@@ -130,6 +134,8 @@ index 000000000..d95e431c5
 +  STR_FPS_NO_NIGHT_VISION: "No night vision gear"
 +  STR_FPS_KILLED: "KILLED IN ACTION"
 +  STR_FPS_ALL_LOST: "ALL SOLDIERS LOST"
++  STR_FPS_BREAKDOWN: "YOU HAVE A MENTAL BREAKDOWN"
++  STR_FPS_ZOMBIFIED: "TURNED INTO A ZOMBIE"
 +  STR_FPS_LIFT: "LIFT PLATFORM"
 +  STR_FPS_GAME_KEYS: "GAME KEYS THAT WORK IN 3D (ALSO IN CONTROLS)"
 +  STR_FPS_KEY_TURN_LEFT: "Turn left"
@@ -215,10 +221,10 @@ index 000000000..d95e431c5
 +  STR_FPS_KEY_CLASSIC_HUD_DESC: "Shows the original bottom panel over the 3D view, e.g. to pick fire modes; the cursor is freed while it's shown."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..cd09ada1a
+index 000000000..1948ee2d9
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,197 @@
+@@ -0,0 +1,203 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom 3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -319,6 +325,10 @@ index 000000000..cd09ada1a
 +  STR_FPS_DECEASED: "DECEASED"
 +  STR_FPS_UNCONSCIOUS: "UNCONSCIOUS"
 +  STR_FPS_MIND_CONTROLLED: "MIND CONTROLLED"
++  STR_FPS_PANIC: "PANIC"
++  STR_FPS_BERSERK: "BERSERK"
++  STR_FPS_BURNING: "BURNING"
++  STR_FPS_ZOMBIE: "ZOMBIE"
 +  STR_FPS_SIGNAL_LOST: "SIGNAL LOST"
 +  STR_FPS_VAULT: "Jump over low obstacles"
 +  STR_FPS_VAULT_DESC: "Jumping (Space) while walking into something low (a fence, a table, a crate, a rock: up to waist height) takes the soldier over it. The jump itself is free: only the walk to the far side costs its normal time units. NO: jumping is just a hop and the original rules decide what blocks you."
@@ -333,6 +343,8 @@ index 000000000..cd09ada1a
 +  STR_FPS_NO_NIGHT_VISION: "No night vision gear"
 +  STR_FPS_KILLED: "KILLED IN ACTION"
 +  STR_FPS_ALL_LOST: "ALL SOLDIERS LOST"
++  STR_FPS_BREAKDOWN: "YOU HAVE A MENTAL BREAKDOWN"
++  STR_FPS_ZOMBIFIED: "TURNED INTO A ZOMBIE"
 +  STR_FPS_LIFT: "LIFT PLATFORM"
 +  STR_FPS_GAME_KEYS: "GAME KEYS THAT WORK IN 3D (ALSO IN CONTROLS)"
 +  STR_FPS_KEY_TURN_LEFT: "Turn left"
@@ -473,7 +485,7 @@ index 000000000..b3f6cb075
 +        color: 144
 diff --git a/mod/OpenXcom3D/metadata.yml b/mod/OpenXcom3D/metadata.yml
 new file mode 100644
-index 000000000..d7c5ac623
+index 000000000..b4811aba2
 --- /dev/null
 +++ b/mod/OpenXcom3D/metadata.yml
 @@ -0,0 +1,11 @@
@@ -481,13 +493,38 @@ index 000000000..d7c5ac623
 +# metadata.yml for OpenXcom3D
 +
 +name: "OpenXcom3D - First-Person View"
-+version: 0.6
++version: 0.7
 +description: "Adds a first-person 3D view of the battlescape (F8): mouse look, real-time movement paid with time units (WASD), firing from the crosshair, a squad bar with soldier camera cards, lights, shadows, flashlight, particles, weather, tactical flares, combat music and its own 3D View options tab. Needs the OpenXcom3D build of OXCE; on a standard OXCE build this mod reports an unsupported engine and stays off."
 +author: OpenXcom3D project
 +
 +master: "*"
 +requiredExtendedEngine: OpenXcom3D
-+requiredExtendedVersion: "0.6"
++requiredExtendedVersion: "0.7"
+diff --git a/src/Battlescape/BattlescapeGame.cpp b/src/Battlescape/BattlescapeGame.cpp
+index b7e1111f3..7bd979a4e 100644
+--- a/src/Battlescape/BattlescapeGame.cpp
++++ b/src/Battlescape/BattlescapeGame.cpp
+@@ -59,6 +59,7 @@
+ #include "../Savegame/BattleUnitStatistics.h"
+ #include "ConfirmEndMissionState.h"
+ #include "../fmath.h"
++#include "../FirstPerson/FirstPersonApi.h"
+ 
+ namespace OpenXcom
+ {
+@@ -1551,7 +1552,11 @@ bool BattlescapeGame::handlePanickingUnit(BattleUnit *unit)
+ 
+ 	// show a little infobox with the name of the unit and "... is panicking"
+ 	Game *game = _parentState->getGame();
+-	if (unit->getVisible() || !Options::noAlienPanicMessages)
++	if (FirstPerson::breakdown(_parentState, unit))
++	{
++		getMap()->getCamera()->centerOnPosition(unit->getPosition()); // the first-person view shows it its own way
++	}
++	else if (unit->getVisible() || !Options::noAlienPanicMessages)
+ 	{
+ 		getMap()->getCamera()->centerOnPosition(unit->getPosition());
+ 		if (status == STATUS_PANICKING)
 diff --git a/src/Battlescape/BattlescapeGame.h b/src/Battlescape/BattlescapeGame.h
 index 7af613cc7..fe578f17f 100644
 --- a/src/Battlescape/BattlescapeGame.h
@@ -1659,7 +1696,7 @@ index a4c23b216..13d36e8f3 100644
  	{
  		_buttonsPressed |= SDL_BUTTON(button);
 diff --git a/src/Engine/ModInfo.cpp b/src/Engine/ModInfo.cpp
-index cca815d3e..4ed8f2c2b 100644
+index cca815d3e..c682e0179 100644
 --- a/src/Engine/ModInfo.cpp
 +++ b/src/Engine/ModInfo.cpp
 @@ -181,6 +181,9 @@ struct EngineData
@@ -1667,7 +1704,7 @@ index cca815d3e..4ed8f2c2b 100644
  const EngineData supportedEngines[] = {
  	{ OPENXCOM_VERSION_ENGINE, { OPENXCOM_VERSION_NUMBER }},
 +#ifndef OXCE_NO_FIRSTPERSON
-+	{ "OpenXcom3D", { 0, 6, 0, 0 } }, // first-person add-on, see src/FirstPerson
++	{ "OpenXcom3D", { 0, 7, 0, 0 } }, // first-person add-on, see src/FirstPerson
 +#endif
  	{ "", { 0, 0, 0, 0 } }, // assume that every engine support mods from base game, remove if its not true.
  };
@@ -1806,10 +1843,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..e9619fc5e
+index 000000000..b776dcacc
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,160 @@
+@@ -0,0 +1,165 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -1967,15 +2004,20 @@ index 000000000..e9619fc5e
 +	return FirstPersonMode::fastShots(state, attacker);
 +}
 +
++bool breakdown(BattlescapeState *state, BattleUnit *unit)
++{
++	return FirstPersonMode::breakdown(state, unit);
++}
++
 +}
 +
 +}
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..3d0d3ab9e
+index 000000000..a3686491e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,94 @@
+@@ -0,0 +1,97 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -2049,6 +2091,8 @@ index 000000000..3d0d3ab9e
 +void freeAimTarget(BattlescapeState *state, const BattleAction &action, Position &target);
 +/// FPS-style shooting is on for this unit's shots (first-person view): their bullet hits play quicker.
 +bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
++/// A unit panics or goes berserk: true if the first-person view shows it (the game then leaves its infobox out).
++bool breakdown(BattlescapeState *state, BattleUnit *unit);
 +
 +#else
 +
@@ -2064,6 +2108,7 @@ index 000000000..3d0d3ab9e
 +inline State *createOptionsTab(OptionsOrigin) { return nullptr; }
 +inline void freeAimTarget(BattlescapeState *, const BattleAction &, Position &) { }
 +inline bool fastShots(BattlescapeState *, const BattleUnit *) { return false; }
++inline bool breakdown(BattlescapeState *, BattleUnit *) { return false; }
 +
 +#endif
 +
@@ -2072,10 +2117,10 @@ index 000000000..3d0d3ab9e
 +}
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..7b8b7ae49
+index 000000000..68da6412e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,4659 @@
+@@ -0,0 +1,4953 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -2103,6 +2148,7 @@ index 000000000..7b8b7ae49
 +#include "FirstPersonSounds.h"
 +#include "FirstPersonView.h"
 +#include "RuleFirstPerson.h"
++#include "../Battlescape/BattleState.h"
 +#include "../Battlescape/BattlescapeGame.h"
 +#include "../Battlescape/BattlescapeState.h"
 +#include "../Battlescape/Camera.h"
@@ -2176,6 +2222,14 @@ index 000000000..7b8b7ae49
 +/// How long the view stays with a soldier who went down (killed, unconscious) or was taken over,
 +/// and how long the next soldier's view takes to come in out of it.
 +const Uint32 DeathCamTime = 2600, FaintTime = 2400, ControlledTime = 2400, AfterFallTime = 600;
++/// A soldier killed and turned into a zombie: down, up again, and the camera gives out.
++const Uint32 ZombieCamTime = 4200;
++/// A soldier's breakdown (panic, berserk): the game holds this long while the view washes out
++/// (as long as its own "has panicked" box stays up), the screen shows at least so long, and
++/// coming to (the white fading away) takes this.
++const Uint32 BreakdownPauseTime = 2000, BreakdownMinTime = 2600, ComeToTime = 1200;
++/// The banner across the top of the view (big letters) and the line under it.
++const int BannerW = 304;
 +/// The lift arrows (canvas pixels) and how long a ride up or down one level takes.
 +const int LiftArrowW = 48, LiftArrowH = 14;
 +const Uint32 RideTime = 1400, DropTime = 600; // a lift ride (or flying up/down); a fall or landing
@@ -2232,10 +2286,47 @@ index 000000000..7b8b7ae49
 +	return (Uint8)best;
 +}
 +
++/**
++ * A text colour for letters of any shade, dark ones too (in plain contrast): the palette index
++ * whose glyph shades (the next five) come nearest to it, inside one colour group.
++ */
++Uint8 inkColor(const SDL_Color *pal, int r, int g, int b)
++{
++	int best = 0, bestDist = INT_MAX;
++	for (int i = 0; i < 256; ++i)
++	{
++		if ((i & 15) > 10) continue;
++		const SDL_Color &c = pal[i + 3];
++		const int dr = c.r - r, dg = c.g - g, db = c.b - b;
++		const int dist = dr * dr * 3 + dg * dg * 6 + db * db;
++		if (dist < bestDist)
++		{
++			bestDist = dist;
++			best = i;
++		}
++	}
++	return (Uint8)best;
++}
++
 +bool isShot(BattleActionType mode)
 +{
 +	return mode == BA_SNAPSHOT || mode == BA_AIMEDSHOT || mode == BA_AUTOSHOT;
 +}
++
++/**
++ * Holds the battle a moment while the 3D view shows a soldier's breakdown, as the game's own
++ * "has panicked" box would (left out in 3D: the box would freeze the view behind it).
++ */
++class BreakdownPause : public BattleState
++{
++	Uint32 _until;
++public:
++	BreakdownPause(BattlescapeGame *parent) : BattleState(parent), _until(SDL_GetTicks() + BreakdownPauseTime) { }
++	void think() override
++	{
++		if (SDL_GetTicks() >= _until) _parent->popState();
++	}
++};
 +
 +}
 +
@@ -2283,7 +2374,7 @@ index 000000000..7b8b7ae49
 +	const int glow[4][2] = { { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } };
 +	for (const auto &offset : glow)
 +	{
-+		Text *text = new Text(240, 17, screenWidth / 2 - 120 + offset[0], 24 + offset[1]);
++		Text *text = new Text(BannerW, 17, screenWidth / 2 - BannerW / 2 + offset[0], 24 + offset[1]);
 +		_state->add(text);
 +		text->setBig();
 +		text->setAlign(ALIGN_CENTER);
@@ -2291,10 +2382,10 @@ index 000000000..7b8b7ae49
 +		_own.insert(text);
 +		_bannerGlow.push_back(text);
 +	}
-+	_txtBanner = addText(240, 17, screenWidth / 2 - 120, 24, "banner", "firstPerson");
++	_txtBanner = addText(BannerW, 17, screenWidth / 2 - BannerW / 2, 24, "banner", "firstPerson");
 +	_txtBanner->setBig();
 +	_shadows.back()->setBig();
-+	_txtFallName = addText(240, 9, screenWidth / 2 - 120, 43, "banner", "firstPerson");
++	_txtFallName = addText(BannerW, 9, screenWidth / 2 - BannerW / 2, 43, "banner", "firstPerson");
 +	_txtFallName->setAlign(ALIGN_CENTER);
 +	_txtFallName->setVisible(false);
 +	// mode and hit chance to the right of the crosshair, so they don't cover what you aim at
@@ -4433,9 +4524,9 @@ index 000000000..7b8b7ae49
 +	_numEnergy->setValue(unit->getEnergy());
 +	_barEnergy->setMax(unit->getBaseStats()->stamina);
 +	_barEnergy->setValue(unit->getEnergy());
-+	_numHealth->setValue(unit->getHealth());
++	_numHealth->setValue(std::max(0, unit->getHealth())); // (an overkill leaves it below zero)
 +	_barHealth->setMax(unit->getBaseStats()->health);
-+	_barHealth->setValue(unit->getHealth());
++	_barHealth->setValue(std::max(0, unit->getHealth()));
 +	_barHealth->setValue2(unit->getStunlevel());
 +	_numMorale->setValue(unit->getMorale());
 +	_barMorale->setMax(100);
@@ -4475,10 +4566,20 @@ index 000000000..7b8b7ae49
 +}
 +
 +/**
-+ * Bleeding wounds first (they need a medikit), else kneeling.
++ * A breakdown this turn first (panic, berserk: out of it for the turn), then on fire, then
++ * bleeding wounds (they need a medikit), else kneeling.
 + */
 +std::string FirstPersonMode::statusLabel(BattleUnit *unit) const
 +{
++	const auto broke = _brokeDown.find(unit);
++	if (broke != _brokeDown.end() && broke->second.first == _save->getTurn())
++	{
++		return _state->tr(broke->second.second ? "STR_FPS_BERSERK" : "STR_FPS_PANIC");
++	}
++	if (unit->getFire() > 0)
++	{
++		return _state->tr("STR_FPS_BURNING");
++	}
 +	if (unit->getFatalWounds() > 0)
 +	{
 +		return _state->tr("STR_FPS_WOUNDS").arg(unit->getFatalWounds());
@@ -4838,7 +4939,8 @@ index 000000000..7b8b7ae49
 +	}
 +	_cardName->setText(unit->getName(_game->getLanguage(), false));
 +	_cardWeapon->setText(weaponLabel(unit));
-+	const std::string status = state == SQUAD_DEAD ? std::string(_state->tr("STR_FPS_DECEASED")) : state == SQUAD_UNCONSCIOUS ? std::string(_state->tr("STR_FPS_UNCONSCIOUS"))
++	const std::string status = state == SQUAD_DEAD ? std::string(_state->tr("STR_FPS_DECEASED")) : state == SQUAD_ZOMBIE ? std::string(_state->tr("STR_FPS_ZOMBIE"))
++		: state == SQUAD_UNCONSCIOUS ? std::string(_state->tr("STR_FPS_UNCONSCIOUS"))
 +		: state == SQUAD_CONTROLLED ? std::string(_state->tr("STR_FPS_MIND_CONTROLLED")) : statusLabel(unit);
 +	_cardStatus->setText(status);
 +	// the name gives way to the status beside it
@@ -4863,7 +4965,7 @@ index 000000000..7b8b7ae49
 +		}
 +		_card->unlock();
 +	}
-+	const int values[4] = { unit->getTimeUnits(), unit->getEnergy(), unit->getHealth(), unit->getMorale() };
++	const int values[4] = { unit->getTimeUnits(), unit->getEnergy(), std::max(0, unit->getHealth()), unit->getMorale() }; // (an overkill leaves health below zero)
 +	const int maxima[4] = { unit->getBaseStats()->tu, unit->getBaseStats()->stamina, unit->getBaseStats()->health, 100 };
 +	for (int i = 0; i < 4; ++i)
 +	{
@@ -5550,7 +5652,12 @@ index 000000000..7b8b7ae49
 +void FirstPersonMode::updateBanner(bool playerTurn)
 +{
 +	std::string text;
-+	if (isActive() && playerTurn && SDL_GetTicks() < _spottedUntil)
++	const bool burning = isActive() && SDL_GetTicks() < _burningUntil;
++	if (burning)
++	{
++		text = _state->tr("STR_FPS_BURNING");
++	}
++	else if (isActive() && playerTurn && SDL_GetTicks() < _spottedUntil)
 +	{
 +		text = _state->tr("STR_FPS_ENEMY_SPOTTED");
 +	}
@@ -5584,9 +5691,9 @@ index 000000000..7b8b7ae49
 +		return;
 +	}
 +	// glowing letters: a yellow core that pulses towards orange, in a halo going red to purple
-+	// (enemy spotted pulses faster, in plain red)
++	// (enemy spotted and burning pulse faster, in plain red)
 +	const SDL_Color *pal = _game->getScreen()->getPalette();
-+	const bool alarm = playerTurn;
++	const bool alarm = playerTurn || burning;
 +	const double t = SDL_GetTicks() / (alarm ? 160.0 : 450.0);
 +	const double pulse = 0.5 + 0.5 * std::sin(t);
 +	const Uint8 core = pulse > 0.5 ? textColor(pal, 255, 230, 70) : textColor(pal, 255, 170, 40);
@@ -5800,8 +5907,32 @@ index 000000000..7b8b7ae49
 +}
 +
 +/**
++ * On fire: the view in flames (fiercer the longer it will burn); catching fire makes them leap,
++ * with a whoosh, a jolt and a BURNING banner.
++ */
++void FirstPersonMode::checkBurning(BattleUnit *unit, Uint32 now)
++{
++	const int fire = unit->getFire();
++	if (unit != _burnUnit)
++	{
++		_burnUnit = unit;
++		_lastFire = fire;
++	}
++	if (fire > _lastFire)
++	{
++		_view->flareUp(1.0f);
++		_view->addShake(1.5f);
++		_sounds->play(FirstPersonSounds::FLARE, 0, 1.0f);
++		_burningUntil = now + 1600;
++	}
++	_lastFire = fire;
++	_view->setBurning(fire > 0 ? std::min(0.75f, 0.45f + 0.1f * fire) : 0.0f);
++}
++
++/**
 + * The soldier we were looking through has gone down, or was taken over: for a moment the view
 + * stays with them. Killed: they fall, the view washes red and the helmet camera dies in static.
++ * Turned into a zombie: killed, then up again, lurching in a sickly green until the camera dies.
 + * Unconscious: a slow sag into dark blue. Mind controlled: the view drifts, washing orange.
 + * Then on to the next soldier, whose view comes in out of it. (With nobody left the game ends
 + * the battle, as on the map.)
@@ -5816,70 +5947,65 @@ index 000000000..7b8b7ae49
 +	{
 +		_deathUnit = unit;
 +		_deathStart = now;
-+		_fallKind = turned ? FALL_CONTROLLED : unit->getStatus() == STATUS_DEAD ? FALL_KILLED : FALL_UNCONSCIOUS;
++		_fallKind = turned ? FALL_CONTROLLED : unit->getAlreadyRespawned() ? FALL_ZOMBIE : unit->getStatus() == STATUS_DEAD ? FALL_KILLED : FALL_UNCONSCIOUS;
++		_deathEye = _eyeZ;
++		_view->setBurning(0.0f); // the flames die down
 +		_stepPending = false;
 +		_throughDoor = false;
 +		_afterFall = 0;
++		_breakdownUnit = nullptr; // went down in the middle of a breakdown
++		_breakdownStart = 0;
 +		_txtMode->setVisible(false);
 +		_txtShot->setVisible(false);
 +		_crosshair->setVisible(false);
 +		_viewModel->setVisible(false); // the weapon falls from the hand
-+		// what happened, in its colour, and whose camera this was
-+		const SDL_Color *pal = _state->getPalette();
-+		const char *title = _fallKind == FALL_KILLED ? "STR_FPS_KILLED" : _fallKind == FALL_UNCONSCIOUS ? "STR_FPS_UNCONSCIOUS" : "STR_FPS_MIND_CONTROLLED";
-+		// (texts take a colour group's start: their glyph shades run down the group)
-+		const Uint8 core = _fallKind == FALL_KILLED ? textColor(pal, 255, 70, 50) : _fallKind == FALL_UNCONSCIOUS ? textColor(pal, 140, 180, 255) : textColor(pal, 255, 170, 60);
-+		const Uint8 halo = _fallKind == FALL_KILLED ? textColor(pal, 150, 10, 10) : _fallKind == FALL_UNCONSCIOUS ? textColor(pal, 30, 40, 140) : textColor(pal, 160, 70, 0);
-+		_txtBanner->setText(_state->tr(title));
-+		_txtBanner->setColor(core);
-+		for (Text *glow : _bannerGlow)
-+		{
-+			glow->setText(_state->tr(title));
-+			glow->setColor(halo);
-+			glow->setVisible(true);
-+		}
-+		_txtBanner->setVisible(true);
-+		_shadows.front()->setColor(halo); // the banner's shadow is part of the halo
 +		bool anyoneLeft = false;
 +		for (const BattleUnit *other : *_save->getUnits())
 +		{
 +			if (other != unit && other->getFaction() == FACTION_PLAYER && !other->isOut()) anyoneLeft = true;
 +		}
 +		_allLost = !anyoneLeft;
-+		_txtFallName->setText(anyoneLeft ? unit->getName(_game->getLanguage()) : std::string(_state->tr("STR_FPS_ALL_LOST")));
-+		_txtFallName->setColor(core);
-+		_txtFallName->setVisible(true);
-+		syncShadows();
++		const char *title = _fallKind == FALL_KILLED ? "STR_FPS_KILLED" : _fallKind == FALL_ZOMBIE ? "STR_FPS_ZOMBIFIED"
++			: _fallKind == FALL_UNCONSCIOUS ? "STR_FPS_UNCONSCIOUS" : "STR_FPS_MIND_CONTROLLED";
++		showFall(_fallKind, _state->tr(title), anyoneLeft ? unit->getName(_game->getLanguage()) : std::string(_state->tr("STR_FPS_ALL_LOST")));
 +	}
 +	if (!_deathUnit)
 +	{
 +		// the next soldier's view comes in out of the static or the colour
 +		if (_afterFall)
 +		{
-+			const float p = (now - _afterFall) / (float)AfterFallTime;
++			const float p = (now - _afterFall) / (float)std::max<Uint32>(1, _afterFallTime);
 +			if (p >= 1.0f)
 +			{
 +				_afterFall = 0;
 +				_view->setStatic(0.0f);
 +				_view->setTint(0.0f);
 +			}
-+			else if (_afterFallKind == FALL_KILLED)
++			else if (_afterFallKind == FALL_KILLED || _afterFallKind == FALL_ZOMBIE)
 +			{
 +				_view->setStatic(1.0f - p);
 +			}
 +			else
 +			{
-+				_view->setTint(1.0f - p, _afterFallKind == FALL_UNCONSCIOUS ? 1 : 2);
++				const int color = _afterFallKind == FALL_UNCONSCIOUS ? 1 : _afterFallKind == FALL_CONTROLLED ? 2 : 3;
++				_view->setTint(1.0f - p * p, color, _afterFallKind == FALL_BERSERK ? 0.3f * (1.0f - p) : 0.0f);
 +			}
 +		}
 +		return false;
 +	}
-+	const Uint32 length = _fallKind == FALL_KILLED ? DeathCamTime : _fallKind == FALL_UNCONSCIOUS ? FaintTime : ControlledTime;
++	if (_fallKind == FALL_KILLED && _deathUnit->getAlreadyRespawned() && now - _deathStart < 1200)
++	{
++		// the game turns them a moment after they fall
++		_fallKind = FALL_ZOMBIE;
++		showFall(FALL_ZOMBIE, _state->tr("STR_FPS_ZOMBIFIED"), _allLost ? std::string(_state->tr("STR_FPS_ALL_LOST")) : _deathUnit->getName(_game->getLanguage()));
++	}
++	const Uint32 length = _fallKind == FALL_KILLED ? DeathCamTime : _fallKind == FALL_ZOMBIE ? ZombieCamTime : _fallKind == FALL_UNCONSCIOUS ? FaintTime : ControlledTime;
 +	const Uint32 age = now - _deathStart;
 +	if (age >= length)
 +	{
 +		_afterFall = now;
 +		_afterFallKind = _fallKind;
++		_afterFallTime = AfterFallTime;
 +		_deathUnit = nullptr;
 +		_trackedUnit = nullptr; // re-place on whoever is next
 +		_view->setVignette(0.0f);
@@ -5917,10 +6043,221 @@ index 000000000..7b8b7ae49
 +		_view->rotate(std::sin(age * 0.004) * dt * 40.0, std::cos(age * 0.003) * dt * 15.0);
 +		_view->setTint(std::min(1.0f, 0.2f + p * 1.1f + 0.08f * (float)std::sin(age * 0.02)), 2);
 +		break;
++	case FALL_ZOMBIE:
++	{
++		// down hard and red, a moment still... then the body gets up again, hunched, lurching,
++		// the red turning a sickly green, until the helmet camera gives out
++		const float rise = std::clamp((p - 0.38f) / 0.34f, 0.0f, 1.0f);
++		if (rise <= 0.0f)
++		{
++			_eyeZ += (floor - _eyeZ) * std::min(1.0, dt * 5.0);
++			_view->rotate(dt * 25.0 * std::max(0.0f, 1.0f - 4.0f * p), dt * 30.0 * std::max(0.0f, 1.0f - 4.0f * p));
++			_view->setTint(std::min(0.85f, 0.45f + p * 2.0f));
++		}
++		else
++		{
++			const double up = floor + (_deathEye - floor) * 0.9 * rise * rise * (3.0 - 2.0 * rise);
++			_eyeZ += (up - _eyeZ) * std::min(1.0, dt * 4.0);
++			const double droop = -12.0 - _view->getPitchDegrees(); // the head hangs
++			_view->rotate(std::sin(age * 0.0026) * dt * 35.0, droop * std::min(1.0, dt * 2.5) + std::sin(age * 0.0041) * dt * 10.0);
++			_view->setTint(0.85f, 4, 1.0f - rise);
++		}
++		_view->setStatic(std::clamp((p - 0.72f) / 0.25f, 0.0f, 1.0f));
++		if (p > 0.8f) _txtFallName->setText(std::string(_deathUnit->getName(_game->getLanguage())) + " - " + std::string(_state->tr("STR_FPS_SIGNAL_LOST")));
++		break;
++	}
++	default:
++		break;
 +	}
 +	_view->setEye(_posX, _posY, _eyeZ);
 +	_view->invalidate();
 +	return true;
++}
++
++/**
++ * Puts up what happened to the soldier we're looking through, in its colours (a bright core in
++ * a halo), and the line under it (whose camera this is).
++ */
++void FirstPersonMode::showFall(FallKind kind, const std::string &title, const std::string &name)
++{
++	const SDL_Color *pal = _state->getPalette();
++	// (texts take a colour group's start, their glyph shades running down the group; dark
++	// letters on the white of a breakdown take plain contrast and a shade of their own)
++	Uint8 core = 0, halo = 0;
++	const bool dark = kind == FALL_PANIC;
++	switch (kind)
++	{
++	case FALL_KILLED: core = textColor(pal, 255, 70, 50); halo = textColor(pal, 150, 10, 10); break;
++	case FALL_UNCONSCIOUS: core = textColor(pal, 140, 180, 255); halo = textColor(pal, 30, 40, 140); break;
++	case FALL_CONTROLLED: core = textColor(pal, 255, 170, 60); halo = textColor(pal, 160, 70, 0); break;
++	case FALL_PANIC: core = inkColor(pal, 14, 14, 18); halo = inkColor(pal, 95, 95, 100); break;
++	case FALL_BERSERK: core = textColor(pal, 255, 40, 30); halo = inkColor(pal, 70, 0, 0); break;
++	case FALL_ZOMBIE: core = textColor(pal, 150, 230, 90); halo = textColor(pal, 30, 90, 20); break;
++	}
++	_txtBanner->setHighContrast(!dark);
++	_txtFallName->setHighContrast(!dark);
++	_txtBanner->setText(title);
++	_txtBanner->setColor(core);
++	for (Text *glow : _bannerGlow)
++	{
++		glow->setText(title);
++		glow->setColor(halo);
++		glow->setVisible(true);
++	}
++	_txtBanner->setVisible(true);
++	_shadows.front()->setColor(halo); // the banner's shadow is part of the halo
++	_txtFallName->setText(name);
++	_txtFallName->setColor(core);
++	_txtFallName->setVisible(true);
++	syncShadows();
++}
++
++/**
++ * A soldier panics or goes berserk at the start of the turn (the game asks before it shows its
++ * "has panicked" box). In 3D the view shows it instead, through their eyes (see breakdownCam),
++ * while the game holds a moment and the soldier then does what they do. Their camera says so
++ * for the rest of the turn either way.
++ * @return True if the 3D view shows it (the game leaves its box out).
++ */
++bool FirstPersonMode::breakdown(BattlescapeState *state, BattleUnit *unit)
++{
++	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
++	if (!mode || !unit || unit->getFaction() != FACTION_PLAYER || mode->_save->getSide() != FACTION_PLAYER)
++	{
++		return false;
++	}
++	const bool berserk = unit->getStatus() == STATUS_BERSERK;
++	mode->_brokeDown[unit] = { mode->_save->getTurn(), berserk };
++	if (!mode->_wanted)
++	{
++		return false;
++	}
++	mode->_breakdownUnit = unit; // one at a time: the next soldier's starts afresh
++	mode->_breakdownBerserk = berserk;
++	mode->_breakdownStart = 0;
++	state->_battleGame->statePushFront(new BreakdownPause(state->_battleGame));
++	return true;
++}
++
++/**
++ * A soldier's breakdown, through their eyes: the view trembles and washes out white, the heart
++ * racing and thumping; gone berserk, red throbs through the white with each beat and every shot
++ * they fire flashes red. It stays while they freeze, flee or fire wildly, then they come to
++ * (the white fades away, see deathCam).
++ * @return True while that's showing.
++ */
++bool FirstPersonMode::breakdownCam(Uint32 now, double dt)
++{
++	BattleUnit *unit = _breakdownUnit;
++	if (!unit)
++	{
++		return false;
++	}
++	if (!_wanted)
++	{
++		endBreakdown(false); // back on the map: it shows again on coming back to 3D
++		return false;
++	}
++	if (unit->isOut() || unit->getFaction() != FACTION_PLAYER || _save->getSide() != FACTION_PLAYER)
++	{
++		endBreakdown(); // gone down meanwhile (the death camera has that)
++		return false;
++	}
++	if (!_breakdownStart)
++	{
++		_breakdownStart = now;
++		_breakdownShot = _state->_map->getProjectile() != nullptr;
++		_breakdownFlash = 0;
++		_heartbeat = -1;
++		_afterFall = 0;
++		if (!isActive())
++		{
++			setActive(true);
++		}
++		_view->setStatic(0.0f);
++		_view->setVignette(0.0f);
++		_txtMode->setVisible(false);
++		_txtShot->setVisible(false);
++		_crosshair->setVisible(false);
++		_viewModel->setVisible(false);
++		const FallKind kind = _breakdownBerserk ? FALL_BERSERK : FALL_PANIC;
++		showFall(kind, _state->tr(_breakdownBerserk ? "STR_FPS_BERSERK" : "STR_FPS_BREAKDOWN"), unit->getName(_game->getLanguage()));
++	}
++	const Uint32 age = now - _breakdownStart;
++	// over once the game is done with them (the next soldier's breakdown, if any, starts afresh)
++	const bool done = !_state->_battleGame->isBusy() && (_state->_battleGame->getPanicHandled() || _save->getSelectedUnit() != unit);
++	if (done && age >= BreakdownMinTime)
++	{
++		const FallKind kind = _breakdownBerserk ? FALL_BERSERK : FALL_PANIC;
++		endBreakdown();
++		_afterFall = now;
++		_afterFallKind = kind;
++		_afterFallTime = ComeToTime;
++		_view->setTint(1.0f, 3, kind == FALL_BERSERK ? 0.3f : 0.0f);
++		return false;
++	}
++	// on them wherever they go (fleeing), the view turning where they turn (to fire), trembling
++	updateCamera(unit, false, dt);
++	const double turn = std::remainder(unit->getDirection() * 45.0 - 90.0 - _view->getYawDegrees(), 360.0);
++	_view->rotate(turn * std::min(1.0, dt * (_breakdownBerserk ? 6.0 : 2.0)) + std::sin(age * 0.0023) * dt * 14.0,
++		std::sin(age * 0.0017) * dt * 9.0);
++	_view->addShake(_breakdownBerserk ? 0.5f : 0.3f);
++	updateTopBar(_save->getSelectedUnit());
++	_view->setBurning(unit->getFire() > 0 ? std::min(0.75f, 0.45f + 0.1f * unit->getFire()) : 0.0f);
++	updatePanel(unit);
++	updateArmor(unit);
++	syncShadows();
++	// the racing heart: each beat thumps and jolts the view
++	const float beats = age / 1000.0f * (_breakdownBerserk ? 2.6f : 2.1f);
++	if ((int)beats != _heartbeat)
++	{
++		_heartbeat = (int)beats;
++		_sounds->play(FirstPersonSounds::HEARTBEAT, 0, 0.9f);
++		_view->addShake(_breakdownBerserk ? 1.2f : 0.9f);
++	}
++	const float beat = std::exp(-(beats - std::floor(beats)) * 7.0f);
++	const float in = std::min(1.0f, age / 1500.0f);
++	const float white = 0.15f + 0.85f * in * in * (3.0f - 2.0f * in);
++	float red = 0.0f;
++	if (_breakdownBerserk)
++	{
++		const bool shot = _state->_map->getProjectile() != nullptr;
++		if (shot && !_breakdownShot)
++		{
++			_breakdownFlash = now;
++			_view->addShake(2.0f);
++		}
++		_breakdownShot = shot;
++		const float flash = _breakdownFlash && now - _breakdownFlash < 300 ? 1.0f - (now - _breakdownFlash) / 300.0f : 0.0f;
++		red = std::min(0.9f, (0.2f + 0.5f * beat) * in + 0.7f * flash);
++	}
++	_view->setTint(white, 3, red);
++	_view->invalidate();
++	return true;
++}
++
++/**
++ * Takes a breakdown's banner down (if it was showing) and forgets it (or, not forgetting, keeps
++ * it to show again from the start).
++ */
++void FirstPersonMode::endBreakdown(bool forget)
++{
++	if (_breakdownUnit && _breakdownStart)
++	{
++		_txtBanner->setVisible(false);
++		for (Text *glow : _bannerGlow) glow->setVisible(false);
++		_txtFallName->setVisible(false);
++		_txtBanner->setHighContrast(true);
++		_txtFallName->setHighContrast(true);
++		_view->setTint(0.0f);
++		syncShadows();
++	}
++	if (forget)
++	{
++		_breakdownUnit = nullptr;
++	}
++	_breakdownStart = 0;
++	_heartbeat = -1;
 +}
 +
 +/**
@@ -6008,7 +6345,7 @@ index 000000000..7b8b7ae49
 +		TextButton *btn = _btnSquad[i];
 +		btn->setText(state == SQUAD_READY ? std::to_string(i + 1) : std::string());
 +		btn->setColor(state == SQUAD_CONTROLLED ? rowNear(230, 130, 30) : state == SQUAD_DEAD ? rowNear(120, 120, 120)
-+			: state == SQUAD_UNCONSCIOUS ? rowNear(90, 120, 170) : _squadColor);
++			: state == SQUAD_UNCONSCIOUS ? rowNear(90, 120, 170) : state == SQUAD_ZOMBIE ? rowNear(90, 140, 60) : _squadColor);
 +		drawSquadIcon(_squadIcons[i], state);
 +	}
 +	if (changed)
@@ -6090,9 +6427,9 @@ index 000000000..7b8b7ae49
 + */
 +FirstPersonMode::SquadState FirstPersonMode::squadState(const BattleUnit *unit) const
 +{
-+	if (!unit)
++	if (!unit || unit->isIgnored())
 +	{
-+		return SQUAD_NONE;
++		return SQUAD_NONE; // (left behind in an earlier stage of the mission: not in this battle)
 +	}
 +	if (unit->getOriginalFaction() != FACTION_PLAYER)
 +	{
@@ -6100,7 +6437,7 @@ index 000000000..7b8b7ae49
 +	}
 +	if (unit->getStatus() == STATUS_DEAD || (unit->isOut() && unit->getHealth() <= 0))
 +	{
-+		return SQUAD_DEAD;
++		return unit->getAlreadyRespawned() ? SQUAD_ZOMBIE : SQUAD_DEAD; // (turned into a zombie when killed)
 +	}
 +	if (unit->isOut())
 +	{
@@ -6119,11 +6456,12 @@ index 000000000..7b8b7ae49
 +	static const char *caduceus[8] = { "##.#.##", ".#####.", "...#...", ".##o##.", "o..#..o", ".oo#oo.", "...#...", "..###.." };
 +	static const char *alien[8] = { "..###..", ".#####.", "#######", "#oo#oo#", "#.o#o.#", ".#####.", "..###..", "...#..." };
 +	const SDL_Color *pal = _state->getPalette();
-+	const char **art = state == SQUAD_DEAD ? skull : state == SQUAD_UNCONSCIOUS ? caduceus : state == SQUAD_CONTROLLED ? alien : nullptr;
++	const char **art = state == SQUAD_DEAD || state == SQUAD_ZOMBIE ? skull : state == SQUAD_UNCONSCIOUS ? caduceus : state == SQUAD_CONTROLLED ? alien : nullptr;
 +	Uint8 ink = 0, ink2 = 0;
 +	switch (state)
 +	{
 +	case SQUAD_DEAD: ink = nearestColor(pal, 235, 230, 205); break;                                    // bone
++	case SQUAD_ZOMBIE: ink = nearestColor(pal, 150, 210, 90); break;                                   // rotting green
 +	case SQUAD_UNCONSCIOUS: ink = nearestColor(pal, 245, 205, 70); ink2 = nearestColor(pal, 120, 230, 140); break; // gold staff, green snakes
 +	case SQUAD_CONTROLLED: ink = nearestColor(pal, 180, 200, 175); ink2 = nearestColor(pal, 10, 10, 10); break;   // grey skin, black eyes
 +	default: break;
@@ -6309,7 +6647,7 @@ index 000000000..7b8b7ae49
 +		_ignoreMotionUntil = now + 150;
 +	}
 +
-+	if (deathCam(now, dt))
++	if (deathCam(now, dt) || breakdownCam(now, dt))
 +	{
 +		return;
 +	}
@@ -6373,6 +6711,7 @@ index 000000000..7b8b7ae49
 +	_view->setSmoothLighting(Options::fpsSmoothLighting);
 +	checkSpotted(unit, playerTurn);
 +	checkHurt(unit, now);
++	checkBurning(unit, now);
 +	checkNearMiss();
 +	updateRecoil(unit, dt);
 +	// FPS-style auto: holding the trigger fires the next burst as soon as the last is done
@@ -6737,10 +7076,10 @@ index 000000000..7b8b7ae49
 +}
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..f0f7df888
+index 000000000..887be94cd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,352 @@
+@@ -0,0 +1,371 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -6831,7 +7170,7 @@ index 000000000..f0f7df888
 +	std::vector<TextButton*> _btnSquad;
 +	std::vector<BattleUnit*> _squad;          // unit shown by each squad button
 +	// how each squad member is: an icon replaces the number of the fallen and the turned
-+	enum SquadState { SQUAD_NONE, SQUAD_READY, SQUAD_DEAD, SQUAD_UNCONSCIOUS, SQUAD_CONTROLLED };
++	enum SquadState { SQUAD_NONE, SQUAD_READY, SQUAD_DEAD, SQUAD_UNCONSCIOUS, SQUAD_CONTROLLED, SQUAD_ZOMBIE };
 +	std::vector<SquadState> _squadStates;
 +	std::vector<Surface*> _squadIcons;
 +	std::vector<size_t> _squadSlots;          // the slots with a button, in order
@@ -6947,12 +7286,25 @@ index 000000000..f0f7df888
 +	float _hurtAmount;
 +	BattleUnit *_deathUnit; // the soldier we were looking through went down (or was taken over): stay a moment
 +	Uint32 _deathStart;
-+	enum FallKind { FALL_KILLED, FALL_UNCONSCIOUS, FALL_CONTROLLED };
++	double _deathEye = 0.0;         // the eye height they fell from (a zombie gets up to about it again)
++	// on fire: the view in flames, a flare-up and a banner when the soldier catches fire
++	const BattleUnit *_burnUnit = nullptr;
++	int _lastFire = 0;
++	Uint32 _burningUntil = 0;
++	enum FallKind { FALL_KILLED, FALL_UNCONSCIOUS, FALL_CONTROLLED, FALL_PANIC, FALL_BERSERK, FALL_ZOMBIE };
 +	FallKind _fallKind = FALL_KILLED;
 +	bool _allLost = false;          // that was the last soldier standing
 +	Text *_txtFallName = nullptr;   // whose camera it was, under the banner
 +	Uint32 _afterFall = 0;          // the next soldier's view coming in out of the static or the colour
 +	FallKind _afterFallKind = FALL_KILLED;
++	Uint32 _afterFallTime = 0;      // ...over this long
++	// a soldier's breakdown at the start of the turn (panic, berserk): the view washes out meanwhile
++	BattleUnit *_breakdownUnit = nullptr;
++	bool _breakdownBerserk = false;
++	Uint32 _breakdownStart = 0;     // when the view started showing it (0: not yet)
++	bool _breakdownShot = false;    // a shot was in the air last frame (each new one flashes red)
++	Uint32 _breakdownFlash = 0;
++	std::unordered_map<const BattleUnit*, std::pair<int, bool>> _brokeDown; // who broke down in which turn, berserk or not (their camera says so)
 +	bool _musicTense = false;   // the combat track is playing
 +	// guided missiles, psi attacks and the mind probe can be aimed on the isometric map
 +	enum MapAimPhase { MAPAIM_NONE, MAPAIM_AIMING, MAPAIM_ACTING };
@@ -7058,11 +7410,15 @@ index 000000000..f0f7df888
 +	void updateBanner(bool playerTurn);
 +	void checkSpotted(BattleUnit *unit, bool playerTurn);
 +	void checkHurt(BattleUnit *unit, Uint32 now);
++	void checkBurning(BattleUnit *unit, Uint32 now);
 +	void updateMusic(Uint32 now);
 +	void startMapAim(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, const char *hint);
 +	void updateMapAim();
 +	bool creatureAt(const Position &voxel, const BattleUnit *self) const;
 +	bool deathCam(Uint32 now, double dt);
++	bool breakdownCam(Uint32 now, double dt);
++	void endBreakdown(bool forget = true);
++	void showFall(FallKind kind, const std::string &title, const std::string &name);
 +	TextButton *buttonAt(double x, double y) const;
 +	void buttonClicked(TextButton *button, Action *action);
 +	void selectUnit(BattleUnit *unit);
@@ -7070,6 +7426,8 @@ index 000000000..f0f7df888
 +	/// An FPS-style shot's next round, asked for by the game (see FirstPerson::freeAimTarget).
 +	static void freeAim(BattlescapeState *state, const BattleAction &action, Position &target);
 +	static bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
++	/// A soldier panics or goes berserk, asked by the game (see FirstPerson::breakdown).
++	static bool breakdown(BattlescapeState *state, BattleUnit *unit);
 +	void freeAimTarget(const BattleAction &action, Position &target);
 +
 +	/// Creates the first-person mode and adds its surfaces to the battlescape state.
@@ -7540,10 +7898,10 @@ index 000000000..708ff4bd8
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..cd0b081e5
+index 000000000..db6f09f98
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,4489 @@
+@@ -0,0 +1,4718 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -8341,6 +8699,11 @@ index 000000000..cd0b081e5
 +	return _yaw * 180.0 / Pi;
 +}
 +
++double FirstPersonView::getPitchDegrees() const
++{
++	return _pitch * 180.0 / Pi;
++}
++
 +void FirstPersonView::setFieldOfView(double degrees)
 +{
 +	_fovTan = std::tan(std::clamp(degrees, 30.0, 120.0) * Pi / 360.0);
@@ -9134,11 +9497,15 @@ index 000000000..cd0b081e5
 +			_look.redTint[i] = nearest(60 + lum * 0.85f, lum * 0.18f, lum * 0.15f);
 +			_look.blueTint[i] = nearest(lum * 0.1f, lum * 0.16f, 25 + lum * 0.45f);
 +			_look.orangeTint[i] = nearest(std::min(255.0f, 80 + lum * 0.9f), 30 + lum * 0.45f, lum * 0.08f);
++			_look.whiteTint[i] = nearest(std::min(255.0f, 180 + lum * 0.3f), std::min(255.0f, 180 + lum * 0.3f), std::min(255.0f, 180 + lum * 0.3f));
++			_look.greenTint[i] = nearest(15 + lum * 0.3f, 35 + lum * 0.7f, lum * 0.2f);
 +			_look.flareTint[i] = nearest(std::min(255.0f, 70 + lum * 1.15f), lum * 0.32f, lum * 0.24f);
 +		}
 +		_look.redTint[0] = 0;
 +		_look.blueTint[0] = nearest(0, 2, 18);
 +		_look.orangeTint[0] = nearest(60, 24, 0);
++		_look.whiteTint[0] = nearest(185, 185, 185);
++		_look.greenTint[0] = nearest(8, 22, 4);
 +		_look.flareTint[0] = 0;
 +		for (int k = 0; k < 4; ++k) _look.grey[k] = nearest(30 + 60 * k, 30 + 60 * k, 30 + 60 * k);
 +	}
@@ -10760,6 +11127,54 @@ index 000000000..cd0b081e5
 +			_particles.add(p);
 +		}
 +	}
++
++	// burning units: flames all over them, and smoke off the top
++	const Uint32 now = SDL_GetTicks();
++	for (const BattleUnit *unit : *_save->getUnits())
++	{
++		if (unit->getFire() <= 0 || unit->isOut() || unit == _cameraUnit || (!unit->getVisible() && !_save->getDebugMode()))
++		{
++			continue;
++		}
++		const int size = unit->getArmor()->getSize();
++		float feet[3];
++		auto glide = _glides.find(unit);
++		if (glide != _glides.end() && now - glide->second.seen < 250)
++		{
++			for (int a = 0; a < 3; ++a) feet[a] = (float)glide->second.pos[a];
++		}
++		else
++		{
++			const Position t = unit->getPosition();
++			const Tile *tile = _save->getTile(t);
++			feet[0] = t.x * 16 + 8.0f * size; feet[1] = t.y * 16 + 8.0f * size; feet[2] = t.z * 24 - (tile ? tile->getTerrainLevel() : 0);
++		}
++		if (std::abs(feet[0] - _eye[0]) > 320 || std::abs(feet[1] - _eye[1]) > 320)
++		{
++			continue;
++		}
++		const float height = (float)(unit->getHeight() + unit->getFloatHeight());
++		const int flames = (int)(dt * 45.0f * size + _particles.random());
++		for (int k = 0; k < flames; ++k)
++		{
++			P::Particle p;
++			p.pos[0] = feet[0] + _particles.random(-4, 4) * size; p.pos[1] = feet[1] + _particles.random(-4, 4) * size;
++			p.pos[2] = feet[2] + height * _particles.random(0.05f, 0.9f);
++			p.vel[0] = _particles.random(-4, 4); p.vel[1] = _particles.random(-4, 4); p.vel[2] = _particles.random(16, 36);
++			p.age = 0; p.life = _particles.random(0.35f, 0.8f); p.gravity = -12; p.drag = 0.8f;
++			p.color = _look.fire[(int)_particles.random(0, 3.99f)]; p.size = 3; p.kind = P::GLOW; p.group = P::EFFECT;
++			_particles.add(p);
++		}
++		if (_particles.random() < dt * 5.0f)
++		{
++			P::Particle p;
++			p.pos[0] = feet[0] + _particles.random(-3, 3); p.pos[1] = feet[1] + _particles.random(-3, 3); p.pos[2] = feet[2] + height + 2.0f;
++			p.vel[0] = _particles.random(-3, 3) + 2; p.vel[1] = _particles.random(-3, 3); p.vel[2] = _particles.random(6, 12);
++			p.age = 0; p.life = _particles.random(1.5f, 2.5f); p.gravity = -3; p.drag = 0.4f;
++			p.color = shadeColor(_look.smoke, (int)_particles.random(1, 4)); p.size = 5; p.kind = P::LIT; p.group = P::EFFECT;
++			_particles.add(p);
++		}
++	}
 +}
 +
 +/**
@@ -11324,6 +11739,176 @@ index 000000000..cd0b081e5
 +		trailSegment(previous, _partnerHead);
 +		std::swap(_trail, _partnerTrail);
 +		std::swap(_trailColor, _partnerColor);
++	}
++}
++
++/**
++ * The soldier we look through is on fire: a sheet of flame rises from the bottom of the view,
++ * tall in the corners and low in the middle so you can still see ahead. Heat rises cell by cell,
++ * drifting sideways and cooling at random (the old fire effect of Doom on the PlayStation), in
++ * blocks of the 320x200 view's pixels; dark red at the tips through orange and yellow to white
++ * at the root. Embers drift up out of it, and its light flickers up from below. Over the world
++ * (the weapon in hand still in front). A flare-up (catching fire) makes it leap; put out, the
++ * last of the heat rises and dies away.
++ */
++void FirstPersonView::drawBurning()
++{
++	const Uint32 now = SDL_GetTicks();
++	const float dt = _flameTick ? std::min<Uint32>(100, now - _flameTick) / 1000.0f : 0.0f;
++	_flameTick = now;
++	_flareUp = std::max(0.0f, _flareUp - dt * 1.2f);
++	if (_onFire <= 0.0f)
++	{
++		_flareUp = 0.0f;
++		if (!_fireLit && _embers.empty()) return;
++	}
++	const int w = getWidth(), h = getHeight();
++	const int block = std::max(1, (int)std::lround(h / 200.0));
++	const int fw = (w + block - 1) / block, fh = (int)(h * 0.7) / block;
++	if (fw != _fireW || fh != _fireH)
++	{
++		_fireW = fw;
++		_fireH = fh;
++		_fireHeat.assign((size_t)fw * fh, 0);
++	}
++	auto rnd = [this]() { _fireSeed = _fireSeed * 1664525u + 1013904223u; return _fireSeed >> 8; };
++	const int MaxHeat = 48;
++	const float px = h / 200.0f; // sizes and speeds as on a 320x200 view
++	const float fierce = std::min(1.0f, _onFire * (1.0f + 1.2f * _flareUp));
++	const float flicker = 0.8f + 0.2f * std::sin(now * 0.031f) * std::sin(now * 0.017f + 1.0f);
++	// the light of the flames, from below
++	if (_onFire > 0.0f)
++	{
++		const int rows = (int)(h * 0.3f);
++		for (int y = h - rows; y < h; ++y)
++		{
++			const float glow = std::pow((y - (h - rows)) / (float)rows, 1.6f) * 0.7f * fierce * flicker;
++			Uint8 *row = getRaw(0, y);
++			for (int x = 0; x < w; ++x)
++			{
++				if (dither(x, y) < glow) row[x] = _look.orangeTint[row[x]];
++			}
++		}
++	}
++	// the flames step 50 times a second: the bottom row is fed (hotter towards the corners),
++	// every cell passes its heat up a row and a little downwind (the wind turns now and then),
++	// a little cooler; the middle cools faster, so the flames stay low there (and a flare-up
++	// cools them less)
++	const int wind = std::sin(now * 0.0005f) > 0.0f ? 1 : -1;
++	_fireStep = std::min(_fireStep + dt, 0.1f);
++	while (_fireStep >= 0.02f)
++	{
++		_fireStep -= 0.02f;
++		Uint8 *heat = _fireHeat.data();
++		Uint8 *source = heat + (size_t)(fh - 1) * fw;
++		const float t = now / 1000.0f;
++		for (int x = 0; x < fw; ++x)
++		{
++			// tongues: hot roots wandering along the bottom
++			const float cell = x * block / px;
++			const float roots = 0.5f + 0.5f * std::sin(cell * 0.21f + t * 1.7f) * std::sin(cell * 0.083f - t * 1.1f + 1.3f);
++			const float edge = std::abs(x - fw * 0.5f) / (fw * 0.5f);
++			source[x] = _onFire > 0.0f ? (Uint8)(MaxHeat * fierce * (0.3f + 0.7f * roots) * (0.65f + 0.35f * edge) * (0.85f + 0.15f * (rnd() & 255) / 255.0f)) : 0;
++		}
++		// and the sides burn up, less the higher (a thin wall of fire framing the view)
++		if (_onFire > 0.0f)
++		{
++			const int side = std::max(2, fw / 48);
++			for (int y = 0; y < fh - 1; ++y)
++			{
++				const float up = (fh - 1 - y) / (float)(fh - 1);
++				const float lick = 0.5f + 0.5f * std::sin(y * block / px * 0.12f + t * 2.3f);
++				const Uint8 feed = (Uint8)std::max(0.0f, MaxHeat * fierce * (0.9f - 1.2f * up) * (0.6f + 0.4f * lick));
++				for (int k = 0; k < side; ++k)
++				{
++					Uint8 &left = heat[y * fw + k], &right = heat[y * fw + fw - 1 - k];
++					left = std::max(left, feed);
++					right = std::max(right, feed);
++				}
++			}
++		}
++		bool lit = false;
++		for (int y = 1; y < fh; ++y)
++		{
++			for (int x = 0; x < fw; ++x)
++			{
++				const Uint8 here = heat[y * fw + x];
++				if (!here)
++				{
++					heat[(y - 1) * fw + x] = 0;
++					continue;
++				}
++				lit = true;
++				const Uint32 r = rnd();
++				const int jitter = (r & 3) == 0 ? -1 : (r & 3) == 3 ? 1 : 0;
++				const int to = std::clamp(x + jitter + (((r >> 2) & 7) == 0 ? wind : 0), 0, fw - 1);
++				const float edge = std::abs(x - fw * 0.5f) / (fw * 0.5f);
++				const float extra = (0.1f + (1.0f - edge) * (1.0f - edge) * 0.55f) * (1.0f - 0.6f * _flareUp);
++				const int cool = (int)((r >> 4) & 1) + (((r >> 8) & 255) < extra * 255.0f ? 1 : 0);
++				heat[(y - 1) * fw + to] = here > cool ? (Uint8)(here - cool) : 0;
++			}
++		}
++		_fireLit = lit || _onFire > 0.0f;
++	}
++	// drawn in blocks: white at the root, yellow, orange, dark red, wispy at the tips
++	const Uint8 ramp[5] = { shadeColor(_look.fire[3], 4), _look.fire[3], _look.fire[2], _look.fire[1], _look.fire[0] };
++	for (int y = 0; y < fh; ++y)
++	{
++		const int sy = h - (fh - y) * block;
++		for (int x = 0; x < fw; ++x)
++		{
++			const int here = _fireHeat[y * fw + x];
++			if (!here) continue;
++			const int sx = x * block;
++			if (here < 7 && dither(sx, sy) >= here / 7.0f) continue;
++			const float f = here / (float)MaxHeat * 4.0f;
++			const int band = std::min(3, (int)f);
++			const Uint8 color = dither(sx + 1, sy + 2) < f - band ? ramp[band + 1] : ramp[band];
++			for (int by = std::max(0, sy); by < std::min(h, sy + block); ++by)
++			{
++				Uint8 *row = getRaw(0, by);
++				for (int bx = sx; bx < std::min(w, sx + block); ++bx) row[bx] = color;
++			}
++		}
++	}
++	// embers drifting up out of it, twinkling
++	_emberSpawn += dt * (_onFire > 0.0f ? 30.0f * fierce : 0.0f);
++	while (_emberSpawn >= 1.0f)
++	{
++		_emberSpawn -= 1.0f;
++		if (_embers.size() >= 200) continue;
++		Ember e;
++		const float u = _particles.random(-1.0f, 1.0f);
++		e.x = w * 0.5f + (u < 0.0f ? -1.0f : 1.0f) * std::sqrt(std::abs(u)) * w * 0.5f;
++		e.y = h - _particles.random(0.05f, 0.3f) * h;
++		e.vx = _particles.random(-20.0f, 20.0f) * px;
++		e.vy = -_particles.random(50.0f, 100.0f) * px;
++		e.age = 0.0f;
++		e.life = _particles.random(0.8f, 1.8f);
++		e.phase = _particles.random(0.0f, 6.3f);
++		_embers.push_back(e);
++	}
++	const int size = std::max(1, block);
++	for (size_t i = 0; i < _embers.size();)
++	{
++		Ember &e = _embers[i];
++		e.age += dt;
++		if (e.age >= e.life)
++		{
++			e = _embers.back();
++			_embers.pop_back();
++			continue;
++		}
++		e.x += (e.vx + std::sin(e.age * 7.0f + e.phase) * 25.0f * px) * dt;
++		e.y += e.vy * dt;
++		++i;
++		if (std::sin(e.age * 30.0f + e.phase) < -0.6f) continue;
++		const Uint8 color = _look.fire[e.age < e.life * 0.5f ? 0 : e.age < e.life * 0.8f ? 1 : 2];
++		const int x0 = (int)e.x, y0 = (int)e.y;
++		for (int y = std::max(0, y0); y < std::min(h, y0 + size); ++y)
++		{
++			for (int x = std::max(0, x0); x < std::min(w, x0 + size); ++x) *getRaw(x, y) = color;
++		}
 +	}
 +}
 +
@@ -12006,14 +12591,15 @@ index 000000000..cd0b081e5
 +		const int w = getWidth(), h = getHeight();
 +		const float cx = w * 0.5f, cy = h * 0.5f, reach = std::sqrt(cx * cx + cy * cy);
 +		const Uint8 group = _nightVision ? (Uint8)((_nightVision - 1) * 16) : 0;
-+		const Uint8 *wash = _tintColor == 1 ? _look.blueTint : _tintColor == 2 ? _look.orangeTint : _look.redTint;
++		const Uint8 *wash = _tintColor == 1 ? _look.blueTint : _tintColor == 2 ? _look.orangeTint : _tintColor == 3 ? _look.whiteTint
++			: _tintColor == 4 ? _look.greenTint : _look.redTint;
 +		for (int y = 0; y < h; ++y)
 +		{
 +			Uint8 *row = getRaw(0, y);
 +			for (int x = 0; x < w; ++x)
 +			{
 +				if (_nightVision && row[x]) row[x] = group | (row[x] & 15);
-+				if (_tint > 0.0f && dither(x, y) < _tint) row[x] = wash[row[x]];
++				if (_tint > 0.0f && dither(x, y) < _tint) row[x] = (_tintRed > 0.0f && dither(y + 1, x + 2) < _tintRed ? _look.redTint : wash)[row[x]];
 +				if (_static > 0.0f)
 +				{
 +					_staticSeed = _staticSeed * 1664525u + 1013904223u;
@@ -12027,6 +12613,7 @@ index 000000000..cd0b081e5
 +			}
 +		}
 +	}
++	drawBurning();
 +	drawHurt();
 +	drawMarkers();
 +	unlock();
@@ -12035,10 +12622,10 @@ index 000000000..cd0b081e5
 +}
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..81581f963
+index 000000000..c5957fb99
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,453 @@
+@@ -0,0 +1,477 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -12169,6 +12756,8 @@ index 000000000..81581f963
 +		Uint8 redTint[256];      // each colour washed with red (hurt, dying)
 +		Uint8 blueTint[256];     // ... with dark blue (passing out)
 +		Uint8 orangeTint[256];   // ... with orange (falling under mind control)
++		Uint8 whiteTint[256];    // ... with white (a breakdown)
++		Uint8 greenTint[256];    // ... with a sickly green (turning into a zombie)
 +		Uint8 grey[4];           // TV static
 +		Uint8 flareTint[256];    // each colour in a flare's red light
 +		Uint8 flareFire[3];      // flare flame: red, orange, yellow
@@ -12235,6 +12824,21 @@ index 000000000..81581f963
 +	bool _muzzleValid = false;
 +	int _hiddenFloor = -1;      // a floor left out: the lift platform the camera rides through
 +	int _tintColor = 0;         // which wash setTint asked for
++	float _tintRed = 0.0f;      // share of the washed pixels washed red instead (berserk's white, a zombie's green)
++	// on fire: a sheet of flame up from the bottom of the view (heat rising and cooling cell by
++	// cell, in blocks of the 320x200 view's pixels) and embers drifting up out of it
++	std::vector<Uint8> _fireHeat;
++	int _fireW = 0, _fireH = 0;
++	bool _fireLit = false;      // some heat left (burning, or dying down)
++	float _fireStep = 0.0f;     // time towards the next step of the flames
++	Uint32 _fireSeed = 1;
++	struct Ember { float x, y, vx, vy, age, life, phase; };
++	std::vector<Ember> _embers;
++	float _onFire = 0.0f;       // how fiercely (0 none .. 1)
++	float _flareUp = 0.0f;      // a burst of it, dying down
++	float _emberSpawn = 0.0f;   // the part of an ember still to spawn
++	Uint32 _flameTick = 0;
++	void drawBurning();
 +	// under fire: shots whizzing past, where hits come from, blood on the view
 +	Uint32 _nearMissTick = 0;
 +	double _nearMissDir[2] = {};
@@ -12427,6 +13031,8 @@ index 000000000..81581f963
 +	void lookAt(const double target[3]);
 +	/// Gets the look direction around the vertical axis, in degrees (0 = east, 90 = south).
 +	double getYawDegrees() const;
++	/// Gets how far the view looks up (negative: down), in degrees.
++	double getPitchDegrees() const;
 +	/// Gets the (normalized) direction of the ray through a pixel of the view.
 +	void getRayDirection(int x, int y, double out[3]);
 +	/// Sets the horizontal field of view.
@@ -12480,9 +13086,14 @@ index 000000000..81581f963
 +	void setVignette(float amount) { _vignette = amount; }
 +	/// Shakes the camera (explosions, hits); stronger shakes win.
 +	void addShake(float amount) { _shake = std::max(_shake, amount); }
-+	/// Washes the view with red (0 none .. 1 full), for getting hurt and dying.
-+	/// Washes the view with a colour: 0 red (hurt, killed), 1 dark blue (unconscious), 2 orange (mind control).
-+	void setTint(float amount, int color = 0) { _tint = amount; _tintColor = color; }
++	/// Washes the view with a colour (0 none .. 1 full): 0 red (hurt, killed), 1 dark blue (unconscious),
++	/// 2 orange (mind control), 3 white (a breakdown), 4 sickly green (turning into a zombie); `red`
++	/// is the share of the washed pixels washed red instead.
++	void setTint(float amount, int color = 0, float red = 0.0f) { _tint = amount; _tintColor = color; _tintRed = red; }
++	/// The soldier is on fire: flames lick up from the bottom of the view (0 none .. 1 fierce).
++	void setBurning(float amount) { _onFire = amount; }
++	/// A burst of flames (catching fire), 0..1.
++	void flareUp(float amount) { _flareUp = std::max(_flareUp, amount); }
 +	/// TV static over the view (a helmet camera losing its signal), 0 none .. 1 all.
 +	void setStatic(float amount) { _static = amount; }
 +	/// Night vision like the isometric map's: brighter, in one colour (group + 1, 0 off).

@@ -71,6 +71,8 @@ State *createOptionsTab(OptionsOrigin origin);
 void freeAimTarget(BattlescapeState *state, const BattleAction &action, Position &target);
 /// FPS-style shooting is on for this unit's shots (first-person view): their bullet hits play quicker.
 bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
+/// A unit panics or goes berserk: true if the first-person view shows it (the game then leaves its infobox out).
+bool breakdown(BattlescapeState *state, BattleUnit *unit);
 
 #else
 
@@ -86,6 +88,7 @@ inline bool hasOptionsTab(const Mod *) { return false; }
 inline State *createOptionsTab(OptionsOrigin) { return nullptr; }
 inline void freeAimTarget(BattlescapeState *, const BattleAction &, Position &) { }
 inline bool fastShots(BattlescapeState *, const BattleUnit *) { return false; }
+inline bool breakdown(BattlescapeState *, BattleUnit *) { return false; }
 
 #endif
 

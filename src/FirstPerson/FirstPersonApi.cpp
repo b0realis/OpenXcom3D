@@ -155,6 +155,11 @@ bool fastShots(BattlescapeState *state, const BattleUnit *attacker)
 	return FirstPersonMode::fastShots(state, attacker);
 }
 
+bool breakdown(BattlescapeState *state, BattleUnit *unit)
+{
+	return FirstPersonMode::breakdown(state, unit);
+}
+
 }
 
 }

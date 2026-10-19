@@ -128,6 +128,8 @@ public:
 		Uint8 redTint[256];      // each colour washed with red (hurt, dying)
 		Uint8 blueTint[256];     // ... with dark blue (passing out)
 		Uint8 orangeTint[256];   // ... with orange (falling under mind control)
+		Uint8 whiteTint[256];    // ... with white (a breakdown)
+		Uint8 greenTint[256];    // ... with a sickly green (turning into a zombie)
 		Uint8 grey[4];           // TV static
 		Uint8 flareTint[256];    // each colour in a flare's red light
 		Uint8 flareFire[3];      // flare flame: red, orange, yellow
@@ -194,6 +196,21 @@ private:
 	bool _muzzleValid = false;
 	int _hiddenFloor = -1;      // a floor left out: the lift platform the camera rides through
 	int _tintColor = 0;         // which wash setTint asked for
+	float _tintRed = 0.0f;      // share of the washed pixels washed red instead (berserk's white, a zombie's green)
+	// on fire: a sheet of flame up from the bottom of the view (heat rising and cooling cell by
+	// cell, in blocks of the 320x200 view's pixels) and embers drifting up out of it
+	std::vector<Uint8> _fireHeat;
+	int _fireW = 0, _fireH = 0;
+	bool _fireLit = false;      // some heat left (burning, or dying down)
+	float _fireStep = 0.0f;     // time towards the next step of the flames
+	Uint32 _fireSeed = 1;
+	struct Ember { float x, y, vx, vy, age, life, phase; };
+	std::vector<Ember> _embers;
+	float _onFire = 0.0f;       // how fiercely (0 none .. 1)
+	float _flareUp = 0.0f;      // a burst of it, dying down
+	float _emberSpawn = 0.0f;   // the part of an ember still to spawn
+	Uint32 _flameTick = 0;
+	void drawBurning();
 	// under fire: shots whizzing past, where hits come from, blood on the view
 	Uint32 _nearMissTick = 0;
 	double _nearMissDir[2] = {};
@@ -386,6 +403,8 @@ public:
 	void lookAt(const double target[3]);
 	/// Gets the look direction around the vertical axis, in degrees (0 = east, 90 = south).
 	double getYawDegrees() const;
+	/// Gets how far the view looks up (negative: down), in degrees.
+	double getPitchDegrees() const;
 	/// Gets the (normalized) direction of the ray through a pixel of the view.
 	void getRayDirection(int x, int y, double out[3]);
 	/// Sets the horizontal field of view.
@@ -439,9 +458,14 @@ public:
 	void setVignette(float amount) { _vignette = amount; }
 	/// Shakes the camera (explosions, hits); stronger shakes win.
 	void addShake(float amount) { _shake = std::max(_shake, amount); }
-	/// Washes the view with red (0 none .. 1 full), for getting hurt and dying.
-	/// Washes the view with a colour: 0 red (hurt, killed), 1 dark blue (unconscious), 2 orange (mind control).
-	void setTint(float amount, int color = 0) { _tint = amount; _tintColor = color; }
+	/// Washes the view with a colour (0 none .. 1 full): 0 red (hurt, killed), 1 dark blue (unconscious),
+	/// 2 orange (mind control), 3 white (a breakdown), 4 sickly green (turning into a zombie); `red`
+	/// is the share of the washed pixels washed red instead.
+	void setTint(float amount, int color = 0, float red = 0.0f) { _tint = amount; _tintColor = color; _tintRed = red; }
+	/// The soldier is on fire: flames lick up from the bottom of the view (0 none .. 1 fierce).
+	void setBurning(float amount) { _onFire = amount; }
+	/// A burst of flames (catching fire), 0..1.
+	void flareUp(float amount) { _flareUp = std::max(_flareUp, amount); }
 	/// TV static over the view (a helmet camera losing its signal), 0 none .. 1 all.
 	void setStatic(float amount) { _static = amount; }
 	/// Night vision like the isometric map's: brighter, in one colour (group + 1, 0 off).

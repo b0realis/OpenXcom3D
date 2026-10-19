@@ -23,7 +23,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "0.6"
+VERSION = "0.7"
 BASE_REPO = "https://github.com/MeridianOXC/OpenXcom.git"
 BASE_BRANCH = "oxce-plus"
 BASE_COMMIT = "f0134ef8065799c7723953d64b565f7832bfd782"
