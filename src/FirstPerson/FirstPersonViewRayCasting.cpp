@@ -48,7 +48,7 @@
  * The colours the view uses for the current palette and time of day, the game's light blended
  * smoothly, point lights with ray-traced shadows, shading the voxel a ray hit, the ground and
  * the taped-off border beyond the map, the sky, and renderRows, which casts the rays for a
- * share of the screen's rows on one thread.
+ * share of the screen's rows on one thread (the threads are kept between frames).
  */
 #include "FirstPersonView.h"
 #include <algorithm>
@@ -231,6 +231,8 @@ void FirstPersonView::updateColors()
 			+ faceNormals[face][2] * sunDirection[2]);
 		_colors.faceShade[face] = (1.0f - lambert) * (0.5f + 2.5f * daylight) + (face == 5 ? 1.0f : 0.0f);
 	}
+	// The UFOs' lights for this frame (the UFO lights option).
+	updateUfos();
 }
 
 /**
@@ -242,9 +244,11 @@ void FirstPersonView::updateColors()
  * @param x World position east, in voxels.
  * @param y World position south, in voxels.
  * @param z World height, in voxels.
+ * @param ufoGlow If not null, receives a UFO's light at the point (0..1), blended the same way
+ *        (the UFO lights option, see findUfos).
  * @return The shade, fractional when blended.
  */
-float FirstPersonView::lightAt(float x, float y, float z) const
+float FirstPersonView::lightAt(float x, float y, float z, float *ufoGlow) const
 {
 	// The tile the point is in (clamped onto the map): its light is the answer without smooth
 	// lighting, and stands in for undiscovered neighbours with it.
@@ -252,9 +256,11 @@ float FirstPersonView::lightAt(float x, float y, float z) const
 	const int tileX = std::clamp((int)std::floor(x / 16), 0, mapSizeX - 1);
 	const int tileY = std::clamp((int)std::floor(y / 16), 0, mapSizeY - 1);
 	const int tileZ = std::clamp((int)std::floor(z / 24), 0, mapSizeZ - 1);
-	const float ownTileShade = _tileViews[(tileZ * mapSizeY + tileY) * mapSizeX + tileX].light;
+	const TileView &ownTile = _tileViews[(tileZ * mapSizeY + tileY) * mapSizeX + tileX];
+	const float ownTileShade = ownTile.light;
 	if (!_smoothLighting)
 	{
+		if (ufoGlow) *ufoGlow = ownTile.ufoGlow / 255.0f;
 		return ownTileShade;
 	}
 	// The point in tile units measured from tile centres: the eight tiles around it start at
@@ -262,14 +268,14 @@ float FirstPersonView::lightAt(float x, float y, float z) const
 	const float gridX = x / 16 - 0.5f, gridY = y / 16 - 0.5f, gridZ = z / 24 - 0.5f;
 	const int lowX = (int)std::floor(gridX), lowY = (int)std::floor(gridY), lowZ = (int)std::floor(gridZ);
 	const float fractionX = gridX - lowX, fractionY = gridY - lowY, fractionZ = gridZ - lowZ;
-	float blendedShade = 0.0f;
+	float blendedShade = 0.0f, blendedGlow = 0.0f;
 	// Add up the eight tiles' shades, each weighted by how close the point is to it. The bits
 	// of `corner` pick the tile: bit 0 the next one east, bit 1 south, bit 2 up.
 	for (int corner = 0; corner < 8; ++corner)
 	{
 		const int cornerX = lowX + (corner & 1), cornerY = lowY + ((corner >> 1) & 1),
 			cornerZ = std::clamp(lowZ + ((corner >> 2) & 1), 0, mapSizeZ - 1); // no level below the ground or above the top
-		float cornerShade;
+		float cornerShade, cornerGlow = 0.0f;
 		if (cornerX < 0 || cornerY < 0 || cornerX >= mapSizeX || cornerY >= mapSizeY)
 		{
 			// Off the map: open ground under the sky.
@@ -279,11 +285,14 @@ float FirstPersonView::lightAt(float x, float y, float z) const
 		{
 			const TileView &tileView = _tileViews[(cornerZ * mapSizeY + cornerY) * mapSizeX + cornerX];
 			cornerShade = tileView.discovered ? tileView.light : ownTileShade;
+			cornerGlow = tileView.discovered ? tileView.ufoGlow : ownTile.ufoGlow;
 		}
 		const float weight = ((corner & 1) ? fractionX : 1 - fractionX) * (((corner >> 1) & 1) ? fractionY : 1 - fractionY)
 			* (((corner >> 2) & 1) ? fractionZ : 1 - fractionZ);
 		blendedShade += cornerShade * weight;
+		blendedGlow += cornerGlow * weight;
 	}
+	if (ufoGlow) *ufoGlow = blendedGlow / 255.0f;
 	return blendedShade;
 }
 
@@ -414,7 +423,8 @@ float FirstPersonView::pointLight(const float point[3], const float normal[3], b
  * north), which take the colour of a face the art does show; and an animated part part way
  * into its next frame dissolves into it. The light is dithered to whole palette shades, then
  * the haze closes in towards the edge of the view.
- * @param hit What the ray hit.
+ * @param hit What the ray hit; whether it shines (hit.emissive) is updated when the pixel shows
+ *            an animated part's next frame.
  * @param rayOrigin The eye, in voxels.
  * @param rayDirection The ray's unit direction in the voxel grid.
  * @param pixelX The ray's pixel on the view (or block of pixels, with a pixel size above 1),
@@ -422,7 +432,7 @@ float FirstPersonView::pointLight(const float point[3], const float normal[3], b
  * @param pixelY The same, down.
  * @return The palette colour to draw.
  */
-Uint8 FirstPersonView::shadeHit(const Hit &hit, const float rayOrigin[3], const float rayDirection[3], int pixelX, int pixelY) const
+Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float rayDirection[3], int pixelX, int pixelY) const
 {
 	const TileView &tileView = _tileViews[hit.tile];
 	// Unexplored parts are black silhouettes. A wall belongs to the tile east or south of it,
@@ -450,6 +460,67 @@ Uint8 FirstPersonView::shadeHit(const Hit &hit, const float rayOrigin[3], const 
 		normal[hit.axis] = rayDirection[hit.axis] > 0 ? -1.0f : 1.0f;
 		faceIndex = hit.axis * 2 + (normal[hit.axis] < 0 ? 1 : 0);
 	}
+	// An animated part part way into its next frame shows that frame on a share of the pixels
+	// (dithered; the share grows as the step goes on). Decided first, so that every colour below
+	// comes from the same frame: a face the art never shows that took the next frame's raw
+	// colour flashed a whole side of a UFO on and off with every step of its lights.
+	const bool showNextFrame = dither(pixelX + 2, pixelY + 1) < _animationBlend;
+	// The colour before shading: the voxel's own, unless the face is one the iso art doesn't show.
+	Uint8 baseColor = hit.color;
+	if (hit.part >= 0 && tileView.part[hit.part])
+	{
+		// The model the pixel shows: the part's next frame once dissolved into it. That frame's
+		// own colour for the voxel, and whether it shines in that frame.
+		const VoxelModel &model = showNextFrame && tileView.next[hit.part] ? *tileView.next[hit.part] : *tileView.part[hit.part];
+		const int voxelX = hit.voxel[0], voxelY = hit.voxel[1], voxelZ = hit.voxel[2];
+		if (&model != tileView.part[hit.part])
+		{
+			const Uint8 nextFrameColor = model.color[voxelZ][voxelY][voxelX];
+			if (nextFrameColor)
+			{
+				baseColor = nextFrameColor;
+				hit.emissive = ((tileView.emissive >> hit.part) & 1) && (nextFrameColor & 15) <= 3 && voxelZ >= model.glowMinZ;
+			}
+		}
+		// On a steady UFO model (the UFO lights option), a voxel the art shows from the east,
+		// the south or above keeps its own colour on all its faces, so a stepped curve of the
+		// hull shows one colour per voxel instead of stripes; only the voxels it never shows
+		// (a hidden west or north skin, an underside) take another face's colour.
+		const bool ownColorAllRound = model.exposed && (model.exposed[voxelZ][voxelY][voxelX] & 0x15);
+		// A face the iso art never shows: what its row shows from the side it does.
+		// An underside (seen from below) shows the colour seen from above: a thin plate's
+		// most common top colour, else the plan view's colour of this column.
+		Uint8 shownColor = hit.axis == 2 && rayDirection[2] > 0.0f ? (model.ceiling ? model.ceiling : model.plan[voxelY][voxelX]) : 0;
+		const int tilesPerLevel = _save->getMapSizeX() * _save->getMapSizeY();
+		if (shownColor && model.color[23][voxelY][voxelX] && hit.tile + tilesPerLevel < (int)_tileViews.size())
+		{
+			// Its top is covered by what's on the level above (a craft's cabin under its roof
+			// plates: the art shows the cabin there), so the top of that is what this is the
+			// underside of.
+			for (const VoxelModel *partAbove : _tileViews[hit.tile + tilesPerLevel].part)
+			{
+				if (partAbove && partAbove->color[0][voxelY][voxelX] && partAbove->plan[voxelY][voxelX])
+				{
+					shownColor = partAbove->ceiling ? partAbove->ceiling : partAbove->plan[voxelY][voxelX];
+					break;
+				}
+			}
+		}
+		if (hit.axis >= 0 && hit.axis < 2 && rayDirection[hit.axis] > 0.0f)
+		{
+			// A west- or north-facing side: on a craft the mirrored side, else its own row seen
+			// from the other side (the colour seen from the east, or from the south).
+			shownColor = mirroredColor(hit, hit.axis, false, showNextFrame);
+			if (!shownColor) shownColor = hit.axis == 0 ? model.east[voxelZ][voxelY] : model.south[voxelZ][voxelX];
+		}
+		else if (hit.axis >= 0 && hit.axis < 2)
+		{
+			// A south or east face on a craft's hidden west or north skin (where the hull steps
+			// in or out): the art sees it through the hull, so it too takes the mirrored side.
+			shownColor = mirroredColor(hit, 1 - hit.axis, true, showNextFrame);
+		}
+		if (shownColor && !ownColorAllRound) baseColor = shownColor;
+	}
 	// The point the light is measured at: the hit, 1.5 voxels out from the face, so it samples
 	// the air in front of the surface rather than the solid tile behind it.
 	float surfacePoint[3];
@@ -457,13 +528,26 @@ Uint8 FirstPersonView::shadeHit(const Hit &hit, const float rayOrigin[3], const 
 	{
 		surfacePoint[axis] = rayOrigin[axis] + rayDirection[axis] * hit.t + normal[axis] * 1.5f;
 	}
+	// The face's shading for its direction. On a steady UFO model (the UFO lights option) it
+	// is the direction the voxel's open faces face together, so a stepped curve of the hull
+	// shades smoothly instead of in stripes.
+	float faceShading = _colors.faceShade[faceIndex];
+	if (hit.part >= 0 && tileView.part[hit.part] && tileView.part[hit.part]->exposed)
+	{
+		const Uint8 openFaces = tileView.part[hit.part]->exposed[hit.voxel[2]][hit.voxel[1]][hit.voxel[0]];
+		if (((openFaces >> faceIndex) & 1) && _ufoFaceShade[openFaces] >= 0.0f) faceShading = _ufoFaceShade[openFaces];
+	}
 	// The shade (0 brightest .. 15 darkest): the game's light, the face's direction, and one
 	// shade darker per 320 voxels (20 tiles) of distance.
-	float shade = lightAt(surfacePoint[0], surfacePoint[1], surfacePoint[2]) + _colors.faceShade[faceIndex] + hit.t / 320.0f;
+	float ufoGlow = 0.0f; // a UFO's light here (the UFO lights option), 0..1
+	float shade = lightAt(surfacePoint[0], surfacePoint[1], surfacePoint[2], _ufoLightsOn ? &ufoGlow : nullptr) + faceShading + hit.t / 320.0f;
 	float flare = 0.0f; // red light from tactical flares
 	if (hit.emissive)
 	{
-		shade = std::min(shade, 0.5f); // lamps, lit screens and UFO lights shine whatever the light around them
+		// Lamps, lit screens and UFO lights shine whatever the light around them; the lights of
+		// a steady UFO model pulse gently, in a wave round the UFO (see updateUfos).
+		const VoxelModel *shining = hit.part >= 0 ? tileView.part[hit.part] : nullptr;
+		shade = shining && shining->pulseKind ? _ufoPulse[shining->pulseKind - 1][_ufoPhaseOfTile[hit.tile] & 15] : std::min(shade, 0.5f);
 	}
 	else if (Options::fpsShadows)
 	{
@@ -505,6 +589,23 @@ Uint8 FirstPersonView::shadeHit(const Hit &hit, const float rayOrigin[3], const 
 			shade -= closeness * closeness * _muzzleFlashLight * (4.0f + 6.0f * _colors.night);
 		}
 	}
+	// A UFO's light (the UFO lights option): its colours on the ground and the walls around it,
+	// on its underside and its outer skin, softly inside (sampled with the game's light above,
+	// see findUfos). Coloured by day and brighter and more coloured at night and under the
+	// sea; the inner colour close to the UFO, the outer one further out.
+	const UfoSpot *ufoLighting = nullptr;
+	float ufoTint = 0.0f, ufoOuterShare = 0.0f;
+	if (ufoGlow > 0.004f && !hit.emissive && _ufoOfTile[hit.tile])
+	{
+		ufoLighting = &_ufos[_ufoOfTile[hit.tile] - 1];
+		const float darkness = _colors.underwater ? 0.6f : _colors.night, glow = ufoGlow * _ufoBreath; // (the sea's light is bright enough)
+		const bool onUfo = (_ufoPhaseOfTile[hit.tile] & UfoTileBit) != 0;
+		shade -= glow * (2.0f + 6.0f * darkness);
+		// Coloured by day too: the ground's pool strongly, the UFO itself less, so its hull's
+		// detail stays readable (the tint keeps each colour's brightness).
+		ufoTint = std::min(0.9f, glow * (onUfo ? 0.35f + 0.3f * darkness : 0.6f + 0.4f * darkness));
+		ufoOuterShare = onUfo ? 0.0f : 1.0f - smoothstep(0.15f, 0.55f, ufoGlow); // (inside the UFO: the inner colour)
+	}
 	if (!hit.emissive && _colors.underwater && faceIndex == 4 && hit.t < 480.0f)
 	{
 		// Sunlight rippling over the sea floor (upward faces nearby): three sine waves crossing
@@ -514,58 +615,15 @@ Uint8 FirstPersonView::shadeHit(const Hit &hit, const float rayOrigin[3], const 
 			+ std::sin((surfacePoint[0] - surfacePoint[1]) * 0.19f + seconds * 0.9f);
 		if (ripple > 1.3f) shade -= (ripple - 1.3f) * 1.8f;
 	}
-	// The colour before shading: the voxel's own, unless the face is one the iso art doesn't show.
-	Uint8 baseColor = hit.color;
-	if (hit.part >= 0 && tileView.part[hit.part])
-	{
-		// A face the iso art never shows: what its row shows from the side it does.
-		const VoxelModel &model = *tileView.part[hit.part];
-		const int voxelX = hit.voxel[0], voxelY = hit.voxel[1], voxelZ = hit.voxel[2];
-		// An underside (seen from below) shows the colour seen from above: a thin plate's
-		// most common top colour, else the plan view's colour of this column.
-		Uint8 shownColor = hit.axis == 2 && rayDirection[2] > 0.0f ? (model.ceiling ? model.ceiling : model.plan[voxelY][voxelX]) : 0;
-		const int tilesPerLevel = _save->getMapSizeX() * _save->getMapSizeY();
-		if (shownColor && model.color[23][voxelY][voxelX] && hit.tile + tilesPerLevel < (int)_tileViews.size())
-		{
-			// Its top is covered by what's on the level above (a craft's cabin under its roof
-			// plates: the art shows the cabin there), so the top of that is what this is the
-			// underside of.
-			for (const VoxelModel *partAbove : _tileViews[hit.tile + tilesPerLevel].part)
-			{
-				if (partAbove && partAbove->color[0][voxelY][voxelX] && partAbove->plan[voxelY][voxelX])
-				{
-					shownColor = partAbove->ceiling ? partAbove->ceiling : partAbove->plan[voxelY][voxelX];
-					break;
-				}
-			}
-		}
-		if (hit.axis >= 0 && hit.axis < 2 && rayDirection[hit.axis] > 0.0f)
-		{
-			// A west- or north-facing side: on a craft the mirrored side, else its own row seen
-			// from the other side (the colour seen from the east, or from the south).
-			shownColor = mirroredColor(hit, hit.axis);
-			if (!shownColor) shownColor = hit.axis == 0 ? model.east[voxelZ][voxelY] : model.south[voxelZ][voxelX];
-		}
-		else if (hit.axis >= 0 && hit.axis < 2)
-		{
-			// A south or east face on a craft's hidden west or north skin (where the hull steps
-			// in or out): the art sees it through the hull, so it too takes the mirrored side.
-			shownColor = mirroredColor(hit, 1 - hit.axis, true);
-		}
-		if (shownColor) baseColor = shownColor;
-	}
-	// An animated part part way into its next frame: that frame's colour, dithered in (more of
-	// the pixels show it the further the game's animation tick has gone).
-	if (hit.part >= 0 && tileView.next[hit.part] && dither(pixelX + 2, pixelY + 1) < _animationBlend)
-	{
-		const Uint8 nextFrameColor = tileView.next[hit.part]->color[hit.voxel[2]][hit.voxel[1]][hit.voxel[0]];
-		if (nextFrameColor) baseColor = nextFrameColor;
-	}
 	// Shade the colour by whole palette shades, the fraction dithered between two.
 	Uint8 color = shadeColor(baseColor, (int)std::max(0.0f, shade + dither(pixelX, pixelY)));
 	if (flare * 1.5f > 0.04f + dither(pixelX + 1, pixelY + 3))
 	{
 		color = _colors.flareTint[color]; // the flare's light is red
+	}
+	if (ufoTint > dither(pixelX + 3, pixelY + 2))
+	{
+		color = ufoLighting->tint[ufoOuterShare > dither(pixelX + 1, pixelY) ? 1 : 0][color]; // a UFO's light: its inner or outer colour
 	}
 	// Far away the haze takes over, dithered in; under the sea the murk closes in much sooner.
 	const float haze = _colors.underwater ? smoothstep(_maxDistance * 0.12f, _maxDistance * 0.65f, hit.t)
@@ -733,15 +791,15 @@ Uint8 FirstPersonView::skyColor(const float rayDirection[3], int pixelX, int pix
 }
 
 /**
- * Casts the rays for a share of the view's rows, on one thread: every n-th row, starting at
- * the given one. For each pixel (or block of pixels, with a pixel size above 1) it walks a ray
- * from the eye through the voxel world and writes the colour it sees, the depth for the
- * sprites' depth test, and whether the pixel shines (for the glow around lights).
- * The threads only read the shared state, and each writes only its own rows.
- * @param firstBlockRow This thread's first row (of pixel blocks).
- * @param blockRowStep How many rows to step: the number of threads.
+ * Casts the rays for a share of the view's rows, on one thread: it takes the next row nobody
+ * has taken yet from the shared counter, one row at a time, until there are none left (so the
+ * threads share the work out by how fast they are). For each pixel (or block of pixels, with a
+ * pixel size above 1) it walks a ray from the eye through the voxel world and writes the
+ * colour it sees, the depth for the sprites' depth test, and whether the pixel shines (for the
+ * glow around lights). Every pixel comes out the same whichever thread casts its ray.
+ * The threads only read the shared state, and each writes only the rows it took.
  */
-void FirstPersonView::renderRows(int firstBlockRow, int blockRowStep)
+void FirstPersonView::renderRows()
 {
 	// The view's size in pixels, and the half-width and half-height of the image plane one
 	// voxel in front of the eye (the tangents of half the field of view).
@@ -765,7 +823,7 @@ void FirstPersonView::renderRows(int firstBlockRow, int blockRowStep)
 	// With a pixel size above 1, one ray colours a block of pixels (pixelSize x pixelSize).
 	const int pixelSize = std::clamp(Options::fpsPixelSize, 1, 3);
 	const int blockRows = (height + pixelSize - 1) / pixelSize, blockColumns = (width + pixelSize - 1) / pixelSize;
-	for (int blockRow = firstBlockRow; blockRow < blockRows; blockRow += blockRowStep)
+	for (int blockRow = _rayWorkers.nextBlockRow++; blockRow < blockRows; blockRow = _rayWorkers.nextBlockRow++)
 	{
 		// The block's top pixel row, and how far up the image plane its centre is.
 		const int topRow = blockRow * pixelSize;
@@ -827,8 +885,10 @@ void FirstPersonView::renderRows(int firstBlockRow, int blockRowStep)
 			{
 				color = _colors.glassTint[color];
 			}
-			// Fill the block: colour, depth, and whether it shines.
-			const Uint8 glowing = (hit.emissive && distanceAlongRay < Infinity) ? 1 : 0;
+			// Fill the block: colour, depth, and whether it shines (a UFO's light counts three
+			// times in the bloom, for a stronger halo round it).
+			Uint8 glowing = (hit.emissive && distanceAlongRay < Infinity) ? 1 : 0;
+			if (glowing && hit.part >= 0 && _tileViews[hit.tile].part[hit.part] && _tileViews[hit.tile].part[hit.part]->pulseKind) glowing = 3;
 			const float viewDepth = distanceAlongRay / directionLength; // distance along the view axis, for sprite sorting
 			for (int pixelY = topRow; pixelY < std::min(height, topRow + pixelSize); ++pixelY)
 			{
@@ -846,24 +906,86 @@ void FirstPersonView::renderRows(int firstBlockRow, int blockRowStep)
 }
 
 /**
- * Casts the rays for every pixel of the view. The rows are shared out between up to eight
- * threads (this one included), each taking every n-th row so they all get a fair share of sky
- * and of busy ground. Returns when all of them are done.
+ * Casts the rays for every pixel of the view. The rows are shared out between up to sixteen
+ * threads (this one included): the helper threads are woken, everyone takes rows from the top
+ * of the view one at a time until none are left, and this returns when all of them are done.
  */
 void FirstPersonView::castAllRays()
 {
-	// One thread per processor core, up to eight (worked out once).
-	static const int threadCount = std::clamp((int)std::thread::hardware_concurrency(), 1, 8);
-	// Start the helper threads on rows 1, 2, ..., take row 0 on this thread, and wait for them.
-	std::vector<std::thread> helpers;
-	for (int threadIndex = 1; threadIndex < threadCount; ++threadIndex)
+	// One thread per processor thread, up to sixteen (worked out once). Since the threads take
+	// rows as they go, a slower core (a hybrid CPU's efficient cores, a second thread on a core)
+	// still adds what it can and never holds the frame up.
+	static const int threadCount = std::clamp((int)std::thread::hardware_concurrency(), 1, 16);
+	// The flares' light for this frame, which every ray hitting near a flare needs.
+	prepareFlareLights();
+	// The helper threads are started on the first frame, then kept for the next ones.
+	if (_rayWorkers.threads.empty())
 	{
-		helpers.emplace_back(&FirstPersonView::renderRows, this, threadIndex, threadCount);
+		for (int helper = 1; helper < threadCount; ++helper)
+		{
+			_rayWorkers.threads.emplace_back(&FirstPersonView::rayWorkerLoop, this);
+		}
 	}
-	renderRows(0, threadCount);
-	for (auto &helper : helpers)
+	// Hand out the rows from the top again, and wake the helpers for this frame.
+	_rayWorkers.nextBlockRow = 0;
 	{
-		helper.join();
+		std::lock_guard<std::mutex> lock(_rayWorkers.mutex);
+		++_rayWorkers.frame;
+		_rayWorkers.working = (int)_rayWorkers.threads.size();
+	}
+	_rayWorkers.wake.notify_all();
+	// This thread casts rays too; then it waits for the helpers to finish their last rows.
+	renderRows();
+	std::unique_lock<std::mutex> lock(_rayWorkers.mutex);
+	_rayWorkers.finished.wait(lock, [this] { return _rayWorkers.working == 0; });
+}
+
+/**
+ * What each of the ray caster's helper threads does as long as the view lives: it sleeps until
+ * a frame is handed out, casts rays for rows until none are left, tells the drawing thread when
+ * it is the last one done, and goes back to sleep. It ends when the view goes away.
+ */
+void FirstPersonView::rayWorkerLoop()
+{
+	unsigned lastFrame = 0; // the last frame this helper worked on
+	while (true)
+	{
+		// Sleep until there is a new frame (or the view is going away).
+		{
+			std::unique_lock<std::mutex> lock(_rayWorkers.mutex);
+			_rayWorkers.wake.wait(lock, [this, lastFrame] { return _rayWorkers.stop || _rayWorkers.frame != lastFrame; });
+			if (_rayWorkers.stop)
+			{
+				return;
+			}
+			lastFrame = _rayWorkers.frame;
+		}
+		// Cast rays for rows until there are none left.
+		renderRows();
+		// The last helper to finish wakes the drawing thread.
+		std::lock_guard<std::mutex> lock(_rayWorkers.mutex);
+		if (--_rayWorkers.working == 0)
+		{
+			_rayWorkers.finished.notify_one();
+		}
+	}
+}
+
+/**
+ * Stops the ray caster's helper threads when the view goes away: tells them to end (under the
+ * lock, so none can miss it), wakes them, and waits for each to end. Between frames they only
+ * sleep, so none is in the middle of a frame.
+ */
+FirstPersonView::RayWorkers::~RayWorkers()
+{
+	{
+		std::lock_guard<std::mutex> lock(mutex);
+		stop = true;
+	}
+	wake.notify_all();
+	for (auto &thread : threads)
+	{
+		thread.join();
 	}
 }
 

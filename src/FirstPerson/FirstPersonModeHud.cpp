@@ -60,9 +60,11 @@
 #include "../Battlescape/BattlescapeState.h"
 #include "../Battlescape/Camera.h"
 #include "../Battlescape/Map.h"
+#include "../Engine/Font.h"
 #include "../Engine/Game.h"
 #include "../Engine/Options.h"
 #include "../Engine/Screen.h"
+#include "../Engine/Unicode.h"
 #include "../Interface/Bar.h"
 #include "../Interface/NumberText.h"
 #include "../Interface/Text.h"
@@ -137,15 +139,18 @@ void FirstPersonMode::toggleNightVision(BattleUnit *unit, Action *action)
 }
 
 /**
- * Fills the info panel at the bottom left of the 3D view: the soldier's name, the weapon in
- * hand with its ammo, the status line (kneeling, wounds, burning...), and the four stats with
- * their bars (time units, energy, health with the stun level over it, morale).
+ * Fills the info panel at the bottom left of the 3D view: the soldier's name and status
+ * (kneeling, wounds, burning...), a line for the weapon in hand and one for the other hand's
+ * item (each gun with the rounds loaded and the spare clips carried for it, see ammoLabel), and
+ * the four stats with their bars (time units, energy, health with the stun level over it,
+ * morale). It is filled anew every frame, so the counts follow every shot, reload, pick-up and
+ * drop.
  * The panel only shows in the 3D view without the classic HUD (which has all of this itself).
  * @param unit The selected soldier, or null for none (the panel hides).
  */
 void FirstPersonMode::updateInfoPanel(BattleUnit *unit)
 {
-	// Show or hide every piece of the panel together. The "doom mode" line shows only while
+	// Show or hide every piece of the panel together. The "doom mode" tag shows only while
 	// that debug option is on.
 	const bool show = isActive() && !_classicHud && unit;
 	for (auto *part : _panelParts)
@@ -157,10 +162,21 @@ void FirstPersonMode::updateInfoPanel(BattleUnit *unit)
 	{
 		return;
 	}
-	// The three text lines: name, weapon, status.
+	// The name and the status.
 	_txtName->setText(unit->getName(_game->getLanguage(), false));
-	_txtWeapon->setText(weaponLabel(unit));
 	_txtStatus->setText(statusLabel(unit));
+
+	// The hands: the weapon that fires (in the fire mode picked for it, when that's the weapon
+	// the mode was picked for), then whatever is in the other hand. The other hand's line is
+	// shown as active too when its gun fires along (dual wield).
+	BattleItem *weapon = activeWeapon(unit);
+	BattleItem *otherItem = weapon == unit->getRightHandWeapon() ? unit->getLeftHandWeapon() : unit->getRightHandWeapon();
+	if (otherItem == weapon)
+	{
+		otherItem = nullptr; // (an item held in both hands)
+	}
+	fillHandLine(_txtWeapon, _txtWeaponAmmo, unit, weapon, weapon && weapon == _fireModeWeapon ? firedAs(weapon, _fireMode) : BA_NONE, true);
+	fillHandLine(_txtOtherWeapon, _txtOtherAmmo, unit, otherItem, BA_NONE, otherItem && otherItem == offHandWeapon(unit, weapon));
 	// The four stats, each as a number and as a bar measured against the soldier's maximum.
 	_numTimeUnits->setValue(unit->getTimeUnits());
 	_barTimeUnits->setMax(unit->getBaseStats()->tu);
@@ -178,44 +194,194 @@ void FirstPersonMode::updateInfoPanel(BattleUnit *unit)
 }
 
 /**
- * Makes the weapon line of the info panel and the soldier card: the weapon in the active hand
- * and the rounds left in it, such as "R: Rifle (20)" ("L:" for the left hand). Only firearms
- * show a round count. With dual wield (two guns, both fired together) the line names both:
- * "R+L: Pistol (12|9)" for a matching pair, or "Rifle (20) + Pistol (9)" for two different
- * guns, the chosen hand's gun first.
+ * Fills one hand's line of the info panel: which hand ("R:" or "L:") and the item's name, and
+ * for a gun its ammo right after it (see ammoLabel), such as "R: Rifle 17 | 2 clips (40)". A
+ * name too long for the room the ammo leaves on the line is shortened. The line of the weapon
+ * that fires is in the weapons' colour; the other hand's line is grey unless it fires along
+ * (dual wield). The ammo is red while the gun has no rounds loaded for the mode. The colours
+ * are group starts (textColor), as the glyph shades need.
+ * @param nameText The line's first text (the hand and the name), at the line's left end.
+ * @param ammoText The line's second text (the ammo), placed right after the name.
+ * @param unit The soldier.
+ * @param item The item in that hand, or null for an empty hand (the line stays empty).
+ * @param mode The fire mode whose ammo to show (BA_NONE: the gun's first shot's).
+ * @param active True if this hand's weapon fires: the line in the weapons' colour.
+ */
+void FirstPersonMode::fillHandLine(Text *nameText, Text *ammoText, BattleUnit *unit, BattleItem *item, BattleActionType mode, bool active)
+{
+	// An empty hand: an empty line.
+	if (!item)
+	{
+		nameText->setText("");
+		ammoText->setText("");
+		return;
+	}
+
+	// The ammo first: the name gets the room it leaves on the line (with a gap of 5 pixels
+	// between them), and the ammo goes right after the name.
+	const int gap = 5;
+	bool loaded = true;
+	const std::string ammo = ammoLabel(unit, item, mode, loaded);
+	const int nameRoom = PanelLineW - (ammo.empty() ? 0 : smallTextWidth(ammo) + gap);
+	const std::string hand = item == unit->getLeftHandWeapon() ? "L: " : "R: ";
+	const std::string name = fitText(hand + std::string(_state->tr(item->getRules()->getName())), nameRoom);
+	if (nameText->getText() != name) nameText->setText(name);
+	if (ammoText->getText() != ammo) ammoText->setText(ammo);
+	ammoText->setX(nameText->getX() + smallTextWidth(name) + gap);
+
+	// The colours (setting one redraws the text, so only on a change).
+	const SDL_Color *palette = _state->getPalette();
+	const Uint8 lineColor = active ? _weaponTextColor : textColor(palette, 160, 160, 160);
+	const Uint8 ammoColor = !loaded ? textColor(palette, 240, 70, 50) : lineColor;
+	if (nameText->getColor() != lineColor) nameText->setColor(lineColor);
+	if (ammoText->getColor() != ammoColor) ammoText->setColor(ammoColor);
+}
+
+/**
+ * Works out a gun's ammo as the info panel shows it: the rounds loaded for a fire mode, then
+ * the spare clips the soldier carries for it and their rounds together, such as
+ * "17 | 2 clips (40)". By the game's own rules:
+ * - the rounds are those in the clip loaded in the ammo slot the fire mode uses (a gun can have
+ *   several slots); "EMPTY" when that slot has no clip (the game drops a clip once it's spent);
+ * - a gun with its rounds built in (no clips) shows its own count, or "∞" when it never runs
+ *   out (the game's clip size -1, like the laser weapons), and nothing about clips;
+ * - the spare clips are the items in the soldier's inventory (belt, pockets, backpack, the
+ *   other hand...) that the gun takes in that slot, by the game's list of compatible ammo (as
+ *   reloading and the inventory use it), of whatever kind (armor piercing, incendiary...).
+ * @param unit The soldier carrying the gun.
+ * @param weapon The item.
+ * @param mode The fire mode whose ammo slot to show (BA_NONE: the gun's first shot's).
+ * @param loaded Set to false when the gun has no rounds loaded for that mode.
+ * @return The ammo text; empty for an item that isn't a gun.
+ */
+std::string FirstPersonMode::ammoLabel(const BattleUnit *unit, const BattleItem *weapon, BattleActionType mode, bool &loaded) const
+{
+	loaded = true;
+	const RuleItem *rules = weapon->getRules();
+	if (rules->getBattleType() != BT_FIREARM)
+	{
+		return "";
+	}
+
+	// The ammo slot: the fire mode's, or for no shot mode the first shot the gun has (snap,
+	// aimed, auto, as the action menu lists them; a guided launcher's is its launch).
+	BattleActionType slotMode = mode;
+	if (!isShot(slotMode) && slotMode != BA_LAUNCH)
+	{
+		slotMode = rules->getCostSnap().Time > 0 ? BA_SNAPSHOT : rules->getCostAimed().Time > 0 ? BA_AIMEDSHOT : BA_AUTOSHOT;
+	}
+	const int slot = weapon->getActionConf(slotMode)->ammoSlot;
+
+	// A shot that uses no ammo at all never runs out.
+	if (slot == RuleItem::AmmoSlotSelfUse)
+	{
+		return _state->tr("STR_FPS_AMMO_UNLIMITED");
+	}
+
+	// The rounds loaded: the clip's (or the gun's own), "∞" for a clip that never runs out.
+	const BattleItem *clip = weapon->getAmmoForSlot(slot);
+	std::string text;
+	if (!clip)
+	{
+		text = _state->tr("STR_FPS_AMMO_EMPTY");
+		loaded = false;
+	}
+	else if (clip->getRules()->getClipSize() < 0)
+	{
+		text = _state->tr("STR_FPS_AMMO_UNLIMITED");
+	}
+	else
+	{
+		text = std::to_string(clip->getAmmoQuantity());
+		loaded = clip->getAmmoQuantity() > 0;
+	}
+
+	// Rounds built into the gun: no clips to count.
+	if (rules->getCompatibleAmmoForSlot(slot)->empty())
+	{
+		return text;
+	}
+
+	// The spare clips carried for that slot, and their rounds.
+	int spareClips = 0, spareRounds = 0;
+	for (const BattleItem *item : *unit->getInventory())
+	{
+		if (item != weapon && rules->getSlotForAmmo(item->getRules()) == slot)
+		{
+			++spareClips;
+			spareRounds += std::max(0, item->getAmmoQuantity());
+		}
+	}
+	return text + " | " + std::string(_state->tr("STR_FPS_SPARE_CLIPS", spareClips).arg(spareRounds));
+}
+
+/**
+ * Makes the weapon line of the soldier card: the weapon in the hand that fires, with its ammo
+ * (see ammoLabel), such as "R: Rifle 17 | 2 clips (40)" ("L:" for the left hand), the name
+ * shortened if the line would not fit the card.
  * @param unit The soldier whose weapon to describe.
  * @return The weapon line, empty if the soldier's hands are empty.
  */
 std::string FirstPersonMode::weaponLabel(BattleUnit *unit) const
 {
-	std::string text;
-	if (BattleItem *weapon = activeWeapon(unit))
+	BattleItem *weapon = activeWeapon(unit);
+	if (!weapon)
 	{
-		// The rounds left in a weapon as text: its clip's count for a firearm, "-" otherwise.
-		auto roundsText = [](const BattleItem *item) {
-			const BattleItem *ammo = item->getAmmoForSlot(0);
-			return ammo && item->getRules()->getBattleType() == BT_FIREARM ? std::to_string(ammo->getAmmoQuantity()) : std::string("-");
-		};
-		const std::string name = _state->tr(weapon->getRules()->getName());
-		if (const BattleItem *offHand = offHandWeapon(unit, weapon))
+		return "";
+	}
+	// The ammo, and the hand and name in the room it leaves on the card (with a space between).
+	bool loaded = true;
+	const std::string ammo = ammoLabel(unit, weapon, BA_NONE, loaded);
+	const std::string hand = weapon == unit->getLeftHandWeapon() ? "L: " : "R: ";
+	const int nameRoom = CardW - 8 - (ammo.empty() ? 0 : smallTextWidth(" " + ammo));
+	const std::string name = fitText(hand + std::string(_state->tr(weapon->getRules()->getName())), nameRoom);
+	return ammo.empty() ? name : name + " " + ammo;
+}
+
+/**
+ * Shortens a text until it fits a width in the small font: it loses letters from its end and
+ * ends in "." instead (a text that fits is left as it is).
+ * @param text The text (UTF-8).
+ * @param maxWidth The room, in pixels.
+ * @return The text, shortened if needed.
+ */
+std::string FirstPersonMode::fitText(const std::string &text, int maxWidth) const
+{
+	if (smallTextWidth(text) <= maxWidth)
+	{
+		return text;
+	}
+	// Letter by letter (whole characters, not bytes) until it fits with the "." added; spaces
+	// left at the end go too.
+	UString letters = Unicode::convUtf8ToUtf32(text);
+	while (!letters.empty())
+	{
+		letters.pop_back();
+		while (!letters.empty() && letters.back() == ' ') letters.pop_back();
+		const std::string shortened = Unicode::convUtf32ToUtf8(letters) + ".";
+		if (smallTextWidth(shortened) <= maxWidth)
 		{
-			// Dual wield: "R+L: Pistol (12|9)" for a matching pair, or "Rifle (20) + Pistol (9)"
-			// (the chosen hand's gun first).
-			if (offHand->getRules() == weapon->getRules())
-			{
-				return "R+L: " + name + " (" + roundsText(weapon) + "|" + roundsText(offHand) + ")";
-			}
-			return name + " (" + roundsText(weapon) + ") + " + std::string(_state->tr(offHand->getRules()->getName())) + " (" + roundsText(offHand) + ")";
-		}
-		// One weapon: which hand holds it, its name, and for a loaded firearm its rounds.
-		text = std::string(weapon == unit->getLeftHandWeapon() ? "L: " : "R: ") + name;
-		const BattleItem *ammo = weapon->getAmmoForSlot(0);
-		if (ammo && weapon->getRules()->getBattleType() == BT_FIREARM)
-		{
-			text += " (" + std::to_string(ammo->getAmmoQuantity()) + ")";
+			return shortened;
 		}
 	}
-	return text;
+	return "";
+}
+
+/**
+ * Measures a text as the game's Text draws it in the small font: the width of each character
+ * (as the font measured its glyph) added up.
+ * @param text The text (UTF-8).
+ * @return Its width, in pixels.
+ */
+int FirstPersonMode::smallTextWidth(const std::string &text) const
+{
+	const Font *font = _game->getMod()->getFont("FONT_SMALL");
+	int width = 0;
+	for (UCode character : Unicode::convUtf8ToUtf32(text))
+	{
+		width += font->getCharSize(character).w;
+	}
+	return width;
 }
 
 /**

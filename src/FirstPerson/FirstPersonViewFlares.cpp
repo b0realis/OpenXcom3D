@@ -241,10 +241,34 @@ void FirstPersonView::updateFlares(float elapsedSeconds)
 }
 
 /**
+ * Works out each flare's light for this frame, once, before the rays need it: where its flame
+ * is (2 voxels above where the flare lies), how far it has faded (over its last 8 seconds) and
+ * its flicker (two slow waves, out of step for each flare). flareLight then only has to work
+ * out the distance and the facing for each pixel.
+ */
+void FirstPersonView::prepareFlareLights()
+{
+	const float seconds = SDL_GetTicks() / 1000.0f; // for the flicker
+	_flareLights.resize(_flares.size());
+	for (size_t flareIndex = 0; flareIndex < _flares.size(); ++flareIndex)
+	{
+		const Flare &flare = _flares[flareIndex];
+		FlareLight &light = _flareLights[flareIndex];
+		light.pos[0] = flare.pos[0];
+		light.pos[1] = flare.pos[1];
+		light.pos[2] = flare.pos[2] + 2.0f;
+		light.fade = std::clamp((FlareLife - flare.age) / 8.0f, 0.0f, 1.0f);
+		light.flicker = 0.85f + 0.075f * (std::sin(seconds * 13.0f + flareIndex * 1.7f)
+			+ std::sin(seconds * 7.1f + flareIndex * 3.1f));
+	}
+}
+
+/**
  * How much a point is lit by the flares, 0 (not at all) .. 1. A flare lights what is close to
  * it (within FlareReach voxels), facing it and, with shadows, not behind anything; its light
- * flickers slowly and fades out at the end, and matters most in the dark. Flares don't add up:
- * the strongest one that isn't hidden lights the point.
+ * flickers slowly and fades out at the end (worked out for the frame by prepareFlareLights),
+ * and matters most in the dark. Flares don't add up: the strongest one that isn't hidden
+ * lights the point.
  * @param point The lit point, in voxels.
  * @param normal The surface's unit normal there, or null for a unit (lit from any side).
  * @param shadows Trace shadow rays (terrain); units are lit without them.
@@ -252,28 +276,23 @@ void FirstPersonView::updateFlares(float elapsedSeconds)
  */
 float FirstPersonView::flareLight(const float point[3], const float normal[3], bool shadows) const
 {
-	const float seconds = SDL_GetTicks() / 1000.0f; // for the flicker
 	const float darkness = _colors.underwater ? 0.6f : 0.3f + 0.7f * _colors.night; // a flare matters most in the dark
 	// The strongest flare that isn't hidden lights the point (they don't add up): rank them
 	// first, so that at most a couple of shadow rays are cast.
 	float powers[FlareMax];
 	float lightPositions[FlareMax][3];
 	int order[FlareMax], count = 0;
-	for (size_t flareIndex = 0; flareIndex < _flares.size() && count < (int)FlareMax; ++flareIndex)
+	for (size_t flareIndex = 0; flareIndex < _flareLights.size() && count < (int)FlareMax; ++flareIndex)
 	{
-		// The flame is 2 voxels above where the flare lies; dx, dy, dz go from the point to it.
-		const Flare &flare = _flares[flareIndex];
-		const float lightPosition[3] = { flare.pos[0], flare.pos[1], flare.pos[2] + 2.0f };
+		// This frame's light of the flare; dx, dy, dz go from the point to its flame.
+		const FlareLight &flare = _flareLights[flareIndex];
+		const float *lightPosition = flare.pos;
 		const float dx = lightPosition[0] - point[0], dy = lightPosition[1] - point[1], dz = lightPosition[2] - point[2];
 		const float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
 		if (distance > FlareReach || distance < 0.01f) continue;
 		// Its strength here: falling off with the square of the distance's share of the reach,
-		// fading over its last 8 seconds, and flickering (two slow waves, out of step for each
-		// flare).
-		const float fade = std::clamp((FlareLife - flare.age) / 8.0f, 0.0f, 1.0f);
-		const float flicker = 0.85f + 0.075f * (std::sin(seconds * 13.0f + flareIndex * 1.7f)
-			+ std::sin(seconds * 7.1f + flareIndex * 3.1f));
-		float power = (1.0f - distance / FlareReach) * (1.0f - distance / FlareReach) * fade * flicker * darkness;
+		// fading and flickering.
+		float power = (1.0f - distance / FlareReach) * (1.0f - distance / FlareReach) * flare.fade * flare.flicker * darkness;
 		// A surface turned away from it isn't lit; one facing it squarely is lit most.
 		if (normal)
 		{

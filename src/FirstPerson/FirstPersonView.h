@@ -96,6 +96,7 @@ class BattleItem;
  *   FirstPersonViewEffects.cpp        particles: explosions, fire, smoke, weather, UFO devices, glows
  *   FirstPersonViewShots.cpp          shots in flight, beams, impacts, bullet holes, explosions' sprites
  *   FirstPersonViewFlares.cpp         tactical flares and their light
+ *   FirstPersonViewUfo.cpp            UFOs (an option): steady hulls with glowing lights, coloured light, an aura
  *   FirstPersonViewScreenEffects.cpp  effects on the screen itself: flames, blood, the hurt arc
  *
  * Constants and helpers the files share are in FirstPersonViewShared.h.
@@ -122,6 +123,10 @@ public:
 		Uint8 ceiling;       // a thin plate's (floor, roof) underside: its most common top colour, 0 if not a plate
 		Uint8 east[24][16];  // [z][y] the colour seen from the east: a west-facing side shows this (the iso art shows only east and south sides)
 		Uint8 south[24][16]; // [z][x] the colour seen from the south: a north-facing side shows this
+		// Only on a UFO part's steady model (the UFO lights option, see FirstPersonViewUfo.cpp):
+		const Uint16 (*lit)[16];        // [z][y], bit x: the voxel is one of the part's lights; null on other models
+		const Uint8 (*exposed)[16][16]; // [z][y][x]: the voxel's open faces (bit per face: +x -x +y -y +z -z), for smooth hull shading
+		Uint8 pulseKind;                // how its lights pulse: 1 small lights, 2 a big lit panel (a lift pad), 0 none
 	};
 	/// Per-frame snapshot of what a ray needs to know about a tile.
 	struct TileView
@@ -135,6 +140,7 @@ public:
 		bool empty;
 		Sint16 swing[2]; // door swings reaching into this tile this frame, -1 none
 		Uint8 emissive;  // bit per part: a light source, whose bright voxels shine
+		Uint8 ufoGlow;   // a UFO's light here (the UFO lights option, once the UFO has been seen): 0 none .. 255 full
 	};
 	/// A door swinging open, as a thin slab turning around its hinge.
 	struct DoorSwing
@@ -300,6 +306,8 @@ public:
 	const RuleItem *getOwnShotAmmo() const { return _ownShotAmmo; }
 	/// Dual wield: when the other gun's last round left its muzzle.
 	Uint32 getPartnerShotTick() const { return _partnerShotTick; }
+	/// Dual wield: the ammo the other gun's last round fired (null if unknown).
+	const RuleItem *getPartnerShotAmmo() const { return _partnerShotAmmo; }
 
 	/// Renders the view.
 	void draw() override;
@@ -343,6 +351,7 @@ private:
 		int sprite[8];
 		const Uint8 *buffer[8];
 		bool animated;
+		const VoxelModel *steady = nullptr; // a UFO part's steady 3D-only model (the UFO lights option), null otherwise
 	};
 	/// A door that opened recently and is still swinging.
 	struct DoorAnimation
@@ -365,10 +374,9 @@ private:
 	std::vector<DoorSwing> _doorSwings;                 // this frame
 	std::vector<const MapData*> _partsLastFrame[4];     // every tile part last frame, to notice destruction
 	std::vector<Uint8> _burningLastFrame;               // tiles on fire last frame: burnt out, they leave a scorch
-	// animated tiles step a frame every game animation tick: how far into the tick we are
-	int _lastAnimationFrame = -1;
-	Uint32 _animationFrameStart = 0, _animationFramePeriod = 100; // when the game's animation frame last changed, and how long a frame lasts (ms)
-	float _animationBlend = 0.0f;                       // how far into the current frame we are (0..1)
+	// animated tiles step a frame every CalmFrameTime ms on the view's own calm clock
+	int _calmFrame = 0;                                 // the animation frame (0..7) animated tiles show now
+	float _animationBlend = 0.0f;                       // how far they have dissolved into the next one (0..1, eased)
 	// light sources and UFO devices near the camera, found while taking the snapshot
 	struct LightSpot { float pos[3]; float strength; Uint8 color; };
 	std::vector<LightSpot> _nearbyLights; // light sources near the camera this frame
@@ -415,9 +423,9 @@ private:
 	/// Finds the crafts and UFOs on the map, whose unseen sides are mirrored.
 	void findMirrors();
 	/// The colour of whatever is solid at a world voxel this frame (0 if nothing).
-	Uint8 voxelColorAt(int worldX, int worldY, int worldZ) const;
+	Uint8 voxelColorAt(int worldX, int worldY, int worldZ, bool nextFrame = false) const;
 	/// For a craft's west or north side: the colour of the side across from it.
-	Uint8 mirroredColor(const Hit &hit, int axis, bool skinOnly = false) const;
+	Uint8 mirroredColor(const Hit &hit, int axis, bool skinOnly = false, bool nextFrame = false) const;
 
 	// =====================================================================================
 	// Colours, light, the sky and the ray caster (FirstPersonViewRayCasting.cpp)
@@ -433,22 +441,44 @@ private:
 
 	/// Picks this frame's colours from the palette, for the time of day.
 	void updateColors();
-	/// The game's light at a point, blended between tile centres (0 bright .. 15 dark).
-	float lightAt(float x, float y, float z) const;
+	/// The game's light at a point, blended between tile centres (0 bright .. 15 dark); also a UFO's light there.
+	float lightAt(float x, float y, float z, float *ufoGlow = nullptr) const;
 	/// Is there anything solid between two points? (A shadow ray.)
 	bool shadowed(const float from[3], const float to[3]) const;
 	/// Extra light at a point from nearby lamps and the flashlight, in shades.
 	float pointLight(const float point[3], const float normal[3], bool shadows) const;
 	/// The final colour of the voxel a ray hit: light, shading, glass, mirroring.
-	Uint8 shadeHit(const Hit &hit, const float rayOrigin[3], const float rayDirection[3], int pixelX, int pixelY) const;
+	Uint8 shadeHit(Hit &hit, const float rayOrigin[3], const float rayDirection[3], int pixelX, int pixelY) const;
 	/// What a ray sees after leaving the map: the border tape, the ground, the sky.
 	Uint8 colorOutsideMap(const float rayOrigin[3], const float rayDirection[3], float tExit, int exitAxis, int pixelX, int pixelY, float &depth) const;
 	/// The sky's colour in a direction.
 	Uint8 skyColor(const float rayDirection[3], int pixelX, int pixelY) const;
-	/// Casts the rays for every pixel, on up to eight threads.
+	/// The ray caster's helper threads. They are started on the first frame and then kept,
+	/// waiting between frames, since starting threads anew every frame costs time. Each frame
+	/// they and the drawing thread take the view's rows one at a time from a shared counter
+	/// until none are left, so a thread on a fast core simply does more rows, and one on a slow
+	/// core (a hybrid CPU's efficient cores) can't hold the frame up with a fixed share.
+	struct RayWorkers
+	{
+		std::vector<std::thread> threads;  // the helpers (the drawing thread is the other one)
+		std::mutex mutex;                  // guards frame, working and stop
+		std::condition_variable wake;      // the helpers wait on it for the next frame
+		std::condition_variable finished;  // the drawing thread waits on it for the helpers
+		unsigned frame = 0;                // counts the frames handed out
+		int working = 0;                   // helpers still casting rays for this frame
+		bool stop = false;                 // the view is going away: the helpers end
+		std::atomic<int> nextBlockRow{0};  // the next row (of pixel blocks) no thread has taken yet
+		/// Stops the helpers and waits for them to end.
+		~RayWorkers();
+	};
+	RayWorkers _rayWorkers; // the ray caster's threads (see castAllRays)
+
+	/// Casts the rays for every pixel, on up to sixteen threads.
 	void castAllRays();
-	/// Casts the rays for every n-th row of the view, from the given one.
-	void renderRows(int firstBlockRow, int blockRowStep);
+	/// What each helper thread does: waits for a frame, casts rays for rows, and so on.
+	void rayWorkerLoop();
+	/// Casts the rays for rows taken one at a time from the shared counter, until none are left.
+	void renderRows();
 
 	// =====================================================================================
 	// Units, items and markers as sprites in the world (FirstPersonViewSprites.cpp)
@@ -592,6 +622,7 @@ private:
 	Trail _partnerTrail = TRAIL_NONE;                   // how it looks in flight
 	Uint8 _partnerColor = 0;                            // its colour
 	Uint32 _partnerShotTick = 0;                        // when it left the muzzle
+	const RuleItem *_partnerShotAmmo = nullptr;         // what it was (the clip may be gone by now)
 	// under fire: shots whizzing past, where they come from
 	Uint32 _nearMissTick = 0;
 	double _nearMissDirection[2] = {}; // which way it passed (x, y in the world)
@@ -647,9 +678,16 @@ private:
 
 	struct Flare { float pos[3], vel[3]; float age; bool resting; };
 	std::vector<Flare> _flares; // tactical flares, burning for a minute
+	/// A flare's light in this frame: where its flame is, how far it has burnt down (fade) and
+	/// its flicker. The same for every pixel of a frame, so it's worked out once a frame
+	/// (prepareFlareLights) instead of once for every pixel the flare lights.
+	struct FlareLight { float pos[3]; float fade, flicker; };
+	std::vector<FlareLight> _flareLights; // this frame's light of each flare, in the order of _flares
 
 	/// Flies, bounces and burns the tactical flares.
 	void updateFlares(float elapsedSeconds);
+	/// Works out each flare's light for this frame, before the rays use it.
+	void prepareFlareLights();
 	/// How much a point is lit by the flares (0..1).
 	float flareLight(const float point[3], const float normal[3], bool shadows) const;
 	/// Draws the flares' red-hot glow.
@@ -691,6 +729,56 @@ private:
 
 	/// Washes the finished picture: night vision, colour wash, static, red edges.
 	void applyScreenWash();
+
+	// =====================================================================================
+	// UFOs (an option, on by default): steady hulls whose lights glow and pulse gently, a
+	// coloured pool of light around each UFO, and an aura of drifting motes
+	// (FirstPersonViewUfo.cpp)
+	// =====================================================================================
+	/// A UFO part's steady 3D-only model, made from its original frames: the first frame's
+	/// shape and colours, with the voxels that light up in any frame marked as lights (in their
+	/// brightest colour), the hidden sides coloured from the hull only, and each voxel's open
+	/// faces for smooth shading.
+	struct UfoModel
+	{
+		VoxelModel model;           // what the rays see (its lit and exposed point at the arrays below)
+		Uint16 lit[24][16];         // [z][y], bit x: a light
+		Uint8 exposed[24][16][16];  // [z][y][x]: open faces, bit per face (+x -x +y -y +z -z)
+	};
+	/// One UFO on the map: its tiles, its size, and its light's colours.
+	struct UfoSpot
+	{
+		std::vector<int> tiles;      // its tiles (indexes into the map)
+		std::vector<int> lifts;      // its tiles with a grav lift floor, for their beams of light
+		std::vector<float> liftBottoms; // for each lift: the height its beam starts at (the floor below it), in voxels
+		float centre[2];             // the middle of its footprint, in world voxels (x, y)
+		float half[2];               // half its footprint's size across x and y, in voxels
+		float bottom, top;           // the heights of its lowest and highest tile's floor and roof, in voxels
+		bool seen;                   // one of its tiles has been seen (or debug mode): its light and aura show
+		bool colorsChosen;           // its light colours have been picked for the current palette
+		Uint8 tint[2][256];          // each palette colour in its inner and its outer light colour
+		Uint8 moteColor[3];          // the aura's colours: inner light, outer light, a white-hot spark
+	};
+	std::unordered_map<const MapData*, UfoModel> _ufoModels; // by MapData: UFO parts' steady models (built by the view that owns the models)
+	std::vector<UfoSpot> _ufos;          // the UFOs on the map
+	std::vector<Uint8> _ufoOfTile;       // per tile: which UFO's light reaches it (its index + 1), 0 none
+	std::vector<Uint8> _ufoPhaseOfTile;  // per tile of a UFO: its lights' pulse phase (bits 0-3, by its angle round the UFO), UFO tile and outer skin marks
+	std::vector<Uint8> _ufoGlowOfTile;   // per tile: how brightly its UFO's light falls there (0..255 at the tile's middle)
+	bool _ufoLightsOn = false;           // the option is on and the map has UFOs (this frame)
+	float _ufoPulse[2][16] = {};         // this frame's shade of a UFO light: [small light, big panel][phase]
+	float _ufoBreath = 1.0f;             // this frame's strength of the UFOs' pools of light (they breathe slowly)
+	float _ufoFaceShade[64] = {};        // this frame's face shade for each set of open faces (smooth hull shading), -1 none
+	Uint32 _ufoPaletteHash = 0;          // the palette the UFOs' light colours were picked for
+	/// Finds the UFOs on the map and builds their parts' steady models.
+	void findUfos();
+	/// Builds a UFO part's steady model from its original frames.
+	void buildUfoModel(const MapData *mapData, const float outward[2], UfoModel &ufoModel);
+	/// Picks a UFO's light colours from its lights, and makes its tint tables.
+	void chooseUfoColors(UfoSpot &ufo);
+	/// This frame's UFO lights: which UFOs have been seen, the pulse, the smooth shading.
+	void updateUfos();
+	/// Spawns the motes drifting around the UFOs in sight.
+	void spawnUfoAura(float elapsedSeconds);
 	/// Draws the flames rising up the view while the soldier burns.
 	void drawBurning();
 	/// Draws the arc towards where a hit came from, and blood on the view.

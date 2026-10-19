@@ -428,9 +428,17 @@ private:
 	Uint32 _crosshairDrawnFor = 0xFFFFFFFF;        // what the crosshair surface shows, to redraw only on change
 	Text *_txtMode = nullptr, *_txtShot = nullptr; // the fire mode, and the shot's odds and cost, beside the crosshair
 	Uint32 _hitMarkerHeard = 0;                    // the last hitmarker that ticked
+	const BattleUnit *_sightCheckUnit = nullptr;   // the soldier the last line-of-sight check was for,
+	Position _sightCheckFrom, _sightCheckTile;     // where he stood and the tile aimed at,
+	int _sightCheckDirection = -1;                 // the way he faced,
+	BattleActionType _sightCheckMode = BA_NONE;    // and the fire mode;
+	Uint32 _sightCheckTime = 0;                    // when it was made (SDL ticks)
+	bool _sightCheckResult = true;                 // and its answer
 
 	/// Updates the crosshair and its texts: mode, hit chance, time units.
 	void updateCrosshair(BattleUnit *unit, bool playerTurn);
+	/// Does the soldier have a line of sight to the aimed tile, as a shot checks it?
+	bool aimedTileInSight(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, const Position &tile);
 	/// Draws the crosshair for a fire mode.
 	void drawCrosshair(BattleActionType mode, int shots, Uint8 color, Uint8 shadow, int hitMark, Uint8 hitColor);
 
@@ -454,7 +462,7 @@ private:
 	Surface *_weaponInHand = nullptr, *_heldSprite = nullptr; // where it's drawn; the held item's inventory picture (32x48)
 	const BattleItem *_heldItem = nullptr;              // the item drawn in hand
 	const RuleItem *_heldRules = nullptr;               // its rules
-	int _heldAmmo = -1;                                 // the rounds it had last frame (more now: a reload)
+	int _heldClipId = -1;                               // the clip loaded last frame (-1: none; another one now: a reload)
 	Uint32 _heldDipStart = 0, _muzzleFlashUntil = 0;    // when the weapon dipped out of view (reload, another weapon); until when the flash shows
 	// the muzzle flash by what the weapon fires: colours, how many rays and how sharp, how big
 	struct MuzzleFlash { Uint8 core, mid, rim; int rays; double spike, sharpness, size; };
@@ -489,7 +497,7 @@ private:
 	/// Gives the weapon's picture volume as voxels.
 	void voxelizeWeapon();
 	/// How the muzzle flashes, by the damage the weapon's ammo does.
-	MuzzleFlash muzzleFlashFor(const BattleItem *weapon) const;
+	MuzzleFlash muzzleFlashFor(const BattleItem *weapon, const RuleItem *firedAmmo) const;
 	/// Draws the weapon as its picture on a plate in perspective.
 	void drawWeaponPlate(bool left, double bob[2], double kick, double dip, int shade, double tip[2]);
 	/// Draws the weapon as voxels, placed like the plate.
@@ -535,6 +543,9 @@ private:
 	// ---- the info panel, bottom left ----
 
 	Text *_txtName = nullptr, *_txtDoom = nullptr, *_txtWeapon = nullptr, *_txtStatus = nullptr; // name, DOOM (debug mode), weapon, status
+	Text *_txtWeaponAmmo = nullptr;                     // the weapon's rounds and spare clips, right after its name
+	Text *_txtOtherWeapon = nullptr, *_txtOtherAmmo = nullptr; // the other hand's item, and its rounds and spare clips
+	Uint8 _weaponTextColor = 0;                         // the weapon lines' own colour (the mod's "weapon" element)
 	NumberText *_numTimeUnits = nullptr, *_numEnergy = nullptr, *_numHealth = nullptr, *_numMorale = nullptr; // the four stats
 	Bar *_barTimeUnits = nullptr, *_barEnergy = nullptr, *_barHealth = nullptr, *_barMorale = nullptr; // and their bars
 	std::vector<Surface*> _panelParts;                  // all of the panel's surfaces, shown and hidden together
@@ -564,8 +575,16 @@ private:
 	void toggleNightVision(BattleUnit *unit, Action *action);
 	/// Fills the info panel for a unit (or hides it).
 	void updateInfoPanel(BattleUnit *unit);
-	/// The weapon line: "R: Rifle (20)".
+	/// The soldier card's weapon line: "R: Rifle 17 | 2 clips (40)".
 	std::string weaponLabel(BattleUnit *unit) const;
+	/// A gun's rounds for a fire mode and the spare clips carried for it: "17 | 2 clips (40)".
+	std::string ammoLabel(const BattleUnit *unit, const BattleItem *weapon, BattleActionType mode, bool &loaded) const;
+	/// Fills one hand's line of the info panel: the item's name and, for a gun, its ammo.
+	void fillHandLine(Text *nameText, Text *ammoText, BattleUnit *unit, BattleItem *item, BattleActionType mode, bool active);
+	/// Shortens a text (ending it in ".") until it fits a width in the small font.
+	std::string fitText(const std::string &text, int maxWidth) const;
+	/// Width of a text in the small font, in pixels.
+	int smallTextWidth(const std::string &text) const;
 	/// The status line: breakdown, on fire, wounds, or kneeling.
 	std::string statusLabel(BattleUnit *unit) const;
 	/// The armor's name and its buttons (fly, light, night vision, special).

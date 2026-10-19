@@ -61,6 +61,7 @@
 #include <SDL.h>
 #include "../Engine/Game.h"
 #include "../Engine/Logger.h"
+#include "../Engine/Options.h"
 #include "../Engine/Surface.h"
 #include "../Engine/SurfaceSet.h"
 #include "../Mod/MapData.h"
@@ -109,6 +110,11 @@ void clearModel(FirstPersonView::VoxelModel &model)
 	std::fill(&model.plan[0][0], &model.plan[0][0] + 16 * 16, (Uint8)0);
 	std::fill(&model.east[0][0], &model.east[0][0] + 24 * 16, (Uint8)0);
 	std::fill(&model.south[0][0], &model.south[0][0] + 24 * 16, (Uint8)0);
+
+	// Not a UFO part's steady model (see buildUfoModel): no lights marked, no smooth shading.
+	model.lit = nullptr;
+	model.exposed = nullptr;
+	model.pulseKind = 0;
 
 	// Empty, with a bounding box that any solid voxel will shrink onto.
 	model.empty = true;
@@ -529,16 +535,19 @@ void FirstPersonView::findMirrors()
  * @param worldX Voxel position east, from the map's west edge (16 per tile).
  * @param worldY Voxel position south, from the map's north edge (16 per tile).
  * @param worldZ Voxel height, from the bottom of the map (24 per level).
+ * @param nextFrame Read an animated part's next frame instead (a pixel already dissolved into it).
  * @return The palette colour, 0 if nothing is there or the voxel is outside the map.
  */
-Uint8 FirstPersonView::voxelColorAt(int worldX, int worldY, int worldZ) const
+Uint8 FirstPersonView::voxelColorAt(int worldX, int worldY, int worldZ, bool nextFrame) const
 {
 	const int mapSizeX = _save->getMapSizeX(), mapSizeY = _save->getMapSizeY(), mapSizeZ = _save->getMapSizeZ();
 	if (worldX < 0 || worldY < 0 || worldZ < 0 || worldX >= mapSizeX * 16 || worldY >= mapSizeY * 16 || worldZ >= mapSizeZ * 24) return 0;
-	// The first of the tile's parts that is solid at that voxel gives the colour.
+	// The first of the tile's parts that is solid at that voxel gives the colour (from the
+	// part's next frame if asked and it has one).
 	const TileView &tileView = _tileViews[((worldZ / 24) * mapSizeY + worldY / 16) * mapSizeX + worldX / 16];
-	for (const VoxelModel *model : tileView.part)
+	for (int part = 0; part < 4; ++part)
 	{
+		const VoxelModel *model = nextFrame && tileView.next[part] ? tileView.next[part] : tileView.part[part];
 		const Uint8 color = model ? model->color[worldZ % 24][worldY % 16][worldX % 16] : 0;
 		if (color) return color;
 	}
@@ -555,10 +564,11 @@ Uint8 FirstPersonView::voxelColorAt(int worldX, int worldY, int worldZ) const
  * @param hit Where a ray hit a tile part.
  * @param axis 0 to mirror east-west, 1 to mirror north-south.
  * @param skinOnly Only answer for the craft's outer skin (0 for anything inside).
+ * @param nextFrame Borrow from animated parts' next frames (a pixel already dissolved into them).
  * @return The mirrored colour; 0 if the hit is not on a craft, the craft doesn't mirror that
  *         way, or no row nearby has anything to borrow.
  */
-Uint8 FirstPersonView::mirroredColor(const Hit &hit, int axis, bool skinOnly) const
+Uint8 FirstPersonView::mirroredColor(const Hit &hit, int axis, bool skinOnly, bool nextFrame) const
 {
 	// Which craft is the hit tile part of, and does that craft mirror along this axis?
 	const int craftId = _mirrorOfTile.empty() ? -1 : _mirrorOfTile[hit.tile];
@@ -628,7 +638,7 @@ Uint8 FirstPersonView::mirroredColor(const Hit &hit, int axis, bool skinOnly) co
 		sourceVoxel[axis] = bestPos;
 		sourceVoxel[1 - axis] = mirror.lo[1 - axis] + rowAcross;
 		sourceVoxel[2] = mirror.lo[2] + rowUp;
-		const Uint8 color = voxelColorAt(sourceVoxel[0], sourceVoxel[1], sourceVoxel[2]); // (0 if it has been blown away since)
+		const Uint8 color = voxelColorAt(sourceVoxel[0], sourceVoxel[1], sourceVoxel[2], nextFrame); // (0 if it has been blown away since)
 		if (color) return color;
 	}
 	return 0;
@@ -983,17 +993,14 @@ void FirstPersonView::snapshotTiles()
 	}
 	_tileViews.resize(tileCount);
 
-	// The game animates tiles one frame per tick: measure the tick's length (40 to 400 ms) and
-	// how far into the current tick we are (0 to 1), so animated tiles can dissolve smoothly
-	// into their next frame.
+	// Animated tiles run on the view's own calm clock rather than the game's 100 ms tick (see
+	// CalmFrameTime): the frame they show now, and how far (eased in and out) they have
+	// dissolved into the next one.
 	const Uint32 now = SDL_GetTicks();
-	if (_save->getAnimFrame() != _lastAnimationFrame)
-	{
-		if (_lastAnimationFrame >= 0) _animationFramePeriod = std::clamp<Uint32>(now - _animationFrameStart, 40, 400);
-		_lastAnimationFrame = _save->getAnimFrame();
-		_animationFrameStart = now;
-	}
-	_animationBlend = std::min(1.0f, (now - _animationFrameStart) / (float)_animationFramePeriod);
+	_calmFrame = (int)((now / CalmFrameTime) % 8);
+	_animationBlend = smoothstep(0.0f, 1.0f, (now % CalmFrameTime) / (float)CalmFrameTime);
+	// UFO parts show their steady models when the UFO lights option is on (see findUfos).
+	_ufoLightsOn = Options::fpsUfoLights && !_ufos.empty();
 
 	// Every tile: notice what changed (or start watching it), take its snapshot, and note the
 	// light sources and devices on it.
@@ -1108,11 +1115,17 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 			continue;
 		}
 
-		// Which animation frame is the tile showing? (Water, lights, computers, UFO doors...)
-		// The game keeps the shown frame's sprite on the tile: find whose pixels those are.
+		// Which animation frame does the part show? A UFO door's frames are its sliding open,
+		// so it shows the game's frame: the game keeps the shown frame's sprite on the tile, so
+		// find whose pixels those are. Anything else that animates (water, lights, computers,
+		// the lit panels of UFOs) follows the view's calm clock instead (see CalmFrameTime).
 		const Frames &frames = getFrames(mapData);
 		int frame = 0;
-		if (frames.animated)
+		if (frames.animated && !mapData->isUFODoor())
+		{
+			frame = _calmFrame;
+		}
+		else if (frames.animated)
 		{
 			const Uint8 *shownBuffer = tile->getSprite((TilePart)part).getBuffer();
 			for (int candidate = 0; candidate < 8; ++candidate)
@@ -1147,8 +1160,9 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 			_ufoDoorOpening.erase(index * 4 + part);
 		}
 
-		// The part's model in that frame (an empty one is left out).
-		const VoxelModel *model = getModel(mapData, frames.sprite[frame], cutout);
+		// The part's model in that frame (an empty one is left out). A UFO part shows its steady
+		// model instead with the UFO lights option: no frames, only its lights glow.
+		const VoxelModel *model = _ufoLightsOn && frames.steady ? frames.steady : getModel(mapData, frames.sprite[frame], cutout);
 		if (model->empty)
 		{
 			continue;
@@ -1156,15 +1170,22 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 		tileView.part[part] = model;
 		tileView.empty = false;
 
-		// The frame it steps to next, to dissolve into over the tick (not for sliding doors).
-		if (frames.animated && !ufoWall && frames.sprite[(frame + 1) % 8] != frames.sprite[frame])
+		// The frame it steps to next, to dissolve into over the step (not for UFO doors, nor for
+		// a steady UFO model).
+		if (frames.animated && !mapData->isUFODoor() && model != frames.steady && frames.sprite[(frame + 1) % 8] != frames.sprite[frame])
 		{
 			const VoxelModel *nextModel = getModel(mapData, frames.sprite[(frame + 1) % 8], false);
 			if (!nextModel->empty) tileView.next[part] = nextModel;
 		}
 
-		// A light source (by the game's rules) with bright voxels: those shine.
-		if (mapData->getLightSource() > 0 && model->glowCount)
+		// A light source (by the game's rules) with bright voxels: those shine. Judged by its
+		// first frame, so an animated lamp doesn't switch its shine on and off with its frames.
+		if (mapData->getLightSource() > 0 && getModel(mapData)->glowCount)
+		{
+			tileView.emissive |= (Uint8)(1 << part);
+		}
+		// A steady UFO model with lights: those shine too (see buildUfoModel).
+		if (model->pulseKind)
 		{
 			tileView.emissive |= (Uint8)(1 << part);
 		}
@@ -1181,6 +1202,8 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 	// war: the floor and the object are seen with the floor, each wall on its own (a wall is
 	// seen from either side, as on the isometric map).
 	tileView.light = (Uint8)std::clamp(tile->getShade(), 0, _nightVision ? 4 : 15);
+	// A UFO's light (the UFO lights option), once that UFO has been seen (see findUfos).
+	tileView.ufoGlow = _ufoLightsOn && _ufoOfTile[index] && _ufos[_ufoOfTile[index] - 1].seen ? _ufoGlowOfTile[index] : 0;
 	tileView.discovered = debug || tile->isDiscovered(O_FLOOR);
 	tileView.seen = (Uint8)((tileView.discovered ? (1 << O_FLOOR) | (1 << O_OBJECT) : 0)
 		| (debug || tile->isDiscovered(O_WESTWALL) ? 1 << O_WESTWALL : 0)
@@ -1214,12 +1237,15 @@ void FirstPersonView::noteLightsAndDevices(const Tile *tile, const TileView &til
 			const MapData *mapData = tile->getMapData((TilePart)part);
 			if (!model || !mapData) continue;
 
-			// A part that shines: a lamp at the centre of its bright voxels, as strong as the
-			// game's light level for it says (12 or more is full strength), in its glow colour.
-			if ((tileView.emissive >> part) & 1)
+			// A part that shines by the game's rules: a lamp at the centre of its bright voxels,
+			// as strong as the game's light level for it says (12 or more is full strength), in
+			// its glow colour. Taken from its first frame, so the pool of light it casts stays
+			// put while the part animates.
+			if (((tileView.emissive >> part) & 1) && mapData->getLightSource() > 0)
 			{
-				LightSpot light = { { originX + model->glow[0], originY + model->glow[1], originZ + model->glow[2] },
-					std::min(1.0f, mapData->getLightSource() / 12.0f), model->glowColor };
+				const VoxelModel *steadyModel = getModel(mapData);
+				LightSpot light = { { originX + steadyModel->glow[0], originY + steadyModel->glow[1], originZ + steadyModel->glow[2] },
+					std::min(1.0f, mapData->getLightSource() / 12.0f), steadyModel->glowColor };
 				_nearbyLights.push_back(light);
 			}
 
@@ -1275,6 +1301,17 @@ void FirstPersonView::updateDoorSwings(int tileCount)
 	_doorSwings.clear();
 	const Uint32 now = SDL_GetTicks();
 	const int mapSizeX = _save->getMapSizeX(), mapSizeY = _save->getMapSizeY();
+	// Points a tile's rays at a swing, in its first free slot: two doors can swing through one
+	// tile at once (its west and north doors, or its own and a neighbour's swung away). A
+	// third at the same moment isn't traced.
+	auto addSwingTo = [](TileView &tileView, Sint16 swingIndex)
+	{
+		for (Sint16 &slot : tileView.swing)
+		{
+			if (slot < 0) { slot = swingIndex; break; }
+		}
+		tileView.empty = false;
+	};
 	for (auto door = _doorAnimations.begin(); door != _doorAnimations.end();)
 	{
 		// How far the swing has got (0 to 1), and where the door's tile is (in tiles).
@@ -1314,17 +1351,14 @@ void FirstPersonView::updateDoorSwings(int tileCount)
 		TileView &tileView = _tileViews[door->tile];
 		tileView.part[door->hiddenPart] = nullptr;
 		tileView.next[door->hiddenPart] = nullptr;
-		tileView.swing[0] = (Sint16)_doorSwings.size();
-		tileView.empty = false;
+		addSwingTo(tileView, (Sint16)_doorSwings.size());
 
 		// A door swinging away reaches into the neighbour on the far side of the wall (west of a
 		// west wall, north of a north wall): its rays must look at the swing too.
 		const int neighbourX = westWall ? tileX - 1 : tileX, neighbourY = westWall ? tileY : tileY - 1;
 		if (door->away && neighbourX >= 0 && neighbourY >= 0)
 		{
-			TileView &neighbour = _tileViews[(tileZ * mapSizeY + neighbourY) * mapSizeX + neighbourX];
-			neighbour.swing[neighbour.swing[0] < 0 ? 0 : 1] = (Sint16)_doorSwings.size();
-			neighbour.empty = false;
+			addSwingTo(_tileViews[(tileZ * mapSizeY + neighbourY) * mapSizeX + neighbourX], (Sint16)_doorSwings.size());
 		}
 		_doorSwings.push_back(swing);
 		++door;

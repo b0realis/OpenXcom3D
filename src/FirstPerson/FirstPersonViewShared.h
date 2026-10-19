@@ -81,6 +81,15 @@ const double UpscaleFrom = 1.6;
 /// How long doors take to open in the view, in milliseconds, so you see them move (the game's
 /// own doors open at once): a door swinging on its hinge, a UFO door sliding aside.
 const Uint32 DoorSwingTime = 500, UfoDoorTime = 600;
+/// Animated terrain (water, machinery, the lights and lit floors of UFOs) steps to its next
+/// frame every CalmFrameTime milliseconds in the view, cross-fading over the whole step. The
+/// game steps every 100 ms, which up close made whole lit panels blink five to ten times a
+/// second: a photosensitivity hazard (WCAG 2.3 allows at most three flashes a second). At this
+/// pace a two-frame blink is a soft pulse of about 1.6 Hz.
+const Uint32 CalmFrameTime = 320;
+/// The marks on a UFO's tiles in FirstPersonView::_ufoPhaseOfTile, above the pulse phase (bits
+/// 0-3): a tile of the UFO, and one of its outer skin (beside a tile that isn't the UFO's).
+const Uint8 UfoTileBit = 0x80, UfoSkinBit = 0x40;
 /// Tactical flares: how long they burn (seconds), how far their light reaches (voxels), and how
 /// many can burn at once.
 const float FlareLife = 60.0f, FlareReach = 150.0f;

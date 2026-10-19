@@ -193,14 +193,15 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightVisionGear", &fpsNightVisionGear, true, "STR_FPS_NIGHT_VISION_GEAR", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCombatMusic", &fpsCombatMusic, true, "STR_FPS_COMBAT_MUSIC", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlares", &fpsFlares, true, "STR_FPS_FLARES", category));
-	// Looks: the weapon in hand and whether it is made of voxels, sprite upscaling (0 off,
-	// 1 smooth, 2 smooth + detail), muzzle flashes, particles (0 none, 1 effects, 2 everything)
-	// and the pixel size (1 to 3: one ray colours a block of pixels that wide and high, for speed).
+	// Looks: the weapon in hand (always made of voxels), sprite upscaling (0 off, 1 smooth,
+	// 2 smooth + detail), muzzle flashes, particles (0 none, 1 effects, 2 everything),
+	// UFOs with steady hulls, glowing lights, coloured light and an aura, and the pixel size
+	// (1 to 3: one ray colours a block of pixels that wide and high, for speed).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsViewModel", &fpsViewModel, true, "STR_FPS_VIEW_MODEL", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsVoxelWeapon", &fpsVoxelWeapon, true, "STR_FPS_VOXEL_WEAPON", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSpriteUpscale", &fpsSpriteUpscale, 2, "STR_FPS_SPRITE_UPSCALE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMuzzleFlash", &fpsMuzzleFlash, true, "STR_FPS_MUZZLE_FLASH", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsParticles", &fpsParticles, 2, "STR_FPS_PARTICLES", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsUfoLights", &fpsUfoLights, true, "STR_FPS_UFO_LIGHTS", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 1, "STR_FPS_PIXEL_SIZE", category));
 	// The crosshair: shown or not, the shot info under it, and aiming at the exact point under
 	// it (YES) or at the tile, as the original game does (NO).

@@ -705,8 +705,8 @@ void FirstPersonView::drawLightHalos()
 	const int cellSize = 4, gridWidth = (width + cellSize - 1) / cellSize, gridHeight = (height + cellSize - 1) / cellSize;
 	_glowBuffer.assign(gridWidth * gridHeight, 0.0f);
 	_glowScratch.assign(gridWidth * gridHeight, 0.0f);
-	// Gather: each cell holds the share of its pixels that shine (0..1). Nothing shining,
-	// nothing to do.
+	// Gather: each cell holds the share of its pixels that shine (0..1; a UFO's light, marked
+	// 3, counts three times). Nothing shining, nothing to do.
 	bool anyGlow = false;
 	for (int y = 0; y < height; ++y)
 	{
@@ -716,7 +716,7 @@ void FirstPersonView::drawLightHalos()
 		{
 			if (maskRow[x])
 			{
-				glowRow[x / cellSize] += 1.0f / (cellSize * cellSize);
+				glowRow[x / cellSize] += maskRow[x] * (1.0f / (cellSize * cellSize));
 				anyGlow = true;
 			}
 		}
@@ -758,6 +758,20 @@ void FirstPersonView::drawLightHalos()
 	// How strongly the glow brightens: more at night, and most under the sea. It is steady
 	// (a flickering bloom makes the dithered glow shimmer).
 	const float gain = _colors.underwater ? 45.0f : 18.0f + 42.0f * _colors.night;
+	// Where in each row of the grid the glow reached at all (the blur spreads it only so far):
+	// its first and last cell (first > last: not at all). Pixels outside those cells (and the
+	// one beside them, which the blend still reaches) are left alone at once, which makes the
+	// bloom cheap when only a few small lights shine.
+	std::vector<int> firstReached(gridHeight, gridWidth), lastReached(gridHeight, -1);
+	for (int gridRow = 0; gridRow < gridHeight; ++gridRow)
+	{
+		for (int gridColumn = 0; gridColumn < gridWidth; ++gridColumn)
+		{
+			if (_glowBuffer[gridRow * gridWidth + gridColumn] <= 0.0f) continue;
+			firstReached[gridRow] = std::min(firstReached[gridRow], gridColumn);
+			lastReached[gridRow] = gridColumn;
+		}
+	}
 	// Brighten every pixel the glow reaches, except the shining pixels themselves and empty
 	// (black, index 0) ones. The glow at a pixel is blended between the four nearest cells.
 	for (int y = 0; y < height; ++y)
@@ -767,9 +781,11 @@ void FirstPersonView::drawLightHalos()
 		const float gridY = std::clamp((y + 0.5f) / cellSize - 0.5f, 0.0f, gridHeight - 1.001f);
 		const int gridRow = (int)gridY;
 		const float blendY = gridY - gridRow;
-		const float *glowAbove = &_glowBuffer[gridRow * gridWidth],
-			*glowBelow = &_glowBuffer[std::min(gridHeight - 1, gridRow + 1) * gridWidth];
-		for (int x = 0; x < width; ++x)
+		const int nextRow = std::min(gridHeight - 1, gridRow + 1);
+		const int firstCell = std::min(firstReached[gridRow], firstReached[nextRow]), lastCell = std::max(lastReached[gridRow], lastReached[nextRow]);
+		if (firstCell > lastCell) continue;
+		const float *glowAbove = &_glowBuffer[gridRow * gridWidth], *glowBelow = &_glowBuffer[nextRow * gridWidth];
+		for (int x = std::max(0, (firstCell - 1) * cellSize); x < std::min(width, (lastCell + 2) * cellSize); ++x)
 		{
 			if (_glowMask[y * width + x] || !pixels[x]) continue;
 			// The same across: the cell column to the left of the pixel and how far towards the next.
@@ -814,12 +830,17 @@ void FirstPersonView::updateParticles()
 		return;
 	}
 	// Move what's there, then add what this frame brings: the battle's effects (shots,
-	// explosions, fire), dual wield's second round, the UFO devices and lamps, and the air.
+	// explosions, fire), dual wield's second round, the UFO devices and lamps, the UFOs' aura
+	// (the UFO lights option), and the air.
 	_particles.update(elapsedSeconds);
 	updateFlares(elapsedSeconds);
 	spawnBattleEffects(elapsedSeconds);
 	spawnPartnerEffects();
 	spawnDevices(elapsedSeconds);
+	if (_ufoLightsOn)
+	{
+		spawnUfoAura(elapsedSeconds);
+	}
 	if (Options::fpsParticles > 1)
 	{
 		spawnAmbient(elapsedSeconds);
@@ -829,7 +850,7 @@ void FirstPersonView::updateParticles()
 /**
  * Draws the particles: square dots (bigger up close, with the corners rounded off), rings for
  * bubbles up close, or streaks for rain, all depth-tested against the scene. Self-lit ones
- * (GLOW, BLINK) darken as they age and feed the bloom; the rest (LIT, BUBBLE) are lit by the
+ * (GLOW, BLINK, MOTE) darken as they age and feed the bloom; the rest (LIT, BUBBLE) are lit by the
  * battlescape light where they are.
  */
 void FirstPersonView::drawParticles()
@@ -868,10 +889,18 @@ void FirstPersonView::drawParticles()
 		}
 		else
 		{
-			// Self-lit: it darkens as it ages. A blinking one is off for part of each blink
-			// (its own rhythm, from where it is).
-			if (particle.kind == P::BLINK && std::sin(particle.age * 5.0f + particle.pos[0]) < 0.3f) continue;
-			shade = (int)(fade * 6.0f);
+			// Self-lit: it darkens as it ages (a mote of a UFO's aura fades in over the first 10%
+			// of its life and out over the last 40%, and stays bright between). A blinking one
+			// fades softly up and down (its own rhythm, from where it is: under once a second,
+			// eased, never a hard on and off) and is left out while it is at its dimmest.
+			shade = particle.kind == P::MOTE ? (int)(std::max(std::max(0.0f, 0.1f - fade) * 60.0f, std::max(0.0f, fade - 0.6f) * 15.0f))
+				: (int)(fade * 6.0f);
+			if (particle.kind == P::BLINK)
+			{
+				const float pulse = 0.5f + 0.5f * std::sin(particle.age * 5.0f + particle.pos[0]); // 0 dim .. 1 bright
+				if (pulse < 0.15f) continue;
+				shade += (int)((1.0f - pulse) * 5.0f);
+			}
 		}
 		const Uint8 color = shadeColor(particle.color, shade);
 		if (particle.kind == P::STREAK)
@@ -930,7 +959,7 @@ void FirstPersonView::drawParticles()
 				if (dotSize >= 3 && (x == left || x == left + dotSize - 1) && (y == top || y == top + dotSize - 1)) continue;
 				if (x < 0 || y < 0 || x >= width || y >= height || depth >= _depthBuffer[y * width + x]) continue;
 				*getRaw(x, y) = color;
-				if (particle.kind == P::GLOW || particle.kind == P::BLINK) _glowMask[y * width + x] = 1; // sparks and embers bloom too
+				if (particle.kind == P::GLOW || particle.kind == P::BLINK || particle.kind == P::MOTE) _glowMask[y * width + x] = 1; // sparks, embers and motes bloom too
 			}
 		}
 	}

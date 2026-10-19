@@ -61,6 +61,7 @@
 #include "../Battlescape/Map.h"
 #include "../Engine/Game.h"
 #include "../Interface/Text.h"
+#include "../Mod/Armor.h"
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/SavedBattleGame.h"
 #include "FirstPersonModeShared.h"
@@ -149,9 +150,12 @@ void FirstPersonMode::checkHurt(BattleUnit *unit, Uint32 now)
 		_view->addShake(1.0f + _hurtAmount * 2.0f);
 
 		// Where it came from: the enemy shot that ended less than 0.8 seconds ago, or else an
-		// alien right beside us on the same level (melee: a hard jolt and blood over the view).
-		// The point is in voxels: the shot's origin, or the middle of the alien's tile at half a
-		// level's height.
+		// alien striking us in melee (a hard jolt and blood over the view): one right beside us
+		// on the same level (any tile of a big one's footprint) that is aiming, which the game
+		// has an attacker do from the blow until its hit has played out (MeleeAttackBState,
+		// ExplosionBState). Anything else (a fall, fire, bleeding) has no direction. The point
+		// is in voxels: the shot's origin, or the middle of the alien's tile at half a level's
+		// height.
 		double hurtFrom[3];
 		const Uint32 enemyShotEnd = _view->getEnemyShotEnd(hurtFrom);
 		const bool fromShot = enemyShotEnd && now - enemyShotEnd < 800;
@@ -161,9 +165,14 @@ void FirstPersonMode::checkHurt(BattleUnit *unit, Uint32 now)
 			const Position unitTile = unit->getPosition();
 			for (const BattleUnit *other : *_save->getUnits())
 			{
+				// The footprint's nearest tile to ours, on each axis (a big unit's position is
+				// its top-left tile).
 				const Position otherTile = other->getPosition();
-				if (!other->isOut() && other->getFaction() == FACTION_HOSTILE
-					&& otherTile.z == unitTile.z && std::abs(otherTile.x - unitTile.x) <= 1 && std::abs(otherTile.y - unitTile.y) <= 1)
+				const int footprint = other->getArmor()->getSize();
+				const int nearestX = std::clamp<int>(unitTile.x, otherTile.x, otherTile.x + footprint - 1);
+				const int nearestY = std::clamp<int>(unitTile.y, otherTile.y, otherTile.y + footprint - 1);
+				if (!other->isOut() && other->getFaction() == FACTION_HOSTILE && other->getStatus() == STATUS_AIMING
+					&& otherTile.z == unitTile.z && std::abs(nearestX - unitTile.x) <= 1 && std::abs(nearestY - unitTile.y) <= 1)
 				{
 					attacker = other;
 				}

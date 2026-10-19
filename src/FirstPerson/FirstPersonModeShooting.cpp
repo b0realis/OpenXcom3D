@@ -420,8 +420,11 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	BattleActionType mode = _fireMode;
 
 	// An action picked from an item's menu that wants a target (the mind probe, psi picked from
-	// the menu...): this click is its target, with that item and action.
-	const bool menuTargeting = action->targeting && action->actor == unit && action->weapon;
+	// the menu...): this click is its target, with that item and action. Not a shot, though:
+	// after a shot the game keeps aiming that same shot (so the player can fire again), and a
+	// shot picked on the classic HUD has just been taken over as the fire mode (updateFireMode),
+	// so a shot fires as the fire mode does, the other hand's gun joining in with dual wield.
+	const bool menuTargeting = action->targeting && action->actor == unit && action->weapon && !isShot(action->type);
 	if (menuTargeting)
 	{
 		weapon = action->weapon;
@@ -543,7 +546,7 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	}
 	action->dualWield = otherWeapon != nullptr;
 	action->dualWeapon = otherWeapon;
-	action->dualType = offMode;
+	action->dualType = otherWeapon ? offMode : BA_NONE; // (dualPartner may name a mode for a gun it turned down)
 
 	// Fire, as a click on the target tile of the isometric map: the game turns the soldier,
 	// checks and spends the time units, and launches the shot. With the game's "confirm fire
@@ -893,8 +896,8 @@ void FirstPersonMode::drawCrosshair(BattleActionType mode, int shots, Uint8 colo
  * Updates the crosshair and the two lines under it, every frame: the mode's name (with the
  * burst size), then the hit chance at what's under the crosshair and the time unit cost.
  * The hit chance is worked out as the game's own isometric cursor does it (the game's firing
- * accuracy, then its range dropoff and maximum range; only the cursor's penalty for a target
- * out of the soldier's line of sight is left out), so the two agree. The
+ * accuracy, then its range dropoff, a mod's penalty for a target out of the soldier's line of
+ * sight, and its maximum range), so the two agree. The
  * crosshair is yellow when the soldier can do it, red when he can't (time units, ammo, range),
  * purple for psi, and grey when it's not his move. In FPS style it shows the spread as a
  * dotted ring instead of odds.
@@ -953,16 +956,16 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 			canFire = canFire && (!weapon->needsAmmoForAction(mode) || weapon->getAmmoForAction(mode));
 		}
 
-		// Dual wield: the other hand's gun joins in if there's time for both (offTime -1: there
-		// isn't, so the chosen gun fires alone, as fire() decides too).
+		// Dual wield: the other hand's gun joins in if it can fire along (dualPartner: a fitting
+		// mode, loaded) and there's time for both; otherwise the chosen gun fires alone, at full
+		// accuracy, as fire() decides too.
 		BattleActionType offMode = BA_NONE;
 		int offTime = 0;
 		if (BattleItem *otherWeapon = canFire ? dualPartner(unit, weapon, slot, offMode) : nullptr)
 		{
 			offTime = BattleActionCost(offMode, unit, otherWeapon).Time;
-			if (!Options::fpsDoomMode && cost.Time + offTime > unit->getTimeUnits()) offTime = -1;
+			dual = Options::fpsDoomMode || cost.Time + offTime <= unit->getTimeUnits();
 		}
-		dual = offTime > 0 || (offTime == 0 && offMode != BA_NONE);
 
 		// The hit chance at what's under the crosshair, for shots and throws (not in FPS style:
 		// no odds there, the spread ring shows it). As the game's isometric cursor works it out
@@ -983,6 +986,14 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 			const int dropoff = rules->calculateLimits(upperLimit, lowerLimit, _save->getDepth(), mode);
 			if (distance > upperLimit) { accuracy -= (distance - upperLimit) * dropoff; accuracyColor = yellowText; }
 			else if (distance < lowerLimit) { accuracy -= (lowerLimit - distance) * dropoff; accuracyColor = yellowText; }
+			// A mod may cut the accuracy of a shot at what the soldier can't see to a share of it
+			// (noLOSAccuracyPenalty, in percent; -1 for none), as the shot and the cursor do.
+			const int noSightPenalty = rules->getNoLOSAccuracyPenalty(_game->getMod());
+			if (noSightPenalty != -1 && !aimedTileInSight(unit, weapon, mode, _aimVoxel.toTile()))
+			{
+				accuracy = accuracy * noSightPenalty / 100;
+				accuracyColor = yellowText;
+			}
 			const bool outOfRange = mode == BA_THROW ? rules->isOutOfThrowRange(distanceSq, _save->getDepth()) : rules->isOutOfRange(distanceSq);
 			if (accuracy <= 0 || outOfRange)
 			{
@@ -1081,6 +1092,59 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 			_crosshair->unlock();
 		}
 	}
+}
+
+/**
+ * Tells whether the soldier has a line of sight to the aimed tile, checked as a shot checks it
+ * for a mod's penalty on shots at what the soldier can't see (Projectile::applyAccuracy): for a
+ * tile with a creature on it, whether the soldier sees that creature; for any other tile,
+ * whether a line from the soldier reaches it. The answer is kept while the crosshair stays on
+ * the same tile and the soldier doesn't move, turn or change the fire mode, for at most a
+ * quarter of a second (creatures move).
+ * @param unit The soldier.
+ * @param weapon The weapon he aims.
+ * @param mode The fire mode (it decides where the line starts).
+ * @param tile The tile under the crosshair.
+ * @return True if he can see it (or it's off the map, where the shot takes no penalty either).
+ */
+bool FirstPersonMode::aimedTileInSight(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, const Position &tile)
+{
+	Tile *aimedTile = _save->getTile(tile);
+	if (!aimedTile)
+	{
+		return true;
+	}
+
+	// The last answer, if it was for the same question just now.
+	const Uint32 now = SDL_GetTicks();
+	if (unit == _sightCheckUnit && unit->getPosition() == _sightCheckFrom && tile == _sightCheckTile
+		&& unit->getDirection() == _sightCheckDirection && mode == _sightCheckMode && now - _sightCheckTime < 250)
+	{
+		return _sightCheckResult;
+	}
+
+	// Ask the game, as the shot does.
+	if (aimedTile->getUnit())
+	{
+		_sightCheckResult = _save->getTileEngine()->visible(unit, aimedTile);
+	}
+	else
+	{
+		BattleAction sightAction;
+		sightAction.actor = unit;
+		sightAction.weapon = weapon;
+		sightAction.type = mode;
+		_sightCheckResult = _save->getTileEngine()->isTileInLOS(&sightAction, aimedTile, false);
+	}
+
+	// Remember what it was for.
+	_sightCheckUnit = unit;
+	_sightCheckFrom = unit->getPosition();
+	_sightCheckTile = tile;
+	_sightCheckDirection = unit->getDirection();
+	_sightCheckMode = mode;
+	_sightCheckTime = now;
+	return _sightCheckResult;
 }
 
 /**

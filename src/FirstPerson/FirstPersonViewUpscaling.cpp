@@ -151,8 +151,8 @@ const Surface *FirstPersonView::upscaled(const Surface *sprite)
 	const bool detail = Options::fpsSpriteUpscale >= 2;
 
 	// A new palette: everything made for the old one goes, finished, waiting or queued (a job
-	// the worker is busy with is dropped when it's done, as its key is no longer queued, unless
-	// the same frame has been queued again meanwhile).
+	// the worker is busy with is dropped when it's done, as its key is no longer queued: the
+	// palette is part of the key, so the same frame queued again meanwhile has another one).
 	if (_upscalePalette != _colors.paletteHash)
 	{
 		std::lock_guard<std::mutex> lock(_upscaleMutex);
@@ -164,9 +164,11 @@ const Surface *FirstPersonView::upscaled(const Surface *sprite)
 		_upscalePalette = _colors.paletteHash;
 	}
 
-	// The cache key: a 64-bit FNV-1a hash of the frame's pixels, seeded with its size and the
-	// detail setting.
+	// The cache key: a 64-bit FNV-1a hash of the frame's pixels, seeded with its size, the
+	// detail setting and the palette (so a frame the worker made for an old palette never
+	// passes for the same frame in the new one).
 	Uint64 key = 1469598103934665603ULL ^ ((Uint64)width << 32) ^ ((Uint64)height << 48) ^ (detail ? 1 : 0);
+	key = (key ^ _colors.paletteHash) * 1099511628211ULL;
 	for (int y = 0; y < height; ++y)
 	{
 		const Uint8 *row = (const Uint8 *)source->pixels + y * source->pitch;
@@ -307,17 +309,17 @@ void FirstPersonView::upscaleWorker()
 		}
 		xbrz::scale(factor, sourceArgb.data(), bigArgb.data(), width, height, xbrz::ARGB);
 
-		// The big frame's colours as floats (red, green, blue per pixel), each channel divided
-		// by the pixel's alpha (taken as at least 0.5, so faint edge pixels don't blow up);
-		// fully transparent pixels 0.
+		// The big frame's colours as floats (red, green, blue per pixel); fully transparent
+		// pixels 0. xBRZ blends an edge with the transparency around it in its alpha only: the
+		// colour is the opaque neighbours' own (weighted by their alpha), not darkened, so it's
+		// taken as it is.
 		std::vector<float> bigRgb(bigWidth * bigHeight * 3);
 		for (int pixel = 0; pixel < bigWidth * bigHeight; ++pixel)
 		{
 			const uint32_t argb = bigArgb[pixel];
-			const float alpha = (argb >> 24) / 255.0f; // xBRZ blends edges with transparency: keep the colour, not the darkening
 			for (int channel = 0; channel < 3; ++channel)
 			{
-				bigRgb[pixel * 3 + channel] = alpha > 0.0f ? ((argb >> (16 - 8 * channel)) & 255) / std::max(alpha, 0.5f) : 0.0f;
+				bigRgb[pixel * 3 + channel] = (argb >> 24) ? (float)((argb >> (16 - 8 * channel)) & 255) : 0.0f;
 			}
 		}
 

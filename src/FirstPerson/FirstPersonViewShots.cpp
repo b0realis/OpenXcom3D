@@ -243,13 +243,23 @@ void FirstPersonView::spawnDebris(const Position &tilePosition, int part, const 
 {
 	typedef FirstPersonParticles P; // short for the particle system: its kinds (P::GLOW...) and groups (P::EFFECT...)
 	// The chunks' colours: two of the destroyed part's own, picked going up through its voxel
-	// model every third layer (in the middle of the tile, or near its north edge), with dust
-	// and smoke colours for any not found.
+	// model every third layer, in the middle of its solid box (a wall stands along the tile's
+	// west or north edge, so the tile's middle is empty), else the first solid voxel anywhere
+	// in that layer of the box (a window or a doorway may leave the middle open); dust and
+	// smoke colours for any not found.
 	const VoxelModel *model = getModel(destroyedMapData);
 	Uint8 chunkColors[2] = { _colors.dust, _colors.smoke };
+	const int boxMiddleX = (model->min[0] + model->max[0]) / 2, boxMiddleY = (model->min[1] + model->max[1]) / 2;
 	for (int z = model->min[2], foundCount = 0; z <= model->max[2] && foundCount < 2; z += 3)
 	{
-		const Uint8 color = model->color[z][8][8] ? model->color[z][8][8] : model->color[z][2][8];
+		Uint8 color = model->color[z][boxMiddleY][boxMiddleX];
+		for (int y = model->min[1]; !color && y <= model->max[1]; ++y)
+		{
+			for (int x = model->min[0]; !color && x <= model->max[0]; ++x)
+			{
+				color = model->color[z][y][x];
+			}
+		}
 		if (color) chunkColors[foundCount++] = color;
 	}
 	// From where the piece stood (in voxels): walls on the tile's west or north edge, anything
@@ -573,6 +583,7 @@ void FirstPersonView::spawnPartnerEffects()
 			// adding up to at most 6.
 			trailFor(partner->getAmmo(), _partnerTrail, _partnerColor);
 			_partnerShotTick = SDL_GetTicks();
+			_partnerShotAmmo = partner->getAmmo() ? partner->getAmmo()->getRules() : nullptr;
 			std::copy(origin, origin + 3, _muzzleFlashPos); // the flash lights up the room
 			_muzzleFlashTick = _partnerShotTick;
 			const float power = partner->getAmmo() ? (float)partner->getAmmo()->getRules()->getPower() : 30.0f;

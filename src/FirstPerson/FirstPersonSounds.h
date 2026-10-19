@@ -72,7 +72,6 @@ public:
 	/// Plays a sound, panned to an angle (0 ahead, 90 right) at a volume (0..1).
 	void play(Id id, int angle = 0, float volume = 1.0f);
 private:
-	int _rate = 0;                       // The mixer's sample rate, in samples per second (0: not known).
 	bool _ready = false;                 // True once the sounds are made (they never are when the mixer isn't 16-bit).
 	std::vector<Sint16> _samples[COUNT]; // Each sound's samples in the mixer's format; its chunk plays straight from them.
 	Mix_Chunk *_chunks[COUNT] = {};      // Each sound as a chunk the mixer can play (null if not made).

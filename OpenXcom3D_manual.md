@@ -1,6 +1,6 @@
 # OpenXcom3D manual
 
-Version 0.7. OpenXcom3D is **OpenXcom Extended (OXCE)** with a first-person 3D battlescape: an engine add-on (`src/FirstPerson/`, with small hooks in the core) and a data mod (`OpenXcom3D`) that switches it on.
+Version 0.8. OpenXcom3D is **OpenXcom Extended (OXCE)** with a first-person 3D battlescape: an engine add-on (`src/FirstPerson/`, with small hooks in the core) and a data mod (`OpenXcom3D`) that switches it on.
 
 1. [Installing](#1-installing)
 2. [Controls](#2-controls)
@@ -25,7 +25,7 @@ Add-on builds keep their own user and config folders, so an existing OXCE profil
 
 ### Option A: the prebuilt release (Linux x86-64)
 
-The release folder `OpenXcom3D-0.7-linux-x86_64/` contains:
+The release folder `OpenXcom3D-0.8-linux-x86_64/` contains:
 
 ```
 bin/openxcom              the engine (OXCE 8.7.1 + OpenXcom3D)
@@ -76,8 +76,8 @@ python3 install.py --target ~/Games/OpenXcom3D --ufo /path/to/UFO --tftd /path/t
 1. Copy the release folder anywhere.
 2. Link your game data into its profile:
    ```sh
-   ln -s /path/to/UFO  OpenXcom3D-0.7-linux-x86_64/user/UFO
-   ln -s /path/to/TFTD OpenXcom3D-0.7-linux-x86_64/user/TFTD
+   ln -s /path/to/UFO  OpenXcom3D-0.8-linux-x86_64/user/UFO
+   ln -s /path/to/TFTD OpenXcom3D-0.8-linux-x86_64/user/TFTD
    ```
 3. Run `./play.sh`.
 
@@ -141,8 +141,8 @@ Notes:
 #### Screen size
 
 - The default is a 1280×800 window with the battlescape at half the screen size (640×400), which keeps 60 FPS on modest machines.
-- Bigger screens work: the 3D view and its controls scale up as a whole, so they never get tiny.
-- **Pixel size** in 3D VIEW trades detail for speed.
+- Bigger screens work, but the game's **Battlescape scale** (video options) sets the 3D view's size. At *screen/2* (the default) a 1920×1080 screen gives a 960×540 view, twice the work of 640×400. At *screen* the view stays at 640×360 with its controls three times bigger, but the isometric map gets small.
+- **Pixel size** in 3D VIEW trades detail for speed: on a 1920×1080 screen with the default scale, pixel size 2 holds 60 FPS and looks almost the same.
 
 ### Uninstalling
 
@@ -150,7 +150,7 @@ Delete the install folder (and `~/.local/share/applications/openxcom3d.desktop` 
 
 ## 2. Controls
 
-All of these can be rebound in **Options → 3D VIEW → Controls**. That page also lists (under a heading) the game's own keys that work in 3D: turning, kneel, reload, inventory, hands, personal light, night vision, next/previous soldier, end turn, frame counter, quick save/load and the ten enemy keys.
+All of these can be rebound in **Options → 3D VIEW → Controls**: click a key's row, then press the new key (Shift, Ctrl and Alt can't be bound); a right click clears it. That page also lists (under a heading) the game's own keys that work in 3D: turning, kneel, reload, inventory, hands, personal light, night vision, next/previous soldier, end turn, frame counter, quick save/load and the ten enemy keys.
 
 | Input | Action |
 |---|---|
@@ -190,6 +190,19 @@ The original hotkeys still work, except for W, A, S, D and the keys above:
 - **SPECIAL** · **NIGHT VISION** · **SUIT LIGHT** · **SUIT FLY**, shown when the soldier has them (labels shorten to SPEC · NV · LIGHT · FLY on a narrow bar);
 - **END** turn.
 
+**Info panel**, bottom left (the classic HUD, H, has all of this in its own way):
+
+- the soldier's name, and on the right what matters most just now: PANIC or BERSERK this turn, BURNING, WOUNDS (fatal wounds), or KNEELING;
+- a line for each hand. First the weapon that fires, then whatever is in the other hand (grey, or as bright as the first when it fires along with Dual wield). A gun's line tells its ammo, for example **`R: Rifle 17 | 2 clips (40)`**:
+  - **17** is the rounds in the loaded clip, for the fire mode you picked (a gun with several ammo slots shows the slot that mode uses). **EMPTY** in red means no clip is loaded: the game throws a clip away when its last round is fired, so reload (R, from the belt) or load one in the inventory;
+  - **2 clips (40)** is the spare ammo the soldier carries for that gun, anywhere in the inventory (belt, pockets, backpack, the other hand), and how many rounds they hold together. It counts every clip the gun can take by the game's rules, all kinds together (a heavy cannon's AP, HE and incendiary). **no clips** means there's nothing to reload from;
+  - guns that never run out, like the lasers, show **∞**; a gun with its rounds built in shows just its count;
+  - the numbers follow every round fired, in faithful and FPS-style shooting alike, and every reload, pick-up and drop. Two guns of the same kind (dual pistols) each count the same spare clips, since either could load them;
+- time units, energy, health (with stun damage over it) and morale, as numbers and bars;
+- the armor, and DOOM MODE while that cheat is on.
+
+Hovering a soldier on the top bar shows the same weapon line on their card.
+
 **Items:**
 
 - Every item works from 3D. Grenades prime and throw.
@@ -198,26 +211,57 @@ The original hotkeys still work, except for W, A, S, D and the keys above:
 
 ## 4. Settings
 
-| Setting | |
-|---|---|
-| **Soldier camera preview** | live view in the soldier cards |
-| Mouse sensitivity, invert mouse, field of view, walking speed, head bob | |
-| **Falling** | walk off a ledge and fall to the level below, hurt by the height (on; off: ledges stop you as on the map) |
-| **Eye height lowered by** | the 3D camera sits this many voxels below the soldier's eye (default 3), so rooms feel less cramped; the game's line of sight is unchanged |
-| **Faithful X-COM targeting** | on: the game's own accuracy (hit chance by the crosshair). **Off: FPS-style shooting** — rounds fly along the crosshair with a spread (skill and kneeling tighten it; the dotted ring shows it), recoil lifts your aim with every round and eases back, and each round flies at a bullet's pace. The game's three slots become: **quick = BURST** (one burst; a gun without auto keeps its single quick shot), **AIMED** = one tight round, **AUTO** = hold the trigger to keep firing until you let go or the clip is empty. Each gun offers only the modes it has in the game ([table](#5-fire-modes-per-weapon-fps-style-shooting)). Time units and damage stay the game's |
-| **Dual wield** | off by default. On: a soldier with a gun in each hand fires both at the same moment, round for round (each with its own mode, time units and ammo), each half as accurate (FPS style: twice the spread); the second gun shows on the other side, and both flash and fire together. Without the time units for both, only the chosen hand fires, at full accuracy. Two-handed weapons also take the game's one-handed penalty |
-| **Flight cost per level (TU)** | what rising or sinking a level costs with SUIT FLY on (0 = free; the original charges about 8) |
-| **Jump over low obstacles** | Space vaults fences, tables and crates (on by default; it changes the rules a little, so it can be switched off: then Space is only a hop) |
-| **Night vision needs gear** | in 3D only soldiers with night vision gear get NIGHT VISION (see below); off: everyone, like on the map |
-| Smooth lighting, shadows, flashlight, combat music | |
-| **Unlimited tactical flares** | the T key |
-| **Weapon in hand** | the weapon at the bottom of the screen, Doom style |
-| **3D weapons (voxel)** | the weapon in hand built from little cubes, so it has volume (off: the flat picture) |
-| **Sprite upscaling** | soldiers, aliens, floor items, explosions and smoke up close scaled the way pixel art scales well (xBRZ, in the game's colours): **Smooth + detail** (default) / Smooth / Off |
-| **Muzzle flashes** | turn off if flashing light bothers you (photosensitivity) |
-| Particles (off / effects / everything), **pixel size** (1–3: detail vs. speed) | |
-| Crosshair, shot info, aim at exact point (or at the tile) | |
-| Alien turn in 3D, start battles in 3D, doom mode (debug), frame rate limit (60 … 240, unlimited), frame counter | |
+**Options → 3D VIEW → Settings**, from the main menu or in a battle (Esc → Options). A left click flips YES / NO or raises a number; a right click lowers it (choices like Particles go round). The line at the bottom of the page gives a one-line reminder of the setting under the mouse; this is the full story, in the order the page lists them, with the default in brackets.
+
+### Looking and moving
+
+- **Soldier camera preview** (YES): hovering a soldier's button on the top bar shows a card with their name, stats and weapon. YES: the card also shows that soldier's helmet camera, live: what they are looking at right now (static if they're down). NO: the card without the camera.
+- **Mouse sensitivity** (5): how fast the view turns with the mouse, from 1 (slow) to 20 (fast).
+- **Invert mouse** (NO): YES: moving the mouse forward looks down instead of up, as in a flight simulator.
+- **Field of view** (75): how wide the 3D view is from side to side, in degrees, from 50 (narrow, like a zoom) to 110 (wide), in steps of 5. The weapon in hand keeps its size and place whatever you pick.
+- **Walking speed** (4): how fast the soldier walks in 3D, in tiles per second, from 1 to 8. Only the pace changes: every tile entered still costs its normal time units.
+- **Head bob** (YES): the view bobs gently with the soldier's steps. Turn it off if it makes you queasy.
+- **Flight cost per level (TU)** (0): the time units a flying (or, under the sea, swimming) soldier pays to rise or sink one level with SUIT FLY switched on in 3D, from 0 (free) to 24. The original game charges about 8.
+- **Jump over low obstacles** (YES): YES: jumping (Space) while walking into something low (a fence, a table, a crate, a rock: up to waist height) takes the soldier over it. The jump itself is free: only the walk to the far side costs its normal time units. It bends the rules a little, which is why it's a setting. NO: Space is just a hop, and the original rules decide what blocks you.
+- **Falling** (YES): YES: you can walk off a ledge and fall to the level below, by the game's own fall, hurt by the height (a little from one level, a lot from two or more; armor takes some of it). NO: ledges stop you, as the map's paths do.
+- **Eye height lowered by** (3): X-COM soldiers fill a level almost to the ceiling, so the 3D camera sits this many voxels lower (about 8 cm each), from 0 to 6, and rooms feel less cramped. 0 is the game's own eye height. What the soldier can see by the game's rules doesn't change.
+
+### Shooting
+
+- **Faithful X-COM targeting** (YES): YES: every shot uses the game's own accuracy, and the hit chance shows by the crosshair. **NO: FPS-style shooting.** Rounds fly along the crosshair with a spread (the soldier's firing skill and kneeling tighten it; the dotted ring shows it), recoil lifts your aim with every round and eases back, and each round flies at a bullet's pace. The game's three fire-mode slots become: **quick = BURST** (one burst, the game's auto shot with its rounds; a gun without auto keeps its single quick shot), **AIMED** = one tight round, **AUTO** = hold the trigger to keep firing until you let go, the clip is empty or the time units run out. Each gun offers only the modes it has in the game ([table](#5-fire-modes-per-weapon-fps-style-shooting)). Time units, ammo and damage stay the game's.
+- **Dual wield** (NO): YES: a soldier with a gun in each hand fires both at the same moment, round for round, on every shot (each gun with its own fire mode, time units and ammo; in a burst the other gun's rounds go with the first ones), but each is half as accurate (FPS style: twice the spread). The other gun fires the same mode if it has it, otherwise its first shot, never more rounds than the chosen gun. Without the time units for both, only the chosen hand fires, at full accuracy. The 3D view shows the second gun on the other side, and the info panel shows both guns' ammo. Two-handed weapons also take the game's own one-handed penalty. NO: one hand at a time, as in the game (G switches hands).
+
+### Light and atmosphere
+
+- **Smooth lighting** (YES): YES: the battlescape's light (sun, flares, fires, personal lights) blends smoothly from tile to tile. NO: tile by tile, as the isometric map shades it.
+- **Shadows** (YES): ray-traced shadows from the sun by day, from street lamps and your flashlight at night, and under every unit. Turn them off on slow machines.
+- **Flashlight** (YES): YES: in the dark, the soldier's personal light (on and off with the game's personal light key, L, or SUIT LIGHT) becomes a shoulder flashlight that lights where you look. NO: the game's round personal light.
+- **Night vision needs gear** (YES): YES: in 3D only soldiers wearing or carrying night vision gear (power and flying suits, ion armor, hover tanks...: the list is in the mod, see [Night vision gear](#6-night-vision-gear)) and units that see in the dark, like aliens, get the NIGHT VISION button. NO: everyone has it, like on the isometric map.
+- **Combat music** (YES): YES: while aliens are in sight the music switches to a tenser track (the base defence one), and goes back to the battle music once they've been out of sight for a few seconds. NO: the battle music all along.
+- **Unlimited tactical flares** (YES): YES: T throws a red flare at the crosshair, free and as often as you like. It bounces off walls and burns with red fire and red light for about a minute; under the sea it only goes a metre or two and bubbles hard. It lights the 3D view only: what the soldiers can see by the game's rules doesn't change. NO: T does nothing.
+
+### Looks
+
+- **Weapon in hand** (YES): YES: the weapon in the soldier's hand shows at the bottom right of the view, Doom style, built in 3D from its inventory picture (little cubes, thickest in the middle, the barrel on the line to the crosshair): it bobs as you walk, kicks when you fire and dips out of sight while reloading. NO: no weapon drawn.
+- **Sprite upscaling** (Smooth + detail): soldiers, aliens, items on the floor, explosions and smoke seen up close are scaled up the way pixel art scales well (xBRZ, in the game's own colours). **Smooth** rounds off the stair-stepped edges; **Smooth + detail** also sharpens the shading a little; **Off** keeps the original pixels.
+- **Muzzle flashes** (YES): YES: gunfire lights up its surroundings for a blink, and units flash when hit. Turn this off if flashing light bothers you (photosensitivity, epilepsy).
+- **Particles** (2): **0** none; **1** effects (muzzle flashes, impacts, explosions, fire, smoke); **2** everything, plus dust, fireflies, bubbles and weather.
+- **UFO lights and aura** (YES): UFOs stand out from the Earth around them. Their hulls stay still and only their lights glow (lit panels, lift pads, screens, navigation lights, found in the original animation frames), pulsing gently in a slow wave round the UFO. Each UFO casts its own two-coloured light (its hull's hue close in, its lights' hue further out) on the ground around it, its underside and its skin, strongest at night, and drifting motes, sparks and a beam of light up each grav lift wrap it. It all shows only once the UFO has been seen, so it never gives a UFO away; with Muzzle flashes off nothing pulses. The small scout's blocky hull is trimmed to its sprite's round outline (only the look: line of fire is still the game's). NO: the original animation frames (calmed, as everywhere in 3D).
+- **Pixel size** (1): **1** full detail; **2** or **3**: each ray colours a block of 2×2 or 3×3 pixels, chunkier but much faster on big screens or slow machines.
+
+### Crosshair
+
+- **Crosshair** (YES): shows the crosshair. Its shape tells the fire mode: an open cross for snap, a scope ring for aimed, brackets with one dot per round for auto, an arc for a throw, a diamond for a launcher, claws for melee, rings for psi.
+- **Shot info** (YES): shows the fire mode, the hit chance and the time unit cost under the crosshair (DUAL in front when both guns fire). Yellow: you can; red: you can't (not enough time units, no ammo, out of range).
+- **Aim at exact point** (YES): YES: shots go for the exact point under the crosshair. NO: like the original game, shots go for the tile and the game picks the spot (the middle of a unit, the object, the wall...). The game's accuracy applies either way. (FPS-style shooting always aims at the exact point.)
+
+### Battle
+
+- **Alien turn in 3D** (YES): YES: stay in the 3D view during the alien turn, looking through your last soldier's eyes (HIDDEN MOVEMENT until an alien comes into sight). NO: switch back to the isometric map for the alien turn.
+- **Start battles in 3D** (NO): YES: begin each battle in the first-person view instead of the isometric map.
+- **Doom mode (debug)** (NO): a cheat for testing and fun: the selected soldier never runs out of time units or energy, and the clips loaded in the weapons in both hands are filled up again every moment (a one-round clip, like a rocket, is still used up by its shot). Insert switches it on and off in battle; DOOM MODE shows on the info panel while it's on.
+- **Frame rate limit** (60): the game's own frame rate cap, the same setting as in Advanced options: 60, 75, 90, 120, 144, 165, 240 or unlimited. 60 is steady on modest machines at 1280×800; raise it for a 120 or 144 Hz screen if your computer keeps up (the frame counter shows it).
+- **Frame counter** (NO): the game's own frames-per-second counter in the top left corner (the same as F7).
 
 ## 5. Fire modes per weapon (FPS-style shooting)
 
@@ -367,7 +411,8 @@ A later mod's list replaces an earlier one.
 
 - The map rebuilt in 3D from the game's own voxel data, with the original art and proportions.
 - Doors that swing and UFO doors that slide.
-- Animated machinery and light.
+- Animated machinery and light, calm and eased: animated terrain steps a frame about three times a second and cross-fades, so nothing large blinks (the photosensitivity guideline WCAG 2.3 allows at most three flashes a second).
+- UFOs that stand out: steady hulls with glowing, softly pulsing lights, their own coloured light around them and an aura of drifting motes (the "UFO lights and aura" setting).
 - Light and shadow: lamps, the sun, your flashlight, flares.
 - Bloom, night vision, rain, snow and dust, and in TFTD bubbles, marine snow and caustics.
 - Smoke, fire, explosions and animated machinery that flow from frame to frame.
@@ -391,9 +436,18 @@ A later mod's list replaces an earlier one.
 
 ## 8. Performance
 
-The default 1280×800 window renders the 3D view at 640×400 on all CPU cores, which holds the game's 60 FPS cap.
+The default 1280×800 window renders the 3D view at 640×400 on up to 16 CPU threads, which holds the game's 60 FPS cap in most scenes (a crowd of flares or thick smoke can still dip below it on a laptop).
 
-Bigger windows and full screen scale the whole 3D view and its controls up together, at the same cost. Use **pixel size** 2 or 3 on slow machines.
+The 3D view is drawn at the battlescape's size (the game's **Battlescape scale**), then magnified to the screen; its controls get bigger in steps from 720 lines (×2) and 1080 lines (×3). So the cost follows the battlescape's size, not the screen's. On a 1920×1080 screen (measured on the test laptop, a Core Ultra 7 155H, walking and turning in a town):
+
+| Battlescape scale | 3D view | Frame rate |
+|---|---|---|
+| *screen/2* (default) | 960×540 | 40–51 FPS, dips when turning |
+| *screen/2* + **pixel size 2** | 960×540 (480×270 rays) | steady 60 FPS, looks almost the same |
+| *screen* | 640×360, controls ×3 (small isometric map) | 55–61 FPS |
+| *original* | 320×200 | steady 60 FPS, chunky |
+
+Sprite upscaling costs nothing measurable. Use **pixel size** 2 or 3 on slow machines too.
 
 ## 9. Known limits and ideas
 
@@ -415,11 +469,11 @@ Bigger windows and full screen scale the whole 3D view and its controls up toget
 | Branch | **`oxce-plus`** |
 | Commit | **`f0134ef8065799c7723953d64b565f7832bfd782`** — 2026-09-29 15:04:49 +0200, author Meridian, "Merge remote-tracking branch 'SupSuper/master' into oxce-plus" |
 | Version string | **OpenXcom Extended 8.7.1 (v2026-09-19)** |
-| OpenXcom3D | engine add-on and mod version **0.7** (`requiredExtendedEngine: OpenXcom3D`, `requiredExtendedVersion: "0.7"`) |
+| OpenXcom3D | engine add-on and mod version **0.8** (`requiredExtendedEngine: OpenXcom3D`, `requiredExtendedVersion: "0.8"`) |
 
 `openxcom3d.patch` holds every change on top of that commit:
 
-- the core hooks: 36 files, about 560 lines;
+- the core hooks: 36 files, about 570 lines;
 - the new `src/FirstPerson/` add-on;
 - the `mod/OpenXcom3D/` data mod.
 
@@ -431,7 +485,7 @@ To work on it: check out the commit above, `git apply openxcom3d.patch`, build (
 
 ### Code layout
 
-**`src/FirstPerson/`, about 17,600 lines**
+**`src/FirstPerson/`, about 19,200 lines**
 
 Every file starts with the project's philosophy and a description of what's in it, and every function and block is commented. The two big classes are split into one file per topic, and their headers follow the same order.
 
@@ -450,12 +504,13 @@ Every file starts with the project's philosophy and a description of what's in i
 | `FirstPersonView.cpp` | The camera, and drawing one frame |
 | `FirstPersonViewTerrain.cpp` | Voxel models from the LOFT shapes coloured by the isometric sprites, crafts' mirrored sides, doors, the ground outside the map, the per-frame tile snapshot |
 | `FirstPersonViewRayWalk.h` | The ray walk: tile by tile, then voxel by voxel in tiles that have something in them |
-| `FirstPersonViewRayCasting.cpp` | Colours for the time of day, light and shadow rays, shading what a ray hit, the border and the sky, the rays on up to 8 threads |
+| `FirstPersonViewRayCasting.cpp` | Colours for the time of day, light and shadow rays, shading what a ray hit, the border and the sky, the rays on up to 16 threads (kept between frames) |
 | `FirstPersonViewSprites.cpp` | Units and items as the game's own sprites standing in the world; enemy markers |
 | `FirstPersonViewUpscaling.cpp` | Optional smoother sprites up close (xBRZ on a worker thread) |
 | `FirstPersonViewEffects.cpp` | Particles: explosions, fire, smoke, weather, UFO devices, bloom |
 | `FirstPersonViewShots.cpp` | Shots in flight, trails, beams, impacts, bullet holes and scorches, debris |
 | `FirstPersonViewFlares.cpp` | Tactical flares and their light |
+| `FirstPersonViewUfo.cpp` | UFOs ("UFO lights and aura"): steady 3D-only models of UFO parts made from their frames (lights marked, tall parts trimmed to the sprite), the UFOs found on the map, their two-coloured light as a per-tile field, the lights' pulse, the aura |
 | `FirstPersonViewScreenEffects.cpp` | On the screen itself: the hurt arc, blood, flames, colour washes, static |
 | `FirstPersonParticles.{h,cpp}` | The particle pool (sparks, smoke, weather...) |
 | `FirstPersonSounds.{h,cpp}` | Sounds made in code (no files): hitmarker and kill ticks, heartbeat, dry-fire click, flare hiss, near-miss whizz, melee swoosh |
@@ -494,11 +549,21 @@ What `FirstPersonView` draws:
 | `Options.cpp` / `Options.inc.h` | `createOptionsOTHER()` → `FirstPerson::createOptions(_info)`; declarations at the end of the file |
 | `OptionsBaseState.{h,cpp}` | 3D VIEW tab via `FirstPerson::hasOptionsTab/createOptionsTab` |
 | `Mod.{h,cpp}` | Parses `firstPerson:` at the end of `Mod::loadFile` |
-| `ModInfo.cpp` | Engine row `{"OpenXcom3D", 0.7}` (add-on builds only) |
+| `ModInfo.cpp` | Engine row `{"OpenXcom3D", 0.8}` (add-on builds only) |
 | `CrossPlatform.cpp` | Add-on builds use their own user/config folders (`~/.local/share/openxcom3d`, `~/.config/openxcom3d`, `Documents/OpenXcom3D`, …). Data folders are shared with stock OXCE |
 | `OpenXcom.2010.vcxproj{,.filters}` | The add-on's files |
 
 ## 11. Version history
+
+### 0.8 (2026-10-19)
+
+- **Fixed: UFO surfaces blinking** (a photosensitivity hazard). Animated terrain followed the game's 100 ms tick, and faces the isometric art never shows took the next frame's raw colour while dissolving into it: up close the small scout's hull sides and lilac floor flashed 5 to 10 times a second. Animated terrain now steps a frame every 320 ms on the view's own clock and cross-fades over the whole step, hidden faces dissolve through the same colour rules, a lamp's pool of light no longer jumps with its frames, and blinking status lights fade softly.
+- **UFO lights and aura** (new setting, on): UFOs stand out from the Earth around them: steady hulls whose own lights glow and pulse gently, each UFO's two-coloured light on the ground and its hull, and an aura of drifting motes, sparks and grav-lift beams, once the UFO has been seen ([Settings](#4-settings)).
+- **Ammo on the info panel**: a line for each hand, such as `R: Rifle 17 | 2 clips (40)`: the rounds in the loaded clip for the fire mode, then the spare clips carried for that gun and their rounds. It follows every round, reload, pick-up and drop, in faithful and FPS-style shooting alike; EMPTY in red, ∞ for lasers. The soldier card shows the same line.
+- Fixed: with **Dual wield**, only the chosen gun fired from the second shot in a fire mode on (and on every held FPS-style burst after the first), though the crosshair said DUAL. Both guns now fire, and spend their rounds and time units, on every shot; the second gun pays its time units only when it really fires.
+- **Options**: every description on the 3D VIEW page is one short line, so none runs into the buttons any more; the full story of every setting is in [Settings](#4-settings). The "3D weapons (voxel)" setting is gone: the weapon in hand is always built in 3D (the flat picture it switched to broke up into jagged stripes at the angle the weapon is held).
+- **Faster**: the ray caster keeps its threads between frames and hands out rows as they go (a hybrid CPU's slow cores no longer hold a frame up), uses up to 16 threads, works out each flare's light once a frame, and the overlay and bloom skip what is empty. On a 1280×800 screen the 3D view takes 33 to 54% less time in complex scenes (urban by day 17.0 → 10.5 ms, 8 flares at night 24.6 → 13.8 ms), with the same picture.
+- Fixed: turning to an enemy (1–0) tilted the view too far up or down; the crosshair said DUAL when the other gun couldn't join; a mod's penalty for shooting at what the soldier can't see wasn't in the hit chance; the weapon didn't dip when a spent clip was reloaded; the off-hand muzzle flash used the wrong gun's ammo; falls, fire and bleeding counted as melee hits; some destroyed walls threw grey chunks; the enemy marker's outline was open at the top; upscaled sprites had over-bright edges; two door swings in one tile erased each other; a frame rate limit off the list stepped to "unlimited".
 
 ### 0.7 (2026-10-18)
 

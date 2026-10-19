@@ -236,7 +236,7 @@ void FirstPersonMode::analyzeWeapon(bool gun)
 }
 
 /**
- * Gives the weapon's picture volume, cushion style (for the setting "3D weapons (voxel)"):
+ * Gives the weapon's picture volume, cushion style (the weapon in hand is drawn this way):
  * each picture pixel becomes a column of voxels in depth, its half depth growing with the
  * square root of its distance to the outline (one voxel at the edge, at most four), so the
  * weapon is thickest in the middle. Only the faces between a voxel and empty space are kept
@@ -361,15 +361,16 @@ void FirstPersonMode::voxelizeWeapon()
  * (cyan under the sea), a round green glow for plasma (pale blue under the sea), blue for stun,
  * yellow-green for acid. The harder it hits (the ammo's power), the bigger.
  * @param weapon The gun that fired.
+ * @param firedAmmo The ammo the round fired, as the 3D view saw it leave (null if unknown).
  * @return The flash: palette colours (core, middle, rim), number of rays, how far and how
  *         sharply they spike out, and its size.
  */
-FirstPersonMode::MuzzleFlash FirstPersonMode::muzzleFlashFor(const BattleItem *weapon) const
+FirstPersonMode::MuzzleFlash FirstPersonMode::muzzleFlashFor(const BattleItem *weapon, const RuleItem *firedAmmo) const
 {
-	// What the shot fired, as the 3D view saw it leave (a launcher's only rocket is gone from
+	// What the round fired, as the 3D view saw it leave (a launcher's only rocket is gone from
 	// the launcher by now); else what's loaded; else the gun itself (it needs no ammo).
 	const BattleItem *ammo = weapon->getAmmoForSlot(0);
-	const RuleItem *shotRules = _view->getOwnShotAmmo() ? _view->getOwnShotAmmo() : ammo ? ammo->getRules() : weapon->getRules();
+	const RuleItem *shotRules = firedAmmo ? firedAmmo : ammo ? ammo->getRules() : weapon->getRules();
 	const RuleDamageType *damageType = shotRules->getDamageType();
 	const bool underwater = _save->getDepth() > 0;
 	const SDL_Color *palette = _state->getPalette();
@@ -408,7 +409,7 @@ FirstPersonMode::MuzzleFlash FirstPersonMode::muzzleFlashFor(const BattleItem *w
 }
 
 /**
- * Draws the voxel weapon (setting "3D weapons (voxel)"). It's placed exactly like the flat
+ * Draws the voxel weapon (the weapon in hand). It's placed exactly like the flat
  * plate (picture x, y mapped onto the plate, depth along the plate's normal at the same scale
  * as across it, see drawWeaponPlate), and drawn as its faces that look at the eye, far to near
  * (the painter's algorithm), each darkened by how far it turns from the light.
@@ -563,8 +564,8 @@ void FirstPersonMode::fillQuad(const double corners[4][2], Uint8 color)
  * muzzle reaching in under the crosshair and the rest running off the bottom corner (right or
  * left, by the hand), with a little depth. It bobs with the steps, kicks back and up when it
  * fires, dips out of sight and back on a reload or a change of weapon, and swings in a melee
- * attack. With the setting "3D weapons (voxel)" the voxels are drawn instead of the plate
- * (drawWeaponVoxels), placed the same way.
+ * attack. The voxels are drawn instead of the plate (drawWeaponVoxels), placed the same way;
+ * the flat plate is left only for a picture that gave no voxels.
  * Camera space here: x right, y down, z ahead, the eye at the origin; the screen point of a
  * camera point is its (x / z, y / z) times the weapon lens's focal length, from the centre.
  * @param left Held in the left hand (drawn mirrored, on the left).
@@ -657,8 +658,8 @@ void FirstPersonMode::drawWeaponPlate(bool left, double bob[2], double kick, dou
 	}
 	minX = std::max(0, minX); minY = std::max(0, minY); maxX = std::min(width - 1, maxX); maxY = std::min(height - 1, maxY);
 
-	// The voxel weapon, if it's on and this weapon has voxels.
-	if (Options::fpsVoxelWeapon && !_heldFaces.empty())
+	// The voxel weapon, if this weapon has voxels (the flat plate below is only the fallback).
+	if (!_heldFaces.empty())
 	{
 		drawWeaponVoxels(nearEnd, along, up, normal, perPixel, shade);
 		return;
@@ -765,17 +766,18 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 		return;
 	}
 
-	// A reload (more rounds in the clip than last frame) or another weapon: dip out of sight
-	// and back (not on the first frame, when nothing was held before).
+	// A reload (another clip in the gun than last frame, also into a gun whose spent clip the
+	// game took out) or another weapon: dip out of sight and back (not on the first frame, when
+	// nothing was held before).
 	const Uint32 now = SDL_GetTicks();
 	const BattleItem *ammo = weapon->getAmmoForSlot(0);
-	const int rounds = ammo && ammo != weapon ? ammo->getAmmoQuantity() : -1; // -1: no clip (or none needed)
-	if (weapon != _heldItem || (rounds > _heldAmmo && _heldAmmo >= 0))
+	const int clipId = ammo && ammo != weapon ? ammo->getId() : -1; // -1: no clip (or none needed)
+	if (weapon != _heldItem || (clipId != -1 && clipId != _heldClipId))
 	{
 		_heldDipStart = _heldItem ? now : 0;
 	}
 	_heldItem = weapon;
-	_heldAmmo = rounds;
+	_heldClipId = clipId;
 
 	// A different kind of weapon: draw its inventory picture (the game's own hand sprite) and
 	// measure it again. Guns and clubs are drawn pointing at the crosshair, the rest held up.
@@ -809,7 +811,7 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 		if (battleType == BT_FIREARM)
 		{
 			_muzzleFlashUntil = now + 80;
-			_muzzleFlash = muzzleFlashFor(weapon);
+			_muzzleFlash = muzzleFlashFor(weapon, _view->getOwnShotAmmo());
 		}
 	}
 
@@ -820,7 +822,7 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 		if (otherWeapon)
 		{
 			_offHandFlashUntil = now + 80;
-			_offHandFlash = muzzleFlashFor(otherWeapon);
+			_offHandFlash = muzzleFlashFor(otherWeapon, _view->getPartnerShotAmmo());
 		}
 	}
 

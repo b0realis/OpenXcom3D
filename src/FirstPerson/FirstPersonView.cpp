@@ -114,8 +114,8 @@ FirstPersonView::~FirstPersonView()
 /**
  * Sets the battle to render, and forgets everything about the previous one: voxel models,
  * doors, particles, shots, flares, marks on the walls, units being watched and so on. Then
- * builds all the voxel models the new battle can need (see preloadModels) and finds the crafts'
- * mirror symmetry (see findMirrors).
+ * builds all the voxel models the new battle can need (see preloadModels), finds the crafts'
+ * mirror symmetry (see findMirrors) and the UFOs (see findUfos).
  * @param save The battle to show.
  */
 void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
@@ -147,6 +147,7 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 	// Build the new battle's voxel models now rather than while playing.
 	preloadModels();
 	findMirrors();
+	findUfos();
 }
 
 /**
@@ -245,8 +246,10 @@ void FirstPersonView::lookAt(const double target[3])
 	{
 		return;
 	}
+	// The pitch is in true proportions, where a voxel up is only ZScale of one across, so the
+	// height difference is scaled down before the angle is taken.
 	_yaw = std::atan2(dy, dx);
-	_pitch = std::clamp(std::atan2(dz, flatDistance), -80.0 * Pi / 180.0, 80.0 * Pi / 180.0);
+	_pitch = std::clamp(std::atan2(dz * ZScale, flatDistance), -80.0 * Pi / 180.0, 80.0 * Pi / 180.0);
 }
 
 /**

@@ -68,6 +68,7 @@ public:
 		STREAK,  // Drawn as a short line along its velocity (rain, tracers).
 		BLINK,   // Self-lit and blinking (fireflies).
 		BUBBLE,  // Lit; drawn as a little ring when close, wobbling as it rises.
+		MOTE,    // Self-lit and steady (a UFO's aura): full brightness for most of its life, fading only at the end.
 	};
 	/// Where a particle comes from, so a whole group can be counted and thinned out:
 	/// EFFECT for what the battle makes (shots, impacts, explosions, fire, smoke),

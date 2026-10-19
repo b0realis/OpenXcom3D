@@ -464,15 +464,29 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 			*value = std::clamp(*value + direction, 0, 24);
 		}
 		// The game's frame rate limit, in the steps screens have (0 = unlimited, after the
-		// highest). A value that isn't one of the steps counts as the last one.
+		// highest). One step up goes to the next step above the current limit, one step down
+		// to the next one below it (none: it stays), so a limit that isn't one of the steps
+		// (15, or a hand-edited 100) moves to its neighbour.
 		else if (value == &Options::FPS)
 		{
 			static const int frameLimitSteps[] = { 60, 75, 90, 120, 144, 165, 240, 0 };
 			const int stepCount = (int)(sizeof(frameLimitSteps) / sizeof(frameLimitSteps[0]));
-			// Find the current step, then move one step along (stopping at either end).
-			int stepIndex = 0;
-			while (stepIndex < stepCount - 1 && frameLimitSteps[stepIndex] != *value) ++stepIndex;
-			*value = frameLimitSteps[std::clamp(stepIndex + direction, 0, stepCount - 1)];
+			auto rate = [](int limit) { return limit == 0 ? 1 << 30 : limit; }; // unlimited is the highest
+			const int currentRate = rate(*value);
+			if (direction > 0)
+			{
+				for (int index = 0; index < stepCount; ++index)
+				{
+					if (rate(frameLimitSteps[index]) > currentRate) { *value = frameLimitSteps[index]; break; }
+				}
+			}
+			else
+			{
+				for (int index = stepCount - 1; index >= 0; --index)
+				{
+					if (rate(frameLimitSteps[index]) < currentRate) { *value = frameLimitSteps[index]; break; }
+				}
+			}
 		}
 	}
 	// Show the new value.
@@ -510,7 +524,9 @@ void OptionsFirstPersonState::lstOptionsKeyPress(Action *action)
 /**
  * Shows the description of the option under the mouse in the tooltip line: our descriptions
  * for the game's two settings and its keys (our label's key plus "_DESC"), and the option's
- * own description key plus "_DESC" for ours. The heading shows nothing.
+ * own description key plus "_DESC" for ours. The heading shows nothing. The descriptions are
+ * one short line each (the manual explains every setting in full); one too long for the box
+ * (a translation, say) is cut short to stay clear of the buttons under it.
  */
 void OptionsFirstPersonState::lstOptionsMouseOver(Action *)
 {
@@ -525,6 +541,24 @@ void OptionsFirstPersonState::lstOptionsMouseOver(Action *)
 			: std::string(tr((gameKeyLabel.empty() ? option->description() : gameKeyLabel) + "_DESC"));
 	}
 	_txtTooltip->setText(tooltip);
+
+	// Keep the description inside its box: while its lines need more height than the box has,
+	// drop its last word (and any punctuation left at the end) and end it in "...". A single
+	// word too long for the box is left for the box to clip.
+	while (_txtTooltip->getTextHeight() > _txtTooltip->getHeight())
+	{
+		const size_t lastSpace = tooltip.find_last_of(' ');
+		if (lastSpace == std::string::npos)
+		{
+			break;
+		}
+		tooltip.erase(lastSpace);
+		while (!tooltip.empty() && std::strchr(" ,.;:", tooltip.back()))
+		{
+			tooltip.pop_back();
+		}
+		_txtTooltip->setText(tooltip + "...");
+	}
 }
 
 /**

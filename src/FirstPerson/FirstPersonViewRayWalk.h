@@ -264,8 +264,10 @@ inline bool traceTile(const FirstPersonView::TileView &tileView, const FirstPers
 			hit.voxel[0] = (Uint8)localX;
 			hit.voxel[1] = (Uint8)localY;
 			hit.voxel[2] = (Uint8)localZ;
-			// A light source shines where its brightest shades are, in the part of it that glows.
-			hit.emissive = ((tileView.emissive >> part) & 1) && (color & 15) <= 3 && localZ >= model->glowMinZ;
+			// A light source shines where its brightest shades are, in the part of it that glows;
+			// a steady UFO model where its lights are (see buildUfoModel).
+			hit.emissive = ((tileView.emissive >> part) & 1)
+				&& (model->lit ? ((model->lit[localZ][localY] >> localX) & 1) != 0 : (color & 15) <= 3 && localZ >= model->glowMinZ);
 			return true;
 		}
 		// Step into the neighbouring voxel across the nearest boundary.

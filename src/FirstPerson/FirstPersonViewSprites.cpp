@@ -765,16 +765,16 @@ void FirstPersonView::drawMarkers()
 		scaleOriginX = tipX;
 		scaleOriginY = tipY;
 		// An arrow pointing down, 7 wide at the top, outlined: first a black triangle one pixel
-		// wider on each side (its narrowest row drawn one lower, under the red tip), then the
-		// red triangle over it.
+		// bigger all round (one more row on top, every row one wider on each side), then the
+		// red triangle over it, then a black pixel under the red tip.
 		for (int pass = 0; pass < 2; ++pass)
 		{
-			for (int row = 0; row < 4; ++row)
+			for (int row = pass == 0 ? -1 : 0; row < 4; ++row)
 			{
-				const int halfWidth = 3 - row + (pass == 0 ? 1 : 0);
+				const int halfWidth = 3 - std::max(row, 0) + (pass == 0 ? 1 : 0);
 				for (int offset = -halfWidth; offset <= halfWidth; ++offset)
 				{
-					put(tipX + offset, tipY - 4 + row + (pass == 0 ? (row == 3 ? 1 : 0) : 0), pass == 0 ? _colors.tapeBlack : _colors.marker);
+					put(tipX + offset, tipY - 4 + row, pass == 0 ? _colors.tapeBlack : _colors.marker);
 				}
 			}
 		}

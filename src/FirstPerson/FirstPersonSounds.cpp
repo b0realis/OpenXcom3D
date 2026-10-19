@@ -77,7 +77,6 @@ FirstPersonSounds::FirstPersonSounds()
 	{
 		return;
 	}
-	_rate = rate;
 	// Noise comes from a generator with a fixed seed, so the sounds are the same every time.
 	std::mt19937 randomEngine(7);
 	std::uniform_real_distribution<float> noise(-1.0f, 1.0f);

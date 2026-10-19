@@ -70,8 +70,8 @@ const int EndTurnW = 30;
 const int PrevNextW = 10;
 /// Squad buttons shown at once (more scroll), and the least width of one.
 const int SquadWindow = 10, SquadMinW = 13;
-/// The info panel, bottom left.
-const int PanelW = 150, PanelH = 45;
+/// The info panel, bottom left, and the width of a line of text in it.
+const int PanelW = 150, PanelH = 54, PanelLineW = PanelW - 6;
 /// The crosshair's surface (square).
 const int CrosshairSize = 41;
 /// The soldier card under a hovered squad button, and its live helmet-camera view.

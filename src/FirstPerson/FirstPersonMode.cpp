@@ -315,9 +315,10 @@ void FirstPersonMode::createTopBar()
 }
 
 /**
- * Makes the info panel, bottom left: name, DOOM (the debug mode's tag), weapon, status, the
- * four stats (time units, energy, health, morale) as numbers and bars coloured like the
- * original HUD, and the armor's name. It has no background, so the world shows through (the
+ * Makes the info panel, bottom left: name and status, a line for the weapon in each hand (its
+ * name on the left, its rounds and spare clips on the right), the four stats (time units,
+ * energy, health, morale) as numbers and bars coloured like the original HUD, and the armor's
+ * name with DOOM (the debug mode's tag). It has no background, so the world shows through (the
  * texts have dark shadows). Filled in by updateInfoPanel.
  */
 void FirstPersonMode::createInfoPanel()
@@ -327,43 +328,52 @@ void FirstPersonMode::createInfoPanel()
 	// The panel's top left corner; everything in it is placed from there (canvas pixels).
 	const int panelX = 1, panelY = height - PanelH - 1;
 
-	// First line: the name, and DOOM on the right. Second line: the weapon, and the status on
-	// the right.
+	// First line: the name, and the status on the right.
 	_txtName = addText(PanelW - 66, 9, panelX + 3, panelY + 2, "textName", "battlescape");
-	_txtDoom = addText(60, 9, panelX + PanelW - 63, panelY + 2, "doom", "firstPerson");
-	_txtWeapon = addText(PanelW - 46, 9, panelX + 3, panelY + 11, "weapon", "firstPerson");
-	_txtStatus = addText(40, 9, panelX + PanelW - 43, panelY + 11, "weapon", "firstPerson");
+	_txtStatus = addText(60, 9, panelX + PanelW - 63, panelY + 2, "weapon", "firstPerson");
+
+	// Then a line for each hand: the weapon in the hand that fires, then the other hand's item.
+	// Each line is two texts: the hand and the name, and the ammo, which fillHandLine places
+	// right after the name (and shortens a name that would leave no room for it).
+	_txtWeapon = addText(PanelLineW, 9, panelX + 3, panelY + 11, "weapon", "firstPerson");
+	_txtWeaponAmmo = addText(PanelLineW, 9, panelX + 3, panelY + 11, "weapon", "firstPerson");
+	_txtOtherWeapon = addText(PanelLineW, 9, panelX + 3, panelY + 20, "weapon", "firstPerson");
+	_txtOtherAmmo = addText(PanelLineW, 9, panelX + 3, panelY + 20, "weapon", "firstPerson");
 
 	// The four stats in two columns, each a number with its bar beside it, in the original
 	// HUD's colours.
-	_numTimeUnits = addNumber(panelX + 3, panelY + 21, "numTUs");
-	_barTimeUnits = new Bar(52, 3, panelX + 19, panelY + 22);
-	_numEnergy = addNumber(panelX + 76, panelY + 21, "numEnergy");
-	_barEnergy = new Bar(52, 3, panelX + 92, panelY + 22);
-	_numHealth = addNumber(panelX + 3, panelY + 27, "numHealth");
-	_barHealth = new Bar(52, 3, panelX + 19, panelY + 28);
-	_numMorale = addNumber(panelX + 76, panelY + 27, "numMorale");
-	_barMorale = new Bar(52, 3, panelX + 92, panelY + 28);
+	_numTimeUnits = addNumber(panelX + 3, panelY + 30, "numTUs");
+	_barTimeUnits = new Bar(52, 3, panelX + 19, panelY + 31);
+	_numEnergy = addNumber(panelX + 76, panelY + 30, "numEnergy");
+	_barEnergy = new Bar(52, 3, panelX + 92, panelY + 31);
+	_numHealth = addNumber(panelX + 3, panelY + 36, "numHealth");
+	_barHealth = new Bar(52, 3, panelX + 19, panelY + 37);
+	_numMorale = addNumber(panelX + 76, panelY + 36, "numMorale");
+	_barMorale = new Bar(52, 3, panelX + 92, panelY + 37);
 	_state->add(_barTimeUnits, "barTUs", "battlescape");
 	_state->add(_barEnergy, "barEnergy", "battlescape");
 	_state->add(_barHealth, "barHealth", "battlescape");
 	_state->add(_barMorale, "barMorale", "battlescape");
 
-	// Last line: the armor.
-	_txtArmor = addText(PanelW - 6, 9, panelX + 3, panelY + 35, "weapon", "firstPerson");
+	// Last line: the armor, and DOOM on the right.
+	_txtArmor = addText(PanelLineW, 9, panelX + 3, panelY + 44, "weapon", "firstPerson");
+	_txtDoom = addText(60, 9, panelX + PanelW - 63, panelY + 44, "doom", "firstPerson");
 
 	// The panel's parts, all ours and all hidden until the 3D view shows.
-	_panelParts = { _txtName, _txtDoom, _txtWeapon, _txtStatus, _numTimeUnits, _barTimeUnits, _numEnergy, _barEnergy,
-		_numHealth, _barHealth, _numMorale, _barMorale, _txtArmor };
+	_panelParts = { _txtName, _txtStatus, _txtWeapon, _txtWeaponAmmo, _txtOtherWeapon, _txtOtherAmmo, _numTimeUnits, _barTimeUnits,
+		_numEnergy, _barEnergy, _numHealth, _barHealth, _numMorale, _barMorale, _txtArmor, _txtDoom };
 	for (auto *part : _panelParts)
 	{
 		_ownSurfaces.insert(part);
 		part->setVisible(false);
 	}
 
-	// Right-aligned texts, the fixed DOOM tag, and bars at one pixel per point.
+	// Right-aligned texts, the weapons' own colour (the ammo turns red when a gun is empty, the
+	// other hand's line grey: see fillHandLine), the fixed DOOM tag, and bars at one pixel per
+	// point.
 	_txtDoom->setAlign(ALIGN_RIGHT);
 	_txtStatus->setAlign(ALIGN_RIGHT);
+	_weaponTextColor = _txtWeapon->getColor();
 	_txtDoom->setText(_state->tr("STR_FPS_DOOM"));
 	for (auto *bar : { _barTimeUnits, _barEnergy, _barHealth, _barMorale })
 	{
@@ -1537,13 +1547,29 @@ void FirstPersonMode::magnify(SDL_Surface *screen, bool transparent)
 	// Each canvas row is widened once, then laid on its _uiScale screen rows (copied whole
 	// where opaque).
 	_magnifyRow.resize(drawWidth);
+	const int canvasColumns = (drawWidth + _uiScale - 1) / _uiScale; // canvas pixels per row that reach the screen
 	for (int canvasY = 0; canvasY * _uiScale < drawHeight; ++canvasY)
 	{
-		// Widen the row: every canvas pixel repeated _uiScale times.
+		// The part of the row to lay on the screen: all of it when opaque; when transparent only
+		// from its first to its last coloured pixel, and nothing at all for an empty row (over
+		// the 3D view most overlay rows are empty, or nearly: the crosshair, a line of text).
 		const Uint8 *canvasRow = (const Uint8 *)canvasSurface->pixels + canvasY * canvasSurface->pitch;
-		for (int screenX = 0, canvasX = 0; screenX < drawWidth; ++canvasX)
+		int firstColumn = 0, endColumn = canvasColumns;
+		if (transparent)
 		{
-			for (int repeat = 0; repeat < _uiScale && screenX < drawWidth; ++repeat) _magnifyRow[screenX++] = canvasRow[canvasX];
+			while (firstColumn < endColumn && !canvasRow[firstColumn]) ++firstColumn;
+			while (endColumn > firstColumn && !canvasRow[endColumn - 1]) --endColumn;
+			if (firstColumn == endColumn)
+			{
+				continue;
+			}
+		}
+		const int firstScreenX = firstColumn * _uiScale, endScreenX = std::min(drawWidth, endColumn * _uiScale);
+
+		// Widen that part: every canvas pixel repeated _uiScale times.
+		for (int screenX = firstScreenX, canvasX = firstColumn; screenX < endScreenX; ++canvasX)
+		{
+			for (int repeat = 0; repeat < _uiScale && screenX < endScreenX; ++repeat) _magnifyRow[screenX++] = canvasRow[canvasX];
 		}
 
 		// Lay it on each of its screen rows: all of it, or only its coloured pixels.
@@ -1555,7 +1581,7 @@ void FirstPersonMode::magnify(SDL_Surface *screen, bool transparent)
 				std::copy(_magnifyRow.begin(), _magnifyRow.end(), screenRow);
 				continue;
 			}
-			for (int screenX = 0; screenX < drawWidth; ++screenX)
+			for (int screenX = firstScreenX; screenX < endScreenX; ++screenX)
 			{
 				if (_magnifyRow[screenX]) screenRow[screenX] = _magnifyRow[screenX];
 			}
