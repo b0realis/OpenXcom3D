@@ -1,4 +1,27 @@
 #!/usr/bin/env python3
+# ==============================================================================================
+#  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
+# ==============================================================================================
+#
+#  Our philosophy
+#
+#  - Faithful first. The 3D view should feel as if it had shipped with UFO: Enemy Unknown on
+#    the day the game came out.
+#  - Another camera on the same battle. The original rules decide everything: time units,
+#    energy, accuracy, line of fire, reaction fire, doors and morale. The 3D view only shows
+#    what the game does.
+#  - Only the original assets: the game's own maps, voxel shapes, sprites, palette and sounds.
+#  - Every addition is a setting. Jumping, night vision as gear, falling, FPS-style shooting
+#    and dual wield can all be switched off.
+#  - Light on the engine. Our code lives in its own folder, the core only gets small hooks, and
+#    without the OpenXcom3D mod nothing changes.
+#  - Runs anywhere: a software renderer on the CPU, no graphics card needed.
+#  - Written for people: descriptive names, and a comment for every function and every block.
+#
+#  Date: 2026-10-19
+#
+#  We wish everyone all the best and all health!
+# ==============================================================================================
 """
 OpenXcom3D installer (Linux).
 
@@ -13,6 +36,13 @@ data mod. This script installs it with your own copy of the original games' data
 
 The original game folders (UFO: Enemy Unknown / X-COM: UFO Defense, and Terror From The
 Deep) are never modified: the installed profile only links to them.
+
+An installation looks like this:
+
+  <target>/bin/openxcom        the game
+  <target>/data/               the engine's own data (common/, standard/)
+  <target>/user/               the profile: options.cfg, the OpenXcom3D mod, links to the games
+  <target>/play.sh             starts the game with that data and profile
 """
 
 import argparse
@@ -23,7 +53,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+# ---- What is installed, and what it is built from ----
+
 VERSION = "0.7"
+# OpenXcom3D is a patch on one exact commit of OpenXcom Extended (OXCE).
 BASE_REPO = "https://github.com/MeridianOXC/OpenXcom.git"
 BASE_BRANCH = "oxce-plus"
 BASE_COMMIT = "f0134ef8065799c7723953d64b565f7832bfd782"
@@ -31,12 +64,20 @@ BASE_VERSION = "OpenXcom Extended 8.7.1 (v2026-09-19)"
 PATCH_NAME = "openxcom3d.patch"
 RELEASE_NAME = "OpenXcom3D-%s-linux-x86_64" % VERSION
 
+# The folder this script is in (a release, or a copy of the repository).
 HERE = Path(__file__).resolve().parent
 
+# ---- What building from source needs ----
+
+# Debian / Ubuntu packages for the build tools and libraries, and the libraries pkg-config checks.
 APT_PACKAGES = ["git", "cmake", "g++", "make", "pkg-config", "libsdl1.2-dev", "libsdl-mixer1.2-dev",
                 "libsdl-image1.2-dev", "libsdl-gfx1.2-dev", "zlib1g-dev", "libglu1-mesa-dev"]
 PKGCONFIG_LIBS = ["sdl", "SDL_mixer", "SDL_image", "SDL_gfx", "zlib", "gl"]
 
+# ---- Files written into the installation ----
+
+# A fresh profile's options: the games found switched on (UFO first if both), the OpenXcom3D mod
+# on, and a 1280x800 window.
 OPTIONS_CFG = """mods:
   - active: %(ufo)s
     id: xcom1
@@ -54,6 +95,7 @@ options:
   FPS: 60
 """
 
+# The starter script: runs the game with this installation's data and profile.
 PLAY_SH = """#!/bin/sh
 # Starts OpenXcom3D with the data and the profile in this folder.
 # Extra arguments are passed on, e.g.  ./play.sh -load mysave.sav
@@ -61,6 +103,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 exec "$HERE/bin/openxcom" -data "$HERE/data/" -user "$HERE/user/" -cfg "$HERE/user/" "$@"
 """
 
+# A desktop menu entry (with --desktop).
 DESKTOP = """[Desktop Entry]
 Type=Application
 Name=OpenXcom3D
@@ -72,23 +115,29 @@ Categories=Game;StrategyGame;
 """
 
 
+# ---- Small helpers ----
+
 def say(text=""):
+    """Prints a line at once (so it shows up between the output of long commands)."""
     print(text, flush=True)
 
 
 def fail(text):
+    """Prints an error and stops the installer."""
     say("error: " + text)
     sys.exit(1)
 
 
-def run(cmd, cwd=None):
-    say("  $ " + " ".join(str(c) for c in cmd))
-    result = subprocess.run([str(c) for c in cmd], cwd=str(cwd) if cwd else None)
+def run(command, cwd=None):
+    """Runs a command, showing it first; stops the installer if it fails."""
+    say("  $ " + " ".join(str(part) for part in command))
+    result = subprocess.run([str(part) for part in command], cwd=str(cwd) if cwd else None)
     if result.returncode != 0:
-        fail("command failed (exit %d): %s" % (result.returncode, " ".join(str(c) for c in cmd)))
+        fail("command failed (exit %d): %s" % (result.returncode, " ".join(str(part) for part in command)))
 
 
 def ask(question, default=None, assume_yes=False):
+    """Asks the user (Enter takes the default); with --yes, or without a terminal, takes the default."""
     if assume_yes:
         return default
     prompt = "%s [%s]: " % (question, default) if default else "%s: " % question
@@ -98,6 +147,8 @@ def ask(question, default=None, assume_yes=False):
         answer = ""
     return answer or default
 
+
+# ---- Finding the original games ----
 
 def find_child(folder, name):
     """A child folder by name, ignoring case (the original data comes in either case)."""
@@ -116,7 +167,12 @@ def looks_like_game(folder, kind):
 
 
 def find_game(given, kind, assume_yes):
-    """Works out (or asks for) the folder of one of the original games; None to skip it."""
+    """
+    Works out (or asks for) the folder of one of the original games ("UFO" or "TFTD").
+    Returns None to install without it.
+    """
+    # Where to look: the folder given on the command line, or the usual places (next to this
+    # script, Steam's library, the home folder).
     candidates = []
     if given:
         candidates.append(Path(given).expanduser())
@@ -127,6 +183,8 @@ def find_game(given, kind, assume_yes):
             candidates += [HERE / "UFO", HERE.parent / "UFO", steam / "XCom UFO Defense/XCOM", home / "UFO"]
         else:
             candidates += [HERE / "TFTD", HERE.parent / "TFTD", steam / "X-COM Terror from the Deep/TFD", home / "TFTD"]
+
+    # The first one that holds the game's data, confirmed by the user (unless given or --yes).
     for folder in candidates:
         if looks_like_game(folder, kind):
             if given or assume_yes:
@@ -134,10 +192,14 @@ def find_game(given, kind, assume_yes):
             answer = ask("Use %s data from %s? (y/n)" % (kind, folder), "y")
             if answer.lower().startswith("y"):
                 return folder.resolve()
+
+    # A folder given on the command line must be right; with --yes, a game not found is skipped.
     if given:
         fail("%s doesn't look like the %s data folder (it needs GEODATA, GEOGRAPH, MAPS, UFOGRAPH)" % (given, kind))
     if assume_yes:
         return None
+
+    # Otherwise ask until we get a good folder, or nothing (skip this game).
     while True:
         answer = ask("Folder with the original %s data (empty to skip)" % kind, "")
         if not answer:
@@ -148,53 +210,70 @@ def find_game(given, kind, assume_yes):
         say("  that folder has no GEODATA/GEOGRAPH/MAPS/UFOGRAPH; try again")
 
 
+# ---- Getting the game: built from source, or the prebuilt release ----
+
 def check_tools():
     """Reports what's missing to build from source; returns True if everything is there."""
-    ok = True
+    all_present = True
+    # The programs.
     for tool in ["git", "cmake", "make", "c++", "pkg-config"]:
         if not shutil.which(tool):
             say("  missing: %s" % tool)
-            ok = False
+            all_present = False
+    # The libraries (as far as pkg-config can tell).
     if shutil.which("pkg-config"):
-        for lib in PKGCONFIG_LIBS:
-            if subprocess.run(["pkg-config", "--exists", lib]).returncode != 0:
-                say("  missing library: %s" % lib)
-                ok = False
-    if not ok:
+        for library in PKGCONFIG_LIBS:
+            if subprocess.run(["pkg-config", "--exists", library]).returncode != 0:
+                say("  missing library: %s" % library)
+                all_present = False
+    # How to get what's missing.
+    if not all_present:
         say("\nOn Debian/Ubuntu these come with:\n  sudo apt install " + " ".join(APT_PACKAGES))
     else:
         say("  build tools and libraries: all present")
-    return ok
+    return all_present
 
 
 def build_from_source(workdir, repo, jobs):
-    """Clones OXCE at the base commit, applies the OpenXcom3D patch and builds it."""
+    """
+    Clones OXCE at the base commit, applies the OpenXcom3D patch and builds it.
+    Returns the folder with the built game (and its data), and the OpenXcom3D mod folder.
+    """
     patch = HERE / PATCH_NAME
     if not patch.is_file():
         fail("%s not found next to this script" % PATCH_NAME)
     if not check_tools():
         fail("install the missing build tools first")
-    src = workdir / "OpenXcom"
+
+    # The source at exactly the base commit (a clone made earlier is reused).
+    source = workdir / "OpenXcom"
     workdir.mkdir(parents=True, exist_ok=True)
-    if not src.exists():
-        run(["git", "clone", "--branch", BASE_BRANCH, repo, src])
-    run(["git", "-C", src, "fetch", "--quiet", "origin", BASE_COMMIT])
-    run(["git", "-C", src, "checkout", "--quiet", "--detach", BASE_COMMIT])
-    check = subprocess.run(["git", "-C", str(src), "apply", "--check", str(patch)])
+    if not source.exists():
+        run(["git", "clone", "--branch", BASE_BRANCH, repo, source])
+    run(["git", "-C", source, "fetch", "--quiet", "origin", BASE_COMMIT])
+    run(["git", "-C", source, "checkout", "--quiet", "--detach", BASE_COMMIT])
+
+    # The patch on top (a source tree that already has it, from an earlier run, is fine).
+    check = subprocess.run(["git", "-C", str(source), "apply", "--check", str(patch)])
     if check.returncode == 0:
-        run(["git", "-C", src, "apply", patch])
-    elif subprocess.run(["git", "-C", str(src), "apply", "--check", "--reverse", str(patch)]).returncode == 0:
+        run(["git", "-C", source, "apply", patch])
+    elif subprocess.run(["git", "-C", str(source), "apply", "--check", "--reverse", str(patch)]).returncode == 0:
         say("  the patch is already applied")
     else:
-        fail("the patch doesn't apply to %s at %s" % (src, BASE_COMMIT))
-    build = src / "build"
-    run(["cmake", "-S", src, "-B", build, "-DCMAKE_BUILD_TYPE=Release", "-DDEV_BUILD=OFF", "-DBUILD_PACKAGE=OFF"])
+        fail("the patch doesn't apply to %s at %s" % (source, BASE_COMMIT))
+
+    # A release build.
+    build = source / "build"
+    run(["cmake", "-S", source, "-B", build, "-DCMAKE_BUILD_TYPE=Release", "-DDEV_BUILD=OFF", "-DBUILD_PACKAGE=OFF"])
     run(["cmake", "--build", build, "--", "-j%d" % jobs])
-    return build / "bin", src / "mod" / "OpenXcom3D"
+    return build / "bin", source / "mod" / "OpenXcom3D"
 
 
 def find_release():
-    """The prebuilt files: this folder if it is a release, else the release folder next to it."""
+    """
+    The prebuilt files: this folder if it is a release, else the release folder next to it.
+    Returns the folders of the game, its data and the OpenXcom3D mod, or None if there's none.
+    """
     for folder in [HERE, HERE / "release" / RELEASE_NAME]:
         if (folder / "bin" / "openxcom").is_file() and (folder / "data" / "standard").is_dir():
             mod = folder / "user" / "mods" / "OpenXcom3D"
@@ -203,17 +282,25 @@ def find_release():
     return None
 
 
+# ---- Installing ----
+
 def install(target, binary_dir, data_dir, mod_dir, ufo, tftd, desktop):
     """Lays out bin/, data/, user/ (mod, links to the games, options) and play.sh in the target."""
+    # The game itself.
     target.mkdir(parents=True, exist_ok=True)
     (target / "bin").mkdir(exist_ok=True)
     shutil.copy2(binary_dir / "openxcom", target / "bin" / "openxcom")
     os.chmod(target / "bin" / "openxcom", 0o755)
+
+    # The engine's own data.
     for part in ["common", "standard"]:
-        source = data_dir / part
-        if not source.is_dir():
-            fail("missing %s" % source)
-        shutil.copytree(source, target / "data" / part, dirs_exist_ok=True)
+        data_source = data_dir / part
+        if not data_source.is_dir():
+            fail("missing %s" % data_source)
+        shutil.copytree(data_source, target / "data" / part, dirs_exist_ok=True)
+
+    # The profile: the OpenXcom3D mod, and links to the original games (never copies, so their
+    # folders are never written to). A real folder already there is kept.
     user = target / "user"
     (user / "mods").mkdir(parents=True, exist_ok=True)
     shutil.copytree(mod_dir, user / "mods" / "OpenXcom3D", dirs_exist_ok=True)
@@ -229,12 +316,16 @@ def install(target, binary_dir, data_dir, mod_dir, ufo, tftd, desktop):
                 continue
         link.symlink_to(folder, target_is_directory=True)
         say("  linked %s -> %s" % (link, folder))
+
+    # The options, only for a new profile (an existing one keeps the player's settings).
     options = user / "options.cfg"
     if options.exists():
         say("  keeping the existing %s (enable OpenXcom3D in Mods if it isn't)" % options)
     else:
         options.write_text(OPTIONS_CFG % {"ufo": "true" if ufo or not tftd else "false",
                                           "tftd": "true" if tftd and not ufo else "false"})
+
+    # The starter script, the documentation, and (if asked) a menu entry.
     play = target / "play.sh"
     play.write_text(PLAY_SH)
     os.chmod(play, 0o755)
@@ -250,6 +341,8 @@ def install(target, binary_dir, data_dir, mod_dir, ufo, tftd, desktop):
 
 
 def main():
+    """Reads the command line, finds the games and the game (prebuilt or built), and installs."""
+    # The command line.
     parser = argparse.ArgumentParser(description="Install OpenXcom3D %s (based on %s, %s@%s)" % (VERSION, BASE_VERSION, BASE_BRANCH, BASE_COMMIT[:10]))
     parser.add_argument("--target", help="install folder (default ~/Games/OpenXcom3D)")
     parser.add_argument("--ufo", help="folder with the original UFO: Enemy Unknown / UFO Defense data")
@@ -270,6 +363,8 @@ def main():
     if args.check:
         sys.exit(0 if check_tools() else 1)
 
+    # Where to install, and the original games (at least one; neither may contain the install
+    # folder, nor sit inside it, since their folders are never written to).
     target = Path(args.target or ask("Install folder", str(Path.home() / "Games" / "OpenXcom3D"), args.yes)).expanduser().resolve()
     ufo = find_game(args.ufo, "UFO", args.yes)
     tftd = find_game(args.tftd, "TFTD", args.yes)
@@ -279,6 +374,7 @@ def main():
         if folder and (folder == target or target in folder.parents or folder in target.parents):
             fail("the install folder must be outside the %s data folder (%s), which is never written to" % (name, folder))
 
+    # The game: built from source, or the prebuilt release next to this script.
     if args.from_source:
         workdir = Path(args.workdir or Path.home() / ".cache" / "openxcom3d-build").expanduser().resolve()
         binary_dir, mod_dir = build_from_source(workdir, args.repo, max(1, args.jobs))
@@ -289,6 +385,7 @@ def main():
             fail("no prebuilt release found next to this script; use --from-source to build one")
         binary_dir, data_dir, mod_dir = found
 
+    # Install it, and say how to start.
     say("Installing into %s" % target)
     play = install(target, binary_dir, data_dir, mod_dir, ufo, tftd, args.desktop)
     say("")
@@ -298,3 +395,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# Thanks mom and dad! You were the ones who exposed me to my first comp.

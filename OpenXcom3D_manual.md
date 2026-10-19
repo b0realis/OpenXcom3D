@@ -431,17 +431,36 @@ To work on it: check out the commit above, `git apply openxcom3d.patch`, build (
 
 ### Code layout
 
-**`src/FirstPerson/`, about 11,800 lines**
+**`src/FirstPerson/`, about 17,600 lines**
+
+Every file starts with the project's philosophy and a description of what's in it, and every function and block is commented. The two big classes are split into one file per topic, and their headers follow the same order.
 
 | File | What |
 |---|---|
 | `FirstPersonApi.{h,cpp}` | **The only header core files include.** No-op inline stubs when built with `-DOXCE_FIRSTPERSON=OFF` (`OXCE_NO_FIRSTPERSON`). Also registers the add-on's options |
-| `FirstPersonView.{h,cpp}` | Renderer, 8 threads (details below) |
+| `FirstPersonMode.h`, `FirstPersonModeShared.h` | **The controller and UI** (`FirstPersonMode`); layout constants, timings and colour helpers its files share |
+| `FirstPersonMode.cpp` | Creating the view and the HUD, the canvas magnified on big screens, switching views, the frame (`think`), input, drawing the screen |
+| `FirstPersonModeCamera.cpp` | Turning by mouse and keys, free facing, turning to an enemy, following the soldier's eye |
+| `FirstPersonModeMovement.cpp` | Real-time walking (each tile through the game's own walking), doors, jumps and vaults, grav lifts, flying, falling, stopping when an enemy is spotted |
+| `FirstPersonModeShooting.cpp` | Weapons and fire modes, aiming along the game's line of fire, firing through the game's own actions, FPS-style spread and recoil, dual wield, the crosshair, flares, aiming on the map |
+| `FirstPersonModeWeaponInHand.cpp` | The weapon in the hands, made from its inventory picture (measured, then given volume as voxels), muzzle flashes, swings |
+| `FirstPersonModeHud.cpp` | Top bar, squad buttons, info panel, soldier cards with the live helmet camera, banner, enemy markers |
+| `FirstPersonModeSoldierStates.cpp` | Hurt, near misses, on fire, going down (killed, zombie, unconscious, mind control), breakdowns (panic, berserk) |
+| `FirstPersonView.h`, `FirstPersonViewShared.h` | **The renderer** (`FirstPersonView`); voxel proportions, dithering, shading and noise helpers its files share |
+| `FirstPersonView.cpp` | The camera, and drawing one frame |
+| `FirstPersonViewTerrain.cpp` | Voxel models from the LOFT shapes coloured by the isometric sprites, crafts' mirrored sides, doors, the ground outside the map, the per-frame tile snapshot |
+| `FirstPersonViewRayWalk.h` | The ray walk: tile by tile, then voxel by voxel in tiles that have something in them |
+| `FirstPersonViewRayCasting.cpp` | Colours for the time of day, light and shadow rays, shading what a ray hit, the border and the sky, the rays on up to 8 threads |
+| `FirstPersonViewSprites.cpp` | Units and items as the game's own sprites standing in the world; enemy markers |
+| `FirstPersonViewUpscaling.cpp` | Optional smoother sprites up close (xBRZ on a worker thread) |
+| `FirstPersonViewEffects.cpp` | Particles: explosions, fire, smoke, weather, UFO devices, bloom |
+| `FirstPersonViewShots.cpp` | Shots in flight, trails, beams, impacts, bullet holes and scorches, debris |
+| `FirstPersonViewFlares.cpp` | Tactical flares and their light |
+| `FirstPersonViewScreenEffects.cpp` | On the screen itself: the hurt arc, blood, flames, colour washes, static |
 | `FirstPersonParticles.{h,cpp}` | The particle pool (sparks, smoke, weather...) |
-| `FirstPersonSounds.{h,cpp}` | Sounds made in code (no files): hitmarker and kill ticks, heartbeat, dry-fire click, flare hiss |
-| `FirstPersonMode.{h,cpp}` | Controller: full-screen view, top bar, info panel, soldier cards, crosshair and fire modes, mouse look vs cursor, classic HUD, free facing, movement and doors, firing, alien turn, spotting, hurt/death feedback (killed, zombie, unconscious, mind control), breakdowns (panic, berserk), on fire, doom mode |
+| `FirstPersonSounds.{h,cpp}` | Sounds made in code (no files): hitmarker and kill ticks, heartbeat, dry-fire click, flare hiss, near-miss whizz, melee swoosh |
 | `OptionsFirstPersonState.{h,cpp}` | 3D VIEW options tab: Settings / Controls sub-tabs, scrolling lists |
-| `RuleFirstPerson.h` | `firstPerson:` ruleset section (header-only): enabled, view distance, window glass, weather |
+| `RuleFirstPerson.h` | `firstPerson:` ruleset section (header-only): enabled, view distance, window glass, weather, combat music, night vision gear |
 
 What `FirstPersonView` draws:
 - terrain from LOFT voxels with iso-sprite projection, animated frames, UFO doors cut out as they slide, doors swinging, window glass;
@@ -488,6 +507,7 @@ What `FirstPersonView` draws:
 - **On fire**: the soldier's view in flames, rising from the bottom and the sides (heat rising cell by cell, as in the old fire effect of Doom), with embers and the light of it; catching fire makes them leap, with a BURNING banner. Their panel and camera card say BURNING. Burning soldiers and aliens in view burn in 3D too.
 - Fixed: a soldier left behind in an earlier stage of a two-stage mission showed in the squad bar as unconscious; they have no button now.
 - Fixed: a soldier killed by an overkill showed a health of 4294... on their card.
+- **The code, restructured for people:** the add-on is split into one file per topic, with descriptive names, our philosophy at the top of every file, and a comment on every function and block. The compiled game is unchanged: every add-on file was proven to compile to the same machine code before and after the renaming and commenting.
 
 ### 0.6 (2026-10-18)
 
