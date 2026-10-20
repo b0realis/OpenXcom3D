@@ -114,6 +114,21 @@ bool FirstPersonView::projectToScreen(const double world[3], double &screenX, do
  * scale), depth-tested against what's already drawn (the ray caster's depth
  * buffer and the sprites before it), so walls and nearer things hide it. Right in front of the
  * camera it fades out, dithered, rather than filling the screen with huge pixels.
+ *
+ * The sprite is a card standing at the anchor, turned to face the camera. It leans back as the
+ * view looks down (and forward as it looks up), so it faces the camera square on, but only up to
+ * CardTiltMax degrees: looking further down, the card stays that upright, its top coming
+ * towards the camera, and a soldier or a corpse seen from above stays above the floor instead
+ * of lying in it (and vanishing). Within that pitch the card is square to the view, which is
+ * simply the sprite scaled at the anchor's distance.
+ * A sprite of something lying on the floor (SpritePose::Lying: items, corpses) stands only
+ * above the anchor: its rows below the anchor, where the isometric art draws the front half of
+ * the floor's diamond, lie flat on the floor in front of the anchor (sqrt(2) voxels nearer the
+ * camera a row), half a voxel above it, so they show on the floor rather than under it.
+ * Each screen row is worked out on its own: where its ray meets the card (or the floor), which
+ * sprite row that is, how far away, and so how wide the sprite's pixels are along it. With the
+ * view tilted by a lean (setRoll) the rows no longer run level, and each pixel is worked out on
+ * its own instead; the card stays upright in the world, so it tilts on the screen with the rest.
  * @param sprite The sprite (palette colours, 0 transparent).
  * @param anchorX The sprite's pixel column that stands at the point.
  * @param anchorY The sprite's pixel row that stands at the point.
@@ -122,9 +137,10 @@ bool FirstPersonView::projectToScreen(const double world[3], double &screenX, do
  *                  voxels (so it isn't hidden by the floor it stands on).
  * @param shade Palette shades to darken it by (0 none .. 15).
  * @param scale World size per sprite pixel (an upscaled sprite is drawn at 1 / its factor).
+ * @param pose Standing (all of it on the card) or lying (the rows below the anchor on the floor).
  */
 void FirstPersonView::drawSprite(const Surface *sprite, int anchorX, int anchorY, const double world[3], double depthBias, int shade,
-	double scale)
+	double scale, SpritePose pose)
 {
 	// Where the anchor lands on the view, and how far away it is.
 	double anchorScreenX, anchorScreenY, viewDepth;
@@ -132,17 +148,6 @@ void FirstPersonView::drawSprite(const Surface *sprite, int anchorX, int anchorY
 	{
 		return;
 	}
-	const int width = getWidth(), height = getHeight();
-	// Screen pixels per sprite pixel: isometric pixels are 1/sqrt(2) of a voxel across and one voxel up.
-	const double pixelsPerColumn = (width / 2.0) / _halfFovTangent / viewDepth * scale * SpritePixelX;
-	const double pixelsPerRow = (width / 2.0) / _halfFovTangent / viewDepth * scale * ZScale;
-	// The screen rectangle the sprite covers, cut to the view (right and bottom exclusive).
-	const int spriteWidth = sprite->getWidth(), spriteHeight = sprite->getHeight();
-	const int left = std::max(0, (int)std::floor(anchorScreenX - anchorX * pixelsPerColumn));
-	const int right = std::min(width, (int)std::ceil(anchorScreenX + (spriteWidth - anchorX) * pixelsPerColumn));
-	const int top = std::max(0, (int)std::floor(anchorScreenY - anchorY * pixelsPerRow));
-	const int bottom = std::min(height, (int)std::ceil(anchorScreenY + (spriteHeight - anchorY) * pixelsPerRow));
-	const float spriteDepth = (float)std::max(1.0, viewDepth - depthBias);
 	// Right in front of the camera a sprite is a wall of huge pixels: fade it out (dithered),
 	// but not a unit on the next tile (melee range), which stays solid.
 	const float opacity = (float)std::clamp((viewDepth - 4.0) / 6.0, 0.0, 1.0);
@@ -150,38 +155,200 @@ void FirstPersonView::drawSprite(const Surface *sprite, int anchorX, int anchorY
 	{
 		return;
 	}
-	if (right <= left || bottom <= top)
+	const int width = getWidth(), height = getHeight();
+	const int spriteWidth = sprite->getWidth(), spriteHeight = sprite->getHeight();
+	const double focalLength = (width / 2.0) / _halfFovTangent;
+	auto dot = [](const double a[3], const double b[3]) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; };
+
+	// The card, in the camera's frame (true proportions, as projectToScreen works): the anchor
+	// from the eye; the way up the card, upright but leaning with the view's pitch up to
+	// CardTiltMax; and the way the card faces (the view axis, while the pitch is within that).
+	const double tilt = std::clamp(_pitch, -CardTiltMax * Pi / 180.0, CardTiltMax * Pi / 180.0);
+	const double level[2] = { std::cos(_yaw), std::sin(_yaw) }; // straight ahead, along the ground
+	const double anchor[3] = { world[0] - _eye[0], world[1] - _eye[1], (world[2] - _eye[2]) * ZScale };
+	const double cardUp[3] = { -std::sin(tilt) * level[0], -std::sin(tilt) * level[1], std::cos(tilt) };
+	const double cardFacing[3] = { std::cos(tilt) * level[0], std::cos(tilt) * level[1], std::sin(tilt) };
+	const double anchorAcross = dot(anchor, _levelRight), anchorFacing = dot(anchor, cardFacing);
+	// A sprite pixel's size (camera units): across, up the card, and along the floor for a
+	// lying row; and the floor lying rows lie on, half a voxel above the anchor (eye height 0).
+	const double columnSize = scale * SpritePixelX, rowSize = scale * ZScale, lyingRowSize = scale * LyingRowVoxels;
+	const double floorHeight = anchor[2] + 0.5 * ZScale;
+	const bool lying = pose == SpritePose::Lying;
+
+	// Where a ray meets the sprite: the ray scaled to reach one unit ahead (so how far along it
+	// is also the view depth), and whether it passes below the anchor. A lying sprite's lower
+	// rows are met on the floor in front of the anchor; the rest on the card. Gives the
+	// distance and the sprite row there; false when the ray misses the sprite.
+	auto meetSprite = [&](const double ray[3], bool belowAnchor, double &distance, double &spriteRow) {
+		distance = -1.0;
+		spriteRow = 0.0;
+		if (lying && belowAnchor && ray[2] < 0.0 && floorHeight < 0.0)
+		{
+			distance = floorHeight / ray[2];
+			const double towardsCamera = (anchor[0] - ray[0] * distance) * level[0] + (anchor[1] - ray[1] * distance) * level[1];
+			spriteRow = anchorY + towardsCamera / lyingRowSize;
+		}
+		if (spriteRow < anchorY || distance < 0.0)
+		{
+			const double facing = dot(ray, cardFacing);
+			if (facing <= 1e-9) return false;
+			distance = anchorFacing / facing;
+			const double fromAnchor[3] = { ray[0] * distance - anchor[0], ray[1] * distance - anchor[1], ray[2] * distance - anchor[2] };
+			spriteRow = anchorY - dot(fromAnchor, cardUp) / rowSize;
+		}
+		return distance >= 1.0 && spriteRow >= 0.0 && spriteRow < spriteHeight;
+	};
+	// Puts one sprite pixel on the screen, shaded, where nothing nearer is drawn already, and
+	// notes its depth so that farther sprites drawn later are hidden by it. A sprite pixel covers
+	// whatever shone behind it, so that no longer glows (see drawLightHalos).
+	auto plot = [&](int pixelX, int pixelY, Uint8 color, float depth) {
+		float &depthHere = _depthBuffer[pixelY * width + pixelX];
+		if (!color || depth >= depthHere || (opacity < 1.0f && dither(pixelX, pixelY) >= opacity)) return;
+		*getRaw(pixelX, pixelY) = shadeColor(color, shade);
+		depthHere = depth;
+		_glowMask[pixelY * width + pixelX] = 0;
+	};
+	const SDL_Surface *spriteSurface = const_cast<Surface*>(sprite)->getSurface(); // read only
+	auto spritePixel = [&](int spriteX, int spriteY) { return ((const Uint8 *)spriteSurface->pixels)[spriteY * spriteSurface->pitch + spriteX]; };
+
+	// The view tilted by a lean (see setRoll): the screen's rows no longer run level across the
+	// card, so each pixel is worked out on its own, the same way: its ray, where that meets the
+	// sprite, and the sprite's column from how far across (level, square to the view) it does.
+	if (_roll != 0.0)
 	{
+		// The pixels to look at: the box round the sprite's corners on the screen, the card's
+		// and, for a lying sprite, the floor's in front of the anchor (all of the view if one is
+		// behind the camera; the rays find what is really there).
+		int left = width, right = 0, top = height, bottom = 0;
+		auto addCorners = [&](const double middle[3]) {
+			for (const double across : { -anchorX * columnSize, (spriteWidth - anchorX) * columnSize })
+			{
+				const double corner[3] = { middle[0] + _levelRight[0] * across, middle[1] + _levelRight[1] * across, middle[2] + _levelRight[2] * across };
+				const double depth = dot(corner, _forward);
+				if (depth <= 1.0)
+				{
+					left = top = 0; right = width; bottom = height;
+					continue;
+				}
+				const double screenX = width / 2.0 + dot(corner, _right) * focalLength / depth, screenY = height / 2.0 - dot(corner, _up) * focalLength / depth;
+				left = std::min(left, (int)std::floor(screenX)); right = std::max(right, (int)std::ceil(screenX));
+				top = std::min(top, (int)std::floor(screenY)); bottom = std::max(bottom, (int)std::ceil(screenY));
+			}
+		};
+		double topMiddle[3], bottomMiddle[3];
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			topMiddle[axis] = anchor[axis] + cardUp[axis] * anchorY * rowSize;
+			bottomMiddle[axis] = anchor[axis] - cardUp[axis] * (spriteHeight - anchorY) * rowSize;
+		}
+		addCorners(topMiddle);
+		if (lying)
+		{
+			const double farFloor[3] = { anchor[0], anchor[1], floorHeight };
+			const double nearFloor[3] = { anchor[0] - level[0] * (spriteHeight - anchorY) * lyingRowSize,
+				anchor[1] - level[1] * (spriteHeight - anchorY) * lyingRowSize, floorHeight };
+			addCorners(anchor);
+			addCorners(farFloor);
+			addCorners(nearFloor);
+		}
+		else
+		{
+			addCorners(bottomMiddle);
+		}
+		left = std::max(0, left); top = std::max(0, top); right = std::min(width, right); bottom = std::min(height, bottom);
+		// How far up the anchor is on the image plane without the tilt: rays below that pass
+		// below the anchor.
+		const double anchorRise = dot(anchor, _levelUp) / dot(anchor, _forward);
+		for (int pixelY = top; pixelY < bottom; ++pixelY)
+		{
+			const double rise = (height / 2.0 - (pixelY + 0.5)) / focalLength;
+			for (int pixelX = left; pixelX < right; ++pixelX)
+			{
+				const double across = (pixelX + 0.5 - width / 2.0) / focalLength;
+				const double ray[3] = { _forward[0] + across * _right[0] + rise * _up[0], _forward[1] + across * _right[1] + rise * _up[1],
+					_forward[2] + across * _right[2] + rise * _up[2] };
+				double distance, spriteRow;
+				if (!meetSprite(ray, dot(ray, _levelUp) < anchorRise, distance, spriteRow)) continue;
+				const int spriteX = (int)std::floor(anchorX + (dot(ray, _levelRight) * distance - anchorAcross) / columnSize);
+				if (spriteX < 0 || spriteX >= spriteWidth) continue;
+				plot(pixelX, pixelY, spritePixel(spriteX, (int)std::floor(spriteRow)), (float)std::max(1.0, distance - depthBias));
+			}
+		}
 		return;
 	}
-	// Which sprite column each screen column shows (-1 outside the sprite), worked out once
-	// (close up a sprite covers much of the screen); rows are read straight from the sprite.
-	_spriteColumns.resize(right - left);
-	for (int pixelX = left; pixelX < right; ++pixelX)
+
+	// The screen rows it may cover: from its top row's down to its bottom row's (an end behind
+	// the camera reaches to the view's edge).
+	auto screenRowOf = [&](const double point[3], double behindCamera) {
+		const double depth = dot(point, _forward);
+		return depth > 1.0 ? height / 2.0 - dot(point, _up) * focalLength / depth : behindCamera;
+	};
+	double topPoint[3], bottomPoint[3];
+	for (int axis = 0; axis < 3; ++axis)
 	{
-		const int spriteX = (int)std::floor(anchorX + (pixelX + 0.5 - anchorScreenX) / pixelsPerColumn);
-		_spriteColumns[pixelX - left] = spriteX >= 0 && spriteX < spriteWidth ? spriteX : -1;
+		topPoint[axis] = anchor[axis] + cardUp[axis] * anchorY * rowSize;
+		bottomPoint[axis] = lying ? (axis < 2 ? anchor[axis] - level[axis] * (spriteHeight - anchorY) * lyingRowSize : floorHeight)
+			: anchor[axis] - cardUp[axis] * (spriteHeight - anchorY) * rowSize;
 	}
-	// Copy the sprite's opaque pixels, shaded, where nothing nearer is drawn already, and
-	// note their depth so that farther sprites drawn later are hidden by them.
-	const SDL_Surface *spriteSurface = const_cast<Surface*>(sprite)->getSurface(); // read only
+	const int top = std::max(0, (int)std::floor(screenRowOf(topPoint, 0.0)));
+	const int bottom = std::min(height, (int)std::ceil(screenRowOf(bottomPoint, height)));
+
+	// Row by row: the ray through the middle of the row, where it meets the sprite, and along
+	// the row, at that distance, where the anchor's column is and how wide a sprite pixel is
+	// (the card and the floor both run square across the view).
 	for (int pixelY = top; pixelY < bottom; ++pixelY)
 	{
-		const int spriteY = (int)std::floor(anchorY + (pixelY + 0.5 - anchorScreenY) / pixelsPerRow);
-		if (spriteY < 0 || spriteY >= spriteHeight) continue;
-		const Uint8 *spriteRow = (const Uint8 *)spriteSurface->pixels + spriteY * spriteSurface->pitch;
-		Uint8 *screenRow = getRaw(0, pixelY);
-		float *depthRow = &_depthBuffer[pixelY * width];
+		const double rise = (height / 2.0 - (pixelY + 0.5)) / focalLength;
+		const double ray[3] = { _forward[0] + rise * _up[0], _forward[1] + rise * _up[1], _forward[2] + rise * _up[2] };
+		double distance, spriteRow;
+		if (!meetSprite(ray, pixelY + 0.5 > anchorScreenY, distance, spriteRow)) continue;
+		const int spriteY = (int)std::floor(spriteRow);
+		const double pixelsPerColumn = focalLength / distance * columnSize;
+		const double rowAnchorX = width / 2.0 + anchorAcross * focalLength / distance;
+		const int left = std::max(0, (int)std::floor(rowAnchorX - anchorX * pixelsPerColumn));
+		const int right = std::min(width, (int)std::ceil(rowAnchorX + (spriteWidth - anchorX) * pixelsPerColumn));
+		const float rowDepth = (float)std::max(1.0, distance - depthBias);
 		for (int pixelX = left; pixelX < right; ++pixelX)
 		{
-			const int spriteX = _spriteColumns[pixelX - left];
-			if (spriteX < 0) continue;
-			const Uint8 color = spriteRow[spriteX];
-			if (!color || spriteDepth >= depthRow[pixelX] || (opacity < 1.0f && dither(pixelX, pixelY) >= opacity)) continue;
-			screenRow[pixelX] = shadeColor(color, shade);
-			depthRow[pixelX] = spriteDepth;
+			const int spriteX = (int)std::floor(anchorX + (pixelX + 0.5 - rowAnchorX) / pixelsPerColumn);
+			if (spriteX < 0 || spriteX >= spriteWidth) continue;
+			plot(pixelX, pixelY, spritePixel(spriteX, spriteY), rowDepth);
 		}
 	}
+}
+
+/**
+ * Where something standing on the ground at a point stands in the view: the point raised out
+ * of the solid voxels it is in, by at most StandRaiseMax voxels. The game stands units and items
+ * at the foot of a tile's floor, where the isometric art draws the floor's surface; the 3D view
+ * builds the floor from its line-of-fire shape, a slab two voxels thick, so drawn at the foot
+ * they would sink into it. (A point deeper in something solid, such as a wall, stays put.)
+ * @param world The point on the ground, in voxels.
+ * @return The height to draw it standing at, in voxels.
+ */
+double FirstPersonView::standingHeight(const double world[3]) const
+{
+	const int voxelX = (int)std::floor(world[0]), voxelY = (int)std::floor(world[1]), voxelZ = (int)std::floor(world[2]);
+	if (voxelX < 0 || voxelY < 0 || voxelZ < 0 || voxelX >= _save->getMapSizeX() * 16 || voxelY >= _save->getMapSizeY() * 16)
+	{
+		return world[2];
+	}
+	for (int raise = 0; raise <= StandRaiseMax; ++raise)
+	{
+		const int z = voxelZ + raise;
+		if (z >= _save->getMapSizeZ() * 24) break;
+		const TileView &view = _tileViews[_save->getTileIndex(Position(voxelX / 16, voxelY / 16, z / 24))];
+		bool solid = false;
+		for (const VoxelModel *part : view.part)
+		{
+			solid = solid || (part && part->color[z % 24][voxelY % 16][voxelX % 16]);
+		}
+		if (!solid)
+		{
+			return raise ? z : world[2];
+		}
+	}
+	return world[2];
 }
 
 /**
@@ -269,16 +436,21 @@ void FirstPersonView::watchUnits()
  */
 void FirstPersonView::drawUnits()
 {
-	// The game's 8-frame animation cycle (a frame every 100 ms), and the sprite drawer, with
-	// the diving helmets on under the sea.
-	const int animFrame = (SDL_GetTicks() / 100) % 8;
-	UnitSprite unitSprite(_spriteBuffer, _game->getMod(), _save, animFrame, _save->getDepth() != 0, 0, 0);
+	// The sprite drawer, with the diving helmets on under the sea, on the game's own animation
+	// counter (a frame every 100 ms), as the map draws: the 8-frame cycles, and the mods'
+	// recolour scripts, which may count much longer ones (a wounded unit blinking red and white).
+	UnitSprite unitSprite(_spriteBuffer, _game->getMod(), _save, _save->getAnimFrame(), _save->getDepth() != 0, 0, 0);
 	const bool debug = _save->getDebugMode();
 	_markerSpots.clear();
 	// Time since the last frame in seconds (at most a tenth, none the first time), for the gliding.
 	const Uint32 now = SDL_GetTicks();
 	const double elapsedSeconds = _unitLastTick ? std::min<Uint32>(100, now - _unitLastTick) / 1000.0 : 0.0;
 	_unitLastTick = now;
+	// The units' size (setting "Unit size", 80 to 100% of the isometric map's: smaller, standing
+	// on the same spot), and their hitboxes (setting): always, or fading in and out once a second.
+	const double unitScale = std::clamp(Options::fpsUnitSize, 80, 100) / 100.0;
+	const float hitboxOpacity = Options::fpsHitboxes == 2 ? 1.0f
+		: Options::fpsHitboxes == 1 ? 0.5f + 0.5f * (float)std::cos((now % 1000) / 1000.0 * 2.0 * Pi) : 0.0f;
 
 	for (BattleUnit *unit : *_save->getUnits())
 	{
@@ -374,13 +546,15 @@ void FirstPersonView::drawUnits()
 		{
 			drawUnitShadow(feet, 5.5 * unitSize); // flying units too: the shadow on the ground shows where they hover
 		}
-		// Draw the unit's frame into the sprite buffer, then stand it in the world.
+		// Draw the unit's frame into the sprite buffer, then stand it in the world, on the floor's
+		// surface (the hitbox and the markers keep the game's own heights).
 		const GraphSubset mask(SpriteBufferSize, SpriteBufferSize);
+		const double standing[3] = { feet[0], feet[1], standingHeight(feet) };
 		// (Drawn unlit and shaded when placed: an upscaled frame then serves in any light.)
 		if (unitSize == 1)
 		{
 			unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
-			drawSpriteSmooth(_spriteBuffer, 32, 40, feet, 0.0, shade); // anchored at the centre of the floor diamond
+			drawSpriteSmooth(_spriteBuffer, 32, 40, standing, 0.0, shade, unitScale); // anchored at the centre of the floor diamond
 		}
 		else
 		{
@@ -389,8 +563,79 @@ void FirstPersonView::drawUnits()
 			unitSprite.draw(unit, 1, 32, 16, 0, mask, false);
 			unitSprite.draw(unit, 2, 0, 16, 0, mask, false);
 			unitSprite.draw(unit, 3, 16, 24, 0, mask, false);
-			drawSpriteSmooth(_spriteBuffer, 32, 48, feet, 0.0, shade); // anchored at the corner shared by the four tiles
+			drawSpriteSmooth(_spriteBuffer, 32, 48, standing, 0.0, shade, unitScale); // anchored at the corner shared by the four tiles
 		}
+		if (hitboxOpacity > 0.05f)
+		{
+			drawHitbox(unit, feet, hitboxOpacity);
+		}
+	}
+}
+
+/**
+ * Outlines a unit's hitbox (setting "Hitboxes"): the voxels the game counts as the unit when a
+ * shot or a blow reaches it, which the sprite only hints at. As the game has it (see
+ * TileEngine::voxelCheck), the unit is its armor's footprint (a LOFT template for each tile it
+ * covers, read mirrored on x, the four parts of a big unit in the game's order) standing from
+ * just above its floor (and its hovering height) up to its height, kneeling or standing. The
+ * outline is the footprint's edge at the bottom and the top, with four upright edges at its
+ * furthest points, in the colour of the unit's side; it is hidden behind walls and behind the
+ * unit's own sprite like anything else in the world.
+ * @param unit The unit.
+ * @param feet Where it's drawn: the middle of its footprint on its floor, in voxels.
+ * @param opacity How much of the outline shows (fading in and out with the blinking setting).
+ */
+void FirstPersonView::drawHitbox(const BattleUnit *unit, const double feet[3], float opacity)
+{
+	const std::vector<Uint16> *loftData = _game->getMod()->getVoxelData();
+	const int size = unit->getArmor()->getSize(), cells = 16 * size;
+	// The footprint, one voxel column per cell: solid where the part's LOFT row has the bit.
+	auto solid = [&](int x, int y) -> bool {
+		if (x < 0 || y < 0 || x >= cells || y >= cells) return false;
+		static const int bigParts[] = { 1, 0, 3, 2 }; // the game's order for a 2x2 unit's parts
+		const int part = size > 1 ? bigParts[x / 16 + (y / 16) * 2] : 0;
+		const size_t row = (size_t)unit->getLoftemps(part) * 16 + y % 16;
+		return row < loftData->size() && ((*loftData)[row] & (1 << (15 - x % 16)));
+	};
+	// Where it stands: the footprint's north-west corner, and the bottom and top of the column
+	// (the game's solid voxels run from one above its floor and hovering height to its height).
+	const float originX = (float)(feet[0] - 8.0 * size), originY = (float)(feet[1] - 8.0 * size);
+	const float bottom = (float)(feet[2] + unit->getFloatHeight() + 1.0), top = bottom + unit->getHeight();
+	const Uint8 color = _colors.hitbox[unit->getFaction() == FACTION_PLAYER ? 0 : unit->getFaction() == FACTION_HOSTILE ? 1 : 2];
+
+	// The footprint's edge, at the bottom and the top: each side of a solid cell with no solid
+	// neighbour beyond it. Meanwhile, its furthest points on each axis, for the upright edges.
+	float extremes[4][2] = { { 1e9f, 0 }, { -1e9f, 0 }, { 0, 1e9f }, { 0, -1e9f } }; // west, east, north, south
+	for (int y = 0; y < cells; ++y)
+	{
+		for (int x = 0; x < cells; ++x)
+		{
+			if (!solid(x, y)) continue;
+			const float x0 = originX + x, y0 = originY + y, x1 = x0 + 1.0f, y1 = y0 + 1.0f;
+			const float sides[4][4] = { { x0, y0, x0, y1 }, { x1, y0, x1, y1 }, { x0, y0, x1, y0 }, { x0, y1, x1, y1 } };
+			const bool open[4] = { !solid(x - 1, y), !solid(x + 1, y), !solid(x, y - 1), !solid(x, y + 1) };
+			for (int side = 0; side < 4; ++side)
+			{
+				if (!open[side]) continue;
+				for (float z : { bottom, top })
+				{
+					const float from[3] = { sides[side][0], sides[side][1], z }, to[3] = { sides[side][2], sides[side][3], z };
+					drawLine3D(from, to, color, 1, opacity);
+				}
+			}
+			const float middleX = x0 + 0.5f, middleY = y0 + 0.5f;
+			if (x0 < extremes[0][0]) { extremes[0][0] = x0; extremes[0][1] = middleY; }
+			if (x1 > extremes[1][0]) { extremes[1][0] = x1; extremes[1][1] = middleY; }
+			if (y0 < extremes[2][1]) { extremes[2][1] = y0; extremes[2][0] = middleX; }
+			if (y1 > extremes[3][1]) { extremes[3][1] = y1; extremes[3][0] = middleX; }
+		}
+	}
+	// The upright edges, at the furthest points west, east, north and south.
+	for (const auto &point : extremes)
+	{
+		if (point[0] > 1e8f || point[0] < -1e8f || point[1] > 1e8f || point[1] < -1e8f) continue;
+		const float from[3] = { point[0], point[1], bottom }, to[3] = { point[0], point[1], top };
+		drawLine3D(from, to, color, 1, opacity);
 	}
 }
 
@@ -472,8 +717,7 @@ void FirstPersonView::drawGroundShade(const double centre[3], double radius, int
  */
 void FirstPersonView::drawFloorItems()
 {
-	const int animFrame = (SDL_GetTicks() / 100) % 8;
-	ItemSprite itemSprite(_spriteBuffer, _game->getMod(), _save, animFrame);
+	ItemSprite itemSprite(_spriteBuffer, _game->getMod(), _save, _save->getAnimFrame()); // on the game's animation counter, as the map draws
 	const int tileCount = _save->getMapSizeXYZ();
 	for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
 	{
@@ -497,11 +741,13 @@ void FirstPersonView::drawFloorItems()
 		{
 			continue;
 		}
-		// Draw the item's floor sprite into the buffer (unlit) and stand it on the floor.
+		// Draw the item's floor sprite into the buffer (unlit) and lay it on the floor's surface:
+		// the art below the middle of the floor's diamond lies flat, the rest stands.
 		_spriteBuffer->clear();
 		const int shade = (int)std::lround(std::clamp(lightAt((float)ground[0], (float)ground[1], (float)ground[2] + 4.0f), 0.0f, 15.0f));
 		itemSprite.draw(item, 16, 8, 0);
-		drawSpriteSmooth(_spriteBuffer, 32, 40, ground, 0.0, shade);
+		const double onFloor[3] = { ground[0], ground[1], standingHeight(ground) };
+		drawSpriteSmooth(_spriteBuffer, 32, 40, onFloor, 0.0, shade, 1.0, SpritePose::Lying);
 	}
 }
 
@@ -681,9 +927,56 @@ const FirstPersonView::SpriteBox &FirstPersonView::spriteBox(const Surface *spri
 }
 
 /**
+ * The discreet map edge (setting): instead of the tape round the map, small red dots on the
+ * floor along its edge, every EdgeDotSpacing voxels, just inside it, on the ground floor's top.
+ * Each is a little square that keeps its size in the world (at least two pixels, so it still
+ * shows far away), hidden by what stands in front of it like anything else, and fading into
+ * the haze in the distance.
+ */
+void FirstPersonView::drawEdgeDots()
+{
+	if (!Options::fpsDiscreetEdge)
+	{
+		return;
+	}
+	const int width = getWidth(), height = getHeight();
+	const float mapX = _save->getMapSizeX() * 16.0f, mapY = _save->getMapSizeY() * 16.0f;
+	const double focalLength = (width / 2.0) / _halfFovTangent;
+	// One dot: projected, sized by its distance, drawn where nothing nearer is.
+	auto dot = [&](float x, float y) {
+		const double point[3] = { x, y, GroundTop };
+		double screenX, screenY, depth;
+		if (!projectToScreen(point, screenX, screenY, depth) || depth > _maxDistance) return;
+		const int size = std::max(2, (int)std::lround(EdgeDotSize * focalLength / depth));
+		const float haze = smoothstep(_maxDistance * 0.3f, _maxDistance, (float)depth);
+		const int left = (int)std::lround(screenX - size / 2.0), top = (int)std::lround(screenY - size / 2.0);
+		for (int pixelY = std::max(0, top); pixelY < std::min(height, top + size); ++pixelY)
+		{
+			for (int pixelX = std::max(0, left); pixelX < std::min(width, left + size); ++pixelX)
+			{
+				if ((float)depth >= _depthBuffer[pixelY * width + pixelX] + 1.0f || haze > dither(pixelX, pixelY)) continue;
+				*getRaw(pixelX, pixelY) = shadeColor(_colors.edgeDot, (int)(_colors.ambient * 0.5f));
+			}
+		}
+	};
+	// Along the four edges, a dot every EdgeDotSpacing voxels, half a spacing from each corner.
+	for (float along = EdgeDotSpacing / 2.0f; along < mapX; along += EdgeDotSpacing)
+	{
+		dot(along, EdgeDotInset);
+		dot(along, mapY - EdgeDotInset);
+	}
+	for (float along = EdgeDotSpacing / 2.0f; along < mapY; along += EdgeDotSpacing)
+	{
+		dot(EdgeDotInset, along);
+		dot(mapX - EdgeDotInset, along);
+	}
+}
+
+/**
  * Smoke and fire on discovered tiles, animated like on the isometric map: the same sprites
  * from SMOKE.PCK, picked the same way (fire, or smoke by its density), with the frames dissolving
- * into each other.
+ * into each other. With the setting "See-through smoke" only the fire: the smoke is then drawn
+ * by the rays, as the game's sight rules have it (see SmokeTrace).
  */
 void FirstPersonView::drawSmokeAndFire()
 {
@@ -699,9 +992,10 @@ void FirstPersonView::drawSmokeAndFire()
 	const int tileCount = _save->getMapSizeXYZ();
 	for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
 	{
-		// Only tiles with smoke (a burning tile has smoke too) that have been seen.
+		// Only tiles with smoke (a burning tile has smoke too) that have been seen; with
+		// see-through smoke, only burning ones.
 		Tile *tile = _save->getTile(tileIndex);
-		if (!tile->getSmoke() || !_tileViews[tileIndex].discovered)
+		if (!tile->getSmoke() || !_tileViews[tileIndex].discovered || (Options::fpsSeeThroughSmoke && !tile->getFire()))
 		{
 			continue;
 		}

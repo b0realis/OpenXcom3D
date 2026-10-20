@@ -696,7 +696,9 @@ void FirstPersonView::spawnDevices(float elapsedSeconds)
  * ray caster and the effects drawn after it) are gathered into a grid at quarter resolution,
  * blurred, and the image is brightened where that glow lands: each pixel by up to three
  * shades within its own 16-colour group, dithered, so the palette still works. It shows most
- * at night and under the sea.
+ * at night and under the sea. The glow keeps the distance of the light it came from (blurred
+ * along with it), and what stands well in front of that light (a soldier between the camera
+ * and a glowing exit tile) isn't brightened: the light doesn't shine through it.
  */
 void FirstPersonView::drawLightHalos()
 {
@@ -705,18 +707,24 @@ void FirstPersonView::drawLightHalos()
 	const int cellSize = 4, gridWidth = (width + cellSize - 1) / cellSize, gridHeight = (height + cellSize - 1) / cellSize;
 	_glowBuffer.assign(gridWidth * gridHeight, 0.0f);
 	_glowScratch.assign(gridWidth * gridHeight, 0.0f);
+	_glowDepth.assign(gridWidth * gridHeight, 0.0f);
+	_glowDepthScratch.assign(gridWidth * gridHeight, 0.0f);
 	// Gather: each cell holds the share of its pixels that shine (0..1; a UFO's light, marked
 	// 3, counts three times). Nothing shining, nothing to do.
 	bool anyGlow = false;
 	for (int y = 0; y < height; ++y)
 	{
 		const Uint8 *maskRow = &_glowMask[y * width];
+		const float *depthRow = &_depthBuffer[y * width];
 		float *glowRow = &_glowBuffer[(y / cellSize) * gridWidth];
+		float *glowDepthRow = &_glowDepth[(y / cellSize) * gridWidth];
 		for (int x = 0; x < width; ++x)
 		{
 			if (maskRow[x])
 			{
-				glowRow[x / cellSize] += maskRow[x] * (1.0f / (cellSize * cellSize));
+				const float weight = maskRow[x] * (1.0f / (cellSize * cellSize));
+				glowRow[x / cellSize] += weight;
+				glowDepthRow[x / cellSize] += weight * std::min(depthRow[x], _maxDistance); // (something shining in the sky counts as far away)
 				anyGlow = true;
 			}
 		}
@@ -726,32 +734,36 @@ void FirstPersonView::drawLightHalos()
 		return;
 	}
 	// Blur: two passes of a box blur 7 cells wide, each across then down (through the scratch
-	// grid), which comes close to a gaussian.
+	// grid), which comes close to a gaussian; the glow's distance the same way.
 	const int radius = 3;
 	for (int pass = 0; pass < 2; ++pass)
 	{
-		for (int y = 0; y < gridHeight; ++y)
+		for (std::vector<float> *grid : { &_glowBuffer, &_glowDepth })
 		{
-			for (int x = 0; x < gridWidth; ++x)
+			std::vector<float> &values = *grid, &scratch = grid == &_glowBuffer ? _glowScratch : _glowDepthScratch;
+			for (int y = 0; y < gridHeight; ++y)
 			{
-				float sum = 0.0f;
-				for (int offset = -radius; offset <= radius; ++offset)
+				for (int x = 0; x < gridWidth; ++x)
 				{
-					sum += _glowBuffer[y * gridWidth + std::clamp(x + offset, 0, gridWidth - 1)];
+					float sum = 0.0f;
+					for (int offset = -radius; offset <= radius; ++offset)
+					{
+						sum += values[y * gridWidth + std::clamp(x + offset, 0, gridWidth - 1)];
+					}
+					scratch[y * gridWidth + x] = sum / (2 * radius + 1);
 				}
-				_glowScratch[y * gridWidth + x] = sum / (2 * radius + 1);
 			}
-		}
-		for (int y = 0; y < gridHeight; ++y)
-		{
-			for (int x = 0; x < gridWidth; ++x)
+			for (int y = 0; y < gridHeight; ++y)
 			{
-				float sum = 0.0f;
-				for (int offset = -radius; offset <= radius; ++offset)
+				for (int x = 0; x < gridWidth; ++x)
 				{
-					sum += _glowScratch[std::clamp(y + offset, 0, gridHeight - 1) * gridWidth + x];
+					float sum = 0.0f;
+					for (int offset = -radius; offset <= radius; ++offset)
+					{
+						sum += scratch[std::clamp(y + offset, 0, gridHeight - 1) * gridWidth + x];
+					}
+					values[y * gridWidth + x] = sum / (2 * radius + 1);
 				}
-				_glowBuffer[y * gridWidth + x] = sum / (2 * radius + 1);
 			}
 		}
 	}
@@ -785,6 +797,7 @@ void FirstPersonView::drawLightHalos()
 		const int firstCell = std::min(firstReached[gridRow], firstReached[nextRow]), lastCell = std::max(lastReached[gridRow], lastReached[nextRow]);
 		if (firstCell > lastCell) continue;
 		const float *glowAbove = &_glowBuffer[gridRow * gridWidth], *glowBelow = &_glowBuffer[nextRow * gridWidth];
+		const float *depthAbove = &_glowDepth[gridRow * gridWidth], *depthBelow = &_glowDepth[nextRow * gridWidth];
 		for (int x = std::max(0, (firstCell - 1) * cellSize); x < std::min(width, (lastCell + 2) * cellSize); ++x)
 		{
 			if (_glowMask[y * width + x] || !pixels[x]) continue;
@@ -795,6 +808,11 @@ void FirstPersonView::drawLightHalos()
 			const int nextColumn = std::min(gridWidth - 1, gridColumn + 1);
 			const float glow = (glowAbove[gridColumn] * (1 - blendX) + glowAbove[nextColumn] * blendX) * (1 - blendY)
 				+ (glowBelow[gridColumn] * (1 - blendX) + glowBelow[nextColumn] * blendX) * blendY;
+			// How far away the light is, here (its glow-weighted distance): a pixel more than a
+			// tile in front of it isn't lit by it.
+			const float weightedDepth = (depthAbove[gridColumn] * (1 - blendX) + depthAbove[nextColumn] * blendX) * (1 - blendY)
+				+ (depthBelow[gridColumn] * (1 - blendX) + depthBelow[nextColumn] * blendX) * blendY;
+			if (glow > 0.0f && _depthBuffer[y * width + x] < weightedDepth / glow - 16.0f) continue;
 			// The glow in shades, dithered: one shade brighter from a dithered threshold up, two
 			// past 1, three past 2. A lower index within a colour group is a brighter shade.
 			const float strength = glow * gain;

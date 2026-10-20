@@ -147,6 +147,33 @@ void FirstPersonView::updateColors()
 	// The single colours: the haze far away is the sky at the horizon, the rest are picked
 	// from fixed RGB values.
 	_colors.haze = _colors.sky[0];
+	// The haze tables: every colour blended towards the haze in HazeSteps steps (the palette's
+	// nearest to each mix), made again when the palette or the haze colour changes (the time of
+	// day is set per battle). See hazeColor.
+	{
+		Uint32 hazeKey = 2166136261u;
+		for (int index = 0; index < 256; ++index)
+		{
+			hazeKey = (hazeKey ^ (palette[index].r | (palette[index].g << 8) | (palette[index].b << 16))) * 16777619u;
+		}
+		hazeKey = (hazeKey ^ _colors.haze) * 16777619u;
+		if (hazeKey != _colors.hazeTintKey)
+		{
+			_colors.hazeTintKey = hazeKey;
+			const SDL_Color &hazeRgb = palette[_colors.haze];
+			for (int step = 0; step <= SceneColors::HazeSteps; ++step)
+			{
+				const float amount = step / (float)SceneColors::HazeSteps;
+				_colors.hazeTint[step][0] = 0;
+				for (int index = 1; index < 256; ++index)
+				{
+					_colors.hazeTint[step][index] = step == 0 ? (Uint8)index : step == SceneColors::HazeSteps ? _colors.haze
+						: nearest(palette[index].r + (hazeRgb.r - palette[index].r) * amount, palette[index].g + (hazeRgb.g - palette[index].g) * amount,
+							palette[index].b + (hazeRgb.b - palette[index].b) * amount);
+				}
+			}
+		}
+	}
 	_colors.star = nearest(230, 230, 240);
 	_colors.moon = nearest(228, 228, 210);
 	_colors.sun = nearest(255, 248, 200);
@@ -155,6 +182,11 @@ void FirstPersonView::updateColors()
 	_colors.fire[2] = nearest(240, 120, 20);
 	_colors.fire[3] = nearest(160, 40, 10);
 	_colors.smoke = nearest(130, 130, 130);
+	_colors.hitbox[0] = nearest(90, 230, 110);
+	_colors.hitbox[1] = nearest(255, 70, 60);
+	_colors.hitbox[2] = nearest(250, 220, 70);
+	_colors.edgeDot = nearest(225, 45, 35);
+	_colors.unexplored = nearest(78, 88, 110);
 	_colors.spark = nearest(255, 240, 160);
 	_colors.blood[0] = nearest(90, 0, 0);
 	_colors.blood[1] = nearest(160, 12, 8);
@@ -435,19 +467,25 @@ float FirstPersonView::pointLight(const float point[3], const float normal[3], b
 Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float rayDirection[3], int pixelX, int pixelY) const
 {
 	const TileView &tileView = _tileViews[hit.tile];
-	// Unexplored parts are black silhouettes. A wall belongs to the tile east or south of it,
-	// but it's seen from both sides, so each part has its own "seen" bit; a swinging door
-	// (part -1) goes by its tile.
+	// Unexplored parts are slate-coloured shapes (see below). A wall belongs to the tile east or
+	// south of it, but it's seen from both sides, so each part has its own "seen" bit; a swinging
+	// door (part -1) goes by its tile.
 	if (hit.part >= 0 ? !((tileView.seen >> hit.part) & 1) : !tileView.discovered)
 	{
 		// The underside of an unexplored level seen from an explored room below is just its
-		// ceiling: draw it, lit by the room. Anything else unexplored is a black silhouette.
+		// ceiling: draw it, lit by the room. Anything else unexplored is a plain shape.
 		const int tilesPerLevel = _save->getMapSizeX() * _save->getMapSizeY();
 		const bool exploredCeiling = hit.axis == 2 && rayDirection[2] > 0.0f && hit.tile >= tilesPerLevel
 			&& _tileViews[hit.tile - tilesPerLevel].discovered;
 		if (!exploredCeiling)
 		{
-			return 0x0F;
+			// Unexplored: shapes in a flat slate colour, shaded by the face and the distance like
+			// the rest, never textured (nothing of the art shows) and never black (black reads as
+			// something missing): the shade stops a few steps short of the colour group's end.
+			const int faceAxis = hit.axis >= 0 ? hit.axis : 2;
+			const int face = faceAxis * 2 + (rayDirection[faceAxis] > 0.0f ? 1 : 0);
+			const int darkest = 12 - (_colors.unexplored & 15);
+			return shadeColor(_colors.unexplored, std::min(darkest, (int)(_colors.ambient * 0.5f + _colors.faceShade[face] + hit.t / 160.0f + dither(pixelX, pixelY))));
 		}
 	}
 	// The face's outward normal, against the ray on the axis it entered through (a top face,
@@ -625,14 +663,43 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 	{
 		color = ufoLighting->tint[ufoOuterShare > dither(pixelX + 1, pixelY) ? 1 : 0][color]; // a UFO's light: its inner or outer colour
 	}
-	// Far away the haze takes over, dithered in; under the sea the murk closes in much sooner.
+	// Far away the haze takes over (see hazeColor), from where the setting has it start; under
+	// the sea the murk closes in much sooner.
 	const float haze = _colors.underwater ? smoothstep(_maxDistance * 0.12f, _maxDistance * 0.65f, hit.t)
-		: smoothstep(_maxDistance * 0.45f, _maxDistance, hit.t);
-	if (haze > dither(pixelX + 2, pixelY + 1))
+		: smoothstep(_maxDistance * hazeStart(), _maxDistance, hit.t);
+	return hazeColor(color, haze, pixelX + 2, pixelY + 1);
+}
+
+/**
+ * Where the distance haze begins on land, as a share of the view's reach (setting "Distance
+ * haze"): Normal from 45%, Light from 75%, Clear only in the last tenth, so the world doesn't
+ * stop with a hard edge where the view ends.
+ * @return The share, 0..1.
+ */
+float FirstPersonView::hazeStart() const
+{
+	return Options::fpsHaze == 2 ? 0.9f : Options::fpsHaze == 1 ? 0.75f : 0.45f;
+}
+
+/**
+ * Fades a colour into the distance haze: blended towards the haze colour by the amount, from a
+ * table of HazeSteps blends (the palette's nearest colour to each mix), dithered only between
+ * the two steps next to the amount. Neighbouring steps are a shade apart, so the dither doesn't
+ * show; dithering the haze colour itself over a dark wall made it look like the sky showing
+ * through the wall in single pixels, and shimmer as the view moved.
+ * @param color The colour.
+ * @param haze How much haze: 0 none .. 1 all haze.
+ * @param pixelX, pixelY The pixel, for the dither.
+ * @return The colour in the haze.
+ */
+Uint8 FirstPersonView::hazeColor(Uint8 color, float haze, int pixelX, int pixelY) const
+{
+	if (haze <= 0.0f)
 	{
-		color = _colors.haze;
+		return color;
 	}
-	return color;
+	const int step = std::clamp((int)(haze * SceneColors::HazeSteps + dither(pixelX, pixelY)), 0, SceneColors::HazeSteps);
+	return _colors.hazeTint[step][color];
 }
 
 /**
@@ -659,18 +726,21 @@ Uint8 FirstPersonView::colorOutsideMap(const float rayOrigin[3], const float ray
 		rayOrigin[2] + rayDirection[2] * tExit };
 	const float alongBorder = exitAxis == 0 ? exitPoint[1] : exitPoint[0];
 	const float tapeBottom = GroundTop + 8.0f; // the tape hangs 8 voxels above the ground, 7 voxels high
+	// The discreet map edge (setting) has no posts and no tape: the ground beyond and the sky
+	// only, the edge marked by dots on the floor instead (see drawEdgeDots).
+	const bool tape = !Options::fpsDiscreetEdge;
 	const float borderShade = _colors.ambient * 0.5f;
 	// A post every 64 voxels (4 tiles) along the border, 1.5 voxels thick and 17 voxels high,
 	// shaded a little darker on the sides facing north or south than on those facing east or west.
 	const float pastLastPost = alongBorder - std::floor(alongBorder / 64.0f) * 64.0f;
-	if (pastLastPost < 1.5f && exitPoint[2] >= GroundTop && exitPoint[2] < GroundTop + 17.0f)
+	if (tape && pastLastPost < 1.5f && exitPoint[2] >= GroundTop && exitPoint[2] < GroundTop + 17.0f)
 	{
 		depth = tExit;
 		return shadeColor(_colors.post, (int)(borderShade + (exitAxis == 0 ? 1.0f : 2.0f) + dither(pixelX, pixelY)));
 	}
 	// The tape: a black edge at the bottom and top, and between them "X-COM  " in black on
 	// yellow, repeated along the border.
-	if (exitPoint[2] >= tapeBottom && exitPoint[2] < tapeBottom + 7.0f)
+	if (tape && exitPoint[2] >= tapeBottom && exitPoint[2] < tapeBottom + 7.0f)
 	{
 		depth = tExit;
 		const int tapeRow = (int)(exitPoint[2] - tapeBottom); // 0..6, bottom to top
@@ -705,12 +775,8 @@ Uint8 FirstPersonView::colorOutsideMap(const float rayOrigin[3], const float ray
 			// The haze closes in towards the horizon, spread over a longer distance than on the
 			// map so the ground fades out gradually; under the sea the murk closes in as on the map.
 			const float haze = _colors.underwater ? smoothstep(_maxDistance * 0.12f, _maxDistance * 0.65f, groundDistance)
-				: smoothstep(_maxDistance * 0.3f, _maxDistance * 1.6f, groundDistance);
-			if (haze > dither(pixelX + 2, pixelY + 1))
-			{
-				color = _colors.haze;
-			}
-			return color;
+				: smoothstep(_maxDistance * hazeStart() * 0.67f, _maxDistance * 1.6f, groundDistance);
+			return hazeColor(color, haze, pixelX + 2, pixelY + 1);
 		}
 	}
 	// Nothing else in the way: the sky.
@@ -791,6 +857,36 @@ Uint8 FirstPersonView::skyColor(const float rayDirection[3], int pixelX, int pix
 }
 
 /**
+ * The colour of smoke on a pixel (see SmokeTrace), or 0 where it leaves the pixel uncovered. The
+ * smoke covers a share of the pixels (dithered), more where its billows are thick; the billows
+ * are cloud-like noise over the world, drifting slowly east and up. It is the smoke's grey,
+ * shaded by its light, a shade lighter in thick billows and darker in thin ones.
+ * @param light The light of the smoke (the game's shade, 0 brightest .. 15 darkest).
+ * @param rayOrigin, rayDirection The ray.
+ * @param distance Where along the ray the smoke is.
+ * @param coverage The share of the pixels it covers: 0 to 1 (1 covers them all).
+ * @param pixelX, pixelY The pixel (or block of pixels), for the dither.
+ * @return The colour, or 0 if the smoke doesn't cover this pixel.
+ */
+Uint8 FirstPersonView::smokeColor(Uint8 light, const float rayOrigin[3], const float rayDirection[3], float distance, float coverage, int pixelX, int pixelY) const
+{
+	// Where the smoke is, in voxels, and how thick its billow is there (0 .. 1).
+	const float x = rayOrigin[0] + rayDirection[0] * distance, y = rayOrigin[1] + rayDirection[1] * distance,
+		z = rayOrigin[2] + rayDirection[2] * distance;
+	const float billow = cloudNoise((x + z * 0.7f) / 12.0f - _smokeDrift * 0.3f, (y - z * 0.5f) / 12.0f + _smokeDrift * 0.15f);
+	if (coverage < 1.0f && dither(pixelX, pixelY) >= coverage * (0.6f + billow * 0.8f))
+	{
+		return 0;
+	}
+	// Its grey: a shade lighter in a thick billow (if the colour's group has a lighter one),
+	// darker in a thin one, then shaded by the light.
+	int color = _colors.smoke, shade = light;
+	if (billow > 0.62f && (color & 15) > 0) --color;
+	else if (billow < 0.38f) ++shade;
+	return shadeColor((Uint8)color, shade);
+}
+
+/**
  * Casts the rays for a share of the view's rows, on one thread: it takes the next row nobody
  * has taken yet from the shared counter, one row at a time, until there are none left (so the
  * threads share the work out by how fast they are). For each pixel (or block of pixels, with a
@@ -819,6 +915,14 @@ void FirstPersonView::renderRows()
 	const float forward[3] = { (float)_forward[0], (float)_forward[1], (float)_forward[2] };
 	const float right[3] = { (float)_right[0], (float)_right[1], (float)_right[2] };
 	const float up[3] = { (float)_up[0], (float)_up[1], (float)_up[2] };
+
+	// Smoke as the game's sight rules have it (setting "See-through smoke"): traced along each
+	// ray with the sight of the soldier the view looks through.
+	SmokeTrace smokeSight;
+	smokeSight.sightVoxels = _smokeSightVoxels;
+	smokeSight.smokeBlock = _smokeBlock;
+	smokeSight.fireBlock = _fireBlock;
+	const bool traceSmoke = Options::fpsSeeThroughSmoke;
 
 	// With a pixel size above 1, one ray colours a block of pixels (pixelSize x pixelSize).
 	// Auto (0) picks 2 for views bigger than AutoPixelMaxWidth x AutoPixelMaxHeight, else 1.
@@ -856,8 +960,16 @@ void FirstPersonView::renderRows()
 			float tEnd, distanceAlongRay;
 			int endAxis;
 			Uint8 color;
-			switch (castRay(rayContext, rayOrigin, rayDirection, hit, tEnd, endAxis))
+			SmokeTrace smoke = smokeSight;
+			const RayEnd rayEnd = castRay(rayContext, rayOrigin, rayDirection, hit, tEnd, endAxis, traceSmoke ? &smoke : nullptr);
+			switch (rayEnd)
 			{
+			case RAY_SMOKE:
+				// Into smoke too thick to see through: the smoke, shaded by its light.
+				color = smokeColor(smoke.light, rayOrigin, rayDirection, smoke.wallAt, 1.0f, blockColumn, blockRow);
+				distanceAlongRay = smoke.wallAt;
+				hit.emissive = false;
+				break;
 			case RAY_HIT:
 				// Something on the map.
 				color = shadeHit(hit, rayOrigin, rayDirection, blockColumn, blockRow);
@@ -873,10 +985,15 @@ void FirstPersonView::renderRows()
 				distanceAlongRay = Infinity;
 				break;
 			case RAY_BOTTOM:
-				// Out through the bottom of the map: nothing down there.
-				color = 0x0F;
-				distanceAlongRay = Infinity;
+			{
+				// Out through the bottom of the map (through a hole blown in the ground floor):
+				// the earth below, the ground's colour in deep shade, never a black hole.
+				const float bottomX = rayOrigin[0] + rayDirection[0] * tEnd, bottomY = rayOrigin[1] + rayDirection[1] * tEnd;
+				const Uint8 earth = _groundModel ? _groundModel->color[0][(int)std::floor(bottomY) & 15][(int)std::floor(bottomX) & 15] : 0;
+				color = earth ? shadeColor(earth, std::min(12 - (earth & 15), 6 + (int)dither(blockColumn, blockRow))) : _colors.unexplored;
+				distanceAlongRay = tEnd;
 				break;
+			}
 			default:
 				// Out through the top: the ground below the map's edge can still be in sight.
 				color = colorOutsideMap(rayOrigin, rayDirection, tEnd, 2, blockColumn, blockRow, distanceAlongRay);
@@ -886,6 +1003,20 @@ void FirstPersonView::renderRows()
 			if (hit.glass)
 			{
 				color = _colors.glassTint[color];
+			}
+			// Seen through thinner smoke: a veil over it, as thick as the share of the sight
+			// the smoke used up (squared, so smoke the soldier sees well through stays light, and
+			// never quite gone). What the veil covers doesn't shine.
+			if (traceSmoke && rayEnd != RAY_SMOKE && smoke.cost > 0.0f)
+			{
+				const float sightLeft = std::max(1.0f, smoke.sightVoxels - smoke.lastSmoke);
+				const float used = std::min(1.0f, smoke.cost / sightLeft);
+				const Uint8 veil = smokeColor(smoke.light, rayOrigin, rayDirection, smoke.lastSmoke, std::max(0.08f, used * used), blockColumn, blockRow);
+				if (veil)
+				{
+					color = veil;
+					hit.emissive = false;
+				}
 			}
 			// Fill the block: colour, depth, and whether it shines (a UFO's light counts three
 			// times in the bloom, for a stronger halo round it).
@@ -918,8 +1049,10 @@ void FirstPersonView::castAllRays()
 	// rows as they go, a slower core (a hybrid CPU's efficient cores, a second thread on a core)
 	// still adds what it can and never holds the frame up.
 	static const int threadCount = std::clamp((int)std::thread::hardware_concurrency(), 1, 16);
-	// The flares' light for this frame, which every ray hitting near a flare needs.
+	// The flares' light for this frame, which every ray hitting near a flare needs, and the
+	// time the smoke's billows drift by (the same for every thread).
 	prepareFlareLights();
+	_smokeDrift = (SDL_GetTicks() % 1000000) / 1000.0f;
 	// The helper threads are started on the first frame, then kept for the next ones.
 	if (_rayWorkers.threads.empty())
 	{

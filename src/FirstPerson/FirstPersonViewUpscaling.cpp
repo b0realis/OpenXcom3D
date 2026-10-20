@@ -102,8 +102,11 @@ bool FirstPersonView::upscaleHere(const double world[3], double scale) const
  * @param world The world point, in voxels.
  * @param depthBias How much nearer than the point the sprite counts for the depth test, in voxels.
  * @param shade How much darker to draw it (the game's shade, 0 none).
+ * @param scale Its size against the isometric map's (1: the same; see drawSprite).
+ * @param pose Standing, or lying on the floor (see drawSprite).
  */
-void FirstPersonView::drawSpriteSmooth(const Surface *sprite, int anchorX, int anchorY, const double world[3], double depthBias, int shade)
+void FirstPersonView::drawSpriteSmooth(const Surface *sprite, int anchorX, int anchorY, const double world[3], double depthBias, int shade, double scale,
+	SpritePose pose)
 {
 	if (sprite && upscaleHere(world, 1.0))
 	{
@@ -111,11 +114,11 @@ void FirstPersonView::drawSpriteSmooth(const Surface *sprite, int anchorX, int a
 		// its anchor scaled up to match.
 		if (const Surface *bigSprite = upscaled(sprite))
 		{
-			drawSprite(bigSprite, anchorX * UpscaleFactor, anchorY * UpscaleFactor, world, depthBias, shade, 1.0 / UpscaleFactor);
+			drawSprite(bigSprite, anchorX * UpscaleFactor, anchorY * UpscaleFactor, world, depthBias, shade, scale / UpscaleFactor, pose);
 			return;
 		}
 	}
-	drawSprite(sprite, anchorX, anchorY, world, depthBias, shade);
+	drawSprite(sprite, anchorX, anchorY, world, depthBias, shade, scale, pose);
 }
 
 /**

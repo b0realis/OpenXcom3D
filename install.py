@@ -59,7 +59,7 @@ from pathlib import Path
 
 # ---- What is installed, and what it is built from ----
 
-VERSION = "0.8.2"
+VERSION = "0.9"
 # OpenXcom3D is a patch on one exact commit of OpenXcom Extended (OXCE).
 BASE_REPO = "https://github.com/MeridianOXC/OpenXcom.git"
 BASE_BRANCH = "oxce-plus"

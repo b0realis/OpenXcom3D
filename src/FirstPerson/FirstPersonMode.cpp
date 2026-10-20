@@ -60,14 +60,17 @@
 #include "../Battlescape/BattlescapeGame.h"
 #include "../Battlescape/ExplosionBState.h"
 #include "../Battlescape/BattlescapeState.h"
+#include "../Battlescape/Camera.h"
 #include "../Battlescape/Map.h"
 #include "../Battlescape/Pathfinding.h"
+#include "../Battlescape/TileEngine.h"
 #include "../Battlescape/WarningMessage.h"
 #include "../Engine/Action.h"
 #include "../Engine/Game.h"
 #include "../Engine/Options.h"
 #include "../Engine/Screen.h"
 #include "../Interface/Bar.h"
+#include "../Interface/BattlescapeButton.h"
 #include "../Interface/NumberText.h"
 #include "../Interface/Text.h"
 #include "../Interface/TextButton.h"
@@ -96,6 +99,8 @@ const SavedBattleGame *lastBattle = nullptr;
 bool lastWants3D = false;
 /// Whether the classic HUD was shown over the 3D view (FirstPersonMode::_classicHud).
 bool lastClassicHud = false;
+/// Whether the 3D HUD was hidden (FirstPersonMode::_hudHidden).
+bool lastHudHidden = false;
 /// When a first-person mode last ran its per-frame update (SDL ticks, ms; 0: never).
 Uint32 lastThinkTicks = 0;
 
@@ -123,6 +128,7 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
 	createView();
 	createCrosshairAndBanner();
 	createLiftArrows();
+	createCompass();
 	createTopBar();
 	createInfoPanel();
 	createSoldierCard();
@@ -150,6 +156,7 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
 	{
 		_wants3D = lastWants3D;
 		_classicHud = lastClassicHud;
+		_hudHidden = lastHudHidden;
 		_mouseLook = !_classicHud;
 	}
 	rememberChoices();
@@ -272,6 +279,39 @@ void FirstPersonMode::createLiftArrows()
 }
 
 /**
+ * Makes the compass (setting "Compass"): a round disc at the top right, under the top bar, with
+ * the heading arrow on top of it, the four letters of the compass going round it, and a line under
+ * it that warns when looking further will turn the soldier at a cost (see updateCompass). All
+ * hidden until the 3D view shows.
+ */
+void FirstPersonMode::createCompass()
+{
+	const int width = canvasWidth(); // our surfaces are laid out on the canvas (see makeCanvas)
+	const int compassX = width - CompassSize - 4, compassY = BarY + BarH + CompassGap;
+	_compass = new Surface(CompassSize, CompassArrowH + CompassSize, compassX, compassY);
+	_state->add(_compass);
+	_compass->setVisible(false);
+	_ownSurfaces.insert(_compass);
+
+	// The letters, small, north in red (as on a compass rose), the others in the buttons' grey.
+	const char *const letters[4] = { "N", "E", "S", "W" };
+	for (int letter = 0; letter < 4; ++letter)
+	{
+		_compassLetters[letter] = addText(7, 8, compassX, compassY, "button", "firstPerson");
+		_compassLetters[letter]->setSmall();
+		_compassLetters[letter]->setAlign(ALIGN_CENTER);
+		_compassLetters[letter]->setText(letters[letter]);
+		_compassLetters[letter]->setColor(letter == 0 ? textColor(_state->getPalette(), 230, 60, 50) : textColor(_state->getPalette(), 200, 200, 210));
+		_compassLetters[letter]->setVisible(false);
+	}
+
+	// The warning line under the dial.
+	_txtCompassTurn = addText(CompassSize + 20, 9, compassX - 10, compassY + CompassArrowH + CompassSize + 1, "weapon", "firstPerson");
+	_txtCompassTurn->setAlign(ALIGN_CENTER);
+	_txtCompassTurn->setVisible(false);
+}
+
+/**
  * Makes the top bar: small buttons in the style of the original UI (colours from the mod's
  * "firstPerson" interface): 3D, HUD, INV, previous / next soldier, the suit's buttons and END.
  * Where each one finally goes is worked out by layoutTopBar. The squad buttons are made as
@@ -381,6 +421,14 @@ void FirstPersonMode::createInfoPanel()
 	{
 		bar->setScale(1.0);
 	}
+	// The stats' own colours, for when Doom IDDQD has turned them silver and stops.
+	const NumberText *numbers[4] = { _numTimeUnits, _numEnergy, _numHealth, _numMorale };
+	const Bar *bars[4] = { _barTimeUnits, _barEnergy, _barHealth, _barMorale };
+	for (int stat = 0; stat < 4; ++stat)
+	{
+		_statColors[stat] = numbers[stat]->getColor();
+		_statColors[4 + stat] = bars[stat]->getColor();
+	}
 }
 
 /**
@@ -472,8 +520,12 @@ void FirstPersonMode::setResizeAnchors()
 	_anchors[_txtMode] = CENTER;
 	_anchors[_txtShot] = CENTER;
 
-	// END and the suit's buttons keep to the top right; the info panel to the bottom left.
+	// END and the suit's buttons keep to the top right, and so does the compass; the info panel
+	// to the bottom left.
 	_anchors[_btnEndTurn] = TOP_RIGHT;
+	_anchors[_compass] = TOP_RIGHT;
+	for (Text *letter : _compassLetters) _anchors[letter] = TOP_RIGHT;
+	_anchors[_txtCompassTurn] = TOP_RIGHT;
 	for (Surface *part : _panelParts) _anchors[part] = BOTTOM_LEFT;
 	for (Surface *part : { _btnFly, _btnLight, _btnNight, _btnSpecial }) _anchors[part] = TOP_RIGHT;
 }
@@ -489,6 +541,7 @@ void FirstPersonMode::rememberChoices() const
 	lastBattle = _save;
 	lastWants3D = _wants3D;
 	lastClassicHud = _classicHud;
+	lastHudHidden = _hudHidden;
 }
 
 /**
@@ -660,6 +713,7 @@ TextButton *FirstPersonMode::makeButton(int x, int width, const std::string &lab
 	button->setSmall();
 	button->setText(label);
 	_ownSurfaces.insert(button);
+	_topBarSurfaces.insert(button);
 	return button;
 }
 
@@ -815,12 +869,22 @@ void FirstPersonMode::toggleView()
 void FirstPersonMode::setActive(bool active)
 {
 	// Back on the isometric map, moves are paid for by the rules there: no flight cost of our
-	// own (the setting "Flight cost per level"), no vault in progress.
+	// own (the setting "Flight cost per level"), no vault in progress. And the map's camera goes
+	// to the soldier the view looked through (on their level), who may have walked far from
+	// where the map was left, so nobody gets lost.
 	if (!active)
 	{
 		_save->getPathfinding()->setFlightCost(nullptr, -1); // by the rules on the isometric map
 		endVault();
+		BattleUnit *viewedUnit = _save->getSide() == FACTION_PLAYER ? _save->getSelectedUnit() : _lastPlayerUnit;
+		if (viewedUnit && !viewedUnit->isOut())
+		{
+			_state->_map->getCamera()->centerOnPosition(viewedUnit->getPosition());
+		}
 	}
+	// A path the isometric map previewed (its arrows) belongs to before the switch: whichever
+	// way it goes, the soldier may have moved since, so the old arrows go.
+	_save->getPathfinding()->removePreview();
 
 	// In 3D the night vision hold key (Space) jumps; night vision there is gear with its own key.
 	_state->_map->setNightVisionHoldBlocked(active && Options::keyFpsJump == Options::keyNightVisionHold);
@@ -864,6 +928,31 @@ void FirstPersonMode::setClassicHud(bool on)
 }
 
 /**
+ * Hides or shows the 3D HUD (the hide HUD key, P by default), for a clear view: the top bar, the
+ * info panel, the compass, the lift arrows, the enemy markers and the original's enemy buttons.
+ * The crosshair and the weapon in hand stay (each has its own setting), and so do the banners
+ * and the game's messages. Hidden buttons can't be clicked. On the isometric map the top bar
+ * shows as ever. Hidden, a message says which key brings it back.
+ */
+void FirstPersonMode::toggleHud()
+{
+	_hudHidden = !_hudHidden;
+	rememberChoices();
+	if (_hudHidden)
+	{
+		_state->warningRaw(_state->tr("STR_FPS_HUD_HIDDEN").arg(keyLabel(Options::keyFpsHideHud)));
+	}
+}
+
+/**
+ * Is the 3D HUD hidden right now: in the 3D view, with the hide HUD key?
+ */
+bool FirstPersonMode::hudHidden() const
+{
+	return _hudHidden && isActive();
+}
+
+/**
  * Switches between mouse look (the mouse turns the view, captured) and a free cursor (for
  * clicking our buttons and aiming at a point). Ends any right-button drag look.
  * @param on True for mouse look.
@@ -893,13 +982,49 @@ bool FirstPersonMode::canAct() const
 }
 
 /**
- * Doom mode (debug): the selected soldier never runs out of time units, energy or ammo. Called
- * every frame: tops up the time units and energy, and refills every clip loaded in the weapons
- * in both hands.
+ * Is doom mode on? It is with its own setting, and with either of its extras, which are doom
+ * mode plus more: IDKFA (endless ammo) and IDDQD (invincible soldiers).
+ * @return True if doom mode is on.
+ */
+bool FirstPersonMode::doomModeOn()
+{
+	return Options::fpsDoomMode || Options::fpsDoomIdkfa || Options::fpsDoomIddqd;
+}
+
+/**
+ * The doom mode key (Insert): with any of the cheats on (doom mode, IDKFA, IDDQD), switches them
+ * all off and remembers which were on; with none on, switches those back on (doom mode alone if
+ * there are none to remember).
+ */
+void FirstPersonMode::toggleCheats()
+{
+	if (doomModeOn())
+	{
+		_pausedCheats = (Options::fpsDoomMode ? 1 : 0) | (Options::fpsDoomIdkfa ? 2 : 0) | (Options::fpsDoomIddqd ? 4 : 0);
+		Options::fpsDoomMode = Options::fpsDoomIdkfa = Options::fpsDoomIddqd = false;
+	}
+	else
+	{
+		const int cheats = _pausedCheats ? _pausedCheats : 1;
+		Options::fpsDoomMode = (cheats & 1) != 0;
+		Options::fpsDoomIdkfa = (cheats & 2) != 0;
+		Options::fpsDoomIddqd = (cheats & 4) != 0;
+	}
+}
+
+/**
+ * Doom mode (debug): the selected soldier never runs out of time units or energy. Called every
+ * frame: tops them up. Ammo still counts, unless IDKFA is on too: then every clip loaded in the
+ * weapons in both hands is filled up again, and no shot spends a round (see endlessAmmo, which
+ * keeps a one-round clip such as a rocket from being used up).
  */
 void FirstPersonMode::applyDoomMode(BattleUnit *unit)
 {
 	unit->resetTimeUnitsAndEnergy();
+	if (!Options::fpsDoomIdkfa)
+	{
+		return;
+	}
 	for (BattleItem *item : { unit->getRightHandWeapon(), unit->getLeftHandWeapon() })
 	{
 		if (!item)
@@ -920,6 +1045,54 @@ void FirstPersonMode::applyDoomMode(BattleUnit *unit)
 }
 
 /**
+ * Doom IDDQD: X-COM's units take no damage (see invincible), and this keeps their morale full,
+ * so seeing a squadmate fall doesn't make them panic either. Called every frame of the battle,
+ * on either side's turn.
+ */
+void FirstPersonMode::applyGodMode()
+{
+	if (!Options::fpsDoomIddqd)
+	{
+		return;
+	}
+	for (BattleUnit *unit : *_save->getUnits())
+	{
+		if (unit->getFaction() == FACTION_PLAYER && !unit->isOut() && unit->getMorale() < 100)
+		{
+			unit->moraleChange(100 - unit->getMorale());
+		}
+	}
+}
+
+/**
+ * Doom IDKFA, asked by the game whenever a weapon spends ammo: does this unit's shot spend
+ * nothing? The selected soldier's, on the player's turn, in the 3D view (where doom mode tops
+ * the soldier up), with IDKFA on.
+ * @param state The battlescape screen.
+ * @param unit The unit holding the weapon.
+ * @return True if the shot spends no ammo.
+ */
+bool FirstPersonMode::endlessAmmo(BattlescapeState *state, const BattleUnit *unit)
+{
+	return Options::fpsDoomIdkfa && state && state->_firstPerson && state->_firstPerson->isActive() && unit
+		&& unit->getFaction() == FACTION_PLAYER && state->_firstPerson->_save->getSide() == FACTION_PLAYER
+		&& state->_firstPerson->_save->getSelectedUnit() == unit;
+}
+
+/**
+ * Doom IDDQD, asked by the game whenever a unit is about to take damage: is it invincible? Any
+ * of X-COM's units, on either side's turn and in either view, with IDDQD on (the alien turn is
+ * when they get shot).
+ * @param state The battlescape screen.
+ * @param unit The unit about to be hurt.
+ * @return True if it takes no damage.
+ */
+bool FirstPersonMode::invincible(BattlescapeState *state, const BattleUnit *unit)
+{
+	return Options::fpsDoomIddqd && state && state->_firstPerson && unit && unit->getFaction() == FACTION_PLAYER;
+}
+
+/**
  * Doom mode (a first step towards a real-time mode): a grenade primed there (pulling the pin is
  * one click, see fire) burns for DoomFuseTime and then goes off wherever it is: where it lies,
  * or in the hand of whoever still holds it, as in a first-person shooter; one still in the air
@@ -936,7 +1109,7 @@ void FirstPersonMode::updateDoomFuses(Uint32 now)
 	{
 		return;
 	}
-	if (!Options::fpsDoomMode)
+	if (!doomModeOn())
 	{
 		_doomFuses.clear();
 		return;
@@ -1074,6 +1247,9 @@ void FirstPersonMode::think()
 		_ignoreMotionUntil = now + 150;
 	}
 
+	// Doom IDDQD keeps X-COM's morale full, whatever the view and whoever's turn it is.
+	applyGodMode();
+
 	// A soldier going down or breaking down: their camera has the frame.
 	if (deathCam(now, elapsedSeconds) || breakdownCam(now, elapsedSeconds))
 	{
@@ -1102,6 +1278,7 @@ void FirstPersonMode::think()
 	// isometric map and flight.
 	updateTopBar(selected);
 	updateSoldierCard();
+	watchMapLayers();
 	updateMusic(now);
 	updateMapAim();
 	updateFlight(show3D ? unit : nullptr);
@@ -1112,6 +1289,7 @@ void FirstPersonMode::think()
 		updateInfoPanel(nullptr);
 		updateArmorButtons(nullptr);
 		updateLift(nullptr, now);
+		updateCompass(nullptr);
 		updateCrosshair(nullptr, playerTurn);
 		updateBanner(playerTurn);
 		updateWeaponInHand(nullptr);
@@ -1120,7 +1298,7 @@ void FirstPersonMode::think()
 	}
 
 	// Doom mode (debug) tops the soldier up, on your turn, and its grenades burn in real time.
-	if (playerTurn && Options::fpsDoomMode && unit->getFaction() == FACTION_PLAYER)
+	if (playerTurn && doomModeOn() && unit->getFaction() == FACTION_PLAYER)
 	{
 		applyDoomMode(unit);
 	}
@@ -1144,6 +1322,9 @@ void FirstPersonMode::think()
 	// more, of 0 bright .. 15 dark), the soldier's personal light becomes a shoulder flashlight
 	// (setting "Flashlight").
 	_view->setNightVision(hasNightVision(unit) ? _state->_map->getNightVisionColor() : 0);
+	// Smoke as this soldier's eyes see through it: the game's sight range, and the armor's heat
+	// vision (setting "See-through smoke").
+	_view->setSmokeSight(_save->getTileEngine()->getMaxViewDistance() * 16.0f, unit->getVisibilityThroughSmoke(), unit->getVisibilityThroughFire());
 	_view->setFlashlight(Options::fpsFlashlight && _save->getTogglePersonalLight() && _save->getGlobalShade() >= 6);
 
 	// The camera follows the soldier (and walks them on your turn); on your turn the soldier
@@ -1161,6 +1342,7 @@ void FirstPersonMode::think()
 	updateInfoPanel(unit);
 	updateArmorButtons(unit);
 	updateLift(unit, now);
+	updateCompass(unit);
 	updateCrosshair(unit, playerTurn);
 	updateBanner(playerTurn);
 	updateWeaponInHand(unit);
@@ -1309,12 +1491,19 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	// night vision. (The flare key is only ours while flares are switched on.)
 	if (key == Options::keyFpsMouseMode) { if (pressed) setMouseLook(!_mouseLook); return true; }
 	if (key == Options::keyFpsClassicHud) { if (pressed) setClassicHud(!_classicHud); return true; }
-	if (key == Options::keyFpsDoomMode) { if (pressed) Options::fpsDoomMode = !Options::fpsDoomMode; return true; }
+	if (key == Options::keyFpsHideHud) { if (pressed) toggleHud(); return true; }
+	if (key == Options::keyFpsDoomMode) { if (pressed) toggleCheats(); return true; }
 	if (key == Options::keyFpsNextMode) { if (pressed) cycleFireMode(1); return true; }
 	if (key == Options::keyFpsModeSnap) { if (pressed) selectFireMode(BA_SNAPSHOT); return true; }
 	if (key == Options::keyFpsModeAimed) { if (pressed) selectFireMode(BA_AIMEDSHOT); return true; }
 	if (key == Options::keyFpsModeAuto) { if (pressed) selectFireMode(BA_AUTOSHOT); return true; }
 	if (key == Options::keyFpsSwitchHand) { if (pressed) switchHand(); return true; }
+	if (key == Options::keyFpsTurnLeft) { if (pressed) { _snapTurnDegrees -= 45.0; _snapTurnFacing = true; } return true; }
+	if (key == Options::keyFpsTurnRight) { if (pressed) { _snapTurnDegrees += 45.0; _snapTurnFacing = true; } return true; }
+	if (key == Options::keyFpsAkimbo) { if (pressed) toggleAkimbo(); return true; }
+	// The lean keys (setting "Lean") are read each frame while held (see updateLean); here they
+	// are only swallowed, so they don't open the hands' menus. With leaning off they're the game's.
+	if (Options::fpsLean > 0 && key != SDLK_UNKNOWN && (key == Options::keyFpsLeanLeft || key == Options::keyFpsLeanRight)) return true;
 	if (key == Options::keyFpsOpenDoor) { if (pressed) openDoor(_save->getSelectedUnit()); return true; }
 	if (key == Options::keyFpsFlare && Options::fpsFlares) { if (pressed) throwFlare(); return true; }
 	if (key == Options::keyFpsUp) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_UP, action); return true; }
@@ -1322,6 +1511,49 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	if (key == Options::keyFpsFlight) { if (pressed) toggleFlight(_save->getSelectedUnit()); return true; }
 	if (key == Options::keyFpsJump) { if (pressed) jump(_save->getSelectedUnit()); return true; }
 	if (key == Options::keyFpsNightVision) { if (pressed) toggleNightVision(_save->getSelectedUnit(), action); return true; }
+
+	// The game's own keys for what acts on the isometric map, translated (see classicHudButton):
+	// the centre key (Home) looks straight ahead; the map level keys (if not taken by up/down
+	// above) look a level up or down; the soldier up/down keys move as ours do; and the minimap
+	// key (M) opens the minimap on the soldier (the map's camera goes there first, then the
+	// game opens it).
+	if (key != SDLK_UNKNOWN)
+	{
+		const BattlescapeState *s = _state;
+		if (key == Options::keyBattleCenterUnit) { if (pressed) classicHudButton(s->_btnCenter, action); return true; }
+		if (key == Options::keyBattleLevelUp) { if (pressed) classicHudButton(s->_btnMapUp, action); return true; }
+		if (key == Options::keyBattleLevelDown) { if (pressed) classicHudButton(s->_btnMapDown, action); return true; }
+		if (key == Options::keyBattleUnitUp) { if (pressed) classicHudButton(s->_btnUnitUp, action); return true; }
+		if (key == Options::keyBattleUnitDown) { if (pressed) classicHudButton(s->_btnUnitDown, action); return true; }
+		if (key == Options::keyBattleMap && pressed && _save->getSelectedUnit())
+		{
+			_state->_map->getCamera()->centerOnPosition(_save->getSelectedUnit()->getPosition());
+			return false;
+		}
+	}
+
+	// The numpad (after the bindable keys, which may use it): moves a tile at a time, almost at
+	// once, as on the isometric map, whatever the movement setting: 8 ahead, 2 back, 4 and 6
+	// sideways, relative to the view; 7 and 9 a snap turn. A press is remembered until the move
+	// can start (see tileMoveVelocity), so a quick tap always counts.
+	if (key == SDLK_KP8 || key == SDLK_KP2 || key == SDLK_KP4 || key == SDLK_KP6)
+	{
+		if (pressed)
+		{
+			_numpadMove[0] = key == SDLK_KP8 ? 1 : key == SDLK_KP2 ? -1 : 0;
+			_numpadMove[1] = key == SDLK_KP6 ? 1 : key == SDLK_KP4 ? -1 : 0;
+		}
+		return true;
+	}
+	if (key == SDLK_KP7 || key == SDLK_KP9)
+	{
+		if (pressed)
+		{
+			_snapTurnDegrees += key == SDLK_KP7 ? -45.0 : 45.0;
+			_snapTurnFacing = true;
+		}
+		return true;
+	}
 
 	// The game's "centre on enemy" keys (1 to 10) turn the view to that enemy instead (an
 	// unbound key, SDLK_UNKNOWN, matches nothing).
@@ -1428,12 +1660,19 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 			}
 		}
 
-		// The wheel over the squad buttons (or previous / next) scrolls them.
+		// The wheel over the squad buttons (or previous / next) scrolls them; so does a right
+		// click on previous / next, which only scrolls (no soldier is selected), to browse the
+		// squad by their helmet cameras.
 		const bool overSquad = buttonUnderCursor && (buttonUnderCursor == _btnPrev || buttonUnderCursor == _btnNext
 			|| std::find(_btnSquad.begin(), _btnSquad.end(), buttonUnderCursor) != _btnSquad.end());
 		if (wheelTurned && overSquad)
 		{
 			scrollSquad(event.button.button == SDL_BUTTON_WHEELUP ? -1 : 1);
+			return true;
+		}
+		if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_RIGHT && (buttonUnderCursor == _btnPrev || buttonUnderCursor == _btnNext))
+		{
+			scrollSquad(buttonUnderCursor == _btnPrev ? -1 : 1);
 			return true;
 		}
 
@@ -1467,18 +1706,37 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 			return true;
 		}
 
-		// The visible enemy buttons turn the view to that enemy (the classic HUD's own handling
-		// centres the map). They are the game's, drawn on the screen itself, not on the canvas.
-		if (!_classicHud && event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT)
+		// The game's own buttons, drawn on the screen itself (not on the canvas), where the map's
+		// handling would move the hidden map instead: the visible enemy buttons (with or without
+		// the classic HUD), and with the classic HUD, its buttons that act on the map.
+		auto under = [&](const InteractiveSurface *button) {
+			return button->getVisible() && mouseX >= button->getX() && mouseX < button->getX() + button->getWidth()
+				&& mouseY >= button->getY() && mouseY < button->getY() + button->getHeight();
+		};
+		const bool press = event.type == SDL_MOUSEBUTTONDOWN && (event.button.button == SDL_BUTTON_LEFT || event.button.button == SDL_BUTTON_RIGHT);
+		const bool release = event.type == SDL_MOUSEBUTTONUP && (event.button.button == SDL_BUTTON_LEFT || event.button.button == SDL_BUTTON_RIGHT);
+		if (press || release)
 		{
-			for (int enemyIndex = 0; enemyIndex < BattlescapeState::VISIBLE_MAX; ++enemyIndex)
+			// An enemy button: the left button turns the view to that enemy, the right one picks
+			// the soldier who sees it with the most time units left, looking at it (the map would
+			// centre on the enemy, or on that soldier).
+			for (int enemyIndex = 0; enemyIndex < BattlescapeState::VISIBLE_MAX && (_classicHud || !hudHidden()); ++enemyIndex)
 			{
-				const InteractiveSurface *enemyButton = _state->_btnVisibleUnit[enemyIndex];
-				if (enemyButton->getVisible()
-					&& mouseX >= enemyButton->getX() && mouseX < enemyButton->getX() + enemyButton->getWidth()
-					&& mouseY >= enemyButton->getY() && mouseY < enemyButton->getY() + enemyButton->getHeight())
+				if (!under(_state->_btnVisibleUnit[enemyIndex])) continue;
+				if (press && event.button.button == SDL_BUTTON_LEFT) lookAtEnemy(enemyIndex);
+				if (press && event.button.button == SDL_BUTTON_RIGHT) lookFromBestSpotter(enemyIndex);
+				return true;
+			}
+			// A classic HUD button that acts on the map: translated on the press (the release is
+			// swallowed too, so the game's button doesn't click as well).
+			if (_classicHud)
+			{
+				const InteractiveSurface *mapButtons[] = { _state->_btnUnitUp, _state->_btnUnitDown, _state->_btnMapUp, _state->_btnMapDown,
+					_state->_btnShowMap, _state->_btnCenter };
+				for (const InteractiveSurface *button : mapButtons)
 				{
-					lookAtEnemy(enemyIndex);
+					if (!under(button)) continue;
+					if (press && event.button.button == SDL_BUTTON_LEFT) classicHudButton(button, action);
 					return true;
 				}
 			}
@@ -1563,7 +1821,7 @@ bool FirstPersonMode::blit()
 	{
 		for (Surface *surface : _state->_surfaces)
 		{
-			if (surface != _view && _ownSurfaces.count(surface)) surface->blit(screen);
+			if (surface != _view && _ownSurfaces.count(surface) && !(hudHidden() && _topBarSurfaces.count(surface))) surface->blit(screen);
 		}
 	}
 	else
@@ -1571,14 +1829,15 @@ bool FirstPersonMode::blit()
 		_canvas->clear();
 		for (Surface *surface : _state->_surfaces)
 		{
-			if (surface != _view && _ownSurfaces.count(surface)) surface->blit(_canvas->getSurface());
+			if (surface != _view && _ownSurfaces.count(surface) && !(hudHidden() && _topBarSurfaces.count(surface))) surface->blit(_canvas->getSurface());
 		}
 		magnify(screen, true);
 	}
 
 	// The original's visible enemy buttons (bottom right; clicking one turns the view to it),
-	// with their numbers, when the classic HUD that normally has them is hidden.
-	if (full3D)
+	// with their numbers, when the classic HUD that normally has them is hidden (and the 3D HUD
+	// isn't).
+	if (full3D && !hudHidden())
 	{
 		for (int enemyIndex = 0; enemyIndex < BattlescapeState::VISIBLE_MAX; ++enemyIndex)
 		{

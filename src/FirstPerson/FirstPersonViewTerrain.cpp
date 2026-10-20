@@ -331,6 +331,81 @@ void findGlow(FirstPersonView::VoxelModel &model)
 	}
 }
 
+/**
+ * Does a wall the mod lists as a window really look like one? The list goes by data set name
+ * and record number, and another mod may use the same data set name for records of its own, so
+ * the number could point at a plain wall, whose pixels in the glass colours would then turn
+ * see-through. A window is a wall (west or north) that is a door (a glass door), or whose shape
+ * is thinner somewhere between its bottom and top layers than at its bottom (an opening, or a
+ * pane thinner than the wall).
+ * @param mapData The record.
+ * @param loftData The game's LOFT templates (16 rows of 16 voxels each).
+ * @return True if it may have glass.
+ */
+bool looksLikeWindow(const MapData *mapData, const std::vector<Uint16> &loftData)
+{
+	if (mapData->getObjectType() != O_WESTWALL && mapData->getObjectType() != O_NORTHWALL)
+	{
+		return false;
+	}
+	if (mapData->isDoor())
+	{
+		return true;
+	}
+	// The solid voxels in each of the 12 layers (each LOFT template covers two voxel layers).
+	int solid[12] = {};
+	int topLayer = -1;
+	for (int layer = 0; layer < 12; ++layer)
+	{
+		const size_t loftStart = mapData->getLoftID(layer) * 16;
+		for (int row = 0; row < 16 && loftStart + 16 <= loftData.size(); ++row)
+		{
+			solid[layer] += std::bitset<16>(loftData[loftStart + row]).count();
+		}
+		if (solid[layer]) topLayer = layer;
+	}
+	// Thinner than the bottom somewhere in between.
+	for (int layer = 1; layer < topLayer; ++layer)
+	{
+		if (solid[layer] < solid[0]) return true;
+	}
+	return false;
+}
+
+/**
+ * Keeps a window's glass inside its panes. The art draws a wall's top edge, the sill and lintel
+ * of a window and the ends of a wall in the same light colours as the glass, and seen through,
+ * those would let the sky show through a wall in single pixels (looking down from a roof, say).
+ * So a glass voxel stays glass only if the voxels above and below it are solid (not the top of
+ * the wall, nor next to the window's opening) and it isn't at either end of the wall.
+ * @param model The window's model, with its voxels and glass already filled in.
+ * @param part The wall it is: O_WESTWALL (it runs north-south, along y) or O_NORTHWALL (along x).
+ */
+void keepGlassInPanes(FirstPersonView::VoxelModel &model, TilePart part)
+{
+	for (int z = 0; z < 24; ++z)
+	{
+		for (int y = 0; y < 16; ++y)
+		{
+			if (!model.glass[z][y]) continue;
+			for (int x = 0; x < 16; ++x)
+			{
+				if (!(model.glass[z][y] & (1 << x))) continue;
+				// Air above (the wall's top, or the opening over a sill) or below (the opening
+				// under a lintel); below the bottom layer counts as solid ground.
+				const bool airAbove = z == 23 || !model.color[z + 1][y][x];
+				const bool airBelow = z > 0 && !model.color[z - 1][y][x];
+				// An end of the wall: its first or last voxel along its length.
+				const int along = part == O_WESTWALL ? y : x;
+				if (airAbove || airBelow || along == 0 || along == 15)
+				{
+					model.glass[z][y] &= (Uint16)~(1 << x);
+				}
+			}
+		}
+	}
+}
+
 }
 
 /**
@@ -756,8 +831,9 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 		return;
 	}
 
-	// Is this record a window (declared by the mod, by data set and record number), and which
-	// of its colours are glass?
+	// Is this record a window (declared by the mod, by data set and record number, and shaped
+	// like one, see looksLikeWindow), and which of its colours are glass?
+	const std::vector<Uint16> *loftData = _game->getMod()->getVoxelData();
 	const std::bitset<256> *glassColors = nullptr;
 	if (const RuleFirstPerson::Windows *windows = _game->getMod()->getFirstPerson().getWindows(mapData->getDataset()->getName()))
 	{
@@ -767,7 +843,7 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 		{
 			if (dataSet->getObject(record) == mapData)
 			{
-				if (windows->records.count((int)record)) glassColors = &windows->glass;
+				if (windows->records.count((int)record) && looksLikeWindow(mapData, *loftData)) glassColors = &windows->glass;
 				break;
 			}
 		}
@@ -775,7 +851,6 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 
 	// Go through the tile's voxels, layer by layer from the bottom (z), row by row from the
 	// north (y), west to east (x).
-	const std::vector<Uint16> *loftData = _game->getMod()->getVoxelData();
 	const int yOffset = mapData->getYOffset();
 	const int nudgeCount = cutout ? 3 : (int)(sizeof(SpriteNudges) / sizeof(SpriteNudges[0]));
 	for (int z = 0; z < Position::TileZ; ++z)
@@ -839,6 +914,12 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 				}
 			}
 		}
+	}
+
+	// A window's glass only inside its panes, not on its frame or the wall's edges.
+	if (glassColors)
+	{
+		keepGlassInPanes(model, mapData->getObjectType());
 	}
 
 	// A thin plate (all its voxels in the bottom 4 layers) may be drawn as a raised slab: fit its top.
@@ -1208,6 +1289,10 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 	tileView.seen = (Uint8)((tileView.discovered ? (1 << O_FLOOR) | (1 << O_OBJECT) : 0)
 		| (debug || tile->isDiscovered(O_WESTWALL) ? 1 << O_WESTWALL : 0)
 		| (debug || tile->isDiscovered(O_NORTHWALL) ? 1 << O_NORTHWALL : 0));
+	// Its smoke, once the tile has been seen (as the map shows smoke only there), and whether
+	// it burns.
+	tileView.smoke = tileView.discovered ? (Uint8)std::clamp(tile->getSmoke(), 0, 255) : 0;
+	tileView.burning = tile->getFire() > 0;
 }
 
 /**

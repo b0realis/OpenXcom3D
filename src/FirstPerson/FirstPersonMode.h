@@ -66,6 +66,7 @@ class BattleUnit;
 class FirstPersonView;
 class FirstPersonSounds;
 class Game;
+class InteractiveSurface;
 class NumberText;
 class SavedBattleGame;
 class Surface;
@@ -130,6 +131,10 @@ public:
 	static bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
 	/// A soldier panics or goes berserk, asked by the game (see FirstPerson::breakdown).
 	static bool breakdown(BattlescapeState *state, BattleUnit *unit);
+	/// Doom IDKFA: does this unit's shot spend no ammo? Asked by the game (see FirstPerson::endlessAmmo).
+	static bool endlessAmmo(BattlescapeState *state, const BattleUnit *unit);
+	/// Doom IDDQD: does this unit take no damage? Asked by the game (see FirstPerson::invincible).
+	static bool invincible(BattlescapeState *state, const BattleUnit *unit);
 	/// Where the next round of an FPS-style shot goes: along the crosshair, with a spread.
 	void freeAimTarget(const BattleAction &action, Position &target);
 
@@ -145,6 +150,7 @@ private:
 	FirstPersonSounds *_sounds = nullptr;  // the sounds we make ourselves (hitmarker, heartbeat, near-miss whizz...)
 	bool _wants3D;                         // the player switched to 3D
 	bool _classicHud = false;              // original bottom HUD drawn over the 3D view
+	bool _hudHidden = false;               // the 3D HUD hidden (the hide HUD key): a clear view
 	bool _mouseLook = true;                // mouse turns the view (captured) instead of moving a cursor
 	bool _dragLook = false;                // right button held over the view in cursor mode
 	bool _mouseWasCaptured = false;        // capture state seen last frame
@@ -154,6 +160,7 @@ private:
 	BattleUnit *_lastPlayerUnit = nullptr; // the last soldier the player had (the view stays with them in the alien turn)
 	bool _musicTense = false;              // the combat track is playing
 	Uint32 _lastEnemySeen = 0;             // when an alien was last in sight (the combat music stops 8 s later)
+	int _pausedCheats = 0;                 // the cheats the doom mode key switched off, to switch back on (bits: 1 doom mode, 2 IDKFA, 4 IDDQD)
 
 	/// Makes the full-screen 3D view, right above the isometric map it replaces.
 	void createView();
@@ -161,6 +168,8 @@ private:
 	void createCrosshairAndBanner();
 	/// Makes the grav lift arrows and their LIFT PLATFORM label.
 	void createLiftArrows();
+	/// Makes the compass at the top right (setting "Compass").
+	void createCompass();
 	/// Makes the top bar's buttons: 3D, HUD, INV, previous / next soldier, the suit's buttons, END.
 	void createTopBar();
 	/// Makes the info panel, bottom left: name, weapon, status, the four stats.
@@ -187,12 +196,22 @@ private:
 	void rememberChoices() const;
 	/// Shows or hides the original bottom HUD over the 3D view.
 	void setClassicHud(bool on);
+	/// Hides or shows the 3D HUD (the hide HUD key).
+	void toggleHud();
+	/// Is the 3D HUD hidden right now (in the 3D view, with the hide HUD key)?
+	bool hudHidden() const;
 	/// Switches between mouse look (captured mouse) and a free cursor.
 	void setMouseLook(bool on);
 	/// Can the player act right now (their turn, nothing else going on)?
 	bool canAct() const;
-	/// Doom mode (debug): refills the soldier's time units, energy and ammo.
+	/// Is doom mode on, by itself or with one of its extras (IDKFA, IDDQD)?
+	static bool doomModeOn();
+	/// The doom mode key: all the cheats off, or back on as they were.
+	void toggleCheats();
+	/// Doom mode (debug): refills the soldier's time units and energy (and ammo, with IDKFA).
 	void applyDoomMode(BattleUnit *unit);
+	/// Doom IDDQD: keeps X-COM's units at full morale.
+	void applyGodMode();
 	/// Doom mode: sets off the grenades whose real-time fuse has burnt down.
 	void updateDoomFuses(Uint32 now);
 	/// Plays the tense combat track while aliens are in sight.
@@ -205,6 +224,7 @@ private:
 	SDL_Color _canvasPalette[256];             // the palette the canvas was given
 	std::vector<Uint8> _magnifyRow;            // a canvas row widened for the screen
 	std::unordered_set<Surface*> _ownSurfaces; // all our surfaces, for blitting without the classic HUD
+	std::unordered_set<Surface*> _topBarSurfaces; // the top bar's (buttons, squad icons), left out while the 3D HUD is hidden
 	enum Anchor { TOP_LEFT, TOP_CENTER, TOP_RIGHT, CENTER, BOTTOM_LEFT, RIGHT_CENTER };
 	std::unordered_map<Surface*, Anchor> _anchors; // which screen corner each of ours keeps to on a resize
 	std::vector<Text*> _textShadows;               // dark copies behind our texts, so they read over the world
@@ -256,16 +276,62 @@ private:
 	void turnByMouse(int mouseDeltaX, int mouseDeltaY);
 	/// Turns the view with the scroll keys.
 	void turnWithKeys(double elapsedSeconds);
-	/// Turns the soldier (for free) to face where the camera looks.
+	/// Turns the soldier to face where the camera looks (free, or by the rules).
 	void faceLookDirection(BattleUnit *unit);
+	double _snapTurnDegrees = 0.0;          // a turn key's 45 degrees still to turn (negative: to the left)
+	bool _snapTurnFacing = false;           // a turn key was pressed: once the view has turned, the soldier faces where it looks
+	double _snapPitchDegrees = 0.0;         // a level look (the classic HUD's map level buttons) still to tilt (positive: up)
+	BattleUnit *_lookAtOnSwitch = nullptr;  // a unit the next soldier looked through turns to look at (an enemy button's right click)
+	bool _mapShowsAllLayers = false;        // the map's multi-level view, to tell when it's switched in 3D
+	Uint32 _turnRefusedWarned = 0;          // when "not enough time units" was last said for a turn
+
+	// ---- the compass (setting "Compass"), top right: where you look, the soldier's facing and,
+	// turning by the rules, the head's free turn and when looking further will cost time units ----
+
+	Surface *_compass = nullptr;                 // the dial
+	Text *_compassLetters[4] = {};               // N, E, S, W, going round as the view turns
+	Text *_txtCompassTurn = nullptr;             // under it near the head's limit: "TURN 1 TU", or "NO TU"
+	int _compassDrawn[3] = { -1000, -1, -1 };    // what the dial shows: the view's bearing (degrees), the facing, the warning
+
+	/// Shows the compass, redrawn when what it shows changes.
+	void updateCompass(BattleUnit *unit);
+	/// Draws the dial for a view bearing (degrees, 0 north, clockwise), a facing (0..7) and a warning (0 none, 1 near the limit, 2 no time units to turn).
+	void drawCompass(int viewBearing, int facing, int warning);
 	/// Turns the view towards the n-th visible enemy.
 	void lookAtEnemy(int enemyIndex);
+	/// Turns the view towards a unit's chest.
+	void lookAtUnit(const BattleUnit *target);
+	/// Switches to the soldier who sees the n-th visible enemy with the most time units left, looking at it.
+	void lookFromBestSpotter(int enemyIndex);
+	/// Turns the view back to where the soldier faces, level (the classic HUD's centre button and key).
+	void lookStraightAhead(const BattleUnit *unit);
+	/// Tilts the view towards the level above (1) or below (-1) (the classic HUD's map level buttons).
+	void lookLevelUpDown(int direction);
+	/// The classic HUD's buttons that act on the isometric map, translated to the 3D view.
+	bool classicHudButton(const InteractiveSurface *button, Action *action);
+	/// Tells, in 3D, that the map's multi-level view was switched (it only changes the map).
+	void watchMapLayers();
 	/// Keeps the camera with the soldier: steps, moves, eye height, rides up and down.
 	void updateCamera(BattleUnit *unit, bool canMove, double elapsedSeconds);
 	/// Puts the camera in the middle of the unit's tile, at eye height.
 	void snapToTile(BattleUnit *unit);
 	/// The camera's eye height for a unit, in voxels.
 	double eyeHeight(const BattleUnit *unit) const;
+
+	// ---- leaning out (setting "Lean"): the lean keys held move the eye to the side, the view tilting with "Tilt" ----
+
+	double _lean = 0.0;                     // how far into a lean: -1 all the way left .. 1 right, following the keys over LeanTime
+	double _leanOffset = 0.0;               // the eye's offset to the side, in voxels (positive: right), stopped short of walls
+	double _leanShift[2] = {};              // the same as a move on the map (x east, y south), in voxels
+
+	/// Leans the eye out while a lean key is held, and works out where it goes.
+	void updateLean(BattleUnit *unit, bool canLean, double elapsedSeconds, double &dropBy);
+	/// How far the eye can go to one side before a wall or a unit in sight, up to the lean's reach.
+	double leanRoom(BattleUnit *unit, double sideX, double sideY) const;
+	/// Straightens up at once: no lean, no tilt.
+	void endLean();
+	/// Whether the soldier leans out far enough for a shot to start from that side.
+	bool leaningOut() const;
 
 	// =====================================================================================
 	// Moving: walking, doors, jumping, lifts, flying, falling (FirstPersonModeMovement.cpp)
@@ -291,16 +357,19 @@ private:
 	/// Plays footstep sounds as the camera walks.
 	void playFootsteps(BattleUnit *unit, double distance);
 
-	// ---- doors ----
+	// ---- doors and diagonal gaps: steps that move the camera on their own ----
 
-	bool _stepThroughDoor = false;  // the pending step goes through a door: wait for it to open, then walk through
-	int _doorStepDirection[2] = {}; // the direction of the step through the door (x, y: -1, 0 or 1)
-	Uint32 _doorStepStart = 0;      // when the camera started waiting at the door
+	bool _guidedStep = false;        // the pending step moves the camera on its own: through a door or a diagonal gap
+	bool _guidedStepDoor = false;    // it goes through a door: wait for it to open first
+	int _guidedStepDirection[2] = {}; // the step's direction (x, y: -1, 0 or 1)
+	Uint32 _guidedStepStart = 0;     // when the step started (the camera waiting at the door)
 
 	/// Is there a closed door between the camera's tile and the next one this way?
 	bool closedDoorTowards(int stepX, int stepY, int z) const;
-	/// Waits for a door to open, then walks the camera through the doorway.
-	bool walkThroughDoor(BattleUnit *unit, double &newEyeX, double &newEyeY, double elapsedSeconds);
+	/// Pushing into a corner whose diagonal step is open but both sides blocked: takes that step.
+	bool stepThroughDiagonalGap(BattleUnit *unit, double newEyeX, double newEyeY, double wantedVelocityX, double wantedVelocityY, bool sidesMayBeOpen);
+	/// Walks the camera through a guided step (after a door has opened).
+	bool walkGuidedStep(BattleUnit *unit, double &newEyeX, double &newEyeY, double elapsedSeconds);
 	/// Opens the door the soldier faces without walking through it.
 	void openDoor(BattleUnit *unit);
 
@@ -366,6 +435,23 @@ private:
 	BattleUnit *_spottingUnit = nullptr; // the unit whose enemies in sight we count
 	size_t _enemiesSpottedCount = 0;     // how many it had in sight last frame
 	bool _movementHeld = false;          // until the movement keys are let go
+
+	// ---- tile by tile (setting "Movement": Tiles): a key press walks one tile ----
+
+	bool _tileMove = false;              // a move to the next tile is under way
+	bool _tileMoveQuick = false;         // it's a numpad move: almost at once
+	Position _tileMoveTarget;            // the tile it goes to (x, y)
+	int _numpadMove[2] = {};             // a numpad key pressed for a move: forward (1, -1), right (1, -1); both 0 for none
+	Uint32 _tileMoveKeysSince = 0;       // when the movement keys were pressed (a moment's wait catches a second key, for a diagonal)
+	double _tileMoveClosest = 0.0;       // the closest the camera has come to the target's middle, voxels
+	Uint32 _tileMoveProgressAt = 0;      // when it last came closer
+
+	/// The movement keys' push: forward (1) or back (-1), right (1) or left (-1).
+	void movementKeys(double &forward, double &strafe) const;
+	/// The numpad's push for a move (8 ahead, 2 back, 4 left, 6 right), held right now.
+	void numpadKeys(int &forward, int &strafe) const;
+	/// Tile moves: the velocity that walks the camera to the next tile's middle; starts and ends the moves.
+	bool tileMoveVelocity(BattleUnit *unit, double forward, double strafe, bool canMove, double walkSpeed, double elapsedSeconds, double &velocityX, double &velocityY);
 	Uint32 _spottedUntil = 0;             // "enemy spotted" banner
 
 	/// Stops the walk when a new enemy comes into view.
@@ -377,6 +463,7 @@ private:
 
 	std::unordered_map<const BattleUnit*, int> _chosenHand; // each soldier's chosen hand: 0 right, 1 left
 	std::unordered_map<int, Uint32> _doomFuses;             // Doom mode: grenades primed in real time (item id: when the pin was pulled)
+	bool _akimboRealisticWasOn = true;                      // the akimbo key switches realistic akimbo back on (false: full akimbo)
 	BattleActionType _fireMode = BA_NONE;               // fire mode for the left mouse button
 	const BattleItem *_fireModeWeapon = nullptr;        // the weapon _fireMode was chosen for
 	Position _aimVoxel;                                 // what's under the crosshair
@@ -384,8 +471,14 @@ private:
 
 	/// The weapon in the chosen hand (or the other hand if that one is empty).
 	BattleItem *activeWeapon(BattleUnit *unit) const;
-	/// Dual wield: the gun in the other hand, or null.
+	/// Leaning: the side a shot starts from, by where the eye is in the tile (setting "Lean shots", or leaning out).
+	BattleActionOrigin leanSide(const BattleUnit *unit, const Position &targetTile) const;
+	/// Melee at a body lying in front or at the feet (setting "Melee hits walls and the downed").
+	bool meleeDowned(BattleUnit *unit, BattleItem *weapon, BattleAction *action);
+	/// Akimbo: the gun in the other hand that fires along, or null.
 	BattleItem *offHandWeapon(BattleUnit *unit, const BattleItem *weapon) const;
+	/// The akimbo key: full or realistic akimbo off, or the same one back on.
+	void toggleAkimbo();
 	/// Dual wield: the other hand's gun if it can fire along with this mode, and the mode it fires.
 	BattleItem *dualPartner(BattleUnit *unit, const BattleItem *weapon, BattleActionType slot, BattleActionType &partnerMode) const;
 	/// The fire modes the left mouse button can use with an item, in wheel order.
@@ -547,12 +640,14 @@ private:
 
 	// ---- the info panel, bottom left ----
 
-	Text *_txtName = nullptr, *_txtDoom = nullptr, *_txtWeapon = nullptr, *_txtStatus = nullptr; // name, DOOM (debug mode), weapon, status
+	Text *_txtName = nullptr, *_txtDoom = nullptr, *_txtWeapon = nullptr, *_txtStatus = nullptr; // name, DOOM MODE / IDDQD / IDKFA (cheats), weapon, status
 	Text *_txtWeaponAmmo = nullptr;                     // the weapon's rounds and spare clips, right after its name
 	Text *_txtOtherWeapon = nullptr, *_txtOtherAmmo = nullptr; // the other hand's item, and its rounds and spare clips
 	Uint8 _weaponTextColor = 0;                         // the weapon lines' own colour (the mod's "weapon" element)
 	NumberText *_numTimeUnits = nullptr, *_numEnergy = nullptr, *_numHealth = nullptr, *_numMorale = nullptr; // the four stats
 	Bar *_barTimeUnits = nullptr, *_barEnergy = nullptr, *_barHealth = nullptr, *_barMorale = nullptr; // and their bars
+	Uint8 _statColors[8] = {};                          // the stats' own colours (numbers, then bars), for when they stop being silver
+	bool _statsSilver = false;                          // the stats are silver: Doom IDDQD, an invincible soldier
 	std::vector<Surface*> _panelParts;                  // all of the panel's surfaces, shown and hidden together
 
 	// ---- the soldier card: hovering a squad button shows the soldier, and (an option) their

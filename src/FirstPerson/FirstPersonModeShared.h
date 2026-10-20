@@ -47,7 +47,9 @@
  * FirstPersonModeShared.h: the layout, timings and small helpers that the FirstPersonMode*.cpp
  * files share. Only those files include it (everything here is private to each of them).
  */
+#include <cctype>
 #include <climits>
+#include <string>
 #include <SDL.h>
 #include "../Mod/RuleItem.h"
 
@@ -63,6 +65,12 @@ namespace
 
 /// The top bar: its row, its height, and where its tool buttons sit (3D, HUD, INV) and how wide.
 const int BarY = 1, BarH = 12;
+/// The compass (setting "Compass"): the disc's size, the room above it for the heading arrow, and
+/// how far below the top bar it sits (canvas pixels).
+const int CompassSize = 40, CompassArrowH = 7, CompassGap = 2;
+/// Turning by the rules: the compass warns this many degrees before the view reaches the
+/// head's limit (HeadTurn), where looking further turns the soldier.
+const double CompassWarnDegrees = 10.0;
 const int ViewButtonX = 1, HudButtonX = 24, InventoryButtonX = 47, ToolButtonW = 22;
 /// Where the squad buttons start, and the widths of the END and the previous / next buttons.
 const int SquadX = 72;
@@ -108,8 +116,40 @@ const double GripAt = 0.3;
 
 // ---- Moving ----
 
+/// Turning by the rules (setting "Turning costs TU"): how far, in degrees, the view may look off
+/// the soldier's facing before they turn (their head turns that far for free).
+const double HeadTurn = 45.0;
+/// The classic HUD's map level buttons in 3D: a press tilts the view this many degrees up (or
+/// down), towards the level above (or below), at SnapTurnSpeed.
+const double LevelLookDegrees = 30.0;
+/// How fast a snap turn (the turn keys) or a level look turns the view, in degrees a second.
+const double SnapTurnSpeed = 360.0;
+/// Leaning (setting "Lean shots"): how far, in voxels, the camera must stand to one side of its
+/// tile's middle, across the line of fire, for a shot to start from that side.
+const double LeanThreshold = 2.0;
+/// Leaning out (setting "Lean", the lean keys held): how far the eye goes to the side at most,
+/// in voxels; how much lower it gets there (a head bending sideways); how long a lean takes to
+/// go all the way out (or back in), in seconds; how far short of anything solid the eye stops,
+/// and the steps it is looked for in, in voxels; and how far the view tilts with "Tilt", in
+/// degrees.
+const double LeanReach = 6.0;
+const double LeanDrop = 1.5;
+const double LeanTime = 0.2;
+const double LeanWallMargin = 2.0;
+const double LeanCheckStep = 0.5;
+const double LeanTiltDegrees = 10.0;
+
 /// How close (in voxels) the camera may get to a tile edge it can't cross.
 const double EdgeMargin = 5.0;
+/// Tile moves: how long the movement keys are held before the move starts, in milliseconds (a
+/// second key pressed with the first, W and D say, makes it a diagonal).
+const Uint32 TileMoveKeyWait = 60;
+/// Tile moves: a move that hasn't come closer to its tile for this long (ms) is over (the step
+/// was refused, or a door or a vault moved the camera on its own).
+const Uint32 TileMoveStuck = 300;
+/// A numpad move's speed, voxels a second: a tile in a tenth of a second, almost at once, like
+/// a step on the isometric map.
+const double NumpadMoveSpeed = 160.0;
 /// How long the camera waits in front of a door it opened, in milliseconds (the 3D view swings
 /// it open meanwhile).
 const Uint32 DoorWait = 150;
@@ -214,6 +254,17 @@ inline Uint8 inkColor(const SDL_Color *palette, int red, int green, int blue)
 		}
 	}
 	return (Uint8)best;
+}
+
+/**
+ * A key's name in capitals, as the game spells key names (e.g. "PAGE UP"), for messages that
+ * tell the player which key to press.
+ */
+inline std::string keyLabel(SDLKey key)
+{
+	std::string text = SDL_GetKeyName(key);
+	for (char &letter : text) letter = (char)toupper((unsigned char)letter);
+	return text;
 }
 
 /**

@@ -142,6 +142,8 @@ public:
 		Sint16 swing[2]; // door swings reaching into this tile this frame, -1 none
 		Uint8 emissive;  // bit per part: a light source, whose bright voxels shine
 		Uint8 ufoGlow;   // a UFO's light here (the UFO lights option, once the UFO has been seen): 0 none .. 255 full
+		Uint8 smoke;     // the game's smoke on the tile (0 none; a fresh smoke grenade makes about 15), once discovered
+		bool burning;    // the tile is on fire (its smoke blocks sight as fire does)
 	};
 	/// A door swinging open, as a thin slab turning around its hinge.
 	struct DoorSwing
@@ -182,6 +184,9 @@ public:
 		Uint8 blood[2];       // splatter on the screen: dark, bright
 		Uint8 smoke, spark, dust, rain, snow, sand, firefly, bubble;
 		Uint8 marker, marine;
+		Uint8 hitbox[3];       // hitboxes (setting "Hitboxes"): X-COM's, the aliens', the civilians'
+		Uint8 edgeDot;         // the discreet map edge's dots
+		Uint8 unexplored;      // terrain not explored yet: plain shapes in this slate colour
 		Uint8 redTint[256];    // each colour washed with red (hurt, dying)
 		Uint8 blueTint[256];   // ... with dark blue (passing out)
 		Uint8 orangeTint[256]; // ... with orange (falling under mind control)
@@ -190,6 +195,9 @@ public:
 		Uint8 grey[4];         // TV static
 		Uint8 flareTint[256];  // each colour in a flare's red light
 		Uint8 flareFire[3];    // flare flame: red, orange, yellow
+		static constexpr int HazeSteps = 8; // the distance haze blends colours towards the haze in this many steps
+		Uint8 hazeTint[HazeSteps + 1][256]; // each colour blended towards the haze, step 0 (itself) .. HazeSteps (the haze)
+		Uint32 hazeTintKey;    // the palette and haze colour the haze tables were made for
 	};
 
 	// =====================================================================================
@@ -233,6 +241,8 @@ public:
 	void rotate(double yawDegrees, double pitchDegrees);
 	/// Points the camera at a point in voxels.
 	void lookAt(const double target[3]);
+	/// Tilts the view to one side (a lean), in degrees: positive to the left.
+	void setRoll(double degrees);
 	/// Gets the look direction around the vertical axis, in degrees (0 = east, 90 = south).
 	double getYawDegrees() const;
 	/// Gets how far the view looks up (negative: down), in degrees.
@@ -252,6 +262,15 @@ public:
 	void setFlashlight(bool on) { _flashlight = on; }
 	/// Night vision like the isometric map's: brighter, in one colour (group + 1, 0 off).
 	void setNightVision(int color) { _nightVision = color; }
+	/// The sight of the soldier the view looks through, for smoke drawn as the game's sight rules
+	/// have it (setting "See-through smoke"): the range in voxels, and how much of the smoke and of
+	/// the smoke over fire their eyes see through (the armor's heat vision, in percent).
+	void setSmokeSight(float sightVoxels, int throughSmoke, int throughFire)
+	{
+		_smokeSightVoxels = sightVoxels;
+		_smokeBlock = (100 - std::clamp(throughSmoke, 0, 100)) / 300.0f;
+		_fireBlock = (100 - std::clamp(throughFire, 0, 100)) / 300.0f;
+	}
 	/// Where the weapon in hand's muzzle is on the view (pixels): our own shots flash and start their trails there.
 	void setMuzzlePoint(double x, double y, bool valid) { _muzzleScreen[0] = x; _muzzleScreen[1] = y; _muzzleValid = valid; }
 	/// Dual wield: where the other gun's muzzle is on the view.
@@ -325,6 +344,8 @@ private:
 	double _eye[3] = {};                                // the eye, in voxels
 	double _yaw = 0.0, _pitch = 0.0;                    // radians; yaw 0 = +x (east), pi/2 = +y (south)
 	double _forward[3] = {}, _right[3] = {}, _up[3] = {}; // camera axes, in true proportions (see ZScale)
+	double _roll = 0.0;                                 // radians the view is tilted by (a lean), positive to the left
+	double _levelRight[3] = {}, _levelUp[3] = {};       // right and up without the tilt: what sprites stand square to
 	double _forwardInVoxels[3] = { 1.0, 0.0, 0.0 };     // the view direction in the voxel grid
 	double _halfFovTangent;                             // tan(horizontal fov / 2)
 	float _maxDistance = 60.0f * Position::TileXY;      // in voxels
@@ -332,6 +353,9 @@ private:
 	Uint32 _shakeLastTick = 0;                          // when the shake was last updated
 	float _recoilKick = 0.0f;                           // recoil: the view kicked up after your own shot, degrees
 	int _nightVision = 0;                               // night vision colour group + 1, 0 off
+	float _smokeSightVoxels = 20.0f * Position::TileXY; // the soldier's sight range, voxels (see setSmokeSight)
+	float _smokeBlock = 1.0f / 3.0f, _fireBlock = 1.0f / 3.0f; // sight used up per voxel walked through 1 point of smoke (over fire), voxels
+	float _smokeDrift = 0.0f;                           // this frame's time, seconds: the smoke's billows drift with it
 	std::vector<float> _depthBuffer;                    // per pixel, how far away what's drawn there is (sprites and effects test against it)
 	std::vector<Uint8> _glowMask;                       // pixels showing something that shines (lit voxels, sparks)
 
@@ -452,6 +476,12 @@ private:
 	Uint8 shadeHit(Hit &hit, const float rayOrigin[3], const float rayDirection[3], int pixelX, int pixelY) const;
 	/// What a ray sees after leaving the map: the border tape, the ground, the sky.
 	Uint8 colorOutsideMap(const float rayOrigin[3], const float rayDirection[3], float tExit, int exitAxis, int pixelX, int pixelY, float &depth) const;
+	/// Where the distance haze begins on land, as a share of the view's reach (setting "Distance haze").
+	float hazeStart() const;
+	/// A colour faded into the distance haze by an amount (0 none .. 1 all haze), dithered between neighbouring blend steps.
+	Uint8 hazeColor(Uint8 color, float haze, int pixelX, int pixelY) const;
+	/// Smoke's colour on a pixel (its wall, or a veil of it), or 0 where it leaves the pixel uncovered.
+	Uint8 smokeColor(Uint8 light, const float rayOrigin[3], const float rayDirection[3], float distance, float coverage, int pixelX, int pixelY) const;
 	/// The sky's colour in a direction.
 	Uint8 skyColor(const float rayDirection[3], int pixelX, int pixelY) const;
 	/// The ray caster's helper threads. They are started on the first frame and then kept,
@@ -498,15 +528,20 @@ private:
 	int _uiScale = 1;                                   // markers drawn this many times bigger
 	Surface *_spriteBuffer;                             // scratch surface for drawing a unit's sprite before it goes into the world
 	std::vector<Surface*> _blendBuffers;                // sprites dissolving into their next frame, one per sprite size
-	std::vector<int> _spriteColumns;                    // drawSprite: the sprite column under each screen column
 	std::vector<int> _blendColumns;                     // drawSpriteBlend's source column and row lookups
 	struct SpriteBox { int x0, y0, x1, y1; bool valid; }; // where a sprite frame's pixels are
 	std::map<const Surface*, SpriteBox> _spriteBoxes;   // measured once per sprite frame
 
 	/// Projects a point in voxels to the view; false if it's behind the camera.
 	bool projectToScreen(const double world[3], double &screenX, double &screenY, double &depth) const;
+	/// How a sprite stands at its anchor (see drawSprite): all of it on a card facing the camera, or,
+	/// for something lying on the floor, its rows below the anchor flat on the floor in front.
+	enum class SpritePose { Standing, Lying };
 	/// Draws a sprite standing in the world, depth-tested.
-	void drawSprite(const Surface *sprite, int anchorX, int anchorY, const double world[3], double depthBias, int shade, double scale = 1.0);
+	void drawSprite(const Surface *sprite, int anchorX, int anchorY, const double world[3], double depthBias, int shade, double scale = 1.0,
+		SpritePose pose = SpritePose::Standing);
+	/// The height something on the ground at a point stands at in the view: out of the floor slab.
+	double standingHeight(const double world[3]) const;
 	/// Draws a sprite part way through dissolving into the next animation frame (ordered dither).
 	void drawSpriteBlend(const Surface *from, const Surface *to, double blend, int anchorX, int anchorY, const double world[3], double depthBias, int shade);
 	/// The box around a sprite frame's pixels.
@@ -517,10 +552,14 @@ private:
 	void drawUnits();
 	/// Draws a soft shadow under a unit.
 	void drawUnitShadow(const double feet[3], double radius);
+	/// Outlines the voxels the game counts as a unit when it's hit (setting "Hitboxes").
+	void drawHitbox(const BattleUnit *unit, const double feet[3], float opacity);
 	/// Darkens the ground in a soft disc.
 	void drawGroundShade(const double centre[3], double radius, int steps, float density);
 	/// Draws the top item lying on each discovered tile.
 	void drawFloorItems();
+	/// The discreet map edge (setting): small red dots on the floor along the edge.
+	void drawEdgeDots();
 	/// Draws smoke and fire on discovered tiles.
 	void drawSmokeAndFire();
 	/// Draws the numbered markers over the visible enemies.
@@ -553,7 +592,8 @@ private:
 	/// Is a sprite at this point big enough on screen to be worth upscaling?
 	bool upscaleHere(const double world[3], double scale) const;
 	/// Draws a sprite, upscaled when it's close.
-	void drawSpriteSmooth(const Surface *sprite, int anchorX, int anchorY, const double world[3], double depthBias, int shade);
+	void drawSpriteSmooth(const Surface *sprite, int anchorX, int anchorY, const double world[3], double depthBias, int shade, double scale = 1.0,
+		SpritePose pose = SpritePose::Standing);
 
 	// =====================================================================================
 	// Particles: explosions, fire, smoke, weather, UFO devices, glows (FirstPersonViewEffects.cpp)
@@ -566,6 +606,7 @@ private:
 	bool _weatherChosen = false;                       // looked up for this battle
 	std::vector<std::pair<float, float>> _bubbleVents; // sea floor spots bubbles rise from
 	std::vector<float> _glowBuffer, _glowScratch;      // quarter resolution glow, blurred into a bloom
+	std::vector<float> _glowDepth, _glowDepthScratch;  // the same for the glow's distance (summed, weighted by the glow): how far away the light is
 	std::set<const Explosion*> _seenExplosions;        // explosions already seen (each spawns its particles once)
 
 	/// Is there open sky above this point?

@@ -107,6 +107,9 @@ const int AutoPixelMaxWidth = 640, AutoPixelMaxHeight = 400;
 
 /// Top of the ground-level floor, in voxels (floors are solid in voxel layers 0-1).
 const float GroundTop = 2.0f;
+/// The discreet map edge (setting): a small red dot on the floor along the edge every this many
+/// voxels (16 to a tile), this far inside the edge, this big across (voxels).
+const float EdgeDotSpacing = 16.0f, EdgeDotInset = 3.0f, EdgeDotSize = 2.5f;
 /// X-COM's voxels aren't cubes. The isometric art is drawn in 2:1 dimetric with one pixel per
 /// voxel up, where a true projection of cubes would draw 1.22 pixels: one voxel up is sqrt(2/3)
 /// of one voxel across. The camera works in true proportions; rays walk the voxel grid.
@@ -114,6 +117,16 @@ const double ZScale = 0.81649658092772603;
 const float ZScaleF = (float)ZScale;
 /// An isometric sprite pixel across is 1/sqrt(2) of a voxel (32 pixels span a tile's diagonal).
 const double SpritePixelX = 0.70710678118654752;
+/// Sprites stand like cards facing the camera, leaning with the view's pitch; looking down (or up)
+/// further than this many degrees, a card leans only this far, so it stays above the floor
+/// instead of lying in it (see drawSprite).
+const double CardTiltMax = 45.0;
+/// A lying sprite's rows below its anchor lie on the floor, each this many voxels nearer the
+/// camera: one isometric pixel down is sqrt(2) voxels along the floor towards the viewer.
+const double LyingRowVoxels = 1.41421356237309505;
+/// Things on the ground are drawn standing on the floor slab the view builds (two voxels thick),
+/// raised out of whatever solid they are in by at most this many voxels (see standingHeight).
+const int StandRaiseMax = 4;
 
 // ---- Colour helpers ----
 

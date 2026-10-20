@@ -254,6 +254,18 @@ void FirstPersonView::lookAt(const double target[3])
 }
 
 /**
+ * Tilts the view to one side about its own axis (a roll), as a head tilts when leaning out,
+ * kept within 20 degrees either way. The ray caster and everything projected take the tilt as it
+ * is; sprites stay upright in the world, so they tilt on the screen with the rest of it.
+ * @param degrees The tilt, in degrees: positive tilts the head to the left (the world turns
+ *                clockwise on the screen), negative to the right, 0 level.
+ */
+void FirstPersonView::setRoll(double degrees)
+{
+	_roll = std::clamp(degrees, -20.0, 20.0) * Pi / 180.0;
+}
+
+/**
  * Gets the direction the camera looks around the vertical axis.
  * @return The yaw in degrees: 0 east, 90 south (clockwise seen from above); within -180..180
  *         once the camera has been turned (lookAlong may leave it up to 225).
@@ -295,6 +307,8 @@ void FirstPersonView::setMaxDistance(int tiles)
  * Works out the camera's axes from its yaw and pitch: forward, right and up, as unit vectors
  * in true proportions (see ZScale), and forward again as a direction in the voxel grid.
  * The recoil kick tilts the view up for the moment without changing the pitch itself.
+ * A lean's tilt (setRoll) then turns right and up about the forward axis; the axes without it
+ * are kept too, for the sprites standing square to the view (see drawSprite).
  * x east, y south, z up is a left-handed frame, hence up = forward x right.
  */
 void FirstPersonView::updateBasis()
@@ -302,12 +316,22 @@ void FirstPersonView::updateBasis()
 	// The pitch with the recoil kick added, within the same 80 degree limits as rotate.
 	const double viewPitch = std::clamp(_pitch + _recoilKick * Pi / 180.0, -80.0 * Pi / 180.0, 80.0 * Pi / 180.0); // recoil shows, it doesn't stay
 	const double cosYaw = std::cos(_yaw), sinYaw = std::sin(_yaw), cosPitch = std::cos(viewPitch), sinPitch = std::sin(viewPitch);
-	// Forward along the yaw, tilted by the pitch; right stays level (no roll); up from the two.
+	// Forward along the yaw, tilted by the pitch; right level (the tilt comes below); up from the two.
 	_forward[0] = cosYaw * cosPitch; _forward[1] = sinYaw * cosPitch; _forward[2] = sinPitch;
 	_right[0] = -sinYaw; _right[1] = cosYaw; _right[2] = 0.0;
 	_up[0] = -_forward[2] * _right[1];
 	_up[1] = _forward[2] * _right[0];
 	_up[2] = _forward[0] * _right[1] - _forward[1] * _right[0];
+	// The tilt: right rises and up leans towards the left by the roll (both stay square to
+	// forward and to each other).
+	const double cosRoll = std::cos(_roll), sinRoll = std::sin(_roll);
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		_levelRight[axis] = _right[axis];
+		_levelUp[axis] = _up[axis];
+		_right[axis] = cosRoll * _levelRight[axis] + sinRoll * _levelUp[axis];
+		_up[axis] = cosRoll * _levelUp[axis] - sinRoll * _levelRight[axis];
+	}
 	// Forward in the voxel grid: a voxel up is shorter than one across, so the same height takes
 	// more voxels (divide by ZScale), then make it a unit vector again.
 	const double forwardZInVoxels = _forward[2] / ZScale;
@@ -450,6 +474,7 @@ void FirstPersonView::draw()
 	watchUnits();
 	drawDecals();
 	drawFloorItems();
+	drawEdgeDots();
 	drawUnits();
 	drawSmokeAndFire();
 	drawProjectilesAndExplosions();

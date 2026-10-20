@@ -121,6 +121,16 @@ bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
 /// (the game then leaves out its "has panicked" box, which would freeze the view behind it).
 bool breakdown(BattlescapeState *state, BattleUnit *unit);
 
+// ---- Items and units (BattleItem.cpp, BattleUnit.cpp) ----
+
+/// Doom IDKFA: does a shot by this unit spend no ammo (the selected soldier, on the player's
+/// turn, in the 3D view)? Asked whenever a weapon would spend ammo, beside the game's own debug
+/// mode, which spends none either.
+bool endlessAmmo(BattlescapeState *state, const BattleUnit *unit);
+/// Doom IDDQD: does this unit take no damage at all (X-COM's units)? Asked whenever a unit is
+/// about to be hurt.
+bool invincible(BattlescapeState *state, const BattleUnit *unit);
+
 #else
 
 // Stock OXCE: the add-on is left out, and every hook does nothing.
@@ -137,6 +147,8 @@ inline State *createOptionsTab(OptionsOrigin) { return nullptr; }
 inline void freeAimTarget(BattlescapeState *, const BattleAction &, Position &) { }
 inline bool fastShots(BattlescapeState *, const BattleUnit *) { return false; }
 inline bool breakdown(BattlescapeState *, BattleUnit *) { return false; }
+inline bool endlessAmmo(BattlescapeState *, const BattleUnit *) { return false; }
+inline bool invincible(BattlescapeState *, const BattleUnit *) { return false; }
 
 #endif
 

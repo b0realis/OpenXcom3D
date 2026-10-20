@@ -170,28 +170,55 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMouseSensitivity", &fpsMouseSensitivity, 5, "STR_FPS_MOUSE_SENSITIVITY", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsInvertMouse", &fpsInvertMouse, false, "STR_FPS_INVERT_MOUSE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFieldOfView", &fpsFieldOfView, 75, "STR_FPS_FIELD_OF_VIEW", category));
-	// Moving: walking speed in tiles per second (1 to 8; every tile still costs its time units),
+	// Turning: free, the soldier facing wherever you look (NO), or by the game's rules (YES): the
+	// head looks up to 45 degrees off the soldier's facing for free, further turns them at the
+	// game's cost.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsTurnCost", &fpsTurnCost, false, "STR_FPS_TURN_COST", category));
+	// The compass at the top right: where you look, the soldier's facing, and turning by the
+	// rules, when looking further will cost time units.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsCompass", &fpsCompass, true, "STR_FPS_COMPASS", category));
+	// Moving: free walking or tile by tile (0 free, 1 tiles: a key press walks one tile), walking
+	// speed in tiles per second (1 to 8; every tile still costs its time units),
 	// the view bobbing with the steps, time units a flying soldier pays per level up or down
-	// (0 = free), jumping over low obstacles, falling off ledges, and how many voxels below the
-	// game's eye height the camera sits (0 to 6).
+	// (0 = free) and whether that overrides the game's own cost for each unit, jumping over low
+	// obstacles, falling off ledges, and how many voxels below the game's eye height the camera
+	// sits (0 to 6).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsMovement", &fpsMovement, 0, "STR_FPS_MOVEMENT", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsWalkSpeed", &fpsWalkSpeed, 4, "STR_FPS_WALK_SPEED", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHeadBob", &fpsHeadBob, true, "STR_FPS_HEAD_BOB", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlightCost", &fpsFlightCost, 0, "STR_FPS_FLIGHT_COST", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlightCostOverride", &fpsFlightCostOverride, true, "STR_FPS_FLIGHT_COST_OVERRIDE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsVault", &fpsVault, true, "STR_FPS_VAULT", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFalling", &fpsFalling, true, "STR_FPS_FALLING", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsEyeLower", &fpsEyeLower, 3, "STR_FPS_EYE_LOWER", category));
 	// Shooting: the game's own accuracy (YES) or FPS-style shooting along the crosshair (NO), and
-	// firing a gun in each hand at once.
+	// firing a gun in each hand at once (akimbo): any two guns (full), or one-handed guns only
+	// (realistic). At most one of the two is on.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFaithfulTargeting", &fpsFaithfulTargeting, true, "STR_FPS_FAITHFUL_TARGETING", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDualWield", &fpsDualWield, false, "STR_FPS_DUAL_WIELD", category));
-	// Light and atmosphere: smooth lighting between tiles, ray-traced shadows, the personal light
-	// as a shoulder flashlight, night vision only with the right gear, tenser music while aliens
-	// are in sight, and unlimited tactical flares.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsAkimboRealistic", &fpsAkimboRealistic, false, "STR_FPS_AKIMBO_REALISTIC", category));
+	// Leaning: standing to one side of the tile's middle shoots from that side (the game's
+	// off-centre origins), to peek round corners; and leaning out with the lean keys: off (0),
+	// the eye moves to the side (1, peek), and the view tilts with it (2, tilt).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsLeanShots", &fpsLeanShots, false, "STR_FPS_LEAN_SHOTS", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsLean", &fpsLean, 0, "STR_FPS_LEAN", category));
+	// Melee at the wall, door or object the soldier faces (the game's terrain melee, on even if
+	// the mod leaves it off) and at a body lying in front.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsMeleeTerrain", &fpsMeleeTerrain, false, "STR_FPS_MELEE_TERRAIN", category));
+	// Light, atmosphere and sound: smooth lighting between tiles, ray-traced shadows, the
+	// personal light as a shoulder flashlight, night vision only with the right gear, tenser
+	// music while aliens are in sight, the ticks of a hit and a kill, smoke drawn as the
+	// soldier's eyes see through it, and unlimited tactical flares.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmoothLighting", &fpsSmoothLighting, true, "STR_FPS_SMOOTH_LIGHTING", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsShadows", &fpsShadows, true, "STR_FPS_SHADOWS", category));
+	// The distance haze on land: normal (0), light (1), clear (2: only a thin fade where the
+	// view ends). Under the sea the murk stays.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsHaze", &fpsHaze, 0, "STR_FPS_HAZE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlashlight", &fpsFlashlight, true, "STR_FPS_FLASHLIGHT", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightVisionGear", &fpsNightVisionGear, true, "STR_FPS_NIGHT_VISION_GEAR", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCombatMusic", &fpsCombatMusic, true, "STR_FPS_COMBAT_MUSIC", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitSounds", &fpsHitSounds, true, "STR_FPS_HIT_SOUNDS", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughSmoke", &fpsSeeThroughSmoke, true, "STR_FPS_SEE_THROUGH_SMOKE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlares", &fpsFlares, true, "STR_FPS_FLARES", category));
 	// Looks: the weapon in hand (always made of voxels), sprite upscaling (0 off, 1 smooth,
 	// 2 smooth + detail), muzzle flashes, particles (0 none, 1 effects, 2 everything),
@@ -199,26 +226,36 @@ void createOptions(std::vector<OptionInfo> &options)
 	// (1 to 3: one ray colours a block of pixels that wide and high, for speed).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsViewModel", &fpsViewModel, true, "STR_FPS_VIEW_MODEL", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSpriteUpscale", &fpsSpriteUpscale, 2, "STR_FPS_SPRITE_UPSCALE", category));
+	// Soldiers' and aliens' sprites a little smaller (80 to 100% of the isometric map's size).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsUnitSize", &fpsUnitSize, 100, "STR_FPS_UNIT_SIZE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMuzzleFlash", &fpsMuzzleFlash, true, "STR_FPS_MUZZLE_FLASH", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsParticles", &fpsParticles, 2, "STR_FPS_PARTICLES", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsUfoLights", &fpsUfoLights, true, "STR_FPS_UFO_LIGHTS", category));
+	// The map's edge as small red dots on the floor, nothing beyond it, instead of the tape.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsDiscreetEdge", &fpsDiscreetEdge, false, "STR_FPS_DISCREET_EDGE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 0, "STR_FPS_PIXEL_SIZE", category));
-	// The crosshair: shown or not, the shot info under it, and aiming at the exact point under
-	// it (YES) or at the tile, as the original game does (NO).
+	// The crosshair: shown or not, the shot info under it, aiming at the exact point under it
+	// (YES) or at the tile, as the original game does (NO), and the units' hitboxes.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshair", &fpsCrosshair, true, "STR_FPS_CROSSHAIR", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshairInfo", &fpsCrosshairInfo, true, "STR_FPS_CROSSHAIR_INFO", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsAimExact", &fpsAimExact, true, "STR_FPS_AIM_EXACT", category));
+	// The units' hitboxes, outlined: off (0), fading in and out once a second (1), always (2).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitboxes", &fpsHitboxes, 0, "STR_FPS_HITBOXES", category));
 	// Staying in the 3D view during the alien turn, starting battles in it, and the debug cheat
-	// "doom mode" (endless time units, energy and ammo).
+	// "doom mode" (endless time units and energy, grenades in real time), with its two extras,
+	// each doom mode plus more: IDKFA (endless ammo) and IDDQD (invincible soldiers).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsAlienTurn3D", &fpsAlienTurn3D, true, "STR_FPS_ALIEN_TURN_3D", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsStartInFirstPerson", &fpsStartInFirstPerson, false, "STR_FPS_START_IN_FIRST_PERSON", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomMode", &fpsDoomMode, false, "STR_FPS_DOOM_MODE", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomIdkfa", &fpsDoomIdkfa, false, "STR_FPS_DOOM_IDKFA", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomIddqd", &fpsDoomIddqd, false, "STR_FPS_DOOM_IDDQD", category));
 
 	// The add-on's own keys, in the order the Controls list shows them, with their default keys.
 	// Switching views, freeing the cursor from mouse look, and showing the classic HUD.
 	options.push_back(OptionInfo(OPTION_OTHER, "keyBattleFirstPerson", &keyBattleFirstPerson, SDLK_F8, "STR_FPS_KEY_TOGGLE_VIEW", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsMouseMode", &keyFpsMouseMode, SDLK_c, "STR_FPS_KEY_MOUSE_MODE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsClassicHud", &keyFpsClassicHud, SDLK_h, "STR_FPS_KEY_CLASSIC_HUD", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsHideHud", &keyFpsHideHud, SDLK_p, "STR_FPS_KEY_HIDE_HUD", category));
 	// Walking and strafing (W, A, S, D).
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsForward", &keyFpsForward, SDLK_w, "STR_FPS_KEY_FORWARD", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsBack", &keyFpsBack, SDLK_s, "STR_FPS_KEY_BACK", category));
@@ -230,6 +267,14 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsModeAimed", &keyFpsModeAimed, SDLK_x, "STR_FPS_KEY_MODE_AIMED", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsModeAuto", &keyFpsModeAuto, SDLK_v, "STR_FPS_KEY_MODE_AUTO", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsSwitchHand", &keyFpsSwitchHand, SDLK_g, "STR_FPS_KEY_SWITCH_HAND", category));
+	// Akimbo on and off in battle (Y: one of the letters the battlescape leaves free).
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsAkimbo", &keyFpsAkimbo, SDLK_y, "STR_FPS_KEY_AKIMBO", category));
+	// Turning 45 degrees at a time, without stepping (comma and period: "<" and ">").
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsTurnLeft", &keyFpsTurnLeft, SDLK_COMMA, "STR_FPS_KEY_SNAP_LEFT", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsTurnRight", &keyFpsTurnRight, SDLK_PERIOD, "STR_FPS_KEY_SNAP_RIGHT", category));
+	// Leaning out, held (setting "Lean"; with it off these are the game's hand keys again).
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsLeanLeft", &keyFpsLeanLeft, SDLK_q, "STR_FPS_KEY_LEAN_LEFT", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsLeanRight", &keyFpsLeanRight, SDLK_e, "STR_FPS_KEY_LEAN_RIGHT", category));
 	// Opening doors (O, as E is the game's "use right hand"), flares, flight, jumping, night
 	// vision, going up and down a level, and doom mode.
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsOpenDoor", &keyFpsOpenDoor, SDLK_o, "STR_FPS_KEY_OPEN_DOOR", category));
@@ -302,6 +347,30 @@ bool fastShots(BattlescapeState *state, const BattleUnit *attacker)
 bool breakdown(BattlescapeState *state, BattleUnit *unit)
 {
 	return FirstPersonMode::breakdown(state, unit);
+}
+
+/**
+ * Called by the game whenever a weapon would spend ammo: with Doom IDKFA on, the selected
+ * soldier's shots in the 3D view spend none, so even a one-round clip (a rocket) isn't used up.
+ * @param state The battlescape screen.
+ * @param unit The unit holding the weapon.
+ * @return True if the shot spends no ammo.
+ */
+bool endlessAmmo(BattlescapeState *state, const BattleUnit *unit)
+{
+	return FirstPersonMode::endlessAmmo(state, unit);
+}
+
+/**
+ * Called by the game whenever a unit is about to take damage: with Doom IDDQD on, X-COM's units
+ * take none.
+ * @param state The battlescape screen.
+ * @param unit The unit about to be hurt.
+ * @return True if it takes no damage.
+ */
+bool invincible(BattlescapeState *state, const BattleUnit *unit)
+{
+	return FirstPersonMode::invincible(state, unit);
 }
 
 }

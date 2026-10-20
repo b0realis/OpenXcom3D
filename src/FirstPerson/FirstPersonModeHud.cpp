@@ -60,12 +60,14 @@
 #include "../Battlescape/BattlescapeState.h"
 #include "../Battlescape/Camera.h"
 #include "../Battlescape/Map.h"
+#include "../Battlescape/Pathfinding.h"
 #include "../Engine/Font.h"
 #include "../Engine/Game.h"
 #include "../Engine/Options.h"
 #include "../Engine/Screen.h"
 #include "../Engine/Unicode.h"
 #include "../Interface/Bar.h"
+#include "../Interface/BattlescapeButton.h"
 #include "../Interface/NumberText.h"
 #include "../Interface/Text.h"
 #include "../Interface/TextButton.h"
@@ -139,6 +141,226 @@ void FirstPersonMode::toggleNightVision(BattleUnit *unit, Action *action)
 }
 
 /**
+ * The compass (setting "Compass"), top right: a disc that turns as you turn under a fixed arrow
+ * on top of it, which shows your heading; the letters of the compass go round with the disc. A
+ * yellow triangle on its rim shows the way the soldier faces. Turning by the rules (setting "Turning costs TU"), an arc shows the head's free turn,
+ * HeadTurn degrees either side of the facing: within CompassWarnDegrees of its end it turns
+ * yellow and the line under it says what looking further costs ("TURN 1 TU"), or red with
+ * "NO TU" when the soldier couldn't pay for the turn. The dial is drawn again only when what it
+ * shows changes.
+ * @param unit The soldier the view looks through, or null to hide the compass.
+ */
+void FirstPersonMode::updateCompass(BattleUnit *unit)
+{
+	const bool show = Options::fpsCompass && isActive() && !_hudHidden && unit;
+	_compass->setVisible(show);
+	for (Text *letter : _compassLetters) letter->setVisible(show);
+	if (!show)
+	{
+		_txtCompassTurn->setVisible(false);
+		return;
+	}
+
+	// The view's bearing (the camera's yaw has 0 = east; a bearing 0 = north, clockwise), the
+	// soldier's facing, and how close the view is to the head's limit, turning by the rules.
+	const int viewBearing = ((int)std::lround(_view->getYawDegrees() + 90.0) % 360 + 360) % 360;
+	const int facing = unit->getDirection();
+	int warning = 0;
+	if (Options::fpsTurnCost)
+	{
+		const double offFacing = std::abs(std::remainder(viewBearing - facing * 45.0, 360.0));
+		if (offFacing > HeadTurn - CompassWarnDegrees)
+		{
+			warning = (doomModeOn() || unit->getTimeUnits() >= unit->getTurnCost()) ? 1 : 2;
+		}
+	}
+	if (viewBearing != _compassDrawn[0] || facing != _compassDrawn[1] || warning != _compassDrawn[2])
+	{
+		_compassDrawn[0] = viewBearing;
+		_compassDrawn[1] = facing;
+		_compassDrawn[2] = warning;
+		drawCompass(viewBearing, facing, warning);
+
+		// The letters, inside the rim, at their bearings measured from the view's.
+		const double radius = CompassSize / 2 - 9.0;
+		for (int letter = 0; letter < 4; ++letter)
+		{
+			const double angle = (letter * 90 - viewBearing) * Pi / 180.0;
+			const double centreX = _compass->getX() + CompassSize / 2.0 + radius * std::sin(angle);
+			const double centreY = _compass->getY() + CompassArrowH + CompassSize / 2.0 - radius * std::cos(angle);
+			_compassLetters[letter]->setX((int)std::lround(centreX - 3.5));
+			_compassLetters[letter]->setY((int)std::lround(centreY - 3.5));
+		}
+
+		// The line under it.
+		_txtCompassTurn->setVisible(warning != 0);
+		if (warning)
+		{
+			_txtCompassTurn->setColor(textColor(_state->getPalette(), warning == 1 ? 240 : 230, warning == 1 ? 210 : 60, warning == 1 ? 60 : 50));
+			_txtCompassTurn->setText(warning == 1 ? std::string(_state->tr("STR_FPS_COMPASS_TURN").arg(unit->getTurnCost())) : std::string(_state->tr("STR_FPS_COMPASS_NO_TU")));
+		}
+	}
+}
+
+/**
+ * Draws the compass: a dark disc with a grey rim, ticks at the eight directions a soldier can
+ * face, the head's free turn as an arc on the rim (turning by the rules), the soldier's facing as
+ * a yellow triangle on the rim, and on top of the disc the heading arrow, hugging the rim and
+ * pointing in. Angles on the disc go clockwise from its top, which is the view's bearing.
+ * @param viewBearing The view's bearing, degrees (0 north, clockwise).
+ * @param facing The soldier's facing, 0 (north) to 7, clockwise.
+ * @param warning 0, or 1 when the view is near the head's limit, 2 when the soldier couldn't pay for the turn.
+ */
+void FirstPersonMode::drawCompass(int viewBearing, int facing, int warning)
+{
+	const SDL_Color *palette = _state->getPalette();
+	const Uint8 dark = nearestColor(palette, 20, 22, 30), rim = nearestColor(palette, 150, 155, 175), tick = nearestColor(palette, 190, 195, 210);
+	const Uint8 facingColor = nearestColor(palette, 250, 220, 70);
+	const Uint8 arcColor = warning == 2 ? nearestColor(palette, 230, 60, 50) : warning == 1 ? nearestColor(palette, 240, 210, 60) : nearestColor(palette, 90, 190, 90);
+	const double centre = (CompassSize - 1) / 2.0, centreY = CompassArrowH + centre, radius = CompassSize / 2.0 - 1.0;
+	// A point at a bearing (degrees from the view) and a distance from the middle, on the surface.
+	auto at = [&](double degreesFromView, double distance, int &x, int &y) {
+		const double angle = degreesFromView * Pi / 180.0;
+		x = (int)std::lround(centre + distance * std::sin(angle));
+		y = (int)std::lround(centreY - distance * std::cos(angle));
+	};
+	_compass->clear();
+	_compass->lock();
+
+	// The disc and its rim.
+	for (int y = CompassArrowH; y < CompassArrowH + CompassSize; ++y)
+	{
+		for (int x = 0; x < CompassSize; ++x)
+		{
+			const double distance = std::sqrt((x - centre) * (x - centre) + (y - centreY) * (y - centreY));
+			if (distance > radius + 0.5) continue;
+			_compass->setPixel(x, y, distance > radius - 1.0 ? rim : dark);
+		}
+	}
+	// Turning by the rules: the head's free turn, an arc along the rim either side of the facing.
+	if (Options::fpsTurnCost)
+	{
+		for (double degrees = -HeadTurn; degrees <= HeadTurn; degrees += 2.0)
+		{
+			for (double distance = radius - 2.0; distance <= radius; distance += 1.0)
+			{
+				int x, y;
+				at(facing * 45.0 - viewBearing + degrees, distance, x, y);
+				_compass->setPixel(x, y, arcColor);
+			}
+		}
+	}
+	// The eight directions a soldier faces: short ticks in from the rim.
+	for (int direction = 0; direction < 8; ++direction)
+	{
+		for (double distance = radius - (direction % 2 ? 3.0 : 4.0); distance <= radius - 1.0; distance += 1.0)
+		{
+			int x, y;
+			at(direction * 45.0 - viewBearing, distance, x, y);
+			_compass->setPixel(x, y, tick);
+		}
+	}
+	// The soldier's facing: a yellow triangle on the rim pointing in, outside the letters.
+	for (double distance = radius - 6.0; distance <= radius; distance += 0.5)
+	{
+		const double halfWidth = (distance - (radius - 6.0)) * 0.45;
+		for (double side = -halfWidth; side <= halfWidth; side += 0.5)
+		{
+			const double angle = (facing * 45.0 - viewBearing) * Pi / 180.0;
+			const int x = (int)std::lround(centre + distance * std::sin(angle) + side * std::cos(angle));
+			const int y = (int)std::lround(centreY - distance * std::cos(angle) + side * std::sin(angle));
+			_compass->setPixel(x, y, facingColor);
+		}
+	}
+	// The heading: a fixed arrow on top of the disc, pointing in, its tip on the rim and its sides
+	// stopping at the rim, so it hugs the disc; bright, outlined dark so it stands out on the sky.
+	const Uint8 arrow = nearestColor(palette, 245, 245, 250), outline = nearestColor(palette, 10, 10, 14);
+	const int middle = (int)std::lround(centre);
+	for (int row = 0; row <= CompassArrowH + 1; ++row)
+	{
+		const int halfWidth = (CompassArrowH + 1 - row) * 6 / (CompassArrowH + 1);
+		for (int column = -halfWidth - 1; column <= halfWidth + 1; ++column)
+		{
+			const int x = middle + column, y = row;
+			const double toCentre = std::sqrt((x - centre) * (x - centre) + (y - centreY) * (y - centreY));
+			if (toCentre < radius - 2.0) continue;
+			const bool edge = std::abs(column) > halfWidth || row == 0;
+			_compass->setPixel(x, y, edge ? outline : arrow);
+		}
+	}
+	_compass->unlock();
+}
+
+/**
+ * The classic HUD in 3D (shown with H): its buttons that act on the isometric map, and their
+ * keys, translated to the 3D view. The rest of the HUD does the same in both views and is left
+ * to the game: kneel, inventory, next soldier (and next with "done"), options, end turn, abort,
+ * the soldier's stats, the hands and their action menus (the action picked is then aimed in 3D,
+ * see fire), the time unit reserves and the special and skill buttons.
+ * - Soldier up / down: as the up and down keys in 3D (moveUpDown: a grav lift, or flight, which
+ *   must be switched on).
+ * - Map level up / down: the map would show the level above or below, which the 3D view shows
+ *   anyway; the view looks towards it instead (lookLevelUpDown).
+ * - Minimap: opens on the soldier (the map's camera, which it shows, goes there first).
+ * - Centre on the soldier: the view turns back to where the soldier faces, level
+ *   (lookStraightAhead).
+ * (The visible enemy buttons are turned into looks at the enemy by handleFreeCursor, and the
+ * map's multi-level view is explained by watchMapLayers.)
+ * @param button The classic HUD's button.
+ * @param action The input event, passed on to the game's handler where one is used.
+ * @return True if the button is one of those (and was handled).
+ */
+bool FirstPersonMode::classicHudButton(const InteractiveSurface *button, Action *action)
+{
+	BattleUnit *unit = _save->getSelectedUnit();
+	if (button == _state->_btnUnitUp || button == _state->_btnUnitDown)
+	{
+		moveUpDown(unit, button == _state->_btnUnitUp ? Pathfinding::DIR_UP : Pathfinding::DIR_DOWN, action);
+		return true;
+	}
+	if (button == _state->_btnMapUp || button == _state->_btnMapDown)
+	{
+		lookLevelUpDown(button == _state->_btnMapUp ? 1 : -1);
+		return true;
+	}
+	if (button == _state->_btnShowMap)
+	{
+		if (unit)
+		{
+			_state->_map->getCamera()->centerOnPosition(unit->getPosition());
+		}
+		_state->btnShowMapClick(action);
+		return true;
+	}
+	if (button == _state->_btnCenter)
+	{
+		// The soldier the view looks through (on the aliens' turn, the last of ours).
+		if (_trackedUnit && !_trackedUnit->isOut())
+		{
+			lookStraightAhead(_trackedUnit);
+		}
+		return true;
+	}
+	return false;
+}
+
+/**
+ * The map's multi-level view (the classic HUD's layers button with OXCE's links menu switched
+ * off, its key, or that menu's "Multi-level view") only changes what the isometric map draws:
+ * the 3D view always shows every level. Switched while the 3D view shows, a warning line says
+ * so. Called every frame, in both views.
+ */
+void FirstPersonMode::watchMapLayers()
+{
+	const bool showsAll = _state->_map->getCamera()->getShowAllLayers();
+	if (showsAll != _mapShowsAllLayers && isActive())
+	{
+		_state->warning(showsAll ? "STR_FPS_MAP_LAYERS_ALL" : "STR_FPS_MAP_LAYERS_ONE");
+	}
+	_mapShowsAllLayers = showsAll;
+}
+
+/**
  * Fills the info panel at the bottom left of the 3D view: the soldier's name and status
  * (kneeling, wounds, burning...), a line for the weapon in hand and one for the other hand's
  * item (each gun with the rounds loaded and the spare clips carried for it, see ammoLabel), and
@@ -150,17 +372,27 @@ void FirstPersonMode::toggleNightVision(BattleUnit *unit, Action *action)
  */
 void FirstPersonMode::updateInfoPanel(BattleUnit *unit)
 {
-	// Show or hide every piece of the panel together. The "doom mode" tag shows only while
-	// that debug option is on.
-	const bool show = isActive() && !_classicHud && unit;
+	// Show or hide every piece of the panel together. The cheat tag shows only while a cheat is
+	// on: DOOM MODE, or the extras that are on (IDDQD, IDKFA).
+	const bool show = isActive() && !_classicHud && !_hudHidden && unit;
 	for (auto *part : _panelParts)
 	{
 		part->setVisible(show);
 	}
-	_txtDoom->setVisible(show && Options::fpsDoomMode);
+	_txtDoom->setVisible(show && doomModeOn());
 	if (!show)
 	{
 		return;
+	}
+	std::string cheatTag = std::string(_state->tr("STR_FPS_DOOM"));
+	if (Options::fpsDoomIddqd || Options::fpsDoomIdkfa)
+	{
+		cheatTag = Options::fpsDoomIddqd ? std::string(_state->tr("STR_FPS_IDDQD")) : "";
+		if (Options::fpsDoomIdkfa) cheatTag += (cheatTag.empty() ? "" : " ") + std::string(_state->tr("STR_FPS_IDKFA"));
+	}
+	if (_txtDoom->getText() != cheatTag)
+	{
+		_txtDoom->setText(cheatTag);
 	}
 	// The name and the status.
 	_txtName->setText(unit->getName(_game->getLanguage(), false));
@@ -191,6 +423,21 @@ void FirstPersonMode::updateInfoPanel(BattleUnit *unit)
 	_numMorale->setValue(unit->getMorale());
 	_barMorale->setMax(100);
 	_barMorale->setValue(unit->getMorale());
+
+	// Doom IDDQD: an invincible soldier's stats are silver; otherwise in their own colours.
+	const bool silver = invincible(_state, unit);
+	if (silver != _statsSilver)
+	{
+		_statsSilver = silver;
+		const Uint8 silverColor = nearestColor(_state->getPalette(), 215, 215, 225);
+		NumberText *numbers[4] = { _numTimeUnits, _numEnergy, _numHealth, _numMorale };
+		Bar *bars[4] = { _barTimeUnits, _barEnergy, _barHealth, _barMorale };
+		for (int stat = 0; stat < 4; ++stat)
+		{
+			numbers[stat]->setColor(silver ? silverColor : _statColors[stat]);
+			bars[stat]->setColor(silver ? silverColor : _statColors[4 + stat]);
+		}
+	}
 }
 
 /**
@@ -739,6 +986,7 @@ void FirstPersonMode::refreshSquad()
 		_state->add(icon);
 		icon->setVisible(false);
 		_ownSurfaces.insert(icon);
+		_topBarSurfaces.insert(icon);
 		_squadIcons.push_back(icon);
 		_squadStates.push_back(SQUAD_NONE);
 	}
@@ -1002,6 +1250,11 @@ void FirstPersonMode::updateTopBar(BattleUnit *selected)
  */
 TextButton *FirstPersonMode::buttonAt(double x, double y) const
 {
+	// With the 3D HUD hidden there's no top bar to click (nor hover, so no soldier card).
+	if (hudHidden())
+	{
+		return nullptr;
+	}
 	// Is the point inside this button's rectangle (and is the button showing)?
 	auto inside = [&](const TextButton *button) {
 		return button->getVisible() && x >= button->getX() && x < button->getX() + button->getWidth()
@@ -1119,7 +1372,7 @@ void FirstPersonMode::updateEnemyMarkers()
 	for (int buttonIndex = 0; buttonIndex < BattlescapeState::VISIBLE_MAX; ++buttonIndex)
 	{
 		BattleUnit *enemy = _state->_visibleUnit[buttonIndex];
-		if (enemy && !enemy->isOut() && _state->_btnVisibleUnit[buttonIndex]->getVisible())
+		if (enemy && !enemy->isOut() && _state->_btnVisibleUnit[buttonIndex]->getVisible() && !hudHidden())
 		{
 			markers.push_back({ enemy, buttonIndex + 1 });
 		}

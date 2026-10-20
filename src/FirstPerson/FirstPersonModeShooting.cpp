@@ -60,6 +60,7 @@
 #include "../Battlescape/BattlescapeGame.h"
 #include "../Battlescape/BattlescapeState.h"
 #include "../Battlescape/Map.h"
+#include "../Battlescape/Pathfinding.h"
 #include "../Battlescape/TileEngine.h"
 #include "../Engine/Game.h"
 #include "../Engine/Options.h"
@@ -96,18 +97,106 @@ BattleItem *FirstPersonMode::activeWeapon(BattleUnit *unit) const
 }
 
 /**
- * Dual wield (an option): finds the gun in the other hand, which is drawn on its own side of
- * the view and fires together with the chosen one.
- * Both weapons must be firearms; a guided launcher (one with waypoints, like the blaster
- * launcher) doesn't count, since its missile is steered on the isometric map.
+ * Melee at the downed (setting "Melee hits walls and the downed"): with no one standing in
+ * reach, the blow may hit a unit lying unconscious in front of the soldier (in the tile they
+ * face, if no wall is in between) or at their feet. The game's melee wants a standing target,
+ * so the blow is the game's own pieces put together here: the time units and ammo the game's
+ * melee spends, the weapon's melee power and damage type as the game works them out, a hit (the
+ * body can't dodge) through the game's own unit damage (TileEngine::hitUnit, as a shot at the
+ * body would), the weapon's melee sound, the game's check for casualties, and reaction fire.
  * @param unit The soldier.
  * @param weapon The weapon in the chosen hand.
- * @return The other hand's gun, or null if dual wield is off or either weapon isn't a gun.
+ * @param action The game's current action, to fill in.
+ * @return True if there was a body to hit (the blow was made, or refused with the reason
+ *         shown); false if there's none in reach.
+ */
+bool FirstPersonMode::meleeDowned(BattleUnit *unit, BattleItem *weapon, BattleAction *action)
+{
+	// The body: in the tile the soldier faces (on its floor, or on the top of stairs below it,
+	// as the game's melee looks), with no wall in between, or else at their feet.
+	Position ahead;
+	Pathfinding::directionToVector(unit->getDirection(), &ahead);
+	Tile *ownTile = _save->getTile(unit->getPosition());
+	Tile *aheadTile = _save->getTile(unit->getPosition() + ahead);
+	if (aheadTile && aheadTile->hasNoFloor(_save) && _save->getBelowTile(aheadTile) && _save->getBelowTile(aheadTile)->getTerrainLevel() <= -16)
+	{
+		aheadTile = _save->getBelowTile(aheadTile);
+	}
+	if (ownTile && aheadTile && _save->getPathfinding()->isBlockedDirection(unit, ownTile, unit->getDirection()))
+	{
+		aheadTile = nullptr;
+	}
+	BattleUnit *body = nullptr;
+	for (Tile *tile : { aheadTile, ownTile })
+	{
+		for (BattleItem *item : tile ? *tile->getInventory() : std::vector<BattleItem*>())
+		{
+			if (!body && item->getUnit() && item->getUnit() != unit && item->getUnit()->getStatus() == STATUS_UNCONSCIOUS)
+			{
+				body = item->getUnit();
+			}
+		}
+	}
+	if (!body)
+	{
+		return false;
+	}
+
+	// The cost: the game's time units for the blow and the weapon's ammo for it.
+	action->type = BA_HIT;
+	action->targeting = false;
+	action->target = body->getPosition();
+	action->result.clear();
+	action->updateTU();
+	BattleItem *ammo = weapon->getAmmoForAction(BA_HIT, &action->result);
+	if (!ammo || !action->spendTU(&action->result))
+	{
+		_state->warning(action->result.empty() ? "STR_NOT_ENOUGH_TIME_UNITS" : action->result);
+		action->type = BA_NONE;
+		return true;
+	}
+	weapon->spendAmmoForAction(BA_HIT, _save);
+
+	// The blow's power and damage type, as the game works them out for a melee hit: a melee
+	// weapon's own power and damage, or a gun's melee bonus and melee damage (a rifle butt).
+	const BattleActionAttack attack = BattleActionAttack::GetAferShoot(*action, ammo);
+	const RuleItem *damageRule = attack.damage_item->getRules();
+	const bool meleeWeapon = damageRule->getBattleType() == BT_MELEE;
+	const int power = meleeWeapon ? damageRule->getPowerBonus(attack) : damageRule->getMeleeBonus(attack);
+	const RuleDamageType *damageType = meleeWeapon ? damageRule->getDamageType() : damageRule->getMeleeType();
+
+	// The hit, its sound, the casualties, and any reaction fire the time spent draws.
+	int sound = weapon->getRules()->getMeleeHitSound();
+	if (sound < 0) sound = weapon->getRules()->getMeleeSound();
+	if (sound >= 0) _state->_battleGame->playSound(sound);
+	_save->getTileEngine()->hitUnit(attack, body, Position(0, 0, 0), damageType->getRandomDamage(power), damageType, false);
+	_state->_battleGame->checkForCasualties(damageType, attack, false, false);
+	_save->getTileEngine()->checkReactionFire(unit, *action);
+	action->type = BA_NONE;
+
+	// The weapon in hand swings, as for any blow that lands.
+	_swingStart = SDL_GetTicks();
+	_swingJolted = false;
+	_sounds->play(FirstPersonSounds::SWOOSH, 0, 0.8f);
+	return true;
+}
+
+/**
+ * Akimbo (dual wield, a setting): finds the gun in the other hand, which is drawn on its own
+ * side of the view and fires together with the chosen one.
+ * Both weapons must be firearms; a guided launcher (one with waypoints, like the blaster
+ * launcher) doesn't count, since its missile is steered on the isometric map. With "Full
+ * akimbo" any two guns pair up (a two-handed one takes the game's one-handed penalty); with
+ * "Realistic akimbo" only guns that aren't two-handed do.
+ * @param unit The soldier.
+ * @param weapon The weapon in the chosen hand.
+ * @return The other hand's gun, or null if akimbo is off or the two don't pair up.
  */
 BattleItem *FirstPersonMode::offHandWeapon(BattleUnit *unit, const BattleItem *weapon) const
 {
-	// The chosen weapon itself must be a plain gun, and the option must be on.
-	if (!Options::fpsDualWield || !unit || !weapon || weapon->getRules()->getBattleType() != BT_FIREARM || weapon->getCurrentWaypoints() != 0)
+	// The chosen weapon itself must be a plain gun, and akimbo must be on.
+	const bool akimbo = Options::fpsDualWield || Options::fpsAkimboRealistic;
+	if (!akimbo || !unit || !weapon || weapon->getRules()->getBattleType() != BT_FIREARM || weapon->getCurrentWaypoints() != 0)
 	{
 		return nullptr;
 	}
@@ -118,7 +207,34 @@ BattleItem *FirstPersonMode::offHandWeapon(BattleUnit *unit, const BattleItem *w
 	{
 		return nullptr;
 	}
+
+	// Realistic akimbo: a two-handed gun (a rifle, a rocket launcher) fires alone.
+	if (Options::fpsAkimboRealistic && (weapon->getRules()->isTwoHanded() || otherWeapon->getRules()->isTwoHanded()))
+	{
+		return nullptr;
+	}
 	return otherWeapon;
+}
+
+/**
+ * The akimbo key (Y): with full or realistic akimbo on, switches it off and remembers which it
+ * was; with both off, switches that one back on (realistic if there's none to remember). The
+ * game's warning line says which.
+ */
+void FirstPersonMode::toggleAkimbo()
+{
+	if (Options::fpsDualWield || Options::fpsAkimboRealistic)
+	{
+		_akimboRealisticWasOn = Options::fpsAkimboRealistic;
+		Options::fpsDualWield = Options::fpsAkimboRealistic = false;
+		_state->warning("STR_FPS_AKIMBO_OFF");
+	}
+	else
+	{
+		Options::fpsAkimboRealistic = _akimboRealisticWasOn;
+		Options::fpsDualWield = !_akimboRealisticWasOn;
+		_state->warning(_akimboRealisticWasOn ? "STR_FPS_AKIMBO_REALISTIC_ON" : "STR_FPS_AKIMBO_FULL_ON");
+	}
 }
 
 /**
@@ -460,7 +576,7 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	// and no timer to pick: the game's own prime action with its fuse at 0 (it spends the time
 	// units Doom mode refills), and a grenade then burns DoomFuseTime in real time (see
 	// updateDoomFuses).
-	if (mode == BA_PRIME && Options::fpsDoomMode && !menuTargeting)
+	if (mode == BA_PRIME && doomModeOn() && !menuTargeting)
 	{
 		action->actor = unit;
 		action->weapon = weapon;
@@ -486,20 +602,42 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 
 	// Melee: the game finds who is in reach in the direction the soldier faces (the 3D view
 	// keeps him facing where it looks) and does the attack as its own action, which needs no
-	// target click.
+	// target click. With no one standing in reach, like the isometric map, the game's own
+	// terrain melee hits the wall, door or object the soldier faces, if the mod switches it on
+	// (extendedTerrainMelee); the setting "Melee hits walls and the downed" switches it on for
+	// the 3D view, and first lets the blow hit a body lying in front (see meleeDowned).
 	if (mode == BA_HIT)
 	{
+		TileEngine *tileEngine = _save->getTileEngine();
 		Position meleeTile;
-		if (!_save->getTileEngine()->validMeleeRange(unit->getPosition(), unit->getDirection(), unit, nullptr, &meleeTile))
-		{
-			_state->warning("STR_THERE_IS_NO_ONE_THERE");
-			return;
-		}
 		action->actor = unit;
 		action->weapon = weapon;
+		action->terrainMeleeTilePart = 0;
+		if (tileEngine->validMeleeRange(unit->getPosition(), unit->getDirection(), unit, nullptr, &meleeTile))
+		{
+			action->target = meleeTile;
+		}
+		else if (Options::fpsMeleeTerrain && meleeDowned(unit, weapon, action))
+		{
+			return;
+		}
+		else
+		{
+			const int modTerrainMelee = Mod::EXTENDED_TERRAIN_MELEE;
+			if (Options::fpsMeleeTerrain && modTerrainMelee <= 0)
+			{
+				Mod::EXTENDED_TERRAIN_MELEE = 1; // only for this check: parts reaching above the bottom layer
+			}
+			const bool terrainInReach = tileEngine->validTerrainMeleeRange(action);
+			Mod::EXTENDED_TERRAIN_MELEE = modTerrainMelee;
+			if (!terrainInReach)
+			{
+				_state->warning("STR_THERE_IS_NO_ONE_THERE");
+				return;
+			}
+		}
 		action->type = BA_HIT;
 		action->targeting = false;
-		action->target = meleeTile;
 		action->result.clear();
 		action->updateTU();
 		battleGame->handleNonTargetAction();
@@ -554,6 +692,9 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	{
 		action->targetVoxel = aimedVoxel;
 	}
+	// Leaning (setting "Lean shots", or leaning out with the lean keys): a soldier whose eye is
+	// to one side of the tile's middle shoots from that side (see leanSide).
+	action->relativeOrigin = (Options::fpsLeanShots || leaningOut()) && isShot(mode) ? leanSide(unit, targetTile) : BattleActionOrigin::CENTRE;
 
 	// Dual wield (an option): the gun in the other hand fires at the same moment, round for
 	// round, both half as accurate (the game halves both shots' accuracy). With time units for
@@ -561,7 +702,7 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	// from a menu.)
 	BattleActionType offMode = BA_NONE;
 	BattleItem *otherWeapon = menuTargeting ? nullptr : dualPartner(unit, weapon, slot, offMode);
-	if (otherWeapon && !Options::fpsDoomMode && action->Time + BattleActionCost(offMode, unit, otherWeapon).Time > unit->getTimeUnits())
+	if (otherWeapon && !doomModeOn() && action->Time + BattleActionCost(offMode, unit, otherWeapon).Time > unit->getTimeUnits())
 	{
 		otherWeapon = nullptr;
 	}
@@ -581,9 +722,43 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	// Clear what we added, so the next action (one from the classic HUD, say) aims normally.
 	action->targetVoxel = Position(-1, -1, -1);
 	action->freeAim = false;
+	action->relativeOrigin = BattleActionOrigin::CENTRE;
 	action->dualWield = false;
 	action->dualWeapon = nullptr;
 	action->dualType = BA_NONE;
+}
+
+/**
+ * Leaning (setting "Lean shots", or leaning out with the lean keys): which side of the soldier a
+ * shot starts from. In the 3D view the soldier may stand off the middle of their tile, and lean
+ * out further (see updateLean); with the eye more than LeanThreshold voxels to one side of the
+ * middle, across the line to the target, the shot starts from that side: the game's own
+ * off-centre origins (BattleActionOrigin LEFT / RIGHT, see TileEngine::getOriginVoxel, the ones
+ * its "off-centre shooting" option tries when the middle has no line of fire), so the offset
+ * stays within the game's limit. Peeking round a corner.
+ * @param unit The soldier.
+ * @param targetTile The tile aimed at.
+ * @return The side the shot starts from: the middle, left or right.
+ */
+BattleActionOrigin FirstPersonMode::leanSide(const BattleUnit *unit, const Position &targetTile) const
+{
+	// The way to the target on the map (x east, y south), and where the eye is (with any lean)
+	// from the middle of the soldier's tile (a big unit's middle is half a tile further on).
+	const int sizeOffset = 8 * (unit->getArmor()->getSize() - 1);
+	const double towardsX = targetTile.x - unit->getPosition().x, towardsY = targetTile.y - unit->getPosition().y;
+	const double length = std::sqrt(towardsX * towardsX + towardsY * towardsY);
+	if (length < 0.5)
+	{
+		return BattleActionOrigin::CENTRE;
+	}
+	const double offsetX = _eyeX + _leanShift[0] - (unit->getPosition().x * 16.0 + 8.0 + sizeOffset),
+		offsetY = _eyeY + _leanShift[1] - (unit->getPosition().y * 16.0 + 8.0 + sizeOffset);
+	// How far to the left of the line to the target the eye is (left of a heading
+	// (x, y) is (y, -x) on a map with y pointing south), in voxels.
+	const double toTheLeft = (offsetX * towardsY - offsetY * towardsX) / length;
+	if (toTheLeft > LeanThreshold) return BattleActionOrigin::LEFT;
+	if (toTheLeft < -LeanThreshold) return BattleActionOrigin::RIGHT;
+	return BattleActionOrigin::CENTRE;
 }
 
 /**
@@ -971,7 +1146,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		// Can he do it: the game's own cost in time units (Doom mode never runs out), and for
 		// a shot, ammo loaded if the weapon needs any.
 		const BattleActionCost cost(mode, unit, weapon);
-		bool canFire = Options::fpsDoomMode || cost.Time <= unit->getTimeUnits();
+		bool canFire = doomModeOn() || cost.Time <= unit->getTimeUnits();
 		if (isShot(mode) || mode == BA_LAUNCH)
 		{
 			canFire = canFire && (!weapon->needsAmmoForAction(mode) || weapon->getAmmoForAction(mode));
@@ -985,7 +1160,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		if (BattleItem *otherWeapon = canFire ? dualPartner(unit, weapon, slot, offMode) : nullptr)
 		{
 			offTime = BattleActionCost(offMode, unit, otherWeapon).Time;
-			dual = Options::fpsDoomMode || cost.Time + offTime <= unit->getTimeUnits();
+			dual = doomModeOn() || cost.Time + offTime <= unit->getTimeUnits();
 		}
 
 		// The hit chance at what's under the crosshair, for shots and throws (not in FPS style:
@@ -1070,12 +1245,16 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	_txtMode->setText(modeText);
 	_txtShot->setText(shotText);
 
-	// A hit (or a kill) on an enemy in sight ticks once and marks the crosshair for 280 ms.
+	// A hit (or a kill) on an enemy in sight ticks once (setting "Hit and kill sounds") and marks
+	// the crosshair for 280 ms.
 	const Uint32 hitTick = _view->getHitMarkTick();
 	if (hitTick != _hitMarkerHeard)
 	{
 		_hitMarkerHeard = hitTick;
-		_sounds->play(_view->getHitMarkKill() ? FirstPersonSounds::KILL : FirstPersonSounds::HIT, 0, 0.7f);
+		if (Options::fpsHitSounds)
+		{
+			_sounds->play(_view->getHitMarkKill() ? FirstPersonSounds::KILL : FirstPersonSounds::HIT, 0, 0.7f);
+		}
 	}
 	const int hitMark = hitTick && SDL_GetTicks() - hitTick < 280 ? (_view->getHitMarkKill() ? 2 : 1) : 0;
 	const Uint8 hitColor = hitMark == 2 ? red : nearestColor(palette, 255, 255, 255);
@@ -1317,7 +1496,7 @@ void FirstPersonMode::keepFiringWhileHeld(BattleUnit *unit, bool playerTurn)
 		// trigger counts as let go.
 		BattleItem *weapon = activeWeapon(unit);
 		BattleActionCost cost(BA_AUTOSHOT, unit, weapon);
-		if (weapon && weapon->getAmmoForAction(BA_AUTOSHOT) && (Options::fpsDoomMode || cost.haveTU()))
+		if (weapon && weapon->getAmmoForAction(BA_AUTOSHOT) && (doomModeOn() || cost.haveTU()))
 		{
 			fire(_view->getWidth() / 2, _view->getHeight() / 2);
 		}

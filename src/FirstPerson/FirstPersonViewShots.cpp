@@ -336,7 +336,7 @@ void FirstPersonView::drawProjectilesAndExplosions()
 			{
 				const Position position = projectile->getPosition();
 				const double world[3] = { (double)position.x, (double)position.y, (double)position.z };
-				ItemSprite itemSprite(_spriteBuffer, mod, _save, 0);
+				ItemSprite itemSprite(_spriteBuffer, mod, _save, _save->getAnimFrame());
 				_spriteBuffer->clear();
 				itemSprite.draw(item, 16, 8, 0);
 				drawSpriteSmooth(_spriteBuffer, 32, 34, world, 4.0, 0); // like Map: the voxel sits at sprite pixel (16, 26)

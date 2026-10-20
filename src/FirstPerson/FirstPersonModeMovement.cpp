@@ -139,7 +139,7 @@ bool FirstPersonMode::stepAllowed(BattleUnit *unit, int stepX, int stepY)
 		// The soldier must be able to pay for it: enough time units and energy, with enough time
 		// units left for the shot the player reserved (only checked here, so the game shows no
 		// message). The debug "doom mode" (endless time units, energy and ammo) skips this.
-		if (allowed && !Options::fpsDoomMode)
+		if (allowed && !doomModeOn())
 		{
 			allowed = unit->getTimeUnits() >= stepCost.cost.time && unit->getEnergy() >= stepCost.cost.energy
 				&& _state->_battleGame->checkReservedTU(unit, stepCost.cost.time, stepCost.cost.energy, true);
@@ -173,13 +173,19 @@ bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 	const std::vector<int> &path = pathfinding->getPath();
 	const int direction = Pathfinding::vectorToDirection(Position(stepX, stepY, 0));
 
-	// Over a ledge the search plans nothing (it never steps into the air), so the step is set by
-	// hand, and the game's own falling takes over once the soldier is out there (setting
-	// "Falling"; a flying soldier with flight on doesn't fall). Otherwise the path must be the
-	// direct step: if the pathfinding prefers a detour (or found no way), we don't take it.
+	// Over a ledge the search never plans the step into the air: it looks for the way to the
+	// ground below instead, which is no way at all, or a walk round by the stairs when there are
+	// some. Either way the step is set by hand, and the game's own falling takes over once the
+	// soldier is out there (setting "Falling"; a flying soldier with flight on doesn't fall).
+	// Otherwise the path must be the direct step: if the pathfinding prefers a detour (or found
+	// no way), we don't take it. A step down stairs is never a fall: the tile ahead has no floor,
+	// but the one below it is the top of the stairs, raised at least half a level (see
+	// stepAllowed), and the game walks it as one step.
 	const Tile *aheadTile = _save->getTile(target);
-	const bool stepsOffLedge = path.empty() && Options::fpsFalling && aheadTile && aheadTile->hasNoFloor(_save)
-		&& !(canFly(unit) && flightOn(unit));
+	const Tile *belowAheadTile = aheadTile ? _save->getBelowTile(aheadTile) : nullptr;
+	const bool stairsDown = belowAheadTile && !belowAheadTile->hasNoFloor(_save) && belowAheadTile->getTerrainLevel() <= -12;
+	const bool stepsOffLedge = path.size() != 1 && Options::fpsFalling && aheadTile && aheadTile->hasNoFloor(_save)
+		&& !stairsDown && !(canFly(unit) && flightOn(unit));
 	if (stepsOffLedge)
 	{
 		pathfinding->setPath(unit, { direction });
@@ -251,20 +257,72 @@ bool FirstPersonMode::closedDoorTowards(int stepX, int stepY, int z) const
 }
 
 /**
- * Moves the camera through a door it is stepping through (see updateMovement, which starts the
- * step when the soldier walks into a closed door). The game's walking state opens the door as
- * part of the step. Meanwhile the camera waits in front of it while it swings or slides open in
- * the 3D view, then walks through the doorway on its own, straight on, until it is well inside
- * the new tile, and then hands back to the movement keys.
+ * A diagonal gap: two units (or two crates) standing corner to corner, with the way between them
+ * open. The game lets a soldier step through it diagonally (only walls block a diagonal step),
+ * but the camera is kept EdgeMargin voxels away from both blocked sides of its tile, so it never
+ * gets to the corner to cross it. Pushing into such a corner takes the diagonal step, and
+ * walkGuidedStep moves the camera through the gap.
+ * @param newEyeX The camera's x this frame, in voxels, before it is kept off the tile's edges.
+ * @param newEyeY The camera's y this frame, in voxels, before it is kept off the tile's edges.
+ * @param wantedVelocityX The velocity the movement keys ask for along x, in voxels a second.
+ * @param wantedVelocityY The velocity the movement keys ask for along y, in voxels a second.
+ * @param sidesMayBeOpen A diagonal tile move: the diagonal step is taken here whether or not the
+ *        sides are open, so it is one step and not two around the corner.
+ * @return True if the step through the gap started.
+ */
+bool FirstPersonMode::stepThroughDiagonalGap(BattleUnit *unit, double newEyeX, double newEyeY, double wantedVelocityX, double wantedVelocityY, bool sidesMayBeOpen)
+{
+	// Pushing towards a corner: each axis has at least a quarter of the push (so between about
+	// 15 and 75 degrees off the axes). Which corner: east or west, south or north.
+	const double push = std::sqrt(wantedVelocityX * wantedVelocityX + wantedVelocityY * wantedVelocityY);
+	if (push == 0.0 || std::abs(wantedVelocityX) < push * 0.25 || std::abs(wantedVelocityY) < push * 0.25)
+	{
+		return false;
+	}
+	const int stepX = wantedVelocityX > 0.0 ? 1 : -1, stepY = wantedVelocityY > 0.0 ? 1 : -1;
+
+	// Up against both sides of that corner: no further than EdgeMargin from either edge (half a
+	// voxel to spare). A big unit's eye sits 8 voxels off its tile's middle (see clampInsideTile).
+	const int sizeOffset = 8 * (unit->getArmor()->getSize() - 1);
+	const double westEdgeX = _trackedTile.x * 16.0 + sizeOffset, northEdgeY = _trackedTile.y * 16.0 + sizeOffset;
+	const double toEdgeX = stepX > 0 ? westEdgeX + 16.0 - newEyeX : newEyeX - westEdgeX;
+	const double toEdgeY = stepY > 0 ? northEdgeY + 16.0 - newEyeY : newEyeY - northEdgeY;
+	if (toEdgeX > EdgeMargin + 0.5 || toEdgeY > EdgeMargin + 0.5)
+	{
+		return false;
+	}
+
+	// Both sides blocked (unless it's a diagonal tile move) and the diagonal open. (With a side
+	// open, the camera crosses that edge as usual, and the diagonal is the next step from there.)
+	if ((!sidesMayBeOpen && (stepAllowed(unit, stepX, 0) || stepAllowed(unit, 0, stepY))) || !stepAllowed(unit, stepX, stepY)
+		|| !commitStep(unit, stepX, stepY))
+	{
+		return false;
+	}
+	_guidedStep = true;
+	_guidedStepDoor = false;
+	_guidedStepDirection[0] = stepX;
+	_guidedStepDirection[1] = stepY;
+	_guidedStepStart = SDL_GetTicks();
+	return true;
+}
+
+/**
+ * Moves the camera through a step that takes it on its own: through a door (see updateMovement,
+ * which starts the step when the soldier walks into a closed door) or through a diagonal gap
+ * (see stepThroughDiagonalGap). The game's walking state opens a door as part of the step;
+ * meanwhile the camera waits in front of it while it swings or slides open in the 3D view. Then
+ * the camera walks on, straight through the doorway or the gap, until it is well inside the new
+ * tile, and hands back to the movement keys.
  * @param newEyeX Set to the camera's x for this frame, in voxels (when returning true).
  * @param newEyeY Set to the camera's y for this frame, in voxels (when returning true).
  * @param elapsedSeconds Seconds since the last frame.
- * @return True while the door step moves the camera; false when there's no door step going on
- *   (any more).
+ * @return True while the step moves the camera; false when there's no such step going on (any
+ *   more).
  */
-bool FirstPersonMode::walkThroughDoor(BattleUnit *unit, double &newEyeX, double &newEyeY, double elapsedSeconds)
+bool FirstPersonMode::walkGuidedStep(BattleUnit *unit, double &newEyeX, double &newEyeY, double elapsedSeconds)
 {
-	if (!_stepThroughDoor)
+	if (!_guidedStep)
 	{
 		return false;
 	}
@@ -275,14 +333,18 @@ bool FirstPersonMode::walkThroughDoor(BattleUnit *unit, double &newEyeX, double 
 	const bool stillHere = unitTile.x == _stepFrom.x && unitTile.y == _stepFrom.y;
 	const int sizeOffset = 8 * (unit->getArmor()->getSize() - 1);
 
-	// Wait in the old tile while the game hasn't moved the unit yet, and while the door is still
+	// Wait in the old tile while the game hasn't moved the unit yet, and while a door is still
 	// opening in the 3D view: at least DoorWait ms, and at most 3 seconds in all, in case the door
 	// never reports that it stopped. The wall the door is in belongs to the tile further east or
 	// south (a tile owns its west and north walls).
-	const Position wall(_stepFrom.x + std::max(_doorStepDirection[0], 0), _stepFrom.y + std::max(_doorStepDirection[1], 0), _stepFrom.z);
-	const int wallPart = _doorStepDirection[0] != 0 ? O_WESTWALL : O_NORTHWALL;
-	const bool waiting = SDL_GetTicks() - _doorStepStart < DoorWait || _view->isDoorMoving(wall, wallPart);
-	if ((_stepPending && stillHere) || (waiting && SDL_GetTicks() - _doorStepStart < 3000))
+	bool waiting = false;
+	if (_guidedStepDoor)
+	{
+		const Position wall(_stepFrom.x + std::max(_guidedStepDirection[0], 0), _stepFrom.y + std::max(_guidedStepDirection[1], 0), _stepFrom.z);
+		const int wallPart = _guidedStepDirection[0] != 0 ? O_WESTWALL : O_NORTHWALL;
+		waiting = (SDL_GetTicks() - _guidedStepStart < DoorWait || _view->isDoorMoving(wall, wallPart)) && SDL_GetTicks() - _guidedStepStart < 3000;
+	}
+	if ((_stepPending && stillHere) || waiting)
 	{
 		newEyeX = clampInsideTile(_stepFrom.x, _eyeX, sizeOffset);
 		newEyeY = clampInsideTile(_stepFrom.y, _eyeY, sizeOffset);
@@ -290,33 +352,187 @@ bool FirstPersonMode::walkThroughDoor(BattleUnit *unit, double &newEyeX, double 
 	}
 
 	// Where the camera is now: in which tile, and whether it is at least EdgeMargin voxels inside
-	// the new tile on the axis it walks along.
+	// the new tile on the axes it walks along.
 	const int cameraX = (int)std::floor((_eyeX - sizeOffset) / 16.0), cameraY = (int)std::floor((_eyeY - sizeOffset) / 16.0);
 	const bool inside =
-		(_doorStepDirection[0] == 0
+		(_guidedStepDirection[0] == 0
 			|| (_eyeX - sizeOffset - _trackedTile.x * 16.0 >= EdgeMargin && _trackedTile.x * 16.0 + 16.0 - (_eyeX - sizeOffset) >= EdgeMargin))
-		&& (_doorStepDirection[1] == 0
+		&& (_guidedStepDirection[1] == 0
 			|| (_eyeY - sizeOffset - _trackedTile.y * 16.0 >= EdgeMargin && _trackedTile.y * 16.0 + 16.0 - (_eyeY - sizeOffset) >= EdgeMargin));
 
-	// The unit has moved on: walk through the doorway, straight on, at the walking speed setting
-	// (1 to 8 tiles a second), kept away from the door frame on the other axis.
+	// The unit has moved on: walk through, straight on, at the walking speed setting (1 to 8
+	// tiles a second; a diagonal no faster), kept away from a door's frame on the other axis.
 	if (!stillHere && (cameraX != _trackedTile.x || cameraY != _trackedTile.y || !inside))
 	{
-		const double distance = std::clamp(Options::fpsWalkSpeed, 1, 8) * 16.0 * elapsedSeconds;
-		newEyeX = _eyeX + _doorStepDirection[0] * distance;
-		newEyeY = _eyeY + _doorStepDirection[1] * distance;
-		if (_doorStepDirection[0] == 0) newEyeX = clampInsideTile(_trackedTile.x, newEyeX, sizeOffset);
-		if (_doorStepDirection[1] == 0) newEyeY = clampInsideTile(_trackedTile.y, newEyeY, sizeOffset);
+		const double diagonal = (_guidedStepDirection[0] != 0 && _guidedStepDirection[1] != 0) ? std::sqrt(0.5) : 1.0;
+		const double distance = std::clamp(Options::fpsWalkSpeed, 1, 8) * 16.0 * elapsedSeconds * diagonal;
+		newEyeX = _eyeX + _guidedStepDirection[0] * distance;
+		newEyeY = _eyeY + _guidedStepDirection[1] * distance;
+		if (_guidedStepDirection[0] == 0) newEyeX = clampInsideTile(_trackedTile.x, newEyeX, sizeOffset);
+		if (_guidedStepDirection[1] == 0) newEyeY = clampInsideTile(_trackedTile.y, newEyeY, sizeOffset);
 		return true;
 	}
 
-	// Through the door, or the step didn't happen (out of time units, say): once the game is done
-	// with the step, the door step is over and the keys take over again.
+	// Through, or the step didn't happen (out of time units, say): once the game is done with
+	// the step, it's over and the keys take over again.
 	if (!_stepPending)
 	{
-		_stepThroughDoor = false;
+		_guidedStep = false;
 	}
 	return false;
+}
+
+/**
+ * Which way the movement keys push: forward (1) or back (-1), and strafing right (1) or left
+ * (-1), each 0 when neither or both of its keys are held.
+ * @param forward Set to the forward push.
+ * @param strafe Set to the sideways push.
+ */
+void FirstPersonMode::movementKeys(double &forward, double &strafe) const
+{
+	const Uint8 *keyStates = SDL_GetKeyState(nullptr);
+	forward = (keyStates[Options::keyFpsForward] ? 1.0 : 0.0) - (keyStates[Options::keyFpsBack] ? 1.0 : 0.0);
+	strafe = (keyStates[Options::keyFpsStrafeRight] ? 1.0 : 0.0) - (keyStates[Options::keyFpsStrafeLeft] ? 1.0 : 0.0);
+}
+
+/**
+ * Which way the numpad's move keys held right now push (see handleKey: 8 ahead, 2 back, 4 left,
+ * 6 right, relative to the view).
+ * @param forward Set to the forward push: 1, -1 or 0.
+ * @param strafe Set to the sideways push: 1 (right), -1 or 0.
+ */
+void FirstPersonMode::numpadKeys(int &forward, int &strafe) const
+{
+	const Uint8 *keyStates = SDL_GetKeyState(nullptr);
+	forward = (keyStates[SDLK_KP8] ? 1 : 0) - (keyStates[SDLK_KP2] ? 1 : 0);
+	strafe = (keyStates[SDLK_KP6] ? 1 : 0) - (keyStates[SDLK_KP4] ? 1 : 0);
+}
+
+/**
+ * Tile moves: a move walks exactly one tile, to the middle of the neighbour in the direction it
+ * pushes (one of eight, relative to the view). The numpad makes such moves whatever the movement
+ * setting, almost at once (NumpadMoveSpeed), like a step on the isometric map: a press is
+ * remembered until the move can start, and a key still held starts the next. With the setting
+ * "Movement: Tiles", W, A, S and D make them too, at walking speed, once held a moment (a second
+ * key pressed with the first, W and D say, makes a diagonal), and holding them walks on.
+ * The move is the normal walk steered to the middle of that tile, so everything walking does
+ * still happens on the way (the step through the game's own walking, doors, falling off ledges,
+ * diagonal gaps, vaults); this only works out the velocity, straight to the tile's middle,
+ * stopping there without overshooting. A move that stops coming closer (the step refused, a
+ * wall) is over, and so is one that a door or a vault took over. Between moves, with tile moves
+ * set, the camera settles back to the middle of its tile.
+ * @param forward, strafe The movement keys' push (see movementKeys).
+ * @param canMove Whether the keys may move the soldier now (see updateMovement).
+ * @param walkSpeed The walking speed, in voxels a second.
+ * @param elapsedSeconds Seconds since the last frame.
+ * @param velocityX, velocityY Set to the velocity, in voxels a second.
+ * @return True while a move is under way (it walks into the next tile, paying for it); false
+ *         when only settling, or still.
+ */
+bool FirstPersonMode::tileMoveVelocity(BattleUnit *unit, double forward, double strafe, bool canMove, double walkSpeed, double elapsedSeconds, double &velocityX, double &velocityY)
+{
+	velocityX = velocityY = 0.0;
+	const Uint32 now = SDL_GetTicks();
+	const bool keyMoves = Options::fpsMovement == 1;
+	const bool pushing = keyMoves && (forward != 0.0 || strafe != 0.0);
+	const int sizeOffset = 8 * (unit->getArmor()->getSize() - 1); // a big unit's eye sits 8 voxels off its tile's middle
+	int numpadForward = 0, numpadStrafe = 0;
+	numpadKeys(numpadForward, numpadStrafe);
+	if (!canMove)
+	{
+		_numpadMove[0] = _numpadMove[1] = 0; // (a press while the soldier may not move is dropped)
+		numpadForward = numpadStrafe = 0;
+	}
+
+	// Start a move when the soldier may step: a numpad press (or a numpad key still held) at
+	// once, else the movement keys held a moment. It goes into the neighbour the push points at
+	// (turned onto the map, yaw 0 east and 90 south, and snapped to the nearest of the eight
+	// directions), if the rules allow that step or a closed door is there (walking through
+	// opens it).
+	if (!_tileMove)
+	{
+		if (!pushing)
+		{
+			_tileMoveKeysSince = 0;
+		}
+		else if (!_tileMoveKeysSince)
+		{
+			_tileMoveKeysSince = now;
+		}
+		double moveForward = 0.0, moveStrafe = 0.0;
+		bool quick = true;
+		if (_numpadMove[0] || _numpadMove[1])
+		{
+			moveForward = _numpadMove[0];
+			moveStrafe = _numpadMove[1];
+		}
+		else if (numpadForward || numpadStrafe)
+		{
+			moveForward = numpadForward;
+			moveStrafe = numpadStrafe;
+		}
+		else if (pushing && now - _tileMoveKeysSince >= TileMoveKeyWait)
+		{
+			moveForward = forward;
+			moveStrafe = strafe;
+			quick = false;
+		}
+		if ((moveForward != 0.0 || moveStrafe != 0.0) && canMove && !_stepPending && canAct() && unit->getStatus() == STATUS_STANDING)
+		{
+			_numpadMove[0] = _numpadMove[1] = 0; // the press is used (or the way is blocked)
+			const double yaw = _view->getYawDegrees() * Pi / 180.0; // radians
+			const double pushX = std::cos(yaw) * moveForward - std::sin(yaw) * moveStrafe, pushY = std::sin(yaw) * moveForward + std::cos(yaw) * moveStrafe;
+			const double octant = std::round(std::atan2(pushY, pushX) / (Pi / 4.0)) * (Pi / 4.0);
+			const int stepX = (int)std::lround(std::cos(octant)), stepY = (int)std::lround(std::sin(octant));
+			if (stepAllowed(unit, stepX, stepY) || closedDoorTowards(stepX, stepY, unit->getPosition().z))
+			{
+				_tileMove = true;
+				_tileMoveQuick = quick;
+				_tileMoveTarget = Position(_trackedTile.x + stepX, _trackedTile.y + stepY, 0);
+				_tileMoveClosest = 1e9;
+				_tileMoveProgressAt = now;
+			}
+		}
+	}
+
+	// No move: with tile moves set, settle back to the middle of the tile (after a refused step,
+	// say); free walking leaves the camera where it is.
+	if (!_tileMove)
+	{
+		const double toMiddleX = _trackedTile.x * 16.0 + 8.0 + sizeOffset - _eyeX, toMiddleY = _trackedTile.y * 16.0 + 8.0 + sizeOffset - _eyeY;
+		const double distance = std::sqrt(toMiddleX * toMiddleX + toMiddleY * toMiddleY);
+		if (keyMoves && distance > 0.01 && !_stepPending && elapsedSeconds > 0.0)
+		{
+			const double speed = std::min(walkSpeed, distance / elapsedSeconds);
+			velocityX = toMiddleX / distance * speed;
+			velocityY = toMiddleY / distance * speed;
+		}
+		return false;
+	}
+
+	// A move: straight to the target tile's middle. Arrived, or not coming any closer: it's
+	// over (with the keys still held, the next move starts at once).
+	const double toTargetX = _tileMoveTarget.x * 16.0 + 8.0 + sizeOffset - _eyeX, toTargetY = _tileMoveTarget.y * 16.0 + 8.0 + sizeOffset - _eyeY;
+	const double distance = std::sqrt(toTargetX * toTargetX + toTargetY * toTargetY);
+	if (distance < _tileMoveClosest - 0.01)
+	{
+		_tileMoveClosest = distance;
+		_tileMoveProgressAt = now;
+	}
+	if (elapsedSeconds <= 0.0)
+	{
+		return true; // a frame with no time passed moves nothing
+	}
+	if (distance <= 0.01 || now - _tileMoveProgressAt > TileMoveStuck)
+	{
+		_tileMove = false;
+		_tileMoveKeysSince = pushing ? now - TileMoveKeyWait : 0;
+		return false;
+	}
+	const double speed = std::min(_tileMoveQuick ? NumpadMoveSpeed : walkSpeed, distance / elapsedSeconds);
+	velocityX = toTargetX / distance * speed;
+	velocityY = toTargetY / distance * speed;
+	return true;
 }
 
 /**
@@ -336,9 +552,8 @@ void FirstPersonMode::jump(BattleUnit *unit)
 	}
 
 	// Which way the movement keys push: forward (1) or back (-1), and strafing right (1) or left (-1).
-	const Uint8 *keyStates = SDL_GetKeyState(nullptr);
-	const double forward = (keyStates[Options::keyFpsForward] ? 1.0 : 0.0) - (keyStates[Options::keyFpsBack] ? 1.0 : 0.0);
-	const double strafe = (keyStates[Options::keyFpsStrafeRight] ? 1.0 : 0.0) - (keyStates[Options::keyFpsStrafeLeft] ? 1.0 : 0.0);
+	double forward = 0.0, strafe = 0.0;
+	movementKeys(forward, strafe);
 
 	// Pushing towards a neighbouring tile while the soldier may act: if the rules block that
 	// step, try to vault over whatever blocks it.
@@ -472,7 +687,7 @@ bool FirstPersonMode::tryVault(BattleUnit *unit, int stepX, int stepY)
 	// The soldier must have the walk's time units, keeping those reserved for a shot (the game's
 	// "not enough time units" message if not). Energy is left to the walking state, which stops
 	// the walk when it runs out (see updateCamera). The debug "doom mode" skips this.
-	if (canVault && !Options::fpsDoomMode)
+	if (canVault && !doomModeOn())
 	{
 		const int timeUnitCost = pathfinding->getTotalTUCost();
 		canVault = unit->getTimeUnits() >= timeUnitCost && _state->_battleGame->checkReservedTU(unit, timeUnitCost, 0, true);
@@ -605,8 +820,8 @@ void FirstPersonMode::endVault()
  * that the game walks and charges by its rules (see commitStep): the diagonal first, else
  * sliding along either axis. Where no step is possible (a wall, not enough time units...) the
  * camera stops short of the tile's edge. Walking into a closed door stops in front of it and
- * steps through it (see walkThroughDoor). A vault (see glideOverObstacle) moves the camera on
- * its own.
+ * steps through it, and pushing into a diagonal gap steps through that (see walkGuidedStep). A
+ * vault (see glideOverObstacle) moves the camera on its own.
  * @param canMove Whether the keys may move the soldier: true on the player's turn, false while
  *   the view only follows the soldier (the aliens' turn, a breakdown).
  * @param elapsedSeconds Seconds since the last frame.
@@ -616,17 +831,17 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 	// After a new enemy was spotted the keys are ignored until they're all let go (see
 	// checkSpotted). Otherwise, which way they push: forward (1) or back (-1), and strafing right
 	// (1) or left (-1).
-	const Uint8 *keyStates = SDL_GetKeyState(nullptr);
 	double forward = 0.0, strafe = 0.0;
-	if (_movementHeld && !keyStates[Options::keyFpsForward] && !keyStates[Options::keyFpsBack]
-		&& !keyStates[Options::keyFpsStrafeLeft] && !keyStates[Options::keyFpsStrafeRight])
+	movementKeys(forward, strafe);
+	int numpadForward = 0, numpadStrafe = 0;
+	numpadKeys(numpadForward, numpadStrafe);
+	if (_movementHeld && forward == 0.0 && strafe == 0.0 && numpadForward == 0 && numpadStrafe == 0)
 	{
 		_movementHeld = false;
 	}
-	if (canMove && !_movementHeld)
+	if (!canMove || _movementHeld)
 	{
-		forward = (keyStates[Options::keyFpsForward] ? 1.0 : 0.0) - (keyStates[Options::keyFpsBack] ? 1.0 : 0.0);
-		strafe = (keyStates[Options::keyFpsStrafeRight] ? 1.0 : 0.0) - (keyStates[Options::keyFpsStrafeLeft] ? 1.0 : 0.0);
+		forward = strafe = 0.0;
 	}
 
 	// The camera's new position starts where it is now. A big unit's eye sits 8 voxels off the
@@ -644,9 +859,9 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 		return;
 	}
 
-	// So does a step through a door, with footsteps. Its speed becomes the momentum, so the
-	// walk carries on smoothly once the doorway is behind.
-	if (walkThroughDoor(unit, newEyeX, newEyeY, elapsedSeconds))
+	// So does a step through a door or a diagonal gap, with footsteps. Its speed becomes the
+	// momentum, so the walk carries on smoothly once the doorway or the gap is behind.
+	if (walkGuidedStep(unit, newEyeX, newEyeY, elapsedSeconds))
 	{
 		const double distanceMoved = std::sqrt((newEyeX - _eyeX) * (newEyeX - _eyeX) + (newEyeY - _eyeY) * (newEyeY - _eyeY));
 		playFootsteps(unit, distanceMoved);
@@ -659,9 +874,16 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 
 	// The velocity the keys ask for, in voxels a second: their push turned from the view's frame
 	// onto the map (yaw 0 is east, 90 south), at walking speed in any direction (diagonals are
-	// no faster).
+	// no faster). Tile by tile, the velocity that walks to the next tile's middle instead, with
+	// no momentum: the moves start and stop crisply.
 	double wantedVelocityX = 0.0, wantedVelocityY = 0.0;
-	if (forward != 0.0 || strafe != 0.0)
+	const bool tileMoves = Options::fpsMovement == 1 || _tileMove || ((_numpadMove[0] || _numpadMove[1] || numpadForward || numpadStrafe) && canMove && !_movementHeld);
+	bool tileMoveDriving = false;
+	if (tileMoves)
+	{
+		tileMoveDriving = tileMoveVelocity(unit, forward, strafe, canMove && !_movementHeld, walkSpeed, elapsedSeconds, wantedVelocityX, wantedVelocityY);
+	}
+	else if (forward != 0.0 || strafe != 0.0)
 	{
 		const double yaw = _view->getYawDegrees() * Pi / 180.0; // radians
 		const double pushX = std::cos(yaw) * forward - std::sin(yaw) * strafe;
@@ -674,7 +896,7 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 	// A little momentum: the soldier speeds up and slows down over a fraction of a second (the
 	// velocity closes in on the wanted one at 12 times the gap per second), and with no key
 	// held a crawl below 1 voxel a second stops dead. Then the camera moves by this frame's share.
-	const double blend = std::min(1.0, elapsedSeconds * 12.0);
+	const double blend = tileMoves ? 1.0 : std::min(1.0, elapsedSeconds * 12.0);
 	_velocityX += (wantedVelocityX - _velocityX) * blend;
 	_velocityY += (wantedVelocityY - _velocityY) * blend;
 	if (wantedVelocityX == 0.0 && std::abs(_velocityX) < 1.0) _velocityX = 0.0;
@@ -683,7 +905,8 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 	newEyeY += _velocityY * elapsedSeconds;
 
 	// Only a held key walks into the next tile (and pays for it); gliding to a stop doesn't.
-	const bool driving = wantedVelocityX != 0.0 || wantedVelocityY != 0.0;
+	// Tile by tile, a move under way walks on (settling back into the tile doesn't).
+	const bool driving = tileMoves ? tileMoveDriving : (wantedVelocityX != 0.0 || wantedVelocityY != 0.0);
 
 	// A closed door ahead (soldiers one tile big only): stop DoorMargin voxels in front of it,
 	// and walking on steps through it, the game opening it on the way.
@@ -711,21 +934,33 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 			if (side[1] > 0) newEyeY = std::min(newEyeY, northEdgeY + 16.0 - DoorMargin);
 			if (side[1] < 0) newEyeY = std::max(newEyeY, northEdgeY + DoorMargin);
 
-			// Walking on, and the rules allow the step: take it, and let walkThroughDoor move the
+			// Walking on, and the rules allow the step: take it, and let walkGuidedStep move the
 			// camera from now on.
 			if (!_stepPending && driving && canMove && canAct() && unit->getStatus() == STATUS_STANDING && stepAllowed(unit, side[0], side[1])
 				&& commitStep(unit, side[0], side[1]))
 			{
-				_stepThroughDoor = true;
-				_doorStepDirection[0] = side[0];
-				_doorStepDirection[1] = side[1];
-				_doorStepStart = SDL_GetTicks();
+				_guidedStep = true;
+				_guidedStepDoor = true;
+				_guidedStepDirection[0] = side[0];
+				_guidedStepDirection[1] = side[1];
+				_guidedStepStart = SDL_GetTicks();
 				playFootsteps(unit, std::sqrt((newEyeX - _eyeX) * (newEyeX - _eyeX) + (newEyeY - _eyeY) * (newEyeY - _eyeY)));
 				_eyeX = newEyeX;
 				_eyeY = newEyeY;
 				return;
 			}
 		}
+	}
+
+	// Pushing into a corner between two units or objects standing corner to corner, with the
+	// diagonal step open (or walking a diagonal tile move): take it (see stepThroughDiagonalGap),
+	// and let walkGuidedStep move the camera through the gap from the next frame on. Meanwhile it
+	// stays where it was.
+	if (!_stepPending && driving && canMove && canAct() && unit->getStatus() == STATUS_STANDING
+		&& stepThroughDiagonalGap(unit, newEyeX, newEyeY, wantedVelocityX, wantedVelocityY,
+			_tileMove && _tileMoveTarget.x != _trackedTile.x && _tileMoveTarget.y != _trackedTile.y))
+	{
+		return;
 	}
 
 	// Which neighbouring tile the new position falls into, per axis: -1, 0 (still this tile) or 1.
@@ -856,7 +1091,7 @@ void FirstPersonMode::updateLift(BattleUnit *unit, Uint32 now)
 	// the unit's position.
 	bool up = false, down = false;
 	const bool riding = _rideStart && now - _rideStart < _rideTime;
-	if (unit && isActive() && !_classicHud && !_stepPending && !riding && canAct() && unit->getStatus() == STATUS_STANDING)
+	if (unit && isActive() && !_classicHud && !_hudHidden && !_stepPending && !riding && canAct() && unit->getStatus() == STATUS_STANDING)
 	{
 		const Tile *tile = unit->getTile();
 		const MapData *floor = tile ? tile->getMapData(O_FLOOR) : nullptr;
@@ -884,13 +1119,8 @@ void FirstPersonMode::updateLift(BattleUnit *unit, Uint32 now)
 	const int liftWays = (up ? 1 : 0) | (down ? 2 : 0);
 	if (liftWays != _liftKeysShownFor)
 	{
-		auto keyName = [](SDLKey key) {
-			std::string text = SDL_GetKeyName(key);
-			for (char &letter : text) letter = (char)toupper((unsigned char)letter);
-			return text;
-		};
-		std::string keyNames = up ? keyName(Options::keyFpsUp) : std::string();
-		if (down) keyNames += (keyNames.empty() ? "" : " / ") + keyName(Options::keyFpsDown);
+		std::string keyNames = up ? keyLabel(Options::keyFpsUp) : std::string();
+		if (down) keyNames += (keyNames.empty() ? "" : " / ") + keyLabel(Options::keyFpsDown);
 		_txtLiftKeys->setText(keyNames);
 		_liftKeysShownFor = liftWays;
 	}
@@ -1107,8 +1337,9 @@ void FirstPersonMode::updateFlight(BattleUnit *unit)
 	}
 
 	// Tell the pathfinding who pays our flight cost for moves up and down (also while landing);
-	// nobody (-1) means the game's own costs.
-	const bool paysFlightCost = unit && canFly(unit) && (flightOn(unit) || _landing);
+	// nobody (-1) means the game's own costs, as with the setting "Flight cost overrides rules"
+	// off (each unit flies at its armor's own cost).
+	const bool paysFlightCost = Options::fpsFlightCostOverride && unit && canFly(unit) && (flightOn(unit) || _landing);
 	_save->getPathfinding()->setFlightCost(paysFlightCost ? unit : nullptr, paysFlightCost ? Options::fpsFlightCost : -1);
 
 	// Landing: whenever the game is idle and the soldier stands (hovers) ready, one more level down.

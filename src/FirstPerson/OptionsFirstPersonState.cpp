@@ -292,6 +292,34 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 			static const char *const upscaleNames[] = { "STR_FPS_UPSCALE_OFF", "STR_FPS_UPSCALE_SMOOTH", "STR_FPS_UPSCALE_DETAIL" };
 			return std::string(tr(upscaleNames[std::clamp(*option.asInt(), 0, 2)]));
 		}
+		// The distance haze is a choice of three, shown by name.
+		if (option.id() == "fpsHaze")
+		{
+			static const char *const hazeNames[] = { "STR_FPS_HAZE_NORMAL", "STR_FPS_HAZE_LIGHT", "STR_FPS_HAZE_CLEAR" };
+			return std::string(tr(hazeNames[std::clamp(*option.asInt(), 0, 2)]));
+		}
+		// The unit size is a percentage.
+		if (option.id() == "fpsUnitSize")
+		{
+			return std::to_string(*option.asInt()) + "%";
+		}
+		// Hitboxes are a choice of three, shown by name.
+		if (option.id() == "fpsHitboxes")
+		{
+			static const char *const hitboxNames[] = { "STR_FPS_HITBOXES_OFF", "STR_FPS_HITBOXES_BLINK", "STR_FPS_HITBOXES_ALWAYS" };
+			return std::string(tr(hitboxNames[std::clamp(*option.asInt(), 0, 2)]));
+		}
+		// Leaning out is a choice of three, shown by name.
+		if (option.id() == "fpsLean")
+		{
+			static const char *const leanNames[] = { "STR_FPS_LEAN_OFF", "STR_FPS_LEAN_PEEK", "STR_FPS_LEAN_TILT" };
+			return std::string(tr(leanNames[std::clamp(*option.asInt(), 0, 2)]));
+		}
+		// Movement is a choice of two, shown by name.
+		if (option.id() == "fpsMovement")
+		{
+			return std::string(tr(*option.asInt() == 1 ? "STR_FPS_MOVEMENT_TILES" : "STR_FPS_MOVEMENT_FREE"));
+		}
 		// A pixel size of 0 is Auto (see AutoPixelMaxWidth).
 		if (option.id() == "fpsPixelSize" && *option.asInt() == 0)
 		{
@@ -414,13 +442,24 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		}
 		return;
 	}
-	// A switch: either button flips it. The frame counter shows or hides at once.
+	// A switch: either button flips it. The frame counter shows or hides at once. Full and
+	// realistic akimbo are two kinds of the same thing: switching one on switches the other off.
 	if (option->type() == OPTION_BOOL)
 	{
 		*option->asBool() = !*option->asBool();
 		if (option->asBool() == &Options::fpsCounter)
 		{
 			_game->getFpsCounter()->setVisible(Options::fpsCounter);
+		}
+		bool *otherAkimbo = option->asBool() == &Options::fpsDualWield ? &Options::fpsAkimboRealistic
+			: option->asBool() == &Options::fpsAkimboRealistic ? &Options::fpsDualWield : nullptr;
+		if (otherAkimbo && *option->asBool() && *otherAkimbo)
+		{
+			*otherAkimbo = false;
+			for (size_t settingRow = 0; settingRow < _settings.size(); ++settingRow)
+			{
+				if (_settings[settingRow].type() == OPTION_BOOL && _settings[settingRow].asBool() == otherAkimbo) _lstOptions->setCellText(settingRow, 1, valueText(_settings[settingRow]));
+			}
 		}
 	}
 	// A number: one step up (left) or down (right), within its range.
@@ -437,6 +476,31 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		else if (value == &Options::fpsMouseSensitivity)
 		{
 			*value = std::clamp(*value + direction, 1, 20);
+		}
+		// Distance haze (normal, light, clear): round and round.
+		else if (value == &Options::fpsHaze)
+		{
+			*value = (*value + direction + 3) % 3;
+		}
+		// Unit size: 80 to 100%, in steps of 5.
+		else if (value == &Options::fpsUnitSize)
+		{
+			*value = std::clamp(*value + 5 * direction, 80, 100);
+		}
+		// Hitboxes (off, blink, always): round and round.
+		else if (value == &Options::fpsHitboxes)
+		{
+			*value = (*value + direction + 3) % 3;
+		}
+		// Leaning out (off, peek, tilt): round and round.
+		else if (value == &Options::fpsLean)
+		{
+			*value = (*value + direction + 3) % 3;
+		}
+		// Movement (free, tiles): either button switches.
+		else if (value == &Options::fpsMovement)
+		{
+			*value = (*value + 1) % 2;
 		}
 		// Walking speed: 1 to 8 tiles per second.
 		else if (value == &Options::fpsWalkSpeed)

@@ -4,7 +4,7 @@
 
 ![Night, through a soldier's eyes](docs/screenshots/night.png)
 
-*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **0.8.2**.
+*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **0.9**.
 
 **Both games are supported:** *UFO: Enemy Unknown* and *X-COM: Terror From The Deep*.
 
@@ -23,18 +23,19 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 | ![Dual wield](docs/screenshots/akimbo.png) | ![Signal lost](docs/screenshots/signal_lost.png) |
 | ![Terror From The Deep, an island attack: a Gillman ahead, a Deep One in a teammate's helmet camera](docs/screenshots/tftd_island.png) | ![A rocket going off far down an alien base hall](docs/screenshots/alien_base.png) |
 
+## New in 0.9
+
+- **A play-test round:** a veteran player sent two long reports (thank you!), and they became some thirty small patches, each tested on its own: walking off ledges and through diagonal gaps, no more sky shimmering through buildings, soldiers and corpses seen from above, items lying on the floor, the blinking units of the big mods, close-quarters combat as the game rolls it, light no longer glowing through units, and more.
+- **New settings,** most of them off, so the game plays as before until you switch them on: turning costs time units, a compass, moving a tile at a time (the numpad always does), Doom IDKFA and IDDQD, realistic akimbo, hitboxes, unit size, see-through smoke, a discreet map edge, distance haze, lean shots.
+- **Lean out:** with the setting *Lean* on, hold **Q** or **E** to peek round a corner; with *Tilt* the view tilts as a head does, and a shot from there leaves from that side.
+- **The classic HUD in 3D:** its buttons now act in the 3D view (centre, look a level up or down, the minimap on your soldier, the enemy buttons), and **P** hides the 3D HUD for a clear view.
+- **Steam Deck:** the lean on the back buttons; akimbo, snap turns, the 3D HUD, the light and the flare on long presses.
+
 ## New in 0.8.2
 
 - **Download and play:** the Linux release now comes with its own libraries, so nothing has to be installed. Unpack it and run `./play.sh`, or take the single-file **AppImage**. It runs on Ubuntu 22.04 and newer, Debian 12, Fedora, Arch and the **Steam Deck**; all it needs is your copy of the original game.
 - **Finds your games by itself:** *X-COM: UFO Defense* and *Terror From The Deep* in any Steam library (Steam installed as a Flatpak or a Snap too, and the Steam Deck's SD card), or a `UFO` / `TFTD` folder next to the game.
 - **Steam Deck:** fullscreen on its screen, and a controller layout made for the game: the left stick walks, the right trackpad looks, L1 switches mouse look and the free cursor, R1 the isometric map and 3D.
-
-## New in 0.8.1
-
-- **The prebuilt release runs on old and new Linux systems:** anything from 2021 on (glibc 2.34: Ubuntu 22.04, Debian 12, Fedora 35, and every rolling one such as Arch), with the system's own SDL libraries in whatever version it has. If something is missing, `play.sh` says what and how to install it.
-- **Pixel size Auto** (the new default) keeps big screens smooth: on 1920×1080 it holds 60 FPS.
-- **Everything in a hand is 3D:** grenades, medi-kits, scanners, clips are built from their inventory pictures like the weapons, half in view at the bottom of the screen; **thrown items fly as 3D objects**, tumbling along the game's arc.
-- **Grenades:** a primed one shows its fuse on the panel. In Doom mode they work in real time (one click pulls the pin, three seconds, boom, in your hand too if you wait): a first step towards a **real-time mode**, which will be attempted in the future.
 
 ## Help wanted
 
@@ -56,7 +57,7 @@ OpenXcom3D stems from **OpenXcom Extended** at exactly this commit:
 All changes on top of it are in one file, [`openxcom3d.patch`](openxcom3d.patch) (it applies with `git apply` to a clean checkout of that commit):
 
 - [`src/FirstPerson/`](src/FirstPerson): the 3D view, an engine add-on (renderer, controller, sounds, options), one file per topic and commented throughout;
-- small hooks in the core (36 files, about 570 lines): see the patch;
+- small hooks in the core (36 files, about 550 lines): see the patch;
 - [`mod/OpenXcom3D/`](mod/OpenXcom3D): the data mod that switches it on.
 
 `src/` and `mod/` in this repository are the same files as in the patch, for reading. Built with `-DOXCE_FIRSTPERSON=OFF`, it is plain OXCE again.
@@ -81,6 +82,8 @@ Everything else — installing by hand, every key, every setting, fire modes per
 ## Thanks
 
 To the open-source community and the GNU project, whose tools and licence make work like this possible, and to the **OpenXcom** and **OpenXcom Extended** developers — SupSuper, Meridian and everyone who contributed — for doing an amazing job keeping this game alive. OpenXcom3D is only a small addition on top of their work.
+
+To **John Carmack** and **id Software**, for spearheading 3D games. Wolfenstein 3D, Doom and Quake showed the world what a ray cast through a grid and a fast loop could do, and every first-person game since stands on their shoulders, this one included: its 3D view is a ray caster at heart. The cheats in the 3D view, **Doom mode**, **IDKFA** and **IDDQD**, are a small tribute to you. Thank you, guys!
 
 The original games and their data belong to their owners. OpenXcom, OpenXcom Extended and OpenXcom3D are free software under the [GNU GPL v3](LICENSE).
 

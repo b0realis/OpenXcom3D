@@ -285,12 +285,13 @@ bool FirstPersonMode::deathCam(Uint32 now, double elapsedSeconds)
 			: unit->getStatus() == STATUS_DEAD ? FALL_KILLED : FALL_UNCONSCIOUS;
 		_deathEyeZ = _eyeZ;
 
-		// Whatever was going on stops: the flames die down, no step, no fade from an earlier
-		// fall, no breakdown (they went down in the middle of one), and the crosshair, its texts
-		// and the weapon in hand go (the weapon falls from the hand).
+		// Whatever was going on stops: the flames die down, no step, no lean, no fade from an
+		// earlier fall, no breakdown (they went down in the middle of one), and the crosshair, its
+		// texts and the weapon in hand go (the weapon falls from the hand).
 		_view->setBurning(0.0f);
+		endLean();
 		_stepPending = false;
-		_stepThroughDoor = false;
+		_guidedStep = false;
 		_afterFallStart = 0;
 		_breakdownUnit = nullptr;
 		_breakdownStart = 0;

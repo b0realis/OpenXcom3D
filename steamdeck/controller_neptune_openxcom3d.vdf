@@ -12,7 +12,7 @@
 		"english"
 		{
 			"Title" "OpenXcom3D"
-			"Description" "OpenXcom3D's first-person battlescape: left stick walks (WASD), the right trackpad looks (mouse), R2 fires, L2 cancels. L1 switches mouse look and the free cursor, R1 the isometric map and 3D. A jump, B reload, X fire mode, Y inventory; d-pad up/down flight and lifts, right next soldier, left switch hand; left trackpad snap, aimed, auto, door; L4 light, L5 night vision, R4 flare, R5 end turn."
+			"Description" "OpenXcom3D's first-person battlescape: left stick walks (WASD), the right trackpad looks (mouse), R2 fires, L2 cancels. L1 switches mouse look and the free cursor, R1 the isometric map and 3D. A jump, B reload, X fire mode, Y inventory; d-pad up/down flight and lifts, right next soldier, left switch hand (held: akimbo); left trackpad snap, aimed, auto, door (left/right held: snap turns); L4/R4 lean (setting Lean), L5 night vision (held: light), R5 end turn (held: flare); Menu classic HUD (held: 3D HUD)."
 		}
 	}
 	"group"
@@ -154,6 +154,17 @@
 							"haptic_intensity"		"1"
 						}
 					}
+					"Long_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press PERIOD"
+						}
+						"settings"
+						{
+							"long_press_time"		"400"
+						}
+					}
 				}
 			}
 			"dpad_west"
@@ -170,6 +181,17 @@
 						{
 							"repeat_rate"		"99"
 							"haptic_intensity"		"1"
+						}
+					}
+					"Long_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press COMMA"
+						}
+						"settings"
+						{
+							"long_press_time"		"400"
 						}
 					}
 				}
@@ -444,6 +466,17 @@
 							"haptic_intensity"		"1"
 						}
 					}
+					"Long_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press Y"
+						}
+						"settings"
+						{
+							"long_press_time"		"400"
+						}
+					}
 				}
 			}
 		}
@@ -511,6 +544,17 @@
 							"binding"		"key_press H"
 						}
 					}
+					"Long_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press P"
+						}
+						"settings"
+						{
+							"long_press_time"		"400"
+						}
+					}
 				}
 			}
 			"left_bumper"
@@ -550,6 +594,17 @@
 							"binding"		"key_press N"
 						}
 					}
+					"Long_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press L"
+						}
+						"settings"
+						{
+							"long_press_time"		"400"
+						}
+					}
 				}
 			}
 			"button_back_right"
@@ -563,6 +618,17 @@
 							"binding"		"key_press BACKSPACE"
 						}
 					}
+					"Long_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press T"
+						}
+						"settings"
+						{
+							"long_press_time"		"400"
+						}
+					}
 				}
 			}
 			"button_back_left_upper"
@@ -573,7 +639,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"key_press L"
+							"binding"		"key_press Q"
 						}
 					}
 				}
@@ -586,7 +652,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"key_press T"
+							"binding"		"key_press E"
 						}
 					}
 				}

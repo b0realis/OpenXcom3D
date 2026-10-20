@@ -58,6 +58,7 @@
 #include "../Battlescape/Pathfinding.h"
 #include "../Battlescape/TileEngine.h"
 #include "../Battlescape/UnitFallBState.h"
+#include "../Battlescape/UnitTurnBState.h"
 #include "../Engine/Options.h"
 #include "../Mod/Armor.h"
 #include "../Mod/MapData.h"
@@ -106,7 +107,22 @@ void FirstPersonMode::turnWithKeys(double elapsedSeconds)
 	if (keyStates[Options::keyBattleUp]) pitchDegrees += turnSpeed * elapsedSeconds;
 	if (keyStates[Options::keyBattleDown]) pitchDegrees -= turnSpeed * elapsedSeconds;
 
-	// Turn only when a key is actually held.
+	// A turn key's 45 degrees (comma and period by default) turn at SnapTurnSpeed, and so does a
+	// level look (the classic HUD's map level buttons) tilt.
+	if (_snapTurnDegrees != 0.0)
+	{
+		const double snapStep = std::copysign(std::min(std::abs(_snapTurnDegrees), SnapTurnSpeed * elapsedSeconds), _snapTurnDegrees);
+		yawDegrees += snapStep;
+		_snapTurnDegrees -= snapStep;
+	}
+	if (_snapPitchDegrees != 0.0)
+	{
+		const double tiltStep = std::copysign(std::min(std::abs(_snapPitchDegrees), SnapTurnSpeed * elapsedSeconds), _snapPitchDegrees);
+		pitchDegrees += tiltStep;
+		_snapPitchDegrees -= tiltStep;
+	}
+
+	// Turn only when a key is actually held (or a snap turn is under way).
 	if (yawDegrees != 0.0 || pitchDegrees != 0.0)
 	{
 		_view->rotate(yawDegrees, pitchDegrees);
@@ -114,11 +130,19 @@ void FirstPersonMode::turnWithKeys(double elapsedSeconds)
 }
 
 /**
- * Looking around turns the soldier for free: the unit faces the compass point (one of eight)
- * the camera looks closest to, and what it sees is worked out again as after a normal turn,
- * only without the time unit cost. Called every frame on the player's turn.
- * Nothing happens while the player can't act, while the soldier isn't simply standing (walking,
- * turning, falling...), or when the selected unit can't be played.
+ * Looking around turns the soldier to face where the camera looks. Called every frame on the
+ * player's turn. Nothing happens while the player can't act, while the soldier isn't simply
+ * standing (walking, turning, falling...), or when the selected unit can't be played.
+ * - By default turning is free: the unit faces the compass point (one of eight) the camera looks
+ *   closest to, and what it sees is worked out again as after a normal turn, only without the
+ *   time unit cost.
+ * - With the setting "Turning costs TU", it's the game's own turn: the camera may look up to
+ *   HeadTurn degrees off the soldier's facing (the head turns, for free); looking further turns
+ *   the soldier a step (45 degrees) that way through the game's turning state, the one the
+ *   isometric map uses, which spends the armor's turn cost and stops when it spots a new enemy.
+ *   Without the time units, the view stops at the head's limit. A turn key (snap turn) turns the
+ *   soldier too: once its 45 degrees are turned, the soldier faces the compass point the view
+ *   looks closest to.
  */
 void FirstPersonMode::faceLookDirection(BattleUnit *unit)
 {
@@ -127,9 +151,54 @@ void FirstPersonMode::faceLookDirection(BattleUnit *unit)
 		return;
 	}
 
-	// The camera's yaw has 0 = east; a unit's direction has 0 = north, clockwise in 45 degree
-	// steps. Turn the yaw a quarter round, round it to the nearest step and wrap it into 0..7
-	// (the double modulo keeps negative angles in range).
+	// Turning by the rules: how far the view looks off the soldier's facing, in degrees
+	// (clockwise positive, -180 to 180). The camera's yaw has 0 = east; a unit's direction has
+	// 0 = north, clockwise in 45 degree steps.
+	if (Options::fpsTurnCost)
+	{
+		const double facingYaw = unit->getDirection() * 45.0 - 90.0;
+		const double offFacing = std::remainder(_view->getYawDegrees() - facingYaw, 360.0);
+		const bool snapTurnDone = _snapTurnFacing && _snapTurnDegrees == 0.0;
+		if (snapTurnDone && std::abs(offFacing) <= 22.5)
+		{
+			_snapTurnFacing = false; // the soldier faces where the snap turn looks
+		}
+		if (std::abs(offFacing) <= (snapTurnDone ? 22.5 : HeadTurn))
+		{
+			return;
+		}
+		const int step = offFacing > 0.0 ? 1 : -1;
+		const int cost = unit->getTurnCost();
+		if (!doomModeOn() && (unit->getTimeUnits() < cost || !_state->_battleGame->checkReservedTU(unit, cost, 0, true)))
+		{
+			// Not enough time units (or they're reserved for a shot): the view stops at the
+			// head's limit, and the game's warning says why (at most every two seconds).
+			_view->rotate(step * HeadTurn - offFacing, 0.0);
+			_snapTurnDegrees = 0.0;
+			_snapTurnFacing = false;
+			const Uint32 now = SDL_GetTicks();
+			if (now - _turnRefusedWarned > 2000)
+			{
+				_turnRefusedWarned = now;
+				_state->warning("STR_NOT_ENOUGH_TIME_UNITS");
+			}
+			return;
+		}
+		// One step that way, through the game's own turning.
+		Position towards;
+		Pathfinding::directionToVector((unit->getDirection() + step + 8) % 8, &towards);
+		BattleAction turn;
+		turn.actor = unit;
+		turn.target = unit->getPosition() + towards;
+		_state->_battleGame->statePushBack(new UnitTurnBState(_state->_battleGame, turn));
+		return;
+	}
+
+	// Free turning (a snap turn needs nothing more: the soldier always faces where the view
+	// looks). The camera's yaw has 0 = east; a unit's direction has 0 = north, clockwise in 45
+	// degree steps. Turn the yaw a quarter round, round it to the nearest step and wrap it into
+	// 0..7 (the double modulo keeps negative angles in range).
+	_snapTurnFacing = false;
 	const int direction = (((int)std::lround((_view->getYawDegrees() + 90.0) / 45.0)) % 8 + 8) % 8;
 	if (direction == unit->getDirection())
 	{
@@ -159,22 +228,112 @@ void FirstPersonMode::lookAtEnemy(int enemyIndex)
 		return;
 	}
 	BattleUnit *enemy = _state->_visibleUnit[enemyIndex];
-	if (!enemy || enemy->isOut())
+	if (enemy && !enemy->isOut())
+	{
+		lookAtUnit(enemy);
+	}
+}
+
+/**
+ * Turns the camera towards a unit: at its chest, about 60% of its height above its feet.
+ * @param target The unit to look at (one inside another's inventory, being carried, has no
+ *               place on the map: the view stays as it is).
+ */
+void FirstPersonMode::lookAtUnit(const BattleUnit *target)
+{
+	const Position targetTile = target->getPosition();
+	if (targetTile == TileEngine::invalid)
 	{
 		return;
 	}
-
 	// The point to look at, in voxels (a tile is 16 x 16 voxels and a level 24 high): the middle
-	// of the enemy's footprint (1 or 2 tiles across), raised by the floor it stands on (the
+	// of the unit's footprint (1 or 2 tiles across), raised by the floor it stands on (the
 	// terrain level is negative for a raised floor), by its hovering height and to its chest.
-	const Position enemyTile = enemy->getPosition();
-	const Tile *tile = _save->getTile(enemyTile);
-	const int unitSize = enemy->getArmor()->getSize();
-	const double target[3] = {
-		enemyTile.x * 16.0 + 8.0 * unitSize,
-		enemyTile.y * 16.0 + 8.0 * unitSize,
-		enemyTile.z * 24.0 - (tile ? tile->getTerrainLevel() : 0) + enemy->getFloatHeight() + enemy->getHeight() * 0.6 };
-	_view->lookAt(target);
+	const Tile *tile = _save->getTile(targetTile);
+	const int unitSize = target->getArmor()->getSize();
+	const double point[3] = {
+		targetTile.x * 16.0 + 8.0 * unitSize,
+		targetTile.y * 16.0 + 8.0 * unitSize,
+		targetTile.z * 24.0 - (tile ? tile->getTerrainLevel() : 0) + target->getFloatHeight() + target->getHeight() * 0.6 };
+	_snapTurnDegrees = _snapPitchDegrees = 0.0;
+	_view->lookAt(point);
+}
+
+/**
+ * A right click on one of the visible enemy buttons, as the isometric map has it: the soldier
+ * who sees that enemy and has the most of their time units left (as a share) is selected; in
+ * 3D their view then turns to the enemy (on the map, the map centred on them).
+ * @param enemyIndex Which enemy button, from 0 to BattlescapeState::VISIBLE_MAX - 1.
+ */
+void FirstPersonMode::lookFromBestSpotter(int enemyIndex)
+{
+	if (enemyIndex < 0 || enemyIndex >= BattlescapeState::VISIBLE_MAX || !canAct())
+	{
+		return;
+	}
+	BattleUnit *enemy = _state->_visibleUnit[enemyIndex];
+	if (!enemy)
+	{
+		return;
+	}
+	// The game's own choice: of the squad who see the enemy, the one with the largest share of
+	// their time units left (the first such, in the squad's order).
+	BattleUnit *spotter = nullptr;
+	int bestShare = -1;
+	for (BattleUnit *unit : *_save->getUnits())
+	{
+		if (!unit->isSelectable(_save->getSide(), false, false) || !unit->hasVisibleUnit(enemy)) continue;
+		const int share = unit->getBaseStats()->tu > 0 ? unit->getTimeUnits() * 100 / unit->getBaseStats()->tu : 0;
+		if (share > bestShare)
+		{
+			bestShare = share;
+			spotter = unit;
+		}
+	}
+	if (!spotter)
+	{
+		return;
+	}
+	// Selecting another soldier switches the camera to them next frame (see updateCamera),
+	// which then turns to the enemy; the soldier already looked through turns at once.
+	if (spotter == _save->getSelectedUnit())
+	{
+		lookAtUnit(enemy);
+		return;
+	}
+	_lookAtOnSwitch = enemy;
+	_state->_battleGame->cancelAllActions();
+	_state->_battleGame->primaryAction(spotter->getPosition());
+}
+
+/**
+ * The classic HUD's centre button (and its key, Home by default) in 3D: the map would centre on
+ * the soldier, who in 3D is where the camera already is; so the view turns back to where the
+ * soldier faces, level, gliding there as a snap turn does.
+ * @param unit The soldier looked through.
+ */
+void FirstPersonMode::lookStraightAhead(const BattleUnit *unit)
+{
+	// How far the view turns: to the soldier's facing (its direction counts from north,
+	// clockwise; the camera's yaw from east), the short way round, and back to level.
+	const double facingYaw = unit->getDirection() * 45.0 - 90.0;
+	double turn = std::fmod(facingYaw - _view->getYawDegrees(), 360.0);
+	if (turn > 180.0) turn -= 360.0;
+	if (turn < -180.0) turn += 360.0;
+	_snapTurnDegrees = turn;
+	_snapTurnFacing = false;
+	_snapPitchDegrees = -_view->getPitchDegrees();
+}
+
+/**
+ * The classic HUD's map level buttons in 3D: the map would show the level above or below; the
+ * 3D view shows every level already, so it looks towards it instead: LevelLookDegrees up or
+ * down, gliding there, as far as the view tilts.
+ * @param direction 1 to look up, -1 to look down.
+ */
+void FirstPersonMode::lookLevelUpDown(int direction)
+{
+	_snapPitchDegrees += direction * LevelLookDegrees;
 }
 
 /**
@@ -192,10 +351,10 @@ void FirstPersonMode::snapToTile(BattleUnit *unit)
 	_eyeZ = eyeHeight(unit);
 	_trackedTile = unitTile;
 
-	// Whatever the camera was doing is over: no step waiting, no door, no momentum, no ride
-	// (and so no floor left out for one).
+	// Whatever the camera was doing is over: no step waiting, no door or gap to walk through,
+	// no momentum, no ride (and so no floor left out for one).
 	_stepPending = false;
-	_stepThroughDoor = false;
+	_guidedStep = false;
 	_velocityX = _velocityY = 0.0;
 	_rideStart = 0;
 	_view->setHiddenFloor(-1);
@@ -225,6 +384,16 @@ void FirstPersonMode::updateCamera(BattleUnit *unit, bool canMove, double elapse
 		_view->lookAlong(unit->getDirection());
 		endVault();
 		snapToTile(unit);
+		endLean();
+		_snapTurnDegrees = _snapPitchDegrees = 0.0;
+		// Picked to look at someone (a right click on an enemy button): turn to them, from this
+		// soldier's eye (the view's eye moves there only at the end of the frame).
+		if (_lookAtOnSwitch)
+		{
+			_view->setEye(_eyeX, _eyeY, _eyeZ);
+			lookAtUnit(_lookAtOnSwitch);
+			_lookAtOnSwitch = nullptr;
+		}
 	}
 	else if (_stepPending)
 	{
@@ -348,9 +517,15 @@ void FirstPersonMode::updateCamera(BattleUnit *unit, bool canMove, double elapse
 		}
 	}
 
-	// Place the eye: the lunge goes the way the camera looks, the bob and a jump go up and down.
+	// Leaning out (setting "Lean"): the eye goes to the side, a little lower.
+	double leanDrop = 0.0;
+	updateLean(unit, canMove, elapsedSeconds, leanDrop);
+
+	// Place the eye: the lunge goes the way the camera looks, the lean to its side, the bob, a
+	// jump and the lean's drop up and down.
 	const double yawRadians = _view->getYawDegrees() * Pi / 180.0;
-	_view->setEye(_eyeX + std::cos(yawRadians) * lunge, _eyeY + std::sin(yawRadians) * lunge, _eyeZ + headBob + currentJumpHeight(unit));
+	_view->setEye(_eyeX + std::cos(yawRadians) * lunge + _leanShift[0], _eyeY + std::sin(yawRadians) * lunge + _leanShift[1],
+		_eyeZ + headBob + currentJumpHeight(unit) - leanDrop);
 }
 
 /**
@@ -365,6 +540,101 @@ double FirstPersonMode::eyeHeight(const BattleUnit *unit) const
 	const double loweredBy = std::clamp(Options::fpsEyeLower, 0, 6) * (unit->isKneeled() ? 0.5 : 1.0);
 	// The middle of the sight origin's voxel (+ 0.5), lowered.
 	return _save->getTileEngine()->getSightOriginVoxel(const_cast<BattleUnit*>(unit)).z + 0.5 - loweredBy;
+}
+
+/**
+ * Leaning out (setting "Lean": Peek, or Tilt): while a lean key is held the soldier leans out
+ * that way, over LeanTime: the eye moves up to LeanReach voxels to the side of where the view
+ * looks, and up to LeanDrop lower, as a head bends; with Tilt the view tilts up to
+ * LeanTiltDegrees too. The eye stops LeanWallMargin short of anything solid or anyone in sight
+ * (see leanRoom), so it never looks into a wall or a teammate's head, and comes back in at once
+ * when either gets closer (walking on while leaning). Letting go straightens up again. The soldier stays where they are, and so does the
+ * game's sight: the lean shows what is round the corner, but who is seen there is still up to
+ * the game. A shot fired while leaning out starts from that side (see fire and leanSide).
+ * @param unit The soldier looked through.
+ * @param canLean Whether the keys may lean now (the player's turn, a soldier of theirs).
+ * @param elapsedSeconds Seconds since the last frame.
+ * @param dropBy Set to how much lower the eye is, in voxels.
+ */
+void FirstPersonMode::updateLean(BattleUnit *unit, bool canLean, double elapsedSeconds, double &dropBy)
+{
+	// Which way the keys lean: -1 left, 1 right, 0 for neither or both (or leaning off).
+	const Uint8 *keyStates = SDL_GetKeyState(nullptr);
+	auto held = [keyStates](SDLKey key) { return key != SDLK_UNKNOWN && keyStates[key]; };
+	double wanted = 0.0;
+	if (Options::fpsLean > 0 && canLean && !unit->isOut())
+	{
+		wanted = (held(Options::keyFpsLeanRight) ? 1.0 : 0.0) - (held(Options::keyFpsLeanLeft) ? 1.0 : 0.0);
+	}
+	// Into the lean (or out of it) at a steady pace, eased in and out.
+	_lean += std::clamp(wanted - _lean, -elapsedSeconds / LeanTime, elapsedSeconds / LeanTime);
+	const double progress = std::abs(_lean);
+	const double amount = std::copysign(progress * progress * (3.0 - 2.0 * progress), _lean); // -1 .. 1
+	dropBy = 0.0;
+	if (amount == 0.0 && _leanOffset == 0.0)
+	{
+		endLean(); // standing straight
+		return;
+	}
+
+	// The eye's way to the side, the view's right along the ground, and the room there is each
+	// way. It goes out towards the lean as far as there is room, never quicker than a lean goes
+	// (passing a wall while leaning doesn't let it jump out), but back in at once when a wall
+	// comes closer.
+	const double yawRadians = _view->getYawDegrees() * Pi / 180.0;
+	const double rightX = -std::sin(yawRadians), rightY = std::cos(yawRadians);
+	const double roomRight = leanRoom(unit, rightX, rightY), roomLeft = leanRoom(unit, -rightX, -rightY);
+	const double wantedOffset = std::clamp(amount * LeanReach, -roomLeft, roomRight);
+	const double step = 2.0 * elapsedSeconds * LeanReach / LeanTime; // twice a lean's own top speed
+	_leanOffset = std::clamp(std::clamp(wantedOffset, _leanOffset - step, _leanOffset + step), -roomLeft, roomRight);
+	_leanShift[0] = rightX * _leanOffset;
+	_leanShift[1] = rightY * _leanOffset;
+	dropBy = std::abs(_leanOffset) / LeanReach * LeanDrop;
+	// The tilt follows the keys, against a wall too (positive tilts the head left).
+	_view->setRoll(Options::fpsLean >= 2 ? -amount * LeanTiltDegrees : 0.0);
+}
+
+/**
+ * How far the eye can lean out one way: up to LeanReach voxels, stopping LeanWallMargin short of
+ * the first solid voxel at eye height on the way, looked for every LeanCheckStep voxels: a wall,
+ * an object, the map's edge, or a unit in sight (not the soldier, and not one the player can't
+ * see, which would give it away).
+ * @param unit The soldier leaning.
+ * @param sideX, sideY The way, along the ground (a unit vector; x east, y south).
+ * @return The room, in voxels (0: none).
+ */
+double FirstPersonMode::leanRoom(BattleUnit *unit, double sideX, double sideY) const
+{
+	TileEngine *tileEngine = _save->getTileEngine();
+	for (double distance = LeanCheckStep; distance <= LeanReach + LeanWallMargin; distance += LeanCheckStep)
+	{
+		const Position voxel((int)std::floor(_eyeX + sideX * distance), (int)std::floor(_eyeY + sideY * distance), (int)std::floor(_eyeZ));
+		if (tileEngine->voxelCheck(voxel, unit, false, true) != V_EMPTY)
+		{
+			return std::max(0.0, distance - LeanCheckStep - LeanWallMargin); // from the last free point
+		}
+	}
+	return LeanReach;
+}
+
+/**
+ * Straightens up at once: no lean, no offset, no tilt. When the camera goes to another soldier,
+ * and when a fall takes the view over.
+ */
+void FirstPersonMode::endLean()
+{
+	_lean = _leanOffset = 0.0;
+	_leanShift[0] = _leanShift[1] = 0.0;
+	_view->setRoll(0.0);
+}
+
+/**
+ * Whether the soldier leans out far enough (more than LeanThreshold voxels) for a shot to start
+ * from that side.
+ */
+bool FirstPersonMode::leaningOut() const
+{
+	return std::abs(_leanOffset) > LeanThreshold;
 }
 
 }
