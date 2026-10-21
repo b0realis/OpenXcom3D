@@ -100,6 +100,18 @@ const double WeaponLens = 1.303;
 const double MuzzleScreen[2] = { 0.42 / WeaponLens, 0.45 / WeaponLens };
 /// How much of the line from the stock point to the muzzle the weapon in hand fills.
 const double WeaponScale = 0.9;
+/// The way a melee weapon's tip points at rest, from its grip (camera space: x out to the weapon's side, y down, z ahead; any length).
+const double MeleeUpright[3] = { 0.3, -1.0, 0.25 };
+/// The aliens' turn cameras (setting "Aliens' turn cameras"): the least time the view stays with a soldier
+/// before cutting to another who sees the alien acting, and how long a popped-up camera shows (ms).
+const Uint32 AlienCameraHold = 1500, AlertTime = 3000;
+/// Zoom (setting "Zoom"): how much closer the view looks, and how many seconds it takes to glide
+/// all the way in (or out), so the SCOPING line's number can be read as it climbs.
+const double ZoomFactor = 4.0, ZoomSeconds = 0.7;
+/// The scope cross shown while zoomed: its gap round the reticle and the spacing of its ticks, in canvas pixels.
+const int ScopeGap = 12, ScopeTickSpacing = 24;
+/// Looking down past LookDownSlideFrom degrees, the weapon in hand slides out of sight, gone at LookDownSlideTo.
+const double LookDownSlideFrom = 45.0, LookDownSlideTo = 72.0;
 /// A held item that isn't a weapon (grenade, medi-kit, scanner, clip...) is shown as voxels in
 /// the bottom corner, its lower half out of sight: 2.6 canvas pixels per picture pixel on a
 /// 200-line canvas (in proportion on bigger ones), a smaller picture than HeldItemMinPixels
@@ -169,9 +181,16 @@ const int VaultMaxHeight = 14;
 
 /// A melee swing in the view: wind up, strike, back (milliseconds).
 const Uint32 SwingTime = 420;
-/// Doom mode (a first step towards a real-time mode): a grenade primed there burns for this
-/// long (milliseconds) and goes off wherever it is, as in a first-person shooter.
-const Uint32 DoomFuseTime = 3000;
+/// Doom free grenades: their gravity (voxels a second, each second, down), the usual speed of a throw (voxels a
+/// second: the flight time is the distance over it, within FreeGrenadeTimeMin and Max seconds).
+const float FreeGrenadeGravity = 360.0f, FreeGrenadeSpeed = 240.0f, FreeGrenadeTimeMin = 0.25f, FreeGrenadeTimeMax = 1.4f;
+/// Doom free grenades reach no further than a person can throw (the game's own reach is far longer: 21 tiles at strength 27, 51
+/// at 60): FreeGrenadeMaxTiles (25 tiles, about 40 m, taking a tile as about 1.6 m from a soldier's height) at strength
+/// FreeGrenadeFullStrength or more, less in proportion below it.
+const float FreeGrenadeMaxTiles = 25.0f, FreeGrenadeFullStrength = 60.0f;
+/// Doom mode with real-time grenades (a first step towards a real-time mode): a thrown grenade
+/// burns for the setting "Doom grenade fuse" (1 to FirstPerson::DoomFuseMaxSeconds seconds) from
+/// the moment it leaves the hand, then goes off wherever it is, as in a first-person shooter.
 
 // ---- What happens to the soldier (milliseconds) ----
 

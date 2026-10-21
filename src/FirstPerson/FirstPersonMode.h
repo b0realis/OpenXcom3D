@@ -153,6 +153,10 @@ private:
 	bool _hudHidden = false;               // the 3D HUD hidden (the hide HUD key): a clear view
 	bool _mouseLook = true;                // mouse turns the view (captured) instead of moving a cursor
 	bool _dragLook = false;                // right button held over the view in cursor mode
+	bool _zoomButtonHeld = false;          // right button held in mouse look, zooming (setting "Zoom")
+	double _zoom = 1.0;                    // how much closer the view looks now: 1, gliding to ZoomFactor and back
+	Surface *_scopeCross = nullptr;        // zoomed in: a thin blue cross through the reticle, across the view
+	Text *_txtScoping = nullptr;           // zoomed in: "SCOPING 2.6x", blue, at the right
 	bool _mouseWasCaptured = false;        // capture state seen last frame
 	Uint32 _ignoreMotionUntil = 0;         // the cursor's jump to the window centre after grabbing isn't a look
 	Uint32 _lastFrameTick = 0;             // when think() last ran (SDL ticks, ms)
@@ -242,8 +246,8 @@ private:
 	void shiftAnchored(int widthChange, int heightChange);
 	/// Lets a button see a mouse event in canvas coordinates.
 	void handleOnCanvas(TextButton *button, Action *action);
-	/// Copies the canvas onto the screen, magnified by the UI scale.
-	void magnify(SDL_Surface *screen, bool transparent);
+	/// Copies a canvas-sized surface (the canvas, or the 3D view) onto the screen, magnified by the UI scale.
+	void magnify(SDL_Surface *screen, SDL_Surface *source, bool transparent);
 	/// Where the game's warnings go in 3D: just above the info panel.
 	int warningY() const;
 	/// Adds a small button in the style of the original UI.
@@ -274,6 +278,10 @@ private:
 
 	/// Turns the view by a mouse movement.
 	void turnByMouse(int mouseDeltaX, int mouseDeltaY);
+	/// Eases the zoom in while the zoom key or the right button is held, and back out.
+	void updateZoom(double elapsedSeconds);
+	/// The field of view the 3D view shows now, in degrees: the setting's, narrowed by the zoom.
+	double fieldOfViewNow() const;
 	/// Turns the view with the scroll keys.
 	void turnWithKeys(double elapsedSeconds);
 	/// Turns the soldier to face where the camera looks (free, or by the rules).
@@ -281,7 +289,7 @@ private:
 	double _snapTurnDegrees = 0.0;          // a turn key's 45 degrees still to turn (negative: to the left)
 	bool _snapTurnFacing = false;           // a turn key was pressed: once the view has turned, the soldier faces where it looks
 	double _snapPitchDegrees = 0.0;         // a level look (the classic HUD's map level buttons) still to tilt (positive: up)
-	BattleUnit *_lookAtOnSwitch = nullptr;  // a unit the next soldier looked through turns to look at (an enemy button's right click)
+	const BattleUnit *_lookAtOnSwitch = nullptr; // a unit the next soldier looked through turns to look at (an enemy button's right click, the aliens' turn cameras)
 	bool _mapShowsAllLayers = false;        // the map's multi-level view, to tell when it's switched in 3D
 	Uint32 _turnRefusedWarned = 0;          // when "not enough time units" was last said for a turn
 
@@ -290,17 +298,23 @@ private:
 
 	Surface *_compass = nullptr;                 // the dial
 	Text *_compassLetters[4] = {};               // N, E, S, W, going round as the view turns
-	Text *_txtCompassTurn = nullptr;             // under it near the head's limit: "TURN 1 TU", or "NO TU"
-	int _compassDrawn[3] = { -1000, -1, -1 };    // what the dial shows: the view's bearing (degrees), the facing, the warning
+	Text *_txtCompassTurn = nullptr;             // under it near the head's limit: "TURN 1 TU", or "NO TU"; or a shot's turn: "SHOT +2 TU"
+	int _compassDrawn[5] = { -1000, -1, -1, -1, -1 }; // what the dial shows: the view's bearing (degrees), the facing, the warning, the shot's facing, the shot's turn warning
 
 	/// Shows the compass, redrawn when what it shows changes.
-	void updateCompass(BattleUnit *unit);
-	/// Draws the dial for a view bearing (degrees, 0 north, clockwise), a facing (0..7) and a warning (0 none, 1 near the limit, 2 no time units to turn).
-	void drawCompass(int viewBearing, int facing, int warning);
+	void updateCompass(BattleUnit *unit, bool playerTurn);
+	/// Draws the dial for a view bearing (degrees, 0 north, clockwise), a facing (0..7), a warning (0 none, 1 near the limit, 2 no time units to turn) and the facing a shot will turn to (-1 none).
+	void drawCompass(int viewBearing, int facing, int warning, int shotFacing);
+	/// The time units the game's turn before a shot or throw at what's under the crosshair will cost, and the facing it turns to.
+	int shotTurnCost(BattleUnit *unit, int &direction, bool &affordable) const;
 	/// Turns the view towards the n-th visible enemy.
 	void lookAtEnemy(int enemyIndex);
 	/// Turns the view towards a unit's chest.
 	void lookAtUnit(const BattleUnit *target);
+	/// Turns the view to a unit, gliding there as a snap turn does.
+	void glideToLookAt(const BattleUnit *target);
+	/// The point on a unit the view looks at (its chest), in voxels; false for a unit off the map.
+	bool chestPoint(const BattleUnit *target, double point[3]) const;
 	/// Switches to the soldier who sees the n-th visible enemy with the most time units left, looking at it.
 	void lookFromBestSpotter(int enemyIndex);
 	/// Turns the view back to where the soldier faces, level (the classic HUD's centre button and key).
@@ -341,6 +355,8 @@ private:
 
 	double _velocityX = 0.0, _velocityY = 0.0; // walking momentum, voxels per second
 	bool _stepPending = false;                 // a step was handed to the game's walking state and is being walked
+	unsigned _mouseReleasesSeen = 0;           // the game's mouse releases known (see think: one since means another screen was on top)
+	int _sidestepFacing = -1;                  // the facing a soldier sidestepping keeps (the game's strafe), while the step is walked; -1 none
 	Position _stepFrom;                        // the tile that step started from
 	int _stepAllowedCache[8];                  // per frame: -1 unknown, 0 blocked, 1 allowed
 	double _footstepDistance = 0.0;            // voxels walked since the last footstep
@@ -461,16 +477,52 @@ private:
 	// Weapons, fire modes, aiming and firing (FirstPersonModeShooting.cpp)
 	// =====================================================================================
 
-	std::unordered_map<const BattleUnit*, int> _chosenHand; // each soldier's chosen hand: 0 right, 1 left
-	std::unordered_map<int, Uint32> _doomFuses;             // Doom mode: grenades primed in real time (item id: when the pin was pulled)
+	std::unordered_map<const BattleUnit*, int> _chosenHand; // each soldier's hand picked with G (or on the classic HUD): 0 right, 1 left, 2 built-in weapon
+	struct DoomFuse { Uint32 lit, length; };                // a real-time fuse: when it started burning (0: not yet, the grenade is still in hand), and for how long (ms)
+	std::unordered_map<int, DoomFuse> _doomFuses;           // Doom mode: grenades armed in real time (by item id)
+	/// A grenade on a timer the Doom real-time fuse can take (not a proximity grenade, not one that goes off on landing).
+	static bool timedGrenade(const BattleItem *item);
+	/// Pulls a grenade's pin for the Doom real-time fuse (primed by the game, the click, the fuse burning from a moment or not yet).
+	void pullDoomPin(BattleUnit *unit, BattleItem *grenade, Uint32 lit);
+	// Doom free grenades (setting "Doom free grenades with airburst"): one flying by the 3D view's own throw
+	struct FreeGrenade { BattleItem *item; BattleUnit *thrower; float position[3], velocity[3]; Uint32 lastTick; }; // voxels; voxels a second
+	FreeGrenade _freeGrenade = {};
+	/// Throws a grenade freely at a point (Doom free grenades): out of the hand, flying from the next tick.
+	void throwFreeGrenade(BattleUnit *unit, BattleItem *grenade, const Position &aimedVoxel);
+	/// Flies the free grenade on to now; false once it has landed or burst (the flight is over).
+	bool stepFreeGrenade(Uint32 now);
 	bool _akimboRealisticWasOn = true;                      // the akimbo key switches realistic akimbo back on (false: full akimbo)
 	BattleActionType _fireMode = BA_NONE;               // fire mode for the left mouse button
 	const BattleItem *_fireModeWeapon = nullptr;        // the weapon _fireMode was chosen for
 	Position _aimVoxel;                                 // what's under the crosshair
 	bool _aimHitsSomething = false;                     // something is under the crosshair (not just sky)
+	// the path the next throw or shot would take (setting "Show trajectory"), and a target marked
+	// for confirm fire (setting "Confirm fire"): the next click on the same tile fires
+	std::vector<int> _trajectoryKey;                    // what the path shown was worked out for (empty: none shown)
+	Position _confirmTile = Position(-1, -1, -1);       // the marked target tile (x -1: none)
+	Position _confirmVoxel;                             // the point marked on it
+	Position _confirmFrom;                              // where the soldier stood when it was marked
+	const BattleUnit *_confirmUnit = nullptr;           // the soldier who marked it
+	const BattleItem *_confirmWeapon = nullptr;         // with this weapon...
+	BattleActionType _confirmMode = BA_NONE;            // ...and this mode
+	bool _burstConfirmed = false;                       // the held trigger's bursts after a confirmed one need no confirming
+	/// Shows the path the next throw or shot would take (or the marked target's), worked out as the game will.
+	void updateTrajectory(BattleUnit *unit, bool playerTurn);
+	/// Forgets the target marked for confirm fire.
+	void clearConfirmMark() { _confirmTile = Position(-1, -1, -1); _confirmUnit = nullptr; _confirmWeapon = nullptr; _confirmMode = BA_NONE; }
 
 	/// The weapon in the chosen hand (or the other hand if that one is empty).
 	BattleItem *activeWeapon(BattleUnit *unit) const;
+	/// The hand the soldier fires with: 0 right, 1 left, 2 the built-in weapon, -1 none.
+	int activeHand(BattleUnit *unit) const;
+	/// What a hand gives: what it holds, else the empty hand's weapon; or (2) the built-in weapon.
+	BattleItem *handWeapon(BattleUnit *unit, int hand) const;
+	/// The unit's empty-hand weapon (fists, a claw: OXCE's specialUseEmptyHand), found as the game finds it.
+	BattleItem *emptyHandWeapon(BattleUnit *unit) const;
+	/// The hand a weapon is used from: 0 right, 1 left, 2 built-in.
+	int handOf(BattleUnit *unit, const BattleItem *weapon) const;
+	/// The hand's letter on the panel: "R: ", "L: ", or "S: " for the built-in (special) weapon.
+	std::string handLetter(BattleUnit *unit, const BattleItem *item) const;
 	/// Leaning: the side a shot starts from, by where the eye is in the tile (setting "Lean shots", or leaning out).
 	BattleActionOrigin leanSide(const BattleUnit *unit, const Position &targetTile) const;
 	/// Melee at a body lying in front or at the feet (setting "Melee hits walls and the downed").
@@ -497,6 +549,10 @@ private:
 	bool aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &voxel);
 	/// Uses the fire mode on whatever is under a pixel of the view, through the game's own actions.
 	void fire(int pixelX, int pixelY);
+	/// The patient a medi-kit would treat now: among the game's own choices, the one pointed at; or null.
+	BattleUnit *medikitPatient(BattleUnit *unit, BattleItem *medikit) const;
+	/// Uses a medi-kit (no action menu) on the patient pointed at, or a scanner, as the game's menu would.
+	void useItemDirectly(BattleUnit *unit, BattleItem *item);
 	/// Tosses a tactical flare at the crosshair.
 	void throwFlare();
 
@@ -539,6 +595,18 @@ private:
 	/// Draws the crosshair for a fire mode.
 	void drawCrosshair(BattleActionType mode, int shots, Uint8 color, Uint8 shadow, int hitMark, Uint8 hitColor);
 
+	// ---- what the player points at: the unit's name under the crosshair, and the middle click ----
+
+	Text *_txtTarget = nullptr;                    // the name of the unit pointed at, under the crosshair (setting "Unit names")
+	/// Where the player points on the view: the crosshair (its middle), or the free cursor.
+	void pointer(int &pointerX, int &pointerY) const;
+	/// What the game's unit screen calls a unit.
+	std::string unitLabel(const BattleUnit *target) const;
+	/// Names the unit pointed at under the crosshair, and tells the view where the player points.
+	void updateUnitName(BattleUnit *unit);
+	/// The middle click as on the isometric map (setting "Middle click identifies"): shows the unit pointed at.
+	bool identifyPointedUnit();
+
 	// ---- guided missiles, psi attacks and the mind probe can be aimed on the isometric map ----
 
 	enum MapAimPhase { MAPAIM_NONE, MAPAIM_AIMING, MAPAIM_ACTING };
@@ -566,7 +634,7 @@ private:
 	MuzzleFlash _muzzleFlash = {}; // the weapon's muzzle flash
 	Uint32 _heldShotSeen = 0;      // our last shot the weapon flashed for
 	// the weapon's inventory picture, measured: its long axis, which end is the muzzle, which side is up
-	struct WeaponShape { double mean[2], along[2], across[2], stock, muzzle, minAcross, maxAcross, bore, boxMin[2], boxMax[2]; int upSign; bool gun; }; // bore: across, where the barrel ends; box: the opaque pixels' bounds
+	struct WeaponShape { double mean[2], along[2], across[2], stock, muzzle, minAcross, maxAcross, bore, boxMin[2], boxMax[2]; int upSign; bool gun, melee; }; // bore: across, where the barrel ends; box: the opaque pixels' bounds; melee: held tip up, swung down
 	WeaponShape _heldShape = {};                        // the measured shape of the weapon's picture
 	// ...and given volume: voxels, each picture pixel as deep as its distance from the outline
 	// allows (a cushion), as the faces that show (see FirstPersonVoxelModel.h)
@@ -586,10 +654,16 @@ private:
 
 	/// Makes the surface the weapon in hand is drawn on.
 	void makeWeaponInHand();
+	/// Makes the scope cross's surface (canvas-sized, just above the weapon in hand) and draws the cross.
+	void makeScopeCross();
+	/// Shows the scope cross and the SCOPING line while zoomed in, with the zoom now.
+	void updateScope();
 	/// Draws the weapon in the soldier's hands at the bottom of the view.
 	void updateWeaponInHand(BattleUnit *unit);
+	/// Is this weapon drawn in the hands? Not a built-in one with nothing to hold (see the definition).
+	bool weaponShownInHand(BattleUnit *unit, const BattleItem *weapon) const;
 	/// Measures the weapon's picture: its long axis, muzzle end and up side.
-	void analyzeWeapon(bool gun);
+	void analyzeWeapon(bool gun, bool melee = false);
 	/// Gives the held picture (weapon or other item) volume as voxels.
 	void voxelizeWeapon();
 	/// How the muzzle flashes, by the damage the weapon's ammo does.
@@ -662,6 +736,7 @@ private:
 	NumberText *_cardNumbers[4] = {};                   // the four stats
 	Bar *_cardBars[4] = {};                             // and their bars
 	int _hoveredSquadButton = -1;                       // squad button under the cursor, -1 none
+	int _cursorX = 0, _cursorY = 0;                     // where the free cursor is, on the canvas (and so on the view)
 	int _cardDrawnHeight = 0;                           // what the frame was drawn for
 
 	// ---- the banner across the top of the view ----
@@ -758,6 +833,26 @@ private:
 
 	/// Stays with a soldier who went down a moment; true while it's showing.
 	bool deathCam(Uint32 now, double elapsedSeconds);
+
+	// ---- the aliens' turn cameras (setting "Aliens' turn cameras"): the view cuts to the soldier
+	// who sees the alien acting (the nearest), or to one of ours firing back; a soldier shot at,
+	// hit or taken over pops up a small camera (the soldier card's) ----
+
+	BattleUnit *_alienTurnCamera = nullptr;               // whose eyes the view looks through on the aliens' turn (null: the last soldier)
+	bool _alienTurnCamerasRan = false;                    // they ran this aliens' turn (the player's turn then starts with the view afresh)
+	Uint32 _alienTurnCameraSince = 0;                     // when the view cut to them
+	const BattleUnit *_alienTurnWatched = nullptr;        // the alien the view last turned to...
+	Position _alienTurnWatchedTile = Position(-1, -1, -1); // ...where it stood then (the view turns to it again when it moves on)
+	const BattleUnit *_alertUnit = nullptr;               // the soldier the popped-up camera shows
+	Uint32 _alertUntil = 0;                               // until when (SDL ticks)
+	std::string _alertText;                               // why ("TARGETED", "HIT") as a string id, shown as their status; empty: their own status
+	std::unordered_map<const BattleUnit*, std::pair<int, int>> _alertWatch; // each soldier of ours last frame: health less stun, and side (-1: down)
+	/// The aliens' turn: whose eyes the view looks through (null: the last soldier), and the cameras that pop up.
+	BattleUnit *alienTurnCamera(Uint32 now);
+	/// Cuts the aliens' turn view to a soldier, looking at a unit.
+	void cutAlienTurnCamera(BattleUnit *soldier, const BattleUnit *lookAt, Uint32 now);
+	/// Pops up the small camera on a soldier for a few seconds, with why (a string id; empty: their own status).
+	void popUpCamera(const BattleUnit *soldier, const std::string &why, Uint32 now);
 	/// Puts up what happened to the soldier, and whose camera it is.
 	void showFallBanner(FallKind kind, const std::string &title, const std::string &name);
 

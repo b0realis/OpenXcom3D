@@ -54,6 +54,19 @@
  * compares distances where each axis's next boundary is crossed (a DDA, "digital differential
  * analyzer": the classic grid walk of Amanatides and Woo), once on the grid of tiles and once on
  * the grid of voxels inside a tile.
+ *
+ * This is the hottest code of the renderer: every pixel's ray, and every shadow ray, runs it.
+ * What keeps it quick (each shortcut gives exactly what the plain walk would):
+ *  - One byte per tile (RayContext::tileFlags, made by snapshotTiles) says whether there is
+ *    anything in the tile, smoke on it, a door swinging through it, and how high its highest
+ *    solid voxel is. Most tiles a ray crosses are air, or a floor it passes over: the walk steps
+ *    on reading only that byte.
+ *  - In a tile with something in it, the ray is first clipped to the box round its solid voxels
+ *    (most tiles are mostly air too).
+ *  - In the box, one bit per voxel (TileView::solid, the parts' voxels together) says whether
+ *    any part has anything there before the parts themselves are looked at.
+ * The data a ray reads is kept small and together for the processor's caches; anything a ray
+ * doesn't need belongs elsewhere (TileView holds only what rays and shading read).
  */
 #include "FirstPersonView.h"
 #include "FirstPersonViewShared.h"
@@ -65,12 +78,14 @@ namespace
 {
 
 /**
- * Everything a ray needs to know about this frame's world: the tile snapshot, the doors that
- * are swinging, the map's size in tiles and how far the view reaches.
+ * Everything a ray needs to know about this frame's world: the tile snapshot, a byte per tile
+ * saying whether there is anything to look at in it, the doors that are swinging, the map's size
+ * in tiles and how far the view reaches.
  */
 struct RayContext
 {
 	const FirstPersonView::TileView *tiles;   // one per tile, x fastest, then y, then z (like the game's tile index)
+	const Uint8 *tileFlags;                   // one per tile, the same way: FirstPersonView::TileFlag bits and the top (see snapshotTiles)
 	const FirstPersonView::DoorSwing *swings; // the doors swinging open this frame (TileView::swing indexes them)
 	int size[3];                              // the map's size in tiles: x, y, levels
 	float maxDistance;                        // how far rays go, in voxels
@@ -152,12 +167,14 @@ inline bool traceSwing(const FirstPersonView::DoorSwing &door, const float rayOr
 enum RayEnd { RAY_HIT, RAY_SIDE, RAY_TOP, RAY_BOTTOM, RAY_FAR, RAY_SMOKE };
 
 /**
- * The smoke along a ray, by the game's sight rules (setting "See-through smoke"). In the game
+ * The smoke along a ray, by the game's sight rules (setting "Smoke": Modern). In the game
  * every voxel a line of sight walks through a tile's smoke uses up smoke / 3 voxels of the
  * soldier's sight (half as much within two tiles of the eye; less with heat vision), and what
  * is further than the sight left can't be seen. Where the ray's smoke has used up all the sight
- * there is left, it ends in the smoke (RAY_SMOKE): too thick to see through. Short of that, the
- * smoke it went through is a veil over what it hits (see FirstPersonView::renderRows).
+ * there is left, it ends in the smoke (RAY_SMOKE): too thick to see through, a wall of smoke.
+ * Short of that, the smoke is drawn see-through over what the ray hits, as the game's own smoke
+ * (see FirstPersonView::drawSeeThroughSmoke), and the wall shows through it where the smoke has
+ * used up most of the sight (see FirstPersonView::renderRows), so its edge is soft.
  */
 struct SmokeTrace
 {
@@ -219,14 +236,21 @@ inline float addSmoke(SmokeTrace &smoke, const FirstPersonView::TileView &tileVi
  * Walks the voxels of one tile between two distances along the ray, looking for the first solid
  * one (window glass is seen through, but noted). Swinging doors reaching into the tile are
  * traced first; anything solid in front of a door hides it.
+ *
+ * Most tiles a ray looks into are mostly air (a floor, a wall along one side), so the ray is
+ * first clipped to the box round the tile's solid voxels: two out of three tiles end there. In
+ * the box it steps voxel by voxel; one bit per voxel (the tile's solid mask, the parts' voxels
+ * together) says whether there is anything there at all before the parts are looked at.
  * @param tileView The tile's snapshot.
  * @param tileCell The tile's coordinates (x, y, level).
+ * @param inverseDirection 1 / rayDirection on each axis (worked out once per ray; unused on an
+ *        axis the ray runs parallel to).
  * @param segmentStart, segmentEnd The part of the ray inside this tile.
  * @param enterAxis Axis of the face the ray crossed to enter the tile, -1 at the eye.
  * @return True if something was hit (the hit is filled in).
  */
 inline bool traceTile(const FirstPersonView::TileView &tileView, const FirstPersonView::DoorSwing *swings, const int tileCell[3], const float rayOrigin[3], const float rayDirection[3],
-	float segmentStart, float segmentEnd, int enterAxis, FirstPersonView::Hit &hit)
+	const float inverseDirection[3], float segmentStart, float segmentEnd, int enterAxis, FirstPersonView::Hit &hit)
 {
 	// Doors swinging through this tile: the nearest hit shortens the segment, so only what's in
 	// front of the door can still win.
@@ -245,6 +269,8 @@ inline bool traceTile(const FirstPersonView::TileView &tileView, const FirstPers
 	}
 
 	// Clip the segment to the box around the solid voxels in this tile: most tiles are mostly air.
+	// The axes in order (so a tie between two faces goes the same way every time), stopping as
+	// soon as nothing of the segment is left: a later axis can only shorten it further.
 	int low[3], high[3];
 	float entry = segmentStart, exit = segmentEnd;
 	int faceAxis = enterAxis;
@@ -255,21 +281,17 @@ inline bool traceTile(const FirstPersonView::TileView &tileView, const FirstPers
 		high[axis] = tileStart + tileView.max[axis];
 		if (rayDirection[axis] != 0.0f)
 		{
-			const float inverse = 1.0f / rayDirection[axis];
-			float nearCrossing = (low[axis] - rayOrigin[axis]) * inverse;
-			float farCrossing = (high[axis] + 1 - rayOrigin[axis]) * inverse;
+			float nearCrossing = (low[axis] - rayOrigin[axis]) * inverseDirection[axis];
+			float farCrossing = (high[axis] + 1 - rayOrigin[axis]) * inverseDirection[axis];
 			if (nearCrossing > farCrossing) std::swap(nearCrossing, farCrossing);
 			if (nearCrossing > entry) { entry = nearCrossing; faceAxis = axis; }
 			if (farCrossing < exit) exit = farCrossing;
+			if (entry > exit) return doorHit;
 		}
 		else if (rayOrigin[axis] < low[axis] || rayOrigin[axis] >= high[axis] + 1)
 		{
-			return false;
+			return doorHit; // running alongside the box, outside it
 		}
-	}
-	if (entry > exit)
-	{
-		return doorHit;
 	}
 
 	// Set up the voxel walk: the voxel where the ray enters the box, which way it steps on each
@@ -284,13 +306,13 @@ inline bool traceTile(const FirstPersonView::TileView &tileView, const FirstPers
 		if (rayDirection[axis] > 0.0f)
 		{
 			step[axis] = 1;
-			crossingSpacing[axis] = 1.0f / rayDirection[axis];
+			crossingSpacing[axis] = inverseDirection[axis];
 			nextCrossing[axis] = (voxel[axis] + 1 - rayOrigin[axis]) / rayDirection[axis];
 		}
 		else if (rayDirection[axis] < 0.0f)
 		{
 			step[axis] = -1;
-			crossingSpacing[axis] = -1.0f / rayDirection[axis];
+			crossingSpacing[axis] = -inverseDirection[axis];
 			nextCrossing[axis] = (voxel[axis] - rayOrigin[axis]) / rayDirection[axis];
 		}
 		else
@@ -301,8 +323,19 @@ inline bool traceTile(const FirstPersonView::TileView &tileView, const FirstPers
 		}
 	}
 
-	// Walk voxel by voxel until something solid, or out of the box.
+	// Walk voxel by voxel until something solid, or out of the box. One step across a voxel
+	// boundary on an axis: false when that leaves the segment or the box. (Only ever called with
+	// a fixed axis, for the same reason as the tile walk's, see castRay.)
 	float distance = entry;
+	auto stepAcross = [&](const int axis) {
+		distance = nextCrossing[axis];
+		if (distance > exit) return false;
+		voxel[axis] += step[axis];
+		if (voxel[axis] < low[axis] || voxel[axis] > high[axis]) return false;
+		nextCrossing[axis] += crossingSpacing[axis];
+		faceAxis = axis;
+		return true;
+	};
 	while (true)
 	{
 		// This voxel, counted from the tile's corner.
@@ -310,38 +343,42 @@ inline bool traceTile(const FirstPersonView::TileView &tileView, const FirstPers
 		const int localY = voxel[1] - tileCell[1] * Position::TileXY;
 		const int localZ = voxel[2] - tileCell[2] * Position::TileZ;
 		// Is it solid in any of the tile's four parts (floor, west wall, north wall, object)?
-		for (int part = 0; part < 4; ++part)
+		// The tile's solid mask (the parts' voxels together) says first whether any of them has
+		// anything there: most voxels a ray steps through are air.
+		if ((tileView.solid[localZ][localY] >> localX) & 1)
 		{
-			const FirstPersonView::VoxelModel *model = tileView.part[part];
-			if (!model) continue;
-			const Uint8 color = model->color[localZ][localY][localX];
-			if (!color) continue;
-			if (model->glass[localZ][localY] & (1 << localX))
+			for (int part = 0; part < 4; ++part)
 			{
-				hit.glass = true; // window glass: tint what's behind it
-				continue;
+				const FirstPersonView::VoxelModel *model = tileView.part[part];
+				if (!model) continue;
+				const Uint8 color = model->color[localZ][localY][localX];
+				if (!color) continue;
+				if (model->glass[localZ][localY] & (1 << localX))
+				{
+					hit.glass = true; // window glass: tint what's behind it
+					continue;
+				}
+				hit.color = color;
+				hit.t = distance;
+				hit.axis = faceAxis;
+				hit.part = part;
+				hit.voxel[0] = (Uint8)localX;
+				hit.voxel[1] = (Uint8)localY;
+				hit.voxel[2] = (Uint8)localZ;
+				// A light source shines where its brightest shades are, in the part of it that glows;
+				// a steady UFO model where its lights are (see buildUfoModel).
+				hit.emissive = ((tileView.emissive >> part) & 1)
+					&& (model->lit ? ((model->lit[localZ][localY] >> localX) & 1) != 0 : (color & 15) <= 3 && localZ >= model->glowMinZ);
+				return true;
 			}
-			hit.color = color;
-			hit.t = distance;
-			hit.axis = faceAxis;
-			hit.part = part;
-			hit.voxel[0] = (Uint8)localX;
-			hit.voxel[1] = (Uint8)localY;
-			hit.voxel[2] = (Uint8)localZ;
-			// A light source shines where its brightest shades are, in the part of it that glows;
-			// a steady UFO model where its lights are (see buildUfoModel).
-			hit.emissive = ((tileView.emissive >> part) & 1)
-				&& (model->lit ? ((model->lit[localZ][localY] >> localX) & 1) != 0 : (color & 15) <= 3 && localZ >= model->glowMinZ);
-			return true;
 		}
-		// Step into the neighbouring voxel across the nearest boundary.
-		const int nextAxis = nextCrossing[0] < nextCrossing[1] ? (nextCrossing[0] < nextCrossing[2] ? 0 : 2) : (nextCrossing[1] < nextCrossing[2] ? 1 : 2);
-		distance = nextCrossing[nextAxis];
-		if (distance > exit) return doorHit;
-		voxel[nextAxis] += step[nextAxis];
-		if (voxel[nextAxis] < low[nextAxis] || voxel[nextAxis] > high[nextAxis]) return doorHit;
-		nextCrossing[nextAxis] += crossingSpacing[nextAxis];
-		faceAxis = nextAxis;
+		// Step into the neighbouring voxel across the nearest boundary (on a tie, the later axis).
+		const bool inBox = nextCrossing[0] < nextCrossing[1] ? (nextCrossing[0] < nextCrossing[2] ? stepAcross(0) : stepAcross(2))
+			: (nextCrossing[1] < nextCrossing[2] ? stepAcross(1) : stepAcross(2));
+		if (!inBox)
+		{
+			return doorHit;
+		}
 	}
 }
 
@@ -361,6 +398,10 @@ inline RayEnd castRay(const RayContext &context, const float rayOrigin[3], const
 {
 	hit.glass = false;
 	hit.emissive = false;
+	// 1 / direction on each axis, for the tiles' boxes (an axis the ray runs parallel to never
+	// uses it).
+	const float inverseDirection[3] = { rayDirection[0] != 0.0f ? 1.0f / rayDirection[0] : 0.0f,
+		rayDirection[1] != 0.0f ? 1.0f / rayDirection[1] : 0.0f, rayDirection[2] != 0.0f ? 1.0f / rayDirection[2] : 0.0f };
 
 	// Set up the tile walk: the eye's tile, which way the ray steps on each axis, how far along
 	// the ray one tile is on each axis, and where it next crosses a tile boundary on each axis.
@@ -398,55 +439,88 @@ inline RayEnd castRay(const RayContext &context, const float rayOrigin[3], const
 		}
 	}
 
-	// Walk tile by tile, as far as the view reaches.
+	// Walk tile by tile, as far as the view reaches. Most tiles on the way are empty air: one
+	// byte per tile (the flags, see snapshotTiles) says so, and the walk steps on without
+	// touching the tile's snapshot.
+	const Uint8 wanted = smoke ? FirstPersonView::TileTraced | FirstPersonView::TileSmoky : FirstPersonView::TileTraced;
 	float distance = 0.0f;
 	int enterAxis = -1;
-	while (distance < context.maxDistance)
-	{
-		// Look inside this tile, between where the ray came in and where it leaves.
-		const int tileIndex = (tileCell[2] * context.size[1] + tileCell[1]) * context.size[0] + tileCell[0];
-		const auto &tileView = context.tiles[tileIndex];
-		const float tileExit = std::min(nextCrossing[0], std::min(nextCrossing[1], nextCrossing[2]));
-		// Smoke in the tile, when traced: where in the tile (if anywhere) it gets too thick to see
-		// through. Only what is in front of that point can still be hit; behind it, the ray ends
-		// in the smoke.
-		float smokeWall = -1.0f;
-		SmokeTrace smokeBefore;
-		if (smoke && tileView.smoke)
-		{
-			smokeBefore = *smoke;
-			smokeWall = addSmoke(*smoke, tileView, distance, tileExit);
-		}
-		const float traceEnd = smokeWall >= 0.0f ? smokeWall : tileExit;
-		if (!tileView.empty && traceTile(tileView, context.swings, tileCell, rayOrigin, rayDirection, distance, traceEnd, enterAxis, hit))
-		{
-			// Hit something in the tile: only the smoke in front of it counts.
-			if (smoke && tileView.smoke)
-			{
-				*smoke = smokeBefore;
-				addSmoke(*smoke, tileView, distance, hit.t);
-			}
-			hit.tile = tileIndex;
-			return RAY_HIT;
-		}
-		if (smokeWall >= 0.0f)
-		{
-			smoke->wallAt = smokeWall;
-			return RAY_SMOKE;
-		}
-		// Step into the neighbouring tile across the nearest boundary; past the map's edge, the
-		// ray is done (the caller draws the ground beyond, the sky or the void).
-		const int nextAxis = nextCrossing[0] < nextCrossing[1] ? (nextCrossing[0] < nextCrossing[2] ? 0 : 2) : (nextCrossing[1] < nextCrossing[2] ? 1 : 2);
-		distance = nextCrossing[nextAxis];
-		tileCell[nextAxis] += step[nextAxis];
-		if (tileCell[nextAxis] < 0 || tileCell[nextAxis] >= context.size[nextAxis])
+	int tileIndex = (tileCell[2] * context.size[1] + tileCell[1]) * context.size[0] + tileCell[0];
+	const int indexStride[3] = { step[0], step[1] * context.size[0], step[2] * context.size[0] * context.size[1] }; // a step on each axis, in tiles of the index
+	// One step across a tile boundary on an axis, into the next tile that way; false when that
+	// leaves the map (noting where, and through which side). It is only ever called with a fixed
+	// axis (see below), never one picked at run time: that lets the compiler keep the walk's
+	// numbers in registers, instead of in arrays in memory it must store and load again every step.
+	auto stepAcross = [&](const int axis) {
+		distance = nextCrossing[axis];
+		tileCell[axis] += step[axis];
+		tileIndex += indexStride[axis];
+		if (tileCell[axis] < 0 || tileCell[axis] >= context.size[axis])
 		{
 			endDistance = distance;
-			endAxis = nextAxis;
-			return nextAxis == 2 ? (step[nextAxis] < 0 ? RAY_BOTTOM : RAY_TOP) : RAY_SIDE;
+			endAxis = axis;
+			return false;
 		}
-		nextCrossing[nextAxis] += crossingSpacing[nextAxis];
-		enterAxis = nextAxis;
+		nextCrossing[axis] += crossingSpacing[axis];
+		enterAxis = axis;
+		return true;
+	};
+	while (distance < context.maxDistance)
+	{
+		const Uint8 flags = context.tileFlags[tileIndex];
+		if (flags & wanted)
+		{
+			// Where the ray leaves the tile. Anything solid to look for on the way? Not when it
+			// passes above all of the tile's solid voxels (a floor, most often) and no door swings
+			// through it: the tile's box would turn it away (see traceTile; a hundredth of a voxel
+			// to spare, so rounding never decides it). And smoke to trace through?
+			const float tileExit = std::min(nextCrossing[0], std::min(nextCrossing[1], nextCrossing[2]));
+			const float solidTop = (float)(tileCell[2] * Position::TileZ + (flags >> FirstPersonView::TileTopShift) + 1) + 0.01f;
+			const bool lookForSolid = (flags & FirstPersonView::TileTraced) && ((flags & FirstPersonView::TileSwinging)
+				|| rayOrigin[2] + rayDirection[2] * distance <= solidTop || rayOrigin[2] + rayDirection[2] * tileExit <= solidTop);
+			const bool traceSmokeHere = smoke && (flags & FirstPersonView::TileSmoky);
+			if (lookForSolid || traceSmokeHere)
+			{
+				// Look inside this tile, between where the ray came in and where it leaves.
+				const auto &tileView = context.tiles[tileIndex];
+				// The smoke in the tile, when traced: where in the tile (if anywhere) it gets too
+				// thick to see through. Only what is in front of that point can still be hit;
+				// behind it, the ray ends in the smoke.
+				float smokeWall = -1.0f;
+				SmokeTrace smokeBefore;
+				if (traceSmokeHere)
+				{
+					smokeBefore = *smoke;
+					smokeWall = addSmoke(*smoke, tileView, distance, tileExit);
+				}
+				const float traceEnd = smokeWall >= 0.0f ? smokeWall : tileExit;
+				if (lookForSolid && traceTile(tileView, context.swings, tileCell, rayOrigin, rayDirection, inverseDirection, distance, traceEnd, enterAxis, hit))
+				{
+					// Hit something in the tile: only the smoke in front of it counts.
+					if (traceSmokeHere)
+					{
+						*smoke = smokeBefore;
+						addSmoke(*smoke, tileView, distance, hit.t);
+					}
+					hit.tile = tileIndex;
+					return RAY_HIT;
+				}
+				if (smokeWall >= 0.0f)
+				{
+					smoke->wallAt = smokeWall;
+					return RAY_SMOKE;
+				}
+			}
+		}
+		// Step into the neighbouring tile across the nearest boundary (on a tie, the later axis);
+		// past the map's edge, the ray is done (the caller draws the ground beyond, the sky or the
+		// void).
+		const bool onMap = nextCrossing[0] < nextCrossing[1] ? (nextCrossing[0] < nextCrossing[2] ? stepAcross(0) : stepAcross(2))
+			: (nextCrossing[1] < nextCrossing[2] ? stepAcross(1) : stepAcross(2));
+		if (!onMap)
+		{
+			return endAxis == 2 ? (step[2] < 0 ? RAY_BOTTOM : RAY_TOP) : RAY_SIDE;
+		}
 	}
 	endDistance = distance;
 	endAxis = -1;

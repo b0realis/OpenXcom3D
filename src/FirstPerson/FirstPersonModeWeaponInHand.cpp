@@ -146,13 +146,18 @@ void FirstPersonMode::makeWeaponInHand()
  * magazine (the one sticking out further from the axis) down. Then gives it volume
  * (voxelizeWeapon). All measures are in picture pixels, along and across the long axis from
  * the picture's centre of mass.
+ * A melee weapon's striking end is the one higher in the picture instead: the games picture
+ * them standing up, the business end at the top (a stun rod's prongs, a lance's point, a
+ * blade), and that end is often the thicker one.
  * @param gun It's a gun or a club, drawn pointing at the crosshair (false: held up like an item).
+ * @param melee It's a melee weapon: held tip up, and swung down at the crosshair (see drawWeaponPlate).
  */
-void FirstPersonMode::analyzeWeapon(bool gun)
+void FirstPersonMode::analyzeWeapon(bool gun, bool melee)
 {
 	WeaponShape &shape = _heldShape;
 	shape = WeaponShape();
 	shape.gun = gun;
+	shape.melee = melee && gun;
 	_heldFaces.clear(); // a picture too small to measure gets none
 
 	// Every opaque pixel of the picture (colour 0 is transparent); too few to measure, and
@@ -215,11 +220,14 @@ void FirstPersonMode::analyzeWeapon(bool gun)
 
 	// The muzzle is at the end that's thinner by more than a pixel. With both ends about as
 	// thick, it's the end nearer the top of the picture (or the left, for a weapon lying flat).
+	// A melee weapon standing up in its picture strikes with its top end.
 	const double lowSpread = lowMax - lowMin, highSpread = highMax - highMin;
+	const bool standingUp = std::abs(shape.along[1]) > std::abs(shape.along[0]);
 	bool muzzleHigh;
-	if (highSpread < lowSpread - 1.0) muzzleHigh = true;
+	if (shape.melee && standingUp) muzzleHigh = shape.along[1] < 0;
+	else if (highSpread < lowSpread - 1.0) muzzleHigh = true;
 	else if (lowSpread < highSpread - 1.0) muzzleHigh = false;
-	else muzzleHigh = std::abs(shape.along[1]) > std::abs(shape.along[0]) ? shape.along[1] < 0 : shape.along[0] < 0;
+	else muzzleHigh = standingUp ? shape.along[1] < 0 : shape.along[0] < 0;
 	shape.stock = muzzleHigh ? minAlong : maxAlong;
 	shape.muzzle = muzzleHigh ? maxAlong : minAlong;
 	shape.minAcross = minAcross;
@@ -530,6 +538,38 @@ void FirstPersonMode::drawWeaponPlate(bool left, double bob[2], double kick, dou
 		nearEnd[axis] = pivot + (nearEnd[axis] - pivot) * sizeFactor;
 	}
 
+	// A melee weapon is held tip up: the same line, turned about the grip. At rest it points up
+	// (leaning a little forward and outwards); a strike turns it down onto the line at the
+	// crosshair (where the thrust above makes it a jab) and it comes back up; the wind-up tilts
+	// it a little further back first. One motion that reads as a swing and as a jab.
+	if (shape.melee)
+	{
+		double pivot[3], towardsTip[3], farLength = 0.0, nearLength = 0.0;
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			pivot[axis] = farEnd[axis] + (nearEnd[axis] - farEnd[axis]) * GripAt;
+			towardsTip[axis] = farEnd[axis] - pivot[axis];
+			farLength += towardsTip[axis] * towardsTip[axis];
+			nearLength += (nearEnd[axis] - pivot[axis]) * (nearEnd[axis] - pivot[axis]);
+		}
+		farLength = std::sqrt(farLength);
+		nearLength = std::sqrt(nearLength);
+		const double upright[3] = { side * MeleeUpright[0], MeleeUpright[1], MeleeUpright[2] };
+		const double raise = std::clamp(1.0 - strike + 0.2 * windup, 0.0, 1.2);
+		double direction[3], directionLength = 0.0;
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			direction[axis] = towardsTip[axis] / farLength * (1.0 - raise) + upright[axis] * raise;
+			directionLength += direction[axis] * direction[axis];
+		}
+		directionLength = std::sqrt(directionLength);
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			farEnd[axis] = pivot[axis] + direction[axis] / directionLength * farLength;
+			nearEnd[axis] = pivot[axis] - direction[axis] / directionLength * nearLength;
+		}
+	}
+
 	// The weapon's axis from stock to muzzle, and its length in camera space.
 	double along[3], length = 0.0;
 	for (int axis = 0; axis < 3; ++axis) { along[axis] = farEnd[axis] - nearEnd[axis]; length += along[axis] * along[axis]; }
@@ -711,6 +751,24 @@ void FirstPersonMode::drawHeldItem(bool left, double bob[2], double dip, int sha
 }
 
 /**
+ * Is a weapon drawn in the soldier's hands? Not a built-in one: an item fixed to the unit (a
+ * tank's cannon, an alien's claws) or the unit's special weapon (OXCE's, used from the SPECIAL
+ * button or by an empty hand: fists, a dog's bite, a Lamia's spit). A tank or a machine has no
+ * hands, and a bite has nothing to hold: the view's hands stay empty. A mod can name built-in
+ * items drawn all the same (`firstPerson: builtInItemsShown:`, a shield, an arm cannon).
+ * Aiming and firing work as with any weapon; only the picture is left out.
+ * @param unit The soldier.
+ * @param weapon The weapon in use.
+ */
+bool FirstPersonMode::weaponShownInHand(BattleUnit *unit, const BattleItem *weapon) const
+{
+	const RuleItem *rules = weapon->getRules();
+	const bool held = weapon == unit->getLeftHandWeapon() || weapon == unit->getRightHandWeapon();
+	const bool builtIn = rules->isFixed() || !held;
+	return !builtIn || _game->getMod()->getFirstPerson().showsBuiltInItem(rules->getType());
+}
+
+/**
  * Updates and draws the weapon in the soldier's hand, every frame, at the bottom of the screen
  * like an FPS (setting "Weapon in hand"), shaded by the game's light where the soldier stands.
  * Notices a new weapon (its picture is measured again) or a reload (it dips out of sight and
@@ -722,9 +780,10 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 {
 	// Shown only in the 3D view with the setting on, the classic HUD off, a weapon in hand,
 	// nobody going down, and the game's inventory pictures (BIGOBS.PCK) at hand.
+	// (A built-in weapon with nothing to hold leaves the hands empty: see weaponShownInHand.)
 	BattleItem *weapon = unit ? activeWeapon(unit) : nullptr;
 	SurfaceSet *inventorySprites = _game->getMod()->getSurfaceSet("BIGOBS.PCK");
-	const bool show = Options::fpsViewModel && isActive() && !_classicHud && weapon && !_deathUnit && inventorySprites;
+	const bool show = Options::fpsViewModel && isActive() && !_classicHud && weapon && weaponShownInHand(unit, weapon) && !_deathUnit && inventorySprites;
 	_weaponInHand->setVisible(show);
 	_view->setMuzzlePoint(0.0, 0.0, false); // set again below while a gun is in hand
 	_view->setOffMuzzlePoint(0.0, 0.0, false);
@@ -755,13 +814,13 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 		_heldRules = weapon->getRules();
 		_heldSprite->clear();
 		weapon->getRules()->drawHandSprite(inventorySprites, _heldSprite, weapon, _save, 0);
-		analyzeWeapon(battleType == BT_FIREARM || battleType == BT_MELEE);
+		analyzeWeapon(battleType == BT_FIREARM || battleType == BT_MELEE, battleType == BT_MELEE);
 	}
 
 	// The game's shade where the eye is (at most 9 shades darker, so it stays visible in the
 	// dark), the hand, and with dual wield the other hand's gun (drawn on the other side).
 	const int shade = std::min(9, _view->getEyeShade());
-	const bool inLeftHand = weapon == unit->getLeftHandWeapon();
+	const bool inLeftHand = handOf(unit, weapon) == 1;
 	BattleItem *otherWeapon = offHandWeapon(unit, weapon);
 
 	// The bob with the steps: _headBobPhase counts the voxels walked, so the weapon sways
@@ -801,6 +860,18 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 	if (_heldDipStart && now - _heldDipStart < 600)
 	{
 		dip = std::sin(Pi * (now - _heldDipStart) / 600.0) * 70.0;
+	}
+	// Looking far down, the weapon slides gently down out of sight (eased in from 45 to 72
+	// degrees below level, following the view), and back up as the view comes up: held low,
+	// it would cover the ground at the soldier's feet. Aiming and firing don't change.
+	// Zoomed in, it's lowered out of sight the same way, as far as the zoom has gone.
+	const double lookingDown = -_view->getPitchDegrees();
+	const double lookDownShare = std::clamp((lookingDown - LookDownSlideFrom) / (LookDownSlideTo - LookDownSlideFrom), 0.0, 1.0);
+	const double zoomShare = std::log(_zoom) / std::log(ZoomFactor);
+	const double slideShare = std::max(lookDownShare, zoomShare);
+	if (slideShare > 0.0)
+	{
+		dip += slideShare * slideShare * (3.0 - 2.0 * slideShare) * _weaponInHand->getHeight() * 0.8;
 	}
 	_weaponInHand->clear();
 	_weaponInHand->lock();

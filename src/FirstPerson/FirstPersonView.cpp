@@ -83,10 +83,11 @@ FirstPersonView::FirstPersonView(Game *game, int width, int height, int x, int y
 	InteractiveSurface(width, height, x, y), _game(game), _halfFovTangent(std::tan(75.0 * Pi / 360.0)),
 	_spriteBuffer(new Surface(SpriteBufferSize, SpriteBufferSize))
 {
-	// Per pixel: how far away the world seen there is (so sprites hide behind walls), and
-	// whether it shines (for the bloom).
+	// Per pixel: how far away the world seen there is (so sprites hide behind walls), whether
+	// it shines (for the bloom), and how much see-through smoke may still veil a unit seen there.
 	_depthBuffer.resize(width * height);
 	_glowMask.resize(width * height);
+	_unitVeil.resize(width * height);
 }
 
 /**
@@ -98,8 +99,12 @@ FirstPersonView::~FirstPersonView()
 {
 	// The scratch surfaces sprites are drawn through.
 	delete _spriteBuffer;
+	for (Surface *frame : _composedFrames) delete frame;
 	delete _itemPicture;
 	for (Surface *buffer : _blendBuffers) delete buffer;
+	for (auto &entry : _softSmoke) delete entry.second.colors;
+	for (auto &entry : _stippleSmoke) delete entry.second.colors;
+	for (auto &entry : _softSmokeBlends) delete entry.second.colors;
 	// Tell the upscaling worker to stop (under its lock, so it can't miss the flag), wake it,
 	// and wait for it to end.
 	{
@@ -123,8 +128,19 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 {
 	// Clear every piece of state that belongs to a battle.
 	_save = save;
+	for (auto &entry : _softSmoke) delete entry.second.colors;
+	_softSmoke.clear();
+	for (auto &entry : _stippleSmoke) delete entry.second.colors;
+	_stippleSmoke.clear();
+	for (auto &entry : _softSmokeBlends) delete entry.second.colors;
+	_softSmokeBlends.clear();
 	_models.clear();
 	_frames.clear();
+	_solidMasks.clear();
+	_tileMemos.clear();
+	_partMemos.clear();
+	_tileFlags.clear();
+	_tileLights.clear();
 	_wallsLastFrame[0].clear();
 	_wallsLastFrame[1].clear();
 	_doorAnimations.clear();
@@ -145,7 +161,9 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 	for (auto &parts : _partsLastFrame) parts.clear();
 	_groundChosen = false;
 	_cameraUnit = nullptr;
-	// Build the new battle's voxel models now rather than while playing.
+	// Build the new battle's voxel models now rather than while playing (UFO parts are built a
+	// little differently, so first which data sets those are).
+	collectUfoDataSets();
 	preloadModels();
 	findMirrors();
 	findUfos();
@@ -240,17 +258,37 @@ void FirstPersonView::rotate(double yawDegrees, double pitchDegrees)
  */
 void FirstPersonView::lookAt(const double target[3])
 {
+	double yawDegrees, pitchDegrees;
+	if (anglesTo(target, yawDegrees, pitchDegrees))
+	{
+		_yaw = yawDegrees * Pi / 180.0;
+		_pitch = pitchDegrees * Pi / 180.0;
+	}
+}
+
+/**
+ * The way the camera would point looking at a point from where its eye is now (for lookAt, and
+ * for a view gliding round to look at something). The pitch is limited to 80 degrees up or
+ * down, as in rotate.
+ * @param target The point, in voxels.
+ * @param yawDegrees Set to the yaw (0 east, clockwise as seen from above, -180 to 180).
+ * @param pitchDegrees Set to the pitch (up positive).
+ * @return False for a point at the eye itself (nothing set).
+ */
+bool FirstPersonView::anglesTo(const double target[3], double &yawDegrees, double &pitchDegrees) const
+{
 	// dx, dy, dz: from the eye to the target, in voxels; flatDistance: the same along the ground.
 	const double dx = target[0] - _eye[0], dy = target[1] - _eye[1], dz = target[2] - _eye[2];
 	const double flatDistance = std::sqrt(dx * dx + dy * dy);
 	if (flatDistance < 1e-6 && std::abs(dz) < 1e-6)
 	{
-		return;
+		return false;
 	}
 	// The pitch is in true proportions, where a voxel up is only ZScale of one across, so the
 	// height difference is scaled down before the angle is taken.
-	_yaw = std::atan2(dy, dx);
-	_pitch = std::clamp(std::atan2(dz * ZScale, flatDistance), -80.0 * Pi / 180.0, 80.0 * Pi / 180.0);
+	yawDegrees = std::atan2(dy, dx) * 180.0 / Pi;
+	pitchDegrees = std::clamp(std::atan2(dz * ZScale, flatDistance) * 180.0 / Pi, -80.0, 80.0);
+	return true;
 }
 
 /**
@@ -285,13 +323,13 @@ double FirstPersonView::getPitchDegrees() const
 }
 
 /**
- * Sets the horizontal field of view, kept between 30 and 120 degrees. The view stores the
- * tangent of half of it, which is what the ray directions are built from.
+ * Sets the horizontal field of view, kept between 5 (zoomed in) and 120 degrees. The view
+ * stores the tangent of half of it, which is what the ray directions are built from.
  * @param degrees The horizontal field of view, in degrees.
  */
 void FirstPersonView::setFieldOfView(double degrees)
 {
-	_halfFovTangent = std::tan(std::clamp(degrees, 30.0, 120.0) * Pi / 360.0);
+	_halfFovTangent = std::tan(std::clamp(degrees, 5.0, 120.0) * Pi / 360.0);
 }
 
 /**
@@ -354,6 +392,19 @@ void FirstPersonView::updateBasis()
 void FirstPersonView::getRayDirection(int pixelX, int pixelY, double out[3])
 {
 	updateBasis();
+	rayDirectionThrough(pixelX, pixelY, out);
+}
+
+/**
+ * The direction of the ray through a pixel, as getRayDirection, with the camera's axes as they
+ * are: for the drawing of a frame, which works them out first (see draw), and may want a ray for
+ * every pixel of a patch of the view (a unit's shadow on the ground, see drawGroundShade).
+ * @param pixelX The pixel's column, from the left.
+ * @param pixelY The pixel's row, from the top.
+ * @param out Receives the direction (x east, y south, z up).
+ */
+void FirstPersonView::rayDirectionThrough(int pixelX, int pixelY, double out[3]) const
+{
 	// Where the pixel lies on an image plane one unit in front of the eye: planeX to the right,
 	// from -tan(half the field of view) to +tan; planeY up, over the same range shrunk by the
 	// view's height over its width.
@@ -388,7 +439,7 @@ void FirstPersonView::getRayDirection(int pixelX, int pixelY, double out[3])
 int FirstPersonView::getEyeShade() const
 {
 	// Before the first frame there's no snapshot of the tiles to read the light from.
-	if (!_save || (int)_tileViews.size() != _save->getMapSizeXYZ())
+	if (!_save || (int)_tileLights.size() != _save->getMapSizeXYZ())
 	{
 		return 0;
 	}
@@ -431,9 +482,10 @@ int FirstPersonView::soundAngle(const Position &tile) const
  * Renders one frame of the view. Terrain, the map border and the sky are drawn by casting a
  * ray per pixel (spread over a few threads); then everything else is drawn over that picture,
  * hidden where the depth buffer says the world is nearer: marks on the walls, items, units,
- * smoke and fire, shots and explosions, flares, beams, particles and glows. Then the effects on
+ * fire (and the old solid smoke), shots and explosions, flares, beams, the see-through smoke
+ * (over all that, farthest first), particles and glows. Then the effects on
  * the screen itself: the colour wash, flames when the soldier burns, the hurt arc and blood, and
- * last the enemy markers, over everything.
+ * last the icons over the downed units and the enemy markers, over everything.
  * Without a battle or a camera unit, the surface is just cleared.
  */
 void FirstPersonView::draw()
@@ -445,15 +497,19 @@ void FirstPersonView::draw()
 		return;
 	}
 	_redraw = false;
+	// Upscaled sprites used from now on belong to this frame (see upscaled).
+	_upscaleFrameStart = _upscaleClock + 1;
 
 	// The camera for this frame: shake and recoil, then its axes.
 	updateCameraEffects();
 
 	updateBasis();
-	// The flashlight sits on the right shoulder, a little below the eye (voxels).
+	// The flashlight sits on the right shoulder, a little below the eye (voxels); the tactical
+	// one just under the eye, on the weapon, so its spot falls on the crosshair.
 	for (int axis = 0; axis < 3; ++axis)
 	{
-		_flashlightPos[axis] = (float)(_eye[axis] + _right[axis] * 4.0 - _up[axis] * 4.0 + _forward[axis] * 2.0);
+		_flashlightPos[axis] = _tacticalFlashlight ? (float)(_eye[axis] - _up[axis] * 1.5 + _forward[axis] * 1.0)
+			: (float)(_eye[axis] + _right[axis] * 4.0 - _up[axis] * 4.0 + _forward[axis] * 2.0);
 	}
 	// What the world looks like this frame: the tiles, the ground beyond the map (chosen once),
 	// the palette colours for the time of day, and the particles moved on.
@@ -471,6 +527,9 @@ void FirstPersonView::draw()
 	castAllRays();
 	// What's in the world: first the units are checked for hits and kills (for their flinches
 	// and the hitmarker), then everything is drawn over the terrain as sprites, dots and lines.
+	// (No unit is on the screen yet, for the see-through smoke.)
+	std::fill(_unitVeil.begin(), _unitVeil.end(), (Uint8)255);
+	std::fill(&_pointerUnits[0][0], &_pointerUnits[0][0] + sizeof(_pointerUnits) / sizeof(_pointerUnits[0][0]), nullptr);
 	watchUnits();
 	drawDecals();
 	drawFloorItems();
@@ -480,13 +539,17 @@ void FirstPersonView::draw()
 	drawProjectilesAndExplosions();
 	drawFlares();
 	drawBeams();
+	drawTrajectory();
+	drawSeeThroughSmoke();
+	findUnitAtPointer();
 	drawParticles();
 	drawLightHalos();
 	// Effects on the finished picture.
 	applyScreenWash();
 	drawBurning();
 	drawHurt();
-	// The enemy markers, over everything.
+	// The icons over the downed units, and the enemy markers, over everything.
+	drawDownedIcons();
 	drawMarkers();
 	unlock();
 }

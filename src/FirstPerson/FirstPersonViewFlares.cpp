@@ -154,6 +154,7 @@ void FirstPersonView::updateFlares(float elapsedSeconds)
 				for (float &component : direction) component /= stepLength;
 				RayContext rayContext;
 				rayContext.tiles = _tileViews.data();
+				rayContext.tileFlags = _tileFlags.data();
 				rayContext.swings = _doorSwings.data();
 				rayContext.size[0] = mapSizeX; rayContext.size[1] = mapSizeY; rayContext.size[2] = _save->getMapSizeZ();
 				rayContext.maxDistance = stepLength;

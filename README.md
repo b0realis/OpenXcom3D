@@ -4,7 +4,7 @@
 
 ![Night, through a soldier's eyes](docs/screenshots/night.png)
 
-*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **0.9**.
+*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.0**.
 
 **Both games are supported:** *UFO: Enemy Unknown* and *X-COM: Terror From The Deep*.
 
@@ -23,6 +23,21 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 | ![Dual wield](docs/screenshots/akimbo.png) | ![Signal lost](docs/screenshots/signal_lost.png) |
 | ![Terror From The Deep, an island attack: a Gillman ahead, a Deep One in a teammate's helmet camera](docs/screenshots/tftd_island.png) | ![A rocket going off far down an alien base hall](docs/screenshots/alien_base.png) |
 
+## New in 1.0
+
+- **Two more play-test reports** from the same veteran player (thank you again!), turned into another twenty-six small patches, each tested on its own. A few of them:
+  - **smoke you can see through,** made from the game's own smoke (setting *Smoke*: Modern, Original or Solid), solid only where your soldier's sight runs out;
+  - **doors** that never fold into their walls, **bullet holes** on every wall, **UFO walls** without black stripes, stairs 0.9 couldn't climb;
+  - **melee weapons** held tip up and swung, **fists** and built-in weapons on G, **medi-kits and scanners** straight from the crosshair, a light switched off again;
+  - **icons over downed units,** the **name of the unit** under the crosshair, a middle click that identifies it.
+- **Zoom:** hold **U** (or the right button) and the view glides in to four times closer: SCOPING, with a thin scope cross.
+- **The path of a throw,** drawn as you aim (setting *Show trajectory*), and **Confirm fire** for those who like to click twice.
+- **The aliens' turn, watched:** the view cuts to whoever sees the alien moving and to anyone firing back, and a soldier in trouble pops up their helmet camera.
+- **A tactical flashlight,** if you like: a light on the weapon, a bright spot right on the crosshair, as in Half-Life, lighting dark places by day too.
+- **The compass** now tells you when a shot will cost time units to turn first.
+- **Faster:** the same picture, drawn 20–32% faster at 1280×800, on every core of the machine.
+- **Lean** moved to **Shift + A / D**, so Q and E are the hand keys again.
+
 ## New in 0.9
 
 - **A play-test round:** a veteran player sent two long reports (thank you!), and they became some thirty small patches, each tested on its own: walking off ledges and through diagonal gaps, no more sky shimmering through buildings, soldiers and corpses seen from above, items lying on the floor, the blinking units of the big mods, close-quarters combat as the game rolls it, light no longer glowing through units, and more.
@@ -30,12 +45,6 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 - **Lean out:** with the setting *Lean* on, hold **Q** or **E** to peek round a corner; with *Tilt* the view tilts as a head does, and a shot from there leaves from that side.
 - **The classic HUD in 3D:** its buttons now act in the 3D view (centre, look a level up or down, the minimap on your soldier, the enemy buttons), and **P** hides the 3D HUD for a clear view.
 - **Steam Deck:** the lean on the back buttons; akimbo, snap turns, the 3D HUD, the light and the flare on long presses.
-
-## New in 0.8.2
-
-- **Download and play:** the Linux release now comes with its own libraries, so nothing has to be installed. Unpack it and run `./play.sh`, or take the single-file **AppImage**. It runs on Ubuntu 22.04 and newer, Debian 12, Fedora, Arch and the **Steam Deck**; all it needs is your copy of the original game.
-- **Finds your games by itself:** *X-COM: UFO Defense* and *Terror From The Deep* in any Steam library (Steam installed as a Flatpak or a Snap too, and the Steam Deck's SD card), or a `UFO` / `TFTD` folder next to the game.
-- **Steam Deck:** fullscreen on its screen, and a controller layout made for the game: the left stick walks, the right trackpad looks, L1 switches mouse look and the free cursor, R1 the isometric map and 3D.
 
 ## Help wanted
 
@@ -57,7 +66,7 @@ OpenXcom3D stems from **OpenXcom Extended** at exactly this commit:
 All changes on top of it are in one file, [`openxcom3d.patch`](openxcom3d.patch) (it applies with `git apply` to a clean checkout of that commit):
 
 - [`src/FirstPerson/`](src/FirstPerson): the 3D view, an engine add-on (renderer, controller, sounds, options), one file per topic and commented throughout;
-- small hooks in the core (36 files, about 550 lines): see the patch;
+- small hooks in the core (39 files, about 570 lines): see the patch;
 - [`mod/OpenXcom3D/`](mod/OpenXcom3D): the data mod that switches it on.
 
 `src/` and `mod/` in this repository are the same files as in the patch, for reading. Built with `-DOXCE_FIRSTPERSON=OFF`, it is plain OXCE again.

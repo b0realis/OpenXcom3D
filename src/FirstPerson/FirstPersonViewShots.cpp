@@ -130,19 +130,21 @@ const FirstPersonView::ItemModel &FirstPersonView::itemModel(BattleItem *item)
 }
 
 /**
- * Draws a thrown item in flight as its voxel model, at the game's position on its path: level
- * with the path to start with (the picture's right along it, its depth across it), turning end
- * over end about the axis across the path (ThrownItemSpin turns a second), ThrownItemScale
- * voxels per picture pixel. Its faces that look at the eye are drawn far to near, depth-tested
+ * Draws a thrown item in flight as its voxel model, at its position on its path: level with the
+ * path to start with (the picture's right along it, its depth across it), turning end over end
+ * about the axis across the path (ThrownItemSpin turns a second), ThrownItemScale voxels per
+ * picture pixel. Its faces that look at the eye are drawn far to near, depth-tested
  * against the world (walls and nearer things hide it), each darkened by how far it turns from
  * the light above and by the light where it is (the game's, lamps, the flashlight and flares, as
  * on units).
  * The work is done in true proportions (heights scaled by ZScale), like the camera.
- * @param projectile The game's projectile carrying it.
+ * @param current Where it is, in voxels.
+ * @param before Where it was a moment ago (which way it flies on the level).
  * @param item The item thrown.
+ * @param thrownStart When it left the hand (SDL ticks), for its tumble.
  * @return False if the item has no voxel model (it's then drawn as its sprite).
  */
-bool FirstPersonView::drawThrownItem(const Projectile *projectile, BattleItem *item)
+bool FirstPersonView::drawThrownItem(const Position &current, const Position &before, BattleItem *item, Uint32 thrownStart)
 {
 	const ItemModel &model = itemModel(item);
 	if (model.faces.empty())
@@ -150,8 +152,7 @@ bool FirstPersonView::drawThrownItem(const Projectile *projectile, BattleItem *i
 		return false;
 	}
 
-	// Where it is, and which way it flies on the level: from where it was a few steps back.
-	const Position current = projectile->getPosition(0), before = projectile->getPosition(-4);
+	// Where it is, and which way it flies on the level.
 	const double centre[3] = { (double)current.x, (double)current.y, current.z * ZScale };
 	double path[2] = { (double)(current.x - before.x), (double)(current.y - before.y) };
 	const double pathLength = std::sqrt(path[0] * path[0] + path[1] * path[1]);
@@ -166,7 +167,7 @@ bool FirstPersonView::drawThrownItem(const Projectile *projectile, BattleItem *i
 
 	// Its axes in the world, each one picture pixel (or voxel of depth) long: right along the
 	// path, down towards the ground, depth across the path; the first two turned end over end.
-	const double angle = (SDL_GetTicks() - _thrownStart) / 1000.0 * ThrownItemSpin * 2.0 * Pi;
+	const double angle = (SDL_GetTicks() - thrownStart) / 1000.0 * ThrownItemSpin * 2.0 * Pi;
 	const double along[3] = { path[0], path[1], 0.0 }, upward[3] = { 0.0, 0.0, 1.0 };
 	double stepPerX[3], stepPerY[3];
 	for (int axis = 0; axis < 3; ++axis)
@@ -311,6 +312,25 @@ void FirstPersonView::fillQuadAtDepth(const double corners[4][2], Uint8 color, f
 }
 
 /**
+ * Draws a Doom free grenade in flight (see setFreeGrenade): tumbling like a thrown item, where it
+ * is now: moved on along its velocity from where it was last set (at most a twentieth of a second
+ * on, the flight's own steps come about that often), so it flies smoothly between them. One
+ * with no inventory picture to give it a model isn't drawn.
+ */
+void FirstPersonView::drawFreeGrenade()
+{
+	if (!_freeGrenade)
+	{
+		return;
+	}
+	const float seconds = std::min(0.05f, (SDL_GetTicks() - _freeGrenadeTick) / 1000.0f);
+	const Position current((int)std::floor(_freeGrenadePos[0] + _freeGrenadeVelocity[0] * seconds), (int)std::floor(_freeGrenadePos[1] + _freeGrenadeVelocity[1] * seconds),
+		(int)std::floor(_freeGrenadePos[2] + _freeGrenadeVelocity[2] * seconds));
+	const Position before((int)std::floor(current.x - _freeGrenadeVelocity[0] * 0.05f), (int)std::floor(current.y - _freeGrenadeVelocity[1] * 0.05f), current.z);
+	drawThrownItem(current, before, _freeGrenade, _freeGrenadeStart);
+}
+
+/**
  * Draws what flies and what explodes, as sprites and dots in the world: a thrown item (its own
  * sprite, at the game's position), the head of a shot in flight (a dot, blob or flame; beams
  * are drawn as lines by drawBeams), dual wield's second round, and the explosions with the
@@ -324,6 +344,8 @@ void FirstPersonView::drawProjectilesAndExplosions()
 		return;
 	}
 	Mod *mod = _game->getMod();
+	// A Doom free grenade in flight (the 3D view's own throw).
+	drawFreeGrenade();
 	// The game's one projectile in flight.
 	if (Projectile *projectile = _map->getProjectile())
 	{
@@ -332,7 +354,7 @@ void FirstPersonView::drawProjectilesAndExplosions()
 			// A thrown item: as its voxel model, tumbling; one with no inventory picture as its
 			// sprite as the map draws it, put into the sprite buffer at (16, 8) and stood at the
 			// item's position in the world.
-			if (!drawThrownItem(projectile, item))
+			if (!drawThrownItem(projectile->getPosition(0), projectile->getPosition(-4), item, _thrownStart))
 			{
 				const Position position = projectile->getPosition();
 				const double world[3] = { (double)position.x, (double)position.y, (double)position.z };
@@ -381,7 +403,9 @@ void FirstPersonView::drawProjectilesAndExplosions()
 			clock.since = now;
 		}
 		const double blend = clock.length ? std::min(1.0, (now - clock.since) / (double)clock.length) : 0.0;
-		// The game's sprite for this frame and the next (none after the last).
+		// The game's sprite for this frame and the next: none after the explosion's own last
+		// frame (the frames after it in the set are another animation's: a bullet's hit fading
+		// into the start of another weapon's looked like a second explosion).
 		const Position position = explosion->getPosition();
 		const double world[3] = { (double)position.x, (double)position.y, (double)position.z };
 		SurfaceSet *spriteSet = mod->getSurfaceSet(explosion->isBig() ? "X1.PCK" : explosion->isHit() ? "HIT.PCK" : "SMOKE.PCK");
@@ -390,7 +414,7 @@ void FirstPersonView::drawProjectilesAndExplosions()
 		{
 			continue;
 		}
-		const Surface *nextSprite = frame + 1 < (int)spriteSet->getTotalFrames() ? spriteSet->getFrame(frame + 1) : nullptr;
+		const Surface *nextSprite = frame + 1 <= explosion->getLastFrame() && frame + 1 < (int)spriteSet->getTotalFrames() ? spriteSet->getFrame(frame + 1) : nullptr;
 		// Anchored where the isometric map anchors them: a big explosion by its centre, a hit
 		// at (15, 25), a puff at (15, 15). They are depth-tested as if 24 (big) or 12 voxels
 		// nearer, so the walls and floor they burst against don't cut them.
@@ -615,8 +639,10 @@ void FirstPersonView::spawnTrailSegment(const float from[3], const float to[3])
  * @param color Its palette colour.
  * @param thickness How thick it is on the screen, in pixels.
  * @param opacity 1 solid .. 0 gone (dithered): a beam fading out.
+ * @param bandTop, bandBottom Only the screen rows from bandTop up to (not including) bandBottom
+ *        are drawn (a band of the view, see replayDrawList): the same pixels as drawn whole.
  */
-void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity)
+void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, int bandTop, int bandBottom)
 {
 	const int width = getWidth(), height = getHeight();
 	// Clip the line against a near plane 3 voxels in front of the eye (depth along the view
@@ -653,7 +679,7 @@ void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 c
 			for (int offsetX = 0; offsetX < thickness; ++offsetX)
 			{
 				const int pixelX = x + offsetX - thickness / 2, pixelY = y + offsetY - thickness / 2;
-				if (pixelX < 0 || pixelY < 0 || pixelX >= width || pixelY >= height
+				if (pixelX < 0 || pixelY < std::max(0, bandTop) || pixelX >= width || pixelY >= std::min(height, bandBottom)
 					|| depth >= _depthBuffer[pixelY * width + pixelX] + 1.0f) continue;
 				if (opacity < 1.0f && dither(pixelX, pixelY) >= opacity) continue;
 				*getRaw(pixelX, pixelY) = color;
@@ -703,20 +729,39 @@ void FirstPersonView::trailFor(const BattleItem *ammo, Trail &trail, Uint8 &colo
 /**
  * Where a shot ended, if not in a unit (that bleeds or sparks, see watchUnits): sparks, chunks
  * in the colour of what was hit and a puff of dust, and a mark: a bullet hole, or a bigger
- * scorch from beams, plasma and incendiaries.
- * @param head Where the shot ended, in voxels.
+ * scorch from beams, plasma and incendiaries. All of it on the surface the view shows there: the
+ * game's line of fire can stop on collision voxels the art leaves empty (a craft's walls are
+ * thicker than they look), so the shot's line is followed on a little through the view's own
+ * world (from 3 voxels back to 12 on), and the mark goes where it meets what is drawn.
+ * @param shotEnd Where the game's shot ended, in voxels.
+ * @param from Where the shot came from, for its direction.
  * @param trail How it looked in flight (from its damage type).
  */
-void FirstPersonView::spawnShotImpact(const float head[3], Trail trail)
+void FirstPersonView::spawnShotImpact(const float shotEnd[3], const float from[3], Trail trail)
 {
 	typedef FirstPersonParticles P; // short for the particle system: its kinds (P::GLOW...) and groups (P::EFFECT...)
 	// Nothing here if there is a unit in the tile it ended in, or in the tile below (a tall
 	// unit reaches up into the next level).
-	const Position headTile((int)head[0] / 16, (int)head[1] / 16, (int)head[2] / 24);
-	const Tile *tile = _save->getTile(headTile);
-	if (tile && (tile->getUnit() || (headTile.z > 0 && _save->getTile(headTile - Position(0, 0, 1))->getUnit())))
+	const Position endTile((int)shotEnd[0] / 16, (int)shotEnd[1] / 16, (int)shotEnd[2] / 24);
+	const Tile *tile = _save->getTile(endTile);
+	if (tile && (tile->getUnit() || (endTile.z > 0 && _save->getTile(endTile - Position(0, 0, 1))->getUnit())))
 	{
 		return;
+	}
+	// Where the shot's line meets what the view draws (see above).
+	float head[3] = { shotEnd[0], shotEnd[1], shotEnd[2] };
+	float direction[3] = { shotEnd[0] - from[0], shotEnd[1] - from[1], shotEnd[2] - from[2] };
+	const float length = std::sqrt(direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2]);
+	if (length > 1.0f)
+	{
+		for (float &component : direction) component /= length;
+		const float back = std::min(3.0f, length - 0.5f);
+		const float start[3] = { shotEnd[0] - direction[0] * back, shotEnd[1] - direction[1] * back, shotEnd[2] - direction[2] * back };
+		float surface[3];
+		if (visibleSurfaceAlong(start, direction, back + 12.0f, surface))
+		{
+			for (int axis = 0; axis < 3; ++axis) head[axis] = surface[axis] - direction[axis] * 0.3f; // just in front of it
+		}
 	}
 	const Uint8 debrisColor = debrisColorAt(head);
 	const Uint8 sparkColors[3] = { _colors.spark, _colors.fire[1], _colors.fire[0] };
@@ -785,7 +830,7 @@ void FirstPersonView::spawnPartnerEffects()
 		// beam fading out.
 		if (_lastPartnerShot)
 		{
-			spawnShotImpact(_partnerHead, _partnerTrail);
+			spawnShotImpact(_partnerHead, _partnerOrigin, _partnerTrail);
 			if (_partnerTrail == TRAIL_BEAM)
 			{
 				_beams.push_back({ { _partnerOrigin[0], _partnerOrigin[1], _partnerOrigin[2] },
@@ -872,6 +917,72 @@ void FirstPersonView::shotHead(const Projectile *projectile, float out[3]) const
 }
 
 /**
+ * The path a throw or shot aimed now would take (setting "Show trajectory", or a target marked
+ * for confirm fire; see FirstPersonMode::updateTrajectory): dashes of TrajectoryDash voxels
+ * along it in a light cyan (no other line is that colour), two pixels thick, fading a little
+ * towards the far end, so the eye follows it out; and where it ends (where a throw lands, or a
+ * shot meets something), a diamond lying flat round it. The first voxels, at the soldier's own hand, are left
+ * out. Depth-tested like any line, so walls hide what's behind them.
+ */
+void FirstPersonView::drawTrajectory()
+{
+	if (_trajectory.size() < 2)
+	{
+		return;
+	}
+	const float TrajectoryDash = 6.0f, TrajectorySkip = 14.0f;
+
+	// The path's length, to fade the dashes along it.
+	auto voxelCentre = [](const Position &voxel, float out[3]) { out[0] = voxel.x + 0.5f; out[1] = voxel.y + 0.5f; out[2] = voxel.z + 0.5f; };
+	float totalLength = 0.0f;
+	for (size_t point = 1; point < _trajectory.size(); ++point)
+	{
+		const Position step = _trajectory[point] - _trajectory[point - 1];
+		totalLength += std::sqrt((float)(step.x * step.x + step.y * step.y + step.z * step.z));
+	}
+	if (totalLength <= TrajectorySkip)
+	{
+		return;
+	}
+
+	// Every other stretch of TrajectoryDash voxels is a dash: drawn as one line from where it
+	// starts to where it ends.
+	const Uint8 color = _colors.trajectory;
+	float travelled = 0.0f, dashStart[3] = {}, previous[3];
+	bool inDash = false;
+	voxelCentre(_trajectory[0], previous);
+	for (size_t point = 1; point < _trajectory.size(); ++point)
+	{
+		float current[3];
+		voxelCentre(_trajectory[point], current);
+		const float stepLength = std::sqrt((current[0] - previous[0]) * (current[0] - previous[0]) + (current[1] - previous[1]) * (current[1] - previous[1])
+			+ (current[2] - previous[2]) * (current[2] - previous[2]));
+		travelled += stepLength;
+		const bool dashHere = travelled > TrajectorySkip && ((int)(travelled / TrajectoryDash) % 2) == 0;
+		if (dashHere && !inDash)
+		{
+			std::copy(previous, previous + 3, dashStart);
+		}
+		if (inDash && (!dashHere || point + 1 == _trajectory.size()))
+		{
+			const float opacity = 1.0f - 0.4f * std::min(1.0f, travelled / totalLength);
+			drawLine3D(dashStart, dashHere ? current : previous, color, 2, opacity);
+		}
+		inDash = dashHere;
+		std::copy(current, current + 3, previous);
+	}
+
+	// The end: a diamond, flat, round the last voxel.
+	float end[3];
+	voxelCentre(_trajectory.back(), end);
+	const float corners[4][3] = { { end[0] + 6.0f, end[1], end[2] }, { end[0], end[1] + 6.0f, end[2] }, { end[0] - 6.0f, end[1], end[2] }, { end[0], end[1] - 6.0f, end[2] } };
+	for (int side = 0; side < 4; ++side)
+	{
+		drawLine3D(corners[side], corners[(side + 1) % 4], color, 2, 1.0f);
+	}
+}
+
+/**
  * Laser (and gauss) beams: a line from the muzzle to wherever the shot is (or ended), a bright
  * core in a coloured sheath, fading out over a third of a second (350 ms) after the hit.
  */
@@ -933,7 +1044,7 @@ void FirstPersonView::finishShot()
 {
 	if (_lastProjectile && !_lastProjectileThrown)
 	{
-		spawnShotImpact(_lastShotHead, _shotTrail);
+		spawnShotImpact(_lastShotHead, _shotTrailOrigin, _shotTrail);
 	}
 	if (_lastProjectile && _shotIsEnemy)
 	{

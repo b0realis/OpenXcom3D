@@ -55,7 +55,12 @@
 #include <cmath>
 #include <thread>
 #include <vector>
+#ifdef __linux__
+#include <sched.h>
+#endif
 #include <SDL.h>
+#include "FirstPersonApi.h"
+#include "../Engine/Logger.h"
 #include "../Engine/Options.h"
 #include "../Savegame/BattleUnit.h" // not used here, but its PARTS_STRING constants are part of this file's object code
 #include "../Savegame/SavedBattleGame.h"
@@ -70,8 +75,8 @@ namespace OpenXcom
  * the TFTD palettes both work: the sky gradient, clouds, haze, the map border's tape and posts,
  * the particles' colours (fire, smoke, blood, weather, flares) and the enemy markers. When the
  * palette has changed it also rebuilds the colour tables: each colour as seen through window
- * glass, and each colour washed with red, blue, orange, white or green (the screen washes) or
- * lit by a flare's red light. Finally it sets the sun and the moon for the time of day, and how
+ * glass, each colour washed with red, blue, orange, white or green (the screen washes) or lit
+ * by a flare's red light, and each colour laid over each other one (see-through drawing). Finally it sets the sun and the moon for the time of day, and how
  * much darker each face direction is shaded.
  */
 void FirstPersonView::updateColors()
@@ -181,10 +186,14 @@ void FirstPersonView::updateColors()
 	_colors.fire[1] = nearest(255, 210, 60);
 	_colors.fire[2] = nearest(240, 120, 20);
 	_colors.fire[3] = nearest(160, 40, 10);
-	_colors.smoke = nearest(130, 130, 130);
 	_colors.hitbox[0] = nearest(90, 230, 110);
 	_colors.hitbox[1] = nearest(255, 70, 60);
 	_colors.hitbox[2] = nearest(250, 220, 70);
+	_colors.downedIcon[0] = nearest(240, 110, 20);
+	_colors.downedIcon[1] = nearest(255, 225, 80);
+	_colors.downedIcon[2] = nearest(215, 25, 25);
+	_colors.downedIcon[3] = nearest(250, 240, 120);
+	_colors.downedIcon[4] = nearest(170, 205, 255);
 	_colors.edgeDot = nearest(225, 45, 35);
 	_colors.unexplored = nearest(78, 88, 110);
 	_colors.spark = nearest(255, 240, 160);
@@ -197,6 +206,7 @@ void FirstPersonView::updateColors()
 	_colors.firefly = nearest(200, 255, 100);
 	_colors.bubble = nearest(170, 230, 240);
 	_colors.tapeYellow = nearest(240, 200, 30);
+	_colors.trajectory = nearest(150, 235, 255);
 	_colors.marker = nearest(235, 40, 30);
 	_colors.marine = nearest(150, 195, 190);
 	_colors.flareFire[0] = nearest(240, 30, 20);
@@ -242,6 +252,35 @@ void FirstPersonView::updateColors()
 		_colors.flareTint[0] = 0;
 		// Four greys, dark to light, for the TV static.
 		for (int level = 0; level < 4; ++level) _colors.grey[level] = nearest(30 + 60 * level, 30 + 60 * level, 30 + 60 * level);
+		// The smoke's colour: the game's own smoke, mixed (see smokeRgb).
+		smokeRgb(_smokeRgb);
+		_colors.smoke = nearest(_smokeRgb[0], _smokeRgb[1], _smokeRgb[2]);
+		// The see-through tables (see seeThrough): first the palette's nearest colour to every
+		// 15-bit RGB colour, then every colour laid over every other in each step, the mix (to
+		// 5 bits a channel) looked up in that.
+		_nearestRgb.resize(32768);
+		for (int rgb15 = 0; rgb15 < 32768; ++rgb15)
+		{
+			_nearestRgb[rgb15] = nearest(((rgb15 >> 10) & 31) * 255 / 31.0f, ((rgb15 >> 5) & 31) * 255 / 31.0f, (rgb15 & 31) * 255 / 31.0f);
+		}
+		_seeThroughTables.resize((SeeThroughLevels - 1) << 16);
+		for (int level = 1; level < SeeThroughLevels; ++level)
+		{
+			Uint8 *table = &_seeThroughTables[(level - 1) << 16];
+			for (int over = 0; over < 256; ++over)
+			{
+				for (int under = 0; under < 256; ++under)
+				{
+					// Each channel: level steps of the colour over it, the rest of the one under it.
+					auto channel = [level](int overValue, int underValue) {
+						const int mixed = (overValue * level + underValue * (SeeThroughLevels - level) + SeeThroughLevels / 2) / SeeThroughLevels;
+						return (mixed * 31 + 127) / 255;
+					};
+					table[(over << 8) | under] = _nearestRgb[(channel(palette[over].r, palette[under].r) << 10)
+						| (channel(palette[over].g, palette[under].g) << 5) | channel(palette[over].b, palette[under].b)];
+				}
+			}
+		}
 	}
 
 	// The sun stands high in the north-west by day; at night there is only the moon, and the
@@ -283,12 +322,13 @@ void FirstPersonView::updateColors()
 float FirstPersonView::lightAt(float x, float y, float z, float *ufoGlow) const
 {
 	// The tile the point is in (clamped onto the map): its light is the answer without smooth
-	// lighting, and stands in for undiscovered neighbours with it.
+	// lighting, and stands in for undiscovered neighbours with it. (The light of each tile is
+	// read from the compact copy, _tileLights: every pixel's shading reads eight of them.)
 	const int mapSizeX = _save->getMapSizeX(), mapSizeY = _save->getMapSizeY(), mapSizeZ = _save->getMapSizeZ();
 	const int tileX = std::clamp((int)std::floor(x / 16), 0, mapSizeX - 1);
 	const int tileY = std::clamp((int)std::floor(y / 16), 0, mapSizeY - 1);
 	const int tileZ = std::clamp((int)std::floor(z / 24), 0, mapSizeZ - 1);
-	const TileView &ownTile = _tileViews[(tileZ * mapSizeY + tileY) * mapSizeX + tileX];
+	const TileLight &ownTile = _tileLights[(tileZ * mapSizeY + tileY) * mapSizeX + tileX];
 	const float ownTileShade = ownTile.light;
 	if (!_smoothLighting)
 	{
@@ -315,9 +355,9 @@ float FirstPersonView::lightAt(float x, float y, float z, float *ufoGlow) const
 		}
 		else
 		{
-			const TileView &tileView = _tileViews[(cornerZ * mapSizeY + cornerY) * mapSizeX + cornerX];
-			cornerShade = tileView.discovered ? tileView.light : ownTileShade;
-			cornerGlow = tileView.discovered ? tileView.ufoGlow : ownTile.ufoGlow;
+			const TileLight &tileLight = _tileLights[(cornerZ * mapSizeY + cornerY) * mapSizeX + cornerX];
+			cornerShade = tileLight.discovered ? tileLight.light : ownTileShade;
+			cornerGlow = tileLight.discovered ? tileLight.ufoGlow : ownTile.ufoGlow;
 		}
 		const float weight = ((corner & 1) ? fractionX : 1 - fractionX) * (((corner >> 1) & 1) ? fractionY : 1 - fractionY)
 			* (((corner >> 2) & 1) ? fractionZ : 1 - fractionZ);
@@ -349,6 +389,7 @@ bool FirstPersonView::shadowed(const float from[3], const float to[3]) const
 	// Walk the ray through the map's tile snapshot, no further than the light.
 	RayContext rayContext;
 	rayContext.tiles = _tileViews.data();
+	rayContext.tileFlags = _tileFlags.data();
 	rayContext.swings = _doorSwings.data();
 	rayContext.size[0] = _save->getMapSizeX();
 	rayContext.size[1] = _save->getMapSizeY();
@@ -358,6 +399,41 @@ bool FirstPersonView::shadowed(const float from[3], const float to[3]) const
 	float tEnd;   // where the ray left the map (not needed here)
 	int endAxis;  // through which side (not needed here)
 	return castRay(rayContext, from, direction, hit, tEnd, endAxis) == RAY_HIT && hit.t < distance;
+}
+
+/**
+ * Where a line first meets the world as the view draws it: the same walk as the view's rays
+ * (terrain, swinging doors), no units. The game's line of fire goes by the parts' collision
+ * shapes, which in places hold voxels the art leaves empty (a craft's walls); a shot stopped by
+ * those ends in front of the surface the view shows, and its mark is put here instead.
+ * @param from Where the line starts, in voxels.
+ * @param direction Its unit direction.
+ * @param maxDistance How far to look, in voxels.
+ * @param point Set to where it meets the world.
+ * @return False if it meets nothing within that distance.
+ */
+bool FirstPersonView::visibleSurfaceAlong(const float from[3], const float direction[3], float maxDistance, float point[3]) const
+{
+	RayContext rayContext;
+	rayContext.tiles = _tileViews.data();
+	rayContext.tileFlags = _tileFlags.data();
+	rayContext.swings = _doorSwings.data();
+	rayContext.size[0] = _save->getMapSizeX();
+	rayContext.size[1] = _save->getMapSizeY();
+	rayContext.size[2] = _save->getMapSizeZ();
+	rayContext.maxDistance = maxDistance;
+	Hit hit;
+	float tEnd;   // where the ray left the map (not needed here)
+	int endAxis;  // through which side (not needed here)
+	if ((int)_tileFlags.size() != _save->getMapSizeXYZ() || castRay(rayContext, from, direction, hit, tEnd, endAxis) != RAY_HIT || hit.t > maxDistance)
+	{
+		return false;
+	}
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		point[axis] = from[axis] + direction[axis] * hit.t;
+	}
+	return true;
 }
 
 /**
@@ -414,8 +490,37 @@ float FirstPersonView::pointLight(const float point[3], const float normal[3], b
 		}
 	}
 	// The flashlight: a cone along the view direction, from the soldier's shoulder, reaching
-	// 14 tiles and fading out with the square of the distance.
-	if (_flashlight)
+	// 14 tiles and fading out with the square of the distance. The tactical flashlight (setting)
+	// is a light on the weapon, as in Half-Life: a tight, bright round spot centred on the
+	// crosshair (full strength within 8 degrees of it, fading out by 13), a faint halo round it
+	// out to 24 degrees, reaching 20 tiles and fading more slowly.
+	if (_flashlight && _tacticalFlashlight)
+	{
+		const float range = 16.0f * 20.0f; // voxels
+		const float fromLight[3] = { point[0] - _flashlightPos[0], point[1] - _flashlightPos[1], point[2] - _flashlightPos[2] };
+		const float distance = std::sqrt(fromLight[0] * fromLight[0] + fromLight[1] * fromLight[1] + fromLight[2] * fromLight[2]);
+		if (distance > 0.5f && distance < range)
+		{
+			// How close the point is to the beam's axis (the cosine of the angle off it): the spot
+			// from 0.974 (13 degrees) to full at 0.990 (8 degrees), the halo from 0.914 (24 degrees).
+			const float cosine = (fromLight[0] * (float)_forwardInVoxels[0] + fromLight[1] * (float)_forwardInVoxels[1]
+				+ fromLight[2] * (float)_forwardInVoxels[2]) / distance;
+			if (cosine > 0.914f)
+			{
+				const float beam = smoothstep(0.974f, 0.990f, cosine) + 0.18f * smoothstep(0.914f, 0.974f, cosine);
+				const float falloff = 1.0f - 0.85f * distance / range;
+				const float facing = normal ? -(normal[0] * fromLight[0] + normal[1] * fromLight[1] + normal[2] * fromLight[2]) / distance
+					: 1.0f;
+				const float power = beam * falloff * falloff * 13.0f * (0.4f + 0.6f * std::max(0.0f, facing));
+				// Light only what faces the light, isn't too faint, and isn't behind anything.
+				if (power > 0.25f && facing > 0.0f && !(shadows && shadowed(point, _flashlightPos)))
+				{
+					light += power;
+				}
+			}
+		}
+	}
+	else if (_flashlight)
 	{
 		const float range = 16.0f * 14.0f; // voxels
 		const float fromLight[3] = { point[0] - _flashlightPos[0], point[1] - _flashlightPos[1], point[2] - _flashlightPos[2] };
@@ -653,8 +758,13 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 			+ std::sin((surfacePoint[0] - surfacePoint[1]) * 0.19f + seconds * 0.9f);
 		if (ripple > 1.3f) shade -= (ripple - 1.3f) * 1.8f;
 	}
-	// Shade the colour by whole palette shades, the fraction dithered between two.
-	Uint8 color = shadeColor(baseColor, (int)std::max(0.0f, shade + dither(pixelX, pixelY)));
+	// Shade the colour by whole palette shades, the fraction dithered between two. Shaded past
+	// the darkest colour of its group, a colour turns black, as in the game; but on a UFO (its
+	// steady model, the UFO lights option) it stays the darkest of its group: the dark panels of
+	// the Harvester's gore tubes showed as black boxes.
+	const int wholeShades = (int)std::max(0.0f, shade + dither(pixelX, pixelY));
+	const bool onSteadyUfo = hit.part >= 0 && tileView.part[hit.part] && tileView.part[hit.part]->exposed;
+	Uint8 color = onSteadyUfo ? (Uint8)((baseColor & 0xF0) | std::min(15, (baseColor & 15) + wholeShades)) : shadeColor(baseColor, wholeShades);
 	if (flare * 1.5f > 0.04f + dither(pixelX + 1, pixelY + 3))
 	{
 		color = _colors.flareTint[color]; // the flare's light is red
@@ -857,27 +967,24 @@ Uint8 FirstPersonView::skyColor(const float rayDirection[3], int pixelX, int pix
 }
 
 /**
- * The colour of smoke on a pixel (see SmokeTrace), or 0 where it leaves the pixel uncovered. The
- * smoke covers a share of the pixels (dithered), more where its billows are thick; the billows
- * are cloud-like noise over the world, drifting slowly east and up. It is the smoke's grey,
- * shaded by its light, a shade lighter in thick billows and darker in thin ones.
+ * The colour of the smoke's wall on a pixel: where a ray ran out of the soldier's sight in the
+ * smoke (see SmokeTrace). The smoke's grey, shaded by its light, a shade lighter in thick billows
+ * and darker in thin ones; the billows are cloud-like noise over the world, drifting slowly east
+ * and up. (Smoke short of that is drawn see-through, as the game's own smoke: see
+ * drawSeeThroughSmoke.)
  * @param light The light of the smoke (the game's shade, 0 brightest .. 15 darkest).
  * @param rayOrigin, rayDirection The ray.
- * @param distance Where along the ray the smoke is.
- * @param coverage The share of the pixels it covers: 0 to 1 (1 covers them all).
- * @param pixelX, pixelY The pixel (or block of pixels), for the dither.
- * @return The colour, or 0 if the smoke doesn't cover this pixel.
+ * @param distance Where along the ray the wall is.
+ * @param billowOut If not null, set to how thick the billow is there (0 .. 1).
+ * @return The colour.
  */
-Uint8 FirstPersonView::smokeColor(Uint8 light, const float rayOrigin[3], const float rayDirection[3], float distance, float coverage, int pixelX, int pixelY) const
+Uint8 FirstPersonView::smokeColor(Uint8 light, const float rayOrigin[3], const float rayDirection[3], float distance, float *billowOut) const
 {
 	// Where the smoke is, in voxels, and how thick its billow is there (0 .. 1).
 	const float x = rayOrigin[0] + rayDirection[0] * distance, y = rayOrigin[1] + rayDirection[1] * distance,
 		z = rayOrigin[2] + rayDirection[2] * distance;
-	const float billow = cloudNoise((x + z * 0.7f) / 12.0f - _smokeDrift * 0.3f, (y - z * 0.5f) / 12.0f + _smokeDrift * 0.15f);
-	if (coverage < 1.0f && dither(pixelX, pixelY) >= coverage * (0.6f + billow * 0.8f))
-	{
-		return 0;
-	}
+	const float billow = cloudNoise((x + z * 0.7f) / 12.0f - _smokeDrift * 0.15f, (y - z * 0.5f) / 12.0f + _smokeDrift * 0.08f);
+	if (billowOut) *billowOut = billow;
 	// Its grey: a shade lighter in a thick billow (if the colour's group has a lighter one),
 	// darker in a thin one, then shaded by the light.
 	int color = _colors.smoke, shade = light;
@@ -905,6 +1012,7 @@ void FirstPersonView::renderRows()
 	// What every ray walks through: this frame's tile snapshot and door swings.
 	RayContext rayContext;
 	rayContext.tiles = _tileViews.data();
+	rayContext.tileFlags = _tileFlags.data();
 	rayContext.swings = _doorSwings.data();
 	rayContext.size[0] = _save->getMapSizeX();
 	rayContext.size[1] = _save->getMapSizeY();
@@ -916,20 +1024,20 @@ void FirstPersonView::renderRows()
 	const float right[3] = { (float)_right[0], (float)_right[1], (float)_right[2] };
 	const float up[3] = { (float)_up[0], (float)_up[1], (float)_up[2] };
 
-	// Smoke as the game's sight rules have it (setting "See-through smoke"): traced along each
+	// Smoke as the game's sight rules have it (setting "Smoke": Modern): traced along each
 	// ray with the sight of the soldier the view looks through.
 	SmokeTrace smokeSight;
 	smokeSight.sightVoxels = _smokeSightVoxels;
 	smokeSight.smokeBlock = _smokeBlock;
 	smokeSight.fireBlock = _fireBlock;
-	const bool traceSmoke = Options::fpsSeeThroughSmoke;
+	const bool traceSmoke = FirstPerson::smokeMode() == 2;
 
 	// With a pixel size above 1, one ray colours a block of pixels (pixelSize x pixelSize).
 	// Auto (0) picks 2 for views bigger than AutoPixelMaxWidth x AutoPixelMaxHeight, else 1.
 	const bool bigView = width > AutoPixelMaxWidth || height > AutoPixelMaxHeight;
 	const int pixelSize = Options::fpsPixelSize == 0 ? (bigView ? 2 : 1) : std::clamp(Options::fpsPixelSize, 1, 3);
 	const int blockRows = (height + pixelSize - 1) / pixelSize, blockColumns = (width + pixelSize - 1) / pixelSize;
-	for (int blockRow = _rayWorkers.nextBlockRow++; blockRow < blockRows; blockRow = _rayWorkers.nextBlockRow++)
+	for (int blockRow = _rayWorkers.nextPiece++; blockRow < blockRows; blockRow = _rayWorkers.nextPiece++)
 	{
 		// The block's top pixel row, and how far up the image plane its centre is.
 		const int topRow = blockRow * pixelSize;
@@ -966,7 +1074,7 @@ void FirstPersonView::renderRows()
 			{
 			case RAY_SMOKE:
 				// Into smoke too thick to see through: the smoke, shaded by its light.
-				color = smokeColor(smoke.light, rayOrigin, rayDirection, smoke.wallAt, 1.0f, blockColumn, blockRow);
+				color = smokeColor(smoke.light, rayOrigin, rayDirection, smoke.wallAt);
 				distanceAlongRay = smoke.wallAt;
 				hit.emissive = false;
 				break;
@@ -1004,18 +1112,21 @@ void FirstPersonView::renderRows()
 			{
 				color = _colors.glassTint[color];
 			}
-			// Seen through thinner smoke: a veil over it, as thick as the share of the sight
-			// the smoke used up (squared, so smoke the soldier sees well through stays light, and
-			// never quite gone). What the veil covers doesn't shine.
+			// Seen through smoke that used up more than about a third of the sight left: the wall of
+			// smoke shows through, the more the nearer the smoke came to blocking the sight, so
+			// the wall's edge is soft, and as ragged as the smoke's billows (a real blend, not a
+			// dither). Thinner smoke is left to the see-through smoke drawn over the picture.
 			if (traceSmoke && rayEnd != RAY_SMOKE && smoke.cost > 0.0f)
 			{
 				const float sightLeft = std::max(1.0f, smoke.sightVoxels - smoke.lastSmoke);
-				const float used = std::min(1.0f, smoke.cost / sightLeft);
-				const Uint8 veil = smokeColor(smoke.light, rayOrigin, rayDirection, smoke.lastSmoke, std::max(0.08f, used * used), blockColumn, blockRow);
-				if (veil)
+				float billow;
+				const Uint8 wall = smokeColor(smoke.light, rayOrigin, rayDirection, smoke.lastSmoke, &billow);
+				const float nearWall = std::clamp((smoke.cost / sightLeft + (billow - 0.5f) * 0.5f - 0.4f) / 0.6f, 0.0f, 1.0f);
+				const int wallOpacity = (int)std::lround(nearWall * nearWall * (3.0f - 2.0f * nearWall) * SeeThroughLevels);
+				if (wallOpacity > 0)
 				{
-					color = veil;
-					hit.emissive = false;
+					color = seeThrough(wallOpacity, wall, color);
+					if (wallOpacity > SeeThroughLevels / 2) hit.emissive = false;
 				}
 			}
 			// Fill the block: colour, depth, and whether it shines (a UFO's light counts three
@@ -1039,67 +1150,106 @@ void FirstPersonView::renderRows()
 }
 
 /**
- * Casts the rays for every pixel of the view. The rows are shared out between up to sixteen
- * threads (this one included): the helper threads are woken, everyone takes rows from the top
- * of the view one at a time until none are left, and this returns when all of them are done.
+ * Casts the rays for every pixel of the view, on all the view's threads (see runOnAllThreads):
+ * each takes rows from the top of the view one at a time until none are left.
  */
 void FirstPersonView::castAllRays()
 {
-	// One thread per processor thread, up to sixteen (worked out once). Since the threads take
-	// rows as they go, a slower core (a hybrid CPU's efficient cores, a second thread on a core)
-	// still adds what it can and never holds the frame up.
-	static const int threadCount = std::clamp((int)std::thread::hardware_concurrency(), 1, 16);
 	// The flares' light for this frame, which every ray hitting near a flare needs, and the
 	// time the smoke's billows drift by (the same for every thread).
 	prepareFlareLights();
 	_smokeDrift = (SDL_GetTicks() % 1000000) / 1000.0f;
-	// The helper threads are started on the first frame, then kept for the next ones.
-	if (_rayWorkers.threads.empty())
+	runOnAllThreads(&FirstPersonView::renderRows);
+}
+
+/**
+ * How many processor threads the game may run on: on Linux the CPUs in its affinity mask, so a
+ * game held to fewer cores (with taskset, in a container, by a launcher) starts no more threads
+ * than it has cores to run them on; elsewhere every processor thread the machine has.
+ * @return The number of processor threads, at least 1.
+ */
+static int usableProcessorThreads()
+{
+#ifdef __linux__
+	cpu_set_t allowed;
+	if (sched_getaffinity(0, sizeof(allowed), &allowed) == 0 && CPU_COUNT(&allowed) > 0)
 	{
+		return CPU_COUNT(&allowed);
+	}
+#endif
+	return std::max(1, (int)std::thread::hardware_concurrency());
+}
+
+/**
+ * Runs a job on all the view's threads: the helpers are woken (and started, the first time),
+ * everyone does the job, taking its pieces from the shared counter until none are left, and this
+ * returns when the last piece is done.
+ * Since the threads take pieces as they go, a slower core (a hybrid CPU's efficient cores, a
+ * second thread on a core) still adds what it can and never holds the frame up; and a helper
+ * that is slow to wake (its core asleep) joins only while there is work left, or not at all.
+ * @param job The job: a member function that loops over pieces taken from _rayWorkers.nextPiece.
+ */
+void FirstPersonView::runOnAllThreads(void (FirstPersonView::*job)())
+{
+	// One thread per processor thread the game may use, up to MaxRenderThreads (worked out
+	// once); the helpers are started on the first job, then kept for the next ones.
+	static const int threadCount = std::clamp(usableProcessorThreads(), 1, MaxRenderThreads);
+	if (!_rayWorkers.started)
+	{
+		_rayWorkers.started = true;
 		for (int helper = 1; helper < threadCount; ++helper)
 		{
 			_rayWorkers.threads.emplace_back(&FirstPersonView::rayWorkerLoop, this);
 		}
+		Log(LOG_INFO) << "OpenXcom3D: the " << getWidth() << "x" << getHeight() << " 3D view draws on " << threadCount << " threads";
 	}
-	// Hand out the rows from the top again, and wake the helpers for this frame.
-	_rayWorkers.nextBlockRow = 0;
+	// Hand out the pieces from the first again, open the round, and wake the helpers for it.
+	_rayWorkers.nextPiece = 0;
 	{
 		std::lock_guard<std::mutex> lock(_rayWorkers.mutex);
-		++_rayWorkers.frame;
-		_rayWorkers.working = (int)_rayWorkers.threads.size();
+		_rayWorkers.job = job;
+		++_rayWorkers.round;
+		_rayWorkers.open = true;
 	}
 	_rayWorkers.wake.notify_all();
-	// This thread casts rays too; then it waits for the helpers to finish their last rows.
-	renderRows();
+	// This thread does its share too, until no piece is left. Then it waits for the helpers
+	// still on their last piece, and closes the round: a helper waking only now doesn't start
+	// on a job that is done (and never takes a piece of the next one for it).
+	(this->*job)();
 	std::unique_lock<std::mutex> lock(_rayWorkers.mutex);
-	_rayWorkers.finished.wait(lock, [this] { return _rayWorkers.working == 0; });
+	_rayWorkers.finished.wait(lock, [this] { return _rayWorkers.busy == 0; });
+	_rayWorkers.open = false;
 }
 
 /**
- * What each of the ray caster's helper threads does as long as the view lives: it sleeps until
- * a frame is handed out, casts rays for rows until none are left, tells the drawing thread when
- * it is the last one done, and goes back to sleep. It ends when the view goes away.
+ * What each of the view's helper threads does as long as the view lives: it sleeps until a job
+ * is handed out, joins it while the round is open, does its share (pieces until none are
+ * left), tells the drawing thread when it is the last one busy, and goes back to sleep. It ends
+ * when the view goes away.
  */
 void FirstPersonView::rayWorkerLoop()
 {
-	unsigned lastFrame = 0; // the last frame this helper worked on
+	unsigned lastRound = 0; // the last job this helper joined
 	while (true)
 	{
-		// Sleep until there is a new frame (or the view is going away).
+		// Sleep until there is a new job open to join (or the view is going away).
+		void (FirstPersonView::*job)() = nullptr;
 		{
 			std::unique_lock<std::mutex> lock(_rayWorkers.mutex);
-			_rayWorkers.wake.wait(lock, [this, lastFrame] { return _rayWorkers.stop || _rayWorkers.frame != lastFrame; });
+			_rayWorkers.wake.wait(lock, [this, lastRound] { return _rayWorkers.stop || (_rayWorkers.open && _rayWorkers.round != lastRound); });
 			if (_rayWorkers.stop)
 			{
 				return;
 			}
-			lastFrame = _rayWorkers.frame;
+			lastRound = _rayWorkers.round;
+			job = _rayWorkers.job;
+			++_rayWorkers.busy;
 		}
-		// Cast rays for rows until there are none left.
-		renderRows();
-		// The last helper to finish wakes the drawing thread.
+		// Its share of the job: pieces until there are none left.
+		(this->*job)();
+		// The last helper busy wakes the drawing thread (if it waits).
 		std::lock_guard<std::mutex> lock(_rayWorkers.mutex);
-		if (--_rayWorkers.working == 0)
+		if (--_rayWorkers.busy == 0)
 		{
 			_rayWorkers.finished.notify_one();
 		}
@@ -1107,9 +1257,9 @@ void FirstPersonView::rayWorkerLoop()
 }
 
 /**
- * Stops the ray caster's helper threads when the view goes away: tells them to end (under the
- * lock, so none can miss it), wakes them, and waits for each to end. Between frames they only
- * sleep, so none is in the middle of a frame.
+ * Stops the view's helper threads when the view goes away: tells them to end (under the lock,
+ * so none can miss it), wakes them, and waits for each to end. Between jobs they only sleep, so
+ * none is in the middle of one.
  */
 FirstPersonView::RayWorkers::~RayWorkers()
 {

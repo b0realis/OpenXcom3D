@@ -50,6 +50,7 @@
 #include <algorithm>
 #include <cctype>
 #include <string>
+#include "FirstPersonApi.h"
 #include "../Engine/Action.h"
 #include "../Engine/Game.h"
 #include "../Engine/LocalizedText.h"
@@ -134,6 +135,7 @@ std::string gameKeyName(const std::string &optionId)
 OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : OptionsBaseState(origin),
 	_selectedKey(-1), _selKey(nullptr)
 {
+	FirstPerson::settleOptions(); // (the smoke's first value, from an older setting)
 	// Show this tab's button pressed in the column of tabs.
 	setCategory(_btnFirstPerson);
 
@@ -308,6 +310,24 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		{
 			static const char *const hitboxNames[] = { "STR_FPS_HITBOXES_OFF", "STR_FPS_HITBOXES_BLINK", "STR_FPS_HITBOXES_ALWAYS" };
 			return std::string(tr(hitboxNames[std::clamp(*option.asInt(), 0, 2)]));
+		}
+		// The smoke is a choice of three, shown by name.
+		if (option.id() == "fpsSmoke")
+		{
+			static const char *const smokeNames[] = { "STR_FPS_SMOKE_SOLID", "STR_FPS_SMOKE_ORIGINAL", "STR_FPS_SMOKE_MODERN" };
+			return std::string(tr(smokeNames[FirstPerson::smokeMode()]));
+		}
+		// The downed units' icons are a choice of three, shown by name.
+		if (option.id() == "fpsDownedIcons")
+		{
+			static const char *const iconNames[] = { "STR_FPS_DOWNED_ICONS_OFF", "STR_FPS_DOWNED_ICONS_CROSSHAIR", "STR_FPS_DOWNED_ICONS_ALWAYS" };
+			return std::string(tr(iconNames[std::clamp(*option.asInt(), 0, 2)]));
+		}
+		// The trajectory is a choice of three, shown by name.
+		if (option.id() == "fpsTrajectory")
+		{
+			static const char *const trajectoryNames[] = { "STR_FPS_TRAJECTORY_OFF", "STR_FPS_TRAJECTORY_ARCS", "STR_FPS_TRAJECTORY_ALL" };
+			return std::string(tr(trajectoryNames[std::clamp(*option.asInt(), 0, 2)]));
 		}
 		// Leaning out is a choice of three, shown by name.
 		if (option.id() == "fpsLean")
@@ -492,6 +512,21 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		{
 			*value = (*value + direction + 3) % 3;
 		}
+		// The smoke (solid, original, modern): round and round.
+		else if (value == &Options::fpsSmoke)
+		{
+			*value = (FirstPerson::smokeMode() + direction + 3) % 3;
+		}
+		// The downed units' icons (off, crosshair, always): round and round.
+		else if (value == &Options::fpsDownedIcons)
+		{
+			*value = (*value + direction + 3) % 3;
+		}
+		// The trajectory (off, arcs, all): round and round.
+		else if (value == &Options::fpsTrajectory)
+		{
+			*value = (*value + direction + 3) % 3;
+		}
 		// Leaning out (off, peek, tilt): round and round.
 		else if (value == &Options::fpsLean)
 		{
@@ -503,6 +538,11 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 			*value = (*value + 1) % 2;
 		}
 		// Walking speed: 1 to 8 tiles per second.
+		// The Doom grenade fuse: 1 to 5 seconds, round and round.
+		else if (value == &Options::fpsDoomGrenadeFuse)
+		{
+			*value = (std::clamp(*value, 1, FirstPerson::DoomFuseMaxSeconds) - 1 + direction + FirstPerson::DoomFuseMaxSeconds) % FirstPerson::DoomFuseMaxSeconds + 1;
+		}
 		else if (value == &Options::fpsWalkSpeed)
 		{
 			*value = std::clamp(*value + direction, 1, 8);
@@ -564,8 +604,8 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 
 /**
  * Assigns the pressed key to the binding picked by a left click (modifier keys can't be bound,
- * as in the Controls tab; pressing one just gives up). Either way the binding is no longer
- * waiting for a key.
+ * as in the Controls tab, but for the lean key, held with the strafe keys; pressing one for any
+ * other just gives up). Either way the binding is no longer waiting for a key.
  * @param action The key press.
  */
 void OptionsFirstPersonState::lstOptionsKeyPress(Action *action)
@@ -575,10 +615,10 @@ void OptionsFirstPersonState::lstOptionsKeyPress(Action *action)
 	{
 		return;
 	}
-	// Bind the key, unless it's unknown or a Shift, Alt or Ctrl key.
+	// Bind the key, unless it's unknown or a Shift, Alt or Ctrl key (the lean key may be one).
 	const SDLKey key = action->getDetails()->key.keysym.sym;
-	if (key != 0 && key != SDLK_LSHIFT && key != SDLK_LALT && key != SDLK_LCTRL &&
-		key != SDLK_RSHIFT && key != SDLK_RALT && key != SDLK_RCTRL)
+	const bool modifier = key == SDLK_LSHIFT || key == SDLK_LALT || key == SDLK_LCTRL || key == SDLK_RSHIFT || key == SDLK_RALT || key == SDLK_RCTRL;
+	if (key != 0 && (!modifier || _selKey->asKey() == &Options::keyFpsLeanHold))
 	{
 		*_selKey->asKey() = key;
 		_lstOptions->setCellText(_selectedKey, 1, keyName(key));

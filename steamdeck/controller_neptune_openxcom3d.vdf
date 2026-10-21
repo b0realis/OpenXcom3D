@@ -639,7 +639,8 @@
 					{
 						"bindings"
 						{
-							"binding"		"key_press Q"
+							"binding"		"key_press LEFT_SHIFT"
+							"binding"		"key_press A"
 						}
 					}
 				}
@@ -652,7 +653,8 @@
 					{
 						"bindings"
 						{
-							"binding"		"key_press E"
+							"binding"		"key_press LEFT_SHIFT"
+							"binding"		"key_press D"
 						}
 					}
 				}

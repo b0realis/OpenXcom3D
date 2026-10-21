@@ -62,6 +62,7 @@
 #include "../Engine/Game.h"
 #include "../Engine/Logger.h"
 #include "../Engine/Options.h"
+#include "../Engine/Palette.h"
 #include "../Engine/Surface.h"
 #include "../Engine/SurfaceSet.h"
 #include "../Mod/MapData.h"
@@ -87,6 +88,125 @@ namespace
 /// nearest drawn pixel up or down the same sprite column gives its colour instead. These are
 /// the row offsets tried, nearest first, in sprite pixels.
 const int SpriteNudges[] = { 0, -1, 1, -2, 2, -3, 3, -4, 4, -6, 6, -8, 8, -12, 12 };
+
+/// A patch of solid black in a UFO part's art is a hole in the picture, not its colour, when at
+/// least this many black pixels touch each other, or when it touches the art's outline (see
+/// findHollowPixels).
+const int HollowBlackPixels = 40;
+
+/**
+ * Finds the pixels of a UFO part's sprite that are a hole in the art rather than its colour:
+ * patches of solid black that are big (HollowBlackPixels or more black pixels touching side by
+ * side) or touch the picture's outline (a transparent pixel or the sprite's edge beside them).
+ * The curved hull of X-COM's UFOs is drawn with black triangles where the isometric camera
+ * would look into it, and outlined in black along its edges; in 3D the voxels behind them
+ * showed as black stripes and wedges on the inner walls. Small black specks inside the picture
+ * (the shadows in a texture) are left alone.
+ * @param sprite The sprite.
+ * @param palette Its palette, to tell black (darker than 14 of 255 to the eye).
+ * @param hollow Set for each pixel (row by row, the sprite's width across) in such a patch.
+ * @return True if any pixel is.
+ */
+bool findHollowPixels(const Surface *sprite, const SDL_Color *palette, std::vector<char> &hollow)
+{
+	const int width = sprite->getWidth(), height = sprite->getHeight();
+	hollow.assign(width * height, 0);
+	auto isBlack = [&](int x, int y)
+	{
+		const Uint8 color = sprite->getPixel(x, y);
+		return color && palette[color].r * 299 + palette[color].g * 587 + palette[color].b * 114 < 14000;
+	};
+	std::vector<char> visited(width * height, 0);
+	std::vector<int> patch, toVisit;
+	bool found = false;
+	for (int start = 0; start < width * height; ++start)
+	{
+		if (visited[start] || !isBlack(start % width, start / width)) continue;
+
+		// The patch: every black pixel joined to this one, side by side, and whether it touches
+		// the outline.
+		patch.clear();
+		toVisit.assign(1, start);
+		visited[start] = 1;
+		bool onOutline = false;
+		while (!toVisit.empty())
+		{
+			const int pixel = toVisit.back();
+			toVisit.pop_back();
+			patch.push_back(pixel);
+			const int x = pixel % width, y = pixel / width;
+			const int sides[4][2] = { { x - 1, y }, { x + 1, y }, { x, y - 1 }, { x, y + 1 } };
+			for (const auto &side : sides)
+			{
+				if (side[0] < 0 || side[1] < 0 || side[0] >= width || side[1] >= height || !sprite->getPixel(side[0], side[1]))
+				{
+					onOutline = true;
+					continue;
+				}
+				const int sideIndex = side[1] * width + side[0];
+				if (!visited[sideIndex] && isBlack(side[0], side[1]))
+				{
+					visited[sideIndex] = 1;
+					toVisit.push_back(sideIndex);
+				}
+			}
+		}
+
+		// Big enough, or on the outline: a hole.
+		if ((int)patch.size() >= HollowBlackPixels || onOutline)
+		{
+			for (const int pixel : patch) hollow[pixel] = 1;
+			found = true;
+		}
+	}
+	return found;
+}
+
+/**
+ * Paints the voxels that took their colour from a hole in the art (see findHollowPixels) like
+ * the voxels around them: pass by pass, each takes the colour of a neighbour with a real colour
+ * (one of its six; the ones in the same layer first), so the paint spreads in from the hole's
+ * edges. Any with no such voxel within reach take the sprite's most common colour.
+ * @param model The model, its voxels coloured (the hollow ones too, black).
+ * @param hollowVoxels The hollow voxels, as (z * 16 + y) * 16 + x; used up.
+ * @param fallbackColor The sprite's most common colour.
+ */
+void fillHollowVoxels(FirstPersonView::VoxelModel &model, std::vector<int> &hollowVoxels, Uint8 fallbackColor)
+{
+	std::vector<char> unpainted(24 * 16 * 16, 0);
+	for (const int voxel : hollowVoxels) unpainted[voxel] = 1;
+	const int sides[6][3] = { { 1, 0, 0 }, { -1, 0, 0 }, { 0, 1, 0 }, { 0, -1, 0 }, { 0, 0, 1 }, { 0, 0, -1 } };
+	std::vector<std::pair<int, Uint8>> paintedNow;
+	for (int pass = 0; pass < 48 && !hollowVoxels.empty(); ++pass)
+	{
+		// Each hollow voxel next to a painted one takes its colour (all at once, after the pass,
+		// so the paint moves one voxel a pass).
+		paintedNow.clear();
+		for (const int voxel : hollowVoxels)
+		{
+			const int x = voxel % 16, y = (voxel / 16) % 16, z = voxel / 256;
+			for (const auto &side : sides)
+			{
+				const int sideX = x + side[0], sideY = y + side[1], sideZ = z + side[2];
+				if (sideX < 0 || sideY < 0 || sideZ < 0 || sideX > 15 || sideY > 15 || sideZ > 23) continue;
+				const Uint8 sideColor = model.color[sideZ][sideY][sideX];
+				if (sideColor && !unpainted[(sideZ * 16 + sideY) * 16 + sideX])
+				{
+					paintedNow.push_back({ voxel, sideColor });
+					break;
+				}
+			}
+		}
+		if (paintedNow.empty()) break;
+		for (const auto &painted : paintedNow)
+		{
+			model.color[painted.first / 256][(painted.first / 16) % 16][painted.first % 16] = painted.second;
+			unpainted[painted.first] = 0;
+		}
+		hollowVoxels.erase(std::remove_if(hollowVoxels.begin(), hollowVoxels.end(), [&](int voxel) { return !unpainted[voxel]; }), hollowVoxels.end());
+	}
+	for (const int voxel : hollowVoxels) model.color[voxel / 256][(voxel / 16) % 16][voxel % 16] = fallbackColor;
+}
 
 /**
  * Empties a voxel model, ready to be built: no solid voxels, no glass, no glow, no colours for
@@ -611,9 +731,10 @@ void FirstPersonView::findMirrors()
  * @param worldY Voxel position south, from the map's north edge (16 per tile).
  * @param worldZ Voxel height, from the bottom of the map (24 per level).
  * @param nextFrame Read an animated part's next frame instead (a pixel already dissolved into it).
+ * @param onlyPart Only this tile part counts (0 floor, 1 west wall, 2 north wall, 3 object); -1 any.
  * @return The palette colour, 0 if nothing is there or the voxel is outside the map.
  */
-Uint8 FirstPersonView::voxelColorAt(int worldX, int worldY, int worldZ, bool nextFrame) const
+Uint8 FirstPersonView::voxelColorAt(int worldX, int worldY, int worldZ, bool nextFrame, int onlyPart) const
 {
 	const int mapSizeX = _save->getMapSizeX(), mapSizeY = _save->getMapSizeY(), mapSizeZ = _save->getMapSizeZ();
 	if (worldX < 0 || worldY < 0 || worldZ < 0 || worldX >= mapSizeX * 16 || worldY >= mapSizeY * 16 || worldZ >= mapSizeZ * 24) return 0;
@@ -622,6 +743,7 @@ Uint8 FirstPersonView::voxelColorAt(int worldX, int worldY, int worldZ, bool nex
 	const TileView &tileView = _tileViews[((worldZ / 24) * mapSizeY + worldY / 16) * mapSizeX + worldX / 16];
 	for (int part = 0; part < 4; ++part)
 	{
+		if (onlyPart >= 0 && part != onlyPart) continue;
 		const VoxelModel *model = nextFrame && tileView.next[part] ? tileView.next[part] : tileView.part[part];
 		const Uint8 color = model ? model->color[worldZ % 24][worldY % 16][worldX % 16] : 0;
 		if (color) return color;
@@ -636,6 +758,11 @@ Uint8 FirstPersonView::voxelColorAt(int worldX, int worldY, int worldZ, bool nex
  * for anything inside, the open east / south face nearest the mirrored spot (walls differ in
  * thickness, so the exact mirrored voxel may be inside a wall or in the air). A row with
  * nothing there borrows from the rows next to it. See findMirrors for the data it reads.
+ * Two things are never borrowed: black (the art outlines a hull's edge in black, which made
+ * black stripes on the inside of a UFO's stepped walls), and, inside the craft, the colour of
+ * another kind of tile part (a craft's insides aren't quite symmetric: a wall took the
+ * texture of the gore tubes standing opposite it in the Harvester). Then the face shows its
+ * own row's colour instead (see shadeHit).
  * @param hit Where a ray hit a tile part.
  * @param axis 0 to mirror east-west, 1 to mirror north-south.
  * @param skinOnly Only answer for the craft's outer skin (0 for anything inside).
@@ -677,6 +804,10 @@ Uint8 FirstPersonView::mirroredColor(const Hit &hit, int axis, bool skinOnly, bo
 	// Where the hit voxel lands mirrored across the craft's middle, along the axis.
 	const int mirroredPos = mirror.sum[axis] - worldVoxel[axis];
 
+	// Black, to the eye (darker than 14 of 255), in the view's palette.
+	const SDL_Color *palette = getPalette();
+	auto isBlack = [palette](Uint8 color) { return palette && palette[color].r * 299 + palette[color].g * 587 + palette[color].b * 114 < 14000; };
+
 	// Look on the hit voxel's own row first, then on the rows beside it (across, then up and
 	// down, then further across): offsets as { across, up }.
 	static const int NearbyRows[][2] = { { 0, 0 }, { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 }, { -2, 0 }, { 2, 0 }, { -3, 0 }, { 3, 0 } };
@@ -708,13 +839,14 @@ Uint8 FirstPersonView::mirroredColor(const Hit &hit, int axis, bool skinOnly, bo
 		}
 		if (bestPos < 0) continue;
 
-		// That voxel's colour as it is now: the colour the art gives its open east / south face.
+		// That voxel's colour as it is now: the colour the art gives its open east / south face
+		// (inside the craft, only from the same kind of tile part as the hit; never black).
 		int sourceVoxel[3] = { worldVoxel[0], worldVoxel[1], worldVoxel[2] };
 		sourceVoxel[axis] = bestPos;
 		sourceVoxel[1 - axis] = mirror.lo[1 - axis] + rowAcross;
 		sourceVoxel[2] = mirror.lo[2] + rowUp;
-		const Uint8 color = voxelColorAt(sourceVoxel[0], sourceVoxel[1], sourceVoxel[2], nextFrame); // (0 if it has been blown away since)
-		if (color) return color;
+		const Uint8 color = voxelColorAt(sourceVoxel[0], sourceVoxel[1], sourceVoxel[2], nextFrame, onSkin ? -1 : hit.part); // (0 if it has been blown away since)
+		if (color && !isBlack(color)) return color;
 	}
 	return 0;
 }
@@ -814,21 +946,47 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 		return;
 	}
 
+	// A UFO part's art may have holes drawn in solid black (the inside of its curved hull, see
+	// findHollowPixels): the voxels behind them are painted like their neighbours instead
+	// (fillHollowVoxels). The sprite's palette tells black; while it's still all black (the
+	// battle not shown yet), the mod's battlescape palette.
+	std::vector<char> hollowPixels;
+	std::vector<int> hollowVoxels;
+	bool hasHollows = false;
+	if (_ufoDataSets.count(mapData->getDataset()->getName()))
+	{
+		const SDL_Palette *spritePalette = const_cast<Surface*>(sprite)->getSurface()->format->palette;
+		const SDL_Color *palette = spritePalette && spritePalette->ncolors >= 256 ? spritePalette->colors : nullptr;
+		int brightness = 0;
+		for (int index = 0; palette && index < 256; ++index) brightness += palette[index].r + palette[index].g + palette[index].b;
+		if (!brightness)
+		{
+			const Palette *modPalette = _game->getMod()->getPalette("PAL_BATTLESCAPE", false);
+			palette = modPalette ? modPalette->getColors() : nullptr;
+		}
+		hasHollows = palette && findHollowPixels(sprite, palette, hollowPixels);
+	}
+
 	// The most common drawn (not transparent) colour of the sprite, for voxels that project
-	// onto transparent pixels. A sprite with no pixels at all is invisible in the isometric
-	// view too, so keep it empty.
-	int histogram[256] = {};
+	// onto transparent pixels (not counting the holes in the art, unless that's all there is).
+	// A sprite with no pixels at all is invisible in the isometric view too, so keep it empty.
+	int histogram[256] = {}, holeHistogram[256] = {};
 	for (int spriteY = 0; spriteY < sprite->getHeight(); ++spriteY)
 	{
 		for (int spriteX = 0; spriteX < sprite->getWidth(); ++spriteX)
 		{
-			histogram[sprite->getPixel(spriteX, spriteY)]++;
+			int *counts = hasHollows && hollowPixels[spriteY * sprite->getWidth() + spriteX] ? holeHistogram : histogram;
+			counts[sprite->getPixel(spriteX, spriteY)]++;
 		}
 	}
-	const Uint8 fallbackColor = (Uint8)(std::max_element(histogram + 1, histogram + 256) - histogram);
+	Uint8 fallbackColor = (Uint8)(std::max_element(histogram + 1, histogram + 256) - histogram);
 	if (histogram[fallbackColor] == 0)
 	{
-		return;
+		fallbackColor = (Uint8)(std::max_element(holeHistogram + 1, holeHistogram + 256) - holeHistogram);
+		if (holeHistogram[fallbackColor] == 0)
+		{
+			return;
+		}
 	}
 
 	// Is this record a window (declared by the mod, by data set and record number, and shaped
@@ -889,14 +1047,20 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 				// The pixel's colour, or if the art left it transparent the nearest drawn pixel
 				// up or down the column (a pixel outside the sprite counts as transparent).
 				Uint8 color = 0;
-				for (int nudge = 0; nudge < nudgeCount && !color; ++nudge)
+				int nudge = 0;
+				for (; nudge < nudgeCount; ++nudge)
 				{
 					color = sprite->getPixel(spriteX, spriteY + SpriteNudges[nudge]);
+					if (color) break;
 				}
 				if (!color)
 				{
 					if (cutout) continue; // that part of the door has slid away
 					color = fallbackColor;
+				}
+				else if (hasHollows && hollowPixels[(spriteY + SpriteNudges[nudge]) * sprite->getWidth() + spriteX])
+				{
+					hollowVoxels.push_back((z * 16 + y) * 16 + x); // a hole in the art: painted after
 				}
 
 				// Store the voxel: its colour, whether it is window glass, and the bounding box.
@@ -914,6 +1078,12 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 				}
 			}
 		}
+	}
+
+	// The voxels behind holes in the art, painted like their neighbours.
+	if (!hollowVoxels.empty())
+	{
+		fillHollowVoxels(model, hollowVoxels, fallbackColor);
 	}
 
 	// A window's glass only inside its panes, not on its frame or the wall's edges.
@@ -963,10 +1133,13 @@ void FirstPersonView::trackDoors(int index, Tile *tile)
 			{
 				// Swing away from the camera when it's on the door's own side (east of a west
 				// wall, south of a north wall), like a door pushed open. The swing hides the
-				// open door's part and shows the closed door's model turning.
+				// open door's part and shows the closed door's model turning. A swing this door
+				// still had (it opened, closed and opened again) gives way to the new one.
 				const int mapSizeX = _save->getMapSizeX(), mapSizeY = _save->getMapSizeY();
 				const bool away = part == O_NORTHWALL ? _eye[1] > (index / mapSizeX % mapSizeY) * 16.0 : _eye[0] > (index % mapSizeX) * 16.0;
-				_doorAnimations.push_back({ index, part, openPart, getModel(wallBefore), SDL_GetTicks(), away });
+				_doorAnimations.erase(std::remove_if(_doorAnimations.begin(), _doorAnimations.end(),
+					[&](const DoorAnimation &old) { return old.tile == index && old.part == (int)part; }), _doorAnimations.end());
+				_doorAnimations.push_back({ index, part, openPart, getModel(wallBefore), SDL_GetTicks(), away, openDoor });
 				break;
 			}
 		}
@@ -1070,6 +1243,8 @@ void FirstPersonView::snapshotTiles()
 		_wallsLastFrame[1].assign(tileCount, nullptr);
 		for (auto &parts : _partsLastFrame) parts.assign(tileCount, nullptr);
 		_burningLastFrame.assign(tileCount, 0);
+		_tileMemos.assign(tileCount, TileMemo{ {}, nullptr });
+		_partMemos.assign(tileCount, std::array<PartMemo, 4>());
 		_doorAnimations.clear();
 	}
 	_tileViews.resize(tileCount);
@@ -1084,9 +1259,14 @@ void FirstPersonView::snapshotTiles()
 	_ufoLightsOn = Options::fpsUfoLights && !_ufos.empty();
 
 	// Every tile: notice what changed (or start watching it), take its snapshot, and note the
-	// light sources and devices on it.
+	// light sources and devices on it. Then, while the tile is still at hand, the byte the rays
+	// look at first as they walk the map: anything to trace in the tile, smoke on it, and the
+	// height of its highest solid voxel (see castRay); and its light, close together with the
+	// others' for the shading (see lightAt).
 	_nearbyLights.clear();
 	_nearbyDevices.clear();
+	_tileFlags.resize(tileCount);
+	_tileLights.resize(tileCount);
 	for (int index = 0; index < tileCount; ++index)
 	{
 		Tile *tile = _save->getTile(index);
@@ -1099,12 +1279,63 @@ void FirstPersonView::snapshotTiles()
 			startWatchingTile(index, tile);
 		}
 		snapshotTile(index, tile, trackWalls);
-		noteLightsAndDevices(tile, _tileViews[index]);
+		const TileView &tileView = _tileViews[index];
+		noteLightsAndDevices(tile, tileView);
+		const int top = tileView.max[2] >= tileView.min[2] ? tileView.max[2] : 0;
+		_tileFlags[index] = (Uint8)((tileView.empty ? 0 : TileTraced) | (tileView.smoke ? TileSmoky : 0) | (top << TileTopShift));
+		_tileLights[index] = { tileView.light, tileView.ufoGlow, tileView.discovered };
 	}
 
-	// Then keep only the nearest lamps, and put the swinging doors into the snapshot.
+	// Then keep only the nearest lamps, and put the swinging doors into the snapshot (their
+	// tiles are marked in the flags too).
 	keepNearestLights();
 	updateDoorSwings(tileCount);
+}
+
+/**
+ * Uses another view's voxel models (and frames) instead of building its own: the soldier card's
+ * small view borrows the big view's. Whatever this view kept that points at the models it used
+ * before (the ground beyond the map, doors swinging, what each tile showed last frame) is
+ * forgotten, to be found again among the new owner's: the old owner may be about to go (a new
+ * big view replaces it when the window changes size).
+ * @param owner The view whose models to use.
+ */
+void FirstPersonView::shareCache(FirstPersonView *owner)
+{
+	_sharedModelsOwner = owner;
+	_groundModel = nullptr;
+	_groundChosen = false;
+	_doorAnimations.clear();
+	_solidMasks.clear();
+	for (auto &memo : _tileMemos) memo = TileMemo{ {}, nullptr };
+	for (auto &memos : _partMemos) memos = std::array<PartMemo, 4>();
+}
+
+/**
+ * The solid mask of a tile with these four parts: for each row of voxels (by height and y), a
+ * bit for each x where any of the parts has a voxel (window glass included: the ray notes glass
+ * in the parts themselves). Made the first time the four parts come together on a tile, and
+ * kept (the parts' models live as long as the view's model cache).
+ * @param parts The tile's four parts (floor, west wall, north wall, object), null where none.
+ * @return The mask, [z][y] with bit x.
+ */
+FirstPersonView::SolidRows FirstPersonView::solidMaskOf(const std::array<const VoxelModel*, 4> &parts)
+{
+	auto made = _solidMasks.find(parts);
+	if (made == _solidMasks.end())
+	{
+		SolidMask mask = {};
+		for (const VoxelModel *model : parts)
+		{
+			if (!model) continue;
+			for (int z = 0; z < 24; ++z)
+				for (int y = 0; y < 16; ++y)
+					for (int x = 0; x < 16; ++x)
+						if (model->color[z][y][x]) mask.rows[z][y] |= (Uint16)(1 << x);
+		}
+		made = _solidMasks.emplace(parts, mask).first;
+	}
+	return made->second.rows;
 }
 
 /**
@@ -1164,6 +1395,9 @@ void FirstPersonView::startWatchingTile(int index, Tile *tile)
  * shows) in each of its parts, the frame each part dissolves into next, the frames of sliding
  * UFO doors, the bounding box of all its parts' solid voxels, which parts are light sources,
  * its light, and what of it has been seen (the fog of war; all of it in debug mode).
+ * This runs for every tile every frame, but tiles hardly ever change: what each part showed
+ * last frame is kept (see PartMemo), and its models are looked up again only when its record,
+ * its frame, its door cut-out or its steady UFO model changed.
  * @param index The tile's index in the map.
  * @param tile The tile.
  * @param trackWalls False on the first frame of a battle: a UFO door already open then is
@@ -1196,11 +1430,23 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 			continue;
 		}
 
+		// The part's memo: a new record (destroyed, swapped for its open door...) starts it afresh.
+		PartMemo &memo = _partMemos[index][part];
+		if (memo.mapData != mapData)
+		{
+			memo = PartMemo();
+			memo.mapData = mapData;
+			memo.frames = &getFrames(mapData);
+			// A light source (by the game's rules) with bright voxels: those shine. Judged by its
+			// first frame, so an animated lamp doesn't switch its shine on and off with its frames.
+			memo.lamp = mapData->getLightSource() > 0 && getModel(mapData)->glowCount;
+		}
+
 		// Which animation frame does the part show? A UFO door's frames are its sliding open,
 		// so it shows the game's frame: the game keeps the shown frame's sprite on the tile, so
 		// find whose pixels those are. Anything else that animates (water, lights, computers,
 		// the lit panels of UFOs) follows the view's calm clock instead (see CalmFrameTime).
-		const Frames &frames = getFrames(mapData);
+		const Frames &frames = *memo.frames;
 		int frame = 0;
 		if (frames.animated && !mapData->isUFODoor())
 		{
@@ -1241,27 +1487,35 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 			_ufoDoorOpening.erase(index * 4 + part);
 		}
 
-		// The part's model in that frame (an empty one is left out). A UFO part shows its steady
-		// model instead with the UFO lights option: no frames, only its lights glow.
-		const VoxelModel *model = _ufoLightsOn && frames.steady ? frames.steady : getModel(mapData, frames.sprite[frame], cutout);
+		// The part's model in that frame (an empty one is left out), and the frame it steps to
+		// next, to dissolve into over the step (not for UFO doors, nor for a steady UFO model): the
+		// memo's, unless the frame, the cut-out or the steady model changed. A UFO part shows its
+		// steady model instead with the UFO lights option: no frames, only its lights glow.
+		const VoxelModel *steady = _ufoLightsOn ? frames.steady : nullptr;
+		if (memo.frame != frame || memo.cutout != cutout || memo.steady != steady)
+		{
+			memo.frame = frame;
+			memo.cutout = cutout;
+			memo.steady = steady;
+			memo.model = steady ? steady : getModel(mapData, frames.sprite[frame], cutout);
+			memo.next = nullptr;
+			if (frames.animated && !mapData->isUFODoor() && memo.model != frames.steady && frames.sprite[(frame + 1) % 8] != frames.sprite[frame])
+			{
+				const VoxelModel *nextModel = getModel(mapData, frames.sprite[(frame + 1) % 8], false);
+				if (!nextModel->empty) memo.next = nextModel;
+			}
+		}
+		const VoxelModel *model = memo.model;
 		if (model->empty)
 		{
 			continue;
 		}
 		tileView.part[part] = model;
+		tileView.next[part] = memo.next;
 		tileView.empty = false;
 
-		// The frame it steps to next, to dissolve into over the step (not for UFO doors, nor for
-		// a steady UFO model).
-		if (frames.animated && !mapData->isUFODoor() && model != frames.steady && frames.sprite[(frame + 1) % 8] != frames.sprite[frame])
-		{
-			const VoxelModel *nextModel = getModel(mapData, frames.sprite[(frame + 1) % 8], false);
-			if (!nextModel->empty) tileView.next[part] = nextModel;
-		}
-
-		// A light source (by the game's rules) with bright voxels: those shine. Judged by its
-		// first frame, so an animated lamp doesn't switch its shine on and off with its frames.
-		if (mapData->getLightSource() > 0 && getModel(mapData)->glowCount)
+		// A light source with bright voxels shines there (see the memo).
+		if (memo.lamp)
 		{
 			tileView.emissive |= (Uint8)(1 << part);
 		}
@@ -1278,6 +1532,17 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 			tileView.max[axis] = std::max(tileView.max[axis], model->max[axis]);
 		}
 	}
+
+	// The parts' voxels together, for the rays (see traceTile): looked up only when the tile's
+	// parts changed since the last frame.
+	TileMemo &memo = _tileMemos[index];
+	const std::array<const VoxelModel*, 4> parts = { tileView.part[0], tileView.part[1], tileView.part[2], tileView.part[3] };
+	if (!memo.solid || memo.parts != parts)
+	{
+		memo.parts = parts;
+		memo.solid = solidMaskOf(parts);
+	}
+	tileView.solid = memo.solid;
 
 	// The game's shade for the tile (with night vision no darker than 4), and the fog of
 	// war: the floor and the object are seen with the floor, each wall on its own (a wall is
@@ -1389,13 +1654,15 @@ void FirstPersonView::updateDoorSwings(int tileCount)
 	// Points a tile's rays at a swing, in its first free slot: two doors can swing through one
 	// tile at once (its west and north doors, or its own and a neighbour's swung away). A
 	// third at the same moment isn't traced.
-	auto addSwingTo = [](TileView &tileView, Sint16 swingIndex)
+	auto addSwingTo = [this](int tileIndex, Sint16 swingIndex)
 	{
+		TileView &tileView = _tileViews[tileIndex];
 		for (Sint16 &slot : tileView.swing)
 		{
 			if (slot < 0) { slot = swingIndex; break; }
 		}
 		tileView.empty = false;
+		_tileFlags[tileIndex] |= TileTraced | TileSwinging; // the rays look into it, and always trace the door
 	};
 	for (auto door = _doorAnimations.begin(); door != _doorAnimations.end();)
 	{
@@ -1404,11 +1671,15 @@ void FirstPersonView::updateDoorSwings(int tileCount)
 		const int tileX = door->tile % mapSizeX, tileY = (door->tile / mapSizeX) % mapSizeY, tileZ = door->tile / (mapSizeX * mapSizeY);
 		const bool westWall = door->part == O_WESTWALL;
 
-		// Finished (unless held open away from the camera still on the door's own side), or no
-		// longer valid: forget it. (The swing index has to fit a Sint16.)
-		const bool cameraOnOwnSide = westWall ? _eye[0] > tileX * 16.0 : _eye[1] > tileY * 16.0;
-		const bool hold = door->away && cameraOnOwnSide && now - door->start < 5000;
-		if ((progress >= 1.0f && !hold) || door->tile >= tileCount || _doorSwings.size() >= 32000)
+		// Forget the swing when the door is no longer open (closed again, or destroyed: its open
+		// record has gone from the tile), or when it has swung towards its own tile and come to
+		// rest where the game's own open door lies, which then shows. A door that swung away
+		// from the camera stays where it was pushed for as long as it is open: the game's open
+		// door lies on the other side of the wall, in the door's own tile, and showing that one
+		// instead would make the door jump through the wall it hangs in. (The swing index has to
+		// fit a Sint16.)
+		const bool stillOpen = door->tile < tileCount && _save->getTile(door->tile)->getMapData((TilePart)door->hiddenPart) == door->openDoor;
+		if (!stillOpen || (progress >= 1.0f && !door->away) || _doorSwings.size() >= 32000)
 		{
 			door = _doorAnimations.erase(door);
 			continue;
@@ -1436,14 +1707,14 @@ void FirstPersonView::updateDoorSwings(int tileCount)
 		TileView &tileView = _tileViews[door->tile];
 		tileView.part[door->hiddenPart] = nullptr;
 		tileView.next[door->hiddenPart] = nullptr;
-		addSwingTo(tileView, (Sint16)_doorSwings.size());
+		addSwingTo(door->tile, (Sint16)_doorSwings.size());
 
 		// A door swinging away reaches into the neighbour on the far side of the wall (west of a
 		// west wall, north of a north wall): its rays must look at the swing too.
 		const int neighbourX = westWall ? tileX - 1 : tileX, neighbourY = westWall ? tileY : tileY - 1;
 		if (door->away && neighbourX >= 0 && neighbourY >= 0)
 		{
-			addSwingTo(_tileViews[(tileZ * mapSizeY + neighbourY) * mapSizeX + neighbourX], (Sint16)_doorSwings.size());
+			addSwingTo((tileZ * mapSizeY + neighbourY) * mapSizeX + neighbourX, (Sint16)_doorSwings.size());
 		}
 		_doorSwings.push_back(swing);
 		++door;

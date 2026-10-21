@@ -53,9 +53,11 @@
 #include <algorithm>
 #include <climits>
 #include <cmath>
+#include <cstring>
 #include <set>
 #include <string>
 #include <SDL.h>
+#include "FirstPersonApi.h"
 #include "../Engine/Game.h"
 #include "../Engine/Options.h"
 #include "../Engine/Surface.h"
@@ -202,8 +204,8 @@ void FirstPersonView::spawnBattleEffects(float elapsedSeconds)
 /**
  * Reacts to the explosions that appeared on the map since the last frame (each one only
  * once). The camera shakes if one is close. A big one (a grenade, a rocket, a blown-up tile)
- * blackens the ground around it and throws out a flash, embers and smoke; a small one (a
- * bullet's hit) throws a few sparks.
+ * blackens the ground around it and throws out a flash, embers and (with Modern smoke) puffs of
+ * smoke; a small one (a bullet's hit) throws a few sparks.
  *
  * The particles are thrown with FirstPersonParticles::burst, whose arguments are, in order:
  * where, how many, kind, group, the colours and how many of them, the slowest and fastest
@@ -252,8 +254,13 @@ void FirstPersonView::spawnExplosionEffects()
 				// Embers in all four fire colours, flung out fast (mostly upwards), falling back
 				// and glowing for a second or so.
 				_particles.burst(centre, 60, P::GLOW, P::EFFECT, _colors.fire, 4, 40, 140, 0.5f, 150, 0.6f, 0.6f, 1.5f, 2);
-				// Big puffs of smoke in two greys, rising slowly and hanging for a few seconds.
-				_particles.burst(centre, 26, P::LIT, P::EFFECT, smokeColors, 2, 6, 24, 0.7f, -12, 0.8f, 2.0f, 3.5f, 5);
+				// Big puffs of smoke in two greys, rising slowly and hanging for a few seconds: with
+				// the setting "Smoke" on Modern only (Original and Solid show the game's own smoke
+				// that the explosion leaves on the tiles, and nothing of ours, as for burning tiles).
+				if (FirstPerson::smokeMode() == 2)
+				{
+					_particles.burst(centre, 26, P::LIT, P::EFFECT, smokeColors, 2, 6, 24, 0.7f, -12, 0.8f, 2.0f, 3.5f, 5);
+				}
 			}
 			else
 			{
@@ -268,7 +275,7 @@ void FirstPersonView::spawnExplosionEffects()
 
 /**
  * Burning tiles near the camera send up flames, and smoky ones drifting smoke (a burning tile
- * smokes too). Only tiles that have been discovered and are within 320 voxels (20 tiles) of
+ * smokes too): puffs; with the setting "Smoke" on Modern, a few wisps; on Original, neither. Only tiles that have been discovered and are within 320 voxels (20 tiles) of
  * the eye, across the map, take part.
  * @param elapsedSeconds Seconds since the last frame: flames and smoke rise at rates per second.
  */
@@ -304,6 +311,28 @@ void FirstPersonView::spawnTileFireAndSmoke(float elapsedSeconds)
 			flame.age = 0; flame.life = _particles.random(0.7f, 1.6f); flame.gravity = -10; flame.drag = 0.8f;
 			flame.color = _colors.fire[(int)_particles.random(0, 4)]; flame.size = 2; flame.kind = P::GLOW; flame.group = P::EFFECT;
 			_particles.add(flame);
+		}
+		// Modern smoke (setting "Smoke"): now and then a wisp of the smoke rises off a smoky tile, a
+		// few more the thicker it is (about one every three seconds off fresh smoke, more off a
+		// fire), drifting slowly up and east as it spreads and thins out (see drawSeeThroughSmoke).
+		if (FirstPerson::smokeMode() == 1)
+		{
+			continue; // (the original games' own smoke only: no puffs, no wisps)
+		}
+		if (FirstPerson::smokeMode() == 2)
+		{
+			if (tile->getSmoke() && _particles.random() < (tile->getFire() ? 0.5f : 0.08f + tile->getSmoke() * 0.016f) * elapsedSeconds)
+			{
+				P::Particle wisp;
+				wisp.pos[0] = centreX + _particles.random(-5, 5);
+				wisp.pos[1] = centreY + _particles.random(-5, 5);
+				wisp.pos[2] = groundZ + _particles.random(8, 16);
+				wisp.vel[0] = _particles.random(0.5f, 2.0f); wisp.vel[1] = _particles.random(-1, 1); wisp.vel[2] = _particles.random(2.5f, 4.5f);
+				wisp.age = 0; wisp.life = _particles.random(4.0f, 6.0f); wisp.gravity = 0; wisp.drag = 0.05f;
+				wisp.color = 0; wisp.size = (Uint8)_particles.random(0, 4); wisp.kind = P::WISP; wisp.group = P::EFFECT; // size: which of the smoke's four frames
+				_particles.add(wisp);
+			}
+			continue;
 		}
 		// Smoke: three puffs a second off a burning tile; off a smoky one 1.5 a second, more the
 		// thicker its smoke. The puffs rise slowly and drift east (+x, the way the rain slants).
@@ -714,7 +743,23 @@ void FirstPersonView::drawLightHalos()
 	bool anyGlow = false;
 	for (int y = 0; y < height; ++y)
 	{
+		// Most rows have nothing shining in them: those are passed over eight pixels at a time.
 		const Uint8 *maskRow = &_glowMask[y * width];
+		bool rowShines = false;
+		for (int x = 0; x + 8 <= width && !rowShines; x += 8)
+		{
+			Uint64 eightPixels;
+			std::memcpy(&eightPixels, maskRow + x, 8);
+			rowShines = eightPixels != 0;
+		}
+		for (int x = width & ~7; x < width && !rowShines; ++x)
+		{
+			rowShines = maskRow[x] != 0;
+		}
+		if (!rowShines)
+		{
+			continue;
+		}
 		const float *depthRow = &_depthBuffer[y * width];
 		float *glowRow = &_glowBuffer[(y / cellSize) * gridWidth];
 		float *glowDepthRow = &_glowDepth[(y / cellSize) * gridWidth];
@@ -878,6 +923,11 @@ void FirstPersonView::drawParticles()
 	const double focalLength = (width / 2.0) / _halfFovTangent; // in pixels
 	for (const auto &particle : _particles.all())
 	{
+		// The smoke's wisps are drawn with the smoke, see-through (see drawSeeThroughSmoke).
+		if (particle.kind == P::WISP)
+		{
+			continue;
+		}
 		// Where it is on the screen (skip it if it's behind the camera or off the screen).
 		double world[3] = { particle.pos[0], particle.pos[1], particle.pos[2] };
 		if (particle.kind == P::BUBBLE)

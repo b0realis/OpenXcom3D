@@ -117,10 +117,18 @@ const double ZScale = 0.81649658092772603;
 const float ZScaleF = (float)ZScale;
 /// An isometric sprite pixel across is 1/sqrt(2) of a voxel (32 pixels span a tile's diagonal).
 const double SpritePixelX = 0.70710678118654752;
-/// Sprites stand like cards facing the camera, leaning with the view's pitch; looking down (or up)
+/// Sprites stand like cards facing the camera, leaning with the view's pitch; looking down
 /// further than this many degrees, a card leans only this far, so it stays above the floor
 /// instead of lying in it (see drawSprite).
 const double CardTiltMax = 45.0;
+/// Looking up, a card leans only this far (its top comes towards the camera): a unit right
+/// beside the soldier leaning in by much more lurched at the camera.
+const double CardTiltUpMax = 10.0;
+/// See-through smoke over a unit the soldier sees veils it by at most this many see-through steps
+/// (of FirstPersonView::SeeThroughLevels) in all, however much smoke lies in front: it stays clear.
+const int UnitVeilMax = 5;
+/// The see-through smoke keeps this share of its colours (the rest turned to grey; see softSmokeFrame).
+const float SmokeColorKept = 0.35f;
 /// A lying sprite's rows below its anchor lie on the floor, each this many voxels nearer the
 /// camera: one isometric pixel down is sqrt(2) voxels along the floor towards the viewer.
 const double LyingRowVoxels = 1.41421356237309505;

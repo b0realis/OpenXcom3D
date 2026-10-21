@@ -63,8 +63,8 @@ namespace OpenXcom
  * The `firstPerson:` ruleset section. The first-person mode is engine code, but it only
  * switches on when an active mod (OpenXcom3D) declares `firstPerson: enabled: true`. The mod
  * also says how far the view reaches, which terrain records are windows (and which of their
- * colours are glass), what weather each terrain has, which music plays in combat, and which
- * armors and items give night vision.
+ * colours are glass), what weather each terrain has, which music plays in combat, which armors
+ * and items give night vision, and which built-in items are drawn in the hands anyway.
  */
 class RuleFirstPerson
 {
@@ -82,6 +82,7 @@ private:
 	std::map<std::string, std::string> _weather; // terrain data set -> rain, snow, dust, ...
 	std::vector<std::string> _combatMusic;       // tense tracks to try, first one the game has wins
 	std::set<std::string> _nightVision;          // armors and items that give their wearer night vision
+	std::set<std::string> _builtInItemsShown;    // built-in items drawn in the hands all the same (a shield, an arm cannon)
 public:
 	/// Creates the rule with the feature switched off.
 	RuleFirstPerson() : _enabled(false), _maxViewDistance(60), _combatMusic({ "GMDEFEND", "GMDEFBAS" }) { }
@@ -113,12 +114,17 @@ public:
 			}
 		}
 
-		// Combat music, and what gives night vision (a list replaces the earlier one).
+		// Combat music, what gives night vision, and the built-in items drawn in the hands (a
+		// list replaces the earlier one).
 		reader.tryRead("combatMusic", _combatMusic);
-		std::vector<std::string> nightVision;
+		std::vector<std::string> nightVision, builtInItemsShown;
 		if (reader.tryRead("nightVision", nightVision))
 		{
 			_nightVision = std::set<std::string>(nightVision.begin(), nightVision.end());
+		}
+		if (reader.tryRead("builtInItemsShown", builtInItemsShown))
+		{
+			_builtInItemsShown = std::set<std::string>(builtInItemsShown.begin(), builtInItemsShown.end());
 		}
 
 		// Weather: per terrain data set, its kind ("rain", "snow", "dust", ...).
@@ -148,6 +154,8 @@ public:
 	const std::vector<std::string> &getCombatMusic() const { return _combatMusic; }
 	/// Does wearing this armor, or carrying this item, give night vision?
 	bool givesNightVision(const std::string &type) const { return _nightVision.count(type) > 0; }
+	/// Is a built-in item (fixed to its unit, or its special weapon) drawn in the hands all the same?
+	bool showsBuiltInItem(const std::string &type) const { return _builtInItemsShown.count(type) > 0; }
 	/// The weather of a terrain data set ("rain", "snow", "dust", ...), or empty for none.
 	std::string getWeather(const std::string &dataSet) const
 	{

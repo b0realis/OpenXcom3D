@@ -53,47 +53,274 @@
 #include "FirstPersonMode.h"
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <sstream>
 #include <string>
 #include "FirstPersonSounds.h"
+#include "FirstPersonApi.h"
 #include "FirstPersonView.h"
+#include "../Battlescape/AlienInventoryState.h"
+#include "../Battlescape/BattleState.h"
 #include "../Battlescape/BattlescapeGame.h"
 #include "../Battlescape/BattlescapeState.h"
+#include "../Battlescape/ExplosionBState.h"
 #include "../Battlescape/Map.h"
+#include "../Battlescape/MedikitState.h"
 #include "../Battlescape/Pathfinding.h"
+#include "../Battlescape/ProjectileFlyBState.h"
+#include "../Battlescape/ScannerState.h"
 #include "../Battlescape/TileEngine.h"
+#include "../Battlescape/UnitInfoState.h"
+#include "../Engine/Action.h"
 #include "../Engine/Game.h"
+#include "../Engine/InteractiveSurface.h"
 #include "../Engine/Options.h"
 #include "../Engine/RNG.h"
 #include "../Engine/Sound.h"
+#include "../Engine/State.h"
+#include "../Interface/Frame.h"
 #include "../Interface/Text.h"
+#include "../Mod/RuleInterface.h"
 #include "../Mod/Mod.h"
 #include "../Mod/RuleDamageType.h"
+#include "../Mod/Unit.h"
 #include "../Savegame/BattleItem.h"
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/SavedBattleGame.h"
+#include "../Savegame/SavedGame.h"
 #include "../Savegame/Tile.h"
 #include "FirstPersonModeShared.h"
 
 namespace OpenXcom
 {
 
+namespace
+{
+
 /**
- * Finds the weapon the soldier fires with: the one in the hand the player chose (G switches
- * hands), or the one in the other hand if the chosen hand is empty.
+ * Holds the battle while a Doom free grenade flies (see FirstPersonMode::throwFreeGrenade), as
+ * the game's own flight state does for its throws: every tick it flies the grenade on (step,
+ * handed the time) and takes itself off the queue once the flight is over.
+ */
+class FreeGrenadeFlight : public BattleState
+{
+	std::function<bool(Uint32)> _step; // flies the grenade on to a time; false once it's over
+public:
+	/// Starts holding the battle run by `parent`, flying the grenade with `step`.
+	FreeGrenadeFlight(BattlescapeGame *parent, std::function<bool(Uint32)> step) : BattleState(parent), _step(std::move(step)) { }
+	/// Each tick: on with the flight, or off the queue once it's over.
+	void think() override
+	{
+		if (!_step(SDL_GetTicks())) _parent->popState();
+	}
+};
+
+/**
+ * Doom real-time grenades: the fuse picked in seconds, 1 to FirstPerson::DoomFuseMaxSeconds, the
+ * way the isometric map picks a grenade's timer (PrimeGrenadeState): a small box made like the
+ * game's own (its frame, colours and big numbers, "SET FUSE" over 1s to 5s). A click on a number,
+ * or its key (1 to 5), picks it; a right click or the cancel key changes nothing. What the pick
+ * does is up to whoever opened it (see FirstPersonMode::fire).
+ */
+class DoomFuseState : public State
+{
+public:
+	/**
+	 * Makes the box, centred like the game's prime menu.
+	 * @param onPicked Called with the seconds picked, after the box has gone.
+	 */
+	explicit DoomFuseState(std::function<void(int)> onPicked) : _onPicked(std::move(onPicked))
+	{
+		_screen = false;
+		const int count = FirstPerson::DoomFuseMaxSeconds;
+		const int rowWidth = count * 24 - 2, boxWidth = 128, boxX = (320 - boxWidth) / 2, firstX = boxX + (boxWidth - rowWidth) / 2;
+		_frame = new Frame(boxWidth, 27, boxX, 70);
+		_title = new Text(boxWidth, 24, boxX, 77);
+		_background = new Surface(boxWidth, 44, boxX, 78);
+		for (int seconds = 0; seconds < count; ++seconds)
+		{
+			_button[seconds] = new InteractiveSurface(22, 22, firstX - 1 + seconds * 24, 98);
+			_number[seconds] = new Text(20, 20, firstX + seconds * 24, 99);
+		}
+		_game->getSavedGame()->getSavedBattle()->setPaletteByDepth(this);
+
+		// The game's own look: the grenade menu's background, frame and text colours.
+		const Element *colors = _game->getMod()->getInterface("battlescape")->getElement("grenadeBackground");
+		add(_background);
+		_background->drawRect(0, 0, _background->getWidth(), _background->getHeight(), colors->color);
+		add(_frame, "grenadeMenu", "battlescape");
+		_frame->setThickness(3);
+		_frame->setHighContrast(true);
+		add(_title, "grenadeMenu", "battlescape");
+		_title->setAlign(ALIGN_CENTER);
+		_title->setBig();
+		_title->setText(tr("STR_FPS_DOOM_SET_FUSE"));
+		_title->setHighContrast(true);
+		for (int seconds = 0; seconds < count; ++seconds)
+		{
+			add(_button[seconds]);
+			_button[seconds]->onMouseClick((ActionHandler)&DoomFuseState::buttonClicked);
+			_button[seconds]->onKeyboardPress((ActionHandler)&DoomFuseState::buttonClicked, (SDLKey)(SDLK_1 + seconds));
+			SDL_Rect square = { 0, 0, (Uint16)_button[seconds]->getWidth(), (Uint16)_button[seconds]->getHeight() };
+			_button[seconds]->drawRect(&square, colors->border);
+			square.x++; square.y++; square.w -= 2; square.h -= 2;
+			_button[seconds]->drawRect(&square, colors->color2);
+			add(_number[seconds], "grenadeMenu", "battlescape");
+			_number[seconds]->setBig();
+			_number[seconds]->setText(std::to_string(seconds + 1) + "s");
+			_number[seconds]->setHighContrast(true);
+			_number[seconds]->setAlign(ALIGN_CENTER);
+			_number[seconds]->setVerticalAlign(ALIGN_MIDDLE);
+		}
+		centerAllSurfaces();
+		lowerAllSurfaces();
+	}
+
+	/// A right click or the cancel key: closed, nothing picked.
+	void handle(Action *action) override
+	{
+		State::handle(action);
+		const SDL_Event &event = *action->getDetails();
+		if ((event.type == SDL_MOUSEBUTTONDOWN && _game->isRightClick(action)) || (event.type == SDL_KEYDOWN && event.key.keysym.sym == Options::keyCancel))
+		{
+			_game->popState();
+		}
+	}
+
+private:
+	Frame *_frame;
+	Text *_title;
+	Surface *_background;
+	InteractiveSurface *_button[FirstPerson::DoomFuseMaxSeconds];
+	Text *_number[FirstPerson::DoomFuseMaxSeconds];
+	std::function<void(int)> _onPicked;
+
+	/// A number clicked (or its key pressed): the box goes, then the pick is handed on.
+	void buttonClicked(Action *action)
+	{
+		if (_game->isRightClick(action)) return; // (handle closes the box)
+		for (int seconds = 0; seconds < FirstPerson::DoomFuseMaxSeconds; ++seconds)
+		{
+			if (action->getSender() != _button[seconds]) continue;
+			const std::function<void(int)> onPicked = _onPicked; // (the box is deleted later, but don't lean on it)
+			_game->popState();
+			onPicked(seconds + 1);
+			return;
+		}
+	}
+};
+
+}
+
+/**
+ * Finds the weapon the soldier fires with: what the active hand gives (see activeHand).
  * @param unit The soldier.
- * @return The weapon, or null if both hands are empty.
+ * @return The weapon, or null if there's none.
  */
 BattleItem *FirstPersonMode::activeWeapon(BattleUnit *unit) const
 {
-	// The hand this soldier was last switched to; every soldier starts with the right hand.
-	auto handEntry = _chosenHand.find(unit);
-	const int hand = handEntry != _chosenHand.end() ? handEntry->second : 0; // 0 right, 1 left
-	BattleItem *rightHandWeapon = unit->getRightHandWeapon(), *leftHandWeapon = unit->getLeftHandWeapon();
+	const int hand = activeHand(unit);
+	return hand < 0 ? nullptr : handWeapon(unit, hand);
+}
 
-	// Take the chosen hand's weapon; with that hand empty, fall back to the other hand.
-	BattleItem *chosenWeapon = hand ? leftHandWeapon : rightHandWeapon;
-	return chosenWeapon ? chosenWeapon : (hand ? rightHandWeapon : leftHandWeapon);
+/**
+ * The hand the soldier fires with. Every soldier starts with the right hand; G (or a pick on
+ * the classic HUD) switches between the right hand, the left and the built-in weapon (the one
+ * the classic HUD's SPECIAL button uses). A hand holds an item, or, empty, it gives the unit's
+ * empty-hand weapon if it has one (fists, a claw), but only when the player picked that hand:
+ * otherwise, as before, an empty hand leaves it to the other hand's item. When the hand
+ * picked gives nothing any more (its item thrown, say), the right hand's item, the left's, the
+ * empty-hand weapon and the built-in weapon are tried in turn.
+ * @param unit The soldier.
+ * @return 0 right, 1 left, 2 the built-in weapon, or -1 if there's nothing to use.
+ */
+int FirstPersonMode::activeHand(BattleUnit *unit) const
+{
+	auto handEntry = _chosenHand.find(unit);
+	const bool picked = handEntry != _chosenHand.end();
+	const int chosen = picked ? handEntry->second : 0;
+	BattleType specialType;
+	if (chosen == 2 ? unit->getSpecialIconWeapon(specialType) != nullptr
+		: ((chosen ? unit->getLeftHandWeapon() : unit->getRightHandWeapon()) || (picked && emptyHandWeapon(unit))))
+	{
+		return chosen;
+	}
+	if (unit->getRightHandWeapon()) return 0;
+	if (unit->getLeftHandWeapon()) return 1;
+	if (emptyHandWeapon(unit)) return chosen == 1 ? 1 : 0;
+	if (unit->getSpecialIconWeapon(specialType)) return 2;
+	return -1;
+}
+
+/**
+ * What a hand gives the soldier to use: the item it holds, or, empty, the unit's empty-hand
+ * weapon (if any); the built-in weapon for hand 2.
+ * @param unit The soldier.
+ * @param hand 0 right, 1 left, 2 the built-in weapon.
+ * @return The weapon, or null.
+ */
+BattleItem *FirstPersonMode::handWeapon(BattleUnit *unit, int hand) const
+{
+	if (hand == 2)
+	{
+		BattleType specialType;
+		return unit->getSpecialIconWeapon(specialType);
+	}
+	BattleItem *held = hand ? unit->getLeftHandWeapon() : unit->getRightHandWeapon();
+	return held ? held : emptyHandWeapon(unit);
+}
+
+/**
+ * The unit's empty-hand weapon: a special weapon of its armor or kind that an empty hand uses
+ * (OXCE's specialUseEmptyHand: fists, a claw), looked for as the game's hand buttons look for
+ * it, by kind in the same order.
+ * @param unit The unit.
+ * @return The weapon, or null if it has none.
+ */
+BattleItem *FirstPersonMode::emptyHandWeapon(BattleUnit *unit) const
+{
+	for (const BattleType type : { BT_MELEE, BT_PSIAMP, BT_FIREARM, BT_MEDIKIT, BT_SCANNER, BT_MINDPROBE })
+	{
+		BattleItem *weapon = unit->getSpecialWeapon(type);
+		if (weapon && weapon->getRules()->isSpecialUsingEmptyHand())
+		{
+			return weapon;
+		}
+	}
+	return nullptr;
+}
+
+/**
+ * The hand a weapon is used from: the hand holding it, the built-in weapon's, or for the
+ * empty-hand weapon the hand it's used from now (an empty one: the left if it's empty, else
+ * the right).
+ * @param unit The soldier.
+ * @param weapon The weapon.
+ * @return 0 right, 1 left, 2 the built-in weapon.
+ */
+int FirstPersonMode::handOf(BattleUnit *unit, const BattleItem *weapon) const
+{
+	if (weapon && weapon == unit->getLeftHandWeapon()) return 1;
+	if (weapon && weapon == unit->getRightHandWeapon()) return 0;
+	BattleType specialType;
+	if (weapon && weapon == unit->getSpecialIconWeapon(specialType) && weapon != emptyHandWeapon(unit)) return 2;
+	const int active = activeHand(unit);
+	if (weapon && weapon == emptyHandWeapon(unit) && (active == 0 || active == 1) && handWeapon(unit, active) == weapon) return active;
+	return unit->getLeftHandWeapon() ? 0 : 1;
+}
+
+/**
+ * The hand's letter in front of an item's name on the panel and the squad card: R or L for
+ * the hands (an empty hand's weapon by the hand it's used from), S for the built-in (special)
+ * weapon.
+ * @param unit The soldier.
+ * @param item The item.
+ * @return "R: ", "L: " or "S: ".
+ */
+std::string FirstPersonMode::handLetter(BattleUnit *unit, const BattleItem *item) const
+{
+	const int hand = handOf(unit, item);
+	return hand == 2 ? "S: " : hand == 1 ? "L: " : "R: ";
 }
 
 /**
@@ -177,7 +404,7 @@ bool FirstPersonMode::meleeDowned(BattleUnit *unit, BattleItem *weapon, BattleAc
 	// The weapon in hand swings, as for any blow that lands.
 	_swingStart = SDL_GetTicks();
 	_swingJolted = false;
-	_sounds->play(FirstPersonSounds::SWOOSH, 0, 0.8f);
+	if (Options::fpsHitSounds) _sounds->play(FirstPersonSounds::SWOOSH, 0, 0.8f); // (one of our added sounds: setting "Hit, kill and swing sounds")
 	return true;
 }
 
@@ -201,7 +428,12 @@ BattleItem *FirstPersonMode::offHandWeapon(BattleUnit *unit, const BattleItem *w
 		return nullptr;
 	}
 
-	// The same test for whatever is in the other hand (and it must be a second item).
+	// The same test for whatever is in the other hand (and it must be a second item). A weapon
+	// not held in a hand (an empty hand's fists, the built-in weapon) fires alone.
+	if (weapon != unit->getRightHandWeapon() && weapon != unit->getLeftHandWeapon())
+	{
+		return nullptr;
+	}
 	BattleItem *otherWeapon = weapon == unit->getRightHandWeapon() ? unit->getLeftHandWeapon() : unit->getRightHandWeapon();
 	if (!otherWeapon || otherWeapon == weapon || otherWeapon->getRules()->getBattleType() != BT_FIREARM || otherWeapon->getCurrentWaypoints() != 0)
 	{
@@ -353,9 +585,15 @@ std::vector<BattleActionType> FirstPersonMode::fireModesFor(BattleUnit *unit, Ba
 		}
 	}
 
-	// Anything not built in can be thrown; a grenade not yet primed can be primed.
+	// Anything not built in can be thrown. Anything with a fuse (a grenade) not yet primed can
+	// be primed; and once primed, unprimed again where its rules allow, as the game's action
+	// menu has it (a mod's flashlight is switched on by priming, and off this way).
 	if (!rules->isFixed() && rules->getCostThrow().Time > 0) modes.push_back(BA_THROW);
-	if (!psiBlocked && rules->getFuseTimerType() != BFT_NONE && weapon->getFuseTimer() == -1 && rules->getCostPrime().Time > 0) modes.push_back(BA_PRIME);
+	if (!psiBlocked && rules->getFuseTimerType() != BFT_NONE)
+	{
+		if (weapon->getFuseTimer() == -1 && rules->getCostPrime().Time > 0) modes.push_back(BA_PRIME);
+		if (weapon->getFuseTimer() >= 0 && rules->getCostUnprime().Time > 0 && !rules->getUnprimeActionName().empty()) modes.push_back(BA_UNPRIME);
+	}
 	return modes;
 }
 
@@ -374,7 +612,7 @@ void FirstPersonMode::updateFireMode(BattleUnit *unit)
 	const bool ownBurst = action->type != _fireMode && action->type == firedAs(action->weapon, _fireMode);
 	if (action->targeting && action->actor == unit && action->weapon && action->type != BA_NONE && !ownBurst)
 	{
-		_chosenHand[unit] = action->weapon == unit->getLeftHandWeapon() ? 1 : 0;
+		_chosenHand[unit] = handOf(unit, action->weapon);
 		_fireMode = action->type;
 		_fireModeWeapon = action->weapon;
 		return;
@@ -441,9 +679,11 @@ void FirstPersonMode::selectFireMode(BattleActionType mode)
 }
 
 /**
- * Switches the soldier's weapon hand (G by default). The fire mode is picked again for the new
- * weapon on the next frame (see updateFireMode). It costs nothing: on the classic HUD either
- * hand's weapon can be used at any time too.
+ * Switches the soldier's weapon hand (G by default): to the next of the right hand, the left
+ * and the built-in weapon that gives something else to use: an item held, an empty hand's
+ * weapon (fists, a claw), the built-in weapon (the classic HUD's SPECIAL). The fire mode is
+ * picked again for the new weapon on the next frame (see updateFireMode). It costs nothing: on
+ * the classic HUD each of them can be used at any time too.
  */
 void FirstPersonMode::switchHand()
 {
@@ -454,7 +694,18 @@ void FirstPersonMode::switchHand()
 	_state->_battleGame->cancelCurrentAction();
 	if (BattleUnit *unit = _save->getSelectedUnit())
 	{
-		_chosenHand[unit] ^= 1; // 0 right <-> 1 left
+		const int current = std::max(0, activeHand(unit));
+		const BattleItem *currentWeapon = activeWeapon(unit);
+		for (int step = 1; step <= 2; ++step)
+		{
+			const int next = (current + step) % 3;
+			BattleItem *nextWeapon = handWeapon(unit, next);
+			if (nextWeapon && nextWeapon != currentWeapon)
+			{
+				_chosenHand[unit] = next;
+				break;
+			}
+		}
 	}
 	_fireModeWeapon = nullptr; // forces a fresh fire mode for whatever is in the new hand
 }
@@ -506,6 +757,382 @@ bool FirstPersonMode::aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &
 void FirstPersonMode::updateAim(BattleUnit *unit)
 {
 	_aimHitsSomething = aimAt(_view->getWidth() / 2, _view->getHeight() / 2, unit, _aimVoxel);
+}
+
+/**
+ * What the game's turn before a shot or a throw at what's under the crosshair will cost (shown
+ * on the compass). The game turns the soldier to face the target tile first (BattleUnit::
+ * directionTo: the eighth it lies in), an eighth at a time the shorter way round, each eighth
+ * costing the armor's turn cost (a tank's turret turns instead, for 1), as UnitTurnBState
+ * charges it. Turning by the rules only: with free turning the soldier faces the target for free
+ * before the shot (see fire). Nothing for melee (it strikes the tile ahead), psi (no turn) or
+ * in Doom mode (time units don't run out).
+ * @param unit The soldier aiming.
+ * @param direction Set to the way the soldier (or its turret) will face for the shot.
+ * @param affordable Set to whether the soldier has the time units for the turn and the shot.
+ * @return The time units the turn will cost; 0 for no turn.
+ */
+int FirstPersonMode::shotTurnCost(BattleUnit *unit, int &direction, bool &affordable) const
+{
+	direction = -1;
+	affordable = true;
+	if (!Options::fpsTurnCost || doomModeOn() || !unit)
+	{
+		return 0;
+	}
+
+	// The weapon and mode the next click fires, as the crosshair works them out.
+	BattleItem *weapon = activeWeapon(unit);
+	const BattleAction *action = _state->_battleGame->getCurrentAction();
+	if (action->targeting && action->actor == unit && action->weapon)
+	{
+		weapon = action->weapon;
+	}
+	const BattleActionType mode = weapon ? firedAs(weapon, _fireMode) : BA_NONE;
+	if (!isShot(mode) && mode != BA_THROW)
+	{
+		return 0;
+	}
+
+	// The target tile as fire() takes it (kept inside the map), and the eighths to turn.
+	Position targetTile = _aimVoxel.toTile();
+	targetTile.x = std::clamp<int>(targetTile.x, 0, _save->getMapSizeX() - 1);
+	targetTile.y = std::clamp<int>(targetTile.y, 0, _save->getMapSizeY() - 1);
+	targetTile.z = std::clamp<int>(targetTile.z, 0, _save->getMapSizeZ() - 1);
+	const bool turret = unit->getTurretType() != -1;
+	direction = unit->directionTo(targetTile);
+	const int facing = turret ? unit->getTurretDirection() : unit->getDirection();
+	const int eighths = std::min((direction - facing + 8) % 8, (facing - direction + 8) % 8);
+	const int cost = eighths * (turret ? 1 : unit->getTurnCost());
+	affordable = cost + BattleActionCost(mode, unit, weapon).Time <= unit->getTimeUnits();
+	return cost;
+}
+
+/**
+ * Pulls a grenade's pin for Doom mode's real-time fuse (see fire, updateDoomFuses): the game's
+ * own prime action with its fuse at 0, if it isn't primed yet (the time units Doom mode refills,
+ * the item's own prime message and sound), our pin's click where the item has no sound of its
+ * own, and the fuse: the setting "Doom grenade fuse", burning from a moment or not yet.
+ * @param unit The soldier holding it.
+ * @param grenade The grenade.
+ * @param lit When its fuse starts burning (SDL ticks); 0: when it leaves the hand.
+ */
+void FirstPersonMode::pullDoomPin(BattleUnit *unit, BattleItem *grenade, Uint32 lit)
+{
+	if (grenade->getFuseTimer() < 0)
+	{
+		BattleAction *action = _state->_battleGame->getCurrentAction();
+		action->actor = unit;
+		action->weapon = grenade;
+		action->type = BA_PRIME;
+		action->value = 0;
+		action->targeting = false;
+		action->result.clear();
+		action->updateTU();
+		_state->_battleGame->handleNonTargetAction();
+	}
+	if (grenade->getFuseTimer() < 0)
+	{
+		return; // the game refused (it says why)
+	}
+	if (grenade->getRules()->getPrimeSoundRaw().empty())
+	{
+		_sounds->play(FirstPersonSounds::PIN);
+	}
+	_doomFuses[grenade->getId()] = { lit, (Uint32)std::clamp(Options::fpsDoomGrenadeFuse, 1, FirstPerson::DoomFuseMaxSeconds) * 1000 };
+}
+
+/**
+ * Doom free grenades (setting "Doom free grenades with airburst"): throws a grenade at a point
+ * by the 3D view's own throw, not the game's, so it goes wherever the crosshair points: under a
+ * roof, over a wall, at a point in the air. It leaves the hand (its real-time fuse, if it has one,
+ * starts burning) from just below the eye and flies a real arc that passes through the point,
+ * taking FreeGrenadeSpeed to get there (within FreeGrenadeTimeMin and Max), and no further than
+ * the soldier could throw it by the game's rules (their strength against its weight) nor than a
+ * person can throw (FreeGrenadeMaxTiles); then on, until it meets something. A short battle state holds the battle meanwhile, as the game's
+ * flight does (see stepFreeGrenade). It makes the game's throw sound, and enemies may react to
+ * it as to any throw. Time units: Doom mode refills them.
+ * @param unit The thrower.
+ * @param grenade The grenade, in their hand.
+ * @param aimedVoxel The point under the crosshair (far along the view for the sky).
+ */
+void FirstPersonMode::throwFreeGrenade(BattleUnit *unit, BattleItem *grenade, const Position &aimedVoxel)
+{
+	// From just below the eye, a little ahead of it.
+	double eye[3];
+	_view->getEye(eye);
+	const double yaw = _view->getYawDegrees() * Pi / 180.0;
+	const float start[3] = { (float)(eye[0] + std::cos(yaw) * 3.0), (float)(eye[1] + std::sin(yaw) * 3.0), (float)(eye[2] - 3.0) };
+
+	// To the point, or as far towards it as the soldier can throw this: the game's own reach for
+	// their strength against its weight, but never further than a person can throw (see
+	// FreeGrenadeMaxTiles: about 40 m for the strongest, less for the weaker).
+	float towards[3] = { aimedVoxel.x + 0.5f - start[0], aimedVoxel.y + 0.5f - start[1], aimedVoxel.z + 0.5f - start[2] };
+	const float level = std::sqrt(towards[0] * towards[0] + towards[1] * towards[1]);
+	const int strength = unit->getBaseStats()->strength;
+	const float humanReach = FreeGrenadeMaxTiles * 16.0f * std::min(1.0f, strength / FreeGrenadeFullStrength);
+	const float reach = std::min(humanReach, (float)ProjectileFlyBState::getMaxThrowDistance(grenade->getTotalWeight(), strength, (int)-towards[2]) + 8.0f);
+	if (level > reach)
+	{
+		for (float &axis : towards) axis *= reach / level;
+	}
+
+	// The arc through it: flying for a time that grows with the distance, rising enough at the
+	// start that gravity brings it down there just then.
+	const float distance = std::sqrt(towards[0] * towards[0] + towards[1] * towards[1] + towards[2] * towards[2]);
+	const float seconds = std::clamp(distance / FreeGrenadeSpeed, FreeGrenadeTimeMin, FreeGrenadeTimeMax);
+	FreeGrenade &flight = _freeGrenade;
+	flight.item = grenade;
+	flight.thrower = unit;
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		flight.position[axis] = start[axis];
+		flight.velocity[axis] = towards[axis] / seconds;
+	}
+	flight.velocity[2] += 0.5f * FreeGrenadeGravity * seconds;
+	flight.lastTick = SDL_GetTicks();
+
+	// Out of the hand, the game's throw sound, the view drawing it, and the battle held while
+	// it flies; enemies may react to the throw.
+	grenade->moveToOwner(nullptr);
+	_game->getMod()->getSoundByDepth(_save->getDepth(), Mod::ITEM_THROW)->play(-1, _state->_map->getSoundAngle(unit->getPosition()));
+	_view->setFreeGrenade(grenade, flight.position, flight.velocity);
+	BattlescapeGame *battleGame = _state->_battleGame;
+	battleGame->statePushBack(new FreeGrenadeFlight(battleGame, [this](Uint32 now) { return stepFreeGrenade(now); }));
+	BattleAction throwAction;
+	throwAction.type = BA_THROW;
+	throwAction.actor = unit;
+	throwAction.weapon = grenade;
+	_save->getTileEngine()->checkReactionFire(unit, throwAction);
+}
+
+/**
+ * Flies the Doom free grenade on to now (see throwFreeGrenade), called by its battle state:
+ * - its real-time fuse ran out (Doom real-time grenades): it bursts where it is, in the air (the
+ *   game's own explosion for a timed grenade there, which also takes the grenade away);
+ * - else it moves on along its arc, a voxel at a time, until it meets something (the game's own
+ *   voxel check, the thrower left out) or leaves the map by a side or the bottom: then it drops
+ *   there as the game drops a thrown item (its landing sound; a grenade the game sets off on
+ *   landing goes off), its fuse burning on. Above the map's top there's nothing to meet: it comes
+ *   back down (one bursting up there bursts just under the top).
+ * @param now The time (SDL ticks).
+ * @return False once the flight is over (landed or burst).
+ */
+bool FirstPersonMode::stepFreeGrenade(Uint32 now)
+{
+	FreeGrenade &flight = _freeGrenade;
+	BattleItem *grenade = flight.item;
+	if (!grenade)
+	{
+		return false;
+	}
+	BattlescapeGame *battleGame = _state->_battleGame;
+	auto finish = [&]()
+	{
+		flight.item = nullptr;
+		_view->setFreeGrenade(nullptr, flight.position, flight.velocity);
+		return false;
+	};
+	auto voxelAt = [](const float point[3]) { return Position((int)std::floor(point[0]), (int)std::floor(point[1]), (int)std::floor(point[2])); };
+
+	// Burst in the air: the fuse has run out.
+	const auto fuse = _doomFuses.find(grenade->getId());
+	if (Options::fpsDoomRealTimeGrenades && fuse != _doomFuses.end() && fuse->second.lit && now - fuse->second.lit >= fuse->second.length)
+	{
+		_doomFuses.erase(fuse);
+		Position burst = voxelAt(flight.position);
+		burst.z = std::min<int>(burst.z, _save->getMapSizeZ() * 24 - 1); // (above the map: just under its top)
+		battleGame->statePushNext(new ExplosionBState(battleGame, burst, BattleActionAttack::GetBeforeShoot(BA_TRIGGER_TIMED_GRENADE, flight.thrower, grenade)));
+		return finish();
+	}
+
+	// On along the arc, a voxel (or less) at a time.
+	const float seconds = std::min(0.05f, (now - flight.lastTick) / 1000.0f);
+	flight.lastTick = now;
+	const float speed = std::sqrt(flight.velocity[0] * flight.velocity[0] + flight.velocity[1] * flight.velocity[1] + flight.velocity[2] * flight.velocity[2]);
+	const int steps = std::max(1, (int)std::ceil(speed * seconds));
+	const float stepSeconds = seconds / steps;
+	const Position mapSize(_save->getMapSizeX() * 16, _save->getMapSizeY() * 16, _save->getMapSizeZ() * 24);
+	for (int step = 0; step < steps; ++step)
+	{
+		float next[3];
+		flight.velocity[2] -= FreeGrenadeGravity * stepSeconds;
+		for (int axis = 0; axis < 3; ++axis) next[axis] = flight.position[axis] + flight.velocity[axis] * stepSeconds;
+		// Out through a side or the bottom of the map: it lands there. Above the map's top there's
+		// nothing to meet (it comes back down).
+		const Position voxel = voxelAt(next);
+		const bool outside = voxel.x < 0 || voxel.y < 0 || voxel.z < 0 || voxel.x >= mapSize.x || voxel.y >= mapSize.y;
+		if (outside || (voxel.z < mapSize.z && _save->getTileEngine()->voxelCheck(voxel, flight.thrower) != V_EMPTY))
+		{
+			// Landed: dropped on the tile it was last in the air over (falling to its floor),
+			// as the game lands a thrown item.
+			Position tile = voxelAt(flight.position).toTile();
+			tile.x = std::clamp<int>(tile.x, 0, _save->getMapSizeX() - 1);
+			tile.y = std::clamp<int>(tile.y, 0, _save->getMapSizeY() - 1);
+			tile.z = std::clamp<int>(tile.z, 0, _save->getMapSizeZ() - 1);
+			_game->getMod()->getSoundByDepth(_save->getDepth(), Mod::ITEM_DROP)->play(-1, _state->_map->getSoundAngle(tile));
+			if (grenade->fuseThrowEvent())
+			{
+				_doomFuses.erase(grenade->getId());
+				battleGame->statePushNext(new ExplosionBState(battleGame, voxelAt(flight.position), BattleActionAttack::GetBeforeShoot(BA_TRIGGER_TIMED_GRENADE, flight.thrower, grenade)));
+			}
+			else
+			{
+				battleGame->dropItem(tile, grenade);
+			}
+			return finish();
+		}
+		std::copy(next, next + 3, flight.position);
+	}
+	_view->setFreeGrenade(grenade, flight.position, flight.velocity);
+	return true;
+}
+
+/**
+ * Is an item a grenade on a timer, one the Doom real-time fuse can take: a grenade (the
+ * battle type: grenades, smoke grenades, high explosive) whose fuse is set by its thrower or
+ * fixed, not one that goes off on landing (instant) or with none. Proximity grenades are another
+ * battle type: they stay the game's own.
+ * @param item The item (may be null).
+ * @return True if it is.
+ */
+bool FirstPersonMode::timedGrenade(const BattleItem *item)
+{
+	if (!item) return false;
+	const RuleItem *rules = item->getRules();
+	return rules->getBattleType() == BT_GRENADE && rules->getFuseTimerType() != BFT_INSTANT && rules->getFuseTimerType() != BFT_NONE;
+}
+
+/**
+ * Shows the path the next throw or shot would take (setting "Show trajectory": throws and
+ * arcing shots, or every shot), or the path to a target marked for confirm fire (whatever the
+ * setting), as a dotted line in the world (FirstPersonView::drawTrajectory). It is worked out
+ * as the game will work it out, only without the accuracy roll (no dice are thrown for it):
+ * - a throw or an arcing shot: from the game's origin voxel (the hand), the game picks the
+ *   point to aim at on the target tile (a unit's middle, an object, a wall, the floor; a throw
+ *   always the floor), finds the lowest curve that lands on the tile (TileEngine::
+ *   validateThrow) and follows that parabola to where it comes down (calculateParabolaVoxel);
+ *   a target it can't reach shows nothing (the game will say so);
+ * - a straight shot: the line of fire from the game's origin to the point under the crosshair,
+ *   up to whatever it meets first (calculateLineVoxel).
+ * Worked out again only when what it depends on changes. A marked target is forgotten when the
+ * soldier, their place, the weapon or the mode change, or the player's turn ends.
+ * @param unit The soldier being looked through (may be null).
+ * @param playerTurn It's the player's turn.
+ */
+void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
+{
+	// The weapon and the mode the next click uses (as the crosshair works them out).
+	BattleItem *weapon = (playerTurn && unit) ? activeWeapon(unit) : nullptr;
+	if (weapon)
+	{
+		const BattleAction *current = _state->_battleGame->getCurrentAction();
+		if (current->targeting && current->actor == unit && current->weapon) weapon = current->weapon;
+	}
+	const BattleActionType mode = weapon ? firedAs(weapon, _fireMode) : BA_NONE;
+
+	// A marked target lasts while nothing it was marked with changes.
+	if (_confirmTile.x >= 0 && (!Options::fpsConfirmFire || !playerTurn || unit != _confirmUnit || !unit || unit->getPosition() != _confirmFrom
+		|| weapon != _confirmWeapon || mode != _confirmMode))
+	{
+		clearConfirmMark();
+	}
+	const bool marked = _confirmTile.x >= 0;
+
+	// What to show: an arc for a throw or an arcing shot, a line for a straight shot (setting
+	// All, or a marked target); nothing while the soldier can't act.
+	const bool arcing = mode == BA_THROW || (isShot(mode) && weapon->getArcingShot(mode));
+	const bool straight = isShot(mode) && !arcing && (Options::fpsTrajectory >= 2 || marked);
+	const bool show = isActive() && unit && canAct() && (Options::fpsTrajectory >= 1 || marked) && (arcing || straight);
+	if (!show)
+	{
+		if (!_trajectoryKey.empty())
+		{
+			_trajectoryKey.clear();
+			_view->setTrajectory(std::vector<Position>());
+		}
+		return;
+	}
+
+	// The target: the marked one, or the tile and point under the crosshair (the tile kept
+	// inside the map, as fire() takes it).
+	Position targetTile = marked ? _confirmTile : _aimVoxel.toTile();
+	const Position targetVoxel = marked ? _confirmVoxel : _aimVoxel;
+	targetTile.x = std::clamp<int>(targetTile.x, 0, _save->getMapSizeX() - 1);
+	targetTile.y = std::clamp<int>(targetTile.y, 0, _save->getMapSizeY() - 1);
+	targetTile.z = std::clamp<int>(targetTile.z, 0, _save->getMapSizeZ() - 1);
+
+	// Worked out again only when something it depends on changed (an arc depends on the
+	// target's tile only, a line on the very point).
+	const Position from = unit->getPosition();
+	const std::vector<int> key = { arcing ? 1 : 2, targetTile.x, targetTile.y, targetTile.z, arcing ? 0 : targetVoxel.x, arcing ? 0 : targetVoxel.y,
+		arcing ? 0 : targetVoxel.z, from.x, from.y, from.z, unit->getDirection(), unit->isKneeled() ? 1 : 0, weapon->getId(), (int)mode };
+	if (key == _trajectoryKey)
+	{
+		return;
+	}
+	_trajectoryKey = key;
+
+	// The game's action for it, and its path.
+	TileEngine *tileEngine = _save->getTileEngine();
+	BattleAction preview;
+	preview.actor = unit;
+	preview.weapon = weapon;
+	preview.type = mode;
+	preview.target = targetTile;
+	std::vector<Position> path;
+	if (arcing)
+	{
+		// The points on the tile the game tries, in its order (Projectile::calculateThrow).
+		const Tile *tile = _save->getTile(targetTile);
+		const Position floorPoint = targetTile.toVoxel() + Position(8, 8, 1 - tile->getTerrainLevel());
+		std::vector<Position> aimPoints;
+		const BattleUnit *targetUnit = mode == BA_THROW ? nullptr : tile->getOverlappingUnit(_save);
+		if (mode == BA_THROW)
+		{
+			aimPoints.push_back(floorPoint);
+		}
+		else if (targetUnit && targetUnit->getVisible())
+		{
+			const Position unitBase = floorPoint + Position(0, 0, targetUnit->getFloatHeight());
+			for (const int height : { targetUnit->getHeight() / 2 + 1, 2, targetUnit->getHeight() - 1 }) aimPoints.push_back(unitBase + Position(0, 0, height));
+		}
+		else if (tile->getMapData(O_OBJECT))
+		{
+			for (const int height : { 13, 8, 23, 2 }) aimPoints.push_back(targetTile.toVoxel() + Position(8, 8, height));
+		}
+		else if (tile->getMapData(O_NORTHWALL))
+		{
+			for (const int height : { 13, 8, 20, 3 }) aimPoints.push_back(targetTile.toVoxel() + Position(8, 0, height));
+		}
+		else if (tile->getMapData(O_WESTWALL))
+		{
+			for (const int height : { 13, 8, 20, 2 }) aimPoints.push_back(targetTile.toVoxel() + Position(0, 8, height));
+		}
+		else if (tile->getMapData(O_FLOOR))
+		{
+			aimPoints.push_back(floorPoint);
+		}
+
+		// The first point the game finds a curve for, and that curve's path.
+		const Position origin = tileEngine->getOriginVoxel(preview, nullptr);
+		for (const Position &aimPoint : aimPoints)
+		{
+			double curvature = 0.0;
+			if (tileEngine->validateThrow(preview, origin, aimPoint, _save->getDepth(), &curvature))
+			{
+				tileEngine->calculateParabolaVoxel(origin, aimPoint, true, &path, unit, curvature, Position(0, 0, 0));
+				break;
+			}
+		}
+	}
+	else
+	{
+		// The line of fire to the point, up to what it meets.
+		const Position origin = tileEngine->getOriginVoxel(preview, _save->getTile(from));
+		tileEngine->calculateLineVoxel(origin, targetVoxel, true, &path, unit);
+	}
+	_view->setTrajectory(path);
 }
 
 /**
@@ -572,28 +1199,57 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 		}
 	}
 
-	// Doom mode (a first step towards a real-time mode): pulling the pin is one click, no menu
-	// and no timer to pick: the game's own prime action with its fuse at 0 (it spends the time
-	// units Doom mode refills), and a grenade then burns DoomFuseTime in real time (see
-	// updateDoomFuses).
-	if (mode == BA_PRIME && doomModeOn() && !menuTargeting)
+	// Doom mode's real-time grenades (setting; a first step towards a real-time mode). PRIME
+	// opens the fuse box (1 to DoomFuseMaxSeconds seconds), as the isometric map's priming opens
+	// its timer; the seconds picked are kept (setting "Doom grenade fuse") for every grenade after.
+	// - Prime on throw (setting "Doom prime on throw", the default): that's all; the grenade is
+	//   armed as it's thrown (below) and goes off that many seconds after it leaves the hand.
+	// - Otherwise the pick pulls the pin, with its click, and the fuse burns from then on, in the
+	//   hand too ("cooking"): throw it, or don't.
+	// Without real-time grenades, grenades in Doom mode are primed and thrown as without it.
+	if (mode == BA_PRIME && doomModeOn() && Options::fpsDoomRealTimeGrenades && !menuTargeting && timedGrenade(weapon))
+	{
+		_game->pushState(new DoomFuseState([this, unit, weapon](int seconds)
+		{
+			Options::fpsDoomGrenadeFuse = seconds;
+			if (Options::fpsDoomPrimeOnThrow)
+			{
+				_state->warningRaw(_state->tr("STR_FPS_DOOM_FUSE_SET").arg(seconds));
+			}
+			else if (canAct())
+			{
+				pullDoomPin(unit, weapon, std::max<Uint32>(1, SDL_GetTicks()));
+			}
+		}));
+		return;
+	}
+
+	// Unpriming has nothing to choose: the game's own action, at once (its time units, its
+	// message and sound); a Doom fuse burning on the item stops with it.
+	if (mode == BA_UNPRIME && !menuTargeting)
 	{
 		action->actor = unit;
 		action->weapon = weapon;
-		action->type = BA_PRIME;
-		action->value = 0;
+		action->type = BA_UNPRIME;
 		action->targeting = false;
 		action->result.clear();
 		action->updateTU();
 		battleGame->handleNonTargetAction();
-		if (weapon->getFuseTimer() >= 0 && weapon->getRules()->getBattleType() == BT_GRENADE)
+		if (weapon->getFuseTimer() == -1)
 		{
-			_doomFuses[weapon->getId()] = SDL_GetTicks();
+			_doomFuses.erase(weapon->getId());
 		}
 		return;
 	}
 
-	// Medi-kit, scanner, priming...: the item's own action menu, as clicking it on the HUD.
+	// A medi-kit or a scanner: used at once, no menu (see useItemDirectly). Anything else used
+	// or primed: the item's own action menu, as clicking it on the HUD.
+	const BattleType itemType = weapon->getRules()->getBattleType();
+	if (mode == BA_USE && !menuTargeting && (itemType == BT_MEDIKIT || itemType == BT_SCANNER))
+	{
+		useItemDirectly(unit, weapon);
+		return;
+	}
 	if ((mode == BA_USE || mode == BA_PRIME) && !menuTargeting)
 	{
 		_state->handleItemClick(weapon, false);
@@ -648,7 +1304,7 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 		{
 			_swingStart = SDL_GetTicks();
 			_swingJolted = false;
-			_sounds->play(FirstPersonSounds::SWOOSH, 0, 0.8f);
+			if (Options::fpsHitSounds) _sounds->play(FirstPersonSounds::SWOOSH, 0, 0.8f); // (setting "Hit, kill and swing sounds")
 		}
 		return;
 	}
@@ -670,6 +1326,47 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	targetTile.x = std::clamp<int>(targetTile.x, 0, _save->getMapSizeX() - 1);
 	targetTile.y = std::clamp<int>(targetTile.y, 0, _save->getMapSizeY() - 1);
 	targetTile.z = std::clamp<int>(targetTile.z, 0, _save->getMapSizeZ() - 1);
+
+	// Confirm fire (setting): the first click marks the target and shows its path (see
+	// updateTrajectory); a click on the same tile with the same weapon and mode fires, a click on
+	// another moves the mark. The held trigger's next bursts after a confirmed one go on firing.
+	if (Options::fpsConfirmFire && (isShot(mode) || mode == BA_THROW) && !(_triggerHeld && _burstConfirmed))
+	{
+		const bool confirmed = _confirmTile == targetTile && _confirmUnit == unit && _confirmWeapon == weapon && _confirmMode == mode;
+		if (!confirmed)
+		{
+			_confirmTile = targetTile;
+			_confirmVoxel = aimedVoxel;
+			_confirmFrom = unit->getPosition();
+			_confirmUnit = unit;
+			_confirmWeapon = weapon;
+			_confirmMode = mode;
+			_triggerHeld = false; // (holding the button doesn't confirm)
+			_state->warning("STR_FPS_CONFIRM_FIRE_HINT");
+			return;
+		}
+		clearConfirmMark();
+		_burstConfirmed = true;
+	}
+
+	// Doom mode's real-time grenades with prime on throw: a grenade on a timer is armed as it's
+	// thrown (its pin pulled, with the click), and burns for the fuse setting from the moment it
+	// leaves the hand (see updateDoomFuses). One already burning (pulled before the setting
+	// changed) burns on.
+	if (mode == BA_THROW && doomModeOn() && Options::fpsDoomRealTimeGrenades && Options::fpsDoomPrimeOnThrow && timedGrenade(weapon)
+		&& !_doomFuses.count(weapon->getId()))
+	{
+		pullDoomPin(unit, weapon, 0);
+	}
+
+	// Doom free grenades (setting): the grenade flies to the point under the crosshair by the 3D
+	// view's own throw, wherever that is, bursting in the air if its fuse runs out first (see
+	// throwFreeGrenade); the game's throw isn't asked.
+	if (mode == BA_THROW && doomModeOn() && Options::fpsDoomFreeGrenades && timedGrenade(weapon))
+	{
+		throwFreeGrenade(unit, weapon, aimedVoxel);
+		return;
+	}
 
 	// Set up the game's current action as its own targeting would, and let it work out the
 	// cost in time units.
@@ -710,9 +1407,19 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	action->dualWeapon = otherWeapon;
 	action->dualType = otherWeapon ? offMode : BA_NONE; // (dualPartner may name a mode for a gun it turned down)
 
-	// Fire, as a click on the target tile of the isometric map: the game turns the soldier,
-	// checks and spends the time units, and launches the shot. With the game's "confirm fire
-	// mode" setting the first click only marks the target, so click a second time.
+	// Free turning (no "Turning costs TU"): the soldier first faces the target for free, as
+	// looking round does, so the game's own turn before the shot costs nothing. (The crosshair
+	// near the edge of an eighth can aim at a tile in the next one.)
+	if (!Options::fpsTurnCost && (isShot(mode) || mode == BA_THROW) && unit->directionTo(targetTile) != unit->getDirection())
+	{
+		unit->setDirection(unit->directionTo(targetTile));
+		_save->getTileEngine()->calculateFOV(unit);
+		_save->getTileEngine()->calculateFOV(unit->getPosition(), 1, false); // others' view of this unit, like UnitTurnBState
+	}
+
+	// Fire, as a click on the target tile of the isometric map: the game turns the soldier (by
+	// the rules), checks and spends the time units, and launches the shot. With the game's
+	// "confirm fire mode" setting the first click only marks the target, so click a second time.
 	battleGame->primaryAction(targetTile);
 	if (Options::battleConfirmFireMode && action->targeting && !action->waypoints.empty())
 	{
@@ -726,6 +1433,165 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	action->dualWield = false;
 	action->dualWeapon = nullptr;
 	action->dualType = BA_NONE;
+}
+
+/**
+ * The patient a medi-kit would treat now. The game's own choices, as its action menu makes
+ * them (and with the same rules for whom the kit may treat, standing or lying, friend, neutral
+ * or foe, immune to wounds or not): a body lying on the soldier's own tile, the unit in the tile
+ * the soldier faces (in reach, as for melee), or the soldier themself. The game takes the first
+ * of these there is; here the player's aim picks among them:
+ * - the unit in reach, when its picture is under the crosshair (or the free cursor): it (none,
+ *   if the kit can't treat it);
+ * - looking down (more than 25 degrees): the body at the feet;
+ * - aiming at nothing in reach: the soldier themself;
+ * - and when the kit can't treat the soldier, the game's own order for the rest.
+ * @param unit The soldier with the kit.
+ * @param medikit The kit.
+ * @return The patient, or null if there's none.
+ */
+BattleUnit *FirstPersonMode::medikitPatient(BattleUnit *unit, BattleItem *medikit) const
+{
+	const RuleItem *rules = medikit->getRules();
+	// Whether the kit may treat a unit of this side, standing or lying.
+	auto sideAllowed = [rules](const BattleUnit *patient, bool lying) {
+		const UnitFaction faction = patient->getOriginalFaction();
+		return lying ? ((rules->getAllowTargetFriendGround() && faction == FACTION_PLAYER) || (rules->getAllowTargetNeutralGround() && faction == FACTION_NEUTRAL)
+				|| (rules->getAllowTargetHostileGround() && faction == FACTION_HOSTILE))
+			: ((rules->getAllowTargetFriendStanding() && faction == FACTION_PLAYER) || (rules->getAllowTargetNeutralStanding() && faction == FACTION_NEUTRAL)
+				|| (rules->getAllowTargetHostileStanding() && faction == FACTION_HOSTILE));
+	};
+	// A body on the soldier's own tile (never a big unit's), unconscious and treatable.
+	BattleUnit *body = nullptr;
+	for (BattleUnit *other : *_save->getUnits())
+	{
+		if (other->getPosition() == unit->getPosition() && other != unit && other->getStatus() == STATUS_UNCONSCIOUS && !other->isBigUnit()
+			&& (other->isWoundable() || rules->getAllowTargetImmune()) && rules->getAllowTargetGround() && sideAllowed(other, true))
+		{
+			body = other;
+			break;
+		}
+	}
+	// The unit in the tile the soldier faces, and whether the kit may treat it.
+	BattleUnit *facedUnit = nullptr, *standing = nullptr;
+	Position facedTile;
+	if (_save->getTileEngine()->validMeleeRange(unit->getPosition(), unit->getDirection(), unit, nullptr, &facedTile, false))
+	{
+		const Tile *tile = _save->getTile(facedTile);
+		facedUnit = tile ? tile->getUnit() : nullptr;
+		if (facedUnit && rules->getAllowTargetStanding() && (facedUnit->isWoundable() || rules->getAllowTargetImmune()) && sideAllowed(facedUnit, false))
+		{
+			standing = facedUnit;
+		}
+	}
+	// The aim picks.
+	const BattleUnit *pointed = _view->getUnitAtPointer();
+	if (pointed && pointed == facedUnit)
+	{
+		return standing;
+	}
+	if (_view->getPitchDegrees() < -25.0 && body)
+	{
+		return body;
+	}
+	if (rules->getAllowTargetSelf())
+	{
+		return unit;
+	}
+	return body ? body : standing;
+}
+
+/**
+ * Uses a medi-kit or a motion scanner straight from the view, with no action menu (it had only
+ * the one entry). The game's own checks come first, as its menu makes them (an alien artifact
+ * not researched yet, whatever stops the item being used). A scanner spends its time units and
+ * shows its screen. A medi-kit treats the patient the player points at (see medikitPatient): a
+ * kit of one kind (heal, stimulant or painkiller only) works at once, as the game's menu does it
+ * (healing the first fatal wound, or the torso); a full kit opens the game's medi-kit screen on
+ * the patient, to pick the body part and the treatment.
+ * @param unit The soldier.
+ * @param item The medi-kit or scanner.
+ */
+void FirstPersonMode::useItemDirectly(BattleUnit *unit, BattleItem *item)
+{
+	BattlescapeGame *battleGame = _state->_battleGame;
+	battleGame->cancelCurrentAction();
+	BattleAction *action = battleGame->getCurrentAction();
+	action->actor = unit;
+	action->weapon = item;
+	action->type = BA_USE;
+	action->skillRules = nullptr;
+	action->targeting = false;
+	action->result.clear();
+	action->updateTU();
+	const RuleItem *rules = item->getRules();
+
+	// The game's checks.
+	std::string result = "STR_UNKNOWN";
+	if (_save->isPreview() || (unit->getOriginalFaction() == FACTION_PLAYER && !_game->getSavedGame()->isResearched(rules->getRequirements())))
+	{
+		_state->warning("STR_UNABLE_TO_USE_ALIEN_ARTIFACT_UNTIL_RESEARCHED");
+		return;
+	}
+	if (!_save->canUseWeapon(item, unit, false, BA_USE, &result))
+	{
+		_state->warning(result);
+		return;
+	}
+
+	// A scanner.
+	if (rules->getBattleType() == BT_SCANNER)
+	{
+		if (action->spendTU(&action->result))
+		{
+			_game->pushState(new ScannerState(action));
+		}
+		else
+		{
+			_state->warning(action->result);
+		}
+		return;
+	}
+
+	// A medi-kit, on the patient pointed at.
+	BattleUnit *patient = medikitPatient(unit, item);
+	if (!patient)
+	{
+		_state->warning("STR_THERE_IS_NO_ONE_THERE");
+		return;
+	}
+	TileEngine *tileEngine = _save->getTileEngine();
+	const BattleMediKitType type = rules->getMediKitType();
+	if (!type)
+	{
+		_game->pushState(new MedikitState(patient, action, tileEngine));
+		return;
+	}
+	if (!((type == BMT_HEAL && item->getHealQuantity() > 0) || (type == BMT_STIMULANT && item->getStimulantQuantity() > 0)
+		|| (type == BMT_PAINKILLER && item->getPainKillerQuantity() > 0)))
+	{
+		_state->warning("STR_NO_USES_LEFT");
+		return;
+	}
+	if (!action->spendTU(&action->result))
+	{
+		_state->warning(action->result);
+		return;
+	}
+	UnitBodyPart part = BODYPART_TORSO;
+	if (type == BMT_HEAL)
+	{
+		for (int bodyPart = 0; bodyPart < BODYPART_MAX; ++bodyPart)
+		{
+			if (patient->getFatalWound((UnitBodyPart)bodyPart))
+			{
+				part = (UnitBodyPart)bodyPart;
+				break;
+			}
+		}
+	}
+	tileEngine->medikitUse(action, patient, type == BMT_HEAL ? BMA_HEAL : type == BMT_STIMULANT ? BMA_STIMULANT : BMA_PAINKILLER, part);
+	tileEngine->medikitRemoveIfEmpty(action);
 }
 
 /**
@@ -880,7 +1746,7 @@ void FirstPersonMode::freeAimTarget(const BattleAction &action, Position &target
 	// the view they point through (the focal length in pixels comes from the field of view).
 	const double angleX = gaussian() * sigmaRadians, angleY = gaussian() * sigmaRadians;
 	const int viewWidth = _view->getWidth(), viewHeight = _view->getHeight();
-	const double focalPixels = (viewWidth / 2.0) / std::tan(std::clamp(Options::fpsFieldOfView, 50, 110) * Pi / 360.0);
+	const double focalPixels = (viewWidth / 2.0) / std::tan(fieldOfViewNow() * Pi / 360.0);
 	const int pixelX = std::clamp((int)std::lround(viewWidth / 2.0 + std::tan(angleX) * focalPixels), 0, viewWidth - 1);
 	const int pixelY = std::clamp((int)std::lround(viewHeight / 2.0 - std::tan(angleY) * focalPixels), 0, viewHeight - 1);
 
@@ -1054,7 +1920,8 @@ void FirstPersonMode::drawCrosshair(BattleActionType mode, int shots, Uint8 colo
 		break;
 	case BA_USE:
 	case BA_PRIME:
-		// An item used from its menu: a box.
+	case BA_UNPRIME:
+		// An item used from its menu (or switched off): a box.
 		line(-5, -5, 5, -5); line(5, -5, 5, 5); line(5, 5, -5, 5); line(-5, 5, -5, -5);
 		dot(0, 0);
 		break;
@@ -1211,10 +2078,23 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 			{ BA_SNAPSHOT, "STR_FPS_MODE_SNAP" }, { BA_AIMEDSHOT, "STR_FPS_MODE_AIMED" }, { BA_AUTOSHOT, "STR_FPS_MODE_AUTO" },
 			{ BA_THROW, "STR_FPS_MODE_THROW" }, { BA_LAUNCH, "STR_FPS_MODE_LAUNCH" }, { BA_HIT, "STR_FPS_MODE_MELEE" },
 			{ BA_PANIC, "STR_FPS_MODE_PANIC" }, { BA_MINDCONTROL, "STR_FPS_MODE_MIND_CONTROL" }, { BA_USE, "STR_FPS_MODE_USE" },
-			{ BA_PRIME, "STR_FPS_MODE_PRIME" } };
+			{ BA_PRIME, "STR_FPS_MODE_PRIME" }, { BA_UNPRIME, "STR_FPS_MODE_UNPRIME" } };
 		for (const auto &entry : modeNames)
 		{
 			if (entry.mode == mode) modeText = _state->tr(entry.name);
+		}
+		// Doom real-time grenades primed on throw: PRIME sets the fuse for every grenade, "FUSE 3s".
+		if (mode == BA_PRIME && doomModeOn() && Options::fpsDoomRealTimeGrenades && Options::fpsDoomPrimeOnThrow && timedGrenade(weapon))
+		{
+			modeText = _state->tr("STR_FPS_DOOM_FUSE").arg(std::clamp(Options::fpsDoomGrenadeFuse, 1, FirstPerson::DoomFuseMaxSeconds));
+		}
+		// A medi-kit names its patient: "USE: Fred", "USE: SELF" (see medikitPatient); with
+		// none, it can't be used.
+		if (mode == BA_USE && rules->getBattleType() == BT_MEDIKIT)
+		{
+			const BattleUnit *patient = medikitPatient(unit, weapon);
+			modeText += ": " + (patient == unit ? std::string(_state->tr("STR_FPS_MEDIKIT_SELF")) : patient ? unitLabel(patient) : std::string("-"));
+			canFire = canFire && patient;
 		}
 		if (mode == BA_AUTOSHOT && slot != mode)
 		{
@@ -1265,7 +2145,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	int ringRadius = 0;
 	if (unit && freeAimOn(mode))
 	{
-		const double focalPixels = (_view->getWidth() / 2.0) / std::tan(std::clamp(Options::fpsFieldOfView, 50, 110) * Pi / 360.0);
+		const double focalPixels = (_view->getWidth() / 2.0) / std::tan(fieldOfViewNow() * Pi / 360.0);
 		ringRadius = std::clamp((int)std::lround(std::tan((spreadFor(unit, mode, dual) + _bloom) * Pi / 180.0) * focalPixels), 2, CrosshairSize / 2 - 1);
 	}
 
@@ -1471,6 +2351,100 @@ bool FirstPersonMode::creatureAt(const Position &voxel, const BattleUnit *self) 
 		}
 	}
 	return false;
+}
+
+/**
+ * Where the player points on the view: the crosshair, in the middle, with mouse look; the free
+ * cursor otherwise (the view lies on our canvas, so its pixels are the canvas's).
+ * @param pointerX, pointerY Set to the pixel on the view.
+ */
+void FirstPersonMode::pointer(int &pointerX, int &pointerY) const
+{
+	pointerX = _mouseLook ? _view->getWidth() / 2 : _cursorX;
+	pointerY = _mouseLook ? _view->getHeight() / 2 : _cursorY;
+}
+
+/**
+ * What the game's own unit screen (the middle click on the map) calls a unit: a civilian by
+ * their kind, an alien by their race (or race and rank, if the mod shows full names there), a
+ * soldier by their name.
+ * @param target The unit.
+ * @return The name.
+ */
+std::string FirstPersonMode::unitLabel(const BattleUnit *target) const
+{
+	if (target->getOriginalFaction() == FACTION_NEUTRAL)
+	{
+		return _state->tr(target->getType());
+	}
+	if (target->getUnitRules())
+	{
+		return target->getUnitRules()->getShowFullNameInAlienInventory(_game->getMod()) ? target->getName(_game->getLanguage())
+			: std::string(_state->tr(target->getUnitRules()->getRace()));
+	}
+	return target->getName(_game->getLanguage());
+}
+
+/**
+ * Every frame in 3D: names the unit the player points at (setting "Unit names": the one whose
+ * picture is under the crosshair or the free cursor, see FirstPersonView::getUnitAtPointer) just
+ * under the crosshair, or the cursor, in its side's colour (green ours, red the aliens', yellow the
+ * civilians'), as the game's unit screen names it; and tells the view where the player points,
+ * and how much text is under it there (the icons over a downed unit go below it).
+ * @param unit The soldier looked through, or null (nothing named).
+ */
+void FirstPersonMode::updateUnitName(BattleUnit *unit)
+{
+	int pointerX, pointerY;
+	pointer(pointerX, pointerY);
+	const BattleUnit *target = Options::fpsUnitNames && isActive() && unit ? _view->getUnitAtPointer() : nullptr;
+	_txtTarget->setVisible(target != nullptr);
+	_view->setPointer(pointerX, pointerY, target ? _txtTarget->getHeight() + 1 : 0);
+	if (!target)
+	{
+		return;
+	}
+	const SDL_Color *palette = _view->getPalette();
+	const Uint8 color = target->getFaction() == FACTION_PLAYER ? textColor(palette, 130, 230, 100)
+		: target->getFaction() == FACTION_HOSTILE ? textColor(palette, 240, 70, 50) : textColor(palette, 255, 216, 64);
+	if (_txtTarget->getColor() != color) _txtTarget->setColor(color);
+	const std::string label = unitLabel(target);
+	if (_txtTarget->getText() != label) _txtTarget->setText(label);
+	// Centred under the crosshair, clear of its picture (about 8 pixels round the middle).
+	_txtTarget->setX(_view->getX() + pointerX - _txtTarget->getWidth() / 2);
+	_txtTarget->setY(_view->getY() + pointerY + 10);
+}
+
+/**
+ * The middle click as on the isometric map (setting "Middle click identifies"): on a unit the
+ * player points at (one in sight, standing, its picture under the crosshair or the cursor: see
+ * FirstPersonView::getUnitAtPointer), the game's own unit screen (who it is and what it
+ * carries); in debug mode with Ctrl held, the mind probe's screen, as the map does.
+ * @return True if a unit was shown; false if there's none there (the click frees or takes
+ *         back the cursor as before).
+ */
+bool FirstPersonMode::identifyPointedUnit()
+{
+	BattleUnit *unit = _save->getSelectedUnit();
+	if (!Options::fpsMiddleClickIdentify || !unit || _state->_battleGame->isBusy())
+	{
+		return false;
+	}
+	BattleUnit *target = _view->getUnitAtPointer();
+	if (!target)
+	{
+		return false;
+	}
+	_state->_battleGame->cancelCurrentAction();
+	if (_save->getDebugMode() && _game->isCtrlPressed())
+	{
+		_state->popup(new UnitInfoState(target, _state, false, true));
+	}
+	else
+	{
+		_game->pushState(new AlienInventoryState(target));
+	}
+	return true;
 }
 
 /**

@@ -63,8 +63,9 @@ public:
 	/// The sounds: HIT (the tick of a hit), KILL (the tick, then a lower one, for a kill),
 	/// HEARTBEAT (lub-dub, when badly hurt), DRY_FIRE (the click of a gun that can't fire),
 	/// FLARE (a strike and a hiss), WHIZZ (a shot whizzing past), SWOOSH (a melee swing
-	/// cutting the air). COUNT is how many there are.
-	enum Id { HIT, KILL, HEARTBEAT, DRY_FIRE, FLARE, WHIZZ, SWOOSH, COUNT };
+	/// cutting the air), PIN (a grenade's pin pulled: a click and the lever's ping). COUNT is how
+	/// many there are.
+	enum Id { HIT, KILL, HEARTBEAT, DRY_FIRE, FLARE, WHIZZ, SWOOSH, PIN, COUNT };
 	/// Synthesizes all the sounds for the mixer's output format.
 	FirstPersonSounds();
 	/// Stops and frees the sounds.

@@ -130,6 +130,18 @@ FirstPersonSounds::FirstPersonSounds()
 	}
 	make(DRY_FIRE, dry);
 
+	// Pin: a grenade's pin pulled (140 ms): a click like the dry fire's but brighter (2600 Hz),
+	// then 60 ms later the lever flying off, a softer high ping (3300 Hz) ringing a little
+	// longer. leverSeconds is the time since the lever's ping began (negative before it).
+	std::vector<float> pin(length(0.14f));
+	for (size_t sample = 0; sample < pin.size(); ++sample)
+	{
+		const float seconds = (float)sample / rate, leverSeconds = seconds - 0.06f;
+		pin[sample] = std::exp(-seconds * 180.0f) * (0.45f * noise(randomEngine) + 0.55f * std::sin(2 * Pi * 2600 * seconds));
+		if (leverSeconds > 0) pin[sample] += 0.5f * std::exp(-leverSeconds * 60.0f) * std::sin(2 * Pi * 3300 * leverSeconds);
+	}
+	make(PIN, pin);
+
 	// Flare: a strike, then a hiss fading out (1.4 seconds in all).
 	std::vector<float> flare(length(1.4f));
 	float lowPassedNoise = 0.0f; // The noise smoothed by a simple low-pass filter.

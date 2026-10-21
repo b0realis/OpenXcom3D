@@ -51,6 +51,7 @@
  */
 #include "FirstPersonMode.h"
 #include <algorithm>
+#include <climits>
 #include <cmath>
 #include <string>
 #include "FirstPersonSounds.h"
@@ -59,11 +60,13 @@
 #include "../Battlescape/BattlescapeGame.h"
 #include "../Battlescape/BattlescapeState.h"
 #include "../Battlescape/Map.h"
+#include "../Battlescape/Projectile.h"
 #include "../Engine/Game.h"
 #include "../Interface/Text.h"
 #include "../Mod/Armor.h"
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/SavedBattleGame.h"
+#include "../Savegame/Tile.h"
 #include "FirstPersonModeShared.h"
 
 namespace OpenXcom
@@ -297,6 +300,7 @@ bool FirstPersonMode::deathCam(Uint32 now, double elapsedSeconds)
 		_breakdownStart = 0;
 		_txtMode->setVisible(false);
 		_txtShot->setVisible(false);
+		_txtTarget->setVisible(false);
 		_crosshair->setVisible(false);
 		_weaponInHand->setVisible(false);
 
@@ -577,6 +581,7 @@ bool FirstPersonMode::breakdownCam(Uint32 now, double elapsedSeconds)
 		_view->setVignette(0.0f);
 		_txtMode->setVisible(false);
 		_txtShot->setVisible(false);
+		_txtTarget->setVisible(false);
 		_crosshair->setVisible(false);
 		_weaponInHand->setVisible(false);
 		const FallKind kind = _breakdownBerserk ? FALL_BERSERK : FALL_PANIC;
@@ -679,6 +684,150 @@ void FirstPersonMode::endBreakdown(bool forget)
 	}
 	_breakdownStart = 0;
 	_lastHeartbeat = -1;
+}
+
+/**
+ * The aliens' turn in 3D (setting "Aliens' turn cameras", with "Alien turn in 3D"): instead of
+ * staying on the last soldier, the view goes where the action is, and soldiers in trouble pop up
+ * a small camera (the soldier card's helmet camera, see updateSoldierCard). In order:
+ * - Watching the squad: a soldier of ours who is hit (health or stun), taken over (mind
+ *   control) or goes down (setting "Camera when a soldier falls") pops up their camera for
+ *   AlertTime; their status says why ("HIT", or by itself MIND CONTROLLED, or DECEASED or
+ *   UNCONSCIOUS over the static of a dead camera). The soldier the view looks through going
+ *   down is the death camera's (see deathCam).
+ * - A shot in flight: one at a soldier of ours from an alien pops up that soldier's camera
+ *   ("TARGETED"); one fired by a soldier of ours (reaction fire) cuts the view to the shooter at
+ *   once, looking at what they shoot at.
+ * - The alien acting now: when the soldier looked through doesn't see it, the view cuts to the
+ *   nearest soldier who does, but never sooner than AlienCameraHold after the last cut (no
+ *   flicking back and forth); and while looking through someone who sees it, the view glides
+ *   round to the alien each time it reaches a new tile (and leaves the mouse alone otherwise).
+ * When no soldier sees anything, the view stays where it is (HIDDEN MOVEMENT).
+ * @param now The time (SDL ticks).
+ * @return The soldier to look through; null for the last soldier (the setting off, or nobody yet).
+ */
+BattleUnit *FirstPersonMode::alienTurnCamera(Uint32 now)
+{
+	// A soldier of ours fit to look through.
+	auto canLookThrough = [](const BattleUnit *unit) { return unit && unit->getFaction() == FACTION_PLAYER && !unit->isOut() && unit->getTile(); };
+	if (!Options::fpsAlienTurnCameras)
+	{
+		_alienTurnCamera = nullptr;
+		return nullptr;
+	}
+	if (!canLookThrough(_alienTurnCamera))
+	{
+		_alienTurnCamera = nullptr;
+	}
+
+	// The squad, watched from frame to frame: hit (less health, or more stun), taken over, or
+	// gone down (dead or unconscious: side -1).
+	for (BattleUnit *soldier : *_save->getUnits())
+	{
+		if (soldier->getOriginalFaction() != FACTION_PLAYER) continue;
+		const int wellBeing = soldier->getHealth() - soldier->getStunlevel();
+		const int side = soldier->isOut() ? -1 : (int)soldier->getFaction();
+		const auto lastFrame = _alertWatch.find(soldier);
+		if (lastFrame != _alertWatch.end())
+		{
+			const int sideBefore = lastFrame->second.second;
+			if (side == -1 && sideBefore != -1) { if (Options::fpsFallenSoldierCamera) popUpCamera(soldier, "", now); }
+			else if (side == FACTION_PLAYER && wellBeing < lastFrame->second.first) popUpCamera(soldier, "STR_FPS_ALERT_HIT", now);
+			else if (side != -1 && side != FACTION_PLAYER && sideBefore == FACTION_PLAYER) popUpCamera(soldier, "", now);
+		}
+		_alertWatch[soldier] = { wellBeing, side };
+	}
+
+	// A shot in flight: who fired it (the unit on the tile it started from), and at whom.
+	BattleUnit *shooter = nullptr, *shotAt = nullptr;
+	if (const Projectile *projectile = _state->_map->getProjectile())
+	{
+		const Tile *fromTile = _save->getTile(projectile->getOrigin()), *toTile = _save->getTile(projectile->getTarget());
+		shooter = fromTile ? fromTile->getUnit() : nullptr;
+		shotAt = toTile ? toTile->getUnit() : nullptr;
+		if (shooter && shooter->getFaction() != FACTION_PLAYER && canLookThrough(shotAt) && !(_alertUnit == shotAt && now < _alertUntil))
+		{
+			popUpCamera(shotAt, "STR_FPS_ALERT_TARGETED", now);
+		}
+	}
+
+	// Reaction fire: one of ours shooting cuts the view to them at once.
+	if (canLookThrough(shooter))
+	{
+		if (shooter != _alienTurnCamera) cutAlienTurnCamera(shooter, shotAt, now);
+		return _alienTurnCamera;
+	}
+
+	// The alien acting now (the game selects each alien as it acts), and who of ours sees it.
+	BattleUnit *acting = _save->getSelectedUnit();
+	if (acting && acting->getFaction() != FACTION_PLAYER && !acting->isOut() && acting->getTile())
+	{
+		const bool watchedSees = _alienTurnCamera && _alienTurnCamera->hasVisibleUnit(acting);
+		if (!watchedSees && now - _alienTurnCameraSince >= AlienCameraHold)
+		{
+			// The nearest soldier who sees it.
+			BattleUnit *spotter = nullptr;
+			int nearestSquared = INT_MAX;
+			for (BattleUnit *soldier : *_save->getUnits())
+			{
+				if (!canLookThrough(soldier) || !soldier->hasVisibleUnit(acting)) continue;
+				const int distanceSquared = soldier->distance3dToUnitSq(acting);
+				if (distanceSquared < nearestSquared)
+				{
+					nearestSquared = distanceSquared;
+					spotter = soldier;
+				}
+			}
+			if (spotter) cutAlienTurnCamera(spotter, acting, now);
+		}
+		else if (watchedSees && (acting != _alienTurnWatched || acting->getPosition() != _alienTurnWatchedTile))
+		{
+			// Still in sight: follow it with the eyes when it moves on a tile.
+			glideToLookAt(acting);
+			_alienTurnWatched = acting;
+			_alienTurnWatchedTile = acting->getPosition();
+		}
+	}
+	return _alienTurnCamera;
+}
+
+/**
+ * Cuts the aliens' turn view to a soldier, turning to look at a unit: at once if the view is
+ * already theirs (gliding), else as the view switches to them (see updateCamera).
+ * @param soldier The soldier to look through.
+ * @param lookAt The unit to look at (null: the way the soldier faces).
+ * @param now The time (SDL ticks).
+ */
+void FirstPersonMode::cutAlienTurnCamera(BattleUnit *soldier, const BattleUnit *lookAt, Uint32 now)
+{
+	_alienTurnCamera = soldier;
+	_alienTurnCameraSince = now;
+	_alienTurnWatched = lookAt;
+	_alienTurnWatchedTile = lookAt ? lookAt->getPosition() : Position(-1, -1, -1);
+	if (!lookAt)
+	{
+		return;
+	}
+	if (soldier == _trackedUnit) glideToLookAt(lookAt);
+	else _lookAtOnSwitch = lookAt;
+}
+
+/**
+ * Pops up the small camera (the soldier card, see updateSoldierCard) on a soldier for
+ * AlertTime, unless it's the soldier the view already looks through.
+ * @param soldier The soldier.
+ * @param why A string id for their status line ("HIT"); empty: their own status.
+ * @param now The time (SDL ticks).
+ */
+void FirstPersonMode::popUpCamera(const BattleUnit *soldier, const std::string &why, Uint32 now)
+{
+	if (soldier == _trackedUnit && isActive())
+	{
+		return;
+	}
+	_alertUnit = soldier;
+	_alertText = why;
+	_alertUntil = now + AlertTime;
 }
 
 }

@@ -53,7 +53,10 @@
 #include <algorithm>
 #include <climits>
 #include <cmath>
+#include <iomanip>
+#include <sstream>
 #include <string>
+#include "FirstPersonApi.h"
 #include "FirstPersonView.h"
 #include "RuleFirstPerson.h"
 #include "../Battlescape/BattlescapeGame.h"
@@ -146,11 +149,15 @@ void FirstPersonMode::toggleNightVision(BattleUnit *unit, Action *action)
  * yellow triangle on its rim shows the way the soldier faces. Turning by the rules (setting "Turning costs TU"), an arc shows the head's free turn,
  * HeadTurn degrees either side of the facing: within CompassWarnDegrees of its end it turns
  * yellow and the line under it says what looking further costs ("TURN 1 TU"), or red with
- * "NO TU" when the soldier couldn't pay for the turn. The dial is drawn again only when what it
- * shows changes.
+ * "NO TU" when the soldier couldn't pay for the turn. A shot or throw aimed off the eighth the
+ * soldier faces makes the game turn the soldier first and charge the turn (turning by the rules,
+ * see shotTurnCost): an orange triangle on the rim marks the way the soldier will face, and the
+ * line under the dial says what the turn adds ("SHOT +2 TU"; red when the time units won't
+ * cover the turn and the shot). The dial is drawn again only when what it shows changes.
  * @param unit The soldier the view looks through, or null to hide the compass.
+ * @param playerTurn It's the player's turn (the shot's turn is shown only then).
  */
-void FirstPersonMode::updateCompass(BattleUnit *unit)
+void FirstPersonMode::updateCompass(BattleUnit *unit, bool playerTurn)
 {
 	const bool show = Options::fpsCompass && isActive() && !_hudHidden && unit;
 	_compass->setVisible(show);
@@ -164,7 +171,16 @@ void FirstPersonMode::updateCompass(BattleUnit *unit)
 	// The view's bearing (the camera's yaw has 0 = east; a bearing 0 = north, clockwise), the
 	// soldier's facing, and how close the view is to the head's limit, turning by the rules.
 	const int viewBearing = ((int)std::lround(_view->getYawDegrees() + 90.0) % 360 + 360) % 360;
-	const int facing = unit->getDirection();
+	// While a step is walked the game points the soldier along the step. Shown instead: the
+	// facing it keeps (a sidestep, turning by the rules), or with free turning the one it takes
+	// again at the end, the compass point the view looks closest to. So the facing on the rim
+	// never flicks sideways for a step to the side.
+	int facing = unit->getDirection();
+	if (_stepPending)
+	{
+		facing = _sidestepFacing >= 0 ? _sidestepFacing
+			: !Options::fpsTurnCost ? (((int)std::lround((_view->getYawDegrees() + 90.0) / 45.0)) % 8 + 8) % 8 : facing;
+	}
 	int warning = 0;
 	if (Options::fpsTurnCost)
 	{
@@ -174,12 +190,24 @@ void FirstPersonMode::updateCompass(BattleUnit *unit)
 			warning = (doomModeOn() || unit->getTimeUnits() >= unit->getTurnCost()) ? 1 : 2;
 		}
 	}
-	if (viewBearing != _compassDrawn[0] || facing != _compassDrawn[1] || warning != _compassDrawn[2])
+	// The shot's turn: its cost and the way the soldier will face (none while a step is walked).
+	int shotFacing = -1, shotTurn = 0, shotWarning = 0;
+	bool shotAffordable = true;
+	if (playerTurn && canAct() && !_stepPending)
+	{
+		shotTurn = shotTurnCost(unit, shotFacing, shotAffordable);
+		shotWarning = shotTurn ? (shotAffordable ? 1 : 2) : 0;
+		if (!shotTurn) shotFacing = -1;
+	}
+	if (viewBearing != _compassDrawn[0] || facing != _compassDrawn[1] || warning != _compassDrawn[2]
+		|| shotFacing != _compassDrawn[3] || shotTurn * 4 + shotWarning != _compassDrawn[4])
 	{
 		_compassDrawn[0] = viewBearing;
 		_compassDrawn[1] = facing;
 		_compassDrawn[2] = warning;
-		drawCompass(viewBearing, facing, warning);
+		_compassDrawn[3] = shotFacing;
+		_compassDrawn[4] = shotTurn * 4 + shotWarning;
+		drawCompass(viewBearing, facing, warning, shotFacing);
 
 		// The letters, inside the rim, at their bearings measured from the view's.
 		const double radius = CompassSize / 2 - 9.0;
@@ -192,9 +220,15 @@ void FirstPersonMode::updateCompass(BattleUnit *unit)
 			_compassLetters[letter]->setY((int)std::lround(centreY - 3.5));
 		}
 
-		// The line under it.
-		_txtCompassTurn->setVisible(warning != 0);
-		if (warning)
+		// The line under it: the shot's turn first (it's what the next click costs), else the
+		// head's limit.
+		_txtCompassTurn->setVisible(warning != 0 || shotWarning != 0);
+		if (shotWarning)
+		{
+			_txtCompassTurn->setColor(textColor(_state->getPalette(), shotWarning == 1 ? 250 : 230, shotWarning == 1 ? 160 : 60, shotWarning == 1 ? 60 : 50));
+			_txtCompassTurn->setText(_state->tr("STR_FPS_COMPASS_SHOT_TURN").arg(shotTurn));
+		}
+		else if (warning)
 		{
 			_txtCompassTurn->setColor(textColor(_state->getPalette(), warning == 1 ? 240 : 230, warning == 1 ? 210 : 60, warning == 1 ? 60 : 50));
 			_txtCompassTurn->setText(warning == 1 ? std::string(_state->tr("STR_FPS_COMPASS_TURN").arg(unit->getTurnCost())) : std::string(_state->tr("STR_FPS_COMPASS_NO_TU")));
@@ -205,13 +239,15 @@ void FirstPersonMode::updateCompass(BattleUnit *unit)
 /**
  * Draws the compass: a dark disc with a grey rim, ticks at the eight directions a soldier can
  * face, the head's free turn as an arc on the rim (turning by the rules), the soldier's facing as
- * a yellow triangle on the rim, and on top of the disc the heading arrow, hugging the rim and
- * pointing in. Angles on the disc go clockwise from its top, which is the view's bearing.
+ * a yellow triangle on the rim, the way a shot will turn the soldier as a smaller orange one,
+ * and on top of the disc the heading arrow, hugging the rim and pointing in. Angles on the disc
+ * go clockwise from its top, which is the view's bearing.
  * @param viewBearing The view's bearing, degrees (0 north, clockwise).
  * @param facing The soldier's facing, 0 (north) to 7, clockwise.
  * @param warning 0, or 1 when the view is near the head's limit, 2 when the soldier couldn't pay for the turn.
+ * @param shotFacing The facing a shot at the crosshair will turn the soldier to, 0 to 7; -1 for none.
  */
-void FirstPersonMode::drawCompass(int viewBearing, int facing, int warning)
+void FirstPersonMode::drawCompass(int viewBearing, int facing, int warning, int shotFacing)
 {
 	const SDL_Color *palette = _state->getPalette();
 	const Uint8 dark = nearestColor(palette, 20, 22, 30), rim = nearestColor(palette, 150, 155, 175), tick = nearestColor(palette, 190, 195, 210);
@@ -260,17 +296,25 @@ void FirstPersonMode::drawCompass(int viewBearing, int facing, int warning)
 			_compass->setPixel(x, y, tick);
 		}
 	}
-	// The soldier's facing: a yellow triangle on the rim pointing in, outside the letters.
-	for (double distance = radius - 6.0; distance <= radius; distance += 0.5)
-	{
-		const double halfWidth = (distance - (radius - 6.0)) * 0.45;
-		for (double side = -halfWidth; side <= halfWidth; side += 0.5)
+	// The soldier's facing: a yellow triangle on the rim pointing in, outside the letters; the way
+	// a shot will turn the soldier, a smaller orange one.
+	auto rimTriangle = [&](int direction, double size, Uint8 color) {
+		const double angle = (direction * 45.0 - viewBearing) * Pi / 180.0;
+		for (double distance = radius - size; distance <= radius; distance += 0.5)
 		{
-			const double angle = (facing * 45.0 - viewBearing) * Pi / 180.0;
-			const int x = (int)std::lround(centre + distance * std::sin(angle) + side * std::cos(angle));
-			const int y = (int)std::lround(centreY - distance * std::cos(angle) + side * std::sin(angle));
-			_compass->setPixel(x, y, facingColor);
+			const double halfWidth = (distance - (radius - size)) * 0.45;
+			for (double side = -halfWidth; side <= halfWidth; side += 0.5)
+			{
+				const int x = (int)std::lround(centre + distance * std::sin(angle) + side * std::cos(angle));
+				const int y = (int)std::lround(centreY - distance * std::cos(angle) + side * std::sin(angle));
+				_compass->setPixel(x, y, color);
+			}
 		}
+	};
+	rimTriangle(facing, 6.0, facingColor);
+	if (shotFacing >= 0)
+	{
+		rimTriangle(shotFacing, 5.0, nearestColor(palette, 250, 140, 40));
 	}
 	// The heading: a fixed arrow on top of the disc, pointing in, its tip on the rim and its sides
 	// stopping at the rim, so it hugs the disc; bright, outlined dark so it stands out on the sky.
@@ -289,6 +333,91 @@ void FirstPersonMode::drawCompass(int viewBearing, int facing, int warning)
 		}
 	}
 	_compass->unlock();
+}
+
+/**
+ * Makes the surface the scope cross is drawn on (shown while zoomed in, see updateScope): as big
+ * as the canvas, just above the weapon in hand and behind the rest of the screen (made again
+ * when the canvas changes size). The cross is drawn once: a thin blue line across the whole
+ * view each way through the reticle, with a gap round the reticle itself (ScopeGap) and short
+ * ticks every ScopeTickSpacing pixels, like a rifle scope's, unobtrusive.
+ */
+void FirstPersonMode::makeScopeCross()
+{
+	const int width = canvasWidth(), height = canvasHeight();
+	Surface *surface = new Surface(width, height, 0, 0);
+	surface->setPalette(_state->getPalette());
+	surface->setVisible(false);
+	auto &surfaces = _state->_surfaces;
+	if (_scopeCross)
+	{
+		// Made again (a resize): the new surface takes the old one's place in the screen's list.
+		std::replace(surfaces.begin(), surfaces.end(), _scopeCross, surface);
+		_ownSurfaces.erase(_scopeCross);
+		delete _scopeCross;
+	}
+	else
+	{
+		// The first time: straight after the weapon in hand in the screen's drawing order.
+		surfaces.insert(std::find(surfaces.begin(), surfaces.end(), _weaponInHand) + 1, surface);
+	}
+	_ownSurfaces.insert(surface);
+	_scopeCross = surface;
+
+	// The cross, from the middle of the canvas (the reticle's middle) out to the edges, in a
+	// soft blue; the ticks a step brighter.
+	const SDL_Color *palette = _state->getPalette();
+	const Uint8 lineColor = nearestColor(palette, 70, 120, 210), tickColor = nearestColor(palette, 110, 160, 240);
+	const int middleX = width / 2, middleY = height / 2;
+	surface->lock();
+	for (int x = 0; x < width; ++x)
+	{
+		const int fromMiddle = std::abs(x - middleX);
+		if (fromMiddle < ScopeGap) continue;
+		surface->setPixel(x, middleY, lineColor);
+		if (fromMiddle % ScopeTickSpacing == 0)
+		{
+			surface->setPixel(x, middleY - 1, tickColor);
+			surface->setPixel(x, middleY + 1, tickColor);
+		}
+	}
+	for (int y = 0; y < height; ++y)
+	{
+		const int fromMiddle = std::abs(y - middleY);
+		if (fromMiddle < ScopeGap) continue;
+		surface->setPixel(middleX, y, lineColor);
+		if (fromMiddle % ScopeTickSpacing == 0)
+		{
+			surface->setPixel(middleX - 1, y, tickColor);
+			surface->setPixel(middleX + 1, y, tickColor);
+		}
+	}
+	surface->unlock();
+}
+
+/**
+ * Zoomed in (setting "Zoom"): shows the scope cross through the reticle, and at the right, in
+ * blue, SCOPING with how much closer the view looks right now ("SCOPING 2.6x"), the number
+ * climbing as the zoom glides in and falling as it glides out (see updateZoom). Both show from
+ * a little past 1x, and not with the HUD hidden.
+ */
+void FirstPersonMode::updateScope()
+{
+	const bool scoping = isActive() && !_hudHidden && _zoom > 1.05;
+	_scopeCross->setVisible(scoping);
+	_txtScoping->setVisible(scoping);
+	if (!scoping)
+	{
+		return;
+	}
+
+	// The zoom with one decimal, or a whole number when it is one ("4x" once all the way in).
+	const double shownZoom = std::round(_zoom * 10.0) / 10.0;
+	std::ostringstream zoomText;
+	if (shownZoom == std::round(shownZoom)) zoomText << (int)shownZoom;
+	else zoomText << std::fixed << std::setprecision(1) << shownZoom;
+	_txtScoping->setColor(textColor(_state->getPalette(), 110, 170, 255));
+	_txtScoping->setText(_state->tr("STR_FPS_SCOPING").arg(zoomText.str()));
 }
 
 /**
@@ -399,10 +528,13 @@ void FirstPersonMode::updateInfoPanel(BattleUnit *unit)
 	_txtStatus->setText(statusLabel(unit));
 
 	// The hands: the weapon that fires (in the fire mode picked for it, when that's the weapon
-	// the mode was picked for), then whatever is in the other hand. The other hand's line is
-	// shown as active too when its gun fires along (dual wield).
+	// the mode was picked for), then whatever is in the other hand (with the built-in weapon in
+	// use, the right hand's item, or else the left's). The other hand's line is shown as active
+	// too when its gun fires along (dual wield).
 	BattleItem *weapon = activeWeapon(unit);
-	BattleItem *otherItem = weapon == unit->getRightHandWeapon() ? unit->getLeftHandWeapon() : unit->getRightHandWeapon();
+	const int hand = activeHand(unit);
+	BattleItem *otherItem = hand == 1 ? unit->getRightHandWeapon() : hand == 0 ? unit->getLeftHandWeapon()
+		: (unit->getRightHandWeapon() ? unit->getRightHandWeapon() : unit->getLeftHandWeapon());
 	if (otherItem == weapon)
 	{
 		otherItem = nullptr; // (an item held in both hands)
@@ -470,8 +602,7 @@ void FirstPersonMode::fillHandLine(Text *nameText, Text *ammoText, BattleUnit *u
 	bool loaded = true;
 	const std::string ammo = ammoLabel(unit, item, mode, loaded);
 	const int nameRoom = PanelLineW - (ammo.empty() ? 0 : smallTextWidth(ammo) + gap);
-	const std::string hand = item == unit->getLeftHandWeapon() ? "L: " : "R: ";
-	const std::string name = fitText(hand + std::string(_state->tr(item->getRules()->getName())), nameRoom);
+	const std::string name = fitText(handLetter(unit, item) + std::string(_state->tr(item->getRules()->getName())), nameRoom);
 	if (nameText->getText() != name) nameText->setText(name);
 	if (ammoText->getText() != ammo) ammoText->setText(ammo);
 	ammoText->setX(nameText->getX() + smallTextWidth(name) + gap);
@@ -512,11 +643,13 @@ std::string FirstPersonMode::ammoLabel(const BattleUnit *unit, const BattleItem 
 		// on landing just PRIMED.
 		if (rules->getFuseTimerType() != BFT_NONE && weapon->getFuseTimer() >= 0)
 		{
-			// Doom mode's real-time fuse: the seconds it has left, to a tenth.
+			// Doom mode's real-time fuse: armed and still in hand, its fuse ("FUSE 3s"); burning,
+			// the seconds it has left, to a tenth.
 			auto doomFuse = _doomFuses.find(weapon->getId());
 			if (doomFuse != _doomFuses.end())
 			{
-				const int tenthsLeft = std::max(0, ((int)DoomFuseTime - (int)(SDL_GetTicks() - doomFuse->second)) / 100);
+				if (!doomFuse->second.lit) return _state->tr("STR_FPS_DOOM_FUSE").arg((int)(doomFuse->second.length / 1000));
+				const int tenthsLeft = std::max(0, ((int)doomFuse->second.length - (int)(SDL_GetTicks() - doomFuse->second.lit)) / 100);
 				return _state->tr("STR_FPS_PRIMED_SECONDS").arg(std::to_string(tenthsLeft / 10) + "." + std::to_string(tenthsLeft % 10));
 			}
 			if (rules->getFuseTimerType() == BFT_INSTANT)
@@ -524,6 +657,12 @@ std::string FirstPersonMode::ammoLabel(const BattleUnit *unit, const BattleItem 
 				return _state->tr("STR_FPS_PRIMED_INSTANT");
 			}
 			return _state->tr("STR_FPS_PRIMED").arg(weapon->getFuseTimer());
+		}
+		// Doom real-time grenades primed on throw: one on a timer, not armed yet, burns for the
+		// fuse once thrown.
+		if (doomModeOn() && Options::fpsDoomRealTimeGrenades && Options::fpsDoomPrimeOnThrow && timedGrenade(weapon))
+		{
+			return _state->tr("STR_FPS_DOOM_FUSE").arg(std::clamp(Options::fpsDoomGrenadeFuse, 1, FirstPerson::DoomFuseMaxSeconds));
 		}
 		return "";
 	}
@@ -597,9 +736,8 @@ std::string FirstPersonMode::weaponLabel(BattleUnit *unit) const
 	// The ammo, and the hand and name in the room it leaves on the card (with a space between).
 	bool loaded = true;
 	const std::string ammo = ammoLabel(unit, weapon, BA_NONE, loaded);
-	const std::string hand = weapon == unit->getLeftHandWeapon() ? "L: " : "R: ";
 	const int nameRoom = CardW - 8 - (ammo.empty() ? 0 : smallTextWidth(" " + ammo));
-	const std::string name = fitText(hand + std::string(_state->tr(weapon->getRules()->getName())), nameRoom);
+	const std::string name = fitText(handLetter(unit, weapon) + std::string(_state->tr(weapon->getRules()->getName())), nameRoom);
 	return ammo.empty() ? name : name + " " + ammo;
 }
 
@@ -734,16 +872,32 @@ void FirstPersonMode::updateArmorButtons(BattleUnit *unit)
  * weapon and the four stats with their bars. With the soldier preview option on, the card also
  * shows a live picture from the soldier's helmet camera (a small second 3D view), or TV static
  * if the soldier is dead or unconscious. The card hides when no squad button is hovered, or
- * while the mouse is captured for mouse look.
+ * while the mouse is captured for mouse look. With no card hovered, a camera popped up on the
+ * aliens' turn (see alienTurnCamera) shows the same way, under that soldier's button, with why
+ * as their status ("HIT").
  */
 void FirstPersonMode::updateSoldierCard()
 {
 	// The soldier under the mouse, if any (only a visible button counts, and only with a free
 	// cursor).
 	BattleUnit *unit = nullptr;
+	int cardButton = -1;
+	std::string alertStatus;
 	if (_hoveredSquadButton >= 0 && _hoveredSquadButton < (int)_btnSquad.size() && _btnSquad[_hoveredSquadButton]->getVisible() && !wantsMouseCapture())
 	{
 		unit = _squadUnits[_hoveredSquadButton];
+		cardButton = _hoveredSquadButton;
+	}
+	else if (_alertUnit && SDL_GetTicks() < _alertUntil && isActive())
+	{
+		// A popped-up camera: under the soldier's squad button if it shows, else the first.
+		for (size_t button = 0; button < _squadUnits.size() && button < _btnSquad.size(); ++button)
+		{
+			if (_squadUnits[button] == _alertUnit && _btnSquad[button]->getVisible()) cardButton = (int)button;
+		}
+		if (cardButton < 0 && !_btnSquad.empty()) cardButton = 0;
+		unit = cardButton >= 0 ? const_cast<BattleUnit*>(_alertUnit) : nullptr;
+		alertStatus = _alertText.empty() ? std::string() : std::string(_state->tr(_alertText));
 	}
 	const SquadState state = unit ? squadState(unit) : SQUAD_NONE;
 	// The dead and the unconscious: their helmet camera shows only static.
@@ -764,7 +918,7 @@ void FirstPersonMode::updateSoldierCard()
 		return;
 	}
 	// Place the card centred under its button, kept inside the canvas.
-	const TextButton *button = _btnSquad[_hoveredSquadButton];
+	const TextButton *button = _btnSquad[cardButton];
 	const int cardX = std::clamp(button->getX() + button->getWidth() / 2 - CardW / 2, 1, canvasWidth() - CardW - 1);
 	for (const auto &part : _cardParts)
 	{
@@ -802,7 +956,8 @@ void FirstPersonMode::updateSoldierCard()
 	const std::string status = state == SQUAD_DEAD ? std::string(_state->tr("STR_FPS_DECEASED"))
 		: state == SQUAD_ZOMBIE ? std::string(_state->tr("STR_FPS_ZOMBIE"))
 		: state == SQUAD_UNCONSCIOUS ? std::string(_state->tr("STR_FPS_UNCONSCIOUS"))
-		: state == SQUAD_CONTROLLED ? std::string(_state->tr("STR_FPS_MIND_CONTROLLED")) : statusLabel(unit);
+		: state == SQUAD_CONTROLLED ? std::string(_state->tr("STR_FPS_MIND_CONTROLLED"))
+		: !alertStatus.empty() ? alertStatus : statusLabel(unit);
 	_cardStatus->setText(status);
 	// The name gives way to the status beside it.
 	const int nameWidth = CardW - 8 - (status.empty() ? 0 : _cardStatus->getTextWidth() + 4);

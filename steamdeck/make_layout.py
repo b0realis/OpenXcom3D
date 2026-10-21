@@ -8,8 +8,9 @@ bindings and its own title. Usage: make_layout.py VALVE_TEMPLATE OUTPUT
 import re
 import sys
 
-# OpenXcom3D's layout: the group's id in Valve's template, the input, its binding, and what a long
-# press of it does (a fourth entry, for some). With a long press on an input, Steam sends its
+# OpenXcom3D's layout: the group's id in Valve's template, the input, its binding (or several,
+# pressed together, as a tuple), and what a long press of it does (a fourth entry, for some).
+# With a long press on an input, Steam sends its
 # ordinary press only when it's let go before LONG_PRESS_MS (the press is "interruptable" by
 # default), so long presses go on inputs that are tapped, never on the ones held (walking, the
 # lean keys).
@@ -44,14 +45,15 @@ BINDINGS = [
     ("9", "click", "mouse_button LEFT"),
     # the switches: View = the game's menu, Menu = classic HUD (held: the 3D HUD on/off), L1 = mouse
     # look / free cursor, R1 = isometric / 3D, back buttons: L4 / R4 held lean left / right (setting
-    # "Lean"), L5 night vision (held: the personal light), R5 end turn (held: a flare)
+    # "Lean": the lean key, Left Shift, with a strafe key, so Q and E stay the hands), L5 night
+    # vision (held: the personal light), R5 end turn (held: a flare)
     ("6", "button_escape", "key_press ESCAPE"),
     ("6", "button_menu", "key_press H", "key_press P"),
     ("6", "left_bumper", "key_press C"),
     ("6", "right_bumper", "key_press F8"),
-    ("6", "button_back_left_upper", "key_press Q"),
+    ("6", "button_back_left_upper", ("key_press LEFT_SHIFT", "key_press A")),
     ("6", "button_back_left", "key_press N", "key_press L"),
-    ("6", "button_back_right_upper", "key_press E"),
+    ("6", "button_back_right_upper", ("key_press LEFT_SHIFT", "key_press D")),
     ("6", "button_back_right", "key_press BACKSPACE", "key_press T"),
 ]
 # How long a press is held to count as a long press, in milliseconds.
@@ -92,8 +94,8 @@ def main():
             open_brace = part.index("{", bindings)
             close_brace = part.index("}", open_brace)
             indent = part[part.rindex("\n", 0, bindings) + 1:bindings]
-            part = (part[:open_brace + 1] + '\n%s\t"binding"\t\t"%s"\n%s' % (indent, binding, indent) +
-                    part[close_brace:])
+            lines = "".join('\n%s\t"binding"\t\t"%s"' % (indent, one) for one in (binding if isinstance(binding, tuple) else (binding,)))
+            part = part[:open_brace + 1] + lines + '\n' + indent + part[close_brace:]
             if long_press:
                 # A Long_Press activator after the Full_Press one, at its indent, with its own
                 # binding and the time it takes.
@@ -112,7 +114,8 @@ def main():
 
     # Every binding asked for is in, once.
     for group, name, binding, *long_press in BINDINGS:
-        assert text.count('"%s"' % binding) >= 1, binding
+        for one in (binding if isinstance(binding, tuple) else (binding,)):
+            assert text.count('"%s"' % one) >= 1, one
         for long_binding in long_press:
             assert text.count('"%s"' % long_binding) == 1, long_binding
     # (with the template's own line ends, CRLF)

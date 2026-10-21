@@ -152,6 +152,45 @@ void hueToRgb(float hueDegrees, float saturation, float out[3])
 }
 
 /**
+ * Lists the map data sets UFOs are built from, once per battle (before the voxel models, which
+ * treat UFO parts a little differently, see buildModel): the sets of every UFO's battlescape
+ * terrain, minus the ones nearly every terrain uses (BLANKS and the like). Their parts get
+ * steady models, wherever they stand (an alien base built from UFO walls too). Of those, the
+ * ones no ordinary terrain uses at all (a UFO's hull) tell a UFO from an alien base.
+ */
+void FirstPersonView::collectUfoDataSets()
+{
+	_ufoDataSets.clear();
+	_ufoOnlyDataSets.clear();
+	const Mod *mod = _save ? _save->getMod() : nullptr;
+	if (!mod)
+	{
+		return;
+	}
+	std::map<std::string, int> terrainsUsing; // how many ordinary terrains use each set
+	auto collect = [](RuleTerrain *terrain, std::set<std::string> &into)
+	{
+		if (!terrain) return;
+		for (const MapDataSet *dataSet : *terrain->getMapDataSets()) into.insert(dataSet->getName());
+	};
+	for (const auto &type : mod->getUfosList()) collect(mod->getUfo(type)->getBattlescapeTerrainData(), _ufoDataSets);
+	const int terrainCount = (int)mod->getTerrainList().size();
+	for (const auto &type : mod->getTerrainList())
+	{
+		std::set<std::string> terrainSets;
+		collect(mod->getTerrain(type), terrainSets);
+		for (const auto &setName : terrainSets) terrainsUsing[setName]++;
+	}
+	for (auto setName = _ufoDataSets.begin(); setName != _ufoDataSets.end();)
+	{
+		const int users = terrainsUsing.count(*setName) ? terrainsUsing[*setName] : 0;
+		if (!users) _ufoOnlyDataSets.insert(*setName);
+		if (users * 2 > terrainCount) setName = _ufoDataSets.erase(setName); // (nearly everywhere)
+		else ++setName;
+	}
+}
+
+/**
  * Finds the UFOs on the map, once per battle (after the voxel models and the mirrors): the map
  * data sets UFOs are built from, a steady model for every part of them (see buildUfoModel;
  * only by the view that owns the voxel models), the UFOs themselves as groups of connected
@@ -178,32 +217,8 @@ void FirstPersonView::findUfos()
 	}
 	const Uint32 startTick = SDL_GetTicks();
 
-	// The names of the map data sets UFOs are built from, minus the ones nearly every terrain
-	// uses (BLANKS and the like): their parts get steady models, wherever they stand (an alien
-	// base built from UFO walls too). Of those, the ones no ordinary terrain uses at all (a
-	// UFO's hull) tell a UFO from an alien base.
-	std::set<std::string> ufoSets, exclusiveSets;
-	std::map<std::string, int> terrainsUsing; // how many ordinary terrains use each set
-	auto collect = [](RuleTerrain *terrain, std::set<std::string> &into)
-	{
-		if (!terrain) return;
-		for (const MapDataSet *dataSet : *terrain->getMapDataSets()) into.insert(dataSet->getName());
-	};
-	for (const auto &type : mod->getUfosList()) collect(mod->getUfo(type)->getBattlescapeTerrainData(), ufoSets);
-	const int terrainCount = (int)mod->getTerrainList().size();
-	for (const auto &type : mod->getTerrainList())
-	{
-		std::set<std::string> terrainSets;
-		collect(mod->getTerrain(type), terrainSets);
-		for (const auto &setName : terrainSets) terrainsUsing[setName]++;
-	}
-	for (auto setName = ufoSets.begin(); setName != ufoSets.end();)
-	{
-		const int users = terrainsUsing.count(*setName) ? terrainsUsing[*setName] : 0;
-		if (!users) exclusiveSets.insert(*setName);
-		if (users * 2 > terrainCount) setName = ufoSets.erase(setName); // (nearly everywhere)
-		else ++setName;
-	}
+	// The map data sets UFOs are built from (see collectUfoDataSets).
+	const std::set<std::string> &ufoSets = _ufoDataSets, &exclusiveSets = _ufoOnlyDataSets;
 	if (ufoSets.empty())
 	{
 		return;

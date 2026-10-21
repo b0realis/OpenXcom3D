@@ -59,6 +59,7 @@
 #include "../Battlescape/TileEngine.h"
 #include "../Battlescape/UnitFallBState.h"
 #include "../Battlescape/UnitTurnBState.h"
+#include "../Engine/Game.h"
 #include "../Engine/Options.h"
 #include "../Mod/Armor.h"
 #include "../Mod/MapData.h"
@@ -84,10 +85,41 @@ void FirstPersonMode::turnByMouse(int mouseDeltaX, int mouseDeltaY)
 	mouseDeltaX = std::clamp(mouseDeltaX, -100, 100);
 	mouseDeltaY = std::clamp(mouseDeltaY, -100, 100);
 
-	// Sensitivity 1..20 gives 0.05..1 degree per pixel. Moving the mouse down tilts the view
-	// down, unless the mouse is inverted.
-	const double degreesPerPixel = std::clamp(Options::fpsMouseSensitivity, 1, 20) * 0.05;
+	// Sensitivity 1..20 gives 0.05..1 degree per pixel (zoomed in, that much less). Moving the
+	// mouse down tilts the view down, unless the mouse is inverted.
+	const double degreesPerPixel = std::clamp(Options::fpsMouseSensitivity, 1, 20) * 0.05 / _zoom;
 	_view->rotate(mouseDeltaX * degreesPerPixel, (Options::fpsInvertMouse ? mouseDeltaY : -mouseDeltaY) * degreesPerPixel);
+}
+
+/**
+ * Zooms the view in while the zoom key (U) or, in mouse look, the right button is held (setting
+ * "Zoom"): the view glides in to ZoomFactor times closer over ZoomSeconds, and back out when
+ * let go, at a steady pace on a log scale (each step magnifies by the same share, so it feels
+ * even), slow enough for the SCOPING line's number to be read as it climbs (see updateScope).
+ * Only the view changes: the crosshair, the aim, the shot and the hit chance stay as they are.
+ * The mouse and the turn keys turn the view that much slower meanwhile (see turnByMouse,
+ * turnWithKeys).
+ * @param elapsedSeconds Seconds since the last frame.
+ */
+void FirstPersonMode::updateZoom(double elapsedSeconds)
+{
+	const Uint8 *keyStates = SDL_GetKeyState(nullptr);
+	const bool keyHeld = Options::keyFpsZoom != SDLK_UNKNOWN && keyStates[Options::keyFpsZoom] && !_game->isCtrlPressed() && !_game->isAltPressed();
+	const bool zoomedIn = Options::fpsZoom && isActive() && (keyHeld || (_zoomButtonHeld && _mouseLook));
+	const double logTarget = zoomedIn ? std::log(ZoomFactor) : 0.0, logStep = std::log(ZoomFactor) * elapsedSeconds / ZoomSeconds;
+	const double logZoom = std::log(_zoom);
+	_zoom = std::exp(logTarget > logZoom ? std::min(logTarget, logZoom + logStep) : std::max(logTarget, logZoom - logStep));
+}
+
+/**
+ * The field of view the 3D view shows now: the setting's (50 to 110 degrees), narrowed by the
+ * zoom (the half-width's tangent divided by it, so everything looks that many times bigger).
+ * @return The horizontal field of view, in degrees.
+ */
+double FirstPersonMode::fieldOfViewNow() const
+{
+	const double halfWidthTangent = std::tan(std::clamp(Options::fpsFieldOfView, 50, 110) * Pi / 360.0) / _zoom;
+	return std::atan(halfWidthTangent) * 360.0 / Pi;
 }
 
 /**
@@ -98,7 +130,7 @@ void FirstPersonMode::turnByMouse(int mouseDeltaX, int mouseDeltaY)
 void FirstPersonMode::turnWithKeys(double elapsedSeconds)
 {
 	const Uint8 *keyStates = SDL_GetKeyState(nullptr);
-	const double turnSpeed = 90.0; // degrees per second
+	const double turnSpeed = 90.0 / _zoom; // degrees per second (zoomed in, that much slower)
 
 	// Add up the turn of every key held: left and right turn, up and down tilt.
 	double yawDegrees = 0.0, pitchDegrees = 0.0;
@@ -241,22 +273,54 @@ void FirstPersonMode::lookAtEnemy(int enemyIndex)
  */
 void FirstPersonMode::lookAtUnit(const BattleUnit *target)
 {
-	const Position targetTile = target->getPosition();
-	if (targetTile == TileEngine::invalid)
+	double point[3];
+	if (!chestPoint(target, point))
 	{
 		return;
 	}
-	// The point to look at, in voxels (a tile is 16 x 16 voxels and a level 24 high): the middle
-	// of the unit's footprint (1 or 2 tiles across), raised by the floor it stands on (the
-	// terrain level is negative for a raised floor), by its hovering height and to its chest.
-	const Tile *tile = _save->getTile(targetTile);
-	const int unitSize = target->getArmor()->getSize();
-	const double point[3] = {
-		targetTile.x * 16.0 + 8.0 * unitSize,
-		targetTile.y * 16.0 + 8.0 * unitSize,
-		targetTile.z * 24.0 - (tile ? tile->getTerrainLevel() : 0) + target->getFloatHeight() + target->getHeight() * 0.6 };
 	_snapTurnDegrees = _snapPitchDegrees = 0.0;
 	_view->lookAt(point);
+}
+
+/**
+ * Turns the view towards a unit's chest (see chestPoint), gliding there at the snap turn's pace
+ * (see turnWithKeys) rather than jumping: the aliens' turn cameras following an alien.
+ * @param target The unit to look at (one off the map leaves the view as it is).
+ */
+void FirstPersonMode::glideToLookAt(const BattleUnit *target)
+{
+	double point[3], yawDegrees, pitchDegrees;
+	if (!chestPoint(target, point) || !_view->anglesTo(point, yawDegrees, pitchDegrees))
+	{
+		return;
+	}
+	_snapTurnDegrees = std::remainder(yawDegrees - _view->getYawDegrees(), 360.0);
+	_snapTurnFacing = false;
+	_snapPitchDegrees = pitchDegrees - _view->getPitchDegrees();
+}
+
+/**
+ * The point on a unit the view looks at: its chest, about 60% of its height above its feet.
+ * In voxels (a tile is 16 x 16 voxels and a level 24 high): the middle of the unit's footprint
+ * (1 or 2 tiles across), raised by the floor it stands on (the terrain level is negative for a
+ * raised floor), by its hovering height and to its chest.
+ * @param target The unit.
+ * @param point Set to the point.
+ * @return False for a unit with no place on the map (carried, inside another's inventory).
+ */
+bool FirstPersonMode::chestPoint(const BattleUnit *target, double point[3]) const
+{
+	const Position targetTile = target->getPosition();
+	if (targetTile == TileEngine::invalid)
+	{
+		return false;
+	}
+	const Tile *tile = _save->getTile(targetTile);
+	const int unitSize = target->getArmor()->getSize();
+	point[0] = targetTile.x * 16.0 + 8.0 * unitSize;
+	point[1] = targetTile.y * 16.0 + 8.0 * unitSize;
+	point[2] = targetTile.z * 24.0 - (tile ? tile->getTerrainLevel() : 0) + target->getFloatHeight() + target->getHeight() * 0.6;
+	return true;
 }
 
 /**
@@ -543,8 +607,9 @@ double FirstPersonMode::eyeHeight(const BattleUnit *unit) const
 }
 
 /**
- * Leaning out (setting "Lean": Peek, or Tilt): while a lean key is held the soldier leans out
- * that way, over LeanTime: the eye moves up to LeanReach voxels to the side of where the view
+ * Leaning out (setting "Lean": Peek, or Tilt): while the lean key is held with a strafe key (Left
+ * Shift with A or D), or a side's own lean key is held, the soldier leans out that way, over
+ * LeanTime: the eye moves up to LeanReach voxels to the side of where the view
  * looks, and up to LeanDrop lower, as a head bends; with Tilt the view tilts up to
  * LeanTiltDegrees too. The eye stops LeanWallMargin short of anything solid or anyone in sight
  * (see leanRoom), so it never looks into a wall or a teammate's head, and comes back in at once
@@ -564,7 +629,10 @@ void FirstPersonMode::updateLean(BattleUnit *unit, bool canLean, double elapsedS
 	double wanted = 0.0;
 	if (Options::fpsLean > 0 && canLean && !unit->isOut())
 	{
-		wanted = (held(Options::keyFpsLeanRight) ? 1.0 : 0.0) - (held(Options::keyFpsLeanLeft) ? 1.0 : 0.0);
+		const bool leanKey = held(Options::keyFpsLeanHold);
+		const bool right = held(Options::keyFpsLeanRightOwn) || (leanKey && held(Options::keyFpsStrafeRight));
+		const bool left = held(Options::keyFpsLeanLeftOwn) || (leanKey && held(Options::keyFpsStrafeLeft));
+		wanted = (right ? 1.0 : 0.0) - (left ? 1.0 : 0.0);
 	}
 	// Into the lean (or out of it) at a steady pace, eased in and out.
 	_lean += std::clamp(wanted - _lean, -elapsedSeconds / LeanTime, elapsedSeconds / LeanTime);

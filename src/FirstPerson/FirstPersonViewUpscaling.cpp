@@ -108,17 +108,37 @@ bool FirstPersonView::upscaleHere(const double world[3], double scale) const
 void FirstPersonView::drawSpriteSmooth(const Surface *sprite, int anchorX, int anchorY, const double world[3], double depthBias, int shade, double scale,
 	SpritePose pose)
 {
-	if (sprite && upscaleHere(world, 1.0))
+	SpriteDraw draw;
+	draw.sprite = sprite;
+	draw.anchorX = anchorX;
+	draw.anchorY = anchorY;
+	std::copy(world, world + 3, draw.world);
+	draw.depthBias = depthBias;
+	draw.shade = shade;
+	draw.scale = scale;
+	draw.pose = pose;
+	useSmoothVersion(draw);
+	drawSprite(draw);
+}
+
+/**
+ * Swaps a sprite about to be drawn for its upscaled version, when it's close (see upscaleHere)
+ * and that version is ready: drawn at 1/UpscaleFactor scale so it covers the same screen area,
+ * its anchor scaled up to match. Otherwise it stays as it is.
+ * @param draw The sprite to draw (see SpriteDraw); its sprite, anchor and scale may change.
+ */
+void FirstPersonView::useSmoothVersion(SpriteDraw &draw)
+{
+	if (draw.sprite && upscaleHere(draw.world, 1.0))
 	{
-		// The bigger version, drawn at 1/UpscaleFactor scale so it covers the same screen area,
-		// its anchor scaled up to match.
-		if (const Surface *bigSprite = upscaled(sprite))
+		if (const Surface *bigSprite = upscaled(draw.sprite))
 		{
-			drawSprite(bigSprite, anchorX * UpscaleFactor, anchorY * UpscaleFactor, world, depthBias, shade, scale / UpscaleFactor, pose);
-			return;
+			draw.sprite = bigSprite;
+			draw.anchorX *= UpscaleFactor;
+			draw.anchorY *= UpscaleFactor;
+			draw.scale /= UpscaleFactor;
 		}
 	}
-	drawSprite(sprite, anchorX, anchorY, world, depthBias, shade, scale, pose);
 }
 
 /**
@@ -233,7 +253,8 @@ const Surface *FirstPersonView::upscaled(const Surface *sprite)
 			(Uint8 *)target->pixels + y * target->pitch);
 	}
 
-	// A few hundred frames (400) are kept; when full, the one unused longest goes.
+	// A few hundred frames (400) are kept; when full, the one unused longest goes (never one
+	// used this frame: a unit recorded to be drawn may still point at it, see drawUnits).
 	if (_upscaledSprites.size() >= 400)
 	{
 		auto oldest = _upscaledSprites.begin();
@@ -241,8 +262,11 @@ const Surface *FirstPersonView::upscaled(const Surface *sprite)
 		{
 			if (entry->second.used < oldest->second.used) oldest = entry;
 		}
-		delete oldest->second.surface;
-		_upscaledSprites.erase(oldest);
+		if (oldest->second.used < _upscaleFrameStart)
+		{
+			delete oldest->second.surface;
+			_upscaledSprites.erase(oldest);
+		}
 	}
 	_upscaledSprites.emplace(key, Upscaled{ result, ++_upscaleClock });
 	return result;

@@ -56,12 +56,14 @@
 #include <string>
 #include <vector>
 #include <SDL.h>
+#include "FirstPersonApi.h"
 #include "../Engine/Game.h"
 #include "../Engine/Options.h"
 #include "../Engine/Surface.h"
 #include "../Engine/SurfaceSet.h"
 #include "../Mod/Armor.h"
 #include "../Mod/Mod.h"
+#include "../Savegame/BattleItem.h"
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/SavedBattleGame.h"
 #include "../Savegame/Tile.h"
@@ -119,8 +121,9 @@ bool FirstPersonView::projectToScreen(const double world[3], double &screenX, do
  * view looks down (and forward as it looks up), so it faces the camera square on, but only up to
  * CardTiltMax degrees: looking further down, the card stays that upright, its top coming
  * towards the camera, and a soldier or a corpse seen from above stays above the floor instead
- * of lying in it (and vanishing). Within that pitch the card is square to the view, which is
- * simply the sprite scaled at the anchor's distance.
+ * of lying in it (and vanishing). Looking up it leans only CardTiltUpMax degrees: a unit right
+ * beside the soldier, leaning in further, lurched at the camera. Within those pitches the card
+ * is square to the view, which is simply the sprite scaled at the anchor's distance.
  * A sprite of something lying on the floor (SpritePose::Lying: items, corpses) stands only
  * above the anchor: its rows below the anchor, where the isometric art draws the front half of
  * the floor's diamond, lie flat on the floor in front of the anchor (sqrt(2) voxels nearer the
@@ -129,19 +132,29 @@ bool FirstPersonView::projectToScreen(const double world[3], double &screenX, do
  * sprite row that is, how far away, and so how wide the sprite's pixels are along it. With the
  * view tilted by a lean (setRoll) the rows no longer run level, and each pixel is worked out on
  * its own instead; the card stays upright in the world, so it tilts on the screen with the rest.
- * @param sprite The sprite (palette colours, 0 transparent).
- * @param anchorX The sprite's pixel column that stands at the point.
- * @param anchorY The sprite's pixel row that stands at the point.
- * @param world The point, in voxels.
- * @param depthBias How much nearer than the point the sprite counts for the depth test, in
- *                  voxels (so it isn't hidden by the floor it stands on).
- * @param shade Palette shades to darken it by (0 none .. 15).
- * @param scale World size per sprite pixel (an upscaled sprite is drawn at 1 / its factor).
- * @param pose Standing (all of it on the card) or lying (the rows below the anchor on the floor).
+ * A see-through sprite (the smoke) is laid over what's there by each pixel's opacity, in the
+ * see-through steps, faded rather than dithered up close, and leaves the depth as it was (it
+ * hides nothing drawn after it, so it is drawn last, farthest first). Over a unit drawn this
+ * frame it stays thin (see _unitVeil): what the soldier sees stays clear.
+ * @param draw The sprite, where it stands and how (see SpriteDraw): the sprite (palette colours,
+ *        0 transparent); its anchor (the sprite pixel standing at the point); the point, in
+ *        voxels; the depth bias (how much nearer than the point the sprite counts for the depth
+ *        test, so it isn't hidden by the floor it stands on); the shade; the scale (world size
+ *        per sprite pixel); the pose (standing, all of it on the card, or lying, the rows below
+ *        the anchor on the floor); how opaque each pixel of a see-through one is (or null: solid);
+ *        and the unit it pictures (or null).
+ * @param bandTop, bandBottom Only the screen rows from bandTop up to (not including) bandBottom
+ *        are drawn: a band of the view, when the drawing is shared out between threads (each
+ *        pixel comes out the same as when the sprite is drawn whole).
  */
-void FirstPersonView::drawSprite(const Surface *sprite, int anchorX, int anchorY, const double world[3], double depthBias, int shade,
-	double scale, SpritePose pose)
+void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBottom)
 {
+	const Surface *sprite = draw.sprite;
+	const int anchorX = draw.anchorX, anchorY = draw.anchorY, shade = draw.shade;
+	const double *world = draw.world;
+	const double depthBias = draw.depthBias, scale = draw.scale;
+	const SpritePose pose = draw.pose;
+	const SeeThroughSprite *seeThroughSprite = draw.seeThrough;
 	// Where the anchor lands on the view, and how far away it is.
 	double anchorScreenX, anchorScreenY, viewDepth;
 	if (!sprite || !projectToScreen(world, anchorScreenX, anchorScreenY, viewDepth))
@@ -149,9 +162,11 @@ void FirstPersonView::drawSprite(const Surface *sprite, int anchorX, int anchorY
 		return;
 	}
 	// Right in front of the camera a sprite is a wall of huge pixels: fade it out (dithered),
-	// but not a unit on the next tile (melee range), which stays solid.
+	// but not a unit on the next tile (melee range), which stays solid. A see-through sprite
+	// fades out instead (its opacity times this).
 	const float opacity = (float)std::clamp((viewDepth - 4.0) / 6.0, 0.0, 1.0);
-	if (opacity <= 0.0f)
+	const float seeThroughOpacity = seeThroughSprite ? seeThroughSprite->opacity * opacity : 1.0f;
+	if (opacity <= 0.0f || seeThroughOpacity * SeeThroughLevels < 0.5f)
 	{
 		return;
 	}
@@ -162,8 +177,9 @@ void FirstPersonView::drawSprite(const Surface *sprite, int anchorX, int anchorY
 
 	// The card, in the camera's frame (true proportions, as projectToScreen works): the anchor
 	// from the eye; the way up the card, upright but leaning with the view's pitch up to
-	// CardTiltMax; and the way the card faces (the view axis, while the pitch is within that).
-	const double tilt = std::clamp(_pitch, -CardTiltMax * Pi / 180.0, CardTiltMax * Pi / 180.0);
+	// CardTiltMax looking down and CardTiltUpMax looking up; and the way the card faces (the
+	// view axis, while the pitch is within that).
+	const double tilt = std::clamp(_pitch, -CardTiltMax * Pi / 180.0, CardTiltUpMax * Pi / 180.0);
 	const double level[2] = { std::cos(_yaw), std::sin(_yaw) }; // straight ahead, along the ground
 	const double anchor[3] = { world[0] - _eye[0], world[1] - _eye[1], (world[2] - _eye[2]) * ZScale };
 	const double cardUp[3] = { -std::sin(tilt) * level[0], -std::sin(tilt) * level[1], std::cos(tilt) };
@@ -200,16 +216,44 @@ void FirstPersonView::drawSprite(const Surface *sprite, int anchorX, int anchorY
 	};
 	// Puts one sprite pixel on the screen, shaded, where nothing nearer is drawn already, and
 	// notes its depth so that farther sprites drawn later are hidden by it. A sprite pixel covers
-	// whatever shone behind it, so that no longer glows (see drawLightHalos).
-	auto plot = [&](int pixelX, int pixelY, Uint8 color, float depth) {
-		float &depthHere = _depthBuffer[pixelY * width + pixelX];
-		if (!color || depth >= depthHere || (opacity < 1.0f && dither(pixelX, pixelY) >= opacity)) return;
+	// whatever shone behind it, so that no longer glows (see drawLightHalos). A unit's pixel
+	// notes that it may be veiled only thinly by see-through smoke, and, near where the player
+	// points, whose picture it is; anything else solid drawn over it takes both back.
+	// A see-through pixel (opacity below SeeThroughLevels) is mixed over what's there instead,
+	// within what's left of a unit's allowance, and leaves the depth alone; it only stops the
+	// glow behind it when it is more than half opaque.
+	auto plot = [&](int pixelX, int pixelY, Uint8 color, float depth, int pixelOpacity) {
+		const int index = pixelY * width + pixelX;
+		float &depthHere = _depthBuffer[index];
+		if (!color || depth >= depthHere) return;
+		if (pixelOpacity < SeeThroughLevels)
+		{
+			Uint8 &veilLeft = _unitVeil[index];
+			pixelOpacity = std::min(pixelOpacity, (int)veilLeft);
+			if (pixelOpacity <= 0) return;
+			if (veilLeft != 255) veilLeft -= pixelOpacity;
+			Uint8 *pixel = getRaw(pixelX, pixelY);
+			*pixel = seeThrough(pixelOpacity, shadeColor(color, shade), *pixel);
+			if (pixelOpacity > SeeThroughLevels / 2) _glowMask[index] = 0;
+			return;
+		}
+		if (opacity < 1.0f && dither(pixelX, pixelY) >= opacity) return;
 		*getRaw(pixelX, pixelY) = shadeColor(color, shade);
 		depthHere = depth;
-		_glowMask[pixelY * width + pixelX] = 0;
+		_glowMask[index] = 0;
+		_unitVeil[index] = draw.unit ? UnitVeilMax : 255;
+		const int patchX = pixelX - _pointerX + PointerReach, patchY = pixelY - _pointerY + PointerReach;
+		if (patchX >= 0 && patchY >= 0 && patchX <= 2 * PointerReach && patchY <= 2 * PointerReach)
+		{
+			_pointerUnits[patchY][patchX] = draw.unit;
+		}
 	};
 	const SDL_Surface *spriteSurface = const_cast<Surface*>(sprite)->getSurface(); // read only
 	auto spritePixel = [&](int spriteX, int spriteY) { return ((const Uint8 *)spriteSurface->pixels)[spriteY * spriteSurface->pitch + spriteX]; };
+	// How opaque a sprite pixel is, in see-through steps (SeeThroughLevels for a solid sprite).
+	auto pixelOpacityAt = [&](int spriteX, int spriteY) {
+		return seeThroughSprite ? (int)(seeThroughSprite->opacityMap[spriteY * spriteWidth + spriteX] * seeThroughOpacity + 0.5f) : SeeThroughLevels;
+	};
 
 	// The view tilted by a lean (see setRoll): the screen's rows no longer run level across the
 	// card, so each pixel is worked out on its own, the same way: its ray, where that meets the
@@ -255,7 +299,7 @@ void FirstPersonView::drawSprite(const Surface *sprite, int anchorX, int anchorY
 		{
 			addCorners(bottomMiddle);
 		}
-		left = std::max(0, left); top = std::max(0, top); right = std::min(width, right); bottom = std::min(height, bottom);
+		left = std::max(0, left); top = std::max(std::max(0, bandTop), top); right = std::min(width, right); bottom = std::min(std::min(height, bandBottom), bottom);
 		// How far up the anchor is on the image plane without the tilt: rays below that pass
 		// below the anchor.
 		const double anchorRise = dot(anchor, _levelUp) / dot(anchor, _forward);
@@ -271,7 +315,8 @@ void FirstPersonView::drawSprite(const Surface *sprite, int anchorX, int anchorY
 				if (!meetSprite(ray, dot(ray, _levelUp) < anchorRise, distance, spriteRow)) continue;
 				const int spriteX = (int)std::floor(anchorX + (dot(ray, _levelRight) * distance - anchorAcross) / columnSize);
 				if (spriteX < 0 || spriteX >= spriteWidth) continue;
-				plot(pixelX, pixelY, spritePixel(spriteX, (int)std::floor(spriteRow)), (float)std::max(1.0, distance - depthBias));
+				const int spriteY = (int)std::floor(spriteRow);
+				plot(pixelX, pixelY, spritePixel(spriteX, spriteY), (float)std::max(1.0, distance - depthBias), pixelOpacityAt(spriteX, spriteY));
 			}
 		}
 		return;
@@ -290,8 +335,22 @@ void FirstPersonView::drawSprite(const Surface *sprite, int anchorX, int anchorY
 		bottomPoint[axis] = lying ? (axis < 2 ? anchor[axis] - level[axis] * (spriteHeight - anchorY) * lyingRowSize : floorHeight)
 			: anchor[axis] - cardUp[axis] * (spriteHeight - anchorY) * rowSize;
 	}
-	const int top = std::max(0, (int)std::floor(screenRowOf(topPoint, 0.0)));
-	const int bottom = std::min(height, (int)std::ceil(screenRowOf(bottomPoint, height)));
+	const int top = std::max(std::max(0, bandTop), (int)std::floor(screenRowOf(topPoint, 0.0)));
+	const int bottom = std::min(std::min(height, bandBottom), (int)std::ceil(screenRowOf(bottomPoint, height)));
+
+	// The coloured part of a sprite row, from its first coloured pixel up to (not including) the
+	// one after its last: most of a unit's frame is transparent round the unit, and up close
+	// each of its pixels covers many on the screen. Found the first time a row is needed;
+	// the screen rows showing the same sprite row share it.
+	int spanRow = -1, spanFirst = 0, spanEnd = 0;
+	auto findSpan = [&](int spriteY) {
+		const Uint8 *row = (const Uint8 *)spriteSurface->pixels + spriteY * spriteSurface->pitch;
+		spanFirst = 0;
+		spanEnd = spriteWidth;
+		while (spanFirst < spanEnd && !row[spanFirst]) ++spanFirst;
+		while (spanEnd > spanFirst && !row[spanEnd - 1]) --spanEnd;
+		spanRow = spriteY;
+	};
 
 	// Row by row: the ray through the middle of the row, where it meets the sprite, and along
 	// the row, at that distance, where the anchor's column is and how wide a sprite pixel is
@@ -303,16 +362,86 @@ void FirstPersonView::drawSprite(const Surface *sprite, int anchorX, int anchorY
 		double distance, spriteRow;
 		if (!meetSprite(ray, pixelY + 0.5 > anchorScreenY, distance, spriteRow)) continue;
 		const int spriteY = (int)std::floor(spriteRow);
+		if (spriteY != spanRow) findSpan(spriteY);
+		if (spanFirst >= spanEnd) continue; // nothing coloured in this row
+		// The screen pixels the sprite's row covers, cut down to its span's (a pixel more on each
+		// side: each pixel's own column is worked out below, and anything outside the span is
+		// transparent anyway, so the edges never depend on rounding).
 		const double pixelsPerColumn = focalLength / distance * columnSize;
 		const double rowAnchorX = width / 2.0 + anchorAcross * focalLength / distance;
-		const int left = std::max(0, (int)std::floor(rowAnchorX - anchorX * pixelsPerColumn));
-		const int right = std::min(width, (int)std::ceil(rowAnchorX + (spriteWidth - anchorX) * pixelsPerColumn));
+		const int left = std::max(std::max(0, (int)std::floor(rowAnchorX - anchorX * pixelsPerColumn)),
+			(int)std::floor(rowAnchorX + (spanFirst - anchorX) * pixelsPerColumn) - 1);
+		const int right = std::min(std::min(width, (int)std::ceil(rowAnchorX + (spriteWidth - anchorX) * pixelsPerColumn)),
+			(int)std::ceil(rowAnchorX + (spanEnd - anchorX) * pixelsPerColumn) + 1);
 		const float rowDepth = (float)std::max(1.0, distance - depthBias);
 		for (int pixelX = left; pixelX < right; ++pixelX)
 		{
 			const int spriteX = (int)std::floor(anchorX + (pixelX + 0.5 - rowAnchorX) / pixelsPerColumn);
 			if (spriteX < 0 || spriteX >= spriteWidth) continue;
-			plot(pixelX, pixelY, spritePixel(spriteX, spriteY), rowDepth);
+			plot(pixelX, pixelY, spritePixel(spriteX, spriteY), rowDepth, pixelOpacityAt(spriteX, spriteY));
+		}
+	}
+}
+
+/**
+ * Draws a sprite standing in the world (see drawSprite above), given piece by piece: something
+ * that isn't a unit, all of it.
+ */
+void FirstPersonView::drawSprite(const Surface *sprite, int anchorX, int anchorY, const double world[3], double depthBias, int shade,
+	double scale, SpritePose pose, const SeeThroughSprite *seeThroughSprite)
+{
+	SpriteDraw draw;
+	draw.sprite = sprite;
+	draw.anchorX = anchorX;
+	draw.anchorY = anchorY;
+	std::copy(world, world + 3, draw.world);
+	draw.depthBias = depthBias;
+	draw.shade = shade;
+	draw.scale = scale;
+	draw.pose = pose;
+	draw.seeThrough = seeThroughSprite;
+	drawSprite(draw);
+}
+
+/**
+ * Draws the recorded steps (see DrawStep) on all the view's threads, each a band of rows at a
+ * time (see drawListBands), and empties the list.
+ */
+void FirstPersonView::replayDrawList()
+{
+	if (!_drawList.empty())
+	{
+		runOnAllThreads(&FirstPersonView::drawListBands);
+	}
+	_drawList.clear();
+}
+
+/**
+ * The recorded steps over bands of the view's rows, taken one at a time from the shared counter
+ * until none are left: a job for all the view's threads (see runOnAllThreads). Each band gets
+ * every step in the order recorded, so every pixel comes out just as if one thread drew them
+ * all, one after another.
+ */
+void FirstPersonView::drawListBands()
+{
+	const int bandCount = (getHeight() + BandRows - 1) / BandRows;
+	for (int band = _rayWorkers.nextPiece++; band < bandCount; band = _rayWorkers.nextPiece++)
+	{
+		const int bandTop = band * BandRows, bandBottom = bandTop + BandRows;
+		for (const DrawStep &step : _drawList)
+		{
+			switch (step.kind)
+			{
+			case DrawStep::Sprite:
+				drawSprite(step.sprite, bandTop, bandBottom);
+				break;
+			case DrawStep::GroundShade:
+				drawGroundShade(step.centre, step.radius, step.steps, step.density, bandTop, bandBottom);
+				break;
+			case DrawStep::Line:
+				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, bandTop, bandBottom);
+				break;
+			}
 		}
 	}
 }
@@ -432,7 +561,10 @@ void FirstPersonView::watchUnits()
  * is, turned to show the side facing the camera. Walking units glide between tiles, and every
  * unit eases between the game's small steps; a hit unit flinches and flashes; each stands on a
  * soft shadow. Also notes where the numbered enemy markers go this frame (drawMarkers).
- * The unit being looked through is not drawn.
+ * The unit being looked through is not drawn. Their pixels are noted as a unit's, so the
+ * see-through smoke drawn later veils them only thinly (see _unitVeil).
+ * Everything is worked out here, on the game's thread, and recorded (see DrawStep); then all of
+ * it is drawn at once on all the view's threads (see replayDrawList).
  */
 void FirstPersonView::drawUnits()
 {
@@ -452,6 +584,10 @@ void FirstPersonView::drawUnits()
 	const float hitboxOpacity = Options::fpsHitboxes == 2 ? 1.0f
 		: Options::fpsHitboxes == 1 ? 0.5f + 0.5f * (float)std::cos((now % 1000) / 1000.0 * 2.0 * Pi) : 0.0f;
 
+	// The units are recorded first (their shadows, sprites and hitboxes, in order), then drawn
+	// on all the view's threads at once (see replayDrawList). Each unit's frame is composed in
+	// the sprite buffer, then kept in a frame of its own until then.
+	int framesUsed = 0;
 	for (BattleUnit *unit : *_save->getUnits())
 	{
 		// Only units still in the fight (not dead or unconscious), not the one looked through,
@@ -544,17 +680,16 @@ void FirstPersonView::drawUnits()
 			- flareLight(chest, nullptr, false) * 8.0f - flash * 6.0f, 0.0f, 15.0f));
 		if (Options::fpsShadows)
 		{
-			drawUnitShadow(feet, 5.5 * unitSize); // flying units too: the shadow on the ground shows where they hover
+			recordUnitShadow(feet, 5.5 * unitSize); // flying units too: the shadow on the ground shows where they hover
 		}
-		// Draw the unit's frame into the sprite buffer, then stand it in the world, on the floor's
-		// surface (the hitbox and the markers keep the game's own heights).
+		// Compose the unit's frame in the sprite buffer and keep it in a frame of its own, then
+		// record it standing in the world, on the floor's surface (the hitbox and the markers
+		// keep the game's own heights). (Composed unlit and shaded when placed: an upscaled frame
+		// then serves in any light.)
 		const GraphSubset mask(SpriteBufferSize, SpriteBufferSize);
-		const double standing[3] = { feet[0], feet[1], standingHeight(feet) };
-		// (Drawn unlit and shaded when placed: an upscaled frame then serves in any light.)
 		if (unitSize == 1)
 		{
 			unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
-			drawSpriteSmooth(_spriteBuffer, 32, 40, standing, 0.0, shade, unitScale); // anchored at the centre of the floor diamond
 		}
 		else
 		{
@@ -563,18 +698,33 @@ void FirstPersonView::drawUnits()
 			unitSprite.draw(unit, 1, 32, 16, 0, mask, false);
 			unitSprite.draw(unit, 2, 0, 16, 0, mask, false);
 			unitSprite.draw(unit, 3, 16, 24, 0, mask, false);
-			drawSpriteSmooth(_spriteBuffer, 32, 48, standing, 0.0, shade, unitScale); // anchored at the corner shared by the four tiles
 		}
+		DrawStep step;
+		step.kind = DrawStep::Sprite;
+		step.sprite.sprite = keepComposedFrame(framesUsed);
+		step.sprite.anchorX = 32;
+		step.sprite.anchorY = unitSize == 1 ? 40 : 48; // the centre of the floor diamond; a big unit's, the corner its four tiles share
+		step.sprite.world[0] = feet[0];
+		step.sprite.world[1] = feet[1];
+		step.sprite.world[2] = standingHeight(feet);
+		step.sprite.shade = shade;
+		step.sprite.scale = unitScale;
+		step.sprite.unit = unit;
+		useSmoothVersion(step.sprite);
+		_drawList.push_back(step);
 		if (hitboxOpacity > 0.05f)
 		{
-			drawHitbox(unit, feet, hitboxOpacity);
+			recordHitbox(unit, feet, hitboxOpacity);
 		}
 	}
+	// Then draw them all.
+	replayDrawList();
 }
 
 /**
- * Outlines a unit's hitbox (setting "Hitboxes"): the voxels the game counts as the unit when a
- * shot or a blow reaches it, which the sprite only hints at. As the game has it (see
+ * Outlines a unit's hitbox (setting "Hitboxes"), recorded as lines to be drawn with the units
+ * (see drawUnits): the voxels the game counts as the unit when a shot or a blow reaches it,
+ * which the sprite only hints at. As the game has it (see
  * TileEngine::voxelCheck), the unit is its armor's footprint (a LOFT template for each tile it
  * covers, read mirrored on x, the four parts of a big unit in the game's order) standing from
  * just above its floor (and its hovering height) up to its height, kneeling or standing. The
@@ -585,7 +735,7 @@ void FirstPersonView::drawUnits()
  * @param feet Where it's drawn: the middle of its footprint on its floor, in voxels.
  * @param opacity How much of the outline shows (fading in and out with the blinking setting).
  */
-void FirstPersonView::drawHitbox(const BattleUnit *unit, const double feet[3], float opacity)
+void FirstPersonView::recordHitbox(const BattleUnit *unit, const double feet[3], float opacity)
 {
 	const std::vector<Uint16> *loftData = _game->getMod()->getVoxelData();
 	const int size = unit->getArmor()->getSize(), cells = 16 * size;
@@ -602,6 +752,17 @@ void FirstPersonView::drawHitbox(const BattleUnit *unit, const double feet[3], f
 	const float originX = (float)(feet[0] - 8.0 * size), originY = (float)(feet[1] - 8.0 * size);
 	const float bottom = (float)(feet[2] + unit->getFloatHeight() + 1.0), top = bottom + unit->getHeight();
 	const Uint8 color = _colors.hitbox[unit->getFaction() == FACTION_PLAYER ? 0 : unit->getFaction() == FACTION_HOSTILE ? 1 : 2];
+	// Each edge is recorded as a line, to be drawn with the units (see drawUnits, replayDrawList).
+	auto recordLine = [&](const float from[3], const float to[3]) {
+		DrawStep step;
+		step.kind = DrawStep::Line;
+		std::copy(from, from + 3, step.from);
+		std::copy(to, to + 3, step.to);
+		step.color = color;
+		step.thickness = 1;
+		step.opacity = opacity;
+		_drawList.push_back(step);
+	};
 
 	// The footprint's edge, at the bottom and the top: each side of a solid cell with no solid
 	// neighbour beyond it. Meanwhile, its furthest points on each axis, for the upright edges.
@@ -620,7 +781,7 @@ void FirstPersonView::drawHitbox(const BattleUnit *unit, const double feet[3], f
 				for (float z : { bottom, top })
 				{
 					const float from[3] = { sides[side][0], sides[side][1], z }, to[3] = { sides[side][2], sides[side][3], z };
-					drawLine3D(from, to, color, 1, opacity);
+					recordLine(from, to);
 				}
 			}
 			const float middleX = x0 + 0.5f, middleY = y0 + 0.5f;
@@ -635,18 +796,49 @@ void FirstPersonView::drawHitbox(const BattleUnit *unit, const double feet[3], f
 	{
 		if (point[0] > 1e8f || point[0] < -1e8f || point[1] > 1e8f || point[1] < -1e8f) continue;
 		const float from[3] = { point[0], point[1], bottom }, to[3] = { point[0], point[1], top };
-		drawLine3D(from, to, color, 1, opacity);
+		recordLine(from, to);
 	}
 }
 
 /**
- * A soft dark patch on the ground under a unit, so it stands on the floor instead of floating.
+ * Finds the unit the player points at, once the frame's sprites are drawn (see
+ * getUnitAtPointer): the one whose picture shows right where the player points, or else the
+ * nearest one within PointerReach pixels of it (a unit far off is only a few pixels across).
+ * Only what's drawn counts, so only units in sight, standing, and not hidden behind anything.
+ */
+void FirstPersonView::findUnitAtPointer()
+{
+	_unitAtPointer = nullptr;
+	int nearest = 1 << 30;
+	for (int patchY = 0; patchY <= 2 * PointerReach; ++patchY)
+	{
+		for (int patchX = 0; patchX <= 2 * PointerReach; ++patchX)
+		{
+			const int distanceSq = (patchX - PointerReach) * (patchX - PointerReach) + (patchY - PointerReach) * (patchY - PointerReach);
+			if (_pointerUnits[patchY][patchX] && distanceSq < nearest)
+			{
+				nearest = distanceSq;
+				_unitAtPointer = _pointerUnits[patchY][patchX];
+			}
+		}
+	}
+}
+
+/**
+ * A soft dark patch on the ground under a unit, so it stands on the floor instead of floating:
+ * recorded, to be drawn with the units (see drawUnits, replayDrawList).
  * @param feet The point on the ground under the unit's middle, in voxels.
  * @param radius The patch's radius, in voxels.
  */
-void FirstPersonView::drawUnitShadow(const double feet[3], double radius)
+void FirstPersonView::recordUnitShadow(const double feet[3], double radius)
 {
-	drawGroundShade(feet, radius, 2, 1.8f);
+	DrawStep step;
+	step.kind = DrawStep::GroundShade;
+	std::copy(feet, feet + 3, step.centre);
+	step.radius = radius;
+	step.steps = 2;
+	step.density = 1.8f;
+	_drawList.push_back(step);
 }
 
 /**
@@ -657,8 +849,10 @@ void FirstPersonView::drawUnitShadow(const double feet[3], double radius)
  * @param radius The disc's radius, in voxels.
  * @param steps How many shades darker it makes the ground.
  * @param density How solid it is: above 1 the middle is solid and only the rim thins out.
+ * @param bandTop, bandBottom Only the screen rows from bandTop up to (not including) bandBottom
+ *        are darkened (a band of the view, see replayDrawList).
  */
-void FirstPersonView::drawGroundShade(const double centre[3], double radius, int steps, float density)
+void FirstPersonView::drawGroundShade(const double centre[3], double radius, int steps, float density, int bandTop, int bandBottom)
 {
 	// The screen rectangle around the disc: the four corners of the square around it projected
 	// (nothing drawn if any is behind the camera), cut to the view.
@@ -676,7 +870,7 @@ void FirstPersonView::drawGroundShade(const double centre[3], double radius, int
 		left = std::min(left, (int)screenX); right = std::max(right, (int)screenX + 1);
 		top = std::min(top, (int)screenY); bottom = std::max(bottom, (int)screenY + 1);
 	}
-	left = std::max(0, left); top = std::max(0, top); right = std::min(width - 1, right); bottom = std::min(height - 1, bottom);
+	left = std::max(0, left); top = std::max(std::max(0, bandTop), top); right = std::min(width - 1, right); bottom = std::min(std::min(height, bandBottom) - 1, bottom);
 	// Each pixel's ray meets the ground plane half a voxel above the centre: if that is within
 	// the disc and it is the floor the pixel shows, darken the pixel.
 	const double groundZ = centre[2] + 0.5;
@@ -687,7 +881,7 @@ void FirstPersonView::drawGroundShade(const double centre[3], double radius, int
 		{
 			// The ray through the pixel, which must go down to meet the ground.
 			double rayDirection[3];
-			getRayDirection(pixelX, pixelY, rayDirection);
+			rayDirectionThrough(pixelX, pixelY, rayDirection);
 			if (rayDirection[2] > -1e-4) continue;
 			const double distanceAlongRay = (groundZ - _eye[2]) / rayDirection[2];
 			if (distanceAlongRay <= 0.0) continue;
@@ -719,6 +913,9 @@ void FirstPersonView::drawFloorItems()
 {
 	ItemSprite itemSprite(_spriteBuffer, _game->getMod(), _save, _save->getAnimFrame()); // on the game's animation counter, as the map draws
 	const int tileCount = _save->getMapSizeXYZ();
+	// The items are recorded first, then drawn on all the view's threads at once (see
+	// replayDrawList); each one's frame is composed in the sprite buffer and kept till then.
+	int framesUsed = 0;
 	for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
 	{
 		// Only tiles with something on them, that have been seen.
@@ -741,14 +938,49 @@ void FirstPersonView::drawFloorItems()
 		{
 			continue;
 		}
-		// Draw the item's floor sprite into the buffer (unlit) and lay it on the floor's surface:
+		// Compose the item's floor sprite in the buffer (unlit) and lay it on the floor's surface:
 		// the art below the middle of the floor's diamond lies flat, the rest stands.
 		_spriteBuffer->clear();
 		const int shade = (int)std::lround(std::clamp(lightAt((float)ground[0], (float)ground[1], (float)ground[2] + 4.0f), 0.0f, 15.0f));
 		itemSprite.draw(item, 16, 8, 0);
-		const double onFloor[3] = { ground[0], ground[1], standingHeight(ground) };
-		drawSpriteSmooth(_spriteBuffer, 32, 40, onFloor, 0.0, shade, 1.0, SpritePose::Lying);
+		DrawStep step;
+		step.kind = DrawStep::Sprite;
+		step.sprite.sprite = keepComposedFrame(framesUsed);
+		step.sprite.anchorX = 32;
+		step.sprite.anchorY = 40;
+		step.sprite.world[0] = ground[0];
+		step.sprite.world[1] = ground[1];
+		step.sprite.world[2] = standingHeight(ground);
+		step.sprite.shade = shade;
+		step.sprite.pose = SpritePose::Lying;
+		useSmoothVersion(step.sprite);
+		_drawList.push_back(step);
 	}
+	// Then draw them all.
+	replayDrawList();
+}
+
+/**
+ * Keeps what's composed in the sprite buffer (a unit's frame, an item's) for a sprite recorded
+ * to be drawn later (see replayDrawList): copies it into the next free composed frame, made the
+ * first time it's needed and kept for the next frames.
+ * @param framesUsed How many composed frames the stage uses so far; counts this one.
+ * @return The frame holding the copy.
+ */
+Surface *FirstPersonView::keepComposedFrame(int &framesUsed)
+{
+	if (framesUsed == (int)_composedFrames.size())
+	{
+		_composedFrames.push_back(new Surface(SpriteBufferSize, SpriteBufferSize));
+	}
+	Surface *frame = _composedFrames[framesUsed++];
+	const SDL_Surface *composed = _spriteBuffer->getSurface();
+	SDL_Surface *kept = frame->getSurface();
+	for (int y = 0; y < SpriteBufferSize; ++y)
+	{
+		std::copy_n((const Uint8 *)composed->pixels + y * composed->pitch, SpriteBufferSize, (Uint8 *)kept->pixels + y * kept->pitch);
+	}
+	return frame;
 }
 
 /**
@@ -975,8 +1207,9 @@ void FirstPersonView::drawEdgeDots()
 /**
  * Smoke and fire on discovered tiles, animated like on the isometric map: the same sprites
  * from SMOKE.PCK, picked the same way (fire, or smoke by its density), with the frames dissolving
- * into each other. With the setting "See-through smoke" only the fire: the smoke is then drawn
- * by the rays, as the game's sight rules have it (see SmokeTrace).
+ * into each other. With the setting "Smoke" on Original or Modern, only the fire: the smoke is
+ * then drawn see-through after everything else (drawSeeThroughSmoke), and with Modern solid only
+ * where the soldier's sight runs out in it, by the rays (see SmokeTrace).
  */
 void FirstPersonView::drawSmokeAndFire()
 {
@@ -995,7 +1228,7 @@ void FirstPersonView::drawSmokeAndFire()
 		// Only tiles with smoke (a burning tile has smoke too) that have been seen; with
 		// see-through smoke, only burning ones.
 		Tile *tile = _save->getTile(tileIndex);
-		if (!tile->getSmoke() || !_tileViews[tileIndex].discovered || (Options::fpsSeeThroughSmoke && !tile->getFire()))
+		if (!tile->getSmoke() || !_tileViews[tileIndex].discovered || (FirstPerson::smokeMode() != 0 && !tile->getFire()))
 		{
 			continue;
 		}
@@ -1005,13 +1238,7 @@ void FirstPersonView::drawSmokeAndFire()
 		int firstFrame = 0, shade = 0;
 		if (!tile->getFire())
 		{
-			firstFrame += _save->getDepth() > 0 ? Mod::UNDERWATER_SMOKE_OFFSET : Mod::SMOKE_OFFSET;
-			if (Mod::EXTENDED_SMOKE_OFFSET == 0)
-				firstFrame += int(std::floor((tile->getSmoke() / 6.0) - 0.1));
-			else if (Mod::EXTENDED_SMOKE_OFFSET == 1)
-				firstFrame += int(std::floor((tile->getSmoke() / 6.0) - 0.1)) * 4;
-			else
-				firstFrame += (tile->getSmoke() - 1) / 5 * 4;
+			firstFrame = firstSmokeFrame(tile->getSmoke());
 			shade = _tileViews[tileIndex].light;
 		}
 		// Each tile is a little out of step with the others (its animation offset), like on
@@ -1022,6 +1249,448 @@ void FirstPersonView::drawSmokeAndFire()
 			tilePosition.z * 24.0 - tile->getTerrainLevel() };
 		drawSpriteBlend(smokeSprites->getFrame(firstFrame + phase), smokeSprites->getFrame(firstFrame + (phase + 1) % 4), blend, 16, 32,
 			ground, 2.0, shade);
+	}
+}
+
+/**
+ * The first of the four frames of SMOKE.PCK the map shows for a density of smoke (1 .. 15 or
+ * so), as it picks them for the mod's smoke layout; under the sea, its own frames.
+ * @param smoke The tile's smoke.
+ * @return The frame number.
+ */
+int FirstPersonView::firstSmokeFrame(int smoke) const
+{
+	int firstFrame = _save->getDepth() > 0 ? Mod::UNDERWATER_SMOKE_OFFSET : Mod::SMOKE_OFFSET;
+	if (Mod::EXTENDED_SMOKE_OFFSET == 0)
+		firstFrame += int(std::floor((smoke / 6.0) - 0.1));
+	else if (Mod::EXTENDED_SMOKE_OFFSET == 1)
+		firstFrame += int(std::floor((smoke / 6.0) - 0.1)) * 4;
+	else
+		firstFrame += (smoke - 1) / 5 * 4;
+	return firstFrame;
+}
+
+/**
+ * The colour of the game's smoke, from its frames for the thickest smoke: the colours of their
+ * dots mixed and turned most of the way to grey (as the see-through smoke's are, see
+ * softSmokeFrame), so the wall of smoke the rays draw matches the see-through smoke over it.
+ * Grey if the mod has no smoke frames.
+ * @param rgb Set to the colour (0 .. 255 per channel).
+ */
+void FirstPersonView::smokeRgb(float rgb[3]) const
+{
+	rgb[0] = rgb[1] = rgb[2] = 130.0f;
+	SurfaceSet *smokeSprites = _game->getMod()->getSurfaceSet("SMOKE.PCK", false);
+	if (!smokeSprites || !_save)
+	{
+		return;
+	}
+	const SDL_Color *palette = getPalette();
+	double sum[3] = { 0.0, 0.0, 0.0 };
+	int dots = 0;
+	const int firstFrame = firstSmokeFrame(15);
+	for (int frameNumber = firstFrame; frameNumber < firstFrame + 4; ++frameNumber)
+	{
+		Surface *frame = smokeSprites->getFrame(frameNumber);
+		if (!frame) continue;
+		const SDL_Surface *frameSurface = frame->getSurface();
+		for (int y = 0; y < frame->getHeight(); ++y)
+		{
+			for (int x = 0; x < frame->getWidth(); ++x)
+			{
+				const Uint8 color = ((const Uint8 *)frameSurface->pixels)[y * frameSurface->pitch + x];
+				if (!color) continue;
+				sum[0] += palette[color].r; sum[1] += palette[color].g; sum[2] += palette[color].b;
+				++dots;
+			}
+		}
+	}
+	if (dots)
+	{
+		const float mixed[3] = { (float)(sum[0] / dots), (float)(sum[1] / dots), (float)(sum[2] / dots) };
+		const float grey = mixed[0] * 0.3f + mixed[1] * 0.59f + mixed[2] * 0.11f;
+		for (int channel = 0; channel < 3; ++channel) rgb[channel] = grey + (mixed[channel] - grey) * SmokeColorKept;
+	}
+}
+
+/**
+ * Makes a frame of the game's smoke see-through. The original smoke is a stipple: scattered
+ * dots, more of them where the smoke is thicker, standing in for see-through smoke on the
+ * isometric map. Here the frame is made UpscaleFactor times bigger and the dots are blurred over
+ * it (a Gaussian, about a pixel and a quarter of the original wide): how densely they lie becomes
+ * how opaque the smoke is, their colours mixed become its colour (turned most of the way to
+ * grey, as mixed dots of the palette's browns and greys would otherwise come out in patches of
+ * colour). So the smoke keeps the game's
+ * shapes, colours and animation, but soft, and truly see-through. A mod's smoke drawn solid
+ * becomes evenly opaque, with soft edges. Made once per frame (and again for another palette).
+ * @param frame The smoke frame (in the view's palette).
+ * @return The see-through frame: colours (0 where there's no smoke) and the opacity of each
+ *         pixel in see-through steps (0 .. SeeThroughLevels).
+ */
+const FirstPersonView::SoftSmoke &FirstPersonView::softSmokeFrame(const Surface *frame)
+{
+	// The colours are the palette's: made again when it changes.
+	if (_softSmokePalette != _colors.paletteHash)
+	{
+		for (auto &entry : _softSmoke) delete entry.second.colors;
+		_softSmoke.clear();
+		for (auto &entry : _stippleSmoke) delete entry.second.colors;
+		_stippleSmoke.clear();
+		for (auto &entry : _softSmokeBlends) delete entry.second.colors;
+		_softSmokeBlends.clear();
+		_softSmokePalette = _colors.paletteHash;
+	}
+	auto made = _softSmoke.find(frame);
+	if (made != _softSmoke.end())
+	{
+		return made->second;
+	}
+
+	// The original's dots: where they are (1) and their colours, as RGB weighted by that.
+	const int width = frame->getWidth(), height = frame->getHeight();
+	const int bigWidth = width * UpscaleFactor, bigHeight = height * UpscaleFactor;
+	const SDL_Color *palette = getPalette();
+	const SDL_Surface *frameSurface = const_cast<Surface*>(frame)->getSurface(); // read only
+	std::vector<float> dots(width * height * 4, 0.0f); // per pixel: covered, then red, green, blue times that
+	for (int y = 0; y < height; ++y)
+	{
+		for (int x = 0; x < width; ++x)
+		{
+			const Uint8 color = ((const Uint8 *)frameSurface->pixels)[y * frameSurface->pitch + x];
+			if (!color) continue;
+			float *dot = &dots[(y * width + x) * 4];
+			dot[0] = 1.0f; dot[1] = palette[color].r; dot[2] = palette[color].g; dot[3] = palette[color].b;
+		}
+	}
+	// The blur's weights for each big pixel along one axis: the original pixels around its
+	// centre, by a Gaussian of their distance (sigma 1.25 original pixels), adding up to 1.
+	// (The same along both axes, so the blur goes across, then down.)
+	const int Taps = 9; // original pixels each big pixel takes from, round its centre
+	auto blurWeights = [](int bigCount, std::vector<int> &firstPixel, std::vector<float> &weights) {
+		firstPixel.resize(bigCount);
+		weights.assign(bigCount * Taps, 0.0f);
+		for (int big = 0; big < bigCount; ++big)
+		{
+			const float centre = (big + 0.5f) / UpscaleFactor - 0.5f; // in original pixels
+			firstPixel[big] = (int)std::floor(centre) - Taps / 2;
+			float total = 0.0f;
+			for (int tap = 0; tap < Taps; ++tap)
+			{
+				const float distance = firstPixel[big] + tap - centre;
+				total += weights[big * Taps + tap] = std::exp(-distance * distance / (2.0f * 1.25f * 1.25f));
+			}
+			for (int tap = 0; tap < Taps; ++tap) weights[big * Taps + tap] /= total;
+		}
+	};
+	std::vector<int> firstColumn, firstRow;
+	std::vector<float> columnWeights, rowWeights;
+	blurWeights(bigWidth, firstColumn, columnWeights);
+	blurWeights(bigHeight, firstRow, rowWeights);
+	// Across: each original row blurred out to the big width.
+	std::vector<float> across(height * bigWidth * 4, 0.0f);
+	for (int y = 0; y < height; ++y)
+	{
+		for (int bigX = 0; bigX < bigWidth; ++bigX)
+		{
+			float *out = &across[(y * bigWidth + bigX) * 4];
+			for (int tap = 0; tap < Taps; ++tap)
+			{
+				const int x = firstColumn[bigX] + tap;
+				if (x < 0 || x >= width) continue;
+				const float weight = columnWeights[bigX * Taps + tap];
+				const float *dot = &dots[(y * width + x) * 4];
+				for (int channel = 0; channel < 4; ++channel) out[channel] += dot[channel] * weight;
+			}
+		}
+	}
+	// Down: each big pixel from the rows round it. The opacity is how densely the dots lie
+	// (more than twice that, as a stipple covers less than half the pixels where it means solid
+	// smoke), the colour their colours mixed, back in the palette.
+	SoftSmoke &soft = _softSmoke[frame];
+	soft.colors = new Surface(bigWidth, bigHeight);
+	soft.opacity.assign(bigWidth * bigHeight, 0);
+	SDL_Surface *colorSurface = soft.colors->getSurface();
+	for (int bigY = 0; bigY < bigHeight; ++bigY)
+	{
+		Uint8 *colorRow = (Uint8 *)colorSurface->pixels + bigY * colorSurface->pitch;
+		for (int bigX = 0; bigX < bigWidth; ++bigX)
+		{
+			float sum[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+			for (int tap = 0; tap < Taps; ++tap)
+			{
+				const int y = firstRow[bigY] + tap;
+				if (y < 0 || y >= height) continue;
+				const float weight = rowWeights[bigY * Taps + tap];
+				const float *value = &across[(y * bigWidth + bigX) * 4];
+				for (int channel = 0; channel < 4; ++channel) sum[channel] += value[channel] * weight;
+			}
+			const int opacity = (int)std::lround(std::min(1.0f, sum[0] * 2.6f) * SeeThroughLevels);
+			colorRow[bigX] = 0;
+			if (opacity <= 0) continue;
+			const float mixed[3] = { sum[1] / sum[0], sum[2] / sum[0], sum[3] / sum[0] };
+			const float grey = mixed[0] * 0.3f + mixed[1] * 0.59f + mixed[2] * 0.11f;
+			auto toFiveBits = [&](int channel) { return std::clamp((int)std::lround((grey + (mixed[channel] - grey) * SmokeColorKept) * 31.0f / 255.0f), 0, 31); };
+			colorRow[bigX] = _nearestRgb[(toFiveBits(0) << 10) | (toFiveBits(1) << 5) | toFiveBits(2)];
+			soft.opacity[bigY * bigWidth + bigX] = (Uint8)opacity;
+		}
+	}
+	return soft;
+}
+
+/**
+ * A frame of the game's smoke as it is, for the setting "Smoke: Original": its dots in their own
+ * colours, each one solid (opacity SeeThroughLevels) and the holes between them empty, UpscaleFactor
+ * times bigger, so it's drawn as the soft frames are: with sprite upscaling on, the upscaler's
+ * version (the dots rounded, as the solid smoke's are), each dot a block until that's ready. How
+ * see-through it looks is left to the opacity of the whole frame (the smoke's density), and the
+ * original's own stipple: thin smoke has few dots, thick smoke many. Made once per frame (and
+ * again for another palette, with the soft ones; and once more when the upscaler's is ready).
+ * @param frame The smoke frame (in the view's palette).
+ * @return The frame: colours (0 where there's no dot) and opacities.
+ */
+const FirstPersonView::SoftSmoke &FirstPersonView::stippleSmokeFrame(const Surface *frame)
+{
+	// Made before, as good as it gets now: as it is. The blocks are made again once the
+	// upscaler's version is ready (the frames between two of them go with the old ones).
+	const Surface *smooth = Options::fpsSpriteUpscale > 0 ? upscaled(frame) : nullptr;
+	auto made = _stippleSmoke.find(frame);
+	if (made != _stippleSmoke.end())
+	{
+		if (made->second.smooth || !smooth)
+		{
+			return made->second;
+		}
+		delete made->second.colors;
+		_stippleSmoke.erase(made);
+		++_smokeUpgrades; // (see drawSeeThroughSmoke)
+		for (auto blend = _softSmokeBlends.begin(); blend != _softSmokeBlends.end();)
+		{
+			if (std::get<3>(blend->first) && (std::get<0>(blend->first) == frame || std::get<1>(blend->first) == frame))
+			{
+				delete blend->second.colors;
+				blend = _softSmokeBlends.erase(blend);
+			}
+			else ++blend;
+		}
+	}
+	const int width = frame->getWidth(), height = frame->getHeight();
+	const int bigWidth = width * UpscaleFactor, bigHeight = height * UpscaleFactor;
+	SoftSmoke &stipple = _stippleSmoke[frame];
+	stipple.colors = new Surface(bigWidth, bigHeight);
+	stipple.opacity.assign(bigWidth * bigHeight, 0);
+	stipple.smooth = smooth != nullptr;
+	const SDL_Surface *source = const_cast<Surface*>(smooth ? smooth : frame)->getSurface(); // read only
+	const int sourceScale = smooth ? 1 : UpscaleFactor; // big pixels per source pixel
+	SDL_Surface *colorSurface = stipple.colors->getSurface();
+	for (int bigY = 0; bigY < bigHeight; ++bigY)
+	{
+		const Uint8 *sourceRow = (const Uint8 *)source->pixels + (bigY / sourceScale) * source->pitch;
+		Uint8 *colorRow = (Uint8 *)colorSurface->pixels + bigY * colorSurface->pitch;
+		for (int bigX = 0; bigX < bigWidth; ++bigX)
+		{
+			const Uint8 color = sourceRow[bigX / sourceScale];
+			colorRow[bigX] = color;
+			stipple.opacity[bigY * bigWidth + bigX] = color ? SeeThroughLevels : 0;
+		}
+	}
+	return stipple;
+}
+
+/**
+ * Two see-through smoke frames part way into each other, made once for each step and kept: each
+ * pixel's opacity runs evenly from the first frame's to the second's, and its colour from the
+ * first's to the second's (through the see-through mix; where only one has smoke, its colour).
+ * So as the step goes up, each pixel only ever changes one way: the smoke melts from one frame
+ * into the next without a pixel blinking back and forth.
+ * @param from The frame the smoke is changing from (of SMOKE.PCK).
+ * @param to The frame it's changing into (of the same size), or null.
+ * @param step How far: 0 (all `from`) .. SmokeBlendSteps - 1.
+ * @param original The original frames' dots as they are (setting "Smoke: Original"), not made soft.
+ * @return The see-through frame between them.
+ */
+const FirstPersonView::SoftSmoke &FirstPersonView::softSmokeBlend(const Surface *from, const Surface *to, int step, bool original)
+{
+	softSmokeFrame(from); // (any palette change is dealt with here, before the frames are taken)
+	const SoftSmoke &softFrom = original ? stippleSmokeFrame(from) : softSmokeFrame(from);
+	if (step <= 0 || !to || to->getWidth() != from->getWidth() || to->getHeight() != from->getHeight())
+	{
+		return softFrom;
+	}
+	const SoftSmoke &softTo = original ? stippleSmokeFrame(to) : softSmokeFrame(to);
+	const auto key = std::make_tuple(from, to, step, original);
+	auto made = _softSmokeBlends.find(key);
+	if (made != _softSmokeBlends.end())
+	{
+		return made->second;
+	}
+	const int width = softFrom.colors->getWidth(), height = softFrom.colors->getHeight();
+	SoftSmoke &blend = _softSmokeBlends[key];
+	blend.colors = new Surface(width, height);
+	blend.opacity.assign(width * height, 0);
+	const SDL_Surface *fromSurface = softFrom.colors->getSurface(), *toSurface = softTo.colors->getSurface();
+	SDL_Surface *blendSurface = blend.colors->getSurface();
+	const int colorLevel = (step * SeeThroughLevels + SmokeBlendSteps / 2) / SmokeBlendSteps; // how far the colour has gone, in see-through steps
+	for (int y = 0; y < height; ++y)
+	{
+		const Uint8 *fromRow = (const Uint8 *)fromSurface->pixels + y * fromSurface->pitch, *toRow = (const Uint8 *)toSurface->pixels + y * toSurface->pitch;
+		Uint8 *blendRow = (Uint8 *)blendSurface->pixels + y * blendSurface->pitch;
+		for (int x = 0; x < width; ++x)
+		{
+			const int index = y * width + x;
+			blend.opacity[index] = (Uint8)((softFrom.opacity[index] * (SmokeBlendSteps - step) + softTo.opacity[index] * step + SmokeBlendSteps / 2) / SmokeBlendSteps);
+			blendRow[x] = !fromRow[x] ? toRow[x] : !toRow[x] ? fromRow[x] : seeThrough(colorLevel, toRow[x], fromRow[x]);
+			if (!blend.opacity[index]) blendRow[x] = 0;
+		}
+	}
+	return blend;
+}
+
+/**
+ * The smoke on discovered tiles drawn see-through (setting "Smoke"): with Modern, the game's own
+ * smoke made soft (see softSmokeFrame), and the wisps rising off it; with Original, the original
+ * frames' own dots (see stippleSmokeFrame), more opaque the thicker the smoke, and no wisps. Drawn after everything
+ * solid, farthest first, each laid over what's behind it; where the soldier's sight runs out in
+ * the smoke, the rays have already drawn a wall of it (see SmokeTrace), and units the soldier
+ * sees stay clear (see _unitVeil).
+ * Each tile's smoke is the frame the map picks for its density, a little more opaque the
+ * thicker it is; its frames melt into each other slowly (an eased cross-fade, nothing blinks),
+ * each tile out of step with the others, a fifth bigger than on the map give or take a little
+ * (so the clouds of neighbouring tiles overlap, and a cloud's edge isn't the tiles' square), set
+ * off from the middle, and swaying and bobbing gently. A wisp is a small puff of the thinnest smoke that rises,
+ * grows and thins out, fading in and away.
+ */
+void FirstPersonView::drawSeeThroughSmoke()
+{
+	SurfaceSet *smokeSprites = _game->getMod()->getSurfaceSet("SMOKE.PCK", false);
+	if (FirstPerson::smokeMode() == 0 || !smokeSprites || _nearestRgb.empty())
+	{
+		return;
+	}
+	const bool original = FirstPerson::smokeMode() == 1;
+	typedef FirstPersonParticles Particles;
+	const double seconds = SDL_GetTicks() / 1000.0;
+	// A frame that changes into the next over FrameSeconds, eased in and out (smoothstep).
+	const double FrameSeconds = 0.8;
+	auto easedBlend = [](double fraction) { return fraction * fraction * (3.0 - 2.0 * fraction); };
+
+	// Everything to draw: a puff of smoke, its anchor in the world (its frames' anchor pixel),
+	// the two frames it is between, how far, how opaque, how big and how lit.
+	struct Puff { double depth; double world[3]; int anchorY; const Surface *from, *to; double blend; float opacity; double scale; int shade; };
+	std::vector<Puff> puffs;
+	auto addPuff = [&](const double world[3], int anchorY, int firstFrame, double frameTime, float opacity, double scale, int shade) {
+		const int phase = ((int)std::floor(frameTime) % 4 + 4) % 4;
+		Puff puff;
+		puff.depth = (world[0] - _eye[0]) * _forward[0] + (world[1] - _eye[1]) * _forward[1] + (world[2] - _eye[2]) * ZScale * _forward[2];
+		if (puff.depth < 1.0) return;
+		std::copy(world, world + 3, puff.world);
+		puff.anchorY = anchorY;
+		puff.from = smokeSprites->getFrame(firstFrame + phase);
+		puff.to = smokeSprites->getFrame(firstFrame + (phase + 1) % 4);
+		puff.blend = easedBlend(frameTime - std::floor(frameTime));
+		puff.opacity = opacity;
+		puff.scale = scale;
+		puff.shade = shade;
+		if (puff.from) puffs.push_back(puff);
+	};
+
+	// Each smoky tile seen (a burning one shows its fire instead), within the view's reach.
+	const int tileCount = _save->getMapSizeXYZ();
+	for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
+	{
+		Tile *tile = _save->getTile(tileIndex);
+		if (!tile->getSmoke() || tile->getFire() || !_tileViews[tileIndex].discovered)
+		{
+			continue;
+		}
+		const Position tilePosition = tile->getPosition();
+		const double ground[3] = { tilePosition.x * 16.0 + 8.0, tilePosition.y * 16.0 + 8.0, tilePosition.z * 24.0 - tile->getTerrainLevel() };
+		if (std::abs(ground[0] - _eye[0]) > _maxDistance || std::abs(ground[1] - _eye[1]) > _maxDistance)
+		{
+			continue;
+		}
+		// The tile's own variations, from its position: four numbers 0 .. 1.
+		Uint32 hash = (Uint32)tileIndex * 2654435761u;
+		float variation[4];
+		for (float &value : variation)
+		{
+			hash ^= hash >> 15; hash *= 2246822519u; hash ^= hash >> 13;
+			value = (hash & 0xFFFF) / 65535.0f;
+		}
+		// Set off from the middle, swaying and bobbing slowly.
+		const double world[3] = {
+			ground[0] + (variation[0] - 0.5) * 4.0 + 0.8 * std::sin(seconds * 0.5 + variation[1] * 2.0 * Pi),
+			ground[1] + (variation[1] - 0.5) * 4.0 + 0.8 * std::cos(seconds * 0.4 + variation[2] * 2.0 * Pi),
+			ground[2] + 1.0 * std::sin(seconds * 0.7 + variation[3] * 2.0 * Pi) };
+		// A little more opaque the thicker the smoke (a fresh smoke grenade makes about 15); the
+		// original's dots more so, as their holes already let the view through.
+		const float opacity = original ? std::clamp(0.35f + tile->getSmoke() * 0.04f, 0.0f, 0.95f) : std::clamp(0.45f + tile->getSmoke() * 0.025f, 0.0f, 0.85f);
+		addPuff(world, 32, firstSmokeFrame(tile->getSmoke()), seconds / FrameSeconds + tile->getAnimationOffset() + variation[2],
+			opacity, 1.14 + variation[3] * 0.12, _tileViews[tileIndex].light);
+	}
+	// The wisps: the thinnest smoke's frames, anchored at their middle, growing as they rise,
+	// fading in over their first quarter and away over their last half.
+	for (const auto &particle : _particles.all())
+	{
+		if (particle.kind != Particles::WISP || original) // (wisps left from Modern are dropped)
+		{
+			continue;
+		}
+		const float age = particle.age / particle.life; // 0 new .. 1 gone
+		const float fade = std::min(std::clamp(age / 0.25f, 0.0f, 1.0f), std::clamp((1.0f - age) / 0.5f, 0.0f, 1.0f));
+		const double world[3] = { particle.pos[0], particle.pos[1], particle.pos[2] };
+		const int shade = (int)std::lround(std::clamp(lightAt(particle.pos[0], particle.pos[1], particle.pos[2]), 0.0f, 15.0f));
+		addPuff(world, 20, firstSmokeFrame(1), seconds / (FrameSeconds * 1.5) + particle.size, 0.45f * fade * fade * (3.0f - 2.0f * fade),
+			0.35 + 0.4 * age, shade);
+	}
+
+	// Farthest first, each over what's behind it: its two frames part way into each other, made
+	// here (on this thread). An original frame upgraded to the upscaler's version on the way
+	// drops the blends made with the old one, some of which may be in the list already: then the
+	// list is made again (it happens once for each frame, ever).
+	std::sort(puffs.begin(), puffs.end(), [](const Puff &a, const Puff &b) { return a.depth > b.depth; });
+	unsigned upgradesBefore;
+	do
+	{
+		upgradesBefore = _smokeUpgrades;
+		_smokeDraws.clear();
+		for (const Puff &puff : puffs)
+		{
+			const SoftSmoke &soft = softSmokeBlend(puff.from, puff.to, std::min(SmokeBlendSteps - 1, (int)(puff.blend * SmokeBlendSteps)), original);
+			_smokeDraws.push_back({ &soft, { puff.world[0], puff.world[1], puff.world[2] }, puff.anchorY, puff.opacity, puff.scale, puff.shade });
+		}
+	} while (_smokeUpgrades != upgradesBefore);
+	// Then drawn on all the view's threads, each a band of rows at a time (see drawSmokeBands).
+	if (!_smokeDraws.empty())
+	{
+		runOnAllThreads(&FirstPersonView::drawSmokeBands);
+	}
+}
+
+/**
+ * Draws this frame's see-through smoke (made by drawSeeThroughSmoke) over bands of the view's
+ * rows, taken one at a time from the shared counter until none are left: a job for all the
+ * view's threads (see runOnAllThreads). Each band gets every puff, farthest first, so every
+ * pixel comes out just as if one thread drew the puffs whole, one after another.
+ */
+void FirstPersonView::drawSmokeBands()
+{
+	const int bandCount = (getHeight() + BandRows - 1) / BandRows;
+	for (int band = _rayWorkers.nextPiece++; band < bandCount; band = _rayWorkers.nextPiece++)
+	{
+		for (const SmokeDraw &smoke : _smokeDraws)
+		{
+			const SeeThroughSprite seeThroughSprite = { smoke.soft->opacity.data(), smoke.opacity };
+			SpriteDraw draw;
+			draw.sprite = smoke.soft->colors;
+			draw.anchorX = 16 * UpscaleFactor;
+			draw.anchorY = smoke.anchorY * UpscaleFactor;
+			std::copy(smoke.world, smoke.world + 3, draw.world);
+			draw.depthBias = 2.0;
+			draw.shade = smoke.shade;
+			draw.scale = smoke.scale / UpscaleFactor;
+			draw.seeThrough = &seeThroughSprite;
+			drawSprite(draw, band * BandRows, (band + 1) * BandRows);
+		}
 	}
 }
 
@@ -1102,6 +1771,159 @@ void FirstPersonView::drawMarkers()
 						}
 					}
 				}
+			}
+		}
+	}
+}
+
+/**
+ * Icons over the downed units in sight (setting "Downed unit icons"): over each body lying
+ * unconscious on a tile seen, one small outlined icon for each thing the matter with it, in the
+ * order the game's own floor indicators take (where a mod has them): burning (a flame),
+ * bleeding (a drop of blood: fatal wounds), shock (a bolt: health draining away), and always out
+ * cold (Zz). Our own pixel art, drawn over everything like the enemy markers and as much bigger
+ * on big screens, a little above the body on the screen, but only where the body itself is in
+ * view (not behind a wall, nor in smoke too thick to see through) and within the view's reach.
+ * With "Crosshair", only for the body the player points at (the one nearest the crosshair, or
+ * the free cursor, within about a tile), just under the crosshair, where the shot info is read
+ * too. A unit whose mod switches its indicators off gets none.
+ */
+void FirstPersonView::drawDownedIcons()
+{
+	if (Options::fpsDownedIcons <= 0)
+	{
+		return;
+	}
+	const int width = getWidth(), height = getHeight();
+	const int uiScale = std::max(1, _uiScale);
+	const double focalLength = (width / 2.0) / _halfFovTangent;
+	enum { Burning = 1, Bleeding = 2, Shock = 4, OutCold = 8 };
+
+	// Each body in view: where its icons go (their bottom, in the middle), what's the matter with
+	// it, and how far it is from where the player points (in about a tile's breadth on the
+	// screen there).
+	struct Downed { double screenX, screenY; int states; double fromPointer; };
+	std::vector<Downed> downed;
+	const int tileCount = _save->getMapSizeXYZ();
+	for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
+	{
+		Tile *tile = _save->getTile(tileIndex);
+		if (tile->getInventory()->empty() || !_tileViews[tileIndex].discovered)
+		{
+			continue;
+		}
+		int states = 0;
+		for (const BattleItem *item : *tile->getInventory())
+		{
+			const BattleUnit *unit = item->getUnit();
+			if (!unit || unit->getStatus() != STATUS_UNCONSCIOUS || !unit->indicatorsAreEnabled()) continue;
+			states |= OutCold;
+			if (unit->getFire() > 0) states |= Burning;
+			if (unit->getFatalWounds() > 0) states |= Bleeding;
+			if (unit->hasNegativeHealthRegen()) states |= Shock;
+		}
+		if (!states)
+		{
+			continue;
+		}
+		// The body on the floor in the middle of the tile, as drawFloorItems lays it: in view if
+		// nothing nearer is drawn there (its own sprite is at its depth), and within reach. Seen
+		// from close by, its middle can be off the bottom of the view with the rest of it on it:
+		// then a point a little higher up the body is looked at instead.
+		const Position tilePosition = tile->getPosition();
+		const double ground[3] = { tilePosition.x * 16.0 + 8.0, tilePosition.y * 16.0 + 8.0, tilePosition.z * 24.0 - tile->getTerrainLevel() };
+		const double onFloor[3] = { ground[0], ground[1], standingHeight(ground) + 2.0 };
+		double screenX = 0.0, screenY = 0.0, depth = 0.0;
+		bool inView = false;
+		for (const double rise : { 0.0, 6.0 })
+		{
+			const double point[3] = { onFloor[0], onFloor[1], onFloor[2] + rise };
+			if (!projectToScreen(point, screenX, screenY, depth) || depth > _maxDistance) break;
+			const int pixelX = (int)screenX, pixelY = (int)screenY;
+			if (pixelX < 0 || pixelY < 0 || pixelX >= width || pixelY >= height) continue;
+			inView = _depthBuffer[pixelY * width + pixelX] >= depth - 8.0;
+			break;
+		}
+		if (!inView)
+		{
+			continue;
+		}
+		// The icons a little above it on the screen: a body lies low (a third of a tile's breadth
+		// there, at most 20 pixels of the art).
+		const double tileOnScreen = std::max(1.0, 12.0 * focalLength / depth);
+		downed.push_back({ screenX, screenY - std::min(tileOnScreen * 0.35, 20.0 * uiScale), states,
+			std::hypot(screenX - _pointerX, screenY - _pointerY) / tileOnScreen });
+	}
+	// With "Crosshair", only the body pointed at, its icons just under the crosshair (which
+	// reaches about 8 pixels of the art round where it points), below any name shown there.
+	if (Options::fpsDownedIcons == 1)
+	{
+		auto pointedAt = std::min_element(downed.begin(), downed.end(), [](const Downed &a, const Downed &b) { return a.fromPointer < b.fromPointer; });
+		if (pointedAt == downed.end() || pointedAt->fromPointer > 1.0)
+		{
+			return;
+		}
+		Downed only = *pointedAt;
+		only.screenX = _pointerX;
+		only.screenY = _pointerY + 17 * uiScale + _pointerTextBelow;
+		downed.assign(1, only);
+	}
+
+	// The icons, at most 7 pixels high: '#' their colour, '+' a second one.
+	struct Icon { int state; int width; const char *rows[7]; Uint8 color, second; };
+	const Icon icons[] = {
+		{ Burning, 5, { "..#..", ".##..", ".###.", "##+##", "#+++#", "#+++#", ".###." }, _colors.downedIcon[0], _colors.downedIcon[1] },
+		{ Bleeding, 5, { "..#..", "..#..", ".###.", ".###.", "#####", "#####", ".###." }, _colors.downedIcon[2], _colors.downedIcon[2] },
+		{ Shock, 5, { "...##", "..##.", ".##..", "#####", "..##.", ".##..", "##..." }, _colors.downedIcon[3], _colors.downedIcon[3] },
+		{ OutCold, 7, { "####...", "..#....", ".#.....", "####...", "....###", ".....#.", "....###" }, _colors.downedIcon[4], _colors.downedIcon[4] },
+	};
+	int originX = 0, originY = 0; // the art is drawn uiScale times bigger around this point
+	// Puts one pixel of the art (unscaled coordinates on the view): a uiScale x uiScale block,
+	// scaled out from the origin, clipped to the view.
+	auto put = [&](int x, int y, Uint8 color) {
+		const int pixelX = originX + (x - originX) * uiScale, pixelY = originY + (y - originY) * uiScale;
+		for (int offsetY = 0; offsetY < uiScale; ++offsetY)
+			for (int offsetX = 0; offsetX < uiScale; ++offsetX)
+				if (pixelX + offsetX >= 0 && pixelY + offsetY >= 0 && pixelX + offsetX < width && pixelY + offsetY < height)
+					*getRaw(pixelX + offsetX, pixelY + offsetY) = color;
+	};
+	for (const Downed &body : downed)
+	{
+		// Its icons in a row, two pixels apart, centred over it, their bottoms on the point.
+		int rowWidth = -2;
+		for (const Icon &icon : icons)
+		{
+			if (body.states & icon.state) rowWidth += icon.width + 2;
+		}
+		originX = (int)body.screenX;
+		originY = (int)body.screenY;
+		// First a black outline round every lit pixel, then the pixels.
+		for (int pass = 0; pass < 2; ++pass)
+		{
+			int left = originX - rowWidth / 2;
+			for (const Icon &icon : icons)
+			{
+				if (!(body.states & icon.state)) continue;
+				for (int row = 0; row < 7; ++row)
+				{
+					for (int column = 0; column < icon.width; ++column)
+					{
+						const char dot = icon.rows[row][column];
+						if (dot == '.') continue;
+						const int x = left + column, y = originY - 7 + row;
+						if (pass == 0)
+						{
+							for (int outlineY = -1; outlineY <= 1; ++outlineY)
+								for (int outlineX = -1; outlineX <= 1; ++outlineX)
+									put(x + outlineX, y + outlineY, _colors.tapeBlack);
+						}
+						else
+						{
+							put(x, y, dot == '+' ? icon.second : icon.color);
+						}
+					}
+				}
+				left += icon.width + 2;
 			}
 		}
 	}

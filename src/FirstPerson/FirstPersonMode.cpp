@@ -54,6 +54,7 @@
 #include <algorithm>
 #include <cmath>
 #include <string>
+#include "FirstPersonApi.h"
 #include "FirstPersonSounds.h"
 #include "FirstPersonView.h"
 #include "RuleFirstPerson.h"
@@ -123,6 +124,7 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
 	// Whether each step is allowed is not known yet (see stepAllowed).
 	_uiScale = uiScaleFor(Options::baseXResolution, Options::baseYResolution);
 	std::fill(std::begin(_stepAllowedCache), std::end(_stepAllowedCache), -1);
+	FirstPerson::settleOptions(); // (the smoke's first value, from an older setting)
 
 	// Our surfaces, in drawing order: each one goes on top of the ones made before it.
 	createView();
@@ -144,6 +146,7 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
 	_offHandSprite = new Surface(32, 48, 0, 0); // (dual wield: the other hand's)
 	_offHandSprite->setPalette(_state->getPalette());
 	makeWeaponInHand();
+	makeScopeCross();
 
 	// Which corner each surface keeps to on a resize, then the top bar's buttons laid out.
 	setResizeAnchors();
@@ -235,9 +238,16 @@ void FirstPersonMode::createCrosshairAndBanner()
 	_txtMode = addText(120, 9, width / 2 + 14, height / 2 - 9, "crosshairText", "firstPerson");
 	_txtShot = addText(120, 9, width / 2 + 14, height / 2 + 1, "crosshairText", "firstPerson");
 	_txtBanner->setAlign(ALIGN_CENTER);
+	// The name of the unit pointed at, under the crosshair (it follows the free cursor).
+	_txtTarget = addText(160, 9, width / 2 - 80, height / 2 + 10, "crosshairText", "firstPerson");
+	_txtTarget->setAlign(ALIGN_CENTER);
+	// Zoomed in: SCOPING and the zoom, at the right just under the scope cross's line (clear of
+	// the lift arrows' texts above it).
+	_txtScoping = addText(90, 9, width - 94, height / 2 + 5, "crosshairText", "firstPerson");
+	_txtScoping->setAlign(ALIGN_RIGHT);
 
 	// All hidden until there's something to show.
-	for (Text *text : { _txtMode, _txtShot, _txtBanner })
+	for (Text *text : { _txtMode, _txtShot, _txtBanner, _txtTarget, _txtScoping })
 	{
 		text->setVisible(false);
 	}
@@ -305,9 +315,10 @@ void FirstPersonMode::createCompass()
 		_compassLetters[letter]->setVisible(false);
 	}
 
-	// The warning line under the dial.
-	_txtCompassTurn = addText(CompassSize + 20, 9, compassX - 10, compassY + CompassArrowH + CompassSize + 1, "weapon", "firstPerson");
-	_txtCompassTurn->setAlign(ALIGN_CENTER);
+	// The warning line under the dial, ending at its right edge (the dial sits against the
+	// screen's right edge, and a line centred under it would run off it).
+	_txtCompassTurn = addText(CompassSize + 40, 9, compassX - 40, compassY + CompassArrowH + CompassSize + 1, "weapon", "firstPerson");
+	_txtCompassTurn->setAlign(ALIGN_RIGHT);
 	_txtCompassTurn->setVisible(false);
 }
 
@@ -450,10 +461,10 @@ void FirstPersonMode::createSoldierCard()
 	// at most 30 tiles and without particles, to stay cheap.
 	_preview = new FirstPersonView(_game, PreviewW, PreviewH, 0, CardY + 36);
 	_state->add(_preview);
+	_preview->shareCache(_view); // (first: then the battle doesn't build models of its own)
 	_preview->setSavedBattleGame(_save);
 	_preview->setMap(_state->_map);
 	_preview->setMaxDistance(std::min(30, mod->getFirstPerson().getMaxViewDistance()));
-	_preview->shareCache(_view);
 	_preview->setParticles(false);
 	_cardParts.push_back({ _preview, 4, 36 });
 
@@ -519,6 +530,7 @@ void FirstPersonMode::setResizeAnchors()
 	for (Surface *part : std::initializer_list<Surface*>{ _liftUp, _liftDown, _txtLift, _txtLiftKeys }) _anchors[part] = RIGHT_CENTER;
 	_anchors[_txtMode] = CENTER;
 	_anchors[_txtShot] = CENTER;
+	_anchors[_txtScoping] = RIGHT_CENTER;
 
 	// END and the suit's buttons keep to the top right, and so does the compass; the info panel
 	// to the bottom left.
@@ -572,6 +584,7 @@ void FirstPersonMode::resized(int widthChange, int heightChange)
 	shiftAnchored(canvasWidth() - oldWidth, canvasHeight() - oldHeight);
 	makeCanvas();
 	makeWeaponInHand();
+	makeScopeCross();
 
 	// A new 3D view at the new canvas size, set up like the old one and put in its place.
 	FirstPersonView *newView = new FirstPersonView(_game, canvasWidth(), canvasHeight(), 0, 0);
@@ -961,6 +974,7 @@ void FirstPersonMode::setMouseLook(bool on)
 {
 	_mouseLook = on;
 	_dragLook = false;
+	_zoomButtonHeld = false;
 }
 
 /**
@@ -1093,14 +1107,17 @@ bool FirstPersonMode::invincible(BattlescapeState *state, const BattleUnit *unit
 }
 
 /**
- * Doom mode (a first step towards a real-time mode): a grenade primed there (pulling the pin is
- * one click, see fire) burns for DoomFuseTime and then goes off wherever it is: where it lies,
- * or in the hand of whoever still holds it, as in a first-person shooter; one still in the air
- * goes off where it lands. The explosion is the game's own, as its end-of-turn fuse makes it
- * (an ExplosionBState for a timed grenade at the grenade's tile, which also removes it). One at
- * a time, on the player's turn, when the game isn't busy with a shot or another explosion.
- * Leaving Doom mode stops the real-time fuses (the game's own fuse, set to 0, is still there:
- * the grenade then goes off at the end of the turn, as usual).
+ * Doom mode with real-time grenades (a first step towards a real-time mode): a grenade armed
+ * there burns for its fuse (the setting "Doom grenade fuse" when it was armed) and then goes off
+ * wherever it is: where it lies, where it lands if it's still in the air, or in the hand of
+ * whoever holds it. Primed on throw (the default, see fire) it starts burning the moment it
+ * leaves the hand, and one whose throw the game refused stays in the hand, armed and not
+ * burning, until it does; with its pin pulled by PRIME it burns from the click, in the hand too. The explosion is
+ * the game's own, as its end-of-turn fuse makes it (an ExplosionBState for a timed grenade at
+ * the grenade's tile, which also removes it). One at a time, on the player's turn, when the game
+ * isn't busy with a shot or another explosion. Leaving Doom mode or real-time grenades stops
+ * the real-time fuses (the game's own fuse, set to 0, is still there: the grenade then goes off
+ * at the end of the turn, as usual).
  * @param now The time, SDL ticks.
  */
 void FirstPersonMode::updateDoomFuses(Uint32 now)
@@ -1109,11 +1126,30 @@ void FirstPersonMode::updateDoomFuses(Uint32 now)
 	{
 		return;
 	}
-	if (!doomModeOn())
+	if (!doomModeOn() || !Options::fpsDoomRealTimeGrenades)
 	{
 		_doomFuses.clear();
 		return;
 	}
+	// A grenade (by its id), if it's still in the battle.
+	auto findGrenade = [this](int id) -> BattleItem*
+	{
+		for (BattleItem *item : *_save->getItems())
+		{
+			if (item->getId() == id) return item;
+		}
+		return nullptr;
+	};
+
+	// A grenade armed to burn from leaving the hand starts burning the moment it does, even while
+	// the game is busy flying it (a thrown item has no owner from the throw on).
+	for (auto &entry : _doomFuses)
+	{
+		if (entry.second.lit) continue;
+		const BattleItem *grenade = findGrenade(entry.first);
+		if (grenade && !grenade->getOwner()) entry.second.lit = std::max<Uint32>(1, now);
+	}
+
 	BattlescapeGame *battleGame = _state->_battleGame;
 	if (battleGame->isBusy() || _save->getSide() != FACTION_PLAYER)
 	{
@@ -1122,28 +1158,27 @@ void FirstPersonMode::updateDoomFuses(Uint32 now)
 	for (auto entry = _doomFuses.begin(); entry != _doomFuses.end(); )
 	{
 		// The grenade, if it's still in the battle and still primed.
-		BattleItem *grenade = nullptr;
-		for (BattleItem *item : *_save->getItems())
-		{
-			if (item->getId() == entry->first)
-			{
-				grenade = item;
-				break;
-			}
-		}
+		BattleItem *grenade = findGrenade(entry->first);
 		if (!grenade || grenade->getFuseTimer() < 0)
 		{
 			entry = _doomFuses.erase(entry);
 			continue;
 		}
-		if (now - entry->second < DoomFuseTime)
+		// Still in a hand: not burning yet.
+		DoomFuse &fuse = entry->second;
+		if (!fuse.lit)
+		{
+			++entry;
+			continue;
+		}
+		if (now - fuse.lit < fuse.length)
 		{
 			++entry;
 			continue;
 		}
 
-		// Where it is: on the ground, or with whoever carries it (at their middle). Neither: it's
-		// in the air, and goes off where it lands.
+		// Where it is: on the ground, or (picked up again meanwhile) with whoever carries it, at
+		// their middle. Neither: it's in the air, and goes off where it lands.
 		const Tile *tile = grenade->getTile();
 		BattleUnit *carrier = grenade->getOwner();
 		if (!tile && carrier)
@@ -1239,11 +1274,17 @@ void FirstPersonMode::think()
 	const bool resumed = _lastFrameTick && now - _lastFrameTick > 250;
 	_lastFrameTick = now;
 
-	// When the mouse gets captured or released (or we come back from another screen), the
-	// cursor jumps; ignore mouse movement for a moment so the jump doesn't turn the view.
-	if (wantsMouseCapture() != _mouseWasCaptured || resumed)
+	// When the mouse gets captured or released, or we come back from another screen, the cursor
+	// jumps; ignore mouse movement for a moment so the jump doesn't turn the view. Coming back
+	// is seen by the game having released the mouse since the last frame, however briefly: a
+	// window that opens and closes at once (the action menu of an item with nothing to do, a
+	// lamp fixed in the hand) came back too quickly to notice otherwise, and its jump turned
+	// the soldier.
+	const unsigned mouseReleases = _game->getMouseReleases();
+	if (wantsMouseCapture() != _mouseWasCaptured || resumed || mouseReleases != _mouseReleasesSeen)
 	{
 		_mouseWasCaptured = wantsMouseCapture();
+		_mouseReleasesSeen = mouseReleases;
 		_ignoreMotionUntil = now + 150;
 	}
 
@@ -1261,7 +1302,25 @@ void FirstPersonMode::think()
 	const bool playerTurn = _save->getSide() == FACTION_PLAYER;
 	BattleUnit *selected = selectNextSoldierIfGone(playerTurn);
 	updateLastPlayerUnit(playerTurn, selected);
-	BattleUnit *unit = playerTurn ? selected : (Options::fpsAlienTurn3D ? _lastPlayerUnit : nullptr);
+	// (The aliens' turn cameras may pick another of ours, see alienTurnCamera; they start afresh
+	// each aliens' turn.)
+	BattleUnit *alienTurnView = nullptr;
+	if (playerTurn)
+	{
+		// The player's turn: the view starts afresh on the soldier, looking the way they face
+		// (the cameras turned it round for the aliens, and turning by the rules mustn't charge
+		// the soldier for that).
+		if (_alienTurnCamerasRan) _trackedUnit = nullptr;
+		_alienTurnCamerasRan = false;
+		_alienTurnCamera = nullptr;
+		_alertWatch.clear();
+	}
+	else if (Options::fpsAlienTurn3D)
+	{
+		alienTurnView = alienTurnCamera(now);
+		_alienTurnCamerasRan = Options::fpsAlienTurnCameras;
+	}
+	BattleUnit *unit = playerTurn ? selected : (Options::fpsAlienTurn3D ? (alienTurnView ? alienTurnView : _lastPlayerUnit) : nullptr);
 	if (unit && unit->isOut())
 	{
 		unit = nullptr;
@@ -1289,8 +1348,9 @@ void FirstPersonMode::think()
 		updateInfoPanel(nullptr);
 		updateArmorButtons(nullptr);
 		updateLift(nullptr, now);
-		updateCompass(nullptr);
+		updateCompass(nullptr, false);
 		updateCrosshair(nullptr, playerTurn);
+		updateUnitName(nullptr);
 		updateBanner(playerTurn);
 		updateWeaponInHand(nullptr);
 		syncShadows();
@@ -1306,7 +1366,9 @@ void FirstPersonMode::think()
 
 	// Turning with the keys, and the view's settings (they can change in the options).
 	turnWithKeys(elapsedSeconds);
-	_view->setFieldOfView(Options::fpsFieldOfView);
+	updateZoom(elapsedSeconds);
+	updateScope();
+	_view->setFieldOfView(fieldOfViewNow());
 	_view->setSmoothLighting(Options::fpsSmoothLighting);
 
 	// What happened to the soldier and around them: a new enemy spotted, hurt, on fire, a shot
@@ -1323,9 +1385,12 @@ void FirstPersonMode::think()
 	// (setting "Flashlight").
 	_view->setNightVision(hasNightVision(unit) ? _state->_map->getNightVisionColor() : 0);
 	// Smoke as this soldier's eyes see through it: the game's sight range, and the armor's heat
-	// vision (setting "See-through smoke").
+	// vision (setting "Smoke": Modern).
 	_view->setSmokeSight(_save->getTileEngine()->getMaxViewDistance() * 16.0f, unit->getVisibilityThroughSmoke(), unit->getVisibilityThroughFire());
-	_view->setFlashlight(Options::fpsFlashlight && _save->getTogglePersonalLight() && _save->getGlobalShade() >= 6);
+	// The flashlight, on with the game's personal light (L, or SUIT LIGHT): the shoulder one in
+	// the dark; the tactical one (setting) whenever it's on, so it lights dark places by day too.
+	if (Options::fpsTacticalFlashlight) _view->setFlashlight(_save->getTogglePersonalLight(), true);
+	else _view->setFlashlight(Options::fpsFlashlight && _save->getTogglePersonalLight() && _save->getGlobalShade() >= 6);
 
 	// The camera follows the soldier (and walks them on your turn); on your turn the soldier
 	// also faces where you look, and the fire mode and aim are kept up to date.
@@ -1336,14 +1401,16 @@ void FirstPersonMode::think()
 		updateFireMode(unit);
 		updateAim(unit);
 	}
+	updateTrajectory(unit, playerTurn);
 
 	// Everything drawn over the view, then the view itself is redrawn.
 	updateEnemyMarkers();
 	updateInfoPanel(unit);
 	updateArmorButtons(unit);
 	updateLift(unit, now);
-	updateCompass(unit);
+	updateCompass(unit, playerTurn);
 	updateCrosshair(unit, playerTurn);
+	updateUnitName(unit);
 	updateBanner(playerTurn);
 	updateWeaponInHand(unit);
 	syncShadows();
@@ -1444,9 +1511,12 @@ bool FirstPersonMode::handle(Action *action)
  */
 void FirstPersonMode::trackHover(Action *action)
 {
-	// Where the mouse is, on the canvas our buttons and arrows live on.
+	// Where the mouse is, on the canvas our buttons and arrows live on (and the view: kept, for
+	// what the free cursor points at).
 	const SDL_Event &event = *action->getDetails();
 	action->setMouseAction(event.motion.x, event.motion.y, 0, 0);
+	_cursorX = (int)(action->getAbsoluteXMouse() / _uiScale);
+	_cursorY = (int)(action->getAbsoluteYMouse() / _uiScale);
 	const TextButton *hoveredButton = buttonAt(action->getAbsoluteXMouse() / _uiScale, action->getAbsoluteYMouse() / _uiScale);
 	_liftArrowHovered = liftArrowAt(action->getAbsoluteXMouse() / _uiScale, action->getAbsoluteYMouse() / _uiScale);
 
@@ -1502,8 +1572,9 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	if (key == Options::keyFpsTurnRight) { if (pressed) { _snapTurnDegrees += 45.0; _snapTurnFacing = true; } return true; }
 	if (key == Options::keyFpsAkimbo) { if (pressed) toggleAkimbo(); return true; }
 	// The lean keys (setting "Lean") are read each frame while held (see updateLean); here they
-	// are only swallowed, so they don't open the hands' menus. With leaning off they're the game's.
-	if (Options::fpsLean > 0 && key != SDLK_UNKNOWN && (key == Options::keyFpsLeanLeft || key == Options::keyFpsLeanRight)) return true;
+	// are only swallowed. With leaning off they're the game's.
+	if (Options::fpsLean > 0 && key != SDLK_UNKNOWN && (key == Options::keyFpsLeanHold || key == Options::keyFpsLeanLeftOwn || key == Options::keyFpsLeanRightOwn)) return true;
+	if (Options::fpsZoom && key != SDLK_UNKNOWN && key == Options::keyFpsZoom) return true; // (held: see updateZoom)
 	if (key == Options::keyFpsOpenDoor) { if (pressed) openDoor(_save->getSelectedUnit()); return true; }
 	if (key == Options::keyFpsFlare && Options::fpsFlares) { if (pressed) throwFlare(); return true; }
 	if (key == Options::keyFpsUp) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_UP, action); return true; }
@@ -1589,7 +1660,13 @@ bool FirstPersonMode::handleMouseLook(Action *action)
 	if (event.type == SDL_MOUSEMOTION)
 	{
 		// Turn the view, except right after the mouse was captured (the cursor's jump to the
-		// window centre isn't a look).
+		// window centre isn't a look). A screen that was on top only for a moment can hand the
+		// battlescape that jump before think() runs again, so a release is looked for here too.
+		if (_game->getMouseReleases() != _mouseReleasesSeen)
+		{
+			_mouseReleasesSeen = _game->getMouseReleases();
+			_ignoreMotionUntil = SDL_GetTicks() + 150;
+		}
 		if (SDL_GetTicks() >= _ignoreMotionUntil)
 		{
 			turnByMouse(event.motion.xrel, event.motion.yrel);
@@ -1602,13 +1679,15 @@ bool FirstPersonMode::handleMouseLook(Action *action)
 	}
 	else if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_MIDDLE && !_dragLook)
 	{
-		// The middle button frees the cursor.
-		setMouseLook(false);
+		// The middle button shows the unit under the crosshair (setting "Middle click
+		// identifies"), or else frees the cursor.
+		if (!identifyPointedUnit()) setMouseLook(false);
 	}
 	else if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT && !_dragLook)
 	{
 		// The left button pulls the trigger: a shot at the middle of the view (the crosshair).
 		_triggerHeld = true;
+		_burstConfirmed = false;
 		fire(_view->getWidth() / 2, _view->getHeight() / 2);
 	}
 	else if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT)
@@ -1618,12 +1697,17 @@ bool FirstPersonMode::handleMouseLook(Action *action)
 	}
 	else if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_RIGHT && !_dragLook)
 	{
-		// The right button cancels a picked action, as on the isometric map.
-		_state->_battleGame->cancelCurrentAction();
+		// The right button forgets a target marked for confirm fire, or cancels a picked action
+		// (or a walk), as on the isometric map; with nothing to cancel, it zooms while held
+		// (setting "Zoom").
+		if (_confirmTile.x >= 0) clearConfirmMark();
+		else if (!_state->_battleGame->cancelCurrentAction()) _zoomButtonHeld = Options::fpsZoom;
 	}
-	else if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_RIGHT && _dragLook)
+	else if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_RIGHT)
 	{
-		// Letting go of the right button ends a drag look (back to the free cursor).
+		// Letting go of the right button stops the zoom, or ends a drag look (back to the free
+		// cursor).
+		_zoomButtonHeld = false;
 		_dragLook = false;
 	}
 	return true;
@@ -1755,7 +1839,7 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 			}
 			if (event.button.button == SDL_BUTTON_MIDDLE)
 			{
-				setMouseLook(true);
+				if (!identifyPointedUnit()) setMouseLook(true);
 				return true;
 			}
 			if (event.button.button == SDL_BUTTON_RIGHT)
@@ -1792,13 +1876,17 @@ bool FirstPersonMode::blit()
 	SDL_Surface *screen = _game->getScreen()->getSurface();
 	const bool full3D = isActive() && !_classicHud;
 
-	// The 3D view at the back, magnified on big screens.
+	// The 3D view at the back, magnified on big screens: straight from the view, which is the
+	// canvas's size and in the same palette (no copy onto the canvas first).
 	if (_view->getVisible())
 	{
 		if (_canvas)
 		{
-			_view->blit(_canvas->getSurface());
-			magnify(screen, false);
+			if (_view->shown())
+			{
+				_view->drawIfAsked();
+				magnify(screen, _view->getSurface(), false);
+			}
 		}
 		else
 		{
@@ -1831,7 +1919,7 @@ bool FirstPersonMode::blit()
 		{
 			if (surface != _view && _ownSurfaces.count(surface) && !(hudHidden() && _topBarSurfaces.count(surface))) surface->blit(_canvas->getSurface());
 		}
-		magnify(screen, true);
+		magnify(screen, _canvas->getSurface(), true);
 	}
 
 	// The original's visible enemy buttons (bottom right; clicking one turns the view to it),
@@ -1852,13 +1940,15 @@ bool FirstPersonMode::blit()
 }
 
 /**
- * Copies the canvas onto the screen _uiScale times bigger, each canvas pixel becoming a square
- * of _uiScale x _uiScale screen pixels (both are 8-bit palette surfaces).
+ * Copies a canvas-sized surface (the canvas with the overlays, or the 3D view itself) onto the
+ * screen _uiScale times bigger, each of its pixels becoming a square of _uiScale x _uiScale
+ * screen pixels (all are 8-bit surfaces in the state's palette: the colours are copied as they are).
  * @param screen The screen surface to draw on.
- * @param transparent True to skip the canvas's empty pixels (colour 0), so what's on the screen
+ * @param source The surface to magnify, the canvas's size.
+ * @param transparent True to skip the source's empty pixels (colour 0), so what's on the screen
  * shows through them; false to copy every pixel.
  */
-void FirstPersonMode::magnify(SDL_Surface *screen, bool transparent)
+void FirstPersonMode::magnify(SDL_Surface *screen, SDL_Surface *source, bool transparent)
 {
 	// Keep the canvas's palette the same as the state's (it changes, e.g. with the time of day).
 	const SDL_Color *palette = _state->getPalette();
@@ -1869,28 +1959,27 @@ void FirstPersonMode::magnify(SDL_Surface *screen, bool transparent)
 		_canvas->setPalette(_canvasPalette);
 	}
 
-	// The part of the screen the magnified canvas covers (it can be a few pixels short of the
+	// The part of the screen the magnified surface covers (it can be a few pixels short of the
 	// screen, when the screen isn't a multiple of the scale).
-	SDL_Surface *canvasSurface = _canvas->getSurface();
-	const int drawWidth = std::min(screen->w, canvasSurface->w * _uiScale), drawHeight = std::min(screen->h, canvasSurface->h * _uiScale);
+	const int drawWidth = std::min(screen->w, source->w * _uiScale), drawHeight = std::min(screen->h, source->h * _uiScale);
 	SDL_LockSurface(screen);
-	SDL_LockSurface(canvasSurface);
+	SDL_LockSurface(source);
 
-	// Each canvas row is widened once, then laid on its _uiScale screen rows (copied whole
+	// Each source row is widened once, then laid on its _uiScale screen rows (copied whole
 	// where opaque).
 	_magnifyRow.resize(drawWidth);
-	const int canvasColumns = (drawWidth + _uiScale - 1) / _uiScale; // canvas pixels per row that reach the screen
-	for (int canvasY = 0; canvasY * _uiScale < drawHeight; ++canvasY)
+	const int sourceColumns = (drawWidth + _uiScale - 1) / _uiScale; // source pixels per row that reach the screen
+	for (int sourceY = 0; sourceY * _uiScale < drawHeight; ++sourceY)
 	{
 		// The part of the row to lay on the screen: all of it when opaque; when transparent only
 		// from its first to its last coloured pixel, and nothing at all for an empty row (over
 		// the 3D view most overlay rows are empty, or nearly: the crosshair, a line of text).
-		const Uint8 *canvasRow = (const Uint8 *)canvasSurface->pixels + canvasY * canvasSurface->pitch;
-		int firstColumn = 0, endColumn = canvasColumns;
+		const Uint8 *sourceRow = (const Uint8 *)source->pixels + sourceY * source->pitch;
+		int firstColumn = 0, endColumn = sourceColumns;
 		if (transparent)
 		{
-			while (firstColumn < endColumn && !canvasRow[firstColumn]) ++firstColumn;
-			while (endColumn > firstColumn && !canvasRow[endColumn - 1]) --endColumn;
+			while (firstColumn < endColumn && !sourceRow[firstColumn]) ++firstColumn;
+			while (endColumn > firstColumn && !sourceRow[endColumn - 1]) --endColumn;
 			if (firstColumn == endColumn)
 			{
 				continue;
@@ -1898,14 +1987,20 @@ void FirstPersonMode::magnify(SDL_Surface *screen, bool transparent)
 		}
 		const int firstScreenX = firstColumn * _uiScale, endScreenX = std::min(drawWidth, endColumn * _uiScale);
 
-		// Widen that part: every canvas pixel repeated _uiScale times.
-		for (int screenX = firstScreenX, canvasX = firstColumn; screenX < endScreenX; ++canvasX)
+		// Widen that part: every source pixel repeated _uiScale times (on most big screens twice,
+		// done in pairs, which the compiler makes quick; then whatever is left one by one).
+		int widenedX = firstScreenX, sourceX = firstColumn;
+		if (_uiScale == 2)
 		{
-			for (int repeat = 0; repeat < _uiScale && screenX < endScreenX; ++repeat) _magnifyRow[screenX++] = canvasRow[canvasX];
+			for (; widenedX + 2 <= endScreenX; widenedX += 2, ++sourceX) _magnifyRow[widenedX] = _magnifyRow[widenedX + 1] = sourceRow[sourceX];
+		}
+		for (; widenedX < endScreenX; ++sourceX)
+		{
+			for (int repeat = 0; repeat < _uiScale && widenedX < endScreenX; ++repeat) _magnifyRow[widenedX++] = sourceRow[sourceX];
 		}
 
 		// Lay it on each of its screen rows: all of it, or only its coloured pixels.
-		for (int screenY = canvasY * _uiScale; screenY < std::min(drawHeight, (canvasY + 1) * _uiScale); ++screenY)
+		for (int screenY = sourceY * _uiScale; screenY < std::min(drawHeight, (sourceY + 1) * _uiScale); ++screenY)
 		{
 			Uint8 *screenRow = (Uint8 *)screen->pixels + screenY * screen->pitch;
 			if (!transparent)
@@ -1919,7 +2014,7 @@ void FirstPersonMode::magnify(SDL_Surface *screen, bool transparent)
 			}
 		}
 	}
-	SDL_UnlockSurface(canvasSurface);
+	SDL_UnlockSurface(source);
 	SDL_UnlockSurface(screen);
 }
 

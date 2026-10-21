@@ -399,6 +399,8 @@ void FirstPersonView::drawHurt()
  * losing its signal) replaces a share of the pixels with random greys. And the screen edges
  * redden for a soldier badly hurt (the vignette). Called from draw, after the world and
  * everything in it are drawn and before the flames, the hurt arc and the markers.
+ * Every pixel is washed on its own, so the work is shared out between all the view's threads,
+ * a band of rows each (see washBands).
  */
 void FirstPersonView::applyScreenWash()
 {
@@ -407,6 +409,17 @@ void FirstPersonView::applyScreenWash()
 	{
 		return;
 	}
+	// The static's pattern changes every frame: each row starts its own random numbers from this.
+	_staticSeed = _staticSeed * 1664525u + 1013904223u;
+	runOnAllThreads(&FirstPersonView::washBands);
+}
+
+/**
+ * The screen wash (see applyScreenWash) over bands of the view's rows, taken one at a time from
+ * the shared counter until none are left: a job for all the view's threads (see runOnAllThreads).
+ */
+void FirstPersonView::washBands()
+{
 	// The middle of the view and the distance from it to a corner (for the vignette), the night
 	// vision's colour group (its first palette index), and the colour table of the wash asked for.
 	const int viewWidth = getWidth(), viewHeight = getHeight();
@@ -414,32 +427,38 @@ void FirstPersonView::applyScreenWash()
 	const Uint8 nightGroup = _nightVision ? (Uint8)((_nightVision - 1) * 16) : 0;
 	const Uint8 *wash = _tintKind == 1 ? _colors.blueTint : _tintKind == 2 ? _colors.orangeTint : _tintKind == 3 ? _colors.whiteTint
 		: _tintKind == 4 ? _colors.greenTint : _colors.redTint;
-	// Every pixel (x, y: screen pixels), each effect in turn.
-	for (int y = 0; y < viewHeight; ++y)
+	// Every pixel of the band (x, y: screen pixels), each effect in turn.
+	const int bandCount = (viewHeight + BandRows - 1) / BandRows;
+	for (int band = _rayWorkers.nextPiece++; band < bandCount; band = _rayWorkers.nextPiece++)
 	{
-		Uint8 *row = getRaw(0, y);
-		for (int x = 0; x < viewWidth; ++x)
+		for (int y = band * BandRows; y < std::min(viewHeight, (band + 1) * BandRows); ++y)
 		{
-			// Night vision: the pixel's shade (the low four bits) moved into the night vision
-			// group. Index 0 (transparent) stays as it is.
-			if (_nightVision && row[x]) row[x] = nightGroup | (row[x] & 15);
-			// The colour wash, on the share of pixels the dither pattern lets through; of those,
-			// a share (by a second, shifted dither) is washed red instead.
-			if (_tintAmount > 0.0f && dither(x, y) < _tintAmount)
-				row[x] = (_tintRedShare > 0.0f && dither(y + 1, x + 2) < _tintRedShare ? _colors.redTint : wash)[row[x]];
-			// TV static: a linear congruential generator per pixel; bits 8-15 decide whether the
-			// pixel is static, the top two bits which of four greys it gets.
-			if (_staticAmount > 0.0f)
+			Uint8 *row = getRaw(0, y);
+			Uint32 staticSeed = _staticSeed ^ ((Uint32)y * 2654435761u); // the row's own random numbers (see below)
+			for (int x = 0; x < viewWidth; ++x)
 			{
-				_staticSeed = _staticSeed * 1664525u + 1013904223u;
-				if (((_staticSeed >> 8) & 255) < _staticAmount * 256.0f) row[x] = _colors.grey[_staticSeed >> 30];
-			}
-			// The vignette: reddened, dithered in, from 55% of the way to the corners outwards,
-			// fully at the corners at full strength.
-			if (_vignette > 0.0f)
-			{
-				const float distanceShare = std::sqrt((x - centerX) * (x - centerX) + (y - centerY) * (y - centerY)) / cornerDistance;
-				if (smoothstep(0.55f, 1.0f, distanceShare) * _vignette > dither(x + 3, y + 1)) row[x] = _colors.redTint[row[x]];
+				// Night vision: the pixel's shade (the low four bits) moved into the night vision
+				// group. Index 0 (transparent) stays as it is.
+				if (_nightVision && row[x]) row[x] = nightGroup | (row[x] & 15);
+				// The colour wash, on the share of pixels the dither pattern lets through; of those,
+				// a share (by a second, shifted dither) is washed red instead.
+				if (_tintAmount > 0.0f && dither(x, y) < _tintAmount)
+					row[x] = (_tintRedShare > 0.0f && dither(y + 1, x + 2) < _tintRedShare ? _colors.redTint : wash)[row[x]];
+				// TV static: a linear congruential generator, a step per pixel (each row starts its
+				// own from the frame's seed and the row's number, so any thread can wash any row);
+				// bits 8-15 decide whether the pixel is static, the top two bits which of four greys.
+				if (_staticAmount > 0.0f)
+				{
+					staticSeed = staticSeed * 1664525u + 1013904223u;
+					if (((staticSeed >> 8) & 255) < _staticAmount * 256.0f) row[x] = _colors.grey[staticSeed >> 30];
+				}
+				// The vignette: reddened, dithered in, from 55% of the way to the corners outwards,
+				// fully at the corners at full strength.
+				if (_vignette > 0.0f)
+				{
+					const float distanceShare = std::sqrt((x - centerX) * (x - centerX) + (y - centerY) * (y - centerY)) / cornerDistance;
+					if (smoothstep(0.55f, 1.0f, distanceShare) * _vignette > dither(x + 3, y + 1)) row[x] = _colors.redTint[row[x]];
+				}
 			}
 		}
 	}

@@ -164,14 +164,27 @@ bool FirstPersonMode::stepAllowed(BattleUnit *unit, int stepX, int stepY)
  */
 bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 {
-	// Ask the pathfinding for the way to the neighbouring tile, on the unit's level. What we want
-	// is the direct step; or, over a ledge, the step and the fall straight down after it.
+	// Ask the pathfinding for the way to the tile the game's own step that way ends on: the
+	// neighbouring tile, or on stairs or a ramp the one a level up (or down), as the isometric
+	// map's cursor would be put on it. (Asked for the neighbouring tile on the unit's own level,
+	// the pathfinding only goes up a level for stairs shaped as the original games' are, so the
+	// 3D view couldn't climb others, a mod's craft say, that the map climbs.) What we want is the
+	// direct step; or, over a ledge, the step and the fall straight down after it.
 	const Position from(_trackedTile.x, _trackedTile.y, unit->getPosition().z);
-	const Position target(from.x + stepX, from.y + stepY, from.z);
-	Pathfinding *pathfinding = _save->getPathfinding();
-	pathfinding->calculate(unit, target, BAM_NORMAL);
-	const std::vector<int> &path = pathfinding->getPath();
+	const Position levelTarget(from.x + stepX, from.y + stepY, from.z); // the neighbouring tile on this level
 	const int direction = Pathfinding::vectorToDirection(Position(stepX, stepY, 0));
+	Pathfinding *pathfinding = _save->getPathfinding();
+	const PathfindingStep gameStep = pathfinding->getTUCost(from, direction, unit, nullptr, BAM_NORMAL);
+	const Position target = gameStep.cost.time < Pathfinding::INVALID_MOVE_COST ? gameStep.pos : levelTarget;
+	// Turning by the rules (setting "Turning costs TU"): a step to the side or half to the side
+	// is the game's own sidestep (its strafe, as Ctrl walks on the map: the soldier keeps facing
+	// the way it faces, for one TU more than the step), not a turn to face the step and a paid
+	// turn back. Steps further round turn as the game turns. With free turning the game turns
+	// the soldier for the step, for free, and it faces the view again after (faceLookDirection).
+	const int offFacing = std::min((direction - unit->getDirection() + 8) % 8, (unit->getDirection() - direction + 8) % 8);
+	const bool sidestep = Options::fpsTurnCost && offFacing >= 1 && offFacing <= 2 && target.z == from.z;
+	pathfinding->calculate(unit, target, sidestep ? BAM_STRAFE : BAM_NORMAL);
+	const std::vector<int> &path = pathfinding->getPath();
 
 	// Over a ledge the search never plans the step into the air: it looks for the way to the
 	// ground below instead, which is no way at all, or a walk round by the stairs when there are
@@ -181,7 +194,7 @@ bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 	// no way), we don't take it. A step down stairs is never a fall: the tile ahead has no floor,
 	// but the one below it is the top of the stairs, raised at least half a level (see
 	// stepAllowed), and the game walks it as one step.
-	const Tile *aheadTile = _save->getTile(target);
+	const Tile *aheadTile = _save->getTile(levelTarget);
 	const Tile *belowAheadTile = aheadTile ? _save->getBelowTile(aheadTile) : nullptr;
 	const bool stairsDown = belowAheadTile && !belowAheadTile->hasNoFloor(_save) && belowAheadTile->getTerrainLevel() <= -12;
 	const bool stepsOffLedge = path.size() != 1 && Options::fpsFalling && aheadTile && aheadTile->hasNoFloor(_save)
@@ -203,6 +216,8 @@ bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 	walk.actor = unit;
 	walk.target = target;
 	walk.instantMove = true; // No step animation: the 3D view moves smoothly on its own.
+	walk.strafe = pathfinding->getStrafeMove(); // the sidestep above, if the game allows it here
+	_sidestepFacing = walk.strafe ? unit->getDirection() : -1;
 	_state->_battleGame->statePushBack(new UnitWalkBState(_state->_battleGame, walk));
 
 	// The camera's tile is the destination from now on. The step is pending until the game has
@@ -217,7 +232,7 @@ bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 	// it then comes down to land (see updateFlight).
 	if (canFly(unit) && !flightOn(unit))
 	{
-		const Tile *destination = _save->getTile(target);
+		const Tile *destination = _save->getTile(levelTarget);
 		if (destination && destination->hasNoFloor(_save))
 		{
 			_flightSwitchedOn[unit] = false;
@@ -384,7 +399,8 @@ bool FirstPersonMode::walkGuidedStep(BattleUnit *unit, double &newEyeX, double &
 
 /**
  * Which way the movement keys push: forward (1) or back (-1), and strafing right (1) or left
- * (-1), each 0 when neither or both of its keys are held.
+ * (-1), each 0 when neither or both of its keys are held. While the lean key is held (setting
+ * "Lean"), the strafe keys lean instead (see updateLean) and don't strafe.
  * @param forward Set to the forward push.
  * @param strafe Set to the sideways push.
  */
@@ -393,6 +409,10 @@ void FirstPersonMode::movementKeys(double &forward, double &strafe) const
 	const Uint8 *keyStates = SDL_GetKeyState(nullptr);
 	forward = (keyStates[Options::keyFpsForward] ? 1.0 : 0.0) - (keyStates[Options::keyFpsBack] ? 1.0 : 0.0);
 	strafe = (keyStates[Options::keyFpsStrafeRight] ? 1.0 : 0.0) - (keyStates[Options::keyFpsStrafeLeft] ? 1.0 : 0.0);
+	if (Options::fpsLean > 0 && Options::keyFpsLeanHold != SDLK_UNKNOWN && keyStates[Options::keyFpsLeanHold])
+	{
+		strafe = 0.0;
+	}
 }
 
 /**

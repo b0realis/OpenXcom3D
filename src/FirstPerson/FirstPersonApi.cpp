@@ -150,6 +150,27 @@ void resized(FirstPersonMode *mode, int widthChange, int heightChange)
 }
 
 /**
+ * Settles settings that take their first value from an older one, once the options are loaded
+ * (called when a battle or the 3D VIEW tab opens): the smoke (Solid, Original, Modern) from 0.9's
+ * "See-through smoke": YES gives Modern, NO Solid.
+ */
+void settleOptions()
+{
+	Options::fpsSmoke = smokeMode();
+}
+
+/**
+ * The smoke setting as it stands: Solid (0), Original (1) or Modern (2). Unset (-1: a profile
+ * from 0.9 not settled yet, or the defaults just restored on the 3D VIEW tab), it's what 0.9's
+ * "See-through smoke" says: YES Modern, NO Solid.
+ * @return 0, 1 or 2.
+ */
+int smokeMode()
+{
+	return Options::fpsSmoke >= 0 && Options::fpsSmoke <= 2 ? Options::fpsSmoke : (Options::fpsSeeThroughSmoke ? 2 : 0);
+}
+
+/**
  * Registers the add-on's options with the game's (called from Options::createOptionsOTHER, the
  * engine's place for a fork's own options), so they are loaded, saved and reset to their
  * defaults like any other option. Category STR_FIRST_PERSON is only listed by the 3D VIEW tab,
@@ -170,6 +191,11 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMouseSensitivity", &fpsMouseSensitivity, 5, "STR_FPS_MOUSE_SENSITIVITY", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsInvertMouse", &fpsInvertMouse, false, "STR_FPS_INVERT_MOUSE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFieldOfView", &fpsFieldOfView, 75, "STR_FPS_FIELD_OF_VIEW", category));
+	// Zoom: holding the zoom key (or the right button in mouse look) looks 4 times closer.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsZoom", &fpsZoom, true, "STR_FPS_ZOOM", category));
+	// The middle button as on the isometric map: a click on a unit in sight shows it (the game's
+	// unit screen); anywhere else it frees the cursor, as always.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsMiddleClickIdentify", &fpsMiddleClickIdentify, true, "STR_FPS_MIDDLE_CLICK_IDENTIFY", category));
 	// Turning: free, the soldier facing wherever you look (NO), or by the game's rules (YES): the
 	// head looks up to 45 degrees off the soldier's facing for free, further turns them at the
 	// game's cost.
@@ -215,11 +241,20 @@ void createOptions(std::vector<OptionInfo> &options)
 	// view ends). Under the sea the murk stays.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHaze", &fpsHaze, 0, "STR_FPS_HAZE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlashlight", &fpsFlashlight, true, "STR_FPS_FLASHLIGHT", category));
+	// ...or, instead, a tactical flashlight on the weapon: a tight spot on the crosshair, lighting
+	// dark places at any time of day.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsTacticalFlashlight", &fpsTacticalFlashlight, false, "STR_FPS_TACTICAL_FLASHLIGHT", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightVisionGear", &fpsNightVisionGear, true, "STR_FPS_NIGHT_VISION_GEAR", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCombatMusic", &fpsCombatMusic, true, "STR_FPS_COMBAT_MUSIC", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitSounds", &fpsHitSounds, true, "STR_FPS_HIT_SOUNDS", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughSmoke", &fpsSeeThroughSmoke, true, "STR_FPS_SEE_THROUGH_SMOKE", category));
+	// The smoke: the game's frames, solid (0); the original games' own frames, see-through by the
+	// smoke's density (1); soft clouds, solid where they block the soldier's sight (2). Unset (-1)
+	// until settled (see settleOptions) from 0.9's "See-through smoke", kept below, unlisted.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmoke", &fpsSmoke, -1, "STR_FPS_SMOKE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlares", &fpsFlares, true, "STR_FPS_FLARES", category));
+	// 0.9's "See-through smoke" (YES/NO), loaded and saved but listed nowhere (a category no
+	// options screen shows): it gives the smoke setting its first value.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughSmoke", &fpsSeeThroughSmoke, true, "STR_FPS_SEE_THROUGH_SMOKE", "STR_FIRST_PERSON_SAVED"));
 	// Looks: the weapon in hand (always made of voxels), sprite upscaling (0 off, 1 smooth,
 	// 2 smooth + detail), muzzle flashes, particles (0 none, 1 effects, 2 everything),
 	// UFOs with steady hulls, glowing lights, coloured light and an aura, and the pixel size
@@ -238,17 +273,41 @@ void createOptions(std::vector<OptionInfo> &options)
 	// (YES) or at the tile, as the original game does (NO), and the units' hitboxes.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshair", &fpsCrosshair, true, "STR_FPS_CROSSHAIR", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshairInfo", &fpsCrosshairInfo, true, "STR_FPS_CROSSHAIR_INFO", category));
+	// The name of the unit under the crosshair (or the free cursor), as the game names it.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsUnitNames", &fpsUnitNames, true, "STR_FPS_UNIT_NAMES", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsAimExact", &fpsAimExact, true, "STR_FPS_AIM_EXACT", category));
+	// The path a throw or shot would take, drawn while aiming: off (0), throws and arcing
+	// shots (1), every shot too (2); and confirm fire: the first click marks the target and
+	// shows its path, a second click on it fires.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsTrajectory", &fpsTrajectory, 1, "STR_FPS_TRAJECTORY", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsConfirmFire", &fpsConfirmFire, false, "STR_FPS_CONFIRM_FIRE", category));
 	// The units' hitboxes, outlined: off (0), fading in and out once a second (1), always (2).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitboxes", &fpsHitboxes, 0, "STR_FPS_HITBOXES", category));
+	// Icons over the downed (unconscious) units in sight, for burning, bleeding, shock and
+	// stunned: off (0), over the body under the crosshair (1), over every body in sight (2).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsDownedIcons", &fpsDownedIcons, 1, "STR_FPS_DOWNED_ICONS", category));
 	// Staying in the 3D view during the alien turn, starting battles in it, and the debug cheat
-	// "doom mode" (endless time units and energy, grenades in real time), with its two extras,
-	// each doom mode plus more: IDKFA (endless ammo) and IDDQD (invincible soldiers).
+	// "doom mode" (endless time units and energy), with its two extras, each doom mode plus
+	// more: IDKFA (endless ammo) and IDDQD (invincible soldiers); and in doom mode, grenades in
+	// real time (one click, a few seconds' fuse) if wanted.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsAlienTurn3D", &fpsAlienTurn3D, true, "STR_FPS_ALIEN_TURN_3D", category));
+	// ...and in it, the view cuts to the soldier who sees the alien acting, or who fires back;
+	// a soldier shot at, hit or taken over pops up their small camera.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsAlienTurnCameras", &fpsAlienTurnCameras, true, "STR_FPS_ALIEN_TURN_CAMERAS", category));
+	// ...and with them, a soldier of ours going down out of view pops up their camera (static).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsFallenSoldierCamera", &fpsFallenSoldierCamera, true, "STR_FPS_FALLEN_SOLDIER_CAMERA", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsStartInFirstPerson", &fpsStartInFirstPerson, false, "STR_FPS_START_IN_FIRST_PERSON", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomMode", &fpsDoomMode, false, "STR_FPS_DOOM_MODE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomIdkfa", &fpsDoomIdkfa, false, "STR_FPS_DOOM_IDKFA", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomIddqd", &fpsDoomIddqd, false, "STR_FPS_DOOM_IDDQD", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomRealTimeGrenades", &fpsDoomRealTimeGrenades, false, "STR_FPS_DOOM_REAL_TIME_GRENADES", category));
+	// ...armed as they're thrown, burning from leaving the hand (YES), or primed with a click and
+	// burning in the hand (NO, "cooking");
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomPrimeOnThrow", &fpsDoomPrimeOnThrow, true, "STR_FPS_DOOM_PRIME_ON_THROW", category));
+	// ...thrown freely at whatever the crosshair points at, bursting in the air when the fuse runs out in flight;
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomFreeGrenades", &fpsDoomFreeGrenades, false, "STR_FPS_DOOM_FREE_GRENADES", category));
+	// ...and their fuse, in seconds (1 to 5; with prime on throw, FUSE in battle steps it too).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomGrenadeFuse", &fpsDoomGrenadeFuse, 3, "STR_FPS_DOOM_GRENADE_FUSE", category));
 
 	// The add-on's own keys, in the order the Controls list shows them, with their default keys.
 	// Switching views, freeing the cursor from mouse look, and showing the classic HUD.
@@ -272,9 +331,13 @@ void createOptions(std::vector<OptionInfo> &options)
 	// Turning 45 degrees at a time, without stepping (comma and period: "<" and ">").
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsTurnLeft", &keyFpsTurnLeft, SDLK_COMMA, "STR_FPS_KEY_SNAP_LEFT", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsTurnRight", &keyFpsTurnRight, SDLK_PERIOD, "STR_FPS_KEY_SNAP_RIGHT", category));
-	// Leaning out, held (setting "Lean"; with it off these are the game's hand keys again).
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsLeanLeft", &keyFpsLeanLeft, SDLK_q, "STR_FPS_KEY_LEAN_LEFT", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsLeanRight", &keyFpsLeanRight, SDLK_e, "STR_FPS_KEY_LEAN_RIGHT", category));
+	// Leaning out (setting "Lean"): the lean key held with a strafe key (Left Shift and A or D),
+	// so Q and E stay the game's hand keys; and a key of its own for each side, held, unbound
+	// unless the player binds one. (0.9's own lean keys, Q and E, were saved as keyFpsLeanLeft
+	// and keyFpsLeanRight: the new names leave those behind, so Q and E are the hands again.)
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsLeanHold", &keyFpsLeanHold, SDLK_LSHIFT, "STR_FPS_KEY_LEAN_HOLD", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsLeanLeftOwn", &keyFpsLeanLeftOwn, SDLK_UNKNOWN, "STR_FPS_KEY_LEAN_LEFT", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsLeanRightOwn", &keyFpsLeanRightOwn, SDLK_UNKNOWN, "STR_FPS_KEY_LEAN_RIGHT", category));
 	// Opening doors (O, as E is the game's "use right hand"), flares, flight, jumping, night
 	// vision, going up and down a level, and doom mode.
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsOpenDoor", &keyFpsOpenDoor, SDLK_o, "STR_FPS_KEY_OPEN_DOOR", category));
@@ -283,6 +346,8 @@ void createOptions(std::vector<OptionInfo> &options)
 	// Space is the map's night vision hold key; in 3D it jumps, and night vision is gear (N).
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsJump", &keyFpsJump, SDLK_SPACE, "STR_FPS_KEY_JUMP", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsNightVision", &keyFpsNightVision, SDLK_n, "STR_FPS_KEY_NIGHT_VISION", category));
+	// Zoom, held (U: free in the game and the add-on).
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsZoom", &keyFpsZoom, SDLK_u, "STR_FPS_KEY_ZOOM", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsUp", &keyFpsUp, SDLK_PAGEUP, "STR_FPS_KEY_UP", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsDown", &keyFpsDown, SDLK_PAGEDOWN, "STR_FPS_KEY_DOWN", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsDoomMode", &keyFpsDoomMode, SDLK_INSERT, "STR_FPS_KEY_DOOM_MODE", category));
