@@ -12,10 +12,10 @@ index 31faa5c79..7e45307af 100644
  if ( CHECK_CCACHE )
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..d7a45aab6
+index 000000000..988488529
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,341 @@
+@@ -0,0 +1,343 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -95,7 +95,10 @@ index 000000000..d7a45aab6
 +  STR_FPS_MODE_PRIME: "PRIME"
 +  STR_FPS_MODE_UNPRIME: "UNPRIME"
 +  STR_FPS_PARTICLES: "Particles"
-+  STR_FPS_PARTICLES_DESC: "0: none. 1: effects. 2: also dust, bubbles and weather."
++  STR_FPS_PARTICLES_DESC: "Off: none. Effects: sparks, smoke and trails. All: also dust, bubbles and weather."
++  STR_FPS_PARTICLES_OFF: "Off"
++  STR_FPS_PARTICLES_EFFECTS: "Effects"
++  STR_FPS_PARTICLES_ALL: "All"
 +  STR_FPS_UFO_LIGHTS: "UFO lights and aura"
 +  STR_FPS_UFO_LIGHTS_DESC: "UFOs glow: steady hulls, soft lights, coloured light, aura."
 +  STR_FPS_DISCREET_EDGE: "Discreet map edge"
@@ -126,8 +129,7 @@ index 000000000..d7a45aab6
 +  STR_FPS_HIT_SOUNDS: "Hit, kill and swing sounds"
 +  STR_FPS_HIT_SOUNDS_DESC: "A tick when you hit an enemy, a double tick for a kill, a swoosh for your melee swings."
 +  STR_FPS_SMOKE: "Smoke"
-+  STR_FPS_SMOKE_DESC: "Solid: the game's smoke. Original: its dots, see-through. Modern: soft grey see-through clouds."
-+  STR_FPS_SMOKE_SOLID: "Solid"
++  STR_FPS_SMOKE_DESC: "Original: the game's own smoke. Modern: soft grey clouds. Both see-through, thick where your soldier can't see through."
 +  STR_FPS_SMOKE_ORIGINAL: "Original"
 +  STR_FPS_SMOKE_MODERN: "Modern"
 +  STR_FPS_LAUNCH_HINT: "Place the missile's waypoints, then press the launch button"
@@ -359,10 +361,10 @@ index 000000000..d7a45aab6
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers: a clear view."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..04e6b3243
+index 000000000..91872bfdc
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,341 @@
+@@ -0,0 +1,343 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -442,7 +444,10 @@ index 000000000..04e6b3243
 +  STR_FPS_MODE_PRIME: "PRIME"
 +  STR_FPS_MODE_UNPRIME: "UNPRIME"
 +  STR_FPS_PARTICLES: "Particles"
-+  STR_FPS_PARTICLES_DESC: "0: none. 1: effects. 2: also dust, bubbles and weather."
++  STR_FPS_PARTICLES_DESC: "Off: none. Effects: sparks, smoke and trails. All: also dust, bubbles and weather."
++  STR_FPS_PARTICLES_OFF: "Off"
++  STR_FPS_PARTICLES_EFFECTS: "Effects"
++  STR_FPS_PARTICLES_ALL: "All"
 +  STR_FPS_UFO_LIGHTS: "UFO lights and aura"
 +  STR_FPS_UFO_LIGHTS_DESC: "UFOs glow: steady hulls, soft lights, colored light, aura."
 +  STR_FPS_DISCREET_EDGE: "Discreet map edge"
@@ -473,8 +478,7 @@ index 000000000..04e6b3243
 +  STR_FPS_HIT_SOUNDS: "Hit, kill and swing sounds"
 +  STR_FPS_HIT_SOUNDS_DESC: "A tick when you hit an enemy, a double tick for a kill, a swoosh for your melee swings."
 +  STR_FPS_SMOKE: "Smoke"
-+  STR_FPS_SMOKE_DESC: "Solid: the game's smoke. Original: its dots, see-through. Modern: soft grey see-through clouds."
-+  STR_FPS_SMOKE_SOLID: "Solid"
++  STR_FPS_SMOKE_DESC: "Original: the game's own smoke. Modern: soft grey clouds. Both see-through, thick where your soldier can't see through."
 +  STR_FPS_SMOKE_ORIGINAL: "Original"
 +  STR_FPS_SMOKE_MODERN: "Modern"
 +  STR_FPS_LAUNCH_HINT: "Place the missile's waypoints, then press the launch button"
@@ -764,7 +768,7 @@ index 000000000..790dc6e09
 +        color: 144
 diff --git a/mod/OpenXcom3D/metadata.yml b/mod/OpenXcom3D/metadata.yml
 new file mode 100644
-index 000000000..caf02d075
+index 000000000..f1b9eb592
 --- /dev/null
 +++ b/mod/OpenXcom3D/metadata.yml
 @@ -0,0 +1,11 @@
@@ -772,13 +776,13 @@ index 000000000..caf02d075
 +# metadata.yml for OpenXcom3D
 +
 +name: "OpenXcom3D - First-Person View"
-+version: 1.01
++version: 1.02
 +description: "Adds a first-person 3D view of the battlescape (F8): mouse look, real-time movement paid with time units (WASD), firing from the crosshair, a squad bar with soldier camera cards, lights, shadows, flashlight, particles, weather, tactical flares, combat music and its own 3D View options tab. Needs the OpenXcom3D build of OXCE; on a standard OXCE build this mod reports an unsupported engine and stays off."
 +author: OpenXcom3D project
 +
 +master: "*"
 +requiredExtendedEngine: OpenXcom3D
-+requiredExtendedVersion: "1.0.1"
++requiredExtendedVersion: "1.0.2"
 diff --git a/src/Battlescape/BattlescapeGame.cpp b/src/Battlescape/BattlescapeGame.cpp
 index b7e1111f3..7bd979a4e 100644
 --- a/src/Battlescape/BattlescapeGame.cpp
@@ -1270,15 +1274,17 @@ index 7f7697c1d..3fe4fd286 100644
  	// finally do a line calculation and store this trajectory.
  	return _save->getTileEngine()->calculateLineVoxel(originVoxel, _targetVoxel, true, &_trajectory, bu);
 diff --git a/src/Battlescape/Projectile.h b/src/Battlescape/Projectile.h
-index a263ca287..2d897f365 100644
+index a263ca287..0c9d0dba8 100644
 --- a/src/Battlescape/Projectile.h
 +++ b/src/Battlescape/Projectile.h
-@@ -80,6 +80,8 @@ public:
+@@ -80,6 +80,10 @@ public:
  	int getParticle(int i) const;
  	/// Gets the item.
  	BattleItem *getItem() const;
 +	/// Gets the ammo it was fired with (still known when the clip is empty now).
 +	const BattleItem *getAmmo() const { return _ammo; }
++	/// Gets the weapon it was fired from (the first-person view sizes the shot by it).
++	const BattleItem *getWeapon() const { return _action.weapon; }
  	/// Skips the bullet flight.
  	void skipTrajectory();
  	/// Gets the Position of origin for the projectile.
@@ -2090,7 +2096,7 @@ index a4c23b216..13d36e8f3 100644
  	{
  		_buttonsPressed |= SDL_BUTTON(button);
 diff --git a/src/Engine/ModInfo.cpp b/src/Engine/ModInfo.cpp
-index cca815d3e..77a29e8ad 100644
+index cca815d3e..102809100 100644
 --- a/src/Engine/ModInfo.cpp
 +++ b/src/Engine/ModInfo.cpp
 @@ -181,6 +181,9 @@ struct EngineData
@@ -2098,7 +2104,7 @@ index cca815d3e..77a29e8ad 100644
  const EngineData supportedEngines[] = {
  	{ OPENXCOM_VERSION_ENGINE, { OPENXCOM_VERSION_NUMBER }},
 +#ifndef OXCE_NO_FIRSTPERSON
-+	{ "OpenXcom3D", { 1, 0, 1, 0 } }, // first-person add-on 1.01, see src/FirstPerson
++	{ "OpenXcom3D", { 1, 0, 2, 0 } }, // first-person add-on 1.02, see src/FirstPerson
 +#endif
  	{ "", { 0, 0, 0, 0 } }, // assume that every engine support mods from base game, remove if its not true.
  };
@@ -2252,10 +2258,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..b36a8e492
+index 000000000..5b2494b8f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,480 @@
+@@ -0,0 +1,489 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -2409,10 +2415,10 @@ index 000000000..b36a8e492
 +
 +/**
 + * Settles settings that take their first value from an older one, once the options are loaded
-+ * (called when a battle or the 3D VIEW tab opens): the smoke (Solid, Original, Modern) from 0.9's
-+ * "See-through smoke": YES gives Modern, NO Solid; the flashlight (Off, On, Dynamic) from 1.0's
-+ * "Flashlight" and "Tactical flashlight"; and 1.0's next fire mode key, when the player had
-+ * moved it off F (F is the flashlight now), once.
++ * (called when a battle or the 3D VIEW tab opens): the smoke (Original, Modern) from 0.9's
++ * "See-through smoke": YES gives Modern, NO Original (1.0's Solid becomes Original too); the
++ * flashlight (Off, On, Dynamic) from 1.0's "Flashlight" and "Tactical flashlight"; and 1.0's
++ * next fire mode key, when the player had moved it off F (F is the flashlight now), once.
 + */
 +void settleOptions()
 +{
@@ -2441,14 +2447,22 @@ index 000000000..b36a8e492
 +}
 +
 +/**
-+ * The smoke setting as it stands: Solid (0), Original (1) or Modern (2). Unset (-1: a profile
-+ * from 0.9 not settled yet, or the defaults just restored on the 3D VIEW tab), it's what 0.9's
-+ * "See-through smoke" says: YES Modern, NO Solid.
-+ * @return 0, 1 or 2.
++ * The smoke setting as it stands: Original (1) or Modern (2). 1.0's Solid (0) is gone: it's
++ * Original now. Unset (-1: a profile from 0.9 not settled yet, or the defaults just restored on
++ * the 3D VIEW tab), it's what 0.9's "See-through smoke" says: YES Modern, NO Original.
++ * @return 1 or 2.
 + */
 +int smokeMode()
 +{
-+	return Options::fpsSmoke >= 0 && Options::fpsSmoke <= 2 ? Options::fpsSmoke : (Options::fpsSeeThroughSmoke ? 2 : 0);
++	if (Options::fpsSmoke == 1 || Options::fpsSmoke == 2)
++	{
++		return Options::fpsSmoke;
++	}
++	if (Options::fpsSmoke == 0)
++	{
++		return 1;
++	}
++	return Options::fpsSeeThroughSmoke ? 2 : 1;
 +}
 +
 +/**
@@ -2530,9 +2544,10 @@ index 000000000..b36a8e492
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightVisionGear", &fpsNightVisionGear, true, "STR_FPS_NIGHT_VISION_GEAR", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCombatMusic", &fpsCombatMusic, true, "STR_FPS_COMBAT_MUSIC", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitSounds", &fpsHitSounds, true, "STR_FPS_HIT_SOUNDS", category));
-+	// The smoke: the game's frames, solid (0); the original games' own frames, see-through by the
-+	// smoke's density (1); soft clouds, solid where they block the soldier's sight (2). Unset (-1)
-+	// until settled (see settleOptions) from 0.9's "See-through smoke", kept below, unlisted.
++	// The smoke: the original games' own frames, see-through where the soldier sees through the
++	// smoke and stacked where the sight runs out (1); soft clouds, solid where they block the
++	// soldier's sight (2). (1.0's Solid, 0, is gone.) Unset (-1) until settled (see settleOptions)
++	// from 0.9's "See-through smoke", kept below, unlisted.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmoke", &fpsSmoke, -1, "STR_FPS_SMOKE", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlares", &fpsFlares, true, "STR_FPS_FLARES", category));
 +	// 0.9's "See-through smoke" (YES/NO), loaded and saved but listed nowhere (a category no
@@ -2738,7 +2753,7 @@ index 000000000..b36a8e492
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..b24487ea3
+index 000000000..7bb8e82ff
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
 @@ -0,0 +1,168 @@
@@ -2853,7 +2868,7 @@ index 000000000..b24487ea3
 +/// Settles settings that take their first value from an older one (the smoke from "See-through
 +/// smoke", the flashlight from 1.0's two flashlight settings, the next fire mode key from 1.0's).
 +void settleOptions();
-+/// The smoke setting as it stands: 0 Solid, 1 Original, 2 Modern (unset: from "See-through smoke").
++/// The smoke setting as it stands: 1 Original, 2 Modern (unset, or 1.0's Solid: see the function).
 +int smokeMode();
 +/// The flashlight setting as it stands: 0 Off, 1 On, 2 Dynamic (unset: from 1.0's settings).
 +int flashlightMode();
@@ -2912,7 +2927,7 @@ index 000000000..b24487ea3
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..bf359633d
+index 000000000..46cc2f265
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
 @@ -0,0 +1,2313 @@
@@ -4571,7 +4586,7 @@ index 000000000..bf359633d
 +	// Night vision (gear), in the isometric map's colour.
 +	_view->setNightVision(hasNightVision(unit) ? _state->_map->getNightVisionColor() : 0);
 +	// Smoke as this soldier's eyes see through it: the game's sight range, and the armor's heat
-+	// vision (setting "Smoke": Modern).
++	// vision (setting "Smoke": Modern's wall, Original's stacked frames).
 +	_view->setSmokeSight(_save->getTileEngine()->getMaxViewDistance() * 16.0f, unit->getVisibilityThroughSmoke(), unit->getVisibilityThroughFire());
 +	// The flashlight (setting "Flashlight"), on and off with its own key (see toggleFlashlight):
 +	// on, a wide beam from the shoulder, in the dark only (the battle's shade 6 or more, of 0
@@ -9979,10 +9994,10 @@ index 000000000..5f3b2939e
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..a1a61137c
+index 000000000..a3a3cec3a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,307 @@
+@@ -0,0 +1,311 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -10085,6 +10100,10 @@ index 000000000..a1a61137c
 +const double MuzzleScreen[2] = { 0.42 / WeaponLens, 0.45 / WeaponLens };
 +/// How much of the line from the stock point to the muzzle the weapon in hand fills.
 +const double WeaponScale = 0.9;
++/// A weapon picture whose long axis is within this many degrees of upright (or of level) is
++/// taken as exactly upright (or level): the games draw their weapons standing straight up, and a
++/// grip, a magazine or a bulky body only tips the measured axis off the barrel.
++const double WeaponUprightSnap = 30.0;
 +/// The way a melee weapon's tip points at rest, from its grip (camera space: x out to the weapon's side, y down, z ahead; any length).
 +const double MeleeUpright[3] = { 0.3, -1.0, 0.25 };
 +/// The aliens' turn cameras (setting "Aliens' turn cameras"): the least time the view stays with a soldier
@@ -10292,10 +10311,10 @@ index 000000000..a1a61137c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..a2431ec87
+index 000000000..b39723338
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,2557 @@
+@@ -0,0 +1,2573 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -11204,6 +11223,15 @@ index 000000000..a2431ec87
 +	_game->getMod()->getSoundByDepth(_save->getDepth(), Mod::ITEM_THROW)->play(-1, _state->_map->getSoundAngle(unit->getPosition()));
 +	_view->setFreeGrenade(grenade, flight.position, flight.velocity);
 +	BattlescapeGame *battleGame = _state->_battleGame;
++	// The game's own aim for a throw of it (Throw picked from the item's menu) ends here, as the
++	// game ends its own throws: else the next click would throw the same grenade again, from
++	// wherever it lies by then.
++	BattleAction *gameAction = battleGame->getCurrentAction();
++	if (gameAction->targeting && gameAction->weapon == grenade)
++	{
++		gameAction->targeting = false;
++		gameAction->type = BA_NONE;
++	}
 +	battleGame->statePushBack(new FreeGrenadeFlight(battleGame, [this](Uint32 now) { return stepFreeGrenade(now); }));
 +	BattleAction throwAction;
 +	throwAction.type = BA_THROW;
@@ -11476,6 +11504,13 @@ index 000000000..a2431ec87
 +	const bool menuTargeting = action->targeting && action->actor == unit && action->weapon && !isShot(action->type);
 +	if (menuTargeting)
 +	{
++		// (An item the soldier no longer carries, thrown or dropped since: that aim is over.)
++		if (action->weapon->getOwner() != unit)
++		{
++			action->targeting = false;
++			action->type = BA_NONE;
++			return;
++		}
 +		weapon = action->weapon;
 +		mode = action->type;
 +	}
@@ -13697,10 +13732,10 @@ index 000000000..3ae0702f2
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeWeaponInHand.cpp b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
 new file mode 100644
-index 000000000..5433fde4b
+index 000000000..220de3e25
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
-@@ -0,0 +1,965 @@
+@@ -0,0 +1,981 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -13843,15 +13878,18 @@ index 000000000..5433fde4b
 +
 +/**
 + * Measures the weapon's inventory picture (the game's own, from BIGOBS.PCK, already drawn into
-+ * _heldSprite), so it can be drawn pointing at the crosshair whatever way it lies in the
-+ * picture: its long axis (the direction its pixels spread out furthest), the muzzle at the
-+ * thinner end (barrels are thin, stocks and grips aren't), and the side with the grip and
++ * _heldSprite), so it can be drawn with its barrel on the line to the crosshair: its long axis
++ * (the direction its pixels spread out furthest), its muzzle end, and the side with the grip and
 + * magazine (the one sticking out further from the axis) down. Then gives it volume
 + * (voxelizeWeapon). All measures are in picture pixels, along and across the long axis from
 + * the picture's centre of mass.
-+ * A melee weapon's striking end is the one higher in the picture instead: the games picture
-+ * them standing up, the business end at the top (a stun rod's prongs, a lance's point, a
-+ * blade), and that end is often the thicker one.
++ * The games draw every weapon standing up, the barrel straight up the picture and the muzzle
++ * (or a melee weapon's business end: a stun rod's prongs, a lance's point) at the top, whatever
++ * its shape. So an axis near upright is taken as exactly upright (a pistol's grip, a cannon's
++ * magazine or a launcher's bulk tip the spread's axis by up to 20 degrees), and a picture
++ * standing up has its muzzle at the top (the thinner end can be the stock: the rifle's is). A
++ * picture lying flat (a mod's) has its muzzle at the thinner end, or with both ends about as
++ * thick, the left.
 + * @param gun It's a gun or a club, drawn pointing at the crosshair (false: held up like an item).
 + * @param melee It's a melee weapon: held tip up, and swung down at the crosshair (see drawWeaponPlate).
 + */
@@ -13895,7 +13933,17 @@ index 000000000..5433fde4b
 +		const double dx = pixel.first - meanX, dy = pixel.second - meanY;
 +		covarianceXX += dx * dx; covarianceYY += dy * dy; covarianceXY += dx * dy;
 +	}
-+	const double axisAngle = 0.5 * std::atan2(2.0 * covarianceXY, covarianceXX - covarianceYY);
++	double axisAngle = 0.5 * std::atan2(2.0 * covarianceXY, covarianceXX - covarianceYY); // radians, -90 .. 90 degrees
++	// Near upright, exactly upright; near level, exactly level (see WeaponUprightSnap).
++	const double snap = WeaponUprightSnap * Pi / 180.0;
++	if (std::abs(std::abs(axisAngle) - Pi / 2.0) < snap)
++	{
++		axisAngle = Pi / 2.0;
++	}
++	else if (std::abs(axisAngle) < snap)
++	{
++		axisAngle = 0.0;
++	}
 +	shape.mean[0] = meanX; shape.mean[1] = meanY;
 +	shape.along[0] = std::cos(axisAngle); shape.along[1] = std::sin(axisAngle);
 +	shape.across[0] = -std::sin(axisAngle); shape.across[1] = std::cos(axisAngle);
@@ -13921,16 +13969,16 @@ index 000000000..5433fde4b
 +		if (posAlong > maxAlong - quarter) { highMin = std::min(highMin, posAcross); highMax = std::max(highMax, posAcross); }
 +	}
 +
-+	// The muzzle is at the end that's thinner by more than a pixel. With both ends about as
-+	// thick, it's the end nearer the top of the picture (or the left, for a weapon lying flat).
-+	// A melee weapon standing up in its picture strikes with its top end.
++	// The muzzle: at the top of a picture standing up (a melee weapon's striking end too); for
++	// one lying flat, at the end that's thinner by more than a pixel, or with both ends about as
++	// thick, the left.
 +	const double lowSpread = lowMax - lowMin, highSpread = highMax - highMin;
 +	const bool standingUp = std::abs(shape.along[1]) > std::abs(shape.along[0]);
 +	bool muzzleHigh;
-+	if (shape.melee && standingUp) muzzleHigh = shape.along[1] < 0;
++	if (standingUp) muzzleHigh = shape.along[1] < 0;
 +	else if (highSpread < lowSpread - 1.0) muzzleHigh = true;
 +	else if (lowSpread < highSpread - 1.0) muzzleHigh = false;
-+	else muzzleHigh = standingUp ? shape.along[1] < 0 : shape.along[0] < 0;
++	else muzzleHigh = shape.along[0] < 0;
 +	shape.stock = muzzleHigh ? minAlong : maxAlong;
 +	shape.muzzle = muzzleHigh ? maxAlong : minAlong;
 +	shape.minAcross = minAcross;
@@ -13967,7 +14015,8 @@ index 000000000..5433fde4b
 + * Works out how the muzzle flashes, by the damage type of what the weapon fires: a yellow star
 + * for bullets, a big orange ball for explosives, red-orange for fire, thin red spikes for lasers
 + * (cyan under the sea), a round green glow for plasma (pale blue under the sea), blue for stun,
-+ * yellow-green for acid. The harder it hits (the ammo's power), the bigger.
++ * yellow-green for acid. Its size goes with the shot's: a pistol's smallest, then a rifle's, an
++ * auto-cannon's, a heavy weapon's.
 + * @param weapon The gun that fired.
 + * @param firedAmmo The ammo the round fired, as the 3D view saw it leave (null if unknown).
 + * @return The flash: palette colours (core, middle, rim), number of rays, how far and how
@@ -14004,7 +14053,9 @@ index 000000000..5433fde4b
 +	default: break;
 +	}
 +
-+	// Into the palette's nearest colours, and sized by the power (50 is 1.0; between 0.8 and 1.5).
++	// Into the palette's nearest colours, and sized by the shot's calibre, as the shot itself (see
++	// FirstPersonView::shotCalibre): a rifle's 1.0, a pistol's smaller, a heavy weapon's bigger
++	// (between 0.75 and 1.5).
 +	MuzzleFlash flash;
 +	flash.core = nearestColor(palette, look.core[0], look.core[1], look.core[2]);
 +	flash.mid = nearestColor(palette, look.mid[0], look.mid[1], look.mid[2]);
@@ -14012,7 +14063,7 @@ index 000000000..5433fde4b
 +	flash.rays = look.rays;
 +	flash.spike = look.spike;
 +	flash.sharpness = look.sharpness;
-+	flash.size = look.size * std::clamp(shotRules->getPower() / 50.0, 0.8, 1.5);
++	flash.size = look.size * std::clamp(0.55 + 0.45 * FirstPersonView::shotCalibre(weapon->getRules(), shotRules), 0.75, 1.5);
 +	return flash;
 +}
 +
@@ -14668,10 +14719,10 @@ index 000000000..5433fde4b
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonParticles.cpp b/src/FirstPerson/FirstPersonParticles.cpp
 new file mode 100644
-index 000000000..668039532
+index 000000000..154fd87a8
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonParticles.cpp
-@@ -0,0 +1,215 @@
+@@ -0,0 +1,216 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -14741,11 +14792,12 @@ index 000000000..668039532
 +/**
 + * Adds one particle. When the system already holds its maximum (Max), the new particle is
 + * quietly dropped, so a huge explosion can never slow the game down with endless particles.
++ * While particles are off (see setAccepting) every one is dropped.
 + * @param particle The particle to add (it is copied).
 + */
 +void FirstPersonParticles::add(const Particle &particle)
 +{
-+	if (_particles.size() < Max)
++	if (_accepting && _particles.size() < Max)
 +	{
 +		_particles.push_back(particle);
 +	}
@@ -14889,10 +14941,10 @@ index 000000000..668039532
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonParticles.h b/src/FirstPerson/FirstPersonParticles.h
 new file mode 100644
-index 000000000..f93e2947e
+index 000000000..228618946
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonParticles.h
-@@ -0,0 +1,121 @@
+@@ -0,0 +1,124 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -14986,14 +15038,17 @@ index 000000000..f93e2947e
 +private:
 +	std::vector<Particle> _particles; // The living particles.
 +	Uint32 _seed;                     // State of the particles' own random number generator (never zero).
++	bool _accepting = true;           // New particles are taken in (not while particles are off: see setAccepting).
 +	static const size_t Max = 6000;   // The most particles there can be at once; more are dropped.
 +public:
 +	/// Creates an empty particle system.
 +	FirstPersonParticles();
 +	/// Removes all particles.
 +	void clear() { _particles.clear(); }
-+	/// Adds a particle (dropped when full).
++	/// Adds a particle (dropped when full, or while not accepting any).
 +	void add(const Particle &particle);
++	/// Takes in new particles, or drops every one added (particles off: the battle's effects still run for what isn't a particle).
++	void setAccepting(bool accepting) { _accepting = accepting; }
 +	/// Moves particles along and removes the expired ones; `elapsedSeconds` is the time since the last frame.
 +	void update(float elapsedSeconds);
 +	/// Removes the particles of a group farther than `radius` (horizontally) from a point, all in voxels.
@@ -15407,7 +15462,7 @@ index 000000000..d67736b97
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..30f5619f4
+index 000000000..90595143a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
 @@ -0,0 +1,595 @@
@@ -15948,7 +16003,7 @@ index 000000000..30f5619f4
 +	drawFloorItems();
 +	drawEdgeDots();
 +	drawUnits();
-+	drawSmokeAndFire();
++	drawFire();
 +	drawProjectilesAndExplosions();
 +	drawFlares();
 +	drawBeams();
@@ -16008,10 +16063,10 @@ index 000000000..30f5619f4
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..ab1a108b0
+index 000000000..71634c45d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1054 @@
+@@ -0,0 +1,1070 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -16234,6 +16289,7 @@ index 000000000..ab1a108b0
 +		Uint8 fire[4];        // white-hot .. dark red
 +		Uint8 blood[2];       // splatter on the screen: dark, bright
 +		Uint8 smoke, spark, dust, rain, snow, sand, firefly, bubble;
++		Uint8 speck;           // the white specks a rocket leaves hanging along its path
 +		Uint8 marker, marine;
 +		Uint8 hitbox[3];       // hitboxes (setting "Hitboxes"): X-COM's, the aliens', the civilians'
 +		Uint8 downedIcon[5];   // icons over the downed: flame, its heart, blood, the shock's bolt, out cold
@@ -16330,8 +16386,9 @@ index 000000000..ab1a108b0
 +	/// Night vision like the isometric map's: brighter, in one colour (group + 1, 0 off).
 +	void setNightVision(int color) { _nightVision = color; }
 +	/// The sight of the soldier the view looks through, for smoke drawn as the game's sight rules
-+	/// have it (setting "Smoke": Modern): the range in voxels, and how much of the smoke and of
-+	/// the smoke over fire their eyes see through (the armor's heat vision, in percent).
++	/// have it (setting "Smoke": Modern's wall, Original's stacked frames): the range in voxels,
++	/// and how much of the smoke and of the smoke over fire their eyes see through (the armor's
++	/// heat vision, in percent).
 +	void setSmokeSight(float sightVoxels, int throughSmoke, int throughFire)
 +	{
 +		_smokeSightVoxels = sightVoxels;
@@ -16407,6 +16464,8 @@ index 000000000..ab1a108b0
 +	Uint32 getPartnerShotTick() const { return _partnerShotTick; }
 +	/// Dual wield: the ammo the other gun's last round fired (null if unknown).
 +	const RuleItem *getPartnerShotAmmo() const { return _partnerShotAmmo; }
++	/// How big a shot and its muzzle flash are drawn: 1 for a rifle's, less for a pistol's, more for heavy weapons'.
++	static float shotCalibre(const RuleItem *weapon, const RuleItem *ammo);
 +
 +	/// Renders the view.
 +	void draw() override;
@@ -16591,6 +16650,11 @@ index 000000000..ab1a108b0
 +	Uint8 hazeColor(Uint8 color, float haze, int pixelX, int pixelY) const;
 +	/// Smoke's colour on a pixel of its wall (where the soldier's sight runs out in it).
 +	Uint8 smokeColor(Uint8 light, const float rayOrigin[3], const float rayDirection[3], float distance, float *billowOut = nullptr) const;
++	/// How much of the soldier's sight the smoke uses up looking through a point and on beyond it (1 or more: they can't see through).
++	float smokeSightUsedThrough(const double point[3]) const;
++	/// Original smoke: how many times a tile's cloud is drawn on top of itself where the soldier can't see through it, inside
++	/// the cloud and on its outer shell (a tile next to one without smoke), so the cloud's outline stays smoke-like (see drawSeeThroughSmoke).
++	static constexpr int OriginalSmokeMaxLayers = 8, OriginalSmokeShellLayers = 3;
 +	/// See-through drawing mixes a colour over another in this many steps (this many: solid).
 +	static constexpr int SeeThroughLevels = 16;
 +	std::vector<Uint8> _nearestRgb;                     // the palette's nearest colour to each 15-bit RGB colour (5 bits a channel)
@@ -16739,7 +16803,7 @@ index 000000000..ab1a108b0
 +	/// The discreet map edge (setting): small red dots on the floor along the edge.
 +	void drawEdgeDots();
 +	/// Draws smoke and fire on discovered tiles.
-+	void drawSmokeAndFire();
++	void drawFire();
 +	/// A frame of the game's smoke made see-through (see softSmokeFrame): UpscaleFactor times bigger, the
 +	/// colours of its dots and how densely they lie (its opacity) blurred over it.
 +	struct SoftSmoke { Surface *colors = nullptr; std::vector<Uint8> opacity; bool smooth = false; }; // (smooth: an original frame from the upscaler)
@@ -16757,6 +16821,8 @@ index 000000000..ab1a108b0
 +	const SoftSmoke &softSmokeBlend(const Surface *from, const Surface *to, int step, bool original);
 +	/// The first of the four smoke frames the map shows for a density of smoke.
 +	int firstSmokeFrame(int smoke) const;
++	/// Is a smoky tile on its cloud's outer shell: next to a tile (on its level, across a side) with no smoke, or the map's edge?
++	bool smokeShell(const Position &tilePosition) const;
 +	/// The colour of the game's smoke (its thickest frames' dots mixed, mostly grey).
 +	void smokeRgb(float rgb[3]) const;
 +	/// Draws the smoke on discovered tiles see-through, and its rising wisps (setting "Smoke": Original, Modern).
@@ -16855,6 +16921,7 @@ index 000000000..ab1a108b0
 +	bool _lastProjectileThrown = false;          // it was a thrown item (no trail, no impact)
 +	Trail _shotTrail = TRAIL_NONE;               // how it looks in flight
 +	Uint8 _shotTrailColor = 0;                   // its colour
++	float _shotCalibre = 1.0f;                   // how big it's drawn (see shotCalibre)
 +	float _shotTrailOrigin[3] = {};              // where its trail (and a laser's beam) starts
 +	Uint32 _ownShotTick = 0;                     // when our own last shot left the muzzle
 +	const RuleItem *_ownShotAmmo = nullptr;      // what it was (the clip may be gone by now)
@@ -16873,6 +16940,7 @@ index 000000000..ab1a108b0
 +	float _partnerLength = 1.0f;                        // its path's length, in voxels
 +	Trail _partnerTrail = TRAIL_NONE;                   // how it looks in flight
 +	Uint8 _partnerColor = 0;                            // its colour
++	float _partnerCalibre = 1.0f;                       // how big it's drawn
 +	Uint32 _partnerShotTick = 0;                        // when it left the muzzle
 +	const RuleItem *_partnerShotAmmo = nullptr;         // what it was (the clip may be gone by now)
 +	// under fire: shots whizzing past, where they come from
@@ -16882,7 +16950,7 @@ index 000000000..ab1a108b0
 +	bool _shotIsEnemy = false;         // the shot in flight is an enemy's
 +	double _enemyShotFrom[3] = {};     // where it came from
 +	Uint32 _enemyShotEnd = 0;          // when it ended
-+	struct Beam { float from[3], to[3]; Uint32 start; Uint8 color; };
++	struct Beam { float from[3], to[3]; Uint32 start; Uint8 color; float calibre; };
 +	std::vector<Beam> _beams;                          // laser beams fading out
 +	struct Decal { float pos[3]; Uint8 size, depth; }; // bullet holes and scorch marks on surfaces
 +	std::vector<Decal> _decals;                        // the marks left so far
@@ -16918,16 +16986,18 @@ index 000000000..ab1a108b0
 +	void drawFreeGrenade();
 +	/// Fills a convex four-sided shape on the view at one depth, behind what's nearer.
 +	void fillQuadAtDepth(const double corners[4][2], Uint8 color, float depth);
-+	/// How a shot looks in flight, from its ammo's damage type.
-+	void trailFor(const BattleItem *ammo, Trail &trail, Uint8 &color) const;
++	/// How a shot looks in flight, from its ammo's damage type, and how big (by its weapon and power).
++	void trailFor(const BattleItem *ammo, const BattleItem *weapon, Trail &trail, Uint8 &color, float &calibre) const;
 +	/// Spawns what a shot leaves behind along the bit of its path it flew this frame.
 +	void spawnTrailSegment(const float from[3], const float to[3]);
 +	/// Where the shot in flight is drawn: the game's position, our own shot's eased from the muzzle.
 +	void shotHead(const Projectile *projectile, float out[3]) const;
 +	/// Spawns sparks, debris and a mark where a shot ended (on the surface the view shows there).
 +	void spawnShotImpact(const float head[3], const float from[3], Trail trail);
-+	/// Draws the head of a shot in flight.
-+	void drawShotDot(const float head[3], Trail trail, Uint8 color);
++	/// Draws the head of a shot in flight, and the streak behind it.
++	void drawShotDot(const float head[3], const float origin[3], Trail trail, Uint8 color, float calibre);
++	/// Draws a laser beam (solid, or fading out), thicker for heavier weapons and up close.
++	void drawBeam(const float from[3], const float to[3], Uint8 color, float calibre, float opacity);
 +	/// Dual wield: the other gun's round, from its own muzzle.
 +	void spawnPartnerEffects();
 +	/// Draws laser beams fading out.
@@ -16935,8 +17005,9 @@ index 000000000..ab1a108b0
 +	std::vector<Position> _trajectory; // the path a throw or shot aimed now would take (setTrajectory)
 +	/// Draws that path: dashes fading out along it, and a mark where it ends.
 +	void drawTrajectory();
-+	/// Draws a glowing line in the world, depth-tested (all of it, or only the screen rows from bandTop up to bandBottom).
-+	void drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, int bandTop = 0, int bandBottom = 1 << 30);
++	/// Draws a glowing line in the world, depth-tested (all of it, or only the screen rows from bandTop up to bandBottom),
++	/// a set number of pixels thick, or as thick as worldWidth voxels look where it is (at most thickness).
++	void drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, float worldWidth = 0.0f, int bandTop = 0, int bandBottom = 1 << 30);
 +	/// Leaves a bullet hole or scorch mark.
 +	void addDecal(const float pos[3], int size, int darkness);
 +	/// Draws the bullet holes, scorch marks and blackened ground.
@@ -17068,10 +17139,10 @@ index 000000000..ab1a108b0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewEffects.cpp b/src/FirstPerson/FirstPersonViewEffects.cpp
 new file mode 100644
-index 000000000..8ee1a40f0
+index 000000000..c80ea90b2
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewEffects.cpp
-@@ -0,0 +1,1041 @@
+@@ -0,0 +1,1030 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -17332,8 +17403,8 @@ index 000000000..8ee1a40f0
 +				// and glowing for a second or so.
 +				_particles.burst(centre, 60, P::GLOW, P::EFFECT, _colors.fire, 4, 40, 140, 0.5f, 150, 0.6f, 0.6f, 1.5f, 2);
 +				// Big puffs of smoke in two greys, rising slowly and hanging for a few seconds: with
-+				// the setting "Smoke" on Modern only (Original and Solid show the game's own smoke
-+				// that the explosion leaves on the tiles, and nothing of ours, as for burning tiles).
++				// the setting "Smoke" on Modern only (Original shows the game's own smoke that the
++				// explosion leaves on the tiles, and nothing of ours, as for burning tiles).
 +				if (FirstPerson::smokeMode() == 2)
 +				{
 +					_particles.burst(centre, 26, P::LIT, P::EFFECT, smokeColors, 2, 6, 24, 0.7f, -12, 0.8f, 2.0f, 3.5f, 5);
@@ -17351,9 +17422,10 @@ index 000000000..8ee1a40f0
 +}
 +
 +/**
-+ * Burning tiles near the camera send up flames, and smoky ones drifting smoke (a burning tile
-+ * smokes too): puffs; with the setting "Smoke" on Modern, a few wisps; on Original, neither. Only tiles that have been discovered and are within 320 voxels (20 tiles) of
-+ * the eye, across the map, take part.
++ * Burning tiles near the camera send up flames, and with the setting "Smoke" on Modern smoky
++ * ones a few wisps of their smoke (a burning tile smokes too; on Original, none). Only tiles
++ * that have been discovered and are within 320 voxels (20 tiles) of the eye, across the map,
++ * take part.
 + * @param elapsedSeconds Seconds since the last frame: flames and smoke rise at rates per second.
 + */
 +void FirstPersonView::spawnTileFireAndSmoke(float elapsedSeconds)
@@ -17392,37 +17464,18 @@ index 000000000..8ee1a40f0
 +		// Modern smoke (setting "Smoke"): now and then a wisp of the smoke rises off a smoky tile, a
 +		// few more the thicker it is (about one every three seconds off fresh smoke, more off a
 +		// fire), drifting slowly up and east as it spreads and thins out (see drawSeeThroughSmoke).
-+		if (FirstPerson::smokeMode() == 1)
++		// Original: the original games' own smoke only, no wisps.
++		if (FirstPerson::smokeMode() == 2 && tile->getSmoke()
++			&& _particles.random() < (tile->getFire() ? 0.5f : 0.08f + tile->getSmoke() * 0.016f) * elapsedSeconds)
 +		{
-+			continue; // (the original games' own smoke only: no puffs, no wisps)
-+		}
-+		if (FirstPerson::smokeMode() == 2)
-+		{
-+			if (tile->getSmoke() && _particles.random() < (tile->getFire() ? 0.5f : 0.08f + tile->getSmoke() * 0.016f) * elapsedSeconds)
-+			{
-+				P::Particle wisp;
-+				wisp.pos[0] = centreX + _particles.random(-5, 5);
-+				wisp.pos[1] = centreY + _particles.random(-5, 5);
-+				wisp.pos[2] = groundZ + _particles.random(8, 16);
-+				wisp.vel[0] = _particles.random(0.5f, 2.0f); wisp.vel[1] = _particles.random(-1, 1); wisp.vel[2] = _particles.random(2.5f, 4.5f);
-+				wisp.age = 0; wisp.life = _particles.random(4.0f, 6.0f); wisp.gravity = 0; wisp.drag = 0.05f;
-+				wisp.color = 0; wisp.size = (Uint8)_particles.random(0, 4); wisp.kind = P::WISP; wisp.group = P::EFFECT; // size: which of the smoke's four frames
-+				_particles.add(wisp);
-+			}
-+			continue;
-+		}
-+		// Smoke: three puffs a second off a burning tile; off a smoky one 1.5 a second, more the
-+		// thicker its smoke. The puffs rise slowly and drift east (+x, the way the rain slants).
-+		if (tile->getSmoke() && _particles.random() < (tile->getFire() ? 3.0f : 1.5f + tile->getSmoke() * 0.2f) * elapsedSeconds)
-+		{
-+			P::Particle puff;
-+			puff.pos[0] = centreX + _particles.random(-7, 7);
-+			puff.pos[1] = centreY + _particles.random(-7, 7);
-+			puff.pos[2] = groundZ + _particles.random(6, 18);
-+			puff.vel[0] = _particles.random(-3, 3) + 2; puff.vel[1] = _particles.random(-3, 3); puff.vel[2] = _particles.random(3, 9);
-+			puff.age = 0; puff.life = _particles.random(2.0f, 3.5f); puff.gravity = -2; puff.drag = 0.4f;
-+			puff.color = shadeColor(_colors.smoke, (int)_particles.random(0, 4)); puff.size = 5; puff.kind = P::LIT; puff.group = P::EFFECT;
-+			_particles.add(puff);
++			P::Particle wisp;
++			wisp.pos[0] = centreX + _particles.random(-5, 5);
++			wisp.pos[1] = centreY + _particles.random(-5, 5);
++			wisp.pos[2] = groundZ + _particles.random(8, 16);
++			wisp.vel[0] = _particles.random(0.5f, 2.0f); wisp.vel[1] = _particles.random(-1, 1); wisp.vel[2] = _particles.random(2.5f, 4.5f);
++			wisp.age = 0; wisp.life = _particles.random(4.0f, 6.0f); wisp.gravity = 0; wisp.drag = 0.05f;
++			wisp.color = 0; wisp.size = (Uint8)_particles.random(0, 4); wisp.kind = P::WISP; wisp.group = P::EFFECT; // size: which of the smoke's four frames
++			_particles.add(wisp);
 +		}
 +	}
 +}
@@ -17947,9 +18000,12 @@ index 000000000..8ee1a40f0
 +
 +/**
 + * Advances the particles by the time since the last frame and spawns the new ones, once per
-+ * frame before drawing. With particles off for this view everything is cleared; with the
-+ * particles option at 0 only the tactical flares still fly (and shine, without their
-+ * particles); the ambient ones (motes, fireflies, weather, bubbles) need the option above 1.
++ * frame before drawing. With particles off for this view, or the particles option at 0, there
++ * are none, but the shots and explosions are still followed: a shot's look in flight, its start
++ * at the muzzle, its beam, the flash on the weapon in hand, the kick, the shake and the marks
++ * aren't particles. With the option at 0 the tactical flares still fly too (and shine, without
++ * their particles). The ambient ones (motes, fireflies, weather, bubbles) need the option
++ * above 1.
 + */
 +void FirstPersonView::updateParticles()
 +{
@@ -17958,15 +18014,19 @@ index 000000000..8ee1a40f0
 +	const Uint32 now = SDL_GetTicks();
 +	const float elapsedSeconds = _particleLastTick ? std::min<Uint32>(100, now - _particleLastTick) / 1000.0f : 0.0f;
 +	_particleLastTick = now;
-+	if (!_particlesOn)
++	if (!_particlesOn || Options::fpsParticles == 0)
 +	{
 +		_particles.clear();
-+		return;
-+	}
-+	if (Options::fpsParticles == 0)
-+	{
-+		_particles.clear();
-+		updateFlares(elapsedSeconds); // flares still fly and shine without their particles
++		if (_particlesOn)
++		{
++			updateFlares(elapsedSeconds); // flares still fly and shine without their particles
++		}
++		// The shots and new explosions, with every particle they'd add dropped.
++		_particles.setAccepting(false);
++		followShots();
++		spawnExplosionEffects();
++		spawnPartnerEffects();
++		_particles.setAccepting(true);
 +		return;
 +	}
 +	// Move what's there, then add what this frame brings: the battle's effects (shots,
@@ -18488,10 +18548,10 @@ index 000000000..b455e197f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..70eb4e7ae
+index 000000000..9f1180122
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,1279 @@
+@@ -0,0 +1,1325 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -18696,6 +18756,7 @@ index 000000000..70eb4e7ae
 +	_colors.dust = nearest(200, 190, 170);
 +	_colors.rain = nearest(150, 170, 200);
 +	_colors.snow = nearest(240, 240, 250);
++	_colors.speck = nearest(236, 236, 228);
 +	_colors.sand = nearest(210, 170, 110);
 +	_colors.firefly = nearest(200, 255, 100);
 +	_colors.bubble = nearest(170, 230, 240);
@@ -19485,6 +19546,51 @@ index 000000000..70eb4e7ae
 +	if (billow > 0.62f && (color & 15) > 0) --color;
 +	else if (billow < 0.38f) ++shade;
 +	return shadeColor((Uint8)color, shade);
++}
++
++/**
++ * How much of the soldier's sight the smoke uses up looking through a point and on beyond it,
++ * by the game's sight rules (see SmokeTrace, as the rays trace them for Modern's wall): the
++ * line from the eye through the point, walked two voxels at a time as far as the sight reaches
++ * (or off the map), its smoke added up tile by tile. Original smoke stacks its frames where the
++ * soldier can't see through it (see drawSeeThroughSmoke).
++ * @param point The point, in voxels.
++ * @return The share of the sight left that the smoke on the line uses up: 1 or more where the
++ *         sight runs out on it (the soldier can't see through the smoke there), less where they
++ *         can, 0 with no smoke on it.
++ */
++float FirstPersonView::smokeSightUsedThrough(const double point[3]) const
++{
++	float direction[3] = { (float)(point[0] - _eye[0]), (float)(point[1] - _eye[1]), (float)(point[2] - _eye[2]) };
++	const float length = std::sqrt(direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2]);
++	if (length < 1.0f)
++	{
++		return 0.0f;
++	}
++	for (float &component : direction) component /= length;
++	SmokeTrace smoke;
++	smoke.sightVoxels = _smokeSightVoxels;
++	smoke.smokeBlock = _smokeBlock;
++	smoke.fireBlock = _fireBlock;
++	const int sizeX = _save->getMapSizeX(), sizeY = _save->getMapSizeY(), sizeZ = _save->getMapSizeZ();
++	const float Step = 2.0f;
++	for (float from = 0.0f; from < _smokeSightVoxels; from += Step)
++	{
++		// This stretch of the line, and the tile its middle is in (off the map: the line ends).
++		const float middle = from + Step * 0.5f;
++		const int tileX = (int)std::floor((_eye[0] + direction[0] * middle) / Position::TileXY);
++		const int tileY = (int)std::floor((_eye[1] + direction[1] * middle) / Position::TileXY);
++		const int tileZ = (int)std::floor((_eye[2] + direction[2] * middle) / Position::TileZ);
++		if (tileX < 0 || tileY < 0 || tileZ < 0 || tileX >= sizeX || tileY >= sizeY || tileZ >= sizeZ)
++		{
++			break;
++		}
++		if (addSmoke(smoke, _tileViews[(tileZ * sizeY + tileY) * sizeX + tileX], from, from + Step) >= 0.0f)
++		{
++			return 1.0f; // the sight runs out here
++		}
++	}
++	return smoke.cost > 0.0f ? smoke.cost / std::max(1.0f, smoke.sightVoxels - smoke.lastSmoke) : 0.0f;
 +}
 +
 +/**
@@ -21039,10 +21145,10 @@ index 000000000..6b51d24f2
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShots.cpp b/src/FirstPerson/FirstPersonViewShots.cpp
 new file mode 100644
-index 000000000..ad7a5e40c
+index 000000000..2c679ff50
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShots.cpp
-@@ -0,0 +1,1215 @@
+@@ -0,0 +1,1349 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -21377,8 +21483,8 @@ index 000000000..ad7a5e40c
 +
 +/**
 + * Draws what flies and what explodes, as sprites and dots in the world: a thrown item (its own
-+ * sprite, at the game's position), the head of a shot in flight (a dot, blob or flame; beams
-+ * are drawn as lines by drawBeams), dual wield's second round, and the explosions with the
++ * sprite, at the game's position), the head of a shot in flight (a dot, blob or flame with its
++ * streak; beams are drawn as lines by drawBeams), dual wield's second round, and the explosions with the
 + * game's own animations (X1.PCK for big ones, HIT.PCK for hits, SMOKE.PCK for puffs), each
 + * frame dissolving smoothly into the next.
 + */
@@ -21411,15 +21517,16 @@ index 000000000..ad7a5e40c
 +		}
 +		else if (_shotTrail != TRAIL_BEAM) // beams are drawn as lines
 +		{
-+			// The head of the shot: a small dot for bullets, a glowing blob for plasma, a flame for rockets.
++			// The head of the shot: a small dot for bullets, a glowing blob for plasma, a flame for
++			// rockets, with its streak behind it, all as big as its calibre.
 +			float head[3];
 +			shotHead(projectile, head);
-+			drawShotDot(head, _shotTrail, _shotTrailColor);
++			drawShotDot(head, _shotTrailOrigin, _shotTrail, _shotTrailColor, _shotCalibre);
 +		}
 +	}
 +	if (_map->getPartnerProjectile() && _partnerTrail != TRAIL_BEAM)
 +	{
-+		drawShotDot(_partnerHead, _partnerTrail, _partnerColor); // dual wield: the other gun's round
++		drawShotDot(_partnerHead, _partnerOrigin, _partnerTrail, _partnerColor, _partnerCalibre); // dual wield: the other gun's round
 +	}
 +	// Explosions step through their frames on the game's clock; each frame dissolves into the
 +	// next over the time frames have been lasting. First forget the clocks of explosions that
@@ -21583,10 +21690,11 @@ index 000000000..ad7a5e40c
 +
 +/**
 + * What a shot leaves behind along the bit of its path it flew this frame: nothing for bullets,
-+ * embers for incendiary rounds, smoke for rockets and other explosives, green glow for plasma,
++ * embers for incendiary rounds, smoke for rockets and other explosives (and white specks that
++ * hang along the path for half a minute, on land and under the sea), green glow for plasma,
 + * sparkles for stun, droplets for acid. Under the sea every shot (and thrown thing) also leaves
-+ * bubbles that hang in the water for half a minute. The look is _shotTrail and _shotTrailColor
-+ * (spawnPartnerEffects swaps dual wield's second round's in for its own trail).
++ * bubbles that hang in the water for half a minute. The look is _shotTrail, _shotTrailColor and
++ * _shotCalibre (spawnPartnerEffects swaps dual wield's second round's in for its own trail).
 + * @param from Where the shot was drawn last frame, in voxels.
 + * @param to Where it is drawn now, in voxels.
 + */
@@ -21606,9 +21714,13 @@ index 000000000..ad7a5e40c
 +	{
 +		for (int axis = 0; axis < 3; ++axis) out[axis] = from[axis] + segment[axis] * progress;
 +	};
-+	// One particle for about every 3 voxels flown, each at a random spot within its share of
-+	// the path.
-+	const int steps = std::max(1, (int)(length / 3.0f));
++	// One particle for about every 3 voxels flown (a rocket's smoke every 1.5), each at a random
++	// spot within its share of the path. A rocket's lasting specks only while there's room for
++	// them under SpeckRoom particles in all, so a salvo of rockets leaves the rest of the
++	// battle's effects room (the system holds 6000).
++	const int steps = std::max(1, (int)(length / (_shotTrail == TRAIL_SMOKE ? 1.5f : 3.0f)));
++	const size_t SpeckRoom = 4500;
++	const bool specksFit = _particles.all().size() < SpeckRoom;
 +	for (int step = 0; step < steps; ++step)
 +	{
 +		float point[3];
@@ -21628,13 +21740,29 @@ index 000000000..ad7a5e40c
 +			particle.size = 2; particle.kind = P::GLOW;
 +			break;
 +		case TRAIL_SMOKE:
-+			// Smoke: puffs in two greys, slowing down and hanging for a couple of seconds.
++			// Smoke: puffs in two greys, starting a little behind the flame at the head (a rocket
++			// flying away would have its newest puffs between it and the eye, over its flame),
++			// slowing down and hanging for two to four seconds, bigger for bigger rounds (a
++			// rocket's bigger than a cannon shell's).
++			for (int axis = 0; axis < 3; ++axis) particle.pos[axis] -= segment[axis] / length * 5.0f;
 +			particle.vel[0] = _particles.random(-2, 2); particle.vel[1] = _particles.random(-2, 2);
 +			particle.vel[2] = _particles.random(1, 4);
-+			particle.life = _particles.random(1.5f, 3.0f);
-+			particle.color = _particles.random() < 0.5f ? _colors.smoke : shadeColor(_colors.smoke, 2);
-+			particle.size = 4; particle.kind = P::LIT;
++			particle.life = _particles.random(2.0f, 4.0f);
++			particle.color = _particles.random() < 0.6f ? _colors.smoke : shadeColor(_colors.smoke, 2);
++			particle.size = (Uint8)std::lround(5.0f + 2.0f * _shotCalibre); particle.kind = P::LIT;
 +			particle.drag = 0.8f;
++			// And two white specks about the spot, hanging there for half a minute, drifting a
++			// little and greying as they go: the rocket's lasting trail.
++			for (int speckIndex = 0; speckIndex < (specksFit ? 2 : 0); ++speckIndex)
++			{
++				P::Particle speck = particle;
++				for (float &coordinate : speck.pos) coordinate += _particles.random(-0.6f, 0.6f);
++				speck.vel[0] = _particles.random(-0.4f, 0.4f); speck.vel[1] = _particles.random(-0.4f, 0.4f);
++				speck.vel[2] = _particles.random(0.1f, 0.5f);
++				speck.life = _particles.random(25.0f, 35.0f); speck.drag = 0.2f;
++				speck.color = _colors.speck; speck.size = 3;
++				_particles.add(speck);
++			}
 +			break;
 +		case TRAIL_PLASMA:
 +			// Plasma: a glow scattering in every direction, gone within half a second.
@@ -21678,18 +21806,22 @@ index 000000000..ad7a5e40c
 +}
 +
 +/**
-+ * Draws a line in the world (a laser beam), depth-tested, a pixel or two thick, faded by
-+ * dithering; it glows (its pixels feed the bloom).
++ * Draws a line in the world (a laser beam, a shot's streak), depth-tested, faded by dithering;
++ * it glows (its pixels feed the bloom). It's a set number of pixels thick, or, given a width in
++ * the world, as thick as that width looks at each point of it (thicker up close, at least a
++ * pixel, at most the set number).
 + * @param from, to The line's ends, in voxels.
 + * @param color Its palette colour.
-+ * @param thickness How thick it is on the screen, in pixels.
++ * @param thickness How thick it is on the screen, in pixels (with a width in the world: at most).
 + * @param opacity 1 solid .. 0 gone (dithered): a beam fading out.
++ * @param worldWidth Its width in the world, in voxels (0: none, the set thickness all along).
 + * @param bandTop, bandBottom Only the screen rows from bandTop up to (not including) bandBottom
 + *        are drawn (a band of the view, see replayDrawList): the same pixels as drawn whole.
 + */
-+void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, int bandTop, int bandBottom)
++void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, float worldWidth, int bandTop, int bandBottom)
 +{
 +	const int width = getWidth(), height = getHeight();
++	const double focalLength = (width / 2.0) / _halfFovTangent; // in pixels
 +	// Clip the line against a near plane 3 voxels in front of the eye (depth along the view
 +	// direction, in true proportions), so a beam from right beside the camera still draws.
 +	double start[3] = { from[0], from[1], from[2] }, end[3] = { to[0], to[1], to[2] };
@@ -21717,13 +21849,15 @@ index 000000000..ad7a5e40c
 +		const double progress = (double)step / steps;
 +		const int x = (int)(startX + (endX - startX) * progress), y = (int)(startY + (endY - startY) * progress);
 +		const float depth = (float)(1.0 / (1.0 / startZ + (1.0 / endZ - 1.0 / startZ) * progress)); // depth is linear in 1/z on screen
-+		// A square of thickness x thickness pixels around the point; in front of the scene
-+		// (with a voxel to spare, so a beam grazing a wall still shows), dithered by opacity.
-+		for (int offsetY = 0; offsetY < thickness; ++offsetY)
++		// How thick it is here: the set thickness, or its width in the world as it looks here.
++		const int pointThickness = worldWidth > 0.0f ? std::clamp((int)std::lround(worldWidth * focalLength / depth), 1, thickness) : thickness;
++		// A square of that many pixels across around the point; in front of the scene (with a
++		// voxel to spare, so a beam grazing a wall still shows), dithered by opacity.
++		for (int offsetY = 0; offsetY < pointThickness; ++offsetY)
 +		{
-+			for (int offsetX = 0; offsetX < thickness; ++offsetX)
++			for (int offsetX = 0; offsetX < pointThickness; ++offsetX)
 +			{
-+				const int pixelX = x + offsetX - thickness / 2, pixelY = y + offsetY - thickness / 2;
++				const int pixelX = x + offsetX - pointThickness / 2, pixelY = y + offsetY - pointThickness / 2;
 +				if (pixelX < 0 || pixelY < std::max(0, bandTop) || pixelX >= width || pixelY >= std::min(height, bandBottom)
 +					|| depth >= _depthBuffer[pixelY * width + pixelX] + 1.0f) continue;
 +				if (opacity < 1.0f && dither(pixelX, pixelY) >= opacity) continue;
@@ -21735,16 +21869,59 @@ index 000000000..ad7a5e40c
 +}
 +
 +/**
++ * How big a shot and its muzzle flash are drawn, its calibre: 1 for a rifle's, less for a
++ * pistol's, more for a heavy weapon's, so pistol, rifle, auto-cannon and heavy cannon (and laser
++ * pistol, laser rifle and heavy laser...) each fire a bigger round than the last. It's the
++ * kind of gun, by how it's carried (in one hand 0.75, a rifle in two hands 1, a heavy weapon
++ * two squares wide or built in 1.25), times the square root of the round's power against a
++ * rifle's of the same kind (bullets 30, lasers 60, plasma 80, explosives, fire, stun and acid
++ * 60): 0.5 to 2.
++ * @param weapon What fired it (null if unknown).
++ * @param ammo What it fired (null: the weapon itself, a laser).
++ * @return The calibre.
++ */
++float FirstPersonView::shotCalibre(const RuleItem *weapon, const RuleItem *ammo)
++{
++	const RuleItem *round = ammo ? ammo : weapon;
++	if (!round)
++	{
++		return 1.0f;
++	}
++	float build = 1.0f;
++	if (weapon && (weapon->isFixed() || weapon->getInventoryWidth() >= 2))
++	{
++		build = 1.25f;
++	}
++	else if (weapon && !weapon->isTwoHanded())
++	{
++		build = 0.75f;
++	}
++	const RuleDamageType *damage = round->getDamageType();
++	float riflePower = 30.0f; // bullets and the like
++	switch (damage ? damage->ResistType : DT_NONE)
++	{
++	case DT_PLASMA: riflePower = 80.0f; break;
++	case DT_LASER: case DT_HE: case DT_IN: case DT_STUN: case DT_ACID: riflePower = 60.0f; break;
++	default: break;
++	}
++	return std::clamp(build * std::sqrt(std::max(1, round->getPower()) / riflePower), 0.5f, 2.0f);
++}
++
++/**
 + * How a shot looks in flight, from its ammo's damage type: the kind of trail and its colour.
 + * Incendiary: embers; high explosive: smoke; laser: a red beam; plasma: a green blob; stun:
 + * pale blue sparkles; acid: yellow-green droplets; anything else (bullets and the like): no
-+ * trail, a spark-coloured dot. Under the sea lasers are a pale blue and plasma a pale cyan.
-+ * The colours are the nearest the current palette has.
++ * trail, a spark-coloured dot. Under the sea lasers are a pale blue, plasma a pale cyan, and
++ * darts, harpoons and shells the vivid yellow of the original game's (pale ones would melt into
++ * the sand).
++ * The colours are the nearest the current palette has. And how big it is (see shotCalibre).
 + * @param ammo The ammo fired (null if unknown).
++ * @param weapon The weapon that fired it (null if unknown).
 + * @param trail Gets the kind of trail.
 + * @param color Gets its palette colour.
++ * @param calibre Gets how big it's drawn.
 + */
-+void FirstPersonView::trailFor(const BattleItem *ammo, Trail &trail, Uint8 &color) const
++void FirstPersonView::trailFor(const BattleItem *ammo, const BattleItem *weapon, Trail &trail, Uint8 &color, float &calibre) const
 +{
 +	const RuleDamageType *damage = ammo ? ammo->getRules()->getDamageType() : nullptr;
 +	// The palette colour nearest to a red, green, blue colour (getPalette only reads, but it
@@ -21767,8 +21944,9 @@ index 000000000..ad7a5e40c
 +	case DT_PLASMA: trail = TRAIL_PLASMA; color = _colors.underwater ? nearest(180, 240, 255) : nearest(90, 255, 90); break;
 +	case DT_STUN: trail = TRAIL_STUN; color = nearest(160, 190, 255); break;
 +	case DT_ACID: trail = TRAIL_ACID; color = nearest(190, 255, 60); break;
-+	default: trail = TRAIL_NONE; color = _colors.spark; break;
++	default: trail = TRAIL_NONE; color = _colors.underwater ? nearest(244, 240, 20) : _colors.spark; break;
 +	}
++	calibre = shotCalibre(weapon ? weapon->getRules() : nullptr, ammo ? ammo->getRules() : nullptr);
 +}
 +
 +/**
@@ -21825,39 +22003,94 @@ index 000000000..ad7a5e40c
 +}
 +
 +/**
-+ * Draws the head of a shot in flight: a small dot for bullets, a glowing blob for plasma, a
-+ * flame for rockets; any shot with a trail glows (feeds the bloom). Nothing is drawn right in
-+ * front of the eye (less than 6 voxels away), where it would be a blob of huge pixels.
++ * Draws the head of a shot in flight and the streak it leaves behind it, as the original game
++ * drew a round with a short trail: a dot and a spark-coloured streak for bullets, a glowing blob
++ * for plasma, a flame for rockets and their exhaust; any shot with a trail glows (feeds the
++ * bloom), and so do the streaks. Both are as big as the shot's calibre (see shotCalibre): a pistol's round the
++ * smallest, then a rifle's, an auto-cannon's, a heavy weapon's. The streak runs back along the
++ * path, never further back than where the shot started, solid for its first half and fading for
++ * the rest. The dot isn't drawn right in front of the eye (less than 6 voxels away), where it
++ * would be a blob of huge pixels.
 + * @param head Where the head is, in voxels.
++ * @param origin Where the shot started (the muzzle for our own), in voxels.
 + * @param trail How the shot looks in flight.
 + * @param color The trail's colour.
++ * @param calibre How big it is (1 a rifle's).
 + */
-+void FirstPersonView::drawShotDot(const float head[3], Trail trail, Uint8 color)
++void FirstPersonView::drawShotDot(const float head[3], const float origin[3], Trail trail, Uint8 color, float calibre)
 +{
++	// Its colours: the dot's rim, middle and centre, and the streak's front and back halves.
++	// Bullets their colour (spark-coloured, under the sea yellow); a rocket (or another explosive round) a flame, white-hot in yellow
++	// in an orange rim, with a yellow-to-orange streak; incendiary rounds the same, burning
++	// redder; the rest the trail's colour, white-hot in the middle (its colour group's brightest
++	// shade).
++	Uint8 rim = color, middle = color, centre = (Uint8)(color & 0xF0), streakFront = color, streakBack = shadeColor(color, 2);
++	switch (trail)
++	{
++	case TRAIL_SMOKE: rim = _colors.fire[2]; middle = _colors.fire[1]; centre = _colors.fire[0]; streakFront = _colors.fire[1]; streakBack = _colors.fire[2]; break;
++	case TRAIL_FIRE: rim = _colors.fire[2]; middle = _colors.fire[1]; centre = _colors.fire[0]; streakFront = _colors.fire[2]; streakBack = _colors.fire[3]; break;
++	default: break;
++	}
++
++	// The streak: its length and width in the world (voxels) by the kind of shot and its
++	// calibre, at most as long as the shot has flown; at most 1 + 1.5 x calibre pixels thick.
++	const float back[3] = { origin[0] - head[0], origin[1] - head[1], origin[2] - head[2] };
++	const float flown = std::sqrt(back[0] * back[0] + back[1] * back[1] + back[2] * back[2]);
++	const float streakLength = std::min(flown, (trail == TRAIL_NONE ? 10.0f : trail == TRAIL_SMOKE ? 9.0f : trail == TRAIL_PLASMA ? 7.0f : 6.0f) * calibre);
++	if (streakLength > 1.0f)
++	{
++		float halfway[3], tail[3];
++		for (int axis = 0; axis < 3; ++axis)
++		{
++			halfway[axis] = head[axis] + back[axis] / flown * streakLength * 0.5f;
++			tail[axis] = head[axis] + back[axis] / flown * streakLength;
++		}
++		const float streakWidth = (trail == TRAIL_PLASMA ? 1.6f : trail == TRAIL_SMOKE ? 1.0f : 0.6f) * calibre;
++		const int widest = 1 + (int)std::lround(calibre * 1.5f);
++		drawLine3D(head, halfway, streakFront, widest, 1.0f, streakWidth);
++		drawLine3D(halfway, tail, streakBack, widest, 0.6f, streakWidth * 0.7f);
++	}
++
++	// The dot: where the head is on the screen, its size in the world (voxels) by the kind of
++	// shot and its calibre, and on the screen a radius in pixels, 1..12.
 +	const double world[3] = { head[0], head[1], head[2] };
 +	double screenX, screenY, depth;
 +	if (!projectToScreen(world, screenX, screenY, depth) || depth < 6.0)
 +	{
 +		return;
 +	}
-+	// Its size in the world (voxels) by the kind of shot, and on the screen (a radius in
-+	// pixels, 1..12); its colour (bullets spark-coloured, rockets fire-coloured).
 +	const int width = getWidth(), height = getHeight();
 +	const double focalLength = (width / 2.0) / _halfFovTangent; // in pixels
-+	const double size = trail == TRAIL_PLASMA ? 5.0 : trail == TRAIL_SMOKE ? 3.0 : 1.2;
++	const double size = (trail == TRAIL_PLASMA ? 3.5 : trail == TRAIL_SMOKE ? 1.1 : 0.9) * calibre;
 +	const int radius = std::clamp((int)std::lround(size * focalLength / depth * 0.5), 1, 12);
-+	const Uint8 coreColor = trail == TRAIL_NONE ? _colors.spark : trail == TRAIL_SMOKE ? _colors.fire[0] : color;
-+	// A round dot, depth-tested, with a white-hot centre (its colour group's brightest shade).
++	// A round dot, depth-tested: the inner 40% in the centre colour, out to 70% the middle one,
++	// the rest the rim.
 +	for (int y = (int)screenY - radius; y <= (int)screenY + radius; ++y)
 +	{
 +		for (int x = (int)screenX - radius; x <= (int)screenX + radius; ++x)
 +		{
 +			const double distance = std::sqrt((x - screenX) * (x - screenX) + (y - screenY) * (y - screenY));
 +			if (distance > radius || x < 0 || y < 0 || x >= width || y >= height || depth >= _depthBuffer[y * width + x]) continue;
-+			*getRaw(x, y) = distance < radius * 0.5 ? (Uint8)(coreColor & 0xF0) : coreColor; // white-hot centre
++			*getRaw(x, y) = distance < radius * 0.4 ? centre : distance < radius * 0.7 ? middle : rim;
 +			if (trail != TRAIL_NONE) _glowMask[y * width + x] = 1;
 +		}
 +	}
++}
++
++/**
++ * Draws a laser beam: a coloured sheath round a white-hot core (its colour group's brightest
++ * shade), each as thick as its width in the world looks where it is (thicker up close), the
++ * widths by the calibre (see shotCalibre): a laser pistol's beam the thinnest, a heavy laser's
++ * the widest; the sheath at most 2 (pistol) to 4 (heavy) pixels, the core 1 or 2.
++ * @param from, to The beam's ends, in voxels.
++ * @param color Its colour.
++ * @param calibre How big the shot is (1 a rifle's).
++ * @param opacity 1 solid .. 0 gone (a beam fading out).
++ */
++void FirstPersonView::drawBeam(const float from[3], const float to[3], Uint8 color, float calibre, float opacity)
++{
++	drawLine3D(from, to, color, (int)std::lround(1.5f + 1.5f * calibre), opacity, 0.3f * calibre);
++	drawLine3D(from, to, (Uint8)(color & 0xF0), calibre > 1.25f ? 2 : 1, opacity, 0.12f * calibre);
 +}
 +
 +/**
@@ -21879,7 +22112,7 @@ index 000000000..ad7a5e40c
 +			if (_partnerTrail == TRAIL_BEAM)
 +			{
 +				_beams.push_back({ { _partnerOrigin[0], _partnerOrigin[1], _partnerOrigin[2] },
-+					{ _partnerHead[0], _partnerHead[1], _partnerHead[2] }, SDL_GetTicks(), _partnerColor });
++					{ _partnerHead[0], _partnerHead[1], _partnerHead[2] }, SDL_GetTicks(), _partnerColor, _partnerCalibre });
 +			}
 +		}
 +		if (partner)
@@ -21907,14 +22140,18 @@ index 000000000..ad7a5e40c
 +			std::copy(origin, origin + 3, _partnerHead);
 +			// Its look in flight, when it left (the weapon in hand flashes), the muzzle flash
 +			// lighting up the room, and the kick: by the ammo's power, 0.5 to 2.5 degrees,
-+			// adding up to at most 6.
-+			trailFor(partner->getAmmo(), _partnerTrail, _partnerColor);
++			// adding up to at most 6 (not in a helmet camera's view: the round is the soldier
++			// we look through's, see beginShot).
++			trailFor(partner->getAmmo(), partner->getWeapon(), _partnerTrail, _partnerColor, _partnerCalibre);
 +			_partnerShotTick = SDL_GetTicks();
 +			_partnerShotAmmo = partner->getAmmo() ? partner->getAmmo()->getRules() : nullptr;
 +			std::copy(origin, origin + 3, _muzzleFlashPos); // the flash lights up the room
 +			_muzzleFlashTick = _partnerShotTick;
 +			const float power = partner->getAmmo() ? (float)partner->getAmmo()->getRules()->getPower() : 30.0f;
-+			_recoilKick = std::min(_recoilKick + std::clamp(power / 30.0f, 0.5f, 2.5f), 6.0f);
++			if (_particlesOn)
++			{
++				_recoilKick = std::min(_recoilKick + std::clamp(power / 30.0f, 0.5f, 2.5f), 6.0f);
++			}
 +		}
 +		_lastPartnerShot = partner;
 +	}
@@ -21937,9 +22174,11 @@ index 000000000..ad7a5e40c
 +		// the call and back.
 +		std::swap(_shotTrail, _partnerTrail);
 +		std::swap(_shotTrailColor, _partnerColor);
++		std::swap(_shotCalibre, _partnerCalibre);
 +		spawnTrailSegment(previous, _partnerHead);
 +		std::swap(_shotTrail, _partnerTrail);
 +		std::swap(_shotTrailColor, _partnerColor);
++		std::swap(_shotCalibre, _partnerCalibre);
 +	}
 +}
 +
@@ -22029,7 +22268,8 @@ index 000000000..ad7a5e40c
 +
 +/**
 + * Laser (and gauss) beams: a line from the muzzle to wherever the shot is (or ended), a bright
-+ * core in a coloured sheath, fading out over a third of a second (350 ms) after the hit.
++ * core in a coloured sheath as wide as the shot's calibre (see drawBeam), fading out over a third
++ * of a second (350 ms) after the hit.
 + */
 +void FirstPersonView::drawBeams()
 +{
@@ -22039,21 +22279,18 @@ index 000000000..ad7a5e40c
 +	for (const auto &beam : _beams)
 +	{
 +		const float fade = 1.0f - (now - beam.start) / 350.0f; // opacity: 1 at the hit .. 0 gone
-+		drawLine3D(beam.from, beam.to, beam.color, 2, fade);
-+		drawLine3D(beam.from, beam.to, shadeColor(beam.color, 0) & 0xF0, 1, fade); // the white-hot core: the group's brightest shade
++		drawBeam(beam.from, beam.to, beam.color, beam.calibre, fade);
 +	}
 +	// The beam of the shot in flight (not a thrown item), solid, from the muzzle to its head.
 +	Projectile *projectile = _map ? _map->getProjectile() : nullptr;
 +	if (projectile && projectile == _lastProjectile && !_lastProjectileThrown && _shotTrail == TRAIL_BEAM)
 +	{
-+		drawLine3D(_shotTrailOrigin, _lastShotHead, _shotTrailColor, 2, 1.0f);
-+		drawLine3D(_shotTrailOrigin, _lastShotHead, (Uint8)(_shotTrailColor & 0xF0), 1, 1.0f);
++		drawBeam(_shotTrailOrigin, _lastShotHead, _shotTrailColor, _shotCalibre, 1.0f);
 +	}
 +	// And dual wield's second round's, the same way.
 +	if (_map && _map->getPartnerProjectile() && _partnerTrail == TRAIL_BEAM)
 +	{
-+		drawLine3D(_partnerOrigin, _partnerHead, _partnerColor, 2, 1.0f);
-+		drawLine3D(_partnerOrigin, _partnerHead, (Uint8)(_partnerColor & 0xF0), 1, 1.0f);
++		drawBeam(_partnerOrigin, _partnerHead, _partnerColor, _partnerCalibre, 1.0f);
 +	}
 +}
 +
@@ -22098,7 +22335,7 @@ index 000000000..ad7a5e40c
 +	if (_lastProjectile && !_lastProjectileThrown && _shotTrail == TRAIL_BEAM)
 +	{
 +		_beams.push_back({ { _shotTrailOrigin[0], _shotTrailOrigin[1], _shotTrailOrigin[2] },
-+			{ _lastShotHead[0], _lastShotHead[1], _lastShotHead[2] }, SDL_GetTicks(), _shotTrailColor });
++			{ _lastShotHead[0], _lastShotHead[1], _lastShotHead[2] }, SDL_GetTicks(), _shotTrailColor, _shotCalibre });
 +	}
 +}
 +
@@ -22122,9 +22359,11 @@ index 000000000..ad7a5e40c
 +	}
 +	// Whose shot: one starting within 20 voxels of the eye is our own (and the weapon in hand
 +	// flashes); any other shot (not a thrown item; a squadmate's counts too) is taken for an
-+	// enemy's, which may whizz past us and whose origin a hit on us points back to.
++	// enemy's, which may whizz past us and whose origin a hit on us points back to. A helmet
++	// camera's view (the one without particles of its own, see setParticles) has no shots of
++	// its own: no weapon in hand, no kick.
 +	const double dx = origin[0] - _eye[0], dy = origin[1] - _eye[1], dz = origin[2] - _eye[2]; // from the eye
-+	const bool ownShot = !_lastProjectileThrown && dx * dx + dy * dy + dz * dz < 20.0 * 20.0;
++	const bool ownShot = _particlesOn && !_lastProjectileThrown && dx * dx + dy * dy + dz * dz < 20.0 * 20.0;
 +	if (ownShot)
 +	{
 +		_ownShotTick = SDL_GetTicks();
@@ -22163,9 +22402,10 @@ index 000000000..ad7a5e40c
 +	}
 +	_shotTrail = TRAIL_NONE;
 +	_shotTrailColor = _colors.spark;
++	_shotCalibre = 1.0f;
 +	if (!_lastProjectileThrown)
 +	{
-+		trailFor(ammo, _shotTrail, _shotTrailColor);
++		trailFor(ammo, projectile->getWeapon(), _shotTrail, _shotTrailColor, _shotCalibre);
 +	}
 +	if (!_lastProjectileThrown)
 +	{
@@ -22260,10 +22500,10 @@ index 000000000..ad7a5e40c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..2a4eccbfc
+index 000000000..397a113cd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,1934 @@
+@@ -0,0 +1,1973 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -22705,7 +22945,7 @@ index 000000000..2a4eccbfc
 +				drawGroundShade(step.centre, step.radius, step.steps, step.density, bandTop, bandBottom);
 +				break;
 +			case DrawStep::Line:
-+				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, bandTop, bandBottom);
++				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, bandTop, bandBottom);
 +				break;
 +			}
 +		}
@@ -23471,13 +23711,12 @@ index 000000000..2a4eccbfc
 +}
 +
 +/**
-+ * Smoke and fire on discovered tiles, animated like on the isometric map: the same sprites
-+ * from SMOKE.PCK, picked the same way (fire, or smoke by its density), with the frames dissolving
-+ * into each other. With the setting "Smoke" on Original or Modern, only the fire: the smoke is
-+ * then drawn see-through after everything else (drawSeeThroughSmoke), and with Modern solid only
-+ * where the soldier's sight runs out in it, by the rays (see SmokeTrace).
++ * Fire on discovered tiles, animated like on the isometric map: the same sprites from SMOKE.PCK
++ * (its first four frames), with the frames dissolving into each other. The smoke is drawn
++ * see-through after everything else (drawSeeThroughSmoke), and with Modern solid where the
++ * soldier's sight runs out in it, by the rays (see SmokeTrace).
 + */
-+void FirstPersonView::drawSmokeAndFire()
++void FirstPersonView::drawFire()
 +{
 +	SurfaceSet *smokeSprites = _game->getMod()->getSurfaceSet("SMOKE.PCK", false);
 +	if (!smokeSprites)
@@ -23491,22 +23730,14 @@ index 000000000..2a4eccbfc
 +	const int tileCount = _save->getMapSizeXYZ();
 +	for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
 +	{
-+		// Only tiles with smoke (a burning tile has smoke too) that have been seen; with
-+		// see-through smoke, only burning ones.
++		// Only burning tiles (a burning tile has smoke too) that have been seen.
 +		Tile *tile = _save->getTile(tileIndex);
-+		if (!tile->getSmoke() || !_tileViews[tileIndex].discovered || (FirstPerson::smokeMode() != 0 && !tile->getFire()))
++		if (!tile->getSmoke() || !tile->getFire() || !_tileViews[tileIndex].discovered)
 +		{
 +			continue;
 +		}
-+		// Fire is the set's first four frames, unshaded (it shines). Smoke is further on (its
-+		// own frames under the sea), thicker smoke further still, as the map picks it for the
-+		// mod's smoke layout; smoke is shaded by the tile's light.
-+		int firstFrame = 0, shade = 0;
-+		if (!tile->getFire())
-+		{
-+			firstFrame = firstSmokeFrame(tile->getSmoke());
-+			shade = _tileViews[tileIndex].light;
-+		}
++		// Fire is the set's first four frames, unshaded (it shines).
++		const int firstFrame = 0, shade = 0;
 +		// Each tile is a little out of step with the others (its animation offset), like on
 +		// the map; the frame shown dissolves into the next one, on the middle of the floor.
 +		const int phase = (halfAnimFrame + tile->getAnimationOffset()) % 4;
@@ -23534,6 +23765,29 @@ index 000000000..2a4eccbfc
 +	else
 +		firstFrame += (smoke - 1) / 5 * 4;
 +	return firstFrame;
++}
++
++/**
++ * Whether a smoky tile is on its cloud's outer shell: one of the four tiles beside it (on its
++ * level, across a side) has no smoke the view knows of, or is off the map. Original smoke
++ * stacks such a tile less where the soldier can't see through it (see drawSeeThroughSmoke),
++ * so the cloud's outline stays loose.
++ * @param tilePosition The tile.
++ * @return True if it's on the shell.
++ */
++bool FirstPersonView::smokeShell(const Position &tilePosition) const
++{
++	const int sizeX = _save->getMapSizeX(), sizeY = _save->getMapSizeY();
++	static const int sides[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
++	for (const auto &side : sides)
++	{
++		const int x = tilePosition.x + side[0], y = tilePosition.y + side[1];
++		if (x < 0 || y < 0 || x >= sizeX || y >= sizeY || !_tileViews[(tilePosition.z * sizeY + y) * sizeX + x].smoke)
++		{
++			return true;
++		}
++	}
++	return false;
 +}
 +
 +/**
@@ -23813,11 +24067,14 @@ index 000000000..2a4eccbfc
 +
 +/**
 + * The smoke on discovered tiles drawn see-through (setting "Smoke"): with Modern, the game's own
-+ * smoke made soft (see softSmokeFrame), and the wisps rising off it; with Original, the original
-+ * frames' own dots (see stippleSmokeFrame), more opaque the thicker the smoke, and no wisps. Drawn after everything
-+ * solid, farthest first, each laid over what's behind it; where the soldier's sight runs out in
-+ * the smoke, the rays have already drawn a wall of it (see SmokeTrace), and units the soldier
-+ * sees stay clear (see _unitVeil).
++ * smoke made soft (see softSmokeFrame), and the wisps rising off it; where the soldier's sight
++ * runs out in the smoke, the rays have already drawn a wall of it (see SmokeTrace). With
++ * Original, the original frames' own dots (see stippleSmokeFrame), more opaque the thicker the
++ * smoke, and no wisps: one cloud on a tile where the soldier sees through the smoke, and where
++ * they can't (by the same rules, see smokeSightUsedThrough), the tile's animation over and over,
++ * each out of step and set off a little, so their dots fill each other's gaps and the cloud
++ * hides what's behind it. Drawn after everything solid, farthest first, each laid
++ * over what's behind it; units the soldier sees stay clear (see _unitVeil).
 + * Each tile's smoke is the frame the map picks for its density, a little more opaque the
 + * thicker it is; its frames melt into each other slowly (an eased cross-fade, nothing blinks),
 + * each tile out of step with the others, a fifth bigger than on the map give or take a little
@@ -23828,7 +24085,7 @@ index 000000000..2a4eccbfc
 +void FirstPersonView::drawSeeThroughSmoke()
 +{
 +	SurfaceSet *smokeSprites = _game->getMod()->getSurfaceSet("SMOKE.PCK", false);
-+	if (FirstPerson::smokeMode() == 0 || !smokeSprites || _nearestRgb.empty())
++	if (!smokeSprites || _nearestRgb.empty())
 +	{
 +		return;
 +	}
@@ -23890,8 +24147,30 @@ index 000000000..2a4eccbfc
 +		// A little more opaque the thicker the smoke (a fresh smoke grenade makes about 15); the
 +		// original's dots more so, as their holes already let the view through.
 +		const float opacity = original ? std::clamp(0.35f + tile->getSmoke() * 0.04f, 0.0f, 0.95f) : std::clamp(0.45f + tile->getSmoke() * 0.025f, 0.0f, 0.85f);
-+		addPuff(world, 32, firstSmokeFrame(tile->getSmoke()), seconds / FrameSeconds + tile->getAnimationOffset() + variation[2],
-+			opacity, 1.14 + variation[3] * 0.12, _tileViews[tileIndex].light);
++		const int firstFrame = firstSmokeFrame(tile->getSmoke());
++		const double frameTime = seconds / FrameSeconds + tile->getAnimationOffset() + variation[2], scale = 1.14 + variation[3] * 0.12;
++		addPuff(world, 32, firstFrame, frameTime, opacity, scale, _tileViews[tileIndex].light);
++		// Original, where the soldier can't see through the smoke looking at the cloud's middle
++		// (the sight runs out on the line through it and on): the cloud again on top, out of
++		// step and set off a little round the tile's middle (a frame of the original's dots
++		// covers only a tenth to a third of its picture), OriginalSmokeMaxLayers times in all
++		// inside the cloud, solid where they overlap, and OriginalSmokeShellLayers times on its
++		// outer shell (a tile next to one without smoke), so its outline stays loose and
++		// smoke-like; where the smoke uses up most of the sight, a few times (the cloud's edge,
++		// as soft as Modern's wall's); where the soldier sees through it, once.
++		if (original)
++		{
++			const double middle[3] = { world[0], world[1], world[2] + 12.0 };
++			const float sightUsed = smokeSightUsedThrough(middle);
++			const int mostLayers = smokeShell(tilePosition) ? OriginalSmokeShellLayers : OriginalSmokeMaxLayers;
++			const int layers = std::min(mostLayers, sightUsed >= 1.0f ? OriginalSmokeMaxLayers : sightUsed >= 0.7f ? 4 : sightUsed >= 0.4f ? 2 : 1);
++			for (int layer = 1; layer < layers; ++layer)
++			{
++				const double angle = layer * 2.4; // the golden angle, so the layers spread evenly round the middle
++				const double shifted[3] = { world[0] + 3.0 * std::cos(angle), world[1] + 3.0 * std::sin(angle), world[2] + (layer % 3 - 1) * 2.0 };
++				addPuff(shifted, 32, firstFrame, frameTime + layer * 1.37, 1.0f, scale * (1.0 + layer * 0.03), _tileViews[tileIndex].light);
++			}
++		}
 +	}
 +	// The wisps: the thinnest smoke's frames, anchored at their middle, growing as they rise,
 +	// fading in over their first quarter and away over their last half.
@@ -27617,10 +27896,10 @@ index 000000000..506cc81c7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..d7ba3a93b
+index 000000000..ad766b4e3
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,694 @@
+@@ -0,0 +1,700 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -27900,7 +28179,8 @@ index 000000000..d7ba3a93b
 +
 +/**
 + * Gives the text for an option's current value: YES or NO for a switch, the number (or its
-+ * name, for sprite upscaling and an unlimited frame rate) for a number, the key's name for a key.
++ * name, for a choice such as particles or sprite upscaling, and an unlimited frame rate) for a
++ * number, the key's name for a key.
 + * @param option The option.
 + * @return The text for the value column.
 + */
@@ -27916,6 +28196,12 @@ index 000000000..d7ba3a93b
 +		{
 +			static const char *const upscaleNames[] = { "STR_FPS_UPSCALE_OFF", "STR_FPS_UPSCALE_SMOOTH", "STR_FPS_UPSCALE_DETAIL" };
 +			return std::string(tr(upscaleNames[std::clamp(*option.asInt(), 0, 2)]));
++		}
++		// Particles are a choice of three, shown by name.
++		if (option.id() == "fpsParticles")
++		{
++			static const char *const particleNames[] = { "STR_FPS_PARTICLES_OFF", "STR_FPS_PARTICLES_EFFECTS", "STR_FPS_PARTICLES_ALL" };
++			return std::string(tr(particleNames[std::clamp(*option.asInt(), 0, 2)]));
 +		}
 +		// The distance haze is a choice of three, shown by name.
 +		if (option.id() == "fpsHaze")
@@ -27934,11 +28220,10 @@ index 000000000..d7ba3a93b
 +			static const char *const hitboxNames[] = { "STR_FPS_HITBOXES_OFF", "STR_FPS_HITBOXES_BLINK", "STR_FPS_HITBOXES_ALWAYS" };
 +			return std::string(tr(hitboxNames[std::clamp(*option.asInt(), 0, 2)]));
 +		}
-+		// The smoke is a choice of three, shown by name.
++		// The smoke is a choice of two, shown by name.
 +		if (option.id() == "fpsSmoke")
 +		{
-+			static const char *const smokeNames[] = { "STR_FPS_SMOKE_SOLID", "STR_FPS_SMOKE_ORIGINAL", "STR_FPS_SMOKE_MODERN" };
-+			return std::string(tr(smokeNames[FirstPerson::smokeMode()]));
++			return std::string(tr(FirstPerson::smokeMode() == 1 ? "STR_FPS_SMOKE_ORIGINAL" : "STR_FPS_SMOKE_MODERN"));
 +		}
 +		// The downed units' icons are a choice of three, shown by name.
 +		if (option.id() == "fpsDownedIcons")
@@ -28141,10 +28426,10 @@ index 000000000..d7ba3a93b
 +		{
 +			*value = (*value + direction + 3) % 3;
 +		}
-+		// The smoke (solid, original, modern): round and round.
++		// The smoke (original, modern): either button switches.
 +		else if (value == &Options::fpsSmoke)
 +		{
-+			*value = (FirstPerson::smokeMode() + direction + 3) % 3;
++			*value = FirstPerson::smokeMode() == 1 ? 2 : 1;
 +		}
 +		// The downed units' icons (off, crosshair, always): round and round.
 +		else if (value == &Options::fpsDownedIcons)
@@ -28181,7 +28466,7 @@ index 000000000..d7ba3a93b
 +		{
 +			*value = std::clamp(*value + direction, 1, 8);
 +		}
-+		// Particles (none, effects, everything): round and round, past the last back to the first.
++		// Particles (off, effects, all): round and round, past the last back to the first.
 +		else if (value == &Options::fpsParticles)
 +		{
 +			*value = (*value + direction + 3) % 3;

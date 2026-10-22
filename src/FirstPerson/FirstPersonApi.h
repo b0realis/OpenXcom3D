@@ -109,7 +109,7 @@ State *createOptionsTab(OptionsOrigin origin);
 /// Settles settings that take their first value from an older one (the smoke from "See-through
 /// smoke", the flashlight from 1.0's two flashlight settings, the next fire mode key from 1.0's).
 void settleOptions();
-/// The smoke setting as it stands: 0 Solid, 1 Original, 2 Modern (unset: from "See-through smoke").
+/// The smoke setting as it stands: 1 Original, 2 Modern (unset, or 1.0's Solid: see the function).
 int smokeMode();
 /// The flashlight setting as it stands: 0 Off, 1 On, 2 Dynamic (unset: from 1.0's settings).
 int flashlightMode();

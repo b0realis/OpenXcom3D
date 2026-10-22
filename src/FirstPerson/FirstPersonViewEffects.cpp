@@ -258,8 +258,8 @@ void FirstPersonView::spawnExplosionEffects()
 				// and glowing for a second or so.
 				_particles.burst(centre, 60, P::GLOW, P::EFFECT, _colors.fire, 4, 40, 140, 0.5f, 150, 0.6f, 0.6f, 1.5f, 2);
 				// Big puffs of smoke in two greys, rising slowly and hanging for a few seconds: with
-				// the setting "Smoke" on Modern only (Original and Solid show the game's own smoke
-				// that the explosion leaves on the tiles, and nothing of ours, as for burning tiles).
+				// the setting "Smoke" on Modern only (Original shows the game's own smoke that the
+				// explosion leaves on the tiles, and nothing of ours, as for burning tiles).
 				if (FirstPerson::smokeMode() == 2)
 				{
 					_particles.burst(centre, 26, P::LIT, P::EFFECT, smokeColors, 2, 6, 24, 0.7f, -12, 0.8f, 2.0f, 3.5f, 5);
@@ -277,9 +277,10 @@ void FirstPersonView::spawnExplosionEffects()
 }
 
 /**
- * Burning tiles near the camera send up flames, and smoky ones drifting smoke (a burning tile
- * smokes too): puffs; with the setting "Smoke" on Modern, a few wisps; on Original, neither. Only tiles that have been discovered and are within 320 voxels (20 tiles) of
- * the eye, across the map, take part.
+ * Burning tiles near the camera send up flames, and with the setting "Smoke" on Modern smoky
+ * ones a few wisps of their smoke (a burning tile smokes too; on Original, none). Only tiles
+ * that have been discovered and are within 320 voxels (20 tiles) of the eye, across the map,
+ * take part.
  * @param elapsedSeconds Seconds since the last frame: flames and smoke rise at rates per second.
  */
 void FirstPersonView::spawnTileFireAndSmoke(float elapsedSeconds)
@@ -318,37 +319,18 @@ void FirstPersonView::spawnTileFireAndSmoke(float elapsedSeconds)
 		// Modern smoke (setting "Smoke"): now and then a wisp of the smoke rises off a smoky tile, a
 		// few more the thicker it is (about one every three seconds off fresh smoke, more off a
 		// fire), drifting slowly up and east as it spreads and thins out (see drawSeeThroughSmoke).
-		if (FirstPerson::smokeMode() == 1)
+		// Original: the original games' own smoke only, no wisps.
+		if (FirstPerson::smokeMode() == 2 && tile->getSmoke()
+			&& _particles.random() < (tile->getFire() ? 0.5f : 0.08f + tile->getSmoke() * 0.016f) * elapsedSeconds)
 		{
-			continue; // (the original games' own smoke only: no puffs, no wisps)
-		}
-		if (FirstPerson::smokeMode() == 2)
-		{
-			if (tile->getSmoke() && _particles.random() < (tile->getFire() ? 0.5f : 0.08f + tile->getSmoke() * 0.016f) * elapsedSeconds)
-			{
-				P::Particle wisp;
-				wisp.pos[0] = centreX + _particles.random(-5, 5);
-				wisp.pos[1] = centreY + _particles.random(-5, 5);
-				wisp.pos[2] = groundZ + _particles.random(8, 16);
-				wisp.vel[0] = _particles.random(0.5f, 2.0f); wisp.vel[1] = _particles.random(-1, 1); wisp.vel[2] = _particles.random(2.5f, 4.5f);
-				wisp.age = 0; wisp.life = _particles.random(4.0f, 6.0f); wisp.gravity = 0; wisp.drag = 0.05f;
-				wisp.color = 0; wisp.size = (Uint8)_particles.random(0, 4); wisp.kind = P::WISP; wisp.group = P::EFFECT; // size: which of the smoke's four frames
-				_particles.add(wisp);
-			}
-			continue;
-		}
-		// Smoke: three puffs a second off a burning tile; off a smoky one 1.5 a second, more the
-		// thicker its smoke. The puffs rise slowly and drift east (+x, the way the rain slants).
-		if (tile->getSmoke() && _particles.random() < (tile->getFire() ? 3.0f : 1.5f + tile->getSmoke() * 0.2f) * elapsedSeconds)
-		{
-			P::Particle puff;
-			puff.pos[0] = centreX + _particles.random(-7, 7);
-			puff.pos[1] = centreY + _particles.random(-7, 7);
-			puff.pos[2] = groundZ + _particles.random(6, 18);
-			puff.vel[0] = _particles.random(-3, 3) + 2; puff.vel[1] = _particles.random(-3, 3); puff.vel[2] = _particles.random(3, 9);
-			puff.age = 0; puff.life = _particles.random(2.0f, 3.5f); puff.gravity = -2; puff.drag = 0.4f;
-			puff.color = shadeColor(_colors.smoke, (int)_particles.random(0, 4)); puff.size = 5; puff.kind = P::LIT; puff.group = P::EFFECT;
-			_particles.add(puff);
+			P::Particle wisp;
+			wisp.pos[0] = centreX + _particles.random(-5, 5);
+			wisp.pos[1] = centreY + _particles.random(-5, 5);
+			wisp.pos[2] = groundZ + _particles.random(8, 16);
+			wisp.vel[0] = _particles.random(0.5f, 2.0f); wisp.vel[1] = _particles.random(-1, 1); wisp.vel[2] = _particles.random(2.5f, 4.5f);
+			wisp.age = 0; wisp.life = _particles.random(4.0f, 6.0f); wisp.gravity = 0; wisp.drag = 0.05f;
+			wisp.color = 0; wisp.size = (Uint8)_particles.random(0, 4); wisp.kind = P::WISP; wisp.group = P::EFFECT; // size: which of the smoke's four frames
+			_particles.add(wisp);
 		}
 	}
 }
@@ -873,9 +855,12 @@ void FirstPersonView::drawLightHalos()
 
 /**
  * Advances the particles by the time since the last frame and spawns the new ones, once per
- * frame before drawing. With particles off for this view everything is cleared; with the
- * particles option at 0 only the tactical flares still fly (and shine, without their
- * particles); the ambient ones (motes, fireflies, weather, bubbles) need the option above 1.
+ * frame before drawing. With particles off for this view, or the particles option at 0, there
+ * are none, but the shots and explosions are still followed: a shot's look in flight, its start
+ * at the muzzle, its beam, the flash on the weapon in hand, the kick, the shake and the marks
+ * aren't particles. With the option at 0 the tactical flares still fly too (and shine, without
+ * their particles). The ambient ones (motes, fireflies, weather, bubbles) need the option
+ * above 1.
  */
 void FirstPersonView::updateParticles()
 {
@@ -884,15 +869,19 @@ void FirstPersonView::updateParticles()
 	const Uint32 now = SDL_GetTicks();
 	const float elapsedSeconds = _particleLastTick ? std::min<Uint32>(100, now - _particleLastTick) / 1000.0f : 0.0f;
 	_particleLastTick = now;
-	if (!_particlesOn)
+	if (!_particlesOn || Options::fpsParticles == 0)
 	{
 		_particles.clear();
-		return;
-	}
-	if (Options::fpsParticles == 0)
-	{
-		_particles.clear();
-		updateFlares(elapsedSeconds); // flares still fly and shine without their particles
+		if (_particlesOn)
+		{
+			updateFlares(elapsedSeconds); // flares still fly and shine without their particles
+		}
+		// The shots and new explosions, with every particle they'd add dropped.
+		_particles.setAccepting(false);
+		followShots();
+		spawnExplosionEffects();
+		spawnPartnerEffects();
+		_particles.setAccepting(true);
 		return;
 	}
 	// Move what's there, then add what this frame brings: the battle's effects (shots,

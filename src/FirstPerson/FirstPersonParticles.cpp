@@ -67,11 +67,12 @@ FirstPersonParticles::FirstPersonParticles() : _seed(0x9E3779B9u)
 /**
  * Adds one particle. When the system already holds its maximum (Max), the new particle is
  * quietly dropped, so a huge explosion can never slow the game down with endless particles.
+ * While particles are off (see setAccepting) every one is dropped.
  * @param particle The particle to add (it is copied).
  */
 void FirstPersonParticles::add(const Particle &particle)
 {
-	if (_particles.size() < Max)
+	if (_accepting && _particles.size() < Max)
 	{
 		_particles.push_back(particle);
 	}

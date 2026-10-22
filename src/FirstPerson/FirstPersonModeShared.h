@@ -100,6 +100,10 @@ const double WeaponLens = 1.303;
 const double MuzzleScreen[2] = { 0.42 / WeaponLens, 0.45 / WeaponLens };
 /// How much of the line from the stock point to the muzzle the weapon in hand fills.
 const double WeaponScale = 0.9;
+/// A weapon picture whose long axis is within this many degrees of upright (or of level) is
+/// taken as exactly upright (or level): the games draw their weapons standing straight up, and a
+/// grip, a magazine or a bulky body only tips the measured axis off the barrel.
+const double WeaponUprightSnap = 30.0;
 /// The way a melee weapon's tip points at rest, from its grip (camera space: x out to the weapon's side, y down, z ahead; any length).
 const double MeleeUpright[3] = { 0.3, -1.0, 0.25 };
 /// The aliens' turn cameras (setting "Aliens' turn cameras"): the least time the view stays with a soldier

@@ -906,6 +906,15 @@ void FirstPersonMode::throwFreeGrenade(BattleUnit *unit, BattleItem *grenade, co
 	_game->getMod()->getSoundByDepth(_save->getDepth(), Mod::ITEM_THROW)->play(-1, _state->_map->getSoundAngle(unit->getPosition()));
 	_view->setFreeGrenade(grenade, flight.position, flight.velocity);
 	BattlescapeGame *battleGame = _state->_battleGame;
+	// The game's own aim for a throw of it (Throw picked from the item's menu) ends here, as the
+	// game ends its own throws: else the next click would throw the same grenade again, from
+	// wherever it lies by then.
+	BattleAction *gameAction = battleGame->getCurrentAction();
+	if (gameAction->targeting && gameAction->weapon == grenade)
+	{
+		gameAction->targeting = false;
+		gameAction->type = BA_NONE;
+	}
 	battleGame->statePushBack(new FreeGrenadeFlight(battleGame, [this](Uint32 now) { return stepFreeGrenade(now); }));
 	BattleAction throwAction;
 	throwAction.type = BA_THROW;
@@ -1178,6 +1187,13 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	const bool menuTargeting = action->targeting && action->actor == unit && action->weapon && !isShot(action->type);
 	if (menuTargeting)
 	{
+		// (An item the soldier no longer carries, thrown or dropped since: that aim is over.)
+		if (action->weapon->getOwner() != unit)
+		{
+			action->targeting = false;
+			action->type = BA_NONE;
+			return;
+		}
 		weapon = action->weapon;
 		mode = action->type;
 	}

@@ -535,7 +535,7 @@ void FirstPersonView::draw()
 	drawFloorItems();
 	drawEdgeDots();
 	drawUnits();
-	drawSmokeAndFire();
+	drawFire();
 	drawProjectilesAndExplosions();
 	drawFlares();
 	drawBeams();

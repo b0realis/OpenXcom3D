@@ -4,7 +4,7 @@
 
 ![Night, through a soldier's eyes](docs/screenshots/night.png)
 
-*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.01**.
+*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.02**.
 
 **Both games are supported:** *UFO: Enemy Unknown* and *X-COM: Terror From The Deep*.
 
@@ -22,6 +22,14 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 | ![The Skyranger](docs/screenshots/skyranger.png) | ![Terror From The Deep: on the sea floor](docs/screenshots/tftd.png) |
 | ![Dual wield](docs/screenshots/akimbo.png) | ![Signal lost](docs/screenshots/signal_lost.png) |
 | ![Terror From The Deep, an island attack: a Gillman ahead, a Deep One in a teammate's helmet camera](docs/screenshots/tftd_island.png) | ![A rocket going off far down an alien base hall](docs/screenshots/alien_base.png) |
+
+## New in 1.02
+
+- **Gunplay, gone over gun by gun:** every weapon fires its own round now, bigger for a bigger gun (pistol, rifle, auto-cannon, heavy cannon; the lasers, the plasma guns and the TFTD guns the same), with a tracer streak, a muzzle flash and a kick to match. Lasers are red beams again, and every shot leaves the muzzle of the hand that holds the gun.
+- **Rockets** leave a trail of smoke, and white specks that hang in the air for half a minute (torpedoes too).
+- **Weapons in hand** all lie barrel first along the line to the crosshair, as the rifles did (the rifle itself had been held the wrong way round, sorry!).
+- **Smoke** comes in two kinds now, Original and Modern. Original, the game's own smoke animation, closes up where your soldier can't see through a cloud, so a smoke grenade really hides what's behind it.
+- **Fixes:** the *Particles* setting no longer takes the shots away with it (it now reads Off, Effects or All), and in Doom mode a grenade thrown from its menu can't be thrown a second time.
 
 ## New in 1.01
 

@@ -140,15 +140,18 @@ void FirstPersonMode::makeWeaponInHand()
 
 /**
  * Measures the weapon's inventory picture (the game's own, from BIGOBS.PCK, already drawn into
- * _heldSprite), so it can be drawn pointing at the crosshair whatever way it lies in the
- * picture: its long axis (the direction its pixels spread out furthest), the muzzle at the
- * thinner end (barrels are thin, stocks and grips aren't), and the side with the grip and
+ * _heldSprite), so it can be drawn with its barrel on the line to the crosshair: its long axis
+ * (the direction its pixels spread out furthest), its muzzle end, and the side with the grip and
  * magazine (the one sticking out further from the axis) down. Then gives it volume
  * (voxelizeWeapon). All measures are in picture pixels, along and across the long axis from
  * the picture's centre of mass.
- * A melee weapon's striking end is the one higher in the picture instead: the games picture
- * them standing up, the business end at the top (a stun rod's prongs, a lance's point, a
- * blade), and that end is often the thicker one.
+ * The games draw every weapon standing up, the barrel straight up the picture and the muzzle
+ * (or a melee weapon's business end: a stun rod's prongs, a lance's point) at the top, whatever
+ * its shape. So an axis near upright is taken as exactly upright (a pistol's grip, a cannon's
+ * magazine or a launcher's bulk tip the spread's axis by up to 20 degrees), and a picture
+ * standing up has its muzzle at the top (the thinner end can be the stock: the rifle's is). A
+ * picture lying flat (a mod's) has its muzzle at the thinner end, or with both ends about as
+ * thick, the left.
  * @param gun It's a gun or a club, drawn pointing at the crosshair (false: held up like an item).
  * @param melee It's a melee weapon: held tip up, and swung down at the crosshair (see drawWeaponPlate).
  */
@@ -192,7 +195,17 @@ void FirstPersonMode::analyzeWeapon(bool gun, bool melee)
 		const double dx = pixel.first - meanX, dy = pixel.second - meanY;
 		covarianceXX += dx * dx; covarianceYY += dy * dy; covarianceXY += dx * dy;
 	}
-	const double axisAngle = 0.5 * std::atan2(2.0 * covarianceXY, covarianceXX - covarianceYY);
+	double axisAngle = 0.5 * std::atan2(2.0 * covarianceXY, covarianceXX - covarianceYY); // radians, -90 .. 90 degrees
+	// Near upright, exactly upright; near level, exactly level (see WeaponUprightSnap).
+	const double snap = WeaponUprightSnap * Pi / 180.0;
+	if (std::abs(std::abs(axisAngle) - Pi / 2.0) < snap)
+	{
+		axisAngle = Pi / 2.0;
+	}
+	else if (std::abs(axisAngle) < snap)
+	{
+		axisAngle = 0.0;
+	}
 	shape.mean[0] = meanX; shape.mean[1] = meanY;
 	shape.along[0] = std::cos(axisAngle); shape.along[1] = std::sin(axisAngle);
 	shape.across[0] = -std::sin(axisAngle); shape.across[1] = std::cos(axisAngle);
@@ -218,16 +231,16 @@ void FirstPersonMode::analyzeWeapon(bool gun, bool melee)
 		if (posAlong > maxAlong - quarter) { highMin = std::min(highMin, posAcross); highMax = std::max(highMax, posAcross); }
 	}
 
-	// The muzzle is at the end that's thinner by more than a pixel. With both ends about as
-	// thick, it's the end nearer the top of the picture (or the left, for a weapon lying flat).
-	// A melee weapon standing up in its picture strikes with its top end.
+	// The muzzle: at the top of a picture standing up (a melee weapon's striking end too); for
+	// one lying flat, at the end that's thinner by more than a pixel, or with both ends about as
+	// thick, the left.
 	const double lowSpread = lowMax - lowMin, highSpread = highMax - highMin;
 	const bool standingUp = std::abs(shape.along[1]) > std::abs(shape.along[0]);
 	bool muzzleHigh;
-	if (shape.melee && standingUp) muzzleHigh = shape.along[1] < 0;
+	if (standingUp) muzzleHigh = shape.along[1] < 0;
 	else if (highSpread < lowSpread - 1.0) muzzleHigh = true;
 	else if (lowSpread < highSpread - 1.0) muzzleHigh = false;
-	else muzzleHigh = standingUp ? shape.along[1] < 0 : shape.along[0] < 0;
+	else muzzleHigh = shape.along[0] < 0;
 	shape.stock = muzzleHigh ? minAlong : maxAlong;
 	shape.muzzle = muzzleHigh ? maxAlong : minAlong;
 	shape.minAcross = minAcross;
@@ -264,7 +277,8 @@ void FirstPersonMode::voxelizeWeapon()
  * Works out how the muzzle flashes, by the damage type of what the weapon fires: a yellow star
  * for bullets, a big orange ball for explosives, red-orange for fire, thin red spikes for lasers
  * (cyan under the sea), a round green glow for plasma (pale blue under the sea), blue for stun,
- * yellow-green for acid. The harder it hits (the ammo's power), the bigger.
+ * yellow-green for acid. Its size goes with the shot's: a pistol's smallest, then a rifle's, an
+ * auto-cannon's, a heavy weapon's.
  * @param weapon The gun that fired.
  * @param firedAmmo The ammo the round fired, as the 3D view saw it leave (null if unknown).
  * @return The flash: palette colours (core, middle, rim), number of rays, how far and how
@@ -301,7 +315,9 @@ FirstPersonMode::MuzzleFlash FirstPersonMode::muzzleFlashFor(const BattleItem *w
 	default: break;
 	}
 
-	// Into the palette's nearest colours, and sized by the power (50 is 1.0; between 0.8 and 1.5).
+	// Into the palette's nearest colours, and sized by the shot's calibre, as the shot itself (see
+	// FirstPersonView::shotCalibre): a rifle's 1.0, a pistol's smaller, a heavy weapon's bigger
+	// (between 0.75 and 1.5).
 	MuzzleFlash flash;
 	flash.core = nearestColor(palette, look.core[0], look.core[1], look.core[2]);
 	flash.mid = nearestColor(palette, look.mid[0], look.mid[1], look.mid[2]);
@@ -309,7 +325,7 @@ FirstPersonMode::MuzzleFlash FirstPersonMode::muzzleFlashFor(const BattleItem *w
 	flash.rays = look.rays;
 	flash.spike = look.spike;
 	flash.sharpness = look.sharpness;
-	flash.size = look.size * std::clamp(shotRules->getPower() / 50.0, 0.8, 1.5);
+	flash.size = look.size * std::clamp(0.55 + 0.45 * FirstPersonView::shotCalibre(weapon->getRules(), shotRules), 0.75, 1.5);
 	return flash;
 }
 

@@ -151,10 +151,10 @@ void resized(FirstPersonMode *mode, int widthChange, int heightChange)
 
 /**
  * Settles settings that take their first value from an older one, once the options are loaded
- * (called when a battle or the 3D VIEW tab opens): the smoke (Solid, Original, Modern) from 0.9's
- * "See-through smoke": YES gives Modern, NO Solid; the flashlight (Off, On, Dynamic) from 1.0's
- * "Flashlight" and "Tactical flashlight"; and 1.0's next fire mode key, when the player had
- * moved it off F (F is the flashlight now), once.
+ * (called when a battle or the 3D VIEW tab opens): the smoke (Original, Modern) from 0.9's
+ * "See-through smoke": YES gives Modern, NO Original (1.0's Solid becomes Original too); the
+ * flashlight (Off, On, Dynamic) from 1.0's "Flashlight" and "Tactical flashlight"; and 1.0's
+ * next fire mode key, when the player had moved it off F (F is the flashlight now), once.
  */
 void settleOptions()
 {
@@ -183,14 +183,22 @@ int flashlightMode()
 }
 
 /**
- * The smoke setting as it stands: Solid (0), Original (1) or Modern (2). Unset (-1: a profile
- * from 0.9 not settled yet, or the defaults just restored on the 3D VIEW tab), it's what 0.9's
- * "See-through smoke" says: YES Modern, NO Solid.
- * @return 0, 1 or 2.
+ * The smoke setting as it stands: Original (1) or Modern (2). 1.0's Solid (0) is gone: it's
+ * Original now. Unset (-1: a profile from 0.9 not settled yet, or the defaults just restored on
+ * the 3D VIEW tab), it's what 0.9's "See-through smoke" says: YES Modern, NO Original.
+ * @return 1 or 2.
  */
 int smokeMode()
 {
-	return Options::fpsSmoke >= 0 && Options::fpsSmoke <= 2 ? Options::fpsSmoke : (Options::fpsSeeThroughSmoke ? 2 : 0);
+	if (Options::fpsSmoke == 1 || Options::fpsSmoke == 2)
+	{
+		return Options::fpsSmoke;
+	}
+	if (Options::fpsSmoke == 0)
+	{
+		return 1;
+	}
+	return Options::fpsSeeThroughSmoke ? 2 : 1;
 }
 
 /**
@@ -272,9 +280,10 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightVisionGear", &fpsNightVisionGear, true, "STR_FPS_NIGHT_VISION_GEAR", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCombatMusic", &fpsCombatMusic, true, "STR_FPS_COMBAT_MUSIC", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitSounds", &fpsHitSounds, true, "STR_FPS_HIT_SOUNDS", category));
-	// The smoke: the game's frames, solid (0); the original games' own frames, see-through by the
-	// smoke's density (1); soft clouds, solid where they block the soldier's sight (2). Unset (-1)
-	// until settled (see settleOptions) from 0.9's "See-through smoke", kept below, unlisted.
+	// The smoke: the original games' own frames, see-through where the soldier sees through the
+	// smoke and stacked where the sight runs out (1); soft clouds, solid where they block the
+	// soldier's sight (2). (1.0's Solid, 0, is gone.) Unset (-1) until settled (see settleOptions)
+	// from 0.9's "See-through smoke", kept below, unlisted.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmoke", &fpsSmoke, -1, "STR_FPS_SMOKE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlares", &fpsFlares, true, "STR_FPS_FLARES", category));
 	// 0.9's "See-through smoke" (YES/NO), loaded and saved but listed nowhere (a category no

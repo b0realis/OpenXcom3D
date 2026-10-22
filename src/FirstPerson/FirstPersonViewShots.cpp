@@ -332,8 +332,8 @@ void FirstPersonView::drawFreeGrenade()
 
 /**
  * Draws what flies and what explodes, as sprites and dots in the world: a thrown item (its own
- * sprite, at the game's position), the head of a shot in flight (a dot, blob or flame; beams
- * are drawn as lines by drawBeams), dual wield's second round, and the explosions with the
+ * sprite, at the game's position), the head of a shot in flight (a dot, blob or flame with its
+ * streak; beams are drawn as lines by drawBeams), dual wield's second round, and the explosions with the
  * game's own animations (X1.PCK for big ones, HIT.PCK for hits, SMOKE.PCK for puffs), each
  * frame dissolving smoothly into the next.
  */
@@ -366,15 +366,16 @@ void FirstPersonView::drawProjectilesAndExplosions()
 		}
 		else if (_shotTrail != TRAIL_BEAM) // beams are drawn as lines
 		{
-			// The head of the shot: a small dot for bullets, a glowing blob for plasma, a flame for rockets.
+			// The head of the shot: a small dot for bullets, a glowing blob for plasma, a flame for
+			// rockets, with its streak behind it, all as big as its calibre.
 			float head[3];
 			shotHead(projectile, head);
-			drawShotDot(head, _shotTrail, _shotTrailColor);
+			drawShotDot(head, _shotTrailOrigin, _shotTrail, _shotTrailColor, _shotCalibre);
 		}
 	}
 	if (_map->getPartnerProjectile() && _partnerTrail != TRAIL_BEAM)
 	{
-		drawShotDot(_partnerHead, _partnerTrail, _partnerColor); // dual wield: the other gun's round
+		drawShotDot(_partnerHead, _partnerOrigin, _partnerTrail, _partnerColor, _partnerCalibre); // dual wield: the other gun's round
 	}
 	// Explosions step through their frames on the game's clock; each frame dissolves into the
 	// next over the time frames have been lasting. First forget the clocks of explosions that
@@ -538,10 +539,11 @@ void FirstPersonView::spawnDebris(const Position &tilePosition, int part, const 
 
 /**
  * What a shot leaves behind along the bit of its path it flew this frame: nothing for bullets,
- * embers for incendiary rounds, smoke for rockets and other explosives, green glow for plasma,
+ * embers for incendiary rounds, smoke for rockets and other explosives (and white specks that
+ * hang along the path for half a minute, on land and under the sea), green glow for plasma,
  * sparkles for stun, droplets for acid. Under the sea every shot (and thrown thing) also leaves
- * bubbles that hang in the water for half a minute. The look is _shotTrail and _shotTrailColor
- * (spawnPartnerEffects swaps dual wield's second round's in for its own trail).
+ * bubbles that hang in the water for half a minute. The look is _shotTrail, _shotTrailColor and
+ * _shotCalibre (spawnPartnerEffects swaps dual wield's second round's in for its own trail).
  * @param from Where the shot was drawn last frame, in voxels.
  * @param to Where it is drawn now, in voxels.
  */
@@ -561,9 +563,13 @@ void FirstPersonView::spawnTrailSegment(const float from[3], const float to[3])
 	{
 		for (int axis = 0; axis < 3; ++axis) out[axis] = from[axis] + segment[axis] * progress;
 	};
-	// One particle for about every 3 voxels flown, each at a random spot within its share of
-	// the path.
-	const int steps = std::max(1, (int)(length / 3.0f));
+	// One particle for about every 3 voxels flown (a rocket's smoke every 1.5), each at a random
+	// spot within its share of the path. A rocket's lasting specks only while there's room for
+	// them under SpeckRoom particles in all, so a salvo of rockets leaves the rest of the
+	// battle's effects room (the system holds 6000).
+	const int steps = std::max(1, (int)(length / (_shotTrail == TRAIL_SMOKE ? 1.5f : 3.0f)));
+	const size_t SpeckRoom = 4500;
+	const bool specksFit = _particles.all().size() < SpeckRoom;
 	for (int step = 0; step < steps; ++step)
 	{
 		float point[3];
@@ -583,13 +589,29 @@ void FirstPersonView::spawnTrailSegment(const float from[3], const float to[3])
 			particle.size = 2; particle.kind = P::GLOW;
 			break;
 		case TRAIL_SMOKE:
-			// Smoke: puffs in two greys, slowing down and hanging for a couple of seconds.
+			// Smoke: puffs in two greys, starting a little behind the flame at the head (a rocket
+			// flying away would have its newest puffs between it and the eye, over its flame),
+			// slowing down and hanging for two to four seconds, bigger for bigger rounds (a
+			// rocket's bigger than a cannon shell's).
+			for (int axis = 0; axis < 3; ++axis) particle.pos[axis] -= segment[axis] / length * 5.0f;
 			particle.vel[0] = _particles.random(-2, 2); particle.vel[1] = _particles.random(-2, 2);
 			particle.vel[2] = _particles.random(1, 4);
-			particle.life = _particles.random(1.5f, 3.0f);
-			particle.color = _particles.random() < 0.5f ? _colors.smoke : shadeColor(_colors.smoke, 2);
-			particle.size = 4; particle.kind = P::LIT;
+			particle.life = _particles.random(2.0f, 4.0f);
+			particle.color = _particles.random() < 0.6f ? _colors.smoke : shadeColor(_colors.smoke, 2);
+			particle.size = (Uint8)std::lround(5.0f + 2.0f * _shotCalibre); particle.kind = P::LIT;
 			particle.drag = 0.8f;
+			// And two white specks about the spot, hanging there for half a minute, drifting a
+			// little and greying as they go: the rocket's lasting trail.
+			for (int speckIndex = 0; speckIndex < (specksFit ? 2 : 0); ++speckIndex)
+			{
+				P::Particle speck = particle;
+				for (float &coordinate : speck.pos) coordinate += _particles.random(-0.6f, 0.6f);
+				speck.vel[0] = _particles.random(-0.4f, 0.4f); speck.vel[1] = _particles.random(-0.4f, 0.4f);
+				speck.vel[2] = _particles.random(0.1f, 0.5f);
+				speck.life = _particles.random(25.0f, 35.0f); speck.drag = 0.2f;
+				speck.color = _colors.speck; speck.size = 3;
+				_particles.add(speck);
+			}
 			break;
 		case TRAIL_PLASMA:
 			// Plasma: a glow scattering in every direction, gone within half a second.
@@ -633,18 +655,22 @@ void FirstPersonView::spawnTrailSegment(const float from[3], const float to[3])
 }
 
 /**
- * Draws a line in the world (a laser beam), depth-tested, a pixel or two thick, faded by
- * dithering; it glows (its pixels feed the bloom).
+ * Draws a line in the world (a laser beam, a shot's streak), depth-tested, faded by dithering;
+ * it glows (its pixels feed the bloom). It's a set number of pixels thick, or, given a width in
+ * the world, as thick as that width looks at each point of it (thicker up close, at least a
+ * pixel, at most the set number).
  * @param from, to The line's ends, in voxels.
  * @param color Its palette colour.
- * @param thickness How thick it is on the screen, in pixels.
+ * @param thickness How thick it is on the screen, in pixels (with a width in the world: at most).
  * @param opacity 1 solid .. 0 gone (dithered): a beam fading out.
+ * @param worldWidth Its width in the world, in voxels (0: none, the set thickness all along).
  * @param bandTop, bandBottom Only the screen rows from bandTop up to (not including) bandBottom
  *        are drawn (a band of the view, see replayDrawList): the same pixels as drawn whole.
  */
-void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, int bandTop, int bandBottom)
+void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, float worldWidth, int bandTop, int bandBottom)
 {
 	const int width = getWidth(), height = getHeight();
+	const double focalLength = (width / 2.0) / _halfFovTangent; // in pixels
 	// Clip the line against a near plane 3 voxels in front of the eye (depth along the view
 	// direction, in true proportions), so a beam from right beside the camera still draws.
 	double start[3] = { from[0], from[1], from[2] }, end[3] = { to[0], to[1], to[2] };
@@ -672,13 +698,15 @@ void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 c
 		const double progress = (double)step / steps;
 		const int x = (int)(startX + (endX - startX) * progress), y = (int)(startY + (endY - startY) * progress);
 		const float depth = (float)(1.0 / (1.0 / startZ + (1.0 / endZ - 1.0 / startZ) * progress)); // depth is linear in 1/z on screen
-		// A square of thickness x thickness pixels around the point; in front of the scene
-		// (with a voxel to spare, so a beam grazing a wall still shows), dithered by opacity.
-		for (int offsetY = 0; offsetY < thickness; ++offsetY)
+		// How thick it is here: the set thickness, or its width in the world as it looks here.
+		const int pointThickness = worldWidth > 0.0f ? std::clamp((int)std::lround(worldWidth * focalLength / depth), 1, thickness) : thickness;
+		// A square of that many pixels across around the point; in front of the scene (with a
+		// voxel to spare, so a beam grazing a wall still shows), dithered by opacity.
+		for (int offsetY = 0; offsetY < pointThickness; ++offsetY)
 		{
-			for (int offsetX = 0; offsetX < thickness; ++offsetX)
+			for (int offsetX = 0; offsetX < pointThickness; ++offsetX)
 			{
-				const int pixelX = x + offsetX - thickness / 2, pixelY = y + offsetY - thickness / 2;
+				const int pixelX = x + offsetX - pointThickness / 2, pixelY = y + offsetY - pointThickness / 2;
 				if (pixelX < 0 || pixelY < std::max(0, bandTop) || pixelX >= width || pixelY >= std::min(height, bandBottom)
 					|| depth >= _depthBuffer[pixelY * width + pixelX] + 1.0f) continue;
 				if (opacity < 1.0f && dither(pixelX, pixelY) >= opacity) continue;
@@ -690,16 +718,59 @@ void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 c
 }
 
 /**
+ * How big a shot and its muzzle flash are drawn, its calibre: 1 for a rifle's, less for a
+ * pistol's, more for a heavy weapon's, so pistol, rifle, auto-cannon and heavy cannon (and laser
+ * pistol, laser rifle and heavy laser...) each fire a bigger round than the last. It's the
+ * kind of gun, by how it's carried (in one hand 0.75, a rifle in two hands 1, a heavy weapon
+ * two squares wide or built in 1.25), times the square root of the round's power against a
+ * rifle's of the same kind (bullets 30, lasers 60, plasma 80, explosives, fire, stun and acid
+ * 60): 0.5 to 2.
+ * @param weapon What fired it (null if unknown).
+ * @param ammo What it fired (null: the weapon itself, a laser).
+ * @return The calibre.
+ */
+float FirstPersonView::shotCalibre(const RuleItem *weapon, const RuleItem *ammo)
+{
+	const RuleItem *round = ammo ? ammo : weapon;
+	if (!round)
+	{
+		return 1.0f;
+	}
+	float build = 1.0f;
+	if (weapon && (weapon->isFixed() || weapon->getInventoryWidth() >= 2))
+	{
+		build = 1.25f;
+	}
+	else if (weapon && !weapon->isTwoHanded())
+	{
+		build = 0.75f;
+	}
+	const RuleDamageType *damage = round->getDamageType();
+	float riflePower = 30.0f; // bullets and the like
+	switch (damage ? damage->ResistType : DT_NONE)
+	{
+	case DT_PLASMA: riflePower = 80.0f; break;
+	case DT_LASER: case DT_HE: case DT_IN: case DT_STUN: case DT_ACID: riflePower = 60.0f; break;
+	default: break;
+	}
+	return std::clamp(build * std::sqrt(std::max(1, round->getPower()) / riflePower), 0.5f, 2.0f);
+}
+
+/**
  * How a shot looks in flight, from its ammo's damage type: the kind of trail and its colour.
  * Incendiary: embers; high explosive: smoke; laser: a red beam; plasma: a green blob; stun:
  * pale blue sparkles; acid: yellow-green droplets; anything else (bullets and the like): no
- * trail, a spark-coloured dot. Under the sea lasers are a pale blue and plasma a pale cyan.
- * The colours are the nearest the current palette has.
+ * trail, a spark-coloured dot. Under the sea lasers are a pale blue, plasma a pale cyan, and
+ * darts, harpoons and shells the vivid yellow of the original game's (pale ones would melt into
+ * the sand).
+ * The colours are the nearest the current palette has. And how big it is (see shotCalibre).
  * @param ammo The ammo fired (null if unknown).
+ * @param weapon The weapon that fired it (null if unknown).
  * @param trail Gets the kind of trail.
  * @param color Gets its palette colour.
+ * @param calibre Gets how big it's drawn.
  */
-void FirstPersonView::trailFor(const BattleItem *ammo, Trail &trail, Uint8 &color) const
+void FirstPersonView::trailFor(const BattleItem *ammo, const BattleItem *weapon, Trail &trail, Uint8 &color, float &calibre) const
 {
 	const RuleDamageType *damage = ammo ? ammo->getRules()->getDamageType() : nullptr;
 	// The palette colour nearest to a red, green, blue colour (getPalette only reads, but it
@@ -722,8 +793,9 @@ void FirstPersonView::trailFor(const BattleItem *ammo, Trail &trail, Uint8 &colo
 	case DT_PLASMA: trail = TRAIL_PLASMA; color = _colors.underwater ? nearest(180, 240, 255) : nearest(90, 255, 90); break;
 	case DT_STUN: trail = TRAIL_STUN; color = nearest(160, 190, 255); break;
 	case DT_ACID: trail = TRAIL_ACID; color = nearest(190, 255, 60); break;
-	default: trail = TRAIL_NONE; color = _colors.spark; break;
+	default: trail = TRAIL_NONE; color = _colors.underwater ? nearest(244, 240, 20) : _colors.spark; break;
 	}
+	calibre = shotCalibre(weapon ? weapon->getRules() : nullptr, ammo ? ammo->getRules() : nullptr);
 }
 
 /**
@@ -780,39 +852,94 @@ void FirstPersonView::spawnShotImpact(const float shotEnd[3], const float from[3
 }
 
 /**
- * Draws the head of a shot in flight: a small dot for bullets, a glowing blob for plasma, a
- * flame for rockets; any shot with a trail glows (feeds the bloom). Nothing is drawn right in
- * front of the eye (less than 6 voxels away), where it would be a blob of huge pixels.
+ * Draws the head of a shot in flight and the streak it leaves behind it, as the original game
+ * drew a round with a short trail: a dot and a spark-coloured streak for bullets, a glowing blob
+ * for plasma, a flame for rockets and their exhaust; any shot with a trail glows (feeds the
+ * bloom), and so do the streaks. Both are as big as the shot's calibre (see shotCalibre): a pistol's round the
+ * smallest, then a rifle's, an auto-cannon's, a heavy weapon's. The streak runs back along the
+ * path, never further back than where the shot started, solid for its first half and fading for
+ * the rest. The dot isn't drawn right in front of the eye (less than 6 voxels away), where it
+ * would be a blob of huge pixels.
  * @param head Where the head is, in voxels.
+ * @param origin Where the shot started (the muzzle for our own), in voxels.
  * @param trail How the shot looks in flight.
  * @param color The trail's colour.
+ * @param calibre How big it is (1 a rifle's).
  */
-void FirstPersonView::drawShotDot(const float head[3], Trail trail, Uint8 color)
+void FirstPersonView::drawShotDot(const float head[3], const float origin[3], Trail trail, Uint8 color, float calibre)
 {
+	// Its colours: the dot's rim, middle and centre, and the streak's front and back halves.
+	// Bullets their colour (spark-coloured, under the sea yellow); a rocket (or another explosive round) a flame, white-hot in yellow
+	// in an orange rim, with a yellow-to-orange streak; incendiary rounds the same, burning
+	// redder; the rest the trail's colour, white-hot in the middle (its colour group's brightest
+	// shade).
+	Uint8 rim = color, middle = color, centre = (Uint8)(color & 0xF0), streakFront = color, streakBack = shadeColor(color, 2);
+	switch (trail)
+	{
+	case TRAIL_SMOKE: rim = _colors.fire[2]; middle = _colors.fire[1]; centre = _colors.fire[0]; streakFront = _colors.fire[1]; streakBack = _colors.fire[2]; break;
+	case TRAIL_FIRE: rim = _colors.fire[2]; middle = _colors.fire[1]; centre = _colors.fire[0]; streakFront = _colors.fire[2]; streakBack = _colors.fire[3]; break;
+	default: break;
+	}
+
+	// The streak: its length and width in the world (voxels) by the kind of shot and its
+	// calibre, at most as long as the shot has flown; at most 1 + 1.5 x calibre pixels thick.
+	const float back[3] = { origin[0] - head[0], origin[1] - head[1], origin[2] - head[2] };
+	const float flown = std::sqrt(back[0] * back[0] + back[1] * back[1] + back[2] * back[2]);
+	const float streakLength = std::min(flown, (trail == TRAIL_NONE ? 10.0f : trail == TRAIL_SMOKE ? 9.0f : trail == TRAIL_PLASMA ? 7.0f : 6.0f) * calibre);
+	if (streakLength > 1.0f)
+	{
+		float halfway[3], tail[3];
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			halfway[axis] = head[axis] + back[axis] / flown * streakLength * 0.5f;
+			tail[axis] = head[axis] + back[axis] / flown * streakLength;
+		}
+		const float streakWidth = (trail == TRAIL_PLASMA ? 1.6f : trail == TRAIL_SMOKE ? 1.0f : 0.6f) * calibre;
+		const int widest = 1 + (int)std::lround(calibre * 1.5f);
+		drawLine3D(head, halfway, streakFront, widest, 1.0f, streakWidth);
+		drawLine3D(halfway, tail, streakBack, widest, 0.6f, streakWidth * 0.7f);
+	}
+
+	// The dot: where the head is on the screen, its size in the world (voxels) by the kind of
+	// shot and its calibre, and on the screen a radius in pixels, 1..12.
 	const double world[3] = { head[0], head[1], head[2] };
 	double screenX, screenY, depth;
 	if (!projectToScreen(world, screenX, screenY, depth) || depth < 6.0)
 	{
 		return;
 	}
-	// Its size in the world (voxels) by the kind of shot, and on the screen (a radius in
-	// pixels, 1..12); its colour (bullets spark-coloured, rockets fire-coloured).
 	const int width = getWidth(), height = getHeight();
 	const double focalLength = (width / 2.0) / _halfFovTangent; // in pixels
-	const double size = trail == TRAIL_PLASMA ? 5.0 : trail == TRAIL_SMOKE ? 3.0 : 1.2;
+	const double size = (trail == TRAIL_PLASMA ? 3.5 : trail == TRAIL_SMOKE ? 1.1 : 0.9) * calibre;
 	const int radius = std::clamp((int)std::lround(size * focalLength / depth * 0.5), 1, 12);
-	const Uint8 coreColor = trail == TRAIL_NONE ? _colors.spark : trail == TRAIL_SMOKE ? _colors.fire[0] : color;
-	// A round dot, depth-tested, with a white-hot centre (its colour group's brightest shade).
+	// A round dot, depth-tested: the inner 40% in the centre colour, out to 70% the middle one,
+	// the rest the rim.
 	for (int y = (int)screenY - radius; y <= (int)screenY + radius; ++y)
 	{
 		for (int x = (int)screenX - radius; x <= (int)screenX + radius; ++x)
 		{
 			const double distance = std::sqrt((x - screenX) * (x - screenX) + (y - screenY) * (y - screenY));
 			if (distance > radius || x < 0 || y < 0 || x >= width || y >= height || depth >= _depthBuffer[y * width + x]) continue;
-			*getRaw(x, y) = distance < radius * 0.5 ? (Uint8)(coreColor & 0xF0) : coreColor; // white-hot centre
+			*getRaw(x, y) = distance < radius * 0.4 ? centre : distance < radius * 0.7 ? middle : rim;
 			if (trail != TRAIL_NONE) _glowMask[y * width + x] = 1;
 		}
 	}
+}
+
+/**
+ * Draws a laser beam: a coloured sheath round a white-hot core (its colour group's brightest
+ * shade), each as thick as its width in the world looks where it is (thicker up close), the
+ * widths by the calibre (see shotCalibre): a laser pistol's beam the thinnest, a heavy laser's
+ * the widest; the sheath at most 2 (pistol) to 4 (heavy) pixels, the core 1 or 2.
+ * @param from, to The beam's ends, in voxels.
+ * @param color Its colour.
+ * @param calibre How big the shot is (1 a rifle's).
+ * @param opacity 1 solid .. 0 gone (a beam fading out).
+ */
+void FirstPersonView::drawBeam(const float from[3], const float to[3], Uint8 color, float calibre, float opacity)
+{
+	drawLine3D(from, to, color, (int)std::lround(1.5f + 1.5f * calibre), opacity, 0.3f * calibre);
+	drawLine3D(from, to, (Uint8)(color & 0xF0), calibre > 1.25f ? 2 : 1, opacity, 0.12f * calibre);
 }
 
 /**
@@ -834,7 +961,7 @@ void FirstPersonView::spawnPartnerEffects()
 			if (_partnerTrail == TRAIL_BEAM)
 			{
 				_beams.push_back({ { _partnerOrigin[0], _partnerOrigin[1], _partnerOrigin[2] },
-					{ _partnerHead[0], _partnerHead[1], _partnerHead[2] }, SDL_GetTicks(), _partnerColor });
+					{ _partnerHead[0], _partnerHead[1], _partnerHead[2] }, SDL_GetTicks(), _partnerColor, _partnerCalibre });
 			}
 		}
 		if (partner)
@@ -862,14 +989,18 @@ void FirstPersonView::spawnPartnerEffects()
 			std::copy(origin, origin + 3, _partnerHead);
 			// Its look in flight, when it left (the weapon in hand flashes), the muzzle flash
 			// lighting up the room, and the kick: by the ammo's power, 0.5 to 2.5 degrees,
-			// adding up to at most 6.
-			trailFor(partner->getAmmo(), _partnerTrail, _partnerColor);
+			// adding up to at most 6 (not in a helmet camera's view: the round is the soldier
+			// we look through's, see beginShot).
+			trailFor(partner->getAmmo(), partner->getWeapon(), _partnerTrail, _partnerColor, _partnerCalibre);
 			_partnerShotTick = SDL_GetTicks();
 			_partnerShotAmmo = partner->getAmmo() ? partner->getAmmo()->getRules() : nullptr;
 			std::copy(origin, origin + 3, _muzzleFlashPos); // the flash lights up the room
 			_muzzleFlashTick = _partnerShotTick;
 			const float power = partner->getAmmo() ? (float)partner->getAmmo()->getRules()->getPower() : 30.0f;
-			_recoilKick = std::min(_recoilKick + std::clamp(power / 30.0f, 0.5f, 2.5f), 6.0f);
+			if (_particlesOn)
+			{
+				_recoilKick = std::min(_recoilKick + std::clamp(power / 30.0f, 0.5f, 2.5f), 6.0f);
+			}
 		}
 		_lastPartnerShot = partner;
 	}
@@ -892,9 +1023,11 @@ void FirstPersonView::spawnPartnerEffects()
 		// the call and back.
 		std::swap(_shotTrail, _partnerTrail);
 		std::swap(_shotTrailColor, _partnerColor);
+		std::swap(_shotCalibre, _partnerCalibre);
 		spawnTrailSegment(previous, _partnerHead);
 		std::swap(_shotTrail, _partnerTrail);
 		std::swap(_shotTrailColor, _partnerColor);
+		std::swap(_shotCalibre, _partnerCalibre);
 	}
 }
 
@@ -984,7 +1117,8 @@ void FirstPersonView::drawTrajectory()
 
 /**
  * Laser (and gauss) beams: a line from the muzzle to wherever the shot is (or ended), a bright
- * core in a coloured sheath, fading out over a third of a second (350 ms) after the hit.
+ * core in a coloured sheath as wide as the shot's calibre (see drawBeam), fading out over a third
+ * of a second (350 ms) after the hit.
  */
 void FirstPersonView::drawBeams()
 {
@@ -994,21 +1128,18 @@ void FirstPersonView::drawBeams()
 	for (const auto &beam : _beams)
 	{
 		const float fade = 1.0f - (now - beam.start) / 350.0f; // opacity: 1 at the hit .. 0 gone
-		drawLine3D(beam.from, beam.to, beam.color, 2, fade);
-		drawLine3D(beam.from, beam.to, shadeColor(beam.color, 0) & 0xF0, 1, fade); // the white-hot core: the group's brightest shade
+		drawBeam(beam.from, beam.to, beam.color, beam.calibre, fade);
 	}
 	// The beam of the shot in flight (not a thrown item), solid, from the muzzle to its head.
 	Projectile *projectile = _map ? _map->getProjectile() : nullptr;
 	if (projectile && projectile == _lastProjectile && !_lastProjectileThrown && _shotTrail == TRAIL_BEAM)
 	{
-		drawLine3D(_shotTrailOrigin, _lastShotHead, _shotTrailColor, 2, 1.0f);
-		drawLine3D(_shotTrailOrigin, _lastShotHead, (Uint8)(_shotTrailColor & 0xF0), 1, 1.0f);
+		drawBeam(_shotTrailOrigin, _lastShotHead, _shotTrailColor, _shotCalibre, 1.0f);
 	}
 	// And dual wield's second round's, the same way.
 	if (_map && _map->getPartnerProjectile() && _partnerTrail == TRAIL_BEAM)
 	{
-		drawLine3D(_partnerOrigin, _partnerHead, _partnerColor, 2, 1.0f);
-		drawLine3D(_partnerOrigin, _partnerHead, (Uint8)(_partnerColor & 0xF0), 1, 1.0f);
+		drawBeam(_partnerOrigin, _partnerHead, _partnerColor, _partnerCalibre, 1.0f);
 	}
 }
 
@@ -1053,7 +1184,7 @@ void FirstPersonView::finishShot()
 	if (_lastProjectile && !_lastProjectileThrown && _shotTrail == TRAIL_BEAM)
 	{
 		_beams.push_back({ { _shotTrailOrigin[0], _shotTrailOrigin[1], _shotTrailOrigin[2] },
-			{ _lastShotHead[0], _lastShotHead[1], _lastShotHead[2] }, SDL_GetTicks(), _shotTrailColor });
+			{ _lastShotHead[0], _lastShotHead[1], _lastShotHead[2] }, SDL_GetTicks(), _shotTrailColor, _shotCalibre });
 	}
 }
 
@@ -1077,9 +1208,11 @@ void FirstPersonView::beginShot(Projectile *projectile)
 	}
 	// Whose shot: one starting within 20 voxels of the eye is our own (and the weapon in hand
 	// flashes); any other shot (not a thrown item; a squadmate's counts too) is taken for an
-	// enemy's, which may whizz past us and whose origin a hit on us points back to.
+	// enemy's, which may whizz past us and whose origin a hit on us points back to. A helmet
+	// camera's view (the one without particles of its own, see setParticles) has no shots of
+	// its own: no weapon in hand, no kick.
 	const double dx = origin[0] - _eye[0], dy = origin[1] - _eye[1], dz = origin[2] - _eye[2]; // from the eye
-	const bool ownShot = !_lastProjectileThrown && dx * dx + dy * dy + dz * dz < 20.0 * 20.0;
+	const bool ownShot = _particlesOn && !_lastProjectileThrown && dx * dx + dy * dy + dz * dz < 20.0 * 20.0;
 	if (ownShot)
 	{
 		_ownShotTick = SDL_GetTicks();
@@ -1118,9 +1251,10 @@ void FirstPersonView::beginShot(Projectile *projectile)
 	}
 	_shotTrail = TRAIL_NONE;
 	_shotTrailColor = _colors.spark;
+	_shotCalibre = 1.0f;
 	if (!_lastProjectileThrown)
 	{
-		trailFor(ammo, _shotTrail, _shotTrailColor);
+		trailFor(ammo, projectile->getWeapon(), _shotTrail, _shotTrailColor, _shotCalibre);
 	}
 	if (!_lastProjectileThrown)
 	{

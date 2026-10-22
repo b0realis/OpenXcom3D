@@ -1,6 +1,6 @@
 # OpenXcom3D manual
 
-Version 1.01. OpenXcom3D is **OpenXcom Extended (OXCE)** with a first-person 3D battlescape: an engine add-on (`src/FirstPerson/`, with small hooks in the core) and a data mod (`OpenXcom3D`) that switches it on.
+Version 1.02. OpenXcom3D is **OpenXcom Extended (OXCE)** with a first-person 3D battlescape: an engine add-on (`src/FirstPerson/`, with small hooks in the core) and a data mod (`OpenXcom3D`) that switches it on.
 
 1. [Installing](#1-installing)
 2. [Controls](#2-controls)
@@ -29,8 +29,8 @@ Add-on builds keep their own user and config folders, so an existing OXCE profil
 
 Download it from the project's [Releases](https://github.com/b0realis/OpenXcom3D/releases) page, in either form:
 
-- **`OpenXcom3D-1.01-x86_64.AppImage`**: a single file. Make it executable (`chmod +x OpenXcom3D-1.01-x86_64.AppImage`, or *Properties → Permissions → executable* in a file manager) and run it. Its profile is in `~/.local/share/openxcom3d`.
-- **`OpenXcom3D-1.01-linux-x86_64.tar.gz`**: unpack it anywhere and run `./play.sh`. Its profile is the `user/` folder inside.
+- **`OpenXcom3D-1.02-x86_64.AppImage`**: a single file. Make it executable (`chmod +x OpenXcom3D-1.02-x86_64.AppImage`, or *Properties → Permissions → executable* in a file manager) and run it. Its profile is in `~/.local/share/openxcom3d`.
+- **`OpenXcom3D-1.02-linux-x86_64.tar.gz`**: unpack it anywhere and run `./play.sh`. Its profile is the `user/` folder inside.
 
 **Nothing needs installing.** The game comes with its own libraries: SDL 1.2 (sdl12-compat on SDL2), SDL_image and SDL_mixer in `lib/`, with SDL_gfx built in. All it takes from the system is glibc 2.34 or newer (2021 on: Ubuntu 22.04 and newer, Debian 12, Fedora 35 and newer, RHEL 9, Mint 21, every current Arch, Manjaro or other rolling system, and SteamOS), plus the display, sound and OpenGL every desktop has. SDL opens X11 or Wayland and PulseAudio, PipeWire or ALSA when the game starts. On a system older than glibc 2.34, build it from source (option B).
 
@@ -85,8 +85,8 @@ python3 install.py --target ~/Games/OpenXcom3D --ufo /path/to/UFO --tftd /path/t
 Unpack the archive anywhere and run `./play.sh`. To use game data it doesn't find, link it into the profile first:
 
 ```sh
-ln -s /path/to/UFO  OpenXcom3D-1.01-linux-x86_64/user/UFO
-ln -s /path/to/TFTD OpenXcom3D-1.01-linux-x86_64/user/TFTD
+ln -s /path/to/UFO  OpenXcom3D-1.02-linux-x86_64/user/UFO
+ln -s /path/to/TFTD OpenXcom3D-1.02-linux-x86_64/user/TFTD
 ```
 
 #### Steam Deck
@@ -348,16 +348,16 @@ Hovering a soldier on the top bar shows the same weapon line on their card.
 - **Night vision needs gear** (YES): YES: in 3D only soldiers wearing or carrying night vision gear (power and flying suits, ion armor, hover tanks...: the list is in the mod, see [Night vision gear](#6-night-vision-gear)) and units that see in the dark, like aliens, get the NIGHT VISION button. NO: everyone has it, like on the isometric map.
 - **Dynamic music** (YES): YES: while aliens are in sight the music switches to a tenser track (the base defence one), and goes back to the battle music once they've been out of sight for a few seconds. NO: the battle music all along (switching it off mid-battle goes straight back to it).
 - **Hit, kill and swing sounds** (YES): a short tick when your shot or blow hits an enemy in sight, a double tick for a kill, and a swoosh for your melee swings: the sounds the 3D view adds. NO: silent (the crosshair still marks the hit), leaving the game's own sounds, such as death cries and a weapon's own hit sound, alone.
-- **Smoke** (Modern): how smoke looks. **Modern**: the game's own smoke, made truly see-through. The original smoke is a stipple of dots that stood in for see-through smoke on the isometric map; here the dots are blurred into soft clouds (how densely they lie is how opaque the smoke is, their colours its colour, mostly grey), so the smoke keeps the game's shapes and colours but you see through it. Thin smoke, from a rocket say, is a light haze that's easy to spot and hides nothing; thicker smoke is a denser cloud. Where the soldier can't see through it by the game's own sight rules (every step through smoke uses up some of the soldier's sight, more in thicker smoke, less within two tiles of them or with heat vision), it turns solid, with a soft, billowy edge, as a smoke grenade's cloud should. The clouds change slowly and smoothly from frame to frame, sway and bob a little, and a few wisps rise off them. **Original**: the original games' own smoke, their dots in their own colours (UFO's greys and browns, TFTD's white under the sea), drawn see-through: more opaque the thicker the smoke, its frames changing smoothly; no grey, no wall and no wisps, and an explosion's flash and embers without our grey puffs (the smoke it leaves is the game's). **Solid**: the game's smoke pictures on every smoky tile, solid, as in 0.8.2. With Modern and Original, units the soldier can see stay clear through the smoke, and units the game hides stay hidden. Fire is drawn the same in all three. (0.9's *See-through smoke* gives the first value: YES Modern, NO Solid.)
+- **Smoke** (Modern): how smoke looks, in two ways. **Modern**: the game's own smoke, made truly see-through. The original smoke is a stipple of dots that stood in for see-through smoke on the isometric map; here the dots are blurred into soft clouds (how densely they lie is how opaque the smoke is, their colours its colour, mostly grey), so the smoke keeps the game's shapes and colours but you see through it. Thin smoke, from a rocket say, is a light haze that's easy to spot and hides nothing; thicker smoke is a denser cloud. Where the soldier can't see through it by the game's own sight rules (every step through smoke uses up some of the soldier's sight, more in thicker smoke, less within two tiles of them or with heat vision), it turns solid, with a soft, billowy edge, as a smoke grenade's cloud should. The clouds change slowly and smoothly from frame to frame, sway and bob a little, and a few wisps rise off them. **Original**: the original games' own smoke animation, their dots in their own colours (UFO's greys and browns, TFTD's white under the sea), its frames melting smoothly into each other instead of blinking. Where the soldier sees through the smoke it is one see-through cloud, more opaque the thicker the smoke; where they can't, by the same sight rules, the animation is stacked on itself, out of step and set off a little, until its dots close up and the cloud hides what's behind it (fewer layers on the cloud's outer tiles and where the sight only just runs out, so its outline stays loose and smoke-like). No grey, no wisps, and an explosion's flash and embers without our grey puffs (the smoke it leaves is the game's). With both, units the soldier can see stay clear through the smoke, and units the game hides stay hidden. Fire is drawn the same in both. (0.9's *See-through smoke* gives the first value: YES Modern, NO Original; 1.0's *Solid* becomes Original.)
 - **Unlimited tactical flares** (YES): YES: T throws a red flare at the crosshair, free and as often as you like. It bounces off walls and burns with red fire and red light for about a minute; under the sea it only goes a metre or two and bubbles hard. It lights the 3D view only: what the soldiers can see by the game's rules doesn't change. NO: T does nothing.
 
 ### Looks
 
-- **Weapon in hand** (YES): YES: the weapon in the soldier's hand shows at the bottom right of the view, Doom style, built in 3D from its inventory picture (little cubes, thickest in the middle, the barrel on the line to the crosshair): it bobs as you walk, kicks when you fire and dips out of sight while reloading, looking far down (from 45°, gone at 72°) and zoomed in. A melee weapon is held tip up and swung. Anything else in the hand (a grenade, a medi-kit, a clip) is built the same way and sits in the bottom corner, its lower half out of sight. With the classic HUD shown it stays hidden (the HUD covers the bottom of the view). NO: nothing drawn.
+- **Weapon in hand** (YES): YES: the weapon in the soldier's hand shows at the bottom right of the view (bottom left in the left hand), Doom style, built in 3D from its inventory picture (little cubes, thickest in the middle). Every weapon is held barrel first with the barrel on the line to the crosshair, pistols, cannons and launchers as well as rifles (the games draw their weapons standing up, muzzle at the top), and your shots leave its muzzle. It bobs as you walk, kicks when you fire and dips out of sight while reloading, looking far down (from 45°, gone at 72°) and zoomed in. A melee weapon is held tip up and swung. Anything else in the hand (a grenade, a medi-kit, a clip) is built the same way and sits in the bottom corner, its lower half out of sight. With the classic HUD shown it stays hidden (the HUD covers the bottom of the view). NO: nothing drawn.
 - **Sprite upscaling** (Smooth + detail): soldiers, aliens, items on the floor, explosions and smoke seen up close are scaled up the way pixel art scales well (xBRZ, in the game's own colours). **Smooth** rounds off the stair-stepped edges; **Smooth + detail** also sharpens the shading a little; **Off** keeps the original pixels.
 - **Unit size** (100%): soldiers and aliens drawn a little smaller, 80 to 100% of the isometric map's size, standing on the same spot, so tall sprites fit under low ceilings. Only the picture changes: what shots hit stays the game's (see *Hitboxes*; at about 80 to 90% the sprites come closest to their hitboxes' heights).
 - **Muzzle flashes** (YES): YES: gunfire lights up its surroundings for a blink, units flash when hit, the view flashes red when your soldier is hit (and at each shot of a berserk soldier), and a blast flashes. NO: none of these flashes, and UFO lights hold steady. Turn this off if flashing light bothers you (photosensitivity, epilepsy).
-- **Particles** (2): **0** none; **1** effects (muzzle flashes, impacts, explosions, fire, smoke); **2** everything, plus dust, fireflies, bubbles and weather.
+- **Particles** (All): **Off** none; **Effects** sparks, debris, smoke, fire and the shots' trails (a rocket's smoke and the white specks it leaves hanging for half a minute, embers, the glow behind plasma); **All** also dust, fireflies, bubbles and weather. Shots look the same in all three: the rounds, beams and blobs, their start at the muzzle, the flash on the weapon, the kick and the marks they leave aren't particles.
 - **UFO lights and aura** (YES): UFOs stand out from the Earth around them. Their hulls stay still and only their lights glow (lit panels, lift pads, screens, navigation lights, found in the original animation frames), pulsing gently in a slow wave round the UFO. Each UFO casts its own two-coloured light (its hull's hue close in, its lights' hue further out) on the ground around it, its underside and its skin, strongest at night, and drifting motes, sparks and a beam of light up each grav lift wrap it. It all shows only once the UFO has been seen, so it never gives a UFO away; with Muzzle flashes off nothing pulses. The small scout's blocky hull is trimmed to its sprite's round outline (only the look: line of fire is still the game's). NO: the original animation frames (calmed, as everywhere in 3D).
 - **Discreet map edge** (NO): YES: no yellow tape and posts round the map; small red dots on the floor along its edge, a tile apart, mark it instead, with the land beyond as before.
 - **Pixel size** (Auto): **Auto** gives full detail up to a 640×400 view and blocks of 2 on bigger ones (a 1920×1080 screen at the default battlescape scale makes a 960×540 view); **1** full detail; **2** or **3**: each ray colours a block of 2×2 or 3×3 pixels, chunkier but much faster on big screens or slow machines.
@@ -556,9 +556,10 @@ firstPerson:
 - Sound that fades with distance (and is a little quieter behind you).
 - Melee that lands: the weapon winds up and drives in towards the crosshair with a swish, the view lunges, the blow jolts, and the target flinches.
 - Weapons:
-  - trails by damage type: none for bullets, beams for lasers, glowing blobs for plasma, smoke for rockets, bubbles under the sea;
-  - the weapon in hand built from voxels, its barrel aimed at the crosshair: your shots leave its muzzle;
-  - recoil, muzzle flashes by weapon class (bullets, explosives, fire, lasers, plasma, stun), hitmarkers with sound, enemies that flinch;
+  - shots by damage type and by gun: a round with a short tracer streak for bullets, a beam for lasers, a glowing blob for plasma, a flame with a smoke trail for rockets and explosive shells (and white specks that hang along a rocket's path for half a minute), embers for incendiaries, a blue blob for stun; each bigger for a bigger gun, a pistol's the smallest, then a rifle's, an auto-cannon's, a heavy weapon's (a laser beam is wider for a heavier laser, and up close);
+  - under the sea: yellow darts and harpoons, pale blue gauss beams, pale cyan sonic blobs, torpedoes with the same smoke and specks, and bubbles behind every shot;
+  - the weapon in hand built from voxels, its barrel aimed at the crosshair: your shots leave its muzzle, in either hand;
+  - recoil, muzzle flashes by weapon class (bullets, explosives, fire, lasers, plasma, stun) and size (bigger for bigger guns), hitmarkers with sound, enemies that flinch;
   - bullet holes, scorch marks, blown-out walls in a burst of debris, burnt ground.
 - When it gets tense:
   - enemy shots whizzing past you (you hear which side) with a flinch; a red arc on the screen's edge towards where a hit came from; blood on the view after a heavy hit or an alien's blow;
@@ -617,7 +618,7 @@ Sprite upscaling costs nothing measurable. Use **pixel size** 2 or 3 on slow mac
 | Branch | **`oxce-plus`** |
 | Commit | **`f0134ef8065799c7723953d64b565f7832bfd782`** — 2026-09-29 15:04:49 +0200, author Meridian, "Merge remote-tracking branch 'SupSuper/master' into oxce-plus" |
 | Version string | **OpenXcom Extended 8.7.1 (v2026-09-19)** |
-| OpenXcom3D | engine add-on and mod version **0.8** (`requiredExtendedEngine: OpenXcom3D`, `requiredExtendedVersion: "0.8"`) |
+| OpenXcom3D | engine add-on and mod version **1.02** (`requiredExtendedEngine: OpenXcom3D`, `requiredExtendedVersion: "1.0.2"`: OXCE reads "1.02" as 1.2) |
 
 `openxcom3d.patch` holds every change on top of that commit:
 
@@ -684,7 +685,7 @@ What `FirstPersonView` draws:
 | `src/CMakeLists.txt` | Adds the `firstperson_src` list, or defines `OXCE_NO_FIRSTPERSON`; links Threads |
 | `BattlescapeState.{h,cpp}` | `FirstPerson::create/destroy/think/handle/blit/wantsMouseCapture/resized`; `friend class FirstPersonMode` |
 | `BattlescapeGame.h` | `BattleAction::targetVoxel` (exact aim point), `instantMove`, `freeAim` (FPS-style shot), `dualWield`/`dualWeapon`/`dualType` (dual wield) |
-| `Projectile.h` | `getAmmo()` getter (trail style from the ammo's damage type) |
+| `Projectile.h` | `getAmmo()` and `getWeapon()` getters (trail style from the ammo's damage type, size from the gun) |
 | `ProjectileFlyBState.{h,cpp}` | Uses `targetVoxel` when set (accuracy still applies); with `freeAim` asks the first-person view for each round's target; dual wield: the other gun's round fired, flown and landed with each round (like a shotgun's extra pellets), both half as accurate; a failed close-quarters check clears `targetVoxel` and `freeAim`, so the deflected shot goes where the game sends it; a lean side (`relativeOrigin`, setting *Lean shots*) with no line of fire falls back to the centre |
 | `BattlescapeGame.cpp` | A soldier panicking or going berserk: in 3D the first-person view shows it (`FirstPerson::breakdown`, which holds the battle as long as the box would) instead of the "has panicked" box |
 | `ExplosionBState.cpp` | FPS-style shooting: our own bullet hits play quicker (`FirstPerson::fastShots`) |
@@ -706,11 +707,23 @@ What `FirstPersonView` draws:
 | `OptionInfo.cpp` | Loading a key binding clears Shift, Alt and Ctrl, except for `keyFpsLeanHold` (the lean key, held with the strafe keys, Left Shift by default) |
 | `OptionsBaseState.{h,cpp}` | 3D VIEW tab via `FirstPerson::hasOptionsTab/createOptionsTab` |
 | `Mod.{h,cpp}` | Parses `firstPerson:` at the end of `Mod::loadFile` |
-| `ModInfo.cpp` | Engine row `{"OpenXcom3D", 1.0.1}` (add-on builds only; 1.01) |
+| `ModInfo.cpp` | Engine row `{"OpenXcom3D", 1.0.2}` (add-on builds only; 1.02) |
 | `CrossPlatform.cpp` | Add-on builds use their own user/config folders (`~/.local/share/openxcom3d`, `~/.config/openxcom3d`, `Documents/OpenXcom3D`, …). Data folders are shared with stock OXCE |
 | `OpenXcom.2010.vcxproj{,.filters}` | The add-on's files |
 
 ## 11. Version history
+
+### 1.02 (2026-10-22)
+
+Gunplay: shots, flashes and the weapon in hand gone over class by class, in UFO and TFTD.
+
+- **Shots with Particles off:** the setting only stops the particles now. Before, it also stopped the 3D view from following the shots: no laser beam, every round a pale dot from the middle of the screen instead of the muzzle, no flash on the weapon and no kick.
+- **Every gun its own round:** pistol, rifle, auto-cannon and heavy cannon (laser pistol, laser rifle and heavy laser; plasma pistol, plasma rifle and heavy plasma; the TFTD guns the same) fire bigger and bigger rounds, beams and blobs, with bigger muzzle flashes; bullets fly with a short tracer streak; a laser beam is wider up close; under the sea darts, harpoons and shells are yellow (they melted into the sand).
+- **Rockets:** a flame with a thicker smoke trail and white specks that hang along the path for half a minute and grey away (torpedoes the same).
+- **Weapon in hand:** every weapon is held barrel first on the line to the crosshair, as the rifles were (pistols, cannons, launchers and the heavy weapons stood too upright; the rifle, the Sonic Pistol and the Thermal Shok were held backwards).
+- **Doom free grenades:** a grenade thrown with the game's Throw (picked from its menu) no longer stays aimed: the next click threw the same grenade again from wherever it lay.
+- **Smoke: two choices, Original and Modern** (*Solid* is gone, with the grey puffs it left hanging in the air; a *Dither* choice, 0.9's smoke brought back on a player's wish, was tried and left out). **Original** is now dense where the soldier can't see through the smoke: the game's smoke animation stacked on itself there (less on the cloud's outer tiles, so its outline stays smoke-like), so a smoke grenade's cloud hides what's behind it, and one see-through cloud where they can.
+- **Settings:** *Particles* shows Off, Effects and All instead of 0, 1 and 2.
 
 ### 1.01 (2026-10-22)
 

@@ -277,7 +277,8 @@ std::string OptionsFirstPersonState::label(const OptionInfo &option) const
 
 /**
  * Gives the text for an option's current value: YES or NO for a switch, the number (or its
- * name, for sprite upscaling and an unlimited frame rate) for a number, the key's name for a key.
+ * name, for a choice such as particles or sprite upscaling, and an unlimited frame rate) for a
+ * number, the key's name for a key.
  * @param option The option.
  * @return The text for the value column.
  */
@@ -293,6 +294,12 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		{
 			static const char *const upscaleNames[] = { "STR_FPS_UPSCALE_OFF", "STR_FPS_UPSCALE_SMOOTH", "STR_FPS_UPSCALE_DETAIL" };
 			return std::string(tr(upscaleNames[std::clamp(*option.asInt(), 0, 2)]));
+		}
+		// Particles are a choice of three, shown by name.
+		if (option.id() == "fpsParticles")
+		{
+			static const char *const particleNames[] = { "STR_FPS_PARTICLES_OFF", "STR_FPS_PARTICLES_EFFECTS", "STR_FPS_PARTICLES_ALL" };
+			return std::string(tr(particleNames[std::clamp(*option.asInt(), 0, 2)]));
 		}
 		// The distance haze is a choice of three, shown by name.
 		if (option.id() == "fpsHaze")
@@ -311,11 +318,10 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 			static const char *const hitboxNames[] = { "STR_FPS_HITBOXES_OFF", "STR_FPS_HITBOXES_BLINK", "STR_FPS_HITBOXES_ALWAYS" };
 			return std::string(tr(hitboxNames[std::clamp(*option.asInt(), 0, 2)]));
 		}
-		// The smoke is a choice of three, shown by name.
+		// The smoke is a choice of two, shown by name.
 		if (option.id() == "fpsSmoke")
 		{
-			static const char *const smokeNames[] = { "STR_FPS_SMOKE_SOLID", "STR_FPS_SMOKE_ORIGINAL", "STR_FPS_SMOKE_MODERN" };
-			return std::string(tr(smokeNames[FirstPerson::smokeMode()]));
+			return std::string(tr(FirstPerson::smokeMode() == 1 ? "STR_FPS_SMOKE_ORIGINAL" : "STR_FPS_SMOKE_MODERN"));
 		}
 		// The downed units' icons are a choice of three, shown by name.
 		if (option.id() == "fpsDownedIcons")
@@ -518,10 +524,10 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		{
 			*value = (*value + direction + 3) % 3;
 		}
-		// The smoke (solid, original, modern): round and round.
+		// The smoke (original, modern): either button switches.
 		else if (value == &Options::fpsSmoke)
 		{
-			*value = (FirstPerson::smokeMode() + direction + 3) % 3;
+			*value = FirstPerson::smokeMode() == 1 ? 2 : 1;
 		}
 		// The downed units' icons (off, crosshair, always): round and round.
 		else if (value == &Options::fpsDownedIcons)
@@ -558,7 +564,7 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		{
 			*value = std::clamp(*value + direction, 1, 8);
 		}
-		// Particles (none, effects, everything): round and round, past the last back to the first.
+		// Particles (off, effects, all): round and round, past the last back to the first.
 		else if (value == &Options::fpsParticles)
 		{
 			*value = (*value + direction + 3) % 3;

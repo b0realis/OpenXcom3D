@@ -91,14 +91,17 @@ public:
 private:
 	std::vector<Particle> _particles; // The living particles.
 	Uint32 _seed;                     // State of the particles' own random number generator (never zero).
+	bool _accepting = true;           // New particles are taken in (not while particles are off: see setAccepting).
 	static const size_t Max = 6000;   // The most particles there can be at once; more are dropped.
 public:
 	/// Creates an empty particle system.
 	FirstPersonParticles();
 	/// Removes all particles.
 	void clear() { _particles.clear(); }
-	/// Adds a particle (dropped when full).
+	/// Adds a particle (dropped when full, or while not accepting any).
 	void add(const Particle &particle);
+	/// Takes in new particles, or drops every one added (particles off: the battle's effects still run for what isn't a particle).
+	void setAccepting(bool accepting) { _accepting = accepting; }
 	/// Moves particles along and removes the expired ones; `elapsedSeconds` is the time since the last frame.
 	void update(float elapsedSeconds);
 	/// Removes the particles of a group farther than `radius` (horizontally) from a point, all in voxels.

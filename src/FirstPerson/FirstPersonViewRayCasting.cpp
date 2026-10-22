@@ -202,6 +202,7 @@ void FirstPersonView::updateColors()
 	_colors.dust = nearest(200, 190, 170);
 	_colors.rain = nearest(150, 170, 200);
 	_colors.snow = nearest(240, 240, 250);
+	_colors.speck = nearest(236, 236, 228);
 	_colors.sand = nearest(210, 170, 110);
 	_colors.firefly = nearest(200, 255, 100);
 	_colors.bubble = nearest(170, 230, 240);
@@ -991,6 +992,51 @@ Uint8 FirstPersonView::smokeColor(Uint8 light, const float rayOrigin[3], const f
 	if (billow > 0.62f && (color & 15) > 0) --color;
 	else if (billow < 0.38f) ++shade;
 	return shadeColor((Uint8)color, shade);
+}
+
+/**
+ * How much of the soldier's sight the smoke uses up looking through a point and on beyond it,
+ * by the game's sight rules (see SmokeTrace, as the rays trace them for Modern's wall): the
+ * line from the eye through the point, walked two voxels at a time as far as the sight reaches
+ * (or off the map), its smoke added up tile by tile. Original smoke stacks its frames where the
+ * soldier can't see through it (see drawSeeThroughSmoke).
+ * @param point The point, in voxels.
+ * @return The share of the sight left that the smoke on the line uses up: 1 or more where the
+ *         sight runs out on it (the soldier can't see through the smoke there), less where they
+ *         can, 0 with no smoke on it.
+ */
+float FirstPersonView::smokeSightUsedThrough(const double point[3]) const
+{
+	float direction[3] = { (float)(point[0] - _eye[0]), (float)(point[1] - _eye[1]), (float)(point[2] - _eye[2]) };
+	const float length = std::sqrt(direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2]);
+	if (length < 1.0f)
+	{
+		return 0.0f;
+	}
+	for (float &component : direction) component /= length;
+	SmokeTrace smoke;
+	smoke.sightVoxels = _smokeSightVoxels;
+	smoke.smokeBlock = _smokeBlock;
+	smoke.fireBlock = _fireBlock;
+	const int sizeX = _save->getMapSizeX(), sizeY = _save->getMapSizeY(), sizeZ = _save->getMapSizeZ();
+	const float Step = 2.0f;
+	for (float from = 0.0f; from < _smokeSightVoxels; from += Step)
+	{
+		// This stretch of the line, and the tile its middle is in (off the map: the line ends).
+		const float middle = from + Step * 0.5f;
+		const int tileX = (int)std::floor((_eye[0] + direction[0] * middle) / Position::TileXY);
+		const int tileY = (int)std::floor((_eye[1] + direction[1] * middle) / Position::TileXY);
+		const int tileZ = (int)std::floor((_eye[2] + direction[2] * middle) / Position::TileZ);
+		if (tileX < 0 || tileY < 0 || tileZ < 0 || tileX >= sizeX || tileY >= sizeY || tileZ >= sizeZ)
+		{
+			break;
+		}
+		if (addSmoke(smoke, _tileViews[(tileZ * sizeY + tileY) * sizeX + tileX], from, from + Step) >= 0.0f)
+		{
+			return 1.0f; // the sight runs out here
+		}
+	}
+	return smoke.cost > 0.0f ? smoke.cost / std::max(1.0f, smoke.sightVoxels - smoke.lastSmoke) : 0.0f;
 }
 
 /**

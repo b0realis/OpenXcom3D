@@ -220,6 +220,7 @@ public:
 		Uint8 fire[4];        // white-hot .. dark red
 		Uint8 blood[2];       // splatter on the screen: dark, bright
 		Uint8 smoke, spark, dust, rain, snow, sand, firefly, bubble;
+		Uint8 speck;           // the white specks a rocket leaves hanging along its path
 		Uint8 marker, marine;
 		Uint8 hitbox[3];       // hitboxes (setting "Hitboxes"): X-COM's, the aliens', the civilians'
 		Uint8 downedIcon[5];   // icons over the downed: flame, its heart, blood, the shock's bolt, out cold
@@ -316,8 +317,9 @@ public:
 	/// Night vision like the isometric map's: brighter, in one colour (group + 1, 0 off).
 	void setNightVision(int color) { _nightVision = color; }
 	/// The sight of the soldier the view looks through, for smoke drawn as the game's sight rules
-	/// have it (setting "Smoke": Modern): the range in voxels, and how much of the smoke and of
-	/// the smoke over fire their eyes see through (the armor's heat vision, in percent).
+	/// have it (setting "Smoke": Modern's wall, Original's stacked frames): the range in voxels,
+	/// and how much of the smoke and of the smoke over fire their eyes see through (the armor's
+	/// heat vision, in percent).
 	void setSmokeSight(float sightVoxels, int throughSmoke, int throughFire)
 	{
 		_smokeSightVoxels = sightVoxels;
@@ -393,6 +395,8 @@ public:
 	Uint32 getPartnerShotTick() const { return _partnerShotTick; }
 	/// Dual wield: the ammo the other gun's last round fired (null if unknown).
 	const RuleItem *getPartnerShotAmmo() const { return _partnerShotAmmo; }
+	/// How big a shot and its muzzle flash are drawn: 1 for a rifle's, less for a pistol's, more for heavy weapons'.
+	static float shotCalibre(const RuleItem *weapon, const RuleItem *ammo);
 
 	/// Renders the view.
 	void draw() override;
@@ -577,6 +581,11 @@ private:
 	Uint8 hazeColor(Uint8 color, float haze, int pixelX, int pixelY) const;
 	/// Smoke's colour on a pixel of its wall (where the soldier's sight runs out in it).
 	Uint8 smokeColor(Uint8 light, const float rayOrigin[3], const float rayDirection[3], float distance, float *billowOut = nullptr) const;
+	/// How much of the soldier's sight the smoke uses up looking through a point and on beyond it (1 or more: they can't see through).
+	float smokeSightUsedThrough(const double point[3]) const;
+	/// Original smoke: how many times a tile's cloud is drawn on top of itself where the soldier can't see through it, inside
+	/// the cloud and on its outer shell (a tile next to one without smoke), so the cloud's outline stays smoke-like (see drawSeeThroughSmoke).
+	static constexpr int OriginalSmokeMaxLayers = 8, OriginalSmokeShellLayers = 3;
 	/// See-through drawing mixes a colour over another in this many steps (this many: solid).
 	static constexpr int SeeThroughLevels = 16;
 	std::vector<Uint8> _nearestRgb;                     // the palette's nearest colour to each 15-bit RGB colour (5 bits a channel)
@@ -725,7 +734,7 @@ private:
 	/// The discreet map edge (setting): small red dots on the floor along the edge.
 	void drawEdgeDots();
 	/// Draws smoke and fire on discovered tiles.
-	void drawSmokeAndFire();
+	void drawFire();
 	/// A frame of the game's smoke made see-through (see softSmokeFrame): UpscaleFactor times bigger, the
 	/// colours of its dots and how densely they lie (its opacity) blurred over it.
 	struct SoftSmoke { Surface *colors = nullptr; std::vector<Uint8> opacity; bool smooth = false; }; // (smooth: an original frame from the upscaler)
@@ -743,6 +752,8 @@ private:
 	const SoftSmoke &softSmokeBlend(const Surface *from, const Surface *to, int step, bool original);
 	/// The first of the four smoke frames the map shows for a density of smoke.
 	int firstSmokeFrame(int smoke) const;
+	/// Is a smoky tile on its cloud's outer shell: next to a tile (on its level, across a side) with no smoke, or the map's edge?
+	bool smokeShell(const Position &tilePosition) const;
 	/// The colour of the game's smoke (its thickest frames' dots mixed, mostly grey).
 	void smokeRgb(float rgb[3]) const;
 	/// Draws the smoke on discovered tiles see-through, and its rising wisps (setting "Smoke": Original, Modern).
@@ -841,6 +852,7 @@ private:
 	bool _lastProjectileThrown = false;          // it was a thrown item (no trail, no impact)
 	Trail _shotTrail = TRAIL_NONE;               // how it looks in flight
 	Uint8 _shotTrailColor = 0;                   // its colour
+	float _shotCalibre = 1.0f;                   // how big it's drawn (see shotCalibre)
 	float _shotTrailOrigin[3] = {};              // where its trail (and a laser's beam) starts
 	Uint32 _ownShotTick = 0;                     // when our own last shot left the muzzle
 	const RuleItem *_ownShotAmmo = nullptr;      // what it was (the clip may be gone by now)
@@ -859,6 +871,7 @@ private:
 	float _partnerLength = 1.0f;                        // its path's length, in voxels
 	Trail _partnerTrail = TRAIL_NONE;                   // how it looks in flight
 	Uint8 _partnerColor = 0;                            // its colour
+	float _partnerCalibre = 1.0f;                       // how big it's drawn
 	Uint32 _partnerShotTick = 0;                        // when it left the muzzle
 	const RuleItem *_partnerShotAmmo = nullptr;         // what it was (the clip may be gone by now)
 	// under fire: shots whizzing past, where they come from
@@ -868,7 +881,7 @@ private:
 	bool _shotIsEnemy = false;         // the shot in flight is an enemy's
 	double _enemyShotFrom[3] = {};     // where it came from
 	Uint32 _enemyShotEnd = 0;          // when it ended
-	struct Beam { float from[3], to[3]; Uint32 start; Uint8 color; };
+	struct Beam { float from[3], to[3]; Uint32 start; Uint8 color; float calibre; };
 	std::vector<Beam> _beams;                          // laser beams fading out
 	struct Decal { float pos[3]; Uint8 size, depth; }; // bullet holes and scorch marks on surfaces
 	std::vector<Decal> _decals;                        // the marks left so far
@@ -904,16 +917,18 @@ private:
 	void drawFreeGrenade();
 	/// Fills a convex four-sided shape on the view at one depth, behind what's nearer.
 	void fillQuadAtDepth(const double corners[4][2], Uint8 color, float depth);
-	/// How a shot looks in flight, from its ammo's damage type.
-	void trailFor(const BattleItem *ammo, Trail &trail, Uint8 &color) const;
+	/// How a shot looks in flight, from its ammo's damage type, and how big (by its weapon and power).
+	void trailFor(const BattleItem *ammo, const BattleItem *weapon, Trail &trail, Uint8 &color, float &calibre) const;
 	/// Spawns what a shot leaves behind along the bit of its path it flew this frame.
 	void spawnTrailSegment(const float from[3], const float to[3]);
 	/// Where the shot in flight is drawn: the game's position, our own shot's eased from the muzzle.
 	void shotHead(const Projectile *projectile, float out[3]) const;
 	/// Spawns sparks, debris and a mark where a shot ended (on the surface the view shows there).
 	void spawnShotImpact(const float head[3], const float from[3], Trail trail);
-	/// Draws the head of a shot in flight.
-	void drawShotDot(const float head[3], Trail trail, Uint8 color);
+	/// Draws the head of a shot in flight, and the streak behind it.
+	void drawShotDot(const float head[3], const float origin[3], Trail trail, Uint8 color, float calibre);
+	/// Draws a laser beam (solid, or fading out), thicker for heavier weapons and up close.
+	void drawBeam(const float from[3], const float to[3], Uint8 color, float calibre, float opacity);
 	/// Dual wield: the other gun's round, from its own muzzle.
 	void spawnPartnerEffects();
 	/// Draws laser beams fading out.
@@ -921,8 +936,9 @@ private:
 	std::vector<Position> _trajectory; // the path a throw or shot aimed now would take (setTrajectory)
 	/// Draws that path: dashes fading out along it, and a mark where it ends.
 	void drawTrajectory();
-	/// Draws a glowing line in the world, depth-tested (all of it, or only the screen rows from bandTop up to bandBottom).
-	void drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, int bandTop = 0, int bandBottom = 1 << 30);
+	/// Draws a glowing line in the world, depth-tested (all of it, or only the screen rows from bandTop up to bandBottom),
+	/// a set number of pixels thick, or as thick as worldWidth voxels look where it is (at most thickness).
+	void drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, float worldWidth = 0.0f, int bandTop = 0, int bandBottom = 1 << 30);
 	/// Leaves a bullet hole or scorch mark.
 	void addDecal(const float pos[3], int size, int darkness);
 	/// Draws the bullet holes, scorch marks and blackened ground.

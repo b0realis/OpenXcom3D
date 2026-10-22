@@ -1653,7 +1653,7 @@ void FirstPersonMode::think()
 	// Night vision (gear), in the isometric map's colour.
 	_view->setNightVision(hasNightVision(unit) ? _state->_map->getNightVisionColor() : 0);
 	// Smoke as this soldier's eyes see through it: the game's sight range, and the armor's heat
-	// vision (setting "Smoke": Modern).
+	// vision (setting "Smoke": Modern's wall, Original's stacked frames).
 	_view->setSmokeSight(_save->getTileEngine()->getMaxViewDistance() * 16.0f, unit->getVisibilityThroughSmoke(), unit->getVisibilityThroughFire());
 	// The flashlight (setting "Flashlight"), on and off with its own key (see toggleFlashlight):
 	// on, a wide beam from the shoulder, in the dark only (the battle's shade 6 or more, of 0
