@@ -215,12 +215,13 @@ void FirstPersonMode::checkHurt(BattleUnit *unit, Uint32 now)
 	}
 	_lastHeartbeat = heartbeatCount;
 
-	// The red flash of the last hit fades away over 450 ms. Not while the next soldier's view is
-	// still coming in after a fall: that fade colours the view itself (see deathCam).
+	// The red flash of the last hit fades away over 450 ms (not with the setting "Muzzle
+	// flashes" off: no flashes then). Not while the next soldier's view is still coming in after
+	// a fall: that fade colours the view itself (see deathCam).
 	const Uint32 sinceHurt = now - _hurtStart;
 	if (!_afterFallStart)
 	{
-		_view->setTint(_hurtStart && sinceHurt < 450 ? _hurtAmount * (1.0f - sinceHurt / 450.0f) : 0.0f);
+		_view->setTint(Options::fpsMuzzleFlash && _hurtStart && sinceHurt < 450 ? _hurtAmount * (1.0f - sinceHurt / 450.0f) : 0.0f);
 	}
 }
 
@@ -644,7 +645,7 @@ bool FirstPersonMode::breakdownCam(Uint32 now, double elapsedSeconds)
 		const bool shotInAir = _state->_map->getProjectile() != nullptr;
 		if (shotInAir && !_breakdownShot)
 		{
-			_breakdownFlash = now;
+			_breakdownFlash = Options::fpsMuzzleFlash ? now : 0; // (no flash with "Muzzle flashes" off)
 			_view->addShake(2.0f);
 		}
 		_breakdownShot = shotInAir;

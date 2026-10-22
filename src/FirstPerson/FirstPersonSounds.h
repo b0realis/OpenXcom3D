@@ -54,7 +54,7 @@ namespace OpenXcom
 /**
  * The few sounds the first-person view adds to the game's own, made in code (no sound files
  * to ship): a crisp tick for a hit, a deeper one for a kill, a heartbeat when badly hurt, the
- * dry click of a gun that can't fire, the hiss of a flare. They play through the game's sound
+ * dry click of a gun that can't fire, the hiss of a flare, the flashlight's switch. They play through the game's sound
  * channels at its sound volume, and not at all when sound is muted.
  */
 class FirstPersonSounds
@@ -63,9 +63,9 @@ public:
 	/// The sounds: HIT (the tick of a hit), KILL (the tick, then a lower one, for a kill),
 	/// HEARTBEAT (lub-dub, when badly hurt), DRY_FIRE (the click of a gun that can't fire),
 	/// FLARE (a strike and a hiss), WHIZZ (a shot whizzing past), SWOOSH (a melee swing
-	/// cutting the air), PIN (a grenade's pin pulled: a click and the lever's ping). COUNT is how
-	/// many there are.
-	enum Id { HIT, KILL, HEARTBEAT, DRY_FIRE, FLARE, WHIZZ, SWOOSH, PIN, COUNT };
+	/// cutting the air), PIN (a grenade's pin pulled: a click and the lever's ping),
+	/// LIGHT_SWITCH (the flashlight's switch: a soft double click). COUNT is how many there are.
+	enum Id { HIT, KILL, HEARTBEAT, DRY_FIRE, FLARE, WHIZZ, SWOOSH, PIN, LIGHT_SWITCH, COUNT };
 	/// Synthesizes all the sounds for the mixer's output format.
 	FirstPersonSounds();
 	/// Stops and frees the sounds.

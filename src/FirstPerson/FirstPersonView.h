@@ -311,8 +311,8 @@ public:
 	BattleUnit *getUnitAtPointer() const { return _unitAtPointer; }
 	/// Leaves out one tile's floor (the lift platform being ridden through), or none (index -1).
 	void setHiddenFloor(int tileIndex) { _hiddenFloor = tileIndex; }
-	/// Turns the flashlight on or off: the shoulder flashlight, or the tactical one (a tight spot on the crosshair).
-	void setFlashlight(bool on, bool tactical = false) { _flashlight = on; _tacticalFlashlight = tactical; }
+	/// Turns the flashlight on or off: the shoulder one, or the dynamic one (a tight spot on the crosshair).
+	void setFlashlight(bool on, bool dynamic = false) { _flashlight = on; _dynamicFlashlight = dynamic; }
 	/// Night vision like the isometric map's: brighter, in one colour (group + 1, 0 off).
 	void setNightVision(int color) { _nightVision = color; }
 	/// The sight of the soldier the view looks through, for smoke drawn as the game's sight rules
@@ -550,8 +550,8 @@ private:
 
 	SceneColors _colors = {};       // this frame's colours
 	bool _smoothLighting = true;    // blend the game's light between tiles (an option)
-	bool _flashlight = false;       // flashlight on (the shoulder one in dark battles with personal lights on; the tactical one whenever the light is on)
-	bool _tacticalFlashlight = false; // it's the tactical flashlight (setting "Tactical flashlight"): from under the eye, a tight spot on the crosshair
+	bool _flashlight = false;       // flashlight on (its key; the shoulder one only in dark battles)
+	bool _dynamicFlashlight = false; // it's the dynamic flashlight (setting "Flashlight": Dynamic): from under the eye, a tight spot on the crosshair
 	float _flashlightPos[3] = {};   // where it is this frame
 	float _muzzleFlashPos[3] = {};  // where the last shot flashed, lighting its surroundings for a moment
 	Uint32 _muzzleFlashTick = 0;    // when it flashed

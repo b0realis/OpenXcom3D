@@ -138,6 +138,11 @@ public:
 	/// Where the next round of an FPS-style shot goes: along the crosshair, with a spread.
 	void freeAimTarget(const BattleAction &action, Position &target);
 
+	/// A Doom real-time fuse: when it started burning (0: not yet, the grenade is still in hand),
+	/// and for how long (ms). (Public so a remade screen of the same battle can take the burning
+	/// fuses over, see rememberChoices.)
+	struct DoomFuse { Uint32 lit, length; };
+
 private:
 	// =====================================================================================
 	// The game, the screen and switching views (FirstPersonMode.cpp)
@@ -149,6 +154,7 @@ private:
 	FirstPersonView *_view = nullptr;      // the full-screen 3D view
 	FirstPersonSounds *_sounds = nullptr;  // the sounds we make ourselves (hitmarker, heartbeat, near-miss whizz...)
 	bool _wants3D;                         // the player switched to 3D
+	std::string _missionAtStart;           // the battle's mission type when this screen was made (another at the end: its next stage)
 	bool _classicHud = false;              // original bottom HUD drawn over the 3D view
 	bool _hudHidden = false;               // the 3D HUD hidden (the hide HUD key): a clear view
 	bool _mouseLook = true;                // mouse turns the view (captured) instead of moving a cursor
@@ -163,6 +169,7 @@ private:
 	int _warningY;                         // where the game's warnings sit with the classic HUD (back there when leaving 3D)
 	BattleUnit *_lastPlayerUnit = nullptr; // the last soldier the player had (the view stays with them in the alien turn)
 	bool _musicTense = false;              // the combat track is playing
+	bool _flashlightOn = true;             // the flashlight (setting "Flashlight") switched on with its key (the suit light is the game's)
 	Uint32 _lastEnemySeen = 0;             // when an alien was last in sight (the combat music stops 8 s later)
 	int _pausedCheats = 0;                 // the cheats the doom mode key switched off, to switch back on (bits: 1 doom mode, 2 IDKFA, 4 IDDQD)
 
@@ -180,6 +187,10 @@ private:
 	void createInfoPanel();
 	/// Makes the soldier card shown over a squad button, with its live helmet-camera view.
 	void createSoldierCard();
+	/// Makes the soldier cam (a soldier's card's camera, enlarged with a right click), hidden.
+	void createSoldierCam();
+	/// Makes the soldier cam's picture (a second small 3D view) and frame at the canvas's size.
+	void makeSoldierCamView();
 	/// Says which screen corner each of our surfaces keeps to when the screen is resized.
 	void setResizeAnchors();
 	/// Selects the next soldier when the one the camera was with is gone; returns the selected unit.
@@ -196,12 +207,15 @@ private:
 	bool handleMouseLook(Action *action);
 	/// Handles the mouse with a free cursor: our buttons, lift arrows, enemy buttons, clicks on the view.
 	bool handleFreeCursor(Action *action, bool active);
-	/// Notes the player's choices (3D, classic HUD) for a remade screen of the same battle.
+	/// Notes the player's choices (3D, classic HUD, the flashlight, what the cheats and akimbo
+	/// keys switch back on, the burning fuses) for a remade screen of the same battle.
 	void rememberChoices() const;
 	/// Shows or hides the original bottom HUD over the 3D view.
 	void setClassicHud(bool on);
 	/// Hides or shows the 3D HUD (the hide HUD key).
 	void toggleHud();
+	/// Switches the flashlight on or off (its key, with the setting "Flashlight" on).
+	void toggleFlashlight();
 	/// Is the 3D HUD hidden right now (in the 3D view, with the hide HUD key)?
 	bool hudHidden() const;
 	/// Switches between mouse look (captured mouse) and a free cursor.
@@ -212,6 +226,14 @@ private:
 	static bool doomModeOn();
 	/// The doom mode key: all the cheats off, or back on as they were.
 	void toggleCheats();
+	/// The cheats that are on, as the info panel tags them ("DOOM MODE", "IDDQD IDKFA").
+	std::string cheatTag() const;
+	/// The modifier bits of the lean key while it's held as one (Shift, Ctrl or Alt; setting "Lean"), else none.
+	SDLMod leanModifierHeld() const;
+	/// Is a Ctrl or Alt held that is the game's (a shortcut), not the lean key?
+	bool gameModifierHeld() const;
+	/// Does the player's time unit reserve leave enough for a move, as the game's own walk checks it?
+	bool reserveAllows(BattleUnit *unit, int timeUnits, int energy) const;
 	/// Doom mode (debug): refills the soldier's time units and energy (and ammo, with IDKFA).
 	void applyDoomMode(BattleUnit *unit);
 	/// Doom IDDQD: keeps X-COM's units at full morale.
@@ -430,6 +452,8 @@ private:
 
 	std::unordered_map<const BattleUnit*, bool> _flightSwitchedOn; // flight switched on, per soldier
 	bool _landing = false;                              // flight switched off in the air: coming down a level at a time
+	const BattleUnit *_landingUnit = nullptr;           // the soldier landing (also while interrupted: another soldier looked through)
+	int _landingResumeTurn = 0;                         // held up (blocked, out of time units): the landing goes on from this turn
 	bool _landAfterStep = false;                        // flight off, stepping off a ramp's edge: land once there
 	int _fallFromZ = -1;                                // a step off a ledge: the level it was taken from (fall damage on landing)
 
@@ -478,7 +502,6 @@ private:
 	// =====================================================================================
 
 	std::unordered_map<const BattleUnit*, int> _chosenHand; // each soldier's hand picked with G (or on the classic HUD): 0 right, 1 left, 2 built-in weapon
-	struct DoomFuse { Uint32 lit, length; };                // a real-time fuse: when it started burning (0: not yet, the grenade is still in hand), and for how long (ms)
 	std::unordered_map<int, DoomFuse> _doomFuses;           // Doom mode: grenades armed in real time (by item id)
 	/// A grenade on a timer the Doom real-time fuse can take (not a proximity grenade, not one that goes off on landing).
 	static bool timedGrenade(const BattleItem *item);
@@ -560,6 +583,7 @@ private:
 	// crosshair with a spread, recoil lifts the aim, holding the trigger in auto keeps firing ----
 
 	bool _triggerHeld = false;                   // the left button is held down (auto keeps firing)
+	bool _shotAimLeft = false;                   // a shot of ours was handed to the game, which keeps aiming it (see endShotAim)
 	Uint32 _recoilShotSeen = 0, _lastRecoil = 0; // our last shot the recoil reacted to; when the view was last kicked up
 	double _recoilDebt = 0.0;                    // degrees the recoil lifted the view, eased back after firing
 	double _bloom = 0.0;                         // extra spread from the last rounds (degrees, 95% circle)
@@ -574,6 +598,8 @@ private:
 	void updateRecoil(BattleUnit *unit, double elapsedSeconds);
 	/// FPS-style auto: fires the next burst while the trigger is held.
 	void keepFiringWhileHeld(BattleUnit *unit, bool playerTurn);
+	/// Stops the game aiming our last shot again, once it's done with it.
+	void endShotAim();
 
 	// ---- the crosshair, with the fire mode and the shot's odds and cost under it ----
 
@@ -738,6 +764,19 @@ private:
 	int _hoveredSquadButton = -1;                       // squad button under the cursor, -1 none
 	int _cursorX = 0, _cursorY = 0;                     // where the free cursor is, on the canvas (and so on the view)
 	int _cardDrawnHeight = 0;                           // what the frame was drawn for
+
+	// ---- the soldier cam: a right click on a squad button enlarges its card's camera ----
+
+	bool _soldierCamOpen = false;           // the soldier cam is open (a right click on a squad button; closes off the bar, or with another)
+	FirstPersonView *_soldierCam = nullptr; // its picture: the helmet camera, big
+	Surface *_soldierCamFrame = nullptr;    // its frame, with a title bar
+	Surface *_soldierCamDot = nullptr;      // the red dot of a live feed, blinking
+	Text *_txtSoldierCam = nullptr;         // "SOLDIER CAM: <name>"
+	int _soldierCamWidth = 0, _soldierCamHeight = 0; // the picture's size, in canvas pixels
+	/// Points a helmet camera (the card's, or the soldier cam) through a soldier's eyes.
+	void aimHelmetCamera(FirstPersonView *camera, BattleUnit *unit);
+	/// Shows the soldier cam for a soldier under a squad button, or hides it (null).
+	void updateSoldierCam(BattleUnit *unit, int cardButton);
 
 	// ---- the banner across the top of the view ----
 

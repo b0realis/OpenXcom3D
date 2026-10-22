@@ -437,7 +437,7 @@ bool FirstPersonView::visibleSurfaceAlong(const float from[3], const float direc
 }
 
 /**
- * Extra light at a point from the lamps nearby and from the soldier's shoulder flashlight, in
+ * Extra light at a point from the lamps nearby and from the soldier's flashlight, in
  * shades to take off the game's shade (negative: darker, because a lamp's shadow is darker than
  * the game's flat light around it). Lamps only matter at night or under the sea; only the
  * strongest lamp in reach counts, so at most one shadow ray is cast for the lamps.
@@ -490,11 +490,11 @@ float FirstPersonView::pointLight(const float point[3], const float normal[3], b
 		}
 	}
 	// The flashlight: a cone along the view direction, from the soldier's shoulder, reaching
-	// 14 tiles and fading out with the square of the distance. The tactical flashlight (setting)
-	// is a light on the weapon, as in Half-Life: a tight, bright round spot centred on the
+	// 14 tiles and fading out with the square of the distance. The dynamic flashlight (setting
+	// "Flashlight": Dynamic) is a light on the weapon, as in Half-Life: a tight, bright round spot centred on the
 	// crosshair (full strength within 8 degrees of it, fading out by 13), a faint halo round it
 	// out to 24 degrees, reaching 20 tiles and fading more slowly.
-	if (_flashlight && _tacticalFlashlight)
+	if (_flashlight && _dynamicFlashlight)
 	{
 		const float range = 16.0f * 20.0f; // voxels
 		const float fromLight[3] = { point[0] - _flashlightPos[0], point[1] - _flashlightPos[1], point[2] - _flashlightPos[2] };

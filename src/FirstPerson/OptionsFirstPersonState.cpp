@@ -329,6 +329,12 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 			static const char *const trajectoryNames[] = { "STR_FPS_TRAJECTORY_OFF", "STR_FPS_TRAJECTORY_ARCS", "STR_FPS_TRAJECTORY_ALL" };
 			return std::string(tr(trajectoryNames[std::clamp(*option.asInt(), 0, 2)]));
 		}
+		// The flashlight is a choice of three, shown by name.
+		if (option.id() == "fpsFlashlightMode")
+		{
+			static const char *const flashlightNames[] = { "STR_FPS_FLASHLIGHT_OFF", "STR_FPS_FLASHLIGHT_ON", "STR_FPS_FLASHLIGHT_DYNAMIC" };
+			return std::string(tr(flashlightNames[FirstPerson::flashlightMode()]));
+		}
 		// Leaning out is a choice of three, shown by name.
 		if (option.id() == "fpsLean")
 		{
@@ -527,6 +533,11 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		{
 			*value = (*value + direction + 3) % 3;
 		}
+		// The flashlight (off, on, dynamic): round and round.
+		else if (value == &Options::fpsFlashlightMode)
+		{
+			*value = (FirstPerson::flashlightMode() + direction + 3) % 3;
+		}
 		// Leaning out (off, peek, tilt): round and round.
 		else if (value == &Options::fpsLean)
 		{
@@ -537,12 +548,12 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		{
 			*value = (*value + 1) % 2;
 		}
-		// Walking speed: 1 to 8 tiles per second.
 		// The Doom grenade fuse: 1 to 5 seconds, round and round.
 		else if (value == &Options::fpsDoomGrenadeFuse)
 		{
 			*value = (std::clamp(*value, 1, FirstPerson::DoomFuseMaxSeconds) - 1 + direction + FirstPerson::DoomFuseMaxSeconds) % FirstPerson::DoomFuseMaxSeconds + 1;
 		}
+		// Walking speed: 1 to 8 tiles per second.
 		else if (value == &Options::fpsWalkSpeed)
 		{
 			*value = std::clamp(*value + direction, 1, 8);

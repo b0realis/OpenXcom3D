@@ -142,6 +142,23 @@ FirstPersonSounds::FirstPersonSounds()
 	}
 	make(PIN, pin);
 
+	// Light switch: the flashlight's switch (70 ms), a soft double click with no noise in it (so
+	// the noise of the sounds after it stays as it was): a low knock (900 Hz with an overtone at
+	// 2300 Hz), and 25 ms later the catch, quieter and higher (1500 and 3600 Hz).
+	// catchSeconds is the time since the catch began (negative before it).
+	std::vector<float> lightSwitch(length(0.07f));
+	for (size_t sample = 0; sample < lightSwitch.size(); ++sample)
+	{
+		const float seconds = (float)sample / rate, catchSeconds = seconds - 0.025f;
+		lightSwitch[sample] = 0.6f * std::exp(-seconds * 220.0f) * (0.7f * std::sin(2 * Pi * 900 * seconds) + 0.3f * std::sin(2 * Pi * 2300 * seconds));
+		if (catchSeconds > 0)
+		{
+			lightSwitch[sample] += 0.35f * std::exp(-catchSeconds * 260.0f)
+				* (0.6f * std::sin(2 * Pi * 1500 * catchSeconds) + 0.4f * std::sin(2 * Pi * 3600 * catchSeconds));
+		}
+	}
+	make(LIGHT_SWITCH, lightSwitch);
+
 	// Flare: a strike, then a hiss fading out (1.4 seconds in all).
 	std::vector<float> flare(length(1.4f));
 	float lowPassedNoise = 0.0f; // The noise smoothed by a simple low-pass filter.

@@ -467,6 +467,9 @@ void FirstPersonMode::toggleAkimbo()
 		Options::fpsDualWield = !_akimboRealisticWasOn;
 		_state->warning(_akimboRealisticWasOn ? "STR_FPS_AKIMBO_REALISTIC_ON" : "STR_FPS_AKIMBO_FULL_ON");
 	}
+	// The options file keeps it, so the options screen's Cancel doesn't quietly undo it.
+	rememberChoices();
+	Options::save();
 }
 
 /**
@@ -630,7 +633,7 @@ void FirstPersonMode::updateFireMode(BattleUnit *unit)
 }
 
 /**
- * Steps to the next or previous fire mode of the weapon in hand (mouse wheel, or F by
+ * Steps to the next or previous fire mode of the weapon in hand (mouse wheel, or J by
  * default), wrapping around at either end. Anything being aimed on the game's side is called
  * off first.
  * @param step +1 for the next mode, -1 for the previous one.
@@ -668,13 +671,18 @@ void FirstPersonMode::selectFireMode(BattleActionType mode)
 		return;
 	}
 
-	// Only a mode the weapon offers; picking it calls off anything being aimed.
+	// Only a mode the weapon offers; picking it calls off anything being aimed. A mode it
+	// doesn't have: a line says so, so the key doesn't seem dead.
 	const std::vector<BattleActionType> modes = fireModesFor(unit, activeWeapon(unit));
 	if (std::find(modes.begin(), modes.end(), mode) != modes.end())
 	{
 		_state->_battleGame->cancelCurrentAction();
 		_fireMode = mode;
 		_fireModeWeapon = activeWeapon(unit);
+	}
+	else
+	{
+		_state->warning("STR_FPS_NO_SUCH_MODE");
 	}
 }
 
@@ -1178,6 +1186,28 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 		return;
 	}
 
+	// The game's own checks before any use but a throw, as its action menu makes them: an alien
+	// artifact the base hasn't researched yet, or a weapon this soldier can't use here (under
+	// water, a mod's limits). Refused, a held trigger counts as let go.
+	if (mode != BA_THROW)
+	{
+		std::string refusal = "STR_UNKNOWN"; // (the game's fall-back when it gives no reason)
+		if (unit->getOriginalFaction() == FACTION_PLAYER && !_game->getSavedGame()->isResearched(weapon->getRules()->getRequirements()))
+		{
+			refusal = "STR_UNABLE_TO_USE_ALIEN_ARTIFACT_UNTIL_RESEARCHED";
+		}
+		else if (_save->canUseWeapon(weapon, unit, false, mode, &refusal))
+		{
+			refusal.clear();
+		}
+		if (!refusal.empty())
+		{
+			_state->warning(refusal);
+			_triggerHeld = false;
+			return;
+		}
+	}
+
 	// A guided missile's waypoints are placed on the isometric map, by the game's own clicks.
 	if (mode == BA_LAUNCH)
 	{
@@ -1212,6 +1242,7 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 		_game->pushState(new DoomFuseState([this, unit, weapon](int seconds)
 		{
 			Options::fpsDoomGrenadeFuse = seconds;
+			Options::save(); // (kept, so the options screen's Cancel doesn't quietly undo it)
 			if (Options::fpsDoomPrimeOnThrow)
 			{
 				_state->warningRaw(_state->tr("STR_FPS_DOOM_FUSE_SET").arg(seconds));
@@ -1296,11 +1327,17 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 		action->targeting = false;
 		action->result.clear();
 		action->updateTU();
+		const bool timeUnitsEnough = action->haveTU();
 		battleGame->handleNonTargetAction();
 
-		// The weapon in hand swings only if the game went ahead: refused (not enough time
-		// units), the action carries the reason in its result.
-		if (action->result.empty())
+		// The weapon in hand swings only if the game went ahead. Refused for time units, the
+		// game says so and nothing swings, and the melee isn't left waiting (as the game's
+		// action menu clears it).
+		if (!timeUnitsEnough)
+		{
+			action->type = BA_NONE;
+		}
+		else if (action->result.empty())
 		{
 			_swingStart = SDL_GetTicks();
 			_swingJolted = false;
@@ -1425,6 +1462,7 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	{
 		battleGame->primaryAction(targetTile);
 	}
+	_shotAimLeft = isShot(mode); // the game keeps aiming the shot after it: see endShotAim
 
 	// Clear what we added, so the next action (one from the classic HUD, say) aims normally.
 	action->targetVoxel = Position(-1, -1, -1);
@@ -1969,16 +2007,25 @@ void FirstPersonMode::drawCrosshair(BattleActionType mode, int shots, Uint8 colo
  */
 void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 {
-	// Shown only in the 3D view, with the crosshair setting; the lines with the "Shot info"
-	// setting, in the player's turn.
-	const bool show = Options::fpsCrosshair && isActive();
-	_crosshair->setVisible(show);
+	// Shown only in the 3D view: the crosshair with its setting, the lines with the "Shot info"
+	// setting in the player's turn (with or without the crosshair). The hit ticks below play
+	// either way.
+	const bool show = isActive();
+	_crosshair->setVisible(show && Options::fpsCrosshair);
 	_txtMode->setVisible(show && Options::fpsCrosshairInfo && playerTurn);
 	_txtShot->setVisible(show && Options::fpsCrosshairInfo && playerTurn);
 	if (!show)
 	{
 		return;
 	}
+	// The lines sit right of the crosshair's middle; without the crosshair they move down a
+	// little, under where a pointed unit's name shows, so the middle of the view stays clear.
+	const int centreX = _crosshair->getX() + CrosshairSize / 2, centreY = _crosshair->getY() + CrosshairSize / 2;
+	const int linesTop = Options::fpsCrosshair ? centreY - 9 : centreY + 22;
+	_txtMode->setX(centreX + 14);
+	_txtMode->setY(linesTop);
+	_txtShot->setX(centreX + 14);
+	_txtShot->setY(linesTop + 10);
 
 	// The colours, picked from the current palette: plain ones for the crosshair, and text
 	// colour groups for the lines.
@@ -2234,7 +2281,9 @@ bool FirstPersonMode::aimedTileInSight(BattleUnit *unit, BattleItem *weapon, Bat
  */
 void FirstPersonMode::throwFlare()
 {
-	BattleUnit *unit = _save->getSelectedUnit();
+	// From the soldier the view looks through (in the aliens' turn the game's selected unit is
+	// the alien acting, whose tile the throw's sound would give away).
+	BattleUnit *unit = _trackedUnit;
 	if (!Options::fpsFlares || !unit || !isActive() || _deathUnit)
 	{
 		return;
@@ -2445,6 +2494,28 @@ bool FirstPersonMode::identifyPointedUnit()
 		_game->pushState(new AlienInventoryState(target));
 	}
 	return true;
+}
+
+/**
+ * After a shot of ours, once the game is done with it (or refused it), stops the game aiming that
+ * shot again. On the isometric map the game keeps aiming after a shot, so the player can fire
+ * again; in 3D every click sets its own shot up, and the leftover aim would eat the next right
+ * click (zoom), Q / E or a classic HUD hand or SPECIAL click, which cancel an aim first.
+ */
+void FirstPersonMode::endShotAim()
+{
+	BattlescapeGame *battleGame = _state->_battleGame;
+	if (!_shotAimLeft || battleGame->isBusy())
+	{
+		return;
+	}
+	_shotAimLeft = false;
+	BattleAction *action = battleGame->getCurrentAction();
+	if (action->targeting && isShot(action->type) && action->waypoints.empty())
+	{
+		action->targeting = false;
+		action->type = BA_NONE;
+	}
 }
 
 /**

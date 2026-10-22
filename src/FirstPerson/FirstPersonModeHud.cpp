@@ -513,15 +513,10 @@ void FirstPersonMode::updateInfoPanel(BattleUnit *unit)
 	{
 		return;
 	}
-	std::string cheatTag = std::string(_state->tr("STR_FPS_DOOM"));
-	if (Options::fpsDoomIddqd || Options::fpsDoomIdkfa)
+	const std::string cheats = cheatTag();
+	if (_txtDoom->getText() != cheats)
 	{
-		cheatTag = Options::fpsDoomIddqd ? std::string(_state->tr("STR_FPS_IDDQD")) : "";
-		if (Options::fpsDoomIdkfa) cheatTag += (cheatTag.empty() ? "" : " ") + std::string(_state->tr("STR_FPS_IDKFA"));
-	}
-	if (_txtDoom->getText() != cheatTag)
-	{
-		_txtDoom->setText(cheatTag);
+		_txtDoom->setText(cheats);
 	}
 	// The name and the status.
 	_txtName->setText(unit->getName(_game->getLanguage(), false));
@@ -848,9 +843,12 @@ void FirstPersonMode::updateArmorButtons(BattleUnit *unit)
 	{
 		return;
 	}
-	// The armor's name ("no armor" for the game's placeholder armor).
+	// The armor's name ("no armor" for the game's placeholder armor). The armors of tanks and of
+	// aliens (one under mind control) have no name in the language files: none is shown then,
+	// rather than the rules' id ("TANK_ARMOR").
 	const std::string &armorType = unit->getArmor()->getType();
-	_txtArmor->setText(armorType == "STR_NONE_UC" ? _state->tr("STR_FPS_NO_ARMOR") : _state->tr(armorType));
+	const std::string armorName = armorType == "STR_NONE_UC" ? std::string(_state->tr("STR_FPS_NO_ARMOR")) : std::string(_state->tr(armorType));
+	_txtArmor->setText(armorName == armorType ? std::string() : armorName);
 	// A toggle button shows pressed when its group pointer points at it. Work out which are on,
 	// and redraw the buttons only when that changed.
 	TextButton *flyGroup = flightOn(unit) ? _btnFly : nullptr;
@@ -883,6 +881,7 @@ void FirstPersonMode::updateSoldierCard()
 	BattleUnit *unit = nullptr;
 	int cardButton = -1;
 	std::string alertStatus;
+	bool poppedUp = false; // a camera popped up in the aliens' turn (its own settings), not a hovered card
 	if (_hoveredSquadButton >= 0 && _hoveredSquadButton < (int)_btnSquad.size() && _btnSquad[_hoveredSquadButton]->getVisible() && !wantsMouseCapture())
 	{
 		unit = _squadUnits[_hoveredSquadButton];
@@ -898,6 +897,7 @@ void FirstPersonMode::updateSoldierCard()
 		if (cardButton < 0 && !_btnSquad.empty()) cardButton = 0;
 		unit = cardButton >= 0 ? const_cast<BattleUnit*>(_alertUnit) : nullptr;
 		alertStatus = _alertText.empty() ? std::string() : std::string(_state->tr(_alertText));
+		poppedUp = true;
 	}
 	const SquadState state = unit ? squadState(unit) : SQUAD_NONE;
 	// The dead and the unconscious: their helmet camera shows only static.
@@ -906,9 +906,22 @@ void FirstPersonMode::updateSoldierCard()
 	{
 		unit = nullptr;
 	}
+	// The soldier cam (a right click on the button) shows a hovered soldier's camera big, in
+	// place of the card; off the bar it closes. A fallen soldier's card stays, with its static.
+	if (_hoveredSquadButton < 0 || wantsMouseCapture())
+	{
+		_soldierCamOpen = false;
+	}
+	const bool soldierCam = _soldierCamOpen && unit && live && !poppedUp;
+	updateSoldierCam(soldierCam ? unit : nullptr, cardButton);
+	if (soldierCam)
+	{
+		unit = nullptr; // (the card hides)
+	}
 	// Show the card's parts: the camera view only for a live soldier, the "no signal" text only
-	// for a dead camera, and both only with the preview option.
-	const bool preview = unit && Options::fpsSoldierPreview;
+	// for a dead camera, and both only with the preview option for a hovered card (a popped-up
+	// camera always shows its picture: "Aliens' turn cameras" is its own setting).
+	const bool preview = unit && (Options::fpsSoldierPreview || poppedUp);
 	for (const auto &part : _cardParts)
 	{
 		part.surface->setVisible(unit && (part.surface != _preview || (preview && live)) && (part.surface != _cardSignal || (preview && !live)));
@@ -998,32 +1011,84 @@ void FirstPersonMode::updateSoldierCard()
 
 	if (preview && live)
 	{
-		// Their eyes. When it's the soldier we're looking through, copy the 3D camera itself
-		// (its eye, and its yaw by turning the preview by the difference), level.
-		_preview->setCameraUnit(unit);
-		if (isActive() && unit == _trackedUnit)
-		{
-			double eye[3];
-			_view->getEye(eye);
-			_preview->setEye(eye[0], eye[1], eye[2]);
-			_preview->lookAlong(unit->getDirection());
-			_preview->rotate(_view->getYawDegrees() - _preview->getYawDegrees(), 0.0);
-		}
-		else
-		{
-			// Anyone else: an eye in the middle of the soldier's tile (or 2x2 tiles for a large
-			// unit) at their eye height, looking the way they face. Voxels: a tile is 16 across.
-			const Position position = unit->getPosition();
-			const int unitSize = unit->getArmor()->getSize();
-			_preview->setEye(position.x * 16.0 + 8.0 * unitSize, position.y * 16.0 + 8.0 * unitSize, eyeHeight(unit));
-			_preview->lookAlong(unit->getDirection());
-		}
-		// The same view settings as the main 3D view, and night vision if the soldier has it.
-		_preview->setFieldOfView(Options::fpsFieldOfView);
-		_preview->setSmoothLighting(Options::fpsSmoothLighting);
-		_preview->setNightVision(hasNightVision(unit) ? _state->_map->getNightVisionColor() : 0);
-		_preview->invalidate();
+		aimHelmetCamera(_preview, unit);
 	}
+}
+
+/**
+ * Points a helmet camera (the card's, or the soldier cam) through a soldier's eyes, with the
+ * main 3D view's settings, and asks for a new picture.
+ * @param camera The camera's view.
+ * @param unit The soldier, live.
+ */
+void FirstPersonMode::aimHelmetCamera(FirstPersonView *camera, BattleUnit *unit)
+{
+	// When it's the soldier we're looking through, copy the 3D camera itself (its eye, and its
+	// yaw by turning the camera by the difference), level.
+	camera->setCameraUnit(unit);
+	if (isActive() && unit == _trackedUnit)
+	{
+		double eye[3];
+		_view->getEye(eye);
+		camera->setEye(eye[0], eye[1], eye[2]);
+		camera->lookAlong(unit->getDirection());
+		camera->rotate(_view->getYawDegrees() - camera->getYawDegrees(), 0.0);
+	}
+	else
+	{
+		// Anyone else: an eye in the middle of the soldier's tile (or 2x2 tiles for a large unit)
+		// at their eye height, looking the way they face. Voxels: a tile is 16 across.
+		const Position position = unit->getPosition();
+		const int unitSize = unit->getArmor()->getSize();
+		camera->setEye(position.x * 16.0 + 8.0 * unitSize, position.y * 16.0 + 8.0 * unitSize, eyeHeight(unit));
+		camera->lookAlong(unit->getDirection());
+	}
+	// The same view settings as the main 3D view, and night vision if the soldier has it.
+	camera->setFieldOfView(Options::fpsFieldOfView);
+	camera->setSmoothLighting(Options::fpsSmoothLighting);
+	camera->setNightVision(hasNightVision(unit) ? _state->_map->getNightVisionColor() : 0);
+	camera->invalidate();
+}
+
+/**
+ * The soldier cam: a soldier's helmet camera enlarged (a right click on their squad button, see
+ * handleFreeCursor), under their button and kept inside the canvas, titled "SOLDIER CAM: name"
+ * with a red dot that blinks once a second, and a little TV static over the picture: plainly a
+ * camera's feed, not the view the player plays in. Moving along the bar shows each soldier's in
+ * turn. Hidden with no soldier.
+ * @param unit The soldier (live) under the hovered squad button, or null to hide it.
+ * @param cardButton The squad button the soldier is under.
+ */
+void FirstPersonMode::updateSoldierCam(BattleUnit *unit, int cardButton)
+{
+	const bool show = unit && cardButton >= 0;
+	for (Surface *part : { (Surface*)_soldierCamFrame, (Surface*)_soldierCam, (Surface*)_txtSoldierCam })
+	{
+		part->setVisible(show);
+	}
+	_soldierCamDot->setVisible(show && SDL_GetTicks() % 1000 < 600);
+	if (!show)
+	{
+		return;
+	}
+
+	// Under the button, kept inside the canvas.
+	const TextButton *button = _btnSquad[cardButton];
+	const int frameX = std::clamp(button->getX() + button->getWidth() / 2 - _soldierCamFrame->getWidth() / 2, 1, canvasWidth() - _soldierCamFrame->getWidth() - 1);
+	_soldierCamFrame->setX(frameX);
+	_soldierCamFrame->setY(CardY);
+	_soldierCam->setX(frameX + 4);
+	_soldierCam->setY(CardY + 16);
+	_soldierCamDot->setX(frameX + 5);
+	_soldierCamDot->setY(CardY + 5);
+	_txtSoldierCam->setX(frameX + 13);
+	_txtSoldierCam->setY(CardY + 4);
+	const std::string title = _state->tr("STR_FPS_SOLDIER_CAM").arg(unit->getName(_game->getLanguage(), false));
+	if (_txtSoldierCam->getText() != title)
+	{
+		_txtSoldierCam->setText(title);
+	}
+	aimHelmetCamera(_soldierCam, unit);
 }
 
 /**

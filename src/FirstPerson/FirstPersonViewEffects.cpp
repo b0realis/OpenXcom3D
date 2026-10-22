@@ -249,8 +249,11 @@ void FirstPersonView::spawnExplosionEffects()
 				}
 				const Uint8 smokeColors[2] = { _colors.smoke, shadeColor(_colors.smoke, 3) };
 				// The flash: a few big blobs in the two hottest fire colours, barely moving and
-				// gone within a fifth of a second.
-				_particles.burst(centre, 18, P::GLOW, P::EFFECT, _colors.fire, 2, 10, 40, 0, 0, 3, 0.08f, 0.2f, 6);
+				// gone within a fifth of a second (not with the setting "Muzzle flashes" off).
+				if (Options::fpsMuzzleFlash)
+				{
+					_particles.burst(centre, 18, P::GLOW, P::EFFECT, _colors.fire, 2, 10, 40, 0, 0, 3, 0.08f, 0.2f, 6);
+				}
 				// Embers in all four fire colours, flung out fast (mostly upwards), falling back
 				// and glowing for a second or so.
 				_particles.burst(centre, 60, P::GLOW, P::EFFECT, _colors.fire, 4, 40, 140, 0.5f, 150, 0.6f, 0.6f, 1.5f, 2);

@@ -52,6 +52,7 @@
  */
 #include "FirstPersonMode.h"
 #include <algorithm>
+#include <climits>
 #include <cmath>
 #include <string>
 #include "FirstPersonApi.h"
@@ -76,6 +77,7 @@
 #include "../Interface/Text.h"
 #include "../Interface/TextButton.h"
 #include "../Mod/Mod.h"
+#include "../Mod/RuleInterface.h"
 #include "../Savegame/BattleItem.h"
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/SavedBattleGame.h"
@@ -90,9 +92,10 @@ namespace
 {
 
 // The game remakes the battlescape screen (and with it this mode) when options change
-// mid-battle; what the player had chosen (3D or not, the classic HUD) carries over to the new
-// screen of the same battle. Loading a game from inside a battle remakes the screen too, with a
-// new battle object: that carries over as well, when the old screen ran only a moment ago.
+// mid-battle; what the player had chosen (3D or not, the classic HUD, the flashlight) carries
+// over to the new screen of the same battle. Loading a game from inside a battle remakes the
+// screen too, with a new battle object: that carries over as well, when the old screen ran only
+// a moment ago.
 
 /// The battle the choices below were made in.
 const SavedBattleGame *lastBattle = nullptr;
@@ -102,8 +105,20 @@ bool lastWants3D = false;
 bool lastClassicHud = false;
 /// Whether the 3D HUD was hidden (FirstPersonMode::_hudHidden).
 bool lastHudHidden = false;
+/// Whether the flashlight was switched on (FirstPersonMode::_flashlightOn).
+bool lastFlashlightOn = true;
+/// The cheats the doom mode key would switch back on (FirstPersonMode::_pausedCheats).
+int lastPausedCheats = 0;
+/// Whether the akimbo key would switch realistic akimbo back on (FirstPersonMode::_akimboRealisticWasOn).
+bool lastAkimboRealisticWasOn = true;
+/// The Doom real-time fuses burning (FirstPersonMode::_doomFuses): only for the same battle.
+std::unordered_map<int, FirstPersonMode::DoomFuse> lastDoomFuses;
 /// When a first-person mode last ran its per-frame update (SDL ticks, ms; 0: never).
 Uint32 lastThinkTicks = 0;
+
+/// The shoulder flashlight (setting "Flashlight": On) lights from the battle's shade 6 on (of 0
+/// bright .. 15 dark): at dusk and night.
+const int FlashlightDarkShade = 6;
 
 }
 
@@ -118,7 +133,7 @@ Uint32 lastThinkTicks = 0;
  * @param state The battlescape screen.
  */
 FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
-	_game(game), _state(state), _save(state->_save), _wants3D(Options::fpsStartInFirstPerson), _warningY(state->_warning->getY())
+	_game(game), _state(state), _save(state->_save), _wants3D(Options::fpsStartInFirstPerson), _missionAtStart(state->_save->getMissionType()), _warningY(state->_warning->getY())
 {
 	// The overlays are laid out on a canvas; on big screens it's drawn magnified (see blit).
 	// Whether each step is allowed is not known yet (see stepAllowed).
@@ -134,6 +149,7 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
 	createTopBar();
 	createInfoPanel();
 	createSoldierCard();
+	createSoldierCam(); // (last: drawn over everything)
 
 	// The mode's own sounds, and the canvas the overlays are drawn on before being magnified.
 	_sounds = new FirstPersonSounds();
@@ -154,12 +170,17 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
 	layoutTopBar();
 
 	// A screen remade for the same battle, or right after another one (a game loaded from
-	// inside a battle, within 3 seconds), takes over the player's choices.
+	// inside a battle, within 3 seconds), takes over the player's choices. The fuses burning
+	// carry over only within the same battle (a loaded game has its grenades as it saved them).
 	if (lastBattle == _save || (lastThinkTicks && SDL_GetTicks() - lastThinkTicks < 3000))
 	{
 		_wants3D = lastWants3D;
 		_classicHud = lastClassicHud;
 		_hudHidden = lastHudHidden;
+		_flashlightOn = lastFlashlightOn;
+		_pausedCheats = lastPausedCheats;
+		_akimboRealisticWasOn = lastAkimboRealisticWasOn;
+		if (lastBattle == _save) _doomFuses = lastDoomFuses;
 		_mouseLook = !_classicHud;
 	}
 	rememberChoices();
@@ -515,6 +536,107 @@ void FirstPersonMode::createSoldierCard()
 }
 
 /**
+ * Makes the soldier cam, hidden: a soldier's card's helmet camera enlarged, with a right click
+ * on their squad button (see updateSoldierCam). A frame with a title bar ("SOLDIER CAM: name",
+ * a blinking red dot, as a live feed has) round a second small 3D view, with a little TV
+ * static over it, so it's plain that it's a camera, not the view the player plays in. The
+ * picture and the frame are made at the canvas's size (see makeSoldierCamView).
+ */
+void FirstPersonMode::createSoldierCam()
+{
+	makeSoldierCamView();
+
+	// The red dot: a filled circle 5 pixels across.
+	_soldierCamDot = new Surface(5, 5, 0, 0);
+	_state->add(_soldierCamDot);
+	_soldierCamDot->setPalette(_state->getPalette());
+	const Uint8 red = nearestColor(_state->getPalette(), 230, 30, 30);
+	_soldierCamDot->lock();
+	for (int dotY = 0; dotY < 5; ++dotY)
+	{
+		for (int dotX = 0; dotX < 5; ++dotX)
+		{
+			if ((dotX - 2) * (dotX - 2) + (dotY - 2) * (dotY - 2) <= 5) _soldierCamDot->setPixel(dotX, dotY, red);
+		}
+	}
+	_soldierCamDot->unlock();
+
+	// The title.
+	_txtSoldierCam = new Text(220, 9, 0, 0);
+	_state->add(_txtSoldierCam, "textName", "battlescape");
+	_txtSoldierCam->setHighContrast(true);
+
+	for (Surface *part : { (Surface*)_soldierCamDot, (Surface*)_txtSoldierCam })
+	{
+		part->setVisible(false);
+		_ownSurfaces.insert(part);
+	}
+}
+
+/**
+ * Makes (or makes again, after a resize) the soldier cam's picture and frame at the canvas's
+ * size: about 60% of its width (at least twice the card's camera, and inside the canvas), in the
+ * card camera's proportions. The picture is a second small 3D view like the card's: sharing the
+ * big view's voxel models, reaching at most 30 tiles, without particles; it takes the old one's
+ * place among the surfaces.
+ */
+void FirstPersonMode::makeSoldierCamView()
+{
+	_soldierCamWidth = std::min(canvasWidth() - 24, std::max(2 * PreviewW, canvasWidth() * 3 / 5)) & ~1;
+	_soldierCamHeight = _soldierCamWidth * PreviewH / PreviewW;
+	const Mod *mod = _game->getMod();
+
+	// The frame: the picture inside a 4 pixel border, under a 16 pixel title bar. Its colours
+	// are the card's (the mod's "firstPerson" interface, element "panel", if it sets them).
+	Surface *frame = new Surface(_soldierCamWidth + 8, _soldierCamHeight + 20, 0, 0);
+	frame->setPalette(_state->getPalette());
+	Uint8 background = 15, border = 8;
+	if (const RuleInterface *interfaceRules = mod->getInterface("firstPerson", false))
+	{
+		if (const Element *panelElement = interfaceRules->getElementOptional("panel"))
+		{
+			if (panelElement->color != INT_MAX) background = panelElement->color;
+			if (panelElement->border != INT_MAX) border = panelElement->border;
+		}
+	}
+	frame->drawRect(0, 0, frame->getWidth(), frame->getHeight(), border);
+	frame->drawRect(1, 1, frame->getWidth() - 2, frame->getHeight() - 2, background);
+	frame->drawRect(3, 15, _soldierCamWidth + 2, _soldierCamHeight + 2, border);
+
+	// The picture.
+	FirstPersonView *camera = new FirstPersonView(_game, _soldierCamWidth, _soldierCamHeight, 0, 0);
+	camera->setPalette(_state->getPalette());
+	camera->shareCache(_view); // (first: then the battle doesn't build models of its own)
+	camera->setSavedBattleGame(_save);
+	camera->setMap(_state->_map);
+	camera->setMaxDistance(std::min(30, mod->getFirstPerson().getMaxViewDistance()));
+	camera->setParticles(false);
+	camera->setStatic(0.03f); // a little TV static: a camera's picture
+
+	// In place of the old ones (or, the first time, added last: drawn over everything).
+	const bool wasVisible = _soldierCam && _soldierCam->getVisible();
+	auto putInPlace = [this, wasVisible](Surface *oldSurface, Surface *newSurface)
+	{
+		if (oldSurface)
+		{
+			std::replace(_state->_surfaces.begin(), _state->_surfaces.end(), oldSurface, newSurface);
+			_ownSurfaces.erase(oldSurface);
+			delete oldSurface;
+		}
+		else
+		{
+			_state->add(newSurface);
+		}
+		newSurface->setVisible(wasVisible);
+		_ownSurfaces.insert(newSurface);
+	};
+	putInPlace(_soldierCamFrame, frame);
+	putInPlace(_soldierCam, camera);
+	_soldierCamFrame = frame;
+	_soldierCam = camera;
+}
+
+/**
  * Decides which screen corner (or edge middle) each of our surfaces keeps to when the screen
  * is resized (see shiftAnchored). Everything not listed stays top left.
  */
@@ -544,9 +666,10 @@ void FirstPersonMode::setResizeAnchors()
 
 
 /**
- * Notes what the player has chosen (3D or not, the classic HUD), for a remade screen of the
- * same battle. Called the moment a choice is made: the old screen is only deleted after the new
- * one is made, so waiting for its destructor would be too late.
+ * Notes what the player has chosen (3D or not, the classic HUD, the flashlight, what the cheats
+ * and akimbo keys switch back on) and the Doom fuses burning, for a remade screen of the same
+ * battle. Called the moment a choice is made, and every frame (for the fuses): the old screen is
+ * only deleted after the new one is made, so waiting for its destructor would be too late.
  */
 void FirstPersonMode::rememberChoices() const
 {
@@ -554,6 +677,10 @@ void FirstPersonMode::rememberChoices() const
 	lastWants3D = _wants3D;
 	lastClassicHud = _classicHud;
 	lastHudHidden = _hudHidden;
+	lastFlashlightOn = _flashlightOn;
+	lastPausedCheats = _pausedCheats;
+	lastAkimboRealisticWasOn = _akimboRealisticWasOn;
+	lastDoomFuses = _doomFuses;
 }
 
 /**
@@ -600,6 +727,7 @@ void FirstPersonMode::resized(int widthChange, int heightChange)
 	delete _view;
 	_view = newView;
 	_trackedUnit = nullptr; // re-place the camera
+	makeSoldierCamView(); // (its size follows the canvas)
 
 	// The game's warning message: its own place moved with the HUD; in full 3D it goes above
 	// our info panel.
@@ -841,9 +969,25 @@ FirstPersonMode::~FirstPersonMode()
 	// screen remade after an options change) gets its pathfinding back to the rules (no vault
 	// let through).
 	SavedGame *savedGame = _game->getSavedGame();
-	if (savedGame && savedGame->getSavedBattle() == _save)
+	const bool battleLivesOn = savedGame && savedGame->getSavedBattle() == _save;
+	if (battleLivesOn)
 	{
 		_save->getPathfinding()->setVault(nullptr, {});
+	}
+	// The battle is over for this screen, unless a remade screen took it over (an options
+	// change; a quickload has already noted its own new battle) or it goes on to its next stage
+	// (a two-stage mission: the mission type changed, the choices carry on, the fuses don't):
+	// forget the choices, so a new battle, which may get the same address, starts afresh (Start
+	// battles in 3D, the flashlight on), however soon.
+	const bool nextStage = battleLivesOn && _save->getMissionType() != _missionAtStart;
+	if (nextStage)
+	{
+		lastDoomFuses.clear();
+	}
+	else if (lastBattle == _save && (!battleLivesOn || _save->getBattleState() == _state))
+	{
+		lastBattle = nullptr;
+		lastThinkTicks = 0;
 	}
 
 	// What isn't owned by the state.
@@ -862,13 +1006,19 @@ bool FirstPersonMode::isActive() const
 }
 
 /**
- * Switches between the isometric map and the 3D view (the 3D key or button). The switch
- * itself happens in think(), called right away, which also checks there is a soldier to look
- * through.
+ * Switches between the isometric map and the 3D view (the 3D key or button), as the ISO/3D
+ * button says: the map when the 3D view shows, else 3D. The switch itself happens in think(),
+ * called right away, which also checks there is a soldier to look through. In the aliens' turn
+ * with "Alien turn in 3D" off the map shows while 3D is wanted: 3D then comes with the player's
+ * turn, and a line says so.
  */
 void FirstPersonMode::toggleView()
 {
-	_wants3D = !_wants3D;
+	_wants3D = !isActive();
+	if (_wants3D && _save->getSide() != FACTION_PLAYER && !Options::fpsAlienTurn3D)
+	{
+		_state->warning("STR_FPS_3D_NEXT_TURN");
+	}
 	rememberChoices();
 	think();
 }
@@ -901,6 +1051,19 @@ void FirstPersonMode::setActive(bool active)
 
 	// In 3D the night vision hold key (Space) jumps; night vision there is gear with its own key.
 	_state->_map->setNightVisionHoldBlocked(active && Options::keyFpsJump == Options::keyNightVisionHold);
+
+	// Going into 3D, and back, the map forgets any arrow key it was scrolling with: a key let go
+	// in 3D, where the map doesn't get it, would leave it drifting. (Done both ways, as the map
+	// takes the release only while its cursor shows, which isn't so while the game is busy.)
+	for (SDLKey scrollKey : { Options::keyBattleLeft, Options::keyBattleRight, Options::keyBattleUp, Options::keyBattleDown })
+	{
+		SDL_Event release = {};
+		release.type = SDL_KEYUP;
+		release.key.keysym.sym = scrollKey;
+		Action releaseAction(&release, 1.0, 1.0, 0, 0);
+		_state->_map->getCamera()->keyboardRelease(&releaseAction, _state);
+	}
+	_state->_map->getCamera()->stopKeyScrolling();
 
 	// In 3D, sounds are panned for the soldier's ears (where the view looks), not the map's camera.
 	if (active)
@@ -958,6 +1121,66 @@ void FirstPersonMode::toggleHud()
 }
 
 /**
+ * Switches the flashlight on or off (its key, F by default), with a click of the switch. It's
+ * the 3D view's own light (setting "Flashlight": on, a wide beam from the shoulder in the dark;
+ * dynamic, a spot on the crosshair at any time of day) and changes nothing in the game's rules;
+ * the suit light (L) is the game's personal light and stays separate. Each battle starts with
+ * it on.
+ */
+void FirstPersonMode::toggleFlashlight()
+{
+	// No flashlight (the setting is Off): say so, so the key doesn't seem dead.
+	if (FirstPerson::flashlightMode() == 0)
+	{
+		_state->warning("STR_FPS_FLASHLIGHT_SETTING_OFF");
+		return;
+	}
+	_flashlightOn = !_flashlightOn;
+	rememberChoices();
+	_sounds->play(FirstPersonSounds::LIGHT_SWITCH);
+	// The shoulder flashlight lights only in the dark: switched by day, a line says so.
+	if (FirstPerson::flashlightMode() == 1 && _save->getGlobalShade() < FlashlightDarkShade)
+	{
+		_state->warning("STR_FPS_FLASHLIGHT_DARK_ONLY");
+	}
+}
+
+/**
+ * The modifier bits of the lean key (setting "Lean") while it's held, when it is a modifier key
+ * (Shift, Ctrl or Alt; Left Shift by default). None with leaning off, another lean key, or the
+ * key not held.
+ */
+SDLMod FirstPersonMode::leanModifierHeld() const
+{
+	if (Options::fpsLean == 0)
+	{
+		return KMOD_NONE;
+	}
+	// Which modifier bits the lean key sets.
+	int bits = KMOD_NONE;
+	switch (Options::keyFpsLeanHold)
+	{
+	case SDLK_LSHIFT: bits = KMOD_LSHIFT; break;
+	case SDLK_RSHIFT: bits = KMOD_RSHIFT; break;
+	case SDLK_LCTRL: bits = KMOD_LCTRL; break;
+	case SDLK_RCTRL: bits = KMOD_RCTRL; break;
+	case SDLK_LALT: bits = KMOD_LALT; break;
+	case SDLK_RALT: bits = KMOD_RALT; break;
+	default: return KMOD_NONE;
+	}
+	return (SDL_GetModState() & bits) ? (SDLMod)bits : KMOD_NONE;
+}
+
+/**
+ * Is a Ctrl or Alt held that is the game's (for a shortcut such as Ctrl+S): then the keys are the
+ * game's. A Ctrl or Alt held as the lean key is ours.
+ */
+bool FirstPersonMode::gameModifierHeld() const
+{
+	return (SDL_GetModState() & (KMOD_CTRL | KMOD_ALT) & ~leanModifierHeld()) != 0;
+}
+
+/**
  * Is the 3D HUD hidden right now: in the 3D view, with the hide HUD key?
  */
 bool FirstPersonMode::hudHidden() const
@@ -1008,7 +1231,7 @@ bool FirstPersonMode::doomModeOn()
 /**
  * The doom mode key (Insert): with any of the cheats on (doom mode, IDKFA, IDDQD), switches them
  * all off and remembers which were on; with none on, switches those back on (doom mode alone if
- * there are none to remember).
+ * there are none to remember). The game's warning line says which.
  */
 void FirstPersonMode::toggleCheats()
 {
@@ -1024,6 +1247,27 @@ void FirstPersonMode::toggleCheats()
 		Options::fpsDoomIdkfa = (cheats & 2) != 0;
 		Options::fpsDoomIddqd = (cheats & 4) != 0;
 	}
+	// A line says which (the panel's tag hides with the classic HUD or the 3D HUD hidden), and
+	// the options file keeps it, so the options screen's Cancel doesn't quietly undo it.
+	if (doomModeOn()) _state->warningRaw(_state->tr("STR_FPS_CHEATS_ON").arg(cheatTag()));
+	else _state->warning("STR_FPS_CHEATS_OFF");
+	rememberChoices();
+	Options::save();
+}
+
+/**
+ * The cheats that are on, as the info panel tags them: DOOM MODE, or the extras that are on
+ * (IDDQD, IDKFA).
+ */
+std::string FirstPersonMode::cheatTag() const
+{
+	if (!Options::fpsDoomIddqd && !Options::fpsDoomIdkfa)
+	{
+		return std::string(_state->tr("STR_FPS_DOOM"));
+	}
+	std::string tag = Options::fpsDoomIddqd ? std::string(_state->tr("STR_FPS_IDDQD")) : "";
+	if (Options::fpsDoomIdkfa) tag += (tag.empty() ? "" : " ") + std::string(_state->tr("STR_FPS_IDKFA"));
+	return tag;
 }
 
 /**
@@ -1268,11 +1512,20 @@ void FirstPersonMode::think()
 	// so a long pause doesn't make one huge step).
 	const Uint32 now = SDL_GetTicks();
 	lastThinkTicks = now;
+	rememberChoices(); // (the fuses burning change all the time)
 	const double elapsedSeconds = _lastFrameTick ? std::min<Uint32>(100, now - _lastFrameTick) / 1000.0 : 0.0;
 
 	// Another screen was on top (popup, next turn, inventory): it had the mouse released.
 	const bool resumed = _lastFrameTick && now - _lastFrameTick > 250;
 	_lastFrameTick = now;
+
+	// The right button may have been let go while another screen had the mouse, or the view
+	// changed: then the zoom it held and the drag look end too.
+	if ((_zoomButtonHeld || _dragLook) && !(SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON(SDL_BUTTON_RIGHT)))
+	{
+		_zoomButtonHeld = false;
+		_dragLook = false;
+	}
 
 	// When the mouse gets captured or released, or we come back from another screen, the cursor
 	// jumps; ignore mouse movement for a moment so the jump doesn't turn the view. Coming back
@@ -1291,9 +1544,16 @@ void FirstPersonMode::think()
 	// Doom IDDQD keeps X-COM's morale full, whatever the view and whoever's turn it is.
 	applyGodMode();
 
-	// A soldier going down or breaking down: their camera has the frame.
+	// A soldier going down or breaking down: their camera has the frame, unzoomed (the scope
+	// goes).
 	if (deathCam(now, elapsedSeconds) || breakdownCam(now, elapsedSeconds))
 	{
+		if (_zoom != 1.0)
+		{
+			_zoom = 1.0;
+			_view->setFieldOfView(fieldOfViewNow());
+			updateScope();
+		}
 		return;
 	}
 
@@ -1309,14 +1569,19 @@ void FirstPersonMode::think()
 	{
 		// The player's turn: the view starts afresh on the soldier, looking the way they face
 		// (the cameras turned it round for the aliens, and turning by the rules mustn't charge
-		// the soldier for that).
-		if (_alienTurnCamerasRan) _trackedUnit = nullptr;
+		// the soldier for that), and forgets an alien it was to turn to.
+		if (_alienTurnCamerasRan)
+		{
+			_trackedUnit = nullptr;
+			_lookAtOnSwitch = nullptr;
+		}
 		_alienTurnCamerasRan = false;
 		_alienTurnCamera = nullptr;
 		_alertWatch.clear();
 	}
-	else if (Options::fpsAlienTurn3D)
+	else if (Options::fpsAlienTurn3D && _wants3D)
 	{
+		// (Only while the 3D view is wanted: with the map shown, nothing for the cameras to do.)
 		alienTurnView = alienTurnCamera(now);
 		_alienTurnCamerasRan = Options::fpsAlienTurnCameras;
 	}
@@ -1342,9 +1607,12 @@ void FirstPersonMode::think()
 	updateMapAim();
 	updateFlight(show3D ? unit : nullptr);
 
-	// On the isometric map: hide the 3D view's overlays, and that's all.
+	// On the isometric map: hide the 3D view's overlays (the scope too: back in 3D the view
+	// starts unzoomed), and that's all.
 	if (!show3D)
 	{
+		_zoom = 1.0;
+		updateScope();
 		updateInfoPanel(nullptr);
 		updateArmorButtons(nullptr);
 		updateLift(nullptr, now);
@@ -1372,25 +1640,27 @@ void FirstPersonMode::think()
 	_view->setSmoothLighting(Options::fpsSmoothLighting);
 
 	// What happened to the soldier and around them: a new enemy spotted, hurt, on fire, a shot
-	// whizzing past; the recoil easing back, and a held trigger firing on.
+	// whizzing past; the recoil easing back, the game done aiming our last shot, and a held
+	// trigger firing on.
 	checkSpotted(unit, playerTurn);
 	checkHurt(unit, now);
 	checkBurning(unit, now);
 	checkNearMiss();
 	updateRecoil(unit, elapsedSeconds);
+	endShotAim();
 	keepFiringWhileHeld(unit, playerTurn);
 
-	// Night vision (gear), in the isometric map's colour. In the dark (the battle's shade 6 or
-	// more, of 0 bright .. 15 dark), the soldier's personal light becomes a shoulder flashlight
-	// (setting "Flashlight").
+	// Night vision (gear), in the isometric map's colour.
 	_view->setNightVision(hasNightVision(unit) ? _state->_map->getNightVisionColor() : 0);
 	// Smoke as this soldier's eyes see through it: the game's sight range, and the armor's heat
 	// vision (setting "Smoke": Modern).
 	_view->setSmokeSight(_save->getTileEngine()->getMaxViewDistance() * 16.0f, unit->getVisibilityThroughSmoke(), unit->getVisibilityThroughFire());
-	// The flashlight, on with the game's personal light (L, or SUIT LIGHT): the shoulder one in
-	// the dark; the tactical one (setting) whenever it's on, so it lights dark places by day too.
-	if (Options::fpsTacticalFlashlight) _view->setFlashlight(_save->getTogglePersonalLight(), true);
-	else _view->setFlashlight(Options::fpsFlashlight && _save->getTogglePersonalLight() && _save->getGlobalShade() >= 6);
+	// The flashlight (setting "Flashlight"), on and off with its own key (see toggleFlashlight):
+	// on, a wide beam from the shoulder, in the dark only (the battle's shade 6 or more, of 0
+	// bright .. 15 dark); dynamic, a spot on the crosshair, so it lights dark places by day too.
+	const int flashlightMode = FirstPerson::flashlightMode();
+	const bool dynamicFlashlight = flashlightMode == 2;
+	_view->setFlashlight(flashlightMode > 0 && _flashlightOn && (dynamicFlashlight || _save->getGlobalShade() >= FlashlightDarkShade), dynamicFlashlight);
 
 	// The camera follows the soldier (and walks them on your turn); on your turn the soldier
 	// also faces where you look, and the fire mode and aim are kept up to date.
@@ -1487,6 +1757,12 @@ bool FirstPersonMode::handle(Action *action)
 		trackHover(action);
 	}
 
+	// The mouse's thumb buttons are the game's (next and previous soldier, OXCE's option).
+	if ((event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) && (event.button.button == SDL_BUTTON_X1 || event.button.button == SDL_BUTTON_X2))
+	{
+		return false;
+	}
+
 	// Keys go to the key handler; anything that's neither a key nor the mouse isn't ours.
 	if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP)
 	{
@@ -1531,20 +1807,24 @@ void FirstPersonMode::trackHover(Action *action)
 /**
  * A key went down or up: the view toggle anywhere; in 3D our own keys. Each of our keys acts
  * when it goes down, and both its down and up are ours. The movement keys are polled each
- * frame, and swallowed here so they don't fire battlescape hotkeys. With Ctrl or Alt held the
- * key belongs to the game.
+ * frame, and swallowed here so they don't fire battlescape hotkeys. With the game's Ctrl or Alt
+ * held the key belongs to the game (not with a Ctrl or Alt that is the lean key, held to lean).
  * @param active Whether the 3D view is showing.
  * @return True if the key was ours.
  */
 bool FirstPersonMode::handleKey(Action *action, bool active)
 {
 	const SDL_Event &event = *action->getDetails();
-	if (_game->isCtrlPressed() || _game->isAltPressed())
+	const SDLKey key = event.key.keysym.sym;
+	// A key SDL can't name is never ours (an unbound action is SDLK_UNKNOWN too), nor one with
+	// the game's Ctrl or Alt held (a shortcut; see gameModifierHeld).
+	if (key == SDLK_UNKNOWN || gameModifierHeld())
 	{
 		return false;
 	}
-	const SDLKey key = event.key.keysym.sym;
 	const bool pressed = event.type == SDL_KEYDOWN; // went down (not up)
+	// (While leaning with Left Shift, the game's own hotkeys stay quiet, as the game ignores a
+	// hotkey with Shift held: Q and E don't open a hand's menu in the middle of a lean.)
 
 	// The 3D key works in both views.
 	if (key == Options::keyBattleFirstPerson)
@@ -1557,13 +1837,14 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 		return false;
 	}
 
-	// Our keys in 3D: the modes, fire modes and hand, doors, flares, up/down, flight, jump and
-	// night vision. (The flare key is only ours while flares are switched on.)
+	// Our keys in 3D: the modes, fire modes and hand, doors, flares, up/down, flight, the
+	// flashlight, jump and night vision. (The flare and flashlight keys with their settings off
+	// say so on the warning line.)
 	if (key == Options::keyFpsMouseMode) { if (pressed) setMouseLook(!_mouseLook); return true; }
 	if (key == Options::keyFpsClassicHud) { if (pressed) setClassicHud(!_classicHud); return true; }
 	if (key == Options::keyFpsHideHud) { if (pressed) toggleHud(); return true; }
 	if (key == Options::keyFpsDoomMode) { if (pressed) toggleCheats(); return true; }
-	if (key == Options::keyFpsNextMode) { if (pressed) cycleFireMode(1); return true; }
+	if (key == Options::keyFpsNextFireMode) { if (pressed) cycleFireMode(1); return true; }
 	if (key == Options::keyFpsModeSnap) { if (pressed) selectFireMode(BA_SNAPSHOT); return true; }
 	if (key == Options::keyFpsModeAimed) { if (pressed) selectFireMode(BA_AIMEDSHOT); return true; }
 	if (key == Options::keyFpsModeAuto) { if (pressed) selectFireMode(BA_AUTOSHOT); return true; }
@@ -1576,12 +1857,16 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	if (Options::fpsLean > 0 && key != SDLK_UNKNOWN && (key == Options::keyFpsLeanHold || key == Options::keyFpsLeanLeftOwn || key == Options::keyFpsLeanRightOwn)) return true;
 	if (Options::fpsZoom && key != SDLK_UNKNOWN && key == Options::keyFpsZoom) return true; // (held: see updateZoom)
 	if (key == Options::keyFpsOpenDoor) { if (pressed) openDoor(_save->getSelectedUnit()); return true; }
-	if (key == Options::keyFpsFlare && Options::fpsFlares) { if (pressed) throwFlare(); return true; }
+	if (key == Options::keyFpsFlare) { if (pressed) { if (Options::fpsFlares) throwFlare(); else _state->warning("STR_FPS_FLARES_OFF"); } return true; }
 	if (key == Options::keyFpsUp) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_UP, action); return true; }
 	if (key == Options::keyFpsDown) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_DOWN, action); return true; }
 	if (key == Options::keyFpsFlight) { if (pressed) toggleFlight(_save->getSelectedUnit()); return true; }
+	if (key == Options::keyFpsFlashlight) { if (pressed) toggleFlashlight(); return true; }
 	if (key == Options::keyFpsJump) { if (pressed) jump(_save->getSelectedUnit()); return true; }
-	if (key == Options::keyFpsNightVision) { if (pressed) toggleNightVision(_save->getSelectedUnit(), action); return true; }
+	// Night vision: the gear of the soldier the view looks through (in the aliens' turn the
+	// game's selected unit is the alien acting); the game's own key (Scroll Lock) checks for it
+	// in 3D too.
+	if (key == Options::keyFpsNightVision || key == Options::keyNightVisionToggle) { if (pressed) toggleNightVision(_trackedUnit, action); return true; }
 
 	// The game's own keys for what acts on the isometric map, translated (see classicHudButton):
 	// the centre key (Home) looks straight ahead; the map level keys (if not taken by up/down
@@ -1609,7 +1894,7 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	// can start (see tileMoveVelocity), so a quick tap always counts.
 	if (key == SDLK_KP8 || key == SDLK_KP2 || key == SDLK_KP4 || key == SDLK_KP6)
 	{
-		if (pressed)
+		if (pressed && _save->getSide() == FACTION_PLAYER) // (not remembered through the aliens' turn)
 		{
 			_numpadMove[0] = key == SDLK_KP8 ? 1 : key == SDLK_KP2 ? -1 : 0;
 			_numpadMove[1] = key == SDLK_KP6 ? 1 : key == SDLK_KP4 ? -1 : 0;
@@ -1760,7 +2045,8 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 			return true;
 		}
 
-		// Any click on one of our buttons is ours; a left press clicks it.
+		// Any click on one of our buttons is ours; a left press clicks it. A right click on a
+		// soldier's button opens the soldier cam (their card's camera, enlarged), or closes it.
 		if (buttonUnderCursor)
 		{
 			if (event.type == SDL_MOUSEBUTTONDOWN)
@@ -1769,6 +2055,10 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 				if (event.button.button == SDL_BUTTON_LEFT)
 				{
 					buttonClicked(buttonUnderCursor, action);
+				}
+				else if (event.button.button == SDL_BUTTON_RIGHT && std::find(_btnSquad.begin(), _btnSquad.end(), buttonUnderCursor) != _btnSquad.end())
+				{
+					_soldierCamOpen = !_soldierCamOpen;
 				}
 			}
 			return true;

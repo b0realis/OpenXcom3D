@@ -152,11 +152,34 @@ void resized(FirstPersonMode *mode, int widthChange, int heightChange)
 /**
  * Settles settings that take their first value from an older one, once the options are loaded
  * (called when a battle or the 3D VIEW tab opens): the smoke (Solid, Original, Modern) from 0.9's
- * "See-through smoke": YES gives Modern, NO Solid.
+ * "See-through smoke": YES gives Modern, NO Solid; the flashlight (Off, On, Dynamic) from 1.0's
+ * "Flashlight" and "Tactical flashlight"; and 1.0's next fire mode key, when the player had
+ * moved it off F (F is the flashlight now), once.
  */
 void settleOptions()
 {
 	Options::fpsSmoke = smokeMode();
+	Options::fpsFlashlightMode = flashlightMode();
+	if (Options::keyFpsNextMode != SDLK_f)
+	{
+		Options::keyFpsNextFireMode = Options::keyFpsNextMode;
+		Options::keyFpsNextMode = SDLK_f;
+	}
+}
+
+/**
+ * The flashlight setting as it stands: Off (0), On (1) or Dynamic (2). Unset (-1: a profile from
+ * 1.0 not settled yet, or the defaults just restored on the 3D VIEW tab), it's what 1.0's two
+ * settings say: "Tactical flashlight" YES Dynamic, else "Flashlight" YES On, NO Off.
+ * @return 0, 1 or 2.
+ */
+int flashlightMode()
+{
+	if (Options::fpsFlashlightMode >= 0 && Options::fpsFlashlightMode <= 2)
+	{
+		return Options::fpsFlashlightMode;
+	}
+	return Options::fpsTacticalFlashlight ? 2 : (Options::fpsFlashlight ? 1 : 0);
 }
 
 /**
@@ -231,19 +254,21 @@ void createOptions(std::vector<OptionInfo> &options)
 	// Melee at the wall, door or object the soldier faces (the game's terrain melee, on even if
 	// the mod leaves it off) and at a body lying in front.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMeleeTerrain", &fpsMeleeTerrain, false, "STR_FPS_MELEE_TERRAIN", category));
-	// Light, atmosphere and sound: smooth lighting between tiles, ray-traced shadows, the
-	// personal light as a shoulder flashlight, night vision only with the right gear, tenser
-	// music while aliens are in sight, the ticks of a hit and a kill, smoke drawn as the
-	// soldier's eyes see through it, and unlimited tactical flares.
+	// Light, atmosphere and sound: smooth lighting between tiles, ray-traced shadows, a
+	// flashlight, night vision only with the right gear, tenser music while aliens are in sight,
+	// the ticks of a hit and a kill, smoke drawn as the soldier's eyes see through it, and
+	// unlimited tactical flares.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmoothLighting", &fpsSmoothLighting, true, "STR_FPS_SMOOTH_LIGHTING", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsShadows", &fpsShadows, true, "STR_FPS_SHADOWS", category));
 	// The distance haze on land: normal (0), light (1), clear (2: only a thin fade where the
 	// view ends). Under the sea the murk stays.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHaze", &fpsHaze, 0, "STR_FPS_HAZE", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlashlight", &fpsFlashlight, true, "STR_FPS_FLASHLIGHT", category));
-	// ...or, instead, a tactical flashlight on the weapon: a tight spot on the crosshair, lighting
-	// dark places at any time of day.
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsTacticalFlashlight", &fpsTacticalFlashlight, false, "STR_FPS_TACTICAL_FLASHLIGHT", category));
+	// The flashlight, a light of the 3D view's own (on and off with its key, F; the suit light
+	// stays the game's): none (0), a wide beam from the shoulder in the dark (1, on), or a light
+	// on the weapon, a tight spot on the crosshair at any time of day (2, dynamic). Unset (-1)
+	// until settled (see settleOptions) from 1.0's two settings, kept below, unlisted (a new name,
+	// as 1.0's YES/NO wouldn't load into a number).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlashlightMode", &fpsFlashlightMode, -1, "STR_FPS_FLASHLIGHT", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightVisionGear", &fpsNightVisionGear, true, "STR_FPS_NIGHT_VISION_GEAR", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCombatMusic", &fpsCombatMusic, true, "STR_FPS_COMBAT_MUSIC", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitSounds", &fpsHitSounds, true, "STR_FPS_HIT_SOUNDS", category));
@@ -255,6 +280,10 @@ void createOptions(std::vector<OptionInfo> &options)
 	// 0.9's "See-through smoke" (YES/NO), loaded and saved but listed nowhere (a category no
 	// options screen shows): it gives the smoke setting its first value.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughSmoke", &fpsSeeThroughSmoke, true, "STR_FPS_SEE_THROUGH_SMOKE", "STR_FIRST_PERSON_SAVED"));
+	// 1.0's "Flashlight" and "Tactical flashlight" (YES/NO), the same way: they give the
+	// flashlight setting its first value.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlashlight", &fpsFlashlight, true, "STR_FPS_FLASHLIGHT", "STR_FIRST_PERSON_SAVED"));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsTacticalFlashlight", &fpsTacticalFlashlight, false, "STR_FPS_FLASHLIGHT", "STR_FIRST_PERSON_SAVED"));
 	// Looks: the weapon in hand (always made of voxels), sprite upscaling (0 off, 1 smooth,
 	// 2 smooth + detail), muzzle flashes, particles (0 none, 1 effects, 2 everything),
 	// UFOs with steady hulls, glowing lights, coloured light and an aura, and the pixel size
@@ -320,8 +349,12 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsBack", &keyFpsBack, SDLK_s, "STR_FPS_KEY_BACK", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsStrafeLeft", &keyFpsStrafeLeft, SDLK_a, "STR_FPS_KEY_STRAFE_LEFT", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsStrafeRight", &keyFpsStrafeRight, SDLK_d, "STR_FPS_KEY_STRAFE_RIGHT", category));
-	// Fire modes (the next one, or snap, aimed and auto directly) and switching hands.
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsNextMode", &keyFpsNextMode, SDLK_f, "STR_FPS_KEY_NEXT_MODE", category));
+	// Fire modes (the next one, or snap, aimed and auto directly) and switching hands. The next
+	// fire mode is J (the game's "reserve TUs for kneel", which keeps it on the map), as F is the
+	// flashlight. (1.0 saved it as keyFpsNextMode, on F: the new name leaves F behind, and a key
+	// the player had picked instead carries over, see settleOptions.)
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsNextFireMode", &keyFpsNextFireMode, SDLK_j, "STR_FPS_KEY_NEXT_MODE", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsNextMode", &keyFpsNextMode, SDLK_f, "STR_FPS_KEY_NEXT_MODE", "STR_FIRST_PERSON_SAVED"));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsModeSnap", &keyFpsModeSnap, SDLK_z, "STR_FPS_KEY_MODE_SNAP", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsModeAimed", &keyFpsModeAimed, SDLK_x, "STR_FPS_KEY_MODE_AIMED", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsModeAuto", &keyFpsModeAuto, SDLK_v, "STR_FPS_KEY_MODE_AUTO", category));
@@ -343,6 +376,8 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsOpenDoor", &keyFpsOpenDoor, SDLK_o, "STR_FPS_KEY_OPEN_DOOR", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlare", &keyFpsFlare, SDLK_t, "STR_FPS_KEY_FLARE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlight", &keyFpsFlight, SDLK_b, "STR_FPS_KEY_FLIGHT", category));
+	// The flashlight on and off (F, as in the first-person shooters; setting "Flashlight").
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlashlight", &keyFpsFlashlight, SDLK_f, "STR_FPS_KEY_FLASHLIGHT", category));
 	// Space is the map's night vision hold key; in 3D it jumps, and night vision is gear (N).
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsJump", &keyFpsJump, SDLK_SPACE, "STR_FPS_KEY_JUMP", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsNightVision", &keyFpsNightVision, SDLK_n, "STR_FPS_KEY_NIGHT_VISION", category));

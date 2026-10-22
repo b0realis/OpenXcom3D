@@ -281,6 +281,11 @@ inline Uint8 inkColor(const SDL_Color *palette, int red, int green, int blue)
  */
 inline std::string keyLabel(SDLKey key)
 {
+	// An unbound key has no name to show (SDL would say "UNKNOWN KEY").
+	if (key == SDLK_UNKNOWN)
+	{
+		return "";
+	}
 	std::string text = SDL_GetKeyName(key);
 	for (char &letter : text) letter = (char)toupper((unsigned char)letter);
 	return text;

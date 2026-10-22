@@ -104,7 +104,7 @@ void FirstPersonMode::turnByMouse(int mouseDeltaX, int mouseDeltaY)
 void FirstPersonMode::updateZoom(double elapsedSeconds)
 {
 	const Uint8 *keyStates = SDL_GetKeyState(nullptr);
-	const bool keyHeld = Options::keyFpsZoom != SDLK_UNKNOWN && keyStates[Options::keyFpsZoom] && !_game->isCtrlPressed() && !_game->isAltPressed();
+	const bool keyHeld = Options::keyFpsZoom != SDLK_UNKNOWN && keyStates[Options::keyFpsZoom] && !gameModifierHeld();
 	const bool zoomedIn = Options::fpsZoom && isActive() && (keyHeld || (_zoomButtonHeld && _mouseLook));
 	const double logTarget = zoomedIn ? std::log(ZoomFactor) : 0.0, logStep = std::log(ZoomFactor) * elapsedSeconds / ZoomSeconds;
 	const double logZoom = std::log(_zoom);
@@ -201,7 +201,7 @@ void FirstPersonMode::faceLookDirection(BattleUnit *unit)
 		}
 		const int step = offFacing > 0.0 ? 1 : -1;
 		const int cost = unit->getTurnCost();
-		if (!doomModeOn() && (unit->getTimeUnits() < cost || !_state->_battleGame->checkReservedTU(unit, cost, 0, true)))
+		if (!doomModeOn() && (unit->getTimeUnits() < cost || !reserveAllows(unit, cost, 0)))
 		{
 			// Not enough time units (or they're reserved for a shot): the view stops at the
 			// head's limit, and the game's warning says why (at most every two seconds).
@@ -450,6 +450,9 @@ void FirstPersonMode::updateCamera(BattleUnit *unit, bool canMove, double elapse
 		snapToTile(unit);
 		endLean();
 		_snapTurnDegrees = _snapPitchDegrees = 0.0;
+		// A tile move (or a numpad press) belonged to the soldier before.
+		_tileMove = false;
+		_numpadMove[0] = _numpadMove[1] = 0;
 		// Picked to look at someone (a right click on an enemy button): turn to them, from this
 		// soldier's eye (the view's eye moves there only at the end of the frame).
 		if (_lookAtOnSwitch)

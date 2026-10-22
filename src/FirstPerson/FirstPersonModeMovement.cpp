@@ -137,12 +137,12 @@ bool FirstPersonMode::stepAllowed(BattleUnit *unit, int stepX, int stepY)
 		}
 
 		// The soldier must be able to pay for it: enough time units and energy, with enough time
-		// units left for the shot the player reserved (only checked here, so the game shows no
-		// message). The debug "doom mode" (endless time units, energy and ammo) skips this.
+		// units left for the shot the player reserved (see reserveAllows). The debug "doom mode"
+		// (endless time units, energy and ammo) skips this.
 		if (allowed && !doomModeOn())
 		{
 			allowed = unit->getTimeUnits() >= stepCost.cost.time && unit->getEnergy() >= stepCost.cost.energy
-				&& _state->_battleGame->checkReservedTU(unit, stepCost.cost.time, stepCost.cost.energy, true);
+				&& reserveAllows(unit, stepCost.cost.time, stepCost.cost.energy);
 		}
 		_stepAllowedCache[direction] = allowed ? 1 : 0;
 	}
@@ -398,6 +398,20 @@ bool FirstPersonMode::walkGuidedStep(BattleUnit *unit, double &newEyeX, double &
 }
 
 /**
+ * Does the time unit reserve the player set (F1 to F4, J on the map) leave enough for a move, as
+ * the game's own walk checks it: a reserve the soldier can't pay for any more (time units already
+ * below the reserved shot's cost) holds nothing back. Only checked, so the game shows no message.
+ * @param unit The soldier.
+ * @param timeUnits The move's time units.
+ * @param energy The move's energy.
+ */
+bool FirstPersonMode::reserveAllows(BattleUnit *unit, int timeUnits, int energy) const
+{
+	BattlescapeGame *battleGame = _state->_battleGame;
+	return !battleGame->checkReservedTU(unit, 0, 0, true) || battleGame->checkReservedTU(unit, timeUnits, energy, true);
+}
+
+/**
  * Which way the movement keys push: forward (1) or back (-1), and strafing right (1) or left
  * (-1), each 0 when neither or both of its keys are held. While the lean key is held (setting
  * "Lean"), the strafe keys lean instead (see updateLean) and don't strafe.
@@ -406,6 +420,12 @@ bool FirstPersonMode::walkGuidedStep(BattleUnit *unit, double &newEyeX, double &
  */
 void FirstPersonMode::movementKeys(double &forward, double &strafe) const
 {
+	// With the game's Ctrl or Alt held, the keys are its shortcuts (Ctrl+S): no walking.
+	if (gameModifierHeld())
+	{
+		forward = strafe = 0.0;
+		return;
+	}
 	const Uint8 *keyStates = SDL_GetKeyState(nullptr);
 	forward = (keyStates[Options::keyFpsForward] ? 1.0 : 0.0) - (keyStates[Options::keyFpsBack] ? 1.0 : 0.0);
 	strafe = (keyStates[Options::keyFpsStrafeRight] ? 1.0 : 0.0) - (keyStates[Options::keyFpsStrafeLeft] ? 1.0 : 0.0);
@@ -710,7 +730,7 @@ bool FirstPersonMode::tryVault(BattleUnit *unit, int stepX, int stepY)
 	if (canVault && !doomModeOn())
 	{
 		const int timeUnitCost = pathfinding->getTotalTUCost();
-		canVault = unit->getTimeUnits() >= timeUnitCost && _state->_battleGame->checkReservedTU(unit, timeUnitCost, 0, true);
+		canVault = unit->getTimeUnits() >= timeUnitCost && reserveAllows(unit, timeUnitCost, 0);
 		if (!canVault)
 		{
 			_state->warning("STR_NOT_ENOUGH_TIME_UNITS");
@@ -1140,7 +1160,8 @@ void FirstPersonMode::updateLift(BattleUnit *unit, Uint32 now)
 	if (liftWays != _liftKeysShownFor)
 	{
 		std::string keyNames = up ? keyLabel(Options::keyFpsUp) : std::string();
-		if (down) keyNames += (keyNames.empty() ? "" : " / ") + keyLabel(Options::keyFpsDown);
+		const std::string downKey = down ? keyLabel(Options::keyFpsDown) : std::string();
+		if (!downKey.empty()) keyNames += (keyNames.empty() ? "" : " / ") + downKey;
 		_txtLiftKeys->setText(keyNames);
 		_liftKeysShownFor = liftWays;
 	}
@@ -1284,8 +1305,17 @@ bool FirstPersonMode::flightOn(const BattleUnit *unit) const
  */
 void FirstPersonMode::toggleFlight(BattleUnit *unit)
 {
-	if (!canFly(unit) || !isActive())
+	// Only for the player's own soldier, on their turn (in the aliens' turn the game's selected
+	// unit is the alien acting).
+	if (!unit || !isActive() || _save->getSide() != FACTION_PLAYER)
 	{
+		return;
+	}
+	// Armor that can't fly (swim, under the sea): a line says so, so the key doesn't seem dead.
+	const bool underwater = _save->getDepth() > 0;
+	if (!canFly(unit))
+	{
+		_state->warning(underwater ? "STR_FPS_CANNOT_SWIM" : "STR_FPS_CANNOT_FLY");
 		return;
 	}
 
@@ -1294,8 +1324,10 @@ void FirstPersonMode::toggleFlight(BattleUnit *unit)
 	const bool on = !flightOn(unit);
 	_flightSwitchedOn[unit] = on;
 	_landing = !on && unit->isFloating();
+	_landingUnit = _landing ? unit : nullptr;
+	_landingResumeTurn = 0;
 	std::fill(std::begin(_stepAllowedCache), std::end(_stepAllowedCache), -1);
-	_state->warning(on ? "STR_FPS_FLIGHT_ON" : "STR_FPS_FLIGHT_OFF");
+	_state->warning(on ? (underwater ? "STR_FPS_SWIM_ON" : "STR_FPS_FLIGHT_ON") : (underwater ? "STR_FPS_SWIM_OFF" : "STR_FPS_FLIGHT_OFF"));
 }
 
 /**
@@ -1318,7 +1350,7 @@ void FirstPersonMode::moveUpDown(BattleUnit *unit, int direction, Action *action
 	const bool gravLift = tile && tile->getMapData(O_FLOOR) && tile->getMapData(O_FLOOR)->isGravLift();
 	if (canFly(unit) && !flightOn(unit) && !gravLift)
 	{
-		_state->warning("STR_FPS_FLIGHT_OFF");
+		_state->warning(_save->getDepth() > 0 ? "STR_FPS_SWIM_OFF" : "STR_FPS_FLIGHT_OFF");
 		return;
 	}
 
@@ -1348,12 +1380,25 @@ void FirstPersonMode::updateFlight(BattleUnit *unit)
 	{
 		_landAfterStep = false;
 		_landing = unit && unit->isFloating() && !flightOn(unit);
+		_landingUnit = _landing ? unit : nullptr;
+		_landingResumeTurn = 0;
 	}
 
-	// The landing is over on the ground, when flight was switched back on, or with no soldier.
-	if (_landing && (!unit || flightOn(unit) || !unit->isFloating()))
+	// The landing is over on the ground, or when flight was switched back on. Looking through
+	// another soldier (or the map) only interrupts it: it goes on when the soldier is looked
+	// through again, still in the air with flight off. Held up (blocked below, out of time
+	// units), it goes on at the next turn.
+	if (_landingUnit && (flightOn(_landingUnit) || !_landingUnit->isFloating() || _landingUnit->isOut()))
+	{
+		_landingUnit = nullptr;
+	}
+	if (_landing && (!unit || unit != _landingUnit))
 	{
 		_landing = false;
+	}
+	if (!_landing && unit && unit == _landingUnit && _save->getTurn() >= _landingResumeTurn)
+	{
+		_landing = true;
 	}
 
 	// Tell the pathfinding who pays our flight cost for moves up and down (also while landing);
@@ -1369,11 +1414,13 @@ void FirstPersonMode::updateFlight(BattleUnit *unit)
 		const int downCost = pathfinding->getTUCost(unit->getPosition(), Pathfinding::DIR_DOWN, unit, nullptr, BAM_NORMAL).cost.time;
 		if (!pathfinding->validateUpDown(unit, unit->getPosition(), Pathfinding::DIR_DOWN))
 		{
-			_landing = false; // Something below (another unit?): stay up.
+			_landing = false; // Something below (another unit?): stay up until the next turn.
+			_landingResumeTurn = _save->getTurn() + 1;
 		}
 		else if (downCost > unit->getTimeUnits())
 		{
 			_landing = false; // Out of time units: hover here until the next turn.
+			_landingResumeTurn = _save->getTurn() + 1;
 			_state->warning("STR_NOT_ENOUGH_TIME_UNITS");
 		}
 		else

@@ -4,7 +4,7 @@
 
 ![Night, through a soldier's eyes](docs/screenshots/night.png)
 
-*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.0**.
+*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.01**.
 
 **Both games are supported:** *UFO: Enemy Unknown* and *X-COM: Terror From The Deep*.
 
@@ -22,6 +22,12 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 | ![The Skyranger](docs/screenshots/skyranger.png) | ![Terror From The Deep: on the sea floor](docs/screenshots/tftd.png) |
 | ![Dual wield](docs/screenshots/akimbo.png) | ![Signal lost](docs/screenshots/signal_lost.png) |
 | ![Terror From The Deep, an island attack: a Gillman ahead, a Deep One in a teammate's helmet camera](docs/screenshots/tftd_island.png) | ![A rocket going off far down an alien base hall](docs/screenshots/alien_base.png) |
+
+## New in 1.01
+
+- **Light fixes:** the flashlight has its own key now, **F**, apart from the suit light (L), and one setting, *Flashlight*: Off, On (a wide beam in the dark) or Dynamic (a spot on the crosshair, day or night). Next fire mode moved to **J** (and the mouse wheel).
+- **Soldier cam:** a right click on a soldier's button opens their helmet camera big, to look through anyone in the squad without switching to them.
+- **Every key and setting gone over once more:** a key that can't act now says why, *Muzzle flashes* off stops every flash, and a dozen small fixes more.
 
 ## New in 1.0
 

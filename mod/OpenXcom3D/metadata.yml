@@ -2,10 +2,10 @@
 # metadata.yml for OpenXcom3D
 
 name: "OpenXcom3D - First-Person View"
-version: 1.0
+version: 1.01
 description: "Adds a first-person 3D view of the battlescape (F8): mouse look, real-time movement paid with time units (WASD), firing from the crosshair, a squad bar with soldier camera cards, lights, shadows, flashlight, particles, weather, tactical flares, combat music and its own 3D View options tab. Needs the OpenXcom3D build of OXCE; on a standard OXCE build this mod reports an unsupported engine and stays off."
 author: OpenXcom3D project
 
 master: "*"
 requiredExtendedEngine: OpenXcom3D
-requiredExtendedVersion: "1.0"
+requiredExtendedVersion: "1.0.1"

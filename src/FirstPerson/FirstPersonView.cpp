@@ -504,11 +504,11 @@ void FirstPersonView::draw()
 	updateCameraEffects();
 
 	updateBasis();
-	// The flashlight sits on the right shoulder, a little below the eye (voxels); the tactical
+	// The flashlight sits on the right shoulder, a little below the eye (voxels); the dynamic
 	// one just under the eye, on the weapon, so its spot falls on the crosshair.
 	for (int axis = 0; axis < 3; ++axis)
 	{
-		_flashlightPos[axis] = _tacticalFlashlight ? (float)(_eye[axis] - _up[axis] * 1.5 + _forward[axis] * 1.0)
+		_flashlightPos[axis] = _dynamicFlashlight ? (float)(_eye[axis] - _up[axis] * 1.5 + _forward[axis] * 1.0)
 			: (float)(_eye[axis] + _right[axis] * 4.0 - _up[axis] * 4.0 + _forward[axis] * 2.0);
 	}
 	// What the world looks like this frame: the tiles, the ground beyond the map (chosen once),

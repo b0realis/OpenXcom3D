@@ -12,7 +12,7 @@
 		"english"
 		{
 			"Title" "OpenXcom3D"
-			"Description" "OpenXcom3D's first-person battlescape: left stick walks (WASD), the right trackpad looks (mouse), R2 fires, L2 cancels. L1 switches mouse look and the free cursor, R1 the isometric map and 3D. A jump, B reload, X fire mode, Y inventory; d-pad up/down flight and lifts, right next soldier, left switch hand (held: akimbo); left trackpad snap, aimed, auto, door (left/right held: snap turns); L4/R4 lean (setting Lean), L5 night vision (held: light), R5 end turn (held: flare); Menu classic HUD (held: 3D HUD)."
+			"Description" "OpenXcom3D's first-person battlescape: left stick walks (WASD), the right trackpad looks (mouse), R2 fires, L2 cancels. L1 switches mouse look and the free cursor, R1 the isometric map and 3D. A jump, B reload, X fire mode, Y inventory; d-pad up/down flight and lifts, right next soldier (held: flashlight), left switch hand (held: akimbo); left trackpad snap, aimed, auto, door (left/right held: snap turns); L4/R4 lean (setting Lean), L5 night vision (held: suit light), R5 flare (held: end turn); View classic HUD (held: 3D HUD), Menu the game's menu."
 		}
 	}
 	"group"
@@ -63,7 +63,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"key_press F"
+							"binding"		"key_press J"
 						}
 						"settings"
 						{
@@ -449,6 +449,17 @@
 							"haptic_intensity"		"1"
 						}
 					}
+					"Long_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press F"
+						}
+						"settings"
+						{
+							"long_press_time"		"400"
+						}
+					}
 				}
 			}
 			"dpad_west"
@@ -615,14 +626,14 @@
 					{
 						"bindings"
 						{
-							"binding"		"key_press BACKSPACE"
+							"binding"		"key_press T"
 						}
 					}
 					"Long_Press"
 					{
 						"bindings"
 						{
-							"binding"		"key_press T"
+							"binding"		"key_press BACKSPACE"
 						}
 						"settings"
 						{

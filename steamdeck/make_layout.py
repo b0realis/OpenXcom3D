@@ -18,7 +18,7 @@ BINDINGS = [
     # the face buttons (four_buttons)
     ("0", "button_a", "key_press SPACE"),          # jump / vault
     ("0", "button_b", "key_press R"),              # reload
-    ("0", "button_x", "key_press F"),              # next fire mode
+    ("0", "button_x", "key_press J"),              # next fire mode
     ("0", "button_y", "key_press I"),              # inventory
     # the left trackpad, clicked (dpad): the fire modes and the door
     ("1", "dpad_north", "key_press Z"),            # snap shot
@@ -36,17 +36,19 @@ BINDINGS = [
     # the triggers: right = left button (fire, click), left = right button (cancel, hold to look)
     ("4", "edge", "mouse_button RIGHT"),
     ("5", "edge", "mouse_button LEFT"),
-    # the d-pad: up and down (flight, lifts), next soldier, switch hand
+    # the d-pad: up and down (flight, lifts), next soldier (held: the flashlight), switch hand
     ("7", "dpad_north", "key_press PAGE_UP"),
     ("7", "dpad_south", "key_press PAGE_DOWN"),
-    ("7", "dpad_east", "key_press TAB"),
+    ("7", "dpad_east", "key_press TAB", "key_press F"),     # held: the flashlight on/off
     ("7", "dpad_west", "key_press G", "key_press Y"),       # held: akimbo on/off
     # the right stick (joystick_mouse): a finer look, click = left button (as Valve's)
     ("9", "click", "mouse_button LEFT"),
-    # the switches: View = the game's menu, Menu = classic HUD (held: the 3D HUD on/off), L1 = mouse
-    # look / free cursor, R1 = isometric / 3D, back buttons: L4 / R4 held lean left / right (setting
-    # "Lean": the lean key, Left Shift, with a strafe key, so Q and E stay the hands), L5 night
-    # vision (held: the personal light), R5 end turn (held: a flare)
+    # the switches: Menu (button_escape, the Deck's right one, Valve's Start) = the game's menu,
+    # View (button_menu, the left one, Valve's Select) = classic HUD (held: the 3D HUD on/off),
+    # L1 = mouse look / free cursor, R1 = isometric / 3D, back buttons: L4 / R4 held lean left /
+    # right (setting "Lean": the lean key, Left Shift, with a strafe key, so Q and E stay the
+    # hands), L5 night vision (held: the suit light, the game's personal light), R5 a flare (held:
+    # end turn, so a press a little short of a long one never ends the turn)
     ("6", "button_escape", "key_press ESCAPE"),
     ("6", "button_menu", "key_press H", "key_press P"),
     ("6", "left_bumper", "key_press C"),
@@ -54,7 +56,7 @@ BINDINGS = [
     ("6", "button_back_left_upper", ("key_press LEFT_SHIFT", "key_press A")),
     ("6", "button_back_left", "key_press N", "key_press L"),
     ("6", "button_back_right_upper", ("key_press LEFT_SHIFT", "key_press D")),
-    ("6", "button_back_right", "key_press BACKSPACE", "key_press T"),
+    ("6", "button_back_right", "key_press T", "key_press BACKSPACE"),
 ]
 # How long a press is held to count as a long press, in milliseconds.
 LONG_PRESS_MS = 400
@@ -63,9 +65,9 @@ TITLE = "OpenXcom3D"
 DESCRIPTION = ("OpenXcom3D's first-person battlescape: left stick walks (WASD), the right trackpad looks "
                "(mouse), R2 fires, L2 cancels. L1 switches mouse look and the free cursor, R1 the "
                "isometric map and 3D. A jump, B reload, X fire mode, Y inventory; d-pad up/down "
-               "flight and lifts, right next soldier, left switch hand (held: akimbo); left trackpad "
+               "flight and lifts, right next soldier (held: flashlight), left switch hand (held: akimbo); left trackpad "
                "snap, aimed, auto, door (left/right held: snap turns); L4/R4 lean (setting Lean), "
-               "L5 night vision (held: light), R5 end turn (held: flare); Menu classic HUD (held: 3D HUD).")
+               "L5 night vision (held: suit light), R5 flare (held: end turn); View classic HUD (held: 3D HUD), Menu the game's menu.")
 
 
 def main():
