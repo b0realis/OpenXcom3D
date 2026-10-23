@@ -53,6 +53,7 @@
  * stock OXCE. Built with it, the add-on still only switches on when an active mod declares
  * `firstPerson: enabled: true` (the OpenXcom3D mod does).
  */
+#include <string>
 #include <vector>
 #include "../Menu/OptionsBaseState.h" // OptionsOrigin
 #include "../Battlescape/Position.h"
@@ -109,6 +110,10 @@ State *createOptionsTab(OptionsOrigin origin);
 /// Settles settings that take their first value from an older one (the smoke from "See-through
 /// smoke", the flashlight from 1.0's two flashlight settings, the next fire mode key from 1.0's).
 void settleOptions();
+/// Does a mod the game finds for the first time (one not yet in the player's mod list) start
+/// switched on? Our own mod does, so a game set up by hand plays in 3D at once; switched off, it
+/// stays off.
+bool activeWhenNew(const std::string &modId);
 /// The smoke setting as it stands: 1 Original, 2 Modern (unset, or 1.0's Solid: see the function).
 int smokeMode();
 /// The flashlight setting as it stands: 0 Off, 1 On, 2 Dynamic (unset: from 1.0's settings).
@@ -157,6 +162,7 @@ inline void resized(FirstPersonMode *, int, int) { }
 inline void createOptions(std::vector<OptionInfo> &) { }
 inline bool hasOptionsTab(const Mod *) { return false; }
 inline State *createOptionsTab(OptionsOrigin) { return nullptr; }
+inline bool activeWhenNew(const std::string &) { return false; }
 inline void freeAimTarget(BattlescapeState *, const BattleAction &, Position &) { }
 inline bool fastShots(BattlescapeState *, const BattleUnit *) { return false; }
 inline bool breakdown(BattlescapeState *, BattleUnit *) { return false; }

@@ -116,7 +116,7 @@ You need your own copy of the original game data (*UFO: Enemy Unknown / X-COM: U
 - **Steam Deck:** the same download, in Desktop Mode. Add `play.sh` (or the AppImage) to Steam as a non-Steam game to play in Game Mode, then run `steamdeck/add_controller_layout.sh` once: your OpenXcom3D shortcut then uses the controller layout made for it. The manual has the [steps](OpenXcom3D_manual.md#steam-deck).
 - **Windows (64-bit, Windows 10 and 11): download and play.** From the [Releases](../../releases) page take the **zip**, unpack it somewhere of yours (Documents, the Desktop, `C:\Games`; not Program Files) and double-click `play.bat`. Nothing needs installing. The first time, it finds the games in your Steam library by itself; otherwise put the game's folder next to it, named `UFO` (or `TFTD`). It only links the data, never changes it. The game isn't signed, so Windows may warn the first time: *More info*, then *Run anyway*. It is tested under Wine only so far, so reports are welcome.
 - **macOS:** no build from us yet; see [Help wanted](#help-wanted).
-- **From source:** `python3 install.py --from-source` clones OXCE at the commit above, applies the patch, builds and installs.
+- **From source:** `python3 install.py --from-source` clones OXCE at the commit above, applies the patch, builds and installs. Every step by hand, for Linux and for Windows (MinGW), is in the **[build guide](https://b0realis.github.io/OpenXcom3D/)**.
 
 Start a game (or a **New Battle**) and in battle press **F8** to go into 3D. Mouse to look, **WASD** to walk, left button to fire, **F8** back to the map.
 

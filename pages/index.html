@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Build OpenXcom3D</title>
+<meta name="description" content="Step by step: compile OpenXcom3D (OpenXcom Extended with a first-person 3D battlescape) from source on Linux, on Windows with MinGW (MSYS2), or for Windows on Linux.">
+<style>
+/* Layout: a dark hero, a sticky bar (your system + progress), then one column of numbered steps on a rail, each with the commands to paste; then what to do when something goes wrong. Only the chosen system's steps show. */
+:root {
+  --bg: #f3f5f8;
+  --surface: #ffffff;
+  --sunk: #e8ecf2;
+  --fg: #16202c;
+  --muted: #566475;
+  --line: #d3dae4;
+  --accent: #1d5e9e;
+  --accent-soft: #e3eef9;
+  --gold: #e0a730;
+  --gold-ink: #2a1c02;
+  --ok: #2a7a49;
+  --warn-bg: #fff3dd;
+  --warn-fg: #6e4308;
+  --hero-bg: #0e1824;
+  --hero-fg: #eef4fb;
+  --hero-muted: #b4c3d4;
+  --term-bg: #121821;
+  --term-bar: #243041;
+  --term-fg: #e6edf5;
+  --term-dim: #8b9bb0;
+  --term-prompt: #f2b950;
+  --shadow: 0 1px 2px rgb(10 20 32 / 0.08), 0 6px 18px rgb(10 20 32 / 0.08);
+  /* The computer's own faces: the page asks no other site for anything. */
+  --font-display: Georgia, "Times New Roman", "DejaVu Serif", serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d131b; --surface: #151d28; --sunk: #1c2633; --fg: #e6edf5; --muted: #9fb0c3;
+    --line: #2b3746; --accent: #79b4ee; --accent-soft: #1b2a3c; --gold: #e8b44c; --gold-ink: #241703;
+    --ok: #74c793; --warn-bg: #2f2513; --warn-fg: #f0c47e;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 18px rgb(0 0 0 / 0.25);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d131b; --surface: #151d28; --sunk: #1c2633; --fg: #e6edf5; --muted: #9fb0c3;
+  --line: #2b3746; --accent: #79b4ee; --accent-soft: #1b2a3c; --gold: #e8b44c; --gold-ink: #241703;
+  --ok: #74c793; --warn-bg: #2f2513; --warn-fg: #f0c47e;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 18px rgb(0 0 0 / 0.25);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-padding-top: 5.5rem; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.6 var(--font-body); }
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; z-index: 10;
+  height: env(safe-area-inset-top, 0px); background: var(--surface);
+}
+.gutter {
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.col { max-width: 52rem; margin: 0 auto; }
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visible + .tick {
+  outline: 3px solid var(--accent); outline-offset: 2px;
+}
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.2; }
+code, kbd { font-family: var(--font-mono); }
+p code, li code, dd code, td code, summary code {
+  font-size: 0.86em; background: var(--sunk); padding: 0.08em 0.35em; border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+img { max-width: 100%; height: auto; display: block; }
+
+/* ---------- hero ---------- */
+.hero { background: var(--hero-bg); color: var(--hero-fg); }
+.hero .col {
+  display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 2rem; align-items: center; padding-block: 2.75rem 2.5rem;
+}
+.hero h1 { font-size: clamp(2rem, 5vw, 2.8rem); margin: 0 0 0.75rem; }
+.hero p { margin: 0 0 1.1rem; color: var(--hero-muted); max-width: 34rem; }
+.hero p a { color: var(--gold); }
+.facts { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+.facts li {
+  border: 1px solid rgb(255 255 255 / 0.18); border-radius: 999px;
+  padding: 0.3rem 0.8rem; font-size: 0.875rem; color: var(--hero-fg);
+}
+.facts b { color: var(--gold); font-weight: 700; }
+.hero figure { margin: 0; }
+.hero figure img {
+  border-radius: 8px; border: 1px solid rgb(255 255 255 / 0.15);
+  box-shadow: 0 10px 40px rgb(0 0 0 / 0.45); image-rendering: pixelated;
+}
+.hero figcaption { font-size: 0.8rem; color: var(--hero-muted); margin-top: 0.5rem; }
+
+/* ---------- sticky bar ---------- */
+.bar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.bar .col {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 0.6rem 1.5rem; padding-block: 0.65rem;
+}
+.os-pick { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.os-pick > span { font-weight: 700; font-size: 0.95rem; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button {
+  font: 700 0.95rem/1 var(--font-body); color: var(--fg); background: var(--surface);
+  border: 0; border-right: 1px solid var(--line); padding: 0.6rem 0.9rem; cursor: pointer;
+}
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--surface); }
+.progress { display: flex; align-items: center; gap: 0.6rem; font-size: 0.875rem; color: var(--muted); }
+.progress .track { width: 8rem; height: 6px; background: var(--sunk); border-radius: 3px; overflow: hidden; }
+.progress .fill { height: 100%; width: 0; background: var(--ok); transition: width 0.3s; }
+.progress output { font-variant-numeric: tabular-nums; }
+
+/* ---------- system switching ---------- */
+#app[data-os="linux"] [data-os]:not([data-os~="linux"]),
+#app[data-os="win"] [data-os]:not([data-os~="win"]),
+#app[data-os="cross"] [data-os]:not([data-os~="cross"]) { display: none !important; }
+
+/* ---------- steps ---------- */
+main .col { padding-block: 2rem 1rem; }
+.intro { max-width: 42rem; margin: 0 0 1.25rem; color: var(--muted); }
+.steps { list-style: none; margin: 1.5rem 0 0; padding: 0; position: relative; }
+.steps::before {
+  content: ""; position: absolute; left: 1.25rem; top: 0.5rem; bottom: 0.5rem;
+  width: 2px; background: var(--line);
+}
+.step {
+  position: relative; display: grid; grid-template-columns: 2.5rem minmax(0, 1fr);
+  gap: 0 1.25rem; padding-bottom: 2.75rem;
+}
+.badge {
+  width: 2.5rem; height: 2.5rem; border-radius: 50%; display: grid; place-items: center;
+  background: var(--gold); color: var(--gold-ink); font: 700 1.15rem/1 var(--font-display);
+  position: relative; z-index: 1; box-shadow: 0 0 0 5px var(--bg);
+}
+.step.done .badge { background: var(--ok); color: var(--surface); }
+.step.done .badge span { display: none; }
+.step.done .badge::after { content: "✓"; font: 700 1.2rem/1 var(--font-body); }
+.step > div { min-width: 0; }
+.step h2 { font-size: 1.55rem; margin: 0.15rem 0 0.6rem; }
+.step h3 { font-size: 1.05rem; font-family: var(--font-body); margin: 1.1rem 0 0.4rem; }
+.step p, .step li { max-width: 42rem; }
+.step p { margin: 0 0 0.9rem; }
+.step ul { padding-left: 1.2rem; margin: 0 0 1rem; display: grid; gap: 0.35rem; }
+.lead { font-size: 1.05rem; }
+.note {
+  background: var(--warn-bg); color: var(--warn-fg); border-radius: 8px;
+  padding: 0.75rem 1rem; margin: 0 0 1rem; max-width: 42rem;
+}
+.note b, .note a { color: inherit; }
+.tip {
+  border-left: 4px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0;
+  padding: 0.7rem 1rem; margin: 0 0 1rem; max-width: 42rem;
+}
+.tip p:last-child { margin-bottom: 0; }
+.check {
+  display: inline-flex; align-items: center; gap: 0.6rem; cursor: pointer; user-select: none;
+  margin-top: 0.25rem; font-weight: 700; font-size: 0.95rem; color: var(--muted);
+}
+.check input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.tick {
+  width: 1.4rem; height: 1.4rem; border: 2px solid var(--line); border-radius: 5px;
+  display: grid; place-items: center; background: var(--surface);
+}
+.check input:checked + .tick { background: var(--ok); border-color: var(--ok); }
+.check input:checked + .tick::after { content: "✓"; color: var(--surface); font-weight: 700; font-size: 0.9rem; }
+.step.done .check { color: var(--ok); }
+.btn {
+  display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none;
+  font: 700 0.9rem/1 var(--font-body); padding: 0.55rem 0.85rem; border-radius: 7px; cursor: pointer;
+  background: var(--accent); color: var(--surface); border: 1px solid var(--accent);
+}
+.btn:hover { filter: brightness(1.07); }
+
+/* a distribution's name above its commands */
+.distro { font-weight: 700; font-size: 0.95rem; margin: 0 0 0.35rem !important; }
+
+/* terminal */
+.term {
+  background: var(--term-bg); color: var(--term-fg); border-radius: 10px; overflow: hidden;
+  box-shadow: var(--shadow); border: 1px solid var(--term-bar); min-width: 0; margin: 0 0 1rem;
+}
+.term-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  padding: 0.4rem 0.5rem 0.4rem 0.8rem; background: var(--term-bar); color: var(--term-dim); font-size: 0.8rem;
+}
+.term-bar .btn { padding: 0.35rem 0.65rem; font-size: 0.8rem; background: transparent; color: var(--term-fg); border-color: #4a5a70; }
+.term pre {
+  margin: 0; padding: 0.85rem 1rem; overflow-x: auto; font: 0.84rem/1.65 var(--font-mono);
+  color: var(--term-fg); background: none; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.term .d { color: var(--term-dim); }
+.copied { font-weight: 700; color: var(--term-prompt); font-size: 0.8rem; min-width: 4.5rem; text-align: right; }
+
+/* kbd */
+kbd {
+  display: inline-block; min-width: 1.6em; text-align: center; font-size: 0.82em; font-weight: 600;
+  padding: 0.15em 0.45em; border: 1px solid var(--line); border-bottom-width: 3px; border-radius: 6px;
+  background: var(--surface); color: var(--fg); white-space: nowrap;
+}
+
+/* folder listing */
+.files {
+  list-style: none; margin: 0 0 1rem; padding: 0.5rem 0.75rem; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px; font: 0.86rem/1.7 var(--font-mono); max-width: 42rem;
+}
+.files li { display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr); gap: 1rem; }
+.files li span { color: var(--muted); font-family: var(--font-body); font-size: 0.85rem; }
+
+/* troubleshooting */
+.faq { padding-block: 0.5rem 2rem; }
+.faq h2 { font-size: 1.55rem; margin: 0 0 0.4rem; }
+.faq > .col > p { color: var(--muted); margin: 0 0 1.25rem; }
+.faq details { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; margin: 0 0 0.75rem; }
+.faq summary { cursor: pointer; padding: 0.75rem 1rem; font-weight: 700; list-style-position: inside; }
+.faq summary code { font-weight: 600; }
+.faq details > div { padding: 0 1rem 0.9rem; }
+.faq details p { margin: 0 0 0.6rem; max-width: 42rem; }
+.faq .term { margin-top: 0.4rem; }
+
+footer { border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; }
+footer .col { padding-block: 1.5rem 2.5rem; display: grid; gap: 0.4rem; }
+footer p { margin: 0; }
+
+@media (max-width: 720px) {
+  .hero .col { grid-template-columns: minmax(0, 1fr); padding-block: 2rem; }
+  .step { grid-template-columns: minmax(0, 1fr); }
+  .steps::before { display: none; }
+  .badge { margin-bottom: 0.5rem; }
+  .progress .track { width: 5rem; }
+  .files li { grid-template-columns: minmax(0, 1fr); gap: 0; }
+}
+</style>
+</head>
+<body>
+<div id="app" data-os="linux">
+
+<header class="hero gutter">
+  <div class="col">
+    <div>
+      <h1>Build OpenXcom3D from source</h1>
+      <p>OpenXcom3D is <b>OpenXcom Extended</b> with a first-person 3D battlescape. Its repository holds one patch for OXCE, not a program that builds by itself: you take OXCE at the right commit, apply the patch and compile. This page walks you through it.</p>
+      <p>Only want to play? The <a href="https://github.com/b0realis/OpenXcom3D/releases/latest">ready builds for Linux and Windows</a> need no compiling.</p>
+      <ul class="facts">
+        <li>About <b>15 minutes</b></li>
+        <li>About <b>1.5 GB</b> free</li>
+        <li>Your own copy of <b>UFO</b> or <b>TFTD</b></li>
+      </ul>
+    </div>
+    <figure>
+      <img src="img/city_dusk.png" width="1280" height="800" alt="The 3D view: a city street at dusk, street lamps along the road, a soldier's rifle in the corner.">
+      <figcaption>Where you'll be at the end: a battle in 3D (press F8).</figcaption>
+    </figure>
+  </div>
+</header>
+
+<nav class="bar gutter" aria-label="Your system and your progress">
+  <div class="col">
+    <div class="os-pick">
+      <span id="os-label">Build on:</span>
+      <div class="seg" role="group" aria-labelledby="os-label">
+        <button type="button" data-pick="linux" aria-pressed="true">Linux</button>
+        <button type="button" data-pick="win" aria-pressed="false">Windows (MinGW)</button>
+        <button type="button" data-pick="cross" aria-pressed="false">Linux, for Windows</button>
+      </div>
+    </div>
+    <div class="progress">
+      <div class="track" aria-hidden="true"><div class="fill" id="fill"></div></div>
+      <output id="count" aria-live="polite">0 of 5 steps done</output>
+    </div>
+  </div>
+</nav>
+
+<main class="gutter">
+  <div class="col">
+    <p class="intro" data-os="linux">On Linux the game builds with the compiler and SDL 1.2 libraries of your distribution. Pick your system in the bar above, and the page shows only its steps.</p>
+    <p class="intro" data-os="win">On Windows the game builds with MinGW-w64 from <b>MSYS2</b>: the compiler, CMake and the SDL 1.2 libraries all come from its package manager. The result is a Windows program like the release's. (Visual Studio isn't tested; MSYS2 is.)</p>
+    <p class="intro" data-os="cross">This is how the release's Windows zip is made: on Linux, with <b>llvm-mingw</b> (Clang for Windows), downloaded by the build script. The scripts build the SDL libraries from their sources too, check every download against its SHA-256, and pack the zip.</p>
+
+    <div class="tip" data-os="linux">
+      <p><b>The short way:</b> with the tools from step 2 and Python 3, the installer does steps 3 to 5 in one go: it says what's missing, clones OXCE, applies the patch, builds, and sets up a profile that finds your Steam games.</p>
+      <div class="term"><div class="term-bar"><span>Terminal</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre class="cmds">git clone https://github.com/b0realis/OpenXcom3D.git
+cd OpenXcom3D
+python3 install.py --from-source</pre></div>
+      <p>Then start it with <code>~/Games/OpenXcom3D/play.sh</code>. Below is the same by hand, to see each part.</p>
+    </div>
+
+    <ol class="steps">
+
+      <!-- 1: the game data -->
+      <li class="step" id="step-1">
+        <div class="badge" aria-hidden="true"><span>1</span></div>
+        <div>
+          <h2>Have the original game ready</h2>
+          <p class="lead">You need your own copy of <i>X-COM: UFO Defense</i> (<i>UFO: Enemy Unknown</i>) and/or <i>X-COM: Terror From The Deep</i>, from Steam or GOG. Nothing of it comes with OpenXcom3D.</p>
+          <p>What the game needs is the folder with <code>GEODATA</code>, <code>GEOGRAPH</code>, <code>MAPS</code> and <code>UFOGRAPH</code> in it. On Steam that's:</p>
+          <ul>
+            <li data-os="linux cross"><code>~/.local/share/Steam/steamapps/common/XCom UFO Defense/XCOM</code></li>
+            <li data-os="linux cross"><code>~/.local/share/Steam/steamapps/common/X-COM Terror from the Deep/TFD</code></li>
+            <li data-os="win"><code>C:\Program Files (x86)\Steam\steamapps\common\XCom UFO Defense\XCOM</code></li>
+            <li data-os="win"><code>C:\Program Files (x86)\Steam\steamapps\common\X-COM Terror from the Deep\TFD</code></li>
+          </ul>
+          <p data-os="cross">The zip you build finds them in Steam by itself on the Windows machine, as the release does.</p>
+          <label class="check"><input type="checkbox" data-step="1"><span class="tick"></span>I know where my game folder is</label>
+        </div>
+      </li>
+
+      <!-- 2: the tools -->
+      <li class="step" id="step-2">
+        <div class="badge" aria-hidden="true"><span>2</span></div>
+        <div>
+          <h2>Install the build tools</h2>
+          <div data-os="linux">
+            <p class="lead">Git, CMake, a C++ compiler, and the SDL 1.2 libraries (on current distributions that's sdl12-compat, SDL 1.2 on top of SDL2, which works fine):</p>
+            <div class="distros">
+              <p class="distro">Debian, Ubuntu, Mint</p><div class="term"><div class="term-bar"><span>Terminal</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre class="cmds">sudo apt install git cmake g++ make pkg-config libsdl1.2-dev libsdl-mixer1.2-dev libsdl-image1.2-dev libsdl-gfx1.2-dev zlib1g-dev libglu1-mesa-dev curl</pre></div>
+              <p class="distro">Fedora</p><div class="term"><div class="term-bar"><span>Terminal</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre class="cmds">sudo dnf install git cmake gcc-c++ make pkgconf sdl12-compat-devel SDL_image-devel SDL_mixer-devel SDL_gfx-devel zlib-devel mesa-libGLU-devel curl</pre></div>
+              <p class="distro">Arch, Manjaro</p><div class="term"><div class="term-bar"><span>Terminal</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre class="cmds">sudo pacman -S --needed base-devel git cmake sdl12-compat sdl_image sdl_mixer sdl_gfx glu zlib curl</pre></div>
+            </div>
+          </div>
+          <div data-os="win">
+            <p class="lead">Download MSYS2 from <a href="https://www.msys2.org/">msys2.org</a> and install it (the default folder, <code>C:\msys64</code>, is fine). Then open <b>MSYS2 UCRT64</b> from the Start menu: the prompt says <code>UCRT64</code>. Every command on this page goes into that window.</p>
+            <p>First bring MSYS2 up to date. If it closes the window, open <b>MSYS2 UCRT64</b> again and run the same command once more:</p>
+            <div class="term"><div class="term-bar"><span>MSYS2 UCRT64</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre class="cmds">pacman -Syu</pre></div>
+            <p>Then the compiler, CMake, Ninja, pkg-config and the SDL 1.2 libraries:</p>
+            <div class="term"><div class="term-bar"><span>MSYS2 UCRT64</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre class="cmds">pacman -S --needed git curl mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-SDL mingw-w64-ucrt-x86_64-SDL_image mingw-w64-ucrt-x86_64-SDL_mixer mingw-w64-ucrt-x86_64-SDL_gfx mingw-w64-ucrt-x86_64-zlib</pre></div>
+          </div>
+          <div data-os="cross">
+            <p class="lead">Only the usual build tools: the Windows compiler (llvm-mingw 20260922, LLVM 23) is downloaded by the build script into the build folder, nothing is installed.</p>
+            <div class="distros">
+              <p class="distro">Debian, Ubuntu, Mint</p><div class="term"><div class="term-bar"><span>Terminal</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre class="cmds">sudo apt install build-essential git cmake pkg-config curl xz-utils zip</pre></div>
+              <p class="distro">Fedora</p><div class="term"><div class="term-bar"><span>Terminal</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre class="cmds">sudo dnf install gcc make git cmake pkgconf curl xz zip</pre></div>
+              <p class="distro">Arch, Manjaro</p><div class="term"><div class="term-bar"><span>Terminal</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre class="cmds">sudo pacman -S --needed base-devel git cmake curl xz zip</pre></div>
+            </div>
+          </div>
+          <label class="check"><input type="checkbox" data-step="2"><span class="tick"></span>The tools are installed</label>
+        </div>
+      </li>
+
+      <!-- 3: the source -->
+      <li class="step" id="step-3">
+        <div class="badge" aria-hidden="true"><span>3</span></div>
+        <div>
+          <h2>Get OXCE and apply the patch</h2>
+          <div data-os="linux win">
+            <p class="lead">OXCE at exactly the commit OpenXcom3D is made for, then the patch on top of it:</p>
+            <div class="term"><div class="term-bar"><span data-os="linux">Terminal</span><span data-os="win">MSYS2 UCRT64</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre class="cmds">git clone --branch oxce-plus https://github.com/MeridianOXC/OpenXcom.git
+cd OpenXcom
+git checkout f0134ef8065799c7723953d64b565f7832bfd782
+curl -LO https://raw.githubusercontent.com/b0realis/OpenXcom3D/main/openxcom3d.patch
+git apply openxcom3d.patch</pre></div>
+            <p><code>git apply</code> says nothing when it works. The commit is OXCE 8.7.1 (2026-09-29); the patch adds the add-on (<code>src/FirstPerson/</code>), small hooks in OXCE, and the mod that switches it on (<code>mod/OpenXcom3D/</code>).</p>
+          </div>
+          <div data-os="cross">
+            <p class="lead">The OpenXcom3D repository (its build scripts and the patch), with OXCE cloned into it as <code>OpenXcom</code>, at exactly the commit OpenXcom3D is made for, and the patch applied:</p>
+            <div class="term"><div class="term-bar"><span>Terminal</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre class="cmds">git clone https://github.com/b0realis/OpenXcom3D.git
+cd OpenXcom3D
+git clone --branch oxce-plus https://github.com/MeridianOXC/OpenXcom.git
+git -C OpenXcom checkout f0134ef8065799c7723953d64b565f7832bfd782
+git -C OpenXcom apply ../openxcom3d.patch</pre></div>
+          </div>
+          <label class="check"><input type="checkbox" data-step="3"><span class="tick"></span>The patch applied</label>
+        </div>
+      </li>
+
+      <!-- 4: build -->
+      <li class="step" id="step-4">
+        <div class="badge" aria-hidden="true"><span>4</span></div>
+        <div>
+          <h2>Build it</h2>
+          <div data-os="linux">
+            <p class="lead">In the <code>OpenXcom</code> folder (a few minutes):</p>
+            <div class="term"><div class="term-bar"><span>Terminal</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre class="cmds">cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDEV_BUILD=OFF -DBUILD_PACKAGE=OFF
+cmake --build build -j 4</pre></div>
+            <p>The game is <code>build/bin/openxcom</code>, with OXCE's own data next to it in <code>build/bin/</code>. With more memory, a bigger <code>-j</code> builds faster.</p>
+          </div>
+          <div data-os="win">
+            <p class="lead">In the <code>OpenXcom</code> folder (several minutes). The options matter, see below:</p>
+            <div class="term"><div class="term-bar"><span>MSYS2 UCRT64</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre class="cmds">cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DDEV_BUILD=OFF -DBUILD_PACKAGE=OFF -DDEPS_DIR=none -DPKG_CONFIG_ARGN=--static -DEXTRA_XCOM_LIBS="$(pkg-config --static --libs libpng16 libjpeg libtiff-4 libwebp vorbisfile libmikmod mad | tr -d '\r' | tr ' ' ';');-l:libFLAC.dll.a"
+cmake --build build
+cp /ucrt64/bin/libFLAC.dll /ucrt64/bin/libogg-0.dll /ucrt64/bin/libwinpthread-1.dll build/bin/</pre></div>
+            <ul>
+              <li><code>-DDEPS_DIR=none</code>: without it, OXCE takes the Visual Studio libraries folder (<code>deps</code>) in its source and fails to link.</li>
+              <li>OXCE links MinGW builds statically, and MSYS2's SDL_image and SDL_mixer don't name the image and sound libraries they need. <code>-DPKG_CONFIG_ARGN=--static</code> and <code>EXTRA_XCOM_LIBS</code> add them.</li>
+              <li>FLAC comes from its DLL (MSYS2's SDL_mixer asks for it so), hence the three DLLs copied next to the game at the end.</li>
+            </ul>
+            <p>The game is <code>build/bin/openxcom.exe</code>, with OXCE's own data next to it in <code>build/bin/</code>.</p>
+          </div>
+          <div data-os="cross">
+            <p class="lead">In the <code>OpenXcom3D</code> folder: the Windows compiler and the libraries first (about 5 minutes, once), then the game, then the zip:</p>
+            <div class="term"><div class="term-bar"><span>Terminal</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre class="cmds">sh tools/windows/build_libs.sh
+sh tools/windows/configure.sh
+make -C OpenXcom/build-win64 -j 4
+sh tools/make_release_windows.sh</pre></div>
+            <p><code>build_libs.sh</code> puts the compiler and the libraries in <code>OpenXcom/build-win64/deps</code>; <code>make_release_windows.sh</code> checks that the game needs nothing but Windows and its two DLLs, and packs <code>release/OpenXcom3D-…-windows-x86_64.zip</code>.</p>
+          </div>
+          <label class="check"><input type="checkbox" data-step="4"><span class="tick"></span>It built</label>
+        </div>
+      </li>
+
+      <!-- 5: play -->
+      <li class="step" id="step-5">
+        <div class="badge" aria-hidden="true"><span>5</span></div>
+        <div>
+          <h2>Set up a profile and play</h2>
+          <div data-os="linux win">
+            <p class="lead">A profile folder of its own keeps your saves apart from any other OXCE. Put the mod in it and the game data next to the mod. Still in the <code>OpenXcom</code> folder:</p>
+          </div>
+          <div data-os="linux">
+            <div class="term"><div class="term-bar"><span>Terminal</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre class="cmds">mkdir -p ~/openxcom3d/mods
+cp -r mod/OpenXcom3D ~/openxcom3d/mods/
+ln -s "$HOME/.local/share/Steam/steamapps/common/XCom UFO Defense/XCOM" ~/openxcom3d/UFO
+build/bin/openxcom -data build/bin/ -user ~/openxcom3d/ -cfg ~/openxcom3d/</pre></div>
+            <p>For TFTD, link its folder as <code>~/openxcom3d/TFTD</code> the same way. Steam elsewhere (<code>~/.steam/steam</code>, a Flatpak, another disk) or a game from GOG: link (or copy) its folder, the one from step 1, as <code>UFO</code> or <code>TFTD</code>.</p>
+          </div>
+          <div data-os="win">
+            <div class="term"><div class="term-bar"><span>MSYS2 UCRT64</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre class="cmds">mkdir -p ~/openxcom3d/mods
+cp -r mod/OpenXcom3D ~/openxcom3d/mods/
+cp -r "/c/Program Files (x86)/Steam/steamapps/common/XCom UFO Defense/XCOM" ~/openxcom3d/UFO
+build/bin/openxcom.exe -data build/bin/ -user ~/openxcom3d/ -cfg ~/openxcom3d/</pre></div>
+            <p>For TFTD, copy its folder to <code>~/openxcom3d/TFTD</code> the same way. In MSYS2, <code>~</code> is <code>C:\msys64\home\</code><i>you</i>, and <code>/c/</code> is drive C.</p>
+          </div>
+          <div data-os="linux win">
+            <p>The OpenXcom3D mod switches itself on the first time the game finds it. Start a game, or <b>New Battle</b>, and in battle press <kbd>F8</kbd> (or the <b>3D</b> button at the top left). Mouse to look, <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> to walk, the left button to fire, <kbd>F8</kbd> back to the map.</p>
+          </div>
+          <div data-os="cross">
+            <p class="lead">Copy <code>release/OpenXcom3D-…-windows-x86_64.zip</code> to the Windows machine, unpack it somewhere of yours (Documents, the Desktop, <code>C:\Games</code>; not Program Files), and double-click <code>play.bat</code>.</p>
+            <p>It finds UFO and TFTD in Steam by itself (or a <code>UFO</code> / <code>TFTD</code> folder next to it) and links them into its <code>user</code> folder. In battle press <kbd>F8</kbd>. The game isn't signed, so Windows may warn the first time: <b>More info</b>, then <b>Run anyway</b>.</p>
+          </div>
+          <label class="check"><input type="checkbox" data-step="5"><span class="tick"></span>I'm in the 3D view</label>
+        </div>
+      </li>
+    </ol>
+  </div>
+</main>
+
+<section class="faq gutter" aria-labelledby="faq-title">
+  <div class="col">
+    <h2 id="faq-title">If something goes wrong</h2>
+    <p>The usual snags, and what to do. Every key and setting of the game is in the <a href="https://github.com/b0realis/OpenXcom3D/blob/main/OpenXcom3D_manual.md">manual</a>.</p>
+
+    <details>
+      <summary>The OpenXcom3D repository has no <code>CMakeLists.txt</code> and doesn't build</summary>
+      <div><p>That's right: it holds the patch (and the add-on's source, for reading), not OXCE. Build OXCE with the patch applied, as in step 3.</p></div>
+    </details>
+    <details>
+      <summary><code>git apply</code>: “patch does not apply” or “corrupt patch”</summary>
+      <div>
+        <p>Check that OXCE is at the right commit: <code>git log -1 --format=%H</code> in the <code>OpenXcom</code> folder should say <code>f0134ef8065799c7723953d64b565f7832bfd782</code>. On a newer OXCE the patch doesn't fit.</p>
+        <p data-os="win cross">On Windows, Git for Windows turns line ends into CRLF by default (<code>core.autocrlf</code>), and the patch then doesn't match. Use MSYS2's own <code>git</code> as in step 2, or run <code>git config --global core.autocrlf false</code> and clone again.</p>
+        <p>A patch saved from a browser page is HTML, not the patch: download it with the <code>curl</code> line (the <i>raw</i> link).</p>
+      </div>
+    </details>
+    <details>
+      <summary>CMake: “Package 'sdl', required by 'virtual:world', not found”</summary>
+      <div>
+        <p data-os="linux">The SDL 1.2 development packages are missing: install them as in step 2.</p>
+        <p data-os="win">The window isn't the UCRT64 one (its prompt says <code>MSYS</code> or <code>MINGW64</code>), or the packages aren't installed. Open <b>MSYS2 UCRT64</b> and run the <code>pacman -S</code> line from step 2.</p>
+        <p data-os="cross">Run <code>tools/windows/build_libs.sh</code> before <code>configure.sh</code>.</p>
+      </div>
+    </details>
+    <details data-os="win">
+      <summary>Linking fails: “undefined reference to png_…, jpeg_…, TIFF…, FLAC__…”</summary>
+      <div><p>The build was configured without the options from step 4. Delete the <code>build</code> folder (<code>rm -rf build</code>) and run the <code>cmake -S . -B build …</code> line from step 4 as it is, all of it on one line.</p></div>
+    </details>
+    <details data-os="win">
+      <summary>“The code execution cannot proceed because libFLAC.dll was not found”</summary>
+      <div><p>The three DLLs aren't next to the game: run the <code>cp /ucrt64/bin/…</code> line from step 4. <code>ldd build/bin/openxcom.exe</code> lists every DLL the game loads; the ones under <code>/ucrt64/bin</code> go next to it.</p></div>
+    </details>
+    <details>
+      <summary>CMake: “Compatibility with CMake &lt; 3.10 has been removed”</summary>
+      <div><p>OXCE asks for CMake 3.5 or newer, which CMake 4.2 still accepts (with a warning you can ignore). If yours refuses, add <code>-DCMAKE_POLICY_VERSION_MINIMUM=3.10</code> to the <code>cmake -S . -B build</code> line.</p></div>
+    </details>
+    <details data-os="linux win">
+      <summary>F8 does nothing, and there's no 3D button</summary>
+      <div>
+        <p>The OpenXcom3D mod isn't on. Open <b>Options → Mods</b> and switch on <b>OpenXcom3D - First-Person View</b>. (This build switches it on by itself the first time it finds it; if you switched it off since, it stays off.)</p>
+        <p>If the mod says it needs another engine, the game wasn't built from the patched source: check step 3.</p>
+      </div>
+    </details>
+    <details data-os="linux win">
+      <summary>“No X-COM installations found”, or the game asks for data</summary>
+      <div><p>The game data isn't in the profile. <code>~/openxcom3d/UFO</code> must be the folder from step 1 itself, with <code>GEODATA</code>, <code>GEOGRAPH</code>, <code>MAPS</code> and <code>UFOGRAPH</code> directly in it (not one folder up, not one down).</p></div>
+    </details>
+    <details data-os="linux">
+      <summary>The window closes at once, with an X error about GLX</summary>
+      <div><p>The system's OpenGL is broken. The game runs without it like this:</p>
+        <div class="term"><div class="term-bar"><span>Terminal</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre class="cmds">SDL12COMPAT_OPENGL_SCALING=0 SDL_RENDER_DRIVER=software build/bin/openxcom -data build/bin/ -user ~/openxcom3d/ -cfg ~/openxcom3d/</pre></div>
+      </div>
+    </details>
+    <details data-os="win">
+      <summary>Can I use Visual Studio instead?</summary>
+      <div><p>OXCE's Visual Studio project lists the add-on, but that build isn't tested. MSYS2, as on this page, is.</p></div>
+    </details>
+    <details data-os="cross">
+      <summary>Which DLLs does the zip's game load?</summary>
+      <div><p>Only Windows' own and the two it comes with, <code>SDL.dll</code> (sdl12-compat 1.2.74) and <code>SDL2.dll</code>; the C++ runtime, SDL_image, SDL_mixer, SDL_gfx and their codecs are linked in. <code>tools/windows/check.sh</code> checks that, and that no home folder paths are in it.</p></div>
+    </details>
+  </div>
+</section>
+
+<footer class="gutter">
+  <div class="col">
+    <p>OpenXcom3D adds a first-person 3D battlescape to OpenXcom Extended: <a href="https://github.com/b0realis/OpenXcom3D">github.com/b0realis/OpenXcom3D</a>. OXCE: <a href="https://github.com/MeridianOXC/OpenXcom">github.com/MeridianOXC/OpenXcom</a>. Both are GPL 3.</p>
+    <p>Tested on this page's steps: Linux (Ubuntu, with the distribution's packages), MSYS2's own compiler, CMake and libraries (run under Wine), and the Windows zip built on Linux.</p>
+  </div>
+</footer>
+
+</div>
+<script>
+(function () {
+  var app = document.getElementById("app");
+  var STORE = "openxcom3d-build-guide";
+  // The reader's system and ticked steps stay in their own browser (the page works without them).
+  function load() {
+    try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) { return {}; }
+  }
+  function save(state) {
+    try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) { /* the page works without it */ }
+  }
+  var state = load();
+
+  // The system: from the link (#linux, #windows, #cross), the last choice, or the browser's own.
+  function guessOs() {
+    var p = ((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent || "").toLowerCase();
+    return p.indexOf("win") >= 0 ? "win" : "linux";
+  }
+  var boxes = document.querySelectorAll(".check input");
+  function setOs(os) {
+    app.setAttribute("data-os", os);
+    document.querySelectorAll(".seg button").forEach(function (b) {
+      b.setAttribute("aria-pressed", b.getAttribute("data-pick") === os ? "true" : "false");
+    });
+    state.os = os; save(state); refresh();
+  }
+  document.querySelectorAll(".seg button").forEach(function (b) {
+    b.addEventListener("click", function () { setOs(b.getAttribute("data-pick")); });
+  });
+
+  // The ticked steps, one list per system.
+  state.done = state.done || {};
+  function key(box) { return app.getAttribute("data-os") + ":" + box.getAttribute("data-step"); }
+  function refresh() {
+    var n = 0;
+    boxes.forEach(function (box) {
+      box.checked = !!state.done[key(box)];
+      box.closest(".step").classList.toggle("done", box.checked);
+      if (box.checked) n++;
+    });
+    document.getElementById("count").textContent = n + " of " + boxes.length + " steps done";
+    document.getElementById("fill").style.width = (100 * n / boxes.length) + "%";
+  }
+  boxes.forEach(function (box) {
+    box.addEventListener("change", function () {
+      state.done[key(box)] = box.checked; save(state); refresh();
+    });
+  });
+  var HASH_OS = { "#linux": "linux", "#windows": "win", "#cross": "cross" };
+  setOs(HASH_OS[location.hash] || state.os || guessOs());
+  window.addEventListener("hashchange", function () {
+    if (HASH_OS[location.hash]) setOs(HASH_OS[location.hash]);
+  });
+
+  // Copy buttons: the commands of the block, or selected for Ctrl C where the clipboard can't be used.
+  document.querySelectorAll("[data-copy]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var term = button.closest(".term");
+      var pre = term.querySelector("pre");
+      var said = term.querySelector(".copied");
+      function fallback() {
+        var range = document.createRange();
+        range.selectNodeContents(pre);
+        var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+        said.textContent = "Ctrl C";
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(pre.textContent).then(function () {
+          said.textContent = "Copied";
+          setTimeout(function () { said.textContent = ""; }, 2000);
+        }, fallback);
+      } else {
+        fallback();
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>

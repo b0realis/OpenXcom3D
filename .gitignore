@@ -1,7 +1,9 @@
-# build outputs and game data never belong here
+# build outputs and game data never belong here (OpenXcom/: the OXCE clone the Windows build uses)
 build/
 *.o
 UFO/
 TFTD/
 user/
 __pycache__/
+OpenXcom/
+release/

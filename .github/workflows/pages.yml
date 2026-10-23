@@ -1,0 +1,42 @@
+# The build guide on GitHub Pages: https://b0realis.github.io/OpenXcom3D/
+#
+# Only pages/ is published: pages/index.html, one page that asks no other site for anything (no
+# web fonts, no scripts from elsewhere; its links open other sites only when clicked). Its one
+# stored value (the reader's system and ticked steps) stays in the reader's browser. Nothing else
+# in the repository becomes a web page.
+#
+# The Pages source is "GitHub Actions" (repository Settings > Pages). It runs when pages/ or this
+# file changes on main, or by hand. The actions are their Node 24 majors, as in ShandalarGodot:
+# checkout v5, configure-pages v6, upload-pages-artifact v5, deploy-pages v5.
+# (tools/make_public.sh copies this file to .github/workflows/pages.yml.)
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ["pages/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: pages
+      - id: deployment
+        uses: actions/deploy-pages@v5

@@ -420,6 +420,19 @@ bool hasOptionsTab(const Mod *mod)
 }
 
 /**
+ * Asks whether a mod the game finds for the first time (one the player's mod list doesn't have
+ * yet) starts switched on. Our own mod does, so a game built and laid out by hand plays in 3D
+ * straight away, as a release (whose starting options list it on) does. The game asks only for
+ * mods new to the list, so a player who switches it off keeps it off.
+ * @param modId The new mod's id.
+ * @return True to switch it on.
+ */
+bool activeWhenNew(const std::string &modId)
+{
+	return modId == "OpenXcom3D";
+}
+
+/**
  * Creates the 3D VIEW options tab, when its tab button is pressed.
  * @param origin The part of the game the options were opened from (main menu, geoscape or
  *  battlescape).

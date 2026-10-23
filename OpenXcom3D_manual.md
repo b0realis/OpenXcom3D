@@ -163,6 +163,8 @@ The Windows build is made on Linux with llvm-mingw (Clang for Windows), from the
 
 ### Option B: build from source
 
+Every command, step by step, for Linux, for Windows with MinGW (MSYS2), and for the Windows build made on Linux: the **[build guide](https://b0realis.github.io/OpenXcom3D/)**.
+
 #### With the installer
 
 ```sh
@@ -200,7 +202,7 @@ cmake --build build -- -j8
 
 The binary and OXCE's data are in `build/bin/`, and the mod is in `mod/OpenXcom3D/`. To lay them out:
 
-1. Put the mod in a profile's `mods/` folder.
+1. Put the mod in a profile's `mods/` folder (it switches itself on the first time the game finds it).
 2. Link `UFO`/`TFTD` into that profile.
 3. Start with:
    ```sh
@@ -778,6 +780,11 @@ What `FirstPersonView` draws:
 | `OpenXcom.2010.vcxproj{,.filters}` | The add-on's files |
 
 ## 11. Version history
+
+### After 1.03 (in the source)
+
+- **The mod switches itself on:** the first time the game finds the OpenXcom3D mod in a profile (one that doesn't list it yet), it starts on. A game built and set up by hand had it off, and F8 did nothing until it was switched on under Mods. A player who switches it off keeps it off. (The releases' profiles list it on already.)
+- **The build guide** on GitHub Pages: [b0realis.github.io/OpenXcom3D](https://b0realis.github.io/OpenXcom3D/), every step for Linux, Windows with MinGW (MSYS2, tested with its own compiler) and the Windows build on Linux, with the snags people hit.
 
 ### 1.03 (2026-10-23)
 

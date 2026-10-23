@@ -2196,7 +2196,7 @@ index 2ce728703..fcd753134 100644
  			*(_ref.k) = SDLK_UNKNOWN;
  		}
 diff --git a/src/Engine/Options.cpp b/src/Engine/Options.cpp
-index 480f22791..1946358c6 100644
+index 480f22791..33fb51351 100644
 --- a/src/Engine/Options.cpp
 +++ b/src/Engine/Options.cpp
 @@ -18,6 +18,7 @@
@@ -2223,6 +2223,17 @@ index 480f22791..1946358c6 100644
  }
  
  void createAdvancedOptionsOTHER()
+@@ -1007,8 +1010,8 @@ void refreshMods()
+ 			continue;
+ 		}
+ 
+-		// not active by default
+-		std::pair<std::string, bool> newMod(i->first, false);
++		// not active by default (OpenXcom3D's own mod is: see FirstPerson::activeWhenNew)
++		std::pair<std::string, bool> newMod(i->first, FirstPerson::activeWhenNew(i->first));
+ 		if (i->second.isMaster())
+ 		{
+ 			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
 index a08796ced..839e3ce02 100644
 --- a/src/Engine/Options.inc.h
@@ -2329,10 +2340,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..eec5364a0
+index 000000000..a69220c90
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,512 @@
+@@ -0,0 +1,525 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -2755,6 +2766,19 @@ index 000000000..eec5364a0
 +}
 +
 +/**
++ * Asks whether a mod the game finds for the first time (one the player's mod list doesn't have
++ * yet) starts switched on. Our own mod does, so a game built and laid out by hand plays in 3D
++ * straight away, as a release (whose starting options list it on) does. The game asks only for
++ * mods new to the list, so a player who switches it off keeps it off.
++ * @param modId The new mod's id.
++ * @return True to switch it on.
++ */
++bool activeWhenNew(const std::string &modId)
++{
++	return modId == "OpenXcom3D";
++}
++
++/**
 + * Creates the 3D VIEW options tab, when its tab button is pressed.
 + * @param origin The part of the game the options were opened from (main menu, geoscape or
 + *  battlescape).
@@ -2847,10 +2871,10 @@ index 000000000..eec5364a0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..0cb5a8618
+index 000000000..1a8d15297
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,173 @@
+@@ -0,0 +1,179 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -2906,6 +2930,7 @@ index 000000000..0cb5a8618
 + * stock OXCE. Built with it, the add-on still only switches on when an active mod declares
 + * `firstPerson: enabled: true` (the OpenXcom3D mod does).
 + */
++#include <string>
 +#include <vector>
 +#include "../Menu/OptionsBaseState.h" // OptionsOrigin
 +#include "../Battlescape/Position.h"
@@ -2962,6 +2987,10 @@ index 000000000..0cb5a8618
 +/// Settles settings that take their first value from an older one (the smoke from "See-through
 +/// smoke", the flashlight from 1.0's two flashlight settings, the next fire mode key from 1.0's).
 +void settleOptions();
++/// Does a mod the game finds for the first time (one not yet in the player's mod list) start
++/// switched on? Our own mod does, so a game set up by hand plays in 3D at once; switched off, it
++/// stays off.
++bool activeWhenNew(const std::string &modId);
 +/// The smoke setting as it stands: 1 Original, 2 Modern (unset, or 1.0's Solid: see the function).
 +int smokeMode();
 +/// The flashlight setting as it stands: 0 Off, 1 On, 2 Dynamic (unset: from 1.0's settings).
@@ -3010,6 +3039,7 @@ index 000000000..0cb5a8618
 +inline void createOptions(std::vector<OptionInfo> &) { }
 +inline bool hasOptionsTab(const Mod *) { return false; }
 +inline State *createOptionsTab(OptionsOrigin) { return nullptr; }
++inline bool activeWhenNew(const std::string &) { return false; }
 +inline void freeAimTarget(BattlescapeState *, const BattleAction &, Position &) { }
 +inline bool fastShots(BattlescapeState *, const BattleUnit *) { return false; }
 +inline bool breakdown(BattlescapeState *, BattleUnit *) { return false; }
