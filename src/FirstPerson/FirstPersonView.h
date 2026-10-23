@@ -52,6 +52,7 @@
 #include <condition_variable>
 #include <deque>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <set>
 #include <string>
@@ -142,6 +143,7 @@ public:
 		Uint16 glass[24][16];    // [z][y], bit x: window glass, seen through
 		Uint8 min[3], max[3];    // inclusive bounds of solid voxels (x, y, z)
 		bool empty;
+		bool ghostly;            // a ghost of a part with no voxels (setting "Parts without shape"): seen through on some pixels, never in the way (see buildGhost)
 		float glow[3]; // centre of the brightest voxels in the top third (a lamp's bulb), in the tile
 		int glowCount;
 		Uint8 glowColor;     // one of those bright colours
@@ -232,6 +234,7 @@ public:
 		Uint8 whiteTint[256];  // ... with white (a breakdown)
 		Uint8 greenTint[256];  // ... with a sickly green (turning into a zombie)
 		Uint8 grey[4];         // TV static
+		Uint8 glitchGreen[2];  // a digital feed's broken blocks: bright and dark green
 		Uint8 flareTint[256];  // each colour in a flare's red light
 		Uint8 flareFire[3];    // flare flame: red, orange, yellow
 		static constexpr int HazeSteps = 8; // the distance haze blends colours towards the haze in this many steps
@@ -366,6 +369,10 @@ public:
 	void flareUp(float amount) { _flameBurst = std::max(_flameBurst, amount); }
 	/// TV static over the view (a helmet camera losing its signal), 0 none .. 1 all.
 	void setStatic(float amount) { _staticAmount = amount; }
+	/// A digital camera feed's bad signal (the helmet cameras): brief blocky patches, green
+	/// squares and frozen pictures (see updateSignalGlitches); 0 none, 1 now and then, 2 a lot
+	/// (the hardest missions, on the aliens' own ground).
+	void setSignalGlitches(int level) { _signalGlitches = level; }
 
 	// =====================================================================================
 	// What the first-person mode asks the view
@@ -397,6 +404,10 @@ public:
 	const RuleItem *getPartnerShotAmmo() const { return _partnerShotAmmo; }
 	/// How big a shot and its muzzle flash are drawn: 1 for a rifle's, less for a pistol's, more for heavy weapons'.
 	static float shotCalibre(const RuleItem *weapon, const RuleItem *ammo);
+	/// Is a weapon launched by hand (a bow, a blowpipe, javelins): aimed with no firing skill at all?
+	static bool handLaunched(const RuleItem *weapon);
+	/// Does a shot fly as an object (an arrow, a dart, a bolt), no powder in it: no muzzle flash, a white streak?
+	bool flyingShot(const RuleItem *ammo, const RuleItem *weapon);
 
 	/// Renders the view.
 	void draw() override;
@@ -449,14 +460,14 @@ private:
 		bool animated;
 		const VoxelModel *steady = nullptr; // a UFO part's steady 3D-only model (the UFO lights option), null otherwise
 	};
-	/// A door that opened recently and is still swinging.
+	/// A door that turned recently (opened or shut) and is still swinging.
 	struct DoorAnimation
 	{
-		int tile, part, hiddenPart;
-		const VoxelModel *model;
+		int tile, part, hiddenPart;   // the door's tile, the wall it left, and the part it went to
+		const VoxelModel *model;      // the door as it was (in the wall it left), for its colours
 		Uint32 start;
-		bool away;               // swings into the neighbour tile, away from a camera on the door's own side (and stays there while open)
-		const MapData *openDoor; // the open door's record on hiddenPart: while it's there, the door is open
+		float fromAngle, toAngle;     // the swing's angles around the hinge (radians from east towards south)
+		const MapData *openDoor;      // the door's record on hiddenPart: while it's there, the swing goes on
 	};
 	std::unordered_map<Uint64, VoxelModel> _models;     // by MapData, sprite and cut-out
 	std::unordered_map<const MapData*, Frames> _frames; // by MapData: its animation frames
@@ -478,8 +489,18 @@ private:
 	std::vector<TileLight> _tileLights;                 // per tile, this frame: its light, a copy of the TileViews' (see lightAt)
 	struct SolidMask { Uint16 rows[24][16]; };          // the storage of a solid mask (see SolidRows)
 	std::map<std::array<const VoxelModel*, 4>, SolidMask> _solidMasks; // by the tile's four parts, made once each
-	struct TileMemo { std::array<const VoxelModel*, 4> parts; SolidRows solid; };
+	struct TileMemo
+	{
+		std::array<const VoxelModel*, 4> parts; // the parts shown last frame
+		SolidRows solid;                        // and their solid mask
+		std::array<const VoxelModel*, 4> paintParts; // the parts the floor was last looked at for (see paintedFloor)
+		const VoxelModel *paintedFloor;              // that floor with the UFO's floor going on inside (null: as it is)
+	};
 	std::vector<TileMemo> _tileMemos;                   // per tile: its parts last frame, and their solid mask
+	/// Floors under a UFO's hull with its floor going on inside (see paintedFloor), by the four parts' models, the UFO's floor and the sides bordering it.
+	std::map<std::array<const VoxelModel*, 6>, std::unique_ptr<VoxelModel>> _paintedFloors;
+	/// The floor of a tile under a UFO's hull, with the UFO's floor going on inside (null: as it is).
+	const VoxelModel *paintedFloor(int index, const std::array<const VoxelModel*, 4> &parts);
 	/// What a tile part was last frame, so its models are looked up again only when something changed (see snapshotTile).
 	struct PartMemo
 	{
@@ -702,7 +723,7 @@ private:
 		enum Kind { Sprite, GroundShade, Line } kind;
 		SpriteDraw sprite;                                                // Sprite (see drawSprite)
 		double centre[3]; double radius; int steps; float density;        // GroundShade (see drawGroundShade)
-		float from[3], to[3]; Uint8 color; int thickness; float opacity;  // Line (see drawLine3D)
+		float from[3], to[3]; Uint8 color; int thickness; float opacity; bool glows; // Line (see drawLine3D)
 	};
 	std::vector<DrawStep> _drawList;    // the steps recorded so far
 	std::vector<Surface*> _composedFrames; // the frames composed for the recorded sprites (a unit's or an item's), one each, reused by each stage
@@ -846,8 +867,10 @@ private:
 	// Shots in flight, beams, impacts and marks (FirstPersonViewShots.cpp)
 	// =====================================================================================
 
-	/// How a shot looks in flight, from its damage type.
-	enum Trail { TRAIL_NONE, TRAIL_FIRE, TRAIL_SMOKE, TRAIL_BEAM, TRAIL_PLASMA, TRAIL_STUN, TRAIL_ACID };
+	/// How a shot looks in flight, from its damage type (TRAIL_FLYING: an object, see flyingShot).
+	enum Trail { TRAIL_NONE, TRAIL_FIRE, TRAIL_SMOKE, TRAIL_BEAM, TRAIL_PLASMA, TRAIL_STUN, TRAIL_ACID, TRAIL_FLYING };
+	std::set<int> _flyingSprites;      // the projectile pictures of the mod's hand-launched weapons (see flyingShot)
+	bool _flyingSpritesFound = false;  // gathered (once a battle)
 	const Projectile *_lastProjectile = nullptr; // the shot in flight last frame
 	float _lastShotHead[3] = {};                 // where it was drawn
 	bool _lastProjectileThrown = false;          // it was a thrown item (no trail, no impact)
@@ -919,7 +942,7 @@ private:
 	/// Fills a convex four-sided shape on the view at one depth, behind what's nearer.
 	void fillQuadAtDepth(const double corners[4][2], Uint8 color, float depth);
 	/// How a shot looks in flight, from its ammo's damage type, and how big (by its weapon and power).
-	void trailFor(const BattleItem *ammo, const BattleItem *weapon, Trail &trail, Uint8 &color, float &calibre) const;
+	void trailFor(const BattleItem *ammo, const BattleItem *weapon, Trail &trail, Uint8 &color, float &calibre);
 	/// Spawns what a shot leaves behind along the bit of its path it flew this frame.
 	void spawnTrailSegment(const float from[3], const float to[3]);
 	/// Where the shot in flight is drawn: the game's position, our own shot's eased from the muzzle.
@@ -937,9 +960,9 @@ private:
 	std::vector<Position> _trajectory; // the path a throw or shot aimed now would take (setTrajectory)
 	/// Draws that path: dashes fading out along it, and a mark where it ends.
 	void drawTrajectory();
-	/// Draws a glowing line in the world, depth-tested (all of it, or only the screen rows from bandTop up to bandBottom),
-	/// a set number of pixels thick, or as thick as worldWidth voxels look where it is (at most thickness).
-	void drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, float worldWidth = 0.0f, int bandTop = 0, int bandBottom = 1 << 30);
+	/// Draws a line in the world, depth-tested (all of it, or only the screen rows from bandTop up to bandBottom),
+	/// a set number of pixels thick, or as thick as worldWidth voxels look where it is (at most thickness); glowing, or plain.
+	void drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, float worldWidth = 0.0f, int bandTop = 0, int bandBottom = 1 << 30, bool glows = true);
 	/// Leaves a bullet hole or scorch mark.
 	void addDecal(const float pos[3], int size, int darkness);
 	/// Draws the bullet holes, scorch marks and blackened ground.
@@ -979,6 +1002,19 @@ private:
 	float _vignette = 0.0f;     // red at the screen edges (badly hurt), 0..1
 	float _staticAmount = 0.0f; // TV static
 	Uint32 _staticSeed = 1;     // random seed for the static
+	// a digital feed's bad signal (setSignalGlitches): now and then, for a moment, a few patches
+	// of the picture in coarse blocks, a few squares of the decoder's green, the picture frozen,
+	// or (a bad signal only) torn: bands of it slid sideways
+	enum GlitchKind { GLITCH_NONE, GLITCH_BLOCKS, GLITCH_GREEN, GLITCH_FREEZE, GLITCH_TEAR };
+	struct GlitchPatch { int x, y, width, height; bool green; }; // in blocks (see glitchBlock); a tear's band: x its slide, y and height its rows, in pixels
+	int _signalGlitches = 0;                       // this view is a camera's feed: how bad its signal is (0 none, 1, 2)
+	Uint32 _glitchSeed = 0x2545F491u;              // random seed for the glitches
+	Uint32 _glitchNextAt = 0;                      // when the next glitch starts (SDL ticks)
+	Uint32 _glitchUntil = 0;                       // when the one going on ends
+	GlitchKind _glitchKind = GLITCH_NONE;          // the one going on
+	const BattleUnit *_glitchFrozenUnit = nullptr; // a freeze holds this soldier's picture (it ends if the camera moves on)
+	Uint32 _lastDrawTick = 0;                      // when the view last drew (or held) a picture
+	std::vector<GlitchPatch> _glitchPatches;       // the patches of the one going on
 	// on fire: a sheet of flame up from the bottom of the view (heat rising and cooling cell by
 	// cell, in blocks of the 320x200 view's pixels) and embers drifting up out of it
 	std::vector<Uint8> _flameHeat;
@@ -1006,6 +1042,13 @@ private:
 	void applyScreenWash();
 	/// The screen wash over bands of rows taken from the shared counter (a job for runOnAllThreads).
 	void washBands();
+	/// The bad signal's block size in pixels: coarser on a bigger picture (4 on the card's camera,
+	/// 8 on the soldier cam at the original battlescape scale).
+	int glitchBlock() const { return std::clamp(getWidth() / 28, 4, 16); }
+	/// Moves the bad signal on (starts and ends glitches); true while the picture is frozen.
+	bool updateSignalGlitches();
+	/// Draws the glitch going on over the finished picture: blocky patches, green squares.
+	void applySignalGlitches();
 
 	// =====================================================================================
 	// UFOs (an option, on by default): steady hulls whose lights glow and pulse gently, a

@@ -844,11 +844,13 @@ void FirstPersonView::drawLightHalos()
 				+ (depthBelow[gridColumn] * (1 - blendX) + depthBelow[nextColumn] * blendX) * blendY;
 			if (glow > 0.0f && _depthBuffer[y * width + x] < weightedDepth / glow - 16.0f) continue;
 			// The glow in shades, dithered: one shade brighter from a dithered threshold up, two
-			// past 1, three past 2. A lower index within a colour group is a brighter shade.
+			// past 1, three past 2. A lower index within a colour group is a brighter shade; the
+			// first group's brightest is 1 (0 is the empty, black one: white would turn black).
 			const float strength = glow * gain;
 			if (strength <= dither(x, y)) continue;
 			const int steps = strength > 2.0f + dither(x + 1, y + 2) ? 3 : strength > 1.0f + dither(x + 1, y + 2) ? 2 : 1;
-			pixels[x] = (Uint8)((pixels[x] & 0xF0) | std::max(0, (pixels[x] & 15) - steps));
+			const int brightest = (pixels[x] & 0xF0) == 0 ? 1 : 0;
+			pixels[x] = (Uint8)((pixels[x] & 0xF0) | std::max(brightest, (pixels[x] & 15) - steps));
 		}
 	}
 }

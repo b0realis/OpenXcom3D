@@ -168,9 +168,18 @@ const Uint32 TileMoveStuck = 300;
 const double NumpadMoveSpeed = 160.0;
 /// Sprinting (its key): the walking pace times this, while the soldier runs (the game's run).
 const double SprintPace = 1.6;
+/// On a grav lift or a ladder, W climbs while the view looks up more than this many degrees,
+/// and goes down while it looks down as much (S the other way round); see updateClimb.
+const double ClimbPitch = 30.0;
+/// A climb with W the game refused (not enough time units, say) is tried again after this many
+/// milliseconds while the key stays held, so its message isn't repeated every frame.
+const Uint32 ClimbRetryTime = 700;
 /// How long the camera waits in front of a door it opened, in milliseconds (the 3D view swings
 /// it open meanwhile).
 const Uint32 DoorWait = 150;
+/// Where the view tips to when a failed close-quarters check knocks the shot at the soldier's
+/// feet or straight up (degrees of pitch; see followDeflectedShot).
+const double DeflectedDownPitch = -75.0, DeflectedUpPitch = 60.0;
 /// How far from a closed door the camera stops (from the tile edge, in voxels).
 const double DoorMargin = 11.0;
 /// How long, in milliseconds, a ride up or down one level takes (a grav lift, or flying up and

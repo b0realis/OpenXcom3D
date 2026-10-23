@@ -56,6 +56,7 @@
 #include "../Battlescape/BattlescapeState.h"
 #include "../Engine/Game.h"
 #include "../Engine/Options.h"
+#include "../Engine/Script.h"
 #include "../Engine/SurfaceSet.h"
 #include "../Mod/Mod.h"
 #include "../Mod/RuleDamageType.h"
@@ -139,8 +140,32 @@ void FirstPersonMode::makeWeaponInHand()
 }
 
 /**
+ * Draws an item's inventory picture (BIGOBS.PCK, with the item's own recolouring scripts, as the
+ * game draws it in a hand) into a picture of the frame's size, whole, at the frame's own place.
+ * The game's hand slot centres the frame by the item's inventory size instead, which pushes a
+ * picture drawn wider than its item (a mod's sword lying across the frame, one square wide in
+ * the inventory) partly off the frame: its tip was cut off, and the thicker end left looked
+ * like the business end.
+ * @param item The item.
+ * @param inventorySprites The game's BIGOBS.PCK.
+ * @param picture Where to draw it (32x48, cleared first).
+ */
+void FirstPersonMode::drawHeldPicture(const BattleItem *item, const SurfaceSet *inventorySprites, Surface *picture) const
+{
+	picture->clear();
+	const Surface *frame = item->getBigSprite(inventorySprites, _save, 0);
+	if (!frame)
+	{
+		return;
+	}
+	ScriptWorkerBlit worker;
+	BattleItem::ScriptFill(&worker, item, _save, BODYPART_ITEM_INVENTORY, 0, 0);
+	worker.executeBlit(frame, picture, 0, 0, 0);
+}
+
+/**
  * Measures the weapon's inventory picture (the game's own, from BIGOBS.PCK, already drawn into
- * _heldSprite), so it can be drawn with its barrel on the line to the crosshair: its long axis
+ * _heldSprite, see drawHeldPicture), so it can be drawn with its barrel on the line to the crosshair: its long axis
  * (the direction its pixels spread out furthest), its muzzle end, and the side with the grip and
  * magazine (the one sticking out further from the axis) down. Then gives it volume
  * (voxelizeWeapon). All measures are in picture pixels, along and across the long axis from
@@ -151,7 +176,8 @@ void FirstPersonMode::makeWeaponInHand()
  * magazine or a launcher's bulk tip the spread's axis by up to 20 degrees), and a picture
  * standing up has its muzzle at the top (the thinner end can be the stock: the rifle's is). A
  * picture lying flat (a mod's) has its muzzle at the thinner end, or with both ends about as
- * thick, the left.
+ * thick, the left. A blade leaning or lying in the picture (the big mods' swords) has its edge
+ * on its lower side, and the edge leads the strike.
  * @param gun It's a gun or a club, drawn pointing at the crosshair (false: held up like an item).
  * @param melee It's a melee weapon: held tip up, and swung down at the crosshair (see drawWeaponPlate).
  */
@@ -248,6 +274,14 @@ void FirstPersonMode::analyzeWeapon(bool gun, bool melee)
 
 	// "Up" is away from the side that sticks out further (the grip and magazine hang down).
 	shape.upSign = maxAcross > -minAcross ? -1 : 1;
+	// A blade drawn leaning (or lying) has its edge on its lower side in the picture: the big
+	// mods' swords lean right with the edge on the right, or left with it on the left. The edge
+	// leads: it faces away at rest and comes down first in the strike (the weapon's "down" side,
+	// see drawWeaponPlate), so that side goes down. Standing straight up, the rule above stands.
+	if (shape.melee && std::abs(shape.across[1]) > 1e-6)
+	{
+		shape.upSign = shape.across[1] > 0 ? -1 : 1;
+	}
 
 	// The bore: the middle (across) of the last two pixels' worth at the muzzle end. That's the
 	// point put on the ray to the crosshair (the shot leaves from there), not the middle of
@@ -266,11 +300,11 @@ void FirstPersonMode::analyzeWeapon(bool gun, bool melee)
 
 /**
  * Gives the held picture volume (the weapon in hand, or a grenade, a medi-kit, a clip...): its
- * voxel model, see voxelizePicture.
+ * voxel model, see voxelizePicture; a blade's a flat plate (see pictureIsPlate).
  */
 void FirstPersonMode::voxelizeWeapon()
 {
-	voxelizePicture(_heldSprite, _heldFaces);
+	voxelizePicture(_heldSprite, _heldFaces, pictureIsPlate(_game->getMod()->getFirstPerson(), _heldRules, _heldSprite));
 }
 
 /**
@@ -822,14 +856,13 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 	_heldItem = weapon;
 	_heldClipId = clipId;
 
-	// A different kind of weapon: draw its inventory picture (the game's own hand sprite) and
+	// A different kind of weapon: draw its inventory picture (see drawHeldPicture) and
 	// measure it again. Guns and clubs are drawn pointing at the crosshair, the rest held up.
 	const BattleType battleType = weapon->getRules()->getBattleType();
 	if (weapon->getRules() != _heldRules)
 	{
 		_heldRules = weapon->getRules();
-		_heldSprite->clear();
-		weapon->getRules()->drawHandSprite(inventorySprites, _heldSprite, weapon, _save, 0);
+		drawHeldPicture(weapon, inventorySprites, _heldSprite);
 		analyzeWeapon(battleType == BT_FIREARM || battleType == BT_MELEE, battleType == BT_MELEE);
 	}
 
@@ -847,11 +880,11 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 	double bob[2] = { std::sin(bobAngle) * 4.0 * _headBobAmount, std::abs(std::cos(bobAngle)) * 4.0 * _headBobAmount };
 
 	// A new round of ours left the muzzle (the 3D view stamps each with its time): a muzzle
-	// flash for 80 ms, its look by what was fired.
+	// flash for 80 ms, its look by what was fired. (None for an object flying: an arrow, a dart.)
 	if (_view->getOwnShotTick() != _heldShotSeen)
 	{
 		_heldShotSeen = _view->getOwnShotTick();
-		if (battleType == BT_FIREARM)
+		if (battleType == BT_FIREARM && !_view->flyingShot(_view->getOwnShotAmmo(), weapon->getRules()))
 		{
 			_muzzleFlashUntil = now + 80;
 			_muzzleFlash = muzzleFlashFor(weapon, _view->getOwnShotAmmo());
@@ -862,7 +895,7 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 	if (_view->getPartnerShotTick() != _offHandShotSeen)
 	{
 		_offHandShotSeen = _view->getPartnerShotTick();
-		if (otherWeapon)
+		if (otherWeapon && !_view->flyingShot(_view->getPartnerShotAmmo(), otherWeapon->getRules()))
 		{
 			_offHandFlashUntil = now + 80;
 			_offHandFlash = muzzleFlashFor(otherWeapon, _view->getPartnerShotAmmo());
@@ -951,8 +984,7 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 			if (otherWeapon->getRules() != _heldRules)
 			{
 				_heldRules = otherWeapon->getRules();
-				_heldSprite->clear();
-				otherWeapon->getRules()->drawHandSprite(inventorySprites, _heldSprite, otherWeapon, _save, 0);
+				drawHeldPicture(otherWeapon, inventorySprites, _heldSprite);
 				analyzeWeapon(true);
 			}
 			if (_heldShape.gun)

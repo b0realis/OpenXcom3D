@@ -181,10 +181,19 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 	// The card, in the camera's frame (true proportions, as projectToScreen works): the anchor
 	// from the eye; the way up the card, upright but leaning with the view's pitch up to
 	// CardTiltMax looking down and CardTiltUpMax looking up; and the way the card faces (the
-	// view axis, while the pitch is within that).
-	const double tilt = std::clamp(_pitch, -CardTiltMax * Pi / 180.0, CardTiltUpMax * Pi / 180.0);
+	// view axis, while the pitch is within that). A card standing steeply above the eye (its
+	// feet higher than CardTiltUpMax up: a unit on a floor above, a flyer) leans towards the eye
+	// by how much steeper it is, up to CardTiltSteepMax, so a unit straight overhead faces down
+	// at the soldier, not edge on. (Units on the soldier's own level have their feet below the
+	// eye: unchanged.)
 	const double level[2] = { std::cos(_yaw), std::sin(_yaw) }; // straight ahead, along the ground
 	const double anchor[3] = { world[0] - _eye[0], world[1] - _eye[1], (world[2] - _eye[2]) * ZScale };
+	const double elevation = std::atan2(anchor[2], std::sqrt(anchor[0] * anchor[0] + anchor[1] * anchor[1])); // the anchor's angle above the eye
+	double tilt = std::clamp(_pitch, -CardTiltMax * Pi / 180.0, CardTiltUpMax * Pi / 180.0);
+	if (elevation > CardTiltUpMax * Pi / 180.0)
+	{
+		tilt = std::max(tilt, std::min(elevation - CardTiltUpMax * Pi / 180.0, CardTiltSteepMax * Pi / 180.0));
+	}
 	const double cardUp[3] = { -std::sin(tilt) * level[0], -std::sin(tilt) * level[1], std::cos(tilt) };
 	const double cardFacing[3] = { std::cos(tilt) * level[0], std::cos(tilt) * level[1], std::sin(tilt) };
 	const double anchorAcross = dot(anchor, _levelRight), anchorFacing = dot(anchor, cardFacing);
@@ -455,7 +464,7 @@ void FirstPersonView::drawListBands()
 				drawGroundShade(step.centre, step.radius, step.steps, step.density, bandTop, bandBottom);
 				break;
 			case DrawStep::Line:
-				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, bandTop, bandBottom);
+				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, bandTop, bandBottom, step.glows);
 				break;
 			}
 		}
@@ -777,6 +786,7 @@ void FirstPersonView::recordHitbox(const BattleUnit *unit, const double feet[3],
 		step.color = color;
 		step.thickness = 1;
 		step.opacity = opacity;
+		step.glows = Options::fpsGlowingOutlines; // (setting "Glowing outlines")
 		_drawList.push_back(step);
 	};
 
@@ -942,15 +952,18 @@ static int topColouredRow(const Surface *sprite)
 
 /**
  * Draws the top item lying on each discovered tile (weapons, corpses, ...) as a sprite on the
- * floor, lit by the game's light just above it. Something lying on a tall object (a shelf, a
- * crate, the top of stairs) is right under the floor above, if there is one: the part of it
- * that stands up from the floor is squashed to fit under that floor, a voxel short of it, or it
- * poked up through the floor into the room above.
+ * floor, lit by the game's light just above it, at the units' size (setting "Unit size").
+ * Something lying on a tall object (a shelf, a crate, the top of stairs) is right under the
+ * floor above, if there is one: the part of it that stands up from the floor is squashed to fit
+ * under that floor, a voxel short of it, or it poked up through the floor into the room above.
  */
 void FirstPersonView::drawFloorItems()
 {
 	ItemSprite itemSprite(_spriteBuffer, _game->getMod(), _save, _save->getAnimFrame()); // on the game's animation counter, as the map draws
 	const int tileCount = _save->getMapSizeXYZ();
+	// The items' size: the units' (setting "Unit size"), so a unit going down doesn't grow into
+	// a bigger corpse, and what lies by it keeps to the same scale.
+	const double itemScale = std::clamp(Options::fpsUnitSize, 80, 100) / 100.0;
 	// The items are recorded first, then drawn on all the view's threads at once (see
 	// replayDrawList); each one's frame is composed in the sprite buffer and kept till then.
 	int framesUsed = 0;
@@ -990,17 +1003,19 @@ void FirstPersonView::drawFloorItems()
 		step.sprite.world[1] = ground[1];
 		step.sprite.world[2] = standingHeight(ground);
 		step.sprite.shade = shade;
+		step.sprite.scale = itemScale;
 		step.sprite.pose = SpritePose::Lying;
 		// Room to stand up in under the floor above (its slab starts at the next level's foot),
-		// against the sprite's coloured rows above the anchor, a voxel high each.
+		// against the sprite's coloured rows above the anchor, a voxel high each at full size.
 		const Tile *aboveTile = _save->getAboveTile(tile);
 		if (aboveTile && !aboveTile->hasNoFloor())
 		{
 			const double headroom = (tilePosition.z + 1) * 24.0 - 1.0 - step.sprite.world[2];
 			const int standingRows = step.sprite.anchorY - topColouredRow(step.sprite.sprite);
-			if (standingRows > 0 && standingRows > headroom)
+			const double standingVoxels = standingRows * itemScale;
+			if (standingRows > 0 && standingVoxels > headroom)
 			{
-				step.sprite.standingSquash = std::max(0.05, headroom) / standingRows;
+				step.sprite.standingSquash = std::max(0.05, headroom) / standingVoxels;
 			}
 		}
 		useSmoothVersion(step.sprite);

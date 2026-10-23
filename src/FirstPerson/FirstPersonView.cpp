@@ -137,6 +137,7 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 	_models.clear();
 	_frames.clear();
 	_solidMasks.clear();
+	_paintedFloors.clear();
 	_tileMemos.clear();
 	_partMemos.clear();
 	_tileFlags.clear();
@@ -248,12 +249,12 @@ void FirstPersonView::lookAlong(int unitDirection)
 void FirstPersonView::rotate(double yawDegrees, double pitchDegrees)
 {
 	_yaw = std::remainder(_yaw + yawDegrees * Pi / 180.0, 2.0 * Pi);
-	_pitch = std::clamp(_pitch + pitchDegrees * Pi / 180.0, -80.0 * Pi / 180.0, 80.0 * Pi / 180.0);
+	_pitch = std::clamp(_pitch + pitchDegrees * Pi / 180.0, -MaxPitch * Pi / 180.0, MaxPitch * Pi / 180.0);
 }
 
 /**
- * Points the camera at a point (used to look at an enemy). The pitch is limited to 80 degrees
- * up or down, as in rotate. A point at the eye itself leaves the camera as it is.
+ * Points the camera at a point (used to look at an enemy). The pitch is limited to MaxPitch
+ * degrees up or down, as in rotate. A point at the eye itself leaves the camera as it is.
  * @param target The point to look at, in voxels.
  */
 void FirstPersonView::lookAt(const double target[3])
@@ -268,8 +269,8 @@ void FirstPersonView::lookAt(const double target[3])
 
 /**
  * The way the camera would point looking at a point from where its eye is now (for lookAt, and
- * for a view gliding round to look at something). The pitch is limited to 80 degrees up or
- * down, as in rotate.
+ * for a view gliding round to look at something). The pitch is limited to MaxPitch degrees up
+ * or down, as in rotate.
  * @param target The point, in voxels.
  * @param yawDegrees Set to the yaw (0 east, clockwise as seen from above, -180 to 180).
  * @param pitchDegrees Set to the pitch (up positive).
@@ -287,7 +288,7 @@ bool FirstPersonView::anglesTo(const double target[3], double &yawDegrees, doubl
 	// The pitch is in true proportions, where a voxel up is only ZScale of one across, so the
 	// height difference is scaled down before the angle is taken.
 	yawDegrees = std::atan2(dy, dx) * 180.0 / Pi;
-	pitchDegrees = std::clamp(std::atan2(dz * ZScale, flatDistance) * 180.0 / Pi, -80.0, 80.0);
+	pitchDegrees = std::clamp(std::atan2(dz * ZScale, flatDistance) * 180.0 / Pi, -MaxPitch, MaxPitch);
 	return true;
 }
 
@@ -351,8 +352,8 @@ void FirstPersonView::setMaxDistance(int tiles)
  */
 void FirstPersonView::updateBasis()
 {
-	// The pitch with the recoil kick added, within the same 80 degree limits as rotate.
-	const double viewPitch = std::clamp(_pitch + _recoilKick * Pi / 180.0, -80.0 * Pi / 180.0, 80.0 * Pi / 180.0); // recoil shows, it doesn't stay
+	// The pitch with the recoil kick added, within the same limits as rotate (MaxPitch).
+	const double viewPitch = std::clamp(_pitch + _recoilKick * Pi / 180.0, -MaxPitch * Pi / 180.0, MaxPitch * Pi / 180.0); // recoil shows, it doesn't stay
 	const double cosYaw = std::cos(_yaw), sinYaw = std::sin(_yaw), cosPitch = std::cos(viewPitch), sinPitch = std::sin(viewPitch);
 	// Forward along the yaw, tilted by the pitch; right level (the tilt comes below); up from the two.
 	_forward[0] = cosYaw * cosPitch; _forward[1] = sinYaw * cosPitch; _forward[2] = sinPitch;
@@ -485,7 +486,9 @@ int FirstPersonView::soundAngle(const Position &tile) const
  * fire (and the old solid smoke), shots and explosions, flares, beams, the see-through smoke
  * (over all that, farthest first), particles and glows. Then the effects on
  * the screen itself: the colour wash, flames when the soldier burns, the hurt arc and blood, and
- * last the icons over the downed units and the enemy markers, over everything.
+ * last the icons over the downed units and the enemy markers, over everything. A helmet
+ * camera's feed now and then shows a bad signal (see updateSignalGlitches): blocky patches and
+ * green squares over the picture, or the last picture held a moment.
  * Without a battle or a camera unit, the surface is just cleared.
  */
 void FirstPersonView::draw()
@@ -497,6 +500,11 @@ void FirstPersonView::draw()
 		return;
 	}
 	_redraw = false;
+	// A camera's feed with a bad signal may hold its last picture a moment (see updateSignalGlitches).
+	if (_signalGlitches && updateSignalGlitches())
+	{
+		return;
+	}
 	// Upscaled sprites used from now on belong to this frame (see upscaled).
 	_upscaleFrameStart = _upscaleClock + 1;
 
@@ -544,8 +552,9 @@ void FirstPersonView::draw()
 	findUnitAtPointer();
 	drawParticles();
 	drawLightHalos();
-	// Effects on the finished picture.
+	// Effects on the finished picture (a camera's feed: its bad signal last).
 	applyScreenWash();
+	if (_signalGlitches) applySignalGlitches();
 	drawBurning();
 	drawHurt();
 	// The icons over the downed units, and the enemy markers, over everything.

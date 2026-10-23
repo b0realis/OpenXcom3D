@@ -80,7 +80,8 @@ namespace
 /**
  * Everything a ray needs to know about this frame's world: the tile snapshot, a byte per tile
  * saying whether there is anything to look at in it, the doors that are swinging, the map's size
- * in tiles and how far the view reaches.
+ * in tiles and how far the view reaches; and for the view's own rays, the pixel's threshold for
+ * ghosts (see ghostOpacity).
  */
 struct RayContext
 {
@@ -89,7 +90,25 @@ struct RayContext
 	const FirstPersonView::DoorSwing *swings; // the doors swinging open this frame (TileView::swing indexes them)
 	int size[3];                              // the map's size in tiles: x, y, levels
 	float maxDistance;                        // how far rays go, in voxels
+	float ghostThreshold = 2.0f;              // a ghost stops the ray where its opacity is above this (the pixel's dither threshold); above 1, never (shadows, aim, flares)
 };
+
+// How solid a ghost looks (see VoxelModel::ghostly): on what share of the pixels it shows, at
+// full up close (GhostNearDistance voxels, a tile and a half), fading to GhostFarOpacity from
+// GhostFarDistance (seven tiles) on, so it's clear up close and doesn't clutter the distance.
+const float GhostNearDistance = 24.0f, GhostFarDistance = 112.0f, GhostFarOpacity = 0.3f;
+
+/**
+ * The share of the pixels a ghost shows on at a distance along the ray (in voxels): 1 up close,
+ * GhostFarOpacity far off, straight in between. The view's rays meet a ghost voxel only where
+ * this is above the pixel's dither threshold (RayContext::ghostThreshold), so it shows as a
+ * screen of dots that thickens as the soldier comes closer.
+ */
+inline float ghostOpacity(float distance)
+{
+	const float fade = (distance - GhostNearDistance) / (GhostFarDistance - GhostNearDistance);
+	return 1.0f - std::clamp(fade, 0.0f, 1.0f) * (1.0f - GhostFarOpacity);
+}
 
 /**
  * Clips a ray's segment to a slab: the space between two parallel planes across one axis.
@@ -234,8 +253,8 @@ inline float addSmoke(SmokeTrace &smoke, const FirstPersonView::TileView &tileVi
 
 /**
  * Walks the voxels of one tile between two distances along the ray, looking for the first solid
- * one (window glass is seen through, but noted). Swinging doors reaching into the tile are
- * traced first; anything solid in front of a door hides it.
+ * one (window glass is seen through, but noted; a ghost too, on some pixels). Swinging doors
+ * reaching into the tile are traced first; anything solid in front of a door hides it.
  *
  * Most tiles a ray looks into are mostly air (a floor, a wall along one side), so the ray is
  * first clipped to the box round the tile's solid voxels: two out of three tiles end there. In
@@ -247,10 +266,12 @@ inline float addSmoke(SmokeTrace &smoke, const FirstPersonView::TileView &tileVi
  *        axis the ray runs parallel to).
  * @param segmentStart, segmentEnd The part of the ray inside this tile.
  * @param enterAxis Axis of the face the ray crossed to enter the tile, -1 at the eye.
+ * @param ghostThreshold A ghost's voxel stops the ray only where its opacity is above this (see
+ *        RayContext::ghostThreshold).
  * @return True if something was hit (the hit is filled in).
  */
 inline bool traceTile(const FirstPersonView::TileView &tileView, const FirstPersonView::DoorSwing *swings, const int tileCell[3], const float rayOrigin[3], const float rayDirection[3],
-	const float inverseDirection[3], float segmentStart, float segmentEnd, int enterAxis, FirstPersonView::Hit &hit)
+	const float inverseDirection[3], float segmentStart, float segmentEnd, int enterAxis, float ghostThreshold, FirstPersonView::Hit &hit)
 {
 	// Doors swinging through this tile: the nearest hit shortens the segment, so only what's in
 	// front of the door can still win.
@@ -353,6 +374,10 @@ inline bool traceTile(const FirstPersonView::TileView &tileView, const FirstPers
 				if (!model) continue;
 				const Uint8 color = model->color[localZ][localY][localX];
 				if (!color) continue;
+				if (model->ghostly && ghostOpacity(distance) <= ghostThreshold)
+				{
+					continue; // a ghost, seen through on this pixel
+				}
 				if (model->glass[localZ][localY] & (1 << localX))
 				{
 					hit.glass = true; // window glass: tint what's behind it
@@ -494,7 +519,7 @@ inline RayEnd castRay(const RayContext &context, const float rayOrigin[3], const
 					smokeWall = addSmoke(*smoke, tileView, distance, tileExit);
 				}
 				const float traceEnd = smokeWall >= 0.0f ? smokeWall : tileExit;
-				if (lookForSolid && traceTile(tileView, context.swings, tileCell, rayOrigin, rayDirection, inverseDirection, distance, traceEnd, enterAxis, hit))
+				if (lookForSolid && traceTile(tileView, context.swings, tileCell, rayOrigin, rayDirection, inverseDirection, distance, traceEnd, enterAxis, context.ghostThreshold, hit))
 				{
 					// Hit something in the tile: only the smoke in front of it counts.
 					if (traceSmokeHere)

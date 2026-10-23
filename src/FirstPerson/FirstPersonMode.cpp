@@ -514,6 +514,7 @@ void FirstPersonMode::createSoldierCard()
 	_preview->setMap(_state->_map);
 	_preview->setMaxDistance(std::min(30, mod->getFirstPerson().getMaxViewDistance()));
 	_preview->setParticles(false);
+	_preview->setSignalGlitches(mod->getFirstPerson().getSignalLevel(_save->getMissionType())); // a camera's feed: a bad signal now and then (a lot on the hardest missions)
 	_cardParts.push_back({ _preview, 4, 36 });
 
 	// The texts: name, weapon, status (top right), and "signal lost" across the middle of
@@ -638,7 +639,9 @@ void FirstPersonMode::makeSoldierCamView()
 	camera->setMap(_state->_map);
 	camera->setMaxDistance(std::min(30, mod->getFirstPerson().getMaxViewDistance()));
 	camera->setParticles(false);
-	camera->setStatic(0.03f); // a little TV static: a camera's picture
+	const int signalLevel = mod->getFirstPerson().getSignalLevel(_save->getMissionType());
+	camera->setStatic(signalLevel >= 2 ? 0.05f : 0.03f); // a little TV static: a camera's picture (more on the hardest missions)
+	camera->setSignalGlitches(signalLevel); // and a digital feed's bad signal now and then (a lot there)
 
 	// In place of the old ones (or, the first time, added last: drawn over everything).
 	const bool wasVisible = _soldierCam && _soldierCam->getVisible();
@@ -1861,11 +1864,16 @@ void FirstPersonMode::trackHover(Action *action)
 	const TextButton *hoveredButton = buttonAt(action->getAbsoluteXMouse() / _uiScale, action->getAbsoluteYMouse() / _uiScale);
 	_liftArrowHovered = liftArrowAt(action->getAbsoluteXMouse() / _uiScale, action->getAbsoluteYMouse() / _uiScale);
 
-	// Which squad button that is, if any (-1: none).
-	_hoveredSquadButton = -1;
-	for (size_t buttonIndex = 0; buttonIndex < _btnSquad.size(); ++buttonIndex)
+	// Which squad button that is, if any (-1: none). Only when the cursor comes onto another
+	// button: the wheel may have moved the card on from the one under it (see browseSquad).
+	if (hoveredButton != _buttonUnderCursor)
 	{
-		if (hoveredButton == _btnSquad[buttonIndex]) _hoveredSquadButton = (int)buttonIndex;
+		_buttonUnderCursor = hoveredButton;
+		_hoveredSquadButton = -1;
+		for (size_t buttonIndex = 0; buttonIndex < _btnSquad.size(); ++buttonIndex)
+		{
+			if (hoveredButton == _btnSquad[buttonIndex]) _hoveredSquadButton = (int)buttonIndex;
+		}
 	}
 }
 
@@ -2072,8 +2080,9 @@ bool FirstPersonMode::handleMouseLook(Action *action)
 /**
  * The mouse with a free cursor: our buttons get it first, then the lift arrows and the visible
  * enemy buttons; over the view a left click fires at the cursor, the right button drags the
- * view round and the middle button goes back to mouse look. The wheel scrolls the squad
- * buttons when over them, and changes the fire mode over the view.
+ * view round and the middle button goes back to mouse look. The wheel over a soldier's button
+ * moves the soldier card (and the soldier cam) on through the squad, over previous / next it
+ * scrolls the squad buttons, and over the view it changes the fire mode.
  * @param active Whether the 3D view is showing (on the isometric map only our buttons count).
  * @return True if the event was consumed.
  */
@@ -2100,12 +2109,17 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 			}
 		}
 
-		// The wheel over the squad buttons (or previous / next) scrolls them; so does a right
-		// click on previous / next, which only scrolls (no soldier is selected), to browse the
-		// squad by their helmet cameras.
-		const bool overSquad = buttonUnderCursor && (buttonUnderCursor == _btnPrev || buttonUnderCursor == _btnNext
-			|| std::find(_btnSquad.begin(), _btnSquad.end(), buttonUnderCursor) != _btnSquad.end());
-		if (wheelTurned && overSquad)
+		// The wheel over a soldier's button moves their card (and the soldier cam, if open) on to
+		// the next or previous soldier (up: the previous one), to browse the squad by their helmet
+		// cameras without moving the mouse. Over previous / next it scrolls the squad buttons, and
+		// so does a right click on them, which only scrolls (no soldier is selected).
+		const bool overSoldier = buttonUnderCursor && std::find(_btnSquad.begin(), _btnSquad.end(), buttonUnderCursor) != _btnSquad.end();
+		if (wheelTurned && overSoldier)
+		{
+			browseSquad(event.button.button == SDL_BUTTON_WHEELUP ? -1 : 1, mouseX / _uiScale, mouseY / _uiScale);
+			return true;
+		}
+		if (wheelTurned && (buttonUnderCursor == _btnPrev || buttonUnderCursor == _btnNext))
 		{
 			scrollSquad(event.button.button == SDL_BUTTON_WHEELUP ? -1 : 1);
 			return true;

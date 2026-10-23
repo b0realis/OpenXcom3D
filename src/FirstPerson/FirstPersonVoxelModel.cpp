@@ -50,27 +50,31 @@
 #include <algorithm>
 #include <cmath>
 #include "../Engine/Surface.h"
+#include "../Mod/RuleItem.h"
+#include "../Mod/RuleDamageType.h"
+#include "RuleFirstPerson.h"
 
 namespace OpenXcom
 {
 
-/**
- * Gives a picture volume, cushion style: each picture pixel becomes a column of voxels in
- * depth, its half depth growing with the square root of its distance to the outline (one voxel
- * at the edge, at most four), so the model is thickest in the middle. Only the faces between a
- * voxel and empty space are kept, with corners in picture x, y and depth (depth centred on 0).
- * @param picture The picture (palette colours, 0 transparent).
- * @param faces Set to the model's faces.
- */
-void voxelizePicture(Surface *picture, std::vector<VoxelFace> &faces)
+namespace
 {
-	faces.clear();
-	const int width = picture->getWidth(), height = picture->getHeight();
-	const int MaxHalfDepth = 4, fullDepth = 2 * MaxHalfDepth + 1; // in voxels
 
-	// How many steps each opaque pixel is from the outside (counting the 8 neighbours): the edge
-	// pixels are 1, found first, then a breadth-first walk goes inwards from them.
-	std::vector<int> stepsToOutside(width * height, 0);
+/// A melee weapon whose picture is nowhere further than this from its outline (in steps, see
+/// stepsToOutside) is thin enough to be a blade, a flat plate (unless it's blunt).
+const int BladeMaxThickness = 4;
+
+/**
+ * How many steps each opaque pixel of a picture is from the outside (counting the 8
+ * neighbours): the edge pixels are 1, found first, then a breadth-first walk goes inwards from
+ * them; transparent pixels are 0.
+ * @param picture The picture (palette colours, 0 transparent).
+ * @param steps Set to each pixel's steps (index y * width + x).
+ */
+void stepsToOutside(Surface *picture, std::vector<int> &steps)
+{
+	const int width = picture->getWidth(), height = picture->getHeight();
+	steps.assign(width * height, 0);
 	std::vector<int> queue; // pixel indices (y * width + x), walked in order
 	auto solid = [&](int x, int y) { return x >= 0 && y >= 0 && x < width && y < height && picture->getPixel(x, y) != 0; };
 	for (int y = 0; y < height; ++y)
@@ -85,7 +89,7 @@ void voxelizePicture(Surface *picture, std::vector<VoxelFace> &faces)
 					onEdge = !solid(x + offsetX, y + offsetY);
 			if (onEdge)
 			{
-				stepsToOutside[y * width + x] = 1;
+				steps[y * width + x] = 1;
 				queue.push_back(y * width + x);
 			}
 		}
@@ -96,15 +100,73 @@ void voxelizePicture(Surface *picture, std::vector<VoxelFace> &faces)
 		const int x = queue[head] % width, y = queue[head] / width;
 		for (int offsetY = -1; offsetY <= 1; ++offsetY)
 			for (int offsetX = -1; offsetX <= 1; ++offsetX)
-				if (solid(x + offsetX, y + offsetY) && !stepsToOutside[(y + offsetY) * width + x + offsetX])
+				if (solid(x + offsetX, y + offsetY) && !steps[(y + offsetY) * width + x + offsetX])
 				{
-					stepsToOutside[(y + offsetY) * width + x + offsetX] = stepsToOutside[queue[head]] + 1;
+					steps[(y + offsetY) * width + x + offsetX] = steps[queue[head]] + 1;
 					queue.push_back((y + offsetY) * width + x + offsetX);
 				}
 	}
+}
+
+} // namespace
+
+/**
+ * Is an item's picture given volume as a flat plate, one voxel thick (a blade: a sword, a knife,
+ * an axe), rather than a cushion? The item table (`firstPerson: items:`, held: plate or
+ * cushion) decides first. Otherwise a melee weapon is a plate when it isn't blunt (its damage
+ * isn't the clubs' and the stun rods': concussive or stun, high explosive and stun in the
+ * original games) and its picture is thin everywhere (BladeMaxThickness): the big mods' swords,
+ * knives and axes, not their maces, knuckles or shields.
+ * @param table The 3D view's rules (the item table).
+ * @param item The item (null: a cushion).
+ * @param picture Its inventory picture.
+ * @return True for a plate.
+ */
+bool pictureIsPlate(const RuleFirstPerson &table, const RuleItem *item, Surface *picture)
+{
+	if (!item)
+	{
+		return false;
+	}
+	if (const RuleFirstPerson::ItemLook *look = table.getItemLook(item->getType()))
+	{
+		if (look->held != RuleFirstPerson::HELD_AUTO) return look->held == RuleFirstPerson::HELD_PLATE;
+	}
+	const ItemDamageType damage = item->getDamageType()->ResistType;
+	if (item->getBattleType() != BT_MELEE || damage == DT_HE || damage == DT_STUN)
+	{
+		return false;
+	}
+	std::vector<int> steps;
+	stepsToOutside(picture, steps);
+	const int thickest = steps.empty() ? 0 : *std::max_element(steps.begin(), steps.end());
+	return thickest > 0 && thickest <= BladeMaxThickness;
+}
+
+/**
+ * Gives a picture volume, cushion style: each picture pixel becomes a column of voxels in
+ * depth, its half depth growing with the square root of its distance to the outline (one voxel
+ * at the edge, at most four), so the model is thickest in the middle. Or a blade's, a flat
+ * plate: every column one voxel. Only the faces between a voxel and empty space are kept, with
+ * corners in picture x, y and depth (depth centred on 0).
+ * @param picture The picture (palette colours, 0 transparent).
+ * @param faces Set to the model's faces.
+ * @param plate A flat plate one voxel thick instead of a cushion.
+ */
+void voxelizePicture(Surface *picture, std::vector<VoxelFace> &faces, bool plate)
+{
+	faces.clear();
+	const int width = picture->getWidth(), height = picture->getHeight();
+	const int MaxHalfDepth = 4, fullDepth = 2 * MaxHalfDepth + 1; // in voxels
+
+	// How many steps each opaque pixel is from the outside (0: transparent).
+	std::vector<int> steps;
+	stepsToOutside(picture, steps);
+	auto solid = [&](int x, int y) { return x >= 0 && y >= 0 && x < width && y < height && steps[y * width + x] > 0; };
 
 	// Fill the voxel grid (width x height x fullDepth, 0 = empty, else the pixel's colour):
-	// each pixel's column reaches its half depth to either side of the middle layer.
+	// each pixel's column reaches its half depth to either side of the middle layer (a plate's:
+	// the middle layer only).
 	std::vector<Uint8> voxels(width * height * fullDepth, 0);
 	auto voxelAt = [&](int x, int y, int z) -> Uint8 {
 		return x >= 0 && y >= 0 && z >= 0 && x < width && y < height && z < fullDepth ? voxels[(z * height + y) * width + x] : 0;
@@ -113,8 +175,8 @@ void voxelizePicture(Surface *picture, std::vector<VoxelFace> &faces)
 	{
 		for (int x = 0; x < width; ++x)
 		{
-			if (!stepsToOutside[y * width + x]) continue;
-			const int halfDepth = std::clamp((int)std::lround(1.2 * std::sqrt((double)stepsToOutside[y * width + x])), 1, MaxHalfDepth);
+			if (!steps[y * width + x]) continue;
+			const int halfDepth = plate ? 0 : std::clamp((int)std::lround(1.2 * std::sqrt((double)steps[y * width + x])), 1, MaxHalfDepth);
 			for (int z = MaxHalfDepth - halfDepth; z <= MaxHalfDepth + halfDepth; ++z) voxels[(z * height + y) * width + x] = picture->getPixel(x, y);
 		}
 	}

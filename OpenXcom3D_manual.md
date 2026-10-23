@@ -27,10 +27,10 @@ Add-on builds keep their own user and config folders, so an existing OXCE profil
 
 ### Option A: the prebuilt release (Linux x86-64)
 
-Download it from the project's [Releases](https://github.com/b0realis/OpenXcom3D/releases) page, in either form (1.03 has no prebuilt download yet: the newest there is 1.02; for 1.03, build it from source, [Option B](#option-b-build-from-source)):
+Download it from the project's [Releases](https://github.com/b0realis/OpenXcom3D/releases) page, in either form:
 
-- **`OpenXcom3D-1.02-x86_64.AppImage`**: a single file. Make it executable (`chmod +x OpenXcom3D-1.02-x86_64.AppImage`, or *Properties → Permissions → executable* in a file manager) and run it. Its profile is in `~/.local/share/openxcom3d`.
-- **`OpenXcom3D-1.02-linux-x86_64.tar.gz`**: unpack it anywhere and run `./play.sh`. Its profile is the `user/` folder inside.
+- **`OpenXcom3D-1.03-x86_64.AppImage`**: a single file. Make it executable (`chmod +x OpenXcom3D-1.03-x86_64.AppImage`, or *Properties → Permissions → executable* in a file manager) and run it. Its profile is in `~/.local/share/openxcom3d`.
+- **`OpenXcom3D-1.03-linux-x86_64.tar.gz`**: unpack it anywhere and run `./play.sh`. Its profile is the `user/` folder inside.
 
 **Nothing needs installing.** The game comes with its own libraries: SDL 1.2 (sdl12-compat on SDL2), SDL_image and SDL_mixer in `lib/`, with SDL_gfx built in. All it takes from the system is glibc 2.34 or newer (2021 on: Ubuntu 22.04 and newer, Debian 12, Fedora 35 and newer, RHEL 9, Mint 21, every current Arch, Manjaro or other rolling system, and SteamOS), plus the display, sound and OpenGL every desktop has. SDL opens X11 or Wayland and PulseAudio, PipeWire or ALSA when the game starts. On a system older than glibc 2.34, build it from source (option B).
 
@@ -85,8 +85,8 @@ python3 install.py --target ~/Games/OpenXcom3D --ufo /path/to/UFO --tftd /path/t
 Unpack the archive anywhere and run `./play.sh`. To use game data it doesn't find, link it into the profile first:
 
 ```sh
-ln -s /path/to/UFO  OpenXcom3D-1.02-linux-x86_64/user/UFO
-ln -s /path/to/TFTD OpenXcom3D-1.02-linux-x86_64/user/TFTD
+ln -s /path/to/UFO  OpenXcom3D-1.03-linux-x86_64/user/UFO
+ln -s /path/to/TFTD OpenXcom3D-1.03-linux-x86_64/user/TFTD
 ```
 
 #### Steam Deck
@@ -215,8 +215,8 @@ All of these can be rebound in **Options → 3D VIEW → Controls**: click a key
 | Input | Action |
 |---|---|
 | **F8** | Isometric ↔ 3D (or the ISO/3D button); back on the map, it's centred on your soldier |
-| **Mouse** | Look around; the soldier turns with you for free (or by the rules: setting *Turning costs TU*) |
-| **W A S D** | Walk and step sideways in real time. Each tile costs its normal TUs; walking into a door opens it. With *Movement: Tiles*, a press walks exactly one tile |
+| **Mouse** | Look around, all but straight up and down (89°); the soldier turns with you for free (or by the rules: setting *Turning costs TU*) |
+| **W A S D** | Walk and step sideways in real time. Each tile costs its normal TUs; walking into a door opens it. With *Movement: Tiles*, a press walks exactly one tile. On a grav lift or a ladder, **W** looking up (more than 30°) climbs and looking down goes down, as on Half-Life's ladders (**S** the other way round); held, it climbs on level by level, each paid like Page Up / Page Down. Looking straight ahead, or at the top or the foot, W walks off as usual |
 | **Caps Lock** | Sprint on/off: each step is the game's own run (Ctrl on the map), faster. By the default rules a run costs three quarters of a walk's TUs and half as much energy again, and only armor that allows running runs. **SPRINT** shows under the compass, green while the soldier runs and grey while they can't and walk (their armor, or no breath left for a run) |
 | **`** (left of 1) | En passant on/off: an enemy coming into sight doesn't stop the walk, as moving with Shift held doesn't on the map; ENEMY SPOTTED still shows. **EN PASSANT** shows under the compass |
 | **Numpad 8 2 4 6** | One tile ahead, back, left or right, almost at once, like a step on the isometric map (whatever the *Movement* setting; holding the key steps on). **7 / 9**: snap turn 45° left / right |
@@ -231,7 +231,7 @@ All of these can be rebound in **Options → 3D VIEW → Controls**: click a key
 | **F** | The flashlight on/off (setting *Flashlight*): the 3D view's own light, separate from the suit light (L) |
 | **Space** | Jump: a free hop. Walking into something low (a fence, table, crate, rock: up to waist height), it vaults over it, paying only the normal walk |
 | **N** | Night vision on/off, with night vision gear (Scroll Lock, the game's own toggle, works too) |
-| **Page Up / Page Down** | Fly up/down (flight on) or ride a grav lift. Standing on a lift, purple arrows with LIFT PLATFORM show which ways it goes; with a free cursor (C), click them to ride |
+| **Page Up / Page Down** | Fly up/down (flight on), or ride a grav lift or climb a ladder. Standing on one, purple arrows with LIFT PLATFORM show which ways it goes; with a free cursor (C), click them to ride. With flight off, a soldier in flying armor keeps to the lift as anyone else does (not on up into the air from its top: the message says which key switches flight on); one in the air all the same comes down to land, by itself or with Page Down |
 | **1 … 0** | Turn to visible enemy 1–10 (or click the red enemy buttons) |
 | **Right button** | Cancel the current action, or forget a target marked for *Confirm fire*; with nothing to cancel, hold to zoom (setting *Zoom*). With a free cursor: hold to look |
 | **U**, held | Zoom: the view glides in to 4 times closer, and back out when you let go (setting *Zoom*). **SCOPING 2.6x** at the right shows how far, and a thin blue cross runs through the crosshair. Aim, shots and hit chances don't change. In 3D, U then isn't the game's UFOpedia key (on the map it is) |
@@ -275,7 +275,7 @@ A key that can't do its job just now says why on the game's warning line: no fla
 **Top bar**, from left to right:
 
 - **ISO/3D** · **HUD** · **INV**;
-- **◄ soldiers ►**: up to 10 shown, the window follows your soldier, and the mouse wheel over the bar scrolls; so does a right click on ◄ or ►, one soldier at a time, without changing who's selected (a left click selects the previous or next soldier). Hovering one shows a card with stats and a live helmet camera. A skull marks the dead, a caduceus the unconscious, and an orange alien face a soldier under alien mind control; A right click on a soldier's button opens their **SOLDIER CAM** (their helmet camera big; see *Soldier camera preview* in [Settings](#4-settings)).
+- **◄ soldiers ►**: up to 10 shown, the window follows your soldier, and the mouse wheel over ◄ or ► scrolls; so does a right click on ◄ or ►, one soldier at a time, without changing who's selected (a left click selects the previous or next soldier). Hovering one shows a card with stats and a live helmet camera. A skull marks the dead, a caduceus the unconscious, and an orange alien face a soldier under alien mind control; A right click on a soldier's button opens their **SOLDIER CAM** (their helmet camera big; see *Soldier camera preview* in [Settings](#4-settings)). The **mouse wheel over a soldier's button** steps the card, or the soldier cam, on to the next soldier (up: the previous one), round the whole squad and scrolling the bar along, without moving the mouse; moving onto another button shows that one again.
 - **SPECIAL** · **NIGHT VISION** · **SUIT LIGHT** · **SUIT FLY**, shown when the soldier has them (labels shorten to SPEC · NV · LIGHT · FLY on a narrow bar);
 - **END** turn.
 
@@ -301,13 +301,13 @@ Hovering a soldier on the top bar shows the same weapon line on their card.
 - **Melee weapons** are held tip up, the way the inventory pictures stand them (the stun rod's prongs, a blade's point, at the top), and a blow swings the tip down at the crosshair and back up.
 - **Switching a light on and off** (an item primed to switch on, as in some mods): the fire modes offer **UNPRIME** once it's primed, as the game's menu does.
 - **Throwing:** as on the isometric map, anything that isn't built in can be thrown (fire mode **throw**, the arc on the crosshair): a grenade, a clip for a squadmate, even a rifle. It flies along the game's arc as a 3D object, tumbling end over end, and lands where the game says. The game refuses a throw it can't make ("Unable to throw here!"): under a roof (inside the Skyranger, say), past the soldier's range, or with someone right in front.
-- **Priming a grenade** (fire mode **prime**): the game's own menu and timer, exactly as on the isometric map: *Prime Grenade*, then the number of turns, 0 to 23. The panel then says **PRIMED** and the turns left. A primed grenade lying on the ground goes off at the end of a turn with its fuse at 0: **0** when you end this turn, **1** at the end of the aliens' turn, **2** at the end of your next one, and so on (every side's turn counts one down). The game's option *Instant grenades* makes a 0 go off on landing instead. A primed grenade still in a hand doesn't go off.
+- **Priming a grenade** (fire mode **prime**): a click opens the game's own timer at once (the number of turns, 0 to 23), as on the isometric map after *Prime Grenade* (the fire mode already says that much, so its menu isn't asked again); a right click on the timer cancels. A grenade with no timer to set (a mod's) is primed at once. The panel then says **PRIMED** and the turns left. A primed grenade lying on the ground goes off at the end of a turn with its fuse at 0: **0** when you end this turn, **1** at the end of the aliens' turn, **2** at the end of your next one, and so on (every side's turn counts one down). The game's option *Instant grenades* makes a 0 go off on landing instead. A primed grenade still in a hand doesn't go off.
 - **In Doom mode with *Doom real-time grenades*** grenades work in real time, like in a first-person shooter, going off a few seconds after they're primed (*Doom grenade fuse*, 3 s by default) wherever they are then. How they're primed is up to *Doom prime on throw*:
   - **YES** (the default): just **throw** one. It's armed as you throw it (you hear the pin) and burns from the moment it leaves your hand, so it never goes off in your hand. **Prime** becomes **FUSE 3s**: it opens a **SET FUSE** box like the map's timer, with 1s to 5s to pick (a click, or the keys 1 to 5), and the seconds you pick hold for every grenade after that until you change them (it's the same as the setting). The panel shows the fuse for a grenade in hand, then counts the seconds down once it's thrown (**PRIMED 2.4s**). A grenade whose throw the game refuses stays in your hand, armed but not burning, until it leaves it.
   - **NO**: **prime** opens the same **SET FUSE** box, and your pick pulls the pin (you hear it): the fuse burns from then on, in your hand too. Throw it in time, or cook it for a shorter flight, but not too long. The panel counts the seconds down.
 
   With *Doom free grenades with airburst* a grenade flies wherever the crosshair points, and one whose fuse runs out in the air bursts there; without it, the game's own throw, and a fuse that runs out in flight goes off as the grenade lands. Proximity grenades work as the game makes them. This is the first step towards a real-time mode (see [Known limits and ideas](#9-known-limits-and-ideas)).
-- The **blaster launcher**, and psi or the mind probe aimed at no one in sight, switch to the isometric map to pick waypoints or a target, then come back.
+- The **blaster launcher**, and psi or the mind probe aimed at no one in sight, switch to the isometric map to pick waypoints or a target, then come back. A psi amp's or a mind probe's **use** is a fire mode like panic and mind control: a click on a creature uses it on them, no menu first.
 
 ## 4. Settings
 
@@ -315,7 +315,7 @@ Hovering a soldier on the top bar shows the same weapon line on their card.
 
 ### Looking and moving
 
-- **Soldier camera preview** (YES): hovering a soldier's button on the top bar shows a card with their name, stats and weapon. YES: the card also shows that soldier's helmet camera, live: what they are looking at right now (static if they're down). NO: the card without the camera (a camera popped up in the aliens' turn still shows its picture). Either way, a **right click** on a soldier's button opens their **SOLDIER CAM**: the helmet camera big, with a blinking red dot and a little TV static, so it's plain it's a camera, not your view; moving along the bar shows each soldier's in turn (a fallen soldier keeps the card with its static), and moving off the bar or a second right click closes it. You stay with your own soldier all the while.
+- **Soldier camera preview** (YES): hovering a soldier's button on the top bar shows a card with their name, stats and weapon. YES: the card also shows that soldier's helmet camera, live: what they are looking at right now (static if they're down). Like a real digital feed, a helmet camera now and then has a bad signal for a moment: a few patches of the picture fall into coarse blocks, a green square or two shows, or the picture freezes for up to half a second (rare and brief on most missions, but often, longer and with tears on the hardest ones and inside UFOs, see [Bad signal by mission](#bad-signal-by-mission); never with *Muzzle flashes* off). NO: the card without the camera (a camera popped up in the aliens' turn still shows its picture). Either way, a **right click** on a soldier's button opens their **SOLDIER CAM**: the helmet camera big, with a blinking red dot and a little TV static, so it's plain it's a camera, not your view; moving along the bar, or the mouse wheel over it, shows each soldier's in turn (a fallen soldier keeps the card with its static), and moving off the bar or a second right click closes it. You stay with your own soldier all the while.
 - **Mouse sensitivity** (5): how fast the view turns with the mouse, from 1 (slow) to 20 (fast).
 - **Invert mouse** (NO): YES: moving the mouse forward looks down instead of up, as in a flight simulator.
 - **Turning costs TU** (NO): NO: the soldier turns with the view for free. YES: turning is the game's own: the view may look up to 45° off the way the soldier faces (they turn their head, for free); looking further turns the soldier 45° that way at the game's cost (1 TU for a soldier), as on the isometric map, and a turn stops when it spots a new enemy. Without the time units the view stops 45° off. The snap turn keys turn the soldier a step each.
@@ -355,12 +355,13 @@ Hovering a soldier on the top bar shows the same weapon line on their card.
 
 ### Looks
 
-- **Weapon in hand** (YES): YES: the weapon in the soldier's hand shows at the bottom right of the view (bottom left in the left hand), Doom style, built in 3D from its inventory picture (little cubes, thickest in the middle). Every weapon is held barrel first with the barrel on the line to the crosshair, pistols, cannons and launchers as well as rifles (the games draw their weapons standing up, muzzle at the top), and your shots leave its muzzle. It bobs as you walk, kicks when you fire and dips out of sight while reloading, looking far down (from 45°, gone at 72°) and zoomed in. A melee weapon is held tip up and swung. Anything else in the hand (a grenade, a medi-kit, a clip) is built the same way and sits in the bottom corner, its lower half out of sight. With the classic HUD shown it stays hidden (the HUD covers the bottom of the view). NO: nothing drawn.
+- **Weapon in hand** (YES): YES: the weapon in the soldier's hand shows at the bottom right of the view (bottom left in the left hand), Doom style, built in 3D from its inventory picture (little cubes, thickest in the middle). Every weapon is held barrel first with the barrel on the line to the crosshair, pistols, cannons and launchers as well as rifles (the games draw their weapons standing up, muzzle at the top), and your shots leave its muzzle. It bobs as you walk, kicks when you fire and dips out of sight while reloading, looking far down (from 45°, gone at 72°) and zoomed in. A melee weapon is held tip up and swung; a sword the art draws leaning (the big mods' swords) comes down edge first (its edge is the side lower in the picture). Anything else in the hand (a grenade, a medi-kit, a clip) is built the same way and sits in the bottom corner, its lower half out of sight. With the classic HUD shown it stays hidden (the HUD covers the bottom of the view). NO: nothing drawn.
 - **Sprite upscaling** (Smooth + detail): soldiers, aliens, items on the floor, explosions and smoke seen up close are scaled up the way pixel art scales well (xBRZ, in the game's own colours). **Smooth** rounds off the stair-stepped edges; **Smooth + detail** also sharpens the shading a little; **Off** keeps the original pixels.
-- **Unit size** (100%): soldiers and aliens drawn a little smaller, 80 to 100% of the isometric map's size, standing on the same spot, so tall sprites fit under low ceilings. Only the picture changes: what shots hit stays the game's (see *Hitboxes*; at about 80 to 90% the sprites come closest to their hitboxes' heights).
-- **Muzzle flashes** (YES): YES: gunfire lights up its surroundings for a blink, units flash when hit, the view flashes red when your soldier is hit (and at each shot of a berserk soldier), and a blast flashes. NO: none of these flashes, and UFO lights hold steady. Turn this off if flashing light bothers you (photosensitivity, epilepsy).
+- **Unit size** (100%): soldiers and aliens drawn a little smaller, 80 to 100% of the isometric map's size, standing on the same spot, so tall sprites fit under low ceilings. Corpses and items on the floor shrink with them, so a soldier going down doesn't grow into a bigger corpse. Only the picture changes: what shots hit stays the game's (see *Hitboxes*; at about 80 to 90% the sprites come closest to their hitboxes' heights).
+- **Muzzle flashes** (YES): YES: gunfire lights up its surroundings for a blink, units flash when hit, the view flashes red when your soldier is hit (and at each shot of a berserk soldier), and a blast flashes. NO: none of these flashes, UFO lights hold steady, and the helmet cameras' bad signal (coarse blocks, green squares, a frozen picture) stays away. Turn this off if flashing light bothers you (photosensitivity, epilepsy).
 - **Particles** (All): **Off** none; **Effects** sparks, debris, smoke, fire and the shots' trails (a rocket's smoke and the white specks it leaves hanging for half a minute, embers, the glow behind plasma); **All** also dust, fireflies, bubbles and weather. Shots look the same in all three: the rounds, beams and blobs, their start at the muzzle, the flash on the weapon, the kick and the marks they leave aren't particles.
 - **UFO lights and aura** (YES): UFOs stand out from the Earth around them. Their hulls stay still and only their lights glow (lit panels, lift pads, screens, navigation lights, found in the original animation frames), pulsing gently in a slow wave round the UFO. Each UFO casts its own two-coloured light (its hull's hue close in, its lights' hue further out) on the ground around it, its underside and its skin, strongest at night, and drifting motes, sparks and a beam of light up each grav lift wrap it. It all shows only once the UFO has been seen, so it never gives a UFO away; with Muzzle flashes off nothing pulses. The small scout's blocky hull is trimmed to its sprite's round outline (only the look: line of fire is still the game's). NO: the original animation frames (calmed, as everywhere in 3D).
+- **Parts without shape** (Lifts): some parts the map draws have no shape in the game's data, so the 3D view had nothing to show: the wooden ladders of the big mods (Piratez), the upper pads of the UFOs' grav lifts (they showed as holes) and some lifts' pads in TFTD. **Lifts** shows those with the grav lift flag (lifts and ladders) as see-through ghosts of their art: a ladder stands upright where the map draws it, a pad lies on the floor; dotted from afar, solid up close. They are only a picture: shots, sight and walking go through them as the game says. **All** does the same for every part without a shape (some mods draw laser walls or decorations that way); **Off** shows none.
 - **Discreet map edge** (NO): YES: no yellow tape and posts round the map; small red dots on the floor along its edge, a tile apart, mark it instead, with the land beyond as before.
 - **Pixel size** (Auto): **Auto** gives full detail up to a 640×400 view and blocks of 2 on bigger ones (a 1920×1080 screen at the default battlescape scale makes a 960×540 view); **1** full detail; **2** or **3**: each ray colours a block of 2×2 or 3×3 pixels, chunkier but much faster on big screens or slow machines.
 
@@ -370,9 +371,10 @@ Hovering a soldier on the top bar shows the same weapon line on their card.
 - **Shot info** (YES): shows the fire mode, the hit chance and the time unit cost right of the crosshair (with *Crosshair* off, a little lower, so the middle of the view stays clear) (DUAL in front when both guns fire). Yellow: you can; red: you can't (not enough time units, no ammo, out of range).
 - **Unit names** (YES): the name of the unit you point at (its picture under the crosshair, or the free cursor), just under the crosshair, as the game's unit screen names it: an alien by its race (or race and rank, where a mod shows those), a civilian by kind, a soldier by name, in green for X-COM, red for aliens, yellow for civilians.
 - **Hitboxes** (Off): outlines, round every unit in sight, the voxels the game counts as that unit when a shot or a blow reaches it (its armor's footprint, from the floor to its height, kneeling or standing): green for X-COM, red for aliens, yellow for civilians. The sprites are only pictures, often taller or wider than what can be hit. **Blink**: the outlines fade in and out once a second; **Always**: they stay.
+- **Glowing outlines** (NO): YES: the hitboxes' outlines and the path of a throw glow, spilling a soft light round them (the bloom). NO: plain lines.
 - **Downed unit icons** (Crosshair): small icons for a unit lying unconscious: a flame if it's burning, a drop of blood if it's bleeding (fatal wounds), a bolt if its health is draining away (shock), and Zz, out cold. Our own pixel art, in the order the game's own floor indicators take where a mod has them. **Crosshair**: for the body you point at (the crosshair, or the free cursor), just under the crosshair. **Always**: over every body in sight. **Off**: none. Only bodies you can see get them, not one behind a wall or in smoke too thick to see through.
 - **Aim at exact point** (YES): YES: shots go for the exact point under the crosshair. NO: like the original game, shots go for the tile and the game picks the spot (the middle of a unit, the object, the wall...). The game's accuracy applies either way. (FPS-style shooting always aims at the exact point.)
-- **Show trajectory** (Arcs): while aiming, the path the next throw or shot will take, as light cyan dashes fading away from you, with a diamond where it lands. It's the game's own path, worked out as the game will (the curve it picks for a throw, the line of fire for a shot), only without the accuracy roll: the real one scatters as the hit chance says. **Arcs**: throws and arcing shots (a spitting alien's weapon in a mod, say); nothing shows where the game couldn't throw. **All**: every shot's line too, up to the first thing it meets. **Off**: none.
+- **Show trajectory** (Arcs): while aiming, the path the next throw or shot will take, as light cyan dashes fading away from you, with a diamond where it lands. It's the game's own path, worked out as the game will (the curve it picks for a throw, the line of fire for a shot), only without the accuracy roll: the real one scatters as the hit chance says. It starts from the side the shot will leave from, so leaning (see *Lean shots*, *Lean*) moves it with the shot. **Arcs**: throws and arcing shots (a spitting alien's weapon in a mod, say); nothing shows where the game couldn't throw. **All**: every shot's line too, up to the first thing it meets. **Off**: none.
 - **Confirm fire** (NO): YES: the first click marks the target and shows its path (whatever *Show trajectory* says), with "Click again to fire"; a click on the same spot fires, a click elsewhere moves the mark, the right button forgets it. Holding the trigger after a confirmed burst keeps firing. NO: one click fires, as always.
 
 ### Battle
@@ -544,16 +546,46 @@ firstPerson:
     - STR_MECH_ARM_CANNON         # a mod's built-in weapon drawn like a held gun
 ```
 
+### Bad signal by mission
+
+The helmet cameras (the soldier card's, the soldier cam) glitch now and then on any mission. On the hardest ones, on the aliens' own ground, and on any mission while the soldier you watch is inside a UFO, they glitch a lot: a glitch every second or two, longer, in more and bigger patches, with more static, and now and then the picture tears (bands of it slide sideways, a bright seam along their edge). Our mod lists those missions (alien deployment types) under `badSignal:` with level 2: Mars (both stages), an alien base, a base defence, and in TFTD an alien colony, T'leth and an artefact site. Level 1 is the usual, 0 none. A mod can list its own:
+
+```yaml
+firstPerson:
+  badSignal:
+    - missions: [STR_MY_ALIEN_FORTRESS]
+      level: 2
+```
+
+### The item table
+
+How an item looks in 3D is worked out from its rules and its inventory picture, and the item table (`items:`) can say otherwise for any item, by type. It holds two things so far (more may follow: it's meant to tune the 3D shapes item by item):
+
+- `held:` **plate** (a flat piece one voxel thick) or **cushion** (rounded, thickest in the middle), how the picture is given volume in the hand and when thrown. Worked out: a melee weapon that isn't blunt (its damage isn't concussive or stun, the clubs' and stun rods') and whose picture is thin everywhere is a plate (swords, knives, axes); everything else a cushion.
+- `shot:` **object** (flies as an object, with no powder: no muzzle flash, barely a kick, and a white streak unless it carries fire, acid or a shock, which keep their own look) or **powder** (a gun's round, with its flash). Worked out: weapons aimed with the throwing skill and not the firing skill (the big mods' bows, blowpipes, javelins) fire objects, and so do guns firing an arrow picture drawn mostly for those (the big mods' crossbows); every other gun fires powder.
+
+Our mod's table has the XPiratez items the automatic rules get wrong (its wide blades, its gloves and claws, its harpoon guns and crossbows). A mod can add its own; a later entry overrides what it sets and leaves the rest:
+
+```yaml
+firstPerson:
+  items:
+    - types: [STR_MY_GREATSWORD, STR_MY_CLEAVER]
+      held: plate
+    - types: [STR_MY_SPEARGUN]
+      shot: object
+```
+
 ## 7. What you'll see
 
 - The map rebuilt in 3D from the game's own voxel data, with the original art and proportions.
-- Doors that swing and UFO doors that slide.
+- Doors that swing (each turn of a door, open or shut, swings to where the game has it) and UFO doors that slide.
+- Inside a UFO or a craft, its floor goes on under the diagonal pieces of its hull (the map leaves the ground there).
 - Animated machinery and light, calm and eased: animated terrain steps a frame about three times a second and cross-fades, so nothing large blinks (the photosensitivity guideline WCAG 2.3 allows at most three flashes a second).
 - UFOs that stand out: steady hulls with glowing, softly pulsing lights, their own coloured light around them and an aura of drifting motes (the "UFO lights and aura" setting).
 - Light and shadow: lamps, the sun, your flashlight, flares.
 - Bloom, night vision, rain, snow and dust, and in TFTD bubbles, marine snow and caustics.
 - Smoke, fire, explosions and animated machinery that flow from frame to frame.
-- Lifts you ride: standing on a grav lift shows LIFT PLATFORM arrows, and the view rises or sinks slowly to the next level.
+- Lifts you ride: standing on a grav lift (or a ladder) shows LIFT PLATFORM arrows, and the view rises or sinks slowly to the next level; ladders and lift pads that have no shape in the game's data show as see-through ghosts of their art.
 - Units seen from the side they face you.
 - Sound that fades with distance (and is a little quieter behind you).
 - Melee that lands: the weapon winds up and drives in towards the crosshair with a swish, the view lunges, the blow jolts, and the target flinches.
@@ -561,6 +593,7 @@ firstPerson:
   - shots by damage type and by gun: a round with a short tracer streak for bullets, a beam for lasers, a glowing blob for plasma, a flame with a smoke trail for rockets and explosive shells (and white specks that hang along a rocket's path for half a minute), embers for incendiaries, a blue blob for stun; each bigger for a bigger gun, a pistol's the smallest, then a rifle's, an auto-cannon's, a heavy weapon's (a laser beam is wider for a heavier laser, and up close);
   - under the sea: yellow darts and harpoons, pale blue gauss beams, pale cyan sonic blobs, torpedoes with the same smoke and specks, and bubbles behind every shot;
   - the weapon in hand built from voxels, its barrel aimed at the crosshair: your shots leave its muzzle, in either hand;
+  - arrows, darts, bolts and javelins (weapons aimed with the throwing skill, as the big mods' bows, and guns firing their arrow, as crossbows; see [the item table](#the-item-table)) fly as a white streak with no muzzle flash and barely a kick (a burning arrow trails embers);
   - recoil, muzzle flashes by weapon class (bullets, explosives, fire, lasers, plasma, stun) and size (bigger for bigger guns), hitmarkers with sound, enemies that flinch;
   - bullet holes, scorch marks, blown-out walls in a burst of debris, burnt ground.
 - When it gets tense:
@@ -602,6 +635,7 @@ Sprite upscaling costs nothing measurable. Use **pixel size** 2 or 3 on slow mac
 - **A real-time mode** will be attempted in the future: the battle running continuously instead of turn by turn, for those who want it, as a setting like everything else. Doom mode's real-time grenades are the first piece of it.
 - **A 3D battlescape** is another idea for the future: the same voxel renderer seen from a free camera above the battle (turn, zoom, pan), with the levels above cut away as on the isometric map, and orders given by clicking tiles and units, a 3D take on the isometric map beside the first-person view.
 - **The art:** soldiers and aliens are 32×40 pixel sprites seen from the side they face you, terrain is the game's 16×16×24 voxel shapes coloured from the isometric pictures, all in 256 colours. Sides the isometric art never shows are filled in (crafts and UFOs from their mirrored side). Ideas that would add resolution without changing the style: rendering the view at a higher scale, smoother voxel shading, colour sampled at the exact hit point, units given volume like the weapon in hand. Good ideas are welcome.
+- **Shots are drawn by kind,** not from a mod's own projectile pictures (an arrow, a bolt): a mod's arrows are white streaks, its custom damage types (Piratez's electric, warp, mind...) bullets for now. Using the mods' pictures is an idea for later.
 - **Sound:** stereo can't tell front from back; sounds behind you are only a little quieter.
 - **Not saved:** bullet holes, scorch marks, flares and each soldier's flight toggle are gone after a quickload or when the screen is rebuilt.
 - **Leaning** shows what's round a corner, but the game's own sight still starts from the middle of the soldier's tile: an alien there shows once the soldier (or someone else) spots it. The weapon in hand stays level while the view tilts.
@@ -663,11 +697,11 @@ Every file starts with the project's philosophy and a description of what's in i
 | `FirstPersonViewFlares.cpp` | Tactical flares and their light |
 | `FirstPersonViewUfo.cpp` | UFOs ("UFO lights and aura"): steady 3D-only models of UFO parts made from their frames (lights marked, tall parts trimmed to the sprite), the UFOs found on the map, their two-coloured light as a per-tile field, the lights' pulse, the aura |
 | `FirstPersonViewScreenEffects.cpp` | On the screen itself: the hurt arc, blood, flames, colour washes, static |
-| `FirstPersonVoxelModel.{h,cpp}` | An item's inventory picture made into a voxel model (the weapon or item in hand, thrown items) |
+| `FirstPersonVoxelModel.{h,cpp}` | An item's inventory picture made into a voxel model, a cushion or a blade's flat plate (the weapon or item in hand, thrown items) |
 | `FirstPersonParticles.{h,cpp}` | The particle pool (sparks, smoke, weather...) |
 | `FirstPersonSounds.{h,cpp}` | Sounds made in code (no files): hitmarker and kill ticks, heartbeat, dry-fire click, flare hiss, near-miss whizz, melee swoosh |
 | `OptionsFirstPersonState.{h,cpp}` | 3D VIEW options tab: Settings / Controls sub-tabs, scrolling lists |
-| `RuleFirstPerson.h` | `firstPerson:` ruleset section (header-only): enabled, view distance, window glass, weather, combat music, night vision gear, built-in items shown in hand |
+| `RuleFirstPerson.h` | `firstPerson:` ruleset section (header-only): enabled, view distance, window glass, weather, combat music, night vision gear, built-in items shown in hand, the item table (held shape, shots) |
 
 What `FirstPersonView` draws:
 - terrain from LOFT voxels with iso-sprite projection, animated frames, UFO doors cut out as they slide, doors swinging, window glass;
@@ -717,12 +751,29 @@ What `FirstPersonView` draws:
 
 ### 1.03 (2026-10-23)
 
-From a player's report on 1.02. Source only for now (no prebuilt download).
+From a player's reports on 1.02, the owner's asks, and a look at XPiratez o2 (the Isolated Valley's temple ladder; Piratez plays in 3D).
 
 - **Aliens' turn cameras on the map:** with *Alien turn in 3D* off (or the map shown), the setting did nothing. Now the helmet camera cards pop up over the map: a soldier shot at (looking at the shooter), hit, mind controlled or going down, a soldier firing back (looking at the target), and the nearest soldier who sees the alien moving (looking at it).
 - **Corpses through floors:** a body lying on the floor above no longer hangs down through the ceiling when seen from below (its front half was drawn on its standing card, below the floor), and one lying on a tall shelf, crate or stairs right under a floor is pressed down to fit under it instead of poking up into the room above. A downed unit's icons don't show through a ceiling either.
 - **Sprint (Caps Lock):** steps are the game's run, faster, by the running rules; **SPRINT** under the compass.
 - **En passant (`):** enemies coming into sight don't stop the walk, as Shift does on the map; **EN PASSANT** under the compass.
+- **Flight off on a lift:** a soldier in flying armor with flight switched off rode a lift or a ladder to its top, and one more Page Up flew them on up into the air, where no key worked (Page Up and Page Down said "Flight off", W did nothing). Now with flight off they keep to the lift as anyone else does: no up arrow at the top, and the message names the flight key. One in the air with flight off comes down to land. Ladders on walls (OXCE's) no longer refuse such a soldier altogether.
+- **Climbing with W and S:** on a lift or a ladder, W looking up climbs and looking down goes down (S the other way round), level by level while held.
+- **Bloom on white:** whatever glows next to something white (snow, a bright sky, white paint) no longer turns it black around itself (the brightest shade of the greys was the empty black one); and a new setting, **Glowing outlines** (default NO), says whether the hitboxes and the path of a throw glow at all.
+- **Doors no longer fold into their wall** (a player's report on 1.02): the game's open door is a door too, standing in the tile's other wall, and the open key turns it back. 3D took that for another opening, hid the shut door and drew the open one swung into the wall beside its hinge, the doorway looking open while the game had it shut. Now every turn of a door swings it through its tile to where the game has it, and a door turned again mid-swing swings back from where it got to. (A door opened from its own side used to swing away from you and stay on the far side, where the game doesn't have it.)
+- **Helmet cameras glitch a lot on the hardest missions** (your ask): on Mars, in an alien base, in a base defence (and in TFTD's colonies, T'leth and artefact sites), and inside any UFO, the cameras' bad signal comes every second or two, in more and bigger patches, and the picture tears now and then (your ask); elsewhere it stays rare. The missions are a list in our mod's rules (see [Bad signal by mission](#bad-signal-by-mission)).
+- **A failed close-quarters check turns your view** to where the shot was knocked (aside, at your feet or up; a player's report): the soldier faced that way already, and the view snapping back turned the soldier again, at a cost with *Turning costs TU*.
+- **No grass inside UFOs:** a UFO's map leaves the ground's floor where the diagonal pieces of its hull stand, and 3D showed it inside; the UFO's floor now goes on inside up to the hull.
+- **Swords and knives are flat** (your ask): a blade in the hand, or thrown, is a thin plate one voxel thick instead of a cushion; clubs, maces, fists and everything else keep the cushion.
+- **The item table** (`firstPerson: items:` in our mod's rules, see [Changing it](#changing-it)): what the 3D view isn't left to work out, item by item, the automatic rules deciding the rest: so far how an item is held (plate or cushion) and what its shots are (objects or powder); our mod's table has the XPiratez items the rules get wrong.
+- **Weapons of the big mods (XPiratez):** a sword drawn leaning comes down edge first (it led with its back); a weapon's picture is measured whole, as the art draws it (the hand slot shifted one drawn wider than its item partly off the picture, its tip cut off); arrows, darts and javelins fly as a white streak with no muzzle flash (they looked like bullets).
+- **Straight up and down:** the view looks up and down to 89° (it stopped at 80°), and a unit straight overhead (a flyer, someone on a floor above) faces down at you instead of showing its edge, so it can be seen and aimed at.
+- **Priming in one click:** the prime fire mode opens the game's timer at once, without the item's menu first; a psi amp's or a mind probe's use targets as panic does, no menu first.
+- **Helmet cameras with a bad signal:** the card's camera and the soldier cam now and then glitch like a digital feed for a moment: coarse blocks, a green square or two, a frozen picture. Rare, brief, and off with *Muzzle flashes*.
+- **The squad on the wheel** (your ask): with the cursor free (C), the mouse wheel over a soldier's button steps the soldier card, or the soldier cam, through the squad one soldier at a time, round from the last to the first and scrolling the bar along (it used to scroll the bar only, so with ten or fewer soldiers it did nothing); over ◄ and ► it still scrolls.
+- **The trajectory follows a lean** (a player's report): the path shown for a shot now starts from the side the shot leaves from, so it moves when the soldier leans, as the shot itself does (it always started from the middle).
+- **Corpses no longer swell** (a player's report): with *Unit size* under 100%, corpses and items on the floor are drawn at the units' size too, so a soldier going down no longer grows into a bigger corpse.
+- **Parts without shape** (new setting, default Lifts): ladders and lift pads that the map draws but the game's data gives no shape (Piratez's wooden ladders, the UFOs' upper lift pads, which showed as holes) show as see-through ghosts of their art, solid up close.
 
 ### 1.02 (2026-10-22)
 

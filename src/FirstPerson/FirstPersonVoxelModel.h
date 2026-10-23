@@ -46,8 +46,9 @@
 /*
  * FirstPersonVoxelModel.h: items given volume. An item's inventory picture (the game's own,
  * from BIGOBS.PCK) becomes a small voxel model, cushion style: each picture pixel a column of
- * voxels in depth, deepest in the middle. The weapon or other item in the soldier's hand
- * (FirstPersonMode) and an item thrown through the air (FirstPersonView) are drawn from it.
+ * voxels in depth, deepest in the middle; or a blade's, a flat plate one voxel thick. The
+ * weapon or other item in the soldier's hand (FirstPersonMode) and an item thrown through the
+ * air (FirstPersonView) are drawn from it.
  */
 #include <vector>
 #include <SDL.h>
@@ -56,14 +57,18 @@ namespace OpenXcom
 {
 
 class Surface;
+class RuleFirstPerson;
+class RuleItem;
 
 /// One face of a voxel model, between a voxel and the air: its four corners in picture x, y and
 /// depth (depth centred on 0), wound so that the cross product of its first two edges points
 /// outwards, and its palette colour.
 struct VoxelFace { float corner[4][3]; Uint8 color; };
 
-/// Gives a picture volume: the faces of its voxel model (none for an empty picture).
-void voxelizePicture(Surface *picture, std::vector<VoxelFace> &faces);
+/// Gives a picture volume: the faces of its voxel model (none for an empty picture), a cushion or a flat plate.
+void voxelizePicture(Surface *picture, std::vector<VoxelFace> &faces, bool plate = false);
+/// Is an item's picture given volume as a flat plate (a blade: a sword, a knife, an axe) rather than a cushion?
+bool pictureIsPlate(const RuleFirstPerson &table, const RuleItem *item, Surface *picture);
 
 }
 

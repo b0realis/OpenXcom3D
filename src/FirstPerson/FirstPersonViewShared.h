@@ -124,6 +124,13 @@ const double CardTiltMax = 45.0;
 /// Looking up, a card leans only this far (its top comes towards the camera): a unit right
 /// beside the soldier leaning in by much more lurched at the camera.
 const double CardTiltUpMax = 10.0;
+/// A card standing high above the eye also leans towards the eye, by how much steeper than
+/// CardTiltUpMax it is, at most this far: a unit straight overhead faces down at the soldier
+/// instead of showing its edge (see drawSprite).
+const double CardTiltSteepMax = 80.0;
+/// How far the view can look up or down, in degrees: all but straight up and down (the camera
+/// keeps its heading there).
+const double MaxPitch = 89.0;
 /// See-through smoke over a unit the soldier sees veils it by at most this many see-through steps
 /// (of FirstPersonView::SeeThroughLevels) in all, however much smoke lies in front: it stays clear.
 const int UnitVeilMax = 5;

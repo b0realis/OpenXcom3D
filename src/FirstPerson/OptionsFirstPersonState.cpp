@@ -323,6 +323,12 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		{
 			return std::string(tr(FirstPerson::smokeMode() == 1 ? "STR_FPS_SMOKE_ORIGINAL" : "STR_FPS_SMOKE_MODERN"));
 		}
+		// The parts without shape are a choice of three, shown by name.
+		if (option.id() == "fpsGhostParts")
+		{
+			static const char *const ghostNames[] = { "STR_FPS_GHOST_PARTS_OFF", "STR_FPS_GHOST_PARTS_LIFTS", "STR_FPS_GHOST_PARTS_ALL" };
+			return std::string(tr(ghostNames[std::clamp(*option.asInt(), 0, 2)]));
+		}
 		// The downed units' icons are a choice of three, shown by name.
 		if (option.id() == "fpsDownedIcons")
 		{
@@ -528,6 +534,11 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		else if (value == &Options::fpsSmoke)
 		{
 			*value = FirstPerson::smokeMode() == 1 ? 2 : 1;
+		}
+		// The parts without shape (off, lifts and ladders, all): round and round.
+		else if (value == &Options::fpsGhostParts)
+		{
+			*value = (*value + direction + 3) % 3;
 		}
 		// The downed units' icons (off, crosshair, always): round and round.
 		else if (value == &Options::fpsDownedIcons)

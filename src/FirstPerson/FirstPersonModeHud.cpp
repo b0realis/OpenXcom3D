@@ -1369,6 +1369,44 @@ void FirstPersonMode::scrollSquad(int step)
 }
 
 /**
+ * The mouse wheel over a soldier's button: moves the soldier card (and the soldier cam, if
+ * open) on to the next or previous soldier in the squad's order, round from the last to the
+ * first, the dead and the unconscious included, scrolling the window of buttons to keep theirs
+ * in it. The cursor stays where it is; moving it onto another button shows that one's soldier.
+ * @param step 1 for the next soldier, -1 for the previous.
+ * @param cursorX Where the cursor is across the canvas: over a squad button (where to start if no card shows).
+ * @param cursorY Where the cursor is down the canvas.
+ */
+void FirstPersonMode::browseSquad(int step, double cursorX, double cursorY)
+{
+	// The slot whose card shows now (else the one under the cursor), and the slot a step on,
+	// round the ends.
+	const TextButton *buttonUnderCursor = buttonAt(cursorX, cursorY);
+	const int slotCount = (int)_squadSlots.size();
+	int shownSlot = -1, cursorSlot = -1;
+	for (int slotIndex = 0; slotIndex < slotCount; ++slotIndex)
+	{
+		if ((int)_squadSlots[slotIndex] == _hoveredSquadButton) shownSlot = slotIndex;
+		if (_btnSquad[_squadSlots[slotIndex]] == buttonUnderCursor) cursorSlot = slotIndex;
+	}
+	const int fromSlot = shownSlot >= 0 ? shownSlot : cursorSlot;
+	if (fromSlot < 0)
+	{
+		return;
+	}
+	const int nextSlot = (fromSlot + step % slotCount + slotCount) % slotCount;
+
+	// Bring that soldier's button into the window and show their card.
+	if (nextSlot < _squadScroll) scrollSquad(nextSlot - _squadScroll);
+	else if (nextSlot >= _squadScroll + _squadWindow) scrollSquad(nextSlot - _squadScroll - _squadWindow + 1);
+	_hoveredSquadButton = (int)_squadSlots[nextSlot];
+
+	// The button now under the cursor (the window may have scrolled under it): the card moves
+	// back only when the cursor comes onto another one (see trackHover).
+	_buttonUnderCursor = buttonAt(cursorX, cursorY);
+}
+
+/**
  * Tells how a squad member is: ready, dead, a zombie (killed and turned into one), unconscious,
  * or turned against us by the aliens' mind control. An alien we control is ready while that
  * lasts, and has no button otherwise.

@@ -236,8 +236,9 @@ void clearModel(FirstPersonView::VoxelModel &model)
 	model.exposed = nullptr;
 	model.pulseKind = 0;
 
-	// Empty, with a bounding box that any solid voxel will shrink onto.
+	// Empty, not a ghost, with a bounding box that any solid voxel will shrink onto.
 	model.empty = true;
+	model.ghostly = false;
 	for (int axis = 0; axis < 3; ++axis)
 	{
 		model.min[axis] = 255;
@@ -526,6 +527,131 @@ void keepGlassInPanes(FirstPersonView::VoxelModel &model, TilePart part)
 	}
 }
 
+/**
+ * Builds the ghost of a part the map draws but gives no voxels at all (setting "Parts without
+ * shape"): a ladder, a lift's pad, a wall of laser beams. Its art, voxel for voxel, on one plane
+ * of the tile, so that it shows where it stands:
+ * - a west or north wall on the tile's west or north edge, where the art draws walls;
+ * - a floor or an object whose art keeps low, inside the floor's diamond (a lift's pad), flat on
+ *   the floor;
+ * - one whose art rises above it (a ladder, drawn upright), upright, on the plane across the
+ *   tile (running north-south or east-west) that shows the most of the art; ties go to the plane
+ *   nearer the tile's middle, then to the north-south one.
+ * Each voxel takes the colour of the pixel it lands on (the projection buildModel uses), and
+ * there's no voxel where that pixel is transparent, so a ladder keeps the gaps between its
+ * rungs. On one plane no two voxels land on the same pixel. The model comes out ghostly: rays
+ * see through it on some pixels, more of them the further away it is (see traceTile), and
+ * nothing else takes it for solid.
+ * @param model The empty model to build it in.
+ * @param sprite The part's sprite frame.
+ * @param partType Which part of a tile it is (O_FLOOR, O_WESTWALL, O_NORTHWALL, O_OBJECT).
+ * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
+ */
+void buildGhost(FirstPersonView::VoxelModel &model, const Surface *sprite, int partType, int yOffset)
+{
+	// The colour of a voxel's pixel; 0 (transparent) outside the sprite.
+	const int width = sprite->getWidth(), height = sprite->getHeight();
+	auto pixelOf = [&](int x, int y, int z) -> Uint8
+	{
+		const int spriteX = 16 + x - y, spriteY = 24 + (x + y) / 2 - z + yOffset;
+		return spriteX >= 0 && spriteY >= 0 && spriteX < width && spriteY < height ? sprite->getPixel(spriteX, spriteY) : 0;
+	};
+
+	// The art's drawn pixels, and how many of them are well above the floor's diamond (more than
+	// two rows above its top corner, where nothing lying on the floor can show).
+	int drawn = 0, rising = 0;
+	for (int spriteY = 0; spriteY < height; ++spriteY)
+	{
+		for (int spriteX = 0; spriteX < width; ++spriteX)
+		{
+			if (!sprite->getPixel(spriteX, spriteY)) continue;
+			++drawn;
+			if (spriteY < 22 + yOffset) ++rising;
+		}
+	}
+	if (!drawn)
+	{
+		return;
+	}
+
+	// A plane across the tile: axis 0 is x = offset (it runs north-south, along y), axis 1 is
+	// y = offset (east-west, along x); -1 for flat on the floor.
+	int axis = -1, offset = 0;
+	auto planeVoxel = [](int planeAxis, int planeOffset, int along, int &x, int &y)
+	{
+		x = planeAxis == 0 ? planeOffset : along;
+		y = planeAxis == 0 ? along : planeOffset;
+	};
+	if (partType == O_WESTWALL || partType == O_NORTHWALL)
+	{
+		axis = partType == O_WESTWALL ? 0 : 1;
+	}
+	else if (rising * 4 > drawn)
+	{
+		// Upright (more than a quarter of the art above the floor): the plane whose voxels land
+		// on the most drawn pixels.
+		int bestCount = -1;
+		double bestFromMiddle = 0.0;
+		for (int planeAxis = 0; planeAxis < 2; ++planeAxis)
+		{
+			for (int planeOffset = 0; planeOffset < 16; ++planeOffset)
+			{
+				int count = 0;
+				for (int along = 0; along < 16; ++along)
+				{
+					for (int z = 0; z < 24; ++z)
+					{
+						int x, y;
+						planeVoxel(planeAxis, planeOffset, along, x, y);
+						if (pixelOf(x, y, z)) ++count;
+					}
+				}
+				const double fromMiddle = std::abs(planeOffset - 7.5);
+				if (count > bestCount || (count == bestCount && fromMiddle < bestFromMiddle))
+				{
+					bestCount = count;
+					bestFromMiddle = fromMiddle;
+					axis = planeAxis;
+					offset = planeOffset;
+				}
+			}
+		}
+	}
+
+	// The voxels: each where its pixel is drawn, with that pixel's colour.
+	auto place = [&](int x, int y, int z)
+	{
+		const Uint8 color = pixelOf(x, y, z);
+		if (!color) return;
+		model.color[z][y][x] = color;
+		model.empty = false;
+		const int voxel[3] = { x, y, z };
+		for (int boxAxis = 0; boxAxis < 3; ++boxAxis)
+		{
+			model.min[boxAxis] = std::min<int>(model.min[boxAxis], voxel[boxAxis]);
+			model.max[boxAxis] = std::max<int>(model.max[boxAxis], voxel[boxAxis]);
+		}
+	};
+	if (axis < 0)
+	{
+		for (int y = 0; y < 16; ++y)
+			for (int x = 0; x < 16; ++x) place(x, y, 0);
+	}
+	else
+	{
+		for (int along = 0; along < 16; ++along)
+		{
+			for (int z = 0; z < 24; ++z)
+			{
+				int x, y;
+				planeVoxel(axis, offset, along, x, y);
+				place(x, y, z);
+			}
+		}
+	}
+	model.ghostly = !model.empty;
+}
+
 }
 
 /**
@@ -570,8 +696,8 @@ void FirstPersonView::findMirrors()
 		return;
 	}
 
-	// Each tile's parts as first drawn (null for none or an empty model); a tile is part of a
-	// craft if any of its parts comes from a craft's data set.
+	// Each tile's parts as first drawn (null for none, an empty model or a ghost, which is never
+	// solid); a tile is part of a craft if any of its parts comes from a craft's data set.
 	std::vector<std::array<const VoxelModel*, 4>> tileModels(tileCount);
 	std::vector<char> isCraftTile(tileCount, 0);
 	for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
@@ -581,7 +707,7 @@ void FirstPersonView::findMirrors()
 		{
 			const MapData *mapData = tile->getMapData((TilePart)part);
 			const VoxelModel *model = mapData ? getModel(mapData, -1, false) : nullptr;
-			tileModels[tileIndex][part] = model && !model->empty ? model : nullptr;
+			tileModels[tileIndex][part] = model && !model->empty && !model->ghostly ? model : nullptr;
 			if (tileModels[tileIndex][part] && mapData->getDataset() && craftSets.count(mapData->getDataset()->getName()))
 				isCraftTile[tileIndex] = 1;
 		}
@@ -1080,6 +1206,21 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 		}
 	}
 
+	// No voxels at all, though the map draws it (a ladder, a lift's pad, a wall of laser beams):
+	// with the setting "Parts without shape" (1: lifts and ladders, the parts with the grav lift
+	// flag; 2: all of them), a see-through ghost of its art, with the sides the art never shows
+	// coloured; no plate fitting, no glow.
+	if (model.empty)
+	{
+		const bool ghostWanted = Options::fpsGhostParts == 2 || (Options::fpsGhostParts == 1 && mapData->isGravLift());
+		if (ghostWanted && !cutout)
+		{
+			buildGhost(model, sprite, mapData->getObjectType(), yOffset);
+			if (!model.empty) colorHiddenSides(model, sprite);
+		}
+		return;
+	}
+
 	// The voxels behind holes in the art, painted like their neighbours.
 	if (!hollowVoxels.empty())
 	{
@@ -1102,11 +1243,14 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 }
 
 /**
- * Notices the doors that just opened on a tile and starts their swing. When the game opens an
- * ordinary door it replaces the closed door in the wall with its open version (the record's
- * alternative MCD), which may sit in another part of the tile. So: a wall that was a closed
- * door last frame and is something else now, while the open version shows up on the tile,
- * means the door just opened. UFO doors slide instead (see snapshotTile).
+ * Notices the doors that just turned on a tile and starts their swing. When the game opens an
+ * ordinary door it replaces the door in the wall with its other version (the record's
+ * alternative MCD), which stands in the tile's other wall: a door in the north wall turns into
+ * the west wall and back, around the tile's north-west corner, its hinge. Both versions are
+ * doors (the open key turns an open one back), so the 3D view doesn't tell opening from
+ * shutting: a wall that was a door last frame and is something else now, while its other
+ * version shows up on the tile, means the door just turned, through the tile, to where the game
+ * has it now. UFO doors slide instead (see snapshotTile).
  * @param index The tile's index in the map.
  * @param tile The tile.
  */
@@ -1125,21 +1269,38 @@ void FirstPersonView::trackDoors(int index, Tile *tile)
 			continue;
 		}
 
-		// Look for the door's open version on any part of the tile.
-		const MapData *openDoor = wallBefore->getDataset()->getObject(wallBefore->getAltMCD());
-		for (int openPart = 0; openPart < 4; ++openPart)
+		// Look for the door's other version on any part of the tile.
+		const MapData *otherDoor = wallBefore->getDataset()->getObject(wallBefore->getAltMCD());
+		for (int otherPart = 0; otherPart < 4; ++otherPart)
 		{
-			if (openDoor && tile->getMapData((TilePart)openPart) == openDoor)
+			if (otherDoor && tile->getMapData((TilePart)otherPart) == otherDoor)
 			{
-				// Swing away from the camera when it's on the door's own side (east of a west
-				// wall, south of a north wall), like a door pushed open. The swing hides the
-				// open door's part and shows the closed door's model turning. A swing this door
-				// still had (it opened, closed and opened again) gives way to the new one.
-				const int mapSizeX = _save->getMapSizeX(), mapSizeY = _save->getMapSizeY();
-				const bool away = part == O_NORTHWALL ? _eye[1] > (index / mapSizeX % mapSizeY) * 16.0 : _eye[0] > (index % mapSizeX) * 16.0;
-				_doorAnimations.erase(std::remove_if(_doorAnimations.begin(), _doorAnimations.end(),
-					[&](const DoorAnimation &old) { return old.tile == index && old.part == (int)part; }), _doorAnimations.end());
-				_doorAnimations.push_back({ index, part, openPart, getModel(wallBefore), SDL_GetTicks(), away, openDoor });
+				// The swing: from along the wall it left (north: east, 0; west: south, 90
+				// degrees) a quarter turn through the tile to the other wall, as the game turned
+				// it. This door's last swing ends: one that brought it into the wall it leaves
+				// now (it turned again before that swing ended) hands over the angle it had got
+				// to, so the door swings back from there. (Another door of the tile, in its other
+				// wall, keeps its own swing.)
+				const float quarterTurn = 1.5707963f;
+				float fromAngle = part == O_NORTHWALL ? 0.0f : quarterTurn;
+				const float toAngle = part == O_NORTHWALL ? quarterTurn : 0.0f;
+				const Uint32 now = SDL_GetTicks();
+				for (auto old = _doorAnimations.begin(); old != _doorAnimations.end();)
+				{
+					if (old->tile != index || (old->hiddenPart != (int)part && old->part != (int)part))
+					{
+						++old;
+						continue;
+					}
+					if (old->hiddenPart == (int)part)
+					{
+						const float progress = std::min(1.0f, (now - old->start) / (float)DoorSwingTime);
+						const float eased = progress * progress * (3.0f - 2.0f * progress);
+						fromAngle = old->fromAngle + (old->toAngle - old->fromAngle) * eased;
+					}
+					old = _doorAnimations.erase(old);
+				}
+				_doorAnimations.push_back({ index, part, otherPart, getModel(wallBefore), now, fromAngle, toAngle, otherDoor });
 				break;
 			}
 		}
@@ -1148,7 +1309,7 @@ void FirstPersonView::trackDoors(int index, Tile *tile)
 
 /**
  * Is the door in this wall still moving? An ordinary door swings for DoorSwingTime ms after it
- * opened; a UFO door slides through its animation frames for UfoDoorTime ms (one the view has
+ * turned; a UFO door slides through its animation frames for UfoDoorTime ms (one the view has
  * not started sliding yet counts as moving too). The first-person mode waits for it before
  * stepping through the doorway.
  * @param pos The tile.
@@ -1209,12 +1370,12 @@ void FirstPersonView::chooseGround()
 		}
 	}
 
-	// The most common one with a model that lies on the ground wins.
+	// The most common one with a model that lies on the ground wins (a ghost never does).
 	int bestCount = 0;
 	for (const auto &entry : floorCounts)
 	{
 		const VoxelModel *model = getModel(entry.first);
-		if (entry.second > bestCount && !model->empty && model->min[2] == 0)
+		if (entry.second > bestCount && !model->empty && !model->ghostly && model->min[2] == 0)
 		{
 			bestCount = entry.second;
 			_groundModel = model;
@@ -1243,7 +1404,7 @@ void FirstPersonView::snapshotTiles()
 		_wallsLastFrame[1].assign(tileCount, nullptr);
 		for (auto &parts : _partsLastFrame) parts.assign(tileCount, nullptr);
 		_burningLastFrame.assign(tileCount, 0);
-		_tileMemos.assign(tileCount, TileMemo{ {}, nullptr });
+		_tileMemos.assign(tileCount, TileMemo{ {}, nullptr, {}, nullptr });
 		_partMemos.assign(tileCount, std::array<PartMemo, 4>());
 		_doorAnimations.clear();
 	}
@@ -1307,7 +1468,8 @@ void FirstPersonView::shareCache(FirstPersonView *owner)
 	_groundChosen = false;
 	_doorAnimations.clear();
 	_solidMasks.clear();
-	for (auto &memo : _tileMemos) memo = TileMemo{ {}, nullptr };
+	_paintedFloors.clear();
+	for (auto &memo : _tileMemos) memo = TileMemo{ {}, nullptr, {}, nullptr };
 	for (auto &memos : _partMemos) memos = std::array<PartMemo, 4>();
 }
 
@@ -1533,9 +1695,26 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 		}
 	}
 
+	// The floor under a UFO's hull, with the UFO's floor going on inside (see paintedFloor):
+	// looked up only when the tile's parts changed since the last frame.
+	TileMemo &memo = _tileMemos[index];
+	if (tileView.part[O_FLOOR] && (tileView.part[O_WESTWALL] || tileView.part[O_NORTHWALL] || tileView.part[O_OBJECT]))
+	{
+		const std::array<const VoxelModel*, 4> shown = { tileView.part[0], tileView.part[1], tileView.part[2], tileView.part[3] };
+		if (memo.paintParts != shown)
+		{
+			memo.paintParts = shown;
+			memo.paintedFloor = paintedFloor(index, shown);
+		}
+		if (memo.paintedFloor)
+		{
+			tileView.part[O_FLOOR] = memo.paintedFloor;
+			tileView.next[O_FLOOR] = nullptr; // (no dissolving into an unpainted next frame)
+		}
+	}
+
 	// The parts' voxels together, for the rays (see traceTile): looked up only when the tile's
 	// parts changed since the last frame.
-	TileMemo &memo = _tileMemos[index];
 	const std::array<const VoxelModel*, 4> parts = { tileView.part[0], tileView.part[1], tileView.part[2], tileView.part[3] };
 	if (!memo.solid || memo.parts != parts)
 	{
@@ -1558,6 +1737,144 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 	// it burns.
 	tileView.smoke = tileView.discovered ? (Uint8)std::clamp(tile->getSmoke(), 0, 255) : 0;
 	tileView.burning = tile->getFire() > 0;
+}
+
+/**
+ * The floor of a tile under a UFO's hull: the UFO's map leaves the floor of the
+ * tiles it doesn't cover whole, so where a diagonal piece of its hull stands, the tile's floor is
+ * still the ground it landed on, and the 3D view showed grass (or road...) inside the UFO. (The
+ * map draws the inside of the hull over it in the hull's art: black.) So the UFO's floor goes on
+ * inside: from the tile's sides that border the UFO's floor (a neighbour on the same level whose
+ * floor is of a data set UFOs are built from, the hull's or its fittings'), the floor is flooded
+ * up to the hull's voxels standing on it, and what's reached takes the colours of that
+ * neighbour's floor at the same spot; the rest (outside the hull) stays the ground. Made once
+ * for each set of parts and neighbouring floor.
+ * @param index The tile's index.
+ * @param parts The tile's four parts' models, as shown: the floor first.
+ * @return The floor with the UFO's floor going on inside, or null if it isn't such a tile.
+ */
+const FirstPersonView::VoxelModel *FirstPersonView::paintedFloor(int index, const std::array<const VoxelModel*, 4> &parts)
+{
+	// The floor's data set, and the walls and object of a UFO's set standing on it (the hull;
+	// other buildings, a barn's walls on a field, keep their ground as it is).
+	const Tile *tile = _save->getTile(index);
+	const MapData *floorData = tile->getMapData(O_FLOOR);
+	if (!floorData || !floorData->getDataset())
+	{
+		return nullptr;
+	}
+	const MapDataSet *hullSet = nullptr;
+	for (int part = O_WESTWALL; part <= O_OBJECT; ++part)
+	{
+		const MapData *partData = tile->getMapData((TilePart)part);
+		if (parts[part] && partData && partData->getDataset() && partData->getDataset() != floorData->getDataset()
+			&& _ufoDataSets.count(partData->getDataset()->getName()))
+		{
+			hullSet = partData->getDataset();
+			break;
+		}
+	}
+	if (!hullSet)
+	{
+		return nullptr;
+	}
+
+	// The sides bordering the UFO's floor: west, north, east, south (a bit each), and that floor.
+	const Position here = tile->getPosition();
+	const int sideSteps[4][2] = { { -1, 0 }, { 0, -1 }, { 1, 0 }, { 0, 1 } };
+	int bordering = 0;
+	const VoxelModel *insideFloor = nullptr;
+	for (int side = 0; side < 4; ++side)
+	{
+		const Tile *neighbour = _save->getTile(here + Position(sideSteps[side][0], sideSteps[side][1], 0));
+		const MapData *neighbourFloor = neighbour ? neighbour->getMapData(O_FLOOR) : nullptr;
+		if (neighbourFloor && neighbourFloor->getDataset() && neighbourFloor->getDataset() != floorData->getDataset()
+			&& _ufoDataSets.count(neighbourFloor->getDataset()->getName()))
+		{
+			const VoxelModel *model = getModel(neighbourFloor);
+			if (model->empty || model->ghostly) continue;
+			bordering |= 1 << side;
+			if (!insideFloor) insideFloor = model;
+		}
+	}
+	if (!bordering)
+	{
+		return nullptr;
+	}
+
+	// Made already for these parts and that floor?
+	const std::array<const VoxelModel*, 6> key = { parts[0], parts[1], parts[2], parts[3], insideFloor, (const VoxelModel*)(std::uintptr_t)bordering };
+	auto made = _paintedFloors.find(key);
+	if (made != _paintedFloors.end())
+	{
+		return made->second.get();
+	}
+
+	// Each column's top floor voxel (-1: none), and whether the hull stands there (a voxel of
+	// the walls or the object within six voxels above the floor).
+	const VoxelModel &floor = *parts[O_FLOOR];
+	int top[16][16];
+	bool standing[16][16];
+	for (int y = 0; y < 16; ++y)
+	{
+		for (int x = 0; x < 16; ++x)
+		{
+			top[y][x] = -1;
+			for (int z = floor.max[2]; z >= floor.min[2] && top[y][x] < 0; --z)
+			{
+				if (floor.color[z][y][x]) top[y][x] = z;
+			}
+			standing[y][x] = false;
+			const int fromZ = std::max(0, top[y][x] + 1), toZ = std::min(23, top[y][x] + 6);
+			for (int part = O_WESTWALL; part <= O_OBJECT && !standing[y][x]; ++part)
+			{
+				if (!parts[part] || parts[part]->ghostly) continue;
+				for (int z = fromZ; z <= toZ && !standing[y][x]; ++z) standing[y][x] = parts[part]->color[z][y][x] != 0;
+			}
+		}
+	}
+
+	// Flood from the bordering sides, side by side, up to where the hull stands.
+	bool inside[16][16] = {};
+	std::vector<std::pair<int, int>> toVisit;
+	auto visit = [&](int x, int y)
+	{
+		if (x < 0 || y < 0 || x > 15 || y > 15 || inside[y][x] || standing[y][x]) return;
+		inside[y][x] = true;
+		toVisit.push_back({ x, y });
+	};
+	for (int along = 0; along < 16; ++along)
+	{
+		if (bordering & 1) visit(0, along);
+		if (bordering & 2) visit(along, 0);
+		if (bordering & 4) visit(15, along);
+		if (bordering & 8) visit(along, 15);
+	}
+	while (!toVisit.empty())
+	{
+		const auto [x, y] = toVisit.back();
+		toVisit.pop_back();
+		visit(x - 1, y);
+		visit(x + 1, y);
+		visit(x, y - 1);
+		visit(x, y + 1);
+	}
+
+	// What's inside takes the hull's floor's colour at the same spot (its top voxel there).
+	std::unique_ptr<VoxelModel> painted;
+	for (int y = 0; y < 16; ++y)
+	{
+		for (int x = 0; x < 16; ++x)
+		{
+			if (!inside[y][x] || top[y][x] < 0) continue;
+			Uint8 color = 0;
+			for (int z = insideFloor->max[2]; z >= insideFloor->min[2] && !color; --z) color = insideFloor->color[z][y][x];
+			if (!color) continue;
+			if (!painted) painted = std::make_unique<VoxelModel>(floor);
+			painted->color[top[y][x]][y][x] = color;
+		}
+	}
+	return (_paintedFloors[key] = std::move(painted)).get();
 }
 
 /**
@@ -1639,11 +1956,10 @@ void FirstPersonView::keepNearestLights()
 }
 
 /**
- * Puts the doors swinging open into this frame's snapshot. Each door turns as a slab around its
- * hinge over DoorSwingTime ms (eased in and out), coloured from the closed door; meanwhile the
- * open door's own part is hidden, so the open door appears only when the swing ends. A door
- * swung away from the camera stays swung (up to 5 seconds) until the camera has gone through:
- * the open door sprite is on the camera's side of the wall, so it would pop up in front of it.
+ * Puts the doors swinging into this frame's snapshot. Each door turns as a slab around its hinge
+ * over DoorSwingTime ms (eased in and out), coloured from the door as it was, from the wall it
+ * left to where the game has it now (see trackDoors); meanwhile the door's new part is hidden,
+ * so the game's own door appears only when the swing ends, right where the swing put it.
  * @param tileCount The number of tiles on the map.
  */
 void FirstPersonView::updateDoorSwings(int tileCount)
@@ -1652,8 +1968,7 @@ void FirstPersonView::updateDoorSwings(int tileCount)
 	const Uint32 now = SDL_GetTicks();
 	const int mapSizeX = _save->getMapSizeX(), mapSizeY = _save->getMapSizeY();
 	// Points a tile's rays at a swing, in its first free slot: two doors can swing through one
-	// tile at once (its west and north doors, or its own and a neighbour's swung away). A
-	// third at the same moment isn't traced.
+	// tile at once (its west and north doors). A third at the same moment isn't traced.
 	auto addSwingTo = [this](int tileIndex, Sint16 swingIndex)
 	{
 		TileView &tileView = _tileViews[tileIndex];
@@ -1671,28 +1986,23 @@ void FirstPersonView::updateDoorSwings(int tileCount)
 		const int tileX = door->tile % mapSizeX, tileY = (door->tile / mapSizeX) % mapSizeY, tileZ = door->tile / (mapSizeX * mapSizeY);
 		const bool westWall = door->part == O_WESTWALL;
 
-		// Forget the swing when the door is no longer open (closed again, or destroyed: its open
-		// record has gone from the tile), or when it has swung towards its own tile and come to
-		// rest where the game's own open door lies, which then shows. A door that swung away
-		// from the camera stays where it was pushed for as long as it is open: the game's open
-		// door lies on the other side of the wall, in the door's own tile, and showing that one
-		// instead would make the door jump through the wall it hangs in. (The swing index has to
-		// fit a Sint16.)
-		const bool stillOpen = door->tile < tileCount && _save->getTile(door->tile)->getMapData((TilePart)door->hiddenPart) == door->openDoor;
-		if (!stillOpen || (progress >= 1.0f && !door->away) || _doorSwings.size() >= 32000)
+		// Forget the swing when it has ended (the game's own door shows where it came to rest),
+		// or when the door is no longer there (it turned again, or was destroyed: its record has
+		// gone from the part). (The swing index has to fit a Sint16.)
+		const bool stillThere = door->tile < tileCount && _save->getTile(door->tile)->getMapData((TilePart)door->hiddenPart) == door->openDoor;
+		if (!stillThere || progress >= 1.0f || _doorSwings.size() >= 32000)
 		{
 			door = _doorAnimations.erase(door);
 			continue;
 		}
 
 		// The door's angle around the hinge, eased (smoothstep), in radians from +x (east)
-		// towards +y (south). A west wall turns from along +y to +x (or to -x when it swings
-		// away); a north wall from along +x to +y (or to -y).
+		// towards +y (south).
 		const float eased = progress * progress * (3.0f - 2.0f * progress);
-		const float angle = westWall ? (door->away ? 1.0f + eased : 1.0f - eased) * 1.5707963f : (door->away ? -eased : eased) * 1.5707963f;
+		const float angle = door->fromAngle + (door->toAngle - door->fromAngle) * eased;
 
 		// The swinging slab: hinged one voxel in from the tile's north-west corner, as tall as
-		// the closed door, in world voxels.
+		// the door, in world voxels.
 		DoorSwing swing;
 		swing.hinge[0] = tileX * 16.0f + 1.0f;
 		swing.hinge[1] = tileY * 16.0f + 1.0f;
@@ -1703,19 +2013,12 @@ void FirstPersonView::updateDoorSwings(int tileCount)
 		swing.model = door->model;
 		swing.westWall = westWall;
 
-		// In the door's own tile: hide the open door's part and point the rays at the swing.
+		// In the door's own tile (it turns inside it): hide the door's new part and point the
+		// rays at the swing.
 		TileView &tileView = _tileViews[door->tile];
 		tileView.part[door->hiddenPart] = nullptr;
 		tileView.next[door->hiddenPart] = nullptr;
 		addSwingTo(door->tile, (Sint16)_doorSwings.size());
-
-		// A door swinging away reaches into the neighbour on the far side of the wall (west of a
-		// west wall, north of a north wall): its rays must look at the swing too.
-		const int neighbourX = westWall ? tileX - 1 : tileX, neighbourY = westWall ? tileY : tileY - 1;
-		if (door->away && neighbourX >= 0 && neighbourY >= 0)
-		{
-			addSwingTo((tileZ * mapSizeY + neighbourY) * mapSizeX + neighbourX, (Sint16)_doorSwings.size());
-		}
 		_doorSwings.push_back(swing);
 		++door;
 	}

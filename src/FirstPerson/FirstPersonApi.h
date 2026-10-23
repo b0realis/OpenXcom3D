@@ -129,6 +129,10 @@ bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
 /// A unit panics or goes berserk: returns true if the first-person view shows it its own way
 /// (the game then leaves out its "has panicked" box, which would freeze the view behind it).
 bool breakdown(BattlescapeState *state, BattleUnit *unit);
+/// A close-quarters check failed: the shooter's shot is knocked aside at this tile, and the game
+/// has turned the shooter to face it. The first-person view looks there too, so the soldier
+/// isn't turned back to the old view afterwards (at a cost, with "Turning costs TU").
+void closeQuartersDeflected(BattlescapeState *state, const BattleUnit *shooter, const Position &target);
 
 // ---- Items and units (BattleItem.cpp, BattleUnit.cpp) ----
 
@@ -156,6 +160,7 @@ inline State *createOptionsTab(OptionsOrigin) { return nullptr; }
 inline void freeAimTarget(BattlescapeState *, const BattleAction &, Position &) { }
 inline bool fastShots(BattlescapeState *, const BattleUnit *) { return false; }
 inline bool breakdown(BattlescapeState *, BattleUnit *) { return false; }
+inline void closeQuartersDeflected(BattlescapeState *, const BattleUnit *, const Position &) { }
 inline bool endlessAmmo(BattlescapeState *, const BattleUnit *) { return false; }
 inline bool invincible(BattlescapeState *, const BattleUnit *) { return false; }
 

@@ -892,6 +892,55 @@ void FirstPersonMode::endVault()
 }
 
 /**
+ * Climbing with W and S, as on Half-Life's ladders: while the soldier stands on a grav lift or a
+ * ladder, W with the view looking up more than ClimbPitch degrees goes up a level and looking
+ * down as much goes down (S the other way round), through moveUpDown, so the game checks and
+ * charges it as it does the up and down keys. Held, it climbs on level by level, each once the
+ * last ride is over. Looking more level, or where the lift doesn't go that way (at its top, at
+ * its foot), the key walks as usual: that's how the soldier steps off.
+ * @param unit The soldier.
+ * @param forward The movement keys' forward push (see movementKeys): 1 for W, -1 for S.
+ * @return True if the push is the climb's, so it doesn't walk.
+ */
+bool FirstPersonMode::updateClimb(BattleUnit *unit, double forward)
+{
+	const double pitch = _view->getPitchDegrees();
+	const bool lookingUp = pitch > ClimbPitch, lookingDown = pitch < -ClimbPitch;
+	if (forward == 0.0 || (!lookingUp && !lookingDown))
+	{
+		return false;
+	}
+
+	// During a ride the push waits (it would drift the camera off the lift).
+	const Uint32 now = SDL_GetTicks();
+	if (_rideStart && now - _rideStart < _rideTime)
+	{
+		return true;
+	}
+
+	// Which way: W looking up (or S looking down) is up. Only where the lift goes that way.
+	const int direction = (forward > 0.0) == lookingUp ? Pathfinding::DIR_UP : Pathfinding::DIR_DOWN;
+	bool up = false, down = false;
+	liftWays(unit, up, down);
+	if (!(direction == Pathfinding::DIR_UP ? up : down))
+	{
+		return false;
+	}
+
+	// Climb as soon as the soldier is free to: not mid-step, the game idle. A climb the game
+	// refused (its message says why) is tried again only after ClimbRetryTime.
+	if (canAct() && unit->getStatus() == STATUS_STANDING && !_stepPending && !_state->_battleGame->isBusy() && now >= _climbRetryAt)
+	{
+		moveUpDown(unit, direction, nullptr);
+		if (!_state->_battleGame->isBusy())
+		{
+			_climbRetryAt = now + ClimbRetryTime;
+		}
+	}
+	return true;
+}
+
+/**
  * Real-time movement with the movement keys, called every frame. Inside a tile the camera moves
  * freely, with a little momentum, and nothing is paid. Crossing into the next tile commits a step
  * that the game walks and charges by its rules (see commitStep): the diagonal first, else
@@ -919,6 +968,13 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 	if (!canMove || _movementHeld)
 	{
 		forward = strafe = 0.0;
+	}
+
+	// On a grav lift or a ladder, W looking up climbs and looking down goes down (S the other way
+	// round, see updateClimb); then the push doesn't walk.
+	if (forward != 0.0 && updateClimb(unit, forward))
+	{
+		forward = 0.0;
 	}
 
 	// The camera's new position starts where it is now. A big unit's eye sits 8 voxels off the
@@ -1156,6 +1212,32 @@ void FirstPersonMode::playFootsteps(BattleUnit *unit, double distance)
 }
 
 /**
+ * Which ways a grav lift (or a ladder) takes the soldier from where they stand: the moves up
+ * and down the pathfinding allows from there, and for a flyer with flight switched off only a
+ * walker's (see walkerMayMoveUpDown: at a lift's top, not on up into the air). Neither when the
+ * soldier isn't on a lift or a ladder.
+ * @param unit The soldier.
+ * @param up Set to whether it goes up.
+ * @param down Set to whether it goes down.
+ */
+void FirstPersonMode::liftWays(BattleUnit *unit, bool &up, bool &down) const
+{
+	up = down = false;
+	const Tile *tile = unit->getTile();
+	const MapData *floor = tile ? tile->getMapData(O_FLOOR) : nullptr;
+	if (!tile || !((floor && floor->isGravLift()) || tile->hasLadder()))
+	{
+		return;
+	}
+	Pathfinding *pathfinding = _save->getPathfinding();
+	const bool walkerOnly = canFly(unit) && !flightOn(unit);
+	up = pathfinding->getTUCost(unit->getPosition(), Pathfinding::DIR_UP, unit, nullptr, BAM_NORMAL).cost.time < Pathfinding::INVALID_MOVE_COST
+		&& (!walkerOnly || walkerMayMoveUpDown(unit->getPosition(), Pathfinding::DIR_UP));
+	down = pathfinding->getTUCost(unit->getPosition(), Pathfinding::DIR_DOWN, unit, nullptr, BAM_NORMAL).cost.time < Pathfinding::INVALID_MOVE_COST
+		&& (!walkerOnly || walkerMayMoveUpDown(unit->getPosition(), Pathfinding::DIR_DOWN));
+}
+
+/**
  * The lift controls, updated every frame. While the soldier stands on a grav lift (or a ladder)
  * that can take them up or down from here, purple arrows show, one for each way it goes, with
  * LIFT PLATFORM between them and the keys that do the same under it. A click on an arrow (with
@@ -1166,20 +1248,12 @@ void FirstPersonMode::playFootsteps(BattleUnit *unit, double distance)
  */
 void FirstPersonMode::updateLift(BattleUnit *unit, Uint32 now)
 {
-	// Which ways the lift goes from here: the moves up and down that the pathfinding allows from
-	// the unit's position.
+	// Which ways the lift goes from here (see liftWays).
 	bool up = false, down = false;
 	const bool riding = _rideStart && now - _rideStart < _rideTime;
 	if (unit && isActive() && !_classicHud && !_hudHidden && !_stepPending && !riding && canAct() && unit->getStatus() == STATUS_STANDING)
 	{
-		const Tile *tile = unit->getTile();
-		const MapData *floor = tile ? tile->getMapData(O_FLOOR) : nullptr;
-		if (tile && ((floor && floor->isGravLift()) || tile->hasLadder()))
-		{
-			Pathfinding *pathfinding = _save->getPathfinding();
-			up = pathfinding->getTUCost(unit->getPosition(), Pathfinding::DIR_UP, unit, nullptr, BAM_NORMAL).cost.time < Pathfinding::INVALID_MOVE_COST;
-			down = pathfinding->getTUCost(unit->getPosition(), Pathfinding::DIR_DOWN, unit, nullptr, BAM_NORMAL).cost.time < Pathfinding::INVALID_MOVE_COST;
-		}
+		liftWays(unit, up, down);
 	}
 
 	// Show an arrow for each way, and the texts with either; with neither, nothing is hovered.
@@ -1370,10 +1444,38 @@ void FirstPersonMode::toggleFlight(BattleUnit *unit)
 }
 
 /**
- * Moves the soldier up or down a level (the up and down keys, or a click on a lift arrow)
- * through the battlescape's own up and down buttons, so the game checks and charges the move as
- * on the map: a grav lift ride, or flying. A soldier who can fly but has flight switched off
- * keeps to the ground (except on a grav lift), with a message saying flight is off.
+ * May a soldier who walks go up or down a level from here? The game's own rule for a unit that
+ * can't fly (Pathfinding::validateUpDown): a ride between two grav lift floors, or a climb on a
+ * ladder (OXCE's grav lift flag on a wall or an object) where nothing is in the way: no floor
+ * above going up, none under the soldier going down. A flyer may also fly up or down wherever
+ * nothing is in the way; with flight switched off it keeps to this (see moveUpDown).
+ * @param position The soldier's tile.
+ * @param direction Pathfinding::DIR_UP or Pathfinding::DIR_DOWN.
+ * @return True if a walker may make the move.
+ */
+bool FirstPersonMode::walkerMayMoveUpDown(const Position &position, int direction) const
+{
+	const Tile *start = _save->getTile(position);
+	const Tile *destination = _save->getTile(position + Position(0, 0, direction == Pathfinding::DIR_UP ? 1 : -1));
+	if (!start || !destination)
+	{
+		return false;
+	}
+	if (start->hasGravLiftFloor() && destination->hasGravLiftFloor())
+	{
+		return true;
+	}
+	return start->hasLadder() && (direction == Pathfinding::DIR_UP ? destination->hasNoFloor(_save) : start->hasNoFloor(_save));
+}
+
+/**
+ * Moves the soldier up or down a level (the up and down keys, a click on a lift arrow, or W and
+ * S looking up or down on a lift, see updateClimb) through the battlescape's own up and down
+ * buttons, so the game checks and charges the move as on the map: a grav lift ride, a ladder
+ * climb, or flying. A soldier who can fly but has flight switched off keeps to what a walker
+ * may do (a lift or a ladder, see walkerMayMoveUpDown: never off the top of one into the air),
+ * with a message naming the flight key otherwise; one who is in the air all the same comes down
+ * to land with the down key (see updateFlight).
  * @param direction Pathfinding::DIR_UP or Pathfinding::DIR_DOWN.
  * @param action The input event, passed on to the button's handler.
  */
@@ -1384,13 +1486,22 @@ void FirstPersonMode::moveUpDown(BattleUnit *unit, int direction, Action *action
 		return;
 	}
 
-	// A flyer with flight off may still ride a grav lift, but not fly up or down.
-	const Tile *tile = _save->getTile(unit->getPosition());
-	const bool gravLift = tile && tile->getMapData(O_FLOOR) && tile->getMapData(O_FLOOR)->isGravLift();
-	if (canFly(unit) && !flightOn(unit) && !gravLift)
+	// A flyer with flight off: in the air, down lands it (level by level, see updateFlight);
+	// otherwise only a walker's moves.
+	if (canFly(unit) && !flightOn(unit))
 	{
-		_state->warning(_save->getDepth() > 0 ? "STR_FPS_SWIM_OFF" : "STR_FPS_FLIGHT_OFF");
-		return;
+		if (direction == Pathfinding::DIR_DOWN && unit->isFloating())
+		{
+			_landing = true;
+			_landingUnit = unit;
+			_landingResumeTurn = 0;
+			return;
+		}
+		if (!walkerMayMoveUpDown(unit->getPosition(), direction))
+		{
+			_state->warningRaw(_state->tr(_save->getDepth() > 0 ? "STR_FPS_SWIM_OFF_KEY" : "STR_FPS_FLIGHT_OFF_KEY").arg(keyLabel(Options::keyFpsFlight)));
+			return;
+		}
 	}
 
 	// Press the battlescape's up or down button.
@@ -1438,6 +1549,15 @@ void FirstPersonMode::updateFlight(BattleUnit *unit)
 	if (!_landing && unit && unit == _landingUnit && _save->getTurn() >= _landingResumeTurn)
 	{
 		_landing = true;
+	}
+	// In the air with flight switched off all the same, and not coming down (nor held up): land.
+	// Flight switched off in the air and floating off a ledge start the landing themselves; this
+	// catches any other way up there, so a soldier is never left hanging where no key works.
+	if (unit && !_landing && unit != _landingUnit && !_landAfterStep && !_stepPending && canFly(unit) && !flightOn(unit) && unit->isFloating())
+	{
+		_landing = true;
+		_landingUnit = unit;
+		_landingResumeTurn = 0;
 	}
 
 	// Tell the pathfinding who pays our flight cost for moves up and down (also while landing);

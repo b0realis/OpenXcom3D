@@ -75,6 +75,16 @@ public:
 		std::set<int> records;  // record numbers in the terrain's MCD data set
 		std::bitset<256> glass; // palette colours of those records that are see-through glass
 	};
+	/// How an item's picture is given volume in 3D: worked out (AUTO), rounded (CUSHION) or flat (PLATE: a blade).
+	enum HeldShape { HELD_AUTO = -1, HELD_CUSHION, HELD_PLATE };
+	/// What a weapon's shots are: worked out (AUTO), a gun's rounds (POWDER) or objects flying (OBJECT: arrows, bolts, harpoons).
+	enum ShotKind { SHOT_AUTO = -1, SHOT_POWDER, SHOT_OBJECT };
+	/// One item's entry in the item table (`items:`): what the 3D view isn't left to work out.
+	struct ItemLook
+	{
+		HeldShape held = HELD_AUTO; // how its picture is given volume
+		ShotKind shot = SHOT_AUTO;  // what its shots are (a weapon's, or an ammo's)
+	};
 private:
 	bool _enabled;
 	int _maxViewDistance;                        // in tiles
@@ -83,6 +93,8 @@ private:
 	std::vector<std::string> _combatMusic;       // tense tracks to try, first one the game has wins
 	std::set<std::string> _nightVision;          // armors and items that give their wearer night vision
 	std::set<std::string> _builtInItemsShown;    // built-in items drawn in the hands all the same (a shield, an arm cannon)
+	std::map<std::string, ItemLook> _itemLooks;  // the item table: item type -> what it's set to
+	std::map<std::string, int> _signalLevels;    // mission type -> how badly helmet cameras glitch (1 as usual, 2 a lot)
 public:
 	/// Creates the rule with the feature switched off.
 	RuleFirstPerson() : _enabled(false), _maxViewDistance(60), _combatMusic({ "GMDEFEND", "GMDEFBAS" }) { }
@@ -127,6 +139,41 @@ public:
 			_builtInItemsShown = std::set<std::string>(builtInItemsShown.begin(), builtInItemsShown.end());
 		}
 
+		// The item table: groups of item types (as the mods name them), each with what it sets:
+		// held (cushion, plate, or auto) and shot (powder, object, or auto). A later entry
+		// overrides what it sets for an item, and leaves the rest.
+		if (const auto& items = reader["items"])
+		{
+			for (const auto& entry : items.children())
+			{
+				std::vector<std::string> types;
+				std::string held, shot;
+				entry.tryRead("types", types);
+				entry.tryRead("held", held);
+				entry.tryRead("shot", shot);
+				for (const std::string &type : types)
+				{
+					ItemLook &look = _itemLooks[type];
+					if (!held.empty()) look.held = held == "plate" ? HELD_PLATE : held == "cushion" ? HELD_CUSHION : HELD_AUTO;
+					if (!shot.empty()) look.shot = shot == "object" ? SHOT_OBJECT : shot == "powder" ? SHOT_POWDER : SHOT_AUTO;
+				}
+			}
+		}
+
+		// The helmet cameras' bad signal by mission (alien deployment) type: groups of missions,
+		// each with its level (1 now and then, as on any mission; 2 a lot: the aliens' own ground).
+		if (const auto& badSignal = reader["badSignal"])
+		{
+			for (const auto& entry : badSignal.children())
+			{
+				std::vector<std::string> missions;
+				int level = 1;
+				entry.tryRead("missions", missions);
+				entry.tryRead("level", level);
+				for (const std::string &mission : missions) _signalLevels[mission] = std::clamp(level, 0, 2);
+			}
+		}
+
 		// Weather: per terrain data set, its kind ("rain", "snow", "dust", ...).
 		if (const auto& weather = reader["weather"])
 		{
@@ -156,6 +203,18 @@ public:
 	bool givesNightVision(const std::string &type) const { return _nightVision.count(type) > 0; }
 	/// Is a built-in item (fixed to its unit, or its special weapon) drawn in the hands all the same?
 	bool showsBuiltInItem(const std::string &type) const { return _builtInItemsShown.count(type) > 0; }
+	/// An item's entry in the item table, or nullptr if it has none (the 3D view works it all out).
+	const ItemLook *getItemLook(const std::string &type) const
+	{
+		auto found = _itemLooks.find(type);
+		return found != _itemLooks.end() ? &found->second : nullptr;
+	}
+	/// How badly the helmet cameras glitch on a mission (its alien deployment type): 1 now and then (any mission not listed), 2 a lot, 0 never.
+	int getSignalLevel(const std::string &mission) const
+	{
+		auto found = _signalLevels.find(mission);
+		return found != _signalLevels.end() ? found->second : 1;
+	}
 	/// The weather of a terrain data set ("rain", "snow", "dust", ...), or empty for none.
 	std::string getWeather(const std::string &dataSet) const
 	{

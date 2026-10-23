@@ -56,6 +56,7 @@
 #include <SDL.h>
 #include "../Engine/Game.h"
 #include "../Engine/Options.h"
+#include "../Engine/Script.h"
 #include "../Engine/Surface.h"
 #include "../Engine/SurfaceSet.h"
 #include "../Mod/MapData.h"
@@ -101,14 +102,21 @@ const FirstPersonView::ItemModel &FirstPersonView::itemModel(BattleItem *item)
 		return model;
 	}
 
-	// The picture, drawn as the inventory draws it, then given volume.
+	// The picture, drawn as the inventory draws it (its recolouring scripts), whole at the
+	// frame's own place (the hand slot would centre it by the item's size and could push a
+	// picture drawn wider than the item off the frame), then given volume.
 	if (!_itemPicture)
 	{
 		_itemPicture = new Surface(32, 48, 0, 0);
 	}
 	_itemPicture->clear();
-	rules->drawHandSprite(inventorySprites, _itemPicture, item, _save, 0);
-	voxelizePicture(_itemPicture, model.faces);
+	if (const Surface *frame = item->getBigSprite(inventorySprites, _save, 0))
+	{
+		ScriptWorkerBlit worker;
+		BattleItem::ScriptFill(&worker, item, _save, BODYPART_ITEM_INVENTORY, 0, 0);
+		worker.executeBlit(frame, _itemPicture, 0, 0, 0);
+	}
+	voxelizePicture(_itemPicture, model.faces, pictureIsPlate(_game->getMod()->getFirstPerson(), item->getRules(), _itemPicture));
 
 	// The middle of its opaque pixels: the point that flies along the game's path.
 	int minX = INT_MAX, maxX = -1, minY = INT_MAX, maxY = -1;
@@ -656,9 +664,10 @@ void FirstPersonView::spawnTrailSegment(const float from[3], const float to[3])
 
 /**
  * Draws a line in the world (a laser beam, a shot's streak), depth-tested, faded by dithering;
- * it glows (its pixels feed the bloom). It's a set number of pixels thick, or, given a width in
- * the world, as thick as that width looks at each point of it (thicker up close, at least a
- * pixel, at most the set number).
+ * it glows (its pixels feed the bloom), or with glows off (a hitbox's outline, the path of a
+ * throw: setting "Glowing outlines") it's a plain line. It's a set number of pixels thick, or,
+ * given a width in the world, as thick as that width looks at each point of it (thicker up
+ * close, at least a pixel, at most the set number).
  * @param from, to The line's ends, in voxels.
  * @param color Its palette colour.
  * @param thickness How thick it is on the screen, in pixels (with a width in the world: at most).
@@ -666,8 +675,9 @@ void FirstPersonView::spawnTrailSegment(const float from[3], const float to[3])
  * @param worldWidth Its width in the world, in voxels (0: none, the set thickness all along).
  * @param bandTop, bandBottom Only the screen rows from bandTop up to (not including) bandBottom
  *        are drawn (a band of the view, see replayDrawList): the same pixels as drawn whole.
+ * @param glows Whether its pixels shine (feed the bloom).
  */
-void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, float worldWidth, int bandTop, int bandBottom)
+void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, float worldWidth, int bandTop, int bandBottom, bool glows)
 {
 	const int width = getWidth(), height = getHeight();
 	const double focalLength = (width / 2.0) / _halfFovTangent; // in pixels
@@ -711,7 +721,7 @@ void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 c
 					|| depth >= _depthBuffer[pixelY * width + pixelX] + 1.0f) continue;
 				if (opacity < 1.0f && dither(pixelX, pixelY) >= opacity) continue;
 				*getRaw(pixelX, pixelY) = color;
-				_glowMask[pixelY * width + pixelX] = 1;
+				_glowMask[pixelY * width + pixelX] = glows ? 1 : 0;
 			}
 		}
 	}
@@ -756,11 +766,136 @@ float FirstPersonView::shotCalibre(const RuleItem *weapon, const RuleItem *ammo)
 	return std::clamp(build * std::sqrt(std::max(1, round->getPower()) / riflePower), 0.5f, 2.0f);
 }
 
+namespace
+{
+
+/**
+ * Which skills a weapon's shots are aimed with (its accuracy multiplier): does the firing skill
+ * count, the throwing skill, any other? The original games' default (not set by a mod): firing.
+ * @param weapon The weapon.
+ * @param firing Gets whether the firing skill counts.
+ * @param throwing Gets whether the throwing skill counts.
+ * @param other Gets whether any other stat counts (melee, strength, reactions...).
+ */
+void aimingSkills(const RuleItem *weapon, bool &firing, bool &throwing, bool &other)
+{
+	const RuleStatBonus *accuracy = weapon->getAccuracyMultiplierRaw();
+	firing = !accuracy || !accuracy->isModded();
+	throwing = other = false;
+	if (firing)
+	{
+		return;
+	}
+	for (const auto &bonus : *accuracy->getBonusRaw())
+	{
+		const bool counts = std::any_of(bonus.second.begin(), bonus.second.end(), [](float coefficient) { return coefficient != 0.0f; });
+		if (bonus.first == "firing") firing = firing || counts;
+		else if (bonus.first == "throwing") throwing = throwing || counts;
+		else other = other || counts;
+	}
+}
+
+} // namespace
+
+/**
+ * Is a weapon launched by hand, no powder in it: a bow, a blowpipe, javelins, a whip's lash? The
+ * big mods aim those with the throwing skill and none of the firing skill (the weapon's accuracy
+ * multiplier), and the original games' guns all use firing. (Crossbows and the like aim with
+ * firing: see flyingShot.)
+ * @param weapon The weapon (null: no).
+ * @return True if its shots are aimed with the throwing skill and not the firing skill.
+ */
+bool FirstPersonView::handLaunched(const RuleItem *weapon)
+{
+	if (!weapon)
+	{
+		return false;
+	}
+	bool firing, throwing, other;
+	aimingSkills(weapon, firing, throwing, other);
+	return throwing && !firing;
+}
+
+/**
+ * Does a shot fly as an object, with no powder in it (an arrow, a dart, a bolt, a javelin)? It
+ * has no muzzle flash, lights nothing up and barely kicks; and it flies as a white streak
+ * (TRAIL_FLYING) unless what it carries has a look of its own (a burning arrow: see trailFor).
+ * The item table (`firstPerson: items:`, shot: object or powder) decides first, the weapon's
+ * entry, then the ammo's. Otherwise it's a shot from a weapon launched by hand (see
+ * handLaunched), or one whose projectile picture (the ammo's, else the weapon's, as the game
+ * picks it) the mod drew for those: a mod draws an arrow once, so a crossbow firing the bows'
+ * arrow fires an arrow too. A picture counts when more of the weapons firing it are aimed by
+ * throwing alone than by the firing skill (the big mods reuse their pictures widely: a whip's
+ * lash, a firecracker and a rifle's round may share one, while the bows' arrow is fired mostly
+ * by bows).
+ * @param ammo The ammo fired (null if unknown).
+ * @param weapon The weapon that fired it (null if unknown).
+ * @return True for an object flying.
+ */
+bool FirstPersonView::flyingShot(const RuleItem *ammo, const RuleItem *weapon)
+{
+	// The item table first: the weapon's entry, then the ammo's.
+	const RuleFirstPerson &table = _game->getMod()->getFirstPerson();
+	for (const RuleItem *item : { weapon, ammo })
+	{
+		const RuleFirstPerson::ItemLook *look = item ? table.getItemLook(item->getType()) : nullptr;
+		if (look && look->shot != RuleFirstPerson::SHOT_AUTO) return look->shot == RuleFirstPerson::SHOT_OBJECT;
+	}
+	if (handLaunched(weapon))
+	{
+		return true;
+	}
+	// The pictures drawn for objects, found once: each picture's ranged weapons (by the pictures
+	// of the rounds they fire) counted, those aimed by throwing alone against those aimed with
+	// the firing skill.
+	if (!_flyingSpritesFound)
+	{
+		_flyingSpritesFound = true;
+		std::map<int, int> thrownVotes, firedVotes;
+		const Mod *mod = _game->getMod();
+		for (const std::string &type : mod->getItemsList())
+		{
+			const RuleItem *rules = mod->getItem(type);
+			if (!rules || rules->getBattleType() != BT_FIREARM) continue;
+			if (rules->getCostAimed().Time <= 0 && rules->getCostSnap().Time <= 0 && rules->getCostAuto().Time <= 0) continue; // no shots (a melee weapon on ammo)
+			bool firing, throwing, other;
+			aimingSkills(rules, firing, throwing, other);
+			std::set<int> sprites;
+			const std::vector<const RuleItem*> *ammoTypes = rules->getPrimaryCompatibleAmmo();
+			if (!ammoTypes || ammoTypes->empty())
+			{
+				sprites.insert(rules->getBulletSprite()); // it fires itself
+			}
+			else
+			{
+				for (const RuleItem *ammoType : *ammoTypes)
+				{
+					sprites.insert(ammoType->getBulletSprite() != Mod::NO_SURFACE ? ammoType->getBulletSprite() : rules->getBulletSprite());
+				}
+			}
+			for (int sprite : sprites)
+			{
+				if (sprite == Mod::NO_SURFACE) continue;
+				if (firing) ++firedVotes[sprite];
+				else if (throwing && !other) ++thrownVotes[sprite];
+			}
+		}
+		for (const auto &[sprite, votes] : thrownVotes)
+		{
+			if (votes > firedVotes[sprite]) _flyingSprites.insert(sprite);
+		}
+	}
+	const int sprite = ammo && ammo->getBulletSprite() != Mod::NO_SURFACE ? ammo->getBulletSprite() : weapon ? weapon->getBulletSprite() : Mod::NO_SURFACE;
+	return sprite != Mod::NO_SURFACE && _flyingSprites.count(sprite) > 0;
+}
+
 /**
  * How a shot looks in flight, from its ammo's damage type: the kind of trail and its colour.
  * Incendiary: embers; high explosive: smoke; laser: a red beam; plasma: a green blob; stun:
  * pale blue sparkles; acid: yellow-green droplets; anything else (bullets and the like): no
- * trail, a spark-coloured dot. Under the sea lasers are a pale blue, plasma a pale cyan, and
+ * trail, a spark-coloured dot. An object flying (an arrow, a dart, see flyingShot) that would
+ * look like a bullet or a rocket: a white streak (one carrying fire, acid, a shock keeps that
+ * look: a burning arrow trails embers). Under the sea lasers are a pale blue, plasma a pale cyan, and
  * darts, harpoons and shells the vivid yellow of the original game's (pale ones would melt into
  * the sand).
  * The colours are the nearest the current palette has. And how big it is (see shotCalibre).
@@ -770,7 +905,7 @@ float FirstPersonView::shotCalibre(const RuleItem *weapon, const RuleItem *ammo)
  * @param color Gets its palette colour.
  * @param calibre Gets how big it's drawn.
  */
-void FirstPersonView::trailFor(const BattleItem *ammo, const BattleItem *weapon, Trail &trail, Uint8 &color, float &calibre) const
+void FirstPersonView::trailFor(const BattleItem *ammo, const BattleItem *weapon, Trail &trail, Uint8 &color, float &calibre)
 {
 	const RuleDamageType *damage = ammo ? ammo->getRules()->getDamageType() : nullptr;
 	// The palette colour nearest to a red, green, blue colour (getPalette only reads, but it
@@ -785,6 +920,7 @@ void FirstPersonView::trailFor(const BattleItem *ammo, const BattleItem *weapon,
 		}
 		return (Uint8)best;
 	};
+	calibre = shotCalibre(weapon ? weapon->getRules() : nullptr, ammo ? ammo->getRules() : nullptr);
 	switch (damage ? damage->ResistType : DT_NONE)
 	{
 	case DT_IN: trail = TRAIL_FIRE; color = _colors.fire[1]; break;
@@ -795,7 +931,13 @@ void FirstPersonView::trailFor(const BattleItem *ammo, const BattleItem *weapon,
 	case DT_ACID: trail = TRAIL_ACID; color = nearest(190, 255, 60); break;
 	default: trail = TRAIL_NONE; color = _colors.underwater ? nearest(244, 240, 20) : _colors.spark; break;
 	}
-	calibre = shotCalibre(weapon ? weapon->getRules() : nullptr, ammo ? ammo->getRules() : nullptr);
+	// An object flying (an arrow, a bolt: see flyingShot) that would look like a bullet or a
+	// rocket: a white streak.
+	if ((trail == TRAIL_NONE || trail == TRAIL_SMOKE) && flyingShot(ammo ? ammo->getRules() : nullptr, weapon ? weapon->getRules() : nullptr))
+	{
+		trail = TRAIL_FLYING;
+		color = nearest(245, 245, 245);
+	}
 }
 
 /**
@@ -839,9 +981,12 @@ void FirstPersonView::spawnShotImpact(const float shotEnd[3], const float from[3
 	const Uint8 sparkColors[3] = { _colors.spark, _colors.fire[1], _colors.fire[0] };
 	const Uint8 chunkColors[2] = { debrisColor, shadeColor(debrisColor, 2) };
 	const Uint8 dustColors[2] = { _colors.dust, _colors.smoke };
-	// Sparks, flying fast and falling, gone within half a second. (The arguments of burst are
-	// explained at spawnDebris.)
-	_particles.burst(head, 14, P::GLOW, P::EFFECT, sparkColors, 3, 30, 90, 0.4f, 160, 1.0f, 0.2f, 0.5f, 2);
+	// Sparks, flying fast and falling, gone within half a second (not from an object flying, an
+	// arrow or a dart: it strikes no sparks). (The arguments of burst are explained at spawnDebris.)
+	if (trail != TRAIL_FLYING)
+	{
+		_particles.burst(head, 14, P::GLOW, P::EFFECT, sparkColors, 3, 30, 90, 0.4f, 160, 1.0f, 0.2f, 0.5f, 2);
+	}
 	// Chunks of what was hit, thrown up and falling back within a second.
 	_particles.burst(head, 8, P::LIT, P::EFFECT, chunkColors, 2, 20, 60, 0.6f, 220, 0.5f, 0.6f, 1.1f, 2);
 	// A puff of dust, slowly rising, for a second or so.
@@ -855,8 +1000,9 @@ void FirstPersonView::spawnShotImpact(const float shotEnd[3], const float from[3
  * Draws the head of a shot in flight and the streak it leaves behind it, as the original game
  * drew a round with a short trail: a dot and a spark-coloured streak for bullets, a glowing blob
  * for plasma, a flame for rockets and their exhaust; any shot with a trail glows (feeds the
- * bloom), and so do the streaks. Both are as big as the shot's calibre (see shotCalibre): a pistol's round the
- * smallest, then a rifle's, an auto-cannon's, a heavy weapon's. The streak runs back along the
+ * bloom), and so do the streaks. An object flying (an arrow, a dart: TRAIL_FLYING) is only a
+ * thin white streak, longer, with no dot. Both are as big as the shot's calibre (see
+ * shotCalibre): a pistol's round the smallest, then a rifle's, an auto-cannon's, a heavy weapon's. The streak runs back along the
  * path, never further back than where the shot started, solid for its first half and fading for
  * the rest. The dot isn't drawn right in front of the eye (less than 6 voxels away), where it
  * would be a blob of huge pixels.
@@ -878,6 +1024,7 @@ void FirstPersonView::drawShotDot(const float head[3], const float origin[3], Tr
 	{
 	case TRAIL_SMOKE: rim = _colors.fire[2]; middle = _colors.fire[1]; centre = _colors.fire[0]; streakFront = _colors.fire[1]; streakBack = _colors.fire[2]; break;
 	case TRAIL_FIRE: rim = _colors.fire[2]; middle = _colors.fire[1]; centre = _colors.fire[0]; streakFront = _colors.fire[2]; streakBack = _colors.fire[3]; break;
+	case TRAIL_FLYING: streakBack = shadeColor(color, 3); break;
 	default: break;
 	}
 
@@ -885,7 +1032,7 @@ void FirstPersonView::drawShotDot(const float head[3], const float origin[3], Tr
 	// calibre, at most as long as the shot has flown; at most 1 + 1.5 x calibre pixels thick.
 	const float back[3] = { origin[0] - head[0], origin[1] - head[1], origin[2] - head[2] };
 	const float flown = std::sqrt(back[0] * back[0] + back[1] * back[1] + back[2] * back[2]);
-	const float streakLength = std::min(flown, (trail == TRAIL_NONE ? 10.0f : trail == TRAIL_SMOKE ? 9.0f : trail == TRAIL_PLASMA ? 7.0f : 6.0f) * calibre);
+	const float streakLength = std::min(flown, (trail == TRAIL_FLYING ? 14.0f : trail == TRAIL_NONE ? 10.0f : trail == TRAIL_SMOKE ? 9.0f : trail == TRAIL_PLASMA ? 7.0f : 6.0f) * calibre);
 	if (streakLength > 1.0f)
 	{
 		float halfway[3], tail[3];
@@ -894,14 +1041,19 @@ void FirstPersonView::drawShotDot(const float head[3], const float origin[3], Tr
 			halfway[axis] = head[axis] + back[axis] / flown * streakLength * 0.5f;
 			tail[axis] = head[axis] + back[axis] / flown * streakLength;
 		}
-		const float streakWidth = (trail == TRAIL_PLASMA ? 1.6f : trail == TRAIL_SMOKE ? 1.0f : 0.6f) * calibre;
+		const float streakWidth = (trail == TRAIL_PLASMA ? 1.6f : trail == TRAIL_SMOKE ? 1.0f : trail == TRAIL_FLYING ? 0.35f : 0.6f) * calibre;
 		const int widest = 1 + (int)std::lround(calibre * 1.5f);
 		drawLine3D(head, halfway, streakFront, widest, 1.0f, streakWidth);
 		drawLine3D(halfway, tail, streakBack, widest, 0.6f, streakWidth * 0.7f);
 	}
 
 	// The dot: where the head is on the screen, its size in the world (voxels) by the kind of
-	// shot and its calibre, and on the screen a radius in pixels, 1..12.
+	// shot and its calibre, and on the screen a radius in pixels, 1..12. (None for an object
+	// flying: the streak is all of it.)
+	if (trail == TRAIL_FLYING)
+	{
+		return;
+	}
 	const double world[3] = { head[0], head[1], head[2] };
 	double screenX, screenY, depth;
 	if (!projectToScreen(world, screenX, screenY, depth) || depth < 6.0)
@@ -994,12 +1146,16 @@ void FirstPersonView::spawnPartnerEffects()
 			trailFor(partner->getAmmo(), partner->getWeapon(), _partnerTrail, _partnerColor, _partnerCalibre);
 			_partnerShotTick = SDL_GetTicks();
 			_partnerShotAmmo = partner->getAmmo() ? partner->getAmmo()->getRules() : nullptr;
-			std::copy(origin, origin + 3, _muzzleFlashPos); // the flash lights up the room
-			_muzzleFlashTick = _partnerShotTick;
 			const float power = partner->getAmmo() ? (float)partner->getAmmo()->getRules()->getPower() : 30.0f;
+			const bool flying = flyingShot(_partnerShotAmmo, partner->getWeapon() ? partner->getWeapon()->getRules() : nullptr);
+			if (!flying) // (an object flying has no flash, and barely kicks)
+			{
+				std::copy(origin, origin + 3, _muzzleFlashPos); // the flash lights up the room
+				_muzzleFlashTick = _partnerShotTick;
+			}
 			if (_particlesOn)
 			{
-				_recoilKick = std::min(_recoilKick + std::clamp(power / 30.0f, 0.5f, 2.5f), 6.0f);
+				_recoilKick = std::min(_recoilKick + std::clamp(power / 30.0f, 0.5f, 2.5f) * (flying ? 0.3f : 1.0f), 6.0f);
 			}
 		}
 		_lastPartnerShot = partner;
@@ -1099,7 +1255,7 @@ void FirstPersonView::drawTrajectory()
 		if (inDash && (!dashHere || point + 1 == _trajectory.size()))
 		{
 			const float opacity = 1.0f - 0.4f * std::min(1.0f, travelled / totalLength);
-			drawLine3D(dashStart, dashHere ? current : previous, color, 2, opacity);
+			drawLine3D(dashStart, dashHere ? current : previous, color, 2, opacity, 0.0f, 0, 1 << 30, Options::fpsGlowingOutlines);
 		}
 		inDash = dashHere;
 		std::copy(current, current + 3, previous);
@@ -1111,7 +1267,7 @@ void FirstPersonView::drawTrajectory()
 	const float corners[4][3] = { { end[0] + 6.0f, end[1], end[2] }, { end[0], end[1] + 6.0f, end[2] }, { end[0] - 6.0f, end[1], end[2] }, { end[0], end[1] - 6.0f, end[2] } };
 	for (int side = 0; side < 4; ++side)
 	{
-		drawLine3D(corners[side], corners[(side + 1) % 4], color, 2, 1.0f);
+		drawLine3D(corners[side], corners[(side + 1) % 4], color, 2, 1.0f, 0.0f, 0, 1 << 30, Options::fpsGlowingOutlines);
 	}
 }
 
@@ -1258,16 +1414,20 @@ void FirstPersonView::beginShot(Projectile *projectile)
 	}
 	if (!_lastProjectileThrown)
 	{
-		// The flash lights up the room for a moment.
-		std::copy(origin, origin + 3, _muzzleFlashPos);
-		_muzzleFlashTick = SDL_GetTicks();
+		// The flash lights up the room for a moment (an object flying, such as an arrow, has none).
+		const bool flying = flyingShot(ammo ? ammo->getRules() : nullptr, projectile->getWeapon() ? projectile->getWeapon()->getRules() : nullptr);
+		if (!flying)
+		{
+			std::copy(origin, origin + 3, _muzzleFlashPos);
+			_muzzleFlashTick = SDL_GetTicks();
+		}
 		// Our own shot kicks the view: hard for guns, by their power (0.8 to 3.5 degrees);
-		// plasma less, lasers barely; adding up to at most 6 degrees. The camera shakes a
+		// plasma less, lasers and objects flying (a bow's arrow) barely; adding up to at most 6 degrees. The camera shakes a
 		// little too.
 		if (ownShot)
 		{
 			const float power = ammo ? (float)ammo->getRules()->getPower() : 30.0f;
-			const float weight = _shotTrail == TRAIL_BEAM ? 0.35f : _shotTrail == TRAIL_PLASMA ? 0.7f : 1.0f;
+			const float weight = _shotTrail == TRAIL_BEAM ? 0.35f : flying ? 0.3f : _shotTrail == TRAIL_PLASMA ? 0.7f : 1.0f;
 			_recoilKick = std::min(_recoilKick + std::clamp(power / 22.0f, 0.8f, 3.5f) * weight, 6.0f);
 			addShake(0.25f + 0.1f * weight);
 		}

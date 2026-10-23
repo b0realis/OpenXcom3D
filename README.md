@@ -25,14 +25,21 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 
 ## New in 1.03
 
-Another report from a player (thank you!), on 1.02:
+Another report from a player (thank you!), on 1.02, and a first look at **XPiratez**:
 
 - **The aliens' turn on the map:** with *Alien turn in 3D* off, the *Aliens' turn cameras* setting used to do nothing. Now the helmet camera cards pop up over the isometric map: a soldier shot at, hit, mind controlled or going down, a soldier firing back, and the one who sees the alien moving. Watching a death from a teammate's helmet is quite something.
 - **Corpses through floors:** a body lying on the floor above no longer hangs down through the ceiling, and one on a shelf right under a floor no longer pokes up into the room above.
 - **Sprint:** **Caps Lock** switches it on and off. Your soldier runs by the game's own running rules (fewer time units, more energy), at a faster pace; **SPRINT** shows under the compass.
 - **En passant:** the **`** key. Enemies coming into sight no longer stop the walk, as Shift does on the map; **EN PASSANT** shows under the compass. (The name is the player's "French move".)
-
-1.03 is in the source for now: `python3 install.py --from-source` builds it. The downloads on the Releases page are still 1.02.
+- **Ladders and lifts:** **W** and **S** climb a ladder or ride a lift by where you look, a soldier who can fly no longer floats off the top of a ladder with flight off, and ladders and lift pads that have no shape in the game's data show as see-through ghosts (setting *Parts without shape*).
+- **Helmet cameras** now and then show a bad digital signal: a few blocks, a green square, a short freeze. On the hardest missions (Mars, an alien base, a base defence, and in TFTD the colonies, T'leth and the artefact sites) and inside any UFO they lose it again and again, and the picture tears. Elsewhere, never much.
+- **Priming in one click:** PRIME opens the timer at once, and a psi-amp or a mind probe aims straight away.
+- **Glow:** white next to a glowing outline no longer turns black, and hitbox outlines glow only with *Glowing outlines*.
+- **Straight up and down:** you can look all the way up and down, and an alien right overhead shows and can be aimed at.
+- **Doors** the open key turns back no longer fold into their wall, a failed close-quarters check turns your view to where the shot went (no turning back at a cost), and UFOs keep their floor under their curved hull (no more grass inside).
+- **The squad on the wheel:** with the cursor free (**C**), the mouse wheel over the squad bar steps the soldier card, or the soldier cam, from one soldier to the next.
+- **Two small ones from the report:** the trajectory shown for a shot now moves with a lean, as the shot does, and with *Unit size* under 100% corpses and items shrink too, so a soldier going down no longer swells into a bigger corpse.
+- **XPiratez:** swords strike edge first and are flat blades, every weapon's picture is measured whole, and arrows, bolts and javelins fly as white streaks with no muzzle flash. An **item table** in our mod's rules sets an item's look by hand wherever the automatic rules get it wrong.
 
 ## New in 1.02
 
@@ -100,7 +107,7 @@ All changes on top of it are in one file, [`openxcom3d.patch`](openxcom3d.patch)
 
 You need your own copy of the original game data (*UFO: Enemy Unknown / X-COM: UFO Defense* and/or *X-COM: Terror From The Deep*, e.g. from Steam or GOG). Nothing of it is included here.
 
-- **Linux (x86-64): download and play.** From the [Releases](../../releases) page (still 1.02; 1.03 builds from source for now) take either:
+- **Linux (x86-64): download and play.** From the [Releases](../../releases) page take either:
   - the **AppImage**: one file. Make it executable (`chmod +x`, or *Properties → Permissions*) and run it;
   - or the **archive**: unpack it anywhere and run `./play.sh`.
 

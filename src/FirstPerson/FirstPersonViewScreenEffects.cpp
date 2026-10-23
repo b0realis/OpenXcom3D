@@ -54,7 +54,10 @@
 #include <algorithm>
 #include <cmath>
 #include <SDL.h>
+#include "../Engine/Options.h"
 #include "../Savegame/BattleUnit.h"
+#include "../Savegame/SavedBattleGame.h"
+#include "../Savegame/Tile.h"
 #include "FirstPersonViewShared.h"
 
 namespace OpenXcom
@@ -458,6 +461,159 @@ void FirstPersonView::washBands()
 				{
 					const float distanceShare = std::sqrt((x - centerX) * (x - centerX) + (y - centerY) * (y - centerY)) / cornerDistance;
 					if (smoothstep(0.55f, 1.0f, distanceShare) * _vignette > dither(x + 3, y + 1)) row[x] = _colors.redTint[row[x]];
+				}
+			}
+		}
+	}
+}
+
+/**
+ * A helmet camera's digital feed with a bad signal (see setSignalGlitches), moved on by a frame:
+ * now and then, for a moment, a glitch. Most often a few patches of the picture fall into coarse
+ * blocks (sometimes with a square or two of the decoder's green), less often only green squares,
+ * least often the picture freezes. Each lasts a fifth of a second or so (a freeze up to half a
+ * second), the next comes some seconds later: enough to tell a camera's feed, never enough to
+ * get in the way. On the hardest missions (level 2, see RuleFirstPerson::getSignalLevel: Mars,
+ * the aliens' bases, a base defence), and on any mission while the soldier watched stands inside
+ * a UFO, the signal is bad: a glitch every second or two, half as long again, in more and bigger
+ * patches, and now and then torn (bands of the picture slid sideways). Never with Muzzle flashes off (the setting for those bothered by flashing
+ * light). A camera shown again after a pause starts afresh: no glitch for a few seconds, and a
+ * freeze never holds an old picture (it also ends when the camera moves to another soldier).
+ * Called at the start of every draw.
+ * @return True while the picture is frozen (draw then keeps the last one).
+ */
+bool FirstPersonView::updateSignalGlitches()
+{
+	const Uint32 now = SDL_GetTicks();
+	auto random = [this](int low, int high)
+	{
+		_glitchSeed = _glitchSeed * 1664525u + 1013904223u;
+		return low + (int)((_glitchSeed >> 8) % (Uint32)(high - low + 1));
+	};
+	const bool shownLately = _lastDrawTick && now - _lastDrawTick < 250;
+	_lastDrawTick = now;
+	// A bad signal (level 2, the hardest missions; or the soldier watched stands inside a UFO,
+	// amid its machinery) glitches every second or two, longer and in more and bigger patches;
+	// the usual one every few seconds, briefly.
+	const Tile *watchedTile = _cameraUnit ? _cameraUnit->getTile() : nullptr;
+	const int watchedIndex = watchedTile ? _save->getTileIndex(watchedTile->getPosition()) : -1;
+	const bool insideUfo = watchedIndex >= 0 && watchedIndex < (int)_ufoPhaseOfTile.size() && (_ufoPhaseOfTile[watchedIndex] & UfoTileBit);
+	const bool bad = _signalGlitches >= 2 || (_signalGlitches == 1 && insideUfo);
+	if (!Options::fpsMuzzleFlash || !shownLately)
+	{
+		_glitchKind = GLITCH_NONE;
+		_glitchNextAt = now + (bad ? random(500, 1500) : random(2000, 6000));
+		return false;
+	}
+
+	// The glitch going on ends in its time (a freeze also when the camera moves on).
+	if (_glitchKind != GLITCH_NONE && (now >= _glitchUntil || (_glitchKind == GLITCH_FREEZE && _cameraUnit != _glitchFrozenUnit)))
+	{
+		_glitchKind = GLITCH_NONE;
+	}
+
+	// The next one: which, how long, and the one after it.
+	if (_glitchKind == GLITCH_NONE && now >= _glitchNextAt)
+	{
+		// Which: blocks, green squares or a freeze; a bad signal also tears.
+		const int roll = random(0, 99);
+		if (bad) _glitchKind = roll < 40 ? GLITCH_BLOCKS : roll < 60 ? GLITCH_GREEN : roll < 85 ? GLITCH_TEAR : GLITCH_FREEZE;
+		else _glitchKind = roll < 55 ? GLITCH_BLOCKS : roll < 80 ? GLITCH_GREEN : GLITCH_FREEZE;
+		const int length = _glitchKind == GLITCH_BLOCKS ? random(120, 360) : _glitchKind == GLITCH_GREEN ? random(60, 200) : _glitchKind == GLITCH_TEAR ? random(80, 220) : random(200, 550);
+		_glitchUntil = now + (bad ? length * 3 / 2 : length);
+		_glitchNextAt = _glitchUntil + (bad ? random(600, 2500) : random(3500, 9000));
+		_glitchFrozenUnit = _cameraUnit;
+		// Its patches, in blocks: one to three small rectangles of coarse blocks (a third of the
+		// time with a green square), or one to four green squares in a row or two. A bad signal:
+		// two to five bigger rectangles with a green square, or up to three groups of squares.
+		_glitchPatches.clear();
+		const int blocksAcross = std::max(1, getWidth() / glitchBlock()), blocksDown = std::max(1, getHeight() / glitchBlock());
+		if (_glitchKind == GLITCH_BLOCKS)
+		{
+			for (int patch = bad ? random(2, 5) : random(1, 3); patch > 0; --patch)
+			{
+				const int width = std::min(blocksAcross, bad ? random(3, 9) : random(2, 6)), height = std::min(blocksDown, bad ? random(1, 4) : random(1, 3));
+				_glitchPatches.push_back({ random(0, blocksAcross - width), random(0, blocksDown - height), width, height, false });
+			}
+			if (bad || random(0, 2) == 0)
+			{
+				_glitchPatches.push_back({ random(0, blocksAcross - 1), random(0, blocksDown - 1), 1, 1, true });
+			}
+		}
+		else if (_glitchKind == GLITCH_TEAR)
+		{
+			// One to three bands across the picture, a twelfth to a quarter of its height each,
+			// slid a tenth to a quarter of its width to either side.
+			const int viewWidth = getWidth(), viewHeight = getHeight();
+			for (int band = random(1, 3); band > 0; --band)
+			{
+				const int rows = random(std::max(1, viewHeight / 12), std::max(1, viewHeight / 4));
+				const int slide = random(std::max(1, viewWidth / 10), std::max(1, viewWidth / 4)) * (random(0, 1) ? 1 : -1);
+				_glitchPatches.push_back({ slide, random(0, std::max(0, viewHeight - rows)), 0, rows, false });
+			}
+		}
+		else if (_glitchKind == GLITCH_GREEN)
+		{
+			for (int group = bad ? random(1, 3) : 1; group > 0; --group)
+			{
+				const int width = std::min(blocksAcross, random(1, 4)), height = std::min(blocksDown, random(1, 2));
+				_glitchPatches.push_back({ random(0, blocksAcross - width), random(0, blocksDown - height), width, height, true });
+			}
+		}
+	}
+	return _glitchKind == GLITCH_FREEZE;
+}
+
+/**
+ * Draws the bad signal's glitch going on (see updateSignalGlitches) over the finished picture:
+ * each block of its patches one flat colour, the pixel in its middle (every other block the one
+ * a block to its left, smeared on as a broken motion vector leaves it), or the decoder's green,
+ * bright and dark by turns; or a tear, bands of the picture slid sideways. Called from draw
+ * after the screen wash.
+ */
+void FirstPersonView::applySignalGlitches()
+{
+	const int block = glitchBlock(), viewWidth = getWidth(), viewHeight = getHeight();
+	// A tear: each band's rows slid sideways, what slides off one side coming in at the other,
+	// and its top edge a bright seam (each pixel three shades brighter in its colour group,
+	// stopping at the group's brightest; group 0's is index 1, index 0 being empty black).
+	if (_glitchKind == GLITCH_TEAR)
+	{
+		for (const GlitchPatch &band : _glitchPatches)
+		{
+			const int slide = ((band.x % viewWidth) + viewWidth) % viewWidth;
+			for (int y = band.y; y < std::min(viewHeight, band.y + band.height); ++y)
+			{
+				Uint8 *row = getRaw(0, y);
+				std::rotate(row, row + (viewWidth - slide) % viewWidth, row + viewWidth);
+				if (y != band.y) continue;
+				for (int x = 0; x < viewWidth; ++x)
+				{
+					const int brightest = (row[x] & 0xF0) == 0 ? 1 : 0;
+					row[x] = (Uint8)((row[x] & 0xF0) | std::max(brightest, (row[x] & 15) - 3));
+				}
+			}
+		}
+		return;
+	}
+	if (_glitchKind != GLITCH_BLOCKS && _glitchKind != GLITCH_GREEN)
+	{
+		return;
+	}
+	for (const GlitchPatch &patch : _glitchPatches)
+	{
+		for (int blockY = patch.y; blockY < patch.y + patch.height; ++blockY)
+		{
+			for (int blockX = patch.x; blockX < patch.x + patch.width; ++blockX)
+			{
+				const int left = blockX * block, top = blockY * block;
+				if (left >= viewWidth || top >= viewHeight) continue;
+				const int sampleX = std::clamp(left + block / 2 - ((blockX & 1) ? block : 0), 0, viewWidth - 1);
+				const int sampleY = std::min(viewHeight - 1, top + block / 2);
+				const Uint8 fill = patch.green ? _colors.glitchGreen[(blockX + blockY) & 1] : *getRaw(sampleX, sampleY);
+				for (int y = top; y < std::min(viewHeight, top + block); ++y)
+				{
+					std::fill(getRaw(left, y), getRaw(left, y) + (std::min(viewWidth, left + block) - left), fill);
 				}
 			}
 		}

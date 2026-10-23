@@ -304,6 +304,10 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMuzzleFlash", &fpsMuzzleFlash, true, "STR_FPS_MUZZLE_FLASH", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsParticles", &fpsParticles, 2, "STR_FPS_PARTICLES", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsUfoLights", &fpsUfoLights, true, "STR_FPS_UFO_LIGHTS", category));
+	// Parts the map draws but gives no shape (no voxels: ladders, lifts' pads, walls of laser
+	// beams), shown as see-through ghosts of their art: 0 none, 1 lifts and ladders (the parts
+	// with the grav lift flag), 2 all of them.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsGhostParts", &fpsGhostParts, 1, "STR_FPS_GHOST_PARTS", category));
 	// The map's edge as small red dots on the floor, nothing beyond it, instead of the tape.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDiscreetEdge", &fpsDiscreetEdge, false, "STR_FPS_DISCREET_EDGE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 0, "STR_FPS_PIXEL_SIZE", category));
@@ -321,6 +325,8 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsConfirmFire", &fpsConfirmFire, false, "STR_FPS_CONFIRM_FIRE", category));
 	// The units' hitboxes, outlined: off (0), fading in and out once a second (1), always (2).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitboxes", &fpsHitboxes, 0, "STR_FPS_HITBOXES", category));
+	// The hitboxes' outlines and the path of a throw glowing (spilling bloom round them), or plain lines.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsGlowingOutlines", &fpsGlowingOutlines, false, "STR_FPS_GLOWING_OUTLINES", category));
 	// Icons over the downed (unconscious) units in sight, for burning, bleeding, shock and
 	// stunned: off (0), over the body under the crosshair (1), over every body in sight (2).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDownedIcons", &fpsDownedIcons, 1, "STR_FPS_DOWNED_ICONS", category));
@@ -435,6 +441,18 @@ State *createOptionsTab(OptionsOrigin origin)
 void freeAimTarget(BattlescapeState *state, const BattleAction &action, Position &target)
 {
 	FirstPersonMode::freeAim(state, action, target);
+}
+
+/**
+ * Called by the game when a close-quarters check knocks a shot aside: the 3D view looks where
+ * the shot now goes (see FirstPersonMode::followDeflectedShot).
+ * @param state The battlescape screen.
+ * @param shooter The unit whose shot was knocked aside.
+ * @param target The tile it now goes at.
+ */
+void closeQuartersDeflected(BattlescapeState *state, const BattleUnit *shooter, const Position &target)
+{
+	FirstPersonMode::deflected(state, shooter, target);
 }
 
 /**

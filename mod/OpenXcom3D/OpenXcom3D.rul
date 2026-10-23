@@ -32,6 +32,37 @@ firstPerson:
       type: dust
     - dataSet: MARS
       type: dust
+  # The helmet cameras' bad signal, by mission (alien deployment) type: 1 a glitch now and then
+  # (any mission not listed), 2 a lot (the aliens' own ground, where their machinery jams the
+  # feed), 0 none. A later entry (or a later mod's) overrides.
+  badSignal:
+    # UFO: Mars (both stages), an alien base, a base defence; TFTD: an alien colony (both
+    # stages), T'leth (all three), an artefact site (both), a base defence
+    - missions: [STR_MARS_CYDONIA_LANDING, STR_MARS_THE_FINAL_ASSAULT, STR_ALIEN_BASE_ASSAULT, STR_BASE_DEFENSE, STR_ALIEN_COLONY_P2, STR_TLETH_P1, STR_TLETH_P2, STR_TLETH_P3, STR_ARTIFACT_SITE_P1, STR_ARTIFACT_SITE_P2]
+      level: 2
+  # The item table: what the 3D view isn't left to work out, by item type (as the mods name
+  # them; types no loaded mod has are ignored). An item not listed, or a setting left out, is
+  # worked out from the item's rules and picture:
+  #   held: plate    a flat piece one voxel thick (worked out for a melee weapon that isn't
+  #                  blunt and whose picture is thin: swords, knives, axes)
+  #   held: cushion  rounded, thickest in the middle (worked out for everything else)
+  #   shot: object   flies as an object, with no powder: no muzzle flash, and a white streak
+  #                  unless it carries fire, acid or a shock (worked out for weapons aimed with
+  #                  the throwing skill and not the firing skill, as the big mods' bows, and for
+  #                  guns firing an arrow picture drawn mostly for those, as their crossbows)
+  #   shot: powder   a gun's round, with a muzzle flash (worked out for every other gun)
+  # A later entry (or a later mod's) overrides what it sets.
+  items:
+    # XPiratez: wide blades (too broad in their pictures to be worked out as blades)
+    - types: [STR_BUTCHER_CLEAVER, STR_BANE_BLADE, STR_AX, STR_BLOOD_AX, STR_STONE_AX, STR_AQUA_HATCHET, STR_THUNDER_SICKLE, STR_SWORD]
+      held: plate
+    # XPiratez: gloves, claws, a noose and a garland of teeth (thin, but no blades)
+    - types: [STR_FISTY, STR_CAT_PAWS, STR_GAUNTLET_CLAW, STR_BLACK_CAT, STR_NEKO_CLAWS, STR_PRED_CLAWS, STR_NOOSE, STR_SHARK_GARLAND]
+      held: cushion
+    # XPiratez: the harpoon guns, the dart pistol and the air musket (gas and air, no powder),
+    # and the crossbows
+    - types: [STR_HARPOON, STR_HARPOON_AUTO, STR_HARPOON_CARBINE, STR_DART_PISTOL, STR_AIR_MUSKET, STR_XBOW, STR_XBOW_CORAL, STR_EXECUTIONER_XBOW, STR_BALLISTA]
+      shot: object
 
 interfaces:
   - type: firstPerson

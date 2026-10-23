@@ -131,6 +131,10 @@ public:
 	static bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
 	/// A soldier panics or goes berserk, asked by the game (see FirstPerson::breakdown).
 	static bool breakdown(BattlescapeState *state, BattleUnit *unit);
+	/// A close-quarters check knocked a shot aside, told by the game (see FirstPerson::closeQuartersDeflected).
+	static void deflected(BattlescapeState *state, const BattleUnit *shooter, const Position &target);
+	/// Turns the view to where a shot knocked aside goes.
+	void followDeflectedShot(const BattleUnit *shooter, const Position &target);
 	/// Doom IDKFA: does this unit's shot spend no ammo? Asked by the game (see FirstPerson::endlessAmmo).
 	static bool endlessAmmo(BattlescapeState *state, const BattleUnit *unit);
 	/// Doom IDDQD: does this unit take no damage? Asked by the game (see FirstPerson::invincible).
@@ -440,9 +444,14 @@ private:
 	Text *_txtLift = nullptr, *_txtLiftKeys = nullptr; // "LIFT PLATFORM", and the keys that ride it
 	int _liftArrowHovered = 0;  // 1 over the up arrow, -1 over the down arrow
 	int _liftKeysShownFor = -1; // which arrows the keys line was written for (bit 1 up, bit 2 down)
+	Uint32 _climbRetryAt = 0;   // a climb with W the game refused (time units, say): tried again from then (SDL ticks), not every frame
 
 	/// Shows the lift arrows while the soldier stands on a grav lift.
 	void updateLift(BattleUnit *unit, Uint32 now);
+	/// Which ways a grav lift or a ladder takes the soldier from here.
+	void liftWays(BattleUnit *unit, bool &up, bool &down) const;
+	/// W and S looking up or down on a lift or a ladder: climbs; true if that took the push.
+	bool updateClimb(BattleUnit *unit, double forward);
 	/// Draws a pulsing purple lift arrow, up or down.
 	void drawLiftArrow(Surface *surface, bool up, bool hover, Uint32 now);
 	/// Which lift arrow is at this canvas point: 1 up, -1 down, 0 none.
@@ -463,7 +472,9 @@ private:
 	bool flightOn(const BattleUnit *unit) const;
 	/// Switches flight on or off.
 	void toggleFlight(BattleUnit *unit);
-	/// Goes up or down a level: by grav lift, or flying.
+	/// May a walker go up or down a level from here (a lift ride, a ladder)?
+	bool walkerMayMoveUpDown(const Position &position, int direction) const;
+	/// Goes up or down a level: by grav lift or ladder, or flying.
 	void moveUpDown(BattleUnit *unit, int direction, Action *action);
 	/// Flight each frame: its cost, and coming down after it's switched off in the air.
 	void updateFlight(BattleUnit *unit);
@@ -711,6 +722,8 @@ private:
 	bool weaponShownInHand(BattleUnit *unit, const BattleItem *weapon) const;
 	/// Measures the weapon's picture: its long axis, muzzle end and up side.
 	void analyzeWeapon(bool gun, bool melee = false);
+	/// Draws an item's inventory picture whole into a 32x48 picture (not shifted as the hand slot does).
+	void drawHeldPicture(const BattleItem *item, const SurfaceSet *inventorySprites, Surface *picture) const;
 	/// Gives the held picture (weapon or other item) volume as voxels.
 	void voxelizeWeapon();
 	/// How the muzzle flashes, by the damage the weapon's ammo does.
@@ -782,7 +795,8 @@ private:
 	Uint32 _cardNoiseSeed = 1;                          // random seed for the card's TV static
 	NumberText *_cardNumbers[4] = {};                   // the four stats
 	Bar *_cardBars[4] = {};                             // and their bars
-	int _hoveredSquadButton = -1;                       // squad button under the cursor, -1 none
+	int _hoveredSquadButton = -1;                       // squad button whose card shows: the one under the cursor (or the wheel's, see browseSquad), -1 none
+	const TextButton *_buttonUnderCursor = nullptr;     // the button the free cursor was last found over
 	int _cursorX = 0, _cursorY = 0;                     // where the free cursor is, on the canvas (and so on the view)
 	int _cardDrawnHeight = 0;                           // what the frame was drawn for
 
@@ -834,6 +848,8 @@ private:
 	void layoutTopBar();
 	/// Scrolls the squad buttons.
 	void scrollSquad(int step);
+	/// Moves the soldier card (and soldier cam) on to the next or previous soldier: the wheel over the squad bar.
+	void browseSquad(int step, double cursorX, double cursorY);
 	/// How a squad member is: ready, dead, unconscious, controlled, zombie.
 	SquadState squadState(const BattleUnit *unit) const;
 	/// Draws the icon for a fallen or turned squad member.

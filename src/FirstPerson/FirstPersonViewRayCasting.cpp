@@ -251,8 +251,10 @@ void FirstPersonView::updateColors()
 		_colors.whiteTint[0] = nearest(185, 185, 185);
 		_colors.greenTint[0] = nearest(8, 22, 4);
 		_colors.flareTint[0] = 0;
-		// Four greys, dark to light, for the TV static.
+		// Four greys, dark to light, for the TV static; two greens for a digital feed's broken blocks.
 		for (int level = 0; level < 4; ++level) _colors.grey[level] = nearest(30 + 60 * level, 30 + 60 * level, 30 + 60 * level);
+		_colors.glitchGreen[0] = nearest(40, 225, 70);
+		_colors.glitchGreen[1] = nearest(10, 130, 40);
 		// The smoke's colour: the game's own smoke, mixed (see smokeRgb).
 		smokeRgb(_smokeRgb);
 		_colors.smoke = nearest(_smokeRgb[0], _smokeRgb[1], _smokeRgb[2]);
@@ -1115,6 +1117,7 @@ void FirstPersonView::renderRows()
 			int endAxis;
 			Uint8 color;
 			SmokeTrace smoke = smokeSight;
+			rayContext.ghostThreshold = dither(blockColumn, blockRow); // ghosts show on a share of the blocks (see ghostOpacity)
 			const RayEnd rayEnd = castRay(rayContext, rayOrigin, rayDirection, hit, tEnd, endAxis, traceSmoke ? &smoke : nullptr);
 			switch (rayEnd)
 			{

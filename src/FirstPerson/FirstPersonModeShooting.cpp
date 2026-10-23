@@ -67,6 +67,7 @@
 #include "../Battlescape/Map.h"
 #include "../Battlescape/MedikitState.h"
 #include "../Battlescape/Pathfinding.h"
+#include "../Battlescape/PrimeGrenadeState.h"
 #include "../Battlescape/ProjectileFlyBState.h"
 #include "../Battlescape/ScannerState.h"
 #include "../Battlescape/TileEngine.h"
@@ -113,6 +114,46 @@ public:
 	{
 		if (!_step(SDL_GetTicks())) _parent->popState();
 	}
+};
+
+/**
+ * Holds the game's timer box (PrimeGrenadeState) when the 3D view primes a grenade, in the place
+ * of the item's action menu the box expects under it: a timer picked closes the box and the menu
+ * together (on the map, back to the battle), so here it closes the box and this; a cancelled box
+ * closes only itself, and this then closes too, as soon as it is on top again. It shows nothing
+ * of its own (the battle shows through).
+ */
+class PrimeTimerHost : public State
+{
+public:
+	/**
+	 * Makes the host for priming the current action's grenade.
+	 * @param action The game's current action, set up to prime (see FirstPersonMode::fire).
+	 */
+	explicit PrimeTimerHost(BattleAction *action) : _action(action)
+	{
+		_screen = false;
+	}
+	/**
+	 * On top: the first time, opens the timer box over itself; after that (the box cancelled),
+	 * closes.
+	 */
+	void init() override
+	{
+		State::init();
+		if (!_boxShown)
+		{
+			_boxShown = true;
+			_game->pushState(new PrimeGrenadeState(_action, false, nullptr));
+		}
+		else
+		{
+			_game->popState();
+		}
+	}
+private:
+	BattleAction *_action;  // the game's current action (priming)
+	bool _boxShown = false; // the timer box has been opened
 };
 
 /**
@@ -1032,6 +1073,7 @@ bool FirstPersonMode::timedGrenade(const BattleItem *item)
  *   a target it can't reach shows nothing (the game will say so);
  * - a straight shot: the line of fire from the game's origin to the point under the crosshair,
  *   up to whatever it meets first (calculateLineVoxel).
+ * Both start from the side of the soldier the shot will leave from (leaning, see leanSide).
  * Worked out again only when what it depends on changes. A marked target is forgotten when the
  * soldier, their place, the weapon or the mode change, or the player's turn ends.
  * @param unit The soldier being looked through (may be null).
@@ -1079,11 +1121,15 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 	targetTile.y = std::clamp<int>(targetTile.y, 0, _save->getMapSizeY() - 1);
 	targetTile.z = std::clamp<int>(targetTile.z, 0, _save->getMapSizeZ() - 1);
 
+	// The side of the soldier a shot leaves from, as fire() picks it: leaning (setting "Lean
+	// shots", or the lean keys) moves it off the middle (see leanSide).
+	const BattleActionOrigin side = (Options::fpsLeanShots || leaningOut()) && isShot(mode) ? leanSide(unit, targetTile) : BattleActionOrigin::CENTRE;
+
 	// Worked out again only when something it depends on changed (an arc depends on the
 	// target's tile only, a line on the very point).
 	const Position from = unit->getPosition();
 	const std::vector<int> key = { arcing ? 1 : 2, targetTile.x, targetTile.y, targetTile.z, arcing ? 0 : targetVoxel.x, arcing ? 0 : targetVoxel.y,
-		arcing ? 0 : targetVoxel.z, from.x, from.y, from.z, unit->getDirection(), unit->isKneeled() ? 1 : 0, weapon->getId(), (int)mode };
+		arcing ? 0 : targetVoxel.z, from.x, from.y, from.z, unit->getDirection(), unit->isKneeled() ? 1 : 0, weapon->getId(), (int)mode, (int)side };
 	if (key == _trajectoryKey)
 	{
 		return;
@@ -1097,6 +1143,7 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 	preview.weapon = weapon;
 	preview.type = mode;
 	preview.target = targetTile;
+	preview.relativeOrigin = side;
 	std::vector<Position> path;
 	if (arcing)
 	{
@@ -1161,7 +1208,9 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
  * - Shots and throws target the tile under the pixel (or its exact voxel, see below).
  * - A guided launcher and psi on a creature out of sight are aimed on the isometric map.
  * - Melee hits whatever is in front of the soldier.
- * - Medi-kits, scanners and priming open the item's usual action menu.
+ * - Medi-kits and scanners are used at once; priming opens the game's timer box straight away
+ *   (the fire mode already says what the item's action menu would ask again); a psi amp's or a
+ *   mind probe's use targets as psi does.
  * @param pixelX Pixel column in the 3D view.
  * @param pixelY Pixel row in the 3D view.
  */
@@ -1232,9 +1281,11 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	}
 
 	// Psi and the mind probe reach creatures out of sight: with no creature under the pixel,
-	// the player picks one on the isometric map instead.
-	const bool mindProbe = mode == BA_USE && menuTargeting && weapon->getRules()->getBattleType() == BT_MINDPROBE;
-	if (mode == BA_PANIC || mode == BA_MINDCONTROL || mindProbe)
+	// the player picks one on the isometric map instead. (A psi amp's or a mind probe's use,
+	// picked as the fire mode or from the item's menu, the same way.)
+	const BattleType itemType = weapon->getRules()->getBattleType();
+	const bool psiUse = mode == BA_USE && (itemType == BT_MINDPROBE || itemType == BT_PSIAMP);
+	if (mode == BA_PANIC || mode == BA_MINDCONTROL || psiUse)
 	{
 		Position pointedVoxel;
 		aimAt(pixelX, pixelY, unit, pointedVoxel);
@@ -1289,15 +1340,39 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 		return;
 	}
 
-	// A medi-kit or a scanner: used at once, no menu (see useItemDirectly). Anything else used
-	// or primed: the item's own action menu, as clicking it on the HUD.
-	const BattleType itemType = weapon->getRules()->getBattleType();
+	// A medi-kit or a scanner: used at once, no menu (see useItemDirectly).
 	if (mode == BA_USE && !menuTargeting && (itemType == BT_MEDIKIT || itemType == BT_SCANNER))
 	{
 		useItemDirectly(unit, weapon);
 		return;
 	}
-	if ((mode == BA_USE || mode == BA_PRIME) && !menuTargeting)
+	// Priming: what the game's action menu does once PRIME is picked, without the menu asking
+	// again what the fire mode already says: the game's timer box for a grenade whose timer is
+	// set (PrimeGrenadeState), else the item's own fuse at once. The game then primes it as
+	// after its menu (its time units, message and sound; nothing if the box is cancelled).
+	if (mode == BA_PRIME && !menuTargeting)
+	{
+		action->actor = unit;
+		action->weapon = weapon;
+		action->type = BA_PRIME;
+		action->targeting = false;
+		action->result.clear();
+		action->value = -1;
+		action->updateTU();
+		if (weapon->getRules()->getFuseTimerType() == BFT_SET)
+		{
+			_state->popup(new PrimeTimerHost(action)); // (the box closes what's under it, see PrimeTimerHost)
+		}
+		else
+		{
+			action->value = weapon->getRules()->getFuseTimerDefault();
+			battleGame->handleNonTargetAction();
+		}
+		return;
+	}
+	// Any other use without a target of its own: the item's action menu, as clicking it on the
+	// HUD. (A psi amp's or a mind probe's use goes on below, as a targeted action.)
+	if (mode == BA_USE && !menuTargeting && !psiUse)
 	{
 		_state->handleItemClick(weapon, false);
 		return;
@@ -1751,6 +1826,51 @@ void FirstPersonMode::freeAim(BattlescapeState *state, const BattleAction &actio
 	{
 		state->_firstPerson->freeAimTarget(action, target);
 	}
+}
+
+/**
+ * The game's hook for a shot knocked aside by a failed close-quarters check (see
+ * FirstPerson::closeQuartersDeflected): passed on to the first-person mode if the 3D view is
+ * showing.
+ * @param state The battlescape screen (it owns the first-person mode).
+ * @param shooter The unit whose shot was knocked aside.
+ * @param target The tile the shot now goes at.
+ */
+void FirstPersonMode::deflected(BattlescapeState *state, const BattleUnit *shooter, const Position &target)
+{
+	if (state && state->_firstPerson && state->_firstPerson->isActive())
+	{
+		state->_firstPerson->followDeflectedShot(shooter, target);
+	}
+}
+
+/**
+ * Turns the view to where a shot knocked aside by a failed close-quarters check goes (the enemy
+ * beside the soldier shoves the gun): the game has already turned the soldier to face it, so
+ * the view goes along, and the soldier isn't turned back to the old view afterwards. Knocked
+ * to the side, the view turns to that tile (the pitch stays); at the feet or straight up, it
+ * tips down or up (the facing stays). Only for the soldier we look through.
+ * @param shooter The unit whose shot was knocked aside.
+ * @param target The tile the shot now goes at: a neighbour, the soldier's own (the feet) or the
+ *               one above it.
+ */
+void FirstPersonMode::followDeflectedShot(const BattleUnit *shooter, const Position &target)
+{
+	if (!shooter || shooter != _save->getSelectedUnit())
+	{
+		return;
+	}
+	_snapTurnDegrees = _snapPitchDegrees = 0.0; // no snap turn carries on against it
+	const Position from = shooter->getPosition();
+	if (target.x == from.x && target.y == from.y)
+	{
+		const double pitch = target.z > from.z ? DeflectedUpPitch : DeflectedDownPitch;
+		_view->rotate(0.0, pitch - _view->getPitchDegrees());
+		return;
+	}
+	// The yaw has 0 = east, 90 = south (map y grows southwards).
+	const double yawDegrees = std::atan2((double)(target.y - from.y), (double)(target.x - from.x)) * 180.0 / Pi;
+	_view->rotate(std::remainder(yawDegrees - _view->getYawDegrees(), 360.0), 0.0);
 }
 
 /**
