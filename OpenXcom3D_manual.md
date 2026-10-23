@@ -21,7 +21,7 @@ You need your own copy of the original game data: *UFO: Enemy Unknown / X-COM: U
 
 Add-on builds keep their own user and config folders, so an existing OXCE profile is never touched:
 
-- the release's `user/` folder, when started with `play.sh`;
+- the release's `user/` folder, when started with `play.sh` (or `play.bat` on Windows);
 - `~/.local/share/openxcom3d` for the AppImage;
 - otherwise `~/.local/share/openxcom3d` and `~/.config/openxcom3d`.
 
@@ -133,6 +133,34 @@ If the window closes at once with an X error about GLX, the system's OpenGL is b
 SDL12COMPAT_OPENGL_SCALING=0 SDL_RENDER_DRIVER=software ./play.sh
 ```
 
+### Option A on Windows: the prebuilt release (64-bit)
+
+Download **`OpenXcom3D-1.03-windows-x86_64.zip`** from the [Releases](https://github.com/b0realis/OpenXcom3D/releases) page and unpack it somewhere of yours: Documents, the Desktop or `C:\Games`. Not *Program Files*: the game writes its saves and options into its `user` folder, and can't there. Then double-click **`play.bat`**.
+
+**Nothing needs installing.** It runs on 64-bit Windows 10 and 11. The game comes with SDL 1.2 (sdl12-compat on SDL2) as `SDL.dll` and `SDL2.dll`, with SDL_image, SDL_mixer, SDL_gfx and the C++ runtime built in, and takes from Windows only what every Windows has. The game isn't signed, so Windows may warn the first time ("Windows protected your PC"): click *More info*, then *Run anyway*.
+
+The zip holds:
+
+```
+play.bat                  starts the game (finds the game data, says what's missing)
+bin\openxcom.exe          the engine (OXCE 8.7.1 + OpenXcom3D)
+bin\SDL.dll, SDL2.dll     SDL 1.2 (sdl12-compat) on SDL2
+data\common, standard     OXCE's own data
+user\mods\OpenXcom3D      the mod
+licenses\                 the licences of the libraries and of the compiler's runtime
+README-Windows.txt, README.md, OpenXcom3D_manual.md, openxcom3d.patch, LICENSE.txt
+```
+
+`play.bat` looks for the games' data as `play.sh` does:
+
+1. a `UFO` or `TFTD` folder already in `user\`;
+2. a `UFO` or `TFTD` folder in the game's folder or next to it;
+3. *X-COM: UFO Defense* and *X-COM: Terror From The Deep* in Steam: its own folder (from the registry) and every other library it lists, such as a second disk.
+
+It links what it finds into `user\` with a directory junction, which needs no administrator and leaves the data as it is. On a disk that can't hold a junction (FAT32, exFAT, a network drive) it copies the data instead. The first time, it also writes the starting options: the game that's there (UFO if both), and a 1280×800 window if the screen has room for one (at least 1300×900), else the full screen. Your saves, the options and the log (`openxcom.log`) are in `user\`. Extra arguments go to the game: `play.bat -load mysave.sav`.
+
+The Windows build is made on Linux with llvm-mingw (Clang for Windows), from the same sources as the Linux release, except sdl12-compat: 1.2.74 instead of 1.2.72, which crashes on Windows. **It's tested under Wine** (11.17): the launcher in every case above, and battles in 3D in UFO and TFTD. It hasn't run on a real Windows machine yet, so reports are welcome.
+
 ### Option B: build from source
 
 #### With the installer
@@ -188,7 +216,7 @@ Notes:
 
 ### Playing
 
-- Start `./play.sh` (or the AppImage), begin a game (or **New Battle**), and in battle press **F8** or click the **3D** button at the top left.
+- Start `./play.sh` (or the AppImage; `play.bat` on Windows), begin a game (or **New Battle**), and in battle press **F8** or click the **3D** button at the top left.
 - **Options → 3D VIEW** has the settings and the key bindings.
 - [Controls](#2-controls) below.
 
@@ -207,6 +235,8 @@ Notes:
 ### Uninstalling
 
 Delete the install folder (and `~/.local/share/applications/openxcom3d.desktop` if you made a menu entry). Your game data folders were only linked, never changed.
+
+On Windows, delete the folder. The game data in `user\` is only a junction (deleting it removes the link, never the data it points to), or a copy where it had to be copied.
 
 ## 2. Controls
 
@@ -641,7 +671,7 @@ Sprite upscaling costs nothing measurable. Use **pixel size** 2 or 3 on slow mac
 - **Leaning** shows what's round a corner, but the game's own sight still starts from the middle of the soldier's tile: an alien there shows once the soldier (or someone else) spots it. The weapon in hand stays level while the view tilts.
 - **Leaning and fair play** (a player's note: the aliens can't lean by choice, so leaning gives the player a small edge). What the lean gives, exactly: it **shows no more than the game does**: the game's sight doesn't change, units it doesn't see aren't drawn, and the lean's room check leaves them out, so a peek shows terrain, never a hidden alien. A **shot** from a lean (and with *Lean shots*) starts from the game's own off-centre origins, a couple of voxels to the side. OXCE has a game option, **off-centre shooting** (`oxceEnableOffCentreShooting`), with which every unit, the aliens included, tries left and right of centre when the centre has no line of fire; with it on, the aliens have that reach too, and the player only gets to pick the side. For the most even game, play with that option on, or leave *Lean shots* off and lean only to look. An idea for later: shots from a lean only when that option is on. Letting the AI lean by choice belongs to the game itself (a fork such as Brutal-OXCE could), not to this add-on.
 - **The game's own messages** (e.g. "has become unconscious") pause the 3D sequences behind them until you click OK, as all battlescape animation does.
-- **Platforms:** built and tested on Linux only (x86-64, the Steam Deck included). The Windows project files list the add-on, untested; Windows and macOS builds from the community are very welcome.
+- **Platforms:** Linux (x86-64, the Steam Deck included) is built and tested here. Windows (64-bit) is built here too, and tested under Wine, not yet on a real Windows machine. There's no macOS build yet; one from the community would be very welcome.
 - **Languages:** English (US and UK) only.
 
 ## 10. For developers
@@ -753,6 +783,7 @@ What `FirstPersonView` draws:
 
 From a player's reports on 1.02, the owner's asks, and a look at XPiratez o2 (the Isolated Valley's temple ladder; Piratez plays in 3D).
 
+- **Windows (64-bit)** (your ask): a first build for Windows 10 and 11, a zip with `play.bat`, which finds the games' data in Steam as `play.sh` does and links it in with a junction. Made on Linux with llvm-mingw and tested under Wine; see [Option A on Windows](#option-a-on-windows-the-prebuilt-release-64-bit). The 3D view's upscaling thread runs at low priority there too.
 - **Aliens' turn cameras on the map:** with *Alien turn in 3D* off (or the map shown), the setting did nothing. Now the helmet camera cards pop up over the map: a soldier shot at (looking at the shooter), hit, mind controlled or going down, a soldier firing back (looking at the target), and the nearest soldier who sees the alien moving (looking at it).
 - **Corpses through floors:** a body lying on the floor above no longer hangs down through the ceiling when seen from below (its front half was drawn on its standing card, below the floor), and one lying on a tall shelf, crate or stairs right under a floor is pressed down to fit under it instead of poking up into the room above. A downed unit's icons don't show through a ceiling either.
 - **Sprint (Caps Lock):** steps are the game's run, faster, by the running rules; **SPRINT** under the compass.

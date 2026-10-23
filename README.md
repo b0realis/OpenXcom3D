@@ -4,7 +4,7 @@
 
 ![Night, through a soldier's eyes](docs/screenshots/night.png)
 
-*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.03**.
+*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.03**, for Linux and now Windows too.
 
 **Both games are supported:** *UFO: Enemy Unknown* and *X-COM: Terror From The Deep*.
 
@@ -27,6 +27,7 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 
 Another report from a player (thank you!), on 1.02, and a first look at **XPiratez**:
 
+- **Windows:** a first build for 64-bit Windows 10 and 11, a zip to unpack, with a `play.bat` that finds your Steam games by itself, as on Linux. It is made on Linux and tested under Wine only, so word on how it runs on a real Windows machine would be very welcome.
 - **The aliens' turn on the map:** with *Alien turn in 3D* off, the *Aliens' turn cameras* setting used to do nothing. Now the helmet camera cards pop up over the isometric map: a soldier shot at, hit, mind controlled or going down, a soldier firing back, and the one who sees the alien moving. Watching a death from a teammate's helmet is quite something.
 - **Corpses through floors:** a body lying on the floor above no longer hangs down through the ceiling, and one on a shelf right under a floor no longer pokes up into the room above.
 - **Sprint:** **Caps Lock** switches it on and off. Your soldier runs by the game's own running rules (fewer time units, more energy), at a faster pace; **SPRINT** shows under the compass.
@@ -82,7 +83,7 @@ Another report from a player (thank you!), on 1.02, and a first look at **XPirat
 
 If someone in the ingenious OpenXcom community has the will to improve this further, help is very welcome: ideas for the art, translations, play-testing, and making the code better. Issues and pull requests are open.
 
-**Windows and macOS builds** especially: only Linux is built and tested here. The patch applies to OXCE's own source, which builds on Windows with Visual Studio (`src/OpenXcom.2010.sln` already lists the add-on) and on macOS as usual. A build shared by someone who has the machine for it would let many more people play.
+**A macOS build** especially, and **reports from Windows:** the Windows build is made on Linux (with llvm-mingw) and tested under Wine, not on a real Windows machine. The patch applies to OXCE's own source, which builds on macOS as usual (and on Windows with Visual Studio: `src/OpenXcom.2010.sln` already lists the add-on). A build shared by someone who has a Mac would let many more people play.
 
 ## What it is based on
 
@@ -113,7 +114,8 @@ You need your own copy of the original game data (*UFO: Enemy Unknown / X-COM: U
 
   Nothing needs installing: the game comes with its own libraries and runs on any Linux from 2021 on (glibc 2.34: Ubuntu 22.04 and newer, Debian 12, Fedora, Arch, the Steam Deck). The first time, it finds *X-COM: UFO Defense* and *Terror From The Deep* in your Steam library by itself. Otherwise put the game's folder next to it, named `UFO` (or `TFTD`); its data is only linked, never copied or changed. `python3 install.py` can also install it, with a menu entry.
 - **Steam Deck:** the same download, in Desktop Mode. Add `play.sh` (or the AppImage) to Steam as a non-Steam game to play in Game Mode, then run `steamdeck/add_controller_layout.sh` once: your OpenXcom3D shortcut then uses the controller layout made for it. The manual has the [steps](OpenXcom3D_manual.md#steam-deck).
-- **Windows and macOS:** no builds from us yet; see [Help wanted](#help-wanted).
+- **Windows (64-bit, Windows 10 and 11): download and play.** From the [Releases](../../releases) page take the **zip**, unpack it somewhere of yours (Documents, the Desktop, `C:\Games`; not Program Files) and double-click `play.bat`. Nothing needs installing. The first time, it finds the games in your Steam library by itself; otherwise put the game's folder next to it, named `UFO` (or `TFTD`). It only links the data, never changes it. The game isn't signed, so Windows may warn the first time: *More info*, then *Run anyway*. It is tested under Wine only so far, so reports are welcome.
+- **macOS:** no build from us yet; see [Help wanted](#help-wanted).
 - **From source:** `python3 install.py --from-source` clones OXCE at the commit above, applies the patch, builds and installs.
 
 Start a game (or a **New Battle**) and in battle press **F8** to go into 3D. Mouse to look, **WASD** to walk, left button to fire, **F8** back to the map.

@@ -59,6 +59,11 @@
 #include <sys/resource.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+#elif defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX // (std::min and std::max, not Windows' macros)
+#endif
+#include <windows.h>
 #endif
 #include <SDL.h>
 #include "../Engine/Options.h"
@@ -275,13 +280,15 @@ const Surface *FirstPersonView::upscaled(const Surface *sprite)
 /**
  * The upscaling worker thread's loop: sleeps until a job is queued, takes it off the queue,
  * makes the frame's bigger version (see upscaled) without holding the lock, and hands the
- * pixels back through _upscaleDone. Runs at low priority (on Linux) until the destructor sets
+ * pixels back through _upscaleDone. Runs at low priority (Linux, Windows) until the destructor sets
  * _upscaleStop. It keeps its own nearest-colour table for the palette the jobs come with.
  */
 void FirstPersonView::upscaleWorker()
 {
 #ifdef __linux__
 	setpriority(PRIO_PROCESS, (id_t)syscall(SYS_gettid), 15); // spare time only: the frame's threads come first
+#elif defined(_WIN32)
+	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_LOWEST);
 #endif
 	// The nearest palette colour to each 15-bit colour (5 bits each of red, green, blue), and
 	// the palette it was made for.
