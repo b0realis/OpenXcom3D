@@ -166,6 +166,8 @@ const Uint32 TileMoveStuck = 300;
 /// A numpad move's speed, voxels a second: a tile in a tenth of a second, almost at once, like
 /// a step on the isometric map.
 const double NumpadMoveSpeed = 160.0;
+/// Sprinting (its key): the walking pace times this, while the soldier runs (the game's run).
+const double SprintPace = 1.6;
 /// How long the camera waits in front of a door it opened, in milliseconds (the 3D view swings
 /// it open meanwhile).
 const Uint32 DoorWait = 150;

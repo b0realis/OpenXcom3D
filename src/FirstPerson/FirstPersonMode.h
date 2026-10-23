@@ -207,8 +207,8 @@ private:
 	bool handleMouseLook(Action *action);
 	/// Handles the mouse with a free cursor: our buttons, lift arrows, enemy buttons, clicks on the view.
 	bool handleFreeCursor(Action *action, bool active);
-	/// Notes the player's choices (3D, classic HUD, the flashlight, what the cheats and akimbo
-	/// keys switch back on, the burning fuses) for a remade screen of the same battle.
+	/// Notes the player's choices (3D, classic HUD, the flashlight, sprinting and en passant, what
+	/// the cheats and akimbo keys switch back on, the burning fuses) for a remade screen of the same battle.
 	void rememberChoices() const;
 	/// Shows or hides the original bottom HUD over the 3D view.
 	void setClassicHud(bool on);
@@ -494,8 +494,29 @@ private:
 	bool tileMoveVelocity(BattleUnit *unit, double forward, double strafe, bool canMove, double walkSpeed, double elapsedSeconds, double &velocityX, double &velocityY);
 	Uint32 _spottedUntil = 0;             // "enemy spotted" banner
 
-	/// Stops the walk when a new enemy comes into view.
+	/// Stops the walk when a new enemy comes into view (not en passant).
 	void checkSpotted(BattleUnit *unit, bool playerTurn);
+
+	// ---- two ways of walking, each switched on and off with its key: sprinting (the game's
+	// run, at a faster pace) and en passant (walking on past enemies coming into sight, as Shift
+	// does on the map); each shows a line under the compass while on ----
+
+	bool _sprintOn = false;              // sprinting switched on (key "Sprint")
+	bool _sprintStepRan = true;          // the last step was a run (false once a run couldn't be paid for: walking pace then)
+	bool _enPassantOn = false;           // en passant switched on (key "En passant")
+	Text *_txtSprint = nullptr;          // "SPRINT" under the compass while sprinting is on
+	Text *_txtEnPassant = nullptr;       // "EN PASSANT" under that while en passant is on
+
+	/// Switches sprinting on or off.
+	void toggleSprint();
+	/// Switches en passant on or off.
+	void toggleEnPassant();
+	/// Is this step the game's run (sprinting, and the soldier can run it), not a walk?
+	bool runsStep(BattleUnit *unit, const Position &from, int direction) const;
+	/// Makes the lines under the compass for the ways of walking, hidden.
+	void createWalkModeLines();
+	/// Shows the lines for the ways of walking switched on, under the compass (3D only).
+	void updateWalkModeLines(BattleUnit *unit);
 
 	// =====================================================================================
 	// Weapons, fire modes, aiming and firing (FirstPersonModeShooting.cpp)
@@ -773,8 +794,8 @@ private:
 	Surface *_soldierCamDot = nullptr;      // the red dot of a live feed, blinking
 	Text *_txtSoldierCam = nullptr;         // "SOLDIER CAM: <name>"
 	int _soldierCamWidth = 0, _soldierCamHeight = 0; // the picture's size, in canvas pixels
-	/// Points a helmet camera (the card's, or the soldier cam) through a soldier's eyes.
-	void aimHelmetCamera(FirstPersonView *camera, BattleUnit *unit);
+	/// Points a helmet camera (the card's, or the soldier cam) through a soldier's eyes, the way they face or at a unit.
+	void aimHelmetCamera(FirstPersonView *camera, BattleUnit *unit, const BattleUnit *lookAt = nullptr);
 	/// Shows the soldier cam for a soldier under a squad button, or hides it (null).
 	void updateSoldierCam(BattleUnit *unit, int cardButton);
 
@@ -875,7 +896,8 @@ private:
 
 	// ---- the aliens' turn cameras (setting "Aliens' turn cameras"): the view cuts to the soldier
 	// who sees the alien acting (the nearest), or to one of ours firing back; a soldier shot at,
-	// hit or taken over pops up a small camera (the soldier card's) ----
+	// hit or taken over pops up a small camera (the soldier card's). With the aliens' turn on
+	// the map, the soldier the view would cut to pops up a camera too ----
 
 	BattleUnit *_alienTurnCamera = nullptr;               // whose eyes the view looks through on the aliens' turn (null: the last soldier)
 	bool _alienTurnCamerasRan = false;                    // they ran this aliens' turn (the player's turn then starts with the view afresh)
@@ -883,15 +905,25 @@ private:
 	const BattleUnit *_alienTurnWatched = nullptr;        // the alien the view last turned to...
 	Position _alienTurnWatchedTile = Position(-1, -1, -1); // ...where it stood then (the view turns to it again when it moves on)
 	const BattleUnit *_alertUnit = nullptr;               // the soldier the popped-up camera shows
-	Uint32 _alertUntil = 0;                               // until when (SDL ticks)
+	const BattleUnit *_alertLookAt = nullptr;             // the unit it looks at (null: the way the soldier faces)
+	Uint32 _alertSince = 0;                               // since when (SDL ticks)
+	Uint32 _alertUntil = 0;                               // until when
 	std::string _alertText;                               // why ("TARGETED", "HIT") as a string id, shown as their status; empty: their own status
 	std::unordered_map<const BattleUnit*, std::pair<int, int>> _alertWatch; // each soldier of ours last frame: health less stun, and side (-1: down)
-	/// The aliens' turn: whose eyes the view looks through (null: the last soldier), and the cameras that pop up.
+	/// The aliens' turn in 3D: whose eyes the view looks through (null: the last soldier), and the cameras that pop up.
 	BattleUnit *alienTurnCamera(Uint32 now);
+	/// The aliens' turn on the map: the cameras that pop up, among them whoever the 3D view would cut to.
+	void alienTurnMapCameras(Uint32 now);
+	/// Pops up the camera of a soldier of ours who was hit, taken over or went down since the last frame.
+	void watchSquad(Uint32 now);
+	/// The shot in flight: who fired it and at whom (null: none); a soldier of ours an alien shoots at pops up their camera.
+	void watchShot(Uint32 now, BattleUnit *&shooter, BattleUnit *&shotAt);
+	/// The soldier of ours nearest a unit who sees it (null: none).
+	BattleUnit *nearestSpotter(const BattleUnit *unit) const;
 	/// Cuts the aliens' turn view to a soldier, looking at a unit.
 	void cutAlienTurnCamera(BattleUnit *soldier, const BattleUnit *lookAt, Uint32 now);
-	/// Pops up the small camera on a soldier for a few seconds, with why (a string id; empty: their own status).
-	void popUpCamera(const BattleUnit *soldier, const std::string &why, Uint32 now);
+	/// Pops up the small camera on a soldier for a few seconds, with why (a string id; empty: their own status), looking at a unit.
+	void popUpCamera(const BattleUnit *soldier, const std::string &why, Uint32 now, const BattleUnit *lookAt = nullptr);
 	/// Puts up what happened to the soldier, and whose camera it is.
 	void showFallBanner(FallKind kind, const std::string &title, const std::string &name);
 

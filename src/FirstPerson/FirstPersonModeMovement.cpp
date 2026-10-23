@@ -119,9 +119,11 @@ bool FirstPersonMode::stepAllowed(BattleUnit *unit, int stepX, int stepY)
 	if (_stepAllowedCache[direction] < 0)
 	{
 		// What the pathfinding charges for this one step, from the camera's tile on the unit's
-		// level. A step that can't be made at all costs INVALID_MOVE_COST time units.
+		// level, walked or (sprinting) run. A step that can't be made at all costs
+		// INVALID_MOVE_COST time units.
 		const Position start(_trackedTile.x, _trackedTile.y, unit->getPosition().z);
-		const PathfindingStep stepCost = _save->getPathfinding()->getTUCost(start, direction, unit, nullptr, BAM_NORMAL);
+		const PathfindingStep stepCost = _save->getPathfinding()->getTUCost(start, direction, unit, nullptr,
+			runsStep(unit, start, direction) ? BAM_RUN : BAM_NORMAL);
 		bool allowed = stepCost.cost.time < Pathfinding::INVALID_MOVE_COST;
 
 		// Flight switched off (or falling switched off): don't step off a ledge into the air.
@@ -147,6 +149,31 @@ bool FirstPersonMode::stepAllowed(BattleUnit *unit, int stepX, int stepY)
 		_stepAllowedCache[direction] = allowed ? 1 : 0;
 	}
 	return _stepAllowedCache[direction] == 1;
+}
+
+/**
+ * Is this step the game's run (as Ctrl moves on the map), not a walk? Only while sprinting is
+ * switched on (its key), with an armor that allows running (most do; a large unit's only when
+ * its rules say so), and when the soldier can pay for the run: its time units and energy, and
+ * the time units reserved for a shot. A soldier out of breath walks the step instead.
+ * @param unit The soldier.
+ * @param from The tile the step starts from.
+ * @param direction The step's direction (0 north .. 7, clockwise).
+ * @return True to run it.
+ */
+bool FirstPersonMode::runsStep(BattleUnit *unit, const Position &from, int direction) const
+{
+	if (!_sprintOn || !unit->getArmor()->allowsRunning(unit->isSmallUnit()))
+	{
+		return false;
+	}
+	const PathfindingStep runCost = _save->getPathfinding()->getTUCost(from, direction, unit, nullptr, BAM_RUN);
+	if (runCost.cost.time >= Pathfinding::INVALID_MOVE_COST)
+	{
+		return false;
+	}
+	return doomModeOn() || (unit->getTimeUnits() >= runCost.cost.time && unit->getEnergy() >= runCost.cost.energy
+		&& reserveAllows(unit, runCost.cost.time, runCost.cost.energy));
 }
 
 /**
@@ -181,9 +208,15 @@ bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 	// the way it faces, for one TU more than the step), not a turn to face the step and a paid
 	// turn back. Steps further round turn as the game turns. With free turning the game turns
 	// the soldier for the step, for free, and it faces the view again after (faceLookDirection).
+	// Sprinting, any other step is the game's run (see runsStep); a sidestep stays one.
 	const int offFacing = std::min((direction - unit->getDirection() + 8) % 8, (unit->getDirection() - direction + 8) % 8);
 	const bool sidestep = Options::fpsTurnCost && offFacing >= 1 && offFacing <= 2 && target.z == from.z;
-	pathfinding->calculate(unit, target, sidestep ? BAM_STRAFE : BAM_NORMAL);
+	const bool run = !sidestep && runsStep(unit, from, direction);
+	if (_sprintOn && !sidestep)
+	{
+		_sprintStepRan = run; // (a step the soldier couldn't run sets the walking pace)
+	}
+	pathfinding->calculate(unit, target, sidestep ? BAM_STRAFE : run ? BAM_RUN : BAM_NORMAL);
 	const std::vector<int> &path = pathfinding->getPath();
 
 	// Over a ledge the search never plans the step into the air: it looks for the way to the
@@ -217,6 +250,10 @@ bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 	walk.target = target;
 	walk.instantMove = true; // No step animation: the 3D view moves smoothly on its own.
 	walk.strafe = pathfinding->getStrafeMove(); // the sidestep above, if the game allows it here
+	walk.run = run && !walk.strafe;
+	// Walking on past an enemy coming into sight: en passant, or a run where the mod's rules say
+	// running does (as the map decides it for a move with Shift or a run).
+	walk.ignoreSpottedEnemies = _enPassantOn || (walk.run && Mod::EXTENDED_RUNNING_COST);
 	_sidestepFacing = walk.strafe ? unit->getDirection() : -1;
 	_state->_battleGame->statePushBack(new UnitWalkBState(_state->_battleGame, walk));
 
@@ -886,10 +923,12 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 
 	// The camera's new position starts where it is now. A big unit's eye sits 8 voxels off the
 	// middle of its tile (see clampInsideTile). The walking speed setting is in tiles a second
-	// (1 to 8), here turned into voxels a second.
+	// (1 to 8), here turned into voxels a second; sprinting, SprintPace times that, while the
+	// soldier can run (its armor allows it, and the last step wasn't walked for want of breath).
 	const int sizeOffset = 8 * (unit->getArmor()->getSize() - 1);
 	double newEyeX = _eyeX, newEyeY = _eyeY;
-	const double walkSpeed = std::clamp(Options::fpsWalkSpeed, 1, 8) * 16.0;
+	const bool sprinting = _sprintOn && _sprintStepRan && unit->getArmor()->allowsRunning(unit->isSmallUnit());
+	const double walkSpeed = std::clamp(Options::fpsWalkSpeed, 1, 8) * 16.0 * (sprinting ? SprintPace : 1.0);
 
 	// A vault in progress moves the camera on its own.
 	if (glideOverObstacle(unit, newEyeX, newEyeY))
@@ -1458,8 +1497,9 @@ void FirstPersonMode::openDoor(BattleUnit *unit)
  * Stops the walk when a new enemy comes into view, as spotting one interrupts a move on the
  * isometric map: the movement keys are ignored until they're all let go (so holding a key
  * doesn't carry the soldier on into fire), and an "enemy spotted" banner shows for 1.5 seconds
- * (see updateBanner). A new enemy shows as a rise in the number of units the soldier has spotted
- * this turn. Called every frame.
+ * (see updateBanner). With en passant on (its key) the walk goes on and only the banner shows,
+ * as moving with Shift held does on the map. A new enemy shows as a rise in the number of units
+ * the soldier has spotted this turn. Called every frame.
  * @param unit The soldier we look through.
  * @param playerTurn Whether it's the player's turn (only then is anything stopped).
  */
@@ -1476,10 +1516,12 @@ void FirstPersonMode::checkSpotted(BattleUnit *unit, bool playerTurn)
 		return;
 	}
 
-	// More than before: stop, and say so.
+	// More than before: stop, and say so. En passant (its key) only says so, and so does a run
+	// where the mod's rules say running walks on past them (see commitStep).
 	if (spottedCount > _enemiesSpottedCount)
 	{
-		_movementHeld = true;
+		const bool walksOn = _enPassantOn || (_sprintOn && _sprintStepRan && Mod::EXTENDED_RUNNING_COST);
+		if (!walksOn) _movementHeld = true;
 		_spottedUntil = SDL_GetTicks() + 1500;
 	}
 	_enemiesSpottedCount = spottedCount;

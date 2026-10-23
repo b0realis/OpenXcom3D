@@ -681,6 +681,7 @@ private:
 		double depthBias = 0.0;           // how much nearer than the point it counts for the depth test, in voxels
 		int shade = 0;                    // palette shades to darken it by (0 none .. 15)
 		double scale = 1.0;               // world size per sprite pixel (an upscaled sprite is drawn at 1 / its factor)
+		double standingSquash = 1.0;      // how tall the rows on the card are, of their full height (less to fit under a floor)
 		SpritePose pose = SpritePose::Standing;
 		const SeeThroughSprite *seeThrough = nullptr; // how opaque each pixel is (the smoke); null for a solid sprite
 		BattleUnit *unit = nullptr;       // the unit it pictures, if any: smoke veils it only thinly, and it can be pointed at

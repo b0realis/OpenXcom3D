@@ -358,6 +358,11 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsBack", &keyFpsBack, SDLK_s, "STR_FPS_KEY_BACK", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsStrafeLeft", &keyFpsStrafeLeft, SDLK_a, "STR_FPS_KEY_STRAFE_LEFT", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsStrafeRight", &keyFpsStrafeRight, SDLK_d, "STR_FPS_KEY_STRAFE_RIGHT", category));
+	// Two ways of walking, each on and off with its key: sprinting (the game's run; Caps Lock,
+	// Doom's own "always run" key) and en passant (walking on past enemies coming into sight, as
+	// Shift does on the map; the key left of 1, as Shift is the lean key).
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsSprint", &keyFpsSprint, SDLK_CAPSLOCK, "STR_FPS_KEY_SPRINT", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsEnPassant", &keyFpsEnPassant, SDLK_BACKQUOTE, "STR_FPS_KEY_EN_PASSANT", category));
 	// Fire modes (the next one, or snap, aimed and auto directly) and switching hands. The next
 	// fire mode is J (the game's "reserve TUs for kneel", which keeps it on the map), as F is the
 	// flashlight. (1.0 saved it as keyFpsNextMode, on F: the new name leaves F behind, and a key

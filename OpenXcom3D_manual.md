@@ -1,6 +1,6 @@
 # OpenXcom3D manual
 
-Version 1.02. OpenXcom3D is **OpenXcom Extended (OXCE)** with a first-person 3D battlescape: an engine add-on (`src/FirstPerson/`, with small hooks in the core) and a data mod (`OpenXcom3D`) that switches it on.
+Version 1.03. OpenXcom3D is **OpenXcom Extended (OXCE)** with a first-person 3D battlescape: an engine add-on (`src/FirstPerson/`, with small hooks in the core) and a data mod (`OpenXcom3D`) that switches it on.
 
 1. [Installing](#1-installing)
 2. [Controls](#2-controls)
@@ -27,7 +27,7 @@ Add-on builds keep their own user and config folders, so an existing OXCE profil
 
 ### Option A: the prebuilt release (Linux x86-64)
 
-Download it from the project's [Releases](https://github.com/b0realis/OpenXcom3D/releases) page, in either form:
+Download it from the project's [Releases](https://github.com/b0realis/OpenXcom3D/releases) page, in either form (1.03 has no prebuilt download yet: the newest there is 1.02; for 1.03, build it from source, [Option B](#option-b-build-from-source)):
 
 - **`OpenXcom3D-1.02-x86_64.AppImage`**: a single file. Make it executable (`chmod +x OpenXcom3D-1.02-x86_64.AppImage`, or *Properties → Permissions → executable* in a file manager) and run it. Its profile is in `~/.local/share/openxcom3d`.
 - **`OpenXcom3D-1.02-linux-x86_64.tar.gz`**: unpack it anywhere and run `./play.sh`. Its profile is the `user/` folder inside.
@@ -217,6 +217,8 @@ All of these can be rebound in **Options → 3D VIEW → Controls**: click a key
 | **F8** | Isometric ↔ 3D (or the ISO/3D button); back on the map, it's centred on your soldier |
 | **Mouse** | Look around; the soldier turns with you for free (or by the rules: setting *Turning costs TU*) |
 | **W A S D** | Walk and step sideways in real time. Each tile costs its normal TUs; walking into a door opens it. With *Movement: Tiles*, a press walks exactly one tile |
+| **Caps Lock** | Sprint on/off: each step is the game's own run (Ctrl on the map), faster. By the default rules a run costs three quarters of a walk's TUs and half as much energy again, and only armor that allows running runs. **SPRINT** shows under the compass, green while the soldier runs and grey while they can't and walk (their armor, or no breath left for a run) |
+| **`** (left of 1) | En passant on/off: an enemy coming into sight doesn't stop the walk, as moving with Shift held doesn't on the map; ENEMY SPOTTED still shows. **EN PASSANT** shows under the compass |
 | **Numpad 8 2 4 6** | One tile ahead, back, left or right, almost at once, like a step on the isometric map (whatever the *Movement* setting; holding the key steps on). **7 / 9**: snap turn 45° left / right |
 | **Left button** | Fire at the crosshair in the current fire mode |
 | **Wheel / J** | Previous / next fire mode (snap, aimed, auto, throw, launch, melee, psi, use, prime) |
@@ -376,7 +378,7 @@ Hovering a soldier on the top bar shows the same weapon line on their card.
 ### Battle
 
 - **Alien turn in 3D** (YES): YES: stay in the 3D view during the alien turn, looking through your last soldier's eyes (HIDDEN MOVEMENT until an alien comes into sight). NO: switch back to the isometric map for the alien turn.
-- **Aliens' turn cameras** (YES): with *Alien turn in 3D*, the view goes where the action is. When one of your soldiers fires back (reaction fire), it cuts to them at once, looking at their target. While an alien moves, it looks through the nearest soldier who sees it, staying at least a second and a half before cutting to another, and turns to the alien each time it reaches a new tile. A soldier who is shot at, hit or mind controlled pops up their helmet camera card for 3 seconds (TARGETED, HIT, MIND CONTROLLED), and one going down too (setting below); the soldier you look through going down gets the death camera, as before. Your turn then starts looking the way the soldier faces. The cards show the camera whatever *Soldier camera preview* says. NO: the view stays with your last soldier.
+- **Aliens' turn cameras** (YES): with *Alien turn in 3D*, the view goes where the action is. When one of your soldiers fires back (reaction fire), it cuts to them at once, looking at their target. While an alien moves, it looks through the nearest soldier who sees it, staying at least a second and a half before cutting to another, and turns to the alien each time it reaches a new tile. A soldier who is shot at, hit or mind controlled pops up their helmet camera card for 3 seconds (TARGETED, looking at the shooter; HIT; MIND CONTROLLED), and one going down too (setting below); the soldier you look through going down gets the death camera, as before. Your turn then starts looking the way the soldier faces. With the aliens' turn on the isometric map (*Alien turn in 3D* off, or you're on the map), the same cards pop up over the map, and so does whoever the 3D view would cut to: a soldier firing back (FIRING, looking at the target) and the nearest soldier who sees the alien moving (WATCHING, looking at it, for as long as they see it), one card at a time, the newest news first. The cards show the camera whatever *Soldier camera preview* says. NO: the view stays with your last soldier, and nothing pops up.
 - **Camera when a soldier falls** (YES): with *Aliens' turn cameras*, a soldier of yours going down out of view (killed or knocked out) pops up their helmet camera card for 3 seconds: static, with DECEASED or UNCONSCIOUS. NO: only the soldier you look through gets the death camera, as before.
 - **Start battles in 3D** (NO): YES: begin each battle in the first-person view instead of the isometric map.
 - **Doom mode (debug)** (NO): a cheat for testing and fun, and a first try at real time: in the 3D view the selected soldier never runs out of time units or energy on your turn: every shot, throw, blow and item is free. Grenades are primed and thrown as usual (or in real time, below). Ammo still counts. DOOM MODE shows on the info panel while it's on.
@@ -618,7 +620,7 @@ Sprite upscaling costs nothing measurable. Use **pixel size** 2 or 3 on slow mac
 | Branch | **`oxce-plus`** |
 | Commit | **`f0134ef8065799c7723953d64b565f7832bfd782`** — 2026-09-29 15:04:49 +0200, author Meridian, "Merge remote-tracking branch 'SupSuper/master' into oxce-plus" |
 | Version string | **OpenXcom Extended 8.7.1 (v2026-09-19)** |
-| OpenXcom3D | engine add-on and mod version **1.02** (`requiredExtendedEngine: OpenXcom3D`, `requiredExtendedVersion: "1.0.2"`: OXCE reads "1.02" as 1.2) |
+| OpenXcom3D | engine add-on and mod version **1.03** (`requiredExtendedEngine: OpenXcom3D`, `requiredExtendedVersion: "1.0.3"`: OXCE reads "1.03" as 1.3) |
 
 `openxcom3d.patch` holds every change on top of that commit:
 
@@ -707,11 +709,20 @@ What `FirstPersonView` draws:
 | `OptionInfo.cpp` | Loading a key binding clears Shift, Alt and Ctrl, except for `keyFpsLeanHold` (the lean key, held with the strafe keys, Left Shift by default) |
 | `OptionsBaseState.{h,cpp}` | 3D VIEW tab via `FirstPerson::hasOptionsTab/createOptionsTab` |
 | `Mod.{h,cpp}` | Parses `firstPerson:` at the end of `Mod::loadFile` |
-| `ModInfo.cpp` | Engine row `{"OpenXcom3D", 1.0.2}` (add-on builds only; 1.02) |
+| `ModInfo.cpp` | Engine row `{"OpenXcom3D", 1.0.3}` (add-on builds only; 1.03) |
 | `CrossPlatform.cpp` | Add-on builds use their own user/config folders (`~/.local/share/openxcom3d`, `~/.config/openxcom3d`, `Documents/OpenXcom3D`, …). Data folders are shared with stock OXCE |
 | `OpenXcom.2010.vcxproj{,.filters}` | The add-on's files |
 
 ## 11. Version history
+
+### 1.03 (2026-10-23)
+
+From a player's report on 1.02. Source only for now (no prebuilt download).
+
+- **Aliens' turn cameras on the map:** with *Alien turn in 3D* off (or the map shown), the setting did nothing. Now the helmet camera cards pop up over the map: a soldier shot at (looking at the shooter), hit, mind controlled or going down, a soldier firing back (looking at the target), and the nearest soldier who sees the alien moving (looking at it).
+- **Corpses through floors:** a body lying on the floor above no longer hangs down through the ceiling when seen from below (its front half was drawn on its standing card, below the floor), and one lying on a tall shelf, crate or stairs right under a floor is pressed down to fit under it instead of poking up into the room above. A downed unit's icons don't show through a ceiling either.
+- **Sprint (Caps Lock):** steps are the game's run, faster, by the running rules; **SPRINT** under the compass.
+- **En passant (`):** enemies coming into sight don't stop the walk, as Shift does on the map; **EN PASSANT** under the compass.
 
 ### 1.02 (2026-10-22)
 

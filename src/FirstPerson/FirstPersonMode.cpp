@@ -92,10 +92,10 @@ namespace
 {
 
 // The game remakes the battlescape screen (and with it this mode) when options change
-// mid-battle; what the player had chosen (3D or not, the classic HUD, the flashlight) carries
-// over to the new screen of the same battle. Loading a game from inside a battle remakes the
-// screen too, with a new battle object: that carries over as well, when the old screen ran only
-// a moment ago.
+// mid-battle; what the player had chosen (3D or not, the classic HUD, the flashlight, the ways
+// of walking) carries over to the new screen of the same battle. Loading a game from inside a
+// battle remakes the screen too, with a new battle object: that carries over as well, when the
+// old screen ran only a moment ago.
 
 /// The battle the choices below were made in.
 const SavedBattleGame *lastBattle = nullptr;
@@ -107,6 +107,8 @@ bool lastClassicHud = false;
 bool lastHudHidden = false;
 /// Whether the flashlight was switched on (FirstPersonMode::_flashlightOn).
 bool lastFlashlightOn = true;
+/// Whether sprinting and en passant were switched on (FirstPersonMode::_sprintOn, _enPassantOn).
+bool lastSprintOn = false, lastEnPassantOn = false;
 /// The cheats the doom mode key would switch back on (FirstPersonMode::_pausedCheats).
 int lastPausedCheats = 0;
 /// Whether the akimbo key would switch realistic akimbo back on (FirstPersonMode::_akimboRealisticWasOn).
@@ -146,6 +148,7 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
 	createCrosshairAndBanner();
 	createLiftArrows();
 	createCompass();
+	createWalkModeLines();
 	createTopBar();
 	createInfoPanel();
 	createSoldierCard();
@@ -178,6 +181,8 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
 		_classicHud = lastClassicHud;
 		_hudHidden = lastHudHidden;
 		_flashlightOn = lastFlashlightOn;
+		_sprintOn = lastSprintOn;
+		_enPassantOn = lastEnPassantOn;
 		_pausedCheats = lastPausedCheats;
 		_akimboRealisticWasOn = lastAkimboRealisticWasOn;
 		if (lastBattle == _save) _doomFuses = lastDoomFuses;
@@ -341,6 +346,28 @@ void FirstPersonMode::createCompass()
 	_txtCompassTurn = addText(CompassSize + 40, 9, compassX - 40, compassY + CompassArrowH + CompassSize + 1, "weapon", "firstPerson");
 	_txtCompassTurn->setAlign(ALIGN_RIGHT);
 	_txtCompassTurn->setVisible(false);
+}
+
+/**
+ * Makes the lines for the ways of walking switched on with their keys, "SPRINT" in green and
+ * "EN PASSANT" in blue, ending at the screen's right edge as the compass's line does; where
+ * they go depends on whether the compass shows (see updateWalkModeLines). Hidden for now.
+ */
+void FirstPersonMode::createWalkModeLines()
+{
+	const int width = canvasWidth(); // our surfaces are laid out on the canvas (see makeCanvas)
+	const int lineWidth = CompassSize + 40, lineX = width - 4 - lineWidth;
+	_txtSprint = addText(lineWidth, 9, lineX, 0, "weapon", "firstPerson");
+	_txtSprint->setText(_state->tr("STR_FPS_SPRINT"));
+	_txtSprint->setColor(textColor(_state->getPalette(), 120, 230, 110));
+	_txtEnPassant = addText(lineWidth, 9, lineX, 0, "weapon", "firstPerson");
+	_txtEnPassant->setText(_state->tr("STR_FPS_EN_PASSANT"));
+	_txtEnPassant->setColor(textColor(_state->getPalette(), 110, 200, 250));
+	for (Text *line : { _txtSprint, _txtEnPassant })
+	{
+		line->setAlign(ALIGN_RIGHT);
+		line->setVisible(false);
+	}
 }
 
 /**
@@ -660,16 +687,19 @@ void FirstPersonMode::setResizeAnchors()
 	_anchors[_compass] = TOP_RIGHT;
 	for (Text *letter : _compassLetters) _anchors[letter] = TOP_RIGHT;
 	_anchors[_txtCompassTurn] = TOP_RIGHT;
+	_anchors[_txtSprint] = TOP_RIGHT;
+	_anchors[_txtEnPassant] = TOP_RIGHT;
 	for (Surface *part : _panelParts) _anchors[part] = BOTTOM_LEFT;
 	for (Surface *part : { _btnFly, _btnLight, _btnNight, _btnSpecial }) _anchors[part] = TOP_RIGHT;
 }
 
 
 /**
- * Notes what the player has chosen (3D or not, the classic HUD, the flashlight, what the cheats
- * and akimbo keys switch back on) and the Doom fuses burning, for a remade screen of the same
- * battle. Called the moment a choice is made, and every frame (for the fuses): the old screen is
- * only deleted after the new one is made, so waiting for its destructor would be too late.
+ * Notes what the player has chosen (3D or not, the classic HUD, the flashlight, sprinting and
+ * en passant, what the cheats and akimbo keys switch back on) and the Doom fuses burning, for a
+ * remade screen of the same battle. Called the moment a choice is made, and every frame (for the
+ * fuses): the old screen is only deleted after the new one is made, so waiting for its
+ * destructor would be too late.
  */
 void FirstPersonMode::rememberChoices() const
 {
@@ -678,6 +708,8 @@ void FirstPersonMode::rememberChoices() const
 	lastClassicHud = _classicHud;
 	lastHudHidden = _hudHidden;
 	lastFlashlightOn = _flashlightOn;
+	lastSprintOn = _sprintOn;
+	lastEnPassantOn = _enPassantOn;
 	lastPausedCheats = _pausedCheats;
 	lastAkimboRealisticWasOn = _akimboRealisticWasOn;
 	lastDoomFuses = _doomFuses;
@@ -1146,6 +1178,32 @@ void FirstPersonMode::toggleFlashlight()
 }
 
 /**
+ * Switches sprinting on or off (its key, Caps Lock by default). While it's on, each step in 3D
+ * is the game's own run (Ctrl on the map), at a faster pace: by the default rules it costs
+ * three quarters of a walk's time units and half as much energy again, and only an armor that
+ * allows running runs. A soldier without the energy for a run walks the step instead (see
+ * runsStep). "SPRINT" shows under the compass while it's on. Each battle starts with it off.
+ */
+void FirstPersonMode::toggleSprint()
+{
+	_sprintOn = !_sprintOn;
+	_sprintStepRan = true; // (a fresh try: the next step tells whether the soldier can run)
+	rememberChoices();
+}
+
+/**
+ * Switches en passant on or off (its key, the one left of 1 by default): while it's on, an enemy
+ * coming into sight doesn't stop the walk, as moving with Shift held doesn't on the map (the
+ * game's own rule, its "ignore spotted enemies"). The banner still says ENEMY SPOTTED. "EN
+ * PASSANT" shows under the compass while it's on. Each battle starts with it off.
+ */
+void FirstPersonMode::toggleEnPassant()
+{
+	_enPassantOn = !_enPassantOn;
+	rememberChoices();
+}
+
+/**
  * The modifier bits of the lean key (setting "Lean") while it's held, when it is a modifier key
  * (Shift, Ctrl or Alt; Left Shift by default). None with leaning off, another lean key, or the
  * key not held.
@@ -1581,9 +1639,14 @@ void FirstPersonMode::think()
 	}
 	else if (Options::fpsAlienTurn3D && _wants3D)
 	{
-		// (Only while the 3D view is wanted: with the map shown, nothing for the cameras to do.)
+		// (Only while the 3D view is wanted; with the map shown, see below.)
 		alienTurnView = alienTurnCamera(now);
 		_alienTurnCamerasRan = Options::fpsAlienTurnCameras;
+	}
+	else if (Options::fpsAlienTurnCameras)
+	{
+		// The map shows the aliens' turn: the cameras pop up over it.
+		alienTurnMapCameras(now);
 	}
 	BattleUnit *unit = playerTurn ? selected : (Options::fpsAlienTurn3D ? (alienTurnView ? alienTurnView : _lastPlayerUnit) : nullptr);
 	if (unit && unit->isOut())
@@ -1617,6 +1680,7 @@ void FirstPersonMode::think()
 		updateArmorButtons(nullptr);
 		updateLift(nullptr, now);
 		updateCompass(nullptr, false);
+		updateWalkModeLines(nullptr);
 		updateCrosshair(nullptr, playerTurn);
 		updateUnitName(nullptr);
 		updateBanner(playerTurn);
@@ -1679,6 +1743,7 @@ void FirstPersonMode::think()
 	updateArmorButtons(unit);
 	updateLift(unit, now);
 	updateCompass(unit, playerTurn);
+	updateWalkModeLines(unit);
 	updateCrosshair(unit, playerTurn);
 	updateUnitName(unit);
 	updateBanner(playerTurn);
@@ -1822,7 +1887,11 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	{
 		return false;
 	}
-	const bool pressed = event.type == SDL_KEYDOWN; // went down (not up)
+	// Went down (not up). Caps Lock and Num Lock are different: SDL 1.2 sends a lock key's
+	// "down" when its lock goes on and its "up" when it goes off, one or the other for each
+	// press, so for them either is a press.
+	const bool lockKey = key == SDLK_CAPSLOCK || key == SDLK_NUMLOCK;
+	const bool pressed = event.type == SDL_KEYDOWN || (lockKey && event.type == SDL_KEYUP);
 	// (While leaning with Left Shift, the game's own hotkeys stay quiet, as the game ignores a
 	// hotkey with Shift held: Q and E don't open a hand's menu in the middle of a lean.)
 
@@ -1838,8 +1907,8 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	}
 
 	// Our keys in 3D: the modes, fire modes and hand, doors, flares, up/down, flight, the
-	// flashlight, jump and night vision. (The flare and flashlight keys with their settings off
-	// say so on the warning line.)
+	// flashlight, sprinting and en passant, jump and night vision. (The flare and flashlight keys
+	// with their settings off say so on the warning line.)
 	if (key == Options::keyFpsMouseMode) { if (pressed) setMouseLook(!_mouseLook); return true; }
 	if (key == Options::keyFpsClassicHud) { if (pressed) setClassicHud(!_classicHud); return true; }
 	if (key == Options::keyFpsHideHud) { if (pressed) toggleHud(); return true; }
@@ -1862,6 +1931,8 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	if (key == Options::keyFpsDown) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_DOWN, action); return true; }
 	if (key == Options::keyFpsFlight) { if (pressed) toggleFlight(_save->getSelectedUnit()); return true; }
 	if (key == Options::keyFpsFlashlight) { if (pressed) toggleFlashlight(); return true; }
+	if (key == Options::keyFpsSprint) { if (pressed) toggleSprint(); return true; }
+	if (key == Options::keyFpsEnPassant) { if (pressed) toggleEnPassant(); return true; }
 	if (key == Options::keyFpsJump) { if (pressed) jump(_save->getSelectedUnit()); return true; }
 	// Night vision: the gear of the soldier the view looks through (in the aliens' turn the
 	// game's selected unit is the alien acting); the game's own key (Scroll Lock) checks for it

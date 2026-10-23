@@ -127,7 +127,9 @@ bool FirstPersonView::projectToScreen(const double world[3], double &screenX, do
  * A sprite of something lying on the floor (SpritePose::Lying: items, corpses) stands only
  * above the anchor: its rows below the anchor, where the isometric art draws the front half of
  * the floor's diamond, lie flat on the floor in front of the anchor (sqrt(2) voxels nearer the
- * camera a row), half a voxel above it, so they show on the floor rather than under it.
+ * camera a row), half a voxel above it, so they show on the floor rather than under it. Seen
+ * from below that floor (a soldier downstairs looking up), they aren't drawn at all: the top of
+ * a floor can't be seen from under it, and on the card they hung down through the ceiling.
  * Each screen row is worked out on its own: where its ray meets the card (or the floor), which
  * sprite row that is, how far away, and so how wide the sprite's pixels are along it. With the
  * view tilted by a lean (setRoll) the rows no longer run level, and each pixel is worked out on
@@ -140,9 +142,10 @@ bool FirstPersonView::projectToScreen(const double world[3], double &screenX, do
  *        0 transparent); its anchor (the sprite pixel standing at the point); the point, in
  *        voxels; the depth bias (how much nearer than the point the sprite counts for the depth
  *        test, so it isn't hidden by the floor it stands on); the shade; the scale (world size
- *        per sprite pixel); the pose (standing, all of it on the card, or lying, the rows below
- *        the anchor on the floor); how opaque each pixel of a see-through one is (or null: solid);
- *        and the unit it pictures (or null).
+ *        per sprite pixel); how tall the card's rows are (squashed to fit under a floor); the
+ *        pose (standing, all of it on the card, or lying, the rows below the anchor on the
+ *        floor); how opaque each pixel of a see-through one is (or null: solid); and the unit it
+ *        pictures (or null).
  * @param bandTop, bandBottom Only the screen rows from bandTop up to (not including) bandBottom
  *        are drawn: a band of the view, when the drawing is shared out between threads (each
  *        pixel comes out the same as when the sprite is drawn whole).
@@ -185,19 +188,25 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 	const double cardUp[3] = { -std::sin(tilt) * level[0], -std::sin(tilt) * level[1], std::cos(tilt) };
 	const double cardFacing[3] = { std::cos(tilt) * level[0], std::cos(tilt) * level[1], std::sin(tilt) };
 	const double anchorAcross = dot(anchor, _levelRight), anchorFacing = dot(anchor, cardFacing);
-	// A sprite pixel's size (camera units): across, up the card, and along the floor for a
-	// lying row; and the floor lying rows lie on, half a voxel above the anchor (eye height 0).
-	const double columnSize = scale * SpritePixelX, rowSize = scale * ZScale, lyingRowSize = scale * LyingRowVoxels;
+	// A sprite pixel's size (camera units): across, up the card (squashed for something that
+	// must fit under a floor), and along the floor for a lying row; and the floor lying rows lie
+	// on, half a voxel above the anchor (eye height 0).
+	const double columnSize = scale * SpritePixelX, rowSize = scale * ZScale * draw.standingSquash, lyingRowSize = scale * LyingRowVoxels;
 	const double floorHeight = anchor[2] + 0.5 * ZScale;
 	const bool lying = pose == SpritePose::Lying;
 
 	// Where a ray meets the sprite: the ray scaled to reach one unit ahead (so how far along it
 	// is also the view depth), and whether it passes below the anchor. A lying sprite's lower
-	// rows are met on the floor in front of the anchor; the rest on the card. Gives the
-	// distance and the sprite row there; false when the ray misses the sprite.
+	// rows are met on the floor in front of the anchor, and never from under that floor; the
+	// rest on the card. Gives the distance and the sprite row there; false when the ray misses
+	// the sprite.
 	auto meetSprite = [&](const double ray[3], bool belowAnchor, double &distance, double &spriteRow) {
 		distance = -1.0;
 		spriteRow = 0.0;
+		if (lying && belowAnchor && floorHeight >= 0.0)
+		{
+			return false;
+		}
 		if (lying && belowAnchor && ray[2] < 0.0 && floorHeight < 0.0)
 		{
 			distance = floorHeight / ray[2];
@@ -335,8 +344,15 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 		bottomPoint[axis] = lying ? (axis < 2 ? anchor[axis] - level[axis] * (spriteHeight - anchorY) * lyingRowSize : floorHeight)
 			: anchor[axis] - cardUp[axis] * (spriteHeight - anchorY) * rowSize;
 	}
+	// (Seen from below a lying sprite's floor, the floor in front of the anchor shows above the
+	// anchor: the card's rows still reach down to the anchor.)
+	double bottomRow = screenRowOf(bottomPoint, height);
+	if (lying)
+	{
+		bottomRow = std::max(bottomRow, anchorScreenY + 1.0);
+	}
 	const int top = std::max(std::max(0, bandTop), (int)std::floor(screenRowOf(topPoint, 0.0)));
-	const int bottom = std::min(std::min(height, bandBottom), (int)std::ceil(screenRowOf(bottomPoint, height)));
+	const int bottom = std::min(std::min(height, bandBottom), (int)std::ceil(bottomRow));
 
 	// The coloured part of a sprite row, from its first coloured pixel up to (not including) the
 	// one after its last: most of a unit's frame is transparent round the unit, and up close
@@ -906,8 +922,30 @@ void FirstPersonView::drawGroundShade(const double centre[3], double radius, int
 }
 
 /**
+ * The topmost row of a sprite with anything coloured in it.
+ * @param sprite The sprite (palette colours, 0 transparent).
+ * @return The row; the sprite's height if it's all transparent.
+ */
+static int topColouredRow(const Surface *sprite)
+{
+	const SDL_Surface *surface = const_cast<Surface*>(sprite)->getSurface(); // read only
+	for (int row = 0; row < surface->h; ++row)
+	{
+		const Uint8 *pixels = (const Uint8 *)surface->pixels + row * surface->pitch;
+		for (int column = 0; column < surface->w; ++column)
+		{
+			if (pixels[column]) return row;
+		}
+	}
+	return surface->h;
+}
+
+/**
  * Draws the top item lying on each discovered tile (weapons, corpses, ...) as a sprite on the
- * floor, lit by the game's light just above it.
+ * floor, lit by the game's light just above it. Something lying on a tall object (a shelf, a
+ * crate, the top of stairs) is right under the floor above, if there is one: the part of it
+ * that stands up from the floor is squashed to fit under that floor, a voxel short of it, or it
+ * poked up through the floor into the room above.
  */
 void FirstPersonView::drawFloorItems()
 {
@@ -953,6 +991,18 @@ void FirstPersonView::drawFloorItems()
 		step.sprite.world[2] = standingHeight(ground);
 		step.sprite.shade = shade;
 		step.sprite.pose = SpritePose::Lying;
+		// Room to stand up in under the floor above (its slab starts at the next level's foot),
+		// against the sprite's coloured rows above the anchor, a voxel high each.
+		const Tile *aboveTile = _save->getAboveTile(tile);
+		if (aboveTile && !aboveTile->hasNoFloor())
+		{
+			const double headroom = (tilePosition.z + 1) * 24.0 - 1.0 - step.sprite.world[2];
+			const int standingRows = step.sprite.anchorY - topColouredRow(step.sprite.sprite);
+			if (standingRows > 0 && standingRows > headroom)
+			{
+				step.sprite.standingSquash = std::max(0.05, headroom) / standingRows;
+			}
+		}
 		useSmoothVersion(step.sprite);
 		_drawList.push_back(step);
 	}
@@ -1866,12 +1916,17 @@ void FirstPersonView::drawDownedIcons()
 			continue;
 		}
 		// The body on the floor in the middle of the tile, as drawFloorItems lays it: in view if
-		// nothing nearer is drawn there (its own sprite is at its depth), and within reach. Seen
-		// from close by, its middle can be off the bottom of the view with the rest of it on it:
-		// then a point a little higher up the body is looked at instead.
+		// nothing nearer is drawn there (its own sprite is at its depth), and within reach, and
+		// not on a floor above the eye (from under that floor it can't be seen, however near).
+		// Seen from close by, its middle can be off the bottom of the view with the rest of it
+		// on it: then a point a little higher up the body is looked at instead.
 		const Position tilePosition = tile->getPosition();
 		const double ground[3] = { tilePosition.x * 16.0 + 8.0, tilePosition.y * 16.0 + 8.0, tilePosition.z * 24.0 - tile->getTerrainLevel() };
 		const double onFloor[3] = { ground[0], ground[1], standingHeight(ground) + 2.0 };
+		if (_eye[2] < onFloor[2] - 2.0)
+		{
+			continue;
+		}
 		double screenX = 0.0, screenY = 0.0, depth = 0.0;
 		bool inView = false;
 		for (const double rise : { 0.0, 6.0 })

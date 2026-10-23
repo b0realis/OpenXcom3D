@@ -4,7 +4,7 @@
 
 ![Night, through a soldier's eyes](docs/screenshots/night.png)
 
-*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.02**.
+*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.03**.
 
 **Both games are supported:** *UFO: Enemy Unknown* and *X-COM: Terror From The Deep*.
 
@@ -22,6 +22,17 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 | ![The Skyranger](docs/screenshots/skyranger.png) | ![Terror From The Deep: on the sea floor](docs/screenshots/tftd.png) |
 | ![Dual wield](docs/screenshots/akimbo.png) | ![Signal lost](docs/screenshots/signal_lost.png) |
 | ![Terror From The Deep, an island attack: a Gillman ahead, a Deep One in a teammate's helmet camera](docs/screenshots/tftd_island.png) | ![A rocket going off far down an alien base hall](docs/screenshots/alien_base.png) |
+
+## New in 1.03
+
+Another report from a player (thank you!), on 1.02:
+
+- **The aliens' turn on the map:** with *Alien turn in 3D* off, the *Aliens' turn cameras* setting used to do nothing. Now the helmet camera cards pop up over the isometric map: a soldier shot at, hit, mind controlled or going down, a soldier firing back, and the one who sees the alien moving. Watching a death from a teammate's helmet is quite something.
+- **Corpses through floors:** a body lying on the floor above no longer hangs down through the ceiling, and one on a shelf right under a floor no longer pokes up into the room above.
+- **Sprint:** **Caps Lock** switches it on and off. Your soldier runs by the game's own running rules (fewer time units, more energy), at a faster pace; **SPRINT** shows under the compass.
+- **En passant:** the **`** key. Enemies coming into sight no longer stop the walk, as Shift does on the map; **EN PASSANT** shows under the compass. (The name is the player's "French move".)
+
+1.03 is in the source for now: `python3 install.py --from-source` builds it. The downloads on the Releases page are still 1.02.
 
 ## New in 1.02
 
@@ -89,7 +100,7 @@ All changes on top of it are in one file, [`openxcom3d.patch`](openxcom3d.patch)
 
 You need your own copy of the original game data (*UFO: Enemy Unknown / X-COM: UFO Defense* and/or *X-COM: Terror From The Deep*, e.g. from Steam or GOG). Nothing of it is included here.
 
-- **Linux (x86-64): download and play.** From the [Releases](../../releases) page take either:
+- **Linux (x86-64): download and play.** From the [Releases](../../releases) page (still 1.02; 1.03 builds from source for now) take either:
   - the **AppImage**: one file. Make it executable (`chmod +x`, or *Properties → Permissions*) and run it;
   - or the **archive**: unpack it anywhere and run `./play.sh`.
 

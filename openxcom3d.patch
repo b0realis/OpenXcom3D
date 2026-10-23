@@ -12,10 +12,10 @@ index 31faa5c79..7e45307af 100644
  if ( CHECK_CCACHE )
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..988488529
+index 000000000..768388682
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,343 @@
+@@ -0,0 +1,351 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -43,6 +43,8 @@ index 000000000..988488529
 +  STR_FPS_COMPASS_DESC: "A compass at the top right (with Turning costs TU: what looking further costs)."
 +  STR_FPS_COMPASS_TURN: "TURN {0} TU"
 +  STR_FPS_COMPASS_NO_TU: "NO TU"
++  STR_FPS_SPRINT: "SPRINT"
++  STR_FPS_EN_PASSANT: "EN PASSANT"
 +  STR_FPS_COMPASS_SHOT_TURN: "SHOT +{0} TU"
 +  STR_FPS_MOVEMENT: "Movement"
 +  STR_FPS_MOVEMENT_DESC: "Free: walk freely. Tiles: a key press walks one tile (numpad too)."
@@ -308,9 +310,11 @@ index 000000000..988488529
 +  STR_FPS_ALIEN_TURN_3D: "Alien turn in 3D"
 +  STR_FPS_ALIEN_TURN_3D_DESC: "Stay in 3D in the alien turn, through your soldier's eyes."
 +  STR_FPS_ALIEN_TURN_CAMERAS: "Aliens' turn cameras"
-+  STR_FPS_ALIEN_TURN_CAMERAS_DESC: "With Alien turn in 3D: cuts to whoever sees the alien move or fires back; a soldier shot at, hit or mind controlled pops up a camera."
++  STR_FPS_ALIEN_TURN_CAMERAS_DESC: "Soldiers shot at, hit or mind controlled pop up a camera; so do those who see the alien or fire back (in 3D the view cuts to them)."
 +  STR_FPS_ALERT_TARGETED: "TARGETED"
 +  STR_FPS_ALERT_HIT: "HIT"
++  STR_FPS_ALERT_FIRING: "FIRING"
++  STR_FPS_ALERT_WATCHING: "WATCHING"
 +  STR_FPS_FALLEN_SOLDIER_CAMERA: "Camera when a soldier falls"
 +  STR_FPS_FALLEN_SOLDIER_CAMERA_DESC: "With the aliens' turn cameras: a soldier going down out of view pops up their helmet camera (static)."
 +  STR_FPS_START_IN_FIRST_PERSON: "Start battles in 3D"
@@ -327,6 +331,10 @@ index 000000000..988488529
 +  STR_FPS_KEY_STRAFE_LEFT_DESC: "Sidestep left."
 +  STR_FPS_KEY_STRAFE_RIGHT: "Step right"
 +  STR_FPS_KEY_STRAFE_RIGHT_DESC: "Sidestep right."
++  STR_FPS_KEY_SPRINT: "Sprint on/off"
++  STR_FPS_KEY_SPRINT_DESC: "Run, not walk: faster, by the game's running rules (more energy)."
++  STR_FPS_KEY_EN_PASSANT: "En passant on/off"
++  STR_FPS_KEY_EN_PASSANT_DESC: "Walk on past enemies coming into sight, as Shift does on the map."
 +  STR_FPS_KEY_NEXT_MODE: "Next fire mode"
 +  STR_FPS_KEY_NEXT_MODE_DESC: "Next fire mode (or the mouse wheel)."
 +  STR_FPS_KEY_MODE_SNAP: "Snap shot"
@@ -361,10 +369,10 @@ index 000000000..988488529
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers: a clear view."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..91872bfdc
+index 000000000..076376767
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,343 @@
+@@ -0,0 +1,351 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -392,6 +400,8 @@ index 000000000..91872bfdc
 +  STR_FPS_COMPASS_DESC: "A compass at the top right (with Turning costs TU: what looking further costs)."
 +  STR_FPS_COMPASS_TURN: "TURN {0} TU"
 +  STR_FPS_COMPASS_NO_TU: "NO TU"
++  STR_FPS_SPRINT: "SPRINT"
++  STR_FPS_EN_PASSANT: "EN PASSANT"
 +  STR_FPS_COMPASS_SHOT_TURN: "SHOT +{0} TU"
 +  STR_FPS_MOVEMENT: "Movement"
 +  STR_FPS_MOVEMENT_DESC: "Free: walk freely. Tiles: a key press walks one tile (numpad too)."
@@ -657,9 +667,11 @@ index 000000000..91872bfdc
 +  STR_FPS_ALIEN_TURN_3D: "Alien turn in 3D"
 +  STR_FPS_ALIEN_TURN_3D_DESC: "Stay in 3D in the alien turn, through your soldier's eyes."
 +  STR_FPS_ALIEN_TURN_CAMERAS: "Aliens' turn cameras"
-+  STR_FPS_ALIEN_TURN_CAMERAS_DESC: "With Alien turn in 3D: cuts to whoever sees the alien move or fires back; a soldier shot at, hit or mind controlled pops up a camera."
++  STR_FPS_ALIEN_TURN_CAMERAS_DESC: "Soldiers shot at, hit or mind controlled pop up a camera; so do those who see the alien or fire back (in 3D the view cuts to them)."
 +  STR_FPS_ALERT_TARGETED: "TARGETED"
 +  STR_FPS_ALERT_HIT: "HIT"
++  STR_FPS_ALERT_FIRING: "FIRING"
++  STR_FPS_ALERT_WATCHING: "WATCHING"
 +  STR_FPS_FALLEN_SOLDIER_CAMERA: "Camera when a soldier falls"
 +  STR_FPS_FALLEN_SOLDIER_CAMERA_DESC: "With the aliens' turn cameras: a soldier going down out of view pops up their helmet camera (static)."
 +  STR_FPS_START_IN_FIRST_PERSON: "Start battles in 3D"
@@ -676,6 +688,10 @@ index 000000000..91872bfdc
 +  STR_FPS_KEY_STRAFE_LEFT_DESC: "Sidestep left."
 +  STR_FPS_KEY_STRAFE_RIGHT: "Step right"
 +  STR_FPS_KEY_STRAFE_RIGHT_DESC: "Sidestep right."
++  STR_FPS_KEY_SPRINT: "Sprint on/off"
++  STR_FPS_KEY_SPRINT_DESC: "Run, not walk: faster, by the game's running rules (more energy)."
++  STR_FPS_KEY_EN_PASSANT: "En passant on/off"
++  STR_FPS_KEY_EN_PASSANT_DESC: "Walk on past enemies coming into sight, as Shift does on the map."
 +  STR_FPS_KEY_NEXT_MODE: "Next fire mode"
 +  STR_FPS_KEY_NEXT_MODE_DESC: "Next fire mode (or the mouse wheel)."
 +  STR_FPS_KEY_MODE_SNAP: "Snap shot"
@@ -768,7 +784,7 @@ index 000000000..790dc6e09
 +        color: 144
 diff --git a/mod/OpenXcom3D/metadata.yml b/mod/OpenXcom3D/metadata.yml
 new file mode 100644
-index 000000000..f1b9eb592
+index 000000000..4dc22cc10
 --- /dev/null
 +++ b/mod/OpenXcom3D/metadata.yml
 @@ -0,0 +1,11 @@
@@ -776,13 +792,13 @@ index 000000000..f1b9eb592
 +# metadata.yml for OpenXcom3D
 +
 +name: "OpenXcom3D - First-Person View"
-+version: 1.02
++version: 1.03
 +description: "Adds a first-person 3D view of the battlescape (F8): mouse look, real-time movement paid with time units (WASD), firing from the crosshair, a squad bar with soldier camera cards, lights, shadows, flashlight, particles, weather, tactical flares, combat music and its own 3D View options tab. Needs the OpenXcom3D build of OXCE; on a standard OXCE build this mod reports an unsupported engine and stays off."
 +author: OpenXcom3D project
 +
 +master: "*"
 +requiredExtendedEngine: OpenXcom3D
-+requiredExtendedVersion: "1.0.2"
++requiredExtendedVersion: "1.0.3"
 diff --git a/src/Battlescape/BattlescapeGame.cpp b/src/Battlescape/BattlescapeGame.cpp
 index b7e1111f3..7bd979a4e 100644
 --- a/src/Battlescape/BattlescapeGame.cpp
@@ -2096,7 +2112,7 @@ index a4c23b216..13d36e8f3 100644
  	{
  		_buttonsPressed |= SDL_BUTTON(button);
 diff --git a/src/Engine/ModInfo.cpp b/src/Engine/ModInfo.cpp
-index cca815d3e..102809100 100644
+index cca815d3e..9e44cde0a 100644
 --- a/src/Engine/ModInfo.cpp
 +++ b/src/Engine/ModInfo.cpp
 @@ -181,6 +181,9 @@ struct EngineData
@@ -2104,7 +2120,7 @@ index cca815d3e..102809100 100644
  const EngineData supportedEngines[] = {
  	{ OPENXCOM_VERSION_ENGINE, { OPENXCOM_VERSION_NUMBER }},
 +#ifndef OXCE_NO_FIRSTPERSON
-+	{ "OpenXcom3D", { 1, 0, 2, 0 } }, // first-person add-on 1.02, see src/FirstPerson
++	{ "OpenXcom3D", { 1, 0, 3, 0 } }, // first-person add-on 1.03, see src/FirstPerson
 +#endif
  	{ "", { 0, 0, 0, 0 } }, // assume that every engine support mods from base game, remove if its not true.
  };
@@ -2153,7 +2169,7 @@ index 480f22791..1946358c6 100644
  
  void createAdvancedOptionsOTHER()
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..dd79868c8 100644
+index a08796ced..b52e3ba27 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -2173,7 +2189,7 @@ index a08796ced..dd79868c8 100644
 +OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsDoomRealTimeGrenades, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades;
 +OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode;
-+OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode;
++OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant;
 diff --git a/src/Engine/Script.h b/src/Engine/Script.h
 index e11f89dde..5658639bc 100644
 --- a/src/Engine/Script.h
@@ -2258,10 +2274,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..5b2494b8f
+index 000000000..da549c85e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,489 @@
+@@ -0,0 +1,494 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -2622,6 +2638,11 @@ index 000000000..5b2494b8f
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsBack", &keyFpsBack, SDLK_s, "STR_FPS_KEY_BACK", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsStrafeLeft", &keyFpsStrafeLeft, SDLK_a, "STR_FPS_KEY_STRAFE_LEFT", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsStrafeRight", &keyFpsStrafeRight, SDLK_d, "STR_FPS_KEY_STRAFE_RIGHT", category));
++	// Two ways of walking, each on and off with its key: sprinting (the game's run; Caps Lock,
++	// Doom's own "always run" key) and en passant (walking on past enemies coming into sight, as
++	// Shift does on the map; the key left of 1, as Shift is the lean key).
++	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsSprint", &keyFpsSprint, SDLK_CAPSLOCK, "STR_FPS_KEY_SPRINT", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsEnPassant", &keyFpsEnPassant, SDLK_BACKQUOTE, "STR_FPS_KEY_EN_PASSANT", category));
 +	// Fire modes (the next one, or snap, aimed and auto directly) and switching hands. The next
 +	// fire mode is J (the game's "reserve TUs for kneel", which keeps it on the map), as F is the
 +	// flashlight. (1.0 saved it as keyFpsNextMode, on F: the new name leaves F behind, and a key
@@ -2927,10 +2948,10 @@ index 000000000..7bb8e82ff
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..46cc2f265
+index 000000000..fec6dd18c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2313 @@
+@@ -0,0 +1,2384 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -3025,10 +3046,10 @@ index 000000000..46cc2f265
 +{
 +
 +// The game remakes the battlescape screen (and with it this mode) when options change
-+// mid-battle; what the player had chosen (3D or not, the classic HUD, the flashlight) carries
-+// over to the new screen of the same battle. Loading a game from inside a battle remakes the
-+// screen too, with a new battle object: that carries over as well, when the old screen ran only
-+// a moment ago.
++// mid-battle; what the player had chosen (3D or not, the classic HUD, the flashlight, the ways
++// of walking) carries over to the new screen of the same battle. Loading a game from inside a
++// battle remakes the screen too, with a new battle object: that carries over as well, when the
++// old screen ran only a moment ago.
 +
 +/// The battle the choices below were made in.
 +const SavedBattleGame *lastBattle = nullptr;
@@ -3040,6 +3061,8 @@ index 000000000..46cc2f265
 +bool lastHudHidden = false;
 +/// Whether the flashlight was switched on (FirstPersonMode::_flashlightOn).
 +bool lastFlashlightOn = true;
++/// Whether sprinting and en passant were switched on (FirstPersonMode::_sprintOn, _enPassantOn).
++bool lastSprintOn = false, lastEnPassantOn = false;
 +/// The cheats the doom mode key would switch back on (FirstPersonMode::_pausedCheats).
 +int lastPausedCheats = 0;
 +/// Whether the akimbo key would switch realistic akimbo back on (FirstPersonMode::_akimboRealisticWasOn).
@@ -3079,6 +3102,7 @@ index 000000000..46cc2f265
 +	createCrosshairAndBanner();
 +	createLiftArrows();
 +	createCompass();
++	createWalkModeLines();
 +	createTopBar();
 +	createInfoPanel();
 +	createSoldierCard();
@@ -3111,6 +3135,8 @@ index 000000000..46cc2f265
 +		_classicHud = lastClassicHud;
 +		_hudHidden = lastHudHidden;
 +		_flashlightOn = lastFlashlightOn;
++		_sprintOn = lastSprintOn;
++		_enPassantOn = lastEnPassantOn;
 +		_pausedCheats = lastPausedCheats;
 +		_akimboRealisticWasOn = lastAkimboRealisticWasOn;
 +		if (lastBattle == _save) _doomFuses = lastDoomFuses;
@@ -3274,6 +3300,28 @@ index 000000000..46cc2f265
 +	_txtCompassTurn = addText(CompassSize + 40, 9, compassX - 40, compassY + CompassArrowH + CompassSize + 1, "weapon", "firstPerson");
 +	_txtCompassTurn->setAlign(ALIGN_RIGHT);
 +	_txtCompassTurn->setVisible(false);
++}
++
++/**
++ * Makes the lines for the ways of walking switched on with their keys, "SPRINT" in green and
++ * "EN PASSANT" in blue, ending at the screen's right edge as the compass's line does; where
++ * they go depends on whether the compass shows (see updateWalkModeLines). Hidden for now.
++ */
++void FirstPersonMode::createWalkModeLines()
++{
++	const int width = canvasWidth(); // our surfaces are laid out on the canvas (see makeCanvas)
++	const int lineWidth = CompassSize + 40, lineX = width - 4 - lineWidth;
++	_txtSprint = addText(lineWidth, 9, lineX, 0, "weapon", "firstPerson");
++	_txtSprint->setText(_state->tr("STR_FPS_SPRINT"));
++	_txtSprint->setColor(textColor(_state->getPalette(), 120, 230, 110));
++	_txtEnPassant = addText(lineWidth, 9, lineX, 0, "weapon", "firstPerson");
++	_txtEnPassant->setText(_state->tr("STR_FPS_EN_PASSANT"));
++	_txtEnPassant->setColor(textColor(_state->getPalette(), 110, 200, 250));
++	for (Text *line : { _txtSprint, _txtEnPassant })
++	{
++		line->setAlign(ALIGN_RIGHT);
++		line->setVisible(false);
++	}
 +}
 +
 +/**
@@ -3593,16 +3641,19 @@ index 000000000..46cc2f265
 +	_anchors[_compass] = TOP_RIGHT;
 +	for (Text *letter : _compassLetters) _anchors[letter] = TOP_RIGHT;
 +	_anchors[_txtCompassTurn] = TOP_RIGHT;
++	_anchors[_txtSprint] = TOP_RIGHT;
++	_anchors[_txtEnPassant] = TOP_RIGHT;
 +	for (Surface *part : _panelParts) _anchors[part] = BOTTOM_LEFT;
 +	for (Surface *part : { _btnFly, _btnLight, _btnNight, _btnSpecial }) _anchors[part] = TOP_RIGHT;
 +}
 +
 +
 +/**
-+ * Notes what the player has chosen (3D or not, the classic HUD, the flashlight, what the cheats
-+ * and akimbo keys switch back on) and the Doom fuses burning, for a remade screen of the same
-+ * battle. Called the moment a choice is made, and every frame (for the fuses): the old screen is
-+ * only deleted after the new one is made, so waiting for its destructor would be too late.
++ * Notes what the player has chosen (3D or not, the classic HUD, the flashlight, sprinting and
++ * en passant, what the cheats and akimbo keys switch back on) and the Doom fuses burning, for a
++ * remade screen of the same battle. Called the moment a choice is made, and every frame (for the
++ * fuses): the old screen is only deleted after the new one is made, so waiting for its
++ * destructor would be too late.
 + */
 +void FirstPersonMode::rememberChoices() const
 +{
@@ -3611,6 +3662,8 @@ index 000000000..46cc2f265
 +	lastClassicHud = _classicHud;
 +	lastHudHidden = _hudHidden;
 +	lastFlashlightOn = _flashlightOn;
++	lastSprintOn = _sprintOn;
++	lastEnPassantOn = _enPassantOn;
 +	lastPausedCheats = _pausedCheats;
 +	lastAkimboRealisticWasOn = _akimboRealisticWasOn;
 +	lastDoomFuses = _doomFuses;
@@ -4079,6 +4132,32 @@ index 000000000..46cc2f265
 +}
 +
 +/**
++ * Switches sprinting on or off (its key, Caps Lock by default). While it's on, each step in 3D
++ * is the game's own run (Ctrl on the map), at a faster pace: by the default rules it costs
++ * three quarters of a walk's time units and half as much energy again, and only an armor that
++ * allows running runs. A soldier without the energy for a run walks the step instead (see
++ * runsStep). "SPRINT" shows under the compass while it's on. Each battle starts with it off.
++ */
++void FirstPersonMode::toggleSprint()
++{
++	_sprintOn = !_sprintOn;
++	_sprintStepRan = true; // (a fresh try: the next step tells whether the soldier can run)
++	rememberChoices();
++}
++
++/**
++ * Switches en passant on or off (its key, the one left of 1 by default): while it's on, an enemy
++ * coming into sight doesn't stop the walk, as moving with Shift held doesn't on the map (the
++ * game's own rule, its "ignore spotted enemies"). The banner still says ENEMY SPOTTED. "EN
++ * PASSANT" shows under the compass while it's on. Each battle starts with it off.
++ */
++void FirstPersonMode::toggleEnPassant()
++{
++	_enPassantOn = !_enPassantOn;
++	rememberChoices();
++}
++
++/**
 + * The modifier bits of the lean key (setting "Lean") while it's held, when it is a modifier key
 + * (Shift, Ctrl or Alt; Left Shift by default). None with leaning off, another lean key, or the
 + * key not held.
@@ -4514,9 +4593,14 @@ index 000000000..46cc2f265
 +	}
 +	else if (Options::fpsAlienTurn3D && _wants3D)
 +	{
-+		// (Only while the 3D view is wanted: with the map shown, nothing for the cameras to do.)
++		// (Only while the 3D view is wanted; with the map shown, see below.)
 +		alienTurnView = alienTurnCamera(now);
 +		_alienTurnCamerasRan = Options::fpsAlienTurnCameras;
++	}
++	else if (Options::fpsAlienTurnCameras)
++	{
++		// The map shows the aliens' turn: the cameras pop up over it.
++		alienTurnMapCameras(now);
 +	}
 +	BattleUnit *unit = playerTurn ? selected : (Options::fpsAlienTurn3D ? (alienTurnView ? alienTurnView : _lastPlayerUnit) : nullptr);
 +	if (unit && unit->isOut())
@@ -4550,6 +4634,7 @@ index 000000000..46cc2f265
 +		updateArmorButtons(nullptr);
 +		updateLift(nullptr, now);
 +		updateCompass(nullptr, false);
++		updateWalkModeLines(nullptr);
 +		updateCrosshair(nullptr, playerTurn);
 +		updateUnitName(nullptr);
 +		updateBanner(playerTurn);
@@ -4612,6 +4697,7 @@ index 000000000..46cc2f265
 +	updateArmorButtons(unit);
 +	updateLift(unit, now);
 +	updateCompass(unit, playerTurn);
++	updateWalkModeLines(unit);
 +	updateCrosshair(unit, playerTurn);
 +	updateUnitName(unit);
 +	updateBanner(playerTurn);
@@ -4755,7 +4841,11 @@ index 000000000..46cc2f265
 +	{
 +		return false;
 +	}
-+	const bool pressed = event.type == SDL_KEYDOWN; // went down (not up)
++	// Went down (not up). Caps Lock and Num Lock are different: SDL 1.2 sends a lock key's
++	// "down" when its lock goes on and its "up" when it goes off, one or the other for each
++	// press, so for them either is a press.
++	const bool lockKey = key == SDLK_CAPSLOCK || key == SDLK_NUMLOCK;
++	const bool pressed = event.type == SDL_KEYDOWN || (lockKey && event.type == SDL_KEYUP);
 +	// (While leaning with Left Shift, the game's own hotkeys stay quiet, as the game ignores a
 +	// hotkey with Shift held: Q and E don't open a hand's menu in the middle of a lean.)
 +
@@ -4771,8 +4861,8 @@ index 000000000..46cc2f265
 +	}
 +
 +	// Our keys in 3D: the modes, fire modes and hand, doors, flares, up/down, flight, the
-+	// flashlight, jump and night vision. (The flare and flashlight keys with their settings off
-+	// say so on the warning line.)
++	// flashlight, sprinting and en passant, jump and night vision. (The flare and flashlight keys
++	// with their settings off say so on the warning line.)
 +	if (key == Options::keyFpsMouseMode) { if (pressed) setMouseLook(!_mouseLook); return true; }
 +	if (key == Options::keyFpsClassicHud) { if (pressed) setClassicHud(!_classicHud); return true; }
 +	if (key == Options::keyFpsHideHud) { if (pressed) toggleHud(); return true; }
@@ -4795,6 +4885,8 @@ index 000000000..46cc2f265
 +	if (key == Options::keyFpsDown) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_DOWN, action); return true; }
 +	if (key == Options::keyFpsFlight) { if (pressed) toggleFlight(_save->getSelectedUnit()); return true; }
 +	if (key == Options::keyFpsFlashlight) { if (pressed) toggleFlashlight(); return true; }
++	if (key == Options::keyFpsSprint) { if (pressed) toggleSprint(); return true; }
++	if (key == Options::keyFpsEnPassant) { if (pressed) toggleEnPassant(); return true; }
 +	if (key == Options::keyFpsJump) { if (pressed) jump(_save->getSelectedUnit()); return true; }
 +	// Night vision: the gear of the soldier the view looks through (in the aliens' turn the
 +	// game's selected unit is the alien acting); the game's own key (Scroll Lock) checks for it
@@ -5246,10 +5338,10 @@ index 000000000..46cc2f265
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..f50dd9e32
+index 000000000..c1c20612c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,916 @@
+@@ -0,0 +1,948 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -5459,8 +5551,8 @@ index 000000000..f50dd9e32
 +	bool handleMouseLook(Action *action);
 +	/// Handles the mouse with a free cursor: our buttons, lift arrows, enemy buttons, clicks on the view.
 +	bool handleFreeCursor(Action *action, bool active);
-+	/// Notes the player's choices (3D, classic HUD, the flashlight, what the cheats and akimbo
-+	/// keys switch back on, the burning fuses) for a remade screen of the same battle.
++	/// Notes the player's choices (3D, classic HUD, the flashlight, sprinting and en passant, what
++	/// the cheats and akimbo keys switch back on, the burning fuses) for a remade screen of the same battle.
 +	void rememberChoices() const;
 +	/// Shows or hides the original bottom HUD over the 3D view.
 +	void setClassicHud(bool on);
@@ -5746,8 +5838,29 @@ index 000000000..f50dd9e32
 +	bool tileMoveVelocity(BattleUnit *unit, double forward, double strafe, bool canMove, double walkSpeed, double elapsedSeconds, double &velocityX, double &velocityY);
 +	Uint32 _spottedUntil = 0;             // "enemy spotted" banner
 +
-+	/// Stops the walk when a new enemy comes into view.
++	/// Stops the walk when a new enemy comes into view (not en passant).
 +	void checkSpotted(BattleUnit *unit, bool playerTurn);
++
++	// ---- two ways of walking, each switched on and off with its key: sprinting (the game's
++	// run, at a faster pace) and en passant (walking on past enemies coming into sight, as Shift
++	// does on the map); each shows a line under the compass while on ----
++
++	bool _sprintOn = false;              // sprinting switched on (key "Sprint")
++	bool _sprintStepRan = true;          // the last step was a run (false once a run couldn't be paid for: walking pace then)
++	bool _enPassantOn = false;           // en passant switched on (key "En passant")
++	Text *_txtSprint = nullptr;          // "SPRINT" under the compass while sprinting is on
++	Text *_txtEnPassant = nullptr;       // "EN PASSANT" under that while en passant is on
++
++	/// Switches sprinting on or off.
++	void toggleSprint();
++	/// Switches en passant on or off.
++	void toggleEnPassant();
++	/// Is this step the game's run (sprinting, and the soldier can run it), not a walk?
++	bool runsStep(BattleUnit *unit, const Position &from, int direction) const;
++	/// Makes the lines under the compass for the ways of walking, hidden.
++	void createWalkModeLines();
++	/// Shows the lines for the ways of walking switched on, under the compass (3D only).
++	void updateWalkModeLines(BattleUnit *unit);
 +
 +	// =====================================================================================
 +	// Weapons, fire modes, aiming and firing (FirstPersonModeShooting.cpp)
@@ -6025,8 +6138,8 @@ index 000000000..f50dd9e32
 +	Surface *_soldierCamDot = nullptr;      // the red dot of a live feed, blinking
 +	Text *_txtSoldierCam = nullptr;         // "SOLDIER CAM: <name>"
 +	int _soldierCamWidth = 0, _soldierCamHeight = 0; // the picture's size, in canvas pixels
-+	/// Points a helmet camera (the card's, or the soldier cam) through a soldier's eyes.
-+	void aimHelmetCamera(FirstPersonView *camera, BattleUnit *unit);
++	/// Points a helmet camera (the card's, or the soldier cam) through a soldier's eyes, the way they face or at a unit.
++	void aimHelmetCamera(FirstPersonView *camera, BattleUnit *unit, const BattleUnit *lookAt = nullptr);
 +	/// Shows the soldier cam for a soldier under a squad button, or hides it (null).
 +	void updateSoldierCam(BattleUnit *unit, int cardButton);
 +
@@ -6127,7 +6240,8 @@ index 000000000..f50dd9e32
 +
 +	// ---- the aliens' turn cameras (setting "Aliens' turn cameras"): the view cuts to the soldier
 +	// who sees the alien acting (the nearest), or to one of ours firing back; a soldier shot at,
-+	// hit or taken over pops up a small camera (the soldier card's) ----
++	// hit or taken over pops up a small camera (the soldier card's). With the aliens' turn on
++	// the map, the soldier the view would cut to pops up a camera too ----
 +
 +	BattleUnit *_alienTurnCamera = nullptr;               // whose eyes the view looks through on the aliens' turn (null: the last soldier)
 +	bool _alienTurnCamerasRan = false;                    // they ran this aliens' turn (the player's turn then starts with the view afresh)
@@ -6135,15 +6249,25 @@ index 000000000..f50dd9e32
 +	const BattleUnit *_alienTurnWatched = nullptr;        // the alien the view last turned to...
 +	Position _alienTurnWatchedTile = Position(-1, -1, -1); // ...where it stood then (the view turns to it again when it moves on)
 +	const BattleUnit *_alertUnit = nullptr;               // the soldier the popped-up camera shows
-+	Uint32 _alertUntil = 0;                               // until when (SDL ticks)
++	const BattleUnit *_alertLookAt = nullptr;             // the unit it looks at (null: the way the soldier faces)
++	Uint32 _alertSince = 0;                               // since when (SDL ticks)
++	Uint32 _alertUntil = 0;                               // until when
 +	std::string _alertText;                               // why ("TARGETED", "HIT") as a string id, shown as their status; empty: their own status
 +	std::unordered_map<const BattleUnit*, std::pair<int, int>> _alertWatch; // each soldier of ours last frame: health less stun, and side (-1: down)
-+	/// The aliens' turn: whose eyes the view looks through (null: the last soldier), and the cameras that pop up.
++	/// The aliens' turn in 3D: whose eyes the view looks through (null: the last soldier), and the cameras that pop up.
 +	BattleUnit *alienTurnCamera(Uint32 now);
++	/// The aliens' turn on the map: the cameras that pop up, among them whoever the 3D view would cut to.
++	void alienTurnMapCameras(Uint32 now);
++	/// Pops up the camera of a soldier of ours who was hit, taken over or went down since the last frame.
++	void watchSquad(Uint32 now);
++	/// The shot in flight: who fired it and at whom (null: none); a soldier of ours an alien shoots at pops up their camera.
++	void watchShot(Uint32 now, BattleUnit *&shooter, BattleUnit *&shotAt);
++	/// The soldier of ours nearest a unit who sees it (null: none).
++	BattleUnit *nearestSpotter(const BattleUnit *unit) const;
 +	/// Cuts the aliens' turn view to a soldier, looking at a unit.
 +	void cutAlienTurnCamera(BattleUnit *soldier, const BattleUnit *lookAt, Uint32 now);
-+	/// Pops up the small camera on a soldier for a few seconds, with why (a string id; empty: their own status).
-+	void popUpCamera(const BattleUnit *soldier, const std::string &why, Uint32 now);
++	/// Pops up the small camera on a soldier for a few seconds, with why (a string id; empty: their own status), looking at a unit.
++	void popUpCamera(const BattleUnit *soldier, const std::string &why, Uint32 now, const BattleUnit *lookAt = nullptr);
 +	/// Puts up what happened to the soldier, and whose camera it is.
 +	void showFallBanner(FallKind kind, const std::string &title, const std::string &name);
 +
@@ -6887,10 +7011,10 @@ index 000000000..8db48364c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..f0ed36b52
+index 000000000..5d5080109
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,1605 @@
+@@ -0,0 +1,1645 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -7127,6 +7251,37 @@ index 000000000..f0ed36b52
 +			_txtCompassTurn->setText(warning == 1 ? std::string(_state->tr("STR_FPS_COMPASS_TURN").arg(unit->getTurnCost())) : std::string(_state->tr("STR_FPS_COMPASS_NO_TU")));
 +		}
 +	}
++}
++
++/**
++ * The lines for the ways of walking switched on with their keys (see toggleSprint and
++ * toggleEnPassant), at the top right: under the compass and its line when the compass shows,
++ * else where the compass would be. "SPRINT" is green while the soldier runs, and grey while they
++ * can't and walk (an armor that doesn't run, or no breath left for a run). Only in 3D, with the
++ * HUD shown.
++ * @param unit The soldier the view looks through, or null to hide the lines.
++ */
++void FirstPersonMode::updateWalkModeLines(BattleUnit *unit)
++{
++	const bool show = isActive() && !_hudHidden && unit;
++	_txtSprint->setVisible(show && _sprintOn);
++	_txtEnPassant->setVisible(show && _enPassantOn);
++	if (!show)
++	{
++		return;
++	}
++	// From under the compass's line (shown or not, so the lines don't jump), or from where the
++	// compass would be; SPRINT first, then EN PASSANT.
++	int lineY = _compass->getVisible() ? _txtCompassTurn->getY() + 10 : _compass->getY();
++	if (_sprintOn)
++	{
++		_txtSprint->setY(lineY);
++		const bool runs = _sprintStepRan && unit->getArmor()->allowsRunning(unit->isSmallUnit());
++		const Uint8 color = runs ? textColor(_state->getPalette(), 120, 230, 110) : textColor(_state->getPalette(), 150, 150, 160);
++		if (_txtSprint->getColor() != color) _txtSprint->setColor(color); // (setting it redraws the text)
++		lineY += 9;
++	}
++	_txtEnPassant->setY(lineY);
 +}
 +
 +/**
@@ -7764,8 +7919,9 @@ index 000000000..f0ed36b52
 + * shows a live picture from the soldier's helmet camera (a small second 3D view), or TV static
 + * if the soldier is dead or unconscious. The card hides when no squad button is hovered, or
 + * while the mouse is captured for mouse look. With no card hovered, a camera popped up on the
-+ * aliens' turn (see alienTurnCamera) shows the same way, under that soldier's button, with why
-+ * as their status ("HIT").
++ * aliens' turn (see alienTurnCamera, and alienTurnMapCameras on the map) shows the same way, in
++ * 3D or on the map, under that soldier's button, with why as their status ("HIT"), looking at
++ * what it pops up for (the alien shooting at them, say).
 + */
 +void FirstPersonMode::updateSoldierCard()
 +{
@@ -7780,7 +7936,7 @@ index 000000000..f0ed36b52
 +		unit = _squadUnits[_hoveredSquadButton];
 +		cardButton = _hoveredSquadButton;
 +	}
-+	else if (_alertUnit && SDL_GetTicks() < _alertUntil && isActive())
++	else if (_alertUnit && SDL_GetTicks() < _alertUntil)
 +	{
 +		// A popped-up camera: under the soldier's squad button if it shows, else the first.
 +		for (size_t button = 0; button < _squadUnits.size() && button < _btnSquad.size(); ++button)
@@ -7904,7 +8060,7 @@ index 000000000..f0ed36b52
 +
 +	if (preview && live)
 +	{
-+		aimHelmetCamera(_preview, unit);
++		aimHelmetCamera(_preview, unit, poppedUp ? _alertLookAt : nullptr);
 +	}
 +}
 +
@@ -7913,8 +8069,10 @@ index 000000000..f0ed36b52
 + * main 3D view's settings, and asks for a new picture.
 + * @param camera The camera's view.
 + * @param unit The soldier, live.
++ * @param lookAt A unit to look at (a popped-up camera's alien, say); null: the way the soldier
++ *   faces (or, for the soldier the 3D view looks through, the way the view looks).
 + */
-+void FirstPersonMode::aimHelmetCamera(FirstPersonView *camera, BattleUnit *unit)
++void FirstPersonMode::aimHelmetCamera(FirstPersonView *camera, BattleUnit *unit, const BattleUnit *lookAt)
 +{
 +	// When it's the soldier we're looking through, copy the 3D camera itself (its eye, and its
 +	// yaw by turning the camera by the difference), level.
@@ -7935,6 +8093,12 @@ index 000000000..f0ed36b52
 +		const int unitSize = unit->getArmor()->getSize();
 +		camera->setEye(position.x * 16.0 + 8.0 * unitSize, position.y * 16.0 + 8.0 * unitSize, eyeHeight(unit));
 +		camera->lookAlong(unit->getDirection());
++	}
++	// At the unit to look at, if it has a place on the map (its chest, as the view turns to one).
++	double point[3];
++	if (lookAt && lookAt != unit && chestPoint(lookAt, point))
++	{
++		camera->lookAt(point);
 +	}
 +	// The same view settings as the main 3D view, and night vision if the soldier has it.
 +	camera->setFieldOfView(Options::fpsFieldOfView);
@@ -8498,10 +8662,10 @@ index 000000000..f0ed36b52
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeMovement.cpp b/src/FirstPerson/FirstPersonModeMovement.cpp
 new file mode 100644
-index 000000000..5f3b2939e
+index 000000000..a40f3dd26
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeMovement.cpp
-@@ -0,0 +1,1490 @@
+@@ -0,0 +1,1532 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -8623,9 +8787,11 @@ index 000000000..5f3b2939e
 +	if (_stepAllowedCache[direction] < 0)
 +	{
 +		// What the pathfinding charges for this one step, from the camera's tile on the unit's
-+		// level. A step that can't be made at all costs INVALID_MOVE_COST time units.
++		// level, walked or (sprinting) run. A step that can't be made at all costs
++		// INVALID_MOVE_COST time units.
 +		const Position start(_trackedTile.x, _trackedTile.y, unit->getPosition().z);
-+		const PathfindingStep stepCost = _save->getPathfinding()->getTUCost(start, direction, unit, nullptr, BAM_NORMAL);
++		const PathfindingStep stepCost = _save->getPathfinding()->getTUCost(start, direction, unit, nullptr,
++			runsStep(unit, start, direction) ? BAM_RUN : BAM_NORMAL);
 +		bool allowed = stepCost.cost.time < Pathfinding::INVALID_MOVE_COST;
 +
 +		// Flight switched off (or falling switched off): don't step off a ledge into the air.
@@ -8651,6 +8817,31 @@ index 000000000..5f3b2939e
 +		_stepAllowedCache[direction] = allowed ? 1 : 0;
 +	}
 +	return _stepAllowedCache[direction] == 1;
++}
++
++/**
++ * Is this step the game's run (as Ctrl moves on the map), not a walk? Only while sprinting is
++ * switched on (its key), with an armor that allows running (most do; a large unit's only when
++ * its rules say so), and when the soldier can pay for the run: its time units and energy, and
++ * the time units reserved for a shot. A soldier out of breath walks the step instead.
++ * @param unit The soldier.
++ * @param from The tile the step starts from.
++ * @param direction The step's direction (0 north .. 7, clockwise).
++ * @return True to run it.
++ */
++bool FirstPersonMode::runsStep(BattleUnit *unit, const Position &from, int direction) const
++{
++	if (!_sprintOn || !unit->getArmor()->allowsRunning(unit->isSmallUnit()))
++	{
++		return false;
++	}
++	const PathfindingStep runCost = _save->getPathfinding()->getTUCost(from, direction, unit, nullptr, BAM_RUN);
++	if (runCost.cost.time >= Pathfinding::INVALID_MOVE_COST)
++	{
++		return false;
++	}
++	return doomModeOn() || (unit->getTimeUnits() >= runCost.cost.time && unit->getEnergy() >= runCost.cost.energy
++		&& reserveAllows(unit, runCost.cost.time, runCost.cost.energy));
 +}
 +
 +/**
@@ -8685,9 +8876,15 @@ index 000000000..5f3b2939e
 +	// the way it faces, for one TU more than the step), not a turn to face the step and a paid
 +	// turn back. Steps further round turn as the game turns. With free turning the game turns
 +	// the soldier for the step, for free, and it faces the view again after (faceLookDirection).
++	// Sprinting, any other step is the game's run (see runsStep); a sidestep stays one.
 +	const int offFacing = std::min((direction - unit->getDirection() + 8) % 8, (unit->getDirection() - direction + 8) % 8);
 +	const bool sidestep = Options::fpsTurnCost && offFacing >= 1 && offFacing <= 2 && target.z == from.z;
-+	pathfinding->calculate(unit, target, sidestep ? BAM_STRAFE : BAM_NORMAL);
++	const bool run = !sidestep && runsStep(unit, from, direction);
++	if (_sprintOn && !sidestep)
++	{
++		_sprintStepRan = run; // (a step the soldier couldn't run sets the walking pace)
++	}
++	pathfinding->calculate(unit, target, sidestep ? BAM_STRAFE : run ? BAM_RUN : BAM_NORMAL);
 +	const std::vector<int> &path = pathfinding->getPath();
 +
 +	// Over a ledge the search never plans the step into the air: it looks for the way to the
@@ -8721,6 +8918,10 @@ index 000000000..5f3b2939e
 +	walk.target = target;
 +	walk.instantMove = true; // No step animation: the 3D view moves smoothly on its own.
 +	walk.strafe = pathfinding->getStrafeMove(); // the sidestep above, if the game allows it here
++	walk.run = run && !walk.strafe;
++	// Walking on past an enemy coming into sight: en passant, or a run where the mod's rules say
++	// running does (as the map decides it for a move with Shift or a run).
++	walk.ignoreSpottedEnemies = _enPassantOn || (walk.run && Mod::EXTENDED_RUNNING_COST);
 +	_sidestepFacing = walk.strafe ? unit->getDirection() : -1;
 +	_state->_battleGame->statePushBack(new UnitWalkBState(_state->_battleGame, walk));
 +
@@ -9390,10 +9591,12 @@ index 000000000..5f3b2939e
 +
 +	// The camera's new position starts where it is now. A big unit's eye sits 8 voxels off the
 +	// middle of its tile (see clampInsideTile). The walking speed setting is in tiles a second
-+	// (1 to 8), here turned into voxels a second.
++	// (1 to 8), here turned into voxels a second; sprinting, SprintPace times that, while the
++	// soldier can run (its armor allows it, and the last step wasn't walked for want of breath).
 +	const int sizeOffset = 8 * (unit->getArmor()->getSize() - 1);
 +	double newEyeX = _eyeX, newEyeY = _eyeY;
-+	const double walkSpeed = std::clamp(Options::fpsWalkSpeed, 1, 8) * 16.0;
++	const bool sprinting = _sprintOn && _sprintStepRan && unit->getArmor()->allowsRunning(unit->isSmallUnit());
++	const double walkSpeed = std::clamp(Options::fpsWalkSpeed, 1, 8) * 16.0 * (sprinting ? SprintPace : 1.0);
 +
 +	// A vault in progress moves the camera on its own.
 +	if (glideOverObstacle(unit, newEyeX, newEyeY))
@@ -9962,8 +10165,9 @@ index 000000000..5f3b2939e
 + * Stops the walk when a new enemy comes into view, as spotting one interrupts a move on the
 + * isometric map: the movement keys are ignored until they're all let go (so holding a key
 + * doesn't carry the soldier on into fire), and an "enemy spotted" banner shows for 1.5 seconds
-+ * (see updateBanner). A new enemy shows as a rise in the number of units the soldier has spotted
-+ * this turn. Called every frame.
++ * (see updateBanner). With en passant on (its key) the walk goes on and only the banner shows,
++ * as moving with Shift held does on the map. A new enemy shows as a rise in the number of units
++ * the soldier has spotted this turn. Called every frame.
 + * @param unit The soldier we look through.
 + * @param playerTurn Whether it's the player's turn (only then is anything stopped).
 + */
@@ -9980,10 +10184,12 @@ index 000000000..5f3b2939e
 +		return;
 +	}
 +
-+	// More than before: stop, and say so.
++	// More than before: stop, and say so. En passant (its key) only says so, and so does a run
++	// where the mod's rules say running walks on past them (see commitStep).
 +	if (spottedCount > _enemiesSpottedCount)
 +	{
-+		_movementHeld = true;
++		const bool walksOn = _enPassantOn || (_sprintOn && _sprintStepRan && Mod::EXTENDED_RUNNING_COST);
++		if (!walksOn) _movementHeld = true;
 +		_spottedUntil = SDL_GetTicks() + 1500;
 +	}
 +	_enemiesSpottedCount = spottedCount;
@@ -9994,10 +10200,10 @@ index 000000000..5f3b2939e
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..a3a3cec3a
+index 000000000..c6212e30f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,311 @@
+@@ -0,0 +1,313 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -10166,6 +10372,8 @@ index 000000000..a3a3cec3a
 +/// A numpad move's speed, voxels a second: a tile in a tenth of a second, almost at once, like
 +/// a step on the isometric map.
 +const double NumpadMoveSpeed = 160.0;
++/// Sprinting (its key): the walking pace times this, while the soldier runs (the game's run).
++const double SprintPace = 1.6;
 +/// How long the camera waits in front of a door it opened, in milliseconds (the 3D view swings
 +/// it open meanwhile).
 +const Uint32 DoorWait = 150;
@@ -12890,10 +13098,10 @@ index 000000000..b39723338
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeSoldierStates.cpp b/src/FirstPerson/FirstPersonModeSoldierStates.cpp
 new file mode 100644
-index 000000000..3ae0702f2
+index 000000000..107d813af
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeSoldierStates.cpp
-@@ -0,0 +1,836 @@
+@@ -0,0 +1,935 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -13587,14 +13795,12 @@ index 000000000..3ae0702f2
 + * The aliens' turn in 3D (setting "Aliens' turn cameras", with "Alien turn in 3D"): instead of
 + * staying on the last soldier, the view goes where the action is, and soldiers in trouble pop up
 + * a small camera (the soldier card's helmet camera, see updateSoldierCard). In order:
-+ * - Watching the squad: a soldier of ours who is hit (health or stun), taken over (mind
-+ *   control) or goes down (setting "Camera when a soldier falls") pops up their camera for
-+ *   AlertTime; their status says why ("HIT", or by itself MIND CONTROLLED, or DECEASED or
-+ *   UNCONSCIOUS over the static of a dead camera). The soldier the view looks through going
-+ *   down is the death camera's (see deathCam).
-+ * - A shot in flight: one at a soldier of ours from an alien pops up that soldier's camera
-+ *   ("TARGETED"); one fired by a soldier of ours (reaction fire) cuts the view to the shooter at
-+ *   once, looking at what they shoot at.
++ * - Watching the squad (see watchSquad): a soldier of ours who is hit, taken over or goes down
++ *   pops up their camera. The soldier the view looks through going down is the death camera's
++ *   (see deathCam).
++ * - A shot in flight (see watchShot): one at a soldier of ours from an alien pops up that
++ *   soldier's camera ("TARGETED"); one fired by a soldier of ours (reaction fire) cuts the view
++ *   to the shooter at once, looking at what they shoot at.
 + * - The alien acting now: when the soldier looked through doesn't see it, the view cuts to the
 + *   nearest soldier who does, but never sooner than AlienCameraHold after the last cut (no
 + *   flicking back and forth); and while looking through someone who sees it, the view glides
@@ -13617,36 +13823,10 @@ index 000000000..3ae0702f2
 +		_alienTurnCamera = nullptr;
 +	}
 +
-+	// The squad, watched from frame to frame: hit (less health, or more stun), taken over, or
-+	// gone down (dead or unconscious: side -1).
-+	for (BattleUnit *soldier : *_save->getUnits())
-+	{
-+		if (soldier->getOriginalFaction() != FACTION_PLAYER) continue;
-+		const int wellBeing = soldier->getHealth() - soldier->getStunlevel();
-+		const int side = soldier->isOut() ? -1 : (int)soldier->getFaction();
-+		const auto lastFrame = _alertWatch.find(soldier);
-+		if (lastFrame != _alertWatch.end())
-+		{
-+			const int sideBefore = lastFrame->second.second;
-+			if (side == -1 && sideBefore != -1) { if (Options::fpsFallenSoldierCamera) popUpCamera(soldier, "", now); }
-+			else if (side == FACTION_PLAYER && wellBeing < lastFrame->second.first) popUpCamera(soldier, "STR_FPS_ALERT_HIT", now);
-+			else if (side != -1 && side != FACTION_PLAYER && sideBefore == FACTION_PLAYER) popUpCamera(soldier, "", now);
-+		}
-+		_alertWatch[soldier] = { wellBeing, side };
-+	}
-+
-+	// A shot in flight: who fired it (the unit on the tile it started from), and at whom.
++	// The squad, and the shot in flight.
++	watchSquad(now);
 +	BattleUnit *shooter = nullptr, *shotAt = nullptr;
-+	if (const Projectile *projectile = _state->_map->getProjectile())
-+	{
-+		const Tile *fromTile = _save->getTile(projectile->getOrigin()), *toTile = _save->getTile(projectile->getTarget());
-+		shooter = fromTile ? fromTile->getUnit() : nullptr;
-+		shotAt = toTile ? toTile->getUnit() : nullptr;
-+		if (shooter && shooter->getFaction() != FACTION_PLAYER && canLookThrough(shotAt) && !(_alertUnit == shotAt && now < _alertUntil))
-+		{
-+			popUpCamera(shotAt, "STR_FPS_ALERT_TARGETED", now);
-+		}
-+	}
++	watchShot(now, shooter, shotAt);
 +
 +	// Reaction fire: one of ours shooting cuts the view to them at once.
 +	if (canLookThrough(shooter))
@@ -13662,20 +13842,7 @@ index 000000000..3ae0702f2
 +		const bool watchedSees = _alienTurnCamera && _alienTurnCamera->hasVisibleUnit(acting);
 +		if (!watchedSees && now - _alienTurnCameraSince >= AlienCameraHold)
 +		{
-+			// The nearest soldier who sees it.
-+			BattleUnit *spotter = nullptr;
-+			int nearestSquared = INT_MAX;
-+			for (BattleUnit *soldier : *_save->getUnits())
-+			{
-+				if (!canLookThrough(soldier) || !soldier->hasVisibleUnit(acting)) continue;
-+				const int distanceSquared = soldier->distance3dToUnitSq(acting);
-+				if (distanceSquared < nearestSquared)
-+				{
-+					nearestSquared = distanceSquared;
-+					spotter = soldier;
-+				}
-+			}
-+			if (spotter) cutAlienTurnCamera(spotter, acting, now);
++			if (BattleUnit *spotter = nearestSpotter(acting)) cutAlienTurnCamera(spotter, acting, now);
 +		}
 +		else if (watchedSees && (acting != _alienTurnWatched || acting->getPosition() != _alienTurnWatchedTile))
 +		{
@@ -13686,6 +13853,140 @@ index 000000000..3ae0702f2
 +		}
 +	}
 +	return _alienTurnCamera;
++}
++
++/**
++ * The aliens' turn on the isometric map (setting "Aliens' turn cameras", when the map shows it:
++ * "Alien turn in 3D" off, or the player on the map): the soldiers' cameras pop up over the map
++ * as in 3D (see alienTurnCamera), and so does whoever the 3D view would cut to, as there is no
++ * view to cut. One camera at a time, the newest news first:
++ * - a soldier of ours hit, taken over or gone down, and one an alien shoots at ("TARGETED",
++ *   looking at the shooter);
++ * - one of ours firing back ("FIRING", looking at what they shoot at);
++ * - else the nearest soldier who sees the alien acting ("WATCHING", looking at it), kept up
++ *   while they see it and AlertTime after, and handed to another soldier only when they don't
++ *   and AlienCameraHold has passed (no flicking back and forth). It gives way to any of the
++ *   others.
++ * @param now The time (SDL ticks).
++ */
++void FirstPersonMode::alienTurnMapCameras(Uint32 now)
++{
++	auto canLookThrough = [](const BattleUnit *unit) { return unit && unit->getFaction() == FACTION_PLAYER && !unit->isOut() && unit->getTile(); };
++
++	// The squad, and the shot in flight.
++	watchSquad(now);
++	BattleUnit *shooter = nullptr, *shotAt = nullptr;
++	watchShot(now, shooter, shotAt);
++
++	// Reaction fire: the shooter's camera, looking at the target.
++	if (canLookThrough(shooter))
++	{
++		popUpCamera(shooter, "STR_FPS_ALERT_FIRING", now, shotAt);
++		return;
++	}
++
++	// The alien acting now, watched by the soldier who sees it, while no other camera is up.
++	const BattleUnit *acting = _save->getSelectedUnit();
++	if (!acting || acting->getFaction() == FACTION_PLAYER || acting->isOut() || !acting->getTile())
++	{
++		return;
++	}
++	const bool cameraUp = _alertUnit && now < _alertUntil;
++	const bool watching = cameraUp && _alertText == "STR_FPS_ALERT_WATCHING";
++	if (cameraUp && !watching)
++	{
++		return;
++	}
++	const BattleUnit *watcher = watching ? _alertUnit : nullptr;
++	if (watching && canLookThrough(watcher) && watcher->hasVisibleUnit(acting))
++	{
++		// Still in sight: kept up, looking at the alien.
++		_alertUntil = now + AlertTime;
++		_alertLookAt = acting;
++	}
++	else if (!cameraUp || now - _alertSince >= AlienCameraHold)
++	{
++		if (BattleUnit *spotter = nearestSpotter(acting)) popUpCamera(spotter, "STR_FPS_ALERT_WATCHING", now, acting);
++	}
++}
++
++/**
++ * Watches the squad from frame to frame (the aliens' turn cameras): a soldier of ours who is hit
++ * (less health, or more stun), taken over (mind control) or goes down (setting "Camera when a
++ * soldier falls") pops up their camera for AlertTime; their status says why ("HIT", or by
++ * itself MIND CONTROLLED, or DECEASED or UNCONSCIOUS over the static of a dead camera). A hit
++ * soldier whose camera was up looking at who shot at them keeps looking there.
++ * @param now The time (SDL ticks).
++ */
++void FirstPersonMode::watchSquad(Uint32 now)
++{
++	for (BattleUnit *soldier : *_save->getUnits())
++	{
++		if (soldier->getOriginalFaction() != FACTION_PLAYER) continue;
++		// Health less stun, and the side (dead or unconscious: -1).
++		const int wellBeing = soldier->getHealth() - soldier->getStunlevel();
++		const int side = soldier->isOut() ? -1 : (int)soldier->getFaction();
++		const auto lastFrame = _alertWatch.find(soldier);
++		if (lastFrame != _alertWatch.end())
++		{
++			const int sideBefore = lastFrame->second.second;
++			const BattleUnit *shotBy = _alertUnit == soldier ? _alertLookAt : nullptr;
++			if (side == -1 && sideBefore != -1) { if (Options::fpsFallenSoldierCamera) popUpCamera(soldier, "", now); }
++			else if (side == FACTION_PLAYER && wellBeing < lastFrame->second.first) popUpCamera(soldier, "STR_FPS_ALERT_HIT", now, shotBy);
++			else if (side != -1 && side != FACTION_PLAYER && sideBefore == FACTION_PLAYER) popUpCamera(soldier, "", now);
++		}
++		_alertWatch[soldier] = { wellBeing, side };
++	}
++}
++
++/**
++ * The shot in flight, if any (the aliens' turn cameras): who fired it (the unit on the tile it
++ * started from) and at whom (the unit on the tile it's aimed at). One at a soldier of ours from
++ * an alien pops up that soldier's camera ("TARGETED"), looking at the shooter, once a shot.
++ * @param now The time (SDL ticks).
++ * @param shooter Set to who fired it (null: no shot, or nobody there).
++ * @param shotAt Set to whom it's aimed at (null: nobody).
++ */
++void FirstPersonMode::watchShot(Uint32 now, BattleUnit *&shooter, BattleUnit *&shotAt)
++{
++	shooter = shotAt = nullptr;
++	const Projectile *projectile = _state->_map->getProjectile();
++	if (!projectile)
++	{
++		return;
++	}
++	const Tile *fromTile = _save->getTile(projectile->getOrigin()), *toTile = _save->getTile(projectile->getTarget());
++	shooter = fromTile ? fromTile->getUnit() : nullptr;
++	shotAt = toTile ? toTile->getUnit() : nullptr;
++	const bool ourSoldierShotAt = shotAt && shotAt->getFaction() == FACTION_PLAYER && !shotAt->isOut() && shotAt->getTile();
++	if (shooter && shooter->getFaction() != FACTION_PLAYER && ourSoldierShotAt && !(_alertUnit == shotAt && now < _alertUntil))
++	{
++		popUpCamera(shotAt, "STR_FPS_ALERT_TARGETED", now, shooter);
++	}
++}
++
++/**
++ * The soldier of ours nearest a unit who sees it (one fit to look through: not down, not taken
++ * over, on the map).
++ * @param unit The unit (an alien acting).
++ * @return The soldier, or null when none sees it.
++ */
++BattleUnit *FirstPersonMode::nearestSpotter(const BattleUnit *unit) const
++{
++	BattleUnit *spotter = nullptr;
++	int nearestSquared = INT_MAX;
++	for (BattleUnit *soldier : *_save->getUnits())
++	{
++		if (soldier->getFaction() != FACTION_PLAYER || soldier->isOut() || !soldier->getTile()) continue;
++		if (!soldier->hasVisibleUnit(unit)) continue;
++		const int distanceSquared = soldier->distance3dToUnitSq(const_cast<BattleUnit*>(unit)); // (it only reads the unit)
++		if (distanceSquared < nearestSquared)
++		{
++			nearestSquared = distanceSquared;
++			spotter = soldier;
++		}
++	}
++	return spotter;
 +}
 +
 +/**
@@ -13711,18 +14012,24 @@ index 000000000..3ae0702f2
 +
 +/**
 + * Pops up the small camera (the soldier card, see updateSoldierCard) on a soldier for
-+ * AlertTime, unless it's the soldier the view already looks through.
++ * AlertTime, unless it's the soldier the 3D view already looks through.
 + * @param soldier The soldier.
 + * @param why A string id for their status line ("HIT"); empty: their own status.
 + * @param now The time (SDL ticks).
++ * @param lookAt The unit the camera looks at (null: the way the soldier faces).
 + */
-+void FirstPersonMode::popUpCamera(const BattleUnit *soldier, const std::string &why, Uint32 now)
++void FirstPersonMode::popUpCamera(const BattleUnit *soldier, const std::string &why, Uint32 now, const BattleUnit *lookAt)
 +{
 +	if (soldier == _trackedUnit && isActive())
 +	{
 +		return;
 +	}
++	if (soldier != _alertUnit || now >= _alertUntil)
++	{
++		_alertSince = now;
++	}
 +	_alertUnit = soldier;
++	_alertLookAt = lookAt;
 +	_alertText = why;
 +	_alertUntil = now + AlertTime;
 +}
@@ -16063,10 +16370,10 @@ index 000000000..90595143a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..71634c45d
+index 000000000..a88e413d0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1070 @@
+@@ -0,0 +1,1071 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -16750,6 +17057,7 @@ index 000000000..71634c45d
 +		double depthBias = 0.0;           // how much nearer than the point it counts for the depth test, in voxels
 +		int shade = 0;                    // palette shades to darken it by (0 none .. 15)
 +		double scale = 1.0;               // world size per sprite pixel (an upscaled sprite is drawn at 1 / its factor)
++		double standingSquash = 1.0;      // how tall the rows on the card are, of their full height (less to fit under a floor)
 +		SpritePose pose = SpritePose::Standing;
 +		const SeeThroughSprite *seeThrough = nullptr; // how opaque each pixel is (the smoke); null for a solid sprite
 +		BattleUnit *unit = nullptr;       // the unit it pictures, if any: smoke veils it only thinly, and it can be pointed at
@@ -22500,10 +22808,10 @@ index 000000000..2c679ff50
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..397a113cd
+index 000000000..fa767b615
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,1973 @@
+@@ -0,0 +1,2028 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -22633,7 +22941,9 @@ index 000000000..397a113cd
 + * A sprite of something lying on the floor (SpritePose::Lying: items, corpses) stands only
 + * above the anchor: its rows below the anchor, where the isometric art draws the front half of
 + * the floor's diamond, lie flat on the floor in front of the anchor (sqrt(2) voxels nearer the
-+ * camera a row), half a voxel above it, so they show on the floor rather than under it.
++ * camera a row), half a voxel above it, so they show on the floor rather than under it. Seen
++ * from below that floor (a soldier downstairs looking up), they aren't drawn at all: the top of
++ * a floor can't be seen from under it, and on the card they hung down through the ceiling.
 + * Each screen row is worked out on its own: where its ray meets the card (or the floor), which
 + * sprite row that is, how far away, and so how wide the sprite's pixels are along it. With the
 + * view tilted by a lean (setRoll) the rows no longer run level, and each pixel is worked out on
@@ -22646,9 +22956,10 @@ index 000000000..397a113cd
 + *        0 transparent); its anchor (the sprite pixel standing at the point); the point, in
 + *        voxels; the depth bias (how much nearer than the point the sprite counts for the depth
 + *        test, so it isn't hidden by the floor it stands on); the shade; the scale (world size
-+ *        per sprite pixel); the pose (standing, all of it on the card, or lying, the rows below
-+ *        the anchor on the floor); how opaque each pixel of a see-through one is (or null: solid);
-+ *        and the unit it pictures (or null).
++ *        per sprite pixel); how tall the card's rows are (squashed to fit under a floor); the
++ *        pose (standing, all of it on the card, or lying, the rows below the anchor on the
++ *        floor); how opaque each pixel of a see-through one is (or null: solid); and the unit it
++ *        pictures (or null).
 + * @param bandTop, bandBottom Only the screen rows from bandTop up to (not including) bandBottom
 + *        are drawn: a band of the view, when the drawing is shared out between threads (each
 + *        pixel comes out the same as when the sprite is drawn whole).
@@ -22691,19 +23002,25 @@ index 000000000..397a113cd
 +	const double cardUp[3] = { -std::sin(tilt) * level[0], -std::sin(tilt) * level[1], std::cos(tilt) };
 +	const double cardFacing[3] = { std::cos(tilt) * level[0], std::cos(tilt) * level[1], std::sin(tilt) };
 +	const double anchorAcross = dot(anchor, _levelRight), anchorFacing = dot(anchor, cardFacing);
-+	// A sprite pixel's size (camera units): across, up the card, and along the floor for a
-+	// lying row; and the floor lying rows lie on, half a voxel above the anchor (eye height 0).
-+	const double columnSize = scale * SpritePixelX, rowSize = scale * ZScale, lyingRowSize = scale * LyingRowVoxels;
++	// A sprite pixel's size (camera units): across, up the card (squashed for something that
++	// must fit under a floor), and along the floor for a lying row; and the floor lying rows lie
++	// on, half a voxel above the anchor (eye height 0).
++	const double columnSize = scale * SpritePixelX, rowSize = scale * ZScale * draw.standingSquash, lyingRowSize = scale * LyingRowVoxels;
 +	const double floorHeight = anchor[2] + 0.5 * ZScale;
 +	const bool lying = pose == SpritePose::Lying;
 +
 +	// Where a ray meets the sprite: the ray scaled to reach one unit ahead (so how far along it
 +	// is also the view depth), and whether it passes below the anchor. A lying sprite's lower
-+	// rows are met on the floor in front of the anchor; the rest on the card. Gives the
-+	// distance and the sprite row there; false when the ray misses the sprite.
++	// rows are met on the floor in front of the anchor, and never from under that floor; the
++	// rest on the card. Gives the distance and the sprite row there; false when the ray misses
++	// the sprite.
 +	auto meetSprite = [&](const double ray[3], bool belowAnchor, double &distance, double &spriteRow) {
 +		distance = -1.0;
 +		spriteRow = 0.0;
++		if (lying && belowAnchor && floorHeight >= 0.0)
++		{
++			return false;
++		}
 +		if (lying && belowAnchor && ray[2] < 0.0 && floorHeight < 0.0)
 +		{
 +			distance = floorHeight / ray[2];
@@ -22841,8 +23158,15 @@ index 000000000..397a113cd
 +		bottomPoint[axis] = lying ? (axis < 2 ? anchor[axis] - level[axis] * (spriteHeight - anchorY) * lyingRowSize : floorHeight)
 +			: anchor[axis] - cardUp[axis] * (spriteHeight - anchorY) * rowSize;
 +	}
++	// (Seen from below a lying sprite's floor, the floor in front of the anchor shows above the
++	// anchor: the card's rows still reach down to the anchor.)
++	double bottomRow = screenRowOf(bottomPoint, height);
++	if (lying)
++	{
++		bottomRow = std::max(bottomRow, anchorScreenY + 1.0);
++	}
 +	const int top = std::max(std::max(0, bandTop), (int)std::floor(screenRowOf(topPoint, 0.0)));
-+	const int bottom = std::min(std::min(height, bandBottom), (int)std::ceil(screenRowOf(bottomPoint, height)));
++	const int bottom = std::min(std::min(height, bandBottom), (int)std::ceil(bottomRow));
 +
 +	// The coloured part of a sprite row, from its first coloured pixel up to (not including) the
 +	// one after its last: most of a unit's frame is transparent round the unit, and up close
@@ -23412,8 +23736,30 @@ index 000000000..397a113cd
 +}
 +
 +/**
++ * The topmost row of a sprite with anything coloured in it.
++ * @param sprite The sprite (palette colours, 0 transparent).
++ * @return The row; the sprite's height if it's all transparent.
++ */
++static int topColouredRow(const Surface *sprite)
++{
++	const SDL_Surface *surface = const_cast<Surface*>(sprite)->getSurface(); // read only
++	for (int row = 0; row < surface->h; ++row)
++	{
++		const Uint8 *pixels = (const Uint8 *)surface->pixels + row * surface->pitch;
++		for (int column = 0; column < surface->w; ++column)
++		{
++			if (pixels[column]) return row;
++		}
++	}
++	return surface->h;
++}
++
++/**
 + * Draws the top item lying on each discovered tile (weapons, corpses, ...) as a sprite on the
-+ * floor, lit by the game's light just above it.
++ * floor, lit by the game's light just above it. Something lying on a tall object (a shelf, a
++ * crate, the top of stairs) is right under the floor above, if there is one: the part of it
++ * that stands up from the floor is squashed to fit under that floor, a voxel short of it, or it
++ * poked up through the floor into the room above.
 + */
 +void FirstPersonView::drawFloorItems()
 +{
@@ -23459,6 +23805,18 @@ index 000000000..397a113cd
 +		step.sprite.world[2] = standingHeight(ground);
 +		step.sprite.shade = shade;
 +		step.sprite.pose = SpritePose::Lying;
++		// Room to stand up in under the floor above (its slab starts at the next level's foot),
++		// against the sprite's coloured rows above the anchor, a voxel high each.
++		const Tile *aboveTile = _save->getAboveTile(tile);
++		if (aboveTile && !aboveTile->hasNoFloor())
++		{
++			const double headroom = (tilePosition.z + 1) * 24.0 - 1.0 - step.sprite.world[2];
++			const int standingRows = step.sprite.anchorY - topColouredRow(step.sprite.sprite);
++			if (standingRows > 0 && standingRows > headroom)
++			{
++				step.sprite.standingSquash = std::max(0.05, headroom) / standingRows;
++			}
++		}
 +		useSmoothVersion(step.sprite);
 +		_drawList.push_back(step);
 +	}
@@ -24372,12 +24730,17 @@ index 000000000..397a113cd
 +			continue;
 +		}
 +		// The body on the floor in the middle of the tile, as drawFloorItems lays it: in view if
-+		// nothing nearer is drawn there (its own sprite is at its depth), and within reach. Seen
-+		// from close by, its middle can be off the bottom of the view with the rest of it on it:
-+		// then a point a little higher up the body is looked at instead.
++		// nothing nearer is drawn there (its own sprite is at its depth), and within reach, and
++		// not on a floor above the eye (from under that floor it can't be seen, however near).
++		// Seen from close by, its middle can be off the bottom of the view with the rest of it
++		// on it: then a point a little higher up the body is looked at instead.
 +		const Position tilePosition = tile->getPosition();
 +		const double ground[3] = { tilePosition.x * 16.0 + 8.0, tilePosition.y * 16.0 + 8.0, tilePosition.z * 24.0 - tile->getTerrainLevel() };
 +		const double onFloor[3] = { ground[0], ground[1], standingHeight(ground) + 2.0 };
++		if (_eye[2] < onFloor[2] - 2.0)
++		{
++			continue;
++		}
 +		double screenX = 0.0, screenY = 0.0, depth = 0.0;
 +		bool inView = false;
 +		for (const double rise : { 0.0, 6.0 })

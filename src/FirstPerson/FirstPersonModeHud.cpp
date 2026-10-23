@@ -237,6 +237,37 @@ void FirstPersonMode::updateCompass(BattleUnit *unit, bool playerTurn)
 }
 
 /**
+ * The lines for the ways of walking switched on with their keys (see toggleSprint and
+ * toggleEnPassant), at the top right: under the compass and its line when the compass shows,
+ * else where the compass would be. "SPRINT" is green while the soldier runs, and grey while they
+ * can't and walk (an armor that doesn't run, or no breath left for a run). Only in 3D, with the
+ * HUD shown.
+ * @param unit The soldier the view looks through, or null to hide the lines.
+ */
+void FirstPersonMode::updateWalkModeLines(BattleUnit *unit)
+{
+	const bool show = isActive() && !_hudHidden && unit;
+	_txtSprint->setVisible(show && _sprintOn);
+	_txtEnPassant->setVisible(show && _enPassantOn);
+	if (!show)
+	{
+		return;
+	}
+	// From under the compass's line (shown or not, so the lines don't jump), or from where the
+	// compass would be; SPRINT first, then EN PASSANT.
+	int lineY = _compass->getVisible() ? _txtCompassTurn->getY() + 10 : _compass->getY();
+	if (_sprintOn)
+	{
+		_txtSprint->setY(lineY);
+		const bool runs = _sprintStepRan && unit->getArmor()->allowsRunning(unit->isSmallUnit());
+		const Uint8 color = runs ? textColor(_state->getPalette(), 120, 230, 110) : textColor(_state->getPalette(), 150, 150, 160);
+		if (_txtSprint->getColor() != color) _txtSprint->setColor(color); // (setting it redraws the text)
+		lineY += 9;
+	}
+	_txtEnPassant->setY(lineY);
+}
+
+/**
  * Draws the compass: a dark disc with a grey rim, ticks at the eight directions a soldier can
  * face, the head's free turn as an arc on the rim (turning by the rules), the soldier's facing as
  * a yellow triangle on the rim, the way a shot will turn the soldier as a smaller orange one,
@@ -871,8 +902,9 @@ void FirstPersonMode::updateArmorButtons(BattleUnit *unit)
  * shows a live picture from the soldier's helmet camera (a small second 3D view), or TV static
  * if the soldier is dead or unconscious. The card hides when no squad button is hovered, or
  * while the mouse is captured for mouse look. With no card hovered, a camera popped up on the
- * aliens' turn (see alienTurnCamera) shows the same way, under that soldier's button, with why
- * as their status ("HIT").
+ * aliens' turn (see alienTurnCamera, and alienTurnMapCameras on the map) shows the same way, in
+ * 3D or on the map, under that soldier's button, with why as their status ("HIT"), looking at
+ * what it pops up for (the alien shooting at them, say).
  */
 void FirstPersonMode::updateSoldierCard()
 {
@@ -887,7 +919,7 @@ void FirstPersonMode::updateSoldierCard()
 		unit = _squadUnits[_hoveredSquadButton];
 		cardButton = _hoveredSquadButton;
 	}
-	else if (_alertUnit && SDL_GetTicks() < _alertUntil && isActive())
+	else if (_alertUnit && SDL_GetTicks() < _alertUntil)
 	{
 		// A popped-up camera: under the soldier's squad button if it shows, else the first.
 		for (size_t button = 0; button < _squadUnits.size() && button < _btnSquad.size(); ++button)
@@ -1011,7 +1043,7 @@ void FirstPersonMode::updateSoldierCard()
 
 	if (preview && live)
 	{
-		aimHelmetCamera(_preview, unit);
+		aimHelmetCamera(_preview, unit, poppedUp ? _alertLookAt : nullptr);
 	}
 }
 
@@ -1020,8 +1052,10 @@ void FirstPersonMode::updateSoldierCard()
  * main 3D view's settings, and asks for a new picture.
  * @param camera The camera's view.
  * @param unit The soldier, live.
+ * @param lookAt A unit to look at (a popped-up camera's alien, say); null: the way the soldier
+ *   faces (or, for the soldier the 3D view looks through, the way the view looks).
  */
-void FirstPersonMode::aimHelmetCamera(FirstPersonView *camera, BattleUnit *unit)
+void FirstPersonMode::aimHelmetCamera(FirstPersonView *camera, BattleUnit *unit, const BattleUnit *lookAt)
 {
 	// When it's the soldier we're looking through, copy the 3D camera itself (its eye, and its
 	// yaw by turning the camera by the difference), level.
@@ -1042,6 +1076,12 @@ void FirstPersonMode::aimHelmetCamera(FirstPersonView *camera, BattleUnit *unit)
 		const int unitSize = unit->getArmor()->getSize();
 		camera->setEye(position.x * 16.0 + 8.0 * unitSize, position.y * 16.0 + 8.0 * unitSize, eyeHeight(unit));
 		camera->lookAlong(unit->getDirection());
+	}
+	// At the unit to look at, if it has a place on the map (its chest, as the view turns to one).
+	double point[3];
+	if (lookAt && lookAt != unit && chestPoint(lookAt, point))
+	{
+		camera->lookAt(point);
 	}
 	// The same view settings as the main 3D view, and night vision if the soldier has it.
 	camera->setFieldOfView(Options::fpsFieldOfView);
