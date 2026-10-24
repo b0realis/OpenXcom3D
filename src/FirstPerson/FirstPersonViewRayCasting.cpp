@@ -62,6 +62,7 @@
 #include "FirstPersonApi.h"
 #include "../Engine/Logger.h"
 #include "../Engine/Options.h"
+#include "../Mod/Mod.h"
 #include "../Savegame/BattleUnit.h" // not used here, but its PARTS_STRING constants are part of this file's object code
 #include "../Savegame/SavedBattleGame.h"
 #include "FirstPersonViewShared.h"
@@ -196,6 +197,7 @@ void FirstPersonView::updateColors()
 	_colors.downedIcon[4] = nearest(170, 205, 255);
 	_colors.edgeDot = nearest(225, 45, 35);
 	_colors.unexplored = nearest(78, 88, 110);
+	_colors.rock = nearest(108, 94, 80);
 	_colors.spark = nearest(255, 240, 160);
 	_colors.blood[0] = nearest(90, 0, 0);
 	_colors.blood[1] = nearest(160, 12, 8);
@@ -208,6 +210,9 @@ void FirstPersonView::updateColors()
 	_colors.bubble = nearest(170, 230, 240);
 	_colors.tapeYellow = nearest(240, 200, 30);
 	_colors.trajectory = nearest(150, 235, 255);
+	_colors.trajectoryForced = nearest(250, 215, 60);
+	_colors.laserSight = nearest(235, 30, 25);
+	_colors.laserDot = nearest(255, 110, 90);
 	_colors.marker = nearest(235, 40, 30);
 	_colors.marine = nearest(150, 195, 190);
 	_colors.flareFire[0] = nearest(240, 30, 20);
@@ -241,15 +246,18 @@ void FirstPersonView::updateColors()
 			_colors.whiteTint[index] = nearest(std::min(255.0f, 180 + luminance * 0.3f), std::min(255.0f, 180 + luminance * 0.3f),
 				std::min(255.0f, 180 + luminance * 0.3f));
 			_colors.greenTint[index] = nearest(15 + luminance * 0.3f, 35 + luminance * 0.7f, luminance * 0.2f);
+			_colors.purpleTint[index] = nearest(std::min(255.0f, 55 + luminance * 0.75f), luminance * 0.25f, std::min(255.0f, 75 + luminance * 0.85f));
 			_colors.flareTint[index] = nearest(std::min(255.0f, 70 + luminance * 1.15f), luminance * 0.32f, luminance * 0.24f);
 		}
-		// Colour 0 (black on the screen): the blue, orange, white and green washes colour even
-		// black, with a dark shade of their own; the red wash and the flare's light leave it black.
+		// Colour 0 (black on the screen): the blue, orange, white, green and purple washes colour
+		// even black, with a dark shade of their own; the red wash and the flare's light leave it
+		// black.
 		_colors.redTint[0] = 0;
 		_colors.blueTint[0] = nearest(0, 2, 18);
 		_colors.orangeTint[0] = nearest(60, 24, 0);
 		_colors.whiteTint[0] = nearest(185, 185, 185);
 		_colors.greenTint[0] = nearest(8, 22, 4);
+		_colors.purpleTint[0] = nearest(40, 6, 58);
 		_colors.flareTint[0] = 0;
 		// Four greys, dark to light, for the TV static; two greens for a digital feed's broken blocks.
 		for (int level = 0; level < 4; ++level) _colors.grey[level] = nearest(30 + 60 * level, 30 + 60 * level, 30 + 60 * level);
@@ -587,13 +595,20 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 			&& _tileViews[hit.tile - tilesPerLevel].discovered;
 		if (!exploredCeiling)
 		{
-			// Unexplored: shapes in a flat slate colour, shaded by the face and the distance like
-			// the rest, never textured (nothing of the art shows) and never black (black reads as
-			// something missing): the shade stops a few steps short of the colour group's end.
+			// Unexplored: shapes in a flat slate colour, shaded by the face like the rest, never
+			// textured (nothing of the art shows) and never black (black reads as something
+			// missing): the shade stops a few steps short of the colour group's end. Further off
+			// they turn misty (see UnexploredMistFrom): they once grew darker with distance and
+			// stood out against the sky as a skyline of buildings that weren't there (a player's
+			// report); a soft blue-grey reads as shapes in the haze. At the view's far reach they
+			// fade out fully, as explored terrain does.
 			const int faceAxis = hit.axis >= 0 ? hit.axis : 2;
 			const int face = faceAxis * 2 + (rayDirection[faceAxis] > 0.0f ? 1 : 0);
 			const int darkest = 12 - (_colors.unexplored & 15);
-			return shadeColor(_colors.unexplored, std::min(darkest, (int)(_colors.ambient * 0.5f + _colors.faceShade[face] + hit.t / 160.0f + dither(pixelX, pixelY))));
+			const Uint8 slate = shadeColor(_colors.unexplored, std::min(darkest, (int)(_colors.ambient * 0.5f + _colors.faceShade[face] + dither(pixelX, pixelY))));
+			const float sight = _save->getMod()->getMaxViewDistance() * (float)Position::TileXY; // the game's sight range, in voxels
+			const float mist = UnexploredMistMax * smoothstep(sight * UnexploredMistFrom, sight * UnexploredMistTo, hit.t);
+			return hazeColor(slate, std::max(terrainHaze(hit.t), mist), pixelX + 2, pixelY + 1);
 		}
 	}
 	// The face's outward normal, against the ray on the axis it entered through (a top face,
@@ -613,6 +628,8 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 	const bool showNextFrame = dither(pixelX + 2, pixelY + 1) < _animationBlend;
 	// The colour before shading: the voxel's own, unless the face is one the iso art doesn't show.
 	Uint8 baseColor = hit.color;
+	int rockCeilingMiddle = -1; // a ceiling under rock: its middle shade within its colour group (see the end)
+	const float hitHeight = rayOrigin[2] + rayDirection[2] * hit.t; // in voxels
 	if (hit.part >= 0 && tileView.part[hit.part])
 	{
 		// The model the pixel shows: the part's next frame once dissolved into it. That frame's
@@ -635,9 +652,20 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 		const bool ownColorAllRound = model.exposed && (model.exposed[voxelZ][voxelY][voxelX] & 0x15);
 		// A face the iso art never shows: what its row shows from the side it does.
 		// An underside (seen from below) shows the colour seen from above: a thin plate's
-		// most common top colour, else the plan view's colour of this column.
-		Uint8 shownColor = hit.axis == 2 && rayDirection[2] > 0.0f ? (model.ceiling ? model.ceiling : model.plan[voxelY][voxelX]) : 0;
+		// most common top colour, else the plan view's colour of this column. Under rock (see
+		// underRock), dark art (its colour in the darker half of its group, DarkCeilingShade)
+		// shows its top's pattern instead, the rock's texture as the iso view shows its top:
+		// one plain colour sank into its darkest shade (the XPiratez hideout's ceiling).
 		const int tilesPerLevel = _save->getMapSizeX() * _save->getMapSizeY();
+		const bool underside = hit.axis == 2 && rayDirection[2] > 0.0f;
+		const bool undersideUnderRock = underside && underRock(hitHeight);
+		auto undersideColor = [&](const VoxelModel &plate) -> Uint8
+		{
+			const Uint8 plain = plate.ceiling ? plate.ceiling : plate.plan[voxelY][voxelX];
+			rockCeilingMiddle = undersideUnderRock && (plain & 15) >= DarkCeilingShade ? (plain & 15) : -1;
+			return rockCeilingMiddle >= 0 ? plate.plan[voxelY][voxelX] : plain;
+		};
+		Uint8 shownColor = underside ? undersideColor(model) : 0;
 		if (shownColor && model.color[23][voxelY][voxelX] && hit.tile + tilesPerLevel < (int)_tileViews.size())
 		{
 			// Its top is covered by what's on the level above (a craft's cabin under its roof
@@ -647,7 +675,7 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 			{
 				if (partAbove && partAbove->color[0][voxelY][voxelX] && partAbove->plan[voxelY][voxelX])
 				{
-					shownColor = partAbove->ceiling ? partAbove->ceiling : partAbove->plan[voxelY][voxelX];
+					shownColor = undersideColor(*partAbove);
 					break;
 				}
 			}
@@ -678,6 +706,10 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 	// is the direction the voxel's open faces face together, so a stepped curve of the hull
 	// shades smoothly instead of in stripes.
 	float faceShading = _colors.faceShade[faceIndex];
+	if (faceIndex == 5 && underRock(hitHeight))
+	{
+		faceShading = RockCeilingShade; // a ceiling under rock: no sun turns it away
+	}
 	if (hit.part >= 0 && tileView.part[hit.part] && tileView.part[hit.part]->exposed)
 	{
 		const Uint8 openFaces = tileView.part[hit.part]->exposed[hit.voxel[2]][hit.voxel[1]][hit.voxel[0]];
@@ -687,6 +719,7 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 	// shade darker per 320 voxels (20 tiles) of distance.
 	float ufoGlow = 0.0f; // a UFO's light here (the UFO lights option), 0..1
 	float shade = lightAt(surfacePoint[0], surfacePoint[1], surfacePoint[2], _ufoLightsOn ? &ufoGlow : nullptr) + faceShading + hit.t / 320.0f;
+	float sunShadow = 0.0f; // the shade a sun shadow adds (not darkness of the place: see the end)
 	float flare = 0.0f; // red light from tactical flares
 	if (hit.emissive)
 	{
@@ -706,7 +739,8 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 			const float towardsSun[3] = { surfacePoint[0] + _colors.sunDir[0] * 260.0f,
 				surfacePoint[1] + _colors.sunDir[1] * 260.0f,
 				surfacePoint[2] + _colors.sunDir[2] * 260.0f };
-			if (shadowed(surfacePoint, towardsSun)) shade += 3.0f * daylight;
+			if (shadowed(surfacePoint, towardsSun)) sunShadow = 3.0f * daylight;
+			shade += sunShadow;
 		}
 		// Lamps and the flashlight, throwing shadows.
 		shade -= pointLight(surfacePoint, normal, true);
@@ -762,12 +796,24 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 		if (ripple > 1.3f) shade -= (ripple - 1.3f) * 1.8f;
 	}
 	// Shade the colour by whole palette shades, the fraction dithered between two. Shaded past
-	// the darkest colour of its group, a colour turns black, as in the game; but on a UFO (its
-	// steady model, the UFO lights option) it stays the darkest of its group: the dark panels of
-	// the Harvester's gore tubes showed as black boxes.
-	const int wholeShades = (int)std::max(0.0f, shade + dither(pixelX, pixelY));
+	// the darkest colour of its group, a colour turns black, as in the game, but only where the
+	// place is really dark (see DarkOverflowFrom): the light there, without the face's turn from
+	// the sun, the distance or a sun shadow. In a lit place it stays the darkest of its group:
+	// dark art (a shot-away wooden floor, the rock over a base's rooms seen from below) showed
+	// as black holes. On a UFO (its steady model, the UFO lights option) it never turns black:
+	// the dark panels of the Harvester's gore tubes showed as black boxes.
+	int wholeShades = (int)std::max(0.0f, shade + dither(pixelX, pixelY));
 	const bool onSteadyUfo = hit.part >= 0 && tileView.part[hit.part] && tileView.part[hit.part]->exposed;
-	Uint8 color = onSteadyUfo ? (Uint8)((baseColor & 0xF0) | std::min(15, (baseColor & 15) + wholeShades)) : shadeColor(baseColor, wholeShades);
+	const float placeShade = shade - faceShading - hit.t / 320.0f - sunShadow;
+	const float blackShare = std::clamp((placeShade - DarkOverflowFrom) / (DarkOverflowTo - DarkOverflowFrom), 0.0f, 1.0f);
+	const bool darkEnoughForBlack = !onSteadyUfo && blackShare > dither(pixelX + 1, pixelY + 2);
+	if (rockCeilingMiddle >= 0 && !darkEnoughForBlack)
+	{
+		// A ceiling under rock keeps its texture, as the rock beyond the map does (see rockColor):
+		// its middle shade stops RockMottleShades short of the darkest, its pattern round that.
+		wholeShades = std::min(wholeShades, std::max(0, 15 - RockMottleShades - rockCeilingMiddle));
+	}
+	Uint8 color = darkEnoughForBlack ? shadeColor(baseColor, wholeShades) : (Uint8)((baseColor & 0xF0) | std::min(15, (baseColor & 15) + wholeShades));
 	if (flare * 1.5f > 0.04f + dither(pixelX + 1, pixelY + 3))
 	{
 		color = _colors.flareTint[color]; // the flare's light is red
@@ -776,11 +822,21 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 	{
 		color = ufoLighting->tint[ufoOuterShare > dither(pixelX + 1, pixelY) ? 1 : 0][color]; // a UFO's light: its inner or outer colour
 	}
-	// Far away the haze takes over (see hazeColor), from where the setting has it start; under
-	// the sea the murk closes in much sooner.
-	const float haze = _colors.underwater ? smoothstep(_maxDistance * 0.12f, _maxDistance * 0.65f, hit.t)
-		: smoothstep(_maxDistance * hazeStart(), _maxDistance, hit.t);
-	return hazeColor(color, haze, pixelX + 2, pixelY + 1);
+	// Far away the haze takes over (see hazeColor and terrainHaze).
+	return hazeColor(color, terrainHaze(hit.t), pixelX + 2, pixelY + 1);
+}
+
+/**
+ * How much of the distance haze terrain at some distance is in: none near, all of it at the
+ * view's reach, from where the setting "Distance haze" has it start; under the sea the murk
+ * closes in much sooner.
+ * @param distance How far away, in voxels.
+ * @return The haze, 0 none .. 1 all haze.
+ */
+float FirstPersonView::terrainHaze(float distance) const
+{
+	return _colors.underwater ? smoothstep(_maxDistance * 0.12f, _maxDistance * 0.65f, distance)
+		: smoothstep(_maxDistance * hazeStart(), _maxDistance, distance);
 }
 
 /**
@@ -816,11 +872,14 @@ Uint8 FirstPersonView::hazeColor(Uint8 color, float haze, int pixelX, int pixelY
 }
 
 /**
- * What a ray sees after leaving the map through its side (or its top): the X-COM tape on its
- * posts along the map's border, then the map's ground running on to the horizon, then the sky.
- * The tape and the posts stand on the border itself, so the ray meets them right where it
- * leaves the map; the ground beyond is a flat plane at floor height, tiled with the ground
- * model chosen for the map.
+ * What a ray sees after leaving the map through its side (or its top): below the map's surface
+ * (see chooseGround), the rock it's cut into; above it, the X-COM tape on its posts along the
+ * map's border, then the map's ground running on to the horizon, then the sky. The rock, the
+ * tape and the posts stand on the border itself, so the ray meets them right where it leaves the
+ * map; the ground beyond is a flat plane at the surface's floor height (ground level outdoors),
+ * tiled with the ground model chosen for the map. A map underground all the way up has rock
+ * beyond every edge and over it as well (a player's report: a base's edge showed the ground of
+ * its sewers far below, and the sky over it).
  * @param rayOrigin The eye, in voxels.
  * @param rayDirection The ray's unit direction in the voxel grid.
  * @param tExit How far along the ray it left the map.
@@ -838,7 +897,18 @@ Uint8 FirstPersonView::colorOutsideMap(const float rayOrigin[3], const float ray
 	const float exitPoint[3] = { rayOrigin[0] + rayDirection[0] * tExit, rayOrigin[1] + rayDirection[1] * tExit,
 		rayOrigin[2] + rayDirection[2] * tExit };
 	const float alongBorder = exitAxis == 0 ? exitPoint[1] : exitPoint[0];
-	const float tapeBottom = GroundTop + 8.0f; // the tape hangs 8 voxels above the ground, 7 voxels high
+	// The top of the ground beyond the border: the surface's floor (a level is 24 voxels high).
+	const float surfaceTop = GroundTop + _surfaceLevel * 24.0f;
+	// Below it, the rock: a wall of it along the border (facing back into the map), or over an
+	// enclosed map, its ceiling (facing down).
+	if (exitAxis != 2 ? exitPoint[2] < surfaceTop : _enclosed)
+	{
+		depth = tExit;
+		const int face = exitAxis == 2 ? 5 : exitAxis * 2 + (rayDirection[exitAxis] > 0.0f ? 1 : 0);
+		return exitAxis == 2 ? rockColor(exitPoint[0], exitPoint[1], face, tExit, pixelX, pixelY)
+			: rockColor(alongBorder, exitPoint[2] / ZScaleF, face, tExit, pixelX, pixelY);
+	}
+	const float tapeBottom = surfaceTop + 8.0f; // the tape hangs 8 voxels above the ground, 7 voxels high
 	// The discreet map edge (setting) has no posts and no tape: the ground beyond and the sky
 	// only, the edge marked by dots on the floor instead (see drawEdgeDots).
 	const bool tape = !Options::fpsDiscreetEdge;
@@ -846,7 +916,7 @@ Uint8 FirstPersonView::colorOutsideMap(const float rayOrigin[3], const float ray
 	// A post every 64 voxels (4 tiles) along the border, 1.5 voxels thick and 17 voxels high,
 	// shaded a little darker on the sides facing north or south than on those facing east or west.
 	const float pastLastPost = alongBorder - std::floor(alongBorder / 64.0f) * 64.0f;
-	if (tape && pastLastPost < 1.5f && exitPoint[2] >= GroundTop && exitPoint[2] < GroundTop + 17.0f)
+	if (tape && pastLastPost < 1.5f && exitPoint[2] >= surfaceTop && exitPoint[2] < surfaceTop + 17.0f)
 	{
 		depth = tExit;
 		return shadeColor(_colors.post, (int)(borderShade + (exitAxis == 0 ? 1.0f : 2.0f) + dither(pixelX, pixelY)));
@@ -870,11 +940,11 @@ Uint8 FirstPersonView::colorOutsideMap(const float rayOrigin[3], const float ray
 		}
 		return shadeColor(color, (int)(borderShade + dither(pixelX, pixelY)));
 	}
-	// The ground beyond the map: where a ray going down meets the plane of the ground floor's
+	// The ground beyond the map: where a ray going down meets the plane of the surface's floor
 	// top, if that is beyond the border.
 	if (rayDirection[2] < 0.0f && _groundModel)
 	{
-		const float groundDistance = (GroundTop - rayOrigin[2]) / rayDirection[2];
+		const float groundDistance = (surfaceTop - rayOrigin[2]) / rayDirection[2];
 		if (groundDistance >= tExit)
 		{
 			depth = groundDistance;
@@ -895,6 +965,45 @@ Uint8 FirstPersonView::colorOutsideMap(const float rayOrigin[3], const float ray
 	// Nothing else in the way: the sky.
 	depth = Infinity;
 	return skyColor(rayDirection, pixelX, pixelY);
+}
+
+/**
+ * Is an underside at some height a ceiling under rock? On a map underground all the way up (a
+ * base, a colony's inside), everywhere; elsewhere up to the map's surface (see chooseGround): the
+ * ground's own floor seen from the caves below it, and anything in them. (On a map whose surface
+ * is its bottom level, nothing: a table's underside, a house's upper floor are plain ceilings.)
+ * @param height The underside's height, in voxels.
+ * @return True if it is.
+ */
+bool FirstPersonView::underRock(float height) const
+{
+	return _enclosed || height <= GroundTop + _surfaceLevel * 24.0f;
+}
+
+/**
+ * The rock round an underground map (beyond its border, below its surface) and over one
+ * underground all the way up: the map's own rock colour (see chooseGround) in a calm mottle, two
+ * scales of value noise over the face, shaded by the face and the scene's light like the rest,
+ * stopping a few steps short of black at its darkest (black reads as something missing), and
+ * fading into the distance haze far off.
+ * @param alongU Where on the rock face the point is, in voxels: along the border (or the map's x, for the ceiling).
+ * @param alongV The same, up the border (or the map's y, for the ceiling).
+ * @param face Which way the face looks (+x -x +y -y +z -z, the order of the face shading).
+ * @param distance How far along the ray the rock is, in voxels.
+ * @param pixelX The ray's pixel on the view (or block of pixels), for the dither pattern.
+ * @param pixelY The same, down.
+ * @return The palette colour to draw.
+ */
+Uint8 FirstPersonView::rockColor(float alongU, float alongV, int face, float distance, int pixelX, int pixelY) const
+{
+	// The light and the face first, stopping RockMottleShades short of the darkest shade the rock
+	// may take, then the mottle on top of that, so it shows by day and by night alike.
+	const float mottle = valueNoise(alongU / 12.0f, alongV / 9.0f) * 0.65f + valueNoise(alongU / 3.0f, alongV / 3.0f) * 0.35f;
+	const Uint8 rock = _rockBase ? _rockBase : _colors.rock; // the map's own rock (see chooseGround), else a plain grey-brown
+	const int darkest = 12 - (rock & 15);
+	const int lit = std::min(darkest - RockMottleShades, (int)(_colors.ambient * 0.5f + _colors.faceShade[face]));
+	const int shades = std::min(darkest, lit + (int)(mottle * RockMottleShades + dither(pixelX, pixelY)));
+	return hazeColor(shadeColor(rock, shades), terrainHaze(distance), pixelX + 2, pixelY + 1);
 }
 
 /**

@@ -217,6 +217,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	// The settings (YES/NO switches and numbers), in the order the Settings list shows them.
 	// First the headline feature: hovering a soldier's button shows that soldier's helmet camera.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSoldierPreview", &fpsSoldierPreview, true, "STR_FPS_SOLDIER_PREVIEW", category));
+	// And on the isometric map, the selected soldier's helmet camera in a window: off, small,
+	// medium or large (0 to 3).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsMapCamera", &fpsMapCamera, 0, "STR_FPS_MAP_CAMERA", category));
 	// Mouse look: how fast the view turns (1 to 20), up and down swapped or not, and the field
 	// of view across the screen, in degrees (50 to 110).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMouseSensitivity", &fpsMouseSensitivity, 5, "STR_FPS_MOUSE_SENSITIVITY", category));
@@ -323,6 +326,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	// shows its path, a second click on it fires.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsTrajectory", &fpsTrajectory, 1, "STR_FPS_TRAJECTORY", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsConfirmFire", &fpsConfirmFire, false, "STR_FPS_CONFIRM_FIRE", category));
+	// An arcing shot the game would refuse (no curve of its own lands on the target tile, as at
+	// a wall seen from the side) fires anyway, forced as with Ctrl held (its path drawn yellow).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsForceArcing", &fpsForceArcing, true, "STR_FPS_FORCE_ARCING", category));
 	// The units' hitboxes, outlined: off (0), fading in and out once a second (1), always (2).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitboxes", &fpsHitboxes, 0, "STR_FPS_HITBOXES", category));
 	// The hitboxes' outlines and the path of a throw glowing (spilling bloom round them), or plain lines.

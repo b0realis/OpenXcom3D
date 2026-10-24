@@ -93,21 +93,24 @@ struct RayContext
 	float ghostThreshold = 2.0f;              // a ghost stops the ray where its opacity is above this (the pixel's dither threshold); above 1, never (shadows, aim, flares)
 };
 
-// How solid a ghost looks (see VoxelModel::ghostly): on what share of the pixels it shows, at
-// full up close (GhostNearDistance voxels, a tile and a half), fading to GhostFarOpacity from
-// GhostFarDistance (seven tiles) on, so it's clear up close and doesn't clutter the distance.
-const float GhostNearDistance = 24.0f, GhostFarDistance = 112.0f, GhostFarOpacity = 0.3f;
+// How solid a ghost looks (see VoxelModel::ghostly): on what share of the pixels it shows,
+// GhostNearOpacity up close (GhostNearDistance voxels, a tile and a half), fading to
+// GhostFarOpacity from GhostFarDistance (seven tiles) on, so it's plain up close and doesn't
+// clutter the distance. Never solid: up close too it's a mesh to see through, as a unit above or
+// below a lift pad is a threat to watch (a player's report on 1.03; it was solid up close).
+const float GhostNearDistance = 24.0f, GhostFarDistance = 112.0f, GhostNearOpacity = 0.5f, GhostFarOpacity = 0.3f;
 
 /**
- * The share of the pixels a ghost shows on at a distance along the ray (in voxels): 1 up close,
- * GhostFarOpacity far off, straight in between. The view's rays meet a ghost voxel only where
- * this is above the pixel's dither threshold (RayContext::ghostThreshold), so it shows as a
- * screen of dots that thickens as the soldier comes closer.
+ * The share of the pixels a ghost shows on at a distance along the ray (in voxels):
+ * GhostNearOpacity up close, GhostFarOpacity far off, straight in between. The view's rays meet
+ * a ghost voxel only where this is above the pixel's dither threshold
+ * (RayContext::ghostThreshold), so it shows as a screen of dots that thickens a little as the
+ * soldier comes closer.
  */
 inline float ghostOpacity(float distance)
 {
 	const float fade = (distance - GhostNearDistance) / (GhostFarDistance - GhostNearDistance);
-	return 1.0f - std::clamp(fade, 0.0f, 1.0f) * (1.0f - GhostFarOpacity);
+	return GhostNearOpacity - std::clamp(fade, 0.0f, 1.0f) * (GhostNearOpacity - GhostFarOpacity);
 }
 
 /**

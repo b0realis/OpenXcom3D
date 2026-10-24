@@ -195,6 +195,12 @@ private:
 	void createSoldierCam();
 	/// Makes the soldier cam's picture (a second small 3D view) and frame at the canvas's size.
 	void makeSoldierCamView();
+	/// Makes the map camera's picture and frame at a size of the setting "Map camera" (1 small .. 3 large).
+	void makeMapCamera(int size);
+	/// Puts a remade surface of ours in the old one's place among the state's surfaces (or adds it the first time).
+	void putSurfaceInPlace(Surface *oldSurface, Surface *newSurface);
+	/// The colours of our panels and cards: the mod's, or black with a grey border.
+	void panelColors(Uint8 &background, Uint8 &border) const;
 	/// Says which screen corner each of our surfaces keeps to when the screen is resized.
 	void setResizeAnchors();
 	/// Selects the next soldier when the one the camera was with is gone; returns the selected unit.
@@ -242,6 +248,9 @@ private:
 	void applyDoomMode(BattleUnit *unit);
 	/// Doom IDDQD: keeps X-COM's units at full morale.
 	void applyGodMode();
+	/// In 3D, while a shot flies or something goes off (and a moment after), lets the battle's timer catch up on missed steps.
+	void catchUp();
+	Uint32 _catchUpUntil = 0; // the timer may catch up until then (see catchUp)
 	/// Doom mode: sets off the grenades whose real-time fuse has burnt down.
 	void updateDoomFuses(Uint32 now);
 	/// Plays the tense combat track while aliens are in sight.
@@ -301,6 +310,16 @@ private:
 	double _rideFrom = 0.0, _rideTo = 0.0; // eye heights; _rideTo is the estimate until the unit is up
 	int _rideLevel = 0;                    // the level the ride started from
 	bool _rideVertical = false;            // a vertical move (lift, flying) seen last frame
+	// a fall (not a lift, a ladder or flight): the eye drops as by gravity
+	Uint32 _fallStart = 0;                 // when it began (0: not falling)
+	double _fallEyeFrom = 0.0;             // the eye's height then
+	Uint32 _landedAt = 0;                  // when the last fall landed (the view dips, see landingDip)
+	/// How long going up or down a level takes (a lift, a ladder, flying, a fall), by the walk speed setting (see RideTiles).
+	Uint32 rideTime() const;
+	/// Is the game making this unit fall (a step into the air, the floor gone under it)?
+	bool isFalling(BattleUnit *unit) const;
+	/// How far the view dips just after a fall has landed, in voxels.
+	double landingDip() const;
 
 	/// Turns the view by a mouse movement.
 	void turnByMouse(int mouseDeltaX, int mouseDeltaY);
@@ -412,8 +431,16 @@ private:
 	bool stepThroughDiagonalGap(BattleUnit *unit, double newEyeX, double newEyeY, double wantedVelocityX, double wantedVelocityY, bool sidesMayBeOpen);
 	/// Walks the camera through a guided step (after a door has opened).
 	bool walkGuidedStep(BattleUnit *unit, double &newEyeX, double &newEyeY, double elapsedSeconds);
-	/// Opens the door the soldier faces without walking through it.
+	/// Opens the door the player points at (or the nearest one in view) within the soldier's reach, without walking through it.
 	void openDoor(BattleUnit *unit);
+	/// The facing that opens the door the player points at, or else the closed one within reach nearest the view; -1 for none.
+	int doorWithinReach(BattleUnit *unit);
+	/// Opens the door once the paid turn towards it (turning by the rules) is done.
+	void openDoorAfterTurn(BattleUnit *unit);
+	/// The game's turn on the spot that opens the door the soldier faces, at its usual cost.
+	void openDoorAhead(BattleUnit *unit);
+	BattleUnit *_doorAfterTurnUnit = nullptr; // turning by the rules towards a door: the soldier turning
+	int _doorAfterTurn = -1;                  // and the facing to open the door from (-1: no door waits)
 
 	// ---- jumping: a free hop of the camera; into a low obstacle, a vault over it (the step is
 	// walked by the rules, the pathfinding letting that obstacle through) ----
@@ -496,6 +523,7 @@ private:
 	Uint32 _tileMoveKeysSince = 0;       // when the movement keys were pressed (a moment's wait catches a second key, for a diagonal)
 	double _tileMoveClosest = 0.0;       // the closest the camera has come to the target's middle, voxels
 	Uint32 _tileMoveProgressAt = 0;      // when it last came closer
+	bool _tileMoveHeldOn = false;        // W, A, S or D held without a break since the last move started (walks on, but not through a closed door)
 
 	/// The movement keys' push: forward (1) or back (-1), right (1) or left (-1).
 	void movementKeys(double &forward, double &strafe) const;
@@ -563,6 +591,12 @@ private:
 	bool _burstConfirmed = false;                       // the held trigger's bursts after a confirmed one need no confirming
 	/// Shows the path the next throw or shot would take (or the marked target's), worked out as the game will.
 	void updateTrajectory(BattleUnit *unit, bool playerTurn);
+	/// The curve the game's own aim finds for a throw or an arcing shot at a tile, if any (its path, if asked for).
+	bool gameArcFound(BattleAction &shot, const Position &targetTile, std::vector<Position> *path);
+	/// The curve of an arcing shot forced at a tile (as with Ctrl held), if any (its path, if asked for).
+	bool forcedArcFound(BattleAction &shot, const Position &targetTile, std::vector<Position> *path);
+	/// Is this an arcing shot the game would refuse, which the setting "Force arcing shots" fires forced?
+	bool forcesArc(BattleAction &shot, const Position &targetTile);
 	/// Forgets the target marked for confirm fire.
 	void clearConfirmMark() { _confirmTile = Position(-1, -1, -1); _confirmUnit = nullptr; _confirmWeapon = nullptr; _confirmMode = BA_NONE; }
 
@@ -588,6 +622,22 @@ private:
 	void toggleAkimbo();
 	/// Dual wield: the other hand's gun if it can fire along with this mode, and the mode it fires.
 	BattleItem *dualPartner(BattleUnit *unit, const BattleItem *weapon, BattleActionType slot, BattleActionType &partnerMode) const;
+	/// Akimbo: do the two guns fire in turn (either one's shot arcs) rather than together?
+	bool firesInTurn(const BattleItem *weapon, BattleActionType mode, const BattleItem *otherWeapon, BattleActionType otherMode) const;
+	/// Akimbo in turn: the other gun's shot, waiting for the game to be done with the first (see fireTurnShot).
+	struct TurnShot
+	{
+		BattleUnit *unit = nullptr;     // the soldier
+		BattleItem *weapon = nullptr;   // the other gun (null: no shot waiting)
+		BattleActionType mode = BA_NONE; // its fire mode
+		Position targetTile, aimedVoxel; // what the first shot was aimed at
+		bool hitSomething = false;      // the aim met something there (not the sky)
+	} _turnShot;
+	const BattleItem *_turnShotFired = nullptr; // the gun that just fired in turn: the game aims with it until endShotAim, which isn't a pick (see updateFireMode)
+	/// Akimbo in turn: fires the other gun's shot once the game is done with the first, or calls it off.
+	void fireTurnShot();
+	/// Fires a shot or a throw at a tile through the game's own action, the other gun joining in (or not).
+	void launchShot(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, const Position &targetTile, const Position &aimedVoxel, bool hitSomething, BattleItem *otherWeapon, BattleActionType otherMode);
 	/// The fire modes the left mouse button can use with an item, in wheel order.
 	std::vector<BattleActionType> fireModesFor(BattleUnit *unit, BattleItem *weapon) const;
 	/// Keeps the fire mode valid for the weapon in hand.
@@ -601,7 +651,7 @@ private:
 	/// Notes what's under the crosshair this frame.
 	void updateAim(BattleUnit *unit);
 	/// The first voxel along the ray through a pixel, as a shot would see it; true if something is there.
-	bool aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &voxel);
+	bool aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &voxel, int *voxelType = nullptr);
 	/// Uses the fire mode on whatever is under a pixel of the view, through the game's own actions.
 	void fire(int pixelX, int pixelY);
 	/// The patient a medi-kit would treat now: among the game's own choices, the one pointed at; or null.
@@ -808,10 +858,25 @@ private:
 	Surface *_soldierCamDot = nullptr;      // the red dot of a live feed, blinking
 	Text *_txtSoldierCam = nullptr;         // "SOLDIER CAM: <name>"
 	int _soldierCamWidth = 0, _soldierCamHeight = 0; // the picture's size, in canvas pixels
-	/// Points a helmet camera (the card's, or the soldier cam) through a soldier's eyes, the way they face or at a unit.
-	void aimHelmetCamera(FirstPersonView *camera, BattleUnit *unit, const BattleUnit *lookAt = nullptr);
-	/// Shows the soldier cam for a soldier under a squad button, or hides it (null).
-	void updateSoldierCam(BattleUnit *unit, int cardButton);
+	/// Points a helmet camera (the card's, the soldier cam, the map camera) through a soldier's eyes, the way they face, at a unit or at a point.
+	void aimHelmetCamera(FirstPersonView *camera, BattleUnit *unit, const BattleUnit *lookAt = nullptr, const double *lookAtPoint = nullptr);
+	/// Shows the soldier cam for a soldier with its frame's left edge at a canvas x, or hides it (null).
+	void updateSoldierCam(BattleUnit *unit, int frameX);
+
+	// ---- the map camera: on the isometric map, the selected soldier's helmet camera in a window ----
+
+	FirstPersonView *_mapCamera = nullptr;  // its picture
+	Surface *_mapCameraFrame = nullptr;     // its frame, with a title line
+	Text *_txtMapCamera = nullptr;          // the title: the soldier's name
+	int _mapCameraSize = 0;                 // the size the picture was made at (see makeMapCamera)
+	int _mapCameraCanvasWidth = 0;          // and the canvas's width it was made for
+	bool _mapSoldierCamOpen = false;        // the soldier cam opened from it (a right click; closes off it, or with another)
+	/// Shows the map camera (or the soldier cam opened from it) in the player's turn on the map, or hides it.
+	void updateMapCamera();
+	/// Is a point on the canvas on the map camera, or on the soldier cam opened from it?
+	bool onMapCamera(int canvasX, int canvasY) const;
+	/// The 3D HUD key on the map: the map camera off, or on again at its last size.
+	void toggleMapCamera();
 
 	// ---- the banner across the top of the view ----
 
@@ -820,8 +885,8 @@ private:
 
 	/// Does this unit have night vision (gear, or eyes that see in the dark)?
 	bool hasNightVision(const BattleUnit *unit) const;
-	/// Switches night vision on or off for a soldier with the gear.
-	void toggleNightVision(BattleUnit *unit, Action *action);
+	/// Switches night vision on or off for a soldier with the gear, whatever the game is doing.
+	void toggleNightVision(BattleUnit *unit);
 	/// Fills the info panel for a unit (or hides it).
 	void updateInfoPanel(BattleUnit *unit);
 	/// The soldier card's weapon line: "R: Rifle 17 | 2 clips (40)".
@@ -881,6 +946,8 @@ private:
 
 	/// Flashes red when the soldier we look through is hurt.
 	void checkHurt(BattleUnit *unit, Uint32 now);
+	/// The purple haze at the view's edges for a unit under our mind control, breathing (0 for any other).
+	float controlHaze(const BattleUnit *unit, Uint32 now) const;
 	/// Reacts to an enemy shot whizzing past close by.
 	void checkNearMiss();
 

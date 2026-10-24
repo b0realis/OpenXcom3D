@@ -469,28 +469,67 @@ void FirstPersonView::drawDecals()
 		const double centre[3] = { scorch.pos[0], scorch.pos[1], scorch.pos[2] };
 		drawGroundShade(centre, scorch.radius, 4, 1.4f);
 	}
-	// Each bullet hole or scorch: a dark round spot, at most 6 pixels in radius, on the screen
-	// where it is (skip it if it's behind the camera or right in front of it).
+	// Each bullet hole or scorch, skipped behind the camera or right in front of it: the pixels
+	// whose point in the scene lies within the mark's radius of it, in 3D. A pixel's point is
+	// rebuilt from the depth buffer (the distance along the view axis) and the ray through the
+	// pixel's middle, in the camera's space (ahead, right, up; heights scaled as the view scales
+	// them), where the mark's own point is too. So slopes, edges and whatever stands in front sort
+	// themselves out: a unit before the wall, or the sky past a corner, is far from the mark. A
+	// mark smaller than half a pixel still darkens the one pixel it falls on, so a far hole is a
+	// dot, never nothing (a player's report: holes on objects came and went by range and by luck).
 	for (const auto &decal : _decals)
 	{
 		const double world[3] = { decal.pos[0], decal.pos[1], decal.pos[2] };
 		double screenX, screenY, depth;
-		if (!projectToScreen(world, screenX, screenY, depth) || depth < 4.0) continue;
-		const int radius = std::clamp((int)std::lround(decal.size * focalLength / depth * 0.3), 0, 6); // in pixels
-		for (int y = (int)screenY - radius; y <= (int)screenY + radius; ++y)
+		if (!projectToScreen(world, screenX, screenY, depth)) continue;
+		const double markRight = (screenX - width / 2.0) * depth / focalLength, markUp = (height / 2.0 - screenY) * depth / focalLength;
+		const double radius = decal.size * MarkRadius;    // in voxels
+		const double pixelSpan = depth / focalLength;     // how much of the world one pixel spans there, in voxels
+		const int centreX = (int)std::floor(screenX), centreY = (int)std::floor(screenY);
+		// How far a pixel's scene point is from the mark, in voxels.
+		auto distanceFromMark = [&](int x, int y)
 		{
-			for (int x = (int)screenX - radius; x <= (int)screenX + radius; ++x)
+			const double sceneAhead = _depthBuffer[y * width + x];
+			const double sceneRight = (x + 0.5 - width / 2.0) * sceneAhead / focalLength, sceneUp = (height / 2.0 - (y + 0.5)) * sceneAhead / focalLength;
+			return std::sqrt((sceneAhead - depth) * (sceneAhead - depth) + (sceneRight - markRight) * (sceneRight - markRight) + (sceneUp - markUp) * (sceneUp - markUp));
+		};
+		// Darkens a pixel by some shades, within its own colour group (empty black pixels stay).
+		auto darken = [&](int x, int y, int shades)
+		{
+			Uint8 &pixel = *getRaw(x, y);
+			if (pixel) pixel = (Uint8)((pixel & 0xF0) | std::min(15, (pixel & 15) + shades));
+		};
+		// A bullet hole's core is darker than its edge (it shows on busy textures such as sand);
+		// a scorch is even all over.
+		const int coreShades = decal.size == 1 ? BulletHoleCoreShades : decal.depth;
+
+		// The pixel it falls on, as its core, if the scene there is the surface it marks (within
+		// its radius and two pixels' span of it, and a voxel more: the camera sees a step's edge or
+		// a slope from another angle than the shot came in at): however small or far the mark,
+		// it's never lost while its surface shows.
+		const bool centreOnScreen = centreX >= 0 && centreY >= 0 && centreX < width && centreY < height;
+		if (centreOnScreen && distanceFromMark(centreX, centreY) <= radius + 2.0 * pixelSpan + 1.0)
+		{
+			darken(centreX, centreY, coreShades);
+		}
+		if (radius < pixelSpan * 0.5)
+		{
+			continue; // smaller than half a pixel: that one pixel is all of it
+		}
+		// The rest: every pixel within its radius, with a ragged edge once it's bigger than a
+		// pixel; right up close no more than MarkMaxPixels across from its middle on the screen
+		// (the radius drawn shrinks to what that many pixels span there, so it stays round).
+		const double drawnRadius = std::min(radius, MarkMaxPixels * pixelSpan);
+		const int reach = (int)std::ceil(drawnRadius / pixelSpan);
+		for (int y = centreY - reach; y <= centreY + reach; ++y)
+		{
+			for (int x = centreX - reach; x <= centreX + reach; ++x)
 			{
-				if (x < 0 || y < 0 || x >= width || y >= height) continue;
-				// Only within the disc, and only on the surface it hit (the scene there is within
-				// 2.5 voxels of the mark's depth): a unit or a wall in front stays clean.
-				const double distance = std::sqrt((x - screenX) * (x - screenX) + (y - screenY) * (y - screenY));
-				if (distance > radius + 0.5 || std::abs(_depthBuffer[y * width + x] - depth) > 2.5) continue;
-				if (radius > 1 && distance > radius * 0.6 && dither(x, y) > 0.5f) continue; // ragged edge
-				// Darker by the mark's darkness (decal.depth, in shades), within the pixel's own
-				// colour group (empty black pixels stay as they are).
-				Uint8 &pixel = *getRaw(x, y);
-				if (pixel) pixel = (Uint8)((pixel & 0xF0) | std::min(15, (pixel & 15) + decal.depth));
+				if (x < 0 || y < 0 || x >= width || y >= height || (x == centreX && y == centreY)) continue;
+				const double distance = distanceFromMark(x, y);
+				if (distance > drawnRadius) continue;
+				if (reach > 1 && distance > drawnRadius * 0.6 && dither(x, y) > 0.5f) continue; // ragged edge
+				darken(x, y, distance <= drawnRadius * 0.5 ? coreShades : decal.depth);
 			}
 		}
 	}
@@ -962,19 +1001,37 @@ void FirstPersonView::spawnShotImpact(const float shotEnd[3], const float from[3
 	{
 		return;
 	}
-	// Where the shot's line meets what the view draws (see above).
+	// Where the shot's line meets what the view draws (see above): the mark goes on it, the
+	// sparks and chunks fly from just in front of it. The search starts
+	// ImpactSearchBack voxels back along the shot's line: an object's art can stand further out
+	// than its collision shape (the desert's dunes, by 3 voxels and more). A start that is
+	// still inside what's drawn (the search would meet it at once, and the mark would sit inside
+	// the shape, unseen) moves back as far again, up to where the shot came from.
 	float head[3] = { shotEnd[0], shotEnd[1], shotEnd[2] };
+	float markAt[3] = { shotEnd[0], shotEnd[1], shotEnd[2] };
 	float direction[3] = { shotEnd[0] - from[0], shotEnd[1] - from[1], shotEnd[2] - from[2] };
 	const float length = std::sqrt(direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2]);
 	if (length > 1.0f)
 	{
 		for (float &component : direction) component /= length;
-		const float back = std::min(3.0f, length - 0.5f);
-		const float start[3] = { shotEnd[0] - direction[0] * back, shotEnd[1] - direction[1] * back, shotEnd[2] - direction[2] * back };
-		float surface[3];
-		if (visibleSurfaceAlong(start, direction, back + 12.0f, surface))
+		for (float back = std::min(ImpactSearchBack, length - 0.5f); ; back = std::min(back * 2.0f, length - 0.5f))
 		{
-			for (int axis = 0; axis < 3; ++axis) head[axis] = surface[axis] - direction[axis] * 0.3f; // just in front of it
+			const float start[3] = { shotEnd[0] - direction[0] * back, shotEnd[1] - direction[1] * back, shotEnd[2] - direction[2] * back };
+			float surface[3];
+			if (!visibleSurfaceAlong(start, direction, back + 12.0f, surface))
+			{
+				break; // nothing drawn there: the mark stays where the shot ended
+			}
+			const float found = (surface[0] - start[0]) * direction[0] + (surface[1] - start[1]) * direction[1] + (surface[2] - start[2]) * direction[2];
+			if (found > 0.05f || back >= length - 0.5f)
+			{
+				for (int axis = 0; axis < 3; ++axis)
+				{
+					markAt[axis] = surface[axis];
+					head[axis] = surface[axis] - direction[axis] * 0.3f; // just in front of it
+				}
+				break;
+			}
 		}
 	}
 	const Uint8 debrisColor = debrisColorAt(head);
@@ -993,7 +1050,7 @@ void FirstPersonView::spawnShotImpact(const float shotEnd[3], const float from[3
 	_particles.burst(head, 6, P::LIT, P::EFFECT, dustColors, 2, 3, 10, 0.5f, -6, 1.5f, 0.8f, 1.6f, 4);
 	// The mark: a scorch (size 3, 6 shades darker) or a bullet hole (size 1, 4 shades darker).
 	const bool scorch = trail == TRAIL_BEAM || trail == TRAIL_PLASMA || trail == TRAIL_FIRE;
-	addDecal(head, scorch ? 3 : 1, scorch ? 6 : 4);
+	addDecal(markAt, scorch ? 3 : 1, scorch ? 6 : 4);
 }
 
 /**
@@ -1207,11 +1264,15 @@ void FirstPersonView::shotHead(const Projectile *projectile, float out[3]) const
 
 /**
  * The path a throw or shot aimed now would take (setting "Show trajectory", or a target marked
- * for confirm fire; see FirstPersonMode::updateTrajectory): dashes of TrajectoryDash voxels
- * along it in a light cyan (no other line is that colour), two pixels thick, fading a little
- * towards the far end, so the eye follows it out; and where it ends (where a throw lands, or a
- * shot meets something), a diamond lying flat round it. The first voxels, at the soldier's own hand, are left
- * out. Depth-tested like any line, so walls hide what's behind them.
+ * for confirm fire; see FirstPersonMode::updateTrajectory), depth-tested like any line, so walls
+ * hide what's behind them; the first voxels, at the soldier's own hand, are left out:
+ * - a throw's or an arcing shot's curve: dashes of TrajectoryDash voxels along it in a light
+ *   cyan (no other line is that colour), two pixels thick, fading a little towards the far end,
+ *   so the eye follows it out, and where it lands a diamond lying flat round it; a forced shot's
+ *   curve (as with Ctrl held, see FirstPersonMode::forcesArc) the same in yellow, for "it may
+ *   meet something on the way";
+ * - a straight shot's line: a laser sight, one pixel thin and red, unbroken, from the weapon,
+ *   with a brighter dot where it meets something (the owner's choice for the player's request).
  */
 void FirstPersonView::drawTrajectory()
 {
@@ -1220,9 +1281,56 @@ void FirstPersonView::drawTrajectory()
 		return;
 	}
 	const float TrajectoryDash = 6.0f, TrajectorySkip = 14.0f;
+	auto voxelCentreOf = [](const Position &voxel, float out[3]) { out[0] = voxel.x + 0.5f; out[1] = voxel.y + 0.5f; out[2] = voxel.z + 0.5f; };
+
+	// A straight shot: the laser from the weapon's muzzle on the screen (12 voxels out along the
+	// ray through it, where the view's own shots leave it), or without a weapon shown from past
+	// the hand along the game's line; to the end, then its dot. (The game's line starts almost
+	// at the eye, and seen from there it would shrink to a few pixels behind the crosshair.)
+	if (_trajectoryLook == TRAJECTORY_STRAIGHT)
+	{
+		float start[3], end[3];
+		voxelCentreOf(_trajectory.back(), end);
+		if (_muzzleValid)
+		{
+			double rayDirection[3];
+			rayDirectionThrough((int)_muzzleScreen[0], (int)_muzzleScreen[1], rayDirection);
+			for (int axis = 0; axis < 3; ++axis) start[axis] = (float)(_eye[axis] + rayDirection[axis] * 12.0);
+		}
+		else
+		{
+			size_t first = 0;
+			for (; first + 1 < _trajectory.size(); ++first)
+			{
+				const Position offset = _trajectory[first] - _trajectory.front();
+				if (offset.x * offset.x + offset.y * offset.y + offset.z * offset.z >= TrajectorySkip * TrajectorySkip) break;
+			}
+			if (first + 1 >= _trajectory.size())
+			{
+				return;
+			}
+			voxelCentreOf(_trajectory[first], start);
+		}
+		drawLine3D(start, end, _colors.laserSight, 1, 1.0f, 0.0f, 0, 1 << 30, Options::fpsGlowingOutlines);
+		// The dot: the pixel the end falls on and its four neighbours, where the scene there is
+		// the surface the line met (within two voxels of it).
+		double screenX, screenY, depth;
+		const double endWorld[3] = { end[0], end[1], end[2] };
+		if (projectToScreen(endWorld, screenX, screenY, depth))
+		{
+			const int width = getWidth(), height = getHeight(), centreX = (int)std::floor(screenX), centreY = (int)std::floor(screenY);
+			const int dot[5][2] = { { 0, 0 }, { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+			for (const auto &offset : dot)
+			{
+				const int pixelX = centreX + offset[0], pixelY = centreY + offset[1];
+				if (pixelX < 0 || pixelY < 0 || pixelX >= width || pixelY >= height || depth > _depthBuffer[pixelY * width + pixelX] + 2.0) continue;
+				*getRaw(pixelX, pixelY) = offset[0] == 0 && offset[1] == 0 ? _colors.laserDot : _colors.laserSight;
+			}
+		}
+		return;
+	}
 
 	// The path's length, to fade the dashes along it.
-	auto voxelCentre = [](const Position &voxel, float out[3]) { out[0] = voxel.x + 0.5f; out[1] = voxel.y + 0.5f; out[2] = voxel.z + 0.5f; };
 	float totalLength = 0.0f;
 	for (size_t point = 1; point < _trajectory.size(); ++point)
 	{
@@ -1236,14 +1344,14 @@ void FirstPersonView::drawTrajectory()
 
 	// Every other stretch of TrajectoryDash voxels is a dash: drawn as one line from where it
 	// starts to where it ends.
-	const Uint8 color = _colors.trajectory;
+	const Uint8 color = _trajectoryLook == TRAJECTORY_FORCED ? _colors.trajectoryForced : _colors.trajectory;
 	float travelled = 0.0f, dashStart[3] = {}, previous[3];
 	bool inDash = false;
-	voxelCentre(_trajectory[0], previous);
+	voxelCentreOf(_trajectory[0], previous);
 	for (size_t point = 1; point < _trajectory.size(); ++point)
 	{
 		float current[3];
-		voxelCentre(_trajectory[point], current);
+		voxelCentreOf(_trajectory[point], current);
 		const float stepLength = std::sqrt((current[0] - previous[0]) * (current[0] - previous[0]) + (current[1] - previous[1]) * (current[1] - previous[1])
 			+ (current[2] - previous[2]) * (current[2] - previous[2]));
 		travelled += stepLength;
@@ -1263,7 +1371,7 @@ void FirstPersonView::drawTrajectory()
 
 	// The end: a diamond, flat, round the last voxel.
 	float end[3];
-	voxelCentre(_trajectory.back(), end);
+	voxelCentreOf(_trajectory.back(), end);
 	const float corners[4][3] = { { end[0] + 6.0f, end[1], end[2] }, { end[0], end[1] + 6.0f, end[2] }, { end[0] - 6.0f, end[1], end[2] }, { end[0], end[1] - 6.0f, end[2] } };
 	for (int side = 0; side < 4; ++side)
 	{
@@ -1369,9 +1477,15 @@ void FirstPersonView::beginShot(Projectile *projectile)
 	// its own: no weapon in hand, no kick.
 	const double dx = origin[0] - _eye[0], dy = origin[1] - _eye[1], dz = origin[2] - _eye[2]; // from the eye
 	const bool ownShot = _particlesOn && !_lastProjectileThrown && dx * dx + dy * dy + dz * dz < 20.0 * 20.0;
+	// Akimbo in turn (see FirstPersonMode::fireTurnShot): our own shot is the other gun's, so it
+	// leaves from that gun's muzzle, and that gun flashes (as a round fired together does).
+	const bool fromOffHand = ownShot && _nextShotOffHand;
+	_nextShotOffHand = false;
+	const bool muzzleValid = fromOffHand ? _offHandMuzzleValid : _muzzleValid;
+	const double *muzzleScreen = fromOffHand ? _offHandMuzzleScreen : _muzzleScreen;
 	if (ownShot)
 	{
-		_ownShotTick = SDL_GetTicks();
+		(fromOffHand ? _partnerShotTick : _ownShotTick) = SDL_GetTicks();
 	}
 	_shotIsEnemy = !ownShot && !_lastProjectileThrown;
 	_nearMissDone = !_shotIsEnemy;
@@ -1387,10 +1501,10 @@ void FirstPersonView::beginShot(Projectile *projectile)
 	// along the ray through it. The offset from the game's start shrinks to nothing at the
 	// impact (see shotHead).
 	std::fill(_shotOffset, _shotOffset + 3, 0.0f);
-	if (ownShot && _muzzleValid)
+	if (ownShot && muzzleValid)
 	{
 		double rayDirection[3];
-		getRayDirection((int)_muzzleScreen[0], (int)_muzzleScreen[1], rayDirection);
+		getRayDirection((int)muzzleScreen[0], (int)muzzleScreen[1], rayDirection);
 		for (int axis = 0; axis < 3; ++axis)
 		{
 			origin[axis] = (float)(_eye[axis] + rayDirection[axis] * 12.0);
@@ -1403,7 +1517,7 @@ void FirstPersonView::beginShot(Projectile *projectile)
 	const BattleItem *ammo = projectile->getAmmo();
 	if (ownShot)
 	{
-		_ownShotAmmo = ammo ? ammo->getRules() : nullptr;
+		(fromOffHand ? _partnerShotAmmo : _ownShotAmmo) = ammo ? ammo->getRules() : nullptr;
 	}
 	_shotTrail = TRAIL_NONE;
 	_shotTrailColor = _colors.spark;
@@ -1439,7 +1553,7 @@ void FirstPersonView::beginShot(Projectile *projectile)
 		// sparks shooting off towards the target, and a little smoke. (Our own shot's flash is
 		// drawn on the weapon in hand; sparks and smoke right before the eyes would be a few
 		// huge squares.)
-		const bool atMuzzle = ownShot && _muzzleValid;
+		const bool atMuzzle = ownShot && muzzleValid;
 		for (int i = 0; i < (Options::fpsMuzzleFlash && !atMuzzle ? 12 : 0); ++i)
 		{
 			P::Particle spark;

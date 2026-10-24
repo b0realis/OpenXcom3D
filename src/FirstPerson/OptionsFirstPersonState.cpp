@@ -335,6 +335,12 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 			static const char *const iconNames[] = { "STR_FPS_DOWNED_ICONS_OFF", "STR_FPS_DOWNED_ICONS_CROSSHAIR", "STR_FPS_DOWNED_ICONS_ALWAYS" };
 			return std::string(tr(iconNames[std::clamp(*option.asInt(), 0, 2)]));
 		}
+		// The map camera is a choice of four, shown by name.
+		if (option.id() == "fpsMapCamera")
+		{
+			static const char *const sizeNames[] = { "STR_FPS_MAP_CAMERA_OFF", "STR_FPS_MAP_CAMERA_SMALL", "STR_FPS_MAP_CAMERA_MEDIUM", "STR_FPS_MAP_CAMERA_LARGE" };
+			return std::string(tr(sizeNames[std::clamp(*option.asInt(), 0, 3)]));
+		}
 		// The trajectory is a choice of three, shown by name.
 		if (option.id() == "fpsTrajectory")
 		{
@@ -544,6 +550,11 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		else if (value == &Options::fpsDownedIcons)
 		{
 			*value = (*value + direction + 3) % 3;
+		}
+		// The map camera (off, small, medium, large): round and round.
+		else if (value == &Options::fpsMapCamera)
+		{
+			*value = (*value + direction + 4) % 4;
 		}
 		// The trajectory (off, arcs, all): round and round.
 		else if (value == &Options::fpsTrajectory)

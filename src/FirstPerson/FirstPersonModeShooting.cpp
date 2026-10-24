@@ -527,8 +527,9 @@ void FirstPersonMode::toggleAkimbo()
  */
 BattleItem *FirstPersonMode::dualPartner(BattleUnit *unit, const BattleItem *weapon, BattleActionType slot, BattleActionType &partnerMode) const
 {
-	// Only shots are fired with both hands (not throws, melee, psi...).
-	BattleItem *otherWeapon = isShot(slot) ? offHandWeapon(unit, weapon) : nullptr;
+	// Only shots are fired with both hands (not throws, melee, psi...), and no aimed one (one
+	// picked on the classic HUD all the same fires the chosen gun alone, see fireModesFor).
+	BattleItem *otherWeapon = isShot(slot) && slot != BA_AIMEDSHOT ? offHandWeapon(unit, weapon) : nullptr;
 	if (!otherWeapon)
 	{
 		return nullptr;
@@ -607,7 +608,7 @@ std::vector<BattleActionType> FirstPersonMode::fireModesFor(BattleUnit *unit, Ba
 			const bool isLauncher = weapon->getCurrentWaypoints() != 0;
 			const int launchAmmoSlot = weapon->getActionConf(BA_LAUNCH)->ammoSlot;
 			if ((!isLauncher || launchAmmoSlot != weapon->getActionConf(BA_SNAPSHOT)->ammoSlot) && rules->getCostSnap().Time > 0) modes.push_back(BA_SNAPSHOT);
-			if (!isLauncher && rules->getCostAimed().Time > 0) modes.push_back(BA_AIMEDSHOT);
+			if (!isLauncher && rules->getCostAimed().Time > 0 && !offHandWeapon(unit, weapon)) modes.push_back(BA_AIMEDSHOT);
 			if ((!isLauncher || launchAmmoSlot != weapon->getActionConf(BA_AUTOSHOT)->ammoSlot) && rules->getCostAuto().Time > 0) modes.push_back(BA_AUTOSHOT);
 			if (isLauncher) modes.push_back(BA_LAUNCH);
 		}
@@ -652,9 +653,11 @@ void FirstPersonMode::updateFireMode(BattleUnit *unit)
 
 	// The game's current action is being aimed by this soldier: that mode was picked on the
 	// classic HUD, so take it over. Not, though, the auto shot that a BURST (FPS style: the
-	// quick slot fires an auto burst) fired just now: the quick slot stays picked.
+	// quick slot fires an auto burst) fired just now: the quick slot stays picked; nor the other
+	// gun's shot fired in turn just now (akimbo, see fireTurnShot): the hand stays.
 	const bool ownBurst = action->type != _fireMode && action->type == firedAs(action->weapon, _fireMode);
-	if (action->targeting && action->actor == unit && action->weapon && action->type != BA_NONE && !ownBurst)
+	const bool ownTurnShot = action->weapon && action->weapon == _turnShotFired;
+	if (action->targeting && action->actor == unit && action->weapon && action->type != BA_NONE && !ownBurst && !ownTurnShot)
 	{
 		_chosenHand[unit] = handOf(unit, action->weapon);
 		_fireMode = action->type;
@@ -721,6 +724,10 @@ void FirstPersonMode::selectFireMode(BattleActionType mode)
 		_fireMode = mode;
 		_fireModeWeapon = activeWeapon(unit);
 	}
+	else if (mode == BA_AIMEDSHOT && offHandWeapon(unit, activeWeapon(unit)))
+	{
+		_state->warningRaw(_state->tr("STR_FPS_AKIMBO_NO_AIMED").arg(keyLabel(Options::keyFpsAkimbo))); // (see fireModesFor)
+	}
 	else
 	{
 		_state->warning("STR_FPS_NO_SUCH_MODE");
@@ -770,9 +777,11 @@ void FirstPersonMode::switchHand()
  * @param pixelY Pixel row in the 3D view.
  * @param unit The soldier looking (left out of the line).
  * @param voxel Set to the voxel hit, or to a point 320 voxels (20 tiles) along the ray.
+ * @param voxelType If given, set to what was hit (V_FLOOR, V_WESTWALL, V_NORTHWALL, V_OBJECT,
+ *   V_UNIT; V_EMPTY for nothing).
  * @return True if something was hit.
  */
-bool FirstPersonMode::aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &voxel)
+bool FirstPersonMode::aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &voxel, int *voxelType)
 {
 	// The ray from the eye through that pixel, in voxels (16 per tile across, 24 per level).
 	double eye[3], rayDirection[3];
@@ -786,12 +795,14 @@ bool FirstPersonMode::aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &
 	// game keeps only the point where the line stopped. The arguments after the trajectory:
 	// leave the soldier out, test every unit, and skip units the player can't see.
 	std::vector<Position> trajectory;
-	const int voxelType = _save->getTileEngine()->calculateLineVoxel(rayOrigin, farPoint, false, &trajectory, unit, nullptr, !_save->getDebugMode());
-	if (voxelType != V_EMPTY && voxelType != V_OUTOFBOUNDS && !trajectory.empty())
+	const int hitType = _save->getTileEngine()->calculateLineVoxel(rayOrigin, farPoint, false, &trajectory, unit, nullptr, !_save->getDebugMode());
+	if (hitType != V_EMPTY && hitType != V_OUTOFBOUNDS && !trajectory.empty())
 	{
 		voxel = trajectory.front(); // a floor, a wall, an object or a unit was hit
+		if (voxelType) *voxelType = hitType;
 		return true;
 	}
+	if (voxelType) *voxelType = V_EMPTY;
 
 	// Nothing hit (the sky, or out of the map): a point 20 tiles along the ray.
 	voxel = Position(rayOrigin.x + (int)(rayDirection[0] * 320), rayOrigin.y + (int)(rayDirection[1] * 320),
@@ -1129,7 +1140,8 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 	// target's tile only, a line on the very point).
 	const Position from = unit->getPosition();
 	const std::vector<int> key = { arcing ? 1 : 2, targetTile.x, targetTile.y, targetTile.z, arcing ? 0 : targetVoxel.x, arcing ? 0 : targetVoxel.y,
-		arcing ? 0 : targetVoxel.z, from.x, from.y, from.z, unit->getDirection(), unit->isKneeled() ? 1 : 0, weapon->getId(), (int)mode, (int)side };
+		arcing ? 0 : targetVoxel.z, from.x, from.y, from.z, unit->getDirection(), unit->isKneeled() ? 1 : 0, weapon->getId(), (int)mode, (int)side,
+		Options::fpsForceArcing ? 1 : 0 };
 	if (key == _trajectoryKey)
 	{
 		return;
@@ -1145,58 +1157,131 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 	preview.target = targetTile;
 	preview.relativeOrigin = side;
 	std::vector<Position> path;
+	FirstPersonView::TrajectoryLook look = FirstPersonView::TRAJECTORY_ARC;
 	if (arcing)
 	{
-		// The points on the tile the game tries, in its order (Projectile::calculateThrow).
-		const Tile *tile = _save->getTile(targetTile);
-		const Position floorPoint = targetTile.toVoxel() + Position(8, 8, 1 - tile->getTerrainLevel());
-		std::vector<Position> aimPoints;
-		const BattleUnit *targetUnit = mode == BA_THROW ? nullptr : tile->getOverlappingUnit(_save);
-		if (mode == BA_THROW)
+		// The game's own curve; or, for an arcing shot it would refuse, the forced one (setting
+		// "Force arcing shots"), drawn yellow: it goes for the tile whatever it meets on the way.
+		if (!gameArcFound(preview, targetTile, &path) && mode != BA_THROW && Options::fpsForceArcing && forcedArcFound(preview, targetTile, &path))
 		{
-			aimPoints.push_back(floorPoint);
-		}
-		else if (targetUnit && targetUnit->getVisible())
-		{
-			const Position unitBase = floorPoint + Position(0, 0, targetUnit->getFloatHeight());
-			for (const int height : { targetUnit->getHeight() / 2 + 1, 2, targetUnit->getHeight() - 1 }) aimPoints.push_back(unitBase + Position(0, 0, height));
-		}
-		else if (tile->getMapData(O_OBJECT))
-		{
-			for (const int height : { 13, 8, 23, 2 }) aimPoints.push_back(targetTile.toVoxel() + Position(8, 8, height));
-		}
-		else if (tile->getMapData(O_NORTHWALL))
-		{
-			for (const int height : { 13, 8, 20, 3 }) aimPoints.push_back(targetTile.toVoxel() + Position(8, 0, height));
-		}
-		else if (tile->getMapData(O_WESTWALL))
-		{
-			for (const int height : { 13, 8, 20, 2 }) aimPoints.push_back(targetTile.toVoxel() + Position(0, 8, height));
-		}
-		else if (tile->getMapData(O_FLOOR))
-		{
-			aimPoints.push_back(floorPoint);
-		}
-
-		// The first point the game finds a curve for, and that curve's path.
-		const Position origin = tileEngine->getOriginVoxel(preview, nullptr);
-		for (const Position &aimPoint : aimPoints)
-		{
-			double curvature = 0.0;
-			if (tileEngine->validateThrow(preview, origin, aimPoint, _save->getDepth(), &curvature))
-			{
-				tileEngine->calculateParabolaVoxel(origin, aimPoint, true, &path, unit, curvature, Position(0, 0, 0));
-				break;
-			}
+			look = FirstPersonView::TRAJECTORY_FORCED;
 		}
 	}
 	else
 	{
-		// The line of fire to the point, up to what it meets.
+		// The line of fire to the point, up to what it meets, drawn as a laser sight.
 		const Position origin = tileEngine->getOriginVoxel(preview, _save->getTile(from));
 		tileEngine->calculateLineVoxel(origin, targetVoxel, true, &path, unit);
+		look = FirstPersonView::TRAJECTORY_STRAIGHT;
 	}
-	_view->setTrajectory(path);
+	_view->setTrajectory(path, look);
+}
+
+/**
+ * The curve the game's own aim finds for a throw or an arcing shot at a tile, as the game works
+ * it out (Projectile::calculateThrow) but without the accuracy roll: the points on the tile it
+ * tries, in its order (a unit's middle, low and high; an object, a wall, each at a few heights;
+ * the floor; a throw always the floor), from the game's origin voxel (the hand), the first one
+ * it finds a curve for that lands on the tile (TileEngine::validateThrow), and that curve
+ * followed to where it comes down (calculateParabolaVoxel). At a wall seen from the side no
+ * curve lands on its tile, and the game refuses the shot.
+ * @param shot The action (actor, weapon, mode, the side it leaves from).
+ * @param targetTile The tile aimed at.
+ * @param path If given, set to the curve's voxels (left as it was when none is found).
+ * @return True if the game finds a curve.
+ */
+bool FirstPersonMode::gameArcFound(BattleAction &shot, const Position &targetTile, std::vector<Position> *path)
+{
+	const Tile *tile = _save->getTile(targetTile);
+	if (!tile)
+	{
+		return false;
+	}
+	const Position floorPoint = targetTile.toVoxel() + Position(8, 8, 1 - tile->getTerrainLevel());
+	std::vector<Position> aimPoints;
+	const BattleUnit *targetUnit = shot.type == BA_THROW ? nullptr : tile->getOverlappingUnit(_save);
+	if (shot.type == BA_THROW)
+	{
+		aimPoints.push_back(floorPoint);
+	}
+	else if (targetUnit && targetUnit->getVisible())
+	{
+		const Position unitBase = floorPoint + Position(0, 0, targetUnit->getFloatHeight());
+		for (const int height : { targetUnit->getHeight() / 2 + 1, 2, targetUnit->getHeight() - 1 }) aimPoints.push_back(unitBase + Position(0, 0, height));
+	}
+	else if (tile->getMapData(O_OBJECT))
+	{
+		for (const int height : { 13, 8, 23, 2 }) aimPoints.push_back(targetTile.toVoxel() + Position(8, 8, height));
+	}
+	else if (tile->getMapData(O_NORTHWALL))
+	{
+		for (const int height : { 13, 8, 20, 3 }) aimPoints.push_back(targetTile.toVoxel() + Position(8, 0, height));
+	}
+	else if (tile->getMapData(O_WESTWALL))
+	{
+		for (const int height : { 13, 8, 20, 2 }) aimPoints.push_back(targetTile.toVoxel() + Position(0, 8, height));
+	}
+	else if (tile->getMapData(O_FLOOR))
+	{
+		aimPoints.push_back(floorPoint);
+	}
+
+	TileEngine *tileEngine = _save->getTileEngine();
+	const Position origin = tileEngine->getOriginVoxel(shot, nullptr);
+	for (const Position &aimPoint : aimPoints)
+	{
+		double curvature = 0.0;
+		if (tileEngine->validateThrow(shot, origin, aimPoint, _save->getDepth(), &curvature))
+		{
+			if (path) tileEngine->calculateParabolaVoxel(origin, aimPoint, true, path, shot.actor, curvature, Position(0, 0, 0));
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * The curve of an arcing shot forced at a tile, as the game works it out with Ctrl held (force
+ * fire, Projectile::calculateThrow): aimed at one point of the tile, half a level up (the game
+ * takes the tile's corner voxel), a curve accepted even where it meets something before it
+ * lands (TileEngine::validateThrow, forced), followed to where it ends.
+ * @param shot The action (actor, weapon, mode, the side it leaves from).
+ * @param targetTile The tile aimed at.
+ * @param path If given, set to the curve's voxels (left as it was when there's none).
+ * @return True if there is a curve.
+ */
+bool FirstPersonMode::forcedArcFound(BattleAction &shot, const Position &targetTile, std::vector<Position> *path)
+{
+	TileEngine *tileEngine = _save->getTileEngine();
+	const Position origin = tileEngine->getOriginVoxel(shot, nullptr);
+	const Position aimPoint = targetTile.toVoxel() + Position(0, 0, 12);
+	double curvature = 0.0;
+	int meets = V_OUTOFBOUNDS;
+	if (!tileEngine->validateThrow(shot, origin, aimPoint, _save->getDepth(), &curvature, &meets, true))
+	{
+		return false;
+	}
+	if (path) tileEngine->calculateParabolaVoxel(origin, aimPoint, true, path, shot.actor, curvature, Position(0, 0, 0));
+	return true;
+}
+
+/**
+ * Is this an arcing shot the game would refuse (its own aim finds no curve onto the tile, see
+ * gameArcFound), which the setting "Force arcing shots" fires forced, as with Ctrl held (a
+ * player's report: firing at the side of a building with a Panzerfaust, the game refused and
+ * showed no path)? Where the game's own aim works, it's kept (its unit, object and wall points).
+ * @param shot The action about to be fired.
+ * @param targetTile The tile aimed at.
+ * @return True if the shot should be forced.
+ */
+bool FirstPersonMode::forcesArc(BattleAction &shot, const Position &targetTile)
+{
+	if (!Options::fpsForceArcing || !isShot(shot.type) || !shot.weapon || !shot.weapon->getArcingShot(shot.type))
+	{
+		return false;
+	}
+	BattleAction probe = shot;
+	return !gameArcFound(probe, targetTile, nullptr);
 }
 
 /**
@@ -1218,9 +1303,9 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 {
 	// Only a soldier of ours who may act now.
 	BattleUnit *unit = _save->getSelectedUnit();
-	if (!unit || !canAct() || !_state->playableUnitSelected())
+	if (!unit || !canAct() || !_state->playableUnitSelected() || _turnShot.weapon)
 	{
-		return;
+		return; // (nor while the other gun's shot waits to fire in turn, see fireTurnShot)
 	}
 	updateFireMode(unit);
 	BattleItem *weapon = activeWeapon(unit);
@@ -1496,6 +1581,47 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 		return;
 	}
 
+	// Dual wield (an option): the gun in the other hand fires at the same moment, round for
+	// round, both less accurate (DualWieldAccuracy). With time units for only one of them, just the chosen hand
+	// fires, at full accuracy. (Not for an action picked from a menu.) With an arcing shot,
+	// either gun's (a grenade launcher's, a Panzerfaust's), they fire in turn instead: this gun
+	// now, alone and at full accuracy, the other once this shot has landed (see fireTurnShot),
+	// each its own arc or line at the target. Together, the other gun's round could neither
+	// follow an arc nor fire one (a player's report on 1.03: with two grenade launchers the
+	// other one never fired, and this one was half as accurate for it).
+	BattleActionType offMode = BA_NONE;
+	BattleItem *otherWeapon = menuTargeting ? nullptr : dualPartner(unit, weapon, slot, offMode);
+	if (otherWeapon && !doomModeOn() && BattleActionCost(mode, unit, weapon).Time + BattleActionCost(offMode, unit, otherWeapon).Time > unit->getTimeUnits())
+	{
+		otherWeapon = nullptr;
+	}
+	if (otherWeapon && firesInTurn(weapon, mode, otherWeapon, offMode))
+	{
+		_turnShot = TurnShot{ unit, otherWeapon, offMode, targetTile, aimedVoxel, hitSomething };
+		otherWeapon = nullptr;
+	}
+	launchShot(unit, weapon, mode, targetTile, aimedVoxel, hitSomething, otherWeapon, offMode);
+}
+
+/**
+ * Fires a shot or a throw at a tile through the game's own action, as a click on the isometric
+ * map would (see fire): the game turns the soldier (by the rules), checks and spends the time
+ * units, and launches it, with what the add-on adds to the action (FPS style's free aim, the
+ * exact point, the side of a lean, a forced arc, the other gun firing along).
+ * @param unit The soldier.
+ * @param weapon The weapon fired or thrown.
+ * @param mode The action (a shot as fired, see firedAs; or a throw).
+ * @param targetTile The tile aimed at.
+ * @param aimedVoxel The voxel the aim met there.
+ * @param hitSomething Whether the aim met something (not the sky).
+ * @param otherWeapon The gun in the other hand firing along (dual wield), or null.
+ * @param otherMode That gun's fire mode.
+ */
+void FirstPersonMode::launchShot(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, const Position &targetTile, const Position &aimedVoxel, bool hitSomething, BattleItem *otherWeapon, BattleActionType otherMode)
+{
+	BattlescapeGame *battleGame = _state->_battleGame;
+	BattleAction *action = battleGame->getCurrentAction();
+
 	// Set up the game's current action as its own targeting would, and let it work out the
 	// cost in time units.
 	action->actor = unit;
@@ -1505,8 +1631,8 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	action->waypoints.clear();
 	action->updateTU();
 
-	// Two things the add-on adds to the action, both read by the game's own shot code
-	// (ProjectileFlyBState, Projectile):
+	// Things the add-on adds to the action, read by the game's own shot code
+	// (ProjectileFlyBState, Projectile; and forced, below):
 	// - freeAim (FPS style): the game asks for each round's target the moment it fires it
 	//   (freeAimTarget) and rolls no accuracy; the line of fire is still the game's.
 	// - targetVoxel (setting "Aim at exact point", or FPS style): aim at the very voxel under
@@ -1520,20 +1646,15 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	// Leaning (setting "Lean shots", or leaning out with the lean keys): a soldier whose eye is
 	// to one side of the tile's middle shoots from that side (see leanSide).
 	action->relativeOrigin = (Options::fpsLeanShots || leaningOut()) && isShot(mode) ? leanSide(unit, targetTile) : BattleActionOrigin::CENTRE;
+	// An arcing shot the game would refuse fires forced, as with Ctrl held (setting "Force
+	// arcing shots", see forcesArc).
+	action->forced = forcesArc(*action, targetTile);
 
-	// Dual wield (an option): the gun in the other hand fires at the same moment, round for
-	// round, both half as accurate (the game halves both shots' accuracy). With time units for
-	// only one of them, just the chosen hand fires, at full accuracy. (Not for an action picked
-	// from a menu.)
-	BattleActionType offMode = BA_NONE;
-	BattleItem *otherWeapon = menuTargeting ? nullptr : dualPartner(unit, weapon, slot, offMode);
-	if (otherWeapon && !doomModeOn() && action->Time + BattleActionCost(offMode, unit, otherWeapon).Time > unit->getTimeUnits())
-	{
-		otherWeapon = nullptr;
-	}
+	// Dual wield: the other gun fires at the same moment (both less accurate: the game cuts both
+	// shots' accuracy, see DualWieldAccuracy), if the caller found one to.
 	action->dualWield = otherWeapon != nullptr;
 	action->dualWeapon = otherWeapon;
-	action->dualType = otherWeapon ? offMode : BA_NONE; // (dualPartner may name a mode for a gun it turned down)
+	action->dualType = otherWeapon ? otherMode : BA_NONE;
 
 	// Free turning (no "Turning costs TU"): the soldier first faces the target for free, as
 	// looking round does, so the game's own turn before the shot costs nothing. (The crosshair
@@ -1558,10 +1679,66 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	// Clear what we added, so the next action (one from the classic HUD, say) aims normally.
 	action->targetVoxel = Position(-1, -1, -1);
 	action->freeAim = false;
+	action->forced = false;
 	action->relativeOrigin = BattleActionOrigin::CENTRE;
 	action->dualWield = false;
 	action->dualWeapon = nullptr;
 	action->dualType = BA_NONE;
+}
+
+/**
+ * Akimbo: do the two guns fire in turn rather than together? When either one's shot arcs: the
+ * other gun's round could neither follow an arc nor fire one beside the first (see fire).
+ * @param weapon The chosen gun.
+ * @param mode Its fire mode (as fired).
+ * @param otherWeapon The gun in the other hand.
+ * @param otherMode Its fire mode.
+ * @return True if they fire in turn.
+ */
+bool FirstPersonMode::firesInTurn(const BattleItem *weapon, BattleActionType mode, const BattleItem *otherWeapon, BattleActionType otherMode) const
+{
+	return weapon->getArcingShot(mode) || otherWeapon->getArcingShot(otherMode);
+}
+
+/**
+ * Akimbo in turn (see fire), every frame: the other gun's shot, once the game is done with the
+ * first (idle again: the shot landed, its blast and any reaction fire over), at the same target,
+ * at full accuracy, leaving from that gun's muzzle on the view. Called off if the soldier is no
+ * longer the one selected or is down, the 3D view was left, or the gun is no longer in hand or
+ * loaded; with too few time units left the game refuses it, as it would a click.
+ */
+void FirstPersonMode::fireTurnShot()
+{
+	if (!_turnShot.weapon)
+	{
+		return;
+	}
+	BattleUnit *unit = _save->getSelectedUnit();
+	if (!isActive() || unit != _turnShot.unit || unit->isOut())
+	{
+		_turnShot = TurnShot();
+		return;
+	}
+	if (!canAct() || _state->_battleGame->isBusy())
+	{
+		return; // the first shot still on its way, or what follows it
+	}
+	const TurnShot shot = _turnShot;
+	_turnShot = TurnShot();
+	if (shot.weapon->getOwner() != unit || !shot.weapon->getAmmoForAction(shot.mode))
+	{
+		return;
+	}
+	_view->setNextShotFromOffHand(true);
+	launchShot(unit, shot.weapon, shot.mode, shot.targetTile, shot.aimedVoxel, shot.hitSomething, nullptr, BA_NONE);
+	if (_state->_battleGame->isBusy())
+	{
+		_turnShotFired = shot.weapon;
+	}
+	else
+	{
+		_view->setNextShotFromOffHand(false); // refused (time units): the next shot is this gun's again
+	}
 }
 
 /**
@@ -1794,7 +1971,7 @@ bool FirstPersonMode::freeAimOn(BattleActionType mode) const
  * as they improve the game's own accuracy.
  * @param unit The soldier firing.
  * @param mode The shot (BA_AIMEDSHOT, BA_AUTOSHOT, or anything else for a snap shot).
- * @param dual Both guns fire at once (dual wield): twice as wide.
+ * @param dual Both guns fire at once (dual wield): wider (see DualWieldAccuracy).
  * @return The 95% spread angle, in degrees.
  */
 double FirstPersonMode::spreadFor(const BattleUnit *unit, BattleActionType mode, bool dual) const
@@ -1808,7 +1985,7 @@ double FirstPersonMode::spreadFor(const BattleUnit *unit, BattleActionType mode,
 	// Kneeling steadies the aim (the game gives kneeling an accuracy bonus too).
 	if (unit->isKneeled()) spreadDegrees *= 0.7;
 
-	if (dual) spreadDegrees *= 2.0; // a gun in each hand: half as accurate
+	if (dual) spreadDegrees /= FirstPerson::DualWieldAccuracy; // a gun in each hand: less accurate
 	return spreadDegrees;
 }
 
@@ -2187,7 +2364,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	int shots = 1;
 	Uint8 color = grey;
 	std::string modeText, shotText;
-	bool dual = false;
+	bool dual = false, inTurn = false; // both guns fire (dual wield); in turn, each at full accuracy (see fire)
 	if (weapon && mode != BA_NONE && unit)
 	{
 		const RuleItem *rules = weapon->getRules();
@@ -2211,6 +2388,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		{
 			offTime = BattleActionCost(offMode, unit, otherWeapon).Time;
 			dual = doomModeOn() || cost.Time + offTime <= unit->getTimeUnits();
+			inTurn = dual && firesInTurn(weapon, mode, otherWeapon, offMode);
 		}
 
 		// The hit chance at what's under the crosshair, for shots and throws (not in FPS style:
@@ -2225,7 +2403,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		{
 			const BattleActionAttack attack = BattleActionAttack::GetBeforeShoot(mode, unit, weapon);
 			accuracy = BattleUnit::getFiringAccuracy(attack, _game->getMod());
-			if (dual) accuracy /= 2; // (before the range dropoff, as the shot does)
+			if (dual && !inTurn) accuracy = (int)(accuracy * FirstPerson::DualWieldAccuracy); // (before the range dropoff, as the shot does)
 			const int distanceSq = unit->distance3dToPositionSq(_aimVoxel.toTile());
 			const int distance = (int)std::ceil(std::sqrt((double)distanceSq)); // in tiles
 			int upperLimit, lowerLimit;
@@ -2329,7 +2507,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	if (unit && freeAimOn(mode))
 	{
 		const double focalPixels = (_view->getWidth() / 2.0) / std::tan(fieldOfViewNow() * Pi / 360.0);
-		ringRadius = std::clamp((int)std::lround(std::tan((spreadFor(unit, mode, dual) + _bloom) * Pi / 180.0) * focalPixels), 2, CrosshairSize / 2 - 1);
+		ringRadius = std::clamp((int)std::lround(std::tan((spreadFor(unit, mode, dual && !inTurn) + _bloom) * Pi / 180.0) * focalPixels), 2, CrosshairSize / 2 - 1);
 	}
 
 	// Redraw the crosshair only when what it shows has changed: all of that packed into one
@@ -2646,6 +2824,7 @@ void FirstPersonMode::endShotAim()
 		return;
 	}
 	_shotAimLeft = false;
+	_turnShotFired = nullptr;
 	BattleAction *action = battleGame->getCurrentAction();
 	if (action->targeting && isShot(action->type) && action->waypoints.empty())
 	{

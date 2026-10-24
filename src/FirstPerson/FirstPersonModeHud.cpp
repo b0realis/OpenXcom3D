@@ -128,11 +128,13 @@ bool FirstPersonMode::hasNightVision(const BattleUnit *unit) const
 /**
  * Switches night vision on or off: what the NIGHT VISION button on the top bar and its key do.
  * A soldier without the gear (see hasNightVision) gets a warning instead. The switch itself is
- * the battlescape's own night vision button, so the isometric map and the 3D view share it.
- * @param unit The soldier asking for night vision.
- * @param action The click or key press, handed on to the battlescape's button handler.
+ * the isometric map's own (the one its night vision button flips), so the map and the 3D view
+ * share it; but unlike that button it works whatever the game is doing (an explosion, a shot in
+ * flight, the aliens' turn), as it only changes how the picture is drawn (a player's report:
+ * night vision couldn't be switched while a chain of explosions went off).
+ * @param unit The soldier the view looks through.
  */
-void FirstPersonMode::toggleNightVision(BattleUnit *unit, Action *action)
+void FirstPersonMode::toggleNightVision(BattleUnit *unit)
 {
 	// No gear: say so and leave night vision as it is.
 	if (!hasNightVision(unit))
@@ -140,7 +142,7 @@ void FirstPersonMode::toggleNightVision(BattleUnit *unit, Action *action)
 		_state->warning("STR_FPS_NO_NIGHT_VISION");
 		return;
 	}
-	_state->btnNightVisionClick(action);
+	_state->_map->toggleNightVision();
 }
 
 /**
@@ -945,7 +947,13 @@ void FirstPersonMode::updateSoldierCard()
 		_soldierCamOpen = false;
 	}
 	const bool soldierCam = _soldierCamOpen && unit && live && !poppedUp;
-	updateSoldierCam(soldierCam ? unit : nullptr, cardButton);
+	int soldierCamX = 0; // under the button, kept inside the canvas
+	if (soldierCam)
+	{
+		const TextButton *button = _btnSquad[cardButton];
+		soldierCamX = std::clamp(button->getX() + button->getWidth() / 2 - _soldierCamFrame->getWidth() / 2, 1, canvasWidth() - _soldierCamFrame->getWidth() - 1);
+	}
+	updateSoldierCam(soldierCam ? unit : nullptr, soldierCamX);
 	if (soldierCam)
 	{
 		unit = nullptr; // (the card hides)
@@ -977,15 +985,8 @@ void FirstPersonMode::updateSoldierCard()
 	if (cardHeight != _cardDrawnHeight)
 	{
 		_cardDrawnHeight = cardHeight;
-		Uint8 background = 15, border = 8;
-		if (const RuleInterface *interfaceRules = _game->getMod()->getInterface("firstPerson", false))
-		{
-			if (const Element *panelElement = interfaceRules->getElementOptional("panel"))
-			{
-				if (panelElement->color != INT_MAX) background = panelElement->color;
-				if (panelElement->border != INT_MAX) border = panelElement->border;
-			}
-		}
+		Uint8 background, border;
+		panelColors(background, border);
 		_card->clear();
 		_card->drawRect(0, 0, CardW, cardHeight, border);
 		_card->drawRect(1, 1, CardW - 2, cardHeight - 2, background);
@@ -1048,14 +1049,15 @@ void FirstPersonMode::updateSoldierCard()
 }
 
 /**
- * Points a helmet camera (the card's, or the soldier cam) through a soldier's eyes, with the
- * main 3D view's settings, and asks for a new picture.
+ * Points a helmet camera (the card's, the soldier cam, the map camera) through a soldier's eyes,
+ * with the main 3D view's settings, and asks for a new picture.
  * @param camera The camera's view.
  * @param unit The soldier, live.
  * @param lookAt A unit to look at (a popped-up camera's alien, say); null: the way the soldier
  *   faces (or, for the soldier the 3D view looks through, the way the view looks).
+ * @param lookAtPoint Or a point to look at, in voxels (an aimed action's target tile).
  */
-void FirstPersonMode::aimHelmetCamera(FirstPersonView *camera, BattleUnit *unit, const BattleUnit *lookAt)
+void FirstPersonMode::aimHelmetCamera(FirstPersonView *camera, BattleUnit *unit, const BattleUnit *lookAt, const double *lookAtPoint)
 {
 	// When it's the soldier we're looking through, copy the 3D camera itself (its eye, and its
 	// yaw by turning the camera by the difference), level.
@@ -1083,25 +1085,31 @@ void FirstPersonMode::aimHelmetCamera(FirstPersonView *camera, BattleUnit *unit,
 	{
 		camera->lookAt(point);
 	}
+	else if (lookAtPoint)
+	{
+		camera->lookAt(lookAtPoint);
+	}
 	// The same view settings as the main 3D view, and night vision if the soldier has it.
 	camera->setFieldOfView(Options::fpsFieldOfView);
 	camera->setSmoothLighting(Options::fpsSmoothLighting);
 	camera->setNightVision(hasNightVision(unit) ? _state->_map->getNightVisionColor() : 0);
+	camera->setControlHaze(controlHaze(unit, SDL_GetTicks())); // (a unit under our mind control: purple edges)
 	camera->invalidate();
 }
 
 /**
- * The soldier cam: a soldier's helmet camera enlarged (a right click on their squad button, see
- * handleFreeCursor), under their button and kept inside the canvas, titled "SOLDIER CAM: name"
- * with a red dot that blinks once a second, and a little TV static over the picture: plainly a
- * camera's feed, not the view the player plays in. Moving along the bar shows each soldier's in
- * turn. Hidden with no soldier.
- * @param unit The soldier (live) under the hovered squad button, or null to hide it.
- * @param cardButton The squad button the soldier is under.
+ * The soldier cam: a soldier's helmet camera enlarged (a right click on their squad button, or
+ * on the map camera, see handleFreeCursor), under the top bar, titled "SOLDIER CAM: name" with a
+ * red dot that blinks once a second, and a little TV static over the picture: plainly a camera's
+ * feed, not the view the player plays in. Moving along the bar shows each soldier's in turn.
+ * Hidden with no soldier.
+ * @param unit The soldier (live), or null to hide it.
+ * @param frameX Where its frame's left edge goes, in canvas pixels (under the soldier's squad
+ *   button, or in the map camera's place).
  */
-void FirstPersonMode::updateSoldierCam(BattleUnit *unit, int cardButton)
+void FirstPersonMode::updateSoldierCam(BattleUnit *unit, int frameX)
 {
-	const bool show = unit && cardButton >= 0;
+	const bool show = unit != nullptr;
 	for (Surface *part : { (Surface*)_soldierCamFrame, (Surface*)_soldierCam, (Surface*)_txtSoldierCam })
 	{
 		part->setVisible(show);
@@ -1112,9 +1120,6 @@ void FirstPersonMode::updateSoldierCam(BattleUnit *unit, int cardButton)
 		return;
 	}
 
-	// Under the button, kept inside the canvas.
-	const TextButton *button = _btnSquad[cardButton];
-	const int frameX = std::clamp(button->getX() + button->getWidth() / 2 - _soldierCamFrame->getWidth() / 2, 1, canvasWidth() - _soldierCamFrame->getWidth() - 1);
 	_soldierCamFrame->setX(frameX);
 	_soldierCamFrame->setY(CardY);
 	_soldierCam->setX(frameX + 4);
@@ -1129,6 +1134,111 @@ void FirstPersonMode::updateSoldierCam(BattleUnit *unit, int cardButton)
 		_txtSoldierCam->setText(title);
 	}
 	aimHelmetCamera(_soldierCam, unit);
+}
+
+/**
+ * The map camera (setting "Map camera"): on the isometric map in the player's turn, the selected
+ * soldier's helmet camera in a window at the top left under the top bar (right of OXCE's touch
+ * buttons when they show), titled with their name. It looks the way they face or, while an
+ * action is being aimed on the map, at the tile under the map's cursor (at the unit there, if
+ * it's seen): the target through the soldier's eyes. It's made again when the setting's size
+ * or the canvas's changes. The soldier cam opened from it (a right click, see handleFreeCursor) shows the same
+ * soldier big in its place until the cursor leaves it or another right click; a squad button's
+ * soldier cam wins over it. Hidden in 3D, in the aliens' turn, and with none of the player's
+ * units selected.
+ */
+void FirstPersonMode::updateMapCamera()
+{
+	BattleUnit *unit = _save->getSelectedUnit();
+	const bool show = Options::fpsMapCamera > 0 && !isActive() && _save->getSide() == FACTION_PLAYER
+		&& unit && unit->getFaction() == FACTION_PLAYER && unit->getTile();
+	if (show && (Options::fpsMapCamera != _mapCameraSize || canvasWidth() != _mapCameraCanvasWidth))
+	{
+		makeMapCamera(Options::fpsMapCamera);
+	}
+
+	// Its place: at the left under the top bar, or right of the touch buttons (screen pixels).
+	const int frameX = _state->_btnCtrl->getVisible() ? (MapCameraTouchClear + _uiScale - 1) / _uiScale : 1;
+	_mapCameraFrame->setX(frameX);
+	_mapCameraFrame->setY(CardY);
+	_mapCamera->setX(frameX + MapCameraBorder);
+	_mapCamera->setY(CardY + MapCameraBorder + MapCameraTitleH);
+	_txtMapCamera->setX(frameX + 4);
+	_txtMapCamera->setY(CardY + 2);
+
+	// The soldier cam opened from it closes when the map camera goes, when a squad button's
+	// soldier cam shows (see updateSoldierCard, just before), or when the cursor leaves it.
+	const bool squadSoldierCam = _soldierCamFrame->getVisible();
+	const bool cursorOnSoldierCam = _cursorX >= frameX && _cursorX < frameX + _soldierCamFrame->getWidth()
+		&& _cursorY >= CardY && _cursorY < CardY + _soldierCamFrame->getHeight();
+	if (!show || squadSoldierCam || !cursorOnSoldierCam)
+	{
+		_mapSoldierCamOpen = false;
+	}
+	if (_mapSoldierCamOpen)
+	{
+		updateSoldierCam(unit, frameX);
+	}
+
+	const bool showWindow = show && !_mapSoldierCamOpen;
+	for (Surface *part : { (Surface*)_mapCameraFrame, (Surface*)_mapCamera, (Surface*)_txtMapCamera })
+	{
+		part->setVisible(showWindow);
+	}
+	if (!showWindow)
+	{
+		return;
+	}
+	const std::string title = unit->getName(_game->getLanguage(), false);
+	if (_txtMapCamera->getText() != title)
+	{
+		_txtMapCamera->setText(title);
+	}
+
+	// Where it looks: while an action is aimed, at the tile under the map's cursor (not the
+	// soldier's own): the unit there if it's seen, else a little over the tile's floor.
+	const BattleUnit *lookAtUnit = nullptr;
+	double tilePoint[3];
+	const double *lookAtPoint = nullptr;
+	if (_state->_battleGame->getCurrentAction()->targeting)
+	{
+		Position target;
+		_state->_map->getSelectorPosition(&target);
+		const Tile *tile = _save->getTile(target);
+		if (tile && target != unit->getPosition())
+		{
+			const BattleUnit *there = tile->getUnit();
+			if (there && there != unit && there->getVisible())
+			{
+				lookAtUnit = there;
+			}
+			else
+			{
+				tilePoint[0] = target.x * 16.0 + 8.0;
+				tilePoint[1] = target.y * 16.0 + 8.0;
+				tilePoint[2] = target.z * 24.0 - tile->getTerrainLevel() + MapCameraAimHeight;
+				lookAtPoint = tilePoint;
+			}
+		}
+	}
+	aimHelmetCamera(_mapCamera, unit, lookAtUnit, lookAtPoint);
+}
+
+/**
+ * Is a point on the canvas on the map camera (as shown), or on the soldier cam opened from it?
+ * There it's the map camera's (see handleFreeCursor), not the map's.
+ * @param canvasX The point, in canvas pixels.
+ * @param canvasY The same, down.
+ * @return True if it is.
+ */
+bool FirstPersonMode::onMapCamera(int canvasX, int canvasY) const
+{
+	auto inside = [canvasX, canvasY](const Surface *surface)
+	{
+		return surface && surface->getVisible() && canvasX >= surface->getX() && canvasX < surface->getX() + surface->getWidth()
+			&& canvasY >= surface->getY() && canvasY < surface->getY() + surface->getHeight();
+	};
+	return inside(_mapCameraFrame) || (_mapSoldierCamOpen && inside(_soldierCamFrame));
 }
 
 /**
@@ -1270,7 +1380,8 @@ void FirstPersonMode::refreshSquad()
 		return (Uint8)(best * 16);
 	};
 	// Restyle the buttons whose soldier's state changed: number or icon, and the colour
-	// (orange: mind controlled, grey: dead, blue: unconscious, green: zombie).
+	// (orange: mind controlled, grey: dead, blue: unconscious, green: zombie; purple: a unit of the
+	// other side under our mind control, as the haze at the view's edges, see controlHaze).
 	for (size_t slot = 0; slot < _squadUnits.size(); ++slot)
 	{
 		const SquadState state = squadState(_squadUnits[slot]);
@@ -1279,8 +1390,10 @@ void FirstPersonMode::refreshSquad()
 		changed = true;
 		TextButton *button = _btnSquad[slot];
 		button->setText(state == SQUAD_READY ? std::to_string(slot + 1) : std::string());
+		const bool ourControl = state == SQUAD_READY && _squadUnits[slot]->getOriginalFaction() != FACTION_PLAYER;
 		button->setColor(state == SQUAD_CONTROLLED ? colorGroupNear(230, 130, 30) : state == SQUAD_DEAD ? colorGroupNear(120, 120, 120)
-			: state == SQUAD_UNCONSCIOUS ? colorGroupNear(90, 120, 170) : state == SQUAD_ZOMBIE ? colorGroupNear(90, 140, 60) : _squadColor);
+			: state == SQUAD_UNCONSCIOUS ? colorGroupNear(90, 120, 170) : state == SQUAD_ZOMBIE ? colorGroupNear(90, 140, 60)
+			: ourControl ? colorGroupNear(170, 80, 220) : _squadColor);
 		drawSquadIcon(_squadIcons[slot], state);
 	}
 	if (changed)
@@ -1607,7 +1720,7 @@ void FirstPersonMode::buttonClicked(TextButton *button, Action *action)
 	}
 	else if (button == _btnNight)
 	{
-		toggleNightVision(_save->getSelectedUnit(), action);
+		toggleNightVision(_trackedUnit);
 	}
 	else if (button == _btnSpecial)
 	{

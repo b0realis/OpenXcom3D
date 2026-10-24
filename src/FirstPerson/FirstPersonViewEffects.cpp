@@ -82,7 +82,8 @@ namespace OpenXcom
  * Tells whether there is open sky above a point: no floor and no object on any level above
  * the one the point is on. Rain, snow, blowing sand and fireflies only appear under open sky,
  * so nothing falls indoors or under a roof. A point outside the map always counts as under
- * open sky (the ground outside the map runs on to the horizon with nothing over it).
+ * open sky (the ground outside the map runs on to the horizon with nothing over it), except on a
+ * map underground all the way up, where nothing is.
  * @param x, y, z The point, in voxels.
  * @return True if nothing on the map covers the point.
  */
@@ -92,6 +93,11 @@ bool FirstPersonView::openSky(float x, float y, float z) const
 	// across).
 	const int mapSizeX = _save->getMapSizeX(), mapSizeY = _save->getMapSizeY(), mapSizeZ = _save->getMapSizeZ();
 	const int tileX = (int)std::floor(x / 16), tileY = (int)std::floor(y / 16);
+	// A map underground all the way up has rock over all of it (see chooseGround).
+	if (_enclosed)
+	{
+		return false;
+	}
 	if (tileX < 0 || tileY < 0 || tileX >= mapSizeX || tileY >= mapSizeY)
 	{
 		return true;

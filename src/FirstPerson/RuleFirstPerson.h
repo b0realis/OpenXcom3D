@@ -92,6 +92,7 @@ private:
 	std::map<std::string, std::string> _weather; // terrain data set -> rain, snow, dust, ...
 	std::vector<std::string> _combatMusic;       // tense tracks to try, first one the game has wins
 	std::set<std::string> _nightVision;          // armors and items that give their wearer night vision
+	std::set<std::string> _undergroundMissions;  // missions underground all the way up, whatever their map's edges show
 	std::set<std::string> _builtInItemsShown;    // built-in items drawn in the hands all the same (a shield, an arm cannon)
 	std::map<std::string, ItemLook> _itemLooks;  // the item table: item type -> what it's set to
 	std::map<std::string, int> _signalLevels;    // mission type -> how badly helmet cameras glitch (1 as usual, 2 a lot)
@@ -133,6 +134,15 @@ public:
 		if (reader.tryRead("nightVision", nightVision))
 		{
 			_nightVision = std::set<std::string>(nightVision.begin(), nightVision.end());
+		}
+		// Missions underground all the way up (rock round the map and above it), for a map whose
+		// rock the 3D view can't tell from its edges (it tells most by itself: see
+		// FirstPersonView::chooseGround). Mission types only; a map that starts on the surface
+		// must never be listed, nor a name two games share for different maps.
+		std::vector<std::string> undergroundMissions;
+		if (reader.tryRead("undergroundMissions", undergroundMissions))
+		{
+			_undergroundMissions = std::set<std::string>(undergroundMissions.begin(), undergroundMissions.end());
 		}
 		if (reader.tryRead("builtInItemsShown", builtInItemsShown))
 		{
@@ -201,6 +211,8 @@ public:
 	const std::vector<std::string> &getCombatMusic() const { return _combatMusic; }
 	/// Does wearing this armor, or carrying this item, give night vision?
 	bool givesNightVision(const std::string &type) const { return _nightVision.count(type) > 0; }
+	/// Is a mission (its alien deployment type) listed as underground all the way up?
+	bool isUnderground(const std::string &mission) const { return _undergroundMissions.count(mission) > 0; }
 	/// Is a built-in item (fixed to its unit, or its special weapon) drawn in the hands all the same?
 	bool showsBuiltInItem(const std::string &type) const { return _builtInItemsShown.count(type) > 0; }
 	/// An item's entry in the item table, or nullptr if it has none (the 3D view works it all out).

@@ -491,7 +491,9 @@ void FirstPersonMode::numpadKeys(int &forward, int &strafe) const
  * setting, almost at once (NumpadMoveSpeed), like a step on the isometric map: a press is
  * remembered until the move can start, and a key still held starts the next. With the setting
  * "Movement: Tiles", W, A, S and D make them too, at walking speed, once held a moment (a second
- * key pressed with the first, W and D say, makes a diagonal), and holding them walks on.
+ * key pressed with the first, W and D say, makes a diagonal), and holding them walks on. A key
+ * held on from one move to the next stops at a closed door (a player's report: a held walk went on
+ * through it, into whatever waited behind): only a fresh press goes through, opening it.
  * The move is the normal walk steered to the middle of that tile, so everything walking does
  * still happens on the way (the step through the game's own walking, doors, falling off ledges,
  * diagonal gaps, vaults); this only works out the velocity, straight to the tile's middle,
@@ -520,6 +522,11 @@ bool FirstPersonMode::tileMoveVelocity(BattleUnit *unit, double forward, double 
 		_numpadMove[0] = _numpadMove[1] = 0; // (a press while the soldier may not move is dropped)
 		numpadForward = numpadStrafe = 0;
 	}
+	// W, A, S, D let go, even for a moment: the next press is a fresh one.
+	if (!pushing)
+	{
+		_tileMoveHeldOn = false;
+	}
 
 	// Start a move when the soldier may step: a numpad press (or a numpad key still held) at
 	// once, else the movement keys held a moment. It goes into the neighbour the push points at
@@ -536,8 +543,11 @@ bool FirstPersonMode::tileMoveVelocity(BattleUnit *unit, double forward, double 
 		{
 			_tileMoveKeysSince = now;
 		}
+		// The move's push, and whether it comes from a key held on since the last move (a numpad
+		// key still down, or W, A, S, D never let go) rather than a fresh press.
 		double moveForward = 0.0, moveStrafe = 0.0;
 		bool quick = true;
+		bool heldOn = false;
 		if (_numpadMove[0] || _numpadMove[1])
 		{
 			moveForward = _numpadMove[0];
@@ -547,12 +557,14 @@ bool FirstPersonMode::tileMoveVelocity(BattleUnit *unit, double forward, double 
 		{
 			moveForward = numpadForward;
 			moveStrafe = numpadStrafe;
+			heldOn = true;
 		}
 		else if (pushing && now - _tileMoveKeysSince >= TileMoveKeyWait)
 		{
 			moveForward = forward;
 			moveStrafe = strafe;
 			quick = false;
+			heldOn = _tileMoveHeldOn;
 		}
 		if ((moveForward != 0.0 || moveStrafe != 0.0) && canMove && !_stepPending && canAct() && unit->getStatus() == STATUS_STANDING)
 		{
@@ -561,13 +573,16 @@ bool FirstPersonMode::tileMoveVelocity(BattleUnit *unit, double forward, double 
 			const double pushX = std::cos(yaw) * moveForward - std::sin(yaw) * moveStrafe, pushY = std::sin(yaw) * moveForward + std::cos(yaw) * moveStrafe;
 			const double octant = std::round(std::atan2(pushY, pushX) / (Pi / 4.0)) * (Pi / 4.0);
 			const int stepX = (int)std::lround(std::cos(octant)), stepY = (int)std::lround(std::sin(octant));
-			if (stepAllowed(unit, stepX, stepY) || closedDoorTowards(stepX, stepY, unit->getPosition().z))
+			// Into a closed door only with a fresh press (a held key stops in front of it).
+			const bool throughDoor = closedDoorTowards(stepX, stepY, unit->getPosition().z);
+			if ((stepAllowed(unit, stepX, stepY) || throughDoor) && !(throughDoor && heldOn))
 			{
 				_tileMove = true;
 				_tileMoveQuick = quick;
 				_tileMoveTarget = Position(_trackedTile.x + stepX, _trackedTile.y + stepY, 0);
 				_tileMoveClosest = 1e9;
 				_tileMoveProgressAt = now;
+				_tileMoveHeldOn = pushing; // W, A, S, D still held when this move ends: the next is held on
 			}
 		}
 	}
@@ -1044,7 +1059,10 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 	const bool driving = tileMoves ? tileMoveDriving : (wantedVelocityX != 0.0 || wantedVelocityY != 0.0);
 
 	// A closed door ahead (soldiers one tile big only): stop DoorMargin voxels in front of it,
-	// and walking on steps through it, the game opening it on the way.
+	// and walking on steps through it, the game opening it on the way. By tile moves, only a move
+	// aimed through that door steps through it: one that only goes to the middle of the tile
+	// before the door comes within DoorMargin of it too (the middle is 8 voxels from the edge),
+	// and must stop there (a player's report: a tap walked on through the door).
 	if (unit->getArmor()->getSize() == 1)
 	{
 		// The tile's west and north edges, in voxels, and the four sides: east, west, south, north.
@@ -1071,7 +1089,8 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 
 			// Walking on, and the rules allow the step: take it, and let walkGuidedStep move the
 			// camera from now on.
-			if (!_stepPending && driving && canMove && canAct() && unit->getStatus() == STATUS_STANDING && stepAllowed(unit, side[0], side[1])
+			const bool moveGoesThrough = !tileMoves || (_tileMove && _tileMoveTarget.x == _trackedTile.x + side[0] && _tileMoveTarget.y == _trackedTile.y + side[1]);
+			if (!_stepPending && driving && moveGoesThrough && canMove && canAct() && unit->getStatus() == STATUS_STANDING && stepAllowed(unit, side[0], side[1])
 				&& commitStep(unit, side[0], side[1]))
 			{
 				_guidedStep = true;
@@ -1589,23 +1608,186 @@ void FirstPersonMode::updateFlight(BattleUnit *unit)
 	}
 }
 
+namespace
+{
+
 /**
- * Opens the door the soldier faces without walking through it (the open door key), like
- * right-clicking it on the map: a turn on the spot towards the tile ahead, which the game's
- * turning state (UnitTurnBState) turns into opening the door in front, at its usual cost.
+ * A door a one-tile soldier can open from where it stands: the tile of its wall, from the
+ * soldier's own, which wall, and the facing that opens it. These are the doors the game's own
+ * opening reaches (TileEngine::unitOpensDoor, as for a right-click on the map): the four sides
+ * of the soldier's tile, and the walls of the tiles round it that meet its corners. For a door
+ * on a side, the facing is the one whose list holds that door alone, so no other door in the
+ * list opens instead.
+ */
+struct ReachableDoor
+{
+	int x, y;       // the wall's tile, from the soldier's
+	TilePart part;  // its west or its north wall
+	int direction;  // the facing that opens it (0 north to 7, clockwise)
+};
+const ReachableDoor ReachableDoors[] = {
+	{ 0, 0, O_NORTHWALL, 0 }, { 0, 0, O_WESTWALL, 6 },   // the tile's own north and west sides
+	{ 1, 0, O_WESTWALL, 2 },  { 0, 1, O_NORTHWALL, 4 },  // its east and south sides (the next tiles' walls)
+	{ 1, -1, O_WESTWALL, 1 }, { 1, 0, O_NORTHWALL, 1 },  // meeting its north-east corner
+	{ 1, 1, O_WESTWALL, 3 },  { 1, 1, O_NORTHWALL, 3 },  // its south-east corner
+	{ -1, 1, O_NORTHWALL, 5 }, { 0, 1, O_WESTWALL, 5 },  // its south-west corner
+	{ 0, -1, O_WESTWALL, 7 }, { -1, 0, O_NORTHWALL, 7 }, // its north-west corner
+};
+
+}
+
+/**
+ * Opens a door without walking through it (the open door key), like right-clicking it on the
+ * map: the door the player points at (the crosshair, or the free cursor), or else the closed one
+ * within reach nearest the way the view looks (see doorWithinReach). The soldier turns to it by
+ * the game's rules first: for free with free turning (the view stays where it looks); with
+ * "Turning costs TU", a paid turn, after which the door opens by itself (openDoorAfterTurn). With
+ * no door within reach, the warning line says so. A unit of more than one tile opens the door
+ * its facing points at, as before (the game lets no such unit open a swinging door anyway).
  */
 void FirstPersonMode::openDoor(BattleUnit *unit)
 {
-	if (!unit || !canAct() || unit->getStatus() != STATUS_STANDING)
+	// (only with the game idle: the turn that opens the door starts at once, before the next
+	// frame turns the soldier back to where the view looks)
+	if (!unit || !canAct() || unit->getStatus() != STATUS_STANDING || _state->_battleGame->isBusy())
 	{
 		return;
 	}
 
+	if (!unit->isBigUnit())
+	{
+		const int direction = doorWithinReach(unit);
+		if (direction < 0)
+		{
+			_state->warning("STR_FPS_NO_DOOR_IN_REACH");
+			return;
+		}
+		if (direction != unit->getDirection())
+		{
+			// Turning by the rules: the game's own turn, at the armor's cost; the door opens once
+			// it's done (unless the turn stops, out of time units or at a newly spotted enemy).
+			if (Options::fpsTurnCost)
+			{
+				Position towards;
+				Pathfinding::directionToVector(direction, &towards);
+				BattleAction turn;
+				turn.actor = unit;
+				turn.target = unit->getPosition() + towards;
+				_doorAfterTurnUnit = unit;
+				_doorAfterTurn = direction;
+				_state->_battleGame->statePushBack(new UnitTurnBState(_state->_battleGame, turn));
+				return;
+			}
+			// Free turning: the soldier faces the door for free (the next frame it faces where
+			// the view looks again, see faceLookDirection).
+			unit->setDirection(direction);
+		}
+	}
+	openDoorAhead(unit);
+}
+
+/**
+ * Which door the open door key opens, as the facing that opens it: the door the player points
+ * at, when it's one within the soldier's reach (the ray the crosshair's own, the game's line of
+ * fire, meets a door's wall first); or else the closed door within reach nearest the way the
+ * view looks, up to DoorPointSlack degrees off it, so looking roughly at a door is enough. The
+ * doors within reach are the game's own (ReachableDoors), on the level it opens them on: the one
+ * above when the soldier stands high on stairs, as TileEngine::unitOpensDoor has it.
+ * @param unit The soldier (one tile).
+ * @return The facing (0 north to 7, clockwise), or -1 if there's no closed door within reach.
+ */
+int FirstPersonMode::doorWithinReach(BattleUnit *unit)
+{
+	const Position origin = unit->getPosition() + Position(0, 0, unit->getTile()->getTerrainLevel() < -12 ? 1 : 0);
+	// Is this door within reach closed? (A UFO door already opening counts as open.)
+	auto closedDoor = [&](const ReachableDoor &door)
+	{
+		const Tile *tile = _save->getTile(origin + Position(door.x, door.y, 0));
+		return tile && (tile->isDoor(door.part) || (tile->isUfoDoor(door.part) && !tile->isUfoDoorOpen(door.part)));
+	};
+
+	// The door pointed at: the wall the ray meets first, and its tile.
+	int pointerX, pointerY;
+	pointer(pointerX, pointerY);
+	Position hitVoxel;
+	int hitType = V_EMPTY;
+	aimAt(pointerX, pointerY, unit, hitVoxel, &hitType);
+	if (hitType == V_WESTWALL || hitType == V_NORTHWALL)
+	{
+		const Position wallTile = hitVoxel.toTile();
+		const TilePart wall = hitType == V_WESTWALL ? O_WESTWALL : O_NORTHWALL;
+		for (const ReachableDoor &door : ReachableDoors)
+		{
+			if (door.part == wall && origin + Position(door.x, door.y, 0) == wallTile && closedDoor(door))
+			{
+				return door.direction;
+			}
+		}
+	}
+
+	// Else the nearest one the view looks towards: the door's middle seen from the eye, as a
+	// yaw (0 = east, 90 = south, as the camera's), compared with the view's. A west wall runs
+	// along its tile's west edge, a north wall along its north edge (16 voxels a tile).
+	double eye[3];
+	_view->getEye(eye);
+	const double viewYaw = _view->getYawDegrees();
+	int nearestDirection = -1;
+	double nearestOff = DoorPointSlack;
+	for (const ReachableDoor &door : ReachableDoors)
+	{
+		if (!closedDoor(door))
+		{
+			continue;
+		}
+		const Position wallTile = origin + Position(door.x, door.y, 0);
+		const double doorX = wallTile.x * 16.0 + (door.part == O_WESTWALL ? 0.0 : 8.0);
+		const double doorY = wallTile.y * 16.0 + (door.part == O_WESTWALL ? 8.0 : 0.0);
+		const double doorYaw = std::atan2(doorY - eye[1], doorX - eye[0]) * 180.0 / Pi;
+		const double off = std::abs(std::remainder(doorYaw - viewYaw, 360.0));
+		if (off < nearestOff)
+		{
+			nearestOff = off;
+			nearestDirection = door.direction;
+		}
+	}
+	return nearestDirection;
+}
+
+/**
+ * Opens the door the open door key turned the soldier to (turning by the rules), once the turn
+ * is done: when the game is idle again and the soldier faces that way. A turn that stopped
+ * short (out of time units, or at a newly spotted enemy, as the game stops it) opens nothing.
+ * Another soldier selected meanwhile drops it. Called every frame on the player's turn.
+ * @param unit The soldier we look through.
+ */
+void FirstPersonMode::openDoorAfterTurn(BattleUnit *unit)
+{
+	if (_doorAfterTurn < 0 || _state->_battleGame->isBusy())
+	{
+		return;
+	}
+	const bool turned = unit == _doorAfterTurnUnit && unit->getDirection() == _doorAfterTurn && unit->getStatus() == STATUS_STANDING;
+	_doorAfterTurn = -1;
+	_doorAfterTurnUnit = nullptr;
+	if (turned && canAct())
+	{
+		openDoorAhead(unit);
+	}
+}
+
+/**
+ * Opens the door the soldier faces, as a right-click on it does on the map: a turn on the spot
+ * towards the tile ahead, which the game's turning state (UnitTurnBState) turns into opening
+ * the door in front at its usual cost (or says there aren't the time units).
+ * @param unit The soldier.
+ */
+void FirstPersonMode::openDoorAhead(BattleUnit *unit)
+{
 	// The tile ahead: the soldier's facing (0 north to 7, clockwise) as a step of one tile.
 	Position forwardStep;
 	Pathfinding::directionToVector(unit->getDirection(), &forwardStep);
 
-	// Turn towards it, through the game's turning state.
+	// Turn towards it (already facing it: no turn), through the game's turning state.
 	BattleAction turn;
 	turn.type = BA_NONE;
 	turn.actor = unit;

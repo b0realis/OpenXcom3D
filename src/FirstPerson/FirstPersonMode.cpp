@@ -71,6 +71,7 @@
 #include "../Engine/Game.h"
 #include "../Engine/Options.h"
 #include "../Engine/Screen.h"
+#include "../Engine/Timer.h"
 #include "../Interface/Bar.h"
 #include "../Interface/BattlescapeButton.h"
 #include "../Interface/NumberText.h"
@@ -117,6 +118,9 @@ bool lastAkimboRealisticWasOn = true;
 std::unordered_map<int, FirstPersonMode::DoomFuse> lastDoomFuses;
 /// When a first-person mode last ran its per-frame update (SDL ticks, ms; 0: never).
 Uint32 lastThinkTicks = 0;
+/// The map camera's size the 3D HUD key brings back on the map (see toggleMapCamera): the last
+/// one it had, medium at first.
+int lastMapCameraSize = 2;
 
 /// The shoulder flashlight (setting "Flashlight": On) lights from the battle's shade 6 on (of 0
 /// bright .. 15 dark): at dusk and night.
@@ -151,6 +155,7 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
 	createWalkModeLines();
 	createTopBar();
 	createInfoPanel();
+	makeMapCamera(Options::fpsMapCamera > 0 ? Options::fpsMapCamera : lastMapCameraSize); // (under the cards)
 	createSoldierCard();
 	createSoldierCam(); // (last: drawn over everything)
 
@@ -614,19 +619,12 @@ void FirstPersonMode::makeSoldierCamView()
 	_soldierCamHeight = _soldierCamWidth * PreviewH / PreviewW;
 	const Mod *mod = _game->getMod();
 
-	// The frame: the picture inside a 4 pixel border, under a 16 pixel title bar. Its colours
-	// are the card's (the mod's "firstPerson" interface, element "panel", if it sets them).
+	// The frame: the picture inside a 4 pixel border, under a 16 pixel title bar, in the card's
+	// colours.
 	Surface *frame = new Surface(_soldierCamWidth + 8, _soldierCamHeight + 20, 0, 0);
 	frame->setPalette(_state->getPalette());
-	Uint8 background = 15, border = 8;
-	if (const RuleInterface *interfaceRules = mod->getInterface("firstPerson", false))
-	{
-		if (const Element *panelElement = interfaceRules->getElementOptional("panel"))
-		{
-			if (panelElement->color != INT_MAX) background = panelElement->color;
-			if (panelElement->border != INT_MAX) border = panelElement->border;
-		}
-	}
+	Uint8 background, border;
+	panelColors(background, border);
 	frame->drawRect(0, 0, frame->getWidth(), frame->getHeight(), border);
 	frame->drawRect(1, 1, frame->getWidth() - 2, frame->getHeight() - 2, background);
 	frame->drawRect(3, 15, _soldierCamWidth + 2, _soldierCamHeight + 2, border);
@@ -644,26 +642,117 @@ void FirstPersonMode::makeSoldierCamView()
 	camera->setSignalGlitches(signalLevel); // and a digital feed's bad signal now and then (a lot there)
 
 	// In place of the old ones (or, the first time, added last: drawn over everything).
-	const bool wasVisible = _soldierCam && _soldierCam->getVisible();
-	auto putInPlace = [this, wasVisible](Surface *oldSurface, Surface *newSurface)
-	{
-		if (oldSurface)
-		{
-			std::replace(_state->_surfaces.begin(), _state->_surfaces.end(), oldSurface, newSurface);
-			_ownSurfaces.erase(oldSurface);
-			delete oldSurface;
-		}
-		else
-		{
-			_state->add(newSurface);
-		}
-		newSurface->setVisible(wasVisible);
-		_ownSurfaces.insert(newSurface);
-	};
-	putInPlace(_soldierCamFrame, frame);
-	putInPlace(_soldierCam, camera);
+	putSurfaceInPlace(_soldierCamFrame, frame);
+	putSurfaceInPlace(_soldierCam, camera);
 	_soldierCamFrame = frame;
 	_soldierCam = camera;
+}
+
+/**
+ * Puts a remade surface of ours in the old one's place among the state's surfaces (so it's drawn
+ * in the same order), shown or hidden as that was, and deletes the old one; the first time (no
+ * old one) it's added last, hidden: drawn over everything made so far.
+ * @param oldSurface The surface it replaces, or null.
+ * @param newSurface The new surface.
+ */
+void FirstPersonMode::putSurfaceInPlace(Surface *oldSurface, Surface *newSurface)
+{
+	const bool wasVisible = oldSurface && oldSurface->getVisible();
+	if (oldSurface)
+	{
+		std::replace(_state->_surfaces.begin(), _state->_surfaces.end(), oldSurface, newSurface);
+		_ownSurfaces.erase(oldSurface);
+		delete oldSurface;
+	}
+	else
+	{
+		_state->add(newSurface);
+	}
+	newSurface->setVisible(wasVisible);
+	_ownSurfaces.insert(newSurface);
+}
+
+/**
+ * The colours of our panels and cards (the info panel's, the soldier card's, the cameras'
+ * frames): the mod's "firstPerson" interface, element "panel", if it sets them, else a black
+ * background with a grey border.
+ * @param background Receives the background's palette colour.
+ * @param border Receives the border's.
+ */
+void FirstPersonMode::panelColors(Uint8 &background, Uint8 &border) const
+{
+	background = 15;
+	border = 8;
+	if (const RuleInterface *interfaceRules = _game->getMod()->getInterface("firstPerson", false))
+	{
+		if (const Element *panelElement = interfaceRules->getElementOptional("panel"))
+		{
+			if (panelElement->color != INT_MAX) background = panelElement->color;
+			if (panelElement->border != INT_MAX) border = panelElement->border;
+		}
+	}
+}
+
+/**
+ * Makes (or makes again, at another size) the map camera's picture and frame (see
+ * updateMapCamera). The picture is a small 3D view like the card's camera: sharing the big
+ * view's voxel models, reaching at most 30 tiles, without particles, with the helmet cameras'
+ * bad signal; the frame has the card's colours, a border round the picture and a title line
+ * above it. They take the old ones' places among the surfaces (the first time they're added,
+ * then the title over them).
+ * @param size The setting "Map camera"'s size: 1 small, 2 medium, 3 large.
+ */
+void FirstPersonMode::makeMapCamera(int size)
+{
+	// The picture's size: its share of the canvas's width, in the card camera's proportions,
+	// and not too tall for the canvas (even widths).
+	_mapCameraSize = std::clamp(size, 1, 3);
+	_mapCameraCanvasWidth = canvasWidth();
+	int pictureWidth = (int)(canvasWidth() * MapCameraShare[_mapCameraSize]) & ~1;
+	int pictureHeight = pictureWidth * PreviewH / PreviewW;
+	const int tallest = (int)(canvasHeight() * MapCameraMaxHeight);
+	if (pictureHeight > tallest)
+	{
+		pictureHeight = tallest;
+		pictureWidth = (pictureHeight * PreviewW / PreviewH) & ~1;
+	}
+	const Mod *mod = _game->getMod();
+
+	// The frame: the picture inside a border, under the title line.
+	Surface *frame = new Surface(pictureWidth + 2 * MapCameraBorder, pictureHeight + MapCameraTitleH + 2 * MapCameraBorder, 0, 0);
+	frame->setPalette(_state->getPalette());
+	Uint8 background, border;
+	panelColors(background, border);
+	frame->drawRect(0, 0, frame->getWidth(), frame->getHeight(), border);
+	frame->drawRect(1, 1, frame->getWidth() - 2, frame->getHeight() - 2, background);
+	frame->drawRect(MapCameraBorder - 1, MapCameraBorder + MapCameraTitleH - 1, pictureWidth + 2, pictureHeight + 2, border);
+
+	// The picture.
+	FirstPersonView *camera = new FirstPersonView(_game, pictureWidth, pictureHeight, 0, 0);
+	camera->setPalette(_state->getPalette());
+	camera->shareCache(_view); // (first: then the battle doesn't build models of its own)
+	camera->setSavedBattleGame(_save);
+	camera->setMap(_state->_map);
+	camera->setMaxDistance(std::min(30, mod->getFirstPerson().getMaxViewDistance()));
+	camera->setParticles(false);
+	camera->setSignalGlitches(mod->getFirstPerson().getSignalLevel(_save->getMissionType()));
+
+	putSurfaceInPlace(_mapCameraFrame, frame);
+	putSurfaceInPlace(_mapCamera, camera);
+	_mapCameraFrame = frame;
+	_mapCamera = camera;
+
+	// The title (made the first time), as wide as the picture.
+	if (!_txtMapCamera)
+	{
+		_txtMapCamera = new Text(pictureWidth, 9, 0, 0);
+		_state->add(_txtMapCamera, "textName", "battlescape");
+		_txtMapCamera->setHighContrast(true);
+		_txtMapCamera->setVisible(false);
+		_ownSurfaces.insert(_txtMapCamera);
+	}
+	_txtMapCamera->setWidth(pictureWidth - 2);
+	_txtMapCamera->setText(""); // (written again for the new width, see updateMapCamera)
 }
 
 /**
@@ -759,6 +848,7 @@ void FirstPersonMode::resized(int widthChange, int heightChange)
 	_ownSurfaces.erase(_view);
 	_ownSurfaces.insert(newView);
 	_preview->shareCache(newView);
+	_mapCamera->shareCache(newView);
 	delete _view;
 	_view = newView;
 	_trackedUnit = nullptr; // re-place the camera
@@ -997,6 +1087,7 @@ void FirstPersonMode::syncShadows()
  */
 FirstPersonMode::~FirstPersonMode()
 {
+	Timer::maxFrameSkip = Options::maxFrameSkip; // the player's own frame skipping again (see catchUp)
 	_state->_map->setSoundListener(nullptr);
 	_state->_map->setNightVisionHoldBlocked(false);
 
@@ -1156,6 +1247,26 @@ void FirstPersonMode::toggleHud()
 }
 
 /**
+ * The 3D HUD key on the isometric map (P by default): the map camera off, or on again at the
+ * size it last had (medium the first time), as if set so in the settings (and kept with them).
+ * A message says which key does the opposite.
+ */
+void FirstPersonMode::toggleMapCamera()
+{
+	if (Options::fpsMapCamera > 0)
+	{
+		lastMapCameraSize = Options::fpsMapCamera;
+		Options::fpsMapCamera = 0;
+		_state->warningRaw(_state->tr("STR_FPS_MAP_CAMERA_HIDDEN").arg(keyLabel(Options::keyFpsHideHud)));
+	}
+	else
+	{
+		Options::fpsMapCamera = std::clamp(lastMapCameraSize, 1, 3);
+		_state->warningRaw(_state->tr("STR_FPS_MAP_CAMERA_SHOWN").arg(keyLabel(Options::keyFpsHideHud)));
+	}
+}
+
+/**
  * Switches the flashlight on or off (its key, F by default), with a click of the switch. It's
  * the 3D view's own light (setting "Flashlight": on, a wide beam from the shoulder in the dark;
  * dynamic, a spot on the crosshair at any time of day) and changes nothing in the game's rules;
@@ -1277,6 +1388,33 @@ bool FirstPersonMode::wantsMouseCapture() const
 bool FirstPersonMode::canAct() const
 {
 	return _state->allowButtons() && _state->_popups.empty();
+}
+
+/**
+ * Shots and explosions in 3D at the isometric map's pace: while the 3D view shows and a shot is
+ * flying or something is going off (a round's hit, a blast), and for CatchUpGrace after (the
+ * step that fires a burst's next round), the battle's timer may run up to CatchUpSteps steps it
+ * missed during a frame (OXCE's own frame skipping, whose option is off by default); otherwise
+ * the player's own setting. A long chain of terrain explosions runs a step a millisecond from its
+ * seventh link on (OXCE's speed-up), which the map keeps up with between its quick frames, a link
+ * in about 45 ms; in 3D each step waited for a whole frame (about 29 ms at 1280x800), and a link
+ * took 374 ms (a player's report: a building-sized chemical tower took ages to go up). Likewise
+ * each round of a burst takes the game about four steps (its flight, its hit, the next round),
+ * and with slow frames (a 640x400 view drawn on one core: 36 ms) a 10-round burst of fast rounds
+ * took 1.2 s, the map 0.6 s (a player's report on 1.03: the X-Com Files' turbo laser). Walking
+ * and everything else the view follows frame by frame keep one step a frame. The timer reads the
+ * limit when it next runs (the battle's think runs it before this), so it applies a frame on.
+ * Called every frame.
+ */
+void FirstPersonMode::catchUp()
+{
+	const Uint32 now = SDL_GetTicks();
+	if (isActive() && (_state->_map->getProjectile() || !_state->_map->getExplosions()->empty()))
+	{
+		_catchUpUntil = now + CatchUpGrace;
+	}
+	const bool catchingUp = isActive() && now < _catchUpUntil;
+	Timer::maxFrameSkip = catchingUp ? std::max(Options::maxFrameSkip, CatchUpSteps) : Options::maxFrameSkip;
 }
 
 /**
@@ -1580,6 +1718,9 @@ void FirstPersonMode::think()
 	const bool resumed = _lastFrameTick && now - _lastFrameTick > 250;
 	_lastFrameTick = now;
 
+	// Explosions in 3D at the isometric map's pace (the battle's timer catching up).
+	catchUp();
+
 	// The right button may have been let go while another screen had the mouse, or the view
 	// changed: then the zoom it held and the drag look end too.
 	if ((_zoomButtonHeld || _dragLook) && !(SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON(SDL_BUTTON_RIGHT)))
@@ -1664,13 +1805,15 @@ void FirstPersonMode::think()
 		setActive(show3D);
 	}
 
-	// What runs in both views: the top bar, the soldier card, the music, aiming on the
-	// isometric map and flight.
+	// What runs in both views: the top bar, the soldier card, the map camera, the music, aiming
+	// on the isometric map, akimbo's second shot in turn and flight.
 	updateTopBar(selected);
 	updateSoldierCard();
+	updateMapCamera(); // (after the card: a squad button's soldier cam wins)
 	watchMapLayers();
 	updateMusic(now);
 	updateMapAim();
+	fireTurnShot(); // (akimbo in turn: the other gun's shot, or calling it off on the map)
 	updateFlight(show3D ? unit : nullptr);
 
 	// On the isometric map: hide the 3D view's overlays (the scope too: back in 3D the view
@@ -1734,6 +1877,7 @@ void FirstPersonMode::think()
 	updateCamera(unit, playerTurn, elapsedSeconds);
 	if (playerTurn)
 	{
+		openDoorAfterTurn(unit);
 		faceLookDirection(unit);
 		updateFireMode(unit);
 		updateAim(unit);
@@ -1903,10 +2047,16 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	// (While leaning with Left Shift, the game's own hotkeys stay quiet, as the game ignores a
 	// hotkey with Shift held: Q and E don't open a hand's menu in the middle of a lean.)
 
-	// The 3D key works in both views.
+	// The 3D key works in both views; on the isometric map, the 3D HUD key shows or hides the
+	// map camera.
 	if (key == Options::keyBattleFirstPerson)
 	{
 		if (pressed) toggleView();
+		return true;
+	}
+	if (!active && key == Options::keyFpsHideHud)
+	{
+		if (pressed) toggleMapCamera();
 		return true;
 	}
 	if (!active)
@@ -1945,7 +2095,7 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	// Night vision: the gear of the soldier the view looks through (in the aliens' turn the
 	// game's selected unit is the alien acting); the game's own key (Scroll Lock) checks for it
 	// in 3D too.
-	if (key == Options::keyFpsNightVision || key == Options::keyNightVisionToggle) { if (pressed) toggleNightVision(_trackedUnit, action); return true; }
+	if (key == Options::keyFpsNightVision || key == Options::keyNightVisionToggle) { if (pressed) toggleNightVision(_trackedUnit); return true; }
 
 	// The game's own keys for what acts on the isometric map, translated (see classicHudButton):
 	// the centre key (Home) looks straight ahead; the map level keys (if not taken by up/down
@@ -2092,6 +2242,13 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 	const bool wheelTurned = event.type == SDL_MOUSEBUTTONDOWN
 		&& (event.button.button == SDL_BUTTON_WHEELUP || event.button.button == SDL_BUTTON_WHEELDOWN);
 
+	// Moving over the map camera on the isometric map: the map's cursor stays where it was (and
+	// an aimed action's target with it, which the camera looks at), not under the picture.
+	if (!active && event.type == SDL_MOUSEMOTION && onMapCamera(_cursorX, _cursorY))
+	{
+		return true;
+	}
+
 	if (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP)
 	{
 		// Where the click is, in the game's screen pixels, and which of our buttons is there.
@@ -2145,6 +2302,23 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 				{
 					_soldierCamOpen = !_soldierCamOpen;
 				}
+			}
+			return true;
+		}
+
+		// On the isometric map, the map camera: a left click on it goes to the 3D view (the
+		// selected soldier's), a right click opens the soldier cam in its place, or closes it. The
+		// map under it gets nothing: no soldier walks off by a click on the picture.
+		if (!active && onMapCamera((int)(mouseX / _uiScale), (int)(mouseY / _uiScale)))
+		{
+			if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT)
+			{
+				_mapSoldierCamOpen = false;
+				toggleView();
+			}
+			else if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_RIGHT)
+			{
+				_mapSoldierCamOpen = !_mapSoldierCamOpen;
 			}
 			return true;
 		}

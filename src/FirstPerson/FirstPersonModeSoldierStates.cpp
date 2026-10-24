@@ -125,6 +125,26 @@ void FirstPersonMode::checkNearMiss()
 }
 
 /**
+ * The purple haze at the view's edges while looking through a unit under our mind control (one
+ * from the other side, ours for now: a player's report on 1.03 asked for "a purple haze aura on
+ * screen border"), so it's plain whose eyes these are: ControlHazeStrength strong, breathing in
+ * and out over ControlHazePeriod. Our own soldiers, and anyone else, have none. The helmet
+ * cameras show it too (see aimHelmetCamera).
+ * @param unit The unit looked through.
+ * @param now SDL ticks, in ms (the breathing).
+ * @return The haze, 0 none .. 1 strong.
+ */
+float FirstPersonMode::controlHaze(const BattleUnit *unit, Uint32 now) const
+{
+	if (!unit || unit->getOriginalFaction() == FACTION_PLAYER || unit->getFaction() != FACTION_PLAYER)
+	{
+		return 0.0f;
+	}
+	const float breath = 0.5f + 0.5f * (float)std::sin(2.0 * Pi * (now % ControlHazePeriod) / ControlHazePeriod);
+	return ControlHazeStrength * (1.0f - ControlHazeBreath + ControlHazeBreath * breath);
+}
+
+/**
  * Shows what getting hurt feels like for the soldier we look through. A hit flashes the view red
  * (more for a bigger wound), shakes it, and shows an arc on the screen's edge towards where the
  * hit came from; a hit in melee, or a heavy one, also splatters blood over the view. While badly
@@ -135,6 +155,9 @@ void FirstPersonMode::checkNearMiss()
  */
 void FirstPersonMode::checkHurt(BattleUnit *unit, Uint32 now)
 {
+	// A unit under our mind control: the purple haze at the edges (see controlHaze).
+	_view->setControlHaze(controlHaze(unit, now));
+
 	// A soldier we weren't watching: just note their health, to notice the next loss.
 	if (unit != _healthWatchedUnit)
 	{

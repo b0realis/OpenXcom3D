@@ -416,11 +416,12 @@ void FirstPersonMode::snapToTile(BattleUnit *unit)
 	_trackedTile = unitTile;
 
 	// Whatever the camera was doing is over: no step waiting, no door or gap to walk through,
-	// no momentum, no ride (and so no floor left out for one).
+	// no momentum, no ride or fall (and so no floor left out for one).
 	_stepPending = false;
 	_guidedStep = false;
 	_velocityX = _velocityY = 0.0;
 	_rideStart = 0;
+	_fallStart = 0;
 	_view->setHiddenFloor(-1);
 }
 
@@ -506,10 +507,10 @@ void FirstPersonMode::updateCamera(BattleUnit *unit, bool canMove, double elapse
 	}
 	else if (unitTile.x == _trackedTile.x && unitTile.y == _trackedTile.y && unitTile.z != _trackedTile.z)
 	{
-		// Up or down a level where it stands. A lift ride is already gliding (see below); a fall
-		// or a landing glides too, quicker, through the upper level's floor (left out of the
-		// picture meanwhile, so the eye doesn't pass through it).
-		if (!_rideStart)
+		// Up or down a level where it stands. A lift ride is already gliding, and a fall dropping
+		// (see below); anything else (a landing) glides too, quicker, through the upper level's
+		// floor (left out of the picture meanwhile, so the eye doesn't pass through it).
+		if (!_rideStart && !_fallStart)
 		{
 			_view->setHiddenFloor(_save->getTileIndex(Position(unitTile.x, unitTile.y, std::max(unitTile.z, _trackedTile.z))));
 			_rideStart = SDL_GetTicks();
@@ -528,14 +529,25 @@ void FirstPersonMode::updateCamera(BattleUnit *unit, bool canMove, double elapse
 	// A lift ride (or flying up or down) glides the eye from the moment it starts, slowly. The
 	// game moves the unit up half way through its own short move; the eye takes its time. The
 	// floor between the two levels is left out of the picture during the ride.
+	// A fall (the game's: a step into the air, the floor gone under the soldier) drops instead, as
+	// by gravity, from where the eye is (see below).
 	const int verticalDirection = unit->getVerticalDirection();
-	if (verticalDirection && !_rideVertical)
+	const bool falling = isFalling(unit);
+	if (falling && !_fallStart)
+	{
+		const Position unitPosition = unit->getPosition();
+		_view->setHiddenFloor(_save->getTileIndex(unitPosition));
+		_fallStart = SDL_GetTicks();
+		_fallEyeFrom = _eyeZ;
+		_rideStart = 0;
+	}
+	else if (verticalDirection && !_rideVertical && !_fallStart)
 	{
 		const int rideDirection = verticalDirection == Pathfinding::DIR_UP ? 1 : -1; // 1 up, -1 down
 		const Position unitPosition = unit->getPosition();
 		_view->setHiddenFloor(_save->getTileIndex(Position(unitPosition.x, unitPosition.y, unitPosition.z + (rideDirection > 0 ? 1 : 0))));
 		_rideStart = SDL_GetTicks();
-		_rideTime = RideTime;
+		_rideTime = rideTime();
 		_rideFrom = _eyeZ;
 		_rideTo = _eyeZ + rideDirection * 24.0;
 		_rideLevel = unitPosition.z;
@@ -550,7 +562,27 @@ void FirstPersonMode::updateCamera(BattleUnit *unit, bool canMove, double elapse
 	// settles quickly on the unit's eye height (kneeling and standing up glide).
 	const double targetEyeZ = eyeHeight(unit);
 	const double rideProgress = _rideStart ? (SDL_GetTicks() - _rideStart) / (double)std::max<Uint32>(1, _rideTime) : 1.0;
-	if (rideProgress < 1.0)
+	if (_fallStart)
+	{
+		// Falling: down by g t^2 / 2, g such that the first level takes a ride's time (by the walk
+		// speed); at most a level ahead of the game, which moves the unit a level at a time
+		// (the eye waits for it there), and only while there's no floor under the unit yet (no
+		// further than where it lands). Landed once the game has stopped the fall and the eye is
+		// down: the view dips.
+		const double seconds = (SDL_GetTicks() - _fallStart) / 1000.0;
+		const double levelSeconds = rideTime() / 1000.0;
+		const double gravity = 2.0 * Position::TileZ / (levelSeconds * levelSeconds); // voxels per second squared
+		const double lowest = targetEyeZ - (falling && unit->haveNoFloorBelow() ? Position::TileZ : 0.0);
+		_eyeZ = std::max(lowest, _fallEyeFrom - 0.5 * gravity * seconds * seconds);
+		if (!falling && _eyeZ <= targetEyeZ + 0.01)
+		{
+			_eyeZ = targetEyeZ;
+			_fallStart = 0;
+			_landedAt = SDL_GetTicks();
+			_view->setHiddenFloor(-1);
+		}
+	}
+	else if (rideProgress < 1.0)
 	{
 		// Towards the new level's eye height once the unit is there, the estimate until then.
 		const double goalEyeZ = unit->getPosition().z != _rideLevel ? targetEyeZ : _rideTo;
@@ -592,21 +624,70 @@ void FirstPersonMode::updateCamera(BattleUnit *unit, bool canMove, double elapse
 	// jump and the lean's drop up and down.
 	const double yawRadians = _view->getYawDegrees() * Pi / 180.0;
 	_view->setEye(_eyeX + std::cos(yawRadians) * lunge + _leanShift[0], _eyeY + std::sin(yawRadians) * lunge + _leanShift[1],
-		_eyeZ + headBob + currentJumpHeight(unit) - leanDrop);
+		_eyeZ + headBob + currentJumpHeight(unit) - leanDrop - landingDip());
+}
+
+/**
+ * How long going up or down a level takes (a grav lift, a ladder, flying, a fall): as long as
+ * walking RideTiles tiles at RidePace of the walk speed setting (1 to 8 tiles a second).
+ * @return The time, in milliseconds.
+ */
+Uint32 FirstPersonMode::rideTime() const
+{
+	const double pace = std::clamp(Options::fpsWalkSpeed, 1, 8) * RidePace; // tiles a second
+	return (Uint32)std::lround(1000.0 * RideTiles / pace);
+}
+
+/**
+ * Is the game making this unit fall: a step off a ledge into the air (see the steps), or the
+ * floor gone from under it? Riding a lift or a ladder, or flying up and down (a flying suit's
+ * landing a level at a time too), isn't a fall.
+ * @param unit The unit.
+ * @return True if it's among the game's falling units.
+ */
+bool FirstPersonMode::isFalling(BattleUnit *unit) const
+{
+	const std::list<BattleUnit*> *fallingUnits = _save->getFallingUnits();
+	return std::find(fallingUnits->begin(), fallingUnits->end(), unit) != fallingUnits->end();
+}
+
+/**
+ * How far the view dips just after a fall has landed: down and back up over LandingDipTime, at
+ * most LandingDip voxels.
+ * @return The dip, in voxels (0 when not just landed).
+ */
+double FirstPersonMode::landingDip() const
+{
+	const Uint32 sinceLanding = SDL_GetTicks() - _landedAt;
+	if (!_landedAt || sinceLanding >= LandingDipTime)
+	{
+		return 0.0;
+	}
+	return LandingDip * std::sin(Pi * sinceLanding / (double)LandingDipTime);
 }
 
 /**
  * Where the 3D camera's eye is, as a height in voxels: the game's sight origin (where its own
  * line of sight starts), lowered a little by the setting "Eye height lowered by" (0..6 voxels,
  * half that when kneeling). X-COM soldiers fill a level almost to the ceiling, so the view sits a bit
- * lower to give rooms some headroom; the game's own line of sight stays where it is.
+ * lower to give rooms some headroom; the game's own line of sight stays where it is. But where
+ * the game has pushed its sight origin down under a floor the soldier's head would reach (one
+ * standing on something tall under a ceiling, see TileEngine::getSightOriginVoxel), the view
+ * stays close to the game's own eye, only PressedEyeLower lower: lowered by the setting too, it
+ * sank onto what the soldier stands on, the view a slit between that and the ceiling (a player's
+ * report on 1.03).
  * @return The eye's height above the bottom of the map, in voxels.
  */
 double FirstPersonMode::eyeHeight(const BattleUnit *unit) const
 {
-	const double loweredBy = std::clamp(Options::fpsEyeLower, 0, 6) * (unit->isKneeled() ? 0.5 : 1.0);
+	// The game's sight origin, and its height with no floor above (as the game works it out).
+	const int sightZ = _save->getTileEngine()->getSightOriginVoxel(const_cast<BattleUnit*>(unit)).z;
+	const int unpressedZ = unit->getPosition().z * Position::TileZ - unit->getTile()->getTerrainLevel()
+		+ unit->getHeight() + unit->getFloatHeight() - 1 + (unit->isBigUnit() ? 1 : 0);
+	const bool pressedUnderFloor = unpressedZ > sightZ;
+	const double loweredBy = pressedUnderFloor ? PressedEyeLower : std::clamp(Options::fpsEyeLower, 0, 6) * (unit->isKneeled() ? 0.5 : 1.0);
 	// The middle of the sight origin's voxel (+ 0.5), lowered.
-	return _save->getTileEngine()->getSightOriginVoxel(const_cast<BattleUnit*>(unit)).z + 0.5 - loweredBy;
+	return sightZ + 0.5 - loweredBy;
 }
 
 /**

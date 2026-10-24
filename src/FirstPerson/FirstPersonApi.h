@@ -74,6 +74,11 @@ class State;
 namespace FirstPerson
 {
 
+/// Akimbo (dual wield): the share of its accuracy each gun keeps when both fire at once, a 30%
+/// penalty (a player's report on 1.03; it was half). The game's shot and its pellets and the
+/// other gun's round use it (ProjectileFlyBState), and the 3D view's spread and hit chance.
+const double DualWieldAccuracy = 0.7;
+
 #ifndef OXCE_NO_FIRSTPERSON
 
 // ---- The battlescape screen (BattlescapeState.cpp) ----

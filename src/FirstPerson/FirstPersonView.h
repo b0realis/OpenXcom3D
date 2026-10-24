@@ -211,6 +211,8 @@ public:
 		Uint8 cloud[8]; // lit .. shadowed
 		Uint8 haze, star, moon, sun, tapeYellow, tapeBlack, post;
 		Uint8 trajectory; // the path a throw or shot aimed now would take (light cyan, unlike anything else drawn)
+		Uint8 trajectoryForced; // ... that of a forced arcing shot (yellow: it may meet something on the way)
+		Uint8 laserSight, laserDot; // ... that of a straight shot: a thin red laser, and its brighter dot where it ends
 		float night; // 0 day .. 1 night
 		bool underwater;
 		int ambient;        // shade of open ground under the sky
@@ -228,11 +230,13 @@ public:
 		Uint8 downedIcon[5];   // icons over the downed: flame, its heart, blood, the shock's bolt, out cold
 		Uint8 edgeDot;         // the discreet map edge's dots
 		Uint8 unexplored;      // terrain not explored yet: plain shapes in this slate colour
+		Uint8 rock;            // the rock round an underground map and over it
 		Uint8 redTint[256];    // each colour washed with red (hurt, dying)
 		Uint8 blueTint[256];   // ... with dark blue (passing out)
 		Uint8 orangeTint[256]; // ... with orange (falling under mind control)
 		Uint8 whiteTint[256];  // ... with white (a breakdown)
 		Uint8 greenTint[256];  // ... with a sickly green (turning into a zombie)
+		Uint8 purpleTint[256]; // ... with purple (the edges, looking through a unit under our mind control)
 		Uint8 grey[4];         // TV static
 		Uint8 glitchGreen[2];  // a digital feed's broken blocks: bright and dark green
 		Uint8 flareTint[256];  // each colour in a flare's red light
@@ -333,7 +337,9 @@ public:
 	void setMuzzlePoint(double x, double y, bool valid) { _muzzleScreen[0] = x; _muzzleScreen[1] = y; _muzzleValid = valid; }
 	/// The path a throw or shot aimed now would take, in voxels from the soldier to its end (see
 	/// drawTrajectory); empty for none. Set again only when it changes.
-	void setTrajectory(const std::vector<Position> &path) { _trajectory = path; }
+	/// How a trajectory is drawn: a throw's or an arcing shot's curve, one forced (as with Ctrl held), a straight shot's line.
+	enum TrajectoryLook { TRAJECTORY_ARC, TRAJECTORY_FORCED, TRAJECTORY_STRAIGHT };
+	void setTrajectory(const std::vector<Position> &path, TrajectoryLook look = TRAJECTORY_ARC) { _trajectory = path; _trajectoryLook = look; }
 	/// Doom free grenades (see FirstPersonMode::stepFreeGrenade): a grenade flying by the 3D view's own throw, where it is and how
 	/// fast it flies (voxels; voxels a second, up in true proportions), at this moment; null to stop drawing it.
 	void setFreeGrenade(BattleItem *item, const float position[3], const float velocity[3])
@@ -357,6 +363,8 @@ public:
 	void showHurt(const double *from, float amount, bool splatter);
 	/// Reddens the screen edges (0 none .. 1 strong), for a soldier badly hurt.
 	void setVignette(float amount) { _vignette = amount; }
+	/// A purple haze at the screen edges (0 none .. 1 strong), looking through a unit under our mind control.
+	void setControlHaze(float amount) { _controlHaze = amount; }
 	/// Shakes the camera (explosions, hits); stronger shakes win.
 	void addShake(float amount) { _shake = std::max(_shake, amount); }
 	/// Washes the view with a colour (0 none .. 1 full): 0 red (hurt, killed), 1 dark blue (unconscious),
@@ -402,6 +410,8 @@ public:
 	Uint32 getPartnerShotTick() const { return _partnerShotTick; }
 	/// Dual wield: the ammo the other gun's last round fired (null if unknown).
 	const RuleItem *getPartnerShotAmmo() const { return _partnerShotAmmo; }
+	/// Akimbo in turn: the next shot of our own leaves from the other gun (true), or no longer (false: the game refused it).
+	void setNextShotFromOffHand(bool fromOffHand) { _nextShotOffHand = fromOffHand; }
 	/// How big a shot and its muzzle flash are drawn: 1 for a rifle's, less for a pistol's, more for heavy weapons'.
 	static float shotCalibre(const RuleItem *weapon, const RuleItem *ammo);
 	/// Is a weapon launched by hand (a bow, a blowpipe, javelins): aimed with no firing skill at all?
@@ -474,6 +484,9 @@ private:
 	FirstPersonView *_sharedModelsOwner = nullptr;      // another view whose voxel models this one uses, or null
 	const VoxelModel *_groundModel = nullptr;           // floor repeated outside the map
 	bool _groundChosen = false;                         // the outside ground has been picked
+	int _surfaceLevel = 0;                              // the map's surface at its edges: rock beyond the edge below it (see chooseGround)
+	bool _enclosed = false;                             // underground all the way up: rock beyond every edge, and above the map
+	Uint8 _rockBase = 0;                                // the rock's colour, from the map's own rock round its edge (0: the plain rock colour)
 	std::vector<TileView> _tileViews;                   // this frame's snapshot of every tile: what the rays read
 	int _hiddenFloor = -1;                              // a floor left out: the lift platform the camera rides through
 	std::vector<const MapData*> _wallsLastFrame[2];     // west/north wall of each tile last frame
@@ -497,8 +510,8 @@ private:
 		const VoxelModel *paintedFloor;              // that floor with the UFO's floor going on inside (null: as it is)
 	};
 	std::vector<TileMemo> _tileMemos;                   // per tile: its parts last frame, and their solid mask
-	/// Floors under a UFO's hull with its floor going on inside (see paintedFloor), by the four parts' models, the UFO's floor and the sides bordering it.
-	std::map<std::array<const VoxelModel*, 6>, std::unique_ptr<VoxelModel>> _paintedFloors;
+	/// Floors under a UFO's hull with its floor going on inside (see paintedFloor), by the four parts' models and the UFO floors on the four sides (null: none there).
+	std::map<std::array<const VoxelModel*, 8>, std::unique_ptr<VoxelModel>> _paintedFloors;
 	/// The floor of a tile under a UFO's hull, with the UFO's floor going on inside (null: as it is).
 	const VoxelModel *paintedFloor(int index, const std::array<const VoxelModel*, 4> &parts);
 	/// What a tile part was last frame, so its models are looked up again only when something changed (see snapshotTile).
@@ -546,8 +559,12 @@ private:
 	const Frames &getFrames(const MapData *mapData);
 	/// Starts the swing of doors that just opened on a tile.
 	void trackDoors(int index, Tile *tile);
-	/// Picks the ground that continues past the map border.
+	/// Picks the ground that continues past the map border, the surface's level and whether the map is underground.
 	void chooseGround();
+	/// The rock beyond an underground map's edge, or over it, at a point there.
+	Uint8 rockColor(float alongU, float alongV, int face, float distance, int pixelX, int pixelY) const;
+	/// Is an underside at this height a ceiling under rock (an underground map, or below its surface)?
+	bool underRock(float height) const;
 	/// Takes this frame's snapshot of every tile, for the rays.
 	void snapshotTiles();
 	/// What changed on a tile since the last frame: doors, burnt-out fires, destruction.
@@ -598,6 +615,8 @@ private:
 	Uint8 colorOutsideMap(const float rayOrigin[3], const float rayDirection[3], float tExit, int exitAxis, int pixelX, int pixelY, float &depth) const;
 	/// Where the distance haze begins on land, as a share of the view's reach (setting "Distance haze").
 	float hazeStart() const;
+	/// How much of the distance haze terrain this far away is in (0 none .. 1 all haze).
+	float terrainHaze(float distance) const;
 	/// A colour faded into the distance haze by an amount (0 none .. 1 all haze), dithered between neighbouring blend steps.
 	Uint8 hazeColor(Uint8 color, float haze, int pixelX, int pixelY) const;
 	/// Smoke's colour on a pixel of its wall (where the soldier's sight runs out in it).
@@ -897,6 +916,7 @@ private:
 	Uint8 _partnerColor = 0;                            // its colour
 	float _partnerCalibre = 1.0f;                       // how big it's drawn
 	Uint32 _partnerShotTick = 0;                        // when it left the muzzle
+	bool _nextShotOffHand = false;                      // akimbo in turn: the next shot of our own is the other gun's (see beginShot)
 	const RuleItem *_partnerShotAmmo = nullptr;         // what it was (the clip may be gone by now)
 	// under fire: shots whizzing past, where they come from
 	Uint32 _nearMissTick = 0;
@@ -958,6 +978,7 @@ private:
 	/// Draws laser beams fading out.
 	void drawBeams();
 	std::vector<Position> _trajectory; // the path a throw or shot aimed now would take (setTrajectory)
+	TrajectoryLook _trajectoryLook = TRAJECTORY_ARC; // and how it's drawn
 	/// Draws that path: dashes fading out along it, and a mark where it ends.
 	void drawTrajectory();
 	/// Draws a line in the world, depth-tested (all of it, or only the screen rows from bandTop up to bandBottom),
@@ -1000,6 +1021,7 @@ private:
 	int _tintKind = 0;          // which wash setTint asked for
 	float _tintRedShare = 0.0f; // share of the washed pixels washed red instead (berserk's white, a zombie's green)
 	float _vignette = 0.0f;     // red at the screen edges (badly hurt), 0..1
+	float _controlHaze = 0.0f;  // purple at the screen edges (a unit under our mind control), 0..1
 	float _staticAmount = 0.0f; // TV static
 	Uint32 _staticSeed = 1;     // random seed for the static
 	// a digital feed's bad signal (setSignalGlitches): now and then, for a moment, a few patches

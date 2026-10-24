@@ -35,6 +35,14 @@ firstPerson:
   # The helmet cameras' bad signal, by mission (alien deployment) type: 1 a glitch now and then
   # (any mission not listed), 2 a lot (the aliens' own ground, where their machinery jams the
   # feed), 0 none. A later entry (or a later mod's) overrides.
+  # Underground maps: the 3D view finds a map's surface from its outer ring of tiles by itself
+  # (levels whose ring is rock are underground: rock beyond the edges below the surface, and a
+  # map underground all the way up, like a base or an alien colony's inside, gets rock over it
+  # instead of the sky or the water). A mission it gets wrong can be listed here as underground
+  # all the way up. Never list a map that starts on the surface and goes on underground, nor a
+  # name two games share for different maps (TFTD's seabed colony is STR_ALIEN_BASE_ASSAULT,
+  # like UFO's alien base).
+  undergroundMissions: []
   badSignal:
     # UFO: Mars (both stages), an alien base, a base defence; TFTD: an alien colony (both
     # stages), T'leth (all three), an artefact site (both), a base defence

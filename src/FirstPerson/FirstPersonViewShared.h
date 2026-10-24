@@ -142,6 +142,48 @@ const double LyingRowVoxels = 1.41421356237309505;
 /// Things on the ground are drawn standing on the floor slab the view builds (two voxels thick),
 /// raised out of whatever solid they are in by at most this many voxels (see standingHeight).
 const int StandRaiseMax = 4;
+/// Bullet holes and scorch marks (see drawDecals): a mark's radius, in voxels, per step of its
+/// size (a bullet hole is size 1, a scorch 3); at most this many pixels from its middle on the
+/// screen, however close; a bullet hole's core this many shades darker (its edge by the mark's
+/// own darkness, 4), so it shows on busy textures such as the desert's sand.
+const double MarkRadius = 0.3;
+const int MarkMaxPixels = 6;
+const int BulletHoleCoreShades = 7;
+/// Unexplored terrain turns misty with distance (see shadeHit): blended towards the haze from
+/// UnexploredMistFrom to UnexploredMistTo times the game's sight range (10 to 30 tiles at its
+/// usual 20), at most UnexploredMistMax of the way, so far shapes are a soft blue-grey, never
+/// sky-coloured boxes; the distance haze still takes them fully at the view's reach.
+const float UnexploredMistFrom = 0.5f, UnexploredMistTo = 1.5f, UnexploredMistMax = 0.6f;
+/// The purple haze of a unit under our mind control (see FirstPersonView::setControlHaze) creeps in
+/// from this share of the way from the middle of the view to its corners, fully at the corners.
+const float ControlHazeFrom = 0.45f;
+/// A level of a map is underground at its edges when at least this share of its outer ring of
+/// tiles is rock: a wall or an object (the rock a base or a cave is cut into), or a floor with
+/// something over it (a base's sewers). 100% on every base, colony and Cydonia map seen; at
+/// most 65% at ground level outdoors, trees, fences and roofed houses included.
+const float UndergroundRingShare = 0.9f;
+/// The rock round and over an underground map is mottled over this many shades (see rockColor),
+/// from this shade of the colour group of the map's own rock (see chooseGround).
+const int RockMottleShades = 3, RockBaseShade = 6;
+/// A colour shaded past the darkest of its group turns black only where the place is really
+/// dark (see shadeHit): the light there (the game's, less lamps, the flashlight and flares; 0
+/// brightest .. 15 darkest) from DarkOverflowFrom (none of it, the group's darkest instead) to
+/// DarkOverflowTo (all of it), dithered between. A lit house is 2, the Piratez hideout's rooms
+/// about 4.5, a night field at the edge of a soldier's light about 6.5, far from it 15.
+const float DarkOverflowFrom = 5.0f, DarkOverflowTo = 8.0f;
+/// A ceiling under rock (see underRock) whose plain colour is this far down its group (its shade,
+/// 0 brightest .. 15 darkest) or further shows its top's pattern, its middle shade stopping
+/// RockMottleShades short of the darkest, as the rock beyond the map (see shadeHit): dark rock
+/// sank into one flat darkest colour. Brighter art (a base's grey roof plates) keeps its plain
+/// ceiling: its top's pattern is the iso art's shading.
+const int DarkCeilingShade = 8;
+/// Under rock no sun shines: a ceiling there is shaded as an underside at night (see the face
+/// shading in updateColors): half a shade for facing away from the moon, one for an underside.
+const float RockCeilingShade = 0.5f + 1.0f;
+/// A shot's mark goes where its line meets what the view draws, searched from this many voxels
+/// back along the line (an object's art can stand out in front of its collision shape; see
+/// spawnShotImpact).
+const float ImpactSearchBack = 8.0f;
 
 // ---- Colour helpers ----
 

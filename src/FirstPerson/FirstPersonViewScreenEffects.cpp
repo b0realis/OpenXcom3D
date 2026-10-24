@@ -408,7 +408,7 @@ void FirstPersonView::drawHurt()
 void FirstPersonView::applyScreenWash()
 {
 	// Nothing to wash with: leave the picture alone (and skip the loop over every pixel).
-	if (!(_nightVision || _tintAmount > 0.0f || _vignette > 0.0f || _staticAmount > 0.0f))
+	if (!(_nightVision || _tintAmount > 0.0f || _vignette > 0.0f || _controlHaze > 0.0f || _staticAmount > 0.0f))
 	{
 		return;
 	}
@@ -456,11 +456,13 @@ void FirstPersonView::washBands()
 					if (((staticSeed >> 8) & 255) < _staticAmount * 256.0f) row[x] = _colors.grey[staticSeed >> 30];
 				}
 				// The vignette: reddened, dithered in, from 55% of the way to the corners outwards,
-				// fully at the corners at full strength.
-				if (_vignette > 0.0f)
+				// fully at the corners at full strength; and a unit under our mind control's purple
+				// haze likewise, from ControlHazeFrom of the way (on another dither, so the two mix).
+				if (_vignette > 0.0f || _controlHaze > 0.0f)
 				{
 					const float distanceShare = std::sqrt((x - centerX) * (x - centerX) + (y - centerY) * (y - centerY)) / cornerDistance;
-					if (smoothstep(0.55f, 1.0f, distanceShare) * _vignette > dither(x + 3, y + 1)) row[x] = _colors.redTint[row[x]];
+					if (_vignette > 0.0f && smoothstep(0.55f, 1.0f, distanceShare) * _vignette > dither(x + 3, y + 1)) row[x] = _colors.redTint[row[x]];
+					else if (_controlHaze > 0.0f && smoothstep(ControlHazeFrom, 1.0f, distanceShare) * _controlHaze > dither(x + 1, y + 2)) row[x] = _colors.purpleTint[row[x]];
 				}
 			}
 		}

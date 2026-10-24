@@ -82,8 +82,23 @@ const int SquadWindow = 10, SquadMinW = 13;
 const int PanelW = 150, PanelH = 54, PanelLineW = PanelW - 6;
 /// The crosshair's surface (square).
 const int CrosshairSize = 41;
+/// Where the game has pushed a soldier's sight under a floor right above (standing on something
+/// tall under a ceiling), the 3D eye is only this many voxels under the game's (see eyeHeight).
+const double PressedEyeLower = 1.0;
 /// The soldier card under a hovered squad button, and its live helmet-camera view.
 const int CardW = 124, CardY = 15, PreviewW = 116, PreviewH = 72;
+/// The map camera's picture (setting "Map camera": small, medium, large; index 0 is off) takes
+/// this share of the canvas's width (96, 128 or 160 pixels on the smallest canvas, 320 wide;
+/// twice that on one 640 wide), in the card camera's proportions, and at most MapCameraMaxHeight
+/// of the canvas's height; its frame adds MapCameraBorder round it and a title line
+/// MapCameraTitleH high above it. It sits at the top left under the top bar (CardY), right of
+/// OXCE's touch buttons when they show (MapCameraTouchClear screen pixels from the left: they
+/// take x 2 to 33).
+const float MapCameraShare[4] = { 0.0f, 0.30f, 0.40f, 0.50f }, MapCameraMaxHeight = 0.55f;
+const int MapCameraBorder = 3, MapCameraTitleH = 10, MapCameraTouchClear = 36;
+/// While an action is aimed on the map, the map camera looks this many voxels over the floor of
+/// the tile under the cursor (with no unit seen there): about a crouching soldier's chest.
+const double MapCameraAimHeight = 12.0;
 /// The banner across the top of the view (big letters) and the line under it.
 const int BannerW = 304;
 /// The grav lift arrows.
@@ -177,14 +192,32 @@ const Uint32 ClimbRetryTime = 700;
 /// How long the camera waits in front of a door it opened, in milliseconds (the 3D view swings
 /// it open meanwhile).
 const Uint32 DoorWait = 150;
+/// Shots and explosions in 3D: while they're on the map, the battle's timer may run up to
+/// CatchUpSteps steps it missed during a frame, so a burst fires and a long chain goes off at the
+/// isometric map's pace (a fast hit's or a chain's steps come a millisecond apart, and the map
+/// runs them between its quick frames: about a 50 ms frame's worth); and for CatchUpGrace
+/// milliseconds after, for the step that fires a burst's next round (see catchUp).
+const int CatchUpSteps = 50;
+const Uint32 CatchUpGrace = 100;
+/// The open door key, with no door under the crosshair: it opens the closed door within reach
+/// nearest the way the view looks, up to this many degrees off it (see doorWithinReach).
+const double DoorPointSlack = 60.0;
 /// Where the view tips to when a failed close-quarters check knocks the shot at the soldier's
 /// feet or straight up (degrees of pitch; see followDeflectedShot).
 const double DeflectedDownPitch = -75.0, DeflectedUpPitch = 60.0;
 /// How far from a closed door the camera stops (from the tile edge, in voxels).
 const double DoorMargin = 11.0;
-/// How long, in milliseconds, a ride up or down one level takes (a grav lift, or flying up and
-/// down), and a fall or a landing.
-const Uint32 RideTime = 1400, DropTime = 600;
+/// Up or down one level (a grav lift, a ladder, flying, a fall) takes as long as walking RideTiles
+/// tiles at RidePace of the walk speed setting (a level is 24 voxels high, a tile 16 across; see
+/// rideTime): 0.75 s at the usual 4 tiles a second (a fall speeding up within it, as by gravity).
+/// (All took 1.4 s at any speed, while the game itself is done in about 0.3 s: a player's report on
+/// 1.03.) Any other change of level where the soldier stands glides in DropTime milliseconds.
+const double RideTiles = 1.5, RidePace = 0.5;
+const Uint32 DropTime = 600;
+/// On landing after a fall the view dips LandingDip voxels and comes back up, over LandingDipTime
+/// milliseconds.
+const double LandingDip = 2.0;
+const Uint32 LandingDipTime = 250;
 /// A jump: a free hop this high (voxels) and this long (milliseconds); a vault over something
 /// low arcs higher.
 const double JumpHeight = 6.0, VaultHeight = 9.0;
@@ -212,6 +245,11 @@ const float FreeGrenadeMaxTiles = 25.0f, FreeGrenadeFullStrength = 60.0f;
 /// How long the view stays with a soldier who was killed, knocked unconscious or taken over,
 /// and how long the next soldier's view takes to come in out of it.
 const Uint32 DeathCamTime = 2600, FaintTime = 2400, ControlledTime = 2400, AfterFallTime = 600;
+/// Looking through a unit under our mind control: a purple haze at the view's edges (see
+/// controlHaze), ControlHazeStrength strong, breathing in and out (by ControlHazeBreath of it) every
+/// ControlHazePeriod milliseconds.
+const float ControlHazeStrength = 0.7f, ControlHazeBreath = 0.25f;
+const Uint32 ControlHazePeriod = 2400;
 /// A soldier killed and turned into a zombie: down, up again, and the camera gives out.
 const Uint32 ZombieCamTime = 4200;
 /// A soldier's breakdown (panic, berserk): the game holds this long while the view washes out

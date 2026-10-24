@@ -1342,33 +1342,113 @@ bool FirstPersonView::isDoorMoving(const Position &pos, int part)
 }
 
 /**
- * Picks the ground that continues past the map border: the most common floor along the map's
- * outer ring of tiles at ground level (grass on a farm, sand in the desert, ...). Only a floor
- * whose model reaches down to the bottom voxel layer counts. Sets _groundModel (left as it was
- * if none qualifies) and _groundChosen.
+ * Works out what lies past the map's border (see colorOutsideMap), from its outer ring of tiles:
+ * - where its surface is: the first level, from the bottom, whose ring isn't underground (at
+ *   least UndergroundRingShare of its tiles rock: a wall or an object, the rock a base or a cave
+ *   is cut into, or a floor with something over it). On any map outdoors that's ground level; on a map that starts on the surface
+ *   and goes on underground, the surface's level. Beyond the border, below the surface, is rock;
+ * - whether the map is underground all the way up (every level of the ring is rock: a base, an
+ *   alien colony's inside, Cydonia's complex), or its mission is listed as underground in the
+ *   mod (RuleFirstPerson::isUnderground): then rock lies beyond the border at every height and
+ *   over the map too, where it would otherwise show the sky (or, under the sea, the water);
+ * - the ground that runs on past the border at the surface's level: the most common floor of the
+ *   ring there (grass on a farm, sand in the desert, ...). Only a floor whose model reaches down
+ *   to the bottom voxel layer counts.
+ * Sets _surfaceLevel, _enclosed, _groundModel (left as it was if no floor qualifies) and
+ * _groundChosen.
  */
 void FirstPersonView::chooseGround()
 {
 	_groundChosen = true;
-
-	// Count the floors of the border tiles (x, y in tiles, level 0).
-	std::map<const MapData*, int> floorCounts;
-	const int mapSizeX = _save->getMapSizeX(), mapSizeY = _save->getMapSizeY();
-	for (int y = 0; y < mapSizeY; ++y)
+	const int mapSizeX = _save->getMapSizeX(), mapSizeY = _save->getMapSizeY(), mapSizeZ = _save->getMapSizeZ();
+	// Calls a function on each tile of the ring at a level.
+	auto forEachRingTile = [&](int z, auto &&visit)
 	{
-		for (int x = 0; x < mapSizeX; ++x)
+		for (int y = 0; y < mapSizeY; ++y)
 		{
-			if (x != 0 && y != 0 && x != mapSizeX - 1 && y != mapSizeY - 1)
+			for (int x = 0; x < mapSizeX; ++x)
 			{
-				continue;
-			}
-			const MapData *floor = _save->getTile(Position(x, y, 0))->getMapData(O_FLOOR);
-			if (floor)
-			{
-				floorCounts[floor]++;
+				if (x == 0 || y == 0 || x == mapSizeX - 1 || y == mapSizeY - 1)
+				{
+					visit(_save->getTile(Position(x, y, z)));
+				}
 			}
 		}
+	};
+
+	// The surface: the levels from the bottom whose ring is rock are underground. A ring tile is
+	// rock when it holds a wall or an object, or a floor with anything over it (a base's sewers
+	// running out to the edge under the rock).
+	_surfaceLevel = 0;
+	for (int z = 0; z < mapSizeZ; ++z)
+	{
+		int ringTiles = 0, rockTiles = 0;
+		forEachRingTile(z, [&](const Tile *tile)
+		{
+			++ringTiles;
+			bool rock = tile->getMapData(O_WESTWALL) || tile->getMapData(O_NORTHWALL) || tile->getMapData(O_OBJECT);
+			for (int above = z + 1; !rock && tile->getMapData(O_FLOOR) && above < mapSizeZ; ++above)
+			{
+				const Tile *over = _save->getTile(tile->getPosition() + Position(0, 0, above - z));
+				rock = over->getMapData(O_FLOOR) || over->getMapData(O_WESTWALL) || over->getMapData(O_NORTHWALL) || over->getMapData(O_OBJECT);
+			}
+			if (rock) ++rockTiles;
+		});
+		if (ringTiles == 0 || rockTiles < ringTiles * UndergroundRingShare)
+		{
+			break;
+		}
+		_surfaceLevel = z + 1;
 	}
+	_enclosed = _surfaceLevel >= mapSizeZ || _save->getMod()->getFirstPerson().isUnderground(_save->getMissionType());
+	if (_enclosed)
+	{
+		_surfaceLevel = mapSizeZ;
+	}
+	// The rock's colour: the commonest colour group among the walls and objects round the map's
+	// underground levels (the rock it's cut into, in whatever palette the battle has: a fixed
+	// brown came out olive or watery blue under the sea), at a middle shade, with room to shade
+	// it either way. Every third voxel of their models is enough to tell.
+	_rockBase = 0;
+	std::map<int, int> rockGroups;
+	for (int z = 0; z < std::min(_surfaceLevel, mapSizeZ); ++z)
+	{
+		forEachRingTile(z, [&](const Tile *tile)
+		{
+			for (TilePart part : { O_WESTWALL, O_NORTHWALL, O_OBJECT })
+			{
+				const MapData *mapData = tile->getMapData(part);
+				if (!mapData) continue;
+				const VoxelModel *model = getModel(mapData);
+				for (int voxelZ = 0; voxelZ < 24; voxelZ += 3)
+					for (int voxelY = 0; voxelY < 16; voxelY += 3)
+						for (int voxelX = 0; voxelX < 16; voxelX += 3)
+							if (const Uint8 color = model->color[voxelZ][voxelY][voxelX]) rockGroups[color & 0xF0]++;
+			}
+		});
+	}
+	int rockCount = 0;
+	for (const auto &group : rockGroups)
+	{
+		if (group.second > rockCount)
+		{
+			rockCount = group.second;
+			_rockBase = (Uint8)(group.first | RockBaseShade);
+		}
+	}
+	Log(LOG_VERBOSE) << "OpenXcom3D: " << _save->getMissionType() << ": " << (_enclosed ? "underground all the way up (rock round the map and over it)"
+		: "the surface at the map's edges is level " + std::to_string(_surfaceLevel) + " (rock beyond the edges below it)");
+
+	// Count the floors of the ring at the surface's level (the bottom one on an enclosed map,
+	// which shows no ground beyond the border anyway).
+	std::map<const MapData*, int> floorCounts;
+	forEachRingTile(std::min(_surfaceLevel, mapSizeZ - 1), [&](const Tile *tile)
+	{
+		if (const MapData *floor = tile->getMapData(O_FLOOR))
+		{
+			floorCounts[floor]++;
+		}
+	});
 
 	// The most common one with a model that lies on the ground wins (a ghost never does).
 	int bestCount = 0;
@@ -1746,9 +1826,9 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
  * map draws the inside of the hull over it in the hull's art: black.) So the UFO's floor goes on
  * inside: from the tile's sides that border the UFO's floor (a neighbour on the same level whose
  * floor is of a data set UFOs are built from, the hull's or its fittings'), the floor is flooded
- * up to the hull's voxels standing on it, and what's reached takes the colours of that
- * neighbour's floor at the same spot; the rest (outside the hull) stays the ground. Made once
- * for each set of parts and neighbouring floor.
+ * up to the hull's voxels standing on it, and what's reached takes the colours of those
+ * neighbours' floors at the same spot (see below); the rest (outside the hull) stays the ground.
+ * Made once for each set of parts and neighbouring floors.
  * @param index The tile's index.
  * @param parts The tile's four parts' models, as shown: the floor first.
  * @return The floor with the UFO's floor going on inside, or null if it isn't such a tile.
@@ -1779,11 +1859,11 @@ const FirstPersonView::VoxelModel *FirstPersonView::paintedFloor(int index, cons
 		return nullptr;
 	}
 
-	// The sides bordering the UFO's floor: west, north, east, south (a bit each), and that floor.
+	// The sides bordering the UFO's floor (west, north, east, south): each one's floor, or null.
 	const Position here = tile->getPosition();
 	const int sideSteps[4][2] = { { -1, 0 }, { 0, -1 }, { 1, 0 }, { 0, 1 } };
-	int bordering = 0;
-	const VoxelModel *insideFloor = nullptr;
+	std::array<const VoxelModel*, 4> sideFloors = {};
+	bool bordering = false;
 	for (int side = 0; side < 4; ++side)
 	{
 		const Tile *neighbour = _save->getTile(here + Position(sideSteps[side][0], sideSteps[side][1], 0));
@@ -1793,8 +1873,8 @@ const FirstPersonView::VoxelModel *FirstPersonView::paintedFloor(int index, cons
 		{
 			const VoxelModel *model = getModel(neighbourFloor);
 			if (model->empty || model->ghostly) continue;
-			bordering |= 1 << side;
-			if (!insideFloor) insideFloor = model;
+			sideFloors[side] = model;
+			bordering = true;
 		}
 	}
 	if (!bordering)
@@ -1802,8 +1882,8 @@ const FirstPersonView::VoxelModel *FirstPersonView::paintedFloor(int index, cons
 		return nullptr;
 	}
 
-	// Made already for these parts and that floor?
-	const std::array<const VoxelModel*, 6> key = { parts[0], parts[1], parts[2], parts[3], insideFloor, (const VoxelModel*)(std::uintptr_t)bordering };
+	// Made already for these parts and those floors?
+	const std::array<const VoxelModel*, 8> key = { parts[0], parts[1], parts[2], parts[3], sideFloors[0], sideFloors[1], sideFloors[2], sideFloors[3] };
 	auto made = _paintedFloors.find(key);
 	if (made != _paintedFloors.end())
 	{
@@ -1845,10 +1925,10 @@ const FirstPersonView::VoxelModel *FirstPersonView::paintedFloor(int index, cons
 	};
 	for (int along = 0; along < 16; ++along)
 	{
-		if (bordering & 1) visit(0, along);
-		if (bordering & 2) visit(along, 0);
-		if (bordering & 4) visit(15, along);
-		if (bordering & 8) visit(along, 15);
+		if (sideFloors[0]) visit(0, along);
+		if (sideFloors[1]) visit(along, 0);
+		if (sideFloors[2]) visit(15, along);
+		if (sideFloors[3]) visit(along, 15);
 	}
 	while (!toVisit.empty())
 	{
@@ -1860,15 +1940,57 @@ const FirstPersonView::VoxelModel *FirstPersonView::paintedFloor(int index, cons
 		visit(x, y + 1);
 	}
 
-	// What's inside takes the hull's floor's colour at the same spot (its top voxel there).
+	// The floors to take colours from, the fullest first (by how many of its columns have a
+	// voxel): a neighbour that is a hull tile itself may have only part of a floor (a triangle by
+	// its own diagonal piece of hull), and the colours of that one alone left most of this floor
+	// the ground's (grass in the Abductor's north-west corners).
+	std::vector<std::pair<int, const VoxelModel*>> sources; // (columns with a voxel, floor)
+	for (const VoxelModel *sideFloor : sideFloors)
+	{
+		if (!sideFloor || std::any_of(sources.begin(), sources.end(), [sideFloor](const auto &source) { return source.second == sideFloor; }))
+		{
+			continue;
+		}
+		int columns = 0;
+		for (int y = 0; y < 16; ++y)
+			for (int x = 0; x < 16; ++x) columns += sideFloor->plan[y][x] != 0;
+		sources.push_back({ columns, sideFloor });
+	}
+	std::stable_sort(sources.begin(), sources.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
+	// A spot's colour: as seen from above on the first of those floors with a voxel there, or
+	// failing that, at the fullest one's nearest spot that has one (rings round the spot).
+	const VoxelModel &fullest = *sources.front().second;
+	auto colorAt = [&](int x, int y) -> Uint8
+	{
+		for (const auto &source : sources)
+		{
+			if (source.second->plan[y][x]) return source.second->plan[y][x];
+		}
+		for (int reach = 1; reach < 16; ++reach)
+		{
+			for (int dy = -reach; dy <= reach; ++dy)
+			{
+				for (int dx = -reach; dx <= reach; ++dx)
+				{
+					const int nearX = x + dx, nearY = y + dy;
+					if (std::max(std::abs(dx), std::abs(dy)) == reach && nearX >= 0 && nearY >= 0 && nearX < 16 && nearY < 16 && fullest.plan[nearY][nearX])
+					{
+						return fullest.plan[nearY][nearX];
+					}
+				}
+			}
+		}
+		return 0;
+	};
+
+	// What's inside takes those floors' colours at the same spot (on this floor's top voxel).
 	std::unique_ptr<VoxelModel> painted;
 	for (int y = 0; y < 16; ++y)
 	{
 		for (int x = 0; x < 16; ++x)
 		{
 			if (!inside[y][x] || top[y][x] < 0) continue;
-			Uint8 color = 0;
-			for (int z = insideFloor->max[2]; z >= insideFloor->min[2] && !color; --z) color = insideFloor->color[z][y][x];
+			const Uint8 color = colorAt(x, y);
 			if (!color) continue;
 			if (!painted) painted = std::make_unique<VoxelModel>(floor);
 			painted->color[top[y][x]][y][x] = color;
