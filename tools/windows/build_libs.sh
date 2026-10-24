@@ -48,19 +48,27 @@ SDL_mixer SDL_mixer-1.2.12.tar.gz https://www.libsdl.org/projects/SDL_mixer/rele
 SDL_gfx SDL_gfx-2.0.26.tar.gz https://www.ferzkopp.net/Software/SDL_gfx-2.0/SDL_gfx-2.0.26.tar.gz 7ceb4ffb6fc63ffba5f1290572db43d74386cd0781c123bc912da50d34945446
 "
 
+# Downloads one file, trying again after a network hiccup (a name that didn't resolve, a server
+# that didn't answer): into a .part file first, so half a file is never taken for the whole.
+download() {
+	curl -sSfL --retry 5 --retry-all-errors --retry-delay 10 -o "$2.part" "$1" || { echo "$(basename "$2"): download failed ($1)" >&2; exit 1; }
+	mv "$2.part" "$2"
+}
+
 # Unpacks one source (taking it from the Linux build's downloads, or downloading it, and
-# checking it first), prints its folder.
+# checking it first) and goes into its folder. It runs in this shell, not in $(...), so a failed
+# download or a wrong checksum stops the whole build.
 unpack() {
 	line=$(echo "$SOURCES" | awk -v n="$1" '$1 == n')
 	file=$(echo "$line" | cut -d' ' -f2); url=$(echo "$line" | cut -d' ' -f3); sum=$(echo "$line" | cut -d' ' -f4)
 	if [ ! -f "$SRC/$file" ]; then
 		if [ -f "$ROOT/OpenXcom/build/portable/src/$file" ]; then cp "$ROOT/OpenXcom/build/portable/src/$file" "$SRC/$file"
-		else curl -sSfL -o "$SRC/$file" "$url"; fi
+		else download "$url" "$SRC/$file"; fi
 	fi
 	echo "$sum  $SRC/$file" | sha256sum -c --quiet - >&2 || { echo "$file: wrong SHA-256" >&2; exit 1; }
 	rm -rf "$D/work/$1"; mkdir -p "$D/work/$1"
 	tar xzf "$SRC/$file" -C "$D/work/$1" --strip-components=1
-	echo "$D/work/$1"
+	cd "$D/work/$1"
 }
 
 # No build paths in what goes out, and for the 2012 sources C11 and warnings, not errors, for
@@ -73,30 +81,30 @@ export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" PKG_CONFIG_LIBDIR="$PREFIX/lib/pk
 CMAKE="cmake -DCMAKE_TOOLCHAIN_FILE=$ROOT/tools/windows/toolchain.cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$PREFIX -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_PREFIX_PATH=$PREFIX"
 CONFIGURE="--host=$HOST --prefix=$PREFIX"
 
-echo "zlib";       cd "$(unpack zlib)";      make -f win32/Makefile.gcc PREFIX=$HOST- CC=$CC CFLAGS="$FLAGS" libz.a > /dev/null
+echo "zlib";       unpack zlib;              make -f win32/Makefile.gcc PREFIX=$HOST- CC=$CC CFLAGS="$FLAGS" libz.a > /dev/null
 make -f win32/Makefile.gcc install PREFIX=$HOST- CC=$CC CFLAGS="$FLAGS" SHARED_MODE=0 BINARY_PATH="$PREFIX/bin" INCLUDE_PATH="$PREFIX/include" LIBRARY_PATH="$PREFIX/lib" > /dev/null
-echo "libpng";     cd "$(unpack libpng)";    $CMAKE -DPNG_SHARED=OFF -DPNG_STATIC=ON -DPNG_TESTS=OFF -DPNG_TOOLS=OFF -DPNG_FRAMEWORK=OFF \
+echo "libpng";     unpack libpng;            $CMAKE -DPNG_SHARED=OFF -DPNG_STATIC=ON -DPNG_TESTS=OFF -DPNG_TOOLS=OFF -DPNG_FRAMEWORK=OFF \
 	-DZLIB_LIBRARY="$PREFIX/lib/libz.a" -DZLIB_INCLUDE_DIR="$PREFIX/include" -B build > /dev/null; cmake --build build -j$JOBS > /dev/null; cmake --install build > /dev/null
-echo "libogg";     cd "$(unpack libogg)";    ./configure $CONFIGURE --disable-shared --enable-static > /dev/null; make -j$JOBS > /dev/null; make install > /dev/null
-echo "libvorbis";  cd "$(unpack libvorbis)"; ./configure $CONFIGURE --disable-shared --enable-static --with-ogg="$PREFIX" > /dev/null; make -j$JOBS > /dev/null; make install > /dev/null
-echo "SDL2";       cd "$(unpack SDL2)";      $CMAKE -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST=OFF -DSDL_TESTS=OFF -B build > /dev/null
+echo "libogg";     unpack libogg;            ./configure $CONFIGURE --disable-shared --enable-static > /dev/null; make -j$JOBS > /dev/null; make install > /dev/null
+echo "libvorbis";  unpack libvorbis;         ./configure $CONFIGURE --disable-shared --enable-static --with-ogg="$PREFIX" > /dev/null; make -j$JOBS > /dev/null; make install > /dev/null
+echo "SDL2";       unpack SDL2;              $CMAKE -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST=OFF -DSDL_TESTS=OFF -B build > /dev/null
 cmake --build build -j$JOBS > /dev/null; cmake --install build > /dev/null
 # (sdl12-compat links SDL.dll with GCC's libgcc, for what the compiler calls by itself: Clang's
 # own library of those, compiler-rt's builtins, stands in for it)
 mkdir -p "$D/work/libgcc"; cp "$(ls "$TC"/lib/clang/*/lib/windows/libclang_rt.builtins-x86_64.a)" "$D/work/libgcc/libgcc.a"
-echo "sdl12-compat"; cd "$(unpack sdl12-compat)"; $CMAKE -DSDL2_INCLUDE_DIR="$PREFIX/include/SDL2" -DSDL12TESTS=OFF -DSTATICDEVEL=OFF \
+echo "sdl12-compat"; unpack sdl12-compat;         $CMAKE -DSDL2_INCLUDE_DIR="$PREFIX/include/SDL2" -DSDL12TESTS=OFF -DSTATICDEVEL=OFF \
 	-DCMAKE_SHARED_LINKER_FLAGS="-L$D/work/libgcc" -B build > /dev/null
 cmake --build build -j$JOBS > /dev/null; cmake --install build > /dev/null
 cp "$PREFIX/lib/pkgconfig/sdl12_compat.pc" "$PREFIX/lib/pkgconfig/sdl.pc"
 # The game links its libraries statically (-static, see src/CMakeLists.txt), so it looks for
 # libSDL.a: that's SDL.dll's import library under the name a static library would have.
 cp "$PREFIX/lib/libSDL.dll.a" "$PREFIX/lib/libSDL.a"
-echo "SDL_image";  cd "$(unpack SDL_image)"; ./configure $CONFIGURE --with-sdl-prefix="$PREFIX" --enable-static --disable-shared \
+echo "SDL_image";  unpack SDL_image;         ./configure $CONFIGURE --with-sdl-prefix="$PREFIX" --enable-static --disable-shared \
 	--enable-png --disable-png-shared --disable-jpg --disable-tif --disable-webp > /dev/null; make -j$JOBS > /dev/null; make install > /dev/null
-echo "SDL_mixer";  cd "$(unpack SDL_mixer)"; ./configure $CONFIGURE --with-sdl-prefix="$PREFIX" --enable-static --disable-shared \
+echo "SDL_mixer";  unpack SDL_mixer;         ./configure $CONFIGURE --with-sdl-prefix="$PREFIX" --enable-static --disable-shared \
 	--enable-music-wave --enable-music-ogg --disable-music-ogg-shared --enable-music-midi --enable-music-timidity-midi --enable-music-native-midi \
 	--disable-music-fluidsynth-midi --disable-music-mod --disable-music-mp3 --disable-music-flac LIBS="-lvorbis -logg" > /dev/null; make -j$JOBS > /dev/null; make install > /dev/null
-echo "SDL_gfx";    cd "$(unpack SDL_gfx)";   ./configure $CONFIGURE --with-sdl-prefix="$PREFIX" --enable-static --disable-shared --disable-mmx > /dev/null
+echo "SDL_gfx";    unpack SDL_gfx;           ./configure $CONFIGURE --with-sdl-prefix="$PREFIX" --enable-static --disable-shared --disable-mmx > /dev/null
 make -j$JOBS > /dev/null; make install > /dev/null
 # What the static libraries need in their turn, for pkg-config --static (their .pc files from
 # 2012 don't say)

@@ -1,0 +1,205 @@
+# The automatic builds: every push and pull request builds the three downloads the way the
+# releases are made, and checks each where it will run.
+# - Linux: the tarball and the AppImage (tools/portable, tools/make_release.sh), built in a clean
+#   Ubuntu 26.04 as the releases are, then started on five distributions, from Rocky Linux 9
+#   (glibc 2.34, the oldest the release supports) to Arch.
+# - Windows: the zip, built on Linux by the build guide's own commands (its "Windows zip on
+#   Linux" route), then checked on GitHub's Windows: the game starts, and play.bat finds Steam's
+#   libraries, links the data and starts the game (tools/ci/windows_zip_check.ps1).
+# - macOS: the app, for Apple silicon and Intel, macOS 11 and newer (tools/macos,
+#   tools/make_release_macos.sh), built and started on GitHub's Mac, its Intel half under Rosetta.
+# There's no game data on these machines: each game is checked as far as it gets without it.
+# The downloads are kept with each run (Actions, the run, Artifacts) for 30 days. A tag v*
+# makes a draft release with them (a person reads it over and publishes it).
+# (tools/make_public.sh copies tools/workflows/ to .github/workflows/.)
+name: Build
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# a newer push to the same branch replaces a run still going (never a tag's)
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+# (every job has a time limit, a little over twice its usual time: a hung check ends in
+# minutes instead of GitHub's six hours)
+jobs:
+  linux:
+    name: Linux release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    container: ubuntu:26.04
+    steps:
+      # The build tools, and the X11 and ALSA headers SDL2 is built with (the releases' SDL2 has
+      # those backends: sdl2_features.sh checks it got the same, no more, no fewer)
+      - name: Build tools
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential cmake git curl ca-certificates \
+            python3 pkg-config file zip libx11-dev libxext-dev libxcursor-dev libxfixes-dev libxi-dev libxrandr-dev libxss-dev \
+            libasound2-dev libudev-dev libsamplerate0-dev libgl-dev libgles-dev libglu1-mesa-dev
+      - uses: actions/checkout@v7
+      - name: OXCE at its commit, with the patch
+        run: sh tools/ci/fetch_oxce.sh
+      - name: Libraries
+        run: sh tools/portable/build_libs.sh
+      - name: SDL2 has the releases' features
+        run: sh tools/ci/sdl2_features.sh OpenXcom/build/portable/prefix/include/SDL2/SDL_config.h tools/ci/sdl2_linux_features.txt
+      - name: Game
+        run: sh tools/portable/configure.sh && make -C OpenXcom/build -j4
+      - name: Tarball and AppImage
+        run: sh tools/make_release.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-release
+          path: |
+            release/*.tar.gz
+            release/*.AppImage
+          retention-days: 30
+
+  linux-run:
+    name: Linux release on ${{ matrix.image }}
+    needs: linux
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: rockylinux:9
+            setup: dnf install -y mesa-libGL tar gzip findutils
+          - image: ubuntu:22.04
+            setup: apt-get update && apt-get install -y libgl1
+          - image: debian:12
+            setup: apt-get update && apt-get install -y libgl1
+          - image: fedora:latest
+            setup: dnf install -y mesa-libGL tar gzip findutils
+          - image: archlinux:latest
+            setup: pacman -Syu --noconfirm libglvnd mesa tar gzip findutils
+    steps:
+      # The OpenGL library every desktop has (the release's only library from the system
+      # besides glibc's and libgcc_s)
+      - name: OpenGL
+        run: ${{ matrix.setup }}
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: linux-release
+          path: dl
+      - name: The game, play.sh and the AppImage
+        run: sh tools/ci/linux_release_check.sh dl/*.tar.gz dl/*.AppImage
+
+  windows:
+    name: Windows zip (the guide's route on Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    container: ubuntu:26.04
+    steps:
+      # (git and Python for the checkout and for reading the guide; the guide installs the rest)
+      - name: Git and Python
+        run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git ca-certificates python3
+      - uses: actions/checkout@v7
+      # The build guide's commands for this route, as a reader copies them from the page
+      # (tools/ci/guide_commands.py says what it changes for a machine: apt-get -y, this
+      # checkout instead of a fresh clone of it)
+      - name: The build guide's commands
+        run: |
+          python3 tools/ci/guide_commands.py cross Ubuntu --root > "$RUNNER_TEMP/guide.sh"
+          cat "$RUNNER_TEMP/guide.sh"
+          GUIDE_REPO="$PWD" sh "$RUNNER_TEMP/guide.sh"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-release
+          path: release/*.zip
+          retention-days: 30
+
+  windows-run:
+    name: Windows zip on Windows
+    needs: windows
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows-release
+          path: dl
+      - name: The game and play.bat
+        shell: pwsh
+        run: ./tools/ci/windows_zip_check.ps1 -Zip (Get-ChildItem dl/*.zip | Select-Object -First 1).FullName
+
+  macos:
+    name: macOS app
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - name: OXCE at its commit, with the patch
+        run: sh tools/ci/fetch_oxce.sh
+      - name: Libraries
+        run: |
+          command -v pkg-config > /dev/null || brew install pkgconf
+          sh tools/macos/build_libs.sh
+      - name: Game
+        run: sh tools/macos/configure.sh && cmake --build OpenXcom/build-macos -j "$(sysctl -n hw.ncpu)"
+      - name: The app
+        run: sh tools/make_release_macos.sh
+      # The game starts (its Apple silicon half here, its Intel half under Rosetta), and the
+      # app's starter, with no game data anywhere, says where it goes after setting up the profile
+      - name: The game and its starter
+        run: |
+          APP=$(ls -d release/OpenXcom3D-*-macos/OpenXcom3D.app)
+          "$APP/Contents/MacOS/openxcom" -version
+          /usr/bin/pgrep -q oahd || sudo softwareupdate --install-rosetta --agree-to-license > /dev/null
+          arch -x86_64 "$APP/Contents/MacOS/openxcom" -version
+          set +e
+          out=$(OPENXCOM3D_NO_DIALOG=1 "$APP/Contents/MacOS/openxcom3d" 2>&1); code=$?
+          set -e
+          echo "$out"
+          [ $code = 1 ] && echo "$out" | grep -q "needs the data of the original game"
+          test -f "$HOME/Library/Application Support/OpenXcom3D/mods/OpenXcom3D/metadata.yml"
+          test -f "$HOME/Library/Application Support/OpenXcom3D/options.cfg"
+          echo "the starter set up the profile and said where the game data goes"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-release
+          path: release/*.zip
+          retention-days: 30
+
+  draft-release:
+    name: Draft release (tags)
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux-run, windows-run, macos]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          path: dl
+          merge-multiple: true
+      # A draft only, and only when the tag has no release yet: a person reads it over and
+      # publishes it. Its text is docs/releases/<tag>.md when there is one.
+      - name: Draft release with the downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "$TAG has a release already: left as it is"
+            exit 0
+          fi
+          notes="docs/releases/$TAG.md"
+          [ -f "$notes" ] || { printf 'OpenXcom3D %s\n' "${TAG#v}" > "$RUNNER_TEMP/notes.md"; notes="$RUNNER_TEMP/notes.md"; }
+          gh release create "$TAG" dl/* --draft --title "OpenXcom3D ${TAG#v}" --notes-file "$notes"

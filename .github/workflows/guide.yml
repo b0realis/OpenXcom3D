@@ -1,0 +1,138 @@
+# The build guide (https://b0realis.github.io/OpenXcom3D/, pages/index.html), followed as a
+# reader follows it: its commands are read off the page itself (tools/ci/guide_commands.py,
+# which says what it changes for a machine without a person at it) and run step by step on a
+# fresh system for each route:
+# - Linux: Ubuntu 26.04, 24.04 and 22.04, Debian 13, Fedora and Arch, each with the guide's own
+#   package list for it;
+# - Windows with MinGW: MSYS2 on GitHub's Windows, with MSYS2's own compiler and libraries;
+# - the installer's short way: python3 install.py --from-source.
+# (Its third route, the Windows zip built on Linux, is the Build workflow's Windows job.)
+# It runs on every push and pull request, and once a week, since the distributions and MSYS2
+# change underneath it.
+# (tools/make_public.sh copies tools/workflows/ to .github/workflows/.)
+name: Build guide
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: guide-${{ github.ref }}
+  cancel-in-progress: true
+
+# (every job has a time limit, a little over twice its usual time: a hung check ends in
+# minutes instead of GitHub's six hours)
+jobs:
+  # The guide's commands for each route, read off the page once (the fresh systems below have
+  # no Python to read it with)
+  commands:
+    name: The guide's commands
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Read them off the page
+        run: |
+          mkdir guide
+          for distro in Ubuntu Debian Fedora Arch; do python3 tools/ci/guide_commands.py linux $distro --root > guide/linux-$distro.sh; done
+          python3 tools/ci/guide_commands.py win > guide/win.sh
+          python3 tools/ci/guide_commands.py linux Ubuntu --root --steps=2 > guide/linux-Ubuntu-tools.sh
+          for f in guide/*.sh; do echo "=== $f"; cat "$f"; done
+      - uses: actions/upload-artifact@v7
+        with:
+          name: guide-commands
+          path: guide/
+          retention-days: 7
+
+  linux:
+    name: Linux, ${{ matrix.image }}
+    needs: commands
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { image: "ubuntu:26.04", distro: Ubuntu }
+          - { image: "ubuntu:24.04", distro: Ubuntu }
+          - { image: "ubuntu:22.04", distro: Ubuntu }
+          - { image: "debian:13", distro: Debian }
+          - { image: "fedora:latest", distro: Fedora }
+          - { image: "archlinux:latest", distro: Arch }
+    steps:
+      # (without git yet, the checkout is a plain download: the guide installs git itself)
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: guide-commands
+          path: guide
+      - name: Steps 2 to 5
+        run: |
+          mkdir -p /tmp/guide && cd /tmp/guide
+          GUIDE_PATCH="$GITHUB_WORKSPACE/openxcom3d.patch" sh "$GITHUB_WORKSPACE/guide/linux-${{ matrix.distro }}.sh"
+
+  msys2:
+    name: Windows, MSYS2
+    needs: commands
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      # (Git for Windows, which checks this out, would give the patch CRLF line ends)
+      - name: Line ends as they are
+        shell: pwsh
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: guide-commands
+          path: guide
+      # MSYS2 as installed from msys2.org, brought up to date first (the guide's pacman -Syu
+      # then has nothing left to do: a runtime update mid-script would end the step, as it
+      # closes the reader's window)
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+      - name: Steps 2 to 5
+        run: |
+          mkdir -p /tmp/guide && cd /tmp/guide
+          W="$(cygpath -u "$GITHUB_WORKSPACE")"
+          GUIDE_PATCH="$W/openxcom3d.patch" sh "$W/guide/win.sh"
+
+  installer:
+    name: Linux, install.py --from-source
+    needs: commands
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    container: ubuntu:26.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: guide-commands
+          path: guide
+      # The guide's tools for Ubuntu (step 2), and Python for the installer
+      - name: The guide's tools
+        run: |
+          sh guide/linux-Ubuntu-tools.sh
+          DEBIAN_FRONTEND=noninteractive apt-get install -y python3
+      # The installer needs one of the games: a stand-in with their four folders (the game
+      # isn't started, only built, installed and asked its version)
+      - name: python3 install.py --from-source
+        run: |
+          for part in GEODATA GEOGRAPH MAPS UFOGRAPH; do mkdir -p "$RUNNER_TEMP/UFO/$part"; done
+          python3 install.py --from-source --yes --ufo "$RUNNER_TEMP/UFO" --target "$RUNNER_TEMP/OpenXcom3D" --workdir "$RUNNER_TEMP/build" --jobs 4
+          test -x "$RUNNER_TEMP/OpenXcom3D/play.sh"
+          test -f "$RUNNER_TEMP/OpenXcom3D/user/mods/OpenXcom3D/metadata.yml"
+          "$RUNNER_TEMP/OpenXcom3D/bin/openxcom" -version

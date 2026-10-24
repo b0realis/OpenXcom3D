@@ -23,6 +23,7 @@ Add-on builds keep their own user and config folders, so an existing OXCE profil
 
 - the release's `user/` folder, when started with `play.sh` (or `play.bat` on Windows);
 - `~/.local/share/openxcom3d` for the AppImage;
+- `~/Library/Application Support/OpenXcom3D` for the macOS app;
 - otherwise `~/.local/share/openxcom3d` and `~/.config/openxcom3d`.
 
 ### Option A: the prebuilt release (Linux x86-64)
@@ -159,7 +160,19 @@ README-Windows.txt, README.md, OpenXcom3D_manual.md, openxcom3d.patch, LICENSE.t
 
 It links what it finds into `user\` with a directory junction, which needs no administrator and leaves the data as it is. On a disk that can't hold a junction (FAT32, exFAT, a network drive) it copies the data instead. The first time, it also writes the starting options: the game that's there (UFO if both), and a 1280×800 window if the screen has room for one (at least 1300×900), else the full screen. Your saves, the options and the log (`openxcom.log`) are in `user\`. Extra arguments go to the game: `play.bat -load mysave.sav`.
 
-The Windows build is made on Linux with llvm-mingw (Clang for Windows), from the same sources as the Linux release, except sdl12-compat: 1.2.74 instead of 1.2.72, which crashes on Windows. **It's tested under Wine** (11.17): the launcher in every case above, and battles in 3D in UFO and TFTD. It hasn't run on a real Windows machine yet, so reports are welcome.
+The Windows build is made on Linux with llvm-mingw (Clang for Windows), from the same sources as the Linux release, except sdl12-compat: 1.2.74 instead of 1.2.72, which crashes on Windows. **It's played under Wine** (11.17) here: the launcher in every case above, and battles in 3D in UFO and TFTD. On a real Windows (GitHub's), the [automatic builds](#automatic-builds) check every change: the game starts, and `play.bat` finds the games in Steam's libraries (a second library on another disk too), links them and starts the game. Nobody has played a battle on a real Windows machine yet, so reports are welcome.
+
+### Option A on macOS: a first, untested build
+
+The [automatic builds](#automatic-builds) make a macOS app on GitHub's Macs: **`OpenXcom3D-<version>-macos.zip`**, for Apple silicon and Intel, macOS 11 (Big Sur) and newer. Nobody here has a Mac: it has been built, checked and started there (the game says its version, natively and under Rosetta, and the app's starter sets up its profile), but never played. Reports are very welcome.
+
+To get it: open the latest run of [Build](https://github.com/b0realis/OpenXcom3D/actions/workflows/build.yml?query=branch%3Amain) and, under *Artifacts*, take **macos-release** (a GitHub account is needed; each run keeps it for 30 days). Inside is the zip; unpack it.
+
+**Opening it the first time:** the app is signed ad hoc, not by Apple, so macOS stops it the first time. Open it once, then *System Settings → Privacy & Security → Open Anyway*; or in Terminal, `xattr -dr com.apple.quarantine /path/to/OpenXcom3D.app`. After that it opens like any other app.
+
+**Nothing needs installing.** The app holds the game (OXCE 8.7.1 + OpenXcom3D), SDL 1.2 (sdl12-compat) and SDL2 in `Contents/Frameworks`, with SDL_image, SDL_mixer and SDL_gfx built in, OXCE's data and the mod; zlib is the system's.
+
+**The game data:** the first time, it looks for the games in a `UFO` or `TFTD` folder next to the app or in your home folder, in your Steam libraries, and in apps named after them in Applications (GOG's keep the DOS game inside), and links what it finds into its profile, changing nothing there. Otherwise copy the game's folder to `~/Library/Application Support/OpenXcom3D/UFO` (or `TFTD`); the app says so in a window if it finds none. Your saves, the options and the log (`openxcom.log`) are in `~/Library/Application Support/OpenXcom3D`.
 
 ### Option B: build from source
 
@@ -673,7 +686,7 @@ Sprite upscaling costs nothing measurable. Use **pixel size** 2 or 3 on slow mac
 - **Leaning** shows what's round a corner, but the game's own sight still starts from the middle of the soldier's tile: an alien there shows once the soldier (or someone else) spots it. The weapon in hand stays level while the view tilts.
 - **Leaning and fair play** (a player's note: the aliens can't lean by choice, so leaning gives the player a small edge). What the lean gives, exactly: it **shows no more than the game does**: the game's sight doesn't change, units it doesn't see aren't drawn, and the lean's room check leaves them out, so a peek shows terrain, never a hidden alien. A **shot** from a lean (and with *Lean shots*) starts from the game's own off-centre origins, a couple of voxels to the side. OXCE has a game option, **off-centre shooting** (`oxceEnableOffCentreShooting`), with which every unit, the aliens included, tries left and right of centre when the centre has no line of fire; with it on, the aliens have that reach too, and the player only gets to pick the side. For the most even game, play with that option on, or leave *Lean shots* off and lean only to look. An idea for later: shots from a lean only when that option is on. Letting the AI lean by choice belongs to the game itself (a fork such as Brutal-OXCE could), not to this add-on.
 - **The game's own messages** (e.g. "has become unconscious") pause the 3D sequences behind them until you click OK, as all battlescape animation does.
-- **Platforms:** Linux (x86-64, the Steam Deck included) is built and tested here. Windows (64-bit) is built here too, and tested under Wine, not yet on a real Windows machine. There's no macOS build yet; one from the community would be very welcome.
+- **Platforms:** Linux (x86-64, the Steam Deck included) is built and played here. Windows (64-bit) is built here too and played under Wine; the automatic builds check on a real Windows that it starts and finds the games. macOS (Apple silicon and Intel) is built by the automatic builds only, and hasn't been played on a real Mac yet: reports are very welcome.
 - **Languages:** English (US and UK) only.
 
 ## 10. For developers
@@ -699,6 +712,20 @@ It applies with `git apply` to a clean checkout of the commit above.
 Built with `-DOXCE_FIRSTPERSON=OFF`, it is plain OXCE again: the add-on is left out and the hooks are no-ops.
 
 To work on it: check out the commit above, `git apply openxcom3d.patch`, build (see [Option B](#option-b-build-from-source)), and make your changes; `git diff` (plus the new files under `src/FirstPerson/` and `mod/`) gives the next patch.
+
+### Automatic builds
+
+Every push and pull request runs two workflows on GitHub ([Actions](https://github.com/b0realis/OpenXcom3D/actions)). Neither machine has the original games' data, so each game is checked as far as it gets without it.
+
+- **Build** builds the three downloads the way the releases are made and checks each where it runs:
+  - *Linux:* the tarball and the AppImage, in a clean Ubuntu 26.04; SDL2 must have the releases' features, no more, no fewer (`tools/ci/sdl2_features.sh`). Then both start on Rocky Linux 9 (glibc 2.34, the oldest supported), Ubuntu 22.04, Debian 12, Fedora and Arch (`tools/ci/linux_release_check.sh`).
+  - *Windows:* the zip, built on Linux by the build guide's own commands, then checked on GitHub's Windows (`tools/ci/windows_zip_check.ps1`): the game starts; `play.bat` with no data says where it goes; with a stand-in Steam (its folder in the registry, a second library on another disk) it finds both games, links them, writes the starting options and starts the game; and it follows the data when it moves.
+  - *macOS:* the app, universal and for macOS 11 and newer (`tools/macos/`, `tools/make_release_macos.sh`), checked by `tools/macos/check.sh` (both architectures, no newer macOS asked for, only the system's libraries and the two inside, the signature), then started natively and under Rosetta.
+
+  The downloads stay with each run for 30 days (the run's *Artifacts*). A tag `v*` also makes a draft release with all three, which a person reads over and publishes.
+- **Build guide** (also once a week, since the systems change underneath it) runs the [build guide](https://b0realis.github.io/OpenXcom3D/)'s commands as a reader copies them: `tools/ci/guide_commands.py` reads them off the page and changes only what a machine without a person needs (package managers don't ask; the patch is the checkout's; the game is asked its version instead of started), each change marked next to the guide's own line. They run on fresh Ubuntu 26.04, 24.04 and 22.04, Debian 13, Fedora and Arch, in MSYS2 on GitHub's Windows, and `install.py --from-source` runs too.
+
+Both get OXCE at the commit `install.py` names, with the patch applied (`tools/ci/fetch_oxce.sh`, which also checks that `src/` and `mod/` here match the patch).
 
 ### Code layout
 
@@ -785,6 +812,7 @@ What `FirstPersonView` draws:
 
 - **The mod switches itself on:** the first time the game finds the OpenXcom3D mod in a profile (one that doesn't list it yet), it starts on. A game built and set up by hand had it off, and F8 did nothing until it was switched on under Mods. A player who switches it off keeps it off. (The releases' profiles list it on already.)
 - **The build guide** on GitHub Pages: [b0realis.github.io/OpenXcom3D](https://b0realis.github.io/OpenXcom3D/), every step for Linux, Windows with MinGW (MSYS2, tested with its own compiler) and the Windows build on Linux, with the snags people hit.
+- **[Automatic builds](#automatic-builds)** on GitHub: every change builds the Linux, Windows and macOS downloads and checks them on five Linux distributions, a real Windows and a Mac; the build guide's commands run on six Linux distributions and in MSYS2 on Windows. With it comes **a first macOS build** (Apple silicon and Intel, macOS 11 and newer), [untested on a real Mac](#option-a-on-macos-a-first-untested-build).
 
 ### 1.03 (2026-10-23)
 

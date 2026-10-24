@@ -1,0 +1,2 @@
+# the patch keeps its line ends everywhere (with CRLF it does not apply)
+*.patch -text
