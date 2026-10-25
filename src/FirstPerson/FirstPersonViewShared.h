@@ -142,6 +142,13 @@ const double LyingRowVoxels = 1.41421356237309505;
 /// Things on the ground are drawn standing on the floor slab the view builds (two voxels thick),
 /// raised out of whatever solid they are in by at most this many voxels (see standingHeight).
 const int StandRaiseMax = 4;
+/// The floor a lying sprite's rows lie on (items, corpses) rises towards the camera with the ground
+/// in front of it, a step or a slope (see lyingRise), so they lie on it rather than in it (a
+/// player's report: items on stairs and slopes sank into them): the ground looked for up to
+/// LyingRiseMax voxels above the item's floor, the slope at most LyingSlopeMax (voxels up for each
+/// voxel towards the camera).
+const int LyingRiseMax = 12;
+const double LyingSlopeMax = 1.5;
 /// Bullet holes and scorch marks (see drawDecals): a mark's radius, in voxels, per step of its
 /// size (a bullet hole is size 1, a scorch 3); at most this many pixels from its middle on the
 /// screen, however close; a bullet hole's core this many shades darker (its edge by the mark's
@@ -157,6 +164,22 @@ const float UnexploredMistFrom = 0.5f, UnexploredMistTo = 1.5f, UnexploredMistMa
 /// The purple haze of a unit under our mind control (see FirstPersonView::setControlHaze) creeps in
 /// from this share of the way from the middle of the view to its corners, fully at the corners.
 const float ControlHazeFrom = 0.45f;
+/// The units' facing rings (see FirstPersonView::drawFacing): the arrow reaches this many voxels out
+/// from the ring, this many to each side at its base.
+const double FacingArrowLength = 7.0, FacingArrowWidth = 4.0;
+/// A shotgun's pellet in flight (setting "Shotgun pellets in flight") is a streak this many voxels long.
+const float PelletStreak = 6.0f;
+/// Under night vision the aimed path (see FirstPersonView::drawTrajectory) is light in the goggles,
+/// as a laser sight is: its core this share white, the rest the goggles' brightest green (dithered:
+/// a white-green, the owner's choice), in a green glare; a forced arc's dashes turn to dots
+/// (colour can't tell it from a normal arc there), NightForcedDotSize pixels across, one every
+/// NightForcedDotSpacing pixels along the path on the screen.
+const float NightLightWhiteShare = 0.5f;
+/// A straight shot the game will refuse (no line of fire; the owner's ask after a player's report)
+/// shows its laser dimmed: dark red, this share of its pixels (dithered), its dot no brighter.
+const float RefusedLineOpacity = 0.5f;
+const int NightForcedDotSize = 2;
+const float NightForcedDotSpacing = 8.0f;
 /// A level of a map is underground at its edges when at least this share of its outer ring of
 /// tiles is rock: a wall or an object (the rock a base or a cave is cut into), or a floor with
 /// something over it (a base's sewers). 100% on every base, colony and Cydonia map seen; at

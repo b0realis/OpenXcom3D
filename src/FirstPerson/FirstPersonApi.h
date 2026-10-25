@@ -78,6 +78,22 @@ namespace FirstPerson
 /// penalty (a player's report on 1.03; it was half). The game's shot and its pellets and the
 /// other gun's round use it (ProjectileFlyBState), and the 3D view's spread and hit chance.
 const double DualWieldAccuracy = 0.7;
+/// Akimbo: two guns fired at once cost the dearer gun's shot and this share more (a player's report:
+/// two identical guns cost twice one shot, at 30% less accuracy each; the owner's choice). The chosen
+/// gun pays its own shot as the game charges it, the other gun the rest (dualWieldCharge). Guns that
+/// fire in turn (an arcing one) are two shots at full accuracy, and pay in full.
+const double DualWieldExtraCost = 0.1;
+/// What the other gun pays when both fire at once, for one kind of cost (time units, energy): the
+/// pair's cost (the dearer gun's and DualWieldExtraCost more, rounded) less what the chosen gun pays.
+/// Akimbo in turn (setting "Akimbo in turn", or its key): the other gun's round leaves this many
+/// milliseconds after the chosen gun's, both at full accuracy and their own cost; the chosen gun's
+/// round lands once the other's has (ProjectileFlyBState).
+const int AkimboInTurnDelay = 150;
+inline int dualWieldCharge(int chosen, int other)
+{
+	const int pair = (int)((chosen > other ? chosen : other) * (1.0 + DualWieldExtraCost) + 0.5);
+	return pair > chosen ? pair - chosen : 0;
+}
 
 #ifndef OXCE_NO_FIRSTPERSON
 
@@ -136,6 +152,9 @@ void freeAimTarget(BattlescapeState *state, const BattleAction &action, Position
 /// Is FPS-style shooting on for this unit's shots in the first-person view? Their bullet hits
 /// then play quicker (a burst at a bullet's pace).
 bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
+/// Setting "Shotgun pellets in flight": do a shotgun's pellets fly beside its round (the 3D view
+/// showing), rather than all landing at once? They're traced as the round is fired, and hit as it lands.
+bool pelletsInFlight(BattlescapeState *state);
 /// A unit panics or goes berserk: returns true if the first-person view shows it its own way
 /// (the game then leaves out its "has panicked" box, which would freeze the view behind it).
 bool breakdown(BattlescapeState *state, BattleUnit *unit);
@@ -170,6 +189,7 @@ inline State *createOptionsTab(OptionsOrigin) { return nullptr; }
 inline bool activeWhenNew(const std::string &) { return false; }
 inline void freeAimTarget(BattlescapeState *, const BattleAction &, Position &) { }
 inline bool fastShots(BattlescapeState *, const BattleUnit *) { return false; }
+inline bool pelletsInFlight(BattlescapeState *) { return false; }
 inline bool breakdown(BattlescapeState *, BattleUnit *) { return false; }
 inline void closeQuartersDeflected(BattlescapeState *, const BattleUnit *, const Position &) { }
 inline bool endlessAmmo(BattlescapeState *, const BattleUnit *) { return false; }

@@ -547,19 +547,23 @@ void FirstPersonView::draw()
 	drawProjectilesAndExplosions();
 	drawFlares();
 	drawBeams();
-	drawTrajectory();
+	drawPellets();
+	drawTrajectory(false);
 	drawSeeThroughSmoke();
 	findUnitAtPointer();
 	drawParticles();
 	drawLightHalos();
-	// Effects on the finished picture (a camera's feed: its bad signal last).
+	// Effects on the finished picture (a camera's feed: its bad signal last). Under night vision
+	// the aimed path is light in the goggles: drawn again over the green, white-green.
 	applyScreenWash();
+	if (_nightVision) drawTrajectory(true);
 	if (_signalGlitches) applySignalGlitches();
 	drawBurning();
 	drawHurt();
-	// The icons over the downed units, and the enemy markers, over everything.
+	// The icons over the downed units, the enemy markers and the units' facing rings, over everything.
 	drawDownedIcons();
 	drawMarkers();
+	drawFacing();
 	unlock();
 }
 

@@ -4,7 +4,7 @@
 
 ![Night, through a soldier's eyes](docs/screenshots/night.png)
 
-*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.03**, for Linux and now Windows too.
+*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.04**, for Linux and Windows.
 
 **Both games are supported:** *UFO: Enemy Unknown* and *X-COM: Terror From The Deep*.
 
@@ -22,6 +22,26 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 | ![The Skyranger](docs/screenshots/skyranger.png) | ![Terror From The Deep: on the sea floor](docs/screenshots/tftd.png) |
 | ![Dual wield](docs/screenshots/akimbo.png) | ![Signal lost](docs/screenshots/signal_lost.png) |
 | ![Terror From The Deep, an island attack: a Gillman ahead, a Deep One in a teammate's helmet camera](docs/screenshots/tftd_island.png) | ![A rocket going off far down an alien base hall](docs/screenshots/alien_base.png) |
+
+## New in 1.04
+
+Two more reports from the same player (thank you!) on 1.03, a long one and a short one:
+
+- **Doors:** **O** opens the door you look at (turning to it first), and tile moves stop in front of a closed door instead of walking on through it.
+- **Bullet holes** on everything, near and far, drawn in 3D: a far one a dot, a near one with a darker core, on slopes and objects as on walls.
+- **At the map's pace:** chains of explosions and fast bursts (the X-Com Files' turbo laser) no longer crawl in 3D on slower computers.
+- **Night vision** switches at any time, and under it the aimed path glares white-green, like a laser sight through goggles.
+- **Underground maps in rock:** bases, colonies and caves sit in their own rock, with a rock ceiling instead of the sky; unexplored terrain turns misty with distance instead of a phantom skyline.
+- **The map camera:** the selected soldier's helmet camera in a window on the isometric map (setting *Map camera*; **P** shows or hides it, a click goes to 3D, a right click opens the soldier cam).
+- **No more "No line of fire" with the shot plainly on the unit:** the game's own aim and OXCE's off-centre shooting are tried before refusing, a unit's head poking into the tile above can be hit, and a shot the game will refuse shows its path dimmed. **Force arcing shots** fires a Panzerfaust at a building's side, and **Force blocked shots** (off) fires anyway when nothing reaches.
+- **Akimbo:** two guns together cost the dearer gun's shot and a tenth (not twice) at a 30% penalty instead of half, or fire one a moment after the other at full accuracy (*Akimbo in turn*, with a key of its own); arcing guns fire in turn, two guns take no aimed shot, and a shotgun in either hand fires its pellets.
+- **Falls, climbing and flying** by the walking speed, falls speeding up as gravity would.
+- **Show facing:** hold **Left Alt** for a ring and an arrow round every unit in sight, the way it faces.
+- **Shotgun pellets in flight** (setting, off): each pellet flies beside the round to where the game's spread sends it.
+- **A purple haze** through the eyes of a unit under your mind control.
+- **Soldiers spawn with guns:** OXCE's own auto-equip handed out staffs and pitchforks first in the big mods, and other weapons each time the mod list changed. Now guns come first, the same every time.
+- **And more:** a big unit's corpse in one piece, items lying up slopes instead of in them, black only where it's really dark, no grass in the Abductor's corners, ghost lift pads see-through up close, no moving or turning mid-shot with tile moves or paid turns.
+- **macOS:** a first build, untested on a real Mac, from the automatic builds (see the manual).
 
 ## New in 1.03
 
@@ -99,7 +119,7 @@ OpenXcom3D stems from **OpenXcom Extended** at exactly this commit:
 All changes on top of it are in one file, [`openxcom3d.patch`](openxcom3d.patch) (it applies with `git apply` to a clean checkout of that commit):
 
 - [`src/FirstPerson/`](src/FirstPerson): the 3D view, an engine add-on (renderer, controller, sounds, options), one file per topic and commented throughout;
-- small hooks in the core (39 files, about 570 lines): see the patch;
+- small hooks in the core (40 files, about 850 lines): see the patch;
 - [`mod/OpenXcom3D/`](mod/OpenXcom3D): the data mod that switches it on.
 
 `src/` and `mod/` in this repository are the same files as in the patch, for reading. Built with `-DOXCE_FIRSTPERSON=OFF`, it is plain OXCE again.

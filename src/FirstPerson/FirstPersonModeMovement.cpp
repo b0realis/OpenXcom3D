@@ -494,6 +494,10 @@ void FirstPersonMode::numpadKeys(int &forward, int &strafe) const
  * key pressed with the first, W and D say, makes a diagonal), and holding them walks on. A key
  * held on from one move to the next stops at a closed door (a player's report: a held walk went on
  * through it, into whatever waited behind): only a fresh press goes through, opening it.
+ * While the game is busy with something besides the soldier's own step (a shot, a turn by the
+ * rules, the aliens' fire), the move keys do nothing (a player's report: a press during a burst
+ * walked as it ended; the owner: ignore it): a numpad press then is dropped, and keys held
+ * through it start no move until let go.
  * The move is the normal walk steered to the middle of that tile, so everything walking does
  * still happens on the way (the step through the game's own walking, doors, falling off ledges,
  * diagonal gaps, vaults); this only works out the velocity, straight to the tile's middle,
@@ -517,7 +521,18 @@ bool FirstPersonMode::tileMoveVelocity(BattleUnit *unit, double forward, double 
 	const int sizeOffset = 8 * (unit->getArmor()->getSize() - 1); // a big unit's eye sits 8 voxels off its tile's middle
 	int numpadForward = 0, numpadStrafe = 0;
 	numpadKeys(numpadForward, numpadStrafe);
-	if (!canMove)
+	// Busy with something besides the soldier's own step (a step of ours keeps the game busy
+	// until it's walked): keys held now wait to be let go.
+	const bool busyElsewhere = !canAct() && !_stepPending;
+	if (busyElsewhere && (pushing || numpadForward || numpadStrafe))
+	{
+		_keysHeldThroughAction = true;
+	}
+	else if (!pushing && !numpadForward && !numpadStrafe)
+	{
+		_keysHeldThroughAction = false;
+	}
+	if (!canMove || busyElsewhere || _keysHeldThroughAction)
 	{
 		_numpadMove[0] = _numpadMove[1] = 0; // (a press while the soldier may not move is dropped)
 		numpadForward = numpadStrafe = 0;
@@ -559,7 +574,7 @@ bool FirstPersonMode::tileMoveVelocity(BattleUnit *unit, double forward, double 
 			moveStrafe = numpadStrafe;
 			heldOn = true;
 		}
-		else if (pushing && now - _tileMoveKeysSince >= TileMoveKeyWait)
+		else if (pushing && !_keysHeldThroughAction && now - _tileMoveKeysSince >= TileMoveKeyWait)
 		{
 			moveForward = forward;
 			moveStrafe = strafe;

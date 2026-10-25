@@ -199,9 +199,12 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 	const double anchorAcross = dot(anchor, _levelRight), anchorFacing = dot(anchor, cardFacing);
 	// A sprite pixel's size (camera units): across, up the card (squashed for something that
 	// must fit under a floor), and along the floor for a lying row; and the floor lying rows lie
-	// on, half a voxel above the anchor (eye height 0).
+	// on, half a voxel above the anchor (eye height 0), rising towards the camera with the ground
+	// in front of it (a step, a slope: see lyingRise), so much higher for each unit nearer.
 	const double columnSize = scale * SpritePixelX, rowSize = scale * ZScale * draw.standingSquash, lyingRowSize = scale * LyingRowVoxels;
 	const double floorHeight = anchor[2] + 0.5 * ZScale;
+	const double floorSlope = draw.lyingSlope * ZScale;
+	const double anchorAlong = anchor[0] * level[0] + anchor[1] * level[1]; // how far ahead the anchor is, along the ground
 	const bool lying = pose == SpritePose::Lying;
 
 	// Where a ray meets the sprite: the ray scaled to reach one unit ahead (so how far along it
@@ -216,10 +219,14 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 		{
 			return false;
 		}
-		if (lying && belowAnchor && ray[2] < 0.0 && floorHeight < 0.0)
+		// The floor's height towards the camera: floorHeight + floorSlope * (anchorAlong - along),
+		// along being how far ahead the ray's point is; where the ray comes down onto it.
+		const double rayAlong = ray[0] * level[0] + ray[1] * level[1];
+		const double descent = ray[2] + floorSlope * rayAlong;
+		if (lying && belowAnchor && descent < 0.0 && floorHeight < 0.0)
 		{
-			distance = floorHeight / ray[2];
-			const double towardsCamera = (anchor[0] - ray[0] * distance) * level[0] + (anchor[1] - ray[1] * distance) * level[1];
+			distance = (floorHeight + floorSlope * anchorAlong) / descent;
+			const double towardsCamera = anchorAlong - rayAlong * distance;
 			spriteRow = anchorY + towardsCamera / lyingRowSize;
 		}
 		if (spriteRow < anchorY || distance < 0.0)
@@ -308,7 +315,7 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 		{
 			const double farFloor[3] = { anchor[0], anchor[1], floorHeight };
 			const double nearFloor[3] = { anchor[0] - level[0] * (spriteHeight - anchorY) * lyingRowSize,
-				anchor[1] - level[1] * (spriteHeight - anchorY) * lyingRowSize, floorHeight };
+				anchor[1] - level[1] * (spriteHeight - anchorY) * lyingRowSize, floorHeight + floorSlope * (spriteHeight - anchorY) * lyingRowSize };
 			addCorners(anchor);
 			addCorners(farFloor);
 			addCorners(nearFloor);
@@ -482,12 +489,26 @@ void FirstPersonView::drawListBands()
  */
 double FirstPersonView::standingHeight(const double world[3]) const
 {
+	const int raise = riseOutOfSolid(world, StandRaiseMax);
+	return raise > 0 ? (int)std::floor(world[2]) + raise : world[2];
+}
+
+/**
+ * How far a point is raised out of the solid voxels it's in: the first voxel above it (or its
+ * own) that nothing of the view's terrain fills, at most a number of voxels up.
+ * @param world The point, in voxels.
+ * @param maxRaise The most voxels to look up.
+ * @return The voxels up to the open (0: it's in the open, or off the map); -1 if it's solid all
+ *         that way (deep in a wall, say).
+ */
+int FirstPersonView::riseOutOfSolid(const double world[3], int maxRaise) const
+{
 	const int voxelX = (int)std::floor(world[0]), voxelY = (int)std::floor(world[1]), voxelZ = (int)std::floor(world[2]);
 	if (voxelX < 0 || voxelY < 0 || voxelZ < 0 || voxelX >= _save->getMapSizeX() * 16 || voxelY >= _save->getMapSizeY() * 16)
 	{
-		return world[2];
+		return 0;
 	}
-	for (int raise = 0; raise <= StandRaiseMax; ++raise)
+	for (int raise = 0; raise <= maxRaise; ++raise)
 	{
 		const int z = voxelZ + raise;
 		if (z >= _save->getMapSizeZ() * 24) break;
@@ -499,10 +520,36 @@ double FirstPersonView::standingHeight(const double world[3]) const
 		}
 		if (!solid)
 		{
-			return raise ? z : world[2];
+			return raise;
 		}
 	}
-	return world[2];
+	return -1;
+}
+
+/**
+ * How steeply the ground in front of something lying at a point rises towards the camera (a step
+ * of stairs, a slope; a player's report: items there sank into them): looked at every 2 voxels
+ * along the floor towards the camera, within the lying rows' reach, how far the solid there rises
+ * above the item's floor (up to LyingRiseMax), and the steepest rise for the way (at most
+ * LyingSlopeMax). Ground that only falls, or is level, gives none.
+ * @param world Where it lies (the anchor, on its floor), in voxels.
+ * @param reach How far towards the camera its lying rows reach, in voxels.
+ * @return Voxels up for each voxel towards the camera.
+ */
+double FirstPersonView::lyingRise(const double world[3], double reach) const
+{
+	double steepest = 0.0;
+	const double towardsCamera[2] = { -std::cos(_yaw), -std::sin(_yaw) };
+	for (double along = 2.0; along <= reach + 0.01; along += 2.0)
+	{
+		const double point[3] = { world[0] + towardsCamera[0] * along, world[1] + towardsCamera[1] * along, world[2] + 0.5 };
+		const int rise = riseOutOfSolid(point, LyingRiseMax);
+		if (rise > 0)
+		{
+			steepest = std::max(steepest, rise / along);
+		}
+	}
+	return std::min(steepest, LyingSlopeMax);
 }
 
 /**
@@ -599,6 +646,7 @@ void FirstPersonView::drawUnits()
 	UnitSprite unitSprite(_spriteBuffer, _game->getMod(), _save, _save->getAnimFrame(), _save->getDepth() != 0, 0, 0);
 	const bool debug = _save->getDebugMode();
 	_markerSpots.clear();
+	_facingSpots.clear();
 	// Time since the last frame in seconds (at most a tenth, none the first time), for the gliding.
 	const Uint32 now = SDL_GetTicks();
 	const double elapsedSeconds = _unitLastTick ? std::min<Uint32>(100, now - _unitLastTick) / 1000.0 : 0.0;
@@ -740,6 +788,15 @@ void FirstPersonView::drawUnits()
 		if (hitboxOpacity > 0.05f)
 		{
 			recordHitbox(unit, feet, hitboxOpacity);
+		}
+		// Which way it faces, with the key for it held (see drawFacing): round its footprint (inside
+		// its tiles, so neighbours' rings don't cross), at the bottom of its hitbox (under a flyer),
+		// in the colour of its side.
+		if (_showFacing)
+		{
+			FacingSpot spot = { { feet[0], feet[1], feet[2] + unit->getFloatHeight() + 1.0 }, 8.0 * unitSize - 1.5, unit->getDirection(),
+				_colors.hitbox[unit->getFaction() == FACTION_PLAYER ? 0 : unit->getFaction() == FACTION_HOSTILE ? 1 : 2] };
+			_facingSpots.push_back(spot);
 		}
 	}
 	// Then draw them all.
@@ -951,11 +1008,36 @@ static int topColouredRow(const Surface *sprite)
 }
 
 /**
+ * The bottom row of a sprite with anything coloured in it.
+ * @param sprite The sprite (palette colours, 0 transparent).
+ * @return The row; -1 if it's all transparent.
+ */
+static int bottomColouredRow(const Surface *sprite)
+{
+	const SDL_Surface *surface = const_cast<Surface*>(sprite)->getSurface(); // read only
+	for (int row = surface->h - 1; row >= 0; --row)
+	{
+		const Uint8 *pixels = (const Uint8 *)surface->pixels + row * surface->pitch;
+		for (int column = 0; column < surface->w; ++column)
+		{
+			if (pixels[column]) return row;
+		}
+	}
+	return -1;
+}
+
+/**
  * Draws the top item lying on each discovered tile (weapons, corpses, ...) as a sprite on the
  * floor, lit by the game's light just above it, at the units' size (setting "Unit size").
  * Something lying on a tall object (a shelf, a crate, the top of stairs) is right under the
  * floor above, if there is one: the part of it that stands up from the floor is squashed to fit
  * under that floor, a voxel short of it, or it poked up through the floor into the room above.
+ * The rows lying on the floor rise with the ground in front (a step, a slope; see lyingRise).
+ * A big unit's corpse lies in parts, one on each of its tiles (the armor's corpse items, part
+ * y * 2 + x on the tile x, y from its corner, as the game drops them): while all four are the top
+ * items of their tiles, they're drawn as one picture, put together as the map draws them, laid at
+ * the corner the four tiles share and scaled round it (a player's report: a 2x2 corpse looked
+ * chopped to pieces, each part shrunk round its own tile and standing on its own).
  */
 void FirstPersonView::drawFloorItems()
 {
@@ -964,6 +1046,34 @@ void FirstPersonView::drawFloorItems()
 	// The items' size: the units' (setting "Unit size"), so a unit going down doesn't grow into
 	// a bigger corpse, and what lies by it keeps to the same scale.
 	const double itemScale = std::clamp(Options::fpsUnitSize, 80, 100) / 100.0;
+	// The tiles whose item went into a whole big corpse already.
+	std::vector<int> partsDrawn;
+	// A big unit's corpse part lying on a tile: the corner of the 2x2 corpse it's part of, when
+	// all four parts lie there as the top items, in their places (the same unit's, each the
+	// armor's corpse item for its place).
+	auto wholeCorpseCorner = [&](const Tile *tile, const BattleItem *item, Position &corner) {
+		const BattleUnit *unit = item->getUnit();
+		if (!unit || item->getRules()->getBattleType() != BT_CORPSE || unit->getArmor()->getSize() != 2) return false;
+		const auto &parts = unit->getArmor()->getCorpseBattlescape();
+		if (parts.size() < 4) return false;
+		const Position at = tile->getPosition();
+		for (const Position &candidate : { at, at - Position(1, 0, 0), at - Position(0, 1, 0), at - Position(1, 1, 0) })
+		{
+			bool whole = true;
+			for (int part = 0; part < 4 && whole; ++part)
+			{
+				const Tile *partTile = _save->getTile(candidate + Position(part % 2, part / 2, 0));
+				const BattleItem *partItem = partTile ? const_cast<Tile*>(partTile)->getTopItem() : nullptr;
+				whole = partItem && partItem->getUnit() == unit && partItem->getRules() == parts[part];
+			}
+			if (whole)
+			{
+				corner = candidate;
+				return true;
+			}
+		}
+		return false;
+	};
 	// The items are recorded first, then drawn on all the view's threads at once (see
 	// replayDrawList); each one's frame is composed in the sprite buffer and kept till then.
 	int framesUsed = 0;
@@ -971,7 +1081,8 @@ void FirstPersonView::drawFloorItems()
 	{
 		// Only tiles with something on them, that have been seen.
 		Tile *tile = _save->getTile(tileIndex);
-		if (tile->getInventory()->empty() || !_tileViews[tileIndex].discovered)
+		if (tile->getInventory()->empty() || !_tileViews[tileIndex].discovered
+			|| std::find(partsDrawn.begin(), partsDrawn.end(), tileIndex) != partsDrawn.end())
 		{
 			continue;
 		}
@@ -980,43 +1091,86 @@ void FirstPersonView::drawFloorItems()
 		{
 			continue;
 		}
-		// The middle of the tile's floor; skip it if it's behind the camera or far off the sides.
+		// The tiles it lies on: its own, or a whole big corpse's four.
+		Position corner;
+		const bool wholeCorpse = wholeCorpseCorner(tile, item, corner);
+		std::vector<Tile*> tilesUnder = { tile };
+		if (wholeCorpse)
+		{
+			tilesUnder.clear();
+			for (int part = 0; part < 4; ++part)
+			{
+				Tile *partTile = _save->getTile(corner + Position(part % 2, part / 2, 0));
+				tilesUnder.push_back(partTile);
+				partsDrawn.push_back(_save->getTileIndex(partTile->getPosition()));
+			}
+		}
+		// Where it lies: the middle of the tile's floor, or the corner a big corpse's tiles share,
+		// on the highest of their floors; skip it if it's behind the camera or far off the sides.
 		const Position tilePosition = tile->getPosition();
-		const double ground[3] = { tilePosition.x * 16.0 + 8.0, tilePosition.y * 16.0 + 8.0,
-			tilePosition.z * 24.0 - tile->getTerrainLevel() };
+		double ground[3] = { tilePosition.x * 16.0 + 8.0, tilePosition.y * 16.0 + 8.0, tilePosition.z * 24.0 - tile->getTerrainLevel() };
+		if (wholeCorpse)
+		{
+			ground[0] = corner.x * 16.0 + 16.0;
+			ground[1] = corner.y * 16.0 + 16.0;
+			for (const Tile *partTile : tilesUnder) ground[2] = std::max(ground[2], corner.z * 24.0 - partTile->getTerrainLevel());
+		}
 		double screenX, screenY, depth;
 		if (!projectToScreen(ground, screenX, screenY, depth) || screenX < -200 || screenX > getWidth() + 200)
 		{
 			continue;
 		}
 		// Compose the item's floor sprite in the buffer (unlit) and lay it on the floor's surface:
-		// the art below the middle of the floor's diamond lies flat, the rest stands.
+		// the art below the middle of the floor's diamond lies flat, the rest stands. A big corpse's
+		// parts go where the map draws them, like the 2x2 tiles they cover, back to front, and its
+		// middle is the corner the four share.
 		_spriteBuffer->clear();
 		const int shade = (int)std::lround(std::clamp(lightAt((float)ground[0], (float)ground[1], (float)ground[2] + 4.0f), 0.0f, 15.0f));
-		itemSprite.draw(item, 16, 8, 0);
+		if (wholeCorpse)
+		{
+			for (int part = 0; part < 4; ++part)
+			{
+				const int x = part % 2, y = part / 2;
+				itemSprite.draw(tilesUnder[part]->getTopItem(), 16 + (x - y) * 16, 8 + (x + y) * 8, 0);
+			}
+		}
+		else
+		{
+			itemSprite.draw(item, 16, 8, 0);
+		}
 		DrawStep step;
 		step.kind = DrawStep::Sprite;
 		step.sprite.sprite = keepComposedFrame(framesUsed);
 		step.sprite.anchorX = 32;
-		step.sprite.anchorY = 40;
+		step.sprite.anchorY = wholeCorpse ? 48 : 40;
 		step.sprite.world[0] = ground[0];
 		step.sprite.world[1] = ground[1];
 		step.sprite.world[2] = standingHeight(ground);
 		step.sprite.shade = shade;
 		step.sprite.scale = itemScale;
 		step.sprite.pose = SpritePose::Lying;
+		// The ground in front rising (a step, a slope): the lying rows rise with it, within their reach.
+		const int lyingRows = bottomColouredRow(step.sprite.sprite) - step.sprite.anchorY + 1;
+		if (lyingRows > 0)
+		{
+			step.sprite.lyingSlope = lyingRise(step.sprite.world, lyingRows * LyingRowVoxels * itemScale);
+		}
 		// Room to stand up in under the floor above (its slab starts at the next level's foot),
 		// against the sprite's coloured rows above the anchor, a voxel high each at full size.
-		const Tile *aboveTile = _save->getAboveTile(tile);
-		if (aboveTile && !aboveTile->hasNoFloor())
+		double headroom = 1e9;
+		for (Tile *under : tilesUnder)
 		{
-			const double headroom = (tilePosition.z + 1) * 24.0 - 1.0 - step.sprite.world[2];
-			const int standingRows = step.sprite.anchorY - topColouredRow(step.sprite.sprite);
-			const double standingVoxels = standingRows * itemScale;
-			if (standingRows > 0 && standingVoxels > headroom)
+			const Tile *aboveTile = _save->getAboveTile(under);
+			if (aboveTile && !aboveTile->hasNoFloor())
 			{
-				step.sprite.standingSquash = std::max(0.05, headroom) / standingVoxels;
+				headroom = std::min(headroom, (tilePosition.z + 1) * 24.0 - 1.0 - step.sprite.world[2]);
 			}
+		}
+		const int standingRows = step.sprite.anchorY - topColouredRow(step.sprite.sprite);
+		const double standingVoxels = standingRows * itemScale;
+		if (headroom < 1e9 && standingRows > 0 && standingVoxels > headroom)
+		{
+			step.sprite.standingSquash = std::max(0.05, headroom) / standingVoxels;
 		}
 		useSmoothVersion(step.sprite);
 		_drawList.push_back(step);
@@ -1795,6 +1949,50 @@ void FirstPersonView::drawSmokeBands()
 			draw.seeThrough = &seeThroughSprite;
 			drawSprite(draw, band * BandRows, (band + 1) * BandRows);
 		}
+	}
+}
+
+/**
+ * Shows which way the units in sight face, while the key for it is held (a player's report:
+ * "Alt being able to show unit facing would be useful ... Some units are not sprited to display
+ * facing"; the owner: a key of its own, a marker like the hitboxes): round each one's footprint,
+ * flat at the bottom of its hitbox, a ring and an arrow out from it the way it faces, in the
+ * colour of its side, drawn over everything (what the soldier knows of it, like the markers).
+ */
+void FirstPersonView::drawFacing()
+{
+	for (const FacingSpot &spot : _facingSpots)
+	{
+		// The ring: an octagon round the footprint, flat on the floor.
+		float corners[8][3];
+		for (int corner = 0; corner < 8; ++corner)
+		{
+			const double angle = (corner + 0.5) * Pi / 4.0;
+			corners[corner][0] = (float)(spot.feet[0] + std::cos(angle) * spot.radius);
+			corners[corner][1] = (float)(spot.feet[1] + std::sin(angle) * spot.radius);
+			corners[corner][2] = (float)spot.feet[2];
+		}
+		for (int corner = 0; corner < 8; ++corner)
+		{
+			drawLine3D(corners[corner], corners[(corner + 1) % 8], spot.color, 1, 1.0f, 0.0f, 0, 1 << 30, false, true);
+		}
+		// The arrow: a triangle out from the ring the way the unit faces (the game's directions:
+		// 0 north, clockwise; the view's angles from east, so a quarter turn back).
+		const double facing = (spot.direction * 45.0 - 90.0) * Pi / 180.0;
+		const double ahead[2] = { std::cos(facing), std::sin(facing) }, side[2] = { -ahead[1], ahead[0] };
+		const float tip[3] = { (float)(spot.feet[0] + ahead[0] * (spot.radius + FacingArrowLength)), (float)(spot.feet[1] + ahead[1] * (spot.radius + FacingArrowLength)),
+			(float)spot.feet[2] };
+		float base[2][3];
+		for (int end = 0; end < 2; ++end)
+		{
+			const double across = end ? FacingArrowWidth : -FacingArrowWidth;
+			base[end][0] = (float)(spot.feet[0] + ahead[0] * spot.radius + side[0] * across);
+			base[end][1] = (float)(spot.feet[1] + ahead[1] * spot.radius + side[1] * across);
+			base[end][2] = (float)spot.feet[2];
+		}
+		drawLine3D(base[0], tip, spot.color, 2, 1.0f, 0.0f, 0, 1 << 30, false, true);
+		drawLine3D(base[1], tip, spot.color, 2, 1.0f, 0.0f, 0, 1 << 30, false, true);
+		drawLine3D(base[0], base[1], spot.color, 2, 1.0f, 0.0f, 0, 1 << 30, false, true);
 	}
 }
 

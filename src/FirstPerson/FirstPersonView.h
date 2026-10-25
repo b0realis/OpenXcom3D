@@ -213,6 +213,9 @@ public:
 		Uint8 trajectory; // the path a throw or shot aimed now would take (light cyan, unlike anything else drawn)
 		Uint8 trajectoryForced; // ... that of a forced arcing shot (yellow: it may meet something on the way)
 		Uint8 laserSight, laserDot; // ... that of a straight shot: a thin red laser, and its brighter dot where it ends
+		Uint8 forcedDot; // ... a straight shot forced ("Force blocked shots"): the laser yellow, as a forced arc, and this its dot
+		Uint8 laserRefused; // ... a straight shot the game will refuse (no line of fire): the laser dimmed, dark red
+		Uint8 nightLight; // the white of a path glaring under night vision (mixed into the goggles' brightest green)
 		float night; // 0 day .. 1 night
 		bool underwater;
 		int ambient;        // shade of open ground under the sky
@@ -338,7 +341,7 @@ public:
 	/// The path a throw or shot aimed now would take, in voxels from the soldier to its end (see
 	/// drawTrajectory); empty for none. Set again only when it changes.
 	/// How a trajectory is drawn: a throw's or an arcing shot's curve, one forced (as with Ctrl held), a straight shot's line.
-	enum TrajectoryLook { TRAJECTORY_ARC, TRAJECTORY_FORCED, TRAJECTORY_STRAIGHT };
+	enum TrajectoryLook { TRAJECTORY_ARC, TRAJECTORY_FORCED, TRAJECTORY_STRAIGHT, TRAJECTORY_FORCED_LINE, TRAJECTORY_REFUSED_LINE };
 	void setTrajectory(const std::vector<Position> &path, TrajectoryLook look = TRAJECTORY_ARC) { _trajectory = path; _trajectoryLook = look; }
 	/// Doom free grenades (see FirstPersonMode::stepFreeGrenade): a grenade flying by the 3D view's own throw, where it is and how
 	/// fast it flies (voxels; voxels a second, up in true proportions), at this moment; null to stop drawing it.
@@ -365,6 +368,8 @@ public:
 	void setVignette(float amount) { _vignette = amount; }
 	/// A purple haze at the screen edges (0 none .. 1 strong), looking through a unit under our mind control.
 	void setControlHaze(float amount) { _controlHaze = amount; }
+	/// Shows which way the units in sight face (the key for it held): a ring and an arrow round each.
+	void setShowFacing(bool show) { _showFacing = show; }
 	/// Shakes the camera (explosions, hits); stronger shakes win.
 	void addShake(float amount) { _shake = std::max(_shake, amount); }
 	/// Washes the view with a colour (0 none .. 1 full): 0 red (hurt, killed), 1 dark blue (unconscious),
@@ -692,6 +697,9 @@ private:
 	std::vector<std::pair<const BattleUnit*, int>> _markers; // visible enemies and their numbers
 	struct MarkerSpot { double pos[3]; int number; };
 	std::vector<MarkerSpot> _markerSpots;               // where they are this frame
+	bool _showFacing = false;                           // which way the units face shown (the key for it held)
+	struct FacingSpot { double feet[3]; double radius; int direction; Uint8 color; };
+	std::vector<FacingSpot> _facingSpots;               // the units in sight this frame, for their facing rings
 	int _uiScale = 1;                                   // markers drawn this many times bigger
 	int _pointerX = -1, _pointerY = -1;                 // where the player points on the view (see setPointer)
 	int _pointerTextBelow = 0;                          // and how many pixels of text are under it
@@ -725,6 +733,7 @@ private:
 		SpritePose pose = SpritePose::Standing;
 		const SeeThroughSprite *seeThrough = nullptr; // how opaque each pixel is (the smoke); null for a solid sprite
 		BattleUnit *unit = nullptr;       // the unit it pictures, if any: smoke veils it only thinly, and it can be pointed at
+		double lyingSlope = 0.0;          // a lying sprite's floor rising towards the camera: voxels up for each voxel along (see lyingRise)
 	};
 	/// Draws a sprite standing in the world, depth-tested (or see-through, laid over what's there):
 	/// all of it, or only the screen rows from bandTop up to bandBottom.
@@ -754,6 +763,10 @@ private:
 	void drawListBands();
 	/// The height something on the ground at a point stands at in the view: out of the floor slab.
 	double standingHeight(const double world[3]) const;
+	/// How far a point is raised out of the solid voxels it's in, up to a number of voxels (0 if it's in the open).
+	int riseOutOfSolid(const double world[3], int maxRaise) const;
+	/// How steeply the ground in front of something lying at a point rises towards the camera, within its reach.
+	double lyingRise(const double world[3], double reach) const;
 	/// Draws a sprite part way through dissolving into the next animation frame (ordered dither).
 	void drawSpriteBlend(const Surface *from, const Surface *to, double blend, int anchorX, int anchorY, const double world[3], double depthBias, int shade);
 	/// The box around a sprite frame's pixels.
@@ -807,6 +820,8 @@ private:
 	void drawSmokeBands();
 	/// Draws the numbered markers over the visible enemies.
 	void drawMarkers();
+	/// Draws a ring and an arrow round each unit in sight, the way it faces (the key for it held).
+	void drawFacing();
 	/// Draws icons over the downed units in sight: burning, bleeding, shock, out cold (setting "Downed unit icons").
 	void drawDownedIcons();
 
@@ -977,13 +992,16 @@ private:
 	void spawnPartnerEffects();
 	/// Draws laser beams fading out.
 	void drawBeams();
+	/// Draws a shotgun's pellets in flight, each a short streak (setting "Shotgun pellets in flight").
+	void drawPellets();
 	std::vector<Position> _trajectory; // the path a throw or shot aimed now would take (setTrajectory)
 	TrajectoryLook _trajectoryLook = TRAJECTORY_ARC; // and how it's drawn
 	/// Draws that path: dashes fading out along it, and a mark where it ends.
-	void drawTrajectory();
+	void drawTrajectory(bool asNightLight);
 	/// Draws a line in the world, depth-tested (all of it, or only the screen rows from bandTop up to bandBottom),
 	/// a set number of pixels thick, or as thick as worldWidth voxels look where it is (at most thickness); glowing, or plain.
-	void drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, float worldWidth = 0.0f, int bandTop = 0, int bandBottom = 1 << 30, bool glows = true);
+	void drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, float worldWidth = 0.0f, int bandTop = 0, int bandBottom = 1 << 30, bool glows = true,
+		bool overEverything = false);
 	/// Leaves a bullet hole or scorch mark.
 	void addDecal(const float pos[3], int size, int darkness);
 	/// Draws the bullet holes, scorch marks and blackened ground.

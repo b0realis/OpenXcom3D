@@ -514,6 +514,18 @@ void FirstPersonMode::toggleAkimbo()
 }
 
 /**
+ * The akimbo style key: switches two guns between firing at once, each less accurate, for the
+ * dearer gun's shot and a tenth ("panic"), and one a moment after the other, both at full
+ * accuracy and their own cost ("focused"; a player's report: the owner's choice of one key). The
+ * game's warning line says which.
+ */
+void FirstPersonMode::toggleAkimboStyle()
+{
+	Options::fpsAkimboInTurn = !Options::fpsAkimboInTurn;
+	_state->warning(Options::fpsAkimboInTurn ? "STR_FPS_AKIMBO_IN_TURN_ON" : "STR_FPS_AKIMBO_TOGETHER_ON");
+}
+
+/**
  * Dual wield: finds the other hand's gun if it can fire along with the chosen gun's fire mode,
  * and works out which of its own modes it fires: the same mode if it has it, else its first
  * shot mode. Each gun pays its own time units for its own mode (by the game's rules).
@@ -1124,13 +1136,11 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 		return;
 	}
 
-	// The target: the marked one, or the tile and point under the crosshair (the tile kept
-	// inside the map, as fire() takes it).
-	Position targetTile = marked ? _confirmTile : _aimVoxel.toTile();
+	// The target: the marked one, or the tile and point under the crosshair (as fire() takes
+	// them, see aimedTile).
+	const Position targetTile = marked ? _confirmTile : aimedTile(_aimVoxel);
 	const Position targetVoxel = marked ? _confirmVoxel : _aimVoxel;
-	targetTile.x = std::clamp<int>(targetTile.x, 0, _save->getMapSizeX() - 1);
-	targetTile.y = std::clamp<int>(targetTile.y, 0, _save->getMapSizeY() - 1);
-	targetTile.z = std::clamp<int>(targetTile.z, 0, _save->getMapSizeZ() - 1);
+	const bool hitSomething = marked || _aimHitsSomething;
 
 	// The side of the soldier a shot leaves from, as fire() picks it: leaning (setting "Lean
 	// shots", or the lean keys) moves it off the middle (see leanSide).
@@ -1141,7 +1151,7 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 	const Position from = unit->getPosition();
 	const std::vector<int> key = { arcing ? 1 : 2, targetTile.x, targetTile.y, targetTile.z, arcing ? 0 : targetVoxel.x, arcing ? 0 : targetVoxel.y,
 		arcing ? 0 : targetVoxel.z, from.x, from.y, from.z, unit->getDirection(), unit->isKneeled() ? 1 : 0, weapon->getId(), (int)mode, (int)side,
-		Options::fpsForceArcing ? 1 : 0 };
+		Options::fpsForceArcing ? 1 : 0, Options::fpsForceBlocked ? 1 : 0, Options::oxceEnableOffCentreShooting ? 1 : 0, hitSomething ? 1 : 0 };
 	if (key == _trajectoryKey)
 	{
 		return;
@@ -1169,10 +1179,16 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 	}
 	else
 	{
-		// The line of fire to the point, up to what it meets, drawn as a laser sight.
-		const Position origin = tileEngine->getOriginVoxel(preview, _save->getTile(from));
-		tileEngine->calculateLineVoxel(origin, targetVoxel, true, &path, unit);
-		look = FirstPersonView::TRAJECTORY_STRAIGHT;
+		// The line of fire, up to what it meets, drawn as a laser sight: to the point under the
+		// crosshair (FPS style; or with the game's own targeting, the line the shot takes, see
+		// aimFor: to the point, to the game's own aim's, or forced, drawn yellow; or the one it
+		// would take, dimmed, when the game will refuse it).
+		Position origin = tileEngine->getOriginVoxel(preview, _save->getTile(from)), voxel = targetVoxel;
+		const ShotAim aim = freeAimOn(mode) ? AIM_EXACT : aimFor(preview, targetTile, targetVoxel, hitSomething, origin, voxel);
+		tileEngine->calculateLineVoxel(origin, voxel, true, &path, unit);
+		// (a shot the game will refuse shows dimmed: no surprise "No line of fire")
+		look = aim == AIM_FORCED ? FirstPersonView::TRAJECTORY_FORCED_LINE : aim == AIM_REFUSED ? FirstPersonView::TRAJECTORY_REFUSED_LINE
+			: FirstPersonView::TRAJECTORY_STRAIGHT;
 	}
 	_view->setTrajectory(path, look);
 }
@@ -1282,6 +1298,185 @@ bool FirstPersonMode::forcesArc(BattleAction &shot, const Position &targetTile)
 	}
 	BattleAction probe = shot;
 	return !gameArcFound(probe, targetTile, nullptr);
+}
+
+/**
+ * The tile a point under the crosshair aims at: the tile it's in, kept inside the map; or, when
+ * it's on a unit's head poking up into the tile above (a unit on stairs or raised ground), the
+ * unit's own tile, as the game's cursor takes it (Tile::getOverlappingUnit). Aimed at the tile
+ * above, the game found no unit there and refused even a shot that hit that very unit (a
+ * player's report: "no line of fire" with the shot plainly on the unit).
+ * @param aimedVoxel The point the aim met.
+ * @return The tile aimed at.
+ */
+Position FirstPersonMode::aimedTile(const Position &aimedVoxel) const
+{
+	Position tile = aimedVoxel.toTile();
+	tile.x = std::clamp<int>(tile.x, 0, _save->getMapSizeX() - 1);
+	tile.y = std::clamp<int>(tile.y, 0, _save->getMapSizeY() - 1);
+	tile.z = std::clamp<int>(tile.z, 0, _save->getMapSizeZ() - 1);
+	const Tile *aimed = _save->getTile(tile);
+	if (aimed && !aimed->getUnit() && aimed->getOverlappingUnit(_save))
+	{
+		--tile.z;
+	}
+	return tile;
+}
+
+/**
+ * Does the game let a straight shot fly along a line, as it checks the player's first round
+ * (Projectile::calculateTrajectory)? The line must meet the target tile first: a unit on it (or
+ * the same unit on another of its tiles), a wall on its side, anything in it; or meet nothing.
+ * Whatever else it meets first, the game says "No line of fire".
+ * @param shot The action (its actor is left out of the line).
+ * @param origin Where the shot leaves from.
+ * @param voxel The point it's aimed at.
+ * @param targetTile The tile aimed at.
+ * @return True if the game lets it fly.
+ */
+bool FirstPersonMode::gameLetsLineFly(BattleAction &shot, const Position &origin, const Position &voxel, const Position &targetTile)
+{
+	std::vector<Position> line;
+	const int meets = _save->getTileEngine()->calculateLineVoxel(origin, voxel, false, &line, shot.actor);
+	if (meets == V_EMPTY || line.empty())
+	{
+		return true;
+	}
+	// The tile it meets first; a unit with no unit on that tile is one lower down (as the game says).
+	Position hitTile = line.front().toTile();
+	const Tile *hit = _save->getTile(hitTile);
+	if (meets == V_UNIT && hit && !hit->getUnit())
+	{
+		--hitTile.z;
+		hit = _save->getTile(hitTile);
+	}
+	if (hitTile == targetTile)
+	{
+		return true;
+	}
+	// Elsewhere: a wall on the near side of the target tile, or the target's unit on another
+	// of its tiles (the game's own checks, as it makes them).
+	if (meets == V_NORTHWALL) return hitTile.y - 1 == targetTile.y;
+	if (meets == V_WESTWALL) return hitTile.x - 1 == targetTile.x;
+	if (meets == V_UNIT)
+	{
+		const Tile *target = _save->getTile(targetTile);
+		return hit && target && hit->getUnit() == target->getUnit();
+	}
+	return false;
+}
+
+/**
+ * The game's own aim at a tile for a straight shot (ProjectileFlyBState::init, without the
+ * accuracy roll), which a shot whose point under the crosshair has no line of fire falls back
+ * on (see aimFor):
+ * - at a unit the soldier sees: any part of it a line reaches (TileEngine::canTargetUnit), from
+ *   the side the shot leaves from, then from the middle (a lean, see leanSide), then left and
+ *   right of the middle with OXCE's "Off-centre shooting" (the game's own order); the side that
+ *   works is kept in the action, as the game keeps it;
+ * - at an object, a wall or a floor: a point on it a line reaches (canTargetTile), else its
+ *   middle; at nothing, the tile's middle; and the game then lets the line fly or not
+ *   (gameLetsLineFly).
+ * @param shot The action (actor, weapon, mode, the side it leaves from).
+ * @param targetTile The tile aimed at.
+ * @param origin Set to where the shot leaves from.
+ * @param voxel Set to the point aimed at.
+ * @return True if the game finds a line of fire.
+ */
+bool FirstPersonMode::gameAimFound(BattleAction &shot, const Position &targetTile, Position &origin, Position &voxel)
+{
+	TileEngine *tileEngine = _save->getTileEngine();
+	Tile *tile = _save->getTile(targetTile);
+	Tile *from = _save->getTile(shot.actor->getPosition());
+	if (!tile || !from)
+	{
+		return false;
+	}
+	const BattleUnit *targetUnit = tile->getUnit();
+	if (targetUnit && targetUnit != shot.actor && targetUnit->getVisible())
+	{
+		std::vector<BattleActionOrigin> sides = { shot.relativeOrigin };
+		if (shot.relativeOrigin != BattleActionOrigin::CENTRE) sides.push_back(BattleActionOrigin::CENTRE);
+		if (Options::oxceEnableOffCentreShooting)
+		{
+			sides.push_back(BattleActionOrigin::LEFT);
+			sides.push_back(BattleActionOrigin::RIGHT);
+		}
+		for (const BattleActionOrigin side : sides)
+		{
+			shot.relativeOrigin = side;
+			origin = tileEngine->getOriginVoxel(shot, from);
+			if (tileEngine->canTargetUnit(&origin, tile, &voxel, shot.actor, false))
+			{
+				return true;
+			}
+		}
+		shot.relativeOrigin = BattleActionOrigin::CENTRE;
+		return false;
+	}
+	origin = tileEngine->getOriginVoxel(shot, from);
+	const Position corner = targetTile.toVoxel();
+	if (tile->getMapData(O_OBJECT))
+	{
+		if (!tileEngine->canTargetTile(&origin, tile, O_OBJECT, &voxel, shot.actor, false)) voxel = corner + Position(8, 8, 10);
+	}
+	else if (tile->getMapData(O_NORTHWALL))
+	{
+		if (!tileEngine->canTargetTile(&origin, tile, O_NORTHWALL, &voxel, shot.actor, false)) voxel = corner + Position(8, 0, 9);
+	}
+	else if (tile->getMapData(O_WESTWALL))
+	{
+		if (!tileEngine->canTargetTile(&origin, tile, O_WESTWALL, &voxel, shot.actor, false)) voxel = corner + Position(0, 8, 9);
+	}
+	else if (tile->getMapData(O_FLOOR))
+	{
+		if (!tileEngine->canTargetTile(&origin, tile, O_FLOOR, &voxel, shot.actor, false)) voxel = corner + Position(8, 8, 2);
+	}
+	else
+	{
+		voxel = corner + TileEngine::voxelTileCenter;
+	}
+	return gameLetsLineFly(shot, origin, voxel, targetTile);
+}
+
+/**
+ * How a straight shot with the game's own targeting (setting "Faithful targeting") goes, in
+ * order (a player's report: "no line of fire" with the shot plainly on the unit; the owner's
+ * choices):
+ * - at the point under the crosshair (setting "Aim at exact point"), if the game lets that line
+ *   fly (gameLetsLineFly);
+ * - else as the game's own aim goes: any part of the unit a line reaches, from the side of the
+ *   shot, the middle, and left and right with OXCE's "Off-centre shooting" (gameAimFound);
+ * - else, with "Force blocked shots", forced along the line to the crosshair, hitting whatever
+ *   is in the way, as with Ctrl held;
+ * - else the game refuses it ("No line of fire").
+ * @param shot The action (actor, weapon, mode, the side it leaves from; left as it was).
+ * @param targetTile The tile aimed at.
+ * @param aimedVoxel The point under the crosshair.
+ * @param hitSomething Whether the aim met something (not the sky).
+ * @param origin Set to where the shot leaves from (for its path).
+ * @param voxel Set to the point it goes for (for its path).
+ * @return How the shot goes.
+ */
+FirstPersonMode::ShotAim FirstPersonMode::aimFor(BattleAction &shot, const Position &targetTile, const Position &aimedVoxel, bool hitSomething, Position &origin, Position &voxel)
+{
+	const BattleActionOrigin side = shot.relativeOrigin;
+	origin = _save->getTileEngine()->getOriginVoxel(shot, _save->getTile(shot.actor->getPosition()));
+	voxel = aimedVoxel;
+	if (Options::fpsAimExact && hitSomething && gameLetsLineFly(shot, origin, aimedVoxel, targetTile))
+	{
+		return AIM_EXACT;
+	}
+	Position gameOrigin, gameVoxel;
+	const bool gameFound = gameAimFound(shot, targetTile, gameOrigin, gameVoxel);
+	shot.relativeOrigin = side;
+	if (gameFound)
+	{
+		origin = gameOrigin;
+		voxel = gameVoxel;
+		return AIM_GAME;
+	}
+	return Options::fpsForceBlocked && hitSomething ? AIM_FORCED : AIM_REFUSED;
 }
 
 /**
@@ -1535,10 +1730,7 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	// in the sky may lie beyond its edge or above its top).
 	Position aimedVoxel;
 	const bool hitSomething = aimAt(pixelX, pixelY, unit, aimedVoxel);
-	Position targetTile = aimedVoxel.toTile();
-	targetTile.x = std::clamp<int>(targetTile.x, 0, _save->getMapSizeX() - 1);
-	targetTile.y = std::clamp<int>(targetTile.y, 0, _save->getMapSizeY() - 1);
-	targetTile.z = std::clamp<int>(targetTile.z, 0, _save->getMapSizeZ() - 1);
+	const Position targetTile = aimedTile(aimedVoxel);
 
 	// Confirm fire (setting): the first click marks the target and shows its path (see
 	// updateTrajectory); a click on the same tile with the same weapon and mode fires, a click on
@@ -1591,11 +1783,19 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	// other one never fired, and this one was half as accurate for it).
 	BattleActionType offMode = BA_NONE;
 	BattleItem *otherWeapon = menuTargeting ? nullptr : dualPartner(unit, weapon, slot, offMode);
-	if (otherWeapon && !doomModeOn() && BattleActionCost(mode, unit, weapon).Time + BattleActionCost(offMode, unit, otherWeapon).Time > unit->getTimeUnits())
+	// The time units for both: together the dearer gun's shot and a tenth more (dualWieldCharge), in
+	// turn (an arcing gun, or "Akimbo in turn": the other gun's round a moment after) each its own.
+	const bool inTurn = otherWeapon && firesInTurn(weapon, mode, otherWeapon, offMode);
+	if (otherWeapon && !doomModeOn())
 	{
-		otherWeapon = nullptr;
+		const int chosenTime = BattleActionCost(mode, unit, weapon).Time, otherTime = BattleActionCost(offMode, unit, otherWeapon).Time;
+		const bool eachOwnCost = inTurn || Options::fpsAkimboInTurn;
+		if (chosenTime + (eachOwnCost ? otherTime : FirstPerson::dualWieldCharge(chosenTime, otherTime)) > unit->getTimeUnits())
+		{
+			otherWeapon = nullptr;
+		}
 	}
-	if (otherWeapon && firesInTurn(weapon, mode, otherWeapon, offMode))
+	if (otherWeapon && inTurn)
 	{
 		_turnShot = TurnShot{ unit, otherWeapon, offMode, targetTile, aimedVoxel, hitSomething };
 		otherWeapon = nullptr;
@@ -1649,10 +1849,34 @@ void FirstPersonMode::launchShot(BattleUnit *unit, BattleItem *weapon, BattleAct
 	// An arcing shot the game would refuse fires forced, as with Ctrl held (setting "Force
 	// arcing shots", see forcesArc).
 	action->forced = forcesArc(*action, targetTile);
+	// A straight shot with the game's own targeting: at the exact point if its line flies; else
+	// the game's own aim (the exact point dropped: the game then aims at any part of the unit,
+	// off-centre too, as it does on the map); else forced along the line to the crosshair
+	// ("Force blocked shots"); else as it was, refused (see aimFor).
+	if (!action->freeAim && isShot(mode) && !weapon->getArcingShot(mode))
+	{
+		BattleAction probe = *action;
+		probe.target = targetTile; // (the game sets it as it fires; the shot's origin depends on it)
+		Position origin, voxel;
+		switch (aimFor(probe, targetTile, aimedVoxel, hitSomething, origin, voxel))
+		{
+		case AIM_GAME:
+			action->targetVoxel = Position(-1, -1, -1);
+			break;
+		case AIM_FORCED:
+			action->targetVoxel = aimedVoxel;
+			action->forced = true;
+			break;
+		default:
+			break;
+		}
+	}
 
 	// Dual wield: the other gun fires at the same moment (both less accurate: the game cuts both
-	// shots' accuracy, see DualWieldAccuracy), if the caller found one to.
-	action->dualWield = otherWeapon != nullptr;
+	// shots' accuracy, see DualWieldAccuracy), or with "Akimbo in turn" a moment after, both at
+	// full accuracy and their own cost (see FirstPerson::AkimboInTurnDelay), if the caller found one to.
+	action->dualInTurn = otherWeapon != nullptr && Options::fpsAkimboInTurn;
+	action->dualWield = otherWeapon != nullptr && !action->dualInTurn;
 	action->dualWeapon = otherWeapon;
 	action->dualType = otherWeapon ? otherMode : BA_NONE;
 
@@ -1682,6 +1906,7 @@ void FirstPersonMode::launchShot(BattleUnit *unit, BattleItem *weapon, BattleAct
 	action->forced = false;
 	action->relativeOrigin = BattleActionOrigin::CENTRE;
 	action->dualWield = false;
+	action->dualInTurn = false;
 	action->dualWeapon = nullptr;
 	action->dualType = BA_NONE;
 }
@@ -2065,6 +2290,19 @@ bool FirstPersonMode::fastShots(BattlescapeState *state, const BattleUnit *attac
 }
 
 /**
+ * Do a shotgun's pellets fly beside its round, asked by the game as it fires one: with the setting
+ * "Shotgun pellets in flight" (a player's report: two guns' rounds fly side by side, so why not a
+ * shotgun's pellets?), while the 3D view shows, whoever fires. Otherwise the game's own way: the
+ * whole blast lands the moment it's fired.
+ * @param state The battlescape screen.
+ * @return True if they fly.
+ */
+bool FirstPersonMode::pelletsInFlight(BattlescapeState *state)
+{
+	return Options::fpsPelletsInFlight && state && state->_firstPerson && state->_firstPerson->isActive();
+}
+
+/**
  * Picks the target of the next round of an FPS-style shot, the moment the game fires it: along
  * the crosshair as it points now (the recoil of the rounds before has lifted it), spread at
  * random by the mode and the soldier (spreadFor), plus the bloom of the last rounds, which then
@@ -2380,15 +2618,18 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		}
 
 		// Dual wield: the other hand's gun joins in if it can fire along (dualPartner: a fitting
-		// mode, loaded) and there's time for both; otherwise the chosen gun fires alone, at full
-		// accuracy, as fire() decides too.
+		// mode, loaded) and there's time for both (together the dearer gun's shot and a tenth
+		// more, in turn each its own: see dualWieldCharge); otherwise the chosen gun fires alone,
+		// at full accuracy, as fire() decides too.
 		BattleActionType offMode = BA_NONE;
 		int offTime = 0;
 		if (BattleItem *otherWeapon = canFire ? dualPartner(unit, weapon, slot, offMode) : nullptr)
 		{
+			const bool pairInTurn = firesInTurn(weapon, mode, otherWeapon, offMode) || Options::fpsAkimboInTurn;
 			offTime = BattleActionCost(offMode, unit, otherWeapon).Time;
+			if (!pairInTurn) offTime = FirstPerson::dualWieldCharge(cost.Time, offTime);
 			dual = doomModeOn() || cost.Time + offTime <= unit->getTimeUnits();
-			inTurn = dual && firesInTurn(weapon, mode, otherWeapon, offMode);
+			inTurn = dual && pairInTurn;
 		}
 
 		// The hit chance at what's under the crosshair, for shots and throws (not in FPS style:
@@ -2433,7 +2674,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		shotText = shotInfo.str();
 
 		// The mode's name. FPS style: the quick slot reads "BURST x<rounds>", and auto says to
-		// hold the trigger; otherwise auto shows its number of rounds. "DUAL" goes in front
+		// hold the trigger; otherwise auto shows its number of rounds. "DUAL" (or "IN TURN") goes in front
 		// with dual wield.
 		static const struct { BattleActionType mode; const char *name; } modeNames[] = {
 			{ BA_SNAPSHOT, "STR_FPS_MODE_SNAP" }, { BA_AIMEDSHOT, "STR_FPS_MODE_AIMED" }, { BA_AUTOSHOT, "STR_FPS_MODE_AUTO" },
@@ -2467,7 +2708,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		}
 		if (dual)
 		{
-			modeText = std::string(_state->tr("STR_FPS_DUAL")) + " " + modeText;
+			modeText = std::string(_state->tr(inTurn ? "STR_FPS_IN_TURN" : "STR_FPS_DUAL")) + " " + modeText;
 		}
 
 		// Colours: red if he can't, purple for psi, yellow otherwise; all grey while he can't

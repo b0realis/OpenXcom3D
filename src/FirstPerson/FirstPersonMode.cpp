@@ -1391,6 +1391,16 @@ bool FirstPersonMode::canAct() const
 }
 
 /**
+ * Is a shot under way: one of ours handed to the game and still going (its burst, its hits, see
+ * endShotAim), or anyone's round in flight or blast going off?
+ * @return True if so.
+ */
+bool FirstPersonMode::shotUnderWay() const
+{
+	return _shotAimLeft || _state->_map->getProjectile() || !_state->_map->getExplosions()->empty();
+}
+
+/**
  * Shots and explosions in 3D at the isometric map's pace: while the 3D view shows and a shot is
  * flying or something is going off (a round's hit, a blast), and for CatchUpGrace after (the
  * step that fires a burst's next round), the battle's timer may run up to CatchUpSteps steps it
@@ -1845,6 +1855,10 @@ void FirstPersonMode::think()
 	// Turning with the keys, and the view's settings (they can change in the options).
 	turnWithKeys(elapsedSeconds);
 	updateZoom(elapsedSeconds);
+	// Which way the units face, while the key for it is held (Left Alt by default: it's the game's
+	// modifier, so held on its own it counts whatever else is held).
+	const Uint8 *heldKeys = SDL_GetKeyState(nullptr);
+	_view->setShowFacing(Options::keyFpsShowFacing != SDLK_UNKNOWN && heldKeys[Options::keyFpsShowFacing]);
 	updateScope();
 	_view->setFieldOfView(fieldOfViewNow());
 	_view->setSmoothLighting(Options::fpsSmoothLighting);
@@ -2079,10 +2093,12 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	if (key == Options::keyFpsTurnLeft) { if (pressed) { _snapTurnDegrees -= 45.0; _snapTurnFacing = true; } return true; }
 	if (key == Options::keyFpsTurnRight) { if (pressed) { _snapTurnDegrees += 45.0; _snapTurnFacing = true; } return true; }
 	if (key == Options::keyFpsAkimbo) { if (pressed) toggleAkimbo(); return true; }
+	if (key != SDLK_UNKNOWN && key == Options::keyFpsAkimboStyle) { if (pressed) toggleAkimboStyle(); return true; }
 	// The lean keys (setting "Lean") are read each frame while held (see updateLean); here they
 	// are only swallowed. With leaning off they're the game's.
 	if (Options::fpsLean > 0 && key != SDLK_UNKNOWN && (key == Options::keyFpsLeanHold || key == Options::keyFpsLeanLeftOwn || key == Options::keyFpsLeanRightOwn)) return true;
 	if (Options::fpsZoom && key != SDLK_UNKNOWN && key == Options::keyFpsZoom) return true; // (held: see updateZoom)
+	if (key != SDLK_UNKNOWN && key == Options::keyFpsShowFacing) return true; // (held: see think)
 	if (key == Options::keyFpsOpenDoor) { if (pressed) openDoor(_save->getSelectedUnit()); return true; }
 	if (key == Options::keyFpsFlare) { if (pressed) { if (Options::fpsFlares) throwFlare(); else _state->warning("STR_FPS_FLARES_OFF"); } return true; }
 	if (key == Options::keyFpsUp) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_UP, action); return true; }

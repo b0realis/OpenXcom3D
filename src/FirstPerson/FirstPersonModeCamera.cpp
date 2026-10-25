@@ -174,10 +174,28 @@ void FirstPersonMode::turnWithKeys(double elapsedSeconds)
  *   isometric map uses, which spends the armor's turn cost and stops when it spots a new enemy.
  *   Without the time units, the view stops at the head's limit. A turn key (snap turn) turns the
  *   soldier too: once its 45 degrees are turned, the soldier faces the compass point the view
- *   looks closest to.
+ *   looks closest to. While a shot is under way (ours, a burst, its hits; anyone's round or
+ *   blast) the head looks no further than its limit, as without the time units, and turns no
+ *   more (a player's report: looking round mid-shot, the soldier turned step by step after it,
+ *   paying for each; the owner: hold the head's limit).
  */
 void FirstPersonMode::faceLookDirection(BattleUnit *unit)
 {
+	if (Options::fpsTurnCost && shotUnderWay() && unit->getFaction() == FACTION_PLAYER && !unit->isOut())
+	{
+		// (held a hair inside the limit: exactly on it, rounding could tip it past once the shot
+		// is over, and the soldier would turn a step after all)
+		const double facingYaw = unit->getDirection() * 45.0 - 90.0;
+		const double offFacing = std::remainder(_view->getYawDegrees() - facingYaw, 360.0);
+		const double heldLimit = HeadTurn - 0.1;
+		if (std::abs(offFacing) > heldLimit)
+		{
+			_view->rotate((offFacing > 0.0 ? heldLimit : -heldLimit) - offFacing, 0.0);
+		}
+		_snapTurnDegrees = 0.0;
+		_snapTurnFacing = false;
+		return;
+	}
 	if (!canAct() || unit->getStatus() != STATUS_STANDING || !_state->playableUnitSelected())
 	{
 		return;

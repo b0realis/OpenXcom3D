@@ -257,6 +257,10 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFaithfulTargeting", &fpsFaithfulTargeting, true, "STR_FPS_FAITHFUL_TARGETING", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDualWield", &fpsDualWield, false, "STR_FPS_DUAL_WIELD", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsAkimboRealistic", &fpsAkimboRealistic, false, "STR_FPS_AKIMBO_REALISTIC", category));
+	// Akimbo's style: both guns at once, each less accurate, for the dearer gun's shot and a tenth
+	// ("panic", NO), or one a moment after the other, both at full accuracy and their own cost
+	// ("focused", YES); its key switches it in play.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsAkimboInTurn", &fpsAkimboInTurn, false, "STR_FPS_AKIMBO_IN_TURN", category));
 	// Leaning: standing to one side of the tile's middle shoots from that side (the game's
 	// off-centre origins), to peek round corners; and leaning out with the lean keys: off (0),
 	// the eye moves to the side (1, peek), and the view tilts with it (2, tilt).
@@ -329,6 +333,13 @@ void createOptions(std::vector<OptionInfo> &options)
 	// An arcing shot the game would refuse (no curve of its own lands on the target tile, as at
 	// a wall seen from the side) fires anyway, forced as with Ctrl held (its path drawn yellow).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsForceArcing", &fpsForceArcing, true, "STR_FPS_FORCE_ARCING", category));
+	// A straight shot with the game's own targeting that finds no line of fire to the point under
+	// the crosshair nor to any part of the target (off-centre too, with OXCE's option) fires anyway,
+	// forced along the line to the crosshair, hitting what's in the way (its path drawn yellow).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsForceBlocked", &fpsForceBlocked, false, "STR_FPS_FORCE_BLOCKED", category));
+	// A shotgun's pellets fly beside its round in the 3D view, each to where the game's spread
+	// sends it, instead of all landing the moment it's fired (the game's own way, kept off).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsPelletsInFlight", &fpsPelletsInFlight, false, "STR_FPS_PELLETS_IN_FLIGHT", category));
 	// The units' hitboxes, outlined: off (0), fading in and out once a second (1), always (2).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitboxes", &fpsHitboxes, 0, "STR_FPS_HITBOXES", category));
 	// The hitboxes' outlines and the path of a throw glowing (spilling bloom round them), or plain lines.
@@ -387,6 +398,8 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsSwitchHand", &keyFpsSwitchHand, SDLK_g, "STR_FPS_KEY_SWITCH_HAND", category));
 	// Akimbo on and off in battle (Y: one of the letters the battlescape leaves free).
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsAkimbo", &keyFpsAkimbo, SDLK_y, "STR_FPS_KEY_AKIMBO", category));
+	// Akimbo's style, both at once or in turn (setting "Akimbo in turn"): unbound unless the player binds one.
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsAkimboStyle", &keyFpsAkimboStyle, SDLK_UNKNOWN, "STR_FPS_KEY_AKIMBO_STYLE", category));
 	// Turning 45 degrees at a time, without stepping (comma and period: "<" and ">").
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsTurnLeft", &keyFpsTurnLeft, SDLK_COMMA, "STR_FPS_KEY_SNAP_LEFT", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsTurnRight", &keyFpsTurnRight, SDLK_PERIOD, "STR_FPS_KEY_SNAP_RIGHT", category));
@@ -409,6 +422,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsNightVision", &keyFpsNightVision, SDLK_n, "STR_FPS_KEY_NIGHT_VISION", category));
 	// Zoom, held (U: free in the game and the add-on).
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsZoom", &keyFpsZoom, SDLK_u, "STR_FPS_KEY_ZOOM", category));
+	// Which way the units in sight face, held (Left Alt, as the map's own Alt shows its unit
+	// indicators): a ring with an arrow on the floor round each, over everything.
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsShowFacing", &keyFpsShowFacing, SDLK_LALT, "STR_FPS_KEY_SHOW_FACING", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsUp", &keyFpsUp, SDLK_PAGEUP, "STR_FPS_KEY_UP", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsDown", &keyFpsDown, SDLK_PAGEDOWN, "STR_FPS_KEY_DOWN", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsDoomMode", &keyFpsDoomMode, SDLK_INSERT, "STR_FPS_KEY_DOOM_MODE", category));
@@ -485,6 +501,17 @@ void closeQuartersDeflected(BattlescapeState *state, const BattleUnit *shooter, 
 bool fastShots(BattlescapeState *state, const BattleUnit *attacker)
 {
 	return FirstPersonMode::fastShots(state, attacker);
+}
+
+/**
+ * Called by the game as it fires a shotgun's round: do its pellets fly beside it (setting
+ * "Shotgun pellets in flight", while the 3D view shows), rather than all landing at once?
+ * @param state The battlescape screen.
+ * @return True if the pellets should fly.
+ */
+bool pelletsInFlight(BattlescapeState *state)
+{
+	return FirstPersonMode::pelletsInFlight(state);
 }
 
 /**

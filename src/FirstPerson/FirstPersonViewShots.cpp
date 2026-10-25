@@ -715,8 +715,11 @@ void FirstPersonView::spawnTrailSegment(const float from[3], const float to[3])
  * @param bandTop, bandBottom Only the screen rows from bandTop up to (not including) bandBottom
  *        are drawn (a band of the view, see replayDrawList): the same pixels as drawn whole.
  * @param glows Whether its pixels shine (feed the bloom).
+ * @param overEverything Drawn over whatever is there, not depth-tested (a marker such as the
+ *        units' facing rings, see drawFacing).
  */
-void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, float worldWidth, int bandTop, int bandBottom, bool glows)
+void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, float worldWidth, int bandTop, int bandBottom, bool glows,
+	bool overEverything)
 {
 	const int width = getWidth(), height = getHeight();
 	const double focalLength = (width / 2.0) / _halfFovTangent; // in pixels
@@ -757,7 +760,7 @@ void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 c
 			{
 				const int pixelX = x + offsetX - pointThickness / 2, pixelY = y + offsetY - pointThickness / 2;
 				if (pixelX < 0 || pixelY < std::max(0, bandTop) || pixelX >= width || pixelY >= std::min(height, bandBottom)
-					|| depth >= _depthBuffer[pixelY * width + pixelX] + 1.0f) continue;
+					|| (!overEverything && depth >= _depthBuffer[pixelY * width + pixelX] + 1.0f)) continue;
 				if (opacity < 1.0f && dither(pixelX, pixelY) >= opacity) continue;
 				*getRaw(pixelX, pixelY) = color;
 				_glowMask[pixelY * width + pixelX] = glows ? 1 : 0;
@@ -1272,9 +1275,17 @@ void FirstPersonView::shotHead(const Projectile *projectile, float out[3]) const
  *   curve (as with Ctrl held, see FirstPersonMode::forcesArc) the same in yellow, for "it may
  *   meet something on the way";
  * - a straight shot's line: a laser sight, one pixel thin and red, unbroken, from the weapon,
- *   with a brighter dot where it meets something (the owner's choice for the player's request).
+ *   with a brighter dot where it meets something (the owner's choice for the player's request);
+ *   a forced one ("Force blocked shots", see FirstPersonMode::aimFor) the same in yellow, and
+ *   one the game will refuse (no line of fire) dimmed: dark red, half its pixels, a dim dot.
+ * Under night vision (a player's report: its green swallowed the path's colours) the path is
+ * light in the goggles, as a laser sight is (the owner's choice): drawn first as by day, so it
+ * glows and the goggles turn its glow green, then again over the green picture (see draw) with
+ * a white-green core, white mixed into the goggles' brightest green (NightLightWhiteShare), its
+ * dot white in the middle. Colour can't tell a forced path there, so it's dotted.
+ * @param asNightLight The second time under night vision: the white-green core.
  */
-void FirstPersonView::drawTrajectory()
+void FirstPersonView::drawTrajectory(bool asNightLight)
 {
 	if (_trajectory.size() < 2)
 	{
@@ -1282,12 +1293,61 @@ void FirstPersonView::drawTrajectory()
 	}
 	const float TrajectoryDash = 6.0f, TrajectorySkip = 14.0f;
 	auto voxelCentreOf = [](const Position &voxel, float out[3]) { out[0] = voxel.x + 0.5f; out[1] = voxel.y + 0.5f; out[2] = voxel.z + 0.5f; };
+	// The goggles' brightest green (night vision moves every colour into its group, keeping the shade).
+	const Uint8 nightGreen = _nightVision ? (Uint8)((_nightVision - 1) * 16) : 0;
+	// A stretch of the path: by day (and the first time under night vision, for the glow) in its
+	// own colour, glowing with "Glowing outlines"; as night light in the goggles' brightest green,
+	// then a share of the same pixels white (the dithering skips the rest), the bloom done already.
+	// (A refused shot's laser is dim: no white in it under night vision.)
+	const bool refused = _trajectoryLook == TRAJECTORY_REFUSED_LINE;
+	auto drawStretch = [&](const float from[3], const float to[3], Uint8 color, int thickness, float opacity)
+	{
+		if (!asNightLight)
+		{
+			drawLine3D(from, to, color, thickness, opacity, 0.0f, 0, 1 << 30, Options::fpsGlowingOutlines && !refused);
+			return;
+		}
+		drawLine3D(from, to, nightGreen, thickness, opacity, 0.0f, 0, 1 << 30, false);
+		if (!refused) drawLine3D(from, to, _colors.nightLight, thickness, opacity * NightLightWhiteShare, 0.0f, 0, 1 << 30, false);
+	};
+	// A laser's dot where it ends: the pixel the end falls on and its four neighbours, where the
+	// scene there is the surface the line met (within two voxels of it). Under night vision it
+	// shines (the first time: a glow round the spot, as a laser's in the goggles), then white in
+	// the middle, white-green round it.
+	auto drawEndDot = [&](const float end[3], Uint8 middleColor, Uint8 rimColor)
+	{
+		double screenX, screenY, depth;
+		const double endWorld[3] = { end[0], end[1], end[2] };
+		if (!projectToScreen(endWorld, screenX, screenY, depth))
+		{
+			return;
+		}
+		const int width = getWidth(), height = getHeight(), centreX = (int)std::floor(screenX), centreY = (int)std::floor(screenY);
+		const int dot[5][2] = { { 0, 0 }, { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+		for (const auto &offset : dot)
+		{
+			const int pixelX = centreX + offset[0], pixelY = centreY + offset[1];
+			if (pixelX < 0 || pixelY < 0 || pixelX >= width || pixelY >= height || depth > _depthBuffer[pixelY * width + pixelX] + 2.0) continue;
+			const bool middle = offset[0] == 0 && offset[1] == 0;
+			if (asNightLight)
+			{
+				*getRaw(pixelX, pixelY) = !refused && (middle || dither(pixelX, pixelY) < NightLightWhiteShare) ? _colors.nightLight : nightGreen;
+				continue;
+			}
+			*getRaw(pixelX, pixelY) = middle ? middleColor : rimColor;
+			if (_nightVision && Options::fpsGlowingOutlines && !refused) _glowMask[pixelY * width + pixelX] = 1;
+		}
+	};
+	// A forced path (yellow by day) is dotted under night vision; a straight one is a line.
+	const bool forced = _trajectoryLook == TRAJECTORY_FORCED || _trajectoryLook == TRAJECTORY_FORCED_LINE;
+	const bool straight = _trajectoryLook == TRAJECTORY_STRAIGHT || _trajectoryLook == TRAJECTORY_FORCED_LINE || refused;
+	const bool dotted = _nightVision && forced;
 
 	// A straight shot: the laser from the weapon's muzzle on the screen (12 voxels out along the
 	// ray through it, where the view's own shots leave it), or without a weapon shown from past
 	// the hand along the game's line; to the end, then its dot. (The game's line starts almost
 	// at the eye, and seen from there it would shrink to a few pixels behind the crosshair.)
-	if (_trajectoryLook == TRAJECTORY_STRAIGHT)
+	if (straight && !dotted)
 	{
 		float start[3], end[3];
 		voxelCentreOf(_trajectory.back(), end);
@@ -1311,22 +1371,9 @@ void FirstPersonView::drawTrajectory()
 			}
 			voxelCentreOf(_trajectory[first], start);
 		}
-		drawLine3D(start, end, _colors.laserSight, 1, 1.0f, 0.0f, 0, 1 << 30, Options::fpsGlowingOutlines);
-		// The dot: the pixel the end falls on and its four neighbours, where the scene there is
-		// the surface the line met (within two voxels of it).
-		double screenX, screenY, depth;
-		const double endWorld[3] = { end[0], end[1], end[2] };
-		if (projectToScreen(endWorld, screenX, screenY, depth))
-		{
-			const int width = getWidth(), height = getHeight(), centreX = (int)std::floor(screenX), centreY = (int)std::floor(screenY);
-			const int dot[5][2] = { { 0, 0 }, { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
-			for (const auto &offset : dot)
-			{
-				const int pixelX = centreX + offset[0], pixelY = centreY + offset[1];
-				if (pixelX < 0 || pixelY < 0 || pixelX >= width || pixelY >= height || depth > _depthBuffer[pixelY * width + pixelX] + 2.0) continue;
-				*getRaw(pixelX, pixelY) = offset[0] == 0 && offset[1] == 0 ? _colors.laserDot : _colors.laserSight;
-			}
-		}
+		const Uint8 lineColor = forced ? _colors.trajectoryForced : refused ? _colors.laserRefused : _colors.laserSight;
+		drawStretch(start, end, lineColor, 1, refused ? RefusedLineOpacity : 1.0f);
+		drawEndDot(end, forced ? _colors.forcedDot : refused ? _colors.laserRefused : _colors.laserDot, lineColor);
 		return;
 	}
 
@@ -1343,12 +1390,12 @@ void FirstPersonView::drawTrajectory()
 	}
 
 	// Every other stretch of TrajectoryDash voxels is a dash: drawn as one line from where it
-	// starts to where it ends.
-	const Uint8 color = _trajectoryLook == TRAJECTORY_FORCED ? _colors.trajectoryForced : _colors.trajectory;
+	// starts to where it ends. (Under night vision a forced path is dotted instead, below.)
+	const Uint8 color = forced ? _colors.trajectoryForced : _colors.trajectory;
 	float travelled = 0.0f, dashStart[3] = {}, previous[3];
 	bool inDash = false;
 	voxelCentreOf(_trajectory[0], previous);
-	for (size_t point = 1; point < _trajectory.size(); ++point)
+	for (size_t point = 1; point < _trajectory.size() && !dotted; ++point)
 	{
 		float current[3];
 		voxelCentreOf(_trajectory[point], current);
@@ -1363,19 +1410,71 @@ void FirstPersonView::drawTrajectory()
 		if (inDash && (!dashHere || point + 1 == _trajectory.size()))
 		{
 			const float opacity = 1.0f - 0.4f * std::min(1.0f, travelled / totalLength);
-			drawLine3D(dashStart, dashHere ? current : previous, color, 2, opacity, 0.0f, 0, 1 << 30, Options::fpsGlowingOutlines);
+			drawStretch(dashStart, dashHere ? current : previous, color, 2, opacity);
 		}
 		inDash = dashHere;
 		std::copy(current, current + 3, previous);
 	}
 
-	// The end: a diamond, flat, round the last voxel.
+	// Under night vision a forced path's dots: one every NightForcedDotSpacing pixels along it as
+	// it looks on the screen (an aimed path is mostly seen end-on, where dots spaced in the world
+	// would run together into a line), each a square NightForcedDotSize pixels across, in front of
+	// the scene; the first time in its own colour, glowing, as night light white-green.
+	if (dotted)
+	{
+		const int width = getWidth(), height = getHeight();
+		float pathTravelled = 0.0f, sinceDot = NightForcedDotSpacing; // a dot where the path starts showing
+		double lastX = 0.0, lastY = 0.0;
+		bool lastOnScreen = false;
+		voxelCentreOf(_trajectory[0], previous);
+		for (size_t point = 1; point < _trajectory.size(); ++point)
+		{
+			float current[3];
+			voxelCentreOf(_trajectory[point], current);
+			pathTravelled += std::sqrt((current[0] - previous[0]) * (current[0] - previous[0]) + (current[1] - previous[1]) * (current[1] - previous[1])
+				+ (current[2] - previous[2]) * (current[2] - previous[2]));
+			std::copy(current, current + 3, previous);
+			const double world[3] = { current[0], current[1], current[2] };
+			double screenX, screenY, depth;
+			if (pathTravelled <= TrajectorySkip || !projectToScreen(world, screenX, screenY, depth))
+			{
+				lastOnScreen = false;
+				continue;
+			}
+			if (lastOnScreen) sinceDot += (float)std::hypot(screenX - lastX, screenY - lastY);
+			lastX = screenX; lastY = screenY; lastOnScreen = true;
+			if (sinceDot < NightForcedDotSpacing) continue;
+			sinceDot = 0.0f;
+			for (int offsetY = 0; offsetY < NightForcedDotSize; ++offsetY)
+			{
+				for (int offsetX = 0; offsetX < NightForcedDotSize; ++offsetX)
+				{
+					const int pixelX = (int)std::floor(screenX) + offsetX - NightForcedDotSize / 2, pixelY = (int)std::floor(screenY) + offsetY - NightForcedDotSize / 2;
+					if (pixelX < 0 || pixelY < 0 || pixelX >= width || pixelY >= height || depth >= _depthBuffer[pixelY * width + pixelX] + 1.0) continue;
+					if (asNightLight)
+					{
+						*getRaw(pixelX, pixelY) = dither(pixelX, pixelY) < NightLightWhiteShare ? _colors.nightLight : nightGreen;
+						continue;
+					}
+					*getRaw(pixelX, pixelY) = color;
+					_glowMask[pixelY * width + pixelX] = Options::fpsGlowingOutlines ? 1 : 0;
+				}
+			}
+		}
+	}
+
+	// The end: a forced line's dot; an arc's diamond, flat, round the last voxel.
 	float end[3];
 	voxelCentreOf(_trajectory.back(), end);
+	if (straight)
+	{
+		drawEndDot(end, _colors.forcedDot, _colors.trajectoryForced);
+		return;
+	}
 	const float corners[4][3] = { { end[0] + 6.0f, end[1], end[2] }, { end[0], end[1] + 6.0f, end[2] }, { end[0] - 6.0f, end[1], end[2] }, { end[0], end[1] - 6.0f, end[2] } };
 	for (int side = 0; side < 4; ++side)
 	{
-		drawLine3D(corners[side], corners[(side + 1) % 4], color, 2, 1.0f, 0.0f, 0, 1 << 30, Options::fpsGlowingOutlines);
+		drawStretch(corners[side], corners[(side + 1) % 4], color, 2, 1.0f);
 	}
 }
 
@@ -1404,6 +1503,35 @@ void FirstPersonView::drawBeams()
 	if (_map && _map->getPartnerProjectile() && _partnerTrail == TRAIL_BEAM)
 	{
 		drawBeam(_partnerOrigin, _partnerHead, _partnerColor, _partnerCalibre, 1.0f);
+	}
+}
+
+/**
+ * A shotgun's pellets in flight (setting "Shotgun pellets in flight"; a player's report: why not
+ * a shotgun's pellets, as two guns' rounds fly side by side?), flying beside the round (see
+ * ProjectileFlyBState::createPellets): each a short streak in the round's colour, leaving the
+ * muzzle as the round does (see shotHead) and going where the game's spread sends it.
+ */
+void FirstPersonView::drawPellets()
+{
+	if (!_map)
+	{
+		return;
+	}
+	for (const Projectile *pellet : _map->getPellets())
+	{
+		float head[3];
+		shotHead(pellet, head);
+		// Back along its way from the head, the streak's length.
+		const Position now = pellet->getPosition(0), before = pellet->getPosition(-2);
+		float way[3] = { (float)(now.x - before.x), (float)(now.y - before.y), (float)(now.z - before.z) };
+		const float length = std::sqrt(way[0] * way[0] + way[1] * way[1] + way[2] * way[2]);
+		if (length < 0.01f)
+		{
+			continue;
+		}
+		const float tail[3] = { head[0] - way[0] / length * PelletStreak, head[1] - way[1] / length * PelletStreak, head[2] - way[2] / length * PelletStreak };
+		drawLine3D(tail, head, _shotTrailColor ? _shotTrailColor : _colors.spark, 1, 1.0f);
 	}
 }
 

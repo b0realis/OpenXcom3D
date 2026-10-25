@@ -213,6 +213,9 @@ void FirstPersonView::updateColors()
 	_colors.trajectoryForced = nearest(250, 215, 60);
 	_colors.laserSight = nearest(235, 30, 25);
 	_colors.laserDot = nearest(255, 110, 90);
+	_colors.nightLight = nearest(255, 255, 255);
+	_colors.forcedDot = nearest(255, 245, 150);
+	_colors.laserRefused = nearest(125, 35, 30);
 	_colors.marker = nearest(235, 40, 30);
 	_colors.marine = nearest(150, 195, 190);
 	_colors.flareFire[0] = nearest(240, 30, 20);

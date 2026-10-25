@@ -129,6 +129,8 @@ public:
 	static void freeAim(BattlescapeState *state, const BattleAction &action, Position &target);
 	/// Should this shot's bullet hits play quicker (an FPS-style shot of ours)?
 	static bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
+	/// Do a shotgun's pellets fly beside its round (setting "Shotgun pellets in flight", the 3D view showing)?
+	static bool pelletsInFlight(BattlescapeState *state);
 	/// A soldier panics or goes berserk, asked by the game (see FirstPerson::breakdown).
 	static bool breakdown(BattlescapeState *state, BattleUnit *unit);
 	/// A close-quarters check knocked a shot aside, told by the game (see FirstPerson::closeQuartersDeflected).
@@ -524,6 +526,7 @@ private:
 	double _tileMoveClosest = 0.0;       // the closest the camera has come to the target's middle, voxels
 	Uint32 _tileMoveProgressAt = 0;      // when it last came closer
 	bool _tileMoveHeldOn = false;        // W, A, S or D held without a break since the last move started (walks on, but not through a closed door)
+	bool _keysHeldThroughAction = false; // move keys held while the game was busy with something else (a shot): no move until let go
 
 	/// The movement keys' push: forward (1) or back (-1), right (1) or left (-1).
 	void movementKeys(double &forward, double &strafe) const;
@@ -597,6 +600,16 @@ private:
 	bool forcedArcFound(BattleAction &shot, const Position &targetTile, std::vector<Position> *path);
 	/// Is this an arcing shot the game would refuse, which the setting "Force arcing shots" fires forced?
 	bool forcesArc(BattleAction &shot, const Position &targetTile);
+	/// The tile a point under the crosshair aims at (a unit's head poking up into the tile above: the unit's own tile).
+	Position aimedTile(const Position &aimedVoxel) const;
+	/// Does the game let a straight shot fly along a line (it meets the target tile first, or nothing)?
+	bool gameLetsLineFly(BattleAction &shot, const Position &origin, const Position &voxel, const Position &targetTile);
+	/// The game's own aim at a tile for a straight shot, with off-centre tries; whether it finds a line of fire.
+	bool gameAimFound(BattleAction &shot, const Position &targetTile, Position &origin, Position &voxel);
+	/// How a straight shot with the game's own targeting goes (see aimFor).
+	enum ShotAim { AIM_EXACT, AIM_GAME, AIM_FORCED, AIM_REFUSED };
+	/// A straight shot with the game's own targeting: at the exact point, the game's aim, forced, or refused; and its line.
+	ShotAim aimFor(BattleAction &shot, const Position &targetTile, const Position &aimedVoxel, bool hitSomething, Position &origin, Position &voxel);
 	/// Forgets the target marked for confirm fire.
 	void clearConfirmMark() { _confirmTile = Position(-1, -1, -1); _confirmUnit = nullptr; _confirmWeapon = nullptr; _confirmMode = BA_NONE; }
 
@@ -620,6 +633,8 @@ private:
 	BattleItem *offHandWeapon(BattleUnit *unit, const BattleItem *weapon) const;
 	/// The akimbo key: full or realistic akimbo off, or the same one back on.
 	void toggleAkimbo();
+	/// The akimbo style key: both guns at once, or one a moment after the other (setting "Akimbo in turn").
+	void toggleAkimboStyle();
 	/// Dual wield: the other hand's gun if it can fire along with this mode, and the mode it fires.
 	BattleItem *dualPartner(BattleUnit *unit, const BattleItem *weapon, BattleActionType slot, BattleActionType &partnerMode) const;
 	/// Akimbo: do the two guns fire in turn (either one's shot arcs) rather than together?
@@ -666,6 +681,8 @@ private:
 
 	bool _triggerHeld = false;                   // the left button is held down (auto keeps firing)
 	bool _shotAimLeft = false;                   // a shot of ours was handed to the game, which keeps aiming it (see endShotAim)
+	/// A shot is under way: ours (its burst, its hits) or anyone's round or blast.
+	bool shotUnderWay() const;
 	Uint32 _recoilShotSeen = 0, _lastRecoil = 0; // our last shot the recoil reacted to; when the view was last kicked up
 	double _recoilDebt = 0.0;                    // degrees the recoil lifted the view, eased back after firing
 	double _bloom = 0.0;                         // extra spread from the last rounds (degrees, 95% circle)

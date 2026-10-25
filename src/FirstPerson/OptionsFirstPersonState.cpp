@@ -654,10 +654,11 @@ void OptionsFirstPersonState::lstOptionsKeyPress(Action *action)
 	{
 		return;
 	}
-	// Bind the key, unless it's unknown or a Shift, Alt or Ctrl key (the lean key may be one).
+	// Bind the key, unless it's unknown or a Shift, Alt or Ctrl key (the lean key and the facing key,
+	// both held, may be one).
 	const SDLKey key = action->getDetails()->key.keysym.sym;
 	const bool modifier = key == SDLK_LSHIFT || key == SDLK_LALT || key == SDLK_LCTRL || key == SDLK_RSHIFT || key == SDLK_RALT || key == SDLK_RCTRL;
-	if (key != 0 && (!modifier || _selKey->asKey() == &Options::keyFpsLeanHold))
+	if (key != 0 && (!modifier || _selKey->asKey() == &Options::keyFpsLeanHold || _selKey->asKey() == &Options::keyFpsShowFacing))
 	{
 		*_selKey->asKey() = key;
 		_lstOptions->setCellText(_selectedKey, 1, keyName(key));
