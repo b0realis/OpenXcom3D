@@ -470,17 +470,112 @@ void FirstPersonView::washBands()
 }
 
 /**
+ * A helmet camera's feed's TV static (setStaticSpells: the soldier cam, the map camera) comes in
+ * spells, not all the time (the owner's ask): StaticGapShortest to StaticGapLongest after the last
+ * one a spell begins, StaticSpellShortest to StaticSpellLongest long, rising smoothly at a random
+ * pace (over StaticRampLeast to StaticRampMost percent of it) to a random peak (StaticPeakLeast to
+ * StaticPeakMost of the pixels) and falling back at another; then the next one's gap. With a bad signal (see badSignal: the hardest missions, inside
+ * a UFO) there's a low static all the time (BadStaticFloor) and the spells come more often, longer
+ * and stronger (the Bad... values). Their clock runs only while the camera shows: hidden, the next
+ * spell (or the one going on) waits. None with "Muzzle flashes" off, which stops every flash and
+ * flicker (the glitches' too). Sets _staticAmount for this frame.
+ */
+void FirstPersonView::updateStaticSpell()
+{
+	const Uint32 now = SDL_GetTicks();
+	auto random = [this](int low, int high)
+	{
+		_glitchSeed = _glitchSeed * 1664525u + 1013904223u;
+		return low + (int)((_glitchSeed >> 8) % (Uint32)(high - low + 1));
+	};
+	// Shown again after a pause: everything waits as long as the camera was hidden.
+	if (_staticSpellTick && now - _staticSpellTick > 250)
+	{
+		const Uint32 pause = now - _staticSpellTick;
+		if (_staticSpellNextAt) _staticSpellNextAt += pause;
+		if (_staticSpellUntil)
+		{
+			_staticSpellFrom += pause;
+			_staticSpellUntil += pause;
+		}
+	}
+	_staticSpellTick = now;
+	_staticAmount = 0.0f;
+	if (!Options::fpsMuzzleFlash)
+	{
+		_staticSpellUntil = _staticSpellNextAt = 0;
+		return;
+	}
+	const bool bad = badSignal();
+	const float floor = bad ? BadStaticFloor : 0.0f;
+	_staticAmount = floor;
+	auto gap = [&]() { return bad ? random(BadStaticGapShortest, BadStaticGapLongest) : random(StaticGapShortest, StaticGapLongest); };
+	if (!_staticSpellNextAt)
+	{
+		_staticSpellNextAt = now + gap();
+	}
+	// A new spell: how long, how fast it rises and falls, how strong.
+	if (!_staticSpellUntil && now >= _staticSpellNextAt)
+	{
+		const Uint32 length = bad ? random(BadStaticSpellShortest, BadStaticSpellLongest) : random(StaticSpellShortest, StaticSpellLongest);
+		_staticSpellFrom = now;
+		_staticSpellUntil = now + length;
+		_staticSpellRise = length * random(StaticRampLeast, StaticRampMost) / 100;
+		_staticSpellFall = length * random(StaticRampLeast, StaticRampMost) / 100;
+		_staticSpellPeak = bad ? random((int)(BadStaticPeakLeast * 100.0f), (int)(BadStaticPeakMost * 100.0f)) / 100.0f
+			: random((int)(StaticPeakLeast * 100.0f), (int)(StaticPeakMost * 100.0f)) / 100.0f;
+	}
+	if (!_staticSpellUntil)
+	{
+		return;
+	}
+	// Over: the next one a gap away.
+	if (now >= _staticSpellUntil)
+	{
+		_staticSpellUntil = 0;
+		_staticSpellNextAt = now + gap();
+		return;
+	}
+	// Rising, at its peak, or falling.
+	const Uint32 into = now - _staticSpellFrom, length = _staticSpellUntil - _staticSpellFrom;
+	float share = 1.0f;
+	if (into < _staticSpellRise)
+	{
+		share = (float)into / _staticSpellRise;
+	}
+	else if (_staticSpellFall > 0 && into > length - _staticSpellFall)
+	{
+		share = (float)(length - into) / _staticSpellFall;
+	}
+	_staticAmount = std::max(floor, _staticSpellPeak * smoothstep(0.0f, 1.0f, share));
+}
+
+/**
+ * Is the camera's signal bad: on the hardest missions (level 2, see RuleFirstPerson::getSignalLevel:
+ * Mars, the aliens' bases, a base defence, TFTD's colonies, T'leth and the artefact sites), or on
+ * any mission while the soldier watched stands inside a UFO, amid its machinery?
+ * @return True if so.
+ */
+bool FirstPersonView::badSignal() const
+{
+	const Tile *watchedTile = _cameraUnit ? _cameraUnit->getTile() : nullptr;
+	const int watchedIndex = watchedTile ? _save->getTileIndex(watchedTile->getPosition()) : -1;
+	const bool insideUfo = watchedIndex >= 0 && watchedIndex < (int)_ufoPhaseOfTile.size() && (_ufoPhaseOfTile[watchedIndex] & UfoTileBit);
+	return _signalGlitches >= 2 || (_signalGlitches == 1 && insideUfo);
+}
+
+/**
  * A helmet camera's digital feed with a bad signal (see setSignalGlitches), moved on by a frame:
  * now and then, for a moment, a glitch. Most often a few patches of the picture fall into coarse
  * blocks (sometimes with a square or two of the decoder's green), less often only green squares,
- * least often the picture freezes. Each lasts a fifth of a second or so (a freeze up to half a
- * second), the next comes some seconds later: enough to tell a camera's feed, never enough to
- * get in the way. On the hardest missions (level 2, see RuleFirstPerson::getSignalLevel: Mars,
- * the aliens' bases, a base defence), and on any mission while the soldier watched stands inside
- * a UFO, the signal is bad: a glitch every second or two, half as long again, in more and bigger
- * patches, and now and then torn (bands of the picture slid sideways). Never with Muzzle flashes off (the setting for those bothered by flashing
- * light). A camera shown again after a pause starts afresh: no glitch for a few seconds, and a
- * freeze never holds an old picture (it also ends when the camera moves to another soldier).
+ * now and then the picture tears (bands of it slid sideways), least often it freezes. Each lasts a
+ * fifth of a second or so (a freeze up to half a second), the next comes a few seconds later
+ * (the owner's ask: more often than before, 1.5 to 5 s): enough to tell a camera's feed, never
+ * enough to get in the way. With a bad signal (see badSignal: the hardest missions, inside a UFO)
+ * a glitch every second or so, half as long again, in more and bigger patches, torn more often.
+ * Never with Muzzle flashes off (the setting for those bothered by flashing light). A camera shown
+ * again after a pause starts afresh: no glitch for a few seconds, and a freeze never holds an old
+ * picture (it also ends when the camera moves to another soldier).
  * Called at the start of every draw.
  * @return True while the picture is frozen (draw then keeps the last one).
  */
@@ -494,13 +589,9 @@ bool FirstPersonView::updateSignalGlitches()
 	};
 	const bool shownLately = _lastDrawTick && now - _lastDrawTick < 250;
 	_lastDrawTick = now;
-	// A bad signal (level 2, the hardest missions; or the soldier watched stands inside a UFO,
-	// amid its machinery) glitches every second or two, longer and in more and bigger patches;
-	// the usual one every few seconds, briefly.
-	const Tile *watchedTile = _cameraUnit ? _cameraUnit->getTile() : nullptr;
-	const int watchedIndex = watchedTile ? _save->getTileIndex(watchedTile->getPosition()) : -1;
-	const bool insideUfo = watchedIndex >= 0 && watchedIndex < (int)_ufoPhaseOfTile.size() && (_ufoPhaseOfTile[watchedIndex] & UfoTileBit);
-	const bool bad = _signalGlitches >= 2 || (_signalGlitches == 1 && insideUfo);
+	// A bad signal (the hardest missions, inside a UFO) glitches every second or so, longer and
+	// in more and bigger patches; the usual one every few seconds, briefly.
+	const bool bad = badSignal();
 	if (!Options::fpsMuzzleFlash || !shownLately)
 	{
 		_glitchKind = GLITCH_NONE;
@@ -517,13 +608,13 @@ bool FirstPersonView::updateSignalGlitches()
 	// The next one: which, how long, and the one after it.
 	if (_glitchKind == GLITCH_NONE && now >= _glitchNextAt)
 	{
-		// Which: blocks, green squares or a freeze; a bad signal also tears.
+		// Which: blocks, green squares, a tear (more often with a bad signal) or a freeze.
 		const int roll = random(0, 99);
-		if (bad) _glitchKind = roll < 40 ? GLITCH_BLOCKS : roll < 60 ? GLITCH_GREEN : roll < 85 ? GLITCH_TEAR : GLITCH_FREEZE;
-		else _glitchKind = roll < 55 ? GLITCH_BLOCKS : roll < 80 ? GLITCH_GREEN : GLITCH_FREEZE;
+		if (bad) _glitchKind = roll < 35 ? GLITCH_BLOCKS : roll < 55 ? GLITCH_GREEN : roll < 85 ? GLITCH_TEAR : GLITCH_FREEZE;
+		else _glitchKind = roll < 45 ? GLITCH_BLOCKS : roll < 70 ? GLITCH_GREEN : roll < 85 ? GLITCH_TEAR : GLITCH_FREEZE;
 		const int length = _glitchKind == GLITCH_BLOCKS ? random(120, 360) : _glitchKind == GLITCH_GREEN ? random(60, 200) : _glitchKind == GLITCH_TEAR ? random(80, 220) : random(200, 550);
 		_glitchUntil = now + (bad ? length * 3 / 2 : length);
-		_glitchNextAt = _glitchUntil + (bad ? random(600, 2500) : random(3500, 9000));
+		_glitchNextAt = _glitchUntil + (bad ? random(300, 1500) : random(1500, 5000));
 		_glitchFrozenUnit = _cameraUnit;
 		// Its patches, in blocks: one to three small rectangles of coarse blocks (a third of the
 		// time with a green square), or one to four green squares in a row or two. A bad signal:

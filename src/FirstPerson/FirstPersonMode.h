@@ -193,6 +193,8 @@ private:
 	void createInfoPanel();
 	/// Makes the soldier card shown over a squad button, with its live helmet-camera view.
 	void createSoldierCard();
+	/// A live feed's red dot (the soldier cam's, the map camera's), added hidden.
+	Surface *makeLiveDot();
 	/// Makes the soldier cam (a soldier's card's camera, enlarged with a right click), hidden.
 	void createSoldierCam();
 	/// Makes the soldier cam's picture (a second small 3D view) and frame at the canvas's size.
@@ -873,6 +875,7 @@ private:
 	FirstPersonView *_soldierCam = nullptr; // its picture: the helmet camera, big
 	Surface *_soldierCamFrame = nullptr;    // its frame, with a title bar
 	Surface *_soldierCamDot = nullptr;      // the red dot of a live feed, blinking
+	Surface *_mapCameraDot = nullptr;       // the map camera's, the same
 	Text *_txtSoldierCam = nullptr;         // "SOLDIER CAM: <name>"
 	int _soldierCamWidth = 0, _soldierCamHeight = 0; // the picture's size, in canvas pixels
 	/// Points a helmet camera (the card's, the soldier cam, the map camera) through a soldier's eyes, the way they face, at a unit or at a point.

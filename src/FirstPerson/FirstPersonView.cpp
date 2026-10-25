@@ -88,6 +88,10 @@ FirstPersonView::FirstPersonView(Game *game, int width, int height, int x, int y
 	_depthBuffer.resize(width * height);
 	_glowMask.resize(width * height);
 	_unitVeil.resize(width * height);
+
+	// A camera's glitches and static spells differ from game to game and from camera to camera
+	// (the time it's made, and where).
+	_glitchSeed ^= SDL_GetTicks() * 2654435761u ^ (Uint32)(uintptr_t)this;
 }
 
 /**
@@ -508,8 +512,9 @@ void FirstPersonView::draw()
 	// Upscaled sprites used from now on belong to this frame (see upscaled).
 	_upscaleFrameStart = _upscaleClock + 1;
 
-	// The camera for this frame: shake and recoil, then its axes.
+	// The camera for this frame: shake and recoil, then its axes; a camera's feed's static spells.
 	updateCameraEffects();
+	if (_staticSpells) updateStaticSpell();
 
 	updateBasis();
 	// The flashlight sits on the right shoulder, a little below the eye (voxels); the dynamic

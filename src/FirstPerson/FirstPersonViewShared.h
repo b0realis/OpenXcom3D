@@ -169,6 +169,23 @@ const float ControlHazeFrom = 0.45f;
 const double FacingArrowLength = 7.0, FacingArrowWidth = 4.0;
 /// A shotgun's pellet in flight (setting "Shotgun pellets in flight") is a streak this many voxels long.
 const float PelletStreak = 6.0f;
+/// A helmet camera's feed (the soldier cam, the map camera) gets a spell of TV static now and then,
+/// not all the time (the owner's ask: "gradually from zero to lots of static and back down - the
+/// duration random, the speed random and interval between static random - from 10s to 2 min"):
+/// StaticGapShortest to StaticGapLongest ms after the last one, it lasts StaticSpellShortest to
+/// StaticSpellLongest ms, rising to a peak of StaticPeakLeast to StaticPeakMost of the pixels and
+/// falling back, each over StaticRampLeast to StaticRampMost percent of it, at random (see
+/// FirstPersonView::updateStaticSpell). With a bad signal
+/// (the hardest missions, inside a UFO: "more interference is expected") a low static all the time,
+/// BadStaticFloor, and spells more often, longer and stronger (the Bad... values).
+const int StaticGapShortest = 10000, StaticGapLongest = 120000;
+const int StaticSpellShortest = 2500, StaticSpellLongest = 8000;
+const float StaticPeakLeast = 0.35f, StaticPeakMost = 0.85f;
+const int StaticRampLeast = 25, StaticRampMost = 45;
+const float BadStaticFloor = 0.03f;
+const int BadStaticGapShortest = 5000, BadStaticGapLongest = 40000;
+const int BadStaticSpellShortest = 3000, BadStaticSpellLongest = 10000;
+const float BadStaticPeakLeast = 0.5f, BadStaticPeakMost = 0.95f;
 /// Under night vision the aimed path (see FirstPersonView::drawTrajectory) is light in the goggles,
 /// as a laser sight is: its core this share white, the rest the goggles' brightest green (dithered:
 /// a white-green, the owner's choice), in a green glare; a forced arc's dashes turn to dots

@@ -382,6 +382,8 @@ public:
 	void flareUp(float amount) { _flameBurst = std::max(_flameBurst, amount); }
 	/// TV static over the view (a helmet camera losing its signal), 0 none .. 1 all.
 	void setStatic(float amount) { _staticAmount = amount; }
+	/// A helmet camera's feed: a spell of TV static now and then (see updateStaticSpell), not a steady amount.
+	void setStaticSpells(bool on) { _staticSpells = on; }
 	/// A digital camera feed's bad signal (the helmet cameras): brief blocky patches, green
 	/// squares and frozen pictures (see updateSignalGlitches); 0 none, 1 now and then, 2 a lot
 	/// (the hardest missions, on the aliens' own ground).
@@ -1041,6 +1043,11 @@ private:
 	float _vignette = 0.0f;     // red at the screen edges (badly hurt), 0..1
 	float _controlHaze = 0.0f;  // purple at the screen edges (a unit under our mind control), 0..1
 	float _staticAmount = 0.0f; // TV static
+	bool _staticSpells = false; // a camera's feed: its static comes in spells (see updateStaticSpell)
+	Uint32 _staticSpellFrom = 0, _staticSpellUntil = 0, _staticSpellNextAt = 0; // the spell going on (until 0: none), the next one's start
+	Uint32 _staticSpellRise = 0, _staticSpellFall = 0; // how long it takes to rise to its peak and to fall back, ms
+	Uint32 _staticSpellTick = 0;                        // the last frame's time (the spells' clock stops while hidden)
+	float _staticSpellPeak = 0.0f;                      // its strongest, the share of pixels
 	Uint32 _staticSeed = 1;     // random seed for the static
 	// a digital feed's bad signal (setSignalGlitches): now and then, for a moment, a few patches
 	// of the picture in coarse blocks, a few squares of the decoder's green, the picture frozen,
@@ -1048,7 +1055,7 @@ private:
 	enum GlitchKind { GLITCH_NONE, GLITCH_BLOCKS, GLITCH_GREEN, GLITCH_FREEZE, GLITCH_TEAR };
 	struct GlitchPatch { int x, y, width, height; bool green; }; // in blocks (see glitchBlock); a tear's band: x its slide, y and height its rows, in pixels
 	int _signalGlitches = 0;                       // this view is a camera's feed: how bad its signal is (0 none, 1, 2)
-	Uint32 _glitchSeed = 0x2545F491u;              // random seed for the glitches
+	Uint32 _glitchSeed = 0x2545F491u;              // random seed for the glitches and static spells (mixed with the time made, see the constructor)
 	Uint32 _glitchNextAt = 0;                      // when the next glitch starts (SDL ticks)
 	Uint32 _glitchUntil = 0;                       // when the one going on ends
 	GlitchKind _glitchKind = GLITCH_NONE;          // the one going on
@@ -1087,6 +1094,10 @@ private:
 	int glitchBlock() const { return std::clamp(getWidth() / 28, 4, 16); }
 	/// Moves the bad signal on (starts and ends glitches); true while the picture is frozen.
 	bool updateSignalGlitches();
+	/// A camera's feed's spells of TV static, moved on to now: sets the static's amount.
+	void updateStaticSpell();
+	/// Is the camera's signal bad (the hardest missions, inside a UFO)?
+	bool badSignal() const;
 	/// Draws the glitch going on over the finished picture: blocky patches, green squares.
 	void applySignalGlitches();
 

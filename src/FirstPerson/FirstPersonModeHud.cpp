@@ -1163,7 +1163,9 @@ void FirstPersonMode::updateMapCamera()
 	_mapCameraFrame->setY(CardY);
 	_mapCamera->setX(frameX + MapCameraBorder);
 	_mapCamera->setY(CardY + MapCameraBorder + MapCameraTitleH);
-	_txtMapCamera->setX(frameX + 4);
+	_mapCameraDot->setX(frameX + 4);
+	_mapCameraDot->setY(CardY + 4);
+	_txtMapCamera->setX(frameX + 12);
 	_txtMapCamera->setY(CardY + 2);
 
 	// The soldier cam opened from it closes when the map camera goes, when a squad button's
@@ -1185,6 +1187,7 @@ void FirstPersonMode::updateMapCamera()
 	{
 		part->setVisible(showWindow);
 	}
+	_mapCameraDot->setVisible(showWindow && SDL_GetTicks() % 1000 < 600); // (blinking, as the soldier cam's)
 	if (!showWindow)
 	{
 		return;

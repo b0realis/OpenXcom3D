@@ -3635,10 +3635,10 @@ index 000000000..eb1651e28
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..91caff2f0
+index 000000000..c4fcf8e18
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2588 @@
+@@ -0,0 +1,2601 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -4210,6 +4210,31 @@ index 000000000..91caff2f0
 +}
 +
 +/**
++ * A live feed's red dot (the soldier cam's, the map camera's): a filled circle 5 pixels across,
++ * added to the screen, hidden; the camera blinks it.
++ * @return The dot.
++ */
++Surface *FirstPersonMode::makeLiveDot()
++{
++	Surface *dot = new Surface(5, 5, 0, 0);
++	_state->add(dot);
++	dot->setPalette(_state->getPalette());
++	const Uint8 red = nearestColor(_state->getPalette(), 230, 30, 30);
++	dot->lock();
++	for (int dotY = 0; dotY < 5; ++dotY)
++	{
++		for (int dotX = 0; dotX < 5; ++dotX)
++		{
++			if ((dotX - 2) * (dotX - 2) + (dotY - 2) * (dotY - 2) <= 5) dot->setPixel(dotX, dotY, red);
++		}
++	}
++	dot->unlock();
++	dot->setVisible(false);
++	_ownSurfaces.insert(dot);
++	return dot;
++}
++
++/**
 + * Makes the soldier cam, hidden: a soldier's card's helmet camera enlarged, with a right click
 + * on their squad button (see updateSoldierCam). A frame with a title bar ("SOLDIER CAM: name",
 + * a blinking red dot, as a live feed has) round a second small 3D view, with a little TV
@@ -4220,20 +4245,7 @@ index 000000000..91caff2f0
 +{
 +	makeSoldierCamView();
 +
-+	// The red dot: a filled circle 5 pixels across.
-+	_soldierCamDot = new Surface(5, 5, 0, 0);
-+	_state->add(_soldierCamDot);
-+	_soldierCamDot->setPalette(_state->getPalette());
-+	const Uint8 red = nearestColor(_state->getPalette(), 230, 30, 30);
-+	_soldierCamDot->lock();
-+	for (int dotY = 0; dotY < 5; ++dotY)
-+	{
-+		for (int dotX = 0; dotX < 5; ++dotX)
-+		{
-+			if ((dotX - 2) * (dotX - 2) + (dotY - 2) * (dotY - 2) <= 5) _soldierCamDot->setPixel(dotX, dotY, red);
-+		}
-+	}
-+	_soldierCamDot->unlock();
++	_soldierCamDot = makeLiveDot();
 +
 +	// The title.
 +	_txtSoldierCam = new Text(220, 9, 0, 0);
@@ -4278,9 +4290,8 @@ index 000000000..91caff2f0
 +	camera->setMap(_state->_map);
 +	camera->setMaxDistance(std::min(30, mod->getFirstPerson().getMaxViewDistance()));
 +	camera->setParticles(false);
-+	const int signalLevel = mod->getFirstPerson().getSignalLevel(_save->getMissionType());
-+	camera->setStatic(signalLevel >= 2 ? 0.05f : 0.03f); // a little TV static: a camera's picture (more on the hardest missions)
-+	camera->setSignalGlitches(signalLevel); // and a digital feed's bad signal now and then (a lot there)
++	camera->setStaticSpells(true); // a camera's picture: a spell of TV static now and then
++	camera->setSignalGlitches(mod->getFirstPerson().getSignalLevel(_save->getMissionType())); // and a digital feed's bad signal now and then (a lot on the hardest missions)
 +
 +	// In place of the old ones (or, the first time, added last: drawn over everything).
 +	putSurfaceInPlace(_soldierCamFrame, frame);
@@ -4376,6 +4387,7 @@ index 000000000..91caff2f0
 +	camera->setMap(_state->_map);
 +	camera->setMaxDistance(std::min(30, mod->getFirstPerson().getMaxViewDistance()));
 +	camera->setParticles(false);
++	camera->setStaticSpells(true); // a helmet camera's feed, as the soldier cam's: static now and then, and the bad signal
 +	camera->setSignalGlitches(mod->getFirstPerson().getSignalLevel(_save->getMissionType()));
 +
 +	putSurfaceInPlace(_mapCameraFrame, frame);
@@ -4383,16 +4395,17 @@ index 000000000..91caff2f0
 +	_mapCameraFrame = frame;
 +	_mapCamera = camera;
 +
-+	// The title (made the first time), as wide as the picture.
++	// The title (made the first time), as wide as the picture less the live feed's red dot before it.
 +	if (!_txtMapCamera)
 +	{
++		_mapCameraDot = makeLiveDot();
 +		_txtMapCamera = new Text(pictureWidth, 9, 0, 0);
 +		_state->add(_txtMapCamera, "textName", "battlescape");
 +		_txtMapCamera->setHighContrast(true);
 +		_txtMapCamera->setVisible(false);
 +		_ownSurfaces.insert(_txtMapCamera);
 +	}
-+	_txtMapCamera->setWidth(pictureWidth - 2);
++	_txtMapCamera->setWidth(pictureWidth - 10);
 +	_txtMapCamera->setText(""); // (written again for the new width, see updateMapCamera)
 +}
 +
@@ -6229,10 +6242,10 @@ index 000000000..91caff2f0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..18b12347f
+index 000000000..e2b862fe6
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1048 @@
+@@ -0,0 +1,1051 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -6428,6 +6441,8 @@ index 000000000..18b12347f
 +	void createInfoPanel();
 +	/// Makes the soldier card shown over a squad button, with its live helmet-camera view.
 +	void createSoldierCard();
++	/// A live feed's red dot (the soldier cam's, the map camera's), added hidden.
++	Surface *makeLiveDot();
 +	/// Makes the soldier cam (a soldier's card's camera, enlarged with a right click), hidden.
 +	void createSoldierCam();
 +	/// Makes the soldier cam's picture (a second small 3D view) and frame at the canvas's size.
@@ -7108,6 +7123,7 @@ index 000000000..18b12347f
 +	FirstPersonView *_soldierCam = nullptr; // its picture: the helmet camera, big
 +	Surface *_soldierCamFrame = nullptr;    // its frame, with a title bar
 +	Surface *_soldierCamDot = nullptr;      // the red dot of a live feed, blinking
++	Surface *_mapCameraDot = nullptr;       // the map camera's, the same
 +	Text *_txtSoldierCam = nullptr;         // "SOLDIER CAM: <name>"
 +	int _soldierCamWidth = 0, _soldierCamHeight = 0; // the picture's size, in canvas pixels
 +	/// Points a helmet camera (the card's, the soldier cam, the map camera) through a soldier's eyes, the way they face, at a unit or at a point.
@@ -8101,10 +8117,10 @@ index 000000000..4e15be992
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..105c85658
+index 000000000..6f885d425
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,1796 @@
+@@ -0,0 +1,1799 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -9270,7 +9286,9 @@ index 000000000..105c85658
 +	_mapCameraFrame->setY(CardY);
 +	_mapCamera->setX(frameX + MapCameraBorder);
 +	_mapCamera->setY(CardY + MapCameraBorder + MapCameraTitleH);
-+	_txtMapCamera->setX(frameX + 4);
++	_mapCameraDot->setX(frameX + 4);
++	_mapCameraDot->setY(CardY + 4);
++	_txtMapCamera->setX(frameX + 12);
 +	_txtMapCamera->setY(CardY + 2);
 +
 +	// The soldier cam opened from it closes when the map camera goes, when a squad button's
@@ -9292,6 +9310,7 @@ index 000000000..105c85658
 +	{
 +		part->setVisible(showWindow);
 +	}
++	_mapCameraDot->setVisible(showWindow && SDL_GetTicks() % 1000 < 600); // (blinking, as the soldier cam's)
 +	if (!showWindow)
 +	{
 +		return;
@@ -17969,10 +17988,10 @@ index 000000000..d67736b97
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..2b5479f16
+index 000000000..45343d80a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,608 @@
+@@ -0,0 +1,613 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -18063,6 +18082,10 @@ index 000000000..2b5479f16
 +	_depthBuffer.resize(width * height);
 +	_glowMask.resize(width * height);
 +	_unitVeil.resize(width * height);
++
++	// A camera's glitches and static spells differ from game to game and from camera to camera
++	// (the time it's made, and where).
++	_glitchSeed ^= SDL_GetTicks() * 2654435761u ^ (Uint32)(uintptr_t)this;
 +}
 +
 +/**
@@ -18483,8 +18506,9 @@ index 000000000..2b5479f16
 +	// Upscaled sprites used from now on belong to this frame (see upscaled).
 +	_upscaleFrameStart = _upscaleClock + 1;
 +
-+	// The camera for this frame: shake and recoil, then its axes.
++	// The camera for this frame: shake and recoil, then its axes; a camera's feed's static spells.
 +	updateCameraEffects();
++	if (_staticSpells) updateStaticSpell();
 +
 +	updateBasis();
 +	// The flashlight sits on the right shoulder, a little below the eye (voxels); the dynamic
@@ -18583,10 +18607,10 @@ index 000000000..2b5479f16
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..ac1f10c8d
+index 000000000..7a1297138
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1154 @@
+@@ -0,0 +1,1165 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -18971,6 +18995,8 @@ index 000000000..ac1f10c8d
 +	void flareUp(float amount) { _flameBurst = std::max(_flameBurst, amount); }
 +	/// TV static over the view (a helmet camera losing its signal), 0 none .. 1 all.
 +	void setStatic(float amount) { _staticAmount = amount; }
++	/// A helmet camera's feed: a spell of TV static now and then (see updateStaticSpell), not a steady amount.
++	void setStaticSpells(bool on) { _staticSpells = on; }
 +	/// A digital camera feed's bad signal (the helmet cameras): brief blocky patches, green
 +	/// squares and frozen pictures (see updateSignalGlitches); 0 none, 1 now and then, 2 a lot
 +	/// (the hardest missions, on the aliens' own ground).
@@ -19630,6 +19656,11 @@ index 000000000..ac1f10c8d
 +	float _vignette = 0.0f;     // red at the screen edges (badly hurt), 0..1
 +	float _controlHaze = 0.0f;  // purple at the screen edges (a unit under our mind control), 0..1
 +	float _staticAmount = 0.0f; // TV static
++	bool _staticSpells = false; // a camera's feed: its static comes in spells (see updateStaticSpell)
++	Uint32 _staticSpellFrom = 0, _staticSpellUntil = 0, _staticSpellNextAt = 0; // the spell going on (until 0: none), the next one's start
++	Uint32 _staticSpellRise = 0, _staticSpellFall = 0; // how long it takes to rise to its peak and to fall back, ms
++	Uint32 _staticSpellTick = 0;                        // the last frame's time (the spells' clock stops while hidden)
++	float _staticSpellPeak = 0.0f;                      // its strongest, the share of pixels
 +	Uint32 _staticSeed = 1;     // random seed for the static
 +	// a digital feed's bad signal (setSignalGlitches): now and then, for a moment, a few patches
 +	// of the picture in coarse blocks, a few squares of the decoder's green, the picture frozen,
@@ -19637,7 +19668,7 @@ index 000000000..ac1f10c8d
 +	enum GlitchKind { GLITCH_NONE, GLITCH_BLOCKS, GLITCH_GREEN, GLITCH_FREEZE, GLITCH_TEAR };
 +	struct GlitchPatch { int x, y, width, height; bool green; }; // in blocks (see glitchBlock); a tear's band: x its slide, y and height its rows, in pixels
 +	int _signalGlitches = 0;                       // this view is a camera's feed: how bad its signal is (0 none, 1, 2)
-+	Uint32 _glitchSeed = 0x2545F491u;              // random seed for the glitches
++	Uint32 _glitchSeed = 0x2545F491u;              // random seed for the glitches and static spells (mixed with the time made, see the constructor)
 +	Uint32 _glitchNextAt = 0;                      // when the next glitch starts (SDL ticks)
 +	Uint32 _glitchUntil = 0;                       // when the one going on ends
 +	GlitchKind _glitchKind = GLITCH_NONE;          // the one going on
@@ -19676,6 +19707,10 @@ index 000000000..ac1f10c8d
 +	int glitchBlock() const { return std::clamp(getWidth() / 28, 4, 16); }
 +	/// Moves the bad signal on (starts and ends glitches); true while the picture is frozen.
 +	bool updateSignalGlitches();
++	/// A camera's feed's spells of TV static, moved on to now: sets the static's amount.
++	void updateStaticSpell();
++	/// Is the camera's signal bad (the hardest missions, inside a UFO)?
++	bool badSignal() const;
 +	/// Draws the glitch going on over the finished picture: blocky patches, green squares.
 +	void applySignalGlitches();
 +
@@ -23174,10 +23209,10 @@ index 000000000..df63d5b97
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewScreenEffects.cpp b/src/FirstPerson/FirstPersonViewScreenEffects.cpp
 new file mode 100644
-index 000000000..c7726393b
+index 000000000..280bc87e2
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewScreenEffects.cpp
-@@ -0,0 +1,627 @@
+@@ -0,0 +1,718 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -23650,17 +23685,112 @@ index 000000000..c7726393b
 +}
 +
 +/**
++ * A helmet camera's feed's TV static (setStaticSpells: the soldier cam, the map camera) comes in
++ * spells, not all the time (the owner's ask): StaticGapShortest to StaticGapLongest after the last
++ * one a spell begins, StaticSpellShortest to StaticSpellLongest long, rising smoothly at a random
++ * pace (over StaticRampLeast to StaticRampMost percent of it) to a random peak (StaticPeakLeast to
++ * StaticPeakMost of the pixels) and falling back at another; then the next one's gap. With a bad signal (see badSignal: the hardest missions, inside
++ * a UFO) there's a low static all the time (BadStaticFloor) and the spells come more often, longer
++ * and stronger (the Bad... values). Their clock runs only while the camera shows: hidden, the next
++ * spell (or the one going on) waits. None with "Muzzle flashes" off, which stops every flash and
++ * flicker (the glitches' too). Sets _staticAmount for this frame.
++ */
++void FirstPersonView::updateStaticSpell()
++{
++	const Uint32 now = SDL_GetTicks();
++	auto random = [this](int low, int high)
++	{
++		_glitchSeed = _glitchSeed * 1664525u + 1013904223u;
++		return low + (int)((_glitchSeed >> 8) % (Uint32)(high - low + 1));
++	};
++	// Shown again after a pause: everything waits as long as the camera was hidden.
++	if (_staticSpellTick && now - _staticSpellTick > 250)
++	{
++		const Uint32 pause = now - _staticSpellTick;
++		if (_staticSpellNextAt) _staticSpellNextAt += pause;
++		if (_staticSpellUntil)
++		{
++			_staticSpellFrom += pause;
++			_staticSpellUntil += pause;
++		}
++	}
++	_staticSpellTick = now;
++	_staticAmount = 0.0f;
++	if (!Options::fpsMuzzleFlash)
++	{
++		_staticSpellUntil = _staticSpellNextAt = 0;
++		return;
++	}
++	const bool bad = badSignal();
++	const float floor = bad ? BadStaticFloor : 0.0f;
++	_staticAmount = floor;
++	auto gap = [&]() { return bad ? random(BadStaticGapShortest, BadStaticGapLongest) : random(StaticGapShortest, StaticGapLongest); };
++	if (!_staticSpellNextAt)
++	{
++		_staticSpellNextAt = now + gap();
++	}
++	// A new spell: how long, how fast it rises and falls, how strong.
++	if (!_staticSpellUntil && now >= _staticSpellNextAt)
++	{
++		const Uint32 length = bad ? random(BadStaticSpellShortest, BadStaticSpellLongest) : random(StaticSpellShortest, StaticSpellLongest);
++		_staticSpellFrom = now;
++		_staticSpellUntil = now + length;
++		_staticSpellRise = length * random(StaticRampLeast, StaticRampMost) / 100;
++		_staticSpellFall = length * random(StaticRampLeast, StaticRampMost) / 100;
++		_staticSpellPeak = bad ? random((int)(BadStaticPeakLeast * 100.0f), (int)(BadStaticPeakMost * 100.0f)) / 100.0f
++			: random((int)(StaticPeakLeast * 100.0f), (int)(StaticPeakMost * 100.0f)) / 100.0f;
++	}
++	if (!_staticSpellUntil)
++	{
++		return;
++	}
++	// Over: the next one a gap away.
++	if (now >= _staticSpellUntil)
++	{
++		_staticSpellUntil = 0;
++		_staticSpellNextAt = now + gap();
++		return;
++	}
++	// Rising, at its peak, or falling.
++	const Uint32 into = now - _staticSpellFrom, length = _staticSpellUntil - _staticSpellFrom;
++	float share = 1.0f;
++	if (into < _staticSpellRise)
++	{
++		share = (float)into / _staticSpellRise;
++	}
++	else if (_staticSpellFall > 0 && into > length - _staticSpellFall)
++	{
++		share = (float)(length - into) / _staticSpellFall;
++	}
++	_staticAmount = std::max(floor, _staticSpellPeak * smoothstep(0.0f, 1.0f, share));
++}
++
++/**
++ * Is the camera's signal bad: on the hardest missions (level 2, see RuleFirstPerson::getSignalLevel:
++ * Mars, the aliens' bases, a base defence, TFTD's colonies, T'leth and the artefact sites), or on
++ * any mission while the soldier watched stands inside a UFO, amid its machinery?
++ * @return True if so.
++ */
++bool FirstPersonView::badSignal() const
++{
++	const Tile *watchedTile = _cameraUnit ? _cameraUnit->getTile() : nullptr;
++	const int watchedIndex = watchedTile ? _save->getTileIndex(watchedTile->getPosition()) : -1;
++	const bool insideUfo = watchedIndex >= 0 && watchedIndex < (int)_ufoPhaseOfTile.size() && (_ufoPhaseOfTile[watchedIndex] & UfoTileBit);
++	return _signalGlitches >= 2 || (_signalGlitches == 1 && insideUfo);
++}
++
++/**
 + * A helmet camera's digital feed with a bad signal (see setSignalGlitches), moved on by a frame:
 + * now and then, for a moment, a glitch. Most often a few patches of the picture fall into coarse
 + * blocks (sometimes with a square or two of the decoder's green), less often only green squares,
-+ * least often the picture freezes. Each lasts a fifth of a second or so (a freeze up to half a
-+ * second), the next comes some seconds later: enough to tell a camera's feed, never enough to
-+ * get in the way. On the hardest missions (level 2, see RuleFirstPerson::getSignalLevel: Mars,
-+ * the aliens' bases, a base defence), and on any mission while the soldier watched stands inside
-+ * a UFO, the signal is bad: a glitch every second or two, half as long again, in more and bigger
-+ * patches, and now and then torn (bands of the picture slid sideways). Never with Muzzle flashes off (the setting for those bothered by flashing
-+ * light). A camera shown again after a pause starts afresh: no glitch for a few seconds, and a
-+ * freeze never holds an old picture (it also ends when the camera moves to another soldier).
++ * now and then the picture tears (bands of it slid sideways), least often it freezes. Each lasts a
++ * fifth of a second or so (a freeze up to half a second), the next comes a few seconds later
++ * (the owner's ask: more often than before, 1.5 to 5 s): enough to tell a camera's feed, never
++ * enough to get in the way. With a bad signal (see badSignal: the hardest missions, inside a UFO)
++ * a glitch every second or so, half as long again, in more and bigger patches, torn more often.
++ * Never with Muzzle flashes off (the setting for those bothered by flashing light). A camera shown
++ * again after a pause starts afresh: no glitch for a few seconds, and a freeze never holds an old
++ * picture (it also ends when the camera moves to another soldier).
 + * Called at the start of every draw.
 + * @return True while the picture is frozen (draw then keeps the last one).
 + */
@@ -23674,13 +23804,9 @@ index 000000000..c7726393b
 +	};
 +	const bool shownLately = _lastDrawTick && now - _lastDrawTick < 250;
 +	_lastDrawTick = now;
-+	// A bad signal (level 2, the hardest missions; or the soldier watched stands inside a UFO,
-+	// amid its machinery) glitches every second or two, longer and in more and bigger patches;
-+	// the usual one every few seconds, briefly.
-+	const Tile *watchedTile = _cameraUnit ? _cameraUnit->getTile() : nullptr;
-+	const int watchedIndex = watchedTile ? _save->getTileIndex(watchedTile->getPosition()) : -1;
-+	const bool insideUfo = watchedIndex >= 0 && watchedIndex < (int)_ufoPhaseOfTile.size() && (_ufoPhaseOfTile[watchedIndex] & UfoTileBit);
-+	const bool bad = _signalGlitches >= 2 || (_signalGlitches == 1 && insideUfo);
++	// A bad signal (the hardest missions, inside a UFO) glitches every second or so, longer and
++	// in more and bigger patches; the usual one every few seconds, briefly.
++	const bool bad = badSignal();
 +	if (!Options::fpsMuzzleFlash || !shownLately)
 +	{
 +		_glitchKind = GLITCH_NONE;
@@ -23697,13 +23823,13 @@ index 000000000..c7726393b
 +	// The next one: which, how long, and the one after it.
 +	if (_glitchKind == GLITCH_NONE && now >= _glitchNextAt)
 +	{
-+		// Which: blocks, green squares or a freeze; a bad signal also tears.
++		// Which: blocks, green squares, a tear (more often with a bad signal) or a freeze.
 +		const int roll = random(0, 99);
-+		if (bad) _glitchKind = roll < 40 ? GLITCH_BLOCKS : roll < 60 ? GLITCH_GREEN : roll < 85 ? GLITCH_TEAR : GLITCH_FREEZE;
-+		else _glitchKind = roll < 55 ? GLITCH_BLOCKS : roll < 80 ? GLITCH_GREEN : GLITCH_FREEZE;
++		if (bad) _glitchKind = roll < 35 ? GLITCH_BLOCKS : roll < 55 ? GLITCH_GREEN : roll < 85 ? GLITCH_TEAR : GLITCH_FREEZE;
++		else _glitchKind = roll < 45 ? GLITCH_BLOCKS : roll < 70 ? GLITCH_GREEN : roll < 85 ? GLITCH_TEAR : GLITCH_FREEZE;
 +		const int length = _glitchKind == GLITCH_BLOCKS ? random(120, 360) : _glitchKind == GLITCH_GREEN ? random(60, 200) : _glitchKind == GLITCH_TEAR ? random(80, 220) : random(200, 550);
 +		_glitchUntil = now + (bad ? length * 3 / 2 : length);
-+		_glitchNextAt = _glitchUntil + (bad ? random(600, 2500) : random(3500, 9000));
++		_glitchNextAt = _glitchUntil + (bad ? random(300, 1500) : random(1500, 5000));
 +		_glitchFrozenUnit = _cameraUnit;
 +		// Its patches, in blocks: one to three small rectangles of coarse blocks (a third of the
 +		// time with a green square), or one to four green squares in a row or two. A bad signal:
@@ -23807,10 +23933,10 @@ index 000000000..c7726393b
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..06559fafc
+index 000000000..717232bf6
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,317 @@
+@@ -0,0 +1,334 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -23982,6 +24108,23 @@ index 000000000..06559fafc
 +const double FacingArrowLength = 7.0, FacingArrowWidth = 4.0;
 +/// A shotgun's pellet in flight (setting "Shotgun pellets in flight") is a streak this many voxels long.
 +const float PelletStreak = 6.0f;
++/// A helmet camera's feed (the soldier cam, the map camera) gets a spell of TV static now and then,
++/// not all the time (the owner's ask: "gradually from zero to lots of static and back down - the
++/// duration random, the speed random and interval between static random - from 10s to 2 min"):
++/// StaticGapShortest to StaticGapLongest ms after the last one, it lasts StaticSpellShortest to
++/// StaticSpellLongest ms, rising to a peak of StaticPeakLeast to StaticPeakMost of the pixels and
++/// falling back, each over StaticRampLeast to StaticRampMost percent of it, at random (see
++/// FirstPersonView::updateStaticSpell). With a bad signal
++/// (the hardest missions, inside a UFO: "more interference is expected") a low static all the time,
++/// BadStaticFloor, and spells more often, longer and stronger (the Bad... values).
++const int StaticGapShortest = 10000, StaticGapLongest = 120000;
++const int StaticSpellShortest = 2500, StaticSpellLongest = 8000;
++const float StaticPeakLeast = 0.35f, StaticPeakMost = 0.85f;
++const int StaticRampLeast = 25, StaticRampMost = 45;
++const float BadStaticFloor = 0.03f;
++const int BadStaticGapShortest = 5000, BadStaticGapLongest = 40000;
++const int BadStaticSpellShortest = 3000, BadStaticSpellLongest = 10000;
++const float BadStaticPeakLeast = 0.5f, BadStaticPeakMost = 0.95f;
 +/// Under night vision the aimed path (see FirstPersonView::drawTrajectory) is light in the goggles,
 +/// as a laser sight is: its core this share white, the rest the goggles' brightest green (dithered:
 +/// a white-green, the owner's choice), in a green glare; a forced arc's dashes turn to dots

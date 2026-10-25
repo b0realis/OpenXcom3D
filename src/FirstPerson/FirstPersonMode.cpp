@@ -569,6 +569,31 @@ void FirstPersonMode::createSoldierCard()
 }
 
 /**
+ * A live feed's red dot (the soldier cam's, the map camera's): a filled circle 5 pixels across,
+ * added to the screen, hidden; the camera blinks it.
+ * @return The dot.
+ */
+Surface *FirstPersonMode::makeLiveDot()
+{
+	Surface *dot = new Surface(5, 5, 0, 0);
+	_state->add(dot);
+	dot->setPalette(_state->getPalette());
+	const Uint8 red = nearestColor(_state->getPalette(), 230, 30, 30);
+	dot->lock();
+	for (int dotY = 0; dotY < 5; ++dotY)
+	{
+		for (int dotX = 0; dotX < 5; ++dotX)
+		{
+			if ((dotX - 2) * (dotX - 2) + (dotY - 2) * (dotY - 2) <= 5) dot->setPixel(dotX, dotY, red);
+		}
+	}
+	dot->unlock();
+	dot->setVisible(false);
+	_ownSurfaces.insert(dot);
+	return dot;
+}
+
+/**
  * Makes the soldier cam, hidden: a soldier's card's helmet camera enlarged, with a right click
  * on their squad button (see updateSoldierCam). A frame with a title bar ("SOLDIER CAM: name",
  * a blinking red dot, as a live feed has) round a second small 3D view, with a little TV
@@ -579,20 +604,7 @@ void FirstPersonMode::createSoldierCam()
 {
 	makeSoldierCamView();
 
-	// The red dot: a filled circle 5 pixels across.
-	_soldierCamDot = new Surface(5, 5, 0, 0);
-	_state->add(_soldierCamDot);
-	_soldierCamDot->setPalette(_state->getPalette());
-	const Uint8 red = nearestColor(_state->getPalette(), 230, 30, 30);
-	_soldierCamDot->lock();
-	for (int dotY = 0; dotY < 5; ++dotY)
-	{
-		for (int dotX = 0; dotX < 5; ++dotX)
-		{
-			if ((dotX - 2) * (dotX - 2) + (dotY - 2) * (dotY - 2) <= 5) _soldierCamDot->setPixel(dotX, dotY, red);
-		}
-	}
-	_soldierCamDot->unlock();
+	_soldierCamDot = makeLiveDot();
 
 	// The title.
 	_txtSoldierCam = new Text(220, 9, 0, 0);
@@ -637,9 +649,8 @@ void FirstPersonMode::makeSoldierCamView()
 	camera->setMap(_state->_map);
 	camera->setMaxDistance(std::min(30, mod->getFirstPerson().getMaxViewDistance()));
 	camera->setParticles(false);
-	const int signalLevel = mod->getFirstPerson().getSignalLevel(_save->getMissionType());
-	camera->setStatic(signalLevel >= 2 ? 0.05f : 0.03f); // a little TV static: a camera's picture (more on the hardest missions)
-	camera->setSignalGlitches(signalLevel); // and a digital feed's bad signal now and then (a lot there)
+	camera->setStaticSpells(true); // a camera's picture: a spell of TV static now and then
+	camera->setSignalGlitches(mod->getFirstPerson().getSignalLevel(_save->getMissionType())); // and a digital feed's bad signal now and then (a lot on the hardest missions)
 
 	// In place of the old ones (or, the first time, added last: drawn over everything).
 	putSurfaceInPlace(_soldierCamFrame, frame);
@@ -735,6 +746,7 @@ void FirstPersonMode::makeMapCamera(int size)
 	camera->setMap(_state->_map);
 	camera->setMaxDistance(std::min(30, mod->getFirstPerson().getMaxViewDistance()));
 	camera->setParticles(false);
+	camera->setStaticSpells(true); // a helmet camera's feed, as the soldier cam's: static now and then, and the bad signal
 	camera->setSignalGlitches(mod->getFirstPerson().getSignalLevel(_save->getMissionType()));
 
 	putSurfaceInPlace(_mapCameraFrame, frame);
@@ -742,16 +754,17 @@ void FirstPersonMode::makeMapCamera(int size)
 	_mapCameraFrame = frame;
 	_mapCamera = camera;
 
-	// The title (made the first time), as wide as the picture.
+	// The title (made the first time), as wide as the picture less the live feed's red dot before it.
 	if (!_txtMapCamera)
 	{
+		_mapCameraDot = makeLiveDot();
 		_txtMapCamera = new Text(pictureWidth, 9, 0, 0);
 		_state->add(_txtMapCamera, "textName", "battlescape");
 		_txtMapCamera->setHighContrast(true);
 		_txtMapCamera->setVisible(false);
 		_ownSurfaces.insert(_txtMapCamera);
 	}
-	_txtMapCamera->setWidth(pictureWidth - 2);
+	_txtMapCamera->setWidth(pictureWidth - 10);
 	_txtMapCamera->setText(""); // (written again for the new width, see updateMapCamera)
 }
 
