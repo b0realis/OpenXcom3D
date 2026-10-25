@@ -12,7 +12,7 @@ index 31faa5c79..7e45307af 100644
  if ( CHECK_CCACHE )
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..5b12ab0ae
+index 000000000..747920589
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,385 @@
@@ -55,13 +55,11 @@ index 000000000..5b12ab0ae
 +  STR_FPS_SMOOTH_LIGHTING: "Smooth lighting"
 +  STR_FPS_SMOOTH_LIGHTING_DESC: "Blends the light smoothly between tiles."
 +  STR_FPS_DOOM_MODE: "Doom mode (debug)"
-+  STR_FPS_DOOM_MODE_DESC: "Cheat, in 3D: endless TU and energy for your soldier; ammo still counts."
++  STR_FPS_DOOM_MODE_DESC: "Cheat, in 3D: endless TU and energy for your soldier; ammo still counts. Grenades go off in real time (Doom grenade fuse)."
 +  STR_FPS_DOOM_IDKFA: "Doom IDKFA"
 +  STR_FPS_DOOM_IDKFA_DESC: "Doom mode plus endless ammo for every weapon, rockets too."
 +  STR_FPS_DOOM_IDDQD: "Doom IDDQD"
 +  STR_FPS_DOOM_IDDQD_DESC: "Doom mode plus invincible soldiers (their stats turn silver)."
-+  STR_FPS_DOOM_REAL_TIME_GRENADES: "Doom real-time grenades"
-+  STR_FPS_DOOM_REAL_TIME_GRENADES_DESC: "In Doom mode grenades go off in real time, seconds after they are primed (Doom grenade fuse). Off: primed and thrown as usual."
 +  STR_FPS_DOOM_PRIME_ON_THROW: "Doom prime on throw"
 +  STR_FPS_DOOM_PRIME_ON_THROW_DESC: "Real-time grenades are armed as you throw them and burn from leaving your hand. NO: PRIME pulls the pin, the fuse burns in hand."
 +  STR_FPS_DOOM_FREE_GRENADES: "Doom free grenades with airburst"
@@ -76,7 +74,9 @@ index 000000000..5b12ab0ae
 +  STR_FPS_IDDQD: "IDDQD"
 +  STR_FPS_AMMO_EMPTY: "EMPTY"
 +  STR_FPS_AMMO_UNLIMITED: "∞"
-+  STR_FPS_PRIMED: "PRIMED {0}"
++  STR_FPS_PRIMED: "PRIMED {0} turns"
++  STR_FPS_PRIMED_ONE_TURN: "PRIMED 1 turn"
++  STR_FPS_PRIMED_THIS_TURN: "PRIMED this turn"
 +  STR_FPS_PRIMED_INSTANT: "PRIMED"
 +  STR_FPS_PRIMED_SECONDS: "PRIMED {0}s"
 +  STR_FPS_SPARE_CLIPS_zero: "no clips"
@@ -403,7 +403,7 @@ index 000000000..5b12ab0ae
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers: a clear view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..d86181528
+index 000000000..e369a6ef3
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,385 @@
@@ -446,13 +446,11 @@ index 000000000..d86181528
 +  STR_FPS_SMOOTH_LIGHTING: "Smooth lighting"
 +  STR_FPS_SMOOTH_LIGHTING_DESC: "Blends the light smoothly between tiles."
 +  STR_FPS_DOOM_MODE: "Doom mode (debug)"
-+  STR_FPS_DOOM_MODE_DESC: "Cheat, in 3D: endless TU and energy for your soldier; ammo still counts."
++  STR_FPS_DOOM_MODE_DESC: "Cheat, in 3D: endless TU and energy for your soldier; ammo still counts. Grenades go off in real time (Doom grenade fuse)."
 +  STR_FPS_DOOM_IDKFA: "Doom IDKFA"
 +  STR_FPS_DOOM_IDKFA_DESC: "Doom mode plus endless ammo for every weapon, rockets too."
 +  STR_FPS_DOOM_IDDQD: "Doom IDDQD"
 +  STR_FPS_DOOM_IDDQD_DESC: "Doom mode plus invincible soldiers (their stats turn silver)."
-+  STR_FPS_DOOM_REAL_TIME_GRENADES: "Doom real-time grenades"
-+  STR_FPS_DOOM_REAL_TIME_GRENADES_DESC: "In Doom mode grenades go off in real time, seconds after they are primed (Doom grenade fuse). Off: primed and thrown as usual."
 +  STR_FPS_DOOM_PRIME_ON_THROW: "Doom prime on throw"
 +  STR_FPS_DOOM_PRIME_ON_THROW_DESC: "Real-time grenades are armed as you throw them and burn from leaving your hand. NO: PRIME pulls the pin, the fuse burns in hand."
 +  STR_FPS_DOOM_FREE_GRENADES: "Doom free grenades with airburst"
@@ -467,7 +465,9 @@ index 000000000..d86181528
 +  STR_FPS_IDDQD: "IDDQD"
 +  STR_FPS_AMMO_EMPTY: "EMPTY"
 +  STR_FPS_AMMO_UNLIMITED: "∞"
-+  STR_FPS_PRIMED: "PRIMED {0}"
++  STR_FPS_PRIMED: "PRIMED {0} turns"
++  STR_FPS_PRIMED_ONE_TURN: "PRIMED 1 turn"
++  STR_FPS_PRIMED_THIS_TURN: "PRIMED this turn"
 +  STR_FPS_PRIMED_INSTANT: "PRIMED"
 +  STR_FPS_PRIMED_SECONDS: "PRIMED {0}s"
 +  STR_FPS_SPARE_CLIPS_zero: "no clips"
@@ -1221,10 +1221,71 @@ index ff9973e6f..6e85d7829 100644
  		int animFrames = -1;
  		int sound = -1;
 diff --git a/src/Battlescape/Map.cpp b/src/Battlescape/Map.cpp
-index 3665cd199..52c0b9fd2 100644
+index 3665cd199..879f12ded 100644
 --- a/src/Battlescape/Map.cpp
 +++ b/src/Battlescape/Map.cpp
-@@ -2432,7 +2432,7 @@ void Map::scrollKey()
+@@ -1119,13 +1119,14 @@ void Map::drawTerrain(Surface *surface)
+ 						}
+ 						else
+ 						{
+-							// draw bullet on the correct tile
+-							if (itX >= bulletLowX && itX <= bulletHighX && itY >= bulletLowY && itY <= bulletHighY)
++							// (OpenXcom3D: a bullet's sprites on this tile, for the round and, beside it, the
++							// other gun's round and a shotgun's pellets in flight, see ProjectileFlyBState)
++							auto drawBullet = [&](const Projectile *bullet)
+ 							{
+ 								int begin = 0;
+ 								int end = BULLET_SPRITES;
+ 								int direction = 1;
+-								if (_projectile->isReversed())
++								if (bullet->isReversed())
+ 								{
+ 									begin = BULLET_SPRITES - 1;
+ 									end = -1;
+@@ -1134,10 +1135,10 @@ void Map::drawTerrain(Surface *surface)
+ 
+ 								for (int i = begin; i != end; i += direction)
+ 								{
+-									tmpSurface = _projectileSet->getFrame(_projectile->getParticle(i));
++									tmpSurface = _projectileSet->getFrame(bullet->getParticle(i));
+ 									if (tmpSurface)
+ 									{
+-										Position voxelPos = _projectile->getPosition(1-i);
++										Position voxelPos = bullet->getPosition(1-i);
+ 										// draw shadow on the floor
+ 										voxelPos.z = _save->getTileEngine()->castedShade(voxelPos);
+ 										if (voxelPos.x / 16 == itX &&
+@@ -1152,7 +1153,7 @@ void Map::drawTerrain(Surface *surface)
+ 										}
+ 
+ 										// draw bullet itself
+-										voxelPos = _projectile->getPosition(1-i);
++										voxelPos = bullet->getPosition(1-i);
+ 										if (voxelPos.x / 16 == itX &&
+ 											voxelPos.y / 16 == itY &&
+ 											voxelPos.z / 24 == itZ &&
+@@ -1165,6 +1166,20 @@ void Map::drawTerrain(Surface *surface)
+ 										}
+ 									}
+ 								}
++							};
++							// draw bullet on the correct tile
++							if (itX >= bulletLowX && itX <= bulletHighX && itY >= bulletLowY && itY <= bulletHighY)
++							{
++								drawBullet(_projectile);
++							}
++							// (OpenXcom3D: and the rounds flying beside it, each checked tile by tile as above)
++							if (_partnerProjectile)
++							{
++								drawBullet(_partnerProjectile);
++							}
++							for (const Projectile *pellet : _pellets)
++							{
++								drawBullet(pellet);
+ 							}
+ 						}
+ 					}
+@@ -2432,7 +2447,7 @@ void Map::scrollKey()
   */
  void Map::fadeShade()
  {
@@ -1233,7 +1294,7 @@ index 3665cd199..52c0b9fd2 100644
  	if ((_nightVisionOn && !hold) || (!_nightVisionOn && hold))
  	{
  		_nvColor = Options::oxceNightVisionColor;
-@@ -2555,6 +2555,10 @@ int Map::getIconWidth() const
+@@ -2555,6 +2570,10 @@ int Map::getIconWidth() const
   */
  int Map::getSoundAngle(const Position& pos) const
  {
@@ -1441,7 +1502,7 @@ index 861c7702a..7f87d9f02 100644
  	const std::vector<int> &getPath() const;
  	/// Makes a copy to the path.
 diff --git a/src/Battlescape/Projectile.cpp b/src/Battlescape/Projectile.cpp
-index 7f7697c1d..ffeb386b4 100644
+index 7f7697c1d..8e28bfb87 100644
 --- a/src/Battlescape/Projectile.cpp
 +++ b/src/Battlescape/Projectile.cpp
 @@ -31,6 +31,7 @@
@@ -1452,8 +1513,15 @@ index 7f7697c1d..ffeb386b4 100644
  #include "../fmath.h"
  
  namespace OpenXcom
-@@ -85,6 +86,14 @@ Projectile::Projectile(Mod *mod, SavedBattleGame *save, BattleAction action, Pos
+@@ -83,8 +84,21 @@ Projectile::Projectile(Mod *mod, SavedBattleGame *save, BattleAction action, Pos
+ 			{
+ 				_speed = std::max(1, _speed + _action.weapon->getRules()->getBulletSpeed());
  			}
++			// (first-person view: shotgun ammo without a sprite gets the one its damage type's ammo uses most, so the map draws its round and pellets in flight)
++			if (_bulletSprite == Mod::NO_SURFACE && _ammo->getRules()->getShotgunPellets() != 0)
++			{
++				_bulletSprite = FirstPerson::shotgunBulletSprite(_mod, _ammo->getRules());
++			}
  		}
  	}
 +	if (_action.freeAim)
@@ -1467,7 +1535,7 @@ index 7f7697c1d..ffeb386b4 100644
  	if ((targetVoxel.x - origin.x) + (targetVoxel.y - origin.y) >= 0)
  	{
  		_reversed = true;
-@@ -132,9 +141,11 @@ int Projectile::calculateTrajectory(double accuracy, const Position& originVoxel
+@@ -132,9 +146,11 @@ int Projectile::calculateTrajectory(double accuracy, const Position& originVoxel
  		_action.actor->getFaction() == FACTION_PLAYER &&
  		_action.autoShotCounter == 1 &&
  		(!_save->isCtrlPressed(true) || !Options::forceFire) &&
@@ -1480,7 +1548,7 @@ index 7f7697c1d..ffeb386b4 100644
  	{
  		Position hitPos = _trajectory.at(0).toTile();
  		if (test == V_UNIT && _save->getTile(hitPos) && _save->getTile(hitPos)->getUnit() == 0) //no unit? must be lower
-@@ -198,7 +209,17 @@ int Projectile::calculateTrajectory(double accuracy, const Position& originVoxel
+@@ -198,7 +214,17 @@ int Projectile::calculateTrajectory(double accuracy, const Position& originVoxel
  
  	// apply some accuracy modifiers.
  	// This will results in a new target voxel
@@ -1499,16 +1567,32 @@ index 7f7697c1d..ffeb386b4 100644
  
  	// finally do a line calculation and store this trajectory.
  	return _save->getTileEngine()->calculateLineVoxel(originVoxel, _targetVoxel, true, &_trajectory, bu);
-@@ -228,7 +249,7 @@ int Projectile::calculateThrow(double accuracy)
+@@ -228,9 +254,10 @@ int Projectile::calculateThrow(double accuracy)
  	else
  	{
  		BattleUnit *tu = targetTile->getOverlappingUnit(_save);
 -		if (Options::forceFire && _save->isCtrlPressed(true) && _save->getSide() == FACTION_PLAYER)
 +		if ((Options::forceFire && _save->isCtrlPressed(true) && _save->getSide() == FACTION_PLAYER) || _action.forced)
  		{
- 			targets.push_back(_action.target.toVoxel() + Position(0, 0, 12));
+-			targets.push_back(_action.target.toVoxel() + Position(0, 0, 12));
++			// (OpenXcom3D: forced at the exact point aimed at under the first-person crosshair, if one was, rather than the tile's corner)
++			targets.push_back(_action.targetVoxel.x >= 0 ? _action.targetVoxel : _action.target.toVoxel() + Position(0, 0, 12));
  			forced = true;
-@@ -493,7 +514,10 @@ bool Projectile::move()
+ 		}
+ 		else if (tu && ((_action.actor->getFaction() != FACTION_PLAYER) ||
+@@ -269,6 +296,11 @@ int Projectile::calculateThrow(double accuracy)
+ 		{
+ 			targets.push_back(targetVoxel);
+ 		}
++		if (!forced && _action.targetVoxel.x >= 0)
++		{
++			// (OpenXcom3D: the exact point aimed at under the first-person crosshair first, then the game's own points)
++			targets.insert(targets.begin(), _action.targetVoxel);
++		}
+ 	}
+ 
+ 	_distance = 0.0f;
+@@ -493,7 +525,10 @@ bool Projectile::move()
  		}
  	}
  
@@ -1544,7 +1628,7 @@ index a263ca287..8cb38be80 100644
  	void skipTrajectory();
  	/// Gets the Position of origin for the projectile.
 diff --git a/src/Battlescape/ProjectileFlyBState.cpp b/src/Battlescape/ProjectileFlyBState.cpp
-index 529b7f282..98b10c4b5 100644
+index 529b7f282..43276e9c0 100644
 --- a/src/Battlescape/ProjectileFlyBState.cpp
 +++ b/src/Battlescape/ProjectileFlyBState.cpp
 @@ -18,6 +18,7 @@
@@ -1680,7 +1764,7 @@ index 529b7f282..98b10c4b5 100644
  
  	BattleActionAttack attack = BattleActionAttack::GetAferShoot(_action, _ammo);
  	if (_action.type == BA_THROW)
-@@ -588,9 +644,278 @@ bool ProjectileFlyBState::createNewProjectile()
+@@ -588,9 +644,280 @@ bool ProjectileFlyBState::createNewProjectile()
  		_parent->getSave()->appendToHitLog(HITLOG_NEW_SHOT, _action.actor->getFaction());
  	}
  
@@ -1730,6 +1814,8 @@ index 529b7f282..98b10c4b5 100644
 +		}
 +		_parent->getMap()->getExplosions()->push_back(explosion);
 +		_parent->getSave()->getTileEngine()->hit(attack, proj->getPosition(offset), power, _ammo->getRules()->getDamageType());
++		// (first-person view: each pellet heard, and marked in the 3D view as the round is)
++		FirstPerson::pelletLanded(_parent->getSave()->getBattleState(), proj->getPosition(offset), proj->getPosition(offset - 12), impact, _action.weapon, _ammo);
 +
 +		//do not work yet
 +//									if (_ammo->getRules()->getExplosionRadius(_unit) != 0)
@@ -1959,7 +2045,7 @@ index 529b7f282..98b10c4b5 100644
  /**
   * Deinitialize the state.
   */
-@@ -654,13 +979,35 @@ void ProjectileFlyBState::think()
+@@ -654,13 +981,35 @@ void ProjectileFlyBState::think()
  	else
  	{
  		BattleActionAttack attack = BattleActionAttack::GetAferShoot(_action, _ammo);
@@ -1996,7 +2082,7 @@ index 529b7f282..98b10c4b5 100644
  			// impact !
  			if (_action.type == BA_THROW)
  			{
-@@ -742,6 +1089,7 @@ void ProjectileFlyBState::think()
+@@ -742,6 +1091,7 @@ void ProjectileFlyBState::think()
  						noMoreShotsToShoot(),
  						shotgun ? 0 : _range + _parent->getMap()->getProjectile()->getDistance()
  					));
@@ -2004,7 +2090,7 @@ index 529b7f282..98b10c4b5 100644
  
  					if (_projectileImpact == V_UNIT)
  					{
-@@ -754,83 +1102,68 @@ void ProjectileFlyBState::think()
+@@ -754,83 +1104,68 @@ void ProjectileFlyBState::think()
  					// special shotgun behaviour: trace extra projectile paths, and add bullet hits at their termination points.
  					if (shotgun)
  					{
@@ -2136,7 +2222,7 @@ index 529b7f282..98b10c4b5 100644
  					}
  
  					// nerf unit's XP values (gained via extra shotgun bullets)
-@@ -842,6 +1175,8 @@ void ProjectileFlyBState::think()
+@@ -842,6 +1177,8 @@ void ProjectileFlyBState::think()
  				}
  			}
  
@@ -2145,7 +2231,7 @@ index 529b7f282..98b10c4b5 100644
  			delete _parent->getMap()->getProjectile();
  			_parent->getMap()->setProjectile(0);
  		}
-@@ -857,6 +1192,9 @@ void ProjectileFlyBState::cancel()
+@@ -857,6 +1194,9 @@ void ProjectileFlyBState::cancel()
  	if (_parent->getMap()->getProjectile())
  	{
  		_parent->getMap()->getProjectile()->skipTrajectory();
@@ -2784,7 +2870,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..579997984 100644
+index a08796ced..41cc34e49 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -2801,7 +2887,7 @@ index a08796ced..579997984 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsDoomRealTimeGrenades, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsAkimboInTurn;
++OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsAkimboInTurn;
 +OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle;
@@ -2889,10 +2975,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..c57f9e839
+index 000000000..25a349bad
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,558 @@
+@@ -0,0 +1,614 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -2942,12 +3028,16 @@ index 000000000..c57f9e839
 + * and its 3D VIEW options tab.
 + */
 +#include "FirstPersonApi.h"
++#include <algorithm>
++#include <map>
 +#include "FirstPersonMode.h"
 +#include "OptionsFirstPersonState.h"
 +#include "../Engine/Game.h"
 +#include "../Engine/OptionInfo.h"
 +#include "../Engine/Options.h"
 +#include "../Mod/Mod.h"
++#include "../Mod/RuleDamageType.h"
++#include "../Mod/RuleItem.h"
 +
 +namespace OpenXcom
 +{
@@ -3244,8 +3334,9 @@ index 000000000..c57f9e839
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsDownedIcons", &fpsDownedIcons, 1, "STR_FPS_DOWNED_ICONS", category));
 +	// Staying in the 3D view during the alien turn, starting battles in it, and the debug cheat
 +	// "doom mode" (endless time units and energy), with its two extras, each doom mode plus
-+	// more: IDKFA (endless ammo) and IDDQD (invincible soldiers); and in doom mode, grenades in
-+	// real time (one click, a few seconds' fuse) if wanted.
++	// more: IDKFA (endless ammo) and IDDQD (invincible soldiers); in doom mode grenades go off in
++	// real time (one click, a few seconds' fuse: the owner, "realtime grenade setting should be
++	// always on with doom mode", where it was a setting of its own).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsAlienTurn3D", &fpsAlienTurn3D, true, "STR_FPS_ALIEN_TURN_3D", category));
 +	// ...and in it, the view cuts to the soldier who sees the alien acting, or who fires back;
 +	// a soldier shot at, hit or taken over pops up their small camera.
@@ -3256,8 +3347,7 @@ index 000000000..c57f9e839
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomMode", &fpsDoomMode, false, "STR_FPS_DOOM_MODE", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomIdkfa", &fpsDoomIdkfa, false, "STR_FPS_DOOM_IDKFA", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomIddqd", &fpsDoomIddqd, false, "STR_FPS_DOOM_IDDQD", category));
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomRealTimeGrenades", &fpsDoomRealTimeGrenades, false, "STR_FPS_DOOM_REAL_TIME_GRENADES", category));
-+	// ...armed as they're thrown, burning from leaving the hand (YES), or primed with a click and
++	// Doom mode's real-time grenades: armed as they're thrown, burning from leaving the hand (YES), or primed with a click and
 +	// burning in the hand (NO, "cooking");
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomPrimeOnThrow", &fpsDoomPrimeOnThrow, true, "STR_FPS_DOOM_PRIME_ON_THROW", category));
 +	// ...thrown freely at whatever the crosshair points at, bursting in the air when the fuse runs out in flight;
@@ -3410,6 +3500,58 @@ index 000000000..c57f9e839
 +}
 +
 +/**
++ * A shotgun's pellet landed: heard, and marked in the 3D view (see FirstPersonMode::pelletLanded).
++ * @param state The battlescape screen.
++ * @param at Where it struck, in voxels.
++ * @param from A point further back on its path, for its direction.
++ * @param impact What it struck (a VoxelType; V_OUTOFBOUNDS: nothing).
++ * @param weapon The weapon that fired it.
++ * @param ammo Its ammo.
++ */
++void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo)
++{
++	FirstPersonMode::pelletLanded(state, at, from, impact, weapon, ammo);
++}
++
++/**
++ * The bullet sprite for shotgun ammo that has none (a player's report: on the isometric map a
++ * shotgun's round is "unsprited"; "Just using the most common used sprite per that damage type
++ * should be fitting for now"): of the mod's items with a bullet sprite, the one used most by those
++ * of the ammo's damage type, or by all of them when none shares it. Worked out once per mod.
++ * @param mod The mod.
++ * @param ammo The shotgun ammo.
++ * @return The bullet sprite, or Mod::NO_SURFACE when no item has one.
++ */
++int shotgunBulletSprite(const Mod *mod, const RuleItem *ammo)
++{
++	// The most used sprite per damage type (and, under DT_NONE's key -1, overall), per mod.
++	static const Mod *countedFor = nullptr;
++	static std::map<int, int> mostUsed;
++	if (countedFor != mod)
++	{
++		countedFor = mod;
++		mostUsed.clear();
++		std::map<int, std::map<int, int>> votes; // damage type (-1: all) -> sprite -> items using it
++		for (const std::string &name : mod->getItemsList())
++		{
++			const RuleItem *item = mod->getItem(name);
++			if (item && item->getBulletSprite() != Mod::NO_SURFACE && item->getDamageType())
++			{
++				++votes[item->getDamageType()->ResistType][item->getBulletSprite()];
++				++votes[-1][item->getBulletSprite()];
++			}
++		}
++		for (const auto &[damage, sprites] : votes)
++		{
++			mostUsed[damage] = std::max_element(sprites.begin(), sprites.end(), [](const auto &a, const auto &b) { return a.second < b.second; })->first;
++		}
++	}
++	auto found = mostUsed.find(ammo->getDamageType() ? (int)ammo->getDamageType()->ResistType : -1);
++	if (found == mostUsed.end()) found = mostUsed.find(-1);
++	return found != mostUsed.end() ? found->second : Mod::NO_SURFACE;
++}
++
++/**
 + * Called by the game when a unit panics or goes berserk: the first-person view may show it its
 + * own way (for the player's soldiers in the player's turn), and the game then leaves out its
 + * little "... is panicking" infobox.
@@ -3453,10 +3595,10 @@ index 000000000..c57f9e839
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..3d1dfa828
+index 000000000..a52103479
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,209 @@
+@@ -0,0 +1,219 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -3522,12 +3664,14 @@ index 000000000..3d1dfa828
 +
 +class Action;
 +struct BattleAction;
++class BattleItem;
 +class BattlescapeState;
 +class BattleUnit;
 +class FirstPersonMode;
 +class Game;
 +class Mod;
 +class OptionInfo;
++class RuleItem;
 +class State;
 +
 +namespace FirstPerson
@@ -3616,9 +3760,15 @@ index 000000000..3d1dfa828
 +/// Is FPS-style shooting on for this unit's shots in the first-person view? Their bullet hits
 +/// then play quicker (a burst at a bullet's pace).
 +bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
-+/// Setting "Shotgun pellets in flight": do a shotgun's pellets fly beside its round (the 3D view
-+/// showing), rather than all landing at once? They're traced as the round is fired, and hit as it lands.
++/// Setting "Shotgun pellets in flight": do a shotgun's pellets fly beside its round (in 3D and on
++/// the map), rather than all landing at once? They're traced as the round is fired, and hit as it lands.
 +bool pelletsInFlight(BattlescapeState *state);
++/// A shotgun's pellet landed (ProjectileFlyBState::pelletLands), in either view: it's heard (a few
++/// to a volley) and the 3D view marks where it struck (sparks, a bullet hole), as it does the round.
++void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo);
++/// The bullet sprite for shotgun ammo that has none (Projectile): the one the mod's other ammo of
++/// its damage type uses most, so the map can draw its round and pellets in flight.
++int shotgunBulletSprite(const Mod *mod, const RuleItem *ammo);
 +/// A unit panics or goes berserk: returns true if the first-person view shows it its own way
 +/// (the game then leaves out its "has panicked" box, which would freeze the view behind it).
 +bool breakdown(BattlescapeState *state, BattleUnit *unit);
@@ -3654,6 +3804,8 @@ index 000000000..3d1dfa828
 +inline void freeAimTarget(BattlescapeState *, const BattleAction &, Position &) { }
 +inline bool fastShots(BattlescapeState *, const BattleUnit *) { return false; }
 +inline bool pelletsInFlight(BattlescapeState *) { return false; }
++inline void pelletLanded(BattlescapeState *, const Position &, const Position &, int, const BattleItem *, const BattleItem *) { }
++inline int shotgunBulletSprite(const Mod *, const RuleItem *) { return -1; } // (Mod::NO_SURFACE)
 +inline bool breakdown(BattlescapeState *, BattleUnit *) { return false; }
 +inline void closeQuartersDeflected(BattlescapeState *, const BattleUnit *, const Position &) { }
 +inline bool endlessAmmo(BattlescapeState *, const BattleUnit *) { return false; }
@@ -3668,7 +3820,7 @@ index 000000000..3d1dfa828
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..c4fcf8e18
+index 000000000..f119d2bc8
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
 @@ -0,0 +1,2601 @@
@@ -5255,9 +5407,9 @@ index 000000000..c4fcf8e18
 + * burning, until it does; with its pin pulled by PRIME it burns from the click, in the hand too. The explosion is
 + * the game's own, as its end-of-turn fuse makes it (an ExplosionBState for a timed grenade at
 + * the grenade's tile, which also removes it). One at a time, on the player's turn, when the game
-+ * isn't busy with a shot or another explosion. Leaving Doom mode or real-time grenades stops
-+ * the real-time fuses (the game's own fuse, set to 0, is still there: the grenade then goes off
-+ * at the end of the turn, as usual).
++ * isn't busy with a shot or another explosion. Leaving Doom mode stops the real-time fuses (the
++ * game's own fuse, set to 0, is still there: the grenade then goes off at the end of the turn,
++ * as usual).
 + * @param now The time, SDL ticks.
 + */
 +void FirstPersonMode::updateDoomFuses(Uint32 now)
@@ -5266,7 +5418,7 @@ index 000000000..c4fcf8e18
 +	{
 +		return;
 +	}
-+	if (!doomModeOn() || !Options::fpsDoomRealTimeGrenades)
++	if (!doomModeOn())
 +	{
 +		_doomFuses.clear();
 +		return;
@@ -6275,10 +6427,10 @@ index 000000000..c4fcf8e18
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..feefc557a
+index 000000000..16047faa2
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1051 @@
+@@ -0,0 +1,1054 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -6412,6 +6564,8 @@ index 000000000..feefc557a
 +	static bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
 +	/// Do a shotgun's pellets fly beside its round (setting "Shotgun pellets in flight", the 3D view showing)?
 +	static bool pelletsInFlight(BattlescapeState *state);
++	/// A shotgun's pellet landed (see FirstPerson::pelletLanded): heard, a few to a volley, and marked in the 3D view.
++	static void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo);
 +	/// A soldier panics or goes berserk, asked by the game (see FirstPerson::breakdown).
 +	static bool breakdown(BattlescapeState *state, BattleUnit *unit);
 +	/// A close-quarters check knocked a shot aside, told by the game (see FirstPerson::closeQuartersDeflected).
@@ -7118,6 +7272,7 @@ index 000000000..feefc557a
 +	std::vector<SquadState> _squadStates;         // how each squad member is
 +	std::vector<Surface*> _squadIcons;            // the icon on each button (for the fallen and the turned)
 +	std::vector<size_t> _squadSlots;              // the slots with a button, in order
++	Uint32 _pelletSoundsFrom = 0; int _pelletSounds = 0; // pellets heard in the last moment (see pelletLanded): when it began, how many
 +	int _squadScroll = 0, _squadWindow = 10;      // the buttons shown at once (ten, more on a wide screen); the rest scroll
 +	const BattleUnit *_squadScrolledTo = nullptr; // the selected soldier the window last followed
 +	Uint8 _squadColor = 0;                        // the buttons' own colour
@@ -8150,10 +8305,10 @@ index 000000000..4e15be992
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..8e0dd8e14
+index 000000000..450abee2b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,1822 @@
+@@ -0,0 +1,1824 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -8822,8 +8977,9 @@ index 000000000..8e0dd8e14
 +	const RuleItem *rules = weapon->getRules();
 +	if (rules->getBattleType() != BT_FIREARM)
 +	{
-+		// A primed grenade (or anything with a fuse): PRIMED and the turns its fuse has left
-+		// (0: it goes off at the end of this turn, once it lies on the ground); one that goes off
++		// A primed grenade (or anything with a fuse): PRIMED and the turns its fuse has left, said
++		// so ("PRIMED 3 turns"; 0: "PRIMED this turn", it goes off at the end of this turn, once it
++		// lies on the ground; the owner, after primed 3 was taken for seconds); one that goes off
 +		// on landing just PRIMED.
 +		if (rules->getFuseTimerType() != BFT_NONE && weapon->getFuseTimer() >= 0)
 +		{
@@ -8840,11 +8996,12 @@ index 000000000..8e0dd8e14
 +			{
 +				return _state->tr("STR_FPS_PRIMED_INSTANT");
 +			}
-+			return _state->tr("STR_FPS_PRIMED").arg(weapon->getFuseTimer());
++			const int turnsLeft = weapon->getFuseTimer();
++			return turnsLeft == 0 ? _state->tr("STR_FPS_PRIMED_THIS_TURN") : turnsLeft == 1 ? _state->tr("STR_FPS_PRIMED_ONE_TURN") : _state->tr("STR_FPS_PRIMED").arg(turnsLeft);
 +		}
-+		// Doom real-time grenades primed on throw: one on a timer, not armed yet, burns for the
-+		// fuse once thrown.
-+		if (doomModeOn() && Options::fpsDoomRealTimeGrenades && Options::fpsDoomPrimeOnThrow && timedGrenade(weapon))
++		// Doom mode's real-time grenades primed on throw: one on a timer, not armed yet, burns for
++		// the fuse once thrown.
++		if (doomModeOn() && Options::fpsDoomPrimeOnThrow && timedGrenade(weapon))
 +		{
 +			return _state->tr("STR_FPS_DOOM_FUSE").arg(std::clamp(Options::fpsDoomGrenadeFuse, 1, FirstPerson::DoomFuseMaxSeconds));
 +		}
@@ -11833,10 +11990,10 @@ index 000000000..14a3a1063
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..c69377677
+index 000000000..710825392
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,361 @@
+@@ -0,0 +1,366 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -11918,6 +12075,11 @@ index 000000000..c69377677
 +/// Squad buttons shown at once (more scroll; more on a screen with room for them at their full
 +/// width, see layoutTopBar), the least width of one and the full width.
 +const int SquadWindow = 10, SquadMinW = 13, SquadFullW = 18;
++/// A shotgun's pellets landing are each heard (the owner: "all pellets should impact, play sound and
++/// show bulletholes"), but at most this many within PelletSoundWindow ms: the mixer has 16 channels,
++/// and two shotguns' sixteen pellets at once would take them all (see FirstPersonMode::pelletLanded).
++const int PelletSoundsAtOnce = 4;
++const Uint32 PelletSoundWindow = 60;
 +/// The info panel, bottom left, and the width of a line of text in it.
 +const int PanelW = 150, PanelH = 54, PanelLineW = PanelW - 6;
 +/// The crosshair's surface (square).
@@ -12200,10 +12362,10 @@ index 000000000..c69377677
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..4b0776b79
+index 000000000..7d02d2164
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,3114 @@
+@@ -0,0 +1,3163 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -13224,7 +13386,7 @@ index 000000000..4b0776b79
 +
 +	// Burst in the air: the fuse has run out.
 +	const auto fuse = _doomFuses.find(grenade->getId());
-+	if (Options::fpsDoomRealTimeGrenades && fuse != _doomFuses.end() && fuse->second.lit && now - fuse->second.lit >= fuse->second.length)
++	if (doomModeOn() && fuse != _doomFuses.end() && fuse->second.lit && now - fuse->second.lit >= fuse->second.length)
 +	{
 +		_doomFuses.erase(fuse);
 +		Position burst = voxelAt(flight.position);
@@ -13352,11 +13514,14 @@ index 000000000..4b0776b79
 +	// shots", or the lean keys) moves it off the middle (see leanSide).
 +	const BattleActionOrigin side = (Options::fpsLeanShots || leaningOut()) && isShot(mode) ? leanSide(unit, targetTile) : BattleActionOrigin::CENTRE;
 +
-+	// Worked out again only when something it depends on changed (an arc depends on the
-+	// target's tile only, a line on the very point).
++	// Worked out again only when something it depends on changed (a throw depends on the
++	// target's tile only, a line and an arcing shot at an exact point on the very point).
 +	const Position from = unit->getPosition();
-+	const std::vector<int> key = { arcing ? 1 : 2, targetTile.x, targetTile.y, targetTile.z, arcing ? 0 : targetVoxel.x, arcing ? 0 : targetVoxel.y,
-+		arcing ? 0 : targetVoxel.z, from.x, from.y, from.z, unit->getDirection(), unit->isKneeled() ? 1 : 0, weapon->getId(), (int)mode, (int)side,
++	// (an arcing shot aims at the exact point as a straight one does, see launchShot; a throw at the tile)
++	const bool exactArc = arcing && (Options::fpsAimExact || freeAimOn(mode)) && hitSomething && isShot(mode);
++	const bool keyedPoint = !arcing || exactArc;
++	const std::vector<int> key = { arcing ? 1 : 2, targetTile.x, targetTile.y, targetTile.z, keyedPoint ? targetVoxel.x : 0, keyedPoint ? targetVoxel.y : 0,
++		keyedPoint ? targetVoxel.z : 0, from.x, from.y, from.z, unit->getDirection(), unit->isKneeled() ? 1 : 0, weapon->getId(), (int)mode, (int)side,
 +		Options::fpsForceArcing ? 1 : 0, Options::fpsForceBlocked ? 1 : 0, Options::oxceEnableOffCentreShooting ? 1 : 0, hitSomething ? 1 : 0 };
 +	if (key == _trajectoryKey)
 +	{
@@ -13372,6 +13537,7 @@ index 000000000..4b0776b79
 +	preview.type = mode;
 +	preview.target = targetTile;
 +	preview.relativeOrigin = side;
++	if (exactArc) preview.targetVoxel = targetVoxel;
 +	std::vector<Position> path;
 +	FirstPersonView::TrajectoryLook look = FirstPersonView::TRAJECTORY_ARC;
 +	if (arcing)
@@ -13402,11 +13568,12 @@ index 000000000..4b0776b79
 +/**
 + * The curve the game's own aim finds for a throw or an arcing shot at a tile, as the game works
 + * it out (Projectile::calculateThrow) but without the accuracy roll: the points on the tile it
-+ * tries, in its order (a unit's middle, low and high; an object, a wall, each at a few heights;
-+ * the floor; a throw always the floor), from the game's origin voxel (the hand), the first one
-+ * it finds a curve for that lands on the tile (TileEngine::validateThrow), and that curve
-+ * followed to where it comes down (calculateParabolaVoxel). At a wall seen from the side no
-+ * curve lands on its tile, and the game refuses the shot.
++ * tries, in its order (an arcing shot aimed at an exact point, see launchShot, that point first;
++ * then a unit's middle, low and high; an object, a wall, each at a few heights; the floor; a
++ * throw always the floor), from the game's origin voxel (the hand), the first one it finds a
++ * curve for that lands on the tile (TileEngine::validateThrow), and that curve followed to where
++ * it comes down (calculateParabolaVoxel). At a wall seen from the side no curve lands on its
++ * tile, and the game refuses the shot.
 + * @param shot The action (actor, weapon, mode, the side it leaves from).
 + * @param targetTile The tile aimed at.
 + * @param path If given, set to the curve's voxels (left as it was when none is found).
@@ -13422,6 +13589,10 @@ index 000000000..4b0776b79
 +	const Position floorPoint = targetTile.toVoxel() + Position(8, 8, 1 - tile->getTerrainLevel());
 +	std::vector<Position> aimPoints;
 +	const BattleUnit *targetUnit = shot.type == BA_THROW ? nullptr : tile->getOverlappingUnit(_save);
++	if (shot.type != BA_THROW && shot.targetVoxel.x >= 0)
++	{
++		aimPoints.push_back(shot.targetVoxel); // (an exact point aimed at: tried first)
++	}
 +	if (shot.type == BA_THROW)
 +	{
 +		aimPoints.push_back(floorPoint);
@@ -13464,9 +13635,10 @@ index 000000000..4b0776b79
 +
 +/**
 + * The curve of an arcing shot forced at a tile, as the game works it out with Ctrl held (force
-+ * fire, Projectile::calculateThrow): aimed at one point of the tile, half a level up (the game
-+ * takes the tile's corner voxel), a curve accepted even where it meets something before it
-+ * lands (TileEngine::validateThrow, forced), followed to where it ends.
++ * fire, Projectile::calculateThrow): aimed at the exact point aimed at (see launchShot), or else
++ * at one point of the tile, half a level up (the game takes the tile's corner voxel), a curve
++ * accepted even where it meets something before it lands (TileEngine::validateThrow, forced),
++ * followed to where it ends.
 + * @param shot The action (actor, weapon, mode, the side it leaves from).
 + * @param targetTile The tile aimed at.
 + * @param path If given, set to the curve's voxels (left as it was when there's none).
@@ -13476,7 +13648,7 @@ index 000000000..4b0776b79
 +{
 +	TileEngine *tileEngine = _save->getTileEngine();
 +	const Position origin = tileEngine->getOriginVoxel(shot, nullptr);
-+	const Position aimPoint = targetTile.toVoxel() + Position(0, 0, 12);
++	const Position aimPoint = shot.targetVoxel.x >= 0 ? shot.targetVoxel : targetTile.toVoxel() + Position(0, 0, 12);
 +	double curvature = 0.0;
 +	int meets = V_OUTOFBOUNDS;
 +	if (!tileEngine->validateThrow(shot, origin, aimPoint, _save->getDepth(), &curvature, &meets, true))
@@ -13782,15 +13954,14 @@ index 000000000..4b0776b79
 +		}
 +	}
 +
-+	// Doom mode's real-time grenades (setting; a first step towards a real-time mode). PRIME
++	// Doom mode's real-time grenades (always with Doom mode; a first step towards a real-time mode). PRIME
 +	// opens the fuse box (1 to DoomFuseMaxSeconds seconds), as the isometric map's priming opens
 +	// its timer; the seconds picked are kept (setting "Doom grenade fuse") for every grenade after.
 +	// - Prime on throw (setting "Doom prime on throw", the default): that's all; the grenade is
 +	//   armed as it's thrown (below) and goes off that many seconds after it leaves the hand.
 +	// - Otherwise the pick pulls the pin, with its click, and the fuse burns from then on, in the
 +	//   hand too ("cooking"): throw it, or don't.
-+	// Without real-time grenades, grenades in Doom mode are primed and thrown as without it.
-+	if (mode == BA_PRIME && doomModeOn() && Options::fpsDoomRealTimeGrenades && !menuTargeting && timedGrenade(weapon))
++	if (mode == BA_PRIME && doomModeOn() && !menuTargeting && timedGrenade(weapon))
 +	{
 +		_game->pushState(new DoomFuseState([this, unit, weapon](int seconds)
 +		{
@@ -13964,7 +14135,7 @@ index 000000000..4b0776b79
 +	// thrown (its pin pulled, with the click), and burns for the fuse setting from the moment it
 +	// leaves the hand (see updateDoomFuses). One already burning (pulled before the setting
 +	// changed) burns on.
-+	if (mode == BA_THROW && doomModeOn() && Options::fpsDoomRealTimeGrenades && Options::fpsDoomPrimeOnThrow && timedGrenade(weapon)
++	if (mode == BA_THROW && doomModeOn() && Options::fpsDoomPrimeOnThrow && timedGrenade(weapon)
 +		&& !_doomFuses.count(weapon->getId()))
 +	{
 +		pullDoomPin(unit, weapon, 0);
@@ -14505,7 +14676,47 @@ index 000000000..4b0776b79
 + */
 +bool FirstPersonMode::pelletsInFlight(BattlescapeState *state)
 +{
-+	return Options::fpsPelletsInFlight && state && state->_firstPerson && state->_firstPerson->isActive();
++	return Options::fpsPelletsInFlight && state && state->_firstPerson;
++}
++
++/**
++ * A shotgun's pellet landed (ProjectileFlyBState::pelletLands), in 3D or on the map (the owner:
++ * "at least cosmetically all pellets should impact, play sound and show bulletholes"): its ammo's
++ * hit sound where it struck (at most PelletSoundsAtOnce within PelletSoundWindow: a volley's
++ * pellets land together, and the mixer's channels are few), and, while the 3D view shows, sparks,
++ * chunks and a bullet hole there, as for the round (none on a unit: it bleeds or sparks its own way).
++ * @param state The battlescape screen.
++ * @param at Where it struck, in voxels.
++ * @param from A point further back on its path, for its direction.
++ * @param impact What it struck (a VoxelType; V_OUTOFBOUNDS: nothing in the map).
++ * @param weapon The weapon that fired it.
++ * @param ammo Its ammo.
++ */
++void FirstPersonMode::pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo)
++{
++	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
++	if (!mode || impact == V_OUTOFBOUNDS || !ammo)
++	{
++		return;
++	}
++	// Heard: a few to a volley.
++	const Uint32 now = SDL_GetTicks();
++	if (now - mode->_pelletSoundsFrom > PelletSoundWindow)
++	{
++		mode->_pelletSoundsFrom = now;
++		mode->_pelletSounds = 0;
++	}
++	if (mode->_pelletSounds < PelletSoundsAtOnce)
++	{
++		++mode->_pelletSounds;
++		state->_battleGame->playSound(ammo->getRules()->getHitSound(), at.toTile());
++	}
++	// Marked in the 3D view, while it shows (as the round's mark: on the map its world may not even
++	// be built yet, a battle loaded there).
++	if (impact != V_UNIT && mode->isActive())
++	{
++		mode->_view->markPelletImpact(at, from, weapon, ammo);
++	}
 +}
 +
 +/**
@@ -14893,7 +15104,7 @@ index 000000000..4b0776b79
 +			if (entry.mode == mode) modeText = _state->tr(entry.name);
 +		}
 +		// Doom real-time grenades primed on throw: PRIME sets the fuse for every grenade, "FUSE 3s".
-+		if (mode == BA_PRIME && doomModeOn() && Options::fpsDoomRealTimeGrenades && Options::fpsDoomPrimeOnThrow && timedGrenade(weapon))
++		if (mode == BA_PRIME && doomModeOn() && Options::fpsDoomPrimeOnThrow && timedGrenade(weapon))
 +		{
 +			modeText = _state->tr("STR_FPS_DOOM_FUSE").arg(std::clamp(Options::fpsDoomGrenadeFuse, 1, FirstPerson::DoomFuseMaxSeconds));
 +		}
@@ -18665,10 +18876,10 @@ index 000000000..45343d80a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..7a1297138
+index 000000000..5addef584
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1165 @@
+@@ -0,0 +1,1167 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -19059,6 +19270,8 @@ index 000000000..7a1297138
 +	/// squares and frozen pictures (see updateSignalGlitches); 0 none, 1 now and then, 2 a lot
 +	/// (the hardest missions, on the aliens' own ground).
 +	void setSignalGlitches(int level) { _signalGlitches = level; }
++	/// Where a shotgun's pellet struck: sparks, chunks and a bullet hole, as for a round (see FirstPerson::pelletLanded).
++	void markPelletImpact(const Position &at, const Position &from, const BattleItem *weapon, const BattleItem *ammo);
 +
 +	// =====================================================================================
 +	// What the first-person mode asks the view
@@ -24331,10 +24544,10 @@ index 000000000..717232bf6
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShots.cpp b/src/FirstPerson/FirstPersonViewShots.cpp
 new file mode 100644
-index 000000000..7488759b0
+index 000000000..bc4d522bd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShots.cpp
-@@ -0,0 +1,1751 @@
+@@ -0,0 +1,1770 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -25317,6 +25530,25 @@ index 000000000..7488759b0
 +		trail = TRAIL_FLYING;
 +		color = nearest(245, 245, 245);
 +	}
++}
++
++/**
++ * Where a shotgun's pellet struck (FirstPerson::pelletLanded, in either view; a player's report:
++ * all pellets should impact and show bullet holes): the round's impact there, sparks, chunks, dust
++ * and a mark in the look of its ammo (a bullet hole; a scorch from beams, plasma, incendiaries).
++ * @param at Where it struck, in voxels.
++ * @param from A point further back on its path, for its direction.
++ * @param weapon The weapon that fired it.
++ * @param ammo Its ammo.
++ */
++void FirstPersonView::markPelletImpact(const Position &at, const Position &from, const BattleItem *weapon, const BattleItem *ammo)
++{
++	Trail trail;
++	Uint8 color;
++	float calibre;
++	trailFor(ammo, weapon, trail, color, calibre);
++	const float end[3] = { at.x + 0.5f, at.y + 0.5f, at.z + 0.5f }, start[3] = { from.x + 0.5f, from.y + 0.5f, from.z + 0.5f };
++	spawnShotImpact(end, start, trail);
 +}
 +
 +/**

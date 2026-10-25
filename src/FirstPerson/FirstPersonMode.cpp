@@ -1581,9 +1581,9 @@ bool FirstPersonMode::invincible(BattlescapeState *state, const BattleUnit *unit
  * burning, until it does; with its pin pulled by PRIME it burns from the click, in the hand too. The explosion is
  * the game's own, as its end-of-turn fuse makes it (an ExplosionBState for a timed grenade at
  * the grenade's tile, which also removes it). One at a time, on the player's turn, when the game
- * isn't busy with a shot or another explosion. Leaving Doom mode or real-time grenades stops
- * the real-time fuses (the game's own fuse, set to 0, is still there: the grenade then goes off
- * at the end of the turn, as usual).
+ * isn't busy with a shot or another explosion. Leaving Doom mode stops the real-time fuses (the
+ * game's own fuse, set to 0, is still there: the grenade then goes off at the end of the turn,
+ * as usual).
  * @param now The time, SDL ticks.
  */
 void FirstPersonMode::updateDoomFuses(Uint32 now)
@@ -1592,7 +1592,7 @@ void FirstPersonMode::updateDoomFuses(Uint32 now)
 	{
 		return;
 	}
-	if (!doomModeOn() || !Options::fpsDoomRealTimeGrenades)
+	if (!doomModeOn())
 	{
 		_doomFuses.clear();
 		return;

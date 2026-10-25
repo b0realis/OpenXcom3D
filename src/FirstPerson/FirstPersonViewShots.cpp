@@ -983,6 +983,25 @@ void FirstPersonView::trailFor(const BattleItem *ammo, const BattleItem *weapon,
 }
 
 /**
+ * Where a shotgun's pellet struck (FirstPerson::pelletLanded, in either view; a player's report:
+ * all pellets should impact and show bullet holes): the round's impact there, sparks, chunks, dust
+ * and a mark in the look of its ammo (a bullet hole; a scorch from beams, plasma, incendiaries).
+ * @param at Where it struck, in voxels.
+ * @param from A point further back on its path, for its direction.
+ * @param weapon The weapon that fired it.
+ * @param ammo Its ammo.
+ */
+void FirstPersonView::markPelletImpact(const Position &at, const Position &from, const BattleItem *weapon, const BattleItem *ammo)
+{
+	Trail trail;
+	Uint8 color;
+	float calibre;
+	trailFor(ammo, weapon, trail, color, calibre);
+	const float end[3] = { at.x + 0.5f, at.y + 0.5f, at.z + 0.5f }, start[3] = { from.x + 0.5f, from.y + 0.5f, from.z + 0.5f };
+	spawnShotImpact(end, start, trail);
+}
+
+/**
  * Where a shot ended, if not in a unit (that bleeds or sparks, see watchUnits): sparks, chunks
  * in the colour of what was hit and a puff of dust, and a mark: a bullet hole, or a bigger
  * scorch from beams, plasma and incendiaries. All of it on the surface the view shows there: the

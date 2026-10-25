@@ -79,6 +79,11 @@ const int PrevNextW = 10;
 /// Squad buttons shown at once (more scroll; more on a screen with room for them at their full
 /// width, see layoutTopBar), the least width of one and the full width.
 const int SquadWindow = 10, SquadMinW = 13, SquadFullW = 18;
+/// A shotgun's pellets landing are each heard (the owner: "all pellets should impact, play sound and
+/// show bulletholes"), but at most this many within PelletSoundWindow ms: the mixer has 16 channels,
+/// and two shotguns' sixteen pellets at once would take them all (see FirstPersonMode::pelletLanded).
+const int PelletSoundsAtOnce = 4;
+const Uint32 PelletSoundWindow = 60;
 /// The info panel, bottom left, and the width of a line of text in it.
 const int PanelW = 150, PanelH = 54, PanelLineW = PanelW - 6;
 /// The crosshair's surface (square).

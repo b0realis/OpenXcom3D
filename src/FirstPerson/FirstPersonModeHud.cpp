@@ -666,8 +666,9 @@ std::string FirstPersonMode::ammoLabel(const BattleUnit *unit, const BattleItem 
 	const RuleItem *rules = weapon->getRules();
 	if (rules->getBattleType() != BT_FIREARM)
 	{
-		// A primed grenade (or anything with a fuse): PRIMED and the turns its fuse has left
-		// (0: it goes off at the end of this turn, once it lies on the ground); one that goes off
+		// A primed grenade (or anything with a fuse): PRIMED and the turns its fuse has left, said
+		// so ("PRIMED 3 turns"; 0: "PRIMED this turn", it goes off at the end of this turn, once it
+		// lies on the ground; the owner, after primed 3 was taken for seconds); one that goes off
 		// on landing just PRIMED.
 		if (rules->getFuseTimerType() != BFT_NONE && weapon->getFuseTimer() >= 0)
 		{
@@ -684,11 +685,12 @@ std::string FirstPersonMode::ammoLabel(const BattleUnit *unit, const BattleItem 
 			{
 				return _state->tr("STR_FPS_PRIMED_INSTANT");
 			}
-			return _state->tr("STR_FPS_PRIMED").arg(weapon->getFuseTimer());
+			const int turnsLeft = weapon->getFuseTimer();
+			return turnsLeft == 0 ? _state->tr("STR_FPS_PRIMED_THIS_TURN") : turnsLeft == 1 ? _state->tr("STR_FPS_PRIMED_ONE_TURN") : _state->tr("STR_FPS_PRIMED").arg(turnsLeft);
 		}
-		// Doom real-time grenades primed on throw: one on a timer, not armed yet, burns for the
-		// fuse once thrown.
-		if (doomModeOn() && Options::fpsDoomRealTimeGrenades && Options::fpsDoomPrimeOnThrow && timedGrenade(weapon))
+		// Doom mode's real-time grenades primed on throw: one on a timer, not armed yet, burns for
+		// the fuse once thrown.
+		if (doomModeOn() && Options::fpsDoomPrimeOnThrow && timedGrenade(weapon))
 		{
 			return _state->tr("STR_FPS_DOOM_FUSE").arg(std::clamp(Options::fpsDoomGrenadeFuse, 1, FirstPerson::DoomFuseMaxSeconds));
 		}

@@ -47,12 +47,16 @@
  * and its 3D VIEW options tab.
  */
 #include "FirstPersonApi.h"
+#include <algorithm>
+#include <map>
 #include "FirstPersonMode.h"
 #include "OptionsFirstPersonState.h"
 #include "../Engine/Game.h"
 #include "../Engine/OptionInfo.h"
 #include "../Engine/Options.h"
 #include "../Mod/Mod.h"
+#include "../Mod/RuleDamageType.h"
+#include "../Mod/RuleItem.h"
 
 namespace OpenXcom
 {
@@ -349,8 +353,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDownedIcons", &fpsDownedIcons, 1, "STR_FPS_DOWNED_ICONS", category));
 	// Staying in the 3D view during the alien turn, starting battles in it, and the debug cheat
 	// "doom mode" (endless time units and energy), with its two extras, each doom mode plus
-	// more: IDKFA (endless ammo) and IDDQD (invincible soldiers); and in doom mode, grenades in
-	// real time (one click, a few seconds' fuse) if wanted.
+	// more: IDKFA (endless ammo) and IDDQD (invincible soldiers); in doom mode grenades go off in
+	// real time (one click, a few seconds' fuse: the owner, "realtime grenade setting should be
+	// always on with doom mode", where it was a setting of its own).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsAlienTurn3D", &fpsAlienTurn3D, true, "STR_FPS_ALIEN_TURN_3D", category));
 	// ...and in it, the view cuts to the soldier who sees the alien acting, or who fires back;
 	// a soldier shot at, hit or taken over pops up their small camera.
@@ -361,8 +366,7 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomMode", &fpsDoomMode, false, "STR_FPS_DOOM_MODE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomIdkfa", &fpsDoomIdkfa, false, "STR_FPS_DOOM_IDKFA", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomIddqd", &fpsDoomIddqd, false, "STR_FPS_DOOM_IDDQD", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomRealTimeGrenades", &fpsDoomRealTimeGrenades, false, "STR_FPS_DOOM_REAL_TIME_GRENADES", category));
-	// ...armed as they're thrown, burning from leaving the hand (YES), or primed with a click and
+	// Doom mode's real-time grenades: armed as they're thrown, burning from leaving the hand (YES), or primed with a click and
 	// burning in the hand (NO, "cooking");
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomPrimeOnThrow", &fpsDoomPrimeOnThrow, true, "STR_FPS_DOOM_PRIME_ON_THROW", category));
 	// ...thrown freely at whatever the crosshair points at, bursting in the air when the fuse runs out in flight;
@@ -512,6 +516,58 @@ bool fastShots(BattlescapeState *state, const BattleUnit *attacker)
 bool pelletsInFlight(BattlescapeState *state)
 {
 	return FirstPersonMode::pelletsInFlight(state);
+}
+
+/**
+ * A shotgun's pellet landed: heard, and marked in the 3D view (see FirstPersonMode::pelletLanded).
+ * @param state The battlescape screen.
+ * @param at Where it struck, in voxels.
+ * @param from A point further back on its path, for its direction.
+ * @param impact What it struck (a VoxelType; V_OUTOFBOUNDS: nothing).
+ * @param weapon The weapon that fired it.
+ * @param ammo Its ammo.
+ */
+void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo)
+{
+	FirstPersonMode::pelletLanded(state, at, from, impact, weapon, ammo);
+}
+
+/**
+ * The bullet sprite for shotgun ammo that has none (a player's report: on the isometric map a
+ * shotgun's round is "unsprited"; "Just using the most common used sprite per that damage type
+ * should be fitting for now"): of the mod's items with a bullet sprite, the one used most by those
+ * of the ammo's damage type, or by all of them when none shares it. Worked out once per mod.
+ * @param mod The mod.
+ * @param ammo The shotgun ammo.
+ * @return The bullet sprite, or Mod::NO_SURFACE when no item has one.
+ */
+int shotgunBulletSprite(const Mod *mod, const RuleItem *ammo)
+{
+	// The most used sprite per damage type (and, under DT_NONE's key -1, overall), per mod.
+	static const Mod *countedFor = nullptr;
+	static std::map<int, int> mostUsed;
+	if (countedFor != mod)
+	{
+		countedFor = mod;
+		mostUsed.clear();
+		std::map<int, std::map<int, int>> votes; // damage type (-1: all) -> sprite -> items using it
+		for (const std::string &name : mod->getItemsList())
+		{
+			const RuleItem *item = mod->getItem(name);
+			if (item && item->getBulletSprite() != Mod::NO_SURFACE && item->getDamageType())
+			{
+				++votes[item->getDamageType()->ResistType][item->getBulletSprite()];
+				++votes[-1][item->getBulletSprite()];
+			}
+		}
+		for (const auto &[damage, sprites] : votes)
+		{
+			mostUsed[damage] = std::max_element(sprites.begin(), sprites.end(), [](const auto &a, const auto &b) { return a.second < b.second; })->first;
+		}
+	}
+	auto found = mostUsed.find(ammo->getDamageType() ? (int)ammo->getDamageType()->ResistType : -1);
+	if (found == mostUsed.end()) found = mostUsed.find(-1);
+	return found != mostUsed.end() ? found->second : Mod::NO_SURFACE;
 }
 
 /**

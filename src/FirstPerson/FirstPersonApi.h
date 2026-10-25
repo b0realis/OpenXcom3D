@@ -63,12 +63,14 @@ namespace OpenXcom
 
 class Action;
 struct BattleAction;
+class BattleItem;
 class BattlescapeState;
 class BattleUnit;
 class FirstPersonMode;
 class Game;
 class Mod;
 class OptionInfo;
+class RuleItem;
 class State;
 
 namespace FirstPerson
@@ -157,9 +159,15 @@ void freeAimTarget(BattlescapeState *state, const BattleAction &action, Position
 /// Is FPS-style shooting on for this unit's shots in the first-person view? Their bullet hits
 /// then play quicker (a burst at a bullet's pace).
 bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
-/// Setting "Shotgun pellets in flight": do a shotgun's pellets fly beside its round (the 3D view
-/// showing), rather than all landing at once? They're traced as the round is fired, and hit as it lands.
+/// Setting "Shotgun pellets in flight": do a shotgun's pellets fly beside its round (in 3D and on
+/// the map), rather than all landing at once? They're traced as the round is fired, and hit as it lands.
 bool pelletsInFlight(BattlescapeState *state);
+/// A shotgun's pellet landed (ProjectileFlyBState::pelletLands), in either view: it's heard (a few
+/// to a volley) and the 3D view marks where it struck (sparks, a bullet hole), as it does the round.
+void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo);
+/// The bullet sprite for shotgun ammo that has none (Projectile): the one the mod's other ammo of
+/// its damage type uses most, so the map can draw its round and pellets in flight.
+int shotgunBulletSprite(const Mod *mod, const RuleItem *ammo);
 /// A unit panics or goes berserk: returns true if the first-person view shows it its own way
 /// (the game then leaves out its "has panicked" box, which would freeze the view behind it).
 bool breakdown(BattlescapeState *state, BattleUnit *unit);
@@ -195,6 +203,8 @@ inline bool activeWhenNew(const std::string &) { return false; }
 inline void freeAimTarget(BattlescapeState *, const BattleAction &, Position &) { }
 inline bool fastShots(BattlescapeState *, const BattleUnit *) { return false; }
 inline bool pelletsInFlight(BattlescapeState *) { return false; }
+inline void pelletLanded(BattlescapeState *, const Position &, const Position &, int, const BattleItem *, const BattleItem *) { }
+inline int shotgunBulletSprite(const Mod *, const RuleItem *) { return -1; } // (Mod::NO_SURFACE)
 inline bool breakdown(BattlescapeState *, BattleUnit *) { return false; }
 inline void closeQuartersDeflected(BattlescapeState *, const BattleUnit *, const Position &) { }
 inline bool endlessAmmo(BattlescapeState *, const BattleUnit *) { return false; }

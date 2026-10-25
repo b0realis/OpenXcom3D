@@ -1018,7 +1018,7 @@ bool FirstPersonMode::stepFreeGrenade(Uint32 now)
 
 	// Burst in the air: the fuse has run out.
 	const auto fuse = _doomFuses.find(grenade->getId());
-	if (Options::fpsDoomRealTimeGrenades && fuse != _doomFuses.end() && fuse->second.lit && now - fuse->second.lit >= fuse->second.length)
+	if (doomModeOn() && fuse != _doomFuses.end() && fuse->second.lit && now - fuse->second.lit >= fuse->second.length)
 	{
 		_doomFuses.erase(fuse);
 		Position burst = voxelAt(flight.position);
@@ -1146,11 +1146,14 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 	// shots", or the lean keys) moves it off the middle (see leanSide).
 	const BattleActionOrigin side = (Options::fpsLeanShots || leaningOut()) && isShot(mode) ? leanSide(unit, targetTile) : BattleActionOrigin::CENTRE;
 
-	// Worked out again only when something it depends on changed (an arc depends on the
-	// target's tile only, a line on the very point).
+	// Worked out again only when something it depends on changed (a throw depends on the
+	// target's tile only, a line and an arcing shot at an exact point on the very point).
 	const Position from = unit->getPosition();
-	const std::vector<int> key = { arcing ? 1 : 2, targetTile.x, targetTile.y, targetTile.z, arcing ? 0 : targetVoxel.x, arcing ? 0 : targetVoxel.y,
-		arcing ? 0 : targetVoxel.z, from.x, from.y, from.z, unit->getDirection(), unit->isKneeled() ? 1 : 0, weapon->getId(), (int)mode, (int)side,
+	// (an arcing shot aims at the exact point as a straight one does, see launchShot; a throw at the tile)
+	const bool exactArc = arcing && (Options::fpsAimExact || freeAimOn(mode)) && hitSomething && isShot(mode);
+	const bool keyedPoint = !arcing || exactArc;
+	const std::vector<int> key = { arcing ? 1 : 2, targetTile.x, targetTile.y, targetTile.z, keyedPoint ? targetVoxel.x : 0, keyedPoint ? targetVoxel.y : 0,
+		keyedPoint ? targetVoxel.z : 0, from.x, from.y, from.z, unit->getDirection(), unit->isKneeled() ? 1 : 0, weapon->getId(), (int)mode, (int)side,
 		Options::fpsForceArcing ? 1 : 0, Options::fpsForceBlocked ? 1 : 0, Options::oxceEnableOffCentreShooting ? 1 : 0, hitSomething ? 1 : 0 };
 	if (key == _trajectoryKey)
 	{
@@ -1166,6 +1169,7 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 	preview.type = mode;
 	preview.target = targetTile;
 	preview.relativeOrigin = side;
+	if (exactArc) preview.targetVoxel = targetVoxel;
 	std::vector<Position> path;
 	FirstPersonView::TrajectoryLook look = FirstPersonView::TRAJECTORY_ARC;
 	if (arcing)
@@ -1196,11 +1200,12 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 /**
  * The curve the game's own aim finds for a throw or an arcing shot at a tile, as the game works
  * it out (Projectile::calculateThrow) but without the accuracy roll: the points on the tile it
- * tries, in its order (a unit's middle, low and high; an object, a wall, each at a few heights;
- * the floor; a throw always the floor), from the game's origin voxel (the hand), the first one
- * it finds a curve for that lands on the tile (TileEngine::validateThrow), and that curve
- * followed to where it comes down (calculateParabolaVoxel). At a wall seen from the side no
- * curve lands on its tile, and the game refuses the shot.
+ * tries, in its order (an arcing shot aimed at an exact point, see launchShot, that point first;
+ * then a unit's middle, low and high; an object, a wall, each at a few heights; the floor; a
+ * throw always the floor), from the game's origin voxel (the hand), the first one it finds a
+ * curve for that lands on the tile (TileEngine::validateThrow), and that curve followed to where
+ * it comes down (calculateParabolaVoxel). At a wall seen from the side no curve lands on its
+ * tile, and the game refuses the shot.
  * @param shot The action (actor, weapon, mode, the side it leaves from).
  * @param targetTile The tile aimed at.
  * @param path If given, set to the curve's voxels (left as it was when none is found).
@@ -1216,6 +1221,10 @@ bool FirstPersonMode::gameArcFound(BattleAction &shot, const Position &targetTil
 	const Position floorPoint = targetTile.toVoxel() + Position(8, 8, 1 - tile->getTerrainLevel());
 	std::vector<Position> aimPoints;
 	const BattleUnit *targetUnit = shot.type == BA_THROW ? nullptr : tile->getOverlappingUnit(_save);
+	if (shot.type != BA_THROW && shot.targetVoxel.x >= 0)
+	{
+		aimPoints.push_back(shot.targetVoxel); // (an exact point aimed at: tried first)
+	}
 	if (shot.type == BA_THROW)
 	{
 		aimPoints.push_back(floorPoint);
@@ -1258,9 +1267,10 @@ bool FirstPersonMode::gameArcFound(BattleAction &shot, const Position &targetTil
 
 /**
  * The curve of an arcing shot forced at a tile, as the game works it out with Ctrl held (force
- * fire, Projectile::calculateThrow): aimed at one point of the tile, half a level up (the game
- * takes the tile's corner voxel), a curve accepted even where it meets something before it
- * lands (TileEngine::validateThrow, forced), followed to where it ends.
+ * fire, Projectile::calculateThrow): aimed at the exact point aimed at (see launchShot), or else
+ * at one point of the tile, half a level up (the game takes the tile's corner voxel), a curve
+ * accepted even where it meets something before it lands (TileEngine::validateThrow, forced),
+ * followed to where it ends.
  * @param shot The action (actor, weapon, mode, the side it leaves from).
  * @param targetTile The tile aimed at.
  * @param path If given, set to the curve's voxels (left as it was when there's none).
@@ -1270,7 +1280,7 @@ bool FirstPersonMode::forcedArcFound(BattleAction &shot, const Position &targetT
 {
 	TileEngine *tileEngine = _save->getTileEngine();
 	const Position origin = tileEngine->getOriginVoxel(shot, nullptr);
-	const Position aimPoint = targetTile.toVoxel() + Position(0, 0, 12);
+	const Position aimPoint = shot.targetVoxel.x >= 0 ? shot.targetVoxel : targetTile.toVoxel() + Position(0, 0, 12);
 	double curvature = 0.0;
 	int meets = V_OUTOFBOUNDS;
 	if (!tileEngine->validateThrow(shot, origin, aimPoint, _save->getDepth(), &curvature, &meets, true))
@@ -1576,15 +1586,14 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 		}
 	}
 
-	// Doom mode's real-time grenades (setting; a first step towards a real-time mode). PRIME
+	// Doom mode's real-time grenades (always with Doom mode; a first step towards a real-time mode). PRIME
 	// opens the fuse box (1 to DoomFuseMaxSeconds seconds), as the isometric map's priming opens
 	// its timer; the seconds picked are kept (setting "Doom grenade fuse") for every grenade after.
 	// - Prime on throw (setting "Doom prime on throw", the default): that's all; the grenade is
 	//   armed as it's thrown (below) and goes off that many seconds after it leaves the hand.
 	// - Otherwise the pick pulls the pin, with its click, and the fuse burns from then on, in the
 	//   hand too ("cooking"): throw it, or don't.
-	// Without real-time grenades, grenades in Doom mode are primed and thrown as without it.
-	if (mode == BA_PRIME && doomModeOn() && Options::fpsDoomRealTimeGrenades && !menuTargeting && timedGrenade(weapon))
+	if (mode == BA_PRIME && doomModeOn() && !menuTargeting && timedGrenade(weapon))
 	{
 		_game->pushState(new DoomFuseState([this, unit, weapon](int seconds)
 		{
@@ -1758,7 +1767,7 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	// thrown (its pin pulled, with the click), and burns for the fuse setting from the moment it
 	// leaves the hand (see updateDoomFuses). One already burning (pulled before the setting
 	// changed) burns on.
-	if (mode == BA_THROW && doomModeOn() && Options::fpsDoomRealTimeGrenades && Options::fpsDoomPrimeOnThrow && timedGrenade(weapon)
+	if (mode == BA_THROW && doomModeOn() && Options::fpsDoomPrimeOnThrow && timedGrenade(weapon)
 		&& !_doomFuses.count(weapon->getId()))
 	{
 		pullDoomPin(unit, weapon, 0);
@@ -2299,7 +2308,47 @@ bool FirstPersonMode::fastShots(BattlescapeState *state, const BattleUnit *attac
  */
 bool FirstPersonMode::pelletsInFlight(BattlescapeState *state)
 {
-	return Options::fpsPelletsInFlight && state && state->_firstPerson && state->_firstPerson->isActive();
+	return Options::fpsPelletsInFlight && state && state->_firstPerson;
+}
+
+/**
+ * A shotgun's pellet landed (ProjectileFlyBState::pelletLands), in 3D or on the map (the owner:
+ * "at least cosmetically all pellets should impact, play sound and show bulletholes"): its ammo's
+ * hit sound where it struck (at most PelletSoundsAtOnce within PelletSoundWindow: a volley's
+ * pellets land together, and the mixer's channels are few), and, while the 3D view shows, sparks,
+ * chunks and a bullet hole there, as for the round (none on a unit: it bleeds or sparks its own way).
+ * @param state The battlescape screen.
+ * @param at Where it struck, in voxels.
+ * @param from A point further back on its path, for its direction.
+ * @param impact What it struck (a VoxelType; V_OUTOFBOUNDS: nothing in the map).
+ * @param weapon The weapon that fired it.
+ * @param ammo Its ammo.
+ */
+void FirstPersonMode::pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo)
+{
+	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
+	if (!mode || impact == V_OUTOFBOUNDS || !ammo)
+	{
+		return;
+	}
+	// Heard: a few to a volley.
+	const Uint32 now = SDL_GetTicks();
+	if (now - mode->_pelletSoundsFrom > PelletSoundWindow)
+	{
+		mode->_pelletSoundsFrom = now;
+		mode->_pelletSounds = 0;
+	}
+	if (mode->_pelletSounds < PelletSoundsAtOnce)
+	{
+		++mode->_pelletSounds;
+		state->_battleGame->playSound(ammo->getRules()->getHitSound(), at.toTile());
+	}
+	// Marked in the 3D view, while it shows (as the round's mark: on the map its world may not even
+	// be built yet, a battle loaded there).
+	if (impact != V_UNIT && mode->isActive())
+	{
+		mode->_view->markPelletImpact(at, from, weapon, ammo);
+	}
 }
 
 /**
@@ -2687,7 +2736,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 			if (entry.mode == mode) modeText = _state->tr(entry.name);
 		}
 		// Doom real-time grenades primed on throw: PRIME sets the fuse for every grenade, "FUSE 3s".
-		if (mode == BA_PRIME && doomModeOn() && Options::fpsDoomRealTimeGrenades && Options::fpsDoomPrimeOnThrow && timedGrenade(weapon))
+		if (mode == BA_PRIME && doomModeOn() && Options::fpsDoomPrimeOnThrow && timedGrenade(weapon))
 		{
 			modeText = _state->tr("STR_FPS_DOOM_FUSE").arg(std::clamp(Options::fpsDoomGrenadeFuse, 1, FirstPerson::DoomFuseMaxSeconds));
 		}

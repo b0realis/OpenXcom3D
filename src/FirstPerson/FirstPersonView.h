@@ -388,6 +388,8 @@ public:
 	/// squares and frozen pictures (see updateSignalGlitches); 0 none, 1 now and then, 2 a lot
 	/// (the hardest missions, on the aliens' own ground).
 	void setSignalGlitches(int level) { _signalGlitches = level; }
+	/// Where a shotgun's pellet struck: sparks, chunks and a bullet hole, as for a round (see FirstPerson::pelletLanded).
+	void markPelletImpact(const Position &at, const Position &from, const BattleItem *weapon, const BattleItem *ammo);
 
 	// =====================================================================================
 	// What the first-person mode asks the view

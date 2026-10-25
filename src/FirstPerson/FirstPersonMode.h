@@ -131,6 +131,8 @@ public:
 	static bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
 	/// Do a shotgun's pellets fly beside its round (setting "Shotgun pellets in flight", the 3D view showing)?
 	static bool pelletsInFlight(BattlescapeState *state);
+	/// A shotgun's pellet landed (see FirstPerson::pelletLanded): heard, a few to a volley, and marked in the 3D view.
+	static void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo);
 	/// A soldier panics or goes berserk, asked by the game (see FirstPerson::breakdown).
 	static bool breakdown(BattlescapeState *state, BattleUnit *unit);
 	/// A close-quarters check knocked a shot aside, told by the game (see FirstPerson::closeQuartersDeflected).
@@ -837,6 +839,7 @@ private:
 	std::vector<SquadState> _squadStates;         // how each squad member is
 	std::vector<Surface*> _squadIcons;            // the icon on each button (for the fallen and the turned)
 	std::vector<size_t> _squadSlots;              // the slots with a button, in order
+	Uint32 _pelletSoundsFrom = 0; int _pelletSounds = 0; // pellets heard in the last moment (see pelletLanded): when it began, how many
 	int _squadScroll = 0, _squadWindow = 10;      // the buttons shown at once (ten, more on a wide screen); the rest scroll
 	const BattleUnit *_squadScrolledTo = nullptr; // the selected soldier the window last followed
 	Uint8 _squadColor = 0;                        // the buttons' own colour
