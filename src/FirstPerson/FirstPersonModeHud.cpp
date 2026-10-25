@@ -1409,8 +1409,14 @@ void FirstPersonMode::refreshSquad()
  * Lays out the right part of the top bar (canvas pixels). From the right: END, then the
  * armor's buttons (with long labels, or short ones if the bar is too narrow for them), then
  * the squad buttons between the previous and next buttons. The squad buttons take what room
- * is left: at most ten are shown at once (a window that scrolls over the rest), each at least
- * SquadMinW and at most 18 pixels wide. Each button keeps its slot's number.
+ * is left: ten are shown at once (a window that scrolls over the rest), or more on a screen with
+ * room for them at their full width (the owner: "If screen permits we can have more soldier
+ * numbers up"), each at least SquadMinW and at most SquadFullW pixels wide. Each button keeps
+ * its slot's number. With room to
+ * spare (a wide screen, a small squad) the squad's group, previous to next, stands in the
+ * middle of the screen (the owner's ask: the left buttons at the left edge, the soldiers in the
+ * middle, the right ones at the right edge), moved aside only as far as it must to clear its
+ * neighbours; on the original screen a full squad fills the bar as before.
  */
 void FirstPersonMode::layoutTopBar()
 {
@@ -1429,7 +1435,10 @@ void FirstPersonMode::layoutTopBar()
 	// leaves too little room for the squad buttons, a second pass uses the short ones.
 	// freeRight ends up as the right end of the room left for the squad buttons.
 	TextButton *suitButtons[4] = { _btnFly, _btnLight, _btnNight, _btnSpecial };
-	const int squadLeft = SquadX + PrevNextW + 1;
+	// Previous's leftmost place: after INV, wherever INV stands (in HUD's place on the map, see
+	// updateTopBar).
+	const int squadX = SquadX - (InventoryButtonX - _btnInventory->getX());
+	const int squadLeft = squadX + PrevNextW + 1;
 	int freeRight = 0;
 	for (int pass = 0; pass < 2; ++pass)
 	{
@@ -1446,16 +1455,23 @@ void FirstPersonMode::layoutTopBar()
 		}
 		if (freeRight - 1 - PrevNextW - squadLeft >= wantedButtons * (SquadMinW + 1)) break;
 	}
-	// Up to ten squad buttons between previous and next; the window scrolls. Work out how many
-	// fit, keep the scroll position inside the slots, and share out the width.
+	// Ten squad buttons between previous and next (as many as fit at the least width), or more
+	// if they fit at the full width; the window scrolls over the rest. Work out how many, keep the
+	// scroll position inside the slots, and share out the width.
 	const int availableWidth = freeRight - 1 - PrevNextW - squadLeft;
 	_squadWindow = std::clamp(availableWidth / (SquadMinW + 1), 1, std::max(1, wantedButtons));
+	_squadWindow = std::max(_squadWindow, std::min((int)_squadSlots.size(), availableWidth / (SquadFullW + 1)));
 	_squadScroll = std::clamp(_squadScroll, 0, std::max(0, (int)_squadSlots.size() - _squadWindow));
-	const int buttonWidth = std::clamp(availableWidth / _squadWindow - 1, SquadMinW, 18);
+	const int buttonWidth = std::clamp(availableWidth / _squadWindow - 1, SquadMinW, SquadFullW);
+	// The group's place: centred on the screen, within the room it has (its spare width).
+	const int shownButtons = std::min((int)_squadSlots.size() - _squadScroll, _squadWindow);
+	const int groupWidth = PrevNextW + 1 + shownButtons * (buttonWidth + 1) + PrevNextW;
+	const int spareWidth = std::max(0, availableWidth - shownButtons * (buttonWidth + 1));
+	const int groupX = squadX + std::clamp((canvasWidth() - groupWidth) / 2 - squadX, 0, spareWidth);
 	// Place previous, the buttons in the window (each with its icon centred on it, shown for a
 	// soldier who isn't ready), and next right after them.
-	_btnPrev->setX(SquadX);
-	int buttonX = squadLeft;
+	_btnPrev->setX(groupX);
+	int buttonX = groupX + PrevNextW + 1;
 	for (int slotIndex = _squadScroll; slotIndex < std::min((int)_squadSlots.size(), _squadScroll + _squadWindow); ++slotIndex)
 	{
 		const size_t buttonIndex = _squadSlots[slotIndex];
@@ -1642,9 +1658,16 @@ void FirstPersonMode::updateTopBar(BattleUnit *selected)
 		}
 	}
 
-	// The HUD button: pressed while the classic HUD is drawn, shown only in 3D. END too shows
-	// only in 3D, and the view button names the view a click switches to.
+	// The HUD button: pressed while the classic HUD is drawn, shown only in 3D (on the map INV
+	// takes its place, no gap left, and the bar is laid out again). END too shows only in 3D,
+	// and the view button names the view a click switches to.
 	const bool active = isActive();
+	const int inventoryX = active ? InventoryButtonX : HudButtonX;
+	if (_btnInventory->getX() != inventoryX)
+	{
+		_btnInventory->setX(inventoryX);
+		layoutTopBar();
+	}
 	TextButton *hudGroup = _classicHud ? _btnHud : nullptr;
 	if (hudGroup != _hudButtonGroup)
 	{

@@ -12,7 +12,7 @@ index 31faa5c79..7e45307af 100644
  if ( CHECK_CCACHE )
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..15a708702
+index 000000000..5b12ab0ae
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,385 @@
@@ -183,7 +183,7 @@ index 000000000..15a708702
 +  STR_FPS_AKIMBO_REALISTIC_ON: "REALISTIC AKIMBO"
 +  STR_FPS_AKIMBO_OFF: "AKIMBO OFF"
 +  STR_FPS_AKIMBO_IN_TURN: "Akimbo in turn"
-+  STR_FPS_AKIMBO_IN_TURN_DESC: "YES: with two guns one fires a moment after the other, each at full accuracy and its own cost. NO: both at once, each 30% less accurate, for the dearer gun's cost and a tenth."
++  STR_FPS_AKIMBO_IN_TURN_DESC: "Two guns fire each 30% less accurate, for the dearer gun's cost and a tenth. YES: one a moment after the other, both rounds flying 30% faster. NO: both at once."
 +  STR_FPS_KEY_AKIMBO_STYLE: "Akimbo style"
 +  STR_FPS_KEY_AKIMBO_STYLE_DESC: "Switches akimbo between both guns at once and one after the other (setting Akimbo in turn)."
 +  STR_FPS_AKIMBO_TOGETHER_ON: "AKIMBO: BOTH AT ONCE"
@@ -403,7 +403,7 @@ index 000000000..15a708702
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers: a clear view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..304ad96a0
+index 000000000..d86181528
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,385 @@
@@ -574,7 +574,7 @@ index 000000000..304ad96a0
 +  STR_FPS_AKIMBO_REALISTIC_ON: "REALISTIC AKIMBO"
 +  STR_FPS_AKIMBO_OFF: "AKIMBO OFF"
 +  STR_FPS_AKIMBO_IN_TURN: "Akimbo in turn"
-+  STR_FPS_AKIMBO_IN_TURN_DESC: "YES: with two guns one fires a moment after the other, each at full accuracy and its own cost. NO: both at once, each 30% less accurate, for the dearer gun's cost and a tenth."
++  STR_FPS_AKIMBO_IN_TURN_DESC: "Two guns fire each 30% less accurate, for the dearer gun's cost and a tenth. YES: one a moment after the other, both rounds flying 30% faster. NO: both at once."
 +  STR_FPS_KEY_AKIMBO_STYLE: "Akimbo style"
 +  STR_FPS_KEY_AKIMBO_STYLE_DESC: "Switches akimbo between both guns at once and one after the other (setting Akimbo in turn)."
 +  STR_FPS_AKIMBO_TOGETHER_ON: "AKIMBO: BOTH AT ONCE"
@@ -932,7 +932,7 @@ index b7e1111f3..7bd979a4e 100644
  		getMap()->getCamera()->centerOnPosition(unit->getPosition());
  		if (status == STATUS_PANICKING)
 diff --git a/src/Battlescape/BattlescapeGame.h b/src/Battlescape/BattlescapeGame.h
-index 7af613cc7..019371ba1 100644
+index 7af613cc7..91d43e28d 100644
 --- a/src/Battlescape/BattlescapeGame.h
 +++ b/src/Battlescape/BattlescapeGame.h
 @@ -90,6 +90,14 @@ struct BattleAction : BattleActionCost
@@ -943,10 +943,10 @@ index 7af613cc7..019371ba1 100644
 +	bool instantMove = false; // walk without the step animation (first-person view)
 +	bool freeAim = false; // FPS-style shot (first-person view): each round goes where the view aims it, no accuracy roll
 +	bool forced = false; // forced shot (first-person view options): as with Ctrl held for force fire (an arcing shot at the target tile, whatever its curve meets; a straight one at targetVoxel, whatever is in the way)
-+	bool dualWield = false; // fired together with the gun in the other hand (first-person view option): less accurate (FirstPerson::DualWieldAccuracy)
++	bool dualWield = false; // fired along with the gun in the other hand (first-person view option): less accurate (FirstPerson::DualWieldAccuracy)
 +	BattleItem *dualWeapon = nullptr; // ...that gun, and its fire mode: its rounds fly beside this one's
 +	BattleActionType dualType = BA_NONE;
-+	bool dualInTurn = false; // ...fired a moment after this one's round instead, both at full accuracy and their own cost (first-person view, "Akimbo in turn")
++	bool dualInTurn = false; // ...fired a moment after this one's round instead of beside it, both rounds faster (first-person view, "Akimbo in turn")
  
  	/// Default constructor
  	BattleAction() : target(-1, -1, -1), targeting(false), value(0), diff(0), autoShotCounter(0), cameraPosition(0, 0, -1), desperate(false), finalFacing(-1), finalAction(false), number(0), sprayTargeting(false) { }
@@ -1441,10 +1441,18 @@ index 861c7702a..7f87d9f02 100644
  	const std::vector<int> &getPath() const;
  	/// Makes a copy to the path.
 diff --git a/src/Battlescape/Projectile.cpp b/src/Battlescape/Projectile.cpp
-index 7f7697c1d..c3c4aa21b 100644
+index 7f7697c1d..ffeb386b4 100644
 --- a/src/Battlescape/Projectile.cpp
 +++ b/src/Battlescape/Projectile.cpp
-@@ -85,6 +85,10 @@ Projectile::Projectile(Mod *mod, SavedBattleGame *save, BattleAction action, Pos
+@@ -31,6 +31,7 @@
+ #include "../Savegame/Tile.h"
+ #include "../Engine/RNG.h"
+ #include "../Engine/Options.h"
++#include "../FirstPerson/FirstPersonApi.h"
+ #include "../fmath.h"
+ 
+ namespace OpenXcom
+@@ -85,6 +86,14 @@ Projectile::Projectile(Mod *mod, SavedBattleGame *save, BattleAction action, Pos
  			}
  		}
  	}
@@ -1452,10 +1460,14 @@ index 7f7697c1d..c3c4aa21b 100644
 +	{
 +		_speed *= 4; // FPS-style shot (first-person view): a bullet's pace
 +	}
++	if (_action.dualInTurn)
++	{
++		_extraSpeed = _speed * (FirstPerson::AkimboInTurnSpeed - 1.0); // akimbo in turn (first-person view): faster rounds, the fraction carried from move to move
++	}
  	if ((targetVoxel.x - origin.x) + (targetVoxel.y - origin.y) >= 0)
  	{
  		_reversed = true;
-@@ -132,9 +136,11 @@ int Projectile::calculateTrajectory(double accuracy, const Position& originVoxel
+@@ -132,9 +141,11 @@ int Projectile::calculateTrajectory(double accuracy, const Position& originVoxel
  		_action.actor->getFaction() == FACTION_PLAYER &&
  		_action.autoShotCounter == 1 &&
  		(!_save->isCtrlPressed(true) || !Options::forceFire) &&
@@ -1468,7 +1480,7 @@ index 7f7697c1d..c3c4aa21b 100644
  	{
  		Position hitPos = _trajectory.at(0).toTile();
  		if (test == V_UNIT && _save->getTile(hitPos) && _save->getTile(hitPos)->getUnit() == 0) //no unit? must be lower
-@@ -198,7 +204,17 @@ int Projectile::calculateTrajectory(double accuracy, const Position& originVoxel
+@@ -198,7 +209,17 @@ int Projectile::calculateTrajectory(double accuracy, const Position& originVoxel
  
  	// apply some accuracy modifiers.
  	// This will results in a new target voxel
@@ -1487,7 +1499,7 @@ index 7f7697c1d..c3c4aa21b 100644
  
  	// finally do a line calculation and store this trajectory.
  	return _save->getTileEngine()->calculateLineVoxel(originVoxel, _targetVoxel, true, &_trajectory, bu);
-@@ -228,7 +244,7 @@ int Projectile::calculateThrow(double accuracy)
+@@ -228,7 +249,7 @@ int Projectile::calculateThrow(double accuracy)
  	else
  	{
  		BattleUnit *tu = targetTile->getOverlappingUnit(_save);
@@ -1496,11 +1508,31 @@ index 7f7697c1d..c3c4aa21b 100644
  		{
  			targets.push_back(_action.target.toVoxel() + Position(0, 0, 12));
  			forced = true;
+@@ -493,7 +514,10 @@ bool Projectile::move()
+ 		}
+ 	}
+ 
+-	for (int i = 0; i < _speed; ++i)
++	_extraCarried += _extraSpeed;
++	const int steps = _speed + (int)_extraCarried;
++	_extraCarried -= (int)_extraCarried;
++	for (int i = 0; i < steps; ++i)
+ 	{
+ 		_position++;
+ 		if (_position == _trajectory.size())
 diff --git a/src/Battlescape/Projectile.h b/src/Battlescape/Projectile.h
-index a263ca287..0c9d0dba8 100644
+index a263ca287..8cb38be80 100644
 --- a/src/Battlescape/Projectile.h
 +++ b/src/Battlescape/Projectile.h
-@@ -80,6 +80,10 @@ public:
+@@ -56,6 +56,7 @@ private:
+ 	float _distance;
+ 	float _distanceMax;
+ 	int _speed;
++	double _extraSpeed = 0.0, _extraCarried = 0.0; // steps a move takes beyond _speed, and the fraction carried on (akimbo in turn, first-person view)
+ 	int _bulletSprite;
+ 	bool _reversed;
+ 	int _vaporColor, _vaporDensity, _vaporProbability;
+@@ -80,6 +81,10 @@ public:
  	int getParticle(int i) const;
  	/// Gets the item.
  	BattleItem *getItem() const;
@@ -1512,7 +1544,7 @@ index a263ca287..0c9d0dba8 100644
  	void skipTrajectory();
  	/// Gets the Position of origin for the projectile.
 diff --git a/src/Battlescape/ProjectileFlyBState.cpp b/src/Battlescape/ProjectileFlyBState.cpp
-index 529b7f282..aebf137f9 100644
+index 529b7f282..98b10c4b5 100644
 --- a/src/Battlescape/ProjectileFlyBState.cpp
 +++ b/src/Battlescape/ProjectileFlyBState.cpp
 @@ -18,6 +18,7 @@
@@ -1597,21 +1629,17 @@ index 529b7f282..aebf137f9 100644
  				if (!foundLoF && Options::oxceEnableOffCentreShooting)
  				{
  					// If we can't target from the standard shooting position, try a bit left and right from the centre.
-@@ -391,6 +424,22 @@ void ProjectileFlyBState::init()
+@@ -391,6 +424,18 @@ void ProjectileFlyBState::init()
  		}
  	}
  
 +	if (_action.dualWeapon && _range == 0)
 +	{
 +		// dual wield: the other gun fires along if it has the time units; they are paid when its first round goes (createPartnerProjectile);
-+		// together the pair costs the dearer gun's shot and a tenth more, so it pays the rest beyond this gun's (FirstPerson::dualWieldCharge);
-+		// in turn (both at full accuracy) it pays its own
++		// the pair costs the dearer gun's shot and a tenth more, together or in turn, so it pays the rest beyond this gun's (FirstPerson::dualWieldCharge)
 +		_partnerCharge = BattleActionCost(_action.dualType, _unit, _action.dualWeapon);
-+		if (!_action.dualInTurn)
-+		{
-+			_partnerCharge.Time = FirstPerson::dualWieldCharge(_action.Time, _partnerCharge.Time);
-+			_partnerCharge.Energy = FirstPerson::dualWieldCharge(_action.Energy, _partnerCharge.Energy);
-+		}
++		_partnerCharge.Time = FirstPerson::dualWieldCharge(_action.Time, _partnerCharge.Time);
++		_partnerCharge.Energy = FirstPerson::dualWieldCharge(_action.Energy, _partnerCharge.Energy);
 +		if (_partnerCharge.haveTU())
 +		{
 +			_partnerShots = _action.dualWeapon->getActionConf(_action.dualType)->shots;
@@ -1620,7 +1648,7 @@ index 529b7f282..aebf137f9 100644
  	if (createNewProjectile())
  	{
  		auto* conf = weapon->getActionConf(_action.type);
-@@ -418,6 +467,7 @@ void ProjectileFlyBState::init()
+@@ -418,6 +463,7 @@ void ProjectileFlyBState::init()
  bool ProjectileFlyBState::createNewProjectile()
  {
  	++_action.autoShotCounter;
@@ -1628,7 +1656,7 @@ index 529b7f282..aebf137f9 100644
  
  	// Special handling for "spray" auto-attack, get target positions from the action's waypoints, starting from the back
  	if (_action.sprayTargeting)
-@@ -447,6 +497,12 @@ bool ProjectileFlyBState::createNewProjectile()
+@@ -447,6 +493,12 @@ bool ProjectileFlyBState::createNewProjectile()
  		_action.waypoints.pop_back();
  	}
  
@@ -1641,7 +1669,7 @@ index 529b7f282..aebf137f9 100644
  	// create a new projectile
  	Projectile *projectile = new Projectile(_parent->getMod(), _parent->getSave(), _action, _origin, _targetVoxel, _ammo);
  
-@@ -465,6 +521,10 @@ bool ProjectileFlyBState::createNewProjectile()
+@@ -465,6 +517,10 @@ bool ProjectileFlyBState::createNewProjectile()
  	{
  		accuracyDivider = 200.0;
  	}
@@ -1652,7 +1680,7 @@ index 529b7f282..aebf137f9 100644
  
  	BattleActionAttack attack = BattleActionAttack::GetAferShoot(_action, _ammo);
  	if (_action.type == BA_THROW)
-@@ -588,9 +648,278 @@ bool ProjectileFlyBState::createNewProjectile()
+@@ -588,9 +644,278 @@ bool ProjectileFlyBState::createNewProjectile()
  		_parent->getSave()->appendToHitLog(HITLOG_NEW_SHOT, _action.actor->getFaction());
  	}
  
@@ -1797,7 +1825,7 @@ index 529b7f282..aebf137f9 100644
 +/**
 + * Dual wield (first-person view): the other gun fires its round at the same moment, with its
 + * own accuracy (cut as this one's, see FirstPerson::DualWieldAccuracy), ammo and sound; it flies beside this round (see think).
-+ * In turn (akimbo in turn) it fires a moment after, at full accuracy, and pays its own cost.
++ * In turn (akimbo in turn) it fires a moment after, cut and charged the same, both rounds faster (FirstPerson::AkimboInTurnSpeed).
 + */
 +void ProjectileFlyBState::createPartnerProjectile()
 +{
@@ -1823,7 +1851,7 @@ index 529b7f282..aebf137f9 100644
 +	}
 +	_partner = new Projectile(_parent->getMod(), _parent->getSave(), _partnerAction, _origin, target, _partnerAmmo);
 +	const BattleActionAttack attack = BattleActionAttack::GetAferShoot(_partnerAction, _partnerAmmo);
-+	const double divider = (_parent->getPanicHandled() ? 100.0 : 200.0) / (_action.dualInTurn ? 1.0 : FirstPerson::DualWieldAccuracy);
++	const double divider = (_parent->getPanicHandled() ? 100.0 : 200.0) / FirstPerson::DualWieldAccuracy; // (together or in turn)
 +	_partnerImpact = _partner->calculateTrajectory(BattleUnit::getFiringAccuracy(attack, _parent->getMod()) / divider);
 +	if (_partnerImpact == V_EMPTY)
 +	{
@@ -1931,7 +1959,7 @@ index 529b7f282..aebf137f9 100644
  /**
   * Deinitialize the state.
   */
-@@ -654,13 +983,35 @@ void ProjectileFlyBState::think()
+@@ -654,13 +979,35 @@ void ProjectileFlyBState::think()
  	else
  	{
  		BattleActionAttack attack = BattleActionAttack::GetAferShoot(_action, _ammo);
@@ -1968,7 +1996,7 @@ index 529b7f282..aebf137f9 100644
  			// impact !
  			if (_action.type == BA_THROW)
  			{
-@@ -742,6 +1093,7 @@ void ProjectileFlyBState::think()
+@@ -742,6 +1089,7 @@ void ProjectileFlyBState::think()
  						noMoreShotsToShoot(),
  						shotgun ? 0 : _range + _parent->getMap()->getProjectile()->getDistance()
  					));
@@ -1976,7 +2004,7 @@ index 529b7f282..aebf137f9 100644
  
  					if (_projectileImpact == V_UNIT)
  					{
-@@ -754,83 +1106,68 @@ void ProjectileFlyBState::think()
+@@ -754,83 +1102,68 @@ void ProjectileFlyBState::think()
  					// special shotgun behaviour: trace extra projectile paths, and add bullet hits at their termination points.
  					if (shotgun)
  					{
@@ -2003,7 +2031,8 @@ index 529b7f282..aebf137f9 100644
 -								{
 -									_targetVoxel = originalTarget;
 -								}
--							}
++								pelletLands(pellet.first, pellet.second, attack, offset);
+ 							}
 -
 -
 -							Projectile *proj = new Projectile(_parent->getMod(), _parent->getSave(), _action, _origin, _targetVoxel, _ammo);
@@ -2015,8 +2044,7 @@ index 529b7f282..aebf137f9 100644
 -								// pellet spread based on spread and choke values
 -								secondaryImpact = proj->calculateTrajectory(std::max(0.0, (1.0 - spread / 100.0) * choke / 100.0));
 -
-+								pelletLands(pellet.first, pellet.second, attack, offset);
- 							}
+-							}
 -							else
 -							{
 -								// pellet spread based on spread and firing accuracy with diminishing formula
@@ -2108,7 +2136,7 @@ index 529b7f282..aebf137f9 100644
  					}
  
  					// nerf unit's XP values (gained via extra shotgun bullets)
-@@ -842,6 +1179,8 @@ void ProjectileFlyBState::think()
+@@ -842,6 +1175,8 @@ void ProjectileFlyBState::think()
  				}
  			}
  
@@ -2117,7 +2145,7 @@ index 529b7f282..aebf137f9 100644
  			delete _parent->getMap()->getProjectile();
  			_parent->getMap()->setProjectile(0);
  		}
-@@ -857,6 +1196,9 @@ void ProjectileFlyBState::cancel()
+@@ -857,6 +1192,9 @@ void ProjectileFlyBState::cancel()
  	if (_parent->getMap()->getProjectile())
  	{
  		_parent->getMap()->getProjectile()->skipTrajectory();
@@ -3425,10 +3453,10 @@ index 000000000..c57f9e839
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..eb1651e28
+index 000000000..3d1dfa828
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,204 @@
+@@ -0,0 +1,209 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -3517,9 +3545,14 @@ index 000000000..eb1651e28
 +/// What the other gun pays when both fire at once, for one kind of cost (time units, energy): the
 +/// pair's cost (the dearer gun's and DualWieldExtraCost more, rounded) less what the chosen gun pays.
 +/// Akimbo in turn (setting "Akimbo in turn", or its key): the other gun's round leaves this many
-+/// milliseconds after the chosen gun's, both at full accuracy and their own cost; the chosen gun's
-+/// round lands once the other's has (ProjectileFlyBState).
++/// milliseconds after the chosen gun's, as less accurate and costing as together (the owner: "it
++/// should be identical to normal dual fire setting" but for the turn); the chosen gun's round lands
++/// once the other's has (ProjectileFlyBState).
 +const int AkimboInTurnDelay = 150;
++/// Akimbo in turn: both rounds (and their pellets) fly this much faster than the game would fly
++/// them, so waiting for one round per gun isn't sluggish (the owner: "raise fire speed 30% from
++/// whatever current projectile speed is"; one gun alone, or two together, at the normal speed).
++const double AkimboInTurnSpeed = 1.3;
 +inline int dualWieldCharge(int chosen, int other)
 +{
 +	const int pair = (int)((chosen > other ? chosen : other) * (1.0 + DualWieldExtraCost) + 0.5);
@@ -6242,7 +6275,7 @@ index 000000000..c4fcf8e18
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..e2b862fe6
+index 000000000..feefc557a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
 @@ -0,0 +1,1051 @@
@@ -7085,7 +7118,7 @@ index 000000000..e2b862fe6
 +	std::vector<SquadState> _squadStates;         // how each squad member is
 +	std::vector<Surface*> _squadIcons;            // the icon on each button (for the fallen and the turned)
 +	std::vector<size_t> _squadSlots;              // the slots with a button, in order
-+	int _squadScroll = 0, _squadWindow = 10;      // at most ten buttons at once; the rest scroll
++	int _squadScroll = 0, _squadWindow = 10;      // the buttons shown at once (ten, more on a wide screen); the rest scroll
 +	const BattleUnit *_squadScrolledTo = nullptr; // the selected soldier the window last followed
 +	Uint8 _squadColor = 0;                        // the buttons' own colour
 +
@@ -8117,10 +8150,10 @@ index 000000000..4e15be992
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..6f885d425
+index 000000000..8e0dd8e14
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,1799 @@
+@@ -0,0 +1,1822 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -9532,8 +9565,14 @@ index 000000000..6f885d425
 + * Lays out the right part of the top bar (canvas pixels). From the right: END, then the
 + * armor's buttons (with long labels, or short ones if the bar is too narrow for them), then
 + * the squad buttons between the previous and next buttons. The squad buttons take what room
-+ * is left: at most ten are shown at once (a window that scrolls over the rest), each at least
-+ * SquadMinW and at most 18 pixels wide. Each button keeps its slot's number.
++ * is left: ten are shown at once (a window that scrolls over the rest), or more on a screen with
++ * room for them at their full width (the owner: "If screen permits we can have more soldier
++ * numbers up"), each at least SquadMinW and at most SquadFullW pixels wide. Each button keeps
++ * its slot's number. With room to
++ * spare (a wide screen, a small squad) the squad's group, previous to next, stands in the
++ * middle of the screen (the owner's ask: the left buttons at the left edge, the soldiers in the
++ * middle, the right ones at the right edge), moved aside only as far as it must to clear its
++ * neighbours; on the original screen a full squad fills the bar as before.
 + */
 +void FirstPersonMode::layoutTopBar()
 +{
@@ -9552,7 +9591,10 @@ index 000000000..6f885d425
 +	// leaves too little room for the squad buttons, a second pass uses the short ones.
 +	// freeRight ends up as the right end of the room left for the squad buttons.
 +	TextButton *suitButtons[4] = { _btnFly, _btnLight, _btnNight, _btnSpecial };
-+	const int squadLeft = SquadX + PrevNextW + 1;
++	// Previous's leftmost place: after INV, wherever INV stands (in HUD's place on the map, see
++	// updateTopBar).
++	const int squadX = SquadX - (InventoryButtonX - _btnInventory->getX());
++	const int squadLeft = squadX + PrevNextW + 1;
 +	int freeRight = 0;
 +	for (int pass = 0; pass < 2; ++pass)
 +	{
@@ -9569,16 +9611,23 @@ index 000000000..6f885d425
 +		}
 +		if (freeRight - 1 - PrevNextW - squadLeft >= wantedButtons * (SquadMinW + 1)) break;
 +	}
-+	// Up to ten squad buttons between previous and next; the window scrolls. Work out how many
-+	// fit, keep the scroll position inside the slots, and share out the width.
++	// Ten squad buttons between previous and next (as many as fit at the least width), or more
++	// if they fit at the full width; the window scrolls over the rest. Work out how many, keep the
++	// scroll position inside the slots, and share out the width.
 +	const int availableWidth = freeRight - 1 - PrevNextW - squadLeft;
 +	_squadWindow = std::clamp(availableWidth / (SquadMinW + 1), 1, std::max(1, wantedButtons));
++	_squadWindow = std::max(_squadWindow, std::min((int)_squadSlots.size(), availableWidth / (SquadFullW + 1)));
 +	_squadScroll = std::clamp(_squadScroll, 0, std::max(0, (int)_squadSlots.size() - _squadWindow));
-+	const int buttonWidth = std::clamp(availableWidth / _squadWindow - 1, SquadMinW, 18);
++	const int buttonWidth = std::clamp(availableWidth / _squadWindow - 1, SquadMinW, SquadFullW);
++	// The group's place: centred on the screen, within the room it has (its spare width).
++	const int shownButtons = std::min((int)_squadSlots.size() - _squadScroll, _squadWindow);
++	const int groupWidth = PrevNextW + 1 + shownButtons * (buttonWidth + 1) + PrevNextW;
++	const int spareWidth = std::max(0, availableWidth - shownButtons * (buttonWidth + 1));
++	const int groupX = squadX + std::clamp((canvasWidth() - groupWidth) / 2 - squadX, 0, spareWidth);
 +	// Place previous, the buttons in the window (each with its icon centred on it, shown for a
 +	// soldier who isn't ready), and next right after them.
-+	_btnPrev->setX(SquadX);
-+	int buttonX = squadLeft;
++	_btnPrev->setX(groupX);
++	int buttonX = groupX + PrevNextW + 1;
 +	for (int slotIndex = _squadScroll; slotIndex < std::min((int)_squadSlots.size(), _squadScroll + _squadWindow); ++slotIndex)
 +	{
 +		const size_t buttonIndex = _squadSlots[slotIndex];
@@ -9765,9 +9814,16 @@ index 000000000..6f885d425
 +		}
 +	}
 +
-+	// The HUD button: pressed while the classic HUD is drawn, shown only in 3D. END too shows
-+	// only in 3D, and the view button names the view a click switches to.
++	// The HUD button: pressed while the classic HUD is drawn, shown only in 3D (on the map INV
++	// takes its place, no gap left, and the bar is laid out again). END too shows only in 3D,
++	// and the view button names the view a click switches to.
 +	const bool active = isActive();
++	const int inventoryX = active ? InventoryButtonX : HudButtonX;
++	if (_btnInventory->getX() != inventoryX)
++	{
++		_btnInventory->setX(inventoryX);
++		layoutTopBar();
++	}
 +	TextButton *hudGroup = _classicHud ? _btnHud : nullptr;
 +	if (hudGroup != _hudButtonGroup)
 +	{
@@ -11777,10 +11833,10 @@ index 000000000..14a3a1063
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..14d3afa92
+index 000000000..c69377677
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,360 @@
+@@ -0,0 +1,361 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -11859,8 +11915,9 @@ index 000000000..14d3afa92
 +const int SquadX = 72;
 +const int EndTurnW = 30;
 +const int PrevNextW = 10;
-+/// Squad buttons shown at once (more scroll), and the least width of one.
-+const int SquadWindow = 10, SquadMinW = 13;
++/// Squad buttons shown at once (more scroll; more on a screen with room for them at their full
++/// width, see layoutTopBar), the least width of one and the full width.
++const int SquadWindow = 10, SquadMinW = 13, SquadFullW = 18;
 +/// The info panel, bottom left, and the width of a line of text in it.
 +const int PanelW = 150, PanelH = 54, PanelLineW = PanelW - 6;
 +/// The crosshair's surface (square).
@@ -12143,10 +12200,10 @@ index 000000000..14d3afa92
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..5c7147fcd
+index 000000000..4b0776b79
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,3113 @@
+@@ -0,0 +1,3114 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -13932,14 +13989,13 @@ index 000000000..5c7147fcd
 +	// other one never fired, and this one was half as accurate for it).
 +	BattleActionType offMode = BA_NONE;
 +	BattleItem *otherWeapon = menuTargeting ? nullptr : dualPartner(unit, weapon, slot, offMode);
-+	// The time units for both: together the dearer gun's shot and a tenth more (dualWieldCharge), in
-+	// turn (an arcing gun, or "Akimbo in turn": the other gun's round a moment after) each its own.
++	// The time units for both: the dearer gun's shot and a tenth more (dualWieldCharge), together or
++	// with "Akimbo in turn"; an arcing pair, firing in turn after the landing, each its own.
 +	const bool inTurn = otherWeapon && firesInTurn(weapon, mode, otherWeapon, offMode);
 +	if (otherWeapon && !doomModeOn())
 +	{
 +		const int chosenTime = BattleActionCost(mode, unit, weapon).Time, otherTime = BattleActionCost(offMode, unit, otherWeapon).Time;
-+		const bool eachOwnCost = inTurn || Options::fpsAkimboInTurn;
-+		if (chosenTime + (eachOwnCost ? otherTime : FirstPerson::dualWieldCharge(chosenTime, otherTime)) > unit->getTimeUnits())
++		if (chosenTime + (inTurn ? otherTime : FirstPerson::dualWieldCharge(chosenTime, otherTime)) > unit->getTimeUnits())
 +		{
 +			otherWeapon = nullptr;
 +		}
@@ -14021,11 +14077,12 @@ index 000000000..5c7147fcd
 +		}
 +	}
 +
-+	// Dual wield: the other gun fires at the same moment (both less accurate: the game cuts both
-+	// shots' accuracy, see DualWieldAccuracy), or with "Akimbo in turn" a moment after, both at
-+	// full accuracy and their own cost (see FirstPerson::AkimboInTurnDelay), if the caller found one to.
++	// Dual wield: the other gun fires at the same moment, or with "Akimbo in turn" a moment after
++	// (see FirstPerson::AkimboInTurnDelay), both rounds then faster (AkimboInTurnSpeed); either way
++	// both less accurate (the game cuts both shots' accuracy, see DualWieldAccuracy) and for the
++	// pair's cost (dualWieldCharge), if the caller found one to fire.
++	action->dualWield = otherWeapon != nullptr;
 +	action->dualInTurn = otherWeapon != nullptr && Options::fpsAkimboInTurn;
-+	action->dualWield = otherWeapon != nullptr && !action->dualInTurn;
 +	action->dualWeapon = otherWeapon;
 +	action->dualType = otherWeapon ? otherMode : BA_NONE;
 +
@@ -14075,7 +14132,7 @@ index 000000000..5c7147fcd
 +}
 +
 +/**
-+ * Akimbo in turn (see fire), every frame: the other gun's shot, once the game is done with the
++ * An arcing pair's turn (see fire), every frame: the other gun's shot, once the game is done with the
 + * first (idle again: the shot landed, its blast and any reaction fire over), at the same target,
 + * at full accuracy, leaving from that gun's muzzle on the view. Called off if the soldier is no
 + * longer the one selected or is down, the 3D view was left, or the gun is no longer in hand or
@@ -14751,7 +14808,7 @@ index 000000000..5c7147fcd
 +	int shots = 1;
 +	Uint8 color = grey;
 +	std::string modeText, shotText;
-+	bool dual = false, inTurn = false; // both guns fire (dual wield); in turn, each at full accuracy (see fire)
++	bool dual = false, inTurn = false, eachFull = false; // both guns fire (dual wield); in turn; each at full accuracy and its own cost (an arcing pair, see fire)
 +	if (weapon && mode != BA_NONE && unit)
 +	{
 +		const RuleItem *rules = weapon->getRules();
@@ -14767,18 +14824,19 @@ index 000000000..5c7147fcd
 +		}
 +
 +		// Dual wield: the other hand's gun joins in if it can fire along (dualPartner: a fitting
-+		// mode, loaded) and there's time for both (together the dearer gun's shot and a tenth
-+		// more, in turn each its own: see dualWieldCharge); otherwise the chosen gun fires alone,
-+		// at full accuracy, as fire() decides too.
++		// mode, loaded) and there's time for both (the dearer gun's shot and a tenth more, together
++		// or with "Akimbo in turn"; an arcing pair each its own: see dualWieldCharge); otherwise the
++		// chosen gun fires alone, at full accuracy, as fire() decides too.
 +		BattleActionType offMode = BA_NONE;
 +		int offTime = 0;
 +		if (BattleItem *otherWeapon = canFire ? dualPartner(unit, weapon, slot, offMode) : nullptr)
 +		{
-+			const bool pairInTurn = firesInTurn(weapon, mode, otherWeapon, offMode) || Options::fpsAkimboInTurn;
++			const bool arcingPair = firesInTurn(weapon, mode, otherWeapon, offMode);
 +			offTime = BattleActionCost(offMode, unit, otherWeapon).Time;
-+			if (!pairInTurn) offTime = FirstPerson::dualWieldCharge(cost.Time, offTime);
++			if (!arcingPair) offTime = FirstPerson::dualWieldCharge(cost.Time, offTime);
 +			dual = doomModeOn() || cost.Time + offTime <= unit->getTimeUnits();
-+			inTurn = dual && pairInTurn;
++			inTurn = dual && (arcingPair || Options::fpsAkimboInTurn);
++			eachFull = dual && arcingPair;
 +		}
 +
 +		// The hit chance at what's under the crosshair, for shots and throws (not in FPS style:
@@ -14793,7 +14851,7 @@ index 000000000..5c7147fcd
 +		{
 +			const BattleActionAttack attack = BattleActionAttack::GetBeforeShoot(mode, unit, weapon);
 +			accuracy = BattleUnit::getFiringAccuracy(attack, _game->getMod());
-+			if (dual && !inTurn) accuracy = (int)(accuracy * FirstPerson::DualWieldAccuracy); // (before the range dropoff, as the shot does)
++			if (dual && !eachFull) accuracy = (int)(accuracy * FirstPerson::DualWieldAccuracy); // (before the range dropoff, as the shot does)
 +			const int distanceSq = unit->distance3dToPositionSq(_aimVoxel.toTile());
 +			const int distance = (int)std::ceil(std::sqrt((double)distanceSq)); // in tiles
 +			int upperLimit, lowerLimit;
@@ -14897,7 +14955,7 @@ index 000000000..5c7147fcd
 +	if (unit && freeAimOn(mode))
 +	{
 +		const double focalPixels = (_view->getWidth() / 2.0) / std::tan(fieldOfViewNow() * Pi / 360.0);
-+		ringRadius = std::clamp((int)std::lround(std::tan((spreadFor(unit, mode, dual && !inTurn) + _bloom) * Pi / 180.0) * focalPixels), 2, CrosshairSize / 2 - 1);
++		ringRadius = std::clamp((int)std::lround(std::tan((spreadFor(unit, mode, dual && !eachFull) + _bloom) * Pi / 180.0) * focalPixels), 2, CrosshairSize / 2 - 1);
 +	}
 +
 +	// Redraw the crosshair only when what it shows has changed: all of that packed into one

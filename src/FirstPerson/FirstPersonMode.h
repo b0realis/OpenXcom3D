@@ -837,7 +837,7 @@ private:
 	std::vector<SquadState> _squadStates;         // how each squad member is
 	std::vector<Surface*> _squadIcons;            // the icon on each button (for the fallen and the turned)
 	std::vector<size_t> _squadSlots;              // the slots with a button, in order
-	int _squadScroll = 0, _squadWindow = 10;      // at most ten buttons at once; the rest scroll
+	int _squadScroll = 0, _squadWindow = 10;      // the buttons shown at once (ten, more on a wide screen); the rest scroll
 	const BattleUnit *_squadScrolledTo = nullptr; // the selected soldier the window last followed
 	Uint8 _squadColor = 0;                        // the buttons' own colour
 

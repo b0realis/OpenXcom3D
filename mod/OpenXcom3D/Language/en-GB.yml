@@ -165,7 +165,7 @@ en-GB:
   STR_FPS_AKIMBO_REALISTIC_ON: "REALISTIC AKIMBO"
   STR_FPS_AKIMBO_OFF: "AKIMBO OFF"
   STR_FPS_AKIMBO_IN_TURN: "Akimbo in turn"
-  STR_FPS_AKIMBO_IN_TURN_DESC: "YES: with two guns one fires a moment after the other, each at full accuracy and its own cost. NO: both at once, each 30% less accurate, for the dearer gun's cost and a tenth."
+  STR_FPS_AKIMBO_IN_TURN_DESC: "Two guns fire each 30% less accurate, for the dearer gun's cost and a tenth. YES: one a moment after the other, both rounds flying 30% faster. NO: both at once."
   STR_FPS_KEY_AKIMBO_STYLE: "Akimbo style"
   STR_FPS_KEY_AKIMBO_STYLE_DESC: "Switches akimbo between both guns at once and one after the other (setting Akimbo in turn)."
   STR_FPS_AKIMBO_TOGETHER_ON: "AKIMBO: BOTH AT ONCE"

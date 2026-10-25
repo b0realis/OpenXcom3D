@@ -76,8 +76,9 @@ const int ViewButtonX = 1, HudButtonX = 24, InventoryButtonX = 47, ToolButtonW =
 const int SquadX = 72;
 const int EndTurnW = 30;
 const int PrevNextW = 10;
-/// Squad buttons shown at once (more scroll), and the least width of one.
-const int SquadWindow = 10, SquadMinW = 13;
+/// Squad buttons shown at once (more scroll; more on a screen with room for them at their full
+/// width, see layoutTopBar), the least width of one and the full width.
+const int SquadWindow = 10, SquadMinW = 13, SquadFullW = 18;
 /// The info panel, bottom left, and the width of a line of text in it.
 const int PanelW = 150, PanelH = 54, PanelLineW = PanelW - 6;
 /// The crosshair's surface (square).

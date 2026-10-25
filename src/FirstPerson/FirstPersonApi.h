@@ -86,9 +86,14 @@ const double DualWieldExtraCost = 0.1;
 /// What the other gun pays when both fire at once, for one kind of cost (time units, energy): the
 /// pair's cost (the dearer gun's and DualWieldExtraCost more, rounded) less what the chosen gun pays.
 /// Akimbo in turn (setting "Akimbo in turn", or its key): the other gun's round leaves this many
-/// milliseconds after the chosen gun's, both at full accuracy and their own cost; the chosen gun's
-/// round lands once the other's has (ProjectileFlyBState).
+/// milliseconds after the chosen gun's, as less accurate and costing as together (the owner: "it
+/// should be identical to normal dual fire setting" but for the turn); the chosen gun's round lands
+/// once the other's has (ProjectileFlyBState).
 const int AkimboInTurnDelay = 150;
+/// Akimbo in turn: both rounds (and their pellets) fly this much faster than the game would fly
+/// them, so waiting for one round per gun isn't sluggish (the owner: "raise fire speed 30% from
+/// whatever current projectile speed is"; one gun alone, or two together, at the normal speed).
+const double AkimboInTurnSpeed = 1.3;
 inline int dualWieldCharge(int chosen, int other)
 {
 	const int pair = (int)((chosen > other ? chosen : other) * (1.0 + DualWieldExtraCost) + 0.5);

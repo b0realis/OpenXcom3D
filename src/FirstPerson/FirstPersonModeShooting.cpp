@@ -1783,14 +1783,13 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	// other one never fired, and this one was half as accurate for it).
 	BattleActionType offMode = BA_NONE;
 	BattleItem *otherWeapon = menuTargeting ? nullptr : dualPartner(unit, weapon, slot, offMode);
-	// The time units for both: together the dearer gun's shot and a tenth more (dualWieldCharge), in
-	// turn (an arcing gun, or "Akimbo in turn": the other gun's round a moment after) each its own.
+	// The time units for both: the dearer gun's shot and a tenth more (dualWieldCharge), together or
+	// with "Akimbo in turn"; an arcing pair, firing in turn after the landing, each its own.
 	const bool inTurn = otherWeapon && firesInTurn(weapon, mode, otherWeapon, offMode);
 	if (otherWeapon && !doomModeOn())
 	{
 		const int chosenTime = BattleActionCost(mode, unit, weapon).Time, otherTime = BattleActionCost(offMode, unit, otherWeapon).Time;
-		const bool eachOwnCost = inTurn || Options::fpsAkimboInTurn;
-		if (chosenTime + (eachOwnCost ? otherTime : FirstPerson::dualWieldCharge(chosenTime, otherTime)) > unit->getTimeUnits())
+		if (chosenTime + (inTurn ? otherTime : FirstPerson::dualWieldCharge(chosenTime, otherTime)) > unit->getTimeUnits())
 		{
 			otherWeapon = nullptr;
 		}
@@ -1872,11 +1871,12 @@ void FirstPersonMode::launchShot(BattleUnit *unit, BattleItem *weapon, BattleAct
 		}
 	}
 
-	// Dual wield: the other gun fires at the same moment (both less accurate: the game cuts both
-	// shots' accuracy, see DualWieldAccuracy), or with "Akimbo in turn" a moment after, both at
-	// full accuracy and their own cost (see FirstPerson::AkimboInTurnDelay), if the caller found one to.
+	// Dual wield: the other gun fires at the same moment, or with "Akimbo in turn" a moment after
+	// (see FirstPerson::AkimboInTurnDelay), both rounds then faster (AkimboInTurnSpeed); either way
+	// both less accurate (the game cuts both shots' accuracy, see DualWieldAccuracy) and for the
+	// pair's cost (dualWieldCharge), if the caller found one to fire.
+	action->dualWield = otherWeapon != nullptr;
 	action->dualInTurn = otherWeapon != nullptr && Options::fpsAkimboInTurn;
-	action->dualWield = otherWeapon != nullptr && !action->dualInTurn;
 	action->dualWeapon = otherWeapon;
 	action->dualType = otherWeapon ? otherMode : BA_NONE;
 
@@ -1926,7 +1926,7 @@ bool FirstPersonMode::firesInTurn(const BattleItem *weapon, BattleActionType mod
 }
 
 /**
- * Akimbo in turn (see fire), every frame: the other gun's shot, once the game is done with the
+ * An arcing pair's turn (see fire), every frame: the other gun's shot, once the game is done with the
  * first (idle again: the shot landed, its blast and any reaction fire over), at the same target,
  * at full accuracy, leaving from that gun's muzzle on the view. Called off if the soldier is no
  * longer the one selected or is down, the 3D view was left, or the gun is no longer in hand or
@@ -2602,7 +2602,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	int shots = 1;
 	Uint8 color = grey;
 	std::string modeText, shotText;
-	bool dual = false, inTurn = false; // both guns fire (dual wield); in turn, each at full accuracy (see fire)
+	bool dual = false, inTurn = false, eachFull = false; // both guns fire (dual wield); in turn; each at full accuracy and its own cost (an arcing pair, see fire)
 	if (weapon && mode != BA_NONE && unit)
 	{
 		const RuleItem *rules = weapon->getRules();
@@ -2618,18 +2618,19 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		}
 
 		// Dual wield: the other hand's gun joins in if it can fire along (dualPartner: a fitting
-		// mode, loaded) and there's time for both (together the dearer gun's shot and a tenth
-		// more, in turn each its own: see dualWieldCharge); otherwise the chosen gun fires alone,
-		// at full accuracy, as fire() decides too.
+		// mode, loaded) and there's time for both (the dearer gun's shot and a tenth more, together
+		// or with "Akimbo in turn"; an arcing pair each its own: see dualWieldCharge); otherwise the
+		// chosen gun fires alone, at full accuracy, as fire() decides too.
 		BattleActionType offMode = BA_NONE;
 		int offTime = 0;
 		if (BattleItem *otherWeapon = canFire ? dualPartner(unit, weapon, slot, offMode) : nullptr)
 		{
-			const bool pairInTurn = firesInTurn(weapon, mode, otherWeapon, offMode) || Options::fpsAkimboInTurn;
+			const bool arcingPair = firesInTurn(weapon, mode, otherWeapon, offMode);
 			offTime = BattleActionCost(offMode, unit, otherWeapon).Time;
-			if (!pairInTurn) offTime = FirstPerson::dualWieldCharge(cost.Time, offTime);
+			if (!arcingPair) offTime = FirstPerson::dualWieldCharge(cost.Time, offTime);
 			dual = doomModeOn() || cost.Time + offTime <= unit->getTimeUnits();
-			inTurn = dual && pairInTurn;
+			inTurn = dual && (arcingPair || Options::fpsAkimboInTurn);
+			eachFull = dual && arcingPair;
 		}
 
 		// The hit chance at what's under the crosshair, for shots and throws (not in FPS style:
@@ -2644,7 +2645,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		{
 			const BattleActionAttack attack = BattleActionAttack::GetBeforeShoot(mode, unit, weapon);
 			accuracy = BattleUnit::getFiringAccuracy(attack, _game->getMod());
-			if (dual && !inTurn) accuracy = (int)(accuracy * FirstPerson::DualWieldAccuracy); // (before the range dropoff, as the shot does)
+			if (dual && !eachFull) accuracy = (int)(accuracy * FirstPerson::DualWieldAccuracy); // (before the range dropoff, as the shot does)
 			const int distanceSq = unit->distance3dToPositionSq(_aimVoxel.toTile());
 			const int distance = (int)std::ceil(std::sqrt((double)distanceSq)); // in tiles
 			int upperLimit, lowerLimit;
@@ -2748,7 +2749,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	if (unit && freeAimOn(mode))
 	{
 		const double focalPixels = (_view->getWidth() / 2.0) / std::tan(fieldOfViewNow() * Pi / 360.0);
-		ringRadius = std::clamp((int)std::lround(std::tan((spreadFor(unit, mode, dual && !inTurn) + _bloom) * Pi / 180.0) * focalPixels), 2, CrosshairSize / 2 - 1);
+		ringRadius = std::clamp((int)std::lround(std::tan((spreadFor(unit, mode, dual && !eachFull) + _bloom) * Pi / 180.0) * focalPixels), 2, CrosshairSize / 2 - 1);
 	}
 
 	// Redraw the crosshair only when what it shows has changed: all of that packed into one
