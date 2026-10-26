@@ -124,16 +124,18 @@ void FirstPersonMode::makeWeaponInHand()
 	surface->setVisible(false);
 	if (_weaponInHand)
 	{
-		// Made again (a resize): the new surface takes the old one's place in the screen's list.
-		std::replace(_state->_surfaces.begin(), _state->_surfaces.end(), _weaponInHand, surface);
+		// Made again (a resize): the new surface takes the old one's place in the screen's lists.
+		replaceStateSurface(_weaponInHand, surface);
 		_ownSurfaces.erase(_weaponInHand);
 		delete _weaponInHand;
 	}
 	else
 	{
-		// The first time: straight after the 3D view in the screen's drawing order.
+		// The first time: straight after the 3D view in the screen's drawing order, and the
+		// screen's to delete at its end.
 		auto &surfaces = _state->_surfaces;
 		surfaces.insert(std::find(surfaces.begin(), surfaces.end(), (Surface*)_view) + 1, surface);
+		_state->_surfacesOwned.push_back(surface);
 	}
 	_ownSurfaces.insert(surface);
 	_weaponInHand = surface;

@@ -384,15 +384,17 @@ void FirstPersonMode::makeScopeCross()
 	auto &surfaces = _state->_surfaces;
 	if (_scopeCross)
 	{
-		// Made again (a resize): the new surface takes the old one's place in the screen's list.
-		std::replace(surfaces.begin(), surfaces.end(), _scopeCross, surface);
+		// Made again (a resize): the new surface takes the old one's place in the screen's lists.
+		replaceStateSurface(_scopeCross, surface);
 		_ownSurfaces.erase(_scopeCross);
 		delete _scopeCross;
 	}
 	else
 	{
-		// The first time: straight after the weapon in hand in the screen's drawing order.
+		// The first time: straight after the weapon in hand in the screen's drawing order, and
+		// the screen's to delete at its end.
 		surfaces.insert(std::find(surfaces.begin(), surfaces.end(), _weaponInHand) + 1, surface);
+		_state->_surfacesOwned.push_back(surface);
 	}
 	_ownSurfaces.insert(surface);
 	_scopeCross = surface;

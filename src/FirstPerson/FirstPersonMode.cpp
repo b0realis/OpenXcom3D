@@ -660,6 +660,21 @@ void FirstPersonMode::makeSoldierCamView()
 }
 
 /**
+ * Puts a surface in another's place in the screen's two lists: the order it draws them in, and
+ * the surfaces it deletes when it goes. Both: a surface remade in a resize (the 3D view, the
+ * soldier cam, the map camera, the scope cross) whose old one stayed in the second list was
+ * deleted again when the battle ended (a player's crash abandoning a mission, State::~State;
+ * the more resizes, the likelier).
+ * @param oldSurface The surface going (the caller deletes it).
+ * @param newSurface The one taking its place.
+ */
+void FirstPersonMode::replaceStateSurface(Surface *oldSurface, Surface *newSurface)
+{
+	std::replace(_state->_surfaces.begin(), _state->_surfaces.end(), oldSurface, newSurface);
+	std::replace(_state->_surfacesOwned.begin(), _state->_surfacesOwned.end(), oldSurface, newSurface);
+}
+
+/**
  * Puts a remade surface of ours in the old one's place among the state's surfaces (so it's drawn
  * in the same order), shown or hidden as that was, and deletes the old one; the first time (no
  * old one) it's added last, hidden: drawn over everything made so far.
@@ -671,7 +686,7 @@ void FirstPersonMode::putSurfaceInPlace(Surface *oldSurface, Surface *newSurface
 	const bool wasVisible = oldSurface && oldSurface->getVisible();
 	if (oldSurface)
 	{
-		std::replace(_state->_surfaces.begin(), _state->_surfaces.end(), oldSurface, newSurface);
+		replaceStateSurface(oldSurface, newSurface);
 		_ownSurfaces.erase(oldSurface);
 		delete oldSurface;
 	}
@@ -829,6 +844,14 @@ void FirstPersonMode::rememberChoices() const
  */
 void FirstPersonMode::resized(int widthChange, int heightChange)
 {
+	// A resize to the same size (a window manager can answer every change of video mode with
+	// one, as the inventory's own screen size makes): nothing to do (it remade the 3D views,
+	// freezing the game for a moment each time).
+	if (widthChange == 0 && heightChange == 0)
+	{
+		return;
+	}
+
 	// The battlescape moved everything to the middle and the bottom; undo that for our
 	// overlays, which live on the canvas.
 	for (Surface *surface : _ownSurfaces)
@@ -850,14 +873,22 @@ void FirstPersonMode::resized(int widthChange, int heightChange)
 	makeWeaponInHand();
 	makeScopeCross();
 
-	// A new 3D view at the new canvas size, set up like the old one and put in its place.
+	// A new 3D view at the new canvas size, set up like the old one and put in its place (only
+	// when the canvas's size changed: the magnification can take up a change of screen size).
+	if (canvasWidth() == _view->getWidth() && canvasHeight() == _view->getHeight())
+	{
+		_warningY += heightChange;
+		_state->_warning->setY(isActive() && !_classicHud ? warningY() : _warningY);
+		layoutTopBar();
+		return;
+	}
 	FirstPersonView *newView = new FirstPersonView(_game, canvasWidth(), canvasHeight(), 0, 0);
 	newView->setPalette(_state->getPalette());
 	newView->setSavedBattleGame(_save);
 	newView->setMap(_state->_map);
 	newView->setMaxDistance(_game->getMod()->getFirstPerson().getMaxViewDistance());
 	newView->setVisible(_view->getVisible());
-	std::replace(_state->_surfaces.begin(), _state->_surfaces.end(), (Surface*)_view, (Surface*)newView);
+	replaceStateSurface(_view, newView);
 	_ownSurfaces.erase(_view);
 	_ownSurfaces.insert(newView);
 	_preview->shareCache(newView);

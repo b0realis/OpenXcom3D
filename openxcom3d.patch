@@ -950,90 +950,8 @@ index 7af613cc7..91d43e28d 100644
  
  	/// Default constructor
  	BattleAction() : target(-1, -1, -1), targeting(false), value(0), diff(0), autoShotCounter(0), cameraPosition(0, 0, -1), desperate(false), finalFacing(-1), finalAction(false), number(0), sprayTargeting(false) { }
-diff --git a/src/Battlescape/BattlescapeGenerator.cpp b/src/Battlescape/BattlescapeGenerator.cpp
-index 1951ba749..cdca500d0 100644
---- a/src/Battlescape/BattlescapeGenerator.cpp
-+++ b/src/Battlescape/BattlescapeGenerator.cpp
-@@ -1350,7 +1350,22 @@ void BattlescapeGenerator::deployXCOM(const RuleStartingCondition* startingCondi
- void BattlescapeGenerator::autoEquip(std::vector<BattleUnit*> units, Mod *mod, std::vector<BattleItem*> *craftInv,
- 		RuleInventory *groundRuleInv, int worldShade, bool allowAutoLoadout, bool overrideEquipmentLayout)
- {
--	for (int pass = 0; pass < 4; ++pass)
-+	// (OpenXcom3D: the items are offered in the mod's own list order, the same every battle; the
-+	// craft's list is ordered by where its items sit in memory, which changed with the mod list.)
-+	std::stable_sort(craftInv->begin(), craftInv->end(),
-+		[](const BattleItem* a, const BattleItem* b)
-+		{
-+			const RuleItem* ruleA = a->getRules();
-+			const RuleItem* ruleB = b->getRules();
-+			if (ruleA->getListOrder() != ruleB->getListOrder())
-+			{
-+				return ruleA->getListOrder() < ruleB->getListOrder();
-+			}
-+			return ruleA->getType() < ruleB->getType();
-+		}
-+	);
-+	const int leftoversPass = 5;
-+	for (int pass = 0; pass <= leftoversPass; ++pass)
- 	{
- 		BattleItem* bi = nullptr;
- 		for (auto iter = craftInv->begin(); iter != craftInv->end();)
-@@ -1366,22 +1381,39 @@ void BattlescapeGenerator::autoEquip(std::vector<BattleUnit*> units, Mod *mod, s
- 			{
- 				bool add = false;
- 
-+				// (OpenXcom3D: guns first, then melee weapons; a two-handed melee weapon counts as a
-+				// rifle, and soldiers spawned with them when they came first in the craft's list. A gun
-+				// is a firearm with a shot that reaches past a few tiles: some mods' melee weapons are
-+				// firearms whose "shot" is a lunge of a tile or two (XPiratez: staffs and swords 1-3
-+				// tiles, whips, flamers and the odd special up to 12, bows from 13, guns 40 and more).)
-+				const int gunReach = 12;
-+				const RuleItem* rule = bi->getRules();
-+				const bool isGun = rule->getBattleType() == BT_FIREARM && rule->getMaxRange() > gunReach &&
-+					(rule->getCostAimed().Time > 0 || rule->getCostSnap().Time > 0 || rule->getCostAuto().Time > 0);
- 				switch (pass)
- 				{
- 				// priority 1: rifles.
- 				case 0:
--					add = bi->getRules()->isRifle();
-+					add = bi->getRules()->isRifle() && isGun;
- 					break;
- 				// priority 2: pistols (assuming no rifles were found).
- 				case 1:
--					add = bi->getRules()->isPistol();
-+					add = bi->getRules()->isPistol() && isGun;
- 					break;
--				// priority 3: ammunition.
-+				// priority 3: two-handed melee weapons (no guns left).
- 				case 2:
--					add = bi->getRules()->getBattleType() == BT_AMMO;
-+					add = bi->getRules()->isRifle() && !isGun;
- 					break;
--				// priority 4: leftovers.
-+				// priority 4: one-handed melee weapons.
- 				case 3:
-+					add = bi->getRules()->isPistol() && !isGun;
-+					break;
-+				// priority 5: ammunition.
-+				case 4:
-+					add = bi->getRules()->getBattleType() == BT_AMMO;
-+					break;
-+				// priority 6: leftovers.
-+				case leftoversPass:
- 					add = !bi->getRules()->isPistol() &&
- 							!bi->getRules()->isRifle() &&
- 							(bi->getRules()->getBattleType() != BT_FLARE || worldShade > mod->getMaxDarknessToSeeUnits());
-@@ -1400,7 +1432,7 @@ void BattlescapeGenerator::autoEquip(std::vector<BattleUnit*> units, Mod *mod, s
- 						}
- 						// let's not be greedy, we'll only take a second extra clip
- 						// if everyone else has had a chance to take a first.
--						bool allowSecondClip = (pass == 3);
-+						bool allowSecondClip = (pass == leftoversPass);
- 						if (bu->addItem(bi, mod, allowSecondClip, allowAutoLoadout))
- 						{
- 							iter = craftInv->erase(iter);
 diff --git a/src/Battlescape/BattlescapeState.cpp b/src/Battlescape/BattlescapeState.cpp
-index 7cd494130..2ddc79d69 100644
+index 7cd494130..58ecf8e01 100644
 --- a/src/Battlescape/BattlescapeState.cpp
 +++ b/src/Battlescape/BattlescapeState.cpp
 @@ -22,6 +22,7 @@
@@ -1063,15 +981,16 @@ index 7cd494130..2ddc79d69 100644
  	_barHealthColor = _barHealth->getColor();
  }
  
-@@ -732,6 +738,7 @@ BattlescapeState::BattlescapeState() :
+@@ -732,6 +738,8 @@ BattlescapeState::BattlescapeState() :
   */
  BattlescapeState::~BattlescapeState()
  {
 +	FirstPerson::destroy(_firstPerson);
++	_firstPerson = nullptr; // (OpenXcom3D: the battle's pending actions, deleted next, find no first-person mode)
  	delete _animTimer;
  	delete _gameTimer;
  	delete _battleGame;
-@@ -872,6 +879,7 @@ void BattlescapeState::think()
+@@ -872,6 +880,7 @@ void BattlescapeState::think()
  			}
  			_animTimer->think(this, 0);
  			_gameTimer->think(this, 0);
@@ -1079,7 +998,7 @@ index 7cd494130..2ddc79d69 100644
  			if (popped)
  			{
  				_battleGame->handleNonTargetAction();
-@@ -2547,6 +2555,25 @@ void BattlescapeState::animate()
+@@ -2547,6 +2556,25 @@ void BattlescapeState::animate()
  	}
  }
  
@@ -1105,7 +1024,7 @@ index 7cd494130..2ddc79d69 100644
  /**
   * Handles the battle game state.
   */
-@@ -2698,6 +2725,11 @@ inline void BattlescapeState::handle(Action *action)
+@@ -2698,6 +2726,11 @@ inline void BattlescapeState::handle(Action *action)
  {
  	if (!_firstInit)
  	{
@@ -1117,7 +1036,7 @@ index 7cd494130..2ddc79d69 100644
  		if (_game->getCursor()->getVisible() || ((action->getDetails()->type == SDL_MOUSEBUTTONDOWN || action->getDetails()->type == SDL_MOUSEBUTTONUP) && _game->isRightClick(action)))
  		{
  			State::handle(action);
-@@ -4078,6 +4110,7 @@ void BattlescapeState::resize(int &dX, int &dY)
+@@ -4078,6 +4111,7 @@ void BattlescapeState::resize(int &dX, int &dY)
  	{
  		pos += dX;
  	}
@@ -3820,10 +3739,10 @@ index 000000000..a52103479
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..f119d2bc8
+index 000000000..4b7b6a6ca
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2601 @@
+@@ -0,0 +1,2632 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -4486,6 +4405,21 @@ index 000000000..f119d2bc8
 +}
 +
 +/**
++ * Puts a surface in another's place in the screen's two lists: the order it draws them in, and
++ * the surfaces it deletes when it goes. Both: a surface remade in a resize (the 3D view, the
++ * soldier cam, the map camera, the scope cross) whose old one stayed in the second list was
++ * deleted again when the battle ended (a player's crash abandoning a mission, State::~State;
++ * the more resizes, the likelier).
++ * @param oldSurface The surface going (the caller deletes it).
++ * @param newSurface The one taking its place.
++ */
++void FirstPersonMode::replaceStateSurface(Surface *oldSurface, Surface *newSurface)
++{
++	std::replace(_state->_surfaces.begin(), _state->_surfaces.end(), oldSurface, newSurface);
++	std::replace(_state->_surfacesOwned.begin(), _state->_surfacesOwned.end(), oldSurface, newSurface);
++}
++
++/**
 + * Puts a remade surface of ours in the old one's place among the state's surfaces (so it's drawn
 + * in the same order), shown or hidden as that was, and deletes the old one; the first time (no
 + * old one) it's added last, hidden: drawn over everything made so far.
@@ -4497,7 +4431,7 @@ index 000000000..f119d2bc8
 +	const bool wasVisible = oldSurface && oldSurface->getVisible();
 +	if (oldSurface)
 +	{
-+		std::replace(_state->_surfaces.begin(), _state->_surfaces.end(), oldSurface, newSurface);
++		replaceStateSurface(oldSurface, newSurface);
 +		_ownSurfaces.erase(oldSurface);
 +		delete oldSurface;
 +	}
@@ -4655,6 +4589,14 @@ index 000000000..f119d2bc8
 + */
 +void FirstPersonMode::resized(int widthChange, int heightChange)
 +{
++	// A resize to the same size (a window manager can answer every change of video mode with
++	// one, as the inventory's own screen size makes): nothing to do (it remade the 3D views,
++	// freezing the game for a moment each time).
++	if (widthChange == 0 && heightChange == 0)
++	{
++		return;
++	}
++
 +	// The battlescape moved everything to the middle and the bottom; undo that for our
 +	// overlays, which live on the canvas.
 +	for (Surface *surface : _ownSurfaces)
@@ -4676,14 +4618,22 @@ index 000000000..f119d2bc8
 +	makeWeaponInHand();
 +	makeScopeCross();
 +
-+	// A new 3D view at the new canvas size, set up like the old one and put in its place.
++	// A new 3D view at the new canvas size, set up like the old one and put in its place (only
++	// when the canvas's size changed: the magnification can take up a change of screen size).
++	if (canvasWidth() == _view->getWidth() && canvasHeight() == _view->getHeight())
++	{
++		_warningY += heightChange;
++		_state->_warning->setY(isActive() && !_classicHud ? warningY() : _warningY);
++		layoutTopBar();
++		return;
++	}
 +	FirstPersonView *newView = new FirstPersonView(_game, canvasWidth(), canvasHeight(), 0, 0);
 +	newView->setPalette(_state->getPalette());
 +	newView->setSavedBattleGame(_save);
 +	newView->setMap(_state->_map);
 +	newView->setMaxDistance(_game->getMod()->getFirstPerson().getMaxViewDistance());
 +	newView->setVisible(_view->getVisible());
-+	std::replace(_state->_surfaces.begin(), _state->_surfaces.end(), (Surface*)_view, (Surface*)newView);
++	replaceStateSurface(_view, newView);
 +	_ownSurfaces.erase(_view);
 +	_ownSurfaces.insert(newView);
 +	_preview->shareCache(newView);
@@ -6427,10 +6377,10 @@ index 000000000..f119d2bc8
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..16047faa2
+index 000000000..4b2646f71
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1054 @@
+@@ -0,0 +1,1056 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -6636,6 +6586,8 @@ index 000000000..16047faa2
 +	void makeSoldierCamView();
 +	/// Makes the map camera's picture and frame at a size of the setting "Map camera" (1 small .. 3 large).
 +	void makeMapCamera(int size);
++	/// Puts a surface in another's place in the screen's lists (drawing, and deleting at its end).
++	void replaceStateSurface(Surface *oldSurface, Surface *newSurface);
 +	/// Puts a remade surface of ours in the old one's place among the state's surfaces (or adds it the first time).
 +	void putSurfaceInPlace(Surface *oldSurface, Surface *newSurface);
 +	/// The colours of our panels and cards: the mod's, or black with a grey border.
@@ -8305,10 +8257,10 @@ index 000000000..4e15be992
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..450abee2b
+index 000000000..4b0930759
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,1824 @@
+@@ -0,0 +1,1826 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -8695,15 +8647,17 @@ index 000000000..450abee2b
 +	auto &surfaces = _state->_surfaces;
 +	if (_scopeCross)
 +	{
-+		// Made again (a resize): the new surface takes the old one's place in the screen's list.
-+		std::replace(surfaces.begin(), surfaces.end(), _scopeCross, surface);
++		// Made again (a resize): the new surface takes the old one's place in the screen's lists.
++		replaceStateSurface(_scopeCross, surface);
 +		_ownSurfaces.erase(_scopeCross);
 +		delete _scopeCross;
 +	}
 +	else
 +	{
-+		// The first time: straight after the weapon in hand in the screen's drawing order.
++		// The first time: straight after the weapon in hand in the screen's drawing order, and
++		// the screen's to delete at its end.
 +		surfaces.insert(std::find(surfaces.begin(), surfaces.end(), _weaponInHand) + 1, surface);
++		_state->_surfacesOwned.push_back(surface);
 +	}
 +	_ownSurfaces.insert(surface);
 +	_scopeCross = surface;
@@ -16495,10 +16449,10 @@ index 000000000..9bdb34a7a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeWeaponInHand.cpp b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
 new file mode 100644
-index 000000000..966422c25
+index 000000000..19a0b6649
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
-@@ -0,0 +1,1013 @@
+@@ -0,0 +1,1015 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -16625,16 +16579,18 @@ index 000000000..966422c25
 +	surface->setVisible(false);
 +	if (_weaponInHand)
 +	{
-+		// Made again (a resize): the new surface takes the old one's place in the screen's list.
-+		std::replace(_state->_surfaces.begin(), _state->_surfaces.end(), _weaponInHand, surface);
++		// Made again (a resize): the new surface takes the old one's place in the screen's lists.
++		replaceStateSurface(_weaponInHand, surface);
 +		_ownSurfaces.erase(_weaponInHand);
 +		delete _weaponInHand;
 +	}
 +	else
 +	{
-+		// The first time: straight after the 3D view in the screen's drawing order.
++		// The first time: straight after the 3D view in the screen's drawing order, and the
++		// screen's to delete at its end.
 +		auto &surfaces = _state->_surfaces;
 +		surfaces.insert(std::find(surfaces.begin(), surfaces.end(), (Surface*)_view) + 1, surface);
++		_state->_surfacesOwned.push_back(surface);
 +	}
 +	_ownSurfaces.insert(surface);
 +	_weaponInHand = surface;
@@ -24204,10 +24160,10 @@ index 000000000..280bc87e2
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..717232bf6
+index 000000000..1b2e50da0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,334 @@
+@@ -0,0 +1,338 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -24379,6 +24335,10 @@ index 000000000..717232bf6
 +const double FacingArrowLength = 7.0, FacingArrowWidth = 4.0;
 +/// A shotgun's pellet in flight (setting "Shotgun pellets in flight") is a streak this many voxels long.
 +const float PelletStreak = 6.0f;
++/// A rocket's or a cannon shell's lasting trail (see spawnTrailSegment): its white specks hang this
++/// many seconds, at random between the two (a player: they lasted "far, far too long" at 25 to 35,
++/// "cut their particle lifetime down 2 thirds"; the owner: the specks only, not the smoke puffs).
++const float TrailSpeckLifeLeast = 8.0f, TrailSpeckLifeMost = 12.0f;
 +/// A helmet camera's feed (the soldier cam, the map camera) gets a spell of TV static now and then,
 +/// not all the time (the owner's ask: "gradually from zero to lots of static and back down - the
 +/// duration random, the speed random and interval between static random - from 10s to 2 min"):
@@ -24544,7 +24504,7 @@ index 000000000..717232bf6
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShots.cpp b/src/FirstPerson/FirstPersonViewShots.cpp
 new file mode 100644
-index 000000000..bc4d522bd
+index 000000000..d8e657b41
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShots.cpp
 @@ -0,0 +1,1770 @@
@@ -25137,7 +25097,7 @@ index 000000000..bc4d522bd
 +/**
 + * What a shot leaves behind along the bit of its path it flew this frame: nothing for bullets,
 + * embers for incendiary rounds, smoke for rockets and other explosives (and white specks that
-+ * hang along the path for half a minute, on land and under the sea), green glow for plasma,
++ * hang along the path for about ten seconds, on land and under the sea), green glow for plasma,
 + * sparkles for stun, droplets for acid. Under the sea every shot (and thrown thing) also leaves
 + * bubbles that hang in the water for half a minute. The look is _shotTrail, _shotTrailColor and
 + * _shotCalibre (spawnPartnerEffects swaps dual wield's second round's in for its own trail).
@@ -25197,15 +25157,15 @@ index 000000000..bc4d522bd
 +			particle.color = _particles.random() < 0.6f ? _colors.smoke : shadeColor(_colors.smoke, 2);
 +			particle.size = (Uint8)std::lround(5.0f + 2.0f * _shotCalibre); particle.kind = P::LIT;
 +			particle.drag = 0.8f;
-+			// And two white specks about the spot, hanging there for half a minute, drifting a
-+			// little and greying as they go: the rocket's lasting trail.
++			// And two white specks about the spot, hanging there for about ten seconds (see
++			// TrailSpeckLifeLeast), drifting a little and greying as they go: the rocket's lasting trail.
 +			for (int speckIndex = 0; speckIndex < (specksFit ? 2 : 0); ++speckIndex)
 +			{
 +				P::Particle speck = particle;
 +				for (float &coordinate : speck.pos) coordinate += _particles.random(-0.6f, 0.6f);
 +				speck.vel[0] = _particles.random(-0.4f, 0.4f); speck.vel[1] = _particles.random(-0.4f, 0.4f);
 +				speck.vel[2] = _particles.random(0.1f, 0.5f);
-+				speck.life = _particles.random(25.0f, 35.0f); speck.drag = 0.2f;
++				speck.life = _particles.random(TrailSpeckLifeLeast, TrailSpeckLifeMost); speck.drag = 0.2f;
 +				speck.color = _colors.speck; speck.size = 3;
 +				_particles.add(speck);
 +			}

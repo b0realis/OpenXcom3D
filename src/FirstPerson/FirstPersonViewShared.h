@@ -169,6 +169,10 @@ const float ControlHazeFrom = 0.45f;
 const double FacingArrowLength = 7.0, FacingArrowWidth = 4.0;
 /// A shotgun's pellet in flight (setting "Shotgun pellets in flight") is a streak this many voxels long.
 const float PelletStreak = 6.0f;
+/// A rocket's or a cannon shell's lasting trail (see spawnTrailSegment): its white specks hang this
+/// many seconds, at random between the two (a player: they lasted "far, far too long" at 25 to 35,
+/// "cut their particle lifetime down 2 thirds"; the owner: the specks only, not the smoke puffs).
+const float TrailSpeckLifeLeast = 8.0f, TrailSpeckLifeMost = 12.0f;
 /// A helmet camera's feed (the soldier cam, the map camera) gets a spell of TV static now and then,
 /// not all the time (the owner's ask: "gradually from zero to lots of static and back down - the
 /// duration random, the speed random and interval between static random - from 10s to 2 min"):

@@ -203,6 +203,8 @@ private:
 	void makeSoldierCamView();
 	/// Makes the map camera's picture and frame at a size of the setting "Map camera" (1 small .. 3 large).
 	void makeMapCamera(int size);
+	/// Puts a surface in another's place in the screen's lists (drawing, and deleting at its end).
+	void replaceStateSurface(Surface *oldSurface, Surface *newSurface);
 	/// Puts a remade surface of ours in the old one's place among the state's surfaces (or adds it the first time).
 	void putSurfaceInPlace(Surface *oldSurface, Surface *newSurface);
 	/// The colours of our panels and cards: the mod's, or black with a grey border.

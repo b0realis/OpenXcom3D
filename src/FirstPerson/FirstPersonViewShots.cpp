@@ -587,7 +587,7 @@ void FirstPersonView::spawnDebris(const Position &tilePosition, int part, const 
 /**
  * What a shot leaves behind along the bit of its path it flew this frame: nothing for bullets,
  * embers for incendiary rounds, smoke for rockets and other explosives (and white specks that
- * hang along the path for half a minute, on land and under the sea), green glow for plasma,
+ * hang along the path for about ten seconds, on land and under the sea), green glow for plasma,
  * sparkles for stun, droplets for acid. Under the sea every shot (and thrown thing) also leaves
  * bubbles that hang in the water for half a minute. The look is _shotTrail, _shotTrailColor and
  * _shotCalibre (spawnPartnerEffects swaps dual wield's second round's in for its own trail).
@@ -647,15 +647,15 @@ void FirstPersonView::spawnTrailSegment(const float from[3], const float to[3])
 			particle.color = _particles.random() < 0.6f ? _colors.smoke : shadeColor(_colors.smoke, 2);
 			particle.size = (Uint8)std::lround(5.0f + 2.0f * _shotCalibre); particle.kind = P::LIT;
 			particle.drag = 0.8f;
-			// And two white specks about the spot, hanging there for half a minute, drifting a
-			// little and greying as they go: the rocket's lasting trail.
+			// And two white specks about the spot, hanging there for about ten seconds (see
+			// TrailSpeckLifeLeast), drifting a little and greying as they go: the rocket's lasting trail.
 			for (int speckIndex = 0; speckIndex < (specksFit ? 2 : 0); ++speckIndex)
 			{
 				P::Particle speck = particle;
 				for (float &coordinate : speck.pos) coordinate += _particles.random(-0.6f, 0.6f);
 				speck.vel[0] = _particles.random(-0.4f, 0.4f); speck.vel[1] = _particles.random(-0.4f, 0.4f);
 				speck.vel[2] = _particles.random(0.1f, 0.5f);
-				speck.life = _particles.random(25.0f, 35.0f); speck.drag = 0.2f;
+				speck.life = _particles.random(TrailSpeckLifeLeast, TrailSpeckLifeMost); speck.drag = 0.2f;
 				speck.color = _colors.speck; speck.size = 3;
 				_particles.add(speck);
 			}
