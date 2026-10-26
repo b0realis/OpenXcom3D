@@ -224,15 +224,26 @@ void FirstPersonMode::analyzeWeapon(bool gun, bool melee)
 		covarianceXX += dx * dx; covarianceYY += dy * dy; covarianceXY += dx * dy;
 	}
 	double axisAngle = 0.5 * std::atan2(2.0 * covarianceXY, covarianceXX - covarianceYY); // radians, -90 .. 90 degrees
-	// Near upright, exactly upright; near level, exactly level (see WeaponUprightSnap).
+	// Near upright, exactly upright; near level, exactly level (see WeaponUprightSnap): but only
+	// when the picture lies about as thin across that axis as across the one measured. A gun
+	// standing straight up whose grip or magazine tipped the measure lies thinner upright (its
+	// barrel along it); a pole drawn on a slant (XPiratez's quarterstaff, at 66 degrees: a
+	// player saw it standing in the air) lies far wider across the upright, and keeps its slant.
+	auto acrossSpread = [&](double angle) {
+		double low = 1e9, high = -1e9;
+		for (const auto &pixel : pixels)
+		{
+			const double across = -(pixel.first - meanX) * std::sin(angle) + (pixel.second - meanY) * std::cos(angle);
+			low = std::min(low, across);
+			high = std::max(high, across);
+		}
+		return high - low;
+	};
 	const double snap = WeaponUprightSnap * Pi / 180.0;
-	if (std::abs(std::abs(axisAngle) - Pi / 2.0) < snap)
+	const double snapTo = std::abs(std::abs(axisAngle) - Pi / 2.0) < snap ? Pi / 2.0 : std::abs(axisAngle) < snap ? 0.0 : axisAngle;
+	if (snapTo != axisAngle && acrossSpread(snapTo) <= acrossSpread(axisAngle) * WeaponSnapSpread + 1.0)
 	{
-		axisAngle = Pi / 2.0;
-	}
-	else if (std::abs(axisAngle) < snap)
-	{
-		axisAngle = 0.0;
+		axisAngle = snapTo;
 	}
 	shape.mean[0] = meanX; shape.mean[1] = meanY;
 	shape.along[0] = std::cos(axisAngle); shape.along[1] = std::sin(axisAngle);

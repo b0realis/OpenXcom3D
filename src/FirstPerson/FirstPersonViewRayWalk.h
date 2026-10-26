@@ -96,8 +96,10 @@ struct RayContext
 // How solid a ghost looks (see VoxelModel::ghostly): on what share of the pixels it shows,
 // GhostNearOpacity up close (GhostNearDistance voxels, a tile and a half), fading to
 // GhostFarOpacity from GhostFarDistance (seven tiles) on, so it's plain up close and doesn't
-// clutter the distance. Never solid: up close too it's a mesh to see through, as a unit above or
-// below a lift pad is a threat to watch (a player's report on 1.03; it was solid up close).
+// clutter the distance. Not solid by default: up close too it's a mesh to see through, as a unit
+// above or below a lift pad is a threat to watch (a player's report on 1.03; it was solid up
+// close). The setting "Ghost opacity" scales both (50%, as here; 100% solid up close: see
+// renderRows).
 const float GhostNearDistance = 24.0f, GhostFarDistance = 112.0f, GhostNearOpacity = 0.5f, GhostFarOpacity = 0.3f;
 
 /**

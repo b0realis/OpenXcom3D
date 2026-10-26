@@ -543,6 +543,7 @@ void FirstPersonView::draw()
 	// (No unit is on the screen yet, for the see-through smoke.)
 	std::fill(_unitVeil.begin(), _unitVeil.end(), (Uint8)255);
 	std::fill(&_pointerUnits[0][0], &_pointerUnits[0][0] + sizeof(_pointerUnits) / sizeof(_pointerUnits[0][0]), nullptr);
+	std::fill(&_pointerBodies[0][0], &_pointerBodies[0][0] + sizeof(_pointerBodies) / sizeof(_pointerBodies[0][0]), nullptr);
 	watchUnits();
 	drawDecals();
 	drawFloorItems();
@@ -568,6 +569,7 @@ void FirstPersonView::draw()
 	// The icons over the downed units, the enemy markers and the units' facing rings, over everything.
 	drawDownedIcons();
 	drawMarkers();
+	drawSprayMarks();
 	drawFacing();
 	unlock();
 }

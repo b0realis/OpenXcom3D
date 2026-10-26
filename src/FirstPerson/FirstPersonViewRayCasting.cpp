@@ -217,6 +217,8 @@ void FirstPersonView::updateColors()
 	_colors.forcedDot = nearest(255, 245, 150);
 	_colors.laserRefused = nearest(125, 35, 30);
 	_colors.marker = nearest(235, 40, 30);
+	_colors.sprayMark = nearest(150, 245, 140);
+	_colors.sprayNext = nearest(160, 160, 170);
 	_colors.marine = nearest(150, 195, 190);
 	_colors.flareFire[0] = nearest(240, 30, 20);
 	_colors.flareFire[1] = nearest(255, 100, 30);
@@ -1192,6 +1194,11 @@ void FirstPersonView::renderRows()
 	smokeSight.fireBlock = _fireBlock;
 	const bool traceSmoke = FirstPerson::smokeMode() == 2;
 
+	// The parts without shape as opaque as the setting "Ghost opacity" has them: its percent of
+	// the pixels up close, of GhostNearOpacity's 50 (the share is scaled by dividing each pixel's
+	// dither threshold instead of multiplying the opacity: the same test, see ghostOpacity).
+	const float ghostScale = std::clamp(Options::fpsGhostOpacity, 10, 100) / (GhostNearOpacity * 100.0f);
+
 	// With a pixel size above 1, one ray colours a block of pixels (pixelSize x pixelSize).
 	// Auto (0) picks 2 for views bigger than AutoPixelMaxWidth x AutoPixelMaxHeight, else 1.
 	const bool bigView = width > AutoPixelMaxWidth || height > AutoPixelMaxHeight;
@@ -1229,7 +1236,7 @@ void FirstPersonView::renderRows()
 			int endAxis;
 			Uint8 color;
 			SmokeTrace smoke = smokeSight;
-			rayContext.ghostThreshold = dither(blockColumn, blockRow); // ghosts show on a share of the blocks (see ghostOpacity)
+			rayContext.ghostThreshold = dither(blockColumn, blockRow) / ghostScale; // ghosts show on a share of the blocks (see ghostOpacity)
 			const RayEnd rayEnd = castRay(rayContext, rayOrigin, rayDirection, hit, tEnd, endAxis, traceSmoke ? &smoke : nullptr);
 			switch (rayEnd)
 			{

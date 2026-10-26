@@ -1031,6 +1031,7 @@ void FirstPersonView::spawnShotImpact(const float shotEnd[3], const float from[3
 	// the shape, unseen) moves back as far again, up to where the shot came from.
 	float head[3] = { shotEnd[0], shotEnd[1], shotEnd[2] };
 	float markAt[3] = { shotEnd[0], shotEnd[1], shotEnd[2] };
+	bool surfaceFound = false;
 	float direction[3] = { shotEnd[0] - from[0], shotEnd[1] - from[1], shotEnd[2] - from[2] };
 	const float length = std::sqrt(direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2]);
 	if (length > 1.0f)
@@ -1052,8 +1053,34 @@ void FirstPersonView::spawnShotImpact(const float shotEnd[3], const float from[3
 					markAt[axis] = surface[axis];
 					head[axis] = surface[axis] - direction[axis] * 0.3f; // just in front of it
 				}
+				surfaceFound = true;
 				break;
 			}
+		}
+	}
+	// Nothing at all where the shot ended in the open (a player: "Shots make puffs of particles
+	// when hitting skybox, they should just vanish"): off into the sky the game's line stops
+	// where it leaves the map, in the air. So with no surface drawn along its line there and
+	// nothing solid within ImpactSolidReach voxels of where it ended (off the map: nothing),
+	// no sparks, no dust, no mark.
+	if (!surfaceFound)
+	{
+		bool solidNear = false;
+		const int endX = (int)std::floor(shotEnd[0]), endY = (int)std::floor(shotEnd[1]), endZ = (int)std::floor(shotEnd[2]);
+		for (int dz = -ImpactSolidReach; dz <= ImpactSolidReach && !solidNear; ++dz)
+		{
+			for (int dy = -ImpactSolidReach; dy <= ImpactSolidReach && !solidNear; ++dy)
+			{
+				for (int dx = -ImpactSolidReach; dx <= ImpactSolidReach && !solidNear; ++dx)
+				{
+					solidNear = solidVoxel(endX + dx, endY + dy, endZ + dz);
+				}
+			}
+		}
+		if (!solidNear)
+		{
+			Log(LOG_VERBOSE) << "OpenXcom3D: a shot ended in the open, no impact"; // (for the tests)
+			return;
 		}
 	}
 	const Uint8 debrisColor = debrisColorAt(head);

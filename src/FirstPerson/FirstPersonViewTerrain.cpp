@@ -528,15 +528,60 @@ void keepGlassInPanes(FirstPersonView::VoxelModel &model, TilePart part)
 }
 
 /**
+ * Is a part's art a cage (a player: the bars round Cydonia's pyramid lifts should stand "on all
+ * sides of tile, like a cage")? Bars standing on the floor's two back edges, as the isometric
+ * art draws a fence round a tile (the front ones would hide what stands inside): an object whose
+ * every drawn column ends at the back edges' line (within CageEdgeRows rows below it, none
+ * above), at least CageMinColumns columns on each half of the sprite (the west edge's and the
+ * north edge's).
+ * @param sprite The part's sprite frame.
+ * @param partType Which part of a tile it is (only an object can be one).
+ * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
+ * @return True for a cage.
+ */
+bool cageArt(const Surface *sprite, int partType, int yOffset)
+{
+	if (partType != O_OBJECT || !sprite)
+	{
+		return false;
+	}
+	const int width = sprite->getWidth(), height = sprite->getHeight();
+	int westColumns = 0, northColumns = 0;
+	for (int spriteX = 0; spriteX < width; ++spriteX)
+	{
+		// The column's lowest drawn pixel, against where the back edges' floor line runs there.
+		int bottom = -1;
+		for (int spriteY = height - 1; spriteY >= 0 && bottom < 0; --spriteY)
+		{
+			if (sprite->getPixel(spriteX, spriteY)) bottom = spriteY;
+		}
+		if (bottom < 0)
+		{
+			continue;
+		}
+		const double backEdgeRow = 24 + std::abs(spriteX - 16) / 2.0 + yOffset;
+		if (bottom < backEdgeRow - 0.5 || bottom > backEdgeRow + CageEdgeRows)
+		{
+			return false; // (something that doesn't stand on the back edges)
+		}
+		if (spriteX < 16) ++westColumns;
+		else if (spriteX > 16) ++northColumns;
+	}
+	return westColumns >= CageMinColumns && northColumns >= CageMinColumns;
+}
+
+/**
  * Builds the ghost of a part the map draws but gives no voxels at all (setting "Parts without
- * shape"): a ladder, a lift's pad, a wall of laser beams. Its art, voxel for voxel, on one plane
- * of the tile, so that it shows where it stands:
+ * shape"): a ladder, a lift's pad, a wall of laser beams, a lift's cage of bars. Its art, voxel
+ * for voxel, on one plane of the tile (a cage on four), so that it shows where it stands:
  * - a west or north wall on the tile's west or north edge, where the art draws walls;
  * - a floor or an object whose art keeps low, inside the floor's diamond (a lift's pad), flat on
  *   the floor;
  * - one whose art rises above it (a ladder, drawn upright), upright, on the plane across the
  *   tile (running north-south or east-west) that shows the most of the art; ties go to the plane
- *   nearer the tile's middle, then to the north-south one.
+ *   nearer the tile's middle, then to the north-south one;
+ * - a cage (see cageArt): on the tile's west and north edges, where the art draws its bars, and
+ *   the same again on the east and south edges, all round.
  * Each voxel takes the colour of the pixel it lands on (the projection buildModel uses), and
  * there's no voxel where that pixel is transparent, so a ladder keeps the gaps between its
  * rungs. On one plane no two voxels land on the same pixel. The model comes out ghostly: rays
@@ -632,7 +677,23 @@ void buildGhost(FirstPersonView::VoxelModel &model, const Surface *sprite, int p
 			model.max[boxAxis] = std::max<int>(model.max[boxAxis], voxel[boxAxis]);
 		}
 	};
-	if (axis < 0)
+	if (cageArt(sprite, partType, yOffset))
+	{
+		// A cage: the west edge's bars (x = 0) again on the east edge, the north edge's (y = 0)
+		// on the south edge.
+		for (int along = 0; along < 16; ++along)
+		{
+			for (int z = 0; z < 24; ++z)
+			{
+				place(0, along, z);
+				place(along, 0, z);
+				const Uint8 west = pixelOf(0, along, z), north = pixelOf(along, 0, z);
+				if (west) { model.color[z][along][15] = west; model.max[0] = 15; model.max[1] = std::max<int>(model.max[1], along); model.min[1] = std::min<int>(model.min[1], along); }
+				if (north) { model.color[z][15][along] = north; model.max[1] = 15; model.max[0] = std::max<int>(model.max[0], along); model.min[0] = std::min<int>(model.min[0], along); }
+			}
+		}
+	}
+	else if (axis < 0)
 	{
 		for (int y = 0; y < 16; ++y)
 			for (int x = 0; x < 16; ++x) place(x, y, 0);
@@ -1208,11 +1269,12 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 
 	// No voxels at all, though the map draws it (a ladder, a lift's pad, a wall of laser beams):
 	// with the setting "Parts without shape" (1: lifts and ladders, the parts with the grav lift
-	// flag; 2: all of them), a see-through ghost of its art, with the sides the art never shows
-	// coloured; no plate fitting, no glow.
+	// flag, and cages, as round a lift; 2: all of them), a see-through ghost of its art, with
+	// the sides the art never shows coloured; no plate fitting, no glow.
 	if (model.empty)
 	{
-		const bool ghostWanted = Options::fpsGhostParts == 2 || (Options::fpsGhostParts == 1 && mapData->isGravLift());
+		const bool ghostWanted = Options::fpsGhostParts == 2
+			|| (Options::fpsGhostParts == 1 && (mapData->isGravLift() || cageArt(sprite, mapData->getObjectType(), yOffset)));
 		if (ghostWanted && !cutout)
 		{
 			buildGhost(model, sprite, mapData->getObjectType(), yOffset);

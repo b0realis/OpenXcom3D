@@ -136,6 +136,11 @@ const double MaxPitch = 89.0;
 const int UnitVeilMax = 5;
 /// The see-through smoke keeps this share of its colours (the rest turned to grey; see softSmokeFrame).
 const float SmokeColorKept = 0.35f;
+/// Eyes with heat vision (the armor's heatVision, in percent: how much of the smoke they see
+/// through, by the game's sight rules) see the see-through smoke that much thinner (a player: a
+/// scout drone's 50% heat vision didn't look any better), but never less than this share of it,
+/// so smoke stays in sight (see FirstPersonView::setSmokeSight).
+const float SmokeSeenMin = 0.2f;
 /// A lying sprite's rows below its anchor lie on the floor, each this many voxels nearer the
 /// camera: one isometric pixel down is sqrt(2) voxels along the floor towards the viewer.
 const double LyingRowVoxels = 1.41421356237309505;
@@ -149,6 +154,17 @@ const int StandRaiseMax = 4;
 /// voxel towards the camera).
 const int LyingRiseMax = 12;
 const double LyingSlopeMax = 1.5;
+/// Something lying on sloping ground (a ramp, the steps of stairs; a player: items there, seen
+/// from the side, sank half into it) lies level at the ground's height under its middle, drawn
+/// over the steps round it (the owner: "just on top of stairs at half height"; see
+/// FirstPersonView::groundPlane): the plane through the ground's surface at 5x5 points round it,
+/// GroundPlaneReach voxels out from it each way (a lone item's within its tile, a big corpse's
+/// over its four), the surface looked for from GroundPlaneProbe voxels above the item's floor
+/// down to as far below, the plane then lifted onto the highest of those points (resting on the
+/// edges of steps) by at most GroundPlaneLiftMax; the depth test gives way by the ground's rise
+/// within that reach, at most SlopeItemDepthBiasMax voxels (more would show it through a wall).
+const double GroundPlaneReach = 6.0, GroundPlaneReachCorpse = 12.0, SlopeItemDepthBiasMax = 6.0;
+const int GroundPlaneProbe = 12, GroundPlaneLiftMax = 4;
 /// Bullet holes and scorch marks (see drawDecals): a mark's radius, in voxels, per step of its
 /// size (a bullet hole is size 1, a scorch 3); at most this many pixels from its middle on the
 /// screen, however close; a bullet hole's core this many shades darker (its edge by the mark's
@@ -228,6 +244,14 @@ const float RockCeilingShade = 0.5f + 1.0f;
 /// back along the line (an object's art can stand out in front of its collision shape; see
 /// spawnShotImpact).
 const float ImpactSearchBack = 8.0f;
+/// A shot that ends with no surface drawn along its line and nothing solid within this many voxels
+/// of its end ended in the open (off into the sky, where the game's line leaves the map): no impact
+/// at all (see spawnShotImpact).
+const int ImpactSolidReach = 2;
+/// A part without shape whose art is bars on the floor's two back edges is a cage, built on all
+/// four edges (see cageArt): each drawn column ends at most this many rows below the back edges'
+/// line, and there are at least CageMinColumns on each edge.
+const int CageEdgeRows = 3, CageMinColumns = 2;
 
 // ---- Colour helpers ----
 
@@ -326,6 +350,12 @@ const Uint8 TapeFont[][5] = {
 /// The tape's text, repeated along it, as glyphs of TapeFont: "X-COM  ".
 const int TapeText[] = { 0, 1, 2, 3, 4, 5, 5 };
 /// 3x5 digits for the numbered markers over the visible enemies, same layout as TapeFont.
+/// A spray burst's marks (see FirstPersonView::drawSprayMarks): a dot of the line along them every
+/// SprayDotSpacing voxels; each mark a pole SprayPoleVoxels high from the tile's floor (two thirds of a level; at least
+/// SprayPoleMinPixels on the screen, far off), a mini target SprayTargetRadius pixels across on it
+/// SprayAimVoxels up (the game aims the rounds at the tile's middle, waist high).
+const double SprayDotSpacing = 4.0, SprayPoleVoxels = 16.0, SprayAimVoxels = 11.0;
+const int SprayPoleMinPixels = 18, SprayTargetRadius = 3;
 const Uint8 DigitFont[10][5] = {
 	{ 7, 5, 5, 5, 7 }, { 2, 6, 2, 2, 7 }, { 7, 1, 7, 4, 7 }, { 7, 1, 3, 1, 7 }, { 5, 5, 7, 1, 1 },
 	{ 7, 4, 7, 1, 7 }, { 7, 4, 7, 5, 7 }, { 7, 1, 1, 2, 2 }, { 7, 5, 7, 5, 7 }, { 7, 5, 7, 1, 7 } };

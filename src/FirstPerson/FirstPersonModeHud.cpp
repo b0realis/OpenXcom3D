@@ -68,6 +68,7 @@
 #include "../Engine/Game.h"
 #include "../Engine/Options.h"
 #include "../Engine/Screen.h"
+#include "../Engine/SurfaceSet.h"
 #include "../Engine/Unicode.h"
 #include "../Interface/Bar.h"
 #include "../Interface/BattlescapeButton.h"
@@ -80,6 +81,7 @@
 #include "../Savegame/BattleItem.h"
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/SavedBattleGame.h"
+#include "../Savegame/Soldier.h"
 #include "FirstPersonModeShared.h"
 
 namespace OpenXcom
@@ -164,6 +166,7 @@ void FirstPersonMode::updateCompass(BattleUnit *unit, bool playerTurn)
 	const bool show = Options::fpsCompass && isActive() && !_hudHidden && unit;
 	_compass->setVisible(show);
 	for (Text *letter : _compassLetters) letter->setVisible(show);
+	updateClimbArrows(show && playerTurn ? unit : nullptr);
 	if (!show)
 	{
 		_txtCompassTurn->setVisible(false);
@@ -267,6 +270,55 @@ void FirstPersonMode::updateWalkModeLines(BattleUnit *unit)
 		lineY += 9;
 	}
 	_txtEnPassant->setY(lineY);
+}
+
+/**
+ * The climb arrows beside the compass (a player: "Compass should have an indicator by it to show
+ * if a unit is looking up enough to climb"): where W and S may climb (a grav lift, a ladder, or
+ * flying with flight on: see climbWays), an arrow for each way it goes, up above and down below,
+ * dim grey; the one W would take now (looking up or down more than ClimbPitch degrees, see
+ * updateClimb) lit yellow. None while the soldier can't climb from there, or can't act. Drawn
+ * again only when what it shows changes.
+ * @param unit The soldier the view looks through, or null to hide them.
+ */
+void FirstPersonMode::updateClimbArrows(BattleUnit *unit)
+{
+	bool up = false, down = false;
+	if (unit && canAct() && unit->getStatus() == STATUS_STANDING && !_stepPending)
+	{
+		climbWays(unit, up, down);
+	}
+	const double pitch = _view->getPitchDegrees();
+	const int lit = pitch > ClimbPitch && up ? 1 : pitch < -ClimbPitch && down ? 2 : 0;
+	const int shown = (up ? 1 : 0) | (down ? 2 : 0) | (lit << 2);
+	_climbArrows->setVisible(shown != 0);
+	if (shown == _climbArrowsShown)
+	{
+		return;
+	}
+	_climbArrowsShown = shown;
+	const SDL_Color *palette = _state->getPalette();
+	const Uint8 dim = nearestColor(palette, 110, 115, 130), bright = nearestColor(palette, 250, 220, 70), outline = nearestColor(palette, 8, 8, 8);
+	_climbArrows->clear();
+	_climbArrows->lock();
+	// Each arrow a triangle ClimbArrowW wide, pointing up at the top or down at the bottom, with a
+	// dark outline.
+	for (int way = 1; way <= 2; ++way)
+	{
+		if (!((way == 1 && up) || (way == 2 && down))) continue;
+		const Uint8 fill = lit == way ? bright : dim;
+		for (int row = 0; row < ClimbArrowH; ++row)
+		{
+			const int halfWidth = row * (ClimbArrowW / 2) / (ClimbArrowH - 1);
+			const int y = way == 1 ? row : _climbArrows->getHeight() - 1 - row;
+			for (int x = ClimbArrowW / 2 - halfWidth; x <= ClimbArrowW / 2 + halfWidth; ++x)
+			{
+				const bool edge = row == ClimbArrowH - 1 || x == ClimbArrowW / 2 - halfWidth || x == ClimbArrowW / 2 + halfWidth;
+				_climbArrows->setPixel(x, y, edge ? outline : fill);
+			}
+		}
+	}
+	_climbArrows->unlock();
 }
 
 /**
@@ -553,7 +605,13 @@ void FirstPersonMode::updateInfoPanel(BattleUnit *unit)
 	{
 		_txtDoom->setText(cheats);
 	}
-	// The name and the status.
+	// The rank (a soldier's) and the name after it (the owner: before the name, less in the way),
+	// and the status.
+	const bool panelRank = drawRankIcon(_panelRank, unit);
+	_panelRank->setVisible(panelRank);
+	_panelRank->setX(_panelNameX);
+	_panelRank->setY(_txtName->getY() - RankIconRise);
+	_txtName->setX(_panelNameX + (panelRank ? RankIconW + RankIconGap : 0));
 	_txtName->setText(unit->getName(_game->getLanguage(), false));
 	_txtStatus->setText(statusLabel(unit));
 
@@ -903,6 +961,123 @@ void FirstPersonMode::updateArmorButtons(BattleUnit *unit)
 }
 
 /**
+ * Draws a soldier's rank into an icon beside their name (the owner's ask: "the RANK mini symbol
+ * of a unit on the right to the unit name", then before it: "less obtrusive"; the info panel's,
+ * the soldier card's, the soldier cam's title): a mod's own tiny rank (TinyRanks, 7x7, as XPiratez has; stock OXCE's set is an
+ * empty placeholder), or else the game's own battlescape rank badge averaged down to the icon's
+ * size (see smallRankBadge; the owner chose it from previews). Drawn again only when the rank
+ * shown changes. Aliens, civilians and the like have no rank to show.
+ * @param icon The icon (RankIconW by RankIconH).
+ * @param unit The unit whose name it follows, or null.
+ * @return True if there is a rank to show.
+ */
+bool FirstPersonMode::drawRankIcon(Surface *icon, const BattleUnit *unit)
+{
+	// The picture: a mod's tiny rank if it drew one, else the small badge.
+	const Soldier *soldier = unit ? unit->getGeoscapeSoldier() : nullptr;
+	Surface *picture = nullptr;
+	int key = -1; // which picture, to draw it only when it changes (a tiny rank's sprite, or 1000 and the badge's)
+	if (soldier)
+	{
+		SurfaceSet *tinyRanks = _game->getMod()->getSurfaceSet("TinyRanks", false);
+		Surface *tiny = tinyRanks ? tinyRanks->getFrame(soldier->getRankSpriteTiny()) : nullptr;
+		bool drawn = false;
+		for (int y = 0; tiny && !drawn && y < tiny->getHeight(); ++y)
+		{
+			for (int x = 0; !drawn && x < tiny->getWidth(); ++x) drawn = tiny->getPixel(x, y) != 0;
+		}
+		if (drawn)
+		{
+			picture = tiny;
+			key = soldier->getRankSpriteTiny();
+		}
+		else if ((picture = smallRankBadge(soldier->getRankSpriteBattlescape())))
+		{
+			key = 1000 + soldier->getRankSpriteBattlescape();
+		}
+	}
+	auto shown = _rankDrawn.emplace(icon, -2).first; // (-2: never drawn)
+	if (shown->second != key)
+	{
+		shown->second = key;
+		icon->clear();
+		if (picture)
+		{
+			picture->blitNShade(icon, 0, (RankIconH - std::min(RankIconH, picture->getHeight())) / 2); // (a tiny rank in the middle of the height)
+		}
+	}
+	return picture != nullptr;
+}
+
+/**
+ * The game's own battlescape rank badge (SMOKE.PCK, 26x23 in the original, as the classic HUD
+ * shows it), averaged down to RankIconW by RankIconH: each of its pixels the average colour of the
+ * badge's pixels under it, matched to the nearest colour of the palette (a corner mostly
+ * transparent stays so). Made once per badge.
+ * @param sprite The badge's frame in SMOKE.PCK.
+ * @return The small badge, or null if the frame isn't there.
+ */
+Surface *FirstPersonMode::smallRankBadge(int sprite)
+{
+	auto made = _smallRankBadges.find(sprite);
+	if (made != _smallRankBadges.end())
+	{
+		return made->second.get();
+	}
+	SurfaceSet *smoke = _game->getMod()->getSurfaceSet("SMOKE.PCK", false);
+	Surface *badge = smoke ? smoke->getFrame(sprite) : nullptr;
+	Surface *small = nullptr;
+	if (badge)
+	{
+		// The badge's own box (the frame is bigger, transparent round it).
+		int left = badge->getWidth(), top = badge->getHeight(), right = -1, bottom = -1;
+		for (int y = 0; y < badge->getHeight(); ++y)
+		{
+			for (int x = 0; x < badge->getWidth(); ++x)
+			{
+				if (badge->getPixel(x, y) == 0) continue;
+				left = std::min(left, x); right = std::max(right, x); top = std::min(top, y); bottom = std::max(bottom, y);
+			}
+		}
+		if (right >= left)
+		{
+			const SDL_Color *palette = _state->getPalette();
+			const int badgeW = right - left + 1, badgeH = bottom - top + 1;
+			small = new Surface(RankIconW, RankIconH, 0, 0);
+			small->setPalette(_state->getPalette());
+			small->lock();
+			for (int smallY = 0; smallY < RankIconH; ++smallY)
+			{
+				for (int smallX = 0; smallX < RankIconW; ++smallX)
+				{
+					// The badge's pixels under this one, their average colour.
+					const int x0 = left + smallX * badgeW / RankIconW, x1 = left + std::max(smallX * badgeW / RankIconW + 1, (smallX + 1) * badgeW / RankIconW);
+					const int y0 = top + smallY * badgeH / RankIconH, y1 = top + std::max(smallY * badgeH / RankIconH + 1, (smallY + 1) * badgeH / RankIconH);
+					int red = 0, green = 0, blue = 0, count = 0, cells = 0;
+					for (int y = y0; y < y1; ++y)
+					{
+						for (int x = x0; x < x1; ++x)
+						{
+							++cells;
+							const Uint8 index = badge->getPixel(x, y);
+							if (index == 0) continue;
+							red += palette[index].r; green += palette[index].g; blue += palette[index].b; ++count;
+						}
+					}
+					if (count * 2 >= cells)
+					{
+						small->setPixel(smallX, smallY, nearestColor(palette, red / count, green / count, blue / count));
+					}
+				}
+			}
+			small->unlock();
+		}
+	}
+	_smallRankBadges[sprite].reset(small);
+	return small;
+}
+
+/**
  * Shows the soldier card under the squad button the mouse is over: the soldier's name, status,
  * weapon and the four stats with their bars. With the soldier preview option on, the card also
  * shows a live picture from the soldier's helmet camera (a small second 3D view), or TV static
@@ -1009,12 +1184,16 @@ void FirstPersonMode::updateSoldierCard()
 		: state == SQUAD_CONTROLLED ? std::string(_state->tr("STR_FPS_MIND_CONTROLLED"))
 		: !alertStatus.empty() ? alertStatus : statusLabel(unit);
 	_cardStatus->setText(status);
-	// The name gives way to the status beside it.
-	const int nameWidth = CardW - 8 - (status.empty() ? 0 : _cardStatus->getTextWidth() + 4);
+	// The name gives way to the status beside it (and to the rank before it).
+	const bool rankShown = drawRankIcon(_cardRank, unit);
+	const int nameWidth = CardW - 8 - (status.empty() ? 0 : _cardStatus->getTextWidth() + 4) - (rankShown ? RankIconW + RankIconGap : 0);
 	if (nameWidth != _cardName->getWidth())
 	{
 		_cardName->setWidth(nameWidth);
 	}
+	_cardRank->setVisible(rankShown);
+	_cardRank->setX(cardX + 4);
+	_cardName->setX(cardX + 4 + (rankShown ? RankIconW + RankIconGap : 0)); // (the rank before the name)
 	if (preview && !live)
 	{
 		// Static on the dead camera: every pixel a random grey, new every frame (a linear
@@ -1119,6 +1298,7 @@ void FirstPersonMode::updateSoldierCam(BattleUnit *unit, int frameX)
 		part->setVisible(show);
 	}
 	_soldierCamDot->setVisible(show && SDL_GetTicks() % 1000 < 600);
+	_soldierCamRank->setVisible(false); // (shown below, for a soldier with a rank)
 	if (!show)
 	{
 		return;
@@ -1130,7 +1310,12 @@ void FirstPersonMode::updateSoldierCam(BattleUnit *unit, int frameX)
 	_soldierCam->setY(CardY + 16);
 	_soldierCamDot->setX(frameX + 5);
 	_soldierCamDot->setY(CardY + 5);
-	_txtSoldierCam->setX(frameX + 13);
+	// The soldier's rank before the title (after the red dot), the title after it.
+	const bool camRank = drawRankIcon(_soldierCamRank, unit);
+	_soldierCamRank->setVisible(camRank);
+	_soldierCamRank->setX(frameX + 13);
+	_soldierCamRank->setY(CardY + 4 - RankIconRise);
+	_txtSoldierCam->setX(frameX + 13 + (camRank ? RankIconW + RankIconGap : 0));
 	_txtSoldierCam->setY(CardY + 4);
 	const std::string title = _state->tr("STR_FPS_SOLDIER_CAM").arg(unit->getName(_game->getLanguage(), false));
 	if (_txtSoldierCam->getText() != title)

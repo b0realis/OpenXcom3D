@@ -268,6 +268,9 @@ void FirstPersonMode::createCrosshairAndBanner()
 	// you aim at.
 	_txtMode = addText(120, 9, width / 2 + 14, height / 2 - 9, "crosshairText", "firstPerson");
 	_txtShot = addText(120, 9, width / 2 + 14, height / 2 + 1, "crosshairText", "firstPerson");
+	// Under them, the action's other costs (setting "Expanded crosshair info"): energy, health and
+	// the rest, a cost the soldier can't pay in the second colour (red).
+	_txtCosts = addText(160, 9, width / 2 + 14, height / 2 + 11, "crosshairText", "firstPerson");
 	_txtBanner->setAlign(ALIGN_CENTER);
 	// The name of the unit pointed at, under the crosshair (it follows the free cursor).
 	_txtTarget = addText(160, 9, width / 2 - 80, height / 2 + 10, "crosshairText", "firstPerson");
@@ -278,7 +281,7 @@ void FirstPersonMode::createCrosshairAndBanner()
 	_txtScoping->setAlign(ALIGN_RIGHT);
 
 	// All hidden until there's something to show.
-	for (Text *text : { _txtMode, _txtShot, _txtBanner, _txtTarget, _txtScoping })
+	for (Text *text : { _txtMode, _txtShot, _txtCosts, _txtBanner, _txtTarget, _txtScoping })
 	{
 		text->setVisible(false);
 	}
@@ -333,6 +336,11 @@ void FirstPersonMode::createCompass()
 	_state->add(_compass);
 	_compass->setVisible(false);
 	_ownSurfaces.insert(_compass);
+	// Beside the dial's left, level with its middle, the climb arrows (see updateClimbArrows).
+	_climbArrows = new Surface(ClimbArrowW, ClimbArrowsH, compassX - ClimbArrowW - ClimbArrowsGap, compassY + CompassArrowH + CompassSize / 2 - ClimbArrowsH / 2);
+	_state->add(_climbArrows);
+	_climbArrows->setVisible(false);
+	_ownSurfaces.insert(_climbArrows);
 
 	// The letters, small, north in red (as on a compass rose), the others in the buttons' grey.
 	const char *const letters[4] = { "N", "E", "S", "W" };
@@ -435,7 +443,8 @@ void FirstPersonMode::createInfoPanel()
 	const int panelX = 1, panelY = height - PanelH - 1;
 
 	// First line: the name, and the status on the right.
-	_txtName = addText(PanelW - 66, 9, panelX + 3, panelY + 2, "textName", "battlescape");
+	_panelNameX = panelX + 3; // (the rank, when there is one, goes here and the name after it)
+	_txtName = addText(PanelW - 66 - RankIconW - RankIconGap, 9, _panelNameX, panelY + 2, "textName", "battlescape");
 	_txtStatus = addText(60, 9, panelX + PanelW - 63, panelY + 2, "weapon", "firstPerson");
 
 	// Then a line for each hand: the weapon in the hand that fires, then the other hand's item.
@@ -465,8 +474,12 @@ void FirstPersonMode::createInfoPanel()
 	_txtArmor = addText(PanelLineW, 9, panelX + 3, panelY + 44, "weapon", "firstPerson");
 	_txtDoom = addText(60, 9, panelX + PanelW - 63, panelY + 44, "doom", "firstPerson");
 
+	// The soldier's rank, a small badge before the name (see drawRankIcon).
+	_panelRank = new Surface(RankIconW, RankIconH, 0, 0);
+	_state->add(_panelRank);
+
 	// The panel's parts, all ours and all hidden until the 3D view shows.
-	_panelParts = { _txtName, _txtStatus, _txtWeapon, _txtWeaponAmmo, _txtOtherWeapon, _txtOtherAmmo, _numTimeUnits, _barTimeUnits,
+	_panelParts = { _txtName, _panelRank, _txtStatus, _txtWeapon, _txtWeaponAmmo, _txtOtherWeapon, _txtOtherAmmo, _numTimeUnits, _barTimeUnits,
 		_numEnergy, _barEnergy, _numHealth, _barHealth, _numMorale, _barMorale, _txtArmor, _txtDoom };
 	for (auto *part : _panelParts)
 	{
@@ -527,6 +540,9 @@ void FirstPersonMode::createSoldierCard()
 	_cardName = new Text(CardW - 8, 9, 0, 0);
 	_state->add(_cardName, "textName", "battlescape");
 	_cardParts.push_back({ _cardName, 4, 3 });
+	_cardRank = new Surface(RankIconW, RankIconH, 0, 0); // (before the name: placed in updateSoldierCard)
+	_state->add(_cardRank);
+	_cardParts.push_back({ _cardRank, 4, 3 - RankIconRise });
 	_cardWeapon = new Text(CardW - 8, 9, 0, 0);
 	_state->add(_cardWeapon, "weapon", "firstPerson");
 	_cardParts.push_back({ _cardWeapon, 4, 12 });
@@ -610,8 +626,10 @@ void FirstPersonMode::createSoldierCam()
 	_txtSoldierCam = new Text(220, 9, 0, 0);
 	_state->add(_txtSoldierCam, "textName", "battlescape");
 	_txtSoldierCam->setHighContrast(true);
+	_soldierCamRank = new Surface(RankIconW, RankIconH, 0, 0); // the soldier's rank, before the title
+	_state->add(_soldierCamRank);
 
-	for (Surface *part : { (Surface*)_soldierCamDot, (Surface*)_txtSoldierCam })
+	for (Surface *part : { (Surface*)_soldierCamDot, (Surface*)_txtSoldierCam, _soldierCamRank })
 	{
 		part->setVisible(false);
 		_ownSurfaces.insert(part);
@@ -799,12 +817,14 @@ void FirstPersonMode::setResizeAnchors()
 	for (Surface *part : std::initializer_list<Surface*>{ _liftUp, _liftDown, _txtLift, _txtLiftKeys }) _anchors[part] = RIGHT_CENTER;
 	_anchors[_txtMode] = CENTER;
 	_anchors[_txtShot] = CENTER;
+	_anchors[_txtCosts] = CENTER;
 	_anchors[_txtScoping] = RIGHT_CENTER;
 
 	// END and the suit's buttons keep to the top right, and so does the compass; the info panel
 	// to the bottom left.
 	_anchors[_btnEndTurn] = TOP_RIGHT;
 	_anchors[_compass] = TOP_RIGHT;
+	_anchors[_climbArrows] = TOP_RIGHT;
 	for (Text *letter : _compassLetters) _anchors[letter] = TOP_RIGHT;
 	_anchors[_txtCompassTurn] = TOP_RIGHT;
 	_anchors[_txtSprint] = TOP_RIGHT;
@@ -1941,6 +1961,7 @@ void FirstPersonMode::think()
 		updateAim(unit);
 	}
 	updateTrajectory(unit, playerTurn);
+	updateSprayMarks(playerTurn ? unit : nullptr);
 
 	// Everything drawn over the view, then the view itself is redrawn.
 	updateEnemyMarkers();
@@ -2179,14 +2200,28 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 
 	// The numpad (after the bindable keys, which may use it): moves a tile at a time, almost at
 	// once, as on the isometric map, whatever the movement setting: 8 ahead, 2 back, 4 and 6
-	// sideways, relative to the view; 7 and 9 a snap turn. A press is remembered until the move
-	// can start (see tileMoveVelocity), so a quick tap always counts.
+	// sideways, relative to the view, two of them pressed together a diagonal (a player: as W, A,
+	// S and D do); 7 and 9 a snap turn. A press is remembered until the move can start (see
+	// tileMoveVelocity), so a quick tap always counts; a key of the other axis pressed within
+	// NumpadComboWait of it joins it.
 	if (key == SDLK_KP8 || key == SDLK_KP2 || key == SDLK_KP4 || key == SDLK_KP6)
 	{
 		if (pressed && _save->getSide() == FACTION_PLAYER) // (not remembered through the aliens' turn)
 		{
-			_numpadMove[0] = key == SDLK_KP8 ? 1 : key == SDLK_KP2 ? -1 : 0;
-			_numpadMove[1] = key == SDLK_KP6 ? 1 : key == SDLK_KP4 ? -1 : 0;
+			const int forward = key == SDLK_KP8 ? 1 : key == SDLK_KP2 ? -1 : 0, strafe = key == SDLK_KP6 ? 1 : key == SDLK_KP4 ? -1 : 0;
+			const Uint32 now = SDL_GetTicks();
+			const bool joins = (_numpadMove[0] || _numpadMove[1]) && now - _numpadPressAt <= NumpadComboWait;
+			if (joins)
+			{
+				if (forward) _numpadMove[0] = forward;
+				if (strafe) _numpadMove[1] = strafe;
+			}
+			else
+			{
+				_numpadMove[0] = forward;
+				_numpadMove[1] = strafe;
+				_numpadPressAt = now;
+			}
 		}
 		return true;
 	}

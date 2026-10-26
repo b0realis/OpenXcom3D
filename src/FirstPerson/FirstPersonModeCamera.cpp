@@ -639,10 +639,58 @@ void FirstPersonMode::updateCamera(BattleUnit *unit, bool canMove, double elapse
 	updateLean(unit, canMove, elapsedSeconds, leanDrop);
 
 	// Place the eye: the lunge goes the way the camera looks, the lean to its side, the bob, a
-	// jump and the lean's drop up and down.
+	// jump and the lean's drop up and down; kept out of anything solid (see clearEye).
 	const double yawRadians = _view->getYawDegrees() * Pi / 180.0;
-	_view->setEye(_eyeX + std::cos(yawRadians) * lunge + _leanShift[0], _eyeY + std::sin(yawRadians) * lunge + _leanShift[1],
-		_eyeZ + headBob + currentJumpHeight(unit) - leanDrop - landingDip());
+	double eye[3] = { _eyeX + std::cos(yawRadians) * lunge + _leanShift[0], _eyeY + std::sin(yawRadians) * lunge + _leanShift[1],
+		_eyeZ + headBob + currentJumpHeight(unit) - leanDrop - landingDip() };
+	clearEye(unit, eye, yawRadians);
+	_view->setEye(eye[0], eye[1], eye[2]);
+}
+
+/**
+ * Keeps the eye out of anything solid (a player's report: a 2x2 unit standing in a door two tiles
+ * wide was blinded, in XPiratez's temple raid). A big unit's eye is the middle of its footprint,
+ * where its four tiles meet: right where a wide door's frame or middle post stands (walls lie on
+ * the tiles' edges), and the 3D view drew from inside it. When the eye's voxel is solid (the
+ * game's own voxels, units left out), it moves to the nearest free one along the ground, looked
+ * for a voxel at a time up to EyeClearReach: ahead the way the view looks first, then to either
+ * side, then behind; it stays inside the unit's footprint. Nothing is found: it stays.
+ * @param unit The unit looked through.
+ * @param eye The eye, in voxels (moved if it must).
+ * @param yawRadians The way the view looks, along the ground.
+ */
+void FirstPersonMode::clearEye(BattleUnit *unit, double eye[3], double yawRadians) const
+{
+	TileEngine *tileEngine = _save->getTileEngine();
+	auto solidAt = [&](double x, double y)
+	{
+		return tileEngine->voxelCheck(Position((int)std::floor(x), (int)std::floor(y), (int)std::floor(eye[2])), unit, true) != V_EMPTY;
+	};
+	if (!solidAt(eye[0], eye[1]))
+	{
+		return;
+	}
+	// The footprint, in voxels (a tile's edge margin in from its sides).
+	const Position tile = unit->getPosition();
+	const double size = unit->getArmor()->getSize() * 16.0;
+	const double minX = tile.x * 16.0 + EdgeMargin, maxX = tile.x * 16.0 + size - EdgeMargin;
+	const double minY = tile.y * 16.0 + EdgeMargin, maxY = tile.y * 16.0 + size - EdgeMargin;
+	const double forward[2] = { std::cos(yawRadians), std::sin(yawRadians) };
+	const double ways[4][2] = { { forward[0], forward[1] }, { -forward[1], forward[0] }, { forward[1], -forward[0] }, { -forward[0], -forward[1] } };
+	for (double distance = 1.0; distance <= EyeClearReach; distance += 1.0)
+	{
+		for (const auto &way : ways)
+		{
+			const double x = eye[0] + way[0] * distance, y = eye[1] + way[1] * distance;
+			if (x < minX || x > maxX || y < minY || y > maxY || solidAt(x, y))
+			{
+				continue;
+			}
+			eye[0] = x;
+			eye[1] = y;
+			return;
+		}
+	}
 }
 
 /**

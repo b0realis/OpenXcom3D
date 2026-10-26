@@ -329,6 +329,11 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 			static const char *const ghostNames[] = { "STR_FPS_GHOST_PARTS_OFF", "STR_FPS_GHOST_PARTS_LIFTS", "STR_FPS_GHOST_PARTS_ALL" };
 			return std::string(tr(ghostNames[std::clamp(*option.asInt(), 0, 2)]));
 		}
+		// The parts without shape's opacity is a percentage.
+		if (option.id() == "fpsGhostOpacity")
+		{
+			return std::to_string(*option.asInt()) + "%";
+		}
 		// The downed units' icons are a choice of three, shown by name.
 		if (option.id() == "fpsDownedIcons")
 		{
@@ -545,6 +550,11 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		else if (value == &Options::fpsGhostParts)
 		{
 			*value = (*value + direction + 3) % 3;
+		}
+		// The parts without shape's opacity: 10 to 100%, in steps of 10.
+		else if (value == &Options::fpsGhostOpacity)
+		{
+			*value = std::clamp(*value + 10 * direction, 10, 100);
 		}
 		// The downed units' icons (off, crosshair, always): round and round.
 		else if (value == &Options::fpsDownedIcons)

@@ -319,6 +319,7 @@ void createOptions(std::vector<OptionInfo> &options)
 	// beams), shown as see-through ghosts of their art: 0 none, 1 lifts and ladders (the parts
 	// with the grav lift flag), 2 all of them.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsGhostParts", &fpsGhostParts, 1, "STR_FPS_GHOST_PARTS", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsGhostOpacity", &fpsGhostOpacity, 50, "STR_FPS_GHOST_OPACITY", category));
 	// The map's edge as small red dots on the floor, nothing beyond it, instead of the tape.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDiscreetEdge", &fpsDiscreetEdge, false, "STR_FPS_DISCREET_EDGE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 0, "STR_FPS_PIXEL_SIZE", category));
@@ -326,6 +327,7 @@ void createOptions(std::vector<OptionInfo> &options)
 	// (YES) or at the tile, as the original game does (NO), and the units' hitboxes.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshair", &fpsCrosshair, true, "STR_FPS_CROSSHAIR", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshairInfo", &fpsCrosshairInfo, true, "STR_FPS_CROSSHAIR_INFO", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshairCosts", &fpsCrosshairCosts, true, "STR_FPS_CROSSHAIR_COSTS", category));
 	// The name of the unit under the crosshair (or the free cursor), as the game names it.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsUnitNames", &fpsUnitNames, true, "STR_FPS_UNIT_NAMES", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsAimExact", &fpsAimExact, true, "STR_FPS_AIM_EXACT", category));

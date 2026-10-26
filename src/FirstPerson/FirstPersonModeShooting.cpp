@@ -779,6 +779,58 @@ void FirstPersonMode::switchHand()
 }
 
 /**
+ * A melee blow at terrain by the crosshair (a player's report: melee couldn't strike a structure
+ * diagonally in front, "Preferably you should be able to melee any voxel structure within around
+ * 1 tile of the player, and base it entirely on where first person crosshair is"; on stairs the
+ * walls of both floors ahead): what the crosshair meets, by the game's own line (see aimAt), if
+ * it's a wall, a door or an object (the game's terrain melee knows no floors), no farther from the
+ * eye than MeleeTerrainReach, on the unit's own tile or one next to it (the eight around, a level
+ * up or down too: the owner's choice), and the weapon damages terrain at all (as the game's own
+ * check, validTerrainMeleeRange). The game's terrain melee then strikes that part of that tile.
+ * @param unit The soldier striking.
+ * @param weapon The weapon (or fist) striking.
+ * @param struck Set to the voxel the crosshair meets.
+ * @param part Set to the part struck (V_WESTWALL, V_NORTHWALL or V_OBJECT).
+ * @return True if there's something to strike.
+ */
+bool FirstPersonMode::crosshairTerrainMelee(BattleUnit *unit, BattleItem *weapon, Position &struck, int &part)
+{
+	// The weapon must damage terrain (a melee weapon's own damage, else its melee's).
+	const RuleItem *rules = weapon ? weapon->getRules() : nullptr;
+	if (rules && (rules->getBattleType() == BT_MELEE ? rules->getDamageType() : rules->getMeleeType())->ToTile == 0.0)
+	{
+		return false;
+	}
+	// What the crosshair meets: a wall, a door or an object, within reach.
+	int hitType = V_EMPTY;
+	if (!aimAt(_view->getWidth() / 2, _view->getHeight() / 2, unit, struck, &hitType) || (hitType != V_WESTWALL && hitType != V_NORTHWALL && hitType != V_OBJECT))
+	{
+		return false;
+	}
+	double eye[3];
+	_view->getEye(eye);
+	const double dx = struck.x + 0.5 - eye[0], dy = struck.y + 0.5 - eye[1], dz = struck.z + 0.5 - eye[2];
+	if (dx * dx + dy * dy + dz * dz > MeleeTerrainReach * MeleeTerrainReach)
+	{
+		return false;
+	}
+	// On the unit's own tile or one next to it, a level up or down included.
+	const Position tile = struck.toTile(), at = unit->getPosition();
+	const int size = unit->getArmor()->getSize();
+	if (tile.x < at.x - 1 || tile.x > at.x + size || tile.y < at.y - 1 || tile.y > at.y + size || std::abs(tile.z - at.z) > 1)
+	{
+		return false;
+	}
+	const Tile *target = _save->getTile(tile);
+	if (!target || !target->getMapData((TilePart)hitType))
+	{
+		return false;
+	}
+	part = hitType;
+	return true;
+}
+
+/**
  * Finds what a shot would hit through a pixel of the view: the first voxel along that ray,
  * found by the game's own line of fire (TileEngine::calculateLineVoxel, the same 3D Bresenham
  * line through the same voxel shapes a real shot flies along). Walls, objects, floors and units
@@ -793,7 +845,7 @@ void FirstPersonMode::switchHand()
  *   V_UNIT; V_EMPTY for nothing).
  * @return True if something was hit.
  */
-bool FirstPersonMode::aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &voxel, int *voxelType)
+bool FirstPersonMode::aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &voxel, int *voxelType) const
 {
 	// The ray from the eye through that pixel, in voxels (16 per tile across, 24 per level).
 	double eye[3], rayDirection[3];
@@ -878,6 +930,36 @@ int FirstPersonMode::shotTurnCost(BattleUnit *unit, int &direction, bool &afford
 	const int cost = eighths * (turret ? 1 : unit->getTurnCost());
 	affordable = cost + BattleActionCost(mode, unit, weapon).Time <= unit->getTimeUnits();
 	return cost;
+}
+
+/**
+ * A spray burst being marked (the game's "spray" auto shot, see fire), every frame: the points
+ * marked so far and the next one, the tile under the crosshair, for the view to draw (see
+ * FirstPersonView::drawSprayMarks); none while nothing is being marked. Each on its tile's floor,
+ * in the middle, where the player clicked, as the map marks the tiles themselves (the game aims
+ * the rounds at the middles of those tiles, waist high, which looking down at the ground nearby
+ * would be out of the top of the view).
+ * @param unit The soldier being looked through, or null.
+ */
+void FirstPersonMode::updateSprayMarks(BattleUnit *unit)
+{
+	const BattleAction *action = _state->_battleGame->getCurrentAction();
+	auto onFloor = [this](Position tile) {
+		tile.x = std::clamp<int>(tile.x, 0, _save->getMapSizeX() - 1);
+		tile.y = std::clamp<int>(tile.y, 0, _save->getMapSizeY() - 1);
+		tile.z = std::clamp<int>(tile.z, 0, _save->getMapSizeZ() - 1);
+		const Tile *mapTile = _save->getTile(tile);
+		return Position(tile.x * 16 + 8, tile.y * 16 + 8, tile.z * 24 - (mapTile ? mapTile->getTerrainLevel() : 0) + 1);
+	};
+	std::vector<Position> points;
+	if (unit && isActive() && action->sprayTargeting && action->actor == unit)
+	{
+		for (const Position &tile : action->waypoints)
+		{
+			points.push_back(onFloor(tile));
+		}
+	}
+	_view->setSprayMarks(points, onFloor(_aimVoxel.toTile()));
 }
 
 /**
@@ -1518,6 +1600,33 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	BattleAction *action = battleGame->getCurrentAction();
 	BattleActionType mode = _fireMode;
 
+	// A spray burst being marked (the game's "spray" auto shot, a player: "Ctrl shift for spray
+	// waypoints ... needs first person equivalent"): begun with Ctrl+Shift and a click (launchShot
+	// hands that to the game, which starts marking), each click marks the next point, the tile
+	// under the crosshair, the game's own way: the one that reaches the weapon's number of points
+	// (or one with Ctrl and Shift held) fires the burst along them. The right button takes the
+	// last point back (the game's cancel). See updateSprayMarks.
+	if (action->sprayTargeting && action->actor == unit)
+	{
+		Position aimed;
+		aimAt(pixelX, pixelY, unit, aimed);
+		Position tile = aimed.toTile();
+		tile.x = std::clamp<int>(tile.x, 0, _save->getMapSizeX() - 1);
+		tile.y = std::clamp<int>(tile.y, 0, _save->getMapSizeY() - 1);
+		tile.z = std::clamp<int>(tile.z, 0, _save->getMapSizeZ() - 1);
+		// (Free turning, no "Turning costs TU": the soldier faces the first point for free, so the
+		// game's turn to it before the burst costs nothing, as for any shot, see launchShot.)
+		if (!Options::fpsTurnCost && !action->waypoints.empty() && unit->directionTo(action->waypoints.front()) != unit->getDirection())
+		{
+			unit->setDirection(unit->directionTo(action->waypoints.front()));
+			_save->getTileEngine()->calculateFOV(unit);
+			_save->getTileEngine()->calculateFOV(unit->getPosition(), 1, false); // others' view of this unit, like UnitTurnBState
+		}
+		battleGame->primaryAction(tile);
+		_triggerHeld = false;
+		return;
+	}
+
 	// An action picked from an item's menu that wants a target (the mind probe, psi picked from
 	// the menu...): this click is its target, with that item and action. Not a shot, though:
 	// after a shot the game keeps aiming that same shot (so the player can fire again), and a
@@ -1669,10 +1778,12 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 
 	// Melee: the game finds who is in reach in the direction the soldier faces (the 3D view
 	// keeps him facing where it looks) and does the attack as its own action, which needs no
-	// target click. With no one standing in reach, like the isometric map, the game's own
-	// terrain melee hits the wall, door or object the soldier faces, if the mod switches it on
-	// (extendedTerrainMelee); the setting "Melee hits walls and the downed" switches it on for
-	// the 3D view, and first lets the blow hit a body lying in front (see meleeDowned).
+	// target click. With no one standing in reach, the game's own terrain melee, if the mod
+	// switches it on (extendedTerrainMelee) or the setting "Melee hits walls and the downed"
+	// does for the 3D view (which first lets the blow hit a body lying in front, see
+	// meleeDowned), strikes the wall, door or object under the crosshair within reach, diagonal
+	// or a level up or down too (see crosshairTerrainMelee; the map's own strikes only the one
+	// straight ahead).
 	if (mode == BA_HIT)
 	{
 		TileEngine *tileEngine = _save->getTileEngine();
@@ -1690,18 +1801,16 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 		}
 		else
 		{
-			const int modTerrainMelee = Mod::EXTENDED_TERRAIN_MELEE;
-			if (Options::fpsMeleeTerrain && modTerrainMelee <= 0)
-			{
-				Mod::EXTENDED_TERRAIN_MELEE = 1; // only for this check: parts reaching above the bottom layer
-			}
-			const bool terrainInReach = tileEngine->validTerrainMeleeRange(action);
-			Mod::EXTENDED_TERRAIN_MELEE = modTerrainMelee;
-			if (!terrainInReach)
+			Position struck;
+			int part = V_EMPTY;
+			if (!(Options::fpsMeleeTerrain || Mod::EXTENDED_TERRAIN_MELEE > 0) || !crosshairTerrainMelee(unit, weapon, struck, part))
 			{
 				_state->warning("STR_THERE_IS_NO_ONE_THERE");
 				return;
 			}
+			action->target = struck.toTile();
+			action->terrainMeleeTilePart = part;
+			action->targetVoxel = struck; // (the hit lands there: MeleeAttackBState)
 		}
 		action->type = BA_HIT;
 		action->targeting = false;
@@ -1709,6 +1818,7 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 		action->updateTU();
 		const bool timeUnitsEnough = action->haveTU();
 		battleGame->handleNonTargetAction();
+		action->targetVoxel = Position(-1, -1, -1); // (taken by the game's melee, if it went ahead)
 
 		// The weapon in hand swings only if the game went ahead. Refused for time units, the
 		// game says so and nothing swings, and the melee isn't left waiting (as the game's
@@ -1902,8 +2012,15 @@ void FirstPersonMode::launchShot(BattleUnit *unit, BattleItem *weapon, BattleAct
 	// Fire, as a click on the target tile of the isometric map: the game turns the soldier (by
 	// the rules), checks and spends the time units, and launches the shot. With the game's
 	// "confirm fire mode" setting the first click only marks the target, so click a second time.
+	// (Ctrl and Shift held with a spray weapon's auto shot: the game starts marking a spray burst
+	// instead, its first point this tile; the trigger is let go, so FPS style's held auto doesn't
+	// mark more, and confirm fire's second click isn't made: it would fire the burst at once.)
 	battleGame->primaryAction(targetTile);
-	if (Options::battleConfirmFireMode && action->targeting && !action->waypoints.empty())
+	if (action->sprayTargeting)
+	{
+		_triggerHeld = false;
+	}
+	else if (Options::battleConfirmFireMode && action->targeting && !action->waypoints.empty())
 	{
 		battleGame->primaryAction(targetTile);
 	}
@@ -1976,23 +2093,31 @@ void FirstPersonMode::fireTurnShot()
 }
 
 /**
- * The patient a medi-kit would treat now. The game's own choices, as its action menu makes
- * them (and with the same rules for whom the kit may treat, standing or lying, friend, neutral
- * or foe, immune to wounds or not): a body lying on the soldier's own tile, the unit in the tile
- * the soldier faces (in reach, as for melee), or the soldier themself. The game takes the first
- * of these there is; here the player's aim picks among them:
- * - the unit in reach, when its picture is under the crosshair (or the free cursor): it (none,
- *   if the kit can't treat it);
- * - looking down (more than 25 degrees): the body at the feet;
- * - aiming at nothing in reach: the soldier themself;
- * - and when the kit can't treat the soldier, the game's own order for the rest.
+ * Whom a medi-kit would treat now, by the crosshair (a player: "the same targetting system ...
+ * proposed for melee"), with the game's own rules for whom the kit may treat (standing or lying,
+ * friend, neutral or foe, immune to wounds or not):
+ * - a unit standing under the crosshair (or the free cursor): treated if it's on a tile next to
+ *   the soldier (any of the eight ways, by the game's melee reach, TileEngine::validMeleeRange),
+ *   the soldier first turning to face it (the way needing the fewest eighths); farther off, out
+ *   of range (none, either way, if the kit can't treat it);
+ * - a unit lying unconscious under the crosshair (its body's picture, see
+ *   FirstPersonView::getBodyAtPointer: a body lying flat reaches far towards the camera, so not
+ *   where the line of fire meets the floor): treated if it lies at the soldier's feet (as the
+ *   game treats bodies: on the soldier's own tile only); elsewhere, the player is told to stand
+ *   over it;
+ * - looking down (more than 25 degrees) with a body at the feet: that body;
+ * - aiming at nothing of these: the soldier themself;
+ * - and when the kit can't treat the soldier, the game's own order: the body at the feet, then
+ *   the unit in the tile faced.
  * @param unit The soldier with the kit.
  * @param medikit The kit.
- * @return The patient, or null if there's none.
+ * @return The patient (null if none, with the reason), and the way to turn to them.
  */
-BattleUnit *FirstPersonMode::medikitPatient(BattleUnit *unit, BattleItem *medikit) const
+FirstPersonMode::MedikitAim FirstPersonMode::medikitPatient(BattleUnit *unit, BattleItem *medikit) const
 {
+	MedikitAim aim;
 	const RuleItem *rules = medikit->getRules();
+	TileEngine *tileEngine = _save->getTileEngine();
 	// Whether the kit may treat a unit of this side, standing or lying.
 	auto sideAllowed = [rules](const BattleUnit *patient, bool lying) {
 		const UnitFaction faction = patient->getOriginalFaction();
@@ -2001,44 +2126,95 @@ BattleUnit *FirstPersonMode::medikitPatient(BattleUnit *unit, BattleItem *mediki
 			: ((rules->getAllowTargetFriendStanding() && faction == FACTION_PLAYER) || (rules->getAllowTargetNeutralStanding() && faction == FACTION_NEUTRAL)
 				|| (rules->getAllowTargetHostileStanding() && faction == FACTION_HOSTILE));
 	};
-	// A body on the soldier's own tile (never a big unit's), unconscious and treatable.
-	BattleUnit *body = nullptr;
-	for (BattleUnit *other : *_save->getUnits())
-	{
-		if (other->getPosition() == unit->getPosition() && other != unit && other->getStatus() == STATUS_UNCONSCIOUS && !other->isBigUnit()
-			&& (other->isWoundable() || rules->getAllowTargetImmune()) && rules->getAllowTargetGround() && sideAllowed(other, true))
+	auto treatableStanding = [&](const BattleUnit *patient) {
+		return rules->getAllowTargetStanding() && (patient->isWoundable() || rules->getAllowTargetImmune()) && sideAllowed(patient, false);
+	};
+	auto treatableLying = [&](const BattleUnit *patient) {
+		return !patient->isBigUnit() && rules->getAllowTargetGround() && (patient->isWoundable() || rules->getAllowTargetImmune()) && sideAllowed(patient, true);
+	};
+	// The unconscious unit lying on a tile (the first), if any.
+	auto bodyOn = [&](Tile *tile) -> BattleUnit* {
+		for (BattleItem *item : tile ? *tile->getInventory() : std::vector<BattleItem*>())
 		{
-			body = other;
-			break;
+			if (item->getUnit() && item->getUnit() != unit && item->getUnit()->getStatus() == STATUS_UNCONSCIOUS)
+			{
+				return item->getUnit();
+			}
 		}
-	}
-	// The unit in the tile the soldier faces, and whether the kit may treat it.
-	BattleUnit *facedUnit = nullptr, *standing = nullptr;
-	Position facedTile;
-	if (_save->getTileEngine()->validMeleeRange(unit->getPosition(), unit->getDirection(), unit, nullptr, &facedTile, false))
+		return nullptr;
+	};
+
+	// A unit standing under the crosshair: next to the soldier (the way to it needing the fewest
+	// eighths of a turn), or out of range.
+	BattleUnit *pointed = _view->getUnitAtPointer();
+	if (pointed && pointed != unit)
 	{
-		const Tile *tile = _save->getTile(facedTile);
-		facedUnit = tile ? tile->getUnit() : nullptr;
-		if (facedUnit && rules->getAllowTargetStanding() && (facedUnit->isWoundable() || rules->getAllowTargetImmune()) && sideAllowed(facedUnit, false))
+		int bestEighths = 9;
+		for (int direction = 0; direction < 8; ++direction)
 		{
-			standing = facedUnit;
+			Position reachedTile;
+			const int eighths = std::min((direction - unit->getDirection() + 8) % 8, (unit->getDirection() - direction + 8) % 8);
+			if (eighths < bestEighths && tileEngine->validMeleeRange(unit->getPosition(), direction, unit, pointed, &reachedTile, false))
+			{
+				bestEighths = eighths;
+				aim.direction = direction;
+			}
 		}
+		if (aim.direction < 0)
+		{
+			aim.refusal = "STR_OUT_OF_RANGE";
+		}
+		else if (treatableStanding(pointed))
+		{
+			aim.patient = pointed;
+		}
+		else
+		{
+			aim.direction = -1;
+			aim.refusal = "STR_THERE_IS_NO_ONE_THERE";
+		}
+		return aim;
 	}
-	// The aim picks.
-	const BattleUnit *pointed = _view->getUnitAtPointer();
-	if (pointed && pointed == facedUnit)
+
+	// A body under the crosshair: at the feet, or elsewhere (stand over it); or looking down at
+	// the feet, a body lying there.
+	BattleUnit *bodyAtFeet = bodyOn(_save->getTile(unit->getPosition()));
+	BattleUnit *pointedBody = _view->getBodyAtPointer();
+	if (pointedBody && pointedBody != bodyAtFeet && pointedBody->getPosition() != unit->getPosition())
 	{
-		return standing;
+		aim.refusal = "STR_FPS_MEDIKIT_STAND_OVER";
+		return aim;
 	}
-	if (_view->getPitchDegrees() < -25.0 && body)
+	if (bodyAtFeet && treatableLying(bodyAtFeet) && (pointedBody || _view->getPitchDegrees() < -25.0))
 	{
-		return body;
+		aim.patient = bodyAtFeet;
+		return aim;
 	}
+
+	// Nothing of these: the soldier, or else the game's own order.
 	if (rules->getAllowTargetSelf())
 	{
-		return unit;
+		aim.patient = unit;
+		return aim;
 	}
-	return body ? body : standing;
+	if (bodyAtFeet && treatableLying(bodyAtFeet))
+	{
+		aim.patient = bodyAtFeet;
+		return aim;
+	}
+	Position facedTile;
+	if (tileEngine->validMeleeRange(unit->getPosition(), unit->getDirection(), unit, nullptr, &facedTile, false))
+	{
+		const Tile *tile = _save->getTile(facedTile);
+		BattleUnit *faced = tile ? tile->getUnit() : nullptr;
+		if (faced && treatableStanding(faced))
+		{
+			aim.patient = faced;
+			return aim;
+		}
+	}
+	aim.refusal = "STR_THERE_IS_NO_ONE_THERE";
+	return aim;
 }
 
 /**
@@ -2093,24 +2269,44 @@ void FirstPersonMode::useItemDirectly(BattleUnit *unit, BattleItem *item)
 		return;
 	}
 
-	// A medi-kit, on the patient pointed at.
-	BattleUnit *patient = medikitPatient(unit, item);
+	// A medi-kit, on the patient pointed at (see medikitPatient).
+	const MedikitAim aim = medikitPatient(unit, item);
+	BattleUnit *patient = aim.patient;
 	if (!patient)
 	{
-		_state->warning("STR_THERE_IS_NO_ONE_THERE");
+		_state->warning(aim.refusal);
 		return;
 	}
 	TileEngine *tileEngine = _save->getTileEngine();
 	const BattleMediKitType type = rules->getMediKitType();
-	if (!type)
-	{
-		_game->pushState(new MedikitState(patient, action, tileEngine));
-		return;
-	}
-	if (!((type == BMT_HEAL && item->getHealQuantity() > 0) || (type == BMT_STIMULANT && item->getStimulantQuantity() > 0)
+	if (type && !((type == BMT_HEAL && item->getHealQuantity() > 0) || (type == BMT_STIMULANT && item->getStimulantQuantity() > 0)
 		|| (type == BMT_PAINKILLER && item->getPainKillerQuantity() > 0)))
 	{
 		_state->warning("STR_NO_USES_LEFT");
+		return;
+	}
+	// A patient beside the soldier but not in the way they face: the soldier turns to them
+	// first. With "Turning costs TU" an eighth at a time the shorter way round, each the armor's
+	// turn cost (as the game's turn charges it; nothing in Doom mode), the turn and the kit's use
+	// both wanting their time units before either is spent; with free turning for nothing.
+	if (aim.direction >= 0 && aim.direction != unit->getDirection())
+	{
+		const int eighths = std::min((aim.direction - unit->getDirection() + 8) % 8, (unit->getDirection() - aim.direction + 8) % 8);
+		const int turnCost = Options::fpsTurnCost && !doomModeOn() ? eighths * unit->getTurnCost() : 0;
+		if (turnCost > 0 && unit->getTimeUnits() < turnCost + (type ? action->Time : 0))
+		{
+			_state->warning("STR_NOT_ENOUGH_TIME_UNITS");
+			return;
+		}
+		unit->spendTimeUnits(turnCost);
+		unit->setDirection(aim.direction);
+		tileEngine->calculateFOV(unit);
+		tileEngine->calculateFOV(unit->getPosition(), 1, false); // others' view of this unit, as after the game's turn
+		_state->updateSoldierInfo(false);
+	}
+	if (!type)
+	{
+		_game->pushState(new MedikitState(patient, action, tileEngine));
 		return;
 	}
 	if (!action->spendTU(&action->result))
@@ -2614,6 +2810,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	_crosshair->setVisible(show && Options::fpsCrosshair);
 	_txtMode->setVisible(show && Options::fpsCrosshairInfo && playerTurn);
 	_txtShot->setVisible(show && Options::fpsCrosshairInfo && playerTurn);
+	_txtCosts->setVisible(show && Options::fpsCrosshairInfo && Options::fpsCrosshairCosts && playerTurn);
 	if (!show)
 	{
 		return;
@@ -2626,6 +2823,8 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	_txtMode->setY(linesTop);
 	_txtShot->setX(centreX + 14);
 	_txtShot->setY(linesTop + 10);
+	_txtCosts->setX(centreX + 14);
+	_txtCosts->setY(linesTop + 20);
 
 	// The colours, picked from the current palette: plain ones for the crosshair, and text
 	// colour groups for the lines.
@@ -2650,7 +2849,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	const BattleActionType mode = firedAs(weapon, slot); // (FPS style: the quick slot is a burst)
 	int shots = 1;
 	Uint8 color = grey;
-	std::string modeText, shotText;
+	std::string modeText, shotText, costText;
 	bool dual = false, inTurn = false, eachFull = false; // both guns fire (dual wield); in turn; each at full accuracy and its own cost (an arcing pair, see fire)
 	if (weapon && mode != BA_NONE && unit)
 	{
@@ -2672,10 +2871,12 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		// chosen gun fires alone, at full accuracy, as fire() decides too.
 		BattleActionType offMode = BA_NONE;
 		int offTime = 0;
+		RuleItemUseCost offCost; // (the other gun's whole cost, for the line of other costs)
 		if (BattleItem *otherWeapon = canFire ? dualPartner(unit, weapon, slot, offMode) : nullptr)
 		{
 			const bool arcingPair = firesInTurn(weapon, mode, otherWeapon, offMode);
-			offTime = BattleActionCost(offMode, unit, otherWeapon).Time;
+			offCost = BattleActionCost(offMode, unit, otherWeapon);
+			offTime = offCost.Time;
 			if (!arcingPair) offTime = FirstPerson::dualWieldCharge(cost.Time, offTime);
 			dual = doomModeOn() || cost.Time + offTime <= unit->getTimeUnits();
 			inTurn = dual && (arcingPair || Options::fpsAkimboInTurn);
@@ -2723,6 +2924,35 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		shotInfo << cost.Time + (dual ? offTime : 0) << std::string(_state->tr("STR_FPS_TU"));
 		shotText = shotInfo.str();
 
+		// Under it, the action's other costs (a player: "an energy cost per action if applicable,
+		// as well as any other costs (health, stun, morale, whatever)"; setting "Expanded
+		// crosshair info"): energy, health, stun, morale and mana, those it has, "EN 6  MP 4"
+		// (a gain, a mod's negative cost, with a plus). Both guns' with dual wield, as the game
+		// charges them: energy like the time units (the other gun the rest of the pair's, or its
+		// own in full for a pair firing in turn), the rest each gun's own. One the soldier can't
+		// pay, by the game's own check (BattleActionCost::haveTU: health must stay above the cost,
+		// and above the stun with it), goes red, and the action can't be done.
+		if (Options::fpsCrosshairCosts)
+		{
+			const int energy = cost.Energy + (dual ? (eachFull ? offCost.Energy : FirstPerson::dualWieldCharge(cost.Energy, offCost.Energy)) : 0);
+			const int health = cost.Health + (dual ? offCost.Health : 0), stun = cost.Stun + (dual ? offCost.Stun : 0);
+			const int morale = cost.Morale + (dual ? offCost.Morale : 0), mana = cost.Mana + (dual ? offCost.Mana : 0);
+			const struct { int amount; bool short_; const char *label; } costs[] = {
+				{ energy, unit->getEnergy() < energy, "STR_FPS_COST_ENERGY" },
+				{ health, health > 0 && unit->getHealth() <= health, "STR_FPS_COST_HEALTH" },
+				{ stun, stun > 0 && unit->getHealth() - unit->getStunlevel() <= stun + health, "STR_FPS_COST_STUN" },
+				{ morale, unit->getMorale() < morale, "STR_FPS_COST_MORALE" },
+				{ mana, unit->getMana() < mana, "STR_FPS_COST_MANA" } };
+			for (const auto &entry : costs)
+			{
+				if (entry.amount == 0) continue;
+				if (!costText.empty()) costText += "  ";
+				const std::string amount = std::string(_state->tr(entry.label)) + " " + (entry.amount < 0 ? "+" + std::to_string(-entry.amount) : std::to_string(entry.amount));
+				costText += entry.short_ ? Unicode::TOK_COLOR_FLIP + amount + Unicode::TOK_COLOR_FLIP : amount;
+				canFire = canFire && !entry.short_;
+			}
+		}
+
 		// The mode's name. FPS style: the quick slot reads "BURST x<rounds>", and auto says to
 		// hold the trigger; otherwise auto shows its number of rounds. "DUAL" (or "IN TURN") goes in front
 		// with dual wield.
@@ -2735,6 +2965,12 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		{
 			if (entry.mode == mode) modeText = _state->tr(entry.name);
 		}
+		// A spray burst being marked: "SPRAY 1/2", the points marked of the weapon's number.
+		const BattleAction *gameAction = _state->_battleGame->getCurrentAction();
+		if (gameAction->sprayTargeting && gameAction->actor == unit && gameAction->weapon == weapon)
+		{
+			modeText = _state->tr("STR_FPS_MODE_SPRAY").arg((int)gameAction->waypoints.size()).arg(weapon->getRules()->getSprayWaypoints());
+		}
 		// Doom real-time grenades primed on throw: PRIME sets the fuse for every grenade, "FUSE 3s".
 		if (mode == BA_PRIME && doomModeOn() && Options::fpsDoomPrimeOnThrow && timedGrenade(weapon))
 		{
@@ -2744,7 +2980,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		// none, it can't be used.
 		if (mode == BA_USE && rules->getBattleType() == BT_MEDIKIT)
 		{
-			const BattleUnit *patient = medikitPatient(unit, weapon);
+			const BattleUnit *patient = medikitPatient(unit, weapon).patient;
 			modeText += ": " + (patient == unit ? std::string(_state->tr("STR_FPS_MEDIKIT_SELF")) : patient ? unitLabel(patient) : std::string("-"));
 			canFire = canFire && patient;
 		}
@@ -2773,9 +3009,12 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		}
 		_txtMode->setColor(labelColor);
 		_txtShot->setColor(accuracy >= 0 && canFire ? accuracyColor : labelColor);
+		_txtCosts->setColor(canAct() ? yellowText : greyText);
+		_txtCosts->setSecondaryColor(canAct() ? redText : greyText);
 	}
 	_txtMode->setText(modeText);
 	_txtShot->setText(shotText);
+	if (_txtCosts->getText() != costText) _txtCosts->setText(costText);
 
 	// A hit (or a kill) on an enemy in sight ticks once (setting "Hit and kill sounds") and marks
 	// the crosshair for 280 ms.
@@ -3053,7 +3292,7 @@ void FirstPersonMode::updateUnitName(BattleUnit *unit)
 	pointer(pointerX, pointerY);
 	const BattleUnit *target = Options::fpsUnitNames && isActive() && unit ? _view->getUnitAtPointer() : nullptr;
 	_txtTarget->setVisible(target != nullptr);
-	_view->setPointer(pointerX, pointerY, target ? _txtTarget->getHeight() + 1 : 0);
+	_view->setPointer(pointerX, pointerY, target ? _txtTarget->getHeight() + 1 + (costLineShown() ? 10 : 0) : 0);
 	if (!target)
 	{
 		return;
@@ -3065,8 +3304,19 @@ void FirstPersonMode::updateUnitName(BattleUnit *unit)
 	const std::string label = unitLabel(target);
 	if (_txtTarget->getText() != label) _txtTarget->setText(label);
 	// Centred under the crosshair, clear of its picture (about 8 pixels round the middle).
+	// (A line lower while the action's other costs show under the shot line: see updateCrosshair.)
 	_txtTarget->setX(_view->getX() + pointerX - _txtTarget->getWidth() / 2);
-	_txtTarget->setY(_view->getY() + pointerY + 10);
+	_txtTarget->setY(_view->getY() + pointerY + 10 + (costLineShown() ? 10 : 0));
+}
+
+/**
+ * Whether the line of the action's other costs shows under the crosshair (see updateCrosshair):
+ * the unit name and the icons over a downed unit go a line lower then.
+ * @return True if it's shown with something on it.
+ */
+bool FirstPersonMode::costLineShown() const
+{
+	return _txtCosts && _txtCosts->getVisible() && !_txtCosts->getText().empty() && Options::fpsCrosshair;
 }
 
 /**

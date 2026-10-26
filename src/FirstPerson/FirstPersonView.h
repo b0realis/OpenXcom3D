@@ -229,6 +229,7 @@ public:
 		Uint8 smoke, spark, dust, rain, snow, sand, firefly, bubble;
 		Uint8 speck;           // the white specks a rocket leaves hanging along its path
 		Uint8 marker, marine;
+		Uint8 sprayMark, sprayNext; // a spray burst's marks and the line between them (light green), the stretch to the next (grey)
 		Uint8 hitbox[3];       // hitboxes (setting "Hitboxes"): X-COM's, the aliens', the civilians'
 		Uint8 downedIcon[5];   // icons over the downed: flame, its heart, blood, the shock's bolt, out cold
 		Uint8 edgeDot;         // the discreet map edge's dots
@@ -315,27 +316,23 @@ public:
 
 	/// Marks units (the visible enemies) with their numbers, over everything.
 	void setMarkers(const std::vector<std::pair<const BattleUnit*, int>> &markers) { _markers = markers; }
+	/// A spray burst being marked (the game's "spray" auto shot): its points so far and the next one under the crosshair, in voxels (none: not marking).
+	void setSprayMarks(const std::vector<Position> &points, const Position &next) { _sprayPoints = points; _sprayNext = next; }
 	/// Where the player points on the view: the crosshair, or the free cursor (pixels on the view),
 	/// and how many pixels of text (a unit's name) are under it.
 	void setPointer(int x, int y, int textBelow) { _pointerX = x; _pointerY = y; _pointerTextBelow = textBelow; }
 	/// The unit whose picture is where the player points (or within a few pixels), as last drawn; or null.
 	BattleUnit *getUnitAtPointer() const { return _unitAtPointer; }
+	/// The unconscious unit whose body's picture is where the player points (nearer it than any standing unit's), as last drawn; or null.
+	BattleUnit *getBodyAtPointer() const { return _bodyAtPointer; }
 	/// Leaves out one tile's floor (the lift platform being ridden through), or none (index -1).
 	void setHiddenFloor(int tileIndex) { _hiddenFloor = tileIndex; }
 	/// Turns the flashlight on or off: the shoulder one, or the dynamic one (a tight spot on the crosshair).
 	void setFlashlight(bool on, bool dynamic = false) { _flashlight = on; _dynamicFlashlight = dynamic; }
 	/// Night vision like the isometric map's: brighter, in one colour (group + 1, 0 off).
 	void setNightVision(int color) { _nightVision = color; }
-	/// The sight of the soldier the view looks through, for smoke drawn as the game's sight rules
-	/// have it (setting "Smoke": Modern's wall, Original's stacked frames): the range in voxels,
-	/// and how much of the smoke and of the smoke over fire their eyes see through (the armor's
-	/// heat vision, in percent).
-	void setSmokeSight(float sightVoxels, int throughSmoke, int throughFire)
-	{
-		_smokeSightVoxels = sightVoxels;
-		_smokeBlock = (100 - std::clamp(throughSmoke, 0, 100)) / 300.0f;
-		_fireBlock = (100 - std::clamp(throughFire, 0, 100)) / 300.0f;
-	}
+	/// The sight of the soldier the view looks through, for the smoke: their range, and how much of the smoke (and smoke over fire) they see through.
+	void setSmokeSight(float sightVoxels, int throughSmoke, int throughFire);
 	/// Where the weapon in hand's muzzle is on the view (pixels): our own shots flash and start their trails there.
 	void setMuzzlePoint(double x, double y, bool valid) { _muzzleScreen[0] = x; _muzzleScreen[1] = y; _muzzleValid = valid; }
 	/// The path a throw or shot aimed now would take, in voxels from the soldier to its end (see
@@ -453,6 +450,7 @@ private:
 	float _recoilKick = 0.0f;                           // recoil: the view kicked up after your own shot, degrees
 	int _nightVision = 0;                               // night vision colour group + 1, 0 off
 	float _smokeSightVoxels = 20.0f * Position::TileXY; // the soldier's sight range, voxels (see setSmokeSight)
+	float _smokeSeen = 1.0f;                            // how opaque the see-through smoke is drawn for their eyes: 1 less their heat vision (see setSmokeSight)
 	float _smokeBlock = 1.0f / 3.0f, _fireBlock = 1.0f / 3.0f; // sight used up per voxel walked through 1 point of smoke (over fire), voxels
 	float _smokeDrift = 0.0f;                           // this frame's time, seconds: the smoke's billows drift with it
 	float _smokeRgb[3] = { 130.0f, 130.0f, 130.0f };    // the colour of the game's smoke (see smokeRgb)
@@ -699,6 +697,10 @@ private:
 	Uint32 _hitMarkTick = 0;                            // when an enemy in sight was last hit
 	bool _hitMarkKill = false;                          // and whether that hit killed it
 	std::vector<std::pair<const BattleUnit*, int>> _markers; // visible enemies and their numbers
+	std::vector<Position> _sprayPoints;                 // a spray burst's marked points, in voxels (see setSprayMarks)
+	Position _sprayNext;                                // and the next one under the crosshair
+	/// Draws a spray burst's marked points, numbered, and the dotted line along them (see setSprayMarks).
+	void drawSprayMarks();
 	struct MarkerSpot { double pos[3]; int number; };
 	std::vector<MarkerSpot> _markerSpots;               // where they are this frame
 	bool _showFacing = false;                           // which way the units face shown (the key for it held)
@@ -709,7 +711,9 @@ private:
 	int _pointerTextBelow = 0;                          // and how many pixels of text are under it
 	static constexpr int PointerReach = 3;              // a unit's picture this many pixels from the pointer still counts
 	BattleUnit *_pointerUnits[2 * PointerReach + 1][2 * PointerReach + 1] = {}; // whose picture each pixel round the pointer shows (null: none)
+	BattleUnit *_pointerBodies[2 * PointerReach + 1][2 * PointerReach + 1] = {}; // and which body's lying there (null: none)
 	BattleUnit *_unitAtPointer = nullptr;               // the unit pointed at, found from them after each frame
+	BattleUnit *_bodyAtPointer = nullptr;               // the body pointed at (nearer the pointer than any unit's picture), likewise
 	Surface *_spriteBuffer;                             // scratch surface for drawing a unit's sprite before it goes into the world
 	std::vector<Surface*> _blendBuffers;                // sprites dissolving into their next frame, one per sprite size
 	std::vector<int> _blendColumns;                     // drawSpriteBlend's source column and row lookups
@@ -737,6 +741,7 @@ private:
 		SpritePose pose = SpritePose::Standing;
 		const SeeThroughSprite *seeThrough = nullptr; // how opaque each pixel is (the smoke); null for a solid sprite
 		BattleUnit *unit = nullptr;       // the unit it pictures, if any: smoke veils it only thinly, and it can be pointed at
+		BattleUnit *body = nullptr;       // the unconscious unit lying in the pile it pictures, if any: it can be pointed at
 		double lyingSlope = 0.0;          // a lying sprite's floor rising towards the camera: voxels up for each voxel along (see lyingRise)
 	};
 	/// Draws a sprite standing in the world, depth-tested (or see-through, laid over what's there):
@@ -771,6 +776,10 @@ private:
 	int riseOutOfSolid(const double world[3], int maxRaise) const;
 	/// How steeply the ground in front of something lying at a point rises towards the camera, within its reach.
 	double lyingRise(const double world[3], double reach) const;
+	/// Whether a voxel is filled by the view's terrain (off the map: no).
+	bool solidVoxel(int voxelX, int voxelY, int voxelZ) const;
+	/// The ground under something lying at a point: the plane through its surface round it, its height there and its slope.
+	bool groundPlane(const double world[3], double reach, double &height, double slope[2]) const;
 	/// Draws a sprite part way through dissolving into the next animation frame (ordered dither).
 	void drawSpriteBlend(const Surface *from, const Surface *to, double blend, int anchorX, int anchorY, const double world[3], double depthBias, int shade);
 	/// The box around a sprite frame's pixels.

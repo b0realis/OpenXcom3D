@@ -489,7 +489,9 @@ void FirstPersonMode::numpadKeys(int &forward, int &strafe) const
  * Tile moves: a move walks exactly one tile, to the middle of the neighbour in the direction it
  * pushes (one of eight, relative to the view). The numpad makes such moves whatever the movement
  * setting, almost at once (NumpadMoveSpeed), like a step on the isometric map: a press is
- * remembered until the move can start, and a key still held starts the next. With the setting
+ * remembered until the move can start, and a key still held starts the next; a press waits
+ * NumpadComboWait for a key of the other axis to join it, and keys held then join it too (a
+ * player: 8 and 4 together should make a diagonal, as W and A do). With the setting
  * "Movement: Tiles", W, A, S and D make them too, at walking speed, once held a moment (a second
  * key pressed with the first, W and D say, makes a diagonal), and holding them walks on. A key
  * held on from one move to the next stops at a closed door (a player's report: a held walk went on
@@ -563,10 +565,16 @@ bool FirstPersonMode::tileMoveVelocity(BattleUnit *unit, double forward, double 
 		double moveForward = 0.0, moveStrafe = 0.0;
 		bool quick = true;
 		bool heldOn = false;
-		if (_numpadMove[0] || _numpadMove[1])
+		const bool numpadPressWaits = (_numpadMove[0] || _numpadMove[1]) && now - _numpadPressAt < NumpadComboWait;
+		if (numpadPressWaits)
 		{
-			moveForward = _numpadMove[0];
-			moveStrafe = _numpadMove[1];
+			// (a second key may still join the press)
+		}
+		else if (_numpadMove[0] || _numpadMove[1])
+		{
+			// The press, and a key of the other axis held with it.
+			moveForward = _numpadMove[0] ? _numpadMove[0] : numpadForward;
+			moveStrafe = _numpadMove[1] ? _numpadMove[1] : numpadStrafe;
 		}
 		else if (numpadForward || numpadStrafe)
 		{
@@ -923,11 +931,13 @@ void FirstPersonMode::endVault()
 
 /**
  * Climbing with W and S, as on Half-Life's ladders: while the soldier stands on a grav lift or a
- * ladder, W with the view looking up more than ClimbPitch degrees goes up a level and looking
- * down as much goes down (S the other way round), through moveUpDown, so the game checks and
- * charges it as it does the up and down keys. Held, it climbs on level by level, each once the
- * last ride is over. Looking more level, or where the lift doesn't go that way (at its top, at
- * its foot), the key walks as usual: that's how the soldier steps off.
+ * ladder, or flies with flight switched on (a player: "letting me look up and hold w to fly
+ * straight up"), W with the view looking up more than ClimbPitch degrees goes up a level and
+ * looking down as much goes down (S the other way round), through moveUpDown, so the game
+ * checks and charges it as it does the up and down keys. Held, it climbs on level by level, each
+ * once the last ride is over. Looking more level, or where the way doesn't go on (a lift's top or
+ * foot, a ceiling over a flyer, the ground under one), the key walks as usual: that's how the
+ * soldier steps off. (The arrows by the compass show it: see updateClimbArrows.)
  * @param unit The soldier.
  * @param forward The movement keys' forward push (see movementKeys): 1 for W, -1 for S.
  * @return True if the push is the climb's, so it doesn't walk.
@@ -948,10 +958,11 @@ bool FirstPersonMode::updateClimb(BattleUnit *unit, double forward)
 		return true;
 	}
 
-	// Which way: W looking up (or S looking down) is up. Only where the lift goes that way.
+	// Which way: W looking up (or S looking down) is up. Only where the lift, the ladder or the
+	// flight goes that way.
 	const int direction = (forward > 0.0) == lookingUp ? Pathfinding::DIR_UP : Pathfinding::DIR_DOWN;
 	bool up = false, down = false;
-	liftWays(unit, up, down);
+	climbWays(unit, up, down);
 	if (!(direction == Pathfinding::DIR_UP ? up : down))
 	{
 		return false;
@@ -1269,6 +1280,26 @@ void FirstPersonMode::liftWays(BattleUnit *unit, bool &up, bool &down) const
 		&& (!walkerOnly || walkerMayMoveUpDown(unit->getPosition(), Pathfinding::DIR_UP));
 	down = pathfinding->getTUCost(unit->getPosition(), Pathfinding::DIR_DOWN, unit, nullptr, BAM_NORMAL).cost.time < Pathfinding::INVALID_MOVE_COST
 		&& (!walkerOnly || walkerMayMoveUpDown(unit->getPosition(), Pathfinding::DIR_DOWN));
+}
+
+/**
+ * Which ways W and S may climb from where the soldier is (see updateClimb): a grav lift's or a
+ * ladder's (see liftWays), or else, flying with flight switched on, the moves up and down the
+ * pathfinding allows a flyer from there (not through a ceiling, nor below the ground).
+ * @param unit The soldier.
+ * @param up Set to whether the way goes up.
+ * @param down Set to whether it goes down.
+ */
+void FirstPersonMode::climbWays(BattleUnit *unit, bool &up, bool &down) const
+{
+	liftWays(unit, up, down);
+	if (up || down || !canFly(unit) || !flightOn(unit))
+	{
+		return;
+	}
+	Pathfinding *pathfinding = _save->getPathfinding();
+	up = pathfinding->getTUCost(unit->getPosition(), Pathfinding::DIR_UP, unit, nullptr, BAM_NORMAL).cost.time < Pathfinding::INVALID_MOVE_COST;
+	down = pathfinding->getTUCost(unit->getPosition(), Pathfinding::DIR_DOWN, unit, nullptr, BAM_NORMAL).cost.time < Pathfinding::INVALID_MOVE_COST;
 }
 
 /**

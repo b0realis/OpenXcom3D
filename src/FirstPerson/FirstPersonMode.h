@@ -205,6 +205,10 @@ private:
 	void makeMapCamera(int size);
 	/// Puts a surface in another's place in the screen's lists (drawing, and deleting at its end).
 	void replaceStateSurface(Surface *oldSurface, Surface *newSurface);
+	/// Draws a soldier's rank into an icon beside their name; true if there is one to show.
+	bool drawRankIcon(Surface *icon, const BattleUnit *unit);
+	/// The game's battlescape rank badge averaged down to the rank icon's size (made once).
+	Surface *smallRankBadge(int sprite);
 	/// Puts a remade surface of ours in the old one's place among the state's surfaces (or adds it the first time).
 	void putSurfaceInPlace(Surface *oldSurface, Surface *newSurface);
 	/// The colours of our panels and cards: the mod's, or black with a grey border.
@@ -350,6 +354,8 @@ private:
 	// turning by the rules, the head's free turn and when looking further will cost time units ----
 
 	Surface *_compass = nullptr;                 // the dial
+	Surface *_climbArrows = nullptr;             // beside it, the ways W may climb, the one it takes now lit (see updateClimbArrows)
+	int _climbArrowsShown = -1;                  // what they show: up 1, down 2, lit (1 up, 2 down) times 4; -1 not drawn yet
 	Text *_compassLetters[4] = {};               // N, E, S, W, going round as the view turns
 	Text *_txtCompassTurn = nullptr;             // under it near the head's limit: "TURN 1 TU", or "NO TU"; or a shot's turn: "SHOT +2 TU"
 	int _compassDrawn[5] = { -1000, -1, -1, -1, -1 }; // what the dial shows: the view's bearing (degrees), the facing, the warning, the shot's facing, the shot's turn warning
@@ -395,6 +401,8 @@ private:
 	void updateLean(BattleUnit *unit, bool canLean, double elapsedSeconds, double &dropBy);
 	/// How far the eye can go to one side before a wall or a unit in sight, up to the lean's reach.
 	double leanRoom(BattleUnit *unit, double sideX, double sideY) const;
+	/// Keeps the eye out of anything solid: to the nearest free voxel in the unit's footprint, ahead first.
+	void clearEye(BattleUnit *unit, double eye[3], double yawRadians) const;
 	/// Straightens up at once: no lean, no tilt.
 	void endLean();
 	/// Whether the soldier leans out far enough for a shot to start from that side.
@@ -485,6 +493,10 @@ private:
 	void updateLift(BattleUnit *unit, Uint32 now);
 	/// Which ways a grav lift or a ladder takes the soldier from here.
 	void liftWays(BattleUnit *unit, bool &up, bool &down) const;
+	/// Which ways W and S may climb from here: a lift's or a ladder's, or a flyer's with flight on.
+	void climbWays(BattleUnit *unit, bool &up, bool &down) const;
+	/// The climb arrows beside the compass: the ways W may climb, the one it takes now lit.
+	void updateClimbArrows(BattleUnit *unit);
 	/// W and S looking up or down on a lift or a ladder: climbs; true if that took the push.
 	bool updateClimb(BattleUnit *unit, double forward);
 	/// Draws a pulsing purple lift arrow, up or down.
@@ -528,6 +540,7 @@ private:
 	bool _tileMoveQuick = false;         // it's a numpad move: almost at once
 	Position _tileMoveTarget;            // the tile it goes to (x, y)
 	int _numpadMove[2] = {};             // a numpad key pressed for a move: forward (1, -1), right (1, -1); both 0 for none
+	Uint32 _numpadPressAt = 0;           // when it was pressed (a second key within NumpadComboWait joins it: a diagonal)
 	Uint32 _tileMoveKeysSince = 0;       // when the movement keys were pressed (a moment's wait catches a second key, for a diagonal)
 	double _tileMoveClosest = 0.0;       // the closest the camera has come to the target's middle, voxels
 	Uint32 _tileMoveProgressAt = 0;      // when it last came closer
@@ -635,6 +648,8 @@ private:
 	BattleActionOrigin leanSide(const BattleUnit *unit, const Position &targetTile) const;
 	/// Melee at a body lying in front or at the feet (setting "Melee hits walls and the downed").
 	bool meleeDowned(BattleUnit *unit, BattleItem *weapon, BattleAction *action);
+	/// A melee blow at terrain by the crosshair: the wall, door or object it meets within reach, on a neighbouring tile.
+	bool crosshairTerrainMelee(BattleUnit *unit, BattleItem *weapon, Position &struck, int &part);
 	/// Akimbo: the gun in the other hand that fires along, or null.
 	BattleItem *offHandWeapon(BattleUnit *unit, const BattleItem *weapon) const;
 	/// The akimbo key: full or realistic akimbo off, or the same one back on.
@@ -671,12 +686,23 @@ private:
 	void switchHand();
 	/// Notes what's under the crosshair this frame.
 	void updateAim(BattleUnit *unit);
+	/// A spray burst being marked: its points and the next one, for the view to draw.
+	void updateSprayMarks(BattleUnit *unit);
+	/// Whether the line of the action's other costs shows under the crosshair (the unit name goes a line lower).
+	bool costLineShown() const;
 	/// The first voxel along the ray through a pixel, as a shot would see it; true if something is there.
-	bool aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &voxel, int *voxelType = nullptr);
+	bool aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &voxel, int *voxelType = nullptr) const;
 	/// Uses the fire mode on whatever is under a pixel of the view, through the game's own actions.
 	void fire(int pixelX, int pixelY);
-	/// The patient a medi-kit would treat now: among the game's own choices, the one pointed at; or null.
-	BattleUnit *medikitPatient(BattleUnit *unit, BattleItem *medikit) const;
+	/// Whom a medi-kit would treat now (see medikitPatient).
+	struct MedikitAim
+	{
+		BattleUnit *patient = nullptr; // the patient (null: none)
+		int direction = -1;            // the way the soldier turns to face them first (-1: no turn)
+		std::string refusal;           // with no patient, why (the warning shown)
+	};
+	/// Whom a medi-kit would treat now, by the crosshair: a unit beside the soldier, a body at their feet, or themself.
+	MedikitAim medikitPatient(BattleUnit *unit, BattleItem *medikit) const;
 	/// Uses a medi-kit (no action menu) on the patient pointed at, or a scanner, as the game's menu would.
 	void useItemDirectly(BattleUnit *unit, BattleItem *item);
 	/// Tosses a tactical flare at the crosshair.
@@ -711,6 +737,7 @@ private:
 	Surface *_crosshair = nullptr;                 // the crosshair's surface
 	Uint32 _crosshairDrawnFor = 0xFFFFFFFF;        // what the crosshair surface shows, to redraw only on change
 	Text *_txtMode = nullptr, *_txtShot = nullptr; // the fire mode, and the shot's odds and cost, beside the crosshair
+	Text *_txtCosts = nullptr;                      // and under them its other costs (setting "Expanded crosshair info")
 	Uint32 _hitMarkerHeard = 0;                    // the last hitmarker that ticked
 	const BattleUnit *_sightCheckUnit = nullptr;   // the soldier the last line-of-sight check was for,
 	Position _sightCheckFrom, _sightCheckTile;     // where he stood and the tile aimed at,
@@ -866,6 +893,10 @@ private:
 	Surface *_card = nullptr;                           // the card's frame
 	FirstPersonView *_preview = nullptr;                // the live view from the soldier's helmet camera
 	Text *_cardName = nullptr, *_cardWeapon = nullptr, *_cardStatus = nullptr, *_cardSignal = nullptr; // name, weapon, status, and SIGNAL LOST
+	Surface *_panelRank = nullptr, *_cardRank = nullptr, *_soldierCamRank = nullptr; // a soldier's rank before their name: the panel's, the card's, the soldier cam's title
+	int _panelNameX = 0;                                // where the panel's name line starts (the rank, then the name)
+	std::unordered_map<Surface*, int> _rankDrawn;       // the rank picture each of those holds (-1: none), so it's drawn only when it changes
+	std::map<int, std::unique_ptr<Surface>> _smallRankBadges; // the battlescape rank badges made small (see smallRankBadge), by sprite
 	Uint32 _cardNoiseSeed = 1;                          // random seed for the card's TV static
 	NumberText *_cardNumbers[4] = {};                   // the four stats
 	Bar *_cardBars[4] = {};                             // and their bars

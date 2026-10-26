@@ -4,7 +4,7 @@
 
 ![Night, through a soldier's eyes](docs/screenshots/night.png)
 
-*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.05**, for Linux, Windows and the Steam Deck, with a first, untested build for macOS.
+*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.06**, for Linux, Windows and the Steam Deck, with a first, untested build for macOS.
 
 **Both games are supported,** *UFO: Enemy Unknown* and *X-COM: Terror From The Deep*, and the big mods built on OXCE run in it too (XPiratez is played and tested here).
 
@@ -22,7 +22,7 @@
 - **See:** the original maps, sprites, palette and sounds, rebuilt in 3D from the game's own voxel data: light and shadow, a flashlight and flares, night vision gear, smoke you can see through, rain and snow, swinging doors, glowing UFOs, bullet holes and scorch marks; under the sea, bubbles, marine snow and caustics.
 - **Lead the squad:** every soldier's live helmet camera on the top bar (hover for their card, right click for the big soldier cam), a camera window over the isometric map, and the aliens' turn watched through the eyes of whoever sees the alien.
 - **Feel it:** recoil and muzzle flashes, hit markers, shots whizzing past, blood on the view and a heartbeat when badly hurt, panic and berserk through your soldier's own eyes, and a helmet camera dying in static.
-- **Make it yours:** 67 settings and 33 keys of its own (**Options → 3D VIEW**), and a controller layout made for the Steam Deck.
+- **Make it yours:** 69 settings and 33 keys of its own (**Options → 3D VIEW**), and a controller layout made for the Steam Deck.
 
 | | |
 |---|---|
@@ -39,21 +39,19 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 
 **But be careful!** It can be a traumatic experience.
 
-## New in 1.05
+## New in 1.06
 
-More from the same player (thank you!), and a crash found from their log:
+Four more play reports from the same player (thank you!):
 
-- **A crash ending a battle, fixed:** abandoning a long mission could crash the game, and opening the inventory could freeze it for a moment. Every resize of the game's window (as a window manager may do whenever the screen's size changes) made the 3D views again, and left the old ones to be deleted twice when the battle ended.
-- **Helmet cameras feel live:** the map camera has the soldier cam's blinking red dot, and both now get TV static only now and then, a spell rising from nothing to a snowstorm and back, 10 seconds to 2 minutes apart; on the hardest missions a little static always, and more glitches everywhere.
-- **The top bar** spans the whole top of a bigger screen: the soldiers in the middle, more of them when they fit, the other buttons at the edges.
-- **Akimbo in turn** is akimbo but for the turn: the same 30% penalty and cost as together, the rounds flying 30% faster so the pair isn't slower.
-- **Shotguns on the map:** with *Shotgun pellets in flight* the pellets fly on the isometric map too, shotguns without a sprite borrow one, and every pellet lands with its sound and, in 3D, its bullet hole.
-- **Arcing shots at the exact point** under the crosshair, a forced one too, instead of the tile's middle or corner.
-- **Primed grenades say turns:** PRIMED 3 turns. Doom mode's grenades always burn in real time.
-- **Shorter rocket trails**, and **auto-equip is OXCE's own again**, unchanged, as modders rank their own items for it.
+- **Everything by the crosshair:** melee strikes the wall, door or object under it on any tile next to the soldier, diagonally and up or down a level too (on stairs, the walls of both floors); a medi-kit treats whoever is under it beside you, or the body at your feet; and a third line under it lists an action's other costs: energy, health, stun, morale, mana (*Expanded crosshair info*), red when the soldier can't pay.
+- **Spray bursts:** X-Com Files' and XPiratez's spray weapons sweep between points from 3D too: Ctrl+Shift and a click marks the first, the next click the second, as on the map, each point a light green pole with a mini target where the rounds will go.
+- **Flying with the view:** with flight on, W looking up flies straight up and looking down comes down, as on a lift, and arrows by the compass show which way W will climb.
+- **Seeing:** heat vision thins the smoke you see (a scout drone's 50% sees through half of it), shots into the sky just vanish, Cydonia's lift bars stand round the lift like a cage, and *Ghost opacity* sets how solid the parts without shape look.
+- **And more:** the soldier's rank before their name (the game's badge made small, or a mod's own), numpad diagonals with two keys, a 2×2 unit no longer blinded in a wide door, items on stairs drawn over the steps.
 
 ## Earlier versions
 
+- **1.05:** a crash ending a long battle fixed, helmet cameras that feel live (static in spells), the top bar across a wide screen, akimbo in turn, shotgun pellets on the map, arcing shots at the exact point.
 - **1.04:** a long play report: doors you open by looking at them, bullet holes on everything, the map camera, aiming that tells the truth (no "No line of fire" with the shot on the unit), underground maps in rock, akimbo reworked, unit facing on **Left Alt**, shotgun pellets in flight, falls and lifts at the walking pace, a purple haze through a mind-controlled alien's eyes, and a first macOS build.
 - **1.03:** a first Windows build; the aliens' turn on the map; sprint and en passant; ladders and lifts; helmet cameras with a bad signal; priming in one click; looking straight up and down; the XPiratez weapons.
 - **1.02:** gunplay gone over gun by gun: every weapon its own round, tracer, muzzle flash and kick; rocket trails; Original and Modern smoke.
@@ -95,7 +93,7 @@ OpenXcom3D stems from **OpenXcom Extended** at exactly this commit:
 All changes on top of it are in one file, [`openxcom3d.patch`](openxcom3d.patch) (it applies with `git apply` to a clean checkout of that commit):
 
 - [`src/FirstPerson/`](src/FirstPerson): the 3D view, an engine add-on (renderer, controller, sounds, options), one file per topic and commented throughout;
-- small hooks in the core (39 files, about 900 lines): see the patch;
+- small hooks in the core (40 files, about 900 lines): see the patch;
 - [`mod/OpenXcom3D/`](mod/OpenXcom3D): the data mod that switches it on.
 
 `src/` and `mod/` in this repository are the same files as in the patch, for reading. Built with `-DOXCE_FIRSTPERSON=OFF`, it is plain OXCE again.

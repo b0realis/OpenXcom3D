@@ -12,10 +12,10 @@ index 31faa5c79..7e45307af 100644
  if ( CHECK_CCACHE )
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..747920589
+index 000000000..1da6d4aec
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,385 @@
+@@ -0,0 +1,396 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -94,6 +94,13 @@ index 000000000..747920589
 +  STR_FPS_MODE_MIND_CONTROL: "MIND CONTROL"
 +  STR_FPS_MODE_USE: "USE"
 +  STR_FPS_MEDIKIT_SELF: "SELF"
++  STR_FPS_MODE_SPRAY: "SPRAY {0}/{1}"
++  STR_FPS_COST_ENERGY: "EN"
++  STR_FPS_COST_HEALTH: "HP"
++  STR_FPS_COST_STUN: "STUN"
++  STR_FPS_COST_MORALE: "MOR"
++  STR_FPS_COST_MANA: "MP"
++  STR_FPS_MEDIKIT_STAND_OVER: "Stand over them to treat them!"
 +  STR_FPS_MODE_PRIME: "PRIME"
 +  STR_FPS_MODE_UNPRIME: "UNPRIME"
 +  STR_FPS_PARTICLES: "Particles"
@@ -108,6 +115,8 @@ index 000000000..747920589
 +  STR_FPS_GHOST_PARTS_OFF: "Off"
 +  STR_FPS_GHOST_PARTS_LIFTS: "Lifts"
 +  STR_FPS_GHOST_PARTS_ALL: "All"
++  STR_FPS_GHOST_OPACITY: "Ghost opacity"
++  STR_FPS_GHOST_OPACITY_DESC: "How solid the parts without shape look up close: 50% as before, 100% solid. Far off, 60% of that."
 +  STR_FPS_DISCREET_EDGE: "Discreet map edge"
 +  STR_FPS_DISCREET_EDGE_DESC: "The map's edge as small red dots on the floor, instead of the yellow tape."
 +  STR_FPS_PIXEL_SIZE: "Pixel size"
@@ -166,9 +175,9 @@ index 000000000..747920589
 +  STR_FPS_UPSCALE_DETAIL: "Smooth + detail"
 +  STR_FPS_FAITHFUL_TARGETING: "Faithful X-COM targeting"
 +  STR_FPS_DUAL_WIELD: "Full akimbo"
-+  STR_FPS_DUAL_WIELD_DESC: "Fire both guns at once, any two, each 30% less accurate, for the dearer gun's cost and a tenth. No aimed shots with a gun in each hand."
++  STR_FPS_DUAL_WIELD_DESC: "Fire both guns at once, any two, each 30% less accurate, for the more expensive gun's cost and a tenth. No aimed shots with a gun in each hand."
 +  STR_FPS_AKIMBO_REALISTIC: "Realistic akimbo"
-+  STR_FPS_AKIMBO_REALISTIC_DESC: "Fire both guns at once, one-handed guns only, each 30% less accurate, for the dearer gun's cost and a tenth. No aimed shots with a gun in each hand."
++  STR_FPS_AKIMBO_REALISTIC_DESC: "Fire both guns at once, one-handed guns only, each 30% less accurate, for the more expensive gun's cost and a tenth. No aimed shots with a gun in each hand."
 +  STR_FPS_AKIMBO_NO_AIMED: "Two guns: no aimed shot ({0}: akimbo off)"
 +  STR_FPS_LEAN_SHOTS: "Lean shots"
 +  STR_FPS_LEAN_SHOTS_DESC: "Movement Free: standing to one side of the tile shoots from that side, to peek."
@@ -183,7 +192,7 @@ index 000000000..747920589
 +  STR_FPS_AKIMBO_REALISTIC_ON: "REALISTIC AKIMBO"
 +  STR_FPS_AKIMBO_OFF: "AKIMBO OFF"
 +  STR_FPS_AKIMBO_IN_TURN: "Akimbo in turn"
-+  STR_FPS_AKIMBO_IN_TURN_DESC: "Two guns fire each 30% less accurate, for the dearer gun's cost and a tenth. YES: one a moment after the other, both rounds flying 30% faster. NO: both at once."
++  STR_FPS_AKIMBO_IN_TURN_DESC: "Two guns fire each 30% less accurate, for the more expensive gun's cost and a tenth. YES: one a moment after the other, both rounds flying 30% faster. NO: both at once."
 +  STR_FPS_KEY_AKIMBO_STYLE: "Akimbo style"
 +  STR_FPS_KEY_AKIMBO_STYLE_DESC: "Switches akimbo between both guns at once and one after the other (setting Akimbo in turn)."
 +  STR_FPS_AKIMBO_TOGETHER_ON: "AKIMBO: BOTH AT ONCE"
@@ -309,6 +318,8 @@ index 000000000..747920589
 +  STR_FPS_CROSSHAIR_DESC: "Shows the crosshair. Its shape tells the fire mode."
 +  STR_FPS_CROSSHAIR_INFO: "Shot info"
 +  STR_FPS_CROSSHAIR_INFO_DESC: "Fire mode, hit chance and TU cost by the crosshair."
++  STR_FPS_CROSSHAIR_COSTS: "Expanded crosshair info"
++  STR_FPS_CROSSHAIR_COSTS_DESC: "Under the shot info, the action's other costs: energy, health, stun, morale, mana."
 +  STR_FPS_AIM_EXACT: "Aim at exact point"
 +  STR_FPS_AIM_EXACT_DESC: "Shots go for the point under the crosshair. NO: for its tile (Faithful targeting)."
 +  STR_FPS_TRAJECTORY: "Show trajectory"
@@ -403,10 +414,10 @@ index 000000000..747920589
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers: a clear view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..e369a6ef3
+index 000000000..ef3a6aa09
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,385 @@
+@@ -0,0 +1,396 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -485,6 +496,13 @@ index 000000000..e369a6ef3
 +  STR_FPS_MODE_MIND_CONTROL: "MIND CONTROL"
 +  STR_FPS_MODE_USE: "USE"
 +  STR_FPS_MEDIKIT_SELF: "SELF"
++  STR_FPS_MODE_SPRAY: "SPRAY {0}/{1}"
++  STR_FPS_COST_ENERGY: "EN"
++  STR_FPS_COST_HEALTH: "HP"
++  STR_FPS_COST_STUN: "STUN"
++  STR_FPS_COST_MORALE: "MOR"
++  STR_FPS_COST_MANA: "MP"
++  STR_FPS_MEDIKIT_STAND_OVER: "Stand over them to treat them!"
 +  STR_FPS_MODE_PRIME: "PRIME"
 +  STR_FPS_MODE_UNPRIME: "UNPRIME"
 +  STR_FPS_PARTICLES: "Particles"
@@ -499,6 +517,8 @@ index 000000000..e369a6ef3
 +  STR_FPS_GHOST_PARTS_OFF: "Off"
 +  STR_FPS_GHOST_PARTS_LIFTS: "Lifts"
 +  STR_FPS_GHOST_PARTS_ALL: "All"
++  STR_FPS_GHOST_OPACITY: "Ghost opacity"
++  STR_FPS_GHOST_OPACITY_DESC: "How solid the parts without shape look up close: 50% as before, 100% solid. Far off, 60% of that."
 +  STR_FPS_DISCREET_EDGE: "Discreet map edge"
 +  STR_FPS_DISCREET_EDGE_DESC: "The map's edge as small red dots on the floor, instead of the yellow tape."
 +  STR_FPS_PIXEL_SIZE: "Pixel size"
@@ -557,9 +577,9 @@ index 000000000..e369a6ef3
 +  STR_FPS_UPSCALE_DETAIL: "Smooth + detail"
 +  STR_FPS_FAITHFUL_TARGETING: "Faithful X-COM targeting"
 +  STR_FPS_DUAL_WIELD: "Full akimbo"
-+  STR_FPS_DUAL_WIELD_DESC: "Fire both guns at once, any two, each 30% less accurate, for the dearer gun's cost and a tenth. No aimed shots with a gun in each hand."
++  STR_FPS_DUAL_WIELD_DESC: "Fire both guns at once, any two, each 30% less accurate, for the more expensive gun's cost and a tenth. No aimed shots with a gun in each hand."
 +  STR_FPS_AKIMBO_REALISTIC: "Realistic akimbo"
-+  STR_FPS_AKIMBO_REALISTIC_DESC: "Fire both guns at once, one-handed guns only, each 30% less accurate, for the dearer gun's cost and a tenth. No aimed shots with a gun in each hand."
++  STR_FPS_AKIMBO_REALISTIC_DESC: "Fire both guns at once, one-handed guns only, each 30% less accurate, for the more expensive gun's cost and a tenth. No aimed shots with a gun in each hand."
 +  STR_FPS_AKIMBO_NO_AIMED: "Two guns: no aimed shot ({0}: akimbo off)"
 +  STR_FPS_LEAN_SHOTS: "Lean shots"
 +  STR_FPS_LEAN_SHOTS_DESC: "Movement Free: standing to one side of the tile shoots from that side, to peek."
@@ -574,7 +594,7 @@ index 000000000..e369a6ef3
 +  STR_FPS_AKIMBO_REALISTIC_ON: "REALISTIC AKIMBO"
 +  STR_FPS_AKIMBO_OFF: "AKIMBO OFF"
 +  STR_FPS_AKIMBO_IN_TURN: "Akimbo in turn"
-+  STR_FPS_AKIMBO_IN_TURN_DESC: "Two guns fire each 30% less accurate, for the dearer gun's cost and a tenth. YES: one a moment after the other, both rounds flying 30% faster. NO: both at once."
++  STR_FPS_AKIMBO_IN_TURN_DESC: "Two guns fire each 30% less accurate, for the more expensive gun's cost and a tenth. YES: one a moment after the other, both rounds flying 30% faster. NO: both at once."
 +  STR_FPS_KEY_AKIMBO_STYLE: "Akimbo style"
 +  STR_FPS_KEY_AKIMBO_STYLE_DESC: "Switches akimbo between both guns at once and one after the other (setting Akimbo in turn)."
 +  STR_FPS_AKIMBO_TOGETHER_ON: "AKIMBO: BOTH AT ONCE"
@@ -700,6 +720,8 @@ index 000000000..e369a6ef3
 +  STR_FPS_CROSSHAIR_DESC: "Shows the crosshair. Its shape tells the fire mode."
 +  STR_FPS_CROSSHAIR_INFO: "Shot info"
 +  STR_FPS_CROSSHAIR_INFO_DESC: "Fire mode, hit chance and TU cost by the crosshair."
++  STR_FPS_CROSSHAIR_COSTS: "Expanded crosshair info"
++  STR_FPS_CROSSHAIR_COSTS_DESC: "Under the shot info, the action's other costs: energy, health, stun, morale, mana."
 +  STR_FPS_AIM_EXACT: "Aim at exact point"
 +  STR_FPS_AIM_EXACT_DESC: "Shots go for the point under the crosshair. NO: for its tile (Faithful targeting)."
 +  STR_FPS_TRAJECTORY: "Show trajectory"
@@ -891,7 +913,7 @@ index 000000000..b894c2f6c
 +        color: 144
 diff --git a/mod/OpenXcom3D/metadata.yml b/mod/OpenXcom3D/metadata.yml
 new file mode 100644
-index 000000000..089502f33
+index 000000000..e8eafd55e
 --- /dev/null
 +++ b/mod/OpenXcom3D/metadata.yml
 @@ -0,0 +1,11 @@
@@ -899,13 +921,13 @@ index 000000000..089502f33
 +# metadata.yml for OpenXcom3D
 +
 +name: "OpenXcom3D - First-Person View"
-+version: 1.05
++version: 1.06
 +description: "Adds a first-person 3D view of the battlescape (F8): mouse look, real-time movement paid with time units (WASD), firing from the crosshair, a squad bar with soldier camera cards, lights, shadows, flashlight, particles, weather, tactical flares, combat music and its own 3D View options tab. Needs the OpenXcom3D build of OXCE; on a standard OXCE build this mod reports an unsupported engine and stays off."
 +author: OpenXcom3D project
 +
 +master: "*"
 +requiredExtendedEngine: OpenXcom3D
-+requiredExtendedVersion: "1.0.5"
++requiredExtendedVersion: "1.0.6"
 diff --git a/src/Battlescape/BattlescapeGame.cpp b/src/Battlescape/BattlescapeGame.cpp
 index b7e1111f3..7bd979a4e 100644
 --- a/src/Battlescape/BattlescapeGame.cpp
@@ -1290,6 +1312,31 @@ index 0fdf2ca16..ffadd2d6c 100644
  	void toggleDebugVisionMode();
  	void persistToggles();
  	/// Resets obstacle markers.
+diff --git a/src/Battlescape/MeleeAttackBState.cpp b/src/Battlescape/MeleeAttackBState.cpp
+index 490a43774..6d3ed3d24 100644
+--- a/src/Battlescape/MeleeAttackBState.cpp
++++ b/src/Battlescape/MeleeAttackBState.cpp
+@@ -119,7 +119,8 @@ void MeleeAttackBState::init()
+ 	// terrain melee
+ 	if (terrainMeleeTilePart > 0)
+ 	{
+-		_voxel = _action.target.toVoxel() + Position(8, 8, 12);
++		// (OpenXcom3D: where the first-person crosshair struck the part, when it gave the point)
++		_voxel = _action.targetVoxel.x >= 0 ? _action.targetVoxel : _action.target.toVoxel() + Position(8, 8, 12);
+ 		performMeleeAttack(terrainMeleeTilePart);
+ 		return;
+ 	}
+@@ -233,6 +234,10 @@ void MeleeAttackBState::performMeleeAttack(int terrainMeleeTilePart)
+ 	difference.y = Clamp<Sint16>(difference.y, -1, 1);
+ 
+ 	Position damagePosition = _voxel + difference;
++	if (terrainMeleeTilePart > 0 && _action.targetVoxel.x >= 0)
++	{
++		damagePosition = _voxel; // (OpenXcom3D: the very point struck, on the part's own tile; the nudge is for a unit)
++	}
+ 
+ 
+ 	// make an explosion action
 diff --git a/src/Battlescape/Pathfinding.cpp b/src/Battlescape/Pathfinding.cpp
 index d8c617e83..0a7167491 100644
 --- a/src/Battlescape/Pathfinding.cpp
@@ -2721,7 +2768,7 @@ index a4c23b216..13d36e8f3 100644
  	{
  		_buttonsPressed |= SDL_BUTTON(button);
 diff --git a/src/Engine/ModInfo.cpp b/src/Engine/ModInfo.cpp
-index cca815d3e..389d9aad1 100644
+index cca815d3e..9d032b177 100644
 --- a/src/Engine/ModInfo.cpp
 +++ b/src/Engine/ModInfo.cpp
 @@ -181,6 +181,9 @@ struct EngineData
@@ -2729,7 +2776,7 @@ index cca815d3e..389d9aad1 100644
  const EngineData supportedEngines[] = {
  	{ OPENXCOM_VERSION_ENGINE, { OPENXCOM_VERSION_NUMBER }},
 +#ifndef OXCE_NO_FIRSTPERSON
-+	{ "OpenXcom3D", { 1, 0, 5, 0 } }, // first-person add-on 1.05, see src/FirstPerson
++	{ "OpenXcom3D", { 1, 0, 6, 0 } }, // first-person add-on 1.06, see src/FirstPerson
 +#endif
  	{ "", { 0, 0, 0, 0 } }, // assume that every engine support mods from base game, remove if its not true.
  };
@@ -2789,7 +2836,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..41cc34e49 100644
+index a08796ced..8bf0d902f 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -2806,8 +2853,8 @@ index a08796ced..41cc34e49 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsAkimboInTurn;
-+OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera;
++OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsAkimboInTurn, fpsCrosshairCosts;
++OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle;
 diff --git a/src/Engine/Script.h b/src/Engine/Script.h
@@ -2894,10 +2941,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..25a349bad
+index 000000000..2fdc47544
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,614 @@
+@@ -0,0 +1,616 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -3219,6 +3266,7 @@ index 000000000..25a349bad
 +	// beams), shown as see-through ghosts of their art: 0 none, 1 lifts and ladders (the parts
 +	// with the grav lift flag), 2 all of them.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsGhostParts", &fpsGhostParts, 1, "STR_FPS_GHOST_PARTS", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsGhostOpacity", &fpsGhostOpacity, 50, "STR_FPS_GHOST_OPACITY", category));
 +	// The map's edge as small red dots on the floor, nothing beyond it, instead of the tape.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsDiscreetEdge", &fpsDiscreetEdge, false, "STR_FPS_DISCREET_EDGE", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 0, "STR_FPS_PIXEL_SIZE", category));
@@ -3226,6 +3274,7 @@ index 000000000..25a349bad
 +	// (YES) or at the tile, as the original game does (NO), and the units' hitboxes.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshair", &fpsCrosshair, true, "STR_FPS_CROSSHAIR", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshairInfo", &fpsCrosshairInfo, true, "STR_FPS_CROSSHAIR_INFO", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshairCosts", &fpsCrosshairCosts, true, "STR_FPS_CROSSHAIR_COSTS", category));
 +	// The name of the unit under the crosshair (or the free cursor), as the game names it.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsUnitNames", &fpsUnitNames, true, "STR_FPS_UNIT_NAMES", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsAimExact", &fpsAimExact, true, "STR_FPS_AIM_EXACT", category));
@@ -3739,10 +3788,10 @@ index 000000000..a52103479
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..4b7b6a6ca
+index 000000000..569ea0e5d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2632 @@
+@@ -0,0 +1,2667 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -4013,6 +4062,9 @@ index 000000000..4b7b6a6ca
 +	// you aim at.
 +	_txtMode = addText(120, 9, width / 2 + 14, height / 2 - 9, "crosshairText", "firstPerson");
 +	_txtShot = addText(120, 9, width / 2 + 14, height / 2 + 1, "crosshairText", "firstPerson");
++	// Under them, the action's other costs (setting "Expanded crosshair info"): energy, health and
++	// the rest, a cost the soldier can't pay in the second colour (red).
++	_txtCosts = addText(160, 9, width / 2 + 14, height / 2 + 11, "crosshairText", "firstPerson");
 +	_txtBanner->setAlign(ALIGN_CENTER);
 +	// The name of the unit pointed at, under the crosshair (it follows the free cursor).
 +	_txtTarget = addText(160, 9, width / 2 - 80, height / 2 + 10, "crosshairText", "firstPerson");
@@ -4023,7 +4075,7 @@ index 000000000..4b7b6a6ca
 +	_txtScoping->setAlign(ALIGN_RIGHT);
 +
 +	// All hidden until there's something to show.
-+	for (Text *text : { _txtMode, _txtShot, _txtBanner, _txtTarget, _txtScoping })
++	for (Text *text : { _txtMode, _txtShot, _txtCosts, _txtBanner, _txtTarget, _txtScoping })
 +	{
 +		text->setVisible(false);
 +	}
@@ -4078,6 +4130,11 @@ index 000000000..4b7b6a6ca
 +	_state->add(_compass);
 +	_compass->setVisible(false);
 +	_ownSurfaces.insert(_compass);
++	// Beside the dial's left, level with its middle, the climb arrows (see updateClimbArrows).
++	_climbArrows = new Surface(ClimbArrowW, ClimbArrowsH, compassX - ClimbArrowW - ClimbArrowsGap, compassY + CompassArrowH + CompassSize / 2 - ClimbArrowsH / 2);
++	_state->add(_climbArrows);
++	_climbArrows->setVisible(false);
++	_ownSurfaces.insert(_climbArrows);
 +
 +	// The letters, small, north in red (as on a compass rose), the others in the buttons' grey.
 +	const char *const letters[4] = { "N", "E", "S", "W" };
@@ -4180,7 +4237,8 @@ index 000000000..4b7b6a6ca
 +	const int panelX = 1, panelY = height - PanelH - 1;
 +
 +	// First line: the name, and the status on the right.
-+	_txtName = addText(PanelW - 66, 9, panelX + 3, panelY + 2, "textName", "battlescape");
++	_panelNameX = panelX + 3; // (the rank, when there is one, goes here and the name after it)
++	_txtName = addText(PanelW - 66 - RankIconW - RankIconGap, 9, _panelNameX, panelY + 2, "textName", "battlescape");
 +	_txtStatus = addText(60, 9, panelX + PanelW - 63, panelY + 2, "weapon", "firstPerson");
 +
 +	// Then a line for each hand: the weapon in the hand that fires, then the other hand's item.
@@ -4210,8 +4268,12 @@ index 000000000..4b7b6a6ca
 +	_txtArmor = addText(PanelLineW, 9, panelX + 3, panelY + 44, "weapon", "firstPerson");
 +	_txtDoom = addText(60, 9, panelX + PanelW - 63, panelY + 44, "doom", "firstPerson");
 +
++	// The soldier's rank, a small badge before the name (see drawRankIcon).
++	_panelRank = new Surface(RankIconW, RankIconH, 0, 0);
++	_state->add(_panelRank);
++
 +	// The panel's parts, all ours and all hidden until the 3D view shows.
-+	_panelParts = { _txtName, _txtStatus, _txtWeapon, _txtWeaponAmmo, _txtOtherWeapon, _txtOtherAmmo, _numTimeUnits, _barTimeUnits,
++	_panelParts = { _txtName, _panelRank, _txtStatus, _txtWeapon, _txtWeaponAmmo, _txtOtherWeapon, _txtOtherAmmo, _numTimeUnits, _barTimeUnits,
 +		_numEnergy, _barEnergy, _numHealth, _barHealth, _numMorale, _barMorale, _txtArmor, _txtDoom };
 +	for (auto *part : _panelParts)
 +	{
@@ -4272,6 +4334,9 @@ index 000000000..4b7b6a6ca
 +	_cardName = new Text(CardW - 8, 9, 0, 0);
 +	_state->add(_cardName, "textName", "battlescape");
 +	_cardParts.push_back({ _cardName, 4, 3 });
++	_cardRank = new Surface(RankIconW, RankIconH, 0, 0); // (before the name: placed in updateSoldierCard)
++	_state->add(_cardRank);
++	_cardParts.push_back({ _cardRank, 4, 3 - RankIconRise });
 +	_cardWeapon = new Text(CardW - 8, 9, 0, 0);
 +	_state->add(_cardWeapon, "weapon", "firstPerson");
 +	_cardParts.push_back({ _cardWeapon, 4, 12 });
@@ -4355,8 +4420,10 @@ index 000000000..4b7b6a6ca
 +	_txtSoldierCam = new Text(220, 9, 0, 0);
 +	_state->add(_txtSoldierCam, "textName", "battlescape");
 +	_txtSoldierCam->setHighContrast(true);
++	_soldierCamRank = new Surface(RankIconW, RankIconH, 0, 0); // the soldier's rank, before the title
++	_state->add(_soldierCamRank);
 +
-+	for (Surface *part : { (Surface*)_soldierCamDot, (Surface*)_txtSoldierCam })
++	for (Surface *part : { (Surface*)_soldierCamDot, (Surface*)_txtSoldierCam, _soldierCamRank })
 +	{
 +		part->setVisible(false);
 +		_ownSurfaces.insert(part);
@@ -4544,12 +4611,14 @@ index 000000000..4b7b6a6ca
 +	for (Surface *part : std::initializer_list<Surface*>{ _liftUp, _liftDown, _txtLift, _txtLiftKeys }) _anchors[part] = RIGHT_CENTER;
 +	_anchors[_txtMode] = CENTER;
 +	_anchors[_txtShot] = CENTER;
++	_anchors[_txtCosts] = CENTER;
 +	_anchors[_txtScoping] = RIGHT_CENTER;
 +
 +	// END and the suit's buttons keep to the top right, and so does the compass; the info panel
 +	// to the bottom left.
 +	_anchors[_btnEndTurn] = TOP_RIGHT;
 +	_anchors[_compass] = TOP_RIGHT;
++	_anchors[_climbArrows] = TOP_RIGHT;
 +	for (Text *letter : _compassLetters) _anchors[letter] = TOP_RIGHT;
 +	_anchors[_txtCompassTurn] = TOP_RIGHT;
 +	_anchors[_txtSprint] = TOP_RIGHT;
@@ -5686,6 +5755,7 @@ index 000000000..4b7b6a6ca
 +		updateAim(unit);
 +	}
 +	updateTrajectory(unit, playerTurn);
++	updateSprayMarks(playerTurn ? unit : nullptr);
 +
 +	// Everything drawn over the view, then the view itself is redrawn.
 +	updateEnemyMarkers();
@@ -5924,14 +5994,28 @@ index 000000000..4b7b6a6ca
 +
 +	// The numpad (after the bindable keys, which may use it): moves a tile at a time, almost at
 +	// once, as on the isometric map, whatever the movement setting: 8 ahead, 2 back, 4 and 6
-+	// sideways, relative to the view; 7 and 9 a snap turn. A press is remembered until the move
-+	// can start (see tileMoveVelocity), so a quick tap always counts.
++	// sideways, relative to the view, two of them pressed together a diagonal (a player: as W, A,
++	// S and D do); 7 and 9 a snap turn. A press is remembered until the move can start (see
++	// tileMoveVelocity), so a quick tap always counts; a key of the other axis pressed within
++	// NumpadComboWait of it joins it.
 +	if (key == SDLK_KP8 || key == SDLK_KP2 || key == SDLK_KP4 || key == SDLK_KP6)
 +	{
 +		if (pressed && _save->getSide() == FACTION_PLAYER) // (not remembered through the aliens' turn)
 +		{
-+			_numpadMove[0] = key == SDLK_KP8 ? 1 : key == SDLK_KP2 ? -1 : 0;
-+			_numpadMove[1] = key == SDLK_KP6 ? 1 : key == SDLK_KP4 ? -1 : 0;
++			const int forward = key == SDLK_KP8 ? 1 : key == SDLK_KP2 ? -1 : 0, strafe = key == SDLK_KP6 ? 1 : key == SDLK_KP4 ? -1 : 0;
++			const Uint32 now = SDL_GetTicks();
++			const bool joins = (_numpadMove[0] || _numpadMove[1]) && now - _numpadPressAt <= NumpadComboWait;
++			if (joins)
++			{
++				if (forward) _numpadMove[0] = forward;
++				if (strafe) _numpadMove[1] = strafe;
++			}
++			else
++			{
++				_numpadMove[0] = forward;
++				_numpadMove[1] = strafe;
++				_numpadPressAt = now;
++			}
 +		}
 +		return true;
 +	}
@@ -6377,10 +6461,10 @@ index 000000000..4b7b6a6ca
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..4b2646f71
+index 000000000..421926691
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1056 @@
+@@ -0,0 +1,1087 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -6588,6 +6672,10 @@ index 000000000..4b2646f71
 +	void makeMapCamera(int size);
 +	/// Puts a surface in another's place in the screen's lists (drawing, and deleting at its end).
 +	void replaceStateSurface(Surface *oldSurface, Surface *newSurface);
++	/// Draws a soldier's rank into an icon beside their name; true if there is one to show.
++	bool drawRankIcon(Surface *icon, const BattleUnit *unit);
++	/// The game's battlescape rank badge averaged down to the rank icon's size (made once).
++	Surface *smallRankBadge(int sprite);
 +	/// Puts a remade surface of ours in the old one's place among the state's surfaces (or adds it the first time).
 +	void putSurfaceInPlace(Surface *oldSurface, Surface *newSurface);
 +	/// The colours of our panels and cards: the mod's, or black with a grey border.
@@ -6733,6 +6821,8 @@ index 000000000..4b2646f71
 +	// turning by the rules, the head's free turn and when looking further will cost time units ----
 +
 +	Surface *_compass = nullptr;                 // the dial
++	Surface *_climbArrows = nullptr;             // beside it, the ways W may climb, the one it takes now lit (see updateClimbArrows)
++	int _climbArrowsShown = -1;                  // what they show: up 1, down 2, lit (1 up, 2 down) times 4; -1 not drawn yet
 +	Text *_compassLetters[4] = {};               // N, E, S, W, going round as the view turns
 +	Text *_txtCompassTurn = nullptr;             // under it near the head's limit: "TURN 1 TU", or "NO TU"; or a shot's turn: "SHOT +2 TU"
 +	int _compassDrawn[5] = { -1000, -1, -1, -1, -1 }; // what the dial shows: the view's bearing (degrees), the facing, the warning, the shot's facing, the shot's turn warning
@@ -6778,6 +6868,8 @@ index 000000000..4b2646f71
 +	void updateLean(BattleUnit *unit, bool canLean, double elapsedSeconds, double &dropBy);
 +	/// How far the eye can go to one side before a wall or a unit in sight, up to the lean's reach.
 +	double leanRoom(BattleUnit *unit, double sideX, double sideY) const;
++	/// Keeps the eye out of anything solid: to the nearest free voxel in the unit's footprint, ahead first.
++	void clearEye(BattleUnit *unit, double eye[3], double yawRadians) const;
 +	/// Straightens up at once: no lean, no tilt.
 +	void endLean();
 +	/// Whether the soldier leans out far enough for a shot to start from that side.
@@ -6868,6 +6960,10 @@ index 000000000..4b2646f71
 +	void updateLift(BattleUnit *unit, Uint32 now);
 +	/// Which ways a grav lift or a ladder takes the soldier from here.
 +	void liftWays(BattleUnit *unit, bool &up, bool &down) const;
++	/// Which ways W and S may climb from here: a lift's or a ladder's, or a flyer's with flight on.
++	void climbWays(BattleUnit *unit, bool &up, bool &down) const;
++	/// The climb arrows beside the compass: the ways W may climb, the one it takes now lit.
++	void updateClimbArrows(BattleUnit *unit);
 +	/// W and S looking up or down on a lift or a ladder: climbs; true if that took the push.
 +	bool updateClimb(BattleUnit *unit, double forward);
 +	/// Draws a pulsing purple lift arrow, up or down.
@@ -6911,6 +7007,7 @@ index 000000000..4b2646f71
 +	bool _tileMoveQuick = false;         // it's a numpad move: almost at once
 +	Position _tileMoveTarget;            // the tile it goes to (x, y)
 +	int _numpadMove[2] = {};             // a numpad key pressed for a move: forward (1, -1), right (1, -1); both 0 for none
++	Uint32 _numpadPressAt = 0;           // when it was pressed (a second key within NumpadComboWait joins it: a diagonal)
 +	Uint32 _tileMoveKeysSince = 0;       // when the movement keys were pressed (a moment's wait catches a second key, for a diagonal)
 +	double _tileMoveClosest = 0.0;       // the closest the camera has come to the target's middle, voxels
 +	Uint32 _tileMoveProgressAt = 0;      // when it last came closer
@@ -7018,6 +7115,8 @@ index 000000000..4b2646f71
 +	BattleActionOrigin leanSide(const BattleUnit *unit, const Position &targetTile) const;
 +	/// Melee at a body lying in front or at the feet (setting "Melee hits walls and the downed").
 +	bool meleeDowned(BattleUnit *unit, BattleItem *weapon, BattleAction *action);
++	/// A melee blow at terrain by the crosshair: the wall, door or object it meets within reach, on a neighbouring tile.
++	bool crosshairTerrainMelee(BattleUnit *unit, BattleItem *weapon, Position &struck, int &part);
 +	/// Akimbo: the gun in the other hand that fires along, or null.
 +	BattleItem *offHandWeapon(BattleUnit *unit, const BattleItem *weapon) const;
 +	/// The akimbo key: full or realistic akimbo off, or the same one back on.
@@ -7054,12 +7153,23 @@ index 000000000..4b2646f71
 +	void switchHand();
 +	/// Notes what's under the crosshair this frame.
 +	void updateAim(BattleUnit *unit);
++	/// A spray burst being marked: its points and the next one, for the view to draw.
++	void updateSprayMarks(BattleUnit *unit);
++	/// Whether the line of the action's other costs shows under the crosshair (the unit name goes a line lower).
++	bool costLineShown() const;
 +	/// The first voxel along the ray through a pixel, as a shot would see it; true if something is there.
-+	bool aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &voxel, int *voxelType = nullptr);
++	bool aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &voxel, int *voxelType = nullptr) const;
 +	/// Uses the fire mode on whatever is under a pixel of the view, through the game's own actions.
 +	void fire(int pixelX, int pixelY);
-+	/// The patient a medi-kit would treat now: among the game's own choices, the one pointed at; or null.
-+	BattleUnit *medikitPatient(BattleUnit *unit, BattleItem *medikit) const;
++	/// Whom a medi-kit would treat now (see medikitPatient).
++	struct MedikitAim
++	{
++		BattleUnit *patient = nullptr; // the patient (null: none)
++		int direction = -1;            // the way the soldier turns to face them first (-1: no turn)
++		std::string refusal;           // with no patient, why (the warning shown)
++	};
++	/// Whom a medi-kit would treat now, by the crosshair: a unit beside the soldier, a body at their feet, or themself.
++	MedikitAim medikitPatient(BattleUnit *unit, BattleItem *medikit) const;
 +	/// Uses a medi-kit (no action menu) on the patient pointed at, or a scanner, as the game's menu would.
 +	void useItemDirectly(BattleUnit *unit, BattleItem *item);
 +	/// Tosses a tactical flare at the crosshair.
@@ -7094,6 +7204,7 @@ index 000000000..4b2646f71
 +	Surface *_crosshair = nullptr;                 // the crosshair's surface
 +	Uint32 _crosshairDrawnFor = 0xFFFFFFFF;        // what the crosshair surface shows, to redraw only on change
 +	Text *_txtMode = nullptr, *_txtShot = nullptr; // the fire mode, and the shot's odds and cost, beside the crosshair
++	Text *_txtCosts = nullptr;                      // and under them its other costs (setting "Expanded crosshair info")
 +	Uint32 _hitMarkerHeard = 0;                    // the last hitmarker that ticked
 +	const BattleUnit *_sightCheckUnit = nullptr;   // the soldier the last line-of-sight check was for,
 +	Position _sightCheckFrom, _sightCheckTile;     // where he stood and the tile aimed at,
@@ -7249,6 +7360,10 @@ index 000000000..4b2646f71
 +	Surface *_card = nullptr;                           // the card's frame
 +	FirstPersonView *_preview = nullptr;                // the live view from the soldier's helmet camera
 +	Text *_cardName = nullptr, *_cardWeapon = nullptr, *_cardStatus = nullptr, *_cardSignal = nullptr; // name, weapon, status, and SIGNAL LOST
++	Surface *_panelRank = nullptr, *_cardRank = nullptr, *_soldierCamRank = nullptr; // a soldier's rank before their name: the panel's, the card's, the soldier cam's title
++	int _panelNameX = 0;                                // where the panel's name line starts (the rank, then the name)
++	std::unordered_map<Surface*, int> _rankDrawn;       // the rank picture each of those holds (-1: none), so it's drawn only when it changes
++	std::map<int, std::unique_ptr<Surface>> _smallRankBadges; // the battlescape rank badges made small (see smallRankBadge), by sprite
 +	Uint32 _cardNoiseSeed = 1;                          // random seed for the card's TV static
 +	NumberText *_cardNumbers[4] = {};                   // the four stats
 +	Bar *_cardBars[4] = {};                             // and their bars
@@ -7439,10 +7554,10 @@ index 000000000..4b2646f71
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeCamera.cpp b/src/FirstPerson/FirstPersonModeCamera.cpp
 new file mode 100644
-index 000000000..4e15be992
+index 000000000..ad3f11493
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeCamera.cpp
-@@ -0,0 +1,812 @@
+@@ -0,0 +1,860 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -8084,10 +8199,58 @@ index 000000000..4e15be992
 +	updateLean(unit, canMove, elapsedSeconds, leanDrop);
 +
 +	// Place the eye: the lunge goes the way the camera looks, the lean to its side, the bob, a
-+	// jump and the lean's drop up and down.
++	// jump and the lean's drop up and down; kept out of anything solid (see clearEye).
 +	const double yawRadians = _view->getYawDegrees() * Pi / 180.0;
-+	_view->setEye(_eyeX + std::cos(yawRadians) * lunge + _leanShift[0], _eyeY + std::sin(yawRadians) * lunge + _leanShift[1],
-+		_eyeZ + headBob + currentJumpHeight(unit) - leanDrop - landingDip());
++	double eye[3] = { _eyeX + std::cos(yawRadians) * lunge + _leanShift[0], _eyeY + std::sin(yawRadians) * lunge + _leanShift[1],
++		_eyeZ + headBob + currentJumpHeight(unit) - leanDrop - landingDip() };
++	clearEye(unit, eye, yawRadians);
++	_view->setEye(eye[0], eye[1], eye[2]);
++}
++
++/**
++ * Keeps the eye out of anything solid (a player's report: a 2x2 unit standing in a door two tiles
++ * wide was blinded, in XPiratez's temple raid). A big unit's eye is the middle of its footprint,
++ * where its four tiles meet: right where a wide door's frame or middle post stands (walls lie on
++ * the tiles' edges), and the 3D view drew from inside it. When the eye's voxel is solid (the
++ * game's own voxels, units left out), it moves to the nearest free one along the ground, looked
++ * for a voxel at a time up to EyeClearReach: ahead the way the view looks first, then to either
++ * side, then behind; it stays inside the unit's footprint. Nothing is found: it stays.
++ * @param unit The unit looked through.
++ * @param eye The eye, in voxels (moved if it must).
++ * @param yawRadians The way the view looks, along the ground.
++ */
++void FirstPersonMode::clearEye(BattleUnit *unit, double eye[3], double yawRadians) const
++{
++	TileEngine *tileEngine = _save->getTileEngine();
++	auto solidAt = [&](double x, double y)
++	{
++		return tileEngine->voxelCheck(Position((int)std::floor(x), (int)std::floor(y), (int)std::floor(eye[2])), unit, true) != V_EMPTY;
++	};
++	if (!solidAt(eye[0], eye[1]))
++	{
++		return;
++	}
++	// The footprint, in voxels (a tile's edge margin in from its sides).
++	const Position tile = unit->getPosition();
++	const double size = unit->getArmor()->getSize() * 16.0;
++	const double minX = tile.x * 16.0 + EdgeMargin, maxX = tile.x * 16.0 + size - EdgeMargin;
++	const double minY = tile.y * 16.0 + EdgeMargin, maxY = tile.y * 16.0 + size - EdgeMargin;
++	const double forward[2] = { std::cos(yawRadians), std::sin(yawRadians) };
++	const double ways[4][2] = { { forward[0], forward[1] }, { -forward[1], forward[0] }, { forward[1], -forward[0] }, { -forward[0], -forward[1] } };
++	for (double distance = 1.0; distance <= EyeClearReach; distance += 1.0)
++	{
++		for (const auto &way : ways)
++		{
++			const double x = eye[0] + way[0] * distance, y = eye[1] + way[1] * distance;
++			if (x < minX || x > maxX || y < minY || y > maxY || solidAt(x, y))
++			{
++				continue;
++			}
++			eye[0] = x;
++			eye[1] = y;
++			return;
++		}
++	}
 +}
 +
 +/**
@@ -8257,10 +8420,10 @@ index 000000000..4e15be992
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..4b0930759
+index 000000000..32259c367
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,1826 @@
+@@ -0,0 +1,2011 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -8331,6 +8494,7 @@ index 000000000..4b0930759
 +#include "../Engine/Game.h"
 +#include "../Engine/Options.h"
 +#include "../Engine/Screen.h"
++#include "../Engine/SurfaceSet.h"
 +#include "../Engine/Unicode.h"
 +#include "../Interface/Bar.h"
 +#include "../Interface/BattlescapeButton.h"
@@ -8343,6 +8507,7 @@ index 000000000..4b0930759
 +#include "../Savegame/BattleItem.h"
 +#include "../Savegame/BattleUnit.h"
 +#include "../Savegame/SavedBattleGame.h"
++#include "../Savegame/Soldier.h"
 +#include "FirstPersonModeShared.h"
 +
 +namespace OpenXcom
@@ -8427,6 +8592,7 @@ index 000000000..4b0930759
 +	const bool show = Options::fpsCompass && isActive() && !_hudHidden && unit;
 +	_compass->setVisible(show);
 +	for (Text *letter : _compassLetters) letter->setVisible(show);
++	updateClimbArrows(show && playerTurn ? unit : nullptr);
 +	if (!show)
 +	{
 +		_txtCompassTurn->setVisible(false);
@@ -8530,6 +8696,55 @@ index 000000000..4b0930759
 +		lineY += 9;
 +	}
 +	_txtEnPassant->setY(lineY);
++}
++
++/**
++ * The climb arrows beside the compass (a player: "Compass should have an indicator by it to show
++ * if a unit is looking up enough to climb"): where W and S may climb (a grav lift, a ladder, or
++ * flying with flight on: see climbWays), an arrow for each way it goes, up above and down below,
++ * dim grey; the one W would take now (looking up or down more than ClimbPitch degrees, see
++ * updateClimb) lit yellow. None while the soldier can't climb from there, or can't act. Drawn
++ * again only when what it shows changes.
++ * @param unit The soldier the view looks through, or null to hide them.
++ */
++void FirstPersonMode::updateClimbArrows(BattleUnit *unit)
++{
++	bool up = false, down = false;
++	if (unit && canAct() && unit->getStatus() == STATUS_STANDING && !_stepPending)
++	{
++		climbWays(unit, up, down);
++	}
++	const double pitch = _view->getPitchDegrees();
++	const int lit = pitch > ClimbPitch && up ? 1 : pitch < -ClimbPitch && down ? 2 : 0;
++	const int shown = (up ? 1 : 0) | (down ? 2 : 0) | (lit << 2);
++	_climbArrows->setVisible(shown != 0);
++	if (shown == _climbArrowsShown)
++	{
++		return;
++	}
++	_climbArrowsShown = shown;
++	const SDL_Color *palette = _state->getPalette();
++	const Uint8 dim = nearestColor(palette, 110, 115, 130), bright = nearestColor(palette, 250, 220, 70), outline = nearestColor(palette, 8, 8, 8);
++	_climbArrows->clear();
++	_climbArrows->lock();
++	// Each arrow a triangle ClimbArrowW wide, pointing up at the top or down at the bottom, with a
++	// dark outline.
++	for (int way = 1; way <= 2; ++way)
++	{
++		if (!((way == 1 && up) || (way == 2 && down))) continue;
++		const Uint8 fill = lit == way ? bright : dim;
++		for (int row = 0; row < ClimbArrowH; ++row)
++		{
++			const int halfWidth = row * (ClimbArrowW / 2) / (ClimbArrowH - 1);
++			const int y = way == 1 ? row : _climbArrows->getHeight() - 1 - row;
++			for (int x = ClimbArrowW / 2 - halfWidth; x <= ClimbArrowW / 2 + halfWidth; ++x)
++			{
++				const bool edge = row == ClimbArrowH - 1 || x == ClimbArrowW / 2 - halfWidth || x == ClimbArrowW / 2 + halfWidth;
++				_climbArrows->setPixel(x, y, edge ? outline : fill);
++			}
++		}
++	}
++	_climbArrows->unlock();
 +}
 +
 +/**
@@ -8816,7 +9031,13 @@ index 000000000..4b0930759
 +	{
 +		_txtDoom->setText(cheats);
 +	}
-+	// The name and the status.
++	// The rank (a soldier's) and the name after it (the owner: before the name, less in the way),
++	// and the status.
++	const bool panelRank = drawRankIcon(_panelRank, unit);
++	_panelRank->setVisible(panelRank);
++	_panelRank->setX(_panelNameX);
++	_panelRank->setY(_txtName->getY() - RankIconRise);
++	_txtName->setX(_panelNameX + (panelRank ? RankIconW + RankIconGap : 0));
 +	_txtName->setText(unit->getName(_game->getLanguage(), false));
 +	_txtStatus->setText(statusLabel(unit));
 +
@@ -9166,6 +9387,123 @@ index 000000000..4b0930759
 +}
 +
 +/**
++ * Draws a soldier's rank into an icon beside their name (the owner's ask: "the RANK mini symbol
++ * of a unit on the right to the unit name", then before it: "less obtrusive"; the info panel's,
++ * the soldier card's, the soldier cam's title): a mod's own tiny rank (TinyRanks, 7x7, as XPiratez has; stock OXCE's set is an
++ * empty placeholder), or else the game's own battlescape rank badge averaged down to the icon's
++ * size (see smallRankBadge; the owner chose it from previews). Drawn again only when the rank
++ * shown changes. Aliens, civilians and the like have no rank to show.
++ * @param icon The icon (RankIconW by RankIconH).
++ * @param unit The unit whose name it follows, or null.
++ * @return True if there is a rank to show.
++ */
++bool FirstPersonMode::drawRankIcon(Surface *icon, const BattleUnit *unit)
++{
++	// The picture: a mod's tiny rank if it drew one, else the small badge.
++	const Soldier *soldier = unit ? unit->getGeoscapeSoldier() : nullptr;
++	Surface *picture = nullptr;
++	int key = -1; // which picture, to draw it only when it changes (a tiny rank's sprite, or 1000 and the badge's)
++	if (soldier)
++	{
++		SurfaceSet *tinyRanks = _game->getMod()->getSurfaceSet("TinyRanks", false);
++		Surface *tiny = tinyRanks ? tinyRanks->getFrame(soldier->getRankSpriteTiny()) : nullptr;
++		bool drawn = false;
++		for (int y = 0; tiny && !drawn && y < tiny->getHeight(); ++y)
++		{
++			for (int x = 0; !drawn && x < tiny->getWidth(); ++x) drawn = tiny->getPixel(x, y) != 0;
++		}
++		if (drawn)
++		{
++			picture = tiny;
++			key = soldier->getRankSpriteTiny();
++		}
++		else if ((picture = smallRankBadge(soldier->getRankSpriteBattlescape())))
++		{
++			key = 1000 + soldier->getRankSpriteBattlescape();
++		}
++	}
++	auto shown = _rankDrawn.emplace(icon, -2).first; // (-2: never drawn)
++	if (shown->second != key)
++	{
++		shown->second = key;
++		icon->clear();
++		if (picture)
++		{
++			picture->blitNShade(icon, 0, (RankIconH - std::min(RankIconH, picture->getHeight())) / 2); // (a tiny rank in the middle of the height)
++		}
++	}
++	return picture != nullptr;
++}
++
++/**
++ * The game's own battlescape rank badge (SMOKE.PCK, 26x23 in the original, as the classic HUD
++ * shows it), averaged down to RankIconW by RankIconH: each of its pixels the average colour of the
++ * badge's pixels under it, matched to the nearest colour of the palette (a corner mostly
++ * transparent stays so). Made once per badge.
++ * @param sprite The badge's frame in SMOKE.PCK.
++ * @return The small badge, or null if the frame isn't there.
++ */
++Surface *FirstPersonMode::smallRankBadge(int sprite)
++{
++	auto made = _smallRankBadges.find(sprite);
++	if (made != _smallRankBadges.end())
++	{
++		return made->second.get();
++	}
++	SurfaceSet *smoke = _game->getMod()->getSurfaceSet("SMOKE.PCK", false);
++	Surface *badge = smoke ? smoke->getFrame(sprite) : nullptr;
++	Surface *small = nullptr;
++	if (badge)
++	{
++		// The badge's own box (the frame is bigger, transparent round it).
++		int left = badge->getWidth(), top = badge->getHeight(), right = -1, bottom = -1;
++		for (int y = 0; y < badge->getHeight(); ++y)
++		{
++			for (int x = 0; x < badge->getWidth(); ++x)
++			{
++				if (badge->getPixel(x, y) == 0) continue;
++				left = std::min(left, x); right = std::max(right, x); top = std::min(top, y); bottom = std::max(bottom, y);
++			}
++		}
++		if (right >= left)
++		{
++			const SDL_Color *palette = _state->getPalette();
++			const int badgeW = right - left + 1, badgeH = bottom - top + 1;
++			small = new Surface(RankIconW, RankIconH, 0, 0);
++			small->setPalette(_state->getPalette());
++			small->lock();
++			for (int smallY = 0; smallY < RankIconH; ++smallY)
++			{
++				for (int smallX = 0; smallX < RankIconW; ++smallX)
++				{
++					// The badge's pixels under this one, their average colour.
++					const int x0 = left + smallX * badgeW / RankIconW, x1 = left + std::max(smallX * badgeW / RankIconW + 1, (smallX + 1) * badgeW / RankIconW);
++					const int y0 = top + smallY * badgeH / RankIconH, y1 = top + std::max(smallY * badgeH / RankIconH + 1, (smallY + 1) * badgeH / RankIconH);
++					int red = 0, green = 0, blue = 0, count = 0, cells = 0;
++					for (int y = y0; y < y1; ++y)
++					{
++						for (int x = x0; x < x1; ++x)
++						{
++							++cells;
++							const Uint8 index = badge->getPixel(x, y);
++							if (index == 0) continue;
++							red += palette[index].r; green += palette[index].g; blue += palette[index].b; ++count;
++						}
++					}
++					if (count * 2 >= cells)
++					{
++						small->setPixel(smallX, smallY, nearestColor(palette, red / count, green / count, blue / count));
++					}
++				}
++			}
++			small->unlock();
++		}
++	}
++	_smallRankBadges[sprite].reset(small);
++	return small;
++}
++
++/**
 + * Shows the soldier card under the squad button the mouse is over: the soldier's name, status,
 + * weapon and the four stats with their bars. With the soldier preview option on, the card also
 + * shows a live picture from the soldier's helmet camera (a small second 3D view), or TV static
@@ -9272,12 +9610,16 @@ index 000000000..4b0930759
 +		: state == SQUAD_CONTROLLED ? std::string(_state->tr("STR_FPS_MIND_CONTROLLED"))
 +		: !alertStatus.empty() ? alertStatus : statusLabel(unit);
 +	_cardStatus->setText(status);
-+	// The name gives way to the status beside it.
-+	const int nameWidth = CardW - 8 - (status.empty() ? 0 : _cardStatus->getTextWidth() + 4);
++	// The name gives way to the status beside it (and to the rank before it).
++	const bool rankShown = drawRankIcon(_cardRank, unit);
++	const int nameWidth = CardW - 8 - (status.empty() ? 0 : _cardStatus->getTextWidth() + 4) - (rankShown ? RankIconW + RankIconGap : 0);
 +	if (nameWidth != _cardName->getWidth())
 +	{
 +		_cardName->setWidth(nameWidth);
 +	}
++	_cardRank->setVisible(rankShown);
++	_cardRank->setX(cardX + 4);
++	_cardName->setX(cardX + 4 + (rankShown ? RankIconW + RankIconGap : 0)); // (the rank before the name)
 +	if (preview && !live)
 +	{
 +		// Static on the dead camera: every pixel a random grey, new every frame (a linear
@@ -9382,6 +9724,7 @@ index 000000000..4b0930759
 +		part->setVisible(show);
 +	}
 +	_soldierCamDot->setVisible(show && SDL_GetTicks() % 1000 < 600);
++	_soldierCamRank->setVisible(false); // (shown below, for a soldier with a rank)
 +	if (!show)
 +	{
 +		return;
@@ -9393,7 +9736,12 @@ index 000000000..4b0930759
 +	_soldierCam->setY(CardY + 16);
 +	_soldierCamDot->setX(frameX + 5);
 +	_soldierCamDot->setY(CardY + 5);
-+	_txtSoldierCam->setX(frameX + 13);
++	// The soldier's rank before the title (after the red dot), the title after it.
++	const bool camRank = drawRankIcon(_soldierCamRank, unit);
++	_soldierCamRank->setVisible(camRank);
++	_soldierCamRank->setX(frameX + 13);
++	_soldierCamRank->setY(CardY + 4 - RankIconRise);
++	_txtSoldierCam->setX(frameX + 13 + (camRank ? RankIconW + RankIconGap : 0));
 +	_txtSoldierCam->setY(CardY + 4);
 +	const std::string title = _state->tr("STR_FPS_SOLDIER_CAM").arg(unit->getName(_game->getLanguage(), false));
 +	if (_txtSoldierCam->getText() != title)
@@ -10089,10 +10437,10 @@ index 000000000..4b0930759
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeMovement.cpp b/src/FirstPerson/FirstPersonModeMovement.cpp
 new file mode 100644
-index 000000000..14a3a1063
+index 000000000..a032f0dac
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeMovement.cpp
-@@ -0,0 +1,1849 @@
+@@ -0,0 +1,1880 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -10584,7 +10932,9 @@ index 000000000..14a3a1063
 + * Tile moves: a move walks exactly one tile, to the middle of the neighbour in the direction it
 + * pushes (one of eight, relative to the view). The numpad makes such moves whatever the movement
 + * setting, almost at once (NumpadMoveSpeed), like a step on the isometric map: a press is
-+ * remembered until the move can start, and a key still held starts the next. With the setting
++ * remembered until the move can start, and a key still held starts the next; a press waits
++ * NumpadComboWait for a key of the other axis to join it, and keys held then join it too (a
++ * player: 8 and 4 together should make a diagonal, as W and A do). With the setting
 + * "Movement: Tiles", W, A, S and D make them too, at walking speed, once held a moment (a second
 + * key pressed with the first, W and D say, makes a diagonal), and holding them walks on. A key
 + * held on from one move to the next stops at a closed door (a player's report: a held walk went on
@@ -10658,10 +11008,16 @@ index 000000000..14a3a1063
 +		double moveForward = 0.0, moveStrafe = 0.0;
 +		bool quick = true;
 +		bool heldOn = false;
-+		if (_numpadMove[0] || _numpadMove[1])
++		const bool numpadPressWaits = (_numpadMove[0] || _numpadMove[1]) && now - _numpadPressAt < NumpadComboWait;
++		if (numpadPressWaits)
 +		{
-+			moveForward = _numpadMove[0];
-+			moveStrafe = _numpadMove[1];
++			// (a second key may still join the press)
++		}
++		else if (_numpadMove[0] || _numpadMove[1])
++		{
++			// The press, and a key of the other axis held with it.
++			moveForward = _numpadMove[0] ? _numpadMove[0] : numpadForward;
++			moveStrafe = _numpadMove[1] ? _numpadMove[1] : numpadStrafe;
 +		}
 +		else if (numpadForward || numpadStrafe)
 +		{
@@ -11018,11 +11374,13 @@ index 000000000..14a3a1063
 +
 +/**
 + * Climbing with W and S, as on Half-Life's ladders: while the soldier stands on a grav lift or a
-+ * ladder, W with the view looking up more than ClimbPitch degrees goes up a level and looking
-+ * down as much goes down (S the other way round), through moveUpDown, so the game checks and
-+ * charges it as it does the up and down keys. Held, it climbs on level by level, each once the
-+ * last ride is over. Looking more level, or where the lift doesn't go that way (at its top, at
-+ * its foot), the key walks as usual: that's how the soldier steps off.
++ * ladder, or flies with flight switched on (a player: "letting me look up and hold w to fly
++ * straight up"), W with the view looking up more than ClimbPitch degrees goes up a level and
++ * looking down as much goes down (S the other way round), through moveUpDown, so the game
++ * checks and charges it as it does the up and down keys. Held, it climbs on level by level, each
++ * once the last ride is over. Looking more level, or where the way doesn't go on (a lift's top or
++ * foot, a ceiling over a flyer, the ground under one), the key walks as usual: that's how the
++ * soldier steps off. (The arrows by the compass show it: see updateClimbArrows.)
 + * @param unit The soldier.
 + * @param forward The movement keys' forward push (see movementKeys): 1 for W, -1 for S.
 + * @return True if the push is the climb's, so it doesn't walk.
@@ -11043,10 +11401,11 @@ index 000000000..14a3a1063
 +		return true;
 +	}
 +
-+	// Which way: W looking up (or S looking down) is up. Only where the lift goes that way.
++	// Which way: W looking up (or S looking down) is up. Only where the lift, the ladder or the
++	// flight goes that way.
 +	const int direction = (forward > 0.0) == lookingUp ? Pathfinding::DIR_UP : Pathfinding::DIR_DOWN;
 +	bool up = false, down = false;
-+	liftWays(unit, up, down);
++	climbWays(unit, up, down);
 +	if (!(direction == Pathfinding::DIR_UP ? up : down))
 +	{
 +		return false;
@@ -11364,6 +11723,26 @@ index 000000000..14a3a1063
 +		&& (!walkerOnly || walkerMayMoveUpDown(unit->getPosition(), Pathfinding::DIR_UP));
 +	down = pathfinding->getTUCost(unit->getPosition(), Pathfinding::DIR_DOWN, unit, nullptr, BAM_NORMAL).cost.time < Pathfinding::INVALID_MOVE_COST
 +		&& (!walkerOnly || walkerMayMoveUpDown(unit->getPosition(), Pathfinding::DIR_DOWN));
++}
++
++/**
++ * Which ways W and S may climb from where the soldier is (see updateClimb): a grav lift's or a
++ * ladder's (see liftWays), or else, flying with flight switched on, the moves up and down the
++ * pathfinding allows a flyer from there (not through a ceiling, nor below the ground).
++ * @param unit The soldier.
++ * @param up Set to whether the way goes up.
++ * @param down Set to whether it goes down.
++ */
++void FirstPersonMode::climbWays(BattleUnit *unit, bool &up, bool &down) const
++{
++	liftWays(unit, up, down);
++	if (up || down || !canFly(unit) || !flightOn(unit))
++	{
++		return;
++	}
++	Pathfinding *pathfinding = _save->getPathfinding();
++	up = pathfinding->getTUCost(unit->getPosition(), Pathfinding::DIR_UP, unit, nullptr, BAM_NORMAL).cost.time < Pathfinding::INVALID_MOVE_COST;
++	down = pathfinding->getTUCost(unit->getPosition(), Pathfinding::DIR_DOWN, unit, nullptr, BAM_NORMAL).cost.time < Pathfinding::INVALID_MOVE_COST;
 +}
 +
 +/**
@@ -11944,10 +12323,10 @@ index 000000000..14a3a1063
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..710825392
+index 000000000..b2e696f99
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,366 @@
+@@ -0,0 +1,386 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -12018,6 +12397,9 @@ index 000000000..710825392
 +/// The compass (setting "Compass"): the disc's size, the room above it for the heading arrow, and
 +/// how far below the top bar it sits (canvas pixels).
 +const int CompassSize = 40, CompassArrowH = 7, CompassGap = 2;
++/// The climb arrows beside the compass (see FirstPersonMode::updateClimbArrows): each ClimbArrowW x
++/// ClimbArrowH pixels, the pair ClimbArrowsH high, ClimbArrowsGap pixels left of the dial.
++const int ClimbArrowW = 13, ClimbArrowH = 9, ClimbArrowsH = 26, ClimbArrowsGap = 2;
 +/// Turning by the rules: the compass warns this many degrees before the view reaches the
 +/// head's limit (HeadTurn), where looking further turns the soldier.
 +const double CompassWarnDegrees = 10.0;
@@ -12043,6 +12425,17 @@ index 000000000..710825392
 +const double PressedEyeLower = 1.0;
 +/// The soldier card under a hovered squad button, and its live helmet-camera view.
 +const int CardW = 124, CardY = 15, PreviewW = 116, PreviewH = 72;
++/// The farthest the eye moves to get out of something solid (a big unit in a wide door, see clearEye), in voxels.
++const double EyeClearReach = 10.0;
++/// A melee blow at terrain by the crosshair (see FirstPersonMode::crosshairTerrainMelee) reaches this far from the eye, in voxels (a tile and a half).
++const double MeleeTerrainReach = 24.0;
++/// A soldier's rank beside their name (see FirstPersonMode::drawRankIcon): the icon's size in pixels,
++/// the game's own battlescape badge (26x23) averaged down to it, or a mod's tiny rank (7x7) inside it;
++/// and the room between the name and it.
++const int RankIconW = 13, RankIconH = 11, RankIconGap = 3;
++/// The badge's top is this many pixels above its text's top, so its bottom row is the letters' bottom
++/// row (a player: it touched the weapon line under the name).
++const int RankIconRise = 3;
 +/// The map camera's picture (setting "Map camera": small, medium, large; index 0 is off) takes
 +/// this share of the canvas's width (96, 128 or 160 pixels on the smallest canvas, 320 wide;
 +/// twice that on one 640 wide), in the card camera's proportions, and at most MapCameraMaxHeight
@@ -12075,6 +12468,9 @@ index 000000000..710825392
 +/// taken as exactly upright (or level): the games draw their weapons standing straight up, and a
 +/// grip, a magazine or a bulky body only tips the measured axis off the barrel.
 +const double WeaponUprightSnap = 30.0;
++/// ...if the picture lies no more than this many times as wide across the upright (or level) axis as
++/// across its measured one (and a pixel): a pole drawn on a slant keeps its slant.
++const double WeaponSnapSpread = 1.25;
 +/// The way a melee weapon's tip points at rest, from its grip (camera space: x out to the weapon's side, y down, z ahead; any length).
 +const double MeleeUpright[3] = { 0.3, -1.0, 0.25 };
 +/// The aliens' turn cameras (setting "Aliens' turn cameras"): the least time the view stays with a soldier
@@ -12131,6 +12527,9 @@ index 000000000..710825392
 +/// Tile moves: how long the movement keys are held before the move starts, in milliseconds (a
 +/// second key pressed with the first, W and D say, makes it a diagonal).
 +const Uint32 TileMoveKeyWait = 60;
++/// The numpad: a move key's press waits this long (ms) for a key of the other axis to join it (8
++/// and 4 together: a diagonal, as W and A make one), so pressing two at once isn't two moves.
++const Uint32 NumpadComboWait = 60;
 +/// Tile moves: a move that hasn't come closer to its tile for this long (ms) is over (the step
 +/// was refused, or a door or a vault moved the camera on its own).
 +const Uint32 TileMoveStuck = 300;
@@ -12316,10 +12715,10 @@ index 000000000..710825392
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..7d02d2164
+index 000000000..010b30c0e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,3163 @@
+@@ -0,0 +1,3413 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -13101,6 +13500,58 @@ index 000000000..7d02d2164
 +}
 +
 +/**
++ * A melee blow at terrain by the crosshair (a player's report: melee couldn't strike a structure
++ * diagonally in front, "Preferably you should be able to melee any voxel structure within around
++ * 1 tile of the player, and base it entirely on where first person crosshair is"; on stairs the
++ * walls of both floors ahead): what the crosshair meets, by the game's own line (see aimAt), if
++ * it's a wall, a door or an object (the game's terrain melee knows no floors), no farther from the
++ * eye than MeleeTerrainReach, on the unit's own tile or one next to it (the eight around, a level
++ * up or down too: the owner's choice), and the weapon damages terrain at all (as the game's own
++ * check, validTerrainMeleeRange). The game's terrain melee then strikes that part of that tile.
++ * @param unit The soldier striking.
++ * @param weapon The weapon (or fist) striking.
++ * @param struck Set to the voxel the crosshair meets.
++ * @param part Set to the part struck (V_WESTWALL, V_NORTHWALL or V_OBJECT).
++ * @return True if there's something to strike.
++ */
++bool FirstPersonMode::crosshairTerrainMelee(BattleUnit *unit, BattleItem *weapon, Position &struck, int &part)
++{
++	// The weapon must damage terrain (a melee weapon's own damage, else its melee's).
++	const RuleItem *rules = weapon ? weapon->getRules() : nullptr;
++	if (rules && (rules->getBattleType() == BT_MELEE ? rules->getDamageType() : rules->getMeleeType())->ToTile == 0.0)
++	{
++		return false;
++	}
++	// What the crosshair meets: a wall, a door or an object, within reach.
++	int hitType = V_EMPTY;
++	if (!aimAt(_view->getWidth() / 2, _view->getHeight() / 2, unit, struck, &hitType) || (hitType != V_WESTWALL && hitType != V_NORTHWALL && hitType != V_OBJECT))
++	{
++		return false;
++	}
++	double eye[3];
++	_view->getEye(eye);
++	const double dx = struck.x + 0.5 - eye[0], dy = struck.y + 0.5 - eye[1], dz = struck.z + 0.5 - eye[2];
++	if (dx * dx + dy * dy + dz * dz > MeleeTerrainReach * MeleeTerrainReach)
++	{
++		return false;
++	}
++	// On the unit's own tile or one next to it, a level up or down included.
++	const Position tile = struck.toTile(), at = unit->getPosition();
++	const int size = unit->getArmor()->getSize();
++	if (tile.x < at.x - 1 || tile.x > at.x + size || tile.y < at.y - 1 || tile.y > at.y + size || std::abs(tile.z - at.z) > 1)
++	{
++		return false;
++	}
++	const Tile *target = _save->getTile(tile);
++	if (!target || !target->getMapData((TilePart)hitType))
++	{
++		return false;
++	}
++	part = hitType;
++	return true;
++}
++
++/**
 + * Finds what a shot would hit through a pixel of the view: the first voxel along that ray,
 + * found by the game's own line of fire (TileEngine::calculateLineVoxel, the same 3D Bresenham
 + * line through the same voxel shapes a real shot flies along). Walls, objects, floors and units
@@ -13115,7 +13566,7 @@ index 000000000..7d02d2164
 + *   V_UNIT; V_EMPTY for nothing).
 + * @return True if something was hit.
 + */
-+bool FirstPersonMode::aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &voxel, int *voxelType)
++bool FirstPersonMode::aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &voxel, int *voxelType) const
 +{
 +	// The ray from the eye through that pixel, in voxels (16 per tile across, 24 per level).
 +	double eye[3], rayDirection[3];
@@ -13200,6 +13651,36 @@ index 000000000..7d02d2164
 +	const int cost = eighths * (turret ? 1 : unit->getTurnCost());
 +	affordable = cost + BattleActionCost(mode, unit, weapon).Time <= unit->getTimeUnits();
 +	return cost;
++}
++
++/**
++ * A spray burst being marked (the game's "spray" auto shot, see fire), every frame: the points
++ * marked so far and the next one, the tile under the crosshair, for the view to draw (see
++ * FirstPersonView::drawSprayMarks); none while nothing is being marked. Each on its tile's floor,
++ * in the middle, where the player clicked, as the map marks the tiles themselves (the game aims
++ * the rounds at the middles of those tiles, waist high, which looking down at the ground nearby
++ * would be out of the top of the view).
++ * @param unit The soldier being looked through, or null.
++ */
++void FirstPersonMode::updateSprayMarks(BattleUnit *unit)
++{
++	const BattleAction *action = _state->_battleGame->getCurrentAction();
++	auto onFloor = [this](Position tile) {
++		tile.x = std::clamp<int>(tile.x, 0, _save->getMapSizeX() - 1);
++		tile.y = std::clamp<int>(tile.y, 0, _save->getMapSizeY() - 1);
++		tile.z = std::clamp<int>(tile.z, 0, _save->getMapSizeZ() - 1);
++		const Tile *mapTile = _save->getTile(tile);
++		return Position(tile.x * 16 + 8, tile.y * 16 + 8, tile.z * 24 - (mapTile ? mapTile->getTerrainLevel() : 0) + 1);
++	};
++	std::vector<Position> points;
++	if (unit && isActive() && action->sprayTargeting && action->actor == unit)
++	{
++		for (const Position &tile : action->waypoints)
++		{
++			points.push_back(onFloor(tile));
++		}
++	}
++	_view->setSprayMarks(points, onFloor(_aimVoxel.toTile()));
 +}
 +
 +/**
@@ -13840,6 +14321,33 @@ index 000000000..7d02d2164
 +	BattleAction *action = battleGame->getCurrentAction();
 +	BattleActionType mode = _fireMode;
 +
++	// A spray burst being marked (the game's "spray" auto shot, a player: "Ctrl shift for spray
++	// waypoints ... needs first person equivalent"): begun with Ctrl+Shift and a click (launchShot
++	// hands that to the game, which starts marking), each click marks the next point, the tile
++	// under the crosshair, the game's own way: the one that reaches the weapon's number of points
++	// (or one with Ctrl and Shift held) fires the burst along them. The right button takes the
++	// last point back (the game's cancel). See updateSprayMarks.
++	if (action->sprayTargeting && action->actor == unit)
++	{
++		Position aimed;
++		aimAt(pixelX, pixelY, unit, aimed);
++		Position tile = aimed.toTile();
++		tile.x = std::clamp<int>(tile.x, 0, _save->getMapSizeX() - 1);
++		tile.y = std::clamp<int>(tile.y, 0, _save->getMapSizeY() - 1);
++		tile.z = std::clamp<int>(tile.z, 0, _save->getMapSizeZ() - 1);
++		// (Free turning, no "Turning costs TU": the soldier faces the first point for free, so the
++		// game's turn to it before the burst costs nothing, as for any shot, see launchShot.)
++		if (!Options::fpsTurnCost && !action->waypoints.empty() && unit->directionTo(action->waypoints.front()) != unit->getDirection())
++		{
++			unit->setDirection(unit->directionTo(action->waypoints.front()));
++			_save->getTileEngine()->calculateFOV(unit);
++			_save->getTileEngine()->calculateFOV(unit->getPosition(), 1, false); // others' view of this unit, like UnitTurnBState
++		}
++		battleGame->primaryAction(tile);
++		_triggerHeld = false;
++		return;
++	}
++
 +	// An action picked from an item's menu that wants a target (the mind probe, psi picked from
 +	// the menu...): this click is its target, with that item and action. Not a shot, though:
 +	// after a shot the game keeps aiming that same shot (so the player can fire again), and a
@@ -13991,10 +14499,12 @@ index 000000000..7d02d2164
 +
 +	// Melee: the game finds who is in reach in the direction the soldier faces (the 3D view
 +	// keeps him facing where it looks) and does the attack as its own action, which needs no
-+	// target click. With no one standing in reach, like the isometric map, the game's own
-+	// terrain melee hits the wall, door or object the soldier faces, if the mod switches it on
-+	// (extendedTerrainMelee); the setting "Melee hits walls and the downed" switches it on for
-+	// the 3D view, and first lets the blow hit a body lying in front (see meleeDowned).
++	// target click. With no one standing in reach, the game's own terrain melee, if the mod
++	// switches it on (extendedTerrainMelee) or the setting "Melee hits walls and the downed"
++	// does for the 3D view (which first lets the blow hit a body lying in front, see
++	// meleeDowned), strikes the wall, door or object under the crosshair within reach, diagonal
++	// or a level up or down too (see crosshairTerrainMelee; the map's own strikes only the one
++	// straight ahead).
 +	if (mode == BA_HIT)
 +	{
 +		TileEngine *tileEngine = _save->getTileEngine();
@@ -14012,18 +14522,16 @@ index 000000000..7d02d2164
 +		}
 +		else
 +		{
-+			const int modTerrainMelee = Mod::EXTENDED_TERRAIN_MELEE;
-+			if (Options::fpsMeleeTerrain && modTerrainMelee <= 0)
-+			{
-+				Mod::EXTENDED_TERRAIN_MELEE = 1; // only for this check: parts reaching above the bottom layer
-+			}
-+			const bool terrainInReach = tileEngine->validTerrainMeleeRange(action);
-+			Mod::EXTENDED_TERRAIN_MELEE = modTerrainMelee;
-+			if (!terrainInReach)
++			Position struck;
++			int part = V_EMPTY;
++			if (!(Options::fpsMeleeTerrain || Mod::EXTENDED_TERRAIN_MELEE > 0) || !crosshairTerrainMelee(unit, weapon, struck, part))
 +			{
 +				_state->warning("STR_THERE_IS_NO_ONE_THERE");
 +				return;
 +			}
++			action->target = struck.toTile();
++			action->terrainMeleeTilePart = part;
++			action->targetVoxel = struck; // (the hit lands there: MeleeAttackBState)
 +		}
 +		action->type = BA_HIT;
 +		action->targeting = false;
@@ -14031,6 +14539,7 @@ index 000000000..7d02d2164
 +		action->updateTU();
 +		const bool timeUnitsEnough = action->haveTU();
 +		battleGame->handleNonTargetAction();
++		action->targetVoxel = Position(-1, -1, -1); // (taken by the game's melee, if it went ahead)
 +
 +		// The weapon in hand swings only if the game went ahead. Refused for time units, the
 +		// game says so and nothing swings, and the melee isn't left waiting (as the game's
@@ -14224,8 +14733,15 @@ index 000000000..7d02d2164
 +	// Fire, as a click on the target tile of the isometric map: the game turns the soldier (by
 +	// the rules), checks and spends the time units, and launches the shot. With the game's
 +	// "confirm fire mode" setting the first click only marks the target, so click a second time.
++	// (Ctrl and Shift held with a spray weapon's auto shot: the game starts marking a spray burst
++	// instead, its first point this tile; the trigger is let go, so FPS style's held auto doesn't
++	// mark more, and confirm fire's second click isn't made: it would fire the burst at once.)
 +	battleGame->primaryAction(targetTile);
-+	if (Options::battleConfirmFireMode && action->targeting && !action->waypoints.empty())
++	if (action->sprayTargeting)
++	{
++		_triggerHeld = false;
++	}
++	else if (Options::battleConfirmFireMode && action->targeting && !action->waypoints.empty())
 +	{
 +		battleGame->primaryAction(targetTile);
 +	}
@@ -14298,23 +14814,31 @@ index 000000000..7d02d2164
 +}
 +
 +/**
-+ * The patient a medi-kit would treat now. The game's own choices, as its action menu makes
-+ * them (and with the same rules for whom the kit may treat, standing or lying, friend, neutral
-+ * or foe, immune to wounds or not): a body lying on the soldier's own tile, the unit in the tile
-+ * the soldier faces (in reach, as for melee), or the soldier themself. The game takes the first
-+ * of these there is; here the player's aim picks among them:
-+ * - the unit in reach, when its picture is under the crosshair (or the free cursor): it (none,
-+ *   if the kit can't treat it);
-+ * - looking down (more than 25 degrees): the body at the feet;
-+ * - aiming at nothing in reach: the soldier themself;
-+ * - and when the kit can't treat the soldier, the game's own order for the rest.
++ * Whom a medi-kit would treat now, by the crosshair (a player: "the same targetting system ...
++ * proposed for melee"), with the game's own rules for whom the kit may treat (standing or lying,
++ * friend, neutral or foe, immune to wounds or not):
++ * - a unit standing under the crosshair (or the free cursor): treated if it's on a tile next to
++ *   the soldier (any of the eight ways, by the game's melee reach, TileEngine::validMeleeRange),
++ *   the soldier first turning to face it (the way needing the fewest eighths); farther off, out
++ *   of range (none, either way, if the kit can't treat it);
++ * - a unit lying unconscious under the crosshair (its body's picture, see
++ *   FirstPersonView::getBodyAtPointer: a body lying flat reaches far towards the camera, so not
++ *   where the line of fire meets the floor): treated if it lies at the soldier's feet (as the
++ *   game treats bodies: on the soldier's own tile only); elsewhere, the player is told to stand
++ *   over it;
++ * - looking down (more than 25 degrees) with a body at the feet: that body;
++ * - aiming at nothing of these: the soldier themself;
++ * - and when the kit can't treat the soldier, the game's own order: the body at the feet, then
++ *   the unit in the tile faced.
 + * @param unit The soldier with the kit.
 + * @param medikit The kit.
-+ * @return The patient, or null if there's none.
++ * @return The patient (null if none, with the reason), and the way to turn to them.
 + */
-+BattleUnit *FirstPersonMode::medikitPatient(BattleUnit *unit, BattleItem *medikit) const
++FirstPersonMode::MedikitAim FirstPersonMode::medikitPatient(BattleUnit *unit, BattleItem *medikit) const
 +{
++	MedikitAim aim;
 +	const RuleItem *rules = medikit->getRules();
++	TileEngine *tileEngine = _save->getTileEngine();
 +	// Whether the kit may treat a unit of this side, standing or lying.
 +	auto sideAllowed = [rules](const BattleUnit *patient, bool lying) {
 +		const UnitFaction faction = patient->getOriginalFaction();
@@ -14323,44 +14847,95 @@ index 000000000..7d02d2164
 +			: ((rules->getAllowTargetFriendStanding() && faction == FACTION_PLAYER) || (rules->getAllowTargetNeutralStanding() && faction == FACTION_NEUTRAL)
 +				|| (rules->getAllowTargetHostileStanding() && faction == FACTION_HOSTILE));
 +	};
-+	// A body on the soldier's own tile (never a big unit's), unconscious and treatable.
-+	BattleUnit *body = nullptr;
-+	for (BattleUnit *other : *_save->getUnits())
-+	{
-+		if (other->getPosition() == unit->getPosition() && other != unit && other->getStatus() == STATUS_UNCONSCIOUS && !other->isBigUnit()
-+			&& (other->isWoundable() || rules->getAllowTargetImmune()) && rules->getAllowTargetGround() && sideAllowed(other, true))
++	auto treatableStanding = [&](const BattleUnit *patient) {
++		return rules->getAllowTargetStanding() && (patient->isWoundable() || rules->getAllowTargetImmune()) && sideAllowed(patient, false);
++	};
++	auto treatableLying = [&](const BattleUnit *patient) {
++		return !patient->isBigUnit() && rules->getAllowTargetGround() && (patient->isWoundable() || rules->getAllowTargetImmune()) && sideAllowed(patient, true);
++	};
++	// The unconscious unit lying on a tile (the first), if any.
++	auto bodyOn = [&](Tile *tile) -> BattleUnit* {
++		for (BattleItem *item : tile ? *tile->getInventory() : std::vector<BattleItem*>())
 +		{
-+			body = other;
-+			break;
++			if (item->getUnit() && item->getUnit() != unit && item->getUnit()->getStatus() == STATUS_UNCONSCIOUS)
++			{
++				return item->getUnit();
++			}
 +		}
-+	}
-+	// The unit in the tile the soldier faces, and whether the kit may treat it.
-+	BattleUnit *facedUnit = nullptr, *standing = nullptr;
-+	Position facedTile;
-+	if (_save->getTileEngine()->validMeleeRange(unit->getPosition(), unit->getDirection(), unit, nullptr, &facedTile, false))
++		return nullptr;
++	};
++
++	// A unit standing under the crosshair: next to the soldier (the way to it needing the fewest
++	// eighths of a turn), or out of range.
++	BattleUnit *pointed = _view->getUnitAtPointer();
++	if (pointed && pointed != unit)
 +	{
-+		const Tile *tile = _save->getTile(facedTile);
-+		facedUnit = tile ? tile->getUnit() : nullptr;
-+		if (facedUnit && rules->getAllowTargetStanding() && (facedUnit->isWoundable() || rules->getAllowTargetImmune()) && sideAllowed(facedUnit, false))
++		int bestEighths = 9;
++		for (int direction = 0; direction < 8; ++direction)
 +		{
-+			standing = facedUnit;
++			Position reachedTile;
++			const int eighths = std::min((direction - unit->getDirection() + 8) % 8, (unit->getDirection() - direction + 8) % 8);
++			if (eighths < bestEighths && tileEngine->validMeleeRange(unit->getPosition(), direction, unit, pointed, &reachedTile, false))
++			{
++				bestEighths = eighths;
++				aim.direction = direction;
++			}
 +		}
++		if (aim.direction < 0)
++		{
++			aim.refusal = "STR_OUT_OF_RANGE";
++		}
++		else if (treatableStanding(pointed))
++		{
++			aim.patient = pointed;
++		}
++		else
++		{
++			aim.direction = -1;
++			aim.refusal = "STR_THERE_IS_NO_ONE_THERE";
++		}
++		return aim;
 +	}
-+	// The aim picks.
-+	const BattleUnit *pointed = _view->getUnitAtPointer();
-+	if (pointed && pointed == facedUnit)
++
++	// A body under the crosshair: at the feet, or elsewhere (stand over it); or looking down at
++	// the feet, a body lying there.
++	BattleUnit *bodyAtFeet = bodyOn(_save->getTile(unit->getPosition()));
++	BattleUnit *pointedBody = _view->getBodyAtPointer();
++	if (pointedBody && pointedBody != bodyAtFeet && pointedBody->getPosition() != unit->getPosition())
 +	{
-+		return standing;
++		aim.refusal = "STR_FPS_MEDIKIT_STAND_OVER";
++		return aim;
 +	}
-+	if (_view->getPitchDegrees() < -25.0 && body)
++	if (bodyAtFeet && treatableLying(bodyAtFeet) && (pointedBody || _view->getPitchDegrees() < -25.0))
 +	{
-+		return body;
++		aim.patient = bodyAtFeet;
++		return aim;
 +	}
++
++	// Nothing of these: the soldier, or else the game's own order.
 +	if (rules->getAllowTargetSelf())
 +	{
-+		return unit;
++		aim.patient = unit;
++		return aim;
 +	}
-+	return body ? body : standing;
++	if (bodyAtFeet && treatableLying(bodyAtFeet))
++	{
++		aim.patient = bodyAtFeet;
++		return aim;
++	}
++	Position facedTile;
++	if (tileEngine->validMeleeRange(unit->getPosition(), unit->getDirection(), unit, nullptr, &facedTile, false))
++	{
++		const Tile *tile = _save->getTile(facedTile);
++		BattleUnit *faced = tile ? tile->getUnit() : nullptr;
++		if (faced && treatableStanding(faced))
++		{
++			aim.patient = faced;
++			return aim;
++		}
++	}
++	aim.refusal = "STR_THERE_IS_NO_ONE_THERE";
++	return aim;
 +}
 +
 +/**
@@ -14415,24 +14990,44 @@ index 000000000..7d02d2164
 +		return;
 +	}
 +
-+	// A medi-kit, on the patient pointed at.
-+	BattleUnit *patient = medikitPatient(unit, item);
++	// A medi-kit, on the patient pointed at (see medikitPatient).
++	const MedikitAim aim = medikitPatient(unit, item);
++	BattleUnit *patient = aim.patient;
 +	if (!patient)
 +	{
-+		_state->warning("STR_THERE_IS_NO_ONE_THERE");
++		_state->warning(aim.refusal);
 +		return;
 +	}
 +	TileEngine *tileEngine = _save->getTileEngine();
 +	const BattleMediKitType type = rules->getMediKitType();
-+	if (!type)
-+	{
-+		_game->pushState(new MedikitState(patient, action, tileEngine));
-+		return;
-+	}
-+	if (!((type == BMT_HEAL && item->getHealQuantity() > 0) || (type == BMT_STIMULANT && item->getStimulantQuantity() > 0)
++	if (type && !((type == BMT_HEAL && item->getHealQuantity() > 0) || (type == BMT_STIMULANT && item->getStimulantQuantity() > 0)
 +		|| (type == BMT_PAINKILLER && item->getPainKillerQuantity() > 0)))
 +	{
 +		_state->warning("STR_NO_USES_LEFT");
++		return;
++	}
++	// A patient beside the soldier but not in the way they face: the soldier turns to them
++	// first. With "Turning costs TU" an eighth at a time the shorter way round, each the armor's
++	// turn cost (as the game's turn charges it; nothing in Doom mode), the turn and the kit's use
++	// both wanting their time units before either is spent; with free turning for nothing.
++	if (aim.direction >= 0 && aim.direction != unit->getDirection())
++	{
++		const int eighths = std::min((aim.direction - unit->getDirection() + 8) % 8, (unit->getDirection() - aim.direction + 8) % 8);
++		const int turnCost = Options::fpsTurnCost && !doomModeOn() ? eighths * unit->getTurnCost() : 0;
++		if (turnCost > 0 && unit->getTimeUnits() < turnCost + (type ? action->Time : 0))
++		{
++			_state->warning("STR_NOT_ENOUGH_TIME_UNITS");
++			return;
++		}
++		unit->spendTimeUnits(turnCost);
++		unit->setDirection(aim.direction);
++		tileEngine->calculateFOV(unit);
++		tileEngine->calculateFOV(unit->getPosition(), 1, false); // others' view of this unit, as after the game's turn
++		_state->updateSoldierInfo(false);
++	}
++	if (!type)
++	{
++		_game->pushState(new MedikitState(patient, action, tileEngine));
 +		return;
 +	}
 +	if (!action->spendTU(&action->result))
@@ -14936,6 +15531,7 @@ index 000000000..7d02d2164
 +	_crosshair->setVisible(show && Options::fpsCrosshair);
 +	_txtMode->setVisible(show && Options::fpsCrosshairInfo && playerTurn);
 +	_txtShot->setVisible(show && Options::fpsCrosshairInfo && playerTurn);
++	_txtCosts->setVisible(show && Options::fpsCrosshairInfo && Options::fpsCrosshairCosts && playerTurn);
 +	if (!show)
 +	{
 +		return;
@@ -14948,6 +15544,8 @@ index 000000000..7d02d2164
 +	_txtMode->setY(linesTop);
 +	_txtShot->setX(centreX + 14);
 +	_txtShot->setY(linesTop + 10);
++	_txtCosts->setX(centreX + 14);
++	_txtCosts->setY(linesTop + 20);
 +
 +	// The colours, picked from the current palette: plain ones for the crosshair, and text
 +	// colour groups for the lines.
@@ -14972,7 +15570,7 @@ index 000000000..7d02d2164
 +	const BattleActionType mode = firedAs(weapon, slot); // (FPS style: the quick slot is a burst)
 +	int shots = 1;
 +	Uint8 color = grey;
-+	std::string modeText, shotText;
++	std::string modeText, shotText, costText;
 +	bool dual = false, inTurn = false, eachFull = false; // both guns fire (dual wield); in turn; each at full accuracy and its own cost (an arcing pair, see fire)
 +	if (weapon && mode != BA_NONE && unit)
 +	{
@@ -14994,10 +15592,12 @@ index 000000000..7d02d2164
 +		// chosen gun fires alone, at full accuracy, as fire() decides too.
 +		BattleActionType offMode = BA_NONE;
 +		int offTime = 0;
++		RuleItemUseCost offCost; // (the other gun's whole cost, for the line of other costs)
 +		if (BattleItem *otherWeapon = canFire ? dualPartner(unit, weapon, slot, offMode) : nullptr)
 +		{
 +			const bool arcingPair = firesInTurn(weapon, mode, otherWeapon, offMode);
-+			offTime = BattleActionCost(offMode, unit, otherWeapon).Time;
++			offCost = BattleActionCost(offMode, unit, otherWeapon);
++			offTime = offCost.Time;
 +			if (!arcingPair) offTime = FirstPerson::dualWieldCharge(cost.Time, offTime);
 +			dual = doomModeOn() || cost.Time + offTime <= unit->getTimeUnits();
 +			inTurn = dual && (arcingPair || Options::fpsAkimboInTurn);
@@ -15045,6 +15645,35 @@ index 000000000..7d02d2164
 +		shotInfo << cost.Time + (dual ? offTime : 0) << std::string(_state->tr("STR_FPS_TU"));
 +		shotText = shotInfo.str();
 +
++		// Under it, the action's other costs (a player: "an energy cost per action if applicable,
++		// as well as any other costs (health, stun, morale, whatever)"; setting "Expanded
++		// crosshair info"): energy, health, stun, morale and mana, those it has, "EN 6  MP 4"
++		// (a gain, a mod's negative cost, with a plus). Both guns' with dual wield, as the game
++		// charges them: energy like the time units (the other gun the rest of the pair's, or its
++		// own in full for a pair firing in turn), the rest each gun's own. One the soldier can't
++		// pay, by the game's own check (BattleActionCost::haveTU: health must stay above the cost,
++		// and above the stun with it), goes red, and the action can't be done.
++		if (Options::fpsCrosshairCosts)
++		{
++			const int energy = cost.Energy + (dual ? (eachFull ? offCost.Energy : FirstPerson::dualWieldCharge(cost.Energy, offCost.Energy)) : 0);
++			const int health = cost.Health + (dual ? offCost.Health : 0), stun = cost.Stun + (dual ? offCost.Stun : 0);
++			const int morale = cost.Morale + (dual ? offCost.Morale : 0), mana = cost.Mana + (dual ? offCost.Mana : 0);
++			const struct { int amount; bool short_; const char *label; } costs[] = {
++				{ energy, unit->getEnergy() < energy, "STR_FPS_COST_ENERGY" },
++				{ health, health > 0 && unit->getHealth() <= health, "STR_FPS_COST_HEALTH" },
++				{ stun, stun > 0 && unit->getHealth() - unit->getStunlevel() <= stun + health, "STR_FPS_COST_STUN" },
++				{ morale, unit->getMorale() < morale, "STR_FPS_COST_MORALE" },
++				{ mana, unit->getMana() < mana, "STR_FPS_COST_MANA" } };
++			for (const auto &entry : costs)
++			{
++				if (entry.amount == 0) continue;
++				if (!costText.empty()) costText += "  ";
++				const std::string amount = std::string(_state->tr(entry.label)) + " " + (entry.amount < 0 ? "+" + std::to_string(-entry.amount) : std::to_string(entry.amount));
++				costText += entry.short_ ? Unicode::TOK_COLOR_FLIP + amount + Unicode::TOK_COLOR_FLIP : amount;
++				canFire = canFire && !entry.short_;
++			}
++		}
++
 +		// The mode's name. FPS style: the quick slot reads "BURST x<rounds>", and auto says to
 +		// hold the trigger; otherwise auto shows its number of rounds. "DUAL" (or "IN TURN") goes in front
 +		// with dual wield.
@@ -15057,6 +15686,12 @@ index 000000000..7d02d2164
 +		{
 +			if (entry.mode == mode) modeText = _state->tr(entry.name);
 +		}
++		// A spray burst being marked: "SPRAY 1/2", the points marked of the weapon's number.
++		const BattleAction *gameAction = _state->_battleGame->getCurrentAction();
++		if (gameAction->sprayTargeting && gameAction->actor == unit && gameAction->weapon == weapon)
++		{
++			modeText = _state->tr("STR_FPS_MODE_SPRAY").arg((int)gameAction->waypoints.size()).arg(weapon->getRules()->getSprayWaypoints());
++		}
 +		// Doom real-time grenades primed on throw: PRIME sets the fuse for every grenade, "FUSE 3s".
 +		if (mode == BA_PRIME && doomModeOn() && Options::fpsDoomPrimeOnThrow && timedGrenade(weapon))
 +		{
@@ -15066,7 +15701,7 @@ index 000000000..7d02d2164
 +		// none, it can't be used.
 +		if (mode == BA_USE && rules->getBattleType() == BT_MEDIKIT)
 +		{
-+			const BattleUnit *patient = medikitPatient(unit, weapon);
++			const BattleUnit *patient = medikitPatient(unit, weapon).patient;
 +			modeText += ": " + (patient == unit ? std::string(_state->tr("STR_FPS_MEDIKIT_SELF")) : patient ? unitLabel(patient) : std::string("-"));
 +			canFire = canFire && patient;
 +		}
@@ -15095,9 +15730,12 @@ index 000000000..7d02d2164
 +		}
 +		_txtMode->setColor(labelColor);
 +		_txtShot->setColor(accuracy >= 0 && canFire ? accuracyColor : labelColor);
++		_txtCosts->setColor(canAct() ? yellowText : greyText);
++		_txtCosts->setSecondaryColor(canAct() ? redText : greyText);
 +	}
 +	_txtMode->setText(modeText);
 +	_txtShot->setText(shotText);
++	if (_txtCosts->getText() != costText) _txtCosts->setText(costText);
 +
 +	// A hit (or a kill) on an enemy in sight ticks once (setting "Hit and kill sounds") and marks
 +	// the crosshair for 280 ms.
@@ -15375,7 +16013,7 @@ index 000000000..7d02d2164
 +	pointer(pointerX, pointerY);
 +	const BattleUnit *target = Options::fpsUnitNames && isActive() && unit ? _view->getUnitAtPointer() : nullptr;
 +	_txtTarget->setVisible(target != nullptr);
-+	_view->setPointer(pointerX, pointerY, target ? _txtTarget->getHeight() + 1 : 0);
++	_view->setPointer(pointerX, pointerY, target ? _txtTarget->getHeight() + 1 + (costLineShown() ? 10 : 0) : 0);
 +	if (!target)
 +	{
 +		return;
@@ -15387,8 +16025,19 @@ index 000000000..7d02d2164
 +	const std::string label = unitLabel(target);
 +	if (_txtTarget->getText() != label) _txtTarget->setText(label);
 +	// Centred under the crosshair, clear of its picture (about 8 pixels round the middle).
++	// (A line lower while the action's other costs show under the shot line: see updateCrosshair.)
 +	_txtTarget->setX(_view->getX() + pointerX - _txtTarget->getWidth() / 2);
-+	_txtTarget->setY(_view->getY() + pointerY + 10);
++	_txtTarget->setY(_view->getY() + pointerY + 10 + (costLineShown() ? 10 : 0));
++}
++
++/**
++ * Whether the line of the action's other costs shows under the crosshair (see updateCrosshair):
++ * the unit name and the icons over a downed unit go a line lower then.
++ * @return True if it's shown with something on it.
++ */
++bool FirstPersonMode::costLineShown() const
++{
++	return _txtCosts && _txtCosts->getVisible() && !_txtCosts->getText().empty() && Options::fpsCrosshair;
 +}
 +
 +/**
@@ -16449,10 +17098,10 @@ index 000000000..9bdb34a7a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeWeaponInHand.cpp b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
 new file mode 100644
-index 000000000..19a0b6649
+index 000000000..dfca2085a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
-@@ -0,0 +1,1015 @@
+@@ -0,0 +1,1026 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -16679,15 +17328,26 @@ index 000000000..19a0b6649
 +		covarianceXX += dx * dx; covarianceYY += dy * dy; covarianceXY += dx * dy;
 +	}
 +	double axisAngle = 0.5 * std::atan2(2.0 * covarianceXY, covarianceXX - covarianceYY); // radians, -90 .. 90 degrees
-+	// Near upright, exactly upright; near level, exactly level (see WeaponUprightSnap).
++	// Near upright, exactly upright; near level, exactly level (see WeaponUprightSnap): but only
++	// when the picture lies about as thin across that axis as across the one measured. A gun
++	// standing straight up whose grip or magazine tipped the measure lies thinner upright (its
++	// barrel along it); a pole drawn on a slant (XPiratez's quarterstaff, at 66 degrees: a
++	// player saw it standing in the air) lies far wider across the upright, and keeps its slant.
++	auto acrossSpread = [&](double angle) {
++		double low = 1e9, high = -1e9;
++		for (const auto &pixel : pixels)
++		{
++			const double across = -(pixel.first - meanX) * std::sin(angle) + (pixel.second - meanY) * std::cos(angle);
++			low = std::min(low, across);
++			high = std::max(high, across);
++		}
++		return high - low;
++	};
 +	const double snap = WeaponUprightSnap * Pi / 180.0;
-+	if (std::abs(std::abs(axisAngle) - Pi / 2.0) < snap)
++	const double snapTo = std::abs(std::abs(axisAngle) - Pi / 2.0) < snap ? Pi / 2.0 : std::abs(axisAngle) < snap ? 0.0 : axisAngle;
++	if (snapTo != axisAngle && acrossSpread(snapTo) <= acrossSpread(axisAngle) * WeaponSnapSpread + 1.0)
 +	{
-+		axisAngle = Pi / 2.0;
-+	}
-+	else if (std::abs(axisAngle) < snap)
-+	{
-+		axisAngle = 0.0;
++		axisAngle = snapTo;
 +	}
 +	shape.mean[0] = meanX; shape.mean[1] = meanY;
 +	shape.along[0] = std::cos(axisAngle); shape.along[1] = std::sin(axisAngle);
@@ -18213,10 +18873,10 @@ index 000000000..d67736b97
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..45343d80a
+index 000000000..996fad498
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,613 @@
+@@ -0,0 +1,615 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -18762,6 +19422,7 @@ index 000000000..45343d80a
 +	// (No unit is on the screen yet, for the see-through smoke.)
 +	std::fill(_unitVeil.begin(), _unitVeil.end(), (Uint8)255);
 +	std::fill(&_pointerUnits[0][0], &_pointerUnits[0][0] + sizeof(_pointerUnits) / sizeof(_pointerUnits[0][0]), nullptr);
++	std::fill(&_pointerBodies[0][0], &_pointerBodies[0][0] + sizeof(_pointerBodies) / sizeof(_pointerBodies[0][0]), nullptr);
 +	watchUnits();
 +	drawDecals();
 +	drawFloorItems();
@@ -18787,6 +19448,7 @@ index 000000000..45343d80a
 +	// The icons over the downed units, the enemy markers and the units' facing rings, over everything.
 +	drawDownedIcons();
 +	drawMarkers();
++	drawSprayMarks();
 +	drawFacing();
 +	unlock();
 +}
@@ -18832,10 +19494,10 @@ index 000000000..45343d80a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..5addef584
+index 000000000..717c24f14
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1167 @@
+@@ -0,0 +1,1176 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -19067,6 +19729,7 @@ index 000000000..5addef584
 +		Uint8 smoke, spark, dust, rain, snow, sand, firefly, bubble;
 +		Uint8 speck;           // the white specks a rocket leaves hanging along its path
 +		Uint8 marker, marine;
++		Uint8 sprayMark, sprayNext; // a spray burst's marks and the line between them (light green), the stretch to the next (grey)
 +		Uint8 hitbox[3];       // hitboxes (setting "Hitboxes"): X-COM's, the aliens', the civilians'
 +		Uint8 downedIcon[5];   // icons over the downed: flame, its heart, blood, the shock's bolt, out cold
 +		Uint8 edgeDot;         // the discreet map edge's dots
@@ -19153,27 +19816,23 @@ index 000000000..5addef584
 +
 +	/// Marks units (the visible enemies) with their numbers, over everything.
 +	void setMarkers(const std::vector<std::pair<const BattleUnit*, int>> &markers) { _markers = markers; }
++	/// A spray burst being marked (the game's "spray" auto shot): its points so far and the next one under the crosshair, in voxels (none: not marking).
++	void setSprayMarks(const std::vector<Position> &points, const Position &next) { _sprayPoints = points; _sprayNext = next; }
 +	/// Where the player points on the view: the crosshair, or the free cursor (pixels on the view),
 +	/// and how many pixels of text (a unit's name) are under it.
 +	void setPointer(int x, int y, int textBelow) { _pointerX = x; _pointerY = y; _pointerTextBelow = textBelow; }
 +	/// The unit whose picture is where the player points (or within a few pixels), as last drawn; or null.
 +	BattleUnit *getUnitAtPointer() const { return _unitAtPointer; }
++	/// The unconscious unit whose body's picture is where the player points (nearer it than any standing unit's), as last drawn; or null.
++	BattleUnit *getBodyAtPointer() const { return _bodyAtPointer; }
 +	/// Leaves out one tile's floor (the lift platform being ridden through), or none (index -1).
 +	void setHiddenFloor(int tileIndex) { _hiddenFloor = tileIndex; }
 +	/// Turns the flashlight on or off: the shoulder one, or the dynamic one (a tight spot on the crosshair).
 +	void setFlashlight(bool on, bool dynamic = false) { _flashlight = on; _dynamicFlashlight = dynamic; }
 +	/// Night vision like the isometric map's: brighter, in one colour (group + 1, 0 off).
 +	void setNightVision(int color) { _nightVision = color; }
-+	/// The sight of the soldier the view looks through, for smoke drawn as the game's sight rules
-+	/// have it (setting "Smoke": Modern's wall, Original's stacked frames): the range in voxels,
-+	/// and how much of the smoke and of the smoke over fire their eyes see through (the armor's
-+	/// heat vision, in percent).
-+	void setSmokeSight(float sightVoxels, int throughSmoke, int throughFire)
-+	{
-+		_smokeSightVoxels = sightVoxels;
-+		_smokeBlock = (100 - std::clamp(throughSmoke, 0, 100)) / 300.0f;
-+		_fireBlock = (100 - std::clamp(throughFire, 0, 100)) / 300.0f;
-+	}
++	/// The sight of the soldier the view looks through, for the smoke: their range, and how much of the smoke (and smoke over fire) they see through.
++	void setSmokeSight(float sightVoxels, int throughSmoke, int throughFire);
 +	/// Where the weapon in hand's muzzle is on the view (pixels): our own shots flash and start their trails there.
 +	void setMuzzlePoint(double x, double y, bool valid) { _muzzleScreen[0] = x; _muzzleScreen[1] = y; _muzzleValid = valid; }
 +	/// The path a throw or shot aimed now would take, in voxels from the soldier to its end (see
@@ -19291,6 +19950,7 @@ index 000000000..5addef584
 +	float _recoilKick = 0.0f;                           // recoil: the view kicked up after your own shot, degrees
 +	int _nightVision = 0;                               // night vision colour group + 1, 0 off
 +	float _smokeSightVoxels = 20.0f * Position::TileXY; // the soldier's sight range, voxels (see setSmokeSight)
++	float _smokeSeen = 1.0f;                            // how opaque the see-through smoke is drawn for their eyes: 1 less their heat vision (see setSmokeSight)
 +	float _smokeBlock = 1.0f / 3.0f, _fireBlock = 1.0f / 3.0f; // sight used up per voxel walked through 1 point of smoke (over fire), voxels
 +	float _smokeDrift = 0.0f;                           // this frame's time, seconds: the smoke's billows drift with it
 +	float _smokeRgb[3] = { 130.0f, 130.0f, 130.0f };    // the colour of the game's smoke (see smokeRgb)
@@ -19537,6 +20197,10 @@ index 000000000..5addef584
 +	Uint32 _hitMarkTick = 0;                            // when an enemy in sight was last hit
 +	bool _hitMarkKill = false;                          // and whether that hit killed it
 +	std::vector<std::pair<const BattleUnit*, int>> _markers; // visible enemies and their numbers
++	std::vector<Position> _sprayPoints;                 // a spray burst's marked points, in voxels (see setSprayMarks)
++	Position _sprayNext;                                // and the next one under the crosshair
++	/// Draws a spray burst's marked points, numbered, and the dotted line along them (see setSprayMarks).
++	void drawSprayMarks();
 +	struct MarkerSpot { double pos[3]; int number; };
 +	std::vector<MarkerSpot> _markerSpots;               // where they are this frame
 +	bool _showFacing = false;                           // which way the units face shown (the key for it held)
@@ -19547,7 +20211,9 @@ index 000000000..5addef584
 +	int _pointerTextBelow = 0;                          // and how many pixels of text are under it
 +	static constexpr int PointerReach = 3;              // a unit's picture this many pixels from the pointer still counts
 +	BattleUnit *_pointerUnits[2 * PointerReach + 1][2 * PointerReach + 1] = {}; // whose picture each pixel round the pointer shows (null: none)
++	BattleUnit *_pointerBodies[2 * PointerReach + 1][2 * PointerReach + 1] = {}; // and which body's lying there (null: none)
 +	BattleUnit *_unitAtPointer = nullptr;               // the unit pointed at, found from them after each frame
++	BattleUnit *_bodyAtPointer = nullptr;               // the body pointed at (nearer the pointer than any unit's picture), likewise
 +	Surface *_spriteBuffer;                             // scratch surface for drawing a unit's sprite before it goes into the world
 +	std::vector<Surface*> _blendBuffers;                // sprites dissolving into their next frame, one per sprite size
 +	std::vector<int> _blendColumns;                     // drawSpriteBlend's source column and row lookups
@@ -19575,6 +20241,7 @@ index 000000000..5addef584
 +		SpritePose pose = SpritePose::Standing;
 +		const SeeThroughSprite *seeThrough = nullptr; // how opaque each pixel is (the smoke); null for a solid sprite
 +		BattleUnit *unit = nullptr;       // the unit it pictures, if any: smoke veils it only thinly, and it can be pointed at
++		BattleUnit *body = nullptr;       // the unconscious unit lying in the pile it pictures, if any: it can be pointed at
 +		double lyingSlope = 0.0;          // a lying sprite's floor rising towards the camera: voxels up for each voxel along (see lyingRise)
 +	};
 +	/// Draws a sprite standing in the world, depth-tested (or see-through, laid over what's there):
@@ -19609,6 +20276,10 @@ index 000000000..5addef584
 +	int riseOutOfSolid(const double world[3], int maxRaise) const;
 +	/// How steeply the ground in front of something lying at a point rises towards the camera, within its reach.
 +	double lyingRise(const double world[3], double reach) const;
++	/// Whether a voxel is filled by the view's terrain (off the map: no).
++	bool solidVoxel(int voxelX, int voxelY, int voxelZ) const;
++	/// The ground under something lying at a point: the plane through its surface round it, its height there and its slope.
++	bool groundPlane(const double world[3], double reach, double &height, double slope[2]) const;
 +	/// Draws a sprite part way through dissolving into the next animation frame (ordered dither).
 +	void drawSpriteBlend(const Surface *from, const Surface *to, double blend, int anchorX, int anchorY, const double world[3], double depthBias, int shade);
 +	/// The box around a sprite frame's pixels.
@@ -21422,10 +22093,10 @@ index 000000000..b455e197f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..4521c9209
+index 000000000..8acc095f1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,1440 @@
+@@ -0,0 +1,1447 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -21645,6 +22316,8 @@ index 000000000..4521c9209
 +	_colors.forcedDot = nearest(255, 245, 150);
 +	_colors.laserRefused = nearest(125, 35, 30);
 +	_colors.marker = nearest(235, 40, 30);
++	_colors.sprayMark = nearest(150, 245, 140);
++	_colors.sprayNext = nearest(160, 160, 170);
 +	_colors.marine = nearest(150, 195, 190);
 +	_colors.flareFire[0] = nearest(240, 30, 20);
 +	_colors.flareFire[1] = nearest(255, 100, 30);
@@ -22620,6 +23293,11 @@ index 000000000..4521c9209
 +	smokeSight.fireBlock = _fireBlock;
 +	const bool traceSmoke = FirstPerson::smokeMode() == 2;
 +
++	// The parts without shape as opaque as the setting "Ghost opacity" has them: its percent of
++	// the pixels up close, of GhostNearOpacity's 50 (the share is scaled by dividing each pixel's
++	// dither threshold instead of multiplying the opacity: the same test, see ghostOpacity).
++	const float ghostScale = std::clamp(Options::fpsGhostOpacity, 10, 100) / (GhostNearOpacity * 100.0f);
++
 +	// With a pixel size above 1, one ray colours a block of pixels (pixelSize x pixelSize).
 +	// Auto (0) picks 2 for views bigger than AutoPixelMaxWidth x AutoPixelMaxHeight, else 1.
 +	const bool bigView = width > AutoPixelMaxWidth || height > AutoPixelMaxHeight;
@@ -22657,7 +23335,7 @@ index 000000000..4521c9209
 +			int endAxis;
 +			Uint8 color;
 +			SmokeTrace smoke = smokeSight;
-+			rayContext.ghostThreshold = dither(blockColumn, blockRow); // ghosts show on a share of the blocks (see ghostOpacity)
++			rayContext.ghostThreshold = dither(blockColumn, blockRow) / ghostScale; // ghosts show on a share of the blocks (see ghostOpacity)
 +			const RayEnd rayEnd = castRay(rayContext, rayOrigin, rayDirection, hit, tEnd, endAxis, traceSmoke ? &smoke : nullptr);
 +			switch (rayEnd)
 +			{
@@ -22868,10 +23546,10 @@ index 000000000..4521c9209
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewRayWalk.h b/src/FirstPerson/FirstPersonViewRayWalk.h
 new file mode 100644
-index 000000000..df63d5b97
+index 000000000..44d0c0e26
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayWalk.h
-@@ -0,0 +1,562 @@
+@@ -0,0 +1,564 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -22970,8 +23648,10 @@ index 000000000..df63d5b97
 +// How solid a ghost looks (see VoxelModel::ghostly): on what share of the pixels it shows,
 +// GhostNearOpacity up close (GhostNearDistance voxels, a tile and a half), fading to
 +// GhostFarOpacity from GhostFarDistance (seven tiles) on, so it's plain up close and doesn't
-+// clutter the distance. Never solid: up close too it's a mesh to see through, as a unit above or
-+// below a lift pad is a threat to watch (a player's report on 1.03; it was solid up close).
++// clutter the distance. Not solid by default: up close too it's a mesh to see through, as a unit
++// above or below a lift pad is a threat to watch (a player's report on 1.03; it was solid up
++// close). The setting "Ghost opacity" scales both (50%, as here; 100% solid up close: see
++// renderRows).
 +const float GhostNearDistance = 24.0f, GhostFarDistance = 112.0f, GhostNearOpacity = 0.5f, GhostFarOpacity = 0.3f;
 +
 +/**
@@ -24160,10 +24840,10 @@ index 000000000..280bc87e2
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..1b2e50da0
+index 000000000..d3e332f15
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,338 @@
+@@ -0,0 +1,368 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -24302,6 +24982,11 @@ index 000000000..1b2e50da0
 +const int UnitVeilMax = 5;
 +/// The see-through smoke keeps this share of its colours (the rest turned to grey; see softSmokeFrame).
 +const float SmokeColorKept = 0.35f;
++/// Eyes with heat vision (the armor's heatVision, in percent: how much of the smoke they see
++/// through, by the game's sight rules) see the see-through smoke that much thinner (a player: a
++/// scout drone's 50% heat vision didn't look any better), but never less than this share of it,
++/// so smoke stays in sight (see FirstPersonView::setSmokeSight).
++const float SmokeSeenMin = 0.2f;
 +/// A lying sprite's rows below its anchor lie on the floor, each this many voxels nearer the
 +/// camera: one isometric pixel down is sqrt(2) voxels along the floor towards the viewer.
 +const double LyingRowVoxels = 1.41421356237309505;
@@ -24315,6 +25000,17 @@ index 000000000..1b2e50da0
 +/// voxel towards the camera).
 +const int LyingRiseMax = 12;
 +const double LyingSlopeMax = 1.5;
++/// Something lying on sloping ground (a ramp, the steps of stairs; a player: items there, seen
++/// from the side, sank half into it) lies level at the ground's height under its middle, drawn
++/// over the steps round it (the owner: "just on top of stairs at half height"; see
++/// FirstPersonView::groundPlane): the plane through the ground's surface at 5x5 points round it,
++/// GroundPlaneReach voxels out from it each way (a lone item's within its tile, a big corpse's
++/// over its four), the surface looked for from GroundPlaneProbe voxels above the item's floor
++/// down to as far below, the plane then lifted onto the highest of those points (resting on the
++/// edges of steps) by at most GroundPlaneLiftMax; the depth test gives way by the ground's rise
++/// within that reach, at most SlopeItemDepthBiasMax voxels (more would show it through a wall).
++const double GroundPlaneReach = 6.0, GroundPlaneReachCorpse = 12.0, SlopeItemDepthBiasMax = 6.0;
++const int GroundPlaneProbe = 12, GroundPlaneLiftMax = 4;
 +/// Bullet holes and scorch marks (see drawDecals): a mark's radius, in voxels, per step of its
 +/// size (a bullet hole is size 1, a scorch 3); at most this many pixels from its middle on the
 +/// screen, however close; a bullet hole's core this many shades darker (its edge by the mark's
@@ -24394,6 +25090,14 @@ index 000000000..1b2e50da0
 +/// back along the line (an object's art can stand out in front of its collision shape; see
 +/// spawnShotImpact).
 +const float ImpactSearchBack = 8.0f;
++/// A shot that ends with no surface drawn along its line and nothing solid within this many voxels
++/// of its end ended in the open (off into the sky, where the game's line leaves the map): no impact
++/// at all (see spawnShotImpact).
++const int ImpactSolidReach = 2;
++/// A part without shape whose art is bars on the floor's two back edges is a cage, built on all
++/// four edges (see cageArt): each drawn column ends at most this many rows below the back edges'
++/// line, and there are at least CageMinColumns on each edge.
++const int CageEdgeRows = 3, CageMinColumns = 2;
 +
 +// ---- Colour helpers ----
 +
@@ -24492,6 +25196,12 @@ index 000000000..1b2e50da0
 +/// The tape's text, repeated along it, as glyphs of TapeFont: "X-COM  ".
 +const int TapeText[] = { 0, 1, 2, 3, 4, 5, 5 };
 +/// 3x5 digits for the numbered markers over the visible enemies, same layout as TapeFont.
++/// A spray burst's marks (see FirstPersonView::drawSprayMarks): a dot of the line along them every
++/// SprayDotSpacing voxels; each mark a pole SprayPoleVoxels high from the tile's floor (two thirds of a level; at least
++/// SprayPoleMinPixels on the screen, far off), a mini target SprayTargetRadius pixels across on it
++/// SprayAimVoxels up (the game aims the rounds at the tile's middle, waist high).
++const double SprayDotSpacing = 4.0, SprayPoleVoxels = 16.0, SprayAimVoxels = 11.0;
++const int SprayPoleMinPixels = 18, SprayTargetRadius = 3;
 +const Uint8 DigitFont[10][5] = {
 +	{ 7, 5, 5, 5, 7 }, { 2, 6, 2, 2, 7 }, { 7, 1, 7, 4, 7 }, { 7, 1, 3, 1, 7 }, { 5, 5, 7, 1, 1 },
 +	{ 7, 4, 7, 1, 7 }, { 7, 4, 7, 5, 7 }, { 7, 1, 1, 2, 2 }, { 7, 5, 7, 5, 7 }, { 7, 5, 7, 1, 7 } };
@@ -24504,10 +25214,10 @@ index 000000000..1b2e50da0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShots.cpp b/src/FirstPerson/FirstPersonViewShots.cpp
 new file mode 100644
-index 000000000..d8e657b41
+index 000000000..d7b65961c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShots.cpp
-@@ -0,0 +1,1770 @@
+@@ -0,0 +1,1797 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -25541,6 +26251,7 @@ index 000000000..d8e657b41
 +	// the shape, unseen) moves back as far again, up to where the shot came from.
 +	float head[3] = { shotEnd[0], shotEnd[1], shotEnd[2] };
 +	float markAt[3] = { shotEnd[0], shotEnd[1], shotEnd[2] };
++	bool surfaceFound = false;
 +	float direction[3] = { shotEnd[0] - from[0], shotEnd[1] - from[1], shotEnd[2] - from[2] };
 +	const float length = std::sqrt(direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2]);
 +	if (length > 1.0f)
@@ -25562,8 +26273,34 @@ index 000000000..d8e657b41
 +					markAt[axis] = surface[axis];
 +					head[axis] = surface[axis] - direction[axis] * 0.3f; // just in front of it
 +				}
++				surfaceFound = true;
 +				break;
 +			}
++		}
++	}
++	// Nothing at all where the shot ended in the open (a player: "Shots make puffs of particles
++	// when hitting skybox, they should just vanish"): off into the sky the game's line stops
++	// where it leaves the map, in the air. So with no surface drawn along its line there and
++	// nothing solid within ImpactSolidReach voxels of where it ended (off the map: nothing),
++	// no sparks, no dust, no mark.
++	if (!surfaceFound)
++	{
++		bool solidNear = false;
++		const int endX = (int)std::floor(shotEnd[0]), endY = (int)std::floor(shotEnd[1]), endZ = (int)std::floor(shotEnd[2]);
++		for (int dz = -ImpactSolidReach; dz <= ImpactSolidReach && !solidNear; ++dz)
++		{
++			for (int dy = -ImpactSolidReach; dy <= ImpactSolidReach && !solidNear; ++dy)
++			{
++				for (int dx = -ImpactSolidReach; dx <= ImpactSolidReach && !solidNear; ++dx)
++				{
++					solidNear = solidVoxel(endX + dx, endY + dy, endZ + dz);
++				}
++			}
++		}
++		if (!solidNear)
++		{
++			Log(LOG_VERBOSE) << "OpenXcom3D: a shot ended in the open, no impact"; // (for the tests)
++			return;
 +		}
 +	}
 +	const Uint8 debrisColor = debrisColorAt(head);
@@ -26280,10 +27017,10 @@ index 000000000..d8e657b41
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..ab85bc765
+index 000000000..9e16d11a4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,2241 @@
+@@ -0,0 +1,2538 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -26529,7 +27266,8 @@ index 000000000..ab85bc765
 +	// notes its depth so that farther sprites drawn later are hidden by it. A sprite pixel covers
 +	// whatever shone behind it, so that no longer glows (see drawLightHalos). A unit's pixel
 +	// notes that it may be veiled only thinly by see-through smoke, and, near where the player
-+	// points, whose picture it is; anything else solid drawn over it takes both back.
++	// points, whose picture it is (a body's too, on the floor); anything else solid drawn over it
++	// takes these back.
 +	// A see-through pixel (opacity below SeeThroughLevels) is mixed over what's there instead,
 +	// within what's left of a unit's allowance, and leaves the depth alone; it only stops the
 +	// glow behind it when it is more than half opaque.
@@ -26557,6 +27295,7 @@ index 000000000..ab85bc765
 +		if (patchX >= 0 && patchY >= 0 && patchX <= 2 * PointerReach && patchY <= 2 * PointerReach)
 +		{
 +			_pointerUnits[patchY][patchX] = draw.unit;
++			_pointerBodies[patchY][patchX] = draw.body;
 +		}
 +	};
 +	const SDL_Surface *spriteSurface = const_cast<Surface*>(sprite)->getSurface(); // read only
@@ -26798,18 +27537,128 @@ index 000000000..ab85bc765
 +	{
 +		const int z = voxelZ + raise;
 +		if (z >= _save->getMapSizeZ() * 24) break;
-+		const TileView &view = _tileViews[_save->getTileIndex(Position(voxelX / 16, voxelY / 16, z / 24))];
-+		bool solid = false;
-+		for (const VoxelModel *part : view.part)
-+		{
-+			solid = solid || (part && part->color[z % 24][voxelY % 16][voxelX % 16]);
-+		}
-+		if (!solid)
++		if (!solidVoxel(voxelX, voxelY, z))
 +		{
 +			return raise;
 +		}
 +	}
 +	return -1;
++}
++
++/**
++ * Whether a voxel is filled by the view's terrain: any of its tile's parts (floor, walls,
++ * object) as the view builds them.
++ * @param voxelX, voxelY, voxelZ The voxel.
++ * @return True if it's solid; false if it's open, or off the map.
++ */
++bool FirstPersonView::solidVoxel(int voxelX, int voxelY, int voxelZ) const
++{
++	if (voxelX < 0 || voxelY < 0 || voxelZ < 0 || voxelX >= _save->getMapSizeX() * 16 || voxelY >= _save->getMapSizeY() * 16 || voxelZ >= _save->getMapSizeZ() * 24)
++	{
++		return false;
++	}
++	const TileView &view = _tileViews[_save->getTileIndex(Position(voxelX / 16, voxelY / 16, voxelZ / 24))];
++	for (const VoxelModel *part : view.part)
++	{
++		if (part && part->color[voxelZ % 24][voxelY % 16][voxelX % 16])
++		{
++			return true;
++		}
++	}
++	return false;
++}
++
++/**
++ * The ground under something lying at a point (a player: items on stairs and slopes, seen from
++ * the side, sank half into them): the plane that best fits the ground's surface round it (least
++ * squares), from 5x5 points out to a reach each way: at each, the top of the first solid voxel
++ * going down from GroundPlaneProbe voxels above the point's floor to as far below it (a point
++ * that starts inside something solid, a wall or a tall object beside it, or finds nothing in
++ * that range, is left out; below the map's bottom the bottom counts), lifted onto the highest of
++ * those points above it (as something flat rests on the edges of steps). On a flat floor that's
++ * the floor's top and no slope; on a ramp its slant; on stairs, the steps' slant, on their edges.
++ * @param world The point (an item's anchor on its floor), in voxels.
++ * @param reach How far out from it the points go each way, in voxels.
++ * @param height Set to the plane's height at the point, in voxels.
++ * @param slope Set to the plane's slope: voxels up for each voxel along x and along y, each at
++ *        most LyingSlopeMax.
++ * @return False if too few points found the ground for a plane (nothing set).
++ */
++bool FirstPersonView::groundPlane(const double world[3], double reach, double &height, double slope[2]) const
++{
++	// The sums for the least squares fit of surface = height + slope x * dx + slope y * dy, and
++	// the points themselves (for the lift onto the highest, below).
++	double sumX = 0.0, sumY = 0.0, sumZ = 0.0, sumXX = 0.0, sumYY = 0.0, sumXY = 0.0, sumXZ = 0.0, sumYZ = 0.0;
++	int count = 0;
++	struct GroundPoint { double dx, dy, surface; };
++	GroundPoint points[25];
++	const int probeTop = (int)std::floor(world[2]) + GroundPlaneProbe;
++	for (int stepY = -2; stepY <= 2; ++stepY)
++	{
++		for (int stepX = -2; stepX <= 2; ++stepX)
++		{
++			const double dx = stepX * reach / 2.0, dy = stepY * reach / 2.0;
++			const int voxelX = (int)std::floor(world[0] + dx), voxelY = (int)std::floor(world[1] + dy);
++			if (voxelX < 0 || voxelY < 0 || voxelX >= _save->getMapSizeX() * 16 || voxelY >= _save->getMapSizeY() * 16 || solidVoxel(voxelX, voxelY, probeTop))
++			{
++				continue;
++			}
++			int surface = -1;
++			for (int z = probeTop - 1; z >= probeTop - 2 * GroundPlaneProbe && surface < 0; --z)
++			{
++				if (z < 0 || solidVoxel(voxelX, voxelY, z))
++				{
++					surface = std::max(z + 1, 0);
++				}
++			}
++			if (surface < 0)
++			{
++				continue;
++			}
++			sumX += dx; sumY += dy; sumZ += surface;
++			sumXX += dx * dx; sumYY += dy * dy; sumXY += dx * dy; sumXZ += dx * surface; sumYZ += dy * surface;
++			points[count++] = { dx, dy, (double)surface };
++		}
++	}
++	if (count < 6)
++	{
++		return false;
++	}
++	// The normal equations, solved by Cramer's rule.
++	const double matrix[3][3] = { { (double)count, sumX, sumY }, { sumX, sumXX, sumXY }, { sumY, sumXY, sumYY } };
++	const double right[3] = { sumZ, sumXZ, sumYZ };
++	auto determinant = [](const double m[3][3]) {
++		return m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
++	};
++	const double whole = determinant(matrix);
++	if (std::abs(whole) < 1e-9)
++	{
++		return false; // (the points all in a line)
++	}
++	double solution[3];
++	for (int column = 0; column < 3; ++column)
++	{
++		double replaced[3][3];
++		for (int row = 0; row < 3; ++row)
++		{
++			for (int col = 0; col < 3; ++col)
++			{
++				replaced[row][col] = col == column ? right[row] : matrix[row][col];
++			}
++		}
++		solution[column] = determinant(replaced) / whole;
++	}
++	slope[0] = std::clamp(solution[1], -LyingSlopeMax, LyingSlopeMax);
++	slope[1] = std::clamp(solution[2], -LyingSlopeMax, LyingSlopeMax);
++	// Lifted onto the highest points above it (at most GroundPlaneLiftMax voxels): something flat
++	// on steps rests on their edges, and the voxel steps of a ramp stand out of the average.
++	double lift = 0.0;
++	for (int point = 0; point < count; ++point)
++	{
++		lift = std::max(lift, points[point].surface - (solution[0] + slope[0] * points[point].dx + slope[1] * points[point].dy));
++	}
++	height = solution[0] + std::min(lift, (double)GroundPlaneLiftMax);
++	return true;
 +}
 +
 +/**
@@ -27174,22 +28023,34 @@ index 000000000..ab85bc765
 + * getUnitAtPointer): the one whose picture shows right where the player points, or else the
 + * nearest one within PointerReach pixels of it (a unit far off is only a few pixels across).
 + * Only what's drawn counts, so only units in sight, standing, and not hidden behind anything.
++ * The same for a body lying on the floor (an unconscious unit's, see getBodyAtPointer), when
++ * its picture is nearer the pointer than any standing unit's (a medi-kit's patient).
 + */
 +void FirstPersonView::findUnitAtPointer()
 +{
 +	_unitAtPointer = nullptr;
-+	int nearest = 1 << 30;
++	_bodyAtPointer = nullptr;
++	int nearestUnit = 1 << 30, nearestBody = 1 << 30;
 +	for (int patchY = 0; patchY <= 2 * PointerReach; ++patchY)
 +	{
 +		for (int patchX = 0; patchX <= 2 * PointerReach; ++patchX)
 +		{
 +			const int distanceSq = (patchX - PointerReach) * (patchX - PointerReach) + (patchY - PointerReach) * (patchY - PointerReach);
-+			if (_pointerUnits[patchY][patchX] && distanceSq < nearest)
++			if (_pointerUnits[patchY][patchX] && distanceSq < nearestUnit)
 +			{
-+				nearest = distanceSq;
++				nearestUnit = distanceSq;
 +				_unitAtPointer = _pointerUnits[patchY][patchX];
 +			}
++			if (_pointerBodies[patchY][patchX] && distanceSq < nearestBody)
++			{
++				nearestBody = distanceSq;
++				_bodyAtPointer = _pointerBodies[patchY][patchX];
++			}
 +		}
++	}
++	if (nearestUnit <= nearestBody)
++	{
++		_bodyAtPointer = nullptr; // (a standing unit's picture is nearer, or as near)
 +	}
 +}
 +
@@ -27431,10 +28292,42 @@ index 000000000..ab85bc765
 +		step.sprite.anchorY = wholeCorpse ? 48 : 40;
 +		step.sprite.world[0] = ground[0];
 +		step.sprite.world[1] = ground[1];
-+		step.sprite.world[2] = standingHeight(ground);
++		// On stairs and slopes (a player: items there, seen from the side, sank half into them;
++		// the owner: "just on top of stairs at half height") it lies level at the height of the
++		// ground under its middle (the plane through the ground round it, on the steps' edges:
++		// see groundPlane; failing that, the floor's top, see standingHeight), drawn over the
++		// steps round it: the depth test gives way by as much as the ground rises within its
++		// reach, up to SlopeItemDepthBiasMax voxels. (Only where a tile under it has a terrain level,
++		// as stairs, ramps and slopes do: a flat floor's top is simply its slab's; and not under a
++		// floor: a corpse on a shelf below a terrace, lifted onto the shelf's edge and drawn over
++		// what's round it, showed through the terrace's floor. A stairwell is open above.)
++		const double planeReach = wholeCorpse ? GroundPlaneReachCorpse : GroundPlaneReach;
++		double planeHeight = 0.0, planeSlope[2] = { 0.0, 0.0 };
++		bool raised = false, underFloor = false;
++		for (Tile *under : tilesUnder)
++		{
++			raised = raised || under->getTerrainLevel() != 0;
++			const Tile *aboveTile = _save->getAboveTile(under);
++			underFloor = underFloor || (aboveTile && !aboveTile->hasNoFloor());
++		}
++		const bool onPlane = raised && !underFloor && groundPlane(ground, planeReach, planeHeight, planeSlope);
++		step.sprite.world[2] = onPlane ? planeHeight : standingHeight(ground);
++		step.sprite.depthBias = std::min(std::hypot(planeSlope[0], planeSlope[1]) * planeReach, SlopeItemDepthBiasMax);
 +		step.sprite.shade = shade;
 +		step.sprite.scale = itemScale;
 +		step.sprite.pose = SpritePose::Lying;
++		// An unconscious unit lying in the pile (any of a big corpse's tiles): its picture can be
++		// pointed at (a medi-kit's patient).
++		for (Tile *under : tilesUnder)
++		{
++			for (BattleItem *pileItem : *under->getInventory())
++			{
++				if (!step.sprite.body && pileItem->getUnit() && pileItem->getUnit()->getStatus() == STATUS_UNCONSCIOUS)
++				{
++					step.sprite.body = pileItem->getUnit();
++				}
++			}
++		}
 +		// The ground in front rising (a step, a slope): the lying rows rise with it, within their reach.
 +		const int lyingRows = bottomColouredRow(step.sprite.sprite) - step.sprite.anchorY + 1;
 +		if (lyingRows > 0)
@@ -28065,6 +28958,24 @@ index 000000000..ab85bc765
 +}
 +
 +/**
++ * The sight of the soldier the view looks through, for smoke drawn as the game's sight rules have
++ * it (setting "Smoke": Modern's wall, Original's stacked frames): the range in voxels, and how
++ * much of the smoke and of the smoke over fire their eyes see through (the armor's heat vision,
++ * in percent). The see-through smoke is drawn thinner by as much (a player: a scout drone's 50%
++ * heat vision didn't look any better), down to SmokeSeenMin of itself (see drawSeeThroughSmoke).
++ * @param sightVoxels Their sight range, in voxels.
++ * @param throughSmoke How much of smoke they see through, in percent.
++ * @param throughFire How much of smoke over fire they see through, in percent.
++ */
++void FirstPersonView::setSmokeSight(float sightVoxels, int throughSmoke, int throughFire)
++{
++	_smokeSightVoxels = sightVoxels;
++	_smokeBlock = (100 - std::clamp(throughSmoke, 0, 100)) / 300.0f;
++	_fireBlock = (100 - std::clamp(throughFire, 0, 100)) / 300.0f;
++	_smokeSeen = std::max(SmokeSeenMin, (100 - std::clamp(throughSmoke, 0, 100)) / 100.0f);
++}
++
++/**
 + * The smoke on discovered tiles drawn see-through (setting "Smoke"): with Modern, the game's own
 + * smoke made soft (see softSmokeFrame), and the wisps rising off it; where the soldier's sight
 + * runs out in the smoke, the rays have already drawn a wall of it (see SmokeTrace). With
@@ -28144,8 +29055,9 @@ index 000000000..ab85bc765
 +			ground[1] + (variation[1] - 0.5) * 4.0 + 0.8 * std::cos(seconds * 0.4 + variation[2] * 2.0 * Pi),
 +			ground[2] + 1.0 * std::sin(seconds * 0.7 + variation[3] * 2.0 * Pi) };
 +		// A little more opaque the thicker the smoke (a fresh smoke grenade makes about 15); the
-+		// original's dots more so, as their holes already let the view through.
-+		const float opacity = original ? std::clamp(0.35f + tile->getSmoke() * 0.04f, 0.0f, 0.95f) : std::clamp(0.45f + tile->getSmoke() * 0.025f, 0.0f, 0.85f);
++		// original's dots more so, as their holes already let the view through. Thinner for eyes
++		// with heat vision (see setSmokeSight).
++		const float opacity = _smokeSeen * (original ? std::clamp(0.35f + tile->getSmoke() * 0.04f, 0.0f, 0.95f) : std::clamp(0.45f + tile->getSmoke() * 0.025f, 0.0f, 0.85f));
 +		const int firstFrame = firstSmokeFrame(tile->getSmoke());
 +		const double frameTime = seconds / FrameSeconds + tile->getAnimationOffset() + variation[2], scale = 1.14 + variation[3] * 0.12;
 +		addPuff(world, 32, firstFrame, frameTime, opacity, scale, _tileViews[tileIndex].light);
@@ -28156,7 +29068,9 @@ index 000000000..ab85bc765
 +		// inside the cloud, solid where they overlap, and OriginalSmokeShellLayers times on its
 +		// outer shell (a tile next to one without smoke), so its outline stays loose and
 +		// smoke-like; where the smoke uses up most of the sight, a few times (the cloud's edge,
-+		// as soft as Modern's wall's); where the soldier sees through it, once.
++		// as soft as Modern's wall's); where the soldier sees through it, once. (With heat
++		// vision the sight lasts longer, so fewer layers stack; where it runs out all the same,
++		// the layers are as solid.)
 +		if (original)
 +		{
 +			const double middle[3] = { world[0], world[1], world[2] + 12.0 };
@@ -28183,7 +29097,7 @@ index 000000000..ab85bc765
 +		const float fade = std::min(std::clamp(age / 0.25f, 0.0f, 1.0f), std::clamp((1.0f - age) / 0.5f, 0.0f, 1.0f));
 +		const double world[3] = { particle.pos[0], particle.pos[1], particle.pos[2] };
 +		const int shade = (int)std::lround(std::clamp(lightAt(particle.pos[0], particle.pos[1], particle.pos[2]), 0.0f, 15.0f));
-+		addPuff(world, 20, firstSmokeFrame(1), seconds / (FrameSeconds * 1.5) + particle.size, 0.45f * fade * fade * (3.0f - 2.0f * fade),
++		addPuff(world, 20, firstSmokeFrame(1), seconds / (FrameSeconds * 1.5) + particle.size, _smokeSeen * 0.45f * fade * fade * (3.0f - 2.0f * fade),
 +			0.35 + 0.4 * age, shade);
 +	}
 +
@@ -28365,6 +29279,126 @@ index 000000000..ab85bc765
 +}
 +
 +/**
++ * A spray burst being marked (the game's "spray" auto shot, a player: Ctrl+Shift and clicks, as on
++ * the map; see FirstPersonMode::updateSprayMarks), drawn over everything like the enemy markers
++ * (as much bigger on big screens), in light green so it's seen far off too (a player: "light green
++ * vertical lines with numbers and mini targets ... so the player really sees in 3d what he
++ * marked"): at each point a pole standing up from the tile's floor, two thirds of a level high (and
++ * at least SprayPoleMinPixels on the screen, for a tile far off), a mini target on it where the game
++ * aims the rounds (the tile's middle, waist high) and the point's number beside it in the tiny digits;
++ * a dotted line along the floors from point to point, and a grey one on to the tile under the
++ * crosshair (where the next click marks). What's behind the camera is left out.
++ */
++void FirstPersonView::drawSprayMarks()
++{
++	if (_sprayPoints.empty())
++	{
++		return;
++	}
++	const int width = getWidth(), height = getHeight();
++	const int uiScale = std::max(1, _uiScale);
++	// One dot of the marks' art, uiScale x uiScale, clipped to the view.
++	auto put = [&](int x, int y, Uint8 color) {
++		for (int offsetY = 0; offsetY < uiScale; ++offsetY)
++			for (int offsetX = 0; offsetX < uiScale; ++offsetX)
++				if (x + offsetX >= 0 && y + offsetY >= 0 && x + offsetX < width && y + offsetY < height)
++					*getRaw(x + offsetX, y + offsetY) = color;
++	};
++	// A dot with a dark outline round it (both passes: first the outlines, then the colour).
++	auto outlined = [&](int x, int y, Uint8 color, int pass) {
++		if (pass == 0)
++		{
++			for (int offsetY = -1; offsetY <= 1; ++offsetY)
++				for (int offsetX = -1; offsetX <= 1; ++offsetX)
++					put(x + offsetX * uiScale, y + offsetY * uiScale, _colors.tapeBlack);
++		}
++		else
++		{
++			put(x, y, color);
++		}
++	};
++	// A point on the screen, or false behind the camera.
++	auto onScreen = [&](const Position &voxel, double up, int &x, int &y) {
++		const double world[3] = { (double)voxel.x, (double)voxel.y, voxel.z + up };
++		double screenX, screenY, depth;
++		if (!projectToScreen(world, screenX, screenY, depth)) return false;
++		x = (int)std::lround(screenX);
++		y = (int)std::lround(screenY);
++		return true;
++	};
++	// The dotted line from one point to the next along the floors, a dot every SprayDotSpacing voxels.
++	auto dottedLine = [&](const Position &from, const Position &to, Uint8 color) {
++		const double delta[3] = { (double)(to.x - from.x), (double)(to.y - from.y), (double)(to.z - from.z) };
++		const double length = std::sqrt(delta[0] * delta[0] + delta[1] * delta[1] + delta[2] * delta[2]);
++		for (int pass = 0; pass < 2; ++pass)
++		{
++			for (double along = 0.0; along <= length; along += SprayDotSpacing)
++			{
++				const double share = length > 0.0 ? along / length : 0.0;
++				const Position point((int)std::lround(from.x + delta[0] * share), (int)std::lround(from.y + delta[1] * share), (int)std::lround(from.z + delta[2] * share));
++				int x, y;
++				if (onScreen(point, 0.0, x, y)) outlined(x, y, color, pass);
++			}
++		}
++	};
++	for (size_t point = 0; point + 1 < _sprayPoints.size(); ++point)
++	{
++		dottedLine(_sprayPoints[point], _sprayPoints[point + 1], _colors.sprayMark);
++	}
++	dottedLine(_sprayPoints.back(), _sprayNext, _colors.sprayNext);
++
++	// The marks: the pole, the mini target on it, the number over it.
++	for (size_t point = 0; point < _sprayPoints.size(); ++point)
++	{
++		int footX, footY, topX, topY, aimX, aimY;
++		const Position &floor = _sprayPoints[point];
++		if (!onScreen(floor, 0.0, footX, footY) || !onScreen(floor, SprayPoleVoxels, topX, topY) || !onScreen(floor, SprayAimVoxels, aimX, aimY))
++		{
++			continue;
++		}
++		// A pole far off stands at least SprayPoleMinPixels high, the mini target the same share up it.
++		const int minimum = SprayPoleMinPixels * uiScale;
++		if (footY - topY < minimum)
++		{
++			topY = footY - minimum;
++			aimY = footY - minimum * SprayAimVoxels / SprayPoleVoxels;
++		}
++		for (int pass = 0; pass < 2; ++pass)
++		{
++			// The pole, a dot every row (a lean tilts it: the steps between foot and top).
++			const int rows = std::max(1, std::abs(footY - topY) / uiScale);
++			for (int row = 0; row <= rows; ++row)
++			{
++				outlined(footX + (topX - footX) * row / rows, footY + (topY - footY) * row / rows, _colors.sprayMark, pass);
++			}
++			// The mini target: a ring SprayTargetRadius across and a dot in its middle.
++			const int radius = SprayTargetRadius * uiScale;
++			for (int step = 0; step < 24; ++step)
++			{
++				const double angle = step * Pi / 12.0;
++				outlined(aimX + (int)std::lround(radius * std::cos(angle)), aimY + (int)std::lround(radius * std::sin(angle)), _colors.sprayMark, pass);
++			}
++			outlined(aimX, aimY, _colors.sprayMark, pass);
++			// The number right of the mini target.
++			const std::string digits = std::to_string(point + 1);
++			const int textLeft = aimX + (SprayTargetRadius + 3) * uiScale, textTop = aimY - 2 * uiScale;
++			for (size_t digitIndex = 0; digitIndex < digits.size(); ++digitIndex)
++			{
++				const Uint8 *glyph = DigitFont[digits[digitIndex] - '0'];
++				for (int glyphRow = 0; glyphRow < 5; ++glyphRow)
++				{
++					for (int glyphColumn = 0; glyphColumn < 3; ++glyphColumn)
++					{
++						if (!(glyph[glyphRow] & (4 >> glyphColumn))) continue; // (bit 2 of a glyph row is its left column)
++						outlined(textLeft + ((int)digitIndex * 4 + glyphColumn) * uiScale, textTop + glyphRow * uiScale, _colors.sprayMark, pass);
++					}
++				}
++			}
++		}
++	}
++}
++
++/**
 + * Icons over the downed units in sight (setting "Downed unit icons"): over each body lying
 + * unconscious on a tile seen, one small outlined icon for each thing the matter with it, in the
 + * order the game's own floor indicators take (where a mod has them): burning (a flame),
@@ -28527,10 +29561,10 @@ index 000000000..ab85bc765
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..7c2003a58
+index 000000000..6819e8fc9
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,2151 @@
+@@ -0,0 +1,2213 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -29061,15 +30095,60 @@ index 000000000..7c2003a58
 +}
 +
 +/**
++ * Is a part's art a cage (a player: the bars round Cydonia's pyramid lifts should stand "on all
++ * sides of tile, like a cage")? Bars standing on the floor's two back edges, as the isometric
++ * art draws a fence round a tile (the front ones would hide what stands inside): an object whose
++ * every drawn column ends at the back edges' line (within CageEdgeRows rows below it, none
++ * above), at least CageMinColumns columns on each half of the sprite (the west edge's and the
++ * north edge's).
++ * @param sprite The part's sprite frame.
++ * @param partType Which part of a tile it is (only an object can be one).
++ * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
++ * @return True for a cage.
++ */
++bool cageArt(const Surface *sprite, int partType, int yOffset)
++{
++	if (partType != O_OBJECT || !sprite)
++	{
++		return false;
++	}
++	const int width = sprite->getWidth(), height = sprite->getHeight();
++	int westColumns = 0, northColumns = 0;
++	for (int spriteX = 0; spriteX < width; ++spriteX)
++	{
++		// The column's lowest drawn pixel, against where the back edges' floor line runs there.
++		int bottom = -1;
++		for (int spriteY = height - 1; spriteY >= 0 && bottom < 0; --spriteY)
++		{
++			if (sprite->getPixel(spriteX, spriteY)) bottom = spriteY;
++		}
++		if (bottom < 0)
++		{
++			continue;
++		}
++		const double backEdgeRow = 24 + std::abs(spriteX - 16) / 2.0 + yOffset;
++		if (bottom < backEdgeRow - 0.5 || bottom > backEdgeRow + CageEdgeRows)
++		{
++			return false; // (something that doesn't stand on the back edges)
++		}
++		if (spriteX < 16) ++westColumns;
++		else if (spriteX > 16) ++northColumns;
++	}
++	return westColumns >= CageMinColumns && northColumns >= CageMinColumns;
++}
++
++/**
 + * Builds the ghost of a part the map draws but gives no voxels at all (setting "Parts without
-+ * shape"): a ladder, a lift's pad, a wall of laser beams. Its art, voxel for voxel, on one plane
-+ * of the tile, so that it shows where it stands:
++ * shape"): a ladder, a lift's pad, a wall of laser beams, a lift's cage of bars. Its art, voxel
++ * for voxel, on one plane of the tile (a cage on four), so that it shows where it stands:
 + * - a west or north wall on the tile's west or north edge, where the art draws walls;
 + * - a floor or an object whose art keeps low, inside the floor's diamond (a lift's pad), flat on
 + *   the floor;
 + * - one whose art rises above it (a ladder, drawn upright), upright, on the plane across the
 + *   tile (running north-south or east-west) that shows the most of the art; ties go to the plane
-+ *   nearer the tile's middle, then to the north-south one.
++ *   nearer the tile's middle, then to the north-south one;
++ * - a cage (see cageArt): on the tile's west and north edges, where the art draws its bars, and
++ *   the same again on the east and south edges, all round.
 + * Each voxel takes the colour of the pixel it lands on (the projection buildModel uses), and
 + * there's no voxel where that pixel is transparent, so a ladder keeps the gaps between its
 + * rungs. On one plane no two voxels land on the same pixel. The model comes out ghostly: rays
@@ -29165,7 +30244,23 @@ index 000000000..7c2003a58
 +			model.max[boxAxis] = std::max<int>(model.max[boxAxis], voxel[boxAxis]);
 +		}
 +	};
-+	if (axis < 0)
++	if (cageArt(sprite, partType, yOffset))
++	{
++		// A cage: the west edge's bars (x = 0) again on the east edge, the north edge's (y = 0)
++		// on the south edge.
++		for (int along = 0; along < 16; ++along)
++		{
++			for (int z = 0; z < 24; ++z)
++			{
++				place(0, along, z);
++				place(along, 0, z);
++				const Uint8 west = pixelOf(0, along, z), north = pixelOf(along, 0, z);
++				if (west) { model.color[z][along][15] = west; model.max[0] = 15; model.max[1] = std::max<int>(model.max[1], along); model.min[1] = std::min<int>(model.min[1], along); }
++				if (north) { model.color[z][15][along] = north; model.max[1] = 15; model.max[0] = std::max<int>(model.max[0], along); model.min[0] = std::min<int>(model.min[0], along); }
++			}
++		}
++	}
++	else if (axis < 0)
 +	{
 +		for (int y = 0; y < 16; ++y)
 +			for (int x = 0; x < 16; ++x) place(x, y, 0);
@@ -29741,11 +30836,12 @@ index 000000000..7c2003a58
 +
 +	// No voxels at all, though the map draws it (a ladder, a lift's pad, a wall of laser beams):
 +	// with the setting "Parts without shape" (1: lifts and ladders, the parts with the grav lift
-+	// flag; 2: all of them), a see-through ghost of its art, with the sides the art never shows
-+	// coloured; no plate fitting, no glow.
++	// flag, and cages, as round a lift; 2: all of them), a see-through ghost of its art, with
++	// the sides the art never shows coloured; no plate fitting, no glow.
 +	if (model.empty)
 +	{
-+		const bool ghostWanted = Options::fpsGhostParts == 2 || (Options::fpsGhostParts == 1 && mapData->isGravLift());
++		const bool ghostWanted = Options::fpsGhostParts == 2
++			|| (Options::fpsGhostParts == 1 && (mapData->isGravLift() || cageArt(sprite, mapData->getObjectType(), yOffset)));
 +		if (ghostWanted && !cutout)
 +		{
 +			buildGhost(model, sprite, mapData->getObjectType(), yOffset);
@@ -32443,10 +33539,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..079c538c3
+index 000000000..16276a94f
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,723 @@
+@@ -0,0 +1,733 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -32778,6 +33874,11 @@ index 000000000..079c538c3
 +			static const char *const ghostNames[] = { "STR_FPS_GHOST_PARTS_OFF", "STR_FPS_GHOST_PARTS_LIFTS", "STR_FPS_GHOST_PARTS_ALL" };
 +			return std::string(tr(ghostNames[std::clamp(*option.asInt(), 0, 2)]));
 +		}
++		// The parts without shape's opacity is a percentage.
++		if (option.id() == "fpsGhostOpacity")
++		{
++			return std::to_string(*option.asInt()) + "%";
++		}
 +		// The downed units' icons are a choice of three, shown by name.
 +		if (option.id() == "fpsDownedIcons")
 +		{
@@ -32994,6 +34095,11 @@ index 000000000..079c538c3
 +		else if (value == &Options::fpsGhostParts)
 +		{
 +			*value = (*value + direction + 3) % 3;
++		}
++		// The parts without shape's opacity: 10 to 100%, in steps of 10.
++		else if (value == &Options::fpsGhostOpacity)
++		{
++			*value = std::clamp(*value + 10 * direction, 10, 100);
 +		}
 +		// The downed units' icons (off, crosshair, always): round and round.
 +		else if (value == &Options::fpsDownedIcons)

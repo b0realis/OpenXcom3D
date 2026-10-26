@@ -243,7 +243,8 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 	// notes its depth so that farther sprites drawn later are hidden by it. A sprite pixel covers
 	// whatever shone behind it, so that no longer glows (see drawLightHalos). A unit's pixel
 	// notes that it may be veiled only thinly by see-through smoke, and, near where the player
-	// points, whose picture it is; anything else solid drawn over it takes both back.
+	// points, whose picture it is (a body's too, on the floor); anything else solid drawn over it
+	// takes these back.
 	// A see-through pixel (opacity below SeeThroughLevels) is mixed over what's there instead,
 	// within what's left of a unit's allowance, and leaves the depth alone; it only stops the
 	// glow behind it when it is more than half opaque.
@@ -271,6 +272,7 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 		if (patchX >= 0 && patchY >= 0 && patchX <= 2 * PointerReach && patchY <= 2 * PointerReach)
 		{
 			_pointerUnits[patchY][patchX] = draw.unit;
+			_pointerBodies[patchY][patchX] = draw.body;
 		}
 	};
 	const SDL_Surface *spriteSurface = const_cast<Surface*>(sprite)->getSurface(); // read only
@@ -512,18 +514,128 @@ int FirstPersonView::riseOutOfSolid(const double world[3], int maxRaise) const
 	{
 		const int z = voxelZ + raise;
 		if (z >= _save->getMapSizeZ() * 24) break;
-		const TileView &view = _tileViews[_save->getTileIndex(Position(voxelX / 16, voxelY / 16, z / 24))];
-		bool solid = false;
-		for (const VoxelModel *part : view.part)
-		{
-			solid = solid || (part && part->color[z % 24][voxelY % 16][voxelX % 16]);
-		}
-		if (!solid)
+		if (!solidVoxel(voxelX, voxelY, z))
 		{
 			return raise;
 		}
 	}
 	return -1;
+}
+
+/**
+ * Whether a voxel is filled by the view's terrain: any of its tile's parts (floor, walls,
+ * object) as the view builds them.
+ * @param voxelX, voxelY, voxelZ The voxel.
+ * @return True if it's solid; false if it's open, or off the map.
+ */
+bool FirstPersonView::solidVoxel(int voxelX, int voxelY, int voxelZ) const
+{
+	if (voxelX < 0 || voxelY < 0 || voxelZ < 0 || voxelX >= _save->getMapSizeX() * 16 || voxelY >= _save->getMapSizeY() * 16 || voxelZ >= _save->getMapSizeZ() * 24)
+	{
+		return false;
+	}
+	const TileView &view = _tileViews[_save->getTileIndex(Position(voxelX / 16, voxelY / 16, voxelZ / 24))];
+	for (const VoxelModel *part : view.part)
+	{
+		if (part && part->color[voxelZ % 24][voxelY % 16][voxelX % 16])
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * The ground under something lying at a point (a player: items on stairs and slopes, seen from
+ * the side, sank half into them): the plane that best fits the ground's surface round it (least
+ * squares), from 5x5 points out to a reach each way: at each, the top of the first solid voxel
+ * going down from GroundPlaneProbe voxels above the point's floor to as far below it (a point
+ * that starts inside something solid, a wall or a tall object beside it, or finds nothing in
+ * that range, is left out; below the map's bottom the bottom counts), lifted onto the highest of
+ * those points above it (as something flat rests on the edges of steps). On a flat floor that's
+ * the floor's top and no slope; on a ramp its slant; on stairs, the steps' slant, on their edges.
+ * @param world The point (an item's anchor on its floor), in voxels.
+ * @param reach How far out from it the points go each way, in voxels.
+ * @param height Set to the plane's height at the point, in voxels.
+ * @param slope Set to the plane's slope: voxels up for each voxel along x and along y, each at
+ *        most LyingSlopeMax.
+ * @return False if too few points found the ground for a plane (nothing set).
+ */
+bool FirstPersonView::groundPlane(const double world[3], double reach, double &height, double slope[2]) const
+{
+	// The sums for the least squares fit of surface = height + slope x * dx + slope y * dy, and
+	// the points themselves (for the lift onto the highest, below).
+	double sumX = 0.0, sumY = 0.0, sumZ = 0.0, sumXX = 0.0, sumYY = 0.0, sumXY = 0.0, sumXZ = 0.0, sumYZ = 0.0;
+	int count = 0;
+	struct GroundPoint { double dx, dy, surface; };
+	GroundPoint points[25];
+	const int probeTop = (int)std::floor(world[2]) + GroundPlaneProbe;
+	for (int stepY = -2; stepY <= 2; ++stepY)
+	{
+		for (int stepX = -2; stepX <= 2; ++stepX)
+		{
+			const double dx = stepX * reach / 2.0, dy = stepY * reach / 2.0;
+			const int voxelX = (int)std::floor(world[0] + dx), voxelY = (int)std::floor(world[1] + dy);
+			if (voxelX < 0 || voxelY < 0 || voxelX >= _save->getMapSizeX() * 16 || voxelY >= _save->getMapSizeY() * 16 || solidVoxel(voxelX, voxelY, probeTop))
+			{
+				continue;
+			}
+			int surface = -1;
+			for (int z = probeTop - 1; z >= probeTop - 2 * GroundPlaneProbe && surface < 0; --z)
+			{
+				if (z < 0 || solidVoxel(voxelX, voxelY, z))
+				{
+					surface = std::max(z + 1, 0);
+				}
+			}
+			if (surface < 0)
+			{
+				continue;
+			}
+			sumX += dx; sumY += dy; sumZ += surface;
+			sumXX += dx * dx; sumYY += dy * dy; sumXY += dx * dy; sumXZ += dx * surface; sumYZ += dy * surface;
+			points[count++] = { dx, dy, (double)surface };
+		}
+	}
+	if (count < 6)
+	{
+		return false;
+	}
+	// The normal equations, solved by Cramer's rule.
+	const double matrix[3][3] = { { (double)count, sumX, sumY }, { sumX, sumXX, sumXY }, { sumY, sumXY, sumYY } };
+	const double right[3] = { sumZ, sumXZ, sumYZ };
+	auto determinant = [](const double m[3][3]) {
+		return m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+	};
+	const double whole = determinant(matrix);
+	if (std::abs(whole) < 1e-9)
+	{
+		return false; // (the points all in a line)
+	}
+	double solution[3];
+	for (int column = 0; column < 3; ++column)
+	{
+		double replaced[3][3];
+		for (int row = 0; row < 3; ++row)
+		{
+			for (int col = 0; col < 3; ++col)
+			{
+				replaced[row][col] = col == column ? right[row] : matrix[row][col];
+			}
+		}
+		solution[column] = determinant(replaced) / whole;
+	}
+	slope[0] = std::clamp(solution[1], -LyingSlopeMax, LyingSlopeMax);
+	slope[1] = std::clamp(solution[2], -LyingSlopeMax, LyingSlopeMax);
+	// Lifted onto the highest points above it (at most GroundPlaneLiftMax voxels): something flat
+	// on steps rests on their edges, and the voxel steps of a ramp stand out of the average.
+	double lift = 0.0;
+	for (int point = 0; point < count; ++point)
+	{
+		lift = std::max(lift, points[point].surface - (solution[0] + slope[0] * points[point].dx + slope[1] * points[point].dy));
+	}
+	height = solution[0] + std::min(lift, (double)GroundPlaneLiftMax);
+	return true;
 }
 
 /**
@@ -888,22 +1000,34 @@ void FirstPersonView::recordHitbox(const BattleUnit *unit, const double feet[3],
  * getUnitAtPointer): the one whose picture shows right where the player points, or else the
  * nearest one within PointerReach pixels of it (a unit far off is only a few pixels across).
  * Only what's drawn counts, so only units in sight, standing, and not hidden behind anything.
+ * The same for a body lying on the floor (an unconscious unit's, see getBodyAtPointer), when
+ * its picture is nearer the pointer than any standing unit's (a medi-kit's patient).
  */
 void FirstPersonView::findUnitAtPointer()
 {
 	_unitAtPointer = nullptr;
-	int nearest = 1 << 30;
+	_bodyAtPointer = nullptr;
+	int nearestUnit = 1 << 30, nearestBody = 1 << 30;
 	for (int patchY = 0; patchY <= 2 * PointerReach; ++patchY)
 	{
 		for (int patchX = 0; patchX <= 2 * PointerReach; ++patchX)
 		{
 			const int distanceSq = (patchX - PointerReach) * (patchX - PointerReach) + (patchY - PointerReach) * (patchY - PointerReach);
-			if (_pointerUnits[patchY][patchX] && distanceSq < nearest)
+			if (_pointerUnits[patchY][patchX] && distanceSq < nearestUnit)
 			{
-				nearest = distanceSq;
+				nearestUnit = distanceSq;
 				_unitAtPointer = _pointerUnits[patchY][patchX];
 			}
+			if (_pointerBodies[patchY][patchX] && distanceSq < nearestBody)
+			{
+				nearestBody = distanceSq;
+				_bodyAtPointer = _pointerBodies[patchY][patchX];
+			}
 		}
+	}
+	if (nearestUnit <= nearestBody)
+	{
+		_bodyAtPointer = nullptr; // (a standing unit's picture is nearer, or as near)
 	}
 }
 
@@ -1145,10 +1269,42 @@ void FirstPersonView::drawFloorItems()
 		step.sprite.anchorY = wholeCorpse ? 48 : 40;
 		step.sprite.world[0] = ground[0];
 		step.sprite.world[1] = ground[1];
-		step.sprite.world[2] = standingHeight(ground);
+		// On stairs and slopes (a player: items there, seen from the side, sank half into them;
+		// the owner: "just on top of stairs at half height") it lies level at the height of the
+		// ground under its middle (the plane through the ground round it, on the steps' edges:
+		// see groundPlane; failing that, the floor's top, see standingHeight), drawn over the
+		// steps round it: the depth test gives way by as much as the ground rises within its
+		// reach, up to SlopeItemDepthBiasMax voxels. (Only where a tile under it has a terrain level,
+		// as stairs, ramps and slopes do: a flat floor's top is simply its slab's; and not under a
+		// floor: a corpse on a shelf below a terrace, lifted onto the shelf's edge and drawn over
+		// what's round it, showed through the terrace's floor. A stairwell is open above.)
+		const double planeReach = wholeCorpse ? GroundPlaneReachCorpse : GroundPlaneReach;
+		double planeHeight = 0.0, planeSlope[2] = { 0.0, 0.0 };
+		bool raised = false, underFloor = false;
+		for (Tile *under : tilesUnder)
+		{
+			raised = raised || under->getTerrainLevel() != 0;
+			const Tile *aboveTile = _save->getAboveTile(under);
+			underFloor = underFloor || (aboveTile && !aboveTile->hasNoFloor());
+		}
+		const bool onPlane = raised && !underFloor && groundPlane(ground, planeReach, planeHeight, planeSlope);
+		step.sprite.world[2] = onPlane ? planeHeight : standingHeight(ground);
+		step.sprite.depthBias = std::min(std::hypot(planeSlope[0], planeSlope[1]) * planeReach, SlopeItemDepthBiasMax);
 		step.sprite.shade = shade;
 		step.sprite.scale = itemScale;
 		step.sprite.pose = SpritePose::Lying;
+		// An unconscious unit lying in the pile (any of a big corpse's tiles): its picture can be
+		// pointed at (a medi-kit's patient).
+		for (Tile *under : tilesUnder)
+		{
+			for (BattleItem *pileItem : *under->getInventory())
+			{
+				if (!step.sprite.body && pileItem->getUnit() && pileItem->getUnit()->getStatus() == STATUS_UNCONSCIOUS)
+				{
+					step.sprite.body = pileItem->getUnit();
+				}
+			}
+		}
 		// The ground in front rising (a step, a slope): the lying rows rise with it, within their reach.
 		const int lyingRows = bottomColouredRow(step.sprite.sprite) - step.sprite.anchorY + 1;
 		if (lyingRows > 0)
@@ -1779,6 +1935,24 @@ const FirstPersonView::SoftSmoke &FirstPersonView::softSmokeBlend(const Surface 
 }
 
 /**
+ * The sight of the soldier the view looks through, for smoke drawn as the game's sight rules have
+ * it (setting "Smoke": Modern's wall, Original's stacked frames): the range in voxels, and how
+ * much of the smoke and of the smoke over fire their eyes see through (the armor's heat vision,
+ * in percent). The see-through smoke is drawn thinner by as much (a player: a scout drone's 50%
+ * heat vision didn't look any better), down to SmokeSeenMin of itself (see drawSeeThroughSmoke).
+ * @param sightVoxels Their sight range, in voxels.
+ * @param throughSmoke How much of smoke they see through, in percent.
+ * @param throughFire How much of smoke over fire they see through, in percent.
+ */
+void FirstPersonView::setSmokeSight(float sightVoxels, int throughSmoke, int throughFire)
+{
+	_smokeSightVoxels = sightVoxels;
+	_smokeBlock = (100 - std::clamp(throughSmoke, 0, 100)) / 300.0f;
+	_fireBlock = (100 - std::clamp(throughFire, 0, 100)) / 300.0f;
+	_smokeSeen = std::max(SmokeSeenMin, (100 - std::clamp(throughSmoke, 0, 100)) / 100.0f);
+}
+
+/**
  * The smoke on discovered tiles drawn see-through (setting "Smoke"): with Modern, the game's own
  * smoke made soft (see softSmokeFrame), and the wisps rising off it; where the soldier's sight
  * runs out in the smoke, the rays have already drawn a wall of it (see SmokeTrace). With
@@ -1858,8 +2032,9 @@ void FirstPersonView::drawSeeThroughSmoke()
 			ground[1] + (variation[1] - 0.5) * 4.0 + 0.8 * std::cos(seconds * 0.4 + variation[2] * 2.0 * Pi),
 			ground[2] + 1.0 * std::sin(seconds * 0.7 + variation[3] * 2.0 * Pi) };
 		// A little more opaque the thicker the smoke (a fresh smoke grenade makes about 15); the
-		// original's dots more so, as their holes already let the view through.
-		const float opacity = original ? std::clamp(0.35f + tile->getSmoke() * 0.04f, 0.0f, 0.95f) : std::clamp(0.45f + tile->getSmoke() * 0.025f, 0.0f, 0.85f);
+		// original's dots more so, as their holes already let the view through. Thinner for eyes
+		// with heat vision (see setSmokeSight).
+		const float opacity = _smokeSeen * (original ? std::clamp(0.35f + tile->getSmoke() * 0.04f, 0.0f, 0.95f) : std::clamp(0.45f + tile->getSmoke() * 0.025f, 0.0f, 0.85f));
 		const int firstFrame = firstSmokeFrame(tile->getSmoke());
 		const double frameTime = seconds / FrameSeconds + tile->getAnimationOffset() + variation[2], scale = 1.14 + variation[3] * 0.12;
 		addPuff(world, 32, firstFrame, frameTime, opacity, scale, _tileViews[tileIndex].light);
@@ -1870,7 +2045,9 @@ void FirstPersonView::drawSeeThroughSmoke()
 		// inside the cloud, solid where they overlap, and OriginalSmokeShellLayers times on its
 		// outer shell (a tile next to one without smoke), so its outline stays loose and
 		// smoke-like; where the smoke uses up most of the sight, a few times (the cloud's edge,
-		// as soft as Modern's wall's); where the soldier sees through it, once.
+		// as soft as Modern's wall's); where the soldier sees through it, once. (With heat
+		// vision the sight lasts longer, so fewer layers stack; where it runs out all the same,
+		// the layers are as solid.)
 		if (original)
 		{
 			const double middle[3] = { world[0], world[1], world[2] + 12.0 };
@@ -1897,7 +2074,7 @@ void FirstPersonView::drawSeeThroughSmoke()
 		const float fade = std::min(std::clamp(age / 0.25f, 0.0f, 1.0f), std::clamp((1.0f - age) / 0.5f, 0.0f, 1.0f));
 		const double world[3] = { particle.pos[0], particle.pos[1], particle.pos[2] };
 		const int shade = (int)std::lround(std::clamp(lightAt(particle.pos[0], particle.pos[1], particle.pos[2]), 0.0f, 15.0f));
-		addPuff(world, 20, firstSmokeFrame(1), seconds / (FrameSeconds * 1.5) + particle.size, 0.45f * fade * fade * (3.0f - 2.0f * fade),
+		addPuff(world, 20, firstSmokeFrame(1), seconds / (FrameSeconds * 1.5) + particle.size, _smokeSeen * 0.45f * fade * fade * (3.0f - 2.0f * fade),
 			0.35 + 0.4 * age, shade);
 	}
 
@@ -2071,6 +2248,126 @@ void FirstPersonView::drawMarkers()
 						{
 							put(dotX, dotY, _colors.marker);
 						}
+					}
+				}
+			}
+		}
+	}
+}
+
+/**
+ * A spray burst being marked (the game's "spray" auto shot, a player: Ctrl+Shift and clicks, as on
+ * the map; see FirstPersonMode::updateSprayMarks), drawn over everything like the enemy markers
+ * (as much bigger on big screens), in light green so it's seen far off too (a player: "light green
+ * vertical lines with numbers and mini targets ... so the player really sees in 3d what he
+ * marked"): at each point a pole standing up from the tile's floor, two thirds of a level high (and
+ * at least SprayPoleMinPixels on the screen, for a tile far off), a mini target on it where the game
+ * aims the rounds (the tile's middle, waist high) and the point's number beside it in the tiny digits;
+ * a dotted line along the floors from point to point, and a grey one on to the tile under the
+ * crosshair (where the next click marks). What's behind the camera is left out.
+ */
+void FirstPersonView::drawSprayMarks()
+{
+	if (_sprayPoints.empty())
+	{
+		return;
+	}
+	const int width = getWidth(), height = getHeight();
+	const int uiScale = std::max(1, _uiScale);
+	// One dot of the marks' art, uiScale x uiScale, clipped to the view.
+	auto put = [&](int x, int y, Uint8 color) {
+		for (int offsetY = 0; offsetY < uiScale; ++offsetY)
+			for (int offsetX = 0; offsetX < uiScale; ++offsetX)
+				if (x + offsetX >= 0 && y + offsetY >= 0 && x + offsetX < width && y + offsetY < height)
+					*getRaw(x + offsetX, y + offsetY) = color;
+	};
+	// A dot with a dark outline round it (both passes: first the outlines, then the colour).
+	auto outlined = [&](int x, int y, Uint8 color, int pass) {
+		if (pass == 0)
+		{
+			for (int offsetY = -1; offsetY <= 1; ++offsetY)
+				for (int offsetX = -1; offsetX <= 1; ++offsetX)
+					put(x + offsetX * uiScale, y + offsetY * uiScale, _colors.tapeBlack);
+		}
+		else
+		{
+			put(x, y, color);
+		}
+	};
+	// A point on the screen, or false behind the camera.
+	auto onScreen = [&](const Position &voxel, double up, int &x, int &y) {
+		const double world[3] = { (double)voxel.x, (double)voxel.y, voxel.z + up };
+		double screenX, screenY, depth;
+		if (!projectToScreen(world, screenX, screenY, depth)) return false;
+		x = (int)std::lround(screenX);
+		y = (int)std::lround(screenY);
+		return true;
+	};
+	// The dotted line from one point to the next along the floors, a dot every SprayDotSpacing voxels.
+	auto dottedLine = [&](const Position &from, const Position &to, Uint8 color) {
+		const double delta[3] = { (double)(to.x - from.x), (double)(to.y - from.y), (double)(to.z - from.z) };
+		const double length = std::sqrt(delta[0] * delta[0] + delta[1] * delta[1] + delta[2] * delta[2]);
+		for (int pass = 0; pass < 2; ++pass)
+		{
+			for (double along = 0.0; along <= length; along += SprayDotSpacing)
+			{
+				const double share = length > 0.0 ? along / length : 0.0;
+				const Position point((int)std::lround(from.x + delta[0] * share), (int)std::lround(from.y + delta[1] * share), (int)std::lround(from.z + delta[2] * share));
+				int x, y;
+				if (onScreen(point, 0.0, x, y)) outlined(x, y, color, pass);
+			}
+		}
+	};
+	for (size_t point = 0; point + 1 < _sprayPoints.size(); ++point)
+	{
+		dottedLine(_sprayPoints[point], _sprayPoints[point + 1], _colors.sprayMark);
+	}
+	dottedLine(_sprayPoints.back(), _sprayNext, _colors.sprayNext);
+
+	// The marks: the pole, the mini target on it, the number over it.
+	for (size_t point = 0; point < _sprayPoints.size(); ++point)
+	{
+		int footX, footY, topX, topY, aimX, aimY;
+		const Position &floor = _sprayPoints[point];
+		if (!onScreen(floor, 0.0, footX, footY) || !onScreen(floor, SprayPoleVoxels, topX, topY) || !onScreen(floor, SprayAimVoxels, aimX, aimY))
+		{
+			continue;
+		}
+		// A pole far off stands at least SprayPoleMinPixels high, the mini target the same share up it.
+		const int minimum = SprayPoleMinPixels * uiScale;
+		if (footY - topY < minimum)
+		{
+			topY = footY - minimum;
+			aimY = footY - minimum * SprayAimVoxels / SprayPoleVoxels;
+		}
+		for (int pass = 0; pass < 2; ++pass)
+		{
+			// The pole, a dot every row (a lean tilts it: the steps between foot and top).
+			const int rows = std::max(1, std::abs(footY - topY) / uiScale);
+			for (int row = 0; row <= rows; ++row)
+			{
+				outlined(footX + (topX - footX) * row / rows, footY + (topY - footY) * row / rows, _colors.sprayMark, pass);
+			}
+			// The mini target: a ring SprayTargetRadius across and a dot in its middle.
+			const int radius = SprayTargetRadius * uiScale;
+			for (int step = 0; step < 24; ++step)
+			{
+				const double angle = step * Pi / 12.0;
+				outlined(aimX + (int)std::lround(radius * std::cos(angle)), aimY + (int)std::lround(radius * std::sin(angle)), _colors.sprayMark, pass);
+			}
+			outlined(aimX, aimY, _colors.sprayMark, pass);
+			// The number right of the mini target.
+			const std::string digits = std::to_string(point + 1);
+			const int textLeft = aimX + (SprayTargetRadius + 3) * uiScale, textTop = aimY - 2 * uiScale;
+			for (size_t digitIndex = 0; digitIndex < digits.size(); ++digitIndex)
+			{
+				const Uint8 *glyph = DigitFont[digits[digitIndex] - '0'];
+				for (int glyphRow = 0; glyphRow < 5; ++glyphRow)
+				{
+					for (int glyphColumn = 0; glyphColumn < 3; ++glyphColumn)
+					{
+						if (!(glyph[glyphRow] & (4 >> glyphColumn))) continue; // (bit 2 of a glyph row is its left column)
+						outlined(textLeft + ((int)digitIndex * 4 + glyphColumn) * uiScale, textTop + glyphRow * uiScale, _colors.sprayMark, pass);
 					}
 				}
 			}

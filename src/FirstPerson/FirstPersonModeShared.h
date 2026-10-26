@@ -68,6 +68,9 @@ const int BarY = 1, BarH = 12;
 /// The compass (setting "Compass"): the disc's size, the room above it for the heading arrow, and
 /// how far below the top bar it sits (canvas pixels).
 const int CompassSize = 40, CompassArrowH = 7, CompassGap = 2;
+/// The climb arrows beside the compass (see FirstPersonMode::updateClimbArrows): each ClimbArrowW x
+/// ClimbArrowH pixels, the pair ClimbArrowsH high, ClimbArrowsGap pixels left of the dial.
+const int ClimbArrowW = 13, ClimbArrowH = 9, ClimbArrowsH = 26, ClimbArrowsGap = 2;
 /// Turning by the rules: the compass warns this many degrees before the view reaches the
 /// head's limit (HeadTurn), where looking further turns the soldier.
 const double CompassWarnDegrees = 10.0;
@@ -93,6 +96,17 @@ const int CrosshairSize = 41;
 const double PressedEyeLower = 1.0;
 /// The soldier card under a hovered squad button, and its live helmet-camera view.
 const int CardW = 124, CardY = 15, PreviewW = 116, PreviewH = 72;
+/// The farthest the eye moves to get out of something solid (a big unit in a wide door, see clearEye), in voxels.
+const double EyeClearReach = 10.0;
+/// A melee blow at terrain by the crosshair (see FirstPersonMode::crosshairTerrainMelee) reaches this far from the eye, in voxels (a tile and a half).
+const double MeleeTerrainReach = 24.0;
+/// A soldier's rank beside their name (see FirstPersonMode::drawRankIcon): the icon's size in pixels,
+/// the game's own battlescape badge (26x23) averaged down to it, or a mod's tiny rank (7x7) inside it;
+/// and the room between the name and it.
+const int RankIconW = 13, RankIconH = 11, RankIconGap = 3;
+/// The badge's top is this many pixels above its text's top, so its bottom row is the letters' bottom
+/// row (a player: it touched the weapon line under the name).
+const int RankIconRise = 3;
 /// The map camera's picture (setting "Map camera": small, medium, large; index 0 is off) takes
 /// this share of the canvas's width (96, 128 or 160 pixels on the smallest canvas, 320 wide;
 /// twice that on one 640 wide), in the card camera's proportions, and at most MapCameraMaxHeight
@@ -125,6 +139,9 @@ const double WeaponScale = 0.9;
 /// taken as exactly upright (or level): the games draw their weapons standing straight up, and a
 /// grip, a magazine or a bulky body only tips the measured axis off the barrel.
 const double WeaponUprightSnap = 30.0;
+/// ...if the picture lies no more than this many times as wide across the upright (or level) axis as
+/// across its measured one (and a pixel): a pole drawn on a slant keeps its slant.
+const double WeaponSnapSpread = 1.25;
 /// The way a melee weapon's tip points at rest, from its grip (camera space: x out to the weapon's side, y down, z ahead; any length).
 const double MeleeUpright[3] = { 0.3, -1.0, 0.25 };
 /// The aliens' turn cameras (setting "Aliens' turn cameras"): the least time the view stays with a soldier
@@ -181,6 +198,9 @@ const double EdgeMargin = 5.0;
 /// Tile moves: how long the movement keys are held before the move starts, in milliseconds (a
 /// second key pressed with the first, W and D say, makes it a diagonal).
 const Uint32 TileMoveKeyWait = 60;
+/// The numpad: a move key's press waits this long (ms) for a key of the other axis to join it (8
+/// and 4 together: a diagonal, as W and A make one), so pressing two at once isn't two moves.
+const Uint32 NumpadComboWait = 60;
 /// Tile moves: a move that hasn't come closer to its tile for this long (ms) is over (the step
 /// was refused, or a door or a vault moved the camera on its own).
 const Uint32 TileMoveStuck = 300;
