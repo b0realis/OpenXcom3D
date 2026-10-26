@@ -1,9 +1,10 @@
-# The build guide on GitHub Pages: https://b0realis.github.io/OpenXcom3D/
+# The build guide and the play guide on GitHub Pages: https://b0realis.github.io/OpenXcom3D/
+# (pages/index.html) and https://b0realis.github.io/OpenXcom3D/play.html (pages/play.html).
 #
-# Only pages/ is published: pages/index.html, one page that asks no other site for anything (no
-# web fonts, no scripts from elsewhere; its links open other sites only when clicked). Its one
-# stored value (the reader's system and ticked steps) stays in the reader's browser. Nothing else
-# in the repository becomes a web page.
+# Only pages/ is published: two pages that ask no other site for anything (no web fonts, no
+# scripts from elsewhere; their links open other sites only when clicked). Each one's stored value
+# (the reader's system and ticked steps) stays in the reader's browser. Nothing else in the
+# repository becomes a web page.
 #
 # The Pages source is "GitHub Actions" (repository Settings > Pages). It runs when pages/ or this
 # file changes on main, or by hand. The actions are their Node 24 majors, as in ShandalarGodot:

@@ -1,6 +1,6 @@
 # OpenXcom3D manual
 
-Version 1.04. OpenXcom3D is **OpenXcom Extended (OXCE)** with a first-person 3D battlescape: an engine add-on (`src/FirstPerson/`, with small hooks in the core) and a data mod (`OpenXcom3D`) that switches it on.
+Version 1.05. OpenXcom3D is **OpenXcom Extended (OXCE)** with a first-person 3D battlescape: an engine add-on (`src/FirstPerson/`, with small hooks in the core) and a data mod (`OpenXcom3D`) that switches it on.
 
 1. [Installing](#1-installing)
 2. [Controls](#2-controls)
@@ -19,6 +19,8 @@ Version 1.04. OpenXcom3D is **OpenXcom Extended (OXCE)** with a first-person 3D 
 
 You need your own copy of the original game data: *UFO: Enemy Unknown / X-COM: UFO Defense* and/or *X-COM: Terror From The Deep*, e.g. from Steam or GOG.
 
+Step by step, for each system: the [play guide](https://b0realis.github.io/OpenXcom3D/play.html) (the downloads on Linux, Windows, the Steam Deck and macOS, and where your game data goes) and the [build guide](https://b0realis.github.io/OpenXcom3D/) (compiling it).
+
 Add-on builds keep their own user and config folders, so an existing OXCE profile is never touched:
 
 - the release's `user/` folder, when started with `play.sh` (or `play.bat` on Windows);
@@ -30,8 +32,8 @@ Add-on builds keep their own user and config folders, so an existing OXCE profil
 
 Download it from the project's [Releases](https://github.com/b0realis/OpenXcom3D/releases) page, in either form:
 
-- **`OpenXcom3D-1.04-x86_64.AppImage`**: a single file. Make it executable (`chmod +x OpenXcom3D-1.04-x86_64.AppImage`, or *Properties → Permissions → executable* in a file manager) and run it. Its profile is in `~/.local/share/openxcom3d`.
-- **`OpenXcom3D-1.04-linux-x86_64.tar.gz`**: unpack it anywhere and run `./play.sh`. Its profile is the `user/` folder inside.
+- **`OpenXcom3D-1.05-x86_64.AppImage`**: a single file. Make it executable (`chmod +x OpenXcom3D-1.05-x86_64.AppImage`, or *Properties → Permissions → executable* in a file manager) and run it. Its profile is in `~/.local/share/openxcom3d`.
+- **`OpenXcom3D-1.05-linux-x86_64.tar.gz`**: unpack it anywhere and run `./play.sh`. Its profile is the `user/` folder inside.
 
 **Nothing needs installing.** The game comes with its own libraries: SDL 1.2 (sdl12-compat on SDL2), SDL_image and SDL_mixer in `lib/`, with SDL_gfx built in. All it takes from the system is glibc 2.34 or newer (2021 on: Ubuntu 22.04 and newer, Debian 12, Fedora 35 and newer, RHEL 9, Mint 21, every current Arch, Manjaro or other rolling system, and SteamOS), plus the display, sound and OpenGL every desktop has. SDL opens X11 or Wayland and PulseAudio, PipeWire or ALSA when the game starts. On a system older than glibc 2.34, build it from source (option B).
 
@@ -86,8 +88,8 @@ python3 install.py --target ~/Games/OpenXcom3D --ufo /path/to/UFO --tftd /path/t
 Unpack the archive anywhere and run `./play.sh`. To use game data it doesn't find, link it into the profile first:
 
 ```sh
-ln -s /path/to/UFO  OpenXcom3D-1.04-linux-x86_64/user/UFO
-ln -s /path/to/TFTD OpenXcom3D-1.04-linux-x86_64/user/TFTD
+ln -s /path/to/UFO  OpenXcom3D-1.05-linux-x86_64/user/UFO
+ln -s /path/to/TFTD OpenXcom3D-1.05-linux-x86_64/user/TFTD
 ```
 
 #### Steam Deck
@@ -136,7 +138,7 @@ SDL12COMPAT_OPENGL_SCALING=0 SDL_RENDER_DRIVER=software ./play.sh
 
 ### Option A on Windows: the prebuilt release (64-bit)
 
-Download **`OpenXcom3D-1.04-windows-x86_64.zip`** from the [Releases](https://github.com/b0realis/OpenXcom3D/releases) page and unpack it somewhere of yours: Documents, the Desktop or `C:\Games`. Not *Program Files*: the game writes its saves and options into its `user` folder, and can't there. Then double-click **`play.bat`**.
+Download **`OpenXcom3D-1.05-windows-x86_64.zip`** from the [Releases](https://github.com/b0realis/OpenXcom3D/releases) page and unpack it somewhere of yours: Documents, the Desktop or `C:\Games`. Not *Program Files*: the game writes its saves and options into its `user` folder, and can't there. Then double-click **`play.bat`**.
 
 **Nothing needs installing.** It runs on 64-bit Windows 10 and 11. The game comes with SDL 1.2 (sdl12-compat on SDL2) as `SDL.dll` and `SDL2.dll`, with SDL_image, SDL_mixer, SDL_gfx and the C++ runtime built in, and takes from Windows only what every Windows has. The game isn't signed, so Windows may warn the first time ("Windows protected your PC"): click *More info*, then *Run anyway*.
 
@@ -716,7 +718,7 @@ Sprite upscaling costs nothing measurable. Use **pixel size** 2 or 3 on slow mac
 | Branch | **`oxce-plus`** |
 | Commit | **`f0134ef8065799c7723953d64b565f7832bfd782`** — 2026-09-29 15:04:49 +0200, author Meridian, "Merge remote-tracking branch 'SupSuper/master' into oxce-plus" |
 | Version string | **OpenXcom Extended 8.7.1 (v2026-09-19)** |
-| OpenXcom3D | engine add-on and mod version **1.04** (`requiredExtendedEngine: OpenXcom3D`, `requiredExtendedVersion: "1.0.4"`: OXCE reads "1.04" as 1.4) |
+| OpenXcom3D | engine add-on and mod version **1.05** (`requiredExtendedEngine: OpenXcom3D`, `requiredExtendedVersion: "1.0.5"`: OXCE reads "1.05" as 1.5) |
 
 `openxcom3d.patch` holds every change on top of that commit:
 
@@ -819,13 +821,15 @@ What `FirstPersonView` draws:
 | `OptionInfo.cpp` | Loading a key binding clears Shift, Alt and Ctrl, except for `keyFpsLeanHold` (the lean key, held with the strafe keys, Left Shift by default) |
 | `OptionsBaseState.{h,cpp}` | 3D VIEW tab via `FirstPerson::hasOptionsTab/createOptionsTab` |
 | `Mod.{h,cpp}` | Parses `firstPerson:` at the end of `Mod::loadFile` |
-| `ModInfo.cpp` | Engine row `{"OpenXcom3D", 1.0.4}` (add-on builds only; 1.04) |
+| `ModInfo.cpp` | Engine row `{"OpenXcom3D", 1.0.5}` (add-on builds only; 1.05) |
 | `CrossPlatform.cpp` | Add-on builds use their own user/config folders (`~/.local/share/openxcom3d`, `~/.config/openxcom3d`, `Documents/OpenXcom3D`, …). Data folders are shared with stock OXCE |
 | `OpenXcom.2010.vcxproj{,.filters}` | The add-on's files |
 
 ## 11. Version history
 
-### Since 1.04 (not released yet)
+### 1.05 (2026-10-26)
+
+From the same player's play reports on 1.04 and the owner's own looks at it: a crash ending a battle found from the player's log, the cameras' feeds, the top bar, akimbo in turn, shotguns on the map, arcs at the exact point.
 
 - **The map camera is a live feed too** (the owner, looking at 1.04's screenshot: it lacked the soldier cam's "static and screen tear along with red dot"): it has the SOLDIER CAM's blinking red dot before the name, and both now have TV static only now and then, not a sprinkle all the time: a spell every 10 seconds to 2 minutes of watching, rising from nothing to a snowstorm and falling back over a few seconds, each at its own pace. On the hardest missions and inside UFOs a little static stays all the time and the spells come every 5 to 40 seconds, longer and stronger. Every helmet camera glitches more often: every 1.5 to 5 seconds on any mission, torn now and then too (only the hardest missions tore before); there every 0.3 to 1.5 seconds, torn more often. And each camera's glitches differ from game to game, where every game played the same pattern.
 - **Akimbo in turn as akimbo together, but for the turn** (the same player: "The idea of each bullet firing one side, one gun then the other is correct, but besides that one difference, it should be identical to normal dual fire setting"). 1.04 fired the two guns in turn each at full accuracy and its own cost (two pistols' snap shots: 20 time units). Now in turn is akimbo's own rules, each gun 30% less accurate and the pair for the dearer gun's shot and a tenth (11 time units), and both rounds fly 30% faster than the game would fly them (from whatever its *Fire speed* setting, the gun and the ammo make it), so waiting for one round per gun isn't sluggish: two pistols in turn are over in about 1.2 s, two together in 1.4 s, one pistol in 1.1 s. One gun, or two together, fly at the normal speed; arcing guns, which always fire in turn after the landing, keep full accuracy and their own costs, as chosen for 1.04.

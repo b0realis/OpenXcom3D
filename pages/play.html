@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Play OpenXcom3D</title>
+<meta name="description" content="Step by step: play the ready builds of OpenXcom3D (OpenXcom Extended with a first-person 3D battlescape) on Linux, Windows, the Steam Deck or macOS, with your own copy of UFO or TFTD.">
+<style>
+/* The build guide's look (index.html): a dark hero, a sticky bar (your system + progress), then one column of numbered steps on a rail; then what to do when something goes wrong. Only the chosen system's steps show. */
+:root {
+  --bg: #f3f5f8;
+  --surface: #ffffff;
+  --sunk: #e8ecf2;
+  --fg: #16202c;
+  --muted: #566475;
+  --line: #d3dae4;
+  --accent: #1d5e9e;
+  --accent-soft: #e3eef9;
+  --gold: #e0a730;
+  --gold-ink: #2a1c02;
+  --ok: #2a7a49;
+  --warn-bg: #fff3dd;
+  --warn-fg: #6e4308;
+  --hero-bg: #0e1824;
+  --hero-fg: #eef4fb;
+  --hero-muted: #b4c3d4;
+  --term-bg: #121821;
+  --term-bar: #243041;
+  --term-fg: #e6edf5;
+  --term-dim: #8b9bb0;
+  --term-prompt: #f2b950;
+  --shadow: 0 1px 2px rgb(10 20 32 / 0.08), 0 6px 18px rgb(10 20 32 / 0.08);
+  /* The computer's own faces: the page asks no other site for anything. */
+  --font-display: Georgia, "Times New Roman", "DejaVu Serif", serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d131b; --surface: #151d28; --sunk: #1c2633; --fg: #e6edf5; --muted: #9fb0c3;
+    --line: #2b3746; --accent: #79b4ee; --accent-soft: #1b2a3c; --gold: #e8b44c; --gold-ink: #241703;
+    --ok: #74c793; --warn-bg: #2f2513; --warn-fg: #f0c47e;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 18px rgb(0 0 0 / 0.25);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d131b; --surface: #151d28; --sunk: #1c2633; --fg: #e6edf5; --muted: #9fb0c3;
+  --line: #2b3746; --accent: #79b4ee; --accent-soft: #1b2a3c; --gold: #e8b44c; --gold-ink: #241703;
+  --ok: #74c793; --warn-bg: #2f2513; --warn-fg: #f0c47e;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 18px rgb(0 0 0 / 0.25);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-padding-top: 5.5rem; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.6 var(--font-body); }
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; z-index: 10;
+  height: env(safe-area-inset-top, 0px); background: var(--surface);
+}
+.gutter {
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.col { max-width: 52rem; margin: 0 auto; }
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visible + .tick {
+  outline: 3px solid var(--accent); outline-offset: 2px;
+}
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.2; }
+code, kbd { font-family: var(--font-mono); }
+p code, li code, dd code, td code, summary code {
+  font-size: 0.86em; background: var(--sunk); padding: 0.08em 0.35em; border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+img { max-width: 100%; height: auto; display: block; }
+
+/* ---------- hero ---------- */
+.hero { background: var(--hero-bg); color: var(--hero-fg); }
+.hero .col {
+  display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 2rem; align-items: center; padding-block: 2.75rem 2.5rem;
+}
+.hero h1 { font-size: clamp(2rem, 5vw, 2.8rem); margin: 0 0 0.75rem; }
+.hero p { margin: 0 0 1.1rem; color: var(--hero-muted); max-width: 34rem; }
+.hero p a { color: var(--gold); }
+.facts { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+.facts li {
+  border: 1px solid rgb(255 255 255 / 0.18); border-radius: 999px;
+  padding: 0.3rem 0.8rem; font-size: 0.875rem; color: var(--hero-fg);
+}
+.facts b { color: var(--gold); font-weight: 700; }
+.hero figure { margin: 0; }
+.hero figure img {
+  border-radius: 8px; border: 1px solid rgb(255 255 255 / 0.15);
+  box-shadow: 0 10px 40px rgb(0 0 0 / 0.45); image-rendering: pixelated;
+}
+.hero figcaption { font-size: 0.8rem; color: var(--hero-muted); margin-top: 0.5rem; }
+
+/* ---------- sticky bar ---------- */
+.bar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.bar .col {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 0.6rem 1.5rem; padding-block: 0.65rem;
+}
+.os-pick { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.os-pick > span { font-weight: 700; font-size: 0.95rem; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button {
+  font: 700 0.95rem/1 var(--font-body); color: var(--fg); background: var(--surface);
+  border: 0; border-right: 1px solid var(--line); padding: 0.6rem 0.9rem; cursor: pointer;
+}
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--surface); }
+.progress { display: flex; align-items: center; gap: 0.6rem; font-size: 0.875rem; color: var(--muted); }
+.progress .track { width: 8rem; height: 6px; background: var(--sunk); border-radius: 3px; overflow: hidden; }
+.progress .fill { height: 100%; width: 0; background: var(--ok); transition: width 0.3s; }
+.progress output { font-variant-numeric: tabular-nums; }
+
+/* ---------- system switching ---------- */
+#app[data-os="linux"] [data-os]:not([data-os~="linux"]),
+#app[data-os="win"] [data-os]:not([data-os~="win"]),
+#app[data-os="deck"] [data-os]:not([data-os~="deck"]),
+#app[data-os="mac"] [data-os]:not([data-os~="mac"]) { display: none !important; }
+
+/* ---------- steps ---------- */
+main .col { padding-block: 2rem 1rem; }
+.intro { max-width: 42rem; margin: 0 0 1.25rem; color: var(--muted); }
+.steps { list-style: none; margin: 1.5rem 0 0; padding: 0; position: relative; }
+.steps::before {
+  content: ""; position: absolute; left: 1.25rem; top: 0.5rem; bottom: 0.5rem;
+  width: 2px; background: var(--line);
+}
+.step {
+  position: relative; display: grid; grid-template-columns: 2.5rem minmax(0, 1fr);
+  gap: 0 1.25rem; padding-bottom: 2.75rem;
+}
+.badge {
+  width: 2.5rem; height: 2.5rem; border-radius: 50%; display: grid; place-items: center;
+  background: var(--gold); color: var(--gold-ink); font: 700 1.15rem/1 var(--font-display);
+  position: relative; z-index: 1; box-shadow: 0 0 0 5px var(--bg);
+}
+.step.done .badge { background: var(--ok); color: var(--surface); }
+.step.done .badge span { display: none; }
+.step.done .badge::after { content: "✓"; font: 700 1.2rem/1 var(--font-body); }
+.step > div { min-width: 0; }
+.step h2 { font-size: 1.55rem; margin: 0.15rem 0 0.6rem; }
+.step h3 { font-size: 1.05rem; font-family: var(--font-body); margin: 1.1rem 0 0.4rem; }
+.step p, .step li { max-width: 42rem; }
+.step p { margin: 0 0 0.9rem; }
+.step ul { padding-left: 1.2rem; margin: 0 0 1rem; display: grid; gap: 0.35rem; }
+.lead { font-size: 1.05rem; }
+.note {
+  background: var(--warn-bg); color: var(--warn-fg); border-radius: 8px;
+  padding: 0.75rem 1rem; margin: 0 0 1rem; max-width: 42rem;
+}
+.note b, .note a { color: inherit; }
+.tip {
+  border-left: 4px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0;
+  padding: 0.7rem 1rem; margin: 0 0 1rem; max-width: 42rem;
+}
+.tip p:last-child { margin-bottom: 0; }
+.check {
+  display: inline-flex; align-items: center; gap: 0.6rem; cursor: pointer; user-select: none;
+  margin-top: 0.25rem; font-weight: 700; font-size: 0.95rem; color: var(--muted);
+}
+.check input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.tick {
+  width: 1.4rem; height: 1.4rem; border: 2px solid var(--line); border-radius: 5px;
+  display: grid; place-items: center; background: var(--surface);
+}
+.check input:checked + .tick { background: var(--ok); border-color: var(--ok); }
+.check input:checked + .tick::after { content: "✓"; color: var(--surface); font-weight: 700; font-size: 0.9rem; }
+.step.done .check { color: var(--ok); }
+.btn {
+  display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none;
+  font: 700 0.9rem/1 var(--font-body); padding: 0.55rem 0.85rem; border-radius: 7px; cursor: pointer;
+  background: var(--accent); color: var(--surface); border: 1px solid var(--accent);
+}
+.btn:hover { filter: brightness(1.07); }
+
+/* a distribution's name above its commands */
+.distro { font-weight: 700; font-size: 0.95rem; margin: 0 0 0.35rem !important; }
+
+/* terminal */
+.term {
+  background: var(--term-bg); color: var(--term-fg); border-radius: 10px; overflow: hidden;
+  box-shadow: var(--shadow); border: 1px solid var(--term-bar); min-width: 0; margin: 0 0 1rem;
+}
+.term-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  padding: 0.4rem 0.5rem 0.4rem 0.8rem; background: var(--term-bar); color: var(--term-dim); font-size: 0.8rem;
+}
+.term-bar .btn { padding: 0.35rem 0.65rem; font-size: 0.8rem; background: transparent; color: var(--term-fg); border-color: #4a5a70; }
+.term pre {
+  margin: 0; padding: 0.85rem 1rem; overflow-x: auto; font: 0.84rem/1.65 var(--font-mono);
+  color: var(--term-fg); background: none; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.term .d { color: var(--term-dim); }
+.copied { font-weight: 700; color: var(--term-prompt); font-size: 0.8rem; min-width: 4.5rem; text-align: right; }
+
+/* kbd */
+kbd {
+  display: inline-block; min-width: 1.6em; text-align: center; font-size: 0.82em; font-weight: 600;
+  padding: 0.15em 0.45em; border: 1px solid var(--line); border-bottom-width: 3px; border-radius: 6px;
+  background: var(--surface); color: var(--fg); white-space: nowrap;
+}
+
+/* folder listing */
+.files {
+  list-style: none; margin: 0 0 1rem; padding: 0.5rem 0.75rem; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px; font: 0.86rem/1.7 var(--font-mono); max-width: 42rem;
+}
+.files li { display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr); gap: 1rem; }
+.files li span { color: var(--muted); font-family: var(--font-body); font-size: 0.85rem; }
+
+/* troubleshooting */
+.faq { padding-block: 0.5rem 2rem; }
+.faq h2 { font-size: 1.55rem; margin: 0 0 0.4rem; }
+.faq > .col > p { color: var(--muted); margin: 0 0 1.25rem; }
+.faq details { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; margin: 0 0 0.75rem; }
+.faq summary { cursor: pointer; padding: 0.75rem 1rem; font-weight: 700; list-style-position: inside; }
+.faq summary code { font-weight: 600; }
+.faq details > div { padding: 0 1rem 0.9rem; }
+.faq details p { margin: 0 0 0.6rem; max-width: 42rem; }
+.faq .term { margin-top: 0.4rem; }
+
+footer { border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; }
+footer .col { padding-block: 1.5rem 2.5rem; display: grid; gap: 0.4rem; }
+footer p { margin: 0; }
+
+@media (max-width: 720px) {
+  .hero .col { grid-template-columns: minmax(0, 1fr); padding-block: 2rem; }
+  .step { grid-template-columns: minmax(0, 1fr); }
+  .steps::before { display: none; }
+  .badge { margin-bottom: 0.5rem; }
+  .progress .track { width: 5rem; }
+  .files li { grid-template-columns: minmax(0, 1fr); gap: 0; }
+}
+</style>
+</head>
+<body>
+<div id="app" data-os="linux">
+
+<header class="hero gutter">
+  <div class="col">
+    <div>
+      <h1>Play OpenXcom3D</h1>
+      <p>OpenXcom3D is <b>OpenXcom Extended</b> with a first-person 3D battlescape. The <a href="https://github.com/b0realis/OpenXcom3D/releases/latest">ready builds</a> need no compiling and nothing installed: download one, give it your copy of the original game, and press F8 in a battle. This page walks you through it, for each system.</p>
+      <p>Rather build it yourself? The <a href="./">build guide</a> does that, step by step.</p>
+      <ul class="facts">
+        <li>About <b>5 minutes</b></li>
+        <li>About <b>12 MB</b> to download</li>
+        <li>Your own copy of <b>UFO</b> or <b>TFTD</b></li>
+      </ul>
+    </div>
+    <figure>
+      <img src="img/skyranger.png" width="1280" height="800" alt="The 3D view: the Skyranger on a field at a terror site, a picket fence in front, the soldier's rifle in the corner.">
+      <figcaption>A battle in 3D: the Skyranger behind you, the street ahead.</figcaption>
+    </figure>
+  </div>
+</header>
+
+<nav class="bar gutter" aria-label="Your system and your progress">
+  <div class="col">
+    <div class="os-pick">
+      <span id="os-label">Play on:</span>
+      <div class="seg" role="group" aria-labelledby="os-label">
+        <button type="button" data-pick="linux" aria-pressed="true">Linux</button>
+        <button type="button" data-pick="win" aria-pressed="false">Windows</button>
+        <button type="button" data-pick="deck" aria-pressed="false">Steam Deck</button>
+        <button type="button" data-pick="mac" aria-pressed="false">macOS</button>
+      </div>
+    </div>
+    <div class="progress">
+      <div class="track" aria-hidden="true"><div class="fill" id="fill"></div></div>
+      <output id="count" aria-live="polite">0 of 5 steps done</output>
+    </div>
+  </div>
+</nav>
+
+<main class="gutter">
+  <div class="col">
+    <p class="intro" data-os="linux">On Linux there are two downloads, the same game in two wrappings: an <b>AppImage</b>, one file to run, and an <b>archive</b> to unpack anywhere. Either runs on any 64-bit Linux from 2021 on (Ubuntu 22.04 and newer, Debian 12, Fedora, Arch and the like) and brings its own libraries. Pick your system in the bar above, and the page shows only its steps.</p>
+    <p class="intro" data-os="win">On Windows it's a <b>zip</b>: unpack it into a folder of yours and start <code>play.bat</code>. It runs on 64-bit Windows 10 and 11 and brings its own libraries; nothing is installed.</p>
+    <p class="intro" data-os="deck">The Steam Deck runs the Linux download. You set it up once in <b>Desktop Mode</b>, add it to Steam, and play it in <b>Game Mode</b> with a controller layout made for it.</p>
+    <p class="intro" data-os="mac">The macOS app is a <b>first, untested build</b>: it is made and started on GitHub's Macs for every change, but nobody has played it on a real Mac yet. Reports are very welcome.</p>
+
+    <ol class="steps">
+
+      <!-- 1: the original game -->
+      <li class="step" id="step-1">
+        <div class="badge" aria-hidden="true"><span>1</span></div>
+        <div>
+          <h2>Have the original game</h2>
+          <p class="lead">You need your own copy of <i>X-COM: UFO Defense</i> (<i>UFO: Enemy Unknown</i>) and/or <i>X-COM: Terror From The Deep</i>: from Steam, from GOG, or the old CDs. Nothing of it comes with OpenXcom3D.</p>
+          <p>What the game needs is the folder with <code>GEODATA</code>, <code>GEOGRAPH</code>, <code>MAPS</code> and <code>UFOGRAPH</code> directly in it. You don't need to run the original game, or DOSBox: OpenXcom3D plays its files itself, and never changes them.</p>
+          <p data-os="linux deck">On Steam that folder is:</p>
+          <ul data-os="linux deck">
+            <li><code>~/.local/share/Steam/steamapps/common/XCom UFO Defense/XCOM</code></li>
+            <li><code>~/.local/share/Steam/steamapps/common/X-COM Terror from the Deep/TFD</code></li>
+          </ul>
+          <p data-os="linux">(Steam as a Flatpak keeps them under <code>~/.var/app/com.valvesoftware.Steam/</code>, as a Snap under <code>~/snap/steam/</code>, and a second library on another disk wherever you put it. All of them are found.)</p>
+          <p data-os="win">On Steam that folder is:</p>
+          <ul data-os="win">
+            <li><code>C:\Program Files (x86)\Steam\steamapps\common\XCom UFO Defense\XCOM</code></li>
+            <li><code>C:\Program Files (x86)\Steam\steamapps\common\X-COM Terror from the Deep\TFD</code></li>
+          </ul>
+          <p data-os="mac">From Steam, it's in your Steam library; from GOG, the app in <i>Applications</i> keeps the DOS game inside. Both are found.</p>
+          <div class="tip" data-os="linux deck">
+            <p><b>Installing it with Steam on Linux:</b> both are Windows games. If Steam shows no <i>Install</i> button for them, switch on Steam Play (<i>Steam → Settings → Compatibility</i>, or the game's <i>Properties → Compatibility</i>). You only need its files on the disk: you never start it from Steam.</p>
+          </div>
+          <label class="check"><input type="checkbox" data-step="1"><span class="tick"></span>I have the game, and know where its folder is</label>
+        </div>
+      </li>
+
+      <!-- 2: download -->
+      <li class="step" id="step-2">
+        <div class="badge" aria-hidden="true"><span>2</span></div>
+        <div>
+          <h2>Download OpenXcom3D</h2>
+          <div data-os="linux">
+            <p class="lead">From the <a href="https://github.com/b0realis/OpenXcom3D/releases/latest">latest release</a>, take one of the two:</p>
+            <ul>
+              <li><b><code>OpenXcom3D-&lt;version&gt;-x86_64.AppImage</code></b>: one file, the simplest. Its saves and options live in <code>~/.local/share/openxcom3d</code>.</li>
+              <li><b><code>OpenXcom3D-&lt;version&gt;-linux-x86_64.tar.gz</code></b>: a folder to unpack. Everything stays in it, its saves too (its <code>user</code> folder), and it comes with an installer that adds a menu entry.</li>
+            </ul>
+          </div>
+          <div data-os="win">
+            <p class="lead">From the <a href="https://github.com/b0realis/OpenXcom3D/releases/latest">latest release</a>, take <b><code>OpenXcom3D-&lt;version&gt;-windows-x86_64.zip</code></b>.</p>
+          </div>
+          <div data-os="deck">
+            <p class="lead">In <b>Desktop Mode</b> (<i>Steam button → Power → Switch to Desktop</i>), open the <a href="https://github.com/b0realis/OpenXcom3D/releases/latest">latest release</a> in the browser and take <b><code>OpenXcom3D-&lt;version&gt;-linux-x86_64.tar.gz</code></b>, the archive: it holds the controller layout too.</p>
+          </div>
+          <div data-os="mac">
+            <p class="lead">The Mac app isn't on the release page yet. It comes from the automatic builds: open the latest run of <a href="https://github.com/b0realis/OpenXcom3D/actions/workflows/build.yml?query=branch%3Amain">Build</a> and, under <i>Artifacts</i>, take <b>macos-release</b> (that needs a free GitHub account; each run keeps it for 30 days). Inside is <code>OpenXcom3D-&lt;version&gt;-macos.zip</code>, for Apple silicon and Intel, macOS 11 and newer.</p>
+          </div>
+          <label class="check"><input type="checkbox" data-step="2"><span class="tick"></span>Downloaded</label>
+        </div>
+      </li>
+
+      <!-- 3: unpack and start -->
+      <li class="step" id="step-3">
+        <div class="badge" aria-hidden="true"><span>3</span></div>
+        <div>
+          <h2>Unpack it and start it</h2>
+          <div data-os="linux">
+            <h3>The AppImage</h3>
+            <p>Make it executable (in a file manager: <i>Properties → Permissions → Allow executing as program</i>), then double-click it. Or in a terminal, where you downloaded it:</p>
+            <div class="term"><div class="term-bar"><span>Terminal</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre>chmod +x OpenXcom3D-*-x86_64.AppImage
+./OpenXcom3D-*-x86_64.AppImage</pre></div>
+            <h3>The archive</h3>
+            <p>Unpack it anywhere (a file manager's <i>Extract here</i> does it) and run <code>play.sh</code> in it:</p>
+            <div class="term"><div class="term-bar"><span>Terminal</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre>tar xzf OpenXcom3D-*-linux-x86_64.tar.gz
+cd OpenXcom3D-*-linux-x86_64
+./play.sh</pre></div>
+            <p>Or let its installer put it in <code>~/Games/OpenXcom3D</code>, with a menu entry: <code>python3 install.py --desktop</code> in that folder. It asks where your game data is, and finds Steam's by itself.</p>
+          </div>
+          <div data-os="win">
+            <p class="lead">Unpack the zip (right click → <i>Extract All</i>) into a folder of yours: <i>Documents</i>, the <i>Desktop</i> or <code>C:\Games</code>. <b>Not</b> <i>Program Files</i>: the game keeps its saves and options in its own <code>user</code> folder, and Windows doesn't let it write there.</p>
+            <p>Then double-click <b><code>play.bat</code></b> in that folder.</p>
+            <div class="note"><p><b>"Windows protected your PC":</b> the game isn't signed, so Windows asks the first time. Click <i>More info</i>, then <i>Run anyway</i>.</p></div>
+          </div>
+          <div data-os="deck">
+            <p class="lead">Unpack the archive into <code>~/Games</code> (in Dolphin, the file manager: right click → <i>Extract → Extract archive here</i>). Then double-click <code>play.sh</code> in its folder and choose <i>Execute</i>, once, to check that it starts and finds your game.</p>
+            <h3>Into Game Mode</h3>
+            <ul>
+              <li>In Steam (still on the desktop): <i>Games → Add a Non-Steam Game to My Library → Browse</i>, set the file type to <i>All Files</i>, pick <code>play.sh</code> and add it.</li>
+              <li>The controller layout: run <code>steamdeck/add_controller_layout.sh</code> from the game's folder once (double-click → <i>Execute</i>). It closes Steam for a moment, adds the layout and sets it for your OpenXcom3D shortcut, and starts Steam again.</li>
+              <li>Back to Game Mode: OpenXcom3D is in your library under <i>Non-Steam</i>, playing full screen with the layout. <b>Steam + X</b> brings up the keyboard.</li>
+            </ul>
+          </div>
+          <div data-os="mac">
+            <p class="lead">Unpack the zip and move <b>OpenXcom3D.app</b> where you like, <i>Applications</i> for instance.</p>
+            <p>The app is signed ad hoc, not by Apple, so macOS stops it the first time. Open it once, then go to <i>System Settings → Privacy &amp; Security</i> and click <i>Open Anyway</i>. Or in Terminal:</p>
+            <div class="term"><div class="term-bar"><span>Terminal</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre>xattr -dr com.apple.quarantine /Applications/OpenXcom3D.app</pre></div>
+            <p>After that it opens like any other app. Its saves and options live in <code>~/Library/Application Support/OpenXcom3D</code>.</p>
+          </div>
+          <label class="check"><input type="checkbox" data-step="3"><span class="tick"></span>It starts</label>
+        </div>
+      </li>
+
+      <!-- 4: the game data -->
+      <li class="step" id="step-4">
+        <div class="badge" aria-hidden="true"><span>4</span></div>
+        <div>
+          <h2>Give it your game data</h2>
+          <p class="lead">The first time, it looks for your games by itself and links them in: a <code>UFO</code> or <code>TFTD</code> folder next to it (on Linux and the Mac, in your home folder too), and your Steam libraries. Then it starts the game it found, UFO if both are there. If it finds none, it says where to put them.</p>
+          <p>To give it a game it didn't find (a GOG or CD copy, or Steam somewhere it doesn't look), put the game folder from step 1 where it looks, named <code>UFO</code> (for UFO Defense) or <code>TFTD</code> (for Terror From The Deep):</p>
+          <div data-os="linux">
+            <h3>For the archive</h3>
+            <p>Into its <code>user</code> folder, a link is enough (a copy works too; a <code>UFO</code> folder next to <code>play.sh</code> is found as well). In the unpacked folder:</p>
+            <div class="term"><div class="term-bar"><span>Terminal</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre>ln -s "/path/to/XCOM" user/UFO
+ln -s "/path/to/TFD"  user/TFTD</pre></div>
+            <h3>For the AppImage</h3>
+            <p>A <code>UFO</code> or <code>TFTD</code> folder next to the AppImage, or in your home folder, is found. Or link it into the AppImage's own profile:</p>
+            <div class="term"><div class="term-bar"><span>Terminal</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre>mkdir -p ~/.local/share/openxcom3d
+ln -s "/path/to/XCOM" ~/.local/share/openxcom3d/UFO</pre></div>
+          </div>
+          <div data-os="win">
+            <p>Copy the game folder into the OpenXcom3D folder (next to <code>play.bat</code>) and rename it <code>UFO</code> or <code>TFTD</code>. <code>play.bat</code> links it into <code>user\</code> the next time it starts (a directory junction: no administrator needed, and the data stays as it is).</p>
+            <p>Steam's own folder, and every other Steam library it lists (a second disk too), are found without that.</p>
+          </div>
+          <div data-os="deck">
+            <p>Steam's games are found by themselves, on the internal disk and on the SD card. For another copy, put the game folder next to <code>play.sh</code> as <code>UFO</code> (or <code>TFTD</code>), in Dolphin: copy it there and rename it.</p>
+          </div>
+          <div data-os="mac">
+            <p>Copy the game folder to <code>~/Library/Application Support/OpenXcom3D/UFO</code> (or <code>TFTD</code>), or put it next to the app as <code>UFO</code>. The app tells you in a window if it finds none.</p>
+          </div>
+          <p>It should look like this, the game's folders directly inside (not one folder deeper):</p>
+          <ul class="files">
+            <li>UFO/GEODATA <span>the Geoscape's data</span></li>
+            <li>UFO/GEOGRAPH <span>its pictures</span></li>
+            <li>UFO/MAPS <span>the battle maps</span></li>
+            <li>UFO/UFOGRAPH <span>the battle's pictures, and the rest of the game's folders beside them</span></li>
+          </ul>
+          <p><b>Both games?</b> Give it both folders. It starts with UFO; to play TFTD, pick <i>Terror From The Deep</i> under <i>Options → Mods</i>.</p>
+          <label class="check"><input type="checkbox" data-step="4"><span class="tick"></span>It found my game</label>
+        </div>
+      </li>
+
+      <!-- 5: 3D -->
+      <li class="step" id="step-5">
+        <div class="badge" aria-hidden="true"><span>5</span></div>
+        <div>
+          <h2>Into 3D</h2>
+          <p class="lead">Start a campaign, or for a quick look a <b>New Battle</b> from the main menu. In the battle, press <kbd>F8</kbd>: you're in your soldier's eyes. <kbd>F8</kbd> again goes back to the map.</p>
+          <ul>
+            <li>Look with the mouse, walk with <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd>, jump with <kbd>Space</kbd>; every step costs its time units, as on the map.</li>
+            <li>Fire with the left mouse button; <kbd>J</kbd> picks the fire mode, <kbd>R</kbd> reloads, <kbd>G</kbd> switches hands.</li>
+            <li><kbd>C</kbd> frees the cursor for the buttons, <kbd>Tab</kbd> goes to the next soldier, <kbd>I</kbd> opens the inventory, <kbd>H</kbd> shows the game's own HUD.</li>
+          </ul>
+          <p>Every key and setting (there are many, all under <i>Options → 3D VIEW</i>) is in the <a href="https://github.com/b0realis/OpenXcom3D/blob/main/OpenXcom3D_manual.md">manual</a>.</p>
+          <label class="check"><input type="checkbox" data-step="5"><span class="tick"></span>I'm in 3D</label>
+        </div>
+      </li>
+
+    </ol>
+  </div>
+</main>
+
+<section class="faq gutter" aria-labelledby="faq-title">
+  <div class="col">
+    <h2 id="faq-title">If something's wrong</h2>
+    <p>What people run into, and what to do. Anything else: <a href="https://github.com/b0realis/OpenXcom3D/issues">open an issue</a>, with the <code>openxcom.log</code> from the game's profile folder.</p>
+    <details>
+      <summary>It says it needs the data of the original game</summary>
+      <div><p>It found no game folder. Put yours where step 4 says, named <code>UFO</code> or <code>TFTD</code>, with <code>GEODATA</code>, <code>GEOGRAPH</code>, <code>MAPS</code> and <code>UFOGRAPH</code> directly in it: not the folder one up (Steam's <code>XCom UFO Defense</code>), and not one down.</p></div>
+    </details>
+    <details>
+      <summary>F8 does nothing, and there's no 3D button</summary>
+      <div><p>The OpenXcom3D mod is off. Open <b>Options → Mods</b> and switch on <b>OpenXcom3D - First-Person View</b>. (A new profile has it on; if you switched it off, it stays off.)</p></div>
+    </details>
+    <details>
+      <summary>A new version: how do I keep my saves?</summary>
+      <div>
+        <p data-os="linux">The AppImage keeps them in <code>~/.local/share/openxcom3d</code>, for every version. With the archive they're in its <code>user</code> folder: copy that folder's <code>xcom1</code> (UFO) or <code>xcom2</code> (TFTD) folder, and <code>options.cfg</code> if you like, into the new version's <code>user</code> folder.</p>
+        <p data-os="win">They're in the <code>user</code> folder of the old version: copy its <code>xcom1</code> (UFO) or <code>xcom2</code> (TFTD) folder, and <code>options.cfg</code> if you like, into the new version's <code>user</code> folder.</p>
+        <p data-os="deck">They're in the old version's <code>user</code> folder: copy its <code>xcom1</code> (UFO) or <code>xcom2</code> (TFTD) folder into the new version's. Point your Steam shortcut at the new <code>play.sh</code> (its <i>Properties</i>), and run <code>steamdeck/add_controller_layout.sh</code> again for the new version's layout.</p>
+        <p data-os="mac">They stay in <code>~/Library/Application Support/OpenXcom3D</code>, for every version.</p>
+      </div>
+    </details>
+    <details data-os="linux deck">
+      <summary>It says the system is older than glibc 2.34, or lacks libGL.so.1</summary>
+      <div><p>The ready build needs a Linux from 2021 or newer; on an older one, <a href="./">build it from source</a>. <code>libGL.so.1</code> comes with the graphics drivers: <code>libgl1</code> on Debian and Ubuntu, <code>libglvnd</code> on Arch, <code>libglvnd-glx</code> on Fedora.</p></div>
+    </details>
+    <details data-os="linux deck">
+      <summary>The window closes at once, with an X error about GLX</summary>
+      <div><p>The system's OpenGL is broken. The game runs without it like this:</p>
+        <div class="term"><div class="term-bar"><span>Terminal</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre>SDL12COMPAT_OPENGL_SCALING=0 SDL_RENDER_DRIVER=software ./play.sh</pre></div>
+      </div>
+    </details>
+    <details data-os="win">
+      <summary>It copies my game data instead of linking it</summary>
+      <div><p>On a disk that can't hold a directory junction (FAT32, exFAT, a network drive), <code>play.bat</code> copies the game folder into <code>user\</code> instead. That's fine; it takes a little space, and the original stays as it is.</p></div>
+    </details>
+    <details data-os="win">
+      <summary>Has it been played on a real Windows?</summary>
+      <div><p>Every change is started and checked on a real Windows by the <a href="https://github.com/b0realis/OpenXcom3D/actions/workflows/build.yml">automatic builds</a> (the game starts, <code>play.bat</code> finds the games in Steam), and battles are played under Wine. Reports from a real Windows machine are very welcome.</p></div>
+    </details>
+  </div>
+</section>
+
+<footer class="gutter">
+  <div class="col">
+    <p>OpenXcom3D adds a first-person 3D battlescape to OpenXcom Extended: <a href="https://github.com/b0realis/OpenXcom3D">github.com/b0realis/OpenXcom3D</a>. OXCE: <a href="https://github.com/MeridianOXC/OpenXcom">github.com/MeridianOXC/OpenXcom</a>. Both are GPL 3.</p>
+    <p>To compile it yourself: the <a href="./">build guide</a>. Every key and setting: the <a href="https://github.com/b0realis/OpenXcom3D/blob/main/OpenXcom3D_manual.md">manual</a>.</p>
+  </div>
+</footer>
+
+</div>
+
+<script>
+(function () {
+  var app = document.getElementById("app");
+  var STORE = "openxcom3d-play-guide";
+  // The reader's system and ticked steps stay in their own browser (the page works without them).
+  function load() {
+    try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) { return {}; }
+  }
+  function save(state) {
+    try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) { /* the page works without it */ }
+  }
+  var state = load();
+
+  // The system: from the link (#linux, #windows, #deck, #mac), the last choice, or the browser's own.
+  function guessOs() {
+    var p = ((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent || "").toLowerCase();
+    return p.indexOf("win") >= 0 ? "win" : p.indexOf("mac") >= 0 ? "mac" : "linux";
+  }
+  var boxes = document.querySelectorAll(".check input");
+  function setOs(os) {
+    app.setAttribute("data-os", os);
+    document.querySelectorAll(".seg button").forEach(function (b) {
+      b.setAttribute("aria-pressed", b.getAttribute("data-pick") === os ? "true" : "false");
+    });
+    state.os = os; save(state); refresh();
+  }
+  document.querySelectorAll(".seg button").forEach(function (b) {
+    b.addEventListener("click", function () { setOs(b.getAttribute("data-pick")); });
+  });
+
+  // The ticked steps, one list per system.
+  state.done = state.done || {};
+  function key(box) { return app.getAttribute("data-os") + ":" + box.getAttribute("data-step"); }
+  function refresh() {
+    var n = 0;
+    boxes.forEach(function (box) {
+      box.checked = !!state.done[key(box)];
+      box.closest(".step").classList.toggle("done", box.checked);
+      if (box.checked) n++;
+    });
+    document.getElementById("count").textContent = n + " of " + boxes.length + " steps done";
+    document.getElementById("fill").style.width = (100 * n / boxes.length) + "%";
+  }
+  boxes.forEach(function (box) {
+    box.addEventListener("change", function () {
+      state.done[key(box)] = box.checked; save(state); refresh();
+    });
+  });
+  var HASH_OS = { "#linux": "linux", "#windows": "win", "#deck": "deck", "#mac": "mac" };
+  setOs(HASH_OS[location.hash] || state.os || guessOs());
+  window.addEventListener("hashchange", function () {
+    if (HASH_OS[location.hash]) setOs(HASH_OS[location.hash]);
+  });
+
+  // Copy buttons: the commands of the block, or selected for Ctrl C where the clipboard can't be used.
+  document.querySelectorAll("[data-copy]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var term = button.closest(".term");
+      var pre = term.querySelector("pre");
+      var said = term.querySelector(".copied");
+      function fallback() {
+        var range = document.createRange();
+        range.selectNodeContents(pre);
+        var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+        said.textContent = "Ctrl C";
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(pre.textContent).then(function () {
+          said.textContent = "Copied";
+          setTimeout(function () { said.textContent = ""; }, 2000);
+        }, fallback);
+      } else {
+        fallback();
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>
