@@ -525,6 +525,166 @@ void FirstPersonMode::toggleAkimboStyle()
 }
 
 /**
+ * Akimbo on the map (the owner: "if we have weapon in each arm there should be a key combo ctrl
+ * shift plus click"): do the soldier's two guns pair up there? Both hands must hold plain guns (not
+ * a guided launcher, steered by its waypoints), two of them; with "Realistic akimbo" neither may
+ * be two-handed. "Full akimbo" needn't be on: the mark on the map is the choice.
+ * @param unit The soldier.
+ * @return True if they pair up.
+ */
+bool FirstPersonMode::mapAkimboPairs(const BattleUnit *unit) const
+{
+	const BattleItem *right = unit ? unit->getRightHandWeapon() : nullptr, *left = unit ? unit->getLeftHandWeapon() : nullptr;
+	auto plainGun = [](const BattleItem *item) { return item && item->getRules()->getBattleType() == BT_FIREARM && item->getCurrentWaypoints() == 0; };
+	if (!plainGun(right) || !plainGun(left) || right == left)
+	{
+		return false;
+	}
+	return !(Options::fpsAkimboRealistic && (right->getRules()->isTwoHanded() || left->getRules()->isTwoHanded()));
+}
+
+/**
+ * Akimbo on the map: the other hand's gun that fires along with the chosen one's mode there, as in
+ * 3D (see dualPartner): a shot's (no aimed one: that fires alone, as in 3D), the other gun's same
+ * mode if it has it, else its first shot, and only if it's loaded for it; with the game's own
+ * targeting, as the map's shots have (no FPS-style burst). Neither may arc (two arcs fire in turn
+ * in 3D, by the view's own doing).
+ * @param unit The soldier.
+ * @param weapon The gun fired.
+ * @param slot Its fire mode.
+ * @param partnerMode Set to the mode the other gun fires.
+ * @return The other gun, or null if it doesn't fire along.
+ */
+BattleItem *FirstPersonMode::mapAkimboPartner(BattleUnit *unit, const BattleItem *weapon, BattleActionType slot, BattleActionType &partnerMode) const
+{
+	if (!isShot(slot) || slot == BA_AIMEDSHOT || !mapAkimboPairs(unit) || (weapon != unit->getRightHandWeapon() && weapon != unit->getLeftHandWeapon())
+		|| weapon->getArcingShot(slot))
+	{
+		return nullptr;
+	}
+	BattleItem *otherWeapon = weapon == unit->getRightHandWeapon() ? unit->getLeftHandWeapon() : unit->getRightHandWeapon();
+	const std::vector<BattleActionType> otherModes = fireModesFor(unit, otherWeapon);
+	partnerMode = BA_NONE;
+	if (std::find(otherModes.begin(), otherModes.end(), slot) != otherModes.end())
+	{
+		partnerMode = slot;
+	}
+	else
+	{
+		for (BattleActionType candidate : otherModes)
+		{
+			if (isShot(candidate)) { partnerMode = candidate; break; }
+		}
+	}
+	if (partnerMode == BA_NONE || otherWeapon->getArcingShot(partnerMode) || !otherWeapon->getAmmoForAction(partnerMode))
+	{
+		return nullptr;
+	}
+	return otherWeapon;
+}
+
+/**
+ * Akimbo on the map (the owner: Ctrl and Shift held, a click on a hand's weapon; "a mini target
+ * should appear next to each weapon"): steps the soldier's two guns through firing together on
+ * the map, both at once (one mini target by each), in turn (two), and not, the game's warning line
+ * saying which; kept with the soldier in the save. Without two guns that pair up, the line says
+ * so. Shots in 3D keep their own akimbo (the settings, the style key).
+ * @param state The battlescape screen.
+ * @param unit The selected soldier.
+ * @return True if the click was taken (the add-on is on).
+ */
+bool FirstPersonMode::toggleMapAkimbo(BattlescapeState *state, BattleUnit *unit)
+{
+	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
+	if (!mode || !unit)
+	{
+		return false;
+	}
+	if (!mode->mapAkimboPairs(unit))
+	{
+		unit->setMapAkimbo(0);
+		state->warning("STR_FPS_MAP_AKIMBO_TWO_GUNS");
+		return true;
+	}
+	const int next = (unit->getMapAkimbo() + 1) % 3;
+	unit->setMapAkimbo(next);
+	state->warning(next == 1 ? "STR_FPS_AKIMBO_TOGETHER_ON" : next == 2 ? "STR_FPS_AKIMBO_IN_TURN_ON" : "STR_FPS_AKIMBO_OFF");
+	return true;
+}
+
+/**
+ * Akimbo on the map: its mini targets in both hands' boxes on the classic HUD (one each for both
+ * guns at once, two for in turn), drawn after the game draws the hands. Once the two no longer
+ * pair up (a gun has left a hand) it's undone.
+ * @param state The battlescape screen.
+ * @param unit The selected soldier (null: none the player can use).
+ * @param leftHand The left hand's box.
+ * @param rightHand The right hand's box.
+ */
+void FirstPersonMode::drawMapAkimbo(BattlescapeState *state, BattleUnit *unit, Surface *leftHand, Surface *rightHand)
+{
+	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
+	if (!mode || !unit || !unit->getMapAkimbo())
+	{
+		return;
+	}
+	if (!mode->mapAkimboPairs(unit))
+	{
+		unit->setMapAkimbo(0);
+		return;
+	}
+	for (Surface *hand : { leftHand, rightHand })
+	{
+		const Uint8 color = nearestColor(hand->getPalette(), MapAkimboMarkRed, MapAkimboMarkGreen, MapAkimboMarkBlue);
+		hand->lock();
+		for (int mark = 0; mark < unit->getMapAkimbo(); ++mark)
+		{
+			for (int row = 0; row < 7; ++row)
+				for (int column = 0; column < 7; ++column)
+				{
+					if (MapAkimboMark[row][column] == 'X') hand->setPixel(MapAkimboMarkX + mark * MapAkimboMarkStep + column, MapAkimboMarkY + row, color);
+				}
+		}
+		hand->unlock();
+	}
+}
+
+/**
+ * A shot fired on the map (BattlescapeGame::primaryAction, as it launches it): with akimbo marked
+ * there for the soldier (see toggleMapAkimbo), the other hand's gun fires along, as in 3D (see
+ * fire): both at once or in turn, both less accurate, for the pair's cost (the other gun fires
+ * only if there are time units for its share). Anything akimbo left on the game's action is
+ * cleared first. Not while the 3D view shows: its shots go through here too, with their own.
+ * @param state The battlescape screen.
+ * @param action The shot.
+ */
+void FirstPersonMode::mapAkimbo(BattlescapeState *state, BattleAction &action)
+{
+	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
+	if (!mode || mode->isActive())
+	{
+		return;
+	}
+	action.dualWield = false;
+	action.dualVolley = false;
+	action.dualWeapon = nullptr;
+	action.dualType = BA_NONE;
+	BattleUnit *unit = action.actor;
+	if (!unit || !unit->getMapAkimbo() || !action.weapon)
+	{
+		return;
+	}
+	BattleActionType partnerMode = BA_NONE;
+	if (BattleItem *partner = mode->mapAkimboPartner(unit, action.weapon, action.type, partnerMode))
+	{
+		action.dualWield = true;
+		action.dualWeapon = partner;
+		action.dualType = partnerMode;
+		action.dualVolley = unit->getMapAkimbo() == 1;
+	}
+}
+
+/**
  * Dual wield: finds the other hand's gun if it can fire along with the chosen gun's fire mode,
  * and works out which of its own modes it fires: the same mode if it has it, else its first
  * shot mode. Each gun pays its own time units for its own mode (by the game's rules).
@@ -2537,6 +2697,19 @@ bool FirstPersonMode::pelletsInFlight(BattlescapeState *state)
 }
 
 /**
+ * Do a shotgun's pellets, and the two rounds of an akimbo volley, each land on their own, asked by
+ * the game as it fires them: with the setting "Each pellet on its own" (on), in either view,
+ * whoever fires (a player's report on OXCE's "shotgun void": the lead pellet decides the whole
+ * blast, and every pellet is lost with it when it flies off the map). Otherwise the game's own way.
+ * @param state The battlescape screen.
+ * @return True if each lands on its own.
+ */
+bool FirstPersonMode::eachPellet(BattlescapeState *state)
+{
+	return Options::fpsEachPellet && state && state->_firstPerson;
+}
+
+/**
  * A shotgun's pellet landed (ProjectileFlyBState::pelletLands), in 3D or on the map (the owner:
  * "at least cosmetically all pellets should impact, play sound and show bulletholes"): its ammo's
  * hit sound where it struck (at most PelletSoundsAtOnce within PelletSoundWindow: a volley's
@@ -2548,8 +2721,9 @@ bool FirstPersonMode::pelletsInFlight(BattlescapeState *state)
  * @param impact What it struck (a VoxelType; V_OUTOFBOUNDS: nothing in the map).
  * @param weapon The weapon that fired it.
  * @param ammo Its ammo.
+ * @param heard Whether it's heard (not one whose hit the explosion state brings, with its own sound).
  */
-void FirstPersonMode::pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo)
+void FirstPersonMode::pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo, bool heard)
 {
 	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
 	if (!mode || impact == V_OUTOFBOUNDS || !ammo)
@@ -2563,7 +2737,7 @@ void FirstPersonMode::pelletLanded(BattlescapeState *state, const Position &at, 
 		mode->_pelletSoundsFrom = now;
 		mode->_pelletSounds = 0;
 	}
-	if (mode->_pelletSounds < PelletSoundsAtOnce)
+	if (heard && mode->_pelletSounds < PelletSoundsAtOnce)
 	{
 		++mode->_pelletSounds;
 		state->_battleGame->playSound(ammo->getRules()->getHitSound(), at.toTile());

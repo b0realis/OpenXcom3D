@@ -62,6 +62,10 @@ firstPerson:
       type: dust
     - dataSet: MARS
       type: dust
+  # Terrain data sets whose floors are water: where the water reaches the map's edge, the sea goes
+  # on beyond it (beyond the rest of the edge, the map's commonest floor). TFTD: the sea round
+  # islands, ports and ships.
+  water: [SEA]
   # The helmet cameras' bad signal, by mission (alien deployment) type: 1 a glitch now and then
   # (any mission not listed), 2 a lot (the aliens' own ground, where their machinery jams the
   # feed), 0 none. A later entry (or a later mod's) overrides.

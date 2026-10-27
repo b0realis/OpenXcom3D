@@ -319,6 +319,10 @@ A key that can't do its job just now says why on the game's warning line: no fla
 | Reserve TUs (F1 … F4, J), spend all TUs (Delete) | Time units kept for a shot or kneeling | The same (in 3D, J is the next fire mode: the kneel reserve is its classic HUD button); walking in 3D keeps the reserve |
 | Inventory, options, end turn, abort, the soldier's name and bars, special, skills | Their screens and menus | The same |
 
+### Akimbo on the map
+
+On the isometric map a soldier with a gun in each hand can fire both too: hold **Ctrl+Shift** and click either hand's weapon. Each click steps the pair on: **both at once** (a mini target in each hand's box), **in turn** (two in each), and off. A shot fired on the map then fires both guns as akimbo does in 3D: pick the mode from the clicked gun's menu as usual, and the other gun fires its mode of the same kind (snap with snap, auto with auto), else its first, both 30% less accurate, for the more expensive gun's shot and a tenth (the other gun fires only if the time units are there for its share). An aimed shot fires alone, as in 3D. It works with *Full akimbo* off (the mark is the choice; with *Realistic akimbo* a two-handed gun doesn't pair up) and is kept with the soldier in the save; it goes once a gun leaves a hand. Shots in 3D keep their own akimbo (the settings and the style key).
+
 ## 3. The top bar and items
 
 **Top bar**, from left to right:
@@ -430,7 +434,8 @@ Hovering a soldier on the top bar shows the same weapon line on their card.
 - **Show trajectory** (Arcs): while aiming, the path the next throw or shot will take: a throw's or an arcing shot's curve as light cyan dashes fading away from you, with a diamond where it lands (yellow for a forced shot, see *Force arcing shots*); a straight shot's line as a thin red laser from your weapon, with a brighter dot where it meets something; a shot the game will refuse (*Faithful X-COM targeting*: no line of fire) shows its laser dimmed, a dotted dark red, so "No line of fire" never comes as a surprise. Under night vision the path is light in the goggles, as a laser sight is: a white-green core in a green glare, the dot white in the middle; a forced arc is dotted there, since colour can't tell it apart. It's the game's own path, worked out as the game will (the curve it picks for a throw, the line of fire for a shot), only without the accuracy roll: the real one scatters as the hit chance says. It starts from the side the shot will leave from, so leaning (see *Lean shots*, *Lean*) moves it with the shot. **Arcs**: throws and arcing shots (a grenade launcher or a Panzerfaust in the big mods, a spitting alien's weapon); nothing shows where the game couldn't throw. **All**: every shot's line too, up to the first thing it meets. **Off**: none.
 - **Force arcing shots** (YES): an arcing shot the game would refuse (none of its own curves lands on the tile you aim at, as at the side of a building) fires anyway, as with Ctrl held (OXCE's force fire): at that tile (at the exact point with *Aim at exact point*, where the game takes the tile's corner), whatever the curve meets on the way, and its path shows yellow ("at your own risk"). Where the game's own aim works (a unit, an object, a wall, the floor), it's kept. NO: the game refuses such a shot, as on the isometric map without Ctrl.
 - **Force blocked shots** (NO): with *Faithful X-COM targeting*, a straight shot with no line of fire, neither to the point under the crosshair nor to any part of the target (off-centre too, with OXCE's option), fires anyway, as with Ctrl held: along the line to the crosshair, the accuracy roll as always, so a round may clear thin cover (a fence top, a crate's edge) or hit it. Its path shows yellow, its dot on what's in the way. NO: the game refuses it ("No line of fire").
-- **Shotgun pellets in flight** (NO): YES: a shotgun's pellets fly beside its round, in 3D and on the isometric map alike, each to where the game's spread sends it (traced as it's fired, the same targets and spread), and hit as the round lands. On the map they're drawn with the round's bullet sprite; shotgun ammo that has none (some big mods' shotguns) borrows the one its damage type's ammo uses most. NO: the game's own way: the whole blast lands the moment it's fired. Either way every pellet lands with its hit sound (a few to a volley) and, in 3D, its sparks and bullet hole.
+- **Shotgun pellets in flight** (NO): YES: a shotgun's pellets fly beside its round, in 3D and on the isometric map alike, each to where the game's spread sends it (traced as it's fired, the same targets and spread), all drawn as the round is (on the map with the round's bullet sprite; shotgun ammo that has none, as some big mods' shotguns, borrows the one its damage type's ammo uses most). With *Each pellet on its own* each hits as it gets there, else as the round lands. NO: the game's own way: the whole blast lands the moment it's fired. Either way every pellet lands with its hit sound (a few to a volley) and, in 3D, its sparks and bullet hole.
+- **Each pellet on its own** (YES): YES: a shotgun's pellets, and the two rounds of an akimbo volley, each land on their own, in either view and whoever fires. In OXCE the game traces only the round (the lead pellet): the others are traced and hit as it lands, and when it flies off the map (over a target into the sky, past one at the map's edge) none is traced at all, every pellet lost with it (a player's report: the "shotgun void"). Now none is lost, and with pellets in flight each hits as it arrives; the deaths come with the last to land in the map, as the game's come with its round. Misses still flying then fly on to the map's edge, only to be seen; nothing waits for them. NO: the game's own way, the lead pellet deciding for the rest.
 - **Confirm fire** (NO): YES: the first click marks the target and shows its path (whatever *Show trajectory* says), with "Click again to fire"; a click on the same spot fires, a click elsewhere moves the mark, the right button forgets it. Holding the trigger after a confirmed burst keeps firing. NO: one click fires, as always.
 
 ### Battle
@@ -624,6 +629,17 @@ firstPerson:
 
 Never list a map that starts on the surface, nor a mission name two games share for different maps (TFTD's seabed colony is `STR_ALIEN_BASE_ASSAULT`, as UFO's alien base is). Our list is empty: every map tried was told right by itself.
 
+### Water
+
+Past the map's edge the ground goes on as the commonest floor of the edge. The floors of the terrain data sets listed as water are the sea instead: where it reaches the edge, the sea goes on past it, and its top is drawn in waves (its colours taken from its own art). Ours lists TFTD's sea round islands, ports and ships:
+
+```yaml
+firstPerson:
+  water: [SEA]
+```
+
+A list replaces the one before it (a mod adding its own water lists ours too).
+
 ### The item table
 
 How an item looks in 3D is worked out from its rules and its inventory picture, and the item table (`items:`) can say otherwise for any item, by type. It holds two things so far (more may follow: it's meant to tune the 3D shapes item by item):
@@ -649,7 +665,8 @@ firstPerson:
 - Inside a UFO or a craft, its floor goes on under the diagonal pieces of its hull (the map leaves the ground there), coloured from every UFO floor beside it.
 - Animated machinery and light, calm and eased: animated terrain steps a frame about three times a second and cross-fades, so nothing large blinks (the photosensitivity guideline WCAG 2.3 allows at most three flashes a second).
 - UFOs that stand out: steady hulls with glowing, softly pulsing lights, their own coloured light around them and an aura of drifting motes (the "UFO lights and aura" setting).
-- Light and shadow: lamps, the sun, your flashlight, flares.
+- Light and shadow: lamps, the sun, your flashlight, flares. Indoors (a roof overhead, or rock) no sun shines: faces there are lit by the room's own light, as on the map.
+- TFTD's sea in waves: swells rolling across it in the sea's own colours, lighter crests breaking into foam, deeper troughs, and where the sea reaches the map's edge it goes on past it.
 - Bloom, night vision, rain, snow and dust, and in TFTD bubbles, marine snow and caustics.
 - Smoke, fire, explosions and animated machinery that flow from frame to frame.
 - Lifts you ride: standing on a grav lift (or a ladder) shows LIFT PLATFORM arrows, and the view rises or sinks to the next level, at half the walking pace (see *Walking speed*); ladders and lift pads that have no shape in the game's data show as see-through ghosts of their art.
@@ -829,6 +846,16 @@ What `FirstPersonView` draws:
 | `OpenXcom.2010.vcxproj{,.filters}` | The add-on's files |
 
 ## 11. Version history
+
+### 1.08 (2026-10-27)
+
+The two things found while taking 1.07's pictures, the sea in waves, and a play report on shotguns (patches 168–172).
+
+- **Rooms in their own light** (the owner, on a 1.07 picture of a shop: its grey inside wall came out black): the 3D view shaded every face by the sun, three shades darker for one turned away from it and three for one facing it from under the roof's shadow, on top of the game's own light, which already makes a roofed tile darker. Indoors (a floor or an object on any level above, as the game counts a roof, or under rock) faces are now shaded as at night, only a little by their direction, and nothing there is in the sun's shadow: inside walls and floors look as on the map. A wall in another test scene that came out all black is grey.
+- **The sea goes on past the island** (the owner: "Fix"): beyond the map the ground was one floor, the commonest of the map's edge: on an island map, whose south side is sea, the island's grass, so the sea stopped at the edge. Where the sea reaches the edge it now goes on past it (the mod's `water:` list of terrain data sets, TFTD's SEA), the land beyond the rest.
+- **Waves** (the owner: "some nice sea wave-like effect (cheap on performance)"): TFTD's sea is drawn as waves rolling across it, three trains crossing at their own lengths, headings and speeds, their crests bending, in the sea's own colours (its art's plain sea-green, the teal of its deep in the troughs, foam on the highest crests), the same on the map and past its edge, so there are no seams at the tiles any more (the art's black edge drew a grid). A few table look-ups a pixel.
+- **Each pellet on its own** (a player's report on OXCE's "shotgun void": the lead pellet decides the whole blast, and when it flies off the map every pellet is lost with it): a new setting, on: no pellet is ever lost, and with pellets in flight each hits as it gets there, the deaths with the last to land. The same for the two rounds of an akimbo volley (the other round hung in the air when the first left the map). Misses still flying when the last hit lands fly on to the map's edge, only to be seen. Off, the game's own way. On the way: FPS-style shooting's pellets all flew down the round's own line (now spread as the game spreads pellets); in 3D every pellet is drawn as the round is ("the pellet that has ACTUAL sprites, while all others are weird wireframe squiggles"); a shotgun in the other hand of a volley sent its pellets at the map's corner when they didn't fly.
+- **Akimbo on the map** (the owner): Ctrl+Shift+click on a hand's weapon marks the soldier's two guns to fire together on the isometric map, both at once (a mini target by each) or in turn (two), as akimbo does in 3D; kept in the save (see [Akimbo on the map](#akimbo-on-the-map)).
 
 ### 1.07 (2026-10-27)
 

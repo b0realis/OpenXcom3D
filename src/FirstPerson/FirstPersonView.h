@@ -146,6 +146,7 @@ public:
 		bool empty;
 		bool ghostly;            // a ghost of a part with no voxels (setting "Parts without shape"): seen through on some pixels, never in the way (see buildGhost, buildShape)
 		float ghostShare;        // how much of a ghost's opacity it shows: less for a part no one can walk into (see UnwalkableGhostShare)
+		bool water;              // a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea): its top is drawn as waves (see waterColor)
 		float glow[3]; // centre of the brightest voxels in the top third (a lamp's bulb), in the tile
 		int glowCount;
 		Uint8 glowColor;     // one of those bright colours
@@ -222,6 +223,7 @@ public:
 		bool underwater;
 		int ambient;        // shade of open ground under the sky
 		float faceShade[6]; // extra shade per face normal: +x -x +y -y +z -z
+		float indoorFaceShade[6]; // ... indoors, where no sun shines (see indoorsAt): as at night
 		float sunDir[3], moonDir[3];
 		float cloudTime;
 		Uint8 glassTint[256]; // each colour as seen through glass
@@ -494,6 +496,10 @@ private:
 	std::unordered_map<const MapData*, Frames> _frames; // by MapData: its animation frames
 	FirstPersonView *_sharedModelsOwner = nullptr;      // another view whose voxel models this one uses, or null
 	const VoxelModel *_groundModel = nullptr;           // floor repeated outside the map
+	const VoxelModel *_waterModel = nullptr;            // ... beyond the stretches of the edge where the water reaches it, or null
+	std::vector<Uint8> _waterAtEdge;                    // by the tile's x and y on the map's outer ring: water there (see chooseGround)
+	Uint8 _waterColors[3] = {};                         // the sea's plain, deep and foam colours, each as a crest's (see waterColor); 0 none
+	float _waveSteps[3][6] = {};                        // this frame's wave trains (WaveTrains): sine-table steps per voxel east and south, the phase; and their bends' steps per voxel east and south, and depth in steps
 	bool _groundChosen = false;                         // the outside ground has been picked
 	int _surfaceLevel = 0;                              // the map's surface at its edges: rock beyond the edge below it (see chooseGround)
 	bool _enclosed = false;                             // underground all the way up: rock beyond every edge, and above the map
@@ -509,8 +515,8 @@ private:
 	// What the snapshot makes for the rays besides the TileViews, small and close together, and
 	// what it keeps from frame to frame so that unchanged tiles cost little (see snapshotTiles).
 	std::vector<Uint8> _tileFlags;                      // per tile, this frame: the TileFlag bits and the top (for the rays' walk)
-	struct TileLight { Uint8 light, ufoGlow; bool discovered; };
-	std::vector<TileLight> _tileLights;                 // per tile, this frame: its light, a copy of the TileViews' (see lightAt)
+	struct TileLight { Uint8 light, ufoGlow; bool discovered, roofed; };
+	std::vector<TileLight> _tileLights;                 // per tile, this frame: its light, a copy of the TileViews' (see lightAt), and a roof over it (see indoorsAt)
 	struct SolidMask { Uint16 rows[24][16]; };          // the storage of a solid mask (see SolidRows)
 	std::map<std::array<const VoxelModel*, 4>, SolidMask> _solidMasks; // by the tile's four parts, made once each
 	struct TileMemo
@@ -572,10 +578,18 @@ private:
 	void trackDoors(int index, Tile *tile);
 	/// Picks the ground that continues past the map border, the surface's level and whether the map is underground.
 	void chooseGround();
+	/// Picks the sea's colours for its waves from its floor's top.
+	void chooseWaterColors(const VoxelModel *seaModel);
+	/// The sea's height at a spot: the trains of waves crossing there (-1 a trough .. 1 a crest).
+	float waveHeight(float x, float y, float distance) const;
+	/// The sea's colour at a spot of its surface, and the shade its wave adds.
+	Uint8 waterColor(float x, float y, float distance, int pixelX, int pixelY, float &shade) const;
 	/// The rock beyond an underground map's edge, or over it, at a point there.
 	Uint8 rockColor(float alongU, float alongV, int face, float distance, int pixelX, int pixelY) const;
 	/// Is an underside at this height a ceiling under rock (an underground map, or below its surface)?
 	bool underRock(float height) const;
+	/// Is a point indoors, where no sun shines (a roof over it, or under rock)?
+	bool indoorsAt(const float point[3]) const;
 	/// Takes this frame's snapshot of every tile, for the rays.
 	void snapshotTiles();
 	/// What changed on a tile since the last frame: doors, burnt-out fires, destruction.
@@ -981,6 +995,8 @@ private:
 
 	/// Follows the game's shot in flight: its start, flight and end.
 	void followShots();
+	/// The game's projectile still in flight: none once it has landed while the rest of its shot flies on.
+	Projectile *flyingProjectile() const;
 	/// The last shot has ended: impact, beam, when an enemy shot ended.
 	void finishShot();
 	/// A new shot has left: its start, look, muzzle flash and kick.

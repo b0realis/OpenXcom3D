@@ -12,10 +12,10 @@ index 31faa5c79..7e45307af 100644
  if ( CHECK_CCACHE )
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..93061f6f4
+index 000000000..c301d4195
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,397 @@
+@@ -0,0 +1,400 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -197,6 +197,7 @@ index 000000000..93061f6f4
 +  STR_FPS_KEY_AKIMBO_STYLE_DESC: "Switches akimbo between taking turns round by round and both at once (setting Akimbo volley)."
 +  STR_FPS_AKIMBO_TOGETHER_ON: "AKIMBO: BOTH AT ONCE"
 +  STR_FPS_AKIMBO_IN_TURN_ON: "AKIMBO: IN TURN"
++  STR_FPS_MAP_AKIMBO_TWO_GUNS: "AKIMBO NEEDS A GUN IN EACH HAND"
 +  STR_FPS_IN_TURN: "IN TURN"
 +  STR_FPS_VOLLEY: "VOLLEY"
 +  STR_FPS_FAITHFUL_TARGETING_DESC: "YES: the game's accuracy. NO: FPS-style aim, spread and recoil."
@@ -332,7 +333,9 @@ index 000000000..93061f6f4
 +  STR_FPS_FORCE_ARCING_DESC: "An arcing shot the game would refuse (as at a wall's side) fires anyway, as with Ctrl held. Its path shows yellow."
 +  STR_FPS_FORCE_BLOCKED: "Force blocked shots"
 +  STR_FPS_PELLETS_IN_FLIGHT: "Shotgun pellets in flight"
-+  STR_FPS_PELLETS_IN_FLIGHT_DESC: "In 3D a shotgun's pellets fly beside its round, each to where the game's spread sends it, and hit as it lands. NO: the game's own way, the whole blast landing the moment it's fired."
++  STR_FPS_PELLETS_IN_FLIGHT_DESC: "In 3D and on the map a shotgun's pellets fly beside its round, each to where the game's spread sends it. NO: the game's own way, the whole blast landing the moment it's fired."
++  STR_FPS_EACH_PELLET: "Each pellet on its own"
++  STR_FPS_EACH_PELLET_DESC: "A shotgun's pellets, and the two rounds of an akimbo volley, each land on their own: none is lost when the lead pellet flies off the map, and in flight each hits as it gets there. NO: the game's own way, the lead pellet deciding for the rest."
 +  STR_FPS_FORCE_BLOCKED_DESC: "A shot with no line of fire to the crosshair's point, nor to any part of the target (with Faithful targeting), fires anyway along the line to the crosshair, hitting what's in the way, as with Ctrl held. Its path shows yellow."
 +  STR_FPS_CONFIRM_FIRE: "Confirm fire"
 +  STR_FPS_CONFIRM_FIRE_DESC: "The first click marks the target and shows the path; click the same spot again to fire. Right button: never mind."
@@ -415,10 +418,10 @@ index 000000000..93061f6f4
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers: a clear view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..2318607a2
+index 000000000..5430563e7
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,397 @@
+@@ -0,0 +1,400 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -600,6 +603,7 @@ index 000000000..2318607a2
 +  STR_FPS_KEY_AKIMBO_STYLE_DESC: "Switches akimbo between taking turns round by round and both at once (setting Akimbo volley)."
 +  STR_FPS_AKIMBO_TOGETHER_ON: "AKIMBO: BOTH AT ONCE"
 +  STR_FPS_AKIMBO_IN_TURN_ON: "AKIMBO: IN TURN"
++  STR_FPS_MAP_AKIMBO_TWO_GUNS: "AKIMBO NEEDS A GUN IN EACH HAND"
 +  STR_FPS_IN_TURN: "IN TURN"
 +  STR_FPS_VOLLEY: "VOLLEY"
 +  STR_FPS_FAITHFUL_TARGETING_DESC: "YES: the game's accuracy. NO: FPS-style aim, spread and recoil."
@@ -735,7 +739,9 @@ index 000000000..2318607a2
 +  STR_FPS_FORCE_ARCING_DESC: "An arcing shot the game would refuse (as at a wall's side) fires anyway, as with Ctrl held. Its path shows yellow."
 +  STR_FPS_FORCE_BLOCKED: "Force blocked shots"
 +  STR_FPS_PELLETS_IN_FLIGHT: "Shotgun pellets in flight"
-+  STR_FPS_PELLETS_IN_FLIGHT_DESC: "In 3D a shotgun's pellets fly beside its round, each to where the game's spread sends it, and hit as it lands. NO: the game's own way, the whole blast landing the moment it's fired."
++  STR_FPS_PELLETS_IN_FLIGHT_DESC: "In 3D and on the map a shotgun's pellets fly beside its round, each to where the game's spread sends it. NO: the game's own way, the whole blast landing the moment it's fired."
++  STR_FPS_EACH_PELLET: "Each pellet on its own"
++  STR_FPS_EACH_PELLET_DESC: "A shotgun's pellets, and the two rounds of an akimbo volley, each land on their own: none is lost when the lead pellet flies off the map, and in flight each hits as it gets there. NO: the game's own way, the lead pellet deciding for the rest."
 +  STR_FPS_FORCE_BLOCKED_DESC: "A shot with no line of fire to the crosshair's point, nor to any part of the target (with Faithful targeting), fires anyway along the line to the crosshair, hitting what's in the way, as with Ctrl held. Its path shows yellow."
 +  STR_FPS_CONFIRM_FIRE: "Confirm fire"
 +  STR_FPS_CONFIRM_FIRE_DESC: "The first click marks the target and shows the path; click the same spot again to fire. Right button: never mind."
@@ -818,10 +824,10 @@ index 000000000..2318607a2
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers: a clear view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..3157f1bc4
+index 000000000..8e5c195aa
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,121 @@
+@@ -0,0 +1,125 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -886,6 +892,10 @@ index 000000000..3157f1bc4
 +      type: dust
 +    - dataSet: MARS
 +      type: dust
++  # Terrain data sets whose floors are water: where the water reaches the map's edge, the sea goes
++  # on beyond it (beyond the rest of the edge, the map's commonest floor). TFTD: the sea round
++  # islands, ports and ships.
++  water: [SEA]
 +  # The helmet cameras' bad signal, by mission (alien deployment) type: 1 a glitch now and then
 +  # (any mission not listed), 2 a lot (the aliens' own ground, where their machinery jams the
 +  # feed), 0 none. A later entry (or a later mod's) overrides.
@@ -945,7 +955,7 @@ index 000000000..3157f1bc4
 +        color: 144
 diff --git a/mod/OpenXcom3D/metadata.yml b/mod/OpenXcom3D/metadata.yml
 new file mode 100644
-index 000000000..ec3c42ff1
+index 000000000..673837018
 --- /dev/null
 +++ b/mod/OpenXcom3D/metadata.yml
 @@ -0,0 +1,11 @@
@@ -953,15 +963,15 @@ index 000000000..ec3c42ff1
 +# metadata.yml for OpenXcom3D
 +
 +name: "OpenXcom3D - First-Person View"
-+version: 1.07
++version: 1.08
 +description: "Adds a first-person 3D view of the battlescape (F8): mouse look, real-time movement paid with time units (WASD), firing from the crosshair, a squad bar with soldier camera cards, lights, shadows, flashlight, particles, weather, tactical flares, combat music and its own 3D View options tab. Needs the OpenXcom3D build of OXCE; on a standard OXCE build this mod reports an unsupported engine and stays off."
 +author: OpenXcom3D project
 +
 +master: "*"
 +requiredExtendedEngine: OpenXcom3D
-+requiredExtendedVersion: "1.0.7"
++requiredExtendedVersion: "1.0.8"
 diff --git a/src/Battlescape/BattlescapeGame.cpp b/src/Battlescape/BattlescapeGame.cpp
-index b7e1111f3..7bd979a4e 100644
+index b7e1111f3..226a7bf7f 100644
 --- a/src/Battlescape/BattlescapeGame.cpp
 +++ b/src/Battlescape/BattlescapeGame.cpp
 @@ -59,6 +59,7 @@
@@ -985,6 +995,14 @@ index b7e1111f3..7bd979a4e 100644
  	{
  		getMap()->getCamera()->centerOnPosition(unit->getPosition());
  		if (status == STATUS_PANICKING)
+@@ -1926,6 +1931,7 @@ void BattlescapeGame::primaryAction(Position pos)
+ 
+ 			_parentState->getGame()->getCursor()->setVisible(false);
+ 			_currentAction.cameraPosition = getMap()->getCamera()->getMapOffset();
++			FirstPerson::mapAkimbo(_parentState, _currentAction); // (OpenXcom3D: the other hand's gun along, marked on the map)
+ 			_states.push_back(new ProjectileFlyBState(this, _currentAction));
+ 			statePushFront(new UnitTurnBState(this, _currentAction)); // first of all turn towards the target
+ 		}
 diff --git a/src/Battlescape/BattlescapeGame.h b/src/Battlescape/BattlescapeGame.h
 index 7af613cc7..286e4f3a5 100644
 --- a/src/Battlescape/BattlescapeGame.h
@@ -1005,7 +1023,7 @@ index 7af613cc7..286e4f3a5 100644
  	/// Default constructor
  	BattleAction() : target(-1, -1, -1), targeting(false), value(0), diff(0), autoShotCounter(0), cameraPosition(0, 0, -1), desperate(false), finalFacing(-1), finalAction(false), number(0), sprayTargeting(false) { }
 diff --git a/src/Battlescape/BattlescapeState.cpp b/src/Battlescape/BattlescapeState.cpp
-index 7cd494130..58ecf8e01 100644
+index 7cd494130..0f9a7ef63 100644
 --- a/src/Battlescape/BattlescapeState.cpp
 +++ b/src/Battlescape/BattlescapeState.cpp
 @@ -22,6 +22,7 @@
@@ -1052,7 +1070,39 @@ index 7cd494130..58ecf8e01 100644
  			if (popped)
  			{
  				_battleGame->handleNonTargetAction();
-@@ -2547,6 +2556,25 @@ void BattlescapeState::animate()
+@@ -1545,6 +1554,11 @@ void BattlescapeState::btnLeftHandItemClick(Action *action)
+ {
+ 	if (playableUnitSelected())
+ 	{
++		// (OpenXcom3D: Ctrl and Shift held, a click marks the two guns to fire together on the map)
++		if (!_game->isRightClick(action, true) && _game->isCtrlPressed(true) && _game->isShiftPressed(true) && FirstPerson::toggleMapAkimbo(this, _save->getSelectedUnit()))
++		{
++			return;
++		}
+ 		// concession for touch devices:
+ 		// click on the item to cancel action, and don't pop up a menu to select a new one
+ 		// TODO: wrap this in an IFDEF ?
+@@ -1594,6 +1608,11 @@ void BattlescapeState::btnRightHandItemClick(Action *action)
+ {
+ 	if (playableUnitSelected())
+ 	{
++		// (OpenXcom3D: Ctrl and Shift held, a click marks the two guns to fire together on the map)
++		if (!_game->isRightClick(action, true) && _game->isCtrlPressed(true) && _game->isShiftPressed(true) && FirstPerson::toggleMapAkimbo(this, _save->getSelectedUnit()))
++		{
++			return;
++		}
+ 		// concession for touch devices:
+ 		// click on the item to cancel action, and don't pop up a menu to select a new one
+ 		// TODO: wrap this in an IFDEF ?
+@@ -2111,6 +2130,7 @@ void BattlescapeState::drawHandsItems()
+ 	}
+ 	drawItem(leftHandItem, _btnLeftHandItem, _numAmmoLeft, _numMedikitLeft, _numTwoHandedIndicatorLeft, left, left2);
+ 	drawItem(rightHandItem, _btnRightHandItem, _numAmmoRight, _numMedikitRight, _numTwoHandedIndicatorRight, right, right2);
++	FirstPerson::drawMapAkimbo(this, battleUnit, _btnLeftHandItem, _btnRightHandItem); // (OpenXcom3D: akimbo on the map's mini targets)
+ }
+ 
+ /**
+@@ -2547,6 +2567,25 @@ void BattlescapeState::animate()
  	}
  }
  
@@ -1078,7 +1128,7 @@ index 7cd494130..58ecf8e01 100644
  /**
   * Handles the battle game state.
   */
-@@ -2698,6 +2726,11 @@ inline void BattlescapeState::handle(Action *action)
+@@ -2698,6 +2737,11 @@ inline void BattlescapeState::handle(Action *action)
  {
  	if (!_firstInit)
  	{
@@ -1090,7 +1140,7 @@ index 7cd494130..58ecf8e01 100644
  		if (_game->getCursor()->getVisible() || ((action->getDetails()->type == SDL_MOUSEBUTTONDOWN || action->getDetails()->type == SDL_MOUSEBUTTONUP) && _game->isRightClick(action)))
  		{
  			State::handle(action);
-@@ -4078,6 +4111,7 @@ void BattlescapeState::resize(int &dX, int &dY)
+@@ -4078,6 +4122,7 @@ void BattlescapeState::resize(int &dX, int &dY)
  	{
  		pos += dX;
  	}
@@ -1194,102 +1244,244 @@ index ff9973e6f..6e85d7829 100644
  		int animFrames = -1;
  		int sound = -1;
 diff --git a/src/Battlescape/Map.cpp b/src/Battlescape/Map.cpp
-index 3665cd199..19387a4f0 100644
+index 3665cd199..619c57252 100644
 --- a/src/Battlescape/Map.cpp
 +++ b/src/Battlescape/Map.cpp
-@@ -758,6 +758,31 @@ void Map::drawTerrain(Surface *surface)
+@@ -252,6 +252,7 @@ Map::~Map()
+ 	delete _message;
+ 	delete _camera;
+ 	delete _txtAccuracy;
++	for (Projectile *stray : _strays) delete stray;
+ }
+ 
+ /**
+@@ -758,8 +759,44 @@ void Map::drawTerrain(Surface *surface)
  
  	NumberText *_numWaypid = 0;
  
 +	// (OpenXcom3D: the rounds flying beside the projectile, the other gun's and a shotgun's pellets,
-+	// each with the tiles its sprites span, as the projectile's below: drawn only there, since
-+	// checking every tile on the screen for every pellet made a shotgun's blast crawl on the map)
++	// and the misses of a shot that ended flying on to the map's edge (see moveStrays), each with
++	// the tiles its sprites span, as the projectile's below: drawn only there, since checking every
++	// tile on the screen for every pellet made a shotgun's blast crawl on the map; each where it's
++	// seen, as the projectile is)
++	moveStrays();
 +	struct BulletBeside { const Projectile *bullet; int lowX, lowY, highX, highY; };
 +	std::vector<BulletBeside> bulletsBeside;
++	std::vector<const Projectile*> beside(_strays.begin(), _strays.end());
 +	if (_projectile && !_projectile->getItem())
 +	{
-+		std::vector<const Projectile*> beside;
 +		if (_partnerProjectile) beside.push_back(_partnerProjectile);
 +		beside.insert(beside.end(), _pellets.begin(), _pellets.end());
-+		for (const Projectile *bullet : beside)
++	}
++	for (const Projectile *bullet : beside)
++	{
++		const Tile *bulletTile = _save->getTile(bullet->getPosition(0).toTile());
++		if (!_save->getDebugMode() && _save->getSide() != FACTION_PLAYER && !(bulletTile && bulletTile->getVisible()))
 +		{
-+			BulletBeside span = { bullet, 16000, 16000, 0, 0 };
-+			for (int i = 0; i < BULLET_SPRITES; ++i)
-+			{
-+				const Position voxel = bullet->getPosition(1-i);
-+				span.lowX = std::min(span.lowX, voxel.x / 16);
-+				span.lowY = std::min(span.lowY, voxel.y / 16);
-+				span.highX = std::max(span.highX, voxel.x / 16);
-+				span.highY = std::max(span.highY, voxel.y / 16);
-+			}
-+			bulletsBeside.push_back(span);
++			continue;
 +		}
++		BulletBeside span = { bullet, 16000, 16000, 0, 0 };
++		for (int i = 0; i < BULLET_SPRITES; ++i)
++		{
++			const Position voxel = bullet->getPosition(1-i);
++			span.lowX = std::min(span.lowX, voxel.x / 16);
++			span.lowY = std::min(span.lowY, voxel.y / 16);
++			span.highX = std::max(span.highX, voxel.x / 16);
++			span.highY = std::max(span.highY, voxel.y / 16);
++		}
++		bulletsBeside.push_back(span);
 +	}
 +
  	// if we got bullet, get the highest x and y tiles to draw it on
- 	if (_projectile && _explosions.empty())
+-	if (_projectile && _explosions.empty())
++	// (OpenXcom3D: not one that landed while the rest of its shot flies on: it's gone; and drawn
++	// while hits play too: with each pellet on its own, or a volley's other round landing first,
++	// the shot's earlier hits play while it still flies, which the game itself never has)
++	if (_projectile && !_projectileLanded)
  	{
-@@ -1119,13 +1144,14 @@ void Map::drawTerrain(Surface *surface)
+ 		int part = _projectile->getItem() ? 0 : BULLET_SPRITES-1;
+ 		for (int i = 0; i <= part; ++i)
+@@ -1074,6 +1111,54 @@ void Map::drawTerrain(Surface *surface)
  						}
- 						else
- 						{
--							// draw bullet on the correct tile
--							if (itX >= bulletLowX && itX <= bulletHighX && itY >= bulletLowY && itY <= bulletHighY)
-+							// (OpenXcom3D: a bullet's sprites on this tile, for the round and, beside it, the
-+							// other gun's round and a shotgun's pellets in flight, see ProjectileFlyBState)
-+							auto drawBullet = [&](const Projectile *bullet)
- 							{
- 								int begin = 0;
- 								int end = BULLET_SPRITES;
- 								int direction = 1;
--								if (_projectile->isReversed())
-+								if (bullet->isReversed())
- 								{
- 									begin = BULLET_SPRITES - 1;
- 									end = -1;
-@@ -1134,10 +1160,10 @@ void Map::drawTerrain(Surface *surface)
+ 					}
  
- 								for (int i = begin; i != end; i += direction)
- 								{
--									tmpSurface = _projectileSet->getFrame(_projectile->getParticle(i));
-+									tmpSurface = _projectileSet->getFrame(bullet->getParticle(i));
- 									if (tmpSurface)
- 									{
--										Position voxelPos = _projectile->getPosition(1-i);
-+										Position voxelPos = bullet->getPosition(1-i);
- 										// draw shadow on the floor
- 										voxelPos.z = _save->getTileEngine()->castedShade(voxelPos);
- 										if (voxelPos.x / 16 == itX &&
-@@ -1152,7 +1178,7 @@ void Map::drawTerrain(Surface *surface)
- 										}
- 
- 										// draw bullet itself
--										voxelPos = _projectile->getPosition(1-i);
-+										voxelPos = bullet->getPosition(1-i);
- 										if (voxelPos.x / 16 == itX &&
- 											voxelPos.y / 16 == itY &&
- 											voxelPos.z / 24 == itZ &&
-@@ -1165,6 +1191,19 @@ void Map::drawTerrain(Surface *surface)
- 										}
- 									}
- 								}
-+							};
-+							// draw bullet on the correct tile
-+							if (itX >= bulletLowX && itX <= bulletHighX && itY >= bulletLowY && itY <= bulletHighY)
++					// (OpenXcom3D: a bullet's sprites on this tile, for the round and, beside it, the
++					// other gun's round and a shotgun's pellets in flight, see ProjectileFlyBState)
++					auto drawBullet = [&](const Projectile *bullet)
++					{
++						int begin = 0;
++						int end = BULLET_SPRITES;
++						int direction = 1;
++						if (bullet->isReversed())
++						{
++							begin = BULLET_SPRITES - 1;
++							end = -1;
++							direction = -1;
++						}
++
++						for (int i = begin; i != end; i += direction)
++						{
++							tmpSurface = _projectileSet->getFrame(bullet->getParticle(i));
++							if (tmpSurface)
 +							{
-+								drawBullet(_projectile);
-+							}
-+							// (OpenXcom3D: and the rounds flying beside it, each on the tiles it spans, as above)
-+							for (const BulletBeside &span : bulletsBeside)
-+							{
-+								if (itX >= span.lowX && itX <= span.highX && itY >= span.lowY && itY <= span.highY)
++								Position voxelPos = bullet->getPosition(1-i);
++								// draw shadow on the floor
++								voxelPos.z = _save->getTileEngine()->castedShade(voxelPos);
++								if (voxelPos.x / 16 == itX &&
++									voxelPos.y / 16 == itY &&
++									voxelPos.z / 24 == itZ &&
++									_save->getTileEngine()->isVoxelVisible(voxelPos))
 +								{
-+									drawBullet(span.bullet);
++									_camera->convertVoxelToScreen(voxelPos, &bulletPositionScreen);
++									bulletPositionScreen.x -= tmpSurface.getWidth() / 2;
++									bulletPositionScreen.y -= tmpSurface.getHeight() / 2;
++									Surface::blitRaw(surface, tmpSurface, bulletPositionScreen.x, bulletPositionScreen.y, 16, false, _nvColor);
 +								}
++
++								// draw bullet itself
++								voxelPos = bullet->getPosition(1-i);
++								if (voxelPos.x / 16 == itX &&
++									voxelPos.y / 16 == itY &&
++									voxelPos.z / 24 == itZ &&
++									_save->getTileEngine()->isVoxelVisible(voxelPos))
++								{
++									_camera->convertVoxelToScreen(voxelPos, &bulletPositionScreen);
++									bulletPositionScreen.x -= tmpSurface.getWidth() / 2;
++									bulletPositionScreen.y -= tmpSurface.getHeight() / 2;
++									Surface::blitRaw(surface, tmpSurface, bulletPositionScreen.x, bulletPositionScreen.y, 0, false, _nvColor);
++								}
++							}
++						}
++					};
+ 					// check if we got bullet && it is in Field Of View
+ 					if (_projectile && _projectileInFOV)
+ 					{
+@@ -1122,52 +1207,19 @@ void Map::drawTerrain(Surface *surface)
+ 							// draw bullet on the correct tile
+ 							if (itX >= bulletLowX && itX <= bulletHighX && itY >= bulletLowY && itY <= bulletHighY)
+ 							{
+-								int begin = 0;
+-								int end = BULLET_SPRITES;
+-								int direction = 1;
+-								if (_projectile->isReversed())
+-								{
+-									begin = BULLET_SPRITES - 1;
+-									end = -1;
+-									direction = -1;
+-								}
+-
+-								for (int i = begin; i != end; i += direction)
+-								{
+-									tmpSurface = _projectileSet->getFrame(_projectile->getParticle(i));
+-									if (tmpSurface)
+-									{
+-										Position voxelPos = _projectile->getPosition(1-i);
+-										// draw shadow on the floor
+-										voxelPos.z = _save->getTileEngine()->castedShade(voxelPos);
+-										if (voxelPos.x / 16 == itX &&
+-											voxelPos.y / 16 == itY &&
+-											voxelPos.z / 24 == itZ &&
+-											_save->getTileEngine()->isVoxelVisible(voxelPos))
+-										{
+-											_camera->convertVoxelToScreen(voxelPos, &bulletPositionScreen);
+-											bulletPositionScreen.x -= tmpSurface.getWidth() / 2;
+-											bulletPositionScreen.y -= tmpSurface.getHeight() / 2;
+-											Surface::blitRaw(surface, tmpSurface, bulletPositionScreen.x, bulletPositionScreen.y, 16, false, _nvColor);
+-										}
+-
+-										// draw bullet itself
+-										voxelPos = _projectile->getPosition(1-i);
+-										if (voxelPos.x / 16 == itX &&
+-											voxelPos.y / 16 == itY &&
+-											voxelPos.z / 24 == itZ &&
+-											_save->getTileEngine()->isVoxelVisible(voxelPos))
+-										{
+-											_camera->convertVoxelToScreen(voxelPos, &bulletPositionScreen);
+-											bulletPositionScreen.x -= tmpSurface.getWidth() / 2;
+-											bulletPositionScreen.y -= tmpSurface.getHeight() / 2;
+-											Surface::blitRaw(surface, tmpSurface, bulletPositionScreen.x, bulletPositionScreen.y, 0, false, _nvColor);
+-										}
+-									}
+-								}
++								drawBullet(_projectile);
  							}
  						}
  					}
-@@ -2432,7 +2471,7 @@ void Map::scrollKey()
++					// (OpenXcom3D: and the rounds flying beside it and the misses flying on after a shot,
++					// each on the tiles it spans, as above)
++					for (const BulletBeside &span : bulletsBeside)
++					{
++						if (itX >= span.lowX && itX <= span.highX && itY >= span.lowY && itY <= span.highY)
++						{
++							drawBullet(span.bullet);
++						}
++					}
+ 
+ 					//draw particle clouds
+ 					int pixelMaskArray[] = { 0, 2, 1, 3 };
+@@ -2330,12 +2382,61 @@ CursorType Map::getCursorType() const
+ void Map::setProjectile(Projectile *projectile)
+ {
+ 	_projectile = projectile;
++	_projectileLanded = false;
+ 	if (projectile && Options::battleSmoothCamera)
+ 	{
+ 		_launch = true;
+ 	}
+ }
+ 
++/**
++ * Takes over the misses of a shot still flying when its last hit landed (first-person view,
++ * setting "Each pellet on its own": the shot ends there, with its deaths and its next round, and
++ * what still flies is leaving the map; a player's choice: they "fly on, nothing waits"). They
++ * fly on to the map's edge only to be seen, on the map and in 3D (see moveStrays).
++ * @param strays The projectiles, owned here from now on.
++ */
++void Map::addStrays(const std::vector<Projectile*> &strays)
++{
++	if (_strays.empty())
++	{
++		_straysMoved = SDL_GetTicks();
++	}
++	_strays.insert(_strays.end(), strays.begin(), strays.end());
++}
++
++/**
++ * Moves the misses flying on after their shot (see addStrays) by the time passed since they last
++ * moved, a step for each StrayStepTime as a shot moves (ProjectileFlyBState thinks at that pace),
++ * whichever view shows (each calls this as it draws them); one at the end of its path, the map's
++ * edge, goes.
++ */
++void Map::moveStrays()
++{
++	const Uint32 now = SDL_GetTicks();
++	const Uint32 steps = (now - _straysMoved) / StrayStepTime;
++	if (steps == 0)
++	{
++		return;
++	}
++	_straysMoved += steps * StrayStepTime;
++	for (auto stray = _strays.begin(); stray != _strays.end(); )
++	{
++		bool flying = true;
++		for (Uint32 step = 0; step < steps && flying; ++step)
++		{
++			flying = (*stray)->move();
++		}
++		if (flying)
++		{
++			++stray;
++			continue;
++		}
++		delete *stray;
++		stray = _strays.erase(stray);
++	}
++}
++
+ /**
+  * Gets the current projectile sprite on the map.
+  * @return Projectile or 0 if there is no projectile sprite on the map.
+@@ -2432,7 +2533,7 @@ void Map::scrollKey()
   */
  void Map::fadeShade()
  {
@@ -1298,7 +1490,7 @@ index 3665cd199..19387a4f0 100644
  	if ((_nightVisionOn && !hold) || (!_nightVisionOn && hold))
  	{
  		_nvColor = Options::oxceNightVisionColor;
-@@ -2555,6 +2594,10 @@ int Map::getIconWidth() const
+@@ -2555,6 +2656,10 @@ int Map::getIconWidth() const
   */
  int Map::getSoundAngle(const Position& pos) const
  {
@@ -1310,7 +1502,7 @@ index 3665cd199..19387a4f0 100644
  	Position relativePosition;
  
 diff --git a/src/Battlescape/Map.h b/src/Battlescape/Map.h
-index 0fdf2ca16..ffadd2d6c 100644
+index 0fdf2ca16..6c3038a35 100644
 --- a/src/Battlescape/Map.h
 +++ b/src/Battlescape/Map.h
 @@ -24,6 +24,7 @@
@@ -1321,7 +1513,15 @@ index 0fdf2ca16..ffadd2d6c 100644
  
  namespace OpenXcom
  {
-@@ -71,6 +72,8 @@ private:
+@@ -65,12 +66,16 @@ private:
+ 	static const int NIGHT_VISION_SHADE = 4;
+ 	static const int NIGHT_VISION_MAX_SHADE = 8;
+ 	static const int BULLET_SPRITES = 35;
++	/// The misses flying on after their shot (see moveStrays) take a step this often, in ms, as a shot does.
++	static const Uint32 StrayStepTime = 1000 / 60;
+ 	Timer *_scrollMouseTimer, *_scrollKeyTimer, *_obstacleTimer;
+ 	Timer *_fadeTimer;
+ 	int _fadeShade;
  	bool _nightVisionOn;
  	int _debugVisionMode;
  	int _nvColor;
@@ -1330,16 +1530,19 @@ index 0fdf2ca16..ffadd2d6c 100644
  	Game *_game;
  	SavedBattleGame *_save;
  	bool _isTFTD;
-@@ -88,6 +91,8 @@ private:
+@@ -88,6 +93,11 @@ private:
  	int _cacheHasLOS; // -1 = unknown, 0 = no LOS, 1 = has LOS
  	int _animFrame;
  	Projectile *_projectile;
 +	Projectile *_partnerProjectile = nullptr; // dual wield (first-person view): the other gun's round
 +	std::vector<Projectile*> _pellets; // a shotgun's pellets flying beside the projectile (first-person view, "Shotgun pellets in flight")
++	bool _projectileLanded = false; // the projectile has landed while the rest of its shot still flies (first-person view, "Each pellet on its own")
++	std::vector<Projectile*> _strays; // misses of a shot that ended, flying on to the map's edge only to be seen (owned here)
++	Uint32 _straysMoved = 0;          // when they last moved
  	bool _followProjectile;
  	bool _projectileInFOV;
  	std::list<Explosion *> _explosions;
-@@ -155,6 +160,12 @@ public:
+@@ -155,6 +165,22 @@ public:
  	void setProjectile(Projectile *projectile);
  	/// Gets projectile.
  	Projectile *getProjectile() const;
@@ -1349,10 +1552,20 @@ index 0fdf2ca16..ffadd2d6c 100644
 +	/// A shotgun's pellets in flight (first-person view): flying beside the projectile, owned by its state.
 +	void setPellets(const std::vector<Projectile*> &pellets) { _pellets = pellets; }
 +	const std::vector<Projectile*> &getPellets() const { return _pellets; }
++	/// The projectile landed before the rest of its shot (first-person view, "Each pellet on its own"):
++	/// no longer drawn, though its shot goes on. A new projectile is flying again.
++	void setProjectileLanded(bool landed) { _projectileLanded = landed; }
++	bool isProjectileLanded() const { return _projectileLanded; }
++	/// Takes over the misses still flying when their shot ended (first-person view, "Each pellet on
++	/// its own"): they fly on to the map's edge, only to be seen.
++	void addStrays(const std::vector<Projectile*> &strays);
++	/// Moves those misses on by the time passed, as a shot moves; drops those at the map's edge.
++	void moveStrays();
++	const std::vector<Projectile*> &getStrays() const { return _strays; }
  	/// Sets follow projectile flag.
  	void setFollowProjectile(bool followProjectile) { _followProjectile = followProjectile; }
  	/// Gets follow projectile flag.
-@@ -198,6 +209,11 @@ public:
+@@ -198,6 +224,11 @@ public:
  	int getIconWidth() const;
  	/// Convert a map position to a sound angle.
  	int getSoundAngle(const Position& pos) const;
@@ -1364,7 +1577,7 @@ index 0fdf2ca16..ffadd2d6c 100644
  	/// Reset the camera smoothing bool.
  	void resetCameraSmoothing();
  	/// Set whether the screen should "flash" or not.
-@@ -210,6 +226,10 @@ public:
+@@ -210,6 +241,10 @@ public:
  	/// toggle the night-vision mode
  	void enableNightVision();
  	void toggleNightVision();
@@ -1531,7 +1744,7 @@ index 861c7702a..7f87d9f02 100644
  	const std::vector<int> &getPath() const;
  	/// Makes a copy to the path.
 diff --git a/src/Battlescape/Projectile.cpp b/src/Battlescape/Projectile.cpp
-index 7f7697c1d..d8aadf0cb 100644
+index 7f7697c1d..29cf90659 100644
 --- a/src/Battlescape/Projectile.cpp
 +++ b/src/Battlescape/Projectile.cpp
 @@ -31,6 +31,7 @@
@@ -1578,7 +1791,7 @@ index 7f7697c1d..d8aadf0cb 100644
  	// apply some accuracy modifiers.
  	// This will results in a new target voxel
 -	applyAccuracy(originVoxel, &_targetVoxel, accuracy, false, extendLine);
-+	if (_action.freeAim)
++	if (_action.freeAim && !_pelletSpread)
 +	{
 +		// FPS-style shot: the first-person view already spread it; only carry the line on
 +		const Position d = _targetVoxel - originVoxel;
@@ -1618,10 +1831,18 @@ index 7f7697c1d..d8aadf0cb 100644
  
  	_distance = 0.0f;
 diff --git a/src/Battlescape/Projectile.h b/src/Battlescape/Projectile.h
-index a263ca287..0c9d0dba8 100644
+index a263ca287..1cf4a21d8 100644
 --- a/src/Battlescape/Projectile.h
 +++ b/src/Battlescape/Projectile.h
-@@ -80,6 +80,10 @@ public:
+@@ -59,6 +59,7 @@ private:
+ 	int _bulletSprite;
+ 	bool _reversed;
+ 	int _vaporColor, _vaporDensity, _vaporProbability;
++	bool _pelletSpread = false; // (OpenXcom3D) a pellet of an FPS-style shot: spread as the game spreads pellets
+ 	void applyAccuracy(Position origin, Position *target, double accuracy, bool keepRange, bool extendLine);
+ public:
+ 	/// Creates a new Projectile.
+@@ -80,6 +81,13 @@ public:
  	int getParticle(int i) const;
  	/// Gets the item.
  	BattleItem *getItem() const;
@@ -1629,11 +1850,14 @@ index a263ca287..0c9d0dba8 100644
 +	const BattleItem *getAmmo() const { return _ammo; }
 +	/// Gets the weapon it was fired from (the first-person view sizes the shot by it).
 +	const BattleItem *getWeapon() const { return _action.weapon; }
++	/// A shotgun's pellet of an FPS-style shot (first-person view): its line is spread as the game
++	/// spreads pellets, round the line the view gave the round (which isn't spread again).
++	void spreadAsPellet() { _pelletSpread = true; }
  	/// Skips the bullet flight.
  	void skipTrajectory();
  	/// Gets the Position of origin for the projectile.
 diff --git a/src/Battlescape/ProjectileFlyBState.cpp b/src/Battlescape/ProjectileFlyBState.cpp
-index 529b7f282..ad6b725e3 100644
+index 529b7f282..c8d4f6691 100644
 --- a/src/Battlescape/ProjectileFlyBState.cpp
 +++ b/src/Battlescape/ProjectileFlyBState.cpp
 @@ -18,6 +18,7 @@
@@ -1782,7 +2006,7 @@ index 529b7f282..ad6b725e3 100644
  
  	BattleActionAttack attack = BattleActionAttack::GetAferShoot(_action, _ammo);
  	if (_action.type == BA_THROW)
-@@ -588,9 +656,360 @@ bool ProjectileFlyBState::createNewProjectile()
+@@ -588,9 +656,684 @@ bool ProjectileFlyBState::createNewProjectile()
  		_parent->getSave()->appendToHitLog(HITLOG_NEW_SHOT, _action.actor->getFaction());
  	}
  
@@ -1792,6 +2016,7 @@ index 529b7f282..ad6b725e3 100644
 +		createPartnerProjectile();
 +	}
 +	createPellets();
++	startGroup(); // (each pellet on its own, its setting on)
  	return true;
  }
  
@@ -1853,8 +2078,9 @@ index 529b7f282..ad6b725e3 100644
 + * @param impact What its path meets (V_OUTOFBOUNDS: nothing in the map).
 + * @param attack The shot's attack.
 + * @param offset Where on its path the hit goes (two steps back for an explosive).
++ * @return Its puff, put on the map; null if it left the map.
 + */
-+void ProjectileFlyBState::pelletLands(Projectile *proj, int impact, const BattleActionAttack &attack, int offset)
++Explosion *ProjectileFlyBState::pelletLands(Projectile *proj, int impact, const BattleActionAttack &attack, int offset)
 +{
 +	// as above: skip the shot to the end of it's path
 +	proj->skipTrajectory();
@@ -1885,7 +2111,9 @@ index 529b7f282..ad6b725e3 100644
 +//									{
 +//										_parent->getTileEngine()->explode({ _action, _ammo }, proj->getPosition(offset), _ammo->getRules()->getPower(), _ammo->getRules()->getDamageType(), _ammo->getRules()->getExplosionRadius(), _unit);
 +//									}
++		return explosion;
 +	}
++	return nullptr;
 +}
 +
 +/**
@@ -1932,6 +2160,10 @@ index 529b7f282..ad6b725e3 100644
 +	{
 +		const Position aim = behaviorType == 1 && firstPelletImpact != origin ? firstPelletImpact : target;
 +		Projectile *proj = new Projectile(_parent->getMod(), _parent->getSave(), action, _origin, aim, ammo);
++		if (action.freeAim)
++		{
++			proj->spreadAsPellet(); // (an FPS-style shot's pellets spread round its line as the game's do: they all flew on it)
++		}
 +		const int impact = behaviorType == 1
 +			? proj->calculateTrajectory(std::max(0.0, (1.0 - spread / 100.0) * choke / 100.0))
 +			: proj->calculateTrajectory(std::max(0.0, (BattleUnit::getFiringAccuracy(attack, _parent->getMod()) / (action.dualWield ? 100.0 / FirstPerson::DualWieldAccuracy : 100.0)) - i * 5.0 * spread / 100.0));
@@ -1998,6 +2230,7 @@ index 529b7f282..ad6b725e3 100644
 +		FirstPerson::freeAimTarget(_parent->getSave()->getBattleState(), _partnerAction, target);
 +	}
 +	_partner = new Projectile(_parent->getMod(), _parent->getSave(), _partnerAction, _origin, target, _partnerAmmo);
++	_partnerTarget = target;
 +	const BattleActionAttack attack = BattleActionAttack::GetAferShoot(_partnerAction, _partnerAmmo);
 +	const double divider = (_parent->getPanicHandled() ? 100.0 : 200.0) / FirstPerson::DualWieldAccuracy; // (together or in turn)
 +	_partnerImpact = _partner->calculateTrajectory(BattleUnit::getFiringAccuracy(attack, _parent->getMod()) / divider);
@@ -2087,7 +2320,7 @@ index 529b7f282..ad6b725e3 100644
 +		{
 +			if (!_partnerPelletsFly)
 +			{
-+				tracePellets(_partnerAction, _partnerAmmo, _partner->getTarget(), *_partner, _partnerPellets);
++				tracePellets(_partnerAction, _partnerAmmo, _partnerTarget, *_partner, _partnerPellets);
 +			}
 +			std::swap(_action, _partnerAction);
 +			std::swap(_ammo, _partnerAmmo);
@@ -2140,10 +2373,325 @@ index 529b7f282..ad6b725e3 100644
 +	}
 +}
 +
++/**
++ * Each pellet on its own (setting "Each pellet on its own", a player's report on OXCE's "shotgun
++ * void": the game traces only its round, the lead pellet; the rest are traced and hit as it lands,
++ * and when it flies off the map they're never traced at all, every one lost): a shotgun's round
++ * and its pellets, and in a volley the other gun's round (and pellets) too, become the shot's rounds
++ * in flight together, each landing on its own as it gets there (see flyGroup). A shotgun whose
++ * pellets don't fly (the setting "Shotgun pellets in flight" off) has them traced now and all of it
++ * lands at once, as the game's does, none lost. A single round, or one whose hit is a blast (only
++ * the explosion state brings a blast), goes the game's own way.
++ */
++void ProjectileFlyBState::startGroup()
++{
++	_group.clear();
++	_groupHits.clear();
++	Projectile *round = _parent->getMap()->getProjectile();
++	if (!round || !_ammo || _action.type == BA_THROW || _action.type == BA_LAUNCH || _action.weapon->getArcingShot(_action.type)
++		|| !FirstPerson::eachPellet(_parent->getSave()->getBattleState()))
++	{
++		return;
++	}
++	// A round whose hit is a bullet's (no blast), and whether it's a shotgun's.
++	auto bulletHit = [](const BattleAction &action, BattleItem *ammo)
++	{
++		return ammo->getRules()->getDamageType()->isDirect() && ammo->getRules()->getExplosionRadius(BattleActionAttack::GetAferShoot(action, ammo)) == 0;
++	};
++	const bool shotgun = _ammo->getRules()->getShotgunPellets() != 0;
++	const bool partnerShotgun = _partner && _partnerAmmo->getRules()->getShotgunPellets() != 0;
++	if (!bulletHit(_action, _ammo) || (!shotgun && !_partner) || (_partner && !bulletHit(_partnerAction, _partnerAmmo)))
++	{
++		return;
++	}
++	if (shotgun && !_pelletsFly)
++	{
++		tracePellets(_action, _ammo, _targetVoxel, *round, _pellets);
++	}
++	if (partnerShotgun && !_partnerPelletsFly)
++	{
++		tracePellets(_partnerAction, _partnerAmmo, _partnerTarget, *_partner, _partnerPellets);
++	}
++	const bool instant = shotgun && !_pelletsFly, partnerInstant = partnerShotgun && !_partnerPelletsFly;
++	_group.push_back({ round, _projectileImpact, 0, true, instant, false });
++	for (const auto &pellet : _pellets)
++	{
++		_group.push_back({ pellet.first, pellet.second, 0, false, instant, false });
++	}
++	if (_partner)
++	{
++		_group.push_back({ _partner, _partnerImpact, 1, true, partnerInstant, false });
++		for (const auto &pellet : _partnerPellets)
++		{
++			_group.push_back({ pellet.first, pellet.second, 1, false, partnerInstant, false });
++		}
++	}
++	// what all the pellets bring in experience counts as one hit's, as the game's (see endGroup)
++	_unit->rememberXP();
++}
++
++/**
++ * Each pellet on its own: the shot's rounds fly on, one step (see startGroup). Those reaching the
++ * end of their path land now, each on its own (see landGroupRound); the last of them to land in
++ * the map, when none flies on to land in it later, brings the explosion state that ends the shot
++ * (see endGroup): this gun's round before the other gun's and before a pellet, when they land
++ * together. Rounds still flying then are leaving the map, and go with the shot. With nothing
++ * landing in the map, the shot ends once the last has left it.
++ * @param lastShot Whether this is the shot's last round (its explosion state puts the gun down).
++ */
++void ProjectileFlyBState::flyGroup(bool lastShot)
++{
++	// Each round still in flight moves on (a shotgun's whose pellets don't fly is at its end at
++	// once); those at the end of their path land.
++	std::vector<GroupRound*> landing;
++	for (GroupRound &groupRound : _group)
++	{
++		if (groupRound.landed)
++		{
++			continue;
++		}
++		if (groupRound.instant)
++		{
++			groupRound.projectile->skipTrajectory();
++		}
++		if (!groupRound.projectile->move())
++		{
++			landing.push_back(&groupRound);
++		}
++	}
++	// The hits shown so far play on.
++	for (auto hit = _groupHits.begin(); hit != _groupHits.end(); )
++	{
++		if ((*hit)->animate())
++		{
++			++hit;
++			continue;
++		}
++		_parent->getMap()->getExplosions()->remove(*hit);
++		delete *hit;
++		hit = _groupHits.erase(hit);
++	}
++	if (landing.empty())
++	{
++		return;
++	}
++	// The one ending the shot: of those landing now in the map, when no other round will land in
++	// it later.
++	GroupRound *carrier = nullptr;
++	const bool laterInMap = std::any_of(_group.begin(), _group.end(), [&landing](const GroupRound &groupRound) {
++		return !groupRound.landed && groupRound.impact != V_OUTOFBOUNDS && std::find(landing.begin(), landing.end(), &groupRound) == landing.end();
++	});
++	for (GroupRound *groupRound : landing)
++	{
++		if (!laterInMap && groupRound->impact != V_OUTOFBOUNDS
++			&& (!carrier || (groupRound->round && (!carrier->round || groupRound->gun < carrier->gun))))
++		{
++			carrier = groupRound;
++		}
++	}
++	for (GroupRound *groupRound : landing)
++	{
++		if (groupRound != carrier)
++		{
++			landGroupRound(*groupRound);
++		}
++	}
++	if (carrier || std::all_of(_group.begin(), _group.end(), [](const GroupRound &groupRound) { return groupRound.landed; }))
++	{
++		endGroup(carrier, lastShot);
++	}
++}
++
++/**
++ * Each pellet on its own: one of the shot's rounds lands at the end of its path, before the one
++ * that ends the shot (see flyGroup). In the map it hits at once: a pellet the game's own way (see
++ * pelletLands); a gun's round as the explosion state hits a bullet (its power less the range's
++ * toll, see groupRange; its hit animation and sound), its hit counted for its gun. Its hit's
++ * animation plays on here until the explosion state takes it over, and the deaths it brings come
++ * with that state, at the end of the shot. Then it's no longer drawn.
++ * @param landing The round landing.
++ */
++void ProjectileFlyBState::landGroupRound(GroupRound &landing)
++{
++	landing.landed = true;
++	if (landing.gun == 1)
++	{
++		std::swap(_action, _partnerAction); // (the other gun's round: its action and ammo)
++		std::swap(_ammo, _partnerAmmo);
++	}
++	if (landing.impact != V_OUTOFBOUNDS)
++	{
++		const BattleActionAttack attack = BattleActionAttack::GetAferShoot(_action, _ammo);
++		Explosion *hit = nullptr;
++		if (landing.round)
++		{
++			const RuleItem *ammoRules = _ammo->getRules(), *weaponRules = _action.weapon->getRules();
++			const Position at = landing.projectile->getPosition(0);
++			if (landing.impact == V_UNIT)
++			{
++				projectileHitUnit(at);
++			}
++			hit = new Explosion(at, ammoRules->getHitAnimation(), 0, false, false, ammoRules->getHitAnimationFrames());
++			_parent->getMap()->getExplosions()->push_back(hit);
++			_parent->playSound(ammoRules->getHitSound(), at.toTile());
++			const int range = groupRange(landing);
++			const int power = weaponRules->getIgnoreAmmoPower() ? weaponRules->getPowerBonus(attack) - weaponRules->getPowerRangeReduction(range)
++				: ammoRules->getPowerBonus(attack) - ammoRules->getPowerRangeReduction(range);
++			_parent->getSave()->getTileEngine()->hit(attack, at, power, ammoRules->getDamageType());
++		}
++		else
++		{
++			hit = pelletLands(landing.projectile, landing.impact, attack, 0);
++		}
++		if (hit)
++		{
++			_groupHits.push_back(hit);
++		}
++	}
++	if (landing.gun == 1)
++	{
++		std::swap(_action, _partnerAction);
++		std::swap(_ammo, _partnerAmmo);
++	}
++	// No longer drawn: this gun's round stays the map's (the shot goes on), the other gun's
++	// leaves the map, a pellet goes.
++	if (landing.round && landing.gun == 0)
++	{
++		_parent->getMap()->setProjectileLanded(true);
++	}
++	else if (landing.round)
++	{
++		_parent->getMap()->setPartnerProjectile(nullptr);
++	}
++	else
++	{
++		auto &pellets = landing.gun == 0 ? _pellets : _partnerPellets;
++		pellets.erase(std::remove_if(pellets.begin(), pellets.end(), [&landing](const std::pair<Projectile*, int> &pellet) { return pellet.first == landing.projectile; }), pellets.end());
++		delete landing.projectile;
++		landing.projectile = nullptr;
++		showPellets();
++	}
++}
++
++/**
++ * Each pellet on its own: the shot ends (see flyGroup). The round landing last in the map brings
++ * the explosion state, as the game's round does: its own hit and sound, the hits before it played
++ * out, then the deaths they all brought, the gun put down after the last round, the walls set off.
++ * A pellet that does is marked in the 3D view as the others are (its sound the state's). What
++ * still flies is leaving the map: it flies on to the map's edge only to be seen, nothing waiting
++ * for it (see Map::addStrays). With nothing landing in the map, the gun is put down as the game
++ * does after a round that left it.
++ * @param carrier The round bringing the explosion state, or null if none landed in the map.
++ * @param lastShot Whether this is the shot's last round.
++ */
++void ProjectileFlyBState::endGroup(GroupRound *carrier, bool lastShot)
++{
++	// counted at its target, as the game counts a round when it lands
++	BattleUnit *targetUnit = _parent->getSave()->getTile(_action.target)->getUnit();
++	if (targetUnit && targetUnit != _unit)
++	{
++		targetUnit->getStatistics()->shotAtCounter++;
++	}
++	_parent->getMap()->resetCameraSmoothing();
++	if (carrier)
++	{
++		carrier->landed = true;
++		if (carrier->gun == 1)
++		{
++			std::swap(_action, _partnerAction);
++			std::swap(_ammo, _partnerAmmo);
++		}
++		const BattleActionAttack attack = BattleActionAttack::GetAferShoot(_action, _ammo);
++		const Position at = carrier->projectile->getPosition(0);
++		_parent->statePushFront(new ExplosionBState(_parent, carrier->projectile->getLastPositions(0), attack, 0, lastShot, groupRange(*carrier)));
++		_hitQueued = true;
++		if (carrier->impact == V_UNIT)
++		{
++			projectileHitUnit(at);
++		}
++		if (!carrier->round)
++		{
++			FirstPerson::pelletLanded(_parent->getSave()->getBattleState(), at, carrier->projectile->getPosition(-12), carrier->impact, _action.weapon, _ammo, false);
++		}
++		if (carrier->gun == 1)
++		{
++			std::swap(_action, _partnerAction);
++			std::swap(_ammo, _partnerAmmo);
++		}
++	}
++	else if (lastShot)
++	{
++		_unit->aim(false);
++	}
++	_unit->nerfXP();
++	_groupHits.clear(); // (the explosion state plays them out with the rest of the map's)
++	// What still flies flies on, handed to the map (taken from where it was kept).
++	Projectile *round = _parent->getMap()->getProjectile();
++	std::vector<Projectile*> strays;
++	for (GroupRound &groupRound : _group)
++	{
++		if (groupRound.landed || !groupRound.projectile)
++		{
++			continue;
++		}
++		strays.push_back(groupRound.projectile);
++		if (groupRound.projectile == round)
++		{
++			round = nullptr;
++		}
++		else if (groupRound.projectile == _partner)
++		{
++			_parent->getMap()->setPartnerProjectile(nullptr);
++			_partner = nullptr;
++		}
++		else
++		{
++			for (auto *pellets : { &_pellets, &_partnerPellets })
++			{
++				pellets->erase(std::remove_if(pellets->begin(), pellets->end(), [&groupRound](const std::pair<Projectile*, int> &pellet) { return pellet.first == groupRound.projectile; }), pellets->end());
++			}
++		}
++	}
++	_parent->getMap()->addStrays(strays);
++	_group.clear();
++	dropPellets(_pellets);
++	dropPellets(_partnerPellets);
++	if (_partner)
++	{
++		_parent->getMap()->setPartnerProjectile(nullptr);
++		delete _partner;
++		_partner = nullptr;
++	}
++	_partnerStopped = _partnerHitShown = false;
++	_parent->getMap()->setProjectile(0);
++	delete round;
++}
++
++/**
++ * Each pellet on its own: the distance a round's power falls off over when it hits, as the game
++ * has it: none for a shotgun's round (the lead pellet hits at full power wherever it lands), the
++ * distance it flew for any other round (with a launched one's legs before), and for a pellet.
++ * @param groupRound The round.
++ * @return The range, in voxels.
++ */
++int ProjectileFlyBState::groupRange(const GroupRound &groupRound) const
++{
++	if (groupRound.round)
++	{
++		const BattleItem *ammo = groupRound.gun == 0 ? _ammo : _partnerAmmo;
++		if (ammo->getRules()->getShotgunPellets() != 0)
++		{
++			return 0;
++		}
++		return (groupRound.gun == 0 ? _range : 0) + (int)groupRound.projectile->getDistance();
++	}
++	return (int)groupRound.projectile->getDistance();
++}
++
  /**
   * Deinitialize the state.
   */
-@@ -607,7 +1026,12 @@ void ProjectileFlyBState::deinit()
+@@ -607,7 +1350,12 @@ void ProjectileFlyBState::deinit()
  void ProjectileFlyBState::think()
  {
  	/// checks if a weapon has any more shots to fire.
@@ -2157,7 +2705,7 @@ index 529b7f282..ad6b725e3 100644
  
  	_parent->getSave()->getBattleState()->clearMouseScrollingState();
  	/* TODO refactoring : store the projectile in this state, instead of getting it from the map each time? */
-@@ -616,9 +1040,17 @@ void ProjectileFlyBState::think()
+@@ -616,9 +1364,17 @@ void ProjectileFlyBState::think()
  		bool hasFloor = _action.actor->haveNoFloorBelow() == false;
  		bool unitCanFly = _action.actor->getMovementType() == MT_FLY;
  
@@ -2177,7 +2725,7 @@ index 529b7f282..ad6b725e3 100644
  			&& (hasFloor || unitCanFly))
  		{
  			createNewProjectile();
-@@ -630,6 +1062,10 @@ void ProjectileFlyBState::think()
+@@ -630,6 +1386,10 @@ void ProjectileFlyBState::think()
  		}
  		else
  		{
@@ -2188,7 +2736,14 @@ index 529b7f282..ad6b725e3 100644
  			if (_action.cameraPosition.z != -1 && _action.waypoints.size() <= 1)
  			{
  				_parent->getMap()->getCamera()->setMapOffset(_action.cameraPosition);
-@@ -654,11 +1090,29 @@ void ProjectileFlyBState::think()
+@@ -651,14 +1411,36 @@ void ProjectileFlyBState::think()
+ 			_parent->popState();
+ 		}
+ 	}
++	else if (!_group.empty())
++	{
++		flyGroup(noMoreShotsToShoot()); // (each pellet on its own)
++	}
  	else
  	{
  		BattleActionAttack attack = BattleActionAttack::GetAferShoot(_action, _ammo);
@@ -2219,7 +2774,7 @@ index 529b7f282..ad6b725e3 100644
  		if (!_parent->getMap()->getProjectile()->move())
  		{
  			// impact !
-@@ -742,6 +1196,7 @@ void ProjectileFlyBState::think()
+@@ -742,6 +1524,7 @@ void ProjectileFlyBState::think()
  						noMoreShotsToShoot(),
  						shotgun ? 0 : _range + _parent->getMap()->getProjectile()->getDistance()
  					));
@@ -2227,7 +2782,7 @@ index 529b7f282..ad6b725e3 100644
  
  					if (_projectileImpact == V_UNIT)
  					{
-@@ -754,83 +1209,68 @@ void ProjectileFlyBState::think()
+@@ -754,83 +1537,72 @@ void ProjectileFlyBState::think()
  					// special shotgun behaviour: trace extra projectile paths, and add bullet hits at their termination points.
  					if (shotgun)
  					{
@@ -2261,19 +2816,19 @@ index 529b7f282..ad6b725e3 100644
 -							// let it trace to the point where it hits
 -							int secondaryImpact = V_EMPTY;
 -							if (behaviorType == 1)
-+							for (const auto &pellet : _pellets)
- 							{
+-							{
 -								// pellet spread based on spread and choke values
 -								secondaryImpact = proj->calculateTrajectory(std::max(0.0, (1.0 - spread / 100.0) * choke / 100.0));
 -
-+								pelletLands(pellet.first, pellet.second, attack, offset);
- 							}
+-							}
 -							else
--							{
++							for (const auto &pellet : _pellets)
+ 							{
 -								// pellet spread based on spread and firing accuracy with diminishing formula
 -								// identical with vanilla formula when spread = 100 (default)
 -								secondaryImpact = proj->calculateTrajectory(std::max(0.0, (BattleUnit::getFiringAccuracy(attack, _parent->getMod()) / 100.0) - i * 5.0 * spread / 100.0));
--							}
++								pelletLands(pellet.first, pellet.second, attack, offset);
+ 							}
 -
 -							if (secondaryImpact != V_EMPTY)
 +							dropPellets(_pellets);
@@ -2324,6 +2879,10 @@ index 529b7f282..ad6b725e3 100644
 -//									}
 +
 +								Projectile *proj = new Projectile(_parent->getMod(), _parent->getSave(), _action, _origin, _targetVoxel, _ammo);
++								if (_action.freeAim)
++								{
++									proj->spreadAsPellet(); // (OpenXcom3D: an FPS-style shot's pellets spread round its line as the game's do)
++								}
 +
 +								// let it trace to the point where it hits
 +								int secondaryImpact = V_EMPTY;
@@ -2338,12 +2897,12 @@ index 529b7f282..ad6b725e3 100644
 +									// pellet spread based on spread and firing accuracy with diminishing formula
 +									// identical with vanilla formula when spread = 100 (default)
 +									secondaryImpact = proj->calculateTrajectory(std::max(0.0, (BattleUnit::getFiringAccuracy(attack, _parent->getMod()) / (_action.dualWield ? 100.0 / FirstPerson::DualWieldAccuracy : 100.0)) - i * 5.0 * spread / 100.0));
-+								}
+ 								}
 +
 +								if (secondaryImpact != V_EMPTY)
 +								{
 +									pelletLands(proj, secondaryImpact, attack, offset);
- 								}
++								}
 +								++i;
 +								delete proj;
  							}
@@ -2359,7 +2918,7 @@ index 529b7f282..ad6b725e3 100644
  					}
  
  					// nerf unit's XP values (gained via extra shotgun bullets)
-@@ -842,6 +1282,9 @@ void ProjectileFlyBState::think()
+@@ -842,6 +1614,9 @@ void ProjectileFlyBState::think()
  				}
  			}
  
@@ -2369,7 +2928,7 @@ index 529b7f282..ad6b725e3 100644
  			delete _parent->getMap()->getProjectile();
  			_parent->getMap()->setProjectile(0);
  		}
-@@ -857,6 +1300,9 @@ void ProjectileFlyBState::cancel()
+@@ -857,6 +1632,9 @@ void ProjectileFlyBState::cancel()
  	if (_parent->getMap()->getProjectile())
  	{
  		_parent->getMap()->getProjectile()->skipTrajectory();
@@ -2380,7 +2939,7 @@ index 529b7f282..ad6b725e3 100644
  		if (!_parent->getMap()->getCamera()->isOnScreen(p, false, 0, false))
  			_parent->getMap()->getCamera()->centerOnPosition(p);
 diff --git a/src/Battlescape/ProjectileFlyBState.h b/src/Battlescape/ProjectileFlyBState.h
-index 067c7b3ba..48fdc3598 100644
+index 067c7b3ba..9004c1ea8 100644
 --- a/src/Battlescape/ProjectileFlyBState.h
 +++ b/src/Battlescape/ProjectileFlyBState.h
 @@ -27,6 +27,8 @@ namespace OpenXcom
@@ -2392,7 +2951,7 @@ index 067c7b3ba..48fdc3598 100644
  class Tile;
  
  /**
-@@ -43,6 +45,40 @@ private:
+@@ -43,6 +45,63 @@ private:
  	/// Tries to create a projectile sprite.
  	bool createNewProjectile();
  	bool _initialized, _targetFloor;
@@ -2401,6 +2960,7 @@ index 067c7b3ba..48fdc3598 100644
 +	BattleAction _partnerAction;
 +	BattleItem *_partnerAmmo = nullptr;
 +	Projectile *_partner = nullptr;
++	Position _partnerTarget; // the point it was fired at, in voxels (its pellets' aim)
 +	int _partnerImpact = 0, _partnerShots = 0;
 +	bool _hitQueued = false, _partnerPaid = false;
 +	BattleActionCost _partnerCharge; // what the other gun pays: the rest of the pair's cost (FirstPerson::dualWieldCharge)
@@ -2427,9 +2987,31 @@ index 067c7b3ba..48fdc3598 100644
 +	bool _pelletsFly = false, _partnerPelletsFly = false;
 +	void createPellets();
 +	void tracePellets(const BattleAction &action, BattleItem *ammo, const Position &target, const Projectile &round, std::vector<std::pair<Projectile*, int>> &into);
-+	void pelletLands(Projectile *proj, int impact, const BattleActionAttack &attack, int offset);
++	Explosion *pelletLands(Projectile *proj, int impact, const BattleActionAttack &attack, int offset);
 +	void showPellets();
 +	void dropPellets(std::vector<std::pair<Projectile*, int>> &pellets);
++	// each pellet on its own (setting "Each pellet on its own", a player's report on OXCE's
++	// "shotgun void"): the rounds of a shot in flight together (this gun's round and its pellets,
++	// the other gun's in a volley), each landing as it gets there, none lost with the round when
++	// it leaves the map; the one landing last in the map brings the explosion state that ends the
++	// shot (the deaths, the gun put down). Each round's projectile is owned where it always is
++	// (the map's round, the other gun's round, the pellet lists).
++	struct GroupRound
++	{
++		Projectile *projectile; // null once a pellet has landed (deleted)
++		int impact;             // what its path meets (V_OUTOFBOUNDS: nothing in the map)
++		int gun;                // 0 this gun, 1 the other gun of a volley
++		bool round;             // a gun's round rather than a pellet
++		bool instant;           // a shotgun's whose pellets don't fly: at its end at once, as the game's
++		bool landed;
++	};
++	std::vector<GroupRound> _group;     // empty: the game's own way
++	std::vector<Explosion*> _groupHits; // hits shown as their rounds landed, played on here until the explosion state takes them over
++	void startGroup();
++	void flyGroup(bool lastShot);
++	void landGroupRound(GroupRound &landing);
++	void endGroup(GroupRound *carrier, bool lastShot);
++	int groupRange(const GroupRound &groupRound) const;
  
  public:
  	/// Creates a new ProjectileFly class
@@ -2955,7 +3537,7 @@ index a4c23b216..13d36e8f3 100644
  	{
  		_buttonsPressed |= SDL_BUTTON(button);
 diff --git a/src/Engine/ModInfo.cpp b/src/Engine/ModInfo.cpp
-index cca815d3e..eda0df5fa 100644
+index cca815d3e..04142940f 100644
 --- a/src/Engine/ModInfo.cpp
 +++ b/src/Engine/ModInfo.cpp
 @@ -181,6 +181,9 @@ struct EngineData
@@ -2963,7 +3545,7 @@ index cca815d3e..eda0df5fa 100644
  const EngineData supportedEngines[] = {
  	{ OPENXCOM_VERSION_ENGINE, { OPENXCOM_VERSION_NUMBER }},
 +#ifndef OXCE_NO_FIRSTPERSON
-+	{ "OpenXcom3D", { 1, 0, 7, 0 } }, // first-person add-on 1.07, see src/FirstPerson
++	{ "OpenXcom3D", { 1, 0, 8, 0 } }, // first-person add-on 1.08, see src/FirstPerson
 +#endif
  	{ "", { 0, 0, 0, 0 } }, // assume that every engine support mods from base game, remove if its not true.
  };
@@ -3023,7 +3605,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..fceddfb59 100644
+index a08796ced..63791d803 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -3040,7 +3622,7 @@ index a08796ced..fceddfb59 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsAkimboVolley, fpsCrosshairCosts;
++OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsAkimboVolley, fpsCrosshairCosts;
 +OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle;
@@ -3128,10 +3710,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..a4ea62c50
+index 000000000..9e1d1ffb7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,617 @@
+@@ -0,0 +1,670 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -3481,6 +4063,10 @@ index 000000000..a4ea62c50
 +	// A shotgun's pellets fly beside its round in the 3D view, each to where the game's spread
 +	// sends it, instead of all landing the moment it's fired (the game's own way, kept off).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsPelletsInFlight", &fpsPelletsInFlight, false, "STR_FPS_PELLETS_IN_FLIGHT", category));
++	// A shotgun's pellets, and the two rounds of an akimbo volley, each land on their own: none is
++	// lost when the lead pellet leaves the map, and in flight each hits as it arrives (a player's
++	// report on OXCE's "shotgun void"); off, the game's own way, the lead pellet deciding.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsEachPellet", &fpsEachPellet, true, "STR_FPS_EACH_PELLET", category));
 +	// The units' hitboxes, outlined: off (0), fading in and out once a second (1), always (2).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitboxes", &fpsHitboxes, 0, "STR_FPS_HITBOXES", category));
 +	// The hitboxes' outlines and the path of a throw glowing (spilling bloom round them), or plain lines.
@@ -3656,6 +4242,54 @@ index 000000000..a4ea62c50
 +}
 +
 +/**
++ * Called by the game as it fires a shotgun's round or an akimbo volley: does each pellet (and each
++ * gun's round) land on its own (setting "Each pellet on its own"), rather than as the lead pellet
++ * lands, the rest lost with it when it leaves the map?
++ * @param state The battlescape screen.
++ * @return True if each lands on its own.
++ */
++bool eachPellet(BattlescapeState *state)
++{
++	return FirstPersonMode::eachPellet(state);
++}
++
++/**
++ * Called by the game as a hand's weapon is clicked with Ctrl and Shift held: akimbo on the map
++ * (see FirstPersonMode::toggleMapAkimbo).
++ * @param state The battlescape screen.
++ * @param unit The selected soldier.
++ * @return True if it took the click (the game then does nothing else with it).
++ */
++bool toggleMapAkimbo(BattlescapeState *state, BattleUnit *unit)
++{
++	return FirstPersonMode::toggleMapAkimbo(state, unit);
++}
++
++/**
++ * Called by the game after it draws the hands' weapons: akimbo on the map's mini targets (see
++ * FirstPersonMode::drawMapAkimbo).
++ * @param state The battlescape screen.
++ * @param unit The selected soldier (null: none the player can use).
++ * @param leftHand The left hand's box.
++ * @param rightHand The right hand's box.
++ */
++void drawMapAkimbo(BattlescapeState *state, BattleUnit *unit, Surface *leftHand, Surface *rightHand)
++{
++	FirstPersonMode::drawMapAkimbo(state, unit, leftHand, rightHand);
++}
++
++/**
++ * Called by the game as it launches a shot clicked on the map: akimbo on the map (see
++ * FirstPersonMode::mapAkimbo).
++ * @param state The battlescape screen.
++ * @param action The shot.
++ */
++void mapAkimbo(BattlescapeState *state, BattleAction &action)
++{
++	FirstPersonMode::mapAkimbo(state, action);
++}
++
++/**
 + * A shotgun's pellet landed: heard, and marked in the 3D view (see FirstPersonMode::pelletLanded).
 + * @param state The battlescape screen.
 + * @param at Where it struck, in voxels.
@@ -3663,10 +4297,11 @@ index 000000000..a4ea62c50
 + * @param impact What it struck (a VoxelType; V_OUTOFBOUNDS: nothing).
 + * @param weapon The weapon that fired it.
 + * @param ammo Its ammo.
++ * @param heard Whether it's heard (not one whose hit the explosion state brings, with its own sound).
 + */
-+void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo)
++void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo, bool heard)
 +{
-+	FirstPersonMode::pelletLanded(state, at, from, impact, weapon, ammo);
++	FirstPersonMode::pelletLanded(state, at, from, impact, weapon, ammo, heard);
 +}
 +
 +/**
@@ -3751,10 +4386,10 @@ index 000000000..a4ea62c50
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..85732d5fe
+index 000000000..a302aa63b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,210 @@
+@@ -0,0 +1,228 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -3829,6 +4464,7 @@ index 000000000..85732d5fe
 +class OptionInfo;
 +class RuleItem;
 +class State;
++class Surface;
 +
 +namespace FirstPerson
 +{
@@ -3910,9 +4546,22 @@ index 000000000..85732d5fe
 +/// Setting "Shotgun pellets in flight": do a shotgun's pellets fly beside its round (in 3D and on
 +/// the map), rather than all landing at once? They're traced as the round is fired, and hit as it lands.
 +bool pelletsInFlight(BattlescapeState *state);
++/// Setting "Each pellet on its own": do a shotgun's pellets and a volley's two rounds each land on
++/// their own (in either view), none lost when the lead pellet leaves the map?
++bool eachPellet(BattlescapeState *state);
++/// Akimbo on the map (Ctrl and Shift held, a click on a hand's weapon): steps the soldier's two
++/// guns through firing together on the map, both at once, in turn, and not. True if it took the click.
++bool toggleMapAkimbo(BattlescapeState *state, BattleUnit *unit);
++/// Akimbo on the map: its mini targets in both hands' boxes (one each both at once, two in turn),
++/// drawn after the game draws the hands; undone once the two guns no longer pair up.
++void drawMapAkimbo(BattlescapeState *state, BattleUnit *unit, Surface *leftHand, Surface *rightHand);
++/// A shot fired on the map, as it's launched: with akimbo marked there, the other hand's gun
++/// fires along, as in 3D (not while the 3D view shows: its shots bring their own).
++void mapAkimbo(BattlescapeState *state, BattleAction &action);
 +/// A shotgun's pellet landed (ProjectileFlyBState::pelletLands), in either view: it's heard (a few
-+/// to a volley) and the 3D view marks where it struck (sparks, a bullet hole), as it does the round.
-+void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo);
++/// to a volley; not one whose hit the explosion state brings, which sounds its own) and the 3D view
++/// marks where it struck (sparks, a bullet hole), as it does the round.
++void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo, bool heard = true);
 +/// The bullet sprite for shotgun ammo that has none (Projectile): the one the mod's other ammo of
 +/// its damage type uses most, so the map can draw its round and pellets in flight.
 +int shotgunBulletSprite(const Mod *mod, const RuleItem *ammo);
@@ -3951,7 +4600,11 @@ index 000000000..85732d5fe
 +inline void freeAimTarget(BattlescapeState *, const BattleAction &, Position &) { }
 +inline bool fastShots(BattlescapeState *, const BattleUnit *) { return false; }
 +inline bool pelletsInFlight(BattlescapeState *) { return false; }
-+inline void pelletLanded(BattlescapeState *, const Position &, const Position &, int, const BattleItem *, const BattleItem *) { }
++inline bool eachPellet(BattlescapeState *) { return false; }
++inline bool toggleMapAkimbo(BattlescapeState *, BattleUnit *) { return false; }
++inline void drawMapAkimbo(BattlescapeState *, BattleUnit *, Surface *, Surface *) { }
++inline void mapAkimbo(BattlescapeState *, BattleAction &) { }
++inline void pelletLanded(BattlescapeState *, const Position &, const Position &, int, const BattleItem *, const BattleItem *, bool = true) { }
 +inline int shotgunBulletSprite(const Mod *, const RuleItem *) { return -1; } // (Mod::NO_SURFACE)
 +inline bool breakdown(BattlescapeState *, BattleUnit *) { return false; }
 +inline void closeQuartersDeflected(BattlescapeState *, const BattleUnit *, const Position &) { }
@@ -6640,10 +7293,10 @@ index 000000000..17e29b102
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..382a4ec9f
+index 000000000..3913978a4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1091 @@
+@@ -0,0 +1,1103 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -6777,8 +7430,16 @@ index 000000000..382a4ec9f
 +	static bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
 +	/// Do a shotgun's pellets fly beside its round (setting "Shotgun pellets in flight", the 3D view showing)?
 +	static bool pelletsInFlight(BattlescapeState *state);
++	/// Akimbo on the map (Ctrl+Shift+click on a hand's weapon): steps the soldier's two guns through firing together there.
++	static bool toggleMapAkimbo(BattlescapeState *state, BattleUnit *unit);
++	/// Akimbo on the map: its mini targets in both hands' boxes; undone once the guns no longer pair up.
++	static void drawMapAkimbo(BattlescapeState *state, BattleUnit *unit, Surface *leftHand, Surface *rightHand);
++	/// A shot fired on the map: with akimbo marked there, the other hand's gun fires along, as in 3D.
++	static void mapAkimbo(BattlescapeState *state, BattleAction &action);
++	/// Do a shotgun's pellets and a volley's two rounds each land on their own (setting "Each pellet on its own")?
++	static bool eachPellet(BattlescapeState *state);
 +	/// A shotgun's pellet landed (see FirstPerson::pelletLanded): heard, a few to a volley, and marked in the 3D view.
-+	static void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo);
++	static void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo, bool heard);
 +	/// A soldier panics or goes berserk, asked by the game (see FirstPerson::breakdown).
 +	static bool breakdown(BattlescapeState *state, BattleUnit *unit);
 +	/// A close-quarters check knocked a shot aside, told by the game (see FirstPerson::closeQuartersDeflected).
@@ -7304,6 +7965,10 @@ index 000000000..382a4ec9f
 +	void toggleAkimboStyle();
 +	/// Dual wield: the other hand's gun if it can fire along with this mode, and the mode it fires.
 +	BattleItem *dualPartner(BattleUnit *unit, const BattleItem *weapon, BattleActionType slot, BattleActionType &partnerMode) const;
++	/// Akimbo on the map: do the soldier's two guns pair up there?
++	bool mapAkimboPairs(const BattleUnit *unit) const;
++	/// Akimbo on the map: the other hand's gun that fires along with this mode there, and the mode it fires.
++	BattleItem *mapAkimboPartner(BattleUnit *unit, const BattleItem *weapon, BattleActionType slot, BattleActionType &partnerMode) const;
 +	/// Dual wield: the other hand's gun that fires along with a shot (dualPartner's, with time units for both), or null.
 +	BattleItem *pairedGun(BattleUnit *unit, BattleItem *weapon, BattleActionType slot, BattleActionType mode, BattleActionType &offMode) const;
 +	/// Akimbo: do the two guns fire in turn (either one's shot arcs) rather than together?
@@ -12506,10 +13171,10 @@ index 000000000..a032f0dac
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..b2e696f99
+index 000000000..dea1203a6
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,386 @@
+@@ -0,0 +1,393 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -12767,6 +13432,13 @@ index 000000000..b2e696f99
 +
 +/// A melee swing in the view: wind up, strike, back (milliseconds).
 +const Uint32 SwingTime = 420;
++/// Akimbo on the map (Ctrl+Shift+click on a hand's weapon, see FirstPersonMode::toggleMapAkimbo): mini targets in
++/// each hand's box, one for both guns at once, two for in turn, from (MapAkimboMarkX, MapAkimboMarkY) in the box (its
++/// bottom left, clear of the ammo counts and the reaction and two-handed marks), MapAkimboMarkStep pixels apart, in
++/// the palette's colour nearest to this yellow; their shape a row a string, 'X' drawn.
++const int MapAkimboMarkX = 1, MapAkimboMarkY = 40, MapAkimboMarkStep = 8;
++const int MapAkimboMarkRed = 255, MapAkimboMarkGreen = 216, MapAkimboMarkBlue = 64;
++const char *const MapAkimboMark[7] = { "...X...", ".XX.XX.", ".X...X.", "X..X..X", ".X...X.", ".XX.XX.", "...X..." };
 +/// Doom free grenades: their gravity (voxels a second, each second, down), the usual speed of a throw (voxels a
 +/// second: the flight time is the distance over it, within FreeGrenadeTimeMin and Max seconds).
 +const float FreeGrenadeGravity = 360.0f, FreeGrenadeSpeed = 240.0f, FreeGrenadeTimeMin = 0.25f, FreeGrenadeTimeMax = 1.4f;
@@ -12898,10 +13570,10 @@ index 000000000..b2e696f99
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..55c5132dd
+index 000000000..8f549c259
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,3486 @@
+@@ -0,0 +1,3660 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -13426,6 +14098,166 @@ index 000000000..55c5132dd
 +{
 +	Options::fpsAkimboVolley = !Options::fpsAkimboVolley;
 +	_state->warning(Options::fpsAkimboVolley ? "STR_FPS_AKIMBO_TOGETHER_ON" : "STR_FPS_AKIMBO_IN_TURN_ON");
++}
++
++/**
++ * Akimbo on the map (the owner: "if we have weapon in each arm there should be a key combo ctrl
++ * shift plus click"): do the soldier's two guns pair up there? Both hands must hold plain guns (not
++ * a guided launcher, steered by its waypoints), two of them; with "Realistic akimbo" neither may
++ * be two-handed. "Full akimbo" needn't be on: the mark on the map is the choice.
++ * @param unit The soldier.
++ * @return True if they pair up.
++ */
++bool FirstPersonMode::mapAkimboPairs(const BattleUnit *unit) const
++{
++	const BattleItem *right = unit ? unit->getRightHandWeapon() : nullptr, *left = unit ? unit->getLeftHandWeapon() : nullptr;
++	auto plainGun = [](const BattleItem *item) { return item && item->getRules()->getBattleType() == BT_FIREARM && item->getCurrentWaypoints() == 0; };
++	if (!plainGun(right) || !plainGun(left) || right == left)
++	{
++		return false;
++	}
++	return !(Options::fpsAkimboRealistic && (right->getRules()->isTwoHanded() || left->getRules()->isTwoHanded()));
++}
++
++/**
++ * Akimbo on the map: the other hand's gun that fires along with the chosen one's mode there, as in
++ * 3D (see dualPartner): a shot's (no aimed one: that fires alone, as in 3D), the other gun's same
++ * mode if it has it, else its first shot, and only if it's loaded for it; with the game's own
++ * targeting, as the map's shots have (no FPS-style burst). Neither may arc (two arcs fire in turn
++ * in 3D, by the view's own doing).
++ * @param unit The soldier.
++ * @param weapon The gun fired.
++ * @param slot Its fire mode.
++ * @param partnerMode Set to the mode the other gun fires.
++ * @return The other gun, or null if it doesn't fire along.
++ */
++BattleItem *FirstPersonMode::mapAkimboPartner(BattleUnit *unit, const BattleItem *weapon, BattleActionType slot, BattleActionType &partnerMode) const
++{
++	if (!isShot(slot) || slot == BA_AIMEDSHOT || !mapAkimboPairs(unit) || (weapon != unit->getRightHandWeapon() && weapon != unit->getLeftHandWeapon())
++		|| weapon->getArcingShot(slot))
++	{
++		return nullptr;
++	}
++	BattleItem *otherWeapon = weapon == unit->getRightHandWeapon() ? unit->getLeftHandWeapon() : unit->getRightHandWeapon();
++	const std::vector<BattleActionType> otherModes = fireModesFor(unit, otherWeapon);
++	partnerMode = BA_NONE;
++	if (std::find(otherModes.begin(), otherModes.end(), slot) != otherModes.end())
++	{
++		partnerMode = slot;
++	}
++	else
++	{
++		for (BattleActionType candidate : otherModes)
++		{
++			if (isShot(candidate)) { partnerMode = candidate; break; }
++		}
++	}
++	if (partnerMode == BA_NONE || otherWeapon->getArcingShot(partnerMode) || !otherWeapon->getAmmoForAction(partnerMode))
++	{
++		return nullptr;
++	}
++	return otherWeapon;
++}
++
++/**
++ * Akimbo on the map (the owner: Ctrl and Shift held, a click on a hand's weapon; "a mini target
++ * should appear next to each weapon"): steps the soldier's two guns through firing together on
++ * the map, both at once (one mini target by each), in turn (two), and not, the game's warning line
++ * saying which; kept with the soldier in the save. Without two guns that pair up, the line says
++ * so. Shots in 3D keep their own akimbo (the settings, the style key).
++ * @param state The battlescape screen.
++ * @param unit The selected soldier.
++ * @return True if the click was taken (the add-on is on).
++ */
++bool FirstPersonMode::toggleMapAkimbo(BattlescapeState *state, BattleUnit *unit)
++{
++	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
++	if (!mode || !unit)
++	{
++		return false;
++	}
++	if (!mode->mapAkimboPairs(unit))
++	{
++		unit->setMapAkimbo(0);
++		state->warning("STR_FPS_MAP_AKIMBO_TWO_GUNS");
++		return true;
++	}
++	const int next = (unit->getMapAkimbo() + 1) % 3;
++	unit->setMapAkimbo(next);
++	state->warning(next == 1 ? "STR_FPS_AKIMBO_TOGETHER_ON" : next == 2 ? "STR_FPS_AKIMBO_IN_TURN_ON" : "STR_FPS_AKIMBO_OFF");
++	return true;
++}
++
++/**
++ * Akimbo on the map: its mini targets in both hands' boxes on the classic HUD (one each for both
++ * guns at once, two for in turn), drawn after the game draws the hands. Once the two no longer
++ * pair up (a gun has left a hand) it's undone.
++ * @param state The battlescape screen.
++ * @param unit The selected soldier (null: none the player can use).
++ * @param leftHand The left hand's box.
++ * @param rightHand The right hand's box.
++ */
++void FirstPersonMode::drawMapAkimbo(BattlescapeState *state, BattleUnit *unit, Surface *leftHand, Surface *rightHand)
++{
++	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
++	if (!mode || !unit || !unit->getMapAkimbo())
++	{
++		return;
++	}
++	if (!mode->mapAkimboPairs(unit))
++	{
++		unit->setMapAkimbo(0);
++		return;
++	}
++	for (Surface *hand : { leftHand, rightHand })
++	{
++		const Uint8 color = nearestColor(hand->getPalette(), MapAkimboMarkRed, MapAkimboMarkGreen, MapAkimboMarkBlue);
++		hand->lock();
++		for (int mark = 0; mark < unit->getMapAkimbo(); ++mark)
++		{
++			for (int row = 0; row < 7; ++row)
++				for (int column = 0; column < 7; ++column)
++				{
++					if (MapAkimboMark[row][column] == 'X') hand->setPixel(MapAkimboMarkX + mark * MapAkimboMarkStep + column, MapAkimboMarkY + row, color);
++				}
++		}
++		hand->unlock();
++	}
++}
++
++/**
++ * A shot fired on the map (BattlescapeGame::primaryAction, as it launches it): with akimbo marked
++ * there for the soldier (see toggleMapAkimbo), the other hand's gun fires along, as in 3D (see
++ * fire): both at once or in turn, both less accurate, for the pair's cost (the other gun fires
++ * only if there are time units for its share). Anything akimbo left on the game's action is
++ * cleared first. Not while the 3D view shows: its shots go through here too, with their own.
++ * @param state The battlescape screen.
++ * @param action The shot.
++ */
++void FirstPersonMode::mapAkimbo(BattlescapeState *state, BattleAction &action)
++{
++	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
++	if (!mode || mode->isActive())
++	{
++		return;
++	}
++	action.dualWield = false;
++	action.dualVolley = false;
++	action.dualWeapon = nullptr;
++	action.dualType = BA_NONE;
++	BattleUnit *unit = action.actor;
++	if (!unit || !unit->getMapAkimbo() || !action.weapon)
++	{
++		return;
++	}
++	BattleActionType partnerMode = BA_NONE;
++	if (BattleItem *partner = mode->mapAkimboPartner(unit, action.weapon, action.type, partnerMode))
++	{
++		action.dualWield = true;
++		action.dualWeapon = partner;
++		action.dualType = partnerMode;
++		action.dualVolley = unit->getMapAkimbo() == 1;
++	}
 +}
 +
 +/**
@@ -15441,6 +16273,19 @@ index 000000000..55c5132dd
 +}
 +
 +/**
++ * Do a shotgun's pellets, and the two rounds of an akimbo volley, each land on their own, asked by
++ * the game as it fires them: with the setting "Each pellet on its own" (on), in either view,
++ * whoever fires (a player's report on OXCE's "shotgun void": the lead pellet decides the whole
++ * blast, and every pellet is lost with it when it flies off the map). Otherwise the game's own way.
++ * @param state The battlescape screen.
++ * @return True if each lands on its own.
++ */
++bool FirstPersonMode::eachPellet(BattlescapeState *state)
++{
++	return Options::fpsEachPellet && state && state->_firstPerson;
++}
++
++/**
 + * A shotgun's pellet landed (ProjectileFlyBState::pelletLands), in 3D or on the map (the owner:
 + * "at least cosmetically all pellets should impact, play sound and show bulletholes"): its ammo's
 + * hit sound where it struck (at most PelletSoundsAtOnce within PelletSoundWindow: a volley's
@@ -15452,8 +16297,9 @@ index 000000000..55c5132dd
 + * @param impact What it struck (a VoxelType; V_OUTOFBOUNDS: nothing in the map).
 + * @param weapon The weapon that fired it.
 + * @param ammo Its ammo.
++ * @param heard Whether it's heard (not one whose hit the explosion state brings, with its own sound).
 + */
-+void FirstPersonMode::pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo)
++void FirstPersonMode::pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo, bool heard)
 +{
 +	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
 +	if (!mode || impact == V_OUTOFBOUNDS || !ammo)
@@ -15467,7 +16313,7 @@ index 000000000..55c5132dd
 +		mode->_pelletSoundsFrom = now;
 +		mode->_pelletSounds = 0;
 +	}
-+	if (mode->_pelletSounds < PelletSoundsAtOnce)
++	if (heard && mode->_pelletSounds < PelletSoundsAtOnce)
 +	{
 +		++mode->_pelletSounds;
 +		state->_battleGame->playSound(ammo->getRules()->getHitSound(), at.toTile());
@@ -19129,10 +19975,10 @@ index 000000000..d67736b97
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..996fad498
+index 000000000..07745f7ca
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,615 @@
+@@ -0,0 +1,616 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -19289,6 +20135,7 @@ index 000000000..996fad498
 +	_lastProjectile = nullptr;
 +	_weatherChosen = false;
 +	_groundModel = nullptr;
++	_waterModel = nullptr;
 +	_unitGlides.clear();
 +	_bubbleVents.clear();
 +	_beams.clear();
@@ -19750,10 +20597,10 @@ index 000000000..996fad498
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..fc14c7f72
+index 000000000..8e99b4995
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1191 @@
+@@ -0,0 +1,1207 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -19902,6 +20749,7 @@ index 000000000..fc14c7f72
 +		bool empty;
 +		bool ghostly;            // a ghost of a part with no voxels (setting "Parts without shape"): seen through on some pixels, never in the way (see buildGhost, buildShape)
 +		float ghostShare;        // how much of a ghost's opacity it shows: less for a part no one can walk into (see UnwalkableGhostShare)
++		bool water;              // a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea): its top is drawn as waves (see waterColor)
 +		float glow[3]; // centre of the brightest voxels in the top third (a lamp's bulb), in the tile
 +		int glowCount;
 +		Uint8 glowColor;     // one of those bright colours
@@ -19978,6 +20826,7 @@ index 000000000..fc14c7f72
 +		bool underwater;
 +		int ambient;        // shade of open ground under the sky
 +		float faceShade[6]; // extra shade per face normal: +x -x +y -y +z -z
++		float indoorFaceShade[6]; // ... indoors, where no sun shines (see indoorsAt): as at night
 +		float sunDir[3], moonDir[3];
 +		float cloudTime;
 +		Uint8 glassTint[256]; // each colour as seen through glass
@@ -20250,6 +21099,10 @@ index 000000000..fc14c7f72
 +	std::unordered_map<const MapData*, Frames> _frames; // by MapData: its animation frames
 +	FirstPersonView *_sharedModelsOwner = nullptr;      // another view whose voxel models this one uses, or null
 +	const VoxelModel *_groundModel = nullptr;           // floor repeated outside the map
++	const VoxelModel *_waterModel = nullptr;            // ... beyond the stretches of the edge where the water reaches it, or null
++	std::vector<Uint8> _waterAtEdge;                    // by the tile's x and y on the map's outer ring: water there (see chooseGround)
++	Uint8 _waterColors[3] = {};                         // the sea's plain, deep and foam colours, each as a crest's (see waterColor); 0 none
++	float _waveSteps[3][6] = {};                        // this frame's wave trains (WaveTrains): sine-table steps per voxel east and south, the phase; and their bends' steps per voxel east and south, and depth in steps
 +	bool _groundChosen = false;                         // the outside ground has been picked
 +	int _surfaceLevel = 0;                              // the map's surface at its edges: rock beyond the edge below it (see chooseGround)
 +	bool _enclosed = false;                             // underground all the way up: rock beyond every edge, and above the map
@@ -20265,8 +21118,8 @@ index 000000000..fc14c7f72
 +	// What the snapshot makes for the rays besides the TileViews, small and close together, and
 +	// what it keeps from frame to frame so that unchanged tiles cost little (see snapshotTiles).
 +	std::vector<Uint8> _tileFlags;                      // per tile, this frame: the TileFlag bits and the top (for the rays' walk)
-+	struct TileLight { Uint8 light, ufoGlow; bool discovered; };
-+	std::vector<TileLight> _tileLights;                 // per tile, this frame: its light, a copy of the TileViews' (see lightAt)
++	struct TileLight { Uint8 light, ufoGlow; bool discovered, roofed; };
++	std::vector<TileLight> _tileLights;                 // per tile, this frame: its light, a copy of the TileViews' (see lightAt), and a roof over it (see indoorsAt)
 +	struct SolidMask { Uint16 rows[24][16]; };          // the storage of a solid mask (see SolidRows)
 +	std::map<std::array<const VoxelModel*, 4>, SolidMask> _solidMasks; // by the tile's four parts, made once each
 +	struct TileMemo
@@ -20328,10 +21181,18 @@ index 000000000..fc14c7f72
 +	void trackDoors(int index, Tile *tile);
 +	/// Picks the ground that continues past the map border, the surface's level and whether the map is underground.
 +	void chooseGround();
++	/// Picks the sea's colours for its waves from its floor's top.
++	void chooseWaterColors(const VoxelModel *seaModel);
++	/// The sea's height at a spot: the trains of waves crossing there (-1 a trough .. 1 a crest).
++	float waveHeight(float x, float y, float distance) const;
++	/// The sea's colour at a spot of its surface, and the shade its wave adds.
++	Uint8 waterColor(float x, float y, float distance, int pixelX, int pixelY, float &shade) const;
 +	/// The rock beyond an underground map's edge, or over it, at a point there.
 +	Uint8 rockColor(float alongU, float alongV, int face, float distance, int pixelX, int pixelY) const;
 +	/// Is an underside at this height a ceiling under rock (an underground map, or below its surface)?
 +	bool underRock(float height) const;
++	/// Is a point indoors, where no sun shines (a roof over it, or under rock)?
++	bool indoorsAt(const float point[3]) const;
 +	/// Takes this frame's snapshot of every tile, for the rays.
 +	void snapshotTiles();
 +	/// What changed on a tile since the last frame: doors, burnt-out fires, destruction.
@@ -20737,6 +21598,8 @@ index 000000000..fc14c7f72
 +
 +	/// Follows the game's shot in flight: its start, flight and end.
 +	void followShots();
++	/// The game's projectile still in flight: none once it has landed while the rest of its shot flies on.
++	Projectile *flyingProjectile() const;
 +	/// The last shot has ended: impact, beam, when an enemy shot ended.
 +	void finishShot();
 +	/// A new shot has left: its start, look, muzzle flash and kick.
@@ -22416,10 +23279,10 @@ index 000000000..b455e197f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..8acc095f1
+index 000000000..0ec65cb43
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,1447 @@
+@@ -0,0 +1,1600 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -22493,6 +23356,14 @@ index 000000000..8acc095f1
 +namespace OpenXcom
 +{
 +
++/// One turn of the sine in WaveSineSteps steps, for the sea's waves (see waveHeight).
++static const std::array<float, WaveSineSteps> WaveSine = []
++{
++	std::array<float, WaveSineSteps> table{};
++	for (int step = 0; step < WaveSineSteps; ++step) table[step] = (float)std::sin(step * 2.0 * Pi / WaveSineSteps);
++	return table;
++}();
++
 +/**
 + * Picks the colours the view needs this frame from the current palette, so that the UFO and
 + * the TFTD palettes both work: the sky gradient, clouds, haze, the map border's tape and posts,
@@ -22535,6 +23406,22 @@ index 000000000..8acc095f1
 +	_colors.underwater = _save->getDepth() > 0;
 +	_colors.ambient = _nightVision ? std::min(globalShade, 4) : globalShade;
 +	_colors.cloudTime = SDL_GetTicks() / 1000.0f; // seconds, to drift the clouds and ripple the sea floor's light
++	// This frame's waves on the sea (see waveHeight): each train's sine-table steps per voxel east
++	// and south, and how far it has run (kept within one turn); and its crests' bend: the steps per
++	// voxel along them (east and south) and how deep it is, in steps.
++	static_assert(WaveTrainCount == 3, "_waveSteps holds three trains");
++	for (int train = 0; train < WaveTrainCount; ++train)
++	{
++		const WaveTrain &wave = WaveTrains[train];
++		const float stepsPerVoxel = WaveSineSteps / wave.length;
++		_waveSteps[train][0] = stepsPerVoxel * std::cos(wave.heading);
++		_waveSteps[train][1] = stepsPerVoxel * std::sin(wave.heading);
++		_waveSteps[train][2] = -(float)std::fmod(SDL_GetTicks() / 1000.0 * wave.speed * stepsPerVoxel, (double)WaveSineSteps);
++		const float bendStepsPerVoxel = WaveSineSteps / wave.bendLength;
++		_waveSteps[train][3] = -bendStepsPerVoxel * std::sin(wave.heading);
++		_waveSteps[train][4] = bendStepsPerVoxel * std::cos(wave.heading);
++		_waveSteps[train][5] = wave.bendDepth * stepsPerVoxel;
++	}
 +
 +	// The sky's colours at the horizon and straight up (the zenith) by day, by night and under
 +	// the sea, and the clouds' lit and shadowed sides by day and by night (RGB).
@@ -22730,15 +23617,17 @@ index 000000000..8acc095f1
 +		_colors.moonDir[axis] = moonDirection[axis];
 +	}
 +	// Each face direction (+x -x +y -y +z -z) is shaded by how much it turns away from the sun
-+	// (Lambert's cosine law): strongly by day, only a little at night. Undersides (-z) get a
-+	// whole shade more on top.
++	// (Lambert's cosine law): strongly by day, only a little at night, and indoors always as at
++	// night (no sun shines there, see indoorsAt). Undersides (-z) get a whole shade more on top.
 +	const float daylight = 1.0f - _colors.night;
 +	static const float faceNormals[6][3] = { { 1, 0, 0 }, { -1, 0, 0 }, { 0, 1, 0 }, { 0, -1, 0 }, { 0, 0, 1 }, { 0, 0, -1 } };
 +	for (int face = 0; face < 6; ++face)
 +	{
 +		const float lambert = std::max(0.0f, faceNormals[face][0] * sunDirection[0] + faceNormals[face][1] * sunDirection[1]
 +			+ faceNormals[face][2] * sunDirection[2]);
-+		_colors.faceShade[face] = (1.0f - lambert) * (0.5f + 2.5f * daylight) + (face == 5 ? 1.0f : 0.0f);
++		const float underside = face == 5 ? 1.0f : 0.0f;
++		_colors.faceShade[face] = (1.0f - lambert) * (0.5f + 2.5f * daylight) + underside;
++		_colors.indoorFaceShade[face] = (1.0f - lambert) * 0.5f + underside;
 +	}
 +	// The UFOs' lights for this frame (the UFO lights option).
 +	updateUfos();
@@ -23056,6 +23945,8 @@ index 000000000..8acc095f1
 +	// The colour before shading: the voxel's own, unless the face is one the iso art doesn't show.
 +	Uint8 baseColor = hit.color;
 +	int rockCeilingMiddle = -1; // a ceiling under rock: its middle shade within its colour group (see the end)
++	float waveShade = 0.0f;     // on the sea: the shade its wave adds (see waterColor)
++	bool onSea = false;         // ...and that this is the sea's top
 +	const float hitHeight = rayOrigin[2] + rayDirection[2] * hit.t; // in voxels
 +	if (hit.part >= 0 && tileView.part[hit.part])
 +	{
@@ -23121,6 +24012,15 @@ index 000000000..8acc095f1
 +			shownColor = mirroredColor(hit, 1 - hit.axis, true, showNextFrame);
 +		}
 +		if (shownColor && !ownColorAllRound) baseColor = shownColor;
++		// The sea's top: waves (see waterColor), as on the sea beyond the map's edge. Its side
++		// (where the tile beside it has no floor) its deep colour: the art's own is the black
++		// edge it draws under a tile of sea.
++		if (model.water && _waterColors[0])
++		{
++			onSea = faceIndex == 4;
++			baseColor = onSea ? waterColor(rayOrigin[0] + rayDirection[0] * hit.t, rayOrigin[1] + rayDirection[1] * hit.t, hit.t, pixelX, pixelY, waveShade)
++				: _waterColors[1];
++		}
 +	}
 +	// The point the light is measured at: the hit, 1.5 voxels out from the face, so it samples
 +	// the air in front of the surface rather than the solid tile behind it.
@@ -23129,23 +24029,24 @@ index 000000000..8acc095f1
 +	{
 +		surfacePoint[axis] = rayOrigin[axis] + rayDirection[axis] * hit.t + normal[axis] * 1.5f;
 +	}
-+	// The face's shading for its direction. On a steady UFO model (the UFO lights option) it
-+	// is the direction the voxel's open faces face together, so a stepped curve of the hull
-+	// shades smoothly instead of in stripes.
-+	float faceShading = _colors.faceShade[faceIndex];
-+	if (faceIndex == 5 && underRock(hitHeight))
-+	{
-+		faceShading = RockCeilingShade; // a ceiling under rock: no sun turns it away
-+	}
-+	if (hit.part >= 0 && tileView.part[hit.part] && tileView.part[hit.part]->exposed)
++	// The face's shading for its direction. Indoors (see indoorsAt) no sun shines: it is shaded
++	// as at night, only a little by its direction, and nothing there is in the sun's shadow (the
++	// game's light already has the roof's shade): every wall of a house turned from the sun or
++	// facing it from under the roof sank three shades deeper, a shop's grey inside wall into the
++	// darkest of its colours. Out in the sun, on a steady UFO model (the UFO lights option) it is
++	// the direction the voxel's open faces face together, so a stepped curve of the hull shades
++	// smoothly instead of in stripes.
++	const bool indoors = indoorsAt(surfacePoint);
++	float faceShading = indoors ? _colors.indoorFaceShade[faceIndex] : _colors.faceShade[faceIndex];
++	if (!indoors && hit.part >= 0 && tileView.part[hit.part] && tileView.part[hit.part]->exposed)
 +	{
 +		const Uint8 openFaces = tileView.part[hit.part]->exposed[hit.voxel[2]][hit.voxel[1]][hit.voxel[0]];
 +		if (((openFaces >> faceIndex) & 1) && _ufoFaceShade[openFaces] >= 0.0f) faceShading = _ufoFaceShade[openFaces];
 +	}
-+	// The shade (0 brightest .. 15 darkest): the game's light, the face's direction, and one
-+	// shade darker per 320 voxels (20 tiles) of distance.
++	// The shade (0 brightest .. 15 darkest): the game's light, the face's direction, one shade
++	// darker per 320 voxels (20 tiles) of distance, and on the sea its wave.
 +	float ufoGlow = 0.0f; // a UFO's light here (the UFO lights option), 0..1
-+	float shade = lightAt(surfacePoint[0], surfacePoint[1], surfacePoint[2], _ufoLightsOn ? &ufoGlow : nullptr) + faceShading + hit.t / 320.0f;
++	float shade = lightAt(surfacePoint[0], surfacePoint[1], surfacePoint[2], _ufoLightsOn ? &ufoGlow : nullptr) + faceShading + hit.t / 320.0f + waveShade;
 +	float sunShadow = 0.0f; // the shade a sun shadow adds (not darkness of the place: see the end)
 +	float flare = 0.0f; // red light from tactical flares
 +	if (hit.emissive)
@@ -23158,10 +24059,11 @@ index 000000000..8acc095f1
 +	else if (Options::fpsShadows)
 +	{
 +		// The sun: a face turned towards it with something in the way is in shadow (only by
-+		// day, and not too far away, as each test is a ray walked 260 voxels towards the sun).
++		// day, out of doors, and not too far away, as each test is a ray walked 260 voxels
++		// towards the sun).
 +		const float daylight = _colors.underwater ? 0.0f : 1.0f - _colors.night;
 +		const float sunFacing = normal[0] * _colors.sunDir[0] + normal[1] * _colors.sunDir[1] + normal[2] * _colors.sunDir[2];
-+		if (daylight > 0.3f && sunFacing > 0.05f && hit.t < 640.0f)
++		if (!indoors && daylight > 0.3f && sunFacing > 0.05f && hit.t < 640.0f)
 +		{
 +			const float towardsSun[3] = { surfacePoint[0] + _colors.sunDir[0] * 260.0f,
 +				surfacePoint[1] + _colors.sunDir[1] * 260.0f,
@@ -23231,7 +24133,7 @@ index 000000000..8acc095f1
 +	// the dark panels of the Harvester's gore tubes showed as black boxes.
 +	int wholeShades = (int)std::max(0.0f, shade + dither(pixelX, pixelY));
 +	const bool onSteadyUfo = hit.part >= 0 && tileView.part[hit.part] && tileView.part[hit.part]->exposed;
-+	const float placeShade = shade - faceShading - hit.t / 320.0f - sunShadow;
++	const float placeShade = shade - faceShading - hit.t / 320.0f - waveShade - sunShadow;
 +	const float blackShare = std::clamp((placeShade - DarkOverflowFrom) / (DarkOverflowTo - DarkOverflowFrom), 0.0f, 1.0f);
 +	const bool darkEnoughForBlack = !onSteadyUfo && blackShare > dither(pixelX + 1, pixelY + 2);
 +	if (rockCeilingMiddle >= 0 && !darkEnoughForBlack)
@@ -23240,7 +24142,9 @@ index 000000000..8acc095f1
 +		// its middle shade stops RockMottleShades short of the darkest, its pattern round that.
 +		wholeShades = std::min(wholeShades, std::max(0, 15 - RockMottleShades - rockCeilingMiddle));
 +	}
-+	Uint8 color = darkEnoughForBlack ? shadeColor(baseColor, wholeShades) : (Uint8)((baseColor & 0xF0) | std::min(15, (baseColor & 15) + wholeShades));
++	// (The sea stops short of its groups' last shades, all but black, see WaterDarkestShade.)
++	const int darkest = onSea ? std::max(baseColor & 15, WaterDarkestShade) : 15;
++	Uint8 color = darkEnoughForBlack ? shadeColor(baseColor, wholeShades) : (Uint8)((baseColor & 0xF0) | std::min(darkest, (baseColor & 15) + wholeShades));
 +	if (flare * 1.5f > 0.04f + dither(pixelX + 1, pixelY + 3))
 +	{
 +		color = _colors.flareTint[color]; // the flare's light is red
@@ -23304,7 +24208,8 @@ index 000000000..8acc095f1
 + * map's border, then the map's ground running on to the horizon, then the sky. The rock, the
 + * tape and the posts stand on the border itself, so the ray meets them right where it leaves the
 + * map; the ground beyond is a flat plane at the surface's floor height (ground level outdoors),
-+ * tiled with the ground model chosen for the map. A map underground all the way up has rock
++ * tiled with the ground model chosen for the map, or the water's beyond a stretch of the border
++ * where the water reaches it (see chooseGround). A map underground all the way up has rock
 + * beyond every edge and over it as well (a player's report: a base's edge showed the ground of
 + * its sewers far below, and the sky over it).
 + * @param rayOrigin The eye, in voxels.
@@ -23375,13 +24280,41 @@ index 000000000..8acc095f1
 +		if (groundDistance >= tExit)
 +		{
 +			depth = groundDistance;
-+			// The ground model repeats every tile: the colour of its top layer (layer 1, or
-+			// layer 0 where layer 1 is empty) at that spot, lit like open ground under the sky.
 +			const float groundX = rayOrigin[0] + rayDirection[0] * groundDistance;
 +			const float groundY = rayOrigin[1] + rayDirection[1] * groundDistance;
-+			Uint8 color = _groundModel->color[1][(int)std::floor(groundY) & 15][(int)std::floor(groundX) & 15];
-+			if (!color) color = _groundModel->color[0][(int)std::floor(groundY) & 15][(int)std::floor(groundX) & 15];
-+			color = shadeColor(color, (int)(_colors.ambient + _colors.faceShade[4] + groundDistance / 320.0f + dither(pixelX, pixelY)));
++			// Beyond a stretch of the border where the water reaches it, the water goes on: the
++			// tile of the map's outer ring straight back across the border from the spot (the
++			// corner tile, beyond a corner) tells.
++			const VoxelModel *ground = _groundModel;
++			if (_waterModel)
++			{
++				const int mapSizeX = _save->getMapSizeX();
++				const int edgeX = std::clamp((int)std::floor(groundX / Position::TileXY), 0, mapSizeX - 1);
++				const int edgeY = std::clamp((int)std::floor(groundY / Position::TileXY), 0, _save->getMapSizeY() - 1);
++				if (_waterAtEdge[edgeY * mapSizeX + edgeX]) ground = _waterModel;
++			}
++			// The model repeats every tile: the colour of its top layer (layer 1, or layer 0
++			// where layer 1 is empty) at that spot; the sea's waves (see waterColor). Lit like
++			// open ground under the sky.
++			Uint8 color;
++			float waveShade = 0.0f;
++			if (ground->water && _waterColors[0])
++			{
++				color = waterColor(groundX, groundY, groundDistance, pixelX, pixelY, waveShade);
++			}
++			else
++			{
++				color = ground->color[1][(int)std::floor(groundY) & 15][(int)std::floor(groundX) & 15];
++				if (!color) color = ground->color[0][(int)std::floor(groundY) & 15][(int)std::floor(groundX) & 15];
++			}
++			// Shaded past the darkest of its colour group, it turns black only where the open ground
++			// is really dark, as on the map (see shadeHit, DarkOverflowFrom); else it stays the
++			// darkest of its group (the sea's troughs at dusk were black blotches).
++			const int shades = (int)(_colors.ambient + _colors.faceShade[4] + waveShade + groundDistance / 320.0f + dither(pixelX, pixelY));
++			// (The sea stops short of its groups' last shades, all but black: WaterDarkestShade.)
++			const float blackShare = std::clamp((_colors.ambient - DarkOverflowFrom) / (DarkOverflowTo - DarkOverflowFrom), 0.0f, 1.0f);
++			const int darkest = ground->water ? std::max(color & 15, WaterDarkestShade) : 15;
++			color = blackShare > dither(pixelX + 1, pixelY + 2) ? shadeColor(color, shades) : (Uint8)((color & 0xF0) | std::min(darkest, (color & 15) + std::max(0, shades)));
 +			// The haze closes in towards the horizon, spread over a longer distance than on the
 +			// map so the ground fades out gradually; under the sea the murk closes in as on the map.
 +			const float haze = _colors.underwater ? smoothstep(_maxDistance * 0.12f, _maxDistance * 0.65f, groundDistance)
@@ -23395,6 +24328,66 @@ index 000000000..8acc095f1
 +}
 +
 +/**
++ * The sea's height at a spot (see WaveTrains): the trains of waves crossing there, each drifting
++ * along its heading, its crests bending to and fro along their length; those whose lines would be
++ * finer than the pixels flatten out with the distance. Two look-ups in a sine table and a few
++ * multiplications a train: cheap enough for every pixel of sea.
++ * @param x World position east, in voxels.
++ * @param y World position south, in voxels.
++ * @param distance How far away it is seen, in voxels.
++ * @return The height, -1 (a trough) .. 1 (a crest).
++ */
++float FirstPersonView::waveHeight(float x, float y, float distance) const
++{
++	float height = 0.0f;
++	for (int train = 0; train < WaveTrainCount; ++train)
++	{
++		const WaveTrain &wave = WaveTrains[train];
++		if (distance >= wave.fadeTo)
++		{
++			continue;
++		}
++		const float fade = distance <= wave.fadeFrom ? 1.0f : (wave.fadeTo - distance) / (wave.fadeTo - wave.fadeFrom);
++		const float *steps = _waveSteps[train];
++		const float bend = WaveSine[(int)(x * steps[3] + y * steps[4]) & (WaveSineSteps - 1)] * steps[5];
++		const int step = (int)(x * steps[0] + y * steps[1] + steps[2] + bend);
++		height += WaveSine[step & (WaveSineSteps - 1)] * wave.share * fade;
++	}
++	return height;
++}
++
++/**
++ * The sea's colour at a spot of its surface (the mod's water: its floors' tops on the map, and
++ * the sea beyond the map's edge), before the light: its own colours (see chooseGround) in waves
++ * rolling across it, the same everywhere, so the sea has no seams at the tiles' or the map's
++ * edges. A crest is WaveShades lighter than the plain colour, a trough as much darker; foam
++ * breaks on the highest crests and the deep colour shows in the troughs, dithered in as more of
++ * either shows.
++ * @param x World position east, in voxels.
++ * @param y World position south, in voxels.
++ * @param distance How far away it is seen, in voxels.
++ * @param pixelX The pixel (or block of pixels), for the dither.
++ * @param pixelY The same, down.
++ * @param shade Out: the shades the wave adds to the colour's (0 on a crest .. twice WaveShades in a trough).
++ * @return The palette colour.
++ */
++Uint8 FirstPersonView::waterColor(float x, float y, float distance, int pixelX, int pixelY, float &shade) const
++{
++	const float height = waveHeight(x, y, distance);
++	shade = WaveShades * (1.0f - height);
++	const float threshold = dither(pixelX + 3, pixelY + 1);
++	if (height > FoamFrom && (height - FoamFrom) / (1.0f - FoamFrom) > threshold)
++	{
++		return _waterColors[2];
++	}
++	if (-height > DeepFrom && (-height - DeepFrom) / (1.0f - DeepFrom) > threshold)
++	{
++		return _waterColors[1];
++	}
++	return _waterColors[0];
++}
++
++/**
 + * Is an underside at some height a ceiling under rock? On a map underground all the way up (a
 + * base, a colony's inside), everywhere; elsewhere up to the map's surface (see chooseGround): the
 + * ground's own floor seen from the caves below it, and anything in them. (On a map whose surface
@@ -23405,6 +24398,29 @@ index 000000000..8acc095f1
 +bool FirstPersonView::underRock(float height) const
 +{
 +	return _enclosed || height <= GroundTop + _surfaceLevel * 24.0f;
++}
++
++/**
++ * Is a point indoors, where no sun shines? Under a roof: a floor or an object on any level above
++ * its tile (see snapshotTiles), as the game counts a roof when it takes the sun's light away;
++ * or under rock (see underRock). Off the map's sides it is out in the open.
++ * @param point The point, in voxels (in the air in front of a face, see shadeHit).
++ * @return True if it is.
++ */
++bool FirstPersonView::indoorsAt(const float point[3]) const
++{
++	if (underRock(point[2]))
++	{
++		return true;
++	}
++	const int mapSizeX = _save->getMapSizeX(), mapSizeY = _save->getMapSizeY();
++	const int tileX = (int)std::floor(point[0] / Position::TileXY), tileY = (int)std::floor(point[1] / Position::TileXY);
++	if (tileX < 0 || tileY < 0 || tileX >= mapSizeX || tileY >= mapSizeY)
++	{
++		return false;
++	}
++	const int tileZ = std::clamp((int)std::floor(point[2] / Position::TileZ), 0, _save->getMapSizeZ() - 1);
++	return _tileLights[(tileZ * mapSizeY + tileY) * mapSizeX + tileX].roofed;
 +}
 +
 +/**
@@ -25167,10 +26183,10 @@ index 000000000..280bc87e2
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..8b6c9d339
+index 000000000..dae72ebe4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,379 @@
+@@ -0,0 +1,397 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -25361,14 +26377,35 @@ index 000000000..8b6c9d339
 +/// usual 20), at most UnexploredMistMax of the way, so far shapes are a soft blue-grey, never
 +/// sky-coloured boxes; the distance haze still takes them fully at the view's reach.
 +const float UnexploredMistFrom = 0.5f, UnexploredMistTo = 1.5f, UnexploredMistMax = 0.6f;
++/// The sea's waves (the mod's water, TFTD's sea: see FirstPersonView::waveHeight): trains of waves
++/// crossing, each its length from crest to crest (voxels, 16 to a tile), its heading (radians
++/// from east towards south), its speed (voxels a second) and its share of the height (together
++/// 1). Each flattens out from fadeFrom to fadeTo voxels away, before its lines grow finer than the
++/// pixels and shimmer. Its crests bend along their length, bendDepth voxels to and fro over
++/// bendLength (straight crests crossing drew a regular lattice of diamonds further out).
++struct WaveTrain { float length, heading, speed, share, fadeFrom, fadeTo, bendLength, bendDepth; };
++const WaveTrain WaveTrains[] = {
++	{ 56.0f, 0.6f, 11.0f, 0.5f, 320.0f, 640.0f, 173.0f, 11.0f },  // the swell, three and a half tiles long
++	{ 31.0f, -0.4f, 8.0f, 0.32f, 200.0f, 400.0f, 109.0f, 7.0f },  // a second swell across it
++	{ 17.0f, 2.4f, 5.0f, 0.18f, 100.0f, 200.0f, 61.0f, 4.0f } }; // the chop, about a tile long, running against them
++const int WaveTrainCount = (int)(sizeof(WaveTrains) / sizeof(WaveTrains[0]));
++/// A wave's crest is WaveShades lighter than the sea's plain colour and its trough as much darker;
++/// above FoamFrom of the height (-1 .. 1) a crest breaks into foam (the plain colour FoamShades
++/// lighter), more of it towards the top; below -DeepFrom a trough takes the sea's deep colour.
++const float WaveShades = 2.0f, FoamFrom = 0.5f, DeepFrom = 0.3f;
++const int FoamShades = 2;
++/// The sea is shaded no darker than this shade of its colour group (0 brightest .. 15 darkest)
++/// unless the place is really dark (see DarkOverflowFrom): the last shades of TFTD's sea colours
++/// are all but black, and its troughs at dusk were black blotches.
++const int WaterDarkestShade = 12;
++/// The sine the waves are made of is a table of this many steps a turn: cheap for every pixel of sea.
++const int WaveSineSteps = 1024;
 +/// The purple haze of a unit under our mind control (see FirstPersonView::setControlHaze) creeps in
 +/// from this share of the way from the middle of the view to its corners, fully at the corners.
 +const float ControlHazeFrom = 0.45f;
 +/// The units' facing rings (see FirstPersonView::drawFacing): the arrow reaches this many voxels out
 +/// from the ring, this many to each side at its base.
 +const double FacingArrowLength = 7.0, FacingArrowWidth = 4.0;
-+/// A shotgun's pellet in flight (setting "Shotgun pellets in flight") is a streak this many voxels long.
-+const float PelletStreak = 6.0f;
 +/// A rocket's or a cannon shell's lasting trail (see spawnTrailSegment): its white specks hang this
 +/// many seconds, at random between the two (a player: they lasted "far, far too long" at 25 to 35,
 +/// "cut their particle lifetime down 2 thirds"; the owner: the specks only, not the smoke puffs).
@@ -25421,9 +26458,6 @@ index 000000000..8b6c9d339
 +/// sank into one flat darkest colour. Brighter art (a base's grey roof plates) keeps its plain
 +/// ceiling: its top's pattern is the iso art's shading.
 +const int DarkCeilingShade = 8;
-+/// Under rock no sun shines: a ceiling there is shaded as an underside at night (see the face
-+/// shading in updateColors): half a shade for facing away from the moon, one for an underside.
-+const float RockCeilingShade = 0.5f + 1.0f;
 +/// A shot's mark goes where its line meets what the view draws, searched from this many voxels
 +/// back along the line (an object's art can stand out in front of its collision shape; see
 +/// spawnShotImpact).
@@ -25552,10 +26586,10 @@ index 000000000..8b6c9d339
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShots.cpp b/src/FirstPerson/FirstPersonViewShots.cpp
 new file mode 100644
-index 000000000..e5b0e84a7
+index 000000000..82ed85844
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShots.cpp
-@@ -0,0 +1,1814 @@
+@@ -0,0 +1,1850 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -25913,7 +26947,7 @@ index 000000000..e5b0e84a7
 +	// A Doom free grenade in flight (the 3D view's own throw).
 +	drawFreeGrenade();
 +	// The game's one projectile in flight.
-+	if (Projectile *projectile = _map->getProjectile())
++	if (Projectile *projectile = flyingProjectile())
 +	{
 +		if (BattleItem *item = projectile->getItem())
 +		{
@@ -26770,8 +27804,9 @@ index 000000000..e5b0e84a7
 +	if (partner != _lastPartnerShot)
 +	{
 +		// The last round has landed: sparks and a mark where it ended, and a laser leaves its
-+		// beam fading out.
-+		if (_lastPartnerShot)
++		// beam fading out (not one flying on after its shot ended, a miss leaving the map).
++		const auto &strays = _map ? _map->getStrays() : std::vector<Projectile*>();
++		if (_lastPartnerShot && std::find(strays.begin(), strays.end(), _lastPartnerShot) == strays.end())
 +		{
 +			spawnShotImpact(_partnerHead, _partnerOrigin, _partnerTrail);
 +			if (_partnerTrail == TRAIL_BEAM)
@@ -27114,7 +28149,7 @@ index 000000000..e5b0e84a7
 +		drawBeam(beam.from, beam.to, beam.color, beam.calibre, fade);
 +	}
 +	// The beam of the shot in flight (not a thrown item), solid, from the muzzle to its head.
-+	Projectile *projectile = _map ? _map->getProjectile() : nullptr;
++	Projectile *projectile = flyingProjectile();
 +	if (projectile && projectile == _lastProjectile && !_lastProjectileThrown && _shotTrail == TRAIL_BEAM)
 +	{
 +		drawBeam(_shotTrailOrigin, _lastShotHead, _shotTrailColor, _shotCalibre, 1.0f);
@@ -27129,8 +28164,12 @@ index 000000000..e5b0e84a7
 +/**
 + * A shotgun's pellets in flight (setting "Shotgun pellets in flight"; a player's report: why not
 + * a shotgun's pellets, as two guns' rounds fly side by side?), flying beside the round (see
-+ * ProjectileFlyBState::createPellets): each a short streak in the round's colour, leaving the
-+ * muzzle as the round does (see shotHead) and going where the game's spread sends it.
++ * ProjectileFlyBState::createPellets): each drawn as the round is (a player's report: the round
++ * had real sprites, the pellets "weird wireframe squiggles", so the lead pellet stood out), its
++ * look from its own ammo and weapon, leaving the muzzle as the round does (see shotHead), the
++ * other gun's from that gun's, and going where the game's spread sends it. And the misses of a
++ * shot that ended, flying on to the map's edge only to be seen (setting "Each pellet on its own",
++ * see Map::addStrays), at the game's position (their shot's muzzle long left behind).
 + */
 +void FirstPersonView::drawPellets()
 +{
@@ -27138,21 +28177,49 @@ index 000000000..e5b0e84a7
 +	{
 +		return;
 +	}
++	// Drawn as a shot in flight is, by its own ammo and weapon, its streak back to where it started.
++	auto drawLikeRound = [this](const Projectile *bullet, const float head[3], const float origin[3])
++	{
++		Trail trail;
++		Uint8 color;
++		float calibre;
++		trailFor(bullet->getAmmo(), bullet->getWeapon(), trail, color, calibre);
++		if (trail == TRAIL_BEAM)
++		{
++			drawBeam(origin, head, color, calibre, 1.0f);
++		}
++		else
++		{
++			drawShotDot(head, origin, trail, color, calibre);
++		}
++	};
++	const Projectile *round = _map->getProjectile(); // (even landed: the pellets are its gun's)
 +	for (const Projectile *pellet : _map->getPellets())
 +	{
 +		float head[3];
 +		shotHead(pellet, head);
-+		// Back along its way from the head, the streak's length.
-+		const Position now = pellet->getPosition(0), before = pellet->getPosition(-2);
-+		float way[3] = { (float)(now.x - before.x), (float)(now.y - before.y), (float)(now.z - before.z) };
-+		const float length = std::sqrt(way[0] * way[0] + way[1] * way[1] + way[2] * way[2]);
-+		if (length < 0.01f)
-+		{
-+			continue;
-+		}
-+		const float tail[3] = { head[0] - way[0] / length * PelletStreak, head[1] - way[1] / length * PelletStreak, head[2] - way[2] / length * PelletStreak };
-+		drawLine3D(tail, head, _shotTrailColor ? _shotTrailColor : _colors.spark, 1, 1.0f);
++		drawLikeRound(pellet, head, round && pellet->getWeapon() != round->getWeapon() ? _partnerOrigin : _shotTrailOrigin);
 +	}
++	_map->moveStrays(); // (the map moves them as it draws them, and in 3D it isn't drawn)
++	for (const Projectile *stray : _map->getStrays())
++	{
++		const Position at = stray->getPosition(0), start = stray->getPosition(-100000);
++		const float head[3] = { (float)at.x, (float)at.y, (float)at.z }, origin[3] = { (float)start.x, (float)start.y, (float)start.z };
++		drawLikeRound(stray, head, origin);
++	}
++}
++
++/**
++ * The game's projectile in flight, as the view draws and follows it: none once it has landed
++ * while the rest of its shot flies on (setting "Each pellet on its own": the round lands before
++ * its pellets), when its end is shown as any shot's (finishShot) and the game keeps it only to
++ * carry on the shot.
++ * @return The projectile, or null.
++ */
++Projectile *FirstPersonView::flyingProjectile() const
++{
++	Projectile *projectile = _map ? _map->getProjectile() : nullptr;
++	return projectile && !_map->isProjectileLanded() ? projectile : nullptr;
 +}
 +
 +/**
@@ -27162,7 +28229,7 @@ index 000000000..e5b0e84a7
 + */
 +void FirstPersonView::followShots()
 +{
-+	Projectile *projectile = _map ? _map->getProjectile() : nullptr;
++	Projectile *projectile = flyingProjectile();
 +	if (projectile != _lastProjectile)
 +	{
 +		finishShot();
@@ -27185,7 +28252,10 @@ index 000000000..e5b0e84a7
 + */
 +void FirstPersonView::finishShot()
 +{
-+	if (_lastProjectile && !_lastProjectileThrown)
++	// (a round flying on after its shot ended, a miss leaving the map, has no end here: see drawPellets)
++	const auto &strays = _map ? _map->getStrays() : std::vector<Projectile*>();
++	const bool flyingOn = std::find(strays.begin(), strays.end(), _lastProjectile) != strays.end();
++	if (_lastProjectile && !_lastProjectileThrown && !flyingOn)
 +	{
 +		spawnShotImpact(_lastShotHead, _shotTrailOrigin, _shotTrail);
 +	}
@@ -27193,7 +28263,7 @@ index 000000000..e5b0e84a7
 +	{
 +		_enemyShotEnd = SDL_GetTicks(); // (a hit on our soldier right now came from _enemyShotFrom)
 +	}
-+	if (_lastProjectile && !_lastProjectileThrown && _shotTrail == TRAIL_BEAM)
++	if (_lastProjectile && !_lastProjectileThrown && !flyingOn && _shotTrail == TRAIL_BEAM)
 +	{
 +		_beams.push_back({ { _shotTrailOrigin[0], _shotTrailOrigin[1], _shotTrailOrigin[2] },
 +			{ _lastShotHead[0], _lastShotHead[1], _lastShotHead[2] }, SDL_GetTicks(), _shotTrailColor, _shotCalibre });
@@ -29941,10 +31011,10 @@ index 000000000..c537a5311
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..6d986dc0e
+index 000000000..054784430
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,2365 @@
+@@ -0,0 +1,2464 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -30189,6 +31259,7 @@ index 000000000..6d986dc0e
 +	model.empty = true;
 +	model.ghostly = false;
 +	model.ghostShare = 1.0f;
++	model.water = false;
 +	for (int axis = 0; axis < 3; ++axis)
 +	{
 +		model.min[axis] = 255;
@@ -31258,6 +32329,10 @@ index 000000000..6d986dc0e
 +	const RuleFirstPerson::Shape *shape = hasNoVoxels(mapData, *loftData) ? firstPerson.getShape(dataSet->getName(), record, Options::getActiveMaster()) : nullptr;
 +	std::array<std::array<Uint16, Position::TileXY>, Position::TileZ> shapeRows = {};
 +	const bool solidShape = shape && !shape->ghost && !cutout;
++	// The sea (the mod's water floors) is drawn as waves on its top (see waterColor), and whole:
++	// its shape isn't cut to the art, whose few transparent pixels at a tile's corner left holes
++	// through to the bottom of the map.
++	const bool waterFloor = mapData->getObjectType() == O_FLOOR && firstPerson.isWater(dataSet->getName());
 +	if (solidShape)
 +	{
 +		for (const auto &box : shape->boxes)
@@ -31319,7 +32394,7 @@ index 000000000..6d986dc0e
 +					color = sprite->getPixel(spriteX, spriteY + SpriteNudges[nudge]);
 +					if (color) break;
 +				}
-+				if (solidShape && !sprite->getPixel(spriteX, spriteY))
++				if (solidShape && !waterFloor && !sprite->getPixel(spriteX, spriteY))
 +				{
 +					continue; // a shape the mod gave keeps to the art's outline (see buildShape)
 +				}
@@ -31401,6 +32476,7 @@ index 000000000..6d986dc0e
 +	}
 +	colorHiddenSides(model, sprite);
 +	findGlow(model);
++	model.water = waterFloor && !model.empty;
 +}
 +
 +/**
@@ -31514,9 +32590,15 @@ index 000000000..6d986dc0e
 + *   over the map too, where it would otherwise show the sky (or, under the sea, the water);
 + * - the ground that runs on past the border at the surface's level: the most common floor of the
 + *   ring there (grass on a farm, sand in the desert, ...). Only a floor whose model reaches down
-+ *   to the bottom voxel layer counts.
-+ * Sets _surfaceLevel, _enclosed, _groundModel (left as it was if no floor qualifies) and
-+ * _groundChosen.
++ *   to the bottom voxel layer counts;
++ * - the water: where a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea) reaches
++ *   the border, the sea goes on beyond that stretch of it, the most common water floor of the
++ *   ring (an island's shore runs on out of the map, the sea round a ship); the ground runs on
++ *   past the rest. A ring of water alone (round a ship) is the ground too. The sea's colours
++ *   for its waves (see waterColor) come from that floor's top, or with no water at the edge
++ *   from the commonest water floor on the map.
++ * Sets _surfaceLevel, _enclosed, _groundModel (left as it was if no floor qualifies),
++ * _waterModel, _waterAtEdge, _waterColors and _groundChosen.
 + */
 +void FirstPersonView::chooseGround()
 +{
@@ -31601,27 +32683,99 @@ index 000000000..6d986dc0e
 +		: "the surface at the map's edges is level " + std::to_string(_surfaceLevel) + " (rock beyond the edges below it)");
 +
 +	// Count the floors of the ring at the surface's level (the bottom one on an enclosed map,
-+	// which shows no ground beyond the border anyway).
-+	std::map<const MapData*, int> floorCounts;
++	// which shows no ground beyond the border anyway), the water's apart, and note where the
++	// water is (by the tile's x and y).
++	const RuleFirstPerson &rules = _save->getMod()->getFirstPerson();
++	std::map<const MapData*, int> floorCounts, waterCounts;
++	_waterAtEdge.assign(mapSizeX * mapSizeY, 0);
 +	forEachRingTile(std::min(_surfaceLevel, mapSizeZ - 1), [&](const Tile *tile)
 +	{
 +		if (const MapData *floor = tile->getMapData(O_FLOOR))
 +		{
-+			floorCounts[floor]++;
++			const bool water = rules.isWater(floor->getDataset()->getName());
++			(water ? waterCounts : floorCounts)[floor]++;
++			_waterAtEdge[tile->getPosition().y * mapSizeX + tile->getPosition().x] = water;
 +		}
 +	});
 +
-+	// The most common one with a model that lies on the ground wins (a ghost never does).
-+	int bestCount = 0;
-+	for (const auto &entry : floorCounts)
++	// Of each, the most common one with a model that lies on the ground (a ghost never does).
++	auto commonest = [&](const std::map<const MapData*, int> &counts) -> const VoxelModel*
 +	{
-+		const VoxelModel *model = getModel(entry.first);
-+		if (entry.second > bestCount && !model->empty && !model->ghostly && model->min[2] == 0)
++		const VoxelModel *best = nullptr;
++		int bestCount = 0;
++		for (const auto &entry : counts)
 +		{
-+			bestCount = entry.second;
-+			_groundModel = model;
++			const VoxelModel *model = getModel(entry.first);
++			if (entry.second > bestCount && !model->empty && !model->ghostly && model->min[2] == 0)
++			{
++				bestCount = entry.second;
++				best = model;
++			}
 +		}
++		return best;
++	};
++	_waterModel = commonest(waterCounts);
++	if (const VoxelModel *ground = commonest(floorCounts))
++	{
++		_groundModel = ground;
 +	}
++	else if (_waterModel)
++	{
++		_groundModel = _waterModel; // nothing but water round the map
++	}
++
++	// No water at the edge: the commonest water floor on the whole level, for the sea's colours.
++	const VoxelModel *seaModel = _waterModel;
++	if (!seaModel)
++	{
++		std::map<const MapData*, int> mapWaterCounts;
++		const int level = std::min(_surfaceLevel, mapSizeZ - 1);
++		for (int y = 0; y < mapSizeY; ++y)
++			for (int x = 0; x < mapSizeX; ++x)
++			{
++				const MapData *floor = _save->getTile(Position(x, y, level))->getMapData(O_FLOOR);
++				if (floor && rules.isWater(floor->getDataset()->getName())) mapWaterCounts[floor]++;
++			}
++		seaModel = commonest(mapWaterCounts);
++	}
++	chooseWaterColors(seaModel);
++}
++
++/**
++ * Picks the sea's colours for its waves (see waterColor) from its floor's top, in whatever
++ * palette the battle has: the plain colour (the top's colour nearest their average), the deep
++ * colour (the commonest of the top's colours from another colour group that is darker but not
++ * too dark to show its hue: TFTD's teal under its sea-green; without one the plain colour three
++ * shades darker) and the foam (the plain colour FoamShades lighter). Each is kept WaveShades
++ * lighter, as on a crest (as far as its group goes): the wave's shade takes it down.
++ * @param seaModel The sea's floor, or null for a map without water (no colours: no waves).
++ */
++void FirstPersonView::chooseWaterColors(const VoxelModel *seaModel)
++{
++	_waterColors[0] = _waterColors[1] = _waterColors[2] = 0;
++	if (!seaModel || !seaModel->ceiling)
++	{
++		return;
++	}
++	// Each colour's brightness to the eye, and a colour so many shades lighter within its group.
++	const SDL_Color *palette = getPalette();
++	auto luminance = [palette](Uint8 color) { return palette[color].r * 0.3f + palette[color].g * 0.59f + palette[color].b * 0.11f; };
++	auto lighter = [](Uint8 color, int shades) { return (Uint8)((color & 0xF0) | std::max(0, (color & 15) - shades)); };
++	const Uint8 plain = seaModel->ceiling;
++	// The deep colour: count the top's colours of other groups, darker than the plain one.
++	int counts[256] = {};
++	for (int y = 0; y < 16; ++y)
++		for (int x = 0; x < 16; ++x)
++		{
++			const Uint8 color = seaModel->plan[y][x];
++			if (color && (color & 0xF0) != (plain & 0xF0) && luminance(color) < luminance(plain) && luminance(color) >= DarkGlowLuma) counts[color]++;
++		}
++	const int deepest = (int)(std::max_element(counts, counts + 256) - counts);
++	const Uint8 deep = counts[deepest] ? (Uint8)deepest : (Uint8)((plain & 0xF0) | std::min(13, (plain & 15) + 3));
++	const int crest = (int)std::lround(WaveShades);
++	_waterColors[0] = lighter(plain, crest);
++	_waterColors[1] = lighter(deep, crest);
++	_waterColors[2] = lighter(plain, crest + FoamShades);
 +}
 +
 +/**
@@ -31685,7 +32839,21 @@ index 000000000..6d986dc0e
 +		noteLightsAndDevices(tile, tileView);
 +		const int top = tileView.max[2] >= tileView.min[2] ? tileView.max[2] : 0;
 +		_tileFlags[index] = (Uint8)((tileView.empty ? 0 : TileTraced) | (tileView.smoke ? TileSmoky : 0) | (top << TileTopShift));
-+		_tileLights[index] = { tileView.light, tileView.ufoGlow, tileView.discovered };
++		_tileLights[index] = { tileView.light, tileView.ufoGlow, tileView.discovered, false };
++	}
++	// Which tiles have a roof over them (see indoorsAt): a floor or an object on any level above,
++	// as the game counts a roof when it takes the sun's light away (TileEngine::calculateSunShading).
++	// Each column from the top down.
++	const int tilesPerLevel = _save->getMapSizeX() * _save->getMapSizeY();
++	for (int column = 0; column < tilesPerLevel; ++column)
++	{
++		bool roofAbove = false;
++		for (int index = column + tileCount - tilesPerLevel; index >= 0; index -= tilesPerLevel)
++		{
++			_tileLights[index].roofed = roofAbove;
++			const Tile *tile = _save->getTile(index);
++			roofAbove = roofAbove || tile->getMapData(O_FLOOR) || tile->getMapData(O_OBJECT);
++		}
 +	}
 +
 +	// Then keep only the nearest lamps, and put the swinging doors into the snapshot (their
@@ -31706,6 +32874,7 @@ index 000000000..6d986dc0e
 +{
 +	_sharedModelsOwner = owner;
 +	_groundModel = nullptr;
++	_waterModel = nullptr;
 +	_groundChosen = false;
 +	_doorAnimations.clear();
 +	_solidMasks.clear();
@@ -34920,10 +36089,10 @@ index 000000000..329648107
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..cbab09852
+index 000000000..f66e21686
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
-@@ -0,0 +1,298 @@
+@@ -0,0 +1,308 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -35033,6 +36202,7 @@ index 000000000..cbab09852
 +	std::map<std::string, Windows> _windows;     // terrain data set -> its windows
 +	std::map<std::pair<std::string, int>, std::vector<Shape>> _shapes; // (terrain data set, record) -> its shapes, one per game
 +	std::map<std::string, std::string> _weather; // terrain data set -> rain, snow, dust, ...
++	std::set<std::string> _water;                // terrain data sets whose floors are water (the sea)
 +	std::vector<std::string> _combatMusic;       // tense tracks to try, first one the game has wins
 +	std::set<std::string> _nightVision;          // armors and items that give their wearer night vision
 +	std::set<std::string> _undergroundMissions;  // missions underground all the way up, whatever their map's edges show
@@ -35120,6 +36290,13 @@ index 000000000..cbab09852
 +		if (reader.tryRead("builtInItemsShown", builtInItemsShown))
 +		{
 +			_builtInItemsShown = std::set<std::string>(builtInItemsShown.begin(), builtInItemsShown.end());
++		}
++		// The terrain data sets whose floors are water: where it reaches the map's edge, the sea
++		// goes on beyond it (FirstPersonView::chooseGround). A list replaces the earlier one.
++		std::vector<std::string> water;
++		if (reader.tryRead("water", water))
++		{
++			_water = std::set<std::string>(water.begin(), water.end());
 +		}
 +
 +		// The item table: groups of item types (as the mods name them), each with what it sets:
@@ -35211,6 +36388,8 @@ index 000000000..cbab09852
 +		auto found = _signalLevels.find(mission);
 +		return found != _signalLevels.end() ? found->second : 1;
 +	}
++	/// Are a terrain data set's floors water (the sea round islands, ports and ships)?
++	bool isWater(const std::string &dataSet) const { return _water.count(dataSet) > 0; }
 +	/// The weather of a terrain data set ("rain", "snow", "dust", ...), or empty for none.
 +	std::string getWeather(const std::string &dataSet) const
 +	{
@@ -35564,7 +36743,7 @@ index af88e1829..760a449f2 100644
  		return;
  	}
 diff --git a/src/Savegame/BattleUnit.cpp b/src/Savegame/BattleUnit.cpp
-index 46fbf1ffd..1984245b5 100644
+index 46fbf1ffd..d8c03915c 100644
 --- a/src/Savegame/BattleUnit.cpp
 +++ b/src/Savegame/BattleUnit.cpp
 @@ -53,6 +53,7 @@
@@ -35575,7 +36754,24 @@ index 46fbf1ffd..1984245b5 100644
  
  namespace OpenXcom
  {
-@@ -1627,6 +1628,11 @@ int BattleUnit::damage(Position relative, int damage, const RuleDamageType *type
+@@ -699,6 +700,7 @@ void BattleUnit::load(const YAML::YamlNodeReader& node, const Mod *mod, const Sc
+ 	reader.tryRead("currStats", _stats);
+ 	reader.tryRead("turretType", _turretType);
+ 	reader.tryRead("visible", _visible);
++	reader.tryRead("mapAkimbo", _mapAkimbo); // (OpenXcom3D)
+ 
+ 	reader.tryReadAs<int>("turnsSinceSpotted", _turnsSinceSpotted[FACTION_HOSTILE]);
+ 	reader.tryReadAs<int>("turnsLeftSpottedForSnipers", _turnsLeftSpottedForSnipers[FACTION_HOSTILE]);
+@@ -817,6 +819,8 @@ void BattleUnit::save(YAML::YamlNodeWriter writer, const ScriptGlobal *shared) c
+ 		writer.write("turretType", _turretType);
+ 	if (_visible)
+ 		writer.write("visible", _visible);
++	if (_mapAkimbo)
++		writer.write("mapAkimbo", _mapAkimbo); // (OpenXcom3D: akimbo on the map, see FirstPersonMode::toggleMapAkimbo)
+ 
+ 	writer.writeAs<int>("turnsSinceSpotted", _turnsSinceSpotted[FACTION_HOSTILE]);
+ 	writer.writeAs<int>("turnsLeftSpottedForSnipers", _turnsLeftSpottedForSnipers[FACTION_HOSTILE]);
+@@ -1627,6 +1631,11 @@ int BattleUnit::damage(Position relative, int damage, const RuleDamageType *type
  	{
  		return 0;
  	}
@@ -35587,6 +36783,28 @@ index 46fbf1ffd..1984245b5 100644
  	UnitSide side = SIDE_FRONT;
  	UnitBodyPart bodypart = BODYPART_TORSO;
  
+diff --git a/src/Savegame/BattleUnit.h b/src/Savegame/BattleUnit.h
+index ecc040fb6..dc617605d 100644
+--- a/src/Savegame/BattleUnit.h
++++ b/src/Savegame/BattleUnit.h
+@@ -117,6 +117,7 @@ private:
+ 	bool _visible;
+ 	UnitStats _exp, _expTmp;
+ 	int _motionPoints;
++	int _mapAkimbo = 0; // (OpenXcom3D) the soldier's two guns fire together on the map: 0 no, 1 both at once, 2 in turn
+ 	int _scannedTurn;
+ 	int _customMarker;
+ 	int _kills;
+@@ -563,6 +564,9 @@ public:
+ 	void stimulant (int energy, int stun, int mana);
+ 	/// Get motion points for the motion scanner.
+ 	int getMotionPoints() const;
++	/// (OpenXcom3D) Akimbo on the map: whether the guns in both hands fire together there (0 no, 1 both at once, 2 in turn).
++	int getMapAkimbo() const { return _mapAkimbo; }
++	void setMapAkimbo(int mapAkimbo) { _mapAkimbo = mapAkimbo; }
+ 	/// Get turn when unit was scanned by the motion scanner.
+ 	int getScannedTurn() const { return _scannedTurn; }
+ 	/// Set turn when unit was scanned by the motion scanner.
 diff --git a/src/main.cpp b/src/main.cpp
 index 4fd8a1d41..a89b6bb01 100644
 --- a/src/main.cpp

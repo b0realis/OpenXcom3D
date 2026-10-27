@@ -188,14 +188,35 @@ const int BulletHoleCoreShades = 7;
 /// usual 20), at most UnexploredMistMax of the way, so far shapes are a soft blue-grey, never
 /// sky-coloured boxes; the distance haze still takes them fully at the view's reach.
 const float UnexploredMistFrom = 0.5f, UnexploredMistTo = 1.5f, UnexploredMistMax = 0.6f;
+/// The sea's waves (the mod's water, TFTD's sea: see FirstPersonView::waveHeight): trains of waves
+/// crossing, each its length from crest to crest (voxels, 16 to a tile), its heading (radians
+/// from east towards south), its speed (voxels a second) and its share of the height (together
+/// 1). Each flattens out from fadeFrom to fadeTo voxels away, before its lines grow finer than the
+/// pixels and shimmer. Its crests bend along their length, bendDepth voxels to and fro over
+/// bendLength (straight crests crossing drew a regular lattice of diamonds further out).
+struct WaveTrain { float length, heading, speed, share, fadeFrom, fadeTo, bendLength, bendDepth; };
+const WaveTrain WaveTrains[] = {
+	{ 56.0f, 0.6f, 11.0f, 0.5f, 320.0f, 640.0f, 173.0f, 11.0f },  // the swell, three and a half tiles long
+	{ 31.0f, -0.4f, 8.0f, 0.32f, 200.0f, 400.0f, 109.0f, 7.0f },  // a second swell across it
+	{ 17.0f, 2.4f, 5.0f, 0.18f, 100.0f, 200.0f, 61.0f, 4.0f } }; // the chop, about a tile long, running against them
+const int WaveTrainCount = (int)(sizeof(WaveTrains) / sizeof(WaveTrains[0]));
+/// A wave's crest is WaveShades lighter than the sea's plain colour and its trough as much darker;
+/// above FoamFrom of the height (-1 .. 1) a crest breaks into foam (the plain colour FoamShades
+/// lighter), more of it towards the top; below -DeepFrom a trough takes the sea's deep colour.
+const float WaveShades = 2.0f, FoamFrom = 0.5f, DeepFrom = 0.3f;
+const int FoamShades = 2;
+/// The sea is shaded no darker than this shade of its colour group (0 brightest .. 15 darkest)
+/// unless the place is really dark (see DarkOverflowFrom): the last shades of TFTD's sea colours
+/// are all but black, and its troughs at dusk were black blotches.
+const int WaterDarkestShade = 12;
+/// The sine the waves are made of is a table of this many steps a turn: cheap for every pixel of sea.
+const int WaveSineSteps = 1024;
 /// The purple haze of a unit under our mind control (see FirstPersonView::setControlHaze) creeps in
 /// from this share of the way from the middle of the view to its corners, fully at the corners.
 const float ControlHazeFrom = 0.45f;
 /// The units' facing rings (see FirstPersonView::drawFacing): the arrow reaches this many voxels out
 /// from the ring, this many to each side at its base.
 const double FacingArrowLength = 7.0, FacingArrowWidth = 4.0;
-/// A shotgun's pellet in flight (setting "Shotgun pellets in flight") is a streak this many voxels long.
-const float PelletStreak = 6.0f;
 /// A rocket's or a cannon shell's lasting trail (see spawnTrailSegment): its white specks hang this
 /// many seconds, at random between the two (a player: they lasted "far, far too long" at 25 to 35,
 /// "cut their particle lifetime down 2 thirds"; the owner: the specks only, not the smoke puffs).
@@ -248,9 +269,6 @@ const float DarkOverflowFrom = 5.0f, DarkOverflowTo = 8.0f;
 /// sank into one flat darkest colour. Brighter art (a base's grey roof plates) keeps its plain
 /// ceiling: its top's pattern is the iso art's shading.
 const int DarkCeilingShade = 8;
-/// Under rock no sun shines: a ceiling there is shaded as an underside at night (see the face
-/// shading in updateColors): half a shade for facing away from the moon, one for an underside.
-const float RockCeilingShade = 0.5f + 1.0f;
 /// A shot's mark goes where its line meets what the view draws, searched from this many voxels
 /// back along the line (an object's art can stand out in front of its collision shape; see
 /// spawnShotImpact).

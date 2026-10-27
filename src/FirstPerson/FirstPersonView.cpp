@@ -154,6 +154,7 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 	_lastProjectile = nullptr;
 	_weatherChosen = false;
 	_groundModel = nullptr;
+	_waterModel = nullptr;
 	_unitGlides.clear();
 	_bubbleVents.clear();
 	_beams.clear();

@@ -255,6 +255,13 @@ const int VaultMaxHeight = 14;
 
 /// A melee swing in the view: wind up, strike, back (milliseconds).
 const Uint32 SwingTime = 420;
+/// Akimbo on the map (Ctrl+Shift+click on a hand's weapon, see FirstPersonMode::toggleMapAkimbo): mini targets in
+/// each hand's box, one for both guns at once, two for in turn, from (MapAkimboMarkX, MapAkimboMarkY) in the box (its
+/// bottom left, clear of the ammo counts and the reaction and two-handed marks), MapAkimboMarkStep pixels apart, in
+/// the palette's colour nearest to this yellow; their shape a row a string, 'X' drawn.
+const int MapAkimboMarkX = 1, MapAkimboMarkY = 40, MapAkimboMarkStep = 8;
+const int MapAkimboMarkRed = 255, MapAkimboMarkGreen = 216, MapAkimboMarkBlue = 64;
+const char *const MapAkimboMark[7] = { "...X...", ".XX.XX.", ".X...X.", "X..X..X", ".X...X.", ".XX.XX.", "...X..." };
 /// Doom free grenades: their gravity (voxels a second, each second, down), the usual speed of a throw (voxels a
 /// second: the flight time is the distance over it, within FreeGrenadeTimeMin and Max seconds).
 const float FreeGrenadeGravity = 360.0f, FreeGrenadeSpeed = 240.0f, FreeGrenadeTimeMin = 0.25f, FreeGrenadeTimeMax = 1.4f;

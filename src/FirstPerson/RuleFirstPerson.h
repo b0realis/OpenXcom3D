@@ -107,6 +107,7 @@ private:
 	std::map<std::string, Windows> _windows;     // terrain data set -> its windows
 	std::map<std::pair<std::string, int>, std::vector<Shape>> _shapes; // (terrain data set, record) -> its shapes, one per game
 	std::map<std::string, std::string> _weather; // terrain data set -> rain, snow, dust, ...
+	std::set<std::string> _water;                // terrain data sets whose floors are water (the sea)
 	std::vector<std::string> _combatMusic;       // tense tracks to try, first one the game has wins
 	std::set<std::string> _nightVision;          // armors and items that give their wearer night vision
 	std::set<std::string> _undergroundMissions;  // missions underground all the way up, whatever their map's edges show
@@ -194,6 +195,13 @@ public:
 		if (reader.tryRead("builtInItemsShown", builtInItemsShown))
 		{
 			_builtInItemsShown = std::set<std::string>(builtInItemsShown.begin(), builtInItemsShown.end());
+		}
+		// The terrain data sets whose floors are water: where it reaches the map's edge, the sea
+		// goes on beyond it (FirstPersonView::chooseGround). A list replaces the earlier one.
+		std::vector<std::string> water;
+		if (reader.tryRead("water", water))
+		{
+			_water = std::set<std::string>(water.begin(), water.end());
 		}
 
 		// The item table: groups of item types (as the mods name them), each with what it sets:
@@ -285,6 +293,8 @@ public:
 		auto found = _signalLevels.find(mission);
 		return found != _signalLevels.end() ? found->second : 1;
 	}
+	/// Are a terrain data set's floors water (the sea round islands, ports and ships)?
+	bool isWater(const std::string &dataSet) const { return _water.count(dataSet) > 0; }
 	/// The weather of a terrain data set ("rain", "snow", "dust", ...), or empty for none.
 	std::string getWeather(const std::string &dataSet) const
 	{

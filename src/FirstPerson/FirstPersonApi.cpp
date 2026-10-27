@@ -347,6 +347,10 @@ void createOptions(std::vector<OptionInfo> &options)
 	// A shotgun's pellets fly beside its round in the 3D view, each to where the game's spread
 	// sends it, instead of all landing the moment it's fired (the game's own way, kept off).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsPelletsInFlight", &fpsPelletsInFlight, false, "STR_FPS_PELLETS_IN_FLIGHT", category));
+	// A shotgun's pellets, and the two rounds of an akimbo volley, each land on their own: none is
+	// lost when the lead pellet leaves the map, and in flight each hits as it arrives (a player's
+	// report on OXCE's "shotgun void"); off, the game's own way, the lead pellet deciding.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsEachPellet", &fpsEachPellet, true, "STR_FPS_EACH_PELLET", category));
 	// The units' hitboxes, outlined: off (0), fading in and out once a second (1), always (2).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitboxes", &fpsHitboxes, 0, "STR_FPS_HITBOXES", category));
 	// The hitboxes' outlines and the path of a throw glowing (spilling bloom round them), or plain lines.
@@ -522,6 +526,54 @@ bool pelletsInFlight(BattlescapeState *state)
 }
 
 /**
+ * Called by the game as it fires a shotgun's round or an akimbo volley: does each pellet (and each
+ * gun's round) land on its own (setting "Each pellet on its own"), rather than as the lead pellet
+ * lands, the rest lost with it when it leaves the map?
+ * @param state The battlescape screen.
+ * @return True if each lands on its own.
+ */
+bool eachPellet(BattlescapeState *state)
+{
+	return FirstPersonMode::eachPellet(state);
+}
+
+/**
+ * Called by the game as a hand's weapon is clicked with Ctrl and Shift held: akimbo on the map
+ * (see FirstPersonMode::toggleMapAkimbo).
+ * @param state The battlescape screen.
+ * @param unit The selected soldier.
+ * @return True if it took the click (the game then does nothing else with it).
+ */
+bool toggleMapAkimbo(BattlescapeState *state, BattleUnit *unit)
+{
+	return FirstPersonMode::toggleMapAkimbo(state, unit);
+}
+
+/**
+ * Called by the game after it draws the hands' weapons: akimbo on the map's mini targets (see
+ * FirstPersonMode::drawMapAkimbo).
+ * @param state The battlescape screen.
+ * @param unit The selected soldier (null: none the player can use).
+ * @param leftHand The left hand's box.
+ * @param rightHand The right hand's box.
+ */
+void drawMapAkimbo(BattlescapeState *state, BattleUnit *unit, Surface *leftHand, Surface *rightHand)
+{
+	FirstPersonMode::drawMapAkimbo(state, unit, leftHand, rightHand);
+}
+
+/**
+ * Called by the game as it launches a shot clicked on the map: akimbo on the map (see
+ * FirstPersonMode::mapAkimbo).
+ * @param state The battlescape screen.
+ * @param action The shot.
+ */
+void mapAkimbo(BattlescapeState *state, BattleAction &action)
+{
+	FirstPersonMode::mapAkimbo(state, action);
+}
+
+/**
  * A shotgun's pellet landed: heard, and marked in the 3D view (see FirstPersonMode::pelletLanded).
  * @param state The battlescape screen.
  * @param at Where it struck, in voxels.
@@ -529,10 +581,11 @@ bool pelletsInFlight(BattlescapeState *state)
  * @param impact What it struck (a VoxelType; V_OUTOFBOUNDS: nothing).
  * @param weapon The weapon that fired it.
  * @param ammo Its ammo.
+ * @param heard Whether it's heard (not one whose hit the explosion state brings, with its own sound).
  */
-void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo)
+void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo, bool heard)
 {
-	FirstPersonMode::pelletLanded(state, at, from, impact, weapon, ammo);
+	FirstPersonMode::pelletLanded(state, at, from, impact, weapon, ammo, heard);
 }
 
 /**

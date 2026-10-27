@@ -131,8 +131,16 @@ public:
 	static bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
 	/// Do a shotgun's pellets fly beside its round (setting "Shotgun pellets in flight", the 3D view showing)?
 	static bool pelletsInFlight(BattlescapeState *state);
+	/// Akimbo on the map (Ctrl+Shift+click on a hand's weapon): steps the soldier's two guns through firing together there.
+	static bool toggleMapAkimbo(BattlescapeState *state, BattleUnit *unit);
+	/// Akimbo on the map: its mini targets in both hands' boxes; undone once the guns no longer pair up.
+	static void drawMapAkimbo(BattlescapeState *state, BattleUnit *unit, Surface *leftHand, Surface *rightHand);
+	/// A shot fired on the map: with akimbo marked there, the other hand's gun fires along, as in 3D.
+	static void mapAkimbo(BattlescapeState *state, BattleAction &action);
+	/// Do a shotgun's pellets and a volley's two rounds each land on their own (setting "Each pellet on its own")?
+	static bool eachPellet(BattlescapeState *state);
 	/// A shotgun's pellet landed (see FirstPerson::pelletLanded): heard, a few to a volley, and marked in the 3D view.
-	static void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo);
+	static void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo, bool heard);
 	/// A soldier panics or goes berserk, asked by the game (see FirstPerson::breakdown).
 	static bool breakdown(BattlescapeState *state, BattleUnit *unit);
 	/// A close-quarters check knocked a shot aside, told by the game (see FirstPerson::closeQuartersDeflected).
@@ -658,6 +666,10 @@ private:
 	void toggleAkimboStyle();
 	/// Dual wield: the other hand's gun if it can fire along with this mode, and the mode it fires.
 	BattleItem *dualPartner(BattleUnit *unit, const BattleItem *weapon, BattleActionType slot, BattleActionType &partnerMode) const;
+	/// Akimbo on the map: do the soldier's two guns pair up there?
+	bool mapAkimboPairs(const BattleUnit *unit) const;
+	/// Akimbo on the map: the other hand's gun that fires along with this mode there, and the mode it fires.
+	BattleItem *mapAkimboPartner(BattleUnit *unit, const BattleItem *weapon, BattleActionType slot, BattleActionType &partnerMode) const;
 	/// Dual wield: the other hand's gun that fires along with a shot (dualPartner's, with time units for both), or null.
 	BattleItem *pairedGun(BattleUnit *unit, BattleItem *weapon, BattleActionType slot, BattleActionType mode, BattleActionType &offMode) const;
 	/// Akimbo: do the two guns fire in turn (either one's shot arcs) rather than together?

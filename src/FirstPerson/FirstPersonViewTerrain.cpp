@@ -242,6 +242,7 @@ void clearModel(FirstPersonView::VoxelModel &model)
 	model.empty = true;
 	model.ghostly = false;
 	model.ghostShare = 1.0f;
+	model.water = false;
 	for (int axis = 0; axis < 3; ++axis)
 	{
 		model.min[axis] = 255;
@@ -1311,6 +1312,10 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	const RuleFirstPerson::Shape *shape = hasNoVoxels(mapData, *loftData) ? firstPerson.getShape(dataSet->getName(), record, Options::getActiveMaster()) : nullptr;
 	std::array<std::array<Uint16, Position::TileXY>, Position::TileZ> shapeRows = {};
 	const bool solidShape = shape && !shape->ghost && !cutout;
+	// The sea (the mod's water floors) is drawn as waves on its top (see waterColor), and whole:
+	// its shape isn't cut to the art, whose few transparent pixels at a tile's corner left holes
+	// through to the bottom of the map.
+	const bool waterFloor = mapData->getObjectType() == O_FLOOR && firstPerson.isWater(dataSet->getName());
 	if (solidShape)
 	{
 		for (const auto &box : shape->boxes)
@@ -1372,7 +1377,7 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 					color = sprite->getPixel(spriteX, spriteY + SpriteNudges[nudge]);
 					if (color) break;
 				}
-				if (solidShape && !sprite->getPixel(spriteX, spriteY))
+				if (solidShape && !waterFloor && !sprite->getPixel(spriteX, spriteY))
 				{
 					continue; // a shape the mod gave keeps to the art's outline (see buildShape)
 				}
@@ -1454,6 +1459,7 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	}
 	colorHiddenSides(model, sprite);
 	findGlow(model);
+	model.water = waterFloor && !model.empty;
 }
 
 /**
@@ -1567,9 +1573,15 @@ bool FirstPersonView::isDoorMoving(const Position &pos, int part)
  *   over the map too, where it would otherwise show the sky (or, under the sea, the water);
  * - the ground that runs on past the border at the surface's level: the most common floor of the
  *   ring there (grass on a farm, sand in the desert, ...). Only a floor whose model reaches down
- *   to the bottom voxel layer counts.
- * Sets _surfaceLevel, _enclosed, _groundModel (left as it was if no floor qualifies) and
- * _groundChosen.
+ *   to the bottom voxel layer counts;
+ * - the water: where a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea) reaches
+ *   the border, the sea goes on beyond that stretch of it, the most common water floor of the
+ *   ring (an island's shore runs on out of the map, the sea round a ship); the ground runs on
+ *   past the rest. A ring of water alone (round a ship) is the ground too. The sea's colours
+ *   for its waves (see waterColor) come from that floor's top, or with no water at the edge
+ *   from the commonest water floor on the map.
+ * Sets _surfaceLevel, _enclosed, _groundModel (left as it was if no floor qualifies),
+ * _waterModel, _waterAtEdge, _waterColors and _groundChosen.
  */
 void FirstPersonView::chooseGround()
 {
@@ -1654,27 +1666,99 @@ void FirstPersonView::chooseGround()
 		: "the surface at the map's edges is level " + std::to_string(_surfaceLevel) + " (rock beyond the edges below it)");
 
 	// Count the floors of the ring at the surface's level (the bottom one on an enclosed map,
-	// which shows no ground beyond the border anyway).
-	std::map<const MapData*, int> floorCounts;
+	// which shows no ground beyond the border anyway), the water's apart, and note where the
+	// water is (by the tile's x and y).
+	const RuleFirstPerson &rules = _save->getMod()->getFirstPerson();
+	std::map<const MapData*, int> floorCounts, waterCounts;
+	_waterAtEdge.assign(mapSizeX * mapSizeY, 0);
 	forEachRingTile(std::min(_surfaceLevel, mapSizeZ - 1), [&](const Tile *tile)
 	{
 		if (const MapData *floor = tile->getMapData(O_FLOOR))
 		{
-			floorCounts[floor]++;
+			const bool water = rules.isWater(floor->getDataset()->getName());
+			(water ? waterCounts : floorCounts)[floor]++;
+			_waterAtEdge[tile->getPosition().y * mapSizeX + tile->getPosition().x] = water;
 		}
 	});
 
-	// The most common one with a model that lies on the ground wins (a ghost never does).
-	int bestCount = 0;
-	for (const auto &entry : floorCounts)
+	// Of each, the most common one with a model that lies on the ground (a ghost never does).
+	auto commonest = [&](const std::map<const MapData*, int> &counts) -> const VoxelModel*
 	{
-		const VoxelModel *model = getModel(entry.first);
-		if (entry.second > bestCount && !model->empty && !model->ghostly && model->min[2] == 0)
+		const VoxelModel *best = nullptr;
+		int bestCount = 0;
+		for (const auto &entry : counts)
 		{
-			bestCount = entry.second;
-			_groundModel = model;
+			const VoxelModel *model = getModel(entry.first);
+			if (entry.second > bestCount && !model->empty && !model->ghostly && model->min[2] == 0)
+			{
+				bestCount = entry.second;
+				best = model;
+			}
 		}
+		return best;
+	};
+	_waterModel = commonest(waterCounts);
+	if (const VoxelModel *ground = commonest(floorCounts))
+	{
+		_groundModel = ground;
 	}
+	else if (_waterModel)
+	{
+		_groundModel = _waterModel; // nothing but water round the map
+	}
+
+	// No water at the edge: the commonest water floor on the whole level, for the sea's colours.
+	const VoxelModel *seaModel = _waterModel;
+	if (!seaModel)
+	{
+		std::map<const MapData*, int> mapWaterCounts;
+		const int level = std::min(_surfaceLevel, mapSizeZ - 1);
+		for (int y = 0; y < mapSizeY; ++y)
+			for (int x = 0; x < mapSizeX; ++x)
+			{
+				const MapData *floor = _save->getTile(Position(x, y, level))->getMapData(O_FLOOR);
+				if (floor && rules.isWater(floor->getDataset()->getName())) mapWaterCounts[floor]++;
+			}
+		seaModel = commonest(mapWaterCounts);
+	}
+	chooseWaterColors(seaModel);
+}
+
+/**
+ * Picks the sea's colours for its waves (see waterColor) from its floor's top, in whatever
+ * palette the battle has: the plain colour (the top's colour nearest their average), the deep
+ * colour (the commonest of the top's colours from another colour group that is darker but not
+ * too dark to show its hue: TFTD's teal under its sea-green; without one the plain colour three
+ * shades darker) and the foam (the plain colour FoamShades lighter). Each is kept WaveShades
+ * lighter, as on a crest (as far as its group goes): the wave's shade takes it down.
+ * @param seaModel The sea's floor, or null for a map without water (no colours: no waves).
+ */
+void FirstPersonView::chooseWaterColors(const VoxelModel *seaModel)
+{
+	_waterColors[0] = _waterColors[1] = _waterColors[2] = 0;
+	if (!seaModel || !seaModel->ceiling)
+	{
+		return;
+	}
+	// Each colour's brightness to the eye, and a colour so many shades lighter within its group.
+	const SDL_Color *palette = getPalette();
+	auto luminance = [palette](Uint8 color) { return palette[color].r * 0.3f + palette[color].g * 0.59f + palette[color].b * 0.11f; };
+	auto lighter = [](Uint8 color, int shades) { return (Uint8)((color & 0xF0) | std::max(0, (color & 15) - shades)); };
+	const Uint8 plain = seaModel->ceiling;
+	// The deep colour: count the top's colours of other groups, darker than the plain one.
+	int counts[256] = {};
+	for (int y = 0; y < 16; ++y)
+		for (int x = 0; x < 16; ++x)
+		{
+			const Uint8 color = seaModel->plan[y][x];
+			if (color && (color & 0xF0) != (plain & 0xF0) && luminance(color) < luminance(plain) && luminance(color) >= DarkGlowLuma) counts[color]++;
+		}
+	const int deepest = (int)(std::max_element(counts, counts + 256) - counts);
+	const Uint8 deep = counts[deepest] ? (Uint8)deepest : (Uint8)((plain & 0xF0) | std::min(13, (plain & 15) + 3));
+	const int crest = (int)std::lround(WaveShades);
+	_waterColors[0] = lighter(plain, crest);
+	_waterColors[1] = lighter(deep, crest);
+	_waterColors[2] = lighter(plain, crest + FoamShades);
 }
 
 /**
@@ -1738,7 +1822,21 @@ void FirstPersonView::snapshotTiles()
 		noteLightsAndDevices(tile, tileView);
 		const int top = tileView.max[2] >= tileView.min[2] ? tileView.max[2] : 0;
 		_tileFlags[index] = (Uint8)((tileView.empty ? 0 : TileTraced) | (tileView.smoke ? TileSmoky : 0) | (top << TileTopShift));
-		_tileLights[index] = { tileView.light, tileView.ufoGlow, tileView.discovered };
+		_tileLights[index] = { tileView.light, tileView.ufoGlow, tileView.discovered, false };
+	}
+	// Which tiles have a roof over them (see indoorsAt): a floor or an object on any level above,
+	// as the game counts a roof when it takes the sun's light away (TileEngine::calculateSunShading).
+	// Each column from the top down.
+	const int tilesPerLevel = _save->getMapSizeX() * _save->getMapSizeY();
+	for (int column = 0; column < tilesPerLevel; ++column)
+	{
+		bool roofAbove = false;
+		for (int index = column + tileCount - tilesPerLevel; index >= 0; index -= tilesPerLevel)
+		{
+			_tileLights[index].roofed = roofAbove;
+			const Tile *tile = _save->getTile(index);
+			roofAbove = roofAbove || tile->getMapData(O_FLOOR) || tile->getMapData(O_OBJECT);
+		}
 	}
 
 	// Then keep only the nearest lamps, and put the swinging doors into the snapshot (their
@@ -1759,6 +1857,7 @@ void FirstPersonView::shareCache(FirstPersonView *owner)
 {
 	_sharedModelsOwner = owner;
 	_groundModel = nullptr;
+	_waterModel = nullptr;
 	_groundChosen = false;
 	_doorAnimations.clear();
 	_solidMasks.clear();

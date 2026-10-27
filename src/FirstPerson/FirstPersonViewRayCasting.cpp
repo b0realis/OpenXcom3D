@@ -71,6 +71,14 @@
 namespace OpenXcom
 {
 
+/// One turn of the sine in WaveSineSteps steps, for the sea's waves (see waveHeight).
+static const std::array<float, WaveSineSteps> WaveSine = []
+{
+	std::array<float, WaveSineSteps> table{};
+	for (int step = 0; step < WaveSineSteps; ++step) table[step] = (float)std::sin(step * 2.0 * Pi / WaveSineSteps);
+	return table;
+}();
+
 /**
  * Picks the colours the view needs this frame from the current palette, so that the UFO and
  * the TFTD palettes both work: the sky gradient, clouds, haze, the map border's tape and posts,
@@ -113,6 +121,22 @@ void FirstPersonView::updateColors()
 	_colors.underwater = _save->getDepth() > 0;
 	_colors.ambient = _nightVision ? std::min(globalShade, 4) : globalShade;
 	_colors.cloudTime = SDL_GetTicks() / 1000.0f; // seconds, to drift the clouds and ripple the sea floor's light
+	// This frame's waves on the sea (see waveHeight): each train's sine-table steps per voxel east
+	// and south, and how far it has run (kept within one turn); and its crests' bend: the steps per
+	// voxel along them (east and south) and how deep it is, in steps.
+	static_assert(WaveTrainCount == 3, "_waveSteps holds three trains");
+	for (int train = 0; train < WaveTrainCount; ++train)
+	{
+		const WaveTrain &wave = WaveTrains[train];
+		const float stepsPerVoxel = WaveSineSteps / wave.length;
+		_waveSteps[train][0] = stepsPerVoxel * std::cos(wave.heading);
+		_waveSteps[train][1] = stepsPerVoxel * std::sin(wave.heading);
+		_waveSteps[train][2] = -(float)std::fmod(SDL_GetTicks() / 1000.0 * wave.speed * stepsPerVoxel, (double)WaveSineSteps);
+		const float bendStepsPerVoxel = WaveSineSteps / wave.bendLength;
+		_waveSteps[train][3] = -bendStepsPerVoxel * std::sin(wave.heading);
+		_waveSteps[train][4] = bendStepsPerVoxel * std::cos(wave.heading);
+		_waveSteps[train][5] = wave.bendDepth * stepsPerVoxel;
+	}
 
 	// The sky's colours at the horizon and straight up (the zenith) by day, by night and under
 	// the sea, and the clouds' lit and shadowed sides by day and by night (RGB).
@@ -308,15 +332,17 @@ void FirstPersonView::updateColors()
 		_colors.moonDir[axis] = moonDirection[axis];
 	}
 	// Each face direction (+x -x +y -y +z -z) is shaded by how much it turns away from the sun
-	// (Lambert's cosine law): strongly by day, only a little at night. Undersides (-z) get a
-	// whole shade more on top.
+	// (Lambert's cosine law): strongly by day, only a little at night, and indoors always as at
+	// night (no sun shines there, see indoorsAt). Undersides (-z) get a whole shade more on top.
 	const float daylight = 1.0f - _colors.night;
 	static const float faceNormals[6][3] = { { 1, 0, 0 }, { -1, 0, 0 }, { 0, 1, 0 }, { 0, -1, 0 }, { 0, 0, 1 }, { 0, 0, -1 } };
 	for (int face = 0; face < 6; ++face)
 	{
 		const float lambert = std::max(0.0f, faceNormals[face][0] * sunDirection[0] + faceNormals[face][1] * sunDirection[1]
 			+ faceNormals[face][2] * sunDirection[2]);
-		_colors.faceShade[face] = (1.0f - lambert) * (0.5f + 2.5f * daylight) + (face == 5 ? 1.0f : 0.0f);
+		const float underside = face == 5 ? 1.0f : 0.0f;
+		_colors.faceShade[face] = (1.0f - lambert) * (0.5f + 2.5f * daylight) + underside;
+		_colors.indoorFaceShade[face] = (1.0f - lambert) * 0.5f + underside;
 	}
 	// The UFOs' lights for this frame (the UFO lights option).
 	updateUfos();
@@ -634,6 +660,8 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 	// The colour before shading: the voxel's own, unless the face is one the iso art doesn't show.
 	Uint8 baseColor = hit.color;
 	int rockCeilingMiddle = -1; // a ceiling under rock: its middle shade within its colour group (see the end)
+	float waveShade = 0.0f;     // on the sea: the shade its wave adds (see waterColor)
+	bool onSea = false;         // ...and that this is the sea's top
 	const float hitHeight = rayOrigin[2] + rayDirection[2] * hit.t; // in voxels
 	if (hit.part >= 0 && tileView.part[hit.part])
 	{
@@ -699,6 +727,15 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 			shownColor = mirroredColor(hit, 1 - hit.axis, true, showNextFrame);
 		}
 		if (shownColor && !ownColorAllRound) baseColor = shownColor;
+		// The sea's top: waves (see waterColor), as on the sea beyond the map's edge. Its side
+		// (where the tile beside it has no floor) its deep colour: the art's own is the black
+		// edge it draws under a tile of sea.
+		if (model.water && _waterColors[0])
+		{
+			onSea = faceIndex == 4;
+			baseColor = onSea ? waterColor(rayOrigin[0] + rayDirection[0] * hit.t, rayOrigin[1] + rayDirection[1] * hit.t, hit.t, pixelX, pixelY, waveShade)
+				: _waterColors[1];
+		}
 	}
 	// The point the light is measured at: the hit, 1.5 voxels out from the face, so it samples
 	// the air in front of the surface rather than the solid tile behind it.
@@ -707,23 +744,24 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 	{
 		surfacePoint[axis] = rayOrigin[axis] + rayDirection[axis] * hit.t + normal[axis] * 1.5f;
 	}
-	// The face's shading for its direction. On a steady UFO model (the UFO lights option) it
-	// is the direction the voxel's open faces face together, so a stepped curve of the hull
-	// shades smoothly instead of in stripes.
-	float faceShading = _colors.faceShade[faceIndex];
-	if (faceIndex == 5 && underRock(hitHeight))
-	{
-		faceShading = RockCeilingShade; // a ceiling under rock: no sun turns it away
-	}
-	if (hit.part >= 0 && tileView.part[hit.part] && tileView.part[hit.part]->exposed)
+	// The face's shading for its direction. Indoors (see indoorsAt) no sun shines: it is shaded
+	// as at night, only a little by its direction, and nothing there is in the sun's shadow (the
+	// game's light already has the roof's shade): every wall of a house turned from the sun or
+	// facing it from under the roof sank three shades deeper, a shop's grey inside wall into the
+	// darkest of its colours. Out in the sun, on a steady UFO model (the UFO lights option) it is
+	// the direction the voxel's open faces face together, so a stepped curve of the hull shades
+	// smoothly instead of in stripes.
+	const bool indoors = indoorsAt(surfacePoint);
+	float faceShading = indoors ? _colors.indoorFaceShade[faceIndex] : _colors.faceShade[faceIndex];
+	if (!indoors && hit.part >= 0 && tileView.part[hit.part] && tileView.part[hit.part]->exposed)
 	{
 		const Uint8 openFaces = tileView.part[hit.part]->exposed[hit.voxel[2]][hit.voxel[1]][hit.voxel[0]];
 		if (((openFaces >> faceIndex) & 1) && _ufoFaceShade[openFaces] >= 0.0f) faceShading = _ufoFaceShade[openFaces];
 	}
-	// The shade (0 brightest .. 15 darkest): the game's light, the face's direction, and one
-	// shade darker per 320 voxels (20 tiles) of distance.
+	// The shade (0 brightest .. 15 darkest): the game's light, the face's direction, one shade
+	// darker per 320 voxels (20 tiles) of distance, and on the sea its wave.
 	float ufoGlow = 0.0f; // a UFO's light here (the UFO lights option), 0..1
-	float shade = lightAt(surfacePoint[0], surfacePoint[1], surfacePoint[2], _ufoLightsOn ? &ufoGlow : nullptr) + faceShading + hit.t / 320.0f;
+	float shade = lightAt(surfacePoint[0], surfacePoint[1], surfacePoint[2], _ufoLightsOn ? &ufoGlow : nullptr) + faceShading + hit.t / 320.0f + waveShade;
 	float sunShadow = 0.0f; // the shade a sun shadow adds (not darkness of the place: see the end)
 	float flare = 0.0f; // red light from tactical flares
 	if (hit.emissive)
@@ -736,10 +774,11 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 	else if (Options::fpsShadows)
 	{
 		// The sun: a face turned towards it with something in the way is in shadow (only by
-		// day, and not too far away, as each test is a ray walked 260 voxels towards the sun).
+		// day, out of doors, and not too far away, as each test is a ray walked 260 voxels
+		// towards the sun).
 		const float daylight = _colors.underwater ? 0.0f : 1.0f - _colors.night;
 		const float sunFacing = normal[0] * _colors.sunDir[0] + normal[1] * _colors.sunDir[1] + normal[2] * _colors.sunDir[2];
-		if (daylight > 0.3f && sunFacing > 0.05f && hit.t < 640.0f)
+		if (!indoors && daylight > 0.3f && sunFacing > 0.05f && hit.t < 640.0f)
 		{
 			const float towardsSun[3] = { surfacePoint[0] + _colors.sunDir[0] * 260.0f,
 				surfacePoint[1] + _colors.sunDir[1] * 260.0f,
@@ -809,7 +848,7 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 	// the dark panels of the Harvester's gore tubes showed as black boxes.
 	int wholeShades = (int)std::max(0.0f, shade + dither(pixelX, pixelY));
 	const bool onSteadyUfo = hit.part >= 0 && tileView.part[hit.part] && tileView.part[hit.part]->exposed;
-	const float placeShade = shade - faceShading - hit.t / 320.0f - sunShadow;
+	const float placeShade = shade - faceShading - hit.t / 320.0f - waveShade - sunShadow;
 	const float blackShare = std::clamp((placeShade - DarkOverflowFrom) / (DarkOverflowTo - DarkOverflowFrom), 0.0f, 1.0f);
 	const bool darkEnoughForBlack = !onSteadyUfo && blackShare > dither(pixelX + 1, pixelY + 2);
 	if (rockCeilingMiddle >= 0 && !darkEnoughForBlack)
@@ -818,7 +857,9 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 		// its middle shade stops RockMottleShades short of the darkest, its pattern round that.
 		wholeShades = std::min(wholeShades, std::max(0, 15 - RockMottleShades - rockCeilingMiddle));
 	}
-	Uint8 color = darkEnoughForBlack ? shadeColor(baseColor, wholeShades) : (Uint8)((baseColor & 0xF0) | std::min(15, (baseColor & 15) + wholeShades));
+	// (The sea stops short of its groups' last shades, all but black, see WaterDarkestShade.)
+	const int darkest = onSea ? std::max(baseColor & 15, WaterDarkestShade) : 15;
+	Uint8 color = darkEnoughForBlack ? shadeColor(baseColor, wholeShades) : (Uint8)((baseColor & 0xF0) | std::min(darkest, (baseColor & 15) + wholeShades));
 	if (flare * 1.5f > 0.04f + dither(pixelX + 1, pixelY + 3))
 	{
 		color = _colors.flareTint[color]; // the flare's light is red
@@ -882,7 +923,8 @@ Uint8 FirstPersonView::hazeColor(Uint8 color, float haze, int pixelX, int pixelY
  * map's border, then the map's ground running on to the horizon, then the sky. The rock, the
  * tape and the posts stand on the border itself, so the ray meets them right where it leaves the
  * map; the ground beyond is a flat plane at the surface's floor height (ground level outdoors),
- * tiled with the ground model chosen for the map. A map underground all the way up has rock
+ * tiled with the ground model chosen for the map, or the water's beyond a stretch of the border
+ * where the water reaches it (see chooseGround). A map underground all the way up has rock
  * beyond every edge and over it as well (a player's report: a base's edge showed the ground of
  * its sewers far below, and the sky over it).
  * @param rayOrigin The eye, in voxels.
@@ -953,13 +995,41 @@ Uint8 FirstPersonView::colorOutsideMap(const float rayOrigin[3], const float ray
 		if (groundDistance >= tExit)
 		{
 			depth = groundDistance;
-			// The ground model repeats every tile: the colour of its top layer (layer 1, or
-			// layer 0 where layer 1 is empty) at that spot, lit like open ground under the sky.
 			const float groundX = rayOrigin[0] + rayDirection[0] * groundDistance;
 			const float groundY = rayOrigin[1] + rayDirection[1] * groundDistance;
-			Uint8 color = _groundModel->color[1][(int)std::floor(groundY) & 15][(int)std::floor(groundX) & 15];
-			if (!color) color = _groundModel->color[0][(int)std::floor(groundY) & 15][(int)std::floor(groundX) & 15];
-			color = shadeColor(color, (int)(_colors.ambient + _colors.faceShade[4] + groundDistance / 320.0f + dither(pixelX, pixelY)));
+			// Beyond a stretch of the border where the water reaches it, the water goes on: the
+			// tile of the map's outer ring straight back across the border from the spot (the
+			// corner tile, beyond a corner) tells.
+			const VoxelModel *ground = _groundModel;
+			if (_waterModel)
+			{
+				const int mapSizeX = _save->getMapSizeX();
+				const int edgeX = std::clamp((int)std::floor(groundX / Position::TileXY), 0, mapSizeX - 1);
+				const int edgeY = std::clamp((int)std::floor(groundY / Position::TileXY), 0, _save->getMapSizeY() - 1);
+				if (_waterAtEdge[edgeY * mapSizeX + edgeX]) ground = _waterModel;
+			}
+			// The model repeats every tile: the colour of its top layer (layer 1, or layer 0
+			// where layer 1 is empty) at that spot; the sea's waves (see waterColor). Lit like
+			// open ground under the sky.
+			Uint8 color;
+			float waveShade = 0.0f;
+			if (ground->water && _waterColors[0])
+			{
+				color = waterColor(groundX, groundY, groundDistance, pixelX, pixelY, waveShade);
+			}
+			else
+			{
+				color = ground->color[1][(int)std::floor(groundY) & 15][(int)std::floor(groundX) & 15];
+				if (!color) color = ground->color[0][(int)std::floor(groundY) & 15][(int)std::floor(groundX) & 15];
+			}
+			// Shaded past the darkest of its colour group, it turns black only where the open ground
+			// is really dark, as on the map (see shadeHit, DarkOverflowFrom); else it stays the
+			// darkest of its group (the sea's troughs at dusk were black blotches).
+			const int shades = (int)(_colors.ambient + _colors.faceShade[4] + waveShade + groundDistance / 320.0f + dither(pixelX, pixelY));
+			// (The sea stops short of its groups' last shades, all but black: WaterDarkestShade.)
+			const float blackShare = std::clamp((_colors.ambient - DarkOverflowFrom) / (DarkOverflowTo - DarkOverflowFrom), 0.0f, 1.0f);
+			const int darkest = ground->water ? std::max(color & 15, WaterDarkestShade) : 15;
+			color = blackShare > dither(pixelX + 1, pixelY + 2) ? shadeColor(color, shades) : (Uint8)((color & 0xF0) | std::min(darkest, (color & 15) + std::max(0, shades)));
 			// The haze closes in towards the horizon, spread over a longer distance than on the
 			// map so the ground fades out gradually; under the sea the murk closes in as on the map.
 			const float haze = _colors.underwater ? smoothstep(_maxDistance * 0.12f, _maxDistance * 0.65f, groundDistance)
@@ -973,6 +1043,66 @@ Uint8 FirstPersonView::colorOutsideMap(const float rayOrigin[3], const float ray
 }
 
 /**
+ * The sea's height at a spot (see WaveTrains): the trains of waves crossing there, each drifting
+ * along its heading, its crests bending to and fro along their length; those whose lines would be
+ * finer than the pixels flatten out with the distance. Two look-ups in a sine table and a few
+ * multiplications a train: cheap enough for every pixel of sea.
+ * @param x World position east, in voxels.
+ * @param y World position south, in voxels.
+ * @param distance How far away it is seen, in voxels.
+ * @return The height, -1 (a trough) .. 1 (a crest).
+ */
+float FirstPersonView::waveHeight(float x, float y, float distance) const
+{
+	float height = 0.0f;
+	for (int train = 0; train < WaveTrainCount; ++train)
+	{
+		const WaveTrain &wave = WaveTrains[train];
+		if (distance >= wave.fadeTo)
+		{
+			continue;
+		}
+		const float fade = distance <= wave.fadeFrom ? 1.0f : (wave.fadeTo - distance) / (wave.fadeTo - wave.fadeFrom);
+		const float *steps = _waveSteps[train];
+		const float bend = WaveSine[(int)(x * steps[3] + y * steps[4]) & (WaveSineSteps - 1)] * steps[5];
+		const int step = (int)(x * steps[0] + y * steps[1] + steps[2] + bend);
+		height += WaveSine[step & (WaveSineSteps - 1)] * wave.share * fade;
+	}
+	return height;
+}
+
+/**
+ * The sea's colour at a spot of its surface (the mod's water: its floors' tops on the map, and
+ * the sea beyond the map's edge), before the light: its own colours (see chooseGround) in waves
+ * rolling across it, the same everywhere, so the sea has no seams at the tiles' or the map's
+ * edges. A crest is WaveShades lighter than the plain colour, a trough as much darker; foam
+ * breaks on the highest crests and the deep colour shows in the troughs, dithered in as more of
+ * either shows.
+ * @param x World position east, in voxels.
+ * @param y World position south, in voxels.
+ * @param distance How far away it is seen, in voxels.
+ * @param pixelX The pixel (or block of pixels), for the dither.
+ * @param pixelY The same, down.
+ * @param shade Out: the shades the wave adds to the colour's (0 on a crest .. twice WaveShades in a trough).
+ * @return The palette colour.
+ */
+Uint8 FirstPersonView::waterColor(float x, float y, float distance, int pixelX, int pixelY, float &shade) const
+{
+	const float height = waveHeight(x, y, distance);
+	shade = WaveShades * (1.0f - height);
+	const float threshold = dither(pixelX + 3, pixelY + 1);
+	if (height > FoamFrom && (height - FoamFrom) / (1.0f - FoamFrom) > threshold)
+	{
+		return _waterColors[2];
+	}
+	if (-height > DeepFrom && (-height - DeepFrom) / (1.0f - DeepFrom) > threshold)
+	{
+		return _waterColors[1];
+	}
+	return _waterColors[0];
+}
+
+/**
  * Is an underside at some height a ceiling under rock? On a map underground all the way up (a
  * base, a colony's inside), everywhere; elsewhere up to the map's surface (see chooseGround): the
  * ground's own floor seen from the caves below it, and anything in them. (On a map whose surface
@@ -983,6 +1113,29 @@ Uint8 FirstPersonView::colorOutsideMap(const float rayOrigin[3], const float ray
 bool FirstPersonView::underRock(float height) const
 {
 	return _enclosed || height <= GroundTop + _surfaceLevel * 24.0f;
+}
+
+/**
+ * Is a point indoors, where no sun shines? Under a roof: a floor or an object on any level above
+ * its tile (see snapshotTiles), as the game counts a roof when it takes the sun's light away;
+ * or under rock (see underRock). Off the map's sides it is out in the open.
+ * @param point The point, in voxels (in the air in front of a face, see shadeHit).
+ * @return True if it is.
+ */
+bool FirstPersonView::indoorsAt(const float point[3]) const
+{
+	if (underRock(point[2]))
+	{
+		return true;
+	}
+	const int mapSizeX = _save->getMapSizeX(), mapSizeY = _save->getMapSizeY();
+	const int tileX = (int)std::floor(point[0] / Position::TileXY), tileY = (int)std::floor(point[1] / Position::TileXY);
+	if (tileX < 0 || tileY < 0 || tileX >= mapSizeX || tileY >= mapSizeY)
+	{
+		return false;
+	}
+	const int tileZ = std::clamp((int)std::floor(point[2] / Position::TileZ), 0, _save->getMapSizeZ() - 1);
+	return _tileLights[(tileZ * mapSizeY + tileY) * mapSizeX + tileX].roofed;
 }
 
 /**

@@ -72,6 +72,7 @@ class Mod;
 class OptionInfo;
 class RuleItem;
 class State;
+class Surface;
 
 namespace FirstPerson
 {
@@ -153,9 +154,22 @@ bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
 /// Setting "Shotgun pellets in flight": do a shotgun's pellets fly beside its round (in 3D and on
 /// the map), rather than all landing at once? They're traced as the round is fired, and hit as it lands.
 bool pelletsInFlight(BattlescapeState *state);
+/// Setting "Each pellet on its own": do a shotgun's pellets and a volley's two rounds each land on
+/// their own (in either view), none lost when the lead pellet leaves the map?
+bool eachPellet(BattlescapeState *state);
+/// Akimbo on the map (Ctrl and Shift held, a click on a hand's weapon): steps the soldier's two
+/// guns through firing together on the map, both at once, in turn, and not. True if it took the click.
+bool toggleMapAkimbo(BattlescapeState *state, BattleUnit *unit);
+/// Akimbo on the map: its mini targets in both hands' boxes (one each both at once, two in turn),
+/// drawn after the game draws the hands; undone once the two guns no longer pair up.
+void drawMapAkimbo(BattlescapeState *state, BattleUnit *unit, Surface *leftHand, Surface *rightHand);
+/// A shot fired on the map, as it's launched: with akimbo marked there, the other hand's gun
+/// fires along, as in 3D (not while the 3D view shows: its shots bring their own).
+void mapAkimbo(BattlescapeState *state, BattleAction &action);
 /// A shotgun's pellet landed (ProjectileFlyBState::pelletLands), in either view: it's heard (a few
-/// to a volley) and the 3D view marks where it struck (sparks, a bullet hole), as it does the round.
-void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo);
+/// to a volley; not one whose hit the explosion state brings, which sounds its own) and the 3D view
+/// marks where it struck (sparks, a bullet hole), as it does the round.
+void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo, bool heard = true);
 /// The bullet sprite for shotgun ammo that has none (Projectile): the one the mod's other ammo of
 /// its damage type uses most, so the map can draw its round and pellets in flight.
 int shotgunBulletSprite(const Mod *mod, const RuleItem *ammo);
@@ -194,7 +208,11 @@ inline bool activeWhenNew(const std::string &) { return false; }
 inline void freeAimTarget(BattlescapeState *, const BattleAction &, Position &) { }
 inline bool fastShots(BattlescapeState *, const BattleUnit *) { return false; }
 inline bool pelletsInFlight(BattlescapeState *) { return false; }
-inline void pelletLanded(BattlescapeState *, const Position &, const Position &, int, const BattleItem *, const BattleItem *) { }
+inline bool eachPellet(BattlescapeState *) { return false; }
+inline bool toggleMapAkimbo(BattlescapeState *, BattleUnit *) { return false; }
+inline void drawMapAkimbo(BattlescapeState *, BattleUnit *, Surface *, Surface *) { }
+inline void mapAkimbo(BattlescapeState *, BattleAction &) { }
+inline void pelletLanded(BattlescapeState *, const Position &, const Position &, int, const BattleItem *, const BattleItem *, bool = true) { }
 inline int shotgunBulletSprite(const Mod *, const RuleItem *) { return -1; } // (Mod::NO_SURFACE)
 inline bool breakdown(BattlescapeState *, BattleUnit *) { return false; }
 inline void closeQuartersDeflected(BattlescapeState *, const BattleUnit *, const Position &) { }

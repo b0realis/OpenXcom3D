@@ -355,7 +355,7 @@ void FirstPersonView::drawProjectilesAndExplosions()
 	// A Doom free grenade in flight (the 3D view's own throw).
 	drawFreeGrenade();
 	// The game's one projectile in flight.
-	if (Projectile *projectile = _map->getProjectile())
+	if (Projectile *projectile = flyingProjectile())
 	{
 		if (BattleItem *item = projectile->getItem())
 		{
@@ -1212,8 +1212,9 @@ void FirstPersonView::spawnPartnerEffects()
 	if (partner != _lastPartnerShot)
 	{
 		// The last round has landed: sparks and a mark where it ended, and a laser leaves its
-		// beam fading out.
-		if (_lastPartnerShot)
+		// beam fading out (not one flying on after its shot ended, a miss leaving the map).
+		const auto &strays = _map ? _map->getStrays() : std::vector<Projectile*>();
+		if (_lastPartnerShot && std::find(strays.begin(), strays.end(), _lastPartnerShot) == strays.end())
 		{
 			spawnShotImpact(_partnerHead, _partnerOrigin, _partnerTrail);
 			if (_partnerTrail == TRAIL_BEAM)
@@ -1556,7 +1557,7 @@ void FirstPersonView::drawBeams()
 		drawBeam(beam.from, beam.to, beam.color, beam.calibre, fade);
 	}
 	// The beam of the shot in flight (not a thrown item), solid, from the muzzle to its head.
-	Projectile *projectile = _map ? _map->getProjectile() : nullptr;
+	Projectile *projectile = flyingProjectile();
 	if (projectile && projectile == _lastProjectile && !_lastProjectileThrown && _shotTrail == TRAIL_BEAM)
 	{
 		drawBeam(_shotTrailOrigin, _lastShotHead, _shotTrailColor, _shotCalibre, 1.0f);
@@ -1571,8 +1572,12 @@ void FirstPersonView::drawBeams()
 /**
  * A shotgun's pellets in flight (setting "Shotgun pellets in flight"; a player's report: why not
  * a shotgun's pellets, as two guns' rounds fly side by side?), flying beside the round (see
- * ProjectileFlyBState::createPellets): each a short streak in the round's colour, leaving the
- * muzzle as the round does (see shotHead) and going where the game's spread sends it.
+ * ProjectileFlyBState::createPellets): each drawn as the round is (a player's report: the round
+ * had real sprites, the pellets "weird wireframe squiggles", so the lead pellet stood out), its
+ * look from its own ammo and weapon, leaving the muzzle as the round does (see shotHead), the
+ * other gun's from that gun's, and going where the game's spread sends it. And the misses of a
+ * shot that ended, flying on to the map's edge only to be seen (setting "Each pellet on its own",
+ * see Map::addStrays), at the game's position (their shot's muzzle long left behind).
  */
 void FirstPersonView::drawPellets()
 {
@@ -1580,21 +1585,49 @@ void FirstPersonView::drawPellets()
 	{
 		return;
 	}
+	// Drawn as a shot in flight is, by its own ammo and weapon, its streak back to where it started.
+	auto drawLikeRound = [this](const Projectile *bullet, const float head[3], const float origin[3])
+	{
+		Trail trail;
+		Uint8 color;
+		float calibre;
+		trailFor(bullet->getAmmo(), bullet->getWeapon(), trail, color, calibre);
+		if (trail == TRAIL_BEAM)
+		{
+			drawBeam(origin, head, color, calibre, 1.0f);
+		}
+		else
+		{
+			drawShotDot(head, origin, trail, color, calibre);
+		}
+	};
+	const Projectile *round = _map->getProjectile(); // (even landed: the pellets are its gun's)
 	for (const Projectile *pellet : _map->getPellets())
 	{
 		float head[3];
 		shotHead(pellet, head);
-		// Back along its way from the head, the streak's length.
-		const Position now = pellet->getPosition(0), before = pellet->getPosition(-2);
-		float way[3] = { (float)(now.x - before.x), (float)(now.y - before.y), (float)(now.z - before.z) };
-		const float length = std::sqrt(way[0] * way[0] + way[1] * way[1] + way[2] * way[2]);
-		if (length < 0.01f)
-		{
-			continue;
-		}
-		const float tail[3] = { head[0] - way[0] / length * PelletStreak, head[1] - way[1] / length * PelletStreak, head[2] - way[2] / length * PelletStreak };
-		drawLine3D(tail, head, _shotTrailColor ? _shotTrailColor : _colors.spark, 1, 1.0f);
+		drawLikeRound(pellet, head, round && pellet->getWeapon() != round->getWeapon() ? _partnerOrigin : _shotTrailOrigin);
 	}
+	_map->moveStrays(); // (the map moves them as it draws them, and in 3D it isn't drawn)
+	for (const Projectile *stray : _map->getStrays())
+	{
+		const Position at = stray->getPosition(0), start = stray->getPosition(-100000);
+		const float head[3] = { (float)at.x, (float)at.y, (float)at.z }, origin[3] = { (float)start.x, (float)start.y, (float)start.z };
+		drawLikeRound(stray, head, origin);
+	}
+}
+
+/**
+ * The game's projectile in flight, as the view draws and follows it: none once it has landed
+ * while the rest of its shot flies on (setting "Each pellet on its own": the round lands before
+ * its pellets), when its end is shown as any shot's (finishShot) and the game keeps it only to
+ * carry on the shot.
+ * @return The projectile, or null.
+ */
+Projectile *FirstPersonView::flyingProjectile() const
+{
+	Projectile *projectile = _map ? _map->getProjectile() : nullptr;
+	return projectile && !_map->isProjectileLanded() ? projectile : nullptr;
 }
 
 /**
@@ -1604,7 +1637,7 @@ void FirstPersonView::drawPellets()
  */
 void FirstPersonView::followShots()
 {
-	Projectile *projectile = _map ? _map->getProjectile() : nullptr;
+	Projectile *projectile = flyingProjectile();
 	if (projectile != _lastProjectile)
 	{
 		finishShot();
@@ -1627,7 +1660,10 @@ void FirstPersonView::followShots()
  */
 void FirstPersonView::finishShot()
 {
-	if (_lastProjectile && !_lastProjectileThrown)
+	// (a round flying on after its shot ended, a miss leaving the map, has no end here: see drawPellets)
+	const auto &strays = _map ? _map->getStrays() : std::vector<Projectile*>();
+	const bool flyingOn = std::find(strays.begin(), strays.end(), _lastProjectile) != strays.end();
+	if (_lastProjectile && !_lastProjectileThrown && !flyingOn)
 	{
 		spawnShotImpact(_lastShotHead, _shotTrailOrigin, _shotTrail);
 	}
@@ -1635,7 +1671,7 @@ void FirstPersonView::finishShot()
 	{
 		_enemyShotEnd = SDL_GetTicks(); // (a hit on our soldier right now came from _enemyShotFrom)
 	}
-	if (_lastProjectile && !_lastProjectileThrown && _shotTrail == TRAIL_BEAM)
+	if (_lastProjectile && !_lastProjectileThrown && !flyingOn && _shotTrail == TRAIL_BEAM)
 	{
 		_beams.push_back({ { _shotTrailOrigin[0], _shotTrailOrigin[1], _shotTrailOrigin[2] },
 			{ _lastShotHead[0], _lastShotHead[1], _lastShotHead[2] }, SDL_GetTicks(), _shotTrailColor, _shotCalibre });
