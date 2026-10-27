@@ -266,7 +266,7 @@ void FirstPersonMode::createCrosshairAndBanner()
 
 	// The fire mode and the hit chance to the right of the crosshair, so they don't cover what
 	// you aim at.
-	_txtMode = addText(120, 9, width / 2 + 14, height / 2 - 9, "crosshairText", "firstPerson");
+	_txtMode = addText(160, 9, width / 2 + 14, height / 2 - 9, "crosshairText", "firstPerson"); // (room for a mod's long mode names)
 	_txtShot = addText(120, 9, width / 2 + 14, height / 2 + 1, "crosshairText", "firstPerson");
 	// Under them, the action's other costs (setting "Expanded crosshair info"): energy, health and
 	// the rest, a cost the soldier can't pay in the second colour (red).

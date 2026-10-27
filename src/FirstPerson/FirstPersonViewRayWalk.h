@@ -379,7 +379,7 @@ inline bool traceTile(const FirstPersonView::TileView &tileView, const FirstPers
 				if (!model) continue;
 				const Uint8 color = model->color[localZ][localY][localX];
 				if (!color) continue;
-				if (model->ghostly && ghostOpacity(distance) <= ghostThreshold)
+				if (model->ghostly && ghostOpacity(distance) * model->ghostShare <= ghostThreshold)
 				{
 					continue; // a ghost, seen through on this pixel
 				}
@@ -387,6 +387,10 @@ inline bool traceTile(const FirstPersonView::TileView &tileView, const FirstPers
 				{
 					hit.glass = true; // window glass: tint what's behind it
 					continue;
+				}
+				if (model->clear[localZ][localY] & (1 << localX))
+				{
+					continue; // behind a hole in the art (a glass door's pane): seen through, as on the map
 				}
 				hit.color = color;
 				hit.t = distance;

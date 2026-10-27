@@ -65,6 +65,7 @@
 #include "../Engine/Palette.h"
 #include "../Engine/Surface.h"
 #include "../Engine/SurfaceSet.h"
+#include "../Battlescape/Pathfinding.h"
 #include "../Mod/MapData.h"
 #include "../Mod/MapDataSet.h"
 #include "../Mod/Mod.h"
@@ -216,9 +217,10 @@ void fillHollowVoxels(FirstPersonView::VoxelModel &model, std::vector<int> &holl
  */
 void clearModel(FirstPersonView::VoxelModel &model)
 {
-	// Every colour 0 (empty) and every glass bit off.
+	// Every colour 0 (empty) and every glass and hole bit off.
 	std::fill(&model.color[0][0][0], &model.color[0][0][0] + sizeof(model.color), (Uint8)0);
 	std::fill(&model.glass[0][0], &model.glass[0][0] + 24 * 16, (Uint16)0);
+	std::fill(&model.clear[0][0], &model.clear[0][0] + 24 * 16, (Uint16)0);
 
 	// No light source found yet.
 	model.glow[0] = model.glow[1] = model.glow[2] = 0.0f;
@@ -239,6 +241,7 @@ void clearModel(FirstPersonView::VoxelModel &model)
 	// Empty, not a ghost, with a bounding box that any solid voxel will shrink onto.
 	model.empty = true;
 	model.ghostly = false;
+	model.ghostShare = 1.0f;
 	for (int axis = 0; axis < 3; ++axis)
 	{
 		model.min[axis] = 255;
@@ -494,6 +497,70 @@ bool looksLikeWindow(const MapData *mapData, const std::vector<Uint16> &loftData
 }
 
 /**
+ * Finds the holes in a part's art: transparent pixels the drawn ones close in all round, which
+ * no transparent path joins to the sprite's edge (a glass door's panes, the gaps in a fence, a
+ * chain-link mesh's every other pixel). On the map one sees through them what lies behind,
+ * though the game's voxels there are solid; the 3D view sees through the voxels behind them too
+ * (a player's report: the gas station's glass doors were see-through on the map, opaque in 3D).
+ * @param sprite The part's sprite frame.
+ * @param holes Gets one entry per pixel, row by row: 1 for a hole.
+ * @return True if the art has any hole.
+ */
+bool findArtHoles(const Surface *sprite, std::vector<char> &holes)
+{
+	// Every transparent pixel reachable from the edge without crossing a drawn one is outside;
+	// the transparent ones left are holes.
+	const int width = sprite->getWidth(), height = sprite->getHeight();
+	std::vector<char> outside(width * height, 0);
+	std::vector<int> toVisit;
+	for (int x = 0; x < width; ++x) { toVisit.push_back(x); toVisit.push_back((height - 1) * width + x); }
+	for (int y = 0; y < height; ++y) { toVisit.push_back(y * width); toVisit.push_back(y * width + width - 1); }
+	while (!toVisit.empty())
+	{
+		const int pixel = toVisit.back();
+		toVisit.pop_back();
+		const int x = pixel % width, y = pixel / width;
+		if (outside[pixel] || sprite->getPixel(x, y)) continue;
+		outside[pixel] = 1;
+		if (x > 0) toVisit.push_back(pixel - 1);
+		if (x < width - 1) toVisit.push_back(pixel + 1);
+		if (y > 0) toVisit.push_back(pixel - width);
+		if (y < height - 1) toVisit.push_back(pixel + width);
+	}
+	holes.assign(width * height, 0);
+	bool found = false;
+	for (int pixel = 0; pixel < width * height; ++pixel)
+	{
+		if (!outside[pixel] && !sprite->getPixel(pixel % width, pixel / width))
+		{
+			holes[pixel] = 1;
+			found = true;
+		}
+	}
+	return found;
+}
+
+/**
+ * Does the game give a record no voxels at all (every layer's LOFT template empty)? Shots and
+ * sight pass through it, whatever the map draws.
+ * @param mapData The record.
+ * @param loftData The game's LOFT templates (16 rows of 16 voxels each).
+ * @return True if it has no solid voxel.
+ */
+bool hasNoVoxels(const MapData *mapData, const std::vector<Uint16> &loftData)
+{
+	for (int layer = 0; layer < 12; ++layer)
+	{
+		const size_t loftStart = mapData->getLoftID(layer) * 16;
+		for (int row = 0; row < 16 && loftStart + 16 <= loftData.size(); ++row)
+		{
+			if (loftData[loftStart + row]) return false;
+		}
+	}
+	return true;
+}
+
+/**
  * Keeps a window's glass inside its panes. The art draws a wall's top edge, the sill and lintel
  * of a window and the ends of a wall in the same light colours as the glass, and seen through,
  * those would let the sky show through a wall in single pixels (looking down from a roof, say).
@@ -707,6 +774,49 @@ void buildGhost(FirstPersonView::VoxelModel &model, const Surface *sprite, int p
 				int x, y;
 				planeVoxel(axis, offset, along, x, y);
 				place(x, y, z);
+			}
+		}
+	}
+	model.ghostly = !model.empty;
+}
+
+/**
+ * Builds a part the game gives no voxels from the shape the mod gives it (`firstPerson: shapes:`,
+ * RuleFirstPerson::Shape; a player's report: the shops' metal racks can't be walked into, yet
+ * they had no voxels to show in 3D): the voxels of its boxes, each coloured by the pixel it
+ * lands on (the projection buildModel uses), and none where that pixel is transparent, so the
+ * art's own outline trims the boxes (the legs stay legs, the gap under a shelf stays open, a box
+ * drawn a little too big loses what the art doesn't show). The model comes out ghostly, as
+ * buildGhost's: the game's shots and sight pass through the part.
+ * @param model The empty model to build it in.
+ * @param sprite The part's sprite frame.
+ * @param shape Its boxes.
+ * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
+ */
+void buildShape(FirstPersonView::VoxelModel &model, const Surface *sprite, const RuleFirstPerson::Shape &shape, int yOffset)
+{
+	const int width = sprite->getWidth(), height = sprite->getHeight();
+	for (const auto &box : shape.boxes)
+	{
+		for (int z = box[2]; z <= box[5]; ++z)
+		{
+			for (int y = box[1]; y <= box[4]; ++y)
+			{
+				for (int x = box[0]; x <= box[3]; ++x)
+				{
+					// The pixel the voxel lands on (see buildModel); none outside the sprite.
+					const int spriteX = 16 + x - y, spriteY = 24 + (x + y) / 2 - z + yOffset;
+					const Uint8 color = spriteX >= 0 && spriteY >= 0 && spriteX < width && spriteY < height ? sprite->getPixel(spriteX, spriteY) : 0;
+					if (!color) continue;
+					model.color[z][y][x] = color;
+					model.empty = false;
+					const int voxel[3] = { x, y, z };
+					for (int axis = 0; axis < 3; ++axis)
+					{
+						model.min[axis] = std::min<int>(model.min[axis], voxel[axis]);
+						model.max[axis] = std::max<int>(model.max[axis], voxel[axis]);
+					}
+				}
 			}
 		}
 	}
@@ -1176,23 +1286,45 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 		}
 	}
 
+	// The record's number in its data set: the mod's tables (windows, shapes) go by it.
+	MapDataSet *dataSet = mapData->getDataset();
+	int record = -1;
+	for (size_t index = 0; index < dataSet->getSize() && record < 0; ++index)
+	{
+		if (dataSet->getObject(index) == mapData) record = (int)index;
+	}
+
 	// Is this record a window (declared by the mod, by data set and record number, and shaped
 	// like one, see looksLikeWindow), and which of its colours are glass?
 	const std::vector<Uint16> *loftData = _game->getMod()->getVoxelData();
+	const RuleFirstPerson &firstPerson = _game->getMod()->getFirstPerson();
 	const std::bitset<256> *glassColors = nullptr;
-	if (const RuleFirstPerson::Windows *windows = _game->getMod()->getFirstPerson().getWindows(mapData->getDataset()->getName()))
+	if (const RuleFirstPerson::Windows *windows = firstPerson.getWindows(dataSet->getName()))
 	{
-		// Find the record's number in its data set.
-		MapDataSet *dataSet = mapData->getDataset();
-		for (size_t record = 0; record < dataSet->getSize(); ++record)
-		{
-			if (dataSet->getObject(record) == mapData)
-			{
-				if (windows->records.count((int)record) && looksLikeWindow(mapData, *loftData)) glassColors = &windows->glass;
-				break;
-			}
-		}
+		if (windows->records.count(record) && looksLikeWindow(mapData, *loftData)) glassColors = &windows->glass;
 	}
+
+	// A record the game gives no voxels may have a shape in the mod's table (`firstPerson:
+	// shapes:`). One that isn't a ghost (a floor: TFTD's sea, which showed the ground outside the
+	// map through it) is built here as if the game had given it those voxels, its rows of voxels
+	// standing in for the LOFT templates' (bit 15 - x for x, as theirs); a ghost after the loop.
+	const RuleFirstPerson::Shape *shape = hasNoVoxels(mapData, *loftData) ? firstPerson.getShape(dataSet->getName(), record, Options::getActiveMaster()) : nullptr;
+	std::array<std::array<Uint16, Position::TileXY>, Position::TileZ> shapeRows = {};
+	const bool solidShape = shape && !shape->ghost && !cutout;
+	if (solidShape)
+	{
+		for (const auto &box : shape->boxes)
+			for (int z = box[2]; z <= box[5]; ++z)
+				for (int y = box[1]; y <= box[4]; ++y)
+					for (int x = box[0]; x <= box[3]; ++x) shapeRows[z][y] |= (Uint16)(1 << (15 - x));
+	}
+
+	// A wall's or door's art with holes in it (a glass door's panes, a fence's gaps, see
+	// findArtHoles): the voxels behind them are seen through. Not a UFO's walls, whose art's
+	// holes are painted over (see findHollowPixels), nor objects (big things drawn tile by tile).
+	std::vector<char> artHoles;
+	const bool hasArtHoles = (mapData->getObjectType() == O_WESTWALL || mapData->getObjectType() == O_NORTHWALL) && !hasHollows
+		&& !_ufoDataSets.count(dataSet->getName()) && findArtHoles(sprite, artHoles);
 
 	// Go through the tile's voxels, layer by layer from the bottom (z), row by row from the
 	// north (y), west to east (x).
@@ -1202,13 +1334,13 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	{
 		// The LOFT template of this voxel's layer (each template covers two voxel layers).
 		const size_t loftStart = mapData->getLoftID(z / 2) * 16;
-		if (loftStart + 16 > loftData->size())
+		if (!solidShape && loftStart + 16 > loftData->size())
 		{
 			continue;
 		}
 		for (int y = 0; y < Position::TileXY; ++y)
 		{
-			const Uint16 loftRow = (*loftData)[loftStart + y];
+			const Uint16 loftRow = solidShape ? shapeRows[z][y] : (*loftData)[loftStart + y];
 			if (!loftRow)
 			{
 				continue;
@@ -1240,6 +1372,10 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 					color = sprite->getPixel(spriteX, spriteY + SpriteNudges[nudge]);
 					if (color) break;
 				}
+				if (solidShape && !sprite->getPixel(spriteX, spriteY))
+				{
+					continue; // a shape the mod gave keeps to the art's outline (see buildShape)
+				}
 				if (!color)
 				{
 					if (cutout) continue; // that part of the door has slid away
@@ -1250,11 +1386,16 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 					hollowVoxels.push_back((z * 16 + y) * 16 + x); // a hole in the art: painted after
 				}
 
-				// Store the voxel: its colour, whether it is window glass, and the bounding box.
+				// Store the voxel: its colour, whether it is window glass or behind a hole in the art,
+				// and the bounding box.
 				model.color[z][y][x] = color;
 				if (glassColors && glassColors->test(color))
 				{
 					model.glass[z][y] |= (Uint16)(1 << x);
+				}
+				if (hasArtHoles && spriteY >= 0 && spriteY < sprite->getHeight() && artHoles[spriteY * sprite->getWidth() + spriteX])
+				{
+					model.clear[z][y] |= (Uint16)(1 << x);
 				}
 				model.empty = false;
 				const int voxel[3] = { x, y, z };
@@ -1271,14 +1412,25 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	// with the setting "Parts without shape" (1: lifts and ladders, the parts with the grav lift
 	// flag, and cages, as round a lift; 2: all of them), a see-through ghost of its art, with
 	// the sides the art never shows coloured; no plate fitting, no glow.
+	// A ghost shape from the mod's table (the shops' racks, see buildShape) is built instead, with
+	// the setting on at all. A ghost no one can walk into (by the game's walking cost) shows fainter.
 	if (model.empty)
 	{
+		const bool ghostShape = shape && shape->ghost;
 		const bool ghostWanted = Options::fpsGhostParts == 2
-			|| (Options::fpsGhostParts == 1 && (mapData->isGravLift() || cageArt(sprite, mapData->getObjectType(), yOffset)));
+			|| (Options::fpsGhostParts == 1 && (ghostShape || mapData->isGravLift() || cageArt(sprite, mapData->getObjectType(), yOffset)));
 		if (ghostWanted && !cutout)
 		{
-			buildGhost(model, sprite, mapData->getObjectType(), yOffset);
+			if (ghostShape)
+			{
+				buildShape(model, sprite, *shape, yOffset);
+			}
+			else
+			{
+				buildGhost(model, sprite, mapData->getObjectType(), yOffset);
+			}
 			if (!model.empty) colorHiddenSides(model, sprite);
+			if (mapData->getTUCost(MT_WALK) == Pathfinding::INVALID_MOVE_COST) model.ghostShare = UnwalkableGhostShare;
 		}
 		return;
 	}

@@ -715,7 +715,8 @@ void FirstPersonView::spawnDevices(float elapsedSeconds)
  * spills a soft glow over its surroundings. The shining pixels (marked in _glowMask by the
  * ray caster and the effects drawn after it) are gathered into a grid at quarter resolution,
  * blurred, and the image is brightened where that glow lands: each pixel by up to three
- * shades within its own 16-colour group, dithered, so the palette still works. It shows most
+ * shades within its own 16-colour group, dithered, so the palette still works; a pixel too dark
+ * to show its group's hue (black) takes on the light's own colour instead. It shows most
  * at night and under the sea. The glow keeps the distance of the light it came from (blurred
  * along with it), and what stands well in front of that light (a soldier between the camera
  * and a glowing exit tile) isn't brightened: the light doesn't shine through it.
@@ -729,6 +730,12 @@ void FirstPersonView::drawLightHalos()
 	_glowScratch.assign(gridWidth * gridHeight, 0.0f);
 	_glowDepth.assign(gridWidth * gridHeight, 0.0f);
 	_glowDepthScratch.assign(gridWidth * gridHeight, 0.0f);
+	// The glow's colour: the shining pixels' red, green and blue (weighted) and their weight, in
+	// a grid half as fine (a cell for every 8x8 pixels).
+	const int hueCellSize = cellSize * 2, hueWidth = (width + hueCellSize - 1) / hueCellSize, hueHeight = (height + hueCellSize - 1) / hueCellSize;
+	_glowHue.assign(hueWidth * hueHeight * 4, 0.0f);
+	_glowHueScratch.assign(hueWidth * hueHeight * 4, 0.0f);
+	const SDL_Color *palette = getPalette();
 	// Gather: each cell holds the share of its pixels that shine (0..1; a UFO's light, marked
 	// 3, counts three times). Nothing shining, nothing to do.
 	bool anyGlow = false;
@@ -754,6 +761,8 @@ void FirstPersonView::drawLightHalos()
 		const float *depthRow = &_depthBuffer[y * width];
 		float *glowRow = &_glowBuffer[(y / cellSize) * gridWidth];
 		float *glowDepthRow = &_glowDepth[(y / cellSize) * gridWidth];
+		float *hueRow = &_glowHue[(y / hueCellSize) * hueWidth * 4];
+		const Uint8 *shownRow = getRaw(0, y);
 		for (int x = 0; x < width; ++x)
 		{
 			if (maskRow[x])
@@ -761,6 +770,9 @@ void FirstPersonView::drawLightHalos()
 				const float weight = maskRow[x] * (1.0f / (cellSize * cellSize));
 				glowRow[x / cellSize] += weight;
 				glowDepthRow[x / cellSize] += weight * std::min(depthRow[x], _maxDistance); // (something shining in the sky counts as far away)
+				const SDL_Color &shining = palette[shownRow[x]];
+				float *hue = &hueRow[(x / hueCellSize) * 4];
+				hue[0] += weight * shining.r; hue[1] += weight * shining.g; hue[2] += weight * shining.b; hue[3] += weight;
 				anyGlow = true;
 			}
 		}
@@ -803,6 +815,32 @@ void FirstPersonView::drawLightHalos()
 			}
 		}
 	}
+	// The glow's colour, blurred the same way on its own grid (a box 5 cells wide, as far as the
+	// glow's spreads), each channel and the weight.
+	const int hueRadius = 2;
+	for (int pass = 0; pass < 2; ++pass)
+	{
+		for (int y = 0; y < hueHeight; ++y)
+			for (int x = 0; x < hueWidth; ++x)
+				for (int channel = 0; channel < 4; ++channel)
+				{
+					float sum = 0.0f;
+					for (int offset = -hueRadius; offset <= hueRadius; ++offset) sum += _glowHue[(y * hueWidth + std::clamp(x + offset, 0, hueWidth - 1)) * 4 + channel];
+					_glowHueScratch[(y * hueWidth + x) * 4 + channel] = sum;
+				}
+		for (int y = 0; y < hueHeight; ++y)
+			for (int x = 0; x < hueWidth; ++x)
+				for (int channel = 0; channel < 4; ++channel)
+				{
+					float sum = 0.0f;
+					for (int offset = -hueRadius; offset <= hueRadius; ++offset) sum += _glowHueScratch[(std::clamp(y + offset, 0, hueHeight - 1) * hueWidth + x) * 4 + channel];
+					_glowHue[(y * hueWidth + x) * 4 + channel] = sum;
+				}
+	}
+	// Each palette colour's luminance: which pixels are too dark to show their group's hue.
+	float luminance[256];
+	for (int index = 0; index < 256; ++index) luminance[index] = palette[index].r * 0.3f + palette[index].g * 0.59f + palette[index].b * 0.11f;
+
 	// How strongly the glow brightens: more at night, and most under the sea. It is steady
 	// (a flickering bloom makes the dithered glow shimmer).
 	const float gain = _colors.underwater ? 45.0f : 18.0f + 42.0f * _colors.night;
@@ -855,6 +893,20 @@ void FirstPersonView::drawLightHalos()
 			const float strength = glow * gain;
 			if (strength <= dither(x, y)) continue;
 			const int steps = strength > 2.0f + dither(x + 1, y + 2) ? 3 : strength > 1.0f + dither(x + 1, y + 2) ? 2 : 1;
+			// A pixel too dark to show its group's hue (black) takes the light's own colour, as
+			// much of it for each step as brightens by DarkGlowStepLuma (a shade up a dark group),
+			// the palette's nearest (a player's report: on TFTD's night black a green hitbox, the
+			// laser and fireflies glowed a creepy red, the black's group climbing to red).
+			const float *hue = &_glowHue[((y / hueCellSize) * hueWidth + x / hueCellSize) * 4];
+			const float hueLuminance = hue[3] > 0.0f ? (hue[0] * 0.3f + hue[1] * 0.59f + hue[2] * 0.11f) / hue[3] : 0.0f;
+			if (luminance[pixels[x]] < DarkGlowLuma && hueLuminance >= 1.0f)
+			{
+				const SDL_Color &dark = palette[pixels[x]];
+				const float share = steps * DarkGlowStepLuma / hueLuminance / hue[3];
+				auto channel = [&](float darkValue, float light) { return (int)std::lround(std::min(255.0f, darkValue + light * share) * 31.0f / 255.0f); };
+				pixels[x] = _nearestRgb[(channel(dark.r, hue[0]) << 10) | (channel(dark.g, hue[1]) << 5) | channel(dark.b, hue[2])];
+				continue;
+			}
 			const int brightest = (pixels[x] & 0xF0) == 0 ? 1 : 0;
 			pixels[x] = (Uint8)((pixels[x] & 0xF0) | std::max(brightest, (pixels[x] & 15) - steps));
 		}

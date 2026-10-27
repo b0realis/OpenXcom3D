@@ -14,6 +14,10 @@ B="$ROOT/OpenXcom/build-win64/bin"
 D="$ROOT/OpenXcom/build-win64/deps"
 T="$D/toolchain/bin/x86_64-w64-mingw32"
 [ -f "$B/openxcom.exe" ] || { echo "build OpenXcom/build-win64 first (see tools/windows/configure.sh)"; exit 1; }
+# this script only packages the build: a source file newer than the program means it wasn't
+# rebuilt (an old engine version refuses the new mod, and every game check under Wine dies)
+NEWER=$(find "$ROOT/OpenXcom/src" -newer "$B/openxcom.exe" -type f \( -name '*.cpp' -o -name '*.h' \) | head -1)
+[ -z "$NEWER" ] || { echo "OpenXcom/build-win64 is older than the source ($NEWER): run make -C OpenXcom/build-win64 -j8 first"; exit 1; }
 [ -f "$ROOT/openxcom3d.patch" ] || { echo "run tools/make_patch.sh first"; exit 1; }
 # a Windows program that needs nothing but Windows and the two DLLs, with no home paths
 sh "$ROOT/tools/windows/check.sh" "$B/openxcom.exe" "$D/prefix/bin" || { echo "set up the Windows build with tools/windows/build_libs.sh and configure.sh"; exit 1; }

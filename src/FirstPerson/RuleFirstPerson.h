@@ -49,10 +49,12 @@
  * every mod's section into it.
  */
 #include <algorithm>
+#include <array>
 #include <bitset>
 #include <map>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 #include "../Engine/Yaml.h"
 
@@ -63,8 +65,9 @@ namespace OpenXcom
  * The `firstPerson:` ruleset section. The first-person mode is engine code, but it only
  * switches on when an active mod (OpenXcom3D) declares `firstPerson: enabled: true`. The mod
  * also says how far the view reaches, which terrain records are windows (and which of their
- * colours are glass), what weather each terrain has, which music plays in combat, which armors
- * and items give night vision, and which built-in items are drawn in the hands anyway.
+ * colours are glass), what shape the parts the game gives no voxels have, what weather each
+ * terrain has, which music plays in combat, which armors and items give night vision, and which
+ * built-in items are drawn in the hands anyway.
  */
 class RuleFirstPerson
 {
@@ -74,6 +77,19 @@ public:
 	{
 		std::set<int> records;  // record numbers in the terrain's MCD data set
 		std::bitset<256> glass; // palette colours of those records that are see-through glass
+	};
+	/// The shape of a terrain record the game gives no voxels (shots and sight pass through it,
+	/// though the map draws something there, often something no one can walk into): boxes of
+	/// voxels in the tile, each west, north, bottom, east, south, top (x 0..15 west to east, y
+	/// 0..15 north to south, z 0..23 up, inclusive), for one game (xcom1, xcom2: the two share
+	/// some data set names). A ghost (an object, a wall) is drawn see-through, as the parts
+	/// without shape are (see FirstPersonView::buildShape); not a ghost (a floor: the sea), as if
+	/// the game had given it those voxels.
+	struct Shape
+	{
+		std::string game;
+		std::vector<std::array<int, 6>> boxes;
+		bool ghost = true;
 	};
 	/// How an item's picture is given volume in 3D: worked out (AUTO), rounded (CUSHION) or flat (PLATE: a blade).
 	enum HeldShape { HELD_AUTO = -1, HELD_CUSHION, HELD_PLATE };
@@ -89,6 +105,7 @@ private:
 	bool _enabled;
 	int _maxViewDistance;                        // in tiles
 	std::map<std::string, Windows> _windows;     // terrain data set -> its windows
+	std::map<std::pair<std::string, int>, std::vector<Shape>> _shapes; // (terrain data set, record) -> its shapes, one per game
 	std::map<std::string, std::string> _weather; // terrain data set -> rain, snow, dust, ...
 	std::vector<std::string> _combatMusic;       // tense tracks to try, first one the game has wins
 	std::set<std::string> _nightVision;          // armors and items that give their wearer night vision
@@ -123,6 +140,36 @@ public:
 				for (int color : colors)
 				{
 					if (color > 0 && color < 256) dataSetWindows.glass.set(color);
+				}
+			}
+		}
+
+		// Shapes: per game and terrain data set, records and the boxes of voxels they're built of
+		// (a later mod's shape for the same game and record replaces an earlier one).
+		if (const auto& shapes = reader["shapes"])
+		{
+			for (const auto& entry : shapes.children())
+			{
+				Shape shape;
+				std::string dataSet;
+				std::vector<int> records;
+				std::vector<std::vector<int>> boxes;
+				entry.tryRead("game", shape.game);
+				entry.tryRead("ghost", shape.ghost);
+				entry.tryRead("dataSet", dataSet);
+				entry.tryRead("records", records);
+				entry.tryRead("boxes", boxes);
+				for (const std::vector<int> &box : boxes)
+				{
+					if (box.size() != 6) continue;
+					shape.boxes.push_back({ std::clamp(box[0], 0, 15), std::clamp(box[1], 0, 15), std::clamp(box[2], 0, 23),
+						std::clamp(box[3], 0, 15), std::clamp(box[4], 0, 15), std::clamp(box[5], 0, 23) });
+				}
+				for (int record : records)
+				{
+					std::vector<Shape> &recordShapes = _shapes[std::make_pair(dataSet, record)];
+					recordShapes.erase(std::remove_if(recordShapes.begin(), recordShapes.end(), [&](const Shape &old) { return old.game == shape.game; }), recordShapes.end());
+					recordShapes.push_back(shape);
 				}
 			}
 		}
@@ -206,6 +253,17 @@ public:
 	{
 		auto found = _windows.find(dataSet);
 		return found != _windows.end() ? &found->second : nullptr;
+	}
+	/// The shape of a terrain record for a game (xcom1, xcom2), or nullptr if it has none.
+	const Shape *getShape(const std::string &dataSet, int record, const std::string &game) const
+	{
+		auto found = _shapes.find(std::make_pair(dataSet, record));
+		if (found == _shapes.end()) return nullptr;
+		for (const Shape &shape : found->second)
+		{
+			if (shape.game == game) return &shape;
+		}
+		return nullptr;
 	}
 	/// Tense music tracks for when aliens are in sight (the first one the game has is played).
 	const std::vector<std::string> &getCombatMusic() const { return _combatMusic; }

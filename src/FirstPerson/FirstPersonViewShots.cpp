@@ -1329,11 +1329,27 @@ void FirstPersonView::shotHead(const Projectile *projectile, float out[3]) const
  * glows and the goggles turn its glow green, then again over the green picture (see draw) with
  * a white-green core, white mixed into the goggles' brightest green (NightLightWhiteShare), its
  * dot white in the middle. Colour can't tell a forced path there, so it's dotted.
+ * With dual wield the other gun's path is drawn the same way, its laser from that gun's muzzle.
  * @param asNightLight The second time under night vision: the white-green core.
  */
 void FirstPersonView::drawTrajectory(bool asNightLight)
 {
-	if (_trajectory.size() < 2)
+	drawTrajectoryPath(_trajectory, _trajectoryLook, _muzzleScreen, _muzzleValid, asNightLight);
+	// (dual wield: the other gun's, from its muzzle; a player: "both weapons need lasers")
+	drawTrajectoryPath(_otherTrajectory, _otherTrajectoryLook, _offHandMuzzleScreen, _offHandMuzzleValid, asNightLight);
+}
+
+/**
+ * One path of drawTrajectory's (the chosen gun's or, with dual wield, the other's), a straight
+ * one's laser starting from that weapon's muzzle on the view.
+ * @param path The path, in voxels from the soldier to its end.
+ * @param look How it's drawn.
+ * @param muzzleScreen, muzzleValid The weapon's muzzle on the view, if it's shown.
+ * @param asNightLight The second time under night vision (see drawTrajectory).
+ */
+void FirstPersonView::drawTrajectoryPath(const std::vector<Position> &path, TrajectoryLook look, const double muzzleScreen[2], bool muzzleValid, bool asNightLight)
+{
+	if (path.size() < 2)
 	{
 		return;
 	}
@@ -1345,7 +1361,7 @@ void FirstPersonView::drawTrajectory(bool asNightLight)
 	// own colour, glowing with "Glowing outlines"; as night light in the goggles' brightest green,
 	// then a share of the same pixels white (the dithering skips the rest), the bloom done already.
 	// (A refused shot's laser is dim: no white in it under night vision.)
-	const bool refused = _trajectoryLook == TRAJECTORY_REFUSED_LINE;
+	const bool refused = look == TRAJECTORY_REFUSED_LINE;
 	auto drawStretch = [&](const float from[3], const float to[3], Uint8 color, int thickness, float opacity)
 	{
 		if (!asNightLight)
@@ -1385,8 +1401,8 @@ void FirstPersonView::drawTrajectory(bool asNightLight)
 		}
 	};
 	// A forced path (yellow by day) is dotted under night vision; a straight one is a line.
-	const bool forced = _trajectoryLook == TRAJECTORY_FORCED || _trajectoryLook == TRAJECTORY_FORCED_LINE;
-	const bool straight = _trajectoryLook == TRAJECTORY_STRAIGHT || _trajectoryLook == TRAJECTORY_FORCED_LINE || refused;
+	const bool forced = look == TRAJECTORY_FORCED || look == TRAJECTORY_FORCED_LINE;
+	const bool straight = look == TRAJECTORY_STRAIGHT || look == TRAJECTORY_FORCED_LINE || refused;
 	const bool dotted = _nightVision && forced;
 
 	// A straight shot: the laser from the weapon's muzzle on the screen (12 voxels out along the
@@ -1396,26 +1412,26 @@ void FirstPersonView::drawTrajectory(bool asNightLight)
 	if (straight && !dotted)
 	{
 		float start[3], end[3];
-		voxelCentreOf(_trajectory.back(), end);
-		if (_muzzleValid)
+		voxelCentreOf(path.back(), end);
+		if (muzzleValid)
 		{
 			double rayDirection[3];
-			rayDirectionThrough((int)_muzzleScreen[0], (int)_muzzleScreen[1], rayDirection);
+			rayDirectionThrough((int)muzzleScreen[0], (int)muzzleScreen[1], rayDirection);
 			for (int axis = 0; axis < 3; ++axis) start[axis] = (float)(_eye[axis] + rayDirection[axis] * 12.0);
 		}
 		else
 		{
 			size_t first = 0;
-			for (; first + 1 < _trajectory.size(); ++first)
+			for (; first + 1 < path.size(); ++first)
 			{
-				const Position offset = _trajectory[first] - _trajectory.front();
+				const Position offset = path[first] - path.front();
 				if (offset.x * offset.x + offset.y * offset.y + offset.z * offset.z >= TrajectorySkip * TrajectorySkip) break;
 			}
-			if (first + 1 >= _trajectory.size())
+			if (first + 1 >= path.size())
 			{
 				return;
 			}
-			voxelCentreOf(_trajectory[first], start);
+			voxelCentreOf(path[first], start);
 		}
 		const Uint8 lineColor = forced ? _colors.trajectoryForced : refused ? _colors.laserRefused : _colors.laserSight;
 		drawStretch(start, end, lineColor, 1, refused ? RefusedLineOpacity : 1.0f);
@@ -1425,9 +1441,9 @@ void FirstPersonView::drawTrajectory(bool asNightLight)
 
 	// The path's length, to fade the dashes along it.
 	float totalLength = 0.0f;
-	for (size_t point = 1; point < _trajectory.size(); ++point)
+	for (size_t point = 1; point < path.size(); ++point)
 	{
-		const Position step = _trajectory[point] - _trajectory[point - 1];
+		const Position step = path[point] - path[point - 1];
 		totalLength += std::sqrt((float)(step.x * step.x + step.y * step.y + step.z * step.z));
 	}
 	if (totalLength <= TrajectorySkip)
@@ -1440,11 +1456,11 @@ void FirstPersonView::drawTrajectory(bool asNightLight)
 	const Uint8 color = forced ? _colors.trajectoryForced : _colors.trajectory;
 	float travelled = 0.0f, dashStart[3] = {}, previous[3];
 	bool inDash = false;
-	voxelCentreOf(_trajectory[0], previous);
-	for (size_t point = 1; point < _trajectory.size() && !dotted; ++point)
+	voxelCentreOf(path[0], previous);
+	for (size_t point = 1; point < path.size() && !dotted; ++point)
 	{
 		float current[3];
-		voxelCentreOf(_trajectory[point], current);
+		voxelCentreOf(path[point], current);
 		const float stepLength = std::sqrt((current[0] - previous[0]) * (current[0] - previous[0]) + (current[1] - previous[1]) * (current[1] - previous[1])
 			+ (current[2] - previous[2]) * (current[2] - previous[2]));
 		travelled += stepLength;
@@ -1453,7 +1469,7 @@ void FirstPersonView::drawTrajectory(bool asNightLight)
 		{
 			std::copy(previous, previous + 3, dashStart);
 		}
-		if (inDash && (!dashHere || point + 1 == _trajectory.size()))
+		if (inDash && (!dashHere || point + 1 == path.size()))
 		{
 			const float opacity = 1.0f - 0.4f * std::min(1.0f, travelled / totalLength);
 			drawStretch(dashStart, dashHere ? current : previous, color, 2, opacity);
@@ -1472,11 +1488,11 @@ void FirstPersonView::drawTrajectory(bool asNightLight)
 		float pathTravelled = 0.0f, sinceDot = NightForcedDotSpacing; // a dot where the path starts showing
 		double lastX = 0.0, lastY = 0.0;
 		bool lastOnScreen = false;
-		voxelCentreOf(_trajectory[0], previous);
-		for (size_t point = 1; point < _trajectory.size(); ++point)
+		voxelCentreOf(path[0], previous);
+		for (size_t point = 1; point < path.size(); ++point)
 		{
 			float current[3];
-			voxelCentreOf(_trajectory[point], current);
+			voxelCentreOf(path[point], current);
 			pathTravelled += std::sqrt((current[0] - previous[0]) * (current[0] - previous[0]) + (current[1] - previous[1]) * (current[1] - previous[1])
 				+ (current[2] - previous[2]) * (current[2] - previous[2]));
 			std::copy(current, current + 3, previous);
@@ -1511,7 +1527,7 @@ void FirstPersonView::drawTrajectory(bool asNightLight)
 
 	// The end: a forced line's dot; an arc's diamond, flat, round the last voxel.
 	float end[3];
-	voxelCentreOf(_trajectory.back(), end);
+	voxelCentreOf(path.back(), end);
 	if (straight)
 	{
 		drawEndDot(end, _colors.forcedDot, _colors.trajectoryForced);
@@ -1651,9 +1667,10 @@ void FirstPersonView::beginShot(Projectile *projectile)
 	// its own: no weapon in hand, no kick.
 	const double dx = origin[0] - _eye[0], dy = origin[1] - _eye[1], dz = origin[2] - _eye[2]; // from the eye
 	const bool ownShot = _particlesOn && !_lastProjectileThrown && dx * dx + dy * dy + dz * dz < 20.0 * 20.0;
-	// Akimbo in turn (see FirstPersonMode::fireTurnShot): our own shot is the other gun's, so it
-	// leaves from that gun's muzzle, and that gun flashes (as a round fired together does).
-	const bool fromOffHand = ownShot && _nextShotOffHand;
+	// Our own shot from the other gun (an arcing pair's second shot, see FirstPersonMode::
+	// fireTurnShot; a round of two guns taking turns, fired from that gun, see ProjectileFlyBState::
+	// takeTurn) leaves from that gun's muzzle, and that gun flashes and kicks.
+	const bool fromOffHand = ownShot && (_nextShotOffHand || (_offHandWeapon && projectile->getWeapon() == _offHandWeapon));
 	_nextShotOffHand = false;
 	const bool muzzleValid = fromOffHand ? _offHandMuzzleValid : _muzzleValid;
 	const double *muzzleScreen = fromOffHand ? _offHandMuzzleScreen : _muzzleScreen;

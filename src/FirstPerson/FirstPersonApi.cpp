@@ -261,10 +261,11 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFaithfulTargeting", &fpsFaithfulTargeting, true, "STR_FPS_FAITHFUL_TARGETING", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDualWield", &fpsDualWield, false, "STR_FPS_DUAL_WIELD", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsAkimboRealistic", &fpsAkimboRealistic, false, "STR_FPS_AKIMBO_REALISTIC", category));
-	// Akimbo's style: both guns at once, each less accurate, for the dearer gun's shot and a tenth
-	// ("panic", NO), or one a moment after the other, both at full accuracy and their own cost
-	// ("focused", YES); its key switches it in play.
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsAkimboInTurn", &fpsAkimboInTurn, false, "STR_FPS_AKIMBO_IN_TURN", category));
+	// Akimbo's style: the two guns take turns round by round, each round resolved before the next
+	// leaves, as an auto burst's (NO), or fire as a volley, both rounds at once and landing together
+	// as a shotgun's pellets (YES); either way each less accurate, for the more expensive gun's shot
+	// and a tenth. Its key switches it in play.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsAkimboVolley", &fpsAkimboVolley, false, "STR_FPS_AKIMBO_VOLLEY", category));
 	// Leaning: standing to one side of the tile's middle shoots from that side (the game's
 	// off-centre origins), to peek round corners; and leaning out with the lean keys: off (0),
 	// the eye moves to the side (1, peek), and the view tilts with it (2, tilt).

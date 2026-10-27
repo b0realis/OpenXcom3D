@@ -22,6 +22,36 @@ firstPerson:
   #     - dataSet: MYTOWN
   #       records: [12, 13]
   #       glassColors: [148, 149, 150, 151]
+  # Shapes for terrain parts the game gives no voxels (its shots and sight pass through them),
+  # though the map draws something solid there, mostly something no one can walk into: the 3D
+  # view builds each from boxes of voxels, west, north, bottom, east, south, top (x 0..15 west to
+  # east, y 0..15 north to south, z 0..23 up). A ghost (the default) is coloured from its art and
+  # cut to its outline, and drawn see-through with "Parts without shape" (Lifts or All), fainter
+  # where no one can walk; "ghost: false" (a floor) is built as if the game had those voxels,
+  # always. Per game (xcom1 UFO, xcom2 TFTD: the two share some data set names), data set and
+  # record numbers in its MCD.
+  shapes:
+    # UFO: the shops' metal racks (city terror sites): four legs, two shelves, the goods.
+    - { game: xcom1, dataSet: URBAN, records: [89], boxes: [[13, 14, 0, 14, 15, 21], [0, 14, 0, 1, 15, 21], [14, 0, 0, 15, 1, 21], [0, 0, 0, 1, 1, 21],
+        [0, 0, 8, 15, 15, 8], [0, 0, 16, 15, 15, 16], [1, 1, 17, 14, 14, 23], [1, 1, 9, 14, 14, 12]] }
+    - { game: xcom1, dataSet: URBAN, records: [90], boxes: [[13, 14, 0, 14, 15, 21], [0, 14, 0, 1, 15, 21], [14, 0, 0, 15, 1, 21], [0, 0, 0, 1, 1, 21],
+        [0, 0, 8, 15, 15, 8], [0, 0, 16, 15, 15, 16], [1, 1, 17, 14, 14, 20], [1, 1, 9, 14, 14, 12], [1, 1, 0, 14, 14, 5]] }
+    - { game: xcom1, dataSet: URBAN, records: [91], boxes: [[13, 14, 0, 14, 15, 21], [0, 14, 0, 1, 15, 21], [14, 0, 0, 15, 1, 21], [0, 0, 0, 1, 1, 21],
+        [0, 0, 8, 15, 15, 8], [0, 0, 16, 15, 15, 16], [3, 1, 17, 14, 7, 21], [1, 8, 17, 9, 14, 18], [1, 6, 9, 8, 14, 10], [8, 1, 9, 14, 6, 12]] }
+    # TFTD: the sea round islands, ports and ships (it showed the ground outside the map), the
+    # cargo ship's waterline and T'leth's great lid: floors.
+    - { game: xcom2, dataSet: SEA, records: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], ghost: false, boxes: [[0, 0, 0, 15, 15, 1]] }
+    - { game: xcom2, dataSet: CARGO3, records: [4], ghost: false, boxes: [[0, 0, 0, 15, 15, 1]] }
+    - { game: xcom2, dataSet: CRYPT2, records: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22], ghost: false, boxes: [[0, 0, 0, 15, 15, 1]] }
+    # TFTD: a platform in the liner's hold, the foam along its hull, the sunken plane's door frames, the
+    # box on the Triton's back, a stalk in the alien ships and a clamp in the base's hangar.
+    - { game: xcom2, dataSet: LINERC, records: [17], boxes: [[1, 1, 0, 14, 14, 12]] }
+    - { game: xcom2, dataSet: LINERB, records: [9, 10], boxes: [[0, 0, 0, 15, 15, 6]] }
+    - { game: xcom2, dataSet: PLANE, records: [19], boxes: [[0, 0, 0, 1, 15, 23]] }
+    - { game: xcom2, dataSet: PLANE, records: [22], boxes: [[0, 0, 0, 15, 1, 23]] }
+    - { game: xcom2, dataSet: TRITON, records: [13], boxes: [[0, 0, 0, 15, 15, 15], [5, 4, 16, 6, 5, 23], [2, 5, 16, 3, 6, 22], [6, 2, 16, 7, 3, 19]] }
+    - { game: xcom2, dataSet: GRUNGE3, records: [2], boxes: [[0, 0, 0, 4, 15, 20]] }
+    - { game: xcom2, dataSet: XBASES01, records: [78], boxes: [[12, 0, 0, 15, 3, 23]] }
   # Weather particles by terrain data set (only where the sky is open above).
   weather:
     - dataSet: POLAR

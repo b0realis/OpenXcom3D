@@ -1004,7 +1004,7 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 			{
 				double otherTip[2];
 				drawWeaponPlate(!inLeftHand, bob, kick, dip, shade, otherTip);
-				_view->setOffMuzzlePoint(otherTip[0] * canvasToView, otherTip[1] * canvasToView, true);
+				_view->setOffMuzzlePoint(otherTip[0] * canvasToView, otherTip[1] * canvasToView, true, otherWeapon);
 				if (Options::fpsMuzzleFlash && now < _offHandFlashUntil)
 				{
 					drawFlash(otherTip, _offHandFlash);

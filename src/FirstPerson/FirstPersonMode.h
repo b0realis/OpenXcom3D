@@ -658,6 +658,8 @@ private:
 	void toggleAkimboStyle();
 	/// Dual wield: the other hand's gun if it can fire along with this mode, and the mode it fires.
 	BattleItem *dualPartner(BattleUnit *unit, const BattleItem *weapon, BattleActionType slot, BattleActionType &partnerMode) const;
+	/// Dual wield: the other hand's gun that fires along with a shot (dualPartner's, with time units for both), or null.
+	BattleItem *pairedGun(BattleUnit *unit, BattleItem *weapon, BattleActionType slot, BattleActionType mode, BattleActionType &offMode) const;
 	/// Akimbo: do the two guns fire in turn (either one's shot arcs) rather than together?
 	bool firesInTurn(const BattleItem *weapon, BattleActionType mode, const BattleItem *otherWeapon, BattleActionType otherMode) const;
 	/// Akimbo in turn: the other gun's shot, waiting for the game to be done with the first (see fireTurnShot).
@@ -748,6 +750,8 @@ private:
 
 	/// Updates the crosshair and its texts: mode, hit chance, time units.
 	void updateCrosshair(BattleUnit *unit, bool playerTurn);
+	/// A mod's own name for an action of an item, in capitals for the crosshair; empty if it keeps the game's name.
+	std::string renamedAction(const RuleItem *rules, BattleActionType mode) const;
 	/// Does the soldier have a line of sight to the aimed tile, as a shot checks it?
 	bool aimedTileInSight(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, const Position &tile);
 	/// Draws the crosshair for a fire mode.

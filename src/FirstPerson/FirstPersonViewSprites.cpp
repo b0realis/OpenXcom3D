@@ -236,6 +236,9 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 			distance = anchorFacing / facing;
 			const double fromAnchor[3] = { ray[0] * distance - anchor[0], ray[1] * distance - anchor[1], ray[2] * distance - anchor[2] };
 			spriteRow = anchorY - dot(fromAnchor, cardUp) / rowSize;
+			// Nothing of the card below the floor it stands on (see SpriteDraw::floorCut): the art's
+			// rows under a unit's feet would hang through the ceiling of the room below.
+			if (_eye[2] + ray[2] * distance / ZScale < draw.floorCut) return false;
 		}
 		return distance >= 1.0 && spriteRow >= 0.0 && spriteRow < spriteHeight;
 	};
@@ -520,6 +523,27 @@ int FirstPersonView::riseOutOfSolid(const double world[3], int maxRaise) const
 		}
 	}
 	return -1;
+}
+
+/**
+ * The underside of the floor slab something standing at a point is on: the bottom of the point's
+ * level, when that level's bottom layer of voxels is solid right under it (a floor, which is the
+ * ceiling of the room below). A unit's sprite is cut off there (a player's report: units on a
+ * floor above showed on the floor below them slightly): its art reaches a few rows below its
+ * feet, the front half of the floor's diamond, and from below those hung through the ceiling. On
+ * the ground (level 0) nothing lies below to show through, and over a hole, a stair's open side
+ * or the air nothing is cut.
+ * @param world The point on the floor, in voxels.
+ * @return The height of the floor's underside, in voxels; NoFloorCut without a floor there.
+ */
+double FirstPersonView::floorUnderside(const double world[3]) const
+{
+	const int level = (int)std::floor(world[2] / Position::TileZ);
+	if (level <= 0)
+	{
+		return NoFloorCut;
+	}
+	return solidVoxel((int)std::floor(world[0]), (int)std::floor(world[1]), level * Position::TileZ) ? level * (double)Position::TileZ : NoFloorCut;
 }
 
 /**
@@ -892,6 +916,7 @@ void FirstPersonView::drawUnits()
 		step.sprite.world[0] = feet[0];
 		step.sprite.world[1] = feet[1];
 		step.sprite.world[2] = standingHeight(feet);
+		step.sprite.floorCut = floorUnderside(feet); // (its art below its feet stays out of the room below)
 		step.sprite.shade = shade;
 		step.sprite.scale = unitScale;
 		step.sprite.unit = unit;

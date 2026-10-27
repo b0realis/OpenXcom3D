@@ -147,6 +147,17 @@ const double LyingRowVoxels = 1.41421356237309505;
 /// Things on the ground are drawn standing on the floor slab the view builds (two voxels thick),
 /// raised out of whatever solid they are in by at most this many voxels (see standingHeight).
 const int StandRaiseMax = 4;
+/// The bloom over a pixel too dark to show its colour group's hue (palette luminance, 0..255,
+/// below DarkGlowLuma: night's black, the void past the map) adds the glow's own colour, as much
+/// of it as brightens by DarkGlowStepLuma for each shade of brightening, about what a shade up a
+/// dark colour group does (see FirstPersonView::drawLightHalos); a brighter pixel goes up its own
+/// colour group as before.
+const float DarkGlowLuma = 28.0f;
+const float DarkGlowStepLuma = 10.0f;
+/// A ghost of a part no one can walk into (a shop's rack: see FirstPersonView::buildShape) shows
+/// this share of a ghost's opacity, fainter than a lift's or a ladder's (a player: "a subtle
+/// indication between walkable, and unwalkable tiles"; the game's sight and shots pass through it).
+const float UnwalkableGhostShare = 0.65f;
 /// The floor a lying sprite's rows lie on (items, corpses) rises towards the camera with the ground
 /// in front of it, a step or a slope (see lyingRise), so they lie on it rather than in it (a
 /// player's report: items on stairs and slopes sank into them): the ground looked for up to

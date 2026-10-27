@@ -141,9 +141,11 @@ public:
 	{
 		Uint8 color[24][16][16]; // [z][y][x]
 		Uint16 glass[24][16];    // [z][y], bit x: window glass, seen through
+		Uint16 clear[24][16];    // [z][y], bit x: behind a hole in the art (a glass door's pane, a fence's gaps), seen straight through (see findArtHoles)
 		Uint8 min[3], max[3];    // inclusive bounds of solid voxels (x, y, z)
 		bool empty;
-		bool ghostly;            // a ghost of a part with no voxels (setting "Parts without shape"): seen through on some pixels, never in the way (see buildGhost)
+		bool ghostly;            // a ghost of a part with no voxels (setting "Parts without shape"): seen through on some pixels, never in the way (see buildGhost, buildShape)
+		float ghostShare;        // how much of a ghost's opacity it shows: less for a part no one can walk into (see UnwalkableGhostShare)
 		float glow[3]; // centre of the brightest voxels in the top third (a lamp's bulb), in the tile
 		int glowCount;
 		Uint8 glowColor;     // one of those bright colours
@@ -340,6 +342,8 @@ public:
 	/// How a trajectory is drawn: a throw's or an arcing shot's curve, one forced (as with Ctrl held), a straight shot's line.
 	enum TrajectoryLook { TRAJECTORY_ARC, TRAJECTORY_FORCED, TRAJECTORY_STRAIGHT, TRAJECTORY_FORCED_LINE, TRAJECTORY_REFUSED_LINE };
 	void setTrajectory(const std::vector<Position> &path, TrajectoryLook look = TRAJECTORY_ARC) { _trajectory = path; _trajectoryLook = look; }
+	/// Dual wield: the other gun's path, drawn from its muzzle (see drawTrajectory); empty for none.
+	void setOtherTrajectory(const std::vector<Position> &path, TrajectoryLook look = TRAJECTORY_ARC) { _otherTrajectory = path; _otherTrajectoryLook = look; }
 	/// Doom free grenades (see FirstPersonMode::stepFreeGrenade): a grenade flying by the 3D view's own throw, where it is and how
 	/// fast it flies (voxels; voxels a second, up in true proportions), at this moment; null to stop drawing it.
 	void setFreeGrenade(BattleItem *item, const float position[3], const float velocity[3])
@@ -350,7 +354,7 @@ public:
 		_freeGrenadeTick = SDL_GetTicks();
 	}
 	/// Dual wield: where the other gun's muzzle is on the view.
-	void setOffMuzzlePoint(double x, double y, bool valid) { _offHandMuzzleScreen[0] = x; _offHandMuzzleScreen[1] = y; _offHandMuzzleValid = valid; }
+	void setOffMuzzlePoint(double x, double y, bool valid, const BattleItem *weapon = nullptr) { _offHandMuzzleScreen[0] = x; _offHandMuzzleScreen[1] = y; _offHandMuzzleValid = valid; _offHandWeapon = valid ? weapon : nullptr; }
 	/// Throws a tactical flare from the soldier's shoulder towards a point (a short toss under the sea).
 	void throwFlare(const float target[3]);
 
@@ -728,6 +732,8 @@ private:
 	/// A sprite drawn see-through (see drawSprite): how opaque each of its pixels is (0 .. SeeThroughLevels,
 	/// one byte a pixel, rows as long as the sprite is wide), times an opacity for all of it (0 .. 1).
 	struct SeeThroughSprite { const Uint8 *opacityMap; float opacity; };
+	/// A standing sprite isn't cut off below any floor (see SpriteDraw::floorCut, floorUnderside).
+	static constexpr double NoFloorCut = -1e9;
 	/// One sprite to draw standing in the world (see drawSprite).
 	struct SpriteDraw
 	{
@@ -743,6 +749,7 @@ private:
 		BattleUnit *unit = nullptr;       // the unit it pictures, if any: smoke veils it only thinly, and it can be pointed at
 		BattleUnit *body = nullptr;       // the unconscious unit lying in the pile it pictures, if any: it can be pointed at
 		double lyingSlope = 0.0;          // a lying sprite's floor rising towards the camera: voxels up for each voxel along (see lyingRise)
+		double floorCut = NoFloorCut;     // no part of a standing sprite below this height, in voxels: the underside of the floor a unit stands on (see floorUnderside)
 	};
 	/// Draws a sprite standing in the world, depth-tested (or see-through, laid over what's there):
 	/// all of it, or only the screen rows from bandTop up to bandBottom.
@@ -776,6 +783,8 @@ private:
 	int riseOutOfSolid(const double world[3], int maxRaise) const;
 	/// How steeply the ground in front of something lying at a point rises towards the camera, within its reach.
 	double lyingRise(const double world[3], double reach) const;
+	/// The underside of the floor slab something standing at a point is on, if a floor is under it (else NoFloorCut).
+	double floorUnderside(const double world[3]) const;
 	/// Whether a voxel is filled by the view's terrain (off the map: no).
 	bool solidVoxel(int voxelX, int voxelY, int voxelZ) const;
 	/// The ground under something lying at a point: the plane through its surface round it, its height there and its slope.
@@ -883,6 +892,7 @@ private:
 	std::vector<std::pair<float, float>> _bubbleVents; // sea floor spots bubbles rise from
 	std::vector<float> _glowBuffer, _glowScratch;      // quarter resolution glow, blurred into a bloom
 	std::vector<float> _glowDepth, _glowDepthScratch;  // the same for the glow's distance (summed, weighted by the glow): how far away the light is
+	std::vector<float> _glowHue, _glowHueScratch;      // the shining pixels' colour, red, green, blue and their weight per cell of a grid half as fine, blurred: the glow's own colour (see drawLightHalos)
 	std::set<const Explosion*> _seenExplosions;        // explosions already seen (each spawns its particles once)
 
 	/// Is there open sky above this point?
@@ -937,6 +947,7 @@ private:
 	// other gun's muzzle
 	double _offHandMuzzleScreen[2] = {};
 	bool _offHandMuzzleValid = false;                   // the other gun's muzzle is on the view
+	const BattleItem *_offHandWeapon = nullptr;         // ...that gun: a round of ours fired from it leaves its muzzle (dual wield taking turns, see beginShot)
 	const Projectile *_lastPartnerShot = nullptr;       // the other gun's round in flight last frame
 	float _partnerFrom[3] = {}, _partnerOffset[3] = {}, _partnerHead[3] = {}, _partnerOrigin[3] = {}; // its path's start, the offset to its muzzle, where it's drawn, where its trail starts
 	float _partnerLength = 1.0f;                        // its path's length, in voxels
@@ -1009,8 +1020,12 @@ private:
 	void drawPellets();
 	std::vector<Position> _trajectory; // the path a throw or shot aimed now would take (setTrajectory)
 	TrajectoryLook _trajectoryLook = TRAJECTORY_ARC; // and how it's drawn
-	/// Draws that path: dashes fading out along it, and a mark where it ends.
+	std::vector<Position> _otherTrajectory; // dual wield: the other gun's (setOtherTrajectory)
+	TrajectoryLook _otherTrajectoryLook = TRAJECTORY_ARC;
+	/// Draws that path, and the other gun's, each from its own weapon.
 	void drawTrajectory(bool asNightLight);
+	/// Draws one path, a straight one from a muzzle on the view: dashes fading out along it, and a mark where it ends.
+	void drawTrajectoryPath(const std::vector<Position> &path, TrajectoryLook look, const double muzzleScreen[2], bool muzzleValid, bool asNightLight);
 	/// Draws a line in the world, depth-tested (all of it, or only the screen rows from bandTop up to bandBottom),
 	/// a set number of pixels thick, or as thick as worldWidth voxels look where it is (at most thickness); glowing, or plain.
 	void drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, float worldWidth = 0.0f, int bandTop = 0, int bandBottom = 1 << 30, bool glows = true,
