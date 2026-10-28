@@ -64,6 +64,7 @@ KEYS = [
     ('The screen', [
         ('<kbd>C</kbd> or the middle button', 'Mouse look &harr; free cursor, to click buttons and hover soldiers for their cards. With <i>Middle click identifies</i> a middle click on a unit shows it.', ''),
         ('<kbd>H</kbd>', 'The classic HUD on/off: every button of it works in 3D.', 'The map\'s whole bottom bar, if you prefer it.'),
+        ('<kbd>Wheel</kbd> over a soldier\'s button', 'With the cursor free: steps the soldier\'s card, or the SOLDIER CAM, through the squad one soldier at a time (over &#9664; and &#9654; it scrolls the bar).', 'Look through every soldier\'s eyes in a few turns of the wheel.'),
         ('<kbd>P</kbd>', 'The 3D HUD on/off, for a clear view (on the map: the map camera on/off).', ''),
         ('<kbd>F7</kbd>', 'The frame counter on/off (the game\'s key).', ''),
     ]),
@@ -217,7 +218,7 @@ SIGNS = [
     ('At the right', 'SCOPING 2.6x while zooming.'),
     ('Warnings', 'UNSAFE LANDING! PUSH AGAIN at a ledge over ground no one can walk on; the game\'s own warnings (No Line of Fire!, Out of Range!), on the warning line.'),
     ('Banners', 'ENEMY SPOTTED!, HIDDEN MOVEMENT, BURNING, YOU HAVE A MENTAL BREAKDOWN, BERSERK, TURNED INTO A ZOMBIE.'),
-    ('Camera cards', 'A soldier\'s helmet camera popping up: TARGETED, HIT, MIND CONTROLLED, FIRING, WATCHING, DECEASED, UNCONSCIOUS. A blinking red dot and now and then a bad signal or static: it\'s a camera, not your view.'),
+    ('Camera cards', 'A soldier\'s helmet camera popping up: TARGETED, HIT, MIND CONTROLLED, FIRING, WATCHING, DECEASED, UNCONSCIOUS. A blinking red dot and now and then a bad signal or static: it\'s a camera, not your view. SIGNAL LOST when the soldier you look through falls.'),
     ('The info panel\'s right side', 'DOOM MODE while the cheat is on (IDDQD, IDKFA or both in its place with those); with IDDQD the stats turn silver.'),
 ]
 
@@ -264,14 +265,14 @@ FEATURES = [
      '<kbd>U</kbd> or the right button, held', 'The view glides in four times closer, the weapon lowers, the mouse slows.', 'Only the picture: the shot and its odds don\'t change.'),
     ('light', 'Light and night', [('night_vision_laser.png', 'Night vision: the laser sight light in the goggles')],
      '<kbd>F</kbd>, <kbd>N</kbd>, <kbd>T</kbd>, <kbd>L</kbd>',
-     'Your flashlight (on F, wide or a tight spot on the crosshair), night vision with the gear for it, red tactical flares, and the game\'s suit light (L).',
+     'Your flashlight (on F, wide or a tight spot on the crosshair), night vision with the gear for it, red tactical flares, and the game\'s suit light (L). Light and shadow come from lamps, the sun, your flashlight and flares; indoors (a roof overhead, or rock) no sun shines, and rooms are lit by their own light, as on the map.',
      'The flashlight and flares light only your view; the suit light is the game\'s, and lets aliens see your soldiers at night.'),
     ('smoke', 'Smoke', [('smoke.png', 'Modern smoke: soft see-through clouds, solid where the soldier can\'t see through')],
      '', 'Modern: the game\'s smoke as soft clouds you see through, solid where your soldier can\'t see through by the game\'s sight rules. Original: the games\' own animation, stacked thick there. Heat vision sees smoke thinner.',
      'What you see through matches what your soldier sees through.'),
-    ('cams', 'Helmet cameras', [('soldier_cam_dusk.png', 'A SOLDIER CAM at dusk'), ('map_camera.png', 'The map camera on the isometric map')],
-     'Hover a soldier\'s button; right click for the SOLDIER CAM; <kbd>P</kbd> on the map',
-     'Every soldier\'s helmet camera, live: on their card, big as the SOLDIER CAM, or over the map (setting <i>Map camera</i>), with a blinking red dot, now and then a bad signal or static, worse on hard missions.',
+    ('cams', 'Helmet cameras', [('soldier_cam_dusk.png', 'A SOLDIER CAM at dusk'), ('map_camera.png', 'The map camera on the isometric map'), ('killed_in_action.png', 'Killed in action: the picture turns red, then breaks into static, SIGNAL LOST')],
+     'Hover a soldier\'s button; right click for the SOLDIER CAM; the wheel over a button; <kbd>P</kbd> on the map',
+     'Every soldier\'s helmet camera, live: on their card, big as the SOLDIER CAM, or over the map (setting <i>Map camera</i>), with a blinking red dot, now and then a bad signal or static, worse on hard missions. With the cursor free, the mouse wheel over a soldier\'s button steps the card or the SOLDIER CAM through the squad. When the soldier you look through falls, the picture turns red and breaks into static: SIGNAL LOST.',
      'See what each soldier sees; aim on the map with a soldier\'s eyes beside it.'),
     ('aliens', 'The aliens\' turn', [('under_fire.png', 'Under fire in the aliens\' turn')],
      '', 'Stay in 3D for the aliens\' turn: the view cuts to a soldier firing back or to the nearest one who sees a moving alien; camera cards pop up for soldiers shot at, hit, mind controlled or going down.',
@@ -279,8 +280,8 @@ FEATURES = [
     ('ghosts', 'Ghosts: lifts, racks, catwalks, sludge', [('ufo_shop_racks.png', 'UFO\'s shop racks as ghosts in their real shape, at Ghost opacity'), ('piratez_catwalk.png', 'XPiratez: a catwalk\'s grating overhead, its rest a ghost'), ('piratez_sludge.png', 'XPiratez: the sewer\'s sludge, a soldier wading in it to the thighs')],
      '', 'Some parts the map draws have no shape, or only a few voxels, in the game\'s data. They show as see-through ghosts of their art: ladders and lift pads, the shops\' racks, the rest of fences, railings and catwalk gratings, and the surface of liquid over a floor (XPiratez\'s sewers). The game\'s own voxels stay solid.',
      'Ghosts are pictures: shots, sight and walking go through them as the game says. Set how solid with <i>Ghost opacity</i>.'),
-    ('sea', 'The sea', [('tftd_sea_past_the_edge.png', 'TFTD: the sea rolling in waves past an island\'s edge')],
-     '', 'Terror From The Deep\'s sea rolls in waves, and where it reaches the map\'s edge it goes on past it.', ''),
+    ('sea', 'The sea, and under it', [('tftd_sea_past_the_edge.png', 'TFTD: the sea rolling in waves past an island\'s edge'), ('tftd_ruins.png', 'TFTD: ruins on the seabed, bubbles rising, light rippling over the sand')],
+     '', 'Terror From The Deep\'s sea rolls in waves, and where it reaches the map\'s edge it goes on past it. Under the water: bubbles, marine snow drifting down, and light rippling over the sand.', 'The particles are a setting (<i>Particles</i>), if you want the water clear.'),
     ('shotguns', 'Shotguns', [('shotgun_pellets_map.png', 'Pellets in flight on the map')],
      '', 'Every pellet lands on its own (<i>Each pellet on its own</i>), and with <i>Shotgun pellets in flight</i> each flies beside the round and hits as it gets there.',
      'No more "shotgun void": a miss by the lead pellet no longer takes the whole blast with it.'),
@@ -288,6 +289,14 @@ FEATURES = [
      '', 'Bars that read: with <i>Scaled</i> a stat whose longest maximum won\'t fit shrinks for all your units alike, on the map and in 3D.', 'Two soldiers\' bars stay comparable.'),
     ('perf', 'Performance', [],
      '', '<i>Pixel size</i> 2 or 3 colours a block of pixels per ray, much faster on big screens; <i>Shadows</i> and <i>Particles</i> off help slow machines; the frame rate cap is the game\'s own.', ''),
+]
+
+# The gallery at the end: the collages (pages/img/gallery/), (file, title, caption)
+GALLERY_IMG = 'img/gallery/'
+GALLERY = [
+    ('collage_108.png', 'Field report 1.08', 'Terror From The Deep\'s sea past an island\'s edge, XPiratez\'s blunderbuss and two guns at once, a spray burst marked, akimbo in 3D and on the isometric map, a Gill Man on an island, and the map camera over the battle.'),
+    ('collage_more.png', 'More from 1.08', 'The open sky at the map\'s edge, a peek past a corner in FPS style, the accuracy line, the landing warning by the sea, wading in XPiratez\'s sludge, the shop\'s racks as ghosts, a tilted lean, smoke, a grenade\'s arc.'),
+    ('collage_moments.png', 'Moments', 'Under fire, a soldier cam at dusk, a sprint down an empty street, night vision, an airburst, a rocket in the street, aquanauts with vibro blades, the ruins on the seabed, and the end of a signal.'),
 ]
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -319,6 +328,15 @@ STYLES = '''<section id="styles" class="sec gutter"><div class="col">
 <h3>Settings that bend the rules a little</h3>
 <p>Each a setting, so you choose: <i>Jump over low obstacles</i> (vault a fence for the walk), <i>Falling</i> (step off a ledge), <i>Lean shots</i> and <i>Lean</i> (shoot from the side of your tile), <i>Full akimbo</i> and <i>Realistic akimbo</i>, <i>Melee hits walls and downed</i>, <i>Force arcing shots</i> and <i>Force blocked shots</i> (as Ctrl on the map), <i>Turning costs TU</i> off (free turns), and the Doom cheats. Everything else only changes what you see.</p>
 </div></section>'''
+
+def size_in(folder, name):
+    """A picture's width and height in a folder of pages/ (1280x800 for one not there yet)."""
+    try:
+        from PIL import Image
+        return Image.open(os.path.join(ROOT, 'pages', folder, name)).size
+    except (ImportError, OSError):
+        return 1280, 800
+
 
 def size(name):
     """A picture's width and height as the HTML gives them (read from the file; 1280x800 for one not there yet)."""
@@ -397,6 +415,13 @@ def sections():
         if plays:
             w('<p class="meta"><span>How it plays</span> %s</p>' % plays)
         w('</article>')
+    w('</div></section>')
+    # the gallery
+    w('<section id="gallery" class="sec gutter"><div class="col gallery">\n<h2>Gallery</h2>\n<p class="intro">From the field: the battles in pictures, from <i>UFO</i>, <i>Terror From The Deep</i> and XPiratez. Click one for it at full size.</p>')
+    for f, title, caption in GALLERY:
+        width, height = size_in(GALLERY_IMG, f)
+        w('<figure class="row"><a href="%s%s"><img src="%s%s" width="%d" height="%d" loading="lazy" alt="%s: %s"></a><figcaption><b>%s</b> %s</figcaption></figure>'
+          % (GALLERY_IMG, f, GALLERY_IMG, f, width, height, title, caption, title, caption))
     w('</div></section>\n</div>')
     return '\n'.join(out)
 
@@ -410,53 +435,90 @@ def splice(text, begin, end, inner):
 
 EXTRA_CSS = '''
 /* ---------- the bar: sections and search (the system switch sits with the steps) ---------- */
-.jump { display: flex; flex-wrap: wrap; gap: 0.35rem 1rem; font-weight: 700; font-size: 0.95rem; }
-.jump a { text-decoration: none; }
-.find { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 0.95rem; }
-.find input { font: 0.95rem var(--font-body); padding: 0.45rem 0.6rem; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--fg); width: 15rem; max-width: 60vw; }
-.ospanel { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem 1.5rem; margin: 0 0 1rem;
-  background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 0.65rem 0.9rem; }
-.part { font-size: 1.9rem; margin: 0 0 0.5rem; }
-/* ---------- the guide ---------- */
+.jump { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; font: 700 0.8rem/1.4 var(--font-mono); text-transform: uppercase; letter-spacing: 0.05em; }
+.jump a { text-decoration: none; color: var(--accent); }
+.jump a:hover { color: var(--gold); }
+.find { display: flex; align-items: center; gap: 0.5rem; font: 700 0.8rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.find input {
+  font: 0.92rem var(--font-body); padding: 0.45rem 0.6rem; border: 1px solid var(--edge); border-radius: 2px;
+  background: var(--term-bg); color: var(--fg); width: 15rem; max-width: 60vw; box-shadow: inset 0 0 12px rgb(58 114 196 / 0.18);
+}
+.find input::placeholder { color: var(--term-dim); }
+.ospanel {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem 1.5rem; margin: 0 0 1rem;
+  background: var(--surface); border: 1px solid var(--edge); border-radius: 2px; padding: 0.65rem 0.9rem; box-shadow: var(--shadow);
+}
+.part { font-size: clamp(1.4rem, 3.5vw, 1.9rem); margin: 0 0 0.75rem; color: var(--gold); text-transform: uppercase; display: flex; align-items: center; gap: 0.75rem; }
+/* ---------- the guide: each section's title an X-COM screen's, gold with a line ---------- */
 .guide .col { max-width: 64rem; }
-.sec .col { padding-block: 2rem 0.5rem; }
-.sec h2 { font-size: 1.8rem; margin: 0 0 0.5rem; }
-.sec h3 { font-size: 1.15rem; font-family: var(--font-body); margin: 1.6rem 0 0.5rem; }
+.sec .col { padding-block: 2.25rem 0.5rem; }
+.sec h2, .part {
+  display: flex; align-items: center; gap: 0.75rem; font-size: clamp(1.4rem, 3.5vw, 1.9rem); margin: 0 0 0.6rem;
+  color: var(--gold); text-transform: uppercase; letter-spacing: 0.06em; text-shadow: 0 0 18px rgb(242 196 67 / 0.25);
+}
+.sec h2::before, .part::before { content: "//"; color: var(--edge); text-shadow: none; }
+.sec h2::after, .part::after { content: ""; flex: 1; height: 2px; background: linear-gradient(90deg, var(--edge), transparent); }
+.sec h3 { font: 700 0.95rem/1.3 var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--cyan); margin: 1.8rem 0 0.6rem; }
 .guide .intro { max-width: 46rem; color: var(--muted); margin: 0 0 1rem; }
-.quick { display: grid; gap: 0.45rem; padding-left: 1.3rem; max-width: 46rem; }
+.quick { display: grid; gap: 0.5rem; padding-left: 1.5rem; max-width: 46rem; }
+.quick li::marker { color: var(--gold); font-family: var(--font-mono); font-weight: 700; }
 .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 0.9rem 1.1rem; box-shadow: var(--shadow); }
-.card h3 { margin-top: 0.2rem; }
-.card ul { padding-left: 1.1rem; margin: 0; display: grid; gap: 0.35rem; }
-.tag { font: 700 0.72rem/1 var(--font-body); background: var(--accent-soft); color: var(--accent); padding: 0.2rem 0.45rem; border-radius: 999px; vertical-align: middle; }
-.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.card { background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--gold); border-radius: 2px; padding: 0.9rem 1.1rem; box-shadow: var(--shadow); }
+.two .card:last-child { border-top-color: var(--cyan); }
+.card h3 { margin-top: 0.2rem; color: var(--fg); font-size: 1rem; }
+.card ul { padding-left: 1.1rem; margin: 0; display: grid; gap: 0.4rem; }
+.card li::marker { color: var(--gold); }
+.tag { font: 700 0.68rem/1 var(--font-mono); background: transparent; color: var(--gold); border: 1px solid var(--gold); padding: 0.2rem 0.4rem; border-radius: 2px; vertical-align: middle; letter-spacing: 0.06em; }
+.two .card:last-child .tag { color: var(--cyan); border-color: var(--cyan); }
+/* ---------- tables: X-COM panels ---------- */
+.tablewrap { overflow-x: auto; border: 1px solid var(--edge); border-radius: 2px; background: var(--surface); box-shadow: var(--shadow); }
 table.grid { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
 .grid th, .grid td { text-align: left; vertical-align: top; padding: 0.55rem 0.75rem; border-top: 1px solid var(--line); }
-.grid thead th { border-top: 0; background: var(--sunk); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
-.grid tbody th { width: 13rem; }
+.grid thead th {
+  border-top: 0; background: linear-gradient(#173159, #10233f); font: 700 0.74rem/1.3 var(--font-mono);
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold); border-bottom: 1px solid var(--edge);
+}
+.grid tbody tr:hover { background: var(--raise); }
+.grid tbody th { width: 13rem; color: var(--fg); }
 .grid td.k { white-space: nowrap; width: 12rem; }
-.grid td.s { font-weight: 700; width: 12rem; }
-.grid td.c { width: 10rem; color: var(--muted); }
-.grid td.c b { color: var(--fg); }
+.grid td.s { font-weight: 700; width: 12rem; color: #f0f5ff; }
+.grid td.c { width: 10rem; color: var(--muted); font: 0.84rem/1.5 var(--font-mono); }
+.grid td.c b { color: var(--gold); }
 .grid td.plays { color: var(--muted); width: 30%; }
 .def { color: var(--muted); }
 .guide kbd { margin: 0.08em 0.1em; }
+/* ---------- pictures: helmet camera frames ---------- */
 .guide figure { margin: 0 0 1rem; }
-.guide figcaption { font-size: 0.85rem; color: var(--muted); margin-top: 0.4rem; }
+.guide figcaption { font-size: 0.85rem; color: var(--muted); margin-top: 0.45rem; }
 .marks { position: relative; }
-.marks img, .shots img, .strip img, .pair img { border-radius: 8px; border: 1px solid var(--line); image-rendering: pixelated; }
-.mark { position: absolute; transform: translate(-50%, -50%); width: 1.7rem; height: 1.7rem; border-radius: 50%; display: grid; place-items: center;
-  background: var(--gold); color: var(--gold-ink); font: 700 0.95rem/1 var(--font-display); box-shadow: 0 0 0 3px rgb(0 0 0 / 0.55); }
+.marks img, .shots img, .strip img, .pair img, .gallery img {
+  border: 2px solid var(--edge); border-radius: 2px; image-rendering: pixelated;
+  box-shadow: 0 0 0 1px #02060d, 0 0 22px rgb(58 114 196 / 0.25), 0 12px 30px rgb(0 0 0 / 0.55);
+}
+.shots a:hover img, .gallery a:hover img { border-color: var(--gold); }
 .pair { max-width: 40rem; }
-.legend { display: grid; gap: 0.35rem; padding-left: 1.4rem; max-width: 52rem; }
+.mark { position: absolute; transform: translate(-50%, -50%); width: 1.8rem; height: 1.8rem; border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle at 35% 30%, #ffe28a, var(--gold) 60%, #b98a17); color: var(--gold-ink); font: 700 0.95rem/1 var(--font-mono);
+  box-shadow: 0 0 0 3px rgb(0 0 0 / 0.7), 0 0 14px rgb(242 196 67 / 0.6); }
+.legend { display: grid; gap: 0.4rem; padding-left: 1.5rem; max-width: 52rem; }
+.legend li::marker { color: var(--gold); font: 700 1em var(--font-mono); }
+.legend b { color: #f0f5ff; }
 .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; list-style: none; padding: 0; margin: 0 0 1rem; }
-.chips li { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 0.25rem 0.75rem; font-size: 0.9rem; }
-.feature { border-top: 1px solid var(--line); padding-top: 0.4rem; margin-top: 1.2rem; }
+.chips li { background: linear-gradient(#1d3b6b, #12284c); border: 1px solid #02060d; box-shadow: var(--bevel); border-radius: 2px; padding: 0.25rem 0.7rem; font-size: 0.88rem; }
+.chips b { color: var(--gold); font-family: var(--font-mono); text-transform: uppercase; font-size: 0.85em; }
+/* ---------- features: one panel each ---------- */
+.feature { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--edge); border-radius: 2px; padding: 0.9rem 1.1rem 0.5rem; margin-top: 1rem; box-shadow: var(--shadow); }
+.feature:hover { border-left-color: var(--gold); }
+.feature h3 { margin-top: 0.1rem; }
 .shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(22rem, 100%), 1fr)); gap: 0.75rem; margin: 0.5rem 0 0.75rem; }
 .shots figure.wide { grid-column: 1 / -1; }
 .shots figure { margin: 0; }
 .feature p { max-width: 50rem; margin: 0 0 0.6rem; }
-.meta span { display: inline-block; min-width: 7.5rem; font-weight: 700; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
+.meta span { display: inline-block; min-width: 7.5rem; font: 700 0.74rem/1.3 var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--cyan); }
+/* ---------- the gallery ---------- */
+.gallery figure { margin: 0 0 1.75rem; }
+.gallery figcaption { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; align-items: baseline; margin-top: 0.55rem; }
+.gallery figcaption b { font: 700 0.8rem/1.3 var(--font-mono); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold); }
 .hidden { display: none !important; }
 @media (max-width: 720px) {
   .two { grid-template-columns: minmax(0, 1fr); }
@@ -468,8 +530,9 @@ table.grid { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
   .grid td, .grid tbody th { border-top: 0; padding: 0.1rem 0; }
   .grid td.k { font-weight: 700; }
   .grid td.plays:empty { display: none; }
-  .grid td.plays::before { content: "How it plays: "; font-weight: 700; }
+  .grid td.plays::before { content: "How it plays: "; font-weight: 700; color: var(--cyan); }
   .mark { width: 1.3rem; height: 1.3rem; font-size: 0.75rem; }
+  .feature { padding: 0.75rem 0.8rem 0.4rem; }
 }
 '''
 

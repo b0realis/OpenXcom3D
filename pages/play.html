@@ -6,119 +6,168 @@
 <title>Play OpenXcom3D</title>
 <meta name="description" content="Play OpenXcom3D (OpenXcom Extended with a first-person 3D battlescape): the ready builds on Linux, Windows, the Steam Deck or macOS step by step, then every key, every setting and how it plays, the 3D view's icons, and every feature in pictures.">
 <style>
-/* The build guide's look (index.html): a dark hero, a sticky bar (the page's parts and a search), then one column of numbered steps on a rail (your system and progress above them: only the chosen system's steps show), what to do when something goes wrong, and the guide (made by tools/make_guide.py between its markers). */
+/* The X-COM look: the battlescape's deep blue panels with bright edges, gold headings, buttons and keys
+bevelled as the game's, stars behind; a sticky bar (the page's parts and a search); numbered steps on a rail
+(your system and progress above them: only the chosen system's steps show); what to do when something goes
+wrong; and the guide (made by tools/make_guide.py between its markers). One theme, dark, as the game is. */
 :root {
-  --bg: #f3f5f8;
-  --surface: #ffffff;
-  --sunk: #e8ecf2;
-  --fg: #16202c;
-  --muted: #566475;
-  --line: #d3dae4;
-  --accent: #1d5e9e;
-  --accent-soft: #e3eef9;
-  --gold: #e0a730;
+  color-scheme: dark;
+  --bg: #050b17;
+  --surface: #0b1a33;
+  --sunk: #081329;
+  --raise: #12284c;
+  --fg: #dbe6f7;
+  --muted: #9cb1cf;
+  --line: #1f3d6b;
+  --edge: #3a72c4;
+  --accent: #82c4ff;
+  --accent-soft: #0f2a52;
+  --gold: #f2c443;
   --gold-ink: #2a1c02;
-  --ok: #2a7a49;
-  --warn-bg: #fff3dd;
-  --warn-fg: #6e4308;
-  --hero-bg: #0e1824;
+  --ok: #7ddc6a;
+  --alert: #ff6a55;
+  --cyan: #52d8e2;
+  --warn-bg: #261c08;
+  --warn-fg: #f3c977;
   --hero-fg: #eef4fb;
-  --hero-muted: #b4c3d4;
-  --term-bg: #121821;
-  --term-bar: #243041;
-  --term-fg: #e6edf5;
-  --term-dim: #8b9bb0;
-  --term-prompt: #f2b950;
-  --shadow: 0 1px 2px rgb(10 20 32 / 0.08), 0 6px 18px rgb(10 20 32 / 0.08);
+  --hero-muted: #c3d2e6;
+  --term-bg: #030810;
+  --term-bar: #10233f;
+  --term-fg: #d9f3d2;
+  --term-dim: #8297b6;
+  --term-prompt: #f2c443;
+  --shadow: 0 0 0 1px #02060d, 0 10px 28px rgb(0 0 0 / 0.55);
   /* The computer's own faces: the page asks no other site for anything. */
-  --font-display: Georgia, "Times New Roman", "DejaVu Serif", serif;
+  --font-display: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
   --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0d131b; --surface: #151d28; --sunk: #1c2633; --fg: #e6edf5; --muted: #9fb0c3;
-    --line: #2b3746; --accent: #79b4ee; --accent-soft: #1b2a3c; --gold: #e8b44c; --gold-ink: #241703;
-    --ok: #74c793; --warn-bg: #2f2513; --warn-fg: #f0c47e;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 18px rgb(0 0 0 / 0.25);
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #0d131b; --surface: #151d28; --sunk: #1c2633; --fg: #e6edf5; --muted: #9fb0c3;
-  --line: #2b3746; --accent: #79b4ee; --accent-soft: #1b2a3c; --gold: #e8b44c; --gold-ink: #241703;
-  --ok: #74c793; --warn-bg: #2f2513; --warn-fg: #f0c47e;
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 18px rgb(0 0 0 / 0.25);
-  color-scheme: dark;
+  /* the game's buttons: a lit top-left edge, a dark bottom-right one */
+  --bevel: inset 1px 1px 0 rgb(150 190 255 / 0.55), inset -1px -1px 0 rgb(2 8 20 / 0.9);
+  --scan: repeating-linear-gradient(to bottom, rgb(0 0 0 / 0) 0 2px, rgb(0 0 0 / 0.16) 2px 3px);
 }
 
 * { box-sizing: border-box; }
-html { scroll-padding-top: 5.5rem; }
-body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.6 var(--font-body); }
+html { scroll-padding-top: 5.5rem; background: var(--bg); }
+/* night sky: a few stars in tiles, and the battlescape's blue glow from above */
+body {
+  margin: 0; color: var(--fg); font: 17px/1.6 var(--font-body);
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(1px 1px at 23px 31px, rgb(255 255 255 / 0.7), transparent),
+    radial-gradient(1px 1px at 151px 87px, rgb(255 255 255 / 0.45), transparent),
+    radial-gradient(1.5px 1.5px at 97px 163px, rgb(170 205 255 / 0.6), transparent),
+    radial-gradient(1px 1px at 211px 203px, rgb(255 255 255 / 0.35), transparent),
+    radial-gradient(1px 1px at 61px 229px, rgb(255 240 200 / 0.4), transparent),
+    radial-gradient(ellipse 110% 55% at 50% -8%, #143667 0%, rgb(20 54 103 / 0) 62%);
+  background-size: 257px 257px, 257px 257px, 257px 257px, 257px 257px, 257px 257px, 100% 100vh;
+  background-repeat: repeat, repeat, repeat, repeat, repeat, no-repeat;
+  background-attachment: fixed;
+}
 body::before {
   content: ""; position: fixed; inset: 0 0 auto; z-index: 10;
-  height: env(safe-area-inset-top, 0px); background: var(--surface);
+  height: env(safe-area-inset-top, 0px); background: var(--sunk);
 }
 .gutter {
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
 .col { max-width: 52rem; margin: 0 auto; }
-a { color: var(--accent); }
-a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visible + .tick {
-  outline: 3px solid var(--accent); outline-offset: 2px;
+a { color: var(--accent); text-underline-offset: 0.18em; }
+a:hover { color: var(--gold); }
+a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visible, input:focus-visible + .tick {
+  outline: 3px solid var(--gold); outline-offset: 2px;
 }
-h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.2; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.2; letter-spacing: 0.02em; }
 code, kbd { font-family: var(--font-mono); }
 p code, li code, dd code, td code, summary code {
-  font-size: 0.86em; background: var(--sunk); padding: 0.08em 0.35em; border-radius: 4px;
-  overflow-wrap: anywhere;
+  font-size: 0.86em; background: var(--sunk); border: 1px solid var(--line); padding: 0.05em 0.35em;
+  border-radius: 3px; overflow-wrap: anywhere; color: #e9f1ff;
 }
 img { max-width: 100%; height: auto; display: block; }
+::selection { background: var(--gold); color: var(--gold-ink); }
 
-/* ---------- hero ---------- */
-.hero { background: var(--hero-bg); color: var(--hero-fg); }
+/* ---------- hero: the 1.08 collage behind, darkened, with scanlines ---------- */
+.hero {
+  color: var(--hero-fg); border-bottom: 2px solid var(--edge);
+  background:
+    var(--scan),
+    linear-gradient(90deg, rgb(5 11 23 / 0.6) 0%, rgb(5 11 23 / 0.25) 55%, rgb(5 11 23 / 0) 100%),
+    linear-gradient(180deg, rgb(5 11 23 / 0.62) 0%, rgb(5 11 23 / 0.86) 62%, var(--bg) 100%),
+    url("img/gallery/hero.jpg") center 30% / cover no-repeat,
+    var(--bg);
+}
 .hero .col {
   display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-  gap: 2rem; align-items: center; padding-block: 2.75rem 2.5rem;
+  gap: 2rem; align-items: center; padding-block: 3rem 2.75rem; max-width: 60rem;
 }
-.hero h1 { font-size: clamp(2rem, 5vw, 2.8rem); margin: 0 0 0.75rem; }
+.eyebrow {
+  font: 700 0.78rem/1.4 var(--font-mono); letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--cyan) !important; margin: 0 0 0.6rem !important;
+}
+.hero h1 {
+  font-size: clamp(2rem, 5.2vw, 3rem); margin: 0 0 0.9rem; text-transform: uppercase; color: var(--gold);
+  text-shadow: 0 0 22px rgb(242 196 67 / 0.35), 0 2px 0 #3a2a05;
+}
 .hero p { margin: 0 0 1.1rem; color: var(--hero-muted); max-width: 34rem; }
 .hero p a { color: var(--gold); }
+.prompt {
+  font: 700 0.9rem/1.5 var(--font-mono); color: var(--ok) !important; letter-spacing: 0.06em;
+  text-transform: uppercase; text-shadow: 0 0 10px rgb(125 220 106 / 0.4);
+}
+.prompt kbd { text-shadow: none; }
+.cursor { display: inline-block; width: 0.6em; height: 1.05em; margin-left: 0.2em; vertical-align: -0.15em; background: var(--ok); animation: blink 1.1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
 .facts { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
 .facts li {
-  border: 1px solid rgb(255 255 255 / 0.18); border-radius: 999px;
-  padding: 0.3rem 0.8rem; font-size: 0.875rem; color: var(--hero-fg);
+  border: 1px solid var(--edge); background: rgb(8 19 41 / 0.75); border-radius: 3px; box-shadow: var(--bevel);
+  padding: 0.3rem 0.75rem; font: 0.82rem/1.4 var(--font-mono); color: var(--hero-fg); text-transform: uppercase;
 }
 .facts b { color: var(--gold); font-weight: 700; }
 .hero figure { margin: 0; }
-.hero figure img {
-  border-radius: 8px; border: 1px solid rgb(255 255 255 / 0.15);
-  box-shadow: 0 10px 40px rgb(0 0 0 / 0.45); image-rendering: pixelated;
+/* a helmet camera's picture: the bright frame, scanlines and a blinking red dot */
+.cam { position: relative; }
+.cam img {
+  border: 2px solid var(--edge); border-radius: 2px; image-rendering: pixelated;
+  box-shadow: 0 0 0 1px #02060d, 0 0 26px rgb(58 114 196 / 0.35), 0 14px 40px rgb(0 0 0 / 0.6);
 }
-.hero figcaption { font-size: 0.8rem; color: var(--hero-muted); margin-top: 0.5rem; }
+.cam::after { content: ""; position: absolute; inset: 2px 2px auto; aspect-ratio: 16 / 10; background: var(--scan); pointer-events: none; }
+.rec {
+  position: absolute; top: 0.55rem; left: 0.6rem; z-index: 1; display: inline-flex; align-items: center; gap: 0.4rem;
+  font: 700 0.72rem/1 var(--font-mono); letter-spacing: 0.12em; color: #fff; text-transform: uppercase;
+  background: rgb(3 8 16 / 0.72); padding: 0.3rem 0.5rem; border: 1px solid rgb(255 255 255 / 0.15);
+}
+.rec::before { content: ""; width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--alert); box-shadow: 0 0 8px var(--alert); animation: blink 1.4s steps(1) infinite; }
+.hero figcaption { font: 0.78rem/1.4 var(--font-mono); color: var(--hero-muted); margin-top: 0.55rem; text-transform: uppercase; letter-spacing: 0.04em; }
 
 /* ---------- sticky bar ---------- */
 .bar {
   position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
-  background: var(--surface); border-bottom: 1px solid var(--line);
+  background: rgb(8 19 41 / 0.94); border-bottom: 2px solid var(--edge);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.45);
 }
+@supports (backdrop-filter: blur(6px)) { .bar { background: rgb(8 19 41 / 0.82); backdrop-filter: blur(6px); } }
 .bar .col {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
-  gap: 0.6rem 1.5rem; padding-block: 0.65rem;
+  gap: 0.6rem 1.5rem; padding-block: 0.6rem; max-width: 64rem;
 }
 .os-pick { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
-.os-pick > span { font-weight: 700; font-size: 0.95rem; }
-.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.os-pick > span { font: 700 0.85rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+/* the game's buttons */
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid #02060d; border-radius: 3px; overflow: hidden; }
 .seg button {
-  font: 700 0.95rem/1 var(--font-body); color: var(--fg); background: var(--surface);
-  border: 0; border-right: 1px solid var(--line); padding: 0.6rem 0.9rem; cursor: pointer;
+  font: 700 0.85rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.04em; color: #d6e5ff;
+  background: linear-gradient(#26497f, #16305a); border: 0; border-right: 1px solid #02060d; box-shadow: var(--bevel);
+  padding: 0.6rem 0.85rem; cursor: pointer;
 }
 .seg button:last-child { border-right: 0; }
-.seg button[aria-pressed="true"] { background: var(--accent); color: var(--surface); }
-.progress { display: flex; align-items: center; gap: 0.6rem; font-size: 0.875rem; color: var(--muted); }
-.progress .track { width: 8rem; height: 6px; background: var(--sunk); border-radius: 3px; overflow: hidden; }
-.progress .fill { height: 100%; width: 0; background: var(--ok); transition: width 0.3s; }
+.seg button:hover { background: linear-gradient(#2f5a9a, #1b3a6c); }
+.seg button[aria-pressed="true"] {
+  background: linear-gradient(#f6d264, #d9a527); color: var(--gold-ink);
+  box-shadow: inset 1px 1px 0 #fff3be, inset -1px -1px 0 #7d5b0c;
+}
+.progress { display: flex; align-items: center; gap: 0.6rem; font: 0.8rem/1.3 var(--font-mono); color: var(--muted); text-transform: uppercase; }
+.progress .track { width: 8rem; height: 8px; background: var(--sunk); border: 1px solid var(--line); overflow: hidden; }
+.progress .fill { height: 100%; width: 0; background: linear-gradient(90deg, #4fae45, var(--ok)); box-shadow: 0 0 8px rgb(125 220 106 / 0.6); transition: width 0.3s; }
 .progress output { font-variant-numeric: tabular-nums; }
 
 /* ---------- system switching ---------- */
@@ -133,7 +182,7 @@ main .col { padding-block: 2rem 1rem; }
 .steps { list-style: none; margin: 1.5rem 0 0; padding: 0; position: relative; }
 .steps::before {
   content: ""; position: absolute; left: 1.25rem; top: 0.5rem; bottom: 0.5rem;
-  width: 2px; background: var(--line);
+  width: 2px; background: linear-gradient(var(--edge), var(--line));
 }
 .step {
   position: relative; display: grid; grid-template-columns: 2.5rem minmax(0, 1fr);
@@ -141,147 +190,195 @@ main .col { padding-block: 2rem 1rem; }
 }
 .badge {
   width: 2.5rem; height: 2.5rem; border-radius: 50%; display: grid; place-items: center;
-  background: var(--gold); color: var(--gold-ink); font: 700 1.15rem/1 var(--font-display);
-  position: relative; z-index: 1; box-shadow: 0 0 0 5px var(--bg);
+  background: radial-gradient(circle at 35% 30%, #ffe28a, var(--gold) 55%, #b98a17); color: var(--gold-ink);
+  font: 700 1.1rem/1 var(--font-display); position: relative; z-index: 1;
+  box-shadow: 0 0 0 5px var(--bg), 0 0 18px rgb(242 196 67 / 0.45);
 }
-.step.done .badge { background: var(--ok); color: var(--surface); }
+.step.done .badge { background: radial-gradient(circle at 35% 30%, #c6f7b8, var(--ok) 55%, #3f8f35); color: #062006; box-shadow: 0 0 0 5px var(--bg), 0 0 18px rgb(125 220 106 / 0.45); }
 .step.done .badge span { display: none; }
 .step.done .badge::after { content: "✓"; font: 700 1.2rem/1 var(--font-body); }
 .step > div { min-width: 0; }
-.step h2 { font-size: 1.55rem; margin: 0.15rem 0 0.6rem; }
-.step h3 { font-size: 1.05rem; font-family: var(--font-body); margin: 1.1rem 0 0.4rem; }
+.step h2 { font-size: 1.45rem; margin: 0.15rem 0 0.6rem; color: var(--gold); text-transform: uppercase; }
+.step h3 { font-size: 0.95rem; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.05em; color: var(--cyan); margin: 1.1rem 0 0.4rem; }
 .step p, .step li { max-width: 42rem; }
 .step p { margin: 0 0 0.9rem; }
 .step ul { padding-left: 1.2rem; margin: 0 0 1rem; display: grid; gap: 0.35rem; }
+.step ul li::marker { color: var(--gold); }
 .lead { font-size: 1.05rem; }
 .note {
-  background: var(--warn-bg); color: var(--warn-fg); border-radius: 8px;
+  background: var(--warn-bg); color: var(--warn-fg); border: 1px solid #5a4314; border-left: 4px solid var(--gold);
   padding: 0.75rem 1rem; margin: 0 0 1rem; max-width: 42rem;
 }
 .note b, .note a { color: inherit; }
 .tip {
-  border-left: 4px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0;
+  border: 1px solid var(--line); border-left: 4px solid var(--cyan); background: var(--accent-soft);
   padding: 0.7rem 1rem; margin: 0 0 1rem; max-width: 42rem;
 }
 .tip p:last-child { margin-bottom: 0; }
 .check {
   display: inline-flex; align-items: center; gap: 0.6rem; cursor: pointer; user-select: none;
-  margin-top: 0.25rem; font-weight: 700; font-size: 0.95rem; color: var(--muted);
+  margin-top: 0.25rem; font: 700 0.85rem/1.3 var(--font-mono); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted);
 }
 .check input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .tick {
-  width: 1.4rem; height: 1.4rem; border: 2px solid var(--line); border-radius: 5px;
-  display: grid; place-items: center; background: var(--surface);
+  width: 1.4rem; height: 1.4rem; border: 1px solid #02060d; border-radius: 3px; box-shadow: var(--bevel);
+  display: grid; place-items: center; background: linear-gradient(#1d3b6b, #12284c);
 }
-.check input:checked + .tick { background: var(--ok); border-color: var(--ok); }
-.check input:checked + .tick::after { content: "✓"; color: var(--surface); font-weight: 700; font-size: 0.9rem; }
+.check input:checked + .tick { background: linear-gradient(#a9ef98, #4fae45); box-shadow: inset 1px 1px 0 #dcffd2, inset -1px -1px 0 #245c1d; }
+.check input:checked + .tick::after { content: "✓"; color: #062006; font-weight: 700; font-size: 0.9rem; }
 .step.done .check { color: var(--ok); }
 .btn {
   display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none;
-  font: 700 0.9rem/1 var(--font-body); padding: 0.55rem 0.85rem; border-radius: 7px; cursor: pointer;
-  background: var(--accent); color: var(--surface); border: 1px solid var(--accent);
+  font: 700 0.82rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 0.55rem 0.85rem; border-radius: 3px; cursor: pointer;
+  background: linear-gradient(#26497f, #16305a); color: #d6e5ff; border: 1px solid #02060d; box-shadow: var(--bevel);
 }
-.btn:hover { filter: brightness(1.07); }
+.btn:hover { background: linear-gradient(#2f5a9a, #1b3a6c); color: #fff; }
 
 /* a distribution's name above its commands */
-.distro { font-weight: 700; font-size: 0.95rem; margin: 0 0 0.35rem !important; }
+.distro { font: 700 0.85rem/1.3 var(--font-mono) !important; text-transform: uppercase; color: var(--cyan); margin: 0 0 0.35rem !important; }
 
 /* terminal */
 .term {
-  background: var(--term-bg); color: var(--term-fg); border-radius: 10px; overflow: hidden;
-  box-shadow: var(--shadow); border: 1px solid var(--term-bar); min-width: 0; margin: 0 0 1rem;
+  background: var(--term-bg); color: var(--term-fg); border-radius: 3px; overflow: hidden;
+  box-shadow: var(--shadow); border: 1px solid var(--edge); min-width: 0; margin: 0 0 1rem;
 }
 .term-bar {
   display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
-  padding: 0.4rem 0.5rem 0.4rem 0.8rem; background: var(--term-bar); color: var(--term-dim); font-size: 0.8rem;
+  padding: 0.4rem 0.5rem 0.4rem 0.8rem; background: linear-gradient(#173159, var(--term-bar)); color: var(--term-dim);
+  font: 0.75rem/1.3 var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em;
 }
-.term-bar .btn { padding: 0.35rem 0.65rem; font-size: 0.8rem; background: transparent; color: var(--term-fg); border-color: #4a5a70; }
+.term-bar .btn { padding: 0.35rem 0.65rem; font-size: 0.74rem; }
 .term pre {
   margin: 0; padding: 0.85rem 1rem; overflow-x: auto; font: 0.84rem/1.65 var(--font-mono);
-  color: var(--term-fg); background: none; white-space: pre-wrap; overflow-wrap: anywhere;
+  color: var(--term-fg); background: var(--scan); white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .term .d { color: var(--term-dim); }
-.copied { font-weight: 700; color: var(--term-prompt); font-size: 0.8rem; min-width: 4.5rem; text-align: right; }
+.copied { font-weight: 700; color: var(--term-prompt); font-size: 0.75rem; min-width: 4.5rem; text-align: right; }
 
-/* kbd */
+/* keys: the game's small buttons */
 kbd {
-  display: inline-block; min-width: 1.6em; text-align: center; font-size: 0.82em; font-weight: 600;
-  padding: 0.15em 0.45em; border: 1px solid var(--line); border-bottom-width: 3px; border-radius: 6px;
-  background: var(--surface); color: var(--fg); white-space: nowrap;
+  display: inline-block; min-width: 1.7em; text-align: center; font: 700 0.78em/1.25 var(--font-mono);
+  padding: 0.2em 0.45em 0.24em; border: 1px solid #02060d; border-radius: 3px; white-space: nowrap;
+  background: linear-gradient(#2c5291, #183563); color: #eef4ff; box-shadow: var(--bevel), 0 1px 0 #02060d;
+  text-shadow: 0 1px 0 rgb(0 0 0 / 0.5);
 }
 
 /* folder listing */
 .files {
-  list-style: none; margin: 0 0 1rem; padding: 0.5rem 0.75rem; background: var(--surface);
-  border: 1px solid var(--line); border-radius: 8px; font: 0.86rem/1.7 var(--font-mono); max-width: 42rem;
+  list-style: none; margin: 0 0 1rem; padding: 0.5rem 0.75rem; background: var(--sunk);
+  border: 1px solid var(--line); border-radius: 3px; font: 0.86rem/1.7 var(--font-mono); max-width: 42rem;
 }
 .files li { display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr); gap: 1rem; }
 .files li span { color: var(--muted); font-family: var(--font-body); font-size: 0.85rem; }
 
 /* troubleshooting */
 .faq { padding-block: 0.5rem 2rem; }
-.faq h2 { font-size: 1.55rem; margin: 0 0 0.4rem; }
+.faq h2 { font-size: 1.45rem; margin: 0 0 0.4rem; color: var(--gold); text-transform: uppercase; }
 .faq > .col > p { color: var(--muted); margin: 0 0 1.25rem; }
-.faq details { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; margin: 0 0 0.75rem; }
+.faq details { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--edge); border-radius: 2px; margin: 0 0 0.75rem; }
+.faq details[open] { border-left-color: var(--gold); }
 .faq summary { cursor: pointer; padding: 0.75rem 1rem; font-weight: 700; list-style-position: inside; }
+.faq summary::marker { color: var(--gold); }
 .faq summary code { font-weight: 600; }
 .faq details > div { padding: 0 1rem 0.9rem; }
 .faq details p { margin: 0 0 0.6rem; max-width: 42rem; }
 .faq .term { margin-top: 0.4rem; }
 
-footer { border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; }
+footer { border-top: 2px solid var(--edge); color: var(--muted); font-size: 0.9rem; background: rgb(3 8 16 / 0.6); }
 footer .col { padding-block: 1.5rem 2.5rem; display: grid; gap: 0.4rem; }
 footer p { margin: 0; }
 
+@media (prefers-reduced-motion: reduce) {
+  .cursor, .rec::before { animation: none; }
+}
+
 /* guide:css:begin */
 /* ---------- the bar: sections and search (the system switch sits with the steps) ---------- */
-.jump { display: flex; flex-wrap: wrap; gap: 0.35rem 1rem; font-weight: 700; font-size: 0.95rem; }
-.jump a { text-decoration: none; }
-.find { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 0.95rem; }
-.find input { font: 0.95rem var(--font-body); padding: 0.45rem 0.6rem; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--fg); width: 15rem; max-width: 60vw; }
-.ospanel { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem 1.5rem; margin: 0 0 1rem;
-  background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 0.65rem 0.9rem; }
-.part { font-size: 1.9rem; margin: 0 0 0.5rem; }
-/* ---------- the guide ---------- */
+.jump { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; font: 700 0.8rem/1.4 var(--font-mono); text-transform: uppercase; letter-spacing: 0.05em; }
+.jump a { text-decoration: none; color: var(--accent); }
+.jump a:hover { color: var(--gold); }
+.find { display: flex; align-items: center; gap: 0.5rem; font: 700 0.8rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.find input {
+  font: 0.92rem var(--font-body); padding: 0.45rem 0.6rem; border: 1px solid var(--edge); border-radius: 2px;
+  background: var(--term-bg); color: var(--fg); width: 15rem; max-width: 60vw; box-shadow: inset 0 0 12px rgb(58 114 196 / 0.18);
+}
+.find input::placeholder { color: var(--term-dim); }
+.ospanel {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem 1.5rem; margin: 0 0 1rem;
+  background: var(--surface); border: 1px solid var(--edge); border-radius: 2px; padding: 0.65rem 0.9rem; box-shadow: var(--shadow);
+}
+.part { font-size: clamp(1.4rem, 3.5vw, 1.9rem); margin: 0 0 0.75rem; color: var(--gold); text-transform: uppercase; display: flex; align-items: center; gap: 0.75rem; }
+/* ---------- the guide: each section's title an X-COM screen's, gold with a line ---------- */
 .guide .col { max-width: 64rem; }
-.sec .col { padding-block: 2rem 0.5rem; }
-.sec h2 { font-size: 1.8rem; margin: 0 0 0.5rem; }
-.sec h3 { font-size: 1.15rem; font-family: var(--font-body); margin: 1.6rem 0 0.5rem; }
+.sec .col { padding-block: 2.25rem 0.5rem; }
+.sec h2, .part {
+  display: flex; align-items: center; gap: 0.75rem; font-size: clamp(1.4rem, 3.5vw, 1.9rem); margin: 0 0 0.6rem;
+  color: var(--gold); text-transform: uppercase; letter-spacing: 0.06em; text-shadow: 0 0 18px rgb(242 196 67 / 0.25);
+}
+.sec h2::before, .part::before { content: "//"; color: var(--edge); text-shadow: none; }
+.sec h2::after, .part::after { content: ""; flex: 1; height: 2px; background: linear-gradient(90deg, var(--edge), transparent); }
+.sec h3 { font: 700 0.95rem/1.3 var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--cyan); margin: 1.8rem 0 0.6rem; }
 .guide .intro { max-width: 46rem; color: var(--muted); margin: 0 0 1rem; }
-.quick { display: grid; gap: 0.45rem; padding-left: 1.3rem; max-width: 46rem; }
+.quick { display: grid; gap: 0.5rem; padding-left: 1.5rem; max-width: 46rem; }
+.quick li::marker { color: var(--gold); font-family: var(--font-mono); font-weight: 700; }
 .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 0.9rem 1.1rem; box-shadow: var(--shadow); }
-.card h3 { margin-top: 0.2rem; }
-.card ul { padding-left: 1.1rem; margin: 0; display: grid; gap: 0.35rem; }
-.tag { font: 700 0.72rem/1 var(--font-body); background: var(--accent-soft); color: var(--accent); padding: 0.2rem 0.45rem; border-radius: 999px; vertical-align: middle; }
-.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.card { background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--gold); border-radius: 2px; padding: 0.9rem 1.1rem; box-shadow: var(--shadow); }
+.two .card:last-child { border-top-color: var(--cyan); }
+.card h3 { margin-top: 0.2rem; color: var(--fg); font-size: 1rem; }
+.card ul { padding-left: 1.1rem; margin: 0; display: grid; gap: 0.4rem; }
+.card li::marker { color: var(--gold); }
+.tag { font: 700 0.68rem/1 var(--font-mono); background: transparent; color: var(--gold); border: 1px solid var(--gold); padding: 0.2rem 0.4rem; border-radius: 2px; vertical-align: middle; letter-spacing: 0.06em; }
+.two .card:last-child .tag { color: var(--cyan); border-color: var(--cyan); }
+/* ---------- tables: X-COM panels ---------- */
+.tablewrap { overflow-x: auto; border: 1px solid var(--edge); border-radius: 2px; background: var(--surface); box-shadow: var(--shadow); }
 table.grid { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
 .grid th, .grid td { text-align: left; vertical-align: top; padding: 0.55rem 0.75rem; border-top: 1px solid var(--line); }
-.grid thead th { border-top: 0; background: var(--sunk); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
-.grid tbody th { width: 13rem; }
+.grid thead th {
+  border-top: 0; background: linear-gradient(#173159, #10233f); font: 700 0.74rem/1.3 var(--font-mono);
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold); border-bottom: 1px solid var(--edge);
+}
+.grid tbody tr:hover { background: var(--raise); }
+.grid tbody th { width: 13rem; color: var(--fg); }
 .grid td.k { white-space: nowrap; width: 12rem; }
-.grid td.s { font-weight: 700; width: 12rem; }
-.grid td.c { width: 10rem; color: var(--muted); }
-.grid td.c b { color: var(--fg); }
+.grid td.s { font-weight: 700; width: 12rem; color: #f0f5ff; }
+.grid td.c { width: 10rem; color: var(--muted); font: 0.84rem/1.5 var(--font-mono); }
+.grid td.c b { color: var(--gold); }
 .grid td.plays { color: var(--muted); width: 30%; }
 .def { color: var(--muted); }
 .guide kbd { margin: 0.08em 0.1em; }
+/* ---------- pictures: helmet camera frames ---------- */
 .guide figure { margin: 0 0 1rem; }
-.guide figcaption { font-size: 0.85rem; color: var(--muted); margin-top: 0.4rem; }
+.guide figcaption { font-size: 0.85rem; color: var(--muted); margin-top: 0.45rem; }
 .marks { position: relative; }
-.marks img, .shots img, .strip img, .pair img { border-radius: 8px; border: 1px solid var(--line); image-rendering: pixelated; }
-.mark { position: absolute; transform: translate(-50%, -50%); width: 1.7rem; height: 1.7rem; border-radius: 50%; display: grid; place-items: center;
-  background: var(--gold); color: var(--gold-ink); font: 700 0.95rem/1 var(--font-display); box-shadow: 0 0 0 3px rgb(0 0 0 / 0.55); }
+.marks img, .shots img, .strip img, .pair img, .gallery img {
+  border: 2px solid var(--edge); border-radius: 2px; image-rendering: pixelated;
+  box-shadow: 0 0 0 1px #02060d, 0 0 22px rgb(58 114 196 / 0.25), 0 12px 30px rgb(0 0 0 / 0.55);
+}
+.shots a:hover img, .gallery a:hover img { border-color: var(--gold); }
 .pair { max-width: 40rem; }
-.legend { display: grid; gap: 0.35rem; padding-left: 1.4rem; max-width: 52rem; }
+.mark { position: absolute; transform: translate(-50%, -50%); width: 1.8rem; height: 1.8rem; border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle at 35% 30%, #ffe28a, var(--gold) 60%, #b98a17); color: var(--gold-ink); font: 700 0.95rem/1 var(--font-mono);
+  box-shadow: 0 0 0 3px rgb(0 0 0 / 0.7), 0 0 14px rgb(242 196 67 / 0.6); }
+.legend { display: grid; gap: 0.4rem; padding-left: 1.5rem; max-width: 52rem; }
+.legend li::marker { color: var(--gold); font: 700 1em var(--font-mono); }
+.legend b { color: #f0f5ff; }
 .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; list-style: none; padding: 0; margin: 0 0 1rem; }
-.chips li { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 0.25rem 0.75rem; font-size: 0.9rem; }
-.feature { border-top: 1px solid var(--line); padding-top: 0.4rem; margin-top: 1.2rem; }
+.chips li { background: linear-gradient(#1d3b6b, #12284c); border: 1px solid #02060d; box-shadow: var(--bevel); border-radius: 2px; padding: 0.25rem 0.7rem; font-size: 0.88rem; }
+.chips b { color: var(--gold); font-family: var(--font-mono); text-transform: uppercase; font-size: 0.85em; }
+/* ---------- features: one panel each ---------- */
+.feature { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--edge); border-radius: 2px; padding: 0.9rem 1.1rem 0.5rem; margin-top: 1rem; box-shadow: var(--shadow); }
+.feature:hover { border-left-color: var(--gold); }
+.feature h3 { margin-top: 0.1rem; }
 .shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(22rem, 100%), 1fr)); gap: 0.75rem; margin: 0.5rem 0 0.75rem; }
 .shots figure.wide { grid-column: 1 / -1; }
 .shots figure { margin: 0; }
 .feature p { max-width: 50rem; margin: 0 0 0.6rem; }
-.meta span { display: inline-block; min-width: 7.5rem; font-weight: 700; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
+.meta span { display: inline-block; min-width: 7.5rem; font: 700 0.74rem/1.3 var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--cyan); }
+/* ---------- the gallery ---------- */
+.gallery figure { margin: 0 0 1.75rem; }
+.gallery figcaption { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; align-items: baseline; margin-top: 0.55rem; }
+.gallery figcaption b { font: 700 0.8rem/1.3 var(--font-mono); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold); }
 .hidden { display: none !important; }
 @media (max-width: 720px) {
   .two { grid-template-columns: minmax(0, 1fr); }
@@ -293,8 +390,9 @@ table.grid { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
   .grid td, .grid tbody th { border-top: 0; padding: 0.1rem 0; }
   .grid td.k { font-weight: 700; }
   .grid td.plays:empty { display: none; }
-  .grid td.plays::before { content: "How it plays: "; font-weight: 700; }
+  .grid td.plays::before { content: "How it plays: "; font-weight: 700; color: var(--cyan); }
   .mark { width: 1.3rem; height: 1.3rem; font-size: 0.75rem; }
+  .feature { padding: 0.75rem 0.8rem 0.4rem; }
 }
 /* guide:css:end */
 @media (max-width: 720px) {
@@ -313,25 +411,28 @@ table.grid { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
 <header class="hero gutter">
   <div class="col">
     <div>
+      <p class="eyebrow">X-COM &middot; Battlescape &middot; First person</p>
       <h1>Play OpenXcom3D</h1>
       <p>OpenXcom3D is <b>OpenXcom Extended</b> with a first-person 3D battlescape. The <a href="https://github.com/b0realis/OpenXcom3D/releases/latest">ready builds</a> need no compiling and nothing installed: download one, give it your copy of the original game, and press F8 in a battle. This page walks you through it for each system, then has everything for playing: <a href="#keys">every key</a>, <a href="#settings">every setting</a> and how it plays, <a href="#screen">what's on the screen</a> and <a href="#features">every feature</a> in pictures.</p>
       <p>Rather build it yourself? The <a href="./">build guide</a> does that, step by step.</p>
+      <p class="prompt" aria-hidden="true">&gt; Press <kbd>F8</kbd> to enter the battlescape<span class="cursor"></span></p>
       <ul class="facts">
         <li>About <b>5 minutes</b></li>
         <li>About <b>12 MB</b> to download</li>
         <li>Your own copy of <b>UFO</b> or <b>TFTD</b></li>
       </ul>
     </div>
-    <figure>
-      <img src="img/skyranger.png" width="1280" height="800" alt="The 3D view: the Skyranger on a field at a terror site, a picket fence in front, the soldier's rifle in the corner.">
-      <figcaption>A battle in 3D: the Skyranger behind you, the street ahead.</figcaption>
+    <figure class="cam">
+      <span class="rec" aria-hidden="true">Live &middot; soldier cam</span>
+      <img src="img/guide/hud.png" width="1280" height="800" alt="The 3D view: a street with tall lamps, a Sectoid ahead under the crosshair with its name below, the hit chance beside it, the squad's buttons along the top, the compass, the soldier's two pistols.">
+      <figcaption>A terror site in 3D: a Sectoid down the street, two pistols in hand.</figcaption>
     </figure>
   </div>
 </header>
 
 <nav class="bar gutter" aria-label="The page's parts and a search">
   <div class="col">
-    <div class="jump"><a href="#install">Get it running</a><a href="#start">Start</a><a href="#styles">Two ways to play</a><a href="#keys">Keys</a><a href="#screen">On screen</a><a href="#settings">Settings</a><a href="#features">Features</a></div>
+    <div class="jump"><a href="#install">Get it running</a><a href="#start">Start</a><a href="#styles">Two ways to play</a><a href="#keys">Keys</a><a href="#screen">On screen</a><a href="#settings">Settings</a><a href="#features">Features</a><a href="#gallery">Gallery</a></div>
     <label class="find"><span>Find</span><input id="find" type="search" placeholder="a key, a setting, a word" autocomplete="off"></label>
   </div>
 </nav>
@@ -640,6 +741,7 @@ ln -s "/path/to/XCOM" ~/.local/share/openxcom3d/UFO</pre></div>
 <div class="tablewrap"><table class="grid keys"><thead><tr><th>Key</th><th>What it does</th><th>How it plays</th></tr></thead><tbody>
 <tr class="row"><td class="k"><kbd>C</kbd> or the middle button</td><td>Mouse look &harr; free cursor, to click buttons and hover soldiers for their cards. With <i>Middle click identifies</i> a middle click on a unit shows it.</td><td class="plays"></td></tr>
 <tr class="row"><td class="k"><kbd>H</kbd></td><td>The classic HUD on/off: every button of it works in 3D.</td><td class="plays">The map's whole bottom bar, if you prefer it.</td></tr>
+<tr class="row"><td class="k"><kbd>Wheel</kbd> over a soldier's button</td><td>With the cursor free: steps the soldier's card, or the SOLDIER CAM, through the squad one soldier at a time (over &#9664; and &#9654; it scrolls the bar).</td><td class="plays">Look through every soldier's eyes in a few turns of the wheel.</td></tr>
 <tr class="row"><td class="k"><kbd>P</kbd></td><td>The 3D HUD on/off, for a clear view (on the map: the map camera on/off).</td><td class="plays"></td></tr>
 <tr class="row"><td class="k"><kbd>F7</kbd></td><td>The frame counter on/off (the game's key).</td><td class="plays"></td></tr>
 </tbody></table></div>
@@ -713,7 +815,7 @@ ln -s "/path/to/XCOM" ~/.local/share/openxcom3d/UFO</pre></div>
 <tr class="row"><th>At the right</th><td>SCOPING 2.6x while zooming.</td></tr>
 <tr class="row"><th>Warnings</th><td>UNSAFE LANDING! PUSH AGAIN at a ledge over ground no one can walk on; the game's own warnings (No Line of Fire!, Out of Range!), on the warning line.</td></tr>
 <tr class="row"><th>Banners</th><td>ENEMY SPOTTED!, HIDDEN MOVEMENT, BURNING, YOU HAVE A MENTAL BREAKDOWN, BERSERK, TURNED INTO A ZOMBIE.</td></tr>
-<tr class="row"><th>Camera cards</th><td>A soldier's helmet camera popping up: TARGETED, HIT, MIND CONTROLLED, FIRING, WATCHING, DECEASED, UNCONSCIOUS. A blinking red dot and now and then a bad signal or static: it's a camera, not your view.</td></tr>
+<tr class="row"><th>Camera cards</th><td>A soldier's helmet camera popping up: TARGETED, HIT, MIND CONTROLLED, FIRING, WATCHING, DECEASED, UNCONSCIOUS. A blinking red dot and now and then a bad signal or static: it's a camera, not your view. SIGNAL LOST when the soldier you look through falls.</td></tr>
 <tr class="row"><th>The info panel's right side</th><td>DOOM MODE while the cheat is on (IDDQD, IDKFA or both in its place with those); with IDDQD the stats turn silver.</td></tr>
 </tbody></table></div>
 <figure class="pair"><img src="img/guide/trajectory.png" width="1280" height="800" loading="lazy" alt="The trajectory of a throw: a light cyan arc onto a diamond where it lands."><figcaption>The trajectory: a grenade's arc, and where it lands.</figcaption></figure>
@@ -872,7 +974,7 @@ ln -s "/path/to/XCOM" ~/.local/share/openxcom3d/UFO</pre></div>
 </article>
 <article class="feature row" id="f-light"><h3>Light and night</h3>
 <div class="shots"><figure><a href="img/guide/night_vision_laser.png"><img src="img/guide/night_vision_laser.png" width="1280" height="800" loading="lazy" alt="Night vision: the laser sight light in the goggles"></a><figcaption>Night vision: the laser sight light in the goggles</figcaption></figure></div>
-<p>Your flashlight (on F, wide or a tight spot on the crosshair), night vision with the gear for it, red tactical flares, and the game's suit light (L).</p>
+<p>Your flashlight (on F, wide or a tight spot on the crosshair), night vision with the gear for it, red tactical flares, and the game's suit light (L). Light and shadow come from lamps, the sun, your flashlight and flares; indoors (a roof overhead, or rock) no sun shines, and rooms are lit by their own light, as on the map.</p>
 <p class="meta"><span>Keys</span> <kbd>F</kbd>, <kbd>N</kbd>, <kbd>T</kbd>, <kbd>L</kbd></p>
 <p class="meta"><span>How it plays</span> The flashlight and flares light only your view; the suit light is the game's, and lets aliens see your soldiers at night.</p>
 </article>
@@ -882,9 +984,9 @@ ln -s "/path/to/XCOM" ~/.local/share/openxcom3d/UFO</pre></div>
 <p class="meta"><span>How it plays</span> What you see through matches what your soldier sees through.</p>
 </article>
 <article class="feature row" id="f-cams"><h3>Helmet cameras</h3>
-<div class="shots"><figure><a href="img/guide/soldier_cam_dusk.png"><img src="img/guide/soldier_cam_dusk.png" width="1280" height="800" loading="lazy" alt="A SOLDIER CAM at dusk"></a><figcaption>A SOLDIER CAM at dusk</figcaption></figure><figure><a href="img/guide/map_camera.png"><img src="img/guide/map_camera.png" width="1280" height="800" loading="lazy" alt="The map camera on the isometric map"></a><figcaption>The map camera on the isometric map</figcaption></figure></div>
-<p>Every soldier's helmet camera, live: on their card, big as the SOLDIER CAM, or over the map (setting <i>Map camera</i>), with a blinking red dot, now and then a bad signal or static, worse on hard missions.</p>
-<p class="meta"><span>Keys</span> Hover a soldier's button; right click for the SOLDIER CAM; <kbd>P</kbd> on the map</p>
+<div class="shots"><figure><a href="img/guide/soldier_cam_dusk.png"><img src="img/guide/soldier_cam_dusk.png" width="1280" height="800" loading="lazy" alt="A SOLDIER CAM at dusk"></a><figcaption>A SOLDIER CAM at dusk</figcaption></figure><figure><a href="img/guide/map_camera.png"><img src="img/guide/map_camera.png" width="1280" height="800" loading="lazy" alt="The map camera on the isometric map"></a><figcaption>The map camera on the isometric map</figcaption></figure><figure><a href="img/guide/killed_in_action.png"><img src="img/guide/killed_in_action.png" width="1280" height="800" loading="lazy" alt="Killed in action: the picture turns red, then breaks into static, SIGNAL LOST"></a><figcaption>Killed in action: the picture turns red, then breaks into static, SIGNAL LOST</figcaption></figure></div>
+<p>Every soldier's helmet camera, live: on their card, big as the SOLDIER CAM, or over the map (setting <i>Map camera</i>), with a blinking red dot, now and then a bad signal or static, worse on hard missions. With the cursor free, the mouse wheel over a soldier's button steps the card or the SOLDIER CAM through the squad. When the soldier you look through falls, the picture turns red and breaks into static: SIGNAL LOST.</p>
+<p class="meta"><span>Keys</span> Hover a soldier's button; right click for the SOLDIER CAM; the wheel over a button; <kbd>P</kbd> on the map</p>
 <p class="meta"><span>How it plays</span> See what each soldier sees; aim on the map with a soldier's eyes beside it.</p>
 </article>
 <article class="feature row" id="f-aliens"><h3>The aliens' turn</h3>
@@ -897,9 +999,10 @@ ln -s "/path/to/XCOM" ~/.local/share/openxcom3d/UFO</pre></div>
 <p>Some parts the map draws have no shape, or only a few voxels, in the game's data. They show as see-through ghosts of their art: ladders and lift pads, the shops' racks, the rest of fences, railings and catwalk gratings, and the surface of liquid over a floor (XPiratez's sewers). The game's own voxels stay solid.</p>
 <p class="meta"><span>How it plays</span> Ghosts are pictures: shots, sight and walking go through them as the game says. Set how solid with <i>Ghost opacity</i>.</p>
 </article>
-<article class="feature row" id="f-sea"><h3>The sea</h3>
-<div class="shots"><figure><a href="img/guide/tftd_sea_past_the_edge.png"><img src="img/guide/tftd_sea_past_the_edge.png" width="1280" height="800" loading="lazy" alt="TFTD: the sea rolling in waves past an island's edge"></a><figcaption>TFTD: the sea rolling in waves past an island's edge</figcaption></figure></div>
-<p>Terror From The Deep's sea rolls in waves, and where it reaches the map's edge it goes on past it.</p>
+<article class="feature row" id="f-sea"><h3>The sea, and under it</h3>
+<div class="shots"><figure><a href="img/guide/tftd_sea_past_the_edge.png"><img src="img/guide/tftd_sea_past_the_edge.png" width="1280" height="800" loading="lazy" alt="TFTD: the sea rolling in waves past an island's edge"></a><figcaption>TFTD: the sea rolling in waves past an island's edge</figcaption></figure><figure><a href="img/guide/tftd_ruins.png"><img src="img/guide/tftd_ruins.png" width="1280" height="800" loading="lazy" alt="TFTD: ruins on the seabed, bubbles rising, light rippling over the sand"></a><figcaption>TFTD: ruins on the seabed, bubbles rising, light rippling over the sand</figcaption></figure></div>
+<p>Terror From The Deep's sea rolls in waves, and where it reaches the map's edge it goes on past it. Under the water: bubbles, marine snow drifting down, and light rippling over the sand.</p>
+<p class="meta"><span>How it plays</span> The particles are a setting (<i>Particles</i>), if you want the water clear.</p>
 </article>
 <article class="feature row" id="f-shotguns"><h3>Shotguns</h3>
 <div class="shots"><figure><a href="img/guide/shotgun_pellets_map.png"><img src="img/guide/shotgun_pellets_map.png" width="1280" height="800" loading="lazy" alt="Pellets in flight on the map"></a><figcaption>Pellets in flight on the map</figcaption></figure></div>
@@ -914,6 +1017,13 @@ ln -s "/path/to/XCOM" ~/.local/share/openxcom3d/UFO</pre></div>
 <article class="feature row" id="f-perf"><h3>Performance</h3>
 <p><i>Pixel size</i> 2 or 3 colours a block of pixels per ray, much faster on big screens; <i>Shadows</i> and <i>Particles</i> off help slow machines; the frame rate cap is the game's own.</p>
 </article>
+</div></section>
+<section id="gallery" class="sec gutter"><div class="col gallery">
+<h2>Gallery</h2>
+<p class="intro">From the field: the battles in pictures, from <i>UFO</i>, <i>Terror From The Deep</i> and XPiratez. Click one for it at full size.</p>
+<figure class="row"><a href="img/gallery/collage_108.png"><img src="img/gallery/collage_108.png" width="1952" height="1232" loading="lazy" alt="Field report 1.08: Terror From The Deep's sea past an island's edge, XPiratez's blunderbuss and two guns at once, a spray burst marked, akimbo in 3D and on the isometric map, a Gill Man on an island, and the map camera over the battle."></a><figcaption><b>Field report 1.08</b> Terror From The Deep's sea past an island's edge, XPiratez's blunderbuss and two guns at once, a spray burst marked, akimbo in 3D and on the isometric map, a Gill Man on an island, and the map camera over the battle.</figcaption></figure>
+<figure class="row"><a href="img/gallery/collage_more.png"><img src="img/gallery/collage_more.png" width="1952" height="1232" loading="lazy" alt="More from 1.08: The open sky at the map's edge, a peek past a corner in FPS style, the accuracy line, the landing warning by the sea, wading in XPiratez's sludge, the shop's racks as ghosts, a tilted lean, smoke, a grenade's arc."></a><figcaption><b>More from 1.08</b> The open sky at the map's edge, a peek past a corner in FPS style, the accuracy line, the landing warning by the sea, wading in XPiratez's sludge, the shop's racks as ghosts, a tilted lean, smoke, a grenade's arc.</figcaption></figure>
+<figure class="row"><a href="img/gallery/collage_moments.png"><img src="img/gallery/collage_moments.png" width="1952" height="1232" loading="lazy" alt="Moments: Under fire, a soldier cam at dusk, a sprint down an empty street, night vision, an airburst, a rocket in the street, aquanauts with vibro blades, the ruins on the seabed, and the end of a signal."></a><figcaption><b>Moments</b> Under fire, a soldier cam at dusk, a sprint down an empty street, night vision, an airburst, a rocket in the street, aquanauts with vibro blades, the ruins on the seabed, and the end of a signal.</figcaption></figure>
 </div></section>
 </div>
 <!-- guide:end -->
