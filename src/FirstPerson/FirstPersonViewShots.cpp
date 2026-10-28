@@ -949,7 +949,16 @@ bool FirstPersonView::flyingShot(const RuleItem *ammo, const RuleItem *weapon)
  */
 void FirstPersonView::trailFor(const BattleItem *ammo, const BattleItem *weapon, Trail &trail, Uint8 &color, float &calibre)
 {
-	const RuleDamageType *damage = ammo ? ammo->getRules()->getDamageType() : nullptr;
+	trailFor(ammo ? ammo->getRules() : nullptr, weapon ? weapon->getRules() : nullptr, trail, color, calibre);
+}
+
+/**
+ * The same, from the ammo's and the weapon's rules (a round noted landing keeps only those, see
+ * Map::noteShotLanded).
+ */
+void FirstPersonView::trailFor(const RuleItem *ammo, const RuleItem *weapon, Trail &trail, Uint8 &color, float &calibre)
+{
+	const RuleDamageType *damage = ammo ? ammo->getDamageType() : nullptr;
 	// The palette colour nearest to a red, green, blue colour (getPalette only reads, but it
 	// isn't marked const).
 	const SDL_Color *palette = const_cast<FirstPersonView*>(this)->getPalette();
@@ -962,7 +971,7 @@ void FirstPersonView::trailFor(const BattleItem *ammo, const BattleItem *weapon,
 		}
 		return (Uint8)best;
 	};
-	calibre = shotCalibre(weapon ? weapon->getRules() : nullptr, ammo ? ammo->getRules() : nullptr);
+	calibre = shotCalibre(weapon, ammo);
 	switch (damage ? damage->ResistType : DT_NONE)
 	{
 	case DT_IN: trail = TRAIL_FIRE; color = _colors.fire[1]; break;
@@ -975,7 +984,7 @@ void FirstPersonView::trailFor(const BattleItem *ammo, const BattleItem *weapon,
 	}
 	// An object flying (an arrow, a bolt: see flyingShot) that would look like a bullet or a
 	// rocket: a white streak.
-	if ((trail == TRAIL_NONE || trail == TRAIL_SMOKE) && flyingShot(ammo ? ammo->getRules() : nullptr, weapon ? weapon->getRules() : nullptr))
+	if ((trail == TRAIL_NONE || trail == TRAIL_SMOKE) && flyingShot(ammo, weapon))
 	{
 		trail = TRAIL_FLYING;
 		color = nearest(245, 245, 245);
@@ -1214,7 +1223,8 @@ void FirstPersonView::spawnPartnerEffects()
 		// The last round has landed: sparks and a mark where it ended, and a laser leaves its
 		// beam fading out (not one flying on after its shot ended, a miss leaving the map).
 		const auto &strays = _map ? _map->getStrays() : std::vector<Projectile*>();
-		if (_lastPartnerShot && std::find(strays.begin(), strays.end(), _lastPartnerShot) == strays.end())
+		// (One followed before the view stopped drawing ended unseen, see followShots.)
+		if (_lastPartnerShot && !_shotsResumed && std::find(strays.begin(), strays.end(), _lastPartnerShot) == strays.end())
 		{
 			spawnShotImpact(_partnerHead, _partnerOrigin, _partnerTrail);
 			if (_partnerTrail == TRAIL_BEAM)
@@ -1631,16 +1641,92 @@ Projectile *FirstPersonView::flyingProjectile() const
 }
 
 /**
+ * A round the map noted landing (Map::noteShotLanded; a player's report: a light minigun's left
+ * no holes, its rounds starting and landing between two frames, never seen by followShots): the
+ * round this view follows (its trail on to where it landed, then its end as any shot's, see
+ * finishShot), the other gun's (its sparks and mark there, a laser's beam fading), or one never
+ * seen at all: its sparks and mark where it landed, a laser's beam fading out. A thrown item has
+ * no mark.
+ * @param shot The round, as noted.
+ */
+void FirstPersonView::landShot(const LandedShot &shot)
+{
+	const float end[3] = { (float)shot.end.x, (float)shot.end.y, (float)shot.end.z };
+	const float origin[3] = { (float)shot.origin.x, (float)shot.origin.y, (float)shot.origin.z };
+	if (!shot.partner && shot.projectile == _lastProjectile)
+	{
+		if (!_lastProjectileThrown)
+		{
+			spawnTrailSegment(_lastShotHead, end);
+		}
+		std::copy(end, end + 3, _lastShotHead);
+		finishShot();
+		_lastProjectile = nullptr;
+		return;
+	}
+	// (A round that ended off the map has no sparks or mark there, but a laser's beam goes to the edge.)
+	const bool inMap = _save->getTile(shot.end.toTile()) != nullptr;
+	if (shot.partner && shot.projectile == _lastPartnerShot)
+	{
+		std::copy(end, end + 3, _partnerHead);
+		if (inMap) spawnShotImpact(_partnerHead, _partnerOrigin, _partnerTrail);
+		if (_partnerTrail == TRAIL_BEAM)
+		{
+			_beams.push_back({ { _partnerOrigin[0], _partnerOrigin[1], _partnerOrigin[2] }, { end[0], end[1], end[2] }, SDL_GetTicks(), _partnerColor, _partnerCalibre });
+		}
+		_lastPartnerShot = nullptr;
+		return;
+	}
+	if (shot.thrown)
+	{
+		return;
+	}
+	Trail trail;
+	Uint8 color;
+	float calibre;
+	trailFor(shot.ammo, shot.weapon, trail, color, calibre);
+	if (inMap) spawnShotImpact(end, origin, trail);
+	if (trail == TRAIL_BEAM)
+	{
+		_beams.push_back({ { origin[0], origin[1], origin[2] }, { end[0], end[1], end[2] }, SDL_GetTicks(), color, calibre });
+	}
+}
+
+/**
  * Follows the shot in flight (the game has one at a time), once per frame: when it changes,
  * the last one has ended (finishShot) and a new one may have begun (beginShot); while it
  * flies, its trail grows (advanceShot).
  */
 void FirstPersonView::followShots()
 {
+	// A view that wasn't drawing a moment ago (the map shown, the aliens' turn watched there, a
+	// screen on top: see LandedShotsCatchUpTime), or a new one, starts from now on: the rounds that
+	// landed meanwhile, and the one it was following, ended unseen (their sparks and beams would
+	// all flash at once).
+	const Uint32 now = SDL_GetTicks();
+	_shotsResumed = !_landedShotsReadAt || now - _landedShotsReadAt > LandedShotsCatchUpTime;
+	_landedShotsReadAt = now;
+	// The rounds that landed since the last frame (Map::noteShotLanded), first: a round that
+	// started and landed between two frames would go by unseen (see landShot). A new battle starts
+	// from now on too.
+	if (_map)
+	{
+		const std::vector<LandedShot> &landed = _map->getLandedShots();
+		const Uint64 total = _map->getLandedShotsTotal(), oldest = total - landed.size();
+		if (_landedShotsSeen > total || _shotsResumed)
+		{
+			_landedShotsSeen = total;
+		}
+		for (Uint64 sequence = std::max(_landedShotsSeen, oldest); sequence < total; ++sequence)
+		{
+			landShot(landed[sequence - oldest]);
+		}
+		_landedShotsSeen = total;
+	}
 	Projectile *projectile = flyingProjectile();
 	if (projectile != _lastProjectile)
 	{
-		finishShot();
+		if (!_shotsResumed) finishShot();
 		if (projectile)
 		{
 			beginShot(projectile);

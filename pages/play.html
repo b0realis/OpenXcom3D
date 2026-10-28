@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Play OpenXcom3D</title>
-<meta name="description" content="Step by step: play the ready builds of OpenXcom3D (OpenXcom Extended with a first-person 3D battlescape) on Linux, Windows, the Steam Deck or macOS, with your own copy of UFO or TFTD.">
+<meta name="description" content="Play OpenXcom3D (OpenXcom Extended with a first-person 3D battlescape): the ready builds on Linux, Windows, the Steam Deck or macOS step by step, then every key, every setting and how it plays, the 3D view's icons, and every feature in pictures.">
 <style>
-/* The build guide's look (index.html): a dark hero, a sticky bar (your system + progress), then one column of numbered steps on a rail; then what to do when something goes wrong. Only the chosen system's steps show. */
+/* The build guide's look (index.html): a dark hero, a sticky bar (the page's parts and a search), then one column of numbered steps on a rail (your system and progress above them: only the chosen system's steps show), what to do when something goes wrong, and the guide (made by tools/make_guide.py between its markers). */
 :root {
   --bg: #f3f5f8;
   --surface: #ffffff;
@@ -233,6 +233,70 @@ footer { border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9r
 footer .col { padding-block: 1.5rem 2.5rem; display: grid; gap: 0.4rem; }
 footer p { margin: 0; }
 
+/* guide:css:begin */
+/* ---------- the bar: sections and search (the system switch sits with the steps) ---------- */
+.jump { display: flex; flex-wrap: wrap; gap: 0.35rem 1rem; font-weight: 700; font-size: 0.95rem; }
+.jump a { text-decoration: none; }
+.find { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 0.95rem; }
+.find input { font: 0.95rem var(--font-body); padding: 0.45rem 0.6rem; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--fg); width: 15rem; max-width: 60vw; }
+.ospanel { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem 1.5rem; margin: 0 0 1rem;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 0.65rem 0.9rem; }
+.part { font-size: 1.9rem; margin: 0 0 0.5rem; }
+/* ---------- the guide ---------- */
+.guide .col { max-width: 64rem; }
+.sec .col { padding-block: 2rem 0.5rem; }
+.sec h2 { font-size: 1.8rem; margin: 0 0 0.5rem; }
+.sec h3 { font-size: 1.15rem; font-family: var(--font-body); margin: 1.6rem 0 0.5rem; }
+.guide .intro { max-width: 46rem; color: var(--muted); margin: 0 0 1rem; }
+.quick { display: grid; gap: 0.45rem; padding-left: 1.3rem; max-width: 46rem; }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 0.9rem 1.1rem; box-shadow: var(--shadow); }
+.card h3 { margin-top: 0.2rem; }
+.card ul { padding-left: 1.1rem; margin: 0; display: grid; gap: 0.35rem; }
+.tag { font: 700 0.72rem/1 var(--font-body); background: var(--accent-soft); color: var(--accent); padding: 0.2rem 0.45rem; border-radius: 999px; vertical-align: middle; }
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table.grid { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
+.grid th, .grid td { text-align: left; vertical-align: top; padding: 0.55rem 0.75rem; border-top: 1px solid var(--line); }
+.grid thead th { border-top: 0; background: var(--sunk); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
+.grid tbody th { width: 13rem; }
+.grid td.k { white-space: nowrap; width: 12rem; }
+.grid td.s { font-weight: 700; width: 12rem; }
+.grid td.c { width: 10rem; color: var(--muted); }
+.grid td.c b { color: var(--fg); }
+.grid td.plays { color: var(--muted); width: 30%; }
+.def { color: var(--muted); }
+.guide kbd { margin: 0.08em 0.1em; }
+.guide figure { margin: 0 0 1rem; }
+.guide figcaption { font-size: 0.85rem; color: var(--muted); margin-top: 0.4rem; }
+.marks { position: relative; }
+.marks img, .shots img, .strip img, .pair img { border-radius: 8px; border: 1px solid var(--line); image-rendering: pixelated; }
+.mark { position: absolute; transform: translate(-50%, -50%); width: 1.7rem; height: 1.7rem; border-radius: 50%; display: grid; place-items: center;
+  background: var(--gold); color: var(--gold-ink); font: 700 0.95rem/1 var(--font-display); box-shadow: 0 0 0 3px rgb(0 0 0 / 0.55); }
+.pair { max-width: 40rem; }
+.legend { display: grid; gap: 0.35rem; padding-left: 1.4rem; max-width: 52rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; list-style: none; padding: 0; margin: 0 0 1rem; }
+.chips li { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 0.25rem 0.75rem; font-size: 0.9rem; }
+.feature { border-top: 1px solid var(--line); padding-top: 0.4rem; margin-top: 1.2rem; }
+.shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(22rem, 100%), 1fr)); gap: 0.75rem; margin: 0.5rem 0 0.75rem; }
+.shots figure.wide { grid-column: 1 / -1; }
+.shots figure { margin: 0; }
+.feature p { max-width: 50rem; margin: 0 0 0.6rem; }
+.meta span { display: inline-block; min-width: 7.5rem; font-weight: 700; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
+.hidden { display: none !important; }
+@media (max-width: 720px) {
+  .two { grid-template-columns: minmax(0, 1fr); }
+  /* the tables' rows as blocks: the key or setting, its choices, what it does, how it plays */
+  .grid thead { display: none; }
+  .grid, .grid tbody, .grid tr, .grid td, .grid tbody th { display: block; width: auto !important; white-space: normal; }
+  .grid tr { border-top: 1px solid var(--line); padding: 0.55rem 0.8rem; }
+  .grid tbody tr:first-child { border-top: 0; }
+  .grid td, .grid tbody th { border-top: 0; padding: 0.1rem 0; }
+  .grid td.k { font-weight: 700; }
+  .grid td.plays:empty { display: none; }
+  .grid td.plays::before { content: "How it plays: "; font-weight: 700; }
+  .mark { width: 1.3rem; height: 1.3rem; font-size: 0.75rem; }
+}
+/* guide:css:end */
 @media (max-width: 720px) {
   .hero .col { grid-template-columns: minmax(0, 1fr); padding-block: 2rem; }
   .step { grid-template-columns: minmax(0, 1fr); }
@@ -250,7 +314,7 @@ footer p { margin: 0; }
   <div class="col">
     <div>
       <h1>Play OpenXcom3D</h1>
-      <p>OpenXcom3D is <b>OpenXcom Extended</b> with a first-person 3D battlescape. The <a href="https://github.com/b0realis/OpenXcom3D/releases/latest">ready builds</a> need no compiling and nothing installed: download one, give it your copy of the original game, and press F8 in a battle. This page walks you through it, for each system.</p>
+      <p>OpenXcom3D is <b>OpenXcom Extended</b> with a first-person 3D battlescape. The <a href="https://github.com/b0realis/OpenXcom3D/releases/latest">ready builds</a> need no compiling and nothing installed: download one, give it your copy of the original game, and press F8 in a battle. This page walks you through it for each system, then has everything for playing: <a href="#keys">every key</a>, <a href="#settings">every setting</a> and how it plays, <a href="#screen">what's on the screen</a> and <a href="#features">every feature</a> in pictures.</p>
       <p>Rather build it yourself? The <a href="./">build guide</a> does that, step by step.</p>
       <ul class="facts">
         <li>About <b>5 minutes</b></li>
@@ -265,8 +329,17 @@ footer p { margin: 0; }
   </div>
 </header>
 
-<nav class="bar gutter" aria-label="Your system and your progress">
+<nav class="bar gutter" aria-label="The page's parts and a search">
   <div class="col">
+    <div class="jump"><a href="#install">Get it running</a><a href="#start">Start</a><a href="#styles">Two ways to play</a><a href="#keys">Keys</a><a href="#screen">On screen</a><a href="#settings">Settings</a><a href="#features">Features</a></div>
+    <label class="find"><span>Find</span><input id="find" type="search" placeholder="a key, a setting, a word" autocomplete="off"></label>
+  </div>
+</nav>
+
+<main class="gutter" id="install">
+  <div class="col">
+    <h2 class="part">Get it running</h2>
+    <div class="ospanel">
     <div class="os-pick">
       <span id="os-label">Play on:</span>
       <div class="seg" role="group" aria-labelledby="os-label">
@@ -280,11 +353,7 @@ footer p { margin: 0; }
       <div class="track" aria-hidden="true"><div class="fill" id="fill"></div></div>
       <output id="count" aria-live="polite">0 of 5 steps done</output>
     </div>
-  </div>
-</nav>
-
-<main class="gutter">
-  <div class="col">
+    </div>
     <p class="intro" data-os="linux">On Linux there are two downloads, the same game in two wrappings: an <b>AppImage</b>, one file to run, and an <b>archive</b> to unpack anywhere. Either runs on any 64-bit Linux from 2021 on (Ubuntu 22.04 and newer, Debian 12, Fedora, Arch and the like) and brings its own libraries. Pick your system in the bar above, and the page shows only its steps.</p>
     <p class="intro" data-os="win">On Windows it's a <b>zip</b>: unpack it into a folder of yours and start <code>play.bat</code>. It runs on 64-bit Windows 10 and 11 and brings its own libraries; nothing is installed.</p>
     <p class="intro" data-os="deck">The Steam Deck runs the Linux download. You set it up once in <b>Desktop Mode</b>, add it to Steam, and play it in <b>Game Mode</b> with a controller layout made for it.</p>
@@ -434,7 +503,7 @@ ln -s "/path/to/XCOM" ~/.local/share/openxcom3d/UFO</pre></div>
             <li>Fire with the left mouse button; <kbd>J</kbd> picks the fire mode, <kbd>R</kbd> reloads, <kbd>G</kbd> switches hands.</li>
             <li><kbd>C</kbd> frees the cursor for the buttons, <kbd>Tab</kbd> goes to the next soldier, <kbd>I</kbd> opens the inventory, <kbd>H</kbd> shows the game's own HUD.</li>
           </ul>
-          <p>Every key and setting (there are many, all under <i>Options → 3D VIEW</i>) is in the <a href="https://github.com/b0realis/OpenXcom3D/blob/main/OpenXcom3D_manual.md">manual</a>.</p>
+          <p>Every key and setting (there are many, all under <i>Options → 3D VIEW</i>) is <a href="#keys">below</a>, with what each means for how you play.</p>
           <label class="check"><input type="checkbox" data-step="5"><span class="tick"></span>I'm in 3D</label>
         </div>
       </li>
@@ -485,10 +554,374 @@ ln -s "/path/to/XCOM" ~/.local/share/openxcom3d/UFO</pre></div>
   </div>
 </section>
 
+<!-- guide:begin -->
+<div class="guide">
+<section id="start" class="sec gutter"><div class="col">
+<h2>Start here</h2>
+<ol class="quick">
+  <li>In a battle press <kbd>F8</kbd>: you're in your soldier's eyes. <kbd>F8</kbd> again goes back to the map, any time.</li>
+  <li>Look with the mouse, walk with <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>: every tile costs its time units, as on the map.</li>
+  <li>Click to fire at the crosshair; <kbd>Z</kbd> <kbd>X</kbd> <kbd>V</kbd> (or the wheel) pick snap, aimed or auto.</li>
+  <li><kbd>C</kbd> frees the cursor to click the buttons; <kbd>H</kbd> brings the map's whole bottom HUD into 3D.</li>
+  <li><kbd>Tab</kbd> goes to the next soldier, <kbd>Backspace</kbd> ends the turn.</li>
+  <li><b>Esc &rarr; Options &rarr; 3D VIEW</b> has the settings and the keys, from the main menu or in a battle.</li>
+</ol>
+</div></section>
+<section id="styles" class="sec gutter"><div class="col">
+<h2>Two ways to play</h2>
+<p class="intro">One setting decides how shots work: <i>Faithful X-COM targeting</i>. Everything else (time units, energy, damage, line of sight, reaction fire, the aliens' minds) is the original game's either way.</p>
+<div class="two">
+  <div class="card">
+    <h3>Faithful X-COM targeting <span class="tag">the default</span></h3>
+    <ul>
+      <li>The game's own accuracy roll; the hit chance shows by the crosshair, as the map's cursor shows it.</li>
+      <li>Shots go for the exact point under the crosshair (or its tile, with <i>Aim at exact point</i> off), from the game's own muzzle points; "No line of fire" where the game says so (the laser shows it dimmed first).</li>
+      <li>The accuracy line: how far a successful roll strays.</li>
+      <li>Snap, aimed and auto as in the game.</li>
+      <li>What you can do from a tile in 3D is what you can do on the map: switching with F8 never changes a shot.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>FPS style <span class="tag">Faithful targeting off</span></h3>
+    <ul>
+      <li>No dice: rounds fly along the crosshair with a spread (firing skill and kneeling tighten it), recoil lifts your aim, the bloom grows as you fire.</li>
+      <li>Each round leaves from your eye, so what you see past a corner, you can hit; and hits whatever is in the way.</li>
+      <li>Quick = a burst, aimed = one tight round, auto = hold the trigger.</li>
+      <li>Rounds fly at a bullet's pace.</li>
+      <li>Your skill decides more, the soldier's less: relaxed, and a different game.</li>
+    </ul>
+  </div>
+</div>
+<h3>Settings that bend the rules a little</h3>
+<p>Each a setting, so you choose: <i>Jump over low obstacles</i> (vault a fence for the walk), <i>Falling</i> (step off a ledge), <i>Lean shots</i> and <i>Lean</i> (shoot from the side of your tile), <i>Full akimbo</i> and <i>Realistic akimbo</i>, <i>Melee hits walls and downed</i>, <i>Force arcing shots</i> and <i>Force blocked shots</i> (as Ctrl on the map), <i>Turning costs TU</i> off (free turns), and the Doom cheats. Everything else only changes what you see.</p>
+</div></section>
+<section id="keys" class="sec gutter"><div class="col">
+<h2>Keys</h2>
+<p class="intro">The defaults: every one can be rebound in <b>Options &rarr; 3D VIEW &rarr; Controls</b> (click its row, press the new key; a right click clears it).</p>
+<h3>Getting around</h3>
+<div class="tablewrap"><table class="grid keys"><thead><tr><th>Key</th><th>What it does</th><th>How it plays</th></tr></thead><tbody>
+<tr class="row"><td class="k"><kbd>F8</kbd></td><td>Switch between the isometric map and 3D (or the ISO/3D button). Back on the map it's centred on your soldier.</td><td class="plays">Switch whenever you like, even mid-turn: the battle is the same one.</td></tr>
+<tr class="row"><td class="k"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></td><td>Walk and step sideways in real time. Each tile costs its normal time units; walking into a door opens it. On a lift or a ladder, or flying, W while looking up climbs and looking down goes down.</td><td class="plays">Free movement can stand you anywhere in a tile, which matters for peeking and lean shots.</td></tr>
+<tr class="row"><td class="k"><kbd>Numpad 8 2 4 6</kbd></td><td>One tile ahead, back, left or right, almost at once, as a step on the map; two together make a diagonal. <kbd>7</kbd> <kbd>9</kbd> snap-turn 45&deg;.</td><td class="plays">Tile-exact moves when you count time units.</td></tr>
+<tr class="row"><td class="k"><kbd>Caps Lock</kbd></td><td>Sprint on/off: every step is the game's run (Ctrl on the map). SPRINT shows under the compass.</td><td class="plays">Three quarters of a walk's time units, half as much energy again: cross open ground fast.</td></tr>
+<tr class="row"><td class="k"><kbd>`</kbd></td><td>En passant on/off: an enemy coming into sight no longer stops the walk (as Shift on the map). ENEMY SPOTTED still shows.</td><td class="plays">Lets you finish a dash, at your own risk.</td></tr>
+<tr class="row"><td class="k"><kbd>Space</kbd></td><td>Jump: a free hop; walking into something low (a fence, a crate, up to waist height) vaults over it.</td><td class="plays">A small bend of the rules (setting <i>Jump over low obstacles</i>).</td></tr>
+<tr class="row"><td class="k"><kbd>Page Up</kbd> <kbd>Page Down</kbd></td><td>Fly up/down with flight on, ride a grav lift, climb a ladder. Purple arrows with LIFT PLATFORM show where a lift goes.</td><td class="plays"></td></tr>
+<tr class="row"><td class="k"><kbd>B</kbd></td><td>Suit flight on/off (flying armor; SWIM under water).</td><td class="plays"></td></tr>
+<tr class="row"><td class="k"><kbd>O</kbd></td><td>Open the door you look at without walking through it, if it's in reach.</td><td class="plays">Look before you step into a room.</td></tr>
+</tbody></table></div>
+<h3>Looking</h3>
+<div class="tablewrap"><table class="grid keys"><thead><tr><th>Key</th><th>What it does</th><th>How it plays</th></tr></thead><tbody>
+<tr class="row"><td class="k">Mouse</td><td>Look around, all but straight up and down; the soldier turns with you for free (or by the rules: <i>Turning costs TU</i>).</td><td class="plays"></td></tr>
+<tr class="row"><td class="k"><kbd>&larr;</kbd> <kbd>&rarr;</kbd> <kbd>&uarr;</kbd> <kbd>&darr;</kbd></td><td>Turn left / right, look up / down.</td><td class="plays"></td></tr>
+<tr class="row"><td class="k"><kbd>Home</kbd></td><td>Look straight ahead, the way the soldier faces (the map's centre key).</td><td class="plays"></td></tr>
+<tr class="row"><td class="k"><kbd>,</kbd> <kbd>.</kbd></td><td>Snap turn 45&deg; left / right.</td><td class="plays"></td></tr>
+<tr class="row"><td class="k"><kbd>1</kbd> &hellip; <kbd>0</kbd></td><td>Turn to visible enemy 1 to 10 (or click the red enemy buttons).</td><td class="plays">Find every alien in sight in one key.</td></tr>
+<tr class="row"><td class="k"><kbd>Left Shift</kbd> + <kbd>A</kbd> / <kbd>D</kbd>, held</td><td>Lean out left / right to peek round a corner. Off until the setting <i>Lean</i> is Peek or Tilt; <i>Lean left</i> and <i>Lean right</i> can also get keys of their own. The eye moves up to six voxels; a shot from a lean leaves from that side.</td><td class="plays">You see the street round the corner; who is seen is still the game's call.</td></tr>
+<tr class="row"><td class="k"><kbd>U</kbd> or the right button, held</td><td>Zoom: the view glides in four times closer (setting <i>Zoom</i>). SCOPING shows how far.</td><td class="plays">Only the picture changes: aim and hit chance stay the same.</td></tr>
+<tr class="row"><td class="k"><kbd>Left Alt</kbd>, held</td><td>Show facing: a ring round every unit in sight with an arrow the way it faces, in its side's colour.</td><td class="plays">Where an alien looks decides whether it reacts to you.</td></tr>
+<tr class="row"><td class="k"><kbd>N</kbd> or <kbd>Scroll Lock</kbd></td><td>Night vision on/off, with night vision gear (Scroll Lock: the game's own key for it).</td><td class="plays"></td></tr>
+<tr class="row"><td class="k"><kbd>F</kbd></td><td>The flashlight on/off (setting <i>Flashlight</i>).</td><td class="plays">Only the 3D view is lit: aliens don't see you any better for it.</td></tr>
+</tbody></table></div>
+<h3>Fighting</h3>
+<div class="tablewrap"><table class="grid keys"><thead><tr><th>Key</th><th>What it does</th><th>How it plays</th></tr></thead><tbody>
+<tr class="row"><td class="k">Left button</td><td>Fire at the crosshair in the current fire mode.</td><td class="plays"></td></tr>
+<tr class="row"><td class="k"><kbd>Wheel</kbd> / <kbd>J</kbd></td><td>Previous / next fire mode: snap, aimed, auto, launch, melee, psi, use, throw, prime.</td><td class="plays"></td></tr>
+<tr class="row"><td class="k"><kbd>Z</kbd> <kbd>X</kbd> <kbd>V</kbd></td><td>Snap / aimed / auto shot.</td><td class="plays">In FPS style: quick = a burst, aimed = one tight round, auto = hold the trigger.</td></tr>
+<tr class="row"><td class="k"><kbd>G</kbd></td><td>Switch hand: right, left, and the built-in weapon, each that gives something to use.</td><td class="plays"></td></tr>
+<tr class="row"><td class="k"><kbd>Y</kbd></td><td>Akimbo off, and the same kind back on; the first time, <i>Realistic akimbo</i> (the settings <i>Full akimbo</i> and <i>Realistic akimbo</i>).</td><td class="plays">Two guns: more rounds, each 30% less accurate. Off to take an aimed shot.</td></tr>
+<tr class="row"><td class="k"><i>Akimbo style</i> (unbound)</td><td>Switch two guns between taking turns round by round and firing at once (<i>Akimbo volley</i>).</td><td class="plays"></td></tr>
+<tr class="row"><td class="k"><kbd>Ctrl</kbd>+<kbd>Shift</kbd> + click</td><td>With a spray weapon's auto shot (X-Com Files' miniguns): mark the spray burst's points, as on the map.</td><td class="plays"></td></tr>
+<tr class="row"><td class="k">Right button</td><td>Cancel the current action, or forget a target marked for <i>Confirm fire</i>; with nothing to cancel, hold to zoom (with a free cursor: hold and drag to look round).</td><td class="plays"></td></tr>
+<tr class="row"><td class="k"><kbd>T</kbd></td><td>Throw a tactical flare (setting <i>Unlimited tactical flares</i>).</td><td class="plays">Lights the 3D view only.</td></tr>
+<tr class="row"><td class="k"><kbd>Insert</kbd></td><td>The Doom cheats off, and the same ones back on.</td><td class="plays"></td></tr>
+</tbody></table></div>
+<h3>The screen</h3>
+<div class="tablewrap"><table class="grid keys"><thead><tr><th>Key</th><th>What it does</th><th>How it plays</th></tr></thead><tbody>
+<tr class="row"><td class="k"><kbd>C</kbd> or the middle button</td><td>Mouse look &harr; free cursor, to click buttons and hover soldiers for their cards. With <i>Middle click identifies</i> a middle click on a unit shows it.</td><td class="plays"></td></tr>
+<tr class="row"><td class="k"><kbd>H</kbd></td><td>The classic HUD on/off: every button of it works in 3D.</td><td class="plays">The map's whole bottom bar, if you prefer it.</td></tr>
+<tr class="row"><td class="k"><kbd>P</kbd></td><td>The 3D HUD on/off, for a clear view (on the map: the map camera on/off).</td><td class="plays"></td></tr>
+<tr class="row"><td class="k"><kbd>F7</kbd></td><td>The frame counter on/off (the game's key).</td><td class="plays"></td></tr>
+</tbody></table></div>
+<h3>The game's own keys, in 3D too</h3>
+<div class="tablewrap"><table class="grid keys"><thead><tr><th>Key</th><th>What it does</th><th>How it plays</th></tr></thead><tbody>
+<tr class="row"><td class="k"><kbd>K</kbd></td><td>Kneel / stand: the view drops to kneeling height.</td><td class="plays">Kneeling steadies the aim, in either style.</td></tr>
+<tr class="row"><td class="k"><kbd>I</kbd></td><td>Inventory.</td><td class="plays"></td></tr>
+<tr class="row"><td class="k"><kbd>R</kbd></td><td>Reload.</td><td class="plays"></td></tr>
+<tr class="row"><td class="k"><kbd>Q</kbd> <kbd>E</kbd></td><td>The left / right hand's action menu.</td><td class="plays"></td></tr>
+<tr class="row"><td class="k"><kbd>L</kbd></td><td>The suit light: the game's personal light for the whole squad.</td><td class="plays">Unlike the flashlight it lights your tiles by the game's rules: aliens see you more easily at night.</td></tr>
+<tr class="row"><td class="k"><kbd>Tab</kbd></td><td>Next soldier; the 3D view looks through them. <i>Previous soldier</i> has no key until you give it one: click &#9664; in the top bar.</td><td class="plays"></td></tr>
+<tr class="row"><td class="k"><kbd>M</kbd></td><td>The minimap, on your soldier.</td><td class="plays"></td></tr>
+<tr class="row"><td class="k"><kbd>Backspace</kbd></td><td>End turn.</td><td class="plays"></td></tr>
+<tr class="row"><td class="k"><kbd>F5</kbd> / <kbd>F9</kbd></td><td>Quick save / load.</td><td class="plays"></td></tr>
+</tbody></table></div>
+<h3>The classic HUD in 3D</h3>
+<p><kbd>H</kbd> shows the game's own bottom HUD over the 3D view with a free cursor; every button works. The map level buttons look 30&deg; up or down, the centre button turns the view back to the way the soldier faces, the red enemy buttons turn the view to that enemy (right click: switch to the soldier who sees it), and a shot picked from a hand's menu becomes the fire mode.</p>
+<h3>On the Steam Deck</h3>
+<p>The controller layout made for OpenXcom3D maps all of this to the Deck's buttons: see <a href="#deck">the Steam Deck steps</a> above.</p>
+</div></section>
+<section id="screen" class="sec gutter"><div class="col">
+<h2>On screen</h2>
+<p class="intro">The 3D view's heads-up display, its icons and its messages.</p>
+<figure class="tour"><div class="marks"><img src="img/guide/hud.png" width="1280" height="800" loading="lazy" alt="The 3D view with its heads-up display: the top bar, the compass, the crosshair with its shot info, the soldier's panel and the weapon in hand.">
+<span class="mark" style="left:11%;top:9%" aria-hidden="true">1</span>
+<span class="mark" style="left:51%;top:9%" aria-hidden="true">2</span>
+<span class="mark" style="left:80%;top:9%" aria-hidden="true">3</span>
+<span class="mark" style="left:85%;top:22%" aria-hidden="true">4</span>
+<span class="mark" style="left:44%;top:46%" aria-hidden="true">5</span>
+<span class="mark" style="left:27%;top:76%" aria-hidden="true">6</span>
+<span class="mark" style="left:66%;top:84%" aria-hidden="true">7</span>
+<span class="mark" style="left:92%;top:61%" aria-hidden="true">8</span>
+</div><figcaption>The heads-up display, numbered below.</figcaption></figure>
+<ol class="legend">
+<li class="row"><b>ISO, HUD, INV.</b> The map and back, the classic HUD, the inventory.</li>
+<li class="row"><b>The squad.</b> Your soldiers in the middle of the top bar: click to select, hover for the card with a live helmet camera, right click for the SOLDIER CAM; &#9664; and &#9654; for the previous and next. A skull marks the dead, a caduceus the unconscious, an orange alien face one under mind control.</li>
+<li class="row"><b>LIGHT, END and the rest.</b> The suit light, the end of the turn, and when the soldier has them NIGHT VISION and SUIT FLY.</li>
+<li class="row"><b>The compass.</b> Your heading under the white arrow, the way the soldier faces (a yellow triangle), and a shot's turn and its cost.</li>
+<li class="row"><b>The crosshair.</b> Its shape is the fire mode; the accuracy line under it; the shot info beside it (mode, hit chance, time units, the other costs below); the name of the unit pointed at under all that.</li>
+<li class="row"><b>The soldier.</b> Rank and name, what matters now (KNEELING, BURNING, WOUNDS, PANIC), a line per hand with its ammo, the four stat bars.</li>
+<li class="row"><b>The weapon in hand.</b> Built in 3D from its inventory picture, its barrel on the line to the crosshair; your shots leave its muzzle.</li>
+<li class="row"><b>The enemies in sight.</b> A red button for each, a red number over its head: click the button, or press 1 to 0, to turn to it.</li>
+</ol>
+<h3>The crosshair: one shape per fire mode, ticks for a hit</h3>
+<figure class="strip"><img src="img/guide/crosshairs.png" width="1280" height="200" loading="lazy" alt="The crosshair's shapes, one per fire mode: snap, aimed, auto, throw, launch, melee, psi, use; and the ticks of a hit and a kill."></figure>
+<ul class="chips">
+<li><b>Snap</b> An open cross</li>
+<li><b>Aimed</b> A scope ring</li>
+<li><b>Auto</b> Brackets, a dot per round</li>
+<li><b>Throw</b> An arc onto a ring</li>
+<li><b>Launch</b> A diamond</li>
+<li><b>Melee</b> Claw marks</li>
+<li><b>Psi</b> Rings spreading out</li>
+<li><b>Use, prime</b> A box</li>
+<li><b>A hit</b> White ticks on the diagonals</li>
+<li><b>A kill</b> Longer red ticks</li>
+</ul>
+<h3>Signs and messages</h3>
+<div class="tablewrap"><table class="grid"><tbody>
+<tr class="row"><th>The crosshair's colour</th><td>Yellow: you can do it. Red: you can't (time units, ammo, range). Purple: psi. Grey: not your move.</td></tr>
+<tr class="row"><th>The shot info</th><td>SNAP 40% 15TU: the fire mode, the hit chance (green; yellow with range or sight penalties; red when it can't be taken) and the time units. With two guns DUAL (round by round), VOLLEY (both at once) or IN TURN (an arcing pair, gun after gun) in front.</td></tr>
+<tr class="row"><th>The other costs</th><td>EN 6 STUN 2 under the shot info: energy, health, stun, morale, mana. A cost you can't pay is red, and the game would refuse the action.</td></tr>
+<tr class="row"><th>The accuracy line</th><td>A green line under the crosshair, a notch up at each end: as far to either side as a successful roll can stray (Faithful targeting), or the spread in FPS style, widening as you fire. Grey when it's not your move.</td></tr>
+<tr class="row"><th>The trajectory</th><td>A light cyan arc for a throw or an arcing shot, a diamond where it lands; a thin red laser for a straight shot, a bright dot where it meets something. Yellow: forced (it goes whatever is in the way). Dim dotted red: the game will refuse it.</td></tr>
+<tr class="row"><th>Unit names</th><td>The unit under the crosshair, by name or race: green X-COM, red aliens, yellow civilians.</td></tr>
+<tr class="row"><th>Downed unit icons</th><td>Over an unconscious body: a flame (burning), a drop (bleeding), a bolt (shock), Zz (out cold).</td></tr>
+<tr class="row"><th>Hitboxes and facing rings</th><td>Outlines of what a shot can really hit (setting <i>Hitboxes</i>); with <kbd>Left Alt</kbd> a ring and arrow round every unit in sight, the way it faces.</td></tr>
+<tr class="row"><th>Enemy markers</th><td>Red numbers over the aliens in sight: the keys 1 to 0 turn to them.</td></tr>
+<tr class="row"><th>Lift arrows</th><td>Purple arrows and LIFT PLATFORM on a grav lift or a ladder: the ways it goes. Arrows left of the compass show where W climbs.</td></tr>
+<tr class="row"><th>Under the compass</th><td>SPRINT (green while running, grey when the soldier can't), EN PASSANT, TURN 1 TU, SHOT +1 TU, NO TU.</td></tr>
+<tr class="row"><th>At the right</th><td>SCOPING 2.6x while zooming.</td></tr>
+<tr class="row"><th>Warnings</th><td>UNSAFE LANDING! PUSH AGAIN at a ledge over ground no one can walk on; the game's own warnings (No Line of Fire!, Out of Range!), on the warning line.</td></tr>
+<tr class="row"><th>Banners</th><td>ENEMY SPOTTED!, HIDDEN MOVEMENT, BURNING, YOU HAVE A MENTAL BREAKDOWN, BERSERK, TURNED INTO A ZOMBIE.</td></tr>
+<tr class="row"><th>Camera cards</th><td>A soldier's helmet camera popping up: TARGETED, HIT, MIND CONTROLLED, FIRING, WATCHING, DECEASED, UNCONSCIOUS. A blinking red dot and now and then a bad signal or static: it's a camera, not your view.</td></tr>
+<tr class="row"><th>The info panel's right side</th><td>DOOM MODE while the cheat is on (IDDQD, IDKFA or both in its place with those); with IDDQD the stats turn silver.</td></tr>
+</tbody></table></div>
+<figure class="pair"><img src="img/guide/trajectory.png" width="1280" height="800" loading="lazy" alt="The trajectory of a throw: a light cyan arc onto a diamond where it lands."><figcaption>The trajectory: a grenade's arc, and where it lands.</figcaption></figure>
+</div></section>
+<section id="settings" class="sec gutter"><div class="col">
+<h2>Settings</h2>
+<p class="intro"><b>Options &rarr; 3D VIEW &rarr; Settings</b>, from the main menu or in a battle: one list there, in this order, grouped here. A left click flips YES / NO or raises a number, a right click lowers it; the default is in bold.</p>
+<h3>Looking and moving</h3>
+<div class="tablewrap"><table class="grid settings"><thead><tr><th>Setting</th><th>Choices</th><th>What it does</th><th>How it plays</th></tr></thead><tbody>
+<tr class="row"><td class="s">Soldier camera preview</td><td class="c"><b>YES</b> / NO</td><td>Hovering a soldier's button shows their card with a live helmet camera. A right click opens their SOLDIER CAM, big.</td><td class="plays">See what each soldier sees without leaving the one you play.</td></tr>
+<tr class="row"><td class="s">Map camera</td><td class="c"><b>Off</b> / Small / Medium / Large</td><td>On the isometric map, the selected soldier's helmet camera in a window at the top left; it turns to your target while you aim.</td><td class="plays">The map with a soldier's eyes beside it: aim on the map, check the view.</td></tr>
+<tr class="row"><td class="s">Mouse sensitivity</td><td class="c">1 to 20 <span class="def">(<b>5</b>)</span></td><td>How fast the view turns with the mouse.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Invert mouse</td><td class="c">YES / <b>NO</b></td><td>Mouse forward looks down, as in a flight simulator.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Field of view</td><td class="c">50 to 110 <span class="def">(<b>75</b>)</span></td><td>How wide the 3D view is, in degrees.</td><td class="plays">Wider shows more around you; narrower makes far targets bigger.</td></tr>
+<tr class="row"><td class="s">Zoom</td><td class="c"><b>YES</b> / NO</td><td>Hold U or the right button to look four times closer.</td><td class="plays">Only the picture: the shot and the hit chance stay the same.</td></tr>
+<tr class="row"><td class="s">Middle click identifies</td><td class="c"><b>YES</b> / NO</td><td>A middle click on a unit opens the game's unit screen, as on the map.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Turning costs TU</td><td class="c">YES / <b>NO</b></td><td>NO: the soldier turns with the view for free. YES: the head turns 45&deg; for free, beyond that the soldier turns at the game's cost, as on the map.</td><td class="plays">YES is the classic rule: facing costs time units and decides reaction fire. NO is relaxed play.</td></tr>
+<tr class="row"><td class="s">Compass</td><td class="c"><b>YES</b> / NO</td><td>A compass at the top right: your heading, the way the soldier faces, and (with turning at a cost) how far the head turns for free.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Movement</td><td class="c"><b>Free</b> / Tiles</td><td>Free: walk anywhere, stepping into the next tile when you cross into it. Tiles: a press walks one tile.</td><td class="plays">Tiles feels like the map; Free lets you stand to one side of a tile (lean shots, peeking).</td></tr>
+<tr class="row"><td class="s">Walking speed</td><td class="c">1 to 8 tiles a second <span class="def">(<b>4</b>)</span></td><td>How fast the soldier walks in 3D. Every tile still costs its time units.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Head bob</td><td class="c"><b>YES</b> / NO</td><td>The view bobs with the soldier's steps.</td><td class="plays">Off if it makes you queasy.</td></tr>
+<tr class="row"><td class="s">Flight cost per level (TU)</td><td class="c">0 to 24 <span class="def">(<b>0</b>)</span></td><td>What a flying (or swimming) soldier pays to rise or sink a level in 3D.</td><td class="plays">The original game charges about 8.</td></tr>
+<tr class="row"><td class="s">Flight cost overrides rules</td><td class="c"><b>YES</b> / NO</td><td>YES: every flyer pays the cost above. NO: each pays its armor's own cost.</td><td class="plays">NO keeps the game's slower flyers slow.</td></tr>
+<tr class="row"><td class="s">Jump over low obstacles</td><td class="c"><b>YES</b> / NO</td><td>Space while walking into something low vaults over it, paying only the walk.</td><td class="plays">Bends the rules a little: on the map a fence makes you walk round.</td></tr>
+<tr class="row"><td class="s">Falling</td><td class="c"><b>YES</b> / NO</td><td>Walk off a ledge and fall to the level below, hurt by the height.</td><td class="plays">A shortcut the map never offers, at the price of the fall.</td></tr>
+<tr class="row"><td class="s">Check the landing</td><td class="c"><b>YES</b> / NO</td><td>A step off a ledge onto ground no one can walk on (a moat, the sea) or where no step leads on stops at the edge: UNSAFE LANDING! PUSH AGAIN.</td><td class="plays">Keeps a soldier out of places they could never leave.</td></tr>
+<tr class="row"><td class="s">Eye height lowered by</td><td class="c">0 to 6 voxels <span class="def">(<b>3</b>)</span></td><td>Sits the 3D camera lower, so rooms feel less cramped. What the soldier sees by the rules doesn't change.</td><td class="plays"></td></tr>
+</tbody></table></div>
+<h3>Shooting</h3>
+<div class="tablewrap"><table class="grid settings"><thead><tr><th>Setting</th><th>Choices</th><th>What it does</th><th>How it plays</th></tr></thead><tbody>
+<tr class="row"><td class="s">Faithful X-COM targeting</td><td class="c"><b>YES</b> / NO</td><td>YES: the game's own accuracy, its hit chance by the crosshair. NO: FPS-style shooting: rounds along the crosshair with a spread, recoil, from your eye.</td><td class="plays">The big choice: see <a href="#styles">Two ways to play</a>.</td></tr>
+<tr class="row"><td class="s">Full akimbo</td><td class="c">YES / <b>NO</b></td><td>A gun in each hand fires both on every shot, the two taking turns round by round, each 30% less accurate, for the dearer gun's shot and a tenth.</td><td class="plays">More rounds for the time units, worse aim; no aimed shots with two guns.</td></tr>
+<tr class="row"><td class="s">Realistic akimbo</td><td class="c">YES / <b>NO</b></td><td>Akimbo, but only with one-handed guns: two pistols fire together, a rifle alone.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Akimbo volley</td><td class="c">YES / <b>NO</b></td><td>NO: two guns take turns round by round, each round resolved before the next. YES: both at once, a volley, their hits landing together.</td><td class="plays">In turns a burst can kill one alien and go on to the next.</td></tr>
+<tr class="row"><td class="s">Lean shots</td><td class="c">YES / <b>NO</b></td><td>Standing to one side of the tile shoots from that side: the game's own off-centre origins.</td><td class="plays">Peek and shoot round a corner (with Faithful targeting; FPS style always shoots from the eye).</td></tr>
+<tr class="row"><td class="s">Lean</td><td class="c"><b>Off</b> / Peek / Tilt</td><td>Left Shift with A or D leans out to peek; Tilt tilts the view too.</td><td class="plays">Shows round corners; a shot from a lean leaves from that side.</td></tr>
+<tr class="row"><td class="s">Melee hits walls and downed</td><td class="c">YES / <b>NO</b></td><td>With no one in reach, a blow strikes the wall, door or object under the crosshair; a blow can hit a body lying in front of you.</td><td class="plays">Break through a wall with a hammer, as the map's terrain melee does in some mods.</td></tr>
+</tbody></table></div>
+<h3>Light, atmosphere and sound</h3>
+<div class="tablewrap"><table class="grid settings"><thead><tr><th>Setting</th><th>Choices</th><th>What it does</th><th>How it plays</th></tr></thead><tbody>
+<tr class="row"><td class="s">Smooth lighting</td><td class="c"><b>YES</b> / NO</td><td>The battle's light blends smoothly from tile to tile. NO: tile by tile, as the map shades it.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Shadows</td><td class="c"><b>YES</b> / NO</td><td>Ray-traced shadows from the sun, lamps and your flashlight, and under every unit.</td><td class="plays">Off on slow machines.</td></tr>
+<tr class="row"><td class="s">Distance haze</td><td class="c"><b>Normal</b> / Light / Clear</td><td>How soon far terrain fades into the haze.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Flashlight</td><td class="c"><b>On</b> / Dynamic / Off</td><td>The 3D view's own light, on F. On: a wide beam from the shoulder, in the dark. Dynamic: a tight spot on the crosshair, day or night.</td><td class="plays">Lights only the 3D view: what the soldiers see by the rules doesn't change.</td></tr>
+<tr class="row"><td class="s">Night vision needs gear</td><td class="c"><b>YES</b> / NO</td><td>Only soldiers with night vision gear (power suits, flying suits...) get NIGHT VISION in 3D. NO: everyone.</td><td class="plays">YES keeps the night dark for the unequipped.</td></tr>
+<tr class="row"><td class="s">Dynamic music</td><td class="c"><b>YES</b> / NO</td><td>Tenser music while aliens are in sight.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Hit, kill and swing sounds</td><td class="c"><b>YES</b> / NO</td><td>A tick for a hit, a double tick for a kill, a swoosh for your swings, and your heartbeat once hurt below half health.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Smoke</td><td class="c"><b>Modern</b> / Original</td><td>Modern: the game's smoke as soft see-through clouds, solid where your soldier can't see through. Original: the games' own smoke animation.</td><td class="plays">Either way units the game hides stay hidden.</td></tr>
+<tr class="row"><td class="s">Unlimited tactical flares</td><td class="c"><b>YES</b> / NO</td><td>T throws a red flare at the crosshair, free and as often as you like.</td><td class="plays">Lights the 3D view only.</td></tr>
+</tbody></table></div>
+<h3>Looks</h3>
+<div class="tablewrap"><table class="grid settings"><thead><tr><th>Setting</th><th>Choices</th><th>What it does</th><th>How it plays</th></tr></thead><tbody>
+<tr class="row"><td class="s">Weapon in hand</td><td class="c"><b>YES</b> / NO</td><td>The weapon in hand at the bottom of the view, built in 3D from its inventory picture, its barrel on the crosshair.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Sprite upscaling</td><td class="c"><b>Smooth + detail</b> / Smooth / Off</td><td>Units, items and effects up close scaled the way pixel art scales well (xBRZ).</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Unit size</td><td class="c">80% to 100% <span class="def">(<b>100%</b>)</span></td><td>Soldiers, aliens, corpses and items drawn a little smaller, so tall sprites fit under low ceilings.</td><td class="plays">Only the picture: what shots hit stays the game's (see <i>Hitboxes</i>).</td></tr>
+<tr class="row"><td class="s">Muzzle flashes</td><td class="c"><b>YES</b> / NO</td><td>Gunfire, hits and blasts flash. NO: no flashes, steady UFO lights, no camera glitches.</td><td class="plays">Off if flashing light bothers you.</td></tr>
+<tr class="row"><td class="s">Particles</td><td class="c"><b>All</b> / Effects / Off</td><td>Effects: sparks, debris, smoke, fire, trails. All: also dust, fireflies, bubbles and weather.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">UFO lights and aura</td><td class="c"><b>YES</b> / NO</td><td>UFOs glow: steady hulls with pulsing lights, their own coloured light, an aura of motes; only once a UFO has been seen.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Ghost opacity</td><td class="c">10% to 100% <span class="def">(<b>50%</b>)</span></td><td>How solid the see-through ghosts look up close (lift pads, ladders, racks, catwalks, sludge); far off 60% of that.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Parts without shape</td><td class="c"><b>Lifts</b> / All / Off</td><td>Parts the map draws with no shape in the game's data, shown as see-through ghosts: ladders, lift pads, the shops' racks, liquid over a floor, the rest of fences and catwalk gratings the game gives only a few voxels.</td><td class="plays">Ghosts are only pictures: shots, sight and walking go through them as the game says.</td></tr>
+<tr class="row"><td class="s">Discreet map edge</td><td class="c">YES / <b>NO</b></td><td>Small red dots along the map's edge instead of the yellow tape.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Pixel size</td><td class="c"><b>Auto</b> / 1 / 2 / 3</td><td>Each ray colours a block of pixels: chunkier, much faster on big screens.</td><td class="plays">Auto: full detail up to 640&times;400, blocks of 2 above.</td></tr>
+</tbody></table></div>
+<h3>Crosshair</h3>
+<div class="tablewrap"><table class="grid settings"><thead><tr><th>Setting</th><th>Choices</th><th>What it does</th><th>How it plays</th></tr></thead><tbody>
+<tr class="row"><td class="s">Crosshair</td><td class="c"><b>YES</b> / NO</td><td>The crosshair; its shape tells the fire mode.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Shot info</td><td class="c"><b>YES</b> / NO</td><td>The fire mode, hit chance and time units right of the crosshair.</td><td class="plays">Yellow: you can; red: you can't.</td></tr>
+<tr class="row"><td class="s">Expanded crosshair info</td><td class="c"><b>YES</b> / NO</td><td>The action's other costs under it: energy, health, stun, morale, mana.</td><td class="plays">The big mods' weapons often cost energy.</td></tr>
+<tr class="row"><td class="s">Accuracy line</td><td class="c"><b>YES</b> / NO</td><td>A green line under the crosshair, as wide as a shot strays to either side: the game's successful roll (Faithful), or the spread (FPS style).</td><td class="plays">With Faithful targeting it is short: a hit strays little, a miss far; the hit chance says how likely each is.</td></tr>
+<tr class="row"><td class="s">Unit names</td><td class="c"><b>YES</b> / NO</td><td>The name of the unit you point at, under the crosshair.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Stat bars</td><td class="c"><b>Scaled</b> / Percentage / Game's own</td><td>How the time units, energy, health and morale bars read, on the map and in 3D. Scaled: one scale for all your units, so a 300-HP unit's bar shows its loss.</td><td class="plays">Two soldiers' bars stay comparable.</td></tr>
+<tr class="row"><td class="s">Aim at exact point</td><td class="c"><b>YES</b> / NO</td><td>Shots go for the exact point under the crosshair (on the open sky, the air on its line). NO: for its tile, as in the original.</td><td class="plays">The game's accuracy applies either way.</td></tr>
+<tr class="row"><td class="s">Show trajectory</td><td class="c"><b>Arcs</b> / All / Off</td><td>While aiming, the path the next throw or shot will take: a cyan arc for throws, a red laser for shots (All).</td><td class="plays">No surprise "No line of fire": a refused shot's laser shows dimmed.</td></tr>
+<tr class="row"><td class="s">Confirm fire</td><td class="c">YES / <b>NO</b></td><td>The first click marks the target and shows its path; a second click fires.</td><td class="plays">Never waste a shot on a slip of the mouse.</td></tr>
+<tr class="row"><td class="s">Force arcing shots</td><td class="c"><b>YES</b> / NO</td><td>An arcing shot the game would refuse fires anyway, as with Ctrl held; its path shows yellow.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Force blocked shots</td><td class="c">YES / <b>NO</b></td><td>A straight shot with no line of fire fires anyway along the line to the crosshair, as with Ctrl held.</td><td class="plays">A round may clear thin cover, or hit it.</td></tr>
+<tr class="row"><td class="s">Shotgun pellets in flight</td><td class="c">YES / <b>NO</b></td><td>A shotgun's pellets fly beside its round, in 3D and on the map.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Each pellet on its own</td><td class="c"><b>YES</b> / NO</td><td>A shotgun's pellets and an akimbo volley's two rounds each land on their own: none lost when the lead pellet leaves the map.</td><td class="plays">OXCE's "shotgun void" closed: shotguns hit as their pellets say.</td></tr>
+<tr class="row"><td class="s">Hitboxes</td><td class="c"><b>Off</b> / Blink / Always</td><td>Outlines round every unit in sight: the voxels a shot can really hit.</td><td class="plays">Sprites are often taller or wider than what can be hit.</td></tr>
+<tr class="row"><td class="s">Glowing outlines</td><td class="c">YES / <b>NO</b></td><td>The hitboxes and a throw's path glow.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Downed unit icons</td><td class="c"><b>Crosshair</b> / Always / Off</td><td>Icons for an unconscious unit: burning, bleeding, shock, out cold.</td><td class="plays">Know whom to carry out first.</td></tr>
+</tbody></table></div>
+<h3>Battle</h3>
+<div class="tablewrap"><table class="grid settings"><thead><tr><th>Setting</th><th>Choices</th><th>What it does</th><th>How it plays</th></tr></thead><tbody>
+<tr class="row"><td class="s">Alien turn in 3D</td><td class="c"><b>YES</b> / NO</td><td>Stay in 3D during the aliens' turn, through your last soldier's eyes. NO: the map for their turn.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Aliens' turn cameras</td><td class="c"><b>YES</b> / NO</td><td>In their turn the view cuts to where the action is: a soldier firing back, the nearest soldier who sees a moving alien; helmet camera cards pop up for soldiers shot at, hit or mind controlled.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Camera when a soldier falls</td><td class="c"><b>YES</b> / NO</td><td>With <i>Aliens' turn cameras</i>, in their turn: a soldier going down out of view pops up their helmet camera card, DECEASED or UNCONSCIOUS.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Start battles in 3D</td><td class="c">YES / <b>NO</b></td><td>Begin every battle in the first-person view.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Doom mode (debug)</td><td class="c">YES / <b>NO</b></td><td>A cheat: in 3D the selected soldier never runs out of time units or energy; grenades go off in real time.</td><td class="plays">For testing and fun, a first step towards real time.</td></tr>
+<tr class="row"><td class="s">Doom IDKFA</td><td class="c">YES / <b>NO</b></td><td>Doom mode plus endless ammo.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Doom IDDQD</td><td class="c">YES / <b>NO</b></td><td>Doom mode plus invincible soldiers.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Doom prime on throw</td><td class="c"><b>YES</b> / NO</td><td>In Doom mode a grenade is armed as you throw it. NO: priming pulls the pin, and the fuse burns in your hand.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Doom free grenades with airburst</td><td class="c">YES / <b>NO</b></td><td>In Doom mode a grenade flies wherever the crosshair points and bursts in the air if its fuse runs out.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Doom grenade fuse (seconds)</td><td class="c">1 to 5 <span class="def">(<b>3</b>)</span></td><td>In Doom mode, how long a grenade burns.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">Frame rate limit</td><td class="c">60 to 240, unlimited <span class="def">(<b>60</b>)</span></td><td>The game's own frame rate cap.</td><td class="plays">Raise it for a 120 or 144 Hz screen if your computer keeps up.</td></tr>
+<tr class="row"><td class="s">Frame counter</td><td class="c">YES / <b>NO</b></td><td>The game's frames-per-second counter (as F7).</td><td class="plays"></td></tr>
+</tbody></table></div>
+</div></section>
+<section id="features" class="sec gutter"><div class="col">
+<h2>Features</h2>
+<p class="intro">What there is to do in 3D, how it plays, and what it looks like.</p>
+<article class="feature row" id="f-aim"><h3>Aiming, by the crosshair</h3>
+<div class="shots"><figure><a href="img/guide/sky_edge.png"><img src="img/guide/sky_edge.png" width="1280" height="800" loading="lazy" alt="On the open sky at the map's edge, the laser runs to the crosshair and the hit chance shows"></a><figcaption>On the open sky at the map's edge, the laser runs to the crosshair and the hit chance shows</figcaption></figure><figure><a href="img/guide/peek_fps.png"><img src="img/guide/peek_fps.png" width="1280" height="800" loading="lazy" alt="FPS style: leaning out past a wall's end, the round leaves from the eye"></a><figcaption>FPS style: leaning out past a wall's end, the round leaves from the eye</figcaption></figure></div>
+<p>With <i>Aim at exact point</i> a shot goes for the very voxel under the crosshair, or on the open sky for the air on its line. If the line from the gun is blocked, the game's other muzzle points are tried (left and right with OXCE's <i>Off-centre shooting</i>), then the game's own aim, as a click on the map does. The laser (<i>Show trajectory: All</i>) shows the line that will fire.</p>
+<p class="meta"><span>Keys</span> Left button, <kbd>Z</kbd> <kbd>X</kbd> <kbd>V</kbd>, wheel</p>
+<p class="meta"><span>How it plays</span> With Faithful targeting it is the map's rules with a finer click. In FPS style the round leaves from your eye: what you see past a corner, you can hit.</p>
+</article>
+<article class="feature row" id="f-line"><h3>The accuracy line</h3>
+<div class="shots"><figure class="wide"><a href="img/guide/accuracy_line.png"><img src="img/guide/accuracy_line.png" width="1280" height="400" loading="lazy" alt="The game's own targeting (left): a short line, as far as a hit strays. FPS style (right): the spread of a burst"></a><figcaption>The game's own targeting (left): a short line, as far as a hit strays. FPS style (right): the spread of a burst</figcaption></figure></div>
+<p>A green line under the crosshair, a notch up at each end, as wide as a round can land to either side. With Faithful targeting: the farthest a successful roll can send the round, by the game's own roll. In FPS style: the spread 95% of the rounds land in, widening with the bloom as you fire.</p>
+<p class="meta"><span>How it plays</span> A successful roll in X-COM strays little, mostly sideways; a miss strays far. The line shows the first, the hit chance how often you get it.</p>
+</article>
+<article class="feature row" id="f-akimbo"><h3>Akimbo</h3>
+<div class="shots"><figure><a href="img/guide/ufo_akimbo_both_lasers.png"><img src="img/guide/ufo_akimbo_both_lasers.png" width="1280" height="800" loading="lazy" alt="Two laser pistols, both lasers showing"></a><figcaption>Two laser pistols, both lasers showing</figcaption></figure><figure><a href="img/guide/ufo_akimbo_on_the_map.png"><img src="img/guide/ufo_akimbo_on_the_map.png" width="1280" height="800" loading="lazy" alt="Akimbo on the map: two mini targets in each hand's box, in turn"></a><figcaption>Akimbo on the map: two mini targets in each hand's box, in turn</figcaption></figure></div>
+<p>A gun in each hand fires both (<i>Full</i> or <i>Realistic akimbo</i>): round by round in turn, or at once as a volley, each its own burst, each 30% less accurate, for the dearer gun's shot and a tenth. On the map Ctrl+Shift+click a hand's weapon marks the pair.</p>
+<p class="meta"><span>Keys</span> <kbd>Y</kbd>, <i>Akimbo style</i>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click on the map</p>
+<p class="meta"><span>How it plays</span> More rounds for your time units, worse aim; no aimed shots with two guns. In turn a burst can drop one alien and go on to the next.</p>
+</article>
+<article class="feature row" id="f-lean"><h3>Lean and peek</h3>
+<div class="shots"><figure><a href="img/guide/lean_tilt.png"><img src="img/guide/lean_tilt.png" width="1280" height="800" loading="lazy" alt="Leaning out with Tilt, round a corner"></a><figcaption>Leaning out with Tilt, round a corner</figcaption></figure></div>
+<p>The eye moves up to six voxels to the side and a little lower, stopping short of walls and of anyone in sight; with Tilt the view tilts too. A shot from a lean leaves from that side: the game's own off-centre point (Faithful) or your eye (FPS style).</p>
+<p class="meta"><span>Keys</span> <kbd>Left Shift</kbd> + <kbd>A</kbd> / <kbd>D</kbd></p>
+<p class="meta"><span>How it plays</span> You see the street round the corner, but who is spotted is still the game's call: a peek never shows a hidden alien.</p>
+</article>
+<article class="feature row" id="f-move"><h3>Walking, jumping, falling</h3>
+<div class="shots"><figure><a href="img/guide/landing_warning.png"><img src="img/guide/landing_warning.png" width="1280" height="800" loading="lazy" alt="TFTD, Check the landing: a step towards the sea stops at the edge, UNSAFE LANDING! PUSH AGAIN"></a><figcaption>TFTD, Check the landing: a step towards the sea stops at the edge, UNSAFE LANDING! PUSH AGAIN</figcaption></figure><figure><a href="img/guide/sprint_dusk.png"><img src="img/guide/sprint_dusk.png" width="1280" height="800" loading="lazy" alt="Sprinting down a street at dusk"></a><figcaption>Sprinting down a street at dusk</figcaption></figure></div>
+<p>Walk freely or tile by tile, every tile at its time units. Space vaults low obstacles; walking off a ledge falls to the level below, hurt by the height. A step onto ground no one can walk on, or where no step leads on, asks first.</p>
+<p class="meta"><span>Keys</span> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>, numpad, <kbd>Space</kbd>, <kbd>Caps Lock</kbd>, <kbd>`</kbd></p>
+<p class="meta"><span>How it plays</span> Falls and vaults are shortcuts the map doesn't have (each a setting). Sprint costs less time and more energy; en passant keeps walking when an enemy shows up.</p>
+</article>
+<article class="feature row" id="f-fly"><h3>Lifts, ladders and flight</h3>
+<div class="shots"><figure><a href="img/guide/ufo_flight_climb_arrow.png"><img src="img/guide/ufo_flight_climb_arrow.png" width="1280" height="800" loading="lazy" alt="A flying suit: the arrow left of the compass lit yellow, W climbs"></a><figcaption>A flying suit: the arrow left of the compass lit yellow, W climbs</figcaption></figure></div>
+<p>Ride a grav lift, climb a ladder, fly with SUIT FLY on: W looking up climbs, looking down sinks, each level paid as on the map. Purple arrows show the ways.</p>
+<p class="meta"><span>Keys</span> <kbd>Page Up</kbd> <kbd>Page Down</kbd>, <kbd>B</kbd>, <kbd>W</kbd> looking up</p>
+</article>
+<article class="feature row" id="f-doors"><h3>Doors</h3>
+<p>Doors open as you walk into them, or with O from where you stand (the one you look at). They swing to where the game has them; UFO doors slide. Glass doors are seen through, while they swing too.</p>
+<p class="meta"><span>Keys</span> <kbd>O</kbd>, or walk into it</p>
+<p class="meta"><span>How it plays</span> Open a door without stepping into the room behind it.</p>
+</article>
+<article class="feature row" id="f-melee"><h3>Melee, medi-kits and items</h3>
+<div class="shots"><figure><a href="img/guide/ufo_medikit_teammate.png"><img src="img/guide/ufo_medikit_teammate.png" width="1280" height="800" loading="lazy" alt="A medi-kit by the crosshair: USE: and the teammate's name"></a><figcaption>A medi-kit by the crosshair: USE: and the teammate's name</figcaption></figure></div>
+<p>Melee strikes what's under the crosshair: a blow swings, lunges and jolts. A medi-kit treats whoever you look at, next to you; aiming at nothing, yourself. The motion scanner and the mind probe go straight to their screens; priming opens the timer at once.</p>
+<p class="meta"><span>Keys</span> Left button in the melee or use mode</p>
+</article>
+<article class="feature row" id="f-throw"><h3>Throwing and grenades</h3>
+<div class="shots"><figure><a href="img/guide/airburst.png"><img src="img/guide/airburst.png" width="1280" height="800" loading="lazy" alt="Doom free grenades: an airburst over a field"></a><figcaption>Doom free grenades: an airburst over a field</figcaption></figure></div>
+<p>Anything in a hand can be thrown along the game's arc (the cyan path shows it). In Doom mode grenades burn in real time, and with free grenades fly wherever the crosshair points and burst in the air.</p>
+<p class="meta"><span>Keys</span> Fire mode throw or prime; <kbd>T</kbd> for a flare</p>
+</article>
+<article class="feature row" id="f-zoom"><h3>Zoom</h3>
+<div class="shots"><figure><a href="img/guide/scope_night.png"><img src="img/guide/scope_night.png" width="1280" height="800" loading="lazy" alt="SCOPING at night, the blue scope cross on the crosshair"></a><figcaption>SCOPING at night, the blue scope cross on the crosshair</figcaption></figure></div>
+<p>The view glides in four times closer, the weapon lowers, the mouse slows.</p>
+<p class="meta"><span>Keys</span> <kbd>U</kbd> or the right button, held</p>
+<p class="meta"><span>How it plays</span> Only the picture: the shot and its odds don't change.</p>
+</article>
+<article class="feature row" id="f-light"><h3>Light and night</h3>
+<div class="shots"><figure><a href="img/guide/night_vision_laser.png"><img src="img/guide/night_vision_laser.png" width="1280" height="800" loading="lazy" alt="Night vision: the laser sight light in the goggles"></a><figcaption>Night vision: the laser sight light in the goggles</figcaption></figure></div>
+<p>Your flashlight (on F, wide or a tight spot on the crosshair), night vision with the gear for it, red tactical flares, and the game's suit light (L).</p>
+<p class="meta"><span>Keys</span> <kbd>F</kbd>, <kbd>N</kbd>, <kbd>T</kbd>, <kbd>L</kbd></p>
+<p class="meta"><span>How it plays</span> The flashlight and flares light only your view; the suit light is the game's, and lets aliens see your soldiers at night.</p>
+</article>
+<article class="feature row" id="f-smoke"><h3>Smoke</h3>
+<div class="shots"><figure><a href="img/guide/smoke.png"><img src="img/guide/smoke.png" width="1280" height="800" loading="lazy" alt="Modern smoke: soft see-through clouds, solid where the soldier can't see through"></a><figcaption>Modern smoke: soft see-through clouds, solid where the soldier can't see through</figcaption></figure></div>
+<p>Modern: the game's smoke as soft clouds you see through, solid where your soldier can't see through by the game's sight rules. Original: the games' own animation, stacked thick there. Heat vision sees smoke thinner.</p>
+<p class="meta"><span>How it plays</span> What you see through matches what your soldier sees through.</p>
+</article>
+<article class="feature row" id="f-cams"><h3>Helmet cameras</h3>
+<div class="shots"><figure><a href="img/guide/soldier_cam_dusk.png"><img src="img/guide/soldier_cam_dusk.png" width="1280" height="800" loading="lazy" alt="A SOLDIER CAM at dusk"></a><figcaption>A SOLDIER CAM at dusk</figcaption></figure><figure><a href="img/guide/map_camera.png"><img src="img/guide/map_camera.png" width="1280" height="800" loading="lazy" alt="The map camera on the isometric map"></a><figcaption>The map camera on the isometric map</figcaption></figure></div>
+<p>Every soldier's helmet camera, live: on their card, big as the SOLDIER CAM, or over the map (setting <i>Map camera</i>), with a blinking red dot, now and then a bad signal or static, worse on hard missions.</p>
+<p class="meta"><span>Keys</span> Hover a soldier's button; right click for the SOLDIER CAM; <kbd>P</kbd> on the map</p>
+<p class="meta"><span>How it plays</span> See what each soldier sees; aim on the map with a soldier's eyes beside it.</p>
+</article>
+<article class="feature row" id="f-aliens"><h3>The aliens' turn</h3>
+<div class="shots"><figure><a href="img/guide/under_fire.png"><img src="img/guide/under_fire.png" width="1280" height="800" loading="lazy" alt="Under fire in the aliens' turn"></a><figcaption>Under fire in the aliens' turn</figcaption></figure></div>
+<p>Stay in 3D for the aliens' turn: the view cuts to a soldier firing back or to the nearest one who sees a moving alien; camera cards pop up for soldiers shot at, hit, mind controlled or going down.</p>
+<p class="meta"><span>How it plays</span> Watch the reaction fire you set up.</p>
+</article>
+<article class="feature row" id="f-ghosts"><h3>Ghosts: lifts, racks, catwalks, sludge</h3>
+<div class="shots"><figure><a href="img/guide/ufo_shop_racks.png"><img src="img/guide/ufo_shop_racks.png" width="1280" height="800" loading="lazy" alt="UFO's shop racks as ghosts in their real shape, at Ghost opacity"></a><figcaption>UFO's shop racks as ghosts in their real shape, at Ghost opacity</figcaption></figure><figure><a href="img/guide/piratez_catwalk.png"><img src="img/guide/piratez_catwalk.png" width="1280" height="800" loading="lazy" alt="XPiratez: a catwalk's grating overhead, its rest a ghost"></a><figcaption>XPiratez: a catwalk's grating overhead, its rest a ghost</figcaption></figure><figure><a href="img/guide/piratez_sludge.png"><img src="img/guide/piratez_sludge.png" width="1280" height="800" loading="lazy" alt="XPiratez: the sewer's sludge, a soldier wading in it to the thighs"></a><figcaption>XPiratez: the sewer's sludge, a soldier wading in it to the thighs</figcaption></figure></div>
+<p>Some parts the map draws have no shape, or only a few voxels, in the game's data. They show as see-through ghosts of their art: ladders and lift pads, the shops' racks, the rest of fences, railings and catwalk gratings, and the surface of liquid over a floor (XPiratez's sewers). The game's own voxels stay solid.</p>
+<p class="meta"><span>How it plays</span> Ghosts are pictures: shots, sight and walking go through them as the game says. Set how solid with <i>Ghost opacity</i>.</p>
+</article>
+<article class="feature row" id="f-sea"><h3>The sea</h3>
+<div class="shots"><figure><a href="img/guide/tftd_sea_past_the_edge.png"><img src="img/guide/tftd_sea_past_the_edge.png" width="1280" height="800" loading="lazy" alt="TFTD: the sea rolling in waves past an island's edge"></a><figcaption>TFTD: the sea rolling in waves past an island's edge</figcaption></figure></div>
+<p>Terror From The Deep's sea rolls in waves, and where it reaches the map's edge it goes on past it.</p>
+</article>
+<article class="feature row" id="f-shotguns"><h3>Shotguns</h3>
+<div class="shots"><figure><a href="img/guide/shotgun_pellets_map.png"><img src="img/guide/shotgun_pellets_map.png" width="1280" height="800" loading="lazy" alt="Pellets in flight on the map"></a><figcaption>Pellets in flight on the map</figcaption></figure></div>
+<p>Every pellet lands on its own (<i>Each pellet on its own</i>), and with <i>Shotgun pellets in flight</i> each flies beside the round and hits as it gets there.</p>
+<p class="meta"><span>How it plays</span> No more "shotgun void": a miss by the lead pellet no longer takes the whole blast with it.</p>
+</article>
+<article class="feature row" id="f-bars"><h3>Stat bars</h3>
+<div class="shots"><figure class="wide"><a href="img/guide/stat_bars.png"><img src="img/guide/stat_bars.png" width="1280" height="220" loading="lazy" alt="A soldier at 60 morale of 100: the game's own bars (left), morale full; Scaled (right), what's gone shows"></a><figcaption>A soldier at 60 morale of 100: the game's own bars (left), morale full; Scaled (right), what's gone shows</figcaption></figure></div>
+<p>Bars that read: with <i>Scaled</i> a stat whose longest maximum won't fit shrinks for all your units alike, on the map and in 3D.</p>
+<p class="meta"><span>How it plays</span> Two soldiers' bars stay comparable.</p>
+</article>
+<article class="feature row" id="f-perf"><h3>Performance</h3>
+<p><i>Pixel size</i> 2 or 3 colours a block of pixels per ray, much faster on big screens; <i>Shadows</i> and <i>Particles</i> off help slow machines; the frame rate cap is the game's own.</p>
+</article>
+</div></section>
+</div>
+<!-- guide:end -->
+
 <footer class="gutter">
   <div class="col">
     <p>OpenXcom3D adds a first-person 3D battlescape to OpenXcom Extended: <a href="https://github.com/b0realis/OpenXcom3D">github.com/b0realis/OpenXcom3D</a>. OXCE: <a href="https://github.com/MeridianOXC/OpenXcom">github.com/MeridianOXC/OpenXcom</a>. Both are GPL 3.</p>
-    <p>To compile it yourself: the <a href="./">build guide</a>. Every key and setting: the <a href="https://github.com/b0realis/OpenXcom3D/blob/main/OpenXcom3D_manual.md">manual</a>.</p>
+    <p>To compile it yourself: the <a href="./">build guide</a>. The whole story of every key, setting and version: the <a href="https://github.com/b0realis/OpenXcom3D/blob/main/OpenXcom3D_manual.md">manual</a>.</p>
   </div>
 </footer>
 
@@ -572,5 +1005,22 @@ ln -s "/path/to/XCOM" ~/.local/share/openxcom3d/UFO</pre></div>
   });
 })();
 </script>
+<!-- guide:script:begin -->
+<script>
+/* Find: shows only the rows, legend lines and feature cards that have every word typed (nothing is stored). */
+(function () {
+  var input = document.getElementById('find');
+  var rows = Array.prototype.slice.call(document.querySelectorAll('.row'));
+  input.addEventListener('input', function () {
+    var words = input.value.toLowerCase().split(/\s+/).filter(Boolean);
+    rows.forEach(function (row) {
+      var text = row.textContent.toLowerCase();
+      var shown = words.every(function (word) { return text.indexOf(word) >= 0; });
+      row.classList.toggle('hidden', !shown);
+    });
+  });
+})();
+</script>
+<!-- guide:script:end -->
 </body>
 </html>

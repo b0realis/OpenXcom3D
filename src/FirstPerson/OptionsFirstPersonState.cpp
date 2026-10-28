@@ -312,6 +312,12 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		{
 			return std::to_string(*option.asInt()) + "%";
 		}
+		// The stat bars are a choice of three, shown by name.
+		if (option.id() == "fpsStatBars")
+		{
+			static const char *const statBarNames[] = { "STR_FPS_STAT_BARS_GAME", "STR_FPS_STAT_BARS_SCALED", "STR_FPS_STAT_BARS_PERCENT" };
+			return std::string(tr(statBarNames[std::clamp(*option.asInt(), 0, 2)]));
+		}
 		// Hitboxes are a choice of three, shown by name.
 		if (option.id() == "fpsHitboxes")
 		{
@@ -535,6 +541,11 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		else if (value == &Options::fpsUnitSize)
 		{
 			*value = std::clamp(*value + 5 * direction, 80, 100);
+		}
+		// The stat bars (the game's own, scaled, percentage): round and round.
+		else if (value == &Options::fpsStatBars)
+		{
+			*value = (*value + direction + 3) % 3;
 		}
 		// Hitboxes (off, blink, always): round and round.
 		else if (value == &Options::fpsHitboxes)

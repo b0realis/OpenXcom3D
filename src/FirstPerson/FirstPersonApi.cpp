@@ -254,6 +254,10 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlightCostOverride", &fpsFlightCostOverride, true, "STR_FPS_FLIGHT_COST_OVERRIDE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsVault", &fpsVault, true, "STR_FPS_VAULT", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFalling", &fpsFalling, true, "STR_FPS_FALLING", category));
+	// A step off a ledge onto ground no one can walk on, or where no step leads out (a player's
+	// report: X-Com Files' blood moat, which the map never lets a soldier into, soft-locked one),
+	// stops at the edge with a warning; pushing that way again (or jumping) goes over.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSafeLanding", &fpsSafeLanding, true, "STR_FPS_SAFE_LANDING", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsEyeLower", &fpsEyeLower, 3, "STR_FPS_EYE_LOWER", category));
 	// Shooting: the game's own accuracy (YES) or FPS-style shooting along the crosshair (NO), and
 	// firing a gun in each hand at once (akimbo): any two guns (full), or one-handed guns only
@@ -329,8 +333,16 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshair", &fpsCrosshair, true, "STR_FPS_CROSSHAIR", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshairInfo", &fpsCrosshairInfo, true, "STR_FPS_CROSSHAIR_INFO", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshairCosts", &fpsCrosshairCosts, true, "STR_FPS_CROSSHAIR_COSTS", category));
+	// A line under the crosshair as wide as a shot strays to either side: with the game's own
+	// targeting, as far as a successful accuracy roll sends it at that range; in FPS style, the spread.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsAccuracyLine", &fpsAccuracyLine, true, "STR_FPS_ACCURACY_LINE", category));
 	// The name of the unit under the crosshair (or the free cursor), as the game names it.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsUnitNames", &fpsUnitNames, true, "STR_FPS_UNIT_NAMES", category));
+	// How the stat bars read, on the map and in 3D (a player's report: a 300-HP unit's bar looked
+	// full with a third of its health gone): the game's own (0: a pixel per point, cut off at the
+	// bar's end), scaled (1: a stat shrinks for all of the player's units alike when a maximum is
+	// longer than the bar, on the map and in 3D), or percentage (2: each bar full at its maximum).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsStatBars", &fpsStatBars, 1, "STR_FPS_STAT_BARS", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsAimExact", &fpsAimExact, true, "STR_FPS_AIM_EXACT", category));
 	// The path a throw or shot would take, drawn while aiming: off (0), throws and arcing
 	// shots (1), every shot too (2); and confirm fire: the first click marks the target and
@@ -490,6 +502,20 @@ void freeAimTarget(BattlescapeState *state, const BattleAction &action, Position
 }
 
 /**
+ * Called by the game as it works out where a shot leaves from (TileEngine::getOriginVoxel): an
+ * FPS-style straight shot leaves from where the first-person view's eye is across the soldier's
+ * tile, at the game's gun height (see FirstPersonMode::freeAimFrom). Nothing changes for any
+ * other shot, or while the 3D view isn't showing.
+ * @param state The battlescape screen.
+ * @param action The shot.
+ * @param origin The game's origin, in voxels; changed in place.
+ */
+void freeAimOrigin(BattlescapeState *state, const BattleAction &action, Position &origin)
+{
+	FirstPersonMode::freeAimFrom(state, action, origin);
+}
+
+/**
  * Called by the game when a close-quarters check knocks a shot aside: the 3D view looks where
  * the shot now goes (see FirstPersonMode::followDeflectedShot).
  * @param state The battlescape screen.
@@ -535,6 +561,20 @@ bool pelletsInFlight(BattlescapeState *state)
 bool eachPellet(BattlescapeState *state)
 {
 	return FirstPersonMode::eachPellet(state);
+}
+
+/**
+ * Called by the game as it fills the map's stat bars (the 3D view's are filled the same way): the scale to draw one at (see
+ * FirstPersonMode::statBarScale).
+ * @param state The battlescape screen.
+ * @param stat Which stat (StatBar).
+ * @param maximum The unit's maximum of it.
+ * @param barWidth The bar's width, in pixels.
+ * @return Pixels per point.
+ */
+double statBarScale(BattlescapeState *state, int stat, int maximum, int barWidth)
+{
+	return FirstPersonMode::statBarScale(state, stat, maximum, barWidth);
 }
 
 /**

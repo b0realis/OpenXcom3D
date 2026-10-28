@@ -8,7 +8,7 @@
 
 **Both games are supported,** *UFO: Enemy Unknown* and *X-COM: Terror From The Deep*, and the big mods built on OXCE run in it too (XPiratez is played and tested here).
 
-> **▶ [How to play it](https://b0realis.github.io/OpenXcom3D/play.html)**: the ready builds on Linux, Windows, the Steam Deck and macOS, step by step, and where your UFO and TFTD data goes.
+> **▶ [How to play it](https://b0realis.github.io/OpenXcom3D/play.html)**: the ready builds on Linux, Windows, the Steam Deck and macOS, step by step, and where your UFO and TFTD data goes; then [every key](https://b0realis.github.io/OpenXcom3D/play.html#keys), [every setting](https://b0realis.github.io/OpenXcom3D/play.html#settings) and what it means for how you play, what's on the screen, and every feature in pictures.
 >
 > **⚙ [How to build it](https://b0realis.github.io/OpenXcom3D/)**: compile it from source on Linux, on Windows, or for Windows on Linux.
 >
@@ -45,6 +45,15 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 - **Akimbo on the map:** **Ctrl+Shift+click** a hand's weapon to fire both guns from the isometric map too, both at once (a mini target by each gun) or in turn (two), kept in the save.
 - **The sea in waves:** TFTD's sea rolls in waves in its own colours, and where it reaches the map's edge it goes on past it instead of the island's grass.
 - **Rooms in their own light:** indoors no sun shading any more, so inside walls look as on the map (a shop's grey wall came out black).
+
+Re-released on 2026-10-28 with seven more play reports and a bug hunt folded in:
+
+- **Aiming at the fringes:** on the open sky a shot goes for the air on the crosshair's line (at the map's edge it went off sideways), past a corner the game's own aim tries OXCE's left and right muzzle points too, and FPS-style shots leave from your eye, so what you see you can hit. With the game's own targeting the rules stay the map's.
+- **Accuracy line:** a green line under the crosshair, as wide as a shot strays to either side: the game's own roll, or FPS style's spread.
+- **Stat bars that read:** a 300-HP unit's bar no longer looks full with a third gone; scaled alike for all your units, on the map and in 3D.
+- **Check the landing:** a step off a ledge onto ground no one can walk on (a moat, the sea) warns first; push again to go.
+- **Sludge you wade through, catwalks that show:** XPiratez's sewer sludge has a surface at thigh height; catwalk gratings, railings and chain-link fences the game gives only a few voxels show their whole art as see-through ghosts; every ghost at *Ghost opacity*.
+- **Fixes:** a light minigun's rounds leave holes, glass doors stay see-through as they swing, the heartbeat only once hurt this battle, the map's cursor after a shot in 3D, no late flash of old shots after the map, and more.
 
 ## Earlier versions
 

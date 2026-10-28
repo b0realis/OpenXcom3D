@@ -629,7 +629,8 @@ void FirstPersonMode::updateInfoPanel(BattleUnit *unit)
 	}
 	fillHandLine(_txtWeapon, _txtWeaponAmmo, unit, weapon, weapon && weapon == _fireModeWeapon ? firedAs(weapon, _fireMode) : BA_NONE, true);
 	fillHandLine(_txtOtherWeapon, _txtOtherAmmo, unit, otherItem, BA_NONE, otherItem && otherItem == offHandWeapon(unit, weapon));
-	// The four stats, each as a number and as a bar measured against the soldier's maximum.
+	// The four stats, each as a number and as a bar measured against the soldier's maximum (its
+	// scale by the setting "Stat bars", see statBarScale).
 	_numTimeUnits->setValue(unit->getTimeUnits());
 	_barTimeUnits->setMax(unit->getBaseStats()->tu);
 	_barTimeUnits->setValue(unit->getTimeUnits());
@@ -643,6 +644,12 @@ void FirstPersonMode::updateInfoPanel(BattleUnit *unit)
 	_numMorale->setValue(unit->getMorale());
 	_barMorale->setMax(100);
 	_barMorale->setValue(unit->getMorale());
+	const int panelMaxima[4] = { unit->getBaseStats()->tu, unit->getBaseStats()->stamina, unit->getBaseStats()->health, 100 };
+	Bar *panelBars[4] = { _barTimeUnits, _barEnergy, _barHealth, _barMorale };
+	for (int stat = 0; stat < 4; ++stat)
+	{
+		panelBars[stat]->setScale(statBarScale(_state, stat, panelMaxima[stat], panelBars[stat]->getWidth()));
+	}
 
 	// Doom IDDQD: an invincible soldier's stats are silver; otherwise in their own colours.
 	const bool silver = invincible(_state, unit);
@@ -1222,6 +1229,7 @@ void FirstPersonMode::updateSoldierCard()
 		_cardNumbers[stat]->setValue(values[stat]);
 		_cardBars[stat]->setMax(maxima[stat]);
 		_cardBars[stat]->setValue(values[stat]);
+		_cardBars[stat]->setScale(statBarScale(_state, stat, maxima[stat], _cardBars[stat]->getWidth()));
 	}
 	_cardBars[2]->setValue2(unit->getStunlevel());
 

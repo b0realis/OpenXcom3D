@@ -127,6 +127,8 @@ public:
 
 	/// An FPS-style shot's next round, asked for by the game (see FirstPerson::freeAimTarget).
 	static void freeAim(BattlescapeState *state, const BattleAction &action, Position &target);
+	/// Where an FPS-style straight shot leaves from, asked by the game (see FirstPerson::freeAimOrigin).
+	static void freeAimFrom(BattlescapeState *state, const BattleAction &action, Position &origin);
 	/// Should this shot's bullet hits play quicker (an FPS-style shot of ours)?
 	static bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
 	/// Do a shotgun's pellets fly beside its round (setting "Shotgun pellets in flight", the 3D view showing)?
@@ -139,6 +141,8 @@ public:
 	static void mapAkimbo(BattlescapeState *state, BattleAction &action);
 	/// Do a shotgun's pellets and a volley's two rounds each land on their own (setting "Each pellet on its own")?
 	static bool eachPellet(BattlescapeState *state);
+	/// The scale a stat bar is drawn at, on the map or in 3D (setting "Stat bars").
+	static double statBarScale(BattlescapeState *state, int stat, int maximum, int barWidth);
 	/// A shotgun's pellet landed (see FirstPerson::pelletLanded): heard, a few to a volley, and marked in the 3D view.
 	static void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo, bool heard);
 	/// A soldier panics or goes berserk, asked by the game (see FirstPerson::breakdown).
@@ -427,7 +431,13 @@ private:
 	unsigned _mouseReleasesSeen = 0;           // the game's mouse releases known (see think: one since means another screen was on top)
 	int _sidestepFacing = -1;                  // the facing a soldier sidestepping keeps (the game's strafe), while the step is walked; -1 none
 	Position _stepFrom;                        // the tile that step started from
-	int _stepAllowedCache[8];                  // per frame: -1 unknown, 0 blocked, 1 allowed
+	int _stepAllowedCache[8];                  // per frame: -1 unknown, 0 blocked, 1 allowed, 2 blocked for an unsafe landing (see landingSafe)
+	// a step off a ledge onto an unsafe landing (setting "Check the landing"): the edge warned about
+	// (the tile and direction), when, the keys let go since, and the next push confirmed
+	Position _unsafeFrom;
+	int _unsafeDirection = -1;
+	Uint32 _unsafeWarnedAt = 0;
+	bool _unsafeReleased = false, _unsafeConfirmed = false;
 	double _footstepDistance = 0.0;            // voxels walked since the last footstep
 	int _footstepPhase = 0;                    // which foot is next
 
@@ -636,7 +646,7 @@ private:
 	/// How a straight shot with the game's own targeting goes (see aimFor).
 	enum ShotAim { AIM_EXACT, AIM_GAME, AIM_FORCED, AIM_REFUSED };
 	/// A straight shot with the game's own targeting: at the exact point, the game's aim, forced, or refused; and its line.
-	ShotAim aimFor(BattleAction &shot, const Position &targetTile, const Position &aimedVoxel, bool hitSomething, Position &origin, Position &voxel);
+	ShotAim aimFor(BattleAction &shot, const Position &targetTile, const Position &aimedVoxel, Position &origin, Position &voxel);
 	/// Forgets the target marked for confirm fire.
 	void clearConfirmMark() { _confirmTile = Position(-1, -1, -1); _confirmUnit = nullptr; _confirmWeapon = nullptr; _confirmMode = BA_NONE; }
 
@@ -660,6 +670,12 @@ private:
 	bool crosshairTerrainMelee(BattleUnit *unit, BattleItem *weapon, Position &struck, int &part);
 	/// Akimbo: the gun in the other hand that fires along, or null.
 	BattleItem *offHandWeapon(BattleUnit *unit, const BattleItem *weapon) const;
+	/// Has a unit lost health in this battle (not only carried over from earlier fights)?
+	bool hurtThisBattle(const BattleUnit *unit) const;
+	/// Is the landing of a step off a ledge safe: ground to walk on, with a step leading out?
+	bool landingSafe(BattleUnit *unit, const Position &ahead) const;
+	/// A push into a step off a ledge refused for an unsafe landing: the warning, or (pushed again) the go-ahead.
+	void pushedIntoUnsafeLanding(int direction, bool deliberate);
 	/// The akimbo key: full or realistic akimbo off, or the same one back on.
 	void toggleAkimbo();
 	/// The akimbo style key: both guns at once, or one a moment after the other (setting "Akimbo in turn").
@@ -704,8 +720,12 @@ private:
 	void updateSprayMarks(BattleUnit *unit);
 	/// Whether the line of the action's other costs shows under the crosshair (the unit name goes a line lower).
 	bool costLineShown() const;
+	/// Whether the accuracy line shows under the crosshair (the unit name and a downed unit's icons go under it).
+	bool accuracyLineShown() const;
 	/// The first voxel along the ray through a pixel, as a shot would see it; true if something is there.
 	bool aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &voxel, int *voxelType = nullptr) const;
+	/// How far along the crosshair's ray a shot at the open sky aims, in voxels (see aimAt).
+	double skyReach(BattleUnit *unit) const;
 	/// Uses the fire mode on whatever is under a pixel of the view, through the game's own actions.
 	void fire(int pixelX, int pixelY);
 	/// Whom a medi-kit would treat now (see medikitPatient).
@@ -749,7 +769,9 @@ private:
 	// ---- the crosshair, with the fire mode and the shot's odds and cost under it ----
 
 	Surface *_crosshair = nullptr;                 // the crosshair's surface
-	Uint32 _crosshairDrawnFor = 0xFFFFFFFF;        // what the crosshair surface shows, to redraw only on change
+	Uint64 _crosshairDrawnFor = ~(Uint64)0;        // what the crosshair surface shows, to redraw only on change
+	Surface *_accuracyLine = nullptr;              // the accuracy line under the crosshair (see drawAccuracyLine)
+	Uint64 _accuracyLineDrawnFor = ~(Uint64)0;     // what it shows, to redraw only on change
 	Text *_txtMode = nullptr, *_txtShot = nullptr; // the fire mode, and the shot's odds and cost, beside the crosshair
 	Text *_txtCosts = nullptr;                      // and under them its other costs (setting "Expanded crosshair info")
 	Uint32 _hitMarkerHeard = 0;                    // the last hitmarker that ticked
@@ -762,6 +784,10 @@ private:
 
 	/// Updates the crosshair and its texts: mode, hit chance, time units.
 	void updateCrosshair(BattleUnit *unit, bool playerTurn);
+	/// The game's own targeting's accuracy line: how far to either side a successful roll strays at what's under the crosshair, in pixels.
+	int hitCloudReach(BattleUnit *unit, BattleItem *weapon, BattleActionType mode);
+	/// Draws the accuracy line: a level line as wide as the reach to either side, a notch up at each end.
+	void drawAccuracyLine(int reach, Uint8 color, Uint8 shadow);
 	/// A mod's own name for an action of an item, in capitals for the crosshair; empty if it keeps the game's name.
 	std::string renamedAction(const RuleItem *rules, BattleActionType mode) const;
 	/// Does the soldier have a line of sight to the aimed tile, as a shot checks it?

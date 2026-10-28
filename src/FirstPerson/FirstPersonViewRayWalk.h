@@ -163,12 +163,17 @@ inline bool traceSwing(const FirstPersonView::DoorSwing &door, const float rayOr
 		return false;
 	}
 
-	// The voxel of the closed door at that point (its first two layers, the door leaf); its gaps let the ray through.
+	// The voxel of the closed door at that point (its first two layers, the door leaf); its gaps let
+	// the ray through, and so do its panes, the voxels behind a hole in its art (a glass door's, see
+	// findArtHoles), as they do while it's shut (a player's report: the gas station's glass door
+	// went solid while it swung open).
 	const int alongVoxel = std::clamp((int)(originAlong + directionAlong * entry) + 1, 0, 15);
 	const int heightVoxel = std::clamp((int)(rayOrigin[2] + rayDirection[2] * entry - door.z0) + door.model->min[2], 0, 23);
 	Uint8 color = 0;
 	for (int layer = 0; layer < 2 && !color; ++layer)
 	{
+		const bool pane = door.westWall ? (door.model->clear[heightVoxel][alongVoxel] >> layer) & 1 : (door.model->clear[heightVoxel][layer] >> alongVoxel) & 1;
+		if (pane) continue;
 		color = door.westWall ? door.model->color[heightVoxel][alongVoxel][layer] : door.model->color[heightVoxel][layer][alongVoxel];
 	}
 	if (!color)
@@ -180,6 +185,7 @@ inline bool traceSwing(const FirstPersonView::DoorSwing &door, const float rayOr
 	hit.color = color;
 	hit.t = entry;
 	hit.part = -1;
+	hit.ghost = false;
 	if (face == 2) hit.axis = 2;
 	else if (face == 1) hit.axis = std::abs(acrossX) > std::abs(acrossY) ? 0 : 1;
 	else hit.axis = std::abs(alongX) > std::abs(alongY) ? 0 : 1;
@@ -377,9 +383,17 @@ inline bool traceTile(const FirstPersonView::TileView &tileView, const FirstPers
 			{
 				const FirstPersonView::VoxelModel *model = tileView.part[part];
 				if (!model) continue;
-				const Uint8 color = model->color[localZ][localY][localX];
+				Uint8 color = model->color[localZ][localY][localX];
+				// Where the part has no voxel, its own ghost may (VoxelModel::ghost: a liquid's surface
+				// over a floor, the rest of a fence's or a grating's art).
+				const bool onGhost = !color && model->ghost;
+				if (onGhost)
+				{
+					model = model->ghost;
+					color = model->color[localZ][localY][localX];
+				}
 				if (!color) continue;
-				if (model->ghostly && ghostOpacity(distance) * model->ghostShare <= ghostThreshold)
+				if (model->ghostly && ghostOpacity(distance) <= ghostThreshold)
 				{
 					continue; // a ghost, seen through on this pixel
 				}
@@ -396,12 +410,13 @@ inline bool traceTile(const FirstPersonView::TileView &tileView, const FirstPers
 				hit.t = distance;
 				hit.axis = faceAxis;
 				hit.part = part;
+				hit.ghost = onGhost;
 				hit.voxel[0] = (Uint8)localX;
 				hit.voxel[1] = (Uint8)localY;
 				hit.voxel[2] = (Uint8)localZ;
 				// A light source shines where its brightest shades are, in the part of it that glows;
 				// a steady UFO model where its lights are (see buildUfoModel).
-				hit.emissive = ((tileView.emissive >> part) & 1)
+				hit.emissive = !onGhost && ((tileView.emissive >> part) & 1)
 					&& (model->lit ? ((model->lit[localZ][localY] >> localX) & 1) != 0 : (color & 15) <= 3 && localZ >= model->glowMinZ);
 				return true;
 			}
@@ -432,6 +447,7 @@ inline RayEnd castRay(const RayContext &context, const float rayOrigin[3], const
 {
 	hit.glass = false;
 	hit.emissive = false;
+	hit.ghost = false;
 	// 1 / direction on each axis, for the tiles' boxes (an axis the ray runs parallel to never
 	// uses it).
 	const float inverseDirection[3] = { rayDirection[0] != 0.0f ? 1.0f / rayDirection[0] : 0.0f,

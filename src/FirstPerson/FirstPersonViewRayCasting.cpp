@@ -667,9 +667,11 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 	{
 		// The model the pixel shows: the part's next frame once dissolved into it. That frame's
 		// own colour for the voxel, and whether it shines in that frame.
-		const VoxelModel &model = showNextFrame && tileView.next[hit.part] ? *tileView.next[hit.part] : *tileView.part[hit.part];
+		// (the part's own ghost: that model, see VoxelModel::ghost)
+		const VoxelModel &model = hit.ghost ? *tileView.part[hit.part]->ghost
+			: showNextFrame && tileView.next[hit.part] ? *tileView.next[hit.part] : *tileView.part[hit.part];
 		const int voxelX = hit.voxel[0], voxelY = hit.voxel[1], voxelZ = hit.voxel[2];
-		if (&model != tileView.part[hit.part])
+		if (!hit.ghost && &model != tileView.part[hit.part])
 		{
 			const Uint8 nextFrameColor = model.color[voxelZ][voxelY][voxelX];
 			if (nextFrameColor)

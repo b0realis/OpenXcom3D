@@ -85,6 +85,11 @@ const double ThrownItemScale = 0.35, ThrownItemSpin = 1.6;
 /// How long doors take to open in the view, in milliseconds, so you see them move (the game's
 /// own doors open at once): a door swinging on its hinge, a UFO door sliding aside.
 const Uint32 DoorSwingTime = 500, UfoDoorTime = 600;
+/// The rounds that landed since the view's last frame (Map::noteShotLanded) are caught up on only if
+/// that frame was at most this many milliseconds ago; a view that wasn't drawing for longer (the map
+/// shown, the aliens' turn watched there, a screen on top) starts from now, or every round that
+/// landed meanwhile would flash its sparks and beam at once (see FirstPersonView::followShots).
+const Uint32 LandedShotsCatchUpTime = 1000;
 /// Animated terrain (water, machinery, the lights and lit floors of UFOs) steps to its next
 /// frame every CalmFrameTime milliseconds in the view, cross-fading over the whole step. The
 /// game steps every 100 ms, which up close made whole lit panels blink five to ten times a
@@ -154,10 +159,26 @@ const int StandRaiseMax = 4;
 /// colour group as before.
 const float DarkGlowLuma = 28.0f;
 const float DarkGlowStepLuma = 10.0f;
-/// A ghost of a part no one can walk into (a shop's rack: see FirstPersonView::buildShape) shows
-/// this share of a ghost's opacity, fainter than a lift's or a ladder's (a player: "a subtle
-/// indication between walkable, and unwalkable tiles"; the game's sight and shots pass through it).
-const float UnwalkableGhostShare = 0.65f;
+/// A floor the art draws as a box of liquid (XPiratez's sewers under its bases: a green block about
+/// half a level tall, though the game gives it only the floor's thin slab of voxels and slows
+/// walking through it; a player: "very intentionally about thigh deep"): the art's outline must be
+/// a tile-wide box this many voxels tall, LiquidMinHeight to LiquidMaxHeight, matching it on this
+/// share of their pixels together (see liquidHeightOf), and walking it must cost more time units
+/// than a plain floor.
+const int LiquidMinHeight = 6, LiquidMaxHeight = 20;
+const float LiquidOutlineMatch = 0.97f;
+const int PlainFloorWalkCost = 4;
+/// The floor under such a liquid is drawn this many shades darker than the liquid's top, so its
+/// surface (a ghost, see buildLiquid) reads as a layer above it.
+const int LiquidBottomShades = 3;
+/// A floor or wall whose voxels leave out most of its art (a catwalk's grating given a few voxels a
+/// layer, a railing posts on every other layer, so shots go through: see sparseArt): its voxels all
+/// within ArtFillPlaneDepth voxels of its plane (a floor's bottom, a wall's edge), filling under
+/// ArtFillShare of the cells of that plane its art draws, of which there are ArtFillMinCells at least
+/// (not a scrap of trim).
+const int ArtFillPlaneDepth = 4;
+const float ArtFillShare = 0.5f;
+const int ArtFillMinCells = 40;
 /// The floor a lying sprite's rows lie on (items, corpses) rises towards the camera with the ground
 /// in front of it, a step or a slope (see lyingRise), so they lie on it rather than in it (a
 /// player's report: items on stairs and slopes sank into them): the ground looked for up to

@@ -241,8 +241,10 @@ void clearModel(FirstPersonView::VoxelModel &model)
 	// Empty, not a ghost, with a bounding box that any solid voxel will shrink onto.
 	model.empty = true;
 	model.ghostly = false;
-	model.ghostShare = 1.0f;
 	model.water = false;
+	model.liquidHeight = 0;
+	model.artFill = false;
+	model.ghost = nullptr;
 	for (int axis = 0; axis < 3; ++axis)
 	{
 		model.min[axis] = 255;
@@ -824,6 +826,217 @@ void buildShape(FirstPersonView::VoxelModel &model, const Surface *sprite, const
 	model.ghostly = !model.empty;
 }
 
+/**
+ * Tells whether a floor's art is a box of liquid, and how tall: XPiratez's sewers under its bases
+ * are a green block about half a level tall (a player: "very intentionally about thigh deep"),
+ * though the game gives the record only the floor's thin slab of voxels. The art's outline (its
+ * drawn pixels) is compared with that of a tile-wide box of each height from LiquidMinHeight to
+ * LiquidMaxHeight: the floor's diamond (where buildModel projects the floor: 32 pixels wide, 16
+ * high, its top corner at pixel (16, 24)) swept up by that many pixels.
+ * @param sprite The floor's sprite frame.
+ * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
+ * @return The box's height in voxels, where its outline and the art's share LiquidOutlineMatch
+ *   of their pixels together; 0 for none.
+ */
+int liquidHeightOf(const Surface *sprite, int yOffset)
+{
+	// Is a pixel inside the floor's diamond lifted by some pixels? On each of the diamond's 16 rows
+	// its half width grows by two pixels a row down to its widest row, then shrinks again.
+	auto inLiftedDiamond = [&](int spriteX, int spriteY, int lift)
+	{
+		const int row = spriteY + lift - 24 - yOffset;
+		if (row < 0 || row > 15) return false;
+		const int halfWidth = row < 8 ? (row + 1) * 2 : (16 - row) * 2;
+		return spriteX >= 16 - halfWidth && spriteX < 16 + halfWidth;
+	};
+	const int width = sprite->getWidth(), height = sprite->getHeight();
+	int bestHeight = 0;
+	float bestMatch = 0.0f;
+	for (int boxHeight = LiquidMinHeight; boxHeight <= LiquidMaxHeight; ++boxHeight)
+	{
+		// The box's outline: the diamond swept up from the floor to the box's top.
+		int both = 0, either = 0;
+		for (int spriteY = 0; spriteY < height; ++spriteY)
+		{
+			for (int spriteX = 0; spriteX < width; ++spriteX)
+			{
+				bool inBox = false;
+				for (int lift = 0; lift <= boxHeight && !inBox; ++lift) inBox = inLiftedDiamond(spriteX, spriteY, lift);
+				const bool drawn = sprite->getPixel(spriteX, spriteY) != 0;
+				both += inBox && drawn;
+				either += inBox || drawn;
+			}
+		}
+		const float match = either ? (float)both / either : 0.0f;
+		if (match > bestMatch)
+		{
+			bestMatch = match;
+			bestHeight = boxHeight;
+		}
+	}
+	return bestMatch >= LiquidOutlineMatch ? bestHeight : 0;
+}
+
+/**
+ * Builds the surface of a floor the art draws as a box of liquid (see liquidHeightOf): a ghost
+ * (see VoxelModel::ghostly), one layer of voxels across the tile at the box's height, each
+ * coloured by the pixel of the box's top it lands on (the projection buildModel uses). Soldiers
+ * wading through it show through it on some pixels from their thighs down, as the map draws them
+ * sunk in it; the game's shots and sight pass through it, as the game gives it no voxels. With
+ * the setting "Parts without shape" off, as no ghost shows, there is none (the model stays empty).
+ * @param model The empty model to build it in.
+ * @param sprite The floor's sprite frame.
+ * @param surfaceHeight The box's height in voxels (VoxelModel::liquidHeight).
+ * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
+ */
+void buildLiquid(FirstPersonView::VoxelModel &model, const Surface *sprite, int surfaceHeight, int yOffset)
+{
+	if (Options::fpsGhostParts == 0)
+	{
+		return;
+	}
+	const int layer = std::min(surfaceHeight, Position::TileZ - 1), width = sprite->getWidth(), height = sprite->getHeight();
+	for (int y = 0; y < Position::TileXY; ++y)
+	{
+		for (int x = 0; x < Position::TileXY; ++x)
+		{
+			const int spriteX = 16 + x - y, spriteY = 24 + (x + y) / 2 - layer + yOffset;
+			const Uint8 color = spriteX >= 0 && spriteY >= 0 && spriteX < width && spriteY < height ? sprite->getPixel(spriteX, spriteY) : 0;
+			if (!color) continue;
+			model.color[layer][y][x] = color;
+			model.empty = false;
+			const int voxel[3] = { x, y, layer };
+			for (int axis = 0; axis < 3; ++axis)
+			{
+				model.min[axis] = std::min<int>(model.min[axis], voxel[axis]);
+				model.max[axis] = std::max<int>(model.max[axis], voxel[axis]);
+			}
+		}
+	}
+	model.ghostly = !model.empty;
+	if (!model.empty) colorHiddenSides(model, sprite);
+}
+
+/**
+ * Tells whether a floor's or a wall's voxels leave out most of its art (a player's report: XPiratez's
+ * catwalks in Chem Town "look like nothing", their gratings given nine voxels a layer and their
+ * railings posts on every other layer, so shots go through, while the art draws a whole grating, a
+ * rail, a chain-link mesh): its voxels all lie in its own plane (a floor's, ArtFillPlaneDepth voxels
+ * up from its bottom; a wall's, as deep in from its edge) and fill under ArtFillShare of the cells of
+ * that plane the art draws (a floor's columns whose top lands on a drawn pixel, a wall's cells of its
+ * face; ArtFillMinCells of them at least). A part whose voxels stand elsewhere in the tile is left as
+ * it is: the rest of its art would land at the wrong depth.
+ * @param model The part's model, built from its voxels.
+ * @param sprite Its sprite frame.
+ * @param partType O_FLOOR, O_WESTWALL or O_NORTHWALL (anything else: no).
+ * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
+ * @return True if the rest of its art should be drawn as a ghost (see buildArtFill).
+ */
+bool sparseArt(const FirstPersonView::VoxelModel &model, const Surface *sprite, int partType, int yOffset)
+{
+	if (model.empty)
+	{
+		return false;
+	}
+	// Does the art draw the pixel a voxel lands on (the projection buildModel uses)?
+	const int width = sprite->getWidth(), height = sprite->getHeight();
+	auto drawn = [&](int x, int y, int z)
+	{
+		const int spriteX = 16 + x - y, spriteY = 24 + (x + y) / 2 - z + yOffset;
+		return spriteX >= 0 && spriteY >= 0 && spriteX < width && spriteY < height && sprite->getPixel(spriteX, spriteY) != 0;
+	};
+	int artCells = 0, filledCells = 0;
+	if (partType == O_FLOOR && model.max[2] < ArtFillPlaneDepth)
+	{
+		// A floor: its columns, the art at its top.
+		for (int y = 0; y < Position::TileXY; ++y)
+			for (int x = 0; x < Position::TileXY; ++x)
+			{
+				if (!drawn(x, y, model.max[2])) continue;
+				++artCells;
+				bool filled = false;
+				for (int z = 0; z <= model.max[2] && !filled; ++z) filled = model.color[z][y][x] != 0;
+				filledCells += filled;
+			}
+	}
+	else if ((partType == O_WESTWALL && model.max[0] < ArtFillPlaneDepth) || (partType == O_NORTHWALL && model.max[1] < ArtFillPlaneDepth))
+	{
+		// A wall: the cells of its face (along it and up), the art on its outer side.
+		const bool west = partType == O_WESTWALL;
+		for (int z = 0; z < Position::TileZ; ++z)
+			for (int along = 0; along < Position::TileXY; ++along)
+			{
+				if (!drawn(west ? 0 : along, west ? along : 0, z)) continue;
+				++artCells;
+				bool filled = false;
+				for (int in = 0; in < ArtFillPlaneDepth && !filled; ++in) filled = (west ? model.color[z][along][in] : model.color[z][in][along]) != 0;
+				filledCells += filled;
+			}
+	}
+	return artCells >= ArtFillMinCells && filledCells < artCells * ArtFillShare;
+}
+
+/**
+ * Builds the rest of the art of a floor or wall whose voxels leave most of it out (see sparseArt): a
+ * ghost (see VoxelModel::ghostly) in the part's own plane, a voxel wherever the art draws a pixel and
+ * the part has no voxel in that column or cell (on a floor's top layer; on a wall's outer layer, at its
+ * edge), coloured by that pixel, so a grating keeps its holes and a fence its mesh where the art has
+ * them. The part's own voxels stay as they are, solid, as the game has them. With the setting "Parts
+ * without shape" off, as no ghost shows, there is none (the model stays empty).
+ * @param fill The empty model to build it in.
+ * @param part The part's own model.
+ * @param sprite Its sprite frame.
+ * @param partType O_FLOOR, O_WESTWALL or O_NORTHWALL.
+ * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
+ */
+void buildArtFill(FirstPersonView::VoxelModel &fill, const FirstPersonView::VoxelModel &part, const Surface *sprite, int partType, int yOffset)
+{
+	if (Options::fpsGhostParts == 0)
+	{
+		return;
+	}
+	const int width = sprite->getWidth(), height = sprite->getHeight();
+	// A voxel of the fill where the art draws the pixel it lands on, in that pixel's colour.
+	auto put = [&](int x, int y, int z)
+	{
+		const int spriteX = 16 + x - y, spriteY = 24 + (x + y) / 2 - z + yOffset;
+		const Uint8 color = spriteX >= 0 && spriteY >= 0 && spriteX < width && spriteY < height ? sprite->getPixel(spriteX, spriteY) : 0;
+		if (!color) return;
+		fill.color[z][y][x] = color;
+		fill.empty = false;
+		const int voxel[3] = { x, y, z };
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			fill.min[axis] = std::min<int>(fill.min[axis], voxel[axis]);
+			fill.max[axis] = std::max<int>(fill.max[axis], voxel[axis]);
+		}
+	};
+	if (partType == O_FLOOR)
+	{
+		const int top = part.max[2];
+		for (int y = 0; y < Position::TileXY; ++y)
+			for (int x = 0; x < Position::TileXY; ++x)
+			{
+				bool filled = false;
+				for (int z = 0; z <= top && !filled; ++z) filled = part.color[z][y][x] != 0;
+				if (!filled) put(x, y, top);
+			}
+	}
+	else
+	{
+		const bool west = partType == O_WESTWALL;
+		for (int z = 0; z < Position::TileZ; ++z)
+			for (int along = 0; along < Position::TileXY; ++along)
+			{
+				bool filled = false;
+				for (int in = 0; in < ArtFillPlaneDepth && !filled; ++in) filled = (west ? part.color[z][along][in] : part.color[z][in][along]) != 0;
+				if (!filled) put(west ? 0 : along, west ? along : 0, z);
+			}
+	}
+	fill.ghostly = !fill.empty;
+	if (!fill.empty) colorHiddenSides(fill, sprite);
+}
+
 }
 
 /**
@@ -1178,6 +1391,24 @@ const FirstPersonView::VoxelModel *FirstPersonView::getModel(const MapData *mapD
 		// Not built yet: build it in place (the map keeps it at the same address from then on).
 		found = _models.emplace(key, VoxelModel()).first;
 		buildModel(mapData, spriteIndex, cutout, found->second);
+		// The part's own ghost (VoxelModel::ghost): a floor drawn as a box of liquid, its surface
+		// (see buildLiquid); a floor or wall whose voxels leave out most of its art, the rest of it
+		// (see buildArtFill).
+		if (found->second.liquidHeight || found->second.artFill)
+		{
+			VoxelModel &ghost = _ghostModels.emplace(key, VoxelModel()).first->second;
+			clearModel(ghost);
+			const Surface *sprite = mapData->getDataset()->getSurfaceset()->getFrame(spriteIndex);
+			if (found->second.liquidHeight)
+			{
+				buildLiquid(ghost, sprite, found->second.liquidHeight, mapData->getYOffset());
+			}
+			else
+			{
+				buildArtFill(ghost, found->second, sprite, mapData->getObjectType(), mapData->getYOffset());
+			}
+			found->second.ghost = ghost.empty ? nullptr : &ghost;
+		}
 	}
 	return &found->second;
 }
@@ -1418,7 +1649,8 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	// flag, and cages, as round a lift; 2: all of them), a see-through ghost of its art, with
 	// the sides the art never shows coloured; no plate fitting, no glow.
 	// A ghost shape from the mod's table (the shops' racks, see buildShape) is built instead, with
-	// the setting on at all. A ghost no one can walk into (by the game's walking cost) shows fainter.
+	// the setting on at all. Walkable or not, every ghost shows at the setting "Ghost opacity" (the
+	// owner took back a fainter ghost where no one can walk: the racks looked far too ghostly).
 	if (model.empty)
 	{
 		const bool ghostShape = shape && shape->ghost;
@@ -1435,7 +1667,6 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 				buildGhost(model, sprite, mapData->getObjectType(), yOffset);
 			}
 			if (!model.empty) colorHiddenSides(model, sprite);
-			if (mapData->getTUCost(MT_WALK) == Pathfinding::INVALID_MOVE_COST) model.ghostShare = UnwalkableGhostShare;
 		}
 		return;
 	}
@@ -1456,6 +1687,34 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	if (!model.empty && model.max[2] <= 3 && !cutout)
 	{
 		fitPlateTopToSprite(model, sprite, yOffset, nudgeCount);
+	}
+
+	// A floor drawn as a box of liquid that slows walking (XPiratez's sewer sludge, see
+	// liquidHeightOf): the game's thin slab stays the floor, its top (the bottom under the liquid)
+	// a few shades darker; the liquid's surface is a ghost model of its own (see getModel).
+	const int walkCost = mapData->getTUCost(MT_WALK);
+	if (mapData->getObjectType() == O_FLOOR && !model.empty && model.max[2] <= 3 && !cutout
+		&& walkCost > PlainFloorWalkCost && walkCost < Pathfinding::INVALID_MOVE_COST)
+	{
+		model.liquidHeight = (Uint8)liquidHeightOf(sprite, yOffset);
+		// (with "Parts without shape" off, no surface: the floor as it is)
+		for (int y = 0; model.liquidHeight && Options::fpsGhostParts != 0 && y < Position::TileXY; ++y)
+		{
+			for (int x = 0; x < Position::TileXY; ++x)
+			{
+				Uint8 &color = model.color[model.max[2]][y][x];
+				if (color) color = (Uint8)((color & 0xF0) | std::min(15, (color & 15) + LiquidBottomShades));
+			}
+		}
+	}
+
+	// A floor or wall whose voxels leave out most of its art (a catwalk's grating, a railing, a
+	// chain-link fence: see sparseArt): the rest of its art is a ghost model of its own (see getModel).
+	// Not a door, nor a door's other version (an open one: its art shows its leaves swung open, which
+	// would stand as a ghost across the doorway; TFTD's liner).
+	if (!model.liquidHeight && !cutout && !mapData->isDoor() && !mapData->isUFODoor() && mapData->getAltMCD() == 0)
+	{
+		model.artFill = sparseArt(model, sprite, mapData->getObjectType(), yOffset);
 	}
 	colorHiddenSides(model, sprite);
 	findGlow(model);
@@ -1880,13 +2139,17 @@ FirstPersonView::SolidRows FirstPersonView::solidMaskOf(const std::array<const V
 	if (made == _solidMasks.end())
 	{
 		SolidMask mask = {};
-		for (const VoxelModel *model : parts)
+		for (const VoxelModel *part : parts)
 		{
-			if (!model) continue;
-			for (int z = 0; z < 24; ++z)
-				for (int y = 0; y < 16; ++y)
-					for (int x = 0; x < 16; ++x)
-						if (model->color[z][y][x]) mask.rows[z][y] |= (Uint16)(1 << x);
+			// The part, and its own ghost (VoxelModel::ghost).
+			for (const VoxelModel *model : { part, part ? part->ghost : nullptr })
+			{
+				if (!model) continue;
+				for (int z = 0; z < 24; ++z)
+					for (int y = 0; y < 16; ++y)
+						for (int x = 0; x < 16; ++x)
+							if (model->color[z][y][x]) mask.rows[z][y] |= (Uint16)(1 << x);
+			}
 		}
 		made = _solidMasks.emplace(parts, mask).first;
 	}
@@ -2080,11 +2343,15 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 			tileView.emissive |= (Uint8)(1 << part);
 		}
 
-		// Grow the tile's bounding box by the part's.
-		for (int axis = 0; axis < 3; ++axis)
+		// Grow the tile's bounding box by the part's (and by its own ghost's).
+		for (const VoxelModel *grown : { model, model->ghost })
 		{
-			tileView.min[axis] = std::min(tileView.min[axis], model->min[axis]);
-			tileView.max[axis] = std::max(tileView.max[axis], model->max[axis]);
+			if (!grown) continue;
+			for (int axis = 0; axis < 3; ++axis)
+			{
+				tileView.min[axis] = std::min(tileView.min[axis], grown->min[axis]);
+				tileView.max[axis] = std::max(tileView.max[axis], grown->max[axis]);
+			}
 		}
 	}
 

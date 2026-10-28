@@ -139,6 +139,7 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 	for (auto &entry : _softSmokeBlends) delete entry.second.colors;
 	_softSmokeBlends.clear();
 	_models.clear();
+	_ghostModels.clear();
 	_frames.clear();
 	_solidMasks.clear();
 	_paintedFloors.clear();

@@ -70,6 +70,7 @@ namespace OpenXcom
 {
 
 class Game;
+struct LandedShot;
 class Map;
 class SavedBattleGame;
 class MapData;
@@ -145,8 +146,10 @@ public:
 		Uint8 min[3], max[3];    // inclusive bounds of solid voxels (x, y, z)
 		bool empty;
 		bool ghostly;            // a ghost of a part with no voxels (setting "Parts without shape"): seen through on some pixels, never in the way (see buildGhost, buildShape)
-		float ghostShare;        // how much of a ghost's opacity it shows: less for a part no one can walk into (see UnwalkableGhostShare)
 		bool water;              // a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea): its top is drawn as waves (see waterColor)
+		Uint8 liquidHeight;       // a floor the art draws as a box of liquid (XPiratez's sewer sludge, see liquidHeightOf): its surface's height in voxels; 0 for none
+		bool artFill;             // a floor or wall whose voxels leave out most of its art (a catwalk's grating, a fence: see sparseArt)
+		const VoxelModel *ghost;  // a ghost model of the part's own, in the same tile where the part has no voxels: the liquid's surface (buildLiquid) or the rest of the art (buildArtFill); null for none
 		float glow[3]; // centre of the brightest voxels in the top third (a lamp's bulb), in the tile
 		int glowCount;
 		Uint8 glowColor;     // one of those bright colours
@@ -203,6 +206,7 @@ public:
 		int axis;       // axis of the face it entered through, -1 if unknown
 		int tile;       // tile index
 		int part;       // tile part hit, -1 for a swinging door
+		bool ghost;     // the part's own ghost was hit (VoxelModel::ghost: a liquid's surface, the rest of a fence's art), not the part itself
 		Uint8 voxel[3]; // which voxel of the part (x, y, z in the tile)
 		bool glass;     // the ray went through window glass on the way
 		bool emissive;  // hit the bright part of a light source
@@ -493,6 +497,7 @@ private:
 		const MapData *openDoor;      // the door's record on hiddenPart: while it's there, the swing goes on
 	};
 	std::unordered_map<Uint64, VoxelModel> _models;     // by MapData, sprite and cut-out
+	std::unordered_map<Uint64, VoxelModel> _ghostModels; // the parts' own ghosts (VoxelModel::ghost), by the part's key in _models
 	std::unordered_map<const MapData*, Frames> _frames; // by MapData: its animation frames
 	FirstPersonView *_sharedModelsOwner = nullptr;      // another view whose voxel models this one uses, or null
 	const VoxelModel *_groundModel = nullptr;           // floor repeated outside the map
@@ -963,6 +968,9 @@ private:
 	bool _offHandMuzzleValid = false;                   // the other gun's muzzle is on the view
 	const BattleItem *_offHandWeapon = nullptr;         // ...that gun: a round of ours fired from it leaves its muzzle (dual wield taking turns, see beginShot)
 	const Projectile *_lastPartnerShot = nullptr;       // the other gun's round in flight last frame
+	Uint64 _landedShotsSeen = ~(Uint64)0;               // the map's landed rounds read so far (see landShot); unset till the first frame
+	Uint32 _landedShotsReadAt = 0;                      // when they were last read (see LandedShotsCatchUpTime); 0 never
+	bool _shotsResumed = false;                         // this frame the view draws again after a pause: what it followed before ended unseen (see followShots)
 	float _partnerFrom[3] = {}, _partnerOffset[3] = {}, _partnerHead[3] = {}, _partnerOrigin[3] = {}; // its path's start, the offset to its muzzle, where it's drawn, where its trail starts
 	float _partnerLength = 1.0f;                        // its path's length, in voxels
 	Trail _partnerTrail = TRAIL_NONE;                   // how it looks in flight
@@ -999,6 +1007,8 @@ private:
 	Projectile *flyingProjectile() const;
 	/// The last shot has ended: impact, beam, when an enemy shot ended.
 	void finishShot();
+	/// A round the map noted landing: the end of the one followed, or a round never seen at all.
+	void landShot(const LandedShot &shot);
 	/// A new shot has left: its start, look, muzzle flash and kick.
 	void beginShot(Projectile *projectile);
 	/// The shot moved on: its trail grows, and it may whizz past the eye.
@@ -1018,6 +1028,7 @@ private:
 	void fillQuadAtDepth(const double corners[4][2], Uint8 color, float depth);
 	/// How a shot looks in flight, from its ammo's damage type, and how big (by its weapon and power).
 	void trailFor(const BattleItem *ammo, const BattleItem *weapon, Trail &trail, Uint8 &color, float &calibre);
+	void trailFor(const RuleItem *ammo, const RuleItem *weapon, Trail &trail, Uint8 &color, float &calibre);
 	/// Spawns what a shot leaves behind along the bit of its path it flew this frame.
 	void spawnTrailSegment(const float from[3], const float to[3]);
 	/// Where the shot in flight is drawn: the game's position, our own shot's eased from the muzzle.

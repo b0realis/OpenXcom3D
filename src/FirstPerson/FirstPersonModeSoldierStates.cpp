@@ -64,6 +64,7 @@
 #include "../Engine/Game.h"
 #include "../Interface/Text.h"
 #include "../Mod/Armor.h"
+#include "../Savegame/Soldier.h"
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/SavedBattleGame.h"
 #include "../Savegame/Tile.h"
@@ -142,6 +143,29 @@ float FirstPersonMode::controlHaze(const BattleUnit *unit, Uint32 now) const
 	}
 	const float breath = 0.5f + 0.5f * (float)std::sin(2.0 * Pi * (now % ControlHazePeriod) / ControlHazePeriod);
 	return ControlHazeStrength * (1.0f - ControlHazeBreath + ControlHazeBreath * breath);
+}
+
+/**
+ * Has a unit been hurt in this battle: is its health below what it started the battle with? A
+ * soldier may start with health missing from earlier fights (OXCE's health missing, which big
+ * mods use) and a wounded one defending the base lower still (as BattleUnit sets it, from the
+ * soldier's own record, which the battle doesn't change, so it holds after a quickload too);
+ * anyone else starts at full health.
+ * @param unit The unit.
+ * @return True if it has lost health in this battle.
+ */
+bool FirstPersonMode::hurtThisBattle(const BattleUnit *unit) const
+{
+	int startHealth = unit->getBaseStats()->health;
+	if (const Soldier *soldier = unit->getGeoscapeSoldier())
+	{
+		startHealth = std::max(1, startHealth - soldier->getHealthMissing());
+		if (soldier->isWounded())
+		{
+			startHealth = std::max(1, startHealth - soldier->getWoundRecoveryInt());
+		}
+	}
+	return unit->getHealth() < startHealth;
 }
 
 /**
@@ -231,8 +255,13 @@ void FirstPersonMode::checkHurt(BattleUnit *unit, Uint32 now)
 
 	// And you hear your heart, in time with the pulse: a thump at the start of each period of the
 	// sine, louder the worse it is (none on the first frame, when there's no count to compare).
+	// Only for the soldier you control, on your turn (not one watched in the aliens' turn), once
+	// hurt in this battle (a player's report: it played for a soldier who hadn't been hit, health
+	// carried over from earlier fights; see hurtThisBattle), and with the setting "Hit, kill and
+	// swing sounds", our added sounds, on.
+	const bool heard = Options::fpsHitSounds && _save->getSide() == FACTION_PLAYER && unit == _save->getSelectedUnit() && hurtThisBattle(unit);
 	const int heartbeatCount = (int)(now / 1000.0f * 7.5f / (2.0f * 3.14159265f));
-	if (danger > 0.0f && heartbeatCount != _lastHeartbeat && _lastHeartbeat >= 0)
+	if (heard && danger > 0.0f && heartbeatCount != _lastHeartbeat && _lastHeartbeat >= 0)
 	{
 		_sounds->play(FirstPersonSounds::HEARTBEAT, 0, 0.35f + 0.65f * danger);
 	}
@@ -326,6 +355,7 @@ bool FirstPersonMode::deathCam(Uint32 now, double elapsedSeconds)
 		_txtShot->setVisible(false);
 		_txtTarget->setVisible(false);
 		_crosshair->setVisible(false);
+		_accuracyLine->setVisible(false);
 		_weaponInHand->setVisible(false);
 
 		// Was that the last soldier standing?
@@ -607,6 +637,7 @@ bool FirstPersonMode::breakdownCam(Uint32 now, double elapsedSeconds)
 		_txtShot->setVisible(false);
 		_txtTarget->setVisible(false);
 		_crosshair->setVisible(false);
+		_accuracyLine->setVisible(false);
 		_weaponInHand->setVisible(false);
 		const FallKind kind = _breakdownBerserk ? FALL_BERSERK : FALL_PANIC;
 		showFallBanner(kind, _state->tr(_breakdownBerserk ? "STR_FPS_BERSERK" : "STR_FPS_BREAKDOWN"), unit->getName(_game->getLanguage()));

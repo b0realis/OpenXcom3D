@@ -97,7 +97,8 @@ double FirstPersonMode::clampInsideTile(int tileCoordinate, double voxelCoordina
  * (walls, objects, corners cut on a diagonal, stairs, the armor's movement costs); the soldier
  * must have both, and keep the time units the player reserved for a shot (the classic HUD's
  * "reserve TU" buttons). With flight switched off, or the setting "Falling" off, a step off a
- * ledge into the air isn't allowed either.
+ * ledge into the air isn't allowed either; with "Check the landing", nor one onto an unsafe landing
+ * (see landingSafe) until the player has pushed that way again after its warning.
  * The movement code asks about the same directions several times a frame, so each answer is
  * kept in _stepAllowedCache until the cache is cleared (every frame, and after anything that
  * changes the answers, such as a step).
@@ -138,6 +139,22 @@ bool FirstPersonMode::stepAllowed(BattleUnit *unit, int stepX, int stepY)
 				|| (belowDestination && !belowDestination->hasNoFloor(_save) && belowDestination->getTerrainLevel() <= -12);
 		}
 
+		// Falling, a step off a ledge (into a tile with no floor, not the top of stairs or a ramp
+		// going down, and not flying) must land somewhere safe (setting "Check the landing", a
+		// player's report: X-Com Files' blood moat soft-locked a soldier), or the player must have
+		// pushed that way again after the warning (see pushedIntoUnsafeLanding).
+		bool unsafe = false;
+		if (allowed && Options::fpsFalling && Options::fpsSafeLanding && !(canFly(unit) && flightOn(unit)))
+		{
+			const Position ahead = start + Position(stepX, stepY, 0);
+			const Tile *aheadTile = _save->getTile(ahead);
+			const Tile *belowAhead = aheadTile ? _save->getBelowTile(aheadTile) : nullptr;
+			const bool ledge = aheadTile && aheadTile->hasNoFloor(_save) && !(belowAhead && !belowAhead->hasNoFloor(_save) && belowAhead->getTerrainLevel() <= -12);
+			const bool confirmed = _unsafeConfirmed && _unsafeDirection == direction && _unsafeFrom == start && SDL_GetTicks() - _unsafeWarnedAt < UnsafeLandingTime;
+			unsafe = ledge && !confirmed && !landingSafe(unit, ahead);
+			allowed = !unsafe;
+		}
+
 		// The soldier must be able to pay for it: enough time units and energy, with enough time
 		// units left for the shot the player reserved (see reserveAllows). The debug "doom mode"
 		// (endless time units, energy and ammo) skips this.
@@ -146,9 +163,81 @@ bool FirstPersonMode::stepAllowed(BattleUnit *unit, int stepX, int stepY)
 			allowed = unit->getTimeUnits() >= stepCost.cost.time && unit->getEnergy() >= stepCost.cost.energy
 				&& reserveAllows(unit, stepCost.cost.time, stepCost.cost.energy);
 		}
-		_stepAllowedCache[direction] = allowed ? 1 : 0;
+		_stepAllowedCache[direction] = allowed ? 1 : unsafe ? 2 : 0;
 	}
 	return _stepAllowedCache[direction] == 1;
+}
+
+/**
+ * Is the landing of a step off a ledge safe (setting "Check the landing")? The soldier falls
+ * straight down from the tile ahead to the first with a floor (the game's own fall). It's unsafe
+ * where no one can walk (a floor or an object the rules give no walking cost: TFTD's sea, X-Com
+ * Files' blood moat, which the map never lets a soldier into) or where not a single step leads on
+ * (eight ways round, and up or down a lift): the soldier would be stuck there for good.
+ * @param unit The soldier.
+ * @param ahead The tile the step goes into, on the soldier's level.
+ * @return True if it's safe.
+ */
+bool FirstPersonMode::landingSafe(BattleUnit *unit, const Position &ahead) const
+{
+	// Where the fall ends.
+	Position landing = ahead;
+	while (landing.z > 0)
+	{
+		const Tile *tile = _save->getTile(landing);
+		if (tile && !tile->hasNoFloor(_save))
+		{
+			break;
+		}
+		--landing.z;
+	}
+	const Tile *landingTile = _save->getTile(landing);
+	if (!landingTile)
+	{
+		return true;
+	}
+	// Ground to stand on.
+	if (landingTile->getTUCost(O_FLOOR, MT_WALK) >= Pathfinding::INVALID_MOVE_COST || landingTile->getTUCost(O_OBJECT, MT_WALK) >= Pathfinding::INVALID_MOVE_COST)
+	{
+		return false;
+	}
+	// A step leading on from it.
+	Pathfinding *pathfinding = _save->getPathfinding();
+	for (int direction = 0; direction < 10; ++direction)
+	{
+		if (pathfinding->getTUCost(landing, direction, unit, nullptr, BAM_NORMAL).cost.time < Pathfinding::INVALID_MOVE_COST)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * The player pushed into a step off a ledge that stepAllowed refused for an unsafe landing
+ * (setting "Check the landing"). The first push warns ("UNSAFE LANDING! PUSH AGAIN"); pushing that
+ * way again within UnsafeLandingTime, after letting the keys go, or with a jump (deliberate), goes
+ * over (the owner: "Another jump then just jumps"). Later, or from elsewhere, it warns afresh.
+ * @param direction The step's direction (0 north .. 7, clockwise).
+ * @param deliberate A jump (Space while pushing), rather than a push of the movement keys.
+ */
+void FirstPersonMode::pushedIntoUnsafeLanding(int direction, bool deliberate)
+{
+	const Uint32 now = SDL_GetTicks();
+	if (_unsafeDirection == direction && _unsafeFrom == _trackedTile && now - _unsafeWarnedAt < UnsafeLandingTime)
+	{
+		if ((_unsafeReleased || deliberate) && !_unsafeConfirmed)
+		{
+			_unsafeConfirmed = true; // (stepAllowed lets it through from now on)
+			std::fill(std::begin(_stepAllowedCache), std::end(_stepAllowedCache), -1);
+		}
+		return;
+	}
+	_state->warningLongRaw(_state->tr("STR_FPS_UNSAFE_LANDING")); // (the game's longer warning: read before it fades)
+	_unsafeFrom = _trackedTile;
+	_unsafeDirection = direction;
+	_unsafeWarnedAt = now;
+	_unsafeReleased = _unsafeConfirmed = false;
 }
 
 /**
@@ -242,6 +331,8 @@ bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 		return false;
 	}
 	_fallFromZ = stepsOffLedge ? from.z : -1; // The level the fall starts from, for the damage on landing.
+	_unsafeDirection = -1; // (an unsafe landing's go-ahead is used, or no longer needed)
+	_unsafeConfirmed = false;
 
 	// Hand the step to the game's walking state.
 	BattleAction walk;
@@ -598,7 +689,14 @@ bool FirstPersonMode::tileMoveVelocity(BattleUnit *unit, double forward, double 
 			const int stepX = (int)std::lround(std::cos(octant)), stepY = (int)std::lround(std::sin(octant));
 			// Into a closed door only with a fresh press (a held key stops in front of it).
 			const bool throughDoor = closedDoorTowards(stepX, stepY, unit->getPosition().z);
-			if ((stepAllowed(unit, stepX, stepY) || throughDoor) && !(throughDoor && heldOn))
+			bool stepOk = stepAllowed(unit, stepX, stepY);
+			const int stepDirection = Pathfinding::vectorToDirection(Position(stepX, stepY, 0));
+			if (!stepOk && !throughDoor && stepDirection >= 0 && _stepAllowedCache[stepDirection] == 2)
+			{
+				pushedIntoUnsafeLanding(stepDirection, false); // (a ledge with an unsafe landing, see stepAllowed: the next press after letting go goes over)
+				stepOk = stepAllowed(unit, stepX, stepY); // (the second press goes over)
+			}
+			if ((stepOk || throughDoor) && !(throughDoor && heldOn))
 			{
 				_tileMove = true;
 				_tileMoveQuick = quick;
@@ -683,9 +781,19 @@ void FirstPersonMode::jump(BattleUnit *unit)
 
 		// A key press comes between frames, so the cached step answers may be old: ask afresh.
 		std::fill(std::begin(_stepAllowedCache), std::end(_stepAllowedCache), -1);
-		if (!stepAllowed(unit, stepX, stepY) && tryVault(unit, stepX, stepY))
+		if (!stepAllowed(unit, stepX, stepY))
 		{
-			return;
+			// A ledge with an unsafe landing: the jump is a deliberate push (its warning, or its go-ahead).
+			const int direction = Pathfinding::vectorToDirection(Position(stepX, stepY, 0));
+			if (_stepAllowedCache[direction] == 2)
+			{
+				pushedIntoUnsafeLanding(direction, true);
+				return;
+			}
+			if (tryVault(unit, stepX, stepY))
+			{
+				return;
+			}
 		}
 	}
 
@@ -1006,6 +1114,10 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 	{
 		_movementHeld = false;
 	}
+	if (forward == 0.0 && strafe == 0.0 && numpadForward == 0 && numpadStrafe == 0)
+	{
+		_unsafeReleased = true; // (after an unsafe landing's warning, the next push goes over: see pushedIntoUnsafeLanding)
+	}
 	if (!canMove || _movementHeld)
 	{
 		forward = strafe = 0.0;
@@ -1184,11 +1296,24 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 
 	// Don't walk into the walls of the tile we're in: EdgeMargin voxels from each edge the
 	// soldier couldn't step across. Its west and north edges, in voxels:
+	// A held push stopped at a ledge with an unsafe landing says so (see pushedIntoUnsafeLanding).
 	const double westEdgeX = _trackedTile.x * 16.0 + sizeOffset, northEdgeY = _trackedTile.y * 16.0 + sizeOffset;
-	if (newEyeX < westEdgeX + EdgeMargin && !stepAllowed(unit, -1, 0)) newEyeX = westEdgeX + EdgeMargin;
-	if (newEyeX > westEdgeX + 16.0 - EdgeMargin && !stepAllowed(unit, 1, 0)) newEyeX = westEdgeX + 16.0 - EdgeMargin;
-	if (newEyeY < northEdgeY + EdgeMargin && !stepAllowed(unit, 0, -1)) newEyeY = northEdgeY + EdgeMargin;
-	if (newEyeY > northEdgeY + 16.0 - EdgeMargin && !stepAllowed(unit, 0, 1)) newEyeY = northEdgeY + 16.0 - EdgeMargin;
+	// (Only the first edge stopped at a frame: pushed diagonally into a corner of two such ledges,
+	// the two warnings took turns every frame and a second push never went over.)
+	bool unsafeEdgeSeen = false;
+	auto stopAtEdge = [&](int stepX, int stepY)
+	{
+		const int direction = Pathfinding::vectorToDirection(Position(stepX, stepY, 0));
+		if (!unsafeEdgeSeen && driving && canMove && !_stepPending && _stepAllowedCache[direction] == 2)
+		{
+			pushedIntoUnsafeLanding(direction, false);
+			unsafeEdgeSeen = true;
+		}
+	};
+	if (newEyeX < westEdgeX + EdgeMargin && !stepAllowed(unit, -1, 0)) { newEyeX = westEdgeX + EdgeMargin; stopAtEdge(-1, 0); }
+	if (newEyeX > westEdgeX + 16.0 - EdgeMargin && !stepAllowed(unit, 1, 0)) { newEyeX = westEdgeX + 16.0 - EdgeMargin; stopAtEdge(1, 0); }
+	if (newEyeY < northEdgeY + EdgeMargin && !stepAllowed(unit, 0, -1)) { newEyeY = northEdgeY + EdgeMargin; stopAtEdge(0, -1); }
+	if (newEyeY > northEdgeY + 16.0 - EdgeMargin && !stepAllowed(unit, 0, 1)) { newEyeY = northEdgeY + 16.0 - EdgeMargin; stopAtEdge(0, 1); }
 
 	// Whatever stopped us (walls, edges, a step not taken) takes the momentum out on that axis:
 	// where the camera really moved slower than the momentum (by more than half a voxel a

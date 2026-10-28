@@ -238,6 +238,10 @@ void FirstPersonMode::createCrosshairAndBanner()
 	// The crosshair, centred on the view (drawn in drawCrosshair).
 	_crosshair = new Surface(CrosshairSize, CrosshairSize, width / 2 - CrosshairSize / 2, height / 2 - CrosshairSize / 2);
 	_state->add(_crosshair);
+	// Under it the accuracy line (drawn in drawAccuracyLine): room for its widest reach to either
+	// side and its shadow, its notches two rows above the line.
+	_accuracyLine = new Surface(AccuracyLineReach * 2 + 3, 4, width / 2 - AccuracyLineReach - 1, height / 2 + AccuracyLineDrop - 2);
+	_state->add(_accuracyLine);
 
 	// The banner's glow: four copies of it, one pixel off to each side, behind it (coloured
 	// in updateBanner).
@@ -287,6 +291,8 @@ void FirstPersonMode::createCrosshairAndBanner()
 	}
 	_crosshair->setVisible(false);
 	_ownSurfaces.insert(_crosshair);
+	_accuracyLine->setVisible(false);
+	_ownSurfaces.insert(_accuracyLine);
 }
 
 /**
@@ -814,6 +820,7 @@ void FirstPersonMode::setResizeAnchors()
 
 	// The crosshair and its texts keep to the middle; the lift arrows to the right edge's middle.
 	_anchors[_crosshair] = CENTER;
+	_anchors[_accuracyLine] = CENTER;
 	for (Surface *part : std::initializer_list<Surface*>{ _liftUp, _liftDown, _txtLift, _txtLiftKeys }) _anchors[part] = RIGHT_CENTER;
 	_anchors[_txtMode] = CENTER;
 	_anchors[_txtShot] = CENTER;
@@ -1905,6 +1912,7 @@ void FirstPersonMode::think()
 		updateUnitName(nullptr);
 		updateBanner(playerTurn);
 		updateWeaponInHand(nullptr);
+		endShotAim(); // (a shot fired in 3D and still flying when the map came up: its aim ends here)
 		syncShadows();
 		return;
 	}

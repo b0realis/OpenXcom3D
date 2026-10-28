@@ -26,8 +26,8 @@ firstPerson:
   # though the map draws something solid there, mostly something no one can walk into: the 3D
   # view builds each from boxes of voxels, west, north, bottom, east, south, top (x 0..15 west to
   # east, y 0..15 north to south, z 0..23 up). A ghost (the default) is coloured from its art and
-  # cut to its outline, and drawn see-through with "Parts without shape" (Lifts or All), fainter
-  # where no one can walk; "ghost: false" (a floor) is built as if the game had those voxels,
+  # cut to its outline, and drawn see-through with "Parts without shape" (Lifts or All), at the
+  # "Ghost opacity" setting; "ghost: false" (a floor) is built as if the game had those voxels,
   # always. Per game (xcom1 UFO, xcom2 TFTD: the two share some data set names), data set and
   # record numbers in its MCD.
   shapes:

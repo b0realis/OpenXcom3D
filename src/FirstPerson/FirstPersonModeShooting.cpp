@@ -983,11 +983,13 @@ bool FirstPersonMode::crosshairTerrainMelee(BattleUnit *unit, BattleItem *weapon
  * line through the same voxel shapes a real shot flies along). Walls, objects, floors and units
  * all stop it, except the soldier himself; units the player can't see are passed through
  * (unless the game is in debug mode), so the crosshair gives nothing away. Off into the sky,
- * it gives a point some way along the ray instead.
+ * it gives a point of the open air on the ray instead, inside the map (see skyReach), which a
+ * shot may aim at as at any other: the game takes an empty tile as a target (its middle), and the
+ * round flies on along the line past it.
  * @param pixelX Pixel column in the 3D view.
  * @param pixelY Pixel row in the 3D view.
  * @param unit The soldier looking (left out of the line).
- * @param voxel Set to the voxel hit, or to a point 320 voxels (20 tiles) along the ray.
+ * @param voxel Set to the voxel hit, or to the point of open air on the ray.
  * @param voxelType If given, set to what was hit (V_FLOOR, V_WESTWALL, V_NORTHWALL, V_OBJECT,
  *   V_UNIT; V_EMPTY for nothing).
  * @return True if something was hit.
@@ -1015,10 +1017,70 @@ bool FirstPersonMode::aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &
 	}
 	if (voxelType) *voxelType = V_EMPTY;
 
-	// Nothing hit (the sky, or out of the map): a point 20 tiles along the ray.
-	voxel = Position(rayOrigin.x + (int)(rayDirection[0] * 320), rayOrigin.y + (int)(rayDirection[1] * 320),
-		rayOrigin.z + (int)(rayDirection[2] * 320));
+	// Nothing hit (the sky, or out of the map): the point of the open air on the ray itself, as far
+	// as skyReach, or the last one inside the map where the ray leaves it sooner. (A point beyond
+	// the map, pulled back in one axis at a time, lay off to the side: a player's report, the shot
+	// went "almost sideways" at the map's edge.)
+	double reach = skyReach(unit);
+	const double mapEnd[3] = { _save->getMapSizeX() * 16.0, _save->getMapSizeY() * 16.0, _save->getMapSizeZ() * 24.0 };
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		if (rayDirection[axis] > 1e-9) reach = std::min(reach, (mapEnd[axis] - 1.0 - eye[axis]) / rayDirection[axis]);
+		else if (rayDirection[axis] < -1e-9) reach = std::min(reach, -eye[axis] / rayDirection[axis]);
+	}
+	reach = std::max(0.0, reach);
+	voxel = Position((int)std::floor(eye[0] + rayDirection[0] * reach), (int)std::floor(eye[1] + rayDirection[1] * reach),
+		(int)std::floor(eye[2] + rayDirection[2] * reach));
+	// Steeply up near the top of the map the ray leaves it within the soldier's own tile, and a shot
+	// at his own tile turned him to face south, and with the game's own aim shot his own floor (the
+	// bug hunt after 184): the point a tile on along the ray's heading instead (straight up, the way
+	// he faces), level with where the ray left the map. The map takes no target above its top, so
+	// such a shot goes a little lower than the crosshair; its path shows it.
+	if (unit)
+	{
+		const Position unitTile = unit->getPosition();
+		const int size = unit->getArmor()->getSize();
+		const Position pointTile = voxel.toTile();
+		if (pointTile.x >= unitTile.x && pointTile.x < unitTile.x + size && pointTile.y >= unitTile.y && pointTile.y < unitTile.y + size)
+		{
+			double headingX = rayDirection[0], headingY = rayDirection[1];
+			const double headingLength = std::sqrt(headingX * headingX + headingY * headingY);
+			if (headingLength < 0.05)
+			{
+				Position facing;
+				Pathfinding::directionToVector(unit->getDirection(), &facing);
+				headingX = facing.x;
+				headingY = facing.y;
+			}
+			const double out = 8.0 + 8.0 * size; // from the eye, past the soldier's tiles
+			const double scale = out / std::max(0.05, std::sqrt(headingX * headingX + headingY * headingY));
+			voxel.x = (int)std::floor(eye[0] + headingX * scale);
+			voxel.y = (int)std::floor(eye[1] + headingY * scale);
+		}
+	}
+	voxel.x = std::clamp<int>(voxel.x, 0, (int)mapEnd[0] - 1);
+	voxel.y = std::clamp<int>(voxel.y, 0, (int)mapEnd[1] - 1);
+	voxel.z = std::clamp<int>(voxel.z, 0, (int)mapEnd[2] - 1);
 	return false;
+}
+
+/**
+ * How far along the crosshair's ray a shot at the open sky aims (see aimAt): SkyAimReach, or less
+ * for a weapon whose range ends sooner, a tile short of its end as the game counts tiles (it
+ * refuses a shot at a tile beyond it: "Out of range"; a tile and a half, as a diagonal's tiles round
+ * up), but a tile at least, so the point never
+ * falls on the eye itself (a line with no length has no direction).
+ * @param unit The soldier aiming (null: SkyAimReach).
+ * @return The reach, in voxels.
+ */
+double FirstPersonMode::skyReach(BattleUnit *unit) const
+{
+	const BattleItem *weapon = unit ? activeWeapon(unit) : nullptr;
+	if (!weapon)
+	{
+		return SkyAimReach;
+	}
+	return std::clamp((weapon->getRules()->getMaxRange() - 1.5) * 16.0, 16.0, SkyAimReach);
 }
 
 /**
@@ -1391,8 +1453,11 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 	const BattleActionOrigin side = (Options::fpsLeanShots || leaningOut()) && isShot(mode) ? leanSide(unit, targetTile) : BattleActionOrigin::CENTRE;
 
 	// Worked out again only when something it depends on changed (a throw depends on the
-	// target's tile only, a line and an arcing shot at an exact point on the very point).
+	// target's tile only, a line and an arcing shot at an exact point on the very point; an
+	// FPS-style line on where the eye is too, its rounds leaving from there, see freeAimFrom).
 	const Position from = unit->getPosition();
+	const bool fromEye = freeAimOn(mode) || (otherWeapon && freeAimOn(offMode));
+	const int eyeVoxelX = fromEye ? (int)std::floor(_eyeX + _leanShift[0]) : 0, eyeVoxelY = fromEye ? (int)std::floor(_eyeY + _leanShift[1]) : 0;
 	// (an arcing shot aims at the exact point as a straight one does, see launchShot; a throw at the tile)
 	const bool arcing = arcs(weapon, mode);
 	const bool exactArc = arcing && (Options::fpsAimExact || freeAimOn(mode)) && hitSomething && isShot(mode);
@@ -1400,7 +1465,7 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 	const std::vector<int> key = { arcing ? 1 : 2, targetTile.x, targetTile.y, targetTile.z, keyedPoint ? targetVoxel.x : 0, keyedPoint ? targetVoxel.y : 0,
 		keyedPoint ? targetVoxel.z : 0, from.x, from.y, from.z, unit->getDirection(), unit->isKneeled() ? 1 : 0, weapon->getId(), (int)mode, (int)side,
 		Options::fpsForceArcing ? 1 : 0, Options::fpsForceBlocked ? 1 : 0, Options::oxceEnableOffCentreShooting ? 1 : 0, hitSomething ? 1 : 0,
-		otherWeapon ? otherWeapon->getId() : -1, (int)offMode };
+		otherWeapon ? otherWeapon->getId() : -1, (int)offMode, eyeVoxelX, eyeVoxelY };
 	if (key == _trajectoryKey)
 	{
 		return;
@@ -1435,8 +1500,10 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 			// crosshair (FPS style; or with the game's own targeting, the line the shot takes, see
 			// aimFor: to the point, to the game's own aim's, or forced, drawn yellow; or the one it
 			// would take, dimmed, when the game will refuse it).
+			// (FPS style: from the eye's place, as its rounds leave, see freeAimFrom)
+			preview.freeAim = freeAimOn(gunMode);
 			Position origin = tileEngine->getOriginVoxel(preview, _save->getTile(from)), voxel = targetVoxel;
-			const ShotAim aim = freeAimOn(gunMode) ? AIM_EXACT : aimFor(preview, targetTile, targetVoxel, hitSomething, origin, voxel);
+			const ShotAim aim = freeAimOn(gunMode) ? AIM_EXACT : aimFor(preview, targetTile, targetVoxel, origin, voxel);
 			tileEngine->calculateLineVoxel(origin, voxel, true, &path, unit);
 			// (a shot the game will refuse shows dimmed: no surprise "No line of fire")
 			look = aim == AIM_FORCED ? FirstPersonView::TRAJECTORY_FORCED_LINE : aim == AIM_REFUSED ? FirstPersonView::TRAJECTORY_REFUSED_LINE
@@ -1707,29 +1774,55 @@ bool FirstPersonMode::gameAimFound(BattleAction &shot, const Position &targetTil
  * How a straight shot with the game's own targeting (setting "Faithful targeting") goes, in
  * order (a player's report: "no line of fire" with the shot plainly on the unit; the owner's
  * choices):
- * - at the point under the crosshair (setting "Aim at exact point"), if the game lets that line
- *   fly (gameLetsLineFly);
+ * - at the point under the crosshair (setting "Aim at exact point"; on the open sky, the point of
+ *   air on its ray, see aimAt), if the game lets that line fly (gameLetsLineFly): from the side
+ *   of the shot, then from the middle, then left and right of it with OXCE's "Off-centre
+ *   shooting", the game's own muzzle points in the order its own aim tries them for a unit (a
+ *   player's report: past the very corner of a craft's opening the shot went for the hull); the
+ *   side that works is left in the action, for the game to fire from;
  * - else as the game's own aim goes: any part of the unit a line reaches, from the side of the
  *   shot, the middle, and left and right with OXCE's "Off-centre shooting" (gameAimFound);
  * - else, with "Force blocked shots", forced along the line to the crosshair, hitting whatever
  *   is in the way, as with Ctrl held;
  * - else the game refuses it ("No line of fire").
- * @param shot The action (actor, weapon, mode, the side it leaves from; left as it was).
+ * @param shot The action (actor, weapon, mode, the side it leaves from; left as it was, but for
+ *   an exact shot the side its line flies from).
  * @param targetTile The tile aimed at.
  * @param aimedVoxel The point under the crosshair.
- * @param hitSomething Whether the aim met something (not the sky).
  * @param origin Set to where the shot leaves from (for its path).
  * @param voxel Set to the point it goes for (for its path).
  * @return How the shot goes.
  */
-FirstPersonMode::ShotAim FirstPersonMode::aimFor(BattleAction &shot, const Position &targetTile, const Position &aimedVoxel, bool hitSomething, Position &origin, Position &voxel)
+FirstPersonMode::ShotAim FirstPersonMode::aimFor(BattleAction &shot, const Position &targetTile, const Position &aimedVoxel, Position &origin, Position &voxel)
 {
+	TileEngine *tileEngine = _save->getTileEngine();
+	Tile *from = _save->getTile(shot.actor->getPosition());
 	const BattleActionOrigin side = shot.relativeOrigin;
-	origin = _save->getTileEngine()->getOriginVoxel(shot, _save->getTile(shot.actor->getPosition()));
+	origin = tileEngine->getOriginVoxel(shot, from);
 	voxel = aimedVoxel;
-	if (Options::fpsAimExact && hitSomething && gameLetsLineFly(shot, origin, aimedVoxel, targetTile))
+	if (Options::fpsAimExact)
 	{
-		return AIM_EXACT;
+		// The exact point from each muzzle point the game may fire from, in its order.
+		std::vector<BattleActionOrigin> sides = { side };
+		if (side != BattleActionOrigin::CENTRE) sides.push_back(BattleActionOrigin::CENTRE);
+		if (Options::oxceEnableOffCentreShooting)
+		{
+			for (const BattleActionOrigin offCentre : { BattleActionOrigin::LEFT, BattleActionOrigin::RIGHT })
+			{
+				if (offCentre != side) sides.push_back(offCentre);
+			}
+		}
+		for (const BattleActionOrigin tried : sides)
+		{
+			shot.relativeOrigin = tried;
+			const Position triedOrigin = tileEngine->getOriginVoxel(shot, from);
+			if (gameLetsLineFly(shot, triedOrigin, aimedVoxel, targetTile))
+			{
+				origin = triedOrigin;
+				return AIM_EXACT;
+			}
+		}
+		shot.relativeOrigin = side;
 	}
 	Position gameOrigin, gameVoxel;
 	const bool gameFound = gameAimFound(shot, targetTile, gameOrigin, gameVoxel);
@@ -1740,7 +1833,7 @@ FirstPersonMode::ShotAim FirstPersonMode::aimFor(BattleAction &shot, const Posit
 		voxel = gameVoxel;
 		return AIM_GAME;
 	}
-	return Options::fpsForceBlocked && hitSomething ? AIM_FORCED : AIM_REFUSED;
+	return Options::fpsForceBlocked ? AIM_FORCED : AIM_REFUSED;
 }
 
 /**
@@ -2017,8 +2110,8 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 		_sounds->play(FirstPersonSounds::DRY_FIRE); // the game refuses the shot itself
 	}
 
-	// The target tile: the one holding the voxel under the pixel, kept inside the map (a point
-	// in the sky may lie beyond its edge or above its top).
+	// The target tile: the one holding the voxel under the pixel (on the open sky the point of
+	// air on the ray, inside the map, see aimAt).
 	Position aimedVoxel;
 	const bool hitSomething = aimAt(pixelX, pixelY, unit, aimedVoxel);
 	const Position targetTile = aimedTile(aimedVoxel);
@@ -2144,9 +2237,10 @@ void FirstPersonMode::launchShot(BattleUnit *unit, BattleItem *weapon, BattleAct
 	//   (freeAimTarget) and rolls no accuracy; the line of fire is still the game's.
 	// - targetVoxel (setting "Aim at exact point", or FPS style): aim at the very voxel under
 	//   the crosshair instead of the point the game picks on the target tile (the middle of a
-	//   unit, an object...); the game's accuracy roll still applies to it.
+	//   unit, an object...), or a straight shot on the open sky at the point of air on the
+	//   crosshair's ray (see aimAt); the game's accuracy roll still applies to it.
 	action->freeAim = freeAimOn(mode);
-	if ((Options::fpsAimExact || action->freeAim) && hitSomething && isShot(mode))
+	if ((Options::fpsAimExact || action->freeAim) && (hitSomething || !weapon->getArcingShot(mode)) && isShot(mode))
 	{
 		action->targetVoxel = aimedVoxel;
 	}
@@ -2156,17 +2250,21 @@ void FirstPersonMode::launchShot(BattleUnit *unit, BattleItem *weapon, BattleAct
 	// An arcing shot the game would refuse fires forced, as with Ctrl held (setting "Force
 	// arcing shots", see forcesArc).
 	action->forced = forcesArc(*action, targetTile);
-	// A straight shot with the game's own targeting: at the exact point if its line flies; else
-	// the game's own aim (the exact point dropped: the game then aims at any part of the unit,
-	// off-centre too, as it does on the map); else forced along the line to the crosshair
-	// ("Force blocked shots"); else as it was, refused (see aimFor).
+	// A straight shot with the game's own targeting: at the exact point if its line flies (from
+	// the muzzle point that lets it, which the game then fires from); else the game's own aim (the
+	// exact point dropped: the game then aims at any part of the unit, off-centre too, as it does
+	// on the map); else forced along the line to the crosshair ("Force blocked shots"); else as it
+	// was, refused (see aimFor).
 	if (!action->freeAim && isShot(mode) && !weapon->getArcingShot(mode))
 	{
 		BattleAction probe = *action;
 		probe.target = targetTile; // (the game sets it as it fires; the shot's origin depends on it)
 		Position origin, voxel;
-		switch (aimFor(probe, targetTile, aimedVoxel, hitSomething, origin, voxel))
+		switch (aimFor(probe, targetTile, aimedVoxel, origin, voxel))
 		{
+		case AIM_EXACT:
+			action->relativeOrigin = probe.relativeOrigin;
+			break;
 		case AIM_GAME:
 			action->targetVoxel = Position(-1, -1, -1);
 			break;
@@ -2625,6 +2723,35 @@ void FirstPersonMode::freeAim(BattlescapeState *state, const BattleAction &actio
 }
 
 /**
+ * The game's hook for where an FPS-style shot leaves from (see FirstPerson::freeAimOrigin): a
+ * straight shot by the soldier the 3D view is with leaves from the eye's place across the tile
+ * (with a lean, the leaned eye's), at the height the game gave it (the gun's, within a voxel of
+ * the eye's). The game's own muzzle point sits on the tile's edge towards the target, up to 7
+ * voxels from the middle, while the eye stays near the middle: past a corner the crosshair
+ * cleared, the game's line could meet the wall (a player's report: the laser went into the near
+ * wall). So what the crosshair sees, the round reaches. Arcing shots keep the game's origin (the
+ * hand), and so does a shot while the eye isn't on the soldier's tile (a step being walked).
+ * @param state The battlescape screen (it owns the first-person mode).
+ * @param action The shot being fired.
+ * @param origin The game's origin, in voxels, to change.
+ */
+void FirstPersonMode::freeAimFrom(BattlescapeState *state, const BattleAction &action, Position &origin)
+{
+	if (!state || !state->_firstPerson || !state->_firstPerson->isActive() || !action.actor || !action.weapon
+		|| action.weapon->getArcingShot(action.type))
+	{
+		return;
+	}
+	const FirstPersonMode *firstPerson = state->_firstPerson;
+	if (action.actor != firstPerson->_trackedUnit || action.actor->getPosition() != firstPerson->_trackedTile)
+	{
+		return;
+	}
+	origin.x = (int)std::floor(firstPerson->_eyeX + firstPerson->_leanShift[0]);
+	origin.y = (int)std::floor(firstPerson->_eyeY + firstPerson->_leanShift[1]);
+}
+
+/**
  * The game's hook for a shot knocked aside by a failed close-quarters check (see
  * FirstPerson::closeQuartersDeflected): passed on to the first-person mode if the 3D view is
  * showing.
@@ -2707,6 +2834,61 @@ bool FirstPersonMode::pelletsInFlight(BattlescapeState *state)
 bool FirstPersonMode::eachPellet(BattlescapeState *state)
 {
 	return Options::fpsEachPellet && state && state->_firstPerson;
+}
+
+/**
+ * The scale a stat bar is drawn at, in pixels per point (a player's report: "say a unit has 300 hp
+ * and takes 100 damage. The bar still appears full", the game drawing a pixel per point and
+ * cutting the rest off at the bar's end), by the setting "Stat bars":
+ * - the game's own: a pixel per point;
+ * - scaled: a pixel per point while every maximum of the stat among the player's units fits the
+ *   bar, else one smaller scale for all of them, so the longest fits and a longer maximum is still
+ *   a longer bar, in either view (the owner: "not all bars are equal width if their absolute values
+ *   are different", and in 3D too). On the map every vanilla soldier fits, and looks as before;
+ *   the 3D view's bars are far shorter (52 and 40 pixels: morale's 100 never fitted), so there
+ *   most stats shrink, all soldiers' alike;
+ * - percentage: the bar full at the unit's own maximum, in both views.
+ * The outline is drawn a pixel longer than the maximum, so the room is the width less one.
+ * @param state The battlescape screen.
+ * @param stat Which stat (FirstPerson::StatBar).
+ * @param maximum The unit's maximum of it.
+ * @param barWidth The bar's width, in pixels.
+ * @return Pixels per point.
+ */
+double FirstPersonMode::statBarScale(BattlescapeState *state, int stat, int maximum, int barWidth)
+{
+	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
+	if (!mode || Options::fpsStatBars == 0 || maximum <= 0)
+	{
+		return 1.0;
+	}
+	const double room = barWidth - 1;
+	if (Options::fpsStatBars == 2)
+	{
+		return room / maximum;
+	}
+	// The longest maximum of the stat among the player's units (morale's is always 100).
+	auto statMaximum = [stat](const BattleUnit *unit)
+	{
+		const UnitStats *stats = unit->getBaseStats();
+		switch (stat)
+		{
+		case FirstPerson::STAT_TU: return (int)stats->tu;
+		case FirstPerson::STAT_ENERGY: return (int)stats->stamina;
+		case FirstPerson::STAT_HEALTH: return (int)stats->health;
+		case FirstPerson::STAT_MANA: return (int)stats->mana;
+		default: return 100;
+		}
+	};
+	int longest = maximum;
+	for (const BattleUnit *unit : *mode->_save->getUnits())
+	{
+		if (unit->getFaction() == FACTION_PLAYER && unit->getStatus() != STATUS_DEAD)
+		{
+			longest = std::max(longest, statMaximum(unit));
+		}
+	}
+	return std::min(1.0, room / longest);
 }
 
 /**
@@ -3035,8 +3217,8 @@ std::string FirstPersonMode::renamedAction(const RuleItem *rules, BattleActionTy
  * accuracy, then its range dropoff, a mod's penalty for a target out of the soldier's line of
  * sight, and its maximum range), so the two agree. The
  * crosshair is yellow when the soldier can do it, red when he can't (time units, ammo, range),
- * purple for psi, and grey when it's not his move. In FPS style it shows the spread as a
- * dotted ring instead of odds.
+ * purple for psi, and grey when it's not his move. Under it the accuracy line (in FPS style
+ * the spread, instead of odds).
  * @param unit The soldier being looked through (may be null).
  * @param playerTurn It's the player's turn (otherwise only a plain crosshair).
  */
@@ -3047,6 +3229,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	// either way.
 	const bool show = isActive();
 	_crosshair->setVisible(show && Options::fpsCrosshair);
+	if (!show) _accuracyLine->setVisible(false); // (else shown below, with a reach)
 	_txtMode->setVisible(show && Options::fpsCrosshairInfo && playerTurn);
 	_txtShot->setVisible(show && Options::fpsCrosshairInfo && playerTurn);
 	_txtCosts->setVisible(show && Options::fpsCrosshairInfo && Options::fpsCrosshairCosts && playerTurn);
@@ -3125,14 +3308,15 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		}
 
 		// The hit chance at what's under the crosshair, for shots and throws (not in FPS style:
-		// no odds there, the spread ring shows it). As the game's isometric cursor works it out
+		// no odds there, the accuracy line shows the spread). As the game's isometric cursor works it out
 		// (Map.cpp): the soldier's firing accuracy with this weapon and mode, less the dropoff
 		// per tile beyond the weapon's aim range or short of its minimum range (then shown
 		// yellow); zero (red) beyond its maximum range.
 		std::ostringstream shotInfo;
 		int accuracy = -1;
 		Uint8 accuracyColor = greenText;
-		if ((isShot(mode) || mode == BA_THROW) && _aimHitsSomething && !freeAimOn(mode))
+		// (A straight shot has one on the open sky too, at the point of air the shot aims at, see aimAt.)
+		if ((isShot(mode) || mode == BA_THROW) && (_aimHitsSomething || (isShot(mode) && !weapon->getArcingShot(mode))) && !freeAimOn(mode))
 		{
 			const BattleActionAttack attack = BattleActionAttack::GetBeforeShoot(mode, unit, weapon);
 			accuracy = BattleUnit::getFiringAccuracy(attack, _game->getMod());
@@ -3277,39 +3461,125 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	const int hitMark = hitTick && SDL_GetTicks() - hitTick < 280 ? (_view->getHitMarkKill() ? 2 : 1) : 0;
 	const Uint8 hitColor = hitMark == 2 ? red : nearestColor(palette, 255, 255, 255);
 
-	// FPS style: a dotted ring shows the spread (it grows with the bloom of the last rounds).
-	// Its radius in pixels is the spread angle seen through the view's lens, kept inside the
-	// crosshair surface.
-	int ringRadius = 0;
-	if (unit && freeAimOn(mode))
-	{
-		const double focalPixels = (_view->getWidth() / 2.0) / std::tan(fieldOfViewNow() * Pi / 360.0);
-		ringRadius = std::clamp((int)std::lround(std::tan((spreadFor(unit, mode, dual && !eachFull) + _bloom) * Pi / 180.0) * focalPixels), 2, CrosshairSize / 2 - 1);
-	}
-
 	// Redraw the crosshair only when what it shows has changed: all of that packed into one
-	// number (mode, rounds, colour, hitmarker, ring radius) and compared with the last one.
-	const Uint32 crosshairKey = (Uint32)mode | ((Uint32)shots << 8) | ((Uint32)color << 16) | ((Uint32)hitMark << 24) | ((Uint32)ringRadius << 26);
+	// number (mode, rounds, colour, hitmarker) and compared with the last one.
+	const Uint64 crosshairKey = (Uint64)mode | ((Uint64)shots << 8) | ((Uint64)color << 16) | ((Uint64)hitMark << 24);
 	if (crosshairKey != _crosshairDrawnFor)
 	{
 		_crosshairDrawnFor = crosshairKey;
 		drawCrosshair(mode, shots, color, shadow, hitMark, hitColor);
-
-		// The spread ring: a dot every 12 degrees, each with a shadow down and to the right.
-		if (ringRadius)
-		{
-			_crosshair->lock();
-			const int centre = CrosshairSize / 2;
-			for (int degrees = 0; degrees < 360; degrees += 12)
-			{
-				const int x = centre + (int)std::lround(ringRadius * std::cos(degrees * Pi / 180.0)),
-					y = centre + (int)std::lround(ringRadius * std::sin(degrees * Pi / 180.0));
-				_crosshair->setPixel(x + 1, y + 1, shadow);
-				_crosshair->setPixel(x, y, color);
-			}
-			_crosshair->unlock();
-		}
 	}
+
+	// The accuracy line (setting "Accuracy line") under the crosshair, green (grey while he
+	// can't act): its half-width how far to either side a round can land, seen through the
+	// view's lens. In FPS style the spread (it grows with the bloom of the last rounds); with
+	// the game's own targeting, for a straight shot, how far a successful accuracy roll can send
+	// the round from what's under the crosshair (see hitCloudReach).
+	int reach = 0;
+	if (unit && weapon && Options::fpsAccuracyLine && freeAimOn(mode))
+	{
+		const double focalPixels = (_view->getWidth() / 2.0) / std::tan(fieldOfViewNow() * Pi / 360.0);
+		reach = std::clamp((int)std::lround(std::tan((spreadFor(unit, mode, dual && !eachFull) + _bloom) * Pi / 180.0) * focalPixels), AccuracyLineLeast, AccuracyLineReach);
+	}
+	else if (unit && weapon && Options::fpsAccuracyLine && isShot(mode) && !weapon->getArcingShot(mode))
+	{
+		reach = hitCloudReach(unit, weapon, mode);
+	}
+	_accuracyLine->setX(centreX - AccuracyLineReach - 1);
+	_accuracyLine->setY(centreY + AccuracyLineDrop - 2);
+	_accuracyLine->setVisible(Options::fpsCrosshair && reach > 0);
+	const Uint8 lineColor = canAct() ? nearestColor(palette, 130, 230, 100) : grey;
+	const Uint64 lineKey = (Uint64)reach | ((Uint64)lineColor << 16);
+	if (reach > 0 && lineKey != _accuracyLineDrawnFor)
+	{
+		_accuracyLineDrawnFor = lineKey;
+		drawAccuracyLine(reach, lineColor, shadow);
+	}
+}
+
+/**
+ * Draws the accuracy line (setting "Accuracy line") onto its surface: a level line through the
+ * middle, as wide to either side as the reach, with a small notch up at each end; each pixel
+ * with a shadow one down and to the right, so it reads on any background.
+ * @param reach The half-width, in pixels (at most AccuracyLineReach).
+ * @param color Palette colour of the line.
+ * @param shadow Palette colour of its shadow.
+ */
+void FirstPersonMode::drawAccuracyLine(int reach, Uint8 color, Uint8 shadow)
+{
+	// The points, from the line's middle (the surface's row 2 is the line's, the notches rise
+	// two rows above it); the shadows go under all of them before the colour goes on top.
+	std::vector<std::pair<int, int>> points;
+	for (int x = -reach; x <= reach; ++x) points.push_back({ x, 2 });
+	for (int side : { -reach, reach }) { points.push_back({ side, 1 }); points.push_back({ side, 0 }); }
+	const int middle = AccuracyLineReach + 1;
+	_accuracyLine->clear();
+	_accuracyLine->lock();
+	for (const auto &point : points) _accuracyLine->setPixel(middle + point.first + 1, point.second + 1, shadow);
+	for (const auto &point : points) _accuracyLine->setPixel(middle + point.first, point.second, color);
+	_accuracyLine->unlock();
+}
+
+/**
+ * The accuracy line's reach with the game's own targeting (setting "Accuracy line"), for a
+ * straight shot at what's under the crosshair: how far to either side of the point aimed at a
+ * successful accuracy roll can send the round, as the game rolls it (Projectile::applyAccuracy).
+ * The roll's deviation grows with the distance from the muzzle, by the game's own measure of it
+ * (more across the map's y than along its x, unless OXCE's "Uniform shooting spread" is on), and
+ * the round goes up to half of it to either side on the map (and an eighth of it up or down,
+ * which the line leaves out), then flies on along that line. A roll under the accuracy strays
+ * this far at most, whatever the soldier's skill (the hit chance says how likely that is; a miss
+ * strays much wider).
+ * @param unit The soldier aiming.
+ * @param weapon The gun.
+ * @param mode The shot.
+ * @return The reach across the view, in pixels (0 with nothing to measure).
+ */
+int FirstPersonMode::hitCloudReach(BattleUnit *unit, BattleItem *weapon, BattleActionType mode)
+{
+	// From the muzzle the shot leaves from (a lean's side too, as fire picks it) to the point
+	// under the crosshair.
+	BattleAction shot;
+	shot.actor = unit;
+	shot.weapon = weapon;
+	shot.type = mode;
+	shot.target = aimedTile(_aimVoxel);
+	shot.relativeOrigin = Options::fpsLeanShots || leaningOut() ? leanSide(unit, shot.target) : BattleActionOrigin::CENTRE;
+	const Position origin = _save->getTileEngine()->getOriginVoxel(shot, _save->getTile(unit->getPosition()));
+
+	// The game's measure of the distance, and its largest deviation for a successful roll.
+	const int xDist = std::abs(origin.x - _aimVoxel.x), yDist = std::abs(origin.y - _aimVoxel.y), zDist = std::abs(origin.z - _aimVoxel.z);
+	int xyShift;
+	if (Options::oxceUniformShootingSpread)
+	{
+		xyShift = xDist <= yDist ? xDist / 4 + yDist : xDist + yDist / 4;
+		xyShift *= 0.839;
+	}
+	else
+	{
+		xyShift = xDist / 2 <= yDist ? xDist / 4 + yDist : (xDist + yDist) / 2;
+	}
+	const int zShift = xyShift <= zDist ? xyShift / 2 + zDist : xyShift + zDist / 2;
+	const double deviation = std::max(1, zShift * HitRollDeviation / 200);
+	const double across = deviation / 2.0;
+
+	// How far that reaches across the view, seen from the eye: the view's right at the point
+	// (level, square to the line of sight).
+	double eye[3];
+	_view->getEye(eye);
+	const double sight[3] = { _aimVoxel.x + 0.5 - eye[0], _aimVoxel.y + 0.5 - eye[1], _aimVoxel.z + 0.5 - eye[2] };
+	const double distance = std::sqrt(sight[0] * sight[0] + sight[1] * sight[1] + sight[2] * sight[2]);
+	const double level = std::sqrt(sight[0] * sight[0] + sight[1] * sight[1]);
+	if (distance < 1.0 || level < 1e-6)
+	{
+		return 0;
+	}
+	const double right[2] = { -sight[1] / level, sight[0] / level };
+	// (the map's spread: a square of it on x and y, or a circle with uniform spread)
+	const double acrossReach = Options::oxceUniformShootingSpread ? across : across * (std::abs(right[0]) + std::abs(right[1]));
+
+	const double focalPixels = (_view->getWidth() / 2.0) / std::tan(fieldOfViewNow() * Pi / 360.0);
+	return std::clamp((int)std::lround(acrossReach / distance * focalPixels), AccuracyLineLeast, AccuracyLineReach);
 }
 
 /**
@@ -3539,7 +3809,12 @@ void FirstPersonMode::updateUnitName(BattleUnit *unit)
 	pointer(pointerX, pointerY);
 	const BattleUnit *target = Options::fpsUnitNames && isActive() && unit ? _view->getUnitAtPointer() : nullptr;
 	_txtTarget->setVisible(target != nullptr);
-	_view->setPointer(pointerX, pointerY, target ? _txtTarget->getHeight() + 1 + (costLineShown() ? 10 : 0) : 0);
+	// The name a line lower while the action's other costs show under the shot line (its text
+	// would run into them), and under the accuracy line while that shows (see updateCrosshair);
+	// a downed unit's icons under both.
+	const int lineRoom = accuracyLineShown() ? AccuracyLineRoom : 0;
+	const int below = std::max(costLineShown() ? 10 : 0, lineRoom);
+	_view->setPointer(pointerX, pointerY, target ? _txtTarget->getHeight() + 1 + below : lineRoom);
 	if (!target)
 	{
 		return;
@@ -3551,9 +3826,8 @@ void FirstPersonMode::updateUnitName(BattleUnit *unit)
 	const std::string label = unitLabel(target);
 	if (_txtTarget->getText() != label) _txtTarget->setText(label);
 	// Centred under the crosshair, clear of its picture (about 8 pixels round the middle).
-	// (A line lower while the action's other costs show under the shot line: see updateCrosshair.)
 	_txtTarget->setX(_view->getX() + pointerX - _txtTarget->getWidth() / 2);
-	_txtTarget->setY(_view->getY() + pointerY + 10 + (costLineShown() ? 10 : 0));
+	_txtTarget->setY(_view->getY() + pointerY + 10 + below);
 }
 
 /**
@@ -3564,6 +3838,16 @@ void FirstPersonMode::updateUnitName(BattleUnit *unit)
 bool FirstPersonMode::costLineShown() const
 {
 	return _txtCosts && _txtCosts->getVisible() && !_txtCosts->getText().empty() && Options::fpsCrosshair;
+}
+
+/**
+ * Whether the accuracy line shows under the crosshair (see updateCrosshair): the unit name and
+ * the icons over a downed unit go under it then.
+ * @return True if it's shown.
+ */
+bool FirstPersonMode::accuracyLineShown() const
+{
+	return _accuracyLine && _accuracyLine->getVisible();
 }
 
 /**
@@ -3602,7 +3886,10 @@ bool FirstPersonMode::identifyPointedUnit()
  * After a shot of ours, once the game is done with it (or refused it), stops the game aiming that
  * shot again. On the isometric map the game keeps aiming after a shot, so the player can fire
  * again; in 3D every click sets its own shot up, and the leftover aim would eat the next right
- * click (zoom), Q / E or a classic HUD hand or SPECIAL click, which cancel an aim first.
+ * click (zoom), Q / E or a classic HUD hand or SPECIAL click, which cancel an aim first. The map's
+ * cursor goes back to the normal one with it (a player's report: after a shot in 3D the map showed
+ * the aim cursor while a click there walked or turned the soldier). Called in both views, so a
+ * switch to the map while the shot still flies ends its aim too.
  */
 void FirstPersonMode::endShotAim()
 {
@@ -3618,6 +3905,7 @@ void FirstPersonMode::endShotAim()
 	{
 		action->targeting = false;
 		action->type = BA_NONE;
+		battleGame->setupCursor(); // (the normal cursor, as the action no longer aims)
 	}
 }
 

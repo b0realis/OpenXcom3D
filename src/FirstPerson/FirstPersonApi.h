@@ -148,6 +148,11 @@ const int DoomFuseMaxSeconds = 5;
 /// projectile code asks this for each round, and then traces the round with its usual line of
 /// fire.
 void freeAimTarget(BattlescapeState *state, const BattleAction &action, Position &target);
+/// An FPS-style straight shot's origin: it leaves from where the first-person view's eye is
+/// across the soldier's tile (a lean too), at the game's gun height, so what the crosshair sees
+/// past a corner the round can reach. The game asks this as it works out where a shot leaves
+/// from (TileEngine::getOriginVoxel); every other shot keeps the game's own muzzle point.
+void freeAimOrigin(BattlescapeState *state, const BattleAction &action, Position &origin);
 /// Is FPS-style shooting on for this unit's shots in the first-person view? Their bullet hits
 /// then play quicker (a burst at a bullet's pace).
 bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
@@ -157,6 +162,12 @@ bool pelletsInFlight(BattlescapeState *state);
 /// Setting "Each pellet on its own": do a shotgun's pellets and a volley's two rounds each land on
 /// their own (in either view), none lost when the lead pellet leaves the map?
 bool eachPellet(BattlescapeState *state);
+/// The stat bars (time units, energy, health, morale, mana: StatBar), setting "Stat bars": the scale,
+/// in pixels per point, a bar of this width is drawn at for a unit's maximum of the stat (the map's; the 3D view's alike):
+/// one, or fitted (one scale per stat for all the player's units, so the longest maximum fits and
+/// different maxima stay different lengths), or the bar full at the unit's own maximum.
+enum StatBar { STAT_TU, STAT_ENERGY, STAT_HEALTH, STAT_MORALE, STAT_MANA };
+double statBarScale(BattlescapeState *state, int stat, int maximum, int barWidth);
 /// Akimbo on the map (Ctrl and Shift held, a click on a hand's weapon): steps the soldier's two
 /// guns through firing together on the map, both at once, in turn, and not. True if it took the click.
 bool toggleMapAkimbo(BattlescapeState *state, BattleUnit *unit);
@@ -206,9 +217,12 @@ inline bool hasOptionsTab(const Mod *) { return false; }
 inline State *createOptionsTab(OptionsOrigin) { return nullptr; }
 inline bool activeWhenNew(const std::string &) { return false; }
 inline void freeAimTarget(BattlescapeState *, const BattleAction &, Position &) { }
+inline void freeAimOrigin(BattlescapeState *, const BattleAction &, Position &) { }
 inline bool fastShots(BattlescapeState *, const BattleUnit *) { return false; }
 inline bool pelletsInFlight(BattlescapeState *) { return false; }
 inline bool eachPellet(BattlescapeState *) { return false; }
+enum StatBar { STAT_TU, STAT_ENERGY, STAT_HEALTH, STAT_MORALE, STAT_MANA };
+inline double statBarScale(BattlescapeState *, int, int, int) { return 1.0; }
 inline bool toggleMapAkimbo(BattlescapeState *, BattleUnit *) { return false; }
 inline void drawMapAkimbo(BattlescapeState *, BattleUnit *, Surface *, Surface *) { }
 inline void mapAkimbo(BattlescapeState *, BattleAction &) { }

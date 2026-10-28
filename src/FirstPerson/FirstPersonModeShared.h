@@ -91,6 +91,24 @@ const Uint32 PelletSoundWindow = 60;
 const int PanelW = 150, PanelH = 54, PanelLineW = PanelW - 6;
 /// The crosshair's surface (square).
 const int CrosshairSize = 41;
+/// The crosshair on the open sky (nothing under it, see FirstPersonMode::aimAt): a shot aims at the
+/// point this many voxels along its ray (20 tiles, the game's usual sight range), or nearer where
+/// the ray leaves the map or the weapon's range ends. A point the soldier sees and can reach
+/// costs no penalty a nearer one wouldn't, and the round flies on past it along the same line.
+const double SkyAimReach = 320.0;
+/// The largest deviation the game's accuracy roll gives a successful roll (Projectile::
+/// applyAccuracy: a roll under the accuracy, plus 10, so 9 at most), for the accuracy line of
+/// "Faithful X-COM targeting" (see FirstPersonMode::hitCloudReach).
+const int HitRollDeviation = 9;
+/// The accuracy line under the crosshair (setting "Accuracy line", see FirstPersonMode::
+/// drawAccuracyLine), in canvas pixels: its reach to either side of the middle at the least and
+/// at the most, how far under the crosshair's middle it runs (clear of the crosshair's shapes,
+/// which reach 13 down with their outline), and the room it takes there (the unit's name and the
+/// icons over a downed unit go that much lower while it shows).
+const int AccuracyLineLeast = 3;
+const int AccuracyLineReach = 60;
+const int AccuracyLineDrop = 16;
+const int AccuracyLineRoom = 9;
 /// Where the game has pushed a soldier's sight under a floor right above (standing on something
 /// tall under a ceiling), the 3D eye is only this many voxels under the game's (see eyeHeight).
 const double PressedEyeLower = 1.0;
@@ -255,6 +273,9 @@ const int VaultMaxHeight = 14;
 
 /// A melee swing in the view: wind up, strike, back (milliseconds).
 const Uint32 SwingTime = 420;
+/// A step off a ledge onto an unsafe landing (setting "Check the landing", see FirstPersonMode::landingSafe):
+/// after its warning, pushing that way again within this many milliseconds goes over; later, it warns again.
+const Uint32 UnsafeLandingTime = 6000;
 /// Akimbo on the map (Ctrl+Shift+click on a hand's weapon, see FirstPersonMode::toggleMapAkimbo): mini targets in
 /// each hand's box, one for both guns at once, two for in turn, from (MapAkimboMarkX, MapAkimboMarkY) in the box (its
 /// bottom left, clear of the ammo counts and the reaction and two-handed marks), MapAkimboMarkStep pixels apart, in
