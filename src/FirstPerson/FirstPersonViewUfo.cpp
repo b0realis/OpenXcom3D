@@ -111,6 +111,33 @@ inline float colorLuminance(const SDL_Color &color)
 }
 
 /**
+ * The palette colour closest to an RGB colour that is as bright as a given brightness: a
+ * difference in brightness counts four times as much as one in hue, so a few shades of one
+ * colour stay a few shades apart however they are tinted (the art's detail kept; a plain
+ * search put the Abductor's wall panels' lilacs onto one flat blue). Colour 0 is never picked.
+ * @param palette The palette.
+ * @param red, green, blue The wanted colour (0..255 per channel).
+ * @param luminance The brightness to keep (see colorLuminance).
+ */
+Uint8 nearestColorKeepingBrightness(const SDL_Color *palette, float red, float green, float blue, float luminance)
+{
+	int bestIndex = 1;
+	float bestDistance = 1e9f;
+	for (int index = 1; index < 256; ++index)
+	{
+		const float dr = palette[index].r - red, dg = palette[index].g - green, db = palette[index].b - blue;
+		const float dl = colorLuminance(palette[index]) - luminance;
+		const float distance = dr * dr * 0.3f + dg * dg * 0.59f + db * db * 0.11f + dl * dl * 4.0f;
+		if (distance < bestDistance)
+		{
+			bestDistance = distance;
+			bestIndex = index;
+		}
+	}
+	return (Uint8)bestIndex;
+}
+
+/**
  * The palette colour closest to an RGB colour (0..255 per channel), weighting the channels by
  * how bright they look. Colour 0 is transparent, so it is never picked.
  */
@@ -797,6 +824,37 @@ void FirstPersonView::chooseUfoColors(UfoSpot &ufo)
 		}
 	}
 
+	// The even tints, for the UFO itself (its floors, walls and consoles inside, and its hull):
+	// each colour mixed with one to twelve twelfths of the inner light's colour (as the tint
+	// table above has it, before it is matched to the palette), the nearest palette colour as
+	// bright as the colour itself (see nearestColorKeepingBrightness). A grey takes all of
+	// that share, a strong colour little of it (its saturation takes off up to four fifths),
+	// so the light shows on the metal and the art keeps its colours: a red lift pad stays red
+	// (a fifth of violet made it a dull mauve).
+	// A surface lit the same all over then takes one colour, where the dithered full tint put
+	// a grid of light-coloured dots over the whole view inside (a player: "a white screen
+	// overlay of dots").
+	for (int step = 0; step < UfoSpot::SoftTintSteps; ++step)
+	{
+		const float share = (step + 1.0f) / UfoSpot::SoftTintSteps;
+		ufo.softTint[step][0] = 0;
+		for (int index = 1; index < 256; ++index)
+		{
+			const float luminance = colorLuminance(palette[index]);
+			float mixed[3];
+			const float own[3] = { (float)palette[index].r, (float)palette[index].g, (float)palette[index].b };
+			const float brightest = std::max(own[0], std::max(own[1], own[2])), dimmest = std::min(own[0], std::min(own[1], own[2]));
+			const float saturation = brightest > 0.0f ? (brightest - dimmest) / brightest : 0.0f;
+			const float colourShare = share * (1.0f - 0.8f * saturation);
+			for (int channel = 0; channel < 3; ++channel)
+			{
+				const float lit = std::min(255.0f, hues[0][channel] * (70.0f + luminance * 1.15f) + luminance * 0.08f);
+				mixed[channel] = own[channel] + (lit - own[channel]) * colourShare;
+			}
+			ufo.softTint[step][index] = nearestColorKeepingBrightness(palette, mixed[0], mixed[1], mixed[2], luminance);
+		}
+	}
+
 	// The aura's motes: the two lights at full brightness, lifted a little towards white and
 	// taken three shades brighter in their palette group (the groups run bright to dark), and a
 	// white-hot spark.
@@ -906,9 +964,19 @@ void FirstPersonView::spawnUfoAura(float elapsedSeconds)
 		const bool room = _particles.all().size() < UfoAuraParticleCap; // (past the cap the aura waits)
 		const int moteCount = room ? (int)(elapsedSeconds * rate + _particles.random()) : 0;
 		const float height = ufo.top - ufo.bottom;
+		// (A point on one of the UFO's own tiles: its rim is an ellipse round its footprint,
+		// which cuts inside the corners of a boxy UFO; the aura stays outside, the inside clean.)
+		const int mapSizeX = _save->getMapSizeX(), mapSizeY = _save->getMapSizeY(), mapSizeZ = _save->getMapSizeZ();
+		auto onUfoTile = [&](const float *pos)
+		{
+			const int x = (int)std::floor(pos[0] / 16.0f), y = (int)std::floor(pos[1] / 16.0f), z = (int)std::floor(pos[2] / 24.0f);
+			if (x < 0 || y < 0 || z < 0 || x >= mapSizeX || y >= mapSizeY || z >= mapSizeZ) return false;
+			return (_ufoPhaseOfTile[(z * mapSizeY + y) * mapSizeX + x] & UfoTileBit) != 0;
+		};
 		for (int i = 0; i < moteCount; ++i)
 		{
-			// A random point just outside the rim, at a random height (more of them low down).
+			// A random point just outside the rim, at a random height (more of them low down),
+			// not on the UFO's own tiles.
 			P::Particle mote;
 			const float angle = _particles.random(0, 2.0f * (float)Pi), out = _particles.random(1.02f, 1.25f);
 			const float cosAngle = std::cos(angle), sinAngle = std::sin(angle);
@@ -916,6 +984,7 @@ void FirstPersonView::spawnUfoAura(float elapsedSeconds)
 			mote.pos[0] = ufo.centre[0] + cosAngle * ufo.half[0] * out;
 			mote.pos[1] = ufo.centre[1] + sinAngle * ufo.half[1] * out;
 			mote.pos[2] = ufo.bottom + 2.0f + heightShare * heightShare * height;
+			if (onUfoTile(mote.pos)) continue;
 			// It drifts round the UFO (all of them the same way), a little outwards and up.
 			const float swirl = _particles.random(3, 7), outwards = _particles.random(0.5f, 2.0f);
 			mote.vel[0] = -sinAngle * swirl + cosAngle * outwards;
@@ -932,7 +1001,8 @@ void FirstPersonView::spawnUfoAura(float elapsedSeconds)
 		}
 
 		// The shimmer: about six times a second round a scout, a spark streaks up the hull
-		// from its foot, fast and white-hot, gone within half a second (drawn as a short line).
+		// from its foot, fast and white-hot, gone within half a second (drawn as a short line;
+		// not on the UFO's own tiles either).
 		const int sparkCount = room ? (int)(elapsedSeconds * 6.0f * size + _particles.random()) : 0;
 		for (int i = 0; i < sparkCount; ++i)
 		{
@@ -941,6 +1011,7 @@ void FirstPersonView::spawnUfoAura(float elapsedSeconds)
 			spark.pos[0] = ufo.centre[0] + std::cos(angle) * ufo.half[0] * 1.03f;
 			spark.pos[1] = ufo.centre[1] + std::sin(angle) * ufo.half[1] * 1.03f;
 			spark.pos[2] = ufo.bottom + _particles.random(1.0f, 6.0f);
+			if (onUfoTile(spark.pos)) continue;
 			spark.vel[0] = std::cos(angle) * 6.0f;
 			spark.vel[1] = std::sin(angle) * 6.0f;
 			spark.vel[2] = _particles.random(70, 110);
@@ -955,7 +1026,6 @@ void FirstPersonView::spawnUfoAura(float elapsedSeconds)
 		// (40 a second, 16 with particles at effects only; one in five a streak). They start
 		// anywhere along the column and live until they reach its top, so the column is full
 		// from the start.
-		const int mapSizeX = _save->getMapSizeX(), mapSizeY = _save->getMapSizeY();
 		for (size_t lift = 0; lift < ufo.lifts.size(); ++lift)
 		{
 			const int liftTile = ufo.lifts[lift];

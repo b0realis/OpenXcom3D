@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo/openxcom3d_logo.png" width="240" alt="OpenXcom3D"></p>
+
 # OpenXcom3D
 
 *A humble attempt at a wish from young days: to stand on the battlescape of* UFO: Enemy Unknown *and look around through a soldier's eyes.*
@@ -39,24 +41,14 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 
 **But be careful!** It can be a traumatic experience.
 
-## New in 1.08
+## New in 1.09
 
-- **Every pellet counts:** a shotgun's pellets each land on their own, and none is lost any more when the lead pellet flies off the map (OXCE's "shotgun void": a miss over a target into the sky took the whole blast with it). With *Shotgun pellets in flight* each hits as it gets there, every pellet drawn as a round, and FPS-style shooting's pellets spread again (they all flew down one line). The same for an akimbo volley's two rounds. A setting, on; off is OXCE's own way.
-- **Akimbo on the map:** **Ctrl+Shift+click** a hand's weapon to fire both guns from the isometric map too, both at once (a mini target by each gun) or in turn (two), kept in the save.
-- **The sea in waves:** TFTD's sea rolls in waves in its own colours, and where it reaches the map's edge it goes on past it instead of the island's grass.
-- **Rooms in their own light:** indoors no sun shading any more, so inside walls look as on the map (a shop's grey wall came out black).
-
-Re-released on 2026-10-28 with seven more play reports and a bug hunt folded in:
-
-- **Aiming at the fringes:** on the open sky a shot goes for the air on the crosshair's line (at the map's edge it went off sideways), past a corner the game's own aim tries OXCE's left and right muzzle points too, and FPS-style shots leave from your eye, so what you see you can hit. With the game's own targeting the rules stay the map's.
-- **Accuracy line:** a green line under the crosshair, as wide as a shot strays to either side: the game's own roll, or FPS style's spread.
-- **Stat bars that read:** a 300-HP unit's bar no longer looks full with a third gone; scaled alike for all your units, on the map and in 3D.
-- **Check the landing:** a step off a ledge onto ground no one can walk on (a moat, the sea) warns first; push again to go.
-- **Sludge you wade through, catwalks that show:** XPiratez's sewer sludge has a surface at thigh height; catwalk gratings, railings and chain-link fences the game gives only a few voxels show their whole art as see-through ghosts; every ghost at *Ghost opacity*.
-- **Fixes:** a light minigun's rounds leave holes, glass doors stay see-through as they swing, the heartbeat only once hurt this battle, the map's cursor after a shot in 3D, no late flash of old shots after the map, and more.
+- **A UFO's light inside it, even:** inside a UFO its light no longer lays a grid of dots over the view; the walls and floors take its colour evenly and stay sharp, strong colours (a red lift pad) keep theirs, and the aura's motes stay outside.
+- **A logo of its own:** the alien in the yellow X, now the icon of the AppImage, the Windows game, the Mac app, the game's window, the menu entry and the web pages.
 
 ## Earlier versions
 
+- **1.08:** every pellet of a shotgun lands on its own, akimbo on the isometric map, the sea in waves, rooms in their own light; aiming at the fringes, an accuracy line under the crosshair, stat bars that read, a check before an unsafe landing, XPiratez's sludge with a surface and catwalks that show, and the play guide with every key and setting.
 - **1.07:** akimbo's two guns take turns round by round, each its whole burst, both lasers; UFO's shop racks in their shape, the sea on TFTD's islands, see-through glass doors; units above no longer through the ceiling; mods' own mode names on the crosshair; no more shotgun lag on the map.
 - **1.06:** everything by the crosshair (melee, medi-kits, every cost of an action), spray bursts from 3D, flying with the view, heat vision thinning the smoke, Cydonia's lift cages, *Ghost opacity*, the rank before the name.
 - **1.05:** a crash ending a long battle fixed, helmet cameras that feel live (static in spells), the top bar across a wide screen, akimbo in turn, shotgun pellets on the map, arcing shots at the exact point.

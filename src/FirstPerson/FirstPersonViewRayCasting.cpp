@@ -827,9 +827,11 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 		const float darkness = _colors.underwater ? 0.6f : _colors.night, glow = ufoGlow * _ufoBreath; // (the sea's light is bright enough)
 		const bool onUfo = (_ufoPhaseOfTile[hit.tile] & UfoTileBit) != 0;
 		shade -= glow * (2.0f + 6.0f * darkness);
-		// Coloured by day too: the ground's pool strongly, the UFO itself less, so its hull's
-		// detail stays readable (the tint keeps each colour's brightness).
-		ufoTint = std::min(0.9f, glow * (onUfo ? 0.35f + 0.3f * darkness : 0.6f + 0.4f * darkness));
+		// Coloured by day too: the ground's pool strongly, the UFO's hull outside less, so its
+		// detail stays readable, and its inside (under its own roof) by its soft inner light,
+		// a fifth of the way to the light's colour by day (the tint keeps each colour's brightness).
+		const float strength = onUfo && indoors ? UfoInsideTint + UfoInsideTintNight * darkness : onUfo ? 0.35f + 0.3f * darkness : 0.6f + 0.4f * darkness;
+		ufoTint = std::min(0.9f, glow * strength);
 		ufoOuterShare = onUfo ? 0.0f : 1.0f - smoothstep(0.15f, 0.55f, ufoGlow); // (inside the UFO: the inner colour)
 	}
 	if (!hit.emissive && _colors.underwater && faceIndex == 4 && hit.t < 480.0f)
@@ -866,9 +868,16 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 	{
 		color = _colors.flareTint[color]; // the flare's light is red
 	}
-	if (ufoTint > dither(pixelX + 3, pixelY + 2))
+	if (ufoLighting && ufoOuterShare <= 0.0f && (_ufoPhaseOfTile[hit.tile] & UfoTileBit))
 	{
-		color = ufoLighting->tint[ufoOuterShare > dither(pixelX + 1, pixelY) ? 1 : 0][color]; // a UFO's light: its inner or outer colour
+		// On the UFO itself (inside it, and its hull): its inner light mixed in evenly, the
+		// nearest of the even tints to the light's strength there, no dots (see chooseUfoColors).
+		const int step = std::min(UfoSpot::SoftTintSteps, (int)std::lround(ufoTint * UfoSpot::SoftTintSteps));
+		if (step > 0) color = ufoLighting->softTint[step - 1][color];
+	}
+	else if (ufoTint > dither(pixelX + 3, pixelY + 2))
+	{
+		color = ufoLighting->tint[ufoOuterShare > dither(pixelX + 1, pixelY) ? 1 : 0][color]; // a UFO's light on the ground around it: its inner or outer colour, sparkling
 	}
 	// Far away the haze takes over (see hazeColor and terrainHaze).
 	return hazeColor(color, terrainHaze(hit.t), pixelX + 2, pixelY + 1);

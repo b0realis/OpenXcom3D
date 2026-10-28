@@ -1181,6 +1181,8 @@ private:
 		bool seen;                   // one of its tiles has been seen (or debug mode): its light and aura show
 		bool colorsChosen;           // its light colours have been picked for the current palette
 		Uint8 tint[2][256];          // each palette colour in its inner and its outer light colour
+		static constexpr int SoftTintSteps = 12; // the even tint's strengths (twelfths of the inner light)
+		Uint8 softTint[SoftTintSteps][256]; // each palette colour with 1..12 twelfths of the inner light mixed in (on the UFO itself, see shade)
 		Uint8 moteColor[3];          // the aura's colours: inner light, outer light, a white-hot spark
 	};
 	std::unordered_map<const MapData*, UfoModel> _ufoModels; // by MapData: UFO parts' steady models (built by the view that owns the models)

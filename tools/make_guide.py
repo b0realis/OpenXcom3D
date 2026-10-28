@@ -142,7 +142,7 @@ SETTINGS = [
         ('Unit size', '100%', '80% to 100%', 'Soldiers, aliens, corpses and items drawn a little smaller, so tall sprites fit under low ceilings.', 'Only the picture: what shots hit stays the game\'s (see <i>Hitboxes</i>).'),
         ('Muzzle flashes', 'YES', 'YES / NO', 'Gunfire, hits and blasts flash. NO: no flashes, steady UFO lights, no camera glitches.', 'Off if flashing light bothers you.'),
         ('Particles', 'All', 'All / Effects / Off', 'Effects: sparks, debris, smoke, fire, trails. All: also dust, fireflies, bubbles and weather.', ''),
-        ('UFO lights and aura', 'YES', 'YES / NO', 'UFOs glow: steady hulls with pulsing lights, their own coloured light, an aura of motes; only once a UFO has been seen.', ''),
+        ('UFO lights and aura', 'YES', 'YES / NO', 'UFOs glow: steady hulls with pulsing lights, their own coloured light, evenly inside them, and an aura of motes outside; only once a UFO has been seen.', 'Inside a UFO the view stays sharp: its light only colours it.'),
         ('Ghost opacity', '50%', '10% to 100%', 'How solid the see-through ghosts look up close (lift pads, ladders, racks, catwalks, sludge); far off 60% of that.', ''),
         ('Parts without shape', 'Lifts', 'Lifts / All / Off', 'Parts the map draws with no shape in the game\'s data, shown as see-through ghosts: ladders, lift pads, the shops\' racks, liquid over a floor, the rest of fences and catwalk gratings the game gives only a few voxels.',
          'Ghosts are only pictures: shots, sight and walking go through them as the game says.'),

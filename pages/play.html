@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Play OpenXcom3D</title>
+<link rel="icon" type="image/png" sizes="32x32" href="img/logo/icon-32.png">
+<link rel="icon" type="image/png" sizes="64x64" href="img/logo/icon-64.png">
+<link rel="apple-touch-icon" href="img/logo/icon-180.png">
 <meta name="description" content="Play OpenXcom3D (OpenXcom Extended with a first-person 3D battlescape): the ready builds on Linux, Windows, the Steam Deck or macOS step by step, then every key, every setting and how it plays, the 3D view's icons, and every feature in pictures.">
 <style>
 /* The X-COM look: the battlescape's deep blue panels with bright edges, gold headings, buttons and keys
@@ -109,6 +112,7 @@ img { max-width: 100%; height: auto; display: block; }
   text-shadow: 0 0 22px rgb(242 196 67 / 0.35), 0 2px 0 #3a2a05;
 }
 .hero p { margin: 0 0 1.1rem; color: var(--hero-muted); max-width: 34rem; }
+.hero .logo { width: 5.5rem; height: auto; margin: 0 0 0.9rem; filter: drop-shadow(0 0 14px rgb(242 196 67 / 0.45)); }
 .hero p a { color: var(--gold); }
 .prompt {
   font: 700 0.9rem/1.5 var(--font-mono); color: var(--ok) !important; letter-spacing: 0.06em;
@@ -411,6 +415,7 @@ table.grid { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
 <header class="hero gutter">
   <div class="col">
     <div>
+      <img class="logo" src="img/logo/icon-256.png" width="256" height="256" alt="The OpenXcom3D logo: an alien's head in a yellow X, with 3D in its corner.">
       <p class="eyebrow">X-COM &middot; Battlescape &middot; First person</p>
       <h1>Play OpenXcom3D</h1>
       <p>OpenXcom3D is <b>OpenXcom Extended</b> with a first-person 3D battlescape. The <a href="https://github.com/b0realis/OpenXcom3D/releases/latest">ready builds</a> need no compiling and nothing installed: download one, give it your copy of the original game, and press F8 in a battle. This page walks you through it for each system, then has everything for playing: <a href="#keys">every key</a>, <a href="#settings">every setting</a> and how it plays, <a href="#screen">what's on the screen</a> and <a href="#features">every feature</a> in pictures.</p>
@@ -873,7 +878,7 @@ ln -s "/path/to/XCOM" ~/.local/share/openxcom3d/UFO</pre></div>
 <tr class="row"><td class="s">Unit size</td><td class="c">80% to 100% <span class="def">(<b>100%</b>)</span></td><td>Soldiers, aliens, corpses and items drawn a little smaller, so tall sprites fit under low ceilings.</td><td class="plays">Only the picture: what shots hit stays the game's (see <i>Hitboxes</i>).</td></tr>
 <tr class="row"><td class="s">Muzzle flashes</td><td class="c"><b>YES</b> / NO</td><td>Gunfire, hits and blasts flash. NO: no flashes, steady UFO lights, no camera glitches.</td><td class="plays">Off if flashing light bothers you.</td></tr>
 <tr class="row"><td class="s">Particles</td><td class="c"><b>All</b> / Effects / Off</td><td>Effects: sparks, debris, smoke, fire, trails. All: also dust, fireflies, bubbles and weather.</td><td class="plays"></td></tr>
-<tr class="row"><td class="s">UFO lights and aura</td><td class="c"><b>YES</b> / NO</td><td>UFOs glow: steady hulls with pulsing lights, their own coloured light, an aura of motes; only once a UFO has been seen.</td><td class="plays"></td></tr>
+<tr class="row"><td class="s">UFO lights and aura</td><td class="c"><b>YES</b> / NO</td><td>UFOs glow: steady hulls with pulsing lights, their own coloured light, evenly inside them, and an aura of motes outside; only once a UFO has been seen.</td><td class="plays">Inside a UFO the view stays sharp: its light only colours it.</td></tr>
 <tr class="row"><td class="s">Ghost opacity</td><td class="c">10% to 100% <span class="def">(<b>50%</b>)</span></td><td>How solid the see-through ghosts look up close (lift pads, ladders, racks, catwalks, sludge); far off 60% of that.</td><td class="plays"></td></tr>
 <tr class="row"><td class="s">Parts without shape</td><td class="c"><b>Lifts</b> / All / Off</td><td>Parts the map draws with no shape in the game's data, shown as see-through ghosts: ladders, lift pads, the shops' racks, liquid over a floor, the rest of fences and catwalk gratings the game gives only a few voxels.</td><td class="plays">Ghosts are only pictures: shots, sight and walking go through them as the game says.</td></tr>
 <tr class="row"><td class="s">Discreet map edge</td><td class="c">YES / <b>NO</b></td><td>Small red dots along the map's edge instead of the yellow tape.</td><td class="plays"></td></tr>

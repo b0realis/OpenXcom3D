@@ -72,6 +72,8 @@ cp "$ROOT/install.py" "$ROOT/README.md" "$ROOT/OpenXcom3D_manual.md" "$ROOT/open
 mkdir -p "$R/steamdeck"
 cp "$ROOT/steamdeck/controller_neptune_openxcom3d.vdf" "$ROOT/steamdeck/add_controller_layout.sh" "$ROOT/steamdeck/use_layout.py" "$R/steamdeck/"
 cp "$ROOT/OpenXcom/LICENSE.txt" "$R/LICENSE.txt"
+# the logo, for the menu entry install.py --desktop makes
+cp "$ROOT/OpenXcom/res/linux/icons/openxcom_128x128.png" "$R/openxcom3d.png"
 # the tarball has no game data links; play.sh finds the games (or install.py links them). Its
 # files are recorded as root's (owner 0/0, no names): tar would otherwise store this machine's
 # user name in every header.

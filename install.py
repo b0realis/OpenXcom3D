@@ -59,7 +59,7 @@ from pathlib import Path
 
 # ---- What is installed, and what it is built from ----
 
-VERSION = "1.08"
+VERSION = "1.09"
 # OpenXcom3D is a patch on one exact commit of OpenXcom Extended (OXCE).
 BASE_REPO = "https://github.com/MeridianOXC/OpenXcom.git"
 BASE_BRANCH = "oxce-plus"
@@ -235,6 +235,7 @@ Name=OpenXcom3D
 Comment=X-COM with a first-person 3D battlescape (OpenXcom Extended + OpenXcom3D)
 Exec=%(play)s
 Path=%(dir)s
+Icon=%(icon)s
 Terminal=false
 Categories=Game;StrategyGame;
 """
@@ -514,9 +515,18 @@ def install(target, binary_dir, data_dir, mod_dir, ufo, tftd, desktop):
         if (HERE / doc).is_file() and (HERE / doc).resolve() != (target / doc).resolve():
             shutil.copy2(HERE / doc, target / doc)
     if desktop:
+        # The logo for it: the archive's openxcom3d.png (or the repository's), copied next to
+        # the game; built from source without either, the game's own window icon.
+        icon = target / "data" / "common" / "openxcom.png"
+        for logo in [HERE / "openxcom3d.png", HERE / "docs" / "logo" / "openxcom3d_icon_128.png"]:
+            if logo.is_file():
+                icon = target / "openxcom3d.png"
+                if logo.resolve() != icon.resolve():
+                    shutil.copy2(logo, icon)
+                break
         apps = Path.home() / ".local/share/applications"
         apps.mkdir(parents=True, exist_ok=True)
-        (apps / "openxcom3d.desktop").write_text(DESKTOP % {"play": play, "dir": target})
+        (apps / "openxcom3d.desktop").write_text(DESKTOP % {"play": play, "dir": target, "icon": icon})
         say("  menu entry: %s" % (apps / "openxcom3d.desktop"))
     return play
 

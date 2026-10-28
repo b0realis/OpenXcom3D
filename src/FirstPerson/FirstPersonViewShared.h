@@ -99,6 +99,11 @@ const Uint32 CalmFrameTime = 320;
 /// The marks on a UFO's tiles in FirstPersonView::_ufoPhaseOfTile, above the pulse phase (bits
 /// 0-3): a tile of the UFO, and one of its outer skin (beside a tile that isn't the UFO's).
 const Uint8 UfoTileBit = 0x80, UfoSkinBit = 0x40;
+/// How strongly a UFO's light colours its inside (its tiles under its roof), per unit of its
+/// glow there (0.12 low down inside, see findUfos): by day, and more on top of it at night. So
+/// the inside takes about a fifth of the light's colour by day, two fifths at night (an even
+/// tint, see FirstPersonView::shade), where its hull outside keeps its detail with less.
+const float UfoInsideTint = 1.8f, UfoInsideTintNight = 1.5f;
 /// Tactical flares: how long they burn (seconds), how far their light reaches (voxels), and how
 /// many can burn at once.
 const float FlareLife = 60.0f, FlareReach = 150.0f;

@@ -91,7 +91,7 @@ en-GB:
   STR_FPS_PARTICLES_EFFECTS: "Effects"
   STR_FPS_PARTICLES_ALL: "All"
   STR_FPS_UFO_LIGHTS: "UFO lights and aura"
-  STR_FPS_UFO_LIGHTS_DESC: "UFOs glow: steady hulls, soft lights, coloured light, aura."
+  STR_FPS_UFO_LIGHTS_DESC: "UFOs glow: steady hulls, soft lights, coloured light (evenly inside), an aura outside."
   STR_FPS_GHOST_PARTS: "Parts without shape"
   STR_FPS_GHOST_PARTS_DESC: "Ladders, lift pads and the original games' shop racks the map draws with no 3D shape, the surface of liquid over a floor (XPiratez's sewers), and the rest of fences, railings and gratings the game gives only a few voxels: shown see-through, at Ghost opacity. Lifts: those. All: any part without shape."
   STR_FPS_GHOST_PARTS_OFF: "Off"
