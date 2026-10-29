@@ -173,6 +173,13 @@ const Uint32 AlienCameraHold = 1500, AlertTime = 3000;
 /// Zoom (setting "Zoom"): how much closer the view looks, and how many seconds it takes to glide
 /// all the way in (or out), so the SCOPING line's number can be read as it climbs.
 const double ZoomFactor = 4.0, ZoomSeconds = 0.7;
+/// The motion scanner held up in 3D (see FirstPersonScanner): how long its ring takes to sweep out to the
+/// edge and how often a sweep goes out (ms), how long a blip takes to fade after the ring finds it (ms), the least
+/// time between two pips (ms), and the round screen's radius on the game's scanner art (pixels of 320x200).
+const Uint32 ScannerSweepMs = 1600, ScannerPeriodMs = 2200, ScannerBlipFadeMs = 1800, ScannerPipSpacingMs = 70;
+const int ScannerRadius = 76;
+/// The motion scanner's round screen in the view: its size across, as a share of the view's height.
+const double ScannerPanelHeightShare = 0.36;
 /// The scope cross shown while zoomed: its gap round the reticle and the spacing of its ticks, in canvas pixels.
 const int ScopeGap = 12, ScopeTickSpacing = 24;
 /// Looking down past LookDownSlideFrom degrees, the weapon in hand slides out of sight, gone at LookDownSlideTo.

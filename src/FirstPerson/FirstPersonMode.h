@@ -64,6 +64,7 @@ struct BattleAction;
 class BattlescapeState;
 class BattleUnit;
 class FirstPersonView;
+class FirstPersonScanner;
 class FirstPersonSounds;
 class Game;
 class InteractiveSurface;
@@ -202,6 +203,8 @@ private:
 	void createLiftArrows();
 	/// Makes the compass at the top right (setting "Compass").
 	void createCompass();
+	/// Makes the motion scanner's round screen at the bottom middle (shown while it's held up).
+	void createScannerPanel();
 	/// Makes the top bar's buttons: 3D, HUD, INV, previous / next soldier, the suit's buttons, END.
 	void createTopBar();
 	/// Makes the info panel, bottom left: name, weapon, status, the four stats.
@@ -369,6 +372,9 @@ private:
 	// turning by the rules, the head's free turn and when looking further will cost time units ----
 
 	Surface *_compass = nullptr;                 // the dial
+	Surface *_scannerPanel = nullptr;            // the motion scanner's round screen, held up at the bottom middle (see updateScanner)
+	FirstPersonScanner *_scanner = nullptr;      // the motion scanner held up (or put away), and its art, ring and blips
+	Uint8 _scannerRimColor = 0;                  // the round screen's rim
 	Surface *_climbArrows = nullptr;             // beside it, the ways W may climb, the one it takes now lit (see updateClimbArrows)
 	int _climbArrowsShown = -1;                  // what they show: up 1, down 2, lit (1 up, 2 down) times 4; -1 not drawn yet
 	Text *_compassLetters[4] = {};               // N, E, S, W, going round as the view turns
@@ -887,6 +893,8 @@ private:
 	void updateScope();
 	/// Draws the weapon in the soldier's hands at the bottom of the view.
 	void updateWeaponInHand(BattleUnit *unit);
+	/// The motion scanner held up, every frame: put away when it's no longer in hand, else drawn turned to the view.
+	void updateScanner(BattleUnit *unit);
 	/// Is this weapon drawn in the hands? Not a built-in one with nothing to hold (see the definition).
 	bool weaponShownInHand(BattleUnit *unit, const BattleItem *weapon) const;
 	/// Measures the weapon's picture: its long axis, muzzle end and up side.

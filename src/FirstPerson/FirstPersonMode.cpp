@@ -56,6 +56,7 @@
 #include <cmath>
 #include <string>
 #include "FirstPersonApi.h"
+#include "FirstPersonScanner.h"
 #include "FirstPersonSounds.h"
 #include "FirstPersonView.h"
 #include "RuleFirstPerson.h"
@@ -150,6 +151,7 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
 	createCrosshairAndBanner();
 	createLiftArrows();
 	createCompass();
+	createScannerPanel();
 	createWalkModeLines();
 	createTopBar();
 	createInfoPanel();
@@ -159,6 +161,7 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
 
 	// The mode's own sounds, and the canvas the overlays are drawn on before being magnified.
 	_sounds = new FirstPersonSounds();
+	_scanner = new FirstPersonScanner(_game, _sounds);
 	makeCanvas();
 
 	// The weapon in hand (placed every frame, bottom right). The sprites hold the game's
@@ -324,6 +327,24 @@ void FirstPersonMode::createLiftArrows()
 		text->setColor(lilac);
 		text->setVisible(false);
 	}
+}
+
+/**
+ * Makes the motion scanner's round screen (see FirstPersonScanner): at the bottom middle of the
+ * view, about a third of its height across (ScannerPanelHeightShare), as if held up in front of
+ * the soldier, where the weapon in hand makes way for it; never over the info panel (on the
+ * original 320x200 the middle would be: there it sits just right of it). Hidden until the
+ * scanner is used (see updateScanner).
+ */
+void FirstPersonMode::createScannerPanel()
+{
+	const int width = canvasWidth(), height = canvasHeight(); // our surfaces are laid out on the canvas (see makeCanvas)
+	const int size = std::max(48, (int)(height * ScannerPanelHeightShare) / 2 * 2);
+	_scannerPanel = new Surface(size, size, std::max(PanelW + 6, width / 2 - size / 2), height - size - 4);
+	_state->add(_scannerPanel);
+	_scannerPanel->setVisible(false);
+	_ownSurfaces.insert(_scannerPanel);
+	_scannerRimColor = textColor(_state->getPalette(), 50, 50, 56);
 }
 
 /**
@@ -1188,6 +1209,7 @@ FirstPersonMode::~FirstPersonMode()
 	// What isn't owned by the state.
 	delete _heldSprite; // not added to the state
 	delete _offHandSprite;
+	delete _scanner;
 	delete _sounds;
 	delete _canvas;
 }
@@ -1930,6 +1952,7 @@ void FirstPersonMode::think()
 		updateCrosshair(nullptr, playerTurn);
 		updateUnitName(nullptr);
 		updateBanner(playerTurn);
+		updateScanner(nullptr);
 		updateWeaponInHand(nullptr);
 		endShotAim(); // (a shot fired in 3D and still flying when the map came up: its aim ends here)
 		syncShadows();
@@ -2000,6 +2023,7 @@ void FirstPersonMode::think()
 	updateCrosshair(unit, playerTurn);
 	updateUnitName(unit);
 	updateBanner(playerTurn);
+	updateScanner(unit);
 	updateWeaponInHand(unit);
 	syncShadows();
 	_view->invalidate();

@@ -20815,10 +20815,10 @@ index bc5f08f46..5ddf353f4 100644
  			playMovementSound();
  			if (_parent->getSave()->isPreview())
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 839f80345..42977f789 100644
+index 839f80345..fc04f25b2 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -441,10 +441,42 @@ set ( rapidyaml_src
+@@ -441,10 +441,43 @@ set ( rapidyaml_src
  
  )
  
@@ -20834,6 +20834,7 @@ index 839f80345..42977f789 100644
 +    FirstPerson/FirstPersonModeSoldierStates.cpp
 +    FirstPerson/FirstPersonModeWeaponInHand.cpp
 +    FirstPerson/FirstPersonParticles.cpp
++    FirstPerson/FirstPersonScanner.cpp
 +    FirstPerson/FirstPersonSounds.cpp
 +    FirstPerson/FirstPersonView.cpp
 +    FirstPerson/FirstPersonViewEffects.cpp
@@ -20861,7 +20862,7 @@ index 839f80345..42977f789 100644
      ${engine_src}
      ${geoscape_src}
      ${interface_src}
-@@ -627,7 +659,10 @@ if (WIN32)
+@@ -627,7 +660,10 @@ if (WIN32)
    set(WIN32_LIBS imagehlp dbghelp)
  endif(WIN32)
  
@@ -22228,10 +22229,10 @@ index 000000000..a45746726
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..c0fc13141
+index 000000000..07ce8b306
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2694 @@
+@@ -0,0 +1,2718 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -22290,6 +22291,7 @@ index 000000000..c0fc13141
 +#include <cmath>
 +#include <string>
 +#include "FirstPersonApi.h"
++#include "FirstPersonScanner.h"
 +#include "FirstPersonSounds.h"
 +#include "FirstPersonView.h"
 +#include "RuleFirstPerson.h"
@@ -22384,6 +22386,7 @@ index 000000000..c0fc13141
 +	createCrosshairAndBanner();
 +	createLiftArrows();
 +	createCompass();
++	createScannerPanel();
 +	createWalkModeLines();
 +	createTopBar();
 +	createInfoPanel();
@@ -22393,6 +22396,7 @@ index 000000000..c0fc13141
 +
 +	// The mode's own sounds, and the canvas the overlays are drawn on before being magnified.
 +	_sounds = new FirstPersonSounds();
++	_scanner = new FirstPersonScanner(_game, _sounds);
 +	makeCanvas();
 +
 +	// The weapon in hand (placed every frame, bottom right). The sprites hold the game's
@@ -22558,6 +22562,24 @@ index 000000000..c0fc13141
 +		text->setColor(lilac);
 +		text->setVisible(false);
 +	}
++}
++
++/**
++ * Makes the motion scanner's round screen (see FirstPersonScanner): at the bottom middle of the
++ * view, about a third of its height across (ScannerPanelHeightShare), as if held up in front of
++ * the soldier, where the weapon in hand makes way for it; never over the info panel (on the
++ * original 320x200 the middle would be: there it sits just right of it). Hidden until the
++ * scanner is used (see updateScanner).
++ */
++void FirstPersonMode::createScannerPanel()
++{
++	const int width = canvasWidth(), height = canvasHeight(); // our surfaces are laid out on the canvas (see makeCanvas)
++	const int size = std::max(48, (int)(height * ScannerPanelHeightShare) / 2 * 2);
++	_scannerPanel = new Surface(size, size, std::max(PanelW + 6, width / 2 - size / 2), height - size - 4);
++	_state->add(_scannerPanel);
++	_scannerPanel->setVisible(false);
++	_ownSurfaces.insert(_scannerPanel);
++	_scannerRimColor = textColor(_state->getPalette(), 50, 50, 56);
 +}
 +
 +/**
@@ -23422,6 +23444,7 @@ index 000000000..c0fc13141
 +	// What isn't owned by the state.
 +	delete _heldSprite; // not added to the state
 +	delete _offHandSprite;
++	delete _scanner;
 +	delete _sounds;
 +	delete _canvas;
 +}
@@ -24164,6 +24187,7 @@ index 000000000..c0fc13141
 +		updateCrosshair(nullptr, playerTurn);
 +		updateUnitName(nullptr);
 +		updateBanner(playerTurn);
++		updateScanner(nullptr);
 +		updateWeaponInHand(nullptr);
 +		endShotAim(); // (a shot fired in 3D and still flying when the map came up: its aim ends here)
 +		syncShadows();
@@ -24234,6 +24258,7 @@ index 000000000..c0fc13141
 +	updateCrosshair(unit, playerTurn);
 +	updateUnitName(unit);
 +	updateBanner(playerTurn);
++	updateScanner(unit);
 +	updateWeaponInHand(unit);
 +	syncShadows();
 +	_view->invalidate();
@@ -24928,10 +24953,10 @@ index 000000000..c0fc13141
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..324b1faad
+index 000000000..7dda7689d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1156 @@
+@@ -0,0 +1,1164 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -24998,6 +25023,7 @@ index 000000000..324b1faad
 +class BattlescapeState;
 +class BattleUnit;
 +class FirstPersonView;
++class FirstPersonScanner;
 +class FirstPersonSounds;
 +class Game;
 +class InteractiveSurface;
@@ -25136,6 +25162,8 @@ index 000000000..324b1faad
 +	void createLiftArrows();
 +	/// Makes the compass at the top right (setting "Compass").
 +	void createCompass();
++	/// Makes the motion scanner's round screen at the bottom middle (shown while it's held up).
++	void createScannerPanel();
 +	/// Makes the top bar's buttons: 3D, HUD, INV, previous / next soldier, the suit's buttons, END.
 +	void createTopBar();
 +	/// Makes the info panel, bottom left: name, weapon, status, the four stats.
@@ -25303,6 +25331,9 @@ index 000000000..324b1faad
 +	// turning by the rules, the head's free turn and when looking further will cost time units ----
 +
 +	Surface *_compass = nullptr;                 // the dial
++	Surface *_scannerPanel = nullptr;            // the motion scanner's round screen, held up at the bottom middle (see updateScanner)
++	FirstPersonScanner *_scanner = nullptr;      // the motion scanner held up (or put away), and its art, ring and blips
++	Uint8 _scannerRimColor = 0;                  // the round screen's rim
 +	Surface *_climbArrows = nullptr;             // beside it, the ways W may climb, the one it takes now lit (see updateClimbArrows)
 +	int _climbArrowsShown = -1;                  // what they show: up 1, down 2, lit (1 up, 2 down) times 4; -1 not drawn yet
 +	Text *_compassLetters[4] = {};               // N, E, S, W, going round as the view turns
@@ -25821,6 +25852,8 @@ index 000000000..324b1faad
 +	void updateScope();
 +	/// Draws the weapon in the soldier's hands at the bottom of the view.
 +	void updateWeaponInHand(BattleUnit *unit);
++	/// The motion scanner held up, every frame: put away when it's no longer in hand, else drawn turned to the view.
++	void updateScanner(BattleUnit *unit);
 +	/// Is this weapon drawn in the hands? Not a built-in one with nothing to hold (see the definition).
 +	bool weaponShownInHand(BattleUnit *unit, const BattleItem *weapon) const;
 +	/// Measures the weapon's picture: its long axis, muzzle end and up side.
@@ -31023,10 +31056,10 @@ index 000000000..1b98a6bd9
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..374f097e1
+index 000000000..3016462df
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,419 @@
+@@ -0,0 +1,426 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -31202,6 +31235,13 @@ index 000000000..374f097e1
 +/// Zoom (setting "Zoom"): how much closer the view looks, and how many seconds it takes to glide
 +/// all the way in (or out), so the SCOPING line's number can be read as it climbs.
 +const double ZoomFactor = 4.0, ZoomSeconds = 0.7;
++/// The motion scanner held up in 3D (see FirstPersonScanner): how long its ring takes to sweep out to the
++/// edge and how often a sweep goes out (ms), how long a blip takes to fade after the ring finds it (ms), the least
++/// time between two pips (ms), and the round screen's radius on the game's scanner art (pixels of 320x200).
++const Uint32 ScannerSweepMs = 1600, ScannerPeriodMs = 2200, ScannerBlipFadeMs = 1800, ScannerPipSpacingMs = 70;
++const int ScannerRadius = 76;
++/// The motion scanner's round screen in the view: its size across, as a share of the view's height.
++const double ScannerPanelHeightShare = 0.36;
 +/// The scope cross shown while zoomed: its gap round the reticle and the spacing of its ticks, in canvas pixels.
 +const int ScopeGap = 12, ScopeTickSpacing = 24;
 +/// Looking down past LookDownSlideFrom degrees, the weapon in hand slides out of sight, gone at LookDownSlideTo.
@@ -31448,10 +31488,10 @@ index 000000000..374f097e1
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..b165b37b9
+index 000000000..29583a85b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,4326 @@
+@@ -0,0 +1,4352 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -31523,7 +31563,7 @@ index 000000000..b165b37b9
 +#include "../Battlescape/Pathfinding.h"
 +#include "../Battlescape/PrimeGrenadeState.h"
 +#include "../Battlescape/ProjectileFlyBState.h"
-+#include "../Battlescape/ScannerState.h"
++#include "FirstPersonScanner.h"
 +#include "../Battlescape/TileEngine.h"
 +#include "../Battlescape/UnitInfoState.h"
 +#include "../Engine/Action.h"
@@ -34371,12 +34411,17 @@ index 000000000..b165b37b9
 +		return;
 +	}
 +
-+	// A scanner.
++	// A scanner: held up at the bottom middle of the view, turned to it, for its time units as
++	// the game's (see FirstPersonScanner, updateScanner); used again, put away (for nothing).
 +	if (rules->getBattleType() == BT_SCANNER)
 +	{
-+		if (action->spendTU(&action->result))
++		if (_scanner->isUp() && _scanner->item() == item)
 +		{
-+			_game->pushState(new ScannerState(action));
++			_scanner->putAway();
++		}
++		else if (action->spendTU(&action->result))
++		{
++			_scanner->bringUp(unit, item);
 +		}
 +		else
 +		{
@@ -34431,6 +34476,27 @@ index 000000000..b165b37b9
 +	}
 +	tileEngine->medikitUse(action, patient, type == BMT_HEAL ? BMA_HEAL : type == BMT_STIMULANT ? BMA_STIMULANT : BMA_PAINKILLER, part);
 +	tileEngine->medikitRemoveIfEmpty(action);
++}
++
++/**
++ * The motion scanner held up (see FirstPersonScanner), every frame: put away once it's no longer
++ * the item in the soldier's chosen hand (hands switched, the item gone), another soldier is
++ * looked through, the soldier is out, or the 3D view is gone; else its round screen shows at the
++ * bottom middle, turned to the way the view looks now (the camera's yaw has 0 = east, a bearing
++ * 0 = north), and the weapon in hand makes way for it (see updateWeaponInHand).
++ * @param unit The soldier looked through, or null.
++ */
++void FirstPersonMode::updateScanner(BattleUnit *unit)
++{
++	if (_scanner->isUp() && (!isActive() || !unit || unit != _scanner->soldier() || unit->isOut() || activeWeapon(unit) != _scanner->item()))
++	{
++		_scanner->putAway();
++	}
++	_scannerPanel->setVisible(_scanner->isUp());
++	if (_scanner->isUp())
++	{
++		_scanner->draw(_scannerPanel, _view->getYawDegrees() + 90.0, _scannerRimColor);
++	}
 +}
 +
 +/**
@@ -36775,10 +36841,10 @@ index 000000000..436ae3e71
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeWeaponInHand.cpp b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
 new file mode 100644
-index 000000000..4f294fdb8
+index 000000000..5e406f809
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
-@@ -0,0 +1,1026 @@
+@@ -0,0 +1,1028 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -36831,6 +36897,7 @@ index 000000000..4f294fdb8
 + * swings. With dual wield a second weapon is drawn on the other side.
 + */
 +#include "FirstPersonMode.h"
++#include "FirstPersonScanner.h"
 +#include <algorithm>
 +#include <cmath>
 +#include "FirstPersonView.h"
@@ -37627,7 +37694,8 @@ index 000000000..4f294fdb8
 +	// (A built-in weapon with nothing to hold leaves the hands empty: see weaponShownInHand.)
 +	BattleItem *weapon = unit ? activeWeapon(unit) : nullptr;
 +	SurfaceSet *inventorySprites = _game->getMod()->getSurfaceSet("BIGOBS.PCK");
-+	const bool show = Options::fpsViewModel && isActive() && !_classicHud && weapon && weaponShownInHand(unit, weapon) && !_deathUnit && inventorySprites;
++	const bool show = Options::fpsViewModel && isActive() && !_classicHud && weapon && weaponShownInHand(unit, weapon) && !_deathUnit && inventorySprites
++		&& !_scanner->isUp(); // (the motion scanner held up takes its place, see updateScanner)
 +	_weaponInHand->setVisible(show);
 +	_view->setMuzzlePoint(0.0, 0.0, false); // set again below while a gun is in hand
 +	_view->setOffMuzzlePoint(0.0, 0.0, false);
@@ -38157,12 +38225,452 @@ index 000000000..228618946
 +}
 +
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
+diff --git a/src/FirstPerson/FirstPersonScanner.cpp b/src/FirstPerson/FirstPersonScanner.cpp
+new file mode 100644
+index 000000000..e42993638
+--- /dev/null
++++ b/src/FirstPerson/FirstPersonScanner.cpp
+@@ -0,0 +1,309 @@
++/*
++ * ==============================================================================================
++ *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
++ * ==============================================================================================
++ *
++ *  Our philosophy
++ *
++ *  - Faithful first. The 3D view should feel as if it had shipped with UFO: Enemy Unknown on
++ *    the day the game came out.
++ *  - Another camera on the same battle. The original rules decide everything: time units,
++ *    energy, accuracy, line of fire, reaction fire, doors and morale. The 3D view only shows
++ *    what the game does.
++ *  - Only the original assets: the game's own maps, voxel shapes, sprites, palette and sounds.
++ *  - Every addition is a setting. Jumping, night vision as gear, falling, FPS-style shooting
++ *    and dual wield can all be switched off.
++ *  - Light on the engine. Our code lives in this folder, the core only gets small hooks, and
++ *    without the OpenXcom3D mod nothing changes.
++ *  - Runs anywhere: a software renderer on the CPU, no graphics card needed.
++ *  - Written for people: descriptive names, and a comment for every function and every block.
++ *
++ *  Date: 2026-10-19
++ *
++ *  We wish everyone all the best and all health!
++ * ==============================================================================================
++ */
++/*
++ * Copyright 2010-2026 OpenXcom Developers.
++ *
++ * This file is part of OpenXcom.
++ *
++ * OpenXcom is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * OpenXcom is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
++ */
++/*
++ * FirstPersonScanner.cpp: the motion scanner held up in the 3D view: the game's own screen,
++ * turned to the view, with a sweeping ring and its pips.
++ */
++#include "FirstPersonScanner.h"
++#include <algorithm>
++#include <cmath>
++#include "FirstPersonModeShared.h"
++#include "FirstPersonSounds.h"
++#include "../Engine/Game.h"
++#include "../Engine/Surface.h"
++#include "../Engine/SurfaceSet.h"
++#include "../Mod/Mod.h"
++#include "../Savegame/BattleUnit.h"
++#include "../Savegame/SavedBattleGame.h"
++#include "../Savegame/SavedGame.h"
++#include "../Savegame/Tile.h"
++
++namespace OpenXcom
++{
++
++namespace
++{
++/// Where the round screen lies on the game's scanner art (320x200): its square's top left corner.
++const int ArtLeft = 56, ArtTop = 24;
++/// How far apart two tiles are on the screen, in pixels, as on the game's scanner.
++const int PixelsPerTile = 8;
++}
++
++/**
++ * The round screen's size across, in pixels (the game's scanner screen's).
++ */
++int FirstPersonScanner::size()
++{
++	return 2 * ScannerRadius;
++}
++
++/**
++ * Prepares the scanner: the round part of the game's scanner screen art (DETBORD2), north up,
++ * to turn as the view turns; and the ring's colours, from the game's own blip (its biggest): its
++ * brightest colour for the ring's edge, and three shades darker each for its trail, in the same
++ * ramp of the palette.
++ * @param game The game (its mod's art).
++ * @param sounds Our sounds, for the whoop and the pips (null: silent).
++ */
++FirstPersonScanner::FirstPersonScanner(Game *game, FirstPersonSounds *sounds) : _game(game), _sounds(sounds), _screen(new Surface(size(), size()))
++{
++	Surface *art = _game->getMod()->getSurface("DETBORD2.PCK");
++	_art.assign((size_t)size() * size(), 0);
++	art->lock();
++	for (int y = 0; y < size(); ++y)
++	{
++		for (int x = 0; x < size(); ++x) _art[(size_t)y * size() + x] = art->getPixel(ArtLeft + x, ArtTop + y);
++	}
++	art->unlock();
++
++	Surface *biggestBlip = _game->getMod()->getSurfaceSet("DETBLOB.DAT")->getFrame(5);
++	Uint8 brightest = 0;
++	biggestBlip->lock();
++	for (int y = 0; y < biggestBlip->getHeight(); ++y)
++	{
++		for (int x = 0; x < biggestBlip->getWidth(); ++x)
++		{
++			const Uint8 color = biggestBlip->getPixel(x, y);
++			if (color && (!brightest || (color & 15) < (brightest & 15))) brightest = color;
++		}
++	}
++	biggestBlip->unlock();
++	for (int step = 0; step < 3; ++step)
++	{
++		_ringColors[step] = (Uint8)((brightest & 0xF0) | std::min(15, (brightest & 15) + 3 * step));
++	}
++}
++
++/**
++ * Frees the round screen it draws on.
++ */
++FirstPersonScanner::~FirstPersonScanner()
++{
++	delete _screen;
++}
++
++/**
++ * Brings the scanner up for a soldier (its use, paid by the caller as the game's): the ring
++ * starts from the middle at once, nothing found yet; what the scanner finds now is noted as
++ * scanned this turn, as the game's scanner notes it.
++ * @param soldier The soldier holding it.
++ * @param item The scanner.
++ */
++void FirstPersonScanner::bringUp(BattleUnit *soldier, BattleItem *item)
++{
++	_soldier = soldier;
++	_item = item;
++	_opened = SDL_GetTicks();
++	_lastSweep = ~0u;
++	_lastRingRadius = 0.0;
++	_pinged.clear();
++	findBlips(0.0, true);
++}
++
++/**
++ * Puts the scanner away.
++ */
++void FirstPersonScanner::putAway()
++{
++	_soldier = nullptr;
++	_item = nullptr;
++	_pinged.clear();
++}
++
++/**
++ * Finds the movement round the soldier now, as the game's scanner does (ScannerView::draw):
++ * every unit on the tiles up to 9 across and along from the soldier, on any level, that moved
++ * this turn (its motion points), its blip the game's frame for how much (one step for every 5,
++ * at most 5). Each is placed on the turned screen (the view's way up), 8 pixels a tile as on the
++ * game's; those beyond the round screen's edge (the square's corners) don't show on it.
++ * @param bearingRadians The way the view looks (0 north, clockwise).
++ * @param noteScanned Whether to note them as scanned this turn, as the game's scanner does (the use).
++ * @return The blips.
++ */
++std::vector<FirstPersonScanner::Blip> FirstPersonScanner::findBlips(double bearingRadians, bool noteScanned) const
++{
++	std::vector<Blip> blips;
++	SavedBattleGame *save = _game->getSavedGame()->getSavedBattle();
++	const double cosine = std::cos(bearingRadians), sine = std::sin(bearingRadians);
++	for (int x = -9; x < 10; ++x)
++	{
++		for (int y = -9; y < 10; ++y)
++		{
++			for (int z = 0; z < save->getMapSizeZ(); ++z)
++			{
++				Tile *tile = save->getTile(Position(x, y, z) + Position(_soldier->getPosition().x, _soldier->getPosition().y, 0));
++				if (!tile || !tile->getUnit() || !tile->getUnit()->getMotionPoints()) continue;
++				const int frame = tile->getUnit()->getMotionPoints() / 5;
++				if (frame < 0) continue;
++				if (noteScanned) tile->getUnit()->setScannedTurn(save->getTurn());
++				// On the turned screen: the map's east and south turned by minus the view's bearing.
++				Blip blip;
++				blip.x = PixelsPerTile * (x * cosine + y * sine);
++				blip.y = PixelsPerTile * (-x * sine + y * cosine);
++				blip.radius = std::hypot(blip.x, blip.y);
++				blip.angle = std::atan2(blip.x, -blip.y) * 180.0 / Pi;
++				blip.frame = std::min(frame, 5);
++				blip.unit = tile->getUnit();
++				blip.tileIndex = save->getTileIndex(tile->getPosition());
++				if (blip.radius <= ScannerRadius - 4) blips.push_back(blip);
++			}
++		}
++	}
++	return blips;
++}
++
++/**
++ * Draws the round screen for now onto the panel: the game's scanner art turned so the view's
++ * way is up (each pixel of the round screen takes the art's pixel that far round the other way;
++ * outside it, nothing), a rim round it; the ring sweeping out from the middle in ScannerSweepMs,
++ * a new sweep every ScannerPeriodMs with the whoop, drawn as a dotted circle in the blips' bright
++ * colour with two fading circles behind it; each movement the ring has reached (a pip as it
++ * does: higher the nearer, from its side, at most one every ScannerPipSpacingMs), as the game
++ * draws its blip (its frame, flickering between two as the game's do), fading over
++ * ScannerBlipFadeMs; and in the middle the game's arrow pointing up, the way the view looks. All
++ * drawn at the art's own size, then scaled onto the panel (pixel for pixel, the nearest).
++ * @param panel The surface to draw on (square).
++ * @param bearingDegrees The way the view looks (0 north, clockwise).
++ * @param rimColor The rim's colour.
++ */
++void FirstPersonScanner::draw(Surface *panel, double bearingDegrees, Uint8 rimColor)
++{
++	const Uint32 now = SDL_GetTicks(), sinceOpened = now - _opened;
++	const double bearingRadians = bearingDegrees * Pi / 180.0;
++	const int middle = ScannerRadius;
++
++	// The ring: where it is, and a new sweep's whoop.
++	const Uint32 sweep = sinceOpened / ScannerPeriodMs, intoSweep = sinceOpened % ScannerPeriodMs;
++	const double ringRadius = intoSweep < ScannerSweepMs ? (double)intoSweep / ScannerSweepMs * ScannerRadius : -1.0;
++	if (sweep != _lastSweep)
++	{
++		_lastSweep = sweep;
++		_lastRingRadius = 0.0;
++		if (_sounds) _sounds->play(FirstPersonSounds::SCAN_PULSE, 0, 0.7f);
++	}
++
++	// The movement round the soldier now, and the blips the ring passes this frame: lit, with a pip.
++	const std::vector<Blip> blips = findBlips(bearingRadians, false);
++	if (ringRadius >= 0.0)
++	{
++		for (const Blip &blip : blips)
++		{
++			if (blip.radius > _lastRingRadius && blip.radius <= ringRadius)
++			{
++				_pinged[{ blip.unit, blip.tileIndex }] = now;
++				if (_sounds && now - _lastPip >= ScannerPipSpacingMs)
++				{
++					_lastPip = now;
++					const FirstPersonSounds::Id pip = blip.radius < 3 * PixelsPerTile ? FirstPersonSounds::SCAN_BLIP_NEAR
++						: blip.radius < 6 * PixelsPerTile ? FirstPersonSounds::SCAN_BLIP_MID : FirstPersonSounds::SCAN_BLIP_FAR;
++					_sounds->play(pip, (int)std::lround(blip.angle), 0.9f);
++				}
++			}
++		}
++		_lastRingRadius = ringRadius;
++	}
++
++	// The art, turned, and its rim.
++	_screen->clear();
++	_screen->lock();
++	const double cosine = std::cos(bearingRadians), sine = std::sin(bearingRadians);
++	for (int y = 0; y < size(); ++y)
++	{
++		for (int x = 0; x < size(); ++x)
++		{
++			const double dx = x + 0.5 - middle, dy = y + 0.5 - middle, distanceSq = dx * dx + dy * dy;
++			if (distanceSq > ScannerRadius * ScannerRadius) continue;
++			if (distanceSq > (ScannerRadius - 2) * (ScannerRadius - 2))
++			{
++				_screen->setPixel(x, y, rimColor);
++				continue;
++			}
++			const int fromX = (int)std::floor(middle + dx * cosine - dy * sine), fromY = (int)std::floor(middle + dx * sine + dy * cosine);
++			if (fromX < 0 || fromY < 0 || fromX >= size() || fromY >= size()) continue;
++			_screen->setPixel(x, y, _art[(size_t)fromY * size() + fromX]);
++		}
++	}
++	// The ring and its trail, 2 and 4 pixels behind it: a dot every pixel or so round it.
++	for (int trail = 0; trail < 3 && ringRadius >= 0.0; ++trail)
++	{
++		const double radius = ringRadius - 2.0 * trail;
++		if (radius < 1.0) continue;
++		const int dots = std::max(8, (int)(2.0 * Pi * radius));
++		for (int dot = 0; dot < dots; ++dot)
++		{
++			const double angle = 2.0 * Pi * dot / dots;
++			const int x = middle + (int)std::lround(radius * std::sin(angle)), y = middle - (int)std::lround(radius * std::cos(angle));
++			if (x >= 0 && y >= 0 && x < size() && y < size()) _screen->setPixel(x, y, _ringColors[trail]);
++		}
++	}
++	_screen->unlock();
++
++	// The blips the ring has found, fading (up to 10 shades darker) till the next sweep.
++	SurfaceSet *blipFrames = _game->getMod()->getSurfaceSet("DETBLOB.DAT");
++	const int flicker = (int)(sinceOpened / 125 % 2);
++	for (const Blip &blip : blips)
++	{
++		auto pinged = _pinged.find({ blip.unit, blip.tileIndex });
++		if (pinged == _pinged.end() || now - pinged->second > ScannerBlipFadeMs) continue;
++		const int shade = (int)((now - pinged->second) * 10 / ScannerBlipFadeMs);
++		Surface *frame = blipFrames->getFrame(blip.frame + flicker);
++		frame->blitNShade(_screen, middle + (int)std::lround(blip.x) - frame->getWidth() / 2, middle + (int)std::lround(blip.y) - frame->getHeight() / 2, shade);
++	}
++	// The soldier's arrow, pointing up (the game's frame for north).
++	Surface *arrow = blipFrames->getFrame(7);
++	arrow->blitNShade(_screen, middle - arrow->getWidth() / 2, middle - arrow->getHeight() / 2, 0);
++
++	// Onto the panel, scaled: each of its pixels the nearest of the round screen's.
++	const int panelSize = panel->getWidth();
++	panel->lock();
++	_screen->lock();
++	for (int y = 0; y < panelSize; ++y)
++	{
++		for (int x = 0; x < panelSize; ++x) panel->setPixel(x, y, _screen->getPixel(x * size() / panelSize, y * size() / panelSize));
++	}
++	_screen->unlock();
++	panel->unlock();
++}
++
++}
+diff --git a/src/FirstPerson/FirstPersonScanner.h b/src/FirstPerson/FirstPersonScanner.h
+new file mode 100644
+index 000000000..bcfc36840
+--- /dev/null
++++ b/src/FirstPerson/FirstPersonScanner.h
+@@ -0,0 +1,119 @@
++#pragma once
++/*
++ * ==============================================================================================
++ *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
++ * ==============================================================================================
++ *
++ *  Our philosophy
++ *
++ *  - Faithful first. The 3D view should feel as if it had shipped with UFO: Enemy Unknown on
++ *    the day the game came out.
++ *  - Another camera on the same battle. The original rules decide everything: time units,
++ *    energy, accuracy, line of fire, reaction fire, doors and morale. The 3D view only shows
++ *    what the game does.
++ *  - Only the original assets: the game's own maps, voxel shapes, sprites, palette and sounds.
++ *  - Every addition is a setting. Jumping, night vision as gear, falling, FPS-style shooting
++ *    and dual wield can all be switched off.
++ *  - Light on the engine. Our code lives in this folder, the core only gets small hooks, and
++ *    without the OpenXcom3D mod nothing changes.
++ *  - Runs anywhere: a software renderer on the CPU, no graphics card needed.
++ *  - Written for people: descriptive names, and a comment for every function and every block.
++ *
++ *  Date: 2026-10-19
++ *
++ *  We wish everyone all the best and all health!
++ * ==============================================================================================
++ */
++/*
++ * Copyright 2010-2026 OpenXcom Developers.
++ *
++ * This file is part of OpenXcom.
++ *
++ * OpenXcom is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * OpenXcom is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
++ */
++/*
++ * FirstPersonScanner.h: the motion scanner held up in the 3D view.
++ */
++#include <map>
++#include <utility>
++#include <vector>
++#include <SDL.h>
++
++namespace OpenXcom
++{
++
++class BattleItem;
++class BattleUnit;
++class FirstPersonSounds;
++class Game;
++class Surface;
++
++/**
++ * The motion scanner held up in the 3D view (a player's report, GitHub issue #39; the owner:
++ * "keep it simple ... just orient the screen to where player is looking in 3d and make some
++ * retro animation like concentric circles from the center and bumping into signals that
++ * refresh. And some cool scary beep upon detection (like alien movie)", and "the 3d scanner
++ * should not overtake whole screen. It should only be a part of 3d screen"; on the isometric map
++ * the game's own scanner, as ever). Using it (its time units, as the game's) brings up a round
++ * screen at the bottom middle of the view, the game's scanner screen (DETBORD2's round part),
++ * turned so the way the view looks is up as the view turns (its N, E, S and W go round with
++ * it). It shows what the game's scanner finds (the units that moved this turn, up to 9 tiles
++ * across and along, a bigger blip the more they moved), placed from where the soldier stands now.
++ * A ring sweeps out from the middle every few seconds with a whoop; a blip shows when the ring
++ * reaches it, with a pip (higher the nearer, from its side), and fades until the next sweep finds
++ * it again. It stays up while the scanner is the item in hand (see FirstPersonMode::updateScanner).
++ */
++class FirstPersonScanner
++{
++public:
++	/// Prepares the scanner: the game's art and blips, and our sounds (null: silent).
++	FirstPersonScanner(Game *game, FirstPersonSounds *sounds);
++	/// Frees its own screen.
++	~FirstPersonScanner();
++	/// Brings the scanner up for a soldier (its use, paid): what it finds now is noted as scanned this turn.
++	void bringUp(BattleUnit *soldier, BattleItem *item);
++	/// Puts the scanner away.
++	void putAway();
++	/// Is the scanner up?
++	bool isUp() const { return _soldier != nullptr; }
++	/// The soldier holding it up, or null.
++	const BattleUnit *soldier() const { return _soldier; }
++	/// The scanner held up, or null.
++	const BattleItem *item() const { return _item; }
++	/// Draws the round screen for now onto the panel (scaled to its size), the view looking the way of bearingDegrees.
++	void draw(Surface *panel, double bearingDegrees, Uint8 rimColor);
++	/// The round screen's size across, in pixels of the game's scanner art.
++	static int size();
++private:
++	/// One movement shown: where it is on the screen (pixels from its middle), how far out
++	/// (pixels), which way it lies from the view (degrees, 0 ahead, 90 right), and its blip (the
++	/// game's frame for how much the unit moved).
++	struct Blip { double x, y, radius, angle; int frame; const BattleUnit *unit; int tileIndex; };
++	Game *_game;
++	FirstPersonSounds *_sounds;                 // Our sounds (the whoop and the pips), or null.
++	std::vector<Uint8> _art;                    // The game's scanner screen (DETBORD2's round part, a square as wide), north up.
++	Surface *_screen;                           // The round screen drawn at the art's own size, then scaled onto the panel.
++	BattleUnit *_soldier = nullptr;             // The soldier holding it up (null: put away).
++	BattleItem *_item = nullptr;                // The scanner held up.
++	Uint32 _opened = 0;                         // When it came up (ms), the sweeps' clock.
++	Uint32 _lastSweep = ~0u;                    // Which sweep the ring is on (counted from the opening).
++	Uint32 _lastPip = 0;                        // When the last pip played (ms).
++	double _lastRingRadius = 0.0;               // How far out the ring was last frame (pixels).
++	Uint8 _ringColors[3] = {};                  // The ring's colours: its bright edge, then its fading trail.
++	std::map<std::pair<const BattleUnit*, int>, Uint32> _pinged; // When the ring last reached each unit's tile (by the tile's index, ms).
++	/// Finds the movement round the soldier now, as the game's scanner does, placed on the turned screen.
++	std::vector<Blip> findBlips(double bearingRadians, bool noteScanned) const;
++};
++
++}
 diff --git a/src/FirstPerson/FirstPersonSounds.cpp b/src/FirstPerson/FirstPersonSounds.cpp
 new file mode 100644
-index 000000000..aa0dc2743
+index 000000000..09924e595
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonSounds.cpp
-@@ -0,0 +1,294 @@
+@@ -0,0 +1,334 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -38324,6 +38832,46 @@ index 000000000..aa0dc2743
 +	}
 +	make(LIGHT_SWITCH, lightSwitch);
 +
++	// The motion scanner (a player's report, GitHub issue #39; the owner: "some cool scary beep
++	// upon detection (like alien movie)"), its sweep going out: a whoop (550 ms) falling from
++	// 1250 to 950 Hz over its first 80 ms, swelling in over 6 ms and dying away, with two echoes
++	// 120 ms apart, each softer, as if in a hollow room. The tone is a sine with a little of its
++	// third harmonic, which makes it sound electronic.
++	auto whoop = [&](float seconds) {
++		if (seconds < 0) return 0.0f;
++		// The phase of a pitch of 950 + 300 e^(-25 t) Hz: the pitch's integral over time.
++		const float phase = 2 * Pi * (950.0f * seconds + 300.0f / 25.0f * (1.0f - std::exp(-seconds * 25.0f)));
++		return std::min(1.0f, seconds * 160.0f) * std::exp(-seconds * 9.0f) * (0.8f * std::sin(phase) + 0.2f * std::sin(3 * phase));
++	};
++	std::vector<float> pulse(length(0.55f));
++	for (size_t sample = 0; sample < pulse.size(); ++sample)
++	{
++		const float seconds = (float)sample / rate;
++		pulse[sample] = 0.55f * (whoop(seconds) + 0.35f * whoop(seconds - 0.12f) + 0.12f * whoop(seconds - 0.24f));
++	}
++	make(SCAN_PULSE, pulse);
++
++	// The scanner finding movement: a sharp pip (180 ms), a high tone with its third harmonic,
++	// dying away fast, and an echo 90 ms later; higher the nearer the movement (1500, 1900 and
++	// 2400 Hz), as the film's tracker climbs when something closes in.
++	auto pip = [&](float pitchHz) {
++		std::vector<float> sound(length(0.18f));
++		auto tone = [&](float seconds) {
++			if (seconds < 0) return 0.0f;
++			const float phase = 2 * Pi * pitchHz * seconds;
++			return std::min(1.0f, seconds * 400.0f) * std::exp(-seconds * 38.0f) * (0.75f * std::sin(phase) + 0.25f * std::sin(3 * phase));
++		};
++		for (size_t sample = 0; sample < sound.size(); ++sample)
++		{
++			const float seconds = (float)sample / rate;
++			sound[sample] = 0.6f * (tone(seconds) + 0.35f * tone(seconds - 0.09f));
++		}
++		return sound;
++	};
++	make(SCAN_BLIP_FAR, pip(1500.0f));
++	make(SCAN_BLIP_MID, pip(1900.0f));
++	make(SCAN_BLIP_NEAR, pip(2400.0f));
++
 +	// Flare: a strike, then a hiss fading out (1.4 seconds in all).
 +	std::vector<float> flare(length(1.4f));
 +	float lowPassedNoise = 0.0f; // The noise smoothed by a simple low-pass filter.
@@ -38459,10 +39007,10 @@ index 000000000..aa0dc2743
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonSounds.h b/src/FirstPerson/FirstPersonSounds.h
 new file mode 100644
-index 000000000..d67736b97
+index 000000000..69ac19c12
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonSounds.h
-@@ -0,0 +1,85 @@
+@@ -0,0 +1,88 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -38529,8 +39077,11 @@ index 000000000..d67736b97
 +	/// HEARTBEAT (lub-dub, when badly hurt), DRY_FIRE (the click of a gun that can't fire),
 +	/// FLARE (a strike and a hiss), WHIZZ (a shot whizzing past), SWOOSH (a melee swing
 +	/// cutting the air), PIN (a grenade's pin pulled: a click and the lever's ping),
-+	/// LIGHT_SWITCH (the flashlight's switch: a soft double click). COUNT is how many there are.
-+	enum Id { HIT, KILL, HEARTBEAT, DRY_FIRE, FLARE, WHIZZ, SWOOSH, PIN, LIGHT_SWITCH, COUNT };
++	/// LIGHT_SWITCH (the flashlight's switch: a soft double click), SCAN_PULSE (the motion
++	/// scanner's sweep going out: a falling electronic whoop and its echoes), SCAN_BLIP_FAR,
++	/// SCAN_BLIP_MID and SCAN_BLIP_NEAR (the scanner finding movement: a sharp pip, higher the
++	/// nearer it is). COUNT is how many there are.
++	enum Id { HIT, KILL, HEARTBEAT, DRY_FIRE, FLARE, WHIZZ, SWOOSH, PIN, LIGHT_SWITCH, SCAN_PULSE, SCAN_BLIP_FAR, SCAN_BLIP_MID, SCAN_BLIP_NEAR, COUNT };
 +	/// Synthesizes all the sounds for the mixer's output format.
 +	FirstPersonSounds();
 +	/// Stops and frees the sounds.
@@ -55774,10 +56325,10 @@ index 2242d13f8..7fd17b1f2 100644
  	bool isManaBarEnabled() const { return _manaBattleUI; }
  	/// Is the mana trained as a primary skill (e.g. like firing accuracy)?
 diff --git a/src/OpenXcom.2010.vcxproj b/src/OpenXcom.2010.vcxproj
-index 99f24ce43..a396ebcb4 100644
+index 99f24ce43..518689faa 100644
 --- a/src/OpenXcom.2010.vcxproj
 +++ b/src/OpenXcom.2010.vcxproj
-@@ -431,6 +431,28 @@
+@@ -431,6 +431,29 @@
      <ClCompile Include="Battlescape\DebriefingState.cpp" />
      <ClCompile Include="Battlescape\ExperienceOverviewState.cpp" />
      <ClCompile Include="Battlescape\Explosion.cpp" />
@@ -55790,6 +56341,7 @@ index 99f24ce43..a396ebcb4 100644
 +    <ClCompile Include="FirstPerson\FirstPersonModeSoldierStates.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonModeWeaponInHand.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonParticles.cpp" />
++    <ClCompile Include="FirstPerson\FirstPersonScanner.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonSounds.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonView.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonViewEffects.cpp" />
@@ -55806,7 +56358,7 @@ index 99f24ce43..a396ebcb4 100644
      <ClCompile Include="Battlescape\ExplosionBState.cpp" />
      <ClCompile Include="Battlescape\ExtendedBattlescapeLinksState.cpp" />
      <ClCompile Include="Battlescape\ExtendedInventoryLinksState.cpp" />
-@@ -910,6 +932,17 @@
+@@ -910,6 +933,18 @@
      <ClInclude Include="Battlescape\DebriefingState.h" />
      <ClInclude Include="Battlescape\ExperienceOverviewState.h" />
      <ClInclude Include="Battlescape\Explosion.h" />
@@ -55814,6 +56366,7 @@ index 99f24ce43..a396ebcb4 100644
 +    <ClInclude Include="FirstPerson\FirstPersonMode.h" />
 +    <ClInclude Include="FirstPerson\FirstPersonModeShared.h" />
 +    <ClInclude Include="FirstPerson\FirstPersonParticles.h" />
++    <ClInclude Include="FirstPerson\FirstPersonScanner.h" />
 +    <ClInclude Include="FirstPerson\FirstPersonSounds.h" />
 +    <ClInclude Include="FirstPerson\FirstPersonView.h" />
 +    <ClInclude Include="FirstPerson\FirstPersonViewRayWalk.h" />
@@ -55825,10 +56378,10 @@ index 99f24ce43..a396ebcb4 100644
      <ClInclude Include="Battlescape\ExtendedBattlescapeLinksState.h" />
      <ClInclude Include="Battlescape\ExtendedInventoryLinksState.h" />
 diff --git a/src/OpenXcom.2010.vcxproj.filters b/src/OpenXcom.2010.vcxproj.filters
-index 92dbcdf0a..358ff8f26 100644
+index 92dbcdf0a..da0c980f7 100644
 --- a/src/OpenXcom.2010.vcxproj.filters
 +++ b/src/OpenXcom.2010.vcxproj.filters
-@@ -329,6 +329,72 @@
+@@ -329,6 +329,75 @@
      <ClCompile Include="Battlescape\Explosion.cpp">
        <Filter>Battlescape</Filter>
      </ClCompile>
@@ -55857,6 +56410,9 @@ index 92dbcdf0a..358ff8f26 100644
 +      <Filter>FirstPerson</Filter>
 +    </ClCompile>
 +    <ClCompile Include="FirstPerson\FirstPersonParticles.cpp">
++      <Filter>FirstPerson</Filter>
++    </ClCompile>
++    <ClCompile Include="FirstPerson\FirstPersonScanner.cpp">
 +      <Filter>FirstPerson</Filter>
 +    </ClCompile>
 +    <ClCompile Include="FirstPerson\FirstPersonSounds.cpp">
@@ -55901,7 +56457,7 @@ index 92dbcdf0a..358ff8f26 100644
      <ClCompile Include="Geoscape\ItemsArrivingState.cpp">
        <Filter>Geoscape</Filter>
      </ClCompile>
-@@ -1571,6 +1637,39 @@
+@@ -1571,6 +1640,42 @@
      <ClInclude Include="Battlescape\Explosion.h">
        <Filter>Battlescape</Filter>
      </ClInclude>
@@ -55915,6 +56471,9 @@ index 92dbcdf0a..358ff8f26 100644
 +      <Filter>FirstPerson</Filter>
 +    </ClInclude>
 +    <ClInclude Include="FirstPerson\FirstPersonParticles.h">
++      <Filter>FirstPerson</Filter>
++    </ClInclude>
++    <ClInclude Include="FirstPerson\FirstPersonScanner.h">
 +      <Filter>FirstPerson</Filter>
 +    </ClInclude>
 +    <ClInclude Include="FirstPerson\FirstPersonSounds.h">
@@ -55941,7 +56500,7 @@ index 92dbcdf0a..358ff8f26 100644
      <ClInclude Include="Basescape\TransfersState.h">
        <Filter>Basescape</Filter>
      </ClInclude>
-@@ -2731,6 +2830,9 @@
+@@ -2731,6 +2836,9 @@
      <Filter Include="Battlescape">
        <UniqueIdentifier>{f7e493ce-c074-420c-8b38-40d81b2d0509}</UniqueIdentifier>
      </Filter>

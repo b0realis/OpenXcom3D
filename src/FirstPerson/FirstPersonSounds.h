@@ -64,8 +64,11 @@ public:
 	/// HEARTBEAT (lub-dub, when badly hurt), DRY_FIRE (the click of a gun that can't fire),
 	/// FLARE (a strike and a hiss), WHIZZ (a shot whizzing past), SWOOSH (a melee swing
 	/// cutting the air), PIN (a grenade's pin pulled: a click and the lever's ping),
-	/// LIGHT_SWITCH (the flashlight's switch: a soft double click). COUNT is how many there are.
-	enum Id { HIT, KILL, HEARTBEAT, DRY_FIRE, FLARE, WHIZZ, SWOOSH, PIN, LIGHT_SWITCH, COUNT };
+	/// LIGHT_SWITCH (the flashlight's switch: a soft double click), SCAN_PULSE (the motion
+	/// scanner's sweep going out: a falling electronic whoop and its echoes), SCAN_BLIP_FAR,
+	/// SCAN_BLIP_MID and SCAN_BLIP_NEAR (the scanner finding movement: a sharp pip, higher the
+	/// nearer it is). COUNT is how many there are.
+	enum Id { HIT, KILL, HEARTBEAT, DRY_FIRE, FLARE, WHIZZ, SWOOSH, PIN, LIGHT_SWITCH, SCAN_PULSE, SCAN_BLIP_FAR, SCAN_BLIP_MID, SCAN_BLIP_NEAR, COUNT };
 	/// Synthesizes all the sounds for the mixer's output format.
 	FirstPersonSounds();
 	/// Stops and frees the sounds.

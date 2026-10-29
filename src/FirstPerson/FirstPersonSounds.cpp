@@ -159,6 +159,46 @@ FirstPersonSounds::FirstPersonSounds()
 	}
 	make(LIGHT_SWITCH, lightSwitch);
 
+	// The motion scanner (a player's report, GitHub issue #39; the owner: "some cool scary beep
+	// upon detection (like alien movie)"), its sweep going out: a whoop (550 ms) falling from
+	// 1250 to 950 Hz over its first 80 ms, swelling in over 6 ms and dying away, with two echoes
+	// 120 ms apart, each softer, as if in a hollow room. The tone is a sine with a little of its
+	// third harmonic, which makes it sound electronic.
+	auto whoop = [&](float seconds) {
+		if (seconds < 0) return 0.0f;
+		// The phase of a pitch of 950 + 300 e^(-25 t) Hz: the pitch's integral over time.
+		const float phase = 2 * Pi * (950.0f * seconds + 300.0f / 25.0f * (1.0f - std::exp(-seconds * 25.0f)));
+		return std::min(1.0f, seconds * 160.0f) * std::exp(-seconds * 9.0f) * (0.8f * std::sin(phase) + 0.2f * std::sin(3 * phase));
+	};
+	std::vector<float> pulse(length(0.55f));
+	for (size_t sample = 0; sample < pulse.size(); ++sample)
+	{
+		const float seconds = (float)sample / rate;
+		pulse[sample] = 0.55f * (whoop(seconds) + 0.35f * whoop(seconds - 0.12f) + 0.12f * whoop(seconds - 0.24f));
+	}
+	make(SCAN_PULSE, pulse);
+
+	// The scanner finding movement: a sharp pip (180 ms), a high tone with its third harmonic,
+	// dying away fast, and an echo 90 ms later; higher the nearer the movement (1500, 1900 and
+	// 2400 Hz), as the film's tracker climbs when something closes in.
+	auto pip = [&](float pitchHz) {
+		std::vector<float> sound(length(0.18f));
+		auto tone = [&](float seconds) {
+			if (seconds < 0) return 0.0f;
+			const float phase = 2 * Pi * pitchHz * seconds;
+			return std::min(1.0f, seconds * 400.0f) * std::exp(-seconds * 38.0f) * (0.75f * std::sin(phase) + 0.25f * std::sin(3 * phase));
+		};
+		for (size_t sample = 0; sample < sound.size(); ++sample)
+		{
+			const float seconds = (float)sample / rate;
+			sound[sample] = 0.6f * (tone(seconds) + 0.35f * tone(seconds - 0.09f));
+		}
+		return sound;
+	};
+	make(SCAN_BLIP_FAR, pip(1500.0f));
+	make(SCAN_BLIP_MID, pip(1900.0f));
+	make(SCAN_BLIP_NEAR, pip(2400.0f));
+
 	// Flare: a strike, then a hiss fading out (1.4 seconds in all).
 	std::vector<float> flare(length(1.4f));
 	float lowPassedNoise = 0.0f; // The noise smoothed by a simple low-pass filter.

@@ -50,6 +50,7 @@
  * swings. With dual wield a second weapon is drawn on the other side.
  */
 #include "FirstPersonMode.h"
+#include "FirstPersonScanner.h"
 #include <algorithm>
 #include <cmath>
 #include "FirstPersonView.h"
@@ -846,7 +847,8 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 	// (A built-in weapon with nothing to hold leaves the hands empty: see weaponShownInHand.)
 	BattleItem *weapon = unit ? activeWeapon(unit) : nullptr;
 	SurfaceSet *inventorySprites = _game->getMod()->getSurfaceSet("BIGOBS.PCK");
-	const bool show = Options::fpsViewModel && isActive() && !_classicHud && weapon && weaponShownInHand(unit, weapon) && !_deathUnit && inventorySprites;
+	const bool show = Options::fpsViewModel && isActive() && !_classicHud && weapon && weaponShownInHand(unit, weapon) && !_deathUnit && inventorySprites
+		&& !_scanner->isUp(); // (the motion scanner held up takes its place, see updateScanner)
 	_weaponInHand->setVisible(show);
 	_view->setMuzzlePoint(0.0, 0.0, false); // set again below while a gun is in hand
 	_view->setOffMuzzlePoint(0.0, 0.0, false);

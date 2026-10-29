@@ -262,7 +262,7 @@ FEATURES = [
      'Open a door without stepping into the room behind it.'),
     ('melee', 'Melee, medi-kits and items', [('ufo_medikit_teammate.png', 'A medi-kit by the crosshair: USE: and the teammate\'s name')],
      'Left button in the melee or use mode',
-     'Melee strikes what\'s under the crosshair: a blow swings, lunges and jolts. A medi-kit treats whoever you look at, next to you; aiming at nothing, yourself. The motion scanner and the mind probe go straight to their screens; priming opens the timer at once.',
+     'Melee strikes what\'s under the crosshair: a blow swings, lunges and jolts. A medi-kit treats whoever you look at, next to you; aiming at nothing, yourself. The motion scanner is held up at the bottom of the view, turning as you look round, a ring sweeping out with a whoop and a pip for each movement it finds; the mind probe to its screen; priming opens the timer at once.',
      ''),
     ('throw', 'Throwing and grenades', [('airburst.png', 'Doom free grenades: an airburst over a field')],
      'Fire mode throw or prime; <kbd>T</kbd> for a flare',

@@ -69,7 +69,7 @@
 #include "../Battlescape/Pathfinding.h"
 #include "../Battlescape/PrimeGrenadeState.h"
 #include "../Battlescape/ProjectileFlyBState.h"
-#include "../Battlescape/ScannerState.h"
+#include "FirstPersonScanner.h"
 #include "../Battlescape/TileEngine.h"
 #include "../Battlescape/UnitInfoState.h"
 #include "../Engine/Action.h"
@@ -2917,12 +2917,17 @@ void FirstPersonMode::useItemDirectly(BattleUnit *unit, BattleItem *item)
 		return;
 	}
 
-	// A scanner.
+	// A scanner: held up at the bottom middle of the view, turned to it, for its time units as
+	// the game's (see FirstPersonScanner, updateScanner); used again, put away (for nothing).
 	if (rules->getBattleType() == BT_SCANNER)
 	{
-		if (action->spendTU(&action->result))
+		if (_scanner->isUp() && _scanner->item() == item)
 		{
-			_game->pushState(new ScannerState(action));
+			_scanner->putAway();
+		}
+		else if (action->spendTU(&action->result))
+		{
+			_scanner->bringUp(unit, item);
 		}
 		else
 		{
@@ -2977,6 +2982,27 @@ void FirstPersonMode::useItemDirectly(BattleUnit *unit, BattleItem *item)
 	}
 	tileEngine->medikitUse(action, patient, type == BMT_HEAL ? BMA_HEAL : type == BMT_STIMULANT ? BMA_STIMULANT : BMA_PAINKILLER, part);
 	tileEngine->medikitRemoveIfEmpty(action);
+}
+
+/**
+ * The motion scanner held up (see FirstPersonScanner), every frame: put away once it's no longer
+ * the item in the soldier's chosen hand (hands switched, the item gone), another soldier is
+ * looked through, the soldier is out, or the 3D view is gone; else its round screen shows at the
+ * bottom middle, turned to the way the view looks now (the camera's yaw has 0 = east, a bearing
+ * 0 = north), and the weapon in hand makes way for it (see updateWeaponInHand).
+ * @param unit The soldier looked through, or null.
+ */
+void FirstPersonMode::updateScanner(BattleUnit *unit)
+{
+	if (_scanner->isUp() && (!isActive() || !unit || unit != _scanner->soldier() || unit->isOut() || activeWeapon(unit) != _scanner->item()))
+	{
+		_scanner->putAway();
+	}
+	_scannerPanel->setVisible(_scanner->isUp());
+	if (_scanner->isUp())
+	{
+		_scanner->draw(_scannerPanel, _view->getYawDegrees() + 90.0, _scannerRimColor);
+	}
 }
 
 /**
