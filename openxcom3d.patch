@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..cadeda018
+index 000000000..ed50f701a
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,431 @@
+@@ -0,0 +1,432 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -364,7 +364,8 @@ index 000000000..cadeda018
 +  STR_FPS_SWIM_OFF: "Swimming off"
 +  STR_FPS_FLIGHT_OFF_KEY: "Flight off ({0} to fly)"
 +  STR_FPS_SWIM_OFF_KEY: "Swimming off ({0} to swim)"
-+  STR_FPS_HUD_HIDDEN: "3D HUD hidden: {0} shows it"
++  STR_FPS_HUD_HIDDEN: "3D HUD hidden: {0} hides the crosshair too"
++  STR_FPS_HUD_CLEAN: "Clean view: {0} shows the HUD"
 +  STR_FPS_MAP_LAYERS_ALL: "The map shows every level (3D always does)"
 +  STR_FPS_MAP_LAYERS_ONE: "The map shows up to its level (3D: every level)"
 +  STR_FPS_BUTTON_FLY_SHORT: "FLY"
@@ -558,13 +559,13 @@ index 000000000..cadeda018
 +  STR_FPS_KEY_CLASSIC_HUD: "Classic HUD on/off"
 +  STR_FPS_KEY_CLASSIC_HUD_DESC: "Shows the original bottom panel over the 3D view."
 +  STR_FPS_KEY_HIDE_HUD: "3D HUD on/off"
-+  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers: a clear view. On the map: the map camera on or off."
++  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..8124a6ae4
+index 000000000..9b004936c
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,431 @@
+@@ -0,0 +1,432 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -801,7 +802,8 @@ index 000000000..8124a6ae4
 +  STR_FPS_SWIM_OFF: "Swimming off"
 +  STR_FPS_FLIGHT_OFF_KEY: "Flight off ({0} to fly)"
 +  STR_FPS_SWIM_OFF_KEY: "Swimming off ({0} to swim)"
-+  STR_FPS_HUD_HIDDEN: "3D HUD hidden: {0} shows it"
++  STR_FPS_HUD_HIDDEN: "3D HUD hidden: {0} hides the crosshair too"
++  STR_FPS_HUD_CLEAN: "Clean view: {0} shows the HUD"
 +  STR_FPS_MAP_LAYERS_ALL: "The map shows every level (3D always does)"
 +  STR_FPS_MAP_LAYERS_ONE: "The map shows up to its level (3D: every level)"
 +  STR_FPS_BUTTON_FLY_SHORT: "FLY"
@@ -995,7 +997,7 @@ index 000000000..8124a6ae4
 +  STR_FPS_KEY_CLASSIC_HUD: "Classic HUD on/off"
 +  STR_FPS_KEY_CLASSIC_HUD_DESC: "Shows the original bottom panel over the 3D view."
 +  STR_FPS_KEY_HIDE_HUD: "3D HUD on/off"
-+  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers: a clear view. On the map: the map camera on or off."
++  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
 index 000000000..2b8ddfb0f
@@ -22226,10 +22228,10 @@ index 000000000..a45746726
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..071b0abd0
+index 000000000..c0fc13141
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2671 @@
+@@ -0,0 +1,2694 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -22336,8 +22338,8 @@ index 000000000..071b0abd0
 +bool lastWants3D = false;
 +/// Whether the classic HUD was shown over the 3D view (FirstPersonMode::_classicHud).
 +bool lastClassicHud = false;
-+/// Whether the 3D HUD was hidden (FirstPersonMode::_hudHidden).
-+bool lastHudHidden = false;
++/// Whether the 3D HUD was hidden (FirstPersonMode::_hudHidden), and the crosshair too (_hudClean).
++bool lastHudHidden = false, lastHudClean = false;
 +/// Whether the flashlight was switched on (FirstPersonMode::_flashlightOn).
 +bool lastFlashlightOn = true;
 +/// Whether sprinting and en passant were switched on (FirstPersonMode::_sprintOn, _enPassantOn).
@@ -22415,6 +22417,7 @@ index 000000000..071b0abd0
 +		_wants3D = lastWants3D;
 +		_classicHud = lastClassicHud;
 +		_hudHidden = lastHudHidden;
++		_hudClean = lastHudClean;
 +		_flashlightOn = lastFlashlightOn;
 +		_sprintOn = lastSprintOn;
 +		_enPassantOn = lastEnPassantOn;
@@ -23083,6 +23086,7 @@ index 000000000..071b0abd0
 +	lastWants3D = _wants3D;
 +	lastClassicHud = _classicHud;
 +	lastHudHidden = _hudHidden;
++	lastHudClean = _hudClean;
 +	lastFlashlightOn = _flashlightOn;
 +	lastSprintOn = _sprintOn;
 +	lastEnPassantOn = _enPassantOn;
@@ -23529,20 +23533,32 @@ index 000000000..071b0abd0
 +}
 +
 +/**
-+ * Hides or shows the 3D HUD (the hide HUD key, P by default), for a clear view: the top bar, the
-+ * info panel, the compass, the lift arrows, the enemy markers and the original's enemy buttons.
-+ * The crosshair and the weapon in hand stay (each has its own setting), and so do the banners
-+ * and the game's messages. Hidden buttons can't be clicked. On the isometric map the top bar
-+ * shows as ever. Hidden, a message says which key brings it back.
++ * Steps the 3D HUD round (the hide HUD key, P by default): shown; hidden, for a clear view: the
++ * top bar, the info panel, the compass, the lift arrows, the enemy markers and the original's
++ * enemy buttons (the crosshair stays); and clean: the crosshair too, with the shot info, the
++ * costs, the accuracy line and the name of the unit pointed at (a player's report, GitHub issue
++ * #37: "full hudless mode would be useful for a project"); then shown again. The weapon in hand
++ * and the trajectory keep their own settings, and the banners and the game's messages still
++ * show. Hidden buttons can't be clicked. On the isometric map the top bar shows as ever. Each
++ * hidden step's message says which key goes on.
 + */
 +void FirstPersonMode::toggleHud()
 +{
-+	_hudHidden = !_hudHidden;
-+	rememberChoices();
-+	if (_hudHidden)
++	if (!_hudHidden)
 +	{
++		_hudHidden = true;
 +		_state->warningRaw(_state->tr("STR_FPS_HUD_HIDDEN").arg(keyLabel(Options::keyFpsHideHud)));
 +	}
++	else if (!_hudClean)
++	{
++		_hudClean = true;
++		_state->warningRaw(_state->tr("STR_FPS_HUD_CLEAN").arg(keyLabel(Options::keyFpsHideHud)));
++	}
++	else
++	{
++		_hudHidden = _hudClean = false;
++	}
++	rememberChoices();
 +}
 +
 +/**
@@ -23657,6 +23673,15 @@ index 000000000..071b0abd0
 +bool FirstPersonMode::hudHidden() const
 +{
 +	return _hudHidden && isActive();
++}
++
++/**
++ * Is the view clean right now: in the 3D view, the HUD hidden and the crosshair with it (the
++ * hide HUD key's third step, see toggleHud)?
++ */
++bool FirstPersonMode::hudClean() const
++{
++	return _hudHidden && _hudClean && isActive();
 +}
 +
 +/**
@@ -24903,10 +24928,10 @@ index 000000000..071b0abd0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..b689a475f
+index 000000000..324b1faad
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1153 @@
+@@ -0,0 +1,1156 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -25086,6 +25111,7 @@ index 000000000..b689a475f
 +	std::string _missionAtStart;           // the battle's mission type when this screen was made (another at the end: its next stage)
 +	bool _classicHud = false;              // original bottom HUD drawn over the 3D view
 +	bool _hudHidden = false;               // the 3D HUD hidden (the hide HUD key): a clear view
++	bool _hudClean = false;                // and the crosshair with all round it too (the key's third step): a clean view
 +	bool _mouseLook = true;                // mouse turns the view (captured) instead of moving a cursor
 +	bool _dragLook = false;                // right button held over the view in cursor mode
 +	bool _zoomButtonHeld = false;          // right button held in mouse look, zooming (setting "Zoom")
@@ -25161,6 +25187,8 @@ index 000000000..b689a475f
 +	void toggleFlashlight();
 +	/// Is the 3D HUD hidden right now (in the 3D view, with the hide HUD key)?
 +	bool hudHidden() const;
++	/// Is the view clean right now: the HUD hidden, and the crosshair with all round it too (the hide HUD key's third step)?
++	bool hudClean() const;
 +	/// Switches between mouse look (captured mouse) and a free cursor.
 +	void setMouseLook(bool on);
 +	/// Can the player act right now (their turn, nothing else going on)?
@@ -31420,7 +31448,7 @@ index 000000000..374f097e1
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..9ac5c07e6
+index 000000000..b165b37b9
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
 @@ -0,0 +1,4326 @@
@@ -34990,10 +35018,10 @@ index 000000000..9ac5c07e6
 + */
 +void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 +{
-+	// Shown only in the 3D view: the crosshair with its setting, the lines with the "Shot info"
-+	// setting in the player's turn (with or without the crosshair). The hit ticks below play
-+	// either way.
-+	const bool show = isActive();
++	// Shown only in the 3D view, and not in a clean view (the hide HUD key's third step): the
++	// crosshair with its setting, the lines with the "Shot info" setting in the player's turn
++	// (with or without the crosshair). The hit ticks below play either way.
++	const bool show = isActive() && !hudClean();
 +	_crosshair->setVisible(show && Options::fpsCrosshair);
 +	if (!show) _accuracyLine->setVisible(false); // (else shown below, with a reach)
 +	_txtMode->setVisible(show && Options::fpsCrosshairInfo && playerTurn);
@@ -35611,7 +35639,7 @@ index 000000000..9ac5c07e6
 +	updatePointedUnit(unit);
 +	int pointerX, pointerY;
 +	pointer(pointerX, pointerY);
-+	const BattleUnit *target = Options::fpsUnitNames ? pointedUnit() : nullptr;
++	const BattleUnit *target = Options::fpsUnitNames && !hudClean() ? pointedUnit() : nullptr;
 +	_txtTarget->setVisible(target != nullptr);
 +	// The name a line lower while the action's other costs show under the shot line (its text
 +	// would run into them), and under the accuracy line while that shows (see updateCrosshair);

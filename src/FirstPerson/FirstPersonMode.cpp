@@ -104,8 +104,8 @@ const SavedBattleGame *lastBattle = nullptr;
 bool lastWants3D = false;
 /// Whether the classic HUD was shown over the 3D view (FirstPersonMode::_classicHud).
 bool lastClassicHud = false;
-/// Whether the 3D HUD was hidden (FirstPersonMode::_hudHidden).
-bool lastHudHidden = false;
+/// Whether the 3D HUD was hidden (FirstPersonMode::_hudHidden), and the crosshair too (_hudClean).
+bool lastHudHidden = false, lastHudClean = false;
 /// Whether the flashlight was switched on (FirstPersonMode::_flashlightOn).
 bool lastFlashlightOn = true;
 /// Whether sprinting and en passant were switched on (FirstPersonMode::_sprintOn, _enPassantOn).
@@ -183,6 +183,7 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
 		_wants3D = lastWants3D;
 		_classicHud = lastClassicHud;
 		_hudHidden = lastHudHidden;
+		_hudClean = lastHudClean;
 		_flashlightOn = lastFlashlightOn;
 		_sprintOn = lastSprintOn;
 		_enPassantOn = lastEnPassantOn;
@@ -851,6 +852,7 @@ void FirstPersonMode::rememberChoices() const
 	lastWants3D = _wants3D;
 	lastClassicHud = _classicHud;
 	lastHudHidden = _hudHidden;
+	lastHudClean = _hudClean;
 	lastFlashlightOn = _flashlightOn;
 	lastSprintOn = _sprintOn;
 	lastEnPassantOn = _enPassantOn;
@@ -1297,20 +1299,32 @@ void FirstPersonMode::setClassicHud(bool on)
 }
 
 /**
- * Hides or shows the 3D HUD (the hide HUD key, P by default), for a clear view: the top bar, the
- * info panel, the compass, the lift arrows, the enemy markers and the original's enemy buttons.
- * The crosshair and the weapon in hand stay (each has its own setting), and so do the banners
- * and the game's messages. Hidden buttons can't be clicked. On the isometric map the top bar
- * shows as ever. Hidden, a message says which key brings it back.
+ * Steps the 3D HUD round (the hide HUD key, P by default): shown; hidden, for a clear view: the
+ * top bar, the info panel, the compass, the lift arrows, the enemy markers and the original's
+ * enemy buttons (the crosshair stays); and clean: the crosshair too, with the shot info, the
+ * costs, the accuracy line and the name of the unit pointed at (a player's report, GitHub issue
+ * #37: "full hudless mode would be useful for a project"); then shown again. The weapon in hand
+ * and the trajectory keep their own settings, and the banners and the game's messages still
+ * show. Hidden buttons can't be clicked. On the isometric map the top bar shows as ever. Each
+ * hidden step's message says which key goes on.
  */
 void FirstPersonMode::toggleHud()
 {
-	_hudHidden = !_hudHidden;
-	rememberChoices();
-	if (_hudHidden)
+	if (!_hudHidden)
 	{
+		_hudHidden = true;
 		_state->warningRaw(_state->tr("STR_FPS_HUD_HIDDEN").arg(keyLabel(Options::keyFpsHideHud)));
 	}
+	else if (!_hudClean)
+	{
+		_hudClean = true;
+		_state->warningRaw(_state->tr("STR_FPS_HUD_CLEAN").arg(keyLabel(Options::keyFpsHideHud)));
+	}
+	else
+	{
+		_hudHidden = _hudClean = false;
+	}
+	rememberChoices();
 }
 
 /**
@@ -1425,6 +1439,15 @@ bool FirstPersonMode::gameModifierHeld() const
 bool FirstPersonMode::hudHidden() const
 {
 	return _hudHidden && isActive();
+}
+
+/**
+ * Is the view clean right now: in the 3D view, the HUD hidden and the crosshair with it (the
+ * hide HUD key's third step, see toggleHud)?
+ */
+bool FirstPersonMode::hudClean() const
+{
+	return _hudHidden && _hudClean && isActive();
 }
 
 /**

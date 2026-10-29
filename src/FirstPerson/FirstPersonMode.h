@@ -177,6 +177,7 @@ private:
 	std::string _missionAtStart;           // the battle's mission type when this screen was made (another at the end: its next stage)
 	bool _classicHud = false;              // original bottom HUD drawn over the 3D view
 	bool _hudHidden = false;               // the 3D HUD hidden (the hide HUD key): a clear view
+	bool _hudClean = false;                // and the crosshair with all round it too (the key's third step): a clean view
 	bool _mouseLook = true;                // mouse turns the view (captured) instead of moving a cursor
 	bool _dragLook = false;                // right button held over the view in cursor mode
 	bool _zoomButtonHeld = false;          // right button held in mouse look, zooming (setting "Zoom")
@@ -252,6 +253,8 @@ private:
 	void toggleFlashlight();
 	/// Is the 3D HUD hidden right now (in the 3D view, with the hide HUD key)?
 	bool hudHidden() const;
+	/// Is the view clean right now: the HUD hidden, and the crosshair with all round it too (the hide HUD key's third step)?
+	bool hudClean() const;
 	/// Switches between mouse look (captured mouse) and a free cursor.
 	void setMouseLook(bool on);
 	/// Can the player act right now (their turn, nothing else going on)?

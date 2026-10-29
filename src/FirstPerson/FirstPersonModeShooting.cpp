@@ -3564,10 +3564,10 @@ std::string FirstPersonMode::renamedAction(const RuleItem *rules, BattleActionTy
  */
 void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 {
-	// Shown only in the 3D view: the crosshair with its setting, the lines with the "Shot info"
-	// setting in the player's turn (with or without the crosshair). The hit ticks below play
-	// either way.
-	const bool show = isActive();
+	// Shown only in the 3D view, and not in a clean view (the hide HUD key's third step): the
+	// crosshair with its setting, the lines with the "Shot info" setting in the player's turn
+	// (with or without the crosshair). The hit ticks below play either way.
+	const bool show = isActive() && !hudClean();
 	_crosshair->setVisible(show && Options::fpsCrosshair);
 	if (!show) _accuracyLine->setVisible(false); // (else shown below, with a reach)
 	_txtMode->setVisible(show && Options::fpsCrosshairInfo && playerTurn);
@@ -4185,7 +4185,7 @@ void FirstPersonMode::updateUnitName(BattleUnit *unit)
 	updatePointedUnit(unit);
 	int pointerX, pointerY;
 	pointer(pointerX, pointerY);
-	const BattleUnit *target = Options::fpsUnitNames ? pointedUnit() : nullptr;
+	const BattleUnit *target = Options::fpsUnitNames && !hudClean() ? pointedUnit() : nullptr;
 	_txtTarget->setVisible(target != nullptr);
 	// The name a line lower while the action's other costs show under the shot line (its text
 	// would run into them), and under the accuracy line while that shows (see updateCrosshair);

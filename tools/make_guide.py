@@ -65,7 +65,7 @@ KEYS = [
         ('<kbd>C</kbd> or the middle button', 'Mouse look &harr; free cursor, to click buttons and hover soldiers for their cards. With <i>Middle click identifies</i> a middle click on a unit shows it.', ''),
         ('<kbd>H</kbd>', 'The classic HUD on/off: every button of it works in 3D.', 'The map\'s whole bottom bar, if you prefer it.'),
         ('<kbd>Wheel</kbd> over a soldier\'s button', 'With the cursor free: steps the soldier\'s card, or the SOLDIER CAM, through the squad one soldier at a time (over &#9664; and &#9654; it scrolls the bar).', 'Look through every soldier\'s eyes in a few turns of the wheel.'),
-        ('<kbd>P</kbd>', 'The 3D HUD on/off, for a clear view (on the map: the map camera on/off).', ''),
+        ('<kbd>P</kbd>', 'The 3D HUD hidden; again, the crosshair too (a clean view); again, all back. On the map: the map camera on/off.', ''),
         ('<kbd>F7</kbd>', 'The frame counter on/off (the game\'s key).', ''),
     ]),
     ('The game\'s own keys, in 3D too', [
