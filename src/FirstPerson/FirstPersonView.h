@@ -331,6 +331,8 @@ public:
 	void setPointer(int x, int y, int textBelow) { _pointerX = x; _pointerY = y; _pointerTextBelow = textBelow; }
 	/// The point the game's line through the pointer meets, in voxels (a pile in front of it turns faint, see drawFloorItems); or none.
 	void setPointerAim(const Position &voxel, bool aimed) { _pointerAim = voxel; _pointerAimed = aimed; }
+	/// The unit the player points at (its hitbox or picture, see FirstPersonMode::updatePointedUnit), or null: setting "Hitboxes" Aimed at outlines only its.
+	void setAimedUnit(const BattleUnit *unit) { _aimedUnit = unit; }
 	/// The unit whose picture is where the player points (or within a few pixels), as last drawn; or null.
 	BattleUnit *getUnitAtPointer() const { return _unitAtPointer; }
 	/// The unconscious unit whose body's picture is where the player points (nearer it than any standing unit's), as last drawn; or null.
@@ -745,6 +747,7 @@ private:
 	const Tile *_pileAtPointer = nullptr;               // the pile pointed at, found from them after each frame (see drawFloorItems)
 	Position _pointerAim;                               // the point the game's line through the pointer meets, in voxels (see setPointerAim)
 	bool _pointerAimed = false;                         // and whether there is one
+	const BattleUnit *_aimedUnit = nullptr;             // the unit pointed at (see setAimedUnit)
 	Surface *_spriteBuffer;                             // scratch surface for drawing a unit's sprite before it goes into the world
 	std::vector<Surface*> _blendBuffers;                // sprites dissolving into their next frame, one per sprite size
 	std::vector<int> _blendColumns;                     // drawSpriteBlend's source column and row lookups

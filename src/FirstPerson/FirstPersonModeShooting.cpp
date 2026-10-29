@@ -562,23 +562,30 @@ BattleItem *FirstPersonMode::offHandWeapon(BattleUnit *unit, const BattleItem *w
 }
 
 /**
- * The akimbo key (Y): with full or realistic akimbo on, switches it off and remembers which it
- * was; with both off, switches that one back on (realistic if there's none to remember). The
- * game's warning line says which.
+ * The akimbo key (Y): with akimbo on just now, switches it off; off, switches it back on, the kind
+ * the setting "Akimbo" says (Full or Realistic, see FirstPerson::akimboChoice). With the setting
+ * Off the key does nothing. The game's warning line says which.
  */
 void FirstPersonMode::toggleAkimbo()
 {
+	// With the setting Off the key does nothing but say so (a player's report, GitHub issue #27:
+	// a finger slipping onto it switched akimbo on, to a new player's surprise).
+	const int choice = FirstPerson::akimboChoice();
+	if (choice == 0)
+	{
+		_state->warning("STR_FPS_AKIMBO_SETTING_OFF");
+		return;
+	}
 	if (Options::fpsDualWield || Options::fpsAkimboRealistic)
 	{
-		_akimboRealisticWasOn = Options::fpsAkimboRealistic;
 		Options::fpsDualWield = Options::fpsAkimboRealistic = false;
 		_state->warning("STR_FPS_AKIMBO_OFF");
 	}
 	else
 	{
-		Options::fpsAkimboRealistic = _akimboRealisticWasOn;
-		Options::fpsDualWield = !_akimboRealisticWasOn;
-		_state->warning(_akimboRealisticWasOn ? "STR_FPS_AKIMBO_REALISTIC_ON" : "STR_FPS_AKIMBO_FULL_ON");
+		Options::fpsAkimboRealistic = choice == 2;
+		Options::fpsDualWield = choice == 1;
+		_state->warning(choice == 2 ? "STR_FPS_AKIMBO_REALISTIC_ON" : "STR_FPS_AKIMBO_FULL_ON");
 	}
 	// The options file keeps it, so the options screen's Cancel doesn't quietly undo it.
 	rememberChoices();
@@ -4139,6 +4146,7 @@ void FirstPersonMode::updatePointedUnit(BattleUnit *unit)
 {
 	_pointedUnit = nullptr;
 	_view->setPointerAim(Position(), false);
+	_view->setAimedUnit(nullptr);
 	if (!unit || !isActive())
 	{
 		return;
@@ -4162,6 +4170,7 @@ void FirstPersonMode::updatePointedUnit(BattleUnit *unit)
 	{
 		_pointedUnit = _view->getUnitAtPointer();
 	}
+	_view->setAimedUnit(_pointedUnit); // (setting "Hitboxes" Aimed at: its hitbox only)
 }
 
 /**

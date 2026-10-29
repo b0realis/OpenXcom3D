@@ -54,7 +54,7 @@ KEYS = [
         ('<kbd>Wheel</kbd> / <kbd>J</kbd>', 'Previous / next fire mode: snap, aimed, auto, launch, melee, psi, use, throw, prime.', ''),
         ('<kbd>Z</kbd> <kbd>X</kbd> <kbd>V</kbd>', 'Snap / aimed / auto shot.', 'In FPS style: snap = one round from the hip, aimed = one tight round, auto = a burst, hold the trigger for more.'),
         ('<kbd>G</kbd>', 'Switch hand: right, left, and the built-in weapon, each that gives something to use.', ''),
-        ('<kbd>Y</kbd>', 'Akimbo off, and the same kind back on; the first time, <i>Realistic akimbo</i> (the settings <i>Full akimbo</i> and <i>Realistic akimbo</i>).', 'Two guns: more rounds, each 30% less accurate. Off to take an aimed shot.'),
+        ('<kbd>Y</kbd>', 'Akimbo off, and back on to the kind the setting <i>Akimbo</i> says (Full or Realistic); with the setting Off it does nothing.', 'Two guns: more rounds, each 30% less accurate. Off to take an aimed shot.'),
         ('<i>Akimbo style</i> (unbound)', 'Switch two guns between taking turns round by round and firing at once (<i>Akimbo volley</i>).', ''),
         ('<kbd>Ctrl</kbd>+<kbd>Shift</kbd> + click', 'With a spray weapon\'s auto shot (X-Com Files\' miniguns): mark the spray burst\'s points, as on the map.', ''),
         ('Right button', 'Cancel the current action, or forget a target marked for <i>Confirm fire</i>; with nothing to cancel, hold to zoom (with a free cursor: hold and drag to look round).', ''),
@@ -86,7 +86,7 @@ KEYS = [
 # them (one list there; the groups are FirstPersonApi.cpp's, where the settings are registered).
 # ---------------------------------------------------------------------------------------------------------------------
 SETTINGS = [
-    ('Looking and moving', [
+    ('View and camera', [
         ('Soldier camera preview', 'YES', 'YES / NO', 'Hovering a soldier\'s button shows their card with a live helmet camera. A right click opens their SOLDIER CAM, big.',
          'See what each soldier sees without leaving the one you play.'),
         ('Map camera', 'Off', 'Off / Small / Medium / Large', 'On the isometric map, the selected soldier\'s helmet camera in a window at the top left; it turns to your target while you aim.',
@@ -95,101 +95,102 @@ SETTINGS = [
         ('Invert mouse', 'NO', 'YES / NO', 'Mouse forward looks down, as in a flight simulator.', ''),
         ('Field of view', '75', '50 to 110', 'How wide the 3D view is, in degrees.', 'Wider shows more around you; narrower makes far targets bigger.'),
         ('Zoom', 'YES', 'YES / NO', 'Hold U or the right button to look four times closer.', 'Only the picture: the shot and the hit chance stay the same.'),
-        ('Middle click identifies', 'YES', 'YES / NO', 'A middle click on a unit opens the game\'s unit screen, as on the map.', ''),
+        ('Start battles in 3D', 'NO', 'YES / NO', 'Begin every battle in the first-person view.', ''),
+        ('Alien turn in 3D', 'YES', 'YES / NO', 'Stay in 3D during the aliens\' turn, through your last soldier\'s eyes. NO: the map for their turn.', ''),
+        ('Aliens\' turn cameras', 'YES', 'YES / NO', 'In their turn the view cuts to where the action is: a soldier firing back, the nearest soldier who sees a moving alien; helmet camera cards pop up for soldiers shot at, hit or mind controlled.', ''),
+        ('Camera when a soldier falls', 'YES', 'YES / NO', 'With <i>Aliens\' turn cameras</i>, in their turn: a soldier going down out of view pops up their helmet camera card, DECEASED or UNCONSCIOUS.', ''),
+        ('Eye height lowered by', '3', '0 to 6 voxels', 'Sits the 3D camera lower, so rooms feel less cramped. What the soldier sees by the rules doesn\'t change.', ''),
+        ('Head bob', 'YES', 'YES / NO', 'The view bobs with the soldier\'s steps.', 'Off if it makes you queasy.'),
+    ]),
+    ('Movement', [
         ('Turning costs TU', 'NO', 'YES / NO', 'NO: the soldier turns with the view for free. YES: the head turns 45&deg; for free, beyond that the soldier turns at the game\'s cost, as on the map.',
          'YES is the classic rule: facing costs time units and decides reaction fire. NO is relaxed play.'),
-        ('Compass', 'YES', 'YES / NO', 'A compass at the top right: your heading, the way the soldier faces, and (with turning at a cost) how far the head turns for free.', ''),
-        ('Movement', 'Free', 'Free / Tiles', 'Free: walk anywhere, stepping into the next tile when you cross into it. Tiles: a press walks one tile.',
+        ('Movement', 'Tiles', 'Free / Tiles', 'Free: walk anywhere, stepping into the next tile when you cross into it. Tiles: a press walks one tile.',
          'Tiles feels like the map; Free lets you stand to one side of a tile (lean shots, peeking).'),
         ('Walking speed', '4', '1 to 8 tiles a second', 'How fast the soldier walks in 3D. Every tile still costs its time units.', ''),
-        ('Head bob', 'YES', 'YES / NO', 'The view bobs with the soldier\'s steps.', 'Off if it makes you queasy.'),
         ('Flight cost per level (TU)', '0', '0 to 24', 'What a flying (or swimming) soldier pays to rise or sink a level in 3D.', 'The original game charges about 8.'),
-        ('Flight cost overrides rules', 'YES', 'YES / NO', 'YES: every flyer pays the cost above. NO: each pays its armor\'s own cost.', 'NO keeps the game\'s slower flyers slow.'),
-        ('Jump over low obstacles', 'YES', 'YES / NO', 'Space while walking into something low vaults over it, paying only the walk.', 'Bends the rules a little: on the map a fence makes you walk round.'),
+        ('Flight cost overrides rules', 'NO', 'YES / NO', 'YES: every flyer pays the cost above. NO: each pays its armor\'s own cost.', 'NO keeps the game\'s slower flyers slow.'),
+        ('Jump over low obstacles', 'NO', 'YES / NO', 'Space while walking into something low vaults over it, paying only the walk.', 'Bends the rules a little: on the map a fence makes you walk round.'),
         ('Falling', 'YES', 'YES / NO', 'Walk off a ledge and fall to the level below, hurt by the height.', 'A shortcut the map never offers, at the price of the fall.'),
         ('Check the landing', 'YES', 'YES / NO', 'A step off a ledge onto ground no one can walk on (a moat, the sea) or where no step leads on stops at the edge: UNSAFE LANDING! PUSH AGAIN.',
          'Keeps a soldier out of places they could never leave.'),
-        ('Eye height lowered by', '3', '0 to 6 voxels', 'Sits the 3D camera lower, so rooms feel less cramped. What the soldier sees by the rules doesn\'t change.', ''),
     ]),
-    ('Shooting', [
-        ('Faithful X-COM targeting', 'YES', 'YES / NO', 'YES: the game\'s own accuracy, its hit chance by the crosshair. NO: FPS-style shooting: rounds along the crosshair with a spread, recoil, from your eye.',
+    ('Aiming and combat', [
+        ('FPS-style shooting (easier)', 'NO', 'YES / NO', 'NO: the game\'s own accuracy, its hit chance by the crosshair. YES: FPS-style shooting, far easier: rounds along the crosshair with a spread, recoil, from your eye.',
          'The big choice: see <a href="#styles">Two ways to play</a>.'),
-        ('Full akimbo', 'NO', 'YES / NO', 'A gun in each hand fires both on every shot, the two taking turns round by round, each 30% less accurate, for the dearer gun\'s shot and a tenth.',
+        ('Akimbo', 'Off', 'Off / Full / Realistic', 'A gun in each hand fires both on every shot, the two taking turns round by round, each 30% less accurate, for the dearer gun\'s shot and a tenth.',
          'More rounds for the time units, worse aim; no aimed shots with two guns.'),
-        ('Realistic akimbo', 'NO', 'YES / NO', 'Akimbo, but only with one-handed guns: two pistols fire together, a rifle alone.', ''),
         ('Akimbo volley', 'NO', 'YES / NO', 'NO: two guns take turns round by round, each round resolved before the next. YES: both at once, a volley, their hits landing together.',
          'In turns a burst can kill one alien and go on to the next.'),
-        ('Lean shots', 'NO', 'YES / NO', 'Standing to one side of the tile shoots from that side: the game\'s own off-centre origins.', 'Peek and shoot round a corner (with Faithful targeting; FPS style always shoots from the eye).'),
+        ('Lean shots', 'NO', 'YES / NO', 'Standing to one side of the tile shoots from that side: the game\'s own off-centre origins.', 'Peek and shoot round a corner (with the game\'s own targeting; FPS style always shoots from the eye).'),
         ('Lean', 'Off', 'Off / Peek / Tilt', 'Left Shift with A or D leans out to peek; Tilt tilts the view too.', 'Shows round corners; a shot from a lean leaves from that side.'),
         ('Melee hits walls and downed', 'NO', 'YES / NO', 'A blow at the wall, door or object under the crosshair strikes it; a blow can hit a body lying in front of you.', 'Break through a wall with a hammer, as the map\'s terrain melee does in some mods.'),
         ('Melee hits floors', 'YES', 'YES / NO', 'With terrain melee on: the floor or ceiling you aim at takes the blow too.', 'Break through the floor at your feet or the ceiling above.'),
-    ]),
-    ('Light, atmosphere and sound', [
-        ('Smooth lighting', 'YES', 'YES / NO', 'The battle\'s light blends smoothly from tile to tile. NO: tile by tile, as the map shades it.', ''),
-        ('Shadows', 'YES', 'YES / NO', 'Ray-traced shadows from the sun, lamps and your flashlight, and under every unit.', 'Off on slow machines.'),
-        ('Distance haze', 'Normal', 'Normal / Light / Clear', 'How soon far terrain fades into the haze.', ''),
-        ('Flashlight', 'On', 'On / Dynamic / Off', 'The 3D view\'s own light, on F. On: a wide beam from the shoulder, in the dark. Dynamic: a tight spot on the crosshair, day or night.',
-         'Lights only the 3D view: what the soldiers see by the rules doesn\'t change.'),
-        ('Night vision needs gear', 'YES', 'YES / NO', 'Only soldiers with night vision gear (power suits, flying suits...) get NIGHT VISION in 3D. NO: everyone.', 'YES keeps the night dark for the unequipped.'),
-        ('Dynamic music', 'YES', 'YES / NO', 'Tenser music while aliens are in sight.', ''),
-        ('Hit, kill and swing sounds', 'YES', 'YES / NO', 'A tick for a hit, a double tick for a kill, a swoosh for your swings, and your heartbeat once hurt below half health.', ''),
-        ('Smoke', 'Modern', 'Modern / Original', 'Modern: the game\'s smoke as soft see-through clouds, solid where your soldier can\'t see through. Original: the games\' own smoke animation.',
-         'Either way units the game hides stay hidden.'),
-        ('Smoke opacity', '45%', '5% to 80%', 'How solid smoke you can see through looks: the thinnest, thicker smoke more. Where your soldier can\'t see through it, it stays solid.',
-         'Lower it if smoke hides too much of the street; your soldier sees what the game says either way.'),
-        ('Night smoke opacity', '25%', '5% to 80%', 'The same in the dark: on a night mission (lamp-lit or suit-lit smoke too), and by day on dark maps and in unlit rooms.',
-         'Lower if smoke at night is blinding.'),
-        ('Unlimited tactical flares', 'YES', 'YES / NO', 'T throws a red flare at the crosshair, free and as often as you like.', 'Lights the 3D view only.'),
-    ]),
-    ('Looks', [
-        ('Weapon in hand', 'YES', 'YES / NO', 'The weapon in hand at the bottom of the view, built in 3D from its inventory picture, its barrel on the crosshair.', ''),
-        ('Sprite upscaling', 'Smooth + detail', 'Smooth + detail / Smooth / Off', 'Units, items and effects up close scaled the way pixel art scales well (xBRZ).', ''),
-        ('Unit size', '100%', '80% to 100%', 'Soldiers, aliens, corpses and items drawn a little smaller, so tall sprites fit under low ceilings.', 'Only the picture: what shots hit stays the game\'s (see <i>Hitboxes</i>).'),
-        ('Muzzle flashes', 'YES', 'YES / NO', 'Gunfire, hits and blasts flash. NO: no flashes, steady UFO lights, no camera glitches.', 'Off if flashing light bothers you.'),
-        ('Particles', 'All', 'All / Effects / Off', 'Effects: sparks, debris, smoke, fire, trails. All: also dust, fireflies, bubbles and weather.', ''),
-        ('UFO lights and aura', 'YES', 'YES / NO', 'UFOs glow: steady hulls with pulsing lights, their own coloured light, evenly inside them, and an aura of motes outside; only once a UFO has been seen.', 'Inside a UFO the view stays sharp: its light only colours it.'),
-        ('Ghost opacity', '50%', '10% to 100%', 'How solid the see-through ghosts look up close (lift pads, ladders, racks, catwalks, sludge); far off 60% of that.', ''),
-        ('See-through corpses', 'NO', 'YES / NO', 'A corpse or item under the crosshair turns faint (at the ghost opacity) while you aim past it.', 'See past the big mods\' tall corpses to what your shot reaches.'),
-        ('Parts without shape', 'Lifts', 'Lifts / All / Off', 'Parts the map draws with no shape in the game\'s data, shown as see-through ghosts: ladders, lift pads, the shops\' racks, liquid over a floor, the rest of fences and catwalk gratings the game gives only a few voxels.',
-         'Ghosts are only pictures: shots, sight and walking go through them as the game says.'),
-        ('Discreet map edge', 'NO', 'YES / NO', 'Small red dots along the map\'s edge instead of the yellow tape.', ''),
-        ('Pixel size', 'Auto', 'Auto / 1 / 2 / 3', 'Each ray colours a block of pixels: chunkier, much faster on big screens.', 'Auto: full detail up to 640&times;400, blocks of 2 above.'),
-    ]),
-    ('Crosshair', [
-        ('Crosshair', 'YES', 'YES / NO', 'The crosshair; its shape tells the fire mode.', ''),
-        ('Shot info', 'YES', 'YES / NO', 'The fire mode, hit chance and time units right of the crosshair.', 'Yellow: you can; red: you can\'t.'),
-        ('Expanded crosshair info', 'YES', 'YES / NO', 'The action\'s other costs under it: energy, health, stun, morale, mana.', 'The big mods\' weapons often cost energy.'),
-        ('Accuracy line', 'YES', 'YES / NO', 'A green line under the crosshair, as wide as a shot strays to either side: the game\'s successful roll (Faithful), or the spread (FPS style).',
-         'With Faithful targeting it is short: a hit strays little, a miss far; the hit chance says how likely each is.'),
-        ('Unit names', 'YES', 'YES / NO', 'The name of the unit you point at, under the crosshair.', ''),
-        ('Stat bars', 'Scaled', 'Scaled / Percentage / Game\'s own', 'How the time units, energy, health and morale bars read, on the map and in 3D. Scaled: one scale for all your units, so a 300-HP unit\'s bar shows its loss.',
-         'Two soldiers\' bars stay comparable.'),
         ('Aim at exact point', 'YES', 'YES / NO', 'Shots go for the exact point under the crosshair (on the open sky, the air on its line). NO: for its tile, as in the original.',
          'The game\'s accuracy applies either way.'),
         ('Show trajectory', 'Arcs', 'Arcs / All / Off', 'While aiming, the path the next throw or shot will take: a cyan arc for throws, a red laser for shots (All).', 'No surprise "No line of fire": a refused shot\'s laser shows dimmed.'),
         ('Confirm fire', 'NO', 'YES / NO', 'The first click marks the target and shows its path; a second click fires.', 'Never waste a shot on a slip of the mouse.'),
         ('Force arcing shots', 'YES', 'YES / NO', 'An arcing shot the game would refuse fires anyway, as with Ctrl held; its path shows yellow.', ''),
         ('Force blocked shots', 'NO', 'YES / NO', 'A straight shot with no line of fire fires anyway along the line to the crosshair, as with Ctrl held.', 'A round may clear thin cover, or hit it.'),
-        ('Shotgun pellets in flight', 'NO', 'YES / NO', 'A shotgun\'s pellets fly beside its round, in 3D and on the map.', ''),
+        ('Shotgun pellets in flight', 'YES', 'YES / NO', 'A shotgun\'s pellets fly beside its round, in 3D and on the map.', ''),
         ('Each pellet on its own', 'YES', 'YES / NO', 'A shotgun\'s pellets and an akimbo volley\'s two rounds each land on their own: none lost when the lead pellet leaves the map.',
          'OXCE\'s "shotgun void" closed: shotguns hit as their pellets say.'),
-        ('Hitboxes', 'Off', 'Off / Blink / Always', 'Outlines round every unit in sight: the voxels a shot can really hit.', 'Sprites are often taller or wider than what can be hit.'),
+        ('Unlimited tactical flares', 'YES', 'YES / NO', 'T throws a red flare at the crosshair, free and as often as you like.', 'Lights the 3D view only.'),
+        ('Night vision needs gear', 'NO', 'YES / NO', 'Only soldiers with night vision gear (power suits, flying suits...) get NIGHT VISION in 3D. NO: everyone.', 'YES keeps the night dark for the unequipped.'),
+    ]),
+    ('Graphics and light', [
+        ('Smooth lighting', 'YES', 'YES / NO', 'The battle\'s light blends smoothly from tile to tile. NO: tile by tile, as the map shades it.', ''),
+        ('Shadows', 'YES', 'YES / NO', 'Ray-traced shadows from the sun, lamps and your flashlight, and under every unit.', 'Off on slow machines.'),
+        ('Distance haze', 'Normal', 'Normal / Light / Clear', 'How soon far terrain fades into the haze.', ''),
+        ('Flashlight', 'On', 'On / Dynamic / Off', 'The 3D view\'s own light, on F. On: a wide beam from the shoulder, in the dark. Dynamic: a tight spot on the crosshair, day or night.',
+         'Lights only the 3D view: what the soldiers see by the rules doesn\'t change.'),
+        ('Smoke', 'Modern', 'Modern / Original', 'Modern: the game\'s smoke as soft see-through clouds, solid where your soldier can\'t see through. Original: the games\' own smoke animation.',
+         'Either way units the game hides stay hidden.'),
+        ('Smoke opacity', '45%', '5% to 80%', 'How solid smoke you can see through looks: the thinnest, thicker smoke more. Where your soldier can\'t see through it, it stays solid.',
+         'Lower it if smoke hides too much of the street; your soldier sees what the game says either way.'),
+        ('Night smoke opacity', '25%', '5% to 80%', 'The same in the dark: on a night mission (lamp-lit or suit-lit smoke too), and by day on dark maps and in unlit rooms.',
+         'Lower if smoke at night is blinding.'),
+        ('Weapon in hand', 'YES', 'YES / NO', 'The weapon in hand at the bottom of the view, built in 3D from its inventory picture, its barrel on the crosshair.', ''),
+        ('Sprite upscaling', 'Smooth + detail', 'Smooth + detail / Smooth / Off', 'Units, items and effects up close scaled the way pixel art scales well (xBRZ).', ''),
+        ('Unit size', '100%', '80% to 100%', 'Soldiers, aliens, corpses and items drawn a little smaller, so tall sprites fit under low ceilings.', 'Only the picture: what shots hit stays the game\'s (see <i>Hitboxes</i>).'),
+        ('Muzzle flashes', 'YES', 'YES / NO', 'Gunfire, hits and blasts flash. NO: no flashes, steady UFO lights, no camera glitches.', 'Off if flashing light bothers you.'),
+        ('Particles', 'All', 'All / Effects / Off', 'Effects: sparks, debris, smoke, fire, trails. All: also dust, fireflies, bubbles and weather.', ''),
+        ('UFO lights and aura', 'YES', 'YES / NO', 'UFOs glow: steady hulls with pulsing lights, their own coloured light, evenly inside them, and an aura of motes outside; only once a UFO has been seen.', 'Inside a UFO the view stays sharp: its light only colours it.'),
+        ('Parts without shape', 'Lifts', 'Lifts / All / Off', 'Parts the map draws with no shape in the game\'s data, shown as see-through ghosts: ladders, lift pads, the shops\' racks, liquid over a floor, the rest of fences and catwalk gratings the game gives only a few voxels.',
+         'Ghosts are only pictures: shots, sight and walking go through them as the game says.'),
+        ('Ghost opacity', '50%', '10% to 100%', 'How solid the see-through ghosts look up close (lift pads, ladders, racks, catwalks, sludge); far off 60% of that.', ''),
+        ('See-through corpses', 'NO', 'YES / NO', 'A corpse or item under the crosshair turns faint (at the ghost opacity) while you aim past it.', 'See past the big mods\' tall corpses to what your shot reaches.'),
+        ('Discreet map edge', 'NO', 'YES / NO', 'Small red dots along the map\'s edge instead of the yellow tape.', ''),
+        ('Pixel size', 'Auto', 'Auto / 1 / 2 / 3', 'Each ray colours a block of pixels: chunkier, much faster on big screens.', 'Auto: full detail up to 640&times;400, blocks of 2 above.'),
+        ('Frame rate limit', '60', '60 to 240, unlimited', 'The game\'s own frame rate cap.', 'Raise it for a 120 or 144 Hz screen if your computer keeps up.'),
+        ('Frame counter', 'NO', 'YES / NO', 'The game\'s frames-per-second counter (as F7).', ''),
+    ]),
+    ('HUD', [
+        ('Crosshair', 'YES', 'YES / NO', 'The crosshair; its shape tells the fire mode.', ''),
+        ('Shot info', 'YES', 'YES / NO', 'The fire mode, hit chance and time units right of the crosshair.', 'Yellow: you can; red: you can\'t.'),
+        ('Expanded crosshair info', 'YES', 'YES / NO', 'The action\'s other costs under it: energy, health, stun, morale, mana.', 'The big mods\' weapons often cost energy.'),
+        ('Accuracy line', 'YES', 'YES / NO', 'A green line under the crosshair, as wide as a shot strays to either side: the game\'s successful roll (its own targeting), or the spread (FPS style).',
+         'With the game\'s own targeting it is short: a hit strays little, a miss far; the hit chance says how likely each is.'),
+        ('Unit names', 'YES', 'YES / NO', 'The name of the unit you point at, under the crosshair.', ''),
+        ('Stat bars', 'Scaled', 'Scaled / Percentage / Game\'s own', 'How the time units, energy, health and morale bars read, on the map and in 3D. Scaled: one scale for all your units, so a 300-HP unit\'s bar shows its loss.',
+         'Two soldiers\' bars stay comparable.'),
+        ('Hitboxes', 'Aimed at', 'Off / Aimed at / Blink / Always', 'Outlines the voxels a shot can really hit: the unit you aim at, or every unit in sight (blinking or always).', 'Sprites are often taller or wider than what can be hit.'),
         ('Glowing outlines', 'NO', 'YES / NO', 'The hitboxes and a throw\'s path glow.', ''),
         ('Downed unit icons', 'Crosshair', 'Crosshair / Always / Off', 'Icons for an unconscious unit: burning, bleeding, shock, out cold.', 'Know whom to carry out first.'),
+        ('Compass', 'YES', 'YES / NO', 'A compass at the top right: your heading, the way the soldier faces, and (with turning at a cost) how far the head turns for free.', ''),
+        ('Middle click identifies', 'YES', 'YES / NO', 'A middle click on a unit opens the game\'s unit screen, as on the map.', ''),
     ]),
-    ('Battle', [
-        ('Alien turn in 3D', 'YES', 'YES / NO', 'Stay in 3D during the aliens\' turn, through your last soldier\'s eyes. NO: the map for their turn.', ''),
-        ('Aliens\' turn cameras', 'YES', 'YES / NO', 'In their turn the view cuts to where the action is: a soldier firing back, the nearest soldier who sees a moving alien; helmet camera cards pop up for soldiers shot at, hit or mind controlled.', ''),
-        ('Camera when a soldier falls', 'YES', 'YES / NO', 'With <i>Aliens\' turn cameras</i>, in their turn: a soldier going down out of view pops up their helmet camera card, DECEASED or UNCONSCIOUS.', ''),
-        ('Start battles in 3D', 'NO', 'YES / NO', 'Begin every battle in the first-person view.', ''),
+    ('Sound', [
+        ('Dynamic music', 'YES', 'YES / NO', 'Tenser music while aliens are in sight.', ''),
+        ('Hit, kill and swing sounds', 'YES', 'YES / NO', 'A tick for a hit, a double tick for a kill, a swoosh for your swings, and your heartbeat once hurt below half health.', ''),
+    ]),
+    ('Cheats', [
         ('Doom mode (debug)', 'NO', 'YES / NO', 'A cheat: in 3D the selected soldier never runs out of time units or energy; grenades go off in real time.', 'For testing and fun, a first step towards real time.'),
         ('Doom IDKFA', 'NO', 'YES / NO', 'Doom mode plus endless ammo.', ''),
         ('Doom IDDQD', 'NO', 'YES / NO', 'Doom mode plus invincible soldiers.', ''),
         ('Doom prime on throw', 'YES', 'YES / NO', 'In Doom mode a grenade is armed as you throw it. NO: priming pulls the pin, and the fuse burns in your hand.', ''),
         ('Doom free grenades with airburst', 'NO', 'YES / NO', 'In Doom mode a grenade flies wherever the crosshair points and bursts in the air if its fuse runs out.', ''),
         ('Doom grenade fuse (seconds)', '3', '1 to 5', 'In Doom mode, how long a grenade burns.', ''),
-        ('Frame rate limit', '60', '60 to 240, unlimited', 'The game\'s own frame rate cap.', 'Raise it for a 120 or 144 Hz screen if your computer keeps up.'),
-        ('Frame counter', 'NO', 'YES / NO', 'The game\'s frames-per-second counter (as F7).', ''),
     ]),
 ]
 
@@ -213,7 +214,7 @@ SIGNS = [
     ('The crosshair\'s colour', 'Yellow: you can do it. Red: you can\'t (time units, ammo, range). Purple: psi. Grey: not your move.'),
     ('The shot info', 'SNAP 40% 15TU: the fire mode, the hit chance (green; yellow with range or sight penalties; red when it can\'t be taken) and the time units. With two guns DUAL (round by round), VOLLEY (both at once) or IN TURN (an arcing pair, gun after gun) in front.'),
     ('The other costs', 'EN 6 STUN 2 under the shot info: energy, health, stun, morale, mana. A cost you can\'t pay is red, and the game would refuse the action.'),
-    ('The accuracy line', 'A green line under the crosshair, a notch up at each end: as far to either side as a successful roll can stray (Faithful targeting), or the spread in FPS style, widening as you fire. Grey when it\'s not your move.'),
+    ('The accuracy line', 'A green line under the crosshair, a notch up at each end: as far to either side as a successful roll can stray (the game\'s own targeting), or the spread in FPS style, widening as you fire. Grey when it\'s not your move.'),
     ('The trajectory', 'A light cyan arc for a throw or an arcing shot, a diamond where it lands; a thin red laser for a straight shot, a bright dot where it meets something. Yellow: forced (it goes whatever is in the way). Dim dotted red: the game will refuse it.'),
     ('Unit names', 'The unit under the crosshair, by name or race: green X-COM, red aliens, yellow civilians.'),
     ('Downed unit icons', 'Over an unconscious body: a flame (burning), a drop (bleeding), a bolt (shock), Zz (out cold).'),
@@ -235,17 +236,17 @@ FEATURES = [
     ('aim', 'Aiming, by the crosshair', [('sky_edge.png', 'On the open sky at the map\'s edge, the laser runs to the crosshair and the hit chance shows'), ('peek_fps.png', 'FPS style: leaning out past a wall\'s end, the round leaves from the eye')],
      'Left button, <kbd>Z</kbd> <kbd>X</kbd> <kbd>V</kbd>, wheel',
      'With <i>Aim at exact point</i> a shot goes for the very voxel under the crosshair, or on the open sky for the air on its line. If the line from the gun is blocked, the game\'s other muzzle points are tried (left and right with OXCE\'s <i>Off-centre shooting</i>), then the game\'s own aim, as a click on the map does. The laser (<i>Show trajectory: All</i>) shows the line that will fire.',
-     'With Faithful targeting it is the map\'s rules with a finer click. In FPS style the round leaves from your eye: what you see past a corner, you can hit.'),
+     'With the game\'s own targeting it is the map\'s rules with a finer click. In FPS style the round leaves from your eye: what you see past a corner, you can hit.'),
     ('line', 'The accuracy line', [('accuracy_line.png', 'The game\'s own targeting (left): a short line, as far as a hit strays. FPS style (right): the spread of a burst')],
-     '', 'A green line under the crosshair, a notch up at each end, as wide as a round can land to either side. With Faithful targeting: the farthest a successful roll can send the round, by the game\'s own roll. In FPS style: the spread 95% of the rounds land in, widening with the bloom as you fire.',
+     '', 'A green line under the crosshair, a notch up at each end, as wide as a round can land to either side. With the game\'s own targeting: the farthest a successful roll can send the round, by the game\'s own roll. In FPS style: the spread 95% of the rounds land in, widening with the bloom as you fire.',
      'A successful roll in X-COM strays little, mostly sideways; a miss strays far. The line shows the first, the hit chance how often you get it.'),
     ('akimbo', 'Akimbo', [('ufo_akimbo_both_lasers.png', 'Two laser pistols, both lasers showing'), ('ufo_akimbo_on_the_map.png', 'Akimbo on the map: two mini targets in each hand\'s box, in turn')],
      '<kbd>Y</kbd>, <i>Akimbo style</i>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click on the map',
-     'A gun in each hand fires both (<i>Full</i> or <i>Realistic akimbo</i>): round by round in turn, or at once as a volley, each its own burst, each 30% less accurate, for the dearer gun\'s shot and a tenth. On the map Ctrl+Shift+click a hand\'s weapon marks the pair.',
+     'A gun in each hand fires both (the setting <i>Akimbo</i>, Full or Realistic): round by round in turn, or at once as a volley, each its own burst, each 30% less accurate, for the dearer gun\'s shot and a tenth. On the map Ctrl+Shift+click a hand\'s weapon marks the pair.',
      'More rounds for your time units, worse aim; no aimed shots with two guns. In turn a burst can drop one alien and go on to the next.'),
     ('lean', 'Lean and peek', [('lean_tilt.png', 'Leaning out with Tilt, round a corner')],
      '<kbd>Left Shift</kbd> + <kbd>A</kbd> / <kbd>D</kbd>',
-     'The eye moves up to six voxels to the side and a little lower, stopping short of walls and of anyone in sight; with Tilt the view tilts too. A shot from a lean leaves from that side: the game\'s own off-centre point (Faithful) or your eye (FPS style).',
+     'The eye moves up to six voxels to the side and a little lower, stopping short of walls and of anyone in sight; with Tilt the view tilts too. A shot from a lean leaves from that side: the game\'s own off-centre point (its own targeting) or your eye (FPS style).',
      'You see the street round the corner, but who is spotted is still the game\'s call: a peek never shows a hidden alien.'),
     ('move', 'Walking, jumping, falling', [('landing_warning.png', 'TFTD, Check the landing: a step towards the sea stops at the edge, UNSAFE LANDING! PUSH AGAIN'), ('sprint_dusk.png', 'Sprinting down a street at dusk')],
      '<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>, numpad, <kbd>Space</kbd>, <kbd>Caps Lock</kbd>, <kbd>`</kbd>',
@@ -308,10 +309,10 @@ GALLERY = [
 # ---------------------------------------------------------------------------------------------------------------------
 STYLES = '''<section id="styles" class="sec gutter"><div class="col">
 <h2>Two ways to play</h2>
-<p class="intro">One setting decides how shots work: <i>Faithful X-COM targeting</i>. Everything else (time units, energy, damage, line of sight, reaction fire, the aliens' minds) is the original game's either way.</p>
+<p class="intro">One setting decides how shots work: <i>FPS-style shooting (easier)</i>. Everything else (time units, energy, damage, line of sight, reaction fire, the aliens' minds) is the original game's either way.</p>
 <div class="two">
   <div class="card">
-    <h3>Faithful X-COM targeting <span class="tag">the default</span></h3>
+    <h3>The game's own targeting <span class="tag">the default</span></h3>
     <ul>
       <li>The game's own accuracy roll; the hit chance shows by the crosshair, as the map's cursor shows it.</li>
       <li>Shots go for the exact point under the crosshair (or its tile, with <i>Aim at exact point</i> off), from the game's own muzzle points; "No line of fire" where the game says so (the laser shows it dimmed first).</li>
@@ -321,7 +322,7 @@ STYLES = '''<section id="styles" class="sec gutter"><div class="col">
     </ul>
   </div>
   <div class="card">
-    <h3>FPS style <span class="tag">Faithful targeting off</span></h3>
+    <h3>FPS style <span class="tag">FPS-style shooting on</span></h3>
     <ul>
       <li>No dice: rounds fly along the crosshair with a spread (firing skill and kneeling tighten it), recoil lifts your aim, the bloom grows as you fire.</li>
       <li>Each round leaves from your eye, so what you see past a corner, you can hit; and hits whatever is in the way.</li>
@@ -332,7 +333,7 @@ STYLES = '''<section id="styles" class="sec gutter"><div class="col">
   </div>
 </div>
 <h3>Settings that bend the rules a little</h3>
-<p>Each a setting, so you choose: <i>Jump over low obstacles</i> (vault a fence for the walk), <i>Falling</i> (step off a ledge), <i>Lean shots</i> and <i>Lean</i> (shoot from the side of your tile), <i>Full akimbo</i> and <i>Realistic akimbo</i>, <i>Melee hits walls and downed</i>, <i>Force arcing shots</i> and <i>Force blocked shots</i> (as Ctrl on the map), <i>Turning costs TU</i> off (free turns), and the Doom cheats. Everything else only changes what you see.</p>
+<p>Each a setting, so you choose: <i>Jump over low obstacles</i> (vault a fence for the walk), <i>Falling</i> (step off a ledge), <i>Lean shots</i> and <i>Lean</i> (shoot from the side of your tile), <i>Akimbo</i>, <i>Melee hits walls and downed</i>, <i>Force arcing shots</i> and <i>Force blocked shots</i> (as Ctrl on the map), <i>Turning costs TU</i> off (free turns), and the Doom cheats. Everything else only changes what you see.</p>
 </div></section>'''
 
 def size_in(folder, name):

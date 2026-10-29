@@ -124,14 +124,22 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..14b592d6c
+index 000000000..cadeda018
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,418 @@
+@@ -0,0 +1,431 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
 +  STR_FIRST_PERSON_TAB: "3D VIEW"
++  STR_FPS_SECTION_VIEW: "VIEW AND CAMERA"
++  STR_FPS_SECTION_MOVEMENT: "MOVEMENT"
++  STR_FPS_SECTION_COMBAT: "AIMING AND COMBAT"
++  STR_FPS_SECTION_GRAPHICS: "GRAPHICS AND LIGHT"
++  STR_FPS_SECTION_HUD: "HUD"
++  STR_FPS_SECTION_SOUND: "SOUND"
++  STR_FPS_SECTION_CHEATS: "CHEATS"
++  STR_FPS_SECTION_OTHER: "OTHER"
 +  STR_FPS_SETTINGS: "Settings"
 +  STR_FPS_CONTROLS: "Controls"
 +  STR_FPS_BUTTON_3D: "3D"
@@ -292,14 +300,18 @@ index 000000000..14b592d6c
 +  STR_FPS_UPSCALE_OFF: "Off"
 +  STR_FPS_UPSCALE_SMOOTH: "Smooth"
 +  STR_FPS_UPSCALE_DETAIL: "Smooth + detail"
-+  STR_FPS_FAITHFUL_TARGETING: "Faithful X-COM targeting"
++  STR_FPS_FPS_STYLE: "FPS-style shooting (easier)"
 +  STR_FPS_DUAL_WIELD: "Full akimbo"
-+  STR_FPS_DUAL_WIELD_DESC: "Fire both guns, any two, each 30% less accurate, for the more expensive gun's cost and a tenth. No aimed shots with a gun in each hand."
++  STR_FPS_AKIMBO: "Akimbo"
++  STR_FPS_AKIMBO_DESC: "A gun in each hand fires both, each 30% less accurate, for the dearer gun's cost and a tenth. Full: any two guns; Realistic: one-handed only. Y switches it in play."
++  STR_FPS_AKIMBO_CHOICE_OFF: "Off"
++  STR_FPS_AKIMBO_CHOICE_FULL: "Full"
++  STR_FPS_AKIMBO_CHOICE_REALISTIC: "Realistic"
++  STR_FPS_AKIMBO_SETTING_OFF: "Akimbo is off in the settings"
 +  STR_FPS_AKIMBO_REALISTIC: "Realistic akimbo"
-+  STR_FPS_AKIMBO_REALISTIC_DESC: "Fire both guns, one-handed guns only, each 30% less accurate, for the more expensive gun's cost and a tenth. No aimed shots with a gun in each hand."
 +  STR_FPS_AKIMBO_NO_AIMED: "Two guns: no aimed shot ({0}: akimbo off)"
 +  STR_FPS_LEAN_SHOTS: "Lean shots"
-+  STR_FPS_LEAN_SHOTS_DESC: "Movement Free: standing to one side of the tile shoots from that side, to peek (Faithful targeting; FPS style always shoots from the eye)."
++  STR_FPS_LEAN_SHOTS_DESC: "Movement Free: standing to one side of the tile shoots from that side, to peek (the game's own targeting; FPS-style shooting always shoots from the eye)."
 +  STR_FPS_LEAN: "Lean"
 +  STR_FPS_LEAN_DESC: "Shift with A or D leans out to peek; Tilt tilts the view too."
 +  STR_FPS_LEAN_OFF: "Off"
@@ -321,7 +333,7 @@ index 000000000..14b592d6c
 +  STR_FPS_MAP_AKIMBO_TWO_GUNS: "AKIMBO NEEDS A GUN IN EACH HAND"
 +  STR_FPS_IN_TURN: "IN TURN"
 +  STR_FPS_VOLLEY: "VOLLEY"
-+  STR_FPS_FAITHFUL_TARGETING_DESC: "YES: the game's accuracy. NO: FPS-style aim, spread and recoil; each round leaves from your eye, so what you see past a corner you can hit."
++  STR_FPS_FPS_STYLE_DESC: "YES: FPS-style aim, spread and recoil, each round from your eye, so what you see past a corner you can hit; far easier than the game. NO: the game's own accuracy."
 +  STR_FPS_HOLD: "(HOLD)"
 +  STR_FPS_DUAL: "DUAL"
 +  STR_FPS_FALLING: "Falling"
@@ -446,9 +458,9 @@ index 000000000..14b592d6c
 +  STR_FPS_CROSSHAIR_COSTS: "Expanded crosshair info"
 +  STR_FPS_CROSSHAIR_COSTS_DESC: "Under the shot info, the action's other costs: energy, health, stun, morale, mana."
 +  STR_FPS_ACCURACY_LINE: "Accuracy line"
-+  STR_FPS_ACCURACY_LINE_DESC: "A green line under the crosshair, as wide as a round can stray to either side. Faithful targeting: as far as a successful accuracy roll can send it at that range. FPS style: the spread, growing as you fire."
++  STR_FPS_ACCURACY_LINE_DESC: "A green line under the crosshair, as wide as a round can stray to either side. The game's own targeting: as far as a successful accuracy roll can send it at that range. FPS-style shooting: the spread, growing as you fire."
 +  STR_FPS_AIM_EXACT: "Aim at exact point"
-+  STR_FPS_AIM_EXACT_DESC: "Shots go for the point under the crosshair, on the open sky the air on its line. NO: for its tile (Faithful targeting)."
++  STR_FPS_AIM_EXACT_DESC: "Shots go for the point under the crosshair, on the open sky the air on its line. NO: for its tile (the game's own targeting)."
 +  STR_FPS_TRAJECTORY: "Show trajectory"
 +  STR_FPS_TRAJECTORY_DESC: "While aiming, the path a throw or an arcing shot will take, to where it lands. All: every shot's line too."
 +  STR_FPS_TRAJECTORY_OFF: "Off"
@@ -461,17 +473,18 @@ index 000000000..14b592d6c
 +  STR_FPS_PELLETS_IN_FLIGHT_DESC: "In 3D and on the map a shotgun's pellets fly beside its round, each to where the game's spread sends it. NO: the game's own way, the whole blast landing the moment it's fired."
 +  STR_FPS_EACH_PELLET: "Each pellet on its own"
 +  STR_FPS_EACH_PELLET_DESC: "A shotgun's pellets, and the two rounds of an akimbo volley, each land on their own: none is lost when the lead pellet flies off the map, and in flight each hits as it gets there. NO: the game's own way, the lead pellet deciding for the rest."
-+  STR_FPS_FORCE_BLOCKED_DESC: "A shot with no line of fire to the crosshair's point, nor to any part of the target (with Faithful targeting), fires anyway along the line to the crosshair, hitting what's in the way, as with Ctrl held. Its path shows yellow."
++  STR_FPS_FORCE_BLOCKED_DESC: "A shot with no line of fire to the crosshair's point, nor to any part of the target (with the game's own targeting), fires anyway along the line to the crosshair, hitting what's in the way, as with Ctrl held. Its path shows yellow."
 +  STR_FPS_CONFIRM_FIRE: "Confirm fire"
 +  STR_FPS_CONFIRM_FIRE_DESC: "The first click marks the target and shows the path; click the same spot again to fire. Right button: never mind."
 +  STR_FPS_CONFIRM_FIRE_HINT: "Click again to fire"
 +  STR_FPS_HITBOXES: "Hitboxes"
-+  STR_FPS_HITBOXES_DESC: "Outlines where shots hit the units in sight: blinking, or always."
++  STR_FPS_HITBOXES_DESC: "Outlines where shots hit units: the one under the crosshair (Aimed at), all in sight blinking, or always."
 +  STR_FPS_GLOWING_OUTLINES: "Glowing outlines"
 +  STR_FPS_GLOWING_OUTLINES_DESC: "YES: the hitboxes and the path of a throw glow. NO: plain lines."
 +  STR_FPS_HITBOXES_OFF: "Off"
 +  STR_FPS_HITBOXES_BLINK: "Blink"
 +  STR_FPS_HITBOXES_ALWAYS: "Always"
++  STR_FPS_HITBOXES_AIMED: "Aimed at"
 +  STR_FPS_UNIT_NAMES: "Unit names"
 +  STR_FPS_UNIT_NAMES_DESC: "The name of the unit under the crosshair."
 +  STR_FPS_STAT_BARS: "Stat bars"
@@ -525,7 +538,7 @@ index 000000000..14b592d6c
 +  STR_FPS_KEY_SWITCH_HAND: "Switch hand"
 +  STR_FPS_KEY_SWITCH_HAND_DESC: "Switches to the other hand."
 +  STR_FPS_KEY_AKIMBO: "Akimbo on/off"
-+  STR_FPS_KEY_AKIMBO_DESC: "Both guns firing (akimbo) off, and the same kind back on."
++  STR_FPS_KEY_AKIMBO_DESC: "Both guns firing (akimbo) off, and back on as the setting Akimbo says (nothing while it's Off)."
 +  STR_FPS_KEY_SNAP_LEFT: "Snap turn left"
 +  STR_FPS_KEY_SNAP_LEFT_DESC: "Turns 45 degrees to the left, without stepping."
 +  STR_FPS_KEY_SNAP_RIGHT: "Snap turn right"
@@ -548,14 +561,22 @@ index 000000000..14b592d6c
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers: a clear view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..8297f2e6e
+index 000000000..8124a6ae4
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,418 @@
+@@ -0,0 +1,431 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
 +  STR_FIRST_PERSON_TAB: "3D VIEW"
++  STR_FPS_SECTION_VIEW: "VIEW AND CAMERA"
++  STR_FPS_SECTION_MOVEMENT: "MOVEMENT"
++  STR_FPS_SECTION_COMBAT: "AIMING AND COMBAT"
++  STR_FPS_SECTION_GRAPHICS: "GRAPHICS AND LIGHT"
++  STR_FPS_SECTION_HUD: "HUD"
++  STR_FPS_SECTION_SOUND: "SOUND"
++  STR_FPS_SECTION_CHEATS: "CHEATS"
++  STR_FPS_SECTION_OTHER: "OTHER"
 +  STR_FPS_SETTINGS: "Settings"
 +  STR_FPS_CONTROLS: "Controls"
 +  STR_FPS_BUTTON_3D: "3D"
@@ -716,14 +737,18 @@ index 000000000..8297f2e6e
 +  STR_FPS_UPSCALE_OFF: "Off"
 +  STR_FPS_UPSCALE_SMOOTH: "Smooth"
 +  STR_FPS_UPSCALE_DETAIL: "Smooth + detail"
-+  STR_FPS_FAITHFUL_TARGETING: "Faithful X-COM targeting"
++  STR_FPS_FPS_STYLE: "FPS-style shooting (easier)"
 +  STR_FPS_DUAL_WIELD: "Full akimbo"
-+  STR_FPS_DUAL_WIELD_DESC: "Fire both guns, any two, each 30% less accurate, for the more expensive gun's cost and a tenth. No aimed shots with a gun in each hand."
++  STR_FPS_AKIMBO: "Akimbo"
++  STR_FPS_AKIMBO_DESC: "A gun in each hand fires both, each 30% less accurate, for the dearer gun's cost and a tenth. Full: any two guns; Realistic: one-handed only. Y switches it in play."
++  STR_FPS_AKIMBO_CHOICE_OFF: "Off"
++  STR_FPS_AKIMBO_CHOICE_FULL: "Full"
++  STR_FPS_AKIMBO_CHOICE_REALISTIC: "Realistic"
++  STR_FPS_AKIMBO_SETTING_OFF: "Akimbo is off in the settings"
 +  STR_FPS_AKIMBO_REALISTIC: "Realistic akimbo"
-+  STR_FPS_AKIMBO_REALISTIC_DESC: "Fire both guns, one-handed guns only, each 30% less accurate, for the more expensive gun's cost and a tenth. No aimed shots with a gun in each hand."
 +  STR_FPS_AKIMBO_NO_AIMED: "Two guns: no aimed shot ({0}: akimbo off)"
 +  STR_FPS_LEAN_SHOTS: "Lean shots"
-+  STR_FPS_LEAN_SHOTS_DESC: "Movement Free: standing to one side of the tile shoots from that side, to peek (Faithful targeting; FPS style always shoots from the eye)."
++  STR_FPS_LEAN_SHOTS_DESC: "Movement Free: standing to one side of the tile shoots from that side, to peek (the game's own targeting; FPS-style shooting always shoots from the eye)."
 +  STR_FPS_LEAN: "Lean"
 +  STR_FPS_LEAN_DESC: "Shift with A or D leans out to peek; Tilt tilts the view too."
 +  STR_FPS_LEAN_OFF: "Off"
@@ -745,7 +770,7 @@ index 000000000..8297f2e6e
 +  STR_FPS_MAP_AKIMBO_TWO_GUNS: "AKIMBO NEEDS A GUN IN EACH HAND"
 +  STR_FPS_IN_TURN: "IN TURN"
 +  STR_FPS_VOLLEY: "VOLLEY"
-+  STR_FPS_FAITHFUL_TARGETING_DESC: "YES: the game's accuracy. NO: FPS-style aim, spread and recoil; each round leaves from your eye, so what you see past a corner you can hit."
++  STR_FPS_FPS_STYLE_DESC: "YES: FPS-style aim, spread and recoil, each round from your eye, so what you see past a corner you can hit; far easier than the game. NO: the game's own accuracy."
 +  STR_FPS_HOLD: "(HOLD)"
 +  STR_FPS_DUAL: "DUAL"
 +  STR_FPS_FALLING: "Falling"
@@ -870,9 +895,9 @@ index 000000000..8297f2e6e
 +  STR_FPS_CROSSHAIR_COSTS: "Expanded crosshair info"
 +  STR_FPS_CROSSHAIR_COSTS_DESC: "Under the shot info, the action's other costs: energy, health, stun, morale, mana."
 +  STR_FPS_ACCURACY_LINE: "Accuracy line"
-+  STR_FPS_ACCURACY_LINE_DESC: "A green line under the crosshair, as wide as a round can stray to either side. Faithful targeting: as far as a successful accuracy roll can send it at that range. FPS style: the spread, growing as you fire."
++  STR_FPS_ACCURACY_LINE_DESC: "A green line under the crosshair, as wide as a round can stray to either side. The game's own targeting: as far as a successful accuracy roll can send it at that range. FPS-style shooting: the spread, growing as you fire."
 +  STR_FPS_AIM_EXACT: "Aim at exact point"
-+  STR_FPS_AIM_EXACT_DESC: "Shots go for the point under the crosshair, on the open sky the air on its line. NO: for its tile (Faithful targeting)."
++  STR_FPS_AIM_EXACT_DESC: "Shots go for the point under the crosshair, on the open sky the air on its line. NO: for its tile (the game's own targeting)."
 +  STR_FPS_TRAJECTORY: "Show trajectory"
 +  STR_FPS_TRAJECTORY_DESC: "While aiming, the path a throw or an arcing shot will take, to where it lands. All: every shot's line too."
 +  STR_FPS_TRAJECTORY_OFF: "Off"
@@ -885,17 +910,18 @@ index 000000000..8297f2e6e
 +  STR_FPS_PELLETS_IN_FLIGHT_DESC: "In 3D and on the map a shotgun's pellets fly beside its round, each to where the game's spread sends it. NO: the game's own way, the whole blast landing the moment it's fired."
 +  STR_FPS_EACH_PELLET: "Each pellet on its own"
 +  STR_FPS_EACH_PELLET_DESC: "A shotgun's pellets, and the two rounds of an akimbo volley, each land on their own: none is lost when the lead pellet flies off the map, and in flight each hits as it gets there. NO: the game's own way, the lead pellet deciding for the rest."
-+  STR_FPS_FORCE_BLOCKED_DESC: "A shot with no line of fire to the crosshair's point, nor to any part of the target (with Faithful targeting), fires anyway along the line to the crosshair, hitting what's in the way, as with Ctrl held. Its path shows yellow."
++  STR_FPS_FORCE_BLOCKED_DESC: "A shot with no line of fire to the crosshair's point, nor to any part of the target (with the game's own targeting), fires anyway along the line to the crosshair, hitting what's in the way, as with Ctrl held. Its path shows yellow."
 +  STR_FPS_CONFIRM_FIRE: "Confirm fire"
 +  STR_FPS_CONFIRM_FIRE_DESC: "The first click marks the target and shows the path; click the same spot again to fire. Right button: never mind."
 +  STR_FPS_CONFIRM_FIRE_HINT: "Click again to fire"
 +  STR_FPS_HITBOXES: "Hitboxes"
-+  STR_FPS_HITBOXES_DESC: "Outlines where shots hit the units in sight: blinking, or always."
++  STR_FPS_HITBOXES_DESC: "Outlines where shots hit units: the one under the crosshair (Aimed at), all in sight blinking, or always."
 +  STR_FPS_GLOWING_OUTLINES: "Glowing outlines"
 +  STR_FPS_GLOWING_OUTLINES_DESC: "YES: the hitboxes and the path of a throw glow. NO: plain lines."
 +  STR_FPS_HITBOXES_OFF: "Off"
 +  STR_FPS_HITBOXES_BLINK: "Blink"
 +  STR_FPS_HITBOXES_ALWAYS: "Always"
++  STR_FPS_HITBOXES_AIMED: "Aimed at"
 +  STR_FPS_UNIT_NAMES: "Unit names"
 +  STR_FPS_UNIT_NAMES_DESC: "The name of the unit under the crosshair."
 +  STR_FPS_STAT_BARS: "Stat bars"
@@ -949,7 +975,7 @@ index 000000000..8297f2e6e
 +  STR_FPS_KEY_SWITCH_HAND: "Switch hand"
 +  STR_FPS_KEY_SWITCH_HAND_DESC: "Switches to the other hand."
 +  STR_FPS_KEY_AKIMBO: "Akimbo on/off"
-+  STR_FPS_KEY_AKIMBO_DESC: "Both guns firing (akimbo) off, and the same kind back on."
++  STR_FPS_KEY_AKIMBO_DESC: "Both guns firing (akimbo) off, and back on as the setting Akimbo says (nothing while it's Off)."
 +  STR_FPS_KEY_SNAP_LEFT: "Snap turn left"
 +  STR_FPS_KEY_SNAP_LEFT_DESC: "Turns 45 degrees to the left, without stepping."
 +  STR_FPS_KEY_SNAP_RIGHT: "Snap turn right"
@@ -21090,7 +21116,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..2c85ac254 100644
+index a08796ced..8858de41a 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -21108,7 +21134,7 @@ index a08796ced..2c85ac254 100644
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
 +OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine;
-+OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity;
++OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle;
 diff --git a/src/Engine/Script.h b/src/Engine/Script.h
@@ -21195,10 +21221,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..80f7d92b4
+index 000000000..71b46a853
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,722 @@
+@@ -0,0 +1,749 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -21358,18 +21384,37 @@ index 000000000..80f7d92b4
 + * Settles settings that take their first value from an older one, once the options are loaded
 + * (called when a battle or the 3D VIEW tab opens): the smoke (Original, Modern) from 0.9's
 + * "See-through smoke": YES gives Modern, NO Original (1.0's Solid becomes Original too); the
-+ * flashlight (Off, On, Dynamic) from 1.0's "Flashlight" and "Tactical flashlight"; and 1.0's
-+ * next fire mode key, when the player had moved it off F (F is the flashlight now), once.
++ * flashlight (Off, On, Dynamic) from 1.0's "Flashlight" and "Tactical flashlight"; akimbo (Off,
++ * Full, Realistic) from 1.08's "Full akimbo" and "Realistic akimbo"; and 1.0's next fire mode
++ * key, when the player had moved it off F (F is the flashlight now), once.
 + */
 +void settleOptions()
 +{
 +	Options::fpsSmoke = smokeMode();
 +	Options::fpsFlashlightMode = flashlightMode();
++	Options::fpsAkimbo = akimboChoice();
 +	if (Options::keyFpsNextMode != SDLK_f)
 +	{
 +		Options::keyFpsNextFireMode = Options::keyFpsNextMode;
 +		Options::keyFpsNextMode = SDLK_f;
 +	}
++}
++
++/**
++ * The akimbo setting as it stands: Off (0), Full (1, any two guns) or Realistic (2, one-handed
++ * guns only). Unset (-1: a profile from 1.08 not settled yet, or the defaults just restored on the
++ * 3D VIEW tab), it's what 1.08's two settings say, which now only tell whether akimbo is on just
++ * now (the akimbo key switches them, see FirstPersonMode::toggleAkimbo): "Realistic akimbo" YES
++ * Realistic, else "Full akimbo" YES Full, NO Off.
++ * @return 0, 1 or 2.
++ */
++int akimboChoice()
++{
++	if (Options::fpsAkimbo >= 0 && Options::fpsAkimbo <= 2)
++	{
++		return Options::fpsAkimbo;
++	}
++	return Options::fpsAkimboRealistic ? 2 : (Options::fpsDualWield ? 1 : 0);
 +}
 +
 +/**
@@ -21448,24 +21493,30 @@ index 000000000..80f7d92b4
 +	// (0 = free) and whether that overrides the game's own cost for each unit, jumping over low
 +	// obstacles, falling off ledges, and how many voxels below the game's eye height the camera
 +	// sits (0 to 6).
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsMovement", &fpsMovement, 0, "STR_FPS_MOVEMENT", category));
++	// (New installs start with the game's own mechanics where the 3D view adds its own: tile by
++	// tile, flight at the game's cost, no vaulting; a player's report, GitHub issue #27.)
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsMovement", &fpsMovement, 1, "STR_FPS_MOVEMENT", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsWalkSpeed", &fpsWalkSpeed, 4, "STR_FPS_WALK_SPEED", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsHeadBob", &fpsHeadBob, true, "STR_FPS_HEAD_BOB", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlightCost", &fpsFlightCost, 0, "STR_FPS_FLIGHT_COST", category));
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlightCostOverride", &fpsFlightCostOverride, true, "STR_FPS_FLIGHT_COST_OVERRIDE", category));
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsVault", &fpsVault, true, "STR_FPS_VAULT", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlightCostOverride", &fpsFlightCostOverride, false, "STR_FPS_FLIGHT_COST_OVERRIDE", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsVault", &fpsVault, false, "STR_FPS_VAULT", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsFalling", &fpsFalling, true, "STR_FPS_FALLING", category));
 +	// A step off a ledge onto ground no one can walk on, or where no step leads out (a player's
 +	// report: X-Com Files' blood moat, which the map never lets a soldier into, soft-locked one),
 +	// stops at the edge with a warning; pushing that way again (or jumping) goes over.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsSafeLanding", &fpsSafeLanding, true, "STR_FPS_SAFE_LANDING", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsEyeLower", &fpsEyeLower, 3, "STR_FPS_EYE_LOWER", category));
-+	// Shooting: the game's own accuracy (YES) or FPS-style shooting along the crosshair (NO), and
-+	// firing a gun in each hand at once (akimbo): any two guns (full), or one-handed guns only
-+	// (realistic). At most one of the two is on.
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsFaithfulTargeting", &fpsFaithfulTargeting, true, "STR_FPS_FAITHFUL_TARGETING", category));
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsDualWield", &fpsDualWield, false, "STR_FPS_DUAL_WIELD", category));
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsAkimboRealistic", &fpsAkimboRealistic, false, "STR_FPS_AKIMBO_REALISTIC", category));
++	// Shooting: the game's own accuracy (YES) or FPS-style shooting along the crosshair (NO; shown
++	// the other way round, as "FPS-style shooting (easier)", NO at first: a player's report, GitHub
++	// issue #27, new players switched it thinking it the faithful way), and firing a gun in each
++	// hand at once (akimbo): off (0), any two guns (1, full), or one-handed guns only (2,
++	// realistic). Unset (-1) until settled (see settleOptions) from 1.08's two settings, which
++	// stay, unlisted, as whether akimbo is on just now (the akimbo key switches them; at most one).
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsFaithfulTargeting", &fpsFaithfulTargeting, true, "STR_FPS_FPS_STYLE", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsAkimbo", &fpsAkimbo, -1, "STR_FPS_AKIMBO", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsDualWield", &fpsDualWield, false, "STR_FPS_DUAL_WIELD", "STR_FIRST_PERSON_SAVED"));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsAkimboRealistic", &fpsAkimboRealistic, false, "STR_FPS_AKIMBO_REALISTIC", "STR_FIRST_PERSON_SAVED"));
 +	// Akimbo's style: the two guns take turns round by round, each round resolved before the next
 +	// leaves, as an auto burst's (NO), or fire as a volley, both rounds at once and landing together
 +	// as a shotgun's pellets (YES); either way each less accurate, for the more expensive gun's shot
@@ -21497,7 +21548,7 @@ index 000000000..80f7d92b4
 +	// until settled (see settleOptions) from 1.0's two settings, kept below, unlisted (a new name,
 +	// as 1.0's YES/NO wouldn't load into a number).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlashlightMode", &fpsFlashlightMode, -1, "STR_FPS_FLASHLIGHT", category));
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightVisionGear", &fpsNightVisionGear, true, "STR_FPS_NIGHT_VISION_GEAR", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightVisionGear", &fpsNightVisionGear, false, "STR_FPS_NIGHT_VISION_GEAR", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCombatMusic", &fpsCombatMusic, true, "STR_FPS_COMBAT_MUSIC", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitSounds", &fpsHitSounds, true, "STR_FPS_HIT_SOUNDS", category));
 +	// The smoke: the original games' own frames, see-through where the soldier sees through the
@@ -21571,13 +21622,15 @@ index 000000000..80f7d92b4
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsForceBlocked", &fpsForceBlocked, false, "STR_FPS_FORCE_BLOCKED", category));
 +	// A shotgun's pellets fly beside its round in the 3D view, each to where the game's spread
 +	// sends it, instead of all landing the moment it's fired (the game's own way, kept off).
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsPelletsInFlight", &fpsPelletsInFlight, false, "STR_FPS_PELLETS_IN_FLIGHT", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsPelletsInFlight", &fpsPelletsInFlight, true, "STR_FPS_PELLETS_IN_FLIGHT", category));
 +	// A shotgun's pellets, and the two rounds of an akimbo volley, each land on their own: none is
 +	// lost when the lead pellet leaves the map, and in flight each hits as it arrives (a player's
 +	// report on OXCE's "shotgun void"); off, the game's own way, the lead pellet deciding.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsEachPellet", &fpsEachPellet, true, "STR_FPS_EACH_PELLET", category));
-+	// The units' hitboxes, outlined: off (0), fading in and out once a second (1), always (2).
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitboxes", &fpsHitboxes, 0, "STR_FPS_HITBOXES", category));
++	// The units' hitboxes, outlined: off (0), fading in and out once a second (1), always (2), or
++	// only the unit pointed at (3, the first for new installs: a player's report, GitHub issue #27,
++	// new players aimed at a Sectoid's picture and missed its hitbox).
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitboxes", &fpsHitboxes, 3, "STR_FPS_HITBOXES", category));
 +	// The hitboxes' outlines and the path of a throw glowing (spilling bloom round them), or plain lines.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsGlowingOutlines", &fpsGlowingOutlines, false, "STR_FPS_GLOWING_OUTLINES", category));
 +	// Icons over the downed (unconscious) units in sight, for burning, bleeding, shock and
@@ -21923,10 +21976,10 @@ index 000000000..80f7d92b4
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..1f9c9e104
+index 000000000..a45746726
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,242 @@
+@@ -0,0 +1,244 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -22067,6 +22120,8 @@ index 000000000..1f9c9e104
 +int smokeMode();
 +/// The flashlight setting as it stands: 0 Off, 1 On, 2 Dynamic (unset: from 1.0's settings).
 +int flashlightMode();
++/// The akimbo setting as it stands: 0 Off, 1 Full, 2 Realistic (unset: from 1.08's two settings).
++int akimboChoice();
 +/// The longest Doom grenade fuse, in seconds (setting "Doom grenade fuse": 1 to this).
 +const int DoomFuseMaxSeconds = 5;
 +
@@ -22171,10 +22226,10 @@ index 000000000..1f9c9e104
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..c214dbeb5
+index 000000000..9162eb260
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2675 @@
+@@ -0,0 +1,2671 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -22289,8 +22344,6 @@ index 000000000..c214dbeb5
 +bool lastSprintOn = false, lastEnPassantOn = false;
 +/// The cheats the doom mode key would switch back on (FirstPersonMode::_pausedCheats).
 +int lastPausedCheats = 0;
-+/// Whether the akimbo key would switch realistic akimbo back on (FirstPersonMode::_akimboRealisticWasOn).
-+bool lastAkimboRealisticWasOn = true;
 +/// The Doom real-time fuses burning (FirstPersonMode::_doomFuses): only for the same battle.
 +std::unordered_map<int, FirstPersonMode::DoomFuse> lastDoomFuses;
 +/// When a first-person mode last ran its per-frame update (SDL ticks, ms; 0: never).
@@ -22366,7 +22419,6 @@ index 000000000..c214dbeb5
 +		_sprintOn = lastSprintOn;
 +		_enPassantOn = lastEnPassantOn;
 +		_pausedCheats = lastPausedCheats;
-+		_akimboRealisticWasOn = lastAkimboRealisticWasOn;
 +		if (lastBattle == _save) _doomFuses = lastDoomFuses;
 +		_mouseLook = !_classicHud;
 +	}
@@ -23035,7 +23087,6 @@ index 000000000..c214dbeb5
 +	lastSprintOn = _sprintOn;
 +	lastEnPassantOn = _enPassantOn;
 +	lastPausedCheats = _pausedCheats;
-+	lastAkimboRealisticWasOn = _akimboRealisticWasOn;
 +	lastDoomFuses = _doomFuses;
 +}
 +
@@ -24852,10 +24903,10 @@ index 000000000..c214dbeb5
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..6b11eb5a1
+index 000000000..b689a475f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1154 @@
+@@ -0,0 +1,1153 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -25472,7 +25523,6 @@ index 000000000..6b11eb5a1
 +	void throwFreeGrenade(BattleUnit *unit, BattleItem *grenade, const Position &aimedVoxel);
 +	/// Flies the free grenade on to now; false once it has landed or burst (the flight is over).
 +	bool stepFreeGrenade(Uint32 now);
-+	bool _akimboRealisticWasOn = true;                      // the akimbo key switches realistic akimbo back on (false: full akimbo)
 +	BattleActionType _fireMode = BA_NONE;               // fire mode for the left mouse button
 +	const BattleItem *_fireModeWeapon = nullptr;        // the weapon _fireMode was chosen for
 +	Position _aimVoxel;                                 // what's under the crosshair
@@ -31370,10 +31420,10 @@ index 000000000..374f097e1
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..c84379274
+index 000000000..9ac5c07e6
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,4317 @@
+@@ -0,0 +1,4326 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -31938,23 +31988,30 @@ index 000000000..c84379274
 +}
 +
 +/**
-+ * The akimbo key (Y): with full or realistic akimbo on, switches it off and remembers which it
-+ * was; with both off, switches that one back on (realistic if there's none to remember). The
-+ * game's warning line says which.
++ * The akimbo key (Y): with akimbo on just now, switches it off; off, switches it back on, the kind
++ * the setting "Akimbo" says (Full or Realistic, see FirstPerson::akimboChoice). With the setting
++ * Off the key does nothing. The game's warning line says which.
 + */
 +void FirstPersonMode::toggleAkimbo()
 +{
++	// With the setting Off the key does nothing but say so (a player's report, GitHub issue #27:
++	// a finger slipping onto it switched akimbo on, to a new player's surprise).
++	const int choice = FirstPerson::akimboChoice();
++	if (choice == 0)
++	{
++		_state->warning("STR_FPS_AKIMBO_SETTING_OFF");
++		return;
++	}
 +	if (Options::fpsDualWield || Options::fpsAkimboRealistic)
 +	{
-+		_akimboRealisticWasOn = Options::fpsAkimboRealistic;
 +		Options::fpsDualWield = Options::fpsAkimboRealistic = false;
 +		_state->warning("STR_FPS_AKIMBO_OFF");
 +	}
 +	else
 +	{
-+		Options::fpsAkimboRealistic = _akimboRealisticWasOn;
-+		Options::fpsDualWield = !_akimboRealisticWasOn;
-+		_state->warning(_akimboRealisticWasOn ? "STR_FPS_AKIMBO_REALISTIC_ON" : "STR_FPS_AKIMBO_FULL_ON");
++		Options::fpsAkimboRealistic = choice == 2;
++		Options::fpsDualWield = choice == 1;
++		_state->warning(choice == 2 ? "STR_FPS_AKIMBO_REALISTIC_ON" : "STR_FPS_AKIMBO_FULL_ON");
 +	}
 +	// The options file keeps it, so the options screen's Cancel doesn't quietly undo it.
 +	rememberChoices();
@@ -35515,6 +35572,7 @@ index 000000000..c84379274
 +{
 +	_pointedUnit = nullptr;
 +	_view->setPointerAim(Position(), false);
++	_view->setAimedUnit(nullptr);
 +	if (!unit || !isActive())
 +	{
 +		return;
@@ -35538,6 +35596,7 @@ index 000000000..c84379274
 +	{
 +		_pointedUnit = _view->getUnitAtPointer();
 +	}
++	_view->setAimedUnit(_pointedUnit); // (setting "Hitboxes" Aimed at: its hitbox only)
 +}
 +
 +/**
@@ -39087,10 +39146,10 @@ index 000000000..8e41758ca
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..b0d43ec2a
+index 000000000..2f93f6f14
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1230 @@
+@@ -0,0 +1,1233 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -39424,6 +39483,8 @@ index 000000000..b0d43ec2a
 +	void setPointer(int x, int y, int textBelow) { _pointerX = x; _pointerY = y; _pointerTextBelow = textBelow; }
 +	/// The point the game's line through the pointer meets, in voxels (a pile in front of it turns faint, see drawFloorItems); or none.
 +	void setPointerAim(const Position &voxel, bool aimed) { _pointerAim = voxel; _pointerAimed = aimed; }
++	/// The unit the player points at (its hitbox or picture, see FirstPersonMode::updatePointedUnit), or null: setting "Hitboxes" Aimed at outlines only its.
++	void setAimedUnit(const BattleUnit *unit) { _aimedUnit = unit; }
 +	/// The unit whose picture is where the player points (or within a few pixels), as last drawn; or null.
 +	BattleUnit *getUnitAtPointer() const { return _unitAtPointer; }
 +	/// The unconscious unit whose body's picture is where the player points (nearer it than any standing unit's), as last drawn; or null.
@@ -39838,6 +39899,7 @@ index 000000000..b0d43ec2a
 +	const Tile *_pileAtPointer = nullptr;               // the pile pointed at, found from them after each frame (see drawFloorItems)
 +	Position _pointerAim;                               // the point the game's line through the pointer meets, in voxels (see setPointerAim)
 +	bool _pointerAimed = false;                         // and whether there is one
++	const BattleUnit *_aimedUnit = nullptr;             // the unit pointed at (see setAimedUnit)
 +	Surface *_spriteBuffer;                             // scratch surface for drawing a unit's sprite before it goes into the world
 +	std::vector<Surface*> _blendBuffers;                // sprites dissolving into their next frame, one per sprite size
 +	std::vector<int> _blendColumns;                     // drawSpriteBlend's source column and row lookups
@@ -47103,10 +47165,10 @@ index 000000000..169832559
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..8cc2f7482
+index 000000000..dc2c7c6cd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,2635 @@
+@@ -0,0 +1,2637 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -47908,9 +47970,11 @@ index 000000000..8cc2f7482
 +	const double elapsedSeconds = _unitLastTick ? std::min<Uint32>(100, now - _unitLastTick) / 1000.0 : 0.0;
 +	_unitLastTick = now;
 +	// The units' size (setting "Unit size", 80 to 100% of the isometric map's: smaller, standing
-+	// on the same spot), and their hitboxes (setting): always, or fading in and out once a second.
++	// on the same spot), and their hitboxes (setting): always, fading in and out once a second, or
++	// only the unit pointed at (Aimed at, see setAimedUnit), steady.
 +	const double unitScale = std::clamp(Options::fpsUnitSize, 80, 100) / 100.0;
-+	const float hitboxOpacity = Options::fpsHitboxes == 2 ? 1.0f
++	const bool hitboxAimedOnly = Options::fpsHitboxes == 3;
++	const float hitboxOpacity = Options::fpsHitboxes == 2 || hitboxAimedOnly ? 1.0f
 +		: Options::fpsHitboxes == 1 ? 0.5f + 0.5f * (float)std::cos((now % 1000) / 1000.0 * 2.0 * Pi) : 0.0f;
 +
 +	// The units are recorded first (their shadows, sprites and hitboxes, in order), then drawn
@@ -48051,7 +48115,7 @@ index 000000000..8cc2f7482
 +		step.sprite.unit = unit;
 +		useSmoothVersion(step.sprite);
 +		_drawList.push_back(step);
-+		if (hitboxOpacity > 0.05f)
++		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit))
 +		{
 +			recordHitbox(unit, feet, hitboxOpacity);
 +		}
@@ -54310,10 +54374,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..67126971e
+index 000000000..50b3cbff2
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,749 @@
+@@ -0,0 +1,793 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -54506,31 +54570,63 @@ index 000000000..67126971e
 +	_colorNormal = _lstOptions->getColor();
 +
 +	// Gather the add-on's options with a label (the switches and numbers as settings, the rest
-+	// as keys), and find two of the game's own settings on the way.
-+	const OptionInfo *frameCounter = nullptr, *frameLimit = nullptr;
++	// as keys), and two of the game's own settings: its frame rate limit (for fast screens) and
++	// its frame counter (F7, handy in 3D), with the graphics.
++	std::vector<OptionInfo> gathered;
 +	for (const auto &option : Options::getOptionInfo())
 +	{
 +		if (option.category() == "STR_FIRST_PERSON" && !option.description().empty())
 +		{
-+			(option.type() == OPTION_KEY ? _keys : _settings).push_back(option);
++			(option.type() == OPTION_KEY ? _keys : gathered).push_back(option);
 +		}
-+		else if (option.id() == "fpsCounter")
++		else if (option.id() == "fpsCounter" || (option.id() == "FPS" && option.type() == OPTION_INT))
 +		{
-+			frameCounter = &option;
-+		}
-+		else if (option.id() == "FPS" && option.type() == OPTION_INT)
-+		{
-+			frameLimit = &option;
++			gathered.push_back(option);
 +		}
 +	}
-+	// The game's two settings go at the end of the settings.
-+	if (frameLimit)
++	// The settings under their section headings, in this order (a player's report, GitHub issue
++	// #27: "these could probably be separated into sections"); any setting not placed here goes
++	// at the end, under a heading of its own.
++	static const struct { const char *heading; std::vector<const char*> ids; } sections[] = {
++		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView", "fpsZoom",
++			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
++		{ "STR_FPS_SECTION_MOVEMENT", { "fpsTurnCost", "fpsMovement", "fpsWalkSpeed", "fpsFlightCost", "fpsFlightCostOverride", "fpsVault",
++			"fpsFalling", "fpsSafeLanding" } },
++		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsLean", "fpsMeleeTerrain",
++			"fpsMeleeFloors", "fpsAimExact", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
++			"fpsEachPellet", "fpsFlares", "fpsNightVisionGear" } },
++		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
++			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsParticles", "fpsUfoLights",
++			"fpsGhostParts", "fpsGhostOpacity", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
++		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars",
++			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsCompass", "fpsMiddleClickIdentify" } },
++		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds" } },
++		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
++	};
++	std::vector<bool> placed(gathered.size(), false);
++	for (const auto &section : sections)
 +	{
-+		_settings.push_back(*frameLimit); // The game's own frame rate limit, for fast screens.
++		_settingHeadings.push_back({ _settings.size(), section.heading });
++		for (const char *id : section.ids)
++		{
++			for (size_t index = 0; index < gathered.size(); ++index)
++			{
++				if (!placed[index] && gathered[index].id() == id)
++				{
++					placed[index] = true;
++					_settings.push_back(gathered[index]);
++				}
++			}
++		}
 +	}
-+	if (frameCounter)
++	for (size_t index = 0; index < gathered.size(); ++index)
 +	{
-+		_settings.push_back(*frameCounter); // The game's own frame counter (F7), handy in 3D.
++		if (placed[index]) continue;
++		if (_settingHeadings.back().first != _settings.size() && _settingHeadings.back().second != "STR_FPS_SECTION_OTHER")
++		{
++			_settingHeadings.push_back({ _settings.size(), "STR_FPS_SECTION_OTHER" });
++		}
++		_settings.push_back(gathered[index]);
 +	}
 +	// After our own keys come the game's keys that work in 3D, in the order of GameKeys and
 +	// then the ten enemy keys.
@@ -54603,6 +54699,11 @@ index 000000000..67126971e
 +	switch (option.type())
 +	{
 +	case OPTION_BOOL:
++		// Faithful targeting shows as "FPS-style shooting (easier)": YES when it's off.
++		if (option.id() == "fpsFaithfulTargeting")
++		{
++			return !*option.asBool() ? std::string(tr("STR_YES")) : std::string(tr("STR_NO"));
++		}
 +		return *option.asBool() ? std::string(tr("STR_YES")) : std::string(tr("STR_NO"));
 +	case OPTION_INT:
 +		// Sprite upscaling is a choice of three, shown by name.
@@ -54634,11 +54735,17 @@ index 000000000..67126971e
 +			static const char *const statBarNames[] = { "STR_FPS_STAT_BARS_GAME", "STR_FPS_STAT_BARS_SCALED", "STR_FPS_STAT_BARS_PERCENT" };
 +			return std::string(tr(statBarNames[std::clamp(*option.asInt(), 0, 2)]));
 +		}
-+		// Hitboxes are a choice of three, shown by name.
++		// Hitboxes are a choice of four, shown by name (Aimed at, 3, came last).
 +		if (option.id() == "fpsHitboxes")
 +		{
-+			static const char *const hitboxNames[] = { "STR_FPS_HITBOXES_OFF", "STR_FPS_HITBOXES_BLINK", "STR_FPS_HITBOXES_ALWAYS" };
-+			return std::string(tr(hitboxNames[std::clamp(*option.asInt(), 0, 2)]));
++			static const char *const hitboxNames[] = { "STR_FPS_HITBOXES_OFF", "STR_FPS_HITBOXES_BLINK", "STR_FPS_HITBOXES_ALWAYS", "STR_FPS_HITBOXES_AIMED" };
++			return std::string(tr(hitboxNames[std::clamp(*option.asInt(), 0, 3)]));
++		}
++		// Akimbo is a choice of three, shown by name.
++		if (option.id() == "fpsAkimbo")
++		{
++			static const char *const akimboNames[] = { "STR_FPS_AKIMBO_CHOICE_OFF", "STR_FPS_AKIMBO_CHOICE_FULL", "STR_FPS_AKIMBO_CHOICE_REALISTIC" };
++			return std::string(tr(akimboNames[FirstPerson::akimboChoice()]));
 +		}
 +		// The smoke is a choice of two, shown by name.
 +		if (option.id() == "fpsSmoke")
@@ -54706,55 +54813,56 @@ index 000000000..67126971e
 +}
 +
 +/**
-+ * Lists the settings or the key bindings, depending on the sub-tab. In the key bindings, a
-+ * heading separates our own keys from the game's keys that work in 3D. Any key waiting to be
-+ * rebound is forgotten.
++ * Lists the settings or the key bindings, depending on the sub-tab, under their headings: the
++ * settings' sections, and in the key bindings one between our own keys and the game's keys that
++ * work in 3D. Which option each row shows is noted (see getEntry). Any key waiting to be rebound
++ * is forgotten.
 + */
 +void OptionsFirstPersonState::updateList()
 +{
 +	_lstOptions->clearList();
++	_rowOptions.clear();
 +	_selectedKey = -1;
 +	_selKey = nullptr;
-+	const std::vector<OptionInfo> &shownOptions = _owner == _btnSettings ? _settings : _keys;
++	const bool settings = _owner == _btnSettings;
++	const std::vector<OptionInfo> &shownOptions = settings ? _settings : _keys;
++	const std::vector<std::pair<size_t, std::string>> keyHeadings = { { _ownKeys, "STR_FPS_GAME_KEYS" } };
++	const std::vector<std::pair<size_t, std::string>> &headings = settings ? _settingHeadings : keyHeadings;
 +	for (size_t optionIndex = 0; optionIndex < shownOptions.size(); ++optionIndex)
 +	{
 +		const OptionInfo &option = shownOptions[optionIndex];
-+		// The heading over the game's keys, before the first of them.
-+		if (&shownOptions == &_keys && optionIndex == _ownKeys)
++		// A heading over the options from here on.
++		for (const auto &heading : headings)
 +		{
-+			_lstOptions->addRow(1, tr("STR_FPS_GAME_KEYS").c_str());
-+			_lstOptions->setRowColor(_lstOptions->getLastRowIndex(), _lstOptions->getSecondaryColor());
++			if (heading.first == optionIndex)
++			{
++				_lstOptions->addRow(1, tr(heading.second).c_str());
++				_lstOptions->setRowColor(_lstOptions->getLastRowIndex(), _lstOptions->getSecondaryColor());
++				_rowOptions.push_back(-1);
++			}
 +		}
 +		// The option's row: its name and its value.
 +		_lstOptions->addRow(2, label(option).c_str(), valueText(option).c_str());
-+		if (option.id() == "fpsSoldierPreview")
-+		{
-+			_lstOptions->setRowColor(_lstOptions->getLastRowIndex(), _lstOptions->getSecondaryColor()); // The headline feature stands out.
-+		}
++		_rowOptions.push_back((int)optionIndex);
 +	}
 +}
 +
 +/**
-+ * Gets the option shown on a list row, if any, allowing for the heading row over the game's keys.
++ * Gets the option shown on a list row, if any, as the list was filled (see updateList: the
++ * headings take rows of their own).
 + * @param row The list row (as the list counts them, not the lines a wrapped row takes).
 + * @param isKey Set to true when the key bindings are showing, false for the settings.
-+ * @return The option, or nullptr for the heading or a row past the end.
++ * @return The option, or nullptr for a heading or a row past the end.
 + */
 +OptionInfo *OptionsFirstPersonState::getEntry(int row, bool *isKey)
 +{
 +	std::vector<OptionInfo> &shownOptions = (_owner == _btnSettings) ? _settings : _keys;
 +	*isKey = (_owner != _btnSettings);
-+	// Rows from the heading on are one further down than their option.
-+	if (*isKey && _ownKeys < shownOptions.size() && row >= (int)_ownKeys)
-+	{
-+		if (row == (int)_ownKeys) return nullptr; // The heading of the game's keys.
-+		--row;
-+	}
-+	if (row < 0 || row >= (int)shownOptions.size())
++	if (row < 0 || row >= (int)_rowOptions.size() || _rowOptions[row] < 0)
 +	{
 +		return nullptr;
 +	}
-+	return &shownOptions[row];
++	return &shownOptions[_rowOptions[row]];
 +}
 +
 +/**
@@ -54813,24 +54921,13 @@ index 000000000..67126971e
 +		}
 +		return;
 +	}
-+	// A switch: either button flips it. The frame counter shows or hides at once. Full and
-+	// realistic akimbo are two kinds of the same thing: switching one on switches the other off.
++	// A switch: either button flips it. The frame counter shows or hides at once.
 +	if (option->type() == OPTION_BOOL)
 +	{
 +		*option->asBool() = !*option->asBool();
 +		if (option->asBool() == &Options::fpsCounter)
 +		{
 +			_game->getFpsCounter()->setVisible(Options::fpsCounter);
-+		}
-+		bool *otherAkimbo = option->asBool() == &Options::fpsDualWield ? &Options::fpsAkimboRealistic
-+			: option->asBool() == &Options::fpsAkimboRealistic ? &Options::fpsDualWield : nullptr;
-+		if (otherAkimbo && *option->asBool() && *otherAkimbo)
-+		{
-+			*otherAkimbo = false;
-+			for (size_t settingRow = 0; settingRow < _settings.size(); ++settingRow)
-+			{
-+				if (_settings[settingRow].type() == OPTION_BOOL && _settings[settingRow].asBool() == otherAkimbo) _lstOptions->setCellText(settingRow, 1, valueText(_settings[settingRow]));
-+			}
 +		}
 +	}
 +	// A number: one step up (left) or down (right), within its range.
@@ -54863,10 +54960,21 @@ index 000000000..67126971e
 +		{
 +			*value = (*value + direction + 3) % 3;
 +		}
-+		// Hitboxes (off, blink, always): round and round.
++		// Hitboxes (off, aimed at, blink, always): round and round, in that order (aimed at is 3).
 +		else if (value == &Options::fpsHitboxes)
 +		{
-+			*value = (*value + direction + 3) % 3;
++			static const int hitboxOrder[] = { 0, 3, 1, 2 };
++			int place = 0;
++			while (place < 3 && hitboxOrder[place] != *value) ++place;
++			*value = hitboxOrder[(place + direction + 4) % 4];
++		}
++		// Akimbo (off, full, realistic): round and round. Akimbo is then on (or off) just now as
++		// chosen (the akimbo key switches it in play, see FirstPersonMode::toggleAkimbo).
++		else if (value == &Options::fpsAkimbo)
++		{
++			*value = (FirstPerson::akimboChoice() + direction + 3) % 3;
++			Options::fpsDualWield = *value == 1;
++			Options::fpsAkimboRealistic = *value == 2;
 +		}
 +		// The smoke (original, modern): either button switches.
 +		else if (value == &Options::fpsSmoke)
@@ -55065,10 +55173,10 @@ index 000000000..67126971e
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.h b/src/FirstPerson/OptionsFirstPersonState.h
 new file mode 100644
-index 000000000..329648107
+index 000000000..f9b4ed797
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.h
-@@ -0,0 +1,104 @@
+@@ -0,0 +1,106 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -55139,11 +55247,13 @@ index 000000000..329648107
 +	TextList *_lstOptions;                              // The list of settings or keys.
 +	std::vector<OptionInfo> _settings, _keys;           // Copies of the options' infos (they still point at the real options).
 +	size_t _ownKeys = 0;                                // How many of _keys are the 3D view's own: they come first, then the game's keys that work in 3D (under a heading).
++	std::vector<std::pair<size_t, std::string>> _settingHeadings; // The settings' section headings: the setting each one goes over, and its text.
++	std::vector<int> _rowOptions;                       // For each row of the list shown: its option (an index into _settings or _keys), or -1 for a heading.
 +	int _selectedKey;                                   // List row of the key waiting for a new key (-1: none).
 +	OptionInfo *_selKey;                                // That key's option (nullptr: none).
 +	Uint8 _colorSel, _colorNormal;                      // Row colours: a key waiting for a new key, and normal.
 +
-+	/// Gets the option shown on a list row (nullptr for the heading); isKey says if the keys are showing.
++	/// Gets the option shown on a list row (nullptr for a heading); isKey says if the keys are showing.
 +	OptionInfo *getEntry(int row, bool *isKey);
 +	/// Text for an option's current value (YES/NO, a number or its name, a key's name).
 +	std::string valueText(const OptionInfo &option) const;

@@ -68,11 +68,13 @@ class OptionsFirstPersonState : public OptionsBaseState
 	TextList *_lstOptions;                              // The list of settings or keys.
 	std::vector<OptionInfo> _settings, _keys;           // Copies of the options' infos (they still point at the real options).
 	size_t _ownKeys = 0;                                // How many of _keys are the 3D view's own: they come first, then the game's keys that work in 3D (under a heading).
+	std::vector<std::pair<size_t, std::string>> _settingHeadings; // The settings' section headings: the setting each one goes over, and its text.
+	std::vector<int> _rowOptions;                       // For each row of the list shown: its option (an index into _settings or _keys), or -1 for a heading.
 	int _selectedKey;                                   // List row of the key waiting for a new key (-1: none).
 	OptionInfo *_selKey;                                // That key's option (nullptr: none).
 	Uint8 _colorSel, _colorNormal;                      // Row colours: a key waiting for a new key, and normal.
 
-	/// Gets the option shown on a list row (nullptr for the heading); isKey says if the keys are showing.
+	/// Gets the option shown on a list row (nullptr for a heading); isKey says if the keys are showing.
 	OptionInfo *getEntry(int row, bool *isKey);
 	/// Text for an option's current value (YES/NO, a number or its name, a key's name).
 	std::string valueText(const OptionInfo &option) const;

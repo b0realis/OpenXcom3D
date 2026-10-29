@@ -799,9 +799,11 @@ void FirstPersonView::drawUnits()
 	const double elapsedSeconds = _unitLastTick ? std::min<Uint32>(100, now - _unitLastTick) / 1000.0 : 0.0;
 	_unitLastTick = now;
 	// The units' size (setting "Unit size", 80 to 100% of the isometric map's: smaller, standing
-	// on the same spot), and their hitboxes (setting): always, or fading in and out once a second.
+	// on the same spot), and their hitboxes (setting): always, fading in and out once a second, or
+	// only the unit pointed at (Aimed at, see setAimedUnit), steady.
 	const double unitScale = std::clamp(Options::fpsUnitSize, 80, 100) / 100.0;
-	const float hitboxOpacity = Options::fpsHitboxes == 2 ? 1.0f
+	const bool hitboxAimedOnly = Options::fpsHitboxes == 3;
+	const float hitboxOpacity = Options::fpsHitboxes == 2 || hitboxAimedOnly ? 1.0f
 		: Options::fpsHitboxes == 1 ? 0.5f + 0.5f * (float)std::cos((now % 1000) / 1000.0 * 2.0 * Pi) : 0.0f;
 
 	// The units are recorded first (their shadows, sprites and hitboxes, in order), then drawn
@@ -942,7 +944,7 @@ void FirstPersonView::drawUnits()
 		step.sprite.unit = unit;
 		useSmoothVersion(step.sprite);
 		_drawList.push_back(step);
-		if (hitboxOpacity > 0.05f)
+		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit))
 		{
 			recordHitbox(unit, feet, hitboxOpacity);
 		}

@@ -190,31 +190,63 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 	_colorNormal = _lstOptions->getColor();
 
 	// Gather the add-on's options with a label (the switches and numbers as settings, the rest
-	// as keys), and find two of the game's own settings on the way.
-	const OptionInfo *frameCounter = nullptr, *frameLimit = nullptr;
+	// as keys), and two of the game's own settings: its frame rate limit (for fast screens) and
+	// its frame counter (F7, handy in 3D), with the graphics.
+	std::vector<OptionInfo> gathered;
 	for (const auto &option : Options::getOptionInfo())
 	{
 		if (option.category() == "STR_FIRST_PERSON" && !option.description().empty())
 		{
-			(option.type() == OPTION_KEY ? _keys : _settings).push_back(option);
+			(option.type() == OPTION_KEY ? _keys : gathered).push_back(option);
 		}
-		else if (option.id() == "fpsCounter")
+		else if (option.id() == "fpsCounter" || (option.id() == "FPS" && option.type() == OPTION_INT))
 		{
-			frameCounter = &option;
-		}
-		else if (option.id() == "FPS" && option.type() == OPTION_INT)
-		{
-			frameLimit = &option;
+			gathered.push_back(option);
 		}
 	}
-	// The game's two settings go at the end of the settings.
-	if (frameLimit)
+	// The settings under their section headings, in this order (a player's report, GitHub issue
+	// #27: "these could probably be separated into sections"); any setting not placed here goes
+	// at the end, under a heading of its own.
+	static const struct { const char *heading; std::vector<const char*> ids; } sections[] = {
+		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView", "fpsZoom",
+			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
+		{ "STR_FPS_SECTION_MOVEMENT", { "fpsTurnCost", "fpsMovement", "fpsWalkSpeed", "fpsFlightCost", "fpsFlightCostOverride", "fpsVault",
+			"fpsFalling", "fpsSafeLanding" } },
+		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsLean", "fpsMeleeTerrain",
+			"fpsMeleeFloors", "fpsAimExact", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
+			"fpsEachPellet", "fpsFlares", "fpsNightVisionGear" } },
+		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
+			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsParticles", "fpsUfoLights",
+			"fpsGhostParts", "fpsGhostOpacity", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
+		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars",
+			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsCompass", "fpsMiddleClickIdentify" } },
+		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds" } },
+		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
+	};
+	std::vector<bool> placed(gathered.size(), false);
+	for (const auto &section : sections)
 	{
-		_settings.push_back(*frameLimit); // The game's own frame rate limit, for fast screens.
+		_settingHeadings.push_back({ _settings.size(), section.heading });
+		for (const char *id : section.ids)
+		{
+			for (size_t index = 0; index < gathered.size(); ++index)
+			{
+				if (!placed[index] && gathered[index].id() == id)
+				{
+					placed[index] = true;
+					_settings.push_back(gathered[index]);
+				}
+			}
+		}
 	}
-	if (frameCounter)
+	for (size_t index = 0; index < gathered.size(); ++index)
 	{
-		_settings.push_back(*frameCounter); // The game's own frame counter (F7), handy in 3D.
+		if (placed[index]) continue;
+		if (_settingHeadings.back().first != _settings.size() && _settingHeadings.back().second != "STR_FPS_SECTION_OTHER")
+		{
+			_settingHeadings.push_back({ _settings.size(), "STR_FPS_SECTION_OTHER" });
+		}
+		_settings.push_back(gathered[index]);
 	}
 	// After our own keys come the game's keys that work in 3D, in the order of GameKeys and
 	// then the ten enemy keys.
@@ -287,6 +319,11 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 	switch (option.type())
 	{
 	case OPTION_BOOL:
+		// Faithful targeting shows as "FPS-style shooting (easier)": YES when it's off.
+		if (option.id() == "fpsFaithfulTargeting")
+		{
+			return !*option.asBool() ? std::string(tr("STR_YES")) : std::string(tr("STR_NO"));
+		}
 		return *option.asBool() ? std::string(tr("STR_YES")) : std::string(tr("STR_NO"));
 	case OPTION_INT:
 		// Sprite upscaling is a choice of three, shown by name.
@@ -318,11 +355,17 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 			static const char *const statBarNames[] = { "STR_FPS_STAT_BARS_GAME", "STR_FPS_STAT_BARS_SCALED", "STR_FPS_STAT_BARS_PERCENT" };
 			return std::string(tr(statBarNames[std::clamp(*option.asInt(), 0, 2)]));
 		}
-		// Hitboxes are a choice of three, shown by name.
+		// Hitboxes are a choice of four, shown by name (Aimed at, 3, came last).
 		if (option.id() == "fpsHitboxes")
 		{
-			static const char *const hitboxNames[] = { "STR_FPS_HITBOXES_OFF", "STR_FPS_HITBOXES_BLINK", "STR_FPS_HITBOXES_ALWAYS" };
-			return std::string(tr(hitboxNames[std::clamp(*option.asInt(), 0, 2)]));
+			static const char *const hitboxNames[] = { "STR_FPS_HITBOXES_OFF", "STR_FPS_HITBOXES_BLINK", "STR_FPS_HITBOXES_ALWAYS", "STR_FPS_HITBOXES_AIMED" };
+			return std::string(tr(hitboxNames[std::clamp(*option.asInt(), 0, 3)]));
+		}
+		// Akimbo is a choice of three, shown by name.
+		if (option.id() == "fpsAkimbo")
+		{
+			static const char *const akimboNames[] = { "STR_FPS_AKIMBO_CHOICE_OFF", "STR_FPS_AKIMBO_CHOICE_FULL", "STR_FPS_AKIMBO_CHOICE_REALISTIC" };
+			return std::string(tr(akimboNames[FirstPerson::akimboChoice()]));
 		}
 		// The smoke is a choice of two, shown by name.
 		if (option.id() == "fpsSmoke")
@@ -390,55 +433,56 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 }
 
 /**
- * Lists the settings or the key bindings, depending on the sub-tab. In the key bindings, a
- * heading separates our own keys from the game's keys that work in 3D. Any key waiting to be
- * rebound is forgotten.
+ * Lists the settings or the key bindings, depending on the sub-tab, under their headings: the
+ * settings' sections, and in the key bindings one between our own keys and the game's keys that
+ * work in 3D. Which option each row shows is noted (see getEntry). Any key waiting to be rebound
+ * is forgotten.
  */
 void OptionsFirstPersonState::updateList()
 {
 	_lstOptions->clearList();
+	_rowOptions.clear();
 	_selectedKey = -1;
 	_selKey = nullptr;
-	const std::vector<OptionInfo> &shownOptions = _owner == _btnSettings ? _settings : _keys;
+	const bool settings = _owner == _btnSettings;
+	const std::vector<OptionInfo> &shownOptions = settings ? _settings : _keys;
+	const std::vector<std::pair<size_t, std::string>> keyHeadings = { { _ownKeys, "STR_FPS_GAME_KEYS" } };
+	const std::vector<std::pair<size_t, std::string>> &headings = settings ? _settingHeadings : keyHeadings;
 	for (size_t optionIndex = 0; optionIndex < shownOptions.size(); ++optionIndex)
 	{
 		const OptionInfo &option = shownOptions[optionIndex];
-		// The heading over the game's keys, before the first of them.
-		if (&shownOptions == &_keys && optionIndex == _ownKeys)
+		// A heading over the options from here on.
+		for (const auto &heading : headings)
 		{
-			_lstOptions->addRow(1, tr("STR_FPS_GAME_KEYS").c_str());
-			_lstOptions->setRowColor(_lstOptions->getLastRowIndex(), _lstOptions->getSecondaryColor());
+			if (heading.first == optionIndex)
+			{
+				_lstOptions->addRow(1, tr(heading.second).c_str());
+				_lstOptions->setRowColor(_lstOptions->getLastRowIndex(), _lstOptions->getSecondaryColor());
+				_rowOptions.push_back(-1);
+			}
 		}
 		// The option's row: its name and its value.
 		_lstOptions->addRow(2, label(option).c_str(), valueText(option).c_str());
-		if (option.id() == "fpsSoldierPreview")
-		{
-			_lstOptions->setRowColor(_lstOptions->getLastRowIndex(), _lstOptions->getSecondaryColor()); // The headline feature stands out.
-		}
+		_rowOptions.push_back((int)optionIndex);
 	}
 }
 
 /**
- * Gets the option shown on a list row, if any, allowing for the heading row over the game's keys.
+ * Gets the option shown on a list row, if any, as the list was filled (see updateList: the
+ * headings take rows of their own).
  * @param row The list row (as the list counts them, not the lines a wrapped row takes).
  * @param isKey Set to true when the key bindings are showing, false for the settings.
- * @return The option, or nullptr for the heading or a row past the end.
+ * @return The option, or nullptr for a heading or a row past the end.
  */
 OptionInfo *OptionsFirstPersonState::getEntry(int row, bool *isKey)
 {
 	std::vector<OptionInfo> &shownOptions = (_owner == _btnSettings) ? _settings : _keys;
 	*isKey = (_owner != _btnSettings);
-	// Rows from the heading on are one further down than their option.
-	if (*isKey && _ownKeys < shownOptions.size() && row >= (int)_ownKeys)
-	{
-		if (row == (int)_ownKeys) return nullptr; // The heading of the game's keys.
-		--row;
-	}
-	if (row < 0 || row >= (int)shownOptions.size())
+	if (row < 0 || row >= (int)_rowOptions.size() || _rowOptions[row] < 0)
 	{
 		return nullptr;
 	}
-	return &shownOptions[row];
+	return &shownOptions[_rowOptions[row]];
 }
 
 /**
@@ -497,24 +541,13 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		}
 		return;
 	}
-	// A switch: either button flips it. The frame counter shows or hides at once. Full and
-	// realistic akimbo are two kinds of the same thing: switching one on switches the other off.
+	// A switch: either button flips it. The frame counter shows or hides at once.
 	if (option->type() == OPTION_BOOL)
 	{
 		*option->asBool() = !*option->asBool();
 		if (option->asBool() == &Options::fpsCounter)
 		{
 			_game->getFpsCounter()->setVisible(Options::fpsCounter);
-		}
-		bool *otherAkimbo = option->asBool() == &Options::fpsDualWield ? &Options::fpsAkimboRealistic
-			: option->asBool() == &Options::fpsAkimboRealistic ? &Options::fpsDualWield : nullptr;
-		if (otherAkimbo && *option->asBool() && *otherAkimbo)
-		{
-			*otherAkimbo = false;
-			for (size_t settingRow = 0; settingRow < _settings.size(); ++settingRow)
-			{
-				if (_settings[settingRow].type() == OPTION_BOOL && _settings[settingRow].asBool() == otherAkimbo) _lstOptions->setCellText(settingRow, 1, valueText(_settings[settingRow]));
-			}
 		}
 	}
 	// A number: one step up (left) or down (right), within its range.
@@ -547,10 +580,21 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		{
 			*value = (*value + direction + 3) % 3;
 		}
-		// Hitboxes (off, blink, always): round and round.
+		// Hitboxes (off, aimed at, blink, always): round and round, in that order (aimed at is 3).
 		else if (value == &Options::fpsHitboxes)
 		{
-			*value = (*value + direction + 3) % 3;
+			static const int hitboxOrder[] = { 0, 3, 1, 2 };
+			int place = 0;
+			while (place < 3 && hitboxOrder[place] != *value) ++place;
+			*value = hitboxOrder[(place + direction + 4) % 4];
+		}
+		// Akimbo (off, full, realistic): round and round. Akimbo is then on (or off) just now as
+		// chosen (the akimbo key switches it in play, see FirstPersonMode::toggleAkimbo).
+		else if (value == &Options::fpsAkimbo)
+		{
+			*value = (FirstPerson::akimboChoice() + direction + 3) % 3;
+			Options::fpsDualWield = *value == 1;
+			Options::fpsAkimboRealistic = *value == 2;
 		}
 		// The smoke (original, modern): either button switches.
 		else if (value == &Options::fpsSmoke)

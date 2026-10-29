@@ -112,8 +112,6 @@ bool lastFlashlightOn = true;
 bool lastSprintOn = false, lastEnPassantOn = false;
 /// The cheats the doom mode key would switch back on (FirstPersonMode::_pausedCheats).
 int lastPausedCheats = 0;
-/// Whether the akimbo key would switch realistic akimbo back on (FirstPersonMode::_akimboRealisticWasOn).
-bool lastAkimboRealisticWasOn = true;
 /// The Doom real-time fuses burning (FirstPersonMode::_doomFuses): only for the same battle.
 std::unordered_map<int, FirstPersonMode::DoomFuse> lastDoomFuses;
 /// When a first-person mode last ran its per-frame update (SDL ticks, ms; 0: never).
@@ -189,7 +187,6 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
 		_sprintOn = lastSprintOn;
 		_enPassantOn = lastEnPassantOn;
 		_pausedCheats = lastPausedCheats;
-		_akimboRealisticWasOn = lastAkimboRealisticWasOn;
 		if (lastBattle == _save) _doomFuses = lastDoomFuses;
 		_mouseLook = !_classicHud;
 	}
@@ -858,7 +855,6 @@ void FirstPersonMode::rememberChoices() const
 	lastSprintOn = _sprintOn;
 	lastEnPassantOn = _enPassantOn;
 	lastPausedCheats = _pausedCheats;
-	lastAkimboRealisticWasOn = _akimboRealisticWasOn;
 	lastDoomFuses = _doomFuses;
 }
 

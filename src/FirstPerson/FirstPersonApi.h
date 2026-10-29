@@ -138,6 +138,8 @@ bool activeWhenNew(const std::string &modId);
 int smokeMode();
 /// The flashlight setting as it stands: 0 Off, 1 On, 2 Dynamic (unset: from 1.0's settings).
 int flashlightMode();
+/// The akimbo setting as it stands: 0 Off, 1 Full, 2 Realistic (unset: from 1.08's two settings).
+int akimboChoice();
 /// The longest Doom grenade fuse, in seconds (setting "Doom grenade fuse": 1 to this).
 const int DoomFuseMaxSeconds = 5;
 

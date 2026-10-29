@@ -614,7 +614,6 @@ private:
 	void throwFreeGrenade(BattleUnit *unit, BattleItem *grenade, const Position &aimedVoxel);
 	/// Flies the free grenade on to now; false once it has landed or burst (the flight is over).
 	bool stepFreeGrenade(Uint32 now);
-	bool _akimboRealisticWasOn = true;                      // the akimbo key switches realistic akimbo back on (false: full akimbo)
 	BattleActionType _fireMode = BA_NONE;               // fire mode for the left mouse button
 	const BattleItem *_fireModeWeapon = nullptr;        // the weapon _fireMode was chosen for
 	Position _aimVoxel;                                 // what's under the crosshair

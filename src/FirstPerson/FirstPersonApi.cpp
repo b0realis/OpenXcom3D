@@ -157,18 +157,37 @@ void resized(FirstPersonMode *mode, int widthChange, int heightChange)
  * Settles settings that take their first value from an older one, once the options are loaded
  * (called when a battle or the 3D VIEW tab opens): the smoke (Original, Modern) from 0.9's
  * "See-through smoke": YES gives Modern, NO Original (1.0's Solid becomes Original too); the
- * flashlight (Off, On, Dynamic) from 1.0's "Flashlight" and "Tactical flashlight"; and 1.0's
- * next fire mode key, when the player had moved it off F (F is the flashlight now), once.
+ * flashlight (Off, On, Dynamic) from 1.0's "Flashlight" and "Tactical flashlight"; akimbo (Off,
+ * Full, Realistic) from 1.08's "Full akimbo" and "Realistic akimbo"; and 1.0's next fire mode
+ * key, when the player had moved it off F (F is the flashlight now), once.
  */
 void settleOptions()
 {
 	Options::fpsSmoke = smokeMode();
 	Options::fpsFlashlightMode = flashlightMode();
+	Options::fpsAkimbo = akimboChoice();
 	if (Options::keyFpsNextMode != SDLK_f)
 	{
 		Options::keyFpsNextFireMode = Options::keyFpsNextMode;
 		Options::keyFpsNextMode = SDLK_f;
 	}
+}
+
+/**
+ * The akimbo setting as it stands: Off (0), Full (1, any two guns) or Realistic (2, one-handed
+ * guns only). Unset (-1: a profile from 1.08 not settled yet, or the defaults just restored on the
+ * 3D VIEW tab), it's what 1.08's two settings say, which now only tell whether akimbo is on just
+ * now (the akimbo key switches them, see FirstPersonMode::toggleAkimbo): "Realistic akimbo" YES
+ * Realistic, else "Full akimbo" YES Full, NO Off.
+ * @return 0, 1 or 2.
+ */
+int akimboChoice()
+{
+	if (Options::fpsAkimbo >= 0 && Options::fpsAkimbo <= 2)
+	{
+		return Options::fpsAkimbo;
+	}
+	return Options::fpsAkimboRealistic ? 2 : (Options::fpsDualWield ? 1 : 0);
 }
 
 /**
@@ -247,24 +266,30 @@ void createOptions(std::vector<OptionInfo> &options)
 	// (0 = free) and whether that overrides the game's own cost for each unit, jumping over low
 	// obstacles, falling off ledges, and how many voxels below the game's eye height the camera
 	// sits (0 to 6).
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsMovement", &fpsMovement, 0, "STR_FPS_MOVEMENT", category));
+	// (New installs start with the game's own mechanics where the 3D view adds its own: tile by
+	// tile, flight at the game's cost, no vaulting; a player's report, GitHub issue #27.)
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsMovement", &fpsMovement, 1, "STR_FPS_MOVEMENT", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsWalkSpeed", &fpsWalkSpeed, 4, "STR_FPS_WALK_SPEED", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHeadBob", &fpsHeadBob, true, "STR_FPS_HEAD_BOB", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlightCost", &fpsFlightCost, 0, "STR_FPS_FLIGHT_COST", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlightCostOverride", &fpsFlightCostOverride, true, "STR_FPS_FLIGHT_COST_OVERRIDE", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsVault", &fpsVault, true, "STR_FPS_VAULT", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlightCostOverride", &fpsFlightCostOverride, false, "STR_FPS_FLIGHT_COST_OVERRIDE", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsVault", &fpsVault, false, "STR_FPS_VAULT", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFalling", &fpsFalling, true, "STR_FPS_FALLING", category));
 	// A step off a ledge onto ground no one can walk on, or where no step leads out (a player's
 	// report: X-Com Files' blood moat, which the map never lets a soldier into, soft-locked one),
 	// stops at the edge with a warning; pushing that way again (or jumping) goes over.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSafeLanding", &fpsSafeLanding, true, "STR_FPS_SAFE_LANDING", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsEyeLower", &fpsEyeLower, 3, "STR_FPS_EYE_LOWER", category));
-	// Shooting: the game's own accuracy (YES) or FPS-style shooting along the crosshair (NO), and
-	// firing a gun in each hand at once (akimbo): any two guns (full), or one-handed guns only
-	// (realistic). At most one of the two is on.
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsFaithfulTargeting", &fpsFaithfulTargeting, true, "STR_FPS_FAITHFUL_TARGETING", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsDualWield", &fpsDualWield, false, "STR_FPS_DUAL_WIELD", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsAkimboRealistic", &fpsAkimboRealistic, false, "STR_FPS_AKIMBO_REALISTIC", category));
+	// Shooting: the game's own accuracy (YES) or FPS-style shooting along the crosshair (NO; shown
+	// the other way round, as "FPS-style shooting (easier)", NO at first: a player's report, GitHub
+	// issue #27, new players switched it thinking it the faithful way), and firing a gun in each
+	// hand at once (akimbo): off (0), any two guns (1, full), or one-handed guns only (2,
+	// realistic). Unset (-1) until settled (see settleOptions) from 1.08's two settings, which
+	// stay, unlisted, as whether akimbo is on just now (the akimbo key switches them; at most one).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsFaithfulTargeting", &fpsFaithfulTargeting, true, "STR_FPS_FPS_STYLE", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsAkimbo", &fpsAkimbo, -1, "STR_FPS_AKIMBO", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsDualWield", &fpsDualWield, false, "STR_FPS_DUAL_WIELD", "STR_FIRST_PERSON_SAVED"));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsAkimboRealistic", &fpsAkimboRealistic, false, "STR_FPS_AKIMBO_REALISTIC", "STR_FIRST_PERSON_SAVED"));
 	// Akimbo's style: the two guns take turns round by round, each round resolved before the next
 	// leaves, as an auto burst's (NO), or fire as a volley, both rounds at once and landing together
 	// as a shotgun's pellets (YES); either way each less accurate, for the more expensive gun's shot
@@ -296,7 +321,7 @@ void createOptions(std::vector<OptionInfo> &options)
 	// until settled (see settleOptions) from 1.0's two settings, kept below, unlisted (a new name,
 	// as 1.0's YES/NO wouldn't load into a number).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlashlightMode", &fpsFlashlightMode, -1, "STR_FPS_FLASHLIGHT", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightVisionGear", &fpsNightVisionGear, true, "STR_FPS_NIGHT_VISION_GEAR", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightVisionGear", &fpsNightVisionGear, false, "STR_FPS_NIGHT_VISION_GEAR", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCombatMusic", &fpsCombatMusic, true, "STR_FPS_COMBAT_MUSIC", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitSounds", &fpsHitSounds, true, "STR_FPS_HIT_SOUNDS", category));
 	// The smoke: the original games' own frames, see-through where the soldier sees through the
@@ -370,13 +395,15 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsForceBlocked", &fpsForceBlocked, false, "STR_FPS_FORCE_BLOCKED", category));
 	// A shotgun's pellets fly beside its round in the 3D view, each to where the game's spread
 	// sends it, instead of all landing the moment it's fired (the game's own way, kept off).
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsPelletsInFlight", &fpsPelletsInFlight, false, "STR_FPS_PELLETS_IN_FLIGHT", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsPelletsInFlight", &fpsPelletsInFlight, true, "STR_FPS_PELLETS_IN_FLIGHT", category));
 	// A shotgun's pellets, and the two rounds of an akimbo volley, each land on their own: none is
 	// lost when the lead pellet leaves the map, and in flight each hits as it arrives (a player's
 	// report on OXCE's "shotgun void"); off, the game's own way, the lead pellet deciding.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsEachPellet", &fpsEachPellet, true, "STR_FPS_EACH_PELLET", category));
-	// The units' hitboxes, outlined: off (0), fading in and out once a second (1), always (2).
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitboxes", &fpsHitboxes, 0, "STR_FPS_HITBOXES", category));
+	// The units' hitboxes, outlined: off (0), fading in and out once a second (1), always (2), or
+	// only the unit pointed at (3, the first for new installs: a player's report, GitHub issue #27,
+	// new players aimed at a Sectoid's picture and missed its hitbox).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitboxes", &fpsHitboxes, 3, "STR_FPS_HITBOXES", category));
 	// The hitboxes' outlines and the path of a throw glowing (spilling bloom round them), or plain lines.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsGlowingOutlines", &fpsGlowingOutlines, false, "STR_FPS_GLOWING_OUTLINES", category));
 	// Icons over the downed (unconscious) units in sight, for burning, bleeding, shock and
