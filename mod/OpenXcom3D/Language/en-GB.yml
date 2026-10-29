@@ -191,7 +191,6 @@ en-GB:
   STR_FPS_VOLLEY: "VOLLEY"
   STR_FPS_FAITHFUL_TARGETING_DESC: "YES: the game's accuracy. NO: FPS-style aim, spread and recoil; each round leaves from your eye, so what you see past a corner you can hit."
   STR_FPS_HOLD: "(HOLD)"
-  STR_FPS_MODE_BURST: "BURST"
   STR_FPS_DUAL: "DUAL"
   STR_FPS_FALLING: "Falling"
   STR_FPS_FALLING_DESC: "Walk off ledges and fall, hurt by the height."

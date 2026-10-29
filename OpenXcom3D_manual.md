@@ -464,9 +464,9 @@ Hovering a soldier on the top bar shows the same weapon line on their card.
 
 ## 5. Fire modes per weapon (FPS-style shooting)
 
-With **Options → 3D VIEW → Faithful X-COM targeting** off, the 3D view keeps the game's three fire-mode slots (keys Z / X / V, mouse wheel or J to cycle) but fires them FPS style. Each gun offers only the modes it has in the game; the table is generated from the game's rulesets (`items.rul`). Time units are the game's, as a percentage of the soldier's time units (a burst costs the game's auto shot).
+With **Options → 3D VIEW → Faithful X-COM targeting** off, the 3D view keeps the game's three fire-mode slots (keys Z / X / V, mouse wheel or J to cycle) but fires them FPS style. Each gun offers only the modes it has in the game; the table is generated from the game's rulesets (`items.rul`). Time units are the game's, as a percentage of the soldier's time units.
 
-- **quick (Z)**: a gun with auto fires one **BURST** (the game's auto: its rounds); without auto, its single **SNAP**
+- **SNAP (Z)**: the game's single snap shot, from the hip (a wider spread than aimed)
 - **AIMED (X)**: one tight round
 - **AUTO (V)**: a click fires a burst; **holding the trigger keeps firing** until you let go, the clip is empty or the time units run out
 - **sweeping a burst**: each round goes where the crosshair is as it fires, so dragging the mouse during a burst sweeps it along the drag. The game's two-point spray (Ctrl+Shift and two clicks, OXCE's) stays on the isometric map (F8 there and back)
@@ -475,7 +475,7 @@ With **Options → 3D VIEW → Faithful X-COM targeting** off, the 3D view keeps
 With akimbo on (full or realistic), the other hand's gun fires too, the two taking turns round by round (or as a volley, *Akimbo volley*): the same mode if it has it, otherwise its first shot, its whole burst (a pistol joins a rifle's auto with a snap, after the rifle's first round). There's no AIMED with a gun in each hand (Y switches akimbo off to aim), and with an arcing gun the two fire in turn (see *Full akimbo*).
 
 ### UFO Defense
-| Weapon | Game modes | Fun mode: quick | Aimed | Auto |
+| Weapon | Game modes | Quick | Aimed | Auto |
 |---|---|---|---|---|
 | Tank/Cannon | snap, aimed | SNAP (33 %TU) | AIMED (80 %TU) | — |
 | Tank/Rocket Launcher | snap, aimed | SNAP (45 %TU) | AIMED (75 %TU) | — |
@@ -483,24 +483,24 @@ With akimbo on (full or realistic), the other hand's gun fires too, the two taki
 | Hovertank/Plasma | snap, aimed | SNAP (30 %TU) | AIMED (60 %TU) | — |
 | Hovertank/Launcher | guided launch | launch (map waypoints) | — | — |
 | Pistol | snap, aimed | SNAP (18 %TU) | AIMED (30 %TU) | — |
-| Rifle (2-handed) | snap, aimed, auto | BURST x3 (35 %TU) | AIMED (80 %TU) | AUTO hold (35 %TU per x3) |
+| Rifle (2-handed) | snap, aimed, auto | SNAP (25 %TU) | AIMED (80 %TU) | AUTO hold (35 %TU per x3) |
 | Heavy Cannon (2-handed) | snap, aimed | SNAP (33 %TU) | AIMED (80 %TU) | — |
-| Auto-Cannon (2-handed) | snap, aimed, auto | BURST x3 (40 %TU) | AIMED (80 %TU) | AUTO hold (40 %TU per x3) |
+| Auto-Cannon (2-handed) | snap, aimed, auto | SNAP (33 %TU) | AIMED (80 %TU) | AUTO hold (40 %TU per x3) |
 | Rocket Launcher (2-handed) | snap, aimed | SNAP (45 %TU) | AIMED (75 %TU) | — |
-| Laser Pistol | snap, aimed, auto | BURST x3 (25 %TU) | AIMED (55 %TU) | AUTO hold (25 %TU per x3) |
-| Laser Rifle (2-handed) | snap, aimed, auto | BURST x3 (34 %TU) | AIMED (50 %TU) | AUTO hold (34 %TU per x3) |
+| Laser Pistol | snap, aimed, auto | SNAP (20 %TU) | AIMED (55 %TU) | AUTO hold (25 %TU per x3) |
+| Laser Rifle (2-handed) | snap, aimed, auto | SNAP (25 %TU) | AIMED (50 %TU) | AUTO hold (34 %TU per x3) |
 | Heavy Laser (2-handed) | snap, aimed | SNAP (33 %TU) | AIMED (75 %TU) | — |
-| Heavy Plasma (2-handed) | snap, aimed, auto | BURST x3 (35 %TU) | AIMED (60 %TU) | AUTO hold (35 %TU per x3) |
-| Plasma Rifle (2-handed) | snap, aimed, auto | BURST x3 (36 %TU) | AIMED (60 %TU) | AUTO hold (36 %TU per x3) |
-| Plasma Pistol | snap, aimed, auto | BURST x3 (30 %TU) | AIMED (60 %TU) | AUTO hold (30 %TU per x3) |
+| Heavy Plasma (2-handed) | snap, aimed, auto | SNAP (30 %TU) | AIMED (60 %TU) | AUTO hold (35 %TU per x3) |
+| Plasma Rifle (2-handed) | snap, aimed, auto | SNAP (30 %TU) | AIMED (60 %TU) | AUTO hold (36 %TU per x3) |
+| Plasma Pistol | snap, aimed, auto | SNAP (30 %TU) | AIMED (60 %TU) | AUTO hold (30 %TU per x3) |
 | Blaster Launcher (2-handed) | guided launch | launch (map waypoints) | — | — |
 | Small Launcher (2-handed) | snap, aimed | SNAP (40 %TU) | AIMED (75 %TU) | — |
 | CYBERDISC_WEAPON | snap, aimed | SNAP (30 %TU) | AIMED (60 %TU) | — |
 | CELATID_WEAPON | snap, aimed | SNAP (30 %TU) | AIMED (60 %TU) | — |
-| SECTOPOD_WEAPON | snap, aimed, auto | BURST x3 (35 %TU) | AIMED (60 %TU) | AUTO hold (35 %TU per x3) |
+| SECTOPOD_WEAPON | snap, aimed, auto | SNAP (30 %TU) | AIMED (60 %TU) | AUTO hold (35 %TU per x3) |
 
 ### Terror From The Deep
-| Weapon | Game modes | Fun mode: quick | Aimed | Auto |
+| Weapon | Game modes | Quick | Aimed | Auto |
 |---|---|---|---|---|
 | Coelacanth/G. Cannon | snap, aimed | SNAP (30 %TU) | AIMED (80 %TU) | — |
 | Coelacanth/Aqua Jet | snap, aimed | SNAP (45 %TU) | AIMED (75 %TU) | — |
@@ -508,19 +508,19 @@ With akimbo on (full or realistic), the other hand's gun fires too, the two taki
 | Displacer/Sonic | snap, aimed | SNAP (30 %TU) | AIMED (60 %TU) | — |
 | Displacer/P.W.T. | guided launch | launch (map waypoints) | — | — |
 | Dart Gun | snap, aimed | SNAP (20 %TU) | AIMED (50 %TU) | — |
-| Jet Harpoon (2-handed) | snap, aimed, auto | BURST x3 (40 %TU) | AIMED (70 %TU) | AUTO hold (40 %TU per x3) |
+| Jet Harpoon (2-handed) | snap, aimed, auto | SNAP (35 %TU) | AIMED (70 %TU) | AUTO hold (40 %TU per x3) |
 | Gas Cannon (2-handed) | snap, aimed | SNAP (40 %TU) | AIMED (75 %TU) | — |
-| Hydro-Jet Cannon (2-handed) | snap, aimed, auto | BURST x3 (40 %TU) | AIMED (80 %TU) | AUTO hold (40 %TU per x3) |
+| Hydro-Jet Cannon (2-handed) | snap, aimed, auto | SNAP (35 %TU) | AIMED (80 %TU) | AUTO hold (40 %TU per x3) |
 | Torpedo Launcher (2-handed) | snap, aimed | SNAP (40 %TU) | AIMED (80 %TU) | — |
-| Gauss Pistol | snap, aimed, auto | BURST x3 (30 %TU) | AIMED (50 %TU) | AUTO hold (30 %TU per x3) |
-| Gauss Rifle (2-handed) | snap, aimed, auto | BURST x3 (40 %TU) | AIMED (60 %TU) | AUTO hold (40 %TU per x3) |
+| Gauss Pistol | snap, aimed, auto | SNAP (25 %TU) | AIMED (50 %TU) | AUTO hold (30 %TU per x3) |
+| Gauss Rifle (2-handed) | snap, aimed, auto | SNAP (30 %TU) | AIMED (60 %TU) | AUTO hold (40 %TU per x3) |
 | Heavy Gauss (2-handed) | snap, aimed | SNAP (40 %TU) | AIMED (80 %TU) | — |
 | Sonic Cannon (2-handed) | snap, aimed | SNAP (50 %TU) | AIMED (70 %TU) | — |
 | Sonic-Blasta Rifle (2-handed) | snap, aimed | SNAP (40 %TU) | AIMED (60 %TU) | — |
 | Sonic Pistol | snap, aimed | SNAP (30 %TU) | AIMED (50 %TU) | — |
 | Disruptor Pulse Launcher (2-handed) | guided launch | launch (map waypoints) | — | — |
 | Thermal Shok Launcher (2-handed) | snap, aimed | SNAP (50 %TU) | AIMED (70 %TU) | — |
-| DEEP_ONE_WEAPON | snap, aimed, auto | BURST x3 (35 %TU) | AIMED (60 %TU) | AUTO hold (35 %TU per x3) |
+| DEEP_ONE_WEAPON | snap, aimed, auto | SNAP (30 %TU) | AIMED (60 %TU) | AUTO hold (35 %TU per x3) |
 | Alien Sonic Weapon | snap, aimed | SNAP (30 %TU) | AIMED (60 %TU) | — |
 | XARQUID_WEAPON | snap, aimed | SNAP (30 %TU) | AIMED (60 %TU) | — |
 
@@ -857,7 +857,7 @@ What `FirstPersonView` draws:
 
 ### 1.09 (2026-10-28)
 
-Playtest reports on UFOs from inside, on smoke at night, on a walk through a door that never ended, on shots off the crosshair and on melee by the compass, at floors and straight up, and a logo of its own (patches 189–194).
+Playtest reports on UFOs from inside, on smoke at night, on a walk through a door that never ended, on shots off the crosshair and on melee by the compass, at floors and straight up, and on FPS style's lost snap shot, and a logo of its own (patches 189–195).
 
 - **A UFO's light inside it, even** (the owner, playing: "The ufo lights and aura put a while screen overlay of dots (daylight mission)... the aura effect should be only on the outside of the ufo to keep screen clean and sharp in the inside"): the UFO's light was mixed in by a dither, a whole pixel of its colour here and there, which inside a UFO, its soft light everywhere, laid a grid of dark dots over the view. Now the UFO itself (its inside and its hull) takes an even tint: tables of each colour with one to twelve twelfths of the light mixed in, each picked as bright as the colour itself, so a lit wall is one tint and its panels keep their detail; greys take all of it and strong colours little (a red lift pad stays red); inside, about a fifth of the way to the light's colour by day and two fifths at night. The pool on the ground around it keeps its sparkle, and the aura's motes and sparks never start on the UFO's own tiles (its rim, an ellipse, cut inside the corners of a boxy UFO). The grav lifts' beams stay.
 - **Smoke opacity, by day and at night** (a player: "non full smoke can be blinding for some players. Suggest a setting for smoke opacity (for not full smoke) defaulted at 40% (or what current is). also suggest seperate night smoke setting, at half of current value by default"): settings *Smoke opacity* (45%, the look before) and *Night smoke opacity* (25%) for the smoke you see through, the thinnest smoke's opacity with thicker smoke more as before; the night value on a night mission (lit smoke on a dark night is the blinding kind) and where the smoke hangs in the dark by day, blended in between. Where sight runs out the smoke stays solid.
@@ -865,6 +865,7 @@ Playtest reports on UFOs from inside, on smoke at night, on a walk through a doo
 - **Shots nearer the crosshair** (a player, with screenshots, issue #36: "odd cases of very visually off shots", "when aiming along flat ground, occasionally lasers jut in strange directions"): with the game's own targeting, when no muzzle point's line reaches the point under the crosshair (along a floor, the line from the gun, lower than the eye, grazes the bumps on the way; over a counter it meets its edge), the shot went for the game's own aim: the tile's middle, or another part of the unit. Now first for the nearest point within 4 voxels (a quarter tile; upwards first) whose line meets the same target near the crosshair as the eye sees it; only then the game's own aim. The game's line of fire and accuracy as before.
 - **No turn south at your own tile** (the same report: "Firing into a wall you are up against to the west, somehow forces you to look south"): OXCE turned a unit aiming at its own tile (a wall it stands against, the floor at its feet) to face south, and with *Turning costs TU* charged for the turn: its direction to a point straight above or below was atan2 of 0 and -0. Now it keeps its facing, on the isometric map too.
 - **Melee by the crosshair, not the compass** (a player, GitHub issue #25: "aiming at north west cabinet strikes the unit to north with melee"): a blow strikes a unit under the crosshair on any tile next to the soldier, diagonally too, the soldier turning to them first (paid with *Turning costs TU*; the compass says HIT +1 TU); a unit under it farther off is out of range; a wall, door or object under it within reach takes the blow (with *Melee hits walls and downed* or the mod's terrain melee; without, the blow strikes nothing). Only with the crosshair on none of these (open floor, the sky, out of reach) does the blow go the way the soldier faces, as on the map.
+- **The snap shot back in FPS style** (a player, GitHub issue #28: "Snap shot appears to vanish in favor of hold auto"): with *Faithful X-COM targeting* off, the quick slot (Z) of a gun with an auto shot fired one burst instead of the snap, which a click on AUTO already does; the gun's single snap shot couldn't be fired. Now Z fires the game's snap shot (its time units, the hip's wider spread), as on the map; a click on AUTO fires one burst, held it keeps firing.
 - **Melee at floors, ceilings and straight up** (a player, GitHub issue #33: melee "doesn't apply to floors sections above or bellow, or units directly above you on lifts"): the setting **Melee hits floors** (YES, with terrain melee on) lets a blow strike the floor or ceiling under the crosshair, by the game's own hit (the game's terrain melee knows no floors). A unit straight above or below you under the crosshair (flying just above, in a shaft) is struck when the game's own line from the blow reaches it; never through a wall or floor: on a UFO lift the upper pad lies between, so a unit on the next level stays out of reach.
 - **A logo of its own** (the owner's): the alien in the yellow X with 3D in its corner, in `docs/logo/` (as supplied, cleaned, and the icon in every size), now the icon of the game's window, the Windows game, the Mac app, the AppImage and the menu entry `install.py --desktop` makes (it replaces OXCE's icon files, so a build from source has it too), and on the web pages.
 

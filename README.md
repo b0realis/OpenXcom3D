@@ -49,6 +49,7 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 - **Shots nearer the crosshair:** when no line reaches the very point under the crosshair (along a bumpy floor, over a counter), the shot goes for the nearest point that one does, not the tile's middle; and aiming at your own tile no longer turns your soldier south (an OXCE quirk, fixed on the map too).
 - **Melee by the crosshair:** a blow strikes the unit you aim at beside you (turning to them, paid with *Turning costs TU*), or the wall you aim at, not whatever stands the way the compass says you face.
 - **Melee at floors and straight up:** with terrain melee on, a blow at the floor or ceiling you aim at strikes it (setting *Melee hits floors*); a unit straight above or below you is struck when nothing solid lies between.
+- **The snap shot in FPS style:** Z fires the gun's single snap shot again (it fired a burst, as a click on AUTO does).
 - **A logo of its own:** the alien in the yellow X, now the icon of the AppImage, the Windows game, the Mac app, the game's window, the menu entry and the web pages.
 
 ## Earlier versions

@@ -628,7 +628,7 @@ void FirstPersonMode::updateInfoPanel(BattleUnit *unit)
 	{
 		otherItem = nullptr; // (an item held in both hands)
 	}
-	fillHandLine(_txtWeapon, _txtWeaponAmmo, unit, weapon, weapon && weapon == _fireModeWeapon ? firedAs(weapon, _fireMode) : BA_NONE, true);
+	fillHandLine(_txtWeapon, _txtWeaponAmmo, unit, weapon, weapon && weapon == _fireModeWeapon ? _fireMode : BA_NONE, true);
 	fillHandLine(_txtOtherWeapon, _txtOtherAmmo, unit, otherItem, BA_NONE, otherItem && otherItem == offHandWeapon(unit, weapon));
 	// The four stats, each as a number and as a bar measured against the soldier's maximum (its
 	// scale by the setting "Stat bars", see statBarScale).

@@ -619,7 +619,7 @@ bool FirstPersonMode::mapAkimboPairs(const BattleUnit *unit) const
  * Akimbo on the map: the other hand's gun that fires along with the chosen one's mode there, as in
  * 3D (see dualPartner): a shot's (no aimed one: that fires alone, as in 3D), the other gun's same
  * mode if it has it, else its first shot, and only if it's loaded for it; with the game's own
- * targeting, as the map's shots have (no FPS-style burst). Neither may arc (two arcs fire in turn
+ * targeting, as the map's shots have. Neither may arc (two arcs fire in turn
  * in 3D, by the view's own doing).
  * @param unit The soldier.
  * @param weapon The gun fired.
@@ -762,17 +762,16 @@ void FirstPersonMode::mapAkimbo(BattlescapeState *state, BattleAction &action)
  * shot mode. Each gun pays its own time units for its own mode (by the game's rules).
  * @param unit The soldier.
  * @param weapon The weapon in the chosen hand.
- * @param slot The fire mode picked for the chosen weapon (before FPS style turns a quick
- *        snap shot into a burst, see firedAs).
+ * @param mode The fire mode picked for the chosen weapon.
  * @param partnerMode Set to the fire mode the other gun fires.
  * @return The other hand's gun, or null if it can't join in (no gun, no shot mode that fits,
  *         or no ammo).
  */
-BattleItem *FirstPersonMode::dualPartner(BattleUnit *unit, const BattleItem *weapon, BattleActionType slot, BattleActionType &partnerMode) const
+BattleItem *FirstPersonMode::dualPartner(BattleUnit *unit, const BattleItem *weapon, BattleActionType mode, BattleActionType &partnerMode) const
 {
 	// Only shots are fired with both hands (not throws, melee, psi...), and no aimed one (one
 	// picked on the classic HUD all the same fires the chosen gun alone, see fireModesFor).
-	BattleItem *otherWeapon = isShot(slot) && slot != BA_AIMEDSHOT ? offHandWeapon(unit, weapon) : nullptr;
+	BattleItem *otherWeapon = isShot(mode) && mode != BA_AIMEDSHOT ? offHandWeapon(unit, weapon) : nullptr;
 	if (!otherWeapon)
 	{
 		return nullptr;
@@ -781,9 +780,9 @@ BattleItem *FirstPersonMode::dualPartner(BattleUnit *unit, const BattleItem *wea
 	// Pick the other gun's mode: the same as the chosen gun's if it has it, else its first shot.
 	const std::vector<BattleActionType> otherModes = fireModesFor(unit, otherWeapon);
 	BattleActionType pickedMode = BA_NONE;
-	if (std::find(otherModes.begin(), otherModes.end(), slot) != otherModes.end())
+	if (std::find(otherModes.begin(), otherModes.end(), mode) != otherModes.end())
 	{
-		pickedMode = slot;
+		pickedMode = mode;
 	}
 	else
 	{
@@ -796,7 +795,7 @@ BattleItem *FirstPersonMode::dualPartner(BattleUnit *unit, const BattleItem *wea
 	{
 		return nullptr;
 	}
-	partnerMode = firedAs(otherWeapon, pickedMode);
+	partnerMode = pickedMode;
 
 	// It fires its own mode's full burst, however many rounds the chosen gun's has (taking turns,
 	// or as a volley with the rounds it has left over following on their own; see
@@ -883,12 +882,10 @@ void FirstPersonMode::updateFireMode(BattleUnit *unit)
 	BattleAction *action = _state->_battleGame->getCurrentAction();
 
 	// The game's current action is being aimed by this soldier: that mode was picked on the
-	// classic HUD, so take it over. Not, though, the auto shot that a BURST (FPS style: the
-	// quick slot fires an auto burst) fired just now: the quick slot stays picked; nor the other
-	// gun's shot fired in turn just now (akimbo, see fireTurnShot): the hand stays.
-	const bool ownBurst = action->type != _fireMode && action->type == firedAs(action->weapon, _fireMode);
+	// classic HUD, so take it over. Not, though, the other gun's shot fired in turn just now
+	// (akimbo, see fireTurnShot): the hand stays.
 	const bool ownTurnShot = action->weapon && action->weapon == _turnShotFired;
-	if (action->targeting && action->actor == unit && action->weapon && action->type != BA_NONE && !ownBurst && !ownTurnShot)
+	if (action->targeting && action->actor == unit && action->weapon && action->type != BA_NONE && !ownTurnShot)
 	{
 		_chosenHand[unit] = handOf(unit, action->weapon);
 		_fireMode = action->type;
@@ -1320,7 +1317,7 @@ int FirstPersonMode::shotTurnCost(BattleUnit *unit, int &direction, bool &afford
 	{
 		weapon = action->weapon;
 	}
-	const BattleActionType mode = weapon ? firedAs(weapon, _fireMode) : BA_NONE;
+	const BattleActionType mode = weapon ? _fireMode : BA_NONE;
 	if (mode == BA_HIT)
 	{
 		// A melee blow: the turn to the unit under the crosshair beside the soldier, or to the
@@ -1628,7 +1625,7 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 		const BattleAction *current = _state->_battleGame->getCurrentAction();
 		if (current->targeting && current->actor == unit && current->weapon) weapon = current->weapon;
 	}
-	const BattleActionType mode = weapon ? firedAs(weapon, _fireMode) : BA_NONE;
+	const BattleActionType mode = weapon ? _fireMode : BA_NONE;
 
 	// A marked target lasts while nothing it was marked with changes.
 	if (_confirmTile.x >= 0 && (!Options::fpsConfirmFire || !playerTurn || unit != _confirmUnit || !unit || unit->getPosition() != _confirmFrom
@@ -1642,7 +1639,7 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 	// fire, both weapons need laser's for trajectory predictions"): the gun that fires along (see
 	// pairedGun), its own line or arc at the same target, as it will fire.
 	BattleActionType offMode = BA_NONE;
-	BattleItem *otherWeapon = weapon && isShot(mode) && weapon == activeWeapon(unit) ? pairedGun(unit, weapon, _fireMode, mode, offMode) : nullptr;
+	BattleItem *otherWeapon = weapon && isShot(mode) && weapon == activeWeapon(unit) ? pairedGun(unit, weapon, mode, offMode) : nullptr;
 
 	// What to show, for a gun and its mode: an arc for a throw or an arcing shot, a line for a
 	// straight shot (setting All, or a marked target); nothing while the soldier can't act.
@@ -2473,10 +2470,7 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 		return;
 	}
 
-	// Shots and throws from here on. FPS style turns the quick slot (snap) into a burst (the
-	// game's auto, see firedAs); "slot" keeps what was picked. An empty gun clicks.
-	const BattleActionType slot = mode;
-	mode = firedAs(weapon, mode);
+	// Shots and throws from here on. An empty gun clicks.
 	if (isShot(mode) && !weapon->getAmmoForAction(mode))
 	{
 		_sounds->play(FirstPersonSounds::DRY_FIRE); // the game refuses the shot itself
@@ -2538,7 +2532,7 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	// fireTurnShot), each its own arc or line at the target (a player's report on 1.03: with two
 	// grenade launchers the other one never fired, and this one was half as accurate for it).
 	BattleActionType offMode = BA_NONE;
-	BattleItem *otherWeapon = menuTargeting ? nullptr : pairedGun(unit, weapon, slot, mode, offMode);
+	BattleItem *otherWeapon = menuTargeting ? nullptr : pairedGun(unit, weapon, mode, offMode);
 	const bool inTurn = otherWeapon && firesInTurn(weapon, mode, otherWeapon, offMode);
 	if (otherWeapon && inTurn)
 	{
@@ -2555,14 +2549,13 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
  * fire() fires it, and the trajectory shows its path too.
  * @param unit The soldier.
  * @param weapon The weapon in the chosen hand.
- * @param slot The fire mode picked for it (see dualPartner).
- * @param mode The action as fired (see firedAs).
+ * @param mode The fire mode picked for it.
  * @param offMode Set to the fire mode the other gun fires.
  * @return The other hand's gun, or null if it doesn't fire along.
  */
-BattleItem *FirstPersonMode::pairedGun(BattleUnit *unit, BattleItem *weapon, BattleActionType slot, BattleActionType mode, BattleActionType &offMode) const
+BattleItem *FirstPersonMode::pairedGun(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, BattleActionType &offMode) const
 {
-	BattleItem *otherWeapon = dualPartner(unit, weapon, slot, offMode);
+	BattleItem *otherWeapon = dualPartner(unit, weapon, mode, offMode);
 	if (otherWeapon && !doomModeOn())
 	{
 		const bool inTurn = firesInTurn(weapon, mode, otherWeapon, offMode);
@@ -2582,7 +2575,7 @@ BattleItem *FirstPersonMode::pairedGun(BattleUnit *unit, BattleItem *weapon, Bat
  * exact point, the side of a lean, a forced arc, the other gun firing along).
  * @param unit The soldier.
  * @param weapon The weapon fired or thrown.
- * @param mode The action (a shot as fired, see firedAs; or a throw).
+ * @param mode The action (a shot or a throw).
  * @param targetTile The tile aimed at.
  * @param aimedVoxel The voxel the aim met there.
  * @param hitSomething Whether the aim met something (not the sky).
@@ -3011,27 +3004,6 @@ BattleActionOrigin FirstPersonMode::leanSide(const BattleUnit *unit, const Posit
 }
 
 /**
- * Tells what a fire mode really fires. Normally just that mode; but in FPS style (setting
- * "Faithful X-COM targeting" off) the quick slot (snap) of a gun that has an auto shot fires one
- * burst instead: the game's own auto shot, with its number of rounds and its time units. (The
- * auto slot itself then keeps firing bursts while the trigger is held, see keepFiringWhileHeld.)
- * @param weapon The weapon (null: the mode as it is).
- * @param mode The fire mode picked.
- * @return The action the game is asked to do.
- */
-BattleActionType FirstPersonMode::firedAs(const BattleItem *weapon, BattleActionType mode) const
-{
-	if (mode != BA_SNAPSHOT || !freeAimOn(mode) || !weapon)
-	{
-		return mode;
-	}
-
-	// A burst only from a gun with an auto shot, and not from a guided launcher.
-	const RuleItem *rules = weapon->getRules();
-	return rules->getCostAuto().Time > 0 && weapon->getCurrentWaypoints() == 0 ? BA_AUTOSHOT : mode;
-}
-
-/**
  * Tells whether this fire mode is FPS style just now: the setting "Faithful X-COM targeting" is
  * off and the mode is one of a gun's shots (snap, aimed, auto). Throws, melee and psi always
  * follow the game's own targeting.
@@ -3374,8 +3346,7 @@ void FirstPersonMode::updateRecoil(BattleUnit *unit, double elapsedSeconds)
 			const RuleItem *ammoRules = ammo ? ammo->getRules() : weapon->getRules();
 			const RuleDamageType *damageType = ammoRules->getDamageType();
 			const double damageFactor = damageType && damageType->ResistType == DT_LASER ? 0.4 : damageType && damageType->ResistType == DT_PLASMA ? 0.7 : 1.0;
-			const BattleActionType firedMode = firedAs(weapon, _fireMode);
-			const double modeFactor = firedMode == BA_AUTOSHOT ? 1.0 : firedMode == BA_SNAPSHOT ? 0.8 : 0.6;
+			const double modeFactor = _fireMode == BA_AUTOSHOT ? 1.0 : _fireMode == BA_SNAPSHOT ? 0.8 : 0.6;
 			const double climbDegrees = std::clamp(ammoRules->getPower() / 40.0, 0.4, 2.0) * damageFactor * modeFactor;
 
 			// Lift the view (and jitter it sideways), remembering how far, to ease it back later.
@@ -3627,8 +3598,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 			weapon = action->weapon;
 		}
 	}
-	const BattleActionType slot = (playerTurn && weapon) ? _fireMode : BA_NONE;
-	const BattleActionType mode = firedAs(weapon, slot); // (FPS style: the quick slot is a burst)
+	const BattleActionType mode = (playerTurn && weapon) ? _fireMode : BA_NONE;
 	int shots = 1;
 	Uint8 color = grey;
 	std::string modeText, shotText, costText;
@@ -3654,7 +3624,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		BattleActionType offMode = BA_NONE;
 		int offTime = 0, offShots = 0;
 		RuleItemUseCost offCost; // (the other gun's whole cost, for the line of other costs)
-		if (BattleItem *otherWeapon = canFire ? dualPartner(unit, weapon, slot, offMode) : nullptr)
+		if (BattleItem *otherWeapon = canFire ? dualPartner(unit, weapon, mode, offMode) : nullptr)
 		{
 			const bool arcingPair = firesInTurn(weapon, mode, otherWeapon, offMode);
 			offCost = BattleActionCost(offMode, unit, otherWeapon);
@@ -3738,8 +3708,8 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 			}
 		}
 
-		// The mode's name. FPS style: the quick slot reads "BURST x<rounds>", and auto says to
-		// hold the trigger; otherwise auto shows its number of rounds (both guns' with dual wield).
+		// The mode's name. FPS style: auto says to hold the trigger; otherwise auto shows its number
+		// of rounds (both guns' with dual wield).
 		// "DUAL" (a volley: "VOLLEY"; an arcing pair: "IN TURN") goes in front with dual wield.
 		static const struct { BattleActionType mode; const char *name; } modeNames[] = {
 			{ BA_SNAPSHOT, "STR_FPS_MODE_SNAP" }, { BA_AIMEDSHOT, "STR_FPS_MODE_AIMED" }, { BA_AUTOSHOT, "STR_FPS_MODE_AUTO" },
@@ -3775,11 +3745,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 			modeText += ": " + (patient == unit ? std::string(_state->tr("STR_FPS_MEDIKIT_SELF")) : patient ? unitLabel(patient) : std::string("-"));
 			canFire = canFire && patient;
 		}
-		if (mode == BA_AUTOSHOT && slot != mode)
-		{
-			modeText = std::string(_state->tr("STR_FPS_MODE_BURST")) + " x" + std::to_string(shots); // FPS style quick slot
-		}
-		else if (mode == BA_AUTOSHOT)
+		if (mode == BA_AUTOSHOT)
 		{
 			modeText += freeAimOn(mode) ? std::string(" ") + std::string(_state->tr("STR_FPS_HOLD")) : " x" + std::to_string(shots + (dual ? offShots : 0)); // (both guns' rounds)
 		}

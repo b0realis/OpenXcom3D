@@ -701,13 +701,13 @@ private:
 	/// The akimbo style key: both guns at once, or one a moment after the other (setting "Akimbo in turn").
 	void toggleAkimboStyle();
 	/// Dual wield: the other hand's gun if it can fire along with this mode, and the mode it fires.
-	BattleItem *dualPartner(BattleUnit *unit, const BattleItem *weapon, BattleActionType slot, BattleActionType &partnerMode) const;
+	BattleItem *dualPartner(BattleUnit *unit, const BattleItem *weapon, BattleActionType mode, BattleActionType &partnerMode) const;
 	/// Akimbo on the map: do the soldier's two guns pair up there?
 	bool mapAkimboPairs(const BattleUnit *unit) const;
 	/// Akimbo on the map: the other hand's gun that fires along with this mode there, and the mode it fires.
 	BattleItem *mapAkimboPartner(BattleUnit *unit, const BattleItem *weapon, BattleActionType slot, BattleActionType &partnerMode) const;
 	/// Dual wield: the other hand's gun that fires along with a shot (dualPartner's, with time units for both), or null.
-	BattleItem *pairedGun(BattleUnit *unit, BattleItem *weapon, BattleActionType slot, BattleActionType mode, BattleActionType &offMode) const;
+	BattleItem *pairedGun(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, BattleActionType &offMode) const;
 	/// Akimbo: do the two guns fire in turn (either one's shot arcs) rather than together?
 	bool firesInTurn(const BattleItem *weapon, BattleActionType mode, const BattleItem *otherWeapon, BattleActionType otherMode) const;
 	/// Akimbo in turn: the other gun's shot, waiting for the game to be done with the first (see fireTurnShot).
@@ -777,8 +777,6 @@ private:
 
 	/// Is this fire mode FPS style just now?
 	bool freeAimOn(BattleActionType mode) const;
-	/// What a fire mode actually fires (FPS style: the quick slot is a burst).
-	BattleActionType firedAs(const BattleItem *weapon, BattleActionType mode) const;
 	/// How wide an FPS-style shot spreads, in degrees (95% of rounds).
 	double spreadFor(const BattleUnit *unit, BattleActionType mode, bool dual = false) const;
 	/// FPS-style recoil: lifts the view with each round, then eases it back.
