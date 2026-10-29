@@ -24845,10 +24845,10 @@ index 000000000..429adf2d4
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..32eeb4388
+index 000000000..c8a91d793
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1149 @@
+@@ -0,0 +1,1154 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -25669,8 +25669,13 @@ index 000000000..32eeb4388
 +	// ---- what the player points at: the unit's name under the crosshair, and the middle click ----
 +
 +	Text *_txtTarget = nullptr;                    // the name of the unit pointed at, under the crosshair (setting "Unit names")
++	BattleUnit *_pointedUnit = nullptr;            // the unit pointed at, found every frame (see updatePointedUnit)
 +	/// Where the player points on the view: the crosshair (its middle), or the free cursor.
 +	void pointer(int &pointerX, int &pointerY) const;
++	/// Finds the unit the player points at, every frame: the one whose hitbox the game's line meets, else the one whose picture is there.
++	void updatePointedUnit(BattleUnit *unit);
++	/// The unit the player points at (see updatePointedUnit), or null.
++	BattleUnit *pointedUnit() const { return _pointedUnit; }
 +	/// What the game's unit screen calls a unit.
 +	std::string unitLabel(const BattleUnit *target) const;
 +	/// Names the unit pointed at under the crosshair, and tells the view where the player points.
@@ -31339,10 +31344,10 @@ index 000000000..374f097e1
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..31780f254
+index 000000000..252847ee0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,4274 @@
+@@ -0,0 +1,4314 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -32343,7 +32348,8 @@ index 000000000..31780f254
 + * Whom a melee blow would strike now, by the crosshair (a player's report, "Melee locked to compass
 + * facing": the crosshair on a cabinet to the north-west, the soldier facing north, the blow struck
 + * the unit to the north, and the other way round; the owner: the crosshair first, as the medi-kit
-+ * aims, see medikitPatient): a unit standing under the crosshair (or the free cursor) on a tile
++ * aims, see medikitPatient): a unit standing under the crosshair (or the free cursor: its
++ * hitbox or picture, see updatePointedUnit) on a tile
 + * next to the soldier, by the game's melee reach (TileEngine::validMeleeRange, any of the eight
 + * ways: the one needing the fewest eighths of a turn), the soldier first turning to face it; a
 + * unit farther off, out of range. A unit straight above or below the soldier (on a lift, in a
@@ -32360,7 +32366,7 @@ index 000000000..31780f254
 +FirstPersonMode::MeleeAim FirstPersonMode::meleeTarget(BattleUnit *unit) const
 +{
 +	MeleeAim aim;
-+	BattleUnit *pointed = _view->getUnitAtPointer();
++	BattleUnit *pointed = pointedUnit();
 +	if (!pointed || pointed == unit)
 +	{
 +		return aim;
@@ -34094,7 +34100,8 @@ index 000000000..31780f254
 + * Whom a medi-kit would treat now, by the crosshair (a player: "the same targetting system ...
 + * proposed for melee"), with the game's own rules for whom the kit may treat (standing or lying,
 + * friend, neutral or foe, immune to wounds or not):
-+ * - a unit standing under the crosshair (or the free cursor): treated if it's on a tile next to
++ * - a unit standing under the crosshair (or the free cursor: its hitbox or picture, see
++ *   updatePointedUnit): treated if it's on a tile next to
 + *   the soldier (any of the eight ways, by the game's melee reach, TileEngine::validMeleeRange),
 + *   the soldier first turning to face it (the way needing the fewest eighths); farther off, out
 + *   of range (none, either way, if the kit can't treat it);
@@ -34144,7 +34151,7 @@ index 000000000..31780f254
 +
 +	// A unit standing under the crosshair: next to the soldier (the way to it needing the fewest
 +	// eighths of a turn), or out of range.
-+	BattleUnit *pointed = _view->getUnitAtPointer();
++	BattleUnit *pointed = pointedUnit();
 +	if (pointed && pointed != unit)
 +	{
 +		int bestEighths = 9;
@@ -35467,18 +35474,56 @@ index 000000000..31780f254
 +}
 +
 +/**
-+ * Every frame in 3D: names the unit the player points at (setting "Unit names": the one whose
-+ * picture is under the crosshair or the free cursor, see FirstPersonView::getUnitAtPointer) just
-+ * under the crosshair, or the cursor, in its side's colour (green ours, red the aliens', yellow the
++ * Every frame in 3D: finds the unit the player points at, under the crosshair or the free cursor,
++ * for the name under it, the middle click, a medi-kit's patient and a melee blow (a player's
++ * report, GitHub issue #26: the name showed only while a pixel of the unit's picture was under
++ * the crosshair, and small units that move oddly, X-Com Files' swarmids, made it blink; the
++ * owner: the hitbox first): the unit whose hitbox the game's own line through the pointer meets,
++ * as a shot would (see aimAt: units out of sight are passed through; a head poking up into the
++ * tile above counts for its unit, Tile::getOverlappingUnit), which doesn't change with the
++ * picture's animation; else the one whose picture is there or within a few pixels of it (see
++ * FirstPersonView::getUnitAtPointer: a unit far off is only a few pixels across).
++ * @param unit The soldier looked through, or null (none pointed at).
++ */
++void FirstPersonMode::updatePointedUnit(BattleUnit *unit)
++{
++	_pointedUnit = nullptr;
++	if (!unit || !isActive())
++	{
++		return;
++	}
++	int pointerX, pointerY;
++	pointer(pointerX, pointerY);
++	Position voxel;
++	int hitType = V_EMPTY;
++	if (aimAt(pointerX, pointerY, unit, voxel, &hitType) && hitType == V_UNIT)
++	{
++		const Tile *tile = _save->getTile(voxel.toTile());
++		BattleUnit *hit = tile ? tile->getOverlappingUnit(_save) : nullptr;
++		if (hit && hit != unit && !hit->isOut())
++		{
++			_pointedUnit = hit;
++		}
++	}
++	if (!_pointedUnit)
++	{
++		_pointedUnit = _view->getUnitAtPointer();
++	}
++}
++
++/**
++ * Every frame in 3D: names the unit the player points at (setting "Unit names": see
++ * updatePointedUnit) just under the crosshair, or the cursor, in its side's colour (green ours, red the aliens', yellow the
 + * civilians'), as the game's unit screen names it; and tells the view where the player points,
 + * and how much text is under it there (the icons over a downed unit go below it).
 + * @param unit The soldier looked through, or null (nothing named).
 + */
 +void FirstPersonMode::updateUnitName(BattleUnit *unit)
 +{
++	updatePointedUnit(unit);
 +	int pointerX, pointerY;
 +	pointer(pointerX, pointerY);
-+	const BattleUnit *target = Options::fpsUnitNames && isActive() && unit ? _view->getUnitAtPointer() : nullptr;
++	const BattleUnit *target = Options::fpsUnitNames ? pointedUnit() : nullptr;
 +	_txtTarget->setVisible(target != nullptr);
 +	// The name a line lower while the action's other costs show under the shot line (its text
 +	// would run into them), and under the accuracy line while that shows (see updateCrosshair);
@@ -35523,8 +35568,8 @@ index 000000000..31780f254
 +
 +/**
 + * The middle click as on the isometric map (setting "Middle click identifies"): on a unit the
-+ * player points at (one in sight, standing, its picture under the crosshair or the cursor: see
-+ * FirstPersonView::getUnitAtPointer), the game's own unit screen (who it is and what it
++ * player points at (one in sight, standing, its hitbox or picture under the crosshair or the
++ * cursor: see updatePointedUnit), the game's own unit screen (who it is and what it
 + * carries); in debug mode with Ctrl held, the mind probe's screen, as the map does.
 + * @return True if a unit was shown; false if there's none there (the click frees or takes
 + *         back the cursor as before).
@@ -35536,7 +35581,7 @@ index 000000000..31780f254
 +	{
 +		return false;
 +	}
-+	BattleUnit *target = _view->getUnitAtPointer();
++	BattleUnit *target = pointedUnit();
 +	if (!target)
 +	{
 +		return false;

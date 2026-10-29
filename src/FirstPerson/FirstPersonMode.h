@@ -818,8 +818,13 @@ private:
 	// ---- what the player points at: the unit's name under the crosshair, and the middle click ----
 
 	Text *_txtTarget = nullptr;                    // the name of the unit pointed at, under the crosshair (setting "Unit names")
+	BattleUnit *_pointedUnit = nullptr;            // the unit pointed at, found every frame (see updatePointedUnit)
 	/// Where the player points on the view: the crosshair (its middle), or the free cursor.
 	void pointer(int &pointerX, int &pointerY) const;
+	/// Finds the unit the player points at, every frame: the one whose hitbox the game's line meets, else the one whose picture is there.
+	void updatePointedUnit(BattleUnit *unit);
+	/// The unit the player points at (see updatePointedUnit), or null.
+	BattleUnit *pointedUnit() const { return _pointedUnit; }
 	/// What the game's unit screen calls a unit.
 	std::string unitLabel(const BattleUnit *target) const;
 	/// Names the unit pointed at under the crosshair, and tells the view where the player points.

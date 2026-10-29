@@ -998,7 +998,8 @@ void FirstPersonMode::switchHand()
  * Whom a melee blow would strike now, by the crosshair (a player's report, "Melee locked to compass
  * facing": the crosshair on a cabinet to the north-west, the soldier facing north, the blow struck
  * the unit to the north, and the other way round; the owner: the crosshair first, as the medi-kit
- * aims, see medikitPatient): a unit standing under the crosshair (or the free cursor) on a tile
+ * aims, see medikitPatient): a unit standing under the crosshair (or the free cursor: its
+ * hitbox or picture, see updatePointedUnit) on a tile
  * next to the soldier, by the game's melee reach (TileEngine::validMeleeRange, any of the eight
  * ways: the one needing the fewest eighths of a turn), the soldier first turning to face it; a
  * unit farther off, out of range. A unit straight above or below the soldier (on a lift, in a
@@ -1015,7 +1016,7 @@ void FirstPersonMode::switchHand()
 FirstPersonMode::MeleeAim FirstPersonMode::meleeTarget(BattleUnit *unit) const
 {
 	MeleeAim aim;
-	BattleUnit *pointed = _view->getUnitAtPointer();
+	BattleUnit *pointed = pointedUnit();
 	if (!pointed || pointed == unit)
 	{
 		return aim;
@@ -2749,7 +2750,8 @@ void FirstPersonMode::fireTurnShot()
  * Whom a medi-kit would treat now, by the crosshair (a player: "the same targetting system ...
  * proposed for melee"), with the game's own rules for whom the kit may treat (standing or lying,
  * friend, neutral or foe, immune to wounds or not):
- * - a unit standing under the crosshair (or the free cursor): treated if it's on a tile next to
+ * - a unit standing under the crosshair (or the free cursor: its hitbox or picture, see
+ *   updatePointedUnit): treated if it's on a tile next to
  *   the soldier (any of the eight ways, by the game's melee reach, TileEngine::validMeleeRange),
  *   the soldier first turning to face it (the way needing the fewest eighths); farther off, out
  *   of range (none, either way, if the kit can't treat it);
@@ -2799,7 +2801,7 @@ FirstPersonMode::MedikitAim FirstPersonMode::medikitPatient(BattleUnit *unit, Ba
 
 	// A unit standing under the crosshair: next to the soldier (the way to it needing the fewest
 	// eighths of a turn), or out of range.
-	BattleUnit *pointed = _view->getUnitAtPointer();
+	BattleUnit *pointed = pointedUnit();
 	if (pointed && pointed != unit)
 	{
 		int bestEighths = 9;
@@ -4122,18 +4124,56 @@ std::string FirstPersonMode::unitLabel(const BattleUnit *target) const
 }
 
 /**
- * Every frame in 3D: names the unit the player points at (setting "Unit names": the one whose
- * picture is under the crosshair or the free cursor, see FirstPersonView::getUnitAtPointer) just
- * under the crosshair, or the cursor, in its side's colour (green ours, red the aliens', yellow the
+ * Every frame in 3D: finds the unit the player points at, under the crosshair or the free cursor,
+ * for the name under it, the middle click, a medi-kit's patient and a melee blow (a player's
+ * report, GitHub issue #26: the name showed only while a pixel of the unit's picture was under
+ * the crosshair, and small units that move oddly, X-Com Files' swarmids, made it blink; the
+ * owner: the hitbox first): the unit whose hitbox the game's own line through the pointer meets,
+ * as a shot would (see aimAt: units out of sight are passed through; a head poking up into the
+ * tile above counts for its unit, Tile::getOverlappingUnit), which doesn't change with the
+ * picture's animation; else the one whose picture is there or within a few pixels of it (see
+ * FirstPersonView::getUnitAtPointer: a unit far off is only a few pixels across).
+ * @param unit The soldier looked through, or null (none pointed at).
+ */
+void FirstPersonMode::updatePointedUnit(BattleUnit *unit)
+{
+	_pointedUnit = nullptr;
+	if (!unit || !isActive())
+	{
+		return;
+	}
+	int pointerX, pointerY;
+	pointer(pointerX, pointerY);
+	Position voxel;
+	int hitType = V_EMPTY;
+	if (aimAt(pointerX, pointerY, unit, voxel, &hitType) && hitType == V_UNIT)
+	{
+		const Tile *tile = _save->getTile(voxel.toTile());
+		BattleUnit *hit = tile ? tile->getOverlappingUnit(_save) : nullptr;
+		if (hit && hit != unit && !hit->isOut())
+		{
+			_pointedUnit = hit;
+		}
+	}
+	if (!_pointedUnit)
+	{
+		_pointedUnit = _view->getUnitAtPointer();
+	}
+}
+
+/**
+ * Every frame in 3D: names the unit the player points at (setting "Unit names": see
+ * updatePointedUnit) just under the crosshair, or the cursor, in its side's colour (green ours, red the aliens', yellow the
  * civilians'), as the game's unit screen names it; and tells the view where the player points,
  * and how much text is under it there (the icons over a downed unit go below it).
  * @param unit The soldier looked through, or null (nothing named).
  */
 void FirstPersonMode::updateUnitName(BattleUnit *unit)
 {
+	updatePointedUnit(unit);
 	int pointerX, pointerY;
 	pointer(pointerX, pointerY);
-	const BattleUnit *target = Options::fpsUnitNames && isActive() && unit ? _view->getUnitAtPointer() : nullptr;
+	const BattleUnit *target = Options::fpsUnitNames ? pointedUnit() : nullptr;
 	_txtTarget->setVisible(target != nullptr);
 	// The name a line lower while the action's other costs show under the shot line (its text
 	// would run into them), and under the accuracy line while that shows (see updateCrosshair);
@@ -4178,8 +4218,8 @@ bool FirstPersonMode::accuracyLineShown() const
 
 /**
  * The middle click as on the isometric map (setting "Middle click identifies"): on a unit the
- * player points at (one in sight, standing, its picture under the crosshair or the cursor: see
- * FirstPersonView::getUnitAtPointer), the game's own unit screen (who it is and what it
+ * player points at (one in sight, standing, its hitbox or picture under the crosshair or the
+ * cursor: see updatePointedUnit), the game's own unit screen (who it is and what it
  * carries); in debug mode with Ctrl held, the mind probe's screen, as the map does.
  * @return True if a unit was shown; false if there's none there (the click frees or takes
  *         back the cursor as before).
@@ -4191,7 +4231,7 @@ bool FirstPersonMode::identifyPointedUnit()
 	{
 		return false;
 	}
-	BattleUnit *target = _view->getUnitAtPointer();
+	BattleUnit *target = pointedUnit();
 	if (!target)
 	{
 		return false;
