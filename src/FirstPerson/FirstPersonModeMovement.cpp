@@ -513,6 +513,17 @@ bool FirstPersonMode::walkGuidedStep(BattleUnit *unit, double &newEyeX, double &
 		newEyeY = _eyeY + _guidedStepDirection[1] * distance;
 		if (_guidedStepDirection[0] == 0) newEyeX = clampInsideTile(_trackedTile.x, newEyeX, sizeOffset);
 		if (_guidedStepDirection[1] == 0) newEyeY = clampInsideTile(_trackedTile.y, newEyeY, sizeOffset);
+		// Never past the new tile: no further than EdgeMargin short of its far side on the axes it
+		// walks along, so the step always ends inside it. (A slow frame, a tenth of a second, moves
+		// the camera 6 to 13 voxels, and the stretch where it counts as inside is 6 wide: jumped
+		// over, the camera walked on for ever, out of the map, while on the map the soldier stood
+		// in the new tile: a player's report, "walks into a door backwards or sideways and appears
+		// to walk infinitely out of bounds". One that got past anyway comes back to it.)
+		const double tileWest = _trackedTile.x * 16.0 + sizeOffset, tileNorth = _trackedTile.y * 16.0 + sizeOffset;
+		if (_guidedStepDirection[0] > 0) newEyeX = std::min(newEyeX, tileWest + 16.0 - EdgeMargin);
+		if (_guidedStepDirection[0] < 0) newEyeX = std::max(newEyeX, tileWest + EdgeMargin);
+		if (_guidedStepDirection[1] > 0) newEyeY = std::min(newEyeY, tileNorth + 16.0 - EdgeMargin);
+		if (_guidedStepDirection[1] < 0) newEyeY = std::max(newEyeY, tileNorth + EdgeMargin);
 		return true;
 	}
 

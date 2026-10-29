@@ -45,6 +45,7 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 
 - **A UFO's light inside it, even:** inside a UFO its light no longer lays a grid of dots over the view; the walls and floors take its colour evenly and stay sharp, strong colours (a red lift pad) keep theirs, and the aura's motes stay outside.
 - **Smoke opacity, by day and at night:** two settings for the smoke you see through, 45% by day (as before) and 25% at night and in the dark, where lit smoke could be blinding; where your soldier can't see through, it stays solid.
+- **No walking on out of the map through a door:** one slow frame in a doorway could send the view walking on for ever while the soldier stood in the next tile; now the step always ends inside it.
 - **A logo of its own:** the alien in the yellow X, now the icon of the AppImage, the Windows game, the Mac app, the game's window, the menu entry and the web pages.
 
 ## Earlier versions
