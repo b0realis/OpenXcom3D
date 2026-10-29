@@ -167,12 +167,21 @@ bool spriteHitboxes(BattlescapeState *state);
 /// through its middle facing the line's start (see FirstPersonSpriteHits.cpp)? A shot's impact
 /// (impact: its line already found the unit there) always does.
 bool spriteHit(SavedBattleGame *save, const BattleUnit *unit, const Position &voxel, const Position &origin, bool impact);
+/// Setting "Full sprite hitboxes": where a round that met a unit's picture struck it, relative to
+/// its middle, for the armour side and body part hit: pushed out towards the shooter, as the
+/// game's own hit shape would have stopped it on that side.
+Position spriteHitRelative(const Position &relative, const BattleUnit *unit, const BattleUnit *shooter);
+/// In a battle with the mod's 3D view, a unit turning to a point on its own tile (straight above
+/// or below it) keeps its facing, where the game turned it south (BattleUnit::directionTo).
+bool keepsFacingOnOwnTile();
 /// Setting "Quick deaths": is a unit killed or knocked out down at once for the battle, its fall
 /// playing on its own (in 3D and on the map, several at once; see FirstPersonQuickDeaths.cpp)?
 bool quickDeaths(BattlescapeState *state);
 /// Setting "Quick deaths": notes a unit going down quickly, as the game takes it out (its fall
 /// plays from now on).
 void noteQuickFall(const SavedBattleGame *save, BattleUnit *unit);
+/// Setting "Quick deaths": forgets the falls under way (a battle starting: its units are new).
+void clearQuickFalls();
 /// Setting "Quick deaths": the frame of a unit's quick fall to draw, or -1 if it isn't falling.
 int quickFallPhase(const BattleUnit *unit);
 /// Setting "Quick deaths": the unit whose quick fall plays on this tile (drawn there falling, the
@@ -267,6 +276,20 @@ inline bool breakdown(BattlescapeState *, BattleUnit *) { return false; }
 inline void closeQuartersDeflected(BattlescapeState *, const BattleUnit *, const Position &) { }
 inline bool endlessAmmo(BattlescapeState *, const BattleUnit *) { return false; }
 inline bool invincible(BattlescapeState *, const BattleUnit *) { return false; }
+inline bool spriteHitboxes(BattlescapeState *) { return false; }
+inline bool spriteHit(SavedBattleGame *, const BattleUnit *, const Position &, const Position &, bool) { return true; }
+inline Position spriteHitRelative(const Position &relative, const BattleUnit *, const BattleUnit *) { return relative; }
+inline bool keepsFacingOnOwnTile() { return false; }
+inline bool quickDeaths(BattlescapeState *) { return false; }
+inline void noteQuickFall(const SavedBattleGame *, BattleUnit *) { }
+inline void clearQuickFalls() { }
+inline int quickFallPhase(const BattleUnit *) { return -1; }
+inline BattleUnit *quickFallOn(const SavedBattleGame *, const Tile *) { return nullptr; }
+class QuickFallPose
+{
+public:
+	explicit QuickFallPose(BattleUnit *) { }
+};
 
 #endif
 

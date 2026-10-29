@@ -129,14 +129,24 @@ void noteQuickFall(const SavedBattleGame *save, BattleUnit *unit)
 }
 
 /**
+ * Forgets the falls under way (setting "Quick deaths"): a battle is starting (or loaded), and its
+ * units are new ones, which may even sit where the last battle's were in memory. Called as the
+ * battle's 3D view is created (FirstPersonMode).
+ */
+void clearQuickFalls()
+{
+	quickFalls().clear();
+}
+
+/**
  * How far a unit's quick fall is (setting "Quick deaths"): the frame of its fall to draw, the
  * game's own fall frames at twice its pace (QuickFallFrameTime each), with no turn to face the
  * screen first.
  * @param unit The unit.
  * @return The frame (0 to its armor's death frames less one), or -1 if it isn't falling (never
- *   went down quickly, the fall is over, or it's no longer down: turned into another unit). It
- *   falls from the moment it's down, still on its tile for a moment (the game draws a unit down
- *   there as nothing) and after it has left it.
+ *   went down quickly, the fall is over, or it's no longer down: woken, or turned into another
+ *   unit, a zombie, which stands there instead). It falls from the moment it's down, still on its
+ *   tile for a moment (the game draws a unit down there as nothing) and after it has left it.
  */
 int quickFallPhase(const BattleUnit *unit)
 {
@@ -148,7 +158,7 @@ int quickFallPhase(const BattleUnit *unit)
 			continue;
 		}
 		const int frame = (int)((now - fall.start) / QuickFallFrameTime);
-		const bool down = unit->getStatus() == STATUS_DEAD || unit->getStatus() == STATUS_UNCONSCIOUS;
+		const bool down = (unit->getStatus() == STATUS_DEAD || unit->getStatus() == STATUS_UNCONSCIOUS) && !unit->getAlreadyRespawned();
 		return down && frame < std::max(1, unit->getArmor()->getDeathFrames()) ? frame : -1;
 	}
 	return -1;

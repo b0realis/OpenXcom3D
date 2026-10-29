@@ -20570,7 +20570,7 @@ index 067c7b3ba..9004c1ea8 100644
  public:
  	/// Creates a new ProjectileFly class
 diff --git a/src/Battlescape/TileEngine.cpp b/src/Battlescape/TileEngine.cpp
-index 6e6846977..b7f139100 100644
+index 6e6846977..a91e65104 100644
 --- a/src/Battlescape/TileEngine.cpp
 +++ b/src/Battlescape/TileEngine.cpp
 @@ -43,6 +43,7 @@
@@ -20610,7 +20610,23 @@ index 6e6846977..b7f139100 100644
  	const int damage = type->getRandomDamage(power);
  	const int tileFinalDamage = type->getTileFinalDamage(type->getRandomDamageForTile(power, damage));
  	if (part >= V_FLOOR && part <= V_OBJECT)
-@@ -4360,6 +4363,9 @@ int TileEngine::calculateLineTile(Position origin, Position target, std::vector<
+@@ -3280,7 +3283,14 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
+ 			}
+ 			const int sz = bu->getArmor()->getSize() * 8;
+ 			const Position target = bu->getPosition().toVoxel() + Position(sz,sz, bu->getFloatHeight() - tile->getTerrainLevel());
+-			const Position relative = (center - target) - Position(0,0,verticaloffset);
++			Position relative = (center - target) - Position(0,0,verticaloffset);
++			// (OpenXcom3D: setting "Full sprite hitboxes": a round met the unit's picture, a card
++			// through its middle, so where it struck says little about the side it came from: the
++			// point is pushed out towards the shooter, see FirstPerson::spriteHitRelative.)
++			if (rangeAtack && attack.attacker && attack.attacker != bu && FirstPerson::spriteHitboxes(_save->getBattleState()))
++			{
++				relative = FirstPerson::spriteHitRelative(relative, bu, attack.attacker);
++			}
+ 
+ 			hitUnit(attack, bu, relative, damage, type, rangeAtack);
+ 			if (bu->getFire())
+@@ -4360,6 +4370,9 @@ int TileEngine::calculateLineTile(Position origin, Position target, std::vector<
  VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool storeTrajectory, std::vector<Position> *trajectory, BattleUnit *excludeUnit, BattleUnit *excludeAllBut, bool onlyVisible)
  {
  	VoxelType result;
@@ -20620,7 +20636,7 @@ index 6e6846977..b7f139100 100644
  	bool excludeAllUnits = false;
  	if (_save->isBeforeGame())
  	{
-@@ -4400,6 +4406,7 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
+@@ -4400,6 +4413,7 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
  			return false;
  		}
  	);
@@ -20628,7 +20644,7 @@ index 6e6846977..b7f139100 100644
  	if (hit)
  	{
  		return result;
-@@ -4526,7 +4533,7 @@ bool TileEngine::isVoxelVisible(Position voxel)
+@@ -4526,7 +4540,7 @@ bool TileEngine::isVoxelVisible(Position voxel)
   * @param excludeAllBut If set, the only unit to be considered for ray hits.
   * @return The objectnumber(0-3) or unit(4) or out of map (5) or -1 (hit nothing).
   */
@@ -20637,7 +20653,7 @@ index 6e6846977..b7f139100 100644
  {
  	if (voxel.x < 0 || voxel.y < 0 || voxel.z < 0) //preliminary out of map
  	{
-@@ -4590,6 +4597,13 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
+@@ -4590,6 +4604,13 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
  
  		if (unit != 0 && !unit->isOut() && unit != excludeUnit && (!excludeAllBut || unit == excludeAllBut) && (!onlyVisible || unit->getVisible() ) )
  		{
@@ -20651,7 +20667,7 @@ index 6e6846977..b7f139100 100644
  			Position tilepos;
  			Position unitpos = unit->getPosition();
  			int terrainHeight = 0;
-@@ -5867,6 +5881,8 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
+@@ -5867,6 +5888,8 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
  					originVoxel.z--;
  				}
  				originVoxel.z -= 4;
@@ -20660,7 +20676,7 @@ index 6e6846977..b7f139100 100644
  			}
  		}
  		int direction = getDirectionTo(origin, action.target);
-@@ -5891,6 +5907,12 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
+@@ -5891,6 +5914,12 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
  			originVoxel.y += ((2 * dirYshift[direction] + dirYshift[(direction + 1) % 8]) * action.actor->getArmor()->getSize() + 1) / 3;
  			break;
  		};
@@ -21429,10 +21445,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..6da022d3f
+index 000000000..deead3b8a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,758 @@
+@@ -0,0 +1,792 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -21499,6 +21515,23 @@ index 000000000..6da022d3f
 +namespace FirstPerson
 +{
 +
++namespace
++{
++
++/**
++ * Whether a battle with the mod's 3D view is on: its mode made (see create) and not yet
++ * destroyed. For the rule fixes that come with the mod (see keepsFacingOnOwnTile), which units
++ * ask without a way to the battle's screen.
++ * @return The flag.
++ */
++bool &battleWithView()
++{
++	static bool on = false;
++	return on;
++}
++
++}
++
 +/**
 + * Creates the first-person mode for a battlescape screen, but only when an active mod switches
 + * the add-on on (`firstPerson: enabled: true`). Without such a mod the battlescape gets no mode
@@ -21514,6 +21547,7 @@ index 000000000..6da022d3f
 +	{
 +		return nullptr;
 +	}
++	battleWithView() = true;
 +	return new FirstPersonMode(game, state);
 +}
 +
@@ -21523,7 +21557,23 @@ index 000000000..6da022d3f
 + */
 +void destroy(FirstPersonMode *mode)
 +{
++	if (mode)
++	{
++		battleWithView() = false;
++	}
 +	delete mode;
++}
++
++/**
++ * Does a unit keep its facing when it turns to a point on its own tile, straight above or below
++ * it (BattleUnit::directionTo)? The game turned it south (atan2(0, -0)), so shooting at a wall it
++ * stood against, or the floor at its feet, cost a turn first; in a battle with the mod's 3D view
++ * it keeps its facing (and a turret its own). Without the mod, the game's own way.
++ * @return True in a battle with the mod's 3D view.
++ */
++bool keepsFacingOnOwnTile()
++{
++	return battleWithView();
 +}
 +
 +/**
@@ -22193,10 +22243,10 @@ index 000000000..6da022d3f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..2442bef1b
+index 000000000..0d861bba0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,277 @@
+@@ -0,0 +1,300 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -22366,12 +22416,21 @@ index 000000000..2442bef1b
 +/// through its middle facing the line's start (see FirstPersonSpriteHits.cpp)? A shot's impact
 +/// (impact: its line already found the unit there) always does.
 +bool spriteHit(SavedBattleGame *save, const BattleUnit *unit, const Position &voxel, const Position &origin, bool impact);
++/// Setting "Full sprite hitboxes": where a round that met a unit's picture struck it, relative to
++/// its middle, for the armour side and body part hit: pushed out towards the shooter, as the
++/// game's own hit shape would have stopped it on that side.
++Position spriteHitRelative(const Position &relative, const BattleUnit *unit, const BattleUnit *shooter);
++/// In a battle with the mod's 3D view, a unit turning to a point on its own tile (straight above
++/// or below it) keeps its facing, where the game turned it south (BattleUnit::directionTo).
++bool keepsFacingOnOwnTile();
 +/// Setting "Quick deaths": is a unit killed or knocked out down at once for the battle, its fall
 +/// playing on its own (in 3D and on the map, several at once; see FirstPersonQuickDeaths.cpp)?
 +bool quickDeaths(BattlescapeState *state);
 +/// Setting "Quick deaths": notes a unit going down quickly, as the game takes it out (its fall
 +/// plays from now on).
 +void noteQuickFall(const SavedBattleGame *save, BattleUnit *unit);
++/// Setting "Quick deaths": forgets the falls under way (a battle starting: its units are new).
++void clearQuickFalls();
 +/// Setting "Quick deaths": the frame of a unit's quick fall to draw, or -1 if it isn't falling.
 +int quickFallPhase(const BattleUnit *unit);
 +/// Setting "Quick deaths": the unit whose quick fall plays on this tile (drawn there falling, the
@@ -22466,6 +22525,20 @@ index 000000000..2442bef1b
 +inline void closeQuartersDeflected(BattlescapeState *, const BattleUnit *, const Position &) { }
 +inline bool endlessAmmo(BattlescapeState *, const BattleUnit *) { return false; }
 +inline bool invincible(BattlescapeState *, const BattleUnit *) { return false; }
++inline bool spriteHitboxes(BattlescapeState *) { return false; }
++inline bool spriteHit(SavedBattleGame *, const BattleUnit *, const Position &, const Position &, bool) { return true; }
++inline Position spriteHitRelative(const Position &relative, const BattleUnit *, const BattleUnit *) { return relative; }
++inline bool keepsFacingOnOwnTile() { return false; }
++inline bool quickDeaths(BattlescapeState *) { return false; }
++inline void noteQuickFall(const SavedBattleGame *, BattleUnit *) { }
++inline void clearQuickFalls() { }
++inline int quickFallPhase(const BattleUnit *) { return -1; }
++inline BattleUnit *quickFallOn(const SavedBattleGame *, const Tile *) { return nullptr; }
++class QuickFallPose
++{
++public:
++	explicit QuickFallPose(BattleUnit *) { }
++};
 +
 +#endif
 +
@@ -22476,10 +22549,10 @@ index 000000000..2442bef1b
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..21672d4df
+index 000000000..792eb3073
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2736 @@
+@@ -0,0 +1,2737 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -22627,6 +22700,7 @@ index 000000000..21672d4df
 +	_uiScale = uiScaleFor(Options::baseXResolution, Options::baseYResolution);
 +	std::fill(std::begin(_stepAllowedCache), std::end(_stepAllowedCache), -1);
 +	FirstPerson::settleOptions(); // (the smoke's first value, from an older setting)
++	FirstPerson::clearQuickFalls(); // (a new battle, or one loaded: none of the last one's falls)
 +
 +	// Our surfaces, in drawing order: each one goes on top of the ones made before it.
 +	createView();
@@ -31788,10 +31862,10 @@ index 000000000..e4caa5ea3
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..ebd67fd2f
+index 000000000..bcef3fcd6
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,4375 @@
+@@ -0,0 +1,4379 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -34795,6 +34869,10 @@ index 000000000..ebd67fd2f
 +	_scannerPanel->setVisible(_scanner->isUp());
 +	if (_scanner->isUp())
 +	{
++		// Where it goes on the canvas as it is now (the window may have been resized since it was
++		// made, see createScannerPanel): the bottom middle, right of the info panel.
++		_scannerPanel->setX(std::max(PanelW + 6, canvasWidth() / 2 - _scannerPanel->getWidth() / 2));
++		_scannerPanel->setY(canvasHeight() - _scannerPanel->getHeight() - 4);
 +		_scanner->draw(_scannerPanel, _view->getYawDegrees() + 90.0, _scannerRimColor);
 +	}
 +}
@@ -36169,10 +36247,10 @@ index 000000000..ebd67fd2f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeSoldierStates.cpp b/src/FirstPerson/FirstPersonModeSoldierStates.cpp
 new file mode 100644
-index 000000000..77aa96ddd
+index 000000000..d670aba76
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeSoldierStates.cpp
-@@ -0,0 +1,1105 @@
+@@ -0,0 +1,1106 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -37175,6 +37253,7 @@ index 000000000..77aa96ddd
 +	_view->setVignette(0.0f);
 +	_view->clearHurt(); // (their wounds aren't the next soldier's)
 +	_hurtStart = 0;
++	_triggerHeld = false; // (a trigger held as they fell doesn't fire on with the next one: press again)
 +	// (in the static or the colour from this frame on, not a frame later: no flicker of a clear view first)
 +	if (_fallKind == FALL_KILLED)
 +	{
@@ -38666,10 +38745,10 @@ index 000000000..228618946
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonQuickDeaths.cpp b/src/FirstPerson/FirstPersonQuickDeaths.cpp
 new file mode 100644
-index 000000000..b89dc86af
+index 000000000..9a63dc355
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonQuickDeaths.cpp
-@@ -0,0 +1,218 @@
+@@ -0,0 +1,228 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -38801,14 +38880,24 @@ index 000000000..b89dc86af
 +}
 +
 +/**
++ * Forgets the falls under way (setting "Quick deaths"): a battle is starting (or loaded), and its
++ * units are new ones, which may even sit where the last battle's were in memory. Called as the
++ * battle's 3D view is created (FirstPersonMode).
++ */
++void clearQuickFalls()
++{
++	quickFalls().clear();
++}
++
++/**
 + * How far a unit's quick fall is (setting "Quick deaths"): the frame of its fall to draw, the
 + * game's own fall frames at twice its pace (QuickFallFrameTime each), with no turn to face the
 + * screen first.
 + * @param unit The unit.
 + * @return The frame (0 to its armor's death frames less one), or -1 if it isn't falling (never
-+ *   went down quickly, the fall is over, or it's no longer down: turned into another unit). It
-+ *   falls from the moment it's down, still on its tile for a moment (the game draws a unit down
-+ *   there as nothing) and after it has left it.
++ *   went down quickly, the fall is over, or it's no longer down: woken, or turned into another
++ *   unit, a zombie, which stands there instead). It falls from the moment it's down, still on its
++ *   tile for a moment (the game draws a unit down there as nothing) and after it has left it.
 + */
 +int quickFallPhase(const BattleUnit *unit)
 +{
@@ -38820,7 +38909,7 @@ index 000000000..b89dc86af
 +			continue;
 +		}
 +		const int frame = (int)((now - fall.start) / QuickFallFrameTime);
-+		const bool down = unit->getStatus() == STATUS_DEAD || unit->getStatus() == STATUS_UNCONSCIOUS;
++		const bool down = (unit->getStatus() == STATUS_DEAD || unit->getStatus() == STATUS_UNCONSCIOUS) && !unit->getAlreadyRespawned();
 +		return down && frame < std::max(1, unit->getArmor()->getDeathFrames()) ? frame : -1;
 +	}
 +	return -1;
@@ -39764,10 +39853,10 @@ index 000000000..69ac19c12
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonSpriteHits.cpp b/src/FirstPerson/FirstPersonSpriteHits.cpp
 new file mode 100644
-index 000000000..15087e122
+index 000000000..d7aa46be4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonSpriteHits.cpp
-@@ -0,0 +1,240 @@
+@@ -0,0 +1,266 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -40004,6 +40093,32 @@ index 000000000..15087e122
 +	const double toShooterDegrees = std::atan2(towardsY, towardsX) * 180.0 / Pi;
 +	const int shooterDirection = (((int)std::lround((toShooterDegrees + 90.0) / 45.0)) % 8 + 8) % 8;
 +	return spriteOf(save, unit, 3 - shooterDirection)[(size_t)row * SpriteBufferSize + column] != 0;
++}
++
++/**
++ * Where a round that met a unit's picture struck it, for the armour side and the body part it hits
++ * (setting "Full sprite hitboxes"; BattleUnit::damage tells the side by which way that point lies
++ * from the unit's middle). The picture is a card through the middle, so the point lies to the side
++ * along the card and hardly towards the shooter at all: a round from straight ahead would hit the
++ * flank, or the rear. It's pushed out towards the shooter by SpriteHitPush, as the game's own hit
++ * shape would have stopped the round on its near side; how far to the side and how high it struck
++ * stay. A shooter straight above or below pushes nothing.
++ * @param relative Where it struck, from the unit's middle (at its floor), in voxels.
++ * @param unit The unit hit.
++ * @param shooter Who fired.
++ * @return The point to tell the side and the body part by.
++ */
++Position spriteHitRelative(const Position &relative, const BattleUnit *unit, const BattleUnit *shooter)
++{
++	const int unitSize = unit->getArmor()->getSize(), shooterSize = shooter->getArmor()->getSize();
++	const double towardsX = (shooter->getPosition().x * 16.0 + 8.0 * shooterSize) - (unit->getPosition().x * 16.0 + 8.0 * unitSize);
++	const double towardsY = (shooter->getPosition().y * 16.0 + 8.0 * shooterSize) - (unit->getPosition().y * 16.0 + 8.0 * unitSize);
++	const double length = std::hypot(towardsX, towardsY);
++	if (length < 1.0)
++	{
++		return relative;
++	}
++	return Position(relative.x + (int)std::lround(towardsX / length * SpriteHitPush), relative.y + (int)std::lround(towardsY / length * SpriteHitPush), relative.z);
 +}
 +
 +}
@@ -46286,10 +46401,10 @@ index 000000000..280bc87e2
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..ebaca6398
+index 000000000..34be5cbee
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,441 @@
+@@ -0,0 +1,445 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -46423,11 +46538,15 @@ index 000000000..ebaca6398
 +/// behind a unit's picture card and still meet it, in voxels: a line steps up to a voxel along each axis at a time, so
 +/// the card is that thick that no line slips through it between two steps.
 +const double SpriteHitSlab = 0.8;
++/// Setting "Full sprite hitboxes": how far a round's point of impact on a unit's picture is pushed out towards the
++/// shooter for the armour side and body part it hits, in voxels (about the radius of the game's hit shape of a
++/// soldier, which would have stopped the round on its near side; see FirstPerson::spriteHitRelative).
++const double SpriteHitPush = 6.0;
 +/// Setting "Quick deaths" (see FirstPersonQuickDeaths.cpp): how long each frame of a quick fall shows (ms: twice the
-+/// game's pace, BattlescapeState::DEFAULT_ANIM_SPEED a frame), and the most fall frames an armor may have (a fall is
-+/// surely over after that many).
++/// game's pace, BattlescapeState::DEFAULT_ANIM_SPEED a frame), and the most fall frames it shows (a fall is surely over
++/// after that many: the armors have 3 or so, mods may give more).
 +const Uint32 QuickFallFrameTime = 50;
-+const int QuickFallMaxFrames = 8;
++const int QuickFallMaxFrames = 32;
 +/// Sprites stand like cards facing the camera, leaning with the view's pitch; looking down
 +/// further than this many degrees, a card leans only this far, so it stays above the floor
 +/// instead of lying in it (see drawSprite).
@@ -48677,10 +48796,10 @@ index 000000000..1cd28ddf1
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..bb8b0c9f7
+index 000000000..bb0cdd619
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,2643 @@
+@@ -0,0 +1,2644 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -49734,7 +49853,8 @@ index 000000000..bb8b0c9f7
 + * Finds the unit the player points at, once the frame's sprites are drawn (see
 + * getUnitAtPointer): the one whose picture shows right where the player points, or else the
 + * nearest one within PointerReach pixels of it (a unit far off is only a few pixels across).
-+ * Only what's drawn counts, so only units in sight, standing, and not hidden behind anything.
++ * Only what's drawn counts, so only units in sight, standing, and not hidden behind anything
++ * (and not one down a moment ago, still drawn falling with "Quick deaths": it's down).
 + * The same for a body lying on the floor (an unconscious unit's, see getBodyAtPointer), when
 + * its picture is nearer the pointer than any standing unit's (a medi-kit's patient); and for the
 + * pile whose picture is there over the world behind it, whatever is drawn in front (it turns
@@ -49751,7 +49871,7 @@ index 000000000..bb8b0c9f7
 +		for (int patchX = 0; patchX <= 2 * PointerReach; ++patchX)
 +		{
 +			const int distanceSq = (patchX - PointerReach) * (patchX - PointerReach) + (patchY - PointerReach) * (patchY - PointerReach);
-+			if (_pointerUnits[patchY][patchX] && distanceSq < nearestUnit)
++			if (_pointerUnits[patchY][patchX] && !_pointerUnits[patchY][patchX]->isOut() && distanceSq < nearestUnit)
 +			{
 +				nearestUnit = distanceSq;
 +				_unitAtPointer = _pointerUnits[patchY][patchX];
@@ -57473,7 +57593,7 @@ index af88e1829..760a449f2 100644
  		return;
  	}
 diff --git a/src/Savegame/BattleUnit.cpp b/src/Savegame/BattleUnit.cpp
-index 46fbf1ffd..d858d36f7 100644
+index 46fbf1ffd..4981e19fd 100644
 --- a/src/Savegame/BattleUnit.cpp
 +++ b/src/Savegame/BattleUnit.cpp
 @@ -53,6 +53,7 @@
@@ -57501,21 +57621,33 @@ index 46fbf1ffd..d858d36f7 100644
  
  	writer.writeAs<int>("turnsSinceSpotted", _turnsSinceSpotted[FACTION_HOSTILE]);
  	writer.writeAs<int>("turnsLeftSpottedForSnipers", _turnsLeftSpottedForSnipers[FACTION_HOSTILE]);
-@@ -1510,6 +1514,13 @@ void BattleUnit::aim(bool aiming)
+@@ -1301,6 +1305,10 @@ int BattleUnit::getDiagonalWalkingPhase() const
+ void BattleUnit::lookAt(Position point, bool turret)
+ {
+ 	int dir = directionTo (point);
++	if (turret && point.x == _pos.x && point.y == _pos.y && FirstPerson::keepsFacingOnOwnTile())
++	{
++		dir = _directionTurret; // (OpenXcom3D: its turret keeps its own facing too, see directionTo)
++	}
+ 
+ 	if (turret)
+ 	{
+@@ -1510,6 +1518,14 @@ void BattleUnit::aim(bool aiming)
   */
  int BattleUnit::directionTo(Position point) const
  {
 +	// (OpenXcom3D: a point on the unit's own tile, straight above or below it, has no direction:
 +	// atan2(0, -0) gave south, so a unit shooting at its own tile, a wall it stood against, the
-+	// floor at its feet, turned south first (and paid for it). It keeps its facing.)
-+	if (point.x == _pos.x && point.y == _pos.y)
++	// floor at its feet, turned south first (and paid for it). With the mod's 3D view in the
++	// battle it keeps its facing; without the mod, the game's own way.)
++	if (point.x == _pos.x && point.y == _pos.y && FirstPerson::keepsFacingOnOwnTile())
 +	{
 +		return _direction;
 +	}
  	double ox = point.x - _pos.x;
  	double oy = point.y - _pos.y;
  	double angle = atan2(ox, -oy);
-@@ -1627,6 +1638,11 @@ int BattleUnit::damage(Position relative, int damage, const RuleDamageType *type
+@@ -1627,6 +1643,11 @@ int BattleUnit::damage(Position relative, int damage, const RuleDamageType *type
  	{
  		return 0;
  	}

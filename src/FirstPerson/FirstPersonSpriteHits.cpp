@@ -236,5 +236,31 @@ bool spriteHit(SavedBattleGame *save, const BattleUnit *unit, const Position &vo
 	return spriteOf(save, unit, 3 - shooterDirection)[(size_t)row * SpriteBufferSize + column] != 0;
 }
 
+/**
+ * Where a round that met a unit's picture struck it, for the armour side and the body part it hits
+ * (setting "Full sprite hitboxes"; BattleUnit::damage tells the side by which way that point lies
+ * from the unit's middle). The picture is a card through the middle, so the point lies to the side
+ * along the card and hardly towards the shooter at all: a round from straight ahead would hit the
+ * flank, or the rear. It's pushed out towards the shooter by SpriteHitPush, as the game's own hit
+ * shape would have stopped the round on its near side; how far to the side and how high it struck
+ * stay. A shooter straight above or below pushes nothing.
+ * @param relative Where it struck, from the unit's middle (at its floor), in voxels.
+ * @param unit The unit hit.
+ * @param shooter Who fired.
+ * @return The point to tell the side and the body part by.
+ */
+Position spriteHitRelative(const Position &relative, const BattleUnit *unit, const BattleUnit *shooter)
+{
+	const int unitSize = unit->getArmor()->getSize(), shooterSize = shooter->getArmor()->getSize();
+	const double towardsX = (shooter->getPosition().x * 16.0 + 8.0 * shooterSize) - (unit->getPosition().x * 16.0 + 8.0 * unitSize);
+	const double towardsY = (shooter->getPosition().y * 16.0 + 8.0 * shooterSize) - (unit->getPosition().y * 16.0 + 8.0 * unitSize);
+	const double length = std::hypot(towardsX, towardsY);
+	if (length < 1.0)
+	{
+		return relative;
+	}
+	return Position(relative.x + (int)std::lround(towardsX / length * SpriteHitPush), relative.y + (int)std::lround(towardsY / length * SpriteHitPush), relative.z);
+}
+
 }
 }

@@ -3001,6 +3001,10 @@ void FirstPersonMode::updateScanner(BattleUnit *unit)
 	_scannerPanel->setVisible(_scanner->isUp());
 	if (_scanner->isUp())
 	{
+		// Where it goes on the canvas as it is now (the window may have been resized since it was
+		// made, see createScannerPanel): the bottom middle, right of the info panel.
+		_scannerPanel->setX(std::max(PanelW + 6, canvasWidth() / 2 - _scannerPanel->getWidth() / 2));
+		_scannerPanel->setY(canvasHeight() - _scannerPanel->getHeight() - 4);
 		_scanner->draw(_scannerPanel, _view->getYawDegrees() + 90.0, _scannerRimColor);
 	}
 }

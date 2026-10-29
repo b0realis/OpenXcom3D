@@ -1000,6 +1000,7 @@ void FirstPersonMode::quickHandOver(BattleUnit *unit, Uint32 now)
 	_view->setVignette(0.0f);
 	_view->clearHurt(); // (their wounds aren't the next soldier's)
 	_hurtStart = 0;
+	_triggerHeld = false; // (a trigger held as they fell doesn't fire on with the next one: press again)
 	// (in the static or the colour from this frame on, not a frame later: no flicker of a clear view first)
 	if (_fallKind == FALL_KILLED)
 	{

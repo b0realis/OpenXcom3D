@@ -1051,7 +1051,8 @@ void FirstPersonView::recordHitbox(const BattleUnit *unit, const double feet[3],
  * Finds the unit the player points at, once the frame's sprites are drawn (see
  * getUnitAtPointer): the one whose picture shows right where the player points, or else the
  * nearest one within PointerReach pixels of it (a unit far off is only a few pixels across).
- * Only what's drawn counts, so only units in sight, standing, and not hidden behind anything.
+ * Only what's drawn counts, so only units in sight, standing, and not hidden behind anything
+ * (and not one down a moment ago, still drawn falling with "Quick deaths": it's down).
  * The same for a body lying on the floor (an unconscious unit's, see getBodyAtPointer), when
  * its picture is nearer the pointer than any standing unit's (a medi-kit's patient); and for the
  * pile whose picture is there over the world behind it, whatever is drawn in front (it turns
@@ -1068,7 +1069,7 @@ void FirstPersonView::findUnitAtPointer()
 		for (int patchX = 0; patchX <= 2 * PointerReach; ++patchX)
 		{
 			const int distanceSq = (patchX - PointerReach) * (patchX - PointerReach) + (patchY - PointerReach) * (patchY - PointerReach);
-			if (_pointerUnits[patchY][patchX] && distanceSq < nearestUnit)
+			if (_pointerUnits[patchY][patchX] && !_pointerUnits[patchY][patchX]->isOut() && distanceSq < nearestUnit)
 			{
 				nearestUnit = distanceSq;
 				_unitAtPointer = _pointerUnits[patchY][patchX];

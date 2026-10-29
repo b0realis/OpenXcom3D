@@ -64,6 +64,23 @@ namespace OpenXcom
 namespace FirstPerson
 {
 
+namespace
+{
+
+/**
+ * Whether a battle with the mod's 3D view is on: its mode made (see create) and not yet
+ * destroyed. For the rule fixes that come with the mod (see keepsFacingOnOwnTile), which units
+ * ask without a way to the battle's screen.
+ * @return The flag.
+ */
+bool &battleWithView()
+{
+	static bool on = false;
+	return on;
+}
+
+}
+
 /**
  * Creates the first-person mode for a battlescape screen, but only when an active mod switches
  * the add-on on (`firstPerson: enabled: true`). Without such a mod the battlescape gets no mode
@@ -79,6 +96,7 @@ FirstPersonMode *create(Game *game, BattlescapeState *state)
 	{
 		return nullptr;
 	}
+	battleWithView() = true;
 	return new FirstPersonMode(game, state);
 }
 
@@ -88,7 +106,23 @@ FirstPersonMode *create(Game *game, BattlescapeState *state)
  */
 void destroy(FirstPersonMode *mode)
 {
+	if (mode)
+	{
+		battleWithView() = false;
+	}
 	delete mode;
+}
+
+/**
+ * Does a unit keep its facing when it turns to a point on its own tile, straight above or below
+ * it (BattleUnit::directionTo)? The game turned it south (atan2(0, -0)), so shooting at a wall it
+ * stood against, or the floor at its feet, cost a turn first; in a battle with the mod's 3D view
+ * it keeps its facing (and a turret its own). Without the mod, the game's own way.
+ * @return True in a battle with the mod's 3D view.
+ */
+bool keepsFacingOnOwnTile()
+{
+	return battleWithView();
 }
 
 /**
