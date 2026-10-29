@@ -22226,7 +22226,7 @@ index 000000000..a45746726
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..9162eb260
+index 000000000..071b0abd0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
 @@ -0,0 +1,2671 @@
@@ -24062,7 +24062,7 @@ index 000000000..9162eb260
 +		if (_zoom != 1.0)
 +		{
 +			_zoom = 1.0;
-+			_view->setFieldOfView(fieldOfViewNow());
++			_view->setFieldOfView(fieldOfViewNow(), _zoom);
 +			updateScope();
 +		}
 +		return;
@@ -24160,7 +24160,7 @@ index 000000000..9162eb260
 +	const Uint8 *heldKeys = SDL_GetKeyState(nullptr);
 +	_view->setShowFacing(Options::keyFpsShowFacing != SDLK_UNKNOWN && heldKeys[Options::keyFpsShowFacing]);
 +	updateScope();
-+	_view->setFieldOfView(fieldOfViewNow());
++	_view->setFieldOfView(fieldOfViewNow(), _zoom);
 +	_view->setSmoothLighting(Options::fpsSmoothLighting);
 +
 +	// What happened to the soldier and around them: a new enemy spotted, hurt, on fire, a shot
@@ -38522,10 +38522,10 @@ index 000000000..d67736b97
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..8e41758ca
+index 000000000..e70e3e989
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,618 @@
+@@ -0,0 +1,622 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -38859,12 +38859,16 @@ index 000000000..8e41758ca
 +
 +/**
 + * Sets the horizontal field of view, kept between 5 (zoomed in) and 120 degrees. The view
-+ * stores the tangent of half of it, which is what the ray directions are built from.
++ * stores the tangent of half of it, which is what the ray directions are built from; and how
++ * many times the zoom narrowed it, for what keeps its size on the screen as if unzoomed (the
++ * bullet holes' cap up close, see drawDecals).
 + * @param degrees The horizontal field of view, in degrees.
++ * @param zoom How many times the zoom narrows it (1: not zoomed).
 + */
-+void FirstPersonView::setFieldOfView(double degrees)
++void FirstPersonView::setFieldOfView(double degrees, double zoom)
 +{
 +	_halfFovTangent = std::tan(std::clamp(degrees, 5.0, 120.0) * Pi / 360.0);
++	_zoom = std::max(1.0, zoom);
 +}
 +
 +/**
@@ -39146,10 +39150,10 @@ index 000000000..8e41758ca
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..2f93f6f14
+index 000000000..f1a492095
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1233 @@
+@@ -0,0 +1,1234 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -39436,8 +39440,8 @@ index 000000000..2f93f6f14
 +	void setSmoothLighting(bool smooth) { _smoothLighting = smooth; }
 +	/// Sets how far the view reaches, in tiles.
 +	void setMaxDistance(int tiles);
-+	/// Sets the horizontal field of view.
-+	void setFieldOfView(double degrees);
++	/// Sets the horizontal field of view, and how many times the zoom narrowed it.
++	void setFieldOfView(double degrees, double zoom = 1.0);
 +	/// Draws the enemy markers this many times bigger (big screens).
 +	void setUiScale(int scale) { _uiScale = scale; }
 +
@@ -39612,6 +39616,7 @@ index 000000000..2f93f6f14
 +	double _levelRight[3] = {}, _levelUp[3] = {};       // right and up without the tilt: what sprites stand square to
 +	double _forwardInVoxels[3] = { 1.0, 0.0, 0.0 };     // the view direction in the voxel grid
 +	double _halfFovTangent;                             // tan(horizontal fov / 2)
++	double _zoom = 1.0;                                 // how many times the zoom narrows that (see setFieldOfView)
 +	float _maxDistance = 60.0f * Position::TileXY;      // in voxels
 +	float _shake = 0.0f;                                // camera shake, voxels
 +	Uint32 _shakeLastTick = 0;                          // when the shake was last updated
@@ -45223,10 +45228,10 @@ index 000000000..6f6461df6
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShots.cpp b/src/FirstPerson/FirstPersonViewShots.cpp
 new file mode 100644
-index 000000000..169832559
+index 000000000..1cd28ddf1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShots.cpp
-@@ -0,0 +1,1936 @@
+@@ -0,0 +1,1938 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -45747,8 +45752,10 @@ index 000000000..169832559
 +		}
 +		// The rest: every pixel within its radius, with a ragged edge once it's bigger than a
 +		// pixel; right up close no more than MarkMaxPixels across from its middle on the screen
-+		// (the radius drawn shrinks to what that many pixels span there, so it stays round).
-+		const double drawnRadius = std::min(radius, MarkMaxPixels * pixelSpan);
++		// (the radius drawn shrinks to what that many pixels span there, so it stays round), as
++		// counted without the zoom: zoomed in, a mark grows with everything round it (a player's
++		// report, GitHub issue #41: zoomed in, the holes looked smaller).
++		const double drawnRadius = std::min(radius, MarkMaxPixels * pixelSpan * _zoom);
 +		const int reach = (int)std::ceil(drawnRadius / pixelSpan);
 +		for (int y = centreY - reach; y <= centreY + reach; ++y)
 +		{

@@ -284,8 +284,8 @@ public:
 	void setSmoothLighting(bool smooth) { _smoothLighting = smooth; }
 	/// Sets how far the view reaches, in tiles.
 	void setMaxDistance(int tiles);
-	/// Sets the horizontal field of view.
-	void setFieldOfView(double degrees);
+	/// Sets the horizontal field of view, and how many times the zoom narrowed it.
+	void setFieldOfView(double degrees, double zoom = 1.0);
 	/// Draws the enemy markers this many times bigger (big screens).
 	void setUiScale(int scale) { _uiScale = scale; }
 
@@ -460,6 +460,7 @@ private:
 	double _levelRight[3] = {}, _levelUp[3] = {};       // right and up without the tilt: what sprites stand square to
 	double _forwardInVoxels[3] = { 1.0, 0.0, 0.0 };     // the view direction in the voxel grid
 	double _halfFovTangent;                             // tan(horizontal fov / 2)
+	double _zoom = 1.0;                                 // how many times the zoom narrows that (see setFieldOfView)
 	float _maxDistance = 60.0f * Position::TileXY;      // in voxels
 	float _shake = 0.0f;                                // camera shake, voxels
 	Uint32 _shakeLastTick = 0;                          // when the shake was last updated

@@ -55,6 +55,7 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 - **See-through corpses** (a setting, off at first): a corpse or item under the crosshair turns faint while you aim past it, as the game's shots pass through it.
 - **Page Up flies:** off a lift, Page Up switches flight on and flies up in one press; Page Down on the ground switches it off.
 - **Settings for new players:** new installs start with the game's own mechanics (tile moves, flight at the game's cost, no vaulting, night vision for all), hitboxes for the unit you aim at; *FPS-style shooting (easier)* says what it does; one *Akimbo* setting; the settings list in sections.
+- **Bullet holes under the zoom:** zoomed in, holes and scorches grow with everything round them (they looked smaller).
 - **A logo of its own:** the alien in the yellow X, now the icon of the AppImage, the Windows game, the Mac app, the game's window, the menu entry and the web pages.
 
 ## Earlier versions

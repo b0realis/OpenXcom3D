@@ -518,8 +518,10 @@ void FirstPersonView::drawDecals()
 		}
 		// The rest: every pixel within its radius, with a ragged edge once it's bigger than a
 		// pixel; right up close no more than MarkMaxPixels across from its middle on the screen
-		// (the radius drawn shrinks to what that many pixels span there, so it stays round).
-		const double drawnRadius = std::min(radius, MarkMaxPixels * pixelSpan);
+		// (the radius drawn shrinks to what that many pixels span there, so it stays round), as
+		// counted without the zoom: zoomed in, a mark grows with everything round it (a player's
+		// report, GitHub issue #41: zoomed in, the holes looked smaller).
+		const double drawnRadius = std::min(radius, MarkMaxPixels * pixelSpan * _zoom);
 		const int reach = (int)std::ceil(drawnRadius / pixelSpan);
 		for (int y = centreY - reach; y <= centreY + reach; ++y)
 		{

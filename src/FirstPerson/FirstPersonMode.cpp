@@ -1830,7 +1830,7 @@ void FirstPersonMode::think()
 		if (_zoom != 1.0)
 		{
 			_zoom = 1.0;
-			_view->setFieldOfView(fieldOfViewNow());
+			_view->setFieldOfView(fieldOfViewNow(), _zoom);
 			updateScope();
 		}
 		return;
@@ -1928,7 +1928,7 @@ void FirstPersonMode::think()
 	const Uint8 *heldKeys = SDL_GetKeyState(nullptr);
 	_view->setShowFacing(Options::keyFpsShowFacing != SDLK_UNKNOWN && heldKeys[Options::keyFpsShowFacing]);
 	updateScope();
-	_view->setFieldOfView(fieldOfViewNow());
+	_view->setFieldOfView(fieldOfViewNow(), _zoom);
 	_view->setSmoothLighting(Options::fpsSmoothLighting);
 
 	// What happened to the soldier and around them: a new enemy spotted, hurt, on fire, a shot
