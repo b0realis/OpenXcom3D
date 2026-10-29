@@ -6,7 +6,7 @@
 
 ![Night, through a soldier's eyes](docs/screenshots/night.png)
 
-*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.08**, for Linux, Windows and the Steam Deck, with a first, untested build for macOS.
+*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.09**, for Linux, Windows and the Steam Deck, with a first, untested build for macOS.
 
 **Both games are supported,** *UFO: Enemy Unknown* and *X-COM: Terror From The Deep*, and the big mods built on OXCE run in it too (XPiratez is played and tested here).
 
@@ -59,6 +59,7 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 - **A clean view:** P's second press hides the crosshair and its info too; a third brings it all back.
 - **The motion scanner in 3D:** held up at the bottom of the view, turning as you look round, a ring sweeping out with a whoop, and a pip for each movement it finds, as in the film.
 - **Full sprite hitboxes** (a setting, off at first): units are hit, and seen, wherever their full sprites show, for everyone, in 3D and on the map.
+- **Quick deaths** (a setting, off at first): units killed or knocked out are down at once, so bursts fire on and several fall together; your soldier's fall plays on their camera card while the view goes on to the next soldier.
 - **A logo of its own:** the alien in the yellow X, now the icon of the AppImage, the Windows game, the Mac app, the game's window, the menu entry and the web pages.
 
 ## Earlier versions

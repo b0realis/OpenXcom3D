@@ -1121,8 +1121,10 @@ void FirstPersonMode::updateSoldierCard()
 		poppedUp = true;
 	}
 	const SquadState state = unit ? squadState(unit) : SQUAD_NONE;
-	// The dead and the unconscious: their helmet camera shows only static.
+	// The dead and the unconscious: their helmet camera shows only static. But for the soldier
+	// looked through going down with "Quick deaths": their fall first (see aimDeathFeed).
 	const bool live = unit && unit->getTile() && (state == SQUAD_READY || state == SQUAD_CONTROLLED);
+	const bool deathFeed = poppedUp && unit && unit == _deathFeedUnit && SDL_GetTicks() - _deathFeedStart < DeathFeedFallTime;
 	if (state == SQUAD_NONE)
 	{
 		unit = nullptr;
@@ -1151,7 +1153,7 @@ void FirstPersonMode::updateSoldierCard()
 	const bool preview = unit && (Options::fpsSoldierPreview || poppedUp);
 	for (const auto &part : _cardParts)
 	{
-		part.surface->setVisible(unit && (part.surface != _preview || (preview && live)) && (part.surface != _cardSignal || (preview && !live)));
+		part.surface->setVisible(unit && (part.surface != _preview || (preview && (live || deathFeed))) && (part.surface != _cardSignal || (preview && !live && !deathFeed)));
 	}
 	if (!unit)
 	{
@@ -1202,7 +1204,7 @@ void FirstPersonMode::updateSoldierCard()
 	_cardRank->setVisible(rankShown);
 	_cardRank->setX(cardX + 4);
 	_cardName->setX(cardX + 4 + (rankShown ? RankIconW + RankIconGap : 0)); // (the rank before the name)
-	if (preview && !live)
+	if (preview && !live && !deathFeed)
 	{
 		// Static on the dead camera: every pixel a random grey, new every frame (a linear
 		// congruential generator, its top bits picking one of four greys).
@@ -1237,6 +1239,10 @@ void FirstPersonMode::updateSoldierCard()
 	if (preview && live)
 	{
 		aimHelmetCamera(_preview, unit, poppedUp ? _alertLookAt : nullptr);
+	}
+	else if (preview && deathFeed)
+	{
+		aimDeathFeed(_preview, SDL_GetTicks());
 	}
 }
 
@@ -1281,7 +1287,10 @@ void FirstPersonMode::aimHelmetCamera(FirstPersonView *camera, BattleUnit *unit,
 	{
 		camera->lookAt(lookAtPoint);
 	}
-	// The same view settings as the main 3D view, and night vision if the soldier has it.
+	// The same view settings as the main 3D view, and night vision if the soldier has it (and no
+	// colour or static left from a fall shown on the card, see aimDeathFeed).
+	camera->setTint(0.0f);
+	camera->setStatic(0.0f);
 	camera->setFieldOfView(Options::fpsFieldOfView);
 	camera->setSmoothLighting(Options::fpsSmoothLighting);
 	camera->setNightVision(hasNightVision(unit) ? _state->_map->getNightVisionColor() : 0);

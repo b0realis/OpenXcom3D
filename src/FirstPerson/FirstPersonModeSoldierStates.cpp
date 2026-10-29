@@ -366,6 +366,14 @@ bool FirstPersonMode::deathCam(Uint32 now, double elapsedSeconds)
 		}
 		_allSoldiersLost = !anyoneLeft;
 
+		// Setting "Quick deaths": killed or knocked out, with someone left to look through: their
+		// fall plays on their helmet camera card while the view goes on to the next soldier at once.
+		if (FirstPersonMode::quickDeaths(_state) && anyoneLeft && (_fallKind == FALL_KILLED || _fallKind == FALL_UNCONSCIOUS))
+		{
+			quickHandOver(unit, now);
+			return false;
+		}
+
 		// The banner: what happened, and under it whose camera this is (or ALL SOLDIERS LOST).
 		const char *title = _fallKind == FALL_KILLED ? "STR_FPS_KILLED" : _fallKind == FALL_ZOMBIE ? "STR_FPS_ZOMBIFIED"
 			: _fallKind == FALL_UNCONSCIOUS ? "STR_FPS_UNCONSCIOUS" : "STR_FPS_MIND_CONTROLLED";
@@ -958,6 +966,114 @@ void FirstPersonMode::cutAlienTurnCamera(BattleUnit *soldier, const BattleUnit *
 	}
 	if (soldier == _trackedUnit) glideToLookAt(lookAt);
 	else _lookAtOnSwitch = lookAt;
+}
+
+/**
+ * Setting "Quick deaths" (a player's report, GitHub issue #40: "If death in first person, cut
+ * camera out to a side feed, play death animation as new unit is picked immediately"): the
+ * soldier looked through has gone down (killed or knocked out). Their fall plays on their helmet
+ * camera card for AlertTime (see aimDeathFeed: the eye dropping, the view keeling over, washing
+ * red, or dark blue for a faint, then the static of a dead camera), while the view goes on to the
+ * next soldier at once, out of QuickHandOverTime of static (or the colour): looked through now,
+ * and selected as soon as the game is free (see selectNextSoldierIfGone; a burst or reaction fire
+ * may still be under way).
+ * @param unit The soldier who went down.
+ * @param now The time (SDL ticks).
+ */
+void FirstPersonMode::quickHandOver(BattleUnit *unit, Uint32 now)
+{
+	// Where they looked from, and how, for the card.
+	_deathFeedUnit = unit;
+	_deathFeedStart = now;
+	_deathFeedKind = _fallKind;
+	_view->getEye(_deathFeedEye);
+	_deathFeedYaw = _view->getYawDegrees();
+	_deathFeedPitch = _view->getPitchDegrees();
+
+	// The view goes on: to the next soldier standing, coming in out of the static (or colour).
+	_quickNextSoldier = nextStandingSoldier(unit);
+	_afterFallStart = now;
+	_afterFallKind = _fallKind;
+	_afterFallTime = QuickHandOverTime;
+	_deathUnit = nullptr;
+	_trackedUnit = nullptr;
+	_view->setVignette(0.0f);
+	_view->clearHurt(); // (their wounds aren't the next soldier's)
+	_hurtStart = 0;
+	// (in the static or the colour from this frame on, not a frame later: no flicker of a clear view first)
+	if (_fallKind == FALL_KILLED)
+	{
+		_view->setStatic(1.0f);
+	}
+	else
+	{
+		_view->setTint(1.0f, 1);
+	}
+	syncShadows();
+
+	// Their card pops up (under their squad button), their status saying what happened.
+	popUpCamera(unit, "", now);
+}
+
+/**
+ * The next soldier of ours still standing after this one, in the squad's order (the units' list,
+ * as the game's next-soldier button goes), round to the start.
+ * @param after The soldier to start after.
+ * @return The soldier, or null if nobody else is standing.
+ */
+BattleUnit *FirstPersonMode::nextStandingSoldier(const BattleUnit *after) const
+{
+	const std::vector<BattleUnit*> &units = *_save->getUnits();
+	const auto start = std::find(units.begin(), units.end(), after);
+	const size_t first = start == units.end() ? 0 : (size_t)(start - units.begin()) + 1;
+	for (size_t step = 0; step < units.size(); ++step)
+	{
+		BattleUnit *unit = units[(first + step) % units.size()];
+		if (unit != after && unit->getFaction() == FACTION_PLAYER && !unit->isOut() && unit->getTile())
+		{
+			return unit;
+		}
+	}
+	return nullptr;
+}
+
+/**
+ * Points the card's camera through the eyes of the soldier going down (setting "Quick deaths",
+ * see quickHandOver), at this moment of their fall (DeathFeedFallTime long): killed, the eye drops
+ * hard to the floor and the view keels over, washing red, the signal going in static at the end;
+ * knocked out, a slower sag into dark blue.
+ * @param camera The card's camera view.
+ * @param now The time (SDL ticks).
+ */
+void FirstPersonMode::aimDeathFeed(FirstPersonView *camera, Uint32 now)
+{
+	const BattleUnit *unit = _deathFeedUnit;
+	const double seconds = (now - _deathFeedStart) / 1000.0;
+	const float progress = std::min(1.0f, (now - _deathFeedStart) / (float)DeathFeedFallTime);
+	const bool killed = _deathFeedKind == FALL_KILLED;
+
+	// The eye: down to someone lying on their floor (5 voxels up), fast at first; the view turning
+	// a little and tipping up as they go down (a faint sags slower, the head dropping).
+	const double lyingEyeZ = unit->getPosition().z * 24.0 + 5.0;
+	const double drop = std::min(1.0, seconds * (killed ? 3.0 : 1.2));
+	const double eased = 1.0 - (1.0 - drop) * (1.0 - drop);
+	camera->setCameraUnit(unit);
+	camera->setEye(_deathFeedEye[0], _deathFeedEye[1], _deathFeedEye[2] + (lyingEyeZ - _deathFeedEye[2]) * eased);
+	camera->lookAlong(0);
+	const double yaw = _deathFeedYaw + (killed ? 25.0 : 8.0) * seconds;
+	const double pitch = _deathFeedPitch + (killed ? 12.0 : -14.0) * eased;
+	camera->rotate(yaw - camera->getYawDegrees(), pitch - camera->getPitchDegrees());
+
+	// Washing red (or dark blue), the signal going in static over the last part.
+	camera->setTint(killed ? std::min(1.0f, 0.4f + progress) : std::min(1.0f, 0.25f + progress), killed ? 0 : 1);
+	camera->setStatic(killed ? std::clamp((progress - 0.6f) / 0.4f, 0.0f, 1.0f) : 0.0f);
+
+	// The same view settings as the main 3D view.
+	camera->setFieldOfView(Options::fpsFieldOfView);
+	camera->setSmoothLighting(Options::fpsSmoothLighting);
+	camera->setNightVision(0);
+	camera->setControlHaze(0.0f);
+	camera->invalidate();
 }
 
 /**

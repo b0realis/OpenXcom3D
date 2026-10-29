@@ -74,6 +74,7 @@ class RuleItem;
 class SavedBattleGame;
 class State;
 class Surface;
+class Tile;
 
 namespace FirstPerson
 {
@@ -166,6 +167,30 @@ bool spriteHitboxes(BattlescapeState *state);
 /// through its middle facing the line's start (see FirstPersonSpriteHits.cpp)? A shot's impact
 /// (impact: its line already found the unit there) always does.
 bool spriteHit(SavedBattleGame *save, const BattleUnit *unit, const Position &voxel, const Position &origin, bool impact);
+/// Setting "Quick deaths": is a unit killed or knocked out down at once for the battle, its fall
+/// playing on its own (in 3D and on the map, several at once; see FirstPersonQuickDeaths.cpp)?
+bool quickDeaths(BattlescapeState *state);
+/// Setting "Quick deaths": notes a unit going down quickly, as the game takes it out (its fall
+/// plays from now on).
+void noteQuickFall(const SavedBattleGame *save, BattleUnit *unit);
+/// Setting "Quick deaths": the frame of a unit's quick fall to draw, or -1 if it isn't falling.
+int quickFallPhase(const BattleUnit *unit);
+/// Setting "Quick deaths": the unit whose quick fall plays on this tile (drawn there falling, the
+/// tile's items held back meanwhile), or null.
+BattleUnit *quickFallOn(const SavedBattleGame *save, const Tile *tile);
+/// Setting "Quick deaths": while it lives, a unit in its quick fall is in that fall's pose for
+/// drawing (the game draws a falling unit by its status and fall frame); a unit that isn't
+/// falling, or null, is left alone.
+class QuickFallPose
+{
+public:
+	explicit QuickFallPose(BattleUnit *unit);
+	~QuickFallPose();
+	QuickFallPose(const QuickFallPose&) = delete;
+	QuickFallPose &operator=(const QuickFallPose&) = delete;
+private:
+	BattleUnit *_unit; // the unit posed (null: none)
+};
 /// Setting "Shotgun pellets in flight": do a shotgun's pellets fly beside its round (in 3D and on
 /// the map), rather than all landing at once? They're traced as the round is fired, and hit as it lands.
 bool pelletsInFlight(BattlescapeState *state);

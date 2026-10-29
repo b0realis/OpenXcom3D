@@ -813,8 +813,10 @@ void FirstPersonView::drawUnits()
 	for (BattleUnit *unit : *_save->getUnits())
 	{
 		// Only units still in the fight (not dead or unconscious), not the one looked through,
-		// and in sight (any unit in debug mode).
-		if (unit->isOut() || unit == _cameraUnit || (!debug && !unit->getVisible()))
+		// and in sight (any unit in debug mode). And one down a moment ago with "Quick deaths",
+		// still falling (on its own, see FirstPerson::quickFallPhase): drawn in that fall.
+		const bool quickFall = unit->isOut() && FirstPerson::quickFallPhase(unit) >= 0;
+		if ((unit->isOut() && !quickFall) || unit == _cameraUnit || (!debug && !unit->getVisible()))
 		{
 			continue;
 		}
@@ -876,10 +878,10 @@ void FirstPersonView::drawUnits()
 			flash = Options::fpsMuzzleFlash ? flinch : 0.0f;
 		}
 
-		// A marked enemy's marker goes 5 voxels above its head.
+		// A marked enemy's marker goes 5 voxels above its head (not over one falling: it's down).
 		for (const auto &marker : _markers)
 		{
-			if (marker.first == unit)
+			if (marker.first == unit && !quickFall)
 			{
 				MarkerSpot spot = { { feet[0], feet[1], feet[2] + unit->getFloatHeight() + unit->getHeight() + 5.0 }, marker.second };
 				_markerSpots.push_back(spot);
@@ -909,17 +911,20 @@ void FirstPersonView::drawUnits()
 		// keep the game's own heights). (Composed unlit and shaded when placed: an upscaled frame
 		// then serves in any light.)
 		const GraphSubset mask(SpriteBufferSize, SpriteBufferSize);
-		if (unitSize == 1)
 		{
-			unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
-		}
-		else
-		{
-			// The parts are laid out on screen like the 2x2 tiles they cover, back to front.
-			unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
-			unitSprite.draw(unit, 1, 32, 16, 0, mask, false);
-			unitSprite.draw(unit, 2, 0, 16, 0, mask, false);
-			unitSprite.draw(unit, 3, 16, 24, 0, mask, false);
+			const FirstPerson::QuickFallPose fallPose(quickFall ? unit : nullptr); // (a quick fall's frame)
+			if (unitSize == 1)
+			{
+				unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
+			}
+			else
+			{
+				// The parts are laid out on screen like the 2x2 tiles they cover, back to front.
+				unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
+				unitSprite.draw(unit, 1, 32, 16, 0, mask, false);
+				unitSprite.draw(unit, 2, 0, 16, 0, mask, false);
+				unitSprite.draw(unit, 3, 16, 24, 0, mask, false);
+			}
 		}
 		DrawStep step;
 		step.kind = DrawStep::Sprite;
@@ -944,14 +949,14 @@ void FirstPersonView::drawUnits()
 		step.sprite.unit = unit;
 		useSmoothVersion(step.sprite);
 		_drawList.push_back(step);
-		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit) && !Options::fpsSpriteHitboxes) // (with full sprite hitboxes the picture is the hitbox)
+		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit) && !Options::fpsSpriteHitboxes && !quickFall) // (with full sprite hitboxes the picture is the hitbox; one falling is down)
 		{
 			recordHitbox(unit, feet, hitboxOpacity);
 		}
 		// Which way it faces, with the key for it held (see drawFacing): round its footprint (inside
 		// its tiles, so neighbours' rings don't cross), at the bottom of its hitbox (under a flyer),
 		// in the colour of its side.
-		if (_showFacing)
+		if (_showFacing && !quickFall)
 		{
 			FacingSpot spot = { { feet[0], feet[1], feet[2] + unit->getFloatHeight() + 1.0 }, 8.0 * unitSize - 1.5, unit->getDirection(),
 				_colors.hitbox[unit->getFaction() == FACTION_PLAYER ? 0 : unit->getFaction() == FACTION_HOSTILE ? 1 : 2] };
@@ -1267,9 +1272,10 @@ void FirstPersonView::drawFloorItems()
 	for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
 	{
 		// Only tiles with something on them, that have been seen.
+		// (Not while a quick fall plays there: the body and what it dropped come once it's down.)
 		Tile *tile = _save->getTile(tileIndex);
 		if (tile->getInventory()->empty() || !_tileViews[tileIndex].discovered
-			|| std::find(partsDrawn.begin(), partsDrawn.end(), tileIndex) != partsDrawn.end())
+			|| std::find(partsDrawn.begin(), partsDrawn.end(), tileIndex) != partsDrawn.end() || FirstPerson::quickFallOn(_save, tile))
 		{
 			continue;
 		}

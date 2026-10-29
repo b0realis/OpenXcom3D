@@ -408,6 +408,11 @@ void createOptions(std::vector<OptionInfo> &options)
 	// FirstPersonSpriteHits.cpp), for everyone's shots, in 3D and on the map, instead of the game's
 	// voxel shapes (the owner's, GitHub issue #42). Off: the game's own.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSpriteHitboxes", &fpsSpriteHitboxes, false, "STR_FPS_SPRITE_HITBOXES", category));
+	// A unit killed or knocked out down at once for the battle, its fall playing on its own (twice
+	// as fast, no turn to face the screen), several at once, in 3D and on the map; the soldier
+	// looked through falls on their helmet camera card while the view goes on to the next (a
+	// player's report, GitHub issue #40). Off: the game's own deaths, one by one.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsQuickDeaths", &fpsQuickDeaths, false, "STR_FPS_QUICK_DEATHS", category));
 	// The hitboxes' outlines and the path of a throw glowing (spilling bloom round them), or plain lines.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsGlowingOutlines", &fpsGlowingOutlines, false, "STR_FPS_GLOWING_OUTLINES", category));
 	// Icons over the downed (unconscious) units in sight, for burning, bleeding, shock and

@@ -2032,20 +2032,38 @@ void FirstPersonMode::think()
 /**
  * The soldier the camera was with is gone (killed, stunned, mind controlled...): carries on
  * with the next one, as soon as the game is free to (not busy, no popup up). Only on the
- * player's turn and while the player wants the 3D view.
- * @return The selected unit (now).
+ * player's turn and while the player wants the 3D view. With "Quick deaths" the view went on
+ * to the next soldier at once (see quickHandOver): until the game is free (a burst or reaction
+ * fire still under way) the view looks through them already, and then they're the one selected.
+ * @return The selected unit (now), or the soldier the view went on to.
  */
 BattleUnit *FirstPersonMode::selectNextSoldierIfGone(bool playerTurn)
 {
 	BattleUnit *selected = _save->getSelectedUnit();
-	// The soldier we were with is gone (killed, stunned, mind controlled...): carry on with the next one.
-	if (_wants3D && playerTurn && (!selected || selected->isOut() || selected->getFaction() != FACTION_PLAYER)
-		&& !_state->_battleGame->isBusy() && _state->_popups.empty())
+	const bool gone = !selected || selected->isOut() || selected->getFaction() != FACTION_PLAYER;
+	if (!gone || !playerTurn || (_quickNextSoldier && (_quickNextSoldier->isOut() || _quickNextSoldier->getFaction() != FACTION_PLAYER)))
 	{
-		_state->selectNextPlayerUnit();
+		_quickNextSoldier = nullptr; // (not needed, or no longer standing)
+	}
+	// The soldier we were with is gone (killed, stunned, mind controlled...): carry on with the next one.
+	if (_wants3D && playerTurn && gone && !_state->_battleGame->isBusy() && _state->_popups.empty())
+	{
+		if (_quickNextSoldier)
+		{
+			// (kept till the game really takes them: it may not take orders yet)
+			selectUnit(_quickNextSoldier);
+			if (_save->getSelectedUnit() == _quickNextSoldier)
+			{
+				_quickNextSoldier = nullptr;
+			}
+		}
+		else
+		{
+			_state->selectNextPlayerUnit();
+		}
 		selected = _save->getSelectedUnit();
 	}
-	return selected;
+	return _quickNextSoldier ? _quickNextSoldier : selected;
 }
 
 /**

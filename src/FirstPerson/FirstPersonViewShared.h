@@ -131,6 +131,11 @@ const double SpritePixelX = 0.70710678118654752;
 /// behind a unit's picture card and still meet it, in voxels: a line steps up to a voxel along each axis at a time, so
 /// the card is that thick that no line slips through it between two steps.
 const double SpriteHitSlab = 0.8;
+/// Setting "Quick deaths" (see FirstPersonQuickDeaths.cpp): how long each frame of a quick fall shows (ms: twice the
+/// game's pace, BattlescapeState::DEFAULT_ANIM_SPEED a frame), and the most fall frames an armor may have (a fall is
+/// surely over after that many).
+const Uint32 QuickFallFrameTime = 50;
+const int QuickFallMaxFrames = 8;
 /// Sprites stand like cards facing the camera, leaning with the view's pitch; looking down
 /// further than this many degrees, a card leans only this far, so it stays above the floor
 /// instead of lying in it (see drawSprite).

@@ -311,6 +311,10 @@ const float FreeGrenadeMaxTiles = 25.0f, FreeGrenadeFullStrength = 60.0f;
 /// How long the view stays with a soldier who was killed, knocked unconscious or taken over,
 /// and how long the next soldier's view takes to come in out of it.
 const Uint32 DeathCamTime = 2600, FaintTime = 2400, ControlledTime = 2400, AfterFallTime = 600;
+/// Setting "Quick deaths": the soldier looked through going down plays on their helmet camera card (for AlertTime)
+/// while the view goes on to the next soldier at once: how long the fall shows on the card before its static, and how
+/// long the next soldier's view takes to come in out of the static (ms).
+const Uint32 DeathFeedFallTime = 1500, QuickHandOverTime = 300;
 /// Looking through a unit under our mind control: a purple haze at the view's edges (see
 /// controlHaze), ControlHazeStrength strong, breathing in and out (by ControlHazeBreath of it) every
 /// ControlHazePeriod milliseconds.

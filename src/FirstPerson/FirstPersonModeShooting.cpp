@@ -3203,6 +3203,17 @@ bool FirstPersonMode::spriteHitboxes(BattlescapeState *state)
 }
 
 /**
+ * Are deaths quick in this battle (setting "Quick deaths", see FirstPerson::quickDeaths): the
+ * setting on, in a battle with the mod's 3D view (in 3D or on the map alike: the battle's rule)?
+ * @param state The battlescape screen.
+ * @return True if deaths are quick.
+ */
+bool FirstPersonMode::quickDeaths(BattlescapeState *state)
+{
+	return Options::fpsQuickDeaths && state && state->_firstPerson;
+}
+
+/**
  * Do a shotgun's pellets, and the two rounds of an akimbo volley, each land on their own, asked by
  * the game as it fires them: with the setting "Each pellet on its own" (on), in either view,
  * whoever fires (a player's report on OXCE's "shotgun void": the lead pellet decides the whole

@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..1a07f7061
+index 000000000..3ed1eb9b0
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,434 @@
+@@ -0,0 +1,436 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -488,6 +488,8 @@ index 000000000..1a07f7061
 +  STR_FPS_HITBOXES_AIMED: "Aimed at"
 +  STR_FPS_SPRITE_HITBOXES: "Full sprite hitboxes"
 +  STR_FPS_SPRITE_HITBOXES_DESC: "Units are hit, and seen, wherever their full sprite shows, for everyone, in 3D and on the map. NO: the game's own hit shapes."
++  STR_FPS_QUICK_DEATHS: "Quick deaths"
++  STR_FPS_QUICK_DEATHS_DESC: "A unit killed or knocked out is down at once: bursts fire on, falls play quickly, all at once. Your soldier falls on their camera card. NO: one by one."
 +  STR_FPS_UNIT_NAMES: "Unit names"
 +  STR_FPS_UNIT_NAMES_DESC: "The name of the unit under the crosshair."
 +  STR_FPS_STAT_BARS: "Stat bars"
@@ -564,10 +566,10 @@ index 000000000..1a07f7061
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..5c30a5e4f
+index 000000000..cc3277fbc
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,434 @@
+@@ -0,0 +1,436 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -928,6 +930,8 @@ index 000000000..5c30a5e4f
 +  STR_FPS_HITBOXES_AIMED: "Aimed at"
 +  STR_FPS_SPRITE_HITBOXES: "Full sprite hitboxes"
 +  STR_FPS_SPRITE_HITBOXES_DESC: "Units are hit, and seen, wherever their full sprite shows, for everyone, in 3D and on the map. NO: the game's own hit shapes."
++  STR_FPS_QUICK_DEATHS: "Quick deaths"
++  STR_FPS_QUICK_DEATHS_DESC: "A unit killed or knocked out is down at once: bursts fire on, falls play quickly, all at once. Your soldier falls on their camera card. NO: one by one."
 +  STR_FPS_UNIT_NAMES: "Unit names"
 +  STR_FPS_UNIT_NAMES_DESC: "The name of the unit under the crosshair."
 +  STR_FPS_STAT_BARS: "Stat bars"
@@ -18671,10 +18675,18 @@ index ff9973e6f..6e85d7829 100644
  		int animFrames = -1;
  		int sound = -1;
 diff --git a/src/Battlescape/Map.cpp b/src/Battlescape/Map.cpp
-index 3665cd199..e8ac9a8a5 100644
+index 3665cd199..dee7728fd 100644
 --- a/src/Battlescape/Map.cpp
 +++ b/src/Battlescape/Map.cpp
-@@ -252,6 +252,7 @@ Map::~Map()
+@@ -52,6 +52,7 @@
+ #include "../Interface/NumberText.h"
+ #include "../Interface/Text.h"
+ #include "../fmath.h"
++#include "../FirstPerson/FirstPersonApi.h"
+ 
+ 
+ /*
+@@ -252,6 +253,7 @@ Map::~Map()
  	delete _message;
  	delete _camera;
  	delete _txtAccuracy;
@@ -18682,7 +18694,43 @@ index 3665cd199..e8ac9a8a5 100644
  }
  
  /**
-@@ -758,8 +759,44 @@ void Map::drawTerrain(Surface *surface)
+@@ -497,10 +499,26 @@ void Map::drawUnit(UnitSprite &unitSprite, Tile *unitTile, Tile *currTile, Posit
+ 		return;
+ 	}
+ 	BattleUnit* bu = unitTile->getOverlappingUnit(_save, TUO_ALWAYS);
++	// (OpenXcom3D: setting "Quick deaths": a unit down a moment ago still falls on its tiles, drawn
++	// in its fall's pose: on the tile still for a moment, then gone from it, see
++	// FirstPerson::quickFallPhase and quickFallOn.)
++	BattleUnit* quickFall = nullptr;
++	if (bu)
++	{
++		quickFall = FirstPerson::quickFallPhase(bu) >= 0 ? bu : nullptr;
++	}
++	else
++	{
++		quickFall = bu = FirstPerson::quickFallOn(_save, unitTile);
++	}
+ 	Position unitOffset;
+ 	bool unitFromBelow = false;
+ 	bool unitFromAbove = false;
+-	if (bu)
++	if (quickFall && !quickFall->getTile())
++	{
++		// (on its own tiles, where it lay)
++	}
++	else if (bu)
+ 	{
+ 		if (bu != unitTile->getUnit())
+ 		{
+@@ -726,6 +744,7 @@ void Map::drawUnit(UnitSprite &unitSprite, Tile *unitTile, Tile *currTile, Posit
+ 	{
+ 		shade = std::min(+NIGHT_VISION_SHADE, shade);
+ 	}
++	FirstPerson::QuickFallPose fallPose(quickFall); // (OpenXcom3D: a quick fall's frame, see above)
+ 	unitSprite.draw(bu, part, tileScreenPosition.x + offsets.ScreenOffset.x, tileScreenPosition.y + offsets.ScreenOffset.y, shade, mask, _isAltPressed && !_isCtrlPressed);
+ }
+ 
+@@ -758,8 +777,44 @@ void Map::drawTerrain(Surface *surface)
  
  	NumberText *_numWaypid = 0;
  
@@ -18728,7 +18776,17 @@ index 3665cd199..e8ac9a8a5 100644
  	{
  		int part = _projectile->getItem() ? 0 : BULLET_SPRITES-1;
  		for (int i = 0; i <= part; ++i)
-@@ -1074,6 +1111,54 @@ void Map::drawTerrain(Surface *surface)
+@@ -1028,7 +1083,8 @@ void Map::drawTerrain(Surface *surface)
+ 							}
+ 						}
+ 						// draw an item on top of the floor (if any)
+-						BattleItem* item = tile->getTopItem();
++						// (OpenXcom3D: not while a quick fall plays there: the body and what it dropped come once it's down)
++						BattleItem* item = FirstPerson::quickFallOn(_save, tile) ? nullptr : tile->getTopItem();
+ 						if (item)
+ 						{
+ 							itemSprite.draw(item,
+@@ -1074,6 +1130,54 @@ void Map::drawTerrain(Surface *surface)
  						}
  					}
  
@@ -18783,7 +18841,7 @@ index 3665cd199..e8ac9a8a5 100644
  					// check if we got bullet && it is in Field Of View
  					if (_projectile && _projectileInFOV)
  					{
-@@ -1122,52 +1207,19 @@ void Map::drawTerrain(Surface *surface)
+@@ -1122,52 +1226,19 @@ void Map::drawTerrain(Surface *surface)
  							// draw bullet on the correct tile
  							if (itX >= bulletLowX && itX <= bulletHighX && itY >= bulletLowY && itY <= bulletHighY)
  							{
@@ -18846,7 +18904,7 @@ index 3665cd199..e8ac9a8a5 100644
  
  					//draw particle clouds
  					int pixelMaskArray[] = { 0, 2, 1, 3 };
-@@ -2330,12 +2382,87 @@ CursorType Map::getCursorType() const
+@@ -2330,12 +2401,87 @@ CursorType Map::getCursorType() const
  void Map::setProjectile(Projectile *projectile)
  {
  	_projectile = projectile;
@@ -18934,7 +18992,7 @@ index 3665cd199..e8ac9a8a5 100644
  /**
   * Gets the current projectile sprite on the map.
   * @return Projectile or 0 if there is no projectile sprite on the map.
-@@ -2432,7 +2559,7 @@ void Map::scrollKey()
+@@ -2432,7 +2578,7 @@ void Map::scrollKey()
   */
  void Map::fadeShade()
  {
@@ -18943,7 +19001,7 @@ index 3665cd199..e8ac9a8a5 100644
  	if ((_nightVisionOn && !hold) || (!_nightVisionOn && hold))
  	{
  		_nvColor = Options::oxceNightVisionColor;
-@@ -2555,6 +2682,10 @@ int Map::getIconWidth() const
+@@ -2555,6 +2701,10 @@ int Map::getIconWidth() const
   */
  int Map::getSoundAngle(const Position& pos) const
  {
@@ -20636,6 +20694,76 @@ index 849787736..b4bdc3044 100644
  	/// Flushes cache of voxel check
  	void voxelCheckFlush();
  	/// Blows this tile up.
+diff --git a/src/Battlescape/UnitDieBState.cpp b/src/Battlescape/UnitDieBState.cpp
+index b353c8db4..f69b5c57c 100644
+--- a/src/Battlescape/UnitDieBState.cpp
++++ b/src/Battlescape/UnitDieBState.cpp
+@@ -33,6 +33,7 @@
+ #include "../Engine/Language.h"
+ #include "../Mod/Armor.h"
+ #include "InfoboxOKState.h"
++#include "../FirstPerson/FirstPersonApi.h"
+ #include "InfoboxState.h"
+ #include "../Savegame/Node.h"
+ 
+@@ -47,10 +48,23 @@ namespace OpenXcom
+  * @param noSound Whether to disable the death sound.
+  */
+ UnitDieBState::UnitDieBState(BattlescapeGame *parent, BattleUnit *unit, const RuleDamageType* damageType, bool noSound) : BattleState(parent),
+-	_unit(unit), _damageType(damageType), _noSound(noSound), _extraFrame(0), _overKill(unit->getOverKillDamage())
++	_unit(unit), _damageType(damageType), _noSound(noSound), _extraFrame(0), _overKill(unit->getOverKillDamage()), _quick(false)
+ {
++	// (OpenXcom3D: setting "Quick deaths": a unit killed or knocked out by a direct hit goes down
++	// at once too, like one blasted with explosives, so a burst fires on and several fall at once;
++	// its fall plays on its own, in 3D and on the map, see FirstPerson::noteQuickFall.)
++	_quick = _damageType->isDirect() && _unit->getStatus() != STATUS_UNCONSCIOUS && !_parent->getSave()->isBeforeGame()
++		&& FirstPerson::quickDeaths(_parent->getSave()->getBattleState());
++	if (_quick)
++	{
++		FirstPerson::noteQuickFall(_parent->getSave(), _unit);
++		if (_unit->getFaction() == FACTION_PLAYER)
++		{
++			_parent->getMap()->setUnitDying(true); // (the map stays drawn for one of ours going down, as below)
++		}
++	}
+ 	// don't show the "fall to death" animation when a unit is blasted with explosives or he is already unconscious
+-	if (!_damageType->isDirect() || _unit->getStatus() == STATUS_UNCONSCIOUS)
++	if (!_damageType->isDirect() || _unit->getStatus() == STATUS_UNCONSCIOUS || _quick)
+ 	{
+ 
+ 		/********************************************************
+@@ -150,7 +164,7 @@ void UnitDieBState::think()
+ 		_parent->popState();
+ 		return;
+ 	}
+-	if (_unit->getDirection() != 3 && _damageType->isDirect())
++	if (_unit->getDirection() != 3 && _damageType->isDirect() && !_quick)
+ 	{
+ 		int dir = _unit->getDirection() + 1;
+ 		if (dir == 8)
+@@ -235,8 +249,8 @@ void UnitDieBState::think()
+ 	}
+ 	else if (_unit->isOut())
+ 	{
+-		_extraFrame = 1;
+-		if (!_noSound && !_damageType->isDirect() && _unit->getStatus() != STATUS_UNCONSCIOUS)
++		_extraFrame = _quick ? 2 : 1; // (OpenXcom3D: a quick death skips the extra frame: its fall plays on its own)
++		if (!_noSound && ((!_damageType->isDirect() && _unit->getStatus() != STATUS_UNCONSCIOUS) || _quick)) // (OpenXcom3D: a quick death's cry, as its fall starts)
+ 		{
+ 			playDeathSound();
+ 		}
+diff --git a/src/Battlescape/UnitDieBState.h b/src/Battlescape/UnitDieBState.h
+index 3a1887ab7..c962ff06f 100644
+--- a/src/Battlescape/UnitDieBState.h
++++ b/src/Battlescape/UnitDieBState.h
+@@ -38,6 +38,7 @@ private:
+ 	bool _noSound;
+ 	int _extraFrame;
+ 	bool _overKill;
++	bool _quick;    // OpenXcom3D: setting "Quick deaths": down at once, the fall playing on its own (see FirstPerson::noteQuickFall)
+ public:
+ 	/// Creates a new UnitDieBState class
+ 	UnitDieBState(BattlescapeGame *parent, BattleUnit *unit, const RuleDamageType *damageType, bool noSound);
 diff --git a/src/Battlescape/UnitSprite.cpp b/src/Battlescape/UnitSprite.cpp
 index 8fa87f892..f4e460584 100644
 --- a/src/Battlescape/UnitSprite.cpp
@@ -20890,10 +21018,10 @@ index bc5f08f46..5ddf353f4 100644
  			playMovementSound();
  			if (_parent->getSave()->isPreview())
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 839f80345..f46804266 100644
+index 839f80345..9d608adb1 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -441,10 +441,44 @@ set ( rapidyaml_src
+@@ -441,10 +441,45 @@ set ( rapidyaml_src
  
  )
  
@@ -20910,6 +21038,7 @@ index 839f80345..f46804266 100644
 +    FirstPerson/FirstPersonModeWeaponInHand.cpp
 +    FirstPerson/FirstPersonParticles.cpp
 +    FirstPerson/FirstPersonSpriteHits.cpp
++    FirstPerson/FirstPersonQuickDeaths.cpp
 +    FirstPerson/FirstPersonScanner.cpp
 +    FirstPerson/FirstPersonSounds.cpp
 +    FirstPerson/FirstPersonView.cpp
@@ -20938,7 +21067,7 @@ index 839f80345..f46804266 100644
      ${engine_src}
      ${geoscape_src}
      ${interface_src}
-@@ -627,7 +661,10 @@ if (WIN32)
+@@ -627,7 +662,10 @@ if (WIN32)
    set(WIN32_LIBS imagehlp dbghelp)
  endif(WIN32)
  
@@ -21195,7 +21324,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..ecf489746 100644
+index a08796ced..8fd2a8fc4 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -21212,7 +21341,7 @@ index a08796ced..ecf489746 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine;
++OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine;
 +OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle;
@@ -21300,10 +21429,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..4354419cf
+index 000000000..6da022d3f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,753 @@
+@@ -0,0 +1,758 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -21714,6 +21843,11 @@ index 000000000..4354419cf
 +	// FirstPersonSpriteHits.cpp), for everyone's shots, in 3D and on the map, instead of the game's
 +	// voxel shapes (the owner's, GitHub issue #42). Off: the game's own.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsSpriteHitboxes", &fpsSpriteHitboxes, false, "STR_FPS_SPRITE_HITBOXES", category));
++	// A unit killed or knocked out down at once for the battle, its fall playing on its own (twice
++	// as fast, no turn to face the screen), several at once, in 3D and on the map; the soldier
++	// looked through falls on their helmet camera card while the view goes on to the next (a
++	// player's report, GitHub issue #40). Off: the game's own deaths, one by one.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsQuickDeaths", &fpsQuickDeaths, false, "STR_FPS_QUICK_DEATHS", category));
 +	// The hitboxes' outlines and the path of a throw glowing (spilling bloom round them), or plain lines.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsGlowingOutlines", &fpsGlowingOutlines, false, "STR_FPS_GLOWING_OUTLINES", category));
 +	// Icons over the downed (unconscious) units in sight, for burning, bleeding, shock and
@@ -22059,10 +22193,10 @@ index 000000000..4354419cf
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..065dd3d13
+index 000000000..2442bef1b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,252 @@
+@@ -0,0 +1,277 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -22139,6 +22273,7 @@ index 000000000..065dd3d13
 +class SavedBattleGame;
 +class State;
 +class Surface;
++class Tile;
 +
 +namespace FirstPerson
 +{
@@ -22231,6 +22366,30 @@ index 000000000..065dd3d13
 +/// through its middle facing the line's start (see FirstPersonSpriteHits.cpp)? A shot's impact
 +/// (impact: its line already found the unit there) always does.
 +bool spriteHit(SavedBattleGame *save, const BattleUnit *unit, const Position &voxel, const Position &origin, bool impact);
++/// Setting "Quick deaths": is a unit killed or knocked out down at once for the battle, its fall
++/// playing on its own (in 3D and on the map, several at once; see FirstPersonQuickDeaths.cpp)?
++bool quickDeaths(BattlescapeState *state);
++/// Setting "Quick deaths": notes a unit going down quickly, as the game takes it out (its fall
++/// plays from now on).
++void noteQuickFall(const SavedBattleGame *save, BattleUnit *unit);
++/// Setting "Quick deaths": the frame of a unit's quick fall to draw, or -1 if it isn't falling.
++int quickFallPhase(const BattleUnit *unit);
++/// Setting "Quick deaths": the unit whose quick fall plays on this tile (drawn there falling, the
++/// tile's items held back meanwhile), or null.
++BattleUnit *quickFallOn(const SavedBattleGame *save, const Tile *tile);
++/// Setting "Quick deaths": while it lives, a unit in its quick fall is in that fall's pose for
++/// drawing (the game draws a falling unit by its status and fall frame); a unit that isn't
++/// falling, or null, is left alone.
++class QuickFallPose
++{
++public:
++	explicit QuickFallPose(BattleUnit *unit);
++	~QuickFallPose();
++	QuickFallPose(const QuickFallPose&) = delete;
++	QuickFallPose &operator=(const QuickFallPose&) = delete;
++private:
++	BattleUnit *_unit; // the unit posed (null: none)
++};
 +/// Setting "Shotgun pellets in flight": do a shotgun's pellets fly beside its round (in 3D and on
 +/// the map), rather than all landing at once? They're traced as the round is fired, and hit as it lands.
 +bool pelletsInFlight(BattlescapeState *state);
@@ -22317,10 +22476,10 @@ index 000000000..065dd3d13
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..07ce8b306
+index 000000000..21672d4df
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2718 @@
+@@ -0,0 +1,2736 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24355,20 +24514,38 @@ index 000000000..07ce8b306
 +/**
 + * The soldier the camera was with is gone (killed, stunned, mind controlled...): carries on
 + * with the next one, as soon as the game is free to (not busy, no popup up). Only on the
-+ * player's turn and while the player wants the 3D view.
-+ * @return The selected unit (now).
++ * player's turn and while the player wants the 3D view. With "Quick deaths" the view went on
++ * to the next soldier at once (see quickHandOver): until the game is free (a burst or reaction
++ * fire still under way) the view looks through them already, and then they're the one selected.
++ * @return The selected unit (now), or the soldier the view went on to.
 + */
 +BattleUnit *FirstPersonMode::selectNextSoldierIfGone(bool playerTurn)
 +{
 +	BattleUnit *selected = _save->getSelectedUnit();
-+	// The soldier we were with is gone (killed, stunned, mind controlled...): carry on with the next one.
-+	if (_wants3D && playerTurn && (!selected || selected->isOut() || selected->getFaction() != FACTION_PLAYER)
-+		&& !_state->_battleGame->isBusy() && _state->_popups.empty())
++	const bool gone = !selected || selected->isOut() || selected->getFaction() != FACTION_PLAYER;
++	if (!gone || !playerTurn || (_quickNextSoldier && (_quickNextSoldier->isOut() || _quickNextSoldier->getFaction() != FACTION_PLAYER)))
 +	{
-+		_state->selectNextPlayerUnit();
++		_quickNextSoldier = nullptr; // (not needed, or no longer standing)
++	}
++	// The soldier we were with is gone (killed, stunned, mind controlled...): carry on with the next one.
++	if (_wants3D && playerTurn && gone && !_state->_battleGame->isBusy() && _state->_popups.empty())
++	{
++		if (_quickNextSoldier)
++		{
++			// (kept till the game really takes them: it may not take orders yet)
++			selectUnit(_quickNextSoldier);
++			if (_save->getSelectedUnit() == _quickNextSoldier)
++			{
++				_quickNextSoldier = nullptr;
++			}
++		}
++		else
++		{
++			_state->selectNextPlayerUnit();
++		}
 +		selected = _save->getSelectedUnit();
 +	}
-+	return selected;
++	return _quickNextSoldier ? _quickNextSoldier : selected;
 +}
 +
 +/**
@@ -25041,10 +25218,10 @@ index 000000000..07ce8b306
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..2920b0b27
+index 000000000..acd8f7c1e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1166 @@
+@@ -0,0 +1,1186 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -25183,6 +25360,8 @@ index 000000000..2920b0b27
 +	static bool pelletsInFlight(BattlescapeState *state);
 +	/// Setting "Full sprite hitboxes": are units hit by their pictures in this battle (see FirstPerson::spriteHitboxes)?
 +	static bool spriteHitboxes(BattlescapeState *state);
++	/// Setting "Quick deaths": are deaths quick in this battle (see FirstPerson::quickDeaths)?
++	static bool quickDeaths(BattlescapeState *state);
 +	/// Akimbo on the map (Ctrl+Shift+click on a hand's weapon): steps the soldier's two guns through firing together there.
 +	static bool toggleMapAkimbo(BattlescapeState *state, BattleUnit *unit);
 +	/// Akimbo on the map: its mini targets in both hands' boxes; undone once the guns no longer pair up.
@@ -26159,6 +26338,24 @@ index 000000000..2920b0b27
 +	/// Stays with a soldier who went down a moment; true while it's showing.
 +	bool deathCam(Uint32 now, double elapsedSeconds);
 +
++	// ---- setting "Quick deaths": the soldier looked through going down falls on their helmet
++	// camera card while the view goes on to the next soldier at once ----
++
++	const BattleUnit *_deathFeedUnit = nullptr;  // the soldier whose fall plays on the card (null: none)
++	Uint32 _deathFeedStart = 0;                  // when they went down
++	FallKind _deathFeedKind = FALL_KILLED;       // killed or knocked out
++	double _deathFeedEye[3] = {};                // the eye they fell from, in voxels...
++	double _deathFeedYaw = 0.0;                  // ...the way they looked...
++	double _deathFeedPitch = 0.0;                // ...and how far up or down
++	BattleUnit *_quickNextSoldier = nullptr;     // the soldier the view went on to (selected once the game is free; null: none)
++
++	/// Hands the view over at once: the fall goes on the soldier's card, the view to the next soldier.
++	void quickHandOver(BattleUnit *unit, Uint32 now);
++	/// The next soldier of ours standing after this one, in the squad's order (null: none).
++	BattleUnit *nextStandingSoldier(const BattleUnit *after) const;
++	/// Points the card's camera through the falling soldier's eyes, at this moment of their fall.
++	void aimDeathFeed(FirstPersonView *camera, Uint32 now);
++
 +	// ---- the aliens' turn cameras (setting "Aliens' turn cameras"): the view cuts to the soldier
 +	// who sees the alien acting (the nearest), or to one of ours firing back; a soldier shot at,
 +	// hit or taken over pops up a small camera (the soldier card's). With the aliens' turn on
@@ -27079,10 +27276,10 @@ index 000000000..ad3f11493
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..9851faf9b
+index 000000000..26a14912f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,2020 @@
+@@ -0,0 +1,2029 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -28206,8 +28403,10 @@ index 000000000..9851faf9b
 +		poppedUp = true;
 +	}
 +	const SquadState state = unit ? squadState(unit) : SQUAD_NONE;
-+	// The dead and the unconscious: their helmet camera shows only static.
++	// The dead and the unconscious: their helmet camera shows only static. But for the soldier
++	// looked through going down with "Quick deaths": their fall first (see aimDeathFeed).
 +	const bool live = unit && unit->getTile() && (state == SQUAD_READY || state == SQUAD_CONTROLLED);
++	const bool deathFeed = poppedUp && unit && unit == _deathFeedUnit && SDL_GetTicks() - _deathFeedStart < DeathFeedFallTime;
 +	if (state == SQUAD_NONE)
 +	{
 +		unit = nullptr;
@@ -28236,7 +28435,7 @@ index 000000000..9851faf9b
 +	const bool preview = unit && (Options::fpsSoldierPreview || poppedUp);
 +	for (const auto &part : _cardParts)
 +	{
-+		part.surface->setVisible(unit && (part.surface != _preview || (preview && live)) && (part.surface != _cardSignal || (preview && !live)));
++		part.surface->setVisible(unit && (part.surface != _preview || (preview && (live || deathFeed))) && (part.surface != _cardSignal || (preview && !live && !deathFeed)));
 +	}
 +	if (!unit)
 +	{
@@ -28287,7 +28486,7 @@ index 000000000..9851faf9b
 +	_cardRank->setVisible(rankShown);
 +	_cardRank->setX(cardX + 4);
 +	_cardName->setX(cardX + 4 + (rankShown ? RankIconW + RankIconGap : 0)); // (the rank before the name)
-+	if (preview && !live)
++	if (preview && !live && !deathFeed)
 +	{
 +		// Static on the dead camera: every pixel a random grey, new every frame (a linear
 +		// congruential generator, its top bits picking one of four greys).
@@ -28322,6 +28521,10 @@ index 000000000..9851faf9b
 +	if (preview && live)
 +	{
 +		aimHelmetCamera(_preview, unit, poppedUp ? _alertLookAt : nullptr);
++	}
++	else if (preview && deathFeed)
++	{
++		aimDeathFeed(_preview, SDL_GetTicks());
 +	}
 +}
 +
@@ -28366,7 +28569,10 @@ index 000000000..9851faf9b
 +	{
 +		camera->lookAt(lookAtPoint);
 +	}
-+	// The same view settings as the main 3D view, and night vision if the soldier has it.
++	// The same view settings as the main 3D view, and night vision if the soldier has it (and no
++	// colour or static left from a fall shown on the card, see aimDeathFeed).
++	camera->setTint(0.0f);
++	camera->setStatic(0.0f);
 +	camera->setFieldOfView(Options::fpsFieldOfView);
 +	camera->setSmoothLighting(Options::fpsSmoothLighting);
 +	camera->setNightVision(hasNightVision(unit) ? _state->_map->getNightVisionColor() : 0);
@@ -31146,10 +31352,10 @@ index 000000000..1b98a6bd9
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..3016462df
+index 000000000..e4caa5ea3
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,426 @@
+@@ -0,0 +1,430 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -31463,6 +31669,10 @@ index 000000000..3016462df
 +/// How long the view stays with a soldier who was killed, knocked unconscious or taken over,
 +/// and how long the next soldier's view takes to come in out of it.
 +const Uint32 DeathCamTime = 2600, FaintTime = 2400, ControlledTime = 2400, AfterFallTime = 600;
++/// Setting "Quick deaths": the soldier looked through going down plays on their helmet camera card (for AlertTime)
++/// while the view goes on to the next soldier at once: how long the fall shows on the card before its static, and how
++/// long the next soldier's view takes to come in out of the static (ms).
++const Uint32 DeathFeedFallTime = 1500, QuickHandOverTime = 300;
 +/// Looking through a unit under our mind control: a purple haze at the view's edges (see
 +/// controlHaze), ControlHazeStrength strong, breathing in and out (by ControlHazeBreath of it) every
 +/// ControlHazePeriod milliseconds.
@@ -31578,10 +31788,10 @@ index 000000000..3016462df
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..770a7ac85
+index 000000000..ebd67fd2f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,4364 @@
+@@ -0,0 +1,4375 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -34787,6 +34997,17 @@ index 000000000..770a7ac85
 +}
 +
 +/**
++ * Are deaths quick in this battle (setting "Quick deaths", see FirstPerson::quickDeaths): the
++ * setting on, in a battle with the mod's 3D view (in 3D or on the map alike: the battle's rule)?
++ * @param state The battlescape screen.
++ * @return True if deaths are quick.
++ */
++bool FirstPersonMode::quickDeaths(BattlescapeState *state)
++{
++	return Options::fpsQuickDeaths && state && state->_firstPerson;
++}
++
++/**
 + * Do a shotgun's pellets, and the two rounds of an akimbo volley, each land on their own, asked by
 + * the game as it fires them: with the setting "Each pellet on its own" (on), in either view,
 + * whoever fires (a player's report on OXCE's "shotgun void": the lead pellet decides the whole
@@ -35948,10 +36169,10 @@ index 000000000..770a7ac85
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeSoldierStates.cpp b/src/FirstPerson/FirstPersonModeSoldierStates.cpp
 new file mode 100644
-index 000000000..436ae3e71
+index 000000000..77aa96ddd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeSoldierStates.cpp
-@@ -0,0 +1,989 @@
+@@ -0,0 +1,1105 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -36319,6 +36540,14 @@ index 000000000..436ae3e71
 +			if (other != unit && other->getFaction() == FACTION_PLAYER && !other->isOut()) anyoneLeft = true;
 +		}
 +		_allSoldiersLost = !anyoneLeft;
++
++		// Setting "Quick deaths": killed or knocked out, with someone left to look through: their
++		// fall plays on their helmet camera card while the view goes on to the next soldier at once.
++		if (FirstPersonMode::quickDeaths(_state) && anyoneLeft && (_fallKind == FALL_KILLED || _fallKind == FALL_UNCONSCIOUS))
++		{
++			quickHandOver(unit, now);
++			return false;
++		}
 +
 +		// The banner: what happened, and under it whose camera this is (or ALL SOLDIERS LOST).
 +		const char *title = _fallKind == FALL_KILLED ? "STR_FPS_KILLED" : _fallKind == FALL_ZOMBIE ? "STR_FPS_ZOMBIFIED"
@@ -36912,6 +37141,114 @@ index 000000000..436ae3e71
 +	}
 +	if (soldier == _trackedUnit) glideToLookAt(lookAt);
 +	else _lookAtOnSwitch = lookAt;
++}
++
++/**
++ * Setting "Quick deaths" (a player's report, GitHub issue #40: "If death in first person, cut
++ * camera out to a side feed, play death animation as new unit is picked immediately"): the
++ * soldier looked through has gone down (killed or knocked out). Their fall plays on their helmet
++ * camera card for AlertTime (see aimDeathFeed: the eye dropping, the view keeling over, washing
++ * red, or dark blue for a faint, then the static of a dead camera), while the view goes on to the
++ * next soldier at once, out of QuickHandOverTime of static (or the colour): looked through now,
++ * and selected as soon as the game is free (see selectNextSoldierIfGone; a burst or reaction fire
++ * may still be under way).
++ * @param unit The soldier who went down.
++ * @param now The time (SDL ticks).
++ */
++void FirstPersonMode::quickHandOver(BattleUnit *unit, Uint32 now)
++{
++	// Where they looked from, and how, for the card.
++	_deathFeedUnit = unit;
++	_deathFeedStart = now;
++	_deathFeedKind = _fallKind;
++	_view->getEye(_deathFeedEye);
++	_deathFeedYaw = _view->getYawDegrees();
++	_deathFeedPitch = _view->getPitchDegrees();
++
++	// The view goes on: to the next soldier standing, coming in out of the static (or colour).
++	_quickNextSoldier = nextStandingSoldier(unit);
++	_afterFallStart = now;
++	_afterFallKind = _fallKind;
++	_afterFallTime = QuickHandOverTime;
++	_deathUnit = nullptr;
++	_trackedUnit = nullptr;
++	_view->setVignette(0.0f);
++	_view->clearHurt(); // (their wounds aren't the next soldier's)
++	_hurtStart = 0;
++	// (in the static or the colour from this frame on, not a frame later: no flicker of a clear view first)
++	if (_fallKind == FALL_KILLED)
++	{
++		_view->setStatic(1.0f);
++	}
++	else
++	{
++		_view->setTint(1.0f, 1);
++	}
++	syncShadows();
++
++	// Their card pops up (under their squad button), their status saying what happened.
++	popUpCamera(unit, "", now);
++}
++
++/**
++ * The next soldier of ours still standing after this one, in the squad's order (the units' list,
++ * as the game's next-soldier button goes), round to the start.
++ * @param after The soldier to start after.
++ * @return The soldier, or null if nobody else is standing.
++ */
++BattleUnit *FirstPersonMode::nextStandingSoldier(const BattleUnit *after) const
++{
++	const std::vector<BattleUnit*> &units = *_save->getUnits();
++	const auto start = std::find(units.begin(), units.end(), after);
++	const size_t first = start == units.end() ? 0 : (size_t)(start - units.begin()) + 1;
++	for (size_t step = 0; step < units.size(); ++step)
++	{
++		BattleUnit *unit = units[(first + step) % units.size()];
++		if (unit != after && unit->getFaction() == FACTION_PLAYER && !unit->isOut() && unit->getTile())
++		{
++			return unit;
++		}
++	}
++	return nullptr;
++}
++
++/**
++ * Points the card's camera through the eyes of the soldier going down (setting "Quick deaths",
++ * see quickHandOver), at this moment of their fall (DeathFeedFallTime long): killed, the eye drops
++ * hard to the floor and the view keels over, washing red, the signal going in static at the end;
++ * knocked out, a slower sag into dark blue.
++ * @param camera The card's camera view.
++ * @param now The time (SDL ticks).
++ */
++void FirstPersonMode::aimDeathFeed(FirstPersonView *camera, Uint32 now)
++{
++	const BattleUnit *unit = _deathFeedUnit;
++	const double seconds = (now - _deathFeedStart) / 1000.0;
++	const float progress = std::min(1.0f, (now - _deathFeedStart) / (float)DeathFeedFallTime);
++	const bool killed = _deathFeedKind == FALL_KILLED;
++
++	// The eye: down to someone lying on their floor (5 voxels up), fast at first; the view turning
++	// a little and tipping up as they go down (a faint sags slower, the head dropping).
++	const double lyingEyeZ = unit->getPosition().z * 24.0 + 5.0;
++	const double drop = std::min(1.0, seconds * (killed ? 3.0 : 1.2));
++	const double eased = 1.0 - (1.0 - drop) * (1.0 - drop);
++	camera->setCameraUnit(unit);
++	camera->setEye(_deathFeedEye[0], _deathFeedEye[1], _deathFeedEye[2] + (lyingEyeZ - _deathFeedEye[2]) * eased);
++	camera->lookAlong(0);
++	const double yaw = _deathFeedYaw + (killed ? 25.0 : 8.0) * seconds;
++	const double pitch = _deathFeedPitch + (killed ? 12.0 : -14.0) * eased;
++	camera->rotate(yaw - camera->getYawDegrees(), pitch - camera->getPitchDegrees());
++
++	// Washing red (or dark blue), the signal going in static over the last part.
++	camera->setTint(killed ? std::min(1.0f, 0.4f + progress) : std::min(1.0f, 0.25f + progress), killed ? 0 : 1);
++	camera->setStatic(killed ? std::clamp((progress - 0.6f) / 0.4f, 0.0f, 1.0f) : 0.0f);
++
++	// The same view settings as the main 3D view.
++	camera->setFieldOfView(Options::fpsFieldOfView);
++	camera->setSmoothLighting(Options::fpsSmoothLighting);
++	camera->setNightVision(0);
++	camera->setControlHaze(0.0f);
++	camera->invalidate();
 +}
 +
 +/**
@@ -38327,6 +38664,230 @@ index 000000000..228618946
 +}
 +
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
+diff --git a/src/FirstPerson/FirstPersonQuickDeaths.cpp b/src/FirstPerson/FirstPersonQuickDeaths.cpp
+new file mode 100644
+index 000000000..b89dc86af
+--- /dev/null
++++ b/src/FirstPerson/FirstPersonQuickDeaths.cpp
+@@ -0,0 +1,218 @@
++/*
++ * ==============================================================================================
++ *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
++ * ==============================================================================================
++ *
++ *  Our philosophy
++ *
++ *  - Faithful first. The 3D view should feel as if it had shipped with UFO: Enemy Unknown on
++ *    the day the game came out.
++ *  - Another camera on the same battle. The original rules decide everything: time units,
++ *    energy, accuracy, line of fire, reaction fire, doors and morale. The 3D view only shows
++ *    what the game does.
++ *  - Only the original assets: the game's own maps, voxel shapes, sprites, palette and sounds.
++ *  - Every addition is a setting. Jumping, night vision as gear, falling, FPS-style shooting
++ *    and dual wield can all be switched off.
++ *  - Light on the engine. Our code lives in this folder, the core only gets small hooks, and
++ *    without the OpenXcom3D mod nothing changes.
++ *  - Runs anywhere: a software renderer on the CPU, no graphics card needed.
++ *  - Written for people: descriptive names, and a comment for every function and every block.
++ *
++ *  Date: 2026-10-19
++ *
++ *  We wish everyone all the best and all health!
++ * ==============================================================================================
++ */
++/*
++ * Copyright 2010-2026 OpenXcom Developers.
++ *
++ * This file is part of OpenXcom.
++ *
++ * OpenXcom is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * OpenXcom is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
++ */
++/*
++ * FirstPersonQuickDeaths.cpp: setting "Quick deaths": a unit killed or knocked out is down at once
++ * for the battle, and its fall plays on its own, in 3D and on the map, several at once.
++ */
++#include "FirstPersonApi.h"
++#include <algorithm>
++#include <vector>
++#include <SDL.h>
++#include "FirstPersonMode.h"
++#include "FirstPersonViewShared.h"
++#include "../Mod/Armor.h"
++#include "../Savegame/BattleUnit.h"
++#include "../Savegame/SavedBattleGame.h"
++#include "../Savegame/Tile.h"
++
++namespace OpenXcom
++{
++namespace FirstPerson
++{
++
++namespace
++{
++
++/**
++ * A fall under way: the unit, the battle it's in, when it went down, and the tiles it lay on
++ * (its north-west corner and its size: 1, or 2 for a big unit).
++ */
++struct QuickFall
++{
++	const SavedBattleGame *save;
++	BattleUnit *unit;
++	Uint32 start;
++	Position corner;
++	int size;
++};
++
++/**
++ * The falls under way (a few at most: they last a fraction of a second).
++ * @return The list.
++ */
++std::vector<QuickFall> &quickFalls()
++{
++	static std::vector<QuickFall> falls;
++	return falls;
++}
++
++/**
++ * Is a fall surely over by now, without looking at its unit (it may be gone with its battle)?
++ * No armor has more than QuickFallMaxFrames frames of falling.
++ * @param fall The fall.
++ * @param now The time (SDL ticks).
++ * @return True if it's over.
++ */
++bool surelyOver(const QuickFall &fall, Uint32 now)
++{
++	return now - fall.start >= (Uint32)QuickFallMaxFrames * QuickFallFrameTime;
++}
++
++}
++
++/**
++ * Setting "Quick deaths" (a player's report, GitHub issue #40: deaths that don't hold up an auto
++ * fire, several at once, "like doomguy chaingunning down zombies"): on, and the mod's 3D view in
++ * the battle (the battle's rule, in 3D and on the map).
++ * @param state The battle's screen.
++ * @return True if deaths are quick.
++ */
++bool quickDeaths(BattlescapeState *state)
++{
++	return FirstPersonMode::quickDeaths(state);
++}
++
++/**
++ * Notes a unit going down quickly (setting "Quick deaths"): it's down at once for the battle,
++ * and its fall plays from now on (see quickFallPhase). Called as the game takes it out, before
++ * it leaves its tile (UnitDieBState).
++ * @param save The battle.
++ * @param unit The unit.
++ */
++void noteQuickFall(const SavedBattleGame *save, BattleUnit *unit)
++{
++	const Uint32 now = SDL_GetTicks();
++	std::vector<QuickFall> &falls = quickFalls();
++	falls.erase(std::remove_if(falls.begin(), falls.end(), [&](const QuickFall &fall) { return surelyOver(fall, now) || fall.unit == unit; }), falls.end());
++	falls.push_back({ save, unit, now, unit->getPosition(), unit->getArmor()->getSize() });
++}
++
++/**
++ * How far a unit's quick fall is (setting "Quick deaths"): the frame of its fall to draw, the
++ * game's own fall frames at twice its pace (QuickFallFrameTime each), with no turn to face the
++ * screen first.
++ * @param unit The unit.
++ * @return The frame (0 to its armor's death frames less one), or -1 if it isn't falling (never
++ *   went down quickly, the fall is over, or it's no longer down: turned into another unit). It
++ *   falls from the moment it's down, still on its tile for a moment (the game draws a unit down
++ *   there as nothing) and after it has left it.
++ */
++int quickFallPhase(const BattleUnit *unit)
++{
++	const Uint32 now = SDL_GetTicks();
++	for (const QuickFall &fall : quickFalls())
++	{
++		if (fall.unit != unit || surelyOver(fall, now))
++		{
++			continue;
++		}
++		const int frame = (int)((now - fall.start) / QuickFallFrameTime);
++		const bool down = unit->getStatus() == STATUS_DEAD || unit->getStatus() == STATUS_UNCONSCIOUS;
++		return down && frame < std::max(1, unit->getArmor()->getDeathFrames()) ? frame : -1;
++	}
++	return -1;
++}
++
++/**
++ * The unit whose quick fall is playing on this tile (setting "Quick deaths"): the map and the 3D
++ * view draw it there, falling, and keep the body and items on the tile back until it's down.
++ * @param save The battle.
++ * @param tile The tile.
++ * @return The unit, or null.
++ */
++BattleUnit *quickFallOn(const SavedBattleGame *save, const Tile *tile)
++{
++	if (quickFalls().empty() || !tile)
++	{
++		return nullptr;
++	}
++	const Uint32 now = SDL_GetTicks();
++	const Position position = tile->getPosition();
++	for (const QuickFall &fall : quickFalls())
++	{
++		const bool onIt = position.z == fall.corner.z && position.x >= fall.corner.x && position.y >= fall.corner.y
++			&& position.x < fall.corner.x + fall.size && position.y < fall.corner.y + fall.size;
++		if (fall.save == save && onIt && !surelyOver(fall, now) && quickFallPhase(fall.unit) >= 0)
++		{
++			return fall.unit;
++		}
++	}
++	return nullptr;
++}
++
++/**
++ * Puts a unit in its quick fall's pose for drawing (the game draws a falling unit by its status
++ * and fall frame, see UnitSprite): falling, at the frame quickFallPhase gives. Nothing for a unit
++ * that isn't falling (or null).
++ * @param unit The unit, or null.
++ */
++QuickFallPose::QuickFallPose(BattleUnit *unit) : _unit(nullptr)
++{
++	const int phase = unit ? quickFallPhase(unit) : -1;
++	if (phase < 0)
++	{
++		return;
++	}
++	_unit = unit;
++	_unit->startFalling();
++	for (int step = 0; step < phase; ++step)
++	{
++		_unit->keepFalling();
++	}
++}
++
++/**
++ * Puts the unit back as the battle has it: down, at the end of its fall (dead, or unconscious
++ * with health left), as the game left it (BattleUnit::instaFalling).
++ */
++QuickFallPose::~QuickFallPose()
++{
++	if (_unit)
++	{
++		_unit->instaFalling();
++	}
++}
++
++}
++}
 diff --git a/src/FirstPerson/FirstPersonScanner.cpp b/src/FirstPerson/FirstPersonScanner.cpp
 new file mode 100644
 index 000000000..e42993638
@@ -40077,10 +40638,10 @@ index 000000000..e70e3e989
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..f1a492095
+index 000000000..4e460189f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1234 @@
+@@ -0,0 +1,1237 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -40468,6 +41029,9 @@ index 000000000..f1a492095
 +	void setShowFacing(bool show) { _showFacing = show; }
 +	/// Shakes the camera (explosions, hits); stronger shakes win.
 +	void addShake(float amount) { _shake = std::max(_shake, amount); }
++	/// Wipes the hurt off the view at once: the blood on it, the arc towards where a hit came
++	/// from, and the shake (the view handed on to another soldier, see FirstPersonMode::quickHandOver).
++	void clearHurt() { _bloodSplats.clear(); _bloodAmount = 0.0f; _hurtStart = 0; _hurtDirectionKnown = false; _shake = 0.0f; }
 +	/// Washes the view with a colour (0 none .. 1 full): 0 red (hurt, killed), 1 dark blue (unconscious),
 +	/// 2 orange (mind control), 3 white (a breakdown), 4 sickly green (turning into a zombie); `red`
 +	/// is the share of the washed pixels washed red instead.
@@ -45717,10 +46281,10 @@ index 000000000..280bc87e2
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..f0f5e6b33
+index 000000000..ebaca6398
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,436 @@
+@@ -0,0 +1,441 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -45854,6 +46418,11 @@ index 000000000..f0f5e6b33
 +/// behind a unit's picture card and still meet it, in voxels: a line steps up to a voxel along each axis at a time, so
 +/// the card is that thick that no line slips through it between two steps.
 +const double SpriteHitSlab = 0.8;
++/// Setting "Quick deaths" (see FirstPersonQuickDeaths.cpp): how long each frame of a quick fall shows (ms: twice the
++/// game's pace, BattlescapeState::DEFAULT_ANIM_SPEED a frame), and the most fall frames an armor may have (a fall is
++/// surely over after that many).
++const Uint32 QuickFallFrameTime = 50;
++const int QuickFallMaxFrames = 8;
 +/// Sprites stand like cards facing the camera, leaning with the view's pitch; looking down
 +/// further than this many degrees, a card leans only this far, so it stays above the floor
 +/// instead of lying in it (see drawSprite).
@@ -48103,10 +48672,10 @@ index 000000000..1cd28ddf1
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..c3120b685
+index 000000000..bb8b0c9f7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,2637 @@
+@@ -0,0 +1,2643 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -48922,8 +49491,10 @@ index 000000000..c3120b685
 +	for (BattleUnit *unit : *_save->getUnits())
 +	{
 +		// Only units still in the fight (not dead or unconscious), not the one looked through,
-+		// and in sight (any unit in debug mode).
-+		if (unit->isOut() || unit == _cameraUnit || (!debug && !unit->getVisible()))
++		// and in sight (any unit in debug mode). And one down a moment ago with "Quick deaths",
++		// still falling (on its own, see FirstPerson::quickFallPhase): drawn in that fall.
++		const bool quickFall = unit->isOut() && FirstPerson::quickFallPhase(unit) >= 0;
++		if ((unit->isOut() && !quickFall) || unit == _cameraUnit || (!debug && !unit->getVisible()))
 +		{
 +			continue;
 +		}
@@ -48985,10 +49556,10 @@ index 000000000..c3120b685
 +			flash = Options::fpsMuzzleFlash ? flinch : 0.0f;
 +		}
 +
-+		// A marked enemy's marker goes 5 voxels above its head.
++		// A marked enemy's marker goes 5 voxels above its head (not over one falling: it's down).
 +		for (const auto &marker : _markers)
 +		{
-+			if (marker.first == unit)
++			if (marker.first == unit && !quickFall)
 +			{
 +				MarkerSpot spot = { { feet[0], feet[1], feet[2] + unit->getFloatHeight() + unit->getHeight() + 5.0 }, marker.second };
 +				_markerSpots.push_back(spot);
@@ -49018,17 +49589,20 @@ index 000000000..c3120b685
 +		// keep the game's own heights). (Composed unlit and shaded when placed: an upscaled frame
 +		// then serves in any light.)
 +		const GraphSubset mask(SpriteBufferSize, SpriteBufferSize);
-+		if (unitSize == 1)
 +		{
-+			unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
-+		}
-+		else
-+		{
-+			// The parts are laid out on screen like the 2x2 tiles they cover, back to front.
-+			unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
-+			unitSprite.draw(unit, 1, 32, 16, 0, mask, false);
-+			unitSprite.draw(unit, 2, 0, 16, 0, mask, false);
-+			unitSprite.draw(unit, 3, 16, 24, 0, mask, false);
++			const FirstPerson::QuickFallPose fallPose(quickFall ? unit : nullptr); // (a quick fall's frame)
++			if (unitSize == 1)
++			{
++				unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
++			}
++			else
++			{
++				// The parts are laid out on screen like the 2x2 tiles they cover, back to front.
++				unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
++				unitSprite.draw(unit, 1, 32, 16, 0, mask, false);
++				unitSprite.draw(unit, 2, 0, 16, 0, mask, false);
++				unitSprite.draw(unit, 3, 16, 24, 0, mask, false);
++			}
 +		}
 +		DrawStep step;
 +		step.kind = DrawStep::Sprite;
@@ -49053,14 +49627,14 @@ index 000000000..c3120b685
 +		step.sprite.unit = unit;
 +		useSmoothVersion(step.sprite);
 +		_drawList.push_back(step);
-+		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit) && !Options::fpsSpriteHitboxes) // (with full sprite hitboxes the picture is the hitbox)
++		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit) && !Options::fpsSpriteHitboxes && !quickFall) // (with full sprite hitboxes the picture is the hitbox; one falling is down)
 +		{
 +			recordHitbox(unit, feet, hitboxOpacity);
 +		}
 +		// Which way it faces, with the key for it held (see drawFacing): round its footprint (inside
 +		// its tiles, so neighbours' rings don't cross), at the bottom of its hitbox (under a flyer),
 +		// in the colour of its side.
-+		if (_showFacing)
++		if (_showFacing && !quickFall)
 +		{
 +			FacingSpot spot = { { feet[0], feet[1], feet[2] + unit->getFloatHeight() + 1.0 }, 8.0 * unitSize - 1.5, unit->getDirection(),
 +				_colors.hitbox[unit->getFaction() == FACTION_PLAYER ? 0 : unit->getFaction() == FACTION_HOSTILE ? 1 : 2] };
@@ -49376,9 +49950,10 @@ index 000000000..c3120b685
 +	for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
 +	{
 +		// Only tiles with something on them, that have been seen.
++		// (Not while a quick fall plays there: the body and what it dropped come once it's down.)
 +		Tile *tile = _save->getTile(tileIndex);
 +		if (tile->getInventory()->empty() || !_tileViews[tileIndex].discovered
-+			|| std::find(partsDrawn.begin(), partsDrawn.end(), tileIndex) != partsDrawn.end())
++			|| std::find(partsDrawn.begin(), partsDrawn.end(), tileIndex) != partsDrawn.end() || FirstPerson::quickFallOn(_save, tile))
 +		{
 +			continue;
 +		}
@@ -55312,7 +55887,7 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..29b13c0eb
+index 000000000..046ce5de7
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,793 @@
@@ -55532,7 +56107,7 @@ index 000000000..29b13c0eb
 +			"fpsFalling", "fpsSafeLanding" } },
 +		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsLean", "fpsMeleeTerrain",
 +			"fpsMeleeFloors", "fpsAimExact", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
-+			"fpsEachPellet", "fpsSpriteHitboxes", "fpsFlares", "fpsNightVisionGear" } },
++			"fpsEachPellet", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsFlares", "fpsNightVisionGear" } },
 +		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
 +			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsParticles", "fpsUfoLights",
 +			"fpsGhostParts", "fpsGhostOpacity", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
@@ -56677,10 +57252,10 @@ index 2242d13f8..7fd17b1f2 100644
  	bool isManaBarEnabled() const { return _manaBattleUI; }
  	/// Is the mana trained as a primary skill (e.g. like firing accuracy)?
 diff --git a/src/OpenXcom.2010.vcxproj b/src/OpenXcom.2010.vcxproj
-index 99f24ce43..49c6883fc 100644
+index 99f24ce43..53de0c120 100644
 --- a/src/OpenXcom.2010.vcxproj
 +++ b/src/OpenXcom.2010.vcxproj
-@@ -431,6 +431,30 @@
+@@ -431,6 +431,31 @@
      <ClCompile Include="Battlescape\DebriefingState.cpp" />
      <ClCompile Include="Battlescape\ExperienceOverviewState.cpp" />
      <ClCompile Include="Battlescape\Explosion.cpp" />
@@ -56694,6 +57269,7 @@ index 99f24ce43..49c6883fc 100644
 +    <ClCompile Include="FirstPerson\FirstPersonModeWeaponInHand.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonParticles.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonSpriteHits.cpp" />
++    <ClCompile Include="FirstPerson\FirstPersonQuickDeaths.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonScanner.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonSounds.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonView.cpp" />
@@ -56711,7 +57287,7 @@ index 99f24ce43..49c6883fc 100644
      <ClCompile Include="Battlescape\ExplosionBState.cpp" />
      <ClCompile Include="Battlescape\ExtendedBattlescapeLinksState.cpp" />
      <ClCompile Include="Battlescape\ExtendedInventoryLinksState.cpp" />
-@@ -910,6 +934,18 @@
+@@ -910,6 +935,18 @@
      <ClInclude Include="Battlescape\DebriefingState.h" />
      <ClInclude Include="Battlescape\ExperienceOverviewState.h" />
      <ClInclude Include="Battlescape\Explosion.h" />
@@ -56731,10 +57307,10 @@ index 99f24ce43..49c6883fc 100644
      <ClInclude Include="Battlescape\ExtendedBattlescapeLinksState.h" />
      <ClInclude Include="Battlescape\ExtendedInventoryLinksState.h" />
 diff --git a/src/OpenXcom.2010.vcxproj.filters b/src/OpenXcom.2010.vcxproj.filters
-index 92dbcdf0a..c2d4a6879 100644
+index 92dbcdf0a..1f1f91f65 100644
 --- a/src/OpenXcom.2010.vcxproj.filters
 +++ b/src/OpenXcom.2010.vcxproj.filters
-@@ -329,6 +329,78 @@
+@@ -329,6 +329,81 @@
      <ClCompile Include="Battlescape\Explosion.cpp">
        <Filter>Battlescape</Filter>
      </ClCompile>
@@ -56766,6 +57342,9 @@ index 92dbcdf0a..c2d4a6879 100644
 +      <Filter>FirstPerson</Filter>
 +    </ClCompile>
 +    <ClCompile Include="FirstPerson\FirstPersonSpriteHits.cpp">
++      <Filter>FirstPerson</Filter>
++    </ClCompile>
++    <ClCompile Include="FirstPerson\FirstPersonQuickDeaths.cpp">
 +      <Filter>FirstPerson</Filter>
 +    </ClCompile>
 +    <ClCompile Include="FirstPerson\FirstPersonScanner.cpp">
@@ -56813,7 +57392,7 @@ index 92dbcdf0a..c2d4a6879 100644
      <ClCompile Include="Geoscape\ItemsArrivingState.cpp">
        <Filter>Geoscape</Filter>
      </ClCompile>
-@@ -1571,6 +1643,42 @@
+@@ -1571,6 +1646,42 @@
      <ClInclude Include="Battlescape\Explosion.h">
        <Filter>Battlescape</Filter>
      </ClInclude>
@@ -56856,7 +57435,7 @@ index 92dbcdf0a..c2d4a6879 100644
      <ClInclude Include="Basescape\TransfersState.h">
        <Filter>Basescape</Filter>
      </ClInclude>
-@@ -2731,6 +2839,9 @@
+@@ -2731,6 +2842,9 @@
      <Filter Include="Battlescape">
        <UniqueIdentifier>{f7e493ce-c074-420c-8b38-40d81b2d0509}</UniqueIdentifier>
      </Filter>

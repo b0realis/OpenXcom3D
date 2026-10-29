@@ -136,6 +136,8 @@ public:
 	static bool pelletsInFlight(BattlescapeState *state);
 	/// Setting "Full sprite hitboxes": are units hit by their pictures in this battle (see FirstPerson::spriteHitboxes)?
 	static bool spriteHitboxes(BattlescapeState *state);
+	/// Setting "Quick deaths": are deaths quick in this battle (see FirstPerson::quickDeaths)?
+	static bool quickDeaths(BattlescapeState *state);
 	/// Akimbo on the map (Ctrl+Shift+click on a hand's weapon): steps the soldier's two guns through firing together there.
 	static bool toggleMapAkimbo(BattlescapeState *state, BattleUnit *unit);
 	/// Akimbo on the map: its mini targets in both hands' boxes; undone once the guns no longer pair up.
@@ -1111,6 +1113,24 @@ private:
 
 	/// Stays with a soldier who went down a moment; true while it's showing.
 	bool deathCam(Uint32 now, double elapsedSeconds);
+
+	// ---- setting "Quick deaths": the soldier looked through going down falls on their helmet
+	// camera card while the view goes on to the next soldier at once ----
+
+	const BattleUnit *_deathFeedUnit = nullptr;  // the soldier whose fall plays on the card (null: none)
+	Uint32 _deathFeedStart = 0;                  // when they went down
+	FallKind _deathFeedKind = FALL_KILLED;       // killed or knocked out
+	double _deathFeedEye[3] = {};                // the eye they fell from, in voxels...
+	double _deathFeedYaw = 0.0;                  // ...the way they looked...
+	double _deathFeedPitch = 0.0;                // ...and how far up or down
+	BattleUnit *_quickNextSoldier = nullptr;     // the soldier the view went on to (selected once the game is free; null: none)
+
+	/// Hands the view over at once: the fall goes on the soldier's card, the view to the next soldier.
+	void quickHandOver(BattleUnit *unit, Uint32 now);
+	/// The next soldier of ours standing after this one, in the squad's order (null: none).
+	BattleUnit *nextStandingSoldier(const BattleUnit *after) const;
+	/// Points the card's camera through the falling soldier's eyes, at this moment of their fall.
+	void aimDeathFeed(FirstPersonView *camera, Uint32 now);
 
 	// ---- the aliens' turn cameras (setting "Aliens' turn cameras"): the view cuts to the soldier
 	// who sees the alien acting (the nearest), or to one of ours firing back; a soldier shot at,

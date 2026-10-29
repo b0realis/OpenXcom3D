@@ -385,6 +385,9 @@ public:
 	void setShowFacing(bool show) { _showFacing = show; }
 	/// Shakes the camera (explosions, hits); stronger shakes win.
 	void addShake(float amount) { _shake = std::max(_shake, amount); }
+	/// Wipes the hurt off the view at once: the blood on it, the arc towards where a hit came
+	/// from, and the shake (the view handed on to another soldier, see FirstPersonMode::quickHandOver).
+	void clearHurt() { _bloodSplats.clear(); _bloodAmount = 0.0f; _hurtStart = 0; _hurtDirectionKnown = false; _shake = 0.0f; }
 	/// Washes the view with a colour (0 none .. 1 full): 0 red (hurt, killed), 1 dark blue (unconscious),
 	/// 2 orange (mind control), 3 white (a breakdown), 4 sickly green (turning into a zombie); `red`
 	/// is the share of the washed pixels washed red instead.
