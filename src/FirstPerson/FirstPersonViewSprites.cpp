@@ -124,8 +124,8 @@ bool FirstPersonView::projectToScreen(const double world[3], double &screenX, do
  * of lying in it (and vanishing). Looking up it leans only CardTiltUpMax degrees: a unit right
  * beside the soldier, leaning in further, lurched at the camera. Within those pitches the card
  * is square to the view, which is simply the sprite scaled at the anchor's distance.
- * A sprite of something lying on the floor (SpritePose::Lying: items, corpses) stands only
- * above the anchor: its rows below the anchor, where the isometric art draws the front half of
+ * A sprite of something lying on the floor (SpritePose::Lying: items, corpses, and a unit's art
+ * below its feet) stands only above the anchor: its rows below the anchor, where the isometric art draws the front half of
  * the floor's diamond, lie flat on the floor in front of the anchor (sqrt(2) voxels nearer the
  * camera a row), half a voxel above it, so they show on the floor rather than under it. Seen
  * from below that floor (a soldier downstairs looking up), they aren't drawn at all: the top of
@@ -919,6 +919,15 @@ void FirstPersonView::drawUnits()
 		step.sprite.floorCut = floorUnderside(feet); // (its art below its feet stays out of the room below)
 		step.sprite.shade = shade;
 		step.sprite.scale = unitScale;
+		// The art below its feet (the front half of the floor's diamond: a snake's tail, a long
+		// body in some facings) lies flat on the floor in front of them, as an item's does, instead
+		// of sinking into it (a player's report, GitHub issue #31: X-Com Files' Asmodean Cobra "in
+		// the ground" in some rotations; for most units only a few pixels of the feet). Not for a
+		// unit in the air: its floor would be seen from below, where lying rows aren't drawn.
+		if (!unit->haveNoFloorBelow() && unit->getStatus() != STATUS_FLYING)
+		{
+			step.sprite.pose = SpritePose::Lying;
+		}
 		step.sprite.unit = unit;
 		useSmoothVersion(step.sprite);
 		_drawList.push_back(step);
