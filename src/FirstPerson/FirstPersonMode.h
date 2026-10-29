@@ -376,8 +376,8 @@ private:
 	void updateCompass(BattleUnit *unit, bool playerTurn);
 	/// Draws the dial for a view bearing (degrees, 0 north, clockwise), a facing (0..7), a warning (0 none, 1 near the limit, 2 no time units to turn) and the facing a shot will turn to (-1 none).
 	void drawCompass(int viewBearing, int facing, int warning, int shotFacing);
-	/// The time units the game's turn before a shot or throw at what's under the crosshair will cost, and the facing it turns to.
-	int shotTurnCost(BattleUnit *unit, int &direction, bool &affordable) const;
+	/// The time units the turn before a shot, throw or melee blow at what's under the crosshair will cost, and the facing it turns to.
+	int shotTurnCost(BattleUnit *unit, int &direction, bool &affordable, bool *melee = nullptr) const;
 	/// Turns the view towards the n-th visible enemy.
 	void lookAtEnemy(int enemyIndex);
 	/// Turns the view towards a unit's chest.
@@ -666,8 +666,22 @@ private:
 	BattleActionOrigin leanSide(const BattleUnit *unit, const Position &targetTile) const;
 	/// Melee at a body lying in front or at the feet (setting "Melee hits walls and the downed").
 	bool meleeDowned(BattleUnit *unit, BattleItem *weapon, BattleAction *action);
-	/// A melee blow at terrain by the crosshair: the wall, door or object it meets within reach, on a neighbouring tile.
-	bool crosshairTerrainMelee(BattleUnit *unit, BattleItem *weapon, Position &struck, int &part);
+	/// The wall, door or object the crosshair meets within a melee blow's reach, on the unit's own tile or a neighbouring one.
+	bool crosshairTerrainMelee(BattleUnit *unit, Position &struck, int &part) const;
+	/// Whether a melee blow may strike terrain: the mod's terrain melee or the setting on, and the weapon damaging terrain.
+	bool meleeStrikesTerrain(BattleItem *weapon) const;
+	/// Whom a melee blow would strike now (see meleeTarget).
+	struct MeleeAim
+	{
+		BattleUnit *target = nullptr; // a unit under the crosshair beside the soldier (null: none)
+		Position tile;                // the tile it's struck on
+		int direction = -1;           // the way the soldier turns to face it first
+		std::string refusal;          // a unit under the crosshair out of reach: why (the warning shown)
+	};
+	/// Whom a melee blow would strike now, by the crosshair: a unit beside the soldier, or out of range.
+	MeleeAim meleeTarget(BattleUnit *unit) const;
+	/// Turns the soldier to face a way before using something on a neighbour (by the rules, or for free); false without the time units for the turn and the use.
+	bool turnBeforeUse(BattleUnit *unit, int direction, int useTime);
 	/// Akimbo: the gun in the other hand that fires along, or null.
 	BattleItem *offHandWeapon(BattleUnit *unit, const BattleItem *weapon) const;
 	/// Has a unit lost health in this battle (not only carried over from earlier fights)?

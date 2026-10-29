@@ -926,28 +926,116 @@ void FirstPersonMode::switchHand()
 }
 
 /**
- * A melee blow at terrain by the crosshair (a player's report: melee couldn't strike a structure
- * diagonally in front, "Preferably you should be able to melee any voxel structure within around
- * 1 tile of the player, and base it entirely on where first person crosshair is"; on stairs the
- * walls of both floors ahead): what the crosshair meets, by the game's own line (see aimAt), if
- * it's a wall, a door or an object (the game's terrain melee knows no floors), no farther from the
- * eye than MeleeTerrainReach, on the unit's own tile or one next to it (the eight around, a level
- * up or down too: the owner's choice), and the weapon damages terrain at all (as the game's own
- * check, validTerrainMeleeRange). The game's terrain melee then strikes that part of that tile.
+ * Whom a melee blow would strike now, by the crosshair (a player's report, "Melee locked to compass
+ * facing": the crosshair on a cabinet to the north-west, the soldier facing north, the blow struck
+ * the unit to the north, and the other way round; the owner: the crosshair first, as the medi-kit
+ * aims, see medikitPatient): a unit standing under the crosshair (or the free cursor) on a tile
+ * next to the soldier, by the game's melee reach (TileEngine::validMeleeRange, any of the eight
+ * ways: the one needing the fewest eighths of a turn), the soldier first turning to face it; a
+ * unit farther off, out of range. With no unit under the crosshair, none (fire goes on to the
+ * wall, door or object under it, then to the way the soldier faces).
  * @param unit The soldier striking.
- * @param weapon The weapon (or fist) striking.
- * @param struck Set to the voxel the crosshair meets.
- * @param part Set to the part struck (V_WESTWALL, V_NORTHWALL or V_OBJECT).
- * @return True if there's something to strike.
+ * @return The unit struck (null if none, with the reason when it's out of reach), the tile it's
+ *   struck on and the way to turn to it.
  */
-bool FirstPersonMode::crosshairTerrainMelee(BattleUnit *unit, BattleItem *weapon, Position &struck, int &part)
+FirstPersonMode::MeleeAim FirstPersonMode::meleeTarget(BattleUnit *unit) const
 {
-	// The weapon must damage terrain (a melee weapon's own damage, else its melee's).
-	const RuleItem *rules = weapon ? weapon->getRules() : nullptr;
-	if (rules && (rules->getBattleType() == BT_MELEE ? rules->getDamageType() : rules->getMeleeType())->ToTile == 0.0)
+	MeleeAim aim;
+	BattleUnit *pointed = _view->getUnitAtPointer();
+	if (!pointed || pointed == unit)
+	{
+		return aim;
+	}
+	int bestEighths = 9;
+	for (int direction = 0; direction < 8; ++direction)
+	{
+		Position reachedTile;
+		const int eighths = std::min((direction - unit->getDirection() + 8) % 8, (unit->getDirection() - direction + 8) % 8);
+		if (eighths < bestEighths && _save->getTileEngine()->validMeleeRange(unit->getPosition(), direction, unit, pointed, &reachedTile))
+		{
+			bestEighths = eighths;
+			aim.direction = direction;
+			aim.tile = reachedTile;
+		}
+	}
+	if (aim.direction < 0)
+	{
+		aim.refusal = "STR_OUT_OF_RANGE";
+		return aim;
+	}
+	aim.target = pointed;
+	return aim;
+}
+
+/**
+ * Turns the soldier to face a way before using something on a neighbour (a medi-kit's patient, a
+ * melee blow's target or the terrain it strikes, see useItemDirectly and fire). With "Turning
+ * costs TU" an eighth at a time the shorter way round, each the armor's turn cost (as the game's
+ * turn charges it; nothing in Doom mode), the turn and the use both wanting their time units
+ * before either is spent; with free turning for nothing.
+ * @param unit The soldier.
+ * @param direction The way to face (-1, or the way faced already: no turn).
+ * @param useTime The time units the use takes after the turn.
+ * @return False, with the game's warning, if the time units won't cover the turn and the use.
+ */
+bool FirstPersonMode::turnBeforeUse(BattleUnit *unit, int direction, int useTime)
+{
+	if (direction < 0 || direction == unit->getDirection())
+	{
+		return true;
+	}
+	const int eighths = std::min((direction - unit->getDirection() + 8) % 8, (unit->getDirection() - direction + 8) % 8);
+	const int turnCost = Options::fpsTurnCost && !doomModeOn() ? eighths * unit->getTurnCost() : 0;
+	if (turnCost > 0 && unit->getTimeUnits() < turnCost + useTime)
+	{
+		_state->warning("STR_NOT_ENOUGH_TIME_UNITS");
+		return false;
+	}
+	unit->spendTimeUnits(turnCost);
+	unit->setDirection(direction);
+	TileEngine *tileEngine = _save->getTileEngine();
+	tileEngine->calculateFOV(unit);
+	tileEngine->calculateFOV(unit->getPosition(), 1, false); // others' view of this unit, as after the game's turn
+	_state->updateSoldierInfo(false);
+	return true;
+}
+
+/**
+ * Whether a melee blow may strike terrain: the mod switches the game's terrain melee on
+ * (extendedTerrainMelee) or the setting "Melee hits walls and the downed" does for the 3D view,
+ * and the weapon damages terrain at all (a melee weapon's own damage, else its melee's; as the
+ * game's own check, validTerrainMeleeRange).
+ * @param weapon The weapon (or fist) striking.
+ * @return True if the blow may strike a wall, door or object.
+ */
+bool FirstPersonMode::meleeStrikesTerrain(BattleItem *weapon) const
+{
+	if (!Options::fpsMeleeTerrain && Mod::EXTENDED_TERRAIN_MELEE <= 0)
 	{
 		return false;
 	}
+	const RuleItem *rules = weapon ? weapon->getRules() : nullptr;
+	return !rules || (rules->getBattleType() == BT_MELEE ? rules->getDamageType() : rules->getMeleeType())->ToTile != 0.0;
+}
+
+/**
+ * The terrain a melee blow at the crosshair meets (a player's report: melee couldn't strike a
+ * structure diagonally in front, "Preferably you should be able to melee any voxel structure
+ * within around 1 tile of the player, and base it entirely on where first person crosshair is";
+ * on stairs the walls of both floors ahead): what the crosshair meets, by the game's own line
+ * (see aimAt), if it's a wall, a door or an object (the game's terrain melee knows no floors), no
+ * farther from the eye than MeleeTerrainReach, on the unit's own tile or one next to it (the eight
+ * around, a level up or down too: the owner's choice). The game's terrain melee then strikes that
+ * part of that tile, if the blow may strike terrain (see meleeStrikesTerrain); if it may not, the
+ * blow strikes nothing (a player's report: the crosshair on a cabinet, the blow struck the unit
+ * the soldier faced).
+ * @param unit The soldier striking.
+ * @param struck Set to the voxel the crosshair meets.
+ * @param part Set to the part met (V_WESTWALL, V_NORTHWALL or V_OBJECT).
+ * @return True if the crosshair meets a wall, door or object within reach.
+ */
+bool FirstPersonMode::crosshairTerrainMelee(BattleUnit *unit, Position &struck, int &part) const
+{
 	// What the crosshair meets: a wall, a door or an object, within reach.
 	int hitType = V_EMPTY;
 	if (!aimAt(_view->getWidth() / 2, _view->getHeight() / 2, unit, struck, &hitType) || (hitType != V_WESTWALL && hitType != V_NORTHWALL && hitType != V_OBJECT))
@@ -1097,18 +1185,21 @@ void FirstPersonMode::updateAim(BattleUnit *unit)
  * on the compass). The game turns the soldier to face the target tile first (BattleUnit::
  * directionTo: the eighth it lies in), an eighth at a time the shorter way round, each eighth
  * costing the armor's turn cost (a tank's turret turns instead, for 1), as UnitTurnBState
- * charges it. Turning by the rules only: with free turning the soldier faces the target for free
- * before the shot (see fire). Nothing for melee (it strikes the tile ahead), psi (no turn) or
- * in Doom mode (time units don't run out).
+ * charges it. A melee blow turns the soldier the same way to the unit under the crosshair beside
+ * them, or to the wall, door or object under it (see fire, turnBeforeUse). Turning by the rules
+ * only: with free turning the soldier faces the target for free first (see fire). Nothing for
+ * psi (no turn) or in Doom mode (time units don't run out).
  * @param unit The soldier aiming.
  * @param direction Set to the way the soldier (or its turret) will face for the shot.
  * @param affordable Set to whether the soldier has the time units for the turn and the shot.
+ * @param melee If given, set to whether it's a melee blow's turn.
  * @return The time units the turn will cost; 0 for no turn.
  */
-int FirstPersonMode::shotTurnCost(BattleUnit *unit, int &direction, bool &affordable) const
+int FirstPersonMode::shotTurnCost(BattleUnit *unit, int &direction, bool &affordable, bool *melee) const
 {
 	direction = -1;
 	affordable = true;
+	if (melee) *melee = false;
 	if (!Options::fpsTurnCost || doomModeOn() || !unit)
 	{
 		return 0;
@@ -1122,6 +1213,32 @@ int FirstPersonMode::shotTurnCost(BattleUnit *unit, int &direction, bool &afford
 		weapon = action->weapon;
 	}
 	const BattleActionType mode = weapon ? firedAs(weapon, _fireMode) : BA_NONE;
+	if (mode == BA_HIT)
+	{
+		// A melee blow: the turn to the unit under the crosshair beside the soldier, or to the
+		// wall, door or object under it within reach, as fire takes them.
+		const MeleeAim aim = meleeTarget(unit);
+		Position struck;
+		int part = V_EMPTY;
+		if (aim.target)
+		{
+			direction = aim.direction;
+		}
+		else if (aim.refusal.empty() && crosshairTerrainMelee(unit, struck, part) && meleeStrikesTerrain(weapon))
+		{
+			direction = unit->directionTo(struck.toTile());
+		}
+		if (direction < 0 || direction == unit->getDirection())
+		{
+			direction = -1;
+			return 0;
+		}
+		if (melee) *melee = true;
+		const int eighths = std::min((direction - unit->getDirection() + 8) % 8, (unit->getDirection() - direction + 8) % 8);
+		const int cost = eighths * unit->getTurnCost();
+		affordable = cost + BattleActionCost(mode, unit, weapon).Time <= unit->getTimeUnits();
+		return cost;
+	}
 	if (!isShot(mode) && mode != BA_THROW)
 	{
 		return 0;
@@ -1955,7 +2072,9 @@ FirstPersonMode::ShotAim FirstPersonMode::aimFor(BattleAction &shot, const Posit
  * and triggers reaction fire.
  * - Shots and throws target the tile under the pixel (or its exact voxel, see below).
  * - A guided launcher and psi on a creature out of sight are aimed on the isometric map.
- * - Melee hits whatever is in front of the soldier.
+ * - Melee strikes the unit beside the soldier under the pixel (turning to it first), the wall,
+ *   door or object under it within reach, or with nothing of these under it whatever is in
+ *   front of the soldier.
  * - Medi-kits and scanners are used at once; priming opens the game's timer box straight away
  *   (the fire mode already says what the item's action menu would ask again); a psi amp's or a
  *   mind probe's use targets as psi does.
@@ -2152,22 +2271,50 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 		return;
 	}
 
-	// Melee: the game finds who is in reach in the direction the soldier faces (the 3D view
-	// keeps him facing where it looks) and does the attack as its own action, which needs no
-	// target click. With no one standing in reach, the game's own terrain melee, if the mod
-	// switches it on (extendedTerrainMelee) or the setting "Melee hits walls and the downed"
-	// does for the 3D view (which first lets the blow hit a body lying in front, see
-	// meleeDowned), strikes the wall, door or object under the crosshair within reach, diagonal
-	// or a level up or down too (see crosshairTerrainMelee; the map's own strikes only the one
-	// straight ahead).
+	// Melee, by the crosshair first (a player's report: "Melee locked to compass facing"): a unit
+	// standing under it beside the soldier, who turns to face it first (see meleeTarget; one
+	// under it farther off is out of range); else the wall, door or object under it within
+	// reach, diagonal or a level up or down too (see crosshairTerrainMelee; the map's own strikes
+	// only the one straight ahead), turning to its tile, if the blow may strike terrain (the
+	// mod's terrain melee, extendedTerrainMelee, or the setting "Melee hits walls and the
+	// downed", see meleeStrikesTerrain), and nothing if it may not; with the crosshair on none of
+	// these (open floor, the sky, out of reach), as the game does it: who is in reach the way the
+	// soldier faces, then (that setting) a body lying in front (see meleeDowned). The turn goes
+	// by the rules or is free (turnBeforeUse), and the game does the attack as its own action,
+	// which needs no target click.
 	if (mode == BA_HIT)
 	{
 		TileEngine *tileEngine = _save->getTileEngine();
-		Position meleeTile;
+		Position meleeTile, struck;
+		int part = V_EMPTY;
 		action->actor = unit;
 		action->weapon = weapon;
 		action->terrainMeleeTilePart = 0;
-		if (tileEngine->validMeleeRange(unit->getPosition(), unit->getDirection(), unit, nullptr, &meleeTile))
+		const MeleeAim aim = meleeTarget(unit);
+		int turnTo = -1;
+		if (!aim.refusal.empty())
+		{
+			_state->warning(aim.refusal);
+			return;
+		}
+		if (aim.target)
+		{
+			action->target = aim.tile;
+			turnTo = aim.direction;
+		}
+		else if (crosshairTerrainMelee(unit, struck, part))
+		{
+			if (!meleeStrikesTerrain(weapon))
+			{
+				_state->warning("STR_THERE_IS_NO_ONE_THERE");
+				return;
+			}
+			action->target = struck.toTile();
+			action->terrainMeleeTilePart = part;
+			action->targetVoxel = struck; // (the hit lands there: MeleeAttackBState)
+			turnTo = unit->directionTo(action->target); // (its own tile's wall: no turn)
+		}
+		else if (tileEngine->validMeleeRange(unit->getPosition(), unit->getDirection(), unit, nullptr, &meleeTile))
 		{
 			action->target = meleeTile;
 		}
@@ -2177,22 +2324,21 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 		}
 		else
 		{
-			Position struck;
-			int part = V_EMPTY;
-			if (!(Options::fpsMeleeTerrain || Mod::EXTENDED_TERRAIN_MELEE > 0) || !crosshairTerrainMelee(unit, weapon, struck, part))
-			{
-				_state->warning("STR_THERE_IS_NO_ONE_THERE");
-				return;
-			}
-			action->target = struck.toTile();
-			action->terrainMeleeTilePart = part;
-			action->targetVoxel = struck; // (the hit lands there: MeleeAttackBState)
+			_state->warning("STR_THERE_IS_NO_ONE_THERE");
+			return;
 		}
 		action->type = BA_HIT;
 		action->targeting = false;
 		action->result.clear();
 		action->updateTU();
 		const bool timeUnitsEnough = action->haveTU();
+		if (timeUnitsEnough && !turnBeforeUse(unit, turnTo, action->Time))
+		{
+			action->type = BA_NONE;
+			action->terrainMeleeTilePart = 0;
+			action->targetVoxel = Position(-1, -1, -1);
+			return;
+		}
 		battleGame->handleNonTargetAction();
 		action->targetVoxel = Position(-1, -1, -1); // (taken by the game's melee, if it went ahead)
 
@@ -2685,23 +2831,10 @@ void FirstPersonMode::useItemDirectly(BattleUnit *unit, BattleItem *item)
 		return;
 	}
 	// A patient beside the soldier but not in the way they face: the soldier turns to them
-	// first. With "Turning costs TU" an eighth at a time the shorter way round, each the armor's
-	// turn cost (as the game's turn charges it; nothing in Doom mode), the turn and the kit's use
-	// both wanting their time units before either is spent; with free turning for nothing.
-	if (aim.direction >= 0 && aim.direction != unit->getDirection())
+	// first (by the rules or for free, see turnBeforeUse).
+	if (!turnBeforeUse(unit, aim.direction, type ? action->Time : 0))
 	{
-		const int eighths = std::min((aim.direction - unit->getDirection() + 8) % 8, (unit->getDirection() - aim.direction + 8) % 8);
-		const int turnCost = Options::fpsTurnCost && !doomModeOn() ? eighths * unit->getTurnCost() : 0;
-		if (turnCost > 0 && unit->getTimeUnits() < turnCost + (type ? action->Time : 0))
-		{
-			_state->warning("STR_NOT_ENOUGH_TIME_UNITS");
-			return;
-		}
-		unit->spendTimeUnits(turnCost);
-		unit->setDirection(aim.direction);
-		tileEngine->calculateFOV(unit);
-		tileEngine->calculateFOV(unit->getPosition(), 1, false); // others' view of this unit, as after the game's turn
-		_state->updateSoldierInfo(false);
+		return;
 	}
 	if (!type)
 	{

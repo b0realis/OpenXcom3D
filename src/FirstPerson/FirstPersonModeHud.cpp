@@ -157,7 +157,8 @@ void FirstPersonMode::toggleNightVision(BattleUnit *unit)
  * soldier faces makes the game turn the soldier first and charge the turn (turning by the rules,
  * see shotTurnCost): an orange triangle on the rim marks the way the soldier will face, and the
  * line under the dial says what the turn adds ("SHOT +2 TU"; red when the time units won't
- * cover the turn and the shot). The dial is drawn again only when what it shows changes.
+ * cover the turn and the shot); a melee blow at a unit or a wall beside the soldier the same
+ * ("HIT +2 TU"). The dial is drawn again only when what it shows changes.
  * @param unit The soldier the view looks through, or null to hide the compass.
  * @param playerTurn It's the player's turn (the shot's turn is shown only then).
  */
@@ -197,21 +198,21 @@ void FirstPersonMode::updateCompass(BattleUnit *unit, bool playerTurn)
 	}
 	// The shot's turn: its cost and the way the soldier will face (none while a step is walked).
 	int shotFacing = -1, shotTurn = 0, shotWarning = 0;
-	bool shotAffordable = true;
+	bool shotAffordable = true, meleeTurn = false;
 	if (playerTurn && canAct() && !_stepPending)
 	{
-		shotTurn = shotTurnCost(unit, shotFacing, shotAffordable);
+		shotTurn = shotTurnCost(unit, shotFacing, shotAffordable, &meleeTurn);
 		shotWarning = shotTurn ? (shotAffordable ? 1 : 2) : 0;
 		if (!shotTurn) shotFacing = -1;
 	}
 	if (viewBearing != _compassDrawn[0] || facing != _compassDrawn[1] || warning != _compassDrawn[2]
-		|| shotFacing != _compassDrawn[3] || shotTurn * 4 + shotWarning != _compassDrawn[4])
+		|| shotFacing != _compassDrawn[3] || (shotTurn * 4 + shotWarning) * 2 + meleeTurn != _compassDrawn[4])
 	{
 		_compassDrawn[0] = viewBearing;
 		_compassDrawn[1] = facing;
 		_compassDrawn[2] = warning;
 		_compassDrawn[3] = shotFacing;
-		_compassDrawn[4] = shotTurn * 4 + shotWarning;
+		_compassDrawn[4] = (shotTurn * 4 + shotWarning) * 2 + meleeTurn;
 		drawCompass(viewBearing, facing, warning, shotFacing);
 
 		// The letters, inside the rim, at their bearings measured from the view's.
@@ -231,7 +232,7 @@ void FirstPersonMode::updateCompass(BattleUnit *unit, bool playerTurn)
 		if (shotWarning)
 		{
 			_txtCompassTurn->setColor(textColor(_state->getPalette(), shotWarning == 1 ? 250 : 230, shotWarning == 1 ? 160 : 60, shotWarning == 1 ? 60 : 50));
-			_txtCompassTurn->setText(_state->tr("STR_FPS_COMPASS_SHOT_TURN").arg(shotTurn));
+			_txtCompassTurn->setText(_state->tr(meleeTurn ? "STR_FPS_COMPASS_HIT_TURN" : "STR_FPS_COMPASS_SHOT_TURN").arg(shotTurn));
 		}
 		else if (warning)
 		{
