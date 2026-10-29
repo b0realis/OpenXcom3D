@@ -539,8 +539,8 @@ private:
 	void toggleFlight(BattleUnit *unit);
 	/// May a walker go up or down a level from here (a lift ride, a ladder)?
 	bool walkerMayMoveUpDown(const Position &position, int direction) const;
-	/// Goes up or down a level: by grav lift or ladder, or flying.
-	void moveUpDown(BattleUnit *unit, int direction, Action *action);
+	/// Goes up or down a level: by grav lift or ladder, or flying (the up and down keys also switch flight on and off).
+	void moveUpDown(BattleUnit *unit, int direction, Action *action, bool upDownKey = false);
 	/// Flight each frame: its cost, and coming down after it's switched off in the air.
 	void updateFlight(BattleUnit *unit);
 	/// Hurts the soldier for a fall of some levels.

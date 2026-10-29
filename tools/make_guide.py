@@ -31,7 +31,7 @@ KEYS = [
          'Lets you finish a dash, at your own risk.'),
         ('<kbd>Space</kbd>', 'Jump: a free hop; walking into something low (a fence, a crate, up to waist height) vaults over it.',
          'A small bend of the rules (setting <i>Jump over low obstacles</i>).'),
-        ('<kbd>Page Up</kbd> <kbd>Page Down</kbd>', 'Fly up/down with flight on, ride a grav lift, climb a ladder. Purple arrows with LIFT PLATFORM show where a lift goes.',
+        ('<kbd>Page Up</kbd> <kbd>Page Down</kbd>', 'Fly up/down, ride a grav lift, climb a ladder. Off a lift, Page Up switches flight on, Page Down on the ground off. Purple arrows with LIFT PLATFORM show where a lift goes.',
          ''),
         ('<kbd>B</kbd>', 'Suit flight on/off (flying armor; SWIM under water).', ''),
         ('<kbd>O</kbd>', 'Open the door you look at without walking through it, if it\'s in reach.', 'Look before you step into a room.'),

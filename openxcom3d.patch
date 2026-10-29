@@ -124,7 +124,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..2d86d31ed
+index 000000000..14b592d6c
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,418 @@
@@ -537,9 +537,9 @@ index 000000000..2d86d31ed
 +  STR_FPS_KEY_LEAN_RIGHT: "Lean right"
 +  STR_FPS_KEY_LEAN_RIGHT_DESC: "A key of its own: held, leans out to the right (setting Lean)."
 +  STR_FPS_KEY_UP: "Fly / lift up"
-+  STR_FPS_KEY_UP_DESC: "Up a level, flying or on a gravity lift."
++  STR_FPS_KEY_UP_DESC: "Up a level, flying or on a gravity lift (off a lift it switches flight on)."
 +  STR_FPS_KEY_DOWN: "Fly / lift down"
-+  STR_FPS_KEY_DOWN_DESC: "Down a level, flying or on a gravity lift."
++  STR_FPS_KEY_DOWN_DESC: "Down a level, flying or on a gravity lift (on the ground it switches flight off)."
 +  STR_FPS_KEY_DOOM_MODE: "Doom mode on/off"
 +  STR_FPS_KEY_DOOM_MODE_DESC: "Cheats off (doom mode, IDKFA, IDDQD), and the same back on."
 +  STR_FPS_KEY_CLASSIC_HUD: "Classic HUD on/off"
@@ -548,7 +548,7 @@ index 000000000..2d86d31ed
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers: a clear view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..53933ffd7
+index 000000000..8297f2e6e
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,418 @@
@@ -961,9 +961,9 @@ index 000000000..53933ffd7
 +  STR_FPS_KEY_LEAN_RIGHT: "Lean right"
 +  STR_FPS_KEY_LEAN_RIGHT_DESC: "A key of its own: held, leans out to the right (setting Lean)."
 +  STR_FPS_KEY_UP: "Fly / lift up"
-+  STR_FPS_KEY_UP_DESC: "Up a level, flying or on a gravity lift."
++  STR_FPS_KEY_UP_DESC: "Up a level, flying or on a gravity lift (off a lift it switches flight on)."
 +  STR_FPS_KEY_DOWN: "Fly / lift down"
-+  STR_FPS_KEY_DOWN_DESC: "Down a level, flying or on a gravity lift."
++  STR_FPS_KEY_DOWN_DESC: "Down a level, flying or on a gravity lift (on the ground it switches flight off)."
 +  STR_FPS_KEY_DOOM_MODE: "Doom mode on/off"
 +  STR_FPS_KEY_DOOM_MODE_DESC: "Cheats off (doom mode, IDKFA, IDDQD), and the same back on."
 +  STR_FPS_KEY_CLASSIC_HUD: "Classic HUD on/off"
@@ -22171,7 +22171,7 @@ index 000000000..1f9c9e104
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..429adf2d4
+index 000000000..c214dbeb5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
 @@ -0,0 +1,2675 @@
@@ -24351,8 +24351,8 @@ index 000000000..429adf2d4
 +	if (key != SDLK_UNKNOWN && key == Options::keyFpsShowFacing) return true; // (held: see think)
 +	if (key == Options::keyFpsOpenDoor) { if (pressed) openDoor(_save->getSelectedUnit()); return true; }
 +	if (key == Options::keyFpsFlare) { if (pressed) { if (Options::fpsFlares) throwFlare(); else _state->warning("STR_FPS_FLARES_OFF"); } return true; }
-+	if (key == Options::keyFpsUp) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_UP, action); return true; }
-+	if (key == Options::keyFpsDown) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_DOWN, action); return true; }
++	if (key == Options::keyFpsUp) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_UP, action, true); return true; }
++	if (key == Options::keyFpsDown) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_DOWN, action, true); return true; }
 +	if (key == Options::keyFpsFlight) { if (pressed) toggleFlight(_save->getSelectedUnit()); return true; }
 +	if (key == Options::keyFpsFlashlight) { if (pressed) toggleFlashlight(); return true; }
 +	if (key == Options::keyFpsSprint) { if (pressed) toggleSprint(); return true; }
@@ -24852,7 +24852,7 @@ index 000000000..429adf2d4
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..c8a91d793
+index 000000000..6b11eb5a1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
 @@ -0,0 +1,1154 @@
@@ -25397,8 +25397,8 @@ index 000000000..c8a91d793
 +	void toggleFlight(BattleUnit *unit);
 +	/// May a walker go up or down a level from here (a lift ride, a ladder)?
 +	bool walkerMayMoveUpDown(const Position &position, int direction) const;
-+	/// Goes up or down a level: by grav lift or ladder, or flying.
-+	void moveUpDown(BattleUnit *unit, int direction, Action *action);
++	/// Goes up or down a level: by grav lift or ladder, or flying (the up and down keys also switch flight on and off).
++	void moveUpDown(BattleUnit *unit, int direction, Action *action, bool upDownKey = false);
 +	/// Flight each frame: its cost, and coming down after it's switched off in the air.
 +	void updateFlight(BattleUnit *unit);
 +	/// Hurts the soldier for a fall of some levels.
@@ -28904,10 +28904,10 @@ index 000000000..9851faf9b
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeMovement.cpp b/src/FirstPerson/FirstPersonModeMovement.cpp
 new file mode 100644
-index 000000000..1a9a02bf6
+index 000000000..1b98a6bd9
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeMovement.cpp
-@@ -0,0 +1,2016 @@
+@@ -0,0 +1,2035 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -30586,11 +30586,18 @@ index 000000000..1a9a02bf6
 + * climb, or flying. A soldier who can fly but has flight switched off keeps to what a walker
 + * may do (a lift or a ladder, see walkerMayMoveUpDown: never off the top of one into the air),
 + * with a message naming the flight key otherwise; one who is in the air all the same comes down
-+ * to land with the down key (see updateFlight).
++ * to land with the down key (see updateFlight). The up and down keys themselves also switch
++ * flight (a player's report, GitHub issue #32: "if I press page up, its very obvious my intention
++ * is to fly"; the owner: and page down off on the ground): the up key with flight off, where a
++ * walker can't go up, switches it on and flies up; the down key with flight on, standing on the
++ * ground where a walker can't go down (nowhere to fly down to), switches it off. Neither on a
++ * lift or a ladder (the player: "if NOT inside lift"; at a lift's top the up key keeps to the
++ * lift, see above), nor W or S looking up or down, a lift's arrows or the classic HUD's buttons.
 + * @param direction Pathfinding::DIR_UP or Pathfinding::DIR_DOWN.
 + * @param action The input event, passed on to the button's handler.
++ * @param upDownKey Whether it's the up or down key.
 + */
-+void FirstPersonMode::moveUpDown(BattleUnit *unit, int direction, Action *action)
++void FirstPersonMode::moveUpDown(BattleUnit *unit, int direction, Action *action, bool upDownKey)
 +{
 +	if (!unit || !canAct())
 +	{
@@ -30598,7 +30605,9 @@ index 000000000..1a9a02bf6
 +	}
 +
 +	// A flyer with flight off: in the air, down lands it (level by level, see updateFlight);
-+	// otherwise only a walker's moves.
++	// otherwise only a walker's moves, or with the up key off a lift or ladder, flight on.
++	const Tile *standing = _save->getTile(unit->getPosition());
++	const bool onLiftOrLadder = standing && (standing->hasGravLiftFloor() || standing->hasLadder());
 +	if (canFly(unit) && !flightOn(unit))
 +	{
 +		if (direction == Pathfinding::DIR_DOWN && unit->isFloating())
@@ -30610,9 +30619,19 @@ index 000000000..1a9a02bf6
 +		}
 +		if (!walkerMayMoveUpDown(unit->getPosition(), direction))
 +		{
-+			_state->warningRaw(_state->tr(_save->getDepth() > 0 ? "STR_FPS_SWIM_OFF_KEY" : "STR_FPS_FLIGHT_OFF_KEY").arg(keyLabel(Options::keyFpsFlight)));
-+			return;
++			if (!upDownKey || direction != Pathfinding::DIR_UP || onLiftOrLadder)
++			{
++				_state->warningRaw(_state->tr(_save->getDepth() > 0 ? "STR_FPS_SWIM_OFF_KEY" : "STR_FPS_FLIGHT_OFF_KEY").arg(keyLabel(Options::keyFpsFlight)));
++				return;
++			}
++			toggleFlight(unit); // the up key: flight on, then up
 +		}
++	}
++	// A flyer with flight on, on the ground: the down key switches flight off.
++	else if (upDownKey && direction == Pathfinding::DIR_DOWN && canFly(unit) && !unit->isFloating() && !onLiftOrLadder && !walkerMayMoveUpDown(unit->getPosition(), direction))
++	{
++		toggleFlight(unit);
++		return;
 +	}
 +
 +	// Press the battlescape's up or down button.

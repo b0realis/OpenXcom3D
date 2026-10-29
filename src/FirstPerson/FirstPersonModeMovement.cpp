@@ -1676,11 +1676,18 @@ bool FirstPersonMode::walkerMayMoveUpDown(const Position &position, int directio
  * climb, or flying. A soldier who can fly but has flight switched off keeps to what a walker
  * may do (a lift or a ladder, see walkerMayMoveUpDown: never off the top of one into the air),
  * with a message naming the flight key otherwise; one who is in the air all the same comes down
- * to land with the down key (see updateFlight).
+ * to land with the down key (see updateFlight). The up and down keys themselves also switch
+ * flight (a player's report, GitHub issue #32: "if I press page up, its very obvious my intention
+ * is to fly"; the owner: and page down off on the ground): the up key with flight off, where a
+ * walker can't go up, switches it on and flies up; the down key with flight on, standing on the
+ * ground where a walker can't go down (nowhere to fly down to), switches it off. Neither on a
+ * lift or a ladder (the player: "if NOT inside lift"; at a lift's top the up key keeps to the
+ * lift, see above), nor W or S looking up or down, a lift's arrows or the classic HUD's buttons.
  * @param direction Pathfinding::DIR_UP or Pathfinding::DIR_DOWN.
  * @param action The input event, passed on to the button's handler.
+ * @param upDownKey Whether it's the up or down key.
  */
-void FirstPersonMode::moveUpDown(BattleUnit *unit, int direction, Action *action)
+void FirstPersonMode::moveUpDown(BattleUnit *unit, int direction, Action *action, bool upDownKey)
 {
 	if (!unit || !canAct())
 	{
@@ -1688,7 +1695,9 @@ void FirstPersonMode::moveUpDown(BattleUnit *unit, int direction, Action *action
 	}
 
 	// A flyer with flight off: in the air, down lands it (level by level, see updateFlight);
-	// otherwise only a walker's moves.
+	// otherwise only a walker's moves, or with the up key off a lift or ladder, flight on.
+	const Tile *standing = _save->getTile(unit->getPosition());
+	const bool onLiftOrLadder = standing && (standing->hasGravLiftFloor() || standing->hasLadder());
 	if (canFly(unit) && !flightOn(unit))
 	{
 		if (direction == Pathfinding::DIR_DOWN && unit->isFloating())
@@ -1700,9 +1709,19 @@ void FirstPersonMode::moveUpDown(BattleUnit *unit, int direction, Action *action
 		}
 		if (!walkerMayMoveUpDown(unit->getPosition(), direction))
 		{
-			_state->warningRaw(_state->tr(_save->getDepth() > 0 ? "STR_FPS_SWIM_OFF_KEY" : "STR_FPS_FLIGHT_OFF_KEY").arg(keyLabel(Options::keyFpsFlight)));
-			return;
+			if (!upDownKey || direction != Pathfinding::DIR_UP || onLiftOrLadder)
+			{
+				_state->warningRaw(_state->tr(_save->getDepth() > 0 ? "STR_FPS_SWIM_OFF_KEY" : "STR_FPS_FLIGHT_OFF_KEY").arg(keyLabel(Options::keyFpsFlight)));
+				return;
+			}
+			toggleFlight(unit); // the up key: flight on, then up
 		}
+	}
+	// A flyer with flight on, on the ground: the down key switches flight off.
+	else if (upDownKey && direction == Pathfinding::DIR_DOWN && canFly(unit) && !unit->isFloating() && !onLiftOrLadder && !walkerMayMoveUpDown(unit->getPosition(), direction))
+	{
+		toggleFlight(unit);
+		return;
 	}
 
 	// Press the battlescape's up or down button.

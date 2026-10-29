@@ -2174,8 +2174,8 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	if (key != SDLK_UNKNOWN && key == Options::keyFpsShowFacing) return true; // (held: see think)
 	if (key == Options::keyFpsOpenDoor) { if (pressed) openDoor(_save->getSelectedUnit()); return true; }
 	if (key == Options::keyFpsFlare) { if (pressed) { if (Options::fpsFlares) throwFlare(); else _state->warning("STR_FPS_FLARES_OFF"); } return true; }
-	if (key == Options::keyFpsUp) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_UP, action); return true; }
-	if (key == Options::keyFpsDown) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_DOWN, action); return true; }
+	if (key == Options::keyFpsUp) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_UP, action, true); return true; }
+	if (key == Options::keyFpsDown) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_DOWN, action, true); return true; }
 	if (key == Options::keyFpsFlight) { if (pressed) toggleFlight(_save->getSelectedUnit()); return true; }
 	if (key == Options::keyFpsFlashlight) { if (pressed) toggleFlashlight(); return true; }
 	if (key == Options::keyFpsSprint) { if (pressed) toggleSprint(); return true; }
