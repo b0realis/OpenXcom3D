@@ -990,8 +990,13 @@ Uint8 FirstPersonView::colorOutsideMap(const float rayOrigin[3], const float ray
 		{
 			// Each letter is 4 voxels wide (3 of glyph and a gap): find the letter under this
 			// voxel column of the repeating text, and whether its glyph is inked there (glyph
-			// rows run top to bottom, so tape rows 5..1 are glyph rows 0..4).
-			const int textColumn = ((int)std::floor(alongBorder) % (TapeTextLength * 4) + TapeTextLength * 4) % (TapeTextLength * 4);
+			// rows run top to bottom, so tape rows 5..1 are glyph rows 0..4). The text reads left
+			// to right from inside the map on every side: along the border eastwards on the north
+			// side and southwards on the east side, but the other way on the south and west sides,
+			// where those run to the left (a player's report, GitHub issue #44: "moc-x").
+			const bool readsBackwards = exitAxis == 0 ? rayDirection[0] < 0.0f : rayDirection[1] > 0.0f;
+			const float alongText = readsBackwards ? -alongBorder : alongBorder;
+			const int textColumn = ((int)std::floor(alongText) % (TapeTextLength * 4) + TapeTextLength * 4) % (TapeTextLength * 4);
 			const int glyph = TapeText[textColumn / 4], glyphColumn = textColumn % 4;
 			const bool ink = glyphColumn < 3 && (TapeFont[glyph][5 - tapeRow] & (4 >> glyphColumn));
 			color = ink ? _colors.tapeBlack : _colors.tapeYellow;
