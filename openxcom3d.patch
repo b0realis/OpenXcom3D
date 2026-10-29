@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..ed50f701a
+index 000000000..1a07f7061
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,432 @@
+@@ -0,0 +1,434 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -486,6 +486,8 @@ index 000000000..ed50f701a
 +  STR_FPS_HITBOXES_BLINK: "Blink"
 +  STR_FPS_HITBOXES_ALWAYS: "Always"
 +  STR_FPS_HITBOXES_AIMED: "Aimed at"
++  STR_FPS_SPRITE_HITBOXES: "Full sprite hitboxes"
++  STR_FPS_SPRITE_HITBOXES_DESC: "Units are hit, and seen, wherever their full sprite shows, for everyone, in 3D and on the map. NO: the game's own hit shapes."
 +  STR_FPS_UNIT_NAMES: "Unit names"
 +  STR_FPS_UNIT_NAMES_DESC: "The name of the unit under the crosshair."
 +  STR_FPS_STAT_BARS: "Stat bars"
@@ -562,10 +564,10 @@ index 000000000..ed50f701a
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..9b004936c
+index 000000000..5c30a5e4f
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,432 @@
+@@ -0,0 +1,434 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -924,6 +926,8 @@ index 000000000..9b004936c
 +  STR_FPS_HITBOXES_BLINK: "Blink"
 +  STR_FPS_HITBOXES_ALWAYS: "Always"
 +  STR_FPS_HITBOXES_AIMED: "Aimed at"
++  STR_FPS_SPRITE_HITBOXES: "Full sprite hitboxes"
++  STR_FPS_SPRITE_HITBOXES_DESC: "Units are hit, and seen, wherever their full sprite shows, for everyone, in 3D and on the map. NO: the game's own hit shapes."
 +  STR_FPS_UNIT_NAMES: "Unit names"
 +  STR_FPS_UNIT_NAMES_DESC: "The name of the unit under the crosshair."
 +  STR_FPS_STAT_BARS: "Stat bars"
@@ -20508,7 +20512,7 @@ index 067c7b3ba..9004c1ea8 100644
  public:
  	/// Creates a new ProjectileFly class
 diff --git a/src/Battlescape/TileEngine.cpp b/src/Battlescape/TileEngine.cpp
-index 6e6846977..66fa167a5 100644
+index 6e6846977..b7f139100 100644
 --- a/src/Battlescape/TileEngine.cpp
 +++ b/src/Battlescape/TileEngine.cpp
 @@ -43,6 +43,7 @@
@@ -20539,7 +20543,57 @@ index 6e6846977..66fa167a5 100644
  	int relX = floor(((float)relPos.y)*normal+0.5);
  	int relY = floor(((float)-relPos.x)*normal+0.5);
  
-@@ -5867,6 +5870,8 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
+@@ -3229,7 +3232,7 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
+ 	}
+ 
+ 	voxelCheckFlush();
+-	const VoxelType part = (terrainMeleeTilePart > 0) ? (VoxelType)terrainMeleeTilePart : voxelCheck(center, attack.attacker);
++	const VoxelType part = (terrainMeleeTilePart > 0) ? (VoxelType)terrainMeleeTilePart : voxelCheck(center, attack.attacker, false, false, nullptr, true); // (OpenXcom3D: the impact, see voxelCheck)
+ 	const int damage = type->getRandomDamage(power);
+ 	const int tileFinalDamage = type->getTileFinalDamage(type->getRandomDamageForTile(power, damage));
+ 	if (part >= V_FLOOR && part <= V_OBJECT)
+@@ -4360,6 +4363,9 @@ int TileEngine::calculateLineTile(Position origin, Position target, std::vector<
+ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool storeTrajectory, std::vector<Position> *trajectory, BattleUnit *excludeUnit, BattleUnit *excludeAllBut, bool onlyVisible)
+ {
+ 	VoxelType result;
++	// (OpenXcom3D: the line's start, for a unit's picture to face while the line is walked; see voxelCheck)
++	const Position outerLineOrigin = _lineOrigin;
++	_lineOrigin = origin;
+ 	bool excludeAllUnits = false;
+ 	if (_save->isBeforeGame())
+ 	{
+@@ -4400,6 +4406,7 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
+ 			return false;
+ 		}
+ 	);
++	_lineOrigin = outerLineOrigin;
+ 	if (hit)
+ 	{
+ 		return result;
+@@ -4526,7 +4533,7 @@ bool TileEngine::isVoxelVisible(Position voxel)
+  * @param excludeAllBut If set, the only unit to be considered for ray hits.
+  * @return The objectnumber(0-3) or unit(4) or out of map (5) or -1 (hit nothing).
+  */
+-VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool excludeAllUnits, bool onlyVisible, BattleUnit *excludeAllBut)
++VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool excludeAllUnits, bool onlyVisible, BattleUnit *excludeAllBut, bool impact)
+ {
+ 	if (voxel.x < 0 || voxel.y < 0 || voxel.z < 0) //preliminary out of map
+ 	{
+@@ -4590,6 +4597,13 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
+ 
+ 		if (unit != 0 && !unit->isOut() && unit != excludeUnit && (!excludeAllBut || unit == excludeAllBut) && (!onlyVisible || unit->getVisible() ) )
+ 		{
++			// (OpenXcom3D: setting "Full sprite hitboxes": in a line of fire a unit is hit where its
++			// picture shows, a card through its middle facing the line's start; a shot's impact,
++			// which its line already found on the unit, is the unit's anywhere in its column.)
++			if (FirstPerson::spriteHitboxes(_save->getBattleState()) && (impact || _lineOrigin != invalid))
++			{
++				return FirstPerson::spriteHit(_save, unit, voxel, _lineOrigin, impact) ? V_UNIT : V_EMPTY;
++			}
+ 			Position tilepos;
+ 			Position unitpos = unit->getPosition();
+ 			int terrainHeight = 0;
+@@ -5867,6 +5881,8 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
  					originVoxel.z--;
  				}
  				originVoxel.z -= 4;
@@ -20548,7 +20602,7 @@ index 6e6846977..66fa167a5 100644
  			}
  		}
  		int direction = getDirectionTo(origin, action.target);
-@@ -5891,6 +5896,12 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
+@@ -5891,6 +5907,12 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
  			originVoxel.y += ((2 * dirYshift[direction] + dirYshift[(direction + 1) % 8]) * action.actor->getArmor()->getSize() + 1) / 3;
  			break;
  		};
@@ -20561,6 +20615,27 @@ index 6e6846977..66fa167a5 100644
  	}
  	else
  	{
+diff --git a/src/Battlescape/TileEngine.h b/src/Battlescape/TileEngine.h
+index 849787736..b4bdc3044 100644
+--- a/src/Battlescape/TileEngine.h
++++ b/src/Battlescape/TileEngine.h
+@@ -118,6 +118,7 @@ private:
+ 	Tile *_cacheTile;
+ 	Tile *_cacheTileBelow;
+ 	Position _cacheTilePos;
++	Position _lineOrigin = invalid;    // OpenXcom3D: where the line being walked starts (a unit's picture faces it: setting "Full sprite hitboxes")
+ 	const int _maxViewDistance;        // 20 tiles by default
+ 	const int _maxViewDistanceSq;      // 20 * 20
+ 	const int _maxVoxelViewDistance;   // maxViewDistance * 16
+@@ -274,7 +275,7 @@ public:
+ 	/// Checks the visibility of a given voxel.
+ 	bool isVoxelVisible(Position voxel);
+ 	/// Checks what type of voxel occupies this space.
+-	VoxelType voxelCheck(Position voxel, BattleUnit *excludeUnit, bool excludeAllUnits = false, bool onlyVisible = false, BattleUnit *excludeAllBut = 0);
++	VoxelType voxelCheck(Position voxel, BattleUnit *excludeUnit, bool excludeAllUnits = false, bool onlyVisible = false, BattleUnit *excludeAllBut = 0, bool impact = false);
+ 	/// Flushes cache of voxel check
+ 	void voxelCheckFlush();
+ 	/// Blows this tile up.
 diff --git a/src/Battlescape/UnitSprite.cpp b/src/Battlescape/UnitSprite.cpp
 index 8fa87f892..f4e460584 100644
 --- a/src/Battlescape/UnitSprite.cpp
@@ -20815,10 +20890,10 @@ index bc5f08f46..5ddf353f4 100644
  			playMovementSound();
  			if (_parent->getSave()->isPreview())
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 839f80345..fc04f25b2 100644
+index 839f80345..f46804266 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -441,10 +441,43 @@ set ( rapidyaml_src
+@@ -441,10 +441,44 @@ set ( rapidyaml_src
  
  )
  
@@ -20834,6 +20909,7 @@ index 839f80345..fc04f25b2 100644
 +    FirstPerson/FirstPersonModeSoldierStates.cpp
 +    FirstPerson/FirstPersonModeWeaponInHand.cpp
 +    FirstPerson/FirstPersonParticles.cpp
++    FirstPerson/FirstPersonSpriteHits.cpp
 +    FirstPerson/FirstPersonScanner.cpp
 +    FirstPerson/FirstPersonSounds.cpp
 +    FirstPerson/FirstPersonView.cpp
@@ -20862,7 +20938,7 @@ index 839f80345..fc04f25b2 100644
      ${engine_src}
      ${geoscape_src}
      ${interface_src}
-@@ -627,7 +660,10 @@ if (WIN32)
+@@ -627,7 +661,10 @@ if (WIN32)
    set(WIN32_LIBS imagehlp dbghelp)
  endif(WIN32)
  
@@ -21119,7 +21195,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..8858de41a 100644
+index a08796ced..ecf489746 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -21136,7 +21212,7 @@ index a08796ced..8858de41a 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine;
++OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine;
 +OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle;
@@ -21224,10 +21300,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..71b46a853
+index 000000000..4354419cf
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,749 @@
+@@ -0,0 +1,753 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -21634,6 +21710,10 @@ index 000000000..71b46a853
 +	// only the unit pointed at (3, the first for new installs: a player's report, GitHub issue #27,
 +	// new players aimed at a Sectoid's picture and missed its hitbox).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitboxes", &fpsHitboxes, 3, "STR_FPS_HITBOXES", category));
++	// A unit hit where its picture shows (in a line of fire, a card facing the shooter; see
++	// FirstPersonSpriteHits.cpp), for everyone's shots, in 3D and on the map, instead of the game's
++	// voxel shapes (the owner's, GitHub issue #42). Off: the game's own.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsSpriteHitboxes", &fpsSpriteHitboxes, false, "STR_FPS_SPRITE_HITBOXES", category));
 +	// The hitboxes' outlines and the path of a throw glowing (spilling bloom round them), or plain lines.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsGlowingOutlines", &fpsGlowingOutlines, false, "STR_FPS_GLOWING_OUTLINES", category));
 +	// Icons over the downed (unconscious) units in sight, for burning, bleeding, shock and
@@ -21979,10 +22059,10 @@ index 000000000..71b46a853
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..a45746726
+index 000000000..065dd3d13
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,244 @@
+@@ -0,0 +1,252 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -22056,6 +22136,7 @@ index 000000000..a45746726
 +class Mod;
 +class OptionInfo;
 +class RuleItem;
++class SavedBattleGame;
 +class State;
 +class Surface;
 +
@@ -22143,6 +22224,13 @@ index 000000000..a45746726
 +/// Is FPS-style shooting on for this unit's shots in the first-person view? Their bullet hits
 +/// then play quicker (a burst at a bullet's pace).
 +bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
++/// Setting "Full sprite hitboxes": is a unit hit where its picture shows, in a line of fire (the
++/// battle's rule, in 3D and on the map, whoever fires), rather than by the game's voxel shapes?
++bool spriteHitboxes(BattlescapeState *state);
++/// Setting "Full sprite hitboxes": does this voxel of a line of fire hit the unit's picture, a card
++/// through its middle facing the line's start (see FirstPersonSpriteHits.cpp)? A shot's impact
++/// (impact: its line already found the unit there) always does.
++bool spriteHit(SavedBattleGame *save, const BattleUnit *unit, const Position &voxel, const Position &origin, bool impact);
 +/// Setting "Shotgun pellets in flight": do a shotgun's pellets fly beside its round (in 3D and on
 +/// the map), rather than all landing at once? They're traced as the round is fired, and hit as it lands.
 +bool pelletsInFlight(BattlescapeState *state);
@@ -24953,10 +25041,10 @@ index 000000000..07ce8b306
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..7dda7689d
+index 000000000..2920b0b27
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1164 @@
+@@ -0,0 +1,1166 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -25093,6 +25181,8 @@ index 000000000..7dda7689d
 +	static bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
 +	/// Do a shotgun's pellets fly beside its round (setting "Shotgun pellets in flight", the 3D view showing)?
 +	static bool pelletsInFlight(BattlescapeState *state);
++	/// Setting "Full sprite hitboxes": are units hit by their pictures in this battle (see FirstPerson::spriteHitboxes)?
++	static bool spriteHitboxes(BattlescapeState *state);
 +	/// Akimbo on the map (Ctrl+Shift+click on a hand's weapon): steps the soldier's two guns through firing together there.
 +	static bool toggleMapAkimbo(BattlescapeState *state, BattleUnit *unit);
 +	/// Akimbo on the map: its mini targets in both hands' boxes; undone once the guns no longer pair up.
@@ -31488,10 +31578,10 @@ index 000000000..3016462df
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..29583a85b
+index 000000000..770a7ac85
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,4352 @@
+@@ -0,0 +1,4364 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -34682,6 +34772,18 @@ index 000000000..29583a85b
 +bool FirstPersonMode::pelletsInFlight(BattlescapeState *state)
 +{
 +	return Options::fpsPelletsInFlight && state && state->_firstPerson;
++}
++
++/**
++ * Are units hit by their pictures in this battle (setting "Full sprite hitboxes", see
++ * FirstPerson::spriteHitboxes): the setting on, in a battle with the mod's 3D view (in 3D or on
++ * the map alike: the battle's rule)?
++ * @param state The battlescape screen.
++ * @return True if units are hit by their pictures.
++ */
++bool FirstPersonMode::spriteHitboxes(BattlescapeState *state)
++{
++	return Options::fpsSpriteHitboxes && state && state->_firstPerson;
 +}
 +
 +/**
@@ -39099,6 +39201,252 @@ index 000000000..69ac19c12
 +}
 +
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
+diff --git a/src/FirstPerson/FirstPersonSpriteHits.cpp b/src/FirstPerson/FirstPersonSpriteHits.cpp
+new file mode 100644
+index 000000000..15087e122
+--- /dev/null
++++ b/src/FirstPerson/FirstPersonSpriteHits.cpp
+@@ -0,0 +1,240 @@
++/*
++ * ==============================================================================================
++ *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
++ * ==============================================================================================
++ *
++ *  Our philosophy
++ *
++ *  - Faithful first. The 3D view should feel as if it had shipped with UFO: Enemy Unknown on
++ *    the day the game came out.
++ *  - Another camera on the same battle. The original rules decide everything: time units,
++ *    energy, accuracy, line of fire, reaction fire, doors and morale. The 3D view only shows
++ *    what the game does.
++ *  - Only the original assets: the game's own maps, voxel shapes, sprites, palette and sounds.
++ *  - Every addition is a setting. Jumping, night vision as gear, falling, FPS-style shooting
++ *    and dual wield can all be switched off.
++ *  - Light on the engine. Our code lives in this folder, the core only gets small hooks, and
++ *    without the OpenXcom3D mod nothing changes.
++ *  - Runs anywhere: a software renderer on the CPU, no graphics card needed.
++ *  - Written for people: descriptive names, and a comment for every function and every block.
++ *
++ *  Date: 2026-10-19
++ *
++ *  We wish everyone all the best and all health!
++ * ==============================================================================================
++ */
++/*
++ * Copyright 2010-2026 OpenXcom Developers.
++ *
++ * This file is part of OpenXcom.
++ *
++ * OpenXcom is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * OpenXcom is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
++ */
++/*
++ * FirstPersonSpriteHits.cpp: setting "Full sprite hitboxes": a unit is hit where its picture shows.
++ */
++#include "FirstPersonApi.h"
++#include <algorithm>
++#include <cmath>
++#include <map>
++#include <utility>
++#include <vector>
++#include "FirstPersonMode.h"
++#include "FirstPersonViewShared.h"
++#include "../Battlescape/BattlescapeState.h"
++#include "../Battlescape/UnitSprite.h"
++#include "../Engine/GraphSubset.h"
++#include "../Engine/Options.h"
++#include "../Engine/Surface.h"
++#include "../Mod/Armor.h"
++#include "../Savegame/BattleUnit.h"
++#include "../Savegame/SavedBattleGame.h"
++#include "../Savegame/Tile.h"
++
++namespace OpenXcom
++{
++namespace FirstPerson
++{
++
++namespace
++{
++
++/**
++ * The units' pictures as shooters see them, kept while the battle's animation frame lasts (a
++ * tenth of a second: within it the AI weighs many lines at the same units): each unit's frame,
++ * as the 3D view composes it from a side (see FirstPersonView::drawUnits), as its solid pixels.
++ */
++struct SpriteCache
++{
++	const SavedBattleGame *save = nullptr;    // the battle they were made for
++	int animFrame = -1;                       // and its animation frame
++	std::map<std::pair<const BattleUnit*, int>, std::vector<Uint8>> pictures; // by unit and view rotation: 1 for a solid pixel
++	Surface *buffer = nullptr;                // where a frame is composed
++};
++
++/**
++ * The cache (made on first use, kept for the game's life).
++ */
++SpriteCache &spriteCache()
++{
++	static SpriteCache cache;
++	return cache;
++}
++
++/**
++ * A unit's picture as seen from one side, as the 3D view composes it (see FirstPersonView::
++ * drawUnits): its sprite in the game's own animation frame, turned by the view rotation (the
++ * isometric art shows units from the south-east), a big unit's four parts put together as the
++ * map draws them; its solid pixels, SpriteBufferSize square.
++ * @param save The battle.
++ * @param unit The unit.
++ * @param rotation The view rotation (3 minus the direction from the unit to the one looking).
++ * @return Its pixels, 1 where the picture is solid, row by row.
++ */
++const std::vector<Uint8> &spriteOf(SavedBattleGame *save, const BattleUnit *unit, int rotation)
++{
++	SpriteCache &cache = spriteCache();
++	if (cache.save != save || cache.animFrame != save->getAnimFrame())
++	{
++		cache.save = save;
++		cache.animFrame = save->getAnimFrame();
++		cache.pictures.clear();
++	}
++	auto known = cache.pictures.find({ unit, rotation });
++	if (known != cache.pictures.end())
++	{
++		return known->second;
++	}
++	if (!cache.buffer)
++	{
++		cache.buffer = new Surface(SpriteBufferSize, SpriteBufferSize);
++	}
++	cache.buffer->clear();
++	UnitSprite unitSprite(cache.buffer, save->getMod(), save, save->getAnimFrame(), save->getDepth() != 0, 0, 0);
++	unitSprite.setViewRotation(rotation);
++	const GraphSubset mask(SpriteBufferSize, SpriteBufferSize);
++	if (unit->getArmor()->getSize() == 1)
++	{
++		unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
++	}
++	else
++	{
++		unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
++		unitSprite.draw(unit, 1, 32, 16, 0, mask, false);
++		unitSprite.draw(unit, 2, 0, 16, 0, mask, false);
++		unitSprite.draw(unit, 3, 16, 24, 0, mask, false);
++	}
++	std::vector<Uint8> &picture = cache.pictures[{ unit, rotation }];
++	picture.assign((size_t)SpriteBufferSize * SpriteBufferSize, 0);
++	cache.buffer->lock();
++	for (int y = 0; y < SpriteBufferSize; ++y)
++	{
++		for (int x = 0; x < SpriteBufferSize; ++x) picture[(size_t)y * SpriteBufferSize + x] = cache.buffer->getPixel(x, y) != 0;
++	}
++	cache.buffer->unlock();
++	return picture;
++}
++
++}
++
++/**
++ * Setting "Full sprite hitboxes" (the owner's, GitHub issue #42: "Setting for hit-boxes the same size
++ * as sprites!"; the battle's rule, for everyone's shots and the game's line of fire checks, and so
++ * its sight too, which walks the same lines (TileEngine::visible, canTargetUnit), in 3D and on the
++ * map): on, and the mod's 3D view in the battle.
++ * @param state The battle's screen.
++ * @return True if units are hit by their pictures.
++ */
++bool spriteHitboxes(BattlescapeState *state)
++{
++	return FirstPersonMode::spriteHitboxes(state);
++}
++
++/**
++ * Does this voxel of a line of fire hit the unit's picture (setting "Full sprite hitboxes")? The
++ * picture stands as the 3D view draws it: a card through the middle of the unit's tiles, its feet
++ * on the floor (the lowest of its tiles' ground), at the setting "Unit size", here upright and
++ * facing the line's start (the shooter), its frame the one seen from the shooter's side. A voxel
++ * hits where it lies on that card (within SpriteHitSlab of it) on one of the picture's solid
++ * pixels; see-through pixels let the line on. One sprite pixel is SpritePixelX of a voxel across
++ * and one voxel up, as the isometric art draws. A shot's impact (its line found the unit there,
++ * and the game asks again for which part was hit) is always the unit's.
++ * @param save The battle.
++ * @param unit The unit on the voxel's tile.
++ * @param voxel The voxel.
++ * @param origin Where the line starts.
++ * @param impact Whether it's a shot's impact.
++ * @return True if the voxel hits the unit.
++ */
++bool spriteHit(SavedBattleGame *save, const BattleUnit *unit, const Position &voxel, const Position &origin, bool impact)
++{
++	if (impact)
++	{
++		return true;
++	}
++	// Where the unit stands: the middle of its tiles, on the highest of their ground (terrain
++	// levels are negative), as the game's own hit shape stands (see TileEngine::voxelCheck).
++	const int size = unit->getArmor()->getSize();
++	int terrainHeight = 0;
++	for (int x = 0; x < size; ++x)
++	{
++		for (int y = 0; y < size; ++y)
++		{
++			const Tile *tile = save->getTile(unit->getPosition() + Position(x, y, 0));
++			if (tile) terrainHeight = std::min(terrainHeight, tile->getTerrainLevel());
++		}
++	}
++	const double middleX = unit->getPosition().x * 16.0 + 8.0 * size, middleY = unit->getPosition().y * 16.0 + 8.0 * size;
++	const double feet = unit->getPosition().z * 24.0 - terrainHeight;
++
++	// The card faces the line's start (straight above or below it, the way the map shows units,
++	// from the south-east).
++	double towardsX = origin.x + 0.5 - middleX, towardsY = origin.y + 0.5 - middleY;
++	const double length = std::hypot(towardsX, towardsY);
++	if (length < 1.0)
++	{
++		towardsX = 1.0;
++		towardsY = 1.0;
++	}
++	const double towardsLength = std::hypot(towardsX, towardsY);
++	towardsX /= towardsLength;
++	towardsY /= towardsLength;
++
++	// The voxel on the card: how far in front of it, how far right of its middle as the shooter
++	// sees it (looking along minus towards, right is (towardsY, -towardsX)), and how high.
++	const double relativeX = voxel.x + 0.5 - middleX, relativeY = voxel.y + 0.5 - middleY;
++	if (std::abs(relativeX * towardsX + relativeY * towardsY) > SpriteHitSlab)
++	{
++		return false;
++	}
++	const double right = relativeX * towardsY - relativeY * towardsX, up = voxel.z + 0.5 - feet;
++
++	// The picture's pixel there: anchored at the floor diamond's middle (a big unit's, the corner
++	// its four tiles share), at the setting "Unit size".
++	const double scale = std::clamp(Options::fpsUnitSize, 80, 100) / 100.0;
++	const int anchorX = 32, anchorY = size == 1 ? 40 : 48;
++	const int column = (int)std::floor(anchorX + right / (SpritePixelX * scale)), row = (int)std::floor(anchorY - up / scale);
++	if (column < 0 || row < 0 || column >= SpriteBufferSize || row >= SpriteBufferSize)
++	{
++		return false;
++	}
++	// The frame from the shooter's side: the isometric art shows units from the south-east
++	// (direction 3); turned by the direction from the unit to the shooter (0 north, clockwise).
++	const double toShooterDegrees = std::atan2(towardsY, towardsX) * 180.0 / Pi;
++	const int shooterDirection = (((int)std::lround((toShooterDegrees + 90.0) / 45.0)) % 8 + 8) % 8;
++	return spriteOf(save, unit, 3 - shooterDirection)[(size_t)row * SpriteBufferSize + column] != 0;
++}
++
++}
++}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
 index 000000000..e70e3e989
@@ -45369,10 +45717,10 @@ index 000000000..280bc87e2
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..6f6461df6
+index 000000000..f0f5e6b33
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,432 @@
+@@ -0,0 +1,436 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -45502,6 +45850,10 @@ index 000000000..6f6461df6
 +const float ZScaleF = (float)ZScale;
 +/// An isometric sprite pixel across is 1/sqrt(2) of a voxel (32 pixels span a tile's diagonal).
 +const double SpritePixelX = 0.70710678118654752;
++/// Setting "Full sprite hitboxes" (see FirstPersonSpriteHits.cpp): how far a voxel of a line of fire may be in front of or
++/// behind a unit's picture card and still meet it, in voxels: a line steps up to a voxel along each axis at a time, so
++/// the card is that thick that no line slips through it between two steps.
++const double SpriteHitSlab = 0.8;
 +/// Sprites stand like cards facing the camera, leaning with the view's pitch; looking down
 +/// further than this many degrees, a card leans only this far, so it stays above the floor
 +/// instead of lying in it (see drawSprite).
@@ -47751,7 +48103,7 @@ index 000000000..1cd28ddf1
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..dc2c7c6cd
+index 000000000..c3120b685
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
 @@ -0,0 +1,2637 @@
@@ -48701,7 +49053,7 @@ index 000000000..dc2c7c6cd
 +		step.sprite.unit = unit;
 +		useSmoothVersion(step.sprite);
 +		_drawList.push_back(step);
-+		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit))
++		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit) && !Options::fpsSpriteHitboxes) // (with full sprite hitboxes the picture is the hitbox)
 +		{
 +			recordHitbox(unit, feet, hitboxOpacity);
 +		}
@@ -54960,7 +55312,7 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..50b3cbff2
+index 000000000..29b13c0eb
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,793 @@
@@ -55180,7 +55532,7 @@ index 000000000..50b3cbff2
 +			"fpsFalling", "fpsSafeLanding" } },
 +		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsLean", "fpsMeleeTerrain",
 +			"fpsMeleeFloors", "fpsAimExact", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
-+			"fpsEachPellet", "fpsFlares", "fpsNightVisionGear" } },
++			"fpsEachPellet", "fpsSpriteHitboxes", "fpsFlares", "fpsNightVisionGear" } },
 +		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
 +			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsParticles", "fpsUfoLights",
 +			"fpsGhostParts", "fpsGhostOpacity", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
@@ -56325,10 +56677,10 @@ index 2242d13f8..7fd17b1f2 100644
  	bool isManaBarEnabled() const { return _manaBattleUI; }
  	/// Is the mana trained as a primary skill (e.g. like firing accuracy)?
 diff --git a/src/OpenXcom.2010.vcxproj b/src/OpenXcom.2010.vcxproj
-index 99f24ce43..518689faa 100644
+index 99f24ce43..49c6883fc 100644
 --- a/src/OpenXcom.2010.vcxproj
 +++ b/src/OpenXcom.2010.vcxproj
-@@ -431,6 +431,29 @@
+@@ -431,6 +431,30 @@
      <ClCompile Include="Battlescape\DebriefingState.cpp" />
      <ClCompile Include="Battlescape\ExperienceOverviewState.cpp" />
      <ClCompile Include="Battlescape\Explosion.cpp" />
@@ -56341,6 +56693,7 @@ index 99f24ce43..518689faa 100644
 +    <ClCompile Include="FirstPerson\FirstPersonModeSoldierStates.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonModeWeaponInHand.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonParticles.cpp" />
++    <ClCompile Include="FirstPerson\FirstPersonSpriteHits.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonScanner.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonSounds.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonView.cpp" />
@@ -56358,7 +56711,7 @@ index 99f24ce43..518689faa 100644
      <ClCompile Include="Battlescape\ExplosionBState.cpp" />
      <ClCompile Include="Battlescape\ExtendedBattlescapeLinksState.cpp" />
      <ClCompile Include="Battlescape\ExtendedInventoryLinksState.cpp" />
-@@ -910,6 +933,18 @@
+@@ -910,6 +934,18 @@
      <ClInclude Include="Battlescape\DebriefingState.h" />
      <ClInclude Include="Battlescape\ExperienceOverviewState.h" />
      <ClInclude Include="Battlescape\Explosion.h" />
@@ -56378,10 +56731,10 @@ index 99f24ce43..518689faa 100644
      <ClInclude Include="Battlescape\ExtendedBattlescapeLinksState.h" />
      <ClInclude Include="Battlescape\ExtendedInventoryLinksState.h" />
 diff --git a/src/OpenXcom.2010.vcxproj.filters b/src/OpenXcom.2010.vcxproj.filters
-index 92dbcdf0a..da0c980f7 100644
+index 92dbcdf0a..c2d4a6879 100644
 --- a/src/OpenXcom.2010.vcxproj.filters
 +++ b/src/OpenXcom.2010.vcxproj.filters
-@@ -329,6 +329,75 @@
+@@ -329,6 +329,78 @@
      <ClCompile Include="Battlescape\Explosion.cpp">
        <Filter>Battlescape</Filter>
      </ClCompile>
@@ -56410,6 +56763,9 @@ index 92dbcdf0a..da0c980f7 100644
 +      <Filter>FirstPerson</Filter>
 +    </ClCompile>
 +    <ClCompile Include="FirstPerson\FirstPersonParticles.cpp">
++      <Filter>FirstPerson</Filter>
++    </ClCompile>
++    <ClCompile Include="FirstPerson\FirstPersonSpriteHits.cpp">
 +      <Filter>FirstPerson</Filter>
 +    </ClCompile>
 +    <ClCompile Include="FirstPerson\FirstPersonScanner.cpp">
@@ -56457,7 +56813,7 @@ index 92dbcdf0a..da0c980f7 100644
      <ClCompile Include="Geoscape\ItemsArrivingState.cpp">
        <Filter>Geoscape</Filter>
      </ClCompile>
-@@ -1571,6 +1640,42 @@
+@@ -1571,6 +1643,42 @@
      <ClInclude Include="Battlescape\Explosion.h">
        <Filter>Battlescape</Filter>
      </ClInclude>
@@ -56500,7 +56856,7 @@ index 92dbcdf0a..da0c980f7 100644
      <ClInclude Include="Basescape\TransfersState.h">
        <Filter>Basescape</Filter>
      </ClInclude>
-@@ -2731,6 +2836,9 @@
+@@ -2731,6 +2839,9 @@
      <Filter Include="Battlescape">
        <UniqueIdentifier>{f7e493ce-c074-420c-8b38-40d81b2d0509}</UniqueIdentifier>
      </Filter>

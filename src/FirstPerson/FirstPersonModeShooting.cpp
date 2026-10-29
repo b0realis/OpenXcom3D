@@ -3191,6 +3191,18 @@ bool FirstPersonMode::pelletsInFlight(BattlescapeState *state)
 }
 
 /**
+ * Are units hit by their pictures in this battle (setting "Full sprite hitboxes", see
+ * FirstPerson::spriteHitboxes): the setting on, in a battle with the mod's 3D view (in 3D or on
+ * the map alike: the battle's rule)?
+ * @param state The battlescape screen.
+ * @return True if units are hit by their pictures.
+ */
+bool FirstPersonMode::spriteHitboxes(BattlescapeState *state)
+{
+	return Options::fpsSpriteHitboxes && state && state->_firstPerson;
+}
+
+/**
  * Do a shotgun's pellets, and the two rounds of an akimbo volley, each land on their own, asked by
  * the game as it fires them: with the setting "Each pellet on its own" (on), in either view,
  * whoever fires (a player's report on OXCE's "shotgun void": the lead pellet decides the whole

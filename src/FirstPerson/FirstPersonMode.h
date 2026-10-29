@@ -134,6 +134,8 @@ public:
 	static bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
 	/// Do a shotgun's pellets fly beside its round (setting "Shotgun pellets in flight", the 3D view showing)?
 	static bool pelletsInFlight(BattlescapeState *state);
+	/// Setting "Full sprite hitboxes": are units hit by their pictures in this battle (see FirstPerson::spriteHitboxes)?
+	static bool spriteHitboxes(BattlescapeState *state);
 	/// Akimbo on the map (Ctrl+Shift+click on a hand's weapon): steps the soldier's two guns through firing together there.
 	static bool toggleMapAkimbo(BattlescapeState *state, BattleUnit *unit);
 	/// Akimbo on the map: its mini targets in both hands' boxes; undone once the guns no longer pair up.

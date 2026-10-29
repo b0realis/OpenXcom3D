@@ -127,6 +127,10 @@ const double ZScale = 0.81649658092772603;
 const float ZScaleF = (float)ZScale;
 /// An isometric sprite pixel across is 1/sqrt(2) of a voxel (32 pixels span a tile's diagonal).
 const double SpritePixelX = 0.70710678118654752;
+/// Setting "Full sprite hitboxes" (see FirstPersonSpriteHits.cpp): how far a voxel of a line of fire may be in front of or
+/// behind a unit's picture card and still meet it, in voxels: a line steps up to a voxel along each axis at a time, so
+/// the card is that thick that no line slips through it between two steps.
+const double SpriteHitSlab = 0.8;
 /// Sprites stand like cards facing the camera, leaning with the view's pitch; looking down
 /// further than this many degrees, a card leans only this far, so it stays above the floor
 /// instead of lying in it (see drawSprite).

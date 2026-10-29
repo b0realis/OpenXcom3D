@@ -58,6 +58,7 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 - **Bullet holes under the zoom:** zoomed in, holes and scorches grow with everything round them (they looked smaller).
 - **A clean view:** P's second press hides the crosshair and its info too; a third brings it all back.
 - **The motion scanner in 3D:** held up at the bottom of the view, turning as you look round, a ring sweeping out with a whoop, and a pip for each movement it finds, as in the film.
+- **Full sprite hitboxes** (a setting, off at first): units are hit, and seen, wherever their full sprites show, for everyone, in 3D and on the map.
 - **A logo of its own:** the alien in the yellow X, now the icon of the AppImage, the Windows game, the Mac app, the game's window, the menu entry and the web pages.
 
 ## Earlier versions

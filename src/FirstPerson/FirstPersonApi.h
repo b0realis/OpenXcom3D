@@ -71,6 +71,7 @@ class Game;
 class Mod;
 class OptionInfo;
 class RuleItem;
+class SavedBattleGame;
 class State;
 class Surface;
 
@@ -158,6 +159,13 @@ void freeAimOrigin(BattlescapeState *state, const BattleAction &action, Position
 /// Is FPS-style shooting on for this unit's shots in the first-person view? Their bullet hits
 /// then play quicker (a burst at a bullet's pace).
 bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
+/// Setting "Full sprite hitboxes": is a unit hit where its picture shows, in a line of fire (the
+/// battle's rule, in 3D and on the map, whoever fires), rather than by the game's voxel shapes?
+bool spriteHitboxes(BattlescapeState *state);
+/// Setting "Full sprite hitboxes": does this voxel of a line of fire hit the unit's picture, a card
+/// through its middle facing the line's start (see FirstPersonSpriteHits.cpp)? A shot's impact
+/// (impact: its line already found the unit there) always does.
+bool spriteHit(SavedBattleGame *save, const BattleUnit *unit, const Position &voxel, const Position &origin, bool impact);
 /// Setting "Shotgun pellets in flight": do a shotgun's pellets fly beside its round (in 3D and on
 /// the map), rather than all landing at once? They're traced as the round is fired, and hit as it lands.
 bool pelletsInFlight(BattlescapeState *state);

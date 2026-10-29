@@ -135,6 +135,7 @@ SETTINGS = [
         ('Shotgun pellets in flight', 'YES', 'YES / NO', 'A shotgun\'s pellets fly beside its round, in 3D and on the map.', ''),
         ('Each pellet on its own', 'YES', 'YES / NO', 'A shotgun\'s pellets and an akimbo volley\'s two rounds each land on their own: none lost when the lead pellet leaves the map.',
          'OXCE\'s "shotgun void" closed: shotguns hit as their pellets say.'),
+        ('Full sprite hitboxes', 'NO', 'YES / NO', 'Units are hit, and seen, wherever their full sprites show (a card facing whoever fires), for everyone, in 3D and on the map.', 'What you see is what you hit: shots pass between legs and hit arms.'),
         ('Unlimited tactical flares', 'YES', 'YES / NO', 'T throws a red flare at the crosshair, free and as often as you like.', 'Lights the 3D view only.'),
         ('Night vision needs gear', 'NO', 'YES / NO', 'Only soldiers with night vision gear (power suits, flying suits...) get NIGHT VISION in 3D. NO: everyone.', 'YES keeps the night dark for the unequipped.'),
     ]),

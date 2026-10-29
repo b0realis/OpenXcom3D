@@ -944,7 +944,7 @@ void FirstPersonView::drawUnits()
 		step.sprite.unit = unit;
 		useSmoothVersion(step.sprite);
 		_drawList.push_back(step);
-		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit))
+		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit) && !Options::fpsSpriteHitboxes) // (with full sprite hitboxes the picture is the hitbox)
 		{
 			recordHitbox(unit, feet, hitboxOpacity);
 		}

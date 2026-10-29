@@ -404,6 +404,10 @@ void createOptions(std::vector<OptionInfo> &options)
 	// only the unit pointed at (3, the first for new installs: a player's report, GitHub issue #27,
 	// new players aimed at a Sectoid's picture and missed its hitbox).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitboxes", &fpsHitboxes, 3, "STR_FPS_HITBOXES", category));
+	// A unit hit where its picture shows (in a line of fire, a card facing the shooter; see
+	// FirstPersonSpriteHits.cpp), for everyone's shots, in 3D and on the map, instead of the game's
+	// voxel shapes (the owner's, GitHub issue #42). Off: the game's own.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSpriteHitboxes", &fpsSpriteHitboxes, false, "STR_FPS_SPRITE_HITBOXES", category));
 	// The hitboxes' outlines and the path of a throw glowing (spilling bloom round them), or plain lines.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsGlowingOutlines", &fpsGlowingOutlines, false, "STR_FPS_GLOWING_OUTLINES", category));
 	// Icons over the downed (unconscious) units in sight, for burning, bleeding, shock and

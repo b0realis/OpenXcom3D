@@ -356,6 +356,8 @@ en-GB:
   STR_FPS_HITBOXES_BLINK: "Blink"
   STR_FPS_HITBOXES_ALWAYS: "Always"
   STR_FPS_HITBOXES_AIMED: "Aimed at"
+  STR_FPS_SPRITE_HITBOXES: "Full sprite hitboxes"
+  STR_FPS_SPRITE_HITBOXES_DESC: "Units are hit, and seen, wherever their full sprite shows, for everyone, in 3D and on the map. NO: the game's own hit shapes."
   STR_FPS_UNIT_NAMES: "Unit names"
   STR_FPS_UNIT_NAMES_DESC: "The name of the unit under the crosshair."
   STR_FPS_STAT_BARS: "Stat bars"
