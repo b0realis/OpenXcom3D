@@ -666,8 +666,14 @@ private:
 	BattleActionOrigin leanSide(const BattleUnit *unit, const Position &targetTile) const;
 	/// Melee at a body lying in front or at the feet (setting "Melee hits walls and the downed").
 	bool meleeDowned(BattleUnit *unit, BattleItem *weapon, BattleAction *action);
-	/// The wall, door or object the crosshair meets within a melee blow's reach, on the unit's own tile or a neighbouring one.
-	bool crosshairTerrainMelee(BattleUnit *unit, Position &struck, int &part) const;
+	/// Melee at the floor or ceiling under the crosshair (setting "Melee hits floors"), by the game's own hit.
+	void meleeFloor(BattleUnit *unit, BattleItem *weapon, BattleAction *action, const Position &struck);
+	/// A melee blow's power and damage type, as the game works them out.
+	int meleeBlowPower(const BattleActionAttack &attack, const RuleDamageType *&damageType) const;
+	/// A blow made by the 3D view's own pieces lands: the weapon's melee sound, and the weapon in hand swings.
+	void meleeBlowLanded(BattleItem *weapon);
+	/// The wall, door or object (or floor, if asked) the crosshair meets within a melee blow's reach, on the unit's own tile or a neighbouring one.
+	bool crosshairTerrainMelee(BattleUnit *unit, Position &struck, int &part, bool floors = false) const;
 	/// Whether a melee blow may strike terrain: the mod's terrain melee or the setting on, and the weapon damaging terrain.
 	bool meleeStrikesTerrain(BattleItem *weapon) const;
 	/// Whom a melee blow would strike now (see meleeTarget).

@@ -425,28 +425,100 @@ bool FirstPersonMode::meleeDowned(BattleUnit *unit, BattleItem *weapon, BattleAc
 	}
 	weapon->spendAmmoForAction(BA_HIT, _save);
 
-	// The blow's power and damage type, as the game works them out for a melee hit: a melee
-	// weapon's own power and damage, or a gun's melee bonus and melee damage (a rifle butt).
+	// The hit (its power and damage type as the game works them out), its sound and the swing,
+	// the casualties, and any reaction fire the time spent draws.
 	const BattleActionAttack attack = BattleActionAttack::GetAferShoot(*action, ammo);
-	const RuleItem *damageRule = attack.damage_item->getRules();
-	const bool meleeWeapon = damageRule->getBattleType() == BT_MELEE;
-	const int power = meleeWeapon ? damageRule->getPowerBonus(attack) : damageRule->getMeleeBonus(attack);
-	const RuleDamageType *damageType = meleeWeapon ? damageRule->getDamageType() : damageRule->getMeleeType();
-
-	// The hit, its sound, the casualties, and any reaction fire the time spent draws.
-	int sound = weapon->getRules()->getMeleeHitSound();
-	if (sound < 0) sound = weapon->getRules()->getMeleeSound();
-	if (sound >= 0) _state->_battleGame->playSound(sound);
+	const RuleDamageType *damageType = nullptr;
+	const int power = meleeBlowPower(attack, damageType);
+	meleeBlowLanded(weapon);
 	_save->getTileEngine()->hitUnit(attack, body, Position(0, 0, 0), damageType->getRandomDamage(power), damageType, false);
 	_state->_battleGame->checkForCasualties(damageType, attack, false, false);
 	_save->getTileEngine()->checkReactionFire(unit, *action);
 	action->type = BA_NONE;
+	return true;
+}
 
-	// The weapon in hand swings, as for any blow that lands.
+/**
+ * Melee at the floor or ceiling under the crosshair (a player's report, GitHub issue #33: melee
+ * "doesn't apply to floors sections above or bellow"; the owner: with terrain melee on, as the
+ * setting "Melee hits floors" says, see crosshairTerrainMelee). The game's terrain melee knows no
+ * floors (a floor is the tile part it reads as none), so the blow is the game's own pieces put
+ * together, as for a body lying down (see meleeDowned): the soldier turns to the floor's tile
+ * first (see turnBeforeUse; none for their own), the time units and ammo the game's melee
+ * spends, the weapon's melee power and damage type, its melee sound, the game's hit at the point
+ * struck (TileEngine::hit: the part found from the point, the floor; a body lying on it takes the
+ * blow first, as with a shot at the floor; the floor's armour, and if it breaks the game's
+ * falling and light; terrain melee doesn't miss), the game's check for casualties, and reaction
+ * fire.
+ * @param unit The soldier.
+ * @param weapon The weapon in the chosen hand.
+ * @param action The game's current action, to fill in.
+ * @param struck The point of the floor the crosshair meets.
+ */
+void FirstPersonMode::meleeFloor(BattleUnit *unit, BattleItem *weapon, BattleAction *action, const Position &struck)
+{
+	// The cost: the game's time units for the blow (and the turn before it, both wanted before
+	// either is spent) and the weapon's ammo for it.
+	action->type = BA_HIT;
+	action->targeting = false;
+	action->target = struck.toTile();
+	action->result.clear();
+	action->updateTU();
+	BattleItem *ammo = weapon->getAmmoForAction(BA_HIT, &action->result);
+	if (!ammo || !action->haveTU(&action->result))
+	{
+		_state->warning(action->result.empty() ? "STR_NOT_ENOUGH_TIME_UNITS" : action->result);
+		action->type = BA_NONE;
+		return;
+	}
+	if (!turnBeforeUse(unit, unit->directionTo(action->target), action->Time))
+	{
+		action->type = BA_NONE;
+		return;
+	}
+	action->spendTU(&action->result);
+	weapon->spendAmmoForAction(BA_HIT, _save);
+
+	// The hit, its sound and the swing, the casualties, and any reaction fire the time spent draws.
+	const BattleActionAttack attack = BattleActionAttack::GetAferShoot(*action, ammo);
+	const RuleDamageType *damageType = nullptr;
+	const int power = meleeBlowPower(attack, damageType);
+	meleeBlowLanded(weapon);
+	_save->getTileEngine()->hit(attack, struck, power, damageType, false, 0);
+	_state->_battleGame->checkForCasualties(damageType, attack, false, false);
+	_save->getTileEngine()->checkReactionFire(unit, *action);
+	action->type = BA_NONE;
+}
+
+/**
+ * A melee blow's power and damage type, as the game works them out for a melee hit: a melee
+ * weapon's own power and damage, or a gun's melee bonus and melee damage (a rifle butt).
+ * @param attack The blow.
+ * @param damageType Set to its damage type.
+ * @return Its power.
+ */
+int FirstPersonMode::meleeBlowPower(const BattleActionAttack &attack, const RuleDamageType *&damageType) const
+{
+	const RuleItem *damageRule = attack.damage_item->getRules();
+	const bool meleeWeapon = damageRule->getBattleType() == BT_MELEE;
+	damageType = meleeWeapon ? damageRule->getDamageType() : damageRule->getMeleeType();
+	return meleeWeapon ? damageRule->getPowerBonus(attack) : damageRule->getMeleeBonus(attack);
+}
+
+/**
+ * A blow the 3D view makes of the game's own pieces lands (see meleeDowned, meleeFloor): the
+ * weapon's melee hit sound (or its swing's), and the weapon in hand swings, as for any blow that
+ * lands, with our swoosh (setting "Hit, kill and swing sounds").
+ * @param weapon The weapon striking.
+ */
+void FirstPersonMode::meleeBlowLanded(BattleItem *weapon)
+{
+	int sound = weapon->getRules()->getMeleeHitSound();
+	if (sound < 0) sound = weapon->getRules()->getMeleeSound();
+	if (sound >= 0) _state->_battleGame->playSound(sound);
 	_swingStart = SDL_GetTicks();
 	_swingJolted = false;
-	if (Options::fpsHitSounds) _sounds->play(FirstPersonSounds::SWOOSH, 0, 0.8f); // (one of our added sounds: setting "Hit, kill and swing sounds")
-	return true;
+	if (Options::fpsHitSounds) _sounds->play(FirstPersonSounds::SWOOSH, 0, 0.8f);
 }
 
 /**
@@ -932,8 +1004,13 @@ void FirstPersonMode::switchHand()
  * aims, see medikitPatient): a unit standing under the crosshair (or the free cursor) on a tile
  * next to the soldier, by the game's melee reach (TileEngine::validMeleeRange, any of the eight
  * ways: the one needing the fewest eighths of a turn), the soldier first turning to face it; a
- * unit farther off, out of range. With no unit under the crosshair, none (fire goes on to the
- * wall, door or object under it, then to the way the soldier faces).
+ * unit farther off, out of range. A unit straight above or below the soldier (on a lift, in a
+ * shaft, flying just above; GitHub issue #33), which the game's melee never reaches: struck if the
+ * game's own line from the blow's origin reaches it (validMeleeRange's origin and test,
+ * TileEngine::canTargetUnit), nothing solid in between (a UFO lift's upper pad is a floor
+ * between, so a unit on the next level stays out of reach), without a turn. With no unit under the
+ * crosshair, none (fire goes on to the wall, door or object under it, then to the way the soldier
+ * faces).
  * @param unit The soldier striking.
  * @return The unit struck (null if none, with the reason when it's out of reach), the tile it's
  *   struck on and the way to turn to it.
@@ -956,6 +1033,34 @@ FirstPersonMode::MeleeAim FirstPersonMode::meleeTarget(BattleUnit *unit) const
 			bestEighths = eighths;
 			aim.direction = direction;
 			aim.tile = reachedTile;
+		}
+	}
+	// Straight above or below: the game's line from the blow's origin (as validMeleeRange's: the
+	// tile's middle, 4 voxels under the top of the unit, and the armor's melee offset).
+	const Position at = unit->getPosition();
+	const int size = unit->getArmor()->getSize();
+	for (int x = 0; x < size && aim.direction < 0; ++x)
+	{
+		for (int y = 0; y < size && aim.direction < 0; ++y)
+		{
+			for (const int dz : { 1, -1 })
+			{
+				Tile *origin = _save->getTile(at + Position(x, y, 0));
+				Tile *target = _save->getTile(at + Position(x, y, dz));
+				if (!origin || !target || target->getUnit() != pointed)
+				{
+					continue;
+				}
+				Position originVoxel = origin->getPosition().toVoxel() + Position(8, 8, unit->getHeight() + unit->getFloatHeight() - 4
+					- origin->getTerrainLevel() + unit->getArmor()->getMeleeOriginVoxelVerticalOffset());
+				Position targetVoxel;
+				if (_save->getTileEngine()->canTargetUnit(&originVoxel, target, &targetVoxel, unit, false))
+				{
+					aim.direction = unit->getDirection();
+					aim.tile = target->getPosition();
+					break;
+				}
+			}
 		}
 	}
 	if (aim.direction < 0)
@@ -1028,17 +1133,20 @@ bool FirstPersonMode::meleeStrikesTerrain(BattleItem *weapon) const
  * around, a level up or down too: the owner's choice). The game's terrain melee then strikes that
  * part of that tile, if the blow may strike terrain (see meleeStrikesTerrain); if it may not, the
  * blow strikes nothing (a player's report: the crosshair on a cabinet, the blow struck the unit
- * the soldier faced).
+ * the soldier faced). Floors too when asked (setting "Melee hits floors", with terrain melee on:
+ * the floor at the feet or around, the ceiling above; see meleeFloor).
  * @param unit The soldier striking.
  * @param struck Set to the voxel the crosshair meets.
- * @param part Set to the part met (V_WESTWALL, V_NORTHWALL or V_OBJECT).
- * @return True if the crosshair meets a wall, door or object within reach.
+ * @param part Set to the part met (V_WESTWALL, V_NORTHWALL, V_OBJECT, or V_FLOOR if asked).
+ * @param floors Whether a floor counts.
+ * @return True if the crosshair meets a wall, door or object (or floor) within reach.
  */
-bool FirstPersonMode::crosshairTerrainMelee(BattleUnit *unit, Position &struck, int &part) const
+bool FirstPersonMode::crosshairTerrainMelee(BattleUnit *unit, Position &struck, int &part, bool floors) const
 {
-	// What the crosshair meets: a wall, a door or an object, within reach.
+	// What the crosshair meets: a wall, a door or an object (or a floor), within reach.
 	int hitType = V_EMPTY;
-	if (!aimAt(_view->getWidth() / 2, _view->getHeight() / 2, unit, struck, &hitType) || (hitType != V_WESTWALL && hitType != V_NORTHWALL && hitType != V_OBJECT))
+	if (!aimAt(_view->getWidth() / 2, _view->getHeight() / 2, unit, struck, &hitType)
+		|| (hitType != V_WESTWALL && hitType != V_NORTHWALL && hitType != V_OBJECT && !(floors && hitType == V_FLOOR)))
 	{
 		return false;
 	}
@@ -1224,7 +1332,7 @@ int FirstPersonMode::shotTurnCost(BattleUnit *unit, int &direction, bool &afford
 		{
 			direction = aim.direction;
 		}
-		else if (aim.refusal.empty() && crosshairTerrainMelee(unit, struck, part) && meleeStrikesTerrain(weapon))
+		else if (aim.refusal.empty() && meleeStrikesTerrain(weapon) && crosshairTerrainMelee(unit, struck, part, Options::fpsMeleeFloors))
 		{
 			direction = unit->directionTo(struck.toTile());
 		}
@@ -2277,7 +2385,9 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	// reach, diagonal or a level up or down too (see crosshairTerrainMelee; the map's own strikes
 	// only the one straight ahead), turning to its tile, if the blow may strike terrain (the
 	// mod's terrain melee, extendedTerrainMelee, or the setting "Melee hits walls and the
-	// downed", see meleeStrikesTerrain), and nothing if it may not; with the crosshair on none of
+	// downed", see meleeStrikesTerrain), and nothing if it may not; with terrain melee and the
+	// setting "Melee hits floors", the floor or ceiling under it too (see meleeFloor); a unit
+	// straight above or below the game's line reaches (see meleeTarget); with the crosshair on none of
 	// these (open floor, the sky, out of reach), as the game does it: who is in reach the way the
 	// soldier faces, then (that setting) a body lying in front (see meleeDowned). The turn goes
 	// by the rules or is free (turnBeforeUse), and the game does the attack as its own action,
@@ -2302,11 +2412,16 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 			action->target = aim.tile;
 			turnTo = aim.direction;
 		}
-		else if (crosshairTerrainMelee(unit, struck, part))
+		else if (crosshairTerrainMelee(unit, struck, part, Options::fpsMeleeFloors && meleeStrikesTerrain(weapon)))
 		{
 			if (!meleeStrikesTerrain(weapon))
 			{
 				_state->warning("STR_THERE_IS_NO_ONE_THERE");
+				return;
+			}
+			if (part == V_FLOOR)
+			{
+				meleeFloor(unit, weapon, action, struck);
 				return;
 			}
 			action->target = struck.toTile();

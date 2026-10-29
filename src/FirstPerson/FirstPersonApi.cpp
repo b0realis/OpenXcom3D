@@ -278,6 +278,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	// Melee at the wall, door or object the soldier faces (the game's terrain melee, on even if
 	// the mod leaves it off) and at a body lying in front.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMeleeTerrain", &fpsMeleeTerrain, false, "STR_FPS_MELEE_TERRAIN", category));
+	// With terrain melee on (that setting or the mod's): melee at the floor or ceiling under the
+	// crosshair too.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsMeleeFloors", &fpsMeleeFloors, true, "STR_FPS_MELEE_FLOORS", category));
 	// Light, atmosphere and sound: smooth lighting between tiles, ray-traced shadows, a
 	// flashlight, night vision only with the right gear, tenser music while aliens are in sight,
 	// the ticks of a hit and a kill, smoke drawn as the soldier's eyes see through it, and

@@ -122,6 +122,7 @@ SETTINGS = [
         ('Lean shots', 'NO', 'YES / NO', 'Standing to one side of the tile shoots from that side: the game\'s own off-centre origins.', 'Peek and shoot round a corner (with Faithful targeting; FPS style always shoots from the eye).'),
         ('Lean', 'Off', 'Off / Peek / Tilt', 'Left Shift with A or D leans out to peek; Tilt tilts the view too.', 'Shows round corners; a shot from a lean leaves from that side.'),
         ('Melee hits walls and downed', 'NO', 'YES / NO', 'A blow at the wall, door or object under the crosshair strikes it; a blow can hit a body lying in front of you.', 'Break through a wall with a hammer, as the map\'s terrain melee does in some mods.'),
+        ('Melee hits floors', 'YES', 'YES / NO', 'With terrain melee on: the floor or ceiling you aim at takes the blow too.', 'Break through the floor at your feet or the ceiling above.'),
     ]),
     ('Light, atmosphere and sound', [
         ('Smooth lighting', 'YES', 'YES / NO', 'The battle\'s light blends smoothly from tile to tile. NO: tile by tile, as the map shades it.', ''),

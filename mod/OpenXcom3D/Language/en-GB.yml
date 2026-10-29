@@ -175,6 +175,8 @@ en-GB:
   STR_FPS_LEAN_TILT: "Tilt"
   STR_FPS_MELEE_TERRAIN: "Melee hits walls and downed"
   STR_FPS_MELEE_TERRAIN_DESC: "Melee also hits the wall you aim at, or a body lying in front."
+  STR_FPS_MELEE_FLOORS: "Melee hits floors"
+  STR_FPS_MELEE_FLOORS_DESC: "With Melee hits walls and downed (or the mod's terrain melee): the floor or ceiling you aim at too."
   STR_FPS_AKIMBO_FULL_ON: "FULL AKIMBO"
   STR_FPS_AKIMBO_REALISTIC_ON: "REALISTIC AKIMBO"
   STR_FPS_AKIMBO_OFF: "AKIMBO OFF"
