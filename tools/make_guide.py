@@ -149,6 +149,7 @@ SETTINGS = [
         ('Particles', 'All', 'All / Effects / Off', 'Effects: sparks, debris, smoke, fire, trails. All: also dust, fireflies, bubbles and weather.', ''),
         ('UFO lights and aura', 'YES', 'YES / NO', 'UFOs glow: steady hulls with pulsing lights, their own coloured light, evenly inside them, and an aura of motes outside; only once a UFO has been seen.', 'Inside a UFO the view stays sharp: its light only colours it.'),
         ('Ghost opacity', '50%', '10% to 100%', 'How solid the see-through ghosts look up close (lift pads, ladders, racks, catwalks, sludge); far off 60% of that.', ''),
+        ('See-through corpses', 'NO', 'YES / NO', 'A corpse or item under the crosshair turns faint (at the ghost opacity) while you aim past it.', 'See past the big mods\' tall corpses to what your shot reaches.'),
         ('Parts without shape', 'Lifts', 'Lifts / All / Off', 'Parts the map draws with no shape in the game\'s data, shown as see-through ghosts: ladders, lift pads, the shops\' racks, liquid over a floor, the rest of fences and catwalk gratings the game gives only a few voxels.',
          'Ghosts are only pictures: shots, sight and walking go through them as the game says.'),
         ('Discreet map edge', 'NO', 'YES / NO', 'Small red dots along the map\'s edge instead of the yellow tape.', ''),

@@ -100,6 +100,8 @@ en-GB:
   STR_FPS_GHOST_PARTS_ALL: "All"
   STR_FPS_GHOST_OPACITY: "Ghost opacity"
   STR_FPS_GHOST_OPACITY_DESC: "How solid the parts without shape look up close: 50% as before, 100% solid. Far off, 60% of that."
+  STR_FPS_SEE_THROUGH_CORPSES: "See-through corpses"
+  STR_FPS_SEE_THROUGH_CORPSES_DESC: "A corpse or item under the crosshair turns faint (at the ghost opacity) when you aim past it, as the game's shots pass through them."
   STR_FPS_DISCREET_EDGE: "Discreet map edge"
   STR_FPS_DISCREET_EDGE_DESC: "The map's edge as small red dots on the floor, instead of the yellow tape."
   STR_FPS_PIXEL_SIZE: "Pixel size"

@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..f3b02d59e
+index 000000000..2d86d31ed
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,416 @@
+@@ -0,0 +1,418 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -230,6 +230,8 @@ index 000000000..f3b02d59e
 +  STR_FPS_GHOST_PARTS_ALL: "All"
 +  STR_FPS_GHOST_OPACITY: "Ghost opacity"
 +  STR_FPS_GHOST_OPACITY_DESC: "How solid the parts without shape look up close: 50% as before, 100% solid. Far off, 60% of that."
++  STR_FPS_SEE_THROUGH_CORPSES: "See-through corpses"
++  STR_FPS_SEE_THROUGH_CORPSES_DESC: "A corpse or item under the crosshair turns faint (at the ghost opacity) when you aim past it, as the game's shots pass through them."
 +  STR_FPS_DISCREET_EDGE: "Discreet map edge"
 +  STR_FPS_DISCREET_EDGE_DESC: "The map's edge as small red dots on the floor, instead of the yellow tape."
 +  STR_FPS_PIXEL_SIZE: "Pixel size"
@@ -546,10 +548,10 @@ index 000000000..f3b02d59e
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers: a clear view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..f9221af96
+index 000000000..53933ffd7
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,416 @@
+@@ -0,0 +1,418 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -652,6 +654,8 @@ index 000000000..f9221af96
 +  STR_FPS_GHOST_PARTS_ALL: "All"
 +  STR_FPS_GHOST_OPACITY: "Ghost opacity"
 +  STR_FPS_GHOST_OPACITY_DESC: "How solid the parts without shape look up close: 50% as before, 100% solid. Far off, 60% of that."
++  STR_FPS_SEE_THROUGH_CORPSES: "See-through corpses"
++  STR_FPS_SEE_THROUGH_CORPSES_DESC: "A corpse or item under the crosshair turns faint (at the ghost opacity) when you aim past it, as the game's shots pass through them."
 +  STR_FPS_DISCREET_EDGE: "Discreet map edge"
 +  STR_FPS_DISCREET_EDGE_DESC: "The map's edge as small red dots on the floor, instead of the yellow tape."
 +  STR_FPS_PIXEL_SIZE: "Pixel size"
@@ -21086,7 +21090,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..35f08a1b6 100644
+index a08796ced..2c85ac254 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -21103,7 +21107,7 @@ index a08796ced..35f08a1b6 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine;
++OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine;
 +OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle;
@@ -21191,10 +21195,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..5881830b4
+index 000000000..80f7d92b4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,719 @@
+@@ -0,0 +1,722 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -21531,6 +21535,9 @@ index 000000000..5881830b4
 +	// with the grav lift flag), 2 all of them.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsGhostParts", &fpsGhostParts, 1, "STR_FPS_GHOST_PARTS", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsGhostOpacity", &fpsGhostOpacity, 50, "STR_FPS_GHOST_OPACITY", category));
++	// A corpse or item pointed at, the game's line passing it to something behind: drawn faint, at
++	// the ghost opacity (the game's shots pass through them).
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCorpses", &fpsSeeThroughCorpses, false, "STR_FPS_SEE_THROUGH_CORPSES", category));
 +	// The map's edge as small red dots on the floor, nothing beyond it, instead of the tape.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsDiscreetEdge", &fpsDiscreetEdge, false, "STR_FPS_DISCREET_EDGE", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 0, "STR_FPS_PIXEL_SIZE", category));
@@ -31344,10 +31351,10 @@ index 000000000..374f097e1
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..252847ee0
+index 000000000..c84379274
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,4314 @@
+@@ -0,0 +1,4317 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -35488,6 +35495,7 @@ index 000000000..252847ee0
 +void FirstPersonMode::updatePointedUnit(BattleUnit *unit)
 +{
 +	_pointedUnit = nullptr;
++	_view->setPointerAim(Position(), false);
 +	if (!unit || !isActive())
 +	{
 +		return;
@@ -35496,7 +35504,9 @@ index 000000000..252847ee0
 +	pointer(pointerX, pointerY);
 +	Position voxel;
 +	int hitType = V_EMPTY;
-+	if (aimAt(pointerX, pointerY, unit, voxel, &hitType) && hitType == V_UNIT)
++	const bool hitSomething = aimAt(pointerX, pointerY, unit, voxel, &hitType);
++	_view->setPointerAim(voxel, true); // (a pile in front of that point turns faint, see FirstPersonView::drawFloorItems)
++	if (hitSomething && hitType == V_UNIT)
 +	{
 +		const Tile *tile = _save->getTile(voxel.toTile());
 +		BattleUnit *hit = tile ? tile->getOverlappingUnit(_save) : nullptr;
@@ -38434,10 +38444,10 @@ index 000000000..d67736b97
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..7ea591a8a
+index 000000000..8e41758ca
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,617 @@
+@@ -0,0 +1,618 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -38986,6 +38996,7 @@ index 000000000..7ea591a8a
 +	std::fill(_unitVeil.begin(), _unitVeil.end(), (Uint8)255);
 +	std::fill(&_pointerUnits[0][0], &_pointerUnits[0][0] + sizeof(_pointerUnits) / sizeof(_pointerUnits[0][0]), nullptr);
 +	std::fill(&_pointerBodies[0][0], &_pointerBodies[0][0] + sizeof(_pointerBodies) / sizeof(_pointerBodies[0][0]), nullptr);
++	std::fill(&_pointerPiles[0][0], &_pointerPiles[0][0] + sizeof(_pointerPiles) / sizeof(_pointerPiles[0][0]), nullptr);
 +	watchUnits();
 +	drawDecals();
 +	drawFloorItems();
@@ -39057,10 +39068,10 @@ index 000000000..7ea591a8a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..1c2982f7e
+index 000000000..b0d43ec2a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1222 @@
+@@ -0,0 +1,1230 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -39392,6 +39403,8 @@ index 000000000..1c2982f7e
 +	/// Where the player points on the view: the crosshair, or the free cursor (pixels on the view),
 +	/// and how many pixels of text (a unit's name) are under it.
 +	void setPointer(int x, int y, int textBelow) { _pointerX = x; _pointerY = y; _pointerTextBelow = textBelow; }
++	/// The point the game's line through the pointer meets, in voxels (a pile in front of it turns faint, see drawFloorItems); or none.
++	void setPointerAim(const Position &voxel, bool aimed) { _pointerAim = voxel; _pointerAimed = aimed; }
 +	/// The unit whose picture is where the player points (or within a few pixels), as last drawn; or null.
 +	BattleUnit *getUnitAtPointer() const { return _unitAtPointer; }
 +	/// The unconscious unit whose body's picture is where the player points (nearer it than any standing unit's), as last drawn; or null.
@@ -39802,6 +39815,10 @@ index 000000000..1c2982f7e
 +	BattleUnit *_pointerBodies[2 * PointerReach + 1][2 * PointerReach + 1] = {}; // and which body's lying there (null: none)
 +	BattleUnit *_unitAtPointer = nullptr;               // the unit pointed at, found from them after each frame
 +	BattleUnit *_bodyAtPointer = nullptr;               // the body pointed at (nearer the pointer than any unit's picture), likewise
++	const Tile *_pointerPiles[2 * PointerReach + 1][2 * PointerReach + 1] = {}; // which pile's picture each pixel round the pointer shows over the world behind (null: none)
++	const Tile *_pileAtPointer = nullptr;               // the pile pointed at, found from them after each frame (see drawFloorItems)
++	Position _pointerAim;                               // the point the game's line through the pointer meets, in voxels (see setPointerAim)
++	bool _pointerAimed = false;                         // and whether there is one
 +	Surface *_spriteBuffer;                             // scratch surface for drawing a unit's sprite before it goes into the world
 +	std::vector<Surface*> _blendBuffers;                // sprites dissolving into their next frame, one per sprite size
 +	std::vector<int> _blendColumns;                     // drawSpriteBlend's source column and row lookups
@@ -39814,8 +39831,9 @@ index 000000000..1c2982f7e
 +	/// for something lying on the floor, its rows below the anchor flat on the floor in front.
 +	enum class SpritePose { Standing, Lying };
 +	/// A sprite drawn see-through (see drawSprite): how opaque each of its pixels is (0 .. SeeThroughLevels,
-+	/// one byte a pixel, rows as long as the sprite is wide), times an opacity for all of it (0 .. 1).
++	/// one byte a pixel, rows as long as the sprite is wide; null: every pixel fully), times an opacity for all of it (0 .. 1).
 +	struct SeeThroughSprite { const Uint8 *opacityMap; float opacity; };
++	SeeThroughSprite _faintPile = { nullptr, 1.0f };    // how the pile pointed at past is drawn (see drawFloorItems)
 +	/// A standing sprite isn't cut off below any floor (see SpriteDraw::floorCut, floorUnderside).
 +	static constexpr double NoFloorCut = -1e9;
 +	/// One sprite to draw standing in the world (see drawSprite).
@@ -39832,6 +39850,7 @@ index 000000000..1c2982f7e
 +		const SeeThroughSprite *seeThrough = nullptr; // how opaque each pixel is (the smoke); null for a solid sprite
 +		BattleUnit *unit = nullptr;       // the unit it pictures, if any: smoke veils it only thinly, and it can be pointed at
 +		BattleUnit *body = nullptr;       // the unconscious unit lying in the pile it pictures, if any: it can be pointed at
++		const Tile *pile = nullptr;       // the floor tile whose pile it pictures (a big corpse's first), if any: it can be pointed at
 +		double lyingSlope = 0.0;          // a lying sprite's floor rising towards the camera: voxels up for each voxel along (see lyingRise)
 +		double floorCut = NoFloorCut;     // no part of a standing sprite below this height, in voxels: the underside of the floor a unit stands on (see floorUnderside)
 +	};
@@ -47065,10 +47084,10 @@ index 000000000..169832559
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..02da48172
+index 000000000..8cc2f7482
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,2594 @@
+@@ -0,0 +1,2635 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -47326,6 +47345,16 @@ index 000000000..02da48172
 +		const int index = pixelY * width + pixelX;
 +		float &depthHere = _depthBuffer[index];
 +		if (!color || depth >= depthHere) return;
++		// A pile's picture near the pointer, over the world behind it, solid or faint: noted on its own
++		// (what's drawn after it doesn't take it back), so a faint pile stays faint with a unit behind.
++		if (draw.pile)
++		{
++			const int pilePatchX = pixelX - _pointerX + PointerReach, pilePatchY = pixelY - _pointerY + PointerReach;
++			if (pilePatchX >= 0 && pilePatchY >= 0 && pilePatchX <= 2 * PointerReach && pilePatchY <= 2 * PointerReach)
++			{
++				_pointerPiles[pilePatchY][pilePatchX] = draw.pile;
++			}
++		}
 +		if (pixelOpacity < SeeThroughLevels)
 +		{
 +			Uint8 &veilLeft = _unitVeil[index];
@@ -47353,7 +47382,8 @@ index 000000000..02da48172
 +	auto spritePixel = [&](int spriteX, int spriteY) { return ((const Uint8 *)spriteSurface->pixels)[spriteY * spriteSurface->pitch + spriteX]; };
 +	// How opaque a sprite pixel is, in see-through steps (SeeThroughLevels for a solid sprite).
 +	auto pixelOpacityAt = [&](int spriteX, int spriteY) {
-+		return seeThroughSprite ? (int)(seeThroughSprite->opacityMap[spriteY * spriteWidth + spriteX] * seeThroughOpacity + 0.5f) : SeeThroughLevels;
++		return !seeThroughSprite ? SeeThroughLevels : seeThroughSprite->opacityMap ? (int)(seeThroughSprite->opacityMap[spriteY * spriteWidth + spriteX] * seeThroughOpacity + 0.5f)
++			: (int)(SeeThroughLevels * seeThroughOpacity + 0.5f);
 +	};
 +
 +	// The view tilted by a lean (see setRoll): the screen's rows no longer run level across the
@@ -48106,13 +48136,16 @@ index 000000000..02da48172
 + * nearest one within PointerReach pixels of it (a unit far off is only a few pixels across).
 + * Only what's drawn counts, so only units in sight, standing, and not hidden behind anything.
 + * The same for a body lying on the floor (an unconscious unit's, see getBodyAtPointer), when
-+ * its picture is nearer the pointer than any standing unit's (a medi-kit's patient).
++ * its picture is nearer the pointer than any standing unit's (a medi-kit's patient); and for the
++ * pile whose picture is there over the world behind it, whatever is drawn in front (it turns
++ * faint the next frame if the pointer aims past it, see drawFloorItems).
 + */
 +void FirstPersonView::findUnitAtPointer()
 +{
 +	_unitAtPointer = nullptr;
 +	_bodyAtPointer = nullptr;
-+	int nearestUnit = 1 << 30, nearestBody = 1 << 30;
++	_pileAtPointer = nullptr;
++	int nearestUnit = 1 << 30, nearestBody = 1 << 30, nearestPile = 1 << 30;
 +	for (int patchY = 0; patchY <= 2 * PointerReach; ++patchY)
 +	{
 +		for (int patchX = 0; patchX <= 2 * PointerReach; ++patchX)
@@ -48127,6 +48160,11 @@ index 000000000..02da48172
 +			{
 +				nearestBody = distanceSq;
 +				_bodyAtPointer = _pointerBodies[patchY][patchX];
++			}
++			if (_pointerPiles[patchY][patchX] && distanceSq < nearestPile)
++			{
++				nearestPile = distanceSq;
++				_pileAtPointer = _pointerPiles[patchY][patchX];
 +			}
 +		}
 +	}
@@ -48267,6 +48305,12 @@ index 000000000..02da48172
 + * items of their tiles, they're drawn as one picture, put together as the map draws them, laid at
 + * the corner the four tiles share and scaled round it (a player's report: a 2x2 corpse looked
 + * chopped to pieces, each part shrunk round its own tile and standing on its own).
++ * With the setting "See-through corpses" (off at first: the owner's), the pile pointed at (its
++ * picture under the crosshair or the free cursor last frame, see findUnitAtPointer) is drawn
++ * faint, at the ghost opacity (setting "Ghost opacity"), while the game's line through the
++ * pointer meets something past it, not the floor it lies on (a player's report, GitHub issue
++ * #35: very tall corpses, XPiratez's, hid what a shot reaches, though the game's shots pass
++ * through items; the owner: the whole picture faint): what's behind it shows.
 + */
 +void FirstPersonView::drawFloorItems()
 +{
@@ -48303,6 +48347,8 @@ index 000000000..02da48172
 +		}
 +		return false;
 +	};
++	// The pile pointed at past: faint, at the ghost opacity.
++	_faintPile = { nullptr, std::clamp(Options::fpsGhostOpacity, 0, 100) / 100.0f };
 +	// The items are recorded first, then drawn on all the view's threads at once (see
 +	// replayDrawList); each one's frame is composed in the sprite buffer and kept till then.
 +	int framesUsed = 0;
@@ -48398,6 +48444,20 @@ index 000000000..02da48172
 +		step.sprite.shade = shade;
 +		step.sprite.scale = itemScale;
 +		step.sprite.pose = SpritePose::Lying;
++		step.sprite.pile = tilesUnder[0];
++		// Pointed at, and aimed past (the game's line meets something on another tile, farther off
++		// than the pile itself): faint.
++		if (Options::fpsSeeThroughCorpses && tilesUnder[0] == _pileAtPointer && _pointerAimed)
++		{
++			bool ownFloor = false;
++			for (const Tile *under : tilesUnder) ownFloor = ownFloor || under->getPosition() == _pointerAim.toTile();
++			const double pileDistance = std::hypot(ground[0] - _eye[0], ground[1] - _eye[1], ground[2] - _eye[2]);
++			const double aimDistance = std::hypot(_pointerAim.x + 0.5 - _eye[0], _pointerAim.y + 0.5 - _eye[1], _pointerAim.z + 0.5 - _eye[2]);
++			if (!ownFloor && aimDistance > pileDistance)
++			{
++				step.sprite.seeThrough = &_faintPile;
++			}
++		}
 +		// An unconscious unit lying in the pile (any of a big corpse's tiles): its picture can be
 +		// pointed at (a medi-kit's patient).
 +		for (Tile *under : tilesUnder)

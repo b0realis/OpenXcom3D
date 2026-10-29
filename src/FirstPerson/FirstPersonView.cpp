@@ -546,6 +546,7 @@ void FirstPersonView::draw()
 	std::fill(_unitVeil.begin(), _unitVeil.end(), (Uint8)255);
 	std::fill(&_pointerUnits[0][0], &_pointerUnits[0][0] + sizeof(_pointerUnits) / sizeof(_pointerUnits[0][0]), nullptr);
 	std::fill(&_pointerBodies[0][0], &_pointerBodies[0][0] + sizeof(_pointerBodies) / sizeof(_pointerBodies[0][0]), nullptr);
+	std::fill(&_pointerPiles[0][0], &_pointerPiles[0][0] + sizeof(_pointerPiles) / sizeof(_pointerPiles[0][0]), nullptr);
 	watchUnits();
 	drawDecals();
 	drawFloorItems();

@@ -255,6 +255,16 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 		const int index = pixelY * width + pixelX;
 		float &depthHere = _depthBuffer[index];
 		if (!color || depth >= depthHere) return;
+		// A pile's picture near the pointer, over the world behind it, solid or faint: noted on its own
+		// (what's drawn after it doesn't take it back), so a faint pile stays faint with a unit behind.
+		if (draw.pile)
+		{
+			const int pilePatchX = pixelX - _pointerX + PointerReach, pilePatchY = pixelY - _pointerY + PointerReach;
+			if (pilePatchX >= 0 && pilePatchY >= 0 && pilePatchX <= 2 * PointerReach && pilePatchY <= 2 * PointerReach)
+			{
+				_pointerPiles[pilePatchY][pilePatchX] = draw.pile;
+			}
+		}
 		if (pixelOpacity < SeeThroughLevels)
 		{
 			Uint8 &veilLeft = _unitVeil[index];
@@ -282,7 +292,8 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 	auto spritePixel = [&](int spriteX, int spriteY) { return ((const Uint8 *)spriteSurface->pixels)[spriteY * spriteSurface->pitch + spriteX]; };
 	// How opaque a sprite pixel is, in see-through steps (SeeThroughLevels for a solid sprite).
 	auto pixelOpacityAt = [&](int spriteX, int spriteY) {
-		return seeThroughSprite ? (int)(seeThroughSprite->opacityMap[spriteY * spriteWidth + spriteX] * seeThroughOpacity + 0.5f) : SeeThroughLevels;
+		return !seeThroughSprite ? SeeThroughLevels : seeThroughSprite->opacityMap ? (int)(seeThroughSprite->opacityMap[spriteY * spriteWidth + spriteX] * seeThroughOpacity + 0.5f)
+			: (int)(SeeThroughLevels * seeThroughOpacity + 0.5f);
 	};
 
 	// The view tilted by a lean (see setRoll): the screen's rows no longer run level across the
@@ -1035,13 +1046,16 @@ void FirstPersonView::recordHitbox(const BattleUnit *unit, const double feet[3],
  * nearest one within PointerReach pixels of it (a unit far off is only a few pixels across).
  * Only what's drawn counts, so only units in sight, standing, and not hidden behind anything.
  * The same for a body lying on the floor (an unconscious unit's, see getBodyAtPointer), when
- * its picture is nearer the pointer than any standing unit's (a medi-kit's patient).
+ * its picture is nearer the pointer than any standing unit's (a medi-kit's patient); and for the
+ * pile whose picture is there over the world behind it, whatever is drawn in front (it turns
+ * faint the next frame if the pointer aims past it, see drawFloorItems).
  */
 void FirstPersonView::findUnitAtPointer()
 {
 	_unitAtPointer = nullptr;
 	_bodyAtPointer = nullptr;
-	int nearestUnit = 1 << 30, nearestBody = 1 << 30;
+	_pileAtPointer = nullptr;
+	int nearestUnit = 1 << 30, nearestBody = 1 << 30, nearestPile = 1 << 30;
 	for (int patchY = 0; patchY <= 2 * PointerReach; ++patchY)
 	{
 		for (int patchX = 0; patchX <= 2 * PointerReach; ++patchX)
@@ -1056,6 +1070,11 @@ void FirstPersonView::findUnitAtPointer()
 			{
 				nearestBody = distanceSq;
 				_bodyAtPointer = _pointerBodies[patchY][patchX];
+			}
+			if (_pointerPiles[patchY][patchX] && distanceSq < nearestPile)
+			{
+				nearestPile = distanceSq;
+				_pileAtPointer = _pointerPiles[patchY][patchX];
 			}
 		}
 	}
@@ -1196,6 +1215,12 @@ static int bottomColouredRow(const Surface *sprite)
  * items of their tiles, they're drawn as one picture, put together as the map draws them, laid at
  * the corner the four tiles share and scaled round it (a player's report: a 2x2 corpse looked
  * chopped to pieces, each part shrunk round its own tile and standing on its own).
+ * With the setting "See-through corpses" (off at first: the owner's), the pile pointed at (its
+ * picture under the crosshair or the free cursor last frame, see findUnitAtPointer) is drawn
+ * faint, at the ghost opacity (setting "Ghost opacity"), while the game's line through the
+ * pointer meets something past it, not the floor it lies on (a player's report, GitHub issue
+ * #35: very tall corpses, XPiratez's, hid what a shot reaches, though the game's shots pass
+ * through items; the owner: the whole picture faint): what's behind it shows.
  */
 void FirstPersonView::drawFloorItems()
 {
@@ -1232,6 +1257,8 @@ void FirstPersonView::drawFloorItems()
 		}
 		return false;
 	};
+	// The pile pointed at past: faint, at the ghost opacity.
+	_faintPile = { nullptr, std::clamp(Options::fpsGhostOpacity, 0, 100) / 100.0f };
 	// The items are recorded first, then drawn on all the view's threads at once (see
 	// replayDrawList); each one's frame is composed in the sprite buffer and kept till then.
 	int framesUsed = 0;
@@ -1327,6 +1354,20 @@ void FirstPersonView::drawFloorItems()
 		step.sprite.shade = shade;
 		step.sprite.scale = itemScale;
 		step.sprite.pose = SpritePose::Lying;
+		step.sprite.pile = tilesUnder[0];
+		// Pointed at, and aimed past (the game's line meets something on another tile, farther off
+		// than the pile itself): faint.
+		if (Options::fpsSeeThroughCorpses && tilesUnder[0] == _pileAtPointer && _pointerAimed)
+		{
+			bool ownFloor = false;
+			for (const Tile *under : tilesUnder) ownFloor = ownFloor || under->getPosition() == _pointerAim.toTile();
+			const double pileDistance = std::hypot(ground[0] - _eye[0], ground[1] - _eye[1], ground[2] - _eye[2]);
+			const double aimDistance = std::hypot(_pointerAim.x + 0.5 - _eye[0], _pointerAim.y + 0.5 - _eye[1], _pointerAim.z + 0.5 - _eye[2]);
+			if (!ownFloor && aimDistance > pileDistance)
+			{
+				step.sprite.seeThrough = &_faintPile;
+			}
+		}
 		// An unconscious unit lying in the pile (any of a big corpse's tiles): its picture can be
 		// pointed at (a medi-kit's patient).
 		for (Tile *under : tilesUnder)

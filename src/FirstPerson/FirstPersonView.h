@@ -329,6 +329,8 @@ public:
 	/// Where the player points on the view: the crosshair, or the free cursor (pixels on the view),
 	/// and how many pixels of text (a unit's name) are under it.
 	void setPointer(int x, int y, int textBelow) { _pointerX = x; _pointerY = y; _pointerTextBelow = textBelow; }
+	/// The point the game's line through the pointer meets, in voxels (a pile in front of it turns faint, see drawFloorItems); or none.
+	void setPointerAim(const Position &voxel, bool aimed) { _pointerAim = voxel; _pointerAimed = aimed; }
 	/// The unit whose picture is where the player points (or within a few pixels), as last drawn; or null.
 	BattleUnit *getUnitAtPointer() const { return _unitAtPointer; }
 	/// The unconscious unit whose body's picture is where the player points (nearer it than any standing unit's), as last drawn; or null.
@@ -739,6 +741,10 @@ private:
 	BattleUnit *_pointerBodies[2 * PointerReach + 1][2 * PointerReach + 1] = {}; // and which body's lying there (null: none)
 	BattleUnit *_unitAtPointer = nullptr;               // the unit pointed at, found from them after each frame
 	BattleUnit *_bodyAtPointer = nullptr;               // the body pointed at (nearer the pointer than any unit's picture), likewise
+	const Tile *_pointerPiles[2 * PointerReach + 1][2 * PointerReach + 1] = {}; // which pile's picture each pixel round the pointer shows over the world behind (null: none)
+	const Tile *_pileAtPointer = nullptr;               // the pile pointed at, found from them after each frame (see drawFloorItems)
+	Position _pointerAim;                               // the point the game's line through the pointer meets, in voxels (see setPointerAim)
+	bool _pointerAimed = false;                         // and whether there is one
 	Surface *_spriteBuffer;                             // scratch surface for drawing a unit's sprite before it goes into the world
 	std::vector<Surface*> _blendBuffers;                // sprites dissolving into their next frame, one per sprite size
 	std::vector<int> _blendColumns;                     // drawSpriteBlend's source column and row lookups
@@ -751,8 +757,9 @@ private:
 	/// for something lying on the floor, its rows below the anchor flat on the floor in front.
 	enum class SpritePose { Standing, Lying };
 	/// A sprite drawn see-through (see drawSprite): how opaque each of its pixels is (0 .. SeeThroughLevels,
-	/// one byte a pixel, rows as long as the sprite is wide), times an opacity for all of it (0 .. 1).
+	/// one byte a pixel, rows as long as the sprite is wide; null: every pixel fully), times an opacity for all of it (0 .. 1).
 	struct SeeThroughSprite { const Uint8 *opacityMap; float opacity; };
+	SeeThroughSprite _faintPile = { nullptr, 1.0f };    // how the pile pointed at past is drawn (see drawFloorItems)
 	/// A standing sprite isn't cut off below any floor (see SpriteDraw::floorCut, floorUnderside).
 	static constexpr double NoFloorCut = -1e9;
 	/// One sprite to draw standing in the world (see drawSprite).
@@ -769,6 +776,7 @@ private:
 		const SeeThroughSprite *seeThrough = nullptr; // how opaque each pixel is (the smoke); null for a solid sprite
 		BattleUnit *unit = nullptr;       // the unit it pictures, if any: smoke veils it only thinly, and it can be pointed at
 		BattleUnit *body = nullptr;       // the unconscious unit lying in the pile it pictures, if any: it can be pointed at
+		const Tile *pile = nullptr;       // the floor tile whose pile it pictures (a big corpse's first), if any: it can be pointed at
 		double lyingSlope = 0.0;          // a lying sprite's floor rising towards the camera: voxels up for each voxel along (see lyingRise)
 		double floorCut = NoFloorCut;     // no part of a standing sprite below this height, in voxels: the underside of the floor a unit stands on (see floorUnderside)
 	};

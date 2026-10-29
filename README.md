@@ -52,6 +52,7 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 - **The snap shot in FPS style:** Z fires the gun's single snap shot again (it fired a burst, as a click on AUTO does).
 - **Names by the hitbox:** the unit you point at (its name, the middle click, a medi-kit's patient, a melee blow) is found by the game's hitbox first, so small moving aliens no longer make the name blink.
 - **Tails on the floor:** what a unit's art draws below its feet (a snake's tail, a long body) lies flat on the floor instead of sinking into it.
+- **See-through corpses** (a setting, off at first): a corpse or item under the crosshair turns faint while you aim past it, as the game's shots pass through it.
 - **A logo of its own:** the alien in the yellow X, now the icon of the AppImage, the Windows game, the Mac app, the game's window, the menu entry and the web pages.
 
 ## Earlier versions

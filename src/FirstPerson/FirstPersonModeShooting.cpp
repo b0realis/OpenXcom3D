@@ -4138,6 +4138,7 @@ std::string FirstPersonMode::unitLabel(const BattleUnit *target) const
 void FirstPersonMode::updatePointedUnit(BattleUnit *unit)
 {
 	_pointedUnit = nullptr;
+	_view->setPointerAim(Position(), false);
 	if (!unit || !isActive())
 	{
 		return;
@@ -4146,7 +4147,9 @@ void FirstPersonMode::updatePointedUnit(BattleUnit *unit)
 	pointer(pointerX, pointerY);
 	Position voxel;
 	int hitType = V_EMPTY;
-	if (aimAt(pointerX, pointerY, unit, voxel, &hitType) && hitType == V_UNIT)
+	const bool hitSomething = aimAt(pointerX, pointerY, unit, voxel, &hitType);
+	_view->setPointerAim(voxel, true); // (a pile in front of that point turns faint, see FirstPersonView::drawFloorItems)
+	if (hitSomething && hitType == V_UNIT)
 	{
 		const Tile *tile = _save->getTile(voxel.toTile());
 		BattleUnit *hit = tile ? tile->getOverlappingUnit(_save) : nullptr;
