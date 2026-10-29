@@ -100,6 +100,11 @@ const double SkyAimReach = 320.0;
 /// applyAccuracy: a roll under the accuracy, plus 10, so 9 at most), for the accuracy line of
 /// "Faithful X-COM targeting" (see FirstPersonMode::hitCloudReach).
 const int HitRollDeviation = 9;
+/// With the game's own targeting, a point under the crosshair no line of fire reaches gives way
+/// to the nearest point around it that one does, on the same target: at most this many voxels
+/// away (a quarter tile), and at most this many lines tried for it (see FirstPersonMode::aimFor).
+const int NearPointReach = 4;
+const int NearPointMostTries = 160;
 /// The accuracy line under the crosshair (setting "Accuracy line", see FirstPersonMode::
 /// drawAccuracyLine), in canvas pixels: its reach to either side of the middle at the least and
 /// at the most, how far under the crosshair's middle it runs (clear of the crosshair's shapes,

@@ -1654,6 +1654,44 @@ Position FirstPersonMode::aimedTile(const Position &aimedVoxel) const
 	return tile;
 }
 
+namespace
+{
+/**
+ * The game's own test of what a line of fire met first against the target (Projectile::
+ * calculateTrajectory): the target tile, a wall on its near side, or the target's unit on another
+ * of its tiles; a unit with no unit on the tile it was met in is one lower down (as the game says).
+ * @param save The battle.
+ * @param meets What the line met (V_FLOOR, V_UNIT...).
+ * @param line The line's points, the first where it met it.
+ * @param targetTile The tile aimed at.
+ */
+bool lineMetTarget(SavedBattleGame *save, int meets, const std::vector<Position> &line, const Position &targetTile)
+{
+	// The tile it meets first; a unit with no unit on that tile is one lower down (as the game says).
+	Position hitTile = line.front().toTile();
+	const Tile *hit = save->getTile(hitTile);
+	if (meets == V_UNIT && hit && !hit->getUnit())
+	{
+		--hitTile.z;
+		hit = save->getTile(hitTile);
+	}
+	if (hitTile == targetTile)
+	{
+		return true;
+	}
+	// Elsewhere: a wall on the near side of the target tile, or the target's unit on another
+	// of its tiles (the game's own checks, as it makes them).
+	if (meets == V_NORTHWALL) return hitTile.y - 1 == targetTile.y;
+	if (meets == V_WESTWALL) return hitTile.x - 1 == targetTile.x;
+	if (meets == V_UNIT)
+	{
+		const Tile *target = save->getTile(targetTile);
+		return hit && target && hit->getUnit() == target->getUnit();
+	}
+	return false;
+}
+}
+
 /**
  * Does the game let a straight shot fly along a line, as it checks the player's first round
  * (Projectile::calculateTrajectory)? The line must meet the target tile first: a unit on it (or
@@ -1673,28 +1711,39 @@ bool FirstPersonMode::gameLetsLineFly(BattleAction &shot, const Position &origin
 	{
 		return true;
 	}
-	// The tile it meets first; a unit with no unit on that tile is one lower down (as the game says).
-	Position hitTile = line.front().toTile();
-	const Tile *hit = _save->getTile(hitTile);
-	if (meets == V_UNIT && hit && !hit->getUnit())
+	return lineMetTarget(_save, meets, line, targetTile);
+}
+
+/**
+ * Does a line from a muzzle point through a point near the crosshair's, carried on past it (three
+ * tiles further), meet the shot's target first, as gameLetsLineFly counts it (the target tile, a
+ * wall on its near side, or its unit)? Not meeting anything doesn't count here: the point is to
+ * hit the target (see aimFor's search for a point near the crosshair's).
+ * @param shot The action (its actor is left out of the line).
+ * @param origin Where the shot leaves from.
+ * @param point The point it would be aimed at.
+ * @param targetTile The tile aimed at.
+ * @param hit Set to where the line meets the target (when it does).
+ * @return True if the line through it meets the target first.
+ */
+bool FirstPersonMode::lineThroughMeetsTarget(BattleAction &shot, const Position &origin, const Position &point, const Position &targetTile, Position &hit)
+{
+	const double dx = point.x - origin.x, dy = point.y - origin.y, dz = point.z - origin.z;
+	const double length = std::sqrt(dx * dx + dy * dy + dz * dz);
+	if (length < 1.0)
 	{
-		--hitTile.z;
-		hit = _save->getTile(hitTile);
+		return false;
 	}
-	if (hitTile == targetTile)
+	const double on = 48.0 / length; // three tiles past the point
+	const Position beyond((int)std::lround(point.x + dx * on), (int)std::lround(point.y + dy * on), (int)std::lround(point.z + dz * on));
+	std::vector<Position> line;
+	const int meets = _save->getTileEngine()->calculateLineVoxel(origin, beyond, false, &line, shot.actor);
+	if (meets == V_EMPTY || meets == V_OUTOFBOUNDS || line.empty() || !lineMetTarget(_save, meets, line, targetTile))
 	{
-		return true;
+		return false;
 	}
-	// Elsewhere: a wall on the near side of the target tile, or the target's unit on another
-	// of its tiles (the game's own checks, as it makes them).
-	if (meets == V_NORTHWALL) return hitTile.y - 1 == targetTile.y;
-	if (meets == V_WESTWALL) return hitTile.x - 1 == targetTile.x;
-	if (meets == V_UNIT)
-	{
-		const Tile *target = _save->getTile(targetTile);
-		return hit && target && hit->getUnit() == target->getUnit();
-	}
-	return false;
+	hit = line.front();
+	return true;
 }
 
 /**
@@ -1780,6 +1829,14 @@ bool FirstPersonMode::gameAimFound(BattleAction &shot, const Position &targetTil
  *   shooting", the game's own muzzle points in the order its own aim tries them for a unit (a
  *   player's report: past the very corner of a craft's opening the shot went for the hull); the
  *   side that works is left in the action, for the game to fire from;
+ * - else at the nearest point around it, within NearPointReach voxels, that a line through
+ *   reaches the same target (upwards first: over a ledge, off a bumpy floor), where it meets it
+ *   seen from the eye no further off the crosshair than NearPointReach and a half at the
+ *   crosshair's point (along a floor it lands a little behind, on the same line of sight; a line
+ *   slipping past a corner to the far side of the target tile doesn't count), from the same
+ *   muzzle points (a player's report, with screenshots: shots "very visually off", lasers along
+ *   flat ground jutting off to a side; the game's own aim below went for another part of the
+ *   unit, or the tile's middle);
  * - else as the game's own aim goes: any part of the unit a line reaches, from the side of the
  *   shot, the middle, and left and right with OXCE's "Off-centre shooting" (gameAimFound);
  * - else, with "Force blocked shots", forced along the line to the crosshair, hitting whatever
@@ -1821,6 +1878,60 @@ FirstPersonMode::ShotAim FirstPersonMode::aimFor(BattleAction &shot, const Posit
 				origin = triedOrigin;
 				return AIM_EXACT;
 			}
+		}
+		// No line to it: the nearest point around it a line through reaches the target, the
+		// points in order of their distance (upwards first at the same distance), at most
+		// NearPointMostTries lines in all (each point from each muzzle point counts one).
+		static const std::vector<Position> nearOffsets = []
+		{
+			std::vector<Position> offsets;
+			for (int z = -NearPointReach; z <= NearPointReach; ++z)
+				for (int y = -NearPointReach; y <= NearPointReach; ++y)
+					for (int x = -NearPointReach; x <= NearPointReach; ++x)
+						if ((x || y || z) && x * x + y * y + z * z <= NearPointReach * NearPointReach) offsets.push_back(Position(x, y, z));
+			std::stable_sort(offsets.begin(), offsets.end(), [](const Position &a, const Position &b)
+			{
+				const int distanceA = a.x * a.x + a.y * a.y + a.z * a.z, distanceB = b.x * b.x + b.y * b.y + b.z * b.z;
+				return distanceA != distanceB ? distanceA < distanceB : a.z > b.z;
+			});
+			return offsets;
+		}();
+		const int mapX = _save->getMapSizeX() * 16, mapY = _save->getMapSizeY() * 16, mapZ = _save->getMapSizeZ() * 24;
+		// How far off the crosshair (seen from the eye) the round may land: the angle of
+		// NearPointReach and a half at the crosshair's point, as a cosine.
+		double eye[3];
+		_view->getEye(eye);
+		const double toAimed[3] = { aimedVoxel.x - eye[0], aimedVoxel.y - eye[1], aimedVoxel.z - eye[2] };
+		const double aimedDistance = std::max(1.0, std::sqrt(toAimed[0] * toAimed[0] + toAimed[1] * toAimed[1] + toAimed[2] * toAimed[2]));
+		const double leastCosine = std::cos(std::atan(NearPointReach * 1.5 / aimedDistance));
+		auto onTheCrosshair = [&](const Position &hit)
+		{
+			const double toHit[3] = { hit.x - eye[0], hit.y - eye[1], hit.z - eye[2] };
+			const double hitDistance = std::sqrt(toHit[0] * toHit[0] + toHit[1] * toHit[1] + toHit[2] * toHit[2]);
+			return hitDistance > 0.0 && (toHit[0] * toAimed[0] + toHit[1] * toAimed[1] + toHit[2] * toAimed[2]) / (hitDistance * aimedDistance) >= leastCosine;
+		};
+		int lines = 0;
+		for (const Position &offset : nearOffsets)
+		{
+			const Position near = aimedVoxel + offset;
+			if (near.x < 0 || near.y < 0 || near.z < 0 || near.x >= mapX || near.y >= mapY || near.z >= mapZ)
+			{
+				continue;
+			}
+			for (const BattleActionOrigin tried : sides)
+			{
+				if (++lines > NearPointMostTries) break;
+				shot.relativeOrigin = tried;
+				const Position triedOrigin = tileEngine->getOriginVoxel(shot, from);
+				Position hit;
+				if (gameLetsLineFly(shot, triedOrigin, near, targetTile) && lineThroughMeetsTarget(shot, triedOrigin, near, targetTile, hit) && onTheCrosshair(hit))
+				{
+					origin = triedOrigin;
+					voxel = near;
+					return AIM_EXACT;
+				}
+			}
+			if (lines > NearPointMostTries) break;
 		}
 		shot.relativeOrigin = side;
 	}
@@ -2264,6 +2375,7 @@ void FirstPersonMode::launchShot(BattleUnit *unit, BattleItem *weapon, BattleAct
 		{
 		case AIM_EXACT:
 			action->relativeOrigin = probe.relativeOrigin;
+			action->targetVoxel = voxel; // (the point under the crosshair, or the nearest one a line reaches, see aimFor)
 			break;
 		case AIM_GAME:
 			action->targetVoxel = Position(-1, -1, -1);

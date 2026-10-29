@@ -724,6 +724,8 @@ private:
 	bool accuracyLineShown() const;
 	/// The first voxel along the ray through a pixel, as a shot would see it; true if something is there.
 	bool aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &voxel, int *voxelType = nullptr) const;
+	/// Does a line through a point, carried on past it, meet the shot's target first (its tile, a wall on its near side, or its unit)?
+	bool lineThroughMeetsTarget(BattleAction &shot, const Position &origin, const Position &point, const Position &targetTile, Position &hit);
 	/// How far along the crosshair's ray a shot at the open sky aims, in voxels (see aimAt).
 	double skyReach(BattleUnit *unit) const;
 	/// Uses the fire mode on whatever is under a pixel of the view, through the game's own actions.
