@@ -341,6 +341,8 @@ public:
 	void setNightVision(int color) { _nightVision = color; }
 	/// The sight of the soldier the view looks through, for the smoke: their range, and how much of the smoke (and smoke over fire) they see through.
 	void setSmokeSight(float sightVoxels, int throughSmoke, int throughFire);
+	/// How much the see-through smoke's opacity is scaled where it hangs, by the settings "Smoke opacity" and "Night smoke opacity" and the game's shade there.
+	float smokeOpacityScale(int shade) const;
 	/// Where the weapon in hand's muzzle is on the view (pixels): our own shots flash and start their trails there.
 	void setMuzzlePoint(double x, double y, bool valid) { _muzzleScreen[0] = x; _muzzleScreen[1] = y; _muzzleValid = valid; }
 	/// The path a throw or shot aimed now would take, in voxels from the soldier to its end (see

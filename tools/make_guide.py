@@ -134,6 +134,10 @@ SETTINGS = [
         ('Hit, kill and swing sounds', 'YES', 'YES / NO', 'A tick for a hit, a double tick for a kill, a swoosh for your swings, and your heartbeat once hurt below half health.', ''),
         ('Smoke', 'Modern', 'Modern / Original', 'Modern: the game\'s smoke as soft see-through clouds, solid where your soldier can\'t see through. Original: the games\' own smoke animation.',
          'Either way units the game hides stay hidden.'),
+        ('Smoke opacity', '45%', '5% to 80%', 'How solid smoke you can see through looks: the thinnest, thicker smoke more. Where your soldier can\'t see through it, it stays solid.',
+         'Lower it if smoke hides too much of the street; your soldier sees what the game says either way.'),
+        ('Night smoke opacity', '25%', '5% to 80%', 'The same in the dark: on a night mission (lamp-lit or suit-lit smoke too), and by day on dark maps and in unlit rooms.',
+         'Lower if smoke at night is blinding.'),
         ('Unlimited tactical flares', 'YES', 'YES / NO', 'T throws a red flare at the crosshair, free and as often as you like.', 'Lights the 3D view only.'),
     ]),
     ('Looks', [

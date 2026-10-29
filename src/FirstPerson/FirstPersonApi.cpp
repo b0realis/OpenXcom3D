@@ -301,6 +301,12 @@ void createOptions(std::vector<OptionInfo> &options)
 	// soldier's sight (2). (1.0's Solid, 0, is gone.) Unset (-1) until settled (see settleOptions)
 	// from 0.9's "See-through smoke", kept below, unlisted.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmoke", &fpsSmoke, -1, "STR_FPS_SMOKE", category));
+	// How opaque the see-through smoke is drawn (not where the soldier can't see through it:
+	// that stays solid): the thinnest smoke's opacity in percent, thicker smoke more as before;
+	// in the dark, by the light where it hangs, the night value (a player: "non full smoke can
+	// be blinding" at night and on dark maps), the two blended in between.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmokeOpacity", &fpsSmokeOpacity, 45, "STR_FPS_SMOKE_OPACITY", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightSmokeOpacity", &fpsNightSmokeOpacity, 25, "STR_FPS_NIGHT_SMOKE_OPACITY", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlares", &fpsFlares, true, "STR_FPS_FLARES", category));
 	// 0.9's "See-through smoke" (YES/NO), loaded and saved but listed nowhere (a category no
 	// options screen shows): it gives the smoke setting its first value.

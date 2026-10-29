@@ -1969,6 +1969,25 @@ const FirstPersonView::SoftSmoke &FirstPersonView::softSmokeBlend(const Surface 
  * @param throughSmoke How much of smoke they see through, in percent.
  * @param throughFire How much of smoke over fire they see through, in percent.
  */
+/**
+ * How much the see-through smoke's opacity is scaled where it hangs (the settings "Smoke
+ * opacity" and "Night smoke opacity", a player: "non full smoke can be blinding for some
+ * players" at night and on dark maps): the day value in the light, the night value in the dark,
+ * over the opacity the clouds are made for. Dark is the darker of the battle (a night mission,
+ * however lamps or the suit lights light the smoke: lit smoke on a dark night is the blinding
+ * kind) and the game's shade where the smoke hangs (a dark base or an unlit room by day; see
+ * SmokeNightFromShade). Only the smoke the soldier sees through: where their sight runs out it
+ * stays solid.
+ * @param shade The game's shade where the smoke hangs, 0 brightest .. 15 darkest.
+ * @return The scale: 1 for the look before the settings (45% by day).
+ */
+float FirstPersonView::smokeOpacityScale(int shade) const
+{
+	const float darkness = std::max(_colors.night, std::clamp((shade - SmokeNightFromShade) / (SmokeNightToShade - SmokeNightFromShade), 0.0f, 1.0f));
+	const float day = std::clamp(Options::fpsSmokeOpacity, 5, 80) / 100.0f, night = std::clamp(Options::fpsNightSmokeOpacity, 5, 80) / 100.0f;
+	return (day + (night - day) * darkness) / SmokeOpacityMadeFor;
+}
+
 void FirstPersonView::setSmokeSight(float sightVoxels, int throughSmoke, int throughFire)
 {
 	_smokeSightVoxels = sightVoxels;
@@ -2059,7 +2078,10 @@ void FirstPersonView::drawSeeThroughSmoke()
 		// A little more opaque the thicker the smoke (a fresh smoke grenade makes about 15); the
 		// original's dots more so, as their holes already let the view through. Thinner for eyes
 		// with heat vision (see setSmokeSight).
-		const float opacity = _smokeSeen * (original ? std::clamp(0.35f + tile->getSmoke() * 0.04f, 0.0f, 0.95f) : std::clamp(0.45f + tile->getSmoke() * 0.025f, 0.0f, 0.85f));
+		// The settings "Smoke opacity" and "Night smoke opacity" scale it, by the light here (see
+		// smokeOpacityScale).
+		const float made = original ? std::clamp(0.35f + tile->getSmoke() * 0.04f, 0.0f, 0.95f) : std::clamp(0.45f + tile->getSmoke() * 0.025f, 0.0f, 0.85f);
+		const float opacity = _smokeSeen * std::min(0.95f, made * smokeOpacityScale(_tileViews[tileIndex].light));
 		const int firstFrame = firstSmokeFrame(tile->getSmoke());
 		const double frameTime = seconds / FrameSeconds + tile->getAnimationOffset() + variation[2], scale = 1.14 + variation[3] * 0.12;
 		addPuff(world, 32, firstFrame, frameTime, opacity, scale, _tileViews[tileIndex].light);
@@ -2099,7 +2121,7 @@ void FirstPersonView::drawSeeThroughSmoke()
 		const float fade = std::min(std::clamp(age / 0.25f, 0.0f, 1.0f), std::clamp((1.0f - age) / 0.5f, 0.0f, 1.0f));
 		const double world[3] = { particle.pos[0], particle.pos[1], particle.pos[2] };
 		const int shade = (int)std::lround(std::clamp(lightAt(particle.pos[0], particle.pos[1], particle.pos[2]), 0.0f, 15.0f));
-		addPuff(world, 20, firstSmokeFrame(1), seconds / (FrameSeconds * 1.5) + particle.size, _smokeSeen * 0.45f * fade * fade * (3.0f - 2.0f * fade),
+		addPuff(world, 20, firstSmokeFrame(1), seconds / (FrameSeconds * 1.5) + particle.size, _smokeSeen * std::min(0.95f, 0.45f * smokeOpacityScale(shade)) * fade * fade * (3.0f - 2.0f * fade),
 			0.35 + 0.4 * age, shade);
 	}
 

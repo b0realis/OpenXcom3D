@@ -335,8 +335,8 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 			static const char *const ghostNames[] = { "STR_FPS_GHOST_PARTS_OFF", "STR_FPS_GHOST_PARTS_LIFTS", "STR_FPS_GHOST_PARTS_ALL" };
 			return std::string(tr(ghostNames[std::clamp(*option.asInt(), 0, 2)]));
 		}
-		// The parts without shape's opacity is a percentage.
-		if (option.id() == "fpsGhostOpacity")
+		// The parts without shape's opacity, and the see-through smoke's, are percentages.
+		if (option.id() == "fpsGhostOpacity" || option.id() == "fpsSmokeOpacity" || option.id() == "fpsNightSmokeOpacity")
 		{
 			return std::to_string(*option.asInt()) + "%";
 		}
@@ -566,6 +566,11 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		else if (value == &Options::fpsGhostOpacity)
 		{
 			*value = std::clamp(*value + 10 * direction, 10, 100);
+		}
+		// The see-through smoke's opacity, by day and in the dark: 5 to 80%, in steps of 5.
+		else if (value == &Options::fpsSmokeOpacity || value == &Options::fpsNightSmokeOpacity)
+		{
+			*value = std::clamp(*value + 5 * direction, 5, 80);
 		}
 		// The downed units' icons (off, crosshair, always): round and round.
 		else if (value == &Options::fpsDownedIcons)

@@ -146,6 +146,15 @@ const double MaxPitch = 89.0;
 const int UnitVeilMax = 5;
 /// The see-through smoke keeps this share of its colours (the rest turned to grey; see softSmokeFrame).
 const float SmokeColorKept = 0.35f;
+/// The thinnest see-through smoke's opacity the clouds are made for (Modern; thicker smoke more,
+/// see drawSeeThroughSmoke): the settings "Smoke opacity" and "Night smoke opacity" scale every
+/// cloud and wisp by theirs over this one (45% by day: the look before the settings).
+const float SmokeOpacityMadeFor = 0.45f;
+/// Where the night value takes over by day, by the game's shade where the smoke hangs (0
+/// brightest .. 15 darkest): the day value up to the first, the night value from the second,
+/// blended between (an alien base's dark rooms, an unlit room). On a night mission the night
+/// value holds anyway (the battle's darkness, on the same scale: see smokeOpacityScale).
+const float SmokeNightFromShade = 3.0f, SmokeNightToShade = 12.0f;
 /// Eyes with heat vision (the armor's heatVision, in percent: how much of the smoke they see
 /// through, by the game's sight rules) see the see-through smoke that much thinner (a player: a
 /// scout drone's 50% heat vision didn't look any better), but never less than this share of it,

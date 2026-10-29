@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..8f99cd024
+index 000000000..4b8b155b0
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,410 @@
+@@ -0,0 +1,414 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -268,6 +268,10 @@ index 000000000..8f99cd024
 +  STR_FPS_HIT_SOUNDS_DESC: "A tick when you hit an enemy, a double tick for a kill, a swoosh for your melee swings, and your heartbeat once hit under half health."
 +  STR_FPS_SMOKE: "Smoke"
 +  STR_FPS_SMOKE_DESC: "Original: the game's own smoke. Modern: soft grey clouds. Both see-through, thick where your soldier can't see through."
++  STR_FPS_SMOKE_OPACITY: "Smoke opacity"
++  STR_FPS_SMOKE_OPACITY_DESC: "How solid smoke you can see through looks (the thinnest; thicker more). Where your soldier can't see through it, it stays solid."
++  STR_FPS_NIGHT_SMOKE_OPACITY: "Night smoke opacity"
++  STR_FPS_NIGHT_SMOKE_OPACITY_DESC: "The same in the dark: at night, on dark maps and in unlit rooms, by the light where the smoke hangs. Lower if smoke is blinding."
 +  STR_FPS_SMOKE_ORIGINAL: "Original"
 +  STR_FPS_SMOKE_MODERN: "Modern"
 +  STR_FPS_LAUNCH_HINT: "Place the missile's waypoints, then press the launch button"
@@ -540,10 +544,10 @@ index 000000000..8f99cd024
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers: a clear view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..ccba1cf5d
+index 000000000..011e1545f
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,410 @@
+@@ -0,0 +1,414 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -684,6 +688,10 @@ index 000000000..ccba1cf5d
 +  STR_FPS_HIT_SOUNDS_DESC: "A tick when you hit an enemy, a double tick for a kill, a swoosh for your melee swings, and your heartbeat once hit under half health."
 +  STR_FPS_SMOKE: "Smoke"
 +  STR_FPS_SMOKE_DESC: "Original: the game's own smoke. Modern: soft grey clouds. Both see-through, thick where your soldier can't see through."
++  STR_FPS_SMOKE_OPACITY: "Smoke opacity"
++  STR_FPS_SMOKE_OPACITY_DESC: "How solid smoke you can see through looks (the thinnest; thicker more). Where your soldier can't see through it, it stays solid."
++  STR_FPS_NIGHT_SMOKE_OPACITY: "Night smoke opacity"
++  STR_FPS_NIGHT_SMOKE_OPACITY_DESC: "The same in the dark: at night, on dark maps and in unlit rooms, by the light where the smoke hangs. Lower if smoke is blinding."
 +  STR_FPS_SMOKE_ORIGINAL: "Original"
 +  STR_FPS_SMOKE_MODERN: "Modern"
 +  STR_FPS_LAUNCH_HINT: "Place the missile's waypoints, then press the launch button"
@@ -21074,7 +21082,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..4d04513b2 100644
+index a08796ced..2a3e441a8 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -21092,7 +21100,7 @@ index a08796ced..4d04513b2 100644
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
 +OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine;
-+OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars;
++OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle;
 diff --git a/src/Engine/Script.h b/src/Engine/Script.h
@@ -21179,10 +21187,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..037b07b25
+index 000000000..4ad03c60c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,710 @@
+@@ -0,0 +1,716 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -21486,6 +21494,12 @@ index 000000000..037b07b25
 +	// soldier's sight (2). (1.0's Solid, 0, is gone.) Unset (-1) until settled (see settleOptions)
 +	// from 0.9's "See-through smoke", kept below, unlisted.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmoke", &fpsSmoke, -1, "STR_FPS_SMOKE", category));
++	// How opaque the see-through smoke is drawn (not where the soldier can't see through it:
++	// that stays solid): the thinnest smoke's opacity in percent, thicker smoke more as before;
++	// in the dark, by the light where it hangs, the night value (a player: "non full smoke can
++	// be blinding" at night and on dark maps), the two blended in between.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmokeOpacity", &fpsSmokeOpacity, 45, "STR_FPS_SMOKE_OPACITY", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightSmokeOpacity", &fpsNightSmokeOpacity, 25, "STR_FPS_NIGHT_SMOKE_OPACITY", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlares", &fpsFlares, true, "STR_FPS_FLARES", category));
 +	// 0.9's "See-through smoke" (YES/NO), loaded and saved but listed nowhere (a category no
 +	// options screen shows): it gives the smoke setting its first value.
@@ -38628,10 +38642,10 @@ index 000000000..7ea591a8a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..19fe9ff87
+index 000000000..1c2982f7e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1220 @@
+@@ -0,0 +1,1222 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -38975,6 +38989,8 @@ index 000000000..19fe9ff87
 +	void setNightVision(int color) { _nightVision = color; }
 +	/// The sight of the soldier the view looks through, for the smoke: their range, and how much of the smoke (and smoke over fire) they see through.
 +	void setSmokeSight(float sightVoxels, int throughSmoke, int throughFire);
++	/// How much the see-through smoke's opacity is scaled where it hangs, by the settings "Smoke opacity" and "Night smoke opacity" and the game's shade there.
++	float smokeOpacityScale(int shade) const;
 +	/// Where the weapon in hand's muzzle is on the view (pixels): our own shots flash and start their trails there.
 +	void setMuzzlePoint(double x, double y, bool valid) { _muzzleScreen[0] = x; _muzzleScreen[1] = y; _muzzleValid = valid; }
 +	/// The path a throw or shot aimed now would take, in voxels from the soldier to its end (see
@@ -44254,10 +44270,10 @@ index 000000000..280bc87e2
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..931fbcda3
+index 000000000..6f6461df6
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,423 @@
+@@ -0,0 +1,432 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -44406,6 +44422,15 @@ index 000000000..931fbcda3
 +const int UnitVeilMax = 5;
 +/// The see-through smoke keeps this share of its colours (the rest turned to grey; see softSmokeFrame).
 +const float SmokeColorKept = 0.35f;
++/// The thinnest see-through smoke's opacity the clouds are made for (Modern; thicker smoke more,
++/// see drawSeeThroughSmoke): the settings "Smoke opacity" and "Night smoke opacity" scale every
++/// cloud and wisp by theirs over this one (45% by day: the look before the settings).
++const float SmokeOpacityMadeFor = 0.45f;
++/// Where the night value takes over by day, by the game's shade where the smoke hangs (0
++/// brightest .. 15 darkest): the day value up to the first, the night value from the second,
++/// blended between (an alien base's dark rooms, an unlit room). On a night mission the night
++/// value holds anyway (the battle's darkness, on the same scale: see smokeOpacityScale).
++const float SmokeNightFromShade = 3.0f, SmokeNightToShade = 12.0f;
 +/// Eyes with heat vision (the armor's heatVision, in percent: how much of the smoke they see
 +/// through, by the game's sight rules) see the see-through smoke that much thinner (a player: a
 +/// scout drone's 50% heat vision didn't look any better), but never less than this share of it,
@@ -46625,10 +46650,10 @@ index 000000000..169832559
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..c537a5311
+index 000000000..206b64ec0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,2563 @@
+@@ -0,0 +1,2585 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -48600,6 +48625,25 @@ index 000000000..c537a5311
 + * @param throughSmoke How much of smoke they see through, in percent.
 + * @param throughFire How much of smoke over fire they see through, in percent.
 + */
++/**
++ * How much the see-through smoke's opacity is scaled where it hangs (the settings "Smoke
++ * opacity" and "Night smoke opacity", a player: "non full smoke can be blinding for some
++ * players" at night and on dark maps): the day value in the light, the night value in the dark,
++ * over the opacity the clouds are made for. Dark is the darker of the battle (a night mission,
++ * however lamps or the suit lights light the smoke: lit smoke on a dark night is the blinding
++ * kind) and the game's shade where the smoke hangs (a dark base or an unlit room by day; see
++ * SmokeNightFromShade). Only the smoke the soldier sees through: where their sight runs out it
++ * stays solid.
++ * @param shade The game's shade where the smoke hangs, 0 brightest .. 15 darkest.
++ * @return The scale: 1 for the look before the settings (45% by day).
++ */
++float FirstPersonView::smokeOpacityScale(int shade) const
++{
++	const float darkness = std::max(_colors.night, std::clamp((shade - SmokeNightFromShade) / (SmokeNightToShade - SmokeNightFromShade), 0.0f, 1.0f));
++	const float day = std::clamp(Options::fpsSmokeOpacity, 5, 80) / 100.0f, night = std::clamp(Options::fpsNightSmokeOpacity, 5, 80) / 100.0f;
++	return (day + (night - day) * darkness) / SmokeOpacityMadeFor;
++}
++
 +void FirstPersonView::setSmokeSight(float sightVoxels, int throughSmoke, int throughFire)
 +{
 +	_smokeSightVoxels = sightVoxels;
@@ -48690,7 +48734,10 @@ index 000000000..c537a5311
 +		// A little more opaque the thicker the smoke (a fresh smoke grenade makes about 15); the
 +		// original's dots more so, as their holes already let the view through. Thinner for eyes
 +		// with heat vision (see setSmokeSight).
-+		const float opacity = _smokeSeen * (original ? std::clamp(0.35f + tile->getSmoke() * 0.04f, 0.0f, 0.95f) : std::clamp(0.45f + tile->getSmoke() * 0.025f, 0.0f, 0.85f));
++		// The settings "Smoke opacity" and "Night smoke opacity" scale it, by the light here (see
++		// smokeOpacityScale).
++		const float made = original ? std::clamp(0.35f + tile->getSmoke() * 0.04f, 0.0f, 0.95f) : std::clamp(0.45f + tile->getSmoke() * 0.025f, 0.0f, 0.85f);
++		const float opacity = _smokeSeen * std::min(0.95f, made * smokeOpacityScale(_tileViews[tileIndex].light));
 +		const int firstFrame = firstSmokeFrame(tile->getSmoke());
 +		const double frameTime = seconds / FrameSeconds + tile->getAnimationOffset() + variation[2], scale = 1.14 + variation[3] * 0.12;
 +		addPuff(world, 32, firstFrame, frameTime, opacity, scale, _tileViews[tileIndex].light);
@@ -48730,7 +48777,7 @@ index 000000000..c537a5311
 +		const float fade = std::min(std::clamp(age / 0.25f, 0.0f, 1.0f), std::clamp((1.0f - age) / 0.5f, 0.0f, 1.0f));
 +		const double world[3] = { particle.pos[0], particle.pos[1], particle.pos[2] };
 +		const int shade = (int)std::lround(std::clamp(lightAt(particle.pos[0], particle.pos[1], particle.pos[2]), 0.0f, 15.0f));
-+		addPuff(world, 20, firstSmokeFrame(1), seconds / (FrameSeconds * 1.5) + particle.size, _smokeSeen * 0.45f * fade * fade * (3.0f - 2.0f * fade),
++		addPuff(world, 20, firstSmokeFrame(1), seconds / (FrameSeconds * 1.5) + particle.size, _smokeSeen * std::min(0.95f, 0.45f * smokeOpacityScale(shade)) * fade * fade * (3.0f - 2.0f * fade),
 +			0.35 + 0.4 * age, shade);
 +	}
 +
@@ -53760,10 +53807,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..74a64bf85
+index 000000000..67126971e
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,744 @@
+@@ -0,0 +1,749 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -54101,8 +54148,8 @@ index 000000000..74a64bf85
 +			static const char *const ghostNames[] = { "STR_FPS_GHOST_PARTS_OFF", "STR_FPS_GHOST_PARTS_LIFTS", "STR_FPS_GHOST_PARTS_ALL" };
 +			return std::string(tr(ghostNames[std::clamp(*option.asInt(), 0, 2)]));
 +		}
-+		// The parts without shape's opacity is a percentage.
-+		if (option.id() == "fpsGhostOpacity")
++		// The parts without shape's opacity, and the see-through smoke's, are percentages.
++		if (option.id() == "fpsGhostOpacity" || option.id() == "fpsSmokeOpacity" || option.id() == "fpsNightSmokeOpacity")
 +		{
 +			return std::to_string(*option.asInt()) + "%";
 +		}
@@ -54332,6 +54379,11 @@ index 000000000..74a64bf85
 +		else if (value == &Options::fpsGhostOpacity)
 +		{
 +			*value = std::clamp(*value + 10 * direction, 10, 100);
++		}
++		// The see-through smoke's opacity, by day and in the dark: 5 to 80%, in steps of 5.
++		else if (value == &Options::fpsSmokeOpacity || value == &Options::fpsNightSmokeOpacity)
++		{
++			*value = std::clamp(*value + 5 * direction, 5, 80);
 +		}
 +		// The downed units' icons (off, crosshair, always): round and round.
 +		else if (value == &Options::fpsDownedIcons)
