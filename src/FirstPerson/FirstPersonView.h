@@ -150,7 +150,8 @@ public:
 		bool water;              // a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea): its top is drawn as waves (see waterColor)
 		Uint8 liquidHeight;       // a floor the art draws as a box of liquid (XPiratez's sewer sludge, see liquidHeightOf): its surface's height in voxels; 0 for none
 		bool artFill;             // a floor or wall whose voxels leave out most of its art (a catwalk's grating, a fence: see sparseArt)
-		const VoxelModel *ghost;  // a ghost model of the part's own, in the same tile where the part has no voxels: the liquid's surface (buildLiquid) or the rest of the art (buildArtFill); null for none
+		Uint8 cropBlock;          // an object the art draws as a block of crops (X-Com Files' wheat, see cropBlockOf): the block's height in voxels; 0 for none
+		const VoxelModel *ghost;  // a ghost model of the part's own, in the same tile where the part has no voxels: the liquid's surface (buildLiquid), the rest of the art (buildArtFill) or a block of crops (buildCropBlock); null for none
 		float glow[3]; // centre of the brightest voxels in the top third (a lamp's bulb), in the tile
 		int glowCount;
 		Uint8 glowColor;     // one of those bright colours

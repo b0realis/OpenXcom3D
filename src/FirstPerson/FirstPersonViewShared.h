@@ -202,6 +202,13 @@ const float LiquidOutlineMatch = 0.97f;
 const int LowArtMaxHeight = 12;
 const float LowArtOutside = 0.03f;
 const int LowArtFlatLayer = 2;
+/// Setting "Parts without shape" (Lifts or All): an object the art draws as a tile-wide block, CropBlockMinHeight to
+/// CropBlockMaxHeight voxels tall (its outline and the box's sharing CropBlockMatch of their pixels together; X-Com
+/// Files' wheat: 14 voxels, its ears above the block costing a few percent), whose own voxels fill under
+/// CropBlockVoxelShare of the block (the wheat: a floor's slab and four thin posts; GitHub issue #56), stands as a
+/// solid block of it (see cropBlockOf, buildCropBlock); knee to waist high at most, and only one walks through.
+const int CropBlockMinHeight = 4, CropBlockMaxHeight = 16;
+const float CropBlockMatch = 0.92f, CropBlockVoxelShare = 0.5f;
 const int PlainFloorWalkCost = 4;
 /// The floor under such a liquid is drawn this many shades darker than the liquid's top, so its
 /// surface (a ghost, see buildLiquid) reads as a layer above it.

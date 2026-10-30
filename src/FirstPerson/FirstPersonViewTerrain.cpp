@@ -245,6 +245,7 @@ void clearModel(FirstPersonView::VoxelModel &model)
 	model.water = false;
 	model.liquidHeight = 0;
 	model.artFill = false;
+	model.cropBlock = 0;
 	model.ghost = nullptr;
 	for (int axis = 0; axis < 3; ++axis)
 	{
@@ -890,14 +891,20 @@ bool lowArt(const Surface *sprite, int yOffset, bool &rises)
  * @param sprite The part's sprite frame.
  * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
  * @param rises Whether the art rises above the floor's diamond (see lowArt).
+ * @param leftOut The pixels to leave out, as if transparent (width x height, a row after another:
+ *   a block's own, see buildCropBlock); null for none.
+ * @param baseZ The height the art stands on, in voxels: 0 for the floor; a block's top for what
+ *   stands on it (rising art only).
  */
-void buildRelief(FirstPersonView::VoxelModel &model, const Surface *sprite, int yOffset, bool rises)
+void buildRelief(FirstPersonView::VoxelModel &model, const Surface *sprite, int yOffset, bool rises, const std::vector<char> *leftOut = nullptr, int baseZ = 0)
 {
-	// The colour of a pixel; 0 (transparent) outside the sprite.
+	// The colour of a pixel; 0 (transparent) outside the sprite or left out.
 	const int width = sprite->getWidth(), height = sprite->getHeight();
 	auto pixelAt = [&](int spriteX, int spriteY) -> Uint8
 	{
-		return spriteX >= 0 && spriteY >= 0 && spriteX < width && spriteY < height ? sprite->getPixel(spriteX, spriteY) : 0;
+		if (spriteX < 0 || spriteY < 0 || spriteX >= width || spriteY >= height) return 0;
+		if (leftOut && (*leftOut)[spriteY * width + spriteX]) return 0;
+		return sprite->getPixel(spriteX, spriteY);
 	};
 	// A voxel in the model, its bounds grown round it.
 	auto place = [&](int x, int y, int z, Uint8 color)
@@ -937,15 +944,15 @@ void buildRelief(FirstPersonView::VoxelModel &model, const Surface *sprite, int 
 		for (int y = std::min(15, 15 - diagonal); y >= std::max(0, -diagonal); --y)
 		{
 			const int x = y + diagonal;
-			const int floorRow = 24 + (x + y) / 2 + yOffset;
+			const int floorRow = 24 + (x + y) / 2 - baseZ + yOffset;
 			if (floorRow >= claimedTop || !pixelAt(spriteX, floorRow)) continue;
 
 			// The run of drawn pixels up from here, a voxel a pixel.
 			int run = 0;
-			while (run <= LowArtMaxHeight && pixelAt(spriteX, floorRow - run)) ++run;
+			while (run <= LowArtMaxHeight && baseZ + run < Position::TileZ && pixelAt(spriteX, floorRow - run)) ++run;
 			for (int z = 0; z < run; ++z)
 			{
-				place(x, y, z, pixelAt(spriteX, floorRow - z));
+				place(x, y, baseZ + z, pixelAt(spriteX, floorRow - z));
 			}
 			claimedTop = floorRow - run + 1;
 		}
@@ -965,7 +972,23 @@ void buildRelief(FirstPersonView::VoxelModel &model, const Surface *sprite, int 
  * @return The box's height in voxels, where its outline and the art's share LiquidOutlineMatch
  *   of their pixels together; 0 for none.
  */
+int boxHeightOf(const Surface *sprite, int yOffset, int minHeight, int maxHeight, float minMatch);
 int liquidHeightOf(const Surface *sprite, int yOffset)
+{
+	return boxHeightOf(sprite, yOffset, LiquidMinHeight, LiquidMaxHeight, LiquidOutlineMatch);
+}
+
+/**
+ * The height of the tile-wide box whose outline the art matches (see liquidHeightOf, cropBlockOf):
+ * the art's outline (its drawn pixels) against that of a box of each height from minHeight to
+ * maxHeight, the floor's diamond swept up by that many pixels.
+ * @param sprite The part's sprite frame.
+ * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
+ * @param minHeight, maxHeight The heights to try, in voxels.
+ * @param minMatch The share of the two outlines' pixels together they must share at least.
+ * @return The best matching box's height in voxels; 0 for none matching well enough.
+ */
+int boxHeightOf(const Surface *sprite, int yOffset, int minHeight, int maxHeight, float minMatch)
 {
 	// Is a pixel inside the floor's diamond lifted by some pixels? On each of the diamond's 16 rows
 	// its half width grows by two pixels a row down to its widest row, then shrinks again.
@@ -979,7 +1002,7 @@ int liquidHeightOf(const Surface *sprite, int yOffset)
 	const int width = sprite->getWidth(), height = sprite->getHeight();
 	int bestHeight = 0;
 	float bestMatch = 0.0f;
-	for (int boxHeight = LiquidMinHeight; boxHeight <= LiquidMaxHeight; ++boxHeight)
+	for (int boxHeight = minHeight; boxHeight <= maxHeight; ++boxHeight)
 	{
 		// The box's outline: the diamond swept up from the floor to the box's top.
 		int both = 0, either = 0;
@@ -1001,7 +1024,7 @@ int liquidHeightOf(const Surface *sprite, int yOffset)
 			bestHeight = boxHeight;
 		}
 	}
-	return bestMatch >= LiquidOutlineMatch ? bestHeight : 0;
+	return bestMatch >= minMatch ? bestHeight : 0;
 }
 
 /**
@@ -1042,6 +1065,105 @@ void buildLiquid(FirstPersonView::VoxelModel &model, const Surface *sprite, int 
 	}
 	model.ghostly = !model.empty;
 	if (!model.empty) colorHiddenSides(model, sprite);
+}
+
+/**
+ * Tells whether an object's art is a block of crops, and how tall (a player, GitHub issue #56: X-Com
+ * Files' wheat fields "have no wheat"): its art a tile-wide block CropBlockMinHeight to
+ * CropBlockMaxHeight voxels tall (see boxHeightOf, CropBlockMatch), while its own voxels fill under
+ * CropBlockVoxelShare of the block (the wheat: the floor's slab and four thin posts up to half its
+ * height), so the 3D view showed thin posts where the map draws a field. Only what one walks through
+ * as through a field: walkable, at the floor's own level (not a mound one stands on, as TFTD's
+ * islands have; nor a UFO's hull or a colony's wall, drawn as tall blocks no one walks through).
+ * None with "Parts without shape" off, and none for a door.
+ * @param model The object's model built from its voxels; null for an object without voxels.
+ * @param mapData The object's record.
+ * @param sprite Its sprite frame.
+ * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
+ * @return The block's height in voxels; 0 for none.
+ */
+int cropBlockOf(const FirstPersonView::VoxelModel *model, const MapData *mapData, const Surface *sprite, int yOffset)
+{
+	if (Options::fpsGhostParts == 0 || mapData->getObjectType() != O_OBJECT || mapData->isDoor() || mapData->isUFODoor() || mapData->getAltMCD() != 0
+		|| mapData->getTUCost(MT_WALK) >= Pathfinding::INVALID_MOVE_COST || mapData->getTerrainLevel() != 0)
+	{
+		return 0;
+	}
+	const int blockHeight = boxHeightOf(sprite, yOffset, CropBlockMinHeight, CropBlockMaxHeight, CropBlockMatch);
+	if (!blockHeight || !model)
+	{
+		return blockHeight;
+	}
+
+	// The object's own voxels inside the block, against the block's.
+	const int top = std::min(blockHeight, Position::TileZ - 1);
+	int inside = 0;
+	for (int z = 0; z <= top; ++z)
+		for (int y = 0; y < Position::TileXY; ++y)
+			for (int x = 0; x < Position::TileXY; ++x)
+				inside += model->color[z][y][x] != 0;
+	return inside < Position::TileXY * Position::TileXY * (top + 1) * CropBlockVoxelShare ? blockHeight : 0;
+}
+
+/**
+ * Builds a block of crops (see cropBlockOf; the owner: a solid block, as the map draws the field): a
+ * ghost the view draws solid (VoxelModel::solidGhost), the block's shell (its top layer at the
+ * block's height and its four sides down to the floor), each voxel the colour of the pixel it lands
+ * on (the projection buildModel uses; where the art has a hole, its commonest colour). In a field
+ * the tiles' sides inside it are hidden by their neighbours', so the field shows sides only where
+ * it ends; whoever stands in it is hidden below its top, and a soldier kneeling in it sees the
+ * crops round him (the shell's inside). What the art draws above the block (the wheat's ears)
+ * stands on its top (see buildRelief). The game's shots, sight and walking go through it, as the
+ * game gives it no such voxels.
+ * @param model The empty model to build it in.
+ * @param sprite The object's sprite frame.
+ * @param blockHeight The block's height in voxels (VoxelModel::cropBlock).
+ * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
+ */
+void buildCropBlock(FirstPersonView::VoxelModel &model, const Surface *sprite, int blockHeight, int yOffset)
+{
+	const int width = sprite->getWidth(), height = sprite->getHeight();
+	const int top = std::min(blockHeight, Position::TileZ - 1);
+
+	// The art's commonest colour, for its holes.
+	int counts[256] = {};
+	for (int spriteY = 0; spriteY < height; ++spriteY)
+		for (int spriteX = 0; spriteX < width; ++spriteX) ++counts[sprite->getPixel(spriteX, spriteY)];
+	counts[0] = 0;
+	const Uint8 common = (Uint8)(std::max_element(counts, counts + 256) - counts);
+
+	// The shell: the top layer and the four sides.
+	for (int z = 0; z <= top; ++z)
+		for (int y = 0; y < Position::TileXY; ++y)
+			for (int x = 0; x < Position::TileXY; ++x)
+			{
+				if (z != top && x != 0 && y != 0 && x != Position::TileXY - 1 && y != Position::TileXY - 1) continue;
+				const int spriteX = 16 + x - y, spriteY = 24 + (x + y) / 2 - z + yOffset;
+				const Uint8 color = spriteX >= 0 && spriteY >= 0 && spriteX < width && spriteY < height ? sprite->getPixel(spriteX, spriteY) : 0;
+				model.color[z][y][x] = color ? color : common;
+			}
+	model.empty = false;
+	model.min[0] = model.min[1] = model.min[2] = 0;
+	model.max[0] = model.max[1] = Position::TileXY - 1;
+	model.max[2] = top;
+
+	// What the art draws above the block's outline (the floor's diamond swept up to its top): standing
+	// on its top.
+	std::vector<char> blockPixels(width * height, 0);
+	for (int spriteY = 0; spriteY < height; ++spriteY)
+		for (int spriteX = 0; spriteX < width; ++spriteX)
+			for (int lift = 0; lift <= blockHeight && !blockPixels[spriteY * width + spriteX]; ++lift)
+			{
+				const int row = spriteY + lift - 24 - yOffset;
+				const int halfWidth = row < 0 || row > 15 ? -1 : row < 8 ? (row + 1) * 2 : (16 - row) * 2;
+				blockPixels[spriteY * width + spriteX] = halfWidth > 0 && spriteX >= 16 - halfWidth && spriteX < 16 + halfWidth;
+			}
+	if (top + 1 < Position::TileZ)
+	{
+		buildRelief(model, sprite, yOffset, true, &blockPixels, top + 1);
+	}
+	model.ghostly = model.solidGhost = true;
+	colorHiddenSides(model, sprite);
 }
 
 /**
@@ -1520,8 +1642,9 @@ const FirstPersonView::VoxelModel *FirstPersonView::getModel(const MapData *mapD
 		buildModel(mapData, spriteIndex, cutout, found->second);
 		// The part's own ghost (VoxelModel::ghost): a floor drawn as a box of liquid, its surface
 		// (see buildLiquid); a floor or wall whose voxels leave out most of its art, the rest of it
-		// (see buildArtFill).
-		if (found->second.liquidHeight || found->second.artFill)
+		// (see buildArtFill); an object the art draws as a block of crops, the block (see
+		// buildCropBlock).
+		if (found->second.liquidHeight || found->second.artFill || found->second.cropBlock)
 		{
 			VoxelModel &ghost = _ghostModels.emplace(key, VoxelModel()).first->second;
 			clearModel(ghost);
@@ -1530,9 +1653,13 @@ const FirstPersonView::VoxelModel *FirstPersonView::getModel(const MapData *mapD
 			{
 				buildLiquid(ghost, sprite, found->second.liquidHeight, mapData->getYOffset());
 			}
-			else
+			else if (found->second.artFill)
 			{
 				buildArtFill(ghost, found->second, sprite, mapData->getObjectType(), mapData->getYOffset());
+			}
+			else
+			{
+				buildCropBlock(ghost, sprite, found->second.cropBlock, mapData->getYOffset());
 			}
 			found->second.ghost = ghost.empty ? nullptr : &ghost;
 		}
@@ -1784,13 +1911,18 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 		const bool ghostShape = shape && shape->ghost;
 		bool rises = false;
 		const bool low = mapData->getObjectType() == O_OBJECT && lowArt(sprite, yOffset, rises);
+		const int block = cutout ? 0 : cropBlockOf(nullptr, mapData, sprite, yOffset);
 		const bool ghostWanted = Options::fpsGhostParts == 2
-			|| (Options::fpsGhostParts == 1 && (ghostShape || mapData->isGravLift() || cageArt(sprite, mapData->getObjectType(), yOffset) || low));
+			|| (Options::fpsGhostParts == 1 && (ghostShape || mapData->isGravLift() || cageArt(sprite, mapData->getObjectType(), yOffset) || low || block));
 		if (ghostWanted && !cutout)
 		{
 			if (ghostShape)
 			{
 				buildShape(model, sprite, *shape, yOffset);
+			}
+			else if (block)
+			{
+				buildCropBlock(model, sprite, block, yOffset);
 			}
 			else if (low)
 			{
@@ -1849,6 +1981,12 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	if (!model.liquidHeight && !cutout && !mapData->isDoor() && !mapData->isUFODoor() && mapData->getAltMCD() == 0)
 	{
 		model.artFill = sparseArt(model, sprite, mapData->getObjectType(), yOffset);
+	}
+	// An object the art draws as a block of crops though the game gives it only a few voxels
+	// (X-Com Files' wheat: see cropBlockOf): the block is a ghost model of its own (see getModel).
+	if (!model.empty && !cutout)
+	{
+		model.cropBlock = (Uint8)cropBlockOf(&model, mapData, sprite, yOffset);
 	}
 	colorHiddenSides(model, sprite);
 	findGlow(model);
