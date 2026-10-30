@@ -358,8 +358,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMiddleClickIdentify", &fpsMiddleClickIdentify, true, "STR_FPS_MIDDLE_CLICK_IDENTIFY", category));
 	// Turning: free, the soldier facing wherever you look (NO), or by the game's rules (YES): the
 	// head looks up to 45 degrees off the soldier's facing for free, further turns them at the
-	// game's cost.
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsTurnCost", &fpsTurnCost, false, "STR_FPS_TURN_COST", category));
+	// game's cost. YES by default (a player, GitHub issue #63: "It being off, is basically a cheat";
+	// the defaults are the game's own mechanics).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsTurnCost", &fpsTurnCost, true, "STR_FPS_TURN_COST", category));
 	// The compass at the top right: where you look, the soldier's facing, and turning by the
 	// rules, when looking further will cost time units.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCompass", &fpsCompass, true, "STR_FPS_COMPASS", category));

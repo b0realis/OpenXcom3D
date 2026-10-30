@@ -38,7 +38,7 @@ KEYS = [
         ('(set a key)', 'Grab the item at your feet into a free hand, in 3D and on the map; with several items or no hand free, the inventory opens.', 'Give it a key on the 3D keys page: it has none.'),
     ]),
     ('Looking', [
-        ('Mouse', 'Look around, all but straight up and down; the soldier turns with you for free (or by the rules: <i>Turning costs TU</i>).', ''),
+        ('Mouse', 'Look around, all but straight up and down; the head turns 45&deg; for free, further turns the soldier at the game\'s cost (<i>Turning costs TU</i>; off, free).', ''),
         ('<kbd>&larr;</kbd> <kbd>&rarr;</kbd> <kbd>&uarr;</kbd> <kbd>&darr;</kbd>', 'Turn left / right, look up / down.', ''),
         ('<kbd>Home</kbd>', 'Look straight ahead, the way the soldier faces (the map\'s centre key).', ''),
         ('<kbd>,</kbd> <kbd>.</kbd>', 'Snap turn 45&deg; left / right.', ''),
@@ -104,7 +104,7 @@ SETTINGS = [
         ('Head bob', 'YES', 'YES / NO', 'The view bobs with the soldier\'s steps.', 'Off if it makes you queasy.'),
     ]),
     ('Movement', [
-        ('Turning costs TU', 'NO', 'YES / NO', 'NO: the soldier turns with the view for free. YES: the head turns 45&deg; for free, beyond that the soldier turns at the game\'s cost, as on the map.',
+        ('Turning costs TU', 'YES', 'YES / NO', 'YES: the head turns 45&deg; for free, beyond that the soldier turns at the game\'s cost, as on the map. NO: the soldier turns with the view for free.',
          'YES is the classic rule: facing costs time units and decides reaction fire. NO is relaxed play.'),
         ('Movement', 'Tiles', 'Free / Tiles', 'Free: walk anywhere, stepping into the next tile when you cross into it. Tiles: a press walks one tile.',
          'Tiles feels like the map; Free lets you stand to one side of a tile (lean shots, peeking).'),
