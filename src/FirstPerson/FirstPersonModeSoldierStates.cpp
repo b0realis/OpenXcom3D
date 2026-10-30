@@ -757,8 +757,9 @@ void FirstPersonMode::endBreakdown(bool forget)
  *   pops up their camera. The soldier the view looks through going down is the death camera's
  *   (see deathCam).
  * - A shot in flight (see watchShot): one at a soldier of ours from an alien pops up that
- *   soldier's camera ("TARGETED"); one fired by a soldier of ours (reaction fire) cuts the view
- *   to the shooter at once, looking at what they shoot at.
+ *   soldier's camera ("TARGETED"), or, when none of ours sees the alien, cuts the view to them
+ *   at once, looking where the fire comes from; one fired by a soldier of ours (reaction fire)
+ *   cuts the view to the shooter at once, looking at what they shoot at.
  * - The alien acting now: when the soldier looked through doesn't see it, the view cuts to the
  *   nearest soldier who does, but never sooner than AlienCameraHold after the last cut (no
  *   flicking back and forth); and while looking through someone who sees it, the view glides
@@ -790,6 +791,20 @@ BattleUnit *FirstPersonMode::alienTurnCamera(Uint32 now)
 	if (canLookThrough(shooter))
 	{
 		if (shooter != _alienTurnCamera) cutAlienTurnCamera(shooter, shotAt, now);
+		return _alienTurnCamera;
+	}
+
+	// An alien nobody of ours sees firing at one of ours (at night, say: a player's report, GitHub
+	// issue #49: the view stayed put while unseen aliens shot): the view cuts to the soldier shot at,
+	// at once, turned to where the fire comes from (their camera card looks there too, and goes:
+	// the view is theirs now).
+	if (shooter && shooter->getFaction() != FACTION_PLAYER && canLookThrough(shotAt) && !nearestSpotter(shooter))
+	{
+		if (shotAt != _alienTurnCamera)
+		{
+			cutAlienTurnCamera(shotAt, shooter, now);
+			if (_alertUnit == shotAt) _alertUntil = 0;
+		}
 		return _alienTurnCamera;
 	}
 
