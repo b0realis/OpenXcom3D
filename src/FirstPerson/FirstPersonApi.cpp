@@ -465,6 +465,10 @@ void createOptions(std::vector<OptionInfo> &options)
 	// with the grav lift flag), 2 all of them.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsGhostParts", &fpsGhostParts, 1, "STR_FPS_GHOST_PARTS", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsGhostOpacity", &fpsGhostOpacity, 50, "STR_FPS_GHOST_OPACITY", category));
+	// The crops, flower beds and rubble the game gives no real shape, drawn solid as on the map (see
+	// buildRelief, buildCropBlock): a bit see-through instead (SeeThroughCropOpacity of the pixels),
+	// so whoever stands in a field shows (the owner's ask, apart from the ghosts' opacity).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCrops", &fpsSeeThroughCrops, false, "STR_FPS_SEE_THROUGH_CROPS", category));
 	// A corpse or item pointed at, the game's line passing it to something behind: drawn faint, at
 	// the ghost opacity (the game's shots pass through them).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCorpses", &fpsSeeThroughCorpses, false, "STR_FPS_SEE_THROUGH_CORPSES", category));

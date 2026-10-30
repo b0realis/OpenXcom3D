@@ -1367,7 +1367,10 @@ void FirstPersonView::renderRows()
 	// the pixels up close, of GhostNearOpacity's 50 (the share is scaled by dividing each pixel's
 	// dither threshold instead of multiplying the opacity: the same test, see ghostOpacity).
 	const float ghostScale = std::clamp(Options::fpsGhostOpacity, 10, 100) / (GhostNearOpacity * 100.0f);
-	rayContext.solidGhosts = true; // and the ghosts drawn solid as the map draws them (low art, see buildRelief)
+	// The ghosts drawn solid as the map draws them (crops, rubble: see buildRelief, buildCropBlock): on
+	// every pixel, or with "See-through crops" on SeeThroughCropOpacity of them.
+	const bool seeThroughCrops = Options::fpsSeeThroughCrops;
+	rayContext.solidGhostThreshold = 0.0f;
 
 	// With a pixel size above 1, one ray colours a block of pixels (pixelSize x pixelSize).
 	// Auto (0) picks 2 for views bigger than AutoPixelMaxWidth x AutoPixelMaxHeight, else 1.
@@ -1407,6 +1410,7 @@ void FirstPersonView::renderRows()
 			Uint8 color;
 			SmokeTrace smoke = smokeSight;
 			rayContext.ghostThreshold = dither(blockColumn, blockRow) / ghostScale; // ghosts show on a share of the blocks (see ghostOpacity)
+			if (seeThroughCrops) rayContext.solidGhostThreshold = dither(blockColumn, blockRow) / SeeThroughCropOpacity;
 			const RayEnd rayEnd = castRay(rayContext, rayOrigin, rayDirection, hit, tEnd, endAxis, traceSmoke ? &smoke : nullptr);
 			switch (rayEnd)
 			{

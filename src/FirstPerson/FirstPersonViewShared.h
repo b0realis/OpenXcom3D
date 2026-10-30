@@ -209,6 +209,9 @@ const int LowArtFlatLayer = 2;
 /// solid block of it (see cropBlockOf, buildCropBlock); knee to waist high at most, and only one walks through.
 const int CropBlockMinHeight = 4, CropBlockMaxHeight = 16;
 const float CropBlockMatch = 0.92f, CropBlockVoxelShare = 0.5f;
+/// Setting "See-through crops": the share of the pixels on which the view draws the solid ghosts (the crops, flower beds
+/// and rubble above: VoxelModel::solidGhost), near or far, apart from the ghosts' opacity; off, all of them.
+const float SeeThroughCropOpacity = 0.75f;
 const int PlainFloorWalkCost = 4;
 /// The floor under such a liquid is drawn this many shades darker than the liquid's top, so its
 /// surface (a ghost, see buildLiquid) reads as a layer above it.

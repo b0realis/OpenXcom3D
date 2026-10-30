@@ -162,6 +162,7 @@ SETTINGS = [
         ('Parts without shape', 'Lifts', 'Lifts / All / Off', 'Parts the map draws with no shape in the game\'s data, shown as see-through ghosts: ladders, lift pads, the shops\' racks, liquid over a floor, the rest of fences and catwalk gratings the game gives only a few voxels; low parts such as crops and rubble stand solid, as on the map, and a wheat field as a solid block.',
          'Ghosts are only pictures: shots, sight and walking go through them as the game says.'),
         ('Ghost opacity', '50%', '10% to 100%', 'How solid the see-through ghosts look up close (lift pads, ladders, racks, catwalks, sludge); far off 60% of that.', ''),
+        ('See-through crops', 'No', 'Yes / No', 'Crops, flower beds and rubble without a real 3D shape, drawn solid as on the map, shown a bit see-through instead, so units in a field show.', ''),
         ('See-through corpses', 'NO', 'YES / NO', 'A corpse or item under the crosshair turns faint (at the ghost opacity) while you aim past it.', 'See past the big mods\' tall corpses to what your shot reaches.'),
         ('Discreet map edge', 'NO', 'YES / NO', 'Small red dots along the map\'s edge instead of the yellow tape.', ''),
         ('Pixel size', 'Auto', 'Auto / 1 / 2 / 3', 'Each ray colours a block of pixels: chunkier, much faster on big screens.', 'Auto: full detail up to 640&times;400, blocks of 2 above.'),

@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..3032c774b
+index 000000000..8c69e5845
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,438 @@
+@@ -0,0 +1,440 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -238,6 +238,8 @@ index 000000000..3032c774b
 +  STR_FPS_GHOST_PARTS_ALL: "All"
 +  STR_FPS_GHOST_OPACITY: "Ghost opacity"
 +  STR_FPS_GHOST_OPACITY_DESC: "How solid the parts without shape look up close: 50% as before, 100% solid. Far off, 60% of that."
++  STR_FPS_SEE_THROUGH_CROPS: "See-through crops"
++  STR_FPS_SEE_THROUGH_CROPS_DESC: "Crops, flower beds and rubble without a real 3D shape drawn a bit see-through, so units in a field show."
 +  STR_FPS_SEE_THROUGH_CORPSES: "See-through corpses"
 +  STR_FPS_SEE_THROUGH_CORPSES_DESC: "A corpse or item under the crosshair turns faint while you aim past it, as the game's shots pass through them."
 +  STR_FPS_DISCREET_EDGE: "Discreet map edge"
@@ -568,10 +570,10 @@ index 000000000..3032c774b
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..b4bfc390a
+index 000000000..d300ae517
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,438 @@
+@@ -0,0 +1,440 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -682,6 +684,8 @@ index 000000000..b4bfc390a
 +  STR_FPS_GHOST_PARTS_ALL: "All"
 +  STR_FPS_GHOST_OPACITY: "Ghost opacity"
 +  STR_FPS_GHOST_OPACITY_DESC: "How solid the parts without shape look up close: 50% as before, 100% solid. Far off, 60% of that."
++  STR_FPS_SEE_THROUGH_CROPS: "See-through crops"
++  STR_FPS_SEE_THROUGH_CROPS_DESC: "Crops, flower beds and rubble without a real 3D shape drawn a bit see-through, so units in a field show."
 +  STR_FPS_SEE_THROUGH_CORPSES: "See-through corpses"
 +  STR_FPS_SEE_THROUGH_CORPSES_DESC: "A corpse or item under the crosshair turns faint while you aim past it, as the game's shots pass through them."
 +  STR_FPS_DISCREET_EDGE: "Discreet map edge"
@@ -21458,7 +21462,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..18896dd11 100644
+index a08796ced..3d08a660f 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -21475,7 +21479,7 @@ index a08796ced..18896dd11 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine;
++OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops;
 +OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle;
@@ -21563,10 +21567,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..f5cf689ae
+index 000000000..7f18a5f50
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,864 @@
+@@ -0,0 +1,868 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -22034,6 +22038,10 @@ index 000000000..f5cf689ae
 +	// with the grav lift flag), 2 all of them.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsGhostParts", &fpsGhostParts, 1, "STR_FPS_GHOST_PARTS", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsGhostOpacity", &fpsGhostOpacity, 50, "STR_FPS_GHOST_OPACITY", category));
++	// The crops, flower beds and rubble the game gives no real shape, drawn solid as on the map (see
++	// buildRelief, buildCropBlock): a bit see-through instead (SeeThroughCropOpacity of the pixels),
++	// so whoever stands in a field shows (the owner's ask, apart from the ghosts' opacity).
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCrops", &fpsSeeThroughCrops, false, "STR_FPS_SEE_THROUGH_CROPS", category));
 +	// A corpse or item pointed at, the game's line passing it to something behind: drawn faint, at
 +	// the ghost opacity (the game's shots pass through them).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCorpses", &fpsSeeThroughCorpses, false, "STR_FPS_SEE_THROUGH_CORPSES", category));
@@ -43706,10 +43714,10 @@ index 000000000..b455e197f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..ff39472d2
+index 000000000..91c11315d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,1617 @@
+@@ -0,0 +1,1621 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -45079,7 +45087,10 @@ index 000000000..ff39472d2
 +	// the pixels up close, of GhostNearOpacity's 50 (the share is scaled by dividing each pixel's
 +	// dither threshold instead of multiplying the opacity: the same test, see ghostOpacity).
 +	const float ghostScale = std::clamp(Options::fpsGhostOpacity, 10, 100) / (GhostNearOpacity * 100.0f);
-+	rayContext.solidGhosts = true; // and the ghosts drawn solid as the map draws them (low art, see buildRelief)
++	// The ghosts drawn solid as the map draws them (crops, rubble: see buildRelief, buildCropBlock): on
++	// every pixel, or with "See-through crops" on SeeThroughCropOpacity of them.
++	const bool seeThroughCrops = Options::fpsSeeThroughCrops;
++	rayContext.solidGhostThreshold = 0.0f;
 +
 +	// With a pixel size above 1, one ray colours a block of pixels (pixelSize x pixelSize).
 +	// Auto (0) picks 2 for views bigger than AutoPixelMaxWidth x AutoPixelMaxHeight, else 1.
@@ -45119,6 +45130,7 @@ index 000000000..ff39472d2
 +			Uint8 color;
 +			SmokeTrace smoke = smokeSight;
 +			rayContext.ghostThreshold = dither(blockColumn, blockRow) / ghostScale; // ghosts show on a share of the blocks (see ghostOpacity)
++			if (seeThroughCrops) rayContext.solidGhostThreshold = dither(blockColumn, blockRow) / SeeThroughCropOpacity;
 +			const RayEnd rayEnd = castRay(rayContext, rayOrigin, rayDirection, hit, tEnd, endAxis, traceSmoke ? &smoke : nullptr);
 +			switch (rayEnd)
 +			{
@@ -45329,10 +45341,10 @@ index 000000000..ff39472d2
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewRayWalk.h b/src/FirstPerson/FirstPersonViewRayWalk.h
 new file mode 100644
-index 000000000..8d7827d8c
+index 000000000..176b4ff15
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayWalk.h
-@@ -0,0 +1,586 @@
+@@ -0,0 +1,587 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -45426,7 +45438,7 @@ index 000000000..8d7827d8c
 +	int size[3];                              // the map's size in tiles: x, y, levels
 +	float maxDistance;                        // how far rays go, in voxels
 +	float ghostThreshold = 2.0f;              // a ghost stops the ray where its opacity is above this (the pixel's dither threshold); above 1, never (shadows, aim, flares)
-+	bool solidGhosts = false;                 // the view's own rays: a solid ghost (VoxelModel::solidGhost) stops them; never shadows, aim or flares
++	float solidGhostThreshold = 2.0f;         // a solid ghost (VoxelModel::solidGhost) stops the ray where 1 is above this: the view's own rays 0 (always), or the pixel's dither scaled by SeeThroughCropOpacity (setting "See-through crops"); above 1, never (shadows, aim, flares)
 +};
 +
 +// How solid a ghost looks (see VoxelModel::ghostly): on what share of the pixels it shows,
@@ -45615,11 +45627,12 @@ index 000000000..8d7827d8c
 + * @param enterAxis Axis of the face the ray crossed to enter the tile, -1 at the eye.
 + * @param ghostThreshold A ghost's voxel stops the ray only where its opacity is above this (see
 + *        RayContext::ghostThreshold).
-+ * @param solidGhosts Whether a solid ghost's voxel stops the ray (see RayContext::solidGhosts).
++ * @param solidGhostThreshold A solid ghost's voxel stops the ray only where 1 is above this (see
++ *        RayContext::solidGhostThreshold).
 + * @return True if something was hit (the hit is filled in).
 + */
 +inline bool traceTile(const FirstPersonView::TileView &tileView, const FirstPersonView::DoorSwing *swings, const int tileCell[3], const float rayOrigin[3], const float rayDirection[3],
-+	const float inverseDirection[3], float segmentStart, float segmentEnd, int enterAxis, float ghostThreshold, bool solidGhosts, FirstPersonView::Hit &hit)
++	const float inverseDirection[3], float segmentStart, float segmentEnd, int enterAxis, float ghostThreshold, float solidGhostThreshold, FirstPersonView::Hit &hit)
 +{
 +	// Doors swinging through this tile: the nearest hit shortens the segment, so only what's in
 +	// front of the door can still win.
@@ -45730,9 +45743,9 @@ index 000000000..8d7827d8c
 +					color = model->color[localZ][localY][localX];
 +				}
 +				if (!color) continue;
-+				if (model->ghostly && (model->solidGhost ? !solidGhosts : ghostOpacity(distance) <= ghostThreshold))
++				if (model->ghostly && (model->solidGhost ? 1.0f <= solidGhostThreshold : ghostOpacity(distance) <= ghostThreshold))
 +				{
-+					continue; // a ghost, seen through on this pixel (a solid one only by shadows, aim and flares)
++					continue; // a ghost, seen through on this pixel (a solid one by shadows, aim and flares, or see-through crops)
 +				}
 +				if (model->glass[localZ][localY] & (1 << localX))
 +				{
@@ -45881,7 +45894,7 @@ index 000000000..8d7827d8c
 +					smokeWall = addSmoke(*smoke, tileView, distance, tileExit);
 +				}
 +				const float traceEnd = smokeWall >= 0.0f ? smokeWall : tileExit;
-+				if (lookForSolid && traceTile(tileView, context.swings, tileCell, rayOrigin, rayDirection, inverseDirection, distance, traceEnd, enterAxis, context.ghostThreshold, context.solidGhosts, hit))
++				if (lookForSolid && traceTile(tileView, context.swings, tileCell, rayOrigin, rayDirection, inverseDirection, distance, traceEnd, enterAxis, context.ghostThreshold, context.solidGhostThreshold, hit))
 +				{
 +					// Hit something in the tile: only the smoke in front of it counts.
 +					if (traceSmokeHere)
@@ -46645,10 +46658,10 @@ index 000000000..280bc87e2
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..c2f457cb9
+index 000000000..c86cef709
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,460 @@
+@@ -0,0 +1,463 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -46860,6 +46873,9 @@ index 000000000..c2f457cb9
 +/// solid block of it (see cropBlockOf, buildCropBlock); knee to waist high at most, and only one walks through.
 +const int CropBlockMinHeight = 4, CropBlockMaxHeight = 16;
 +const float CropBlockMatch = 0.92f, CropBlockVoxelShare = 0.5f;
++/// Setting "See-through crops": the share of the pixels on which the view draws the solid ghosts (the crops, flower beds
++/// and rubble above: VoxelModel::solidGhost), near or far, apart from the ghosts' opacity; off, all of them.
++const float SeeThroughCropOpacity = 0.75f;
 +const int PlainFloorWalkCost = 4;
 +/// The floor under such a liquid is drawn this many shades darker than the liquid's top, so its
 +/// surface (a ghost, see buildLiquid) reads as a layer above it.
@@ -56543,7 +56559,7 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..cf049f311
+index 000000000..11a010579
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,793 @@
@@ -56766,7 +56782,7 @@ index 000000000..cf049f311
 +			"fpsEachPellet", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear" } },
 +		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
 +			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsParticles", "fpsUfoLights",
-+			"fpsGhostParts", "fpsGhostOpacity", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
++			"fpsGhostParts", "fpsGhostOpacity", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
 +		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars",
 +			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsCompass", "fpsMiddleClickIdentify" } },
 +		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds" } },
