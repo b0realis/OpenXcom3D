@@ -150,6 +150,7 @@ public:
 		bool water;              // a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea): its top is drawn as waves (see waterColor)
 		Uint8 liquidHeight;       // a floor the art draws as a box of liquid (XPiratez's sewer sludge, see liquidHeightOf): its surface's height in voxels; 0 for none
 		bool artFill;             // a floor or wall whose voxels leave out most of its art (a catwalk's grating, a fence: see sparseArt)
+		bool foliage;             // a mass of foliage (see foliageArt): drawn leafy on a tile without a floor (leafyModel)
 		Uint8 cropBlock;          // an object the art draws as a block of crops (X-Com Files' wheat, see cropBlockOf): the block's height in voxels; 0 for none
 		const VoxelModel *ghost;  // a ghost model of the part's own, in the same tile where the part has no voxels: the liquid's surface (buildLiquid), the rest of the art (buildArtFill) or a block of crops (buildCropBlock); null for none
 		float glow[3]; // centre of the brightest voxels in the top third (a lamp's bulb), in the tile
@@ -510,6 +511,7 @@ private:
 	};
 	std::unordered_map<Uint64, VoxelModel> _models;     // by MapData, sprite and cut-out
 	std::unordered_map<Uint64, VoxelModel> _ghostModels; // the parts' own ghosts (VoxelModel::ghost), by the part's key in _models
+	std::unordered_map<Uint64, VoxelModel> _leafyModels; // the leafy models of foliage (see leafyModel), by the part's key in _models
 	std::unordered_map<const MapData*, Frames> _frames; // by MapData: its animation frames
 	FirstPersonView *_sharedModelsOwner = nullptr;      // another view whose voxel models this one uses, or null
 	const VoxelModel *_groundModel = nullptr;           // floor repeated outside the map
@@ -587,6 +589,8 @@ private:
 
 	/// Gets (building on first use) the voxel model of a MapData record shown with a sprite.
 	const VoxelModel *getModel(const MapData *mapData, int spriteIndex = -1, bool cutout = false);
+	/// Gets the leafy model of a mass of foliage hanging with no floor under it (a tree's crown).
+	const VoxelModel *leafyModel(const MapData *mapData, int spriteIndex);
 	/// Builds a voxel model: shapes from the LOFT templates, colours from the isometric sprite.
 	void buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model) const;
 	/// Gets the sprite frames of a MapData record, and whether it animates.

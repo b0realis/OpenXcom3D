@@ -246,6 +246,7 @@ void clearModel(FirstPersonView::VoxelModel &model)
 	model.liquidHeight = 0;
 	model.artFill = false;
 	model.cropBlock = 0;
+	model.foliage = false;
 	model.ghost = nullptr;
 	for (int axis = 0; axis < 3; ++axis)
 	{
@@ -1167,6 +1168,90 @@ void buildCropBlock(FirstPersonView::VoxelModel &model, const Surface *sprite, i
 }
 
 /**
+ * Tells whether a part's art and shape are a mass of foliage (a player, GitHub issue #59: X-Com
+ * Files' forest "in iso they look good, in first, they look like cubes of playdoh": its big pines'
+ * crowns are solid boxes, three tiles by three and two levels tall, which the map shows only from
+ * above and the south-east): its drawn pixels mostly green (FoliageGreenShare, a pixel greener than
+ * it is red or blue), and its voxels filling a good part of the tile (FoliageBulkShare). Whether it
+ * is drawn leafy is the tile's to say (see leafyModel: only on a tile without a floor, a crown, not
+ * a green wall of an alien base standing on one).
+ * @param model The part's model, built from its voxels.
+ * @param sprite Its sprite frame.
+ * @param palette The palette its colours are in.
+ * @return True for foliage.
+ */
+bool foliageArt(const FirstPersonView::VoxelModel &model, const Surface *sprite, const SDL_Color *palette)
+{
+	if (model.empty)
+	{
+		return false;
+	}
+	int drawn = 0, green = 0, voxels = 0;
+	for (int spriteY = 0; spriteY < sprite->getHeight(); ++spriteY)
+		for (int spriteX = 0; spriteX < sprite->getWidth(); ++spriteX)
+		{
+			const Uint8 color = sprite->getPixel(spriteX, spriteY);
+			if (!color) continue;
+			++drawn;
+			const SDL_Color &rgb = palette[color];
+			green += rgb.g > rgb.r + FoliageGreenMargin && rgb.g > rgb.b + FoliageGreenMargin;
+		}
+	for (int z = 0; z < Position::TileZ; ++z)
+		for (int y = 0; y < Position::TileXY; ++y)
+			for (int x = 0; x < Position::TileXY; ++x) voxels += model.color[z][y][x] != 0;
+	return drawn > 0 && green >= drawn * FoliageGreenShare && voxels >= Position::TileXY * Position::TileXY * Position::TileZ * FoliageBulkShare;
+}
+
+/**
+ * Makes a model of foliage leafy (see foliageArt, leafyModel; the owner: holes in it, more towards
+ * its edges, so sky and light show through, and it reads as leaves, not as a box): voxels left out
+ * by a fixed pattern (a hash of the voxel and the part's sprite, the same every time), the more of
+ * them the nearer the surface: LeafHoleChance by the voxel's depth (1 for a voxel touching the
+ * outside or the tile's side, then inwards), none deeper. Only a picture: the game's shots and
+ * sight go by its own voxels.
+ * @param model The model, built from its voxels.
+ * @param seed The pattern's seed (the part's sprite).
+ */
+void carveLeaves(FirstPersonView::VoxelModel &model, unsigned seed)
+{
+	// Each voxel's depth: 0 for air, 1 for one touching air or the tile's side, then inwards.
+	const int deepest = (int)(sizeof(LeafHoleChance) / sizeof(LeafHoleChance[0]));
+	int depth[Position::TileZ][Position::TileXY][Position::TileXY];
+	for (int z = 0; z < Position::TileZ; ++z)
+		for (int y = 0; y < Position::TileXY; ++y)
+			for (int x = 0; x < Position::TileXY; ++x) depth[z][y][x] = model.color[z][y][x] ? deepest + 1 : 0;
+	const int steps[6][3] = { { 1, 0, 0 }, { -1, 0, 0 }, { 0, 1, 0 }, { 0, -1, 0 }, { 0, 0, 1 }, { 0, 0, -1 } };
+	for (int pass = 0; pass < deepest; ++pass)
+		for (int z = 0; z < Position::TileZ; ++z)
+			for (int y = 0; y < Position::TileXY; ++y)
+				for (int x = 0; x < Position::TileXY; ++x)
+				{
+					if (!depth[z][y][x]) continue;
+					for (const auto &step : steps)
+					{
+						const int nx = x + step[0], ny = y + step[1], nz = z + step[2];
+						const bool outside = nx < 0 || ny < 0 || nz < 0 || nx >= Position::TileXY || ny >= Position::TileXY || nz >= Position::TileZ;
+						depth[z][y][x] = std::min(depth[z][y][x], (outside ? 0 : depth[nz][ny][nx]) + 1);
+					}
+				}
+
+	// The holes.
+	for (int z = 0; z < Position::TileZ; ++z)
+		for (int y = 0; y < Position::TileXY; ++y)
+			for (int x = 0; x < Position::TileXY; ++x)
+			{
+				const int voxelDepth = depth[z][y][x];
+				if (!voxelDepth || voxelDepth > deepest) continue;
+				unsigned hash = (unsigned)x * 73856093u ^ (unsigned)y * 19349663u ^ (unsigned)z * 83492791u ^ seed;
+				hash ^= hash >> 13;
+				hash *= 0x5bd1e995u;
+				hash ^= hash >> 15;
+				if ((int)(hash % 100) < LeafHoleChance[voxelDepth - 1]) model.color[z][y][x] = 0;
+			}
+}
+
+
+/**
  * Tells whether a floor's or a wall's voxels leave out most of its art (a player's report: XPiratez's
  * catwalks in Chem Town "look like nothing", their gratings given nine voxels a layer and their
  * railings posts on every other layer, so shots go through, while the art draws a whole grating, a
@@ -1668,6 +1753,32 @@ const FirstPersonView::VoxelModel *FirstPersonView::getModel(const MapData *mapD
 }
 
 /**
+ * Gets the leafy model of a mass of foliage (see foliageArt, carveLeaves): the part's model with
+ * holes in it, for a tile where it hangs with no floor under it (a tree's crown). Built on first
+ * use, as getModel's.
+ * @param mapData The tile part's record.
+ * @param spriteIndex The frame of the record's surface set.
+ * @return The model; it stays valid until the battle changes.
+ */
+const FirstPersonView::VoxelModel *FirstPersonView::leafyModel(const MapData *mapData, int spriteIndex)
+{
+	if (_sharedModelsOwner)
+	{
+		return _sharedModelsOwner->leafyModel(mapData, spriteIndex);
+	}
+	const Uint64 key = ((Uint64)(uintptr_t)mapData << 16) | ((Uint64)(spriteIndex & 0x7FFF) << 1);
+	auto found = _leafyModels.find(key);
+	if (found == _leafyModels.end())
+	{
+		found = _leafyModels.emplace(key, VoxelModel()).first;
+		buildModel(mapData, spriteIndex, false, found->second);
+		carveLeaves(found->second, (unsigned)spriteIndex * 2654435761u);
+		colorHiddenSides(found->second, mapData->getDataset()->getSurfaceset()->getFrame(spriteIndex));
+	}
+	return &found->second;
+}
+
+/**
  * Gets the sprite frames of a MapData record: the sprite index of each of its 8 animation
  * frames, the pixel buffer of each (to tell which frame a tile shows by comparing buffers), and
  * whether it animates at all. Looked up once per record and kept; a view that shares another
@@ -1988,6 +2099,8 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	{
 		model.cropBlock = (Uint8)cropBlockOf(&model, mapData, sprite, yOffset);
 	}
+	// A mass of foliage: drawn leafy on a tile without a floor (see foliageArt, leafyModel).
+	model.foliage = mapData->getObjectType() == O_OBJECT && !cutout && foliageArt(model, sprite, getPalette());
 	colorHiddenSides(model, sprite);
 	findGlow(model);
 	model.water = waterFloor && !model.empty;
@@ -2588,6 +2701,13 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 			memo.cutout = cutout;
 			memo.steady = steady;
 			memo.model = steady ? steady : getModel(mapData, frames.sprite[frame], cutout);
+			// A tree's crown (foliage on a tile with no floor under it: a big tree's upper levels):
+			// leafy (see leafyModel), also where a mod counts its forest among a UFO's tile sets
+			// (X-Com Files: a crown has no lights for a steady model to show).
+			if (!cutout && part == O_OBJECT && !tile->getMapData(O_FLOOR) && getModel(mapData, frames.sprite[frame], false)->foliage)
+			{
+				memo.model = leafyModel(mapData, frames.sprite[frame]);
+			}
 			memo.next = nullptr;
 			if (frames.animated && !mapData->isUFODoor() && memo.model != frames.steady && frames.sprite[(frame + 1) % 8] != frames.sprite[frame])
 			{

@@ -209,6 +209,13 @@ const int LowArtFlatLayer = 2;
 /// solid block of it (see cropBlockOf, buildCropBlock); knee to waist high at most, and only one walks through.
 const int CropBlockMinHeight = 4, CropBlockMaxHeight = 16;
 const float CropBlockMatch = 0.92f, CropBlockVoxelShare = 0.5f;
+/// A mass of foliage (a big tree's crown, see foliageArt; GitHub issue #59): at least FoliageGreenShare of its art's drawn
+/// pixels green (greener than red and blue by FoliageGreenMargin), its voxels filling FoliageBulkShare of the tile or
+/// more. Drawn leafy on a tile without a floor (carveLeaves): a voxel left out by a fixed pattern with LeafHoleChance
+/// percent by its depth from the surface (1, 2, 3, 4 voxels in), none deeper.
+const float FoliageGreenShare = 0.6f, FoliageBulkShare = 0.4f;
+const int FoliageGreenMargin = 4;
+const int LeafHoleChance[] = { 60, 45, 30, 15 };
 /// Setting "See-through crops": the share of the pixels on which the view draws the solid ghosts (the crops, flower beds
 /// and rubble above: VoxelModel::solidGhost), near or far, apart from the ghosts' opacity; off, all of them.
 const float SeeThroughCropOpacity = 0.75f;
