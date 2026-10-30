@@ -206,12 +206,24 @@ class QuickFallPose
 {
 public:
 	explicit QuickFallPose(BattleUnit *unit);
+	/// The same, at a frame of the fall given (a body coming down from the air, see airFallHeight).
+	QuickFallPose(BattleUnit *unit, int phase);
 	~QuickFallPose();
 	QuickFallPose(const QuickFallPose&) = delete;
 	QuickFallPose &operator=(const QuickFallPose&) = delete;
 private:
 	BattleUnit *_unit; // the unit posed (null: none)
 };
+/// A unit going down as it hovers over no floor (GitHub issue #62): notes it as the game takes it
+/// out, so the 3D view draws it falling to the ground, the game itself having it there at once.
+void noteAirFall(const SavedBattleGame *save, BattleUnit *unit);
+/// Forgets the falls from the air under way (a battle starting: its units are new).
+void clearAirFalls();
+/// Where a unit coming down from the air is now: its tile across (x, y) and its feet's height in
+/// voxels; false if it isn't falling (never was, or it has landed).
+bool airFallHeight(const BattleUnit *unit, Position &tile, double &feetZ);
+/// Whether a body coming down from the air lands on this tile and hasn't yet (its items held back).
+bool airFallLandsOn(const SavedBattleGame *save, const Tile *tile);
 /// Setting "Shotgun pellets in flight": do a shotgun's pellets fly beside its round (in 3D and on
 /// the map), rather than all landing at once? They're traced as the round is fired, and hit as it lands.
 bool pelletsInFlight(BattlescapeState *state);
@@ -304,7 +316,12 @@ class QuickFallPose
 {
 public:
 	explicit QuickFallPose(BattleUnit *) { }
+	QuickFallPose(BattleUnit *, int) { }
 };
+inline void noteAirFall(const SavedBattleGame *, BattleUnit *) { }
+inline void clearAirFalls() { }
+inline bool airFallHeight(const BattleUnit *, Position &, double &) { return false; }
+inline bool airFallLandsOn(const SavedBattleGame *, const Tile *) { return false; }
 
 #endif
 

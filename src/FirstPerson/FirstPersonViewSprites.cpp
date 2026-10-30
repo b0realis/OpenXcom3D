@@ -814,9 +814,15 @@ void FirstPersonView::drawUnits()
 	{
 		// Only units still in the fight (not dead or unconscious), not the one looked through,
 		// and in sight (any unit in debug mode). And one down a moment ago with "Quick deaths",
-		// still falling (on its own, see FirstPerson::quickFallPhase): drawn in that fall.
+		// still falling (on its own, see FirstPerson::quickFallPhase): drawn in that fall. And one
+		// gone down in the air, coming down to the ground (FirstPerson::airFallHeight): drawn
+		// falling, lying once its own fall frames are over.
 		const bool quickFall = unit->isOut() && FirstPerson::quickFallPhase(unit) >= 0;
-		if ((unit->isOut() && !quickFall) || unit == _cameraUnit || (!debug && !unit->getVisible()))
+		Position airFallTile;
+		double airFallFeetZ = 0.0;
+		const bool airFall = FirstPerson::airFallHeight(unit, airFallTile, airFallFeetZ);
+		const bool fallingDown = quickFall || (airFall && unit->isOut());
+		if ((unit->isOut() && !fallingDown) || unit == _cameraUnit || (!debug && !unit->getVisible()))
 		{
 			continue;
 		}
@@ -846,11 +852,18 @@ void FirstPersonView::drawUnits()
 		{
 			place(unit->getPosition(), feet);
 		}
+		if (airFall)
+		{
+			// Coming down from the air: over the tile it hovered over, as low as it has fallen.
+			place(airFallTile, feet);
+			feet[2] = airFallFeetZ;
+		}
 		// The game moves units in small steps a few times a second: glide between them
-		// (but snap on anything big: a unit seen anew, teleported, falling a floor).
+		// (but snap on anything big: a unit seen anew, teleported, falling a floor; and follow a
+		// fall from the air as it is).
 		Glide &glide = _unitGlides[unit];
 		const double jump = std::abs(glide.pos[0] - feet[0]) + std::abs(glide.pos[1] - feet[1]) + std::abs(glide.pos[2] - feet[2]);
-		if (now - glide.seen > 250 || jump > 24.0)
+		if (now - glide.seen > 250 || jump > 24.0 || airFall)
 		{
 			std::copy(feet, feet + 3, glide.pos);
 		}
@@ -881,7 +894,7 @@ void FirstPersonView::drawUnits()
 		// A marked enemy's marker goes 5 voxels above its head (not over one falling: it's down).
 		for (const auto &marker : _markers)
 		{
-			if (marker.first == unit && !quickFall)
+			if (marker.first == unit && !fallingDown)
 			{
 				MarkerSpot spot = { { feet[0], feet[1], feet[2] + unit->getFloatHeight() + unit->getHeight() + 5.0 }, marker.second };
 				_markerSpots.push_back(spot);
@@ -912,7 +925,9 @@ void FirstPersonView::drawUnits()
 		// then serves in any light.)
 		const GraphSubset mask(SpriteBufferSize, SpriteBufferSize);
 		{
-			const FirstPerson::QuickFallPose fallPose(quickFall ? unit : nullptr); // (a quick fall's frame)
+			// (a quick fall's frame; a body coming down from the air after its own fall frames, the last)
+			const int fallFrame = quickFall ? FirstPerson::quickFallPhase(unit) : fallingDown ? std::max(0, unit->getArmor()->getDeathFrames() - 1) : -1;
+			const FirstPerson::QuickFallPose fallPose(fallingDown ? unit : nullptr, fallFrame);
 			if (unitSize == 1)
 			{
 				unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
@@ -949,14 +964,14 @@ void FirstPersonView::drawUnits()
 		step.sprite.unit = unit;
 		useSmoothVersion(step.sprite);
 		_drawList.push_back(step);
-		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit) && !Options::fpsSpriteHitboxes && !quickFall) // (with full sprite hitboxes the picture is the hitbox; one falling is down)
+		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit) && !Options::fpsSpriteHitboxes && !fallingDown) // (with full sprite hitboxes the picture is the hitbox; one falling is down)
 		{
 			recordHitbox(unit, feet, hitboxOpacity);
 		}
 		// Which way it faces, with the key for it held (see drawFacing): round its footprint (inside
 		// its tiles, so neighbours' rings don't cross), at the bottom of its hitbox (under a flyer),
 		// in the colour of its side.
-		if (_showFacing && !quickFall)
+		if (_showFacing && !fallingDown)
 		{
 			FacingSpot spot = { { feet[0], feet[1], feet[2] + unit->getFloatHeight() + 1.0 }, 8.0 * unitSize - 1.5, unit->getDirection(),
 				_colors.hitbox[unit->getFaction() == FACTION_PLAYER ? 0 : unit->getFaction() == FACTION_HOSTILE ? 1 : 2] };
@@ -1273,10 +1288,12 @@ void FirstPersonView::drawFloorItems()
 	for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
 	{
 		// Only tiles with something on them, that have been seen.
-		// (Not while a quick fall plays there: the body and what it dropped come once it's down.)
+		// (Not while a quick fall plays there, nor while a body coming down from the air hasn't
+		// landed there: the body and what it dropped come once it's down.)
 		Tile *tile = _save->getTile(tileIndex);
 		if (tile->getInventory()->empty() || !_tileViews[tileIndex].discovered
-			|| std::find(partsDrawn.begin(), partsDrawn.end(), tileIndex) != partsDrawn.end() || FirstPerson::quickFallOn(_save, tile))
+			|| std::find(partsDrawn.begin(), partsDrawn.end(), tileIndex) != partsDrawn.end() || FirstPerson::quickFallOn(_save, tile)
+			|| FirstPerson::airFallLandsOn(_save, tile))
 		{
 			continue;
 		}

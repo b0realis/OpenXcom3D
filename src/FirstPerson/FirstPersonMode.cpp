@@ -146,6 +146,7 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
 	std::fill(std::begin(_stepAllowedCache), std::end(_stepAllowedCache), -1);
 	FirstPerson::settleOptions(); // (the smoke's first value, from an older setting)
 	FirstPerson::clearQuickFalls(); // (a new battle, or one loaded: none of the last one's falls)
+	FirstPerson::clearAirFalls();
 
 	// Our surfaces, in drawing order: each one goes on top of the ones made before it.
 	createView();

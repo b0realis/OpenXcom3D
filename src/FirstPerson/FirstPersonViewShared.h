@@ -139,6 +139,9 @@ const double SpriteHitPush = 6.0;
 /// pace, BattlescapeState::DEFAULT_ANIM_SPEED a frame; GitHub issue #58: the fall needn't hurry, nothing waits for it),
 /// and the most fall frames it shows (a fall is surely over after that many: the armors have 3 or so, mods may give more).
 const Uint32 QuickFallFrameTime = 100;
+/// A unit going down as it hovers over no floor comes down to the ground in 3D (GitHub issue #62, see
+/// FirstPerson::noteAirFall), falling by this gravity, in voxels a second a second (a level of 24 voxels in half a second).
+const double AirFallGravity = 192.0;
 const int QuickFallMaxFrames = 32;
 /// Sprites stand like cards facing the camera, leaning with the view's pitch; looking down
 /// further than this many degrees, a card leans only this far, so it stays above the floor
