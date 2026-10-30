@@ -3274,6 +3274,20 @@ bool FirstPersonMode::pelletsInFlight(BattlescapeState *state)
 }
 
 /**
+ * Does a chain of terrain explosions settle at once, asked by the game as a blast sets one off:
+ * with the setting "Instant chain explosions" (a player's request, GitHub issue #61: long chains of
+ * explosive terrain are slow to watch and heavy on the computer, and a shooter shows the outcome)
+ * while the 3D view shows. The first blast plays; the links it sets off settle in one frame, with
+ * one sound, and the wreckage, smoke and fire they leave show. On the map, the game's own chain.
+ * @param state The battlescape screen.
+ * @return True if the chain settles at once.
+ */
+bool FirstPersonMode::instantChains(BattlescapeState *state)
+{
+	return Options::fpsInstantChains && state && state->_firstPerson && state->_firstPerson->isActive();
+}
+
+/**
  * Are units hit by their pictures in this battle (setting "Full sprite hitboxes", see
  * FirstPerson::spriteHitboxes): the setting on, in a battle with the mod's 3D view (in 3D or on
  * the map alike: the battle's rule)?

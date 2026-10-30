@@ -140,6 +140,8 @@ SETTINGS = [
         ('Shotgun pellets in flight', 'YES', 'YES / NO', 'A shotgun\'s pellets fly beside its round, in 3D and on the map.', ''),
         ('Each pellet on its own', 'YES', 'YES / NO', 'A shotgun\'s pellets and an akimbo volley\'s two rounds each land on their own: none lost when the lead pellet leaves the map.',
          'OXCE\'s "shotgun void" closed: shotguns hit as their pellets say.'),
+        ('Instant chain explosions', 'NO', 'YES / NO', 'In 3D, explosive terrain set off by a blast goes up at once: the first blast plays, the chain it sets off settles in a moment, one sound.',
+         'Long chains of barrels and fuel without the wait; the wreckage is the same.'),
         ('Full sprite hitboxes', 'NO', 'YES / NO', 'Units are hit, and seen, wherever their full sprites show (a card facing whoever fires), for everyone, in 3D and on the map.', 'What you see is what you hit: shots pass between legs and hit arms.'),
         ('Auto-equip guns first', 'NO', 'YES / NO', 'Soldiers with no saved loadout take guns before melee weapons, in the mod\'s item order. NO: OpenXcom\'s own auto-equip.', 'In XPiratez or X-Com Files OXCE often hands out staffs and swords first.'),
         ('Quick deaths', 'NO', 'YES / NO', 'Units killed or knocked out are down at once: bursts fire on, falls play on their own and together, in 3D and on the map; your soldier falls on their camera card while the view goes on to the next.', 'Doom-style pace: chaingun through a group without waiting for each fall.'),

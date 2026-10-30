@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..0f5bff6e2
+index 000000000..3a53cf138
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,454 @@
+@@ -0,0 +1,456 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -489,6 +489,8 @@ index 000000000..0f5bff6e2
 +  STR_FPS_PELLETS_IN_FLIGHT: "Shotgun pellets in flight"
 +  STR_FPS_PELLETS_IN_FLIGHT_DESC: "A shotgun's pellets fly beside its round, in 3D and on the map. NO: the game's way, the whole blast landing at once."
 +  STR_FPS_EACH_PELLET: "Each pellet on its own"
++  STR_FPS_INSTANT_CHAINS: "Instant chain explosions"
++  STR_FPS_INSTANT_CHAINS_DESC: "In 3D, explosive terrain set off by a blast goes up at once, the whole chain in a moment. NO: the game's way."
 +  STR_FPS_EACH_PELLET_DESC: "Every shotgun pellet and akimbo volley round lands on its own, none lost with the lead one. NO: the game's way."
 +  STR_FPS_FORCE_BLOCKED_DESC: "A shot with no line of fire fires anyway along the crosshair's line, hitting what's in the way, as with Ctrl held."
 +  STR_FPS_CONFIRM_FIRE: "Confirm fire"
@@ -584,10 +586,10 @@ index 000000000..0f5bff6e2
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..78543b216
+index 000000000..d028d13a8
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,454 @@
+@@ -0,0 +1,456 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -949,6 +951,8 @@ index 000000000..78543b216
 +  STR_FPS_PELLETS_IN_FLIGHT: "Shotgun pellets in flight"
 +  STR_FPS_PELLETS_IN_FLIGHT_DESC: "A shotgun's pellets fly beside its round, in 3D and on the map. NO: the game's way, the whole blast landing at once."
 +  STR_FPS_EACH_PELLET: "Each pellet on its own"
++  STR_FPS_INSTANT_CHAINS: "Instant chain explosions"
++  STR_FPS_INSTANT_CHAINS_DESC: "In 3D, explosive terrain set off by a blast goes up at once, the whole chain in a moment. NO: the game's way."
 +  STR_FPS_EACH_PELLET_DESC: "Every shotgun pellet and akimbo volley round lands on its own, none lost with the lead one. NO: the game's way."
 +  STR_FPS_FORCE_BLOCKED_DESC: "A shot with no line of fire fires anyway along the crosshair's line, hitting what's in the way, as with Ctrl held."
 +  STR_FPS_CONFIRM_FIRE: "Confirm fire"
@@ -18424,7 +18428,7 @@ zS5@`!3aHaZGtp45!Lxph$oiM+^CR%dVZh&K3*XTV@UN4gPwa!|{1W=Aba=<@`1p*z
 ih*j<5N1;eik|IX<zbW+g$UZrfr}=t{<U#TybpHoxAdk2J
 
 diff --git a/src/Battlescape/BattlescapeGame.cpp b/src/Battlescape/BattlescapeGame.cpp
-index b7e1111f3..226a7bf7f 100644
+index b7e1111f3..2f66e5e04 100644
 --- a/src/Battlescape/BattlescapeGame.cpp
 +++ b/src/Battlescape/BattlescapeGame.cpp
 @@ -59,6 +59,7 @@
@@ -18435,7 +18439,25 @@ index b7e1111f3..226a7bf7f 100644
  
  namespace OpenXcom
  {
-@@ -1551,7 +1552,11 @@ bool BattlescapeGame::handlePanickingUnit(BattleUnit *unit)
+@@ -1156,6 +1157,17 @@ void BattlescapeGame::handleState()
+ 		else
+ 		{
+ 			_states.front()->think();
++			// (OpenXcom3D: the links of a chain settling at once all settle in this frame, see
++			// ExplosionBState::setInstant; each pops itself, at most a thousand as a guard)
++			for (int link = 0; link < 1000 && !_states.empty(); ++link)
++			{
++				auto *explosion = dynamic_cast<ExplosionBState*>(_states.front());
++				if (!explosion || !explosion->isInstant())
++				{
++					break;
++				}
++				explosion->think();
++			}
+ 		}
+ 		getMap()->invalidate(); // redraw map
+ 	}
+@@ -1551,7 +1563,11 @@ bool BattlescapeGame::handlePanickingUnit(BattleUnit *unit)
  
  	// show a little infobox with the name of the unit and "... is panicking"
  	Game *game = _parentState->getGame();
@@ -18448,7 +18470,7 @@ index b7e1111f3..226a7bf7f 100644
  	{
  		getMap()->getCamera()->centerOnPosition(unit->getPosition());
  		if (status == STATUS_PANICKING)
-@@ -1926,6 +1931,7 @@ void BattlescapeGame::primaryAction(Position pos)
+@@ -1926,6 +1942,7 @@ void BattlescapeGame::primaryAction(Position pos)
  
  			_parentState->getGame()->getCursor()->setVisible(false);
  			_currentAction.cameraPosition = getMap()->getCamera()->getMapOffset();
@@ -18753,7 +18775,7 @@ index 365e012fa..2f7d4751e 100644
  
  }
 diff --git a/src/Battlescape/ExplosionBState.cpp b/src/Battlescape/ExplosionBState.cpp
-index ff9973e6f..43d862ac7 100644
+index ff9973e6f..47d9091eb 100644
 --- a/src/Battlescape/ExplosionBState.cpp
 +++ b/src/Battlescape/ExplosionBState.cpp
 @@ -31,6 +31,7 @@
@@ -18764,7 +18786,24 @@ index ff9973e6f..43d862ac7 100644
  
  namespace OpenXcom
  {
-@@ -273,7 +274,12 @@ void ExplosionBState::init()
+@@ -224,6 +225,16 @@ void ExplosionBState::init()
+ 				frameCount = itemRule->getHitAnimationFrames();
+ 				optValue(sound, itemRule->getExplosionHitSound());
+ 			}
++			if (_instant)
++			{
++				// (OpenXcom3D: a link of a chain settling at once: no blast to watch, the chain's first link sounding for all)
++				if (_instantSound)
++				{
++					_parent->playSound(sound);
++				}
++				_parent->setStateInterval(1);
++				return;
++			}
+ 			if (_parent->getDepth() > 0)
+ 			{
+ 				frame -= (frameCount > 0 ? frameCount : Explosion::EXPLODE_FRAMES);
+@@ -273,7 +284,12 @@ void ExplosionBState::init()
  	{
  		_parent->getSave()->getTileEngine()->hit(_attack, _center, _power, _damageType, range, _terrainMeleeTilePart);
  
@@ -18778,7 +18817,7 @@ index ff9973e6f..43d862ac7 100644
  		int anim = -1;
  		int animFrames = -1;
  		int sound = -1;
-@@ -349,6 +355,7 @@ void ExplosionBState::init()
+@@ -349,6 +365,7 @@ void ExplosionBState::init()
  		if (anim != -1)
  		{
  			Explosion *explosion = new Explosion(_center, anim, 0, false, (_hit || _psi), animFrames); // Don't burn the tile
@@ -18786,6 +18825,55 @@ index ff9973e6f..43d862ac7 100644
  			_parent->getMap()->getExplosions()->push_back(explosion);
  		}
  		if (_parent->getMap()->getFollowProjectile())
+@@ -379,6 +396,11 @@ void ExplosionBState::init()
+  */
+ void ExplosionBState::think()
+ {
++	if (_instant)
++	{
++		explode(); // (OpenXcom3D: a link of a chain settling at once, see setInstant)
++		return;
++	}
+ 	if (!_parent->getMap()->getBlastFlash())
+ 	{
+ 		if (_parent->getMap()->getExplosions()->empty())
+@@ -477,7 +499,12 @@ void ExplosionBState::explode()
+ 	{
+ 		Position p = t->getPosition().toVoxel();
+ 		p += Position(8,8,0);
+-		_parent->statePushFront(new ExplosionBState(_parent, p, BattleActionAttack{ BA_NONE, _attack.attacker, }, t, false, 0, _explosionCounter + 1));
++		auto *link = new ExplosionBState(_parent, p, BattleActionAttack{ BA_NONE, _attack.attacker, }, t, false, 0, _explosionCounter + 1);
++		if (_areaOfEffect && FirstPerson::instantChains(save->getBattleState()))
++		{
++			link->setInstant(!_instant); // (OpenXcom3D: set off by a blast, it settles at once; the chain's first link sounds for all)
++		}
++		_parent->statePushFront(link);
+ 	}
+ 
+ 	// Spawn a unit if the item does that
+diff --git a/src/Battlescape/ExplosionBState.h b/src/Battlescape/ExplosionBState.h
+index c112ccbe8..f6edf25be 100644
+--- a/src/Battlescape/ExplosionBState.h
++++ b/src/Battlescape/ExplosionBState.h
+@@ -47,6 +47,7 @@ private:
+ 	int _radius;
+ 	int _range;
+ 	bool _areaOfEffect, _lowerWeapon, _hit, _psi;
++	bool _instant = false, _instantSound = false; // (OpenXcom3D: a link of a chain settled at once, see setInstant)
+ 
+ 	/// Calculates the effects of the explosion.
+ 	void explode();
+@@ -57,6 +58,10 @@ public:
+ 	ExplosionBState(BattlescapeGame *parent, LastPositions center, BattleActionAttack attack, Tile *tile = 0, bool lowerWeapon = false, int range = 0, int explosionCounter = 0, int terrainMeleeTilePart = 0);
+ 	/// Cleans up the ExplosionBState.
+ 	~ExplosionBState();
++	/// Makes this terrain explosion a link of a chain that settles at once (OpenXcom3D add-on, setting "Instant chain explosions"): no blast to watch, its sound only if asked.
++	void setInstant(bool sound) { _instant = true; _instantSound = sound; }
++	/// Checks if this explosion settles at once (see setInstant).
++	bool isInstant() const { return _instant; }
+ 	/// Initializes the state.
+ 	void init() override;
+ 	/// Handles a cancel request.
 diff --git a/src/Battlescape/Map.cpp b/src/Battlescape/Map.cpp
 index 3665cd199..dee7728fd 100644
 --- a/src/Battlescape/Map.cpp
@@ -21520,7 +21608,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..25d83aea0 100644
+index a08796ced..828ef08e2 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -21537,7 +21625,7 @@ index a08796ced..25d83aea0 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons;
++OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains;
 +OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode;
@@ -21626,10 +21714,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..a0d49dfe1
+index 000000000..2ac725871
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1050 @@
+@@ -0,0 +1,1064 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -22321,6 +22409,9 @@ index 000000000..a0d49dfe1
 +	// lost when the lead pellet leaves the map, and in flight each hits as it arrives (a player's
 +	// report on OXCE's "shotgun void"); off, the game's own way, the lead pellet deciding.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsEachPellet", &fpsEachPellet, true, "STR_FPS_EACH_PELLET", category));
++	// In 3D, a chain of terrain explosions set off by a blast settles at once, without its blasts to
++	// watch (a player's request, GitHub issue #61: long chains are slow and heavy); off, the game's way.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsInstantChains", &fpsInstantChains, false, "STR_FPS_INSTANT_CHAINS", category));
 +	// The units' hitboxes, outlined: off (0), fading in and out once a second (1), always (2), or
 +	// only the unit pointed at (3, the first for new installs: a player's report, GitHub issue #27,
 +	// new players aimed at a Sectoid's picture and missed its hitbox).
@@ -22524,6 +22615,17 @@ index 000000000..a0d49dfe1
 +}
 +
 +/**
++ * Called by the game as a blast sets off a terrain explosion: does it settle at once, with the
++ * rest of the chain (setting "Instant chain explosions", while the 3D view shows)?
++ * @param state The battlescape screen.
++ * @return True if the chain's links settle at once.
++ */
++bool instantChains(BattlescapeState *state)
++{
++	return FirstPersonMode::instantChains(state);
++}
++
++/**
 + * Called by the game as it fires a shotgun's round or an akimbo volley: does each pellet (and each
 + * gun's round) land on its own (setting "Each pellet on its own"), rather than as the lead pellet
 + * lands, the rest lost with it when it leaves the map?
@@ -22682,10 +22784,10 @@ index 000000000..a0d49dfe1
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..fecf4eead
+index 000000000..71b11fd1a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,340 @@
+@@ -0,0 +1,344 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -22923,6 +23025,9 @@ index 000000000..fecf4eead
 +/// Setting "Shotgun pellets in flight": do a shotgun's pellets fly beside its round (in 3D and on
 +/// the map), rather than all landing at once? They're traced as the round is fired, and hit as it lands.
 +bool pelletsInFlight(BattlescapeState *state);
++/// Setting "Instant chain explosions": does a terrain explosion set off by a blast settle at once,
++/// with the rest of its chain, without blasts to watch (in 3D only)?
++bool instantChains(BattlescapeState *state);
 +/// Setting "Each pellet on its own": do a shotgun's pellets and a volley's two rounds each land on
 +/// their own (in either view), none lost when the lead pellet leaves the map?
 +bool eachPellet(BattlescapeState *state);
@@ -22984,6 +23089,7 @@ index 000000000..fecf4eead
 +inline void freeAimOrigin(BattlescapeState *, const BattleAction &, Position &) { }
 +inline bool fastShots(BattlescapeState *, const BattleUnit *) { return false; }
 +inline bool pelletsInFlight(BattlescapeState *) { return false; }
++inline bool instantChains(BattlescapeState *) { return false; }
 +inline bool eachPellet(BattlescapeState *) { return false; }
 +enum StatBar { STAT_TU, STAT_ENERGY, STAT_HEALTH, STAT_MORALE, STAT_MANA };
 +inline double statBarScale(BattlescapeState *, int, int, int) { return 1.0; }
@@ -25785,10 +25891,10 @@ index 000000000..779f1245a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..ba91fe4e0
+index 000000000..ef32c5398
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1203 @@
+@@ -0,0 +1,1205 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -25925,6 +26031,8 @@ index 000000000..ba91fe4e0
 +	static bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
 +	/// Do a shotgun's pellets fly beside its round (setting "Shotgun pellets in flight", the 3D view showing)?
 +	static bool pelletsInFlight(BattlescapeState *state);
++	/// Does a chain of terrain explosions settle at once (setting "Instant chain explosions", in 3D)?
++	static bool instantChains(BattlescapeState *state);
 +	/// Setting "Full sprite hitboxes": are units hit by their pictures in this battle (see FirstPerson::spriteHitboxes)?
 +	static bool spriteHitboxes(BattlescapeState *state);
 +	/// Setting "Quick deaths": are deaths quick in this battle (see FirstPerson::quickDeaths)?
@@ -32572,10 +32680,10 @@ index 000000000..01e1ec279
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..23b920467
+index 000000000..f59332e35
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,4597 @@
+@@ -0,0 +1,4611 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -35849,6 +35957,20 @@ index 000000000..23b920467
 +bool FirstPersonMode::pelletsInFlight(BattlescapeState *state)
 +{
 +	return Options::fpsPelletsInFlight && state && state->_firstPerson;
++}
++
++/**
++ * Does a chain of terrain explosions settle at once, asked by the game as a blast sets one off:
++ * with the setting "Instant chain explosions" (a player's request, GitHub issue #61: long chains of
++ * explosive terrain are slow to watch and heavy on the computer, and a shooter shows the outcome)
++ * while the 3D view shows. The first blast plays; the links it sets off settle in one frame, with
++ * one sound, and the wreckage, smoke and fire they leave show. On the map, the game's own chain.
++ * @param state The battlescape screen.
++ * @return True if the chain settles at once.
++ */
++bool FirstPersonMode::instantChains(BattlescapeState *state)
++{
++	return Options::fpsInstantChains && state && state->_firstPerson && state->_firstPerson->isActive();
 +}
 +
 +/**
@@ -57554,7 +57676,7 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..1753aa852
+index 000000000..d210edd8d
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,817 @@
@@ -57775,7 +57897,7 @@ index 000000000..1753aa852
 +			"fpsFalling", "fpsSafeLanding" } },
 +		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsLean", "fpsMeleeTerrain",
 +			"fpsMeleeFloors", "fpsAimExact", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
-+			"fpsEachPellet", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear" } },
++			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear" } },
 +		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
 +			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsParticles", "fpsUfoLights",
 +			"fpsGhostParts", "fpsGhostOpacity", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },

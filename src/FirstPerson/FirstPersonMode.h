@@ -134,6 +134,8 @@ public:
 	static bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
 	/// Do a shotgun's pellets fly beside its round (setting "Shotgun pellets in flight", the 3D view showing)?
 	static bool pelletsInFlight(BattlescapeState *state);
+	/// Does a chain of terrain explosions settle at once (setting "Instant chain explosions", in 3D)?
+	static bool instantChains(BattlescapeState *state);
 	/// Setting "Full sprite hitboxes": are units hit by their pictures in this battle (see FirstPerson::spriteHitboxes)?
 	static bool spriteHitboxes(BattlescapeState *state);
 	/// Setting "Quick deaths": are deaths quick in this battle (see FirstPerson::quickDeaths)?

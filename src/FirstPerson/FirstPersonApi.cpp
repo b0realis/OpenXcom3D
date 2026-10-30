@@ -689,6 +689,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	// lost when the lead pellet leaves the map, and in flight each hits as it arrives (a player's
 	// report on OXCE's "shotgun void"); off, the game's own way, the lead pellet deciding.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsEachPellet", &fpsEachPellet, true, "STR_FPS_EACH_PELLET", category));
+	// In 3D, a chain of terrain explosions set off by a blast settles at once, without its blasts to
+	// watch (a player's request, GitHub issue #61: long chains are slow and heavy); off, the game's way.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsInstantChains", &fpsInstantChains, false, "STR_FPS_INSTANT_CHAINS", category));
 	// The units' hitboxes, outlined: off (0), fading in and out once a second (1), always (2), or
 	// only the unit pointed at (3, the first for new installs: a player's report, GitHub issue #27,
 	// new players aimed at a Sectoid's picture and missed its hitbox).
@@ -889,6 +892,17 @@ bool fastShots(BattlescapeState *state, const BattleUnit *attacker)
 bool pelletsInFlight(BattlescapeState *state)
 {
 	return FirstPersonMode::pelletsInFlight(state);
+}
+
+/**
+ * Called by the game as a blast sets off a terrain explosion: does it settle at once, with the
+ * rest of the chain (setting "Instant chain explosions", while the 3D view shows)?
+ * @param state The battlescape screen.
+ * @return True if the chain's links settle at once.
+ */
+bool instantChains(BattlescapeState *state)
+{
+	return FirstPersonMode::instantChains(state);
 }
 
 /**

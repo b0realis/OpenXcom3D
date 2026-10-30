@@ -235,6 +235,9 @@ bool airFallLandsOn(const SavedBattleGame *save, const Tile *tile);
 /// Setting "Shotgun pellets in flight": do a shotgun's pellets fly beside its round (in 3D and on
 /// the map), rather than all landing at once? They're traced as the round is fired, and hit as it lands.
 bool pelletsInFlight(BattlescapeState *state);
+/// Setting "Instant chain explosions": does a terrain explosion set off by a blast settle at once,
+/// with the rest of its chain, without blasts to watch (in 3D only)?
+bool instantChains(BattlescapeState *state);
 /// Setting "Each pellet on its own": do a shotgun's pellets and a volley's two rounds each land on
 /// their own (in either view), none lost when the lead pellet leaves the map?
 bool eachPellet(BattlescapeState *state);
@@ -296,6 +299,7 @@ inline void freeAimTarget(BattlescapeState *, const BattleAction &, Position &) 
 inline void freeAimOrigin(BattlescapeState *, const BattleAction &, Position &) { }
 inline bool fastShots(BattlescapeState *, const BattleUnit *) { return false; }
 inline bool pelletsInFlight(BattlescapeState *) { return false; }
+inline bool instantChains(BattlescapeState *) { return false; }
 inline bool eachPellet(BattlescapeState *) { return false; }
 enum StatBar { STAT_TU, STAT_ENERGY, STAT_HEALTH, STAT_MORALE, STAT_MANA };
 inline double statBarScale(BattlescapeState *, int, int, int) { return 1.0; }
