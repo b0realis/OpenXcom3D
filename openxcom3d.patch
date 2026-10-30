@@ -124,7 +124,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..61b73bd8b
+index 000000000..d0caec452
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,436 @@
@@ -303,12 +303,12 @@ index 000000000..61b73bd8b
 +  STR_FPS_FPS_STYLE: "FPS-style shooting (easier)"
 +  STR_FPS_DUAL_WIELD: "Full akimbo"
 +  STR_FPS_AKIMBO: "Akimbo"
-+  STR_FPS_AKIMBO_DESC: "A gun in each hand fires both, each 30% less accurate, for the dearer gun's cost and a tenth. Full: any two guns; Realistic: one-handed only. Y switches it in play."
++  STR_FPS_AKIMBO_DESC: "A gun in each hand fires both, each 30% less accurate. Full: any two guns; One-hand: one-handed only. Y switches it."
 +  STR_FPS_AKIMBO_CHOICE_OFF: "Off"
 +  STR_FPS_AKIMBO_CHOICE_FULL: "Full"
-+  STR_FPS_AKIMBO_CHOICE_REALISTIC: "Realistic"
++  STR_FPS_AKIMBO_CHOICE_REALISTIC: "One-hand"
 +  STR_FPS_AKIMBO_SETTING_OFF: "Akimbo is off in the settings"
-+  STR_FPS_AKIMBO_REALISTIC: "Realistic akimbo"
++  STR_FPS_AKIMBO_REALISTIC: "One-hand akimbo"
 +  STR_FPS_AKIMBO_NO_AIMED: "Two guns: no aimed shot ({0}: akimbo off)"
 +  STR_FPS_LEAN_SHOTS: "Lean shots"
 +  STR_FPS_LEAN_SHOTS_DESC: "Movement Free: standing to one side of the tile shoots from that side, to peek (the game's own targeting; FPS-style shooting always shoots from the eye)."
@@ -322,7 +322,7 @@ index 000000000..61b73bd8b
 +  STR_FPS_MELEE_FLOORS: "Melee hits floors"
 +  STR_FPS_MELEE_FLOORS_DESC: "With Melee hits walls and downed (or the mod's terrain melee): the floor or ceiling you aim at too."
 +  STR_FPS_AKIMBO_FULL_ON: "FULL AKIMBO"
-+  STR_FPS_AKIMBO_REALISTIC_ON: "REALISTIC AKIMBO"
++  STR_FPS_AKIMBO_REALISTIC_ON: "AKIMBO, ONE-HAND"
 +  STR_FPS_AKIMBO_OFF: "AKIMBO OFF"
 +  STR_FPS_AKIMBO_VOLLEY: "Akimbo volley"
 +  STR_FPS_AKIMBO_VOLLEY_DESC: "NO: two guns take turns round by round, each round landing (its hit, deaths, walls) before the next leaves, as an auto burst's. YES: both at once, their rounds landing together."
@@ -566,7 +566,7 @@ index 000000000..61b73bd8b
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..1ba1b342e
+index 000000000..10faafcec
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,436 @@
@@ -745,12 +745,12 @@ index 000000000..1ba1b342e
 +  STR_FPS_FPS_STYLE: "FPS-style shooting (easier)"
 +  STR_FPS_DUAL_WIELD: "Full akimbo"
 +  STR_FPS_AKIMBO: "Akimbo"
-+  STR_FPS_AKIMBO_DESC: "A gun in each hand fires both, each 30% less accurate, for the dearer gun's cost and a tenth. Full: any two guns; Realistic: one-handed only. Y switches it in play."
++  STR_FPS_AKIMBO_DESC: "A gun in each hand fires both, each 30% less accurate. Full: any two guns; One-hand: one-handed only. Y switches it."
 +  STR_FPS_AKIMBO_CHOICE_OFF: "Off"
 +  STR_FPS_AKIMBO_CHOICE_FULL: "Full"
-+  STR_FPS_AKIMBO_CHOICE_REALISTIC: "Realistic"
++  STR_FPS_AKIMBO_CHOICE_REALISTIC: "One-hand"
 +  STR_FPS_AKIMBO_SETTING_OFF: "Akimbo is off in the settings"
-+  STR_FPS_AKIMBO_REALISTIC: "Realistic akimbo"
++  STR_FPS_AKIMBO_REALISTIC: "One-hand akimbo"
 +  STR_FPS_AKIMBO_NO_AIMED: "Two guns: no aimed shot ({0}: akimbo off)"
 +  STR_FPS_LEAN_SHOTS: "Lean shots"
 +  STR_FPS_LEAN_SHOTS_DESC: "Movement Free: standing to one side of the tile shoots from that side, to peek (the game's own targeting; FPS-style shooting always shoots from the eye)."
@@ -764,7 +764,7 @@ index 000000000..1ba1b342e
 +  STR_FPS_MELEE_FLOORS: "Melee hits floors"
 +  STR_FPS_MELEE_FLOORS_DESC: "With Melee hits walls and downed (or the mod's terrain melee): the floor or ceiling you aim at too."
 +  STR_FPS_AKIMBO_FULL_ON: "FULL AKIMBO"
-+  STR_FPS_AKIMBO_REALISTIC_ON: "REALISTIC AKIMBO"
++  STR_FPS_AKIMBO_REALISTIC_ON: "AKIMBO, ONE-HAND"
 +  STR_FPS_AKIMBO_OFF: "AKIMBO OFF"
 +  STR_FPS_AKIMBO_VOLLEY: "Akimbo volley"
 +  STR_FPS_AKIMBO_VOLLEY_DESC: "NO: two guns take turns round by round, each round landing (its hit, deaths, walls) before the next leaves, as an auto burst's. YES: both at once, their rounds landing together."
@@ -31930,10 +31930,10 @@ index 000000000..e4caa5ea3
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..342975280
+index 000000000..8062ce604
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,4384 @@
+@@ -0,0 +1,4395 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -32461,9 +32461,11 @@ index 000000000..342975280
 + * Akimbo (dual wield, a setting): finds the gun in the other hand, which is drawn on its own
 + * side of the view and fires together with the chosen one.
 + * Both weapons must be firearms; a guided launcher (one with waypoints, like the blaster
-+ * launcher) doesn't count, since its missile is steered on the isometric map. With "Full
-+ * akimbo" any two guns pair up (a two-handed one takes the game's one-handed penalty); with
-+ * "Realistic akimbo" only guns that aren't two-handed do.
++ * launcher) doesn't count, since its missile is steered on the isometric map, and neither does a
++ * gun that blocks both hands (the game's red 2: it won't fire one with the other hand full; a
++ * player's report, GitHub issue #48: the pair was drawn, then refused). With akimbo Full any
++ * other two guns pair up (a two-handed one takes the game's one-handed penalty); with One-handed
++ * only, only guns that aren't two-handed do.
 + * @param unit The soldier.
 + * @param weapon The weapon in the chosen hand.
 + * @return The other hand's gun, or null if akimbo is off or the two don't pair up.
@@ -32489,7 +32491,12 @@ index 000000000..342975280
 +		return nullptr;
 +	}
 +
-+	// Realistic akimbo: a two-handed gun (a rifle, a rocket launcher) fires alone.
++	// A gun that blocks both hands never pairs; with akimbo One-handed only, a two-handed gun (a
++	// rifle, a rocket launcher) fires alone too.
++	if (weapon->getRules()->isBlockingBothHands() || otherWeapon->getRules()->isBlockingBothHands())
++	{
++		return nullptr;
++	}
 +	if (Options::fpsAkimboRealistic && (weapon->getRules()->isTwoHanded() || otherWeapon->getRules()->isTwoHanded()))
 +	{
 +		return nullptr;
@@ -32542,8 +32549,8 @@ index 000000000..342975280
 +/**
 + * Akimbo on the map (the owner: "if we have weapon in each arm there should be a key combo ctrl
 + * shift plus click"): do the soldier's two guns pair up there? Both hands must hold plain guns (not
-+ * a guided launcher, steered by its waypoints), two of them; with "Realistic akimbo" neither may
-+ * be two-handed. "Full akimbo" needn't be on: the mark on the map is the choice.
++ * a guided launcher, steered by its waypoints), two of them, neither blocking both hands (the
++ * game's red 2, GitHub issue #48); with akimbo One-handed only neither may be two-handed. "Full akimbo" needn't be on: the mark on the map is the choice.
 + * @param unit The soldier.
 + * @return True if they pair up.
 + */
@@ -32552,6 +32559,10 @@ index 000000000..342975280
 +	const BattleItem *right = unit ? unit->getRightHandWeapon() : nullptr, *left = unit ? unit->getLeftHandWeapon() : nullptr;
 +	auto plainGun = [](const BattleItem *item) { return item && item->getRules()->getBattleType() == BT_FIREARM && item->getCurrentWaypoints() == 0; };
 +	if (!plainGun(right) || !plainGun(left) || right == left)
++	{
++		return false;
++	}
++	if (right->getRules()->isBlockingBothHands() || left->getRules()->isBlockingBothHands())
 +	{
 +		return false;
 +	}

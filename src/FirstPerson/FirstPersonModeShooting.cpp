@@ -525,9 +525,11 @@ void FirstPersonMode::meleeBlowLanded(BattleItem *weapon)
  * Akimbo (dual wield, a setting): finds the gun in the other hand, which is drawn on its own
  * side of the view and fires together with the chosen one.
  * Both weapons must be firearms; a guided launcher (one with waypoints, like the blaster
- * launcher) doesn't count, since its missile is steered on the isometric map. With "Full
- * akimbo" any two guns pair up (a two-handed one takes the game's one-handed penalty); with
- * "Realistic akimbo" only guns that aren't two-handed do.
+ * launcher) doesn't count, since its missile is steered on the isometric map, and neither does a
+ * gun that blocks both hands (the game's red 2: it won't fire one with the other hand full; a
+ * player's report, GitHub issue #48: the pair was drawn, then refused). With akimbo Full any
+ * other two guns pair up (a two-handed one takes the game's one-handed penalty); with One-handed
+ * only, only guns that aren't two-handed do.
  * @param unit The soldier.
  * @param weapon The weapon in the chosen hand.
  * @return The other hand's gun, or null if akimbo is off or the two don't pair up.
@@ -553,7 +555,12 @@ BattleItem *FirstPersonMode::offHandWeapon(BattleUnit *unit, const BattleItem *w
 		return nullptr;
 	}
 
-	// Realistic akimbo: a two-handed gun (a rifle, a rocket launcher) fires alone.
+	// A gun that blocks both hands never pairs; with akimbo One-handed only, a two-handed gun (a
+	// rifle, a rocket launcher) fires alone too.
+	if (weapon->getRules()->isBlockingBothHands() || otherWeapon->getRules()->isBlockingBothHands())
+	{
+		return nullptr;
+	}
 	if (Options::fpsAkimboRealistic && (weapon->getRules()->isTwoHanded() || otherWeapon->getRules()->isTwoHanded()))
 	{
 		return nullptr;
@@ -606,8 +613,8 @@ void FirstPersonMode::toggleAkimboStyle()
 /**
  * Akimbo on the map (the owner: "if we have weapon in each arm there should be a key combo ctrl
  * shift plus click"): do the soldier's two guns pair up there? Both hands must hold plain guns (not
- * a guided launcher, steered by its waypoints), two of them; with "Realistic akimbo" neither may
- * be two-handed. "Full akimbo" needn't be on: the mark on the map is the choice.
+ * a guided launcher, steered by its waypoints), two of them, neither blocking both hands (the
+ * game's red 2, GitHub issue #48); with akimbo One-handed only neither may be two-handed. "Full akimbo" needn't be on: the mark on the map is the choice.
  * @param unit The soldier.
  * @return True if they pair up.
  */
@@ -616,6 +623,10 @@ bool FirstPersonMode::mapAkimboPairs(const BattleUnit *unit) const
 	const BattleItem *right = unit ? unit->getRightHandWeapon() : nullptr, *left = unit ? unit->getLeftHandWeapon() : nullptr;
 	auto plainGun = [](const BattleItem *item) { return item && item->getRules()->getBattleType() == BT_FIREARM && item->getCurrentWaypoints() == 0; };
 	if (!plainGun(right) || !plainGun(left) || right == left)
+	{
+		return false;
+	}
+	if (right->getRules()->isBlockingBothHands() || left->getRules()->isBlockingBothHands())
 	{
 		return false;
 	}
