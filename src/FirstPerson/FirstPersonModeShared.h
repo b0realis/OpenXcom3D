@@ -328,6 +328,12 @@ const Uint32 ZombieCamTime = 4200;
 const Uint32 BreakdownPauseTime = 2000, BreakdownMinTime = 2600, ComeToTime = 1200;
 
 const double Pi = 3.14159265358979323846;
+/// The ammo tag's colour by damage type (see FirstPersonMode::ammoTag; GitHub issue #51): none, armor piercing (grey-white),
+/// incendiary (red), high explosive (orange), laser (pink), plasma (green), stun (light blue), melee (grey), acid
+/// (yellow-green), smoke (grey); a mod's own types (10 to 19) AmmoTagModColor (purple).
+const Uint8 AmmoTagColors[][3] = { { 200, 200, 200 }, { 225, 225, 225 }, { 240, 60, 40 }, { 255, 150, 40 }, { 255, 110, 170 },
+	{ 90, 230, 90 }, { 110, 190, 255 }, { 170, 170, 170 }, { 190, 230, 60 }, { 170, 170, 170 } };
+const Uint8 AmmoTagModColor[3] = { 190, 120, 255 };
 
 // ---- Colours for our texts and drawings ----
 // The game draws in a 256-colour palette; these find the palette entries closest to a colour.

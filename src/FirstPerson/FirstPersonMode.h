@@ -1029,9 +1029,11 @@ private:
 	/// Fills the info panel for a unit (or hides it).
 	void updateInfoPanel(BattleUnit *unit);
 	/// The soldier card's weapon line: "R: Rifle 17 | 2 clips (40)".
-	std::string weaponLabel(BattleUnit *unit) const;
+	std::string weaponLabel(BattleUnit *unit, int *tagColor = nullptr) const;
 	/// A gun's rounds for a fire mode and the spare clips carried for it: "17 | 2 clips (40)".
-	std::string ammoLabel(const BattleUnit *unit, const BattleItem *weapon, BattleActionType mode, bool &loaded) const;
+	std::string ammoLabel(const BattleUnit *unit, const BattleItem *weapon, BattleActionType mode, bool &loaded, int *tagColor = nullptr) const;
+	/// The loaded clip's damage type in two letters, for a gun taking several: "HE"; empty for none.
+	std::string ammoTag(const BattleItem *weapon, int slot, const BattleItem *clip, Uint8 &color) const;
 	/// Fills one hand's line of the info panel: the item's name and, for a gun, its ammo.
 	void fillHandLine(Text *nameText, Text *ammoText, BattleUnit *unit, BattleItem *item, BattleActionType mode, bool active);
 	/// Shortens a text (ending it in ".") until it fits a width in the small font.

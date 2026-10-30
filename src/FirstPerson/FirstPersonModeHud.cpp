@@ -696,7 +696,8 @@ void FirstPersonMode::fillHandLine(Text *nameText, Text *ammoText, BattleUnit *u
 	// between them), and the ammo goes right after the name.
 	const int gap = 5;
 	bool loaded = true;
-	const std::string ammo = ammoLabel(unit, item, mode, loaded);
+	int tagColor = -1;
+	const std::string ammo = ammoLabel(unit, item, mode, loaded, &tagColor);
 	const int nameRoom = PanelLineW - (ammo.empty() ? 0 : smallTextWidth(ammo) + gap);
 	const std::string name = fitText(handLetter(unit, item) + std::string(_state->tr(item->getRules()->getName())), nameRoom);
 	if (nameText->getText() != name) nameText->setText(name);
@@ -709,6 +710,7 @@ void FirstPersonMode::fillHandLine(Text *nameText, Text *ammoText, BattleUnit *u
 	const Uint8 ammoColor = !loaded ? textColor(palette, 240, 70, 50) : lineColor;
 	if (nameText->getColor() != lineColor) nameText->setColor(lineColor);
 	if (ammoText->getColor() != ammoColor) ammoText->setColor(ammoColor);
+	if (tagColor >= 0 && ammoText->getSecondaryColor() != tagColor) ammoText->setSecondaryColor((Uint8)tagColor); // (the ammo tag, see ammoTag)
 }
 
 /**
@@ -721,14 +723,18 @@ void FirstPersonMode::fillHandLine(Text *nameText, Text *ammoText, BattleUnit *u
  *   out (the game's clip size -1, like the laser weapons), and nothing about clips;
  * - the spare clips are the items in the soldier's inventory (belt, pockets, backpack, the
  *   other hand...) that the gun takes in that slot, by the game's list of compatible ammo (as
- *   reloading and the inventory use it), of whatever kind (armor piercing, incendiary...).
+ *   reloading and the inventory use it), of whatever kind (armor piercing, incendiary...);
+ * - a gun that takes clips of several damage types in that slot says the loaded one's after
+ *   its rounds, in two letters in its colour (see ammoTag): "6 [HE] | 2 clips (12)".
  * @param unit The soldier carrying the gun.
  * @param weapon The item.
  * @param mode The fire mode whose ammo slot to show (BA_NONE: the gun's first shot's).
  * @param loaded Set to false when the gun has no rounds loaded for that mode.
+ * @param tagColor If not null, set to the ammo tag's colour (the text's secondary colour: the tag
+ *   sits between two Unicode::TOK_COLOR_FLIP), a palette index; left alone without a tag.
  * @return The ammo text; empty for an item that isn't a gun.
  */
-std::string FirstPersonMode::ammoLabel(const BattleUnit *unit, const BattleItem *weapon, BattleActionType mode, bool &loaded) const
+std::string FirstPersonMode::ammoLabel(const BattleUnit *unit, const BattleItem *weapon, BattleActionType mode, bool &loaded, int *tagColor) const
 {
 	loaded = true;
 	const RuleItem *rules = weapon->getRules();
@@ -798,6 +804,15 @@ std::string FirstPersonMode::ammoLabel(const BattleUnit *unit, const BattleItem 
 		loaded = clip->getAmmoQuantity() > 0;
 	}
 
+	// The loaded clip's damage type, for a gun that takes several (GitHub issue #51).
+	Uint8 color = 0;
+	const std::string tag = ammoTag(weapon, slot, clip, color);
+	if (!tag.empty())
+	{
+		text += std::string(" ") + Unicode::TOK_COLOR_FLIP + "[" + tag + "]" + Unicode::TOK_COLOR_FLIP;
+		if (tagColor) *tagColor = color;
+	}
+
 	// Rounds built into the gun: no clips to count.
 	if (rules->getCompatibleAmmoForSlot(slot)->empty())
 	{
@@ -818,13 +833,85 @@ std::string FirstPersonMode::ammoLabel(const BattleUnit *unit, const BattleItem 
 }
 
 /**
+ * Names the damage type of the clip loaded in a gun's ammo slot in two letters, for a gun that
+ * takes clips of more than one damage type there (a player, GitHub issue #51: whether a cannon has
+ * normal, explosive or incendiary loaded, at a glance; the owner: two letters in brackets, only for
+ * such guns, coloured): the heavy cannon and auto-cannon (AP, HE, IN), the rocket launcher (small
+ * and large rockets HE, incendiary IN), TFTD's gas cannon, hydro-jet and torpedo launcher; a rifle
+ * or pistol (one type) gets none. The letters come from the type's name as the Ufopaedia gives it
+ * in the game's language (a mod's own names included): the first letters of its first two words,
+ * or a one-word name's first two letters ("ARMOR PIERCING" AP, "HIGH EXPLOSIVE" HE, "INCENDIARY"
+ * IN, "LASER BEAM" LB, X-Com Files' "ELECTRIC" EL); a mod's own type it doesn't name, its number
+ * (10 to 19). The colour is the type's (AmmoTagColors; a mod's own types AmmoTagModColor).
+ * @param weapon The gun.
+ * @param slot Its ammo slot.
+ * @param clip The clip loaded there, or null for none (no tag).
+ * @param color Set to the tag's colour (a group start, see textColor).
+ * @return The two letters; empty for no tag.
+ */
+std::string FirstPersonMode::ammoTag(const BattleItem *weapon, int slot, const BattleItem *clip, Uint8 &color) const
+{
+	if (!clip || !clip->getRules()->getDamageType())
+	{
+		return "";
+	}
+
+	// Only for a gun whose clips for that slot do more than one type of damage.
+	const ItemDamageType type = clip->getRules()->getDamageType()->ResistType;
+	const std::vector<const RuleItem*> *compatible = weapon->getRules()->getCompatibleAmmoForSlot(slot);
+	bool severalTypes = false;
+	for (const RuleItem *ammo : *compatible)
+	{
+		severalTypes |= ammo->getDamageType() && ammo->getDamageType()->ResistType != type;
+	}
+	if (!severalTypes || type <= DT_NONE || type >= DAMAGE_TYPES)
+	{
+		return "";
+	}
+
+	// The letters, from the type's name (the Ufopaedia's strings, as ArticleState::getDamageTypeText).
+	static const char *const typeNames[DAMAGE_TYPES] = { "STR_DAMAGE_NONE", "STR_DAMAGE_ARMOR_PIERCING", "STR_DAMAGE_INCENDIARY",
+		"STR_DAMAGE_HIGH_EXPLOSIVE", "STR_DAMAGE_LASER_BEAM", "STR_DAMAGE_PLASMA_BEAM", "STR_DAMAGE_STUN", "STR_DAMAGE_MELEE",
+		"STR_DAMAGE_ACID", "STR_DAMAGE_SMOKE", "STR_DAMAGE_10", "STR_DAMAGE_11", "STR_DAMAGE_12", "STR_DAMAGE_13", "STR_DAMAGE_14",
+		"STR_DAMAGE_15", "STR_DAMAGE_16", "STR_DAMAGE_17", "STR_DAMAGE_18", "STR_DAMAGE_19" };
+	const std::string name = _state->tr(typeNames[type]);
+	std::string tag;
+	if (name == typeNames[type])
+	{
+		tag = std::to_string((int)type); // (a mod's own type with no name)
+	}
+	else
+	{
+		// The words, split at spaces and hyphens.
+		std::vector<UString> words(1);
+		for (UCode character : Unicode::convUtf8ToUtf32(name))
+		{
+			if (character == ' ' || character == '-') { if (!words.back().empty()) words.emplace_back(); }
+			else words.back() += character;
+		}
+		if (words.back().empty()) words.pop_back();
+		UString letters;
+		if (words.size() >= 2) letters = { words[0][0], words[1][0] };
+		else if (!words.empty()) letters = words[0].substr(0, 2);
+		tag = Unicode::convUtf32ToUtf8(letters);
+		Unicode::upperCase(tag);
+	}
+
+	// The colour.
+	const Uint8 *rgb = type < (int)(sizeof(AmmoTagColors) / sizeof(AmmoTagColors[0])) ? AmmoTagColors[type] : AmmoTagModColor;
+	color = textColor(_state->getPalette(), rgb[0], rgb[1], rgb[2]);
+	return tag;
+}
+
+/**
  * Makes the weapon line of the soldier card: the weapon in the hand that fires, with its ammo
  * (see ammoLabel), such as "R: Rifle 17 | 2 clips (40)" ("L:" for the left hand), the name
  * shortened if the line would not fit the card.
  * @param unit The soldier whose weapon to describe.
+ * @param tagColor If not null, set to the ammo tag's colour, if there is one (see ammoLabel).
  * @return The weapon line, empty if the soldier's hands are empty.
  */
-std::string FirstPersonMode::weaponLabel(BattleUnit *unit) const
+std::string FirstPersonMode::weaponLabel(BattleUnit *unit, int *tagColor) const
 {
 	BattleItem *weapon = activeWeapon(unit);
 	if (!weapon)
@@ -833,7 +920,7 @@ std::string FirstPersonMode::weaponLabel(BattleUnit *unit) const
 	}
 	// The ammo, and the hand and name in the room it leaves on the card (with a space between).
 	bool loaded = true;
-	const std::string ammo = ammoLabel(unit, weapon, BA_NONE, loaded);
+	const std::string ammo = ammoLabel(unit, weapon, BA_NONE, loaded, tagColor);
 	const int nameRoom = CardW - 8 - (ammo.empty() ? 0 : smallTextWidth(" " + ammo));
 	const std::string name = fitText(handLetter(unit, weapon) + std::string(_state->tr(weapon->getRules()->getName())), nameRoom);
 	return ammo.empty() ? name : name + " " + ammo;
@@ -880,6 +967,7 @@ int FirstPersonMode::smallTextWidth(const std::string &text) const
 	int width = 0;
 	for (UCode character : Unicode::convUtf8ToUtf32(text))
 	{
+		if (character == (UCode)Unicode::TOK_COLOR_FLIP) continue; // (a colour change, see ammoTag)
 		width += font->getCharSize(character).w;
 	}
 	return width;
@@ -1187,7 +1275,9 @@ void FirstPersonMode::updateSoldierCard()
 	// The text: name, weapon, and a status that says first whether the soldier has fallen or
 	// been turned.
 	_cardName->setText(unit->getName(_game->getLanguage(), false));
-	_cardWeapon->setText(weaponLabel(unit));
+	int tagColor = -1;
+	_cardWeapon->setText(weaponLabel(unit, &tagColor));
+	if (tagColor >= 0) _cardWeapon->setSecondaryColor((Uint8)tagColor); // (the ammo tag, see ammoTag)
 	const std::string status = state == SQUAD_DEAD ? std::string(_state->tr("STR_FPS_DECEASED"))
 		: state == SQUAD_ZOMBIE ? std::string(_state->tr("STR_FPS_ZOMBIE"))
 		: state == SQUAD_UNCONSCIOUS ? std::string(_state->tr("STR_FPS_UNCONSCIOUS"))

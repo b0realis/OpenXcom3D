@@ -208,7 +208,7 @@ HUD_MARKS = [
     (3, 80, 9, 'LIGHT, END and the rest', 'The suit light, the end of the turn, and when the soldier has them NIGHT VISION and SUIT FLY.'),
     (4, 85, 22, 'The compass', 'Your heading under the white arrow, the way the soldier faces (a yellow triangle), and a shot\'s turn and its cost.'),
     (5, 44, 46, 'The crosshair', 'Its shape is the fire mode; the accuracy line under it; the shot info beside it (mode, hit chance, time units, the other costs below); the name of the unit pointed at under all that.'),
-    (6, 27, 76, 'The soldier', 'Rank and name, what matters now (KNEELING, BURNING, WOUNDS, PANIC), a line per hand with its ammo, the four stat bars.'),
+    (6, 27, 76, 'The soldier', 'Rank and name, what matters now (KNEELING, BURNING, WOUNDS, PANIC), a line per hand with its ammo (a cannon or launcher says the loaded kind: [AP], [HE], [IN]), the four stat bars.'),
     (7, 66, 84, 'The weapon in hand', 'Built in 3D from its inventory picture, its barrel on the line to the crosshair; your shots leave its muzzle.'),
     (8, 92, 61, 'The enemies in sight', 'A red button for each, a red number over its head: click the button, or press 1 to 0, to turn to it.'),
 ]
