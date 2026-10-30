@@ -1505,14 +1505,17 @@ void FirstPersonMode::updateBanner(bool playerTurn)
 		return;
 	}
 	// Glowing letters: a yellow core that pulses towards orange, in a halo going red to purple
-	// (enemy spotted and burning pulse faster, in plain red). The pulse is a sine of the time:
-	// one radian every 160 ms for an alarm, every 450 ms otherwise.
+	// (enemy spotted and burning pulse faster, in plain red; on the civilians' turn the halo goes
+	// between greens, as the map's turn bar turns green then: a player's report, GitHub issue #55).
+	// The pulse is a sine of the time: one radian every 160 ms for an alarm, every 450 ms otherwise.
 	const SDL_Color *palette = _game->getScreen()->getPalette();
 	const bool alarm = playerTurn || burning;
 	const double pulsePhase = SDL_GetTicks() / (alarm ? 160.0 : 450.0);
 	const double pulse = 0.5 + 0.5 * std::sin(pulsePhase);
 	const Uint8 core = pulse > 0.5 ? textColor(palette, 255, 230, 70) : textColor(palette, 255, 170, 40);
+	const bool civiliansTurn = !playerTurn && _save->getSide() == FACTION_NEUTRAL;
 	const Uint8 halo = alarm ? textColor(palette, 240, 40, 30)
+		: civiliansTurn ? (std::sin(pulsePhase * 0.37) > 0 ? textColor(palette, 60, 210, 70) : textColor(palette, 40, 160, 120))
 		: (std::sin(pulsePhase * 0.37) > 0 ? textColor(palette, 235, 50, 40) : textColor(palette, 190, 70, 230));
 	// Recolour only on change (setting a colour redraws the text).
 	if (_txtBanner->getColor() != core)
