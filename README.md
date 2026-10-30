@@ -61,6 +61,15 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 - **Full sprite hitboxes** (a setting, off at first): units are hit, and seen, wherever their full sprites show, for everyone, in 3D and on the map.
 - **Quick deaths** (a setting, off at first): units killed or knocked out are down at once, so bursts fire on and several fall together; your soldier's fall plays on their camera card while the view goes on to the next soldier.
 - **A logo of its own:** the alien in the yellow X, now the icon of the AppImage, the Windows game, the Mac app, the game's window, the menu entry and the web pages.
+- **Playstyle:** one switch at the top of the settings: *Faithful* (the game's own way), *FPS* (FPS-style shooting, free turning and walking, vaulting, leaning, full sprite hitboxes, quick deaths, melee at walls) or *Custom*, your own mix of those, kept across restarts.
+- **The accuracy line shows misses:** with the game's own targeting, beyond the bright middle where a hit lands, a dotted line runs out to where a miss can stray at that hit chance, up to the view's edges.
+- **Instant chain explosions** (a setting, off at first): in 3D, explosive terrain set off by a blast goes up at once, the whole chain in a moment with the same wreckage.
+- **Doom IDCLIP:** a cheat beside IDDQD and IDKFA: walk and float through walls, doors, floors and ceilings; no one falls while it's on.
+- **Crops, rubble and wheat as the map draws them:** parts with no 3D shape in the big mods' data (X-Com Files' and XPiratez's fields, broken glass) stand as their pictures show; wheat as a solid crop block (*See-through crops* makes it faint); leafy crowns for X-Com Files' forest trees.
+- **Deaths in the air come down:** a flying unit killed over no floor falls to the ground with gravity, its collapse playing on the way.
+- **On the HUD:** *Shot damage* (a setting) shows the damage range under the hit chance; *Craft icons* put each soldier's figure on the cards; a gun with several ammo types says the loaded one's ("6 [HE]").
+- **More:** a key to grab the item underfoot (unbound at first); *Auto-equip guns first* (a setting) for the big mods' melee-heavy stores; *Turning costs TU* on by default; the aliens' turn cuts to a soldier shot at by an unseen alien.
+- **Fixed:** melee on big units with full sprite hitboxes; quick deaths' falls at the game's pace; akimbo never pairs a gun that blocks both hands; HIDDEN MOVEMENT glows green on the civilians' turn; no sparks for a missed blow.
 
 ## Earlier versions
 
@@ -109,7 +118,7 @@ OpenXcom3D stems from **OpenXcom Extended** at exactly this commit:
 All changes on top of it are in one file, [`openxcom3d.patch`](openxcom3d.patch) (it applies with `git apply` to a clean checkout of that commit):
 
 - [`src/FirstPerson/`](src/FirstPerson): the 3D view, an engine add-on (renderer, controller, sounds, options), one file per topic and commented throughout;
-- hooks in the core (41 files, about 1,500 lines, most of them the shot's own in `ProjectileFlyBState`): see the patch;
+- hooks in the core (46 files, about 1,700 lines, half of them the shot's own in `ProjectileFlyBState`): see the patch;
 - [`mod/OpenXcom3D/`](mod/OpenXcom3D): the data mod that switches it on.
 
 `src/` and `mod/` in this repository are the same files as in the patch, for reading. Built with `-DOXCE_FIRSTPERSON=OFF`, it is plain OXCE again.
