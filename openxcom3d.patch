@@ -124,7 +124,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..ea2a272e0
+index 000000000..3032c774b
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,438 @@
@@ -232,7 +232,7 @@ index 000000000..ea2a272e0
 +  STR_FPS_UFO_LIGHTS: "UFO lights and aura"
 +  STR_FPS_UFO_LIGHTS_DESC: "UFOs glow: steady hulls, soft lights, coloured light (evenly inside), an aura outside."
 +  STR_FPS_GHOST_PARTS: "Parts without shape"
-+  STR_FPS_GHOST_PARTS_DESC: "Parts without a 3D shape (ladders, lift pads, racks, sludge, railings) shown see-through. Lifts: those; All: any."
++  STR_FPS_GHOST_PARTS_DESC: "Parts without a 3D shape (ladders, lift pads, racks, sludge, railings, crops) shown. Lifts: those; All: any."
 +  STR_FPS_GHOST_PARTS_OFF: "Off"
 +  STR_FPS_GHOST_PARTS_LIFTS: "Lifts"
 +  STR_FPS_GHOST_PARTS_ALL: "All"
@@ -568,7 +568,7 @@ index 000000000..ea2a272e0
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..2d6de63d5
+index 000000000..b4bfc390a
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,438 @@
@@ -676,7 +676,7 @@ index 000000000..2d6de63d5
 +  STR_FPS_UFO_LIGHTS: "UFO lights and aura"
 +  STR_FPS_UFO_LIGHTS_DESC: "UFOs glow: steady hulls, soft lights, colored light (evenly inside), an aura outside."
 +  STR_FPS_GHOST_PARTS: "Parts without shape"
-+  STR_FPS_GHOST_PARTS_DESC: "Parts without a 3D shape (ladders, lift pads, racks, sludge, railings) shown see-through. Lifts: those; All: any."
++  STR_FPS_GHOST_PARTS_DESC: "Parts without a 3D shape (ladders, lift pads, racks, sludge, railings, crops) shown. Lifts: those; All: any."
 +  STR_FPS_GHOST_PARTS_OFF: "Off"
 +  STR_FPS_GHOST_PARTS_LIFTS: "Lifts"
 +  STR_FPS_GHOST_PARTS_ALL: "All"
@@ -40992,10 +40992,10 @@ index 000000000..e70e3e989
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..4e460189f
+index 000000000..f1eb536df
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1237 @@
+@@ -0,0 +1,1238 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -41144,6 +41144,7 @@ index 000000000..4e460189f
 +		Uint8 min[3], max[3];    // inclusive bounds of solid voxels (x, y, z)
 +		bool empty;
 +		bool ghostly;            // a ghost of a part with no voxels (setting "Parts without shape"): seen through on some pixels, never in the way (see buildGhost, buildShape)
++		bool solidGhost;         // a ghost the view draws solid, as the map draws it (low art, as crops: see buildRelief); still never in the way
 +		bool water;              // a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea): its top is drawn as waves (see waterColor)
 +		Uint8 liquidHeight;       // a floor the art draws as a box of liquid (XPiratez's sewer sludge, see liquidHeightOf): its surface's height in voxels; 0 for none
 +		bool artFill;             // a floor or wall whose voxels leave out most of its art (a catwalk's grating, a fence: see sparseArt)
@@ -43704,10 +43705,10 @@ index 000000000..b455e197f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..76e6e0b82
+index 000000000..ff39472d2
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,1616 @@
+@@ -0,0 +1,1617 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -45077,6 +45078,7 @@ index 000000000..76e6e0b82
 +	// the pixels up close, of GhostNearOpacity's 50 (the share is scaled by dividing each pixel's
 +	// dither threshold instead of multiplying the opacity: the same test, see ghostOpacity).
 +	const float ghostScale = std::clamp(Options::fpsGhostOpacity, 10, 100) / (GhostNearOpacity * 100.0f);
++	rayContext.solidGhosts = true; // and the ghosts drawn solid as the map draws them (low art, see buildRelief)
 +
 +	// With a pixel size above 1, one ray colours a block of pixels (pixelSize x pixelSize).
 +	// Auto (0) picks 2 for views bigger than AutoPixelMaxWidth x AutoPixelMaxHeight, else 1.
@@ -45326,10 +45328,10 @@ index 000000000..76e6e0b82
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewRayWalk.h b/src/FirstPerson/FirstPersonViewRayWalk.h
 new file mode 100644
-index 000000000..6e2e26599
+index 000000000..8d7827d8c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayWalk.h
-@@ -0,0 +1,584 @@
+@@ -0,0 +1,586 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -45423,6 +45425,7 @@ index 000000000..6e2e26599
 +	int size[3];                              // the map's size in tiles: x, y, levels
 +	float maxDistance;                        // how far rays go, in voxels
 +	float ghostThreshold = 2.0f;              // a ghost stops the ray where its opacity is above this (the pixel's dither threshold); above 1, never (shadows, aim, flares)
++	bool solidGhosts = false;                 // the view's own rays: a solid ghost (VoxelModel::solidGhost) stops them; never shadows, aim or flares
 +};
 +
 +// How solid a ghost looks (see VoxelModel::ghostly): on what share of the pixels it shows,
@@ -45611,10 +45614,11 @@ index 000000000..6e2e26599
 + * @param enterAxis Axis of the face the ray crossed to enter the tile, -1 at the eye.
 + * @param ghostThreshold A ghost's voxel stops the ray only where its opacity is above this (see
 + *        RayContext::ghostThreshold).
++ * @param solidGhosts Whether a solid ghost's voxel stops the ray (see RayContext::solidGhosts).
 + * @return True if something was hit (the hit is filled in).
 + */
 +inline bool traceTile(const FirstPersonView::TileView &tileView, const FirstPersonView::DoorSwing *swings, const int tileCell[3], const float rayOrigin[3], const float rayDirection[3],
-+	const float inverseDirection[3], float segmentStart, float segmentEnd, int enterAxis, float ghostThreshold, FirstPersonView::Hit &hit)
++	const float inverseDirection[3], float segmentStart, float segmentEnd, int enterAxis, float ghostThreshold, bool solidGhosts, FirstPersonView::Hit &hit)
 +{
 +	// Doors swinging through this tile: the nearest hit shortens the segment, so only what's in
 +	// front of the door can still win.
@@ -45725,9 +45729,9 @@ index 000000000..6e2e26599
 +					color = model->color[localZ][localY][localX];
 +				}
 +				if (!color) continue;
-+				if (model->ghostly && ghostOpacity(distance) <= ghostThreshold)
++				if (model->ghostly && (model->solidGhost ? !solidGhosts : ghostOpacity(distance) <= ghostThreshold))
 +				{
-+					continue; // a ghost, seen through on this pixel
++					continue; // a ghost, seen through on this pixel (a solid one only by shadows, aim and flares)
 +				}
 +				if (model->glass[localZ][localY] & (1 << localX))
 +				{
@@ -45876,7 +45880,7 @@ index 000000000..6e2e26599
 +					smokeWall = addSmoke(*smoke, tileView, distance, tileExit);
 +				}
 +				const float traceEnd = smokeWall >= 0.0f ? smokeWall : tileExit;
-+				if (lookForSolid && traceTile(tileView, context.swings, tileCell, rayOrigin, rayDirection, inverseDirection, distance, traceEnd, enterAxis, context.ghostThreshold, hit))
++				if (lookForSolid && traceTile(tileView, context.swings, tileCell, rayOrigin, rayDirection, inverseDirection, distance, traceEnd, enterAxis, context.ghostThreshold, context.solidGhosts, hit))
 +				{
 +					// Hit something in the tile: only the smoke in front of it counts.
 +					if (traceSmokeHere)
@@ -46640,10 +46644,10 @@ index 000000000..280bc87e2
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..3b2a1edbf
+index 000000000..ac4484eaa
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,445 @@
+@@ -0,0 +1,453 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -46840,6 +46844,14 @@ index 000000000..3b2a1edbf
 +/// than a plain floor.
 +const int LiquidMinHeight = 6, LiquidMaxHeight = 20;
 +const float LiquidOutlineMatch = 0.97f;
++/// Setting "Parts without shape" at Lifts (the default): a part without a shape whose art stays low on its own tile (the
++/// big mods' crops, broken glass; GitHub issues #56, #52) shows too, drawn solid as the map draws it: all but
++/// LowArtOutside of its drawn pixels inside the floor's diamond swept up by LowArtMaxHeight voxels (half a level: knee
++/// to thigh high). Art lying flat inside the diamond is laid in the voxel layer LowArtFlatLayer, on top of a floor's slab
++/// (layers 0-1, see GroundTop), not in it (see buildRelief).
++const int LowArtMaxHeight = 12;
++const float LowArtOutside = 0.03f;
++const int LowArtFlatLayer = 2;
 +const int PlainFloorWalkCost = 4;
 +/// The floor under such a liquid is drawn this many shades darker than the liquid's top, so its
 +/// surface (a ghost, see buildLiquid) reads as a layer above it.
@@ -51685,10 +51697,10 @@ index 000000000..bb0cdd619
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..1853c17c7
+index 000000000..5832a5919
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,2731 @@
+@@ -0,0 +1,2865 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -51932,6 +51944,7 @@ index 000000000..1853c17c7
 +	// Empty, not a ghost, with a bounding box that any solid voxel will shrink onto.
 +	model.empty = true;
 +	model.ghostly = false;
++	model.solidGhost = false;
 +	model.water = false;
 +	model.liquidHeight = 0;
 +	model.artFill = false;
@@ -52515,6 +52528,132 @@ index 000000000..1853c17c7
 +		}
 +	}
 +	model.ghostly = !model.empty;
++}
++
++/**
++ * Does a part without a shape stand low on its own tile (setting "Parts without shape" at Lifts,
++ * asked for objects only: a floor without voxels is drawn as it was,
++ * a player's reports, GitHub issues #56 and #52: X-Com Files' and XPiratez's crops, X-Com Files'
++ * broken glass had no 3D shape and showed as nothing)? Its drawn pixels inside the floor's
++ * diamond (as buildModel projects it: 32 pixels wide, 16 high, its top corner at pixel (16, 24))
++ * swept up by LowArtMaxHeight pixels (a voxel a pixel up), all but LowArtOutside of them: a
++ * crop, a heap, a scatter of glass; not a wall, a lamp post or anything reaching up or beyond.
++ * @param sprite The part's sprite frame.
++ * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
++ * @param rises Set to whether some of it rises above the floor's own diamond (a crop, a heap);
++ *   art lying wholly inside it may be paint on the floor (TFTD's Triton has such a patch by its
++ *   nose), which buildRelief lays on the floor instead of standing it up.
++ * @return True for low art (and some drawn at all).
++ */
++bool lowArt(const Surface *sprite, int yOffset, bool &rises)
++{
++	// Is a pixel inside the floor's diamond lifted by some pixels? On each of the diamond's 16 rows
++	// its half width grows by two pixels a row down to its widest row, then shrinks again.
++	auto inLiftedDiamond = [&](int spriteX, int spriteY, int lift)
++	{
++		const int row = spriteY + lift - 24 - yOffset;
++		const int halfWidth = row < 0 || row > 15 ? -1 : row < 8 ? (row + 1) * 2 : (16 - row) * 2;
++		return halfWidth > 0 && spriteX >= 16 - halfWidth && spriteX < 16 + halfWidth;
++	};
++
++	int inside = 0, outside = 0, rising = 0;
++	for (int spriteY = 0; spriteY < sprite->getHeight(); ++spriteY)
++	{
++		for (int spriteX = 0; spriteX < sprite->getWidth(); ++spriteX)
++		{
++			if (!sprite->getPixel(spriteX, spriteY)) continue;
++			bool low = false;
++			for (int lift = 0; lift <= LowArtMaxHeight && !low; ++lift)
++			{
++				low = inLiftedDiamond(spriteX, spriteY, lift);
++			}
++			(low ? inside : outside) += 1;
++			if (low && !inLiftedDiamond(spriteX, spriteY, 0)) ++rising;
++		}
++	}
++	rises = rising > 0;
++	return inside > 0 && outside <= (inside + outside) * LowArtOutside;
++}
++
++/**
++ * Builds the ghost of low art (see lowArt: a crop, a heap, a scatter of glass) standing up as the
++ * map draws it (the owner: the isometric map is the reference; laid flat, as buildGhost lays a
++ * lift's pad, it sank into the floor under it and showed as nothing). Each column of the sprite
++ * crosses the floor's diamond along one line of voxels, front to back (buildModel's projection).
++ * Read from the bottom up: where a drawn pixel meets the diamond, the run of drawn pixels above it
++ * (at most LowArtMaxHeight + 1) stands there as a column of voxels, each the colour of its pixel;
++ * drawn pixels above that run, where they meet the diamond again, stand further back. From the
++ * map's side it looks as the map draws it; from elsewhere, as thin cards. Art lying flat inside
++ * the floor's diamond (paint on the floor, shards of glass) is laid on the floor instead: one
++ * layer of voxels on top of a floor's slab (LowArtFlatLayer), each the colour of the pixel the
++ * floor shows there. A ghost that the view draws solid, as the map does
++ * (VoxelModel::solidGhost), not seen through on some pixels: in the game nothing stops at it,
++ * but a field of crops is no lift pad to watch through.
++ * @param model The empty model to build it in.
++ * @param sprite The part's sprite frame.
++ * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
++ * @param rises Whether the art rises above the floor's diamond (see lowArt).
++ */
++void buildRelief(FirstPersonView::VoxelModel &model, const Surface *sprite, int yOffset, bool rises)
++{
++	// The colour of a pixel; 0 (transparent) outside the sprite.
++	const int width = sprite->getWidth(), height = sprite->getHeight();
++	auto pixelAt = [&](int spriteX, int spriteY) -> Uint8
++	{
++		return spriteX >= 0 && spriteY >= 0 && spriteX < width && spriteY < height ? sprite->getPixel(spriteX, spriteY) : 0;
++	};
++	// A voxel in the model, its bounds grown round it.
++	auto place = [&](int x, int y, int z, Uint8 color)
++	{
++		model.color[z][y][x] = color;
++		model.empty = false;
++		const int voxel[3] = { x, y, z };
++		for (int boxAxis = 0; boxAxis < 3; ++boxAxis)
++		{
++			model.min[boxAxis] = std::min<int>(model.min[boxAxis], voxel[boxAxis]);
++			model.max[boxAxis] = std::max<int>(model.max[boxAxis], voxel[boxAxis]);
++		}
++	};
++
++	if (!rises)
++	{
++		// Flat: each voxel of the floor's diamond the colour of its pixel, on top of the slab.
++		for (int y = 0; y < 16; ++y)
++		{
++			for (int x = 0; x < 16; ++x)
++			{
++				const Uint8 color = pixelAt(16 + x - y, 24 + (x + y) / 2 + yOffset);
++				if (color) place(x, y, LowArtFlatLayer, color);
++			}
++		}
++		model.ghostly = model.solidGhost = !model.empty;
++		return;
++	}
++
++	for (int spriteX = 0; spriteX < width; ++spriteX)
++	{
++		// The voxels this column crosses: those with x - y = spriteX - 16, one a row, the front
++		// one (the highest x + y) lowest.
++		const int diagonal = spriteX - 16;
++		if (diagonal < -15 || diagonal > 15) continue;
++		int claimedTop = INT_MAX; // the highest row a run nearer the front took
++		for (int y = std::min(15, 15 - diagonal); y >= std::max(0, -diagonal); --y)
++		{
++			const int x = y + diagonal;
++			const int floorRow = 24 + (x + y) / 2 + yOffset;
++			if (floorRow >= claimedTop || !pixelAt(spriteX, floorRow)) continue;
++
++			// The run of drawn pixels up from here, a voxel a pixel.
++			int run = 0;
++			while (run <= LowArtMaxHeight && pixelAt(spriteX, floorRow - run)) ++run;
++			for (int z = 0; z < run; ++z)
++			{
++				place(x, y, z, pixelAt(spriteX, floorRow - z));
++			}
++			claimedTop = floorRow - run + 1;
++		}
++	}
++	model.ghostly = model.solidGhost = !model.empty;
 +}
 +
 +/**
@@ -53337,7 +53476,8 @@ index 000000000..1853c17c7
 +
 +	// No voxels at all, though the map draws it (a ladder, a lift's pad, a wall of laser beams):
 +	// with the setting "Parts without shape" (1: lifts and ladders, the parts with the grav lift
-+	// flag, and cages, as round a lift; 2: all of them), a see-through ghost of its art, with
++	// flag, cages, as round a lift, and low art, as crops, see lowArt; 2: all of them), a
++	// see-through ghost of its art (low art standing up as the map draws it, see buildRelief), with
 +	// the sides the art never shows coloured; no plate fitting, no glow.
 +	// A ghost shape from the mod's table (the shops' racks, see buildShape) is built instead, with
 +	// the setting on at all. Walkable or not, every ghost shows at the setting "Ghost opacity" (the
@@ -53345,13 +53485,19 @@ index 000000000..1853c17c7
 +	if (model.empty)
 +	{
 +		const bool ghostShape = shape && shape->ghost;
++		bool rises = false;
++		const bool low = mapData->getObjectType() == O_OBJECT && lowArt(sprite, yOffset, rises);
 +		const bool ghostWanted = Options::fpsGhostParts == 2
-+			|| (Options::fpsGhostParts == 1 && (ghostShape || mapData->isGravLift() || cageArt(sprite, mapData->getObjectType(), yOffset)));
++			|| (Options::fpsGhostParts == 1 && (ghostShape || mapData->isGravLift() || cageArt(sprite, mapData->getObjectType(), yOffset) || low));
 +		if (ghostWanted && !cutout)
 +		{
 +			if (ghostShape)
 +			{
 +				buildShape(model, sprite, *shape, yOffset);
++			}
++			else if (low)
++			{
++				buildRelief(model, sprite, yOffset, rises);
 +			}
 +			else
 +			{

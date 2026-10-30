@@ -1367,6 +1367,7 @@ void FirstPersonView::renderRows()
 	// the pixels up close, of GhostNearOpacity's 50 (the share is scaled by dividing each pixel's
 	// dither threshold instead of multiplying the opacity: the same test, see ghostOpacity).
 	const float ghostScale = std::clamp(Options::fpsGhostOpacity, 10, 100) / (GhostNearOpacity * 100.0f);
+	rayContext.solidGhosts = true; // and the ghosts drawn solid as the map draws them (low art, see buildRelief)
 
 	// With a pixel size above 1, one ray colours a block of pixels (pixelSize x pixelSize).
 	// Auto (0) picks 2 for views bigger than AutoPixelMaxWidth x AutoPixelMaxHeight, else 1.

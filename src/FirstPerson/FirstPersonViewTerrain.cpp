@@ -241,6 +241,7 @@ void clearModel(FirstPersonView::VoxelModel &model)
 	// Empty, not a ghost, with a bounding box that any solid voxel will shrink onto.
 	model.empty = true;
 	model.ghostly = false;
+	model.solidGhost = false;
 	model.water = false;
 	model.liquidHeight = 0;
 	model.artFill = false;
@@ -824,6 +825,132 @@ void buildShape(FirstPersonView::VoxelModel &model, const Surface *sprite, const
 		}
 	}
 	model.ghostly = !model.empty;
+}
+
+/**
+ * Does a part without a shape stand low on its own tile (setting "Parts without shape" at Lifts,
+ * asked for objects only: a floor without voxels is drawn as it was,
+ * a player's reports, GitHub issues #56 and #52: X-Com Files' and XPiratez's crops, X-Com Files'
+ * broken glass had no 3D shape and showed as nothing)? Its drawn pixels inside the floor's
+ * diamond (as buildModel projects it: 32 pixels wide, 16 high, its top corner at pixel (16, 24))
+ * swept up by LowArtMaxHeight pixels (a voxel a pixel up), all but LowArtOutside of them: a
+ * crop, a heap, a scatter of glass; not a wall, a lamp post or anything reaching up or beyond.
+ * @param sprite The part's sprite frame.
+ * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
+ * @param rises Set to whether some of it rises above the floor's own diamond (a crop, a heap);
+ *   art lying wholly inside it may be paint on the floor (TFTD's Triton has such a patch by its
+ *   nose), which buildRelief lays on the floor instead of standing it up.
+ * @return True for low art (and some drawn at all).
+ */
+bool lowArt(const Surface *sprite, int yOffset, bool &rises)
+{
+	// Is a pixel inside the floor's diamond lifted by some pixels? On each of the diamond's 16 rows
+	// its half width grows by two pixels a row down to its widest row, then shrinks again.
+	auto inLiftedDiamond = [&](int spriteX, int spriteY, int lift)
+	{
+		const int row = spriteY + lift - 24 - yOffset;
+		const int halfWidth = row < 0 || row > 15 ? -1 : row < 8 ? (row + 1) * 2 : (16 - row) * 2;
+		return halfWidth > 0 && spriteX >= 16 - halfWidth && spriteX < 16 + halfWidth;
+	};
+
+	int inside = 0, outside = 0, rising = 0;
+	for (int spriteY = 0; spriteY < sprite->getHeight(); ++spriteY)
+	{
+		for (int spriteX = 0; spriteX < sprite->getWidth(); ++spriteX)
+		{
+			if (!sprite->getPixel(spriteX, spriteY)) continue;
+			bool low = false;
+			for (int lift = 0; lift <= LowArtMaxHeight && !low; ++lift)
+			{
+				low = inLiftedDiamond(spriteX, spriteY, lift);
+			}
+			(low ? inside : outside) += 1;
+			if (low && !inLiftedDiamond(spriteX, spriteY, 0)) ++rising;
+		}
+	}
+	rises = rising > 0;
+	return inside > 0 && outside <= (inside + outside) * LowArtOutside;
+}
+
+/**
+ * Builds the ghost of low art (see lowArt: a crop, a heap, a scatter of glass) standing up as the
+ * map draws it (the owner: the isometric map is the reference; laid flat, as buildGhost lays a
+ * lift's pad, it sank into the floor under it and showed as nothing). Each column of the sprite
+ * crosses the floor's diamond along one line of voxels, front to back (buildModel's projection).
+ * Read from the bottom up: where a drawn pixel meets the diamond, the run of drawn pixels above it
+ * (at most LowArtMaxHeight + 1) stands there as a column of voxels, each the colour of its pixel;
+ * drawn pixels above that run, where they meet the diamond again, stand further back. From the
+ * map's side it looks as the map draws it; from elsewhere, as thin cards. Art lying flat inside
+ * the floor's diamond (paint on the floor, shards of glass) is laid on the floor instead: one
+ * layer of voxels on top of a floor's slab (LowArtFlatLayer), each the colour of the pixel the
+ * floor shows there. A ghost that the view draws solid, as the map does
+ * (VoxelModel::solidGhost), not seen through on some pixels: in the game nothing stops at it,
+ * but a field of crops is no lift pad to watch through.
+ * @param model The empty model to build it in.
+ * @param sprite The part's sprite frame.
+ * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
+ * @param rises Whether the art rises above the floor's diamond (see lowArt).
+ */
+void buildRelief(FirstPersonView::VoxelModel &model, const Surface *sprite, int yOffset, bool rises)
+{
+	// The colour of a pixel; 0 (transparent) outside the sprite.
+	const int width = sprite->getWidth(), height = sprite->getHeight();
+	auto pixelAt = [&](int spriteX, int spriteY) -> Uint8
+	{
+		return spriteX >= 0 && spriteY >= 0 && spriteX < width && spriteY < height ? sprite->getPixel(spriteX, spriteY) : 0;
+	};
+	// A voxel in the model, its bounds grown round it.
+	auto place = [&](int x, int y, int z, Uint8 color)
+	{
+		model.color[z][y][x] = color;
+		model.empty = false;
+		const int voxel[3] = { x, y, z };
+		for (int boxAxis = 0; boxAxis < 3; ++boxAxis)
+		{
+			model.min[boxAxis] = std::min<int>(model.min[boxAxis], voxel[boxAxis]);
+			model.max[boxAxis] = std::max<int>(model.max[boxAxis], voxel[boxAxis]);
+		}
+	};
+
+	if (!rises)
+	{
+		// Flat: each voxel of the floor's diamond the colour of its pixel, on top of the slab.
+		for (int y = 0; y < 16; ++y)
+		{
+			for (int x = 0; x < 16; ++x)
+			{
+				const Uint8 color = pixelAt(16 + x - y, 24 + (x + y) / 2 + yOffset);
+				if (color) place(x, y, LowArtFlatLayer, color);
+			}
+		}
+		model.ghostly = model.solidGhost = !model.empty;
+		return;
+	}
+
+	for (int spriteX = 0; spriteX < width; ++spriteX)
+	{
+		// The voxels this column crosses: those with x - y = spriteX - 16, one a row, the front
+		// one (the highest x + y) lowest.
+		const int diagonal = spriteX - 16;
+		if (diagonal < -15 || diagonal > 15) continue;
+		int claimedTop = INT_MAX; // the highest row a run nearer the front took
+		for (int y = std::min(15, 15 - diagonal); y >= std::max(0, -diagonal); --y)
+		{
+			const int x = y + diagonal;
+			const int floorRow = 24 + (x + y) / 2 + yOffset;
+			if (floorRow >= claimedTop || !pixelAt(spriteX, floorRow)) continue;
+
+			// The run of drawn pixels up from here, a voxel a pixel.
+			int run = 0;
+			while (run <= LowArtMaxHeight && pixelAt(spriteX, floorRow - run)) ++run;
+			for (int z = 0; z < run; ++z)
+			{
+				place(x, y, z, pixelAt(spriteX, floorRow - z));
+			}
+			claimedTop = floorRow - run + 1;
+		}
+	}
+	model.ghostly = model.solidGhost = !model.empty;
 }
 
 /**
@@ -1646,7 +1773,8 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 
 	// No voxels at all, though the map draws it (a ladder, a lift's pad, a wall of laser beams):
 	// with the setting "Parts without shape" (1: lifts and ladders, the parts with the grav lift
-	// flag, and cages, as round a lift; 2: all of them), a see-through ghost of its art, with
+	// flag, cages, as round a lift, and low art, as crops, see lowArt; 2: all of them), a
+	// see-through ghost of its art (low art standing up as the map draws it, see buildRelief), with
 	// the sides the art never shows coloured; no plate fitting, no glow.
 	// A ghost shape from the mod's table (the shops' racks, see buildShape) is built instead, with
 	// the setting on at all. Walkable or not, every ghost shows at the setting "Ghost opacity" (the
@@ -1654,13 +1782,19 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	if (model.empty)
 	{
 		const bool ghostShape = shape && shape->ghost;
+		bool rises = false;
+		const bool low = mapData->getObjectType() == O_OBJECT && lowArt(sprite, yOffset, rises);
 		const bool ghostWanted = Options::fpsGhostParts == 2
-			|| (Options::fpsGhostParts == 1 && (ghostShape || mapData->isGravLift() || cageArt(sprite, mapData->getObjectType(), yOffset)));
+			|| (Options::fpsGhostParts == 1 && (ghostShape || mapData->isGravLift() || cageArt(sprite, mapData->getObjectType(), yOffset) || low));
 		if (ghostWanted && !cutout)
 		{
 			if (ghostShape)
 			{
 				buildShape(model, sprite, *shape, yOffset);
+			}
+			else if (low)
+			{
+				buildRelief(model, sprite, yOffset, rises);
 			}
 			else
 			{

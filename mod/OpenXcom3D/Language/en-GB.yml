@@ -102,7 +102,7 @@ en-GB:
   STR_FPS_UFO_LIGHTS: "UFO lights and aura"
   STR_FPS_UFO_LIGHTS_DESC: "UFOs glow: steady hulls, soft lights, coloured light (evenly inside), an aura outside."
   STR_FPS_GHOST_PARTS: "Parts without shape"
-  STR_FPS_GHOST_PARTS_DESC: "Parts without a 3D shape (ladders, lift pads, racks, sludge, railings) shown see-through. Lifts: those; All: any."
+  STR_FPS_GHOST_PARTS_DESC: "Parts without a 3D shape (ladders, lift pads, racks, sludge, railings, crops) shown. Lifts: those; All: any."
   STR_FPS_GHOST_PARTS_OFF: "Off"
   STR_FPS_GHOST_PARTS_LIFTS: "Lifts"
   STR_FPS_GHOST_PARTS_ALL: "All"

@@ -146,6 +146,7 @@ public:
 		Uint8 min[3], max[3];    // inclusive bounds of solid voxels (x, y, z)
 		bool empty;
 		bool ghostly;            // a ghost of a part with no voxels (setting "Parts without shape"): seen through on some pixels, never in the way (see buildGhost, buildShape)
+		bool solidGhost;         // a ghost the view draws solid, as the map draws it (low art, as crops: see buildRelief); still never in the way
 		bool water;              // a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea): its top is drawn as waves (see waterColor)
 		Uint8 liquidHeight;       // a floor the art draws as a box of liquid (XPiratez's sewer sludge, see liquidHeightOf): its surface's height in voxels; 0 for none
 		bool artFill;             // a floor or wall whose voxels leave out most of its art (a catwalk's grating, a fence: see sparseArt)

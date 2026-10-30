@@ -194,6 +194,14 @@ const float DarkGlowStepLuma = 10.0f;
 /// than a plain floor.
 const int LiquidMinHeight = 6, LiquidMaxHeight = 20;
 const float LiquidOutlineMatch = 0.97f;
+/// Setting "Parts without shape" at Lifts (the default): a part without a shape whose art stays low on its own tile (the
+/// big mods' crops, broken glass; GitHub issues #56, #52) shows too, drawn solid as the map draws it: all but
+/// LowArtOutside of its drawn pixels inside the floor's diamond swept up by LowArtMaxHeight voxels (half a level: knee
+/// to thigh high). Art lying flat inside the diamond is laid in the voxel layer LowArtFlatLayer, on top of a floor's slab
+/// (layers 0-1, see GroundTop), not in it (see buildRelief).
+const int LowArtMaxHeight = 12;
+const float LowArtOutside = 0.03f;
+const int LowArtFlatLayer = 2;
 const int PlainFloorWalkCost = 4;
 /// The floor under such a liquid is drawn this many shades darker than the liquid's top, so its
 /// surface (a ghost, see buildLiquid) reads as a layer above it.
