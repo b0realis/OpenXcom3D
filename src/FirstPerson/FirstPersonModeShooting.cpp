@@ -1059,7 +1059,12 @@ FirstPersonMode::MeleeAim FirstPersonMode::meleeTarget(BattleUnit *unit) const
 				Position originVoxel = origin->getPosition().toVoxel() + Position(8, 8, unit->getHeight() + unit->getFloatHeight() - 4
 					- origin->getTerrainLevel() + unit->getArmor()->getMeleeOriginVoxelVerticalOffset());
 				Position targetVoxel;
-				if (_save->getTileEngine()->canTargetUnit(&originVoxel, target, &targetVoxel, unit, false))
+				// (by the game's own shapes, as its melee reach: setting "Full sprite hitboxes",
+				// see TileEngine::validMeleeRange)
+				const bool shapesBefore = _save->getTileEngine()->setGameShapesOnly(true);
+				const bool reached = _save->getTileEngine()->canTargetUnit(&originVoxel, target, &targetVoxel, unit, false);
+				_save->getTileEngine()->setGameShapesOnly(shapesBefore);
+				if (reached)
 				{
 					aim.direction = unit->getDirection();
 					aim.tile = target->getPosition();

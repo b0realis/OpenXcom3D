@@ -20570,7 +20570,7 @@ index 067c7b3ba..9004c1ea8 100644
  public:
  	/// Creates a new ProjectileFly class
 diff --git a/src/Battlescape/TileEngine.cpp b/src/Battlescape/TileEngine.cpp
-index 6e6846977..a91e65104 100644
+index 6e6846977..25e97568a 100644
 --- a/src/Battlescape/TileEngine.cpp
 +++ b/src/Battlescape/TileEngine.cpp
 @@ -43,6 +43,7 @@
@@ -20591,7 +20591,25 @@ index 6e6846977..a91e65104 100644
  	int relX = floor(((float)relPos.y)*normal+0.5);
  	int relY = floor(((float)-relPos.x)*normal+0.5);
  
-@@ -2207,7 +2209,8 @@ bool TileEngine::canTargetUnit(Position *originVoxel, Tile *tile, Position *scan
+@@ -2189,6 +2191,17 @@ bool TileEngine::canTargetUnit(Position *originVoxel, Tile *tile, Position *scan
+ 
+ 	if (potentialUnit == excludeUnit) return false; //skip self
+ 
++	// (OpenXcom3D: setting "Full sprite hitboxes": a big unit's picture stands in its middle, where
++	// its tiles meet, so the tile's middle can lie short of it, and lines aimed there never reach
++	// it: the scan aims at the unit's middle instead, and a hit on any of its tiles counts
++	// (GitHub issue #57). One-tile units have their middle there already.)
++	const bool spriteAim = !_gameShapesOnly && potentialUnit->getArmor()->getSize() > 1 && FirstPerson::spriteHitboxes(_save->getBattleState());
++	if (spriteAim)
++	{
++		const int bigSize = potentialUnit->getArmor()->getSize();
++		targetVoxel.x = potentialUnit->getPosition().x * 16 + 8 * bigSize;
++		targetVoxel.y = potentialUnit->getPosition().y * 16 + 8 * bigSize;
++	}
+ 	int targetMinHeight = targetVoxel.z - tile->getTerrainLevel();
+ 	targetMinHeight += potentialUnit->getFloatHeight();
+ 
+@@ -2207,7 +2220,8 @@ bool TileEngine::canTargetUnit(Position *originVoxel, Tile *tile, Position *scan
  	}
  	// vector manipulation to make scan work in view-space
  	Position relPos = targetVoxel - *originVoxel;
@@ -20601,7 +20619,26 @@ index 6e6846977..a91e65104 100644
  	int relX = floor(((float)relPos.y)*normal+0.5);
  	int relY = floor(((float)-relPos.x)*normal+0.5);
  
-@@ -3229,7 +3232,7 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
+@@ -2239,7 +2253,17 @@ bool TileEngine::canTargetUnit(Position *originVoxel, Tile *tile, Position *scan
+ 			scanVoxel->y=targetVoxel.y + sliceTargets[j*2+1];
+ 			_trajectory.clear();
+ 			int test = calculateLineVoxel(*originVoxel, *scanVoxel, false, &_trajectory, excludeUnit);
+-			if (test == V_UNIT)
++			if (test == V_UNIT && spriteAim)
++			{
++				// (OpenXcom3D: on any of the big unit's tiles, see above)
++				const Position hitTile = _trajectory.at(0).toTile(), unitAt = potentialUnit->getPosition();
++				if (hitTile.x >= unitAt.x && hitTile.x <= unitAt.x + targetSize && hitTile.y >= unitAt.y && hitTile.y <= unitAt.y + targetSize &&
++					_trajectory.at(0).z >= targetMinHeight && _trajectory.at(0).z <= targetMaxHeight)
++				{
++					return true;
++				}
++			}
++			else if (test == V_UNIT)
+ 			{
+ 				for (int x = 0; x <= targetSize; ++x)
+ 				{
+@@ -3229,7 +3253,7 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
  	}
  
  	voxelCheckFlush();
@@ -20610,7 +20647,7 @@ index 6e6846977..a91e65104 100644
  	const int damage = type->getRandomDamage(power);
  	const int tileFinalDamage = type->getTileFinalDamage(type->getRandomDamageForTile(power, damage));
  	if (part >= V_FLOOR && part <= V_OBJECT)
-@@ -3280,7 +3283,14 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
+@@ -3280,7 +3304,14 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
  			}
  			const int sz = bu->getArmor()->getSize() * 8;
  			const Position target = bu->getPosition().toVoxel() + Position(sz,sz, bu->getFloatHeight() - tile->getTerrainLevel());
@@ -20626,7 +20663,7 @@ index 6e6846977..a91e65104 100644
  
  			hitUnit(attack, bu, relative, damage, type, rangeAtack);
  			if (bu->getFire())
-@@ -4360,6 +4370,9 @@ int TileEngine::calculateLineTile(Position origin, Position target, std::vector<
+@@ -4360,6 +4391,9 @@ int TileEngine::calculateLineTile(Position origin, Position target, std::vector<
  VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool storeTrajectory, std::vector<Position> *trajectory, BattleUnit *excludeUnit, BattleUnit *excludeAllBut, bool onlyVisible)
  {
  	VoxelType result;
@@ -20636,7 +20673,7 @@ index 6e6846977..a91e65104 100644
  	bool excludeAllUnits = false;
  	if (_save->isBeforeGame())
  	{
-@@ -4400,6 +4413,7 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
+@@ -4400,6 +4434,7 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
  			return false;
  		}
  	);
@@ -20644,7 +20681,7 @@ index 6e6846977..a91e65104 100644
  	if (hit)
  	{
  		return result;
-@@ -4526,7 +4540,7 @@ bool TileEngine::isVoxelVisible(Position voxel)
+@@ -4526,7 +4561,7 @@ bool TileEngine::isVoxelVisible(Position voxel)
   * @param excludeAllBut If set, the only unit to be considered for ray hits.
   * @return The objectnumber(0-3) or unit(4) or out of map (5) or -1 (hit nothing).
   */
@@ -20653,21 +20690,36 @@ index 6e6846977..a91e65104 100644
  {
  	if (voxel.x < 0 || voxel.y < 0 || voxel.z < 0) //preliminary out of map
  	{
-@@ -4590,6 +4604,13 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
+@@ -4590,6 +4625,13 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
  
  		if (unit != 0 && !unit->isOut() && unit != excludeUnit && (!excludeAllBut || unit == excludeAllBut) && (!onlyVisible || unit->getVisible() ) )
  		{
 +			// (OpenXcom3D: setting "Full sprite hitboxes": in a line of fire a unit is hit where its
 +			// picture shows, a card through its middle facing the line's start; a shot's impact,
 +			// which its line already found on the unit, is the unit's anywhere in its column.)
-+			if (FirstPerson::spriteHitboxes(_save->getBattleState()) && (impact || _lineOrigin != invalid))
++			if (!_gameShapesOnly && FirstPerson::spriteHitboxes(_save->getBattleState()) && (impact || _lineOrigin != invalid))
 +			{
 +				return FirstPerson::spriteHit(_save, unit, voxel, _lineOrigin, impact) ? V_UNIT : V_EMPTY;
 +			}
  			Position tilepos;
  			Position unitpos = unit->getPosition();
  			int terrainHeight = 0;
-@@ -5867,6 +5888,8 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
+@@ -5383,7 +5425,13 @@ bool TileEngine::validMeleeRange(Position pos, int direction, BattleUnit *attack
+ 						Position originVoxel = Position(origin->getPosition().toVoxel())
+ 							+ Position(8,8,attacker->getHeight() + attacker->getFloatHeight() - 4 -origin->getTerrainLevel() + meleeOriginVoxelVerticalOffset);
+ 						Position targetVoxel;
+-						if (canTargetUnit(&originVoxel, targetTile, &targetVoxel, attacker, false))
++						// (OpenXcom3D: setting "Full sprite hitboxes": melee reach by the game's own shapes,
++						// for everyone: it aims at the tile's middle, short of a big unit's picture,
++						// which stands in the unit's middle (GitHub issue #57).)
++						const bool shapesBefore = setGameShapesOnly(true);
++						const bool reached = canTargetUnit(&originVoxel, targetTile, &targetVoxel, attacker, false);
++						setGameShapesOnly(shapesBefore);
++						if (reached)
+ 						{
+ 							if (dest)
+ 							{
+@@ -5867,6 +5915,8 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
  					originVoxel.z--;
  				}
  				originVoxel.z -= 4;
@@ -20676,7 +20728,7 @@ index 6e6846977..a91e65104 100644
  			}
  		}
  		int direction = getDirectionTo(origin, action.target);
-@@ -5891,6 +5914,12 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
+@@ -5891,6 +5941,12 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
  			originVoxel.y += ((2 * dirYshift[direction] + dirYshift[(direction + 1) % 8]) * action.actor->getArmor()->getSize() + 1) / 3;
  			break;
  		};
@@ -20690,18 +20742,28 @@ index 6e6846977..a91e65104 100644
  	else
  	{
 diff --git a/src/Battlescape/TileEngine.h b/src/Battlescape/TileEngine.h
-index 849787736..b4bdc3044 100644
+index 849787736..b9388fd3c 100644
 --- a/src/Battlescape/TileEngine.h
 +++ b/src/Battlescape/TileEngine.h
-@@ -118,6 +118,7 @@ private:
+@@ -118,6 +118,8 @@ private:
  	Tile *_cacheTile;
  	Tile *_cacheTileBelow;
  	Position _cacheTilePos;
 +	Position _lineOrigin = invalid;    // OpenXcom3D: where the line being walked starts (a unit's picture faces it: setting "Full sprite hitboxes")
++	bool _gameShapesOnly = false;      // OpenXcom3D: lines meet units by the game's own shapes even with "Full sprite hitboxes" (melee reach)
  	const int _maxViewDistance;        // 20 tiles by default
  	const int _maxViewDistanceSq;      // 20 * 20
  	const int _maxVoxelViewDistance;   // maxViewDistance * 16
-@@ -274,7 +275,7 @@ public:
+@@ -258,6 +260,8 @@ public:
+ 
+ 	/// Returns melee validity between two units.
+ 	bool validMeleeRange(BattleUnit *attacker, BattleUnit *target, int dir);
++	/// OpenXcom3D: lines meet units by the game's own shapes, even with "Full sprite hitboxes" (melee reach, see validMeleeRange); returns how it was.
++	bool setGameShapesOnly(bool on) { const bool was = _gameShapesOnly; _gameShapesOnly = on; return was; }
+ 	/// Returns validity of a melee attack from a given position.
+ 	bool validMeleeRange(Position pos, int direction, BattleUnit *attacker, BattleUnit *target, Position *dest, bool preferEnemy = true);
+ 	bool validTerrainMeleeRange(BattleAction* action);
+@@ -274,7 +278,7 @@ public:
  	/// Checks the visibility of a given voxel.
  	bool isVoxelVisible(Position voxel);
  	/// Checks what type of voxel occupies this space.
@@ -31868,10 +31930,10 @@ index 000000000..e4caa5ea3
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..bcef3fcd6
+index 000000000..342975280
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,4379 @@
+@@ -0,0 +1,4384 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -32933,7 +32995,12 @@ index 000000000..bcef3fcd6
 +				Position originVoxel = origin->getPosition().toVoxel() + Position(8, 8, unit->getHeight() + unit->getFloatHeight() - 4
 +					- origin->getTerrainLevel() + unit->getArmor()->getMeleeOriginVoxelVerticalOffset());
 +				Position targetVoxel;
-+				if (_save->getTileEngine()->canTargetUnit(&originVoxel, target, &targetVoxel, unit, false))
++				// (by the game's own shapes, as its melee reach: setting "Full sprite hitboxes",
++				// see TileEngine::validMeleeRange)
++				const bool shapesBefore = _save->getTileEngine()->setGameShapesOnly(true);
++				const bool reached = _save->getTileEngine()->canTargetUnit(&originVoxel, target, &targetVoxel, unit, false);
++				_save->getTileEngine()->setGameShapesOnly(shapesBefore);
++				if (reached)
 +				{
 +					aim.direction = unit->getDirection();
 +					aim.tile = target->getPosition();
