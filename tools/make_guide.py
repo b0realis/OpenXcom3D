@@ -180,6 +180,7 @@ SETTINGS = [
         ('Unit names', 'YES', 'YES / NO', 'The name of the unit you point at, under the crosshair.', ''),
         ('Stat bars', 'Scaled', 'Scaled / Percentage / Game\'s own', 'How the time units, energy, health and morale bars read, on the map and in 3D. Scaled: one scale for all your units, so a 300-HP unit\'s bar shows its loss.',
          'Two soldiers\' bars stay comparable.'),
+        ('Craft icons', 'YES', 'YES / NO', 'On the soldier cards, each soldier\'s figure from the craft screen, where the mod draws one for the armor (X-Com Files, XPiratez).', 'Tells your agents apart at a glance.'),
         ('Hitboxes', 'Aimed at', 'Off / Aimed at / Blink / Always', 'Outlines the voxels a shot can really hit: the unit you aim at, or every unit in sight (blinking or always).', 'Sprites are often taller or wider than what can be hit.'),
         ('Glowing outlines', 'NO', 'YES / NO', 'The hitboxes and a throw\'s path glow.', ''),
         ('Downed unit icons', 'Crosshair', 'Crosshair / Always / Off', 'Icons for an unconscious unit: burning, bleeding, shock, out cold.', 'Know whom to carry out first.'),

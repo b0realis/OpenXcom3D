@@ -571,6 +571,9 @@ void FirstPersonMode::createSoldierCard()
 	_cardRank = new Surface(RankIconW, RankIconH, 0, 0); // (before the name: placed in updateSoldierCard)
 	_state->add(_cardRank);
 	_cardParts.push_back({ _cardRank, 4, 3 - RankIconRise });
+	_cardIcon = new Surface(CraftIconW, CraftIconH, 0, 0); // (before the rank and name, and the weapon line: see updateSoldierCard)
+	_state->add(_cardIcon);
+	_cardParts.push_back({ _cardIcon, CraftIconX, CraftIconY });
 	_cardWeapon = new Text(CardW - 8, 9, 0, 0);
 	_state->add(_cardWeapon, "weapon", "firstPerson");
 	_cardParts.push_back({ _cardWeapon, 4, 12 });

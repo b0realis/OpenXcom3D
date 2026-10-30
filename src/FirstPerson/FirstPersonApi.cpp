@@ -483,6 +483,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	// The shot's damage range under the hit chance, as the map shows it with Alt (a player, GitHub
 	// issue #50; the owner: a setting, off).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshairDamage", &fpsCrosshairDamage, false, "STR_FPS_CROSSHAIR_DAMAGE", category));
+	// The soldier cards show each soldier's little figure from the craft screen, when the mod draws
+	// one for the armor (a player, GitHub issue #53; the owner: the cards only, a setting, on).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsCraftIcons", &fpsCraftIcons, true, "STR_FPS_CRAFT_ICONS", category));
 	// A line under the crosshair as wide as a shot strays to either side: with the game's own
 	// targeting, as far as a successful accuracy roll sends it at that range; in FPS style, the spread.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsAccuracyLine", &fpsAccuracyLine, true, "STR_FPS_ACCURACY_LINE", category));

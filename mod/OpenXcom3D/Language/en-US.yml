@@ -334,6 +334,8 @@ en-US:
   STR_FPS_CROSSHAIR_INFO_DESC: "Fire mode, hit chance and TU cost by the crosshair."
   STR_FPS_CROSSHAIR_COSTS: "Expanded crosshair info"
   STR_FPS_CROSSHAIR_DAMAGE: "Shot damage"
+  STR_FPS_CRAFT_ICONS: "Craft icons"
+  STR_FPS_CRAFT_ICONS_DESC: "On the soldier cards, each soldier's figure from the craft screen, when the mod draws its armor one (X-Com Files)."
   STR_FPS_CROSSHAIR_DAMAGE_DESC: "Under the hit chance, the shot's damage range, as the map shows it with Alt: your soldier's stats, the distance."
   STR_FPS_CROSSHAIR_COSTS_DESC: "Under the shot info, the action's other costs: energy, health, stun, morale, mana."
   STR_FPS_ACCURACY_LINE: "Accuracy line"

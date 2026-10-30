@@ -69,6 +69,7 @@
 #include "../Engine/Options.h"
 #include "../Engine/Screen.h"
 #include "../Engine/SurfaceSet.h"
+#include "../Engine/Palette.h"
 #include "../Engine/Unicode.h"
 #include "../Interface/Bar.h"
 #include "../Interface/BattlescapeButton.h"
@@ -77,6 +78,7 @@
 #include "../Interface/TextButton.h"
 #include "../Mod/Armor.h"
 #include "../Mod/Mod.h"
+#include "../Mod/RuleItem.h"
 #include "../Mod/RuleInterface.h"
 #include "../Savegame/BattleItem.h"
 #include "../Savegame/BattleUnit.h"
@@ -904,12 +906,14 @@ std::string FirstPersonMode::ammoTag(const BattleItem *weapon, int slot, const B
 /**
  * Makes the weapon line of the soldier card: the weapon in the hand that fires, with its ammo
  * (see ammoLabel), such as "R: Rifle 17 | 2 clips (40)" ("L:" for the left hand), the name
- * shortened if the line would not fit the card.
+ * shortened if the line would not fit the card, and the spare clips left out if even then the
+ * name would get under CardWeaponNameMin.
  * @param unit The soldier whose weapon to describe.
  * @param tagColor If not null, set to the ammo tag's colour, if there is one (see ammoLabel).
+ * @param lessRoom How much narrower than the card's text the line is (the craft icon before it).
  * @return The weapon line, empty if the soldier's hands are empty.
  */
-std::string FirstPersonMode::weaponLabel(BattleUnit *unit, int *tagColor) const
+std::string FirstPersonMode::weaponLabel(BattleUnit *unit, int *tagColor, int lessRoom) const
 {
 	BattleItem *weapon = activeWeapon(unit);
 	if (!weapon)
@@ -917,9 +921,17 @@ std::string FirstPersonMode::weaponLabel(BattleUnit *unit, int *tagColor) const
 		return "";
 	}
 	// The ammo, and the hand and name in the room it leaves on the card (with a space between).
+	// With hardly any room left for the name (the craft icon before the line, a long ammo text),
+	// the spare clips go: "R: Heavy C. 6 [AP]".
 	bool loaded = true;
-	const std::string ammo = ammoLabel(unit, weapon, BA_NONE, loaded, tagColor);
-	const int nameRoom = CardW - 8 - (ammo.empty() ? 0 : smallTextWidth(" " + ammo));
+	std::string ammo = ammoLabel(unit, weapon, BA_NONE, loaded, tagColor);
+	int nameRoom = CardW - 8 - lessRoom - (ammo.empty() ? 0 : smallTextWidth(" " + ammo));
+	const size_t spareClips = ammo.find(" | ");
+	if (nameRoom < CardWeaponNameMin && spareClips != std::string::npos)
+	{
+		ammo = ammo.substr(0, spareClips);
+		nameRoom = CardW - 8 - lessRoom - smallTextWidth(" " + ammo);
+	}
 	const std::string name = fitText(handLetter(unit, weapon) + std::string(_state->tr(weapon->getRules()->getName())), nameRoom);
 	return ammo.empty() ? name : name + " " + ammo;
 }
@@ -1052,6 +1064,74 @@ void FirstPersonMode::updateArmorButtons(BattleUnit *unit)
 		_btnLight->invalidate();
 		_btnNight->invalidate();
 	}
+}
+
+/**
+ * A soldier's craft icon (setting "Craft icons"; a player, GitHub issue #53: "Craft icons display
+ * a very low res version of units, which could help distinguish units seperately"; the owner: on
+ * the soldier cards only): the little figure the craft screen shows for the armor the soldier
+ * wears (the armor's customArmorPreviewIndex in the mod's CustomArmorPreviews, its first one), or
+ * for a tank the tank's (its item's customItemPreviewIndex in CustomItemPreviews), only where the
+ * mod draws its own (X-Com Files, XPiratez; the owner: only icons that tell soldiers apart, and
+ * in the original games every soldier shares one). It's the armor's, not the craft's, so a base
+ * defence's soldiers have theirs too. Its colours are the base screens' palette (PAL_BASESCAPE, as
+ * the craft screen draws it), matched to the nearest of the battlescape's; made once per icon.
+ * @param unit The unit.
+ * @return The icon (CraftIconW by CraftIconH), or null for none.
+ */
+Surface *FirstPersonMode::craftIcon(const BattleUnit *unit)
+{
+	if (!unit || !Options::fpsCraftIcons)
+	{
+		return nullptr;
+	}
+
+	// The armor's figure for a soldier, the item's for a tank.
+	SurfaceSet *set = nullptr;
+	int index = Mod::NO_SURFACE, key = 0;
+	if (unit->getGeoscapeSoldier())
+	{
+		const std::vector<int> &indexes = unit->getArmor()->getCustomArmorPreviewIndex();
+		set = _game->getMod()->getSurfaceSet("CustomArmorPreviews", false);
+		index = indexes.empty() ? Mod::NO_SURFACE : indexes.front();
+		key = index;
+	}
+	else if (const RuleItem *item = _game->getMod()->getItem(unit->getType()))
+	{
+		if (item->getVehicleUnit())
+		{
+			const std::vector<int> &indexes = item->getCustomItemPreviewIndex();
+			set = _game->getMod()->getSurfaceSet("CustomItemPreviews", false);
+			index = indexes.empty() ? Mod::NO_SURFACE : indexes.front();
+			key = CraftIconItemKey + index;
+		}
+	}
+	Surface *frame = set && index >= 0 ? set->getFrame(index) : nullptr;
+	if (!frame)
+	{
+		return nullptr;
+	}
+
+	// In the battlescape's colours.
+	auto made = _craftIcons.find(key);
+	if (made != _craftIcons.end())
+	{
+		return made->second.get();
+	}
+	const Palette *basePalette = _game->getMod()->getPalette("PAL_BASESCAPE", false);
+	const SDL_Color *from = basePalette ? basePalette->getColors() : _state->getPalette(), *to = _state->getPalette();
+	auto icon = std::make_unique<Surface>(CraftIconW, CraftIconH, 0, 0);
+	icon->lock();
+	for (int y = 0; y < std::min(CraftIconH, frame->getHeight()); ++y)
+	{
+		for (int x = 0; x < std::min(CraftIconW, frame->getWidth()); ++x)
+		{
+			const Uint8 color = frame->getPixel(x, y);
+			icon->setPixel(x, y, color ? nearestColor(to, from[color].r, from[color].g, from[color].b) : 0);
+		}
+	}
+	icon->unlock();
+	return _craftIcons.emplace(key, std::move(icon)).first->second.get();
 }
 
 /**
@@ -1273,8 +1353,21 @@ void FirstPersonMode::updateSoldierCard()
 	// The text: name, weapon, and a status that says first whether the soldier has fallen or
 	// been turned.
 	_cardName->setText(unit->getName(_game->getLanguage(), false));
+	// The soldier's craft icon first (setting "Craft icons", see craftIcon): the lines move right
+	// of it.
+	Surface *icon = craftIcon(unit);
+	if (icon != _cardIconDrawn)
+	{
+		_cardIconDrawn = icon;
+		_cardIcon->clear();
+		if (icon) icon->blitNShade(_cardIcon, 0, 0);
+	}
+	_cardIcon->setVisible(icon != nullptr);
+	const int iconShift = icon ? CraftIconW + CraftIconGap : 0;
 	int tagColor = -1;
-	_cardWeapon->setText(weaponLabel(unit, &tagColor));
+	_cardWeapon->setText(weaponLabel(unit, &tagColor, iconShift));
+	_cardWeapon->setX(cardX + 4 + iconShift);
+	if (_cardWeapon->getWidth() != CardW - 8 - iconShift) _cardWeapon->setWidth(CardW - 8 - iconShift);
 	if (tagColor >= 0) _cardWeapon->setSecondaryColor((Uint8)tagColor); // (the ammo tag, see ammoTag)
 	const std::string status = state == SQUAD_DEAD ? std::string(_state->tr("STR_FPS_DECEASED"))
 		: state == SQUAD_ZOMBIE ? std::string(_state->tr("STR_FPS_ZOMBIE"))
@@ -1284,14 +1377,14 @@ void FirstPersonMode::updateSoldierCard()
 	_cardStatus->setText(status);
 	// The name gives way to the status beside it (and to the rank before it).
 	const bool rankShown = drawRankIcon(_cardRank, unit);
-	const int nameWidth = CardW - 8 - (status.empty() ? 0 : _cardStatus->getTextWidth() + 4) - (rankShown ? RankIconW + RankIconGap : 0);
+	const int nameWidth = CardW - 8 - iconShift - (status.empty() ? 0 : _cardStatus->getTextWidth() + 4) - (rankShown ? RankIconW + RankIconGap : 0);
 	if (nameWidth != _cardName->getWidth())
 	{
 		_cardName->setWidth(nameWidth);
 	}
 	_cardRank->setVisible(rankShown);
-	_cardRank->setX(cardX + 4);
-	_cardName->setX(cardX + 4 + (rankShown ? RankIconW + RankIconGap : 0)); // (the rank before the name)
+	_cardRank->setX(cardX + 4 + iconShift);
+	_cardName->setX(cardX + 4 + iconShift + (rankShown ? RankIconW + RankIconGap : 0)); // (the icon and rank before the name)
 	if (preview && !live && !deathFeed)
 	{
 		// Static on the dead camera: every pixel a random grey, new every frame (a linear

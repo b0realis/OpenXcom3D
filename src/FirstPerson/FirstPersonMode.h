@@ -987,6 +987,9 @@ private:
 	int _panelNameX = 0;                                // where the panel's name line starts (the rank, then the name)
 	std::unordered_map<Surface*, int> _rankDrawn;       // the rank picture each of those holds (-1: none), so it's drawn only when it changes
 	std::map<int, std::unique_ptr<Surface>> _smallRankBadges; // the battlescape rank badges made small (see smallRankBadge), by sprite
+	std::map<int, std::unique_ptr<Surface>> _craftIcons;     // the craft icons in the battlescape's colours (see craftIcon), by sprite (a tank's plus CraftIconItemKey)
+	const Surface *_cardIconDrawn = nullptr;                  // the craft icon the card's icon holds, so it's drawn only when it changes
+	Surface *_cardIcon = nullptr;                             // the soldier card's craft icon (setting "Craft icons"), before the name
 	Uint32 _cardNoiseSeed = 1;                          // random seed for the card's TV static
 	NumberText *_cardNumbers[4] = {};                   // the four stats
 	Bar *_cardBars[4] = {};                             // and their bars
@@ -1036,7 +1039,9 @@ private:
 	/// Fills the info panel for a unit (or hides it).
 	void updateInfoPanel(BattleUnit *unit);
 	/// The soldier card's weapon line: "R: Rifle 17 | 2 clips (40)".
-	std::string weaponLabel(BattleUnit *unit, int *tagColor = nullptr) const;
+	std::string weaponLabel(BattleUnit *unit, int *tagColor = nullptr, int lessRoom = 0) const;
+	/// A soldier's (or tank's) little figure from the craft screen, in the battlescape's colours; null for none.
+	Surface *craftIcon(const BattleUnit *unit);
 	/// A gun's rounds for a fire mode and the spare clips carried for it: "17 | 2 clips (40)".
 	std::string ammoLabel(const BattleUnit *unit, const BattleItem *weapon, BattleActionType mode, bool &loaded, int *tagColor = nullptr) const;
 	/// The loaded clip's damage type in two letters, for a gun taking several: "HE"; empty for none.

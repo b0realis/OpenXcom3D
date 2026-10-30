@@ -130,6 +130,14 @@ const int RankIconW = 13, RankIconH = 11, RankIconGap = 3;
 /// The badge's top is this many pixels above its text's top, so its bottom row is the letters' bottom
 /// row (a player: it touched the weapon line under the name).
 const int RankIconRise = 3;
+/// A soldier's craft icon on the soldier card (setting "Craft icons", see FirstPersonMode::craftIcon): the craft screen's
+/// figures' size, before the name and weapon lines (which move right by its width and the gap), from the card's top left.
+const int CraftIconW = 12, CraftIconH = 20, CraftIconGap = 2, CraftIconX = 4, CraftIconY = 1;
+/// The soldier card's weapon line leaves out the spare clips when the gun's name would get less room than this (pixels):
+/// "R: Heavy C. 6 [AP]", not "R:. 6 [AP] | 3 clips (18)" (the craft icon before the line takes room).
+const int CardWeaponNameMin = 24;
+/// The key of a tank's craft icon among the soldiers' (FirstPersonMode::_craftIcons): this plus its sprite.
+const int CraftIconItemKey = 1000000;
 /// The map camera's picture (setting "Map camera": small, medium, large; index 0 is off) takes
 /// this share of the canvas's width (96, 128 or 160 pixels on the smallest canvas, 320 wide;
 /// twice that on one 640 wide), in the card camera's proportions, and at most MapCameraMaxHeight

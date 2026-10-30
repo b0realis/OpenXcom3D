@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..bf1d14dce
+index 000000000..0dea18806
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,446 @@
+@@ -0,0 +1,448 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -464,6 +464,8 @@ index 000000000..bf1d14dce
 +  STR_FPS_CROSSHAIR_INFO_DESC: "Fire mode, hit chance and TU cost by the crosshair."
 +  STR_FPS_CROSSHAIR_COSTS: "Expanded crosshair info"
 +  STR_FPS_CROSSHAIR_DAMAGE: "Shot damage"
++  STR_FPS_CRAFT_ICONS: "Craft icons"
++  STR_FPS_CRAFT_ICONS_DESC: "On the soldier cards, each soldier's figure from the craft screen, when the mod draws its armor one (X-Com Files)."
 +  STR_FPS_CROSSHAIR_DAMAGE_DESC: "Under the hit chance, the shot's damage range, as the map shows it with Alt: your soldier's stats, the distance."
 +  STR_FPS_CROSSHAIR_COSTS_DESC: "Under the shot info, the action's other costs: energy, health, stun, morale, mana."
 +  STR_FPS_ACCURACY_LINE: "Accuracy line"
@@ -576,10 +578,10 @@ index 000000000..bf1d14dce
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..6ecb01e8c
+index 000000000..56f3322f4
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,446 @@
+@@ -0,0 +1,448 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -916,6 +918,8 @@ index 000000000..6ecb01e8c
 +  STR_FPS_CROSSHAIR_INFO_DESC: "Fire mode, hit chance and TU cost by the crosshair."
 +  STR_FPS_CROSSHAIR_COSTS: "Expanded crosshair info"
 +  STR_FPS_CROSSHAIR_DAMAGE: "Shot damage"
++  STR_FPS_CRAFT_ICONS: "Craft icons"
++  STR_FPS_CRAFT_ICONS_DESC: "On the soldier cards, each soldier's figure from the craft screen, when the mod draws its armor one (X-Com Files)."
 +  STR_FPS_CROSSHAIR_DAMAGE_DESC: "Under the hit chance, the shot's damage range, as the map shows it with Alt: your soldier's stats, the distance."
 +  STR_FPS_CROSSHAIR_COSTS_DESC: "Under the shot info, the action's other costs: energy, health, stun, morale, mana."
 +  STR_FPS_ACCURACY_LINE: "Accuracy line"
@@ -21474,7 +21478,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..aea852814 100644
+index a08796ced..096212931 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -21491,7 +21495,7 @@ index a08796ced..aea852814 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage;
++OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons;
 +OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
@@ -21579,10 +21583,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..312b87bec
+index 000000000..bb1559774
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,874 @@
+@@ -0,0 +1,877 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -22068,6 +22072,9 @@ index 000000000..312b87bec
 +	// The shot's damage range under the hit chance, as the map shows it with Alt (a player, GitHub
 +	// issue #50; the owner: a setting, off).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshairDamage", &fpsCrosshairDamage, false, "STR_FPS_CROSSHAIR_DAMAGE", category));
++	// The soldier cards show each soldier's little figure from the craft screen, when the mod draws
++	// one for the armor (a player, GitHub issue #53; the owner: the cards only, a setting, on).
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsCraftIcons", &fpsCraftIcons, true, "STR_FPS_CRAFT_ICONS", category));
 +	// A line under the crosshair as wide as a shot strays to either side: with the game's own
 +	// targeting, as far as a successful accuracy roll sends it at that range; in FPS style, the spread.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsAccuracyLine", &fpsAccuracyLine, true, "STR_FPS_ACCURACY_LINE", category));
@@ -22780,10 +22787,10 @@ index 000000000..27f04553d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..0fa98f4b9
+index 000000000..bc6921797
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2746 @@
+@@ -0,0 +1,2749 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -23357,6 +23364,9 @@ index 000000000..0fa98f4b9
 +	_cardRank = new Surface(RankIconW, RankIconH, 0, 0); // (before the name: placed in updateSoldierCard)
 +	_state->add(_cardRank);
 +	_cardParts.push_back({ _cardRank, 4, 3 - RankIconRise });
++	_cardIcon = new Surface(CraftIconW, CraftIconH, 0, 0); // (before the rank and name, and the weapon line: see updateSoldierCard)
++	_state->add(_cardIcon);
++	_cardParts.push_back({ _cardIcon, CraftIconX, CraftIconY });
 +	_cardWeapon = new Text(CardW - 8, 9, 0, 0);
 +	_state->add(_cardWeapon, "weapon", "firstPerson");
 +	_cardParts.push_back({ _cardWeapon, 4, 12 });
@@ -25532,10 +25542,10 @@ index 000000000..0fa98f4b9
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..cc70858e1
+index 000000000..6f5089647
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1197 @@
+@@ -0,0 +1,1202 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -26525,6 +26535,9 @@ index 000000000..cc70858e1
 +	int _panelNameX = 0;                                // where the panel's name line starts (the rank, then the name)
 +	std::unordered_map<Surface*, int> _rankDrawn;       // the rank picture each of those holds (-1: none), so it's drawn only when it changes
 +	std::map<int, std::unique_ptr<Surface>> _smallRankBadges; // the battlescape rank badges made small (see smallRankBadge), by sprite
++	std::map<int, std::unique_ptr<Surface>> _craftIcons;     // the craft icons in the battlescape's colours (see craftIcon), by sprite (a tank's plus CraftIconItemKey)
++	const Surface *_cardIconDrawn = nullptr;                  // the craft icon the card's icon holds, so it's drawn only when it changes
++	Surface *_cardIcon = nullptr;                             // the soldier card's craft icon (setting "Craft icons"), before the name
 +	Uint32 _cardNoiseSeed = 1;                          // random seed for the card's TV static
 +	NumberText *_cardNumbers[4] = {};                   // the four stats
 +	Bar *_cardBars[4] = {};                             // and their bars
@@ -26574,7 +26587,9 @@ index 000000000..cc70858e1
 +	/// Fills the info panel for a unit (or hides it).
 +	void updateInfoPanel(BattleUnit *unit);
 +	/// The soldier card's weapon line: "R: Rifle 17 | 2 clips (40)".
-+	std::string weaponLabel(BattleUnit *unit, int *tagColor = nullptr) const;
++	std::string weaponLabel(BattleUnit *unit, int *tagColor = nullptr, int lessRoom = 0) const;
++	/// A soldier's (or tank's) little figure from the craft screen, in the battlescape's colours; null for none.
++	Surface *craftIcon(const BattleUnit *unit);
 +	/// A gun's rounds for a fire mode and the spare clips carried for it: "17 | 2 clips (40)".
 +	std::string ammoLabel(const BattleUnit *unit, const BattleItem *weapon, BattleActionType mode, bool &loaded, int *tagColor = nullptr) const;
 +	/// The loaded clip's damage type in two letters, for a gun taking several: "HE"; empty for none.
@@ -27601,10 +27616,10 @@ index 000000000..ad3f11493
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..9121dd15e
+index 000000000..fcfc5fcad
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,2120 @@
+@@ -0,0 +1,2213 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -27676,6 +27691,7 @@ index 000000000..9121dd15e
 +#include "../Engine/Options.h"
 +#include "../Engine/Screen.h"
 +#include "../Engine/SurfaceSet.h"
++#include "../Engine/Palette.h"
 +#include "../Engine/Unicode.h"
 +#include "../Interface/Bar.h"
 +#include "../Interface/BattlescapeButton.h"
@@ -27684,6 +27700,7 @@ index 000000000..9121dd15e
 +#include "../Interface/TextButton.h"
 +#include "../Mod/Armor.h"
 +#include "../Mod/Mod.h"
++#include "../Mod/RuleItem.h"
 +#include "../Mod/RuleInterface.h"
 +#include "../Savegame/BattleItem.h"
 +#include "../Savegame/BattleUnit.h"
@@ -28511,12 +28528,14 @@ index 000000000..9121dd15e
 +/**
 + * Makes the weapon line of the soldier card: the weapon in the hand that fires, with its ammo
 + * (see ammoLabel), such as "R: Rifle 17 | 2 clips (40)" ("L:" for the left hand), the name
-+ * shortened if the line would not fit the card.
++ * shortened if the line would not fit the card, and the spare clips left out if even then the
++ * name would get under CardWeaponNameMin.
 + * @param unit The soldier whose weapon to describe.
 + * @param tagColor If not null, set to the ammo tag's colour, if there is one (see ammoLabel).
++ * @param lessRoom How much narrower than the card's text the line is (the craft icon before it).
 + * @return The weapon line, empty if the soldier's hands are empty.
 + */
-+std::string FirstPersonMode::weaponLabel(BattleUnit *unit, int *tagColor) const
++std::string FirstPersonMode::weaponLabel(BattleUnit *unit, int *tagColor, int lessRoom) const
 +{
 +	BattleItem *weapon = activeWeapon(unit);
 +	if (!weapon)
@@ -28524,9 +28543,17 @@ index 000000000..9121dd15e
 +		return "";
 +	}
 +	// The ammo, and the hand and name in the room it leaves on the card (with a space between).
++	// With hardly any room left for the name (the craft icon before the line, a long ammo text),
++	// the spare clips go: "R: Heavy C. 6 [AP]".
 +	bool loaded = true;
-+	const std::string ammo = ammoLabel(unit, weapon, BA_NONE, loaded, tagColor);
-+	const int nameRoom = CardW - 8 - (ammo.empty() ? 0 : smallTextWidth(" " + ammo));
++	std::string ammo = ammoLabel(unit, weapon, BA_NONE, loaded, tagColor);
++	int nameRoom = CardW - 8 - lessRoom - (ammo.empty() ? 0 : smallTextWidth(" " + ammo));
++	const size_t spareClips = ammo.find(" | ");
++	if (nameRoom < CardWeaponNameMin && spareClips != std::string::npos)
++	{
++		ammo = ammo.substr(0, spareClips);
++		nameRoom = CardW - 8 - lessRoom - smallTextWidth(" " + ammo);
++	}
 +	const std::string name = fitText(handLetter(unit, weapon) + std::string(_state->tr(weapon->getRules()->getName())), nameRoom);
 +	return ammo.empty() ? name : name + " " + ammo;
 +}
@@ -28659,6 +28686,74 @@ index 000000000..9121dd15e
 +		_btnLight->invalidate();
 +		_btnNight->invalidate();
 +	}
++}
++
++/**
++ * A soldier's craft icon (setting "Craft icons"; a player, GitHub issue #53: "Craft icons display
++ * a very low res version of units, which could help distinguish units seperately"; the owner: on
++ * the soldier cards only): the little figure the craft screen shows for the armor the soldier
++ * wears (the armor's customArmorPreviewIndex in the mod's CustomArmorPreviews, its first one), or
++ * for a tank the tank's (its item's customItemPreviewIndex in CustomItemPreviews), only where the
++ * mod draws its own (X-Com Files, XPiratez; the owner: only icons that tell soldiers apart, and
++ * in the original games every soldier shares one). It's the armor's, not the craft's, so a base
++ * defence's soldiers have theirs too. Its colours are the base screens' palette (PAL_BASESCAPE, as
++ * the craft screen draws it), matched to the nearest of the battlescape's; made once per icon.
++ * @param unit The unit.
++ * @return The icon (CraftIconW by CraftIconH), or null for none.
++ */
++Surface *FirstPersonMode::craftIcon(const BattleUnit *unit)
++{
++	if (!unit || !Options::fpsCraftIcons)
++	{
++		return nullptr;
++	}
++
++	// The armor's figure for a soldier, the item's for a tank.
++	SurfaceSet *set = nullptr;
++	int index = Mod::NO_SURFACE, key = 0;
++	if (unit->getGeoscapeSoldier())
++	{
++		const std::vector<int> &indexes = unit->getArmor()->getCustomArmorPreviewIndex();
++		set = _game->getMod()->getSurfaceSet("CustomArmorPreviews", false);
++		index = indexes.empty() ? Mod::NO_SURFACE : indexes.front();
++		key = index;
++	}
++	else if (const RuleItem *item = _game->getMod()->getItem(unit->getType()))
++	{
++		if (item->getVehicleUnit())
++		{
++			const std::vector<int> &indexes = item->getCustomItemPreviewIndex();
++			set = _game->getMod()->getSurfaceSet("CustomItemPreviews", false);
++			index = indexes.empty() ? Mod::NO_SURFACE : indexes.front();
++			key = CraftIconItemKey + index;
++		}
++	}
++	Surface *frame = set && index >= 0 ? set->getFrame(index) : nullptr;
++	if (!frame)
++	{
++		return nullptr;
++	}
++
++	// In the battlescape's colours.
++	auto made = _craftIcons.find(key);
++	if (made != _craftIcons.end())
++	{
++		return made->second.get();
++	}
++	const Palette *basePalette = _game->getMod()->getPalette("PAL_BASESCAPE", false);
++	const SDL_Color *from = basePalette ? basePalette->getColors() : _state->getPalette(), *to = _state->getPalette();
++	auto icon = std::make_unique<Surface>(CraftIconW, CraftIconH, 0, 0);
++	icon->lock();
++	for (int y = 0; y < std::min(CraftIconH, frame->getHeight()); ++y)
++	{
++		for (int x = 0; x < std::min(CraftIconW, frame->getWidth()); ++x)
++		{
++			const Uint8 color = frame->getPixel(x, y);
++			icon->setPixel(x, y, color ? nearestColor(to, from[color].r, from[color].g, from[color].b) : 0);
++		}
++	}
++	icon->unlock();
++	return _craftIcons.emplace(key, std::move(icon)).first->second.get();
 +}
 +
 +/**
@@ -28880,8 +28975,21 @@ index 000000000..9121dd15e
 +	// The text: name, weapon, and a status that says first whether the soldier has fallen or
 +	// been turned.
 +	_cardName->setText(unit->getName(_game->getLanguage(), false));
++	// The soldier's craft icon first (setting "Craft icons", see craftIcon): the lines move right
++	// of it.
++	Surface *icon = craftIcon(unit);
++	if (icon != _cardIconDrawn)
++	{
++		_cardIconDrawn = icon;
++		_cardIcon->clear();
++		if (icon) icon->blitNShade(_cardIcon, 0, 0);
++	}
++	_cardIcon->setVisible(icon != nullptr);
++	const int iconShift = icon ? CraftIconW + CraftIconGap : 0;
 +	int tagColor = -1;
-+	_cardWeapon->setText(weaponLabel(unit, &tagColor));
++	_cardWeapon->setText(weaponLabel(unit, &tagColor, iconShift));
++	_cardWeapon->setX(cardX + 4 + iconShift);
++	if (_cardWeapon->getWidth() != CardW - 8 - iconShift) _cardWeapon->setWidth(CardW - 8 - iconShift);
 +	if (tagColor >= 0) _cardWeapon->setSecondaryColor((Uint8)tagColor); // (the ammo tag, see ammoTag)
 +	const std::string status = state == SQUAD_DEAD ? std::string(_state->tr("STR_FPS_DECEASED"))
 +		: state == SQUAD_ZOMBIE ? std::string(_state->tr("STR_FPS_ZOMBIE"))
@@ -28891,14 +28999,14 @@ index 000000000..9121dd15e
 +	_cardStatus->setText(status);
 +	// The name gives way to the status beside it (and to the rank before it).
 +	const bool rankShown = drawRankIcon(_cardRank, unit);
-+	const int nameWidth = CardW - 8 - (status.empty() ? 0 : _cardStatus->getTextWidth() + 4) - (rankShown ? RankIconW + RankIconGap : 0);
++	const int nameWidth = CardW - 8 - iconShift - (status.empty() ? 0 : _cardStatus->getTextWidth() + 4) - (rankShown ? RankIconW + RankIconGap : 0);
 +	if (nameWidth != _cardName->getWidth())
 +	{
 +		_cardName->setWidth(nameWidth);
 +	}
 +	_cardRank->setVisible(rankShown);
-+	_cardRank->setX(cardX + 4);
-+	_cardName->setX(cardX + 4 + (rankShown ? RankIconW + RankIconGap : 0)); // (the rank before the name)
++	_cardRank->setX(cardX + 4 + iconShift);
++	_cardName->setX(cardX + 4 + iconShift + (rankShown ? RankIconW + RankIconGap : 0)); // (the icon and rank before the name)
 +	if (preview && !live && !deathFeed)
 +	{
 +		// Static on the dead camera: every pixel a random grey, new every frame (a linear
@@ -31768,10 +31876,10 @@ index 000000000..1b98a6bd9
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..9f735eaa2
+index 000000000..b37ab62ed
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,436 @@
+@@ -0,0 +1,444 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -31904,6 +32012,14 @@ index 000000000..9f735eaa2
 +/// The badge's top is this many pixels above its text's top, so its bottom row is the letters' bottom
 +/// row (a player: it touched the weapon line under the name).
 +const int RankIconRise = 3;
++/// A soldier's craft icon on the soldier card (setting "Craft icons", see FirstPersonMode::craftIcon): the craft screen's
++/// figures' size, before the name and weapon lines (which move right by its width and the gap), from the card's top left.
++const int CraftIconW = 12, CraftIconH = 20, CraftIconGap = 2, CraftIconX = 4, CraftIconY = 1;
++/// The soldier card's weapon line leaves out the spare clips when the gun's name would get less room than this (pixels):
++/// "R: Heavy C. 6 [AP]", not "R:. 6 [AP] | 3 clips (18)" (the craft icon before the line takes room).
++const int CardWeaponNameMin = 24;
++/// The key of a tank's craft icon among the soldiers' (FirstPersonMode::_craftIcons): this plus its sprite.
++const int CraftIconItemKey = 1000000;
 +/// The map camera's picture (setting "Map camera": small, medium, large; index 0 is off) takes
 +/// this share of the canvas's width (96, 128 or 160 pixels on the smallest canvas, 320 wide;
 +/// twice that on one 640 wide), in the card camera's proportions, and at most MapCameraMaxHeight
@@ -56871,7 +56987,7 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..f40c7145d
+index 000000000..7d411d5d6
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,793 @@
@@ -57095,7 +57211,7 @@ index 000000000..f40c7145d
 +		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
 +			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsParticles", "fpsUfoLights",
 +			"fpsGhostParts", "fpsGhostOpacity", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
-+		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars",
++		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
 +			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsCompass", "fpsMiddleClickIdentify" } },
 +		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds" } },
 +		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
