@@ -136,6 +136,7 @@ SETTINGS = [
         ('Each pellet on its own', 'YES', 'YES / NO', 'A shotgun\'s pellets and an akimbo volley\'s two rounds each land on their own: none lost when the lead pellet leaves the map.',
          'OXCE\'s "shotgun void" closed: shotguns hit as their pellets say.'),
         ('Full sprite hitboxes', 'NO', 'YES / NO', 'Units are hit, and seen, wherever their full sprites show (a card facing whoever fires), for everyone, in 3D and on the map.', 'What you see is what you hit: shots pass between legs and hit arms.'),
+        ('Auto-equip guns first', 'NO', 'YES / NO', 'Soldiers with no saved loadout take guns before melee weapons, in the mod\'s item order. NO: OpenXcom\'s own auto-equip.', 'In XPiratez or X-Com Files OXCE often hands out staffs and swords first.'),
         ('Quick deaths', 'NO', 'YES / NO', 'Units killed or knocked out are down at once: bursts fire on, falls play on their own and together, in 3D and on the map; your soldier falls on their camera card while the view goes on to the next.', 'Doom-style pace: chaingun through a group without waiting for each fall.'),
         ('Unlimited tactical flares', 'YES', 'YES / NO', 'T throws a red flare at the crosshair, free and as often as you like.', 'Lights the 3D view only.'),
         ('Night vision needs gear', 'NO', 'YES / NO', 'Only soldiers with night vision gear (power suits, flying suits...) get NIGHT VISION in 3D. NO: everyone.', 'YES keeps the night dark for the unequipped.'),

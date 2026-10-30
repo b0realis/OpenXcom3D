@@ -359,6 +359,8 @@ en-GB:
   STR_FPS_SPRITE_HITBOXES: "Full sprite hitboxes"
   STR_FPS_SPRITE_HITBOXES_DESC: "Units are hit, and seen, wherever their full sprite shows, for everyone, in 3D and on the map. NO: the game's own hit shapes."
   STR_FPS_QUICK_DEATHS: "Quick deaths"
+  STR_FPS_AUTO_EQUIP_GUNS_FIRST: "Auto-equip guns first"
+  STR_FPS_AUTO_EQUIP_GUNS_FIRST_DESC: "Soldiers with no saved loadout take guns before melee weapons, in the mod's item order. NO: OpenXcom's own."
   STR_FPS_QUICK_DEATHS_DESC: "A unit killed or knocked out is down at once: bursts fire on, falls play on their own, all at once. Your soldier falls on their camera card. NO: one by one."
   STR_FPS_UNIT_NAMES: "Unit names"
   STR_FPS_UNIT_NAMES_DESC: "The name of the unit under the crosshair."

@@ -57,6 +57,7 @@
 #include "../Mod/Mod.h"
 #include "../Mod/RuleDamageType.h"
 #include "../Mod/RuleItem.h"
+#include "../Savegame/BattleItem.h"
 
 namespace OpenXcom
 {
@@ -123,6 +124,68 @@ void destroy(FirstPersonMode *mode)
 bool keepsFacingOnOwnTile()
 {
 	return battleWithView();
+}
+
+/**
+ * Does the game's auto-equip (soldiers with no saved loadout: a New Battle's, or never equipped)
+ * hand out guns before melee weapons, in the mod's own item order (setting "Auto-equip guns
+ * first", a player's report, GitHub issue #46: soldiers in XPiratez and X-Com Files spawned with
+ * claws, shovels and swords)? OXCE counts a two-handed melee weapon as a rifle, handed out first,
+ * and offers the craft's kit in no fixed order. Off (the default), OXCE's own way, unchanged.
+ * @param mod The game's rules (the setting only with the OpenXcom3D mod on).
+ * @return True if guns come first.
+ */
+bool autoEquipGunsFirst(const Mod *mod)
+{
+	return Options::fpsAutoEquipGunsFirst && mod && mod->getFirstPerson().isEnabled();
+}
+
+/**
+ * The kit offered to the auto-equip in the mod's own item order (then by type), the same in every
+ * battle (setting "Auto-equip guns first"; the craft's list follows where its items sit in memory).
+ * @param items The craft's kit.
+ */
+void sortAutoEquip(std::vector<BattleItem*> &items)
+{
+	std::stable_sort(items.begin(), items.end(), [](const BattleItem *a, const BattleItem *b)
+	{
+		const RuleItem *ruleA = a->getRules(), *ruleB = b->getRules();
+		if (ruleA->getListOrder() != ruleB->getListOrder())
+		{
+			return ruleA->getListOrder() < ruleB->getListOrder();
+		}
+		return ruleA->getType() < ruleB->getType();
+	});
+}
+
+/**
+ * Does this pass of the auto-equip take this item (setting "Auto-equip guns first")? The passes:
+ * two-handed guns, one-handed guns, two-handed melee weapons, one-handed melee weapons, ammo, then
+ * the rest (AutoEquipLeftoversPass; a flare only when it's dark enough), as OXCE's rifles,
+ * pistols, ammo and leftovers but guns first. A gun is a firearm with an aimed, snap or auto shot
+ * reaching past AutoEquipGunReach tiles: some mods' melee weapons are firearms whose "shot" is a
+ * lunge of a tile or two (XPiratez: staffs and swords 1 to 3 tiles, whips and flamers up to 12,
+ * bows from 13, guns 40 and more).
+ * @param rule The item.
+ * @param pass The pass, 0 to AutoEquipLeftoversPass.
+ * @param takeFlares Whether it's dark enough for a flare.
+ * @return True if the pass takes it.
+ */
+bool autoEquipTakes(const RuleItem *rule, int pass, bool takeFlares)
+{
+	const int AutoEquipGunReach = 12;
+	const bool isGun = rule->getBattleType() == BT_FIREARM && rule->getMaxRange() > AutoEquipGunReach &&
+		(rule->getCostAimed().Time > 0 || rule->getCostSnap().Time > 0 || rule->getCostAuto().Time > 0);
+	switch (pass)
+	{
+	case 0: return rule->isRifle() && isGun;
+	case 1: return rule->isPistol() && isGun;
+	case 2: return rule->isRifle() && !isGun;
+	case 3: return rule->isPistol() && !isGun;
+	case 4: return rule->getBattleType() == BT_AMMO;
+	case AutoEquipLeftoversPass: return !rule->isPistol() && !rule->isRifle() && (rule->getBattleType() != BT_FLARE || takeFlares);
+	default: return false;
+	}
 }
 
 /**
@@ -335,6 +398,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	// as a shotgun's pellets (YES); either way each less accurate, for the more expensive gun's shot
 	// and a tenth. Its key switches it in play.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsAkimboVolley", &fpsAkimboVolley, false, "STR_FPS_AKIMBO_VOLLEY", category));
+	// The game's auto-equip hands out guns before melee weapons, in the mod's item order (a player's
+	// report, GitHub issue #46; patch 113's way, now a choice). Off: OXCE's own auto-equip, unchanged.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsAutoEquipGunsFirst", &fpsAutoEquipGunsFirst, false, "STR_FPS_AUTO_EQUIP_GUNS_FIRST", category));
 	// Leaning: standing to one side of the tile's middle shoots from that side (the game's
 	// off-centre origins), to peek round corners; and leaning out with the lean keys: off (0),
 	// the eye moves to the side (1, peek), and the view tilts with it (2, tilt).

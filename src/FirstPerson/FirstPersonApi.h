@@ -96,6 +96,9 @@ inline int dualWieldCharge(int chosen, int other)
 	return pair > chosen ? pair - chosen : 0;
 }
 
+/// Setting "Auto-equip guns first": the auto-equip's last pass (the rest of the kit), see autoEquipTakes.
+const int AutoEquipLeftoversPass = 5;
+
 #ifndef OXCE_NO_FIRSTPERSON
 
 // ---- The battlescape screen (BattlescapeState.cpp) ----
@@ -174,6 +177,15 @@ Position spriteHitRelative(const Position &relative, const BattleUnit *unit, con
 /// In a battle with the mod's 3D view, a unit turning to a point on its own tile (straight above
 /// or below it) keeps its facing, where the game turned it south (BattleUnit::directionTo).
 bool keepsFacingOnOwnTile();
+/// Setting "Auto-equip guns first": does the game's auto-equip hand out guns before melee weapons,
+/// in the mod's own item order (BattlescapeGenerator::autoEquip), rather than its own way?
+bool autoEquipGunsFirst(const Mod *mod);
+/// Setting "Auto-equip guns first": the items offered, in the mod's list order (then by type).
+void sortAutoEquip(std::vector<BattleItem*> &items);
+/// Setting "Auto-equip guns first": does this pass of the auto-equip take this item? Passes 0 to
+/// AutoEquipLeftoversPass: two-handed guns, one-handed guns, two-handed melee weapons, one-handed
+/// ones, ammo, the rest (flares only when it's dark enough, takeFlares).
+bool autoEquipTakes(const RuleItem *rule, int pass, bool takeFlares);
 /// Setting "Quick deaths": is a unit killed or knocked out down at once for the battle, its fall
 /// playing on its own (in 3D and on the map, several at once; see FirstPersonQuickDeaths.cpp)?
 bool quickDeaths(BattlescapeState *state);
@@ -280,6 +292,9 @@ inline bool spriteHitboxes(BattlescapeState *) { return false; }
 inline bool spriteHit(SavedBattleGame *, const BattleUnit *, const Position &, const Position &, bool) { return true; }
 inline Position spriteHitRelative(const Position &relative, const BattleUnit *, const BattleUnit *) { return relative; }
 inline bool keepsFacingOnOwnTile() { return false; }
+inline bool autoEquipGunsFirst(const Mod *) { return false; }
+inline void sortAutoEquip(std::vector<BattleItem*> &) { }
+inline bool autoEquipTakes(const RuleItem *, int, bool) { return false; }
 inline bool quickDeaths(BattlescapeState *) { return false; }
 inline void noteQuickFall(const SavedBattleGame *, BattleUnit *) { }
 inline void clearQuickFalls() { }

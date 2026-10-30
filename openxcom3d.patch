@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..d0caec452
+index 000000000..1e60b0bf8
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,436 @@
+@@ -0,0 +1,438 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -489,6 +489,8 @@ index 000000000..d0caec452
 +  STR_FPS_SPRITE_HITBOXES: "Full sprite hitboxes"
 +  STR_FPS_SPRITE_HITBOXES_DESC: "Units are hit, and seen, wherever their full sprite shows, for everyone, in 3D and on the map. NO: the game's own hit shapes."
 +  STR_FPS_QUICK_DEATHS: "Quick deaths"
++  STR_FPS_AUTO_EQUIP_GUNS_FIRST: "Auto-equip guns first"
++  STR_FPS_AUTO_EQUIP_GUNS_FIRST_DESC: "Soldiers with no saved loadout take guns before melee weapons, in the mod's item order. NO: OpenXcom's own."
 +  STR_FPS_QUICK_DEATHS_DESC: "A unit killed or knocked out is down at once: bursts fire on, falls play on their own, all at once. Your soldier falls on their camera card. NO: one by one."
 +  STR_FPS_UNIT_NAMES: "Unit names"
 +  STR_FPS_UNIT_NAMES_DESC: "The name of the unit under the crosshair."
@@ -566,10 +568,10 @@ index 000000000..d0caec452
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..10faafcec
+index 000000000..00b2c03f3
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,436 @@
+@@ -0,0 +1,438 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -931,6 +933,8 @@ index 000000000..10faafcec
 +  STR_FPS_SPRITE_HITBOXES: "Full sprite hitboxes"
 +  STR_FPS_SPRITE_HITBOXES_DESC: "Units are hit, and seen, wherever their full sprite shows, for everyone, in 3D and on the map. NO: the game's own hit shapes."
 +  STR_FPS_QUICK_DEATHS: "Quick deaths"
++  STR_FPS_AUTO_EQUIP_GUNS_FIRST: "Auto-equip guns first"
++  STR_FPS_AUTO_EQUIP_GUNS_FIRST_DESC: "Soldiers with no saved loadout take guns before melee weapons, in the mod's item order. NO: OpenXcom's own."
 +  STR_FPS_QUICK_DEATHS_DESC: "A unit killed or knocked out is down at once: bursts fire on, falls play on their own, all at once. Your soldier falls on their camera card. NO: one by one."
 +  STR_FPS_UNIT_NAMES: "Unit names"
 +  STR_FPS_UNIT_NAMES_DESC: "The name of the unit under the crosshair."
@@ -18439,6 +18443,58 @@ index 7af613cc7..286e4f3a5 100644
  
  	/// Default constructor
  	BattleAction() : target(-1, -1, -1), targeting(false), value(0), diff(0), autoShotCounter(0), cameraPosition(0, 0, -1), desperate(false), finalFacing(-1), finalAction(false), number(0), sprayTargeting(false) { }
+diff --git a/src/Battlescape/BattlescapeGenerator.cpp b/src/Battlescape/BattlescapeGenerator.cpp
+index 1951ba749..c236fa9a9 100644
+--- a/src/Battlescape/BattlescapeGenerator.cpp
++++ b/src/Battlescape/BattlescapeGenerator.cpp
+@@ -62,6 +62,7 @@
+ #include "../Mod/RuleBaseFacility.h"
+ #include "../Mod/Texture.h"
+ #include "Pathfinding.h"
++#include "../FirstPerson/FirstPersonApi.h"
+ 
+ namespace OpenXcom
+ {
+@@ -1350,7 +1351,16 @@ void BattlescapeGenerator::deployXCOM(const RuleStartingCondition* startingCondi
+ void BattlescapeGenerator::autoEquip(std::vector<BattleUnit*> units, Mod *mod, std::vector<BattleItem*> *craftInv,
+ 		RuleInventory *groundRuleInv, int worldShade, bool allowAutoLoadout, bool overrideEquipmentLayout)
+ {
+-	for (int pass = 0; pass < 4; ++pass)
++	// (OpenXcom3D: setting "Auto-equip guns first", off by default (GitHub issue #46): guns before
++	// melee weapons, in the mod's own item order, see FirstPerson::autoEquipTakes; off, the game's
++	// own four passes below, unchanged.)
++	const bool gunsFirst = FirstPerson::autoEquipGunsFirst(mod);
++	if (gunsFirst)
++	{
++		FirstPerson::sortAutoEquip(*craftInv);
++	}
++	const int leftoversPass = gunsFirst ? FirstPerson::AutoEquipLeftoversPass : 3;
++	for (int pass = 0; pass <= leftoversPass; ++pass)
+ 	{
+ 		BattleItem* bi = nullptr;
+ 		for (auto iter = craftInv->begin(); iter != craftInv->end();)
+@@ -1366,7 +1376,11 @@ void BattlescapeGenerator::autoEquip(std::vector<BattleUnit*> units, Mod *mod, s
+ 			{
+ 				bool add = false;
+ 
+-				switch (pass)
++				if (gunsFirst)
++				{
++					add = FirstPerson::autoEquipTakes(bi->getRules(), pass, worldShade > mod->getMaxDarknessToSeeUnits());
++				}
++				else switch (pass)
+ 				{
+ 				// priority 1: rifles.
+ 				case 0:
+@@ -1400,7 +1414,7 @@ void BattlescapeGenerator::autoEquip(std::vector<BattleUnit*> units, Mod *mod, s
+ 						}
+ 						// let's not be greedy, we'll only take a second extra clip
+ 						// if everyone else has had a chance to take a first.
+-						bool allowSecondClip = (pass == 3);
++						bool allowSecondClip = (pass == leftoversPass);
+ 						if (bu->addItem(bi, mod, allowSecondClip, allowAutoLoadout))
+ 						{
+ 							iter = craftInv->erase(iter);
 diff --git a/src/Battlescape/BattlescapeState.cpp b/src/Battlescape/BattlescapeState.cpp
 index 7cd494130..f80b56335 100644
 --- a/src/Battlescape/BattlescapeState.cpp
@@ -21402,7 +21458,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..8fd2a8fc4 100644
+index a08796ced..18896dd11 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -21419,7 +21475,7 @@ index a08796ced..8fd2a8fc4 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine;
++OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine;
 +OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle;
@@ -21507,10 +21563,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..4375df698
+index 000000000..f5cf689ae
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,798 @@
+@@ -0,0 +1,864 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -21570,6 +21626,7 @@ index 000000000..4375df698
 +#include "../Mod/Mod.h"
 +#include "../Mod/RuleDamageType.h"
 +#include "../Mod/RuleItem.h"
++#include "../Savegame/BattleItem.h"
 +
 +namespace OpenXcom
 +{
@@ -21636,6 +21693,68 @@ index 000000000..4375df698
 +bool keepsFacingOnOwnTile()
 +{
 +	return battleWithView();
++}
++
++/**
++ * Does the game's auto-equip (soldiers with no saved loadout: a New Battle's, or never equipped)
++ * hand out guns before melee weapons, in the mod's own item order (setting "Auto-equip guns
++ * first", a player's report, GitHub issue #46: soldiers in XPiratez and X-Com Files spawned with
++ * claws, shovels and swords)? OXCE counts a two-handed melee weapon as a rifle, handed out first,
++ * and offers the craft's kit in no fixed order. Off (the default), OXCE's own way, unchanged.
++ * @param mod The game's rules (the setting only with the OpenXcom3D mod on).
++ * @return True if guns come first.
++ */
++bool autoEquipGunsFirst(const Mod *mod)
++{
++	return Options::fpsAutoEquipGunsFirst && mod && mod->getFirstPerson().isEnabled();
++}
++
++/**
++ * The kit offered to the auto-equip in the mod's own item order (then by type), the same in every
++ * battle (setting "Auto-equip guns first"; the craft's list follows where its items sit in memory).
++ * @param items The craft's kit.
++ */
++void sortAutoEquip(std::vector<BattleItem*> &items)
++{
++	std::stable_sort(items.begin(), items.end(), [](const BattleItem *a, const BattleItem *b)
++	{
++		const RuleItem *ruleA = a->getRules(), *ruleB = b->getRules();
++		if (ruleA->getListOrder() != ruleB->getListOrder())
++		{
++			return ruleA->getListOrder() < ruleB->getListOrder();
++		}
++		return ruleA->getType() < ruleB->getType();
++	});
++}
++
++/**
++ * Does this pass of the auto-equip take this item (setting "Auto-equip guns first")? The passes:
++ * two-handed guns, one-handed guns, two-handed melee weapons, one-handed melee weapons, ammo, then
++ * the rest (AutoEquipLeftoversPass; a flare only when it's dark enough), as OXCE's rifles,
++ * pistols, ammo and leftovers but guns first. A gun is a firearm with an aimed, snap or auto shot
++ * reaching past AutoEquipGunReach tiles: some mods' melee weapons are firearms whose "shot" is a
++ * lunge of a tile or two (XPiratez: staffs and swords 1 to 3 tiles, whips and flamers up to 12,
++ * bows from 13, guns 40 and more).
++ * @param rule The item.
++ * @param pass The pass, 0 to AutoEquipLeftoversPass.
++ * @param takeFlares Whether it's dark enough for a flare.
++ * @return True if the pass takes it.
++ */
++bool autoEquipTakes(const RuleItem *rule, int pass, bool takeFlares)
++{
++	const int AutoEquipGunReach = 12;
++	const bool isGun = rule->getBattleType() == BT_FIREARM && rule->getMaxRange() > AutoEquipGunReach &&
++		(rule->getCostAimed().Time > 0 || rule->getCostSnap().Time > 0 || rule->getCostAuto().Time > 0);
++	switch (pass)
++	{
++	case 0: return rule->isRifle() && isGun;
++	case 1: return rule->isPistol() && isGun;
++	case 2: return rule->isRifle() && !isGun;
++	case 3: return rule->isPistol() && !isGun;
++	case 4: return rule->getBattleType() == BT_AMMO;
++	case AutoEquipLeftoversPass: return !rule->isPistol() && !rule->isRifle() && (rule->getBattleType() != BT_FLARE || takeFlares);
++	default: return false;
++	}
 +}
 +
 +/**
@@ -21848,6 +21967,9 @@ index 000000000..4375df698
 +	// as a shotgun's pellets (YES); either way each less accurate, for the more expensive gun's shot
 +	// and a tenth. Its key switches it in play.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsAkimboVolley", &fpsAkimboVolley, false, "STR_FPS_AKIMBO_VOLLEY", category));
++	// The game's auto-equip hands out guns before melee weapons, in the mod's item order (a player's
++	// report, GitHub issue #46; patch 113's way, now a choice). Off: OXCE's own auto-equip, unchanged.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsAutoEquipGunsFirst", &fpsAutoEquipGunsFirst, false, "STR_FPS_AUTO_EQUIP_GUNS_FIRST", category));
 +	// Leaning: standing to one side of the tile's middle shoots from that side (the game's
 +	// off-centre origins), to peek round corners; and leaning out with the lean keys: off (0),
 +	// the eye moves to the side (1, peek), and the view tilts with it (2, tilt).
@@ -22311,10 +22433,10 @@ index 000000000..4375df698
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..0d861bba0
+index 000000000..27f04553d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,300 @@
+@@ -0,0 +1,315 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -22413,6 +22535,9 @@ index 000000000..0d861bba0
 +	return pair > chosen ? pair - chosen : 0;
 +}
 +
++/// Setting "Auto-equip guns first": the auto-equip's last pass (the rest of the kit), see autoEquipTakes.
++const int AutoEquipLeftoversPass = 5;
++
 +#ifndef OXCE_NO_FIRSTPERSON
 +
 +// ---- The battlescape screen (BattlescapeState.cpp) ----
@@ -22491,6 +22616,15 @@ index 000000000..0d861bba0
 +/// In a battle with the mod's 3D view, a unit turning to a point on its own tile (straight above
 +/// or below it) keeps its facing, where the game turned it south (BattleUnit::directionTo).
 +bool keepsFacingOnOwnTile();
++/// Setting "Auto-equip guns first": does the game's auto-equip hand out guns before melee weapons,
++/// in the mod's own item order (BattlescapeGenerator::autoEquip), rather than its own way?
++bool autoEquipGunsFirst(const Mod *mod);
++/// Setting "Auto-equip guns first": the items offered, in the mod's list order (then by type).
++void sortAutoEquip(std::vector<BattleItem*> &items);
++/// Setting "Auto-equip guns first": does this pass of the auto-equip take this item? Passes 0 to
++/// AutoEquipLeftoversPass: two-handed guns, one-handed guns, two-handed melee weapons, one-handed
++/// ones, ammo, the rest (flares only when it's dark enough, takeFlares).
++bool autoEquipTakes(const RuleItem *rule, int pass, bool takeFlares);
 +/// Setting "Quick deaths": is a unit killed or knocked out down at once for the battle, its fall
 +/// playing on its own (in 3D and on the map, several at once; see FirstPersonQuickDeaths.cpp)?
 +bool quickDeaths(BattlescapeState *state);
@@ -22597,6 +22731,9 @@ index 000000000..0d861bba0
 +inline bool spriteHit(SavedBattleGame *, const BattleUnit *, const Position &, const Position &, bool) { return true; }
 +inline Position spriteHitRelative(const Position &relative, const BattleUnit *, const BattleUnit *) { return relative; }
 +inline bool keepsFacingOnOwnTile() { return false; }
++inline bool autoEquipGunsFirst(const Mod *) { return false; }
++inline void sortAutoEquip(std::vector<BattleItem*> &) { }
++inline bool autoEquipTakes(const RuleItem *, int, bool) { return false; }
 +inline bool quickDeaths(BattlescapeState *) { return false; }
 +inline void noteQuickFall(const SavedBattleGame *, BattleUnit *) { }
 +inline void clearQuickFalls() { }
@@ -56096,7 +56233,7 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..046ce5de7
+index 000000000..cf049f311
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,793 @@
@@ -56316,7 +56453,7 @@ index 000000000..046ce5de7
 +			"fpsFalling", "fpsSafeLanding" } },
 +		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsLean", "fpsMeleeTerrain",
 +			"fpsMeleeFloors", "fpsAimExact", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
-+			"fpsEachPellet", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsFlares", "fpsNightVisionGear" } },
++			"fpsEachPellet", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear" } },
 +		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
 +			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsParticles", "fpsUfoLights",
 +			"fpsGhostParts", "fpsGhostOpacity", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
