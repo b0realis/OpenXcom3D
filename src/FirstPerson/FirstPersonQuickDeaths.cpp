@@ -140,7 +140,7 @@ void clearQuickFalls()
 
 /**
  * How far a unit's quick fall is (setting "Quick deaths"): the frame of its fall to draw, the
- * game's own fall frames at twice its pace (QuickFallFrameTime each), with no turn to face the
+ * game's own fall frames at its own pace (QuickFallFrameTime each), with no turn to face the
  * screen first.
  * @param unit The unit.
  * @return The frame (0 to its armor's death frames less one), or -1 if it isn't falling (never

@@ -124,7 +124,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..3ed1eb9b0
+index 000000000..61b73bd8b
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,436 @@
@@ -489,7 +489,7 @@ index 000000000..3ed1eb9b0
 +  STR_FPS_SPRITE_HITBOXES: "Full sprite hitboxes"
 +  STR_FPS_SPRITE_HITBOXES_DESC: "Units are hit, and seen, wherever their full sprite shows, for everyone, in 3D and on the map. NO: the game's own hit shapes."
 +  STR_FPS_QUICK_DEATHS: "Quick deaths"
-+  STR_FPS_QUICK_DEATHS_DESC: "A unit killed or knocked out is down at once: bursts fire on, falls play quickly, all at once. Your soldier falls on their camera card. NO: one by one."
++  STR_FPS_QUICK_DEATHS_DESC: "A unit killed or knocked out is down at once: bursts fire on, falls play on their own, all at once. Your soldier falls on their camera card. NO: one by one."
 +  STR_FPS_UNIT_NAMES: "Unit names"
 +  STR_FPS_UNIT_NAMES_DESC: "The name of the unit under the crosshair."
 +  STR_FPS_STAT_BARS: "Stat bars"
@@ -566,7 +566,7 @@ index 000000000..3ed1eb9b0
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..cc3277fbc
+index 000000000..1ba1b342e
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,436 @@
@@ -931,7 +931,7 @@ index 000000000..cc3277fbc
 +  STR_FPS_SPRITE_HITBOXES: "Full sprite hitboxes"
 +  STR_FPS_SPRITE_HITBOXES_DESC: "Units are hit, and seen, wherever their full sprite shows, for everyone, in 3D and on the map. NO: the game's own hit shapes."
 +  STR_FPS_QUICK_DEATHS: "Quick deaths"
-+  STR_FPS_QUICK_DEATHS_DESC: "A unit killed or knocked out is down at once: bursts fire on, falls play quickly, all at once. Your soldier falls on their camera card. NO: one by one."
++  STR_FPS_QUICK_DEATHS_DESC: "A unit killed or knocked out is down at once: bursts fire on, falls play on their own, all at once. Your soldier falls on their camera card. NO: one by one."
 +  STR_FPS_UNIT_NAMES: "Unit names"
 +  STR_FPS_UNIT_NAMES_DESC: "The name of the unit under the crosshair."
 +  STR_FPS_STAT_BARS: "Stat bars"
@@ -21507,7 +21507,7 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..010721e5b
+index 000000000..4375df698
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
 @@ -0,0 +1,798 @@
@@ -21961,8 +21961,8 @@ index 000000000..010721e5b
 +	// FirstPersonSpriteHits.cpp), for everyone's shots, in 3D and on the map, instead of the game's
 +	// voxel shapes (the owner's, GitHub issue #42). Off: the game's own.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsSpriteHitboxes", &fpsSpriteHitboxes, false, "STR_FPS_SPRITE_HITBOXES", category));
-+	// A unit killed or knocked out down at once for the battle, its fall playing on its own (twice
-+	// as fast, no turn to face the screen), several at once, in 3D and on the map; the soldier
++	// A unit killed or knocked out down at once for the battle, its fall playing on its own (at the
++	// game's pace, no turn to face the screen), several at once, in 3D and on the map; the soldier
 +	// looked through falls on their helmet camera card while the view goes on to the next (a
 +	// player's report, GitHub issue #40). Off: the game's own deaths, one by one.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsQuickDeaths", &fpsQuickDeaths, false, "STR_FPS_QUICK_DEATHS", category));
@@ -38818,7 +38818,7 @@ index 000000000..228618946
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonQuickDeaths.cpp b/src/FirstPerson/FirstPersonQuickDeaths.cpp
 new file mode 100644
-index 000000000..9a63dc355
+index 000000000..82232d544
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonQuickDeaths.cpp
 @@ -0,0 +1,228 @@
@@ -38964,7 +38964,7 @@ index 000000000..9a63dc355
 +
 +/**
 + * How far a unit's quick fall is (setting "Quick deaths"): the frame of its fall to draw, the
-+ * game's own fall frames at twice its pace (QuickFallFrameTime each), with no turn to face the
++ * game's own fall frames at its own pace (QuickFallFrameTime each), with no turn to face the
 + * screen first.
 + * @param unit The unit.
 + * @return The frame (0 to its armor's death frames less one), or -1 if it isn't falling (never
@@ -46474,7 +46474,7 @@ index 000000000..280bc87e2
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..34be5cbee
+index 000000000..3b2a1edbf
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
 @@ -0,0 +1,445 @@
@@ -46615,10 +46615,10 @@ index 000000000..34be5cbee
 +/// shooter for the armour side and body part it hits, in voxels (about the radius of the game's hit shape of a
 +/// soldier, which would have stopped the round on its near side; see FirstPerson::spriteHitRelative).
 +const double SpriteHitPush = 6.0;
-+/// Setting "Quick deaths" (see FirstPersonQuickDeaths.cpp): how long each frame of a quick fall shows (ms: twice the
-+/// game's pace, BattlescapeState::DEFAULT_ANIM_SPEED a frame), and the most fall frames it shows (a fall is surely over
-+/// after that many: the armors have 3 or so, mods may give more).
-+const Uint32 QuickFallFrameTime = 50;
++/// Setting "Quick deaths" (see FirstPersonQuickDeaths.cpp): how long each frame of a quick fall shows (ms: the game's own
++/// pace, BattlescapeState::DEFAULT_ANIM_SPEED a frame; GitHub issue #58: the fall needn't hurry, nothing waits for it),
++/// and the most fall frames it shows (a fall is surely over after that many: the armors have 3 or so, mods may give more).
++const Uint32 QuickFallFrameTime = 100;
 +const int QuickFallMaxFrames = 32;
 +/// Sprites stand like cards facing the camera, leaning with the view's pitch; looking down
 +/// further than this many degrees, a card leans only this far, so it stays above the floor

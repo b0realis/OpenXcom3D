@@ -135,10 +135,10 @@ const double SpriteHitSlab = 0.8;
 /// shooter for the armour side and body part it hits, in voxels (about the radius of the game's hit shape of a
 /// soldier, which would have stopped the round on its near side; see FirstPerson::spriteHitRelative).
 const double SpriteHitPush = 6.0;
-/// Setting "Quick deaths" (see FirstPersonQuickDeaths.cpp): how long each frame of a quick fall shows (ms: twice the
-/// game's pace, BattlescapeState::DEFAULT_ANIM_SPEED a frame), and the most fall frames it shows (a fall is surely over
-/// after that many: the armors have 3 or so, mods may give more).
-const Uint32 QuickFallFrameTime = 50;
+/// Setting "Quick deaths" (see FirstPersonQuickDeaths.cpp): how long each frame of a quick fall shows (ms: the game's own
+/// pace, BattlescapeState::DEFAULT_ANIM_SPEED a frame; GitHub issue #58: the fall needn't hurry, nothing waits for it),
+/// and the most fall frames it shows (a fall is surely over after that many: the armors have 3 or so, mods may give more).
+const Uint32 QuickFallFrameTime = 100;
 const int QuickFallMaxFrames = 32;
 /// Sprites stand like cards facing the camera, leaning with the view's pitch; looking down
 /// further than this many degrees, a card leans only this far, so it stays above the floor
