@@ -2208,6 +2208,12 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 		if (pressed) toggleMapCamera();
 		return true;
 	}
+	// The grab key (no key until the player gives it one) works in both views too.
+	if (key != SDLK_UNKNOWN && key == Options::keyFpsGrabItem)
+	{
+		if (pressed) grabItemUnderfoot(action);
+		return true;
+	}
 	if (!active)
 	{
 		return false;

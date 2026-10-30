@@ -594,6 +594,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	// Opening doors (O, as E is the game's "use right hand"), flares, flight, jumping, night
 	// vision, going up and down a level, and doom mode.
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsOpenDoor", &keyFpsOpenDoor, SDLK_o, "STR_FPS_KEY_OPEN_DOOR", category));
+	// Grabbing the item underfoot into a free hand, in 3D and on the map (GitHub issue #54): no key until
+	// the player gives it one (every letter is the game's or ours).
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsGrabItem", &keyFpsGrabItem, SDLK_UNKNOWN, "STR_FPS_KEY_GRAB_ITEM", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlare", &keyFpsFlare, SDLK_t, "STR_FPS_KEY_FLARE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlight", &keyFpsFlight, SDLK_b, "STR_FPS_KEY_FLIGHT", category));
 	// The flashlight on and off (F, as in the first-person shooters; setting "Flashlight").

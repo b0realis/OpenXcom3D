@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..8c69e5845
+index 000000000..22aa7c8b0
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,440 @@
+@@ -0,0 +1,444 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -257,6 +257,10 @@ index 000000000..8c69e5845
 +  STR_FPS_MAP_CAMERA_SHOWN: "Map camera on: {0} hides it"
 +  STR_FPS_MAP_CAMERA_HIDDEN: "Map camera off: {0} shows it"
 +  STR_FPS_KEY_OPEN_DOOR: "Open door"
++  STR_FPS_KEY_GRAB_ITEM: "Grab item underfoot"
++  STR_FPS_KEY_GRAB_ITEM_DESC: "One item at your feet and a free hand: takes it into that hand (costs TU). More, or no free hand: the inventory."
++  STR_FPS_NOTHING_UNDERFOOT: "NOTHING UNDERFOOT"
++  STR_FPS_ITEM_GRABBED: "{0} TAKEN"
 +  STR_FPS_KEY_SHOW_FACING: "Show facing"
 +  STR_FPS_KEY_SHOW_FACING_DESC: "Held: a ring with an arrow on the floor round every unit in sight shows which way it faces, in its side's colour, over everything."
 +  STR_FPS_KEY_OPEN_DOOR_DESC: "Opens the door you look at, within reach, without walking in (costs TU)."
@@ -570,10 +574,10 @@ index 000000000..8c69e5845
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..d300ae517
+index 000000000..27d5adee0
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,440 @@
+@@ -0,0 +1,444 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -703,6 +707,10 @@ index 000000000..d300ae517
 +  STR_FPS_MAP_CAMERA_SHOWN: "Map camera on: {0} hides it"
 +  STR_FPS_MAP_CAMERA_HIDDEN: "Map camera off: {0} shows it"
 +  STR_FPS_KEY_OPEN_DOOR: "Open door"
++  STR_FPS_KEY_GRAB_ITEM: "Grab item underfoot"
++  STR_FPS_KEY_GRAB_ITEM_DESC: "One item at your feet and a free hand: takes it into that hand (costs TU). More, or no free hand: the inventory."
++  STR_FPS_NOTHING_UNDERFOOT: "NOTHING UNDERFOOT"
++  STR_FPS_ITEM_GRABBED: "{0} TAKEN"
 +  STR_FPS_KEY_SHOW_FACING: "Show facing"
 +  STR_FPS_KEY_SHOW_FACING_DESC: "Held: a ring with an arrow on the floor round every unit in sight shows which way it faces, in its side's colour, over everything."
 +  STR_FPS_KEY_OPEN_DOOR_DESC: "Opens the door you look at, within reach, without walking in (costs TU)."
@@ -21462,7 +21470,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..3d08a660f 100644
+index a08796ced..300d3f4d0 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -21482,7 +21490,7 @@ index a08796ced..3d08a660f 100644
 +OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops;
 +OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode;
-+OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle;
++OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
 diff --git a/src/Engine/Script.h b/src/Engine/Script.h
 index e11f89dde..5658639bc 100644
 --- a/src/Engine/Script.h
@@ -21567,10 +21575,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..7f18a5f50
+index 000000000..a5632dc5e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,868 @@
+@@ -0,0 +1,871 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -22167,6 +22175,9 @@ index 000000000..7f18a5f50
 +	// Opening doors (O, as E is the game's "use right hand"), flares, flight, jumping, night
 +	// vision, going up and down a level, and doom mode.
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsOpenDoor", &keyFpsOpenDoor, SDLK_o, "STR_FPS_KEY_OPEN_DOOR", category));
++	// Grabbing the item underfoot into a free hand, in 3D and on the map (GitHub issue #54): no key until
++	// the player gives it one (every letter is the game's or ours).
++	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsGrabItem", &keyFpsGrabItem, SDLK_UNKNOWN, "STR_FPS_KEY_GRAB_ITEM", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlare", &keyFpsFlare, SDLK_t, "STR_FPS_KEY_FLARE", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlight", &keyFpsFlight, SDLK_b, "STR_FPS_KEY_FLIGHT", category));
 +	// The flashlight on and off (F, as in the first-person shooters; setting "Flashlight").
@@ -22762,10 +22773,10 @@ index 000000000..27f04553d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..792eb3073
+index 000000000..caf7c42e3
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2737 @@
+@@ -0,0 +1,2743 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24976,6 +24987,12 @@ index 000000000..792eb3073
 +		if (pressed) toggleMapCamera();
 +		return true;
 +	}
++	// The grab key (no key until the player gives it one) works in both views too.
++	if (key != SDLK_UNKNOWN && key == Options::keyFpsGrabItem)
++	{
++		if (pressed) grabItemUnderfoot(action);
++		return true;
++	}
 +	if (!active)
 +	{
 +		return false;
@@ -25505,10 +25522,10 @@ index 000000000..792eb3073
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..acd8f7c1e
+index 000000000..f58a227f8
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1186 @@
+@@ -0,0 +1,1188 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -26257,6 +26274,8 @@ index 000000000..acd8f7c1e
 +	void selectFireMode(BattleActionType mode);
 +	/// Switches the weapon hand.
 +	void switchHand();
++	/// Grabs the lone item at the soldier's feet into a free hand, or opens the inventory.
++	void grabItemUnderfoot(Action *action);
 +	/// Notes what's under the crosshair this frame.
 +	void updateAim(BattleUnit *unit);
 +	/// A spray burst being marked: its points and the next one, for the view to draw.
@@ -32078,10 +32097,10 @@ index 000000000..e4caa5ea3
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..8062ce604
+index 000000000..bfc96d5d3
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,4395 @@
+@@ -0,0 +1,4457 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -32167,6 +32186,7 @@ index 000000000..8062ce604
 +#include "../Interface/Text.h"
 +#include "../Mod/RuleInterface.h"
 +#include "../Mod/Mod.h"
++#include "../Mod/RuleInventory.h"
 +#include "../Mod/RuleDamageType.h"
 +#include "../Mod/Unit.h"
 +#include "../Savegame/BattleItem.h"
@@ -33094,6 +33114,67 @@ index 000000000..8062ce604
 +		}
 +	}
 +	_fireModeWeapon = nullptr; // forces a fresh fire mode for whatever is in the new hand
++}
++
++/**
++ * Grabs the item at the selected soldier's feet (the key "Grab item underfoot", none until the
++ * player gives it one; a player, GitHub issue #54: "assuming a singular item is under a units feet,
++ * pressing it automatically grabs and puts into empty hand. Assuming multiple items, or full hands,
++ * opens inventory"), in 3D and on the map:
++ * - one item on his tile and a hand that takes it: into that hand, the right one first, for the
++ *   game's time units for that move (the inventory's own cost, ground to hand); not beside a gun
++ *   that blocks both hands (the game's red 2, which won't fire then), nor such a gun beside
++ *   anything;
++ * - more than one, or no hand to take it: the inventory, as its button opens it;
++ * - nothing there: a word on the warning line.
++ * A soldier without an inventory (a tank) grabs nothing.
++ * @param action The key's action (passed on to the inventory button).
++ */
++void FirstPersonMode::grabItemUnderfoot(Action *action)
++{
++	BattleUnit *unit = _save->getSelectedUnit();
++	if (!unit || !canAct() || _save->isPreview() || !unit->hasInventory() || !unit->getTile())
++	{
++		return;
++	}
++	const std::vector<BattleItem*> &items = *unit->getTile()->getInventory();
++	if (items.empty())
++	{
++		_state->warning("STR_FPS_NOTHING_UNDERFOOT");
++		return;
++	}
++
++	// A lone item: the first free hand that takes it.
++	if (items.size() == 1)
++	{
++		BattleItem *item = items.front();
++		RuleInventory *rightHand = _game->getMod()->getInventoryRightHand(), *leftHand = _game->getMod()->getInventoryLeftHand();
++		BattleItem *inRight = unit->getRightHandWeapon(), *inLeft = unit->getLeftHandWeapon();
++		auto takes = [&](RuleInventory *hand, const BattleItem *held, const BattleItem *other)
++		{
++			return hand && !held && item->getRules()->canBePlacedIntoInventorySection(hand) && hand->fitItemInSlot(item->getRules(), 0, 0)
++				&& !(other && (other->getRules()->isBlockingBothHands() || item->getRules()->isBlockingBothHands()));
++		};
++		RuleInventory *hand = takes(rightHand, inRight, inLeft) ? rightHand : takes(leftHand, inLeft, inRight) ? leftHand : nullptr;
++		if (hand)
++		{
++			if (!unit->spendTimeUnits(item->getMoveToCost(hand)))
++			{
++				_state->warning("STR_NOT_ENOUGH_TIME_UNITS");
++				return;
++			}
++			_state->_battleGame->cancelCurrentAction();
++			_save->getTileEngine()->itemMoveInventory(unit->getTile(), unit, item, hand, 0, 0);
++			_state->updateSoldierInfo(false);
++			const std::string name = _game->getSavedGame()->isResearched(item->getRules()->getRequirements())
++				? _state->tr(item->getRules()->getName()) : _state->tr("STR_ALIEN_ARTIFACT");
++			_state->warningRaw(_state->tr("STR_FPS_ITEM_GRABBED").arg(name));
++			return;
++		}
++	}
++
++	// More, or no hand to take it: the inventory.
++	_state->btnInventoryClick(action);
 +}
 +
 +/**

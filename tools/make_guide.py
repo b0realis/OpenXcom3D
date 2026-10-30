@@ -35,6 +35,7 @@ KEYS = [
          ''),
         ('<kbd>B</kbd>', 'Suit flight on/off (flying armor; SWIM under water).', ''),
         ('<kbd>O</kbd>', 'Open the door you look at without walking through it, if it\'s in reach.', 'Look before you step into a room.'),
+        ('(set a key)', 'Grab the item at your feet into a free hand, in 3D and on the map; with several items or no hand free, the inventory opens.', 'Give it a key on the 3D keys page: it has none.'),
     ]),
     ('Looking', [
         ('Mouse', 'Look around, all but straight up and down; the soldier turns with you for free (or by the rules: <i>Turning costs TU</i>).', ''),

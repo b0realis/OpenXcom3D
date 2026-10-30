@@ -746,6 +746,8 @@ private:
 	void selectFireMode(BattleActionType mode);
 	/// Switches the weapon hand.
 	void switchHand();
+	/// Grabs the lone item at the soldier's feet into a free hand, or opens the inventory.
+	void grabItemUnderfoot(Action *action);
 	/// Notes what's under the crosshair this frame.
 	void updateAim(BattleUnit *unit);
 	/// A spray burst being marked: its points and the next one, for the view to draw.

@@ -83,6 +83,7 @@
 #include "../Interface/Text.h"
 #include "../Mod/RuleInterface.h"
 #include "../Mod/Mod.h"
+#include "../Mod/RuleInventory.h"
 #include "../Mod/RuleDamageType.h"
 #include "../Mod/Unit.h"
 #include "../Savegame/BattleItem.h"
@@ -1010,6 +1011,67 @@ void FirstPersonMode::switchHand()
 		}
 	}
 	_fireModeWeapon = nullptr; // forces a fresh fire mode for whatever is in the new hand
+}
+
+/**
+ * Grabs the item at the selected soldier's feet (the key "Grab item underfoot", none until the
+ * player gives it one; a player, GitHub issue #54: "assuming a singular item is under a units feet,
+ * pressing it automatically grabs and puts into empty hand. Assuming multiple items, or full hands,
+ * opens inventory"), in 3D and on the map:
+ * - one item on his tile and a hand that takes it: into that hand, the right one first, for the
+ *   game's time units for that move (the inventory's own cost, ground to hand); not beside a gun
+ *   that blocks both hands (the game's red 2, which won't fire then), nor such a gun beside
+ *   anything;
+ * - more than one, or no hand to take it: the inventory, as its button opens it;
+ * - nothing there: a word on the warning line.
+ * A soldier without an inventory (a tank) grabs nothing.
+ * @param action The key's action (passed on to the inventory button).
+ */
+void FirstPersonMode::grabItemUnderfoot(Action *action)
+{
+	BattleUnit *unit = _save->getSelectedUnit();
+	if (!unit || !canAct() || _save->isPreview() || !unit->hasInventory() || !unit->getTile())
+	{
+		return;
+	}
+	const std::vector<BattleItem*> &items = *unit->getTile()->getInventory();
+	if (items.empty())
+	{
+		_state->warning("STR_FPS_NOTHING_UNDERFOOT");
+		return;
+	}
+
+	// A lone item: the first free hand that takes it.
+	if (items.size() == 1)
+	{
+		BattleItem *item = items.front();
+		RuleInventory *rightHand = _game->getMod()->getInventoryRightHand(), *leftHand = _game->getMod()->getInventoryLeftHand();
+		BattleItem *inRight = unit->getRightHandWeapon(), *inLeft = unit->getLeftHandWeapon();
+		auto takes = [&](RuleInventory *hand, const BattleItem *held, const BattleItem *other)
+		{
+			return hand && !held && item->getRules()->canBePlacedIntoInventorySection(hand) && hand->fitItemInSlot(item->getRules(), 0, 0)
+				&& !(other && (other->getRules()->isBlockingBothHands() || item->getRules()->isBlockingBothHands()));
+		};
+		RuleInventory *hand = takes(rightHand, inRight, inLeft) ? rightHand : takes(leftHand, inLeft, inRight) ? leftHand : nullptr;
+		if (hand)
+		{
+			if (!unit->spendTimeUnits(item->getMoveToCost(hand)))
+			{
+				_state->warning("STR_NOT_ENOUGH_TIME_UNITS");
+				return;
+			}
+			_state->_battleGame->cancelCurrentAction();
+			_save->getTileEngine()->itemMoveInventory(unit->getTile(), unit, item, hand, 0, 0);
+			_state->updateSoldierInfo(false);
+			const std::string name = _game->getSavedGame()->isResearched(item->getRules()->getRequirements())
+				? _state->tr(item->getRules()->getName()) : _state->tr("STR_ALIEN_ARTIFACT");
+			_state->warningRaw(_state->tr("STR_FPS_ITEM_GRABBED").arg(name));
+			return;
+		}
+	}
+
+	// More, or no hand to take it: the inventory.
+	_state->btnInventoryClick(action);
 }
 
 /**
