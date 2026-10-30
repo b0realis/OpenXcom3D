@@ -192,14 +192,20 @@ void resized(FirstPersonMode *mode, int widthChange, int heightChange)
  * (called when a battle or the 3D VIEW tab opens): the smoke (Original, Modern) from 0.9's
  * "See-through smoke": YES gives Modern, NO Original (1.0's Solid becomes Original too); the
  * flashlight (Off, On, Dynamic) from 1.0's "Flashlight" and "Tactical flashlight"; akimbo (Off,
- * Full, Realistic) from 1.08's "Full akimbo" and "Realistic akimbo"; and 1.0's next fire mode
- * key, when the player had moved it off F (F is the flashlight now), once.
+ * Full, Realistic) from 1.08's "Full akimbo" and "Realistic akimbo" (and with akimbo Off, those
+ * two, which now tell whether it's on just now, off: a hand-edited profile can't have two guns
+ * fire with the setting Off, the akimbo key refusing to switch them off); and 1.0's next fire
+ * mode key, when the player had moved it off F (F is the flashlight now), once.
  */
 void settleOptions()
 {
 	Options::fpsSmoke = smokeMode();
 	Options::fpsFlashlightMode = flashlightMode();
 	Options::fpsAkimbo = akimboChoice();
+	if (Options::fpsAkimbo == 0)
+	{
+		Options::fpsDualWield = Options::fpsAkimboRealistic = false;
+	}
 	if (Options::keyFpsNextMode != SDLK_f)
 	{
 		Options::keyFpsNextFireMode = Options::keyFpsNextMode;
