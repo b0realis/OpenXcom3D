@@ -135,6 +135,14 @@ State *createOptionsTab(OptionsOrigin origin);
 /// Settles settings that take their first value from an older one (the smoke from "See-through
 /// smoke", the flashlight from 1.0's two flashlight settings, the next fire mode key from 1.0's).
 void settleOptions();
+/// Setting "Playstyle": chooses Faithful (0), FPS (1) or Custom (2), setting its switches.
+void choosePlaystyle(int playstyle);
+/// Setting "Playstyle": notes one of its switches changed by hand (the playstyle the switches make now, Custom keeping them).
+void playstyleSwitchChanged();
+/// Setting "Playstyle": whether a setting is one of the switches it sets.
+bool isPlaystyleSwitch(const std::string &id);
+/// Setting "Playstyle": settles it with the switches as they are (a profile from before it: Custom unless they match).
+void settlePlaystyle();
 /// Does a mod the game finds for the first time (one not yet in the player's mod list) start
 /// switched on? Our own mod does, so a game set up by hand plays in 3D at once; switched off, it
 /// stays off.

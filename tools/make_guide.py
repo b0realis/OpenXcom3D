@@ -87,6 +87,10 @@ KEYS = [
 # them (one list there; the groups are FirstPersonApi.cpp's, where the settings are registered).
 # ---------------------------------------------------------------------------------------------------------------------
 SETTINGS = [
+    ('Playstyle', [
+        ('Playstyle', 'Faithful', 'Faithful / FPS / Custom', 'One switch for how it plays, setting nine at once. Faithful: the game\'s own way, close to the map. FPS: FPS-style shooting, free turning and walking, vaulting, leaning, full sprite hitboxes, quick deaths, melee at walls. Custom: your own mix of those, kept.',
+         'Change one of the nine by hand and it becomes Custom; flipping back brings your mix back.'),
+    ]),
     ('View and camera', [
         ('Soldier camera preview', 'YES', 'YES / NO', 'Hovering a soldier\'s button shows their card with a live helmet camera. A right click opens their SOLDIER CAM, big.',
          'See what each soldier sees without leaving the one you play.'),

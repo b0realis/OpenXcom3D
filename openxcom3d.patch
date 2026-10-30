@@ -124,14 +124,15 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..0dea18806
+index 000000000..6f004af10
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,448 @@
+@@ -0,0 +1,454 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
 +  STR_FIRST_PERSON_TAB: "3D VIEW"
++  STR_FPS_SECTION_PLAYSTYLE: "PLAYSTYLE"
 +  STR_FPS_SECTION_VIEW: "VIEW AND CAMERA"
 +  STR_FPS_SECTION_MOVEMENT: "MOVEMENT"
 +  STR_FPS_SECTION_COMBAT: "AIMING AND COMBAT"
@@ -157,6 +158,11 @@ index 000000000..0dea18806
 +  STR_FPS_ZOOM: "Zoom"
 +  STR_FPS_ZOOM_DESC: "Hold U (in 3D then not the UFOpedia), or the right button in mouse look, to look 4 times closer. Aim and hit chances stay the same."
 +  STR_FPS_SCOPING: "SCOPING {0}x"
++  STR_FPS_PLAYSTYLE: "Playstyle"
++  STR_FPS_PLAYSTYLE_DESC: "Faithful: the game's way. FPS: shooting, turning, moving, hitboxes, deaths as a shooter's. Custom: your mix."
++  STR_FPS_PLAYSTYLE_FAITHFUL: "Faithful"
++  STR_FPS_PLAYSTYLE_FPS: "FPS"
++  STR_FPS_PLAYSTYLE_CUSTOM: "Custom"
 +  STR_FPS_TURN_COST: "Turning costs TU"
 +  STR_FPS_TURN_COST_DESC: "YES: looking past 45 degrees turns you, at the game's TU cost."
 +  STR_FPS_COMPASS: "Compass"
@@ -578,14 +584,15 @@ index 000000000..0dea18806
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..56f3322f4
+index 000000000..bc3ddc660
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,448 @@
+@@ -0,0 +1,454 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
 +  STR_FIRST_PERSON_TAB: "3D VIEW"
++  STR_FPS_SECTION_PLAYSTYLE: "PLAYSTYLE"
 +  STR_FPS_SECTION_VIEW: "VIEW AND CAMERA"
 +  STR_FPS_SECTION_MOVEMENT: "MOVEMENT"
 +  STR_FPS_SECTION_COMBAT: "AIMING AND COMBAT"
@@ -611,6 +618,11 @@ index 000000000..56f3322f4
 +  STR_FPS_ZOOM: "Zoom"
 +  STR_FPS_ZOOM_DESC: "Hold U (in 3D then not the UFOpedia), or the right button in mouse look, to look 4 times closer. Aim and hit chances stay the same."
 +  STR_FPS_SCOPING: "SCOPING {0}x"
++  STR_FPS_PLAYSTYLE: "Playstyle"
++  STR_FPS_PLAYSTYLE_DESC: "Faithful: the game's way. FPS: shooting, turning, moving, hitboxes, deaths as a shooter's. Custom: your mix."
++  STR_FPS_PLAYSTYLE_FAITHFUL: "Faithful"
++  STR_FPS_PLAYSTYLE_FPS: "FPS"
++  STR_FPS_PLAYSTYLE_CUSTOM: "Custom"
 +  STR_FPS_TURN_COST: "Turning costs TU"
 +  STR_FPS_TURN_COST_DESC: "YES: looking past 45 degrees turns you, at the game's TU cost."
 +  STR_FPS_COMPASS: "Compass"
@@ -21508,7 +21520,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..096212931 100644
+index a08796ced..25d83aea0 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -21519,14 +21531,15 @@ index a08796ced..096212931 100644
  OPT bool oxceThumbButtons;
  OPT int oxceThrottleMouseMoveEvent;
  OPT bool oxceDisableThinkingProgressBar;
-@@ -186,3 +187,9 @@ OPT SoundFormat currentSound;
+@@ -186,3 +187,10 @@ OPT SoundFormat currentSound;
  
  OPT int battleXcomSpeedOrig;
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
 +OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons;
-+OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo;
++OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle;
++OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
 diff --git a/src/Engine/Script.h b/src/Engine/Script.h
@@ -21613,10 +21626,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..7fecffb21
+index 000000000..a0d49dfe1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,878 @@
+@@ -0,0 +1,1050 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -21881,6 +21894,7 @@ index 000000000..7fecffb21
 + */
 +void settleOptions()
 +{
++	settlePlaystyle();
 +	Options::fpsSmoke = smokeMode();
 +	Options::fpsFlashlightMode = flashlightMode();
 +	Options::fpsAkimbo = akimboChoice();
@@ -21892,6 +21906,172 @@ index 000000000..7fecffb21
 +	{
 +		Options::keyFpsNextFireMode = Options::keyFpsNextMode;
 +		Options::keyFpsNextMode = SDLK_f;
++	}
++}
++
++namespace
++{
++
++/**
++ * One of the switches the setting "Playstyle" sets: its option (a switch or a number), and its
++ * value under Faithful (the game's own way, the defaults) and under FPS (a shooter's).
++ */
++struct PlaystyleSwitch
++{
++	const char *id;
++	bool *flag;
++	int *number;
++	int faithful, fps;
++};
++
++/**
++ * The switches the setting "Playstyle" sets (the owner's choice: shooting and turning, moving,
++ * the feel of combat; the cheats stay apart): FPS-style shooting, turning by the rules, movement
++ * tile by tile, jumping over low obstacles, leaning (Peek) and lean shots, full sprite hitboxes,
++ * quick deaths, melee hitting walls and the downed.
++ * @return The switches.
++ */
++const std::vector<PlaystyleSwitch> &playstyleSwitches()
++{
++	static const std::vector<PlaystyleSwitch> switches = {
++		{ "fpsFaithfulTargeting", &Options::fpsFaithfulTargeting, nullptr, 1, 0 },
++		{ "fpsTurnCost", &Options::fpsTurnCost, nullptr, 1, 0 },
++		{ "fpsMovement", nullptr, &Options::fpsMovement, 1, 0 },
++		{ "fpsVault", &Options::fpsVault, nullptr, 0, 1 },
++		{ "fpsLean", nullptr, &Options::fpsLean, 0, 1 },
++		{ "fpsLeanShots", &Options::fpsLeanShots, nullptr, 0, 1 },
++		{ "fpsSpriteHitboxes", &Options::fpsSpriteHitboxes, nullptr, 0, 1 },
++		{ "fpsQuickDeaths", &Options::fpsQuickDeaths, nullptr, 0, 1 },
++		{ "fpsMeleeTerrain", &Options::fpsMeleeTerrain, nullptr, 0, 1 },
++	};
++	return switches;
++}
++
++/**
++ * A playstyle switch's value now (a switch as 0 or 1).
++ * @param playstyleSwitch The switch.
++ * @return The value.
++ */
++int switchValue(const PlaystyleSwitch &playstyleSwitch)
++{
++	return playstyleSwitch.flag ? (*playstyleSwitch.flag ? 1 : 0) : *playstyleSwitch.number;
++}
++
++/**
++ * Sets a playstyle switch.
++ * @param playstyleSwitch The switch.
++ * @param value Its value (a switch: 0 or not).
++ */
++void setSwitch(const PlaystyleSwitch &playstyleSwitch, int value)
++{
++	if (playstyleSwitch.flag) *playstyleSwitch.flag = value != 0;
++	else *playstyleSwitch.number = value;
++}
++
++/**
++ * The playstyle switches as they are now, as Custom keeps them: "fpsTurnCost=0;fpsMovement=0;...".
++ * @return The text.
++ */
++std::string currentMix()
++{
++	std::string mix;
++	for (const PlaystyleSwitch &playstyleSwitch : playstyleSwitches())
++	{
++		mix += std::string(playstyleSwitch.id) + "=" + std::to_string(switchValue(playstyleSwitch)) + ";";
++	}
++	return mix;
++}
++
++/**
++ * The playstyle the switches are in now: Faithful (0) if all of them are as Faithful has them,
++ * FPS (1) if all are as FPS has them, else Custom (2).
++ * @return The playstyle.
++ */
++int playstyleOfSwitches()
++{
++	bool faithful = true, fps = true;
++	for (const PlaystyleSwitch &playstyleSwitch : playstyleSwitches())
++	{
++		faithful = faithful && switchValue(playstyleSwitch) == playstyleSwitch.faithful;
++		fps = fps && switchValue(playstyleSwitch) == playstyleSwitch.fps;
++	}
++	return faithful ? 0 : fps ? 1 : 2;
++}
++
++}
++
++/**
++ * Chooses a playstyle (setting "Playstyle", the owner's ask: "Faithful has all that we have now
++ * defaults (close to iso play but in 3d). Doom mode pushes multiple switches for easier FPS
++ * gameplay. And third setting custom - it is a mix of player own settings and remembers player
++ * settings in next start"): Faithful and FPS set their switches (see playstyleSwitches); Custom
++ * sets them back as the player had them (Options::fpsCustomPlaystyle). Leaving Custom keeps the
++ * mix first, so flipping to Faithful or FPS and back loses nothing.
++ * @param playstyle Faithful (0), FPS (1) or Custom (2).
++ */
++void choosePlaystyle(int playstyle)
++{
++	if (Options::fpsPlaystyle == 2)
++	{
++		Options::fpsCustomPlaystyle = currentMix();
++	}
++	Options::fpsPlaystyle = std::clamp(playstyle, 0, 2);
++	for (const PlaystyleSwitch &playstyleSwitch : playstyleSwitches())
++	{
++		if (Options::fpsPlaystyle < 2)
++		{
++			setSwitch(playstyleSwitch, Options::fpsPlaystyle == 0 ? playstyleSwitch.faithful : playstyleSwitch.fps);
++			continue;
++		}
++		// Custom: the kept value, where there is one ("id=value;").
++		const std::string key = std::string(playstyleSwitch.id) + "=";
++		const size_t at = Options::fpsCustomPlaystyle.find(key);
++		if (at != std::string::npos && (at == 0 || Options::fpsCustomPlaystyle[at - 1] == ';'))
++		{
++			setSwitch(playstyleSwitch, std::atoi(Options::fpsCustomPlaystyle.c_str() + at + key.size()));
++		}
++	}
++}
++
++/**
++ * Notes a playstyle switch changed by hand (setting "Playstyle"): the playstyle becomes the one
++ * the switches now make (Faithful or FPS if they are all as those have them), else Custom,
++ * keeping the mix.
++ */
++void playstyleSwitchChanged()
++{
++	Options::fpsPlaystyle = playstyleOfSwitches();
++	if (Options::fpsPlaystyle == 2)
++	{
++		Options::fpsCustomPlaystyle = currentMix();
++	}
++}
++
++/**
++ * Whether a setting is one the setting "Playstyle" sets (see playstyleSwitches).
++ * @param id The setting's id.
++ * @return True if so.
++ */
++bool isPlaystyleSwitch(const std::string &id)
++{
++	for (const PlaystyleSwitch &playstyleSwitch : playstyleSwitches())
++	{
++		if (id == playstyleSwitch.id) return true;
++	}
++	return false;
++}
++
++/**
++ * Settles the setting "Playstyle" with the switches as they are (a profile from before it, its
++ * switches the player's own, or one edited by hand): Faithful or FPS only if the switches are all
++ * as that playstyle has them, else Custom, keeping them as the mix. Custom stays Custom.
++ */
++void settlePlaystyle()
++{
++	if (Options::fpsPlaystyle != 2 && playstyleOfSwitches() != Options::fpsPlaystyle)
++	{
++		Options::fpsPlaystyle = 2;
++		Options::fpsCustomPlaystyle = currentMix();
 +	}
 +}
 +
@@ -21961,6 +22141,11 @@ index 000000000..7fecffb21
 +
 +	// The settings (YES/NO switches and numbers), in the order the Settings list shows them.
 +	// First the headline feature: hovering a soldier's button shows that soldier's helmet camera.
++	// The playstyle (the owner's ask: a theme flipping the switches that make it play like the
++	// game or like a shooter, see choosePlaystyle): Faithful (0), FPS (1) or Custom (2), the
++	// player's own mix of those switches kept (unlisted: no description).
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsPlaystyle", &fpsPlaystyle, 0, "STR_FPS_PLAYSTYLE", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsCustomPlaystyle", &fpsCustomPlaystyle, "", "", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsSoldierPreview", &fpsSoldierPreview, true, "STR_FPS_SOLDIER_PREVIEW", category));
 +	// And on the isometric map, the selected soldier's helmet camera in a window: off, small,
 +	// medium or large (0 to 3).
@@ -22497,10 +22682,10 @@ index 000000000..7fecffb21
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..f061ab8b0
+index 000000000..fecf4eead
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,332 @@
+@@ -0,0 +1,340 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -22638,6 +22823,14 @@ index 000000000..f061ab8b0
 +/// Settles settings that take their first value from an older one (the smoke from "See-through
 +/// smoke", the flashlight from 1.0's two flashlight settings, the next fire mode key from 1.0's).
 +void settleOptions();
++/// Setting "Playstyle": chooses Faithful (0), FPS (1) or Custom (2), setting its switches.
++void choosePlaystyle(int playstyle);
++/// Setting "Playstyle": notes one of its switches changed by hand (the playstyle the switches make now, Custom keeping them).
++void playstyleSwitchChanged();
++/// Setting "Playstyle": whether a setting is one of the switches it sets.
++bool isPlaystyleSwitch(const std::string &id);
++/// Setting "Playstyle": settles it with the switches as they are (a profile from before it: Custom unless they match).
++void settlePlaystyle();
 +/// Does a mod the game finds for the first time (one not yet in the player's mod list) start
 +/// switched on? Our own mod does, so a game set up by hand plays in 3D at once; switched off, it
 +/// stays off.
@@ -57331,10 +57524,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..7d411d5d6
+index 000000000..1753aa852
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,793 @@
+@@ -0,0 +1,817 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -57545,6 +57738,7 @@ index 000000000..7d411d5d6
 +	// #27: "these could probably be separated into sections"); any setting not placed here goes
 +	// at the end, under a heading of its own.
 +	static const struct { const char *heading; std::vector<const char*> ids; } sections[] = {
++		{ "STR_FPS_SECTION_PLAYSTYLE", { "fpsPlaystyle" } },
 +		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView", "fpsZoom",
 +			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
 +		{ "STR_FPS_SECTION_MOVEMENT", { "fpsTurnCost", "fpsMovement", "fpsWalkSpeed", "fpsFlightCost", "fpsFlightCostOverride", "fpsVault",
@@ -57743,6 +57937,12 @@ index 000000000..7d411d5d6
 +		{
 +			static const char *const flashlightNames[] = { "STR_FPS_FLASHLIGHT_OFF", "STR_FPS_FLASHLIGHT_ON", "STR_FPS_FLASHLIGHT_DYNAMIC" };
 +			return std::string(tr(flashlightNames[FirstPerson::flashlightMode()]));
++		}
++		// The playstyle is a choice of three, shown by name.
++		if (option.id() == "fpsPlaystyle")
++		{
++			static const char *const playstyleNames[] = { "STR_FPS_PLAYSTYLE_FAITHFUL", "STR_FPS_PLAYSTYLE_FPS", "STR_FPS_PLAYSTYLE_CUSTOM" };
++			return std::string(tr(playstyleNames[std::clamp(*option.asInt(), 0, 2)]));
 +		}
 +		// Leaning out is a choice of three, shown by name.
 +		if (option.id() == "fpsLean")
@@ -57973,6 +58173,11 @@ index 000000000..7d411d5d6
 +		{
 +			*value = (FirstPerson::flashlightMode() + direction + 3) % 3;
 +		}
++		// The playstyle (Faithful, FPS, Custom): round and round, its switches set with it.
++		else if (value == &Options::fpsPlaystyle)
++		{
++			FirstPerson::choosePlaystyle((*value + direction + 3) % 3);
++		}
 +		// Leaning out (off, peek, tilt): round and round.
 +		else if (value == &Options::fpsLean)
 +		{
@@ -58044,8 +58249,20 @@ index 000000000..7d411d5d6
 +			}
 +		}
 +	}
-+	// Show the new value.
-+	_lstOptions->setCellText(row, 1, valueText(*option));
++	// A playstyle switch changed by hand: the playstyle follows (see playstyleSwitchChanged).
++	if (FirstPerson::isPlaystyleSwitch(option->id()))
++	{
++		FirstPerson::playstyleSwitchChanged();
++	}
++	// Show the new value, and every other row's (the playstyle and its switches move together).
++	for (int shownRow = 0; shownRow < (int)_rowOptions.size(); ++shownRow)
++	{
++		bool shownIsKey = false;
++		if (const OptionInfo *shown = getEntry(shownRow, &shownIsKey))
++		{
++			if (!shownIsKey) _lstOptions->setCellText(shownRow, 1, valueText(*shown));
++		}
++	}
 +}
 +
 +/**

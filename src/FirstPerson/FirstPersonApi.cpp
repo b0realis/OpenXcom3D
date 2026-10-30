@@ -262,6 +262,7 @@ void resized(FirstPersonMode *mode, int widthChange, int heightChange)
  */
 void settleOptions()
 {
+	settlePlaystyle();
 	Options::fpsSmoke = smokeMode();
 	Options::fpsFlashlightMode = flashlightMode();
 	Options::fpsAkimbo = akimboChoice();
@@ -273,6 +274,172 @@ void settleOptions()
 	{
 		Options::keyFpsNextFireMode = Options::keyFpsNextMode;
 		Options::keyFpsNextMode = SDLK_f;
+	}
+}
+
+namespace
+{
+
+/**
+ * One of the switches the setting "Playstyle" sets: its option (a switch or a number), and its
+ * value under Faithful (the game's own way, the defaults) and under FPS (a shooter's).
+ */
+struct PlaystyleSwitch
+{
+	const char *id;
+	bool *flag;
+	int *number;
+	int faithful, fps;
+};
+
+/**
+ * The switches the setting "Playstyle" sets (the owner's choice: shooting and turning, moving,
+ * the feel of combat; the cheats stay apart): FPS-style shooting, turning by the rules, movement
+ * tile by tile, jumping over low obstacles, leaning (Peek) and lean shots, full sprite hitboxes,
+ * quick deaths, melee hitting walls and the downed.
+ * @return The switches.
+ */
+const std::vector<PlaystyleSwitch> &playstyleSwitches()
+{
+	static const std::vector<PlaystyleSwitch> switches = {
+		{ "fpsFaithfulTargeting", &Options::fpsFaithfulTargeting, nullptr, 1, 0 },
+		{ "fpsTurnCost", &Options::fpsTurnCost, nullptr, 1, 0 },
+		{ "fpsMovement", nullptr, &Options::fpsMovement, 1, 0 },
+		{ "fpsVault", &Options::fpsVault, nullptr, 0, 1 },
+		{ "fpsLean", nullptr, &Options::fpsLean, 0, 1 },
+		{ "fpsLeanShots", &Options::fpsLeanShots, nullptr, 0, 1 },
+		{ "fpsSpriteHitboxes", &Options::fpsSpriteHitboxes, nullptr, 0, 1 },
+		{ "fpsQuickDeaths", &Options::fpsQuickDeaths, nullptr, 0, 1 },
+		{ "fpsMeleeTerrain", &Options::fpsMeleeTerrain, nullptr, 0, 1 },
+	};
+	return switches;
+}
+
+/**
+ * A playstyle switch's value now (a switch as 0 or 1).
+ * @param playstyleSwitch The switch.
+ * @return The value.
+ */
+int switchValue(const PlaystyleSwitch &playstyleSwitch)
+{
+	return playstyleSwitch.flag ? (*playstyleSwitch.flag ? 1 : 0) : *playstyleSwitch.number;
+}
+
+/**
+ * Sets a playstyle switch.
+ * @param playstyleSwitch The switch.
+ * @param value Its value (a switch: 0 or not).
+ */
+void setSwitch(const PlaystyleSwitch &playstyleSwitch, int value)
+{
+	if (playstyleSwitch.flag) *playstyleSwitch.flag = value != 0;
+	else *playstyleSwitch.number = value;
+}
+
+/**
+ * The playstyle switches as they are now, as Custom keeps them: "fpsTurnCost=0;fpsMovement=0;...".
+ * @return The text.
+ */
+std::string currentMix()
+{
+	std::string mix;
+	for (const PlaystyleSwitch &playstyleSwitch : playstyleSwitches())
+	{
+		mix += std::string(playstyleSwitch.id) + "=" + std::to_string(switchValue(playstyleSwitch)) + ";";
+	}
+	return mix;
+}
+
+/**
+ * The playstyle the switches are in now: Faithful (0) if all of them are as Faithful has them,
+ * FPS (1) if all are as FPS has them, else Custom (2).
+ * @return The playstyle.
+ */
+int playstyleOfSwitches()
+{
+	bool faithful = true, fps = true;
+	for (const PlaystyleSwitch &playstyleSwitch : playstyleSwitches())
+	{
+		faithful = faithful && switchValue(playstyleSwitch) == playstyleSwitch.faithful;
+		fps = fps && switchValue(playstyleSwitch) == playstyleSwitch.fps;
+	}
+	return faithful ? 0 : fps ? 1 : 2;
+}
+
+}
+
+/**
+ * Chooses a playstyle (setting "Playstyle", the owner's ask: "Faithful has all that we have now
+ * defaults (close to iso play but in 3d). Doom mode pushes multiple switches for easier FPS
+ * gameplay. And third setting custom - it is a mix of player own settings and remembers player
+ * settings in next start"): Faithful and FPS set their switches (see playstyleSwitches); Custom
+ * sets them back as the player had them (Options::fpsCustomPlaystyle). Leaving Custom keeps the
+ * mix first, so flipping to Faithful or FPS and back loses nothing.
+ * @param playstyle Faithful (0), FPS (1) or Custom (2).
+ */
+void choosePlaystyle(int playstyle)
+{
+	if (Options::fpsPlaystyle == 2)
+	{
+		Options::fpsCustomPlaystyle = currentMix();
+	}
+	Options::fpsPlaystyle = std::clamp(playstyle, 0, 2);
+	for (const PlaystyleSwitch &playstyleSwitch : playstyleSwitches())
+	{
+		if (Options::fpsPlaystyle < 2)
+		{
+			setSwitch(playstyleSwitch, Options::fpsPlaystyle == 0 ? playstyleSwitch.faithful : playstyleSwitch.fps);
+			continue;
+		}
+		// Custom: the kept value, where there is one ("id=value;").
+		const std::string key = std::string(playstyleSwitch.id) + "=";
+		const size_t at = Options::fpsCustomPlaystyle.find(key);
+		if (at != std::string::npos && (at == 0 || Options::fpsCustomPlaystyle[at - 1] == ';'))
+		{
+			setSwitch(playstyleSwitch, std::atoi(Options::fpsCustomPlaystyle.c_str() + at + key.size()));
+		}
+	}
+}
+
+/**
+ * Notes a playstyle switch changed by hand (setting "Playstyle"): the playstyle becomes the one
+ * the switches now make (Faithful or FPS if they are all as those have them), else Custom,
+ * keeping the mix.
+ */
+void playstyleSwitchChanged()
+{
+	Options::fpsPlaystyle = playstyleOfSwitches();
+	if (Options::fpsPlaystyle == 2)
+	{
+		Options::fpsCustomPlaystyle = currentMix();
+	}
+}
+
+/**
+ * Whether a setting is one the setting "Playstyle" sets (see playstyleSwitches).
+ * @param id The setting's id.
+ * @return True if so.
+ */
+bool isPlaystyleSwitch(const std::string &id)
+{
+	for (const PlaystyleSwitch &playstyleSwitch : playstyleSwitches())
+	{
+		if (id == playstyleSwitch.id) return true;
+	}
+	return false;
+}
+
+/**
+ * Settles the setting "Playstyle" with the switches as they are (a profile from before it, its
+ * switches the player's own, or one edited by hand): Faithful or FPS only if the switches are all
+ * as that playstyle has them, else Custom, keeping them as the mix. Custom stays Custom.
+ */
+void settlePlaystyle()
+{
+	if (Options::fpsPlaystyle != 2 && playstyleOfSwitches() != Options::fpsPlaystyle)
+	{
+		Options::fpsPlaystyle = 2;
+		Options::fpsCustomPlaystyle = currentMix();
 	}
 }
 
@@ -342,6 +509,11 @@ void createOptions(std::vector<OptionInfo> &options)
 
 	// The settings (YES/NO switches and numbers), in the order the Settings list shows them.
 	// First the headline feature: hovering a soldier's button shows that soldier's helmet camera.
+	// The playstyle (the owner's ask: a theme flipping the switches that make it play like the
+	// game or like a shooter, see choosePlaystyle): Faithful (0), FPS (1) or Custom (2), the
+	// player's own mix of those switches kept (unlisted: no description).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsPlaystyle", &fpsPlaystyle, 0, "STR_FPS_PLAYSTYLE", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsCustomPlaystyle", &fpsCustomPlaystyle, "", "", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSoldierPreview", &fpsSoldierPreview, true, "STR_FPS_SOLDIER_PREVIEW", category));
 	// And on the isometric map, the selected soldier's helmet camera in a window: off, small,
 	// medium or large (0 to 3).

@@ -208,6 +208,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 	// #27: "these could probably be separated into sections"); any setting not placed here goes
 	// at the end, under a heading of its own.
 	static const struct { const char *heading; std::vector<const char*> ids; } sections[] = {
+		{ "STR_FPS_SECTION_PLAYSTYLE", { "fpsPlaystyle" } },
 		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView", "fpsZoom",
 			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
 		{ "STR_FPS_SECTION_MOVEMENT", { "fpsTurnCost", "fpsMovement", "fpsWalkSpeed", "fpsFlightCost", "fpsFlightCostOverride", "fpsVault",
@@ -406,6 +407,12 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		{
 			static const char *const flashlightNames[] = { "STR_FPS_FLASHLIGHT_OFF", "STR_FPS_FLASHLIGHT_ON", "STR_FPS_FLASHLIGHT_DYNAMIC" };
 			return std::string(tr(flashlightNames[FirstPerson::flashlightMode()]));
+		}
+		// The playstyle is a choice of three, shown by name.
+		if (option.id() == "fpsPlaystyle")
+		{
+			static const char *const playstyleNames[] = { "STR_FPS_PLAYSTYLE_FAITHFUL", "STR_FPS_PLAYSTYLE_FPS", "STR_FPS_PLAYSTYLE_CUSTOM" };
+			return std::string(tr(playstyleNames[std::clamp(*option.asInt(), 0, 2)]));
 		}
 		// Leaning out is a choice of three, shown by name.
 		if (option.id() == "fpsLean")
@@ -636,6 +643,11 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		{
 			*value = (FirstPerson::flashlightMode() + direction + 3) % 3;
 		}
+		// The playstyle (Faithful, FPS, Custom): round and round, its switches set with it.
+		else if (value == &Options::fpsPlaystyle)
+		{
+			FirstPerson::choosePlaystyle((*value + direction + 3) % 3);
+		}
 		// Leaning out (off, peek, tilt): round and round.
 		else if (value == &Options::fpsLean)
 		{
@@ -707,8 +719,20 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 			}
 		}
 	}
-	// Show the new value.
-	_lstOptions->setCellText(row, 1, valueText(*option));
+	// A playstyle switch changed by hand: the playstyle follows (see playstyleSwitchChanged).
+	if (FirstPerson::isPlaystyleSwitch(option->id()))
+	{
+		FirstPerson::playstyleSwitchChanged();
+	}
+	// Show the new value, and every other row's (the playstyle and its switches move together).
+	for (int shownRow = 0; shownRow < (int)_rowOptions.size(); ++shownRow)
+	{
+		bool shownIsKey = false;
+		if (const OptionInfo *shown = getEntry(shownRow, &shownIsKey))
+		{
+			if (!shownIsKey) _lstOptions->setCellText(shownRow, 1, valueText(*shown));
+		}
+	}
 }
 
 /**
