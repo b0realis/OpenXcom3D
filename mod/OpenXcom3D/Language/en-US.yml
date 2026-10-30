@@ -345,7 +345,7 @@ en-US:
   STR_FPS_CROSSHAIR_DAMAGE_DESC: "Under the hit chance, the shot's damage range, as the map shows it with Alt: your soldier's stats, the distance."
   STR_FPS_CROSSHAIR_COSTS_DESC: "Under the shot info, the action's other costs: energy, health, stun, morale, mana."
   STR_FPS_ACCURACY_LINE: "Accuracy line"
-  STR_FPS_ACCURACY_LINE_DESC: "A green line under the crosshair as wide as a round can stray: by the game's accuracy roll, or FPS style's spread."
+  STR_FPS_ACCURACY_LINE_DESC: "A green line under the crosshair: where a hit lands, dotted out to where a miss can stray; in FPS style, the spread."
   STR_FPS_AIM_EXACT: "Aim at exact point"
   STR_FPS_AIM_EXACT_DESC: "Shots go for the point under the crosshair, on the open sky the air on its line. NO: for its tile (the game's own targeting)."
   STR_FPS_TRAJECTORY: "Show trajectory"

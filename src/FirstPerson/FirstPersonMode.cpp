@@ -242,8 +242,9 @@ void FirstPersonMode::createCrosshairAndBanner()
 	_crosshair = new Surface(CrosshairSize, CrosshairSize, width / 2 - CrosshairSize / 2, height / 2 - CrosshairSize / 2);
 	_state->add(_crosshair);
 	// Under it the accuracy line (drawn in drawAccuracyLine): room for its widest reach to either
-	// side and its shadow, its notches two rows above the line.
-	_accuracyLine = new Surface(AccuracyLineReach * 2 + 3, 4, width / 2 - AccuracyLineReach - 1, height / 2 + AccuracyLineDrop - 2);
+	// side, the view's edges, and its shadow, its notches two rows above the line.
+	_accuracyLineHalf = width / 2;
+	_accuracyLine = new Surface(_accuracyLineHalf * 2 + 3, 4, width / 2 - _accuracyLineHalf - 1, height / 2 + AccuracyLineDrop - 2);
 	_state->add(_accuracyLine);
 
 	// The banner's glow: four copies of it, one pixel off to each side, behind it (coloured

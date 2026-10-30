@@ -124,7 +124,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..6f004af10
+index 000000000..0f5bff6e2
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,454 @@
@@ -475,7 +475,7 @@ index 000000000..6f004af10
 +  STR_FPS_CROSSHAIR_DAMAGE_DESC: "Under the hit chance, the shot's damage range, as the map shows it with Alt: your soldier's stats, the distance."
 +  STR_FPS_CROSSHAIR_COSTS_DESC: "Under the shot info, the action's other costs: energy, health, stun, morale, mana."
 +  STR_FPS_ACCURACY_LINE: "Accuracy line"
-+  STR_FPS_ACCURACY_LINE_DESC: "A green line under the crosshair as wide as a round can stray: by the game's accuracy roll, or FPS style's spread."
++  STR_FPS_ACCURACY_LINE_DESC: "A green line under the crosshair: where a hit lands, dotted out to where a miss can stray; in FPS style, the spread."
 +  STR_FPS_AIM_EXACT: "Aim at exact point"
 +  STR_FPS_AIM_EXACT_DESC: "Shots go for the point under the crosshair, on the open sky the air on its line. NO: for its tile (the game's own targeting)."
 +  STR_FPS_TRAJECTORY: "Show trajectory"
@@ -584,7 +584,7 @@ index 000000000..6f004af10
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..bc3ddc660
+index 000000000..78543b216
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,454 @@
@@ -935,7 +935,7 @@ index 000000000..bc3ddc660
 +  STR_FPS_CROSSHAIR_DAMAGE_DESC: "Under the hit chance, the shot's damage range, as the map shows it with Alt: your soldier's stats, the distance."
 +  STR_FPS_CROSSHAIR_COSTS_DESC: "Under the shot info, the action's other costs: energy, health, stun, morale, mana."
 +  STR_FPS_ACCURACY_LINE: "Accuracy line"
-+  STR_FPS_ACCURACY_LINE_DESC: "A green line under the crosshair as wide as a round can stray: by the game's accuracy roll, or FPS style's spread."
++  STR_FPS_ACCURACY_LINE_DESC: "A green line under the crosshair: where a hit lands, dotted out to where a miss can stray; in FPS style, the spread."
 +  STR_FPS_AIM_EXACT: "Aim at exact point"
 +  STR_FPS_AIM_EXACT_DESC: "Shots go for the point under the crosshair, on the open sky the air on its line. NO: for its tile (the game's own targeting)."
 +  STR_FPS_TRAJECTORY: "Show trajectory"
@@ -23028,10 +23028,10 @@ index 000000000..fecf4eead
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..66b131713
+index 000000000..779f1245a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2750 @@
+@@ -0,0 +1,2751 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -23276,8 +23276,9 @@ index 000000000..66b131713
 +	_crosshair = new Surface(CrosshairSize, CrosshairSize, width / 2 - CrosshairSize / 2, height / 2 - CrosshairSize / 2);
 +	_state->add(_crosshair);
 +	// Under it the accuracy line (drawn in drawAccuracyLine): room for its widest reach to either
-+	// side and its shadow, its notches two rows above the line.
-+	_accuracyLine = new Surface(AccuracyLineReach * 2 + 3, 4, width / 2 - AccuracyLineReach - 1, height / 2 + AccuracyLineDrop - 2);
++	// side, the view's edges, and its shadow, its notches two rows above the line.
++	_accuracyLineHalf = width / 2;
++	_accuracyLine = new Surface(_accuracyLineHalf * 2 + 3, 4, width / 2 - _accuracyLineHalf - 1, height / 2 + AccuracyLineDrop - 2);
 +	_state->add(_accuracyLine);
 +
 +	// The banner's glow: four copies of it, one pixel off to each side, behind it (coloured
@@ -25784,10 +25785,10 @@ index 000000000..66b131713
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..6f5089647
+index 000000000..ba91fe4e0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1202 @@
+@@ -0,0 +1,1203 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -26601,6 +26602,7 @@ index 000000000..6f5089647
 +	Surface *_crosshair = nullptr;                 // the crosshair's surface
 +	Uint64 _crosshairDrawnFor = ~(Uint64)0;        // what the crosshair surface shows, to redraw only on change
 +	Surface *_accuracyLine = nullptr;              // the accuracy line under the crosshair (see drawAccuracyLine)
++	int _accuracyLineHalf = 0;                     // its widest reach to either side, in pixels (the view's half width)
 +	Uint64 _accuracyLineDrawnFor = ~(Uint64)0;     // what it shows, to redraw only on change
 +	Text *_txtMode = nullptr, *_txtShot = nullptr; // the fire mode, and the shot's odds and cost, beside the crosshair
 +	Text *_txtCosts = nullptr;                      // and under them its other costs (setting "Expanded crosshair info")
@@ -26616,9 +26618,9 @@ index 000000000..6f5089647
 +	/// Updates the crosshair and its texts: mode, hit chance, time units.
 +	void updateCrosshair(BattleUnit *unit, bool playerTurn);
 +	/// The game's own targeting's accuracy line: how far to either side a successful roll strays at what's under the crosshair, in pixels.
-+	int hitCloudReach(BattleUnit *unit, BattleItem *weapon, BattleActionType mode);
++	int hitCloudReach(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, int accuracy, int &missReach);
 +	/// Draws the accuracy line: a level line as wide as the reach to either side, a notch up at each end.
-+	void drawAccuracyLine(int reach, Uint8 color, Uint8 shadow);
++	void drawAccuracyLine(int reach, int missReach, Uint8 color, Uint8 missColor, Uint8 shadow);
 +	/// A mod's own name for an action of an item, in capitals for the crosshair; empty if it keeps the game's name.
 +	std::string renamedAction(const RuleItem *rules, BattleActionType mode) const;
 +	/// Does the soldier have a line of sight to the aimed tile, as a shot checks it?
@@ -32118,10 +32120,10 @@ index 000000000..1b98a6bd9
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..b37ab62ed
+index 000000000..01e1ec279
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,444 @@
+@@ -0,0 +1,446 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -32230,14 +32232,16 @@ index 000000000..b37ab62ed
 +const int NearPointReach = 4;
 +const int NearPointMostTries = 160;
 +/// The accuracy line under the crosshair (setting "Accuracy line", see FirstPersonMode::
-+/// drawAccuracyLine), in canvas pixels: its reach to either side of the middle at the least and
-+/// at the most, how far under the crosshair's middle it runs (clear of the crosshair's shapes,
-+/// which reach 13 down with their outline), and the room it takes there (the unit's name and the
-+/// icons over a downed unit go that much lower while it shows).
++/// drawAccuracyLine), in canvas pixels: its reach to either side of the middle at the least (at
++/// the most, the view's edges: GitHub issue #66), how far under the crosshair's middle it runs
++/// (clear of the crosshair's shapes, which reach 13 down with their outline), and the room it
++/// takes there (the unit's name and the icons over a downed unit go that much lower while it shows).
 +const int AccuracyLineLeast = 3;
-+const int AccuracyLineReach = 60;
 +const int AccuracyLineDrop = 16;
 +const int AccuracyLineRoom = 9;
++/// With the game's own targeting, the accuracy line's dotted outer part reaches as far as a miss can stray: the game's
++/// miss roll goes up to this less the hit chance (percent) (Projectile::applyAccuracy: 0 to 100, plus 50 for a miss).
++const int MissRollDeviation = 150;
 +/// Where the game has pushed a soldier's sight under a floor right above (standing on something
 +/// tall under a ceiling), the 3D eye is only this many voxels under the game's (see eyeHeight).
 +const double PressedEyeLower = 1.0;
@@ -32568,10 +32572,10 @@ index 000000000..b37ab62ed
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..c177de226
+index 000000000..23b920467
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,4571 @@
+@@ -0,0 +1,4597 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -36320,6 +36324,7 @@ index 000000000..c177de226
 +	Uint8 color = grey;
 +	std::string modeText, shotText, costText, damageText;
 +	int damageColor = -1;
++	int lineAccuracy = -1; // the hit chance worked out for the shot (percent), for the accuracy line
 +	bool dual = false, inTurn = false, volley = false, eachFull = false; // both guns fire (dual wield); an arcing pair, gun after gun, each at full accuracy and its own cost (see fire); a volley (setting "Akimbo volley")
 +	if (weapon && mode != BA_NONE && unit)
 +	{
@@ -36391,6 +36396,7 @@ index 000000000..c177de226
 +				canFire = false;
 +			}
 +			shotInfo << accuracy << "%  ";
++			lineAccuracy = accuracy;
 +		}
 +
 +		// Then the time units it costs (both guns' with dual wield).
@@ -36526,51 +36532,63 @@ index 000000000..c177de226
 +
 +	// The accuracy line (setting "Accuracy line") under the crosshair, green (grey while he
 +	// can't act): its half-width how far to either side a round can land, seen through the
-+	// view's lens. In FPS style the spread (it grows with the bloom of the last rounds); with
-+	// the game's own targeting, for a straight shot, how far a successful accuracy roll can send
-+	// the round from what's under the crosshair (see hitCloudReach).
-+	int reach = 0;
++	// view's lens, up to the view's edges. In FPS style the spread (it grows with the bloom of
++	// the last rounds); with the game's own targeting, for a straight shot, how far a successful
++	// accuracy roll can send the round from what's under the crosshair, and dotted beyond that,
++	// dimmer, how far a missed roll can (see hitCloudReach; a player, GitHub issue #66: a low hit
++	// chance's rounds scattered far wider than the line showed).
++	int reach = 0, missReach = 0;
 +	if (unit && weapon && Options::fpsAccuracyLine && freeAimOn(mode))
 +	{
 +		const double focalPixels = (_view->getWidth() / 2.0) / std::tan(fieldOfViewNow() * Pi / 360.0);
-+		reach = std::clamp((int)std::lround(std::tan((spreadFor(unit, mode, dual && !eachFull) + _bloom) * Pi / 180.0) * focalPixels), AccuracyLineLeast, AccuracyLineReach);
++		reach = std::clamp((int)std::lround(std::tan((spreadFor(unit, mode, dual && !eachFull) + _bloom) * Pi / 180.0) * focalPixels), AccuracyLineLeast, _accuracyLineHalf);
 +	}
 +	else if (unit && weapon && Options::fpsAccuracyLine && isShot(mode) && !weapon->getArcingShot(mode))
 +	{
-+		reach = hitCloudReach(unit, weapon, mode);
++		reach = hitCloudReach(unit, weapon, mode, lineAccuracy, missReach);
 +	}
-+	_accuracyLine->setX(centreX - AccuracyLineReach - 1);
++	_accuracyLine->setX(centreX - _accuracyLineHalf - 1);
 +	_accuracyLine->setY(centreY + AccuracyLineDrop - 2);
 +	_accuracyLine->setVisible(Options::fpsCrosshair && reach > 0);
 +	const Uint8 lineColor = canAct() ? nearestColor(palette, 130, 230, 100) : grey;
-+	const Uint64 lineKey = (Uint64)reach | ((Uint64)lineColor << 16);
++	const Uint8 missColor = canAct() ? nearestColor(palette, 70, 150, 60) : grey;
++	const Uint64 lineKey = (Uint64)reach | ((Uint64)missReach << 12) | ((Uint64)lineColor << 24) | ((Uint64)missColor << 32);
 +	if (reach > 0 && lineKey != _accuracyLineDrawnFor)
 +	{
 +		_accuracyLineDrawnFor = lineKey;
-+		drawAccuracyLine(reach, lineColor, shadow);
++		drawAccuracyLine(reach, missReach, lineColor, missColor, shadow);
 +	}
 +}
 +
 +/**
 + * Draws the accuracy line (setting "Accuracy line") onto its surface: a level line through the
-+ * middle, as wide to either side as the reach, with a small notch up at each end; each pixel
-+ * with a shadow one down and to the right, so it reads on any background.
-+ * @param reach The half-width, in pixels (at most AccuracyLineReach).
++ * middle, as wide to either side as the reach, with a small notch up at each end; beyond it, out
++ * to the miss reach, a dotted line in the dimmer colour (every other pixel) with a notch of one
++ * pixel at each end; each pixel with a shadow one down and to the right, so it reads on any
++ * background.
++ * @param reach The half-width, in pixels (at most the view's half width).
++ * @param missReach How far the dotted part reaches, in pixels (0, or no more than reach: none).
 + * @param color Palette colour of the line.
++ * @param missColor Palette colour of the dotted part.
 + * @param shadow Palette colour of its shadow.
 + */
-+void FirstPersonMode::drawAccuracyLine(int reach, Uint8 color, Uint8 shadow)
++void FirstPersonMode::drawAccuracyLine(int reach, int missReach, Uint8 color, Uint8 missColor, Uint8 shadow)
 +{
 +	// The points, from the line's middle (the surface's row 2 is the line's, the notches rise
-+	// two rows above it); the shadows go under all of them before the colour goes on top.
-+	std::vector<std::pair<int, int>> points;
-+	for (int x = -reach; x <= reach; ++x) points.push_back({ x, 2 });
-+	for (int side : { -reach, reach }) { points.push_back({ side, 1 }); points.push_back({ side, 0 }); }
-+	const int middle = AccuracyLineReach + 1;
++	// two rows above it), each with its colour; the shadows go under all of them before the
++	// colours go on top.
++	reach = std::min(reach, _accuracyLineHalf);
++	missReach = std::min(missReach, _accuracyLineHalf);
++	std::vector<std::pair<std::pair<int, int>, Uint8>> points;
++	for (int x = -reach; x <= reach; ++x) points.push_back({ { x, 2 }, color });
++	for (int side : { -reach, reach }) { points.push_back({ { side, 1 }, color }); points.push_back({ { side, 0 }, color }); }
++	for (int x = reach + 2; x <= missReach; x += 2) { points.push_back({ { x, 2 }, missColor }); points.push_back({ { -x, 2 }, missColor }); }
++	if (missReach > reach + 1) for (int side : { -missReach, missReach }) { points.push_back({ { side, 2 }, missColor }); points.push_back({ { side, 1 }, missColor }); }
++	const int middle = _accuracyLineHalf + 1;
 +	_accuracyLine->clear();
 +	_accuracyLine->lock();
-+	for (const auto &point : points) _accuracyLine->setPixel(middle + point.first + 1, point.second + 1, shadow);
-+	for (const auto &point : points) _accuracyLine->setPixel(middle + point.first, point.second, color);
++	for (const auto &point : points) _accuracyLine->setPixel(middle + point.first.first + 1, point.first.second + 1, shadow);
++	for (const auto &point : points) _accuracyLine->setPixel(middle + point.first.first, point.first.second, point.second);
 +	_accuracyLine->unlock();
 +}
 +
@@ -36582,15 +36600,20 @@ index 000000000..c177de226
 + * (more across the map's y than along its x, unless OXCE's "Uniform shooting spread" is on), and
 + * the round goes up to half of it to either side on the map (and an eighth of it up or down,
 + * which the line leaves out), then flies on along that line. A roll under the accuracy strays
-+ * this far at most, whatever the soldier's skill (the hit chance says how likely that is; a miss
-+ * strays much wider).
++ * this far at most, whatever the soldier's skill (the hit chance says how likely that is). A
++ * missed roll strays much wider: up to MissRollDeviation less the hit chance where the roll's
++ * 9 stand (at 16%, nearly fifteen times as far; none at 100% or more).
 + * @param unit The soldier aiming.
 + * @param weapon The gun.
 + * @param mode The shot.
++ * @param accuracy The shot's hit chance as worked out for the crosshair (percent; -1: unknown,
++ *   no miss reach).
++ * @param missReach Set to how far a missed roll can send the round, the same way (0 for none).
 + * @return The reach across the view, in pixels (0 with nothing to measure).
 + */
-+int FirstPersonMode::hitCloudReach(BattleUnit *unit, BattleItem *weapon, BattleActionType mode)
++int FirstPersonMode::hitCloudReach(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, int accuracy, int &missReach)
 +{
++	missReach = 0;
 +	// From the muzzle the shot leaves from (a lean's side too, as fire picks it) to the point
 +	// under the crosshair.
 +	BattleAction shot;
@@ -36633,7 +36656,14 @@ index 000000000..c177de226
 +	const double acrossReach = Options::oxceUniformShootingSpread ? across : across * (std::abs(right[0]) + std::abs(right[1]));
 +
 +	const double focalPixels = (_view->getWidth() / 2.0) / std::tan(fieldOfViewNow() * Pi / 360.0);
-+	return std::clamp((int)std::lround(acrossReach / distance * focalPixels), AccuracyLineLeast, AccuracyLineReach);
++	if (accuracy >= 0 && accuracy < 100)
++	{
++		// A missed roll: the same, with the miss's largest deviation.
++		const double missAcross = std::max(1, zShift * (MissRollDeviation - accuracy) / 200) / 2.0;
++		const double missAcrossReach = Options::oxceUniformShootingSpread ? missAcross : missAcross * (std::abs(right[0]) + std::abs(right[1]));
++		missReach = std::clamp((int)std::lround(missAcrossReach / distance * focalPixels), AccuracyLineLeast, _accuracyLineHalf);
++	}
++	return std::clamp((int)std::lround(acrossReach / distance * focalPixels), AccuracyLineLeast, _accuracyLineHalf);
 +}
 +
 +/**

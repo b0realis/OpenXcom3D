@@ -3746,6 +3746,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	Uint8 color = grey;
 	std::string modeText, shotText, costText, damageText;
 	int damageColor = -1;
+	int lineAccuracy = -1; // the hit chance worked out for the shot (percent), for the accuracy line
 	bool dual = false, inTurn = false, volley = false, eachFull = false; // both guns fire (dual wield); an arcing pair, gun after gun, each at full accuracy and its own cost (see fire); a volley (setting "Akimbo volley")
 	if (weapon && mode != BA_NONE && unit)
 	{
@@ -3817,6 +3818,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 				canFire = false;
 			}
 			shotInfo << accuracy << "%  ";
+			lineAccuracy = accuracy;
 		}
 
 		// Then the time units it costs (both guns' with dual wield).
@@ -3952,51 +3954,63 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 
 	// The accuracy line (setting "Accuracy line") under the crosshair, green (grey while he
 	// can't act): its half-width how far to either side a round can land, seen through the
-	// view's lens. In FPS style the spread (it grows with the bloom of the last rounds); with
-	// the game's own targeting, for a straight shot, how far a successful accuracy roll can send
-	// the round from what's under the crosshair (see hitCloudReach).
-	int reach = 0;
+	// view's lens, up to the view's edges. In FPS style the spread (it grows with the bloom of
+	// the last rounds); with the game's own targeting, for a straight shot, how far a successful
+	// accuracy roll can send the round from what's under the crosshair, and dotted beyond that,
+	// dimmer, how far a missed roll can (see hitCloudReach; a player, GitHub issue #66: a low hit
+	// chance's rounds scattered far wider than the line showed).
+	int reach = 0, missReach = 0;
 	if (unit && weapon && Options::fpsAccuracyLine && freeAimOn(mode))
 	{
 		const double focalPixels = (_view->getWidth() / 2.0) / std::tan(fieldOfViewNow() * Pi / 360.0);
-		reach = std::clamp((int)std::lround(std::tan((spreadFor(unit, mode, dual && !eachFull) + _bloom) * Pi / 180.0) * focalPixels), AccuracyLineLeast, AccuracyLineReach);
+		reach = std::clamp((int)std::lround(std::tan((spreadFor(unit, mode, dual && !eachFull) + _bloom) * Pi / 180.0) * focalPixels), AccuracyLineLeast, _accuracyLineHalf);
 	}
 	else if (unit && weapon && Options::fpsAccuracyLine && isShot(mode) && !weapon->getArcingShot(mode))
 	{
-		reach = hitCloudReach(unit, weapon, mode);
+		reach = hitCloudReach(unit, weapon, mode, lineAccuracy, missReach);
 	}
-	_accuracyLine->setX(centreX - AccuracyLineReach - 1);
+	_accuracyLine->setX(centreX - _accuracyLineHalf - 1);
 	_accuracyLine->setY(centreY + AccuracyLineDrop - 2);
 	_accuracyLine->setVisible(Options::fpsCrosshair && reach > 0);
 	const Uint8 lineColor = canAct() ? nearestColor(palette, 130, 230, 100) : grey;
-	const Uint64 lineKey = (Uint64)reach | ((Uint64)lineColor << 16);
+	const Uint8 missColor = canAct() ? nearestColor(palette, 70, 150, 60) : grey;
+	const Uint64 lineKey = (Uint64)reach | ((Uint64)missReach << 12) | ((Uint64)lineColor << 24) | ((Uint64)missColor << 32);
 	if (reach > 0 && lineKey != _accuracyLineDrawnFor)
 	{
 		_accuracyLineDrawnFor = lineKey;
-		drawAccuracyLine(reach, lineColor, shadow);
+		drawAccuracyLine(reach, missReach, lineColor, missColor, shadow);
 	}
 }
 
 /**
  * Draws the accuracy line (setting "Accuracy line") onto its surface: a level line through the
- * middle, as wide to either side as the reach, with a small notch up at each end; each pixel
- * with a shadow one down and to the right, so it reads on any background.
- * @param reach The half-width, in pixels (at most AccuracyLineReach).
+ * middle, as wide to either side as the reach, with a small notch up at each end; beyond it, out
+ * to the miss reach, a dotted line in the dimmer colour (every other pixel) with a notch of one
+ * pixel at each end; each pixel with a shadow one down and to the right, so it reads on any
+ * background.
+ * @param reach The half-width, in pixels (at most the view's half width).
+ * @param missReach How far the dotted part reaches, in pixels (0, or no more than reach: none).
  * @param color Palette colour of the line.
+ * @param missColor Palette colour of the dotted part.
  * @param shadow Palette colour of its shadow.
  */
-void FirstPersonMode::drawAccuracyLine(int reach, Uint8 color, Uint8 shadow)
+void FirstPersonMode::drawAccuracyLine(int reach, int missReach, Uint8 color, Uint8 missColor, Uint8 shadow)
 {
 	// The points, from the line's middle (the surface's row 2 is the line's, the notches rise
-	// two rows above it); the shadows go under all of them before the colour goes on top.
-	std::vector<std::pair<int, int>> points;
-	for (int x = -reach; x <= reach; ++x) points.push_back({ x, 2 });
-	for (int side : { -reach, reach }) { points.push_back({ side, 1 }); points.push_back({ side, 0 }); }
-	const int middle = AccuracyLineReach + 1;
+	// two rows above it), each with its colour; the shadows go under all of them before the
+	// colours go on top.
+	reach = std::min(reach, _accuracyLineHalf);
+	missReach = std::min(missReach, _accuracyLineHalf);
+	std::vector<std::pair<std::pair<int, int>, Uint8>> points;
+	for (int x = -reach; x <= reach; ++x) points.push_back({ { x, 2 }, color });
+	for (int side : { -reach, reach }) { points.push_back({ { side, 1 }, color }); points.push_back({ { side, 0 }, color }); }
+	for (int x = reach + 2; x <= missReach; x += 2) { points.push_back({ { x, 2 }, missColor }); points.push_back({ { -x, 2 }, missColor }); }
+	if (missReach > reach + 1) for (int side : { -missReach, missReach }) { points.push_back({ { side, 2 }, missColor }); points.push_back({ { side, 1 }, missColor }); }
+	const int middle = _accuracyLineHalf + 1;
 	_accuracyLine->clear();
 	_accuracyLine->lock();
-	for (const auto &point : points) _accuracyLine->setPixel(middle + point.first + 1, point.second + 1, shadow);
-	for (const auto &point : points) _accuracyLine->setPixel(middle + point.first, point.second, color);
+	for (const auto &point : points) _accuracyLine->setPixel(middle + point.first.first + 1, point.first.second + 1, shadow);
+	for (const auto &point : points) _accuracyLine->setPixel(middle + point.first.first, point.first.second, point.second);
 	_accuracyLine->unlock();
 }
 
@@ -4008,15 +4022,20 @@ void FirstPersonMode::drawAccuracyLine(int reach, Uint8 color, Uint8 shadow)
  * (more across the map's y than along its x, unless OXCE's "Uniform shooting spread" is on), and
  * the round goes up to half of it to either side on the map (and an eighth of it up or down,
  * which the line leaves out), then flies on along that line. A roll under the accuracy strays
- * this far at most, whatever the soldier's skill (the hit chance says how likely that is; a miss
- * strays much wider).
+ * this far at most, whatever the soldier's skill (the hit chance says how likely that is). A
+ * missed roll strays much wider: up to MissRollDeviation less the hit chance where the roll's
+ * 9 stand (at 16%, nearly fifteen times as far; none at 100% or more).
  * @param unit The soldier aiming.
  * @param weapon The gun.
  * @param mode The shot.
+ * @param accuracy The shot's hit chance as worked out for the crosshair (percent; -1: unknown,
+ *   no miss reach).
+ * @param missReach Set to how far a missed roll can send the round, the same way (0 for none).
  * @return The reach across the view, in pixels (0 with nothing to measure).
  */
-int FirstPersonMode::hitCloudReach(BattleUnit *unit, BattleItem *weapon, BattleActionType mode)
+int FirstPersonMode::hitCloudReach(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, int accuracy, int &missReach)
 {
+	missReach = 0;
 	// From the muzzle the shot leaves from (a lean's side too, as fire picks it) to the point
 	// under the crosshair.
 	BattleAction shot;
@@ -4059,7 +4078,14 @@ int FirstPersonMode::hitCloudReach(BattleUnit *unit, BattleItem *weapon, BattleA
 	const double acrossReach = Options::oxceUniformShootingSpread ? across : across * (std::abs(right[0]) + std::abs(right[1]));
 
 	const double focalPixels = (_view->getWidth() / 2.0) / std::tan(fieldOfViewNow() * Pi / 360.0);
-	return std::clamp((int)std::lround(acrossReach / distance * focalPixels), AccuracyLineLeast, AccuracyLineReach);
+	if (accuracy >= 0 && accuracy < 100)
+	{
+		// A missed roll: the same, with the miss's largest deviation.
+		const double missAcross = std::max(1, zShift * (MissRollDeviation - accuracy) / 200) / 2.0;
+		const double missAcrossReach = Options::oxceUniformShootingSpread ? missAcross : missAcross * (std::abs(right[0]) + std::abs(right[1]));
+		missReach = std::clamp((int)std::lround(missAcrossReach / distance * focalPixels), AccuracyLineLeast, _accuracyLineHalf);
+	}
+	return std::clamp((int)std::lround(acrossReach / distance * focalPixels), AccuracyLineLeast, _accuracyLineHalf);
 }
 
 /**

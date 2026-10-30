@@ -811,6 +811,7 @@ private:
 	Surface *_crosshair = nullptr;                 // the crosshair's surface
 	Uint64 _crosshairDrawnFor = ~(Uint64)0;        // what the crosshair surface shows, to redraw only on change
 	Surface *_accuracyLine = nullptr;              // the accuracy line under the crosshair (see drawAccuracyLine)
+	int _accuracyLineHalf = 0;                     // its widest reach to either side, in pixels (the view's half width)
 	Uint64 _accuracyLineDrawnFor = ~(Uint64)0;     // what it shows, to redraw only on change
 	Text *_txtMode = nullptr, *_txtShot = nullptr; // the fire mode, and the shot's odds and cost, beside the crosshair
 	Text *_txtCosts = nullptr;                      // and under them its other costs (setting "Expanded crosshair info")
@@ -826,9 +827,9 @@ private:
 	/// Updates the crosshair and its texts: mode, hit chance, time units.
 	void updateCrosshair(BattleUnit *unit, bool playerTurn);
 	/// The game's own targeting's accuracy line: how far to either side a successful roll strays at what's under the crosshair, in pixels.
-	int hitCloudReach(BattleUnit *unit, BattleItem *weapon, BattleActionType mode);
+	int hitCloudReach(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, int accuracy, int &missReach);
 	/// Draws the accuracy line: a level line as wide as the reach to either side, a notch up at each end.
-	void drawAccuracyLine(int reach, Uint8 color, Uint8 shadow);
+	void drawAccuracyLine(int reach, int missReach, Uint8 color, Uint8 missColor, Uint8 shadow);
 	/// A mod's own name for an action of an item, in capitals for the crosshair; empty if it keeps the game's name.
 	std::string renamedAction(const RuleItem *rules, BattleActionType mode) const;
 	/// Does the soldier have a line of sight to the aimed tile, as a shot checks it?

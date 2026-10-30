@@ -106,14 +106,16 @@ const int HitRollDeviation = 9;
 const int NearPointReach = 4;
 const int NearPointMostTries = 160;
 /// The accuracy line under the crosshair (setting "Accuracy line", see FirstPersonMode::
-/// drawAccuracyLine), in canvas pixels: its reach to either side of the middle at the least and
-/// at the most, how far under the crosshair's middle it runs (clear of the crosshair's shapes,
-/// which reach 13 down with their outline), and the room it takes there (the unit's name and the
-/// icons over a downed unit go that much lower while it shows).
+/// drawAccuracyLine), in canvas pixels: its reach to either side of the middle at the least (at
+/// the most, the view's edges: GitHub issue #66), how far under the crosshair's middle it runs
+/// (clear of the crosshair's shapes, which reach 13 down with their outline), and the room it
+/// takes there (the unit's name and the icons over a downed unit go that much lower while it shows).
 const int AccuracyLineLeast = 3;
-const int AccuracyLineReach = 60;
 const int AccuracyLineDrop = 16;
 const int AccuracyLineRoom = 9;
+/// With the game's own targeting, the accuracy line's dotted outer part reaches as far as a miss can stray: the game's
+/// miss roll goes up to this less the hit chance (percent) (Projectile::applyAccuracy: 0 to 100, plus 50 for a miss).
+const int MissRollDeviation = 150;
 /// Where the game has pushed a soldier's sight under a floor right above (standing on something
 /// tall under a ceiling), the 3D eye is only this many voxels under the game's (see eyeHeight).
 const double PressedEyeLower = 1.0;
