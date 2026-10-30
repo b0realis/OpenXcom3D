@@ -218,7 +218,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
 			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsParticles", "fpsUfoLights",
 			"fpsGhostParts", "fpsGhostOpacity", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
-		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars",
+		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars",
 			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsCompass", "fpsMiddleClickIdentify" } },
 		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds" } },
 		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },

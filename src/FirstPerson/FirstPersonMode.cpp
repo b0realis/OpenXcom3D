@@ -277,6 +277,8 @@ void FirstPersonMode::createCrosshairAndBanner()
 	// Under them, the action's other costs (setting "Expanded crosshair info"): energy, health and
 	// the rest, a cost the soldier can't pay in the second colour (red).
 	_txtCosts = addText(160, 9, width / 2 + 14, height / 2 + 11, "crosshairText", "firstPerson");
+	// Under the hit chance, the shot's damage range (setting "Shot damage"), the costs a line lower.
+	_txtDamage = addText(120, 9, width / 2 + 14, height / 2 + 11, "crosshairText", "firstPerson");
 	_txtBanner->setAlign(ALIGN_CENTER);
 	// The name of the unit pointed at, under the crosshair (it follows the free cursor).
 	_txtTarget = addText(160, 9, width / 2 - 80, height / 2 + 10, "crosshairText", "firstPerson");
@@ -287,7 +289,7 @@ void FirstPersonMode::createCrosshairAndBanner()
 	_txtScoping->setAlign(ALIGN_RIGHT);
 
 	// All hidden until there's something to show.
-	for (Text *text : { _txtMode, _txtShot, _txtCosts, _txtBanner, _txtTarget, _txtScoping })
+	for (Text *text : { _txtMode, _txtShot, _txtCosts, _txtDamage, _txtBanner, _txtTarget, _txtScoping })
 	{
 		text->setVisible(false);
 	}
@@ -845,6 +847,7 @@ void FirstPersonMode::setResizeAnchors()
 	_anchors[_txtMode] = CENTER;
 	_anchors[_txtShot] = CENTER;
 	_anchors[_txtCosts] = CENTER;
+	_anchors[_txtDamage] = CENTER;
 	_anchors[_txtScoping] = RIGHT_CENTER;
 
 	// END and the suit's buttons keep to the top right, and so does the compass; the info panel

@@ -333,6 +333,8 @@ en-US:
   STR_FPS_CROSSHAIR_INFO: "Shot info"
   STR_FPS_CROSSHAIR_INFO_DESC: "Fire mode, hit chance and TU cost by the crosshair."
   STR_FPS_CROSSHAIR_COSTS: "Expanded crosshair info"
+  STR_FPS_CROSSHAIR_DAMAGE: "Shot damage"
+  STR_FPS_CROSSHAIR_DAMAGE_DESC: "Under the hit chance, the shot's damage range, as the map shows it with Alt: your soldier's stats, the distance."
   STR_FPS_CROSSHAIR_COSTS_DESC: "Under the shot info, the action's other costs: energy, health, stun, morale, mana."
   STR_FPS_ACCURACY_LINE: "Accuracy line"
   STR_FPS_ACCURACY_LINE_DESC: "A green line under the crosshair as wide as a round can stray: by the game's accuracy roll, or FPS style's spread."

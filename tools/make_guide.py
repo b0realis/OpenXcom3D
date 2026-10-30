@@ -174,6 +174,7 @@ SETTINGS = [
         ('Crosshair', 'YES', 'YES / NO', 'The crosshair; its shape tells the fire mode.', ''),
         ('Shot info', 'YES', 'YES / NO', 'The fire mode, hit chance and time units right of the crosshair.', 'Yellow: you can; red: you can\'t.'),
         ('Expanded crosshair info', 'YES', 'YES / NO', 'The action\'s other costs under it: energy, health, stun, morale, mana.', 'The big mods\' weapons often cost energy.'),
+        ('Shot damage', 'NO', 'YES / NO', 'The shot\'s damage range under the hit chance, as the map shows it with Alt: your soldier\'s stats and the distance counted, in the damage type\'s colour.', ''),
         ('Accuracy line', 'YES', 'YES / NO', 'A green line under the crosshair, as wide as a shot strays to either side: the game\'s successful roll (its own targeting), or the spread (FPS style).',
          'With the game\'s own targeting it is short: a hit strays little, a miss far; the hit chance says how likely each is.'),
         ('Unit names', 'YES', 'YES / NO', 'The name of the unit you point at, under the crosshair.', ''),

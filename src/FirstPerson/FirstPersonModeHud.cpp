@@ -842,7 +842,7 @@ std::string FirstPersonMode::ammoLabel(const BattleUnit *unit, const BattleItem 
  * in the game's language (a mod's own names included): the first letters of its first two words,
  * or a one-word name's first two letters ("ARMOR PIERCING" AP, "HIGH EXPLOSIVE" HE, "INCENDIARY"
  * IN, "LASER BEAM" LB, X-Com Files' "ELECTRIC" EL); a mod's own type it doesn't name, its number
- * (10 to 19). The colour is the type's (AmmoTagColors; a mod's own types AmmoTagModColor).
+ * (10 to 19). The colour is the type's (see damageTypeColor).
  * @param weapon The gun.
  * @param slot Its ammo slot.
  * @param clip The clip loaded there, or null for none (no tag).
@@ -897,9 +897,7 @@ std::string FirstPersonMode::ammoTag(const BattleItem *weapon, int slot, const B
 		Unicode::upperCase(tag);
 	}
 
-	// The colour.
-	const Uint8 *rgb = type < (int)(sizeof(AmmoTagColors) / sizeof(AmmoTagColors[0])) ? AmmoTagColors[type] : AmmoTagModColor;
-	color = textColor(_state->getPalette(), rgb[0], rgb[1], rgb[2]);
+	color = damageTypeColor(type);
 	return tag;
 }
 

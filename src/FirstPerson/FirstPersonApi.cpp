@@ -480,6 +480,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshair", &fpsCrosshair, true, "STR_FPS_CROSSHAIR", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshairInfo", &fpsCrosshairInfo, true, "STR_FPS_CROSSHAIR_INFO", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshairCosts", &fpsCrosshairCosts, true, "STR_FPS_CROSSHAIR_COSTS", category));
+	// The shot's damage range under the hit chance, as the map shows it with Alt (a player, GitHub
+	// issue #50; the owner: a setting, off).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshairDamage", &fpsCrosshairDamage, false, "STR_FPS_CROSSHAIR_DAMAGE", category));
 	// A line under the crosshair as wide as a shot strays to either side: with the game's own
 	// targeting, as far as a successful accuracy roll sends it at that range; in FPS style, the spread.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsAccuracyLine", &fpsAccuracyLine, true, "STR_FPS_ACCURACY_LINE", category));

@@ -90,6 +90,7 @@
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/SavedBattleGame.h"
 #include "../Savegame/SavedGame.h"
+#include "../Ufopaedia/Ufopaedia.h"
 #include "../Savegame/Tile.h"
 #include "FirstPersonModeShared.h"
 
@@ -3704,6 +3705,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	_txtMode->setVisible(show && Options::fpsCrosshairInfo && playerTurn);
 	_txtShot->setVisible(show && Options::fpsCrosshairInfo && playerTurn);
 	_txtCosts->setVisible(show && Options::fpsCrosshairInfo && Options::fpsCrosshairCosts && playerTurn);
+	_txtDamage->setVisible(show && Options::fpsCrosshairInfo && Options::fpsCrosshairDamage && playerTurn);
 	if (!show)
 	{
 		return;
@@ -3716,8 +3718,9 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	_txtMode->setY(linesTop);
 	_txtShot->setX(centreX + 14);
 	_txtShot->setY(linesTop + 10);
-	_txtCosts->setX(centreX + 14);
-	_txtCosts->setY(linesTop + 20);
+	_txtDamage->setX(centreX + 14);
+	_txtDamage->setY(linesTop + 20);
+	_txtCosts->setX(centreX + 14); // (its line: below, once the damage line is known)
 
 	// The colours, picked from the current palette: plain ones for the crosshair, and text
 	// colour groups for the lines.
@@ -3741,7 +3744,8 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	const BattleActionType mode = (playerTurn && weapon) ? _fireMode : BA_NONE;
 	int shots = 1;
 	Uint8 color = grey;
-	std::string modeText, shotText, costText;
+	std::string modeText, shotText, costText, damageText;
+	int damageColor = -1;
 	bool dual = false, inTurn = false, volley = false, eachFull = false; // both guns fire (dual wield); an arcing pair, gun after gun, each at full accuracy and its own cost (see fire); a volley (setting "Akimbo volley")
 	if (weapon && mode != BA_NONE && unit)
 	{
@@ -3818,6 +3822,12 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		// Then the time units it costs (both guns' with dual wield).
 		shotInfo << cost.Time + (dual ? offTime : 0) << std::string(_state->tr("STR_FPS_TU"));
 		shotText = shotInfo.str();
+
+		// Under it, the damage range (setting "Shot damage", see shotDamage).
+		if (Options::fpsCrosshairDamage)
+		{
+			damageText = shotDamage(unit, weapon, mode, damageColor);
+		}
 
 		// Under it, the action's other costs (a player: "an energy cost per action if applicable,
 		// as well as any other costs (health, stun, morale, whatever)"; setting "Expanded
@@ -3908,10 +3918,14 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		_txtShot->setColor(accuracy >= 0 && canFire ? accuracyColor : labelColor);
 		_txtCosts->setColor(canAct() ? yellowText : greyText);
 		_txtCosts->setSecondaryColor(canAct() ? redText : greyText);
+		const Uint8 damageTextColor = damageColor < 0 || !canAct() ? greyText : (Uint8)damageColor;
+		if (_txtDamage->getColor() != damageTextColor) _txtDamage->setColor(damageTextColor);
 	}
 	_txtMode->setText(modeText);
 	_txtShot->setText(shotText);
 	if (_txtCosts->getText() != costText) _txtCosts->setText(costText);
+	if (_txtDamage->getText() != damageText) _txtDamage->setText(damageText);
+	_txtCosts->setY(linesTop + (_txtDamage->getVisible() && !damageText.empty() ? 30 : 20));
 
 	// A hit (or a kill) on an enemy in sight ticks once (setting "Hit and kill sounds") and marks
 	// the crosshair for 280 ms.
@@ -4318,11 +4332,11 @@ void FirstPersonMode::updateUnitName(BattleUnit *unit)
 	pointer(pointerX, pointerY);
 	const BattleUnit *target = Options::fpsUnitNames && !hudClean() ? pointedUnit() : nullptr;
 	_txtTarget->setVisible(target != nullptr);
-	// The name a line lower while the action's other costs show under the shot line (its text
-	// would run into them), and under the accuracy line while that shows (see updateCrosshair);
-	// a downed unit's icons under both.
+	// The name a line lower for each line under the shot line (the damage range, the other costs:
+	// its text would run into them), and under the accuracy line while that shows (see
+	// updateCrosshair); a downed unit's icons under both.
 	const int lineRoom = accuracyLineShown() ? AccuracyLineRoom : 0;
-	const int below = std::max(costLineShown() ? 10 : 0, lineRoom);
+	const int below = std::max(linesUnderShot() * 10, lineRoom);
 	_view->setPointer(pointerX, pointerY, target ? _txtTarget->getHeight() + 1 + below : lineRoom);
 	if (!target)
 	{
@@ -4347,6 +4361,106 @@ void FirstPersonMode::updateUnitName(BattleUnit *unit)
 bool FirstPersonMode::costLineShown() const
 {
 	return _txtCosts && _txtCosts->getVisible() && !_txtCosts->getText().empty() && Options::fpsCrosshair;
+}
+
+/**
+ * How many lines show under the shot line beside the crosshair (see updateCrosshair): the damage
+ * range (setting "Shot damage") and the action's other costs, each with something on it; the unit
+ * name goes that many lines lower (see updateUnitName). None without the crosshair (the lines then
+ * sit below the name).
+ * @return 0, 1 or 2.
+ */
+int FirstPersonMode::linesUnderShot() const
+{
+	const bool damageLine = _txtDamage && _txtDamage->getVisible() && !_txtDamage->getText().empty() && Options::fpsCrosshair;
+	return (costLineShown() ? 1 : 0) + (damageLine ? 1 : 0);
+}
+
+/**
+ * The shot's damage range by the crosshair (setting "Shot damage"; a player, GitHub issue #50:
+ * "similar to how alt in iso shows shot damage range ... adjust damage by skill of current unit ...
+ * just display damage range directly under crosshair", tinted by the damage type), worked out as
+ * the game's isometric cursor does it with Alt held (Map.cpp):
+ * - the power of what deals the damage (the ammo loaded for the mode, or the item itself: a blow,
+ *   a throw, a psi amp, a gun that ignores its ammo's power) with the soldier's stat bonuses
+ *   (strength for a blow, firing for some mods' guns: RuleItem::getPowerBonus), less its dropoff
+ *   over the distance to what the crosshair points at, as the lowest and highest damage its type
+ *   rolls: "30-90", a star after it for the two-dice kind (DRT_UFO_WITH_TWO_DICE);
+ * - a psi attack (panic, mind control): its range of success against a plain defence, "12-67%";
+ * - "?-?" while the weapon or its ammo isn't in the Ufopaedia yet (a new battle knows them all);
+ * - nothing for an action that deals no damage (a medi-kit, priming) or a gun with nothing loaded.
+ * @param unit The soldier.
+ * @param weapon The item used.
+ * @param mode The action.
+ * @param color Set to the text's colour: the damage type's (see damageTypeColor), psi's for a psi
+ *   attack; left alone (-1: grey) for "?-?".
+ * @return The text; empty for none.
+ */
+std::string FirstPersonMode::shotDamage(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, int &color) const
+{
+	const RuleItem *weaponRules = weapon->getRules();
+	const bool psiAttack = mode == BA_PANIC || mode == BA_MINDCONTROL;
+	const bool psiUse = mode == BA_USE && weaponRules->getBattleType() == BT_PSIAMP;
+	if (!isShot(mode) && mode != BA_THROW && mode != BA_HIT && mode != BA_LAUNCH && !psiAttack && !psiUse)
+	{
+		return "";
+	}
+
+	// What deals the damage, as the map has it.
+	const BattleActionAttack attack = BattleActionAttack::GetBeforeShoot(mode, unit, weapon);
+	const RuleItem *rule = weaponRules->getBattleType() == BT_PSIAMP ? weaponRules
+		: weapon->needsAmmoForAction(mode) ? (attack.damage_item ? attack.damage_item->getRules() : nullptr) : weaponRules;
+	if (!rule || !rule->getDamageType())
+	{
+		return "";
+	}
+
+	// Known: the weapon's and the ammo's Ufopaedia articles available.
+	if (_game->getSavedGame()->getMonthsPassed() != -1)
+	{
+		for (const RuleItem *item : { rule, weaponRules })
+		{
+			ArticleDefinition *article = _game->getMod()->getUfopaediaArticle(item->getType(), false);
+			if (article && !Ufopaedia::isArticleAvailable(_game->getSavedGame(), article))
+			{
+				return "?-?";
+			}
+		}
+	}
+
+	// A psi attack: its odds' range, at the distance to the tile pointed at.
+	const Position target = _aimVoxel.toTile();
+	if (psiAttack)
+	{
+		const float attackStrength = BattleUnit::getPsiAccuracy(attack), defenceStrength = 30.0f; // (as the map: a plain defence)
+		const float voxelDistance = Position::distance(unit->getPosition().toVoxel(), target.toVoxel());
+		const int lowest = (int)(attackStrength - defenceStrength - rule->getPsiAccuracyRangeReduction(voxelDistance)), highest = lowest + 55;
+		color = textColor(_state->getPalette(), 200, 120, 255);
+		return highest <= 0 ? std::string("0%") : std::to_string(lowest) + "-" + std::to_string(highest) + "%";
+	}
+
+	// The damage: the power with the soldier's bonuses, less the dropoff over the distance in tiles.
+	const int distance = (int)std::ceil(std::sqrt((double)unit->distance3dToPositionSq(target)));
+	const RuleItem *powerRules = weaponRules->getIgnoreAmmoPower() ? weaponRules : rule;
+	const int power = std::max(0, powerRules->getPowerBonus(attack) - (int)powerRules->getPowerRangeReduction(distance * 16));
+	const RuleDamageType *type = rule->getDamageType();
+	std::string text = std::to_string(type->getRandomDamage(power, 1)) + "-" + std::to_string(type->getRandomDamage(power, 2));
+	if (type->RandomType == DRT_UFO_WITH_TWO_DICE) text += "*";
+	color = damageTypeColor(type->ResistType);
+	return text;
+}
+
+/**
+ * The text colour of a damage type, as the ammo tag (see FirstPersonMode::ammoTag) and the damage
+ * range (shotDamage) show it: AmmoTagColors for the game's own types, AmmoTagModColor for a mod's
+ * (10 to 19).
+ * @param type The damage type.
+ * @return The colour (a group start, see textColor).
+ */
+Uint8 FirstPersonMode::damageTypeColor(ItemDamageType type) const
+{
+	const Uint8 *rgb = type >= 0 && type < (int)(sizeof(AmmoTagColors) / sizeof(AmmoTagColors[0])) ? AmmoTagColors[type] : AmmoTagModColor;
+	return textColor(_state->getPalette(), rgb[0], rgb[1], rgb[2]);
 }
 
 /**

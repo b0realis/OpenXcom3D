@@ -754,6 +754,12 @@ private:
 	void updateSprayMarks(BattleUnit *unit);
 	/// Whether the line of the action's other costs shows under the crosshair (the unit name goes a line lower).
 	bool costLineShown() const;
+	/// How many lines show under the shot line (the damage range, the other costs): 0 to 2.
+	int linesUnderShot() const;
+	/// The shot's damage range by the crosshair, as the map shows it with Alt: "30-90"; empty for none.
+	std::string shotDamage(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, int &color) const;
+	/// The text colour of a damage type (the ammo tag's and the damage range's).
+	Uint8 damageTypeColor(ItemDamageType type) const;
 	/// Whether the accuracy line shows under the crosshair (the unit name and a downed unit's icons go under it).
 	bool accuracyLineShown() const;
 	/// The first voxel along the ray through a pixel, as a shot would see it; true if something is there.
@@ -808,6 +814,7 @@ private:
 	Uint64 _accuracyLineDrawnFor = ~(Uint64)0;     // what it shows, to redraw only on change
 	Text *_txtMode = nullptr, *_txtShot = nullptr; // the fire mode, and the shot's odds and cost, beside the crosshair
 	Text *_txtCosts = nullptr;                      // and under them its other costs (setting "Expanded crosshair info")
+	Text *_txtDamage = nullptr;                     // and under the hit chance the shot's damage range (setting "Shot damage")
 	Uint32 _hitMarkerHeard = 0;                    // the last hitmarker that ticked
 	const BattleUnit *_sightCheckUnit = nullptr;   // the soldier the last line-of-sight check was for,
 	Position _sightCheckFrom, _sightCheckTile;     // where he stood and the tile aimed at,

@@ -353,6 +353,8 @@ bool FirstPersonMode::deathCam(Uint32 now, double elapsedSeconds)
 		_breakdownStart = 0;
 		_txtMode->setVisible(false);
 		_txtShot->setVisible(false);
+		_txtCosts->setVisible(false);
+		_txtDamage->setVisible(false);
 		_txtTarget->setVisible(false);
 		_crosshair->setVisible(false);
 		_accuracyLine->setVisible(false);
@@ -643,6 +645,8 @@ bool FirstPersonMode::breakdownCam(Uint32 now, double elapsedSeconds)
 		_view->setVignette(0.0f);
 		_txtMode->setVisible(false);
 		_txtShot->setVisible(false);
+		_txtCosts->setVisible(false);
+		_txtDamage->setVisible(false);
 		_txtTarget->setVisible(false);
 		_crosshair->setVisible(false);
 		_accuracyLine->setVisible(false);
