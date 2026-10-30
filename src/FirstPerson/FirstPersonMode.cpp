@@ -1549,17 +1549,17 @@ void FirstPersonMode::catchUp()
 }
 
 /**
- * Is doom mode on? It is with its own setting, and with either of its extras, which are doom
- * mode plus more: IDKFA (endless ammo) and IDDQD (invincible soldiers).
+ * Is doom mode on? It is with its own setting, and with any of its extras, which are doom mode
+ * plus more: IDKFA (endless ammo), IDDQD (invincible soldiers) and IDCLIP (noclip).
  * @return True if doom mode is on.
  */
 bool FirstPersonMode::doomModeOn()
 {
-	return Options::fpsDoomMode || Options::fpsDoomIdkfa || Options::fpsDoomIddqd;
+	return Options::fpsDoomMode || Options::fpsDoomIdkfa || Options::fpsDoomIddqd || Options::fpsDoomIdclip;
 }
 
 /**
- * The doom mode key (Insert): with any of the cheats on (doom mode, IDKFA, IDDQD), switches them
+ * The doom mode key (Insert): with any of the cheats on (doom mode, IDKFA, IDDQD, IDCLIP), switches them
  * all off and remembers which were on; with none on, switches those back on (doom mode alone if
  * there are none to remember). The game's warning line says which.
  */
@@ -1567,8 +1567,8 @@ void FirstPersonMode::toggleCheats()
 {
 	if (doomModeOn())
 	{
-		_pausedCheats = (Options::fpsDoomMode ? 1 : 0) | (Options::fpsDoomIdkfa ? 2 : 0) | (Options::fpsDoomIddqd ? 4 : 0);
-		Options::fpsDoomMode = Options::fpsDoomIdkfa = Options::fpsDoomIddqd = false;
+		_pausedCheats = (Options::fpsDoomMode ? 1 : 0) | (Options::fpsDoomIdkfa ? 2 : 0) | (Options::fpsDoomIddqd ? 4 : 0) | (Options::fpsDoomIdclip ? 8 : 0);
+		Options::fpsDoomMode = Options::fpsDoomIdkfa = Options::fpsDoomIddqd = Options::fpsDoomIdclip = false;
 	}
 	else
 	{
@@ -1576,6 +1576,7 @@ void FirstPersonMode::toggleCheats()
 		Options::fpsDoomMode = (cheats & 1) != 0;
 		Options::fpsDoomIdkfa = (cheats & 2) != 0;
 		Options::fpsDoomIddqd = (cheats & 4) != 0;
+		Options::fpsDoomIdclip = (cheats & 8) != 0;
 	}
 	// A line says which (the panel's tag hides with the classic HUD or the 3D HUD hidden), and
 	// the options file keeps it, so the options screen's Cancel doesn't quietly undo it.
@@ -1587,16 +1588,19 @@ void FirstPersonMode::toggleCheats()
 
 /**
  * The cheats that are on, as the info panel tags them: DOOM MODE, or the extras that are on
- * (IDDQD, IDKFA).
+ * (IDDQD, IDKFA, IDCLIP).
  */
 std::string FirstPersonMode::cheatTag() const
 {
-	if (!Options::fpsDoomIddqd && !Options::fpsDoomIdkfa)
+	if (!Options::fpsDoomIddqd && !Options::fpsDoomIdkfa && !Options::fpsDoomIdclip)
 	{
 		return std::string(_state->tr("STR_FPS_DOOM"));
 	}
-	std::string tag = Options::fpsDoomIddqd ? std::string(_state->tr("STR_FPS_IDDQD")) : "";
-	if (Options::fpsDoomIdkfa) tag += (tag.empty() ? "" : " ") + std::string(_state->tr("STR_FPS_IDKFA"));
+	std::string tag;
+	auto add = [&](const char *id) { tag += (tag.empty() ? "" : " ") + std::string(_state->tr(id)); };
+	if (Options::fpsDoomIddqd) add("STR_FPS_IDDQD");
+	if (Options::fpsDoomIdkfa) add("STR_FPS_IDKFA");
+	if (Options::fpsDoomIdclip) add("STR_FPS_IDCLIP");
 	return tag;
 }
 
@@ -1678,6 +1682,55 @@ bool FirstPersonMode::endlessAmmo(BattlescapeState *state, const BattleUnit *uni
 bool FirstPersonMode::invincible(BattlescapeState *state, const BattleUnit *unit)
 {
 	return Options::fpsDoomIddqd && state && state->_firstPerson && unit && unit->getFaction() == FACTION_PLAYER;
+}
+
+/**
+ * Doom IDCLIP, asked by the game whenever a unit with no floor under it is about to fall: does it
+ * float where it is instead? Any of X-COM's units, in either view, with IDCLIP on: a soldier
+ * walked out into the air or up through a ceiling stays there (see noclipMove), and falls only
+ * once IDCLIP is switched off (see applyNoclipEnd).
+ * @param state The battlescape screen.
+ * @param unit The unit about to fall.
+ * @return True if it doesn't fall.
+ */
+bool FirstPersonMode::noclipFloats(BattlescapeState *state, const BattleUnit *unit)
+{
+	return Options::fpsDoomIdclip && state && state->_firstPerson && unit && unit->getFaction() == FACTION_PLAYER;
+}
+
+/**
+ * Doom IDCLIP (a player's request, GitHub issue #45: "turns movement hit detection off ... If
+ * inside terrain when on, grant ghost property to current square to assist visibility. Enable fly
+ * ... so player doesn't fall into terrain"): does this soldier walk and float through anything
+ * right now? The player's own soldier, one tile big (a 2x2 unit keeps the rules), in the 3D view,
+ * with IDCLIP on.
+ * @param unit The soldier looked through.
+ * @return True if their moves go through walls, doors and floors.
+ */
+bool FirstPersonMode::noclipOn(const BattleUnit *unit) const
+{
+	return Options::fpsDoomIdclip && isActive() && unit && unit->getFaction() == FACTION_PLAYER && unit->getArmor()->getSize() == 1 && !unit->isOut();
+}
+
+/**
+ * Doom IDCLIP switched off (by its setting or the doom mode key), called every frame of the
+ * battle: X-COM's units it left in the air (or inside the ground's level, with no floor) get the
+ * game's gravity, so those who can't fly fall and flyers take to the air, as after a floor gives
+ * way. The game starts the falls itself as soon as nothing else is going on.
+ */
+void FirstPersonMode::applyNoclipEnd()
+{
+	if (_idclipWas && !Options::fpsDoomIdclip)
+	{
+		for (BattleUnit *unit : *_save->getUnits())
+		{
+			if (unit->getFaction() == FACTION_PLAYER && !unit->isOut() && unit->getTile())
+			{
+				_save->getTileEngine()->applyGravity(unit->getTile());
+			}
+		}
+	}
+	_idclipWas = Options::fpsDoomIdclip;
 }
 
 /**
@@ -1874,8 +1927,10 @@ void FirstPersonMode::think()
 		_ignoreMotionUntil = now + 150;
 	}
 
-	// Doom IDDQD keeps X-COM's morale full, whatever the view and whoever's turn it is.
+	// Doom IDDQD keeps X-COM's morale full, whatever the view and whoever's turn it is; Doom
+	// IDCLIP switched off lets those it left in the air fall.
 	applyGodMode();
+	applyNoclipEnd();
 
 	// A soldier going down or breaking down: their camera has the frame, unzoomed (the scope
 	// goes).
@@ -2012,6 +2067,7 @@ void FirstPersonMode::think()
 	// The camera follows the soldier (and walks them on your turn); on your turn the soldier
 	// also faces where you look, and the fire mode and aim are kept up to date.
 	updateCamera(unit, playerTurn, elapsedSeconds);
+	updateNoclipView(unit);
 	if (playerTurn)
 	{
 		openDoorAfterTurn(unit);

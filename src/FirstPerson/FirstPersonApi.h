@@ -280,6 +280,8 @@ bool endlessAmmo(BattlescapeState *state, const BattleUnit *unit);
 /// Doom IDDQD: does this unit take no damage at all (X-COM's units)? Asked whenever a unit is
 /// about to be hurt.
 bool invincible(BattlescapeState *state, const BattleUnit *unit);
+/// Doom IDCLIP: does this unit float where it is rather than fall (any of X-COM's units, either view)?
+bool noclipFloats(BattlescapeState *state, const BattleUnit *unit);
 
 #else
 
@@ -312,6 +314,7 @@ inline bool breakdown(BattlescapeState *, BattleUnit *) { return false; }
 inline void closeQuartersDeflected(BattlescapeState *, const BattleUnit *, const Position &) { }
 inline bool endlessAmmo(BattlescapeState *, const BattleUnit *) { return false; }
 inline bool invincible(BattlescapeState *, const BattleUnit *) { return false; }
+inline bool noclipFloats(BattlescapeState *, const BattleUnit *) { return false; }
 inline bool spriteHitboxes(BattlescapeState *) { return false; }
 inline bool spriteHit(SavedBattleGame *, const BattleUnit *, const Position &, const Position &, bool) { return true; }
 inline Position spriteHitRelative(const Position &relative, const BattleUnit *, const BattleUnit *) { return relative; }

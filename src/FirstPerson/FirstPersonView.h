@@ -342,6 +342,8 @@ public:
 	BattleUnit *getBodyAtPointer() const { return _bodyAtPointer; }
 	/// Leaves out one tile's floor (the lift platform being ridden through), or none (index -1).
 	void setHiddenFloor(int tileIndex) { _hiddenFloor = tileIndex; }
+	/// Leaves out these parts (tile index, part), the ones the eye is inside with Doom IDCLIP, or none.
+	void setLeftOutParts(const std::vector<std::pair<int, int>> &parts) { _leftOutParts = parts; }
 	/// Turns the flashlight on or off: the shoulder one, or the dynamic one (a tight spot on the crosshair).
 	void setFlashlight(bool on, bool dynamic = false) { _flashlight = on; _dynamicFlashlight = dynamic; }
 	/// Night vision like the isometric map's: brighter, in one colour (group + 1, 0 off).
@@ -525,6 +527,7 @@ private:
 	Uint8 _rockBase = 0;                                // the rock's colour, from the map's own rock round its edge (0: the plain rock colour)
 	std::vector<TileView> _tileViews;                   // this frame's snapshot of every tile: what the rays read
 	int _hiddenFloor = -1;                              // a floor left out: the lift platform the camera rides through
+	std::vector<std::pair<int, int>> _leftOutParts;     // parts left out (tile index, part): the ones the eye is inside with Doom IDCLIP
 	std::vector<const MapData*> _wallsLastFrame[2];     // west/north wall of each tile last frame
 	std::vector<DoorAnimation> _doorAnimations;         // doors swinging open
 	std::unordered_map<int, Uint32> _ufoDoorOpening;    // UFO door part (tile * 4 + part) -> when it started sliding

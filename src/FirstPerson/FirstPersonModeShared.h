@@ -235,6 +235,9 @@ const double LeanTiltDegrees = 10.0;
 
 /// How close (in voxels) the camera may get to a tile edge it can't cross.
 const double EdgeMargin = 5.0;
+/// Doom IDCLIP: a wall or object part whose voxels (the game's shape of it) come this near the eye, in voxels, is left
+/// out of the picture (the eye is inside it, or as good as: its 3D picture can stand a little wider than its voxels).
+const int NoclipReach = 2;
 /// Tile moves: how long the movement keys are held before the move starts, in milliseconds (a
 /// second key pressed with the first, W and D say, makes it a diagonal).
 const Uint32 TileMoveKeyWait = 60;

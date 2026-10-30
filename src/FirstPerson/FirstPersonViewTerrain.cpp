@@ -2626,9 +2626,11 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 	{
 		tileView.part[part] = nullptr;
 		tileView.next[part] = nullptr;
-		// Nothing there, or the floor left out (the lift platform the camera rides through).
+		// Nothing there, or the floor left out (the lift platform the camera rides through), or a
+		// part the eye is inside (Doom IDCLIP).
 		const MapData *mapData = tile->getMapData((TilePart)part);
-		if (!mapData || (part == O_FLOOR && (int)index == _hiddenFloor))
+		if (!mapData || (part == O_FLOOR && (int)index == _hiddenFloor)
+			|| (!_leftOutParts.empty() && std::find(_leftOutParts.begin(), _leftOutParts.end(), std::make_pair(index, part)) != _leftOutParts.end()))
 		{
 			continue;
 		}

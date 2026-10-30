@@ -675,6 +675,7 @@ bool FirstPersonMode::breakdownCam(Uint32 now, double elapsedSeconds)
 	// they turn (to fire: quicker when berserk), trembling all the while. A unit's direction is
 	// 0 for north in 45 degree steps, the view's yaw 0 for east: hence the 90 degrees.
 	updateCamera(unit, false, elapsedSeconds);
+	updateNoclipView(unit);
 	const double turnDegrees = std::remainder(unit->getDirection() * 45.0 - 90.0 - _view->getYawDegrees(), 360.0);
 	_view->rotate(turnDegrees * std::min(1.0, elapsedSeconds * (_breakdownBerserk ? 6.0 : 2.0)) + std::sin(sinceStart * 0.0023) * elapsedSeconds * 14.0,
 		std::sin(sinceStart * 0.0017) * elapsedSeconds * 9.0);

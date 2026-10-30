@@ -725,6 +725,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomMode", &fpsDoomMode, false, "STR_FPS_DOOM_MODE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomIdkfa", &fpsDoomIdkfa, false, "STR_FPS_DOOM_IDKFA", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomIddqd", &fpsDoomIddqd, false, "STR_FPS_DOOM_IDDQD", category));
+	// Doom mode plus noclip (a player's request, GitHub issue #45): in 3D the soldier walks and
+	// floats through walls, objects, doors and floors, and X-COM's units don't fall.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomIdclip", &fpsDoomIdclip, false, "STR_FPS_DOOM_IDCLIP", category));
 	// Doom mode's real-time grenades: armed as they're thrown, burning from leaving the hand (YES), or primed with a click and
 	// burning in the hand (NO, "cooking");
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomPrimeOnThrow", &fpsDoomPrimeOnThrow, true, "STR_FPS_DOOM_PRIME_ON_THROW", category));
@@ -1055,6 +1058,17 @@ bool endlessAmmo(BattlescapeState *state, const BattleUnit *unit)
 bool invincible(BattlescapeState *state, const BattleUnit *unit)
 {
 	return FirstPersonMode::invincible(state, unit);
+}
+
+/**
+ * Called by the game as a unit is about to start falling: does it float instead (Doom IDCLIP)?
+ * @param state The battlescape screen.
+ * @param unit The unit with no floor under it.
+ * @return True if it stays where it is.
+ */
+bool noclipFloats(BattlescapeState *state, const BattleUnit *unit)
+{
+	return FirstPersonMode::noclipFloats(state, unit);
 }
 
 }

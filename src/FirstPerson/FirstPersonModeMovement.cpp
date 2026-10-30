@@ -116,6 +116,14 @@ bool FirstPersonMode::stepAllowed(BattleUnit *unit, int stepX, int stepY)
 		return false;
 	}
 
+	// Doom IDCLIP: any step to a tile of the map that no other unit stands on, through walls,
+	// objects and doors, and out into the air (see noclipMove). The map's edge still holds.
+	if (noclipOn(unit))
+	{
+		const Tile *destination = _save->getTile(Position(_trackedTile.x + stepX, _trackedTile.y + stepY, unit->getPosition().z));
+		return destination && (!destination->getUnit() || destination->getUnit() == unit);
+	}
+
 	// Work the answer out only once per direction.
 	if (_stepAllowedCache[direction] < 0)
 	{
@@ -280,6 +288,12 @@ bool FirstPersonMode::runsStep(BattleUnit *unit, const Position &from, int direc
  */
 bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 {
+	// Doom IDCLIP: no walk, straight onto the tile (see noclipMove).
+	if (noclipOn(unit))
+	{
+		return noclipMove(unit, Position(_trackedTile.x + stepX, _trackedTile.y + stepY, unit->getPosition().z), true);
+	}
+
 	// Ask the pathfinding for the way to the tile the game's own step that way ends on: the
 	// neighbouring tile, or on stairs or a ramp the one a level up (or down), as the isometric
 	// map's cursor would be put on it. (Asked for the neighbouring tile on the unit's own level,
@@ -368,6 +382,74 @@ bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 		}
 	}
 	return true;
+}
+
+/**
+ * Doom IDCLIP: moves the soldier straight onto a tile (a neighbour, or the one above or below),
+ * through whatever is between: walls, objects, closed doors, floors and ceilings. Nothing is paid
+ * (IDCLIP is doom mode too) and nothing happens on the way: no reaction fire, no mines, and no
+ * fall in the air (see noclipFloats). The tile must be on the map, with no other unit on it.
+ * Sight and light follow the soldier as for a walked step: who they see there, and who sees them.
+ * @param target The tile.
+ * @param across True for a step across: the camera's tile is the new one at once (the eye walks
+ *   on smoothly); false for one up or down: the eye glides to the new level (see updateCamera).
+ * @return True if the soldier moved.
+ */
+bool FirstPersonMode::noclipMove(BattleUnit *unit, const Position &target, bool across)
+{
+	Tile *destination = _save->getTile(target);
+	if (!destination || (destination->getUnit() && destination->getUnit() != unit))
+	{
+		return false;
+	}
+	unit->setPosition(target);
+	unit->setTile(destination, _save);
+	TileEngine *tileEngine = _save->getTileEngine();
+	tileEngine->calculateLighting(LL_UNITS, target, 2);
+	tileEngine->calculateFOV(target, 2, false); // who can see the soldier there now
+	tileEngine->calculateFOV(unit);
+	if (across)
+	{
+		_trackedTile = target;
+	}
+	std::fill(std::begin(_stepAllowedCache), std::end(_stepAllowedCache), -1);
+	return true;
+}
+
+/**
+ * Doom IDCLIP: the eye may be inside a wall, an object or a floor, which would fill the picture.
+ * Every frame, the parts whose voxels (the game's shape of them) hold the eye, or a wall's or an
+ * object's within NoclipReach of it, are left out of the picture (the player: "grant ghost property
+ * to current square to assist visibility"), so the view looks out of them. Otherwise none are.
+ * @param unit The soldier looked through (or null).
+ */
+void FirstPersonMode::updateNoclipView(BattleUnit *unit)
+{
+	std::vector<std::pair<int, int>> parts;
+	if (unit && noclipOn(unit))
+	{
+		double eye[3];
+		_view->getEye(eye);
+		// The eye, and a point NoclipReach voxels from it each way along each axis (a floor only at
+		// the eye itself: under a ceiling the reach would find the floor above).
+		const int offsets[7][3] = { { 0, 0, 0 }, { NoclipReach, 0, 0 }, { -NoclipReach, 0, 0 }, { 0, NoclipReach, 0 },
+			{ 0, -NoclipReach, 0 }, { 0, 0, NoclipReach }, { 0, 0, -NoclipReach } };
+		for (int k = 0; k < 7; ++k)
+		{
+			const Position voxel((int)std::floor(eye[0]) + offsets[k][0], (int)std::floor(eye[1]) + offsets[k][1], (int)std::floor(eye[2]) + offsets[k][2]);
+			const VoxelType type = _save->getTileEngine()->voxelCheck(voxel, nullptr, true);
+			if (type < V_FLOOR || type > V_OBJECT || (type == V_FLOOR && k > 0) || !_save->getTile(voxel.toTile()))
+			{
+				continue;
+			}
+			const std::pair<int, int> part(_save->getTileIndex(voxel.toTile()), (int)type);
+			if (std::find(parts.begin(), parts.end(), part) == parts.end())
+			{
+				parts.push_back(part);
+			}
+		}
+	}
+	_view->setLeftOutParts(parts);
 }
 
 /**
@@ -1212,7 +1294,7 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 	// aimed through that door steps through it: one that only goes to the middle of the tile
 	// before the door comes within DoorMargin of it too (the middle is 8 voxels from the edge),
 	// and must stop there (a player's report: a tap walked on through the door).
-	if (unit->getArmor()->getSize() == 1)
+	if (unit->getArmor()->getSize() == 1 && !noclipOn(unit)) // (with Doom IDCLIP, straight through)
 	{
 		// The tile's west and north edges, in voxels, and the four sides: east, west, south, north.
 		const double westEdgeX = _trackedTile.x * 16.0, northEdgeY = _trackedTile.y * 16.0;
@@ -1259,7 +1341,7 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 	// diagonal step open (or walking a diagonal tile move): take it (see stepThroughDiagonalGap),
 	// and let walkGuidedStep move the camera through the gap from the next frame on. Meanwhile it
 	// stays where it was.
-	if (!_stepPending && driving && canMove && canAct() && unit->getStatus() == STATUS_STANDING
+	if (!_stepPending && driving && canMove && canAct() && unit->getStatus() == STATUS_STANDING && !noclipOn(unit)
 		&& stepThroughDiagonalGap(unit, newEyeX, newEyeY, wantedVelocityX, wantedVelocityY,
 			_tileMove && _tileMoveTarget.x != _trackedTile.x && _tileMoveTarget.y != _trackedTile.y))
 	{
@@ -1691,6 +1773,13 @@ void FirstPersonMode::moveUpDown(BattleUnit *unit, int direction, Action *action
 {
 	if (!unit || !canAct())
 	{
+		return;
+	}
+
+	// Doom IDCLIP: straight up or down a level, through the ceiling or the floor (see noclipMove).
+	if (noclipOn(unit))
+	{
+		noclipMove(unit, unit->getPosition() + Position(0, 0, direction == Pathfinding::DIR_UP ? 1 : -1), false);
 		return;
 	}
 

@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..3a53cf138
+index 000000000..1302cc44a
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,456 @@
+@@ -0,0 +1,459 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -187,6 +187,8 @@ index 000000000..3a53cf138
 +  STR_FPS_DOOM_IDKFA_DESC: "Doom mode plus endless ammo for every weapon, rockets too."
 +  STR_FPS_DOOM_IDDQD: "Doom IDDQD"
 +  STR_FPS_DOOM_IDDQD_DESC: "Doom mode plus invincible soldiers (their stats turn silver)."
++  STR_FPS_DOOM_IDCLIP: "Doom IDCLIP"
++  STR_FPS_DOOM_IDCLIP_DESC: "Doom mode plus noclip: in 3D, walk and float through walls, doors and floors; no one falls."
 +  STR_FPS_DOOM_PRIME_ON_THROW: "Doom prime on throw"
 +  STR_FPS_DOOM_PRIME_ON_THROW_DESC: "Real-time grenades are armed as you throw them and burn from leaving your hand. NO: PRIME pulls the pin, the fuse burns in hand."
 +  STR_FPS_DOOM_FREE_GRENADES: "Doom free grenades with airburst"
@@ -199,6 +201,7 @@ index 000000000..3a53cf138
 +  STR_FPS_DOOM: "DOOM MODE"
 +  STR_FPS_IDKFA: "IDKFA"
 +  STR_FPS_IDDQD: "IDDQD"
++  STR_FPS_IDCLIP: "IDCLIP"
 +  STR_FPS_AMMO_EMPTY: "EMPTY"
 +  STR_FPS_AMMO_UNLIMITED: "∞"
 +  STR_FPS_PRIMED: "PRIMED {0} turns"
@@ -586,10 +589,10 @@ index 000000000..3a53cf138
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..d028d13a8
+index 000000000..7be251a56
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,456 @@
+@@ -0,0 +1,459 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -649,6 +652,8 @@ index 000000000..d028d13a8
 +  STR_FPS_DOOM_IDKFA_DESC: "Doom mode plus endless ammo for every weapon, rockets too."
 +  STR_FPS_DOOM_IDDQD: "Doom IDDQD"
 +  STR_FPS_DOOM_IDDQD_DESC: "Doom mode plus invincible soldiers (their stats turn silver)."
++  STR_FPS_DOOM_IDCLIP: "Doom IDCLIP"
++  STR_FPS_DOOM_IDCLIP_DESC: "Doom mode plus noclip: in 3D, walk and float through walls, doors and floors; no one falls."
 +  STR_FPS_DOOM_PRIME_ON_THROW: "Doom prime on throw"
 +  STR_FPS_DOOM_PRIME_ON_THROW_DESC: "Real-time grenades are armed as you throw them and burn from leaving your hand. NO: PRIME pulls the pin, the fuse burns in hand."
 +  STR_FPS_DOOM_FREE_GRENADES: "Doom free grenades with airburst"
@@ -661,6 +666,7 @@ index 000000000..d028d13a8
 +  STR_FPS_DOOM: "DOOM MODE"
 +  STR_FPS_IDKFA: "IDKFA"
 +  STR_FPS_IDDQD: "IDDQD"
++  STR_FPS_IDCLIP: "IDCLIP"
 +  STR_FPS_AMMO_EMPTY: "EMPTY"
 +  STR_FPS_AMMO_UNLIMITED: "∞"
 +  STR_FPS_PRIMED: "PRIMED {0} turns"
@@ -21608,7 +21614,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..828ef08e2 100644
+index a08796ced..a03aa9258 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -21625,7 +21631,7 @@ index a08796ced..828ef08e2 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains;
++OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip;
 +OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode;
@@ -21714,10 +21720,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..2ac725871
+index 000000000..6be7c5d15
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1064 @@
+@@ -0,0 +1,1078 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -22445,6 +22451,9 @@ index 000000000..2ac725871
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomMode", &fpsDoomMode, false, "STR_FPS_DOOM_MODE", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomIdkfa", &fpsDoomIdkfa, false, "STR_FPS_DOOM_IDKFA", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomIddqd", &fpsDoomIddqd, false, "STR_FPS_DOOM_IDDQD", category));
++	// Doom mode plus noclip (a player's request, GitHub issue #45): in 3D the soldier walks and
++	// floats through walls, objects, doors and floors, and X-COM's units don't fall.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomIdclip", &fpsDoomIdclip, false, "STR_FPS_DOOM_IDCLIP", category));
 +	// Doom mode's real-time grenades: armed as they're thrown, burning from leaving the hand (YES), or primed with a click and
 +	// burning in the hand (NO, "cooking");
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomPrimeOnThrow", &fpsDoomPrimeOnThrow, true, "STR_FPS_DOOM_PRIME_ON_THROW", category));
@@ -22777,6 +22786,17 @@ index 000000000..2ac725871
 +	return FirstPersonMode::invincible(state, unit);
 +}
 +
++/**
++ * Called by the game as a unit is about to start falling: does it float instead (Doom IDCLIP)?
++ * @param state The battlescape screen.
++ * @param unit The unit with no floor under it.
++ * @return True if it stays where it is.
++ */
++bool noclipFloats(BattlescapeState *state, const BattleUnit *unit)
++{
++	return FirstPersonMode::noclipFloats(state, unit);
++}
++
 +}
 +
 +}
@@ -22784,10 +22804,10 @@ index 000000000..2ac725871
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..71b11fd1a
+index 000000000..2d1633fff
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,344 @@
+@@ -0,0 +1,347 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -23070,6 +23090,8 @@ index 000000000..71b11fd1a
 +/// Doom IDDQD: does this unit take no damage at all (X-COM's units)? Asked whenever a unit is
 +/// about to be hurt.
 +bool invincible(BattlescapeState *state, const BattleUnit *unit);
++/// Doom IDCLIP: does this unit float where it is rather than fall (any of X-COM's units, either view)?
++bool noclipFloats(BattlescapeState *state, const BattleUnit *unit);
 +
 +#else
 +
@@ -23102,6 +23124,7 @@ index 000000000..71b11fd1a
 +inline void closeQuartersDeflected(BattlescapeState *, const BattleUnit *, const Position &) { }
 +inline bool endlessAmmo(BattlescapeState *, const BattleUnit *) { return false; }
 +inline bool invincible(BattlescapeState *, const BattleUnit *) { return false; }
++inline bool noclipFloats(BattlescapeState *, const BattleUnit *) { return false; }
 +inline bool spriteHitboxes(BattlescapeState *) { return false; }
 +inline bool spriteHit(SavedBattleGame *, const BattleUnit *, const Position &, const Position &, bool) { return true; }
 +inline Position spriteHitRelative(const Position &relative, const BattleUnit *, const BattleUnit *) { return relative; }
@@ -23134,10 +23157,10 @@ index 000000000..71b11fd1a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..779f1245a
+index 000000000..bfafdd9ce
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2751 @@
+@@ -0,0 +1,2807 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24689,17 +24712,17 @@ index 000000000..779f1245a
 +}
 +
 +/**
-+ * Is doom mode on? It is with its own setting, and with either of its extras, which are doom
-+ * mode plus more: IDKFA (endless ammo) and IDDQD (invincible soldiers).
++ * Is doom mode on? It is with its own setting, and with any of its extras, which are doom mode
++ * plus more: IDKFA (endless ammo), IDDQD (invincible soldiers) and IDCLIP (noclip).
 + * @return True if doom mode is on.
 + */
 +bool FirstPersonMode::doomModeOn()
 +{
-+	return Options::fpsDoomMode || Options::fpsDoomIdkfa || Options::fpsDoomIddqd;
++	return Options::fpsDoomMode || Options::fpsDoomIdkfa || Options::fpsDoomIddqd || Options::fpsDoomIdclip;
 +}
 +
 +/**
-+ * The doom mode key (Insert): with any of the cheats on (doom mode, IDKFA, IDDQD), switches them
++ * The doom mode key (Insert): with any of the cheats on (doom mode, IDKFA, IDDQD, IDCLIP), switches them
 + * all off and remembers which were on; with none on, switches those back on (doom mode alone if
 + * there are none to remember). The game's warning line says which.
 + */
@@ -24707,8 +24730,8 @@ index 000000000..779f1245a
 +{
 +	if (doomModeOn())
 +	{
-+		_pausedCheats = (Options::fpsDoomMode ? 1 : 0) | (Options::fpsDoomIdkfa ? 2 : 0) | (Options::fpsDoomIddqd ? 4 : 0);
-+		Options::fpsDoomMode = Options::fpsDoomIdkfa = Options::fpsDoomIddqd = false;
++		_pausedCheats = (Options::fpsDoomMode ? 1 : 0) | (Options::fpsDoomIdkfa ? 2 : 0) | (Options::fpsDoomIddqd ? 4 : 0) | (Options::fpsDoomIdclip ? 8 : 0);
++		Options::fpsDoomMode = Options::fpsDoomIdkfa = Options::fpsDoomIddqd = Options::fpsDoomIdclip = false;
 +	}
 +	else
 +	{
@@ -24716,6 +24739,7 @@ index 000000000..779f1245a
 +		Options::fpsDoomMode = (cheats & 1) != 0;
 +		Options::fpsDoomIdkfa = (cheats & 2) != 0;
 +		Options::fpsDoomIddqd = (cheats & 4) != 0;
++		Options::fpsDoomIdclip = (cheats & 8) != 0;
 +	}
 +	// A line says which (the panel's tag hides with the classic HUD or the 3D HUD hidden), and
 +	// the options file keeps it, so the options screen's Cancel doesn't quietly undo it.
@@ -24727,16 +24751,19 @@ index 000000000..779f1245a
 +
 +/**
 + * The cheats that are on, as the info panel tags them: DOOM MODE, or the extras that are on
-+ * (IDDQD, IDKFA).
++ * (IDDQD, IDKFA, IDCLIP).
 + */
 +std::string FirstPersonMode::cheatTag() const
 +{
-+	if (!Options::fpsDoomIddqd && !Options::fpsDoomIdkfa)
++	if (!Options::fpsDoomIddqd && !Options::fpsDoomIdkfa && !Options::fpsDoomIdclip)
 +	{
 +		return std::string(_state->tr("STR_FPS_DOOM"));
 +	}
-+	std::string tag = Options::fpsDoomIddqd ? std::string(_state->tr("STR_FPS_IDDQD")) : "";
-+	if (Options::fpsDoomIdkfa) tag += (tag.empty() ? "" : " ") + std::string(_state->tr("STR_FPS_IDKFA"));
++	std::string tag;
++	auto add = [&](const char *id) { tag += (tag.empty() ? "" : " ") + std::string(_state->tr(id)); };
++	if (Options::fpsDoomIddqd) add("STR_FPS_IDDQD");
++	if (Options::fpsDoomIdkfa) add("STR_FPS_IDKFA");
++	if (Options::fpsDoomIdclip) add("STR_FPS_IDCLIP");
 +	return tag;
 +}
 +
@@ -24818,6 +24845,55 @@ index 000000000..779f1245a
 +bool FirstPersonMode::invincible(BattlescapeState *state, const BattleUnit *unit)
 +{
 +	return Options::fpsDoomIddqd && state && state->_firstPerson && unit && unit->getFaction() == FACTION_PLAYER;
++}
++
++/**
++ * Doom IDCLIP, asked by the game whenever a unit with no floor under it is about to fall: does it
++ * float where it is instead? Any of X-COM's units, in either view, with IDCLIP on: a soldier
++ * walked out into the air or up through a ceiling stays there (see noclipMove), and falls only
++ * once IDCLIP is switched off (see applyNoclipEnd).
++ * @param state The battlescape screen.
++ * @param unit The unit about to fall.
++ * @return True if it doesn't fall.
++ */
++bool FirstPersonMode::noclipFloats(BattlescapeState *state, const BattleUnit *unit)
++{
++	return Options::fpsDoomIdclip && state && state->_firstPerson && unit && unit->getFaction() == FACTION_PLAYER;
++}
++
++/**
++ * Doom IDCLIP (a player's request, GitHub issue #45: "turns movement hit detection off ... If
++ * inside terrain when on, grant ghost property to current square to assist visibility. Enable fly
++ * ... so player doesn't fall into terrain"): does this soldier walk and float through anything
++ * right now? The player's own soldier, one tile big (a 2x2 unit keeps the rules), in the 3D view,
++ * with IDCLIP on.
++ * @param unit The soldier looked through.
++ * @return True if their moves go through walls, doors and floors.
++ */
++bool FirstPersonMode::noclipOn(const BattleUnit *unit) const
++{
++	return Options::fpsDoomIdclip && isActive() && unit && unit->getFaction() == FACTION_PLAYER && unit->getArmor()->getSize() == 1 && !unit->isOut();
++}
++
++/**
++ * Doom IDCLIP switched off (by its setting or the doom mode key), called every frame of the
++ * battle: X-COM's units it left in the air (or inside the ground's level, with no floor) get the
++ * game's gravity, so those who can't fly fall and flyers take to the air, as after a floor gives
++ * way. The game starts the falls itself as soon as nothing else is going on.
++ */
++void FirstPersonMode::applyNoclipEnd()
++{
++	if (_idclipWas && !Options::fpsDoomIdclip)
++	{
++		for (BattleUnit *unit : *_save->getUnits())
++		{
++			if (unit->getFaction() == FACTION_PLAYER && !unit->isOut() && unit->getTile())
++			{
++				_save->getTileEngine()->applyGravity(unit->getTile());
++			}
++		}
++	}
++	_idclipWas = Options::fpsDoomIdclip;
 +}
 +
 +/**
@@ -25014,8 +25090,10 @@ index 000000000..779f1245a
 +		_ignoreMotionUntil = now + 150;
 +	}
 +
-+	// Doom IDDQD keeps X-COM's morale full, whatever the view and whoever's turn it is.
++	// Doom IDDQD keeps X-COM's morale full, whatever the view and whoever's turn it is; Doom
++	// IDCLIP switched off lets those it left in the air fall.
 +	applyGodMode();
++	applyNoclipEnd();
 +
 +	// A soldier going down or breaking down: their camera has the frame, unzoomed (the scope
 +	// goes).
@@ -25152,6 +25230,7 @@ index 000000000..779f1245a
 +	// The camera follows the soldier (and walks them on your turn); on your turn the soldier
 +	// also faces where you look, and the fire mode and aim are kept up to date.
 +	updateCamera(unit, playerTurn, elapsedSeconds);
++	updateNoclipView(unit);
 +	if (playerTurn)
 +	{
 +		openDoorAfterTurn(unit);
@@ -25891,10 +25970,10 @@ index 000000000..779f1245a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..ef32c5398
+index 000000000..8f7554cf6
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1205 @@
+@@ -0,0 +1,1216 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -26059,6 +26138,8 @@ index 000000000..ef32c5398
 +	static bool endlessAmmo(BattlescapeState *state, const BattleUnit *unit);
 +	/// Doom IDDQD: does this unit take no damage? Asked by the game (see FirstPerson::invincible).
 +	static bool invincible(BattlescapeState *state, const BattleUnit *unit);
++	/// Doom IDCLIP: does this unit float rather than fall? Asked by the game (see FirstPerson::noclipFloats).
++	static bool noclipFloats(BattlescapeState *state, const BattleUnit *unit);
 +	/// Where the next round of an FPS-style shot goes: along the crosshair, with a spread.
 +	void freeAimTarget(const BattleAction &action, Position &target);
 +
@@ -26096,7 +26177,8 @@ index 000000000..ef32c5398
 +	bool _musicTense = false;              // the combat track is playing
 +	bool _flashlightOn = true;             // the flashlight (setting "Flashlight") switched on with its key (the suit light is the game's)
 +	Uint32 _lastEnemySeen = 0;             // when an alien was last in sight (the combat music stops 8 s later)
-+	int _pausedCheats = 0;                 // the cheats the doom mode key switched off, to switch back on (bits: 1 doom mode, 2 IDKFA, 4 IDDQD)
++	int _pausedCheats = 0;                 // the cheats the doom mode key switched off, to switch back on (bits: 1 doom mode, 2 IDKFA, 4 IDDQD, 8 IDCLIP)
++	bool _idclipWas = false;               // Doom IDCLIP was on last frame (switched off, the soldiers in the air fall: see applyNoclipEnd)
 +
 +	/// Makes the full-screen 3D view, right above the isometric map it replaces.
 +	void createView();
@@ -26165,11 +26247,11 @@ index 000000000..ef32c5398
 +	void setMouseLook(bool on);
 +	/// Can the player act right now (their turn, nothing else going on)?
 +	bool canAct() const;
-+	/// Is doom mode on, by itself or with one of its extras (IDKFA, IDDQD)?
++	/// Is doom mode on, by itself or with one of its extras (IDKFA, IDDQD, IDCLIP)?
 +	static bool doomModeOn();
 +	/// The doom mode key: all the cheats off, or back on as they were.
 +	void toggleCheats();
-+	/// The cheats that are on, as the info panel tags them ("DOOM MODE", "IDDQD IDKFA").
++	/// The cheats that are on, as the info panel tags them ("DOOM MODE", "IDDQD IDKFA IDCLIP").
 +	std::string cheatTag() const;
 +	/// The modifier bits of the lean key while it's held as one (Shift, Ctrl or Alt; setting "Lean"), else none.
 +	SDLMod leanModifierHeld() const;
@@ -26181,6 +26263,14 @@ index 000000000..ef32c5398
 +	void applyDoomMode(BattleUnit *unit);
 +	/// Doom IDDQD: keeps X-COM's units at full morale.
 +	void applyGodMode();
++	/// Doom IDCLIP: does this soldier walk and float through anything in 3D right now?
++	bool noclipOn(const BattleUnit *unit) const;
++	/// Doom IDCLIP: moves the soldier straight to a tile, through whatever is in the way.
++	bool noclipMove(BattleUnit *unit, const Position &target, bool across);
++	/// Doom IDCLIP: leaves out of the picture the parts the eye is inside.
++	void updateNoclipView(BattleUnit *unit);
++	/// Doom IDCLIP switched off: X-COM's units left in the air fall.
++	void applyNoclipEnd();
 +	/// In 3D, while a shot flies or something goes off (and a moment after), lets the battle's timer catch up on missed steps.
 +	void catchUp();
 +	Uint32 _catchUpUntil = 0; // the timer may catch up until then (see catchUp)
@@ -30187,10 +30277,10 @@ index 000000000..fcfc5fcad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeMovement.cpp b/src/FirstPerson/FirstPersonModeMovement.cpp
 new file mode 100644
-index 000000000..1b98a6bd9
+index 000000000..d086c7fbf
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeMovement.cpp
-@@ -0,0 +1,2035 @@
+@@ -0,0 +1,2124 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -30307,6 +30397,14 @@ index 000000000..1b98a6bd9
 +	if (direction < 0 || direction > 7)
 +	{
 +		return false;
++	}
++
++	// Doom IDCLIP: any step to a tile of the map that no other unit stands on, through walls,
++	// objects and doors, and out into the air (see noclipMove). The map's edge still holds.
++	if (noclipOn(unit))
++	{
++		const Tile *destination = _save->getTile(Position(_trackedTile.x + stepX, _trackedTile.y + stepY, unit->getPosition().z));
++		return destination && (!destination->getUnit() || destination->getUnit() == unit);
 +	}
 +
 +	// Work the answer out only once per direction.
@@ -30473,6 +30571,12 @@ index 000000000..1b98a6bd9
 + */
 +bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 +{
++	// Doom IDCLIP: no walk, straight onto the tile (see noclipMove).
++	if (noclipOn(unit))
++	{
++		return noclipMove(unit, Position(_trackedTile.x + stepX, _trackedTile.y + stepY, unit->getPosition().z), true);
++	}
++
 +	// Ask the pathfinding for the way to the tile the game's own step that way ends on: the
 +	// neighbouring tile, or on stairs or a ramp the one a level up (or down), as the isometric
 +	// map's cursor would be put on it. (Asked for the neighbouring tile on the unit's own level,
@@ -30561,6 +30665,74 @@ index 000000000..1b98a6bd9
 +		}
 +	}
 +	return true;
++}
++
++/**
++ * Doom IDCLIP: moves the soldier straight onto a tile (a neighbour, or the one above or below),
++ * through whatever is between: walls, objects, closed doors, floors and ceilings. Nothing is paid
++ * (IDCLIP is doom mode too) and nothing happens on the way: no reaction fire, no mines, and no
++ * fall in the air (see noclipFloats). The tile must be on the map, with no other unit on it.
++ * Sight and light follow the soldier as for a walked step: who they see there, and who sees them.
++ * @param target The tile.
++ * @param across True for a step across: the camera's tile is the new one at once (the eye walks
++ *   on smoothly); false for one up or down: the eye glides to the new level (see updateCamera).
++ * @return True if the soldier moved.
++ */
++bool FirstPersonMode::noclipMove(BattleUnit *unit, const Position &target, bool across)
++{
++	Tile *destination = _save->getTile(target);
++	if (!destination || (destination->getUnit() && destination->getUnit() != unit))
++	{
++		return false;
++	}
++	unit->setPosition(target);
++	unit->setTile(destination, _save);
++	TileEngine *tileEngine = _save->getTileEngine();
++	tileEngine->calculateLighting(LL_UNITS, target, 2);
++	tileEngine->calculateFOV(target, 2, false); // who can see the soldier there now
++	tileEngine->calculateFOV(unit);
++	if (across)
++	{
++		_trackedTile = target;
++	}
++	std::fill(std::begin(_stepAllowedCache), std::end(_stepAllowedCache), -1);
++	return true;
++}
++
++/**
++ * Doom IDCLIP: the eye may be inside a wall, an object or a floor, which would fill the picture.
++ * Every frame, the parts whose voxels (the game's shape of them) hold the eye, or a wall's or an
++ * object's within NoclipReach of it, are left out of the picture (the player: "grant ghost property
++ * to current square to assist visibility"), so the view looks out of them. Otherwise none are.
++ * @param unit The soldier looked through (or null).
++ */
++void FirstPersonMode::updateNoclipView(BattleUnit *unit)
++{
++	std::vector<std::pair<int, int>> parts;
++	if (unit && noclipOn(unit))
++	{
++		double eye[3];
++		_view->getEye(eye);
++		// The eye, and a point NoclipReach voxels from it each way along each axis (a floor only at
++		// the eye itself: under a ceiling the reach would find the floor above).
++		const int offsets[7][3] = { { 0, 0, 0 }, { NoclipReach, 0, 0 }, { -NoclipReach, 0, 0 }, { 0, NoclipReach, 0 },
++			{ 0, -NoclipReach, 0 }, { 0, 0, NoclipReach }, { 0, 0, -NoclipReach } };
++		for (int k = 0; k < 7; ++k)
++		{
++			const Position voxel((int)std::floor(eye[0]) + offsets[k][0], (int)std::floor(eye[1]) + offsets[k][1], (int)std::floor(eye[2]) + offsets[k][2]);
++			const VoxelType type = _save->getTileEngine()->voxelCheck(voxel, nullptr, true);
++			if (type < V_FLOOR || type > V_OBJECT || (type == V_FLOOR && k > 0) || !_save->getTile(voxel.toTile()))
++			{
++				continue;
++			}
++			const std::pair<int, int> part(_save->getTileIndex(voxel.toTile()), (int)type);
++			if (std::find(parts.begin(), parts.end(), part) == parts.end())
++			{
++				parts.push_back(part);
++			}
++		}
++	}
++	_view->setLeftOutParts(parts);
 +}
 +
 +/**
@@ -31405,7 +31577,7 @@ index 000000000..1b98a6bd9
 +	// aimed through that door steps through it: one that only goes to the middle of the tile
 +	// before the door comes within DoorMargin of it too (the middle is 8 voxels from the edge),
 +	// and must stop there (a player's report: a tap walked on through the door).
-+	if (unit->getArmor()->getSize() == 1)
++	if (unit->getArmor()->getSize() == 1 && !noclipOn(unit)) // (with Doom IDCLIP, straight through)
 +	{
 +		// The tile's west and north edges, in voxels, and the four sides: east, west, south, north.
 +		const double westEdgeX = _trackedTile.x * 16.0, northEdgeY = _trackedTile.y * 16.0;
@@ -31452,7 +31624,7 @@ index 000000000..1b98a6bd9
 +	// diagonal step open (or walking a diagonal tile move): take it (see stepThroughDiagonalGap),
 +	// and let walkGuidedStep move the camera through the gap from the next frame on. Meanwhile it
 +	// stays where it was.
-+	if (!_stepPending && driving && canMove && canAct() && unit->getStatus() == STATUS_STANDING
++	if (!_stepPending && driving && canMove && canAct() && unit->getStatus() == STATUS_STANDING && !noclipOn(unit)
 +		&& stepThroughDiagonalGap(unit, newEyeX, newEyeY, wantedVelocityX, wantedVelocityY,
 +			_tileMove && _tileMoveTarget.x != _trackedTile.x && _tileMoveTarget.y != _trackedTile.y))
 +	{
@@ -31887,6 +32059,13 @@ index 000000000..1b98a6bd9
 +		return;
 +	}
 +
++	// Doom IDCLIP: straight up or down a level, through the ceiling or the floor (see noclipMove).
++	if (noclipOn(unit))
++	{
++		noclipMove(unit, unit->getPosition() + Position(0, 0, direction == Pathfinding::DIR_UP ? 1 : -1), false);
++		return;
++	}
++
 +	// A flyer with flight off: in the air, down lands it (level by level, see updateFlight);
 +	// otherwise only a walker's moves, or with the up key off a lift or ladder, flight on.
 +	const Tile *standing = _save->getTile(unit->getPosition());
@@ -32228,10 +32407,10 @@ index 000000000..1b98a6bd9
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..01e1ec279
+index 000000000..f185b53c5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,446 @@
+@@ -0,0 +1,449 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -32469,6 +32648,9 @@ index 000000000..01e1ec279
 +
 +/// How close (in voxels) the camera may get to a tile edge it can't cross.
 +const double EdgeMargin = 5.0;
++/// Doom IDCLIP: a wall or object part whose voxels (the game's shape of it) come this near the eye, in voxels, is left
++/// out of the picture (the eye is inside it, or as good as: its 3D picture can stand a little wider than its voxels).
++const int NoclipReach = 2;
 +/// Tile moves: how long the movement keys are held before the move starts, in milliseconds (a
 +/// second key pressed with the first, W and D say, makes it a diagonal).
 +const Uint32 TileMoveKeyWait = 60;
@@ -37297,10 +37479,10 @@ index 000000000..f59332e35
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeSoldierStates.cpp b/src/FirstPerson/FirstPersonModeSoldierStates.cpp
 new file mode 100644
-index 000000000..83b438dd9
+index 000000000..0b53ef42d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeSoldierStates.cpp
-@@ -0,0 +1,1125 @@
+@@ -0,0 +1,1126 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -37978,6 +38160,7 @@ index 000000000..83b438dd9
 +	// they turn (to fire: quicker when berserk), trembling all the while. A unit's direction is
 +	// 0 for north in 45 degree steps, the view's yaw 0 for east: hence the 90 degrees.
 +	updateCamera(unit, false, elapsedSeconds);
++	updateNoclipView(unit);
 +	const double turnDegrees = std::remainder(unit->getDirection() * 45.0 - 90.0 - _view->getYawDegrees(), 360.0);
 +	_view->rotate(turnDegrees * std::min(1.0, elapsedSeconds * (_breakdownBerserk ? 6.0 : 2.0)) + std::sin(sinceStart * 0.0023) * elapsedSeconds * 14.0,
 +		std::sin(sinceStart * 0.0017) * elapsedSeconds * 9.0);
@@ -41964,10 +42147,10 @@ index 000000000..1edd633db
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..f25aca274
+index 000000000..7a38348de
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1243 @@
+@@ -0,0 +1,1246 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -42312,6 +42495,8 @@ index 000000000..f25aca274
 +	BattleUnit *getBodyAtPointer() const { return _bodyAtPointer; }
 +	/// Leaves out one tile's floor (the lift platform being ridden through), or none (index -1).
 +	void setHiddenFloor(int tileIndex) { _hiddenFloor = tileIndex; }
++	/// Leaves out these parts (tile index, part), the ones the eye is inside with Doom IDCLIP, or none.
++	void setLeftOutParts(const std::vector<std::pair<int, int>> &parts) { _leftOutParts = parts; }
 +	/// Turns the flashlight on or off: the shoulder one, or the dynamic one (a tight spot on the crosshair).
 +	void setFlashlight(bool on, bool dynamic = false) { _flashlight = on; _dynamicFlashlight = dynamic; }
 +	/// Night vision like the isometric map's: brighter, in one colour (group + 1, 0 off).
@@ -42495,6 +42680,7 @@ index 000000000..f25aca274
 +	Uint8 _rockBase = 0;                                // the rock's colour, from the map's own rock round its edge (0: the plain rock colour)
 +	std::vector<TileView> _tileViews;                   // this frame's snapshot of every tile: what the rays read
 +	int _hiddenFloor = -1;                              // a floor left out: the lift platform the camera rides through
++	std::vector<std::pair<int, int>> _leftOutParts;     // parts left out (tile index, part): the ones the eye is inside with Doom IDCLIP
 +	std::vector<const MapData*> _wallsLastFrame[2];     // west/north wall of each tile last frame
 +	std::vector<DoorAnimation> _doorAnimations;         // doors swinging open
 +	std::unordered_map<int, Uint32> _ufoDoorOpening;    // UFO door part (tile * 4 + part) -> when it started sliding
@@ -52718,10 +52904,10 @@ index 000000000..bf4b6ebe4
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..691eff2a9
+index 000000000..04a6c8cb9
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,3123 @@
+@@ -0,0 +1,3125 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -55350,9 +55536,11 @@ index 000000000..691eff2a9
 +	{
 +		tileView.part[part] = nullptr;
 +		tileView.next[part] = nullptr;
-+		// Nothing there, or the floor left out (the lift platform the camera rides through).
++		// Nothing there, or the floor left out (the lift platform the camera rides through), or a
++		// part the eye is inside (Doom IDCLIP).
 +		const MapData *mapData = tile->getMapData((TilePart)part);
-+		if (!mapData || (part == O_FLOOR && (int)index == _hiddenFloor))
++		if (!mapData || (part == O_FLOOR && (int)index == _hiddenFloor)
++			|| (!_leftOutParts.empty() && std::find(_leftOutParts.begin(), _leftOutParts.end(), std::make_pair(index, part)) != _leftOutParts.end()))
 +		{
 +			continue;
 +		}
@@ -57676,7 +57864,7 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..d210edd8d
+index 000000000..f2b4caf0e
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,817 @@
@@ -57904,7 +58092,7 @@ index 000000000..d210edd8d
 +		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
 +			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsCompass", "fpsMiddleClickIdentify" } },
 +		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds" } },
-+		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
++		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
 +	};
 +	std::vector<bool> placed(gathered.size(), false);
 +	for (const auto &section : sections)
@@ -59369,6 +59557,29 @@ index ecc040fb6..dc617605d 100644
  	/// Get turn when unit was scanned by the motion scanner.
  	int getScannedTurn() const { return _scannedTurn; }
  	/// Set turn when unit was scanned by the motion scanner.
+diff --git a/src/Savegame/SavedBattleGame.cpp b/src/Savegame/SavedBattleGame.cpp
+index 240b22a42..ef04e213d 100644
+--- a/src/Savegame/SavedBattleGame.cpp
++++ b/src/Savegame/SavedBattleGame.cpp
+@@ -31,6 +31,7 @@
+ #include "../Battlescape/Pathfinding.h"
+ #include "../Battlescape/TileEngine.h"
+ #include "../Battlescape/BattlescapeState.h"
++#include "../FirstPerson/FirstPersonApi.h"
+ #include "../Battlescape/BattlescapeGame.h"
+ #include "../Battlescape/Position.h"
+ #include "../Battlescape/Inventory.h"
+@@ -2699,6 +2700,10 @@ bool SavedBattleGame::eyesOnTarget(UnitFaction faction, BattleUnit* unit)
+  */
+ bool SavedBattleGame::addFallingUnit(BattleUnit* unit)
+ {
++	if (FirstPerson::noclipFloats(getBattleState(), unit))
++	{
++		return false; // (OpenXcom3D: Doom IDCLIP, X-COM's units float where they are)
++	}
+ 	bool add = true;
+ 	for (auto* bu : _fallingUnits)
+ 	{
 diff --git a/src/main.cpp b/src/main.cpp
 index 4fd8a1d41..a89b6bb01 100644
 --- a/src/main.cpp

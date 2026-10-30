@@ -162,6 +162,8 @@ public:
 	static bool endlessAmmo(BattlescapeState *state, const BattleUnit *unit);
 	/// Doom IDDQD: does this unit take no damage? Asked by the game (see FirstPerson::invincible).
 	static bool invincible(BattlescapeState *state, const BattleUnit *unit);
+	/// Doom IDCLIP: does this unit float rather than fall? Asked by the game (see FirstPerson::noclipFloats).
+	static bool noclipFloats(BattlescapeState *state, const BattleUnit *unit);
 	/// Where the next round of an FPS-style shot goes: along the crosshair, with a spread.
 	void freeAimTarget(const BattleAction &action, Position &target);
 
@@ -199,7 +201,8 @@ private:
 	bool _musicTense = false;              // the combat track is playing
 	bool _flashlightOn = true;             // the flashlight (setting "Flashlight") switched on with its key (the suit light is the game's)
 	Uint32 _lastEnemySeen = 0;             // when an alien was last in sight (the combat music stops 8 s later)
-	int _pausedCheats = 0;                 // the cheats the doom mode key switched off, to switch back on (bits: 1 doom mode, 2 IDKFA, 4 IDDQD)
+	int _pausedCheats = 0;                 // the cheats the doom mode key switched off, to switch back on (bits: 1 doom mode, 2 IDKFA, 4 IDDQD, 8 IDCLIP)
+	bool _idclipWas = false;               // Doom IDCLIP was on last frame (switched off, the soldiers in the air fall: see applyNoclipEnd)
 
 	/// Makes the full-screen 3D view, right above the isometric map it replaces.
 	void createView();
@@ -268,11 +271,11 @@ private:
 	void setMouseLook(bool on);
 	/// Can the player act right now (their turn, nothing else going on)?
 	bool canAct() const;
-	/// Is doom mode on, by itself or with one of its extras (IDKFA, IDDQD)?
+	/// Is doom mode on, by itself or with one of its extras (IDKFA, IDDQD, IDCLIP)?
 	static bool doomModeOn();
 	/// The doom mode key: all the cheats off, or back on as they were.
 	void toggleCheats();
-	/// The cheats that are on, as the info panel tags them ("DOOM MODE", "IDDQD IDKFA").
+	/// The cheats that are on, as the info panel tags them ("DOOM MODE", "IDDQD IDKFA IDCLIP").
 	std::string cheatTag() const;
 	/// The modifier bits of the lean key while it's held as one (Shift, Ctrl or Alt; setting "Lean"), else none.
 	SDLMod leanModifierHeld() const;
@@ -284,6 +287,14 @@ private:
 	void applyDoomMode(BattleUnit *unit);
 	/// Doom IDDQD: keeps X-COM's units at full morale.
 	void applyGodMode();
+	/// Doom IDCLIP: does this soldier walk and float through anything in 3D right now?
+	bool noclipOn(const BattleUnit *unit) const;
+	/// Doom IDCLIP: moves the soldier straight to a tile, through whatever is in the way.
+	bool noclipMove(BattleUnit *unit, const Position &target, bool across);
+	/// Doom IDCLIP: leaves out of the picture the parts the eye is inside.
+	void updateNoclipView(BattleUnit *unit);
+	/// Doom IDCLIP switched off: X-COM's units left in the air fall.
+	void applyNoclipEnd();
 	/// In 3D, while a shot flies or something goes off (and a moment after), lets the battle's timer catch up on missed steps.
 	void catchUp();
 	Uint32 _catchUpUntil = 0; // the timer may catch up until then (see catchUp)

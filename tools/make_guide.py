@@ -201,6 +201,7 @@ SETTINGS = [
         ('Doom mode (debug)', 'NO', 'YES / NO', 'A cheat: in 3D the selected soldier never runs out of time units or energy; grenades go off in real time.', 'For testing and fun, a first step towards real time.'),
         ('Doom IDKFA', 'NO', 'YES / NO', 'Doom mode plus endless ammo.', ''),
         ('Doom IDDQD', 'NO', 'YES / NO', 'Doom mode plus invincible soldiers.', ''),
+        ('Doom IDCLIP', 'NO', 'YES / NO', 'Doom mode plus noclip: in 3D, walk and float through walls, doors, floors and ceilings (Page Up and Down go straight up and down); no one falls while it\'s on.', ''),
         ('Doom prime on throw', 'YES', 'YES / NO', 'In Doom mode a grenade is armed as you throw it. NO: priming pulls the pin, and the fuse burns in your hand.', ''),
         ('Doom free grenades with airburst', 'NO', 'YES / NO', 'In Doom mode a grenade flies wherever the crosshair points and bursts in the air if its fuse runs out.', ''),
         ('Doom grenade fuse (seconds)', '3', '1 to 5', 'In Doom mode, how long a grenade burns.', ''),
