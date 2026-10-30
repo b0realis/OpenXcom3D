@@ -211,7 +211,9 @@ void FirstPersonView::spawnBattleEffects(float elapsedSeconds)
  * Reacts to the explosions that appeared on the map since the last frame (each one only
  * once). The camera shakes if one is close. A big one (a grenade, a rocket, a blown-up tile)
  * blackens the ground around it and throws out a flash, embers and (with Modern smoke) puffs of
- * smoke; a small one (a bullet's hit) throws a few sparks.
+ * smoke; a small one (a bullet's hit, a blow) throws a few sparks, but not a blow or psi attack
+ * that missed (a player, GitHub issue #60: "MELEE swing should only emit spark particles on
+ * successful hit"; Explosion::isMiss), whose animation still plays as on the map.
  *
  * The particles are thrown with FirstPersonParticles::burst, whose arguments are, in order:
  * where, how many, kind, group, the colours and how many of them, the slowest and fastest
@@ -271,7 +273,7 @@ void FirstPersonView::spawnExplosionEffects()
 					_particles.burst(centre, 26, P::LIT, P::EFFECT, smokeColors, 2, 6, 24, 0.7f, -12, 0.8f, 2.0f, 3.5f, 5);
 				}
 			}
-			else
+			else if (!explosion->isMiss())
 			{
 				// A small explosion (a hit): a few sparks, falling and gone within half a second.
 				const Uint8 sparkColors[2] = { _colors.spark, _colors.fire[1] };

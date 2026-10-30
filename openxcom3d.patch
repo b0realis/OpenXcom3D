@@ -18712,10 +18712,18 @@ index aa1770f60..3cbc921d4 100644
   * Returns flag to indicate if it is a bullet hit (false), or a real explosion (true).
   * @return True if it is a real explosion, false if it is a bullet hit.
 diff --git a/src/Battlescape/Explosion.h b/src/Battlescape/Explosion.h
-index 365e012fa..4594e95c6 100644
+index 365e012fa..2f7d4751e 100644
 --- a/src/Battlescape/Explosion.h
 +++ b/src/Battlescape/Explosion.h
-@@ -47,6 +47,8 @@ public:
+@@ -32,6 +32,7 @@ private:
+ 	Position _position;
+ 	int _currentFrame, _startFrame, _frameDelay;
+ 	bool _big, _hit;
++	bool _miss = false; // (OpenXcom3D: a blow or psi attack that missed, see setMiss)
+ 	int _frames;
+ public:
+ 	static const int HIT_FRAMES;
+@@ -47,10 +48,16 @@ public:
  	Position getPosition() const;
  	/// Gets the current frame.
  	int getCurrentFrame() const;
@@ -18724,8 +18732,16 @@ index 365e012fa..4594e95c6 100644
  	/// Checks if this is a real explosion.
  	bool isBig() const;
  	/// Checks if this is a melee or psi hit.
+ 	bool isHit() const;
++	/// Marks the animation of a blow or psi attack that missed (OpenXcom3D add-on: its 3D view throws no sparks for it).
++	void setMiss(bool miss) { _miss = miss; }
++	/// Checks if this is the animation of a blow or psi attack that missed (see setMiss).
++	bool isMiss() const { return _miss; }
+ };
+ 
+ }
 diff --git a/src/Battlescape/ExplosionBState.cpp b/src/Battlescape/ExplosionBState.cpp
-index ff9973e6f..6e85d7829 100644
+index ff9973e6f..43d862ac7 100644
 --- a/src/Battlescape/ExplosionBState.cpp
 +++ b/src/Battlescape/ExplosionBState.cpp
 @@ -31,6 +31,7 @@
@@ -18750,6 +18766,14 @@ index ff9973e6f..6e85d7829 100644
  		int anim = -1;
  		int animFrames = -1;
  		int sound = -1;
+@@ -349,6 +355,7 @@ void ExplosionBState::init()
+ 		if (anim != -1)
+ 		{
+ 			Explosion *explosion = new Explosion(_center, anim, 0, false, (_hit || _psi), animFrames); // Don't burn the tile
++			explosion->setMiss(miss && (_hit || _psi)); // (OpenXcom3D: a blow or psi attack that missed: no sparks in 3D)
+ 			_parent->getMap()->getExplosions()->push_back(explosion);
+ 		}
+ 		if (_parent->getMap()->getFollowProjectile())
 diff --git a/src/Battlescape/Map.cpp b/src/Battlescape/Map.cpp
 index 3665cd199..dee7728fd 100644
 --- a/src/Battlescape/Map.cpp
@@ -42673,10 +42697,10 @@ index 000000000..b03329eb8
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewEffects.cpp b/src/FirstPerson/FirstPersonViewEffects.cpp
 new file mode 100644
-index 000000000..04952f5ec
+index 000000000..5960d8333
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewEffects.cpp
-@@ -0,0 +1,1090 @@
+@@ -0,0 +1,1092 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -42890,7 +42914,9 @@ index 000000000..04952f5ec
 + * Reacts to the explosions that appeared on the map since the last frame (each one only
 + * once). The camera shakes if one is close. A big one (a grenade, a rocket, a blown-up tile)
 + * blackens the ground around it and throws out a flash, embers and (with Modern smoke) puffs of
-+ * smoke; a small one (a bullet's hit) throws a few sparks.
++ * smoke; a small one (a bullet's hit, a blow) throws a few sparks, but not a blow or psi attack
++ * that missed (a player, GitHub issue #60: "MELEE swing should only emit spark particles on
++ * successful hit"; Explosion::isMiss), whose animation still plays as on the map.
 + *
 + * The particles are thrown with FirstPersonParticles::burst, whose arguments are, in order:
 + * where, how many, kind, group, the colours and how many of them, the slowest and fastest
@@ -42950,7 +42976,7 @@ index 000000000..04952f5ec
 +					_particles.burst(centre, 26, P::LIT, P::EFFECT, smokeColors, 2, 6, 24, 0.7f, -12, 0.8f, 2.0f, 3.5f, 5);
 +				}
 +			}
-+			else
++			else if (!explosion->isMiss())
 +			{
 +				// A small explosion (a hit): a few sparks, falling and gone within half a second.
 +				const Uint8 sparkColors[2] = { _colors.spark, _colors.fire[1] };
