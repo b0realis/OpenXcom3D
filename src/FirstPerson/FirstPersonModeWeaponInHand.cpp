@@ -855,20 +855,27 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 	if (!show)
 	{
 		_heldItem = nullptr;
+		_heldBy = nullptr;
 		return;
 	}
 
 	// A reload (another clip in the gun than last frame, also into a gun whose spent clip the
 	// game took out) or another weapon: dip out of sight and back (not on the first frame, when
-	// nothing was held before).
+	// nothing was held before, nor when the view went to another soldier, whose gun is simply
+	// there: a player, GitHub issue #86, the aliens' turn cameras dipped every gun they showed).
 	const Uint32 now = SDL_GetTicks();
 	const BattleItem *ammo = weapon->getAmmoForSlot(0);
 	const int clipId = ammo && ammo != weapon ? ammo->getId() : -1; // -1: no clip (or none needed)
-	if (weapon != _heldItem || (clipId != -1 && clipId != _heldClipId))
+	if (unit != _heldBy)
+	{
+		_heldDipStart = 0;
+	}
+	else if (weapon != _heldItem || (clipId != -1 && clipId != _heldClipId))
 	{
 		_heldDipStart = _heldItem ? now : 0;
 	}
 	_heldItem = weapon;
+	_heldBy = unit;
 	_heldClipId = clipId;
 
 	// A different kind of weapon: draw its inventory picture (see drawHeldPicture) and

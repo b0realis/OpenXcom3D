@@ -26148,10 +26148,10 @@ index 000000000..bfafdd9ce
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..8450cdb0d
+index 000000000..5598e343f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1219 @@
+@@ -0,0 +1,1220 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -27043,6 +27043,7 @@ index 000000000..8450cdb0d
 +
 +	Surface *_weaponInHand = nullptr, *_heldSprite = nullptr; // where it's drawn; the held item's inventory picture (32x48)
 +	const BattleItem *_heldItem = nullptr;              // the item drawn in hand
++	const BattleUnit *_heldBy = nullptr;                // and whose hand it's in (another soldier's: no dip, see updateWeaponInHand)
 +	const RuleItem *_heldRules = nullptr;               // its rules
 +	int _heldClipId = -1;                               // the clip loaded last frame (-1: none; another one now: a reload)
 +	Uint32 _heldDipStart = 0, _muzzleFlashUntil = 0;    // when the weapon dipped out of view (reload, another weapon); until when the flash shows
@@ -38856,10 +38857,10 @@ index 000000000..0b53ef42d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeWeaponInHand.cpp b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
 new file mode 100644
-index 000000000..5e406f809
+index 000000000..fa1d80173
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
-@@ -0,0 +1,1028 @@
+@@ -0,0 +1,1035 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -39717,20 +39718,27 @@ index 000000000..5e406f809
 +	if (!show)
 +	{
 +		_heldItem = nullptr;
++		_heldBy = nullptr;
 +		return;
 +	}
 +
 +	// A reload (another clip in the gun than last frame, also into a gun whose spent clip the
 +	// game took out) or another weapon: dip out of sight and back (not on the first frame, when
-+	// nothing was held before).
++	// nothing was held before, nor when the view went to another soldier, whose gun is simply
++	// there: a player, GitHub issue #86, the aliens' turn cameras dipped every gun they showed).
 +	const Uint32 now = SDL_GetTicks();
 +	const BattleItem *ammo = weapon->getAmmoForSlot(0);
 +	const int clipId = ammo && ammo != weapon ? ammo->getId() : -1; // -1: no clip (or none needed)
-+	if (weapon != _heldItem || (clipId != -1 && clipId != _heldClipId))
++	if (unit != _heldBy)
++	{
++		_heldDipStart = 0;
++	}
++	else if (weapon != _heldItem || (clipId != -1 && clipId != _heldClipId))
 +	{
 +		_heldDipStart = _heldItem ? now : 0;
 +	}
 +	_heldItem = weapon;
++	_heldBy = unit;
 +	_heldClipId = clipId;
 +
 +	// A different kind of weapon: draw its inventory picture (see drawHeldPicture) and

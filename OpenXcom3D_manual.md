@@ -885,6 +885,8 @@ What `FirstPersonView` draws:
 
 ### 1.10 (not released yet)
 
+- **No dip when the view goes to another soldier** (a player, GitHub issue #86: in the aliens' turn every camera swap lowered and raised the gun, "as if they were just equipped"): the gun in hand dips out of sight and back only when the same soldier takes another weapon or reloads; looking through another soldier shows his gun at once.
+
 - **Arcing shots and throws at a wall you stand against** (a player, GitHub issue #84: X-Com Files' position markers, fired in an arc a tile off, unfolded behind the soldier or through walls in 3D, never on the map): aimed at the wall at the edge of the soldier's own tile, a throw or an arcing shot aims at the tile across it, as the map is clicked beyond the wall, and the game arcs over it or refuses (they aimed at the soldier's own tile, and what they set down went to the nearest free tile). *Force arcing shots* never forces a round that sets a unit down. And a crash fixed in the game itself: an arc blocked at its very first step (from against a wall, now and then only, by the shot's random deviation) left an empty path, which the game read from its end.
 
 - **Zombies hatch with quick deaths** (a player, GitHub issue #80: "Animation where zombie hatches into chysallid is entirely skipped"): with *Quick deaths* on, a unit that turns into another as it dies (a Zombie, whose death is the Chryssalid bursting out of it) dies the game's own way: its death plays, and the Chryssalid comes once it has (down at once, it hatched at once, unseen).

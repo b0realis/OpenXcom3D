@@ -889,6 +889,7 @@ private:
 
 	Surface *_weaponInHand = nullptr, *_heldSprite = nullptr; // where it's drawn; the held item's inventory picture (32x48)
 	const BattleItem *_heldItem = nullptr;              // the item drawn in hand
+	const BattleUnit *_heldBy = nullptr;                // and whose hand it's in (another soldier's: no dip, see updateWeaponInHand)
 	const RuleItem *_heldRules = nullptr;               // its rules
 	int _heldClipId = -1;                               // the clip loaded last frame (-1: none; another one now: a reload)
 	Uint32 _heldDipStart = 0, _muzzleFlashUntil = 0;    // when the weapon dipped out of view (reload, another weapon); until when the flash shows
