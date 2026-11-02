@@ -33012,10 +33012,10 @@ index 000000000..6fc07ebde
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..f59332e35
+index 000000000..635deade5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,4611 @@
+@@ -0,0 +1,4631 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -34307,6 +34307,26 @@ index 000000000..f59332e35
 +	// leave the soldier out, test every unit, and skip units the player can't see.
 +	std::vector<Position> trajectory;
 +	const int hitType = _save->getTileEngine()->calculateLineVoxel(rayOrigin, farPoint, false, &trajectory, unit, nullptr, !_save->getDebugMode());
++	// Window glass the view draws before whatever the game's line meets (or before the sky): the
++	// aim stops on it, half a voxel into the pane (the owner, GitHub issue #75: "All aiming stops at
++	// glass"; the game's line may slip between the layers of a pane's voxels, where the view shows
++	// smooth glass). It's aimed at as the wall it is: a shot goes for it, a blow strikes it.
++	{
++		const bool gameHit = hitType != V_EMPTY && hitType != V_OUTOFBOUNDS && !trajectory.empty();
++		const double gameDistance = gameHit ? std::sqrt(std::pow(trajectory.front().x + 0.5 - eye[0], 2) + std::pow(trajectory.front().y + 0.5 - eye[1], 2)
++			+ std::pow(trajectory.front().z + 0.5 - eye[2], 2)) : 1500.0;
++		const float from[3] = { (float)eye[0], (float)eye[1], (float)eye[2] };
++		const float along[3] = { (float)rayDirection[0], (float)rayDirection[1], (float)rayDirection[2] };
++		float glassPoint[3];
++		int glassTile = -1, glassPart = -1;
++		if (_view->glassAlong(from, along, (float)gameDistance, glassPoint, glassTile, glassPart))
++		{
++			voxel = Position((int)std::floor(glassPoint[0] + along[0] * 0.5f), (int)std::floor(glassPoint[1] + along[1] * 0.5f),
++				(int)std::floor(glassPoint[2] + along[2] * 0.5f));
++			if (voxelType) *voxelType = glassPart; // (the tile parts and the voxel types count alike: V_WESTWALL is O_WESTWALL)
++			return true;
++		}
++	}
 +	if (hitType != V_EMPTY && hitType != V_OUTOFBOUNDS && !trajectory.empty())
 +	{
 +		voxel = trajectory.front(); // a floor, a wall, an object or a unit was hit
@@ -42297,10 +42317,10 @@ index 000000000..1edd633db
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..86325cd84
+index 000000000..34181e2af
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1246 @@
+@@ -0,0 +1,1250 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -42643,6 +42663,8 @@ index 000000000..86325cd84
 +	BattleUnit *getUnitAtPointer() const { return _unitAtPointer; }
 +	/// The unconscious unit whose body's picture is where the player points (nearer it than any standing unit's), as last drawn; or null.
 +	BattleUnit *getBodyAtPointer() const { return _bodyAtPointer; }
++	/// Where a line first meets window glass as the view draws it, if nothing else comes first (the aim stops on glass).
++	bool glassAlong(const float from[3], const float direction[3], float maxDistance, float point[3], int &tile, int &part) const;
 +	/// Leaves out one tile's floor (the lift platform being ridden through), or none (index -1).
 +	void setHiddenFloor(int tileIndex) { _hiddenFloor = tileIndex; }
 +	/// Leaves out these parts (tile index, part), the ones the eye is inside with Doom IDCLIP, or none.
@@ -42899,6 +42921,8 @@ index 000000000..86325cd84
 +	const VoxelModel *leafyModel(const MapData *mapData, int spriteIndex);
 +	/// Builds a voxel model: shapes from the LOFT templates, colours from the isometric sprite.
 +	void buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model) const;
++	/// What a pane of glass breaks into keeps the pane's edges in its frame (see paneOfGlass).
++	void addBrokenPaneEdges(const MapData *mapData, VoxelModel &model) const;
 +	/// Gets the sprite frames of a MapData record, and whether it animates.
 +	const Frames &getFrames(const MapData *mapData);
 +	/// Starts the swing of doors that just opened on a tile.
@@ -45020,10 +45044,10 @@ index 000000000..b455e197f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..91c11315d
+index 000000000..344da87e4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,1621 @@
+@@ -0,0 +1,1662 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -45501,6 +45525,47 @@ index 000000000..91c11315d
 +	{
 +		point[axis] = from[axis] + direction[axis] * hit.t;
 +	}
++	return true;
++}
++
++/**
++ * Where a line first meets window glass as the view draws it (a pane of glass, see paneOfGlass,
++ * or a mod's window), if nothing else the view draws comes first. Aiming stops on the glass (the
++ * owner, GitHub issue #75: "All aiming stops at glass"): the game's own line of fire through a
++ * pane's voxels may slip through the gaps between its layers, where the view shows smooth glass.
++ * @param from Where the line starts, in voxels.
++ * @param direction Its unit direction.
++ * @param maxDistance How far to look, in voxels.
++ * @param point Set to where it meets the glass.
++ * @param tile Set to the glass's tile index.
++ * @param part Set to its part (O_WESTWALL, O_NORTHWALL...).
++ * @return False if it meets no glass first within that distance.
++ */
++bool FirstPersonView::glassAlong(const float from[3], const float direction[3], float maxDistance, float point[3], int &tile, int &part) const
++{
++	RayContext rayContext;
++	rayContext.tiles = _tileViews.data();
++	rayContext.tileFlags = _tileFlags.data();
++	rayContext.swings = _doorSwings.data();
++	rayContext.size[0] = _save->getMapSizeX();
++	rayContext.size[1] = _save->getMapSizeY();
++	rayContext.size[2] = _save->getMapSizeZ();
++	rayContext.maxDistance = maxDistance;
++	rayContext.glassStops = true;
++	Hit hit;
++	float tEnd;   // where the ray left the map (not needed here)
++	int endAxis;  // through which side (not needed here)
++	if ((int)_tileFlags.size() != _save->getMapSizeXYZ() || castRay(rayContext, from, direction, hit, tEnd, endAxis) != RAY_HIT
++		|| !hit.glass || hit.t > maxDistance || hit.part < 0)
++	{
++		return false;
++	}
++	for (int axis = 0; axis < 3; ++axis)
++	{
++		point[axis] = from[axis] + direction[axis] * hit.t;
++	}
++	tile = hit.tile;
++	part = hit.part;
 +	return true;
 +}
 +
@@ -46647,10 +46712,10 @@ index 000000000..91c11315d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewRayWalk.h b/src/FirstPerson/FirstPersonViewRayWalk.h
 new file mode 100644
-index 000000000..176b4ff15
+index 000000000..2ac658111
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayWalk.h
-@@ -0,0 +1,587 @@
+@@ -0,0 +1,588 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -46745,6 +46810,7 @@ index 000000000..176b4ff15
 +	float maxDistance;                        // how far rays go, in voxels
 +	float ghostThreshold = 2.0f;              // a ghost stops the ray where its opacity is above this (the pixel's dither threshold); above 1, never (shadows, aim, flares)
 +	float solidGhostThreshold = 2.0f;         // a solid ghost (VoxelModel::solidGhost) stops the ray where 1 is above this: the view's own rays 0 (always), or the pixel's dither scaled by SeeThroughCropOpacity (setting "See-through crops"); above 1, never (shadows, aim, flares)
++	bool glassStops = false;                  // window glass stops the ray (Hit::glass set on the hit): the aim's (see FirstPersonView::glassAlong); else it's seen through, tinted
 +};
 +
 +// How solid a ghost looks (see VoxelModel::ghostly): on what share of the pixels it shows,
@@ -46938,7 +47004,7 @@ index 000000000..176b4ff15
 + * @return True if something was hit (the hit is filled in).
 + */
 +inline bool traceTile(const FirstPersonView::TileView &tileView, const FirstPersonView::DoorSwing *swings, const int tileCell[3], const float rayOrigin[3], const float rayDirection[3],
-+	const float inverseDirection[3], float segmentStart, float segmentEnd, int enterAxis, float ghostThreshold, float solidGhostThreshold, FirstPersonView::Hit &hit)
++	const float inverseDirection[3], float segmentStart, float segmentEnd, int enterAxis, float ghostThreshold, float solidGhostThreshold, bool glassStops, FirstPersonView::Hit &hit)
 +{
 +	// Doors swinging through this tile: the nearest hit shortens the segment, so only what's in
 +	// front of the door can still win.
@@ -47056,7 +47122,7 @@ index 000000000..176b4ff15
 +				if (model->glass[localZ][localY] & (1 << localX))
 +				{
 +					hit.glass = true; // window glass: tint what's behind it
-+					continue;
++					if (!glassStops) continue; // (or the aim stops on it: see RayContext::glassStops)
 +				}
 +				if (model->clear[localZ][localY] & (1 << localX))
 +				{
@@ -47200,7 +47266,7 @@ index 000000000..176b4ff15
 +					smokeWall = addSmoke(*smoke, tileView, distance, tileExit);
 +				}
 +				const float traceEnd = smokeWall >= 0.0f ? smokeWall : tileExit;
-+				if (lookForSolid && traceTile(tileView, context.swings, tileCell, rayOrigin, rayDirection, inverseDirection, distance, traceEnd, enterAxis, context.ghostThreshold, context.solidGhostThreshold, hit))
++				if (lookForSolid && traceTile(tileView, context.swings, tileCell, rayOrigin, rayDirection, inverseDirection, distance, traceEnd, enterAxis, context.ghostThreshold, context.solidGhostThreshold, context.glassStops, hit))
 +				{
 +					// Hit something in the tile: only the smoke in front of it counts.
 +					if (traceSmokeHere)
@@ -47964,10 +48030,10 @@ index 000000000..280bc87e2
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..289b48d8d
+index 000000000..069843fdb
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,480 @@
+@@ -0,0 +1,487 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -48113,6 +48179,13 @@ index 000000000..289b48d8d
 +/// HitFlashShade shade steps brighter at the hit (settings "Hit flash" and "Muzzle flashes", which turns every flash
 +/// off); a downed unit's body flashes the same way.
 +/// Blood from a body sprays from BodySprayHeight voxels above the floor it lies on.
++/// A UFO rule whose most damage is no more than this is a mission site set on the map with a UFO's rules (X-Com Files'
++/// museum, bank, barn...), not a craft: its terrain's sets aren't UFO hulls (see FirstPersonView::collectUfoDataSets).
++const int UfoSiteDamageMax = 1;
++/// A pane of glass (see paneOfGlass): a wall whose art's holes join into a patch of at least this many pixels (a fence's
++/// gaps and a chain-link mesh are smaller). Broken, its edges stay: a band BrokenPaneEdgeMin to BrokenPaneEdgeMin +
++/// BrokenPaneEdgeExtra voxels wide round the inside of its frame (see FirstPersonView::addBrokenPaneEdges).
++const int GlassPaneMinPixels = 40, BrokenPaneEdgeMin = 1, BrokenPaneEdgeExtra = 2;
 +const Uint32 HitFlinchTime = 220;
 +const float HitFlashShade = 6.0f;
 +const float BodySprayHeight = 4.0f;
@@ -53116,10 +53189,10 @@ index 000000000..c76dc65c7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..04a6c8cb9
+index 000000000..c03eafc40
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,3125 @@
+@@ -0,0 +1,3286 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -53173,6 +53246,7 @@ index 000000000..04a6c8cb9
 + * a snapshot of every tile is taken for the ray caster to read.
 + */
 +#include "FirstPersonView.h"
++#include <memory>
 +#include <algorithm>
 +#include <array>
 +#include <bitset>
@@ -53190,6 +53264,7 @@ index 000000000..04a6c8cb9
 +#include "../Battlescape/Pathfinding.h"
 +#include "../Mod/MapData.h"
 +#include "../Mod/MapDataSet.h"
++#include "../Mod/RuleDamageType.h"
 +#include "../Mod/Mod.h"
 +#include "../Mod/RuleCraft.h"
 +#include "../Mod/RuleTerrain.h"
@@ -53666,6 +53741,80 @@ index 000000000..04a6c8cb9
 +		}
 +	}
 +	return found;
++}
++
++/**
++ * Is a wall a pane of glass (a shop's window, a glass wall)? The game lets sight through it (it
++ * doesn't block the view, though its voxels stop shots), and its art is a frame round a big
++ * see-through area (holes of at least GlassPaneMinPixels joined together; a fence's gaps and a
++ * chain-link mesh are smaller). Its pane is everything inside the frame: the holes and what the
++ * art draws among them (glints, streaks), not the frame itself (the drawn pixels next to the
++ * transparent ones outside it, or on the sprite's edge). A player, GitHub issue #75: X-Com Files'
++ * shop windows were opaque; the owner: "just a smooth see-through pane".
++ * @param mapData The record.
++ * @param sprite Its sprite frame.
++ * @param holes Its art's holes (see findArtHoles).
++ * @param pane Gets one entry per pixel, row by row: 1 inside the pane.
++ * @return True if it's a pane of glass.
++ */
++bool paneOfGlass(const MapData *mapData, const Surface *sprite, const std::vector<char> &holes, std::vector<char> &pane)
++{
++	if ((mapData->getObjectType() != O_WESTWALL && mapData->getObjectType() != O_NORTHWALL) || mapData->getBlock(DT_NONE) != 0)
++	{
++		return false;
++	}
++	// The biggest patch of holes joined together.
++	const int width = sprite->getWidth(), height = sprite->getHeight();
++	std::vector<char> seen(width * height, 0);
++	int biggest = 0;
++	for (int start = 0; start < width * height; ++start)
++	{
++		if (!holes[start] || seen[start]) continue;
++		int size = 0;
++		std::vector<int> toVisit = { start };
++		seen[start] = 1;
++		while (!toVisit.empty())
++		{
++			const int pixel = toVisit.back();
++			toVisit.pop_back();
++			++size;
++			const int x = pixel % width, y = pixel / width;
++			const int neighbours[4] = { x > 0 ? pixel - 1 : -1, x < width - 1 ? pixel + 1 : -1, y > 0 ? pixel - width : -1, y < height - 1 ? pixel + width : -1 };
++			for (int next : neighbours)
++			{
++				if (next >= 0 && holes[next] && !seen[next])
++				{
++					seen[next] = 1;
++					toVisit.push_back(next);
++				}
++			}
++		}
++		biggest = std::max(biggest, size);
++	}
++	if (biggest < GlassPaneMinPixels)
++	{
++		return false;
++	}
++	// The pane: the holes, and the drawn pixels with no transparent pixel outside the frame next
++	// to them (nor on the sprite's edge).
++	pane.assign(width * height, 0);
++	auto outsideAt = [&](int x, int y) { return x < 0 || y < 0 || x >= width || y >= height || (!sprite->getPixel(x, y) && !holes[y * width + x]); };
++	for (int y = 0; y < height; ++y)
++	{
++		for (int x = 0; x < width; ++x)
++		{
++			const int pixel = y * width + x;
++			if (holes[pixel])
++			{
++				pane[pixel] = 1;
++			}
++			else if (sprite->getPixel(x, y) && !outsideAt(x - 1, y) && !outsideAt(x + 1, y) && !outsideAt(x, y - 1) && !outsideAt(x, y + 1))
++			{
++				pane[pixel] = 1;
++			}
++		}
++	}
++	return true;
 +}
 +
 +/**
@@ -55048,6 +55197,10 @@ index 000000000..04a6c8cb9
 +	std::vector<char> artHoles;
 +	const bool hasArtHoles = (mapData->getObjectType() == O_WESTWALL || mapData->getObjectType() == O_NORTHWALL) && !hasHollows
 +		&& !_ufoDataSets.count(dataSet->getName()) && findArtHoles(sprite, artHoles);
++	// A pane of glass (see paneOfGlass): the voxels behind its pane are window glass, a smooth
++	// see-through tint of what lies behind, its frame solid.
++	std::vector<char> pane;
++	const bool glassPane = hasArtHoles && !cutout && paneOfGlass(mapData, sprite, artHoles, pane);
 +
 +	// Go through the tile's voxels, layer by layer from the bottom (z), row by row from the
 +	// north (y), west to east (x).
@@ -55116,7 +55269,11 @@ index 000000000..04a6c8cb9
 +				{
 +					model.glass[z][y] |= (Uint16)(1 << x);
 +				}
-+				if (hasArtHoles && spriteY >= 0 && spriteY < sprite->getHeight() && artHoles[spriteY * sprite->getWidth() + spriteX])
++				if (glassPane && spriteY >= 0 && spriteY < sprite->getHeight() && pane[spriteY * sprite->getWidth() + spriteX])
++				{
++					model.glass[z][y] |= (Uint16)(1 << x);
++				}
++				else if (hasArtHoles && spriteY >= 0 && spriteY < sprite->getHeight() && artHoles[spriteY * sprite->getWidth() + spriteX])
 +				{
 +					model.clear[z][y] |= (Uint16)(1 << x);
 +				}
@@ -55129,6 +55286,12 @@ index 000000000..04a6c8cb9
 +				}
 +			}
 +		}
++	}
++
++	// What a pane of glass breaks into: its edges stay in the frame (see addBrokenPaneEdges).
++	if (!cutout)
++	{
++		addBrokenPaneEdges(mapData, model);
 +	}
 +
 +	// No voxels at all, though the map draws it (a ladder, a lift's pad, a wall of laser beams):
@@ -55226,6 +55389,77 @@ index 000000000..04a6c8cb9
 +	colorHiddenSides(model, sprite);
 +	findGlow(model);
 +	model.water = waterFloor && !model.empty;
++}
++
++/**
++ * The record a pane of glass turns into when broken (its "die" record, see paneOfGlass) keeps
++ * the pane's edges: a jagged band of glass, one to three voxels wide, all round the inside of the
++ * frame (and the frame itself), solid, as shards left standing; the middle is open (the owner,
++ * GitHub issue #75: "when broken only voxels on the edges shown"). Its own voxels (the shards on
++ * the floor) stay. The pane's model is built here, not taken from the models kept (that cache may
++ * grow while this one is being built).
++ * @param mapData The record being built.
++ * @param model Its model, its own voxels already in.
++ */
++void FirstPersonView::addBrokenPaneEdges(const MapData *mapData, VoxelModel &model) const
++{
++	static thread_local bool searching = false; // (a pane's own model isn't searched again)
++	MapDataSet *dataSet = mapData->getDataset();
++	if (searching || !dataSet)
++	{
++		return;
++	}
++	for (size_t index = 0; index < dataSet->getSize(); ++index)
++	{
++		const MapData *intact = dataSet->getObject(index);
++		if (intact == mapData || intact->getDieMCD() <= 0 || intact->getDieMCD() >= (int)dataSet->getSize()
++			|| dataSet->getObject(intact->getDieMCD()) != mapData || intact->getObjectType() != mapData->getObjectType())
++		{
++			continue;
++		}
++		// The intact pane's model; glass in it means it was a pane.
++		searching = true;
++		auto paneModel = std::make_unique<VoxelModel>();
++		buildModel(intact, intact->getSprite(0), false, *paneModel);
++		searching = false;
++		bool anyGlass = false;
++		for (int z = 0; z < Position::TileZ && !anyGlass; ++z)
++			for (int y = 0; y < Position::TileXY && !anyGlass; ++y) anyGlass = paneModel->glass[z][y] != 0;
++		if (!anyGlass || paneModel->empty)
++		{
++			continue;
++		}
++		// Along the wall: y for a west wall, x for a north wall. A glass voxel stays within its
++		// band of the pane's edge (1 to 3 voxels, by a fixed scatter), a frame voxel always.
++		const bool westWall = mapData->getObjectType() == O_WESTWALL;
++		const int alongMin = paneModel->min[westWall ? 1 : 0], alongMax = paneModel->max[westWall ? 1 : 0];
++		for (int z = 0; z < Position::TileZ; ++z)
++		{
++			for (int y = 0; y < Position::TileXY; ++y)
++			{
++				for (int x = 0; x < Position::TileXY; ++x)
++				{
++					const Uint8 color = paneModel->color[z][y][x];
++					if (!color || model.color[z][y][x]) continue;
++					if ((paneModel->glass[z][y] >> x) & 1)
++					{
++						const int along = westWall ? y : x;
++						const int edge = std::min({ along - alongMin, alongMax - along, z - paneModel->min[2], paneModel->max[2] - z });
++						if (edge >= BrokenPaneEdgeMin + (along * 7 + z * 13) % (BrokenPaneEdgeExtra + 1)) continue;
++					}
++					model.color[z][y][x] = color;
++					model.empty = false;
++					const int voxel[3] = { x, y, z };
++					for (int axis = 0; axis < 3; ++axis)
++					{
++						model.min[axis] = std::min<int>(model.min[axis], voxel[axis]);
++						model.max[axis] = std::max<int>(model.max[axis], voxel[axis]);
++					}
++				}
++			}
++		}
++		return;
++	}
 +}
 +
 +/**
@@ -56247,10 +56481,10 @@ index 000000000..04a6c8cb9
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewUfo.cpp b/src/FirstPerson/FirstPersonViewUfo.cpp
 new file mode 100644
-index 000000000..e415fd5f1
+index 000000000..1234222fc
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewUfo.cpp
-@@ -0,0 +1,1057 @@
+@@ -0,0 +1,1068 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -56437,6 +56671,10 @@ index 000000000..e415fd5f1
 + * terrain, minus the ones nearly every terrain uses (BLANKS and the like). Their parts get
 + * steady models, wherever they stand (an alien base built from UFO walls too). Of those, the
 + * ones no ordinary terrain uses at all (a UFO's hull) tell a UFO from an alien base.
++ * Not a "UFO" that can't take a hit (most damage UfoSiteDamageMax or less): some mods (X-Com
++ * Files: a museum, a bank, a barn, labs, a graveyard) give their mission sites a UFO's rules to
++ * set them on the map, built from ordinary town and field sets, which then counted as UFO hulls
++ * (a player, GitHub issue #75: a shop's glass, whose art holes a UFO's walls never get, opaque).
 + */
 +void FirstPersonView::collectUfoDataSets()
 +{
@@ -56453,7 +56691,14 @@ index 000000000..e415fd5f1
 +		if (!terrain) return;
 +		for (const MapDataSet *dataSet : *terrain->getMapDataSets()) into.insert(dataSet->getName());
 +	};
-+	for (const auto &type : mod->getUfosList()) collect(mod->getUfo(type)->getBattlescapeTerrainData(), _ufoDataSets);
++	for (const auto &type : mod->getUfosList())
++	{
++		const RuleUfo *ufo = mod->getUfo(type);
++		if (ufo->getStats().damageMax > UfoSiteDamageMax)
++		{
++			collect(ufo->getBattlescapeTerrainData(), _ufoDataSets);
++		}
++	}
 +	const int terrainCount = (int)mod->getTerrainList().size();
 +	for (const auto &type : mod->getTerrainList())
 +	{

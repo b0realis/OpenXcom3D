@@ -184,6 +184,10 @@ void hueToRgb(float hueDegrees, float saturation, float out[3])
  * terrain, minus the ones nearly every terrain uses (BLANKS and the like). Their parts get
  * steady models, wherever they stand (an alien base built from UFO walls too). Of those, the
  * ones no ordinary terrain uses at all (a UFO's hull) tell a UFO from an alien base.
+ * Not a "UFO" that can't take a hit (most damage UfoSiteDamageMax or less): some mods (X-Com
+ * Files: a museum, a bank, a barn, labs, a graveyard) give their mission sites a UFO's rules to
+ * set them on the map, built from ordinary town and field sets, which then counted as UFO hulls
+ * (a player, GitHub issue #75: a shop's glass, whose art holes a UFO's walls never get, opaque).
  */
 void FirstPersonView::collectUfoDataSets()
 {
@@ -200,7 +204,14 @@ void FirstPersonView::collectUfoDataSets()
 		if (!terrain) return;
 		for (const MapDataSet *dataSet : *terrain->getMapDataSets()) into.insert(dataSet->getName());
 	};
-	for (const auto &type : mod->getUfosList()) collect(mod->getUfo(type)->getBattlescapeTerrainData(), _ufoDataSets);
+	for (const auto &type : mod->getUfosList())
+	{
+		const RuleUfo *ufo = mod->getUfo(type);
+		if (ufo->getStats().damageMax > UfoSiteDamageMax)
+		{
+			collect(ufo->getBattlescapeTerrainData(), _ufoDataSets);
+		}
+	}
 	const int terrainCount = (int)mod->getTerrainList().size();
 	for (const auto &type : mod->getTerrainList())
 	{

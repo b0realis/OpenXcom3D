@@ -340,6 +340,8 @@ public:
 	BattleUnit *getUnitAtPointer() const { return _unitAtPointer; }
 	/// The unconscious unit whose body's picture is where the player points (nearer it than any standing unit's), as last drawn; or null.
 	BattleUnit *getBodyAtPointer() const { return _bodyAtPointer; }
+	/// Where a line first meets window glass as the view draws it, if nothing else comes first (the aim stops on glass).
+	bool glassAlong(const float from[3], const float direction[3], float maxDistance, float point[3], int &tile, int &part) const;
 	/// Leaves out one tile's floor (the lift platform being ridden through), or none (index -1).
 	void setHiddenFloor(int tileIndex) { _hiddenFloor = tileIndex; }
 	/// Leaves out these parts (tile index, part), the ones the eye is inside with Doom IDCLIP, or none.
@@ -596,6 +598,8 @@ private:
 	const VoxelModel *leafyModel(const MapData *mapData, int spriteIndex);
 	/// Builds a voxel model: shapes from the LOFT templates, colours from the isometric sprite.
 	void buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model) const;
+	/// What a pane of glass breaks into keeps the pane's edges in its frame (see paneOfGlass).
+	void addBrokenPaneEdges(const MapData *mapData, VoxelModel &model) const;
 	/// Gets the sprite frames of a MapData record, and whether it animates.
 	const Frames &getFrames(const MapData *mapData);
 	/// Starts the swing of doors that just opened on a tile.

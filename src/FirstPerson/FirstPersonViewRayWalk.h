@@ -92,6 +92,7 @@ struct RayContext
 	float maxDistance;                        // how far rays go, in voxels
 	float ghostThreshold = 2.0f;              // a ghost stops the ray where its opacity is above this (the pixel's dither threshold); above 1, never (shadows, aim, flares)
 	float solidGhostThreshold = 2.0f;         // a solid ghost (VoxelModel::solidGhost) stops the ray where 1 is above this: the view's own rays 0 (always), or the pixel's dither scaled by SeeThroughCropOpacity (setting "See-through crops"); above 1, never (shadows, aim, flares)
+	bool glassStops = false;                  // window glass stops the ray (Hit::glass set on the hit): the aim's (see FirstPersonView::glassAlong); else it's seen through, tinted
 };
 
 // How solid a ghost looks (see VoxelModel::ghostly): on what share of the pixels it shows,
@@ -285,7 +286,7 @@ inline float addSmoke(SmokeTrace &smoke, const FirstPersonView::TileView &tileVi
  * @return True if something was hit (the hit is filled in).
  */
 inline bool traceTile(const FirstPersonView::TileView &tileView, const FirstPersonView::DoorSwing *swings, const int tileCell[3], const float rayOrigin[3], const float rayDirection[3],
-	const float inverseDirection[3], float segmentStart, float segmentEnd, int enterAxis, float ghostThreshold, float solidGhostThreshold, FirstPersonView::Hit &hit)
+	const float inverseDirection[3], float segmentStart, float segmentEnd, int enterAxis, float ghostThreshold, float solidGhostThreshold, bool glassStops, FirstPersonView::Hit &hit)
 {
 	// Doors swinging through this tile: the nearest hit shortens the segment, so only what's in
 	// front of the door can still win.
@@ -403,7 +404,7 @@ inline bool traceTile(const FirstPersonView::TileView &tileView, const FirstPers
 				if (model->glass[localZ][localY] & (1 << localX))
 				{
 					hit.glass = true; // window glass: tint what's behind it
-					continue;
+					if (!glassStops) continue; // (or the aim stops on it: see RayContext::glassStops)
 				}
 				if (model->clear[localZ][localY] & (1 << localX))
 				{
@@ -547,7 +548,7 @@ inline RayEnd castRay(const RayContext &context, const float rayOrigin[3], const
 					smokeWall = addSmoke(*smoke, tileView, distance, tileExit);
 				}
 				const float traceEnd = smokeWall >= 0.0f ? smokeWall : tileExit;
-				if (lookForSolid && traceTile(tileView, context.swings, tileCell, rayOrigin, rayDirection, inverseDirection, distance, traceEnd, enterAxis, context.ghostThreshold, context.solidGhostThreshold, hit))
+				if (lookForSolid && traceTile(tileView, context.swings, tileCell, rayOrigin, rayDirection, inverseDirection, distance, traceEnd, enterAxis, context.ghostThreshold, context.solidGhostThreshold, context.glassStops, hit))
 				{
 					// Hit something in the tile: only the smoke in front of it counts.
 					if (traceSmokeHere)

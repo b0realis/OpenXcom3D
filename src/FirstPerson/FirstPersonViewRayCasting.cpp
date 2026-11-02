@@ -479,6 +479,47 @@ bool FirstPersonView::visibleSurfaceAlong(const float from[3], const float direc
 }
 
 /**
+ * Where a line first meets window glass as the view draws it (a pane of glass, see paneOfGlass,
+ * or a mod's window), if nothing else the view draws comes first. Aiming stops on the glass (the
+ * owner, GitHub issue #75: "All aiming stops at glass"): the game's own line of fire through a
+ * pane's voxels may slip through the gaps between its layers, where the view shows smooth glass.
+ * @param from Where the line starts, in voxels.
+ * @param direction Its unit direction.
+ * @param maxDistance How far to look, in voxels.
+ * @param point Set to where it meets the glass.
+ * @param tile Set to the glass's tile index.
+ * @param part Set to its part (O_WESTWALL, O_NORTHWALL...).
+ * @return False if it meets no glass first within that distance.
+ */
+bool FirstPersonView::glassAlong(const float from[3], const float direction[3], float maxDistance, float point[3], int &tile, int &part) const
+{
+	RayContext rayContext;
+	rayContext.tiles = _tileViews.data();
+	rayContext.tileFlags = _tileFlags.data();
+	rayContext.swings = _doorSwings.data();
+	rayContext.size[0] = _save->getMapSizeX();
+	rayContext.size[1] = _save->getMapSizeY();
+	rayContext.size[2] = _save->getMapSizeZ();
+	rayContext.maxDistance = maxDistance;
+	rayContext.glassStops = true;
+	Hit hit;
+	float tEnd;   // where the ray left the map (not needed here)
+	int endAxis;  // through which side (not needed here)
+	if ((int)_tileFlags.size() != _save->getMapSizeXYZ() || castRay(rayContext, from, direction, hit, tEnd, endAxis) != RAY_HIT
+		|| !hit.glass || hit.t > maxDistance || hit.part < 0)
+	{
+		return false;
+	}
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		point[axis] = from[axis] + direction[axis] * hit.t;
+	}
+	tile = hit.tile;
+	part = hit.part;
+	return true;
+}
+
+/**
  * Extra light at a point from the lamps nearby and from the soldier's flashlight, in
  * shades to take off the game's shade (negative: darker, because a lamp's shadow is darker than
  * the game's flat light around it). Lamps only matter at night or under the sea; only the

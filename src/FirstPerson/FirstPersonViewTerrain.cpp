@@ -51,6 +51,7 @@
  * a snapshot of every tile is taken for the ray caster to read.
  */
 #include "FirstPersonView.h"
+#include <memory>
 #include <algorithm>
 #include <array>
 #include <bitset>
@@ -68,6 +69,7 @@
 #include "../Battlescape/Pathfinding.h"
 #include "../Mod/MapData.h"
 #include "../Mod/MapDataSet.h"
+#include "../Mod/RuleDamageType.h"
 #include "../Mod/Mod.h"
 #include "../Mod/RuleCraft.h"
 #include "../Mod/RuleTerrain.h"
@@ -544,6 +546,80 @@ bool findArtHoles(const Surface *sprite, std::vector<char> &holes)
 		}
 	}
 	return found;
+}
+
+/**
+ * Is a wall a pane of glass (a shop's window, a glass wall)? The game lets sight through it (it
+ * doesn't block the view, though its voxels stop shots), and its art is a frame round a big
+ * see-through area (holes of at least GlassPaneMinPixels joined together; a fence's gaps and a
+ * chain-link mesh are smaller). Its pane is everything inside the frame: the holes and what the
+ * art draws among them (glints, streaks), not the frame itself (the drawn pixels next to the
+ * transparent ones outside it, or on the sprite's edge). A player, GitHub issue #75: X-Com Files'
+ * shop windows were opaque; the owner: "just a smooth see-through pane".
+ * @param mapData The record.
+ * @param sprite Its sprite frame.
+ * @param holes Its art's holes (see findArtHoles).
+ * @param pane Gets one entry per pixel, row by row: 1 inside the pane.
+ * @return True if it's a pane of glass.
+ */
+bool paneOfGlass(const MapData *mapData, const Surface *sprite, const std::vector<char> &holes, std::vector<char> &pane)
+{
+	if ((mapData->getObjectType() != O_WESTWALL && mapData->getObjectType() != O_NORTHWALL) || mapData->getBlock(DT_NONE) != 0)
+	{
+		return false;
+	}
+	// The biggest patch of holes joined together.
+	const int width = sprite->getWidth(), height = sprite->getHeight();
+	std::vector<char> seen(width * height, 0);
+	int biggest = 0;
+	for (int start = 0; start < width * height; ++start)
+	{
+		if (!holes[start] || seen[start]) continue;
+		int size = 0;
+		std::vector<int> toVisit = { start };
+		seen[start] = 1;
+		while (!toVisit.empty())
+		{
+			const int pixel = toVisit.back();
+			toVisit.pop_back();
+			++size;
+			const int x = pixel % width, y = pixel / width;
+			const int neighbours[4] = { x > 0 ? pixel - 1 : -1, x < width - 1 ? pixel + 1 : -1, y > 0 ? pixel - width : -1, y < height - 1 ? pixel + width : -1 };
+			for (int next : neighbours)
+			{
+				if (next >= 0 && holes[next] && !seen[next])
+				{
+					seen[next] = 1;
+					toVisit.push_back(next);
+				}
+			}
+		}
+		biggest = std::max(biggest, size);
+	}
+	if (biggest < GlassPaneMinPixels)
+	{
+		return false;
+	}
+	// The pane: the holes, and the drawn pixels with no transparent pixel outside the frame next
+	// to them (nor on the sprite's edge).
+	pane.assign(width * height, 0);
+	auto outsideAt = [&](int x, int y) { return x < 0 || y < 0 || x >= width || y >= height || (!sprite->getPixel(x, y) && !holes[y * width + x]); };
+	for (int y = 0; y < height; ++y)
+	{
+		for (int x = 0; x < width; ++x)
+		{
+			const int pixel = y * width + x;
+			if (holes[pixel])
+			{
+				pane[pixel] = 1;
+			}
+			else if (sprite->getPixel(x, y) && !outsideAt(x - 1, y) && !outsideAt(x + 1, y) && !outsideAt(x, y - 1) && !outsideAt(x, y + 1))
+			{
+				pane[pixel] = 1;
+			}
+		}
+	}
+	return true;
 }
 
 /**
@@ -1926,6 +2002,10 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	std::vector<char> artHoles;
 	const bool hasArtHoles = (mapData->getObjectType() == O_WESTWALL || mapData->getObjectType() == O_NORTHWALL) && !hasHollows
 		&& !_ufoDataSets.count(dataSet->getName()) && findArtHoles(sprite, artHoles);
+	// A pane of glass (see paneOfGlass): the voxels behind its pane are window glass, a smooth
+	// see-through tint of what lies behind, its frame solid.
+	std::vector<char> pane;
+	const bool glassPane = hasArtHoles && !cutout && paneOfGlass(mapData, sprite, artHoles, pane);
 
 	// Go through the tile's voxels, layer by layer from the bottom (z), row by row from the
 	// north (y), west to east (x).
@@ -1994,7 +2074,11 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 				{
 					model.glass[z][y] |= (Uint16)(1 << x);
 				}
-				if (hasArtHoles && spriteY >= 0 && spriteY < sprite->getHeight() && artHoles[spriteY * sprite->getWidth() + spriteX])
+				if (glassPane && spriteY >= 0 && spriteY < sprite->getHeight() && pane[spriteY * sprite->getWidth() + spriteX])
+				{
+					model.glass[z][y] |= (Uint16)(1 << x);
+				}
+				else if (hasArtHoles && spriteY >= 0 && spriteY < sprite->getHeight() && artHoles[spriteY * sprite->getWidth() + spriteX])
 				{
 					model.clear[z][y] |= (Uint16)(1 << x);
 				}
@@ -2007,6 +2091,12 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 				}
 			}
 		}
+	}
+
+	// What a pane of glass breaks into: its edges stay in the frame (see addBrokenPaneEdges).
+	if (!cutout)
+	{
+		addBrokenPaneEdges(mapData, model);
 	}
 
 	// No voxels at all, though the map draws it (a ladder, a lift's pad, a wall of laser beams):
@@ -2104,6 +2194,77 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	colorHiddenSides(model, sprite);
 	findGlow(model);
 	model.water = waterFloor && !model.empty;
+}
+
+/**
+ * The record a pane of glass turns into when broken (its "die" record, see paneOfGlass) keeps
+ * the pane's edges: a jagged band of glass, one to three voxels wide, all round the inside of the
+ * frame (and the frame itself), solid, as shards left standing; the middle is open (the owner,
+ * GitHub issue #75: "when broken only voxels on the edges shown"). Its own voxels (the shards on
+ * the floor) stay. The pane's model is built here, not taken from the models kept (that cache may
+ * grow while this one is being built).
+ * @param mapData The record being built.
+ * @param model Its model, its own voxels already in.
+ */
+void FirstPersonView::addBrokenPaneEdges(const MapData *mapData, VoxelModel &model) const
+{
+	static thread_local bool searching = false; // (a pane's own model isn't searched again)
+	MapDataSet *dataSet = mapData->getDataset();
+	if (searching || !dataSet)
+	{
+		return;
+	}
+	for (size_t index = 0; index < dataSet->getSize(); ++index)
+	{
+		const MapData *intact = dataSet->getObject(index);
+		if (intact == mapData || intact->getDieMCD() <= 0 || intact->getDieMCD() >= (int)dataSet->getSize()
+			|| dataSet->getObject(intact->getDieMCD()) != mapData || intact->getObjectType() != mapData->getObjectType())
+		{
+			continue;
+		}
+		// The intact pane's model; glass in it means it was a pane.
+		searching = true;
+		auto paneModel = std::make_unique<VoxelModel>();
+		buildModel(intact, intact->getSprite(0), false, *paneModel);
+		searching = false;
+		bool anyGlass = false;
+		for (int z = 0; z < Position::TileZ && !anyGlass; ++z)
+			for (int y = 0; y < Position::TileXY && !anyGlass; ++y) anyGlass = paneModel->glass[z][y] != 0;
+		if (!anyGlass || paneModel->empty)
+		{
+			continue;
+		}
+		// Along the wall: y for a west wall, x for a north wall. A glass voxel stays within its
+		// band of the pane's edge (1 to 3 voxels, by a fixed scatter), a frame voxel always.
+		const bool westWall = mapData->getObjectType() == O_WESTWALL;
+		const int alongMin = paneModel->min[westWall ? 1 : 0], alongMax = paneModel->max[westWall ? 1 : 0];
+		for (int z = 0; z < Position::TileZ; ++z)
+		{
+			for (int y = 0; y < Position::TileXY; ++y)
+			{
+				for (int x = 0; x < Position::TileXY; ++x)
+				{
+					const Uint8 color = paneModel->color[z][y][x];
+					if (!color || model.color[z][y][x]) continue;
+					if ((paneModel->glass[z][y] >> x) & 1)
+					{
+						const int along = westWall ? y : x;
+						const int edge = std::min({ along - alongMin, alongMax - along, z - paneModel->min[2], paneModel->max[2] - z });
+						if (edge >= BrokenPaneEdgeMin + (along * 7 + z * 13) % (BrokenPaneEdgeExtra + 1)) continue;
+					}
+					model.color[z][y][x] = color;
+					model.empty = false;
+					const int voxel[3] = { x, y, z };
+					for (int axis = 0; axis < 3; ++axis)
+					{
+						model.min[axis] = std::min<int>(model.min[axis], voxel[axis]);
+						model.max[axis] = std::max<int>(model.max[axis], voxel[axis]);
+					}
+				}
+			}
+		}
+		return;
+	}
 }
 
 /**

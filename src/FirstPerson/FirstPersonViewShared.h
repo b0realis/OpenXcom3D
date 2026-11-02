@@ -143,6 +143,13 @@ const Uint32 QuickFallFrameTime = 100;
 /// HitFlashShade shade steps brighter at the hit (settings "Hit flash" and "Muzzle flashes", which turns every flash
 /// off); a downed unit's body flashes the same way.
 /// Blood from a body sprays from BodySprayHeight voxels above the floor it lies on.
+/// A UFO rule whose most damage is no more than this is a mission site set on the map with a UFO's rules (X-Com Files'
+/// museum, bank, barn...), not a craft: its terrain's sets aren't UFO hulls (see FirstPersonView::collectUfoDataSets).
+const int UfoSiteDamageMax = 1;
+/// A pane of glass (see paneOfGlass): a wall whose art's holes join into a patch of at least this many pixels (a fence's
+/// gaps and a chain-link mesh are smaller). Broken, its edges stay: a band BrokenPaneEdgeMin to BrokenPaneEdgeMin +
+/// BrokenPaneEdgeExtra voxels wide round the inside of its frame (see FirstPersonView::addBrokenPaneEdges).
+const int GlassPaneMinPixels = 40, BrokenPaneEdgeMin = 1, BrokenPaneEdgeExtra = 2;
 const Uint32 HitFlinchTime = 220;
 const float HitFlashShade = 6.0f;
 const float BodySprayHeight = 4.0f;

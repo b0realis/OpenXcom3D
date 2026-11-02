@@ -1289,6 +1289,26 @@ bool FirstPersonMode::aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &
 	// leave the soldier out, test every unit, and skip units the player can't see.
 	std::vector<Position> trajectory;
 	const int hitType = _save->getTileEngine()->calculateLineVoxel(rayOrigin, farPoint, false, &trajectory, unit, nullptr, !_save->getDebugMode());
+	// Window glass the view draws before whatever the game's line meets (or before the sky): the
+	// aim stops on it, half a voxel into the pane (the owner, GitHub issue #75: "All aiming stops at
+	// glass"; the game's line may slip between the layers of a pane's voxels, where the view shows
+	// smooth glass). It's aimed at as the wall it is: a shot goes for it, a blow strikes it.
+	{
+		const bool gameHit = hitType != V_EMPTY && hitType != V_OUTOFBOUNDS && !trajectory.empty();
+		const double gameDistance = gameHit ? std::sqrt(std::pow(trajectory.front().x + 0.5 - eye[0], 2) + std::pow(trajectory.front().y + 0.5 - eye[1], 2)
+			+ std::pow(trajectory.front().z + 0.5 - eye[2], 2)) : 1500.0;
+		const float from[3] = { (float)eye[0], (float)eye[1], (float)eye[2] };
+		const float along[3] = { (float)rayDirection[0], (float)rayDirection[1], (float)rayDirection[2] };
+		float glassPoint[3];
+		int glassTile = -1, glassPart = -1;
+		if (_view->glassAlong(from, along, (float)gameDistance, glassPoint, glassTile, glassPart))
+		{
+			voxel = Position((int)std::floor(glassPoint[0] + along[0] * 0.5f), (int)std::floor(glassPoint[1] + along[1] * 0.5f),
+				(int)std::floor(glassPoint[2] + along[2] * 0.5f));
+			if (voxelType) *voxelType = glassPart; // (the tile parts and the voxel types count alike: V_WESTWALL is O_WESTWALL)
+			return true;
+		}
+	}
 	if (hitType != V_EMPTY && hitType != V_OUTOFBOUNDS && !trajectory.empty())
 	{
 		voxel = trajectory.front(); // a floor, a wall, an object or a unit was hit
