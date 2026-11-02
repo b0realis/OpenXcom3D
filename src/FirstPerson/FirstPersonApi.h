@@ -186,9 +186,9 @@ Position spriteHitRelative(const Position &relative, const BattleUnit *unit, con
 /// or below it) keeps its facing, where the game turned it south (BattleUnit::directionTo).
 bool keepsFacingOnOwnTile();
 /// Setting "Auto-equip guns first": does the game's auto-equip hand out guns before melee weapons,
-/// in the mod's own item order (BattlescapeGenerator::autoEquip), rather than its own way?
+/// the strongest first (BattlescapeGenerator::autoEquip), rather than its own way?
 bool autoEquipGunsFirst(const Mod *mod);
-/// Setting "Auto-equip guns first": the items offered, in the mod's list order (then by type).
+/// Setting "Auto-equip guns first": the items offered, the hardest-hitting first (then the mod's list order, then by type).
 void sortAutoEquip(std::vector<BattleItem*> &items);
 /// Setting "Auto-equip guns first": does this pass of the auto-equip take this item? Passes 0 to
 /// AutoEquipLeftoversPass: two-handed guns, one-handed guns, two-handed melee weapons, one-handed

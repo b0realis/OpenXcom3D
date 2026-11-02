@@ -124,7 +124,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..f36634f21
+index 000000000..a3a36c99b
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,461 @@
@@ -513,7 +513,7 @@ index 000000000..f36634f21
 +  STR_FPS_SPRITE_HITBOXES_DESC: "Units are hit, and seen, wherever their full sprite shows, for everyone, in 3D and on the map. NO: the game's own hit shapes."
 +  STR_FPS_QUICK_DEATHS: "Quick deaths"
 +  STR_FPS_AUTO_EQUIP_GUNS_FIRST: "Auto-equip guns first"
-+  STR_FPS_AUTO_EQUIP_GUNS_FIRST_DESC: "Soldiers with no saved loadout take guns before melee weapons, in the mod's item order. NO: OpenXcom's own."
++  STR_FPS_AUTO_EQUIP_GUNS_FIRST_DESC: "Soldiers with no saved loadout take guns before melee weapons, the hardest-hitting first, launchers last. NO: OpenXcom's own."
 +  STR_FPS_QUICK_DEATHS_DESC: "A unit killed or knocked out is down at once: bursts fire on, falls play on their own. NO: the game's, one by one."
 +  STR_FPS_UNIT_NAMES: "Unit names"
 +  STR_FPS_UNIT_NAMES_DESC: "The name of the unit under the crosshair."
@@ -591,7 +591,7 @@ index 000000000..f36634f21
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..37d13f9ff
+index 000000000..c2c8a394d
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,461 @@
@@ -980,7 +980,7 @@ index 000000000..37d13f9ff
 +  STR_FPS_SPRITE_HITBOXES_DESC: "Units are hit, and seen, wherever their full sprite shows, for everyone, in 3D and on the map. NO: the game's own hit shapes."
 +  STR_FPS_QUICK_DEATHS: "Quick deaths"
 +  STR_FPS_AUTO_EQUIP_GUNS_FIRST: "Auto-equip guns first"
-+  STR_FPS_AUTO_EQUIP_GUNS_FIRST_DESC: "Soldiers with no saved loadout take guns before melee weapons, in the mod's item order. NO: OpenXcom's own."
++  STR_FPS_AUTO_EQUIP_GUNS_FIRST_DESC: "Soldiers with no saved loadout take guns before melee weapons, the hardest-hitting first, launchers last. NO: OpenXcom's own."
 +  STR_FPS_QUICK_DEATHS_DESC: "A unit killed or knocked out is down at once: bursts fire on, falls play on their own. NO: the game's, one by one."
 +  STR_FPS_UNIT_NAMES: "Unit names"
 +  STR_FPS_UNIT_NAMES_DESC: "The name of the unit under the crosshair."
@@ -18508,7 +18508,7 @@ index 7af613cc7..286e4f3a5 100644
  	/// Default constructor
  	BattleAction() : target(-1, -1, -1), targeting(false), value(0), diff(0), autoShotCounter(0), cameraPosition(0, 0, -1), desperate(false), finalFacing(-1), finalAction(false), number(0), sprayTargeting(false) { }
 diff --git a/src/Battlescape/BattlescapeGenerator.cpp b/src/Battlescape/BattlescapeGenerator.cpp
-index 1951ba749..c236fa9a9 100644
+index 1951ba749..45aa0e792 100644
 --- a/src/Battlescape/BattlescapeGenerator.cpp
 +++ b/src/Battlescape/BattlescapeGenerator.cpp
 @@ -62,6 +62,7 @@
@@ -18525,7 +18525,7 @@ index 1951ba749..c236fa9a9 100644
  {
 -	for (int pass = 0; pass < 4; ++pass)
 +	// (OpenXcom3D: setting "Auto-equip guns first", off by default (GitHub issue #46): guns before
-+	// melee weapons, in the mod's own item order, see FirstPerson::autoEquipTakes; off, the game's
++	// melee weapons, the strongest first, see FirstPerson::autoEquipTakes; off, the game's
 +	// own four passes below, unchanged.)
 +	const bool gunsFirst = FirstPerson::autoEquipGunsFirst(mod);
 +	if (gunsFirst)
@@ -21724,10 +21724,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..4ee87402d
+index 000000000..363c5eeec
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1082 @@
+@@ -0,0 +1,1182 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -21858,7 +21858,7 @@ index 000000000..4ee87402d
 +
 +/**
 + * Does the game's auto-equip (soldiers with no saved loadout: a New Battle's, or never equipped)
-+ * hand out guns before melee weapons, in the mod's own item order (setting "Auto-equip guns
++ * hand out guns before melee weapons, the strongest first (setting "Auto-equip guns
 + * first", a player's report, GitHub issue #46: soldiers in XPiratez and X-Com Files spawned with
 + * claws, shovels and swords)? OXCE counts a two-handed melee weapon as a rifle, handed out first,
 + * and offers the craft's kit in no fixed order. Off (the default), OXCE's own way, unchanged.
@@ -21871,15 +21871,115 @@ index 000000000..4ee87402d
 +}
 +
 +/**
-+ * The kit offered to the auto-equip in the mod's own item order (then by type), the same in every
-+ * battle (setting "Auto-equip guns first"; the craft's list follows where its items sit in memory).
++ * How a weapon ranks for the auto-equip's order (setting "Auto-equip guns first"): direct fire
++ * before launchers, then the harder-hitting first. Its rounds are the ammo its shots (aimed, snap
++ * or auto) fire, the ones for it in the craft's kit, or failing that any it takes, or the gun
++ * itself when it needs no ammo. It's a launcher when its shots arc or every round of it is an
++ * area blast (a damage type with a radius: rockets, mortar bombs, grenades); its power is one
++ * round's, the strongest direct round's (or the strongest blast's, for a launcher): bursts and
++ * pellets mostly miss at range, and counted in they put shotguns and miniguns before heavy plasma
++ * and cannons. A melee weapon by its own power; anything else at 0.
++ */
++struct AutoEquipRank
++{
++	bool launcher = false; ///< arcing, or only blasts: handed out after the direct-fire guns
++	double power = 0.0;    ///< the power of its strongest round
++};
++
++/**
++ * Ranks a weapon for the auto-equip's order (see AutoEquipRank).
++ * @param rule The item.
++ * @param items The craft's kit (the ammo in it counts first).
++ * @return Whether it's a launcher, and the power of its strongest round.
++ */
++static AutoEquipRank autoEquipRank(const RuleItem *rule, const std::vector<BattleItem*> &items)
++{
++	AutoEquipRank rank;
++	if (rule->getBattleType() == BT_MELEE)
++	{
++		rank.power = rule->getPower();
++		return rank;
++	}
++	if (rule->getBattleType() != BT_FIREARM)
++	{
++		return rank;
++	}
++	// The rounds its shots fire, by their ammo slots: those in the kit, else any it takes, else
++	// the gun itself.
++	std::vector<const RuleItem*> rounds;
++	const std::pair<const RuleItemAction*, int> actions[3] = { { rule->getConfigAimed(), rule->getCostAimed().Time },
++		{ rule->getConfigSnap(), rule->getCostSnap().Time }, { rule->getConfigAuto(), rule->getCostAuto().Time } };
++	for (const auto &action : actions)
++	{
++		if (!action.first || action.second <= 0)
++		{
++			continue;
++		}
++		const std::vector<const RuleItem*> *ammo = rule->getCompatibleAmmoForSlot(action.first->ammoSlot);
++		if (!ammo || ammo->empty())
++		{
++			rounds.push_back(rule);
++			continue;
++		}
++		bool anyInKit = false;
++		for (const RuleItem *round : *ammo)
++		{
++			const bool inKit = std::any_of(items.begin(), items.end(), [round](const BattleItem *item) { return item->getRules() == round; });
++			if (inKit)
++			{
++				rounds.push_back(round);
++				anyInKit = true;
++			}
++		}
++		if (!anyInKit)
++		{
++			rounds.insert(rounds.end(), ammo->begin(), ammo->end());
++		}
++	}
++	// Its strongest direct round, else its strongest blast (a launcher).
++	double direct = -1.0, blast = -1.0;
++	for (const RuleItem *round : rounds)
++	{
++		double &strongest = round->getDamageType()->isDirect() ? direct : blast;
++		strongest = std::max(strongest, (double)round->getPower());
++	}
++	rank.launcher = rule->getArcingShot() || direct < 0.0;
++	rank.power = std::max(0.0, direct >= 0.0 && !rule->getArcingShot() ? direct : std::max(direct, blast));
++	return rank;
++}
++
++/**
++ * The kit offered to the auto-equip in a fixed order (setting "Auto-equip guns first"): the
++ * direct-fire guns before the launchers, the harder-hitting first (see autoEquipRank), then the
++ * mod's own item order, then by type; so each pass hands out its best first (a player, GitHub
++ * issue #76: the mod's order put X-Com Files' bows and old SMGs before its cannons and gauss
++ * rifles; the owner: launchers after the direct-fire guns), the same in every battle (OXCE's own
++ * order is where the items sit in memory, which changes between builds and runs).
 + * @param items The craft's kit.
 + */
 +void sortAutoEquip(std::vector<BattleItem*> &items)
 +{
-+	std::stable_sort(items.begin(), items.end(), [](const BattleItem *a, const BattleItem *b)
++	std::map<const RuleItem*, AutoEquipRank> ranks;
++	for (const BattleItem *item : items)
++	{
++		ranks.emplace(item->getRules(), AutoEquipRank());
++	}
++	for (auto &entry : ranks)
++	{
++		entry.second = autoEquipRank(entry.first, items);
++	}
++	std::stable_sort(items.begin(), items.end(), [&ranks](const BattleItem *a, const BattleItem *b)
 +	{
 +		const RuleItem *ruleA = a->getRules(), *ruleB = b->getRules();
++		const AutoEquipRank &rankA = ranks[ruleA], &rankB = ranks[ruleB];
++		if (rankA.launcher != rankB.launcher)
++		{
++			return !rankA.launcher;
++		}
++		if (rankA.power != rankB.power)
++		{
++			return rankA.power > rankB.power;
++		}
 +		if (ruleA->getListOrder() != ruleB->getListOrder())
 +		{
 +			return ruleA->getListOrder() < ruleB->getListOrder();
@@ -22812,7 +22912,7 @@ index 000000000..4ee87402d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..2d1633fff
+index 000000000..0c5a2020b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
 @@ -0,0 +1,347 @@
@@ -23004,9 +23104,9 @@ index 000000000..2d1633fff
 +/// or below it) keeps its facing, where the game turned it south (BattleUnit::directionTo).
 +bool keepsFacingOnOwnTile();
 +/// Setting "Auto-equip guns first": does the game's auto-equip hand out guns before melee weapons,
-+/// in the mod's own item order (BattlescapeGenerator::autoEquip), rather than its own way?
++/// the strongest first (BattlescapeGenerator::autoEquip), rather than its own way?
 +bool autoEquipGunsFirst(const Mod *mod);
-+/// Setting "Auto-equip guns first": the items offered, in the mod's list order (then by type).
++/// Setting "Auto-equip guns first": the items offered, the hardest-hitting first (then the mod's list order, then by type).
 +void sortAutoEquip(std::vector<BattleItem*> &items);
 +/// Setting "Auto-equip guns first": does this pass of the auto-equip take this item? Passes 0 to
 +/// AutoEquipLeftoversPass: two-handed guns, one-handed guns, two-handed melee weapons, one-handed

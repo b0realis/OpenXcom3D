@@ -128,7 +128,7 @@ bool keepsFacingOnOwnTile()
 
 /**
  * Does the game's auto-equip (soldiers with no saved loadout: a New Battle's, or never equipped)
- * hand out guns before melee weapons, in the mod's own item order (setting "Auto-equip guns
+ * hand out guns before melee weapons, the strongest first (setting "Auto-equip guns
  * first", a player's report, GitHub issue #46: soldiers in XPiratez and X-Com Files spawned with
  * claws, shovels and swords)? OXCE counts a two-handed melee weapon as a rifle, handed out first,
  * and offers the craft's kit in no fixed order. Off (the default), OXCE's own way, unchanged.
@@ -141,15 +141,115 @@ bool autoEquipGunsFirst(const Mod *mod)
 }
 
 /**
- * The kit offered to the auto-equip in the mod's own item order (then by type), the same in every
- * battle (setting "Auto-equip guns first"; the craft's list follows where its items sit in memory).
+ * How a weapon ranks for the auto-equip's order (setting "Auto-equip guns first"): direct fire
+ * before launchers, then the harder-hitting first. Its rounds are the ammo its shots (aimed, snap
+ * or auto) fire, the ones for it in the craft's kit, or failing that any it takes, or the gun
+ * itself when it needs no ammo. It's a launcher when its shots arc or every round of it is an
+ * area blast (a damage type with a radius: rockets, mortar bombs, grenades); its power is one
+ * round's, the strongest direct round's (or the strongest blast's, for a launcher): bursts and
+ * pellets mostly miss at range, and counted in they put shotguns and miniguns before heavy plasma
+ * and cannons. A melee weapon by its own power; anything else at 0.
+ */
+struct AutoEquipRank
+{
+	bool launcher = false; ///< arcing, or only blasts: handed out after the direct-fire guns
+	double power = 0.0;    ///< the power of its strongest round
+};
+
+/**
+ * Ranks a weapon for the auto-equip's order (see AutoEquipRank).
+ * @param rule The item.
+ * @param items The craft's kit (the ammo in it counts first).
+ * @return Whether it's a launcher, and the power of its strongest round.
+ */
+static AutoEquipRank autoEquipRank(const RuleItem *rule, const std::vector<BattleItem*> &items)
+{
+	AutoEquipRank rank;
+	if (rule->getBattleType() == BT_MELEE)
+	{
+		rank.power = rule->getPower();
+		return rank;
+	}
+	if (rule->getBattleType() != BT_FIREARM)
+	{
+		return rank;
+	}
+	// The rounds its shots fire, by their ammo slots: those in the kit, else any it takes, else
+	// the gun itself.
+	std::vector<const RuleItem*> rounds;
+	const std::pair<const RuleItemAction*, int> actions[3] = { { rule->getConfigAimed(), rule->getCostAimed().Time },
+		{ rule->getConfigSnap(), rule->getCostSnap().Time }, { rule->getConfigAuto(), rule->getCostAuto().Time } };
+	for (const auto &action : actions)
+	{
+		if (!action.first || action.second <= 0)
+		{
+			continue;
+		}
+		const std::vector<const RuleItem*> *ammo = rule->getCompatibleAmmoForSlot(action.first->ammoSlot);
+		if (!ammo || ammo->empty())
+		{
+			rounds.push_back(rule);
+			continue;
+		}
+		bool anyInKit = false;
+		for (const RuleItem *round : *ammo)
+		{
+			const bool inKit = std::any_of(items.begin(), items.end(), [round](const BattleItem *item) { return item->getRules() == round; });
+			if (inKit)
+			{
+				rounds.push_back(round);
+				anyInKit = true;
+			}
+		}
+		if (!anyInKit)
+		{
+			rounds.insert(rounds.end(), ammo->begin(), ammo->end());
+		}
+	}
+	// Its strongest direct round, else its strongest blast (a launcher).
+	double direct = -1.0, blast = -1.0;
+	for (const RuleItem *round : rounds)
+	{
+		double &strongest = round->getDamageType()->isDirect() ? direct : blast;
+		strongest = std::max(strongest, (double)round->getPower());
+	}
+	rank.launcher = rule->getArcingShot() || direct < 0.0;
+	rank.power = std::max(0.0, direct >= 0.0 && !rule->getArcingShot() ? direct : std::max(direct, blast));
+	return rank;
+}
+
+/**
+ * The kit offered to the auto-equip in a fixed order (setting "Auto-equip guns first"): the
+ * direct-fire guns before the launchers, the harder-hitting first (see autoEquipRank), then the
+ * mod's own item order, then by type; so each pass hands out its best first (a player, GitHub
+ * issue #76: the mod's order put X-Com Files' bows and old SMGs before its cannons and gauss
+ * rifles; the owner: launchers after the direct-fire guns), the same in every battle (OXCE's own
+ * order is where the items sit in memory, which changes between builds and runs).
  * @param items The craft's kit.
  */
 void sortAutoEquip(std::vector<BattleItem*> &items)
 {
-	std::stable_sort(items.begin(), items.end(), [](const BattleItem *a, const BattleItem *b)
+	std::map<const RuleItem*, AutoEquipRank> ranks;
+	for (const BattleItem *item : items)
+	{
+		ranks.emplace(item->getRules(), AutoEquipRank());
+	}
+	for (auto &entry : ranks)
+	{
+		entry.second = autoEquipRank(entry.first, items);
+	}
+	std::stable_sort(items.begin(), items.end(), [&ranks](const BattleItem *a, const BattleItem *b)
 	{
 		const RuleItem *ruleA = a->getRules(), *ruleB = b->getRules();
+		const AutoEquipRank &rankA = ranks[ruleA], &rankB = ranks[ruleB];
+		if (rankA.launcher != rankB.launcher)
+		{
+			return !rankA.launcher;
+		}
+		if (rankA.power != rankB.power)
+		{
+			return rankA.power > rankB.power;
+		}
 		if (ruleA->getListOrder() != ruleB->getListOrder())
 		{
 			return ruleA->getListOrder() < ruleB->getListOrder();
