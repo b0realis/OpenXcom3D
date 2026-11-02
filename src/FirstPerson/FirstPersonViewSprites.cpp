@@ -700,10 +700,13 @@ double FirstPersonView::lyingRise(const double world[3], double reach) const
 }
 
 /**
- * Watches the units for hits and kills, once a frame, by their health and whether they are
- * out (dead or unconscious) compared with the last frame. A hit unit flinches back from the
- * camera and flashes (see drawUnits); one in sight sprays blood (or sparks, from machines);
- * and an enemy hit or downed in sight marks the crosshair (the hitmarker).
+ * Watches the units for hits and kills, once a frame, by their health, their stun and whether
+ * they are out (unconscious or dead) compared with the last frame. A hit unit flinches back from
+ * the camera and flashes (see drawUnits; a downed one's body flashes, see drawFloorItems); one in
+ * sight sprays blood (or sparks, from machines), a downed one from its body on the floor; and an
+ * enemy hit, downed or killed in sight marks the crosshair (the hitmarker). (A player, GitHub
+ * issue #74: units already down showed nothing when hit; and a knocked-out unit mostly takes
+ * stun, which counts as a hit now, for standing units too.)
  */
 void FirstPersonView::watchUnits()
 {
@@ -716,25 +719,63 @@ void FirstPersonView::watchUnits()
 		auto found = _watchedUnits.find(unit);
 		if (found == _watchedUnits.end())
 		{
-			_watchedUnits.emplace(unit, UnitWatch{ unit->getHealth(), isOut, 0, { 0.0f, 0.0f } });
+			_watchedUnits.emplace(unit, UnitWatch{ unit->getHealth(), unit->getStunlevel(), isOut, unit->getStatus() == STATUS_DEAD, 0, { 0.0f, 0.0f } });
 			continue;
 		}
-		// Did it lose health, or go down (killed or knocked out), since the last frame?
+		// Did it lose health or take stun, go down (knocked out or killed) or die where it lay,
+		// since the last frame?
 		UnitWatch &watch = found->second;
-		const bool wasHit = unit->getHealth() < watch.health;
-		const bool killed = isOut && !watch.out;
+		const bool dead = unit->getStatus() == STATUS_DEAD;
+		const bool wasDown = watch.out;
+		const bool wasHit = unit->getHealth() < watch.health || unit->getStunlevel() > watch.stun;
+		const bool killed = (isOut && !watch.out) || (dead && !watch.dead);
 		watch.health = unit->getHealth();
+		watch.stun = unit->getStunlevel();
 		watch.out = isOut;
+		watch.dead = dead;
 		if (!wasHit && !killed)
 		{
 			continue;
 		}
-		// Its chest (the middle of its tiles, 60% of its height up), and the level direction
-		// from the camera to it: dx, dy from the eye, flatDistance their length.
-		const Position tilePosition = unit->getPosition();
-		const int unitSize = unit->getArmor()->getSize(); // tiles across: 1, or 2 for big units
-		const float chest[3] = { tilePosition.x * 16.0f + 8.0f * unitSize, tilePosition.y * 16.0f + 8.0f * unitSize,
-			tilePosition.z * 24.0f + unit->getFloatHeight() + unit->getHeight() * 0.6f };
+		// Where it was hit: a standing unit's chest (the middle of its tiles, 60% of its height
+		// up); one already down, its body, a little above the floor it lies on (none while it's
+		// carried); and the level direction from the camera to it: dx, dy from the eye,
+		// flatDistance their length. Seen: the unit in sight; a body, where the view draws it.
+		float chest[3];
+		bool seen;
+		if (wasDown)
+		{
+			const BattleItem *body = nullptr;
+			for (const BattleItem *item : *_save->getItems())
+			{
+				if (item->getUnit() == unit && item->getTile())
+				{
+					body = item;
+					break;
+				}
+			}
+			if (!body)
+			{
+				continue;
+			}
+			const Tile *bodyTile = body->getTile();
+			const Position at = bodyTile->getPosition();
+			chest[0] = at.x * 16.0f + 8.0f;
+			chest[1] = at.y * 16.0f + 8.0f;
+			chest[2] = at.z * 24.0f - bodyTile->getTerrainLevel() + BodySprayHeight;
+			// (seen as the view draws it, on a tile seen before, as the map shows what lies there:
+			// the game's sight may leave out a body just below a ledge the soldier stands on)
+			seen = _tileViews[_save->getTileIndex(at)].discovered || bodyTile->getVisible() || _save->getDebugMode();
+		}
+		else
+		{
+			const Position tilePosition = unit->getPosition();
+			const int unitSize = unit->getArmor()->getSize(); // tiles across: 1, or 2 for big units
+			chest[0] = tilePosition.x * 16.0f + 8.0f * unitSize;
+			chest[1] = tilePosition.y * 16.0f + 8.0f * unitSize;
+			chest[2] = tilePosition.z * 24.0f + unit->getFloatHeight() + unit->getHeight() * 0.6f;
+			seen = unit->getVisible() || _save->getDebugMode();
+		}
 		const float dx = chest[0] - (float)_eye[0], dy = chest[1] - (float)_eye[1];
 		const float flatDistance = std::max(0.01f, std::sqrt(dx * dx + dy * dy));
 		// A hit starts the flinch, pushing it away from the camera.
@@ -744,7 +785,6 @@ void FirstPersonView::watchUnits()
 			watch.push[0] = dx / flatDistance;
 			watch.push[1] = dy / flatDistance;
 		}
-		const bool seen = unit->getVisible() || _save->getDebugMode();
 		if (seen && unit != _cameraUnit)
 		{
 			// Blood or sparks, thrown away from the camera: 14 particles of two colours,
@@ -766,7 +806,7 @@ void FirstPersonView::watchUnits()
 				_particles.add(particle);
 			}
 		}
-		// An enemy hit or downed in sight: the hitmarker on the crosshair.
+		// An enemy hit, downed or killed in sight: the hitmarker on the crosshair.
 		if (seen && unit->getFaction() == FACTION_HOSTILE)
 		{
 			_hitMarkTick = now;
@@ -879,16 +919,16 @@ void FirstPersonView::drawUnits()
 			}
 		}
 		glide.seen = now;
-		// A hit unit flinches back from the camera for a moment (220 ms, up to 3 voxels), and
-		// flashes (with muzzle flashes on).
+		// A hit unit flinches back from the camera for a moment (HitFlinchTime, up to 3 voxels), and
+		// flashes (setting "Hit flash", and "Muzzle flashes", which turns every flash off).
 		float flash = 0.0f;
 		auto watched = _watchedUnits.find(unit);
-		if (watched != _watchedUnits.end() && watched->second.hitTick && now - watched->second.hitTick < 220)
+		if (watched != _watchedUnits.end() && watched->second.hitTick && now - watched->second.hitTick < HitFlinchTime)
 		{
-			const float flinch = 1.0f - (now - watched->second.hitTick) / 220.0f; // 1 at the hit, down to 0
+			const float flinch = 1.0f - (now - watched->second.hitTick) / (float)HitFlinchTime; // 1 at the hit, down to 0
 			feet[0] += watched->second.push[0] * 3.0 * flinch;
 			feet[1] += watched->second.push[1] * 3.0 * flinch;
-			flash = Options::fpsMuzzleFlash ? flinch : 0.0f;
+			flash = Options::fpsMuzzleFlash && Options::fpsHitFlash ? flinch : 0.0f;
 		}
 
 		// A marked enemy's marker goes 5 voxels above its head (not over one falling: it's down).
@@ -914,7 +954,7 @@ void FirstPersonView::drawUnits()
 		_spriteBuffer->clear();
 		const float chest[3] = { (float)feet[0], (float)feet[1], (float)feet[2] + 12.0f };
 		const int shade = (int)std::lround(std::clamp(lightAt(chest[0], chest[1], chest[2]) - pointLight(chest, nullptr, false)
-			- flareLight(chest, nullptr, false) * 8.0f - flash * 6.0f, 0.0f, 15.0f));
+			- flareLight(chest, nullptr, false) * 8.0f - flash * HitFlashShade, 0.0f, 15.0f));
 		if (Options::fpsShadows)
 		{
 			recordUnitShadow(feet, 5.5 * unitSize); // flying units too: the shadow on the ground shows where they hover
@@ -1395,17 +1435,32 @@ void FirstPersonView::drawFloorItems()
 			}
 		}
 		// An unconscious unit lying in the pile (any of a big corpse's tiles): its picture can be
-		// pointed at (a medi-kit's patient).
+		// pointed at (a medi-kit's patient). A unit lying there hit a moment ago (or killed where it
+		// lay): the pile flashes as a standing unit does when hit (settings "Hit flash" and "Muzzle
+		// flashes"; a player, GitHub issue #74), at most once however many are hit.
+		const Uint32 now = SDL_GetTicks();
+		float flash = 0.0f;
 		for (Tile *under : tilesUnder)
 		{
 			for (BattleItem *pileItem : *under->getInventory())
 			{
-				if (!step.sprite.body && pileItem->getUnit() && pileItem->getUnit()->getStatus() == STATUS_UNCONSCIOUS)
+				BattleUnit *lying = pileItem->getUnit();
+				if (!lying)
 				{
-					step.sprite.body = pileItem->getUnit();
+					continue;
+				}
+				if (!step.sprite.body && lying->getStatus() == STATUS_UNCONSCIOUS)
+				{
+					step.sprite.body = lying;
+				}
+				auto watched = _watchedUnits.find(lying);
+				if (Options::fpsMuzzleFlash && Options::fpsHitFlash && watched != _watchedUnits.end() && watched->second.hitTick && now - watched->second.hitTick < HitFlinchTime)
+				{
+					flash = std::max(flash, 1.0f - (now - watched->second.hitTick) / (float)HitFlinchTime);
 				}
 			}
 		}
+		step.sprite.shade = (int)std::lround(std::clamp(shade - flash * HitFlashShade, 0.0f, 15.0f));
 		// The ground in front rising (a step, a slope): the lying rows rise with it, within their reach.
 		const int lyingRows = bottomColouredRow(step.sprite.sprite) - step.sprite.anchorY + 1;
 		if (lyingRows > 0)

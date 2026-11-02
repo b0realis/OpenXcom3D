@@ -139,6 +139,13 @@ const double SpriteHitPush = 6.0;
 /// pace, BattlescapeState::DEFAULT_ANIM_SPEED a frame; GitHub issue #58: the fall needn't hurry, nothing waits for it),
 /// and the most fall frames it shows (a fall is surely over after that many: the armors have 3 or so, mods may give more).
 const Uint32 QuickFallFrameTime = 100;
+/// A hit unit flinches back and flashes for this many milliseconds (see FirstPersonView::watchUnits), the flash up to
+/// HitFlashShade shade steps brighter at the hit (settings "Hit flash" and "Muzzle flashes", which turns every flash
+/// off); a downed unit's body flashes the same way.
+/// Blood from a body sprays from BodySprayHeight voxels above the floor it lies on.
+const Uint32 HitFlinchTime = 220;
+const float HitFlashShade = 6.0f;
+const float BodySprayHeight = 4.0f;
 /// A unit going down as it hovers over no floor comes down to the ground in 3D (GitHub issue #62, see
 /// FirstPerson::noteAirFall), falling by this gravity, in voxels a second a second (a level of 24 voxels in half a second).
 const double AirFallGravity = 192.0;

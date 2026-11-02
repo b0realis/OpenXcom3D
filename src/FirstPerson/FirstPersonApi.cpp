@@ -631,6 +631,10 @@ void createOptions(std::vector<OptionInfo> &options)
 	// Soldiers' and aliens' sprites a little smaller (80 to 100% of the isometric map's size).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsUnitSize", &fpsUnitSize, 100, "STR_FPS_UNIT_SIZE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMuzzleFlash", &fpsMuzzleFlash, true, "STR_FPS_MUZZLE_FLASH", category));
+	// A unit hit, standing or down, flashes for a moment (the owner, on GitHub issue #74: its own
+	// setting); off, it only flinches. "Muzzle flashes" off turns it off too (every flash: the
+	// setting for players whom flashing light bothers).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitFlash", &fpsHitFlash, true, "STR_FPS_HIT_FLASH", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsParticles", &fpsParticles, 2, "STR_FPS_PARTICLES", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsUfoLights", &fpsUfoLights, true, "STR_FPS_UFO_LIGHTS", category));
 	// Parts the map draws but gives no shape (no voxels: ladders, lifts' pads, walls of laser

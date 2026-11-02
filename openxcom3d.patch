@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..1302cc44a
+index 000000000..f36634f21
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,459 @@
+@@ -0,0 +1,461 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -360,6 +360,8 @@ index 000000000..1302cc44a
 +  STR_FPS_EYE_LOWER_DESC: "Lowers the 3D camera, in voxels. The soldier's sight is unchanged."
 +  STR_FPS_MUZZLE_FLASH: "Muzzle flashes"
 +  STR_FPS_MUZZLE_FLASH_DESC: "Flashes from gunfire, hits and blasts. Off if flashes bother you."
++  STR_FPS_HIT_FLASH: "Hit flash"
++  STR_FPS_HIT_FLASH_DESC: "A unit hit, standing or down, flashes for a moment (with Muzzle flashes on). NO: it only flinches."
 +  STR_FPS_FLIGHT_COST: "Flight cost per level (TU)"
 +  STR_FPS_FLIGHT_COST_DESC: "TU to fly up or down one level (0 = free)."
 +  STR_FPS_FLIGHT_COST_OVERRIDE: "Flight cost overrides rules"
@@ -589,10 +591,10 @@ index 000000000..1302cc44a
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..7be251a56
+index 000000000..37d13f9ff
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,459 @@
+@@ -0,0 +1,461 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -825,6 +827,8 @@ index 000000000..7be251a56
 +  STR_FPS_EYE_LOWER_DESC: "Lowers the 3D camera, in voxels. The soldier's sight is unchanged."
 +  STR_FPS_MUZZLE_FLASH: "Muzzle flashes"
 +  STR_FPS_MUZZLE_FLASH_DESC: "Flashes from gunfire, hits and blasts. Off if flashes bother you."
++  STR_FPS_HIT_FLASH: "Hit flash"
++  STR_FPS_HIT_FLASH_DESC: "A unit hit, standing or down, flashes for a moment (with Muzzle flashes on). NO: it only flinches."
 +  STR_FPS_FLIGHT_COST: "Flight cost per level (TU)"
 +  STR_FPS_FLIGHT_COST_DESC: "TU to fly up or down one level (0 = free)."
 +  STR_FPS_FLIGHT_COST_OVERRIDE: "Flight cost overrides rules"
@@ -21614,7 +21618,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..a03aa9258 100644
+index a08796ced..85c819251 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -21631,7 +21635,7 @@ index a08796ced..a03aa9258 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip;
++OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash;
 +OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode;
@@ -21720,10 +21724,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..6be7c5d15
+index 000000000..4ee87402d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1078 @@
+@@ -0,0 +1,1082 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -22357,6 +22361,10 @@ index 000000000..6be7c5d15
 +	// Soldiers' and aliens' sprites a little smaller (80 to 100% of the isometric map's size).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsUnitSize", &fpsUnitSize, 100, "STR_FPS_UNIT_SIZE", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsMuzzleFlash", &fpsMuzzleFlash, true, "STR_FPS_MUZZLE_FLASH", category));
++	// A unit hit, standing or down, flashes for a moment (the owner, on GitHub issue #74: its own
++	// setting); off, it only flinches. "Muzzle flashes" off turns it off too (every flash: the
++	// setting for players whom flashing light bothers).
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitFlash", &fpsHitFlash, true, "STR_FPS_HIT_FLASH", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsParticles", &fpsParticles, 2, "STR_FPS_PARTICLES", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsUfoLights", &fpsUfoLights, true, "STR_FPS_UFO_LIGHTS", category));
 +	// Parts the map draws but gives no shape (no voxels: ladders, lifts' pads, walls of laser
@@ -42147,7 +42155,7 @@ index 000000000..1edd633db
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..7a38348de
+index 000000000..86325cd84
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
 @@ -0,0 +1,1246 @@
@@ -42887,7 +42895,7 @@ index 000000000..7a38348de
 +	struct Glide { double pos[3]; Uint32 seen; };
 +	std::unordered_map<const BattleUnit*, Glide> _unitGlides; // where each unit is drawn: eases after the game's steps
 +	Uint32 _unitLastTick = 0;                           // when the units' glides were last advanced
-+	struct UnitWatch { int health; bool out; Uint32 hitTick; float push[2]; };
++	struct UnitWatch { int health; int stun; bool out; bool dead; Uint32 hitTick; float push[2]; };
 +	std::unordered_map<const BattleUnit*, UnitWatch> _watchedUnits; // hits and kills, for flinches and hitmarkers
 +	Uint32 _hitMarkTick = 0;                            // when an enemy in sight was last hit
 +	bool _hitMarkKill = false;                          // and whether that hit killed it
@@ -47814,10 +47822,10 @@ index 000000000..280bc87e2
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..3493938dd
+index 000000000..289b48d8d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,473 @@
+@@ -0,0 +1,480 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -47959,6 +47967,13 @@ index 000000000..3493938dd
 +/// pace, BattlescapeState::DEFAULT_ANIM_SPEED a frame; GitHub issue #58: the fall needn't hurry, nothing waits for it),
 +/// and the most fall frames it shows (a fall is surely over after that many: the armors have 3 or so, mods may give more).
 +const Uint32 QuickFallFrameTime = 100;
++/// A hit unit flinches back and flashes for this many milliseconds (see FirstPersonView::watchUnits), the flash up to
++/// HitFlashShade shade steps brighter at the hit (settings "Hit flash" and "Muzzle flashes", which turns every flash
++/// off); a downed unit's body flashes the same way.
++/// Blood from a body sprays from BodySprayHeight voxels above the floor it lies on.
++const Uint32 HitFlinchTime = 220;
++const float HitFlashShade = 6.0f;
++const float BodySprayHeight = 4.0f;
 +/// A unit going down as it hovers over no floor comes down to the ground in 3D (GitHub issue #62, see
 +/// FirstPerson::noteAirFall), falling by this gravity, in voxels a second a second (a level of 24 voxels in half a second).
 +const double AirFallGravity = 192.0;
@@ -50237,10 +50252,10 @@ index 000000000..1cd28ddf1
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..bf4b6ebe4
+index 000000000..c76dc65c7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,2661 @@
+@@ -0,0 +1,2716 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -50943,10 +50958,13 @@ index 000000000..bf4b6ebe4
 +}
 +
 +/**
-+ * Watches the units for hits and kills, once a frame, by their health and whether they are
-+ * out (dead or unconscious) compared with the last frame. A hit unit flinches back from the
-+ * camera and flashes (see drawUnits); one in sight sprays blood (or sparks, from machines);
-+ * and an enemy hit or downed in sight marks the crosshair (the hitmarker).
++ * Watches the units for hits and kills, once a frame, by their health, their stun and whether
++ * they are out (unconscious or dead) compared with the last frame. A hit unit flinches back from
++ * the camera and flashes (see drawUnits; a downed one's body flashes, see drawFloorItems); one in
++ * sight sprays blood (or sparks, from machines), a downed one from its body on the floor; and an
++ * enemy hit, downed or killed in sight marks the crosshair (the hitmarker). (A player, GitHub
++ * issue #74: units already down showed nothing when hit; and a knocked-out unit mostly takes
++ * stun, which counts as a hit now, for standing units too.)
 + */
 +void FirstPersonView::watchUnits()
 +{
@@ -50959,25 +50977,63 @@ index 000000000..bf4b6ebe4
 +		auto found = _watchedUnits.find(unit);
 +		if (found == _watchedUnits.end())
 +		{
-+			_watchedUnits.emplace(unit, UnitWatch{ unit->getHealth(), isOut, 0, { 0.0f, 0.0f } });
++			_watchedUnits.emplace(unit, UnitWatch{ unit->getHealth(), unit->getStunlevel(), isOut, unit->getStatus() == STATUS_DEAD, 0, { 0.0f, 0.0f } });
 +			continue;
 +		}
-+		// Did it lose health, or go down (killed or knocked out), since the last frame?
++		// Did it lose health or take stun, go down (knocked out or killed) or die where it lay,
++		// since the last frame?
 +		UnitWatch &watch = found->second;
-+		const bool wasHit = unit->getHealth() < watch.health;
-+		const bool killed = isOut && !watch.out;
++		const bool dead = unit->getStatus() == STATUS_DEAD;
++		const bool wasDown = watch.out;
++		const bool wasHit = unit->getHealth() < watch.health || unit->getStunlevel() > watch.stun;
++		const bool killed = (isOut && !watch.out) || (dead && !watch.dead);
 +		watch.health = unit->getHealth();
++		watch.stun = unit->getStunlevel();
 +		watch.out = isOut;
++		watch.dead = dead;
 +		if (!wasHit && !killed)
 +		{
 +			continue;
 +		}
-+		// Its chest (the middle of its tiles, 60% of its height up), and the level direction
-+		// from the camera to it: dx, dy from the eye, flatDistance their length.
-+		const Position tilePosition = unit->getPosition();
-+		const int unitSize = unit->getArmor()->getSize(); // tiles across: 1, or 2 for big units
-+		const float chest[3] = { tilePosition.x * 16.0f + 8.0f * unitSize, tilePosition.y * 16.0f + 8.0f * unitSize,
-+			tilePosition.z * 24.0f + unit->getFloatHeight() + unit->getHeight() * 0.6f };
++		// Where it was hit: a standing unit's chest (the middle of its tiles, 60% of its height
++		// up); one already down, its body, a little above the floor it lies on (none while it's
++		// carried); and the level direction from the camera to it: dx, dy from the eye,
++		// flatDistance their length. Seen: the unit in sight; a body, where the view draws it.
++		float chest[3];
++		bool seen;
++		if (wasDown)
++		{
++			const BattleItem *body = nullptr;
++			for (const BattleItem *item : *_save->getItems())
++			{
++				if (item->getUnit() == unit && item->getTile())
++				{
++					body = item;
++					break;
++				}
++			}
++			if (!body)
++			{
++				continue;
++			}
++			const Tile *bodyTile = body->getTile();
++			const Position at = bodyTile->getPosition();
++			chest[0] = at.x * 16.0f + 8.0f;
++			chest[1] = at.y * 16.0f + 8.0f;
++			chest[2] = at.z * 24.0f - bodyTile->getTerrainLevel() + BodySprayHeight;
++			// (seen as the view draws it, on a tile seen before, as the map shows what lies there:
++			// the game's sight may leave out a body just below a ledge the soldier stands on)
++			seen = _tileViews[_save->getTileIndex(at)].discovered || bodyTile->getVisible() || _save->getDebugMode();
++		}
++		else
++		{
++			const Position tilePosition = unit->getPosition();
++			const int unitSize = unit->getArmor()->getSize(); // tiles across: 1, or 2 for big units
++			chest[0] = tilePosition.x * 16.0f + 8.0f * unitSize;
++			chest[1] = tilePosition.y * 16.0f + 8.0f * unitSize;
++			chest[2] = tilePosition.z * 24.0f + unit->getFloatHeight() + unit->getHeight() * 0.6f;
++			seen = unit->getVisible() || _save->getDebugMode();
++		}
 +		const float dx = chest[0] - (float)_eye[0], dy = chest[1] - (float)_eye[1];
 +		const float flatDistance = std::max(0.01f, std::sqrt(dx * dx + dy * dy));
 +		// A hit starts the flinch, pushing it away from the camera.
@@ -50987,7 +51043,6 @@ index 000000000..bf4b6ebe4
 +			watch.push[0] = dx / flatDistance;
 +			watch.push[1] = dy / flatDistance;
 +		}
-+		const bool seen = unit->getVisible() || _save->getDebugMode();
 +		if (seen && unit != _cameraUnit)
 +		{
 +			// Blood or sparks, thrown away from the camera: 14 particles of two colours,
@@ -51009,7 +51064,7 @@ index 000000000..bf4b6ebe4
 +				_particles.add(particle);
 +			}
 +		}
-+		// An enemy hit or downed in sight: the hitmarker on the crosshair.
++		// An enemy hit, downed or killed in sight: the hitmarker on the crosshair.
 +		if (seen && unit->getFaction() == FACTION_HOSTILE)
 +		{
 +			_hitMarkTick = now;
@@ -51122,16 +51177,16 @@ index 000000000..bf4b6ebe4
 +			}
 +		}
 +		glide.seen = now;
-+		// A hit unit flinches back from the camera for a moment (220 ms, up to 3 voxels), and
-+		// flashes (with muzzle flashes on).
++		// A hit unit flinches back from the camera for a moment (HitFlinchTime, up to 3 voxels), and
++		// flashes (setting "Hit flash", and "Muzzle flashes", which turns every flash off).
 +		float flash = 0.0f;
 +		auto watched = _watchedUnits.find(unit);
-+		if (watched != _watchedUnits.end() && watched->second.hitTick && now - watched->second.hitTick < 220)
++		if (watched != _watchedUnits.end() && watched->second.hitTick && now - watched->second.hitTick < HitFlinchTime)
 +		{
-+			const float flinch = 1.0f - (now - watched->second.hitTick) / 220.0f; // 1 at the hit, down to 0
++			const float flinch = 1.0f - (now - watched->second.hitTick) / (float)HitFlinchTime; // 1 at the hit, down to 0
 +			feet[0] += watched->second.push[0] * 3.0 * flinch;
 +			feet[1] += watched->second.push[1] * 3.0 * flinch;
-+			flash = Options::fpsMuzzleFlash ? flinch : 0.0f;
++			flash = Options::fpsMuzzleFlash && Options::fpsHitFlash ? flinch : 0.0f;
 +		}
 +
 +		// A marked enemy's marker goes 5 voxels above its head (not over one falling: it's down).
@@ -51157,7 +51212,7 @@ index 000000000..bf4b6ebe4
 +		_spriteBuffer->clear();
 +		const float chest[3] = { (float)feet[0], (float)feet[1], (float)feet[2] + 12.0f };
 +		const int shade = (int)std::lround(std::clamp(lightAt(chest[0], chest[1], chest[2]) - pointLight(chest, nullptr, false)
-+			- flareLight(chest, nullptr, false) * 8.0f - flash * 6.0f, 0.0f, 15.0f));
++			- flareLight(chest, nullptr, false) * 8.0f - flash * HitFlashShade, 0.0f, 15.0f));
 +		if (Options::fpsShadows)
 +		{
 +			recordUnitShadow(feet, 5.5 * unitSize); // flying units too: the shadow on the ground shows where they hover
@@ -51638,17 +51693,32 @@ index 000000000..bf4b6ebe4
 +			}
 +		}
 +		// An unconscious unit lying in the pile (any of a big corpse's tiles): its picture can be
-+		// pointed at (a medi-kit's patient).
++		// pointed at (a medi-kit's patient). A unit lying there hit a moment ago (or killed where it
++		// lay): the pile flashes as a standing unit does when hit (settings "Hit flash" and "Muzzle
++		// flashes"; a player, GitHub issue #74), at most once however many are hit.
++		const Uint32 now = SDL_GetTicks();
++		float flash = 0.0f;
 +		for (Tile *under : tilesUnder)
 +		{
 +			for (BattleItem *pileItem : *under->getInventory())
 +			{
-+				if (!step.sprite.body && pileItem->getUnit() && pileItem->getUnit()->getStatus() == STATUS_UNCONSCIOUS)
++				BattleUnit *lying = pileItem->getUnit();
++				if (!lying)
 +				{
-+					step.sprite.body = pileItem->getUnit();
++					continue;
++				}
++				if (!step.sprite.body && lying->getStatus() == STATUS_UNCONSCIOUS)
++				{
++					step.sprite.body = lying;
++				}
++				auto watched = _watchedUnits.find(lying);
++				if (Options::fpsMuzzleFlash && Options::fpsHitFlash && watched != _watchedUnits.end() && watched->second.hitTick && now - watched->second.hitTick < HitFlinchTime)
++				{
++					flash = std::max(flash, 1.0f - (now - watched->second.hitTick) / (float)HitFlinchTime);
 +				}
 +			}
 +		}
++		step.sprite.shade = (int)std::lround(std::clamp(shade - flash * HitFlashShade, 0.0f, 15.0f));
 +		// The ground in front rising (a step, a slope): the lying rows rise with it, within their reach.
 +		const int lyingRows = bottomColouredRow(step.sprite.sprite) - step.sprite.anchorY + 1;
 +		if (lyingRows > 0)
@@ -57864,7 +57934,7 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..f2b4caf0e
+index 000000000..a6d0734c8
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,817 @@
@@ -58087,7 +58157,7 @@ index 000000000..f2b4caf0e
 +			"fpsMeleeFloors", "fpsAimExact", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
 +			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear" } },
 +		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
-+			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsParticles", "fpsUfoLights",
++			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsHitFlash", "fpsParticles", "fpsUfoLights",
 +			"fpsGhostParts", "fpsGhostOpacity", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
 +		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
 +			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsCompass", "fpsMiddleClickIdentify" } },

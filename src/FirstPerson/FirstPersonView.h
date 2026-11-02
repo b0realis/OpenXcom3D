@@ -734,7 +734,7 @@ private:
 	struct Glide { double pos[3]; Uint32 seen; };
 	std::unordered_map<const BattleUnit*, Glide> _unitGlides; // where each unit is drawn: eases after the game's steps
 	Uint32 _unitLastTick = 0;                           // when the units' glides were last advanced
-	struct UnitWatch { int health; bool out; Uint32 hitTick; float push[2]; };
+	struct UnitWatch { int health; int stun; bool out; bool dead; Uint32 hitTick; float push[2]; };
 	std::unordered_map<const BattleUnit*, UnitWatch> _watchedUnits; // hits and kills, for flinches and hitmarkers
 	Uint32 _hitMarkTick = 0;                            // when an enemy in sight was last hit
 	bool _hitMarkKill = false;                          // and whether that hit killed it

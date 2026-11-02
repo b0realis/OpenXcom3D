@@ -164,6 +164,7 @@ SETTINGS = [
         ('Sprite upscaling', 'Smooth + detail', 'Smooth + detail / Smooth / Off', 'Units, items and effects up close scaled the way pixel art scales well (xBRZ).', ''),
         ('Unit size', '100%', '80% to 100%', 'Soldiers, aliens, corpses and items drawn a little smaller, so tall sprites fit under low ceilings.', 'Only the picture: what shots hit stays the game\'s (see <i>Hitboxes</i>).'),
         ('Muzzle flashes', 'YES', 'YES / NO', 'Gunfire, hits and blasts flash. NO: no flashes, steady UFO lights, no camera glitches.', 'Off if flashing light bothers you.'),
+        ('Hit flash', 'YES', 'YES / NO', 'A unit hit, standing or down, flashes for a moment (with Muzzle flashes on). NO: it only flinches.', ''),
         ('Particles', 'All', 'All / Effects / Off', 'Effects: sparks, debris, smoke, fire, trails. All: also dust, fireflies, bubbles and weather.', ''),
         ('UFO lights and aura', 'YES', 'YES / NO', 'UFOs glow: steady hulls with pulsing lights, their own coloured light, evenly inside them, and an aura of motes outside; only once a UFO has been seen.', 'Inside a UFO the view stays sharp: its light only colours it.'),
         ('Parts without shape', 'Lifts', 'Lifts / All / Off', 'Parts the map draws with no shape in the game\'s data, shown as see-through ghosts: ladders, lift pads, the shops\' racks, liquid over a floor, the rest of fences and catwalk gratings the game gives only a few voxels; low parts such as crops and rubble stand solid, as on the map, and a wheat field as a solid block.',

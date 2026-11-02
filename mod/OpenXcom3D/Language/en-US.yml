@@ -230,6 +230,8 @@ en-US:
   STR_FPS_EYE_LOWER_DESC: "Lowers the 3D camera, in voxels. The soldier's sight is unchanged."
   STR_FPS_MUZZLE_FLASH: "Muzzle flashes"
   STR_FPS_MUZZLE_FLASH_DESC: "Flashes from gunfire, hits and blasts. Off if flashes bother you."
+  STR_FPS_HIT_FLASH: "Hit flash"
+  STR_FPS_HIT_FLASH_DESC: "A unit hit, standing or down, flashes for a moment (with Muzzle flashes on). NO: it only flinches."
   STR_FPS_FLIGHT_COST: "Flight cost per level (TU)"
   STR_FPS_FLIGHT_COST_DESC: "TU to fly up or down one level (0 = free)."
   STR_FPS_FLIGHT_COST_OVERRIDE: "Flight cost overrides rules"
