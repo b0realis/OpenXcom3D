@@ -643,6 +643,7 @@ private:
 	BattleActionType _fireMode = BA_NONE;               // fire mode for the left mouse button
 	const BattleItem *_fireModeWeapon = nullptr;        // the weapon _fireMode was chosen for
 	Position _aimVoxel;                                 // what's under the crosshair
+	int _aimVoxelType = -1;                             // and what it is (V_FLOOR, V_WESTWALL...; V_EMPTY for the sky)
 	bool _aimHitsSomething = false;                     // something is under the crosshair (not just sky)
 	// the path the next throw or shot would take (setting "Show trajectory"), and a target marked
 	// for confirm fire (setting "Confirm fire"): the next click on the same tile fires
@@ -664,6 +665,8 @@ private:
 	bool forcesArc(BattleAction &shot, const Position &targetTile);
 	/// The tile a point under the crosshair aims at (a unit's head poking up into the tile above: the unit's own tile).
 	Position aimedTile(const Position &aimedVoxel) const;
+	/// The tile a throw or an arcing shot aims at: a wall at the soldier's own tile's edge aims across it.
+	Position arcTargetTile(const Position &aimedVoxel, int voxelType, const BattleUnit *unit) const;
 	/// Does the game let a straight shot fly along a line (it meets the target tile first, or nothing)?
 	bool gameLetsLineFly(BattleAction &shot, const Position &origin, const Position &voxel, const Position &targetTile);
 	/// The game's own aim at a tile for a straight shot, with off-centre tries; whether it finds a line of fire.

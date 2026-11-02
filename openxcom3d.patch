@@ -19492,7 +19492,7 @@ index 861c7702a..7f87d9f02 100644
  	const std::vector<int> &getPath() const;
  	/// Makes a copy to the path.
 diff --git a/src/Battlescape/Projectile.cpp b/src/Battlescape/Projectile.cpp
-index 7f7697c1d..29cf90659 100644
+index 7f7697c1d..1544e5827 100644
 --- a/src/Battlescape/Projectile.cpp
 +++ b/src/Battlescape/Projectile.cpp
 @@ -31,6 +31,7 @@
@@ -19578,6 +19578,20 @@ index 7f7697c1d..29cf90659 100644
  	}
  
  	_distance = 0.0f;
+@@ -305,6 +333,13 @@ int Projectile::calculateThrow(double accuracy)
+ 
+ 
+ 		test = _save->getTileEngine()->calculateParabolaVoxel(originVoxel, targetVoxel, true, &_trajectory, _action.actor, curvature, deltas);
++		if (_trajectory.empty())
++		{
++			// (OpenXcom3D: blocked at its very first step, from against a wall, the deviated arc
++			// leaves no path, which was read from its end: another try)
++			test = V_OUTOFBOUNDS;
++			continue;
++		}
+ 		if (forced) return O_OBJECT; //fake hit
+ 		Position endPoint = getPositionFromEnd(_trajectory, ItemDropVoxelOffset).toTile();
+ 		Tile *endTile = _save->getTile(endPoint);
 diff --git a/src/Battlescape/Projectile.h b/src/Battlescape/Projectile.h
 index a263ca287..1cf4a21d8 100644
 --- a/src/Battlescape/Projectile.h
@@ -20780,7 +20794,7 @@ index 067c7b3ba..9004c1ea8 100644
  public:
  	/// Creates a new ProjectileFly class
 diff --git a/src/Battlescape/TileEngine.cpp b/src/Battlescape/TileEngine.cpp
-index 6e6846977..25e97568a 100644
+index 6e6846977..fb97e5a6c 100644
 --- a/src/Battlescape/TileEngine.cpp
 +++ b/src/Battlescape/TileEngine.cpp
 @@ -43,6 +43,7 @@
@@ -20929,7 +20943,21 @@ index 6e6846977..25e97568a 100644
  						{
  							if (dest)
  							{
-@@ -5867,6 +5915,8 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
+@@ -5705,6 +5753,13 @@ bool TileEngine::validateThrow(BattleAction &action, Position originVoxel, Posit
+ 	{
+ 		trajectory.clear();
+ 		test = calculateParabolaVoxel(originVoxel, targetVoxel, true, &trajectory, action.actor, curvature, Position(0,0,0));
++		if (trajectory.empty())
++		{
++			// (OpenXcom3D: an arc blocked at its very first step, a throw from against a wall at the
++			// tile across it, leaves no path, which was read from its end: no arc at this curvature)
++			curvature += 0.5;
++			continue;
++		}
+ 		//position that item hit
+ 		Position hitPos = (trajectory.back() + Position(0,0,1)).toTile();
+ 		//position where item will land
+@@ -5867,6 +5922,8 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
  					originVoxel.z--;
  				}
  				originVoxel.z -= 4;
@@ -20938,7 +20966,7 @@ index 6e6846977..25e97568a 100644
  			}
  		}
  		int direction = getDirectionTo(origin, action.target);
-@@ -5891,6 +5941,12 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
+@@ -5891,6 +5948,12 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
  			originVoxel.y += ((2 * dirYshift[direction] + dirYshift[(direction + 1) % 8]) * action.actor->getArmor()->getSize() + 1) / 3;
  			break;
  		};
@@ -26120,10 +26148,10 @@ index 000000000..bfafdd9ce
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..8f7554cf6
+index 000000000..8450cdb0d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1216 @@
+@@ -0,0 +1,1219 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -26769,6 +26797,7 @@ index 000000000..8f7554cf6
 +	BattleActionType _fireMode = BA_NONE;               // fire mode for the left mouse button
 +	const BattleItem *_fireModeWeapon = nullptr;        // the weapon _fireMode was chosen for
 +	Position _aimVoxel;                                 // what's under the crosshair
++	int _aimVoxelType = -1;                             // and what it is (V_FLOOR, V_WESTWALL...; V_EMPTY for the sky)
 +	bool _aimHitsSomething = false;                     // something is under the crosshair (not just sky)
 +	// the path the next throw or shot would take (setting "Show trajectory"), and a target marked
 +	// for confirm fire (setting "Confirm fire"): the next click on the same tile fires
@@ -26790,6 +26819,8 @@ index 000000000..8f7554cf6
 +	bool forcesArc(BattleAction &shot, const Position &targetTile);
 +	/// The tile a point under the crosshair aims at (a unit's head poking up into the tile above: the unit's own tile).
 +	Position aimedTile(const Position &aimedVoxel) const;
++	/// The tile a throw or an arcing shot aims at: a wall at the soldier's own tile's edge aims across it.
++	Position arcTargetTile(const Position &aimedVoxel, int voxelType, const BattleUnit *unit) const;
 +	/// Does the game let a straight shot fly along a line (it meets the target tile first, or nothing)?
 +	bool gameLetsLineFly(BattleAction &shot, const Position &origin, const Position &voxel, const Position &targetTile);
 +	/// The game's own aim at a tile for a straight shot, with off-centre tries; whether it finds a line of fire.
@@ -33015,10 +33046,10 @@ index 000000000..6fc07ebde
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..635deade5
+index 000000000..ba8dd06d3
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,4631 @@
+@@ -0,0 +1,4672 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -34410,7 +34441,7 @@ index 000000000..635deade5
 + */
 +void FirstPersonMode::updateAim(BattleUnit *unit)
 +{
-+	_aimHitsSomething = aimAt(_view->getWidth() / 2, _view->getHeight() / 2, unit, _aimVoxel);
++	_aimHitsSomething = aimAt(_view->getWidth() / 2, _view->getHeight() / 2, unit, _aimVoxel, &_aimVoxelType);
 +}
 +
 +/**
@@ -34794,7 +34825,7 @@ index 000000000..635deade5
 +
 +	// The target: the marked one, or the tile and point under the crosshair (as fire() takes
 +	// them, see aimedTile).
-+	const Position targetTile = marked ? _confirmTile : aimedTile(_aimVoxel);
++	const Position targetTile = marked ? _confirmTile : arcs(weapon, mode) ? arcTargetTile(_aimVoxel, _aimVoxelType, unit) : aimedTile(_aimVoxel);
 +	const Position targetVoxel = marked ? _confirmVoxel : _aimVoxel;
 +	const bool hitSomething = marked || _aimHitsSomething;
 +
@@ -34977,6 +35008,14 @@ index 000000000..635deade5
 +	{
 +		return false;
 +	}
++	// Not a round that sets a unit down where it lands (X-Com Files' position markers: GitHub
++	// issue #84): forced where the game finds no arc, it only met the wall in the way, and the unit
++	// went to the nearest free tile, behind the soldier or through the wall; refused, as on the map.
++	const BattleItem *round = shot.weapon->getAmmoForAction(shot.type);
++	if (shot.weapon->getRules()->getSpawnUnit() || (round && round->getRules()->getSpawnUnit()))
++	{
++		return false;
++	}
 +	BattleAction probe = shot;
 +	return !gameArcFound(probe, targetTile, nullptr);
 +}
@@ -35001,6 +35040,37 @@ index 000000000..635deade5
 +	{
 +		--tile.z;
 +	}
++	return tile;
++}
++
++/**
++ * The tile a throw or an arcing shot aims at (a player, GitHub issue #84: X-Com Files' position
++ * markers, fired in an arc a tile off, unfolded behind the soldier): the tile the point under the
++ * crosshair is in (see aimedTile), except a wall on the edge of the soldier's own tile (a west or
++ * north wall belongs to the tile east or south of it, the soldier's when he stands against it):
++ * the tile across it, as the map is clicked beyond the wall. Aimed at his own tile, the round
++ * landed at his feet and what it set down went to the nearest free tile, behind him or through a
++ * wall; across the wall, the game arcs over it or refuses as on the map.
++ * @param aimedVoxel The point the aim met.
++ * @param voxelType What it met (V_WESTWALL, V_NORTHWALL...; V_EMPTY for the sky).
++ * @param unit The soldier aiming.
++ * @return The tile aimed at.
++ */
++Position FirstPersonMode::arcTargetTile(const Position &aimedVoxel, int voxelType, const BattleUnit *unit) const
++{
++	Position tile = aimedTile(aimedVoxel);
++	if (!unit || (voxelType != V_WESTWALL && voxelType != V_NORTHWALL))
++	{
++		return tile;
++	}
++	const Position own = unit->getPosition();
++	const int size = unit->getArmor()->getSize();
++	if (tile.z != own.z || tile.x < own.x || tile.x >= own.x + size || tile.y < own.y || tile.y >= own.y + size)
++	{
++		return tile;
++	}
++	if (voxelType == V_WESTWALL && tile.x > 0) --tile.x;
++	if (voxelType == V_NORTHWALL && tile.y > 0) --tile.y;
 +	return tile;
 +}
 +
@@ -35607,8 +35677,10 @@ index 000000000..635deade5
 +	// The target tile: the one holding the voxel under the pixel (on the open sky the point of
 +	// air on the ray, inside the map, see aimAt).
 +	Position aimedVoxel;
-+	const bool hitSomething = aimAt(pixelX, pixelY, unit, aimedVoxel);
-+	const Position targetTile = aimedTile(aimedVoxel);
++	int aimedType = -1;
++	const bool hitSomething = aimAt(pixelX, pixelY, unit, aimedVoxel, &aimedType);
++	const bool arcing = mode == BA_THROW || (isShot(mode) && weapon && weapon->getArcingShot(mode));
++	const Position targetTile = arcing ? arcTargetTile(aimedVoxel, aimedType, unit) : aimedTile(aimedVoxel);
 +
 +	// Confirm fire (setting): the first click marks the target and shows its path (see
 +	// updateTrajectory); a click on the same tile with the same weapon and mode fires, a click on

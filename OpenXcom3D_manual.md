@@ -861,7 +861,7 @@ What `FirstPersonView` draws:
 | `SavedBattleGame.cpp` | `addFallingUnit`: X-COM's units float where they are with Doom IDCLIP (`FirstPerson::noclipFloats`) |
 | `BattleItem.cpp` | `spendAmmoForAction`: no ammo spent with Doom IDKFA (`FirstPerson::endlessAmmo`), beside the game's own debug mode |
 | `BattleUnit.{h,cpp}` | `damage`: X-COM's units take none with Doom IDDQD (`FirstPerson::invincible`); `getMapAkimbo()`: akimbo on the map |
-| `Projectile.cpp` | With `freeAim`: no accuracy roll, no line-of-fire refusal, the line carried on through the target, a bullet's speed |
+| `Projectile.cpp` | With `freeAim`: no accuracy roll, no line-of-fire refusal, the line carried on through the target, a bullet's speed; `calculateThrow`: an arc blocked at its very first step (a shot from against a wall) leaves no path, which was read from its end (a crash): another try |
 | `UnitWalkBState.cpp` | `instantMove` walks take the no-animation path |
 | `Map.{h,cpp}` | `getNightVisionColor()`, `isNightVisionOn()` getters; `setSoundListener()`: in 3D, `getSoundAngle` pans sounds for the 3D camera; `setNightVisionHoldBlocked()`: in 3D the hold key (Space) jumps; `getPartnerProjectile()`: the dual-wield round in flight |
 | `Sound.{h,cpp}` | `packDistance()`: in 3D the listener packs the distance into the stereo angle, so sounds fade with distance without touching the call sites |
@@ -869,7 +869,7 @@ What `FirstPersonView` draws:
 | `main.cpp` | Window caption " - OpenXcom3D" (add-on builds) |
 | `InteractiveSurface.cpp` | Upstream UB fixes found by UBSan: button 0 ignored (no shift by −1), `SDLK_ANY` inside the enum |
 | `Script.h` | Upstream UB fix found by UBSan: `ScriptRef::compare` doesn't `memcmp` empty (null) refs |
-| `TileEngine.cpp` | Upstream UB fix found by UBSan: `canTargetUnit` and `checkVoxelExposure` don't divide by zero when the shooter and the target stand in one column (the side scan lines then lie on the centre line); `getOriginVoxel`: on something tall under a ceiling, where the game pushes the muzzle under the floor above and 4 voxels lower, it never goes below the top of what the unit stands on (it went a voxel into it, and shots struck whatever stood about as high nearby); an FPS-style straight shot (`freeAim`) asks the first-person view, which moves its origin across the tile to the 3D eye's place, at the same height |
+| `TileEngine.cpp` | `validateThrow`: an arc blocked at its very first step (a shot from against a wall) leaves no path, which was read from its end (a crash): no arc at that curvature. Upstream UB fix found by UBSan: `canTargetUnit` and `checkVoxelExposure` don't divide by zero when the shooter and the target stand in one column (the side scan lines then lie on the centre line); `getOriginVoxel`: on something tall under a ceiling, where the game pushes the muzzle under the floor above and 4 voxels lower, it never goes below the top of what the unit stands on (it went a voxel into it, and shots struck whatever stood about as high nearby); an FPS-style straight shot (`freeAim`) asks the first-person view, which moves its origin across the tile to the 3D eye's place, at the same height |
 | `Explosion.{h,cpp}` | `getLastFrame()`: the last frame of an explosion's own animation (the 3D view's frame blend stops there); `setMiss()`/`isMiss()`: a missed blow's animation (no sparks in 3D) |
 | `State.h`, `Game.{h,cpp}` | Generic hook: the top state may ask for mouse capture (relative mouse look); released with the cursor centred for every other state, each release counted (`getMouseReleases`) so the 3D view can ignore the cursor's jump |
 | `UnitSprite.{h,cpp}` | `setViewRotation()`: draw a unit from any side |
@@ -884,6 +884,8 @@ What `FirstPersonView` draws:
 ## 11. Version history
 
 ### 1.10 (not released yet)
+
+- **Arcing shots and throws at a wall you stand against** (a player, GitHub issue #84: X-Com Files' position markers, fired in an arc a tile off, unfolded behind the soldier or through walls in 3D, never on the map): aimed at the wall at the edge of the soldier's own tile, a throw or an arcing shot aims at the tile across it, as the map is clicked beyond the wall, and the game arcs over it or refuses (they aimed at the soldier's own tile, and what they set down went to the nearest free tile). *Force arcing shots* never forces a round that sets a unit down. And a crash fixed in the game itself: an arc blocked at its very first step (from against a wall, now and then only, by the shot's random deviation) left an empty path, which the game read from its end.
 
 - **Zombies hatch with quick deaths** (a player, GitHub issue #80: "Animation where zombie hatches into chysallid is entirely skipped"): with *Quick deaths* on, a unit that turns into another as it dies (a Zombie, whose death is the Chryssalid bursting out of it) dies the game's own way: its death plays, and the Chryssalid comes once it has (down at once, it hatched at once, unseen).
 

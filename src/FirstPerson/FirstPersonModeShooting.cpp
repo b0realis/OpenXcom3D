@@ -1389,7 +1389,7 @@ double FirstPersonMode::skyReach(BattleUnit *unit) const
  */
 void FirstPersonMode::updateAim(BattleUnit *unit)
 {
-	_aimHitsSomething = aimAt(_view->getWidth() / 2, _view->getHeight() / 2, unit, _aimVoxel);
+	_aimHitsSomething = aimAt(_view->getWidth() / 2, _view->getHeight() / 2, unit, _aimVoxel, &_aimVoxelType);
 }
 
 /**
@@ -1773,7 +1773,7 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 
 	// The target: the marked one, or the tile and point under the crosshair (as fire() takes
 	// them, see aimedTile).
-	const Position targetTile = marked ? _confirmTile : aimedTile(_aimVoxel);
+	const Position targetTile = marked ? _confirmTile : arcs(weapon, mode) ? arcTargetTile(_aimVoxel, _aimVoxelType, unit) : aimedTile(_aimVoxel);
 	const Position targetVoxel = marked ? _confirmVoxel : _aimVoxel;
 	const bool hitSomething = marked || _aimHitsSomething;
 
@@ -1956,6 +1956,14 @@ bool FirstPersonMode::forcesArc(BattleAction &shot, const Position &targetTile)
 	{
 		return false;
 	}
+	// Not a round that sets a unit down where it lands (X-Com Files' position markers: GitHub
+	// issue #84): forced where the game finds no arc, it only met the wall in the way, and the unit
+	// went to the nearest free tile, behind the soldier or through the wall; refused, as on the map.
+	const BattleItem *round = shot.weapon->getAmmoForAction(shot.type);
+	if (shot.weapon->getRules()->getSpawnUnit() || (round && round->getRules()->getSpawnUnit()))
+	{
+		return false;
+	}
 	BattleAction probe = shot;
 	return !gameArcFound(probe, targetTile, nullptr);
 }
@@ -1980,6 +1988,37 @@ Position FirstPersonMode::aimedTile(const Position &aimedVoxel) const
 	{
 		--tile.z;
 	}
+	return tile;
+}
+
+/**
+ * The tile a throw or an arcing shot aims at (a player, GitHub issue #84: X-Com Files' position
+ * markers, fired in an arc a tile off, unfolded behind the soldier): the tile the point under the
+ * crosshair is in (see aimedTile), except a wall on the edge of the soldier's own tile (a west or
+ * north wall belongs to the tile east or south of it, the soldier's when he stands against it):
+ * the tile across it, as the map is clicked beyond the wall. Aimed at his own tile, the round
+ * landed at his feet and what it set down went to the nearest free tile, behind him or through a
+ * wall; across the wall, the game arcs over it or refuses as on the map.
+ * @param aimedVoxel The point the aim met.
+ * @param voxelType What it met (V_WESTWALL, V_NORTHWALL...; V_EMPTY for the sky).
+ * @param unit The soldier aiming.
+ * @return The tile aimed at.
+ */
+Position FirstPersonMode::arcTargetTile(const Position &aimedVoxel, int voxelType, const BattleUnit *unit) const
+{
+	Position tile = aimedTile(aimedVoxel);
+	if (!unit || (voxelType != V_WESTWALL && voxelType != V_NORTHWALL))
+	{
+		return tile;
+	}
+	const Position own = unit->getPosition();
+	const int size = unit->getArmor()->getSize();
+	if (tile.z != own.z || tile.x < own.x || tile.x >= own.x + size || tile.y < own.y || tile.y >= own.y + size)
+	{
+		return tile;
+	}
+	if (voxelType == V_WESTWALL && tile.x > 0) --tile.x;
+	if (voxelType == V_NORTHWALL && tile.y > 0) --tile.y;
 	return tile;
 }
 
@@ -2586,8 +2625,10 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	// The target tile: the one holding the voxel under the pixel (on the open sky the point of
 	// air on the ray, inside the map, see aimAt).
 	Position aimedVoxel;
-	const bool hitSomething = aimAt(pixelX, pixelY, unit, aimedVoxel);
-	const Position targetTile = aimedTile(aimedVoxel);
+	int aimedType = -1;
+	const bool hitSomething = aimAt(pixelX, pixelY, unit, aimedVoxel, &aimedType);
+	const bool arcing = mode == BA_THROW || (isShot(mode) && weapon && weapon->getArcingShot(mode));
+	const Position targetTile = arcing ? arcTargetTile(aimedVoxel, aimedType, unit) : aimedTile(aimedVoxel);
 
 	// Confirm fire (setting): the first click marks the target and shows its path (see
 	// updateTrajectory); a click on the same tile with the same weapon and mode fires, a click on
