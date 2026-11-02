@@ -856,6 +856,7 @@ What `FirstPersonView` draws:
 | `ExplosionBState.{h,cpp}` | FPS-style shooting: our own bullet hits play quicker (`FirstPerson::fastShots`); a missed blow's or psi attack's animation is marked (`Explosion::setMiss`); a terrain explosion set off by a blast settles at once in 3D, without its animation (`setInstant`, `FirstPerson::instantChains`) |
 | `MeleeAttackBState.cpp` | A blow at terrain lands on the very point the crosshair struck (`targetVoxel`) |
 | `UnitDieBState.{h,cpp}` | Setting *Quick deaths*: a direct hit's victim goes down at once (`FirstPerson::quickDeaths`, `noteQuickFall`); a unit going down over no floor comes down in 3D (`FirstPerson::noteAirFall`) |
+| `MainMenuState.cpp` | The mod's version in small letters beside the title (`FirstPerson::addMenuVersion`) |
 | `BattlescapeGenerator.cpp` | Setting *Auto-equip guns first*: guns before melee weapons, the hardest-hitting first (`FirstPerson::autoEquipGunsFirst`, `sortAutoEquip`, `autoEquipTakes`) |
 | `SavedBattleGame.cpp` | `addFallingUnit`: X-COM's units float where they are with Doom IDCLIP (`FirstPerson::noclipFloats`) |
 | `BattleItem.cpp` | `spendAmmoForAction`: no ammo spent with Doom IDKFA (`FirstPerson::endlessAmmo`), beside the game's own debug mode |
@@ -883,6 +884,8 @@ What `FirstPersonView` draws:
 ## 11. Version history
 
 ### 1.10 (not released yet)
+
+- **The version in the main menu** (a player, GitHub issue #69: without the AppImage's name, no telling the version; the owner: "a smaller space and our version number besides OpenXcom3D", then "Make the version no. Smaller"): the mod's version in small letters just right of the title's big "OpenXcom3D", read from the mod's own metadata, so every bump shows.
 
 - **Auto-equip guns first: the hardest-hitting first** (a player, GitHub issue #76: X-Com Files' soldiers got staffs and swords from our build with the setting off, bows and old SMGs with it on, cannons and gauss from their stock OXCE): OXCE's auto-equip has no ranking; it hands out the craft's kit in the order the items sit in memory (a map keyed by the rules' addresses), which differs between builds and between runs of one build (one battle, run three times on ours: a rifle, a musket, a rifle; on stock OXCE from the same source three rifles). The setting now offers the guns by the power of one round of the strongest ammo for them in the craft, direct fire before launchers (the owner), in a fixed order: in X-Com Files a sonic cannon, a recoilless gun, a heavy plasma, a sonic shotgun, a sonic blasta rifle; in UFO the heavy plasma, the heavy laser, the plasma rifle ... the rifle, then the blaster, rocket and small launchers. Off, OXCE's own, unchanged.
 

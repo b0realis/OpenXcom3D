@@ -73,6 +73,7 @@ class OptionInfo;
 class RuleItem;
 class SavedBattleGame;
 class State;
+class Text;
 class Surface;
 class Tile;
 
@@ -188,6 +189,8 @@ bool keepsFacingOnOwnTile();
 /// Setting "Auto-equip guns first": does the game's auto-equip hand out guns before melee weapons,
 /// the strongest first (BattlescapeGenerator::autoEquip), rather than its own way?
 bool autoEquipGunsFirst(const Mod *mod);
+/// The main menu: the mod's version in small letters just right of the title's "OpenXcom3D" (none without the mod).
+void addMenuVersion(State *state, Text *title, const Mod *mod);
 /// Setting "Auto-equip guns first": the items offered, the hardest-hitting first (then the mod's list order, then by type).
 void sortAutoEquip(std::vector<BattleItem*> &items);
 /// Setting "Auto-equip guns first": does this pass of the auto-equip take this item? Passes 0 to
@@ -320,6 +323,7 @@ inline bool spriteHit(SavedBattleGame *, const BattleUnit *, const Position &, c
 inline Position spriteHitRelative(const Position &relative, const BattleUnit *, const BattleUnit *) { return relative; }
 inline bool keepsFacingOnOwnTile() { return false; }
 inline bool autoEquipGunsFirst(const Mod *) { return false; }
+inline void addMenuVersion(State *, Text *, const Mod *) { }
 inline void sortAutoEquip(std::vector<BattleItem*> &) { }
 inline bool autoEquipTakes(const RuleItem *, int, bool) { return false; }
 inline bool quickDeaths(BattlescapeState *) { return false; }

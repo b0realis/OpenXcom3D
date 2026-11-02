@@ -21724,10 +21724,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..363c5eeec
+index 000000000..86147e10a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1182 @@
+@@ -0,0 +1,1217 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -21785,6 +21785,9 @@ index 000000000..363c5eeec
 +#include "../Engine/OptionInfo.h"
 +#include "../Engine/Options.h"
 +#include "../Mod/Mod.h"
++#include "../Engine/State.h"
++#include "../Interface/Text.h"
++#include "FirstPersonModeShared.h"
 +#include "../Mod/RuleDamageType.h"
 +#include "../Mod/RuleItem.h"
 +#include "../Savegame/BattleItem.h"
@@ -21868,6 +21871,38 @@ index 000000000..363c5eeec
 +bool autoEquipGunsFirst(const Mod *mod)
 +{
 +	return Options::fpsAutoEquipGunsFirst && mod && mod->getFirstPerson().isEnabled();
++}
++
++/**
++ * The main menu with the mod on: its version (the mod's own metadata, "1.09") in small letters
++ * just right of the title's first line, "OpenXcom3D", its foot on the big letters' foot (a player,
++ * GitHub issue #69: without the AppImage's name, no telling the version; the owner: "a smaller
++ * space and our version number besides OpenXcom3D", then "Make the version no. Smaller"). A text
++ * of its own (one text has one size a line), added to the menu like its others.
++ * @param state The main menu.
++ * @param title Its title (centred, big, its first line the mod's name).
++ * @param mod The game's rules.
++ */
++void addMenuVersion(State *state, Text *title, const Mod *mod)
++{
++	if (!state || !title || !mod || !mod->getFirstPerson().isEnabled())
++	{
++		return;
++	}
++	const auto &mods = Options::getModInfos();
++	const auto found = mods.find("OpenXcom3D");
++	if (found == mods.end())
++	{
++		return;
++	}
++	Text *version = new Text(MenuVersionWidth, MenuVersionHeight);
++	state->add(version, "text", "mainMenu");
++	version->setSmall();
++	version->setText(found->second.getVersion());
++	// Just right of the name, centred in the title's width, their feet on one line.
++	const int nameRight = title->getX() + (title->getWidth() + title->getTextWidth(0)) / 2;
++	version->setX(nameRight + MenuVersionGap);
++	version->setY(title->getY() + MenuVersionDrop);
 +}
 +
 +/**
@@ -22912,10 +22947,10 @@ index 000000000..363c5eeec
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..0c5a2020b
+index 000000000..d422a9051
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,347 @@
+@@ -0,0 +1,351 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -22991,6 +23026,7 @@ index 000000000..0c5a2020b
 +class RuleItem;
 +class SavedBattleGame;
 +class State;
++class Text;
 +class Surface;
 +class Tile;
 +
@@ -23106,6 +23142,8 @@ index 000000000..0c5a2020b
 +/// Setting "Auto-equip guns first": does the game's auto-equip hand out guns before melee weapons,
 +/// the strongest first (BattlescapeGenerator::autoEquip), rather than its own way?
 +bool autoEquipGunsFirst(const Mod *mod);
++/// The main menu: the mod's version in small letters just right of the title's "OpenXcom3D" (none without the mod).
++void addMenuVersion(State *state, Text *title, const Mod *mod);
 +/// Setting "Auto-equip guns first": the items offered, the hardest-hitting first (then the mod's list order, then by type).
 +void sortAutoEquip(std::vector<BattleItem*> &items);
 +/// Setting "Auto-equip guns first": does this pass of the auto-equip take this item? Passes 0 to
@@ -23238,6 +23276,7 @@ index 000000000..0c5a2020b
 +inline Position spriteHitRelative(const Position &relative, const BattleUnit *, const BattleUnit *) { return relative; }
 +inline bool keepsFacingOnOwnTile() { return false; }
 +inline bool autoEquipGunsFirst(const Mod *) { return false; }
++inline void addMenuVersion(State *, Text *, const Mod *) { }
 +inline void sortAutoEquip(std::vector<BattleItem*> &) { }
 +inline bool autoEquipTakes(const RuleItem *, int, bool) { return false; }
 +inline bool quickDeaths(BattlescapeState *) { return false; }
@@ -32515,10 +32554,10 @@ index 000000000..d086c7fbf
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..f185b53c5
+index 000000000..6fc07ebde
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,449 @@
+@@ -0,0 +1,452 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -32759,6 +32798,9 @@ index 000000000..f185b53c5
 +/// Doom IDCLIP: a wall or object part whose voxels (the game's shape of it) come this near the eye, in voxels, is left
 +/// out of the picture (the eye is inside it, or as good as: its 3D picture can stand a little wider than its voxels).
 +const int NoclipReach = 2;
++/// The main menu's version (see FirstPerson::addMenuVersion): its small text's size, how far right of the title's
++/// "OpenXcom3D" it starts, and how far below the title's top, so its digits' feet sit on the big letters' feet.
++const int MenuVersionWidth = 40, MenuVersionHeight = 9, MenuVersionGap = 3, MenuVersionDrop = 3;
 +/// Tile moves: how long the movement keys are held before the move starts, in milliseconds (a
 +/// second key pressed with the first, W and D say, makes it a diagonal).
 +const Uint32 TileMoveKeyWait = 60;
@@ -59281,6 +59323,26 @@ index 000000000..f66e21686
 +}
 +
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
+diff --git a/src/Menu/MainMenuState.cpp b/src/Menu/MainMenuState.cpp
+index 543a45c0b..1900671fb 100644
+--- a/src/Menu/MainMenuState.cpp
++++ b/src/Menu/MainMenuState.cpp
+@@ -34,6 +34,7 @@
+ #include "../Engine/Options.h"
+ #include "../Engine/FileMap.h"
+ #include "../Engine/SDL2Helpers.h"
++#include "../FirstPerson/FirstPersonApi.h"
+ #include <fstream>
+ 
+ namespace OpenXcom
+@@ -237,6 +238,7 @@ MainMenuState::MainMenuState(bool updateCheck)
+ 	title << tr("STR_OPENXCOM").arg(Options::getActiveMasterInfo()->getVersionDisplay()) << Unicode::TOK_NL_SMALL;
+ 	title << "OpenXcom " << OPENXCOM_VERSION_SHORT << OPENXCOM_VERSION_GIT;
+ 	_txtTitle->setText(title.str());
++	FirstPerson::addMenuVersion(this, _txtTitle, _game->getMod()); // (OpenXcom3D: its version beside its name)
+ }
+ 
+ void MainMenuState::init()
 diff --git a/src/Menu/OptionsBaseState.cpp b/src/Menu/OptionsBaseState.cpp
 index d1c00b63a..d37066871 100644
 --- a/src/Menu/OptionsBaseState.cpp

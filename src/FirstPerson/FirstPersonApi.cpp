@@ -55,6 +55,9 @@
 #include "../Engine/OptionInfo.h"
 #include "../Engine/Options.h"
 #include "../Mod/Mod.h"
+#include "../Engine/State.h"
+#include "../Interface/Text.h"
+#include "FirstPersonModeShared.h"
 #include "../Mod/RuleDamageType.h"
 #include "../Mod/RuleItem.h"
 #include "../Savegame/BattleItem.h"
@@ -138,6 +141,38 @@ bool keepsFacingOnOwnTile()
 bool autoEquipGunsFirst(const Mod *mod)
 {
 	return Options::fpsAutoEquipGunsFirst && mod && mod->getFirstPerson().isEnabled();
+}
+
+/**
+ * The main menu with the mod on: its version (the mod's own metadata, "1.09") in small letters
+ * just right of the title's first line, "OpenXcom3D", its foot on the big letters' foot (a player,
+ * GitHub issue #69: without the AppImage's name, no telling the version; the owner: "a smaller
+ * space and our version number besides OpenXcom3D", then "Make the version no. Smaller"). A text
+ * of its own (one text has one size a line), added to the menu like its others.
+ * @param state The main menu.
+ * @param title Its title (centred, big, its first line the mod's name).
+ * @param mod The game's rules.
+ */
+void addMenuVersion(State *state, Text *title, const Mod *mod)
+{
+	if (!state || !title || !mod || !mod->getFirstPerson().isEnabled())
+	{
+		return;
+	}
+	const auto &mods = Options::getModInfos();
+	const auto found = mods.find("OpenXcom3D");
+	if (found == mods.end())
+	{
+		return;
+	}
+	Text *version = new Text(MenuVersionWidth, MenuVersionHeight);
+	state->add(version, "text", "mainMenu");
+	version->setSmall();
+	version->setText(found->second.getVersion());
+	// Just right of the name, centred in the title's width, their feet on one line.
+	const int nameRight = title->getX() + (title->getWidth() + title->getTextWidth(0)) / 2;
+	version->setX(nameRight + MenuVersionGap);
+	version->setY(title->getY() + MenuVersionDrop);
 }
 
 /**
