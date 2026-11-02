@@ -134,10 +134,12 @@ void FirstPersonMode::turnWithKeys(double elapsedSeconds)
 
 	// Add up the turn of every key held: left and right turn, up and down tilt.
 	double yawDegrees = 0.0, pitchDegrees = 0.0;
-	if (keyStates[Options::keyBattleLeft]) yawDegrees -= turnSpeed * elapsedSeconds;
-	if (keyStates[Options::keyBattleRight]) yawDegrees += turnSpeed * elapsedSeconds;
-	if (keyStates[Options::keyBattleUp]) pitchDegrees += turnSpeed * elapsedSeconds;
-	if (keyStates[Options::keyBattleDown]) pitchDegrees -= turnSpeed * elapsedSeconds;
+	// (the 3D view's own turn and look keys, the arrows; not the map's scroll keys, which a player
+	// may have put on W, A, S, D: GitHub issue #81)
+	if (Options::keyFpsLookLeft != SDLK_UNKNOWN && keyStates[Options::keyFpsLookLeft]) yawDegrees -= turnSpeed * elapsedSeconds;
+	if (Options::keyFpsLookRight != SDLK_UNKNOWN && keyStates[Options::keyFpsLookRight]) yawDegrees += turnSpeed * elapsedSeconds;
+	if (Options::keyFpsLookUp != SDLK_UNKNOWN && keyStates[Options::keyFpsLookUp]) pitchDegrees += turnSpeed * elapsedSeconds;
+	if (Options::keyFpsLookDown != SDLK_UNKNOWN && keyStates[Options::keyFpsLookDown]) pitchDegrees -= turnSpeed * elapsedSeconds;
 
 	// A turn key's 45 degrees (comma and period by default) turn at SnapTurnSpeed, and so does a
 	// level look (the classic HUD's map level buttons) tilt.

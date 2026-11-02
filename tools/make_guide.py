@@ -39,7 +39,7 @@ KEYS = [
     ]),
     ('Looking', [
         ('Mouse', 'Look around, all but straight up and down; the head turns 45&deg; for free, further turns the soldier at the game\'s cost (<i>Turning costs TU</i>; off, free).', ''),
-        ('<kbd>&larr;</kbd> <kbd>&rarr;</kbd> <kbd>&uarr;</kbd> <kbd>&darr;</kbd>', 'Turn left / right, look up / down.', ''),
+        ('<kbd>&larr;</kbd> <kbd>&rarr;</kbd> <kbd>&uarr;</kbd> <kbd>&darr;</kbd>', 'Turn left / right, look up / down.', 'The 3D view\'s own keys: the map\'s scroll keys can go on W, A, S, D.'),
         ('<kbd>Home</kbd>', 'Look straight ahead, the way the soldier faces (the map\'s centre key).', ''),
         ('<kbd>,</kbd> <kbd>.</kbd>', 'Snap turn 45&deg; left / right.', ''),
         ('<kbd>1</kbd> &hellip; <kbd>0</kbd>', 'Turn to visible enemy 1 to 10 (or click the red enemy buttons).', 'Find every alien in sight in one key.'),

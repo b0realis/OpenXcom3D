@@ -290,7 +290,7 @@ All of these can be rebound in **Options → 3D VIEW → Controls**: click a key
 | **C** or **middle button** | Mouse look ↔ free cursor (to click the buttons, hover soldiers for their cards). With *Middle click identifies* on, a middle click on a unit shows it instead, as on the map |
 | **H** | Classic HUD on/off: every button of it works in 3D ([below](#the-classic-hud-in-3d)) |
 | **P** | The 3D HUD in three steps. Once, a clear view: the top bar, the info panel, the compass, the lift arrows and the enemy markers hide (and can't be clicked); the crosshair stays. Twice, a clean view: the crosshair, its lines (mode, hit chance, costs), the accuracy line and the name under it go too. Three times, all back. The weapon in hand and the trajectory keep their own settings, and the messages still show. On the isometric map the top bar shows as ever, and P shows or hides the map camera instead (see *Map camera*) |
-| **Arrow keys** | Turn |
+| **Arrow keys** | Turn left and right, look up and down (the 3D view's own keys, *Turn left* ... *Look down*; the map's scroll keys stay the map's, so they can be put on W, A, S, D) |
 | **, / .** | Snap turn 45° left / right, without stepping (the soldier turns with it) |
 | **Left Shift + A / D**, held | Lean out left / right, to peek round a corner, with the setting *Lean* on (otherwise Shift does nothing and A / D strafe, as before): the eye moves to the side, stopping short of walls and of anyone in sight, and with *Tilt* the view tilts. A shot while leaning out starts from that side. Q and E stay the game's hand keys (they don't act while Shift is held, so a lean never opens a menu). The lean key is rebindable (*Lean (hold with strafe)* under Controls, Shift, Ctrl or Alt allowed), and each side can have a key of its own too (*Lean left / right*, unbound) |
 | **Insert** | Cheats off, and the same ones back on (Doom mode, Doom IDKFA, Doom IDDQD, Doom IDCLIP: see [Settings](#cheats)) |
@@ -884,6 +884,8 @@ What `FirstPersonView` draws:
 ## 11. Version history
 
 ### 1.10 (not released yet)
+
+- **The 3D view's own turn and look keys** (a player, GitHub issue #81: someone scrolling the map with W, A, S, D found 3D walking and turning at once): turning and looking up and down in 3D have their own keys (*Turn left*, *Turn right*, *Look up*, *Look down*, the arrows as before) instead of the map's scroll keys, so the map can scroll on W, A, S, D (set in the game's own Controls) while 3D walks on them.
 
 - **No dip when the view goes to another soldier** (a player, GitHub issue #86: in the aliens' turn every camera swap lowered and raised the gun, "as if they were just equipped"): the gun in hand dips out of sight and back only when the same soldier takes another weapon or reloads; looking through another soldier shows his gun at once.
 

@@ -886,6 +886,13 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsBack", &keyFpsBack, SDLK_s, "STR_FPS_KEY_BACK", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsStrafeLeft", &keyFpsStrafeLeft, SDLK_a, "STR_FPS_KEY_STRAFE_LEFT", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsStrafeRight", &keyFpsStrafeRight, SDLK_d, "STR_FPS_KEY_STRAFE_RIGHT", category));
+	// Turning and looking up and down with the keys (the arrows): the 3D view's own, not the map's
+	// scroll keys it used before (a player, GitHub issue #81: with the map scrolled on W, A, S, D,
+	// those keys walked and turned at once).
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsLookLeft", &keyFpsLookLeft, SDLK_LEFT, "STR_FPS_KEY_TURN_LEFT", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsLookRight", &keyFpsLookRight, SDLK_RIGHT, "STR_FPS_KEY_TURN_RIGHT", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsLookUp", &keyFpsLookUp, SDLK_UP, "STR_FPS_KEY_LOOK_UP", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsLookDown", &keyFpsLookDown, SDLK_DOWN, "STR_FPS_KEY_LOOK_DOWN", category));
 	// Two ways of walking, each on and off with its key: sprinting (the game's run; Caps Lock,
 	// Doom's own "always run" key) and en passant (walking on past enemies coming into sight, as
 	// Shift does on the map; the key left of 1, as Shift is the lean key).

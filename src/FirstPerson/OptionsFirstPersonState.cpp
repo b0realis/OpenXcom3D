@@ -94,8 +94,6 @@ std::string keyName(SDLKey key)
 /// what they do there: each entry is the option's id and our label for it. The keys that
 /// centre on an enemy (keyBattleCenterEnemy1 to 10) are added by number.
 const char *const GameKeys[][2] = {
-	{ "keyBattleLeft", "STR_FPS_KEY_TURN_LEFT" }, { "keyBattleRight", "STR_FPS_KEY_TURN_RIGHT" },
-	{ "keyBattleUp", "STR_FPS_KEY_LOOK_UP" }, { "keyBattleDown", "STR_FPS_KEY_LOOK_DOWN" },
 	{ "keyBattleKneel", "STR_FPS_KEY_KNEEL" }, { "keyBattleReload", "STR_FPS_KEY_RELOAD" },
 	{ "keyBattleInventory", "STR_FPS_KEY_INVENTORY" }, { "keyBattleUseLeftHand", "STR_FPS_KEY_LEFT_HAND" },
 	{ "keyBattleUseRightHand", "STR_FPS_KEY_RIGHT_HAND" }, { "keyBattlePersonalLighting", "STR_FPS_KEY_LIGHT" },
