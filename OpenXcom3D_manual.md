@@ -855,7 +855,7 @@ What `FirstPersonView` draws:
 | `BattlescapeGame.cpp` | A soldier panicking or going berserk: in 3D the first-person view shows it (`FirstPerson::breakdown`, which holds the battle as long as the box would) instead of the "has panicked" box; `primaryAction`: akimbo on the map (`FirstPerson::mapAkimbo`); `handleState`: the links of an instant chain of explosions all settle in one frame (setting *Instant chain explosions*) |
 | `ExplosionBState.{h,cpp}` | FPS-style shooting: our own bullet hits play quicker (`FirstPerson::fastShots`); a missed blow's or psi attack's animation is marked (`Explosion::setMiss`); a terrain explosion set off by a blast settles at once in 3D, without its animation (`setInstant`, `FirstPerson::instantChains`) |
 | `MeleeAttackBState.cpp` | A blow at terrain lands on the very point the crosshair struck (`targetVoxel`) |
-| `UnitDieBState.{h,cpp}` | Setting *Quick deaths*: a direct hit's victim goes down at once (`FirstPerson::quickDeaths`, `noteQuickFall`); a unit going down over no floor comes down in 3D (`FirstPerson::noteAirFall`) |
+| `UnitDieBState.{h,cpp}` | Setting *Quick deaths*: a direct hit's victim goes down at once (`FirstPerson::quickDeaths`, `noteQuickFall`), but not one that turns into another (a Zombie); a unit going down over no floor comes down in 3D (`FirstPerson::noteAirFall`) |
 | `MainMenuState.cpp` | The mod's version in small letters beside the title (`FirstPerson::addMenuVersion`) |
 | `BattlescapeGenerator.cpp` | Setting *Auto-equip guns first*: guns before melee weapons, the hardest-hitting first (`FirstPerson::autoEquipGunsFirst`, `sortAutoEquip`, `autoEquipTakes`) |
 | `SavedBattleGame.cpp` | `addFallingUnit`: X-COM's units float where they are with Doom IDCLIP (`FirstPerson::noclipFloats`) |
@@ -884,6 +884,8 @@ What `FirstPersonView` draws:
 ## 11. Version history
 
 ### 1.10 (not released yet)
+
+- **Zombies hatch with quick deaths** (a player, GitHub issue #80: "Animation where zombie hatches into chysallid is entirely skipped"): with *Quick deaths* on, a unit that turns into another as it dies (a Zombie, whose death is the Chryssalid bursting out of it) dies the game's own way: its death plays, and the Chryssalid comes once it has (down at once, it hatched at once, unseen).
 
 - **Glass you can see through** (a player, GitHub issue #75, with an X-Com Files save: a shop's glass walls opaque, broken glass leaving nothing; the owner: "just a smooth seethrough pane (like we have for ghost) and when broken only voxels on the edges shown"): a wall the game lets sight through whose art is a frame round a big see-through area is a pane of glass: what lies behind shows through it, a little paler and bluer, smooth, its frame solid; broken, a jagged band of glass stays round the inside of its frame and the middle is open. Every aim stops on glass (the owner): the crosshair's point is on the pane, so a shot goes for it and a blow strikes it (and breaks it). X-Com Files' mission sites set on the map with a UFO's rules (a museum, a bank, a barn, labs) no longer count their town and field parts as UFO hulls, which had kept the shop's glass opaque.
 

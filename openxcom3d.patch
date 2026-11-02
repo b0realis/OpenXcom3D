@@ -20983,7 +20983,7 @@ index 849787736..b9388fd3c 100644
  	void voxelCheckFlush();
  	/// Blows this tile up.
 diff --git a/src/Battlescape/UnitDieBState.cpp b/src/Battlescape/UnitDieBState.cpp
-index b353c8db4..91cff787a 100644
+index b353c8db4..e901534e2 100644
 --- a/src/Battlescape/UnitDieBState.cpp
 +++ b/src/Battlescape/UnitDieBState.cpp
 @@ -33,6 +33,7 @@
@@ -20994,7 +20994,7 @@ index b353c8db4..91cff787a 100644
  #include "InfoboxState.h"
  #include "../Savegame/Node.h"
  
-@@ -47,10 +48,29 @@ namespace OpenXcom
+@@ -47,10 +48,32 @@ namespace OpenXcom
   * @param noSound Whether to disable the death sound.
   */
  UnitDieBState::UnitDieBState(BattlescapeGame *parent, BattleUnit *unit, const RuleDamageType* damageType, bool noSound) : BattleState(parent),
@@ -21003,9 +21003,12 @@ index b353c8db4..91cff787a 100644
  {
 +	// (OpenXcom3D: setting "Quick deaths": a unit killed or knocked out by a direct hit goes down
 +	// at once too, like one blasted with explosives, so a burst fires on and several fall at once;
-+	// its fall plays on its own, in 3D and on the map, see FirstPerson::noteQuickFall.)
++	// its fall plays on its own, in 3D and on the map, see FirstPerson::noteQuickFall. Not a unit
++	// that turns into another as it dies (a Zombie: its death is the Chryssalid hatching, and the
++	// Chryssalid comes once it has played; a player, GitHub issue #80: down at once, it hatched at
++	// once, unseen).)
 +	_quick = _damageType->isDirect() && _unit->getStatus() != STATUS_UNCONSCIOUS && !_parent->getSave()->isBeforeGame()
-+		&& FirstPerson::quickDeaths(_parent->getSave()->getBattleState());
++		&& !_unit->getSpawnUnit() && FirstPerson::quickDeaths(_parent->getSave()->getBattleState());
 +	// (OpenXcom3D: a unit going down as it hovers over no floor comes down to the ground in 3D,
 +	// falling, see FirstPerson::noteAirFall; the game has it there at once, as ever.)
 +	if (!_parent->getSave()->isBeforeGame())
@@ -21026,7 +21029,7 @@ index b353c8db4..91cff787a 100644
  	{
  
  		/********************************************************
-@@ -150,7 +170,7 @@ void UnitDieBState::think()
+@@ -150,7 +173,7 @@ void UnitDieBState::think()
  		_parent->popState();
  		return;
  	}
@@ -21035,7 +21038,7 @@ index b353c8db4..91cff787a 100644
  	{
  		int dir = _unit->getDirection() + 1;
  		if (dir == 8)
-@@ -235,8 +255,8 @@ void UnitDieBState::think()
+@@ -235,8 +258,8 @@ void UnitDieBState::think()
  	}
  	else if (_unit->isOut())
  	{
