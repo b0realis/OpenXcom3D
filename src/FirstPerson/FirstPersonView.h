@@ -821,6 +821,7 @@ private:
 		enum Kind { Sprite, GroundShade, Line } kind;
 		SpriteDraw sprite;                                                // Sprite (see drawSprite)
 		double centre[3]; double radius; int steps; float density;        // GroundShade (see drawGroundShade)
+		double away[2]; double length;                                    // ... stretched away from a light that long (0: a disc)
 		float from[3], to[3]; Uint8 color; int thickness; float opacity; bool glows; // Line (see drawLine3D)
 	};
 	std::vector<DrawStep> _drawList;    // the steps recorded so far
@@ -855,10 +856,13 @@ private:
 	void findUnitAtPointer();
 	/// Records a soft shadow under a unit, to be drawn with the units (see replayDrawList).
 	void recordUnitShadow(const double feet[3], double radius);
+	/// A unit's soft shadow from the flare lighting it most, stretched away from it (recorded like recordUnitShadow).
+	void recordFlareShadow(const BattleUnit *unit, const double feet[3], double radius);
 	/// Records the outline of the voxels the game counts as a unit when it's hit (setting "Hitboxes"), to be drawn with the units.
 	void recordHitbox(const BattleUnit *unit, const double feet[3], float opacity);
 	/// Darkens the ground in a soft disc (all of it, or only the screen rows from bandTop up to bandBottom).
-	void drawGroundShade(const double centre[3], double radius, int steps, float density, int bandTop = 0, int bandBottom = 1 << 30);
+	void drawGroundShade(const double centre[3], double radius, int steps, float density, int bandTop = 0, int bandBottom = 1 << 30,
+		const double *away = nullptr, double length = 0.0);
 	/// Draws the top item lying on each discovered tile.
 	void drawFloorItems();
 	/// The discreet map edge (setting): small red dots on the floor along the edge.
@@ -1117,6 +1121,8 @@ private:
 	void prepareFlareLights();
 	/// How much a point is lit by the flares (0..1).
 	float flareLight(const float point[3], const float normal[3], bool shadows) const;
+	/// One flare's light this frame at a distance from it, before the surface's facing (0..1).
+	float flarePower(const FlareLight &flare, float distance) const;
 	/// Draws the flares' red-hot glow.
 	void drawFlares();
 

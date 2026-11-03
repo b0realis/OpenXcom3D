@@ -108,6 +108,13 @@ const float UfoInsideTint = 1.8f, UfoInsideTintNight = 1.5f;
 /// many can burn at once.
 const float FlareLife = 60.0f, FlareReach = 150.0f;
 const size_t FlareMax = 8;
+/// A unit's shadow from a tactical flare (GitHub issue #73; the owner: a stretched soft shadow, see
+/// FirstPersonView::recordFlareShadow): at most this long (voxels, 3 tiles), widening to this many
+/// times the unit's soft shadow's radius at its end, at most this many shades dark (by the flare's
+/// light at the feet, 0..1, times FlareShadowShades), and none from a flare fainter than this there.
+const double FlareShadowMaxLength = 48.0, FlareShadowWidening = 1.6;
+const int FlareShadowMaxSteps = 5;
+const float FlareShadowShades = 8.0f, FlareShadowMinPower = 0.06f;
 /// Pixel size Auto (the option at 0): views up to this size get full detail, bigger ones blocks
 /// of 2. A 1920x1080 screen at the default battlescape scale makes a 960x540 view, which ran at
 /// 40-51 FPS in a busy town; in blocks of 2 it holds 60 and looks almost the same.

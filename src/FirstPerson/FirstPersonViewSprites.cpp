@@ -492,7 +492,7 @@ void FirstPersonView::drawListBands()
 				drawSprite(step.sprite, bandTop, bandBottom);
 				break;
 			case DrawStep::GroundShade:
-				drawGroundShade(step.centre, step.radius, step.steps, step.density, bandTop, bandBottom);
+				drawGroundShade(step.centre, step.radius, step.steps, step.density, bandTop, bandBottom, step.away, step.length);
 				break;
 			case DrawStep::Line:
 				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, bandTop, bandBottom, step.glows);
@@ -966,6 +966,7 @@ void FirstPersonView::drawUnits()
 		if (Options::fpsShadows)
 		{
 			recordUnitShadow(feet, 5.5 * unitSize); // flying units too: the shadow on the ground shows where they hover
+			recordFlareShadow(unit, feet, 5.5 * unitSize);
 		}
 		// Compose the unit's frame in the sprite buffer and keep it in a frame of its own, then
 		// record it standing in the world, on the floor's surface (the hitbox and the markers
@@ -1157,7 +1158,9 @@ void FirstPersonView::findUnitAtPointer()
 
 /**
  * A soft dark patch on the ground under a unit, so it stands on the floor instead of floating:
- * recorded, to be drawn with the units (see drawUnits, replayDrawList).
+ * recorded, to be drawn with the units (see drawUnits, replayDrawList). It lies on the floor's
+ * surface, where the unit stands in the view (see standingHeight): at the game's foot of the
+ * floor, inside the slab, the floor seen past a few tiles off missed it (GitHub issue #73).
  * @param feet The point on the ground under the unit's middle, in voxels.
  * @param radius The patch's radius, in voxels.
  */
@@ -1166,33 +1169,99 @@ void FirstPersonView::recordUnitShadow(const double feet[3], double radius)
 	DrawStep step;
 	step.kind = DrawStep::GroundShade;
 	std::copy(feet, feet + 3, step.centre);
+	step.centre[2] = standingHeight(feet);
 	step.radius = radius;
 	step.steps = 2;
 	step.density = 1.8f;
+	step.length = 0.0;
 	_drawList.push_back(step);
 }
 
 /**
- * Darkens the ground in a soft disc (unit shadows, scorched earth): pixels whose floor lies
- * within the disc lose up to `steps` shades, thinning out (dithered) towards the edge. Only
- * pixels showing the floor right there are darkened, not a wall or a unit in front of it.
- * @param centre The disc's centre on the ground, in voxels.
- * @param radius The disc's radius, in voxels.
+ * A unit's shadow from the tactical flare lighting it most (a player, GitHub issue #73: "let tac
+ * flares cast unit shadows"; the owner: a stretched soft shadow): a soft dark patch on the ground
+ * from its feet away from the flare, as long as the unit's height thrown from the flare's (up to
+ * FlareShadowMaxLength: a flare on the ground throws it that far), widening towards its end and
+ * fading out there, as dark as the flare is bright at the unit. None from a flare the unit can't
+ * see (a ray from its chest), nor from one fainter than FlareShadowMinPower or right under it.
+ * Recorded, to be drawn with the units (see drawGroundShade).
+ * @param unit The unit.
+ * @param feet The point on the ground under the unit's middle, in voxels.
+ * @param radius Its soft shadow's radius, in voxels (the patch's width at the feet).
+ */
+void FirstPersonView::recordFlareShadow(const BattleUnit *unit, const double feet[3], double radius)
+{
+	// The flare that lights the unit most (as they light a unit: no adding up, see flareLight).
+	const float chest[3] = { (float)feet[0], (float)feet[1], (float)feet[2] + 12.0f };
+	const FlareLight *brightest = nullptr;
+	float brightestPower = 0.0f;
+	for (const FlareLight &flare : _flareLights)
+	{
+		const float power = flarePower(flare, std::sqrt((flare.pos[0] - chest[0]) * (flare.pos[0] - chest[0])
+			+ (flare.pos[1] - chest[1]) * (flare.pos[1] - chest[1]) + (flare.pos[2] - chest[2]) * (flare.pos[2] - chest[2])));
+		if (power > brightestPower)
+		{
+			brightest = &flare;
+			brightestPower = power;
+		}
+	}
+	if (!brightest || brightestPower < FlareShadowMinPower || shadowed(chest, brightest->pos))
+	{
+		return;
+	}
+	// Away from the flare along the ground, and how far: the unit's top (at the pictures' size)
+	// thrown from the flare's height onto the ground, or the longest for a flare no higher.
+	const double awayX = feet[0] - brightest->pos[0], awayY = feet[1] - brightest->pos[1], across = std::hypot(awayX, awayY);
+	if (across < 1.0)
+	{
+		return;
+	}
+	const double height = (unit->getFloatHeight() + unit->getHeight()) * Options::fpsUnitSize / 100.0;
+	const double flareAbove = brightest->pos[2] - feet[2];
+	const double length = flareAbove > height + 1.0 ? std::min(FlareShadowMaxLength, across * height / (flareAbove - height)) : FlareShadowMaxLength;
+	DrawStep step;
+	step.kind = DrawStep::GroundShade;
+	std::copy(feet, feet + 3, step.centre);
+	step.centre[2] = standingHeight(feet); // (on the floor's surface, see recordUnitShadow)
+	step.radius = radius;
+	step.steps = std::clamp((int)std::lround(brightestPower * FlareShadowShades), 1, FlareShadowMaxSteps);
+	step.density = 1.4f;
+	step.away[0] = awayX / across;
+	step.away[1] = awayY / across;
+	step.length = std::max(length, radius);
+	_drawList.push_back(step);
+}
+
+/**
+ * Darkens the ground in a soft disc (unit shadows, scorched earth), or in a patch stretched away
+ * from a light (a unit's shadow from a flare, see recordFlareShadow): pixels whose floor lies
+ * within it lose up to `steps` shades, thinning out (dithered) towards the edge (and a stretched
+ * patch towards its end too, widening there). Only pixels showing the floor right there are
+ * darkened, not a wall or a unit in front of it.
+ * @param centre The disc's centre on the ground, in voxels (a stretched patch's start).
+ * @param radius The disc's radius, in voxels (a stretched patch's half width at its start).
  * @param steps How many shades darker it makes the ground.
  * @param density How solid it is: above 1 the middle is solid and only the rim thins out.
  * @param bandTop, bandBottom Only the screen rows from bandTop up to (not including) bandBottom
  *        are darkened (a band of the view, see replayDrawList).
+ * @param away The direction a stretched patch runs along the ground (x, y; a unit vector), or null for a disc.
+ * @param length How far a stretched patch runs, in voxels.
  */
-void FirstPersonView::drawGroundShade(const double centre[3], double radius, int steps, float density, int bandTop, int bandBottom)
+void FirstPersonView::drawGroundShade(const double centre[3], double radius, int steps, float density, int bandTop, int bandBottom,
+	const double *away, double length)
 {
-	// The screen rectangle around the disc: the four corners of the square around it projected
-	// (nothing drawn if any is behind the camera), cut to the view.
+	// The screen rectangle around it: the four corners of the box around the disc, or around the
+	// stretched patch from its start to its end at its widest, projected (nothing drawn if any is
+	// behind the camera), cut to the view.
+	const bool stretched = away && length > 0.0;
+	const double reach = stretched ? radius * FlareShadowWidening : radius;
+	const double endX = stretched ? centre[0] + away[0] * length : centre[0], endY = stretched ? centre[1] + away[1] * length : centre[1];
 	const int width = getWidth(), height = getHeight();
 	int left = width, top = height, right = -1, bottom = -1;
 	for (int corner = 0; corner < 4; ++corner)
 	{
-		const double cornerPoint[3] = { centre[0] + ((corner & 1) ? radius : -radius), centre[1] + ((corner & 2) ? radius : -radius),
-			centre[2] + 0.5 };
+		const double cornerPoint[3] = { (corner & 1) ? std::max(centre[0], endX) + reach : std::min(centre[0], endX) - reach,
+			(corner & 2) ? std::max(centre[1], endY) + reach : std::min(centre[1], endY) - reach, centre[2] + 0.5 };
 		double screenX, screenY, cornerDepth;
 		if (!projectToScreen(cornerPoint, screenX, screenY, cornerDepth))
 		{
@@ -1219,15 +1288,30 @@ void FirstPersonView::drawGroundShade(const double centre[3], double radius, int
 			// Where it meets the ground, from the disc's centre (offsetX, offsetY in voxels).
 			const double offsetX = _eye[0] + rayDirection[0] * distanceAlongRay - centre[0],
 				offsetY = _eye[1] + rayDirection[1] * distanceAlongRay - centre[1];
-			const double distanceFromCentre = std::sqrt(offsetX * offsetX + offsetY * offsetY);
-			if (distanceFromCentre > radius) continue;
+			// How close to the middle (0 at the edge .. 1): of the disc; of a stretched patch,
+			// across it (as wide as the disc at its start, FlareShadowWidening times at its end)
+			// and fading along it (the disc under the unit covers its start).
+			float closeness;
+			if (stretched)
+			{
+				const double along = offsetX * away[0] + offsetY * away[1], aside = std::abs(offsetX * away[1] - offsetY * away[0]);
+				if (along < 0.0 || along > length) continue;
+				const double share = along / length, halfWidth = radius * (1.0 + (FlareShadowWidening - 1.0) * share);
+				if (aside > halfWidth) continue;
+				closeness = (float)((1.0 - aside / halfWidth) * (1.0 - share));
+			}
+			else
+			{
+				const double distanceFromCentre = std::sqrt(offsetX * offsetX + offsetY * offsetY);
+				if (distanceFromCentre > radius) continue;
+				closeness = (float)(1.0 - distanceFromCentre / radius);
+			}
 			// Its depth along the view axis, in true proportions like the depth buffer's.
 			const double viewDepth = distanceAlongRay * (rayDirection[0] * _forward[0] + rayDirection[1] * _forward[1]
 				+ rayDirection[2] * ZScale * _forward[2]); // true depth
 			if (std::abs(_depthBuffer[pixelY * width + pixelX] - viewDepth) > 3.0) continue; // only on the floor right there
 			// Darker towards the middle: more of the pixels get the shade (dithered), each
 			// darkened within its colour group.
-			const float closeness = (float)(1.0 - distanceFromCentre / radius);
 			if (closeness * density > dither(pixelX, pixelY) && pixelRow[pixelX])
 			{
 				pixelRow[pixelX] = (Uint8)((pixelRow[pixelX] & 0xF0) | std::min(15, (pixelRow[pixelX] & 15) + steps));
@@ -2722,3 +2806,4 @@ void FirstPersonView::drawDownedIcons()
 }
 
 // Thanks mom and dad! You were the ones who exposed me to my first comp.
+

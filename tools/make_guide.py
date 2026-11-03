@@ -151,7 +151,7 @@ SETTINGS = [
     ]),
     ('Graphics and light', [
         ('Smooth lighting', 'YES', 'YES / NO', 'The battle\'s light blends smoothly from tile to tile. NO: tile by tile, as the map shades it.', ''),
-        ('Shadows', 'YES', 'YES / NO', 'Ray-traced shadows from the sun, lamps and your flashlight, and under every unit.', 'Off on slow machines.'),
+        ('Shadows', 'YES', 'YES / NO', 'Ray-traced shadows from the sun, lamps, your flashlight and flares, and under every unit; a flare throws a unit\'s soft shadow along the ground.', 'Off on slow machines.'),
         ('Distance haze', 'Normal', 'Normal / Light / Clear', 'How soon far terrain fades into the haze.', ''),
         ('Flashlight', 'On', 'On / Dynamic / Off', 'The 3D view\'s own light, on F. On: a wide beam from the shoulder, in the dark. Dynamic: a tight spot on the crosshair, day or night.',
          'Lights only the 3D view: what the soldiers see by the rules doesn\'t change.'),

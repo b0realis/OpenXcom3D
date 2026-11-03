@@ -265,6 +265,24 @@ void FirstPersonView::prepareFlareLights()
 }
 
 /**
+ * One flare's light this frame at a distance from it, before the surface's facing: falling off
+ * with the square of the distance's share of its reach, fading and flickering, and mattering
+ * most in the dark.
+ * @param flare The flare's light this frame (see prepareFlareLights).
+ * @param distance The distance from it, in voxels.
+ * @return Its strength, 0 (none: out of reach) .. 1.
+ */
+float FirstPersonView::flarePower(const FlareLight &flare, float distance) const
+{
+	if (distance > FlareReach)
+	{
+		return 0.0f;
+	}
+	const float darkness = _colors.underwater ? 0.6f : 0.3f + 0.7f * _colors.night;
+	return (1.0f - distance / FlareReach) * (1.0f - distance / FlareReach) * flare.fade * flare.flicker * darkness;
+}
+
+/**
  * How much a point is lit by the flares, 0 (not at all) .. 1. A flare lights what is close to
  * it (within FlareReach voxels), facing it and, with shadows, not behind anything; its light
  * flickers slowly and fades out at the end (worked out for the frame by prepareFlareLights),
@@ -277,7 +295,6 @@ void FirstPersonView::prepareFlareLights()
  */
 float FirstPersonView::flareLight(const float point[3], const float normal[3], bool shadows) const
 {
-	const float darkness = _colors.underwater ? 0.6f : 0.3f + 0.7f * _colors.night; // a flare matters most in the dark
 	// The strongest flare that isn't hidden lights the point (they don't add up): rank them
 	// first, so that at most a couple of shadow rays are cast.
 	float powers[FlareMax];
@@ -291,9 +308,7 @@ float FirstPersonView::flareLight(const float point[3], const float normal[3], b
 		const float dx = lightPosition[0] - point[0], dy = lightPosition[1] - point[1], dz = lightPosition[2] - point[2];
 		const float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
 		if (distance > FlareReach || distance < 0.01f) continue;
-		// Its strength here: falling off with the square of the distance's share of the reach,
-		// fading and flickering.
-		float power = (1.0f - distance / FlareReach) * (1.0f - distance / FlareReach) * flare.fade * flare.flicker * darkness;
+		float power = flarePower(flare, distance);
 		// A surface turned away from it isn't lit; one facing it squarely is lit most.
 		if (normal)
 		{
