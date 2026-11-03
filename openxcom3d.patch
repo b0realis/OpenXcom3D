@@ -32713,7 +32713,7 @@ index 000000000..d086c7fbf
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..181fcb2dc
+index 000000000..910a420ef
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
 @@ -0,0 +1,473 @@
@@ -32977,7 +32977,7 @@ index 000000000..181fcb2dc
 +const int NoclipReach = 2;
 +/// The main menu's version (see FirstPerson::addMenuVersion): its small text's size, how far right of the title's
 +/// "OpenXcom3D" it starts, and how far below the title's top, so its digits' feet sit on the big letters' feet.
-+const int MenuVersionWidth = 40, MenuVersionHeight = 9, MenuVersionGap = 3, MenuVersionDrop = 3;
++const int MenuVersionWidth = 40, MenuVersionHeight = 9, MenuVersionGap = 3, MenuVersionDrop = 5;
 +/// On the 3D VIEW tab's Controls, a key waiting to be rebound shows a "_" in its key's place, on and off this many
 +/// milliseconds each (see OptionsFirstPersonState::think).
 +const Uint32 KeyWaitBlinkTime = 400;
@@ -53816,10 +53816,10 @@ index 000000000..b4ce7de47
 +
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..fb2b9a4ee
+index 000000000..f47010e2b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,3429 @@
+@@ -0,0 +1,3506 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -54401,6 +54401,70 @@ index 000000000..fb2b9a4ee
 +}
 +
 +/**
++ * The glass of a pane with holes in its art, as the game's voxels behind it show it: in each
++ * column of the art, from the top to the bottom of the window's holes there (the patches of at
++ * least GlassSmallPaneMin pixels; a frame's tiny gaps don't count), the holes and what's drawn
++ * among them (a glass panel's glints and streaks, a crossbar), not the art above or below them
++ * (a shop's wall round its small window, which a pane taken as all inside the art's edge made
++ * glass: the owner, "in iso there are windows and in 3d the whole wall is seethrough?").
++ * @param sprite Its sprite frame.
++ * @param holes Its art's holes (see findArtHoles).
++ * @param glass Gets one entry per pixel, row by row: 1 for glass.
++ */
++void paneHoleSpans(const Surface *sprite, const std::vector<char> &holes, std::vector<char> &glass)
++{
++	const int width = sprite->getWidth(), height = sprite->getHeight();
++	glass.assign(width * height, 0);
++	if (holes.empty())
++	{
++		return;
++	}
++	// The window's holes: the patches big enough, joined together.
++	std::vector<char> windowHole(width * height, 0), seen(width * height, 0);
++	for (int start = 0; start < width * height; ++start)
++	{
++		if (!holes[start] || seen[start]) continue;
++		std::vector<int> patch = { start }, toVisit = { start };
++		seen[start] = 1;
++		while (!toVisit.empty())
++		{
++			const int pixel = toVisit.back();
++			toVisit.pop_back();
++			const int x = pixel % width, y = pixel / width;
++			const int neighbours[4] = { x > 0 ? pixel - 1 : -1, x < width - 1 ? pixel + 1 : -1, y > 0 ? pixel - width : -1, y < height - 1 ? pixel + width : -1 };
++			for (int next : neighbours)
++			{
++				if (next >= 0 && holes[next] && !seen[next])
++				{
++					seen[next] = 1;
++					toVisit.push_back(next);
++					patch.push_back(next);
++				}
++			}
++		}
++		if ((int)patch.size() >= GlassSmallPaneMin)
++		{
++			for (int pixel : patch) windowHole[pixel] = 1;
++		}
++	}
++	// Each column: from its top window hole to its bottom one, the art (hole or drawn) is glass.
++	for (int x = 0; x < width; ++x)
++	{
++		int top = -1, bottom = -1;
++		for (int y = 0; y < height; ++y)
++		{
++			if (!windowHole[y * width + x]) continue;
++			if (top < 0) top = y;
++			bottom = y;
++		}
++		for (int y = top; top >= 0 && y <= bottom; ++y)
++		{
++			if (holes[y * width + x] || sprite->getPixel(x, y)) glass[y * width + x] = 1;
++		}
++	}
++}
++
++/**
 + * Is most of a sprite's art pale bluish glass (see GlassPaintedPaleMin): its drawn pixels' colours
 + * light in every channel, no warmer than a touch, and nearly grey or lilac?
 + * @param sprite The sprite (palette colours, 0 transparent).
@@ -54450,10 +54514,12 @@ index 000000000..fb2b9a4ee
 + * @param loftData The LOFT templates (the wall's shape).
 + * @param palette The battlescape's palette (for painted glass's colours).
 + * @param pane Gets one entry per pixel, row by row: 1 inside the pane.
++ * @param painted Set true for painted glass (its whole pane is glass on the game's voxels; a pane
++ *        with holes is glass there only behind its holes, see buildModel).
 + * @return True if it's a pane of glass.
 + */
 +bool paneOfGlass(const MapData *mapData, const Surface *sprite, const std::vector<char> &holes, const std::vector<Uint16> &loftData, const SDL_Color *palette,
-+	std::vector<char> &pane)
++	std::vector<char> &pane, bool &painted)
 +{
 +	if ((mapData->getObjectType() != O_WESTWALL && mapData->getObjectType() != O_NORTHWALL) || mapData->getBlock(DT_NONE) != 0)
 +	{
@@ -54491,7 +54557,8 @@ index 000000000..fb2b9a4ee
 +	}
 +	const bool bigPane = biggest >= GlassPaneMinPixels;
 +	const bool smallPaned = smallPanes >= GlassPaneMinPixels && tinyPatches <= GlassMeshPatchesMax && wallShapeCover(mapData, loftData) >= GlassWallCoverMin;
-+	if (!bigPane && !smallPaned && !(biggest < GlassSmallPaneMin && paintedGlass(sprite, palette) && wallShapeCover(mapData, loftData) >= GlassPaintedCoverMin))
++	painted = !bigPane && !smallPaned && biggest < GlassSmallPaneMin && paintedGlass(sprite, palette) && wallShapeCover(mapData, loftData) >= GlassPaintedCoverMin;
++	if (!bigPane && !smallPaned && !painted)
 +	{
 +		return false;
 +	}
@@ -55901,7 +55968,17 @@ index 000000000..fb2b9a4ee
 +	// A pane of glass (see paneOfGlass): the voxels behind its pane are window glass, a smooth
 +	// see-through tint of what lies behind, its frame solid.
 +	std::vector<char> pane;
-+	const bool glassPane = wallArt && !cutout && paneOfGlass(mapData, sprite, artHoles, *loftData, getPalette(), pane); // (painted glass has no holes)
++	bool paintedPane = false;
++	const bool glassPane = wallArt && !cutout && paneOfGlass(mapData, sprite, artHoles, *loftData, getPalette(), pane, paintedPane); // (painted glass has no holes)
++	// On the game's own voxels a pane is glass only where its window is (see paneHoleSpans): the art
++	// round it (a shop's wall round its small window) stays solid. Painted glass has no holes: its
++	// whole pane is glass.
++	std::vector<char> windowGlass;
++	if (glassPane && !paintedPane)
++	{
++		paneHoleSpans(sprite, artHoles, windowGlass);
++	}
++	const std::vector<char> &glassPixels = paintedPane ? pane : windowGlass;
 +
 +	// Go through the tile's voxels, layer by layer from the bottom (z), row by row from the
 +	// north (y), west to east (x).
@@ -55970,7 +56047,7 @@ index 000000000..fb2b9a4ee
 +				{
 +					model.glass[z][y] |= (Uint16)(1 << x);
 +				}
-+				if (glassPane && spriteY >= 0 && spriteY < sprite->getHeight() && pane[spriteY * sprite->getWidth() + spriteX])
++				if (glassPane && spriteY >= 0 && spriteY < sprite->getHeight() && glassPixels[spriteY * sprite->getWidth() + spriteX])
 +				{
 +					model.glass[z][y] |= (Uint16)(1 << x);
 +				}

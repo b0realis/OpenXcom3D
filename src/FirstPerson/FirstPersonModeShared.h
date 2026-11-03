@@ -258,7 +258,7 @@ const double EdgeMargin = 5.0;
 const int NoclipReach = 2;
 /// The main menu's version (see FirstPerson::addMenuVersion): its small text's size, how far right of the title's
 /// "OpenXcom3D" it starts, and how far below the title's top, so its digits' feet sit on the big letters' feet.
-const int MenuVersionWidth = 40, MenuVersionHeight = 9, MenuVersionGap = 3, MenuVersionDrop = 3;
+const int MenuVersionWidth = 40, MenuVersionHeight = 9, MenuVersionGap = 3, MenuVersionDrop = 5;
 /// On the 3D VIEW tab's Controls, a key waiting to be rebound shows a "_" in its key's place, on and off this many
 /// milliseconds each (see OptionsFirstPersonState::think).
 const Uint32 KeyWaitBlinkTime = 400;
