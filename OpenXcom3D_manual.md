@@ -889,6 +889,8 @@ What `FirstPersonView` draws:
 
 ### 1.10 (not released yet)
 
+- **Painted glass** (the owner, of X-Com Files' market: "the building should have translucent windows all around"): a wall the game sees through (the map shows the room behind it) whose shape is a solid wall and whose art is mostly pale bluish glass with no see-through pixels, X-Com Files' standard glass panels and glass doors (its markets, offices, labs, prisons, bases), shows what's behind it as a pane of glass, its frame solid, where it showed an opaque panel. The game's shots stop on it, and so does the aim; units behind it stay hidden as on the map, which spots no one through it.
+
 - **Windows of small panes are glass too** (the owner, after GitHub issue #75: "glass by the game's rules"): a wall the game lets sight through, its art a window split by bars into small panes (a house's window in UFO, TFTD's port, X-Com Files' towns), shows a pane of glass where it showed an open hole; and every pane's openings in the game's shape are glass, so a pane is even, not striped. Where the game's shape is open (its rounds and sight go through), that glass is a look only: the aim goes through it to what's behind. Walls the game doesn't see through (the shops' beige walls, white panels and glass doors in X-Com Files' towns) stay solid, as on the map. A glass door swinging open shows its panes again (they had swung as a grey slab since #75).
 
 - **A mod's mana on the 3D panel** (a player, GitHub issue #77: XPiratez's freshness, X-Com Files' sanity): where the map shows the mana bar, the 3D info panel shows it too, a thin bar under the stats as on the map (the soldier card left as it was).

@@ -579,6 +579,35 @@ float wallShapeCover(const MapData *mapData, const std::vector<Uint16> &loftData
 }
 
 /**
+ * Is most of a sprite's art pale bluish glass (see GlassPaintedPaleMin): its drawn pixels' colours
+ * light in every channel, no warmer than a touch, and nearly grey or lilac?
+ * @param sprite The sprite (palette colours, 0 transparent).
+ * @param palette The battlescape's palette.
+ * @return True if it is.
+ */
+bool paintedGlass(const Surface *sprite, const SDL_Color *palette)
+{
+	if (!palette)
+	{
+		return false;
+	}
+	int drawn = 0, pale = 0;
+	for (int y = 0; y < sprite->getHeight(); ++y)
+	{
+		for (int x = 0; x < sprite->getWidth(); ++x)
+		{
+			const Uint8 color = sprite->getPixel(x, y);
+			if (!color) continue;
+			++drawn;
+			const SDL_Color &rgb = palette[color];
+			const int lowest = std::min({ (int)rgb.r, (int)rgb.g, (int)rgb.b }), highest = std::max({ (int)rgb.r, (int)rgb.g, (int)rgb.b });
+			if (lowest >= GlassPaleMinChannel && rgb.b + GlassPaleBlueSlack >= rgb.r && highest - lowest <= GlassPaleSpread) ++pale;
+		}
+	}
+	return drawn > 0 && pale >= GlassPaintedPaleMin * drawn;
+}
+
+/**
  * Is a wall a pane of glass (a shop's window, a glass wall)? The game lets sight through it (it
  * doesn't block the view, though its voxels stop shots), and its art is a frame round a big
  * see-through area (holes of at least GlassPaneMinPixels joined together; a fence's gaps and a
@@ -588,16 +617,21 @@ float wallShapeCover(const MapData *mapData, const std::vector<Uint16> &loftData
  * GlassWallCoverMin of its plane, not a post or a railing; the owner, after GitHub issue #75:
  * "glass by the game's rules"). Its pane is everything inside the frame: the holes and what the
  * art draws among them (glints, streaks, bars), not the frame itself (the drawn pixels next to the
- * transparent ones outside it, or on the sprite's edge). A player, GitHub issue #75: X-Com Files'
- * shop windows were opaque; the owner: "just a smooth see-through pane".
+ * transparent ones outside it, or on the sprite's edge). Or its glass is painted (no holes) on a
+ * solid shape the game sees through: most of its art pale bluish glass, its shape a whole wall (see
+ * GlassPaintedPaleMin; X-Com Files' panels and glass doors, the market's: the map shows the room
+ * behind them). A player, GitHub issue #75: X-Com Files' shop windows were opaque; the owner:
+ * "just a smooth see-through pane".
  * @param mapData The record.
  * @param sprite Its sprite frame.
  * @param holes Its art's holes (see findArtHoles).
  * @param loftData The LOFT templates (the wall's shape).
+ * @param palette The battlescape's palette (for painted glass's colours).
  * @param pane Gets one entry per pixel, row by row: 1 inside the pane.
  * @return True if it's a pane of glass.
  */
-bool paneOfGlass(const MapData *mapData, const Surface *sprite, const std::vector<char> &holes, const std::vector<Uint16> &loftData, std::vector<char> &pane)
+bool paneOfGlass(const MapData *mapData, const Surface *sprite, const std::vector<char> &holes, const std::vector<Uint16> &loftData, const SDL_Color *palette,
+	std::vector<char> &pane)
 {
 	if ((mapData->getObjectType() != O_WESTWALL && mapData->getObjectType() != O_NORTHWALL) || mapData->getBlock(DT_NONE) != 0)
 	{
@@ -635,7 +669,7 @@ bool paneOfGlass(const MapData *mapData, const Surface *sprite, const std::vecto
 	}
 	const bool bigPane = biggest >= GlassPaneMinPixels;
 	const bool smallPaned = smallPanes >= GlassPaneMinPixels && tinyPatches <= GlassMeshPatchesMax && wallShapeCover(mapData, loftData) >= GlassWallCoverMin;
-	if (!bigPane && !smallPaned)
+	if (!bigPane && !smallPaned && !(biggest < GlassSmallPaneMin && paintedGlass(sprite, palette) && wallShapeCover(mapData, loftData) >= GlassPaintedCoverMin))
 	{
 		return false;
 	}
@@ -2039,12 +2073,13 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	// findArtHoles): the voxels behind them are seen through. Not a UFO's walls, whose art's
 	// holes are painted over (see findHollowPixels), nor objects (big things drawn tile by tile).
 	std::vector<char> artHoles;
-	const bool hasArtHoles = (mapData->getObjectType() == O_WESTWALL || mapData->getObjectType() == O_NORTHWALL) && !hasHollows
-		&& !_ufoDataSets.count(dataSet->getName()) && findArtHoles(sprite, artHoles);
+	const bool wallArt = (mapData->getObjectType() == O_WESTWALL || mapData->getObjectType() == O_NORTHWALL) && !hasHollows
+		&& !_ufoDataSets.count(dataSet->getName());
+	const bool hasArtHoles = wallArt && findArtHoles(sprite, artHoles); // (the holes, none or some, are found for any such wall)
 	// A pane of glass (see paneOfGlass): the voxels behind its pane are window glass, a smooth
 	// see-through tint of what lies behind, its frame solid.
 	std::vector<char> pane;
-	const bool glassPane = hasArtHoles && !cutout && paneOfGlass(mapData, sprite, artHoles, *loftData, pane);
+	const bool glassPane = wallArt && !cutout && paneOfGlass(mapData, sprite, artHoles, *loftData, getPalette(), pane); // (painted glass has no holes)
 
 	// Go through the tile's voxels, layer by layer from the bottom (z), row by row from the
 	// north (y), west to east (x).

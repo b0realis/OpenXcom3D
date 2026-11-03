@@ -162,6 +162,14 @@ const int GlassPaneMinPixels = 40, BrokenPaneEdgeMin = 1, BrokenPaneEdgeExtra = 
 /// smaller than that (a fence's mesh has many more), on a wall whose shape covers at least GlassWallCoverMin of its plane.
 const int GlassSmallPaneMin = 10, GlassMeshPatchesMax = 6;
 const float GlassWallCoverMin = 0.5f;
+/// A pane of painted glass (see paneOfGlass; the owner, of X-Com Files' market: its pale panels let the map see through,
+/// "the building should have translucent windows all around"): a wall the game sees through whose shape is solid
+/// (covering at least GlassPaintedCoverMin of its plane) and whose art, with no pane-sized hole, is at least
+/// GlassPaintedPaleMin pale bluish glass: colours no darker than GlassPaleMinChannel in any channel, their blue no more
+/// than GlassPaleBlueSlack under their red, their channels within GlassPaleSpread of each other (cave rock, wood, a
+/// decorated wall or a craft's hull is far less).
+const float GlassPaintedCoverMin = 0.9f, GlassPaintedPaleMin = 0.5f;
+const int GlassPaleMinChannel = 150, GlassPaleBlueSlack = 8, GlassPaleSpread = 70;
 const Uint32 HitFlinchTime = 220;
 const float HitFlashShade = 6.0f;
 const float BodySprayHeight = 4.0f;
