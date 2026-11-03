@@ -124,7 +124,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..3d24708f7
+index 000000000..0a276f562
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,467 @@
@@ -318,7 +318,7 @@ index 000000000..3d24708f7
 +  STR_FPS_FPS_STYLE: "FPS-style shooting (easier)"
 +  STR_FPS_DUAL_WIELD: "Full akimbo"
 +  STR_FPS_AKIMBO: "Akimbo"
-+  STR_FPS_AKIMBO_DESC: "A gun in each hand fires both, each 30% less accurate. Full: any two guns; One-hand: one-handed only. Y switches it."
++  STR_FPS_AKIMBO_DESC: "A gun in each hand fires both, each 20% less accurate. Full: any two guns; One-hand: one-handed only. Y switches it."
 +  STR_FPS_AKIMBO_CHOICE_OFF: "Off"
 +  STR_FPS_AKIMBO_CHOICE_FULL: "Full"
 +  STR_FPS_AKIMBO_CHOICE_REALISTIC: "One-hand"
@@ -597,7 +597,7 @@ index 000000000..3d24708f7
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..41058b2b9
+index 000000000..e6c2140cd
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,467 @@
@@ -791,7 +791,7 @@ index 000000000..41058b2b9
 +  STR_FPS_FPS_STYLE: "FPS-style shooting (easier)"
 +  STR_FPS_DUAL_WIELD: "Full akimbo"
 +  STR_FPS_AKIMBO: "Akimbo"
-+  STR_FPS_AKIMBO_DESC: "A gun in each hand fires both, each 30% less accurate. Full: any two guns; One-hand: one-handed only. Y switches it."
++  STR_FPS_AKIMBO_DESC: "A gun in each hand fires both, each 20% less accurate. Full: any two guns; One-hand: one-handed only. Y switches it."
 +  STR_FPS_AKIMBO_CHOICE_OFF: "Off"
 +  STR_FPS_AKIMBO_CHOICE_FULL: "Full"
 +  STR_FPS_AKIMBO_CHOICE_REALISTIC: "One-hand"
@@ -23027,10 +23027,10 @@ index 000000000..a57b75489
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..fd91583ad
+index 000000000..6055bc031
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,355 @@
+@@ -0,0 +1,357 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -23113,10 +23113,12 @@ index 000000000..fd91583ad
 +namespace FirstPerson
 +{
 +
-+/// Akimbo (dual wield): the share of its accuracy each gun keeps when both fire at once, a 30%
-+/// penalty (a player's report on 1.03; it was half). The game's shot and its pellets and the
-+/// other gun's round use it (ProjectileFlyBState), and the 3D view's spread and hit chance.
-+const double DualWieldAccuracy = 0.7;
++/// Akimbo (dual wield): the share of its accuracy each gun keeps when both fire at once, a 20%
++/// penalty (a player's report on 1.03: it was half, then 30%; a player, GitHub issue #87: it
++/// stacks with the game's two-handed penalty, the owner cut it to 20%). The game's shot and its
++/// pellets and the other gun's round use it (ProjectileFlyBState), and the 3D view's spread and
++/// hit chance.
++const double DualWieldAccuracy = 0.8;
 +/// Akimbo: two guns fired at once cost the dearer gun's shot and this share more (a player's report:
 +/// two identical guns cost twice one shot, at 30% less accuracy each; the owner's choice). The chosen
 +/// gun pays its own shot as the game charges it, the other gun the rest (dualWieldCharge). Guns that

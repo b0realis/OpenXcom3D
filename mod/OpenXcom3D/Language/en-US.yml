@@ -188,7 +188,7 @@ en-US:
   STR_FPS_FPS_STYLE: "FPS-style shooting (easier)"
   STR_FPS_DUAL_WIELD: "Full akimbo"
   STR_FPS_AKIMBO: "Akimbo"
-  STR_FPS_AKIMBO_DESC: "A gun in each hand fires both, each 30% less accurate. Full: any two guns; One-hand: one-handed only. Y switches it."
+  STR_FPS_AKIMBO_DESC: "A gun in each hand fires both, each 20% less accurate. Full: any two guns; One-hand: one-handed only. Y switches it."
   STR_FPS_AKIMBO_CHOICE_OFF: "Off"
   STR_FPS_AKIMBO_CHOICE_FULL: "Full"
   STR_FPS_AKIMBO_CHOICE_REALISTIC: "One-hand"

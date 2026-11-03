@@ -80,10 +80,12 @@ class Tile;
 namespace FirstPerson
 {
 
-/// Akimbo (dual wield): the share of its accuracy each gun keeps when both fire at once, a 30%
-/// penalty (a player's report on 1.03; it was half). The game's shot and its pellets and the
-/// other gun's round use it (ProjectileFlyBState), and the 3D view's spread and hit chance.
-const double DualWieldAccuracy = 0.7;
+/// Akimbo (dual wield): the share of its accuracy each gun keeps when both fire at once, a 20%
+/// penalty (a player's report on 1.03: it was half, then 30%; a player, GitHub issue #87: it
+/// stacks with the game's two-handed penalty, the owner cut it to 20%). The game's shot and its
+/// pellets and the other gun's round use it (ProjectileFlyBState), and the 3D view's spread and
+/// hit chance.
+const double DualWieldAccuracy = 0.8;
 /// Akimbo: two guns fired at once cost the dearer gun's shot and this share more (a player's report:
 /// two identical guns cost twice one shot, at 30% less accuracy each; the owner's choice). The chosen
 /// gun pays its own shot as the game charges it, the other gun the rest (dualWieldCharge). Guns that
