@@ -758,6 +758,8 @@ private:
 	void launchShot(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, const Position &targetTile, const Position &aimedVoxel, bool hitSomething, BattleItem *otherWeapon, BattleActionType otherMode);
 	/// The fire modes the left mouse button can use with an item, in wheel order.
 	std::vector<BattleActionType> fireModesFor(BattleUnit *unit, BattleItem *weapon) const;
+	/// The mode an item starts on: a gun's snap shot where it has one, else the first (of the shots only, if asked).
+	static BattleActionType startingMode(const std::vector<BattleActionType> &modes, bool shotsOnly);
 	/// Keeps the fire mode valid for the weapon in hand.
 	void updateFireMode(BattleUnit *unit);
 	/// Switches to the next or previous fire mode.

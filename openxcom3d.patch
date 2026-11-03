@@ -26203,10 +26203,10 @@ index 000000000..bfafdd9ce
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..876415f7c
+index 000000000..06d208023
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1224 @@
+@@ -0,0 +1,1226 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -26967,6 +26967,8 @@ index 000000000..876415f7c
 +	void launchShot(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, const Position &targetTile, const Position &aimedVoxel, bool hitSomething, BattleItem *otherWeapon, BattleActionType otherMode);
 +	/// The fire modes the left mouse button can use with an item, in wheel order.
 +	std::vector<BattleActionType> fireModesFor(BattleUnit *unit, BattleItem *weapon) const;
++	/// The mode an item starts on: a gun's snap shot where it has one, else the first (of the shots only, if asked).
++	static BattleActionType startingMode(const std::vector<BattleActionType> &modes, bool shotsOnly);
 +	/// Keeps the fire mode valid for the weapon in hand.
 +	void updateFireMode(BattleUnit *unit);
 +	/// Switches to the next or previous fire mode.
@@ -33111,10 +33113,10 @@ index 000000000..399453615
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..1f4886b78
+index 000000000..9ee29c81e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,4720 @@
+@@ -0,0 +1,4737 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -33801,10 +33803,7 @@ index 000000000..1f4886b78
 +	}
 +	else
 +	{
-+		for (BattleActionType candidate : otherModes)
-+		{
-+			if (isShot(candidate)) { partnerMode = candidate; break; }
-+		}
++		partnerMode = startingMode(otherModes, true);
 +	}
 +	if (partnerMode == BA_NONE || otherWeapon->getArcingShot(partnerMode) || !otherWeapon->getAmmoForAction(partnerMode))
 +	{
@@ -33961,7 +33960,8 @@ index 000000000..1f4886b78
 +		return nullptr;
 +	}
 +
-+	// Pick the other gun's mode: the same as the chosen gun's if it has it, else its first shot.
++	// Pick the other gun's mode: the same as the chosen gun's if it has it, else its starting
++	// shot (its snap, see startingMode).
 +	const std::vector<BattleActionType> otherModes = fireModesFor(unit, otherWeapon);
 +	BattleActionType pickedMode = BA_NONE;
 +	if (std::find(otherModes.begin(), otherModes.end(), mode) != otherModes.end())
@@ -33970,10 +33970,7 @@ index 000000000..1f4886b78
 +	}
 +	else
 +	{
-+		for (BattleActionType candidate : otherModes)
-+		{
-+			if (isShot(candidate)) { pickedMode = candidate; break; }
-+		}
++		pickedMode = startingMode(otherModes, true);
 +	}
 +	if (pickedMode == BA_NONE)
 +	{
@@ -33993,9 +33990,11 @@ index 000000000..1f4886b78
 +
 +/**
 + * Lists what the left mouse button can do with an item, in the order the mouse wheel cycles
-+ * through them. It mirrors the game's own action menu (ActionMenuState): the same actions
-+ * under the same conditions, so the 3D view offers nothing the game wouldn't. (Unpriming and
-+ * the mana requirement some mods use are not mirrored.)
++ * through them: a gun's shots from quantity to quality, auto, snap, aimed (a player, GitHub
++ * issue #71: aimed in the middle confused), a gun starting on snap (see startingMode). It
++ * mirrors the game's own action menu (ActionMenuState): the same actions under the same
++ * conditions, so the 3D view offers nothing the game wouldn't. (Unpriming and the mana
++ * requirement some mods use are not mirrored.)
 + * @param unit The soldier holding the item.
 + * @param weapon The item (null gives an empty list).
 + * @return The fire modes (actions) in menu order.
@@ -34021,9 +34020,9 @@ index 000000000..1f4886b78
 +		{
 +			const bool isLauncher = weapon->getCurrentWaypoints() != 0;
 +			const int launchAmmoSlot = weapon->getActionConf(BA_LAUNCH)->ammoSlot;
++			if ((!isLauncher || launchAmmoSlot != weapon->getActionConf(BA_AUTOSHOT)->ammoSlot) && rules->getCostAuto().Time > 0) modes.push_back(BA_AUTOSHOT);
 +			if ((!isLauncher || launchAmmoSlot != weapon->getActionConf(BA_SNAPSHOT)->ammoSlot) && rules->getCostSnap().Time > 0) modes.push_back(BA_SNAPSHOT);
 +			if (!isLauncher && rules->getCostAimed().Time > 0 && !offHandWeapon(unit, weapon)) modes.push_back(BA_AIMEDSHOT);
-+			if ((!isLauncher || launchAmmoSlot != weapon->getActionConf(BA_AUTOSHOT)->ammoSlot) && rules->getCostAuto().Time > 0) modes.push_back(BA_AUTOSHOT);
 +			if (isLauncher) modes.push_back(BA_LAUNCH);
 +		}
 +
@@ -34057,6 +34056,26 @@ index 000000000..1f4886b78
 +}
 +
 +/**
++ * The mode an item starts on (see fireModesFor): a gun's snap shot, in the middle of its shots
++ * (one wheel notch to aimed, one to auto), where it has one; else the first.
++ * @param modes The item's modes (see fireModesFor).
++ * @param shotsOnly Only shots count (the other gun's in akimbo): none gives BA_NONE.
++ * @return The mode.
++ */
++BattleActionType FirstPersonMode::startingMode(const std::vector<BattleActionType> &modes, bool shotsOnly)
++{
++	if (std::find(modes.begin(), modes.end(), BA_SNAPSHOT) != modes.end())
++	{
++		return BA_SNAPSHOT;
++	}
++	for (BattleActionType mode : modes)
++	{
++		if (!shotsOnly || isShot(mode)) return mode;
++	}
++	return BA_NONE;
++}
++
++/**
 + * Keeps the fire mode valid for the weapon in hand, every frame of the player's turn. A fire
 + * mode picked on the classic HUD (its weapon buttons and action menu) is taken over, hand and
 + * all; otherwise a new weapon, or a mode the weapon no longer has, falls back to its first mode.
@@ -34078,12 +34097,12 @@ index 000000000..1f4886b78
 +	}
 +
 +	// Otherwise keep the mode while the weapon has it; a different weapon, or a mode that's
-+	// gone (a grenade just primed, say), starts again at the weapon's first mode.
++	// gone (a grenade just primed, say), starts again at the weapon's starting mode (a gun's snap).
 +	BattleItem *weapon = activeWeapon(unit);
 +	const std::vector<BattleActionType> modes = fireModesFor(unit, weapon);
 +	if (weapon != _fireModeWeapon || std::find(modes.begin(), modes.end(), _fireMode) == modes.end())
 +	{
-+		_fireMode = modes.empty() ? BA_NONE : modes.front();
++		_fireMode = startingMode(modes, false);
 +		_fireModeWeapon = weapon;
 +	}
 +}

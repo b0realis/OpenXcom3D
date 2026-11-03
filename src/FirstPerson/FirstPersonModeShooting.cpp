@@ -684,10 +684,7 @@ BattleItem *FirstPersonMode::mapAkimboPartner(BattleUnit *unit, const BattleItem
 	}
 	else
 	{
-		for (BattleActionType candidate : otherModes)
-		{
-			if (isShot(candidate)) { partnerMode = candidate; break; }
-		}
+		partnerMode = startingMode(otherModes, true);
 	}
 	if (partnerMode == BA_NONE || otherWeapon->getArcingShot(partnerMode) || !otherWeapon->getAmmoForAction(partnerMode))
 	{
@@ -844,7 +841,8 @@ BattleItem *FirstPersonMode::dualPartner(BattleUnit *unit, const BattleItem *wea
 		return nullptr;
 	}
 
-	// Pick the other gun's mode: the same as the chosen gun's if it has it, else its first shot.
+	// Pick the other gun's mode: the same as the chosen gun's if it has it, else its starting
+	// shot (its snap, see startingMode).
 	const std::vector<BattleActionType> otherModes = fireModesFor(unit, otherWeapon);
 	BattleActionType pickedMode = BA_NONE;
 	if (std::find(otherModes.begin(), otherModes.end(), mode) != otherModes.end())
@@ -853,10 +851,7 @@ BattleItem *FirstPersonMode::dualPartner(BattleUnit *unit, const BattleItem *wea
 	}
 	else
 	{
-		for (BattleActionType candidate : otherModes)
-		{
-			if (isShot(candidate)) { pickedMode = candidate; break; }
-		}
+		pickedMode = startingMode(otherModes, true);
 	}
 	if (pickedMode == BA_NONE)
 	{
@@ -876,9 +871,11 @@ BattleItem *FirstPersonMode::dualPartner(BattleUnit *unit, const BattleItem *wea
 
 /**
  * Lists what the left mouse button can do with an item, in the order the mouse wheel cycles
- * through them. It mirrors the game's own action menu (ActionMenuState): the same actions
- * under the same conditions, so the 3D view offers nothing the game wouldn't. (Unpriming and
- * the mana requirement some mods use are not mirrored.)
+ * through them: a gun's shots from quantity to quality, auto, snap, aimed (a player, GitHub
+ * issue #71: aimed in the middle confused), a gun starting on snap (see startingMode). It
+ * mirrors the game's own action menu (ActionMenuState): the same actions under the same
+ * conditions, so the 3D view offers nothing the game wouldn't. (Unpriming and the mana
+ * requirement some mods use are not mirrored.)
  * @param unit The soldier holding the item.
  * @param weapon The item (null gives an empty list).
  * @return The fire modes (actions) in menu order.
@@ -904,9 +901,9 @@ std::vector<BattleActionType> FirstPersonMode::fireModesFor(BattleUnit *unit, Ba
 		{
 			const bool isLauncher = weapon->getCurrentWaypoints() != 0;
 			const int launchAmmoSlot = weapon->getActionConf(BA_LAUNCH)->ammoSlot;
+			if ((!isLauncher || launchAmmoSlot != weapon->getActionConf(BA_AUTOSHOT)->ammoSlot) && rules->getCostAuto().Time > 0) modes.push_back(BA_AUTOSHOT);
 			if ((!isLauncher || launchAmmoSlot != weapon->getActionConf(BA_SNAPSHOT)->ammoSlot) && rules->getCostSnap().Time > 0) modes.push_back(BA_SNAPSHOT);
 			if (!isLauncher && rules->getCostAimed().Time > 0 && !offHandWeapon(unit, weapon)) modes.push_back(BA_AIMEDSHOT);
-			if ((!isLauncher || launchAmmoSlot != weapon->getActionConf(BA_AUTOSHOT)->ammoSlot) && rules->getCostAuto().Time > 0) modes.push_back(BA_AUTOSHOT);
 			if (isLauncher) modes.push_back(BA_LAUNCH);
 		}
 
@@ -940,6 +937,26 @@ std::vector<BattleActionType> FirstPersonMode::fireModesFor(BattleUnit *unit, Ba
 }
 
 /**
+ * The mode an item starts on (see fireModesFor): a gun's snap shot, in the middle of its shots
+ * (one wheel notch to aimed, one to auto), where it has one; else the first.
+ * @param modes The item's modes (see fireModesFor).
+ * @param shotsOnly Only shots count (the other gun's in akimbo): none gives BA_NONE.
+ * @return The mode.
+ */
+BattleActionType FirstPersonMode::startingMode(const std::vector<BattleActionType> &modes, bool shotsOnly)
+{
+	if (std::find(modes.begin(), modes.end(), BA_SNAPSHOT) != modes.end())
+	{
+		return BA_SNAPSHOT;
+	}
+	for (BattleActionType mode : modes)
+	{
+		if (!shotsOnly || isShot(mode)) return mode;
+	}
+	return BA_NONE;
+}
+
+/**
  * Keeps the fire mode valid for the weapon in hand, every frame of the player's turn. A fire
  * mode picked on the classic HUD (its weapon buttons and action menu) is taken over, hand and
  * all; otherwise a new weapon, or a mode the weapon no longer has, falls back to its first mode.
@@ -961,12 +978,12 @@ void FirstPersonMode::updateFireMode(BattleUnit *unit)
 	}
 
 	// Otherwise keep the mode while the weapon has it; a different weapon, or a mode that's
-	// gone (a grenade just primed, say), starts again at the weapon's first mode.
+	// gone (a grenade just primed, say), starts again at the weapon's starting mode (a gun's snap).
 	BattleItem *weapon = activeWeapon(unit);
 	const std::vector<BattleActionType> modes = fireModesFor(unit, weapon);
 	if (weapon != _fireModeWeapon || std::find(modes.begin(), modes.end(), _fireMode) == modes.end())
 	{
-		_fireMode = modes.empty() ? BA_NONE : modes.front();
+		_fireMode = startingMode(modes, false);
 		_fireModeWeapon = weapon;
 	}
 }

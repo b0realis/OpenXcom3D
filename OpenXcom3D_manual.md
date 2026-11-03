@@ -271,7 +271,7 @@ All of these can be rebound in **Options → 3D VIEW → Controls**: click a key
 | **Ctrl+Shift + click** | With the auto shot of a spray weapon (`sprayWaypoints`, X-Com Files' miniguns): marks a spray burst's first point, the tile under the crosshair; each click after marks the next, and the last fires the burst along them, as on the map (a Ctrl+Shift+click fires early). The right button takes back the last point. The points show as light green poles with a mini target and their number. |
 | **Numpad 8 2 4 6** | One tile ahead, back, left or right, almost at once, like a step on the isometric map; two pressed together (8 and 4) a diagonal tile, as W and A make one (whatever the *Movement* setting; holding the key steps on, but stops at a closed door: press again to go through). **7 / 9**: snap turn 45° left / right |
 | **Left button** | Fire at the crosshair in the current fire mode |
-| **Wheel / J** | Previous / next fire mode (snap, aimed, auto, launch, melee, psi, use, throw, prime) |
+| **Wheel / J** | Previous / next fire mode (auto, snap, aimed, launch, melee, psi, use, throw, prime: a gun's shots from quantity to quality, a gun starting on snap, one notch from either) |
 | **Z / X / V** | Snap / aimed / auto shot |
 | **G** | Switch hand: the right hand, the left, and the built-in weapon (the classic HUD's SPECIAL, such as an armor's), in turn, each that gives something to use. The weapon moves to that side of the screen; with akimbo on, it picks which gun fires first. An empty hand gives the unit's empty-hand weapon, where a mod has one (fists, a claw: OXCE's `specialUseEmptyHand`); without one, G skips it, as an empty hand has nothing to use |
 | **Y** | Akimbo off, and back on to the kind the setting *Akimbo* says (Full or One-hand, see [Settings](#aiming-and-combat)); with the setting Off it does nothing; the warning line says which. It also marks the soldier's akimbo on the map, or clears it, so their map and reaction shots follow (see [Akimbo on the map](#akimbo-on-the-map)). The *Akimbo style* key (unbound unless you set one) switches two guns between taking turns round by round and both at once (*Akimbo volley*) |
@@ -887,6 +887,8 @@ What `FirstPersonView` draws:
 ## 11. Version history
 
 ### 1.10 (not released yet)
+
+- **The fire modes from quantity to quality** (a player, GitHub issue #71: "Aimed in the middle is confusing"): the wheel and J go auto, snap, aimed (then melee, throw, prime as before); a gun still starts on snap, so aimed is one notch down and auto one up.
 
 - **Akimbo 20% less accurate, not 30%** (a player, GitHub issue #87: the penalty stacks with the game's own for a two-handed gun, which made light two-handed guns unmanageable): each of two guns fired together keeps 80% of its accuracy (FPS style: the spread a quarter wider, not 1.4 times), in 3D and on the map.
 

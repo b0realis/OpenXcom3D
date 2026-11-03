@@ -52,7 +52,7 @@ KEYS = [
     ]),
     ('Fighting', [
         ('Left button', 'Fire at the crosshair in the current fire mode.', ''),
-        ('<kbd>Wheel</kbd> / <kbd>J</kbd>', 'Previous / next fire mode: snap, aimed, auto, launch, melee, psi, use, throw, prime.', ''),
+        ('<kbd>Wheel</kbd> / <kbd>J</kbd>', 'Previous / next fire mode: auto, snap, aimed, launch, melee, psi, use, throw, prime.', 'A gun starts on snap: aimed one notch down, auto one up.'),
         ('<kbd>Z</kbd> <kbd>X</kbd> <kbd>V</kbd>', 'Snap / aimed / auto shot.', 'In FPS style: snap = one round from the hip, aimed = one tight round, auto = a burst, hold the trigger for more.'),
         ('<kbd>G</kbd>', 'Switch hand: right, left, and the built-in weapon, each that gives something to use.', ''),
         ('<kbd>Y</kbd>', 'Akimbo off, and back on to the kind the setting <i>Akimbo</i> says (Full or One-hand); with the setting Off it does nothing. It marks the soldier\'s akimbo on the map along with it.', 'Two guns: more rounds, each 20% less accurate. Off to take an aimed shot. Reaction shots fire both guns too.'),
