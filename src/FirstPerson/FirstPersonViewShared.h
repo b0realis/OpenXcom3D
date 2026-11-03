@@ -157,6 +157,11 @@ const int UfoSiteDamageMax = 1;
 /// gaps and a chain-link mesh are smaller). Broken, its edges stay: a band BrokenPaneEdgeMin to BrokenPaneEdgeMin +
 /// BrokenPaneEdgeExtra voxels wide round the inside of its frame (see FirstPersonView::addBrokenPaneEdges).
 const int GlassPaneMinPixels = 40, BrokenPaneEdgeMin = 1, BrokenPaneEdgeExtra = 2;
+/// A window of small panes (see paneOfGlass; GitHub issue #75's follow-up: a house's window split by bars): its art's hole
+/// patches of at least GlassSmallPaneMin pixels add up to GlassPaneMinPixels, with at most GlassMeshPatchesMax patches
+/// smaller than that (a fence's mesh has many more), on a wall whose shape covers at least GlassWallCoverMin of its plane.
+const int GlassSmallPaneMin = 10, GlassMeshPatchesMax = 6;
+const float GlassWallCoverMin = 0.5f;
 const Uint32 HitFlinchTime = 220;
 const float HitFlashShade = 6.0f;
 const float BodySprayHeight = 4.0f;

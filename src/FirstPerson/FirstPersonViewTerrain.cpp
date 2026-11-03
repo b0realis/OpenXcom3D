@@ -222,6 +222,7 @@ void clearModel(FirstPersonView::VoxelModel &model)
 	// Every colour 0 (empty) and every glass and hole bit off.
 	std::fill(&model.color[0][0][0], &model.color[0][0][0] + sizeof(model.color), (Uint8)0);
 	std::fill(&model.glass[0][0], &model.glass[0][0] + 24 * 16, (Uint16)0);
+	std::fill(&model.lookOnly[0][0], &model.lookOnly[0][0] + 24 * 16, (Uint16)0);
 	std::fill(&model.clear[0][0], &model.clear[0][0] + 24 * 16, (Uint16)0);
 
 	// No light source found yet.
@@ -549,29 +550,64 @@ bool findArtHoles(const Surface *sprite, std::vector<char> &holes)
 }
 
 /**
+ * How much of its plane a wall's shape (the game's voxels) covers: the share of the plane's
+ * cells, along the wall by its height (16 by 24), that have a voxel in any of its rows across.
+ * @param mapData The wall's record.
+ * @param loftData The LOFT templates.
+ * @return The share, 0..1.
+ */
+float wallShapeCover(const MapData *mapData, const std::vector<Uint16> &loftData)
+{
+	const bool westWall = mapData->getObjectType() == O_WESTWALL;
+	int covered = 0;
+	for (int z = 0; z < Position::TileZ; ++z)
+	{
+		const size_t loftStart = mapData->getLoftID(z / 2) * 16;
+		if (loftStart + 16 > loftData.size()) continue;
+		for (int along = 0; along < Position::TileXY; ++along)
+		{
+			bool any = false;
+			for (int across = 0; across < Position::TileXY && !any; ++across)
+			{
+				const int x = westWall ? across : along, y = westWall ? along : across;
+				any = (loftData[loftStart + y] >> (15 - x)) & 1;
+			}
+			covered += any ? 1 : 0;
+		}
+	}
+	return covered / (float)(Position::TileZ * Position::TileXY);
+}
+
+/**
  * Is a wall a pane of glass (a shop's window, a glass wall)? The game lets sight through it (it
  * doesn't block the view, though its voxels stop shots), and its art is a frame round a big
  * see-through area (holes of at least GlassPaneMinPixels joined together; a fence's gaps and a
- * chain-link mesh are smaller). Its pane is everything inside the frame: the holes and what the
- * art draws among them (glints, streaks), not the frame itself (the drawn pixels next to the
+ * chain-link mesh are smaller), or round a window of small panes (a house's window split by
+ * bars: patches of at least GlassSmallPaneMin pixels adding up to GlassPaneMinPixels, with at most
+ * GlassMeshPatchesMax smaller ones, a mesh having many more, on a wall whose shape covers at least
+ * GlassWallCoverMin of its plane, not a post or a railing; the owner, after GitHub issue #75:
+ * "glass by the game's rules"). Its pane is everything inside the frame: the holes and what the
+ * art draws among them (glints, streaks, bars), not the frame itself (the drawn pixels next to the
  * transparent ones outside it, or on the sprite's edge). A player, GitHub issue #75: X-Com Files'
  * shop windows were opaque; the owner: "just a smooth see-through pane".
  * @param mapData The record.
  * @param sprite Its sprite frame.
  * @param holes Its art's holes (see findArtHoles).
+ * @param loftData The LOFT templates (the wall's shape).
  * @param pane Gets one entry per pixel, row by row: 1 inside the pane.
  * @return True if it's a pane of glass.
  */
-bool paneOfGlass(const MapData *mapData, const Surface *sprite, const std::vector<char> &holes, std::vector<char> &pane)
+bool paneOfGlass(const MapData *mapData, const Surface *sprite, const std::vector<char> &holes, const std::vector<Uint16> &loftData, std::vector<char> &pane)
 {
 	if ((mapData->getObjectType() != O_WESTWALL && mapData->getObjectType() != O_NORTHWALL) || mapData->getBlock(DT_NONE) != 0)
 	{
 		return false;
 	}
-	// The biggest patch of holes joined together.
+	// The patches of holes joined together: the biggest, the small panes' total and how many
+	// tiny ones (a mesh's).
 	const int width = sprite->getWidth(), height = sprite->getHeight();
 	std::vector<char> seen(width * height, 0);
-	int biggest = 0;
+	int biggest = 0, smallPanes = 0, tinyPatches = 0;
 	for (int start = 0; start < width * height; ++start)
 	{
 		if (!holes[start] || seen[start]) continue;
@@ -595,8 +631,11 @@ bool paneOfGlass(const MapData *mapData, const Surface *sprite, const std::vecto
 			}
 		}
 		biggest = std::max(biggest, size);
+		if (size >= GlassSmallPaneMin) smallPanes += size; else ++tinyPatches;
 	}
-	if (biggest < GlassPaneMinPixels)
+	const bool bigPane = biggest >= GlassPaneMinPixels;
+	const bool smallPaned = smallPanes >= GlassPaneMinPixels && tinyPatches <= GlassMeshPatchesMax && wallShapeCover(mapData, loftData) >= GlassWallCoverMin;
+	if (!bigPane && !smallPaned)
 	{
 		return false;
 	}
@@ -2005,7 +2044,7 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	// A pane of glass (see paneOfGlass): the voxels behind its pane are window glass, a smooth
 	// see-through tint of what lies behind, its frame solid.
 	std::vector<char> pane;
-	const bool glassPane = hasArtHoles && !cutout && paneOfGlass(mapData, sprite, artHoles, pane);
+	const bool glassPane = hasArtHoles && !cutout && paneOfGlass(mapData, sprite, artHoles, *loftData, pane);
 
 	// Go through the tile's voxels, layer by layer from the bottom (z), row by row from the
 	// north (y), west to east (x).
@@ -2091,6 +2130,13 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 				}
 			}
 		}
+	}
+
+	// A pane's openings in the game's shape (a house's window has no voxels where its glass is:
+	// sight and shots go through) filled with glass too, a look only (see fillPaneOpenings).
+	if (glassPane)
+	{
+		fillPaneOpenings(mapData, sprite, pane, fallbackColor, model);
 	}
 
 	// What a pane of glass breaks into: its edges stay in the frame (see addBrokenPaneEdges).
@@ -2197,6 +2243,68 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 }
 
 /**
+ * Fills a pane of glass's openings with glass: where the game's shape has no voxel across the
+ * wall (a house's window, whose glass the game leaves open, so sight and shots go through) and
+ * the art there is inside the pane (see paneOfGlass), glass voxels in the wall's own rows, so the
+ * window shows a pane, not a hole (the owner, after GitHub issue #75: "glass by the game's
+ * rules"). They're a look only (VoxelModel::lookOnly): the aim goes through them as the game's
+ * rounds do, and they don't break into shards (see addBrokenPaneEdges).
+ * @param mapData The wall's record.
+ * @param sprite Its sprite frame.
+ * @param pane Its pane (see paneOfGlass).
+ * @param fallbackColor A colour for a voxel over a hole in the art (glass is drawn by the tint of
+ *        what's behind it, not its colour).
+ * @param model Its model, its own voxels already in.
+ */
+void FirstPersonView::fillPaneOpenings(const MapData *mapData, const Surface *sprite, const std::vector<char> &pane, Uint8 fallbackColor, VoxelModel &model) const
+{
+	if (model.empty)
+	{
+		return;
+	}
+	// The wall's rows across it: y for a north wall, x for a west wall (the ones its voxels are in).
+	const bool westWall = mapData->getObjectType() == O_WESTWALL;
+	Uint16 rows = 0;
+	for (int z = 0; z < Position::TileZ; ++z)
+		for (int y = 0; y < Position::TileXY; ++y)
+			for (int x = 0; x < Position::TileXY; ++x)
+				if (model.color[z][y][x]) rows |= (Uint16)(1 << (westWall ? x : y));
+	const int width = sprite->getWidth(), height = sprite->getHeight(), yOffset = mapData->getYOffset();
+	for (int z = 0; z < Position::TileZ; ++z)
+	{
+		for (int along = 0; along < Position::TileXY; ++along)
+		{
+			// Only where the wall has no voxel at all across it.
+			bool solid = false;
+			for (int across = 0; across < Position::TileXY && !solid; ++across)
+			{
+				solid = model.color[z][westWall ? along : across][westWall ? across : along] != 0;
+			}
+			if (solid) continue;
+			for (int across = 0; across < Position::TileXY; ++across)
+			{
+				if (!((rows >> across) & 1)) continue;
+				const int x = westWall ? across : along, y = westWall ? along : across;
+				// Where the voxel lands in the art (as in buildModel): inside the pane?
+				const int spriteX = std::clamp(16 + x - y, 0, width - 1);
+				const int spriteY = 24 + (x + y) / 2 - z + yOffset;
+				if (spriteY < 0 || spriteY >= height || !pane[spriteY * width + spriteX]) continue;
+				const Uint8 color = sprite->getPixel(spriteX, spriteY);
+				model.color[z][y][x] = color ? color : fallbackColor;
+				model.glass[z][y] |= (Uint16)(1 << x);
+				model.lookOnly[z][y] |= (Uint16)(1 << x);
+				const int voxel[3] = { x, y, z };
+				for (int axis = 0; axis < 3; ++axis)
+				{
+					model.min[axis] = std::min<int>(model.min[axis], voxel[axis]);
+					model.max[axis] = std::max<int>(model.max[axis], voxel[axis]);
+				}
+			}
+		}
+	}
+}
+
+/**
  * The record a pane of glass turns into when broken (its "die" record, see paneOfGlass) keeps
  * the pane's edges: a jagged band of glass, one to three voxels wide, all round the inside of the
  * frame (and the frame itself), solid, as shards left standing; the middle is open (the owner,
@@ -2245,7 +2353,7 @@ void FirstPersonView::addBrokenPaneEdges(const MapData *mapData, VoxelModel &mod
 				for (int x = 0; x < Position::TileXY; ++x)
 				{
 					const Uint8 color = paneModel->color[z][y][x];
-					if (!color || model.color[z][y][x]) continue;
+					if (!color || model.color[z][y][x] || ((paneModel->lookOnly[z][y] >> x) & 1)) continue; // (glass filled into an opening isn't the game's: no shards)
 					if ((paneModel->glass[z][y] >> x) & 1)
 					{
 						const int along = westWall ? y : x;

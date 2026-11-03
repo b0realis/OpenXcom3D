@@ -167,14 +167,17 @@ inline bool traceSwing(const FirstPersonView::DoorSwing &door, const float rayOr
 
 	// The voxel of the closed door at that point (its first two layers, the door leaf); its gaps let
 	// the ray through, and so do its panes, the voxels behind a hole in its art (a glass door's, see
-	// findArtHoles), as they do while it's shut (a player's report: the gas station's glass door
-	// went solid while it swung open).
+	// findArtHoles) or its glass (a pane of glass's, see paneOfGlass: since GitHub issue #75 a glass
+	// door's holes are glass), as they do while it's shut (a player's report: the gas station's glass
+	// door went solid while it swung open).
 	const int alongVoxel = std::clamp((int)(originAlong + directionAlong * entry) + 1, 0, 15);
 	const int heightVoxel = std::clamp((int)(rayOrigin[2] + rayDirection[2] * entry - door.z0) + door.model->min[2], 0, 23);
 	Uint8 color = 0;
 	for (int layer = 0; layer < 2 && !color; ++layer)
 	{
-		const bool pane = door.westWall ? (door.model->clear[heightVoxel][alongVoxel] >> layer) & 1 : (door.model->clear[heightVoxel][layer] >> alongVoxel) & 1;
+		const Uint16 seenThrough[2] = { door.model->clear[heightVoxel][door.westWall ? alongVoxel : layer], door.model->glass[heightVoxel][door.westWall ? alongVoxel : layer] };
+		const int bit = door.westWall ? layer : alongVoxel;
+		const bool pane = ((seenThrough[0] | seenThrough[1]) >> bit) & 1;
 		if (pane) continue;
 		color = door.westWall ? door.model->color[heightVoxel][alongVoxel][layer] : door.model->color[heightVoxel][layer][alongVoxel];
 	}
@@ -403,8 +406,12 @@ inline bool traceTile(const FirstPersonView::TileView &tileView, const FirstPers
 				}
 				if (model->glass[localZ][localY] & (1 << localX))
 				{
-					hit.glass = true; // window glass: tint what's behind it
-					if (!glassStops) continue; // (or the aim stops on it: see RayContext::glassStops)
+					// Window glass: tint what's behind it (or the aim stops on it: see RayContext::glassStops),
+					// but glass filled into an opening of the game's shape is a look only: the aim goes through
+					// it, as the game's rounds do (see FirstPersonView::fillPaneOpenings).
+					const bool lookOnly = (model->lookOnly[localZ][localY] >> localX) & 1;
+					if (!(glassStops && lookOnly)) hit.glass = true;
+					if (!glassStops || lookOnly) continue;
 				}
 				if (model->clear[localZ][localY] & (1 << localX))
 				{

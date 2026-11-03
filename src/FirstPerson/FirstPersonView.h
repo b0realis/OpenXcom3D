@@ -142,6 +142,7 @@ public:
 	{
 		Uint8 color[24][16][16]; // [z][y][x]
 		Uint16 glass[24][16];    // [z][y], bit x: window glass, seen through
+		Uint16 lookOnly[24][16]; // [z][y], bit x: glass filled into an opening of the game's shape (see fillPaneOpenings): drawn, never in the way
 		Uint16 clear[24][16];    // [z][y], bit x: behind a hole in the art (a glass door's pane, a fence's gaps), seen straight through (see findArtHoles)
 		Uint8 min[3], max[3];    // inclusive bounds of solid voxels (x, y, z)
 		bool empty;
@@ -604,6 +605,8 @@ private:
 	void buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model) const;
 	/// What a pane of glass breaks into keeps the pane's edges in its frame (see paneOfGlass).
 	void addBrokenPaneEdges(const MapData *mapData, VoxelModel &model) const;
+	/// A pane of glass's openings in the game's shape filled with glass, a look only.
+	void fillPaneOpenings(const MapData *mapData, const Surface *sprite, const std::vector<char> &pane, Uint8 fallbackColor, VoxelModel &model) const;
 	/// Gets the sprite frames of a MapData record, and whether it animates.
 	const Frames &getFrames(const MapData *mapData);
 	/// Starts the swing of doors that just opened on a tile.

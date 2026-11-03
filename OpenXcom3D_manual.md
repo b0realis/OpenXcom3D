@@ -889,6 +889,8 @@ What `FirstPersonView` draws:
 
 ### 1.10 (not released yet)
 
+- **Windows of small panes are glass too** (the owner, after GitHub issue #75: "glass by the game's rules"): a wall the game lets sight through, its art a window split by bars into small panes (a house's window in UFO, TFTD's port, X-Com Files' towns), shows a pane of glass where it showed an open hole; and every pane's openings in the game's shape are glass, so a pane is even, not striped. Where the game's shape is open (its rounds and sight go through), that glass is a look only: the aim goes through it to what's behind. Walls the game doesn't see through (the shops' beige walls, white panels and glass doors in X-Com Files' towns) stay solid, as on the map. A glass door swinging open shows its panes again (they had swung as a grey slab since #75).
+
 - **A mod's mana on the 3D panel** (a player, GitHub issue #77: XPiratez's freshness, X-Com Files' sanity): where the map shows the mana bar, the 3D info panel shows it too, a thin bar under the stats as on the map (the soldier card left as it was).
 
 - **Cameras see as the eyes** (a player, GitHub issue #90: an X-Com Files X-Bat's heat vision saw through smoke in the 3D view, its camera saw none of it): a setting (View and camera, NO by default: a realistic camera, as before); YES, the helmet cameras (the soldier card's, the soldier cam, the map camera, a fallen soldier's last picture) see through smoke with the soldier's heat vision, as the 3D view does.
