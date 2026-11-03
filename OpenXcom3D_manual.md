@@ -259,7 +259,7 @@ On Windows, delete the folder. The game data in `user\` is only a junction (dele
 
 ## 2. Controls
 
-All of these can be rebound in **Options → 3D VIEW → Controls**: click a key's row, then press the new key (Shift, Ctrl and Alt can't be bound); a right click clears it. That page also lists (under a heading) the game's own keys that work in 3D: turning, kneel, reload, inventory, hands, the suit light (the game's personal light), night vision, next/previous soldier, end turn, frame counter, quick save/load and the ten enemy keys.
+All of these can be rebound in **Options → 3D VIEW → Controls**: click a key's row (it turns gold, a blinking _ in place of its key while it waits), then press the new key (Shift, Ctrl and Alt can't be bound; Esc leaves the key as it was); a right click clears it. That page also lists (under a heading) the game's own keys that work in 3D: turning, kneel, reload, inventory, hands, the suit light (the game's personal light), night vision, next/previous soldier, end turn, frame counter, quick save/load and the ten enemy keys.
 
 | Input | Action |
 |---|---|
@@ -884,6 +884,8 @@ What `FirstPersonView` draws:
 ## 11. Version history
 
 ### 1.10 (not released yet)
+
+- **A key waiting to be rebound shows it** (a player, GitHub issue #83: with no sign it was waiting, players thought keys couldn't be rebound): on the 3D VIEW tab's Controls a clicked key's row turns gold and a _ blinks in place of its key until a key is pressed; Esc cancels and leaves the key as it was (it closed the options before).
 
 - **The 3D view's own turn and look keys** (a player, GitHub issue #81: someone scrolling the map with W, A, S, D found 3D walking and turning at once): turning and looking up and down in 3D have their own keys (*Turn left*, *Turn right*, *Look up*, *Look down*, the arrows as before) instead of the map's scroll keys, so the map can scroll on W, A, S, D (set in the game's own Controls) while 3D walks on them.
 

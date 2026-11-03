@@ -71,6 +71,7 @@ class OptionsFirstPersonState : public OptionsBaseState
 	std::vector<std::pair<size_t, std::string>> _settingHeadings; // The settings' section headings: the setting each one goes over, and its text.
 	std::vector<int> _rowOptions;                       // For each row of the list shown: its option (an index into _settings or _keys), or -1 for a heading.
 	int _selectedKey;                                   // List row of the key waiting for a new key (-1: none).
+	Uint32 _selectedSince = 0;                          // When it began waiting (its "_" blinks from then, see think).
 	OptionInfo *_selKey;                                // That key's option (nullptr: none).
 	Uint8 _colorSel, _colorNormal;                      // Row colours: a key waiting for a new key, and normal.
 
@@ -85,6 +86,10 @@ class OptionsFirstPersonState : public OptionsBaseState
 public:
 	/// Creates the 3D View options tab.
 	OptionsFirstPersonState(OptionsOrigin origin);
+	/// Blinks the "_" of a key waiting to be rebound.
+	void think() override;
+	/// Esc while a key waits to be rebound cancels just that.
+	void handle(Action *action) override;
 	/// Cleans up the tab.
 	~OptionsFirstPersonState();
 	/// Fills the list.

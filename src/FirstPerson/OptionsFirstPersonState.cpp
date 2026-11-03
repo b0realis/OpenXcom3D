@@ -51,6 +51,7 @@
 #include <cctype>
 #include <string>
 #include "FirstPersonApi.h"
+#include "FirstPersonModeShared.h"
 #include "../Engine/Action.h"
 #include "../Engine/Game.h"
 #include "../Engine/LocalizedText.h"
@@ -184,7 +185,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 	_lstOptions->setFocus(true);
 
 	// A key binding waiting for its new key is shown in the scrollbar's colour.
-	_colorSel = _lstOptions->getScrollbarColor();
+	_colorSel = _lstOptions->getSecondaryColor(); // (the headings' gold: the scrollbar's colour was the text's here, a key waiting looked like any other)
 	_colorNormal = _lstOptions->getColor();
 
 	// Gather the add-on's options with a label (the switches and numbers as settings, the rest
@@ -513,9 +514,10 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 	{
 		return;
 	}
-	// Any click on the list drops a key that was waiting to be rebound.
+	// Any click on the list drops a key that was waiting to be rebound (its key shows again).
 	if (_selectedKey != -1)
 	{
+		_lstOptions->setCellText(_selectedKey, 1, keyName(*_selKey->asKey()));
 		_lstOptions->setCellColor(_selectedKey, 0, _colorNormal);
 		_lstOptions->setCellColor(_selectedKey, 1, _colorNormal);
 		_selectedKey = -1;
@@ -536,6 +538,8 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		{
 			_selectedKey = row;
 			_selKey = option;
+			_selectedSince = SDL_GetTicks();
+			_lstOptions->setCellText(row, 1, "_");
 			_lstOptions->setCellColor(row, 0, _colorSel);
 			_lstOptions->setCellColor(row, 1, _colorSel);
 		}
@@ -747,19 +751,58 @@ void OptionsFirstPersonState::lstOptionsKeyPress(Action *action)
 		return;
 	}
 	// Bind the key, unless it's unknown or a Shift, Alt or Ctrl key (the lean key and the facing key,
-	// both held, may be one).
+	// both held, may be one), or Esc (it cancels, see handle; a player, GitHub issue #83). The key
+	// shows again.
 	const SDLKey key = action->getDetails()->key.keysym.sym;
 	const bool modifier = key == SDLK_LSHIFT || key == SDLK_LALT || key == SDLK_LCTRL || key == SDLK_RSHIFT || key == SDLK_RALT || key == SDLK_RCTRL;
-	if (key != 0 && (!modifier || _selKey->asKey() == &Options::keyFpsLeanHold || _selKey->asKey() == &Options::keyFpsShowFacing))
+	if (key != 0 && key != SDLK_ESCAPE && (!modifier || _selKey->asKey() == &Options::keyFpsLeanHold || _selKey->asKey() == &Options::keyFpsShowFacing))
 	{
 		*_selKey->asKey() = key;
-		_lstOptions->setCellText(_selectedKey, 1, keyName(key));
 	}
+	_lstOptions->setCellText(_selectedKey, 1, keyName(*_selKey->asKey()));
 	// The row goes back to its normal colour.
 	_lstOptions->setCellColor(_selectedKey, 0, _colorNormal);
 	_lstOptions->setCellColor(_selectedKey, 1, _colorNormal);
 	_selectedKey = -1;
 	_selKey = nullptr;
+}
+
+/**
+ * Takes Esc while a key waits to be rebound: it cancels the wait (the key shows again, as it
+ * was), and nothing else; the screen's own Cancel button, which Esc presses too, would close the
+ * options with the wait. Everything else goes on as usual.
+ * @param action The input event.
+ */
+void OptionsFirstPersonState::handle(Action *action)
+{
+	if (_selectedKey != -1 && action->getDetails()->type == SDL_KEYDOWN && action->getDetails()->key.keysym.sym == SDLK_ESCAPE)
+	{
+		_lstOptions->setCellText(_selectedKey, 1, keyName(*_selKey->asKey()));
+		_lstOptions->setCellColor(_selectedKey, 0, _colorNormal);
+		_lstOptions->setCellColor(_selectedKey, 1, _colorNormal);
+		_selectedKey = -1;
+		_selKey = nullptr;
+		return;
+	}
+	OptionsBaseState::handle(action);
+}
+
+/**
+ * Every frame: a key waiting to be rebound blinks a "_" in its key's place (KeyWaitBlinkTime on,
+ * as long off), the row in the headings' gold, until a key is pressed (Esc cancels) or the list
+ * is clicked (a player, GitHub issue #83: with no sign it was waiting, rebinding seemed not to work).
+ */
+void OptionsFirstPersonState::think()
+{
+	OptionsBaseState::think();
+	if (_selectedKey != -1)
+	{
+		const std::string blink = ((SDL_GetTicks() - _selectedSince) / KeyWaitBlinkTime) % 2 == 0 ? "_" : "";
+		if (_lstOptions->getCellText(_selectedKey, 1) != blink)
+		{
+			_lstOptions->setCellText(_selectedKey, 1, blink);
+		}
+	}
 }
 
 /**
