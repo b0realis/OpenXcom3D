@@ -68,6 +68,7 @@
 #include "../Battlescape/MedikitState.h"
 #include "../Battlescape/Pathfinding.h"
 #include "../Battlescape/PrimeGrenadeState.h"
+#include "../Battlescape/Projectile.h"
 #include "../Battlescape/ProjectileFlyBState.h"
 #include "FirstPersonScanner.h"
 #include "../Battlescape/TileEngine.h"
@@ -1860,7 +1861,7 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 	// them, see aimedTile).
 	const Position targetTile = marked ? _confirmTile : arcs(weapon, mode) ? arcTargetTile(_aimVoxel, _aimVoxelType, unit) : aimedTile(_aimVoxel);
 	const Position targetVoxel = marked ? _confirmVoxel : _aimVoxel;
-	const bool hitSomething = marked || _aimHitsSomething;
+	const bool hitSomething = marked ? _confirmHits : _aimHitsSomething;
 
 	// The side of the soldier a shot leaves from, as fire() picks it: leaning (setting "Lean
 	// shots", or the lean keys) moves it off the middle (see leanSide).
@@ -1875,7 +1876,7 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 	// (an arcing shot aims at the exact point as a straight one does, see launchShot; a throw at the tile)
 	const bool arcing = arcs(weapon, mode);
 	const bool exactArc = arcing && (Options::fpsAimExact || freeAimOn(mode)) && hitSomething && isShot(mode);
-	const bool keyedPoint = !arcing || exactArc || (otherWeapon && !arcs(otherWeapon, offMode));
+	const bool keyedPoint = !arcing || exactArc || !hitSomething || (otherWeapon && !arcs(otherWeapon, offMode)); // (at the open sky, an arc through the point: see skyArcPoint)
 	const std::vector<int> key = { arcing ? 1 : 2, targetTile.x, targetTile.y, targetTile.z, keyedPoint ? targetVoxel.x : 0, keyedPoint ? targetVoxel.y : 0,
 		keyedPoint ? targetVoxel.z : 0, from.x, from.y, from.z, unit->getDirection(), unit->isKneeled() ? 1 : 0, weapon->getId(), (int)mode, (int)side,
 		Options::fpsForceArcing ? 1 : 0, Options::fpsForceBlocked ? 1 : 0, Options::oxceEnableOffCentreShooting ? 1 : 0, hitSomething ? 1 : 0,
@@ -1899,7 +1900,27 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 		const bool gunExactArc = gunArcs && (Options::fpsAimExact || freeAimOn(gunMode)) && hitSomething && isShot(gunMode);
 		if (gunExactArc) preview.targetVoxel = targetVoxel;
 		FirstPersonView::TrajectoryLook look = FirstPersonView::TRAJECTORY_ARC;
-		if (gunArcs)
+		if (gunArcs && !hitSomething)
+		{
+			// At the open sky: through the point on the crosshair's ray and on to where it comes
+			// down, as launchShot fires it (a throw at the tile it comes down on, by the game's own
+			// curve); none if every arc leaves the map (refused).
+			Position point, landing;
+			std::vector<Position> skyPath;
+			if (skyArcPoint(preview, targetVoxel, point, landing, &skyPath))
+			{
+				if (gunMode == BA_THROW)
+				{
+					preview.target = landing.toTile();
+					gameArcFound(preview, preview.target, &path);
+				}
+				else
+				{
+					path = skyPath;
+				}
+			}
+		}
+		else if (gunArcs)
 		{
 			// The game's own curve; or, for an arcing shot it would refuse, the forced one (setting
 			// "Force arcing shots"), drawn yellow: it goes for the tile whatever it meets on the way.
@@ -2024,6 +2045,74 @@ bool FirstPersonMode::forcedArcFound(BattleAction &shot, const Position &targetT
 	}
 	if (path) tileEngine->calculateParabolaVoxel(origin, aimPoint, true, path, shot.actor, curvature, Position(0, 0, 0));
 	return true;
+}
+
+/**
+ * Where an arcing shot or a throw at the open sky goes (a player, GitHub issues #72 and #91:
+ * aimed above the horizon, it went for a corner of a tile of air and, forced, burst in the open
+ * air where its arc left the map): through a point on the crosshair's ray, the farthest from the
+ * point of air aimAt found (see skyReach) back towards the eye, SkyArcStep voxels at a time,
+ * whose arc forced through it (the game's curve for the action, see TileEngine::validateThrow)
+ * stays in the map and comes down on something; on to there. (A throw goes at the tile it comes
+ * down on, by the game's own throw, which must reach it.)
+ * @param shot The action (actor, weapon, type).
+ * @param skyPoint The point of air on the crosshair's ray (see aimAt).
+ * @param point Set to the point to arc through.
+ * @param landing Set to where the arc comes down (the voxel an item would land at).
+ * @param path If given, set to the arc's voxels.
+ * @return True if there is one (false: every arc leaves the map).
+ */
+bool FirstPersonMode::skyArcPoint(const BattleAction &shot, const Position &skyPoint, Position &point, Position &landing, std::vector<Position> *path)
+{
+	TileEngine *tileEngine = _save->getTileEngine();
+	BattleAction probe = shot;
+	const Position origin = tileEngine->getOriginVoxel(probe, nullptr);
+	const double towards[3] = { skyPoint.x - _eyeX, skyPoint.y - _eyeY, skyPoint.z - _eyeZ };
+	const double reach = std::sqrt(towards[0] * towards[0] + towards[1] * towards[1] + towards[2] * towards[2]);
+	std::vector<Position> arc;
+	for (double along = reach; along >= SkyArcStep; along -= SkyArcStep)
+	{
+		const Position candidate((int)std::lround(_eyeX + towards[0] * along / reach), (int)std::lround(_eyeY + towards[1] * along / reach),
+			(int)std::lround(_eyeZ + towards[2] * along / reach));
+		probe.target = aimedTile(candidate);
+		probe.targetVoxel = candidate;
+		if (!_save->getTile(probe.target) || candidate.toTile() != probe.target)
+		{
+			continue;
+		}
+		double curvature = 0.0;
+		int meets = V_OUTOFBOUNDS;
+		if (!tileEngine->validateThrow(probe, origin, candidate, _save->getDepth(), &curvature, &meets, true) || meets == V_OUTOFBOUNDS || meets == V_EMPTY)
+		{
+			continue;
+		}
+		arc.clear();
+		tileEngine->calculateParabolaVoxel(origin, candidate, true, &arc, shot.actor, curvature, Position(0, 0, 0));
+		if (arc.empty())
+		{
+			continue;
+		}
+		const Position comesDown = Projectile::getPositionFromEnd(arc, Projectile::ItemDropVoxelOffset);
+		if (shot.type == BA_THROW)
+		{
+			// A throw goes at the tile it comes down on, by the game's own throw: that must reach it
+			// (the soldier's strength) and find a curve onto it, or the game refuses it.
+			BattleAction throwAt = shot;
+			throwAt.target = comesDown.toTile();
+			const Tile *landingTile = _save->getTile(throwAt.target);
+			double throwCurve = 0.0;
+			if (!landingTile || !tileEngine->validateThrow(throwAt, origin, throwAt.target.toVoxel() + Position(8, 8, 1 - landingTile->getTerrainLevel()),
+				_save->getDepth(), &throwCurve, nullptr, false))
+			{
+				continue;
+			}
+		}
+		point = candidate;
+		landing = comesDown;
+		if (path) *path = arc;
+		return true;
+	}
+	return false;
 }
 
 /**
@@ -2725,6 +2814,7 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 		{
 			_confirmTile = targetTile;
 			_confirmVoxel = aimedVoxel;
+			_confirmHits = hitSomething;
 			_confirmFrom = unit->getPosition();
 			_confirmUnit = unit;
 			_confirmWeapon = weapon;
@@ -2815,10 +2905,31 @@ BattleItem *FirstPersonMode::pairedGun(BattleUnit *unit, BattleItem *weapon, Bat
  * @param otherWeapon The gun in the other hand firing along (dual wield), or null.
  * @param otherMode That gun's fire mode.
  */
-void FirstPersonMode::launchShot(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, const Position &targetTile, const Position &aimedVoxel, bool hitSomething, BattleItem *otherWeapon, BattleActionType otherMode)
+void FirstPersonMode::launchShot(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, Position targetTile, const Position &aimedVoxel, bool hitSomething, BattleItem *otherWeapon, BattleActionType otherMode)
 {
 	BattlescapeGame *battleGame = _state->_battleGame;
 	BattleAction *action = battleGame->getCurrentAction();
+
+	// An arcing shot or a throw at the open sky (a player, GitHub issues #72 and #91: it went for
+	// a corner of a tile of air and burst in the open air): through the point of air under the
+	// crosshair and on to where it comes down, an arcing shot forced through that very point, a
+	// throw at the tile it comes down on (see skyArcPoint). None that stays in the map: refused,
+	// as the game refuses an arc out of it.
+	const bool skyArc = !hitSomething && (mode == BA_THROW || (isShot(mode) && weapon->getArcingShot(mode)));
+	Position skyPoint, skyLanding;
+	if (skyArc)
+	{
+		BattleAction probe;
+		probe.actor = unit;
+		probe.weapon = weapon;
+		probe.type = mode;
+		if (!skyArcPoint(probe, aimedVoxel, skyPoint, skyLanding, nullptr))
+		{
+			_state->warning("STR_NO_TRAJECTORY");
+			return;
+		}
+		targetTile = mode == BA_THROW ? skyLanding.toTile() : skyPoint.toTile();
+	}
 
 	// Set up the game's current action as its own targeting would, and let it work out the
 	// cost in time units.
@@ -2848,6 +2959,11 @@ void FirstPersonMode::launchShot(BattleUnit *unit, BattleItem *weapon, BattleAct
 	// An arcing shot the game would refuse fires forced, as with Ctrl held (setting "Force
 	// arcing shots", see forcesArc).
 	action->forced = forcesArc(*action, targetTile);
+	if (skyArc && mode != BA_THROW)
+	{
+		action->targetVoxel = skyPoint;
+		action->forced = true;
+	}
 	// A straight shot with the game's own targeting: at the exact point if its line flies (from
 	// the muzzle point that lets it, which the game then fires from); else the game's own aim (the
 	// exact point dropped: the game then aims at any part of the unit, off-centre too, as it does
@@ -4784,3 +4900,4 @@ void FirstPersonMode::keepFiringWhileHeld(BattleUnit *unit, bool playerTurn)
 }
 
 // Thanks mom and dad! You were the ones who exposed me to my first comp.
+

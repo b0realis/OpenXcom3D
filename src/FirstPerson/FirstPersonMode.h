@@ -654,6 +654,7 @@ private:
 	std::vector<int> _trajectoryKey;                    // what the path shown was worked out for (empty: none shown)
 	Position _confirmTile = Position(-1, -1, -1);       // the marked target tile (x -1: none)
 	Position _confirmVoxel;                             // the point marked on it
+	bool _confirmHits = false;                          // whether the aim met something there (not the open sky)
 	Position _confirmFrom;                              // where the soldier stood when it was marked
 	const BattleUnit *_confirmUnit = nullptr;           // the soldier who marked it
 	const BattleItem *_confirmWeapon = nullptr;         // with this weapon...
@@ -665,6 +666,8 @@ private:
 	bool gameArcFound(BattleAction &shot, const Position &targetTile, std::vector<Position> *path);
 	/// The curve of an arcing shot forced at a tile (as with Ctrl held), if any (its path, if asked for).
 	bool forcedArcFound(BattleAction &shot, const Position &targetTile, std::vector<Position> *path);
+	/// An arcing shot or a throw at the open sky: the point on the crosshair's ray to arc through (and where it comes down, and its path).
+	bool skyArcPoint(const BattleAction &shot, const Position &skyPoint, Position &point, Position &landing, std::vector<Position> *path);
 	/// Is this an arcing shot the game would refuse, which the setting "Force arcing shots" fires forced?
 	bool forcesArc(BattleAction &shot, const Position &targetTile);
 	/// The tile a point under the crosshair aims at (a unit's head poking up into the tile above: the unit's own tile).
@@ -757,7 +760,7 @@ private:
 	/// Akimbo in turn: fires the other gun's shot once the game is done with the first, or calls it off.
 	void fireTurnShot();
 	/// Fires a shot or a throw at a tile through the game's own action, the other gun joining in (or not).
-	void launchShot(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, const Position &targetTile, const Position &aimedVoxel, bool hitSomething, BattleItem *otherWeapon, BattleActionType otherMode);
+	void launchShot(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, Position targetTile, const Position &aimedVoxel, bool hitSomething, BattleItem *otherWeapon, BattleActionType otherMode);
 	/// The fire modes the left mouse button can use with an item, in wheel order.
 	std::vector<BattleActionType> fireModesFor(BattleUnit *unit, BattleItem *weapon) const;
 	/// The mode an item starts on: a gun's snap shot where it has one, else the first (of the shots only, if asked).

@@ -106,6 +106,10 @@ const int NoHarmShieldLightRed = 170, NoHarmShieldLightGreen = 210, NoHarmShield
 /// the ray leaves the map or the weapon's range ends. A point the soldier sees and can reach
 /// costs no penalty a nearer one wouldn't, and the round flies on past it along the same line.
 const double SkyAimReach = 320.0;
+/// An arcing shot or a throw at the open sky (GitHub issues #72 and #91; see FirstPersonMode::skyArcPoint): the points on
+/// the crosshair's ray tried, from the point of air back towards the eye, this many voxels apart, for one whose arc stays
+/// in the map and comes down on something.
+const double SkyArcStep = 8.0;
 /// The largest deviation the game's accuracy roll gives a successful roll (Projectile::
 /// applyAccuracy: a roll under the accuracy, plus 10, so 9 at most), for the accuracy line of
 /// "Faithful X-COM targeting" (see FirstPersonMode::hitCloudReach).
