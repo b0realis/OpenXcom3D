@@ -653,6 +653,11 @@ void createOptions(std::vector<OptionInfo> &options)
 	// And on the isometric map, the selected soldier's helmet camera in a window: off, small,
 	// medium or large (0 to 3).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMapCamera", &fpsMapCamera, 0, "STR_FPS_MAP_CAMERA", category));
+	// The helmet cameras see as the soldier's eyes do (a player, GitHub issue #90: an X-Com Files
+	// X-Bat's heat vision saw through smoke, its camera didn't): their heat vision through smoke
+	// and fire. Off (the owner: a realistic camera, as before, by default): a camera hasn't the
+	// wearer's eyes.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsCameraEyes", &fpsCameraEyes, false, "STR_FPS_CAMERA_EYES", category));
 	// Mouse look: how fast the view turns (1 to 20), up and down swapped or not, and the field
 	// of view across the screen, in degrees (50 to 110).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMouseSensitivity", &fpsMouseSensitivity, 5, "STR_FPS_MOUSE_SENSITIVITY", category));

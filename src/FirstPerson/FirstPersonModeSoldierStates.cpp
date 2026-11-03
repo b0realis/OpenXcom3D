@@ -61,6 +61,7 @@
 #include "../Battlescape/BattlescapeState.h"
 #include "../Battlescape/Map.h"
 #include "../Battlescape/Projectile.h"
+#include "../Battlescape/TileEngine.h"
 #include "../Engine/Game.h"
 #include "../Interface/Text.h"
 #include "../Mod/Armor.h"
@@ -1089,10 +1090,12 @@ void FirstPersonMode::aimDeathFeed(FirstPersonView *camera, Uint32 now)
 	camera->setTint(killed ? std::min(1.0f, 0.4f + progress) : std::min(1.0f, 0.25f + progress), killed ? 0 : 1);
 	camera->setStatic(killed ? std::clamp((progress - 0.6f) / 0.4f, 0.0f, 1.0f) : 0.0f);
 
-	// The same view settings as the main 3D view.
+	// The same view settings as the main 3D view, and the smoke as a helmet camera sees it (see aimHelmetCamera).
 	camera->setFieldOfView(Options::fpsFieldOfView);
 	camera->setSmoothLighting(Options::fpsSmoothLighting);
 	camera->setNightVision(0);
+	camera->setSmokeSight(_save->getTileEngine()->getMaxViewDistance() * 16.0f, Options::fpsCameraEyes ? unit->getVisibilityThroughSmoke() : 0,
+		Options::fpsCameraEyes ? unit->getVisibilityThroughFire() : 0);
 	camera->setControlHaze(0.0f);
 	camera->invalidate();
 }

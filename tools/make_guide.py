@@ -96,6 +96,7 @@ SETTINGS = [
          'See what each soldier sees without leaving the one you play.'),
         ('Map camera', 'Off', 'Off / Small / Medium / Large', 'On the isometric map, the selected soldier\'s helmet camera in a window at the top left; it turns to your target while you aim.',
          'The map with a soldier\'s eyes beside it: aim on the map, check the view.'),
+        ('Cameras see as the eyes', 'NO', 'YES / NO', 'YES: the helmet cameras see through smoke with the soldier\'s heat vision, as the 3D view. NO: a realistic camera.', ''),
         ('Mouse sensitivity', '5', '1 to 20', 'How fast the view turns with the mouse.', ''),
         ('Invert mouse', 'NO', 'YES / NO', 'Mouse forward looks down, as in a flight simulator.', ''),
         ('Field of view', '75', '50 to 110', 'How wide the 3D view is, in degrees.', 'Wider shows more around you; narrower makes far targets bigger.'),

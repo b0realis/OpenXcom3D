@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..8b949ed9b
+index 000000000..8f84ce9fd
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,467 @@
+@@ -0,0 +1,469 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -258,6 +258,8 @@ index 000000000..8b949ed9b
 +  STR_FPS_SOLDIER_PREVIEW: "SOLDIER CAMERA PREVIEW"
 +  STR_FPS_SOLDIER_PREVIEW_DESC: "Soldier cards on the top bar show a live helmet camera."
 +  STR_FPS_MAP_CAMERA: "Map camera"
++  STR_FPS_CAMERA_EYES: "Cameras see as the eyes"
++  STR_FPS_CAMERA_EYES_DESC: "YES: the helmet cameras see through smoke with the soldier's heat vision, as the 3D view. NO: a camera, without it."
 +  STR_FPS_MAP_CAMERA_DESC: "On the map in your turn: the selected soldier's helmet camera, top left, on the target while you aim. Click: 3D view. Right click: bigger."
 +  STR_FPS_MAP_CAMERA_OFF: "Off"
 +  STR_FPS_MAP_CAMERA_SMALL: "Small"
@@ -597,10 +599,10 @@ index 000000000..8b949ed9b
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..62b94242c
+index 000000000..5239f6827
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,467 @@
+@@ -0,0 +1,469 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -731,6 +733,8 @@ index 000000000..62b94242c
 +  STR_FPS_SOLDIER_PREVIEW: "SOLDIER CAMERA PREVIEW"
 +  STR_FPS_SOLDIER_PREVIEW_DESC: "Soldier cards on the top bar show a live helmet camera."
 +  STR_FPS_MAP_CAMERA: "Map camera"
++  STR_FPS_CAMERA_EYES: "Cameras see as the eyes"
++  STR_FPS_CAMERA_EYES_DESC: "YES: the helmet cameras see through smoke with the soldier's heat vision, as the 3D view. NO: a camera, without it."
 +  STR_FPS_MAP_CAMERA_DESC: "On the map in your turn: the selected soldier's helmet camera, top left, on the target while you aim. Click: 3D view. Right click: bigger."
 +  STR_FPS_MAP_CAMERA_OFF: "Off"
 +  STR_FPS_MAP_CAMERA_SMALL: "Small"
@@ -21679,7 +21683,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..75051a717 100644
+index a08796ced..df7530160 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -21696,7 +21700,7 @@ index a08796ced..75051a717 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits;
++OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes;
 +OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
@@ -21785,10 +21789,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..2a7f8a85a
+index 000000000..885e35366
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1259 @@
+@@ -0,0 +1,1264 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -22444,6 +22448,11 @@ index 000000000..2a7f8a85a
 +	// And on the isometric map, the selected soldier's helmet camera in a window: off, small,
 +	// medium or large (0 to 3).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsMapCamera", &fpsMapCamera, 0, "STR_FPS_MAP_CAMERA", category));
++	// The helmet cameras see as the soldier's eyes do (a player, GitHub issue #90: an X-Com Files
++	// X-Bat's heat vision saw through smoke, its camera didn't): their heat vision through smoke
++	// and fire. Off (the owner: a realistic camera, as before, by default): a camera hasn't the
++	// wearer's eyes.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsCameraEyes", &fpsCameraEyes, false, "STR_FPS_CAMERA_EYES", category));
 +	// Mouse look: how fast the view turns (1 to 20), up and down swapped or not, and the field
 +	// of view across the screen, in degrees (50 to 110).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsMouseSensitivity", &fpsMouseSensitivity, 5, "STR_FPS_MOUSE_SENSITIVITY", category));
@@ -28336,10 +28345,10 @@ index 000000000..fd0923b46
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..fcfc5fcad
+index 000000000..3c9ae99ed
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,2213 @@
+@@ -0,0 +1,2219 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -28406,6 +28415,7 @@ index 000000000..fcfc5fcad
 +#include "../Battlescape/Camera.h"
 +#include "../Battlescape/Map.h"
 +#include "../Battlescape/Pathfinding.h"
++#include "../Battlescape/TileEngine.h"
 +#include "../Engine/Font.h"
 +#include "../Engine/Game.h"
 +#include "../Engine/Options.h"
@@ -29817,6 +29827,11 @@ index 000000000..fcfc5fcad
 +	camera->setFieldOfView(Options::fpsFieldOfView);
 +	camera->setSmoothLighting(Options::fpsSmoothLighting);
 +	camera->setNightVision(hasNightVision(unit) ? _state->_map->getNightVisionColor() : 0);
++	// And the smoke: with the setting "Cameras see as the eyes", as the soldier's eyes see it, as
++	// the main view does (a player, GitHub issue #90: an X-Com Files X-Bat's heat vision sees
++	// through smoke there, its camera saw none); else as a camera, without the wearer's heat vision.
++	camera->setSmokeSight(_save->getTileEngine()->getMaxViewDistance() * 16.0f, Options::fpsCameraEyes ? unit->getVisibilityThroughSmoke() : 0,
++		Options::fpsCameraEyes ? unit->getVisibilityThroughFire() : 0);
 +	camera->setControlHaze(controlHaze(unit, SDL_GetTicks())); // (a unit under our mind control: purple edges)
 +	camera->invalidate();
 +}
@@ -38069,10 +38084,10 @@ index 000000000..a3f093c79
 +
 diff --git a/src/FirstPerson/FirstPersonModeSoldierStates.cpp b/src/FirstPerson/FirstPersonModeSoldierStates.cpp
 new file mode 100644
-index 000000000..0b53ef42d
+index 000000000..e7e38ec76
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeSoldierStates.cpp
-@@ -0,0 +1,1126 @@
+@@ -0,0 +1,1129 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -38136,6 +38151,7 @@ index 000000000..0b53ef42d
 +#include "../Battlescape/BattlescapeState.h"
 +#include "../Battlescape/Map.h"
 +#include "../Battlescape/Projectile.h"
++#include "../Battlescape/TileEngine.h"
 +#include "../Engine/Game.h"
 +#include "../Interface/Text.h"
 +#include "../Mod/Armor.h"
@@ -39164,10 +39180,12 @@ index 000000000..0b53ef42d
 +	camera->setTint(killed ? std::min(1.0f, 0.4f + progress) : std::min(1.0f, 0.25f + progress), killed ? 0 : 1);
 +	camera->setStatic(killed ? std::clamp((progress - 0.6f) / 0.4f, 0.0f, 1.0f) : 0.0f);
 +
-+	// The same view settings as the main 3D view.
++	// The same view settings as the main 3D view, and the smoke as a helmet camera sees it (see aimHelmetCamera).
 +	camera->setFieldOfView(Options::fpsFieldOfView);
 +	camera->setSmoothLighting(Options::fpsSmoothLighting);
 +	camera->setNightVision(0);
++	camera->setSmokeSight(_save->getTileEngine()->getMaxViewDistance() * 16.0f, Options::fpsCameraEyes ? unit->getVisibilityThroughSmoke() : 0,
++		Options::fpsCameraEyes ? unit->getVisibilityThroughFire() : 0);
 +	camera->setControlHaze(0.0f);
 +	camera->invalidate();
 +}
@@ -58890,7 +58908,7 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..429952caf
+index 000000000..3ad991363
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,858 @@
@@ -59104,7 +59122,7 @@ index 000000000..429952caf
 +	// at the end, under a heading of its own.
 +	static const struct { const char *heading; std::vector<const char*> ids; } sections[] = {
 +		{ "STR_FPS_SECTION_PLAYSTYLE", { "fpsPlaystyle" } },
-+		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView", "fpsZoom",
++		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsCameraEyes", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView", "fpsZoom",
 +			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
 +		{ "STR_FPS_SECTION_MOVEMENT", { "fpsTurnCost", "fpsMovement", "fpsWalkSpeed", "fpsFlightCost", "fpsFlightCostOverride", "fpsVault",
 +			"fpsFalling", "fpsSafeLanding" } },

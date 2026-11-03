@@ -64,6 +64,7 @@
 #include "../Battlescape/Camera.h"
 #include "../Battlescape/Map.h"
 #include "../Battlescape/Pathfinding.h"
+#include "../Battlescape/TileEngine.h"
 #include "../Engine/Font.h"
 #include "../Engine/Game.h"
 #include "../Engine/Options.h"
@@ -1475,6 +1476,11 @@ void FirstPersonMode::aimHelmetCamera(FirstPersonView *camera, BattleUnit *unit,
 	camera->setFieldOfView(Options::fpsFieldOfView);
 	camera->setSmoothLighting(Options::fpsSmoothLighting);
 	camera->setNightVision(hasNightVision(unit) ? _state->_map->getNightVisionColor() : 0);
+	// And the smoke: with the setting "Cameras see as the eyes", as the soldier's eyes see it, as
+	// the main view does (a player, GitHub issue #90: an X-Com Files X-Bat's heat vision sees
+	// through smoke there, its camera saw none); else as a camera, without the wearer's heat vision.
+	camera->setSmokeSight(_save->getTileEngine()->getMaxViewDistance() * 16.0f, Options::fpsCameraEyes ? unit->getVisibilityThroughSmoke() : 0,
+		Options::fpsCameraEyes ? unit->getVisibilityThroughFire() : 0);
 	camera->setControlHaze(controlHaze(unit, SDL_GetTicks())); // (a unit under our mind control: purple edges)
 	camera->invalidate();
 }

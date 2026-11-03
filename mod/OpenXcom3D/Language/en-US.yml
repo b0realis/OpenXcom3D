@@ -128,6 +128,8 @@ en-US:
   STR_FPS_SOLDIER_PREVIEW: "SOLDIER CAMERA PREVIEW"
   STR_FPS_SOLDIER_PREVIEW_DESC: "Soldier cards on the top bar show a live helmet camera."
   STR_FPS_MAP_CAMERA: "Map camera"
+  STR_FPS_CAMERA_EYES: "Cameras see as the eyes"
+  STR_FPS_CAMERA_EYES_DESC: "YES: the helmet cameras see through smoke with the soldier's heat vision, as the 3D view. NO: a camera, without it."
   STR_FPS_MAP_CAMERA_DESC: "On the map in your turn: the selected soldier's helmet camera, top left, on the target while you aim. Click: 3D view. Right click: bigger."
   STR_FPS_MAP_CAMERA_OFF: "Off"
   STR_FPS_MAP_CAMERA_SMALL: "Small"
