@@ -84,6 +84,7 @@
 #include "../Savegame/BattleItem.h"
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/SavedBattleGame.h"
+#include "../Savegame/SavedGame.h"
 #include "../Savegame/Soldier.h"
 #include "FirstPersonModeShared.h"
 
@@ -585,7 +586,7 @@ void FirstPersonMode::watchMapLayers()
  * (kneeling, wounds, burning...), a line for the weapon in hand and one for the other hand's
  * item (each gun with the rounds loaded and the spare clips carried for it, see ammoLabel), and
  * the four stats with their bars (time units, energy, health with the stun level over it,
- * morale). It is filled anew every frame, so the counts follow every shot, reload, pick-up and
+ * morale), and a mod's mana as a thin bar under them where the map shows it. It is filled anew every frame, so the counts follow every shot, reload, pick-up and
  * drop.
  * The panel only shows in the 3D view without the classic HUD (which has all of this itself).
  * @param unit The selected soldier, or null for none (the panel hides).
@@ -600,6 +601,9 @@ void FirstPersonMode::updateInfoPanel(BattleUnit *unit)
 		part->setVisible(show);
 	}
 	_txtDoom->setVisible(show && doomModeOn());
+	// The mana bar as the map has it: the mod uses mana, shows it in battle, and it's unlocked.
+	Mod *mod = _game->getMod();
+	_barMana->setVisible(show && mod->isManaFeatureEnabled() && mod->isManaBarEnabled() && _game->getSavedGame()->isManaUnlocked(mod));
 	if (!show)
 	{
 		return;
@@ -648,6 +652,9 @@ void FirstPersonMode::updateInfoPanel(BattleUnit *unit)
 	_numMorale->setValue(unit->getMorale());
 	_barMorale->setMax(100);
 	_barMorale->setValue(unit->getMorale());
+	_barMana->setMax(unit->getBaseStats()->mana);
+	_barMana->setValue(unit->getMana());
+	_barMana->setScale(statBarScale(_state, FirstPerson::STAT_MANA, unit->getBaseStats()->mana, _barMana->getWidth()));
 	const int panelMaxima[4] = { unit->getBaseStats()->tu, unit->getBaseStats()->stamina, unit->getBaseStats()->health, 100 };
 	Bar *panelBars[4] = { _barTimeUnits, _barEnergy, _barHealth, _barMorale };
 	for (int stat = 0; stat < 4; ++stat)

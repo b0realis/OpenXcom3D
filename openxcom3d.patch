@@ -23426,10 +23426,10 @@ index 000000000..22bfdd4c1
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..bfafdd9ce
+index 000000000..c15434e1c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2807 @@
+@@ -0,0 +1,2812 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -23931,6 +23931,11 @@ index 000000000..bfafdd9ce
 +	_state->add(_barEnergy, "barEnergy", "battlescape");
 +	_state->add(_barHealth, "barHealth", "battlescape");
 +	_state->add(_barMorale, "barMorale", "battlescape");
++	// A mod's mana (Piratez's freshness, X-Com Files' sanity: a player, GitHub issue #77): a thin
++	// bar under the stats, across both columns, in the mod's mana colour, as the map shows it (no
++	// number, as there); shown only when the map shows it (see updateInfoPanel).
++	_barMana = new Bar(PanelManaW, PanelManaH, panelX + PanelManaX, panelY + PanelManaY);
++	_state->add(_barMana, "barMana", "battlescape");
 +
 +	// Last line: the armor, and DOOM on the right.
 +	_txtArmor = addText(PanelLineW, 9, panelX + 3, panelY + 44, "weapon", "firstPerson");
@@ -23942,7 +23947,7 @@ index 000000000..bfafdd9ce
 +
 +	// The panel's parts, all ours and all hidden until the 3D view shows.
 +	_panelParts = { _txtName, _panelRank, _txtStatus, _txtWeapon, _txtWeaponAmmo, _txtOtherWeapon, _txtOtherAmmo, _numTimeUnits, _barTimeUnits,
-+		_numEnergy, _barEnergy, _numHealth, _barHealth, _numMorale, _barMorale, _txtArmor, _txtDoom };
++		_numEnergy, _barEnergy, _numHealth, _barHealth, _numMorale, _barMorale, _barMana, _txtArmor, _txtDoom };
 +	for (auto *part : _panelParts)
 +	{
 +		_ownSurfaces.insert(part);
@@ -23956,7 +23961,7 @@ index 000000000..bfafdd9ce
 +	_txtStatus->setAlign(ALIGN_RIGHT);
 +	_weaponTextColor = _txtWeapon->getColor();
 +	_txtDoom->setText(_state->tr("STR_FPS_DOOM"));
-+	for (auto *bar : { _barTimeUnits, _barEnergy, _barHealth, _barMorale })
++	for (auto *bar : { _barTimeUnits, _barEnergy, _barHealth, _barMorale, _barMana })
 +	{
 +		bar->setScale(1.0);
 +	}
@@ -26239,10 +26244,10 @@ index 000000000..bfafdd9ce
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..418eb665c
+index 000000000..607f0ee16
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1232 @@
+@@ -0,0 +1,1233 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -27246,6 +27251,7 @@ index 000000000..418eb665c
 +	Uint8 _weaponTextColor = 0;                         // the weapon lines' own colour (the mod's "weapon" element)
 +	NumberText *_numTimeUnits = nullptr, *_numEnergy = nullptr, *_numHealth = nullptr, *_numMorale = nullptr; // the four stats
 +	Bar *_barTimeUnits = nullptr, *_barEnergy = nullptr, *_barHealth = nullptr, *_barMorale = nullptr; // and their bars
++	Bar *_barMana = nullptr;                            // a mod's mana (Piratez freshness, X-Com Files sanity): a thin bar under them, as on the map
 +	Uint8 _statColors[8] = {};                          // the stats' own colours (numbers, then bars), for when they stop being silver
 +	bool _statsSilver = false;                          // the stats are silver: Doom IDDQD, an invincible soldier
 +	std::vector<Surface*> _panelParts;                  // all of the panel's surfaces, shown and hidden together
@@ -28345,10 +28351,10 @@ index 000000000..fd0923b46
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..3c9ae99ed
+index 000000000..5ffcdb123
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,2219 @@
+@@ -0,0 +1,2226 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -28435,6 +28441,7 @@ index 000000000..3c9ae99ed
 +#include "../Savegame/BattleItem.h"
 +#include "../Savegame/BattleUnit.h"
 +#include "../Savegame/SavedBattleGame.h"
++#include "../Savegame/SavedGame.h"
 +#include "../Savegame/Soldier.h"
 +#include "FirstPersonModeShared.h"
 +
@@ -28936,7 +28943,7 @@ index 000000000..3c9ae99ed
 + * (kneeling, wounds, burning...), a line for the weapon in hand and one for the other hand's
 + * item (each gun with the rounds loaded and the spare clips carried for it, see ammoLabel), and
 + * the four stats with their bars (time units, energy, health with the stun level over it,
-+ * morale). It is filled anew every frame, so the counts follow every shot, reload, pick-up and
++ * morale), and a mod's mana as a thin bar under them where the map shows it. It is filled anew every frame, so the counts follow every shot, reload, pick-up and
 + * drop.
 + * The panel only shows in the 3D view without the classic HUD (which has all of this itself).
 + * @param unit The selected soldier, or null for none (the panel hides).
@@ -28951,6 +28958,9 @@ index 000000000..3c9ae99ed
 +		part->setVisible(show);
 +	}
 +	_txtDoom->setVisible(show && doomModeOn());
++	// The mana bar as the map has it: the mod uses mana, shows it in battle, and it's unlocked.
++	Mod *mod = _game->getMod();
++	_barMana->setVisible(show && mod->isManaFeatureEnabled() && mod->isManaBarEnabled() && _game->getSavedGame()->isManaUnlocked(mod));
 +	if (!show)
 +	{
 +		return;
@@ -28999,6 +29009,9 @@ index 000000000..3c9ae99ed
 +	_numMorale->setValue(unit->getMorale());
 +	_barMorale->setMax(100);
 +	_barMorale->setValue(unit->getMorale());
++	_barMana->setMax(unit->getBaseStats()->mana);
++	_barMana->setValue(unit->getMana());
++	_barMana->setScale(statBarScale(_state, FirstPerson::STAT_MANA, unit->getBaseStats()->mana, _barMana->getWidth()));
 +	const int panelMaxima[4] = { unit->getBaseStats()->tu, unit->getBaseStats()->stamina, unit->getBaseStats()->health, 100 };
 +	Bar *panelBars[4] = { _barTimeUnits, _barEnergy, _barHealth, _barMorale };
 +	for (int stat = 0; stat < 4; ++stat)
@@ -32700,10 +32713,10 @@ index 000000000..d086c7fbf
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..f3d19a3ea
+index 000000000..181fcb2dc
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,469 @@
+@@ -0,0 +1,473 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -32795,6 +32808,10 @@ index 000000000..f3d19a3ea
 +const Uint32 PelletSoundWindow = 60;
 +/// The info panel, bottom left, and the width of a line of text in it.
 +const int PanelW = 150, PanelH = 54, PanelLineW = PanelW - 6;
++/// The info panel's mana bar (a mod's mana, GitHub issue #77): a thin bar across both stat columns, in the gap between the
++/// second stat row and the armour line (pixels from the panel's left and top; its width and height: 3, a frame round the
++/// fill, as the map's).
++const int PanelManaX = 3, PanelManaY = 41, PanelManaW = 141, PanelManaH = 3;
 +/// The crosshair's surface (square).
 +const int CrosshairSize = 41;
 +/// How long a hit, a kill or a strike that did no harm marks the crosshair, in milliseconds.

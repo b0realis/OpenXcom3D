@@ -89,6 +89,10 @@ const int PelletSoundsAtOnce = 4;
 const Uint32 PelletSoundWindow = 60;
 /// The info panel, bottom left, and the width of a line of text in it.
 const int PanelW = 150, PanelH = 54, PanelLineW = PanelW - 6;
+/// The info panel's mana bar (a mod's mana, GitHub issue #77): a thin bar across both stat columns, in the gap between the
+/// second stat row and the armour line (pixels from the panel's left and top; its width and height: 3, a frame round the
+/// fill, as the map's).
+const int PanelManaX = 3, PanelManaY = 41, PanelManaW = 141, PanelManaH = 3;
 /// The crosshair's surface (square).
 const int CrosshairSize = 41;
 /// How long a hit, a kill or a strike that did no harm marks the crosshair, in milliseconds.

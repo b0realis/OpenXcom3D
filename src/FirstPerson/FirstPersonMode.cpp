@@ -499,6 +499,11 @@ void FirstPersonMode::createInfoPanel()
 	_state->add(_barEnergy, "barEnergy", "battlescape");
 	_state->add(_barHealth, "barHealth", "battlescape");
 	_state->add(_barMorale, "barMorale", "battlescape");
+	// A mod's mana (Piratez's freshness, X-Com Files' sanity: a player, GitHub issue #77): a thin
+	// bar under the stats, across both columns, in the mod's mana colour, as the map shows it (no
+	// number, as there); shown only when the map shows it (see updateInfoPanel).
+	_barMana = new Bar(PanelManaW, PanelManaH, panelX + PanelManaX, panelY + PanelManaY);
+	_state->add(_barMana, "barMana", "battlescape");
 
 	// Last line: the armor, and DOOM on the right.
 	_txtArmor = addText(PanelLineW, 9, panelX + 3, panelY + 44, "weapon", "firstPerson");
@@ -510,7 +515,7 @@ void FirstPersonMode::createInfoPanel()
 
 	// The panel's parts, all ours and all hidden until the 3D view shows.
 	_panelParts = { _txtName, _panelRank, _txtStatus, _txtWeapon, _txtWeaponAmmo, _txtOtherWeapon, _txtOtherAmmo, _numTimeUnits, _barTimeUnits,
-		_numEnergy, _barEnergy, _numHealth, _barHealth, _numMorale, _barMorale, _txtArmor, _txtDoom };
+		_numEnergy, _barEnergy, _numHealth, _barHealth, _numMorale, _barMorale, _barMana, _txtArmor, _txtDoom };
 	for (auto *part : _panelParts)
 	{
 		_ownSurfaces.insert(part);
@@ -524,7 +529,7 @@ void FirstPersonMode::createInfoPanel()
 	_txtStatus->setAlign(ALIGN_RIGHT);
 	_weaponTextColor = _txtWeapon->getColor();
 	_txtDoom->setText(_state->tr("STR_FPS_DOOM"));
-	for (auto *bar : { _barTimeUnits, _barEnergy, _barHealth, _barMorale })
+	for (auto *bar : { _barTimeUnits, _barEnergy, _barHealth, _barMorale, _barMana })
 	{
 		bar->setScale(1.0);
 	}

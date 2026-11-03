@@ -345,7 +345,7 @@ On the isometric map a soldier with a gun in each hand can fire both too: hold *
   - guns that never run out, like the lasers, show **∞**; a gun with its rounds built in shows just its count;
   - the numbers follow every round fired, in faithful and FPS-style shooting alike, and every reload, pick-up and drop. Two guns of the same kind (dual pistols) each count the same spare clips, since either could load them;
   - a primed grenade shows the turns its fuse has left: **PRIMED 3 turns**, **PRIMED 1 turn**, **PRIMED this turn** (it goes off when this turn ends); in Doom mode grenades burn in real time, so it shows the seconds: **PRIMED 2.4s**;
-- time units, energy, health (with stun damage over it) and morale, as numbers and bars;
+- time units, energy, health (with stun damage over it) and morale, as numbers and bars; and under them, where a mod uses mana and the map shows its bar (XPiratez's freshness, X-Com Files' sanity), a thin bar for it as on the map;
 - the armor, and on the right DOOM MODE while that cheat is on (IDDQD and/or IDKFA for its extras; with IDDQD the four stats turn silver).
 
 Hovering a soldier on the top bar shows the same weapon line on their card.
@@ -888,6 +888,8 @@ What `FirstPersonView` draws:
 ## 11. Version history
 
 ### 1.10 (not released yet)
+
+- **A mod's mana on the 3D panel** (a player, GitHub issue #77: XPiratez's freshness, X-Com Files' sanity): where the map shows the mana bar, the 3D info panel shows it too, a thin bar under the stats as on the map (the soldier card left as it was).
 
 - **Cameras see as the eyes** (a player, GitHub issue #90: an X-Com Files X-Bat's heat vision saw through smoke in the 3D view, its camera saw none of it): a setting (View and camera, NO by default: a realistic camera, as before); YES, the helmet cameras (the soldier card's, the soldier cam, the map camera, a fallen soldier's last picture) see through smoke with the soldier's heat vision, as the 3D view does.
 
