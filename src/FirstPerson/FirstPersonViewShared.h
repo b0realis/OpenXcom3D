@@ -170,6 +170,13 @@ const float GlassWallCoverMin = 0.5f;
 /// decorated wall or a craft's hull is far less).
 const float GlassPaintedCoverMin = 0.9f, GlassPaintedPaleMin = 0.5f;
 const int GlassPaleMinChannel = 150, GlassPaleBlueSlack = 8, GlassPaleSpread = 70;
+/// Glass only in a window (the owner: "barn windows in farm are just openings as before without glass", then "railings
+/// open"): a big pane's wall covers at least GlassBigPaneCoverMin of its plane (barbed wire, a blasted breach, an arch's
+/// thin frame less); a window's wall reaches at least GlassWallTopMin voxels up (a deck railing stops lower); painted glass
+/// and the glass filled into openings only in a wall at most GlassThinRowsMax voxel rows thick (an ice cave's rock, a
+/// plane's fuselage more).
+const float GlassBigPaneCoverMin = 0.3f;
+const int GlassWallTopMin = 20, GlassThinRowsMax = 3;
 /// Window glass breaking (FirstPersonView::spawnGlassShards; the owner: "glass shatters (by the travelling bullets)
 /// ... only visual and for visceral feel"): shards from GlassShardsAcross voxels of the pane at most, falling, and,
 /// where a round went through, GlassShardsAtHit flying on with it and GlassGlints glints; none from a pane further
