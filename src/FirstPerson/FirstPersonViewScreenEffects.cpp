@@ -396,7 +396,8 @@ void FirstPersonView::drawHurt()
 /**
  * Washes the finished picture, pixel by pixel, with whatever applies right now. Night vision
  * recolours everything into one colour group (keeping each shade, like the map's night
- * vision). A colour wash (red: hurt or killed, dark blue: unconscious, orange: mind control,
+ * vision); with the setting "Futuristic night vision" units, bodies and items keep their own
+ * colours, as on the map (see _ownColours). A colour wash (red: hurt or killed, dark blue: unconscious, orange: mind control,
  * white: a breakdown, sickly green: turning into a zombie; see setTint) dithers in over that
  * share of the pixels, some of them washed red instead if asked. TV static (a helmet camera
  * losing its signal) replaces a share of the pixels with random greys. And the screen edges
@@ -428,6 +429,7 @@ void FirstPersonView::washBands()
 	const int viewWidth = getWidth(), viewHeight = getHeight();
 	const float centerX = viewWidth * 0.5f, centerY = viewHeight * 0.5f, cornerDistance = std::sqrt(centerX * centerX + centerY * centerY);
 	const Uint8 nightGroup = _nightVision ? (Uint8)((_nightVision - 1) * 16) : 0;
+	const bool ownColours = Options::fpsNightVisionUnits;
 	const Uint8 *wash = _tintKind == 1 ? _colors.blueTint : _tintKind == 2 ? _colors.orangeTint : _tintKind == 3 ? _colors.whiteTint
 		: _tintKind == 4 ? _colors.greenTint : _colors.redTint;
 	// Every pixel of the band (x, y: screen pixels), each effect in turn.
@@ -441,8 +443,9 @@ void FirstPersonView::washBands()
 			for (int x = 0; x < viewWidth; ++x)
 			{
 				// Night vision: the pixel's shade (the low four bits) moved into the night vision
-				// group. Index 0 (transparent) stays as it is.
-				if (_nightVision && row[x]) row[x] = nightGroup | (row[x] & 15);
+				// group. Index 0 (transparent) stays as it is, and so does a unit's, a body's or an
+				// item's pixel with futuristic night vision.
+				if (_nightVision && row[x] && !(ownColours && _ownColours[y * viewWidth + x])) row[x] = nightGroup | (row[x] & 15);
 				// The colour wash, on the share of pixels the dither pattern lets through; of those,
 				// a share (by a second, shifted dither) is washed red instead.
 				if (_tintAmount > 0.0f && dither(x, y) < _tintAmount)

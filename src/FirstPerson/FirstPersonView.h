@@ -484,6 +484,7 @@ private:
 	std::vector<float> _depthBuffer;                    // per pixel, how far away what's drawn there is (sprites and effects test against it)
 	std::vector<Uint8> _glowMask;                       // pixels showing something that shines (lit voxels, sparks)
 	std::vector<Uint8> _unitVeil;                       // per pixel, how much more see-through smoke may veil the unit seen there (in SeeThroughLevels; 255: no unit)
+	std::vector<Uint8> _ownColours;                     // per pixel, 1: a unit's, a body's or an item's picture shows there (futuristic night vision leaves its colours, see washBands)
 
 	/// Works out the camera's axes from its yaw and pitch.
 	void updateBasis();

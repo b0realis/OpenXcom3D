@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..ebb9abc3a
+index 000000000..3d24708f7
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,465 @@
+@@ -0,0 +1,467 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -365,6 +365,8 @@ index 000000000..ebb9abc3a
 +  STR_FPS_SCREEN_SHAKE: "Screen shake"
 +  STR_FPS_SCREEN_SHAKE_DESC: "Explosions, hits, falls and your own shots shake the view. NO: nothing shakes it."
 +  STR_FPS_RECOIL: "Recoil"
++  STR_FPS_NIGHT_VISION_UNITS: "Futuristic night vision"
++  STR_FPS_NIGHT_VISION_UNITS_DESC: "YES: units, bodies and items keep their colours, as on the map; the world goes green. NO: all green."
 +  STR_FPS_RECOIL_DESC: "Each shot kicks the view up (and climbs in a burst with FPS-style shooting). NO: the view stays still."
 +  STR_FPS_FLIGHT_COST: "Flight cost per level (TU)"
 +  STR_FPS_FLIGHT_COST_DESC: "TU to fly up or down one level (0 = free)."
@@ -595,10 +597,10 @@ index 000000000..ebb9abc3a
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..38fc5e6ca
+index 000000000..41058b2b9
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,465 @@
+@@ -0,0 +1,467 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -836,6 +838,8 @@ index 000000000..38fc5e6ca
 +  STR_FPS_SCREEN_SHAKE: "Screen shake"
 +  STR_FPS_SCREEN_SHAKE_DESC: "Explosions, hits, falls and your own shots shake the view. NO: nothing shakes it."
 +  STR_FPS_RECOIL: "Recoil"
++  STR_FPS_NIGHT_VISION_UNITS: "Futuristic night vision"
++  STR_FPS_NIGHT_VISION_UNITS_DESC: "YES: units, bodies and items keep their colours, as on the map; the world goes green. NO: all green."
 +  STR_FPS_RECOIL_DESC: "Each shot kicks the view up (and climbs in a burst with FPS-style shooting). NO: the view stays still."
 +  STR_FPS_FLIGHT_COST: "Flight cost per level (TU)"
 +  STR_FPS_FLIGHT_COST_DESC: "TU to fly up or down one level (0 = free)."
@@ -21665,7 +21669,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..30cd37010 100644
+index a08796ced..75051a717 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -21682,7 +21686,7 @@ index a08796ced..30cd37010 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil;
++OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits;
 +OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
@@ -21771,10 +21775,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..b2721df15
+index 000000000..a57b75489
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1242 @@
+@@ -0,0 +1,1246 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -22553,6 +22557,10 @@ index 000000000..b2721df15
 +	// Screen shake (a player, GitHub issue #67): off, nothing shakes the view (explosions, hits,
 +	// falls, landings, panic, one's own shots).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsScreenShake", &fpsScreenShake, true, "STR_FPS_SCREEN_SHAKE", category));
++	// Futuristic night vision (a player, GitHub issue #88: the map's night vision leaves units and
++	// items their own colours): units, bodies and items keep theirs, the world goes green. Off (the
++	// owner: realistic, by default), everything goes green.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightVisionUnits", &fpsNightVisionUnits, false, "STR_FPS_NIGHT_VISION_UNITS", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsParticles", &fpsParticles, 2, "STR_FPS_PARTICLES", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsUfoLights", &fpsUfoLights, true, "STR_FPS_UFO_LIGHTS", category));
 +	// Parts the map draws but gives no shape (no voxels: ladders, lifts' pads, walls of laser
@@ -41873,10 +41881,10 @@ index 000000000..d7aa46be4
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..b14b36126
+index 000000000..f8e876f6b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,623 @@
+@@ -0,0 +1,626 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -41963,10 +41971,12 @@ index 000000000..b14b36126
 +	_spriteBuffer(new Surface(SpriteBufferSize, SpriteBufferSize))
 +{
 +	// Per pixel: how far away the world seen there is (so sprites hide behind walls), whether
-+	// it shines (for the bloom), and how much see-through smoke may still veil a unit seen there.
++	// it shines (for the bloom), how much see-through smoke may still veil a unit seen there,
++	// and whether a unit's or an item's picture shows there.
 +	_depthBuffer.resize(width * height);
 +	_glowMask.resize(width * height);
 +	_unitVeil.resize(width * height);
++	_ownColours.resize(width * height);
 +
 +	// A camera's glitches and static spells differ from game to game and from camera to camera
 +	// (the time it's made, and where).
@@ -42428,6 +42438,7 @@ index 000000000..b14b36126
 +	// and the hitmarker), then everything is drawn over the terrain as sprites, dots and lines.
 +	// (No unit is on the screen yet, for the see-through smoke.)
 +	std::fill(_unitVeil.begin(), _unitVeil.end(), (Uint8)255);
++	std::fill(_ownColours.begin(), _ownColours.end(), (Uint8)0);
 +	std::fill(&_pointerUnits[0][0], &_pointerUnits[0][0] + sizeof(_pointerUnits) / sizeof(_pointerUnits[0][0]), nullptr);
 +	std::fill(&_pointerBodies[0][0], &_pointerBodies[0][0] + sizeof(_pointerBodies) / sizeof(_pointerBodies[0][0]), nullptr);
 +	std::fill(&_pointerPiles[0][0], &_pointerPiles[0][0] + sizeof(_pointerPiles) / sizeof(_pointerPiles[0][0]), nullptr);
@@ -42502,10 +42513,10 @@ index 000000000..b14b36126
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..34181e2af
+index 000000000..533af8d9e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1250 @@
+@@ -0,0 +1,1251 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -42992,6 +43003,7 @@ index 000000000..34181e2af
 +	std::vector<float> _depthBuffer;                    // per pixel, how far away what's drawn there is (sprites and effects test against it)
 +	std::vector<Uint8> _glowMask;                       // pixels showing something that shines (lit voxels, sparks)
 +	std::vector<Uint8> _unitVeil;                       // per pixel, how much more see-through smoke may veil the unit seen there (in SeeThroughLevels; 255: no unit)
++	std::vector<Uint8> _ownColours;                     // per pixel, 1: a unit's, a body's or an item's picture shows there (futuristic night vision leaves its colours, see washBands)
 +
 +	/// Works out the camera's axes from its yaw and pitch.
 +	void updateBasis();
@@ -47491,10 +47503,10 @@ index 000000000..2ac658111
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewScreenEffects.cpp b/src/FirstPerson/FirstPersonViewScreenEffects.cpp
 new file mode 100644
-index 000000000..280bc87e2
+index 000000000..986e42728
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewScreenEffects.cpp
-@@ -0,0 +1,718 @@
+@@ -0,0 +1,721 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -47893,7 +47905,8 @@ index 000000000..280bc87e2
 +/**
 + * Washes the finished picture, pixel by pixel, with whatever applies right now. Night vision
 + * recolours everything into one colour group (keeping each shade, like the map's night
-+ * vision). A colour wash (red: hurt or killed, dark blue: unconscious, orange: mind control,
++ * vision); with the setting "Futuristic night vision" units, bodies and items keep their own
++ * colours, as on the map (see _ownColours). A colour wash (red: hurt or killed, dark blue: unconscious, orange: mind control,
 + * white: a breakdown, sickly green: turning into a zombie; see setTint) dithers in over that
 + * share of the pixels, some of them washed red instead if asked. TV static (a helmet camera
 + * losing its signal) replaces a share of the pixels with random greys. And the screen edges
@@ -47925,6 +47938,7 @@ index 000000000..280bc87e2
 +	const int viewWidth = getWidth(), viewHeight = getHeight();
 +	const float centerX = viewWidth * 0.5f, centerY = viewHeight * 0.5f, cornerDistance = std::sqrt(centerX * centerX + centerY * centerY);
 +	const Uint8 nightGroup = _nightVision ? (Uint8)((_nightVision - 1) * 16) : 0;
++	const bool ownColours = Options::fpsNightVisionUnits;
 +	const Uint8 *wash = _tintKind == 1 ? _colors.blueTint : _tintKind == 2 ? _colors.orangeTint : _tintKind == 3 ? _colors.whiteTint
 +		: _tintKind == 4 ? _colors.greenTint : _colors.redTint;
 +	// Every pixel of the band (x, y: screen pixels), each effect in turn.
@@ -47938,8 +47952,9 @@ index 000000000..280bc87e2
 +			for (int x = 0; x < viewWidth; ++x)
 +			{
 +				// Night vision: the pixel's shade (the low four bits) moved into the night vision
-+				// group. Index 0 (transparent) stays as it is.
-+				if (_nightVision && row[x]) row[x] = nightGroup | (row[x] & 15);
++				// group. Index 0 (transparent) stays as it is, and so does a unit's, a body's or an
++				// item's pixel with futuristic night vision.
++				if (_nightVision && row[x] && !(ownColours && _ownColours[y * viewWidth + x])) row[x] = nightGroup | (row[x] & 15);
 +				// The colour wash, on the share of pixels the dither pattern lets through; of those,
 +				// a share (by a second, shifted dither) is washed red instead.
 +				if (_tintAmount > 0.0f && dither(x, y) < _tintAmount)
@@ -50652,10 +50667,10 @@ index 000000000..1cd28ddf1
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..c76dc65c7
+index 000000000..f0104622d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,2716 @@
+@@ -0,0 +1,2724 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -50908,7 +50923,10 @@ index 000000000..c76dc65c7
 +	// takes these back.
 +	// A see-through pixel (opacity below SeeThroughLevels) is mixed over what's there instead,
 +	// within what's left of a unit's allowance, and leaves the depth alone; it only stops the
-+	// glow behind it when it is more than half opaque.
++	// glow behind it when it is more than half opaque. A unit's, a body's or an item's pixel
++	// keeps its colours under futuristic night vision; anything else solid (smoke more than
++	// half opaque) drawn over it takes that back (see _ownColours).
++	const Uint8 ownColours = draw.unit || draw.body || draw.pile ? 1 : 0;
 +	auto plot = [&](int pixelX, int pixelY, Uint8 color, float depth, int pixelOpacity) {
 +		const int index = pixelY * width + pixelX;
 +		float &depthHere = _depthBuffer[index];
@@ -50931,7 +50949,11 @@ index 000000000..c76dc65c7
 +			if (veilLeft != 255) veilLeft -= pixelOpacity;
 +			Uint8 *pixel = getRaw(pixelX, pixelY);
 +			*pixel = seeThrough(pixelOpacity, shadeColor(color, shade), *pixel);
-+			if (pixelOpacity > SeeThroughLevels / 2) _glowMask[index] = 0;
++			if (pixelOpacity > SeeThroughLevels / 2)
++			{
++				_glowMask[index] = 0;
++				_ownColours[index] = ownColours;
++			}
 +			return;
 +		}
 +		if (opacity < 1.0f && dither(pixelX, pixelY) >= opacity) return;
@@ -50939,6 +50961,7 @@ index 000000000..c76dc65c7
 +		depthHere = depth;
 +		_glowMask[index] = 0;
 +		_unitVeil[index] = draw.unit ? UnitVeilMax : 255;
++		_ownColours[index] = ownColours;
 +		const int patchX = pixelX - _pointerX + PointerReach, patchY = pixelY - _pointerY + PointerReach;
 +		if (patchX >= 0 && patchY >= 0 && patchX <= 2 * PointerReach && patchY <= 2 * PointerReach)
 +		{
@@ -58506,7 +58529,7 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..1a03a8c65
+index 000000000..429952caf
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,858 @@
@@ -58728,7 +58751,7 @@ index 000000000..1a03a8c65
 +			"fpsMeleeFloors", "fpsAimExact", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
 +			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear" } },
 +		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
-+			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsHitFlash", "fpsScreenShake", "fpsParticles", "fpsUfoLights",
++			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsHitFlash", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 +			"fpsGhostParts", "fpsGhostOpacity", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
 +		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
 +			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsCompass", "fpsMiddleClickIdentify" } },

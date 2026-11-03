@@ -776,6 +776,10 @@ void createOptions(std::vector<OptionInfo> &options)
 	// Screen shake (a player, GitHub issue #67): off, nothing shakes the view (explosions, hits,
 	// falls, landings, panic, one's own shots).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsScreenShake", &fpsScreenShake, true, "STR_FPS_SCREEN_SHAKE", category));
+	// Futuristic night vision (a player, GitHub issue #88: the map's night vision leaves units and
+	// items their own colours): units, bodies and items keep theirs, the world goes green. Off (the
+	// owner: realistic, by default), everything goes green.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightVisionUnits", &fpsNightVisionUnits, false, "STR_FPS_NIGHT_VISION_UNITS", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsParticles", &fpsParticles, 2, "STR_FPS_PARTICLES", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsUfoLights", &fpsUfoLights, true, "STR_FPS_UFO_LIGHTS", category));
 	// Parts the map draws but gives no shape (no voxels: ladders, lifts' pads, walls of laser

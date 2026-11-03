@@ -235,6 +235,8 @@ en-GB:
   STR_FPS_SCREEN_SHAKE: "Screen shake"
   STR_FPS_SCREEN_SHAKE_DESC: "Explosions, hits, falls and your own shots shake the view. NO: nothing shakes it."
   STR_FPS_RECOIL: "Recoil"
+  STR_FPS_NIGHT_VISION_UNITS: "Futuristic night vision"
+  STR_FPS_NIGHT_VISION_UNITS_DESC: "YES: units, bodies and items keep their colours, as on the map; the world goes green. NO: all green."
   STR_FPS_RECOIL_DESC: "Each shot kicks the view up (and climbs in a burst with FPS-style shooting). NO: the view stays still."
   STR_FPS_FLIGHT_COST: "Flight cost per level (TU)"
   STR_FPS_FLIGHT_COST_DESC: "TU to fly up or down one level (0 = free)."
