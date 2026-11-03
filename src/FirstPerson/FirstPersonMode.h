@@ -146,6 +146,8 @@ public:
 	static void drawMapAkimbo(BattlescapeState *state, BattleUnit *unit, Surface *leftHand, Surface *rightHand);
 	/// A shot fired on the map: with akimbo marked there, the other hand's gun fires along, as in 3D.
 	static void mapAkimbo(BattlescapeState *state, BattleAction &action);
+	/// A reaction shot: with the soldier's akimbo marked, the other hand's gun fires along.
+	static void reactionAkimbo(BattlescapeState *state, BattleAction &action);
 	/// Do a shotgun's pellets and a volley's two rounds each land on their own (setting "Each pellet on its own")?
 	static bool eachPellet(BattlescapeState *state);
 	/// The scale a stat bar is drawn at, on the map or in 3D (setting "Stat bars").
@@ -728,6 +730,8 @@ private:
 	void toggleAkimbo();
 	/// The akimbo style key: both guns at once, or one a moment after the other (setting "Akimbo in turn").
 	void toggleAkimboStyle();
+	/// The soldier's akimbo mark on the map follows akimbo in 3D.
+	void markMapAkimbo(BattleUnit *unit);
 	/// Dual wield: the other hand's gun if it can fire along with this mode, and the mode it fires.
 	BattleItem *dualPartner(BattleUnit *unit, const BattleItem *weapon, BattleActionType mode, BattleActionType &partnerMode) const;
 	/// Akimbo on the map: do the soldier's two guns pair up there?

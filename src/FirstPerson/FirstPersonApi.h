@@ -259,6 +259,9 @@ void drawMapAkimbo(BattlescapeState *state, BattleUnit *unit, Surface *leftHand,
 /// A shot fired on the map, as it's launched: with akimbo marked there, the other hand's gun
 /// fires along, as in 3D (not while the 3D view shows: its shots bring their own).
 void mapAkimbo(BattlescapeState *state, BattleAction &action);
+/// A reaction shot, as it's launched, in either view: with the soldier's akimbo marked on the map,
+/// the other hand's gun fires along.
+void reactionAkimbo(BattlescapeState *state, BattleAction &action);
 /// A shotgun's pellet landed (ProjectileFlyBState::pelletLands), in either view: it's heard (a few
 /// to a volley; not one whose hit the explosion state brings, which sounds its own) and the 3D view
 /// marks where it struck (sparks, a bullet hole), as it does the round.
@@ -311,6 +314,7 @@ inline double statBarScale(BattlescapeState *, int, int, int) { return 1.0; }
 inline bool toggleMapAkimbo(BattlescapeState *, BattleUnit *) { return false; }
 inline void drawMapAkimbo(BattlescapeState *, BattleUnit *, Surface *, Surface *) { }
 inline void mapAkimbo(BattlescapeState *, BattleAction &) { }
+inline void reactionAkimbo(BattlescapeState *, BattleAction &) { }
 inline void pelletLanded(BattlescapeState *, const Position &, const Position &, int, const BattleItem *, const BattleItem *, bool = true) { }
 inline int shotgunBulletSprite(const Mod *, const RuleItem *) { return -1; } // (Mod::NO_SURFACE)
 inline bool breakdown(BattlescapeState *, BattleUnit *) { return false; }

@@ -55,7 +55,7 @@ KEYS = [
         ('<kbd>Wheel</kbd> / <kbd>J</kbd>', 'Previous / next fire mode: snap, aimed, auto, launch, melee, psi, use, throw, prime.', ''),
         ('<kbd>Z</kbd> <kbd>X</kbd> <kbd>V</kbd>', 'Snap / aimed / auto shot.', 'In FPS style: snap = one round from the hip, aimed = one tight round, auto = a burst, hold the trigger for more.'),
         ('<kbd>G</kbd>', 'Switch hand: right, left, and the built-in weapon, each that gives something to use.', ''),
-        ('<kbd>Y</kbd>', 'Akimbo off, and back on to the kind the setting <i>Akimbo</i> says (Full or One-hand); with the setting Off it does nothing.', 'Two guns: more rounds, each 30% less accurate. Off to take an aimed shot.'),
+        ('<kbd>Y</kbd>', 'Akimbo off, and back on to the kind the setting <i>Akimbo</i> says (Full or One-hand); with the setting Off it does nothing. It marks the soldier\'s akimbo on the map along with it.', 'Two guns: more rounds, each 30% less accurate. Off to take an aimed shot. Reaction shots fire both guns too.'),
         ('<i>Akimbo style</i> (unbound)', 'Switch two guns between taking turns round by round and firing at once (<i>Akimbo volley</i>).', ''),
         ('<kbd>Ctrl</kbd>+<kbd>Shift</kbd> + click', 'With a spray weapon\'s auto shot (X-Com Files\' miniguns): mark the spray burst\'s points, as on the map.', ''),
         ('Right button', 'Cancel the current action, or forget a target marked for <i>Confirm fire</i>; with nothing to cancel, hold to zoom (with a free cursor: hold and drag to look round).', ''),

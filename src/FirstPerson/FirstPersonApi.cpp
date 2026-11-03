@@ -1093,6 +1093,18 @@ bool toggleMapAkimbo(BattlescapeState *state, BattleUnit *unit)
 }
 
 /**
+ * Called by the game as a reaction shot is launched (TileEngine::tryReaction): with the soldier's
+ * akimbo marked (on the map, or by the akimbo key in 3D), the other hand's gun fires along (see
+ * FirstPersonMode::reactionAkimbo).
+ * @param state The battlescape screen.
+ * @param action The reaction shot.
+ */
+void reactionAkimbo(BattlescapeState *state, BattleAction &action)
+{
+	FirstPersonMode::reactionAkimbo(state, action);
+}
+
+/**
  * Called by the game after it draws the hands' weapons: akimbo on the map's mini targets (see
  * FirstPersonMode::drawMapAkimbo).
  * @param state The battlescape screen.

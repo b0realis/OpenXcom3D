@@ -596,6 +596,10 @@ void FirstPersonMode::toggleAkimbo()
 		Options::fpsDualWield = choice == 1;
 		_state->warning(choice == 2 ? "STR_FPS_AKIMBO_REALISTIC_ON" : "STR_FPS_AKIMBO_FULL_ON");
 	}
+	// The soldier's akimbo on the map goes with it (a player, GitHub issue #79): marked on, both at
+	// once or in turn as "Akimbo volley" says, where the two guns pair up there; off with it. The
+	// map's shots and the soldier's reaction shots follow the mark (see mapAkimbo, reactionAkimbo).
+	markMapAkimbo(_save->getSelectedUnit());
 	// The options file keeps it, so the options screen's Cancel doesn't quietly undo it.
 	rememberChoices();
 	Options::save();
@@ -610,6 +614,23 @@ void FirstPersonMode::toggleAkimboStyle()
 {
 	Options::fpsAkimboVolley = !Options::fpsAkimboVolley;
 	_state->warning(Options::fpsAkimboVolley ? "STR_FPS_AKIMBO_TOGETHER_ON" : "STR_FPS_AKIMBO_IN_TURN_ON");
+	markMapAkimbo(_save->getSelectedUnit()); // (the soldier's mark on the map follows, see toggleAkimbo)
+}
+
+/**
+ * The soldier's akimbo mark on the map follows akimbo in 3D (see toggleAkimbo): marked on, both
+ * at once (1) or in turn (2) as "Akimbo volley" says, while akimbo is on and the two guns pair up
+ * on the map (see mapAkimboPairs); otherwise off (0).
+ * @param unit The soldier (null: none).
+ */
+void FirstPersonMode::markMapAkimbo(BattleUnit *unit)
+{
+	if (!unit || unit->getFaction() != FACTION_PLAYER)
+	{
+		return;
+	}
+	const bool on = (Options::fpsDualWield || Options::fpsAkimboRealistic) && mapAkimboPairs(unit);
+	unit->setMapAkimbo(on ? (Options::fpsAkimboVolley ? 1 : 2) : 0);
 }
 
 /**
@@ -763,6 +784,32 @@ void FirstPersonMode::mapAkimbo(BattlescapeState *state, BattleAction &action)
 	action.dualType = BA_NONE;
 	BattleUnit *unit = action.actor;
 	if (!unit || !unit->getMapAkimbo() || !action.weapon)
+	{
+		return;
+	}
+	BattleActionType partnerMode = BA_NONE;
+	if (BattleItem *partner = mode->mapAkimboPartner(unit, action.weapon, action.type, partnerMode))
+	{
+		action.dualWield = true;
+		action.dualWeapon = partner;
+		action.dualType = partnerMode;
+		action.dualVolley = unit->getMapAkimbo() == 1;
+	}
+}
+
+/**
+ * A reaction shot (TileEngine::tryReaction, as it launches it), in either view: with the soldier's
+ * akimbo marked (on the map, or set along with the akimbo key in 3D, see toggleAkimbo), the other
+ * hand's gun fires along, both at once or in turn as marked, as a shot of the player's does on the
+ * map (see mapAkimbo; a player, GitHub issue #79: "fire akimbo on reactions").
+ * @param state The battlescape screen.
+ * @param action The reaction shot.
+ */
+void FirstPersonMode::reactionAkimbo(BattlescapeState *state, BattleAction &action)
+{
+	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
+	BattleUnit *unit = action.actor;
+	if (!mode || !unit || !unit->getMapAkimbo() || !action.weapon)
 	{
 		return;
 	}
