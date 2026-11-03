@@ -6,7 +6,7 @@
 
 ![Night, through a soldier's eyes](docs/screenshots/night.png)
 
-*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.09**, for Linux, Windows and the Steam Deck, with a first, untested build for macOS.
+*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.10**, for Linux, Windows and the Steam Deck, with a first, untested build for macOS.
 
 **Both games are supported,** *UFO: Enemy Unknown* and *X-COM: Terror From The Deep*, and the big mods built on OXCE run in it too (XPiratez is played and tested here).
 
@@ -24,7 +24,7 @@
 - **See:** the original maps, sprites, palette and sounds, rebuilt in 3D from the game's own voxel data: light and shadow, a flashlight and flares, night vision gear, smoke you can see through, rain and snow, swinging doors, glowing UFOs, bullet holes and scorch marks; under the sea, bubbles, marine snow and caustics.
 - **Lead the squad:** every soldier's live helmet camera on the top bar (hover for their card, right click for the big soldier cam), a camera window over the isometric map, and the aliens' turn watched through the eyes of whoever sees the alien.
 - **Feel it:** recoil and muzzle flashes, hit markers, shots whizzing past, blood on the view and a heartbeat when badly hurt, panic and berserk through your soldier's own eyes, and a helmet camera dying in static.
-- **Make it yours:** 69 settings and 33 keys of its own (**Options → 3D VIEW**), and a controller layout made for the Steam Deck.
+- **Make it yours:** 89 settings and 39 keys of its own (**Options → 3D VIEW**), and a controller layout made for the Steam Deck.
 
 | | |
 |---|---|
@@ -41,38 +41,23 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 
 **But be careful!** It can be a traumatic experience.
 
-## New in 1.09
+## New in 1.10
 
-- **A UFO's light inside it, even:** inside a UFO its light no longer lays a grid of dots over the view; the walls and floors take its colour evenly and stay sharp, strong colours (a red lift pad) keep theirs, and the aura's motes stay outside.
-- **Smoke opacity, by day and at night:** two settings for the smoke you see through, 45% by day (as before) and 25% at night and in the dark, where lit smoke could be blinding; where your soldier can't see through, it stays solid.
-- **No walking on out of the map through a door:** one slow frame in a doorway could send the view walking on for ever while the soldier stood in the next tile; now the step always ends inside it.
-- **Shots nearer the crosshair:** when no line reaches the very point under the crosshair (along a bumpy floor, over a counter), the shot goes for the nearest point that one does, not the tile's middle; and aiming at your own tile no longer turns your soldier south (an OXCE quirk, fixed on the map too).
-- **Melee by the crosshair:** a blow strikes the unit you aim at beside you (turning to them, paid with *Turning costs TU*), or the wall you aim at, not whatever stands the way the compass says you face.
-- **Melee at floors and straight up:** with terrain melee on, a blow at the floor or ceiling you aim at strikes it (setting *Melee hits floors*); a unit straight above or below you is struck when nothing solid lies between.
-- **The snap shot in FPS style:** Z fires the gun's single snap shot again (it fired a burst, as a click on AUTO does).
-- **Names by the hitbox:** the unit you point at (its name, the middle click, a medi-kit's patient, a melee blow) is found by the game's hitbox first, so small moving aliens no longer make the name blink.
-- **Tails on the floor:** what a unit's art draws below its feet (a snake's tail, a long body) lies flat on the floor instead of sinking into it.
-- **See-through corpses** (a setting, off at first): a corpse or item under the crosshair turns faint while you aim past it, as the game's shots pass through it.
-- **Page Up flies:** off a lift, Page Up switches flight on and flies up in one press; Page Down on the ground switches it off.
-- **Settings for new players:** new installs start with the game's own mechanics (tile moves, flight at the game's cost, no vaulting, night vision for all), hitboxes for the unit you aim at; *FPS-style shooting (easier)* says what it does; one *Akimbo* setting; the settings list in sections.
-- **Bullet holes under the zoom:** zoomed in, holes and scorches grow with everything round them (they looked smaller).
-- **A clean view:** P's second press hides the crosshair and its info too; a third brings it all back.
-- **The motion scanner in 3D:** held up at the bottom of the view, turning as you look round, a ring sweeping out with a whoop, and a pip for each movement it finds, as in the film.
-- **Full sprite hitboxes** (a setting, off at first): units are hit, and seen, wherever their full sprites show, for everyone, in 3D and on the map.
-- **Quick deaths** (a setting, off at first): units killed or knocked out are down at once, so bursts fire on and several fall together; your soldier's fall plays on their camera card while the view goes on to the next soldier.
-- **A logo of its own:** the alien in the yellow X, now the icon of the AppImage, the Windows game, the Mac app, the game's window, the menu entry and the web pages.
-- **Playstyle:** one switch at the top of the settings: *Faithful* (the game's own way), *FPS* (FPS-style shooting, free turning and walking, vaulting, leaning, full sprite hitboxes, quick deaths, melee at walls) or *Custom*, your own mix of those, kept across restarts.
-- **The accuracy line shows misses:** with the game's own targeting, beyond the bright middle where a hit lands, a dotted line runs out to where a miss can stray at that hit chance, up to the view's edges.
-- **Instant chain explosions** (a setting, off at first): in 3D, explosive terrain set off by a blast goes up at once, the whole chain in a moment with the same wreckage.
-- **Doom IDCLIP:** a cheat beside IDDQD and IDKFA: walk and float through walls, doors, floors and ceilings; no one falls while it's on.
-- **Crops, rubble and wheat as the map draws them:** parts with no 3D shape in the big mods' data (X-Com Files' and XPiratez's fields, broken glass) stand as their pictures show; wheat as a solid crop block (*See-through crops* makes it faint); leafy crowns for X-Com Files' forest trees.
-- **Deaths in the air come down:** a flying unit killed over no floor falls to the ground with gravity, its collapse playing on the way.
-- **On the HUD:** *Shot damage* (a setting) shows the damage range under the hit chance; *Craft icons* put each soldier's figure on the cards; a gun with several ammo types says the loaded one's ("6 [HE]").
-- **More:** a key to grab the item underfoot (unbound at first); *Auto-equip guns first* (a setting) for the big mods' melee-heavy stores; *Turning costs TU* on by default; the aliens' turn cuts to a soldier shot at by an unseen alien.
-- **Fixed:** melee on big units with full sprite hitboxes; quick deaths' falls at the game's pace; akimbo never pairs a gun that blocks both hands; HIDDEN MOVEMENT glows green on the civilians' turn; no sparks for a missed blow.
+- **Glass:** windows the map sees through are glass in 3D, what's behind them a little paler and bluer: houses' and shops' windows, glass doors, X-Com Files' glass panels and walls. A plain opening (a barn's window, an alien base's) stays open, as on the map.
+- **Glass shatters:** a round, a pellet or a thrown item through a window, or a blast beside it, shatters the glass: shards fall, a crack and tinkle is heard, and the window stays open for the rest of the battle, kept in the save. Only the look: rounds and sight go as the game has them.
+- **A blue shield for no harm:** a strike on an enemy in sight that took neither health nor stun marks the crosshair with a small blue shield and a duller tick.
+- **Hits on downed units:** a knocked-out unit hit flashes and bleeds, and marks the crosshair; a hit that only stuns counts.
+- **Arcs at the open sky:** arcing shots and throws aimed at the sky fly on through the point on the crosshair's line and come down where they fall.
+- **Flare shadows:** with *Shadows* on, a unit lit by a flare throws a soft shadow away from it, longer the lower the flare.
+- **Night vision and cameras:** *Futuristic night vision* (a setting) keeps units and items in their own colours, as the map does; *Cameras see as the eyes* (a setting) lets the helmet cameras see through smoke with heat vision.
+- **Your controls:** *Screen shake* and *Recoil* can be switched off; the 3D view has its own turn and look keys, so the map can scroll on W, A, S, D; a key waiting to be rebound shows it.
+- **Akimbo:** two guns at once lose 20% of their accuracy (not 30%); Y in 3D marks akimbo on the map too, and reaction shots fire both guns.
+- **The fire modes** on the wheel go from quantity to quality: auto, snap, aimed.
+- **More:** a mod's mana bar on the 3D panel (XPiratez, X-Com Files); the version in the main menu; *Auto-equip guns first* hands out the hardest-hitting first; Zombies hatch the game's way with quick deaths; no gun dip when the view goes to another soldier; arcs and throws at a wall you stand against go over it.
 
 ## Earlier versions
 
+- **1.09:** a UFO's light inside it even, smoke opacity by day and at night, melee by the crosshair and at floors, the motion scanner in 3D, full sprite hitboxes, quick deaths, *Playstyle*, Doom IDCLIP, instant chain explosions, and a logo of its own.
 - **1.08:** every pellet of a shotgun lands on its own, akimbo on the isometric map, the sea in waves, rooms in their own light; aiming at the fringes, an accuracy line under the crosshair, stat bars that read, a check before an unsafe landing, XPiratez's sludge with a surface and catwalks that show, and the play guide with every key and setting.
 - **1.07:** akimbo's two guns take turns round by round, each its whole burst, both lasers; UFO's shop racks in their shape, the sea on TFTD's islands, see-through glass doors; units above no longer through the ceiling; mods' own mode names on the crosshair; no more shotgun lag on the map.
 - **1.06:** everything by the crosshair (melee, medi-kits, every cost of an action), spray bursts from 3D, flying with the view, heat vision thinning the smoke, Cydonia's lift cages, *Ghost opacity*, the rank before the name.
@@ -118,7 +103,7 @@ OpenXcom3D stems from **OpenXcom Extended** at exactly this commit:
 All changes on top of it are in one file, [`openxcom3d.patch`](openxcom3d.patch) (it applies with `git apply` to a clean checkout of that commit):
 
 - [`src/FirstPerson/`](src/FirstPerson): the 3D view, an engine add-on (renderer, controller, sounds, options), one file per topic and commented throughout;
-- hooks in the core (46 files, about 1,700 lines, half of them the shot's own in `ProjectileFlyBState`): see the patch;
+- hooks in the core (48 files, about 1,800 lines, half of them the shot's own in `ProjectileFlyBState`): see the patch;
 - [`mod/OpenXcom3D/`](mod/OpenXcom3D): the data mod that switches it on.
 
 `src/` and `mod/` in this repository are the same files as in the patch, for reading. Built with `-DOXCE_FIRSTPERSON=OFF`, it is plain OXCE again.

@@ -4937,4 +4937,3 @@ void FirstPersonMode::keepFiringWhileHeld(BattleUnit *unit, bool playerTurn)
 }
 
 // Thanks mom and dad! You were the ones who exposed me to my first comp.
-

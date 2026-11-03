@@ -2806,4 +2806,3 @@ void FirstPersonView::drawDownedIcons()
 }
 
 // Thanks mom and dad! You were the ones who exposed me to my first comp.
-

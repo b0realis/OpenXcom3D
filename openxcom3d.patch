@@ -1205,7 +1205,7 @@ index 000000000..2b8ddfb0f
 +        color: 144
 diff --git a/mod/OpenXcom3D/metadata.yml b/mod/OpenXcom3D/metadata.yml
 new file mode 100644
-index 000000000..ddcfc71a5
+index 000000000..375fb8ef9
 --- /dev/null
 +++ b/mod/OpenXcom3D/metadata.yml
 @@ -0,0 +1,11 @@
@@ -1213,13 +1213,13 @@ index 000000000..ddcfc71a5
 +# metadata.yml for OpenXcom3D
 +
 +name: "OpenXcom3D - First-Person View"
-+version: 1.09
++version: 1.10
 +description: "Adds a first-person 3D view of the battlescape (F8): mouse look, real-time movement paid with time units (WASD), firing from the crosshair, a squad bar with soldier camera cards, lights, shadows, flashlight, particles, weather, tactical flares, combat music and its own 3D View options tab. Needs the OpenXcom3D build of OXCE; on a standard OXCE build this mod reports an unsupported engine and stays off."
 +author: OpenXcom3D project
 +
 +master: "*"
 +requiredExtendedEngine: OpenXcom3D
-+requiredExtendedVersion: "1.0.9"
++requiredExtendedVersion: "1.0.10"
 diff --git a/res/linux/icons/openxcom.svg b/res/linux/icons/openxcom.svg
 index 444f7387b..9196ac813 100644
 --- a/res/linux/icons/openxcom.svg
@@ -21639,7 +21639,7 @@ index a4c23b216..13d36e8f3 100644
  	{
  		_buttonsPressed |= SDL_BUTTON(button);
 diff --git a/src/Engine/ModInfo.cpp b/src/Engine/ModInfo.cpp
-index cca815d3e..e29cefc2b 100644
+index cca815d3e..8053820d9 100644
 --- a/src/Engine/ModInfo.cpp
 +++ b/src/Engine/ModInfo.cpp
 @@ -181,6 +181,9 @@ struct EngineData
@@ -21647,7 +21647,7 @@ index cca815d3e..e29cefc2b 100644
  const EngineData supportedEngines[] = {
  	{ OPENXCOM_VERSION_ENGINE, { OPENXCOM_VERSION_NUMBER }},
 +#ifndef OXCE_NO_FIRSTPERSON
-+	{ "OpenXcom3D", { 1, 0, 9, 0 } }, // first-person add-on 1.09, see src/FirstPerson
++	{ "OpenXcom3D", { 1, 0, 10, 0 } }, // first-person add-on 1.10, see src/FirstPerson
 +#endif
  	{ "", { 0, 0, 0, 0 } }, // assume that every engine support mods from base game, remove if its not true.
  };
@@ -21813,7 +21813,7 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..e3afbc20b
+index 000000000..52f0ea42f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
 @@ -0,0 +1,1288 @@
@@ -21963,7 +21963,7 @@ index 000000000..e3afbc20b
 +}
 +
 +/**
-+ * The main menu with the mod on: its version (the mod's own metadata, "1.09") in small letters
++ * The main menu with the mod on: its version (the mod's own metadata, "1.10") in small letters
 + * just right of the title's first line, "OpenXcom3D", its foot on the big letters' foot (a player,
 + * GitHub issue #69: without the AppImage's name, no telling the version; the owner: "a smaller
 + * space and our version number besides OpenXcom3D", then "Make the version no. Smaller"). A text
@@ -33260,10 +33260,10 @@ index 000000000..910a420ef
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..7ca28ea2a
+index 000000000..56597ade0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,4940 @@
+@@ -0,0 +1,4939 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -38203,7 +38203,6 @@ index 000000000..7ca28ea2a
 +}
 +
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
-+
 diff --git a/src/FirstPerson/FirstPersonModeSoldierStates.cpp b/src/FirstPerson/FirstPersonModeSoldierStates.cpp
 new file mode 100644
 index 000000000..9507fcd26
@@ -51425,10 +51424,10 @@ index 000000000..17ff3d48d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..b4ce7de47
+index 000000000..bfe06c3d7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,2809 @@
+@@ -0,0 +1,2808 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -54237,7 +54236,6 @@ index 000000000..b4ce7de47
 +}
 +
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
-+
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
 index 000000000..945cac2d8

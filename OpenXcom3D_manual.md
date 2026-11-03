@@ -1,6 +1,6 @@
 # OpenXcom3D manual
 
-Version 1.09. OpenXcom3D is **OpenXcom Extended (OXCE)** with a first-person 3D battlescape: an engine add-on (`src/FirstPerson/`, with small hooks in the core) and a data mod (`OpenXcom3D`) that switches it on.
+Version 1.10. OpenXcom3D is **OpenXcom Extended (OXCE)** with a first-person 3D battlescape: an engine add-on (`src/FirstPerson/`, with small hooks in the core) and a data mod (`OpenXcom3D`) that switches it on.
 
 In short, with pictures: the [play guide](https://b0realis.github.io/OpenXcom3D/play.html) has [every key](https://b0realis.github.io/OpenXcom3D/play.html#keys), [every setting](https://b0realis.github.io/OpenXcom3D/play.html#settings) and how each plays, what's on the screen, and every feature. This manual has the whole story.
 
@@ -770,7 +770,7 @@ Sprite upscaling costs nothing measurable. Use **pixel size** 2 or 3 on slow mac
 | Branch | **`oxce-plus`** |
 | Commit | **`f0134ef8065799c7723953d64b565f7832bfd782`** — 2026-09-29 15:04:49 +0200, author Meridian, "Merge remote-tracking branch 'SupSuper/master' into oxce-plus" |
 | Version string | **OpenXcom Extended 8.7.1 (v2026-09-19)** |
-| OpenXcom3D | engine add-on and mod version **1.09** (`requiredExtendedEngine: OpenXcom3D`, `requiredExtendedVersion: "1.0.9"`: OXCE reads "1.09" as 1.9) |
+| OpenXcom3D | engine add-on and mod version **1.10** (`requiredExtendedEngine: OpenXcom3D`, `requiredExtendedVersion: "1.0.10"`: OXCE would read "1.09" as 1.9, so the engine counts 1.0.9, 1.0.10) |
 
 `openxcom3d.patch` holds every change on top of that commit:
 
@@ -887,7 +887,7 @@ What `FirstPersonView` draws:
 
 ## 11. Version history
 
-### 1.10 (not released yet)
+### 1.10 (2026-11-03)
 
 - **Glass only in windows** (the owner: "barn windows in farm are just openings as before without glass - check!", then "railings open"): a wall the game sees through gets glass in 3D only where it's a window. One hole with no bars across it is glass only where the game's own shape stands across most of it (X-Com Files' kiosk glass, single-pane glass doors: sight passes, shots stop); one the game leaves open is an opening, as the map and 1.09 show it: UFO's barn windows, Cydonia's and the alien bases' openings, TFTD's port frames and portholes, X-Com Files' village barns and blasted breaches (70 walls across UFO, TFTD and X-Com Files). A wall whose shape covers under a third of its plane (barbed wire, an arch's thin frame) and the gaps of a railing (its wall stopping short of the top: TFTD's cargo deck) get none; painted glass only on a thin wall (not X-Com Files' ice-cave rock), and no glass fill in a thick one (TFTD's airliner fuselage). Windows with bars, glass doors and painted panels keep their glass.
 

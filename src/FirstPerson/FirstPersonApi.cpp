@@ -144,7 +144,7 @@ bool autoEquipGunsFirst(const Mod *mod)
 }
 
 /**
- * The main menu with the mod on: its version (the mod's own metadata, "1.09") in small letters
+ * The main menu with the mod on: its version (the mod's own metadata, "1.10") in small letters
  * just right of the title's first line, "OpenXcom3D", its foot on the big letters' foot (a player,
  * GitHub issue #69: without the AppImage's name, no telling the version; the owner: "a smaller
  * space and our version number besides OpenXcom3D", then "Make the version no. Smaller"). A text
