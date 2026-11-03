@@ -3585,8 +3585,9 @@ void FirstPersonMode::freeAimTarget(const BattleAction &action, Position &target
 
 /**
  * FPS-style recoil, every frame: each of our rounds lifts the view by the power of what it
- * fires (lasers barely, plasma a little more), with a little sideways jitter. After a pause in
- * firing the view eases back down by as much as it climbed, and the bloom fades.
+ * fires (lasers barely, plasma a little more), with a little sideways jitter (not with the
+ * setting "Recoil" off). After a pause in firing the view eases back down by as much as it
+ * climbed, and the bloom fades.
  * @param unit The soldier being looked through (may be null).
  * @param elapsedSeconds Seconds since the last frame.
  */
@@ -3601,7 +3602,7 @@ void FirstPersonMode::updateRecoil(BattleUnit *unit, double elapsedSeconds)
 	{
 		_recoilShotSeen = shotKey;
 		BattleItem *weapon = unit ? activeWeapon(unit) : nullptr;
-		if (!Options::fpsFaithfulTargeting && weapon && weapon->getRules()->getBattleType() == BT_FIREARM)
+		if (!Options::fpsFaithfulTargeting && Options::fpsRecoil && weapon && weapon->getRules()->getBattleType() == BT_FIREARM)
 		{
 			// How hard it kicks: by the power of the loaded ammo (or of the gun, if it needs
 			// none), less for beams, and less for single shots than for bursts.

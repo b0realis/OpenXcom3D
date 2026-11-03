@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..a3a36c99b
+index 000000000..ebb9abc3a
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,461 @@
+@@ -0,0 +1,465 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -362,6 +362,10 @@ index 000000000..a3a36c99b
 +  STR_FPS_MUZZLE_FLASH_DESC: "Flashes from gunfire, hits and blasts. Off if flashes bother you."
 +  STR_FPS_HIT_FLASH: "Hit flash"
 +  STR_FPS_HIT_FLASH_DESC: "A unit hit, standing or down, flashes for a moment (with Muzzle flashes on). NO: it only flinches."
++  STR_FPS_SCREEN_SHAKE: "Screen shake"
++  STR_FPS_SCREEN_SHAKE_DESC: "Explosions, hits, falls and your own shots shake the view. NO: nothing shakes it."
++  STR_FPS_RECOIL: "Recoil"
++  STR_FPS_RECOIL_DESC: "Each shot kicks the view up (and climbs in a burst with FPS-style shooting). NO: the view stays still."
 +  STR_FPS_FLIGHT_COST: "Flight cost per level (TU)"
 +  STR_FPS_FLIGHT_COST_DESC: "TU to fly up or down one level (0 = free)."
 +  STR_FPS_FLIGHT_COST_OVERRIDE: "Flight cost overrides rules"
@@ -591,10 +595,10 @@ index 000000000..a3a36c99b
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..c2c8a394d
+index 000000000..38fc5e6ca
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,461 @@
+@@ -0,0 +1,465 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -829,6 +833,10 @@ index 000000000..c2c8a394d
 +  STR_FPS_MUZZLE_FLASH_DESC: "Flashes from gunfire, hits and blasts. Off if flashes bother you."
 +  STR_FPS_HIT_FLASH: "Hit flash"
 +  STR_FPS_HIT_FLASH_DESC: "A unit hit, standing or down, flashes for a moment (with Muzzle flashes on). NO: it only flinches."
++  STR_FPS_SCREEN_SHAKE: "Screen shake"
++  STR_FPS_SCREEN_SHAKE_DESC: "Explosions, hits, falls and your own shots shake the view. NO: nothing shakes it."
++  STR_FPS_RECOIL: "Recoil"
++  STR_FPS_RECOIL_DESC: "Each shot kicks the view up (and climbs in a burst with FPS-style shooting). NO: the view stays still."
 +  STR_FPS_FLIGHT_COST: "Flight cost per level (TU)"
 +  STR_FPS_FLIGHT_COST_DESC: "TU to fly up or down one level (0 = free)."
 +  STR_FPS_FLIGHT_COST_OVERRIDE: "Flight cost overrides rules"
@@ -21657,7 +21665,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..6816b5197 100644
+index a08796ced..30cd37010 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -21674,7 +21682,7 @@ index a08796ced..6816b5197 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash;
++OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil;
 +OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
@@ -21763,10 +21771,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..57c64a45b
+index 000000000..b2721df15
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1236 @@
+@@ -0,0 +1,1242 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -22467,6 +22475,9 @@ index 000000000..57c64a45b
 +	// realistic). Unset (-1) until settled (see settleOptions) from 1.08's two settings, which
 +	// stay, unlisted, as whether akimbo is on just now (the akimbo key switches them; at most one).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsFaithfulTargeting", &fpsFaithfulTargeting, true, "STR_FPS_FPS_STYLE", category));
++	// Recoil (a player, GitHub issue #67: for players whom a moving view bothers): off, the view
++	// neither kicks up at each shot nor climbs in a burst; the gun in hand still kicks back.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsRecoil", &fpsRecoil, true, "STR_FPS_RECOIL", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsAkimbo", &fpsAkimbo, -1, "STR_FPS_AKIMBO", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsDualWield", &fpsDualWield, false, "STR_FPS_DUAL_WIELD", "STR_FIRST_PERSON_SAVED"));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsAkimboRealistic", &fpsAkimboRealistic, false, "STR_FPS_AKIMBO_REALISTIC", "STR_FIRST_PERSON_SAVED"));
@@ -22539,6 +22550,9 @@ index 000000000..57c64a45b
 +	// setting); off, it only flinches. "Muzzle flashes" off turns it off too (every flash: the
 +	// setting for players whom flashing light bothers).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitFlash", &fpsHitFlash, true, "STR_FPS_HIT_FLASH", category));
++	// Screen shake (a player, GitHub issue #67): off, nothing shakes the view (explosions, hits,
++	// falls, landings, panic, one's own shots).
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsScreenShake", &fpsScreenShake, true, "STR_FPS_SCREEN_SHAKE", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsParticles", &fpsParticles, 2, "STR_FPS_PARTICLES", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsUfoLights", &fpsUfoLights, true, "STR_FPS_UFO_LIGHTS", category));
 +	// Parts the map draws but gives no shape (no voxels: ladders, lifts' pads, walls of laser
@@ -33087,10 +33101,10 @@ index 000000000..399453615
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..02bdaca39
+index 000000000..1f4886b78
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,4719 @@
+@@ -0,0 +1,4720 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -36678,8 +36692,9 @@ index 000000000..02bdaca39
 +
 +/**
 + * FPS-style recoil, every frame: each of our rounds lifts the view by the power of what it
-+ * fires (lasers barely, plasma a little more), with a little sideways jitter. After a pause in
-+ * firing the view eases back down by as much as it climbed, and the bloom fades.
++ * fires (lasers barely, plasma a little more), with a little sideways jitter (not with the
++ * setting "Recoil" off). After a pause in firing the view eases back down by as much as it
++ * climbed, and the bloom fades.
 + * @param unit The soldier being looked through (may be null).
 + * @param elapsedSeconds Seconds since the last frame.
 + */
@@ -36694,7 +36709,7 @@ index 000000000..02bdaca39
 +	{
 +		_recoilShotSeen = shotKey;
 +		BattleItem *weapon = unit ? activeWeapon(unit) : nullptr;
-+		if (!Options::fpsFaithfulTargeting && weapon && weapon->getRules()->getBattleType() == BT_FIREARM)
++		if (!Options::fpsFaithfulTargeting && Options::fpsRecoil && weapon && weapon->getRules()->getBattleType() == BT_FIREARM)
 +		{
 +			// How hard it kicks: by the power of the loaded ammo (or of the gun, if it needs
 +			// none), less for beams, and less for single shots than for bursts.
@@ -41858,7 +41873,7 @@ index 000000000..d7aa46be4
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..1edd633db
+index 000000000..b14b36126
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
 @@ -0,0 +1,623 @@
@@ -42228,7 +42243,7 @@ index 000000000..1edd633db
 +void FirstPersonView::updateBasis()
 +{
 +	// The pitch with the recoil kick added, within the same limits as rotate (MaxPitch).
-+	const double viewPitch = std::clamp(_pitch + _recoilKick * Pi / 180.0, -MaxPitch * Pi / 180.0, MaxPitch * Pi / 180.0); // recoil shows, it doesn't stay
++	const double viewPitch = std::clamp(_pitch + (Options::fpsRecoil ? _recoilKick : 0.0f) * Pi / 180.0, -MaxPitch * Pi / 180.0, MaxPitch * Pi / 180.0); // recoil shows, it doesn't stay (none with the setting "Recoil" off; the gun in hand still kicks)
 +	const double cosYaw = std::cos(_yaw), sinYaw = std::sin(_yaw), cosPitch = std::cos(viewPitch), sinPitch = std::sin(viewPitch);
 +	// Forward along the yaw, tilted by the pitch; right level (the tilt comes below); up from the two.
 +	_forward[0] = cosYaw * cosPitch; _forward[1] = sinYaw * cosPitch; _forward[2] = sinPitch;
@@ -42459,8 +42474,8 @@ index 000000000..1edd633db
 +	const float elapsedSeconds = _shakeLastTick ? std::min<Uint32>(100, now - _shakeLastTick) / 1000.0f : 0.0f;
 +	_shakeLastTick = now;
 +	// Camera shake: the eye jitters for this frame only, dying away (halving about every tenth
-+	// of a second).
-+	if (_shake > 0.02f)
++	// of a second). None with the setting "Screen shake" off.
++	if (_shake > 0.02f && Options::fpsScreenShake)
 +	{
 +		// Smooth shaking (a few wobbles a second, from sines of the time), not a new random jolt
 +		// every frame; less sideways than up and down.
@@ -58491,7 +58506,7 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..1e49bb7ac
+index 000000000..1a03a8c65
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,858 @@
@@ -58709,11 +58724,11 @@ index 000000000..1e49bb7ac
 +			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
 +		{ "STR_FPS_SECTION_MOVEMENT", { "fpsTurnCost", "fpsMovement", "fpsWalkSpeed", "fpsFlightCost", "fpsFlightCostOverride", "fpsVault",
 +			"fpsFalling", "fpsSafeLanding" } },
-+		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsLean", "fpsMeleeTerrain",
++		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsRecoil", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsLean", "fpsMeleeTerrain",
 +			"fpsMeleeFloors", "fpsAimExact", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
 +			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear" } },
 +		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
-+			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsHitFlash", "fpsParticles", "fpsUfoLights",
++			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsHitFlash", "fpsScreenShake", "fpsParticles", "fpsUfoLights",
 +			"fpsGhostParts", "fpsGhostOpacity", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
 +		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
 +			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsCompass", "fpsMiddleClickIdentify" } },

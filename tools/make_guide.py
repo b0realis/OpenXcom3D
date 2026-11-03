@@ -123,6 +123,7 @@ SETTINGS = [
     ('Aiming and combat', [
         ('FPS-style shooting (easier)', 'NO', 'YES / NO', 'NO: the game\'s own accuracy, its hit chance by the crosshair. YES: FPS-style shooting, far easier: rounds along the crosshair with a spread, recoil, from your eye.',
          'The big choice: see <a href="#styles">Two ways to play</a>.'),
+        ('Recoil', 'YES', 'YES / NO', 'Each shot kicks the view up (and climbs it in a burst with FPS-style shooting). NO: the view stays still; the gun in hand still kicks.', ''),
         ('Akimbo', 'Off', 'Off / Full / One-hand', 'A gun in each hand fires both on every shot, the two taking turns round by round, each 30% less accurate, for the dearer gun\'s shot and a tenth.',
          'More rounds for the time units, worse aim; no aimed shots with two guns.'),
         ('Akimbo volley', 'NO', 'YES / NO', 'NO: two guns take turns round by round, each round resolved before the next. YES: both at once, a volley, their hits landing together.',
@@ -165,6 +166,7 @@ SETTINGS = [
         ('Unit size', '100%', '80% to 100%', 'Soldiers, aliens, corpses and items drawn a little smaller, so tall sprites fit under low ceilings.', 'Only the picture: what shots hit stays the game\'s (see <i>Hitboxes</i>).'),
         ('Muzzle flashes', 'YES', 'YES / NO', 'Gunfire, hits and blasts flash. NO: no flashes, steady UFO lights, no camera glitches.', 'Off if flashing light bothers you.'),
         ('Hit flash', 'YES', 'YES / NO', 'A unit hit, standing or down, flashes for a moment (with Muzzle flashes on). NO: it only flinches.', ''),
+        ('Screen shake', 'YES', 'YES / NO', 'Explosions, hits, falls and your own shots shake the view. NO: nothing shakes it.', ''),
         ('Particles', 'All', 'All / Effects / Off', 'Effects: sparks, debris, smoke, fire, trails. All: also dust, fireflies, bubbles and weather.', ''),
         ('UFO lights and aura', 'YES', 'YES / NO', 'UFOs glow: steady hulls with pulsing lights, their own coloured light, evenly inside them, and an aura of motes outside; only once a UFO has been seen.', 'Inside a UFO the view stays sharp: its light only colours it.'),
         ('Parts without shape', 'Lifts', 'Lifts / All / Off', 'Parts the map draws with no shape in the game\'s data, shown as see-through ghosts: ladders, lift pads, the shops\' racks, liquid over a floor, the rest of fences and catwalk gratings the game gives only a few voxels; low parts such as crops and rubble stand solid, as on the map, and a wheat field as a solid block.',

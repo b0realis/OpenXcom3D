@@ -364,7 +364,7 @@ void FirstPersonView::setMaxDistance(int tiles)
 void FirstPersonView::updateBasis()
 {
 	// The pitch with the recoil kick added, within the same limits as rotate (MaxPitch).
-	const double viewPitch = std::clamp(_pitch + _recoilKick * Pi / 180.0, -MaxPitch * Pi / 180.0, MaxPitch * Pi / 180.0); // recoil shows, it doesn't stay
+	const double viewPitch = std::clamp(_pitch + (Options::fpsRecoil ? _recoilKick : 0.0f) * Pi / 180.0, -MaxPitch * Pi / 180.0, MaxPitch * Pi / 180.0); // recoil shows, it doesn't stay (none with the setting "Recoil" off; the gun in hand still kicks)
 	const double cosYaw = std::cos(_yaw), sinYaw = std::sin(_yaw), cosPitch = std::cos(viewPitch), sinPitch = std::sin(viewPitch);
 	// Forward along the yaw, tilted by the pitch; right level (the tilt comes below); up from the two.
 	_forward[0] = cosYaw * cosPitch; _forward[1] = sinYaw * cosPitch; _forward[2] = sinPitch;
@@ -595,8 +595,8 @@ void FirstPersonView::updateCameraEffects()
 	const float elapsedSeconds = _shakeLastTick ? std::min<Uint32>(100, now - _shakeLastTick) / 1000.0f : 0.0f;
 	_shakeLastTick = now;
 	// Camera shake: the eye jitters for this frame only, dying away (halving about every tenth
-	// of a second).
-	if (_shake > 0.02f)
+	// of a second). None with the setting "Screen shake" off.
+	if (_shake > 0.02f && Options::fpsScreenShake)
 	{
 		// Smooth shaking (a few wobbles a second, from sines of the time), not a new random jolt
 		// every frame; less sideways than up and down.

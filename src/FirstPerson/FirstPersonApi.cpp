@@ -698,6 +698,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	// realistic). Unset (-1) until settled (see settleOptions) from 1.08's two settings, which
 	// stay, unlisted, as whether akimbo is on just now (the akimbo key switches them; at most one).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFaithfulTargeting", &fpsFaithfulTargeting, true, "STR_FPS_FPS_STYLE", category));
+	// Recoil (a player, GitHub issue #67: for players whom a moving view bothers): off, the view
+	// neither kicks up at each shot nor climbs in a burst; the gun in hand still kicks back.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsRecoil", &fpsRecoil, true, "STR_FPS_RECOIL", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsAkimbo", &fpsAkimbo, -1, "STR_FPS_AKIMBO", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDualWield", &fpsDualWield, false, "STR_FPS_DUAL_WIELD", "STR_FIRST_PERSON_SAVED"));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsAkimboRealistic", &fpsAkimboRealistic, false, "STR_FPS_AKIMBO_REALISTIC", "STR_FIRST_PERSON_SAVED"));
@@ -770,6 +773,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	// setting); off, it only flinches. "Muzzle flashes" off turns it off too (every flash: the
 	// setting for players whom flashing light bothers).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitFlash", &fpsHitFlash, true, "STR_FPS_HIT_FLASH", category));
+	// Screen shake (a player, GitHub issue #67): off, nothing shakes the view (explosions, hits,
+	// falls, landings, panic, one's own shots).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsScreenShake", &fpsScreenShake, true, "STR_FPS_SCREEN_SHAKE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsParticles", &fpsParticles, 2, "STR_FPS_PARTICLES", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsUfoLights", &fpsUfoLights, true, "STR_FPS_UFO_LIGHTS", category));
 	// Parts the map draws but gives no shape (no voxels: ladders, lifts' pads, walls of laser
