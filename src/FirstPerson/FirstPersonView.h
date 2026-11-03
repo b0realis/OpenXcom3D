@@ -429,6 +429,9 @@ public:
 	/// When an enemy in sight was last hit, and whether that hit killed it (for the hitmarker).
 	Uint32 getHitMarkTick() const { return _hitMarkTick; }
 	bool getHitMarkKill() const { return _hitMarkKill; }
+	/// An enemy in sight struck to no harm just now (see FirstPersonMode::unitStruck), and when that was last.
+	void markNoHarm() { _noHarmTick = SDL_GetTicks(); }
+	Uint32 getNoHarmTick() const { return _noHarmTick; }
 	/// When an enemy shot last whizzed past close by (0 never), and from which side.
 	Uint32 getNearMissTick() const { return _nearMissTick; }
 	void getNearMissDirection(double out[2]) const { out[0] = _nearMissDirection[0]; out[1] = _nearMissDirection[1]; }
@@ -743,6 +746,7 @@ private:
 	std::unordered_map<const BattleUnit*, UnitWatch> _watchedUnits; // hits and kills, for flinches and hitmarkers
 	Uint32 _hitMarkTick = 0;                            // when an enemy in sight was last hit
 	bool _hitMarkKill = false;                          // and whether that hit killed it
+	Uint32 _noHarmTick = 0;                             // when an enemy in sight was last struck to no harm
 	std::vector<std::pair<const BattleUnit*, int>> _markers; // visible enemies and their numbers
 	std::vector<Position> _sprayPoints;                 // a spray burst's marked points, in voxels (see setSprayMarks)
 	Position _sprayNext;                                // and the next one under the crosshair

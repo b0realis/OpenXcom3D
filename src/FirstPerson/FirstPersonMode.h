@@ -148,6 +148,8 @@ public:
 	static void mapAkimbo(BattlescapeState *state, BattleAction &action);
 	/// A reaction shot: with the soldier's akimbo marked, the other hand's gun fires along.
 	static void reactionAkimbo(BattlescapeState *state, BattleAction &action);
+	/// A round or a blow struck a unit: an enemy in sight it did no harm marks the crosshair.
+	static void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefore, int stunBefore);
 	/// Do a shotgun's pellets and a volley's two rounds each land on their own (setting "Each pellet on its own")?
 	static bool eachPellet(BattlescapeState *state);
 	/// The scale a stat bar is drawn at, on the map or in 3D (setting "Stat bars").
@@ -839,6 +841,7 @@ private:
 	Text *_txtCosts = nullptr;                      // and under them its other costs (setting "Expanded crosshair info")
 	Text *_txtDamage = nullptr;                     // and under the hit chance the shot's damage range (setting "Shot damage")
 	Uint32 _hitMarkerHeard = 0;                    // the last hitmarker that ticked
+	Uint32 _noHarmHeard = 0;                       // the last strike to no harm that ticked
 	const BattleUnit *_sightCheckUnit = nullptr;   // the soldier the last line-of-sight check was for,
 	Position _sightCheckFrom, _sightCheckTile;     // where he stood and the tile aimed at,
 	int _sightCheckDirection = -1;                 // the way he faced,

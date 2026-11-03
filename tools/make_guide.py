@@ -199,7 +199,7 @@ SETTINGS = [
     ]),
     ('Sound', [
         ('Dynamic music', 'YES', 'YES / NO', 'Tenser music while aliens are in sight.', ''),
-        ('Hit, kill and swing sounds', 'YES', 'YES / NO', 'A tick for a hit, a double tick for a kill, a swoosh for your swings, and your heartbeat once hurt below half health.', ''),
+        ('Hit, kill and swing sounds', 'YES', 'YES / NO', 'A tick for a hit, a duller one for a hit that did no harm, a double tick for a kill, a swoosh for your swings, and your heartbeat once hurt below half health.', ''),
     ]),
     ('Cheats', [
         ('Doom mode (debug)', 'NO', 'YES / NO', 'A cheat: in 3D the selected soldier never runs out of time units or energy; grenades go off in real time.', 'For testing and fun, a first step towards real time.'),

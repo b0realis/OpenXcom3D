@@ -1115,6 +1115,19 @@ void reactionAkimbo(BattlescapeState *state, BattleAction &action)
 }
 
 /**
+ * Called by the game after a round or a blow struck a unit (TileEngine::hit): one that did no
+ * harm to an enemy in sight marks the 3D view's crosshair (see FirstPersonMode::unitStruck).
+ * @param state The battlescape screen.
+ * @param unit The unit struck.
+ * @param healthBefore Its health before the strike.
+ * @param stunBefore Its stun before the strike.
+ */
+void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefore, int stunBefore)
+{
+	FirstPersonMode::unitStruck(state, unit, healthBefore, stunBefore);
+}
+
+/**
  * Called by the game after it draws the hands' weapons: akimbo on the map's mini targets (see
  * FirstPersonMode::drawMapAkimbo).
  * @param state The battlescape screen.

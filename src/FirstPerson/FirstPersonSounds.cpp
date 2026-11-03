@@ -199,6 +199,16 @@ FirstPersonSounds::FirstPersonSounds()
 	make(SCAN_BLIP_MID, pip(1900.0f));
 	make(SCAN_BLIP_NEAR, pip(2400.0f));
 
+	// No harm: the hit's tick, duller (60 ms): lower partials (1100 and 1650 Hz), softer, with a
+	// little noise, dying away a little faster.
+	std::vector<float> noHarm(length(0.06f));
+	for (size_t sample = 0; sample < noHarm.size(); ++sample)
+	{
+		const float seconds = (float)sample / rate;
+		noHarm[sample] = 0.6f * std::exp(-seconds * 110.0f) * (0.55f * std::sin(2 * Pi * 1100 * seconds) + 0.3f * std::sin(2 * Pi * 1650 * seconds) + 0.15f * noise(randomEngine));
+	}
+	make(NO_HARM, noHarm);
+
 	// Flare: a strike, then a hiss fading out (1.4 seconds in all).
 	std::vector<float> flare(length(1.4f));
 	float lowPassedNoise = 0.0f; // The noise smoothed by a simple low-pass filter.

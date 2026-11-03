@@ -821,6 +821,27 @@ void FirstPersonMode::reactionAkimbo(BattlescapeState *state, BattleAction &acti
 }
 
 /**
+ * A round or a blow struck a unit (TileEngine::hit, after the damage): one that took neither
+ * health nor stun from an enemy in sight (it bounced off the armour, rolled nothing, or met a full
+ * resistance) marks the crosshair with the no-harm dots (a player, GitHub issue #82: "a
+ * hitmarker for hit, failed to penetrate"; see FirstPersonView::markNoHarm).
+ * @param state The battlescape screen.
+ * @param unit The unit struck.
+ * @param healthBefore Its health before the strike.
+ * @param stunBefore Its stun before the strike.
+ */
+void FirstPersonMode::unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefore, int stunBefore)
+{
+	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
+	if (!mode || !mode->isActive() || !unit || unit->getFaction() != FACTION_HOSTILE || !unit->getVisible()
+		|| unit->getHealth() != healthBefore || unit->getStunlevel() != stunBefore)
+	{
+		return;
+	}
+	mode->_view->markNoHarm();
+}
+
+/**
  * Dual wield: finds the other hand's gun if it can fire along with the chosen gun's fire mode,
  * and works out which of its own modes it fires: the same mode if it has it, else its first
  * shot mode. Each gun pays its own time units for its own mode (by the game's rules).
@@ -3661,7 +3682,8 @@ void FirstPersonMode::updateRecoil(BattleUnit *unit, double elapsedSeconds)
  * @param shots Rounds in an auto burst (dots under the brackets, at most six).
  * @param color Palette colour of the crosshair.
  * @param shadow Palette colour of its outline.
- * @param hitMark 0 none, 1 a hit, 2 a kill: ticks on the diagonals.
+ * @param hitMark 0 none, 1 a hit, 2 a kill: ticks on the diagonals; 3 a strike that did no harm:
+ *        a little blue shield to the lower left.
  * @param hitColor Palette colour of those ticks.
  */
 void FirstPersonMode::drawCrosshair(BattleActionType mode, int shots, Uint8 color, Uint8 shadow, int hitMark, Uint8 hitColor)
@@ -3765,7 +3787,7 @@ void FirstPersonMode::drawCrosshair(BattleActionType mode, int shots, Uint8 colo
 	// The hitmarker: four ticks on the diagonals (white for a hit; for a kill red, and longer).
 	// The points from here on get the hit colour.
 	const size_t modePoints = points.size();
-	if (hitMark)
+	if (hitMark == 1 || hitMark == 2)
 	{
 		const int tickInner = hitMark == 2 ? 6 : 7, tickOuter = hitMark == 2 ? 12 : 10;
 		line(-tickInner, -tickInner, -tickOuter, -tickOuter); line(tickInner, -tickInner, tickOuter, -tickOuter);
@@ -3783,6 +3805,21 @@ void FirstPersonMode::drawCrosshair(BattleActionType mode, int shots, Uint8 colo
 	for (size_t pointIndex = 0; pointIndex < points.size(); ++pointIndex)
 	{
 		_crosshair->setPixel(points[pointIndex].first, points[pointIndex].second, pointIndex < modePoints ? color : hitColor);
+	}
+
+	// A strike that did no harm: a little blue shield to the lower left (see NoHarmShield), its
+	// outline in the crosshair's own.
+	if (hitMark == 3)
+	{
+		const Uint8 blue = nearestColor(_crosshair->getPalette(), NoHarmShieldRed, NoHarmShieldGreen, NoHarmShieldBlue);
+		const Uint8 lightBlue = nearestColor(_crosshair->getPalette(), NoHarmShieldLightRed, NoHarmShieldLightGreen, NoHarmShieldLightBlue);
+		for (int row = 0; row < 9; ++row)
+			for (int column = 0; NoHarmShield[row][column]; ++column)
+			{
+				const char cell = NoHarmShield[row][column];
+				if (cell == '.') continue;
+				_crosshair->setPixel(centre + NoHarmShieldX + column, centre + NoHarmShieldY + row, cell == 'O' ? shadow : cell == 'L' ? lightBlue : blue);
+			}
 	}
 }
 
@@ -4080,8 +4117,20 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 			_sounds->play(_view->getHitMarkKill() ? FirstPersonSounds::KILL : FirstPersonSounds::HIT, 0, 0.7f);
 		}
 	}
-	const int hitMark = hitTick && SDL_GetTicks() - hitTick < 280 ? (_view->getHitMarkKill() ? 2 : 1) : 0;
-	const Uint8 hitColor = hitMark == 2 ? red : nearestColor(palette, 255, 255, 255);
+	// A strike that did no harm: a dull tick, and the no-harm dots for as long (a hit's ticks
+	// win when both are new).
+	const Uint32 noHarmTick = _view->getNoHarmTick();
+	if (noHarmTick != _noHarmHeard)
+	{
+		_noHarmHeard = noHarmTick;
+		if (Options::fpsHitSounds)
+		{
+			_sounds->play(FirstPersonSounds::NO_HARM, 0, 0.7f);
+		}
+	}
+	const Uint32 now = SDL_GetTicks();
+	const int hitMark = hitTick && now - hitTick < HitMarkTime ? (_view->getHitMarkKill() ? 2 : 1) : noHarmTick && now - noHarmTick < HitMarkTime ? 3 : 0;
+	const Uint8 hitColor = hitMark == 2 ? red : nearestColor(palette, 255, 255, 255); // (white for a hit and for the no-harm dots' rims)
 
 	// Redraw the crosshair only when what it shows has changed: all of that packed into one
 	// number (mode, rounds, colour, hitmarker) and compared with the last one.

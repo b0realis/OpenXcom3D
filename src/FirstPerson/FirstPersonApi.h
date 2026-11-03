@@ -264,6 +264,9 @@ void mapAkimbo(BattlescapeState *state, BattleAction &action);
 /// A reaction shot, as it's launched, in either view: with the soldier's akimbo marked on the map,
 /// the other hand's gun fires along.
 void reactionAkimbo(BattlescapeState *state, BattleAction &action);
+/// A round or a blow struck a unit (TileEngine::hit, after the damage): an enemy in sight it did
+/// no harm marks the 3D view's crosshair (its health and stun before the strike given).
+void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefore, int stunBefore);
 /// A shotgun's pellet landed (ProjectileFlyBState::pelletLands), in either view: it's heard (a few
 /// to a volley; not one whose hit the explosion state brings, which sounds its own) and the 3D view
 /// marks where it struck (sparks, a bullet hole), as it does the round.
@@ -317,6 +320,7 @@ inline bool toggleMapAkimbo(BattlescapeState *, BattleUnit *) { return false; }
 inline void drawMapAkimbo(BattlescapeState *, BattleUnit *, Surface *, Surface *) { }
 inline void mapAkimbo(BattlescapeState *, BattleAction &) { }
 inline void reactionAkimbo(BattlescapeState *, BattleAction &) { }
+inline void unitStruck(BattlescapeState *, const BattleUnit *, int, int) { }
 inline void pelletLanded(BattlescapeState *, const Position &, const Position &, int, const BattleItem *, const BattleItem *, bool = true) { }
 inline int shotgunBulletSprite(const Mod *, const RuleItem *) { return -1; } // (Mod::NO_SURFACE)
 inline bool breakdown(BattlescapeState *, BattleUnit *) { return false; }

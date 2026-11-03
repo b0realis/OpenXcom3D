@@ -91,6 +91,16 @@ const Uint32 PelletSoundWindow = 60;
 const int PanelW = 150, PanelH = 54, PanelLineW = PanelW - 6;
 /// The crosshair's surface (square).
 const int CrosshairSize = 41;
+/// How long a hit, a kill or a strike that did no harm marks the crosshair, in milliseconds.
+const Uint32 HitMarkTime = 280;
+/// A strike that did no harm (GitHub issue #82; the owner: "a mini blue shield to the lower left of the crosshair"): a
+/// little shield, its top left corner this many pixels from the crosshair's centre (left and down), clear of every fire
+/// mode's shape; its shape a row a string ('O' the outline, 'B' blue, 'L' a lighter blue along its left edge), its
+/// colours the palette's nearest to these.
+const int NoHarmShieldX = -17, NoHarmShieldY = 8;
+const char *const NoHarmShield[9] = { "OOOOOOO", "OLBBBBO", "OLBBBBO", "OLBBBBO", "OLBBBBO", ".OLBBO.", ".OBBBO.", "..OBO..", "...O..." };
+const int NoHarmShieldRed = 70, NoHarmShieldGreen = 130, NoHarmShieldBlue = 255;
+const int NoHarmShieldLightRed = 170, NoHarmShieldLightGreen = 210, NoHarmShieldLightBlue = 255;
 /// The crosshair on the open sky (nothing under it, see FirstPersonMode::aimAt): a shot aims at the
 /// point this many voxels along its ray (20 tiles, the game's usual sight range), or nearer where
 /// the ray leaves the map or the weapon's range ends. A point the soldier sees and can reach
