@@ -1770,6 +1770,7 @@ bool FirstPersonMode::stepFreeGrenade(Uint32 now)
 			return finish();
 		}
 		std::copy(next, next + 3, flight.position);
+		_view->breakGlassAt(voxel, flight.velocity, isActive()); // (glass in a window's opening shatters as it goes through)
 	}
 	_view->setFreeGrenade(grenade, flight.position, flight.velocity);
 	return true;
@@ -3678,6 +3679,42 @@ void FirstPersonMode::pelletLanded(BattlescapeState *state, const Position &at, 
 	if (impact != V_UNIT && mode->isActive())
 	{
 		mode->_view->markPelletImpact(at, from, weapon, ammo);
+	}
+}
+
+/**
+ * A round (or a thrown item) took a step along its path (see FirstPerson::roundPassed), in either
+ * view: glass the 3D view fills into a window's opening there breaks (see
+ * FirstPersonView::breakGlassAt); its shards fly and it's heard only while the 3D view shows.
+ * @param state The battlescape screen.
+ * @param voxel Where it is now, in voxels.
+ * @param from Where it was a few steps back, for its way.
+ */
+void FirstPersonMode::roundPassed(BattlescapeState *state, const Position &voxel, const Position &from)
+{
+	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
+	if (!mode || !mode->_view)
+	{
+		return;
+	}
+	const float way[3] = { (float)(voxel.x - from.x), (float)(voxel.y - from.y), (float)(voxel.z - from.z) };
+	mode->_view->breakGlassAt(voxel, way, mode->isActive());
+}
+
+/**
+ * A blast that harms terrain reached these tiles (see FirstPerson::blastReached), in either view:
+ * the glass in the openings of their windows breaks in the 3D view (see
+ * FirstPersonView::blastGlass); its shards fly and it's heard only while the 3D view shows.
+ * @param state The battlescape screen.
+ * @param center Where it went off, in voxels.
+ * @param tiles The tiles it reached, with the damage it does to each.
+ */
+void FirstPersonMode::blastReached(BattlescapeState *state, const Position &center, const std::map<Tile*, int> &tiles)
+{
+	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
+	if (mode && mode->_view)
+	{
+		mode->_view->blastGlass(center, tiles, mode->isActive());
 	}
 }
 

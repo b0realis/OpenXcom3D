@@ -127,6 +127,32 @@ void FirstPersonMode::checkNearMiss()
 }
 
 /**
+ * Window glass broke in sight (the 3D view notes it, see FirstPersonView::noteGlassBreak): heard
+ * on its side, as loud as its distance leaves it (setting "Hit, kill and swing sounds"). Called
+ * every frame; hears each break once (of breaks at once, the loudest).
+ */
+void FirstPersonMode::checkGlassBreak()
+{
+	const Uint32 glassBreakTick = _view->getGlassBreakTick();
+	if (glassBreakTick == _glassBreakSeen)
+	{
+		return;
+	}
+	_glassBreakSeen = glassBreakTick;
+	if (!Options::fpsHitSounds)
+	{
+		return;
+	}
+	// Which way it is from the eye, as an angle from where the view looks (as checkNearMiss's).
+	float at[3];
+	const float loudness = _view->getGlassBreak(at);
+	double eye[3];
+	_view->getEye(eye);
+	const double angle = std::fmod((std::atan2(at[1] - eye[1], at[0] - eye[0]) - _view->getYawDegrees() * Pi / 180.0) * 180.0 / Pi + 720.0, 360.0);
+	_sounds->play(FirstPersonSounds::GLASS, (int)angle, 0.9f * loudness);
+}
+
+/**
  * The purple haze at the view's edges while looking through a unit under our mind control (one
  * from the other side, ours for now: a player's report on 1.03 asked for "a purple haze aura on
  * screen border"), so it's plain whose eyes these are: ControlHazeStrength strong, breathing in

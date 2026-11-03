@@ -170,6 +170,12 @@ const float GlassWallCoverMin = 0.5f;
 /// decorated wall or a craft's hull is far less).
 const float GlassPaintedCoverMin = 0.9f, GlassPaintedPaleMin = 0.5f;
 const int GlassPaleMinChannel = 150, GlassPaleBlueSlack = 8, GlassPaleSpread = 70;
+/// Window glass breaking (FirstPersonView::spawnGlassShards; the owner: "glass shatters (by the travelling bullets)
+/// ... only visual and for visceral feel"): shards from GlassShardsAcross voxels of the pane at most, falling, and,
+/// where a round went through, GlassShardsAtHit flying on with it and GlassGlints glints; none from a pane further
+/// than GlassSeenFar voxels away (30 tiles, as debris), and heard fading to a quarter at GlassHeardFar voxels.
+const int GlassShardsAcross = 48, GlassShardsAtHit = 16, GlassGlints = 6;
+const float GlassSeenFar = 480.0f, GlassHeardFar = 640.0f;
 const Uint32 HitFlinchTime = 220;
 const float HitFlashShade = 6.0f;
 const float BodySprayHeight = 4.0f;

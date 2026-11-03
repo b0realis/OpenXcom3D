@@ -587,6 +587,220 @@ void FirstPersonView::spawnDebris(const Position &tilePosition, int part, const 
 }
 
 /**
+ * A round (or a thrown item) at a voxel on its way (Projectile::move, a Doom free grenade's
+ * flight): glass filled into a window's opening there (VoxelModel::openingGlass: the game's
+ * rounds go through the opening, the 3D view shows a pane in it) breaks, for the rest of the
+ * battle, and the opening is left empty, as 1.09 showed it (the owner: "lets implement that you
+ * shoot theough window opening as before - but side effect is that glass shatters ... This does
+ * not influence any game mechanics"). The glass stands in the wall's own rows, a voxel or two
+ * thick, and a path steps through every row it crosses, so it can't slip past.
+ * @param voxel Where the round is, in voxels.
+ * @param way Which way it goes (any length).
+ * @param effects Its shards fly and it's heard (the 3D view shows).
+ * @return True if glass broke.
+ */
+bool FirstPersonView::breakGlassAt(const Position &voxel, const float way[3], bool effects)
+{
+	Tile *tile = _save && voxel.x >= 0 && voxel.y >= 0 && voxel.z >= 0 ? _save->getTile(voxel.toTile()) : nullptr;
+	if (!tile)
+	{
+		return false;
+	}
+	const int x = voxel.x % Position::TileXY, y = voxel.y % Position::TileXY, z = voxel.z % Position::TileZ;
+	for (const int part : { O_WESTWALL, O_NORTHWALL })
+	{
+		const MapData *mapData = tile->getMapData((TilePart)part);
+		const VoxelModel *model = mapData ? getModel(mapData) : nullptr;
+		if (model && model->openingGlass && ((model->lookOnly[z][y] >> x) & 1))
+		{
+			const float hit[3] = { voxel.x + 0.5f, voxel.y + 0.5f, voxel.z + 0.5f };
+			return breakOpeningGlass(tile, part, hit, way, effects);
+		}
+	}
+	return false;
+}
+
+/**
+ * A blast that harms terrain reached these tiles (TileEngine::explode, with the damage it does
+ * to each): the glass filled into the openings of the windows on their sides (each tile's west
+ * and north walls, and the walls on its east and south sides, the next tiles') breaks, the whole
+ * pane thrown away from the blast.
+ * @param center Where the blast went off, in voxels.
+ * @param tiles The tiles it reached, with the damage it does to each.
+ * @param effects Shards fly and it's heard (the 3D view shows).
+ */
+void FirstPersonView::blastGlass(const Position &center, const std::map<Tile*, int> &tiles, bool effects)
+{
+	if (!_save)
+	{
+		return;
+	}
+	for (const auto &reached : tiles)
+	{
+		if (reached.second <= 0) continue;
+		const Position at = reached.first->getPosition();
+		const std::pair<Position, int> sides[4] = { { at, O_WESTWALL }, { at, O_NORTHWALL }, { at + Position(1, 0, 0), O_WESTWALL }, { at + Position(0, 1, 0), O_NORTHWALL } };
+		for (const auto &side : sides)
+		{
+			Tile *tile = _save->getTile(side.first);
+			const MapData *mapData = tile ? tile->getMapData((TilePart)side.second) : nullptr;
+			if (!mapData || !getModel(mapData)->openingGlass) continue;
+			// Away from the blast: from where it went off to the middle of the wall, halfway up.
+			const float way[3] = { side.first.x * 16.0f + (side.second == O_WESTWALL ? 0.5f : 8.0f) - center.x,
+				side.first.y * 16.0f + (side.second == O_NORTHWALL ? 0.5f : 8.0f) - center.y, side.first.z * 24.0f + 12.0f - center.z };
+			breakOpeningGlass(tile, side.second, nullptr, way, effects);
+		}
+	}
+}
+
+/**
+ * Breaks the glass filled into a tile part's window openings, if it's still whole: noted broken
+ * for the rest of the battle (in the battle's list, kept in the save: SavedBattleGame::
+ * getBrokenGlass; the snapshot shows the part without it from now on, see openedModel), and,
+ * with `effects`, its shards fly and it's heard.
+ * @param tile The tile.
+ * @param part Its wall (O_WESTWALL or O_NORTHWALL).
+ * @param hit Where a round went through it, in voxels; null for a blast (the whole pane bursts).
+ * @param way Which way the round or the blast went (any length).
+ * @param effects Its shards and its sound.
+ * @return True if it broke now.
+ */
+bool FirstPersonView::breakOpeningGlass(Tile *tile, int part, const float hit[3], const float way[3], bool effects)
+{
+	const int key = _save->getTileIndex(tile->getPosition()) * 4 + part;
+	std::vector<int> &broken = _save->getBrokenGlass();
+	const auto place = std::lower_bound(broken.begin(), broken.end(), key);
+	if (place != broken.end() && *place == key)
+	{
+		return false;
+	}
+	broken.insert(place, key);
+	const Position at = tile->getPosition();
+	Log(LOG_VERBOSE) << "OpenXcom3D: window glass broke at " << at.x << "," << at.y << "," << at.z << (part == O_WESTWALL ? " (west wall)" : " (north wall)")
+		<< (hit ? ", a round through it" : ", a blast"); // (for the tests)
+	if (effects)
+	{
+		spawnGlassShards(tile->getPosition(), getModel(tile->getMapData((TilePart)part)), true, false, hit, way, hit ? 1.0f : 1.6f);
+	}
+	return true;
+}
+
+/**
+ * A pane of glass breaking: its shards. Pale glass shards from all over it (from some of its
+ * voxels), falling, pushed on a little the way the round or the blast went; where a round went
+ * through, more of them flying on with it, fast, and a few glints of light; and it's heard (see
+ * noteGlassBreak). A pane further than GlassSeenFar from the eye is left out, as debris is.
+ * @param tilePosition The tile the pane stands on.
+ * @param model The pane's model, whole.
+ * @param withOpening The glass filled into its openings (VoxelModel::lookOnly) broke.
+ * @param withPane The glass on the game's own voxels broke too (a pane the game destroyed).
+ * @param hit Where a round went through, in voxels; null for none.
+ * @param way Which way the round or blast went (any length); null for none (they only fall).
+ * @param force How hard they're thrown: 1 a round, more for a blast.
+ * @return True if shards flew (it had glass that broke, near enough).
+ */
+bool FirstPersonView::spawnGlassShards(const Position &tilePosition, const VoxelModel *model, bool withOpening, bool withPane, const float hit[3], const float way[3], float force)
+{
+	typedef FirstPersonParticles P; // short for the particle system: its kinds (P::GLOW...) and groups (P::EFFECT...)
+	// The glass that broke, voxel by voxel (their middles, in the world), and the pane's middle.
+	std::vector<std::array<float, 3>> glass;
+	float middle[3] = { 0.0f, 0.0f, 0.0f };
+	for (int z = 0; z < Position::TileZ; ++z)
+	{
+		for (int y = 0; y < Position::TileXY; ++y)
+		{
+			const Uint16 bits = (withOpening ? model->lookOnly[z][y] : 0) | (withPane ? model->glass[z][y] & ~model->lookOnly[z][y] : 0);
+			for (int x = 0; x < Position::TileXY; ++x)
+			{
+				if (!((bits >> x) & 1)) continue;
+				glass.push_back({ tilePosition.x * 16.0f + x + 0.5f, tilePosition.y * 16.0f + y + 0.5f, tilePosition.z * 24.0f + z + 0.5f });
+				for (int axis = 0; axis < 3; ++axis) middle[axis] += glass.back()[axis];
+			}
+		}
+	}
+	if (glass.empty())
+	{
+		return false;
+	}
+	for (float &axis : middle) axis /= glass.size();
+	const double dx = middle[0] - _eye[0], dy = middle[1] - _eye[1];
+	if (dx * dx + dy * dy > GlassSeenFar * GlassSeenFar)
+	{
+		return false;
+	}
+	noteGlassBreak(hit ? hit : middle);
+	// The way as a unit vector (none: no push).
+	float direction[3] = { 0.0f, 0.0f, 0.0f };
+	const float length = way ? std::sqrt(way[0] * way[0] + way[1] * way[1] + way[2] * way[2]) : 0.0f;
+	for (int axis = 0; axis < 3 && length > 0.0f; ++axis) direction[axis] = way[axis] / length;
+	// One shard: from a point, pushed the way at a speed (voxels per second) plus a random
+	// scatter, under gravity (voxels per second squared), living lifeMin to lifeMax seconds.
+	auto shard = [&](const float from[3], float speed, float scatter, float gravity, P::Kind kind, Uint8 color, float lifeMin, float lifeMax, Uint8 size)
+	{
+		P::Particle particle;
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			particle.pos[axis] = from[axis];
+			particle.vel[axis] = direction[axis] * speed + _particles.random(-scatter, scatter);
+		}
+		particle.age = 0.0f;
+		particle.life = _particles.random(lifeMin, lifeMax);
+		particle.gravity = gravity;
+		particle.drag = 0.5f;
+		particle.color = color;
+		particle.size = size;
+		particle.kind = kind;
+		particle.group = P::EFFECT;
+		_particles.add(particle);
+	};
+	// A shard's colour: white two times in three, else pale cyan or grey-blue (lit shards darken
+	// with the light, and a blue one turns navy: few of those).
+	auto shardColor = [&]() { const float pick = _particles.random(); return _colors.glassShard[pick < 0.66f ? 1 : pick < 0.88f ? 0 : 2]; };
+	// From all over the pane: the glass coming down, pushed on a little, for 0.5 to 1.3 seconds;
+	// lit by the light where it is, one in four glinting (self-lit) as it falls, one in three bigger.
+	const int across = std::min<int>(GlassShardsAcross, (int)glass.size());
+	for (int i = 0; i < across; ++i)
+	{
+		const std::array<float, 3> &from = glass[(size_t)(_particles.random() * glass.size()) % glass.size()];
+		const bool glints = _particles.random() < 0.25f;
+		shard(from.data(), _particles.random(4.0f, 24.0f) * force, 8.0f * force, 220.0f, glints ? P::GLOW : P::LIT, glints ? _colors.glassShard[1] : shardColor(),
+			0.5f, 1.3f, (Uint8)(_particles.random() < 0.33f ? 2 : 1));
+	}
+	// Where a round went through: a spray flying on with it, and glints catching the light.
+	if (hit)
+	{
+		for (int i = 0; i < GlassShardsAtHit; ++i)
+		{
+			shard(hit, _particles.random(30.0f, 90.0f), 20.0f, 220.0f, P::LIT, shardColor(), 0.4f, 1.0f, 1);
+		}
+		for (int i = 0; i < GlassGlints; ++i)
+		{
+			shard(hit, _particles.random(10.0f, 40.0f), 30.0f, 60.0f, P::GLOW, _colors.glassShard[1], 0.15f, 0.35f, 2);
+		}
+	}
+	return true;
+}
+
+/**
+ * Notes glass breaking, for the mode's sound (see FirstPersonMode::checkGlassBreak): when, where,
+ * and how loud by its distance from the eye (full up close, fading to a quarter at GlassHeardFar).
+ * Of breaks at once (a blast, a burst through a row of windows) the loudest is heard.
+ * @param at Where, in voxels.
+ */
+void FirstPersonView::noteGlassBreak(const float at[3])
+{
+	const double dx = at[0] - _eye[0], dy = at[1] - _eye[1], dz = at[2] - _eye[2];
+	const float loudness = std::clamp(1.0f - (float)std::sqrt(dx * dx + dy * dy + dz * dz) / GlassHeardFar, 0.25f, 1.0f);
+	const Uint32 now = SDL_GetTicks();
+	if (now != _glassBreakTick || loudness > _glassBreakLoudness)
+	{
+		_glassBreakTick = now;
+		std::copy(at, at + 3, _glassBreakAt);
+		_glassBreakLoudness = loudness;
+	}
+}
+
+/**
  * What a shot leaves behind along the bit of its path it flew this frame: nothing for bullets,
  * embers for incendiary rounds, smoke for rockets and other explosives (and white specks that
  * hang along the path for about ten seconds, on land and under the sea), green glow for plasma,

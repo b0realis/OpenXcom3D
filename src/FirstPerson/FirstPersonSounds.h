@@ -54,7 +54,8 @@ namespace OpenXcom
 /**
  * The few sounds the first-person view adds to the game's own, made in code (no sound files
  * to ship): a crisp tick for a hit, a deeper one for a kill, a heartbeat when badly hurt, the
- * dry click of a gun that can't fire, the hiss of a flare, the flashlight's switch. They play through the game's sound
+ * dry click of a gun that can't fire, the hiss of a flare, the flashlight's switch, window glass
+ * shattering. They play through the game's sound
  * channels at its sound volume, and not at all when sound is muted.
  */
 class FirstPersonSounds
@@ -67,8 +68,9 @@ public:
 	/// LIGHT_SWITCH (the flashlight's switch: a soft double click), SCAN_PULSE (the motion
 	/// scanner's sweep going out: a falling electronic whoop and its echoes), SCAN_BLIP_FAR,
 	/// SCAN_BLIP_MID and SCAN_BLIP_NEAR (the scanner finding movement: a sharp pip, higher the
-	/// nearer it is), NO_HARM (a dull tick: a strike that did no harm). COUNT is how many there are.
-	enum Id { HIT, KILL, HEARTBEAT, DRY_FIRE, FLARE, WHIZZ, SWOOSH, PIN, LIGHT_SWITCH, SCAN_PULSE, SCAN_BLIP_FAR, SCAN_BLIP_MID, SCAN_BLIP_NEAR, NO_HARM, COUNT };
+	/// nearer it is), NO_HARM (a dull tick: a strike that did no harm), GLASS (window glass
+	/// shattering: a crack and its shards tinkling down). COUNT is how many there are.
+	enum Id { HIT, KILL, HEARTBEAT, DRY_FIRE, FLARE, WHIZZ, SWOOSH, PIN, LIGHT_SWITCH, SCAN_PULSE, SCAN_BLIP_FAR, SCAN_BLIP_MID, SCAN_BLIP_NEAR, NO_HARM, GLASS, COUNT };
 	/// Synthesizes all the sounds for the mixer's output format.
 	FirstPersonSounds();
 	/// Stops and frees the sounds.

@@ -46,6 +46,7 @@
  * FirstPersonMode.h: the first-person mode, the controller and user interface of the 3D view
  * (its code is in the FirstPersonMode*.cpp files, one per topic).
  */
+#include <map>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -156,6 +157,10 @@ public:
 	static double statBarScale(BattlescapeState *state, int stat, int maximum, int barWidth);
 	/// A shotgun's pellet landed (see FirstPerson::pelletLanded): heard, a few to a volley, and marked in the 3D view.
 	static void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo, bool heard);
+	/// A round (or a thrown item) took a step (see FirstPerson::roundPassed): glass in a window's opening there breaks in the 3D view.
+	static void roundPassed(BattlescapeState *state, const Position &voxel, const Position &from);
+	/// A blast reached these tiles (see FirstPerson::blastReached): the glass in their windows' openings breaks in the 3D view.
+	static void blastReached(BattlescapeState *state, const Position &center, const std::map<Tile*, int> &tiles);
 	/// A soldier panics or goes berserk, asked by the game (see FirstPerson::breakdown).
 	static bool breakdown(BattlescapeState *state, BattleUnit *unit);
 	/// A close-quarters check knocked a shot aside, told by the game (see FirstPerson::closeQuartersDeflected).
@@ -1127,6 +1132,7 @@ private:
 	float _hurtAmount = 0.0f;                       // how strong it is (0..1)
 	int _lastHeartbeat = -1;                        // the last heartbeat that thumped
 	Uint32 _nearMissSeen = 0;                       // the last near miss we reacted to
+	Uint32 _glassBreakSeen = 0;                     // the last window glass breaking we heard (see checkGlassBreak)
 
 	/// Flashes red when the soldier we look through is hurt.
 	void checkHurt(BattleUnit *unit, Uint32 now);
@@ -1134,6 +1140,8 @@ private:
 	float controlHaze(const BattleUnit *unit, Uint32 now) const;
 	/// Reacts to an enemy shot whizzing past close by.
 	void checkNearMiss();
+	/// Window glass broke in sight: heard, from its side.
+	void checkGlassBreak();
 
 	// ---- on fire: the view in flames, a flare-up and a banner when the soldier catches fire ----
 

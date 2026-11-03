@@ -1172,6 +1172,30 @@ void pelletLanded(BattlescapeState *state, const Position &at, const Position &f
 }
 
 /**
+ * A round (or a thrown item) took a step along its path: glass in a window's opening there
+ * shatters in the 3D view (see FirstPersonMode::roundPassed).
+ * @param state The battlescape screen.
+ * @param voxel Where it is now, in voxels.
+ * @param from Where it was a few steps back, for its way.
+ */
+void roundPassed(BattlescapeState *state, const Position &voxel, const Position &from)
+{
+	FirstPersonMode::roundPassed(state, voxel, from);
+}
+
+/**
+ * A blast that harms terrain reached these tiles: the glass in the openings of their windows
+ * shatters in the 3D view (see FirstPersonMode::blastReached).
+ * @param state The battlescape screen.
+ * @param center Where it went off, in voxels.
+ * @param tiles The tiles it reached, with the damage it does to each.
+ */
+void blastReached(BattlescapeState *state, const Position &center, const std::map<Tile*, int> &tiles)
+{
+	FirstPersonMode::blastReached(state, center, tiles);
+}
+
+/**
  * The bullet sprite for shotgun ammo that has none (a player's report: on the isometric map a
  * shotgun's round is "unsprited"; "Just using the most common used sprite per that damage type
  * should be fitting for now"): of the mod's items with a bullet sprite, the one used most by those

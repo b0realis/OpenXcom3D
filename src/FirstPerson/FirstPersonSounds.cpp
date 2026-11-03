@@ -262,6 +262,41 @@ FirstPersonSounds::FirstPersonSounds()
 	make(WHIZZ, sweep(0.34f, 3200.0f, 700.0f, 0.12f, 14.0f));
 	// A swing: air cut by a blade or a club, rising.
 	make(SWOOSH, sweep(0.24f, 500.0f, 1700.0f, 0.13f, 16.0f));
+
+	// Glass: window glass shattering (0.7 seconds). The crack: a burst of the noise's high, sharp
+	// part (the noise minus its smoothed copy), gone within about 40 ms; a shimmer of it fading
+	// over half a second; and the shards tinkling down, GlassTinkles high pings (each two
+	// partials, 2.5 to 7 kHz and 2.76 times that, ringing a few tens of ms) at random moments,
+	// thinning out and softer as they come later.
+	const int GlassTinkles = 18;
+	struct Tinkle { float start, pitch, decay, amplitude; };
+	std::vector<Tinkle> tinkles;
+	for (int i = 0; i < GlassTinkles; ++i)
+	{
+		const float start = 0.005f + 0.55f * std::pow((noise(randomEngine) + 1.0f) * 0.5f, 1.6f); // (bunched early)
+		tinkles.push_back({ start, 2500.0f + 4500.0f * (noise(randomEngine) + 1.0f) * 0.5f, 55.0f + 50.0f * (noise(randomEngine) + 1.0f) * 0.5f,
+			0.35f * (1.0f - start * 1.2f) });
+	}
+	std::vector<float> glass(length(0.7f));
+	float smoothedNoise = 0.0f; // The noise smoothed by a simple low-pass filter.
+	for (size_t sample = 0; sample < glass.size(); ++sample)
+	{
+		const float seconds = (float)sample / rate;
+		const float whiteNoise = noise(randomEngine);
+		smoothedNoise += (whiteNoise - smoothedNoise) * 0.3f;
+		const float sharpNoise = whiteNoise - smoothedNoise;
+		float amplitude = 0.8f * std::exp(-seconds * 70.0f) * sharpNoise + 0.12f * std::exp(-seconds * 7.0f) * sharpNoise;
+		for (const Tinkle &tinkle : tinkles)
+		{
+			const float since = seconds - tinkle.start;
+			if (since < 0.0f || since > 0.12f) continue;
+			amplitude += tinkle.amplitude * std::exp(-since * tinkle.decay)
+				* (0.7f * std::sin(2 * Pi * tinkle.pitch * since) + 0.3f * std::sin(2 * Pi * tinkle.pitch * 2.76f * since));
+		}
+		// Fade in over the first millisecond, so the sound doesn't start with a click.
+		glass[sample] = std::clamp(amplitude * std::min(1.0f, seconds * 1000.0f), -1.0f, 1.0f);
+	}
+	make(GLASS, glass);
 	// All made: play() may play them from now on.
 	_ready = true;
 }

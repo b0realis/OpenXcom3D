@@ -229,6 +229,9 @@ void FirstPersonView::updateColors()
 	_colors.rain = nearest(150, 170, 200);
 	_colors.snow = nearest(240, 240, 250);
 	_colors.speck = nearest(236, 236, 228);
+	_colors.glassShard[0] = nearest(200, 228, 240);
+	_colors.glassShard[1] = nearest(240, 248, 252);
+	_colors.glassShard[2] = nearest(150, 178, 196);
 	_colors.sand = nearest(210, 170, 110);
 	_colors.firefly = nearest(200, 255, 100);
 	_colors.bubble = nearest(170, 230, 240);

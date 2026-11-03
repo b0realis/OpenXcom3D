@@ -19508,7 +19508,7 @@ index 861c7702a..7f87d9f02 100644
  	const std::vector<int> &getPath() const;
  	/// Makes a copy to the path.
 diff --git a/src/Battlescape/Projectile.cpp b/src/Battlescape/Projectile.cpp
-index 7f7697c1d..6dafd1bc7 100644
+index 7f7697c1d..c7af3ff84 100644
 --- a/src/Battlescape/Projectile.cpp
 +++ b/src/Battlescape/Projectile.cpp
 @@ -31,6 +31,7 @@
@@ -19614,8 +19614,18 @@ index 7f7697c1d..6dafd1bc7 100644
  		Position endPoint = getPositionFromEnd(_trajectory, ItemDropVoxelOffset).toTile();
  		Tile *endTile = _save->getTile(endPoint);
  		// check if the item would land on a tile with a blocking object
+@@ -503,6 +542,9 @@ bool Projectile::move()
+ 		}
+ 
+ 		_distance += TileEngine::trajectoryStepSize(_trajectory, _position);
++		// (OpenXcom3D: glass in a window's opening, in the 3D view, shatters as it goes through; from
++		// a few steps back, its way)
++		FirstPerson::roundPassed(_save->getBattleState(), _trajectory[_position], getPositionFromStart(_trajectory, (int)_position - 8));
+ 
+ 		if (_vaporColor != -1 && _ammo && _action.type != BA_THROW)
+ 		{
 diff --git a/src/Battlescape/Projectile.h b/src/Battlescape/Projectile.h
-index a263ca287..1cf4a21d8 100644
+index a263ca287..6a06e0148 100644
 --- a/src/Battlescape/Projectile.h
 +++ b/src/Battlescape/Projectile.h
 @@ -59,6 +59,7 @@ private:
@@ -19626,7 +19636,15 @@ index a263ca287..1cf4a21d8 100644
  	void applyAccuracy(Position origin, Position *target, double accuracy, bool keepRange, bool extendLine);
  public:
  	/// Creates a new Projectile.
-@@ -80,6 +81,13 @@ public:
+@@ -74,12 +75,21 @@ public:
+ 	bool move();
+ 	/// Gets the current position in voxel space.
+ 	Position getPosition(int offset = 0) const;
++	/// Gets a position counted from the end of its path, in voxel space (where getPosition would be at the end).
++	Position getEndPosition(int offset = 0) const { return getPositionFromEnd(_trajectory, offset); }
+ 	/// Gets the two last position in voxel space.
+ 	LastPositions getLastPositions(int offset = 0) const { return LastPositions(getPosition(offset), getPosition(offset + ItemDropVoxelOffset)); }
+ 	/// Gets a particle from the particle array.
  	int getParticle(int i) const;
  	/// Gets the item.
  	BattleItem *getItem() const;
@@ -19641,7 +19659,7 @@ index a263ca287..1cf4a21d8 100644
  	void skipTrajectory();
  	/// Gets the Position of origin for the projectile.
 diff --git a/src/Battlescape/ProjectileFlyBState.cpp b/src/Battlescape/ProjectileFlyBState.cpp
-index 529b7f282..b88ec980f 100644
+index 529b7f282..0a0840016 100644
 --- a/src/Battlescape/ProjectileFlyBState.cpp
 +++ b/src/Battlescape/ProjectileFlyBState.cpp
 @@ -18,6 +18,7 @@
@@ -19790,7 +19808,7 @@ index 529b7f282..b88ec980f 100644
  
  	BattleActionAttack attack = BattleActionAttack::GetAferShoot(_action, _ammo);
  	if (_action.type == BA_THROW)
-@@ -588,9 +656,697 @@ bool ProjectileFlyBState::createNewProjectile()
+@@ -588,9 +656,695 @@ bool ProjectileFlyBState::createNewProjectile()
  		_parent->getSave()->appendToHitLog(HITLOG_NEW_SHOT, _action.actor->getFaction());
  	}
  
@@ -19935,9 +19953,7 @@ index 529b7f282..b88ec980f 100644
 +	const int behaviorType = ammo->getRules()->getShotgunBehaviorType();
 +	const int spread = ammo->getRules()->getShotgunSpread();
 +	const int choke = action.weapon->getRules()->getShotgunChoke();
-+	Projectile roundAtEnd = round;
-+	roundAtEnd.skipTrajectory();
-+	const Position firstPelletImpact = roundAtEnd.getPosition(-2);
++	const Position firstPelletImpact = round.getEndPosition(-2); // (where the round's end is: not flown there, which would break glass on the way now)
 +	BattleAction originAction = action;
 +	const Position origin = _parent->getSave()->getTileEngine()->getOriginVoxel(originAction, _parent->getSave()->getTile(_origin));
 +	for (int i = 1; i != ammo->getRules()->getShotgunPellets(); ++i)
@@ -20488,7 +20504,7 @@ index 529b7f282..b88ec980f 100644
  /**
   * Deinitialize the state.
   */
-@@ -607,7 +1363,12 @@ void ProjectileFlyBState::deinit()
+@@ -607,7 +1361,12 @@ void ProjectileFlyBState::deinit()
  void ProjectileFlyBState::think()
  {
  	/// checks if a weapon has any more shots to fire.
@@ -20502,7 +20518,7 @@ index 529b7f282..b88ec980f 100644
  
  	_parent->getSave()->getBattleState()->clearMouseScrollingState();
  	/* TODO refactoring : store the projectile in this state, instead of getting it from the map each time? */
-@@ -616,9 +1377,17 @@ void ProjectileFlyBState::think()
+@@ -616,9 +1375,17 @@ void ProjectileFlyBState::think()
  		bool hasFloor = _action.actor->haveNoFloorBelow() == false;
  		bool unitCanFly = _action.actor->getMovementType() == MT_FLY;
  
@@ -20522,7 +20538,7 @@ index 529b7f282..b88ec980f 100644
  			&& (hasFloor || unitCanFly))
  		{
  			createNewProjectile();
-@@ -630,6 +1399,10 @@ void ProjectileFlyBState::think()
+@@ -630,6 +1397,10 @@ void ProjectileFlyBState::think()
  		}
  		else
  		{
@@ -20533,7 +20549,7 @@ index 529b7f282..b88ec980f 100644
  			if (_action.cameraPosition.z != -1 && _action.waypoints.size() <= 1)
  			{
  				_parent->getMap()->getCamera()->setMapOffset(_action.cameraPosition);
-@@ -651,16 +1424,39 @@ void ProjectileFlyBState::think()
+@@ -651,16 +1422,39 @@ void ProjectileFlyBState::think()
  			_parent->popState();
  		}
  	}
@@ -20574,7 +20590,7 @@ index 529b7f282..b88ec980f 100644
  			// impact !
  			if (_action.type == BA_THROW)
  			{
-@@ -742,6 +1538,7 @@ void ProjectileFlyBState::think()
+@@ -742,6 +1536,7 @@ void ProjectileFlyBState::think()
  						noMoreShotsToShoot(),
  						shotgun ? 0 : _range + _parent->getMap()->getProjectile()->getDistance()
  					));
@@ -20582,7 +20598,7 @@ index 529b7f282..b88ec980f 100644
  
  					if (_projectileImpact == V_UNIT)
  					{
-@@ -754,83 +1551,72 @@ void ProjectileFlyBState::think()
+@@ -754,83 +1549,72 @@ void ProjectileFlyBState::think()
  					// special shotgun behaviour: trace extra projectile paths, and add bullet hits at their termination points.
  					if (shotgun)
  					{
@@ -20718,7 +20734,7 @@ index 529b7f282..b88ec980f 100644
  					}
  
  					// nerf unit's XP values (gained via extra shotgun bullets)
-@@ -842,6 +1628,9 @@ void ProjectileFlyBState::think()
+@@ -842,6 +1626,9 @@ void ProjectileFlyBState::think()
  				}
  			}
  
@@ -20728,7 +20744,7 @@ index 529b7f282..b88ec980f 100644
  			delete _parent->getMap()->getProjectile();
  			_parent->getMap()->setProjectile(0);
  		}
-@@ -857,6 +1646,9 @@ void ProjectileFlyBState::cancel()
+@@ -857,6 +1644,9 @@ void ProjectileFlyBState::cancel()
  	if (_parent->getMap()->getProjectile())
  	{
  		_parent->getMap()->getProjectile()->skipTrajectory();
@@ -20816,7 +20832,7 @@ index 067c7b3ba..9004c1ea8 100644
  public:
  	/// Creates a new ProjectileFly class
 diff --git a/src/Battlescape/TileEngine.cpp b/src/Battlescape/TileEngine.cpp
-index 6e6846977..df49726b2 100644
+index 6e6846977..335f9329e 100644
 --- a/src/Battlescape/TileEngine.cpp
 +++ b/src/Battlescape/TileEngine.cpp
 @@ -43,6 +43,7 @@
@@ -20921,7 +20937,15 @@ index 6e6846977..df49726b2 100644
  			if (bu->getFire())
  			{
  				effectGenerated = 2;
-@@ -4360,6 +4394,9 @@ int TileEngine::calculateLineTile(Position origin, Position target, std::vector<
+@@ -3512,6 +3546,7 @@ void TileEngine::explode(BattleActionAttack attack, Position center, int power,
+ 	// now detonate the tiles affected by explosion
+ 	if (type->ToTile > 0.0f)
+ 	{
++		FirstPerson::blastReached(_save->getBattleState(), center, tilesAffected); // (OpenXcom3D: window glass in the 3D view shatters)
+ 		for (auto& pair : tilesAffected)
+ 		{
+ 			if (detonate(pair.first, pair.second))
+@@ -4360,6 +4395,9 @@ int TileEngine::calculateLineTile(Position origin, Position target, std::vector<
  VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool storeTrajectory, std::vector<Position> *trajectory, BattleUnit *excludeUnit, BattleUnit *excludeAllBut, bool onlyVisible)
  {
  	VoxelType result;
@@ -20931,7 +20955,7 @@ index 6e6846977..df49726b2 100644
  	bool excludeAllUnits = false;
  	if (_save->isBeforeGame())
  	{
-@@ -4400,6 +4437,7 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
+@@ -4400,6 +4438,7 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
  			return false;
  		}
  	);
@@ -20939,7 +20963,7 @@ index 6e6846977..df49726b2 100644
  	if (hit)
  	{
  		return result;
-@@ -4526,7 +4564,7 @@ bool TileEngine::isVoxelVisible(Position voxel)
+@@ -4526,7 +4565,7 @@ bool TileEngine::isVoxelVisible(Position voxel)
   * @param excludeAllBut If set, the only unit to be considered for ray hits.
   * @return The objectnumber(0-3) or unit(4) or out of map (5) or -1 (hit nothing).
   */
@@ -20948,7 +20972,7 @@ index 6e6846977..df49726b2 100644
  {
  	if (voxel.x < 0 || voxel.y < 0 || voxel.z < 0) //preliminary out of map
  	{
-@@ -4590,6 +4628,13 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
+@@ -4590,6 +4629,13 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
  
  		if (unit != 0 && !unit->isOut() && unit != excludeUnit && (!excludeAllBut || unit == excludeAllBut) && (!onlyVisible || unit->getVisible() ) )
  		{
@@ -20962,7 +20986,7 @@ index 6e6846977..df49726b2 100644
  			Position tilepos;
  			Position unitpos = unit->getPosition();
  			int terrainHeight = 0;
-@@ -5383,7 +5428,13 @@ bool TileEngine::validMeleeRange(Position pos, int direction, BattleUnit *attack
+@@ -5383,7 +5429,13 @@ bool TileEngine::validMeleeRange(Position pos, int direction, BattleUnit *attack
  						Position originVoxel = Position(origin->getPosition().toVoxel())
  							+ Position(8,8,attacker->getHeight() + attacker->getFloatHeight() - 4 -origin->getTerrainLevel() + meleeOriginVoxelVerticalOffset);
  						Position targetVoxel;
@@ -20977,7 +21001,7 @@ index 6e6846977..df49726b2 100644
  						{
  							if (dest)
  							{
-@@ -5705,6 +5756,13 @@ bool TileEngine::validateThrow(BattleAction &action, Position originVoxel, Posit
+@@ -5705,6 +5757,13 @@ bool TileEngine::validateThrow(BattleAction &action, Position originVoxel, Posit
  	{
  		trajectory.clear();
  		test = calculateParabolaVoxel(originVoxel, targetVoxel, true, &trajectory, action.actor, curvature, Position(0,0,0));
@@ -20991,7 +21015,7 @@ index 6e6846977..df49726b2 100644
  		//position that item hit
  		Position hitPos = (trajectory.back() + Position(0,0,1)).toTile();
  		//position where item will land
-@@ -5867,6 +5925,8 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
+@@ -5867,6 +5926,8 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
  					originVoxel.z--;
  				}
  				originVoxel.z -= 4;
@@ -21000,7 +21024,7 @@ index 6e6846977..df49726b2 100644
  			}
  		}
  		int direction = getDirectionTo(origin, action.target);
-@@ -5891,6 +5951,12 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
+@@ -5891,6 +5952,12 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
  			originVoxel.y += ((2 * dirYshift[direction] + dirYshift[(direction + 1) % 8]) * action.actor->getArmor()->getSize() + 1) / 3;
  			break;
  		};
@@ -21789,10 +21813,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..885e35366
+index 000000000..e3afbc20b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1264 @@
+@@ -0,0 +1,1288 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -22967,6 +22991,30 @@ index 000000000..885e35366
 +}
 +
 +/**
++ * A round (or a thrown item) took a step along its path: glass in a window's opening there
++ * shatters in the 3D view (see FirstPersonMode::roundPassed).
++ * @param state The battlescape screen.
++ * @param voxel Where it is now, in voxels.
++ * @param from Where it was a few steps back, for its way.
++ */
++void roundPassed(BattlescapeState *state, const Position &voxel, const Position &from)
++{
++	FirstPersonMode::roundPassed(state, voxel, from);
++}
++
++/**
++ * A blast that harms terrain reached these tiles: the glass in the openings of their windows
++ * shatters in the 3D view (see FirstPersonMode::blastReached).
++ * @param state The battlescape screen.
++ * @param center Where it went off, in voxels.
++ * @param tiles The tiles it reached, with the damage it does to each.
++ */
++void blastReached(BattlescapeState *state, const Position &center, const std::map<Tile*, int> &tiles)
++{
++	FirstPersonMode::blastReached(state, center, tiles);
++}
++
++/**
 + * The bullet sprite for shotgun ammo that has none (a player's report: on the isometric map a
 + * shotgun's round is "unsprited"; "Just using the most common used sprite per that damage type
 + * should be fitting for now"): of the mod's items with a bullet sprite, the one used most by those
@@ -23059,10 +23107,10 @@ index 000000000..885e35366
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..22bfdd4c1
+index 000000000..2baff7d94
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,361 @@
+@@ -0,0 +1,372 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -23118,6 +23166,7 @@ index 000000000..22bfdd4c1
 + * stock OXCE. Built with it, the add-on still only switches on when an active mod declares
 + * `firstPerson: enabled: true` (the OpenXcom3D mod does).
 + */
++#include <map>
 +#include <string>
 +#include <vector>
 +#include "../Menu/OptionsBaseState.h" // OptionsOrigin
@@ -23336,6 +23385,14 @@ index 000000000..22bfdd4c1
 +/// to a volley; not one whose hit the explosion state brings, which sounds its own) and the 3D view
 +/// marks where it struck (sparks, a bullet hole), as it does the round.
 +void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo, bool heard = true);
++/// A round (or a thrown item) took a step along its path (Projectile::move: `voxel` where it is now,
++/// `from` a few steps back), in either view: glass the 3D view fills into a window's opening there
++/// (the game's rounds go through the opening) shatters, for the rest of the battle; its shards and
++/// sound only while the 3D view shows. Only the look: the game's rules never know.
++void roundPassed(BattlescapeState *state, const Position &voxel, const Position &from);
++/// A blast that harms terrain reached these tiles (TileEngine::explode, the damage it does each), in
++/// either view: the glass in the openings of their windows shatters, as roundPassed's.
++void blastReached(BattlescapeState *state, const Position &center, const std::map<Tile*, int> &tiles);
 +/// The bullet sprite for shotgun ammo that has none (Projectile): the one the mod's other ammo of
 +/// its damage type uses most, so the map can draw its round and pellets in flight.
 +int shotgunBulletSprite(const Mod *mod, const RuleItem *ammo);
@@ -23387,6 +23444,8 @@ index 000000000..22bfdd4c1
 +inline void reactionAkimbo(BattlescapeState *, BattleAction &) { }
 +inline void unitStruck(BattlescapeState *, const BattleUnit *, int, int) { }
 +inline void pelletLanded(BattlescapeState *, const Position &, const Position &, int, const BattleItem *, const BattleItem *, bool = true) { }
++inline void roundPassed(BattlescapeState *, const Position &, const Position &) { }
++inline void blastReached(BattlescapeState *, const Position &, const std::map<Tile*, int> &) { }
 +inline int shotgunBulletSprite(const Mod *, const RuleItem *) { return -1; } // (Mod::NO_SURFACE)
 +inline bool breakdown(BattlescapeState *, BattleUnit *) { return false; }
 +inline void closeQuartersDeflected(BattlescapeState *, const BattleUnit *, const Position &) { }
@@ -23426,10 +23485,10 @@ index 000000000..22bfdd4c1
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..c15434e1c
+index 000000000..aa9804a3d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2812 @@
+@@ -0,0 +1,2813 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -25485,6 +25544,7 @@ index 000000000..c15434e1c
 +	checkHurt(unit, now);
 +	checkBurning(unit, now);
 +	checkNearMiss();
++	checkGlassBreak();
 +	updateRecoil(unit, elapsedSeconds);
 +	endShotAim();
 +	keepFiringWhileHeld(unit, playerTurn);
@@ -26244,10 +26304,10 @@ index 000000000..c15434e1c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..607f0ee16
+index 000000000..ef599784d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1233 @@
+@@ -0,0 +1,1241 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -26296,6 +26356,7 @@ index 000000000..607f0ee16
 + * FirstPersonMode.h: the first-person mode, the controller and user interface of the 3D view
 + * (its code is in the FirstPersonMode*.cpp files, one per topic).
 + */
++#include <map>
 +#include <unordered_map>
 +#include <unordered_set>
 +#include <vector>
@@ -26406,6 +26467,10 @@ index 000000000..607f0ee16
 +	static double statBarScale(BattlescapeState *state, int stat, int maximum, int barWidth);
 +	/// A shotgun's pellet landed (see FirstPerson::pelletLanded): heard, a few to a volley, and marked in the 3D view.
 +	static void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo, bool heard);
++	/// A round (or a thrown item) took a step (see FirstPerson::roundPassed): glass in a window's opening there breaks in the 3D view.
++	static void roundPassed(BattlescapeState *state, const Position &voxel, const Position &from);
++	/// A blast reached these tiles (see FirstPerson::blastReached): the glass in their windows' openings breaks in the 3D view.
++	static void blastReached(BattlescapeState *state, const Position &center, const std::map<Tile*, int> &tiles);
 +	/// A soldier panics or goes berserk, asked by the game (see FirstPerson::breakdown).
 +	static bool breakdown(BattlescapeState *state, BattleUnit *unit);
 +	/// A close-quarters check knocked a shot aside, told by the game (see FirstPerson::closeQuartersDeflected).
@@ -27377,6 +27442,7 @@ index 000000000..607f0ee16
 +	float _hurtAmount = 0.0f;                       // how strong it is (0..1)
 +	int _lastHeartbeat = -1;                        // the last heartbeat that thumped
 +	Uint32 _nearMissSeen = 0;                       // the last near miss we reacted to
++	Uint32 _glassBreakSeen = 0;                     // the last window glass breaking we heard (see checkGlassBreak)
 +
 +	/// Flashes red when the soldier we look through is hurt.
 +	void checkHurt(BattleUnit *unit, Uint32 now);
@@ -27384,6 +27450,8 @@ index 000000000..607f0ee16
 +	float controlHaze(const BattleUnit *unit, Uint32 now) const;
 +	/// Reacts to an enemy shot whizzing past close by.
 +	void checkNearMiss();
++	/// Window glass broke in sight: heard, from its side.
++	void checkGlassBreak();
 +
 +	// ---- on fire: the view in flames, a flare-up and a banner when the soldier catches fire ----
 +
@@ -33192,10 +33260,10 @@ index 000000000..910a420ef
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..a3f093c79
+index 000000000..7ca28ea2a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,4903 @@
+@@ -0,0 +1,4940 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -34968,6 +35036,7 @@ index 000000000..a3f093c79
 +			return finish();
 +		}
 +		std::copy(next, next + 3, flight.position);
++		_view->breakGlassAt(voxel, flight.velocity, isActive()); // (glass in a window's opening shatters as it goes through)
 +	}
 +	_view->setFreeGrenade(grenade, flight.position, flight.velocity);
 +	return true;
@@ -36880,6 +36949,42 @@ index 000000000..a3f093c79
 +}
 +
 +/**
++ * A round (or a thrown item) took a step along its path (see FirstPerson::roundPassed), in either
++ * view: glass the 3D view fills into a window's opening there breaks (see
++ * FirstPersonView::breakGlassAt); its shards fly and it's heard only while the 3D view shows.
++ * @param state The battlescape screen.
++ * @param voxel Where it is now, in voxels.
++ * @param from Where it was a few steps back, for its way.
++ */
++void FirstPersonMode::roundPassed(BattlescapeState *state, const Position &voxel, const Position &from)
++{
++	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
++	if (!mode || !mode->_view)
++	{
++		return;
++	}
++	const float way[3] = { (float)(voxel.x - from.x), (float)(voxel.y - from.y), (float)(voxel.z - from.z) };
++	mode->_view->breakGlassAt(voxel, way, mode->isActive());
++}
++
++/**
++ * A blast that harms terrain reached these tiles (see FirstPerson::blastReached), in either view:
++ * the glass in the openings of their windows breaks in the 3D view (see
++ * FirstPersonView::blastGlass); its shards fly and it's heard only while the 3D view shows.
++ * @param state The battlescape screen.
++ * @param center Where it went off, in voxels.
++ * @param tiles The tiles it reached, with the damage it does to each.
++ */
++void FirstPersonMode::blastReached(BattlescapeState *state, const Position &center, const std::map<Tile*, int> &tiles)
++{
++	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
++	if (mode && mode->_view)
++	{
++		mode->_view->blastGlass(center, tiles, mode->isActive());
++	}
++}
++
++/**
 + * Picks the target of the next round of an FPS-style shot, the moment the game fires it: along
 + * the crosshair as it points now (the recoil of the rounds before has lifted it), spread at
 + * random by the mode and the soldier (spreadFor), plus the bloom of the last rounds, which then
@@ -38101,10 +38206,10 @@ index 000000000..a3f093c79
 +
 diff --git a/src/FirstPerson/FirstPersonModeSoldierStates.cpp b/src/FirstPerson/FirstPersonModeSoldierStates.cpp
 new file mode 100644
-index 000000000..e7e38ec76
+index 000000000..9507fcd26
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeSoldierStates.cpp
-@@ -0,0 +1,1129 @@
+@@ -0,0 +1,1155 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -38231,6 +38336,32 @@ index 000000000..e7e38ec76
 +	// The whizz, panned to that side, and a small flinch of the camera.
 +	_sounds->play(FirstPersonSounds::WHIZZ, (int)angle, 0.85f);
 +	_view->addShake(0.8f);
++}
++
++/**
++ * Window glass broke in sight (the 3D view notes it, see FirstPersonView::noteGlassBreak): heard
++ * on its side, as loud as its distance leaves it (setting "Hit, kill and swing sounds"). Called
++ * every frame; hears each break once (of breaks at once, the loudest).
++ */
++void FirstPersonMode::checkGlassBreak()
++{
++	const Uint32 glassBreakTick = _view->getGlassBreakTick();
++	if (glassBreakTick == _glassBreakSeen)
++	{
++		return;
++	}
++	_glassBreakSeen = glassBreakTick;
++	if (!Options::fpsHitSounds)
++	{
++		return;
++	}
++	// Which way it is from the eye, as an angle from where the view looks (as checkNearMiss's).
++	float at[3];
++	const float loudness = _view->getGlassBreak(at);
++	double eye[3];
++	_view->getEye(eye);
++	const double angle = std::fmod((std::atan2(at[1] - eye[1], at[0] - eye[0]) - _view->getYawDegrees() * Pi / 180.0) * 180.0 / Pi + 720.0, 360.0);
++	_sounds->play(FirstPersonSounds::GLASS, (int)angle, 0.9f * loudness);
 +}
 +
 +/**
@@ -41444,10 +41575,10 @@ index 000000000..bcfc36840
 +}
 diff --git a/src/FirstPerson/FirstPersonSounds.cpp b/src/FirstPerson/FirstPersonSounds.cpp
 new file mode 100644
-index 000000000..2d3ab5cbc
+index 000000000..f218575b4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonSounds.cpp
-@@ -0,0 +1,344 @@
+@@ -0,0 +1,379 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -41712,6 +41843,41 @@ index 000000000..2d3ab5cbc
 +	make(WHIZZ, sweep(0.34f, 3200.0f, 700.0f, 0.12f, 14.0f));
 +	// A swing: air cut by a blade or a club, rising.
 +	make(SWOOSH, sweep(0.24f, 500.0f, 1700.0f, 0.13f, 16.0f));
++
++	// Glass: window glass shattering (0.7 seconds). The crack: a burst of the noise's high, sharp
++	// part (the noise minus its smoothed copy), gone within about 40 ms; a shimmer of it fading
++	// over half a second; and the shards tinkling down, GlassTinkles high pings (each two
++	// partials, 2.5 to 7 kHz and 2.76 times that, ringing a few tens of ms) at random moments,
++	// thinning out and softer as they come later.
++	const int GlassTinkles = 18;
++	struct Tinkle { float start, pitch, decay, amplitude; };
++	std::vector<Tinkle> tinkles;
++	for (int i = 0; i < GlassTinkles; ++i)
++	{
++		const float start = 0.005f + 0.55f * std::pow((noise(randomEngine) + 1.0f) * 0.5f, 1.6f); // (bunched early)
++		tinkles.push_back({ start, 2500.0f + 4500.0f * (noise(randomEngine) + 1.0f) * 0.5f, 55.0f + 50.0f * (noise(randomEngine) + 1.0f) * 0.5f,
++			0.35f * (1.0f - start * 1.2f) });
++	}
++	std::vector<float> glass(length(0.7f));
++	float smoothedNoise = 0.0f; // The noise smoothed by a simple low-pass filter.
++	for (size_t sample = 0; sample < glass.size(); ++sample)
++	{
++		const float seconds = (float)sample / rate;
++		const float whiteNoise = noise(randomEngine);
++		smoothedNoise += (whiteNoise - smoothedNoise) * 0.3f;
++		const float sharpNoise = whiteNoise - smoothedNoise;
++		float amplitude = 0.8f * std::exp(-seconds * 70.0f) * sharpNoise + 0.12f * std::exp(-seconds * 7.0f) * sharpNoise;
++		for (const Tinkle &tinkle : tinkles)
++		{
++			const float since = seconds - tinkle.start;
++			if (since < 0.0f || since > 0.12f) continue;
++			amplitude += tinkle.amplitude * std::exp(-since * tinkle.decay)
++				* (0.7f * std::sin(2 * Pi * tinkle.pitch * since) + 0.3f * std::sin(2 * Pi * tinkle.pitch * 2.76f * since));
++		}
++		// Fade in over the first millisecond, so the sound doesn't start with a click.
++		glass[sample] = std::clamp(amplitude * std::min(1.0f, seconds * 1000.0f), -1.0f, 1.0f);
++	}
++	make(GLASS, glass);
 +	// All made: play() may play them from now on.
 +	_ready = true;
 +}
@@ -41794,10 +41960,10 @@ index 000000000..2d3ab5cbc
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonSounds.h b/src/FirstPerson/FirstPersonSounds.h
 new file mode 100644
-index 000000000..ec8b62f9c
+index 000000000..44a6559e0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonSounds.h
-@@ -0,0 +1,88 @@
+@@ -0,0 +1,90 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -41854,7 +42020,8 @@ index 000000000..ec8b62f9c
 +/**
 + * The few sounds the first-person view adds to the game's own, made in code (no sound files
 + * to ship): a crisp tick for a hit, a deeper one for a kill, a heartbeat when badly hurt, the
-+ * dry click of a gun that can't fire, the hiss of a flare, the flashlight's switch. They play through the game's sound
++ * dry click of a gun that can't fire, the hiss of a flare, the flashlight's switch, window glass
++ * shattering. They play through the game's sound
 + * channels at its sound volume, and not at all when sound is muted.
 + */
 +class FirstPersonSounds
@@ -41867,8 +42034,9 @@ index 000000000..ec8b62f9c
 +	/// LIGHT_SWITCH (the flashlight's switch: a soft double click), SCAN_PULSE (the motion
 +	/// scanner's sweep going out: a falling electronic whoop and its echoes), SCAN_BLIP_FAR,
 +	/// SCAN_BLIP_MID and SCAN_BLIP_NEAR (the scanner finding movement: a sharp pip, higher the
-+	/// nearer it is), NO_HARM (a dull tick: a strike that did no harm). COUNT is how many there are.
-+	enum Id { HIT, KILL, HEARTBEAT, DRY_FIRE, FLARE, WHIZZ, SWOOSH, PIN, LIGHT_SWITCH, SCAN_PULSE, SCAN_BLIP_FAR, SCAN_BLIP_MID, SCAN_BLIP_NEAR, NO_HARM, COUNT };
++	/// nearer it is), NO_HARM (a dull tick: a strike that did no harm), GLASS (window glass
++	/// shattering: a crack and its shards tinkling down). COUNT is how many there are.
++	enum Id { HIT, KILL, HEARTBEAT, DRY_FIRE, FLARE, WHIZZ, SWOOSH, PIN, LIGHT_SWITCH, SCAN_PULSE, SCAN_BLIP_FAR, SCAN_BLIP_MID, SCAN_BLIP_NEAR, NO_HARM, GLASS, COUNT };
 +	/// Synthesizes all the sounds for the mixer's output format.
 +	FirstPersonSounds();
 +	/// Stops and frees the sounds.
@@ -42160,10 +42328,10 @@ index 000000000..d7aa46be4
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..f8e876f6b
+index 000000000..db3b27e73
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,626 @@
+@@ -0,0 +1,627 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -42309,6 +42477,7 @@ index 000000000..f8e876f6b
 +	_models.clear();
 +	_ghostModels.clear();
 +	_leafyModels.clear();
++	_openedModels.clear();
 +	_frames.clear();
 +	_solidMasks.clear();
 +	_paintedFloors.clear();
@@ -42792,10 +42961,10 @@ index 000000000..f8e876f6b
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..5dd263447
+index 000000000..d5d4b5d40
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1264 @@
+@@ -0,0 +1,1289 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -42949,6 +43118,7 @@ index 000000000..5dd263447
 +		bool water;              // a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea): its top is drawn as waves (see waterColor)
 +		Uint8 liquidHeight;       // a floor the art draws as a box of liquid (XPiratez's sewer sludge, see liquidHeightOf): its surface's height in voxels; 0 for none
 +		bool artFill;             // a floor or wall whose voxels leave out most of its art (a catwalk's grating, a fence: see sparseArt)
++		bool openingGlass;        // glass filled into an opening of the game's shape (lookOnly bits, see fillPaneOpenings): a round going through breaks it (see breakGlassAt)
 +		bool foliage;             // a mass of foliage (see foliageArt): drawn leafy on a tile without a floor (leafyModel)
 +		Uint8 cropBlock;          // an object the art draws as a block of crops (X-Com Files' wheat, see cropBlockOf): the block's height in voxels; 0 for none
 +		const VoxelModel *ghost;  // a ghost model of the part's own, in the same tile where the part has no voxels: the liquid's surface (buildLiquid), the rest of the art (buildArtFill) or a block of crops (buildCropBlock); null for none
@@ -43038,6 +43208,7 @@ index 000000000..5dd263447
 +		Uint8 blood[2];       // splatter on the screen: dark, bright
 +		Uint8 smoke, spark, dust, rain, snow, sand, firefly, bubble;
 +		Uint8 speck;           // the white specks a rocket leaves hanging along its path
++		Uint8 glassShard[3];   // a window's shards (see spawnGlassShards): pale cyan, white, grey-blue
 +		Uint8 marker, marine;
 +		Uint8 sprayMark, sprayNext; // a spray burst's marks and the line between them (light green), the stretch to the next (grey)
 +		Uint8 hitbox[3];       // hitboxes (setting "Hitboxes"): X-COM's, the aliens', the civilians'
@@ -43234,6 +43405,14 @@ index 000000000..5dd263447
 +	/// When an enemy shot last whizzed past close by (0 never), and from which side.
 +	Uint32 getNearMissTick() const { return _nearMissTick; }
 +	void getNearMissDirection(double out[2]) const { out[0] = _nearMissDirection[0]; out[1] = _nearMissDirection[1]; }
++	/// A round (or a thrown item) at a voxel on its way: glass filled into a window's opening there
++	/// breaks (see breakGlassAt); with `effects`, its shards fly and it's heard. True if it broke.
++	bool breakGlassAt(const Position &voxel, const float way[3], bool effects);
++	/// A blast reached these tiles (with the damage it does each): the glass in their windows' openings breaks (see blastGlass).
++	void blastGlass(const Position &center, const std::map<Tile*, int> &tiles, bool effects);
++	/// When window glass last broke in sight (0 never), for its sound: where (voxels), and how loud (0..1, returned).
++	Uint32 getGlassBreakTick() const { return _glassBreakTick; }
++	float getGlassBreak(float at[3]) const { std::copy(_glassBreakAt, _glassBreakAt + 3, at); return _glassBreakLoudness; }
 +	/// Where the last enemy shot came from and when it ended (0 none yet).
 +	Uint32 getEnemyShotEnd(double from[3]) const { std::copy(_enemyShotFrom, _enemyShotFrom + 3, from); return _enemyShotEnd; }
 +	/// When our own last shot left the muzzle (for the weapon in hand's flash).
@@ -43319,6 +43498,7 @@ index 000000000..5dd263447
 +	std::unordered_map<Uint64, VoxelModel> _models;     // by MapData, sprite and cut-out
 +	std::unordered_map<Uint64, VoxelModel> _ghostModels; // the parts' own ghosts (VoxelModel::ghost), by the part's key in _models
 +	std::unordered_map<Uint64, VoxelModel> _leafyModels; // the leafy models of foliage (see leafyModel), by the part's key in _models
++	std::unordered_map<const VoxelModel*, VoxelModel> _openedModels; // models with the glass in their openings broken out (see openedModel), by the whole one
 +	std::unordered_map<const MapData*, Frames> _frames; // by MapData: its animation frames
 +	FirstPersonView *_sharedModelsOwner = nullptr;      // another view whose voxel models this one uses, or null
 +	const VoxelModel *_groundModel = nullptr;           // floor repeated outside the map
@@ -43399,6 +43579,10 @@ index 000000000..5dd263447
 +	const VoxelModel *getModel(const MapData *mapData, int spriteIndex = -1, bool cutout = false);
 +	/// Gets the leafy model of a mass of foliage hanging with no floor under it (a tree's crown).
 +	const VoxelModel *leafyModel(const MapData *mapData, int spriteIndex);
++	/// Gets (building on first use) a model with the glass filled into its openings broken out.
++	const VoxelModel *openedModel(const VoxelModel *model);
++	/// Is the glass in the openings of a tile part's window broken (see breakGlassAt)?
++	bool glassBroken(int tileIndex, int part) const;
 +	/// Builds a voxel model: shapes from the LOFT templates, colours from the isometric sprite.
 +	void buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model) const;
 +	/// What a pane of glass breaks into keeps the pane's edges in its frame (see paneOfGlass).
@@ -43826,6 +44010,10 @@ index 000000000..5dd263447
 +	bool _shotIsEnemy = false;         // the shot in flight is an enemy's
 +	double _enemyShotFrom[3] = {};     // where it came from
 +	Uint32 _enemyShotEnd = 0;          // when it ended
++	// window glass breaking (see breakGlassAt): the last break heard, for the mode's sound
++	Uint32 _glassBreakTick = 0;        // when (0 never)
++	float _glassBreakAt[3] = {};       // where, in voxels
++	float _glassBreakLoudness = 0.0f;  // how loud, 0..1 (by its distance)
 +	struct Beam { float from[3], to[3]; Uint32 start; Uint8 color; float calibre; };
 +	std::vector<Beam> _beams;                          // laser beams fading out
 +	struct Decal { float pos[3]; Uint8 size, depth; }; // bullet holes and scorch marks on surfaces
@@ -43903,6 +44091,12 @@ index 000000000..5dd263447
 +	void drawDecals();
 +	/// Spawns chunks and dust from a destroyed tile part.
 +	void spawnDebris(const Position &tilePosition, int part, const MapData *destroyedMapData);
++	/// Breaks the glass in a tile part's window openings, if still whole (see breakGlassAt); true if it did.
++	bool breakOpeningGlass(Tile *tile, int part, const float hit[3], const float way[3], bool effects);
++	/// Spawns a pane of glass's shards as it breaks, and notes it heard; false if it had no glass (or was too far).
++	bool spawnGlassShards(const Position &tilePosition, const VoxelModel *model, bool withOpening, bool withPane, const float hit[3], const float way[3], float force);
++	/// Notes glass breaking, for its sound (see getGlassBreakTick).
++	void noteGlassBreak(const float at[3]);
 +
 +	// =====================================================================================
 +	// Tactical flares (FirstPersonViewFlares.cpp)
@@ -45548,10 +45742,10 @@ index 000000000..77a3cc4ed
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..344da87e4
+index 000000000..62173c703
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,1662 @@
+@@ -0,0 +1,1665 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -45783,6 +45977,9 @@ index 000000000..344da87e4
 +	_colors.rain = nearest(150, 170, 200);
 +	_colors.snow = nearest(240, 240, 250);
 +	_colors.speck = nearest(236, 236, 228);
++	_colors.glassShard[0] = nearest(200, 228, 240);
++	_colors.glassShard[1] = nearest(240, 248, 252);
++	_colors.glassShard[2] = nearest(150, 178, 196);
 +	_colors.sand = nearest(210, 170, 110);
 +	_colors.firefly = nearest(200, 255, 100);
 +	_colors.bubble = nearest(170, 230, 240);
@@ -48544,10 +48741,10 @@ index 000000000..986e42728
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..d41fcc350
+index 000000000..5698fa39b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,507 @@
+@@ -0,0 +1,513 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -48720,6 +48917,12 @@ index 000000000..d41fcc350
 +/// decorated wall or a craft's hull is far less).
 +const float GlassPaintedCoverMin = 0.9f, GlassPaintedPaleMin = 0.5f;
 +const int GlassPaleMinChannel = 150, GlassPaleBlueSlack = 8, GlassPaleSpread = 70;
++/// Window glass breaking (FirstPersonView::spawnGlassShards; the owner: "glass shatters (by the travelling bullets)
++/// ... only visual and for visceral feel"): shards from GlassShardsAcross voxels of the pane at most, falling, and,
++/// where a round went through, GlassShardsAtHit flying on with it and GlassGlints glints; none from a pane further
++/// than GlassSeenFar voxels away (30 tiles, as debris), and heard fading to a quarter at GlassHeardFar voxels.
++const int GlassShardsAcross = 48, GlassShardsAtHit = 16, GlassGlints = 6;
++const float GlassSeenFar = 480.0f, GlassHeardFar = 640.0f;
 +const Uint32 HitFlinchTime = 220;
 +const float HitFlashShade = 6.0f;
 +const float BodySprayHeight = 4.0f;
@@ -49057,10 +49260,10 @@ index 000000000..d41fcc350
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShots.cpp b/src/FirstPerson/FirstPersonViewShots.cpp
 new file mode 100644
-index 000000000..1cd28ddf1
+index 000000000..17ff3d48d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShots.cpp
-@@ -0,0 +1,1938 @@
+@@ -0,0 +1,2152 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -49647,6 +49850,220 @@ index 000000000..1cd28ddf1
 +	// Dust: big slow puffs, rising and hanging for a few seconds.
 +	const Uint8 dustColors[2] = { _colors.dust, _colors.smoke };
 +	_particles.burst(centre, 10, P::LIT, P::EFFECT, dustColors, 2, 3, 14, 0.5f, -8, 1.2f, 1.5f, 3.0f, 6);
++}
++
++/**
++ * A round (or a thrown item) at a voxel on its way (Projectile::move, a Doom free grenade's
++ * flight): glass filled into a window's opening there (VoxelModel::openingGlass: the game's
++ * rounds go through the opening, the 3D view shows a pane in it) breaks, for the rest of the
++ * battle, and the opening is left empty, as 1.09 showed it (the owner: "lets implement that you
++ * shoot theough window opening as before - but side effect is that glass shatters ... This does
++ * not influence any game mechanics"). The glass stands in the wall's own rows, a voxel or two
++ * thick, and a path steps through every row it crosses, so it can't slip past.
++ * @param voxel Where the round is, in voxels.
++ * @param way Which way it goes (any length).
++ * @param effects Its shards fly and it's heard (the 3D view shows).
++ * @return True if glass broke.
++ */
++bool FirstPersonView::breakGlassAt(const Position &voxel, const float way[3], bool effects)
++{
++	Tile *tile = _save && voxel.x >= 0 && voxel.y >= 0 && voxel.z >= 0 ? _save->getTile(voxel.toTile()) : nullptr;
++	if (!tile)
++	{
++		return false;
++	}
++	const int x = voxel.x % Position::TileXY, y = voxel.y % Position::TileXY, z = voxel.z % Position::TileZ;
++	for (const int part : { O_WESTWALL, O_NORTHWALL })
++	{
++		const MapData *mapData = tile->getMapData((TilePart)part);
++		const VoxelModel *model = mapData ? getModel(mapData) : nullptr;
++		if (model && model->openingGlass && ((model->lookOnly[z][y] >> x) & 1))
++		{
++			const float hit[3] = { voxel.x + 0.5f, voxel.y + 0.5f, voxel.z + 0.5f };
++			return breakOpeningGlass(tile, part, hit, way, effects);
++		}
++	}
++	return false;
++}
++
++/**
++ * A blast that harms terrain reached these tiles (TileEngine::explode, with the damage it does
++ * to each): the glass filled into the openings of the windows on their sides (each tile's west
++ * and north walls, and the walls on its east and south sides, the next tiles') breaks, the whole
++ * pane thrown away from the blast.
++ * @param center Where the blast went off, in voxels.
++ * @param tiles The tiles it reached, with the damage it does to each.
++ * @param effects Shards fly and it's heard (the 3D view shows).
++ */
++void FirstPersonView::blastGlass(const Position &center, const std::map<Tile*, int> &tiles, bool effects)
++{
++	if (!_save)
++	{
++		return;
++	}
++	for (const auto &reached : tiles)
++	{
++		if (reached.second <= 0) continue;
++		const Position at = reached.first->getPosition();
++		const std::pair<Position, int> sides[4] = { { at, O_WESTWALL }, { at, O_NORTHWALL }, { at + Position(1, 0, 0), O_WESTWALL }, { at + Position(0, 1, 0), O_NORTHWALL } };
++		for (const auto &side : sides)
++		{
++			Tile *tile = _save->getTile(side.first);
++			const MapData *mapData = tile ? tile->getMapData((TilePart)side.second) : nullptr;
++			if (!mapData || !getModel(mapData)->openingGlass) continue;
++			// Away from the blast: from where it went off to the middle of the wall, halfway up.
++			const float way[3] = { side.first.x * 16.0f + (side.second == O_WESTWALL ? 0.5f : 8.0f) - center.x,
++				side.first.y * 16.0f + (side.second == O_NORTHWALL ? 0.5f : 8.0f) - center.y, side.first.z * 24.0f + 12.0f - center.z };
++			breakOpeningGlass(tile, side.second, nullptr, way, effects);
++		}
++	}
++}
++
++/**
++ * Breaks the glass filled into a tile part's window openings, if it's still whole: noted broken
++ * for the rest of the battle (in the battle's list, kept in the save: SavedBattleGame::
++ * getBrokenGlass; the snapshot shows the part without it from now on, see openedModel), and,
++ * with `effects`, its shards fly and it's heard.
++ * @param tile The tile.
++ * @param part Its wall (O_WESTWALL or O_NORTHWALL).
++ * @param hit Where a round went through it, in voxels; null for a blast (the whole pane bursts).
++ * @param way Which way the round or the blast went (any length).
++ * @param effects Its shards and its sound.
++ * @return True if it broke now.
++ */
++bool FirstPersonView::breakOpeningGlass(Tile *tile, int part, const float hit[3], const float way[3], bool effects)
++{
++	const int key = _save->getTileIndex(tile->getPosition()) * 4 + part;
++	std::vector<int> &broken = _save->getBrokenGlass();
++	const auto place = std::lower_bound(broken.begin(), broken.end(), key);
++	if (place != broken.end() && *place == key)
++	{
++		return false;
++	}
++	broken.insert(place, key);
++	const Position at = tile->getPosition();
++	Log(LOG_VERBOSE) << "OpenXcom3D: window glass broke at " << at.x << "," << at.y << "," << at.z << (part == O_WESTWALL ? " (west wall)" : " (north wall)")
++		<< (hit ? ", a round through it" : ", a blast"); // (for the tests)
++	if (effects)
++	{
++		spawnGlassShards(tile->getPosition(), getModel(tile->getMapData((TilePart)part)), true, false, hit, way, hit ? 1.0f : 1.6f);
++	}
++	return true;
++}
++
++/**
++ * A pane of glass breaking: its shards. Pale glass shards from all over it (from some of its
++ * voxels), falling, pushed on a little the way the round or the blast went; where a round went
++ * through, more of them flying on with it, fast, and a few glints of light; and it's heard (see
++ * noteGlassBreak). A pane further than GlassSeenFar from the eye is left out, as debris is.
++ * @param tilePosition The tile the pane stands on.
++ * @param model The pane's model, whole.
++ * @param withOpening The glass filled into its openings (VoxelModel::lookOnly) broke.
++ * @param withPane The glass on the game's own voxels broke too (a pane the game destroyed).
++ * @param hit Where a round went through, in voxels; null for none.
++ * @param way Which way the round or blast went (any length); null for none (they only fall).
++ * @param force How hard they're thrown: 1 a round, more for a blast.
++ * @return True if shards flew (it had glass that broke, near enough).
++ */
++bool FirstPersonView::spawnGlassShards(const Position &tilePosition, const VoxelModel *model, bool withOpening, bool withPane, const float hit[3], const float way[3], float force)
++{
++	typedef FirstPersonParticles P; // short for the particle system: its kinds (P::GLOW...) and groups (P::EFFECT...)
++	// The glass that broke, voxel by voxel (their middles, in the world), and the pane's middle.
++	std::vector<std::array<float, 3>> glass;
++	float middle[3] = { 0.0f, 0.0f, 0.0f };
++	for (int z = 0; z < Position::TileZ; ++z)
++	{
++		for (int y = 0; y < Position::TileXY; ++y)
++		{
++			const Uint16 bits = (withOpening ? model->lookOnly[z][y] : 0) | (withPane ? model->glass[z][y] & ~model->lookOnly[z][y] : 0);
++			for (int x = 0; x < Position::TileXY; ++x)
++			{
++				if (!((bits >> x) & 1)) continue;
++				glass.push_back({ tilePosition.x * 16.0f + x + 0.5f, tilePosition.y * 16.0f + y + 0.5f, tilePosition.z * 24.0f + z + 0.5f });
++				for (int axis = 0; axis < 3; ++axis) middle[axis] += glass.back()[axis];
++			}
++		}
++	}
++	if (glass.empty())
++	{
++		return false;
++	}
++	for (float &axis : middle) axis /= glass.size();
++	const double dx = middle[0] - _eye[0], dy = middle[1] - _eye[1];
++	if (dx * dx + dy * dy > GlassSeenFar * GlassSeenFar)
++	{
++		return false;
++	}
++	noteGlassBreak(hit ? hit : middle);
++	// The way as a unit vector (none: no push).
++	float direction[3] = { 0.0f, 0.0f, 0.0f };
++	const float length = way ? std::sqrt(way[0] * way[0] + way[1] * way[1] + way[2] * way[2]) : 0.0f;
++	for (int axis = 0; axis < 3 && length > 0.0f; ++axis) direction[axis] = way[axis] / length;
++	// One shard: from a point, pushed the way at a speed (voxels per second) plus a random
++	// scatter, under gravity (voxels per second squared), living lifeMin to lifeMax seconds.
++	auto shard = [&](const float from[3], float speed, float scatter, float gravity, P::Kind kind, Uint8 color, float lifeMin, float lifeMax, Uint8 size)
++	{
++		P::Particle particle;
++		for (int axis = 0; axis < 3; ++axis)
++		{
++			particle.pos[axis] = from[axis];
++			particle.vel[axis] = direction[axis] * speed + _particles.random(-scatter, scatter);
++		}
++		particle.age = 0.0f;
++		particle.life = _particles.random(lifeMin, lifeMax);
++		particle.gravity = gravity;
++		particle.drag = 0.5f;
++		particle.color = color;
++		particle.size = size;
++		particle.kind = kind;
++		particle.group = P::EFFECT;
++		_particles.add(particle);
++	};
++	// A shard's colour: white two times in three, else pale cyan or grey-blue (lit shards darken
++	// with the light, and a blue one turns navy: few of those).
++	auto shardColor = [&]() { const float pick = _particles.random(); return _colors.glassShard[pick < 0.66f ? 1 : pick < 0.88f ? 0 : 2]; };
++	// From all over the pane: the glass coming down, pushed on a little, for 0.5 to 1.3 seconds;
++	// lit by the light where it is, one in four glinting (self-lit) as it falls, one in three bigger.
++	const int across = std::min<int>(GlassShardsAcross, (int)glass.size());
++	for (int i = 0; i < across; ++i)
++	{
++		const std::array<float, 3> &from = glass[(size_t)(_particles.random() * glass.size()) % glass.size()];
++		const bool glints = _particles.random() < 0.25f;
++		shard(from.data(), _particles.random(4.0f, 24.0f) * force, 8.0f * force, 220.0f, glints ? P::GLOW : P::LIT, glints ? _colors.glassShard[1] : shardColor(),
++			0.5f, 1.3f, (Uint8)(_particles.random() < 0.33f ? 2 : 1));
++	}
++	// Where a round went through: a spray flying on with it, and glints catching the light.
++	if (hit)
++	{
++		for (int i = 0; i < GlassShardsAtHit; ++i)
++		{
++			shard(hit, _particles.random(30.0f, 90.0f), 20.0f, 220.0f, P::LIT, shardColor(), 0.4f, 1.0f, 1);
++		}
++		for (int i = 0; i < GlassGlints; ++i)
++		{
++			shard(hit, _particles.random(10.0f, 40.0f), 30.0f, 60.0f, P::GLOW, _colors.glassShard[1], 0.15f, 0.35f, 2);
++		}
++	}
++	return true;
++}
++
++/**
++ * Notes glass breaking, for the mode's sound (see FirstPersonMode::checkGlassBreak): when, where,
++ * and how loud by its distance from the eye (full up close, fading to a quarter at GlassHeardFar).
++ * Of breaks at once (a blast, a burst through a row of windows) the loudest is heard.
++ * @param at Where, in voxels.
++ */
++void FirstPersonView::noteGlassBreak(const float at[3])
++{
++	const double dx = at[0] - _eye[0], dy = at[1] - _eye[1], dz = at[2] - _eye[2];
++	const float loudness = std::clamp(1.0f - (float)std::sqrt(dx * dx + dy * dy + dz * dz) / GlassHeardFar, 0.25f, 1.0f);
++	const Uint32 now = SDL_GetTicks();
++	if (now != _glassBreakTick || loudness > _glassBreakLoudness)
++	{
++		_glassBreakTick = now;
++		std::copy(at, at + 3, _glassBreakAt);
++		_glassBreakLoudness = loudness;
++	}
 +}
 +
 +/**
@@ -53816,10 +54233,10 @@ index 000000000..b4ce7de47
 +
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..f47010e2b
+index 000000000..42558dbd9
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,3506 @@
+@@ -0,0 +1,3587 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -54070,6 +54487,7 @@ index 000000000..f47010e2b
 +	model.water = false;
 +	model.liquidHeight = 0;
 +	model.artFill = false;
++	model.openingGlass = false;
 +	model.cropBlock = 0;
 +	model.foliage = false;
 +	model.ghost = nullptr;
@@ -56177,12 +56595,78 @@ index 000000000..f47010e2b
 +}
 +
 +/**
++ * Is the glass in the openings of a tile part's window broken (see breakGlassAt)? The battle keeps
++ * the list (SavedBattleGame::getBrokenGlass), so it's kept in the save.
++ * @param tileIndex The tile's index in the map.
++ * @param part Its part.
++ * @return True if broken.
++ */
++bool FirstPersonView::glassBroken(int tileIndex, int part) const
++{
++	const std::vector<int> &broken = _save->getBrokenGlass();
++	return std::binary_search(broken.begin(), broken.end(), tileIndex * 4 + part);
++}
++
++/**
++ * A model with the glass filled into its openings (VoxelModel::lookOnly, see fillPaneOpenings)
++ * broken out, as a round going through left it (see breakGlassAt): the opening empty, as the
++ * game has it (and as 1.09 showed it). Made the first time it's needed, and kept as long as the
++ * models (a view that shares another's models shares these too).
++ * @param model The whole model.
++ * @return The model without its opening's glass.
++ */
++const FirstPersonView::VoxelModel *FirstPersonView::openedModel(const VoxelModel *model)
++{
++	if (_sharedModelsOwner)
++	{
++		return _sharedModelsOwner->openedModel(model);
++	}
++	auto made = _openedModels.find(model);
++	if (made == _openedModels.end())
++	{
++		made = _openedModels.emplace(model, *model).first;
++		VoxelModel &opened = made->second;
++		// The opening's glass voxels gone; the bounding box and emptiness again from what's left.
++		opened.openingGlass = false;
++		opened.empty = true;
++		for (int axis = 0; axis < 3; ++axis)
++		{
++			opened.min[axis] = 255;
++			opened.max[axis] = 0;
++		}
++		for (int z = 0; z < Position::TileZ; ++z)
++		{
++			for (int y = 0; y < Position::TileXY; ++y)
++			{
++				const Uint16 broken = opened.lookOnly[z][y];
++				opened.glass[z][y] &= (Uint16)~broken;
++				opened.lookOnly[z][y] = 0;
++				for (int x = 0; x < Position::TileXY; ++x)
++				{
++					if ((broken >> x) & 1) opened.color[z][y][x] = 0;
++					if (!opened.color[z][y][x]) continue;
++					opened.empty = false;
++					const int voxel[3] = { x, y, z };
++					for (int axis = 0; axis < 3; ++axis)
++					{
++						opened.min[axis] = (Uint8)std::min<int>(opened.min[axis], voxel[axis]);
++						opened.max[axis] = (Uint8)std::max<int>(opened.max[axis], voxel[axis]);
++					}
++				}
++			}
++		}
++	}
++	return &made->second;
++}
++
++/**
 + * Fills a pane of glass's openings with glass: where the game's shape has no voxel across the
 + * wall (a house's window, whose glass the game leaves open, so sight and shots go through) and
 + * the art there is inside the pane (see paneOfGlass), glass voxels in the wall's own rows, so the
 + * window shows a pane, not a hole (the owner, after GitHub issue #75: "glass by the game's
 + * rules"). They're a look only (VoxelModel::lookOnly): the aim goes through them as the game's
-+ * rounds do, and they don't break into shards (see addBrokenPaneEdges).
++ * rounds do, and they don't break into shards (see addBrokenPaneEdges); a round going through
++ * breaks them out, for the rest of the battle (see breakGlassAt).
 + * @param mapData The wall's record.
 + * @param sprite Its sprite frame.
 + * @param pane Its pane (see paneOfGlass).
@@ -56227,6 +56711,7 @@ index 000000000..f47010e2b
 +				model.color[z][y][x] = color ? color : fallbackColor;
 +				model.glass[z][y] |= (Uint16)(1 << x);
 +				model.lookOnly[z][y] |= (Uint16)(1 << x);
++				model.openingGlass = true;
 +				const int voxel[3] = { x, y, z };
 +				for (int axis = 0; axis < 3; ++axis)
 +				{
@@ -56779,6 +57264,13 @@ index 000000000..f47010e2b
 +		const Position tilePos = tile->getPosition();
 +		const double dx = tilePos.x * 16.0 + 8.0 - _eye[0], dy = tilePos.y * 16.0 + 8.0 - _eye[1];
 +		if (dx * dx + dy * dy < 480.0 * 480.0) spawnDebris(tilePos, part, partBefore);
++		// A pane of glass among it (on the game's own voxels, see paneOfGlass; or filled into its
++		// openings, still whole): its shards fly too, and it's heard (the owner: "same shards and
++		// sound").
++		if (spawnGlassShards(tilePos, getModel(partBefore), !glassBroken(index, part), true, nullptr, nullptr, 1.2f))
++		{
++			Log(LOG_VERBOSE) << "OpenXcom3D: a pane of glass destroyed at " << tilePos.x << "," << tilePos.y << "," << tilePos.z << ", part " << part; // (for the tests)
++		}
 +	}
 +}
 +
@@ -56920,13 +57412,19 @@ index 000000000..f47010e2b
 +				if (!nextModel->empty) memo.next = nextModel;
 +			}
 +		}
-+		const VoxelModel *model = memo.model;
++		// The glass in a window's opening broken (see breakGlassAt): the opening shown empty.
++		const VoxelModel *model = memo.model, *next = memo.next;
++		if (model->openingGlass && glassBroken(index, part))
++		{
++			model = openedModel(model);
++			if (next && next->openingGlass) next = openedModel(next);
++		}
 +		if (model->empty)
 +		{
 +			continue;
 +		}
 +		tileView.part[part] = model;
-+		tileView.next[part] = memo.next;
++		tileView.next[part] = next;
 +		tileView.empty = false;
 +
 +		// A light source with bright voxels shines there (see the memo).
@@ -60928,7 +61426,7 @@ index ecc040fb6..dc617605d 100644
  	int getScannedTurn() const { return _scannedTurn; }
  	/// Set turn when unit was scanned by the motion scanner.
 diff --git a/src/Savegame/SavedBattleGame.cpp b/src/Savegame/SavedBattleGame.cpp
-index 240b22a42..ef04e213d 100644
+index 240b22a42..2bdabd8aa 100644
 --- a/src/Savegame/SavedBattleGame.cpp
 +++ b/src/Savegame/SavedBattleGame.cpp
 @@ -31,6 +31,7 @@
@@ -60939,7 +61437,35 @@ index 240b22a42..ef04e213d 100644
  #include "../Battlescape/BattlescapeGame.h"
  #include "../Battlescape/Position.h"
  #include "../Battlescape/Inventory.h"
-@@ -2699,6 +2700,10 @@ bool SavedBattleGame::eyesOnTarget(UnitFaction faction, BattleUnit* unit)
+@@ -168,6 +169,8 @@ void SavedBattleGame::load(const YAML::YamlNodeReader& node, Mod *mod, SavedGame
+ 	reader.tryRead("reinforcementsBlocks", _reinforcementsBlocks);
+ 	reader.tryRead("flattenedMapTerrainNames", _flattenedMapTerrainNames);
+ 	reader.tryRead("flattenedMapBlockNames", _flattenedMapBlockNames);
++	reader.tryRead("openxcom3dBrokenGlass", _brokenGlass); // (OpenXcom3D: the 3D view's broken window glass)
++	std::sort(_brokenGlass.begin(), _brokenGlass.end());
+ 	reader.tryRead("globalshade", _globalShade);
+ 	reader.tryRead("turn", _turn);
+ 	reader.tryRead("bughuntMinTurn", _bughuntMinTurn);
+@@ -531,6 +534,10 @@ void SavedBattleGame::save(YAML::YamlNodeWriter writer) const
+ 	writer.write("reinforcementsBlocks", _reinforcementsBlocks);
+ 	writer.write("flattenedMapTerrainNames", _flattenedMapTerrainNames);
+ 	writer.write("flattenedMapBlockNames", _flattenedMapBlockNames);
++	if (!_brokenGlass.empty())
++	{
++		writer.write("openxcom3dBrokenGlass", _brokenGlass); // (OpenXcom3D: the 3D view's broken window glass)
++	}
+ 	writer.write("globalshade", _globalShade);
+ 	writer.write("turn", _turn);
+ 	writer.write("bughuntMinTurn", _bughuntMinTurn);
+@@ -648,6 +655,7 @@ void SavedBattleGame::initMap(int mapsize_x, int mapsize_y, int mapsize_z, bool
+ 	_mapsize_z = mapsize_z;
+ 
+ 	_tiles.clear();
++	_brokenGlass.clear(); // (OpenXcom3D: a new map, its windows whole)
+ 	_tiles.reserve(_mapsize_z * _mapsize_y * _mapsize_x);
+ 	for (int i = 0; i < _mapsize_z * _mapsize_y * _mapsize_x; ++i)
+ 	{
+@@ -2699,6 +2707,10 @@ bool SavedBattleGame::eyesOnTarget(UnitFaction faction, BattleUnit* unit)
   */
  bool SavedBattleGame::addFallingUnit(BattleUnit* unit)
  {
@@ -60950,6 +61476,27 @@ index 240b22a42..ef04e213d 100644
  	bool add = true;
  	for (auto* bu : _fallingUnits)
  	{
+diff --git a/src/Savegame/SavedBattleGame.h b/src/Savegame/SavedBattleGame.h
+index 6c121c7b9..be4276167 100644
+--- a/src/Savegame/SavedBattleGame.h
++++ b/src/Savegame/SavedBattleGame.h
+@@ -91,6 +91,7 @@ private:
+ 	std::vector< std::vector<int> > _reinforcementsBlocks;
+ 	std::vector< std::vector<std::string> > _flattenedMapTerrainNames;
+ 	std::vector< std::vector<std::string> > _flattenedMapBlockNames;
++	std::vector<int> _brokenGlass; // (OpenXcom3D) window glass the 3D view shows broken: tile index * 4 + tile part, sorted; the game itself never reads it
+ 	const RuleStartingCondition *_startingCondition;
+ 	const RuleEnviroEffects *_enviroEffects;
+ 	bool _ecEnabledFriendly, _ecEnabledHostile, _ecEnabledNeutral;
+@@ -212,6 +213,8 @@ public:
+ 	std::vector< std::vector<std::string> > &getFlattenedMapTerrainNames() { return _flattenedMapTerrainNames; }
+ 	/// Gets the flattened map block names generated by the BattlescapeGenerator.
+ 	std::vector< std::vector<std::string> > &getFlattenedMapBlockNames() { return _flattenedMapBlockNames; }
++	/// (OpenXcom3D) Gets the window glass the 3D view shows broken: tile index * 4 + tile part, sorted (kept in the save, never read by the game itself).
++	std::vector<int> &getBrokenGlass() { return _brokenGlass; }
+ 
+ 	/// Sets the global shade.
+ 	void setGlobalShade(int shade);
 diff --git a/src/main.cpp b/src/main.cpp
 index 4fd8a1d41..a89b6bb01 100644
 --- a/src/main.cpp

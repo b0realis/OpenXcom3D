@@ -151,6 +151,7 @@ public:
 		bool water;              // a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea): its top is drawn as waves (see waterColor)
 		Uint8 liquidHeight;       // a floor the art draws as a box of liquid (XPiratez's sewer sludge, see liquidHeightOf): its surface's height in voxels; 0 for none
 		bool artFill;             // a floor or wall whose voxels leave out most of its art (a catwalk's grating, a fence: see sparseArt)
+		bool openingGlass;        // glass filled into an opening of the game's shape (lookOnly bits, see fillPaneOpenings): a round going through breaks it (see breakGlassAt)
 		bool foliage;             // a mass of foliage (see foliageArt): drawn leafy on a tile without a floor (leafyModel)
 		Uint8 cropBlock;          // an object the art draws as a block of crops (X-Com Files' wheat, see cropBlockOf): the block's height in voxels; 0 for none
 		const VoxelModel *ghost;  // a ghost model of the part's own, in the same tile where the part has no voxels: the liquid's surface (buildLiquid), the rest of the art (buildArtFill) or a block of crops (buildCropBlock); null for none
@@ -240,6 +241,7 @@ public:
 		Uint8 blood[2];       // splatter on the screen: dark, bright
 		Uint8 smoke, spark, dust, rain, snow, sand, firefly, bubble;
 		Uint8 speck;           // the white specks a rocket leaves hanging along its path
+		Uint8 glassShard[3];   // a window's shards (see spawnGlassShards): pale cyan, white, grey-blue
 		Uint8 marker, marine;
 		Uint8 sprayMark, sprayNext; // a spray burst's marks and the line between them (light green), the stretch to the next (grey)
 		Uint8 hitbox[3];       // hitboxes (setting "Hitboxes"): X-COM's, the aliens', the civilians'
@@ -436,6 +438,14 @@ public:
 	/// When an enemy shot last whizzed past close by (0 never), and from which side.
 	Uint32 getNearMissTick() const { return _nearMissTick; }
 	void getNearMissDirection(double out[2]) const { out[0] = _nearMissDirection[0]; out[1] = _nearMissDirection[1]; }
+	/// A round (or a thrown item) at a voxel on its way: glass filled into a window's opening there
+	/// breaks (see breakGlassAt); with `effects`, its shards fly and it's heard. True if it broke.
+	bool breakGlassAt(const Position &voxel, const float way[3], bool effects);
+	/// A blast reached these tiles (with the damage it does each): the glass in their windows' openings breaks (see blastGlass).
+	void blastGlass(const Position &center, const std::map<Tile*, int> &tiles, bool effects);
+	/// When window glass last broke in sight (0 never), for its sound: where (voxels), and how loud (0..1, returned).
+	Uint32 getGlassBreakTick() const { return _glassBreakTick; }
+	float getGlassBreak(float at[3]) const { std::copy(_glassBreakAt, _glassBreakAt + 3, at); return _glassBreakLoudness; }
 	/// Where the last enemy shot came from and when it ended (0 none yet).
 	Uint32 getEnemyShotEnd(double from[3]) const { std::copy(_enemyShotFrom, _enemyShotFrom + 3, from); return _enemyShotEnd; }
 	/// When our own last shot left the muzzle (for the weapon in hand's flash).
@@ -521,6 +531,7 @@ private:
 	std::unordered_map<Uint64, VoxelModel> _models;     // by MapData, sprite and cut-out
 	std::unordered_map<Uint64, VoxelModel> _ghostModels; // the parts' own ghosts (VoxelModel::ghost), by the part's key in _models
 	std::unordered_map<Uint64, VoxelModel> _leafyModels; // the leafy models of foliage (see leafyModel), by the part's key in _models
+	std::unordered_map<const VoxelModel*, VoxelModel> _openedModels; // models with the glass in their openings broken out (see openedModel), by the whole one
 	std::unordered_map<const MapData*, Frames> _frames; // by MapData: its animation frames
 	FirstPersonView *_sharedModelsOwner = nullptr;      // another view whose voxel models this one uses, or null
 	const VoxelModel *_groundModel = nullptr;           // floor repeated outside the map
@@ -601,6 +612,10 @@ private:
 	const VoxelModel *getModel(const MapData *mapData, int spriteIndex = -1, bool cutout = false);
 	/// Gets the leafy model of a mass of foliage hanging with no floor under it (a tree's crown).
 	const VoxelModel *leafyModel(const MapData *mapData, int spriteIndex);
+	/// Gets (building on first use) a model with the glass filled into its openings broken out.
+	const VoxelModel *openedModel(const VoxelModel *model);
+	/// Is the glass in the openings of a tile part's window broken (see breakGlassAt)?
+	bool glassBroken(int tileIndex, int part) const;
 	/// Builds a voxel model: shapes from the LOFT templates, colours from the isometric sprite.
 	void buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model) const;
 	/// What a pane of glass breaks into keeps the pane's edges in its frame (see paneOfGlass).
@@ -1028,6 +1043,10 @@ private:
 	bool _shotIsEnemy = false;         // the shot in flight is an enemy's
 	double _enemyShotFrom[3] = {};     // where it came from
 	Uint32 _enemyShotEnd = 0;          // when it ended
+	// window glass breaking (see breakGlassAt): the last break heard, for the mode's sound
+	Uint32 _glassBreakTick = 0;        // when (0 never)
+	float _glassBreakAt[3] = {};       // where, in voxels
+	float _glassBreakLoudness = 0.0f;  // how loud, 0..1 (by its distance)
 	struct Beam { float from[3], to[3]; Uint32 start; Uint8 color; float calibre; };
 	std::vector<Beam> _beams;                          // laser beams fading out
 	struct Decal { float pos[3]; Uint8 size, depth; }; // bullet holes and scorch marks on surfaces
@@ -1105,6 +1124,12 @@ private:
 	void drawDecals();
 	/// Spawns chunks and dust from a destroyed tile part.
 	void spawnDebris(const Position &tilePosition, int part, const MapData *destroyedMapData);
+	/// Breaks the glass in a tile part's window openings, if still whole (see breakGlassAt); true if it did.
+	bool breakOpeningGlass(Tile *tile, int part, const float hit[3], const float way[3], bool effects);
+	/// Spawns a pane of glass's shards as it breaks, and notes it heard; false if it had no glass (or was too far).
+	bool spawnGlassShards(const Position &tilePosition, const VoxelModel *model, bool withOpening, bool withPane, const float hit[3], const float way[3], float force);
+	/// Notes glass breaking, for its sound (see getGlassBreakTick).
+	void noteGlassBreak(const float at[3]);
 
 	// =====================================================================================
 	// Tactical flares (FirstPersonViewFlares.cpp)

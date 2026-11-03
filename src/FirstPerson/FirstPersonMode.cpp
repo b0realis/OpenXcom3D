@@ -2053,6 +2053,7 @@ void FirstPersonMode::think()
 	checkHurt(unit, now);
 	checkBurning(unit, now);
 	checkNearMiss();
+	checkGlassBreak();
 	updateRecoil(unit, elapsedSeconds);
 	endShotAim();
 	keepFiringWhileHeld(unit, playerTurn);

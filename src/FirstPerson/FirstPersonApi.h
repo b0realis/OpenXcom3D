@@ -53,6 +53,7 @@
  * stock OXCE. Built with it, the add-on still only switches on when an active mod declares
  * `firstPerson: enabled: true` (the OpenXcom3D mod does).
  */
+#include <map>
 #include <string>
 #include <vector>
 #include "../Menu/OptionsBaseState.h" // OptionsOrigin
@@ -271,6 +272,14 @@ void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefor
 /// to a volley; not one whose hit the explosion state brings, which sounds its own) and the 3D view
 /// marks where it struck (sparks, a bullet hole), as it does the round.
 void pelletLanded(BattlescapeState *state, const Position &at, const Position &from, int impact, const BattleItem *weapon, const BattleItem *ammo, bool heard = true);
+/// A round (or a thrown item) took a step along its path (Projectile::move: `voxel` where it is now,
+/// `from` a few steps back), in either view: glass the 3D view fills into a window's opening there
+/// (the game's rounds go through the opening) shatters, for the rest of the battle; its shards and
+/// sound only while the 3D view shows. Only the look: the game's rules never know.
+void roundPassed(BattlescapeState *state, const Position &voxel, const Position &from);
+/// A blast that harms terrain reached these tiles (TileEngine::explode, the damage it does each), in
+/// either view: the glass in the openings of their windows shatters, as roundPassed's.
+void blastReached(BattlescapeState *state, const Position &center, const std::map<Tile*, int> &tiles);
 /// The bullet sprite for shotgun ammo that has none (Projectile): the one the mod's other ammo of
 /// its damage type uses most, so the map can draw its round and pellets in flight.
 int shotgunBulletSprite(const Mod *mod, const RuleItem *ammo);
@@ -322,6 +331,8 @@ inline void mapAkimbo(BattlescapeState *, BattleAction &) { }
 inline void reactionAkimbo(BattlescapeState *, BattleAction &) { }
 inline void unitStruck(BattlescapeState *, const BattleUnit *, int, int) { }
 inline void pelletLanded(BattlescapeState *, const Position &, const Position &, int, const BattleItem *, const BattleItem *, bool = true) { }
+inline void roundPassed(BattlescapeState *, const Position &, const Position &) { }
+inline void blastReached(BattlescapeState *, const Position &, const std::map<Tile*, int> &) { }
 inline int shotgunBulletSprite(const Mod *, const RuleItem *) { return -1; } // (Mod::NO_SURFACE)
 inline bool breakdown(BattlescapeState *, BattleUnit *) { return false; }
 inline void closeQuartersDeflected(BattlescapeState *, const BattleUnit *, const Position &) { }

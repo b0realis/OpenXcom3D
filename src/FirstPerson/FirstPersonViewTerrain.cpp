@@ -248,6 +248,7 @@ void clearModel(FirstPersonView::VoxelModel &model)
 	model.water = false;
 	model.liquidHeight = 0;
 	model.artFill = false;
+	model.openingGlass = false;
 	model.cropBlock = 0;
 	model.foliage = false;
 	model.ghost = nullptr;
@@ -2355,12 +2356,78 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 }
 
 /**
+ * Is the glass in the openings of a tile part's window broken (see breakGlassAt)? The battle keeps
+ * the list (SavedBattleGame::getBrokenGlass), so it's kept in the save.
+ * @param tileIndex The tile's index in the map.
+ * @param part Its part.
+ * @return True if broken.
+ */
+bool FirstPersonView::glassBroken(int tileIndex, int part) const
+{
+	const std::vector<int> &broken = _save->getBrokenGlass();
+	return std::binary_search(broken.begin(), broken.end(), tileIndex * 4 + part);
+}
+
+/**
+ * A model with the glass filled into its openings (VoxelModel::lookOnly, see fillPaneOpenings)
+ * broken out, as a round going through left it (see breakGlassAt): the opening empty, as the
+ * game has it (and as 1.09 showed it). Made the first time it's needed, and kept as long as the
+ * models (a view that shares another's models shares these too).
+ * @param model The whole model.
+ * @return The model without its opening's glass.
+ */
+const FirstPersonView::VoxelModel *FirstPersonView::openedModel(const VoxelModel *model)
+{
+	if (_sharedModelsOwner)
+	{
+		return _sharedModelsOwner->openedModel(model);
+	}
+	auto made = _openedModels.find(model);
+	if (made == _openedModels.end())
+	{
+		made = _openedModels.emplace(model, *model).first;
+		VoxelModel &opened = made->second;
+		// The opening's glass voxels gone; the bounding box and emptiness again from what's left.
+		opened.openingGlass = false;
+		opened.empty = true;
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			opened.min[axis] = 255;
+			opened.max[axis] = 0;
+		}
+		for (int z = 0; z < Position::TileZ; ++z)
+		{
+			for (int y = 0; y < Position::TileXY; ++y)
+			{
+				const Uint16 broken = opened.lookOnly[z][y];
+				opened.glass[z][y] &= (Uint16)~broken;
+				opened.lookOnly[z][y] = 0;
+				for (int x = 0; x < Position::TileXY; ++x)
+				{
+					if ((broken >> x) & 1) opened.color[z][y][x] = 0;
+					if (!opened.color[z][y][x]) continue;
+					opened.empty = false;
+					const int voxel[3] = { x, y, z };
+					for (int axis = 0; axis < 3; ++axis)
+					{
+						opened.min[axis] = (Uint8)std::min<int>(opened.min[axis], voxel[axis]);
+						opened.max[axis] = (Uint8)std::max<int>(opened.max[axis], voxel[axis]);
+					}
+				}
+			}
+		}
+	}
+	return &made->second;
+}
+
+/**
  * Fills a pane of glass's openings with glass: where the game's shape has no voxel across the
  * wall (a house's window, whose glass the game leaves open, so sight and shots go through) and
  * the art there is inside the pane (see paneOfGlass), glass voxels in the wall's own rows, so the
  * window shows a pane, not a hole (the owner, after GitHub issue #75: "glass by the game's
  * rules"). They're a look only (VoxelModel::lookOnly): the aim goes through them as the game's
- * rounds do, and they don't break into shards (see addBrokenPaneEdges).
+ * rounds do, and they don't break into shards (see addBrokenPaneEdges); a round going through
+ * breaks them out, for the rest of the battle (see breakGlassAt).
  * @param mapData The wall's record.
  * @param sprite Its sprite frame.
  * @param pane Its pane (see paneOfGlass).
@@ -2405,6 +2472,7 @@ void FirstPersonView::fillPaneOpenings(const MapData *mapData, const Surface *sp
 				model.color[z][y][x] = color ? color : fallbackColor;
 				model.glass[z][y] |= (Uint16)(1 << x);
 				model.lookOnly[z][y] |= (Uint16)(1 << x);
+				model.openingGlass = true;
 				const int voxel[3] = { x, y, z };
 				for (int axis = 0; axis < 3; ++axis)
 				{
@@ -2957,6 +3025,13 @@ void FirstPersonView::noticeTileChanges(int index, Tile *tile)
 		const Position tilePos = tile->getPosition();
 		const double dx = tilePos.x * 16.0 + 8.0 - _eye[0], dy = tilePos.y * 16.0 + 8.0 - _eye[1];
 		if (dx * dx + dy * dy < 480.0 * 480.0) spawnDebris(tilePos, part, partBefore);
+		// A pane of glass among it (on the game's own voxels, see paneOfGlass; or filled into its
+		// openings, still whole): its shards fly too, and it's heard (the owner: "same shards and
+		// sound").
+		if (spawnGlassShards(tilePos, getModel(partBefore), !glassBroken(index, part), true, nullptr, nullptr, 1.2f))
+		{
+			Log(LOG_VERBOSE) << "OpenXcom3D: a pane of glass destroyed at " << tilePos.x << "," << tilePos.y << "," << tilePos.z << ", part " << part; // (for the tests)
+		}
 	}
 }
 
@@ -3098,13 +3173,19 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 				if (!nextModel->empty) memo.next = nextModel;
 			}
 		}
-		const VoxelModel *model = memo.model;
+		// The glass in a window's opening broken (see breakGlassAt): the opening shown empty.
+		const VoxelModel *model = memo.model, *next = memo.next;
+		if (model->openingGlass && glassBroken(index, part))
+		{
+			model = openedModel(model);
+			if (next && next->openingGlass) next = openedModel(next);
+		}
 		if (model->empty)
 		{
 			continue;
 		}
 		tileView.part[part] = model;
-		tileView.next[part] = memo.next;
+		tileView.next[part] = next;
 		tileView.empty = false;
 
 		// A light source with bright voxels shines there (see the memo).

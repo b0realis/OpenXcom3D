@@ -200,7 +200,7 @@ SETTINGS = [
     ]),
     ('Sound', [
         ('Dynamic music', 'YES', 'YES / NO', 'Tenser music while aliens are in sight.', ''),
-        ('Hit, kill and swing sounds', 'YES', 'YES / NO', 'A tick for a hit, a duller one for a hit that did no harm, a double tick for a kill, a swoosh for your swings, and your heartbeat once hurt below half health.', ''),
+        ('Hit, kill and swing sounds', 'YES', 'YES / NO', 'A tick for a hit, a duller one for a hit that did no harm, a double tick for a kill, a swoosh for your swings, your heartbeat once hurt below half health, and window glass shattering.', ''),
     ]),
     ('Cheats', [
         ('Doom mode (debug)', 'NO', 'YES / NO', 'A cheat: in 3D the selected soldier never runs out of time units or energy; grenades go off in real time.', 'For testing and fun, a first step towards real time.'),
@@ -309,6 +309,9 @@ FEATURES = [
     ('ghosts', 'Ghosts: lifts, racks, catwalks, sludge', [('ufo_shop_racks.png', 'UFO\'s shop racks as ghosts in their real shape, at Ghost opacity'), ('piratez_catwalk.png', 'XPiratez: a catwalk\'s grating overhead, its rest a ghost'), ('piratez_sludge.png', 'XPiratez: the sewer\'s sludge, a soldier wading in it to the thighs')],
      '', 'Some parts the map draws have no shape, or only a few voxels, in the game\'s data. They show as see-through ghosts of their art: ladders and lift pads, the shops\' racks, the rest of fences, railings and catwalk gratings, and the surface of liquid over a floor (XPiratez\'s sewers). The game\'s own voxels stay solid.',
      'Ghosts are pictures: shots, sight and walking go through them as the game says. Set how solid with <i>Ghost opacity</i>.'),
+    ('glass', 'Windows and glass', [],
+     '', 'Windows and glass walls the map sees through are glass in 3D, tinting what\'s behind them. A round, a pellet or a thrown item through a window, or a blast beside it, shatters the glass: shards fall, a crack is heard, and the window stays open for the rest of the battle, kept in the save. A glass wall the game blows in throws its shards too.',
+     'Only the look: rounds and sight go through as the game has them.'),
     ('sea', 'The sea, and under it', [('tftd_sea_past_the_edge.png', 'TFTD: the sea rolling in waves past an island\'s edge'), ('tftd_ruins.png', 'TFTD: ruins on the seabed, bubbles rising, light rippling over the sand')],
      '', 'Terror From The Deep\'s sea rolls in waves, and where it reaches the map\'s edge it goes on past it. Under the water: bubbles, marine snow drifting down, and light rippling over the sand.', 'The particles are a setting (<i>Particles</i>), if you want the water clear.'),
     ('shotguns', 'Shotguns', [('shotgun_pellets_map.png', 'Pellets in flight on the map')],
