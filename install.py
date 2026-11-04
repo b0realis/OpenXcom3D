@@ -59,7 +59,7 @@ from pathlib import Path
 
 # ---- What is installed, and what it is built from ----
 
-VERSION = "1.10"
+VERSION = "1.11"
 # OpenXcom3D is a patch on one exact commit of OpenXcom Extended (OXCE).
 BASE_REPO = "https://github.com/MeridianOXC/OpenXcom.git"
 BASE_BRANCH = "oxce-plus"
@@ -518,7 +518,7 @@ def install(target, binary_dir, data_dir, mod_dir, ufo, tftd, desktop):
         # The logo for it: the archive's openxcom3d.png (or the repository's), copied next to
         # the game; built from source without either, the game's own window icon.
         icon = target / "data" / "common" / "openxcom.png"
-        for logo in [HERE / "openxcom3d.png", HERE / "docs" / "logo" / "openxcom3d_icon_128.png"]:
+        for logo in [HERE / "openxcom3d.png", HERE / "docs" / "logo" / "openxcom3d_icon_256.png"]:
             if logo.is_file():
                 icon = target / "openxcom3d.png"
                 if logo.resolve() != icon.resolve():

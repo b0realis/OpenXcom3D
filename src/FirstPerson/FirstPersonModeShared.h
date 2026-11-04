@@ -65,6 +65,9 @@ namespace
 
 /// The top bar: its row, its height, and where its tool buttons sit (3D, HUD, INV) and how wide.
 const int BarY = 1, BarH = 12;
+/// The game's own line at the top left (its debug messages and "Bug Hunt mode activated", see
+/// FirstPersonMode::placeGameLine) goes this many pixels under the top bar (or the map camera's window).
+const int GameLineGap = 1;
 /// The compass (setting "Compass"): the disc's size, the room above it for the heading arrow, and
 /// how far below the top bar it sits (canvas pixels).
 const int CompassSize = 40, CompassArrowH = 7, CompassGap = 2;
@@ -181,6 +184,10 @@ const int MapCameraBorder = 3, MapCameraTitleH = 10, MapCameraTouchClear = 36;
 const double MapCameraAimHeight = 12.0;
 /// The banner across the top of the view (big letters) and the line under it.
 const int BannerW = 304;
+/// The original's visible enemy buttons in full 3D (see FirstPersonMode::enemyButtonPlace): each this many pixels
+/// above the one before, as the game stacks them, and the column at least this far from the compass's lines above
+/// it and from SCOPING at its left.
+const int EnemyButtonStep = 13, EnemyButtonsGap = 3;
 /// The grav lift arrows.
 const int LiftArrowW = 48, LiftArrowH = 14;
 

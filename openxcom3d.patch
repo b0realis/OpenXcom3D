@@ -1276,7 +1276,7 @@ index 000000000..a70d41a13
 +        color: 144
 diff --git a/mod/OpenXcom3D/metadata.yml b/mod/OpenXcom3D/metadata.yml
 new file mode 100644
-index 000000000..375fb8ef9
+index 000000000..d09210084
 --- /dev/null
 +++ b/mod/OpenXcom3D/metadata.yml
 @@ -0,0 +1,11 @@
@@ -1284,13 +1284,13 @@ index 000000000..375fb8ef9
 +# metadata.yml for OpenXcom3D
 +
 +name: "OpenXcom3D - First-Person View"
-+version: 1.10
++version: 1.11
 +description: "Adds a first-person 3D view of the battlescape (F8): mouse look, real-time movement paid with time units (WASD), firing from the crosshair, a squad bar with soldier camera cards, lights, shadows, flashlight, particles, weather, tactical flares, combat music and its own 3D View options tab. Needs the OpenXcom3D build of OXCE; on a standard OXCE build this mod reports an unsupported engine and stays off."
 +author: OpenXcom3D project
 +
 +master: "*"
 +requiredExtendedEngine: OpenXcom3D
-+requiredExtendedVersion: "1.0.10"
++requiredExtendedVersion: "1.0.11"
 diff --git a/res/linux/icons/openxcom.svg b/res/linux/icons/openxcom.svg
 index 444f7387b..9196ac813 100644
 --- a/res/linux/icons/openxcom.svg
@@ -21710,7 +21710,7 @@ index a4c23b216..13d36e8f3 100644
  	{
  		_buttonsPressed |= SDL_BUTTON(button);
 diff --git a/src/Engine/ModInfo.cpp b/src/Engine/ModInfo.cpp
-index cca815d3e..8053820d9 100644
+index cca815d3e..5b4d3e00c 100644
 --- a/src/Engine/ModInfo.cpp
 +++ b/src/Engine/ModInfo.cpp
 @@ -181,6 +181,9 @@ struct EngineData
@@ -21718,7 +21718,7 @@ index cca815d3e..8053820d9 100644
  const EngineData supportedEngines[] = {
  	{ OPENXCOM_VERSION_ENGINE, { OPENXCOM_VERSION_NUMBER }},
 +#ifndef OXCE_NO_FIRSTPERSON
-+	{ "OpenXcom3D", { 1, 0, 10, 0 } }, // first-person add-on 1.10, see src/FirstPerson
++	{ "OpenXcom3D", { 1, 0, 11, 0 } }, // first-person add-on 1.11, see src/FirstPerson
 +#endif
  	{ "", { 0, 0, 0, 0 } }, // assume that every engine support mods from base game, remove if its not true.
  };
@@ -21884,7 +21884,7 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..52f0ea42f
+index 000000000..f0ffb1e94
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
 @@ -0,0 +1,1288 @@
@@ -22034,7 +22034,7 @@ index 000000000..52f0ea42f
 +}
 +
 +/**
-+ * The main menu with the mod on: its version (the mod's own metadata, "1.10") in small letters
++ * The main menu with the mod on: its version (the mod's own metadata, "1.11") in small letters
 + * just right of the title's first line, "OpenXcom3D", its foot on the big letters' foot (a player,
 + * GitHub issue #69: without the AppImage's name, no telling the version; the owner: "a smaller
 + * space and our version number besides OpenXcom3D", then "Make the version no. Smaller"). A text
@@ -23556,10 +23556,10 @@ index 000000000..2baff7d94
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..66a61a2a5
+index 000000000..6e5c4dd50
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2822 @@
+@@ -0,0 +1,2882 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -23700,7 +23700,8 @@ index 000000000..66a61a2a5
 + * @param state The battlescape screen.
 + */
 +FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
-+	_game(game), _state(state), _save(state->_save), _wants3D(Options::fpsStartInFirstPerson), _missionAtStart(state->_save->getMissionType()), _warningY(state->_warning->getY())
++	_game(game), _state(state), _save(state->_save), _wants3D(Options::fpsStartInFirstPerson), _missionAtStart(state->_save->getMissionType()), _warningY(state->_warning->getY()),
++	_gameLineX(state->_txtDebug->getX())
 +{
 +	// The overlays are laid out on a canvas; on big screens it's drawn magnified (see blit).
 +	// Whether each step is allowed is not known yet (see stepAllowed).
@@ -23848,7 +23849,7 @@ index 000000000..66a61a2a5
 +	_txtTarget = addText(160, 9, width / 2 - 80, height / 2 + 10, "crosshairText", "firstPerson");
 +	_txtTarget->setAlign(ALIGN_CENTER);
 +	// Zoomed in: SCOPING and the zoom, at the right just under the scope cross's line (clear of
-+	// the lift arrows' texts above it).
++	// the lift arrows' texts above it), left of the visible enemy buttons (see updateScope).
 +	_txtScoping = addText(90, 9, width - 94, height / 2 + 5, "crosshairText", "firstPerson");
 +	_txtScoping->setAlign(ALIGN_RIGHT);
 +
@@ -25563,6 +25564,7 @@ index 000000000..66a61a2a5
 +	updateTopBar(selected);
 +	updateSoldierCard();
 +	updateMapCamera(); // (after the card: a squad button's soldier cam wins)
++	placeGameLine(); // (after the map camera: under its window while it shows)
 +	watchMapLayers();
 +	updateMusic(now);
 +	updateMapAim();
@@ -26151,9 +26153,10 @@ index 000000000..66a61a2a5
 +			return true;
 +		}
 +
-+		// The game's own buttons, drawn on the screen itself (not on the canvas), where the map's
-+		// handling would move the hidden map instead: the visible enemy buttons (with or without
-+		// the classic HUD), and with the classic HUD, its buttons that act on the map.
++		// The game's own buttons, where the map's handling would move the hidden map instead: the
++		// visible enemy buttons (in full 3D with our overlays, see drawEnemyButtons; with the
++		// classic HUD on the screen itself, in its place), and with the classic HUD, its buttons
++		// that act on the map.
 +		auto under = [&](const InteractiveSurface *button) {
 +			return button->getVisible() && mouseX >= button->getX() && mouseX < button->getX() + button->getWidth()
 +				&& mouseY >= button->getY() && mouseY < button->getY() + button->getHeight();
@@ -26167,7 +26170,8 @@ index 000000000..66a61a2a5
 +			// centre on the enemy, or on that soldier).
 +			for (int enemyIndex = 0; enemyIndex < BattlescapeState::VISIBLE_MAX && (_classicHud || !hudHidden()); ++enemyIndex)
 +			{
-+				if (!under(_state->_btnVisibleUnit[enemyIndex])) continue;
++				// (in full 3D where drawEnemyButtons draws them, with the classic HUD in its own place)
++				if (_classicHud ? !under(_state->_btnVisibleUnit[enemyIndex]) : !onEnemyButton(enemyIndex, mouseX / _uiScale, mouseY / _uiScale)) continue;
 +				if (press && event.button.button == SDL_BUTTON_LEFT) lookAtEnemy(enemyIndex);
 +				if (press && event.button.button == SDL_BUTTON_RIGHT) lookFromBestSpotter(enemyIndex);
 +				return true;
@@ -26228,8 +26232,8 @@ index 000000000..66a61a2a5
 + * Draws the whole battlescape screen, every frame and in both views, in place of the state's
 + * own drawing: the 3D view at the back (when it shows), then the game's own surfaces (in full
 + * 3D, without the classic HUD, only its warnings and debug text), then our overlays on top (the
-+ * top bar shows over the isometric map too), and in full 3D the original's visible enemy
-+ * buttons. On big screens the view and the overlays are drawn on the canvas and magnified.
++ * top bar shows over the isometric map too), with them in full 3D the original's visible
++ * enemy buttons. On big screens the view and the overlays are drawn on the canvas and magnified.
 + * @return Always true: the screen is drawn here, so the state doesn't draw it itself.
 + */
 +bool FirstPersonMode::blit()
@@ -26265,13 +26269,16 @@ index 000000000..66a61a2a5
 +	}
 +
 +	// Our overlays: straight onto the screen, or onto the cleared canvas and magnified (its
-+	// empty pixels let what's under them show).
++	// empty pixels let what's under them show); with them, when the classic HUD that normally
++	// has them is hidden (and the 3D HUD isn't), the original's visible enemy buttons.
++	const bool enemyButtons = full3D && !hudHidden();
 +	if (!_canvas)
 +	{
 +		for (Surface *surface : _state->_surfaces)
 +		{
 +			if (surface != _view && _ownSurfaces.count(surface) && !(hudHidden() && _topBarSurfaces.count(surface))) surface->blit(screen);
 +		}
++		if (enemyButtons) drawEnemyButtons(screen);
 +	}
 +	else
 +	{
@@ -26280,24 +26287,77 @@ index 000000000..66a61a2a5
 +		{
 +			if (surface != _view && _ownSurfaces.count(surface) && !(hudHidden() && _topBarSurfaces.count(surface))) surface->blit(_canvas->getSurface());
 +		}
++		if (enemyButtons) drawEnemyButtons(_canvas->getSurface());
 +		magnify(screen, _canvas->getSurface(), true);
 +	}
-+
-+	// The original's visible enemy buttons (bottom right; clicking one turns the view to it),
-+	// with their numbers, when the classic HUD that normally has them is hidden (and the 3D HUD
-+	// isn't).
-+	if (full3D && !hudHidden())
-+	{
-+		for (int enemyIndex = 0; enemyIndex < BattlescapeState::VISIBLE_MAX; ++enemyIndex)
-+		{
-+			if (_state->_btnVisibleUnit[enemyIndex]->getVisible())
-+			{
-+				_state->_btnVisibleUnit[enemyIndex]->blit(screen);
-+				_state->_numVisibleUnit[enemyIndex]->blit(screen);
-+			}
-+		}
-+	}
 +	return true;
++}
++
++/**
++ * Where a visible enemy button goes in full 3D (see drawEnemyButtons): the column of those showing (the game shows
++ * the first ones), stacked as the game stacks them (the first at the bottom, each EnemyButtonStep above the one
++ * before), centred on the view's height, under the compass's middle (which keeps it clear of the red arrows that
++ * mark enemies past the view's right edge); on a low screen under the compass's lines (turning, SPRINT, EN
++ * PASSANT), and all of it on the screen.
++ * @param index The button (0: the first).
++ * @param x Its left edge, in canvas pixels.
++ * @param y Its top, in canvas pixels.
++ */
++void FirstPersonMode::enemyButtonPlace(int index, int &x, int &y) const
++{
++	const InteractiveSurface *button = _state->_btnVisibleUnit[index];
++	int shown = 1;
++	while (shown < BattlescapeState::VISIBLE_MAX && _state->_btnVisibleUnit[shown]->getVisible()) ++shown;
++	const int columnHeight = (shown - 1) * EnemyButtonStep + button->getHeight();
++	const int underCompass = _txtCompassTurn->getY() + _txtCompassTurn->getHeight() + 1 + _txtSprint->getHeight() + _txtEnPassant->getHeight() + EnemyButtonsGap;
++	const int top = std::max(0, std::min(std::max(canvasHeight() / 2 - columnHeight / 2, underCompass), canvasHeight() - 2 - columnHeight));
++	x = _compass->getX() + CompassSize / 2 - button->getWidth() / 2;
++	y = top + (shown - 1 - index) * EnemyButtonStep;
++}
++
++/**
++ * Is a point on the canvas on a visible enemy button, where full 3D draws it (see enemyButtonPlace)?
++ * @param index The button.
++ * @param canvasX The point, in canvas pixels.
++ * @param canvasY The same, down.
++ * @return True if the button shows there.
++ */
++bool FirstPersonMode::onEnemyButton(int index, double canvasX, double canvasY) const
++{
++	const InteractiveSurface *button = _state->_btnVisibleUnit[index];
++	int x, y;
++	enemyButtonPlace(index, x, y);
++	return button->getVisible() && canvasX >= x && canvasX < x + button->getWidth() && canvasY >= y && canvasY < y + button->getHeight();
++}
++
++/**
++ * The original's visible enemy buttons (clicking one turns the view to it), with their numbers, in full 3D: in a
++ * column at the right, centred on the view's height (a player: where the classic HUD has them they stood off to the
++ * middle of a wide screen), at the HUD's scale (drawn with our overlays). Each is moved there for the frame and put
++ * back, so the game's HUD keeps them where it has them (the map, the classic HUD).
++ * @param target The canvas, or the screen when there's no canvas (scale 1).
++ */
++void FirstPersonMode::drawEnemyButtons(SDL_Surface *target)
++{
++	for (int enemyIndex = 0; enemyIndex < BattlescapeState::VISIBLE_MAX; ++enemyIndex)
++	{
++		InteractiveSurface *button = _state->_btnVisibleUnit[enemyIndex];
++		NumberText *number = _state->_numVisibleUnit[enemyIndex];
++		if (!button->getVisible()) continue;
++		const int buttonX = button->getX(), buttonY = button->getY(), numberX = number->getX(), numberY = number->getY();
++		int x, y;
++		enemyButtonPlace(enemyIndex, x, y);
++		button->setX(x);
++		button->setY(y);
++		number->setX(x + numberX - buttonX); // (the number where the game puts it on its button)
++		number->setY(y + numberY - buttonY);
++		button->blit(target);
++		number->blit(target);
++		button->setX(buttonX);
++		button->setY(buttonY);
++		number->setX(numberX);
++		number->setY(numberY);
++	}
 +}
 +
 +/**
@@ -26384,10 +26444,10 @@ index 000000000..66a61a2a5
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..be606d0d0
+index 000000000..fa3342ece
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1246 @@
+@@ -0,0 +1,1255 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -26596,6 +26656,7 @@ index 000000000..be606d0d0
 +	Uint32 _ignoreMotionUntil = 0;         // the cursor's jump to the window centre after grabbing isn't a look
 +	Uint32 _lastFrameTick = 0;             // when think() last ran (SDL ticks, ms)
 +	int _warningY;                         // where the game's warnings sit with the classic HUD (back there when leaving 3D)
++	int _gameLineX;                        // where the game's own line (debug, Bug Hunt) starts at the top left (screen pixels)
 +	BattleUnit *_lastPlayerUnit = nullptr; // the last soldier the player had (the view stays with them in the alien turn)
 +	bool _musicTense = false;              // the combat track is playing
 +	bool _flashlightOn = true;             // the flashlight (setting "Flashlight") switched on with its key (the suit light is the game's)
@@ -27453,6 +27514,8 @@ index 000000000..be606d0d0
 +	bool onMapCamera(int canvasX, int canvasY) const;
 +	/// The 3D HUD key on the map: the map camera off, or on again at its last size.
 +	void toggleMapCamera();
++	/// Puts the game's own line (debug messages, Bug Hunt mode) under the top bar, or under the map camera's window.
++	void placeGameLine();
 +
 +	// ---- the banner across the top of the view ----
 +
@@ -27513,6 +27576,12 @@ index 000000000..be606d0d0
 +	void selectUnit(BattleUnit *unit);
 +	/// Hands the 3D view the visible enemies to mark.
 +	void updateEnemyMarkers();
++	/// Where a visible enemy button goes in full 3D: in a column at the right, those showing centred on the view's height.
++	void enemyButtonPlace(int index, int &x, int &y) const;
++	/// Is a point on the canvas on a visible enemy button where full 3D draws it?
++	bool onEnemyButton(int index, double canvasX, double canvasY) const;
++	/// Draws the visible enemy buttons, with their numbers, in their full 3D place.
++	void drawEnemyButtons(SDL_Surface *target);
 +
 +	// =====================================================================================
 +	// What happens to the soldier: hurt, burning, down, breakdowns
@@ -28504,10 +28573,10 @@ index 000000000..fd0923b46
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..5639c6603
+index 000000000..278561765
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,2314 @@
+@@ -0,0 +1,2342 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -29013,6 +29082,12 @@ index 000000000..5639c6603
 +	{
 +		return;
 +	}
++
++	// Its right end left of the visible enemy buttons' column (see enemyButtonPlace), which
++	// stands across the scope's line at the right.
++	int columnX, columnY;
++	enemyButtonPlace(0, columnX, columnY);
++	_txtScoping->setX(columnX - EnemyButtonsGap - _txtScoping->getWidth());
 +
 +	// The zoom with one decimal, or a whole number when it is one ("4x" once all the way in).
 +	const double shownZoom = std::round(_zoom * 10.0) / 10.0;
@@ -30241,6 +30316,28 @@ index 000000000..5639c6603
 +			&& canvasY >= surface->getY() && canvasY < surface->getY() + surface->getHeight();
 +	};
 +	return inside(_mapCameraFrame) || (_mapSoldierCamOpen && inside(_soldierCamFrame));
++}
++
++/**
++ * The game's own line at the top left of the screen (its debug messages, and "Bug Hunt mode activated" each turn
++ * once that's on; a player: it lay over the top bar's buttons) goes one line down, just under the top bar, in both
++ * views: right of OXCE's touch buttons when they show, as the map camera, and under the map camera's window while
++ * that's open (the window starts where the line would be). In screen pixels, as the game's own surfaces are placed.
++ */
++void FirstPersonMode::placeGameLine()
++{
++	int x = _gameLineX, y = (BarY + BarH + GameLineGap) * _uiScale;
++	if (_mapCameraFrame->getVisible())
++	{
++		x = _mapCameraFrame->getX() * _uiScale;
++		y = (_mapCameraFrame->getY() + _mapCameraFrame->getHeight() + GameLineGap) * _uiScale;
++	}
++	else if (_state->_btnCtrl->getVisible())
++	{
++		x = std::max(x, MapCameraTouchClear);
++	}
++	_state->_txtDebug->setX(x);
++	_state->_txtDebug->setY(y);
 +}
 +
 +/**
@@ -32955,10 +33052,10 @@ index 000000000..2fc48c293
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..3ae1ccfbf
+index 000000000..3486db61a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,482 @@
+@@ -0,0 +1,489 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -33026,6 +33123,9 @@ index 000000000..3ae1ccfbf
 +
 +/// The top bar: its row, its height, and where its tool buttons sit (3D, HUD, INV) and how wide.
 +const int BarY = 1, BarH = 12;
++/// The game's own line at the top left (its debug messages and "Bug Hunt mode activated", see
++/// FirstPersonMode::placeGameLine) goes this many pixels under the top bar (or the map camera's window).
++const int GameLineGap = 1;
 +/// The compass (setting "Compass"): the disc's size, the room above it for the heading arrow, and
 +/// how far below the top bar it sits (canvas pixels).
 +const int CompassSize = 40, CompassArrowH = 7, CompassGap = 2;
@@ -33142,6 +33242,10 @@ index 000000000..3ae1ccfbf
 +const double MapCameraAimHeight = 12.0;
 +/// The banner across the top of the view (big letters) and the line under it.
 +const int BannerW = 304;
++/// The original's visible enemy buttons in full 3D (see FirstPersonMode::enemyButtonPlace): each this many pixels
++/// above the one before, as the game stacks them, and the column at least this far from the compass's lines above
++/// it and from SCOPING at its left.
++const int EnemyButtonStep = 13, EnemyButtonsGap = 3;
 +/// The grav lift arrows.
 +const int LiftArrowW = 48, LiftArrowH = 14;
 +

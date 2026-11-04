@@ -1,6 +1,6 @@
 # OpenXcom3D manual
 
-Version 1.10. OpenXcom3D is **OpenXcom Extended (OXCE)** with a first-person 3D battlescape: an engine add-on (`src/FirstPerson/`, with small hooks in the core) and a data mod (`OpenXcom3D`) that switches it on.
+Version 1.11. OpenXcom3D is **OpenXcom Extended (OXCE)** with a first-person 3D battlescape: an engine add-on (`src/FirstPerson/`, with small hooks in the core) and a data mod (`OpenXcom3D`) that switches it on.
 
 In short, with pictures: the [play guide](https://b0realis.github.io/OpenXcom3D/play.html) has [every key](https://b0realis.github.io/OpenXcom3D/play.html#keys), [every setting](https://b0realis.github.io/OpenXcom3D/play.html#settings) and how each plays, what's on the screen, and every feature. This manual has the whole story.
 
@@ -334,6 +334,10 @@ On the isometric map a soldier with a gun in each hand can fire both too: hold *
 - **◄ soldiers ►**, in the middle of the screen: 10 shown (on a wide screen, as many as fit at full size), the window follows your soldier, and the mouse wheel over ◄ or ► scrolls; so does a right click on ◄ or ►, one soldier at a time, without changing who's selected (a left click selects the previous or next soldier). Hovering one shows a card with stats and a live helmet camera. A skull marks the dead, a caduceus the unconscious, and an orange alien face a soldier under alien mind control; a unit of the other side under *your* mind control gets a button too, after your soldiers, its number in purple (looking through it, the view's edges are washed purple, breathing gently, as is its helmet camera). A right click on a soldier's button opens their **SOLDIER CAM** (their helmet camera big; see *Soldier camera preview* in [Settings](#4-settings)). The **mouse wheel over a soldier's button** steps the card, or the soldier cam, on to the next soldier (up: the previous one), round the whole squad and scrolling the bar along, without moving the mouse; moving onto another button shows that one again.
 - **SPECIAL** · **NIGHT VISION** · **SUIT LIGHT** · **SUIT FLY**, shown when the soldier has them (labels shorten to SPEC · NV · LIGHT · FLY on a narrow bar);
 - **END** turn, at the right edge.
+
+**Under the top bar**, at the left: the game's own line (its debug messages, and *Bug Hunt mode activated* each turn once that's on), one line down so it never covers the buttons; under the map camera's window while that's open.
+
+**Enemies in sight**, at the right: the game's red buttons, one for each enemy the soldier sees (the first at the bottom, numbered as the red markers over the enemies), in a column under the compass, centred on the view's height on any screen, clear of the markers that point at enemies past the view's edge. With the free cursor, a click turns the view to that enemy and a right click switches to the soldier who sees it with the most time units left, as the classic HUD's own buttons do (H shows them in their place).
 
 **Info panel**, bottom left (the classic HUD, H, has all of this in its own way):
 
@@ -807,7 +811,7 @@ Smoke costs what it covers. A smoke grenade's cloud (about 90 tiles over two lev
 | Branch | **`oxce-plus`** |
 | Commit | **`f0134ef8065799c7723953d64b565f7832bfd782`** — 2026-09-29 15:04:49 +0200, author Meridian, "Merge remote-tracking branch 'SupSuper/master' into oxce-plus" |
 | Version string | **OpenXcom Extended 8.7.1 (v2026-09-19)** |
-| OpenXcom3D | engine add-on and mod version **1.10** (`requiredExtendedEngine: OpenXcom3D`, `requiredExtendedVersion: "1.0.10"`: OXCE would read "1.09" as 1.9, so the engine counts 1.0.9, 1.0.10) |
+| OpenXcom3D | engine add-on and mod version **1.11** (`requiredExtendedEngine: OpenXcom3D`, `requiredExtendedVersion: "1.0.11"`: OXCE would read "1.09" as 1.9, so the engine counts 1.0.9, 1.0.10, 1.0.11) |
 
 `openxcom3d.patch` holds every change on top of that commit:
 
@@ -923,6 +927,26 @@ What `FirstPersonView` draws:
 | `OpenXcom.2010.vcxproj{,.filters}` | The add-on's files |
 
 ## 11. Version history
+
+### 1.11 (2026-11-04)
+
+- **Skies by the weather and the place** (a player, GitHub issue #94: "Slightly disorienting to have a Blue or stary sky, and rain"; the owner: "check all special missions so sky is ok!"): rain and snow fall from overcast, a grey sky (paler for snow, darker at night) under a drifting deck of cloud, with no sun, moon or stars and no sun shadows, every face lit from above. A battle's sky goes by the mod's new `skies:` table (by mission type, else a terrain of the map's blocks, else the environment the big mods give a battle). Space and orbit are black with stars and the sun, nothing past the map's edge and space under it; from XPiratez's orbital stations the Earth lies below, its clouds drifting and its air glowing over its edge; over the Moon the Earth's disc hangs in the black sky, lit on the sun's side; Mars has a butterscotch sky by day with a smaller sun, stars by night and no clouds (Cydonia, the big mods' Mars); XPiratez's Shadowlands, dreams and Doom lie in a violet void. The weather goes by the environment too (acid rain, the dust storm), and there is none in space or under the sea. Round two (the owner: "check all special missions in xpiratez, tftd, ufo and xcom files. Correct as necessary"; 518 New Battles): the big mods' copy of TFTD's sea is water, so the sea runs on past their islands, ports and ships, at the deck's height round the liners and cargo ships; TFTD's own liner and cargo ship float on their sea past the hull; and 19 more maps lie under rock (XPiratez's Thule base, Old Earth metro and sewers, its ninja bases' underground stages, the City of the Dead's sewers, the Rabbit Crypt and the Realm of Fear; X-Com Files' Cyberweb lair, smugglers' refuge, brainsucked lair and ooze nest).
+
+- **Reload from any clip carried** (the owner, GitHub issue #95: "reloading should use compatible spare clips from anywhere in the soldier's inventory"): the game's reload always looked through the whole inventory (belt, backpack, pockets, shoulders, the other hand) and took the clip cheapest to reach. With the big mods' extended reload cost (XPiratez, X-Com Files) the clip's move to the hand is charged too, and when that was more than the soldier had left, R did nothing, silently. In 3D, R now says why when nothing loads: "Already loaded", "No spare clip for this weapon" or "Not enough time units to reload (23 needed)". With Ctrl, Alt or Shift held, R is the game's.
+
+- **The flight switch kept** (the owner, GitHub issue #96): a soldier's flight switched on or off with **B** is kept in the save (`flightSwitch`, beside `mapAkimbo`). Before, after a load every flyer flew only if it was in the air, so one walking on with flight on had it off again.
+
+- **A door under the crosshair** (the owner, GitHub issue #97; then: "Move it to the left of the crosshair"): a little green door left of the crosshair when the wall its line meets first is a door you have seen, a swinging door or a UFO's; on your turn, and not while a unit is under the crosshair (the line can pass over a small alien's head onto a door behind it). Under TFTD's sea it's teal: its palette has no true green.
+
+- **T'leth's ceiling** (the owner, after a campaign run of the final mission: "How does ceiling look like in final? Ok?"): T'leth's first stage and the artifact site's second showed their rock black overhead, under night vision and the flashlight too: the commonest colour of the walls round the map's edge is black at every shade in the deep sea's palette. A colour too dark to show its hue is passed over for the next commonest, the map's own (a dark green).
+
+- **Smoke drawn for less** (a player, GitHub issue #92; the owner: "i would still draw all smoke but check if we can do it efficiently ... and check if it hogs down the performance"): every puff is still drawn, but a puff off the view or wholly behind what's already drawn is left out, and each draws only its own rows and the runs of its coloured pixels. A grenade's cloud of 94 tiles at 1920×1080: 1.6 ms a frame with Modern smoke ahead (2.0 before), 2.75 from inside it (3.2), 5.5 with Original (7.1); on one core at 640×400 1.9, 3.1 and 10.5 ms (2.5, 4.3 and 12). The picture is the same to the pixel, checked frame by frame.
+
+- **The game's line under the top bar** (a player: "When the game triggers Bug Hunt mode, the text layers over the buttons along the top bar that the mod adds. If it's possible to move the bug hunt text down a line when it spawns, that would take care of the issue I think."): OXCE's line at the top left of the screen (its debug messages, and "Bug Hunt mode activated: enemies are visible on the minimap!" each turn once bug hunt mode is on) starts one line down, under our top bar, on the map and in 3D; right of OXCE's touch buttons when they show, and under the map camera's window while that's open (the window starts where the line would be).
+
+- **The enemy buttons at the centre right** (the owner, with a player's picture: "the icons for spotted enemies (green and red squares) are a bit in the middle in 3d - should we position them to the center right of the screen - independent of resolution?", then: "center right - still space for red arrows of enemies"): in full 3D the game's buttons for the enemies in sight stood where the classic HUD has them, off towards the middle of a wide screen. Now they stand in a column at the right, under the compass's middle, those showing centred on the view's height, at the HUD's scale on every screen size, and clear of the red markers at the view's right edge; on a low screen (the Original battlescape scale) they start under the compass's lines. Zoomed in, SCOPING ends left of them. The classic HUD keeps them in its own place.
+
+- **The logo for the downloads** (the owner: "Use logo for icons in release targets, bundle the logo image in releases also"): the AppImage's icon and that of the menu entry the archive's installer makes are the logo at 256 pixels (128 before); the Windows zip has the logo's icon for a shortcut to `play.bat` (`openxcom3d.ico`; `openxcom.exe` has carried it since 1.09); and every download has the logo's picture (`openxcom3d_logo.png`).
 
 ### 1.10 (2026-11-03)
 

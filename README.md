@@ -6,7 +6,7 @@
 
 ![Night, through a soldier's eyes](docs/screenshots/night.png)
 
-*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.10**, for Linux, Windows and the Steam Deck, with a first, untested build for macOS.
+*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.11**, for Linux, Windows and the Steam Deck, with a first, untested build for macOS.
 
 **Both games are supported,** *UFO: Enemy Unknown* and *X-COM: Terror From The Deep*, and the big mods built on OXCE run in it too (XPiratez is played and tested here).
 
@@ -41,22 +41,20 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 
 **But be careful!** It can be a traumatic experience.
 
-## New in 1.10
+## New in 1.11
 
-- **Glass:** windows the map sees through are glass in 3D, what's behind them a little paler and bluer: houses' and shops' windows, glass doors, X-Com Files' glass panels and walls. A plain opening (a barn's window, an alien base's) stays open, as on the map.
-- **Glass shatters:** a round, a pellet or a thrown item through a window, or a blast beside it, shatters the glass: shards fall, a crack and tinkle is heard, and the window stays open for the rest of the battle, kept in the save. Only the look: rounds and sight go as the game has them.
-- **A blue shield for no harm:** a strike on an enemy in sight that took neither health nor stun marks the crosshair with a small blue shield and a duller tick.
-- **Hits on downed units:** a knocked-out unit hit flashes and bleeds, and marks the crosshair; a hit that only stuns counts.
-- **Arcs at the open sky:** arcing shots and throws aimed at the sky fly on through the point on the crosshair's line and come down where they fall.
-- **Flare shadows:** with *Shadows* on, a unit lit by a flare throws a soft shadow away from it, longer the lower the flare.
-- **Night vision and cameras:** *Futuristic night vision* (a setting) keeps units and items in their own colours, as the map does; *Cameras see as the eyes* (a setting) lets the helmet cameras see through smoke with heat vision.
-- **Your controls:** *Screen shake* and *Recoil* can be switched off; the 3D view has its own turn and look keys, so the map can scroll on W, A, S, D; a key waiting to be rebound shows it.
-- **Akimbo:** two guns at once lose 20% of their accuracy (not 30%); Y in 3D marks akimbo on the map too, and reaction shots fire both guns.
-- **The fire modes** on the wheel go from quantity to quality: auto, snap, aimed.
-- **More:** a mod's mana bar on the 3D panel (XPiratez, X-Com Files); the version in the main menu; *Auto-equip guns first* hands out the hardest-hitting first; Zombies hatch the game's way with quick deaths; no gun dip when the view goes to another soldier; arcs and throws at a wall you stand against go over it.
+- **Skies by the weather and the place:** rain and snow fall from a grey deck of cloud, with no sun, moon or stars and no sun shadows. Space and orbit are black and starry, the Earth below XPiratez's stations; the Moon has the Earth's disc in its sky; Mars is butterscotch by day and dark by night; XPiratez's Shadowlands lie in a violet void. The big mods' seas run on past the map's edge as TFTD's does, and 19 more underground maps (metros, sewers, crypts, lairs) lie under rock.
+- **Reload from anywhere:** **R** in 3D loads a clip that fits from anywhere the soldier carries one, and says why when nothing loads: already loaded, no clip that fits, or the time units it needs (the big mods charge a clip's move to the hand).
+- **A door under the crosshair:** a little green door left of the crosshair when it's on a door you have seen.
+- **Flight kept:** a soldier's flight switch (**B**) stays as it was through a save and a load.
+- **Enemy buttons at the right:** in 3D the buttons for the enemies in sight stand in a column at the right, centred on the screen's height on any screen, clear of the red arrows at the edge.
+- **Smoke drawn for less:** a grenade's cloud costs 13–28% less time a frame, drawn the same to the pixel.
+- **Fixed:** T'leth's first stage and the artifact site's second have their own dark green rock overhead, not black; the game's Bug Hunt and debug line sits under the top bar, not over its buttons.
+- **The logo** in every download: its picture, a sharper icon (256 pixels), and on Windows an icon for a shortcut.
 
 ## Earlier versions
 
+- **1.10:** window glass that shatters, a blue shield for no harm, hits on downed units, arcs at the open sky, flare shadows, futuristic night vision, cameras that see as the eyes, *Screen shake* and *Recoil*, akimbo at 20%, and the fire modes from quantity to quality.
 - **1.09:** a UFO's light inside it even, smoke opacity by day and at night, melee by the crosshair and at floors, the motion scanner in 3D, full sprite hitboxes, quick deaths, *Playstyle*, Doom IDCLIP, instant chain explosions, and a logo of its own.
 - **1.08:** every pellet of a shotgun lands on its own, akimbo on the isometric map, the sea in waves, rooms in their own light; aiming at the fringes, an accuracy line under the crosshair, stat bars that read, a check before an unsafe landing, XPiratez's sludge with a surface and catwalks that show, and the play guide with every key and setting.
 - **1.07:** akimbo's two guns take turns round by round, each its whole burst, both lasers; UFO's shop racks in their shape, the sea on TFTD's islands, see-through glass doors; units above no longer through the ceiling; mods' own mode names on the crosshair; no more shotgun lag on the map.

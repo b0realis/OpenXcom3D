@@ -15,6 +15,9 @@ Starting
   Windows may warn the first time ("Windows protected your PC"), since the game isn't signed:
   click "More info", then "Run anyway".
 
+  A shortcut with the logo: right-click play.bat, Show more options, Send to, Desktop (create
+  shortcut); then in the shortcut's Properties, Change Icon..., Browse..., openxcom3d.ico here.
+
 In battle press F8 (or click the 3D button at the top left) for the first-person view. Every
 key and setting is in OpenXcom3D_manual.md (a text file: any editor or browser shows it).
 

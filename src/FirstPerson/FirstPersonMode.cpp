@@ -138,7 +138,8 @@ const int FlashlightDarkShade = 6;
  * @param state The battlescape screen.
  */
 FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
-	_game(game), _state(state), _save(state->_save), _wants3D(Options::fpsStartInFirstPerson), _missionAtStart(state->_save->getMissionType()), _warningY(state->_warning->getY())
+	_game(game), _state(state), _save(state->_save), _wants3D(Options::fpsStartInFirstPerson), _missionAtStart(state->_save->getMissionType()), _warningY(state->_warning->getY()),
+	_gameLineX(state->_txtDebug->getX())
 {
 	// The overlays are laid out on a canvas; on big screens it's drawn magnified (see blit).
 	// Whether each step is allowed is not known yet (see stepAllowed).
@@ -286,7 +287,7 @@ void FirstPersonMode::createCrosshairAndBanner()
 	_txtTarget = addText(160, 9, width / 2 - 80, height / 2 + 10, "crosshairText", "firstPerson");
 	_txtTarget->setAlign(ALIGN_CENTER);
 	// Zoomed in: SCOPING and the zoom, at the right just under the scope cross's line (clear of
-	// the lift arrows' texts above it).
+	// the lift arrows' texts above it), left of the visible enemy buttons (see updateScope).
 	_txtScoping = addText(90, 9, width - 94, height / 2 + 5, "crosshairText", "firstPerson");
 	_txtScoping->setAlign(ALIGN_RIGHT);
 
@@ -2001,6 +2002,7 @@ void FirstPersonMode::think()
 	updateTopBar(selected);
 	updateSoldierCard();
 	updateMapCamera(); // (after the card: a squad button's soldier cam wins)
+	placeGameLine(); // (after the map camera: under its window while it shows)
 	watchMapLayers();
 	updateMusic(now);
 	updateMapAim();
@@ -2589,9 +2591,10 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 			return true;
 		}
 
-		// The game's own buttons, drawn on the screen itself (not on the canvas), where the map's
-		// handling would move the hidden map instead: the visible enemy buttons (with or without
-		// the classic HUD), and with the classic HUD, its buttons that act on the map.
+		// The game's own buttons, where the map's handling would move the hidden map instead: the
+		// visible enemy buttons (in full 3D with our overlays, see drawEnemyButtons; with the
+		// classic HUD on the screen itself, in its place), and with the classic HUD, its buttons
+		// that act on the map.
 		auto under = [&](const InteractiveSurface *button) {
 			return button->getVisible() && mouseX >= button->getX() && mouseX < button->getX() + button->getWidth()
 				&& mouseY >= button->getY() && mouseY < button->getY() + button->getHeight();
@@ -2605,7 +2608,8 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 			// centre on the enemy, or on that soldier).
 			for (int enemyIndex = 0; enemyIndex < BattlescapeState::VISIBLE_MAX && (_classicHud || !hudHidden()); ++enemyIndex)
 			{
-				if (!under(_state->_btnVisibleUnit[enemyIndex])) continue;
+				// (in full 3D where drawEnemyButtons draws them, with the classic HUD in its own place)
+				if (_classicHud ? !under(_state->_btnVisibleUnit[enemyIndex]) : !onEnemyButton(enemyIndex, mouseX / _uiScale, mouseY / _uiScale)) continue;
 				if (press && event.button.button == SDL_BUTTON_LEFT) lookAtEnemy(enemyIndex);
 				if (press && event.button.button == SDL_BUTTON_RIGHT) lookFromBestSpotter(enemyIndex);
 				return true;
@@ -2666,8 +2670,8 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
  * Draws the whole battlescape screen, every frame and in both views, in place of the state's
  * own drawing: the 3D view at the back (when it shows), then the game's own surfaces (in full
  * 3D, without the classic HUD, only its warnings and debug text), then our overlays on top (the
- * top bar shows over the isometric map too), and in full 3D the original's visible enemy
- * buttons. On big screens the view and the overlays are drawn on the canvas and magnified.
+ * top bar shows over the isometric map too), with them in full 3D the original's visible
+ * enemy buttons. On big screens the view and the overlays are drawn on the canvas and magnified.
  * @return Always true: the screen is drawn here, so the state doesn't draw it itself.
  */
 bool FirstPersonMode::blit()
@@ -2703,13 +2707,16 @@ bool FirstPersonMode::blit()
 	}
 
 	// Our overlays: straight onto the screen, or onto the cleared canvas and magnified (its
-	// empty pixels let what's under them show).
+	// empty pixels let what's under them show); with them, when the classic HUD that normally
+	// has them is hidden (and the 3D HUD isn't), the original's visible enemy buttons.
+	const bool enemyButtons = full3D && !hudHidden();
 	if (!_canvas)
 	{
 		for (Surface *surface : _state->_surfaces)
 		{
 			if (surface != _view && _ownSurfaces.count(surface) && !(hudHidden() && _topBarSurfaces.count(surface))) surface->blit(screen);
 		}
+		if (enemyButtons) drawEnemyButtons(screen);
 	}
 	else
 	{
@@ -2718,24 +2725,77 @@ bool FirstPersonMode::blit()
 		{
 			if (surface != _view && _ownSurfaces.count(surface) && !(hudHidden() && _topBarSurfaces.count(surface))) surface->blit(_canvas->getSurface());
 		}
+		if (enemyButtons) drawEnemyButtons(_canvas->getSurface());
 		magnify(screen, _canvas->getSurface(), true);
 	}
-
-	// The original's visible enemy buttons (bottom right; clicking one turns the view to it),
-	// with their numbers, when the classic HUD that normally has them is hidden (and the 3D HUD
-	// isn't).
-	if (full3D && !hudHidden())
-	{
-		for (int enemyIndex = 0; enemyIndex < BattlescapeState::VISIBLE_MAX; ++enemyIndex)
-		{
-			if (_state->_btnVisibleUnit[enemyIndex]->getVisible())
-			{
-				_state->_btnVisibleUnit[enemyIndex]->blit(screen);
-				_state->_numVisibleUnit[enemyIndex]->blit(screen);
-			}
-		}
-	}
 	return true;
+}
+
+/**
+ * Where a visible enemy button goes in full 3D (see drawEnemyButtons): the column of those showing (the game shows
+ * the first ones), stacked as the game stacks them (the first at the bottom, each EnemyButtonStep above the one
+ * before), centred on the view's height, under the compass's middle (which keeps it clear of the red arrows that
+ * mark enemies past the view's right edge); on a low screen under the compass's lines (turning, SPRINT, EN
+ * PASSANT), and all of it on the screen.
+ * @param index The button (0: the first).
+ * @param x Its left edge, in canvas pixels.
+ * @param y Its top, in canvas pixels.
+ */
+void FirstPersonMode::enemyButtonPlace(int index, int &x, int &y) const
+{
+	const InteractiveSurface *button = _state->_btnVisibleUnit[index];
+	int shown = 1;
+	while (shown < BattlescapeState::VISIBLE_MAX && _state->_btnVisibleUnit[shown]->getVisible()) ++shown;
+	const int columnHeight = (shown - 1) * EnemyButtonStep + button->getHeight();
+	const int underCompass = _txtCompassTurn->getY() + _txtCompassTurn->getHeight() + 1 + _txtSprint->getHeight() + _txtEnPassant->getHeight() + EnemyButtonsGap;
+	const int top = std::max(0, std::min(std::max(canvasHeight() / 2 - columnHeight / 2, underCompass), canvasHeight() - 2 - columnHeight));
+	x = _compass->getX() + CompassSize / 2 - button->getWidth() / 2;
+	y = top + (shown - 1 - index) * EnemyButtonStep;
+}
+
+/**
+ * Is a point on the canvas on a visible enemy button, where full 3D draws it (see enemyButtonPlace)?
+ * @param index The button.
+ * @param canvasX The point, in canvas pixels.
+ * @param canvasY The same, down.
+ * @return True if the button shows there.
+ */
+bool FirstPersonMode::onEnemyButton(int index, double canvasX, double canvasY) const
+{
+	const InteractiveSurface *button = _state->_btnVisibleUnit[index];
+	int x, y;
+	enemyButtonPlace(index, x, y);
+	return button->getVisible() && canvasX >= x && canvasX < x + button->getWidth() && canvasY >= y && canvasY < y + button->getHeight();
+}
+
+/**
+ * The original's visible enemy buttons (clicking one turns the view to it), with their numbers, in full 3D: in a
+ * column at the right, centred on the view's height (a player: where the classic HUD has them they stood off to the
+ * middle of a wide screen), at the HUD's scale (drawn with our overlays). Each is moved there for the frame and put
+ * back, so the game's HUD keeps them where it has them (the map, the classic HUD).
+ * @param target The canvas, or the screen when there's no canvas (scale 1).
+ */
+void FirstPersonMode::drawEnemyButtons(SDL_Surface *target)
+{
+	for (int enemyIndex = 0; enemyIndex < BattlescapeState::VISIBLE_MAX; ++enemyIndex)
+	{
+		InteractiveSurface *button = _state->_btnVisibleUnit[enemyIndex];
+		NumberText *number = _state->_numVisibleUnit[enemyIndex];
+		if (!button->getVisible()) continue;
+		const int buttonX = button->getX(), buttonY = button->getY(), numberX = number->getX(), numberY = number->getY();
+		int x, y;
+		enemyButtonPlace(enemyIndex, x, y);
+		button->setX(x);
+		button->setY(y);
+		number->setX(x + numberX - buttonX); // (the number where the game puts it on its button)
+		number->setY(y + numberY - buttonY);
+		button->blit(target);
+		number->blit(target);
+		button->setX(buttonX);
+		button->setY(buttonY);
+		number->setX(numberX);
+		number->setY(numberY);
+	}
 }
 
 /**

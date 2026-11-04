@@ -65,6 +65,9 @@ cp -r "$ROOT/OpenXcom/mod/OpenXcom3D" "$R/user/mods/OpenXcom3D"
 sed 's/$/\r/' "$ROOT/tools/windows/play.bat" > "$R/play.bat"
 sed 's/$/\r/' "$ROOT/tools/windows/README-Windows.txt" > "$R/README-Windows.txt"
 cp "$ROOT/README.md" "$ROOT/OpenXcom3D_manual.md" "$ROOT/openxcom3d.patch" "$R/"
+# the logo: its picture, and its icon (bin\openxcom.exe carries it too) for a shortcut to play.bat
+cp "$ROOT/docs/logo/openxcom3d_logo.png" "$R/openxcom3d_logo.png"
+cp "$ROOT/OpenXcom/res/windows/openxcom.ico" "$R/openxcom3d.ico"
 cp "$ROOT/OpenXcom/LICENSE.txt" "$R/LICENSE.txt"
 # the zip, without this machine's user and group ids (-X)
 rm -f "$ROOT/release/$NAME.zip"

@@ -504,6 +504,12 @@ void FirstPersonMode::updateScope()
 		return;
 	}
 
+	// Its right end left of the visible enemy buttons' column (see enemyButtonPlace), which
+	// stands across the scope's line at the right.
+	int columnX, columnY;
+	enemyButtonPlace(0, columnX, columnY);
+	_txtScoping->setX(columnX - EnemyButtonsGap - _txtScoping->getWidth());
+
 	// The zoom with one decimal, or a whole number when it is one ("4x" once all the way in).
 	const double shownZoom = std::round(_zoom * 10.0) / 10.0;
 	std::ostringstream zoomText;
@@ -1731,6 +1737,28 @@ bool FirstPersonMode::onMapCamera(int canvasX, int canvasY) const
 			&& canvasY >= surface->getY() && canvasY < surface->getY() + surface->getHeight();
 	};
 	return inside(_mapCameraFrame) || (_mapSoldierCamOpen && inside(_soldierCamFrame));
+}
+
+/**
+ * The game's own line at the top left of the screen (its debug messages, and "Bug Hunt mode activated" each turn
+ * once that's on; a player: it lay over the top bar's buttons) goes one line down, just under the top bar, in both
+ * views: right of OXCE's touch buttons when they show, as the map camera, and under the map camera's window while
+ * that's open (the window starts where the line would be). In screen pixels, as the game's own surfaces are placed.
+ */
+void FirstPersonMode::placeGameLine()
+{
+	int x = _gameLineX, y = (BarY + BarH + GameLineGap) * _uiScale;
+	if (_mapCameraFrame->getVisible())
+	{
+		x = _mapCameraFrame->getX() * _uiScale;
+		y = (_mapCameraFrame->getY() + _mapCameraFrame->getHeight() + GameLineGap) * _uiScale;
+	}
+	else if (_state->_btnCtrl->getVisible())
+	{
+		x = std::max(x, MapCameraTouchClear);
+	}
+	_state->_txtDebug->setX(x);
+	_state->_txtDebug->setY(y);
 }
 
 /**

@@ -206,6 +206,7 @@ private:
 	Uint32 _ignoreMotionUntil = 0;         // the cursor's jump to the window centre after grabbing isn't a look
 	Uint32 _lastFrameTick = 0;             // when think() last ran (SDL ticks, ms)
 	int _warningY;                         // where the game's warnings sit with the classic HUD (back there when leaving 3D)
+	int _gameLineX;                        // where the game's own line (debug, Bug Hunt) starts at the top left (screen pixels)
 	BattleUnit *_lastPlayerUnit = nullptr; // the last soldier the player had (the view stays with them in the alien turn)
 	bool _musicTense = false;              // the combat track is playing
 	bool _flashlightOn = true;             // the flashlight (setting "Flashlight") switched on with its key (the suit light is the game's)
@@ -1063,6 +1064,8 @@ private:
 	bool onMapCamera(int canvasX, int canvasY) const;
 	/// The 3D HUD key on the map: the map camera off, or on again at its last size.
 	void toggleMapCamera();
+	/// Puts the game's own line (debug messages, Bug Hunt mode) under the top bar, or under the map camera's window.
+	void placeGameLine();
 
 	// ---- the banner across the top of the view ----
 
@@ -1123,6 +1126,12 @@ private:
 	void selectUnit(BattleUnit *unit);
 	/// Hands the 3D view the visible enemies to mark.
 	void updateEnemyMarkers();
+	/// Where a visible enemy button goes in full 3D: in a column at the right, those showing centred on the view's height.
+	void enemyButtonPlace(int index, int &x, int &y) const;
+	/// Is a point on the canvas on a visible enemy button where full 3D draws it?
+	bool onEnemyButton(int index, double canvasX, double canvasY) const;
+	/// Draws the visible enemy buttons, with their numbers, in their full 3D place.
+	void drawEnemyButtons(SDL_Surface *target);
 
 	// =====================================================================================
 	// What happens to the soldier: hurt, burning, down, breakdowns

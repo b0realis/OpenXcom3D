@@ -89,7 +89,7 @@ sh "$ROOT/tools/macos/check.sh" "$APP"
 
 # Next to the app: how to open it and where the games' data goes, the docs and the licences
 # (all allow this; the game itself is GPL 3, see LICENSE.txt)
-cp "$ROOT/tools/macos/README-macOS.txt" "$ROOT/README.md" "$ROOT/OpenXcom3D_manual.md" "$ROOT/openxcom3d.patch" "$R/"
+cp "$ROOT/tools/macos/README-macOS.txt" "$ROOT/README.md" "$ROOT/OpenXcom3D_manual.md" "$ROOT/openxcom3d.patch" "$ROOT/docs/logo/openxcom3d_logo.png" "$R/"
 cp "$ROOT/OpenXcom/LICENSE.txt" "$R/LICENSE.txt"
 for part in SDL2/LICENSE.txt sdl12-compat/LICENSE.txt SDL_image/COPYING SDL_mixer/COPYING SDL_mixer/timidity/COPYING \
 	SDL_gfx/COPYING libpng/LICENSE libogg/COPYING libvorbis/COPYING; do
