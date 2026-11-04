@@ -559,7 +559,6 @@ private:
 
 	// ---- flying and falling ----
 
-	std::unordered_map<const BattleUnit*, bool> _flightSwitchedOn; // flight switched on, per soldier
 	bool _landing = false;                              // flight switched off in the air: coming down a level at a time
 	const BattleUnit *_landingUnit = nullptr;           // the soldier landing (also while interrupted: another soldier looked through)
 	int _landingResumeTurn = 0;                         // held up (blocked, out of time units): the landing goes on from this turn
@@ -868,7 +867,9 @@ private:
 	/// Does the soldier have a line of sight to the aimed tile, as a shot checks it?
 	bool aimedTileInSight(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, const Position &tile);
 	/// Draws the crosshair for a fire mode.
-	void drawCrosshair(BattleActionType mode, int shots, Uint8 color, Uint8 shadow, int hitMark, Uint8 hitColor);
+	void drawCrosshair(BattleActionType mode, int shots, Uint8 color, Uint8 shadow, int hitMark, Uint8 hitColor, bool doorMark);
+	/// Is a door the player has seen under the crosshair (the little green door to its left)?
+	bool doorUnderCrosshair() const;
 
 	// ---- what the player points at: the unit's name under the crosshair, and the middle click ----
 
@@ -1080,6 +1081,10 @@ private:
 	Surface *craftIcon(const BattleUnit *unit);
 	/// A gun's rounds for a fire mode and the spare clips carried for it: "17 | 2 clips (40)".
 	std::string ammoLabel(const BattleUnit *unit, const BattleItem *weapon, BattleActionType mode, bool &loaded, int *tagColor = nullptr) const;
+	/// The reload key in 3D: the game's own reload, and on the warning line why when it loads nothing.
+	void reload(Action *action);
+	/// Why a reload loads nothing (the guns loaded, no clip that fits, too few time units); empty when there's nothing to say.
+	std::string reloadRefusal(const BattleUnit *unit) const;
 	/// The loaded clip's damage type in two letters, for a gun taking several: "HE"; empty for none.
 	std::string ammoTag(const BattleItem *weapon, int slot, const BattleItem *clip, Uint8 &color) const;
 	/// Fills one hand's line of the info panel: the item's name and, for a gun, its ammo.

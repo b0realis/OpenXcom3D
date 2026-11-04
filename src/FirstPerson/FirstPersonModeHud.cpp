@@ -81,6 +81,7 @@
 #include "../Mod/Mod.h"
 #include "../Mod/RuleItem.h"
 #include "../Mod/RuleInterface.h"
+#include "../Mod/RuleInventory.h"
 #include "../Savegame/BattleItem.h"
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/SavedBattleGame.h"
@@ -840,6 +841,93 @@ std::string FirstPersonMode::ammoLabel(const BattleUnit *unit, const BattleItem 
 		}
 	}
 	return text + " | " + std::string(_state->tr("STR_FPS_SPARE_CLIPS", spareClips).arg(spareRounds));
+}
+
+/**
+ * The game's reload key in 3D (R): the game's own reload (BattlescapeState::btnReloadClick), and
+ * when it loads nothing, the warning line says why (see reloadRefusal), so the key doesn't seem
+ * dead. The reload takes a clip from anywhere the soldier carries one (GitHub issue #95, checked:
+ * the belt, the backpack, the pockets, the other hand...), and in the big mods one deeper in
+ * the inventory costs more time units, which the line then names.
+ * @param action The key press, passed on to the game's handler.
+ */
+void FirstPersonMode::reload(Action *action)
+{
+	BattleUnit *unit = _save->getSelectedUnit();
+	if (!unit || !_state->playableUnitSelected())
+	{
+		return;
+	}
+	// The clips in the hands' guns, before and after: a reload fills an ammo slot.
+	auto clipsLoaded = [unit]()
+	{
+		int clips = 0;
+		for (const BattleItem *weapon : { unit->getRightHandWeapon(), unit->getLeftHandWeapon() })
+			for (int slot = 0; weapon && slot < RuleItem::AmmoSlotMax; ++slot)
+				if (weapon->getAmmoForSlot(slot)) ++clips;
+		return clips;
+	};
+	const int before = clipsLoaded();
+	_state->btnReloadClick(action);
+	if (clipsLoaded() == before)
+	{
+		const std::string refusal = reloadRefusal(unit);
+		if (!refusal.empty()) _state->warningRaw(refusal);
+	}
+}
+
+/**
+ * Why the game's reload (BattleUnit::reloadAmmo) loads nothing for a soldier. It fills an empty
+ * ammo slot of the gun in either hand with a clip that fits it, from anywhere the soldier carries
+ * one, the one cheapest to reach: its load cost in time units, plus, with the mod's extended
+ * reload cost (extendedItemReloadCost: the big mods), the cost of moving it to the hand, as the
+ * inventory charges (from the backpack more than from the belt). So it loads nothing when the
+ * guns have every slot loaded, when no clip carried fits an empty one, or when the cheapest that
+ * does costs more time units than are left.
+ * @param unit The soldier.
+ * @return The warning line, translated; empty with no gun in hand (or no reason found).
+ */
+std::string FirstPersonMode::reloadRefusal(const BattleUnit *unit) const
+{
+	bool gun = false, loaded = true, fits = false;
+	int cheapest = INT_MAX;
+	for (const BattleItem *weapon : { unit->getRightHandWeapon(), unit->getLeftHandWeapon() })
+	{
+		if (!weapon || !weapon->isWeaponWithAmmo())
+		{
+			continue;
+		}
+		gun = true;
+		if (weapon->haveAllAmmo())
+		{
+			continue;
+		}
+		loaded = false;
+		for (const BattleItem *clip : *unit->getInventory())
+		{
+			const int slot = weapon->getRules()->getSlotForAmmo(clip->getRules());
+			if (slot == -1 || weapon->getAmmoForSlot(slot))
+			{
+				continue;
+			}
+			fits = true;
+			const int reach = Mod::EXTENDED_ITEM_RELOAD_COST && clip->getSlot()->getType() != INV_HAND ? clip->getMoveToCost(weapon->getSlot()) : 0;
+			cheapest = std::min(cheapest, reach + weapon->getRules()->getTULoad(slot));
+		}
+	}
+	if (!gun)
+	{
+		return "";
+	}
+	if (loaded)
+	{
+		return _state->tr("STR_FPS_RELOAD_LOADED");
+	}
+	if (!fits)
+	{
+		return _state->tr("STR_FPS_RELOAD_NO_CLIP");
+	}
+	return cheapest > unit->getTimeUnits() ? std::string(_state->tr("STR_FPS_RELOAD_NO_TU").arg(cheapest)) : "";
 }
 
 /**

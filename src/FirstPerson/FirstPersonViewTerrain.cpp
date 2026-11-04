@@ -2874,7 +2874,13 @@ void FirstPersonView::chooseGround()
 	// The rock's colour: the commonest colour group among the walls and objects round the map's
 	// underground levels (the rock it's cut into, in whatever palette the battle has: a fixed
 	// brown came out olive or watery blue under the sea), at a middle shade, with room to shade
-	// it either way. Every third voxel of their models is enough to tell.
+	// it either way. Every third voxel of their models is enough to tell. A group too dark at that
+	// shade to show its hue (below DarkGlowLuma) can't be rock: T'leth's first level is walled
+	// round in the deep sea palette's black (group 112, black at every shade), and its ceiling
+	// stayed black under night vision and the flashlight (the owner: "How does ceiling look like
+	// in final?"); the commonest of the others is taken (the map's own colours still), and with
+	// none, the plain rock (see rockColor). A dark rock that shows its hue (XPiratez's sewers,
+	// its Thule base) stays as it is.
 	_rockBase = 0;
 	std::map<int, int> rockGroups;
 	for (int z = 0; z < std::min(_surfaceLevel, mapSizeZ); ++z)
@@ -2893,17 +2899,26 @@ void FirstPersonView::chooseGround()
 			}
 		});
 	}
-	int rockCount = 0;
+	const SDL_Color *palette = getPalette();
+	int rockCount = 0, mostVoxels = 0, mostGroup = -1;
 	for (const auto &group : rockGroups)
 	{
-		if (group.second > rockCount)
+		const SDL_Color &middle = palette[group.first | RockBaseShade];
+		if (group.second > rockCount && middle.r * 0.3f + middle.g * 0.59f + middle.b * 0.11f >= DarkGlowLuma)
 		{
 			rockCount = group.second;
 			_rockBase = (Uint8)(group.first | RockBaseShade);
 		}
+		if (group.second > mostVoxels)
+		{
+			mostVoxels = group.second;
+			mostGroup = group.first;
+		}
 	}
 	Log(LOG_VERBOSE) << "OpenXcom3D: " << _save->getMissionType() << ": " << (_enclosed ? "underground all the way up (rock round the map and over it)"
-		: "the surface at the map's edges is level " + std::to_string(_surfaceLevel) + " (rock beyond the edges below it)");
+		: "the surface at the map's edges is level " + std::to_string(_surfaceLevel) + " (rock beyond the edges below it)")
+		<< ", the rock in " << (_rockBase ? "colour group " + std::to_string(_rockBase & 0xF0) : std::string("plain colours"))
+		<< (mostGroup >= 0 && mostGroup != (_rockBase & 0xF0) ? " (the commonest, " + std::to_string(mostGroup) + ", too dark)" : std::string());
 
 	// Count the floors of the ring at the surface's level (the bottom one on an enclosed map,
 	// which shows no ground beyond the border anyway), the water's apart, and note where the

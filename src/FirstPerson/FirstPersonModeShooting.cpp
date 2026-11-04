@@ -3838,8 +3838,9 @@ void FirstPersonMode::updateRecoil(BattleUnit *unit, double elapsedSeconds)
  * @param hitMark 0 none, 1 a hit, 2 a kill: ticks on the diagonals; 3 a strike that did no harm:
  *        a little blue shield to the lower left.
  * @param hitColor Palette colour of those ticks.
+ * @param doorMark A door under the crosshair: a little green door to the left.
  */
-void FirstPersonMode::drawCrosshair(BattleActionType mode, int shots, Uint8 color, Uint8 shadow, int hitMark, Uint8 hitColor)
+void FirstPersonMode::drawCrosshair(BattleActionType mode, int shots, Uint8 color, Uint8 shadow, int hitMark, Uint8 hitColor, bool doorMark)
 {
 	// The shapes are collected as points first (relative to the centre), so the outline can go
 	// under all of them before the colour goes on top.
@@ -3960,20 +3961,46 @@ void FirstPersonMode::drawCrosshair(BattleActionType mode, int shots, Uint8 colo
 		_crosshair->setPixel(points[pointIndex].first, points[pointIndex].second, pointIndex < modePoints ? color : hitColor);
 	}
 
-	// A strike that did no harm: a little blue shield to the lower left (see NoHarmShield), its
-	// outline in the crosshair's own.
+	// Little pictures beside it, their outlines in the crosshair's own: a strike that did no harm, a
+	// blue shield to the lower left (see NoHarmShield); a door under the crosshair, a green door to
+	// the left (see DoorMark).
+	auto drawMark = [&](const char *const rows[9], int left, int top, Uint8 fill, Uint8 light)
+	{
+		for (int row = 0; row < 9; ++row)
+			for (int column = 0; rows[row][column]; ++column)
+			{
+				const char cell = rows[row][column];
+				if (cell == '.') continue;
+				_crosshair->setPixel(centre + left + column, centre + top + row, cell == 'O' ? shadow : cell == 'L' ? light : fill);
+			}
+	};
+	const SDL_Color *palette = _crosshair->getPalette();
 	if (hitMark == 3)
 	{
-		const Uint8 blue = nearestColor(_crosshair->getPalette(), NoHarmShieldRed, NoHarmShieldGreen, NoHarmShieldBlue);
-		const Uint8 lightBlue = nearestColor(_crosshair->getPalette(), NoHarmShieldLightRed, NoHarmShieldLightGreen, NoHarmShieldLightBlue);
-		for (int row = 0; row < 9; ++row)
-			for (int column = 0; NoHarmShield[row][column]; ++column)
-			{
-				const char cell = NoHarmShield[row][column];
-				if (cell == '.') continue;
-				_crosshair->setPixel(centre + NoHarmShieldX + column, centre + NoHarmShieldY + row, cell == 'O' ? shadow : cell == 'L' ? lightBlue : blue);
-			}
+		drawMark(NoHarmShield, NoHarmShieldX, NoHarmShieldY, nearestColor(palette, NoHarmShieldRed, NoHarmShieldGreen, NoHarmShieldBlue),
+			nearestColor(palette, NoHarmShieldLightRed, NoHarmShieldLightGreen, NoHarmShieldLightBlue));
 	}
+	if (doorMark)
+	{
+		drawMark(DoorMark, DoorMarkX, DoorMarkY, nearestColor(palette, DoorMarkRed, DoorMarkGreen, DoorMarkBlue),
+			nearestColor(palette, DoorMarkLightRed, DoorMarkLightGreen, DoorMarkLightBlue));
+	}
+}
+
+/**
+ * Is a door under the crosshair: the wall the crosshair's ray meets first (see updateAim) a door,
+ * a swinging one or a UFO's, that the player has seen (an unexplored wall is only a shape, see
+ * FirstPersonView::shadeHit)? For the little green door beside the crosshair (GitHub issue #97).
+ */
+bool FirstPersonMode::doorUnderCrosshair() const
+{
+	if (!_aimHitsSomething || (_aimVoxelType != V_WESTWALL && _aimVoxelType != V_NORTHWALL))
+	{
+		return false;
+	}
+	const TilePart wall = _aimVoxelType == V_WESTWALL ? O_WESTWALL : O_NORTHWALL;
+	const Tile *tile = _save->getTile(_aimVoxel.toTile());
+	return tile && (tile->isDoor(wall) || tile->isUfoDoor(wall)) && (tile->isDiscovered(wall) || _save->getDebugMode());
 }
 
 /**
@@ -4285,13 +4312,20 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	const int hitMark = hitTick && now - hitTick < HitMarkTime ? (_view->getHitMarkKill() ? 2 : 1) : noHarmTick && now - noHarmTick < HitMarkTime ? 3 : 0;
 	const Uint8 hitColor = hitMark == 2 ? red : nearestColor(palette, 255, 255, 255); // (white for a hit and for the no-harm dots' rims)
 
+	// A door under the crosshair on the player's turn (the aim is worked out only then): a little
+	// green door to its left (GitHub issue #97). Not while a unit's picture is under it, which the
+	// game's line can pass (over a small alien's head, onto a door behind it): the crosshair is on
+	// the unit then, as the name under it says (see updatePointedUnit; with the free cursor that's
+	// the cursor's unit, not the crosshair's).
+	const bool doorMark = playerTurn && unit && doorUnderCrosshair() && !(_mouseLook && _pointedUnit);
+
 	// Redraw the crosshair only when what it shows has changed: all of that packed into one
-	// number (mode, rounds, colour, hitmarker) and compared with the last one.
-	const Uint64 crosshairKey = (Uint64)mode | ((Uint64)shots << 8) | ((Uint64)color << 16) | ((Uint64)hitMark << 24);
+	// number (mode, rounds, colour, hitmarker, door) and compared with the last one.
+	const Uint64 crosshairKey = (Uint64)mode | ((Uint64)shots << 8) | ((Uint64)color << 16) | ((Uint64)hitMark << 24) | ((Uint64)doorMark << 32);
 	if (crosshairKey != _crosshairDrawnFor)
 	{
 		_crosshairDrawnFor = crosshairKey;
-		drawCrosshair(mode, shots, color, shadow, hitMark, hitColor);
+		drawCrosshair(mode, shots, color, shadow, hitMark, hitColor, doorMark);
 	}
 
 	// The accuracy line (setting "Accuracy line") under the crosshair, green (grey while he

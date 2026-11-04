@@ -2324,6 +2324,15 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	// in 3D too.
 	if (key == Options::keyFpsNightVision || key == Options::keyNightVisionToggle) { if (pressed) toggleNightVision(_trackedUnit); return true; }
 
+	// The game's reload key (R): the game's own reload, and the warning line says why when it loads
+	// nothing (see reload). With Ctrl, Alt or Shift held it stays the game's, which then ignores it,
+	// as it does every hotkey (see InteractiveSurface::keyboardPress).
+	if (key == Options::keyBattleReload && !(event.key.keysym.mod & (KMOD_CTRL | KMOD_ALT | KMOD_SHIFT)))
+	{
+		if (pressed) reload(action);
+		return true;
+	}
+
 	// The game's own keys for what acts on the isometric map, translated (see classicHudButton):
 	// the centre key (Home) looks straight ahead; the map level keys (if not taken by up/down
 	// above) look a level up or down; the soldier up/down keys move as ours do; and the minimap

@@ -377,7 +377,7 @@ bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 		const Tile *destination = _save->getTile(levelTarget);
 		if (destination && destination->hasNoFloor(_save))
 		{
-			_flightSwitchedOn[unit] = false;
+			unit->setFlightSwitch(-1);
 			_landAfterStep = true;
 		}
 	}
@@ -1681,8 +1681,10 @@ bool FirstPersonMode::canFly(const BattleUnit *unit) const
 
 /**
  * Is flight switched on for this soldier (the flight key or the FLY button)? Until the player
- * switches it for a soldier, one already in the air flies and one on the ground doesn't.
- * Always false for a unit that can't fly.
+ * switches it for a soldier, one already in the air flies and one on the ground doesn't. The
+ * switch is the unit's own, so it's saved with the game (GitHub issue #96: a soldier's flight
+ * switched on, on the ground, was off again after loading the save). Always false for a unit
+ * that can't fly.
  */
 bool FirstPersonMode::flightOn(const BattleUnit *unit) const
 {
@@ -1690,8 +1692,7 @@ bool FirstPersonMode::flightOn(const BattleUnit *unit) const
 	{
 		return false;
 	}
-	auto switchedOn = _flightSwitchedOn.find(unit);
-	return switchedOn != _flightSwitchedOn.end() ? switchedOn->second : unit->isFloating();
+	return unit->getFlightSwitch() != 0 ? unit->getFlightSwitch() > 0 : unit->isFloating();
 }
 
 /**
@@ -1718,7 +1719,7 @@ void FirstPersonMode::toggleFlight(BattleUnit *unit)
 	// Flip the switch; off in the air starts the landing. Whether steps off ledges are allowed
 	// changes with it, so the cached step answers are dropped.
 	const bool on = !flightOn(unit);
-	_flightSwitchedOn[unit] = on;
+	unit->setFlightSwitch(on ? 1 : -1);
 	_landing = !on && unit->isFloating();
 	_landingUnit = _landing ? unit : nullptr;
 	_landingResumeTurn = 0;
