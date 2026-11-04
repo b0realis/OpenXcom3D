@@ -63,7 +63,6 @@
 #include "../Engine/Surface.h"
 #include "../Mod/Armor.h"
 #include "../Mod/MapData.h"
-#include "../Mod/MapDataSet.h"
 #include "../Mod/Mod.h"
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/SavedBattleGame.h"
@@ -72,7 +71,6 @@
 #include "../Battlescape/Map.h"
 #include "../Battlescape/Position.h"
 #include "FirstPersonParticles.h"
-#include "RuleFirstPerson.h"
 #include "FirstPersonViewShared.h"
 
 namespace OpenXcom
@@ -411,10 +409,11 @@ void FirstPersonView::spawnBurningUnitFlames(float elapsedSeconds)
 }
 
 /**
- * Keeps the air alive around the camera: dust motes by day, fireflies outside at night,
- * bubbles under the sea, and the terrain's weather (rain, snow, blowing sand) where the sky
- * is open above. Under the sea there are also columns of bubbles rising from a few spots on
- * the sea floor, and marine snow (specks hanging in the water) instead of weather.
+ * Keeps the air alive around the camera: dust motes by day, fireflies outside at night (only
+ * under the Earth's sky; out of the air, in space and on the Moon, motes only under a roof),
+ * bubbles under the sea, and the battle's weather (rain, snow, blowing sand: see chooseSky)
+ * where the sky is open above. Under the sea there are also columns of bubbles rising from a
+ * few spots on the sea floor, and marine snow (specks hanging in the water) instead of weather.
  * Particles the camera has left behind are dropped and new ones fill in around it, so the
  * camera seems to move through endless air (or water).
  * @param elapsedSeconds Seconds since the last frame: the spawn rates are per second.
@@ -422,22 +421,7 @@ void FirstPersonView::spawnBurningUnitFlames(float elapsedSeconds)
 void FirstPersonView::spawnAmbient(float elapsedSeconds)
 {
 	typedef FirstPersonParticles P; // short for the particle system: its kinds (P::GLOW...) and groups (P::EFFECT...)
-	// The weather is chosen once per battle: the first of the battle's terrain data sets that
-	// the mod gives a weather (rain, snow, or dust for blowing sand), else none.
-	if (!_weatherChosen)
-	{
-		_weatherChosen = true;
-		_weather.clear();
-		for (const MapDataSet *mapDataSet : *_save->getMapDataSets())
-		{
-			const std::string weather = _game->getMod()->getFirstPerson().getWeather(mapDataSet->getName());
-			if (!weather.empty())
-			{
-				_weather = weather;
-				break;
-			}
-		}
-	}
+	chooseSky(); // the battle's weather
 	const float eye[3] = { (float)_eye[0], (float)_eye[1], (float)_eye[2] };
 	// What the camera left behind (more than 130 or 150 voxels away across the map) is gone,
 	// and comes back around it.
@@ -478,9 +462,9 @@ void FirstPersonView::spawnAmbient(float elapsedSeconds)
 			particle.color = _colors.bubble; particle.kind = P::BUBBLE;
 			particle.size = (Uint8)(2 + (int)(_particles.random() * 3.0f)); // 2..4
 		}
-		else if (_colors.night > 0.6f)
+		else if (_colors.night > 0.6f && _sky == SkyEarth)
 		{
-			// A firefly, only under the open sky, wandering and blinking for a few seconds.
+			// A firefly, only under the Earth's open sky, wandering and blinking for a few seconds.
 			if (!openSky(particle.pos[0], particle.pos[1], particle.pos[2])) continue;
 			particle.vel[0] = _particles.random(-4, 4); particle.vel[1] = _particles.random(-4, 4);
 			particle.vel[2] = _particles.random(-2, 2);
@@ -489,7 +473,9 @@ void FirstPersonView::spawnAmbient(float elapsedSeconds)
 		}
 		else
 		{
-			// A dust mote, lit by the light where it is, barely drifting.
+			// A dust mote, lit by the light where it is, barely drifting (out of the air, in
+			// space and on the Moon, only under a roof).
+			if (airless() && openSky(particle.pos[0], particle.pos[1], particle.pos[2])) continue;
 			particle.vel[0] = _particles.random(-1.5f, 1.5f); particle.vel[1] = _particles.random(-1.5f, 1.5f);
 			particle.vel[2] = _particles.random(-0.8f, 0.8f);
 			particle.life = _particles.random(4, 9); particle.gravity = 0; particle.drag = 0;

@@ -66,8 +66,8 @@ namespace OpenXcom
  * switches on when an active mod (OpenXcom3D) declares `firstPerson: enabled: true`. The mod
  * also says how far the view reaches, which terrain records are windows (and which of their
  * colours are glass), what shape the parts the game gives no voxels have, what weather each
- * terrain has, which music plays in combat, which armors and items give night vision, and which
- * built-in items are drawn in the hands anyway.
+ * terrain has, which battles have another world's sky, which music plays in combat, which armors
+ * and items give night vision, and which built-in items are drawn in the hands anyway.
  */
 class RuleFirstPerson
 {
@@ -107,7 +107,10 @@ private:
 	std::map<std::string, Windows> _windows;     // terrain data set -> its windows
 	std::map<std::pair<std::string, int>, std::vector<Shape>> _shapes; // (terrain data set, record) -> its shapes, one per game
 	std::map<std::string, std::string> _weather; // terrain data set -> rain, snow, dust, ...
+	std::map<std::string, std::string> _enviroWeather; // battle environment (enviroEffects type) -> rain, snow, dust, ... (before the data sets')
+	std::map<std::string, std::string> _enviroSkies, _missionSkies, _terrainSkies; // environment, mission type, terrain -> its sky (space, moon, ...)
 	std::set<std::string> _water;                // terrain data sets whose floors are water (the sea)
+	std::map<std::string, std::set<int>> _waterRecords; // terrain data set -> its records that are water (the sea round a ship, among its parts)
 	std::vector<std::string> _combatMusic;       // tense tracks to try, first one the game has wins
 	std::set<std::string> _nightVision;          // armors and items that give their wearer night vision
 	std::set<std::string> _undergroundMissions;  // missions underground all the way up, whatever their map's edges show
@@ -197,11 +200,28 @@ public:
 			_builtInItemsShown = std::set<std::string>(builtInItemsShown.begin(), builtInItemsShown.end());
 		}
 		// The terrain data sets whose floors are water: where it reaches the map's edge, the sea
-		// goes on beyond it (FirstPersonView::chooseGround). A list replaces the earlier one.
-		std::vector<std::string> water;
-		if (reader.tryRead("water", water))
+		// goes on beyond it (FirstPersonView::chooseGround). A data set's name for all of its
+		// floors, or its name and records for some (a ship's data set with the sea round the ship
+		// among its parts). A list replaces the earlier one.
+		if (const auto& water = reader["water"])
 		{
-			_water = std::set<std::string>(water.begin(), water.end());
+			_water.clear();
+			_waterRecords.clear();
+			for (const auto& entry : water.children())
+			{
+				if (entry.isMap())
+				{
+					std::string dataSet;
+					std::vector<int> records;
+					entry.tryRead("dataSet", dataSet);
+					entry.tryRead("records", records);
+					_waterRecords[dataSet].insert(records.begin(), records.end());
+				}
+				else
+				{
+					_water.insert(entry.readVal<std::string>());
+				}
+			}
 		}
 
 		// The item table: groups of item types (as the mods name them), each with what it sets:
@@ -239,15 +259,38 @@ public:
 			}
 		}
 
-		// Weather: per terrain data set, its kind ("rain", "snow", "dust", ...).
+		// Weather: per terrain data set, or per battle environment (its enviroEffects, as the big
+		// mods name them: acid rain, a dust storm), its kind ("rain", "snow", "dust", ...).
 		if (const auto& weather = reader["weather"])
 		{
 			for (const auto& entry : weather.children())
 			{
 				std::string dataSet, type;
+				std::vector<std::string> enviroEffects;
 				entry.tryRead("dataSet", dataSet);
+				entry.tryRead("enviroEffects", enviroEffects);
 				entry.tryRead("type", type);
-				_weather[dataSet] = type;
+				if (!dataSet.empty()) _weather[dataSet] = type;
+				for (const std::string &enviro : enviroEffects) _enviroWeather[enviro] = type;
+			}
+		}
+
+		// Skies that aren't the Earth's open air: per mission (alien deployment) type, map terrain and
+		// battle environment (its enviroEffects), the sky ("space", "orbit", "moon", "mars", "sea",
+		// "void", or "earth" for the Earth's own). A later entry (or a later mod's) overrides.
+		if (const auto& skies = reader["skies"])
+		{
+			for (const auto& entry : skies.children())
+			{
+				std::string sky;
+				std::vector<std::string> enviroEffects, missions, terrains;
+				entry.tryRead("sky", sky);
+				entry.tryRead("enviroEffects", enviroEffects);
+				entry.tryRead("missions", missions);
+				entry.tryRead("terrains", terrains);
+				for (const std::string &enviro : enviroEffects) _enviroSkies[enviro] = sky;
+				for (const std::string &mission : missions) _missionSkies[mission] = sky;
+				for (const std::string &terrain : terrains) _terrainSkies[terrain] = sky;
 			}
 		}
 	}
@@ -293,13 +336,37 @@ public:
 		auto found = _signalLevels.find(mission);
 		return found != _signalLevels.end() ? found->second : 1;
 	}
-	/// Are a terrain data set's floors water (the sea round islands, ports and ships)?
-	bool isWater(const std::string &dataSet) const { return _water.count(dataSet) > 0; }
+	/// Is a terrain record's floor water (the sea round islands, ports and ships)?
+	bool isWater(const std::string &dataSet, int record) const
+	{
+		auto found = _waterRecords.find(dataSet);
+		return _water.count(dataSet) > 0 || (found != _waterRecords.end() && found->second.count(record) > 0);
+	}
 	/// The weather of a terrain data set ("rain", "snow", "dust", ...), or empty for none.
 	std::string getWeather(const std::string &dataSet) const
 	{
 		auto found = _weather.find(dataSet);
 		return found != _weather.end() ? found->second : std::string();
+	}
+	/// The weather of a battle environment (an enviroEffects type), or empty for none (then its terrain data sets tell).
+	std::string getEnviroWeather(const std::string &enviro) const
+	{
+		auto found = _enviroWeather.find(enviro);
+		return found != _enviroWeather.end() ? found->second : std::string();
+	}
+	/// A battle's sky, the most particular first: its mission type's, else that of the first of its map's terrains that
+	/// has one, else its environment's (an enviroEffects type, which many missions share); empty for the Earth's.
+	std::string getSky(const std::string &enviro, const std::string &mission, const std::vector<std::string> &terrains) const
+	{
+		auto found = _missionSkies.find(mission);
+		if (found != _missionSkies.end()) return found->second;
+		for (const std::string &terrain : terrains)
+		{
+			found = _terrainSkies.find(terrain);
+			if (found != _terrainSkies.end()) return found->second;
+		}
+		found = _enviroSkies.find(enviro);
+		return found != _enviroSkies.end() ? found->second : std::string();
 	}
 };
 

@@ -659,18 +659,52 @@ firstPerson:
   undergroundMissions: [STR_MY_BUNKER]
 ```
 
-Never list a map that starts on the surface, nor a mission name two games share for different maps (TFTD's seabed colony is `STR_ALIEN_BASE_ASSAULT`, as UFO's alien base is). Our list is empty: every map tried was told right by itself.
+Never list a map that starts on the surface, nor a mission name two games share for different maps (TFTD's seabed colony is `STR_ALIEN_BASE_ASSAULT`, as UFO's alien base is). Ours lists XPiratez's Thule base ("the sprawling complex under the surface of the Moon", its top open on the map), its Old Earth metro and sewers (their roof is rock the art leaves invisible, so the stars showed through it), the ninja bases' underground stages, and in the Shadowlands the sewers under the City of the Dead, the Rabbit Crypt and the Realm of Fear's dungeons; and X-Com Files' hideouts in the city sewers (the Cyberweb lairs, the smugglers' refuge, the ooze nest). Every other map tried was told right by itself.
 
 ### Water
 
-Past the map's edge the ground goes on as the commonest floor of the edge. The floors of the terrain data sets listed as water are the sea instead: where it reaches the edge, the sea goes on past it, and its top is drawn in waves (its colours taken from its own art). Ours lists TFTD's sea round islands, ports and ships:
+Past the map's edge the ground goes on as the commonest floor of the edge. The floors of the terrain data sets listed as water are the sea instead: where it reaches the edge, the sea goes on past it, and its top is drawn in waves (its colours taken from its own art). A data set's name makes all its floors water; a data set with records, only those. Ours lists TFTD's sea round islands, ports and ships, the big mods' copy of it (XPiratez's and X-Com Files' islands, ports, liners and cargo ships), and the sea round TFTD's liner and cargo ship that is one of their own parts (drawn as a dark floor, so its waves take TFTD's sea colours). Where the sea lies a level or more above the floors at the map's edge (round a ship's lower decks), the world past the edge is at the sea's height:
 
 ```yaml
 firstPerson:
-  water: [SEA]
+  water: [SEA, SEAURBAN, { dataSet: LINERB, records: [1] }]
 ```
 
 A list replaces the one before it (a mod adding its own water lists ours too).
+
+### Skies and weather
+
+Over the Earth the 3D view draws the day's sky (the sun, drifting clouds) or the night's (the stars, the moon). Where it rains or snows, clouds cover it (a player, GitHub issue #94): a grey deck of them drifting overhead, paler over snow, darker at night; no sun, moon or stars, no sun shadows, and the walls lit evenly from the sky. Rain, snow and blowing sand (dust) come by the battle's environment (its `enviroEffects`, as the big mods name them), or else by terrain data set. Ours gives the polar maps snow, the jungle rain, the deserts and Mars dust, and XPiratez's acid rain and dust storm their rain and dust:
+
+```yaml
+firstPerson:
+  weather:
+    - dataSet: POLAR
+      type: snow
+    - enviroEffects: [STR_ENVIRO_ACID_RAIN]
+      type: rain
+```
+
+A battle somewhere else has its own sky, by its mission (alien deployment) type, or else a terrain its map is built of, or else its environment (which many missions share):
+
+- **space**: black, the stars all round, nothing past the map's edge (no ground, no rock, no tape): a ship in deep space;
+- **orbit**: the same, with the Earth filling the view below, its clouds drifting by: a station in orbit;
+- **moon**: black, the stars and the Earth hanging in the sky, over the Moon's ground;
+- **mars**: a dusty butterscotch sky by day with a smaller sun, the stars by night, no Moon;
+- **sea**: under the sea, as TFTD's battles under water (the murk, bubbles, marine snow, the light rippling on the floor), for a sea floor the game keeps dry;
+- **void**: a dark violet sky with slow wisps, no sun, moon or stars;
+- **earth**: the Earth's own.
+
+Out of the air (space, orbit, the Moon) there's no haze, as with *Distance haze* Clear, and no dust floating in the open. Ours sets Cydonia's surface to Mars, in XPiratez and X-Com Files their Mars, Moon, orbital stations, space freighter and sea floor, and their other worlds and dreams (XPiratez's Shadowlands, X-Com Files' dreamscape and the land beyond the Doom portal) to the void. An environment that recolours the map (XPiratez's heat, cold and acid, X-Com Files' red sun) recolours the sky the same way. A mod can add its own; a later entry overrides:
+
+```yaml
+firstPerson:
+  skies:
+    - sky: moon
+      enviroEffects: [STR_MY_MOON]
+      missions: [STR_MY_LUNAR_BASE]
+      terrains: [MY_MOON]
+```
 
 ### The item table
 
@@ -698,8 +732,9 @@ firstPerson:
 - Animated machinery and light, calm and eased: animated terrain steps a frame about three times a second and cross-fades, so nothing large blinks (the photosensitivity guideline WCAG 2.3 allows at most three flashes a second).
 - UFOs that stand out: steady hulls with glowing, softly pulsing lights, their own coloured light around them and an aura of drifting motes (the "UFO lights and aura" setting).
 - Light and shadow: lamps, the sun, your flashlight, flares. Indoors (a roof overhead, or rock) no sun shines: faces there are lit by the room's own light, as on the map.
-- TFTD's sea in waves: swells rolling across it in the sea's own colours, lighter crests breaking into foam, deeper troughs, and where the sea reaches the map's edge it goes on past it.
-- Bloom, night vision, rain, snow and dust, and in TFTD bubbles, marine snow and caustics.
+- TFTD's sea in waves: swells rolling across it in the sea's own colours, lighter crests breaking into foam, deeper troughs, and where the sea reaches the map's edge it goes on past it (round islands, ports and ships, the big mods' too).
+- Bloom, night vision, rain and snow under clouds, dust, and in TFTD bubbles, marine snow and caustics.
+- Other worlds' skies in the special missions: the stars all round in space, the Earth below a station in orbit, the Earth over the Moon, Mars' dusty sky (see [Skies and weather](#skies-and-weather)).
 - Smoke, fire, explosions and animated machinery that flow from frame to frame.
 - Lifts you ride: standing on a grav lift (or a ladder) shows LIFT PLATFORM arrows, and the view rises or sinks to the next level, at half the walking pace (see *Walking speed*); ladders and lift pads that have no shape in the game's data show as see-through ghosts of their art.
 - Units seen from the side they face you.
@@ -834,12 +869,12 @@ Every file starts with the project's philosophy and a description of what's in i
 | `FirstPersonSpriteHits.cpp` | Setting *Full sprite hitboxes*: whether a voxel of a line of fire meets a unit's picture (a card through its middle facing the shooter, the frame from that side, kept per unit and side) |
 | `FirstPersonQuickDeaths.cpp` | Setting *Quick deaths*: the falls under way, the frame of each, and a unit put in that frame's pose for drawing (on the map and in 3D) |
 | `OptionsFirstPersonState.{h,cpp}` | 3D VIEW options tab: Settings / Controls sub-tabs, scrolling lists |
-| `RuleFirstPerson.h` | `firstPerson:` ruleset section (header-only): enabled, view distance, window glass, weather, combat music, night vision gear, built-in items shown in hand, the item table (held shape, shots) |
+| `RuleFirstPerson.h` | `firstPerson:` ruleset section (header-only): enabled, view distance, window glass, weather, skies, combat music, night vision gear, built-in items shown in hand, the item table (held shape, shots) |
 
 What `FirstPersonView` draws:
 - terrain from LOFT voxels with iso-sprite projection, animated frames, UFO doors cut out as they slide, doors swinging, window glass;
 - smooth light plus sun face shading, Bayer dithering and horizon haze; a colour shaded past the darkest of its colour group turns black only where the place is really dark (night past the lights, an unlit room), and in a lit place stays that darkest colour (a burnt wooden floor dark brown, not a black hole); colour washes (hurt, dying, unconscious, mind control, breakdown, zombie); purple edges through a unit under our mind control; night vision recolouring; the fire over the view of a burning soldier;
-- the outside world: ground, X-COM tape and posts (or the discreet edge's dots); the sky. Underground, rock: below a map's surface beyond its edges, and over a map that's underground all the way up (a base, an alien colony's inside, Cydonia's complex), found from the map's own edge (see [Underground maps](#underground-maps));
+- the outside world: ground, X-COM tape and posts (or the discreet edge's dots); the sky (the Earth's, overcast in rain and snow, or another world's: see [Skies and weather](#skies-and-weather); in space nothing but space past the edge). Underground, rock: below a map's surface beyond its edges, and over a map that's underground all the way up (a base, an alien colony's inside, Cydonia's complex), found from the map's own edge (see [Underground maps](#underground-maps));
 - terrain not explored yet: plain slate-coloured shapes (never black, which reads as missing), turning to a soft misty blue-grey further off (from half the soldiers' sight range on); a hole through the ground floor shows the earth below;
 - cards for units, floor items, projectiles and explosions, facing the camera and leaning with its pitch only up to 45° looking down (so they stay above the floor seen from above) and 10° looking up (so a unit close by doesn't lurch over the camera), standing on the floor's top; the art of items and corpses below their anchor lies flat on the floor; units glide, and fade right in front of the camera;
 - particles; red numbered markers over the visible enemies; the path a throw or shot would take (setting *Show trajectory*);

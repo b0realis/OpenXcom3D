@@ -332,6 +332,9 @@ const int FoamShades = 2;
 /// unless the place is really dark (see DarkOverflowFrom): the last shades of TFTD's sea colours
 /// are all but black, and its troughs at dusk were black blotches.
 const int WaterDarkestShade = 12;
+/// The sea's plain and deep colours (RGB) where a map's water is a dark floor standing in for it
+/// (TFTD's liner and cargo ship, round their hulls): TFTD's own sea's green and teal.
+const float StandInSeaPlain[3] = { 31.0f, 155.0f, 110.0f }, StandInSeaDeep[3] = { 0.0f, 120.0f, 120.0f };
 /// The sine the waves are made of is a table of this many steps a turn: cheap for every pixel of sea.
 const int WaveSineSteps = 1024;
 /// The purple haze of a unit under our mind control (see FirstPersonView::setControlHaze) creeps in
@@ -380,6 +383,18 @@ const float UndergroundRingShare = 0.9f;
 /// The rock round and over an underground map is mottled over this many shades (see rockColor),
 /// from this shade of the colour group of the map's own rock (see chooseGround).
 const int RockMottleShades = 3, RockBaseShade = 6;
+/// From orbit (see FirstPersonView::airlessSkyColor) the Earth fills the view from its edge down:
+/// the sine of how far below the level the edge is (20 degrees, a station's low orbit); the glow
+/// of its air in a band this high over the edge (in the same sines).
+const float OrbitEarthEdge = 0.34f, OrbitAirGlow = 0.035f;
+/// Over the Moon the Earth hangs high in the south-east (a unit direction: x east, y south, z up),
+/// its disc this big (the cosine and the sine of its radius, 3.2 degrees: bigger than it really
+/// looks, so it shows on the low-resolution view).
+const float MoonEarthDirection[3] = { 0.433f, 0.75f, 0.5f };
+const float MoonEarthCos = 0.99844f, MoonEarthSin = 0.0558f;
+/// A rain or snow cloud deck (and a void's wisps: see FirstPersonView::skyColor) is mottled by its
+/// noise over this many of the sky's 32 bands either way.
+const float CloudDeckMottle = 14.0f;
 /// A colour shaded past the darkest of its group turns black only where the place is really
 /// dark (see shadeHit): the light there (the game's, less lamps, the flashlight and flares; 0
 /// brightest .. 15 darkest) from DarkOverflowFrom (none of it, the group's darkest instead) to

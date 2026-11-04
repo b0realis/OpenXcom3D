@@ -1074,10 +1074,10 @@ index 000000000..5239f6827
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..2b8ddfb0f
+index 000000000..a70d41a13
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,125 @@
+@@ -0,0 +1,190 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1132,7 +1132,15 @@ index 000000000..2b8ddfb0f
 +    - { game: xcom2, dataSet: TRITON, records: [13], boxes: [[0, 0, 0, 15, 15, 15], [5, 4, 16, 6, 5, 23], [2, 5, 16, 3, 6, 22], [6, 2, 16, 7, 3, 19]] }
 +    - { game: xcom2, dataSet: GRUNGE3, records: [2], boxes: [[0, 0, 0, 4, 15, 20]] }
 +    - { game: xcom2, dataSet: XBASES01, records: [78], boxes: [[12, 0, 0, 15, 3, 23]] }
-+  # Weather particles by terrain data set (only where the sky is open above).
++    # XPiratez and X-Com Files: TFTD's sea, as their SEAURBAN, round their islands, ports and
++    # ships, and the cargo ship's waterline: floors too.
++    - { game: piratez, dataSet: SEAURBAN, records: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], ghost: false, boxes: [[0, 0, 0, 15, 15, 1]] }
++    - { game: x-com-files, dataSet: SEAURBAN, records: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], ghost: false, boxes: [[0, 0, 0, 15, 15, 1]] }
++    - { game: piratez, dataSet: CARGO3, records: [4], ghost: false, boxes: [[0, 0, 0, 15, 15, 1]] }
++    - { game: x-com-files, dataSet: CARGO3, records: [4], ghost: false, boxes: [[0, 0, 0, 15, 15, 1]] }
++  # Weather particles (only where the sky is open above), by the battle's environment (its
++  # enviroEffects, as the big mods name them) or else by terrain data set. Rain and snow fall from
++  # clouds that cover the sky.
 +  weather:
 +    - dataSet: POLAR
 +      type: snow
@@ -1142,10 +1150,57 @@ index 000000000..2b8ddfb0f
 +      type: dust
 +    - dataSet: MARS
 +      type: dust
++    # XPiratez: acid rain, a dust storm
++    - enviroEffects: [STR_ENVIRO_ACID_RAIN]
++      type: rain
++    - enviroEffects: [STR_ENVIRO_DUST_STORM]
++      type: dust
++  # Battles under another sky than the Earth's open air (the sun and the clouds by day, the stars
++  # and the moon by night, overcast in rain and snow), the most particular first: by the mission
++  # (alien deployment) type, or else a terrain the map is built of, or else the battle's
++  # environment (its enviroEffects, which many missions share). Names no loaded mod has are
++  # ignored; a later entry (or a later mod's) overrides.
++  #   space  black, the stars all round, nothing past the map's edge: a ship in deep space
++  #   orbit  the same, the Earth filling the view below: a station in orbit
++  #   moon   black, the stars and the Earth, over the Moon's ground
++  #   mars   a dusty butterscotch sky by day, a smaller sun; the stars by night, no Moon
++  #   sea    under the sea, as TFTD's battles under water, for a sea floor the game keeps dry
++  #   void   a dark violet sky with slow wisps, no sun, moon or stars: other worlds, dreams
++  #   earth  the Earth's own
++  skies:
++    # UFO: Cydonia (its base under rock, as the map shows it)
++    - sky: mars
++      missions: [STR_MARS_CYDONIA_LANDING, STR_MARS_THE_FINAL_ASSAULT]
++    # X-Com Files: its orbital station, outside and in (its STR_SPACE is the Moon's too), and the
++    # insides of its Moon bases (under rock where the map shows it, else the Moon's sky)
++    - sky: orbit
++      missions: [STR_USTATION, STR_USTATION_INSIDE]
++      terrains: [USTATIONSIDE]
++    - sky: moon
++      missions: [STR_MOON_ALIEN_COLONY_SUBURBS, STR_MOON_ALIEN_COLONY_MAIN, STR_MOON_ALIEN_COLONY_CORE, STR_MOON_UAC_BASE_EXPLORATION, STR_UAC_MOON_BASE_DIMENSIONAL_PORTAL, STR_MIB_LUNAR_BASE_ASSAULT_UNDERGROUND]
++    # XPiratez: Mars (Cydonia, Labyrinthus Noctis), the Moon (Moonberia), the orbital stations,
++    # the space freighter, the sea floor, the Shadowlands (the Diablo catacombs, the City of the
++    # Dead, the Nightosphere, the Styx, the VR simulations); X-Com Files: Cydonia, the Moon (its
++    # STR_SPACE), the sea floor (a battle it keeps dry), the dreamscape, beyond the Doom portal
++    - sky: mars
++      enviroEffects: [STR_ENVIRO_MARS, STR_ENVIRO_CYDONIA, STR_ENVIRO_CYDONIA_SURFACE, STR_ENVIRO_CYDONIA_2, STR_ENVIRO_CYDONIA_3, STR_ENVIRO_LABYRINTHUS_NOCTIS, STR_CYDONIA]
++    - sky: moon
++      enviroEffects: [STR_ENVIRO_MOON, STR_SPACE]
++    - sky: orbit
++      enviroEffects: [STR_ENVIRO_SPACE]
++    - sky: space
++      enviroEffects: [STR_ENVIRO_SPACE_FREIGHTER]
++    - sky: sea
++      enviroEffects: [STR_ENVIRO_SEA, STR_UNDERWATER_GEAR, STR_UNDERWATER_GEAR_HARD, STR_UNDERWATER_GEAR_SEVERE, STR_UNDERWATER_GEAR_EXTREME]
++    - sky: void
++      enviroEffects: [STR_ENVIRO_SHADOWLANDS_1, STR_ENVIRO_SHADOWLANDS_2, STR_ENVIRO_SHADOWLANDS_ARMORSTRIPPER, STR_ENVIRO_GNOMES_SHADOWTRAP, STR_DREAMSCAPE, STR_DOOM]
 +  # Terrain data sets whose floors are water: where the water reaches the map's edge, the sea goes
-+  # on beyond it (beyond the rest of the edge, the map's commonest floor). TFTD: the sea round
-+  # islands, ports and ships.
-+  water: [SEA]
++  # on beyond it (beyond the rest of the edge, the map's commonest floor). A data set's name for
++  # all its floors, or its name and records for some. TFTD: the sea round islands, ports and
++  # ships, and the sea round the liner and the cargo ship among their parts (it was their black
++  # ground past the edge); XPiratez and X-Com Files: the same sea, their SEAURBAN, and the
++  # cargo ship's.
++  water: [SEA, SEAURBAN, { dataSet: LINERB, records: [1] }, { dataSet: CARGO3, records: [4] }]
 +  # The helmet cameras' bad signal, by mission (alien deployment) type: 1 a glitch now and then
 +  # (any mission not listed), 2 a lot (the aliens' own ground, where their machinery jams the
 +  # feed), 0 none. A later entry (or a later mod's) overrides.
@@ -1156,7 +1211,17 @@ index 000000000..2b8ddfb0f
 +  # all the way up. Never list a map that starts on the surface and goes on underground, nor a
 +  # name two games share for different maps (TFTD's seabed colony is STR_ALIEN_BASE_ASSAULT,
 +  # like UFO's alien base).
-+  undergroundMissions: []
++  # XPiratez: the Thule base, "the sprawling complex under the surface of the Moon", its top open
++  # on the map; the Old Earth metro's "underground subways" and the sewers (a gnome's
++  # "underground arms workshop", the smugglers' safehouse), roofed only with rock the art leaves
++  # invisible; the ninja bases' "bowels"; in the Shadowlands, the sewers "deep below the urban
++  # surface of Paradiso" (the Fountain of Youth too), the Rabbit Crypt, the Realm of Fear's
++  # "unending dungeons" and "long hallways". X-Com Files: the hideouts "deep in the city sewers"
++  # (the Cyberweb lairs, the smugglers' refuge) and the ooze's nest "in the sewers".
++  undergroundMissions: [STR_LOC_THULEBASE, STR_LOC_OLD_EARTH_METRO, STR_LOC_OLD_EARTH_METRO_IRRADIATED, STR_LOC_OLD_EARTH_METRO_PSYCHEDELIC,
++    STR_LOC_OLD_EARTH_METRO_TOXIC, STR_LOC_GNOME_LAIR, STR_LOC_SMUGGLER_LAIR, STR_NINJA_BASE_2_UNDERGROUND_ASSAULT, STR_NINJA_BASE_HQ_UNDERGROUND_ASSAULT,
++    STR_LOC_CITY_OF_THE_DEAD_SEWERS, STR_LOC_FOUNTAIN_OF_YOUTH, STR_LOC_FOUNTAIN_OF_YOUTH_G, STR_LOC_DOOMED_CRYPT, STR_LOC_GATE_OF_FEAR, STR_LOC_HALLS_OF_FEAR,
++    STR_CYBERWEB_LAIR, STR_SMUGGLERS_REFUGE, STR_THE_BRAINSUCKED_LAIR, STR_OOZE_NEST]
 +  badSignal:
 +    # UFO: Mars (both stages), an alien base, a base defence; TFTD: an alien colony (both
 +    # stages), T'leth (all three), an artefact site (both), a base defence
@@ -42327,7 +42392,7 @@ index 000000000..d7aa46be4
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..db3b27e73
+index 000000000..99de9db55
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
 @@ -0,0 +1,627 @@
@@ -42490,7 +42555,7 @@ index 000000000..db3b27e73
 +	_particles.clear();
 +	_seenExplosions.clear();
 +	_lastProjectile = nullptr;
-+	_weatherChosen = false;
++	_skyChosen = false;
 +	_groundModel = nullptr;
 +	_waterModel = nullptr;
 +	_unitGlides.clear();
@@ -42960,10 +43025,10 @@ index 000000000..db3b27e73
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..d5d4b5d40
+index 000000000..feca00bbc
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1289 @@
+@@ -0,0 +1,1306 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -43188,6 +43253,8 @@ index 000000000..d5d4b5d40
 +		Uint8 sky[32];  // horizon .. zenith
 +		Uint8 cloud[8]; // lit .. shadowed
 +		Uint8 haze, star, moon, sun, tapeYellow, tapeBlack, post;
++		Uint8 faintStar; // the fainter stars of the sky out of the air (space, the Moon)
++		Uint8 earth[4];  // the Earth seen from the Moon or from orbit: its sea lit, its night side, its clouds, the glow of its air
 +		Uint8 trajectory; // the path a throw or shot aimed now would take (light cyan, unlike anything else drawn)
 +		Uint8 trajectoryForced; // ... that of a forced arcing shot (yellow: it may meet something on the way)
 +		Uint8 laserSight, laserDot; // ... that of a straight shot: a thin red laser, and its brighter dot where it ends
@@ -43195,11 +43262,15 @@ index 000000000..d5d4b5d40
 +		Uint8 laserRefused; // ... a straight shot the game will refuse (no line of fire): the laser dimmed, dark red
 +		Uint8 nightLight; // the white of a path glaring under night vision (mixed into the goggles' brightest green)
 +		float night; // 0 day .. 1 night
-+		bool underwater;
++		bool underwater; // under the sea: TFTD's battles under water, and the big mods' sea floor
++		bool overcast;   // rain or snow: clouds hide the sun, the moon and the stars
 +		int ambient;        // shade of open ground under the sky
 +		float faceShade[6]; // extra shade per face normal: +x -x +y -y +z -z
 +		float indoorFaceShade[6]; // ... indoors, where no sun shines (see indoorsAt): as at night
 +		float sunDir[3], moonDir[3];
++		float shadingDir[3];  // where the light that shades a face by its direction comes from: the sun, or straight up under clouds
++		float shadingTurn;    // how many shades darker a face turned away from that light is
++		float shadingBase;    // the shades every face out of doors takes on top (the clouds dim the day)
 +		float cloudTime;
 +		Uint8 glassTint[256]; // each colour as seen through glass
 +		Uint32 paletteHash;   // palette the tint table was built for
@@ -43632,6 +43703,12 @@ index 000000000..d5d4b5d40
 +	// =====================================================================================
 +
 +	SceneColors _colors = {};       // this frame's colours
++	/// The sky over a battle (see chooseSky): the Earth's (day and night, the clouds, overcast in
++	/// rain and snow), deep space, orbit over the Earth, the Moon's, Mars', under the sea, or a void.
++	enum Sky { SkyEarth, SkySpace, SkyOrbit, SkyMoon, SkyMars, SkySea, SkyVoid };
++	Sky _sky = SkyEarth;            // this battle's
++	bool _skyChosen = false;        // the sky and the weather looked up for this battle
++	const SDL_Color *_skyPalette = nullptr; // the battle's palette before its environment recoloured it (see updateColors), or null
 +	bool _smoothLighting = true;    // blend the game's light between tiles (an option)
 +	bool _flashlight = false;       // flashlight on (its key; the shoulder one only in dark battles)
 +	bool _dynamicFlashlight = false; // it's the dynamic flashlight (setting "Flashlight": Dynamic): from under the eye, a tight spot on the crosshair
@@ -43640,6 +43717,10 @@ index 000000000..d5d4b5d40
 +	Uint32 _muzzleFlashTick = 0;    // when it flashed
 +	float _muzzleFlashLight = 0.0f; // the flash's strength this frame
 +
++	/// Looks up the battle's sky and weather (once a battle).
++	void chooseSky();
++	/// Is the battle out of the air (space, orbit, the Moon): no haze, no dust in the open?
++	bool airless() const { return _sky == SkySpace || _sky == SkyOrbit || _sky == SkyMoon; }
 +	/// Picks this frame's colours from the palette, for the time of day.
 +	void updateColors();
 +	/// The game's light at a point, blended between tile centres (0 bright .. 15 dark); also a UFO's light there.
@@ -43678,6 +43759,8 @@ index 000000000..d5d4b5d40
 +	}
 +	/// The sky's colour in a direction.
 +	Uint8 skyColor(const float rayDirection[3], int pixelX, int pixelY) const;
++	/// ... out of the air (space, orbit, the Moon): black, the stars, the sun, the Earth.
++	Uint8 airlessSkyColor(const float rayDirection[3], int pixelX, int pixelY) const;
 +	/// The view's helper threads, for the work of a frame that splits into many small pieces
 +	/// (the rays of a row, the smoke over a band of rows). They are started on the first frame
 +	/// and then kept, waiting between jobs, since starting threads anew every frame costs time.
@@ -43929,8 +44012,7 @@ index 000000000..d5d4b5d40
 +	FirstPersonParticles _particles; // all the particles
 +	bool _particlesOn = true;        // particles switched on for this view (off for the small helmet-camera view)
 +	Uint32 _particleLastTick = 0;    // when the particles were last advanced
-+	std::string _weather;                 // the battle's weather: "rain", "snow", "dust" or none
-+	bool _weatherChosen = false;                       // looked up for this battle
++	std::string _weather;                              // the battle's weather: "rain", "snow", "dust" or none (see chooseSky)
 +	std::vector<std::pair<float, float>> _bubbleVents; // sea floor spots bubbles rise from
 +	std::vector<float> _glowBuffer, _glowScratch;      // quarter resolution glow, blurred into a bloom
 +	std::vector<float> _glowDepth, _glowDepthScratch;  // the same for the glow's distance (summed, weighted by the glow): how far away the light is
@@ -44255,10 +44337,10 @@ index 000000000..d5d4b5d40
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewEffects.cpp b/src/FirstPerson/FirstPersonViewEffects.cpp
 new file mode 100644
-index 000000000..5960d8333
+index 000000000..331b006be
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewEffects.cpp
-@@ -0,0 +1,1092 @@
+@@ -0,0 +1,1078 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -44324,7 +44406,6 @@ index 000000000..5960d8333
 +#include "../Engine/Surface.h"
 +#include "../Mod/Armor.h"
 +#include "../Mod/MapData.h"
-+#include "../Mod/MapDataSet.h"
 +#include "../Mod/Mod.h"
 +#include "../Savegame/BattleUnit.h"
 +#include "../Savegame/SavedBattleGame.h"
@@ -44333,7 +44414,6 @@ index 000000000..5960d8333
 +#include "../Battlescape/Map.h"
 +#include "../Battlescape/Position.h"
 +#include "FirstPersonParticles.h"
-+#include "RuleFirstPerson.h"
 +#include "FirstPersonViewShared.h"
 +
 +namespace OpenXcom
@@ -44672,10 +44752,11 @@ index 000000000..5960d8333
 +}
 +
 +/**
-+ * Keeps the air alive around the camera: dust motes by day, fireflies outside at night,
-+ * bubbles under the sea, and the terrain's weather (rain, snow, blowing sand) where the sky
-+ * is open above. Under the sea there are also columns of bubbles rising from a few spots on
-+ * the sea floor, and marine snow (specks hanging in the water) instead of weather.
++ * Keeps the air alive around the camera: dust motes by day, fireflies outside at night (only
++ * under the Earth's sky; out of the air, in space and on the Moon, motes only under a roof),
++ * bubbles under the sea, and the battle's weather (rain, snow, blowing sand: see chooseSky)
++ * where the sky is open above. Under the sea there are also columns of bubbles rising from a
++ * few spots on the sea floor, and marine snow (specks hanging in the water) instead of weather.
 + * Particles the camera has left behind are dropped and new ones fill in around it, so the
 + * camera seems to move through endless air (or water).
 + * @param elapsedSeconds Seconds since the last frame: the spawn rates are per second.
@@ -44683,22 +44764,7 @@ index 000000000..5960d8333
 +void FirstPersonView::spawnAmbient(float elapsedSeconds)
 +{
 +	typedef FirstPersonParticles P; // short for the particle system: its kinds (P::GLOW...) and groups (P::EFFECT...)
-+	// The weather is chosen once per battle: the first of the battle's terrain data sets that
-+	// the mod gives a weather (rain, snow, or dust for blowing sand), else none.
-+	if (!_weatherChosen)
-+	{
-+		_weatherChosen = true;
-+		_weather.clear();
-+		for (const MapDataSet *mapDataSet : *_save->getMapDataSets())
-+		{
-+			const std::string weather = _game->getMod()->getFirstPerson().getWeather(mapDataSet->getName());
-+			if (!weather.empty())
-+			{
-+				_weather = weather;
-+				break;
-+			}
-+		}
-+	}
++	chooseSky(); // the battle's weather
 +	const float eye[3] = { (float)_eye[0], (float)_eye[1], (float)_eye[2] };
 +	// What the camera left behind (more than 130 or 150 voxels away across the map) is gone,
 +	// and comes back around it.
@@ -44739,9 +44805,9 @@ index 000000000..5960d8333
 +			particle.color = _colors.bubble; particle.kind = P::BUBBLE;
 +			particle.size = (Uint8)(2 + (int)(_particles.random() * 3.0f)); // 2..4
 +		}
-+		else if (_colors.night > 0.6f)
++		else if (_colors.night > 0.6f && _sky == SkyEarth)
 +		{
-+			// A firefly, only under the open sky, wandering and blinking for a few seconds.
++			// A firefly, only under the Earth's open sky, wandering and blinking for a few seconds.
 +			if (!openSky(particle.pos[0], particle.pos[1], particle.pos[2])) continue;
 +			particle.vel[0] = _particles.random(-4, 4); particle.vel[1] = _particles.random(-4, 4);
 +			particle.vel[2] = _particles.random(-2, 2);
@@ -44750,7 +44816,9 @@ index 000000000..5960d8333
 +		}
 +		else
 +		{
-+			// A dust mote, lit by the light where it is, barely drifting.
++			// A dust mote, lit by the light where it is, barely drifting (out of the air, in
++			// space and on the Moon, only under a roof).
++			if (airless() && openSky(particle.pos[0], particle.pos[1], particle.pos[2])) continue;
 +			particle.vel[0] = _particles.random(-1.5f, 1.5f); particle.vel[1] = _particles.random(-1.5f, 1.5f);
 +			particle.vel[2] = _particles.random(-0.8f, 0.8f);
 +			particle.life = _particles.random(4, 9); particle.gravity = 0; particle.drag = 0;
@@ -45741,10 +45809,10 @@ index 000000000..77a3cc4ed
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..62173c703
+index 000000000..5fcd17963
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,1665 @@
+@@ -0,0 +1,1878 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -45809,9 +45877,13 @@ index 000000000..62173c703
 +#include "FirstPersonApi.h"
 +#include "../Engine/Logger.h"
 +#include "../Engine/Options.h"
++#include "../Engine/Palette.h"
++#include "../Mod/MapDataSet.h"
 +#include "../Mod/Mod.h"
++#include "../Mod/RuleEnviroEffects.h"
 +#include "../Savegame/BattleUnit.h" // not used here, but its PARTS_STRING constants are part of this file's object code
 +#include "../Savegame/SavedBattleGame.h"
++#include "RuleFirstPerson.h"
 +#include "FirstPersonViewShared.h"
 +#include "FirstPersonViewRayWalk.h"
 +
@@ -45827,6 +45899,69 @@ index 000000000..62173c703
 +}();
 +
 +/**
++ * Looks up the battle's sky and weather, once a battle, from the mod's tables (RuleFirstPerson;
++ * a player, GitHub issue #94: rain under a blue or starry sky; the owner: "check all special
++ * missions so sky is ok"):
++ * - the sky: the Earth's (day and night, the clouds, overcast in rain and snow), unless the
++ *   battle's mission type, one of the terrains its map was built of or its environment (its
++ *   enviroEffects, as the big mods name them, many missions sharing one), the most particular
++ *   first, has another: deep space (the stars all round, nothing past the map's edge), orbit
++ *   (the same over the Earth), the Moon's (black, the stars and the Earth over its ground),
++ *   Mars' (butterscotch by day, the stars by night, no Moon), the sea's (as TFTD's battles under
++ *   water, for a sea floor the game keeps dry: X-Com Files') or a void (a dark sky, no sun, moon
++ *   or stars: other dimensions, dreams). A battle under water always has the sea's;
++ * - the weather: its environment's (acid rain, a dust storm), else that of the first of its
++ *   terrain data sets that has one (rain, snow, or dust for blowing sand), else none. None out
++ *   of the air or under the sea.
++ */
++void FirstPersonView::chooseSky()
++{
++	if (_skyChosen)
++	{
++		return;
++	}
++	_skyChosen = true;
++	const RuleFirstPerson &rules = _save->getMod()->getFirstPerson();
++	const std::string enviro = _save->getEnviroEffects() ? _save->getEnviroEffects()->getType() : std::string();
++	// The terrains the map was built of, block by block (a craft's or a UFO's blocks have its name instead).
++	std::vector<std::string> terrains;
++	for (const std::vector<std::string> &column : _save->getFlattenedMapTerrainNames())
++	{
++		for (const std::string &name : column)
++		{
++			if (!name.empty() && std::find(terrains.begin(), terrains.end(), name) == terrains.end()) terrains.push_back(name);
++		}
++	}
++	const std::string sky = rules.getSky(enviro, _save->getMissionType(), terrains);
++	_sky = sky == "space" ? SkySpace : sky == "orbit" ? SkyOrbit : sky == "moon" ? SkyMoon : sky == "mars" ? SkyMars
++		: sky == "sea" ? SkySea : sky == "void" ? SkyVoid : SkyEarth;
++	if (_save->getDepth() > 0)
++	{
++		_sky = SkySea;
++	}
++	_weather = rules.getEnviroWeather(enviro);
++	for (const MapDataSet *mapDataSet : *_save->getMapDataSets())
++	{
++		if (!_weather.empty()) break;
++		_weather = rules.getWeather(mapDataSet->getName());
++	}
++	if (airless() || _sky == SkySea)
++	{
++		_weather.clear();
++	}
++	// The battle's palette as it was before its environment recoloured it (the game keeps a
++	// backup of each), for the sky's colours (see updateColors). Not for Mars: its sky's colours
++	// are Mars' own, and the big mods' Martian palettes (made for Mars' ground) would recolour
++	// them again; picked from the palette on the screen, they stay butterscotch.
++	const std::string paletteName = _save->getDepth() > 0 ? "PAL_BATTLESCAPE_" + std::to_string(_save->getDepth()) : "PAL_BATTLESCAPE";
++	Palette *backup = _sky == SkyMars ? nullptr : _save->getMod()->getPalette("BACKUP_" + paletteName, false);
++	_skyPalette = backup ? backup->getColors() : nullptr;
++	static const char *const SkyNames[] = { "earth", "space", "orbit", "moon", "mars", "sea", "void" };
++	Log(LOG_VERBOSE) << "OpenXcom3D: " << _save->getMissionType() << " (" << (enviro.empty() ? "no environment" : enviro) << "): the sky "
++		<< SkyNames[_sky] << ", weather " << (_weather.empty() ? "none" : _weather);
++}
++
++/**
 + * Picks the colours the view needs this frame from the current palette, so that the UFO and
 + * the TFTD palettes both work: the sky gradient, clouds, haze, the map border's tape and posts,
 + * the particles' colours (fire, smoke, blood, weather, flares) and the enemy markers. When the
@@ -45837,16 +45972,17 @@ index 000000000..62173c703
 + */
 +void FirstPersonView::updateColors()
 +{
++	chooseSky();
 +	const SDL_Color *palette = getPalette();
-+	// The palette colour closest to an RGB colour (0..255 per channel), weighting the channels
-+	// by how bright they look to the eye. Colour 0 is transparent, so it is never picked.
-+	auto nearest = [palette](float red, float green, float blue) {
++	// The colour of a palette closest to an RGB colour (0..255 per channel), weighting the
++	// channels by how bright they look to the eye. Colour 0 is transparent, so it is never picked.
++	auto nearestIn = [](const SDL_Color *colors, float red, float green, float blue) {
 +		int bestIndex = 1;
 +		float bestDistance = 1e9f;
 +		for (int index = 1; index < 256; ++index)
 +		{
 +			// dr, dg, db: how far this palette colour is from the wanted one, per channel.
-+			const float dr = palette[index].r - red, dg = palette[index].g - green, db = palette[index].b - blue;
++			const float dr = colors[index].r - red, dg = colors[index].g - green, db = colors[index].b - blue;
 +			const float distance = dr * dr * 0.3f + dg * dg * 0.59f + db * db * 0.11f;
 +			if (distance < bestDistance)
 +			{
@@ -45856,6 +45992,13 @@ index 000000000..62173c703
 +		}
 +		return (Uint8)bestIndex;
 +	};
++	// Most colours are the closest the palette on the screen has. The sky's (and the weather's)
++	// are the closest the battle's palette had before its environment recoloured it (the big
++	// mods' heat, cold, acid rain, a red sun; but not Mars': see chooseSky), so that the
++	// environment recolours the sky as it does the map; picked from the screen's palette, they
++	// undid its tint.
++	auto nearest = [&](float red, float green, float blue) { return nearestIn(palette, red, green, blue); };
++	auto nearestSky = [&](float red, float green, float blue) { return nearestIn(_skyPalette ? _skyPalette : palette, red, green, blue); };
 +	// Mixes two RGB colours: amount 0 gives `from`, 1 gives `to`.
 +	auto mix = [](const float *from, const float *to, float amount, float *out) {
 +		for (int channel = 0; channel < 3; ++channel) out[channel] = from[channel] + (to[channel] - from[channel]) * amount;
@@ -45865,7 +46008,9 @@ index 000000000..62173c703
 +	// full day up to shade 3, full night from shade 12. Night vision brightens open ground.
 +	const int globalShade = std::clamp(_save->getGlobalShade(), 0, 15);
 +	_colors.night = std::clamp((globalShade - 3) / 9.0f, 0.0f, 1.0f);
-+	_colors.underwater = _save->getDepth() > 0;
++	_colors.underwater = _sky == SkySea;
++	// Rain and snow fall from clouds that cover the Earth's sky (GitHub issue #94).
++	_colors.overcast = _sky == SkyEarth && (_weather == "rain" || _weather == "snow");
 +	_colors.ambient = _nightVision ? std::min(globalShade, 4) : globalShade;
 +	_colors.cloudTime = SDL_GetTicks() / 1000.0f; // seconds, to drift the clouds and ripple the sea floor's light
 +	// This frame's waves on the sea (see waveHeight): each train's sine-table steps per voxel east
@@ -45885,32 +46030,31 @@ index 000000000..62173c703
 +		_waveSteps[train][5] = wave.bendDepth * stepsPerVoxel;
 +	}
 +
-+	// The sky's colours at the horizon and straight up (the zenith) by day, by night and under
-+	// the sea, and the clouds' lit and shadowed sides by day and by night (RGB).
-+	static const float dayHorizon[3] = { 190, 210, 230 }, dayZenith[3] = { 70, 120, 200 };
-+	static const float nightHorizon[3] = { 24, 28, 50 }, nightZenith[3] = { 3, 4, 14 };
-+	static const float waterHorizon[3] = { 8, 34, 46 }, waterZenith[3] = { 34, 104, 118 };
++	// The sky's colours at the horizon and straight up (the zenith), by day and by night: the
++	// Earth's clear sky, under rain clouds, under snow clouds (paler), Mars' dusty one, the black
++	// of space and of the Moon's sky, a void's dark violet, and under the sea the water's, the
++	// same all day. And the clouds' lit and shadowed sides by day and by night (RGB).
++	struct SkyRgb { float dayHorizon[3], dayZenith[3], nightHorizon[3], nightZenith[3]; };
++	static const SkyRgb EarthSky = { { 190, 210, 230 }, { 70, 120, 200 }, { 24, 28, 50 }, { 3, 4, 14 } };
++	static const SkyRgb RainSky = { { 150, 155, 162 }, { 108, 114, 124 }, { 34, 36, 42 }, { 16, 17, 21 } };
++	static const SkyRgb SnowSky = { { 202, 206, 212 }, { 162, 168, 178 }, { 40, 42, 48 }, { 20, 21, 26 } };
++	static const SkyRgb MarsSky = { { 214, 172, 132 }, { 160, 112, 82 }, { 32, 18, 14 }, { 5, 3, 4 } }; // (the night's dark red in the big mods' Martian palette, not its olive)
++	static const SkyRgb SpaceSky = { { 4, 4, 8 }, { 2, 2, 5 }, { 4, 4, 8 }, { 2, 2, 5 } };
++	static const SkyRgb VoidSky = { { 52, 26, 64 }, { 12, 5, 20 }, { 40, 20, 50 }, { 8, 4, 14 } };
++	static const SkyRgb SeaSky = { { 8, 34, 46 }, { 34, 104, 118 }, { 8, 34, 46 }, { 34, 104, 118 } };
 +	static const float cloudLit[3] = { 240, 240, 245 }, cloudDark[3] = { 140, 146, 162 };
 +	static const float cloudNightLit[3] = { 46, 48, 66 }, cloudNightDark[3] = { 20, 22, 34 };
++	const SkyRgb &skyRgb = _colors.underwater ? SeaSky : airless() ? SpaceSky : _sky == SkyMars ? MarsSky : _sky == SkyVoid ? VoidSky
++		: !_colors.overcast ? EarthSky : _weather == "snow" ? SnowSky : RainSky;
 +	float horizon[3], zenith[3], litCloud[3], darkCloud[3];
-+	// Under the sea the water's colours stay the same all day; above it the sky darkens from
-+	// the day's colours to the night's.
-+	if (_colors.underwater)
-+	{
-+		mix(waterHorizon, waterHorizon, 0, horizon);
-+		mix(waterZenith, waterZenith, 0, zenith);
-+	}
-+	else
-+	{
-+		mix(dayHorizon, nightHorizon, _colors.night, horizon);
-+		mix(dayZenith, nightZenith, _colors.night, zenith);
-+	}
++	mix(skyRgb.dayHorizon, skyRgb.nightHorizon, _colors.night, horizon);
++	mix(skyRgb.dayZenith, skyRgb.nightZenith, _colors.night, zenith);
 +	// The sky gradient: 32 steps from the horizon up to the zenith.
 +	for (int band = 0; band < 32; ++band)
 +	{
 +		float color[3];
 +		mix(horizon, zenith, band / 31.0f, color);
-+		_colors.sky[band] = nearest(color[0], color[1], color[2]);
++		_colors.sky[band] = nearestSky(color[0], color[1], color[2]);
 +	}
 +	// The clouds: 8 steps from their lit side to their shadowed side, darker at night.
 +	mix(cloudLit, cloudNightLit, _colors.night, litCloud);
@@ -45919,7 +46063,7 @@ index 000000000..62173c703
 +	{
 +		float color[3];
 +		mix(litCloud, darkCloud, level / 7.0f, color);
-+		_colors.cloud[level] = nearest(color[0], color[1], color[2]);
++		_colors.cloud[level] = nearestSky(color[0], color[1], color[2]);
 +	}
 +	// The single colours: the haze far away is the sky at the horizon, the rest are picked
 +	// from fixed RGB values.
@@ -45951,9 +46095,14 @@ index 000000000..62173c703
 +			}
 +		}
 +	}
-+	_colors.star = nearest(230, 230, 240);
-+	_colors.moon = nearest(228, 228, 210);
-+	_colors.sun = nearest(255, 248, 200);
++	_colors.star = nearestSky(230, 230, 240);
++	_colors.faintStar = nearestSky(120, 122, 140);
++	_colors.moon = nearestSky(228, 228, 210);
++	_colors.sun = nearestSky(255, 248, 200);
++	_colors.earth[0] = nearestSky(46, 96, 178);
++	_colors.earth[1] = nearestSky(8, 12, 28);
++	_colors.earth[2] = nearestSky(236, 238, 246);
++	_colors.earth[3] = nearestSky(130, 180, 240);
 +	_colors.fire[0] = nearest(255, 250, 200);
 +	_colors.fire[1] = nearest(255, 210, 60);
 +	_colors.fire[2] = nearest(240, 120, 20);
@@ -45973,13 +46122,13 @@ index 000000000..62173c703
 +	_colors.blood[0] = nearest(90, 0, 0);
 +	_colors.blood[1] = nearest(160, 12, 8);
 +	_colors.dust = nearest(200, 190, 170);
-+	_colors.rain = nearest(150, 170, 200);
-+	_colors.snow = nearest(240, 240, 250);
++	_colors.rain = nearestSky(150, 170, 200);
++	_colors.snow = nearestSky(240, 240, 250);
 +	_colors.speck = nearest(236, 236, 228);
 +	_colors.glassShard[0] = nearest(200, 228, 240);
 +	_colors.glassShard[1] = nearest(240, 248, 252);
 +	_colors.glassShard[2] = nearest(150, 178, 196);
-+	_colors.sand = nearest(210, 170, 110);
++	_colors.sand = nearestSky(210, 170, 110);
 +	_colors.firefly = nearest(200, 255, 100);
 +	_colors.bubble = nearest(170, 230, 240);
 +	_colors.tapeYellow = nearest(240, 200, 30);
@@ -46081,18 +46230,31 @@ index 000000000..62173c703
 +		_colors.sunDir[axis] = sunDirection[axis];
 +		_colors.moonDir[axis] = moonDirection[axis];
 +	}
-+	// Each face direction (+x -x +y -y +z -z) is shaded by how much it turns away from the sun
-+	// (Lambert's cosine law): strongly by day, only a little at night, and indoors always as at
-+	// night (no sun shines there, see indoorsAt). Undersides (-z) get a whole shade more on top.
++	// Each face direction (+x -x +y -y +z -z) is shaded by how much it turns away from the light
++	// (Lambert's cosine law): the sun's, strongly by day, only a little at night, and indoors
++	// always as at night (no sun shines there, see indoorsAt). Under rain or snow clouds and in a
++	// void no sun shines: the light comes from the whole sky above, every wall alike, and the
++	// clouds dim the day a little. Undersides (-z) get a whole shade more on top.
 +	const float daylight = 1.0f - _colors.night;
++	const bool sunless = _colors.overcast || _sky == SkyVoid;
++	static const float straightUp[3] = { 0.0f, 0.0f, 1.0f };
++	const float *shadingFrom = sunless ? straightUp : sunDirection;
++	for (int axis = 0; axis < 3; ++axis)
++	{
++		_colors.shadingDir[axis] = shadingFrom[axis];
++	}
++	_colors.shadingTurn = 0.5f + (sunless ? 1.3f : 2.5f) * daylight;
++	_colors.shadingBase = sunless ? 0.6f * daylight : 0.0f;
 +	static const float faceNormals[6][3] = { { 1, 0, 0 }, { -1, 0, 0 }, { 0, 1, 0 }, { 0, -1, 0 }, { 0, 0, 1 }, { 0, 0, -1 } };
 +	for (int face = 0; face < 6; ++face)
 +	{
-+		const float lambert = std::max(0.0f, faceNormals[face][0] * sunDirection[0] + faceNormals[face][1] * sunDirection[1]
-+			+ faceNormals[face][2] * sunDirection[2]);
++		auto lambert = [&](const float *from)
++		{
++			return std::max(0.0f, faceNormals[face][0] * from[0] + faceNormals[face][1] * from[1] + faceNormals[face][2] * from[2]);
++		};
 +		const float underside = face == 5 ? 1.0f : 0.0f;
-+		_colors.faceShade[face] = (1.0f - lambert) * (0.5f + 2.5f * daylight) + underside;
-+		_colors.indoorFaceShade[face] = (1.0f - lambert) * 0.5f + underside;
++		_colors.faceShade[face] = _colors.shadingBase + (1.0f - lambert(shadingFrom)) * _colors.shadingTurn + underside;
++		_colors.indoorFaceShade[face] = (1.0f - lambert(sunDirection)) * 0.5f + underside;
 +	}
 +	// The UFOs' lights for this frame (the UFO lights option).
 +	updateUfos();
@@ -46568,8 +46730,9 @@ index 000000000..62173c703
 +	{
 +		// The sun: a face turned towards it with something in the way is in shadow (only by
 +		// day, out of doors, and not too far away, as each test is a ray walked 260 voxels
-+		// towards the sun).
-+		const float daylight = _colors.underwater ? 0.0f : 1.0f - _colors.night;
++		// towards the sun; none where no sun shines: under the sea, under rain or snow clouds,
++		// in a void).
++		const float daylight = _colors.underwater || _colors.overcast || _sky == SkyVoid ? 0.0f : 1.0f - _colors.night;
 +		const float sunFacing = normal[0] * _colors.sunDir[0] + normal[1] * _colors.sunDir[1] + normal[2] * _colors.sunDir[2];
 +		if (!indoors && daylight > 0.3f && sunFacing > 0.05f && hit.t < 640.0f)
 +		{
@@ -46690,12 +46853,13 @@ index 000000000..62173c703
 +/**
 + * Where the distance haze begins on land, as a share of the view's reach (setting "Distance
 + * haze"): Normal from 45%, Light from 75%, Clear only in the last tenth, so the world doesn't
-+ * stop with a hard edge where the view ends.
++ * stop with a hard edge where the view ends. Out of the air (space, orbit, the Moon) always as
++ * Clear: there's no air to be hazy.
 + * @return The share, 0..1.
 + */
 +float FirstPersonView::hazeStart() const
 +{
-+	return Options::fpsHaze == 2 ? 0.9f : Options::fpsHaze == 1 ? 0.75f : 0.45f;
++	return Options::fpsHaze == 2 || airless() ? 0.9f : Options::fpsHaze == 1 ? 0.75f : 0.45f;
 +}
 +
 +/**
@@ -46728,7 +46892,8 @@ index 000000000..62173c703
 + * tiled with the ground model chosen for the map, or the water's beyond a stretch of the border
 + * where the water reaches it (see chooseGround). A map underground all the way up has rock
 + * beyond every edge and over it as well (a player's report: a base's edge showed the ground of
-+ * its sewers far below, and the sky over it).
++ * its sewers far below, and the sky over it). In space (a station, a ship: see chooseSky) there
++ * is nothing past the edge but space: no rock, no tape and no ground.
 + * @param rayOrigin The eye, in voxels.
 + * @param rayDirection The ray's unit direction in the voxel grid.
 + * @param tExit How far along the ray it left the map.
@@ -46750,7 +46915,8 @@ index 000000000..62173c703
 +	const float surfaceTop = GroundTop + _surfaceLevel * 24.0f;
 +	// Below it, the rock: a wall of it along the border (facing back into the map), or over an
 +	// enclosed map, its ceiling (facing down).
-+	if (exitAxis != 2 ? exitPoint[2] < surfaceTop : _enclosed)
++	const bool inSpace = _sky == SkySpace || _sky == SkyOrbit;
++	if (!inSpace && (exitAxis != 2 ? exitPoint[2] < surfaceTop : _enclosed))
 +	{
 +		depth = tExit;
 +		const int face = exitAxis == 2 ? 5 : exitAxis * 2 + (rayDirection[exitAxis] > 0.0f ? 1 : 0);
@@ -46759,8 +46925,8 @@ index 000000000..62173c703
 +	}
 +	const float tapeBottom = surfaceTop + 8.0f; // the tape hangs 8 voxels above the ground, 7 voxels high
 +	// The discreet map edge (setting) has no posts and no tape: the ground beyond and the sky
-+	// only, the edge marked by dots on the floor instead (see drawEdgeDots).
-+	const bool tape = !Options::fpsDiscreetEdge;
++	// only, the edge marked by dots on the floor instead (see drawEdgeDots). Nor has space.
++	const bool tape = !Options::fpsDiscreetEdge && !inSpace;
 +	const float borderShade = _colors.ambient * 0.5f;
 +	// A post every 64 voxels (4 tiles) along the border, 1.5 voxels thick and 17 voxels high,
 +	// shaded a little darker on the sides facing north or south than on those facing east or west.
@@ -46974,7 +47140,10 @@ index 000000000..62173c703
 +/**
 + * The colour of the sky in a direction: a dithered gradient from the horizon up, with clouds
 + * and the sun by day, stars and the moon by night, or just murky water when the battle is
-+ * under the sea.
++ * under the sea. Under rain or snow clouds (GitHub issue #94) a grey deck of them all over: no
++ * sun, moon or stars; a void's dark sky has the same, slow violet wisps. Over Mars a dusty sky,
++ * a smaller sun by day and the stars by night, no clouds and no Moon. Out of the air (space,
++ * orbit, the Moon) a black sky full of stars (see airlessSkyColor).
 + * @param rayDirection The ray's unit direction (z up).
 + * @param pixelX The ray's pixel on the view (or block of pixels), for the dither pattern.
 + * @param pixelY The same, down.
@@ -46982,10 +47151,25 @@ index 000000000..62173c703
 + */
 +Uint8 FirstPersonView::skyColor(const float rayDirection[3], int pixelX, int pixelY) const
 +{
++	if (airless())
++	{
++		return airlessSkyColor(rayDirection, pixelX, pixelY);
++	}
 +	// The gradient: how far up the ray points (0 at the horizon and below, 1 straight up),
 +	// eased so the horizon's colours spread further up, picks one of the 32 sky colours.
 +	const float elevation = std::max(rayDirection[2], 0.0f);
 +	const float gradient = std::pow(elevation, 0.6f) * 31.0f;
++	if (_colors.overcast || _sky == SkyVoid)
++	{
++		// A low deck of cloud all over (a void's wisps): its noise where the ray meets it,
++		// drifting with the wind, mottles it lighter and darker within the sky's own colours;
++		// far off, low down, it melts into the horizon's haze.
++		const float layerDistance = 1.0f / std::max(elevation, 0.06f);
++		const float drift = _colors.cloudTime * (_sky == SkyVoid ? 0.01f : 0.05f);
++		const float deck = cloudNoise(rayDirection[0] * layerDistance * 0.9f + drift, rayDirection[1] * layerDistance * 0.9f + drift * 0.4f);
++		const float mottle = (deck - 0.5f) * 2.0f * CloudDeckMottle * smoothstep(0.0f, 0.3f, elevation);
++		return _colors.sky[std::clamp((int)(gradient + mottle + dither(pixelX, pixelY)), 0, 31)];
++	}
 +	Uint8 color = _colors.sky[std::clamp((int)(gradient + dither(pixelX, pixelY)), 0, 31)];
 +	if (_colors.underwater)
 +	{
@@ -46993,14 +47177,15 @@ index 000000000..62173c703
 +	}
 +
 +	// The sun by day and the moon by night: small discs where the ray points almost straight
-+	// at them (the cosine of the angle very close to 1).
++	// at them (the cosine of the angle very close to 1). From Mars the sun looks smaller, and
++	// the Earth's Moon isn't there.
 +	const float daylight = 1.0f - _colors.night;
 +	const float sunDot = rayDirection[0] * _colors.sunDir[0] + rayDirection[1] * _colors.sunDir[1] + rayDirection[2] * _colors.sunDir[2];
-+	if (daylight > 0.4f && sunDot > 0.9995f)
++	if (daylight > 0.4f && sunDot > (_sky == SkyMars ? 0.9998f : 0.9995f))
 +	{
 +		return _colors.sun;
 +	}
-+	if (_colors.night > 0.4f)
++	if (_colors.night > 0.4f && _sky != SkyMars)
 +	{
 +		const float moonDot = rayDirection[0] * _colors.moonDir[0] + rayDirection[1] * _colors.moonDir[1]
 +			+ rayDirection[2] * _colors.moonDir[2];
@@ -47010,11 +47195,11 @@ index 000000000..62173c703
 +		}
 +	}
 +
-+	// Clouds on a flat layer high up, thinning out towards the horizon, drifting slowly. The
-+	// ray meets the layer at a distance of about 1 / elevation (capped low down); the noise
-+	// there says how thick the cloud is: thin edges get the shadowed colours, thick middles
-+	// the lit ones.
-+	if (elevation > 0.02f && _colors.night < 0.9f)
++	// Clouds on a flat layer high up, thinning out towards the horizon, drifting slowly (none
++	// over Mars). The ray meets the layer at a distance of about 1 / elevation (capped low
++	// down); the noise there says how thick the cloud is: thin edges get the shadowed colours,
++	// thick middles the lit ones.
++	if (elevation > 0.02f && _colors.night < 0.9f && _sky != SkyMars)
 +	{
 +		const float layerDistance = 1.0f / std::max(elevation, 0.06f);
 +		const float cloudU = rayDirection[0] * layerDistance * 1.6f + _colors.cloudTime * 0.02f;
@@ -47041,6 +47226,95 @@ index 000000000..62173c703
 +		}
 +	}
 +	return color;
++}
++
++/**
++ * The sky out of the air (space, orbit, the Moon: see chooseSky): black, with stars and fainter
++ * ones among them, all round in space and in orbit (nothing past a station's or a ship's edge
++ * hides them), over the Moon down to its horizon; the sun a bright disc by day, with none of the
++ * sky's blue round it. From orbit the Earth fills the view from a little below the horizon down
++ * (OrbitEarthEdge): its seas and clouds drifting by as the station circles it, the glow of its
++ * air along its edge, its night side dark. Over the Moon the Earth hangs high in the south-east
++ * (MoonEarthDirection), lit on the sun's side.
++ * @param rayDirection The ray's unit direction (z up).
++ * @param pixelX The ray's pixel on the view (or block of pixels), for the dither pattern.
++ * @param pixelY The same, down.
++ * @return The palette colour to draw.
++ */
++Uint8 FirstPersonView::airlessSkyColor(const float rayDirection[3], int pixelX, int pixelY) const
++{
++	const float daylight = 1.0f - _colors.night;
++	if (_sky == SkyOrbit && rayDirection[2] < -OrbitEarthEdge + OrbitAirGlow)
++	{
++		const float below = -rayDirection[2];
++		// The glow of the air over the Earth's edge, thinning out upwards (the night side's faint).
++		if (below < OrbitEarthEdge)
++		{
++			const float glow = (below - (OrbitEarthEdge - OrbitAirGlow)) / OrbitAirGlow * (daylight > 0.4f ? 1.0f : 0.4f);
++			return glow > dither(pixelX, pixelY) ? _colors.earth[3] : _colors.sky[0];
++		}
++		if (daylight <= 0.4f)
++		{
++			return _colors.earth[1];
++		}
++		// Its face: where the ray meets it, as if it were flat far below, its clouds over its
++		// seas, drifting by; near the edge, seen through more air, the glow mixes in.
++		const float planeX = rayDirection[0] / below * 1.4f + _colors.cloudTime * 0.012f, planeY = rayDirection[1] / below * 1.4f;
++		if (smoothstep(OrbitEarthEdge + 0.08f, OrbitEarthEdge, below) > dither(pixelX + 1, pixelY + 2))
++		{
++			return _colors.earth[3];
++		}
++		return cloudNoise(planeX, planeY) > 0.56f ? _colors.earth[2] : _colors.earth[0];
++	}
++	// The sun by day: a disc where the ray points almost straight at it.
++	const float sunDot = rayDirection[0] * _colors.sunDir[0] + rayDirection[1] * _colors.sunDir[1] + rayDirection[2] * _colors.sunDir[2];
++	if (daylight > 0.4f && sunDot > 0.9995f)
++	{
++		return _colors.sun;
++	}
++	if (_sky == SkyMoon)
++	{
++		const float along = rayDirection[0] * MoonEarthDirection[0] + rayDirection[1] * MoonEarthDirection[1] + rayDirection[2] * MoonEarthDirection[2];
++		if (along > MoonEarthCos)
++		{
++			// The Earth: the point of its globe the ray meets, from across its disc (in its radii)
++			// and the side facing the Moon; lit where it faces the sun, else its night side; the
++			// glow of its air round its edge, its clouds over its seas.
++			float across[3], normal[3];
++			for (int axis = 0; axis < 3; ++axis) across[axis] = (rayDirection[axis] - MoonEarthDirection[axis] * along) / MoonEarthSin;
++			const float acrossSquared = across[0] * across[0] + across[1] * across[1] + across[2] * across[2];
++			const float facing = std::sqrt(std::max(0.0f, 1.0f - acrossSquared));
++			for (int axis = 0; axis < 3; ++axis) normal[axis] = across[axis] - MoonEarthDirection[axis] * facing;
++			const float sunlit = normal[0] * _colors.sunDir[0] + normal[1] * _colors.sunDir[1] + normal[2] * _colors.sunDir[2];
++			if (sunlit < 0.1f * dither(pixelX, pixelY))
++			{
++				return _colors.earth[1];
++			}
++			if (acrossSquared > 0.82f)
++			{
++				return _colors.earth[3];
++			}
++			return cloudNoise(across[0] * 3.0f + 7.0f, across[1] * 3.0f + across[2] * 3.0f) > 0.55f ? _colors.earth[2] : _colors.earth[0];
++		}
++	}
++	// The stars: the sky divided into small cells by azimuth and elevation angle, and a hash of
++	// each cell lights up 6 in 1000 of them, and 12 more faintly (over the Moon only above its
++	// horizon: its ground hides the rest).
++	if (_sky != SkyMoon || rayDirection[2] > 0.0f)
++	{
++		const float azimuth = std::atan2(rayDirection[1], rayDirection[0]), // radians
++			elevationAngle = std::asin(std::clamp(rayDirection[2], -1.0f, 1.0f));
++		const Uint32 cellHash = hash2((int)std::floor(azimuth * 160.0f), (int)std::floor(elevationAngle * 160.0f)) % 1000;
++		if (cellHash < 6)
++		{
++			return _colors.star;
++		}
++		if (cellHash < 18)
++		{
++			return _colors.faintStar;
++		}
++	}
++	return _colors.sky[0];
 +}
 +
 +/**
@@ -47228,7 +47502,14 @@ index 000000000..62173c703
 +			case RAY_BOTTOM:
 +			{
 +				// Out through the bottom of the map (through a hole blown in the ground floor):
-+				// the earth below, the ground's colour in deep shade, never a black hole.
++				// the earth below, the ground's colour in deep shade, never a black hole. In
++				// space, space (and in orbit the Earth far below).
++				if (_sky == SkySpace || _sky == SkyOrbit)
++				{
++					color = skyColor(rayDirection, blockColumn, blockRow);
++					distanceAlongRay = Infinity;
++					break;
++				}
 +				const float bottomX = rayOrigin[0] + rayDirection[0] * tEnd, bottomY = rayOrigin[1] + rayDirection[1] * tEnd;
 +				const Uint8 earth = _groundModel ? _groundModel->color[0][(int)std::floor(bottomY) & 15][(int)std::floor(bottomX) & 15] : 0;
 +				color = earth ? shadeColor(earth, std::min(12 - (earth & 15), 6 + (int)dither(blockColumn, blockRow))) : _colors.unexplored;
@@ -48740,10 +49021,10 @@ index 000000000..986e42728
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..5bc96b4fc
+index 000000000..e23467115
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,520 @@
+@@ -0,0 +1,535 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -49078,6 +49359,9 @@ index 000000000..5bc96b4fc
 +/// unless the place is really dark (see DarkOverflowFrom): the last shades of TFTD's sea colours
 +/// are all but black, and its troughs at dusk were black blotches.
 +const int WaterDarkestShade = 12;
++/// The sea's plain and deep colours (RGB) where a map's water is a dark floor standing in for it
++/// (TFTD's liner and cargo ship, round their hulls): TFTD's own sea's green and teal.
++const float StandInSeaPlain[3] = { 31.0f, 155.0f, 110.0f }, StandInSeaDeep[3] = { 0.0f, 120.0f, 120.0f };
 +/// The sine the waves are made of is a table of this many steps a turn: cheap for every pixel of sea.
 +const int WaveSineSteps = 1024;
 +/// The purple haze of a unit under our mind control (see FirstPersonView::setControlHaze) creeps in
@@ -49126,6 +49410,18 @@ index 000000000..5bc96b4fc
 +/// The rock round and over an underground map is mottled over this many shades (see rockColor),
 +/// from this shade of the colour group of the map's own rock (see chooseGround).
 +const int RockMottleShades = 3, RockBaseShade = 6;
++/// From orbit (see FirstPersonView::airlessSkyColor) the Earth fills the view from its edge down:
++/// the sine of how far below the level the edge is (20 degrees, a station's low orbit); the glow
++/// of its air in a band this high over the edge (in the same sines).
++const float OrbitEarthEdge = 0.34f, OrbitAirGlow = 0.035f;
++/// Over the Moon the Earth hangs high in the south-east (a unit direction: x east, y south, z up),
++/// its disc this big (the cosine and the sine of its radius, 3.2 degrees: bigger than it really
++/// looks, so it shows on the low-resolution view).
++const float MoonEarthDirection[3] = { 0.433f, 0.75f, 0.5f };
++const float MoonEarthCos = 0.99844f, MoonEarthSin = 0.0558f;
++/// A rain or snow cloud deck (and a void's wisps: see FirstPersonView::skyColor) is mottled by its
++/// noise over this many of the sky's 32 bands either way.
++const float CloudDeckMottle = 14.0f;
 +/// A colour shaded past the darkest of its group turns black only where the place is really
 +/// dark (see shadeHit): the light there (the game's, less lamps, the flashlight and flares; 0
 +/// brightest .. 15 darkest) from DarkOverflowFrom (none of it, the group's darkest instead) to
@@ -54238,10 +54534,10 @@ index 000000000..bfe06c3d7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..945cac2d8
+index 000000000..e8787d900
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,3686 @@
+@@ -0,0 +1,3747 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -54594,6 +54890,27 @@ index 000000000..945cac2d8
 +				if (color) model.color[topLayer][y][x] = color;
 +			}
 +	}
++}
++
++/**
++ * The colour of a palette nearest to an RGB colour (0..255 per channel), weighting the channels
++ * by how bright they look to the eye. Colour 0 is transparent, so it is never picked.
++ */
++Uint8 nearestColor(const SDL_Color *palette, const float *rgb)
++{
++	int best = 1;
++	float bestDistance = 1e9f;
++	for (int index = 1; index < 256; ++index)
++	{
++		const float dr = palette[index].r - rgb[0], dg = palette[index].g - rgb[1], db = palette[index].b - rgb[2];
++		const float distance = dr * dr * 0.3f + dg * dg * 0.59f + db * db * 0.11f;
++		if (distance < bestDistance)
++		{
++			bestDistance = distance;
++			best = index;
++		}
++	}
++	return (Uint8)best;
 +}
 +
 +/**
@@ -56465,7 +56782,7 @@ index 000000000..945cac2d8
 +	// The sea (the mod's water floors) is drawn as waves on its top (see waterColor), and whole:
 +	// its shape isn't cut to the art, whose few transparent pixels at a tile's corner left holes
 +	// through to the bottom of the map.
-+	const bool waterFloor = mapData->getObjectType() == O_FLOOR && firstPerson.isWater(dataSet->getName());
++	const bool waterFloor = mapData->getObjectType() == O_FLOOR && firstPerson.isWater(dataSet->getName(), record);
 +	if (solidShape)
 +	{
 +		for (const auto &box : shape->boxes)
@@ -57002,7 +57319,8 @@ index 000000000..945cac2d8
 + * - where its surface is: the first level, from the bottom, whose ring isn't underground (at
 + *   least UndergroundRingShare of its tiles rock: a wall or an object, the rock a base or a cave
 + *   is cut into, or a floor with something over it). On any map outdoors that's ground level; on a map that starts on the surface
-+ *   and goes on underground, the surface's level. Beyond the border, below the surface, is rock;
++ *   and goes on underground, the surface's level; where the sea lies on a level above that (round
++ *   a ship's lower decks), the sea's. Beyond the border, below the surface, is rock;
 + * - whether the map is underground all the way up (every level of the ring is rock: a base, an
 + *   alien colony's inside, Cydonia's complex), or its mission is listed as underground in the
 + *   mod (RuleFirstPerson::isUnderground): then rock lies beyond the border at every height and
@@ -57010,18 +57328,23 @@ index 000000000..945cac2d8
 + * - the ground that runs on past the border at the surface's level: the most common floor of the
 + *   ring there (grass on a farm, sand in the desert, ...). Only a floor whose model reaches down
 + *   to the bottom voxel layer counts;
-+ * - the water: where a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea) reaches
++ * - the water: where a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea, the big
++ *   mods' copy of it, the sea round TFTD's ships among their parts) reaches
 + *   the border, the sea goes on beyond that stretch of it, the most common water floor of the
 + *   ring (an island's shore runs on out of the map, the sea round a ship); the ground runs on
 + *   past the rest. A ring of water alone (round a ship) is the ground too. The sea's colours
 + *   for its waves (see waterColor) come from that floor's top, or with no water at the edge
 + *   from the commonest water floor on the map.
++ * In space (a station, a ship: see chooseSky) none of it: only space lies past the map's edge,
++ * round it, under it and over it, however walled in its edges are.
 + * Sets _surfaceLevel, _enclosed, _groundModel (left as it was if no floor qualifies),
 + * _waterModel, _waterAtEdge, _waterColors and _groundChosen.
 + */
 +void FirstPersonView::chooseGround()
 +{
 +	_groundChosen = true;
++	chooseSky();
++	const bool inSpace = _sky == SkySpace || _sky == SkyOrbit;
 +	const int mapSizeX = _save->getMapSizeX(), mapSizeY = _save->getMapSizeY(), mapSizeZ = _save->getMapSizeZ();
 +	// Calls a function on each tile of the ring at a level.
 +	auto forEachRingTile = [&](int z, auto &&visit)
@@ -57067,6 +57390,27 @@ index 000000000..945cac2d8
 +	{
 +		_surfaceLevel = mapSizeZ;
 +	}
++	if (inSpace)
++	{
++		_surfaceLevel = 0;
++		_enclosed = false;
++	}
++	// The sea round a ship's lower decks (TFTD's liner, its second stage) lies on a level above
++	// the floors at the edge: the surface is the highest level of the ring that is mostly water.
++	for (int z = mapSizeZ - 1; !_enclosed && !inSpace && z > _surfaceLevel; --z)
++	{
++		int ringTiles = 0, waterTiles = 0;
++		forEachRingTile(z, [&](const Tile *tile)
++		{
++			++ringTiles;
++			const MapData *floor = tile->getMapData(O_FLOOR);
++			if (floor && getModel(floor)->water) ++waterTiles;
++		});
++		if (waterTiles * 2 > ringTiles)
++		{
++			_surfaceLevel = z;
++		}
++	}
 +	// The rock's colour: the commonest colour group among the walls and objects round the map's
 +	// underground levels (the rock it's cut into, in whatever palette the battle has: a fixed
 +	// brown came out olive or watery blue under the sea), at a middle shade, with room to shade
@@ -57104,14 +57448,13 @@ index 000000000..945cac2d8
 +	// Count the floors of the ring at the surface's level (the bottom one on an enclosed map,
 +	// which shows no ground beyond the border anyway), the water's apart, and note where the
 +	// water is (by the tile's x and y).
-+	const RuleFirstPerson &rules = _save->getMod()->getFirstPerson();
 +	std::map<const MapData*, int> floorCounts, waterCounts;
 +	_waterAtEdge.assign(mapSizeX * mapSizeY, 0);
 +	forEachRingTile(std::min(_surfaceLevel, mapSizeZ - 1), [&](const Tile *tile)
 +	{
 +		if (const MapData *floor = tile->getMapData(O_FLOOR))
 +		{
-+			const bool water = rules.isWater(floor->getDataset()->getName());
++			const bool water = getModel(floor)->water;
 +			(water ? waterCounts : floorCounts)[floor]++;
 +			_waterAtEdge[tile->getPosition().y * mapSizeX + tile->getPosition().x] = water;
 +		}
@@ -57133,8 +57476,12 @@ index 000000000..945cac2d8
 +		}
 +		return best;
 +	};
-+	_waterModel = commonest(waterCounts);
-+	if (const VoxelModel *ground = commonest(floorCounts))
++	_waterModel = inSpace ? nullptr : commonest(waterCounts);
++	if (inSpace)
++	{
++		_groundModel = nullptr;
++	}
++	else if (const VoxelModel *ground = commonest(floorCounts))
 +	{
 +		_groundModel = ground;
 +	}
@@ -57153,7 +57500,7 @@ index 000000000..945cac2d8
 +			for (int x = 0; x < mapSizeX; ++x)
 +			{
 +				const MapData *floor = _save->getTile(Position(x, y, level))->getMapData(O_FLOOR);
-+				if (floor && rules.isWater(floor->getDataset()->getName())) mapWaterCounts[floor]++;
++				if (floor && getModel(floor)->water) mapWaterCounts[floor]++;
 +			}
 +		seaModel = commonest(mapWaterCounts);
 +	}
@@ -57180,17 +57527,27 @@ index 000000000..945cac2d8
 +	const SDL_Color *palette = getPalette();
 +	auto luminance = [palette](Uint8 color) { return palette[color].r * 0.3f + palette[color].g * 0.59f + palette[color].b * 0.11f; };
 +	auto lighter = [](Uint8 color, int shades) { return (Uint8)((color & 0xF0) | std::max(0, (color & 15) - shades)); };
-+	const Uint8 plain = seaModel->ceiling;
-+	// The deep colour: count the top's colours of other groups, darker than the plain one.
-+	int counts[256] = {};
-+	for (int y = 0; y < 16; ++y)
-+		for (int x = 0; x < 16; ++x)
-+		{
-+			const Uint8 color = seaModel->plan[y][x];
-+			if (color && (color & 0xF0) != (plain & 0xF0) && luminance(color) < luminance(plain) && luminance(color) >= DarkGlowLuma) counts[color]++;
-+		}
-+	const int deepest = (int)(std::max_element(counts, counts + 256) - counts);
-+	const Uint8 deep = counts[deepest] ? (Uint8)deepest : (Uint8)((plain & 0xF0) | std::min(13, (plain & 15) + 3));
++	Uint8 plain = seaModel->ceiling, deep = 0;
++	if (luminance(plain) < DarkGlowLuma)
++	{
++		// A ship's dark floor round its hull standing in for the sea (TFTD's liner draws it black,
++		// its cargo ship all but black): the colours of TFTD's sea instead, the palette's nearest.
++		plain = nearestColor(palette, StandInSeaPlain);
++		deep = nearestColor(palette, StandInSeaDeep);
++	}
++	else
++	{
++		// The deep colour: count the top's colours of other groups, darker than the plain one.
++		int counts[256] = {};
++		for (int y = 0; y < 16; ++y)
++			for (int x = 0; x < 16; ++x)
++			{
++				const Uint8 color = seaModel->plan[y][x];
++				if (color && (color & 0xF0) != (plain & 0xF0) && luminance(color) < luminance(plain) && luminance(color) >= DarkGlowLuma) counts[color]++;
++			}
++		const int deepest = (int)(std::max_element(counts, counts + 256) - counts);
++		deep = counts[deepest] ? (Uint8)deepest : (Uint8)((plain & 0xF0) | std::min(13, (plain & 15) + 3));
++	}
 +	const int crest = (int)std::lround(WaveShades);
 +	_waterColors[0] = lighter(plain, crest);
 +	_waterColors[1] = lighter(deep, crest);
@@ -57930,10 +58287,10 @@ index 000000000..945cac2d8
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewUfo.cpp b/src/FirstPerson/FirstPersonViewUfo.cpp
 new file mode 100644
-index 000000000..1234222fc
+index 000000000..59d44e25c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewUfo.cpp
-@@ -0,0 +1,1068 @@
+@@ -0,0 +1,1067 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -58861,9 +59218,8 @@ index 000000000..1234222fc
 +
 +	// Smooth hull shading: for every set of open faces, the face shade of the direction they
 +	// face together (their normals added up), by the same rule as the faces' own shading in
-+	// updateColors. A set with two opposite faces (a thin wall or plate) has no one direction:
-+	// it keeps each face's own shade (-1).
-+	const float daylight = 1.0f - _colors.night;
++	// updateColors (the sun's light, or under clouds the whole sky's). A set with two opposite
++	// faces (a thin wall or plate) has no one direction: it keeps each face's own shade (-1).
 +	for (int openFaces = 0; openFaces < 64; ++openFaces)
 +	{
 +		float sum[3] = { 0, 0, 0 };
@@ -58880,8 +59236,8 @@ index 000000000..1234222fc
 +			_ufoFaceShade[openFaces] = -1.0f;
 +			continue;
 +		}
-+		const float lambert = std::max(0.0f, (sum[0] * _colors.sunDir[0] + sum[1] * _colors.sunDir[1] + sum[2] * _colors.sunDir[2]) / length);
-+		_ufoFaceShade[openFaces] = (1.0f - lambert) * (0.5f + 2.5f * daylight) + std::max(0.0f, -sum[2] / length);
++		const float lambert = std::max(0.0f, (sum[0] * _colors.shadingDir[0] + sum[1] * _colors.shadingDir[1] + sum[2] * _colors.shadingDir[2]) / length);
++		_ufoFaceShade[openFaces] = _colors.shadingBase + (1.0f - lambert) * _colors.shadingTurn + std::max(0.0f, -sum[2] / length);
 +	}
 +}
 +
@@ -60751,10 +61107,10 @@ index 000000000..69bc23727
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..f66e21686
+index 000000000..5d4205c1b
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
-@@ -0,0 +1,308 @@
+@@ -0,0 +1,375 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -60823,8 +61179,8 @@ index 000000000..f66e21686
 + * switches on when an active mod (OpenXcom3D) declares `firstPerson: enabled: true`. The mod
 + * also says how far the view reaches, which terrain records are windows (and which of their
 + * colours are glass), what shape the parts the game gives no voxels have, what weather each
-+ * terrain has, which music plays in combat, which armors and items give night vision, and which
-+ * built-in items are drawn in the hands anyway.
++ * terrain has, which battles have another world's sky, which music plays in combat, which armors
++ * and items give night vision, and which built-in items are drawn in the hands anyway.
 + */
 +class RuleFirstPerson
 +{
@@ -60864,7 +61220,10 @@ index 000000000..f66e21686
 +	std::map<std::string, Windows> _windows;     // terrain data set -> its windows
 +	std::map<std::pair<std::string, int>, std::vector<Shape>> _shapes; // (terrain data set, record) -> its shapes, one per game
 +	std::map<std::string, std::string> _weather; // terrain data set -> rain, snow, dust, ...
++	std::map<std::string, std::string> _enviroWeather; // battle environment (enviroEffects type) -> rain, snow, dust, ... (before the data sets')
++	std::map<std::string, std::string> _enviroSkies, _missionSkies, _terrainSkies; // environment, mission type, terrain -> its sky (space, moon, ...)
 +	std::set<std::string> _water;                // terrain data sets whose floors are water (the sea)
++	std::map<std::string, std::set<int>> _waterRecords; // terrain data set -> its records that are water (the sea round a ship, among its parts)
 +	std::vector<std::string> _combatMusic;       // tense tracks to try, first one the game has wins
 +	std::set<std::string> _nightVision;          // armors and items that give their wearer night vision
 +	std::set<std::string> _undergroundMissions;  // missions underground all the way up, whatever their map's edges show
@@ -60954,11 +61313,28 @@ index 000000000..f66e21686
 +			_builtInItemsShown = std::set<std::string>(builtInItemsShown.begin(), builtInItemsShown.end());
 +		}
 +		// The terrain data sets whose floors are water: where it reaches the map's edge, the sea
-+		// goes on beyond it (FirstPersonView::chooseGround). A list replaces the earlier one.
-+		std::vector<std::string> water;
-+		if (reader.tryRead("water", water))
++		// goes on beyond it (FirstPersonView::chooseGround). A data set's name for all of its
++		// floors, or its name and records for some (a ship's data set with the sea round the ship
++		// among its parts). A list replaces the earlier one.
++		if (const auto& water = reader["water"])
 +		{
-+			_water = std::set<std::string>(water.begin(), water.end());
++			_water.clear();
++			_waterRecords.clear();
++			for (const auto& entry : water.children())
++			{
++				if (entry.isMap())
++				{
++					std::string dataSet;
++					std::vector<int> records;
++					entry.tryRead("dataSet", dataSet);
++					entry.tryRead("records", records);
++					_waterRecords[dataSet].insert(records.begin(), records.end());
++				}
++				else
++				{
++					_water.insert(entry.readVal<std::string>());
++				}
++			}
 +		}
 +
 +		// The item table: groups of item types (as the mods name them), each with what it sets:
@@ -60996,15 +61372,38 @@ index 000000000..f66e21686
 +			}
 +		}
 +
-+		// Weather: per terrain data set, its kind ("rain", "snow", "dust", ...).
++		// Weather: per terrain data set, or per battle environment (its enviroEffects, as the big
++		// mods name them: acid rain, a dust storm), its kind ("rain", "snow", "dust", ...).
 +		if (const auto& weather = reader["weather"])
 +		{
 +			for (const auto& entry : weather.children())
 +			{
 +				std::string dataSet, type;
++				std::vector<std::string> enviroEffects;
 +				entry.tryRead("dataSet", dataSet);
++				entry.tryRead("enviroEffects", enviroEffects);
 +				entry.tryRead("type", type);
-+				_weather[dataSet] = type;
++				if (!dataSet.empty()) _weather[dataSet] = type;
++				for (const std::string &enviro : enviroEffects) _enviroWeather[enviro] = type;
++			}
++		}
++
++		// Skies that aren't the Earth's open air: per mission (alien deployment) type, map terrain and
++		// battle environment (its enviroEffects), the sky ("space", "orbit", "moon", "mars", "sea",
++		// "void", or "earth" for the Earth's own). A later entry (or a later mod's) overrides.
++		if (const auto& skies = reader["skies"])
++		{
++			for (const auto& entry : skies.children())
++			{
++				std::string sky;
++				std::vector<std::string> enviroEffects, missions, terrains;
++				entry.tryRead("sky", sky);
++				entry.tryRead("enviroEffects", enviroEffects);
++				entry.tryRead("missions", missions);
++				entry.tryRead("terrains", terrains);
++				for (const std::string &enviro : enviroEffects) _enviroSkies[enviro] = sky;
++				for (const std::string &mission : missions) _missionSkies[mission] = sky;
++				for (const std::string &terrain : terrains) _terrainSkies[terrain] = sky;
 +			}
 +		}
 +	}
@@ -61050,13 +61449,37 @@ index 000000000..f66e21686
 +		auto found = _signalLevels.find(mission);
 +		return found != _signalLevels.end() ? found->second : 1;
 +	}
-+	/// Are a terrain data set's floors water (the sea round islands, ports and ships)?
-+	bool isWater(const std::string &dataSet) const { return _water.count(dataSet) > 0; }
++	/// Is a terrain record's floor water (the sea round islands, ports and ships)?
++	bool isWater(const std::string &dataSet, int record) const
++	{
++		auto found = _waterRecords.find(dataSet);
++		return _water.count(dataSet) > 0 || (found != _waterRecords.end() && found->second.count(record) > 0);
++	}
 +	/// The weather of a terrain data set ("rain", "snow", "dust", ...), or empty for none.
 +	std::string getWeather(const std::string &dataSet) const
 +	{
 +		auto found = _weather.find(dataSet);
 +		return found != _weather.end() ? found->second : std::string();
++	}
++	/// The weather of a battle environment (an enviroEffects type), or empty for none (then its terrain data sets tell).
++	std::string getEnviroWeather(const std::string &enviro) const
++	{
++		auto found = _enviroWeather.find(enviro);
++		return found != _enviroWeather.end() ? found->second : std::string();
++	}
++	/// A battle's sky, the most particular first: its mission type's, else that of the first of its map's terrains that
++	/// has one, else its environment's (an enviroEffects type, which many missions share); empty for the Earth's.
++	std::string getSky(const std::string &enviro, const std::string &mission, const std::vector<std::string> &terrains) const
++	{
++		auto found = _missionSkies.find(mission);
++		if (found != _missionSkies.end()) return found->second;
++		for (const std::string &terrain : terrains)
++		{
++			found = _terrainSkies.find(terrain);
++			if (found != _terrainSkies.end()) return found->second;
++		}
++		found = _enviroSkies.find(enviro);
++		return found != _enviroSkies.end() ? found->second : std::string();
 +	}
 +};
 +

@@ -925,9 +925,8 @@ void FirstPersonView::updateUfos()
 
 	// Smooth hull shading: for every set of open faces, the face shade of the direction they
 	// face together (their normals added up), by the same rule as the faces' own shading in
-	// updateColors. A set with two opposite faces (a thin wall or plate) has no one direction:
-	// it keeps each face's own shade (-1).
-	const float daylight = 1.0f - _colors.night;
+	// updateColors (the sun's light, or under clouds the whole sky's). A set with two opposite
+	// faces (a thin wall or plate) has no one direction: it keeps each face's own shade (-1).
 	for (int openFaces = 0; openFaces < 64; ++openFaces)
 	{
 		float sum[3] = { 0, 0, 0 };
@@ -944,8 +943,8 @@ void FirstPersonView::updateUfos()
 			_ufoFaceShade[openFaces] = -1.0f;
 			continue;
 		}
-		const float lambert = std::max(0.0f, (sum[0] * _colors.sunDir[0] + sum[1] * _colors.sunDir[1] + sum[2] * _colors.sunDir[2]) / length);
-		_ufoFaceShade[openFaces] = (1.0f - lambert) * (0.5f + 2.5f * daylight) + std::max(0.0f, -sum[2] / length);
+		const float lambert = std::max(0.0f, (sum[0] * _colors.shadingDir[0] + sum[1] * _colors.shadingDir[1] + sum[2] * _colors.shadingDir[2]) / length);
+		_ufoFaceShade[openFaces] = _colors.shadingBase + (1.0f - lambert) * _colors.shadingTurn + std::max(0.0f, -sum[2] / length);
 	}
 }
 

@@ -62,9 +62,13 @@
 #include "FirstPersonApi.h"
 #include "../Engine/Logger.h"
 #include "../Engine/Options.h"
+#include "../Engine/Palette.h"
+#include "../Mod/MapDataSet.h"
 #include "../Mod/Mod.h"
+#include "../Mod/RuleEnviroEffects.h"
 #include "../Savegame/BattleUnit.h" // not used here, but its PARTS_STRING constants are part of this file's object code
 #include "../Savegame/SavedBattleGame.h"
+#include "RuleFirstPerson.h"
 #include "FirstPersonViewShared.h"
 #include "FirstPersonViewRayWalk.h"
 
@@ -80,6 +84,69 @@ static const std::array<float, WaveSineSteps> WaveSine = []
 }();
 
 /**
+ * Looks up the battle's sky and weather, once a battle, from the mod's tables (RuleFirstPerson;
+ * a player, GitHub issue #94: rain under a blue or starry sky; the owner: "check all special
+ * missions so sky is ok"):
+ * - the sky: the Earth's (day and night, the clouds, overcast in rain and snow), unless the
+ *   battle's mission type, one of the terrains its map was built of or its environment (its
+ *   enviroEffects, as the big mods name them, many missions sharing one), the most particular
+ *   first, has another: deep space (the stars all round, nothing past the map's edge), orbit
+ *   (the same over the Earth), the Moon's (black, the stars and the Earth over its ground),
+ *   Mars' (butterscotch by day, the stars by night, no Moon), the sea's (as TFTD's battles under
+ *   water, for a sea floor the game keeps dry: X-Com Files') or a void (a dark sky, no sun, moon
+ *   or stars: other dimensions, dreams). A battle under water always has the sea's;
+ * - the weather: its environment's (acid rain, a dust storm), else that of the first of its
+ *   terrain data sets that has one (rain, snow, or dust for blowing sand), else none. None out
+ *   of the air or under the sea.
+ */
+void FirstPersonView::chooseSky()
+{
+	if (_skyChosen)
+	{
+		return;
+	}
+	_skyChosen = true;
+	const RuleFirstPerson &rules = _save->getMod()->getFirstPerson();
+	const std::string enviro = _save->getEnviroEffects() ? _save->getEnviroEffects()->getType() : std::string();
+	// The terrains the map was built of, block by block (a craft's or a UFO's blocks have its name instead).
+	std::vector<std::string> terrains;
+	for (const std::vector<std::string> &column : _save->getFlattenedMapTerrainNames())
+	{
+		for (const std::string &name : column)
+		{
+			if (!name.empty() && std::find(terrains.begin(), terrains.end(), name) == terrains.end()) terrains.push_back(name);
+		}
+	}
+	const std::string sky = rules.getSky(enviro, _save->getMissionType(), terrains);
+	_sky = sky == "space" ? SkySpace : sky == "orbit" ? SkyOrbit : sky == "moon" ? SkyMoon : sky == "mars" ? SkyMars
+		: sky == "sea" ? SkySea : sky == "void" ? SkyVoid : SkyEarth;
+	if (_save->getDepth() > 0)
+	{
+		_sky = SkySea;
+	}
+	_weather = rules.getEnviroWeather(enviro);
+	for (const MapDataSet *mapDataSet : *_save->getMapDataSets())
+	{
+		if (!_weather.empty()) break;
+		_weather = rules.getWeather(mapDataSet->getName());
+	}
+	if (airless() || _sky == SkySea)
+	{
+		_weather.clear();
+	}
+	// The battle's palette as it was before its environment recoloured it (the game keeps a
+	// backup of each), for the sky's colours (see updateColors). Not for Mars: its sky's colours
+	// are Mars' own, and the big mods' Martian palettes (made for Mars' ground) would recolour
+	// them again; picked from the palette on the screen, they stay butterscotch.
+	const std::string paletteName = _save->getDepth() > 0 ? "PAL_BATTLESCAPE_" + std::to_string(_save->getDepth()) : "PAL_BATTLESCAPE";
+	Palette *backup = _sky == SkyMars ? nullptr : _save->getMod()->getPalette("BACKUP_" + paletteName, false);
+	_skyPalette = backup ? backup->getColors() : nullptr;
+	static const char *const SkyNames[] = { "earth", "space", "orbit", "moon", "mars", "sea", "void" };
+	Log(LOG_VERBOSE) << "OpenXcom3D: " << _save->getMissionType() << " (" << (enviro.empty() ? "no environment" : enviro) << "): the sky "
+		<< SkyNames[_sky] << ", weather " << (_weather.empty() ? "none" : _weather);
+}
+
+/**
  * Picks the colours the view needs this frame from the current palette, so that the UFO and
  * the TFTD palettes both work: the sky gradient, clouds, haze, the map border's tape and posts,
  * the particles' colours (fire, smoke, blood, weather, flares) and the enemy markers. When the
@@ -90,16 +157,17 @@ static const std::array<float, WaveSineSteps> WaveSine = []
  */
 void FirstPersonView::updateColors()
 {
+	chooseSky();
 	const SDL_Color *palette = getPalette();
-	// The palette colour closest to an RGB colour (0..255 per channel), weighting the channels
-	// by how bright they look to the eye. Colour 0 is transparent, so it is never picked.
-	auto nearest = [palette](float red, float green, float blue) {
+	// The colour of a palette closest to an RGB colour (0..255 per channel), weighting the
+	// channels by how bright they look to the eye. Colour 0 is transparent, so it is never picked.
+	auto nearestIn = [](const SDL_Color *colors, float red, float green, float blue) {
 		int bestIndex = 1;
 		float bestDistance = 1e9f;
 		for (int index = 1; index < 256; ++index)
 		{
 			// dr, dg, db: how far this palette colour is from the wanted one, per channel.
-			const float dr = palette[index].r - red, dg = palette[index].g - green, db = palette[index].b - blue;
+			const float dr = colors[index].r - red, dg = colors[index].g - green, db = colors[index].b - blue;
 			const float distance = dr * dr * 0.3f + dg * dg * 0.59f + db * db * 0.11f;
 			if (distance < bestDistance)
 			{
@@ -109,6 +177,13 @@ void FirstPersonView::updateColors()
 		}
 		return (Uint8)bestIndex;
 	};
+	// Most colours are the closest the palette on the screen has. The sky's (and the weather's)
+	// are the closest the battle's palette had before its environment recoloured it (the big
+	// mods' heat, cold, acid rain, a red sun; but not Mars': see chooseSky), so that the
+	// environment recolours the sky as it does the map; picked from the screen's palette, they
+	// undid its tint.
+	auto nearest = [&](float red, float green, float blue) { return nearestIn(palette, red, green, blue); };
+	auto nearestSky = [&](float red, float green, float blue) { return nearestIn(_skyPalette ? _skyPalette : palette, red, green, blue); };
 	// Mixes two RGB colours: amount 0 gives `from`, 1 gives `to`.
 	auto mix = [](const float *from, const float *to, float amount, float *out) {
 		for (int channel = 0; channel < 3; ++channel) out[channel] = from[channel] + (to[channel] - from[channel]) * amount;
@@ -118,7 +193,9 @@ void FirstPersonView::updateColors()
 	// full day up to shade 3, full night from shade 12. Night vision brightens open ground.
 	const int globalShade = std::clamp(_save->getGlobalShade(), 0, 15);
 	_colors.night = std::clamp((globalShade - 3) / 9.0f, 0.0f, 1.0f);
-	_colors.underwater = _save->getDepth() > 0;
+	_colors.underwater = _sky == SkySea;
+	// Rain and snow fall from clouds that cover the Earth's sky (GitHub issue #94).
+	_colors.overcast = _sky == SkyEarth && (_weather == "rain" || _weather == "snow");
 	_colors.ambient = _nightVision ? std::min(globalShade, 4) : globalShade;
 	_colors.cloudTime = SDL_GetTicks() / 1000.0f; // seconds, to drift the clouds and ripple the sea floor's light
 	// This frame's waves on the sea (see waveHeight): each train's sine-table steps per voxel east
@@ -138,32 +215,31 @@ void FirstPersonView::updateColors()
 		_waveSteps[train][5] = wave.bendDepth * stepsPerVoxel;
 	}
 
-	// The sky's colours at the horizon and straight up (the zenith) by day, by night and under
-	// the sea, and the clouds' lit and shadowed sides by day and by night (RGB).
-	static const float dayHorizon[3] = { 190, 210, 230 }, dayZenith[3] = { 70, 120, 200 };
-	static const float nightHorizon[3] = { 24, 28, 50 }, nightZenith[3] = { 3, 4, 14 };
-	static const float waterHorizon[3] = { 8, 34, 46 }, waterZenith[3] = { 34, 104, 118 };
+	// The sky's colours at the horizon and straight up (the zenith), by day and by night: the
+	// Earth's clear sky, under rain clouds, under snow clouds (paler), Mars' dusty one, the black
+	// of space and of the Moon's sky, a void's dark violet, and under the sea the water's, the
+	// same all day. And the clouds' lit and shadowed sides by day and by night (RGB).
+	struct SkyRgb { float dayHorizon[3], dayZenith[3], nightHorizon[3], nightZenith[3]; };
+	static const SkyRgb EarthSky = { { 190, 210, 230 }, { 70, 120, 200 }, { 24, 28, 50 }, { 3, 4, 14 } };
+	static const SkyRgb RainSky = { { 150, 155, 162 }, { 108, 114, 124 }, { 34, 36, 42 }, { 16, 17, 21 } };
+	static const SkyRgb SnowSky = { { 202, 206, 212 }, { 162, 168, 178 }, { 40, 42, 48 }, { 20, 21, 26 } };
+	static const SkyRgb MarsSky = { { 214, 172, 132 }, { 160, 112, 82 }, { 32, 18, 14 }, { 5, 3, 4 } }; // (the night's dark red in the big mods' Martian palette, not its olive)
+	static const SkyRgb SpaceSky = { { 4, 4, 8 }, { 2, 2, 5 }, { 4, 4, 8 }, { 2, 2, 5 } };
+	static const SkyRgb VoidSky = { { 52, 26, 64 }, { 12, 5, 20 }, { 40, 20, 50 }, { 8, 4, 14 } };
+	static const SkyRgb SeaSky = { { 8, 34, 46 }, { 34, 104, 118 }, { 8, 34, 46 }, { 34, 104, 118 } };
 	static const float cloudLit[3] = { 240, 240, 245 }, cloudDark[3] = { 140, 146, 162 };
 	static const float cloudNightLit[3] = { 46, 48, 66 }, cloudNightDark[3] = { 20, 22, 34 };
+	const SkyRgb &skyRgb = _colors.underwater ? SeaSky : airless() ? SpaceSky : _sky == SkyMars ? MarsSky : _sky == SkyVoid ? VoidSky
+		: !_colors.overcast ? EarthSky : _weather == "snow" ? SnowSky : RainSky;
 	float horizon[3], zenith[3], litCloud[3], darkCloud[3];
-	// Under the sea the water's colours stay the same all day; above it the sky darkens from
-	// the day's colours to the night's.
-	if (_colors.underwater)
-	{
-		mix(waterHorizon, waterHorizon, 0, horizon);
-		mix(waterZenith, waterZenith, 0, zenith);
-	}
-	else
-	{
-		mix(dayHorizon, nightHorizon, _colors.night, horizon);
-		mix(dayZenith, nightZenith, _colors.night, zenith);
-	}
+	mix(skyRgb.dayHorizon, skyRgb.nightHorizon, _colors.night, horizon);
+	mix(skyRgb.dayZenith, skyRgb.nightZenith, _colors.night, zenith);
 	// The sky gradient: 32 steps from the horizon up to the zenith.
 	for (int band = 0; band < 32; ++band)
 	{
 		float color[3];
 		mix(horizon, zenith, band / 31.0f, color);
-		_colors.sky[band] = nearest(color[0], color[1], color[2]);
+		_colors.sky[band] = nearestSky(color[0], color[1], color[2]);
 	}
 	// The clouds: 8 steps from their lit side to their shadowed side, darker at night.
 	mix(cloudLit, cloudNightLit, _colors.night, litCloud);
@@ -172,7 +248,7 @@ void FirstPersonView::updateColors()
 	{
 		float color[3];
 		mix(litCloud, darkCloud, level / 7.0f, color);
-		_colors.cloud[level] = nearest(color[0], color[1], color[2]);
+		_colors.cloud[level] = nearestSky(color[0], color[1], color[2]);
 	}
 	// The single colours: the haze far away is the sky at the horizon, the rest are picked
 	// from fixed RGB values.
@@ -204,9 +280,14 @@ void FirstPersonView::updateColors()
 			}
 		}
 	}
-	_colors.star = nearest(230, 230, 240);
-	_colors.moon = nearest(228, 228, 210);
-	_colors.sun = nearest(255, 248, 200);
+	_colors.star = nearestSky(230, 230, 240);
+	_colors.faintStar = nearestSky(120, 122, 140);
+	_colors.moon = nearestSky(228, 228, 210);
+	_colors.sun = nearestSky(255, 248, 200);
+	_colors.earth[0] = nearestSky(46, 96, 178);
+	_colors.earth[1] = nearestSky(8, 12, 28);
+	_colors.earth[2] = nearestSky(236, 238, 246);
+	_colors.earth[3] = nearestSky(130, 180, 240);
 	_colors.fire[0] = nearest(255, 250, 200);
 	_colors.fire[1] = nearest(255, 210, 60);
 	_colors.fire[2] = nearest(240, 120, 20);
@@ -226,13 +307,13 @@ void FirstPersonView::updateColors()
 	_colors.blood[0] = nearest(90, 0, 0);
 	_colors.blood[1] = nearest(160, 12, 8);
 	_colors.dust = nearest(200, 190, 170);
-	_colors.rain = nearest(150, 170, 200);
-	_colors.snow = nearest(240, 240, 250);
+	_colors.rain = nearestSky(150, 170, 200);
+	_colors.snow = nearestSky(240, 240, 250);
 	_colors.speck = nearest(236, 236, 228);
 	_colors.glassShard[0] = nearest(200, 228, 240);
 	_colors.glassShard[1] = nearest(240, 248, 252);
 	_colors.glassShard[2] = nearest(150, 178, 196);
-	_colors.sand = nearest(210, 170, 110);
+	_colors.sand = nearestSky(210, 170, 110);
 	_colors.firefly = nearest(200, 255, 100);
 	_colors.bubble = nearest(170, 230, 240);
 	_colors.tapeYellow = nearest(240, 200, 30);
@@ -334,18 +415,31 @@ void FirstPersonView::updateColors()
 		_colors.sunDir[axis] = sunDirection[axis];
 		_colors.moonDir[axis] = moonDirection[axis];
 	}
-	// Each face direction (+x -x +y -y +z -z) is shaded by how much it turns away from the sun
-	// (Lambert's cosine law): strongly by day, only a little at night, and indoors always as at
-	// night (no sun shines there, see indoorsAt). Undersides (-z) get a whole shade more on top.
+	// Each face direction (+x -x +y -y +z -z) is shaded by how much it turns away from the light
+	// (Lambert's cosine law): the sun's, strongly by day, only a little at night, and indoors
+	// always as at night (no sun shines there, see indoorsAt). Under rain or snow clouds and in a
+	// void no sun shines: the light comes from the whole sky above, every wall alike, and the
+	// clouds dim the day a little. Undersides (-z) get a whole shade more on top.
 	const float daylight = 1.0f - _colors.night;
+	const bool sunless = _colors.overcast || _sky == SkyVoid;
+	static const float straightUp[3] = { 0.0f, 0.0f, 1.0f };
+	const float *shadingFrom = sunless ? straightUp : sunDirection;
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		_colors.shadingDir[axis] = shadingFrom[axis];
+	}
+	_colors.shadingTurn = 0.5f + (sunless ? 1.3f : 2.5f) * daylight;
+	_colors.shadingBase = sunless ? 0.6f * daylight : 0.0f;
 	static const float faceNormals[6][3] = { { 1, 0, 0 }, { -1, 0, 0 }, { 0, 1, 0 }, { 0, -1, 0 }, { 0, 0, 1 }, { 0, 0, -1 } };
 	for (int face = 0; face < 6; ++face)
 	{
-		const float lambert = std::max(0.0f, faceNormals[face][0] * sunDirection[0] + faceNormals[face][1] * sunDirection[1]
-			+ faceNormals[face][2] * sunDirection[2]);
+		auto lambert = [&](const float *from)
+		{
+			return std::max(0.0f, faceNormals[face][0] * from[0] + faceNormals[face][1] * from[1] + faceNormals[face][2] * from[2]);
+		};
 		const float underside = face == 5 ? 1.0f : 0.0f;
-		_colors.faceShade[face] = (1.0f - lambert) * (0.5f + 2.5f * daylight) + underside;
-		_colors.indoorFaceShade[face] = (1.0f - lambert) * 0.5f + underside;
+		_colors.faceShade[face] = _colors.shadingBase + (1.0f - lambert(shadingFrom)) * _colors.shadingTurn + underside;
+		_colors.indoorFaceShade[face] = (1.0f - lambert(sunDirection)) * 0.5f + underside;
 	}
 	// The UFOs' lights for this frame (the UFO lights option).
 	updateUfos();
@@ -821,8 +915,9 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 	{
 		// The sun: a face turned towards it with something in the way is in shadow (only by
 		// day, out of doors, and not too far away, as each test is a ray walked 260 voxels
-		// towards the sun).
-		const float daylight = _colors.underwater ? 0.0f : 1.0f - _colors.night;
+		// towards the sun; none where no sun shines: under the sea, under rain or snow clouds,
+		// in a void).
+		const float daylight = _colors.underwater || _colors.overcast || _sky == SkyVoid ? 0.0f : 1.0f - _colors.night;
 		const float sunFacing = normal[0] * _colors.sunDir[0] + normal[1] * _colors.sunDir[1] + normal[2] * _colors.sunDir[2];
 		if (!indoors && daylight > 0.3f && sunFacing > 0.05f && hit.t < 640.0f)
 		{
@@ -943,12 +1038,13 @@ float FirstPersonView::terrainHaze(float distance) const
 /**
  * Where the distance haze begins on land, as a share of the view's reach (setting "Distance
  * haze"): Normal from 45%, Light from 75%, Clear only in the last tenth, so the world doesn't
- * stop with a hard edge where the view ends.
+ * stop with a hard edge where the view ends. Out of the air (space, orbit, the Moon) always as
+ * Clear: there's no air to be hazy.
  * @return The share, 0..1.
  */
 float FirstPersonView::hazeStart() const
 {
-	return Options::fpsHaze == 2 ? 0.9f : Options::fpsHaze == 1 ? 0.75f : 0.45f;
+	return Options::fpsHaze == 2 || airless() ? 0.9f : Options::fpsHaze == 1 ? 0.75f : 0.45f;
 }
 
 /**
@@ -981,7 +1077,8 @@ Uint8 FirstPersonView::hazeColor(Uint8 color, float haze, int pixelX, int pixelY
  * tiled with the ground model chosen for the map, or the water's beyond a stretch of the border
  * where the water reaches it (see chooseGround). A map underground all the way up has rock
  * beyond every edge and over it as well (a player's report: a base's edge showed the ground of
- * its sewers far below, and the sky over it).
+ * its sewers far below, and the sky over it). In space (a station, a ship: see chooseSky) there
+ * is nothing past the edge but space: no rock, no tape and no ground.
  * @param rayOrigin The eye, in voxels.
  * @param rayDirection The ray's unit direction in the voxel grid.
  * @param tExit How far along the ray it left the map.
@@ -1003,7 +1100,8 @@ Uint8 FirstPersonView::colorOutsideMap(const float rayOrigin[3], const float ray
 	const float surfaceTop = GroundTop + _surfaceLevel * 24.0f;
 	// Below it, the rock: a wall of it along the border (facing back into the map), or over an
 	// enclosed map, its ceiling (facing down).
-	if (exitAxis != 2 ? exitPoint[2] < surfaceTop : _enclosed)
+	const bool inSpace = _sky == SkySpace || _sky == SkyOrbit;
+	if (!inSpace && (exitAxis != 2 ? exitPoint[2] < surfaceTop : _enclosed))
 	{
 		depth = tExit;
 		const int face = exitAxis == 2 ? 5 : exitAxis * 2 + (rayDirection[exitAxis] > 0.0f ? 1 : 0);
@@ -1012,8 +1110,8 @@ Uint8 FirstPersonView::colorOutsideMap(const float rayOrigin[3], const float ray
 	}
 	const float tapeBottom = surfaceTop + 8.0f; // the tape hangs 8 voxels above the ground, 7 voxels high
 	// The discreet map edge (setting) has no posts and no tape: the ground beyond and the sky
-	// only, the edge marked by dots on the floor instead (see drawEdgeDots).
-	const bool tape = !Options::fpsDiscreetEdge;
+	// only, the edge marked by dots on the floor instead (see drawEdgeDots). Nor has space.
+	const bool tape = !Options::fpsDiscreetEdge && !inSpace;
 	const float borderShade = _colors.ambient * 0.5f;
 	// A post every 64 voxels (4 tiles) along the border, 1.5 voxels thick and 17 voxels high,
 	// shaded a little darker on the sides facing north or south than on those facing east or west.
@@ -1227,7 +1325,10 @@ Uint8 FirstPersonView::rockColor(float alongU, float alongV, int face, float dis
 /**
  * The colour of the sky in a direction: a dithered gradient from the horizon up, with clouds
  * and the sun by day, stars and the moon by night, or just murky water when the battle is
- * under the sea.
+ * under the sea. Under rain or snow clouds (GitHub issue #94) a grey deck of them all over: no
+ * sun, moon or stars; a void's dark sky has the same, slow violet wisps. Over Mars a dusty sky,
+ * a smaller sun by day and the stars by night, no clouds and no Moon. Out of the air (space,
+ * orbit, the Moon) a black sky full of stars (see airlessSkyColor).
  * @param rayDirection The ray's unit direction (z up).
  * @param pixelX The ray's pixel on the view (or block of pixels), for the dither pattern.
  * @param pixelY The same, down.
@@ -1235,10 +1336,25 @@ Uint8 FirstPersonView::rockColor(float alongU, float alongV, int face, float dis
  */
 Uint8 FirstPersonView::skyColor(const float rayDirection[3], int pixelX, int pixelY) const
 {
+	if (airless())
+	{
+		return airlessSkyColor(rayDirection, pixelX, pixelY);
+	}
 	// The gradient: how far up the ray points (0 at the horizon and below, 1 straight up),
 	// eased so the horizon's colours spread further up, picks one of the 32 sky colours.
 	const float elevation = std::max(rayDirection[2], 0.0f);
 	const float gradient = std::pow(elevation, 0.6f) * 31.0f;
+	if (_colors.overcast || _sky == SkyVoid)
+	{
+		// A low deck of cloud all over (a void's wisps): its noise where the ray meets it,
+		// drifting with the wind, mottles it lighter and darker within the sky's own colours;
+		// far off, low down, it melts into the horizon's haze.
+		const float layerDistance = 1.0f / std::max(elevation, 0.06f);
+		const float drift = _colors.cloudTime * (_sky == SkyVoid ? 0.01f : 0.05f);
+		const float deck = cloudNoise(rayDirection[0] * layerDistance * 0.9f + drift, rayDirection[1] * layerDistance * 0.9f + drift * 0.4f);
+		const float mottle = (deck - 0.5f) * 2.0f * CloudDeckMottle * smoothstep(0.0f, 0.3f, elevation);
+		return _colors.sky[std::clamp((int)(gradient + mottle + dither(pixelX, pixelY)), 0, 31)];
+	}
 	Uint8 color = _colors.sky[std::clamp((int)(gradient + dither(pixelX, pixelY)), 0, 31)];
 	if (_colors.underwater)
 	{
@@ -1246,14 +1362,15 @@ Uint8 FirstPersonView::skyColor(const float rayDirection[3], int pixelX, int pix
 	}
 
 	// The sun by day and the moon by night: small discs where the ray points almost straight
-	// at them (the cosine of the angle very close to 1).
+	// at them (the cosine of the angle very close to 1). From Mars the sun looks smaller, and
+	// the Earth's Moon isn't there.
 	const float daylight = 1.0f - _colors.night;
 	const float sunDot = rayDirection[0] * _colors.sunDir[0] + rayDirection[1] * _colors.sunDir[1] + rayDirection[2] * _colors.sunDir[2];
-	if (daylight > 0.4f && sunDot > 0.9995f)
+	if (daylight > 0.4f && sunDot > (_sky == SkyMars ? 0.9998f : 0.9995f))
 	{
 		return _colors.sun;
 	}
-	if (_colors.night > 0.4f)
+	if (_colors.night > 0.4f && _sky != SkyMars)
 	{
 		const float moonDot = rayDirection[0] * _colors.moonDir[0] + rayDirection[1] * _colors.moonDir[1]
 			+ rayDirection[2] * _colors.moonDir[2];
@@ -1263,11 +1380,11 @@ Uint8 FirstPersonView::skyColor(const float rayDirection[3], int pixelX, int pix
 		}
 	}
 
-	// Clouds on a flat layer high up, thinning out towards the horizon, drifting slowly. The
-	// ray meets the layer at a distance of about 1 / elevation (capped low down); the noise
-	// there says how thick the cloud is: thin edges get the shadowed colours, thick middles
-	// the lit ones.
-	if (elevation > 0.02f && _colors.night < 0.9f)
+	// Clouds on a flat layer high up, thinning out towards the horizon, drifting slowly (none
+	// over Mars). The ray meets the layer at a distance of about 1 / elevation (capped low
+	// down); the noise there says how thick the cloud is: thin edges get the shadowed colours,
+	// thick middles the lit ones.
+	if (elevation > 0.02f && _colors.night < 0.9f && _sky != SkyMars)
 	{
 		const float layerDistance = 1.0f / std::max(elevation, 0.06f);
 		const float cloudU = rayDirection[0] * layerDistance * 1.6f + _colors.cloudTime * 0.02f;
@@ -1294,6 +1411,95 @@ Uint8 FirstPersonView::skyColor(const float rayDirection[3], int pixelX, int pix
 		}
 	}
 	return color;
+}
+
+/**
+ * The sky out of the air (space, orbit, the Moon: see chooseSky): black, with stars and fainter
+ * ones among them, all round in space and in orbit (nothing past a station's or a ship's edge
+ * hides them), over the Moon down to its horizon; the sun a bright disc by day, with none of the
+ * sky's blue round it. From orbit the Earth fills the view from a little below the horizon down
+ * (OrbitEarthEdge): its seas and clouds drifting by as the station circles it, the glow of its
+ * air along its edge, its night side dark. Over the Moon the Earth hangs high in the south-east
+ * (MoonEarthDirection), lit on the sun's side.
+ * @param rayDirection The ray's unit direction (z up).
+ * @param pixelX The ray's pixel on the view (or block of pixels), for the dither pattern.
+ * @param pixelY The same, down.
+ * @return The palette colour to draw.
+ */
+Uint8 FirstPersonView::airlessSkyColor(const float rayDirection[3], int pixelX, int pixelY) const
+{
+	const float daylight = 1.0f - _colors.night;
+	if (_sky == SkyOrbit && rayDirection[2] < -OrbitEarthEdge + OrbitAirGlow)
+	{
+		const float below = -rayDirection[2];
+		// The glow of the air over the Earth's edge, thinning out upwards (the night side's faint).
+		if (below < OrbitEarthEdge)
+		{
+			const float glow = (below - (OrbitEarthEdge - OrbitAirGlow)) / OrbitAirGlow * (daylight > 0.4f ? 1.0f : 0.4f);
+			return glow > dither(pixelX, pixelY) ? _colors.earth[3] : _colors.sky[0];
+		}
+		if (daylight <= 0.4f)
+		{
+			return _colors.earth[1];
+		}
+		// Its face: where the ray meets it, as if it were flat far below, its clouds over its
+		// seas, drifting by; near the edge, seen through more air, the glow mixes in.
+		const float planeX = rayDirection[0] / below * 1.4f + _colors.cloudTime * 0.012f, planeY = rayDirection[1] / below * 1.4f;
+		if (smoothstep(OrbitEarthEdge + 0.08f, OrbitEarthEdge, below) > dither(pixelX + 1, pixelY + 2))
+		{
+			return _colors.earth[3];
+		}
+		return cloudNoise(planeX, planeY) > 0.56f ? _colors.earth[2] : _colors.earth[0];
+	}
+	// The sun by day: a disc where the ray points almost straight at it.
+	const float sunDot = rayDirection[0] * _colors.sunDir[0] + rayDirection[1] * _colors.sunDir[1] + rayDirection[2] * _colors.sunDir[2];
+	if (daylight > 0.4f && sunDot > 0.9995f)
+	{
+		return _colors.sun;
+	}
+	if (_sky == SkyMoon)
+	{
+		const float along = rayDirection[0] * MoonEarthDirection[0] + rayDirection[1] * MoonEarthDirection[1] + rayDirection[2] * MoonEarthDirection[2];
+		if (along > MoonEarthCos)
+		{
+			// The Earth: the point of its globe the ray meets, from across its disc (in its radii)
+			// and the side facing the Moon; lit where it faces the sun, else its night side; the
+			// glow of its air round its edge, its clouds over its seas.
+			float across[3], normal[3];
+			for (int axis = 0; axis < 3; ++axis) across[axis] = (rayDirection[axis] - MoonEarthDirection[axis] * along) / MoonEarthSin;
+			const float acrossSquared = across[0] * across[0] + across[1] * across[1] + across[2] * across[2];
+			const float facing = std::sqrt(std::max(0.0f, 1.0f - acrossSquared));
+			for (int axis = 0; axis < 3; ++axis) normal[axis] = across[axis] - MoonEarthDirection[axis] * facing;
+			const float sunlit = normal[0] * _colors.sunDir[0] + normal[1] * _colors.sunDir[1] + normal[2] * _colors.sunDir[2];
+			if (sunlit < 0.1f * dither(pixelX, pixelY))
+			{
+				return _colors.earth[1];
+			}
+			if (acrossSquared > 0.82f)
+			{
+				return _colors.earth[3];
+			}
+			return cloudNoise(across[0] * 3.0f + 7.0f, across[1] * 3.0f + across[2] * 3.0f) > 0.55f ? _colors.earth[2] : _colors.earth[0];
+		}
+	}
+	// The stars: the sky divided into small cells by azimuth and elevation angle, and a hash of
+	// each cell lights up 6 in 1000 of them, and 12 more faintly (over the Moon only above its
+	// horizon: its ground hides the rest).
+	if (_sky != SkyMoon || rayDirection[2] > 0.0f)
+	{
+		const float azimuth = std::atan2(rayDirection[1], rayDirection[0]), // radians
+			elevationAngle = std::asin(std::clamp(rayDirection[2], -1.0f, 1.0f));
+		const Uint32 cellHash = hash2((int)std::floor(azimuth * 160.0f), (int)std::floor(elevationAngle * 160.0f)) % 1000;
+		if (cellHash < 6)
+		{
+			return _colors.star;
+		}
+		if (cellHash < 18)
+		{
+			return _colors.faintStar;
+		}
+	}
+	return _colors.sky[0];
 }
 
 /**
@@ -1481,7 +1687,14 @@ void FirstPersonView::renderRows()
 			case RAY_BOTTOM:
 			{
 				// Out through the bottom of the map (through a hole blown in the ground floor):
-				// the earth below, the ground's colour in deep shade, never a black hole.
+				// the earth below, the ground's colour in deep shade, never a black hole. In
+				// space, space (and in orbit the Earth far below).
+				if (_sky == SkySpace || _sky == SkyOrbit)
+				{
+					color = skyColor(rayDirection, blockColumn, blockRow);
+					distanceAlongRay = Infinity;
+					break;
+				}
 				const float bottomX = rayOrigin[0] + rayDirection[0] * tEnd, bottomY = rayOrigin[1] + rayDirection[1] * tEnd;
 				const Uint8 earth = _groundModel ? _groundModel->color[0][(int)std::floor(bottomY) & 15][(int)std::floor(bottomX) & 15] : 0;
 				color = earth ? shadeColor(earth, std::min(12 - (earth & 15), 6 + (int)dither(blockColumn, blockRow))) : _colors.unexplored;

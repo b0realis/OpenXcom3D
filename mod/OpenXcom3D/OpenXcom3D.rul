@@ -52,7 +52,15 @@ firstPerson:
     - { game: xcom2, dataSet: TRITON, records: [13], boxes: [[0, 0, 0, 15, 15, 15], [5, 4, 16, 6, 5, 23], [2, 5, 16, 3, 6, 22], [6, 2, 16, 7, 3, 19]] }
     - { game: xcom2, dataSet: GRUNGE3, records: [2], boxes: [[0, 0, 0, 4, 15, 20]] }
     - { game: xcom2, dataSet: XBASES01, records: [78], boxes: [[12, 0, 0, 15, 3, 23]] }
-  # Weather particles by terrain data set (only where the sky is open above).
+    # XPiratez and X-Com Files: TFTD's sea, as their SEAURBAN, round their islands, ports and
+    # ships, and the cargo ship's waterline: floors too.
+    - { game: piratez, dataSet: SEAURBAN, records: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], ghost: false, boxes: [[0, 0, 0, 15, 15, 1]] }
+    - { game: x-com-files, dataSet: SEAURBAN, records: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], ghost: false, boxes: [[0, 0, 0, 15, 15, 1]] }
+    - { game: piratez, dataSet: CARGO3, records: [4], ghost: false, boxes: [[0, 0, 0, 15, 15, 1]] }
+    - { game: x-com-files, dataSet: CARGO3, records: [4], ghost: false, boxes: [[0, 0, 0, 15, 15, 1]] }
+  # Weather particles (only where the sky is open above), by the battle's environment (its
+  # enviroEffects, as the big mods name them) or else by terrain data set. Rain and snow fall from
+  # clouds that cover the sky.
   weather:
     - dataSet: POLAR
       type: snow
@@ -62,10 +70,57 @@ firstPerson:
       type: dust
     - dataSet: MARS
       type: dust
+    # XPiratez: acid rain, a dust storm
+    - enviroEffects: [STR_ENVIRO_ACID_RAIN]
+      type: rain
+    - enviroEffects: [STR_ENVIRO_DUST_STORM]
+      type: dust
+  # Battles under another sky than the Earth's open air (the sun and the clouds by day, the stars
+  # and the moon by night, overcast in rain and snow), the most particular first: by the mission
+  # (alien deployment) type, or else a terrain the map is built of, or else the battle's
+  # environment (its enviroEffects, which many missions share). Names no loaded mod has are
+  # ignored; a later entry (or a later mod's) overrides.
+  #   space  black, the stars all round, nothing past the map's edge: a ship in deep space
+  #   orbit  the same, the Earth filling the view below: a station in orbit
+  #   moon   black, the stars and the Earth, over the Moon's ground
+  #   mars   a dusty butterscotch sky by day, a smaller sun; the stars by night, no Moon
+  #   sea    under the sea, as TFTD's battles under water, for a sea floor the game keeps dry
+  #   void   a dark violet sky with slow wisps, no sun, moon or stars: other worlds, dreams
+  #   earth  the Earth's own
+  skies:
+    # UFO: Cydonia (its base under rock, as the map shows it)
+    - sky: mars
+      missions: [STR_MARS_CYDONIA_LANDING, STR_MARS_THE_FINAL_ASSAULT]
+    # X-Com Files: its orbital station, outside and in (its STR_SPACE is the Moon's too), and the
+    # insides of its Moon bases (under rock where the map shows it, else the Moon's sky)
+    - sky: orbit
+      missions: [STR_USTATION, STR_USTATION_INSIDE]
+      terrains: [USTATIONSIDE]
+    - sky: moon
+      missions: [STR_MOON_ALIEN_COLONY_SUBURBS, STR_MOON_ALIEN_COLONY_MAIN, STR_MOON_ALIEN_COLONY_CORE, STR_MOON_UAC_BASE_EXPLORATION, STR_UAC_MOON_BASE_DIMENSIONAL_PORTAL, STR_MIB_LUNAR_BASE_ASSAULT_UNDERGROUND]
+    # XPiratez: Mars (Cydonia, Labyrinthus Noctis), the Moon (Moonberia), the orbital stations,
+    # the space freighter, the sea floor, the Shadowlands (the Diablo catacombs, the City of the
+    # Dead, the Nightosphere, the Styx, the VR simulations); X-Com Files: Cydonia, the Moon (its
+    # STR_SPACE), the sea floor (a battle it keeps dry), the dreamscape, beyond the Doom portal
+    - sky: mars
+      enviroEffects: [STR_ENVIRO_MARS, STR_ENVIRO_CYDONIA, STR_ENVIRO_CYDONIA_SURFACE, STR_ENVIRO_CYDONIA_2, STR_ENVIRO_CYDONIA_3, STR_ENVIRO_LABYRINTHUS_NOCTIS, STR_CYDONIA]
+    - sky: moon
+      enviroEffects: [STR_ENVIRO_MOON, STR_SPACE]
+    - sky: orbit
+      enviroEffects: [STR_ENVIRO_SPACE]
+    - sky: space
+      enviroEffects: [STR_ENVIRO_SPACE_FREIGHTER]
+    - sky: sea
+      enviroEffects: [STR_ENVIRO_SEA, STR_UNDERWATER_GEAR, STR_UNDERWATER_GEAR_HARD, STR_UNDERWATER_GEAR_SEVERE, STR_UNDERWATER_GEAR_EXTREME]
+    - sky: void
+      enviroEffects: [STR_ENVIRO_SHADOWLANDS_1, STR_ENVIRO_SHADOWLANDS_2, STR_ENVIRO_SHADOWLANDS_ARMORSTRIPPER, STR_ENVIRO_GNOMES_SHADOWTRAP, STR_DREAMSCAPE, STR_DOOM]
   # Terrain data sets whose floors are water: where the water reaches the map's edge, the sea goes
-  # on beyond it (beyond the rest of the edge, the map's commonest floor). TFTD: the sea round
-  # islands, ports and ships.
-  water: [SEA]
+  # on beyond it (beyond the rest of the edge, the map's commonest floor). A data set's name for
+  # all its floors, or its name and records for some. TFTD: the sea round islands, ports and
+  # ships, and the sea round the liner and the cargo ship among their parts (it was their black
+  # ground past the edge); XPiratez and X-Com Files: the same sea, their SEAURBAN, and the
+  # cargo ship's.
+  water: [SEA, SEAURBAN, { dataSet: LINERB, records: [1] }, { dataSet: CARGO3, records: [4] }]
   # The helmet cameras' bad signal, by mission (alien deployment) type: 1 a glitch now and then
   # (any mission not listed), 2 a lot (the aliens' own ground, where their machinery jams the
   # feed), 0 none. A later entry (or a later mod's) overrides.
@@ -76,7 +131,17 @@ firstPerson:
   # all the way up. Never list a map that starts on the surface and goes on underground, nor a
   # name two games share for different maps (TFTD's seabed colony is STR_ALIEN_BASE_ASSAULT,
   # like UFO's alien base).
-  undergroundMissions: []
+  # XPiratez: the Thule base, "the sprawling complex under the surface of the Moon", its top open
+  # on the map; the Old Earth metro's "underground subways" and the sewers (a gnome's
+  # "underground arms workshop", the smugglers' safehouse), roofed only with rock the art leaves
+  # invisible; the ninja bases' "bowels"; in the Shadowlands, the sewers "deep below the urban
+  # surface of Paradiso" (the Fountain of Youth too), the Rabbit Crypt, the Realm of Fear's
+  # "unending dungeons" and "long hallways". X-Com Files: the hideouts "deep in the city sewers"
+  # (the Cyberweb lairs, the smugglers' refuge) and the ooze's nest "in the sewers".
+  undergroundMissions: [STR_LOC_THULEBASE, STR_LOC_OLD_EARTH_METRO, STR_LOC_OLD_EARTH_METRO_IRRADIATED, STR_LOC_OLD_EARTH_METRO_PSYCHEDELIC,
+    STR_LOC_OLD_EARTH_METRO_TOXIC, STR_LOC_GNOME_LAIR, STR_LOC_SMUGGLER_LAIR, STR_NINJA_BASE_2_UNDERGROUND_ASSAULT, STR_NINJA_BASE_HQ_UNDERGROUND_ASSAULT,
+    STR_LOC_CITY_OF_THE_DEAD_SEWERS, STR_LOC_FOUNTAIN_OF_YOUTH, STR_LOC_FOUNTAIN_OF_YOUTH_G, STR_LOC_DOOMED_CRYPT, STR_LOC_GATE_OF_FEAR, STR_LOC_HALLS_OF_FEAR,
+    STR_CYBERWEB_LAIR, STR_SMUGGLERS_REFUGE, STR_THE_BRAINSUCKED_LAIR, STR_OOZE_NEST]
   badSignal:
     # UFO: Mars (both stages), an alien base, a base defence; TFTD: an alien colony (both
     # stages), T'leth (all three), an artefact site (both), a base defence

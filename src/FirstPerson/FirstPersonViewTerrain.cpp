@@ -353,6 +353,27 @@ void fitPlateTopToSprite(FirstPersonView::VoxelModel &model, const Surface *spri
 }
 
 /**
+ * The colour of a palette nearest to an RGB colour (0..255 per channel), weighting the channels
+ * by how bright they look to the eye. Colour 0 is transparent, so it is never picked.
+ */
+Uint8 nearestColor(const SDL_Color *palette, const float *rgb)
+{
+	int best = 1;
+	float bestDistance = 1e9f;
+	for (int index = 1; index < 256; ++index)
+	{
+		const float dr = palette[index].r - rgb[0], dg = palette[index].g - rgb[1], db = palette[index].b - rgb[2];
+		const float distance = dr * dr * 0.3f + dg * dg * 0.59f + db * db * 0.11f;
+		if (distance < bestDistance)
+		{
+			bestDistance = distance;
+			best = index;
+		}
+	}
+	return (Uint8)best;
+}
+
+/**
  * Works out the colours of the sides the isometric art never shows. The art looks at the map
  * from above and from the south-east, so it shows only tops and the faces looking east and
  * south. Seen in 3D, an underside, a plate's ceiling, and the faces looking west and north
@@ -2221,7 +2242,7 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	// The sea (the mod's water floors) is drawn as waves on its top (see waterColor), and whole:
 	// its shape isn't cut to the art, whose few transparent pixels at a tile's corner left holes
 	// through to the bottom of the map.
-	const bool waterFloor = mapData->getObjectType() == O_FLOOR && firstPerson.isWater(dataSet->getName());
+	const bool waterFloor = mapData->getObjectType() == O_FLOOR && firstPerson.isWater(dataSet->getName(), record);
 	if (solidShape)
 	{
 		for (const auto &box : shape->boxes)
@@ -2758,7 +2779,8 @@ bool FirstPersonView::isDoorMoving(const Position &pos, int part)
  * - where its surface is: the first level, from the bottom, whose ring isn't underground (at
  *   least UndergroundRingShare of its tiles rock: a wall or an object, the rock a base or a cave
  *   is cut into, or a floor with something over it). On any map outdoors that's ground level; on a map that starts on the surface
- *   and goes on underground, the surface's level. Beyond the border, below the surface, is rock;
+ *   and goes on underground, the surface's level; where the sea lies on a level above that (round
+ *   a ship's lower decks), the sea's. Beyond the border, below the surface, is rock;
  * - whether the map is underground all the way up (every level of the ring is rock: a base, an
  *   alien colony's inside, Cydonia's complex), or its mission is listed as underground in the
  *   mod (RuleFirstPerson::isUnderground): then rock lies beyond the border at every height and
@@ -2766,18 +2788,23 @@ bool FirstPersonView::isDoorMoving(const Position &pos, int part)
  * - the ground that runs on past the border at the surface's level: the most common floor of the
  *   ring there (grass on a farm, sand in the desert, ...). Only a floor whose model reaches down
  *   to the bottom voxel layer counts;
- * - the water: where a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea) reaches
+ * - the water: where a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea, the big
+ *   mods' copy of it, the sea round TFTD's ships among their parts) reaches
  *   the border, the sea goes on beyond that stretch of it, the most common water floor of the
  *   ring (an island's shore runs on out of the map, the sea round a ship); the ground runs on
  *   past the rest. A ring of water alone (round a ship) is the ground too. The sea's colours
  *   for its waves (see waterColor) come from that floor's top, or with no water at the edge
  *   from the commonest water floor on the map.
+ * In space (a station, a ship: see chooseSky) none of it: only space lies past the map's edge,
+ * round it, under it and over it, however walled in its edges are.
  * Sets _surfaceLevel, _enclosed, _groundModel (left as it was if no floor qualifies),
  * _waterModel, _waterAtEdge, _waterColors and _groundChosen.
  */
 void FirstPersonView::chooseGround()
 {
 	_groundChosen = true;
+	chooseSky();
+	const bool inSpace = _sky == SkySpace || _sky == SkyOrbit;
 	const int mapSizeX = _save->getMapSizeX(), mapSizeY = _save->getMapSizeY(), mapSizeZ = _save->getMapSizeZ();
 	// Calls a function on each tile of the ring at a level.
 	auto forEachRingTile = [&](int z, auto &&visit)
@@ -2823,6 +2850,27 @@ void FirstPersonView::chooseGround()
 	{
 		_surfaceLevel = mapSizeZ;
 	}
+	if (inSpace)
+	{
+		_surfaceLevel = 0;
+		_enclosed = false;
+	}
+	// The sea round a ship's lower decks (TFTD's liner, its second stage) lies on a level above
+	// the floors at the edge: the surface is the highest level of the ring that is mostly water.
+	for (int z = mapSizeZ - 1; !_enclosed && !inSpace && z > _surfaceLevel; --z)
+	{
+		int ringTiles = 0, waterTiles = 0;
+		forEachRingTile(z, [&](const Tile *tile)
+		{
+			++ringTiles;
+			const MapData *floor = tile->getMapData(O_FLOOR);
+			if (floor && getModel(floor)->water) ++waterTiles;
+		});
+		if (waterTiles * 2 > ringTiles)
+		{
+			_surfaceLevel = z;
+		}
+	}
 	// The rock's colour: the commonest colour group among the walls and objects round the map's
 	// underground levels (the rock it's cut into, in whatever palette the battle has: a fixed
 	// brown came out olive or watery blue under the sea), at a middle shade, with room to shade
@@ -2860,14 +2908,13 @@ void FirstPersonView::chooseGround()
 	// Count the floors of the ring at the surface's level (the bottom one on an enclosed map,
 	// which shows no ground beyond the border anyway), the water's apart, and note where the
 	// water is (by the tile's x and y).
-	const RuleFirstPerson &rules = _save->getMod()->getFirstPerson();
 	std::map<const MapData*, int> floorCounts, waterCounts;
 	_waterAtEdge.assign(mapSizeX * mapSizeY, 0);
 	forEachRingTile(std::min(_surfaceLevel, mapSizeZ - 1), [&](const Tile *tile)
 	{
 		if (const MapData *floor = tile->getMapData(O_FLOOR))
 		{
-			const bool water = rules.isWater(floor->getDataset()->getName());
+			const bool water = getModel(floor)->water;
 			(water ? waterCounts : floorCounts)[floor]++;
 			_waterAtEdge[tile->getPosition().y * mapSizeX + tile->getPosition().x] = water;
 		}
@@ -2889,8 +2936,12 @@ void FirstPersonView::chooseGround()
 		}
 		return best;
 	};
-	_waterModel = commonest(waterCounts);
-	if (const VoxelModel *ground = commonest(floorCounts))
+	_waterModel = inSpace ? nullptr : commonest(waterCounts);
+	if (inSpace)
+	{
+		_groundModel = nullptr;
+	}
+	else if (const VoxelModel *ground = commonest(floorCounts))
 	{
 		_groundModel = ground;
 	}
@@ -2909,7 +2960,7 @@ void FirstPersonView::chooseGround()
 			for (int x = 0; x < mapSizeX; ++x)
 			{
 				const MapData *floor = _save->getTile(Position(x, y, level))->getMapData(O_FLOOR);
-				if (floor && rules.isWater(floor->getDataset()->getName())) mapWaterCounts[floor]++;
+				if (floor && getModel(floor)->water) mapWaterCounts[floor]++;
 			}
 		seaModel = commonest(mapWaterCounts);
 	}
@@ -2936,17 +2987,27 @@ void FirstPersonView::chooseWaterColors(const VoxelModel *seaModel)
 	const SDL_Color *palette = getPalette();
 	auto luminance = [palette](Uint8 color) { return palette[color].r * 0.3f + palette[color].g * 0.59f + palette[color].b * 0.11f; };
 	auto lighter = [](Uint8 color, int shades) { return (Uint8)((color & 0xF0) | std::max(0, (color & 15) - shades)); };
-	const Uint8 plain = seaModel->ceiling;
-	// The deep colour: count the top's colours of other groups, darker than the plain one.
-	int counts[256] = {};
-	for (int y = 0; y < 16; ++y)
-		for (int x = 0; x < 16; ++x)
-		{
-			const Uint8 color = seaModel->plan[y][x];
-			if (color && (color & 0xF0) != (plain & 0xF0) && luminance(color) < luminance(plain) && luminance(color) >= DarkGlowLuma) counts[color]++;
-		}
-	const int deepest = (int)(std::max_element(counts, counts + 256) - counts);
-	const Uint8 deep = counts[deepest] ? (Uint8)deepest : (Uint8)((plain & 0xF0) | std::min(13, (plain & 15) + 3));
+	Uint8 plain = seaModel->ceiling, deep = 0;
+	if (luminance(plain) < DarkGlowLuma)
+	{
+		// A ship's dark floor round its hull standing in for the sea (TFTD's liner draws it black,
+		// its cargo ship all but black): the colours of TFTD's sea instead, the palette's nearest.
+		plain = nearestColor(palette, StandInSeaPlain);
+		deep = nearestColor(palette, StandInSeaDeep);
+	}
+	else
+	{
+		// The deep colour: count the top's colours of other groups, darker than the plain one.
+		int counts[256] = {};
+		for (int y = 0; y < 16; ++y)
+			for (int x = 0; x < 16; ++x)
+			{
+				const Uint8 color = seaModel->plan[y][x];
+				if (color && (color & 0xF0) != (plain & 0xF0) && luminance(color) < luminance(plain) && luminance(color) >= DarkGlowLuma) counts[color]++;
+			}
+		const int deepest = (int)(std::max_element(counts, counts + 256) - counts);
+		deep = counts[deepest] ? (Uint8)deepest : (Uint8)((plain & 0xF0) | std::min(13, (plain & 15) + 3));
+	}
 	const int crest = (int)std::lround(WaveShades);
 	_waterColors[0] = lighter(plain, crest);
 	_waterColors[1] = lighter(deep, crest);

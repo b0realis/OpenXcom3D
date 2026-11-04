@@ -222,6 +222,8 @@ public:
 		Uint8 sky[32];  // horizon .. zenith
 		Uint8 cloud[8]; // lit .. shadowed
 		Uint8 haze, star, moon, sun, tapeYellow, tapeBlack, post;
+		Uint8 faintStar; // the fainter stars of the sky out of the air (space, the Moon)
+		Uint8 earth[4];  // the Earth seen from the Moon or from orbit: its sea lit, its night side, its clouds, the glow of its air
 		Uint8 trajectory; // the path a throw or shot aimed now would take (light cyan, unlike anything else drawn)
 		Uint8 trajectoryForced; // ... that of a forced arcing shot (yellow: it may meet something on the way)
 		Uint8 laserSight, laserDot; // ... that of a straight shot: a thin red laser, and its brighter dot where it ends
@@ -229,11 +231,15 @@ public:
 		Uint8 laserRefused; // ... a straight shot the game will refuse (no line of fire): the laser dimmed, dark red
 		Uint8 nightLight; // the white of a path glaring under night vision (mixed into the goggles' brightest green)
 		float night; // 0 day .. 1 night
-		bool underwater;
+		bool underwater; // under the sea: TFTD's battles under water, and the big mods' sea floor
+		bool overcast;   // rain or snow: clouds hide the sun, the moon and the stars
 		int ambient;        // shade of open ground under the sky
 		float faceShade[6]; // extra shade per face normal: +x -x +y -y +z -z
 		float indoorFaceShade[6]; // ... indoors, where no sun shines (see indoorsAt): as at night
 		float sunDir[3], moonDir[3];
+		float shadingDir[3];  // where the light that shades a face by its direction comes from: the sun, or straight up under clouds
+		float shadingTurn;    // how many shades darker a face turned away from that light is
+		float shadingBase;    // the shades every face out of doors takes on top (the clouds dim the day)
 		float cloudTime;
 		Uint8 glassTint[256]; // each colour as seen through glass
 		Uint32 paletteHash;   // palette the tint table was built for
@@ -666,6 +672,12 @@ private:
 	// =====================================================================================
 
 	SceneColors _colors = {};       // this frame's colours
+	/// The sky over a battle (see chooseSky): the Earth's (day and night, the clouds, overcast in
+	/// rain and snow), deep space, orbit over the Earth, the Moon's, Mars', under the sea, or a void.
+	enum Sky { SkyEarth, SkySpace, SkyOrbit, SkyMoon, SkyMars, SkySea, SkyVoid };
+	Sky _sky = SkyEarth;            // this battle's
+	bool _skyChosen = false;        // the sky and the weather looked up for this battle
+	const SDL_Color *_skyPalette = nullptr; // the battle's palette before its environment recoloured it (see updateColors), or null
 	bool _smoothLighting = true;    // blend the game's light between tiles (an option)
 	bool _flashlight = false;       // flashlight on (its key; the shoulder one only in dark battles)
 	bool _dynamicFlashlight = false; // it's the dynamic flashlight (setting "Flashlight": Dynamic): from under the eye, a tight spot on the crosshair
@@ -674,6 +686,10 @@ private:
 	Uint32 _muzzleFlashTick = 0;    // when it flashed
 	float _muzzleFlashLight = 0.0f; // the flash's strength this frame
 
+	/// Looks up the battle's sky and weather (once a battle).
+	void chooseSky();
+	/// Is the battle out of the air (space, orbit, the Moon): no haze, no dust in the open?
+	bool airless() const { return _sky == SkySpace || _sky == SkyOrbit || _sky == SkyMoon; }
 	/// Picks this frame's colours from the palette, for the time of day.
 	void updateColors();
 	/// The game's light at a point, blended between tile centres (0 bright .. 15 dark); also a UFO's light there.
@@ -712,6 +728,8 @@ private:
 	}
 	/// The sky's colour in a direction.
 	Uint8 skyColor(const float rayDirection[3], int pixelX, int pixelY) const;
+	/// ... out of the air (space, orbit, the Moon): black, the stars, the sun, the Earth.
+	Uint8 airlessSkyColor(const float rayDirection[3], int pixelX, int pixelY) const;
 	/// The view's helper threads, for the work of a frame that splits into many small pieces
 	/// (the rays of a row, the smoke over a band of rows). They are started on the first frame
 	/// and then kept, waiting between jobs, since starting threads anew every frame costs time.
@@ -963,8 +981,7 @@ private:
 	FirstPersonParticles _particles; // all the particles
 	bool _particlesOn = true;        // particles switched on for this view (off for the small helmet-camera view)
 	Uint32 _particleLastTick = 0;    // when the particles were last advanced
-	std::string _weather;                 // the battle's weather: "rain", "snow", "dust" or none
-	bool _weatherChosen = false;                       // looked up for this battle
+	std::string _weather;                              // the battle's weather: "rain", "snow", "dust" or none (see chooseSky)
 	std::vector<std::pair<float, float>> _bubbleVents; // sea floor spots bubbles rise from
 	std::vector<float> _glowBuffer, _glowScratch;      // quarter resolution glow, blurred into a bloom
 	std::vector<float> _glowDepth, _glowDepthScratch;  // the same for the glow's distance (summed, weighted by the glow): how far away the light is
