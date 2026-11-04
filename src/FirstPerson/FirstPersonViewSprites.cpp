@@ -430,11 +430,43 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 		const int right = std::min(std::min(width, (int)std::ceil(rowAnchorX + (spriteWidth - anchorX) * pixelsPerColumn)),
 			(int)std::ceil(rowAnchorX + (spanEnd - anchorX) * pixelsPerColumn) + 1);
 		const float rowDepth = (float)std::max(1.0, distance - depthBias);
-		for (int pixelX = left; pixelX < right; ++pixelX)
+		// The row's screen pixels from `from` up to `to` that show its sprite columns from firstColumn up
+		// to endColumn. A block of the view where everything drawn is nearer than the row (see
+		// cullSmokeDraws) is passed over whole: every pixel of it would fail the depth test.
+		const float *rowBlocks = seeThroughSprite && seeThroughSprite->depthBlocks ? seeThroughSprite->depthBlocks + (pixelY / SmokeCullBlock) * seeThroughSprite->depthBlockColumns : nullptr;
+		auto drawColumns = [&](int from, int to, int firstColumn, int endColumn)
 		{
-			const int spriteX = (int)std::floor(anchorX + (pixelX + 0.5 - rowAnchorX) / pixelsPerColumn);
-			if (spriteX < 0 || spriteX >= spriteWidth) continue;
-			plot(pixelX, pixelY, spritePixel(spriteX, spriteY), rowDepth, pixelOpacityAt(spriteX, spriteY));
+			for (int pixelX = from; pixelX < to; ++pixelX)
+			{
+				if (rowBlocks && rowBlocks[pixelX / SmokeCullBlock] <= rowDepth)
+				{
+					pixelX = pixelX / SmokeCullBlock * SmokeCullBlock + SmokeCullBlock - 1;
+					continue;
+				}
+				// (Its column: the floor of where the pixel's middle falls, which once it's past the first
+				// column, never below 0, is the whole part: no floor to call for each pixel.)
+				const double column = anchorX + (pixelX + 0.5 - rowAnchorX) / pixelsPerColumn;
+				if (column < firstColumn) continue;
+				const int spriteX = (int)column;
+				if (spriteX >= endColumn) continue;
+				plot(pixelX, pixelY, spritePixel(spriteX, spriteY), rowDepth, pixelOpacityAt(spriteX, spriteY));
+			}
+		};
+		// A sprite with its rows' runs of coloured pixels noted (see-through smoke: the original's dots
+		// leave most of a frame empty) only along those runs (a little more each side, each pixel's own
+		// column still worked out as above, so the gaps, which draw nothing, are all that's left out).
+		if (seeThroughSprite && seeThroughSprite->rowRuns)
+		{
+			for (int run = seeThroughSprite->rowRunStart[spriteY]; run < seeThroughSprite->rowRunStart[spriteY + 1]; ++run)
+			{
+				const int firstColumn = seeThroughSprite->rowRuns[run].first, endColumn = seeThroughSprite->rowRuns[run].second;
+				drawColumns(std::max(left, (int)(rowAnchorX + (firstColumn - anchorX) * pixelsPerColumn) - 2),
+					std::min(right, (int)(rowAnchorX + (endColumn - anchorX) * pixelsPerColumn) + 2), firstColumn, endColumn); // (two more pixels each side: no floor or ceiling to call)
+			}
+		}
+		else
+		{
+			drawColumns(left, right, 0, spriteWidth);
 		}
 	}
 }
@@ -2145,6 +2177,38 @@ const FirstPersonView::SoftSmoke &FirstPersonView::stippleSmokeFrame(const Surfa
  * @param original The original frames' dots as they are (setting "Smoke: Original"), not made soft.
  * @return The see-through frame between them.
  */
+/**
+ * Notes each row's runs of coloured pixels in a frame of see-through smoke, once (it is never
+ * changed after: an upgraded or recoloured frame is made anew): the smoke is drawn only along them
+ * (see drawSprite), an original frame's dots leaving most of it empty and a soft frame's edges
+ * fading out to nothing. Found on the drawing thread before the frame's puffs are drawn (see
+ * drawSeeThroughSmoke).
+ */
+void FirstPersonView::SoftSmoke::findRuns() const
+{
+	if (!runStart.empty() || !colors)
+	{
+		return;
+	}
+	const SDL_Surface *surface = colors->getSurface();
+	for (int y = 0; y < surface->h; ++y)
+	{
+		runStart.push_back((int)runs.size());
+		const Uint8 *row = (const Uint8 *)surface->pixels + y * surface->pitch;
+		for (int x = 0; x < surface->w;)
+		{
+			while (x < surface->w && !row[x]) ++x;
+			const int first = x;
+			while (x < surface->w && row[x]) ++x;
+			if (x <= first) continue;
+			// (A gap of a few pixels is drawn over: a run costs more than the pixels it would skip.)
+			if (!runs.empty() && (int)runs.size() > runStart.back() && first - runs.back().second < SmokeRunGapMin) runs.back().second = x;
+			else runs.push_back({ first, x });
+		}
+	}
+	runStart.push_back((int)runs.size());
+}
+
 const FirstPersonView::SoftSmoke &FirstPersonView::softSmokeBlend(const Surface *from, const Surface *to, int step, bool original)
 {
 	softSmokeFrame(from); // (any palette change is dealt with here, before the frames are taken)
@@ -2361,14 +2425,109 @@ void FirstPersonView::drawSeeThroughSmoke()
 		for (const Puff &puff : puffs)
 		{
 			const SoftSmoke &soft = softSmokeBlend(puff.from, puff.to, std::min(SmokeBlendSteps - 1, (int)(puff.blend * SmokeBlendSteps)), original);
+			soft.findRuns();
 			_smokeDraws.push_back({ &soft, { puff.world[0], puff.world[1], puff.world[2] }, puff.anchorY, puff.opacity, puff.scale, puff.shade });
 		}
 	} while (_smokeUpgrades != upgradesBefore);
-	// Then drawn on all the view's threads, each a band of rows at a time (see drawSmokeBands).
+	// Only what can show, each puff in the rows it may reach (see cullSmokeDraws); then drawn on
+	// all the view's threads, each a band of rows at a time (see drawSmokeBands).
+	cullSmokeDraws();
 	if (!_smokeDraws.empty())
 	{
 		runOnAllThreads(&FirstPersonView::drawSmokeBands);
 	}
+}
+
+/**
+ * Leaves out of this frame's see-through smoke the puffs that can't show, and notes the screen
+ * rows each of the others covers, so that each band of rows draws only the puffs in it (see
+ * drawSmokeBands): every band sets each of its puffs' cards up anew, and a thick cloud has
+ * hundreds of them (GitHub issue #92, "smoke grenades drawing maybe 70 tiles of smoke"; the
+ * owner: "still draw all smoke but check if we can do it efficiently"). A puff is left out when it
+ * lies off the view, or wholly behind what's drawn already (a wall, a unit, Modern's wall of smoke
+ * where the soldier's sight runs out in it), where every pixel of it would fail the depth test: the
+ * picture stays the same. The card is placed as drawSprite places it (upright, leaning with the
+ * view's pitch, more steeply above the eye) and its four corners taken to the screen: its rows and
+ * columns there (a row more each way), and its nearest corner's depth against the farthest depth
+ * drawn in each block of the view it covers. With the view tilted by a lean, or a corner behind
+ * the camera, a puff may be anywhere and is kept, on every row.
+ */
+void FirstPersonView::cullSmokeDraws()
+{
+	if (_smokeDraws.empty())
+	{
+		return;
+	}
+	const int width = getWidth(), height = getHeight();
+	const int blockColumns = (width + SmokeCullBlock - 1) / SmokeCullBlock, blockRows = (height + SmokeCullBlock - 1) / SmokeCullBlock;
+	// The farthest depth drawn in each block (the sky's is infinite: nothing in front of it hides).
+	_smokeCullDepth.assign(blockColumns * blockRows, 0.0f);
+	for (int pixelY = 0; pixelY < height; ++pixelY)
+	{
+		const float *depthRow = &_depthBuffer[pixelY * width];
+		float *blockRow = &_smokeCullDepth[(pixelY / SmokeCullBlock) * blockColumns];
+		for (int pixelX = 0; pixelX < width; ++pixelX)
+		{
+			float &farthest = blockRow[pixelX / SmokeCullBlock];
+			farthest = std::max(farthest, depthRow[pixelX]);
+		}
+	}
+	const double focalLength = (width / 2.0) / _halfFovTangent;
+	const double level[2] = { std::cos(_yaw), std::sin(_yaw) };
+	auto dot = [](const double a[3], const double b[3]) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; };
+	auto cannotShow = [&](SmokeDraw &smoke)
+	{
+		smoke.top = 0;
+		smoke.bottom = height;
+		if (_roll != 0.0)
+		{
+			return false;
+		}
+		// The card as drawSmokeBands draws it (anchorX 16 and anchorY its own, in the frame's
+		// pixels, at its scale), leaning as drawSprite leans it.
+		const Surface *sprite = smoke.soft->colors;
+		const double scale = smoke.scale / UpscaleFactor, anchorX = 16.0 * UpscaleFactor, anchorY = smoke.anchorY * UpscaleFactor;
+		const double columnSize = scale * SpritePixelX, rowSize = scale * ZScale;
+		const double anchor[3] = { smoke.world[0] - _eye[0], smoke.world[1] - _eye[1], (smoke.world[2] - _eye[2]) * ZScale };
+		const double elevation = std::atan2(anchor[2], std::sqrt(anchor[0] * anchor[0] + anchor[1] * anchor[1]));
+		double tilt = std::clamp(_pitch, -CardTiltMax * Pi / 180.0, CardTiltUpMax * Pi / 180.0);
+		if (elevation > CardTiltUpMax * Pi / 180.0)
+		{
+			tilt = std::max(tilt, std::min(elevation - CardTiltUpMax * Pi / 180.0, CardTiltSteepMax * Pi / 180.0));
+		}
+		const double cardUp[3] = { -std::sin(tilt) * level[0], -std::sin(tilt) * level[1], std::cos(tilt) };
+		// Its corners on the screen.
+		double left = width, right = 0.0, top = height, bottom = 0.0, nearest = Infinity;
+		for (const double up : { anchorY * rowSize, (anchorY - sprite->getHeight()) * rowSize })
+			for (const double across : { -anchorX * columnSize, (sprite->getWidth() - anchorX) * columnSize })
+			{
+				const double corner[3] = { anchor[0] + cardUp[0] * up + _levelRight[0] * across, anchor[1] + cardUp[1] * up + _levelRight[1] * across,
+					anchor[2] + cardUp[2] * up + _levelRight[2] * across };
+				const double depth = dot(corner, _forward);
+				if (depth <= 1.0)
+				{
+					return false;
+				}
+				const double screenX = width / 2.0 + dot(corner, _right) * focalLength / depth, screenY = height / 2.0 - dot(corner, _up) * focalLength / depth;
+				left = std::min(left, screenX); right = std::max(right, screenX);
+				top = std::min(top, screenY); bottom = std::max(bottom, screenY);
+				nearest = std::min(nearest, depth);
+			}
+		const int firstColumn = std::max(0, (int)std::floor(left) - 1), endColumn = std::min(width, (int)std::ceil(right) + 1);
+		smoke.top = std::max(0, (int)std::floor(top) - 1);
+		smoke.bottom = std::min(height, (int)std::ceil(bottom) + 1);
+		if (firstColumn >= endColumn || smoke.top >= smoke.bottom)
+		{
+			return true;
+		}
+		// Hidden when nothing drawn in the blocks it covers lies farther than its nearest pixel would.
+		const float nearestPixel = (float)std::max(1.0, nearest - SmokeDepthBias);
+		for (int blockY = smoke.top / SmokeCullBlock; blockY <= (smoke.bottom - 1) / SmokeCullBlock; ++blockY)
+			for (int blockX = firstColumn / SmokeCullBlock; blockX <= (endColumn - 1) / SmokeCullBlock; ++blockX)
+				if (_smokeCullDepth[blockY * blockColumns + blockX] > nearestPixel) return false;
+		return true;
+	};
+	_smokeDraws.erase(std::remove_if(_smokeDraws.begin(), _smokeDraws.end(), cannotShow), _smokeDraws.end());
 }
 
 /**
@@ -2384,13 +2543,15 @@ void FirstPersonView::drawSmokeBands()
 	{
 		for (const SmokeDraw &smoke : _smokeDraws)
 		{
-			const SeeThroughSprite seeThroughSprite = { smoke.soft->opacity.data(), smoke.opacity };
+			if (smoke.bottom <= band * BandRows || smoke.top >= (band + 1) * BandRows) continue; // (not in this band: see cullSmokeDraws)
+			const SeeThroughSprite seeThroughSprite = { smoke.soft->opacity.data(), smoke.opacity, smoke.soft->runStart.data(), smoke.soft->runs.data(),
+				_smokeCullDepth.data(), (getWidth() + SmokeCullBlock - 1) / SmokeCullBlock };
 			SpriteDraw draw;
 			draw.sprite = smoke.soft->colors;
 			draw.anchorX = 16 * UpscaleFactor;
 			draw.anchorY = smoke.anchorY * UpscaleFactor;
 			std::copy(smoke.world, smoke.world + 3, draw.world);
-			draw.depthBias = 2.0;
+			draw.depthBias = SmokeDepthBias;
 			draw.shade = smoke.shade;
 			draw.scale = smoke.scale / UpscaleFactor;
 			draw.seeThrough = &seeThroughSprite;

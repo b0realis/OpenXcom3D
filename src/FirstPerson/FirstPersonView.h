@@ -819,7 +819,14 @@ private:
 	enum class SpritePose { Standing, Lying };
 	/// A sprite drawn see-through (see drawSprite): how opaque each of its pixels is (0 .. SeeThroughLevels,
 	/// one byte a pixel, rows as long as the sprite is wide; null: every pixel fully), times an opacity for all of it (0 .. 1).
-	struct SeeThroughSprite { const Uint8 *opacityMap; float opacity; };
+	struct SeeThroughSprite
+	{
+		const Uint8 *opacityMap; float opacity;
+		const int *rowRunStart = nullptr;              // if given, where each sprite row's runs begin in rowRuns (one more at the end):
+		const std::pair<int, int> *rowRuns = nullptr;  // the runs of coloured pixels, first and one past the last column (only these are drawn)
+		const float *depthBlocks = nullptr;            // if given, the farthest depth drawn in each SmokeCullBlock square of the view:
+		int depthBlockColumns = 0;                     // a square where everything is nearer than the sprite isn't looked at (see cullSmokeDraws)
+	};
 	SeeThroughSprite _faintPile = { nullptr, 1.0f };    // how the pile pointed at past is drawn (see drawFloorItems)
 	/// A standing sprite isn't cut off below any floor (see SpriteDraw::floorCut, floorUnderside).
 	static constexpr double NoFloorCut = -1e9;
@@ -907,7 +914,16 @@ private:
 	void drawFire();
 	/// A frame of the game's smoke made see-through (see softSmokeFrame): UpscaleFactor times bigger, the
 	/// colours of its dots and how densely they lie (its opacity) blurred over it.
-	struct SoftSmoke { Surface *colors = nullptr; std::vector<Uint8> opacity; bool smooth = false; }; // (smooth: an original frame from the upscaler)
+	struct SoftSmoke
+	{
+		Surface *colors = nullptr; std::vector<Uint8> opacity; bool smooth = false; // (smooth: an original frame from the upscaler)
+		mutable std::vector<int> runStart;                // each row's runs of coloured pixels, found once (see findRuns): where the
+		mutable std::vector<std::pair<int, int>> runs;    // row's runs begin in runs (one more at the end), and the runs themselves
+		/// Notes each row's runs of coloured pixels, once.
+		void findRuns() const;
+		/// Two runs closer than this many pixels make one (the pixels between are drawn, as nothing).
+		static constexpr int SmokeRunGapMin = 8;
+	};
 	std::map<const Surface*, SoftSmoke> _softSmoke;    // the frames made so far
 	std::map<const Surface*, SoftSmoke> _stippleSmoke; // the original frames as they are, for the setting "Smoke: Original"
 	std::map<std::tuple<const Surface*, const Surface*, int, bool>, SoftSmoke> _softSmokeBlends; // two frames part way into each other (see softSmokeBlend)
@@ -929,8 +945,15 @@ private:
 	/// Draws the smoke on discovered tiles see-through, and its rising wisps (setting "Smoke": Original, Modern).
 	void drawSeeThroughSmoke();
 	/// One see-through smoke sprite to draw this frame (see drawSeeThroughSmoke).
-	struct SmokeDraw { const SoftSmoke *soft; double world[3]; int anchorY; float opacity; double scale; int shade; };
+	struct SmokeDraw { const SoftSmoke *soft; double world[3]; int anchorY; float opacity; double scale; int shade; int top = 0, bottom = 0; }; // (top, bottom: the screen rows it may reach)
 	std::vector<SmokeDraw> _smokeDraws; // this frame's, farthest first
+	/// How much nearer than its point a puff of see-through smoke counts for the depth test, in voxels.
+	static constexpr double SmokeDepthBias = 2.0;
+	/// The see-through smoke leaves out puffs wholly behind what's drawn, by the farthest depth in each block of this many pixels square.
+	static constexpr int SmokeCullBlock = 8;
+	std::vector<float> _smokeCullDepth; // this frame's farthest depth in each block of the view (see cullSmokeDraws)
+	/// Leaves out of this frame's see-through smoke the puffs that can't show, and notes the rows each may reach.
+	void cullSmokeDraws();
 	unsigned _smokeUpgrades = 0;        // counts the original frames upgraded to the upscaler's (their old blends dropped)
 	/// Draws this frame's see-through smoke over bands of rows taken from the shared counter (a job for runOnAllThreads).
 	void drawSmokeBands();

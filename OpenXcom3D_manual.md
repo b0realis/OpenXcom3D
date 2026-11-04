@@ -781,6 +781,8 @@ The 3D view is drawn at the battlescape's size (the game's **Battlescape scale**
 
 Sprite upscaling costs nothing measurable. Use **pixel size** 2 or 3 on slow machines too.
 
+Smoke costs what it covers. A smoke grenade's cloud (about 90 tiles over two levels) in view adds about 1.6 ms a frame with *Smoke* Modern, 2.8 ms from inside it, and 5.5 ms with Original, which stacks each tile's frames to close the cloud up (1920×1080, screen/2, the test machine's 22 threads); on a single core at 640×400 about 2, 3 and 10.5 ms. All of it is drawn, but nothing that wouldn't show: puffs off the view or wholly behind a wall, a unit or Modern's wall of smoke are left out, each puff is drawn only on the rows it covers, and only along its frame's coloured pixels (Original's dots leave most of a frame empty), the picture the same to the pixel. On a slow machine choose Modern.
+
 ## 9. Known limits and ideas
 
 - **A real-time mode** will be attempted in the future: the battle running continuously instead of turn by turn, for those who want it, as a setting like everything else. Doom mode's real-time grenades are the first piece of it.
