@@ -1534,13 +1534,15 @@ Uint8 FirstPersonView::smokeColor(Uint8 light, const float rayOrigin[3], const f
  * by the game's sight rules (see SmokeTrace, as the rays trace them for Modern's wall): the
  * line from the eye through the point, walked two voxels at a time as far as the sight reaches
  * (or off the map), its smoke added up tile by tile. Original smoke stacks its frames where the
- * soldier can't see through it (see drawSeeThroughSmoke).
+ * soldier can't see through it (see drawSeeThroughSmoke); a unit the soldier doesn't see with
+ * smoke on the line to it isn't drawn (see drawUnits).
  * @param point The point, in voxels.
+ * @param beyond On beyond the point (true), or only up to it.
  * @return The share of the sight left that the smoke on the line uses up: 1 or more where the
  *         sight runs out on it (the soldier can't see through the smoke there), less where they
  *         can, 0 with no smoke on it.
  */
-float FirstPersonView::smokeSightUsedThrough(const double point[3]) const
+float FirstPersonView::smokeSightUsedThrough(const double point[3], bool beyond) const
 {
 	float direction[3] = { (float)(point[0] - _eye[0]), (float)(point[1] - _eye[1]), (float)(point[2] - _eye[2]) };
 	const float length = std::sqrt(direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2]);
@@ -1554,8 +1556,8 @@ float FirstPersonView::smokeSightUsedThrough(const double point[3]) const
 	smoke.smokeBlock = _smokeBlock;
 	smoke.fireBlock = _fireBlock;
 	const int sizeX = _save->getMapSizeX(), sizeY = _save->getMapSizeY(), sizeZ = _save->getMapSizeZ();
-	const float Step = 2.0f;
-	for (float from = 0.0f; from < _smokeSightVoxels; from += Step)
+	const float Step = 2.0f, reach = beyond ? _smokeSightVoxels : std::min(_smokeSightVoxels, length);
+	for (float from = 0.0f; from < reach; from += Step)
 	{
 		// This stretch of the line, and the tile its middle is in (off the map: the line ends).
 		const float middle = from + Step * 0.5f;

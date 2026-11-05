@@ -43317,7 +43317,7 @@ index 000000000..99de9db55
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..e7d7e717a
+index 000000000..1b954793a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
 @@ -0,0 +1,1329 @@
@@ -44035,8 +44035,8 @@ index 000000000..e7d7e717a
 +	Uint8 hazeColor(Uint8 color, float haze, int pixelX, int pixelY) const;
 +	/// Smoke's colour on a pixel of its wall (where the soldier's sight runs out in it).
 +	Uint8 smokeColor(Uint8 light, const float rayOrigin[3], const float rayDirection[3], float distance, float *billowOut = nullptr) const;
-+	/// How much of the soldier's sight the smoke uses up looking through a point and on beyond it (1 or more: they can't see through).
-+	float smokeSightUsedThrough(const double point[3]) const;
++	/// How much of the soldier's sight the smoke uses up looking through a point and on beyond it, or only up to it (1 or more: they can't see through).
++	float smokeSightUsedThrough(const double point[3], bool beyond = true) const;
 +	/// Original smoke: how many times a tile's cloud is drawn on top of itself where the soldier can't see through it, inside
 +	/// the cloud and on its outer shell (a tile next to one without smoke), so the cloud's outline stays smoke-like (see drawSeeThroughSmoke).
 +	static constexpr int OriginalSmokeMaxLayers = 8, OriginalSmokeShellLayers = 3;
@@ -46124,10 +46124,10 @@ index 000000000..77a3cc4ed
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..5fcd17963
+index 000000000..bb4f9b300
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,1878 @@
+@@ -0,0 +1,1880 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -47664,13 +47664,15 @@ index 000000000..5fcd17963
 + * by the game's sight rules (see SmokeTrace, as the rays trace them for Modern's wall): the
 + * line from the eye through the point, walked two voxels at a time as far as the sight reaches
 + * (or off the map), its smoke added up tile by tile. Original smoke stacks its frames where the
-+ * soldier can't see through it (see drawSeeThroughSmoke).
++ * soldier can't see through it (see drawSeeThroughSmoke); a unit the soldier doesn't see with
++ * smoke on the line to it isn't drawn (see drawUnits).
 + * @param point The point, in voxels.
++ * @param beyond On beyond the point (true), or only up to it.
 + * @return The share of the sight left that the smoke on the line uses up: 1 or more where the
 + *         sight runs out on it (the soldier can't see through the smoke there), less where they
 + *         can, 0 with no smoke on it.
 + */
-+float FirstPersonView::smokeSightUsedThrough(const double point[3]) const
++float FirstPersonView::smokeSightUsedThrough(const double point[3], bool beyond) const
 +{
 +	float direction[3] = { (float)(point[0] - _eye[0]), (float)(point[1] - _eye[1]), (float)(point[2] - _eye[2]) };
 +	const float length = std::sqrt(direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2]);
@@ -47684,8 +47686,8 @@ index 000000000..5fcd17963
 +	smoke.smokeBlock = _smokeBlock;
 +	smoke.fireBlock = _fireBlock;
 +	const int sizeX = _save->getMapSizeX(), sizeY = _save->getMapSizeY(), sizeZ = _save->getMapSizeZ();
-+	const float Step = 2.0f;
-+	for (float from = 0.0f; from < _smokeSightVoxels; from += Step)
++	const float Step = 2.0f, reach = beyond ? _smokeSightVoxels : std::min(_smokeSightVoxels, length);
++	for (float from = 0.0f; from < reach; from += Step)
 +	{
 +		// This stretch of the line, and the tile its middle is in (off the map: the line ends).
 +		const float middle = from + Step * 0.5f;
@@ -52035,10 +52037,10 @@ index 000000000..17ff3d48d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..1c0cfd995
+index 000000000..6c5ab520b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,2969 @@
+@@ -0,0 +1,2981 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -53019,6 +53021,18 @@ index 000000000..1c0cfd995
 +			{
 +				MarkerSpot spot = { { feet[0], feet[1], feet[2] + unit->getFloatHeight() + unit->getHeight() + 5.0 }, marker.second };
 +				_markerSpots.push_back(spot);
++			}
++		}
++		// An enemy the squad sees but the soldier looked through doesn't, with smoke on the line to
++		// it: not drawn, only its marker, as for one behind a wall (a player's report, GitHub issue
++		// #98: "if a unit is visible, let me see it, if a unit is invisible, don't let me see it").
++		// Enemies the soldier sees stay clear of the smoke (see _unitVeil).
++		if (_cameraUnit && !debug && !fallingDown && unit->getFaction() == FACTION_HOSTILE && !_cameraUnit->hasVisibleUnit(unit))
++		{
++			const double middle[3] = { feet[0], feet[1], feet[2] + unit->getFloatHeight() + unit->getHeight() * 0.5 };
++			if (smokeSightUsedThrough(middle, false) > 0.0f)
++			{
++				continue;
 +			}
 +		}
 +

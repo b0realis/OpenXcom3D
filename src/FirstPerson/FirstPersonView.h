@@ -712,8 +712,8 @@ private:
 	Uint8 hazeColor(Uint8 color, float haze, int pixelX, int pixelY) const;
 	/// Smoke's colour on a pixel of its wall (where the soldier's sight runs out in it).
 	Uint8 smokeColor(Uint8 light, const float rayOrigin[3], const float rayDirection[3], float distance, float *billowOut = nullptr) const;
-	/// How much of the soldier's sight the smoke uses up looking through a point and on beyond it (1 or more: they can't see through).
-	float smokeSightUsedThrough(const double point[3]) const;
+	/// How much of the soldier's sight the smoke uses up looking through a point and on beyond it, or only up to it (1 or more: they can't see through).
+	float smokeSightUsedThrough(const double point[3], bool beyond = true) const;
 	/// Original smoke: how many times a tile's cloud is drawn on top of itself where the soldier can't see through it, inside
 	/// the cloud and on its outer shell (a tile next to one without smoke), so the cloud's outline stays smoke-like (see drawSeeThroughSmoke).
 	static constexpr int OriginalSmokeMaxLayers = 8, OriginalSmokeShellLayers = 3;

@@ -980,6 +980,18 @@ void FirstPersonView::drawUnits()
 				_markerSpots.push_back(spot);
 			}
 		}
+		// An enemy the squad sees but the soldier looked through doesn't, with smoke on the line to
+		// it: not drawn, only its marker, as for one behind a wall (a player's report, GitHub issue
+		// #98: "if a unit is visible, let me see it, if a unit is invisible, don't let me see it").
+		// Enemies the soldier sees stay clear of the smoke (see _unitVeil).
+		if (_cameraUnit && !debug && !fallingDown && unit->getFaction() == FACTION_HOSTILE && !_cameraUnit->hasVisibleUnit(unit))
+		{
+			const double middle[3] = { feet[0], feet[1], feet[2] + unit->getFloatHeight() + unit->getHeight() * 0.5 };
+			if (smokeSightUsedThrough(middle, false) > 0.0f)
+			{
+				continue;
+			}
+		}
 
 		// The isometric sprites show units as seen from the south-east (direction 3).
 		// Rotate the unit's facing so the side turned towards the camera is shown: the
