@@ -48,8 +48,11 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 - **A door under the crosshair:** a little green door left of the crosshair when it's on a door you have seen.
 - **Flight kept:** a soldier's flight switch (**B**) stays as it was through a save and a load.
 - **Enemy buttons at the right:** in 3D the buttons for the enemies in sight stand in a column at the right, centred on the screen's height on any screen, clear of the red arrows at the edge.
-- **Smoke drawn for less:** a grenade's cloud costs 13–28% less time a frame, drawn the same to the pixel.
-- **Fixed:** T'leth's first stage and the artifact site's second have their own dark green rock overhead, not black; the game's Bug Hunt and debug line sits under the top bar, not over its buttons.
+- **Smoke as the map draws it**, as in 0.8: no grey wall where your soldier's sight runs out, nothing stacked; Modern's soft clouds never more opaque than *Smoke opacity*, now a maximum (80% by day, 45% at night by default, up to 95%), Original's dots as on the map. And cheaper.
+- **Enemies by your soldier's own eyes:** an enemy only squadmates see isn't drawn through smoke, only its marker.
+- **A tank's turret switch:** **TURRET** on the top bar turns the turret alone, at the turret's cost; off, the whole tank turns as before.
+- **Live motion scanner**, a setting (off, on with the FPS playstyle): off, the scanner is one look from where it's used, as in the game.
+- **Fixed:** T'leth's first stage and the artifact site's second have their own dark green rock overhead, not black; the game's Bug Hunt and debug line sits under the top bar, not over its buttons; flying with *Falling* off goes sideways through the air again; touching down keeps flight on (Page Down on the ground switches it off).
 - **The logo** in every download: its picture, a sharper icon (256 pixels), and on Windows an icon for a shortcut.
 
 ## Earlier versions

@@ -10,7 +10,8 @@
 #   tools/make_release_macos.sh), built and started on GitHub's Mac, its Intel half under Rosetta.
 # There's no game data on these machines: each game is checked as far as it gets without it.
 # The downloads are kept with each run (Actions, the run, Artifacts) for 30 days. A tag v*
-# makes a draft release with them (a person reads it over and publishes it).
+# makes a draft release with them (a person reads it over and publishes it); a tag whose release
+# is there already (made and checked by hand) gets what it lacks: the macOS app.
 # (tools/make_public.sh copies tools/workflows/ to .github/workflows/.)
 name: Build
 
@@ -190,14 +191,25 @@ jobs:
           path: dl
           merge-multiple: true
       # A draft only, and only when the tag has no release yet: a person reads it over and
-      # publishes it. Its text is docs/releases/<tag>.md when there is one.
+      # publishes it. Its text is docs/releases/<tag>.md when there is one. When the release is
+      # there already (its Linux and Windows downloads made and checked by hand, the owner: the
+      # automatic build should add its own), only what it lacks is added: the macOS app, which
+      # only these builds make.
       - name: Draft release with the downloads
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
           if gh release view "$TAG" > /dev/null 2>&1; then
-            echo "$TAG has a release already: left as it is"
+            have=$(gh release view "$TAG" --json assets --jq '.assets[].name')
+            for download in dl/*; do
+              if echo "$have" | grep -qxF "$(basename "$download")"; then
+                echo "$TAG has $(basename "$download") already: left as it is"
+              else
+                gh release upload "$TAG" "$download"
+                echo "$TAG: $(basename "$download") added"
+              fi
+            done
             exit 0
           fi
           notes="docs/releases/$TAG.md"
