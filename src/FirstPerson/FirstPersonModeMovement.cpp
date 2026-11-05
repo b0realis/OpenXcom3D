@@ -139,7 +139,9 @@ bool FirstPersonMode::stepAllowed(BattleUnit *unit, int stepX, int stepY)
 		// The destination must have a floor, or the tile below it must be the top of a ramp or
 		// of stairs going down: its ground raised at least half a level (the terrain level is
 		// negative for raised ground, and a level is 24 voxels high), which is ground to walk on.
-		if (allowed && ((canFly(unit) && !flightOn(unit)) || !Options::fpsFalling))
+		// A flyer with flight on crosses the air either way, as on the map (a player's report,
+		// GitHub issue #99: with falling off, no step sideways in mid-air).
+		if (allowed && !(canFly(unit) && flightOn(unit)) && (canFly(unit) || !Options::fpsFalling))
 		{
 			const Tile *destination = _save->getTile(start + Position(stepX, stepY, 0));
 			const Tile *belowDestination = destination ? _save->getBelowTile(destination) : nullptr;
