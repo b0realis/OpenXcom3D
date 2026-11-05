@@ -278,7 +278,7 @@ All of these can be rebound in **Options → 3D VIEW → Controls**: click a key
 | **O** | Open a door without walking through: the one you look at, if it's within reach (the sides of your tile, or a wall meeting one of its corners, as a right-click on the map reaches), else the nearest one the view looks towards. The soldier turns to it first, by the rules (*Turning costs TU*: a paid turn, then the door) |
 | **(no key: set one)** | Grab the item underfoot, in 3D and on the map: one item on your tile and a hand free to take it, into that hand (the right one first) for the game's time units for that move (ground to hand); with more items, or no hand free (nor beside a gun that blocks both hands, the game's red 2), the inventory opens instead; with nothing there, NOTHING UNDERFOOT. It has no key until you give it one on the 3D keys page (every letter is the game's or ours) |
 | **T** | Throw a tactical flare (with "Unlimited tactical flares" on) |
-| **B** | Suit flight on/off (flying armor; SWIM under water); each soldier's switch is kept with the save |
+| **B** | Suit flight on/off (flying armor; SWIM under water); each soldier's switch is kept with the save. A soldier who went up without it (the map's own up button or path) has it switched on when seen in the air, so touching down keeps flight on: Page Down on the ground (or B) switches it off |
 | **F** | The flashlight on/off (setting *Flashlight*): the 3D view's own light, separate from the suit light (L) |
 | **Space** | Jump: a free hop. Walking into something low (a fence, table, crate, rock: up to waist height), it vaults over it, paying only the normal walk |
 | **N** | Night vision on/off, with night vision gear (Scroll Lock, the game's own toggle, works too); at any time, also during explosions, shots and the aliens' turn |
@@ -949,6 +949,8 @@ What `FirstPersonView` draws:
 - **The logo for the downloads** (the owner: "Use logo for icons in release targets, bundle the logo image in releases also"): the AppImage's icon and that of the menu entry the archive's installer makes are the logo at 256 pixels (128 before); the Windows zip has the logo's icon for a shortcut to `play.bat` (`openxcom3d.ico`; `openxcom.exe` has carried it since 1.09); and every download has the logo's picture (`openxcom3d_logo.png`).
 
 - **Flight across the air with Falling off** (a player, GitHub issue #99: "Turning "falling" off when midair suddedly disabled horrizontal flight, mid air."): with *Falling* off, a soldier flying (flight on) steps sideways through the air again, as on the map; the rule that keeps walkers from stepping off a ledge with *Falling* off caught flyers too, so in the air, where no tile around has a floor, every step was refused (since 0.8.2).
+
+- **Landing keeps flight on** (a player, GitHub issue #100: "Rather than touching down instantly disabling flight, make it do it when page down is pressed when already on the ground"): a soldier taken up into the air without the flight switch (the map's own up button or path, or a save from before 1.11) has it switched on in 3D, as if by **B**, so W into the ground or a roof no longer ends the flight: Page Down on the ground (or B) does. Before, such a soldier flew only while in the air, and the first touch of a floor switched flight off.
 
 ### 1.10 (2026-11-03)
 

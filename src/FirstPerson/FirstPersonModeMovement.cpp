@@ -1837,6 +1837,15 @@ void FirstPersonMode::moveUpDown(BattleUnit *unit, int direction, Action *action
  */
 void FirstPersonMode::updateFlight(BattleUnit *unit)
 {
+	// A flyer up in the air whose flight was never switched (taken up by the map's own up button
+	// or path, or from a save made before the switch was kept) has it switched on, as if by B: so
+	// touching down keeps flight on, and only Page Down on the ground (or B) switches it off (a
+	// player's report, GitHub issue #100: W into the ground ended the flight).
+	if (unit && canFly(unit) && unit->getFlightSwitch() == 0 && unit->isFloating())
+	{
+		unit->setFlightSwitch(1);
+	}
+
 	// Floated off a ledge with flight off: once the step is done, land if still in the air.
 	if (_landAfterStep && (!unit || !_stepPending))
 	{

@@ -30921,10 +30921,10 @@ index 000000000..278561765
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeMovement.cpp b/src/FirstPerson/FirstPersonModeMovement.cpp
 new file mode 100644
-index 000000000..0b7efb490
+index 000000000..56ce843e2
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeMovement.cpp
-@@ -0,0 +1,2127 @@
+@@ -0,0 +1,2136 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -32764,6 +32764,15 @@ index 000000000..0b7efb490
 + */
 +void FirstPersonMode::updateFlight(BattleUnit *unit)
 +{
++	// A flyer up in the air whose flight was never switched (taken up by the map's own up button
++	// or path, or from a save made before the switch was kept) has it switched on, as if by B: so
++	// touching down keeps flight on, and only Page Down on the ground (or B) switches it off (a
++	// player's report, GitHub issue #100: W into the ground ended the flight).
++	if (unit && canFly(unit) && unit->getFlightSwitch() == 0 && unit->isFloating())
++	{
++		unit->setFlightSwitch(1);
++	}
++
 +	// Floated off a ledge with flight off: once the step is done, land if still in the air.
 +	if (_landAfterStep && (!unit || !_stepPending))
 +	{
