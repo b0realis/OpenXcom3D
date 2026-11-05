@@ -19,12 +19,12 @@
 ## What you can do
 
 - **Switch at any moment:** **F8** takes you from the isometric map into the selected soldier's eyes and back, in the middle of a turn. Whatever you do in 3D is the game's own action, by its own rules: time units, energy, accuracy, reaction fire, line of sight, doors, morale.
-- **Move:** walk and step sideways with **W A S D** in real time, each tile paid as you cross into it, or a tile at a time; sprint, jump, vault a fence, drop off a ledge, climb ladders and ride grav lifts, fly with flying armor, open doors, and lean round a corner.
-- **Fight:** fire at the crosshair in every mode the weapon has (snap, aimed, auto, throw, launch, melee, psi), with the game's accuracy and line of fire, the path shown before you fire; or FPS style, each round where the crosshair points. Zoom in, fire two guns at once or one after the other, and watch a shotgun's pellets fly.
-- **See:** the original maps, sprites, palette and sounds, rebuilt in 3D from the game's own voxel data: light and shadow, a flashlight and flares, night vision gear, smoke you can see through, rain and snow, swinging doors, glowing UFOs, bullet holes and scorch marks; under the sea, bubbles, marine snow and caustics.
+- **Move:** walk and step sideways with **W A S D** in real time, each tile paid as you cross into it, or a tile at a time; sprint, jump, vault a fence, drop off a ledge, climb ladders and ride grav lifts, fly with flying armor, open doors (a little green door by the crosshair says it's on one), and lean round a corner.
+- **Fight:** fire at the crosshair in every mode the weapon has (snap, aimed, auto, throw, launch, melee, psi), with the game's accuracy and line of fire, the path shown before you fire; or FPS style, each round where the crosshair points. Zoom in, fire two guns at once or one after the other, watch a shotgun's pellets fly, and in a tank turn the turret alone.
+- **See:** the original maps, sprites, palette and sounds, rebuilt in 3D from the game's own voxel data: light and shadow, a flashlight and flares, night vision gear, smoke as the map draws it, rain and snow under a grey sky, windows that shatter, swinging doors, glowing UFOs, bullet holes and scorch marks; the stars over XPiratez's space stations; under the sea, bubbles, marine snow and caustics.
 - **Lead the squad:** every soldier's live helmet camera on the top bar (hover for their card, right click for the big soldier cam), a camera window over the isometric map, and the aliens' turn watched through the eyes of whoever sees the alien.
-- **Feel it:** recoil and muzzle flashes, hit markers, shots whizzing past, blood on the view and a heartbeat when badly hurt, panic and berserk through your soldier's own eyes, and a helmet camera dying in static.
-- **Make it yours:** 89 settings and 39 keys of its own (**Options → 3D VIEW**), and a controller layout made for the Steam Deck.
+- **Feel it:** recoil and muzzle flashes, marks on the crosshair (white ticks for a hit, red for a kill, a blue shield when a strike does no harm), shots whizzing past, blood on the view and a heartbeat when badly hurt, panic and berserk through your soldier's own eyes, and a helmet camera dying in static.
+- **Make it yours:** 91 settings and 40 keys of its own (**Options → 3D VIEW**), and a controller layout made for the Steam Deck.
 
 | | |
 |---|---|
@@ -48,8 +48,11 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 - **A door under the crosshair:** a little green door left of the crosshair when it's on a door you have seen.
 - **Flight kept:** a soldier's flight switch (**B**) stays as it was through a save and a load.
 - **Enemy buttons at the right:** in 3D the buttons for the enemies in sight stand in a column at the right, centred on the screen's height on any screen, clear of the red arrows at the edge.
-- **Smoke drawn for less:** a grenade's cloud costs 13–28% less time a frame, drawn the same to the pixel.
-- **Fixed:** T'leth's first stage and the artifact site's second have their own dark green rock overhead, not black; the game's Bug Hunt and debug line sits under the top bar, not over its buttons.
+- **Smoke as the map draws it**, as in 0.8: no grey wall where your soldier's sight runs out, nothing stacked; Modern's soft clouds never more opaque than *Smoke opacity*, now a maximum (80% by day, 45% at night by default, up to 95%), Original's dots as on the map. And cheaper.
+- **Enemies by your soldier's own eyes:** an enemy only squadmates see isn't drawn through smoke, only its marker.
+- **A tank's turret switch:** **TURRET** on the top bar turns the turret alone, at the turret's cost; off, the whole tank turns as before.
+- **Live motion scanner**, a setting (off, on with the FPS playstyle): off, the scanner is one look from where it's used, as in the game.
+- **Fixed:** T'leth's first stage and the artifact site's second have their own dark green rock overhead, not black; the game's Bug Hunt and debug line sits under the top bar, not over its buttons; flying with *Falling* off goes sideways through the air again; touching down keeps flight on (Page Down on the ground switches it off).
 - **The logo** in every download: its picture, a sharper icon (256 pixels), and on Windows an icon for a shortcut.
 
 ## Earlier versions
@@ -76,7 +79,7 @@ You need your own copy of the original game data (*UFO: Enemy Unknown / X-COM: U
 - **Linux (x86-64):** from the [latest release](https://github.com/b0realis/OpenXcom3D/releases/latest) take the **AppImage** (one file: make it executable and run it) or the **archive** (unpack it anywhere and run `./play.sh`). Nothing needs installing; it runs on any Linux from 2021 on (glibc 2.34: Ubuntu 22.04 and newer, Debian 12, Fedora, Arch, SteamOS).
 - **Windows 10 and 11 (64-bit):** take the **zip**, unpack it into a folder of yours (not *Program Files*) and double-click `play.bat`. It's not signed, so Windows may warn the first time: *More info*, then *Run anyway*.
 - **Steam Deck:** the Linux archive, set up once in Desktop Mode and added to Steam, played in Game Mode with its own controller layout.
-- **macOS (Apple silicon and Intel, macOS 11 and newer):** a first, untested build, made by the [automatic builds](https://github.com/b0realis/OpenXcom3D/actions/workflows/build.yml?query=branch%3Amain) (under *Artifacts*, **macos-release**).
+- **macOS (Apple silicon and Intel, macOS 11 and newer):** the **macOS zip** from the latest release: unpack it and open **OpenXcom3D.app**. A first build, made by the [automatic builds](https://github.com/b0realis/OpenXcom3D/actions/workflows/build.yml?query=branch%3Amain) and not yet tried on a real Mac.
 - **From source:** `python3 install.py --from-source` clones OXCE at the commit below, applies the patch, builds and installs; the **[build guide](https://b0realis.github.io/OpenXcom3D/)** has every step by hand, for Linux and for Windows.
 
 The first time, it finds *X-COM: UFO Defense* and *Terror From The Deep* in your Steam libraries by itself; otherwise put the game's folder next to it, named `UFO` (or `TFTD`). Its data is only linked, never copied or changed. Then start a game (or a **New Battle**) and press **F8** in battle: mouse to look, **W A S D** to walk, the left button to fire, **F8** back to the map.

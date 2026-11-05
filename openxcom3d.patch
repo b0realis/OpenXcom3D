@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..a10c25249
+index 000000000..c32d7524c
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,474 @@
+@@ -0,0 +1,483 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -295,9 +295,9 @@ index 000000000..a10c25249
 +  STR_FPS_HIT_SOUNDS: "Hit, kill and swing sounds"
 +  STR_FPS_HIT_SOUNDS_DESC: "A tick when you hit an enemy (duller when it did no harm), a double tick for a kill, a swoosh for your melee swings, and your heartbeat once hit under half health."
 +  STR_FPS_SMOKE: "Smoke"
-+  STR_FPS_SMOKE_DESC: "Original: the game's own smoke. Modern: soft grey clouds. Both see-through, thick where your soldier can't see through."
++  STR_FPS_SMOKE_DESC: "Original: the game's own smoke, as the map draws it. Modern: soft see-through clouds. Units as your soldier sees them."
 +  STR_FPS_SMOKE_OPACITY: "Smoke opacity"
-+  STR_FPS_SMOKE_OPACITY_DESC: "How solid smoke you can see through looks (the thinnest; thicker more). Where your soldier can't see through it, it stays solid."
++  STR_FPS_SMOKE_OPACITY_DESC: "The most solid Modern smoke gets (the thickest; thinner less): smoke over smoke never hides more than this."
 +  STR_FPS_NIGHT_SMOKE_OPACITY: "Night smoke opacity"
 +  STR_FPS_NIGHT_SMOKE_OPACITY_DESC: "The same in the dark: at night, on dark maps and in unlit rooms, by the light where the smoke hangs. Lower if smoke is blinding."
 +  STR_FPS_SMOKE_ORIGINAL: "Original"
@@ -378,6 +378,8 @@ index 000000000..a10c25249
 +  STR_FPS_FLIGHT_COST_OVERRIDE_DESC: "YES: the cost above for all. NO: each unit's own, as the game has."
 +  STR_FPS_KEY_FLIGHT: "Flight on/off"
 +  STR_FPS_KEY_FLIGHT_DESC: "Flight on/off, for flying armour."
++  STR_FPS_KEY_TURRET: "Turret only (tanks)"
++  STR_FPS_KEY_TURRET_DESC: "A tank's turret switch: the view turns only the turret, at the turret's cost. No key at first."
 +  STR_FPS_KEY_FLASHLIGHT: "Flashlight on/off"
 +  STR_FPS_KEY_FLASHLIGHT_DESC: "The flashlight on/off (setting Flashlight). The suit light is the game's personal light."
 +  STR_FPS_BUTTON_FLY: "SUIT FLY"
@@ -387,6 +389,9 @@ index 000000000..a10c25249
 +  STR_FPS_NO_ARMOR: "No armor"
 +  STR_FPS_FLIGHT_ON: "Flight on"
 +  STR_FPS_FLIGHT_OFF: "Flight off"
++  STR_FPS_TURRET_ON: "Turret only: the view turns the turret"
++  STR_FPS_TURRET_OFF: "Turret off: the view turns the whole tank"
++  STR_FPS_NO_TURRET: "No turret to turn"
 +  STR_FPS_SWIM_ON: "Swimming on"
 +  STR_FPS_SWIM_OFF: "Swimming off"
 +  STR_FPS_FLIGHT_OFF_KEY: "Flight off ({0} to fly)"
@@ -396,6 +401,8 @@ index 000000000..a10c25249
 +  STR_FPS_MAP_LAYERS_ALL: "The map shows every level (3D always does)"
 +  STR_FPS_MAP_LAYERS_ONE: "The map shows up to its level (3D: every level)"
 +  STR_FPS_BUTTON_FLY_SHORT: "FLY"
++  STR_FPS_BUTTON_TURRET: "TURRET"
++  STR_FPS_BUTTON_TURRET_SHORT: "TUR"
 +  STR_FPS_BUTTON_SWIM_SHORT: "SWIM"
 +  STR_FPS_BUTTON_LIGHT_SHORT: "LIGHT"
 +  STR_FPS_BUTTON_SPECIAL_SHORT: "SPEC"
@@ -528,6 +535,8 @@ index 000000000..a10c25249
 +  STR_FPS_AUTO_EQUIP_GUNS_FIRST: "Auto-equip guns first"
 +  STR_FPS_AUTO_EQUIP_GUNS_FIRST_DESC: "Soldiers with no saved loadout take guns before melee weapons, the hardest-hitting first, launchers last. NO: OpenXcom's own."
 +  STR_FPS_QUICK_DEATHS_DESC: "A unit killed or knocked out is down at once: bursts fire on, falls play on their own. NO: the game's, one by one."
++  STR_FPS_LIVE_SCANNER: "Live motion scanner"
++  STR_FPS_LIVE_SCANNER_DESC: "The motion scanner stays up as you move and through the aliens' turn. NO: one look from where it's used, as in the game."
 +  STR_FPS_UNIT_NAMES: "Unit names"
 +  STR_FPS_UNIT_NAMES_DESC: "The name of the unit under the crosshair."
 +  STR_FPS_STAT_BARS: "Stat bars"
@@ -604,10 +613,10 @@ index 000000000..a10c25249
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..966030095
+index 000000000..326138cbd
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,474 @@
+@@ -0,0 +1,483 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -775,9 +784,9 @@ index 000000000..966030095
 +  STR_FPS_HIT_SOUNDS: "Hit, kill and swing sounds"
 +  STR_FPS_HIT_SOUNDS_DESC: "A tick when you hit an enemy (duller when it did no harm), a double tick for a kill, a swoosh for your melee swings, and your heartbeat once hit under half health."
 +  STR_FPS_SMOKE: "Smoke"
-+  STR_FPS_SMOKE_DESC: "Original: the game's own smoke. Modern: soft grey clouds. Both see-through, thick where your soldier can't see through."
++  STR_FPS_SMOKE_DESC: "Original: the game's own smoke, as the map draws it. Modern: soft see-through clouds. Units as your soldier sees them."
 +  STR_FPS_SMOKE_OPACITY: "Smoke opacity"
-+  STR_FPS_SMOKE_OPACITY_DESC: "How solid smoke you can see through looks (the thinnest; thicker more). Where your soldier can't see through it, it stays solid."
++  STR_FPS_SMOKE_OPACITY_DESC: "The most solid Modern smoke gets (the thickest; thinner less): smoke over smoke never hides more than this."
 +  STR_FPS_NIGHT_SMOKE_OPACITY: "Night smoke opacity"
 +  STR_FPS_NIGHT_SMOKE_OPACITY_DESC: "The same in the dark: at night, on dark maps and in unlit rooms, by the light where the smoke hangs. Lower if smoke is blinding."
 +  STR_FPS_SMOKE_ORIGINAL: "Original"
@@ -858,6 +867,8 @@ index 000000000..966030095
 +  STR_FPS_FLIGHT_COST_OVERRIDE_DESC: "YES: the cost above for all. NO: each unit's own, as the game has."
 +  STR_FPS_KEY_FLIGHT: "Flight on/off"
 +  STR_FPS_KEY_FLIGHT_DESC: "Flight on/off, for flying armor."
++  STR_FPS_KEY_TURRET: "Turret only (tanks)"
++  STR_FPS_KEY_TURRET_DESC: "A tank's turret switch: the view turns only the turret, at the turret's cost. No key at first."
 +  STR_FPS_KEY_FLASHLIGHT: "Flashlight on/off"
 +  STR_FPS_KEY_FLASHLIGHT_DESC: "The flashlight on/off (setting Flashlight). The suit light is the game's personal light."
 +  STR_FPS_BUTTON_FLY: "SUIT FLY"
@@ -867,6 +878,9 @@ index 000000000..966030095
 +  STR_FPS_NO_ARMOR: "No armor"
 +  STR_FPS_FLIGHT_ON: "Flight on"
 +  STR_FPS_FLIGHT_OFF: "Flight off"
++  STR_FPS_TURRET_ON: "Turret only: the view turns the turret"
++  STR_FPS_TURRET_OFF: "Turret off: the view turns the whole tank"
++  STR_FPS_NO_TURRET: "No turret to turn"
 +  STR_FPS_SWIM_ON: "Swimming on"
 +  STR_FPS_SWIM_OFF: "Swimming off"
 +  STR_FPS_FLIGHT_OFF_KEY: "Flight off ({0} to fly)"
@@ -876,6 +890,8 @@ index 000000000..966030095
 +  STR_FPS_MAP_LAYERS_ALL: "The map shows every level (3D always does)"
 +  STR_FPS_MAP_LAYERS_ONE: "The map shows up to its level (3D: every level)"
 +  STR_FPS_BUTTON_FLY_SHORT: "FLY"
++  STR_FPS_BUTTON_TURRET: "TURRET"
++  STR_FPS_BUTTON_TURRET_SHORT: "TUR"
 +  STR_FPS_BUTTON_SWIM_SHORT: "SWIM"
 +  STR_FPS_BUTTON_LIGHT_SHORT: "LIGHT"
 +  STR_FPS_BUTTON_SPECIAL_SHORT: "SPEC"
@@ -1008,6 +1024,8 @@ index 000000000..966030095
 +  STR_FPS_AUTO_EQUIP_GUNS_FIRST: "Auto-equip guns first"
 +  STR_FPS_AUTO_EQUIP_GUNS_FIRST_DESC: "Soldiers with no saved loadout take guns before melee weapons, the hardest-hitting first, launchers last. NO: OpenXcom's own."
 +  STR_FPS_QUICK_DEATHS_DESC: "A unit killed or knocked out is down at once: bursts fire on, falls play on their own. NO: the game's, one by one."
++  STR_FPS_LIVE_SCANNER: "Live motion scanner"
++  STR_FPS_LIVE_SCANNER_DESC: "The motion scanner stays up as you move and through the aliens' turn. NO: one look from where it's used, as in the game."
 +  STR_FPS_UNIT_NAMES: "Unit names"
 +  STR_FPS_UNIT_NAMES_DESC: "The name of the unit under the crosshair."
 +  STR_FPS_STAT_BARS: "Stat bars"
@@ -22104,7 +22122,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..02337ed50 100644
+index a08796ced..c9e6bc5e9 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -22121,11 +22139,11 @@ index a08796ced..02337ed50 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsVoxelUnits;
++OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsVoxelUnits;
 +OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
-+OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
++OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsTurret, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
 diff --git a/src/Engine/Script.h b/src/Engine/Script.h
 index e11f89dde..5658639bc 100644
 --- a/src/Engine/Script.h
@@ -22210,10 +22228,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..ba370335b
+index 000000000..1d3328b6d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1290 @@
+@@ -0,0 +1,1306 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -22647,7 +22665,7 @@ index 000000000..ba370335b
 + * The switches the setting "Playstyle" sets (the owner's choice: shooting and turning, moving,
 + * the feel of combat; the cheats stay apart): FPS-style shooting, turning by the rules, movement
 + * tile by tile, jumping over low obstacles, leaning (Peek) and lean shots, full sprite hitboxes,
-+ * quick deaths, melee hitting walls and the downed.
++ * quick deaths, melee hitting walls and the downed, and the live motion scanner.
 + * @return The switches.
 + */
 +const std::vector<PlaystyleSwitch> &playstyleSwitches()
@@ -22662,6 +22680,7 @@ index 000000000..ba370335b
 +		{ "fpsSpriteHitboxes", &Options::fpsSpriteHitboxes, nullptr, 0, 1 },
 +		{ "fpsQuickDeaths", &Options::fpsQuickDeaths, nullptr, 0, 1 },
 +		{ "fpsMeleeTerrain", &Options::fpsMeleeTerrain, nullptr, 0, 1 },
++		{ "fpsLiveScanner", &Options::fpsLiveScanner, nullptr, 0, 1 },
 +	};
 +	return switches;
 +}
@@ -22787,6 +22806,12 @@ index 000000000..ba370335b
 + */
 +void settlePlaystyle()
 +{
++	// The live motion scanner joined the playstyle in 1.11 (GitHub issue #101): a profile from before
++	// it that says FPS gets it as FPS has it (switched off by hand, it would have said Custom).
++	if (Options::fpsPlaystyle == 1 && !Options::fpsLiveScanner)
++	{
++		Options::fpsLiveScanner = true;
++	}
 +	if (Options::fpsPlaystyle != 2 && playstyleOfSwitches() != Options::fpsPlaystyle)
 +	{
 +		Options::fpsPlaystyle = 2;
@@ -22967,12 +22992,13 @@ index 000000000..ba370335b
 +	// soldier's sight (2). (1.0's Solid, 0, is gone.) Unset (-1) until settled (see settleOptions)
 +	// from 0.9's "See-through smoke", kept below, unlisted.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmoke", &fpsSmoke, -1, "STR_FPS_SMOKE", category));
-+	// How opaque the see-through smoke is drawn (not where the soldier can't see through it:
-+	// that stays solid): the thinnest smoke's opacity in percent, thicker smoke more as before;
-+	// in the dark, by the light where it hangs, the night value (a player: "non full smoke can
-+	// be blinding" at night and on dark maps), the two blended in between.
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmokeOpacity", &fpsSmokeOpacity, 45, "STR_FPS_SMOKE_OPACITY", category));
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightSmokeOpacity", &fpsNightSmokeOpacity, 25, "STR_FPS_NIGHT_SMOKE_OPACITY", category));
++	// The most opaque Modern's smoke is drawn, in percent: the thickest smoke's, thinner smoke less,
++	// and smoke over smoke builds up to it and no further (a player's report, GitHub issue #98:
++	// stacked smoke hid more than the game's sight rules); in the dark, by the light where it
++	// hangs, the night value (a player: "non full smoke can be blinding" at night and on dark
++	// maps), the two blended in between.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmokeOpacity", &fpsSmokeOpacity, 80, "STR_FPS_SMOKE_OPACITY", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightSmokeOpacity", &fpsNightSmokeOpacity, 45, "STR_FPS_NIGHT_SMOKE_OPACITY", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlares", &fpsFlares, true, "STR_FPS_FLARES", category));
 +	// 0.9's "See-through smoke" (YES/NO), loaded and saved but listed nowhere (a category no
 +	// options screen shows): it gives the smoke setting its first value.
@@ -23077,6 +23103,11 @@ index 000000000..ba370335b
 +	// looked through falls on their helmet camera card while the view goes on to the next (a
 +	// player's report, GitHub issue #40). Off: the game's own deaths, one by one.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsQuickDeaths", &fpsQuickDeaths, false, "STR_FPS_QUICK_DEATHS", category));
++	// The motion scanner held up in 3D stays up as the soldier moves and through the aliens' turn,
++	// a live radar for its one use (a player's report, GitHub issue #101: "potentially neat
++	// feature"; the owner: a setting, off by default, in the playstyle). Off: one look from where
++	// it was used, as the game's own scanner (see FirstPersonMode::updateScanner).
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsLiveScanner", &fpsLiveScanner, false, "STR_FPS_LIVE_SCANNER", category));
 +	// The hitboxes' outlines and the path of a throw glowing (spilling bloom round them), or plain lines.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsGlowingOutlines", &fpsGlowingOutlines, false, "STR_FPS_GLOWING_OUTLINES", category));
 +	// Icons over the downed (unconscious) units in sight, for burning, bleeding, shock and
@@ -23163,6 +23194,9 @@ index 000000000..ba370335b
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsGrabItem", &keyFpsGrabItem, SDLK_UNKNOWN, "STR_FPS_KEY_GRAB_ITEM", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlare", &keyFpsFlare, SDLK_t, "STR_FPS_KEY_FLARE", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlight", &keyFpsFlight, SDLK_b, "STR_FPS_KEY_FLIGHT", category));
++	// A tank's turret switch (a player's report: turning the view turned the whole tank, at its full
++	// cost; the TURRET button on the top bar too): no key until the player gives it one.
++	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsTurret", &keyFpsTurret, SDLK_UNKNOWN, "STR_FPS_KEY_TURRET", category));
 +	// The flashlight on and off (F, as in the first-person shooters; setting "Flashlight").
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlashlight", &keyFpsFlashlight, SDLK_f, "STR_FPS_KEY_FLASHLIGHT", category));
 +	// Space is the map's night vision hold key; in 3D it jumps, and night vision is gear (N).
@@ -23886,10 +23920,10 @@ index 000000000..9a3a667c9
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..6e5c4dd50
+index 000000000..edc73bad5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2882 @@
+@@ -0,0 +1,2884 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24327,15 +24361,15 @@ index 000000000..6e5c4dd50
 +	_btnNext = makeButton(SquadX, PrevNextW, ">");
 +
 +	// The suit's buttons, shown for what it can do (laid out right to left from END): fly (swim
-+	// under the sea), personal light, night vision and a special weapon. Each label comes in
++	// under the sea), personal light, night vision, a special weapon and a tank's turret switch. Each label comes in
 +	// full and short, for a narrow bar; the buttons start as wide as the full label.
 +	const bool underwater = _save->getDepth() > 0;
-+	const char *suitLabels[4][2] = {
++	const char *suitLabels[5][2] = {
 +		{ underwater ? "STR_FPS_BUTTON_SWIM" : "STR_FPS_BUTTON_FLY", underwater ? "STR_FPS_BUTTON_SWIM_SHORT" : "STR_FPS_BUTTON_FLY_SHORT" },
 +		{ "STR_FPS_BUTTON_LIGHT", "STR_FPS_BUTTON_LIGHT_SHORT" }, { "STR_FPS_BUTTON_NIGHT", "STR_FPS_BUTTON_NIGHT_SHORT" },
-+		{ "STR_FPS_BUTTON_SPECIAL", "STR_FPS_BUTTON_SPECIAL_SHORT" } };
-+	TextButton **suitButtons[4] = { &_btnFly, &_btnLight, &_btnNight, &_btnSpecial };
-+	for (int buttonIndex = 0; buttonIndex < 4; ++buttonIndex)
++		{ "STR_FPS_BUTTON_SPECIAL", "STR_FPS_BUTTON_SPECIAL_SHORT" }, { "STR_FPS_BUTTON_TURRET", "STR_FPS_BUTTON_TURRET_SHORT" } };
++	TextButton **suitButtons[5] = { &_btnFly, &_btnLight, &_btnNight, &_btnSpecial, &_btnTurret };
++	for (int buttonIndex = 0; buttonIndex < 5; ++buttonIndex)
 +	{
 +		_suitLabelsLong[buttonIndex] = _state->tr(suitLabels[buttonIndex][0]);
 +		_suitLabelsShort[buttonIndex] = _state->tr(suitLabels[buttonIndex][1]);
@@ -24343,11 +24377,12 @@ index 000000000..6e5c4dd50
 +		(*suitButtons[buttonIndex])->setVisible(false);
 +	}
 +
-+	// Flight, light and night vision are toggles: each a button group of its own, so the
-+	// button stays pressed while it's on.
++	// Flight, light, night vision and the turret are toggles: each a button group of its own, so
++	// the button stays pressed while it's on.
 +	_btnFly->setGroup(&_flyButtonGroup);
 +	_btnLight->setGroup(&_lightButtonGroup);
 +	_btnNight->setGroup(&_nightButtonGroup);
++	_btnTurret->setGroup(&_turretButtonGroup);
 +	// One squad button per soldier, made as they're needed (see refreshSquad).
 +}
 +
@@ -24763,7 +24798,7 @@ index 000000000..6e5c4dd50
 +	_anchors[_txtSprint] = TOP_RIGHT;
 +	_anchors[_txtEnPassant] = TOP_RIGHT;
 +	for (Surface *part : _panelParts) _anchors[part] = BOTTOM_LEFT;
-+	for (Surface *part : { _btnFly, _btnLight, _btnNight, _btnSpecial }) _anchors[part] = TOP_RIGHT;
++	for (Surface *part : { _btnFly, _btnLight, _btnNight, _btnSpecial, _btnTurret }) _anchors[part] = TOP_RIGHT;
 +}
 +
 +
@@ -25955,7 +25990,7 @@ index 000000000..6e5c4dd50
 +	// Night vision (gear), in the isometric map's colour.
 +	_view->setNightVision(hasNightVision(unit) ? _state->_map->getNightVisionColor() : 0);
 +	// Smoke as this soldier's eyes see through it: the game's sight range, and the armor's heat
-+	// vision (setting "Smoke": Modern's wall, Original's stacked frames).
++	// vision (the see-through smoke thinner; enemies they don't see in smoke not drawn).
 +	_view->setSmokeSight(_save->getTileEngine()->getMaxViewDistance() * 16.0f, unit->getVisibilityThroughSmoke(), unit->getVisibilityThroughFire());
 +	// The flashlight (setting "Flashlight"), on and off with its own key (see toggleFlashlight):
 +	// on, a wide beam from the shoulder, in the dark only (the battle's shade 6 or more, of 0
@@ -26209,6 +26244,7 @@ index 000000000..6e5c4dd50
 +	if (key == Options::keyFpsUp) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_UP, action, true); return true; }
 +	if (key == Options::keyFpsDown) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_DOWN, action, true); return true; }
 +	if (key == Options::keyFpsFlight) { if (pressed) toggleFlight(_save->getSelectedUnit()); return true; }
++	if (key != SDLK_UNKNOWN && key == Options::keyFpsTurret) { if (pressed) toggleTurret(_save->getSelectedUnit()); return true; }
 +	if (key == Options::keyFpsFlashlight) { if (pressed) toggleFlashlight(); return true; }
 +	if (key == Options::keyFpsSprint) { if (pressed) toggleSprint(); return true; }
 +	if (key == Options::keyFpsEnPassant) { if (pressed) toggleEnPassant(); return true; }
@@ -26404,7 +26440,7 @@ index 000000000..6e5c4dd50
 +		if (event.type == SDL_MOUSEBUTTONUP)
 +		{
 +			for (TextButton *button : _btnSquad) handleOnCanvas(button, action);
-+			for (TextButton *button : { _btnView, _btnHud, _btnInventory, _btnEndTurn, _btnFly, _btnLight, _btnNight, _btnSpecial, _btnPrev, _btnNext })
++			for (TextButton *button : { _btnView, _btnHud, _btnInventory, _btnEndTurn, _btnFly, _btnLight, _btnNight, _btnSpecial, _btnTurret, _btnPrev, _btnNext })
 +			{
 +				handleOnCanvas(button, action);
 +			}
@@ -26774,10 +26810,10 @@ index 000000000..6e5c4dd50
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..fa3342ece
+index 000000000..0d167822a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1255 @@
+@@ -0,0 +1,1261 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -27181,6 +27217,8 @@ index 000000000..fa3342ece
 +	Surface *_compass = nullptr;                 // the dial
 +	Surface *_scannerPanel = nullptr;            // the motion scanner's round screen, held up at the bottom middle (see updateScanner)
 +	FirstPersonScanner *_scanner = nullptr;      // the motion scanner held up (or put away), and its art, ring and blips
++	Position _scannerFrom;                       // where it was used, and in which turn (setting "Live motion scanner"
++	int _scannerTurn = 0;                        //   off: one look from there, see updateScanner)
 +	Uint8 _scannerRimColor = 0;                  // the round screen's rim
 +	Surface *_climbArrows = nullptr;             // beside it, the ways W may climb, the one it takes now lit (see updateClimbArrows)
 +	int _climbArrowsShown = -1;                  // what they show: up 1, down 2, lit (1 up, 2 down) times 4; -1 not drawn yet
@@ -27352,6 +27390,10 @@ index 000000000..fa3342ece
 +	bool flightOn(const BattleUnit *unit) const;
 +	/// Switches flight on or off.
 +	void toggleFlight(BattleUnit *unit);
++	/// Switches a tank's turret-only turning on or off (the TURRET button).
++	void toggleTurret(BattleUnit *unit);
++	/// Does turning the view turn only this unit's turret?
++	bool turretTurning(const BattleUnit *unit) const;
 +	/// May a walker go up or down a level from here (a lift ride, a ladder)?
 +	bool walkerMayMoveUpDown(const Position &position, int direction) const;
 +	/// Goes up or down a level: by grav lift or ladder, or flying (the up and down keys also switch flight on and off).
@@ -27762,9 +27804,9 @@ index 000000000..fa3342ece
 +	// the armor: its name, and buttons for what it and the gear can do (flight, personal light,
 +	// night vision, a special weapon), left of END
 +	Text *_txtArmor = nullptr;
-+	TextButton *_btnFly = nullptr, *_btnLight = nullptr, *_btnNight = nullptr, *_btnSpecial = nullptr; // FLY (SWIM), LIGHT, NIGHT VISION, SPECIAL
-+	TextButton *_flyButtonGroup = nullptr, *_lightButtonGroup = nullptr, *_nightButtonGroup = nullptr; // their pressed looks (switched on)
-+	std::string _suitLabelsLong[4], _suitLabelsShort[4]; // suit button labels: in full, and for a narrow bar
++	TextButton *_btnFly = nullptr, *_btnLight = nullptr, *_btnNight = nullptr, *_btnSpecial = nullptr, *_btnTurret = nullptr; // FLY (SWIM), LIGHT, NIGHT VISION, SPECIAL, TURRET
++	TextButton *_flyButtonGroup = nullptr, *_lightButtonGroup = nullptr, *_nightButtonGroup = nullptr, *_turretButtonGroup = nullptr; // their pressed looks (switched on)
++	std::string _suitLabelsLong[5], _suitLabelsShort[5]; // suit button labels: in full, and for a narrow bar
 +
 +	// ---- one button per soldier ----
 +
@@ -28035,10 +28077,10 @@ index 000000000..fa3342ece
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeCamera.cpp b/src/FirstPerson/FirstPersonModeCamera.cpp
 new file mode 100644
-index 000000000..fd0923b46
+index 000000000..f88b40451
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeCamera.cpp
-@@ -0,0 +1,862 @@
+@@ -0,0 +1,878 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -28221,14 +28263,18 @@ index 000000000..fd0923b46
 + *   blast) the head looks no further than its limit, as without the time units, and turns no
 + *   more (a player's report: looking round mid-shot, the soldier turned step by step after it,
 + *   paying for each; the owner: hold the head's limit).
++ * - A tank with its turret switch on (see toggleTurret) turns only its turret, by the same rules:
++ *   the turret's facing, the game's own turret turn (1 time unit an eighth), the hull left as it is.
 + */
 +void FirstPersonMode::faceLookDirection(BattleUnit *unit)
 +{
++	const bool turret = turretTurning(unit);
++	const int facingNow = turret ? unit->getTurretDirection() : unit->getDirection();
 +	if (Options::fpsTurnCost && shotUnderWay() && unit->getFaction() == FACTION_PLAYER && !unit->isOut())
 +	{
 +		// (held a hair inside the limit: exactly on it, rounding could tip it past once the shot
 +		// is over, and the soldier would turn a step after all)
-+		const double facingYaw = unit->getDirection() * 45.0 - 90.0;
++		const double facingYaw = facingNow * 45.0 - 90.0;
 +		const double offFacing = std::remainder(_view->getYawDegrees() - facingYaw, 360.0);
 +		const double heldLimit = HeadTurn - 0.1;
 +		if (std::abs(offFacing) > heldLimit)
@@ -28249,7 +28295,7 @@ index 000000000..fd0923b46
 +	// 0 = north, clockwise in 45 degree steps.
 +	if (Options::fpsTurnCost)
 +	{
-+		const double facingYaw = unit->getDirection() * 45.0 - 90.0;
++		const double facingYaw = facingNow * 45.0 - 90.0;
 +		const double offFacing = std::remainder(_view->getYawDegrees() - facingYaw, 360.0);
 +		const bool snapTurnDone = _snapTurnFacing && _snapTurnDegrees == 0.0;
 +		if (snapTurnDone && std::abs(offFacing) <= 22.5)
@@ -28261,7 +28307,7 @@ index 000000000..fd0923b46
 +			return;
 +		}
 +		const int step = offFacing > 0.0 ? 1 : -1;
-+		const int cost = unit->getTurnCost();
++		const int cost = turret ? 1 : unit->getTurnCost();
 +		if (!doomModeOn() && (unit->getTimeUnits() < cost || !reserveAllows(unit, cost, 0)))
 +		{
 +			// Not enough time units (or they're reserved for a shot): the view stops at the
@@ -28277,12 +28323,13 @@ index 000000000..fd0923b46
 +			}
 +			return;
 +		}
-+		// One step that way, through the game's own turning.
++		// One step that way, through the game's own turning (a turret's alone, as the map's Ctrl turn).
 +		Position towards;
-+		Pathfinding::directionToVector((unit->getDirection() + step + 8) % 8, &towards);
++		Pathfinding::directionToVector((facingNow + step + 8) % 8, &towards);
 +		BattleAction turn;
 +		turn.actor = unit;
 +		turn.target = unit->getPosition() + towards;
++		turn.strafe = turret;
 +		_state->_battleGame->statePushBack(new UnitTurnBState(_state->_battleGame, turn));
 +		return;
 +	}
@@ -28293,14 +28340,25 @@ index 000000000..fd0923b46
 +	// 0..7 (the double modulo keeps negative angles in range).
 +	_snapTurnFacing = false;
 +	const int direction = (((int)std::lround((_view->getYawDegrees() + 90.0) / 45.0)) % 8 + 8) % 8;
-+	if (direction == unit->getDirection())
++	if (direction == facingNow)
 +	{
 +		return;
 +	}
 +
-+	// Turn the soldier, then update what it sees, what others see of it (as UnitTurnBState does
-+	// after a turn) and the classic HUD's soldier info.
-+	unit->setDirection(direction);
++	// Turn the soldier (a tank with its turret switch on: the turret alone, by the game's own
++	// turret turn), then update what it sees, what others see of it (as UnitTurnBState does after
++	// a turn) and the classic HUD's soldier info.
++	if (turret)
++	{
++		Position towards;
++		Pathfinding::directionToVector(direction, &towards);
++		unit->lookAt(unit->getPosition() + towards, true);
++		while (unit->getStatus() == STATUS_TURNING) unit->turn(true);
++	}
++	else
++	{
++		unit->setDirection(direction);
++	}
 +	TileEngine *tileEngine = _save->getTileEngine();
 +	tileEngine->calculateFOV(unit);
 +	tileEngine->calculateFOV(unit->getPosition(), 1, false); // others' view of this unit, like UnitTurnBState
@@ -28903,10 +28961,10 @@ index 000000000..fd0923b46
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..278561765
+index 000000000..9a56bb902
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,2342 @@
+@@ -0,0 +1,2352 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -29095,7 +29153,7 @@ index 000000000..278561765
 +	// facing it keeps (a sidestep, turning by the rules), or with free turning the one it takes
 +	// again at the end, the compass point the view looks closest to. So the facing on the rim
 +	// never flicks sideways for a step to the side.
-+	int facing = unit->getDirection();
++	int facing = turretTurning(unit) ? unit->getTurretDirection() : unit->getDirection(); // (a tank's turret, with the switch on)
 +	if (_stepPending)
 +	{
 +		facing = _sidestepFacing >= 0 ? _sidestepFacing
@@ -29107,7 +29165,7 @@ index 000000000..278561765
 +		const double offFacing = std::abs(std::remainder(viewBearing - facing * 45.0, 360.0));
 +		if (offFacing > HeadTurn - CompassWarnDegrees)
 +		{
-+			warning = (doomModeOn() || unit->getTimeUnits() >= unit->getTurnCost()) ? 1 : 2;
++			warning = (doomModeOn() || unit->getTimeUnits() >= (turretTurning(unit) ? 1 : unit->getTurnCost())) ? 1 : 2;
 +		}
 +	}
 +	// The shot's turn: its cost and the way the soldier will face (none while a step is walked).
@@ -29151,7 +29209,7 @@ index 000000000..278561765
 +		else if (warning)
 +		{
 +			_txtCompassTurn->setColor(textColor(_state->getPalette(), warning == 1 ? 240 : 230, warning == 1 ? 210 : 60, warning == 1 ? 60 : 50));
-+			_txtCompassTurn->setText(warning == 1 ? std::string(_state->tr("STR_FPS_COMPASS_TURN").arg(unit->getTurnCost())) : std::string(_state->tr("STR_FPS_COMPASS_NO_TU")));
++			_txtCompassTurn->setText(warning == 1 ? std::string(_state->tr("STR_FPS_COMPASS_TURN").arg(turretTurning(unit) ? 1 : unit->getTurnCost())) : std::string(_state->tr("STR_FPS_COMPASS_NO_TU")));
 +		}
 +	}
 +}
@@ -30028,7 +30086,8 @@ index 000000000..278561765
 + * Keeps the armor's part of the top bar up to date: the armor's name, and a button for each
 + * thing the armor and the soldier's gear can do. FLY (SWIM under water) for armor that flies,
 + * LIGHT for the armor's personal light, NIGHT VISION for a soldier who has it (see
-+ * hasNightVision), SPECIAL for a weapon built into the armor. A button shows pressed while its
++ * hasNightVision), SPECIAL for a weapon built into the armor, TURRET for a unit with a turret
++ * (a tank, see toggleTurret). A button shows pressed while its
 + * feature is switched on. When a button appears or disappears, the squad buttons are laid out
 + * again to make room.
 + * @param unit The selected soldier, or null for none (all the buttons hide).
@@ -30041,14 +30100,16 @@ index 000000000..278561765
 +	const bool showFly = show && canFly(unit), showLight = show && unit->getArmor()->getPersonalLightFriend() > 0;
 +	const bool showSpecial = show && unit->getSpecialIconWeapon(specialType) != nullptr;
 +	const bool showNight = show && hasNightVision(unit);
++	const bool showTurret = show && unit->getTurretType() != -1;
 +	// Show or hide them; any change moves the other buttons on the bar.
 +	if (showFly != _btnFly->getVisible() || showLight != _btnLight->getVisible()
-+		|| showNight != _btnNight->getVisible() || showSpecial != _btnSpecial->getVisible())
++		|| showNight != _btnNight->getVisible() || showSpecial != _btnSpecial->getVisible() || showTurret != _btnTurret->getVisible())
 +	{
 +		_btnFly->setVisible(showFly);
 +		_btnLight->setVisible(showLight);
 +		_btnNight->setVisible(showNight);
 +		_btnSpecial->setVisible(showSpecial);
++		_btnTurret->setVisible(showTurret);
 +		layoutTopBar(); // the squad buttons make room
 +	}
 +	if (!show)
@@ -30066,14 +30127,17 @@ index 000000000..278561765
 +	TextButton *flyGroup = flightOn(unit) ? _btnFly : nullptr;
 +	TextButton *lightGroup = _save->getTogglePersonalLight() ? _btnLight : nullptr;
 +	TextButton *nightGroup = _state->_map->isNightVisionOn() ? _btnNight : nullptr;
-+	if (flyGroup != _flyButtonGroup || lightGroup != _lightButtonGroup || nightGroup != _nightButtonGroup)
++	TextButton *turretGroup = turretTurning(unit) ? _btnTurret : nullptr;
++	if (flyGroup != _flyButtonGroup || lightGroup != _lightButtonGroup || nightGroup != _nightButtonGroup || turretGroup != _turretButtonGroup)
 +	{
 +		_flyButtonGroup = flyGroup;
 +		_lightButtonGroup = lightGroup;
 +		_nightButtonGroup = nightGroup;
++		_turretButtonGroup = turretGroup;
 +		_btnFly->invalidate();
 +		_btnLight->invalidate();
 +		_btnNight->invalidate();
++		_btnTurret->invalidate();
 +	}
 +}
 +
@@ -30863,7 +30927,7 @@ index 000000000..278561765
 +	// The suit's buttons, right to left from END. A first pass tries the long labels; if that
 +	// leaves too little room for the squad buttons, a second pass uses the short ones.
 +	// freeRight ends up as the right end of the room left for the squad buttons.
-+	TextButton *suitButtons[4] = { _btnFly, _btnLight, _btnNight, _btnSpecial };
++	TextButton *suitButtons[5] = { _btnFly, _btnLight, _btnNight, _btnSpecial, _btnTurret };
 +	// Previous's leftmost place: after INV, wherever INV stands (in HUD's place on the map, see
 +	// updateTopBar).
 +	const int squadX = SquadX - (InventoryButtonX - _btnInventory->getX());
@@ -30872,7 +30936,7 @@ index 000000000..278561765
 +	for (int pass = 0; pass < 2; ++pass)
 +	{
 +		freeRight = canvasWidth() - 1 - EndTurnW - 2;
-+		for (int suitIndex = 0; suitIndex < 4; ++suitIndex)
++		for (int suitIndex = 0; suitIndex < 5; ++suitIndex)
 +		{
 +			if (!suitButtons[suitIndex]->getVisible()) continue;
 +			const std::string &label = pass == 0 ? _suitLabelsLong[suitIndex] : _suitLabelsShort[suitIndex];
@@ -31127,7 +31191,7 @@ index 000000000..278561765
 +			&& y >= button->getY() && y < button->getY() + button->getHeight();
 +	};
 +	// The fixed buttons first, then the squad buttons.
-+	for (TextButton *button : { _btnView, _btnHud, _btnInventory, _btnEndTurn, _btnFly, _btnLight, _btnNight, _btnSpecial, _btnPrev, _btnNext })
++	for (TextButton *button : { _btnView, _btnHud, _btnInventory, _btnEndTurn, _btnFly, _btnLight, _btnNight, _btnSpecial, _btnTurret, _btnPrev, _btnNext })
 +	{
 +		if (inside(button)) return button;
 +	}
@@ -31180,6 +31244,10 @@ index 000000000..278561765
 +	else if (button == _btnSpecial)
 +	{
 +		_state->btnSpecialClick(action);
++	}
++	else if (button == _btnTurret)
++	{
++		toggleTurret(_save->getSelectedUnit());
 +	}
 +	else if (button == _btnPrev)
 +	{
@@ -31251,10 +31319,10 @@ index 000000000..278561765
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeMovement.cpp b/src/FirstPerson/FirstPersonModeMovement.cpp
 new file mode 100644
-index 000000000..2fc48c293
+index 000000000..7e2596427
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeMovement.cpp
-@@ -0,0 +1,2125 @@
+@@ -0,0 +1,2171 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -31396,7 +31464,9 @@ index 000000000..2fc48c293
 +		// The destination must have a floor, or the tile below it must be the top of a ramp or
 +		// of stairs going down: its ground raised at least half a level (the terrain level is
 +		// negative for raised ground, and a level is 24 voxels high), which is ground to walk on.
-+		if (allowed && ((canFly(unit) && !flightOn(unit)) || !Options::fpsFalling))
++		// A flyer with flight on crosses the air either way, as on the map (a player's report,
++		// GitHub issue #99: with falling off, no step sideways in mid-air).
++		if (allowed && !(canFly(unit) && flightOn(unit)) && (canFly(unit) || !Options::fpsFalling))
 +		{
 +			const Tile *destination = _save->getTile(start + Position(stepX, stepY, 0));
 +			const Tile *belowDestination = destination ? _save->getBelowTile(destination) : nullptr;
@@ -32985,6 +33055,41 @@ index 000000000..2fc48c293
 +}
 +
 +/**
++ * Switches turret-only turning on or off for a unit with a turret, a tank (the TURRET button or
++ * its key; a player's report, XPiratez: turning the view turned the whole tank, at its full
++ * turning cost; the owner: a switch on the top bar, off at first, kept with the save). While it's
++ * on, turning the view turns only the turret, as the map turns it with Ctrl or while aiming (the
++ * game's own turret turn: 1 time unit an eighth with "Turning costs TU"), and the hull stays as
++ * it is; a step still turns the hull the way it goes, the turret with it (see faceLookDirection).
++ * Only for the player's own unit, on their turn.
++ * @param unit The selected unit.
++ */
++void FirstPersonMode::toggleTurret(BattleUnit *unit)
++{
++	if (!unit || !isActive() || _save->getSide() != FACTION_PLAYER)
++	{
++		return;
++	}
++	if (unit->getTurretType() == -1)
++	{
++		_state->warning("STR_FPS_NO_TURRET"); // (so the key doesn't seem dead)
++		return;
++	}
++	unit->setTurretOnly(!unit->getTurretOnly());
++	_state->warning(unit->getTurretOnly() ? "STR_FPS_TURRET_ON" : "STR_FPS_TURRET_OFF");
++}
++
++/**
++ * Does turning the view turn only this unit's turret: a unit with one, its turret switch on (see toggleTurret)?
++ * @param unit The unit.
++ * @return True if so.
++ */
++bool FirstPersonMode::turretTurning(const BattleUnit *unit) const
++{
++	return unit && unit->getTurretType() != -1 && unit->getTurretOnly();
++}
++
++/**
 + * May a soldier who walks go up or down a level from here? The game's own rule for a unit that
 + * can't fly (Pathfinding::validateUpDown): a ride between two grav lift floors, or a climb on a
 + * ladder (OXCE's grav lift flag on a wall or an object) where nothing is in the way: no floor
@@ -33092,6 +33197,15 @@ index 000000000..2fc48c293
 + */
 +void FirstPersonMode::updateFlight(BattleUnit *unit)
 +{
++	// A flyer up in the air whose flight was never switched (taken up by the map's own up button
++	// or path, or from a save made before the switch was kept) has it switched on, as if by B: so
++	// touching down keeps flight on, and only Page Down on the ground (or B) switches it off (a
++	// player's report, GitHub issue #100: W into the ground ended the flight).
++	if (unit && canFly(unit) && unit->getFlightSwitch() == 0 && unit->isFloating())
++	{
++		unit->setFlightSwitch(1);
++	}
++
 +	// Floated off a ledge with flight off: once the step is done, land if still in the air.
 +	if (_landAfterStep && (!unit || !_stepPending))
 +	{
@@ -33877,10 +33991,10 @@ index 000000000..3486db61a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..183a86fc4
+index 000000000..91a1d5ac8
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,4973 @@
+@@ -0,0 +1,4980 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -37153,6 +37267,8 @@ index 000000000..183a86fc4
 +		else if (action->spendTU(&action->result))
 +		{
 +			_scanner->bringUp(unit, item);
++			_scannerFrom = unit->getPosition();
++			_scannerTurn = _save->getTurn();
 +		}
 +		else
 +		{
@@ -37219,7 +37335,12 @@ index 000000000..183a86fc4
 + */
 +void FirstPersonMode::updateScanner(BattleUnit *unit)
 +{
-+	if (_scanner->isUp() && (!isActive() || !unit || unit != _scanner->soldier() || unit->isOut() || activeWeapon(unit) != _scanner->item()))
++	// Setting "Live motion scanner" off: one look from where it was used, as the game's own scanner
++	// (a player's report, GitHub issue #101): a step to another tile, or the end of the player's turn,
++	// puts it away; turned on the spot it stays up, its screen turning with the view and sweeping.
++	const bool lookOver = !Options::fpsLiveScanner && unit
++		&& (unit->getPosition() != _scannerFrom || _save->getTurn() != _scannerTurn || _save->getSide() != FACTION_PLAYER);
++	if (_scanner->isUp() && (!isActive() || !unit || unit != _scanner->soldier() || unit->isOut() || activeWeapon(unit) != _scanner->item() || lookOver))
 +	{
 +		_scanner->putAway();
 +	}
@@ -43000,10 +43121,10 @@ index 000000000..d7aa46be4
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..7aabe15df
+index 000000000..db799fb26
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,630 @@
+@@ -0,0 +1,632 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -43095,6 +43216,7 @@ index 000000000..7aabe15df
 +	_depthBuffer.resize(width * height);
 +	_glowMask.resize(width * height);
 +	_unitVeil.resize(width * height);
++	_smokeVeil.resize(width * height);
 +	_ownColours.resize(width * height);
 +
 +	// A camera's glitches and static spells differ from game to game and from camera to camera
@@ -43561,6 +43683,7 @@ index 000000000..7aabe15df
 +	// and the hitmarker), then everything is drawn over the terrain as sprites, dots and lines.
 +	// (No unit is on the screen yet, for the see-through smoke.)
 +	std::fill(_unitVeil.begin(), _unitVeil.end(), (Uint8)255);
++	std::fill(_smokeVeil.begin(), _smokeVeil.end(), (Uint8)0);
 +	std::fill(_ownColours.begin(), _ownColours.end(), (Uint8)0);
 +	std::fill(&_pointerUnits[0][0], &_pointerUnits[0][0] + sizeof(_pointerUnits) / sizeof(_pointerUnits[0][0]), nullptr);
 +	std::fill(&_pointerBodies[0][0], &_pointerBodies[0][0] + sizeof(_pointerBodies) / sizeof(_pointerBodies[0][0]), nullptr);
@@ -43636,10 +43759,10 @@ index 000000000..7aabe15df
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..6d71db5ad
+index 000000000..cecde58ef
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1347 @@
+@@ -0,0 +1,1341 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -43832,10 +43955,10 @@ index 000000000..6d71db5ad
 +		SolidRows solid; // [z][y], bit x: solid (or glass) in any of the parts, so a ray knows where to look at them
 +	};
 +	/// What a ray walking past a tile needs to know first, a byte per tile (see snapshotTiles):
-+	/// whether there is anything in it to trace (parts or a swinging door), smoke on it, a door
-+	/// swinging through it, and in the top five bits the height of its highest solid voxel (0..23),
++	/// whether there is anything in it to trace (parts or a swinging door), a door swinging
++	/// through it, and in the top five bits the height of its highest solid voxel (0..23),
 +	/// so a ray passing above everything in the tile (a floor, most often) needn't look inside.
-+	enum TileFlag : Uint8 { TileTraced = 1, TileSmoky = 2, TileSwinging = 4 };
++	enum TileFlag : Uint8 { TileTraced = 1, TileSwinging = 4 };
 +	static constexpr int TileTopShift = 3; // where the highest solid voxel's height sits in the flags
 +	/// A door swinging open, as a thin slab turning around its hinge.
 +	struct DoorSwing
@@ -44004,8 +44127,8 @@ index 000000000..6d71db5ad
 +	void setNightVision(int color) { _nightVision = color; }
 +	/// The sight of the soldier the view looks through, for the smoke: their range, and how much of the smoke (and smoke over fire) they see through.
 +	void setSmokeSight(float sightVoxels, int throughSmoke, int throughFire);
-+	/// How much the see-through smoke's opacity is scaled where it hangs, by the settings "Smoke opacity" and "Night smoke opacity" and the game's shade there.
-+	float smokeOpacityScale(int shade) const;
++	/// The most opaque see-through smoke may get where it hangs (a maximum), by the settings "Smoke opacity" and "Night smoke opacity" and the game's shade there.
++	float smokeOpacityAt(int shade) const;
 +	/// Where the weapon in hand's muzzle is on the view (pixels): our own shots flash and start their trails there.
 +	void setMuzzlePoint(double x, double y, bool valid) { _muzzleScreen[0] = x; _muzzleScreen[1] = y; _muzzleValid = valid; }
 +	/// The path a throw or shot aimed now would take, in voxels from the soldier to its end (see
@@ -44142,11 +44265,11 @@ index 000000000..6d71db5ad
 +	float _smokeSightVoxels = 20.0f * Position::TileXY; // the soldier's sight range, voxels (see setSmokeSight)
 +	float _smokeSeen = 1.0f;                            // how opaque the see-through smoke is drawn for their eyes: 1 less their heat vision (see setSmokeSight)
 +	float _smokeBlock = 1.0f / 3.0f, _fireBlock = 1.0f / 3.0f; // sight used up per voxel walked through 1 point of smoke (over fire), voxels
-+	float _smokeDrift = 0.0f;                           // this frame's time, seconds: the smoke's billows drift with it
 +	float _smokeRgb[3] = { 130.0f, 130.0f, 130.0f };    // the colour of the game's smoke (see smokeRgb)
 +	std::vector<float> _depthBuffer;                    // per pixel, how far away what's drawn there is (sprites and effects test against it)
 +	std::vector<Uint8> _glowMask;                       // pixels showing something that shines (lit voxels, sparks)
 +	std::vector<Uint8> _unitVeil;                       // per pixel, how much more see-through smoke may veil the unit seen there (in SeeThroughLevels; 255: no unit)
++	std::vector<Uint8> _smokeVeil;                      // per pixel, how much see-through smoke veils what's seen there this frame (in SeeThroughLevels; up to its cap)
 +	std::vector<Uint8> _ownColours;                     // per pixel, 1: a unit's, a body's or an item's picture shows there (futuristic night vision leaves its colours, see washBands)
 +
 +	/// Works out the camera's axes from its yaw and pitch.
@@ -44353,13 +44476,8 @@ index 000000000..6d71db5ad
 +	float terrainHaze(float distance) const;
 +	/// A colour faded into the distance haze by an amount (0 none .. 1 all haze), dithered between neighbouring blend steps.
 +	Uint8 hazeColor(Uint8 color, float haze, int pixelX, int pixelY) const;
-+	/// Smoke's colour on a pixel of its wall (where the soldier's sight runs out in it).
-+	Uint8 smokeColor(Uint8 light, const float rayOrigin[3], const float rayDirection[3], float distance, float *billowOut = nullptr) const;
-+	/// How much of the soldier's sight the smoke uses up looking through a point and on beyond it (1 or more: they can't see through).
-+	float smokeSightUsedThrough(const double point[3]) const;
-+	/// Original smoke: how many times a tile's cloud is drawn on top of itself where the soldier can't see through it, inside
-+	/// the cloud and on its outer shell (a tile next to one without smoke), so the cloud's outline stays smoke-like (see drawSeeThroughSmoke).
-+	static constexpr int OriginalSmokeMaxLayers = 8, OriginalSmokeShellLayers = 3;
++	/// How much of the soldier's sight the smoke on the line from the eye to a point uses up (1 or more: they can't see through it).
++	float smokeSightUsedTo(const double point[3]) const;
 +	/// See-through drawing mixes a colour over another in this many steps (this many: solid).
 +	static constexpr int SeeThroughLevels = 16;
 +	std::vector<Uint8> _nearestRgb;                     // the palette's nearest colour to each 15-bit RGB colour (5 bits a channel)
@@ -44469,6 +44587,7 @@ index 000000000..6d71db5ad
 +		const std::pair<int, int> *rowRuns = nullptr;  // the runs of coloured pixels, first and one past the last column (only these are drawn)
 +		const float *depthBlocks = nullptr;            // if given, the farthest depth drawn in each SmokeCullBlock square of the view:
 +		int depthBlockColumns = 0;                     // a square where everything is nearer than the sprite isn't looked at (see cullSmokeDraws)
++		int capLevels = 0;                             // above 0: see-through smoke builds up on a pixel to this (of SeeThroughLevels) and no further (see _smokeVeil)
 +	};
 +	SeeThroughSprite _faintPile = { nullptr, 1.0f };    // how the pile pointed at past is drawn (see drawFloorItems)
 +	/// A standing sprite isn't cut off below any floor (see SpriteDraw::floorCut, floorUnderside).
@@ -44598,15 +44717,13 @@ index 000000000..6d71db5ad
 +	const SoftSmoke &softSmokeBlend(const Surface *from, const Surface *to, int step, bool original);
 +	/// The first of the four smoke frames the map shows for a density of smoke.
 +	int firstSmokeFrame(int smoke) const;
-+	/// Is a smoky tile on its cloud's outer shell: next to a tile (on its level, across a side) with no smoke, or the map's edge?
-+	bool smokeShell(const Position &tilePosition) const;
 +	/// The colour of the game's smoke (its thickest frames' dots mixed, mostly grey).
 +	void smokeRgb(float rgb[3]) const;
 +	/// Draws the smoke on discovered tiles see-through, and its rising wisps (setting "Smoke": Original, Modern).
 +	void drawSeeThroughSmoke();
 +	/// One see-through smoke sprite to draw this frame (see drawSeeThroughSmoke).
-+	struct SmokeDraw { const SoftSmoke *soft; double world[3]; int anchorY; float opacity; double scale; int shade; int top = 0, bottom = 0; }; // (top, bottom: the screen rows it may reach)
-+	std::vector<SmokeDraw> _smokeDraws; // this frame's, farthest first
++	struct SmokeDraw { const SoftSmoke *soft; double world[3]; int anchorY; float opacity, cap; double scale; int shade; int top = 0, bottom = 0; }; // (top, bottom: the screen rows it may reach)
++	std::vector<SmokeDraw> _smokeDraws; // this frame's, nearest first
 +	/// How much nearer than its point a puff of see-through smoke counts for the depth test, in voxels.
 +	static constexpr double SmokeDepthBias = 2.0;
 +	/// The see-through smoke leaves out puffs wholly behind what's drawn, by the farthest depth in each block of this many pixels square.
@@ -46461,10 +46578,10 @@ index 000000000..77a3cc4ed
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..5fcd17963
+index 000000000..3ced366be
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,1878 @@
+@@ -0,0 +1,1817 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -47970,44 +48087,16 @@ index 000000000..5fcd17963
 +}
 +
 +/**
-+ * The colour of the smoke's wall on a pixel: where a ray ran out of the soldier's sight in the
-+ * smoke (see SmokeTrace). The smoke's grey, shaded by its light, a shade lighter in thick billows
-+ * and darker in thin ones; the billows are cloud-like noise over the world, drifting slowly east
-+ * and up. (Smoke short of that is drawn see-through, as the game's own smoke: see
-+ * drawSeeThroughSmoke.)
-+ * @param light The light of the smoke (the game's shade, 0 brightest .. 15 darkest).
-+ * @param rayOrigin, rayDirection The ray.
-+ * @param distance Where along the ray the wall is.
-+ * @param billowOut If not null, set to how thick the billow is there (0 .. 1).
-+ * @return The colour.
-+ */
-+Uint8 FirstPersonView::smokeColor(Uint8 light, const float rayOrigin[3], const float rayDirection[3], float distance, float *billowOut) const
-+{
-+	// Where the smoke is, in voxels, and how thick its billow is there (0 .. 1).
-+	const float x = rayOrigin[0] + rayDirection[0] * distance, y = rayOrigin[1] + rayDirection[1] * distance,
-+		z = rayOrigin[2] + rayDirection[2] * distance;
-+	const float billow = cloudNoise((x + z * 0.7f) / 12.0f - _smokeDrift * 0.15f, (y - z * 0.5f) / 12.0f + _smokeDrift * 0.08f);
-+	if (billowOut) *billowOut = billow;
-+	// Its grey: a shade lighter in a thick billow (if the colour's group has a lighter one),
-+	// darker in a thin one, then shaded by the light.
-+	int color = _colors.smoke, shade = light;
-+	if (billow > 0.62f && (color & 15) > 0) --color;
-+	else if (billow < 0.38f) ++shade;
-+	return shadeColor((Uint8)color, shade);
-+}
-+
-+/**
-+ * How much of the soldier's sight the smoke uses up looking through a point and on beyond it,
-+ * by the game's sight rules (see SmokeTrace, as the rays trace them for Modern's wall): the
-+ * line from the eye through the point, walked two voxels at a time as far as the sight reaches
-+ * (or off the map), its smoke added up tile by tile. Original smoke stacks its frames where the
-+ * soldier can't see through it (see drawSeeThroughSmoke).
++ * How much of the soldier's sight the smoke on the line from the eye to a point uses up, by the
++ * game's sight rules (see SmokeTrace): walked two voxels at a time up to the point (or as far as
++ * the sight reaches, or off the map), its smoke added up tile by tile. An enemy the soldier
++ * doesn't see with smoke on the line to it isn't drawn (see drawUnits).
 + * @param point The point, in voxels.
 + * @return The share of the sight left that the smoke on the line uses up: 1 or more where the
 + *         sight runs out on it (the soldier can't see through the smoke there), less where they
 + *         can, 0 with no smoke on it.
 + */
-+float FirstPersonView::smokeSightUsedThrough(const double point[3]) const
++float FirstPersonView::smokeSightUsedTo(const double point[3]) const
 +{
 +	float direction[3] = { (float)(point[0] - _eye[0]), (float)(point[1] - _eye[1]), (float)(point[2] - _eye[2]) };
 +	const float length = std::sqrt(direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2]);
@@ -48021,8 +48110,8 @@ index 000000000..5fcd17963
 +	smoke.smokeBlock = _smokeBlock;
 +	smoke.fireBlock = _fireBlock;
 +	const int sizeX = _save->getMapSizeX(), sizeY = _save->getMapSizeY(), sizeZ = _save->getMapSizeZ();
-+	const float Step = 2.0f;
-+	for (float from = 0.0f; from < _smokeSightVoxels; from += Step)
++	const float Step = 2.0f, reach = std::min(_smokeSightVoxels, length);
++	for (float from = 0.0f; from < reach; from += Step)
 +	{
 +		// This stretch of the line, and the tile its middle is in (off the map: the line ends).
 +		const float middle = from + Step * 0.5f;
@@ -48072,14 +48161,6 @@ index 000000000..5fcd17963
 +	const float right[3] = { (float)_right[0], (float)_right[1], (float)_right[2] };
 +	const float up[3] = { (float)_up[0], (float)_up[1], (float)_up[2] };
 +
-+	// Smoke as the game's sight rules have it (setting "Smoke": Modern): traced along each
-+	// ray with the sight of the soldier the view looks through.
-+	SmokeTrace smokeSight;
-+	smokeSight.sightVoxels = _smokeSightVoxels;
-+	smokeSight.smokeBlock = _smokeBlock;
-+	smokeSight.fireBlock = _fireBlock;
-+	const bool traceSmoke = FirstPerson::smokeMode() == 2;
-+
 +	// The parts without shape as opaque as the setting "Ghost opacity" has them: its percent of
 +	// the pixels up close, of GhostNearOpacity's 50 (the share is scaled by dividing each pixel's
 +	// dither threshold instead of multiplying the opacity: the same test, see ghostOpacity).
@@ -48125,18 +48206,11 @@ index 000000000..5fcd17963
 +			float tEnd, distanceAlongRay;
 +			int endAxis;
 +			Uint8 color;
-+			SmokeTrace smoke = smokeSight;
 +			rayContext.ghostThreshold = dither(blockColumn, blockRow) / ghostScale; // ghosts show on a share of the blocks (see ghostOpacity)
 +			if (seeThroughCrops) rayContext.solidGhostThreshold = dither(blockColumn, blockRow) / SeeThroughCropOpacity;
-+			const RayEnd rayEnd = castRay(rayContext, rayOrigin, rayDirection, hit, tEnd, endAxis, traceSmoke ? &smoke : nullptr);
++			const RayEnd rayEnd = castRay(rayContext, rayOrigin, rayDirection, hit, tEnd, endAxis);
 +			switch (rayEnd)
 +			{
-+			case RAY_SMOKE:
-+				// Into smoke too thick to see through: the smoke, shaded by its light.
-+				color = smokeColor(smoke.light, rayOrigin, rayDirection, smoke.wallAt);
-+				distanceAlongRay = smoke.wallAt;
-+				hit.emissive = false;
-+				break;
 +			case RAY_HIT:
 +				// Something on the map.
 +				color = shadeHit(hit, rayOrigin, rayDirection, blockColumn, blockRow);
@@ -48178,23 +48252,6 @@ index 000000000..5fcd17963
 +			{
 +				color = _colors.glassTint[color];
 +			}
-+			// Seen through smoke that used up more than about a third of the sight left: the wall of
-+			// smoke shows through, the more the nearer the smoke came to blocking the sight, so
-+			// the wall's edge is soft, and as ragged as the smoke's billows (a real blend, not a
-+			// dither). Thinner smoke is left to the see-through smoke drawn over the picture.
-+			if (traceSmoke && rayEnd != RAY_SMOKE && smoke.cost > 0.0f)
-+			{
-+				const float sightLeft = std::max(1.0f, smoke.sightVoxels - smoke.lastSmoke);
-+				float billow;
-+				const Uint8 wall = smokeColor(smoke.light, rayOrigin, rayDirection, smoke.lastSmoke, &billow);
-+				const float nearWall = std::clamp((smoke.cost / sightLeft + (billow - 0.5f) * 0.5f - 0.4f) / 0.6f, 0.0f, 1.0f);
-+				const int wallOpacity = (int)std::lround(nearWall * nearWall * (3.0f - 2.0f * nearWall) * SeeThroughLevels);
-+				if (wallOpacity > 0)
-+				{
-+					color = seeThrough(wallOpacity, wall, color);
-+					if (wallOpacity > SeeThroughLevels / 2) hit.emissive = false;
-+				}
-+			}
 +			// Fill the block: colour, depth, and whether it shines (a UFO's light counts three
 +			// times in the bloom, for a stronger halo round it).
 +			Uint8 glowing = (hit.emissive && distanceAlongRay < Infinity) ? 1 : 0;
@@ -48221,10 +48278,9 @@ index 000000000..5fcd17963
 + */
 +void FirstPersonView::castAllRays()
 +{
-+	// The flares' light for this frame, which every ray hitting near a flare needs, and the
-+	// time the smoke's billows drift by (the same for every thread).
++	// The flares' light for this frame, which every ray hitting near a flare needs (the same for
++	// every thread).
 +	prepareFlareLights();
-+	_smokeDrift = (SDL_GetTicks() % 1000000) / 1000.0f;
 +	runOnAllThreads(&FirstPersonView::renderRows);
 +}
 +
@@ -48345,10 +48401,10 @@ index 000000000..5fcd17963
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewRayWalk.h b/src/FirstPerson/FirstPersonViewRayWalk.h
 new file mode 100644
-index 000000000..842550862
+index 000000000..ae3f925b8
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayWalk.h
-@@ -0,0 +1,595 @@
+@@ -0,0 +1,555 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -48550,17 +48606,16 @@ index 000000000..842550862
 +
 +/// How a ray's walk ended: it hit something, or it left the map through a side, the top or
 +/// the bottom, or it went as far as the view reaches.
-+enum RayEnd { RAY_HIT, RAY_SIDE, RAY_TOP, RAY_BOTTOM, RAY_FAR, RAY_SMOKE };
++enum RayEnd { RAY_HIT, RAY_SIDE, RAY_TOP, RAY_BOTTOM, RAY_FAR };
 +
 +/**
-+ * The smoke along a ray, by the game's sight rules (setting "Smoke": Modern). In the game
-+ * every voxel a line of sight walks through a tile's smoke uses up smoke / 3 voxels of the
-+ * soldier's sight (half as much within two tiles of the eye; less with heat vision), and what
-+ * is further than the sight left can't be seen. Where the ray's smoke has used up all the sight
-+ * there is left, it ends in the smoke (RAY_SMOKE): too thick to see through, a wall of smoke.
-+ * Short of that, the smoke is drawn see-through over what the ray hits, as the game's own smoke
-+ * (see FirstPersonView::drawSeeThroughSmoke), and the wall shows through it where the smoke has
-+ * used up most of the sight (see FirstPersonView::renderRows), so its edge is soft.
++ * The smoke along a line of sight, by the game's sight rules. In the game every voxel a line
++ * of sight walks through a tile's smoke uses up smoke / 3 voxels of the soldier's sight (half as
++ * much within two tiles of the eye; less with heat vision), and what is further than the sight
++ * left can't be seen. Added up tile by tile (addSmoke) on the line from the eye to a point (see
++ * FirstPersonView::smokeSightUsedTo): an enemy the soldier doesn't see with smoke on the line to
++ * it isn't drawn. The smoke itself is drawn see-through, as the map draws it (see
++ * FirstPersonView::drawSeeThroughSmoke).
 + */
 +struct SmokeTrace
 +{
@@ -48568,10 +48623,7 @@ index 000000000..842550862
 +	float smokeBlock = 0.0f;     // in: sight used up per voxel walked through 1 point of smoke
 +	float fireBlock = 0.0f;      // in: the same through the smoke of a burning tile
 +	float cost = 0.0f;           // out: the sight the smoke used up along the ray, voxels
-+	float lastSmoke = 0.0f;      // out: how far along the ray the last smoke on it ended
-+	float wallAt = 0.0f;         // out (RAY_SMOKE): where the ray ended in the smoke
-+	Uint8 light = 15;            // out: the light of the thickest smoke on the way, to shade it
-+	float thickest = 0.0f;       // (the sight a voxel of that smoke uses up)
++	float lastSmoke = 0.0f;      // out: how far along the line the last smoke on it ended
 +};
 +
 +/// Within this many voxels of the eye, smoke uses up half as much sight (two tiles, as in the game).
@@ -48591,11 +48643,6 @@ index 000000000..842550862
 +	if (perVoxel <= 0.0f || to <= from)
 +	{
 +		return -1.0f;
-+	}
-+	if (perVoxel > smoke.thickest)
-+	{
-+		smoke.thickest = perVoxel;
-+		smoke.light = tileView.light;
 +	}
 +	smoke.lastSmoke = to;
 +	// The stretch in up to two pieces: within SmokeNearEye of the eye (half the rate), and beyond.
@@ -48800,12 +48847,9 @@ index 000000000..842550862
 + * @param rayDirection The ray's direction, in voxel units (see the top of this file).
 + * @param hit Filled in when something is hit.
 + * @param endDistance, endAxis Where and through which face the ray left the map (when nothing was hit).
-+ * @param smoke Null, or the smoke to trace along the ray (see SmokeTrace): the ray may then end
-+ *        in thick smoke (RAY_SMOKE).
 + * @return How the ray ended.
 + */
-+inline RayEnd castRay(const RayContext &context, const float rayOrigin[3], const float rayDirection[3], FirstPersonView::Hit &hit, float &endDistance, int &endAxis,
-+	SmokeTrace *smoke = nullptr)
++inline RayEnd castRay(const RayContext &context, const float rayOrigin[3], const float rayDirection[3], FirstPersonView::Hit &hit, float &endDistance, int &endAxis)
 +{
 +	hit.glass = false;
 +	hit.emissive = false;
@@ -48854,7 +48898,6 @@ index 000000000..842550862
 +	// Walk tile by tile, as far as the view reaches. Most tiles on the way are empty air: one
 +	// byte per tile (the flags, see snapshotTiles) says so, and the walk steps on without
 +	// touching the tile's snapshot.
-+	const Uint8 wanted = smoke ? FirstPersonView::TileTraced | FirstPersonView::TileSmoky : FirstPersonView::TileTraced;
 +	float distance = 0.0f;
 +	int enterAxis = -1;
 +	int tileIndex = (tileCell[2] * context.size[1] + tileCell[1]) * context.size[0] + tileCell[0];
@@ -48880,48 +48923,21 @@ index 000000000..842550862
 +	while (distance < context.maxDistance)
 +	{
 +		const Uint8 flags = context.tileFlags[tileIndex];
-+		if (flags & wanted)
++		if (flags & FirstPersonView::TileTraced)
 +		{
 +			// Where the ray leaves the tile. Anything solid to look for on the way? Not when it
 +			// passes above all of the tile's solid voxels (a floor, most often) and no door swings
 +			// through it: the tile's box would turn it away (see traceTile; a hundredth of a voxel
-+			// to spare, so rounding never decides it). And smoke to trace through?
++			// to spare, so rounding never decides it).
 +			const float tileExit = std::min(nextCrossing[0], std::min(nextCrossing[1], nextCrossing[2]));
 +			const float solidTop = (float)(tileCell[2] * Position::TileZ + (flags >> FirstPersonView::TileTopShift) + 1) + 0.01f;
 +			const bool lookForSolid = (flags & FirstPersonView::TileTraced) && ((flags & FirstPersonView::TileSwinging)
 +				|| rayOrigin[2] + rayDirection[2] * distance <= solidTop || rayOrigin[2] + rayDirection[2] * tileExit <= solidTop);
-+			const bool traceSmokeHere = smoke && (flags & FirstPersonView::TileSmoky);
-+			if (lookForSolid || traceSmokeHere)
++			// Look inside this tile, between where the ray came in and where it leaves.
++			if (lookForSolid && traceTile(context.tiles[tileIndex], context.swings, tileCell, rayOrigin, rayDirection, inverseDirection, distance, tileExit, enterAxis, context.ghostThreshold, context.solidGhostThreshold, context.glassStops, hit))
 +			{
-+				// Look inside this tile, between where the ray came in and where it leaves.
-+				const auto &tileView = context.tiles[tileIndex];
-+				// The smoke in the tile, when traced: where in the tile (if anywhere) it gets too
-+				// thick to see through. Only what is in front of that point can still be hit;
-+				// behind it, the ray ends in the smoke.
-+				float smokeWall = -1.0f;
-+				SmokeTrace smokeBefore;
-+				if (traceSmokeHere)
-+				{
-+					smokeBefore = *smoke;
-+					smokeWall = addSmoke(*smoke, tileView, distance, tileExit);
-+				}
-+				const float traceEnd = smokeWall >= 0.0f ? smokeWall : tileExit;
-+				if (lookForSolid && traceTile(tileView, context.swings, tileCell, rayOrigin, rayDirection, inverseDirection, distance, traceEnd, enterAxis, context.ghostThreshold, context.solidGhostThreshold, context.glassStops, hit))
-+				{
-+					// Hit something in the tile: only the smoke in front of it counts.
-+					if (traceSmokeHere)
-+					{
-+						*smoke = smokeBefore;
-+						addSmoke(*smoke, tileView, distance, hit.t);
-+					}
-+					hit.tile = tileIndex;
-+					return RAY_HIT;
-+				}
-+				if (smokeWall >= 0.0f)
-+				{
-+					smoke->wallAt = smokeWall;
-+					return RAY_SMOKE;
-+				}
++				hit.tile = tileIndex;
++				return RAY_HIT;
 +			}
 +		}
 +		// Step into the neighbouring tile across the nearest boundary (on a tie, the later axis);
@@ -49673,10 +49689,10 @@ index 000000000..986e42728
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..601b58f7a
+index 000000000..3f74e66d2
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,546 @@
+@@ -0,0 +1,542 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -49899,14 +49915,10 @@ index 000000000..601b58f7a
 +const int UnitVeilMax = 5;
 +/// The see-through smoke keeps this share of its colours (the rest turned to grey; see softSmokeFrame).
 +const float SmokeColorKept = 0.35f;
-+/// The thinnest see-through smoke's opacity the clouds are made for (Modern; thicker smoke more,
-+/// see drawSeeThroughSmoke): the settings "Smoke opacity" and "Night smoke opacity" scale every
-+/// cloud and wisp by theirs over this one (45% by day: the look before the settings).
-+const float SmokeOpacityMadeFor = 0.45f;
 +/// Where the night value takes over by day, by the game's shade where the smoke hangs (0
 +/// brightest .. 15 darkest): the day value up to the first, the night value from the second,
 +/// blended between (an alien base's dark rooms, an unlit room). On a night mission the night
-+/// value holds anyway (the battle's darkness, on the same scale: see smokeOpacityScale).
++/// value holds anyway (the battle's darkness, on the same scale: see smokeOpacityAt).
 +const float SmokeNightFromShade = 3.0f, SmokeNightToShade = 12.0f;
 +/// Eyes with heat vision (the armor's heatVision, in percent: how much of the smoke they see
 +/// through, by the game's sight rules) see the see-through smoke that much thinner (a player: a
@@ -52383,10 +52395,10 @@ index 000000000..17ff3d48d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..82e317537
+index 000000000..3957f63f1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,3236 @@
+@@ -0,0 +1,3213 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -52661,8 +52673,13 @@ index 000000000..82e317537
 +		{
 +			Uint8 &veilLeft = _unitVeil[index];
 +			pixelOpacity = std::min(pixelOpacity, (int)veilLeft);
++			// Smoke builds up on a pixel to its cap and no further (settings "Smoke opacity" and
++			// "Night smoke opacity", a maximum).
++			const int smokeCap = seeThroughSprite ? seeThroughSprite->capLevels : 0;
++			if (smokeCap > 0) pixelOpacity = std::min(pixelOpacity, smokeCap - (int)_smokeVeil[index]);
 +			if (pixelOpacity <= 0) return;
 +			if (veilLeft != 255) veilLeft -= pixelOpacity;
++			if (smokeCap > 0) _smokeVeil[index] += (Uint8)pixelOpacity;
 +			Uint8 *pixel = getRaw(pixelX, pixelY);
 +			*pixel = seeThrough(pixelOpacity, shadeColor(color, shade), *pixel);
 +			if (pixelOpacity > SeeThroughLevels / 2)
@@ -53509,6 +53526,18 @@ index 000000000..82e317537
 +			{
 +				MarkerSpot spot = { { feet[0], feet[1], feet[2] + unit->getFloatHeight() + unit->getHeight() + 5.0 }, marker.second };
 +				_markerSpots.push_back(spot);
++			}
++		}
++		// An enemy the squad sees but the soldier looked through doesn't, with smoke on the line to
++		// it: not drawn, only its marker, as for one behind a wall (a player's report, GitHub issue
++		// #98: "if a unit is visible, let me see it, if a unit is invisible, don't let me see it").
++		// Enemies the soldier sees stay clear of the smoke (see _unitVeil).
++		if (_cameraUnit && !debug && !fallingDown && unit->getFaction() == FACTION_HOSTILE && !_cameraUnit->hasVisibleUnit(unit))
++		{
++			const double middle[3] = { feet[0], feet[1], feet[2] + unit->getFloatHeight() + unit->getHeight() * 0.5 };
++			if (smokeSightUsedTo(middle) > 0.0f)
++			{
++				continue;
 +			}
 +		}
 +
@@ -54573,29 +54602,6 @@ index 000000000..82e317537
 +}
 +
 +/**
-+ * Whether a smoky tile is on its cloud's outer shell: one of the four tiles beside it (on its
-+ * level, across a side) has no smoke the view knows of, or is off the map. Original smoke
-+ * stacks such a tile less where the soldier can't see through it (see drawSeeThroughSmoke),
-+ * so the cloud's outline stays loose.
-+ * @param tilePosition The tile.
-+ * @return True if it's on the shell.
-+ */
-+bool FirstPersonView::smokeShell(const Position &tilePosition) const
-+{
-+	const int sizeX = _save->getMapSizeX(), sizeY = _save->getMapSizeY();
-+	static const int sides[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
-+	for (const auto &side : sides)
-+	{
-+		const int x = tilePosition.x + side[0], y = tilePosition.y + side[1];
-+		if (x < 0 || y < 0 || x >= sizeX || y >= sizeY || !_tileViews[(tilePosition.z * sizeY + y) * sizeX + x].smoke)
-+		{
-+			return true;
-+		}
-+	}
-+	return false;
-+}
-+
-+/**
 + * The colour of the game's smoke, from its frames for the thickest smoke: the colours of their
 + * dots mixed and turned most of the way to grey (as the see-through smoke's are, see
 + * softSmokeFrame), so the wall of smoke the rays draw matches the see-through smoke over it.
@@ -54904,7 +54910,7 @@ index 000000000..82e317537
 +
 +/**
 + * The sight of the soldier the view looks through, for smoke drawn as the game's sight rules have
-+ * it (setting "Smoke": Modern's wall, Original's stacked frames): the range in voxels, and how
++ * it (an enemy they don't see with smoke between isn't drawn, see drawUnits): the range in voxels, and how
 + * much of the smoke and of the smoke over fire their eyes see through (the armor's heat vision,
 + * in percent). The see-through smoke is drawn thinner by as much (a player: a scout drone's 50%
 + * heat vision didn't look any better), down to SmokeSeenMin of itself (see drawSeeThroughSmoke).
@@ -54913,22 +54919,22 @@ index 000000000..82e317537
 + * @param throughFire How much of smoke over fire they see through, in percent.
 + */
 +/**
-+ * How much the see-through smoke's opacity is scaled where it hangs (the settings "Smoke
-+ * opacity" and "Night smoke opacity", a player: "non full smoke can be blinding for some
-+ * players" at night and on dark maps): the day value in the light, the night value in the dark,
-+ * over the opacity the clouds are made for. Dark is the darker of the battle (a night mission,
-+ * however lamps or the suit lights light the smoke: lit smoke on a dark night is the blinding
-+ * kind) and the game's shade where the smoke hangs (a dark base or an unlit room by day; see
-+ * SmokeNightFromShade). Only the smoke the soldier sees through: where their sight runs out it
-+ * stays solid.
++ * The most opaque see-through smoke may get where it hangs (the settings "Smoke opacity" and
++ * "Night smoke opacity", a player: "non full smoke can be blinding for some players" at night
++ * and on dark maps; since GitHub issue #98 a maximum: smoke over smoke builds up to it and no
++ * further): the day value in the light, the night value in the dark. Dark is the darker of the
++ * battle (a night mission, however lamps or the suit lights light the smoke: lit smoke on a dark
++ * night is the blinding kind) and the game's shade where the smoke hangs (a dark base or an unlit
++ * room by day; see SmokeNightFromShade). Only the smoke the soldier sees through: where their
++ * sight runs out it stays solid.
 + * @param shade The game's shade where the smoke hangs, 0 brightest .. 15 darkest.
-+ * @return The scale: 1 for the look before the settings (45% by day).
++ * @return The opacity, 0.05 .. 0.95.
 + */
-+float FirstPersonView::smokeOpacityScale(int shade) const
++float FirstPersonView::smokeOpacityAt(int shade) const
 +{
 +	const float darkness = std::max(_colors.night, std::clamp((shade - SmokeNightFromShade) / (SmokeNightToShade - SmokeNightFromShade), 0.0f, 1.0f));
-+	const float day = std::clamp(Options::fpsSmokeOpacity, 5, 80) / 100.0f, night = std::clamp(Options::fpsNightSmokeOpacity, 5, 80) / 100.0f;
-+	return (day + (night - day) * darkness) / SmokeOpacityMadeFor;
++	const float day = std::clamp(Options::fpsSmokeOpacity, 5, 95) / 100.0f, night = std::clamp(Options::fpsNightSmokeOpacity, 5, 95) / 100.0f;
++	return day + (night - day) * darkness;
 +}
 +
 +void FirstPersonView::setSmokeSight(float sightVoxels, int throughSmoke, int throughFire)
@@ -54940,17 +54946,16 @@ index 000000000..82e317537
 +}
 +
 +/**
-+ * The smoke on discovered tiles drawn see-through (setting "Smoke"): with Modern, the game's own
-+ * smoke made soft (see softSmokeFrame), and the wisps rising off it; where the soldier's sight
-+ * runs out in the smoke, the rays have already drawn a wall of it (see SmokeTrace). With
-+ * Original, the original frames' own dots (see stippleSmokeFrame), more opaque the thicker the
-+ * smoke, and no wisps: one cloud on a tile where the soldier sees through the smoke, and where
-+ * they can't (by the same rules, see smokeSightUsedThrough), the tile's animation over and over,
-+ * each out of step and set off a little, so their dots fill each other's gaps and the cloud
-+ * hides what's behind it. Drawn after everything solid, farthest first, each laid
-+ * over what's behind it; units the soldier sees stay clear (see _unitVeil).
-+ * Each tile's smoke is the frame the map picks for its density, a little more opaque the
-+ * thicker it is; its frames melt into each other slowly (an eased cross-fade, nothing blinks),
++ * The smoke on discovered tiles drawn as the map draws the game's smoke, nothing solid where the
++ * soldier's sight runs out (a player's report, GitHub issue #98; the owner: "0.8's way": the game
++ * hides units in smoke, not the world). With the setting "Smoke" Modern, the game's own smoke made
++ * soft (see softSmokeFrame), and the wisps rising off it, more opaque the thicker the smoke, up to
++ * the most the settings "Smoke opacity" and "Night smoke opacity" allow, which smoke over smoke
++ * builds up to and no further (see smokeOpacityAt, _smokeVeil); with Original, the original
++ * frames' own dots as they are, solid, one frame a tile, as on the map (see stippleSmokeFrame),
++ * and no wisps. Drawn after everything solid, nearest first; units the soldier sees stay clear
++ * (see _unitVeil), the others aren't drawn with smoke between (see drawUnits).
++ * Each tile's smoke is the frame the map picks for its density; its frames melt into each other slowly (an eased cross-fade, nothing blinks),
 + * each tile out of step with the others, a fifth bigger than on the map give or take a little
 + * (so the clouds of neighbouring tiles overlap, and a cloud's edge isn't the tiles' square), set
 + * off from the middle, and swaying and bobbing gently. A wisp is a small puff of the thinnest smoke that rises,
@@ -54971,10 +54976,11 @@ index 000000000..82e317537
 +	auto easedBlend = [](double fraction) { return fraction * fraction * (3.0 - 2.0 * fraction); };
 +
 +	// Everything to draw: a puff of smoke, its anchor in the world (its frames' anchor pixel),
-+	// the two frames it is between, how far, how opaque, how big and how lit.
-+	struct Puff { double depth; double world[3]; int anchorY; const Surface *from, *to; double blend; float opacity; double scale; int shade; };
++	// the two frames it is between, how far, how opaque (and the most its light allows, see
++	// smokeOpacityAt), how big and how lit.
++	struct Puff { double depth; double world[3]; int anchorY; const Surface *from, *to; double blend; float opacity, cap; double scale; int shade; };
 +	std::vector<Puff> puffs;
-+	auto addPuff = [&](const double world[3], int anchorY, int firstFrame, double frameTime, float opacity, double scale, int shade) {
++	auto addPuff = [&](const double world[3], int anchorY, int firstFrame, double frameTime, float opacity, float cap, double scale, int shade) {
 +		const int phase = ((int)std::floor(frameTime) % 4 + 4) % 4;
 +		Puff puff;
 +		puff.depth = (world[0] - _eye[0]) * _forward[0] + (world[1] - _eye[1]) * _forward[1] + (world[2] - _eye[2]) * ZScale * _forward[2];
@@ -54985,6 +54991,7 @@ index 000000000..82e317537
 +		puff.to = smokeSprites->getFrame(firstFrame + (phase + 1) % 4);
 +		puff.blend = easedBlend(frameTime - std::floor(frameTime));
 +		puff.opacity = opacity;
++		puff.cap = cap;
 +		puff.scale = scale;
 +		puff.shade = shade;
 +		if (puff.from) puffs.push_back(puff);
@@ -55013,44 +55020,25 @@ index 000000000..82e317537
 +			hash ^= hash >> 15; hash *= 2246822519u; hash ^= hash >> 13;
 +			value = (hash & 0xFFFF) / 65535.0f;
 +		}
-+		// Set off from the middle, swaying and bobbing slowly.
++		// Set off from the middle; Modern's clouds sway and bob slowly, Original's stay put as on the
++		// map (its solid dots would crawl a pixel at a time; its frames melt into each other instead).
++		const double sway = original ? 0.0 : 1.0;
 +		const double world[3] = {
-+			ground[0] + (variation[0] - 0.5) * 4.0 + 0.8 * std::sin(seconds * 0.5 + variation[1] * 2.0 * Pi),
-+			ground[1] + (variation[1] - 0.5) * 4.0 + 0.8 * std::cos(seconds * 0.4 + variation[2] * 2.0 * Pi),
-+			ground[2] + 1.0 * std::sin(seconds * 0.7 + variation[3] * 2.0 * Pi) };
-+		// A little more opaque the thicker the smoke (a fresh smoke grenade makes about 15); the
-+		// original's dots more so, as their holes already let the view through. Thinner for eyes
-+		// with heat vision (see setSmokeSight).
-+		// The settings "Smoke opacity" and "Night smoke opacity" scale it, by the light here (see
-+		// smokeOpacityScale).
-+		const float made = original ? std::clamp(0.35f + tile->getSmoke() * 0.04f, 0.0f, 0.95f) : std::clamp(0.45f + tile->getSmoke() * 0.025f, 0.0f, 0.85f);
-+		const float opacity = _smokeSeen * std::min(0.95f, made * smokeOpacityScale(_tileViews[tileIndex].light));
++			ground[0] + (variation[0] - 0.5) * 4.0 + sway * 0.8 * std::sin(seconds * 0.5 + variation[1] * 2.0 * Pi),
++			ground[1] + (variation[1] - 0.5) * 4.0 + sway * 0.8 * std::cos(seconds * 0.4 + variation[2] * 2.0 * Pi),
++			ground[2] + sway * 1.0 * std::sin(seconds * 0.7 + variation[3] * 2.0 * Pi) };
++		// Modern: a little more opaque the thicker the smoke (a fresh smoke grenade makes about
++		// 15), the thickest as opaque as the settings "Smoke opacity" and "Night smoke opacity"
++		// allow by the light here, their maximum, which smoke over smoke builds up to and no
++		// further (a player's report, GitHub issue #98: stacked smoke hid more than the game's
++		// sight rules do; see smokeOpacityAt, _smokeVeil). Original: the game's dots as they are,
++		// solid, one frame a tile, as the map draws them (the owner: "exactly as the map"; their
++		// holes are the see-through). Both thinner for eyes with heat vision (see setSmokeSight).
++		const float cap = original ? 0.0f : _smokeSeen * smokeOpacityAt(_tileViews[tileIndex].light);
++		const float opacity = original ? _smokeSeen : cap * std::clamp(0.45f + tile->getSmoke() * 0.025f, 0.0f, 0.85f) / 0.85f;
 +		const int firstFrame = firstSmokeFrame(tile->getSmoke());
 +		const double frameTime = seconds / FrameSeconds + tile->getAnimationOffset() + variation[2], scale = 1.14 + variation[3] * 0.12;
-+		addPuff(world, 32, firstFrame, frameTime, opacity, scale, _tileViews[tileIndex].light);
-+		// Original, where the soldier can't see through the smoke looking at the cloud's middle
-+		// (the sight runs out on the line through it and on): the cloud again on top, out of
-+		// step and set off a little round the tile's middle (a frame of the original's dots
-+		// covers only a tenth to a third of its picture), OriginalSmokeMaxLayers times in all
-+		// inside the cloud, solid where they overlap, and OriginalSmokeShellLayers times on its
-+		// outer shell (a tile next to one without smoke), so its outline stays loose and
-+		// smoke-like; where the smoke uses up most of the sight, a few times (the cloud's edge,
-+		// as soft as Modern's wall's); where the soldier sees through it, once. (With heat
-+		// vision the sight lasts longer, so fewer layers stack; where it runs out all the same,
-+		// the layers are as solid.)
-+		if (original)
-+		{
-+			const double middle[3] = { world[0], world[1], world[2] + 12.0 };
-+			const float sightUsed = smokeSightUsedThrough(middle);
-+			const int mostLayers = smokeShell(tilePosition) ? OriginalSmokeShellLayers : OriginalSmokeMaxLayers;
-+			const int layers = std::min(mostLayers, sightUsed >= 1.0f ? OriginalSmokeMaxLayers : sightUsed >= 0.7f ? 4 : sightUsed >= 0.4f ? 2 : 1);
-+			for (int layer = 1; layer < layers; ++layer)
-+			{
-+				const double angle = layer * 2.4; // the golden angle, so the layers spread evenly round the middle
-+				const double shifted[3] = { world[0] + 3.0 * std::cos(angle), world[1] + 3.0 * std::sin(angle), world[2] + (layer % 3 - 1) * 2.0 };
-+				addPuff(shifted, 32, firstFrame, frameTime + layer * 1.37, 1.0f, scale * (1.0 + layer * 0.03), _tileViews[tileIndex].light);
-+			}
-+		}
++		addPuff(world, 32, firstFrame, frameTime, opacity, cap, scale, _tileViews[tileIndex].light);
 +	}
 +	// The wisps: the thinnest smoke's frames, anchored at their middle, growing as they rise,
 +	// fading in over their first quarter and away over their last half.
@@ -55064,15 +55052,17 @@ index 000000000..82e317537
 +		const float fade = std::min(std::clamp(age / 0.25f, 0.0f, 1.0f), std::clamp((1.0f - age) / 0.5f, 0.0f, 1.0f));
 +		const double world[3] = { particle.pos[0], particle.pos[1], particle.pos[2] };
 +		const int shade = (int)std::lround(std::clamp(lightAt(particle.pos[0], particle.pos[1], particle.pos[2]), 0.0f, 15.0f));
-+		addPuff(world, 20, firstSmokeFrame(1), seconds / (FrameSeconds * 1.5) + particle.size, _smokeSeen * std::min(0.95f, 0.45f * smokeOpacityScale(shade)) * fade * fade * (3.0f - 2.0f * fade),
-+			0.35 + 0.4 * age, shade);
++		const float cap = _smokeSeen * smokeOpacityAt(shade);
++		addPuff(world, 20, firstSmokeFrame(1), seconds / (FrameSeconds * 1.5) + particle.size, cap * (0.45f / 0.85f) * fade * fade * (3.0f - 2.0f * fade),
++			cap, 0.35 + 0.4 * age, shade);
 +	}
 +
-+	// Farthest first, each over what's behind it: its two frames part way into each other, made
++	// Nearest first, so the smoke in front keeps its own shape and sway when the smoke behind
++	// it would go past the most a pixel may take (see _smokeVeil): its two frames part way into each other, made
 +	// here (on this thread). An original frame upgraded to the upscaler's version on the way
 +	// drops the blends made with the old one, some of which may be in the list already: then the
 +	// list is made again (it happens once for each frame, ever).
-+	std::sort(puffs.begin(), puffs.end(), [](const Puff &a, const Puff &b) { return a.depth > b.depth; });
++	std::sort(puffs.begin(), puffs.end(), [](const Puff &a, const Puff &b) { return a.depth < b.depth; });
 +	unsigned upgradesBefore;
 +	do
 +	{
@@ -55082,7 +55072,7 @@ index 000000000..82e317537
 +		{
 +			const SoftSmoke &soft = softSmokeBlend(puff.from, puff.to, std::min(SmokeBlendSteps - 1, (int)(puff.blend * SmokeBlendSteps)), original);
 +			soft.findRuns();
-+			_smokeDraws.push_back({ &soft, { puff.world[0], puff.world[1], puff.world[2] }, puff.anchorY, puff.opacity, puff.scale, puff.shade });
++			_smokeDraws.push_back({ &soft, { puff.world[0], puff.world[1], puff.world[2] }, puff.anchorY, puff.opacity, puff.cap, puff.scale, puff.shade });
 +		}
 +	} while (_smokeUpgrades != upgradesBefore);
 +	// Only what can show, each puff in the rows it may reach (see cullSmokeDraws); then drawn on
@@ -55100,9 +55090,8 @@ index 000000000..82e317537
 + * drawSmokeBands): every band sets each of its puffs' cards up anew, and a thick cloud has
 + * hundreds of them (GitHub issue #92, "smoke grenades drawing maybe 70 tiles of smoke"; the
 + * owner: "still draw all smoke but check if we can do it efficiently"). A puff is left out when it
-+ * lies off the view, or wholly behind what's drawn already (a wall, a unit, Modern's wall of smoke
-+ * where the soldier's sight runs out in it), where every pixel of it would fail the depth test: the
-+ * picture stays the same. The card is placed as drawSprite places it (upright, leaning with the
++ * lies off the view, or wholly behind what's drawn already (a wall, a unit), where every pixel of
++ * it would fail the depth test: the picture stays the same. The card is placed as drawSprite places it (upright, leaning with the
 + * view's pitch, more steeply above the eye) and its four corners taken to the screen: its rows and
 + * columns there (a row more each way), and its nearest corner's depth against the farthest depth
 + * drawn in each block of the view it covers. With the view tilted by a lean, or a corner behind
@@ -55189,7 +55178,7 @@ index 000000000..82e317537
 +/**
 + * Draws this frame's see-through smoke (made by drawSeeThroughSmoke) over bands of the view's
 + * rows, taken one at a time from the shared counter until none are left: a job for all the
-+ * view's threads (see runOnAllThreads). Each band gets every puff, farthest first, so every
++ * view's threads (see runOnAllThreads). Each band gets every puff, nearest first, so every
 + * pixel comes out just as if one thread drew the puffs whole, one after another.
 + */
 +void FirstPersonView::drawSmokeBands()
@@ -55201,7 +55190,7 @@ index 000000000..82e317537
 +		{
 +			if (smoke.bottom <= band * BandRows || smoke.top >= (band + 1) * BandRows) continue; // (not in this band: see cullSmokeDraws)
 +			const SeeThroughSprite seeThroughSprite = { smoke.soft->opacity.data(), smoke.opacity, smoke.soft->runStart.data(), smoke.soft->runs.data(),
-+				_smokeCullDepth.data(), (getWidth() + SmokeCullBlock - 1) / SmokeCullBlock };
++				_smokeCullDepth.data(), (getWidth() + SmokeCullBlock - 1) / SmokeCullBlock, (int)std::lround(smoke.cap * SeeThroughLevels) };
 +			SpriteDraw draw;
 +			draw.sprite = smoke.soft->colors;
 +			draw.anchorX = 16 * UpscaleFactor;
@@ -55625,7 +55614,7 @@ index 000000000..82e317537
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..6dba41ce3
+index 000000000..f705ca55b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
 @@ -0,0 +1,3762 @@
@@ -58720,7 +58709,7 @@ index 000000000..6dba41ce3
 +		const TileView &tileView = _tileViews[index];
 +		noteLightsAndDevices(tile, tileView);
 +		const int top = tileView.max[2] >= tileView.min[2] ? tileView.max[2] : 0;
-+		_tileFlags[index] = (Uint8)((tileView.empty ? 0 : TileTraced) | (tileView.smoke ? TileSmoky : 0) | (top << TileTopShift));
++		_tileFlags[index] = (Uint8)((tileView.empty ? 0 : TileTraced) | (top << TileTopShift));
 +		_tileLights[index] = { tileView.light, tileView.ufoGlow, tileView.discovered, false };
 +	}
 +	// Which tiles have a roof over them (see indoorsAt): a floor or an object on any level above,
@@ -61232,10 +61221,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..55f109b15
+index 000000000..e6d6229e7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,1978 @@
+@@ -0,0 +1,1985 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -62017,12 +62006,19 @@ index 000000000..55f109b15
 +	return std::sqrt((a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]) + (a[2] - b[2]) * (a[2] - b[2]));
 +}
 +
++/// The length of (x, y). (Not std::hypot: on floats that is hypotf, which asks for glibc 2.35, and the release must
++/// start on 2.34: see tools/portable/check.sh.)
++inline float planeLength(float x, float y)
++{
++	return std::sqrt(x * x + y * y);
++}
++
 +/// The distance from a point to the segment a - b, on a frame.
 +inline float segmentDistance(float x, float y, float ax, float ay, float bx, float by)
 +{
 +	const float abx = bx - ax, aby = by - ay, length2 = abx * abx + aby * aby;
 +	const float t = length2 > 1e-9f ? std::clamp(((x - ax) * abx + (y - ay) * aby) / length2, 0.0f, 1.0f) : 0.0f;
-+	return std::hypot(x - (ax + t * abx), y - (ay + t * aby));
++	return planeLength(x - (ax + t * abx), y - (ay + t * aby));
 +}
 +
 +/// An arm's frames as its skeleton is fitted to them. A thin arm (a soldier's, a Sectoid's: two pixels) is drawn a
@@ -62050,7 +62046,7 @@ index 000000000..55f109b15
 +						for (int x = std::max(0, column - 4); x <= std::min(FrameSize - 1, column + 4); ++x)
 +						{
 +							float &here = distance[d][y * FrameSize + x];
-+							here = std::min(here, std::hypot((float)(x - column), (float)(y - row)));
++							here = std::min(here, planeLength((float)(x - column), (float)(y - row)));
 +						}
 +					}
 +				}
@@ -62073,7 +62069,7 @@ index 000000000..55f109b15
 +			for (int bone = 0; bone < 2; ++bone)
 +			{
 +				const float dx = column[bone + 1] - column[bone], dy = row[bone + 1] - row[bone];
-+				const int steps = std::max(2, (int)(std::hypot(dx, dy) * 2.0f));
++				const int steps = std::max(2, (int)(planeLength(dx, dy) * 2.0f));
 +				for (int i = 0; i < steps; ++i)
 +				{
 +					const float t = i / (float)(steps - 1);
@@ -62136,7 +62132,7 @@ index 000000000..55f109b15
 +	for (float &a : axis) a /= reach;
 +	// two ways square to the arm: across it level, and the third
 +	float side[3] = { axis[1], -axis[0], 0.0f };
-+	if (std::hypot(side[0], side[1]) < 1e-4f) { side[0] = -axis[2]; side[1] = 0.0f; side[2] = axis[0]; }
++	if (planeLength(side[0], side[1]) < 1e-4f) { side[0] = -axis[2]; side[1] = 0.0f; side[2] = axis[0]; }
 +	const float sideLength = std::sqrt(side[0] * side[0] + side[1] * side[1] + side[2] * side[2]);
 +	for (float &a : side) a /= sideLength;
 +	const float other[3] = { axis[1] * side[2] - axis[2] * side[1], axis[2] * side[0] - axis[0] * side[2], axis[0] * side[1] - axis[1] * side[0] };
@@ -62173,7 +62169,7 @@ index 000000000..55f109b15
 +			const float lower = segmentDistance(frames.columns[d][i], frames.rows[d][i], column[1], row[1], column[2], row[2]);
 +			count[upper <= lower ? 0 : 1] += 1.0f;
 +		}
-+		for (int bone = 0; bone < 2; ++bone) length[bone] += std::hypot(column[bone + 1] - column[bone], row[bone + 1] - row[bone]) + 1.0f;
++		for (int bone = 0; bone < 2; ++bone) length[bone] += planeLength(column[bone + 1] - column[bone], row[bone + 1] - row[bone]) + 1.0f;
 +	}
 +	for (int bone = 0; bone < 2; ++bone) radius[bone] = std::clamp(count[bone] / std::max(length[bone], 1.0f) / 2.0f / 1.2f, ArmRadiusMin, ArmRadiusMax);
 +}
@@ -63400,7 +63396,7 @@ index 000000000..06aed858b
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..8e21c2e9c
+index 000000000..46cc53f89
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,858 @@
@@ -63620,7 +63616,7 @@ index 000000000..8e21c2e9c
 +			"fpsFalling", "fpsSafeLanding" } },
 +		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsRecoil", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsLean", "fpsMeleeTerrain",
 +			"fpsMeleeFloors", "fpsAimExact", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
-+			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear" } },
++			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear" } },
 +		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
 +			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsVoxelUnits", "fpsMuzzleFlash", "fpsHitFlash", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 +			"fpsGhostParts", "fpsGhostOpacity", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
@@ -64026,10 +64022,10 @@ index 000000000..8e21c2e9c
 +		{
 +			*value = std::clamp(*value + 10 * direction, 10, 100);
 +		}
-+		// The see-through smoke's opacity, by day and in the dark: 5 to 80%, in steps of 5.
++		// The see-through smoke's opacity, by day and in the dark: 5 to 95%, in steps of 5.
 +		else if (value == &Options::fpsSmokeOpacity || value == &Options::fpsNightSmokeOpacity)
 +		{
-+			*value = std::clamp(*value + 5 * direction, 5, 80);
++			*value = std::clamp(*value + 5 * direction, 5, 95);
 +		}
 +		// The downed units' icons (off, crosshair, always): round and round.
 +		else if (value == &Options::fpsDownedIcons)
@@ -65146,7 +65142,7 @@ index af88e1829..760a449f2 100644
  		return;
  	}
 diff --git a/src/Savegame/BattleUnit.cpp b/src/Savegame/BattleUnit.cpp
-index 46fbf1ffd..c6630cf2c 100644
+index 46fbf1ffd..58f8bdd5f 100644
 --- a/src/Savegame/BattleUnit.cpp
 +++ b/src/Savegame/BattleUnit.cpp
 @@ -53,6 +53,7 @@
@@ -65157,16 +65153,17 @@ index 46fbf1ffd..c6630cf2c 100644
  
  namespace OpenXcom
  {
-@@ -699,6 +700,8 @@ void BattleUnit::load(const YAML::YamlNodeReader& node, const Mod *mod, const Sc
+@@ -699,6 +700,9 @@ void BattleUnit::load(const YAML::YamlNodeReader& node, const Mod *mod, const Sc
  	reader.tryRead("currStats", _stats);
  	reader.tryRead("turretType", _turretType);
  	reader.tryRead("visible", _visible);
 +	reader.tryRead("mapAkimbo", _mapAkimbo); // (OpenXcom3D)
 +	reader.tryRead("flightSwitch", _flightSwitch); // (OpenXcom3D)
++	reader.tryRead("turretOnly", _turretOnly); // (OpenXcom3D)
  
  	reader.tryReadAs<int>("turnsSinceSpotted", _turnsSinceSpotted[FACTION_HOSTILE]);
  	reader.tryReadAs<int>("turnsLeftSpottedForSnipers", _turnsLeftSpottedForSnipers[FACTION_HOSTILE]);
-@@ -817,6 +820,10 @@ void BattleUnit::save(YAML::YamlNodeWriter writer, const ScriptGlobal *shared) c
+@@ -817,6 +821,12 @@ void BattleUnit::save(YAML::YamlNodeWriter writer, const ScriptGlobal *shared) c
  		writer.write("turretType", _turretType);
  	if (_visible)
  		writer.write("visible", _visible);
@@ -65174,10 +65171,12 @@ index 46fbf1ffd..c6630cf2c 100644
 +		writer.write("mapAkimbo", _mapAkimbo); // (OpenXcom3D: akimbo on the map, see FirstPersonMode::toggleMapAkimbo)
 +	if (_flightSwitch)
 +		writer.write("flightSwitch", _flightSwitch); // (OpenXcom3D: the 3D view's flight switch, see FirstPersonMode::toggleFlight)
++	if (_turretOnly)
++		writer.write("turretOnly", _turretOnly); // (OpenXcom3D: the 3D view's turret switch, see FirstPersonMode::toggleTurret)
  
  	writer.writeAs<int>("turnsSinceSpotted", _turnsSinceSpotted[FACTION_HOSTILE]);
  	writer.writeAs<int>("turnsLeftSpottedForSnipers", _turnsLeftSpottedForSnipers[FACTION_HOSTILE]);
-@@ -1301,6 +1308,10 @@ int BattleUnit::getDiagonalWalkingPhase() const
+@@ -1301,6 +1311,10 @@ int BattleUnit::getDiagonalWalkingPhase() const
  void BattleUnit::lookAt(Position point, bool turret)
  {
  	int dir = directionTo (point);
@@ -65188,7 +65187,7 @@ index 46fbf1ffd..c6630cf2c 100644
  
  	if (turret)
  	{
-@@ -1510,6 +1521,14 @@ void BattleUnit::aim(bool aiming)
+@@ -1510,6 +1524,14 @@ void BattleUnit::aim(bool aiming)
   */
  int BattleUnit::directionTo(Position point) const
  {
@@ -65203,7 +65202,7 @@ index 46fbf1ffd..c6630cf2c 100644
  	double ox = point.x - _pos.x;
  	double oy = point.y - _pos.y;
  	double angle = atan2(ox, -oy);
-@@ -1627,6 +1646,11 @@ int BattleUnit::damage(Position relative, int damage, const RuleDamageType *type
+@@ -1627,6 +1649,11 @@ int BattleUnit::damage(Position relative, int damage, const RuleDamageType *type
  	{
  		return 0;
  	}
@@ -65216,19 +65215,20 @@ index 46fbf1ffd..c6630cf2c 100644
  	UnitBodyPart bodypart = BODYPART_TORSO;
  
 diff --git a/src/Savegame/BattleUnit.h b/src/Savegame/BattleUnit.h
-index ecc040fb6..86fedc77c 100644
+index ecc040fb6..cd4e7d546 100644
 --- a/src/Savegame/BattleUnit.h
 +++ b/src/Savegame/BattleUnit.h
-@@ -117,6 +117,8 @@ private:
+@@ -117,6 +117,9 @@ private:
  	bool _visible;
  	UnitStats _exp, _expTmp;
  	int _motionPoints;
 +	int _mapAkimbo = 0; // (OpenXcom3D) the soldier's two guns fire together on the map: 0 no, 1 both at once, 2 in turn
 +	int _flightSwitch = 0; // (OpenXcom3D) the 3D view's flight switch: 0 never switched (flies while in the air), 1 on, -1 off
++	bool _turretOnly = false; // (OpenXcom3D) the 3D view's turret switch: the view turns only a tank's turret
  	int _scannedTurn;
  	int _customMarker;
  	int _kills;
-@@ -563,6 +565,12 @@ public:
+@@ -563,6 +566,15 @@ public:
  	void stimulant (int energy, int stun, int mana);
  	/// Get motion points for the motion scanner.
  	int getMotionPoints() const;
@@ -65238,6 +65238,9 @@ index ecc040fb6..86fedc77c 100644
 +	/// (OpenXcom3D) The 3D view's flight switch (the flight key, the FLY button): 0 never switched, 1 on, -1 off.
 +	int getFlightSwitch() const { return _flightSwitch; }
 +	void setFlightSwitch(int flightSwitch) { _flightSwitch = flightSwitch; }
++	/// (OpenXcom3D) The 3D view's turret switch (the TURRET button): turning the view turns only the turret.
++	bool getTurretOnly() const { return _turretOnly; }
++	void setTurretOnly(bool turretOnly) { _turretOnly = turretOnly; }
  	/// Get turn when unit was scanned by the motion scanner.
  	int getScannedTurn() const { return _scannedTurn; }
  	/// Set turn when unit was scanned by the motion scanner.

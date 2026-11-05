@@ -34,6 +34,7 @@ KEYS = [
         ('<kbd>Page Up</kbd> <kbd>Page Down</kbd>', 'Fly up/down, ride a grav lift, climb a ladder. Off a lift, Page Up switches flight on, Page Down on the ground off. Purple arrows with LIFT PLATFORM show where a lift goes.',
          ''),
         ('<kbd>B</kbd>', 'Suit flight on/off (flying armor; SWIM under water), kept in the save.', ''),
+        ('(set a key)', '<i>Turret only (tanks)</i>: TURRET on/off, as its button on the top bar: turning the view turns a tank\'s turret alone, at the turret\'s cost, the hull staying as it is. Kept in the save, tank by tank.', 'Swing the gun round without turning the whole tank: in the big mods a tank\'s turn costs far more than its turret\'s.'),
         ('<kbd>O</kbd>', 'Open the door you look at without walking through it, if it\'s in reach.', 'Look before you step into a room.'),
         ('(set a key)', 'Grab the item at your feet into a free hand, in 3D and on the map; with several items or no hand free, the inventory opens.', 'Give it a key on the 3D keys page: it has none.'),
     ]),
@@ -88,7 +89,7 @@ KEYS = [
 # ---------------------------------------------------------------------------------------------------------------------
 SETTINGS = [
     ('Playstyle', [
-        ('Playstyle', 'Faithful', 'Faithful / FPS / Custom', 'One switch for how it plays, setting nine at once. Faithful: the game\'s own way, close to the map. FPS: FPS-style shooting, free turning and walking, vaulting, leaning, full sprite hitboxes, quick deaths, melee at walls. Custom: your own mix of those, kept.',
+        ('Playstyle', 'Faithful', 'Faithful / FPS / Custom', 'One switch for how it plays, setting ten at once. Faithful: the game\'s own way, close to the map. FPS: FPS-style shooting, free turning and walking, vaulting, leaning, full sprite hitboxes, quick deaths, melee at walls, a live motion scanner. Custom: your own mix of those, kept.',
          'Change one of the nine by hand and it becomes Custom; flipping back brings your mix back.'),
     ]),
     ('View and camera', [
@@ -147,6 +148,7 @@ SETTINGS = [
         ('Full sprite hitboxes', 'NO', 'YES / NO', 'Units are hit, and seen, wherever their full sprites show (a card facing whoever fires), for everyone, in 3D and on the map.', 'What you see is what you hit: shots pass between legs and hit arms.'),
         ('Auto-equip guns first', 'NO', 'YES / NO', 'Soldiers with no saved loadout take guns before melee weapons, the hardest-hitting first, launchers last. NO: OpenXcom\'s own auto-equip.', 'OXCE has no ranking: its order changes between builds, so in XPiratez or X-Com Files it often hands out staffs and swords first.'),
         ('Quick deaths', 'NO', 'YES / NO', 'Units killed or knocked out are down at once: bursts fire on, falls play on their own and together, in 3D and on the map; your soldier falls on their camera card while the view goes on to the next.', 'Doom-style pace: chaingun through a group without waiting for each fall.'),
+        ('Live motion scanner', 'NO', 'YES / NO', 'YES: the motion scanner stays up as you move and through the aliens\' turn, a live radar for one use. NO: one look from where it was used, as the game\'s own scanner.', 'An edge the game never gives; on with the FPS playstyle.'),
         ('Unlimited tactical flares', 'YES', 'YES / NO', 'T throws a red flare at the crosshair, free and as often as you like.', 'Lights the 3D view only.'),
         ('Night vision needs gear', 'NO', 'YES / NO', 'Only soldiers with night vision gear (power suits, flying suits...) get NIGHT VISION in 3D. NO: everyone.', 'YES keeps the night dark for the unequipped.'),
     ]),
@@ -156,11 +158,11 @@ SETTINGS = [
         ('Distance haze', 'Normal', 'Normal / Light / Clear', 'How soon far terrain fades into the haze.', ''),
         ('Flashlight', 'On', 'On / Dynamic / Off', 'The 3D view\'s own light, on F. On: a wide beam from the shoulder, in the dark. Dynamic: a tight spot on the crosshair, day or night.',
          'Lights only the 3D view: what the soldiers see by the rules doesn\'t change.'),
-        ('Smoke', 'Modern', 'Modern / Original', 'Modern: the game\'s smoke as soft see-through clouds, solid where your soldier can\'t see through. Original: the games\' own smoke animation.',
+        ('Smoke', 'Modern', 'Modern / Original', 'Modern: the game\'s smoke as soft see-through clouds. Original: the games\' own smoke animation, as the map draws it.',
          'Either way units the game hides stay hidden.'),
-        ('Smoke opacity', '45%', '5% to 80%', 'How solid smoke you can see through looks: the thinnest, thicker smoke more. Where your soldier can\'t see through it, it stays solid.',
+        ('Smoke opacity', '80%', '5% to 95%', 'The most solid Modern smoke gets: the thickest; thinner smoke less, and smoke over smoke no more.',
          'Lower it if smoke hides too much of the street; your soldier sees what the game says either way.'),
-        ('Night smoke opacity', '25%', '5% to 80%', 'The same in the dark: on a night mission (lamp-lit or suit-lit smoke too), and by day on dark maps and in unlit rooms.',
+        ('Night smoke opacity', '45%', '5% to 95%', 'The same in the dark: on a night mission (lamp-lit or suit-lit smoke too), and by day on dark maps and in unlit rooms.',
          'Lower if smoke at night is blinding.'),
         ('Weapon in hand', 'YES', 'YES / NO', 'The weapon in hand at the bottom of the view, built in 3D from its inventory picture, its barrel on the crosshair.', ''),
         ('Sprite upscaling', 'Smooth + detail', 'Smooth + detail / Smooth / Off', 'Units, items and effects up close scaled the way pixel art scales well (xBRZ).', ''),
@@ -220,21 +222,25 @@ SETTINGS = [
 HUD_MARKS = [
     (1, 11, 9, 'ISO, HUD, INV', 'The map and back, the classic HUD, the inventory.'),
     (2, 51, 9, 'The squad', 'Your soldiers in the middle of the top bar: click to select, hover for the card with a live helmet camera, right click for the SOLDIER CAM; &#9664; and &#9654; for the previous and next. A skull marks the dead, a caduceus the unconscious, an orange alien face one under mind control.'),
-    (3, 80, 9, 'LIGHT, END and the rest', 'The suit light, the end of the turn, and when the soldier has them NIGHT VISION and SUIT FLY.'),
+    (3, 80, 9, 'LIGHT, END and the rest', 'The suit light, the end of the turn, and when the soldier has them NIGHT VISION, SUIT FLY and a tank\'s TURRET (the view turns the turret alone).'),
     (4, 85, 22, 'The compass', 'Your heading under the white arrow, the way the soldier faces (a yellow triangle), and a shot\'s turn and its cost.'),
-    (5, 44, 46, 'The crosshair', 'Its shape is the fire mode; the accuracy line under it; the shot info beside it (mode, hit chance, time units, the other costs below); the name of the unit pointed at under all that.'),
-    (6, 27, 76, 'The soldier', 'Rank and name, what matters now (KNEELING, BURNING, WOUNDS, PANIC), a line per hand with its ammo (a cannon or launcher says the loaded kind: [AP], [HE], [IN]), the four stat bars.'),
+    (5, 44, 46, 'The crosshair', 'Its shape is the fire mode; the accuracy line under it; the shot info beside it (mode, hit chance, time units, the other costs below); the name of the unit pointed at under all that. A little green door at its left: it\'s on a door. A blue shield at its lower left: your strike did no harm.'),
+    (6, 27, 76, 'The soldier', 'Rank and name, what matters now (KNEELING, BURNING, WOUNDS, PANIC), a line per hand with its ammo (a cannon or launcher says the loaded kind: [AP], [HE], [IN]), the four stat bars, and a mod\'s mana as a thin bar under them.'),
     (7, 66, 84, 'The weapon in hand', 'Built in 3D from its inventory picture, its barrel on the line to the crosshair; your shots leave its muzzle.'),
-    (8, 92, 61, 'The enemies in sight', 'A red button for each, a red number over its head: click the button, or press 1 to 0, to turn to it.'),
+    (8, 92, 61, 'The enemies in sight', 'A red button for each, in a column at the right, a red number over its head: click the button, or press 1 to 0, to turn to it.'),
 ]
 CROSSHAIRS = [('Snap', 'An open cross'), ('Aimed', 'A scope ring'), ('Auto', 'Brackets, a dot per round'), ('Throw', 'An arc onto a ring'),
               ('Launch', 'A diamond'), ('Melee', 'Claw marks'), ('Psi', 'Rings spreading out'), ('Use, prime', 'A box'),
-              ('A hit', 'White ticks on the diagonals'), ('A kill', 'Longer red ticks')]
+              ('A hit', 'White ticks on the diagonals'), ('A kill', 'Longer red ticks'), ('No harm', 'A small blue shield, lower left'),
+              ('A door', 'A little green door, at the left')]
 SIGNS = [
     ('The crosshair\'s colour', 'Yellow: you can do it. Red: you can\'t (time units, ammo, range). Purple: psi. Grey: not your move.'),
     ('The shot info', 'SNAP 40% 15TU: the fire mode, the hit chance (green; yellow with range or sight penalties; red when it can\'t be taken) and the time units. With two guns DUAL (round by round), VOLLEY (both at once) or IN TURN (an arcing pair, gun after gun) in front.'),
     ('The other costs', 'EN 6 STUN 2 under the shot info: energy, health, stun, morale, mana. A cost you can\'t pay is red, and the game would refuse the action.'),
-    ('The accuracy line', 'A green line under the crosshair, a notch up at each end: as far to either side as a successful roll can stray (the game\'s own targeting), or the spread in FPS style, widening as you fire. Grey when it\'s not your move.'),
+    ('Shot damage', 'With the setting <i>Shot damage</i>: the shot\'s damage range under the hit chance, as the map shows it with Alt, in the damage type\'s colour.'),
+    ('The accuracy line', 'A green line under the crosshair, a notch up at each end: with the game\'s own targeting bright as far to either side as a successful roll can stray, and dotted on out to where a miss can; in FPS style the spread, widening as you fire. Grey when it\'s not your move.'),
+    ('Hits, kills, no harm', 'A hit: white ticks on the crosshair\'s diagonals and a tick heard, the unit flashing and flinching back; a downed one too, bleeding on the floor. A kill: longer red ticks and a double tick. A strike that did no harm (armour, a zero roll, full resistance): a small blue shield at the crosshair\'s lower left and a duller tick.'),
+    ('A door', 'A little green door at the crosshair\'s left: the first wall its line meets is a door you have seen, a swinging door or a UFO\'s (teal under TFTD\'s sea). <kbd>O</kbd> opens it from where you stand, if it\'s in reach.'),
     ('The trajectory', 'A light cyan arc for a throw or an arcing shot, a diamond where it lands; a thin red laser for a straight shot, a bright dot where it meets something. Yellow: forced (it goes whatever is in the way). Dim dotted red: the game will refuse it.'),
     ('Unit names', 'The unit under the crosshair, by name or race: green X-COM, red aliens, yellow civilians.'),
     ('Downed unit icons', 'Over an unconscious body: a flame (burning), a drop (bleeding), a bolt (shock), Zz (out cold).'),
@@ -243,7 +249,7 @@ SIGNS = [
     ('Lift arrows', 'Purple arrows and LIFT PLATFORM on a grav lift or a ladder: the ways it goes. Arrows left of the compass show where W climbs.'),
     ('Under the compass', 'SPRINT (green while running, grey when the soldier can\'t), EN PASSANT, TURN 1 TU, SHOT +1 TU, NO TU.'),
     ('At the right', 'SCOPING 2.6x while zooming.'),
-    ('Warnings', 'UNSAFE LANDING! PUSH AGAIN at a ledge over ground no one can walk on; the game\'s own warnings (No Line of Fire!, Out of Range!), on the warning line.'),
+    ('Warnings', 'UNSAFE LANDING! PUSH AGAIN at a ledge over ground no one can walk on; when <kbd>R</kbd> loads nothing, why: Already loaded, No spare clip for this weapon, Not enough time units to reload; the game\'s own warnings (No Line of Fire!, Out of Range!), on the warning line.'),
     ('Banners', 'ENEMY SPOTTED!, HIDDEN MOVEMENT, BURNING, YOU HAVE A MENTAL BREAKDOWN, BERSERK, TURNED INTO A ZOMBIE.'),
     ('Camera cards', 'A soldier\'s helmet camera popping up: TARGETED, HIT, MIND CONTROLLED, FIRING, WATCHING, DECEASED, UNCONSCIOUS. A blinking red dot and now and then a bad signal or static: it\'s a camera, not your view. SIGNAL LOST when the soldier you look through falls.'),
     ('The info panel\'s right side', 'DOOM MODE while the cheat is on (IDDQD, IDKFA or both in its place with those); with IDDQD the stats turn silver.'),
@@ -257,9 +263,12 @@ FEATURES = [
      'Left button, <kbd>Z</kbd> <kbd>X</kbd> <kbd>V</kbd>, wheel',
      'With <i>Aim at exact point</i> a shot goes for the very voxel under the crosshair, or on the open sky for the air on its line. If the line from the gun is blocked, the game\'s other muzzle points are tried (left and right with OXCE\'s <i>Off-centre shooting</i>), then the game\'s own aim, as a click on the map does. The laser (<i>Show trajectory: All</i>) shows the line that will fire.',
      'With the game\'s own targeting it is the map\'s rules with a finer click. In FPS style the round leaves from your eye: what you see past a corner, you can hit. With <i>Full sprite hitboxes</i> a unit is hit, and seen, where its picture shows: between the legs is a miss, a gun held out a hit.'),
-    ('line', 'The accuracy line', [('accuracy_line.png', 'The game\'s own targeting (left): a short line, as far as a hit strays. FPS style (right): the spread of a burst')],
-     '', 'A green line under the crosshair, a notch up at each end, as wide as a round can land to either side. With the game\'s own targeting: the farthest a successful roll can send the round, by the game\'s own roll. In FPS style: the spread 95% of the rounds land in, widening with the bloom as you fire.',
-     'A successful roll in X-COM strays little, mostly sideways; a miss strays far. The line shows the first, the hit chance how often you get it.'),
+    ('line', 'The accuracy line', [('accuracy_line_111.png', 'The game\'s own targeting (left): bright as far as a hit strays, dotted out to where a miss can. FPS style (right): the spread of a burst')],
+     '', 'A green line under the crosshair, a notch up at each end, as wide as a round can land to either side. With the game\'s own targeting: bright as far as a successful roll can send the round, by the game\'s own roll, and dotted on out to where a miss can stray. In FPS style: the spread 95% of the rounds land in, widening with the bloom as you fire.',
+     'A successful roll in X-COM strays little, mostly sideways; a miss strays far: the bright part and the dotted ends. The hit chance says how often you get which.'),
+    ('marks', 'Hits, no harm, a door', [('crosshair_marks.png', 'A little green door left of the crosshair, on a room\'s door (left); a blue shield at its lower left: a round that didn\'t get through an armoured Sectoid (right)')],
+     '', 'The crosshair says what your last strike did and what it\'s on. A hit: white ticks on its diagonals and a tick heard, the unit flashing (setting <i>Hit flash</i>) and flinching back; a downed unit flashes too, and bleeds on the floor. A kill: longer red ticks and a double tick. A strike that did no harm (armour, a zero roll, full resistance): a small blue shield at its lower left and a duller tick. A door: a little green door at its left when the first wall its line meets is a door you have seen.',
+     'Know at once whether a round did anything, and whether <kbd>O</kbd> will open what you look at.'),
     ('akimbo', 'Akimbo', [('ufo_akimbo_both_lasers.png', 'Two laser pistols, both lasers showing'), ('ufo_akimbo_on_the_map.png', 'Akimbo on the map: two mini targets in each hand\'s box, in turn')],
      '<kbd>Y</kbd>, <i>Akimbo style</i>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click on the map',
      'A gun in each hand fires both (the setting <i>Akimbo</i>, Full or One-hand): round by round in turn, or at once as a volley, each its own burst, each 20% less accurate, for the dearer gun\'s shot and a tenth. On the map Ctrl+Shift+click a hand\'s weapon marks the pair.',
@@ -274,32 +283,36 @@ FEATURES = [
      'Falls and vaults are shortcuts the map doesn\'t have (each a setting). Sprint costs less time and more energy; en passant keeps walking when an enemy shows up.'),
     ('fly', 'Lifts, ladders and flight', [('ufo_flight_climb_arrow.png', 'A flying suit: the arrow left of the compass lit yellow, W climbs')],
      '<kbd>Page Up</kbd> <kbd>Page Down</kbd>, <kbd>B</kbd>, <kbd>W</kbd> looking up',
-     'Ride a grav lift, climb a ladder, fly with SUIT FLY on: W looking up climbs, looking down sinks, each level paid as on the map. Purple arrows show the ways.',
+     'Ride a grav lift, climb a ladder, fly with SUIT FLY on: W looking up climbs, looking down sinks, each level paid as on the map. Purple arrows show the ways. Flight stays on through a save and a load, and when you touch down: Page Down on the ground switches it off.',
      ''),
+    ('tank', 'Tanks and their turrets', [],
+     'TURRET on the top bar; <i>Turret only (tanks)</i> (set a key)',
+     'A tank with a turret gets a TURRET button on the top bar, off at first. On, turning the view turns the turret alone, by the game\'s own turret turn and at its cost (with <i>Turning costs TU</i>), the hull staying as it is; off, the whole tank turns. Each tank keeps its switch in the save. A tank has no hands, so no weapon is drawn at the bottom of the view; the crosshair, aiming and firing work as with any gun.',
+     'In the big mods (XPiratez) a tank\'s own turn can cost far more than its turret\'s.'),
     ('doors', 'Doors', [],
      '<kbd>O</kbd>, or walk into it',
-     'Doors open as you walk into them, or with O from where you stand (the one you look at). They swing to where the game has them; UFO doors slide. Glass doors are seen through, while they swing too.',
+     'Doors open as you walk into them, or with O from where you stand (the one you look at). They swing to where the game has them; UFO doors slide. Glass doors are seen through, while they swing too. A little green door left of the crosshair says it\'s on a door you have seen.',
      'Open a door without stepping into the room behind it.'),
     ('melee', 'Melee, medi-kits and items', [('ufo_medikit_teammate.png', 'A medi-kit by the crosshair: USE: and the teammate\'s name'), ('ufo_motion_scanner.png', 'The motion scanner held up: the sweep going out, two blips behind the soldier')],
      'Left button in the melee or use mode',
-     'Melee strikes what\'s under the crosshair: a blow swings, lunges and jolts. A medi-kit treats whoever you look at, next to you; aiming at nothing, yourself. The motion scanner is held up at the bottom of the view, turning as you look round, a ring sweeping out with a whoop and a pip for each movement it finds; the mind probe to its screen; priming opens the timer at once.',
+     'Melee strikes what\'s under the crosshair: a blow swings, lunges and jolts. A medi-kit treats whoever you look at, next to you; aiming at nothing, yourself. The motion scanner is held up at the bottom of the view (one look from where it was used, or live with Live motion scanner), turning as you look round, a ring sweeping out with a whoop and a pip for each movement it finds; the mind probe to its screen; priming opens the timer at once.',
      ''),
     ('throw', 'Throwing and grenades', [('airburst.png', 'Doom free grenades: an airburst over a field')],
      'Fire mode throw or prime; <kbd>T</kbd> for a flare',
-     'Anything in a hand can be thrown along the game\'s arc (the cyan path shows it). In Doom mode grenades burn in real time, and with free grenades fly wherever the crosshair points and burst in the air.',
+     'Anything in a hand can be thrown along the game\'s arc (the cyan path shows it). Aimed at the open sky, a throw or an arcing shot goes through the air on the crosshair\'s line and comes down wherever that arc falls. In Doom mode grenades burn in real time, and with free grenades fly wherever the crosshair points and burst in the air.',
      ''),
     ('zoom', 'Zoom', [('scope_night.png', 'SCOPING at night, the blue scope cross on the crosshair')],
      '<kbd>U</kbd> or the right button, held', 'The view glides in four times closer, the weapon lowers, the mouse slows.', 'Only the picture: the shot and its odds don\'t change.'),
     ('light', 'Light and night', [('night_vision_laser.png', 'Night vision: the laser sight light in the goggles')],
      '<kbd>F</kbd>, <kbd>N</kbd>, <kbd>T</kbd>, <kbd>L</kbd>',
-     'Your flashlight (on F, wide or a tight spot on the crosshair), night vision with the gear for it, red tactical flares, and the game\'s suit light (L). Light and shadow come from lamps, the sun, your flashlight and flares; indoors (a roof overhead, or rock) no sun shines, and rooms are lit by their own light, as on the map.',
+     'Your flashlight (on F, wide or a tight spot on the crosshair), night vision with the gear for it (all green, or with <i>Futuristic night vision</i> units and items in their own colours), red tactical flares, and the game\'s suit light (L). Light and shadow come from lamps, the sun, your flashlight and flares, a unit lit by a flare throwing a long soft shadow; indoors (a roof overhead, or rock) no sun shines, and rooms are lit by their own light, as on the map.',
      'The flashlight and flares light only your view; the suit light is the game\'s, and lets aliens see your soldiers at night.'),
-    ('smoke', 'Smoke', [('smoke.png', 'Modern smoke: soft see-through clouds, solid where the soldier can\'t see through')],
-     '', 'Modern: the game\'s smoke as soft clouds you see through, solid where your soldier can\'t see through by the game\'s sight rules. Original: the games\' own animation, stacked thick there. Heat vision sees smoke thinner.',
-     'What you see through matches what your soldier sees through.'),
+    ('smoke', 'Smoke', [('smoke.png', 'Modern smoke: soft see-through clouds')],
+     '', 'Smoke is drawn as the map draws it. Modern: soft clouds you see through, never more solid than <i>Smoke opacity</i> (80% by day, 45% at night, up to 95%). Original: the game\'s own dots, exactly as on the map. The game hides units in smoke, not the world: an enemy your soldier can\'t see through it isn\'t drawn, only its marker. Heat vision sees smoke thinner.',
+     'What you see matches what your soldier sees: an alien only a squadmate spots stays hidden in the cloud.'),
     ('cams', 'Helmet cameras', [('soldier_cam_dusk.png', 'A SOLDIER CAM at dusk'), ('map_camera.png', 'The map camera on the isometric map'), ('killed_in_action.png', 'Killed in action: the picture turns red, then breaks into static, SIGNAL LOST')],
      'Hover a soldier\'s button; right click for the SOLDIER CAM; the wheel over a button; <kbd>P</kbd> on the map',
-     'Every soldier\'s helmet camera, live: on their card, big as the SOLDIER CAM, or over the map (setting <i>Map camera</i>), with a blinking red dot, now and then a bad signal or static, worse on hard missions. With the cursor free, the mouse wheel over a soldier\'s button steps the card or the SOLDIER CAM through the squad. When the soldier you look through falls, the picture turns red and breaks into static: SIGNAL LOST.',
+     'Every soldier\'s helmet camera, live: on their card, big as the SOLDIER CAM, or over the map (setting <i>Map camera</i>), with a blinking red dot, now and then a bad signal or static, worse on hard missions. With the cursor free, the mouse wheel over a soldier\'s button steps the card or the SOLDIER CAM through the squad. When the soldier you look through falls, the picture turns red and breaks into static: SIGNAL LOST. With <i>Cameras see as the eyes</i> a camera sees through smoke with the soldier\'s heat vision, as the 3D view does.',
      'See what each soldier sees; aim on the map with a soldier\'s eyes beside it.'),
     ('deaths', 'Quick deaths', [('ufo_quick_death_card.png', 'The soldier looked through is down: the view goes on with the next one, while the fallen soldier\'s card, DECEASED, shows his last look')],
      '', 'With <i>Quick deaths</i> a unit killed or knocked out is down at once: a burst fires on through it to whoever stands behind, several fall together, each fall on its own, at the game\'s pace, in 3D and on the map. When the soldier you look through goes down, their fall plays on their camera card while the view goes on to the next soldier at once.',
@@ -310,11 +323,14 @@ FEATURES = [
     ('ghosts', 'Ghosts: lifts, racks, catwalks, sludge', [('ufo_shop_racks.png', 'UFO\'s shop racks as ghosts in their real shape, at Ghost opacity'), ('piratez_catwalk.png', 'XPiratez: a catwalk\'s grating overhead, its rest a ghost'), ('piratez_sludge.png', 'XPiratez: the sewer\'s sludge, a soldier wading in it to the thighs')],
      '', 'Some parts the map draws have no shape, or only a few voxels, in the game\'s data. They show as see-through ghosts of their art: ladders and lift pads, the shops\' racks, the rest of fences, railings and catwalk gratings, and the surface of liquid over a floor (XPiratez\'s sewers). The game\'s own voxels stay solid.',
      'Ghosts are pictures: shots, sight and walking go through them as the game says. Set how solid with <i>Ghost opacity</i>.'),
-    ('glass', 'Windows and glass', [],
+    ('glass', 'Windows and glass', [('ufo_window_glass.png', 'A house\'s window from inside: the garden and the street behind it a little paler'), ('ufo_glass_shatters.png', 'A round through the window: shards over the garden')],
      '', 'Windows and glass walls the map sees through are glass in 3D, tinting what\'s behind them; a plain opening, a barn\'s window, stays open. A round, a pellet or a thrown item through a window, or a blast beside it, shatters the glass: shards fall, a crack is heard, and the window stays open for the rest of the battle, kept in the save. A glass wall the game blows in throws its shards too.',
      'Only the look: rounds and sight go through as the game has them.'),
     ('sea', 'The sea, and under it', [('tftd_sea_past_the_edge.png', 'TFTD: the sea rolling in waves past an island\'s edge'), ('tftd_ruins.png', 'TFTD: ruins on the seabed, bubbles rising, light rippling over the sand')],
      '', 'Terror From The Deep\'s sea rolls in waves, and where it reaches the map\'s edge it goes on past it. Under the water: bubbles, marine snow drifting down, and light rippling over the sand.', 'The particles are a setting (<i>Particles</i>), if you want the water clear.'),
+    ('sky', 'The sky over the battle', [('ufo_snow_cloud.png', 'UFO: the Skyranger in falling snow, under a grey deck of cloud'), ('piratez_earth_orbit.png', 'XPiratez: the Earth below a space station, its clouds drifting')],
+     '', 'Each battle gets the sky of its weather and its place. Rain and snow fall from a grey deck of cloud, with no sun, moon or stars and no sun shadows. Space and orbit are black and full of stars, the Earth below XPiratez\'s stations; the Moon has the Earth\'s disc in its sky; Mars is butterscotch by day; the Shadowlands lie in a violet void. The big mods\' seas run on past the map\'s edge as TFTD\'s does, and their underground maps (metros, sewers, crypts, lairs) lie under rock.',
+     ''),
     ('shotguns', 'Shotguns', [('shotgun_pellets_map.png', 'Pellets in flight on the map')],
      '', 'Every pellet lands on its own (<i>Each pellet on its own</i>), and with <i>Shotgun pellets in flight</i> each flies beside the round and hits as it gets there.',
      'No more "shotgun void": a miss by the lead pellet no longer takes the whole blast with it.'),
@@ -327,6 +343,7 @@ FEATURES = [
 # The gallery at the end: the collages (pages/img/gallery/), (file, title, caption)
 GALLERY_IMG = 'img/gallery/'
 GALLERY = [
+    ('collage_111.png', 'Under the right sky: 1.11', 'Snow under cloud, the Earth from orbit (XPiratez), the sea floor (TFTD), deep woods (X-Com Files), Cydonia, the city of T\'leth.'),
     ('collage_108.png', 'Field report 1.08', 'Terror From The Deep\'s sea past an island\'s edge, XPiratez\'s blunderbuss and two guns at once, a spray burst marked, akimbo in 3D and on the isometric map, a Gill Man on an island, and the map camera over the battle.'),
     ('collage_more.png', 'More from 1.08', 'The open sky at the map\'s edge, a peek past a corner in FPS style, the accuracy line, the landing warning by the sea, wading in XPiratez\'s sludge, the shop\'s racks as ghosts, a tilted lean, smoke, a grenade\'s arc.'),
     ('collage_moments.png', 'Moments', 'Under fire, a soldier cam at dusk, a sprint down an empty street, night vision, an airburst, a rocket in the street, aquanauts with vibro blades, the ruins on the seabed, and the end of a signal.'),
@@ -418,7 +435,7 @@ def sections():
     w('</div><figcaption>The heads-up display, numbered below.</figcaption></figure>\n<ol class="legend">')
     for n, x, y, title, text in HUD_MARKS:
         w('<li class="row"><b>%s.</b> %s</li>' % (title, text))
-    w('</ol>\n<h3>The crosshair: one shape per fire mode, ticks for a hit</h3>\n<figure class="strip"><img src="%scrosshairs.png" width="1280" height="200" loading="lazy" alt="The crosshair\'s shapes, one per fire mode: snap, aimed, auto, throw, launch, melee, psi, use; and the ticks of a hit and a kill."></figure>\n<ul class="chips">' % IMG)
+    w('</ol>\n<h3>The crosshair: one shape per fire mode, and its marks</h3>\n<figure class="strip"><img src="%scrosshairs_111.png" width="%d" height="%d" loading="lazy" alt="The crosshair\'s shapes, one per fire mode: snap, aimed, auto, throw, launch, melee, psi, use; the ticks of a hit and a kill; a blue shield for no harm and a green door for a door."></figure>\n<ul class="chips">' % ((IMG,) + size('crosshairs_111.png')))
     for name, shape in CROSSHAIRS:
         w('<li><b>%s</b> %s</li>' % (name, shape))
     w('</ul>\n<h3>Signs and messages</h3>\n<div class="tablewrap"><table class="grid"><tbody>')
@@ -450,7 +467,7 @@ def sections():
         w('</article>')
     w('</div></section>')
     # the gallery
-    w('<section id="gallery" class="sec gutter"><div class="col gallery">\n<h2>Gallery</h2>\n<p class="intro">From the field: the battles in pictures, from <i>UFO</i>, <i>Terror From The Deep</i> and XPiratez. Click one for it at full size.</p>')
+    w('<section id="gallery" class="sec gutter"><div class="col gallery">\n<h2>Gallery</h2>\n<p class="intro">From the field: the battles in pictures, from <i>UFO</i>, <i>Terror From The Deep</i>, XPiratez and X-Com Files. Click one for it at full size.</p>')
     for f, title, caption in GALLERY:
         width, height = size_in(GALLERY_IMG, f)
         w('<figure class="row"><a href="%s%s"><img src="%s%s" width="%d" height="%d" loading="lazy" alt="%s: %s"></a><figcaption><b>%s</b> %s</figcaption></figure>'

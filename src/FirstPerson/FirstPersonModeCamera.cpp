@@ -180,14 +180,18 @@ void FirstPersonMode::turnWithKeys(double elapsedSeconds)
  *   blast) the head looks no further than its limit, as without the time units, and turns no
  *   more (a player's report: looking round mid-shot, the soldier turned step by step after it,
  *   paying for each; the owner: hold the head's limit).
+ * - A tank with its turret switch on (see toggleTurret) turns only its turret, by the same rules:
+ *   the turret's facing, the game's own turret turn (1 time unit an eighth), the hull left as it is.
  */
 void FirstPersonMode::faceLookDirection(BattleUnit *unit)
 {
+	const bool turret = turretTurning(unit);
+	const int facingNow = turret ? unit->getTurretDirection() : unit->getDirection();
 	if (Options::fpsTurnCost && shotUnderWay() && unit->getFaction() == FACTION_PLAYER && !unit->isOut())
 	{
 		// (held a hair inside the limit: exactly on it, rounding could tip it past once the shot
 		// is over, and the soldier would turn a step after all)
-		const double facingYaw = unit->getDirection() * 45.0 - 90.0;
+		const double facingYaw = facingNow * 45.0 - 90.0;
 		const double offFacing = std::remainder(_view->getYawDegrees() - facingYaw, 360.0);
 		const double heldLimit = HeadTurn - 0.1;
 		if (std::abs(offFacing) > heldLimit)
@@ -208,7 +212,7 @@ void FirstPersonMode::faceLookDirection(BattleUnit *unit)
 	// 0 = north, clockwise in 45 degree steps.
 	if (Options::fpsTurnCost)
 	{
-		const double facingYaw = unit->getDirection() * 45.0 - 90.0;
+		const double facingYaw = facingNow * 45.0 - 90.0;
 		const double offFacing = std::remainder(_view->getYawDegrees() - facingYaw, 360.0);
 		const bool snapTurnDone = _snapTurnFacing && _snapTurnDegrees == 0.0;
 		if (snapTurnDone && std::abs(offFacing) <= 22.5)
@@ -220,7 +224,7 @@ void FirstPersonMode::faceLookDirection(BattleUnit *unit)
 			return;
 		}
 		const int step = offFacing > 0.0 ? 1 : -1;
-		const int cost = unit->getTurnCost();
+		const int cost = turret ? 1 : unit->getTurnCost();
 		if (!doomModeOn() && (unit->getTimeUnits() < cost || !reserveAllows(unit, cost, 0)))
 		{
 			// Not enough time units (or they're reserved for a shot): the view stops at the
@@ -236,12 +240,13 @@ void FirstPersonMode::faceLookDirection(BattleUnit *unit)
 			}
 			return;
 		}
-		// One step that way, through the game's own turning.
+		// One step that way, through the game's own turning (a turret's alone, as the map's Ctrl turn).
 		Position towards;
-		Pathfinding::directionToVector((unit->getDirection() + step + 8) % 8, &towards);
+		Pathfinding::directionToVector((facingNow + step + 8) % 8, &towards);
 		BattleAction turn;
 		turn.actor = unit;
 		turn.target = unit->getPosition() + towards;
+		turn.strafe = turret;
 		_state->_battleGame->statePushBack(new UnitTurnBState(_state->_battleGame, turn));
 		return;
 	}
@@ -252,14 +257,25 @@ void FirstPersonMode::faceLookDirection(BattleUnit *unit)
 	// 0..7 (the double modulo keeps negative angles in range).
 	_snapTurnFacing = false;
 	const int direction = (((int)std::lround((_view->getYawDegrees() + 90.0) / 45.0)) % 8 + 8) % 8;
-	if (direction == unit->getDirection())
+	if (direction == facingNow)
 	{
 		return;
 	}
 
-	// Turn the soldier, then update what it sees, what others see of it (as UnitTurnBState does
-	// after a turn) and the classic HUD's soldier info.
-	unit->setDirection(direction);
+	// Turn the soldier (a tank with its turret switch on: the turret alone, by the game's own
+	// turret turn), then update what it sees, what others see of it (as UnitTurnBState does after
+	// a turn) and the classic HUD's soldier info.
+	if (turret)
+	{
+		Position towards;
+		Pathfinding::directionToVector(direction, &towards);
+		unit->lookAt(unit->getPosition() + towards, true);
+		while (unit->getStatus() == STATUS_TURNING) unit->turn(true);
+	}
+	else
+	{
+		unit->setDirection(direction);
+	}
 	TileEngine *tileEngine = _save->getTileEngine();
 	tileEngine->calculateFOV(unit);
 	tileEngine->calculateFOV(unit->getPosition(), 1, false); // others' view of this unit, like UnitTurnBState

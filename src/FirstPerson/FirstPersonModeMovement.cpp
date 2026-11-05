@@ -139,7 +139,9 @@ bool FirstPersonMode::stepAllowed(BattleUnit *unit, int stepX, int stepY)
 		// The destination must have a floor, or the tile below it must be the top of a ramp or
 		// of stairs going down: its ground raised at least half a level (the terrain level is
 		// negative for raised ground, and a level is 24 voxels high), which is ground to walk on.
-		if (allowed && ((canFly(unit) && !flightOn(unit)) || !Options::fpsFalling))
+		// A flyer with flight on crosses the air either way, as on the map (a player's report,
+		// GitHub issue #99: with falling off, no step sideways in mid-air).
+		if (allowed && !(canFly(unit) && flightOn(unit)) && (canFly(unit) || !Options::fpsFalling))
 		{
 			const Tile *destination = _save->getTile(start + Position(stepX, stepY, 0));
 			const Tile *belowDestination = destination ? _save->getBelowTile(destination) : nullptr;
@@ -1728,6 +1730,41 @@ void FirstPersonMode::toggleFlight(BattleUnit *unit)
 }
 
 /**
+ * Switches turret-only turning on or off for a unit with a turret, a tank (the TURRET button or
+ * its key; a player's report, XPiratez: turning the view turned the whole tank, at its full
+ * turning cost; the owner: a switch on the top bar, off at first, kept with the save). While it's
+ * on, turning the view turns only the turret, as the map turns it with Ctrl or while aiming (the
+ * game's own turret turn: 1 time unit an eighth with "Turning costs TU"), and the hull stays as
+ * it is; a step still turns the hull the way it goes, the turret with it (see faceLookDirection).
+ * Only for the player's own unit, on their turn.
+ * @param unit The selected unit.
+ */
+void FirstPersonMode::toggleTurret(BattleUnit *unit)
+{
+	if (!unit || !isActive() || _save->getSide() != FACTION_PLAYER)
+	{
+		return;
+	}
+	if (unit->getTurretType() == -1)
+	{
+		_state->warning("STR_FPS_NO_TURRET"); // (so the key doesn't seem dead)
+		return;
+	}
+	unit->setTurretOnly(!unit->getTurretOnly());
+	_state->warning(unit->getTurretOnly() ? "STR_FPS_TURRET_ON" : "STR_FPS_TURRET_OFF");
+}
+
+/**
+ * Does turning the view turn only this unit's turret: a unit with one, its turret switch on (see toggleTurret)?
+ * @param unit The unit.
+ * @return True if so.
+ */
+bool FirstPersonMode::turretTurning(const BattleUnit *unit) const
+{
+	return unit && unit->getTurretType() != -1 && unit->getTurretOnly();
+}
+
+/**
  * May a soldier who walks go up or down a level from here? The game's own rule for a unit that
  * can't fly (Pathfinding::validateUpDown): a ride between two grav lift floors, or a climb on a
  * ladder (OXCE's grav lift flag on a wall or an object) where nothing is in the way: no floor
@@ -1835,6 +1872,15 @@ void FirstPersonMode::moveUpDown(BattleUnit *unit, int direction, Action *action
  */
 void FirstPersonMode::updateFlight(BattleUnit *unit)
 {
+	// A flyer up in the air whose flight was never switched (taken up by the map's own up button
+	// or path, or from a save made before the switch was kept) has it switched on, as if by B: so
+	// touching down keeps flight on, and only Page Down on the ground (or B) switches it off (a
+	// player's report, GitHub issue #100: W into the ground ended the flight).
+	if (unit && canFly(unit) && unit->getFlightSwitch() == 0 && unit->isFloating())
+	{
+		unit->setFlightSwitch(1);
+	}
+
 	// Floated off a ledge with flight off: once the step is done, land if still in the air.
 	if (_landAfterStep && (!unit || !_stepPending))
 	{

@@ -186,7 +186,7 @@ void FirstPersonMode::updateCompass(BattleUnit *unit, bool playerTurn)
 	// facing it keeps (a sidestep, turning by the rules), or with free turning the one it takes
 	// again at the end, the compass point the view looks closest to. So the facing on the rim
 	// never flicks sideways for a step to the side.
-	int facing = unit->getDirection();
+	int facing = turretTurning(unit) ? unit->getTurretDirection() : unit->getDirection(); // (a tank's turret, with the switch on)
 	if (_stepPending)
 	{
 		facing = _sidestepFacing >= 0 ? _sidestepFacing
@@ -198,7 +198,7 @@ void FirstPersonMode::updateCompass(BattleUnit *unit, bool playerTurn)
 		const double offFacing = std::abs(std::remainder(viewBearing - facing * 45.0, 360.0));
 		if (offFacing > HeadTurn - CompassWarnDegrees)
 		{
-			warning = (doomModeOn() || unit->getTimeUnits() >= unit->getTurnCost()) ? 1 : 2;
+			warning = (doomModeOn() || unit->getTimeUnits() >= (turretTurning(unit) ? 1 : unit->getTurnCost())) ? 1 : 2;
 		}
 	}
 	// The shot's turn: its cost and the way the soldier will face (none while a step is walked).
@@ -242,7 +242,7 @@ void FirstPersonMode::updateCompass(BattleUnit *unit, bool playerTurn)
 		else if (warning)
 		{
 			_txtCompassTurn->setColor(textColor(_state->getPalette(), warning == 1 ? 240 : 230, warning == 1 ? 210 : 60, warning == 1 ? 60 : 50));
-			_txtCompassTurn->setText(warning == 1 ? std::string(_state->tr("STR_FPS_COMPASS_TURN").arg(unit->getTurnCost())) : std::string(_state->tr("STR_FPS_COMPASS_NO_TU")));
+			_txtCompassTurn->setText(warning == 1 ? std::string(_state->tr("STR_FPS_COMPASS_TURN").arg(turretTurning(unit) ? 1 : unit->getTurnCost())) : std::string(_state->tr("STR_FPS_COMPASS_NO_TU")));
 		}
 	}
 }
@@ -1119,7 +1119,8 @@ std::string FirstPersonMode::statusLabel(BattleUnit *unit) const
  * Keeps the armor's part of the top bar up to date: the armor's name, and a button for each
  * thing the armor and the soldier's gear can do. FLY (SWIM under water) for armor that flies,
  * LIGHT for the armor's personal light, NIGHT VISION for a soldier who has it (see
- * hasNightVision), SPECIAL for a weapon built into the armor. A button shows pressed while its
+ * hasNightVision), SPECIAL for a weapon built into the armor, TURRET for a unit with a turret
+ * (a tank, see toggleTurret). A button shows pressed while its
  * feature is switched on. When a button appears or disappears, the squad buttons are laid out
  * again to make room.
  * @param unit The selected soldier, or null for none (all the buttons hide).
@@ -1132,14 +1133,16 @@ void FirstPersonMode::updateArmorButtons(BattleUnit *unit)
 	const bool showFly = show && canFly(unit), showLight = show && unit->getArmor()->getPersonalLightFriend() > 0;
 	const bool showSpecial = show && unit->getSpecialIconWeapon(specialType) != nullptr;
 	const bool showNight = show && hasNightVision(unit);
+	const bool showTurret = show && unit->getTurretType() != -1;
 	// Show or hide them; any change moves the other buttons on the bar.
 	if (showFly != _btnFly->getVisible() || showLight != _btnLight->getVisible()
-		|| showNight != _btnNight->getVisible() || showSpecial != _btnSpecial->getVisible())
+		|| showNight != _btnNight->getVisible() || showSpecial != _btnSpecial->getVisible() || showTurret != _btnTurret->getVisible())
 	{
 		_btnFly->setVisible(showFly);
 		_btnLight->setVisible(showLight);
 		_btnNight->setVisible(showNight);
 		_btnSpecial->setVisible(showSpecial);
+		_btnTurret->setVisible(showTurret);
 		layoutTopBar(); // the squad buttons make room
 	}
 	if (!show)
@@ -1157,14 +1160,17 @@ void FirstPersonMode::updateArmorButtons(BattleUnit *unit)
 	TextButton *flyGroup = flightOn(unit) ? _btnFly : nullptr;
 	TextButton *lightGroup = _save->getTogglePersonalLight() ? _btnLight : nullptr;
 	TextButton *nightGroup = _state->_map->isNightVisionOn() ? _btnNight : nullptr;
-	if (flyGroup != _flyButtonGroup || lightGroup != _lightButtonGroup || nightGroup != _nightButtonGroup)
+	TextButton *turretGroup = turretTurning(unit) ? _btnTurret : nullptr;
+	if (flyGroup != _flyButtonGroup || lightGroup != _lightButtonGroup || nightGroup != _nightButtonGroup || turretGroup != _turretButtonGroup)
 	{
 		_flyButtonGroup = flyGroup;
 		_lightButtonGroup = lightGroup;
 		_nightButtonGroup = nightGroup;
+		_turretButtonGroup = turretGroup;
 		_btnFly->invalidate();
 		_btnLight->invalidate();
 		_btnNight->invalidate();
+		_btnTurret->invalidate();
 	}
 }
 
@@ -1954,7 +1960,7 @@ void FirstPersonMode::layoutTopBar()
 	// The suit's buttons, right to left from END. A first pass tries the long labels; if that
 	// leaves too little room for the squad buttons, a second pass uses the short ones.
 	// freeRight ends up as the right end of the room left for the squad buttons.
-	TextButton *suitButtons[4] = { _btnFly, _btnLight, _btnNight, _btnSpecial };
+	TextButton *suitButtons[5] = { _btnFly, _btnLight, _btnNight, _btnSpecial, _btnTurret };
 	// Previous's leftmost place: after INV, wherever INV stands (in HUD's place on the map, see
 	// updateTopBar).
 	const int squadX = SquadX - (InventoryButtonX - _btnInventory->getX());
@@ -1963,7 +1969,7 @@ void FirstPersonMode::layoutTopBar()
 	for (int pass = 0; pass < 2; ++pass)
 	{
 		freeRight = canvasWidth() - 1 - EndTurnW - 2;
-		for (int suitIndex = 0; suitIndex < 4; ++suitIndex)
+		for (int suitIndex = 0; suitIndex < 5; ++suitIndex)
 		{
 			if (!suitButtons[suitIndex]->getVisible()) continue;
 			const std::string &label = pass == 0 ? _suitLabelsLong[suitIndex] : _suitLabelsShort[suitIndex];
@@ -2218,7 +2224,7 @@ TextButton *FirstPersonMode::buttonAt(double x, double y) const
 			&& y >= button->getY() && y < button->getY() + button->getHeight();
 	};
 	// The fixed buttons first, then the squad buttons.
-	for (TextButton *button : { _btnView, _btnHud, _btnInventory, _btnEndTurn, _btnFly, _btnLight, _btnNight, _btnSpecial, _btnPrev, _btnNext })
+	for (TextButton *button : { _btnView, _btnHud, _btnInventory, _btnEndTurn, _btnFly, _btnLight, _btnNight, _btnSpecial, _btnTurret, _btnPrev, _btnNext })
 	{
 		if (inside(button)) return button;
 	}
@@ -2271,6 +2277,10 @@ void FirstPersonMode::buttonClicked(TextButton *button, Action *action)
 	else if (button == _btnSpecial)
 	{
 		_state->btnSpecialClick(action);
+	}
+	else if (button == _btnTurret)
+	{
+		toggleTurret(_save->getSelectedUnit());
 	}
 	else if (button == _btnPrev)
 	{

@@ -3270,6 +3270,8 @@ void FirstPersonMode::useItemDirectly(BattleUnit *unit, BattleItem *item)
 		else if (action->spendTU(&action->result))
 		{
 			_scanner->bringUp(unit, item);
+			_scannerFrom = unit->getPosition();
+			_scannerTurn = _save->getTurn();
 		}
 		else
 		{
@@ -3336,7 +3338,12 @@ void FirstPersonMode::useItemDirectly(BattleUnit *unit, BattleItem *item)
  */
 void FirstPersonMode::updateScanner(BattleUnit *unit)
 {
-	if (_scanner->isUp() && (!isActive() || !unit || unit != _scanner->soldier() || unit->isOut() || activeWeapon(unit) != _scanner->item()))
+	// Setting "Live motion scanner" off: one look from where it was used, as the game's own scanner
+	// (a player's report, GitHub issue #101): a step to another tile, or the end of the player's turn,
+	// puts it away; turned on the spot it stays up, its screen turning with the view and sweeping.
+	const bool lookOver = !Options::fpsLiveScanner && unit
+		&& (unit->getPosition() != _scannerFrom || _save->getTurn() != _scannerTurn || _save->getSide() != FACTION_PLAYER);
+	if (_scanner->isUp() && (!isActive() || !unit || unit != _scanner->soldier() || unit->isOut() || activeWeapon(unit) != _scanner->item() || lookOver))
 	{
 		_scanner->putAway();
 	}

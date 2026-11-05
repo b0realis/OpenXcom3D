@@ -401,6 +401,8 @@ private:
 	Surface *_compass = nullptr;                 // the dial
 	Surface *_scannerPanel = nullptr;            // the motion scanner's round screen, held up at the bottom middle (see updateScanner)
 	FirstPersonScanner *_scanner = nullptr;      // the motion scanner held up (or put away), and its art, ring and blips
+	Position _scannerFrom;                       // where it was used, and in which turn (setting "Live motion scanner"
+	int _scannerTurn = 0;                        //   off: one look from there, see updateScanner)
 	Uint8 _scannerRimColor = 0;                  // the round screen's rim
 	Surface *_climbArrows = nullptr;             // beside it, the ways W may climb, the one it takes now lit (see updateClimbArrows)
 	int _climbArrowsShown = -1;                  // what they show: up 1, down 2, lit (1 up, 2 down) times 4; -1 not drawn yet
@@ -572,6 +574,10 @@ private:
 	bool flightOn(const BattleUnit *unit) const;
 	/// Switches flight on or off.
 	void toggleFlight(BattleUnit *unit);
+	/// Switches a tank's turret-only turning on or off (the TURRET button).
+	void toggleTurret(BattleUnit *unit);
+	/// Does turning the view turn only this unit's turret?
+	bool turretTurning(const BattleUnit *unit) const;
 	/// May a walker go up or down a level from here (a lift ride, a ladder)?
 	bool walkerMayMoveUpDown(const Position &position, int direction) const;
 	/// Goes up or down a level: by grav lift or ladder, or flying (the up and down keys also switch flight on and off).
@@ -982,9 +988,9 @@ private:
 	// the armor: its name, and buttons for what it and the gear can do (flight, personal light,
 	// night vision, a special weapon), left of END
 	Text *_txtArmor = nullptr;
-	TextButton *_btnFly = nullptr, *_btnLight = nullptr, *_btnNight = nullptr, *_btnSpecial = nullptr; // FLY (SWIM), LIGHT, NIGHT VISION, SPECIAL
-	TextButton *_flyButtonGroup = nullptr, *_lightButtonGroup = nullptr, *_nightButtonGroup = nullptr; // their pressed looks (switched on)
-	std::string _suitLabelsLong[4], _suitLabelsShort[4]; // suit button labels: in full, and for a narrow bar
+	TextButton *_btnFly = nullptr, *_btnLight = nullptr, *_btnNight = nullptr, *_btnSpecial = nullptr, *_btnTurret = nullptr; // FLY (SWIM), LIGHT, NIGHT VISION, SPECIAL, TURRET
+	TextButton *_flyButtonGroup = nullptr, *_lightButtonGroup = nullptr, *_nightButtonGroup = nullptr, *_turretButtonGroup = nullptr; // their pressed looks (switched on)
+	std::string _suitLabelsLong[5], _suitLabelsShort[5]; // suit button labels: in full, and for a narrow bar
 
 	// ---- one button per soldier ----
 

@@ -3089,7 +3089,7 @@ void FirstPersonView::snapshotTiles()
 		const TileView &tileView = _tileViews[index];
 		noteLightsAndDevices(tile, tileView);
 		const int top = tileView.max[2] >= tileView.min[2] ? tileView.max[2] : 0;
-		_tileFlags[index] = (Uint8)((tileView.empty ? 0 : TileTraced) | (tileView.smoke ? TileSmoky : 0) | (top << TileTopShift));
+		_tileFlags[index] = (Uint8)((tileView.empty ? 0 : TileTraced) | (top << TileTopShift));
 		_tileLights[index] = { tileView.light, tileView.ufoGlow, tileView.discovered, false };
 	}
 	// Which tiles have a roof over them (see indoorsAt): a floor or an object on any level above,

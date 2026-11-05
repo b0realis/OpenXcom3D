@@ -779,12 +779,19 @@ inline float distance3(const float a[3], const float b[3])
 	return std::sqrt((a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]) + (a[2] - b[2]) * (a[2] - b[2]));
 }
 
+/// The length of (x, y). (Not std::hypot: on floats that is hypotf, which asks for glibc 2.35, and the release must
+/// start on 2.34: see tools/portable/check.sh.)
+inline float planeLength(float x, float y)
+{
+	return std::sqrt(x * x + y * y);
+}
+
 /// The distance from a point to the segment a - b, on a frame.
 inline float segmentDistance(float x, float y, float ax, float ay, float bx, float by)
 {
 	const float abx = bx - ax, aby = by - ay, length2 = abx * abx + aby * aby;
 	const float t = length2 > 1e-9f ? std::clamp(((x - ax) * abx + (y - ay) * aby) / length2, 0.0f, 1.0f) : 0.0f;
-	return std::hypot(x - (ax + t * abx), y - (ay + t * aby));
+	return planeLength(x - (ax + t * abx), y - (ay + t * aby));
 }
 
 /// An arm's frames as its skeleton is fitted to them. A thin arm (a soldier's, a Sectoid's: two pixels) is drawn a
@@ -812,7 +819,7 @@ struct ArmFrames
 						for (int x = std::max(0, column - 4); x <= std::min(FrameSize - 1, column + 4); ++x)
 						{
 							float &here = distance[d][y * FrameSize + x];
-							here = std::min(here, std::hypot((float)(x - column), (float)(y - row)));
+							here = std::min(here, planeLength((float)(x - column), (float)(y - row)));
 						}
 					}
 				}
@@ -835,7 +842,7 @@ struct ArmFrames
 			for (int bone = 0; bone < 2; ++bone)
 			{
 				const float dx = column[bone + 1] - column[bone], dy = row[bone + 1] - row[bone];
-				const int steps = std::max(2, (int)(std::hypot(dx, dy) * 2.0f));
+				const int steps = std::max(2, (int)(planeLength(dx, dy) * 2.0f));
 				for (int i = 0; i < steps; ++i)
 				{
 					const float t = i / (float)(steps - 1);
@@ -898,7 +905,7 @@ void placeElbow(const float shoulder[3], const float hand[3], float bone, const 
 	for (float &a : axis) a /= reach;
 	// two ways square to the arm: across it level, and the third
 	float side[3] = { axis[1], -axis[0], 0.0f };
-	if (std::hypot(side[0], side[1]) < 1e-4f) { side[0] = -axis[2]; side[1] = 0.0f; side[2] = axis[0]; }
+	if (planeLength(side[0], side[1]) < 1e-4f) { side[0] = -axis[2]; side[1] = 0.0f; side[2] = axis[0]; }
 	const float sideLength = std::sqrt(side[0] * side[0] + side[1] * side[1] + side[2] * side[2]);
 	for (float &a : side) a /= sideLength;
 	const float other[3] = { axis[1] * side[2] - axis[2] * side[1], axis[2] * side[0] - axis[0] * side[2], axis[0] * side[1] - axis[1] * side[0] };
@@ -935,7 +942,7 @@ void armRadii(const ArmFrames &frames, const float shoulder[3], const float elbo
 			const float lower = segmentDistance(frames.columns[d][i], frames.rows[d][i], column[1], row[1], column[2], row[2]);
 			count[upper <= lower ? 0 : 1] += 1.0f;
 		}
-		for (int bone = 0; bone < 2; ++bone) length[bone] += std::hypot(column[bone + 1] - column[bone], row[bone + 1] - row[bone]) + 1.0f;
+		for (int bone = 0; bone < 2; ++bone) length[bone] += planeLength(column[bone + 1] - column[bone], row[bone + 1] - row[bone]) + 1.0f;
 	}
 	for (int bone = 0; bone < 2; ++bone) radius[bone] = std::clamp(count[bone] / std::max(length[bone], 1.0f) / 2.0f / 1.2f, ArmRadiusMin, ArmRadiusMax);
 }

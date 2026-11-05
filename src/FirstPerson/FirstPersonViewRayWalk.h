@@ -199,17 +199,16 @@ inline bool traceSwing(const FirstPersonView::DoorSwing &door, const float rayOr
 
 /// How a ray's walk ended: it hit something, or it left the map through a side, the top or
 /// the bottom, or it went as far as the view reaches.
-enum RayEnd { RAY_HIT, RAY_SIDE, RAY_TOP, RAY_BOTTOM, RAY_FAR, RAY_SMOKE };
+enum RayEnd { RAY_HIT, RAY_SIDE, RAY_TOP, RAY_BOTTOM, RAY_FAR };
 
 /**
- * The smoke along a ray, by the game's sight rules (setting "Smoke": Modern). In the game
- * every voxel a line of sight walks through a tile's smoke uses up smoke / 3 voxels of the
- * soldier's sight (half as much within two tiles of the eye; less with heat vision), and what
- * is further than the sight left can't be seen. Where the ray's smoke has used up all the sight
- * there is left, it ends in the smoke (RAY_SMOKE): too thick to see through, a wall of smoke.
- * Short of that, the smoke is drawn see-through over what the ray hits, as the game's own smoke
- * (see FirstPersonView::drawSeeThroughSmoke), and the wall shows through it where the smoke has
- * used up most of the sight (see FirstPersonView::renderRows), so its edge is soft.
+ * The smoke along a line of sight, by the game's sight rules. In the game every voxel a line
+ * of sight walks through a tile's smoke uses up smoke / 3 voxels of the soldier's sight (half as
+ * much within two tiles of the eye; less with heat vision), and what is further than the sight
+ * left can't be seen. Added up tile by tile (addSmoke) on the line from the eye to a point (see
+ * FirstPersonView::smokeSightUsedTo): an enemy the soldier doesn't see with smoke on the line to
+ * it isn't drawn. The smoke itself is drawn see-through, as the map draws it (see
+ * FirstPersonView::drawSeeThroughSmoke).
  */
 struct SmokeTrace
 {
@@ -217,10 +216,7 @@ struct SmokeTrace
 	float smokeBlock = 0.0f;     // in: sight used up per voxel walked through 1 point of smoke
 	float fireBlock = 0.0f;      // in: the same through the smoke of a burning tile
 	float cost = 0.0f;           // out: the sight the smoke used up along the ray, voxels
-	float lastSmoke = 0.0f;      // out: how far along the ray the last smoke on it ended
-	float wallAt = 0.0f;         // out (RAY_SMOKE): where the ray ended in the smoke
-	Uint8 light = 15;            // out: the light of the thickest smoke on the way, to shade it
-	float thickest = 0.0f;       // (the sight a voxel of that smoke uses up)
+	float lastSmoke = 0.0f;      // out: how far along the line the last smoke on it ended
 };
 
 /// Within this many voxels of the eye, smoke uses up half as much sight (two tiles, as in the game).
@@ -240,11 +236,6 @@ inline float addSmoke(SmokeTrace &smoke, const FirstPersonView::TileView &tileVi
 	if (perVoxel <= 0.0f || to <= from)
 	{
 		return -1.0f;
-	}
-	if (perVoxel > smoke.thickest)
-	{
-		smoke.thickest = perVoxel;
-		smoke.light = tileView.light;
 	}
 	smoke.lastSmoke = to;
 	// The stretch in up to two pieces: within SmokeNearEye of the eye (half the rate), and beyond.
@@ -449,12 +440,9 @@ inline bool traceTile(const FirstPersonView::TileView &tileView, const FirstPers
  * @param rayDirection The ray's direction, in voxel units (see the top of this file).
  * @param hit Filled in when something is hit.
  * @param endDistance, endAxis Where and through which face the ray left the map (when nothing was hit).
- * @param smoke Null, or the smoke to trace along the ray (see SmokeTrace): the ray may then end
- *        in thick smoke (RAY_SMOKE).
  * @return How the ray ended.
  */
-inline RayEnd castRay(const RayContext &context, const float rayOrigin[3], const float rayDirection[3], FirstPersonView::Hit &hit, float &endDistance, int &endAxis,
-	SmokeTrace *smoke = nullptr)
+inline RayEnd castRay(const RayContext &context, const float rayOrigin[3], const float rayDirection[3], FirstPersonView::Hit &hit, float &endDistance, int &endAxis)
 {
 	hit.glass = false;
 	hit.emissive = false;
@@ -503,7 +491,6 @@ inline RayEnd castRay(const RayContext &context, const float rayOrigin[3], const
 	// Walk tile by tile, as far as the view reaches. Most tiles on the way are empty air: one
 	// byte per tile (the flags, see snapshotTiles) says so, and the walk steps on without
 	// touching the tile's snapshot.
-	const Uint8 wanted = smoke ? FirstPersonView::TileTraced | FirstPersonView::TileSmoky : FirstPersonView::TileTraced;
 	float distance = 0.0f;
 	int enterAxis = -1;
 	int tileIndex = (tileCell[2] * context.size[1] + tileCell[1]) * context.size[0] + tileCell[0];
@@ -529,48 +516,21 @@ inline RayEnd castRay(const RayContext &context, const float rayOrigin[3], const
 	while (distance < context.maxDistance)
 	{
 		const Uint8 flags = context.tileFlags[tileIndex];
-		if (flags & wanted)
+		if (flags & FirstPersonView::TileTraced)
 		{
 			// Where the ray leaves the tile. Anything solid to look for on the way? Not when it
 			// passes above all of the tile's solid voxels (a floor, most often) and no door swings
 			// through it: the tile's box would turn it away (see traceTile; a hundredth of a voxel
-			// to spare, so rounding never decides it). And smoke to trace through?
+			// to spare, so rounding never decides it).
 			const float tileExit = std::min(nextCrossing[0], std::min(nextCrossing[1], nextCrossing[2]));
 			const float solidTop = (float)(tileCell[2] * Position::TileZ + (flags >> FirstPersonView::TileTopShift) + 1) + 0.01f;
 			const bool lookForSolid = (flags & FirstPersonView::TileTraced) && ((flags & FirstPersonView::TileSwinging)
 				|| rayOrigin[2] + rayDirection[2] * distance <= solidTop || rayOrigin[2] + rayDirection[2] * tileExit <= solidTop);
-			const bool traceSmokeHere = smoke && (flags & FirstPersonView::TileSmoky);
-			if (lookForSolid || traceSmokeHere)
+			// Look inside this tile, between where the ray came in and where it leaves.
+			if (lookForSolid && traceTile(context.tiles[tileIndex], context.swings, tileCell, rayOrigin, rayDirection, inverseDirection, distance, tileExit, enterAxis, context.ghostThreshold, context.solidGhostThreshold, context.glassStops, hit))
 			{
-				// Look inside this tile, between where the ray came in and where it leaves.
-				const auto &tileView = context.tiles[tileIndex];
-				// The smoke in the tile, when traced: where in the tile (if anywhere) it gets too
-				// thick to see through. Only what is in front of that point can still be hit;
-				// behind it, the ray ends in the smoke.
-				float smokeWall = -1.0f;
-				SmokeTrace smokeBefore;
-				if (traceSmokeHere)
-				{
-					smokeBefore = *smoke;
-					smokeWall = addSmoke(*smoke, tileView, distance, tileExit);
-				}
-				const float traceEnd = smokeWall >= 0.0f ? smokeWall : tileExit;
-				if (lookForSolid && traceTile(tileView, context.swings, tileCell, rayOrigin, rayDirection, inverseDirection, distance, traceEnd, enterAxis, context.ghostThreshold, context.solidGhostThreshold, context.glassStops, hit))
-				{
-					// Hit something in the tile: only the smoke in front of it counts.
-					if (traceSmokeHere)
-					{
-						*smoke = smokeBefore;
-						addSmoke(*smoke, tileView, distance, hit.t);
-					}
-					hit.tile = tileIndex;
-					return RAY_HIT;
-				}
-				if (smokeWall >= 0.0f)
-				{
-					smoke->wallAt = smokeWall;
-					return RAY_SMOKE;
-				}
+				hit.tile = tileIndex;
+				return RAY_HIT;
 			}
 		}
 		// Step into the neighbouring tile across the nearest boundary (on a tie, the later axis);

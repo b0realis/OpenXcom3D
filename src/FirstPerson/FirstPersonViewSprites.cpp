@@ -272,8 +272,13 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 		{
 			Uint8 &veilLeft = _unitVeil[index];
 			pixelOpacity = std::min(pixelOpacity, (int)veilLeft);
+			// Smoke builds up on a pixel to its cap and no further (settings "Smoke opacity" and
+			// "Night smoke opacity", a maximum).
+			const int smokeCap = seeThroughSprite ? seeThroughSprite->capLevels : 0;
+			if (smokeCap > 0) pixelOpacity = std::min(pixelOpacity, smokeCap - (int)_smokeVeil[index]);
 			if (pixelOpacity <= 0) return;
 			if (veilLeft != 255) veilLeft -= pixelOpacity;
+			if (smokeCap > 0) _smokeVeil[index] += (Uint8)pixelOpacity;
 			Uint8 *pixel = getRaw(pixelX, pixelY);
 			*pixel = seeThrough(pixelOpacity, shadeColor(color, shade), *pixel);
 			if (pixelOpacity > SeeThroughLevels / 2)
@@ -1120,6 +1125,18 @@ void FirstPersonView::drawUnits()
 			{
 				MarkerSpot spot = { { feet[0], feet[1], feet[2] + unit->getFloatHeight() + unit->getHeight() + 5.0 }, marker.second };
 				_markerSpots.push_back(spot);
+			}
+		}
+		// An enemy the squad sees but the soldier looked through doesn't, with smoke on the line to
+		// it: not drawn, only its marker, as for one behind a wall (a player's report, GitHub issue
+		// #98: "if a unit is visible, let me see it, if a unit is invisible, don't let me see it").
+		// Enemies the soldier sees stay clear of the smoke (see _unitVeil).
+		if (_cameraUnit && !debug && !fallingDown && unit->getFaction() == FACTION_HOSTILE && !_cameraUnit->hasVisibleUnit(unit))
+		{
+			const double middle[3] = { feet[0], feet[1], feet[2] + unit->getFloatHeight() + unit->getHeight() * 0.5 };
+			if (smokeSightUsedTo(middle) > 0.0f)
+			{
+				continue;
 			}
 		}
 
@@ -2184,29 +2201,6 @@ int FirstPersonView::firstSmokeFrame(int smoke) const
 }
 
 /**
- * Whether a smoky tile is on its cloud's outer shell: one of the four tiles beside it (on its
- * level, across a side) has no smoke the view knows of, or is off the map. Original smoke
- * stacks such a tile less where the soldier can't see through it (see drawSeeThroughSmoke),
- * so the cloud's outline stays loose.
- * @param tilePosition The tile.
- * @return True if it's on the shell.
- */
-bool FirstPersonView::smokeShell(const Position &tilePosition) const
-{
-	const int sizeX = _save->getMapSizeX(), sizeY = _save->getMapSizeY();
-	static const int sides[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
-	for (const auto &side : sides)
-	{
-		const int x = tilePosition.x + side[0], y = tilePosition.y + side[1];
-		if (x < 0 || y < 0 || x >= sizeX || y >= sizeY || !_tileViews[(tilePosition.z * sizeY + y) * sizeX + x].smoke)
-		{
-			return true;
-		}
-	}
-	return false;
-}
-
-/**
  * The colour of the game's smoke, from its frames for the thickest smoke: the colours of their
  * dots mixed and turned most of the way to grey (as the see-through smoke's are, see
  * softSmokeFrame), so the wall of smoke the rays draw matches the see-through smoke over it.
@@ -2515,7 +2509,7 @@ const FirstPersonView::SoftSmoke &FirstPersonView::softSmokeBlend(const Surface 
 
 /**
  * The sight of the soldier the view looks through, for smoke drawn as the game's sight rules have
- * it (setting "Smoke": Modern's wall, Original's stacked frames): the range in voxels, and how
+ * it (an enemy they don't see with smoke between isn't drawn, see drawUnits): the range in voxels, and how
  * much of the smoke and of the smoke over fire their eyes see through (the armor's heat vision,
  * in percent). The see-through smoke is drawn thinner by as much (a player: a scout drone's 50%
  * heat vision didn't look any better), down to SmokeSeenMin of itself (see drawSeeThroughSmoke).
@@ -2524,22 +2518,22 @@ const FirstPersonView::SoftSmoke &FirstPersonView::softSmokeBlend(const Surface 
  * @param throughFire How much of smoke over fire they see through, in percent.
  */
 /**
- * How much the see-through smoke's opacity is scaled where it hangs (the settings "Smoke
- * opacity" and "Night smoke opacity", a player: "non full smoke can be blinding for some
- * players" at night and on dark maps): the day value in the light, the night value in the dark,
- * over the opacity the clouds are made for. Dark is the darker of the battle (a night mission,
- * however lamps or the suit lights light the smoke: lit smoke on a dark night is the blinding
- * kind) and the game's shade where the smoke hangs (a dark base or an unlit room by day; see
- * SmokeNightFromShade). Only the smoke the soldier sees through: where their sight runs out it
- * stays solid.
+ * The most opaque see-through smoke may get where it hangs (the settings "Smoke opacity" and
+ * "Night smoke opacity", a player: "non full smoke can be blinding for some players" at night
+ * and on dark maps; since GitHub issue #98 a maximum: smoke over smoke builds up to it and no
+ * further): the day value in the light, the night value in the dark. Dark is the darker of the
+ * battle (a night mission, however lamps or the suit lights light the smoke: lit smoke on a dark
+ * night is the blinding kind) and the game's shade where the smoke hangs (a dark base or an unlit
+ * room by day; see SmokeNightFromShade). Only the smoke the soldier sees through: where their
+ * sight runs out it stays solid.
  * @param shade The game's shade where the smoke hangs, 0 brightest .. 15 darkest.
- * @return The scale: 1 for the look before the settings (45% by day).
+ * @return The opacity, 0.05 .. 0.95.
  */
-float FirstPersonView::smokeOpacityScale(int shade) const
+float FirstPersonView::smokeOpacityAt(int shade) const
 {
 	const float darkness = std::max(_colors.night, std::clamp((shade - SmokeNightFromShade) / (SmokeNightToShade - SmokeNightFromShade), 0.0f, 1.0f));
-	const float day = std::clamp(Options::fpsSmokeOpacity, 5, 80) / 100.0f, night = std::clamp(Options::fpsNightSmokeOpacity, 5, 80) / 100.0f;
-	return (day + (night - day) * darkness) / SmokeOpacityMadeFor;
+	const float day = std::clamp(Options::fpsSmokeOpacity, 5, 95) / 100.0f, night = std::clamp(Options::fpsNightSmokeOpacity, 5, 95) / 100.0f;
+	return day + (night - day) * darkness;
 }
 
 void FirstPersonView::setSmokeSight(float sightVoxels, int throughSmoke, int throughFire)
@@ -2551,17 +2545,16 @@ void FirstPersonView::setSmokeSight(float sightVoxels, int throughSmoke, int thr
 }
 
 /**
- * The smoke on discovered tiles drawn see-through (setting "Smoke"): with Modern, the game's own
- * smoke made soft (see softSmokeFrame), and the wisps rising off it; where the soldier's sight
- * runs out in the smoke, the rays have already drawn a wall of it (see SmokeTrace). With
- * Original, the original frames' own dots (see stippleSmokeFrame), more opaque the thicker the
- * smoke, and no wisps: one cloud on a tile where the soldier sees through the smoke, and where
- * they can't (by the same rules, see smokeSightUsedThrough), the tile's animation over and over,
- * each out of step and set off a little, so their dots fill each other's gaps and the cloud
- * hides what's behind it. Drawn after everything solid, farthest first, each laid
- * over what's behind it; units the soldier sees stay clear (see _unitVeil).
- * Each tile's smoke is the frame the map picks for its density, a little more opaque the
- * thicker it is; its frames melt into each other slowly (an eased cross-fade, nothing blinks),
+ * The smoke on discovered tiles drawn as the map draws the game's smoke, nothing solid where the
+ * soldier's sight runs out (a player's report, GitHub issue #98; the owner: "0.8's way": the game
+ * hides units in smoke, not the world). With the setting "Smoke" Modern, the game's own smoke made
+ * soft (see softSmokeFrame), and the wisps rising off it, more opaque the thicker the smoke, up to
+ * the most the settings "Smoke opacity" and "Night smoke opacity" allow, which smoke over smoke
+ * builds up to and no further (see smokeOpacityAt, _smokeVeil); with Original, the original
+ * frames' own dots as they are, solid, one frame a tile, as on the map (see stippleSmokeFrame),
+ * and no wisps. Drawn after everything solid, nearest first; units the soldier sees stay clear
+ * (see _unitVeil), the others aren't drawn with smoke between (see drawUnits).
+ * Each tile's smoke is the frame the map picks for its density; its frames melt into each other slowly (an eased cross-fade, nothing blinks),
  * each tile out of step with the others, a fifth bigger than on the map give or take a little
  * (so the clouds of neighbouring tiles overlap, and a cloud's edge isn't the tiles' square), set
  * off from the middle, and swaying and bobbing gently. A wisp is a small puff of the thinnest smoke that rises,
@@ -2582,10 +2575,11 @@ void FirstPersonView::drawSeeThroughSmoke()
 	auto easedBlend = [](double fraction) { return fraction * fraction * (3.0 - 2.0 * fraction); };
 
 	// Everything to draw: a puff of smoke, its anchor in the world (its frames' anchor pixel),
-	// the two frames it is between, how far, how opaque, how big and how lit.
-	struct Puff { double depth; double world[3]; int anchorY; const Surface *from, *to; double blend; float opacity; double scale; int shade; };
+	// the two frames it is between, how far, how opaque (and the most its light allows, see
+	// smokeOpacityAt), how big and how lit.
+	struct Puff { double depth; double world[3]; int anchorY; const Surface *from, *to; double blend; float opacity, cap; double scale; int shade; };
 	std::vector<Puff> puffs;
-	auto addPuff = [&](const double world[3], int anchorY, int firstFrame, double frameTime, float opacity, double scale, int shade) {
+	auto addPuff = [&](const double world[3], int anchorY, int firstFrame, double frameTime, float opacity, float cap, double scale, int shade) {
 		const int phase = ((int)std::floor(frameTime) % 4 + 4) % 4;
 		Puff puff;
 		puff.depth = (world[0] - _eye[0]) * _forward[0] + (world[1] - _eye[1]) * _forward[1] + (world[2] - _eye[2]) * ZScale * _forward[2];
@@ -2596,6 +2590,7 @@ void FirstPersonView::drawSeeThroughSmoke()
 		puff.to = smokeSprites->getFrame(firstFrame + (phase + 1) % 4);
 		puff.blend = easedBlend(frameTime - std::floor(frameTime));
 		puff.opacity = opacity;
+		puff.cap = cap;
 		puff.scale = scale;
 		puff.shade = shade;
 		if (puff.from) puffs.push_back(puff);
@@ -2624,44 +2619,25 @@ void FirstPersonView::drawSeeThroughSmoke()
 			hash ^= hash >> 15; hash *= 2246822519u; hash ^= hash >> 13;
 			value = (hash & 0xFFFF) / 65535.0f;
 		}
-		// Set off from the middle, swaying and bobbing slowly.
+		// Set off from the middle; Modern's clouds sway and bob slowly, Original's stay put as on the
+		// map (its solid dots would crawl a pixel at a time; its frames melt into each other instead).
+		const double sway = original ? 0.0 : 1.0;
 		const double world[3] = {
-			ground[0] + (variation[0] - 0.5) * 4.0 + 0.8 * std::sin(seconds * 0.5 + variation[1] * 2.0 * Pi),
-			ground[1] + (variation[1] - 0.5) * 4.0 + 0.8 * std::cos(seconds * 0.4 + variation[2] * 2.0 * Pi),
-			ground[2] + 1.0 * std::sin(seconds * 0.7 + variation[3] * 2.0 * Pi) };
-		// A little more opaque the thicker the smoke (a fresh smoke grenade makes about 15); the
-		// original's dots more so, as their holes already let the view through. Thinner for eyes
-		// with heat vision (see setSmokeSight).
-		// The settings "Smoke opacity" and "Night smoke opacity" scale it, by the light here (see
-		// smokeOpacityScale).
-		const float made = original ? std::clamp(0.35f + tile->getSmoke() * 0.04f, 0.0f, 0.95f) : std::clamp(0.45f + tile->getSmoke() * 0.025f, 0.0f, 0.85f);
-		const float opacity = _smokeSeen * std::min(0.95f, made * smokeOpacityScale(_tileViews[tileIndex].light));
+			ground[0] + (variation[0] - 0.5) * 4.0 + sway * 0.8 * std::sin(seconds * 0.5 + variation[1] * 2.0 * Pi),
+			ground[1] + (variation[1] - 0.5) * 4.0 + sway * 0.8 * std::cos(seconds * 0.4 + variation[2] * 2.0 * Pi),
+			ground[2] + sway * 1.0 * std::sin(seconds * 0.7 + variation[3] * 2.0 * Pi) };
+		// Modern: a little more opaque the thicker the smoke (a fresh smoke grenade makes about
+		// 15), the thickest as opaque as the settings "Smoke opacity" and "Night smoke opacity"
+		// allow by the light here, their maximum, which smoke over smoke builds up to and no
+		// further (a player's report, GitHub issue #98: stacked smoke hid more than the game's
+		// sight rules do; see smokeOpacityAt, _smokeVeil). Original: the game's dots as they are,
+		// solid, one frame a tile, as the map draws them (the owner: "exactly as the map"; their
+		// holes are the see-through). Both thinner for eyes with heat vision (see setSmokeSight).
+		const float cap = original ? 0.0f : _smokeSeen * smokeOpacityAt(_tileViews[tileIndex].light);
+		const float opacity = original ? _smokeSeen : cap * std::clamp(0.45f + tile->getSmoke() * 0.025f, 0.0f, 0.85f) / 0.85f;
 		const int firstFrame = firstSmokeFrame(tile->getSmoke());
 		const double frameTime = seconds / FrameSeconds + tile->getAnimationOffset() + variation[2], scale = 1.14 + variation[3] * 0.12;
-		addPuff(world, 32, firstFrame, frameTime, opacity, scale, _tileViews[tileIndex].light);
-		// Original, where the soldier can't see through the smoke looking at the cloud's middle
-		// (the sight runs out on the line through it and on): the cloud again on top, out of
-		// step and set off a little round the tile's middle (a frame of the original's dots
-		// covers only a tenth to a third of its picture), OriginalSmokeMaxLayers times in all
-		// inside the cloud, solid where they overlap, and OriginalSmokeShellLayers times on its
-		// outer shell (a tile next to one without smoke), so its outline stays loose and
-		// smoke-like; where the smoke uses up most of the sight, a few times (the cloud's edge,
-		// as soft as Modern's wall's); where the soldier sees through it, once. (With heat
-		// vision the sight lasts longer, so fewer layers stack; where it runs out all the same,
-		// the layers are as solid.)
-		if (original)
-		{
-			const double middle[3] = { world[0], world[1], world[2] + 12.0 };
-			const float sightUsed = smokeSightUsedThrough(middle);
-			const int mostLayers = smokeShell(tilePosition) ? OriginalSmokeShellLayers : OriginalSmokeMaxLayers;
-			const int layers = std::min(mostLayers, sightUsed >= 1.0f ? OriginalSmokeMaxLayers : sightUsed >= 0.7f ? 4 : sightUsed >= 0.4f ? 2 : 1);
-			for (int layer = 1; layer < layers; ++layer)
-			{
-				const double angle = layer * 2.4; // the golden angle, so the layers spread evenly round the middle
-				const double shifted[3] = { world[0] + 3.0 * std::cos(angle), world[1] + 3.0 * std::sin(angle), world[2] + (layer % 3 - 1) * 2.0 };
-				addPuff(shifted, 32, firstFrame, frameTime + layer * 1.37, 1.0f, scale * (1.0 + layer * 0.03), _tileViews[tileIndex].light);
-			}
-		}
+		addPuff(world, 32, firstFrame, frameTime, opacity, cap, scale, _tileViews[tileIndex].light);
 	}
 	// The wisps: the thinnest smoke's frames, anchored at their middle, growing as they rise,
 	// fading in over their first quarter and away over their last half.
@@ -2675,15 +2651,17 @@ void FirstPersonView::drawSeeThroughSmoke()
 		const float fade = std::min(std::clamp(age / 0.25f, 0.0f, 1.0f), std::clamp((1.0f - age) / 0.5f, 0.0f, 1.0f));
 		const double world[3] = { particle.pos[0], particle.pos[1], particle.pos[2] };
 		const int shade = (int)std::lround(std::clamp(lightAt(particle.pos[0], particle.pos[1], particle.pos[2]), 0.0f, 15.0f));
-		addPuff(world, 20, firstSmokeFrame(1), seconds / (FrameSeconds * 1.5) + particle.size, _smokeSeen * std::min(0.95f, 0.45f * smokeOpacityScale(shade)) * fade * fade * (3.0f - 2.0f * fade),
-			0.35 + 0.4 * age, shade);
+		const float cap = _smokeSeen * smokeOpacityAt(shade);
+		addPuff(world, 20, firstSmokeFrame(1), seconds / (FrameSeconds * 1.5) + particle.size, cap * (0.45f / 0.85f) * fade * fade * (3.0f - 2.0f * fade),
+			cap, 0.35 + 0.4 * age, shade);
 	}
 
-	// Farthest first, each over what's behind it: its two frames part way into each other, made
+	// Nearest first, so the smoke in front keeps its own shape and sway when the smoke behind
+	// it would go past the most a pixel may take (see _smokeVeil): its two frames part way into each other, made
 	// here (on this thread). An original frame upgraded to the upscaler's version on the way
 	// drops the blends made with the old one, some of which may be in the list already: then the
 	// list is made again (it happens once for each frame, ever).
-	std::sort(puffs.begin(), puffs.end(), [](const Puff &a, const Puff &b) { return a.depth > b.depth; });
+	std::sort(puffs.begin(), puffs.end(), [](const Puff &a, const Puff &b) { return a.depth < b.depth; });
 	unsigned upgradesBefore;
 	do
 	{
@@ -2693,7 +2671,7 @@ void FirstPersonView::drawSeeThroughSmoke()
 		{
 			const SoftSmoke &soft = softSmokeBlend(puff.from, puff.to, std::min(SmokeBlendSteps - 1, (int)(puff.blend * SmokeBlendSteps)), original);
 			soft.findRuns();
-			_smokeDraws.push_back({ &soft, { puff.world[0], puff.world[1], puff.world[2] }, puff.anchorY, puff.opacity, puff.scale, puff.shade });
+			_smokeDraws.push_back({ &soft, { puff.world[0], puff.world[1], puff.world[2] }, puff.anchorY, puff.opacity, puff.cap, puff.scale, puff.shade });
 		}
 	} while (_smokeUpgrades != upgradesBefore);
 	// Only what can show, each puff in the rows it may reach (see cullSmokeDraws); then drawn on
@@ -2711,9 +2689,8 @@ void FirstPersonView::drawSeeThroughSmoke()
  * drawSmokeBands): every band sets each of its puffs' cards up anew, and a thick cloud has
  * hundreds of them (GitHub issue #92, "smoke grenades drawing maybe 70 tiles of smoke"; the
  * owner: "still draw all smoke but check if we can do it efficiently"). A puff is left out when it
- * lies off the view, or wholly behind what's drawn already (a wall, a unit, Modern's wall of smoke
- * where the soldier's sight runs out in it), where every pixel of it would fail the depth test: the
- * picture stays the same. The card is placed as drawSprite places it (upright, leaning with the
+ * lies off the view, or wholly behind what's drawn already (a wall, a unit), where every pixel of
+ * it would fail the depth test: the picture stays the same. The card is placed as drawSprite places it (upright, leaning with the
  * view's pitch, more steeply above the eye) and its four corners taken to the screen: its rows and
  * columns there (a row more each way), and its nearest corner's depth against the farthest depth
  * drawn in each block of the view it covers. With the view tilted by a lean, or a corner behind
@@ -2800,7 +2777,7 @@ void FirstPersonView::cullSmokeDraws()
 /**
  * Draws this frame's see-through smoke (made by drawSeeThroughSmoke) over bands of the view's
  * rows, taken one at a time from the shared counter until none are left: a job for all the
- * view's threads (see runOnAllThreads). Each band gets every puff, farthest first, so every
+ * view's threads (see runOnAllThreads). Each band gets every puff, nearest first, so every
  * pixel comes out just as if one thread drew the puffs whole, one after another.
  */
 void FirstPersonView::drawSmokeBands()
@@ -2812,7 +2789,7 @@ void FirstPersonView::drawSmokeBands()
 		{
 			if (smoke.bottom <= band * BandRows || smoke.top >= (band + 1) * BandRows) continue; // (not in this band: see cullSmokeDraws)
 			const SeeThroughSprite seeThroughSprite = { smoke.soft->opacity.data(), smoke.opacity, smoke.soft->runStart.data(), smoke.soft->runs.data(),
-				_smokeCullDepth.data(), (getWidth() + SmokeCullBlock - 1) / SmokeCullBlock };
+				_smokeCullDepth.data(), (getWidth() + SmokeCullBlock - 1) / SmokeCullBlock, (int)std::lround(smoke.cap * SeeThroughLevels) };
 			SpriteDraw draw;
 			draw.sprite = smoke.soft->colors;
 			draw.anchorX = 16 * UpscaleFactor;

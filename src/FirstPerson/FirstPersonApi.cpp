@@ -431,7 +431,7 @@ struct PlaystyleSwitch
  * The switches the setting "Playstyle" sets (the owner's choice: shooting and turning, moving,
  * the feel of combat; the cheats stay apart): FPS-style shooting, turning by the rules, movement
  * tile by tile, jumping over low obstacles, leaning (Peek) and lean shots, full sprite hitboxes,
- * quick deaths, melee hitting walls and the downed.
+ * quick deaths, melee hitting walls and the downed, and the live motion scanner.
  * @return The switches.
  */
 const std::vector<PlaystyleSwitch> &playstyleSwitches()
@@ -446,6 +446,7 @@ const std::vector<PlaystyleSwitch> &playstyleSwitches()
 		{ "fpsSpriteHitboxes", &Options::fpsSpriteHitboxes, nullptr, 0, 1 },
 		{ "fpsQuickDeaths", &Options::fpsQuickDeaths, nullptr, 0, 1 },
 		{ "fpsMeleeTerrain", &Options::fpsMeleeTerrain, nullptr, 0, 1 },
+		{ "fpsLiveScanner", &Options::fpsLiveScanner, nullptr, 0, 1 },
 	};
 	return switches;
 }
@@ -571,6 +572,12 @@ bool isPlaystyleSwitch(const std::string &id)
  */
 void settlePlaystyle()
 {
+	// The live motion scanner joined the playstyle in 1.11 (GitHub issue #101): a profile from before
+	// it that says FPS gets it as FPS has it (switched off by hand, it would have said Custom).
+	if (Options::fpsPlaystyle == 1 && !Options::fpsLiveScanner)
+	{
+		Options::fpsLiveScanner = true;
+	}
 	if (Options::fpsPlaystyle != 2 && playstyleOfSwitches() != Options::fpsPlaystyle)
 	{
 		Options::fpsPlaystyle = 2;
@@ -751,12 +758,13 @@ void createOptions(std::vector<OptionInfo> &options)
 	// soldier's sight (2). (1.0's Solid, 0, is gone.) Unset (-1) until settled (see settleOptions)
 	// from 0.9's "See-through smoke", kept below, unlisted.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmoke", &fpsSmoke, -1, "STR_FPS_SMOKE", category));
-	// How opaque the see-through smoke is drawn (not where the soldier can't see through it:
-	// that stays solid): the thinnest smoke's opacity in percent, thicker smoke more as before;
-	// in the dark, by the light where it hangs, the night value (a player: "non full smoke can
-	// be blinding" at night and on dark maps), the two blended in between.
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmokeOpacity", &fpsSmokeOpacity, 45, "STR_FPS_SMOKE_OPACITY", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightSmokeOpacity", &fpsNightSmokeOpacity, 25, "STR_FPS_NIGHT_SMOKE_OPACITY", category));
+	// The most opaque Modern's smoke is drawn, in percent: the thickest smoke's, thinner smoke less,
+	// and smoke over smoke builds up to it and no further (a player's report, GitHub issue #98:
+	// stacked smoke hid more than the game's sight rules); in the dark, by the light where it
+	// hangs, the night value (a player: "non full smoke can be blinding" at night and on dark
+	// maps), the two blended in between.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmokeOpacity", &fpsSmokeOpacity, 80, "STR_FPS_SMOKE_OPACITY", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightSmokeOpacity", &fpsNightSmokeOpacity, 45, "STR_FPS_NIGHT_SMOKE_OPACITY", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlares", &fpsFlares, true, "STR_FPS_FLARES", category));
 	// 0.9's "See-through smoke" (YES/NO), loaded and saved but listed nowhere (a category no
 	// options screen shows): it gives the smoke setting its first value.
@@ -861,6 +869,11 @@ void createOptions(std::vector<OptionInfo> &options)
 	// looked through falls on their helmet camera card while the view goes on to the next (a
 	// player's report, GitHub issue #40). Off: the game's own deaths, one by one.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsQuickDeaths", &fpsQuickDeaths, false, "STR_FPS_QUICK_DEATHS", category));
+	// The motion scanner held up in 3D stays up as the soldier moves and through the aliens' turn,
+	// a live radar for its one use (a player's report, GitHub issue #101: "potentially neat
+	// feature"; the owner: a setting, off by default, in the playstyle). Off: one look from where
+	// it was used, as the game's own scanner (see FirstPersonMode::updateScanner).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsLiveScanner", &fpsLiveScanner, false, "STR_FPS_LIVE_SCANNER", category));
 	// The hitboxes' outlines and the path of a throw glowing (spilling bloom round them), or plain lines.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsGlowingOutlines", &fpsGlowingOutlines, false, "STR_FPS_GLOWING_OUTLINES", category));
 	// Icons over the downed (unconscious) units in sight, for burning, bleeding, shock and
@@ -947,6 +960,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsGrabItem", &keyFpsGrabItem, SDLK_UNKNOWN, "STR_FPS_KEY_GRAB_ITEM", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlare", &keyFpsFlare, SDLK_t, "STR_FPS_KEY_FLARE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlight", &keyFpsFlight, SDLK_b, "STR_FPS_KEY_FLIGHT", category));
+	// A tank's turret switch (a player's report: turning the view turned the whole tank, at its full
+	// cost; the TURRET button on the top bar too): no key until the player gives it one.
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsTurret", &keyFpsTurret, SDLK_UNKNOWN, "STR_FPS_KEY_TURRET", category));
 	// The flashlight on and off (F, as in the first-person shooters; setting "Flashlight").
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlashlight", &keyFpsFlashlight, SDLK_f, "STR_FPS_KEY_FLASHLIGHT", category));
 	// Space is the map's night vision hold key; in 3D it jumps, and night vision is gear (N).

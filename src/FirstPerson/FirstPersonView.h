@@ -190,10 +190,10 @@ public:
 		SolidRows solid; // [z][y], bit x: solid (or glass) in any of the parts, so a ray knows where to look at them
 	};
 	/// What a ray walking past a tile needs to know first, a byte per tile (see snapshotTiles):
-	/// whether there is anything in it to trace (parts or a swinging door), smoke on it, a door
-	/// swinging through it, and in the top five bits the height of its highest solid voxel (0..23),
+	/// whether there is anything in it to trace (parts or a swinging door), a door swinging
+	/// through it, and in the top five bits the height of its highest solid voxel (0..23),
 	/// so a ray passing above everything in the tile (a floor, most often) needn't look inside.
-	enum TileFlag : Uint8 { TileTraced = 1, TileSmoky = 2, TileSwinging = 4 };
+	enum TileFlag : Uint8 { TileTraced = 1, TileSwinging = 4 };
 	static constexpr int TileTopShift = 3; // where the highest solid voxel's height sits in the flags
 	/// A door swinging open, as a thin slab turning around its hinge.
 	struct DoorSwing
@@ -362,8 +362,8 @@ public:
 	void setNightVision(int color) { _nightVision = color; }
 	/// The sight of the soldier the view looks through, for the smoke: their range, and how much of the smoke (and smoke over fire) they see through.
 	void setSmokeSight(float sightVoxels, int throughSmoke, int throughFire);
-	/// How much the see-through smoke's opacity is scaled where it hangs, by the settings "Smoke opacity" and "Night smoke opacity" and the game's shade there.
-	float smokeOpacityScale(int shade) const;
+	/// The most opaque see-through smoke may get where it hangs (a maximum), by the settings "Smoke opacity" and "Night smoke opacity" and the game's shade there.
+	float smokeOpacityAt(int shade) const;
 	/// Where the weapon in hand's muzzle is on the view (pixels): our own shots flash and start their trails there.
 	void setMuzzlePoint(double x, double y, bool valid) { _muzzleScreen[0] = x; _muzzleScreen[1] = y; _muzzleValid = valid; }
 	/// The path a throw or shot aimed now would take, in voxels from the soldier to its end (see
@@ -500,11 +500,11 @@ private:
 	float _smokeSightVoxels = 20.0f * Position::TileXY; // the soldier's sight range, voxels (see setSmokeSight)
 	float _smokeSeen = 1.0f;                            // how opaque the see-through smoke is drawn for their eyes: 1 less their heat vision (see setSmokeSight)
 	float _smokeBlock = 1.0f / 3.0f, _fireBlock = 1.0f / 3.0f; // sight used up per voxel walked through 1 point of smoke (over fire), voxels
-	float _smokeDrift = 0.0f;                           // this frame's time, seconds: the smoke's billows drift with it
 	float _smokeRgb[3] = { 130.0f, 130.0f, 130.0f };    // the colour of the game's smoke (see smokeRgb)
 	std::vector<float> _depthBuffer;                    // per pixel, how far away what's drawn there is (sprites and effects test against it)
 	std::vector<Uint8> _glowMask;                       // pixels showing something that shines (lit voxels, sparks)
 	std::vector<Uint8> _unitVeil;                       // per pixel, how much more see-through smoke may veil the unit seen there (in SeeThroughLevels; 255: no unit)
+	std::vector<Uint8> _smokeVeil;                      // per pixel, how much see-through smoke veils what's seen there this frame (in SeeThroughLevels; up to its cap)
 	std::vector<Uint8> _ownColours;                     // per pixel, 1: a unit's, a body's or an item's picture shows there (futuristic night vision leaves its colours, see washBands)
 
 	/// Works out the camera's axes from its yaw and pitch.
@@ -711,13 +711,8 @@ private:
 	float terrainHaze(float distance) const;
 	/// A colour faded into the distance haze by an amount (0 none .. 1 all haze), dithered between neighbouring blend steps.
 	Uint8 hazeColor(Uint8 color, float haze, int pixelX, int pixelY) const;
-	/// Smoke's colour on a pixel of its wall (where the soldier's sight runs out in it).
-	Uint8 smokeColor(Uint8 light, const float rayOrigin[3], const float rayDirection[3], float distance, float *billowOut = nullptr) const;
-	/// How much of the soldier's sight the smoke uses up looking through a point and on beyond it (1 or more: they can't see through).
-	float smokeSightUsedThrough(const double point[3]) const;
-	/// Original smoke: how many times a tile's cloud is drawn on top of itself where the soldier can't see through it, inside
-	/// the cloud and on its outer shell (a tile next to one without smoke), so the cloud's outline stays smoke-like (see drawSeeThroughSmoke).
-	static constexpr int OriginalSmokeMaxLayers = 8, OriginalSmokeShellLayers = 3;
+	/// How much of the soldier's sight the smoke on the line from the eye to a point uses up (1 or more: they can't see through it).
+	float smokeSightUsedTo(const double point[3]) const;
 	/// See-through drawing mixes a colour over another in this many steps (this many: solid).
 	static constexpr int SeeThroughLevels = 16;
 	std::vector<Uint8> _nearestRgb;                     // the palette's nearest colour to each 15-bit RGB colour (5 bits a channel)
@@ -827,6 +822,7 @@ private:
 		const std::pair<int, int> *rowRuns = nullptr;  // the runs of coloured pixels, first and one past the last column (only these are drawn)
 		const float *depthBlocks = nullptr;            // if given, the farthest depth drawn in each SmokeCullBlock square of the view:
 		int depthBlockColumns = 0;                     // a square where everything is nearer than the sprite isn't looked at (see cullSmokeDraws)
+		int capLevels = 0;                             // above 0: see-through smoke builds up on a pixel to this (of SeeThroughLevels) and no further (see _smokeVeil)
 	};
 	SeeThroughSprite _faintPile = { nullptr, 1.0f };    // how the pile pointed at past is drawn (see drawFloorItems)
 	/// A standing sprite isn't cut off below any floor (see SpriteDraw::floorCut, floorUnderside).
@@ -956,15 +952,13 @@ private:
 	const SoftSmoke &softSmokeBlend(const Surface *from, const Surface *to, int step, bool original);
 	/// The first of the four smoke frames the map shows for a density of smoke.
 	int firstSmokeFrame(int smoke) const;
-	/// Is a smoky tile on its cloud's outer shell: next to a tile (on its level, across a side) with no smoke, or the map's edge?
-	bool smokeShell(const Position &tilePosition) const;
 	/// The colour of the game's smoke (its thickest frames' dots mixed, mostly grey).
 	void smokeRgb(float rgb[3]) const;
 	/// Draws the smoke on discovered tiles see-through, and its rising wisps (setting "Smoke": Original, Modern).
 	void drawSeeThroughSmoke();
 	/// One see-through smoke sprite to draw this frame (see drawSeeThroughSmoke).
-	struct SmokeDraw { const SoftSmoke *soft; double world[3]; int anchorY; float opacity; double scale; int shade; int top = 0, bottom = 0; }; // (top, bottom: the screen rows it may reach)
-	std::vector<SmokeDraw> _smokeDraws; // this frame's, farthest first
+	struct SmokeDraw { const SoftSmoke *soft; double world[3]; int anchorY; float opacity, cap; double scale; int shade; int top = 0, bottom = 0; }; // (top, bottom: the screen rows it may reach)
+	std::vector<SmokeDraw> _smokeDraws; // this frame's, nearest first
 	/// How much nearer than its point a puff of see-through smoke counts for the depth test, in voxels.
 	static constexpr double SmokeDepthBias = 2.0;
 	/// The see-through smoke leaves out puffs wholly behind what's drawn, by the farthest depth in each block of this many pixels square.
