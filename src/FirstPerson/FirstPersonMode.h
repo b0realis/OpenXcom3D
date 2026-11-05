@@ -401,6 +401,8 @@ private:
 	Surface *_compass = nullptr;                 // the dial
 	Surface *_scannerPanel = nullptr;            // the motion scanner's round screen, held up at the bottom middle (see updateScanner)
 	FirstPersonScanner *_scanner = nullptr;      // the motion scanner held up (or put away), and its art, ring and blips
+	Position _scannerFrom;                       // where it was used, and in which turn (setting "Live motion scanner"
+	int _scannerTurn = 0;                        //   off: one look from there, see updateScanner)
 	Uint8 _scannerRimColor = 0;                  // the round screen's rim
 	Surface *_climbArrows = nullptr;             // beside it, the ways W may climb, the one it takes now lit (see updateClimbArrows)
 	int _climbArrowsShown = -1;                  // what they show: up 1, down 2, lit (1 up, 2 down) times 4; -1 not drawn yet

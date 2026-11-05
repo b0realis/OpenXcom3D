@@ -88,7 +88,7 @@ KEYS = [
 # ---------------------------------------------------------------------------------------------------------------------
 SETTINGS = [
     ('Playstyle', [
-        ('Playstyle', 'Faithful', 'Faithful / FPS / Custom', 'One switch for how it plays, setting nine at once. Faithful: the game\'s own way, close to the map. FPS: FPS-style shooting, free turning and walking, vaulting, leaning, full sprite hitboxes, quick deaths, melee at walls. Custom: your own mix of those, kept.',
+        ('Playstyle', 'Faithful', 'Faithful / FPS / Custom', 'One switch for how it plays, setting ten at once. Faithful: the game\'s own way, close to the map. FPS: FPS-style shooting, free turning and walking, vaulting, leaning, full sprite hitboxes, quick deaths, melee at walls, a live motion scanner. Custom: your own mix of those, kept.',
          'Change one of the nine by hand and it becomes Custom; flipping back brings your mix back.'),
     ]),
     ('View and camera', [
@@ -147,6 +147,7 @@ SETTINGS = [
         ('Full sprite hitboxes', 'NO', 'YES / NO', 'Units are hit, and seen, wherever their full sprites show (a card facing whoever fires), for everyone, in 3D and on the map.', 'What you see is what you hit: shots pass between legs and hit arms.'),
         ('Auto-equip guns first', 'NO', 'YES / NO', 'Soldiers with no saved loadout take guns before melee weapons, the hardest-hitting first, launchers last. NO: OpenXcom\'s own auto-equip.', 'OXCE has no ranking: its order changes between builds, so in XPiratez or X-Com Files it often hands out staffs and swords first.'),
         ('Quick deaths', 'NO', 'YES / NO', 'Units killed or knocked out are down at once: bursts fire on, falls play on their own and together, in 3D and on the map; your soldier falls on their camera card while the view goes on to the next.', 'Doom-style pace: chaingun through a group without waiting for each fall.'),
+        ('Live motion scanner', 'NO', 'YES / NO', 'YES: the motion scanner stays up as you move and through the aliens\' turn, a live radar for one use. NO: one look from where it was used, as the game\'s own scanner.', 'An edge the game never gives; on with the FPS playstyle.'),
         ('Unlimited tactical flares', 'YES', 'YES / NO', 'T throws a red flare at the crosshair, free and as often as you like.', 'Lights the 3D view only.'),
         ('Night vision needs gear', 'NO', 'YES / NO', 'Only soldiers with night vision gear (power suits, flying suits...) get NIGHT VISION in 3D. NO: everyone.', 'YES keeps the night dark for the unequipped.'),
     ]),
@@ -281,7 +282,7 @@ FEATURES = [
      'Open a door without stepping into the room behind it.'),
     ('melee', 'Melee, medi-kits and items', [('ufo_medikit_teammate.png', 'A medi-kit by the crosshair: USE: and the teammate\'s name'), ('ufo_motion_scanner.png', 'The motion scanner held up: the sweep going out, two blips behind the soldier')],
      'Left button in the melee or use mode',
-     'Melee strikes what\'s under the crosshair: a blow swings, lunges and jolts. A medi-kit treats whoever you look at, next to you; aiming at nothing, yourself. The motion scanner is held up at the bottom of the view, turning as you look round, a ring sweeping out with a whoop and a pip for each movement it finds; the mind probe to its screen; priming opens the timer at once.',
+     'Melee strikes what\'s under the crosshair: a blow swings, lunges and jolts. A medi-kit treats whoever you look at, next to you; aiming at nothing, yourself. The motion scanner is held up at the bottom of the view (one look from where it was used, or live with Live motion scanner), turning as you look round, a ring sweeping out with a whoop and a pip for each movement it finds; the mind probe to its screen; priming opens the timer at once.',
      ''),
     ('throw', 'Throwing and grenades', [('airburst.png', 'Doom free grenades: an airburst over a field')],
      'Fire mode throw or prime; <kbd>T</kbd> for a flare',

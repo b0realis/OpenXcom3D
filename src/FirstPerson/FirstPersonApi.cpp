@@ -431,7 +431,7 @@ struct PlaystyleSwitch
  * The switches the setting "Playstyle" sets (the owner's choice: shooting and turning, moving,
  * the feel of combat; the cheats stay apart): FPS-style shooting, turning by the rules, movement
  * tile by tile, jumping over low obstacles, leaning (Peek) and lean shots, full sprite hitboxes,
- * quick deaths, melee hitting walls and the downed.
+ * quick deaths, melee hitting walls and the downed, and the live motion scanner.
  * @return The switches.
  */
 const std::vector<PlaystyleSwitch> &playstyleSwitches()
@@ -446,6 +446,7 @@ const std::vector<PlaystyleSwitch> &playstyleSwitches()
 		{ "fpsSpriteHitboxes", &Options::fpsSpriteHitboxes, nullptr, 0, 1 },
 		{ "fpsQuickDeaths", &Options::fpsQuickDeaths, nullptr, 0, 1 },
 		{ "fpsMeleeTerrain", &Options::fpsMeleeTerrain, nullptr, 0, 1 },
+		{ "fpsLiveScanner", &Options::fpsLiveScanner, nullptr, 0, 1 },
 	};
 	return switches;
 }
@@ -571,6 +572,12 @@ bool isPlaystyleSwitch(const std::string &id)
  */
 void settlePlaystyle()
 {
+	// The live motion scanner joined the playstyle in 1.11 (GitHub issue #101): a profile from before
+	// it that says FPS gets it as FPS has it (switched off by hand, it would have said Custom).
+	if (Options::fpsPlaystyle == 1 && !Options::fpsLiveScanner)
+	{
+		Options::fpsLiveScanner = true;
+	}
 	if (Options::fpsPlaystyle != 2 && playstyleOfSwitches() != Options::fpsPlaystyle)
 	{
 		Options::fpsPlaystyle = 2;
@@ -859,6 +866,11 @@ void createOptions(std::vector<OptionInfo> &options)
 	// looked through falls on their helmet camera card while the view goes on to the next (a
 	// player's report, GitHub issue #40). Off: the game's own deaths, one by one.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsQuickDeaths", &fpsQuickDeaths, false, "STR_FPS_QUICK_DEATHS", category));
+	// The motion scanner held up in 3D stays up as the soldier moves and through the aliens' turn,
+	// a live radar for its one use (a player's report, GitHub issue #101: "potentially neat
+	// feature"; the owner: a setting, off by default, in the playstyle). Off: one look from where
+	// it was used, as the game's own scanner (see FirstPersonMode::updateScanner).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsLiveScanner", &fpsLiveScanner, false, "STR_FPS_LIVE_SCANNER", category));
 	// The hitboxes' outlines and the path of a throw glowing (spilling bloom round them), or plain lines.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsGlowingOutlines", &fpsGlowingOutlines, false, "STR_FPS_GLOWING_OUTLINES", category));
 	// Icons over the downed (unconscious) units in sight, for burning, bleeding, shock and

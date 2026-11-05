@@ -396,6 +396,8 @@ en-GB:
   STR_FPS_AUTO_EQUIP_GUNS_FIRST: "Auto-equip guns first"
   STR_FPS_AUTO_EQUIP_GUNS_FIRST_DESC: "Soldiers with no saved loadout take guns before melee weapons, the hardest-hitting first, launchers last. NO: OpenXcom's own."
   STR_FPS_QUICK_DEATHS_DESC: "A unit killed or knocked out is down at once: bursts fire on, falls play on their own. NO: the game's, one by one."
+  STR_FPS_LIVE_SCANNER: "Live motion scanner"
+  STR_FPS_LIVE_SCANNER_DESC: "The motion scanner stays up as you move and through the aliens' turn. NO: one look from where it's used, as in the game."
   STR_FPS_UNIT_NAMES: "Unit names"
   STR_FPS_UNIT_NAMES_DESC: "The name of the unit under the crosshair."
   STR_FPS_STAT_BARS: "Stat bars"
