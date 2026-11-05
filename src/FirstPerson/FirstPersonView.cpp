@@ -89,6 +89,7 @@ FirstPersonView::FirstPersonView(Game *game, int width, int height, int x, int y
 	_depthBuffer.resize(width * height);
 	_glowMask.resize(width * height);
 	_unitVeil.resize(width * height);
+	_smokeVeil.resize(width * height);
 	_ownColours.resize(width * height);
 
 	// A camera's glitches and static spells differ from game to game and from camera to camera
@@ -552,6 +553,7 @@ void FirstPersonView::draw()
 	// and the hitmarker), then everything is drawn over the terrain as sprites, dots and lines.
 	// (No unit is on the screen yet, for the see-through smoke.)
 	std::fill(_unitVeil.begin(), _unitVeil.end(), (Uint8)255);
+	std::fill(_smokeVeil.begin(), _smokeVeil.end(), (Uint8)0);
 	std::fill(_ownColours.begin(), _ownColours.end(), (Uint8)0);
 	std::fill(&_pointerUnits[0][0], &_pointerUnits[0][0] + sizeof(_pointerUnits) / sizeof(_pointerUnits[0][0]), nullptr);
 	std::fill(&_pointerBodies[0][0], &_pointerBodies[0][0] + sizeof(_pointerBodies) / sizeof(_pointerBodies[0][0]), nullptr);

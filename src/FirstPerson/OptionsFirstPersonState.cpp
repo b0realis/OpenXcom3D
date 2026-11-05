@@ -620,10 +620,10 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		{
 			*value = std::clamp(*value + 10 * direction, 10, 100);
 		}
-		// The see-through smoke's opacity, by day and in the dark: 5 to 80%, in steps of 5.
+		// The see-through smoke's opacity, by day and in the dark: 5 to 95%, in steps of 5.
 		else if (value == &Options::fpsSmokeOpacity || value == &Options::fpsNightSmokeOpacity)
 		{
-			*value = std::clamp(*value + 5 * direction, 5, 80);
+			*value = std::clamp(*value + 5 * direction, 5, 95);
 		}
 		// The downed units' icons (off, crosshair, always): round and round.
 		else if (value == &Options::fpsDownedIcons)
