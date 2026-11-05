@@ -958,6 +958,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsGrabItem", &keyFpsGrabItem, SDLK_UNKNOWN, "STR_FPS_KEY_GRAB_ITEM", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlare", &keyFpsFlare, SDLK_t, "STR_FPS_KEY_FLARE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlight", &keyFpsFlight, SDLK_b, "STR_FPS_KEY_FLIGHT", category));
+	// A tank's turret switch (a player's report: turning the view turned the whole tank, at its full
+	// cost; the TURRET button on the top bar too): no key until the player gives it one.
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsTurret", &keyFpsTurret, SDLK_UNKNOWN, "STR_FPS_KEY_TURRET", category));
 	// The flashlight on and off (F, as in the first-person shooters; setting "Flashlight").
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlashlight", &keyFpsFlashlight, SDLK_f, "STR_FPS_KEY_FLASHLIGHT", category));
 	// Space is the map's night vision hold key; in 3D it jumps, and night vision is gear (N).

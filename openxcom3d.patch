@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..5ba0b13ff
+index 000000000..6c61da9cb
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,474 @@
+@@ -0,0 +1,481 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -376,6 +376,8 @@ index 000000000..5ba0b13ff
 +  STR_FPS_FLIGHT_COST_OVERRIDE_DESC: "YES: the cost above for all. NO: each unit's own, as the game has."
 +  STR_FPS_KEY_FLIGHT: "Flight on/off"
 +  STR_FPS_KEY_FLIGHT_DESC: "Flight on/off, for flying armour."
++  STR_FPS_KEY_TURRET: "Turret only (tanks)"
++  STR_FPS_KEY_TURRET_DESC: "A tank's turret switch: the view turns only the turret, at the turret's cost. No key at first."
 +  STR_FPS_KEY_FLASHLIGHT: "Flashlight on/off"
 +  STR_FPS_KEY_FLASHLIGHT_DESC: "The flashlight on/off (setting Flashlight). The suit light is the game's personal light."
 +  STR_FPS_BUTTON_FLY: "SUIT FLY"
@@ -385,6 +387,9 @@ index 000000000..5ba0b13ff
 +  STR_FPS_NO_ARMOR: "No armor"
 +  STR_FPS_FLIGHT_ON: "Flight on"
 +  STR_FPS_FLIGHT_OFF: "Flight off"
++  STR_FPS_TURRET_ON: "Turret only: the view turns the turret"
++  STR_FPS_TURRET_OFF: "Turret off: the view turns the whole tank"
++  STR_FPS_NO_TURRET: "No turret to turn"
 +  STR_FPS_SWIM_ON: "Swimming on"
 +  STR_FPS_SWIM_OFF: "Swimming off"
 +  STR_FPS_FLIGHT_OFF_KEY: "Flight off ({0} to fly)"
@@ -394,6 +399,8 @@ index 000000000..5ba0b13ff
 +  STR_FPS_MAP_LAYERS_ALL: "The map shows every level (3D always does)"
 +  STR_FPS_MAP_LAYERS_ONE: "The map shows up to its level (3D: every level)"
 +  STR_FPS_BUTTON_FLY_SHORT: "FLY"
++  STR_FPS_BUTTON_TURRET: "TURRET"
++  STR_FPS_BUTTON_TURRET_SHORT: "TUR"
 +  STR_FPS_BUTTON_SWIM_SHORT: "SWIM"
 +  STR_FPS_BUTTON_LIGHT_SHORT: "LIGHT"
 +  STR_FPS_BUTTON_SPECIAL_SHORT: "SPEC"
@@ -604,10 +611,10 @@ index 000000000..5ba0b13ff
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..298b64381
+index 000000000..8c7e30a89
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,474 @@
+@@ -0,0 +1,481 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -856,6 +863,8 @@ index 000000000..298b64381
 +  STR_FPS_FLIGHT_COST_OVERRIDE_DESC: "YES: the cost above for all. NO: each unit's own, as the game has."
 +  STR_FPS_KEY_FLIGHT: "Flight on/off"
 +  STR_FPS_KEY_FLIGHT_DESC: "Flight on/off, for flying armor."
++  STR_FPS_KEY_TURRET: "Turret only (tanks)"
++  STR_FPS_KEY_TURRET_DESC: "A tank's turret switch: the view turns only the turret, at the turret's cost. No key at first."
 +  STR_FPS_KEY_FLASHLIGHT: "Flashlight on/off"
 +  STR_FPS_KEY_FLASHLIGHT_DESC: "The flashlight on/off (setting Flashlight). The suit light is the game's personal light."
 +  STR_FPS_BUTTON_FLY: "SUIT FLY"
@@ -865,6 +874,9 @@ index 000000000..298b64381
 +  STR_FPS_NO_ARMOR: "No armor"
 +  STR_FPS_FLIGHT_ON: "Flight on"
 +  STR_FPS_FLIGHT_OFF: "Flight off"
++  STR_FPS_TURRET_ON: "Turret only: the view turns the turret"
++  STR_FPS_TURRET_OFF: "Turret off: the view turns the whole tank"
++  STR_FPS_NO_TURRET: "No turret to turn"
 +  STR_FPS_SWIM_ON: "Swimming on"
 +  STR_FPS_SWIM_OFF: "Swimming off"
 +  STR_FPS_FLIGHT_OFF_KEY: "Flight off ({0} to fly)"
@@ -874,6 +886,8 @@ index 000000000..298b64381
 +  STR_FPS_MAP_LAYERS_ALL: "The map shows every level (3D always does)"
 +  STR_FPS_MAP_LAYERS_ONE: "The map shows up to its level (3D: every level)"
 +  STR_FPS_BUTTON_FLY_SHORT: "FLY"
++  STR_FPS_BUTTON_TURRET: "TURRET"
++  STR_FPS_BUTTON_TURRET_SHORT: "TUR"
 +  STR_FPS_BUTTON_SWIM_SHORT: "SWIM"
 +  STR_FPS_BUTTON_LIGHT_SHORT: "LIGHT"
 +  STR_FPS_BUTTON_SPECIAL_SHORT: "SPEC"
@@ -21782,7 +21796,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..84c9f66bf 100644
+index a08796ced..385d81fdc 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -21803,7 +21817,7 @@ index a08796ced..84c9f66bf 100644
 +OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
-+OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
++OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsTurret, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
 diff --git a/src/Engine/Script.h b/src/Engine/Script.h
 index e11f89dde..5658639bc 100644
 --- a/src/Engine/Script.h
@@ -21888,10 +21902,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..de64c0a1b
+index 000000000..e79c5ae16
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1301 @@
+@@ -0,0 +1,1304 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -22852,6 +22866,9 @@ index 000000000..de64c0a1b
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsGrabItem", &keyFpsGrabItem, SDLK_UNKNOWN, "STR_FPS_KEY_GRAB_ITEM", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlare", &keyFpsFlare, SDLK_t, "STR_FPS_KEY_FLARE", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlight", &keyFpsFlight, SDLK_b, "STR_FPS_KEY_FLIGHT", category));
++	// A tank's turret switch (a player's report: turning the view turned the whole tank, at its full
++	// cost; the TURRET button on the top bar too): no key until the player gives it one.
++	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsTurret", &keyFpsTurret, SDLK_UNKNOWN, "STR_FPS_KEY_TURRET", category));
 +	// The flashlight on and off (F, as in the first-person shooters; setting "Flashlight").
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlashlight", &keyFpsFlashlight, SDLK_f, "STR_FPS_KEY_FLASHLIGHT", category));
 +	// Space is the map's night vision hold key; in 3D it jumps, and night vision is gear (N).
@@ -23573,10 +23590,10 @@ index 000000000..2baff7d94
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..1a62d65c9
+index 000000000..edc73bad5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2882 @@
+@@ -0,0 +1,2884 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24014,15 +24031,15 @@ index 000000000..1a62d65c9
 +	_btnNext = makeButton(SquadX, PrevNextW, ">");
 +
 +	// The suit's buttons, shown for what it can do (laid out right to left from END): fly (swim
-+	// under the sea), personal light, night vision and a special weapon. Each label comes in
++	// under the sea), personal light, night vision, a special weapon and a tank's turret switch. Each label comes in
 +	// full and short, for a narrow bar; the buttons start as wide as the full label.
 +	const bool underwater = _save->getDepth() > 0;
-+	const char *suitLabels[4][2] = {
++	const char *suitLabels[5][2] = {
 +		{ underwater ? "STR_FPS_BUTTON_SWIM" : "STR_FPS_BUTTON_FLY", underwater ? "STR_FPS_BUTTON_SWIM_SHORT" : "STR_FPS_BUTTON_FLY_SHORT" },
 +		{ "STR_FPS_BUTTON_LIGHT", "STR_FPS_BUTTON_LIGHT_SHORT" }, { "STR_FPS_BUTTON_NIGHT", "STR_FPS_BUTTON_NIGHT_SHORT" },
-+		{ "STR_FPS_BUTTON_SPECIAL", "STR_FPS_BUTTON_SPECIAL_SHORT" } };
-+	TextButton **suitButtons[4] = { &_btnFly, &_btnLight, &_btnNight, &_btnSpecial };
-+	for (int buttonIndex = 0; buttonIndex < 4; ++buttonIndex)
++		{ "STR_FPS_BUTTON_SPECIAL", "STR_FPS_BUTTON_SPECIAL_SHORT" }, { "STR_FPS_BUTTON_TURRET", "STR_FPS_BUTTON_TURRET_SHORT" } };
++	TextButton **suitButtons[5] = { &_btnFly, &_btnLight, &_btnNight, &_btnSpecial, &_btnTurret };
++	for (int buttonIndex = 0; buttonIndex < 5; ++buttonIndex)
 +	{
 +		_suitLabelsLong[buttonIndex] = _state->tr(suitLabels[buttonIndex][0]);
 +		_suitLabelsShort[buttonIndex] = _state->tr(suitLabels[buttonIndex][1]);
@@ -24030,11 +24047,12 @@ index 000000000..1a62d65c9
 +		(*suitButtons[buttonIndex])->setVisible(false);
 +	}
 +
-+	// Flight, light and night vision are toggles: each a button group of its own, so the
-+	// button stays pressed while it's on.
++	// Flight, light, night vision and the turret are toggles: each a button group of its own, so
++	// the button stays pressed while it's on.
 +	_btnFly->setGroup(&_flyButtonGroup);
 +	_btnLight->setGroup(&_lightButtonGroup);
 +	_btnNight->setGroup(&_nightButtonGroup);
++	_btnTurret->setGroup(&_turretButtonGroup);
 +	// One squad button per soldier, made as they're needed (see refreshSquad).
 +}
 +
@@ -24450,7 +24468,7 @@ index 000000000..1a62d65c9
 +	_anchors[_txtSprint] = TOP_RIGHT;
 +	_anchors[_txtEnPassant] = TOP_RIGHT;
 +	for (Surface *part : _panelParts) _anchors[part] = BOTTOM_LEFT;
-+	for (Surface *part : { _btnFly, _btnLight, _btnNight, _btnSpecial }) _anchors[part] = TOP_RIGHT;
++	for (Surface *part : { _btnFly, _btnLight, _btnNight, _btnSpecial, _btnTurret }) _anchors[part] = TOP_RIGHT;
 +}
 +
 +
@@ -25896,6 +25914,7 @@ index 000000000..1a62d65c9
 +	if (key == Options::keyFpsUp) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_UP, action, true); return true; }
 +	if (key == Options::keyFpsDown) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_DOWN, action, true); return true; }
 +	if (key == Options::keyFpsFlight) { if (pressed) toggleFlight(_save->getSelectedUnit()); return true; }
++	if (key != SDLK_UNKNOWN && key == Options::keyFpsTurret) { if (pressed) toggleTurret(_save->getSelectedUnit()); return true; }
 +	if (key == Options::keyFpsFlashlight) { if (pressed) toggleFlashlight(); return true; }
 +	if (key == Options::keyFpsSprint) { if (pressed) toggleSprint(); return true; }
 +	if (key == Options::keyFpsEnPassant) { if (pressed) toggleEnPassant(); return true; }
@@ -26091,7 +26110,7 @@ index 000000000..1a62d65c9
 +		if (event.type == SDL_MOUSEBUTTONUP)
 +		{
 +			for (TextButton *button : _btnSquad) handleOnCanvas(button, action);
-+			for (TextButton *button : { _btnView, _btnHud, _btnInventory, _btnEndTurn, _btnFly, _btnLight, _btnNight, _btnSpecial, _btnPrev, _btnNext })
++			for (TextButton *button : { _btnView, _btnHud, _btnInventory, _btnEndTurn, _btnFly, _btnLight, _btnNight, _btnSpecial, _btnTurret, _btnPrev, _btnNext })
 +			{
 +				handleOnCanvas(button, action);
 +			}
@@ -26461,10 +26480,10 @@ index 000000000..1a62d65c9
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..f1089978b
+index 000000000..0d167822a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1257 @@
+@@ -0,0 +1,1261 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -27041,6 +27060,10 @@ index 000000000..f1089978b
 +	bool flightOn(const BattleUnit *unit) const;
 +	/// Switches flight on or off.
 +	void toggleFlight(BattleUnit *unit);
++	/// Switches a tank's turret-only turning on or off (the TURRET button).
++	void toggleTurret(BattleUnit *unit);
++	/// Does turning the view turn only this unit's turret?
++	bool turretTurning(const BattleUnit *unit) const;
 +	/// May a walker go up or down a level from here (a lift ride, a ladder)?
 +	bool walkerMayMoveUpDown(const Position &position, int direction) const;
 +	/// Goes up or down a level: by grav lift or ladder, or flying (the up and down keys also switch flight on and off).
@@ -27451,9 +27474,9 @@ index 000000000..f1089978b
 +	// the armor: its name, and buttons for what it and the gear can do (flight, personal light,
 +	// night vision, a special weapon), left of END
 +	Text *_txtArmor = nullptr;
-+	TextButton *_btnFly = nullptr, *_btnLight = nullptr, *_btnNight = nullptr, *_btnSpecial = nullptr; // FLY (SWIM), LIGHT, NIGHT VISION, SPECIAL
-+	TextButton *_flyButtonGroup = nullptr, *_lightButtonGroup = nullptr, *_nightButtonGroup = nullptr; // their pressed looks (switched on)
-+	std::string _suitLabelsLong[4], _suitLabelsShort[4]; // suit button labels: in full, and for a narrow bar
++	TextButton *_btnFly = nullptr, *_btnLight = nullptr, *_btnNight = nullptr, *_btnSpecial = nullptr, *_btnTurret = nullptr; // FLY (SWIM), LIGHT, NIGHT VISION, SPECIAL, TURRET
++	TextButton *_flyButtonGroup = nullptr, *_lightButtonGroup = nullptr, *_nightButtonGroup = nullptr, *_turretButtonGroup = nullptr; // their pressed looks (switched on)
++	std::string _suitLabelsLong[5], _suitLabelsShort[5]; // suit button labels: in full, and for a narrow bar
 +
 +	// ---- one button per soldier ----
 +
@@ -27724,10 +27747,10 @@ index 000000000..f1089978b
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeCamera.cpp b/src/FirstPerson/FirstPersonModeCamera.cpp
 new file mode 100644
-index 000000000..fd0923b46
+index 000000000..f88b40451
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeCamera.cpp
-@@ -0,0 +1,862 @@
+@@ -0,0 +1,878 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -27910,14 +27933,18 @@ index 000000000..fd0923b46
 + *   blast) the head looks no further than its limit, as without the time units, and turns no
 + *   more (a player's report: looking round mid-shot, the soldier turned step by step after it,
 + *   paying for each; the owner: hold the head's limit).
++ * - A tank with its turret switch on (see toggleTurret) turns only its turret, by the same rules:
++ *   the turret's facing, the game's own turret turn (1 time unit an eighth), the hull left as it is.
 + */
 +void FirstPersonMode::faceLookDirection(BattleUnit *unit)
 +{
++	const bool turret = turretTurning(unit);
++	const int facingNow = turret ? unit->getTurretDirection() : unit->getDirection();
 +	if (Options::fpsTurnCost && shotUnderWay() && unit->getFaction() == FACTION_PLAYER && !unit->isOut())
 +	{
 +		// (held a hair inside the limit: exactly on it, rounding could tip it past once the shot
 +		// is over, and the soldier would turn a step after all)
-+		const double facingYaw = unit->getDirection() * 45.0 - 90.0;
++		const double facingYaw = facingNow * 45.0 - 90.0;
 +		const double offFacing = std::remainder(_view->getYawDegrees() - facingYaw, 360.0);
 +		const double heldLimit = HeadTurn - 0.1;
 +		if (std::abs(offFacing) > heldLimit)
@@ -27938,7 +27965,7 @@ index 000000000..fd0923b46
 +	// 0 = north, clockwise in 45 degree steps.
 +	if (Options::fpsTurnCost)
 +	{
-+		const double facingYaw = unit->getDirection() * 45.0 - 90.0;
++		const double facingYaw = facingNow * 45.0 - 90.0;
 +		const double offFacing = std::remainder(_view->getYawDegrees() - facingYaw, 360.0);
 +		const bool snapTurnDone = _snapTurnFacing && _snapTurnDegrees == 0.0;
 +		if (snapTurnDone && std::abs(offFacing) <= 22.5)
@@ -27950,7 +27977,7 @@ index 000000000..fd0923b46
 +			return;
 +		}
 +		const int step = offFacing > 0.0 ? 1 : -1;
-+		const int cost = unit->getTurnCost();
++		const int cost = turret ? 1 : unit->getTurnCost();
 +		if (!doomModeOn() && (unit->getTimeUnits() < cost || !reserveAllows(unit, cost, 0)))
 +		{
 +			// Not enough time units (or they're reserved for a shot): the view stops at the
@@ -27966,12 +27993,13 @@ index 000000000..fd0923b46
 +			}
 +			return;
 +		}
-+		// One step that way, through the game's own turning.
++		// One step that way, through the game's own turning (a turret's alone, as the map's Ctrl turn).
 +		Position towards;
-+		Pathfinding::directionToVector((unit->getDirection() + step + 8) % 8, &towards);
++		Pathfinding::directionToVector((facingNow + step + 8) % 8, &towards);
 +		BattleAction turn;
 +		turn.actor = unit;
 +		turn.target = unit->getPosition() + towards;
++		turn.strafe = turret;
 +		_state->_battleGame->statePushBack(new UnitTurnBState(_state->_battleGame, turn));
 +		return;
 +	}
@@ -27982,14 +28010,25 @@ index 000000000..fd0923b46
 +	// 0..7 (the double modulo keeps negative angles in range).
 +	_snapTurnFacing = false;
 +	const int direction = (((int)std::lround((_view->getYawDegrees() + 90.0) / 45.0)) % 8 + 8) % 8;
-+	if (direction == unit->getDirection())
++	if (direction == facingNow)
 +	{
 +		return;
 +	}
 +
-+	// Turn the soldier, then update what it sees, what others see of it (as UnitTurnBState does
-+	// after a turn) and the classic HUD's soldier info.
-+	unit->setDirection(direction);
++	// Turn the soldier (a tank with its turret switch on: the turret alone, by the game's own
++	// turret turn), then update what it sees, what others see of it (as UnitTurnBState does after
++	// a turn) and the classic HUD's soldier info.
++	if (turret)
++	{
++		Position towards;
++		Pathfinding::directionToVector(direction, &towards);
++		unit->lookAt(unit->getPosition() + towards, true);
++		while (unit->getStatus() == STATUS_TURNING) unit->turn(true);
++	}
++	else
++	{
++		unit->setDirection(direction);
++	}
 +	TileEngine *tileEngine = _save->getTileEngine();
 +	tileEngine->calculateFOV(unit);
 +	tileEngine->calculateFOV(unit->getPosition(), 1, false); // others' view of this unit, like UnitTurnBState
@@ -28592,10 +28631,10 @@ index 000000000..fd0923b46
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..278561765
+index 000000000..9a56bb902
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,2342 @@
+@@ -0,0 +1,2352 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -28784,7 +28823,7 @@ index 000000000..278561765
 +	// facing it keeps (a sidestep, turning by the rules), or with free turning the one it takes
 +	// again at the end, the compass point the view looks closest to. So the facing on the rim
 +	// never flicks sideways for a step to the side.
-+	int facing = unit->getDirection();
++	int facing = turretTurning(unit) ? unit->getTurretDirection() : unit->getDirection(); // (a tank's turret, with the switch on)
 +	if (_stepPending)
 +	{
 +		facing = _sidestepFacing >= 0 ? _sidestepFacing
@@ -28796,7 +28835,7 @@ index 000000000..278561765
 +		const double offFacing = std::abs(std::remainder(viewBearing - facing * 45.0, 360.0));
 +		if (offFacing > HeadTurn - CompassWarnDegrees)
 +		{
-+			warning = (doomModeOn() || unit->getTimeUnits() >= unit->getTurnCost()) ? 1 : 2;
++			warning = (doomModeOn() || unit->getTimeUnits() >= (turretTurning(unit) ? 1 : unit->getTurnCost())) ? 1 : 2;
 +		}
 +	}
 +	// The shot's turn: its cost and the way the soldier will face (none while a step is walked).
@@ -28840,7 +28879,7 @@ index 000000000..278561765
 +		else if (warning)
 +		{
 +			_txtCompassTurn->setColor(textColor(_state->getPalette(), warning == 1 ? 240 : 230, warning == 1 ? 210 : 60, warning == 1 ? 60 : 50));
-+			_txtCompassTurn->setText(warning == 1 ? std::string(_state->tr("STR_FPS_COMPASS_TURN").arg(unit->getTurnCost())) : std::string(_state->tr("STR_FPS_COMPASS_NO_TU")));
++			_txtCompassTurn->setText(warning == 1 ? std::string(_state->tr("STR_FPS_COMPASS_TURN").arg(turretTurning(unit) ? 1 : unit->getTurnCost())) : std::string(_state->tr("STR_FPS_COMPASS_NO_TU")));
 +		}
 +	}
 +}
@@ -29717,7 +29756,8 @@ index 000000000..278561765
 + * Keeps the armor's part of the top bar up to date: the armor's name, and a button for each
 + * thing the armor and the soldier's gear can do. FLY (SWIM under water) for armor that flies,
 + * LIGHT for the armor's personal light, NIGHT VISION for a soldier who has it (see
-+ * hasNightVision), SPECIAL for a weapon built into the armor. A button shows pressed while its
++ * hasNightVision), SPECIAL for a weapon built into the armor, TURRET for a unit with a turret
++ * (a tank, see toggleTurret). A button shows pressed while its
 + * feature is switched on. When a button appears or disappears, the squad buttons are laid out
 + * again to make room.
 + * @param unit The selected soldier, or null for none (all the buttons hide).
@@ -29730,14 +29770,16 @@ index 000000000..278561765
 +	const bool showFly = show && canFly(unit), showLight = show && unit->getArmor()->getPersonalLightFriend() > 0;
 +	const bool showSpecial = show && unit->getSpecialIconWeapon(specialType) != nullptr;
 +	const bool showNight = show && hasNightVision(unit);
++	const bool showTurret = show && unit->getTurretType() != -1;
 +	// Show or hide them; any change moves the other buttons on the bar.
 +	if (showFly != _btnFly->getVisible() || showLight != _btnLight->getVisible()
-+		|| showNight != _btnNight->getVisible() || showSpecial != _btnSpecial->getVisible())
++		|| showNight != _btnNight->getVisible() || showSpecial != _btnSpecial->getVisible() || showTurret != _btnTurret->getVisible())
 +	{
 +		_btnFly->setVisible(showFly);
 +		_btnLight->setVisible(showLight);
 +		_btnNight->setVisible(showNight);
 +		_btnSpecial->setVisible(showSpecial);
++		_btnTurret->setVisible(showTurret);
 +		layoutTopBar(); // the squad buttons make room
 +	}
 +	if (!show)
@@ -29755,14 +29797,17 @@ index 000000000..278561765
 +	TextButton *flyGroup = flightOn(unit) ? _btnFly : nullptr;
 +	TextButton *lightGroup = _save->getTogglePersonalLight() ? _btnLight : nullptr;
 +	TextButton *nightGroup = _state->_map->isNightVisionOn() ? _btnNight : nullptr;
-+	if (flyGroup != _flyButtonGroup || lightGroup != _lightButtonGroup || nightGroup != _nightButtonGroup)
++	TextButton *turretGroup = turretTurning(unit) ? _btnTurret : nullptr;
++	if (flyGroup != _flyButtonGroup || lightGroup != _lightButtonGroup || nightGroup != _nightButtonGroup || turretGroup != _turretButtonGroup)
 +	{
 +		_flyButtonGroup = flyGroup;
 +		_lightButtonGroup = lightGroup;
 +		_nightButtonGroup = nightGroup;
++		_turretButtonGroup = turretGroup;
 +		_btnFly->invalidate();
 +		_btnLight->invalidate();
 +		_btnNight->invalidate();
++		_btnTurret->invalidate();
 +	}
 +}
 +
@@ -30552,7 +30597,7 @@ index 000000000..278561765
 +	// The suit's buttons, right to left from END. A first pass tries the long labels; if that
 +	// leaves too little room for the squad buttons, a second pass uses the short ones.
 +	// freeRight ends up as the right end of the room left for the squad buttons.
-+	TextButton *suitButtons[4] = { _btnFly, _btnLight, _btnNight, _btnSpecial };
++	TextButton *suitButtons[5] = { _btnFly, _btnLight, _btnNight, _btnSpecial, _btnTurret };
 +	// Previous's leftmost place: after INV, wherever INV stands (in HUD's place on the map, see
 +	// updateTopBar).
 +	const int squadX = SquadX - (InventoryButtonX - _btnInventory->getX());
@@ -30561,7 +30606,7 @@ index 000000000..278561765
 +	for (int pass = 0; pass < 2; ++pass)
 +	{
 +		freeRight = canvasWidth() - 1 - EndTurnW - 2;
-+		for (int suitIndex = 0; suitIndex < 4; ++suitIndex)
++		for (int suitIndex = 0; suitIndex < 5; ++suitIndex)
 +		{
 +			if (!suitButtons[suitIndex]->getVisible()) continue;
 +			const std::string &label = pass == 0 ? _suitLabelsLong[suitIndex] : _suitLabelsShort[suitIndex];
@@ -30816,7 +30861,7 @@ index 000000000..278561765
 +			&& y >= button->getY() && y < button->getY() + button->getHeight();
 +	};
 +	// The fixed buttons first, then the squad buttons.
-+	for (TextButton *button : { _btnView, _btnHud, _btnInventory, _btnEndTurn, _btnFly, _btnLight, _btnNight, _btnSpecial, _btnPrev, _btnNext })
++	for (TextButton *button : { _btnView, _btnHud, _btnInventory, _btnEndTurn, _btnFly, _btnLight, _btnNight, _btnSpecial, _btnTurret, _btnPrev, _btnNext })
 +	{
 +		if (inside(button)) return button;
 +	}
@@ -30869,6 +30914,10 @@ index 000000000..278561765
 +	else if (button == _btnSpecial)
 +	{
 +		_state->btnSpecialClick(action);
++	}
++	else if (button == _btnTurret)
++	{
++		toggleTurret(_save->getSelectedUnit());
 +	}
 +	else if (button == _btnPrev)
 +	{
@@ -30940,10 +30989,10 @@ index 000000000..278561765
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeMovement.cpp b/src/FirstPerson/FirstPersonModeMovement.cpp
 new file mode 100644
-index 000000000..56ce843e2
+index 000000000..7e2596427
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeMovement.cpp
-@@ -0,0 +1,2136 @@
+@@ -0,0 +1,2171 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -32673,6 +32722,41 @@ index 000000000..56ce843e2
 +	_landingResumeTurn = 0;
 +	std::fill(std::begin(_stepAllowedCache), std::end(_stepAllowedCache), -1);
 +	_state->warning(on ? (underwater ? "STR_FPS_SWIM_ON" : "STR_FPS_FLIGHT_ON") : (underwater ? "STR_FPS_SWIM_OFF" : "STR_FPS_FLIGHT_OFF"));
++}
++
++/**
++ * Switches turret-only turning on or off for a unit with a turret, a tank (the TURRET button or
++ * its key; a player's report, XPiratez: turning the view turned the whole tank, at its full
++ * turning cost; the owner: a switch on the top bar, off at first, kept with the save). While it's
++ * on, turning the view turns only the turret, as the map turns it with Ctrl or while aiming (the
++ * game's own turret turn: 1 time unit an eighth with "Turning costs TU"), and the hull stays as
++ * it is; a step still turns the hull the way it goes, the turret with it (see faceLookDirection).
++ * Only for the player's own unit, on their turn.
++ * @param unit The selected unit.
++ */
++void FirstPersonMode::toggleTurret(BattleUnit *unit)
++{
++	if (!unit || !isActive() || _save->getSide() != FACTION_PLAYER)
++	{
++		return;
++	}
++	if (unit->getTurretType() == -1)
++	{
++		_state->warning("STR_FPS_NO_TURRET"); // (so the key doesn't seem dead)
++		return;
++	}
++	unit->setTurretOnly(!unit->getTurretOnly());
++	_state->warning(unit->getTurretOnly() ? "STR_FPS_TURRET_ON" : "STR_FPS_TURRET_OFF");
++}
++
++/**
++ * Does turning the view turn only this unit's turret: a unit with one, its turret switch on (see toggleTurret)?
++ * @param unit The unit.
++ * @return True if so.
++ */
++bool FirstPersonMode::turretTurning(const BattleUnit *unit) const
++{
++	return unit && unit->getTurretType() != -1 && unit->getTurretOnly();
 +}
 +
 +/**
@@ -62224,7 +62308,7 @@ index af88e1829..760a449f2 100644
  		return;
  	}
 diff --git a/src/Savegame/BattleUnit.cpp b/src/Savegame/BattleUnit.cpp
-index 46fbf1ffd..c6630cf2c 100644
+index 46fbf1ffd..58f8bdd5f 100644
 --- a/src/Savegame/BattleUnit.cpp
 +++ b/src/Savegame/BattleUnit.cpp
 @@ -53,6 +53,7 @@
@@ -62235,16 +62319,17 @@ index 46fbf1ffd..c6630cf2c 100644
  
  namespace OpenXcom
  {
-@@ -699,6 +700,8 @@ void BattleUnit::load(const YAML::YamlNodeReader& node, const Mod *mod, const Sc
+@@ -699,6 +700,9 @@ void BattleUnit::load(const YAML::YamlNodeReader& node, const Mod *mod, const Sc
  	reader.tryRead("currStats", _stats);
  	reader.tryRead("turretType", _turretType);
  	reader.tryRead("visible", _visible);
 +	reader.tryRead("mapAkimbo", _mapAkimbo); // (OpenXcom3D)
 +	reader.tryRead("flightSwitch", _flightSwitch); // (OpenXcom3D)
++	reader.tryRead("turretOnly", _turretOnly); // (OpenXcom3D)
  
  	reader.tryReadAs<int>("turnsSinceSpotted", _turnsSinceSpotted[FACTION_HOSTILE]);
  	reader.tryReadAs<int>("turnsLeftSpottedForSnipers", _turnsLeftSpottedForSnipers[FACTION_HOSTILE]);
-@@ -817,6 +820,10 @@ void BattleUnit::save(YAML::YamlNodeWriter writer, const ScriptGlobal *shared) c
+@@ -817,6 +821,12 @@ void BattleUnit::save(YAML::YamlNodeWriter writer, const ScriptGlobal *shared) c
  		writer.write("turretType", _turretType);
  	if (_visible)
  		writer.write("visible", _visible);
@@ -62252,10 +62337,12 @@ index 46fbf1ffd..c6630cf2c 100644
 +		writer.write("mapAkimbo", _mapAkimbo); // (OpenXcom3D: akimbo on the map, see FirstPersonMode::toggleMapAkimbo)
 +	if (_flightSwitch)
 +		writer.write("flightSwitch", _flightSwitch); // (OpenXcom3D: the 3D view's flight switch, see FirstPersonMode::toggleFlight)
++	if (_turretOnly)
++		writer.write("turretOnly", _turretOnly); // (OpenXcom3D: the 3D view's turret switch, see FirstPersonMode::toggleTurret)
  
  	writer.writeAs<int>("turnsSinceSpotted", _turnsSinceSpotted[FACTION_HOSTILE]);
  	writer.writeAs<int>("turnsLeftSpottedForSnipers", _turnsLeftSpottedForSnipers[FACTION_HOSTILE]);
-@@ -1301,6 +1308,10 @@ int BattleUnit::getDiagonalWalkingPhase() const
+@@ -1301,6 +1311,10 @@ int BattleUnit::getDiagonalWalkingPhase() const
  void BattleUnit::lookAt(Position point, bool turret)
  {
  	int dir = directionTo (point);
@@ -62266,7 +62353,7 @@ index 46fbf1ffd..c6630cf2c 100644
  
  	if (turret)
  	{
-@@ -1510,6 +1521,14 @@ void BattleUnit::aim(bool aiming)
+@@ -1510,6 +1524,14 @@ void BattleUnit::aim(bool aiming)
   */
  int BattleUnit::directionTo(Position point) const
  {
@@ -62281,7 +62368,7 @@ index 46fbf1ffd..c6630cf2c 100644
  	double ox = point.x - _pos.x;
  	double oy = point.y - _pos.y;
  	double angle = atan2(ox, -oy);
-@@ -1627,6 +1646,11 @@ int BattleUnit::damage(Position relative, int damage, const RuleDamageType *type
+@@ -1627,6 +1649,11 @@ int BattleUnit::damage(Position relative, int damage, const RuleDamageType *type
  	{
  		return 0;
  	}
@@ -62294,19 +62381,20 @@ index 46fbf1ffd..c6630cf2c 100644
  	UnitBodyPart bodypart = BODYPART_TORSO;
  
 diff --git a/src/Savegame/BattleUnit.h b/src/Savegame/BattleUnit.h
-index ecc040fb6..86fedc77c 100644
+index ecc040fb6..cd4e7d546 100644
 --- a/src/Savegame/BattleUnit.h
 +++ b/src/Savegame/BattleUnit.h
-@@ -117,6 +117,8 @@ private:
+@@ -117,6 +117,9 @@ private:
  	bool _visible;
  	UnitStats _exp, _expTmp;
  	int _motionPoints;
 +	int _mapAkimbo = 0; // (OpenXcom3D) the soldier's two guns fire together on the map: 0 no, 1 both at once, 2 in turn
 +	int _flightSwitch = 0; // (OpenXcom3D) the 3D view's flight switch: 0 never switched (flies while in the air), 1 on, -1 off
++	bool _turretOnly = false; // (OpenXcom3D) the 3D view's turret switch: the view turns only a tank's turret
  	int _scannedTurn;
  	int _customMarker;
  	int _kills;
-@@ -563,6 +565,12 @@ public:
+@@ -563,6 +566,15 @@ public:
  	void stimulant (int energy, int stun, int mana);
  	/// Get motion points for the motion scanner.
  	int getMotionPoints() const;
@@ -62316,6 +62404,9 @@ index ecc040fb6..86fedc77c 100644
 +	/// (OpenXcom3D) The 3D view's flight switch (the flight key, the FLY button): 0 never switched, 1 on, -1 off.
 +	int getFlightSwitch() const { return _flightSwitch; }
 +	void setFlightSwitch(int flightSwitch) { _flightSwitch = flightSwitch; }
++	/// (OpenXcom3D) The 3D view's turret switch (the TURRET button): turning the view turns only the turret.
++	bool getTurretOnly() const { return _turretOnly; }
++	void setTurretOnly(bool turretOnly) { _turretOnly = turretOnly; }
  	/// Get turn when unit was scanned by the motion scanner.
  	int getScannedTurn() const { return _scannedTurn; }
  	/// Set turn when unit was scanned by the motion scanner.

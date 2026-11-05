@@ -435,15 +435,15 @@ void FirstPersonMode::createTopBar()
 	_btnNext = makeButton(SquadX, PrevNextW, ">");
 
 	// The suit's buttons, shown for what it can do (laid out right to left from END): fly (swim
-	// under the sea), personal light, night vision and a special weapon. Each label comes in
+	// under the sea), personal light, night vision, a special weapon and a tank's turret switch. Each label comes in
 	// full and short, for a narrow bar; the buttons start as wide as the full label.
 	const bool underwater = _save->getDepth() > 0;
-	const char *suitLabels[4][2] = {
+	const char *suitLabels[5][2] = {
 		{ underwater ? "STR_FPS_BUTTON_SWIM" : "STR_FPS_BUTTON_FLY", underwater ? "STR_FPS_BUTTON_SWIM_SHORT" : "STR_FPS_BUTTON_FLY_SHORT" },
 		{ "STR_FPS_BUTTON_LIGHT", "STR_FPS_BUTTON_LIGHT_SHORT" }, { "STR_FPS_BUTTON_NIGHT", "STR_FPS_BUTTON_NIGHT_SHORT" },
-		{ "STR_FPS_BUTTON_SPECIAL", "STR_FPS_BUTTON_SPECIAL_SHORT" } };
-	TextButton **suitButtons[4] = { &_btnFly, &_btnLight, &_btnNight, &_btnSpecial };
-	for (int buttonIndex = 0; buttonIndex < 4; ++buttonIndex)
+		{ "STR_FPS_BUTTON_SPECIAL", "STR_FPS_BUTTON_SPECIAL_SHORT" }, { "STR_FPS_BUTTON_TURRET", "STR_FPS_BUTTON_TURRET_SHORT" } };
+	TextButton **suitButtons[5] = { &_btnFly, &_btnLight, &_btnNight, &_btnSpecial, &_btnTurret };
+	for (int buttonIndex = 0; buttonIndex < 5; ++buttonIndex)
 	{
 		_suitLabelsLong[buttonIndex] = _state->tr(suitLabels[buttonIndex][0]);
 		_suitLabelsShort[buttonIndex] = _state->tr(suitLabels[buttonIndex][1]);
@@ -451,11 +451,12 @@ void FirstPersonMode::createTopBar()
 		(*suitButtons[buttonIndex])->setVisible(false);
 	}
 
-	// Flight, light and night vision are toggles: each a button group of its own, so the
-	// button stays pressed while it's on.
+	// Flight, light, night vision and the turret are toggles: each a button group of its own, so
+	// the button stays pressed while it's on.
 	_btnFly->setGroup(&_flyButtonGroup);
 	_btnLight->setGroup(&_lightButtonGroup);
 	_btnNight->setGroup(&_nightButtonGroup);
+	_btnTurret->setGroup(&_turretButtonGroup);
 	// One squad button per soldier, made as they're needed (see refreshSquad).
 }
 
@@ -871,7 +872,7 @@ void FirstPersonMode::setResizeAnchors()
 	_anchors[_txtSprint] = TOP_RIGHT;
 	_anchors[_txtEnPassant] = TOP_RIGHT;
 	for (Surface *part : _panelParts) _anchors[part] = BOTTOM_LEFT;
-	for (Surface *part : { _btnFly, _btnLight, _btnNight, _btnSpecial }) _anchors[part] = TOP_RIGHT;
+	for (Surface *part : { _btnFly, _btnLight, _btnNight, _btnSpecial, _btnTurret }) _anchors[part] = TOP_RIGHT;
 }
 
 
@@ -2317,6 +2318,7 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	if (key == Options::keyFpsUp) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_UP, action, true); return true; }
 	if (key == Options::keyFpsDown) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_DOWN, action, true); return true; }
 	if (key == Options::keyFpsFlight) { if (pressed) toggleFlight(_save->getSelectedUnit()); return true; }
+	if (key != SDLK_UNKNOWN && key == Options::keyFpsTurret) { if (pressed) toggleTurret(_save->getSelectedUnit()); return true; }
 	if (key == Options::keyFpsFlashlight) { if (pressed) toggleFlashlight(); return true; }
 	if (key == Options::keyFpsSprint) { if (pressed) toggleSprint(); return true; }
 	if (key == Options::keyFpsEnPassant) { if (pressed) toggleEnPassant(); return true; }
@@ -2512,7 +2514,7 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 		if (event.type == SDL_MOUSEBUTTONUP)
 		{
 			for (TextButton *button : _btnSquad) handleOnCanvas(button, action);
-			for (TextButton *button : { _btnView, _btnHud, _btnInventory, _btnEndTurn, _btnFly, _btnLight, _btnNight, _btnSpecial, _btnPrev, _btnNext })
+			for (TextButton *button : { _btnView, _btnHud, _btnInventory, _btnEndTurn, _btnFly, _btnLight, _btnNight, _btnSpecial, _btnTurret, _btnPrev, _btnNext })
 			{
 				handleOnCanvas(button, action);
 			}

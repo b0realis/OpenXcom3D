@@ -220,7 +220,7 @@ SETTINGS = [
 HUD_MARKS = [
     (1, 11, 9, 'ISO, HUD, INV', 'The map and back, the classic HUD, the inventory.'),
     (2, 51, 9, 'The squad', 'Your soldiers in the middle of the top bar: click to select, hover for the card with a live helmet camera, right click for the SOLDIER CAM; &#9664; and &#9654; for the previous and next. A skull marks the dead, a caduceus the unconscious, an orange alien face one under mind control.'),
-    (3, 80, 9, 'LIGHT, END and the rest', 'The suit light, the end of the turn, and when the soldier has them NIGHT VISION and SUIT FLY.'),
+    (3, 80, 9, 'LIGHT, END and the rest', 'The suit light, the end of the turn, and when the soldier has them NIGHT VISION, SUIT FLY and a tank\'s TURRET (the view turns the turret alone).'),
     (4, 85, 22, 'The compass', 'Your heading under the white arrow, the way the soldier faces (a yellow triangle), and a shot\'s turn and its cost.'),
     (5, 44, 46, 'The crosshair', 'Its shape is the fire mode; the accuracy line under it; the shot info beside it (mode, hit chance, time units, the other costs below); the name of the unit pointed at under all that.'),
     (6, 27, 76, 'The soldier', 'Rank and name, what matters now (KNEELING, BURNING, WOUNDS, PANIC), a line per hand with its ammo (a cannon or launcher says the loaded kind: [AP], [HE], [IN]), the four stat bars.'),
