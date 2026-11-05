@@ -170,7 +170,7 @@ The Windows build is made on Linux with llvm-mingw (Clang for Windows), from the
 
 The [automatic builds](#automatic-builds) make a macOS app on GitHub's Macs: **`OpenXcom3D-<version>-macos.zip`**, for Apple silicon and Intel, macOS 11 (Big Sur) and newer. Nobody here has a Mac: it has been built, checked and started there (the game says its version, natively and under Rosetta, and the app's starter sets up its profile), but never played. Reports are very welcome.
 
-To get it: open the latest run of [Build](https://github.com/b0realis/OpenXcom3D/actions/workflows/build.yml?query=branch%3Amain) and, under *Artifacts*, take **macos-release** (a GitHub account is needed; each run keeps it for 30 days). Inside is the zip; unpack it.
+To get it: from the [latest release](https://github.com/b0realis/OpenXcom3D/releases/latest), take **`OpenXcom3D-<version>-macos.zip`** and unpack it. Between releases the latest run of [Build](https://github.com/b0realis/OpenXcom3D/actions/workflows/build.yml?query=branch%3Amain) has one too: under *Artifacts*, **macos-release** (a GitHub account is needed; each run keeps it for 30 days).
 
 **Opening it the first time:** the app is signed ad hoc, not by Apple, so macOS stops it the first time. Open it once, then *System Settings → Privacy & Security → Open Anyway*; or in Terminal, `xattr -dr com.apple.quarantine /path/to/OpenXcom3D.app`. After that it opens like any other app.
 
@@ -836,7 +836,7 @@ Every push and pull request runs two workflows on GitHub ([Actions](https://gith
   - *Windows:* the zip, built on Linux by the build guide's own commands, then checked on GitHub's Windows (`tools/ci/windows_zip_check.ps1`): the game starts; `play.bat` with no data says where it goes; with a stand-in Steam (its folder in the registry, a second library on another disk) it finds both games, links them, writes the starting options and starts the game; and it follows the data when it moves.
   - *macOS:* the app, universal and for macOS 11 and newer (`tools/macos/`, `tools/make_release_macos.sh`), checked by `tools/macos/check.sh` (both architectures, no newer macOS asked for, only the system's libraries and the two inside, the signature), then started natively and under Rosetta.
 
-  The downloads stay with each run for 30 days (the run's *Artifacts*). A tag `v*` also makes a draft release with all three, which a person reads over and publishes.
+  The downloads stay with each run for 30 days (the run's *Artifacts*). A tag `v*` also makes a draft release with all three, which a person reads over and publishes; a tag whose release is there already (its Linux and Windows downloads made and checked by hand) gets what it lacks: the macOS app.
 - **Build guide** (also once a week, since the systems change underneath it) runs the [build guide](https://b0realis.github.io/OpenXcom3D/)'s commands as a reader copies them: `tools/ci/guide_commands.py` reads them off the page and changes only what a machine without a person needs (package managers don't ask; the patch is the checkout's; the game is asked its version instead of started), each change marked next to the guide's own line. They run on fresh Ubuntu 26.04, 24.04 and 22.04, Debian 13, Fedora and Arch, in MSYS2 on GitHub's Windows, and `install.py --from-source` runs too.
 
 Both get OXCE at the commit `install.py` names, with the patch applied (`tools/ci/fetch_oxce.sh`, which also checks that `src/` and `mod/` here match the patch).
