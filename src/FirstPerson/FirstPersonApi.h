@@ -210,6 +210,8 @@ void noteQuickFall(const SavedBattleGame *save, BattleUnit *unit);
 void clearQuickFalls();
 /// Setting "Quick deaths": the frame of a unit's quick fall to draw, or -1 if it isn't falling.
 int quickFallPhase(const BattleUnit *unit);
+/// Setting "Quick deaths": how far a unit's quick fall has come, 0 to 1 (smoothly), or -1 if it isn't falling.
+double quickFallProgress(const BattleUnit *unit);
 /// Setting "Quick deaths": the unit whose quick fall plays on this tile (drawn there falling, the
 /// tile's items held back meanwhile), or null.
 BattleUnit *quickFallOn(const SavedBattleGame *save, const Tile *tile);

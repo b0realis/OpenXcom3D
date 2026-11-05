@@ -142,6 +142,9 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 	_softSmokeBlends.clear();
 	_models.clear();
 	_ghostModels.clear();
+	_voxelUnits.clear();
+	_collapseStarts.clear();
+	_facingsWell.clear();
 	_leafyModels.clear();
 	_openedModels.clear();
 	_frames.clear();

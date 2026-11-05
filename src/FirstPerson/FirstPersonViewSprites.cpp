@@ -502,6 +502,7 @@ void FirstPersonView::replayDrawList()
 		runOnAllThreads(&FirstPersonView::drawListBands);
 	}
 	_drawList.clear();
+	_voxelSplats.clear();
 }
 
 /**
@@ -529,6 +530,146 @@ void FirstPersonView::drawListBands()
 			case DrawStep::Line:
 				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, bandTop, bandBottom, step.glows);
 				break;
+			case DrawStep::VoxelUnit:
+				drawVoxelUnit(step, bandTop, bandBottom);
+				break;
+			}
+		}
+	}
+}
+
+/**
+ * Records a unit drawn as its voxel body (setting "Voxel units", see VoxelUnits): each of its surface voxels a little
+ * square facing the camera, a little bigger than the voxel at its distance (no gaps between them), the body turned to
+ * the unit's facing (and swung to the walk's phase), each voxel coloured by the frame of the direction its sprite
+ * would show here and shaded by the light on the unit; projected here, once, sorted by screen row for the bands. Up
+ * close it fades out as a sprite does (dithered, see drawSprite).
+ * @param body The body.
+ * @param walkPhase The walk's phase (0-7), or -1: as it was made.
+ * @param facing The unit's direction (0 north, clockwise).
+ * @param direction The frame that colours it (the direction its sprite would be drawn in here).
+ * @param level Coloured by the frames as pictures taken at its height (else along the isometric slant).
+ * @param feet The middle of its feet, in voxels.
+ * @param floorCut Nothing of it below this height (the floor it stands on, see SpriteDraw::floorCut).
+ * @param shade The shade of the light on it.
+ * @param scale Its size (the setting "Unit size").
+ * @param unit The unit (the pointer finds it in its pixels), or null for a body lying in a pile.
+ * @param fall How far it has gone down: 0 standing, 1 down, in the poses its death frames show (crumpled, tipped over:
+ *        see VoxelUnitModel::fall), each painted by its frame where the frame shows it.
+ * @param items With the items in its hands (a body lying in a pile has dropped them: they're in the pile).
+ * @param lyingBody The unconscious unit lying in the pile it pictures, if any (the pointer finds it: a medi-kit's patient).
+ * @param pile The floor tile whose pile it pictures, if any (the pointer finds it).
+ */
+void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase, int facing, int direction, bool level, const double feet[3], double floorCut,
+	int shade, double scale, BattleUnit *unit, double fall, bool items, BattleUnit *lyingBody, const Tile *pile)
+{
+	double anchorX, anchorY, anchorDepth;
+	if (!projectToScreen(feet, anchorX, anchorY, anchorDepth)) return;
+	const float opacity = (float)std::clamp((anchorDepth - 4.0) / 6.0, 0.0, 1.0);
+	if (opacity <= 0.0f) return;
+	const bool walking = walkPhase >= 0 && walkPhase < 8;
+	const std::vector<float> &right = walking ? body.walkRight[walkPhase] : body.right;
+	const std::vector<float> &ahead = walking ? body.walkAhead[walkPhase] : body.ahead;
+	const std::vector<float> &up = walking ? body.walkUp[walkPhase] : body.up;
+	// The unit's right and ahead on the map: east and north turned by its facing.
+	const double angle = facing * Pi / 4.0, cosine = std::cos(angle), sine = std::sin(angle);
+	const double focalLength = (getWidth() / 2.0) / _halfFovTangent;
+	const double halfSquare = 0.5 * VoxelSplatSize * scale * focalLength; // half a square at a depth of one
+	const bool falling = fall > 0.0;
+	const VoxelUnitModel::FallPose pose = body.poseAt(fall);
+	const int fallFrame = falling ? body.fallFrameAt(fall) : -1;
+	const size_t voxels = body.part.size();
+	DrawStep step;
+	step.kind = DrawStep::VoxelUnit;
+	step.sprite.unit = unit;
+	step.sprite.body = lyingBody;
+	step.sprite.pile = pile;
+	step.voxelFirst = _voxelSplats.size();
+	step.voxelOpacity = opacity;
+	for (size_t k = 0; k < body.part.size(); ++k)
+	{
+		if (!items && body.part[k] == VoxelUnitModel::Item) continue;
+		float across = right[k], along = ahead[k], height = up[k];
+		if (falling) body.posed(pose, across, along, height);
+		const double toRight = across * scale, toAhead = along * scale;
+		const double world[3] = { feet[0] + toRight * cosine + toAhead * sine, feet[1] + toRight * sine - toAhead * cosine, feet[2] + height * scale };
+		if (world[2] < floorCut) continue;
+		double screenX, screenY, depth;
+		if (!projectToScreen(world, screenX, screenY, depth)) continue;
+		VoxelSplat splat;
+		splat.x = (float)screenX;
+		splat.y = (float)screenY;
+		splat.half = (float)std::min(VoxelSplatHalfMax, halfSquare / depth);
+		splat.depth = (float)depth;
+		const Uint8 fallen = fallFrame >= 0 ? body.fallColours[fallFrame * voxels + k] : 0;
+		splat.colour = shadeColor(fallen ? fallen : body.colour(k, direction, level), shade);
+		step.voxelHalfMax = std::max(step.voxelHalfMax, splat.half);
+		_voxelSplats.push_back(splat);
+	}
+	step.voxelCount = _voxelSplats.size() - step.voxelFirst;
+	if (step.voxelCount == 0) return;
+	std::sort(_voxelSplats.begin() + step.voxelFirst, _voxelSplats.end(), [](const VoxelSplat &a, const VoxelSplat &b) { return a.y < b.y; });
+	_drawList.push_back(step);
+}
+
+/**
+ * How far a voxel body going down by the game's own fall (a unit collapsing) has come: by the clock since it was first
+ * seen collapsing, at the quick fall's pace (QuickFallFrameTime for each of its death frames).
+ * @param unit The unit.
+ * @param now The time now (SDL ticks).
+ * @return 0 to 1 (lying), or -1 if it wasn't seen collapsing (or the fall is long forgotten).
+ */
+double FirstPersonView::collapseFall(const BattleUnit *unit, Uint32 now) const
+{
+	auto started = _collapseStarts.find(unit);
+	if (started == _collapseStarts.end()) return -1.0;
+	const int frames = std::max(1, unit->getArmor()->getDeathFrames());
+	return std::min(1.0, (now - started->second) / (double)(frames * QuickFallFrameTime));
+}
+
+/**
+ * Draws a recorded voxel body (see recordVoxelUnit): its squares on the band's rows. Its pixels are depth-tested
+ * against what's drawn (the rays, the steps before it) and marked as a unit's (or a pile's), as its sprite's would be:
+ * smoke veils a unit only thinly, futuristic night vision leaves its colours, and near where the player points, the
+ * pointer finds it.
+ * @param step The recorded step.
+ * @param bandTop The first screen row to draw.
+ * @param bandBottom One past the last.
+ */
+void FirstPersonView::drawVoxelUnit(const DrawStep &step, int bandTop, int bandBottom)
+{
+	const int width = getWidth(), top = std::max(bandTop, 0), bottom = std::min(bandBottom, getHeight());
+	const auto first = _voxelSplats.begin() + step.voxelFirst, last = first + step.voxelCount;
+	// (sorted by row: from the first that the biggest square could reach the band's top from)
+	auto splat = std::lower_bound(first, last, top - step.voxelHalfMax - 1.0f, [](const VoxelSplat &one, float row) { return one.y < row; });
+	for (; splat != last && splat->y < bottom + step.voxelHalfMax + 1.0f; ++splat)
+	{
+		// The pixels whose middles the square covers, and at least the one its middle is in.
+		const int middleX = (int)std::floor(splat->x), middleY = (int)std::floor(splat->y);
+		const int y0 = std::max(top, std::min(middleY, (int)std::ceil(splat->y - splat->half - 0.5f)));
+		const int y1 = std::min(bottom, std::max(middleY + 1, (int)std::floor(splat->y + splat->half - 0.5f) + 1));
+		if (y0 >= y1) continue;
+		const int x0 = std::max(0, std::min(middleX, (int)std::ceil(splat->x - splat->half - 0.5f)));
+		const int x1 = std::min(width, std::max(middleX + 1, (int)std::floor(splat->x + splat->half - 0.5f) + 1));
+		for (int y = y0; y < y1; ++y)
+		{
+			for (int x = x0; x < x1; ++x)
+			{
+				const int index = y * width + x;
+				if (splat->depth >= _depthBuffer[index]) continue;
+				if (step.voxelOpacity < 1.0f && dither(x, y) >= step.voxelOpacity) continue;
+				*getRaw(x, y) = splat->colour;
+				_depthBuffer[index] = splat->depth;
+				_glowMask[index] = 0;
+				_unitVeil[index] = step.sprite.unit ? UnitVeilMax : 255;
+				_ownColours[index] = 1;
+				const int patchX = x - _pointerX + PointerReach, patchY = y - _pointerY + PointerReach;
+				if (patchX >= 0 && patchY >= 0 && patchX <= 2 * PointerReach && patchY <= 2 * PointerReach)
+				{
+					if (step.sprite.pile) _pointerPiles[patchY][patchX] = step.sprite.pile;
+					_pointerUnits[patchY][patchX] = step.sprite.unit;
+					_pointerBodies[patchY][patchX] = step.sprite.body;
+				}
 			}
 		}
 	}
@@ -882,6 +1023,7 @@ void FirstPersonView::drawUnits()
 	// on the same spot), and their hitboxes (setting): always, fading in and out once a second, or
 	// only the unit pointed at (Aimed at, see setAimedUnit), steady.
 	const double unitScale = std::clamp(Options::fpsUnitSize, 80, 100) / 100.0;
+	int voxelBuilds = VoxelBuildsPerFrame; // (voxel bodies still to be made this frame, see below)
 	const bool hitboxAimedOnly = Options::fpsHitboxes == 3;
 	const float hitboxOpacity = Options::fpsHitboxes == 2 || hitboxAimedOnly ? 1.0f
 		: Options::fpsHitboxes == 1 ? 0.5f + 0.5f * (float)std::cos((now % 1000) / 1000.0 * 2.0 * Pi) : 0.0f;
@@ -1000,51 +1142,157 @@ void FirstPersonView::drawUnits()
 			recordUnitShadow(feet, 5.5 * unitSize); // flying units too: the shadow on the ground shows where they hover
 			recordFlareShadow(unit, feet, 5.5 * unitSize);
 		}
-		// Compose the unit's frame in the sprite buffer and keep it in a frame of its own, then
-		// record it standing in the world, on the floor's surface (the hitbox and the markers
-		// keep the game's own heights). (Composed unlit and shaded when placed: an upscaled frame
-		// then serves in any light.)
-		const GraphSubset mask(SpriteBufferSize, SpriteBufferSize);
+		// Setting "Voxel units": a unit (soldiers, aliens, civilians; one tile big or two by two) as its body made from
+		// its own sprites (see VoxelUnits), turned to its facing and painted by the frame of the direction its sprite
+		// would show here; level for a camera near its height, along the isometric slant from higher than
+		// VoxelSlantAbove. Drawn as its sprite until it has been seen standing (the walk swings the standing body).
+		const VoxelUnitModel *body = nullptr;
+		int walkPhase = -1;
+		double fall = 0.0;
+		const bool collapsing = unit->getStatus() == STATUS_COLLAPSING;
+		if (Options::fpsVoxelUnits && unitSize == 1 && (collapsing || fallingDown || airFall))
 		{
-			// (a quick fall's frame; a body coming down from the air after its own fall frames, the last)
-			const int fallFrame = quickFall ? FirstPerson::quickFallPhase(unit) : fallingDown ? std::max(0, unit->getArmor()->getDeathFrames() - 1) : -1;
-			const FirstPerson::QuickFallPose fallPose(fallingDown ? unit : nullptr, fallFrame);
-			if (unitSize == 1)
+			// Going down (the game's own fall, a quick death's, a body coming down from the air): the body it was last
+			// drawn with goes down as its death frames show, to lie as its corpse's picture (see VoxelUnitModel::fall), as
+			// far as the fall has come: by the clock, at the quick fall's pace (QuickFallFrameTime a frame; the game's own
+			// frames go faster); down while it comes down from the air. (Its corpse then lies so, finishing a fall the game
+			// is done with: see drawFloorItems.) A big unit falls in its own frames.
+			body = _voxelUnits.lastBody(unit);
+			if (collapsing)
 			{
-				unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
+				_collapseStarts.emplace(unit, now);
+				fall = collapseFall(unit, now);
 			}
 			else
 			{
-				// The parts are laid out on screen like the 2x2 tiles they cover, back to front.
+				const double quick = FirstPerson::quickFallProgress(unit);
+				fall = quick >= 0.0 ? quick : 1.0;
+			}
+			fall = std::clamp(fall, 0.0, 1.0);
+		}
+		else if (Options::fpsVoxelUnits && !quickFall && !fallingDown && !airFall && VoxelUnits::suits(unit))
+		{
+			// (a body is made only for a unit in view, and VoxelBuildsPerFrame a frame at most: a first look at a squad
+			// doesn't stall the game; one waiting is drawn as its sprite meanwhile)
+			double middleX, middleY, middleDepth;
+			const double middle[3] = { feet[0], feet[1], feet[2] + 12.0 };
+			const bool seen = projectToScreen(middle, middleX, middleY, middleDepth);
+			const double reach = seen ? 24.0 * unitScale * (getWidth() / 2.0) / _halfFovTangent / middleDepth : 0.0;
+			int noBuilds = 0;
+			int &builds = seen && middleX > -reach && middleX < getWidth() + reach && middleY > -reach && middleY < getHeight() + reach ? voxelBuilds : noBuilds;
+			body = _voxelUnits.modelFor(unit, unitSprite, _game->getMod()->getSurfaceSet("BIGOBS.PCK"), _game->getMod()->getSurfaceSet("FLOOROB.PCK"), _save,
+				getPalette(), builds, walkPhase);
+			unitSprite.setViewRotation(3 - cameraDirection);
+			_spriteBuffer->clear(); // (anything the drawer drew there while the body was made: its sprite, if drawn instead, starts clean)
+		}
+		if (body)
+		{
+			// The way it faces: the game turns a unit going down to face the screen first (its fall frames face it, see
+			// UnitDieBState); a body keeps the way it faced, last seen well. (More than halfway down, painted as its
+			// corpse lies: its front up, seen from above.)
+			int facing = unit->getDirection();
+			if (unit->isOut() || unit->isOutThresholdExceed() || collapsing)
+			{
+				auto well = _facingsWell.find(unit);
+				if (well != _facingsWell.end()) facing = well->second;
+			}
+			else
+			{
+				_facingsWell[unit] = facing;
+			}
+			const bool fallen = fall > 0.5;
+			const double flat = std::max(1.0, std::hypot(_eye[0] - feet[0], _eye[1] - feet[1]));
+			const bool level = !fallen && std::atan2((_eye[2] - chest[2]) * ZScale, flat) < VoxelSlantAbove * Pi / 180.0;
+			const int direction = fallen ? 3 : ((facing + 3 - cameraDirection) % 8 + 8) % 8;
+			const double standing[3] = { feet[0], feet[1], standingHeight(feet) };
+			recordVoxelUnit(*body, walkPhase, facing, direction, level, standing, floorUnderside(feet), shade, unitScale, unit, fall);
+			// What the game draws over a unit's sprite, its flames when it burns and its breath's bubbles under the sea, is
+			// drawn over its body: the drawer's overlay alone (the unit's parts drawn nowhere), standing at the unit, nearer
+			// by VoxelOverlayNearer to show over the body's front; unshaded, as the game draws flames.
+			if (unit->getFire() > 0 || unit->getBreathExhaleFrame() >= 0)
+			{
+				_spriteBuffer->clear();
+				Surface nowhere(SpriteBufferSize, SpriteBufferSize);
+				Surface *parts[BODYPART_LARGE_TURRET + 4];
+				std::fill(std::begin(parts), std::end(parts), &nowhere);
+				const GraphSubset mask(SpriteBufferSize, SpriteBufferSize);
+				unitSprite.setPartCapture(parts);
 				unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
-				unitSprite.draw(unit, 1, 32, 16, 0, mask, false);
-				unitSprite.draw(unit, 2, 0, 16, 0, mask, false);
-				unitSprite.draw(unit, 3, 16, 24, 0, mask, false);
+				if (unitSize > 1)
+				{
+					unitSprite.draw(unit, 1, 32, 16, 0, mask, false);
+					unitSprite.draw(unit, 2, 0, 16, 0, mask, false);
+					unitSprite.draw(unit, 3, 16, 24, 0, mask, false);
+				}
+				unitSprite.setPartCapture(nullptr);
+				bool overlaid = false;
+				for (int y = 0; y < SpriteBufferSize && !overlaid; ++y)
+					for (int x = 0; x < SpriteBufferSize && !overlaid; ++x) overlaid = _spriteBuffer->getPixel(x, y) != 0;
+				if (overlaid)
+				{
+					DrawStep step;
+					step.kind = DrawStep::Sprite;
+					step.sprite.sprite = keepComposedFrame(framesUsed);
+					step.sprite.anchorX = 32;
+					step.sprite.anchorY = unitSize == 1 ? 40 : 48;
+					std::copy(standing, standing + 3, step.sprite.world);
+					step.sprite.depthBias = VoxelOverlayNearer;
+					step.sprite.floorCut = floorUnderside(feet);
+					step.sprite.scale = unitScale;
+					step.sprite.unit = unit;
+					useSmoothVersion(step.sprite);
+					_drawList.push_back(step);
+				}
 			}
 		}
-		DrawStep step;
-		step.kind = DrawStep::Sprite;
-		step.sprite.sprite = keepComposedFrame(framesUsed);
-		step.sprite.anchorX = 32;
-		step.sprite.anchorY = unitSize == 1 ? 40 : 48; // the centre of the floor diamond; a big unit's, the corner its four tiles share
-		step.sprite.world[0] = feet[0];
-		step.sprite.world[1] = feet[1];
-		step.sprite.world[2] = standingHeight(feet);
-		step.sprite.floorCut = floorUnderside(feet); // (its art below its feet stays out of the room below)
-		step.sprite.shade = shade;
-		step.sprite.scale = unitScale;
-		// The art below its feet (the front half of the floor's diamond: a snake's tail, a long
-		// body in some facings) lies flat on the floor in front of them, as an item's does, instead
-		// of sinking into it (a player's report, GitHub issue #31: X-Com Files' Asmodean Cobra "in
-		// the ground" in some rotations; for most units only a few pixels of the feet). Not for a
-		// unit in the air: its floor would be seen from below, where lying rows aren't drawn.
-		if (!unit->haveNoFloorBelow() && unit->getStatus() != STATUS_FLYING)
+		else
 		{
-			step.sprite.pose = SpritePose::Lying;
+			// Compose the unit's frame in the sprite buffer and keep it in a frame of its own, then
+			// record it standing in the world, on the floor's surface (the hitbox and the markers
+			// keep the game's own heights). (Composed unlit and shaded when placed: an upscaled frame
+			// then serves in any light.)
+			const GraphSubset mask(SpriteBufferSize, SpriteBufferSize);
+			{
+				// (a quick fall's frame; a body coming down from the air after its own fall frames, the last)
+				const int fallFrame = quickFall ? FirstPerson::quickFallPhase(unit) : fallingDown ? std::max(0, unit->getArmor()->getDeathFrames() - 1) : -1;
+				const FirstPerson::QuickFallPose fallPose(fallingDown ? unit : nullptr, fallFrame);
+				if (unitSize == 1)
+				{
+					unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
+				}
+				else
+				{
+					// The parts are laid out on screen like the 2x2 tiles they cover, back to front.
+					unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
+					unitSprite.draw(unit, 1, 32, 16, 0, mask, false);
+					unitSprite.draw(unit, 2, 0, 16, 0, mask, false);
+					unitSprite.draw(unit, 3, 16, 24, 0, mask, false);
+				}
+			}
+			DrawStep step;
+			step.kind = DrawStep::Sprite;
+			step.sprite.sprite = keepComposedFrame(framesUsed);
+			step.sprite.anchorX = 32;
+			step.sprite.anchorY = unitSize == 1 ? 40 : 48; // the centre of the floor diamond; a big unit's, the corner its four tiles share
+			step.sprite.world[0] = feet[0];
+			step.sprite.world[1] = feet[1];
+			step.sprite.world[2] = standingHeight(feet);
+			step.sprite.floorCut = floorUnderside(feet); // (its art below its feet stays out of the room below)
+			step.sprite.shade = shade;
+			step.sprite.scale = unitScale;
+			// The art below its feet (the front half of the floor's diamond: a snake's tail, a long
+			// body in some facings) lies flat on the floor in front of them, as an item's does, instead
+			// of sinking into it (a player's report, GitHub issue #31: X-Com Files' Asmodean Cobra "in
+			// the ground" in some rotations; for most units only a few pixels of the feet). Not for a
+			// unit in the air: its floor would be seen from below, where lying rows aren't drawn.
+			if (!unit->haveNoFloorBelow() && unit->getStatus() != STATUS_FLYING)
+			{
+				step.sprite.pose = SpritePose::Lying;
+			}
+			step.sprite.unit = unit;
+			useSmoothVersion(step.sprite);
+			_drawList.push_back(step);
 		}
-		step.sprite.unit = unit;
-		useSmoothVersion(step.sprite);
-		_drawList.push_back(step);
 		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit) && !Options::fpsSpriteHitboxes && !fallingDown) // (with full sprite hitboxes the picture is the hitbox; one falling is down)
 		{
 			recordHitbox(unit, feet, hitboxOpacity);
@@ -1058,6 +1306,11 @@ void FirstPersonView::drawUnits()
 				_colors.hitbox[unit->getFaction() == FACTION_PLAYER ? 0 : unit->getFaction() == FACTION_HOSTILE ? 1 : 2] };
 			_facingSpots.push_back(spot);
 		}
+	}
+	// (a fall is forgotten once over and the game is done with it: one woken and knocked out once more falls anew)
+	for (auto started = _collapseStarts.begin(); started != _collapseStarts.end();)
+	{
+		started = started->first->getStatus() == STATUS_COLLAPSING || collapseFall(started->first, now) < 1.0 ? std::next(started) : _collapseStarts.erase(started);
 	}
 	// Then draw them all.
 	replayDrawList();
@@ -1607,6 +1860,20 @@ void FirstPersonView::drawFloorItems()
 		if (headroom < 1e9 && standingRows > 0 && standingVoxels > headroom)
 		{
 			step.sprite.standingSquash = std::max(0.05, headroom) / standingVoxels;
+		}
+		// Setting "Voxel units": the corpse on top a unit's that was drawn as its voxel body (dead, or knocked out: one
+		// tile big) lies here as that body, on its back as it fell (see drawUnits), its hands empty (what it held is in
+		// the pile); not while faint (see-through corpses), nor under a floor it would poke through.
+		BattleUnit *owner = item->getUnit();
+		const VoxelUnitModel *lying = Options::fpsVoxelUnits && owner && owner->isOut() && !wholeCorpse && !step.sprite.seeThrough
+			&& step.sprite.standingSquash >= 1.0 && owner->getArmor()->getSize() == 1 ? _voxelUnits.lastBody(owner) : nullptr;
+		if (lying)
+		{
+			auto well = _facingsWell.find(owner);
+			const double fall = collapseFall(owner, SDL_GetTicks());
+			recordVoxelUnit(*lying, -1, well != _facingsWell.end() ? well->second : owner->getDirection(), 3, false, step.sprite.world, NoFloorCut,
+				step.sprite.shade, itemScale, nullptr, fall >= 0.0 ? fall : 1.0, false, step.sprite.body, step.sprite.pile);
+			continue;
 		}
 		useSmoothVersion(step.sprite);
 		_drawList.push_back(step);

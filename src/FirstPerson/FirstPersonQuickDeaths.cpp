@@ -203,6 +203,28 @@ int quickFallPhase(const BattleUnit *unit)
 }
 
 /**
+ * How far a unit's quick fall has come (setting "Quick deaths"), smoothly: for a voxel body tipping over (setting
+ * "Voxel units").
+ * @param unit The unit.
+ * @return 0 as it goes down to 1 when its fall frames are over, or -1 if it isn't falling (see quickFallPhase).
+ */
+double quickFallProgress(const BattleUnit *unit)
+{
+	const Uint32 now = SDL_GetTicks();
+	for (const QuickFall &fall : quickFalls())
+	{
+		if (fall.unit != unit || surelyOver(fall, now))
+		{
+			continue;
+		}
+		const bool down = (unit->getStatus() == STATUS_DEAD || unit->getStatus() == STATUS_UNCONSCIOUS) && !unit->getAlreadyRespawned();
+		const double length = std::max(1, unit->getArmor()->getDeathFrames()) * (double)QuickFallFrameTime;
+		return down ? std::min(1.0, (now - fall.start) / length) : -1.0;
+	}
+	return -1.0;
+}
+
+/**
  * The unit whose quick fall is playing on this tile (setting "Quick deaths"): the map and the 3D
  * view draw it there, falling, and keep the body and items on the tile back until it's down.
  * @param save The battle.

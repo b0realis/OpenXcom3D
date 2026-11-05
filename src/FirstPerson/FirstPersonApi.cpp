@@ -773,6 +773,8 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSpriteUpscale", &fpsSpriteUpscale, 2, "STR_FPS_SPRITE_UPSCALE", category));
 	// Soldiers' and aliens' sprites a little smaller (80 to 100% of the isometric map's size).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsUnitSize", &fpsUnitSize, 100, "STR_FPS_UNIT_SIZE", category));
+	// Units (one tile big or two by two) as 3D bodies made from their own sprites (see VoxelUnits; the owner's sub-project).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsVoxelUnits", &fpsVoxelUnits, false, "STR_FPS_VOXEL_UNITS", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMuzzleFlash", &fpsMuzzleFlash, true, "STR_FPS_MUZZLE_FLASH", category));
 	// A unit hit, standing or down, flashes for a moment (the owner, on GitHub issue #74: its own
 	// setting); off, it only flinches. "Muzzle flashes" off turns it off too (every flash: the

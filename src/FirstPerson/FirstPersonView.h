@@ -65,6 +65,7 @@
 #include "../Engine/InteractiveSurface.h"
 #include "FirstPersonParticles.h"
 #include "FirstPersonVoxelModel.h"
+#include "FirstPersonVoxelUnits.h"
 
 namespace OpenXcom
 {
@@ -861,8 +862,10 @@ private:
 	/// the game's thread, took as long as all the rays on a big screen.
 	struct DrawStep
 	{
-		enum Kind { Sprite, GroundShade, Line } kind;
-		SpriteDraw sprite;                                                // Sprite (see drawSprite)
+		enum Kind { Sprite, GroundShade, Line, VoxelUnit } kind;
+		SpriteDraw sprite;                                                // Sprite (see drawSprite); a VoxelUnit's unit
+		size_t voxelFirst = 0, voxelCount = 0;                            // VoxelUnit (see drawVoxelUnit): its splats in _voxelSplats,
+		float voxelHalfMax = 0.0f, voxelOpacity = 1.0f;                   // the biggest one's half size, and its opacity (dithered up close)
 		double centre[3]; double radius; int steps; float density;        // GroundShade (see drawGroundShade)
 		double away[2]; double length;                                    // ... stretched away from a light that long (0: a disc)
 		float from[3], to[3]; Uint8 color; int thickness; float opacity; bool glows; // Line (see drawLine3D)
@@ -873,6 +876,21 @@ private:
 	Surface *keepComposedFrame(int &framesUsed);
 	/// Draws the recorded steps on all the view's threads, band by band, and empties the list.
 	void replayDrawList();
+	/// A voxel of a unit's voxel body on the screen: a square (its middle and half its size, pixels), its depth and colour.
+	struct VoxelSplat { float x, y, half, depth; Uint8 colour; };
+	/// Records a unit drawn as its voxel body (setting "Voxel units"): its voxels projected, shaded and sorted by row;
+	/// going down, tipped over backwards (fall 0 to 1: lying on its back), with or without the items in hand; a body lying
+	/// in a pile pointed at as that pile (and the unconscious unit in it).
+	void recordVoxelUnit(const VoxelUnitModel &body, int walkPhase, int facing, int direction, bool level, const double feet[3], double floorCut,
+		int shade, double scale, BattleUnit *unit, double fall = 0.0, bool items = true, BattleUnit *lyingBody = nullptr, const Tile *pile = nullptr);
+	std::map<const BattleUnit*, Uint32> _collapseStarts; // when each unit collapsing (the game's own fall) was first seen so
+	std::map<const BattleUnit*, int> _facingsWell;       // the way each unit faced, last seen well (a voxel body going down keeps it)
+	/// How far a voxel body going down by the game's own fall has come (see drawUnits): 0 to 1, or -1 if it isn't.
+	double collapseFall(const BattleUnit *unit, Uint32 now) const;
+	/// Draws a recorded voxel body's splats, all of them or those on the screen rows from bandTop up to bandBottom.
+	void drawVoxelUnit(const DrawStep &step, int bandTop, int bandBottom);
+	VoxelUnits _voxelUnits;             // the units' voxel bodies made so far this battle
+	std::vector<VoxelSplat> _voxelSplats; // the recorded voxel bodies' splats (see DrawStep::voxelFirst), emptied with the steps
 	/// The recorded steps over bands of rows taken from the shared counter (a job for runOnAllThreads).
 	void drawListBands();
 	/// The height something on the ground at a point stands at in the view: out of the floor slab.

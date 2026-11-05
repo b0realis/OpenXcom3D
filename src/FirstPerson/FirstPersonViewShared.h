@@ -131,6 +131,17 @@ const float EdgeDotSpacing = 16.0f, EdgeDotInset = 3.0f, EdgeDotSize = 2.5f;
 /// voxel up, where a true projection of cubes would draw 1.22 pixels: one voxel up is sqrt(2/3)
 /// of one voxel across. The camera works in true proportions; rays walk the voxel grid.
 const double ZScale = 0.81649658092772603;
+/// A voxel unit (setting "Voxel units") is painted by its sprites as pictures taken at its height up to a camera this many
+/// degrees above its chest, along the isometric view's slant from higher (see VoxelUnitModel::colours).
+const double VoxelSlantAbove = 15.0;
+/// A voxel unit's voxel (half a voxel big) is drawn as a square this many voxels wide, so that no gaps show between them,
+/// and at most this many pixels from its middle (right up against the camera).
+const double VoxelSplatSize = 0.6, VoxelSplatHalfMax = 32.0;
+/// At most this many voxel units' bodies are made a frame (each takes a few milliseconds; see VoxelUnits).
+const int VoxelBuildsPerFrame = 1;
+/// What the game draws over a voxel unit's sprite (flames, bubbles) is drawn this many voxels nearer than the unit, over
+/// its body's front.
+const double VoxelOverlayNearer = 8.0;
 const float ZScaleF = (float)ZScale;
 /// An isometric sprite pixel across is 1/sqrt(2) of a voxel (32 pixels span a tile's diagonal).
 const double SpritePixelX = 0.70710678118654752;

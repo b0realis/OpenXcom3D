@@ -165,6 +165,7 @@ SETTINGS = [
         ('Weapon in hand', 'YES', 'YES / NO', 'The weapon in hand at the bottom of the view, built in 3D from its inventory picture, its barrel on the crosshair.', ''),
         ('Sprite upscaling', 'Smooth + detail', 'Smooth + detail / Smooth / Off', 'Units, items and effects up close scaled the way pixel art scales well (xBRZ).', ''),
         ('Unit size', '100%', '80% to 100%', 'Soldiers, aliens, corpses and items drawn a little smaller, so tall sprites fit under low ceilings.', 'Only the picture: what shots hit stays the game\'s (see <i>Hitboxes</i>).'),
+        ('Voxel units', 'NO', 'YES / NO', 'Experimental. YES: units are 3D bodies made from their own sprites, walking and going down as their frames show. NO: the game\'s pictures.', 'Only the picture: what shots hit stays the game\'s.'),
         ('Muzzle flashes', 'YES', 'YES / NO', 'Gunfire, hits and blasts flash. NO: no flashes, steady UFO lights, no camera glitches.', 'Off if flashing light bothers you.'),
         ('Hit flash', 'YES', 'YES / NO', 'A unit hit, standing or down, flashes for a moment (with Muzzle flashes on). NO: it only flinches.', ''),
         ('Screen shake', 'YES', 'YES / NO', 'Explosions, hits, falls and your own shots shake the view. NO: nothing shakes it.', ''),
