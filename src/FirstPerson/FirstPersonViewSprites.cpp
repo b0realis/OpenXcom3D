@@ -1689,11 +1689,11 @@ void FirstPersonView::drawSpriteBlend(const Surface *from, const Surface *to, do
 	// scaled up with them: each original pixel becomes factor x factor pixels).
 	SpriteBox fromBox = spriteBox(from), toBox = spriteBox(to);
 	double scale = 1.0;
-	const Surface *bigFrom = upscaleHere(world, 1.0) ? upscaled(from) : nullptr;
-	const Surface *bigTo = bigFrom ? upscaled(to) : nullptr;
+	const int factor = spriteUpscaleFactor();
+	const Surface *bigFrom = upscaleHere(world, 1.0) ? upscaled(from, factor) : nullptr;
+	const Surface *bigTo = bigFrom ? upscaled(to, factor) : nullptr;
 	if (bigFrom && bigTo)
 	{
-		const int factor = UpscaleFactor;
 		from = bigFrom;
 		to = bigTo;
 		anchorX *= factor;
@@ -2117,7 +2117,7 @@ const FirstPersonView::SoftSmoke &FirstPersonView::stippleSmokeFrame(const Surfa
 {
 	// Made before, as good as it gets now: as it is. The blocks are made again once the
 	// upscaler's version is ready (the frames between two of them go with the old ones).
-	const Surface *smooth = Options::fpsSpriteUpscale > 0 ? upscaled(frame) : nullptr;
+	const Surface *smooth = Options::fpsSpriteUpscale > 0 ? upscaled(frame, UpscaleFactor) : nullptr;
 	auto made = _stippleSmoke.find(frame);
 	if (made != _stippleSmoke.end())
 	{

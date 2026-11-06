@@ -774,11 +774,12 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlashlight", &fpsFlashlight, true, "STR_FPS_FLASHLIGHT", "STR_FIRST_PERSON_SAVED"));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsTacticalFlashlight", &fpsTacticalFlashlight, false, "STR_FPS_FLASHLIGHT", "STR_FIRST_PERSON_SAVED"));
 	// Looks: the weapon in hand (always made of voxels), sprite upscaling (0 off, 1 smooth,
-	// 2 smooth + detail), muzzle flashes, particles (0 none, 1 effects, 2 everything),
+	// 2 smooth + detail, 3 finest: six times bigger; the default, a profile saved before keeps its
+	// value), muzzle flashes, particles (0 none, 1 effects, 2 everything),
 	// UFOs with steady hulls, glowing lights, coloured light and an aura, and the pixel size
 	// (1 to 3: one ray colours a block of pixels that wide and high, for speed).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsViewModel", &fpsViewModel, true, "STR_FPS_VIEW_MODEL", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsSpriteUpscale", &fpsSpriteUpscale, 2, "STR_FPS_SPRITE_UPSCALE", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSpriteUpscale", &fpsSpriteUpscale, 3, "STR_FPS_SPRITE_UPSCALE", category));
 	// Soldiers' and aliens' sprites a little smaller (80 to 100% of the isometric map's size).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsUnitSize", &fpsUnitSize, 100, "STR_FPS_UNIT_SIZE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMuzzleFlash", &fpsMuzzleFlash, true, "STR_FPS_MUZZLE_FLASH", category));

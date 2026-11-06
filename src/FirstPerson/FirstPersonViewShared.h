@@ -75,6 +75,24 @@ const int SpriteBufferSize = 64;
 /// screen pixels per sprite pixel on it is used (further away the original looks as good).
 const int UpscaleFactor = 4;
 const double UpscaleFrom = 1.6;
+/// With "Finest", units', items' and effects' copies are this many times bigger (finer up close,
+/// 2.25 times the memory); the soft smoke frames keep UpscaleFactor.
+const int FinestUpscaleFactor = 6;
+/// How many upscaled frames are kept (the least recently used goes; a unit's 64x64 frame is 64 KB
+/// at 4x, 147 KB at 6x: about 26 or 59 MB when full).
+const size_t UpscaleCacheFrames = 400;
+/// The softened shading inside a ramp: a neighbour more than this many shades from a pixel's own
+/// (an outline, a highlight) never mixes in; each colour moves this much of the way (all of it) to
+/// the neighbours' Gaussian average.
+const int UpscaleSoftenShades = 1;
+const float UpscaleSoftenAmount = 1.0f;
+/// The detail pass ("Smooth + detail", "Finest"): each colour is pushed this much further away from
+/// the average of its neighbours of the same ramp, where they differ by more than this (out of 255).
+const float UpscaleDetailAmount = 0.5f, UpscaleDetailThreshold = 3.0f;
+/// A small feature ("Finest" keeps them as xBRZ draws them): an original pixel brighter or darker
+/// than every one of its solid neighbours, at least this many of the 8, by this much luminance.
+const int UpscaleFeatureNeighbours = 6;
+const float UpscaleFeatureContrast = 20.0f;
 /// A thrown item flies as its voxel model (its inventory picture given volume): this many voxels
 /// per picture pixel (a grenade's picture, about 12 pixels, is a third of a tile across),
 /// turning end over end this many times a second.

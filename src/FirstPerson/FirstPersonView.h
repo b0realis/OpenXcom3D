@@ -971,7 +971,7 @@ private:
 
 	struct Upscaled { Surface *surface; Uint32 used; };
 	std::unordered_map<Uint64, Upscaled> _upscaledSprites; // the upscaled frames made so far, by their pixels
-	struct UpscaleJob { Uint64 key; int w, h; bool detail; std::vector<Uint8> pixels; std::vector<SDL_Color> palette; Uint64 paletteHash; };
+	struct UpscaleJob { Uint64 key; int w, h, factor; bool detail, keepFeatures; std::vector<Uint8> pixels; std::vector<SDL_Color> palette; Uint64 paletteHash; };
 	std::thread _upscaleThread;                         // the worker thread (started on first use)
 	std::mutex _upscaleMutex;                           // guards the job queue and the finished results
 	std::condition_variable _upscaleWake;               // wakes the worker when there's a job (or it should stop)
@@ -985,8 +985,10 @@ private:
 
 	/// The upscaling worker thread: makes the bigger versions of queued sprite frames.
 	void upscaleWorker();
-	/// A sprite frame's upscaled version, or the original until it's ready.
-	const Surface *upscaled(const Surface *sprite);
+	/// A sprite frame's upscaled version (factor times bigger), or null until it's ready.
+	const Surface *upscaled(const Surface *sprite, int factor);
+	/// How much bigger units', items' and effects' frames are made for the setting (4, or 6 with "Finest").
+	int spriteUpscaleFactor() const;
 	/// Is a sprite at this point big enough on screen to be worth upscaling?
 	bool upscaleHere(const double world[3], double scale) const;
 	/// Draws a sprite, upscaled when it's close.
