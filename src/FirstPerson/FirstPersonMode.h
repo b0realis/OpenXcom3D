@@ -734,6 +734,8 @@ private:
 	};
 	/// Whom a melee blow would strike now, by the crosshair: a unit beside the soldier, or out of range.
 	MeleeAim meleeTarget(BattleUnit *unit) const;
+	/// The body a melee blow at the downed would strike now: the one under the crosshair at the feet or beside the soldier (or out of range), else the one in the tile faced or at the feet.
+	MeleeAim meleeDownedTarget(BattleUnit *unit) const;
 	/// Turns the soldier to face a way before using something on a neighbour (by the rules, or for free); false without the time units for the turn and the use.
 	bool turnBeforeUse(BattleUnit *unit, int direction, int useTime);
 	/// Akimbo: the gun in the other hand that fires along, or null.

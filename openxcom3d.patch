@@ -27144,10 +27144,10 @@ index 000000000..728d1f697
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..7cf2d6d21
+index 000000000..c91b64260
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1263 @@
+@@ -0,0 +1,1265 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -27884,6 +27884,8 @@ index 000000000..7cf2d6d21
 +	};
 +	/// Whom a melee blow would strike now, by the crosshair: a unit beside the soldier, or out of range.
 +	MeleeAim meleeTarget(BattleUnit *unit) const;
++	/// The body a melee blow at the downed would strike now: the one under the crosshair at the feet or beside the soldier (or out of range), else the one in the tile faced or at the feet.
++	MeleeAim meleeDownedTarget(BattleUnit *unit) const;
 +	/// Turns the soldier to face a way before using something on a neighbour (by the rules, or for free); false without the time units for the turn and the use.
 +	bool turnBeforeUse(BattleUnit *unit, int direction, int useTime);
 +	/// Akimbo: the gun in the other hand that fires along, or null.
@@ -34327,10 +34329,10 @@ index 000000000..3486db61a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..4edfcdbcf
+index 000000000..7f1f79c9d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,5005 @@
+@@ -0,0 +1,5096 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -34702,63 +34704,56 @@ index 000000000..4edfcdbcf
 +
 +/**
 + * Melee at the downed (setting "Melee hits walls and the downed"): with no one standing in
-+ * reach, the blow may hit a unit lying unconscious in front of the soldier (in the tile they
-+ * face, if no wall is in between) or at their feet. The game's melee wants a standing target,
-+ * so the blow is the game's own pieces put together here: the time units and ammo the game's
-+ * melee spends, the weapon's melee power and damage type as the game works them out, a hit (the
-+ * body can't dodge) through the game's own unit damage (TileEngine::hitUnit, as a shot at the
-+ * body would), the weapon's melee sound, the game's check for casualties, and reaction fire.
++ * reach, the blow may hit a unit lying unconscious: the one under the crosshair, at the soldier's
++ * feet or on a tile next to them, any of the eight ways, the soldier first turning to it; with
++ * none under the crosshair, one in the tile they face or at their feet (see meleeDownedTarget).
++ * The game's melee wants a standing target, so the blow is the game's own pieces put together
++ * here: the time units and ammo the game's melee spends (and the turn's, both wanted before
++ * either is spent, see turnBeforeUse), the weapon's melee power and damage type as the game works
++ * them out, a hit (the body can't dodge) through the game's own unit damage (TileEngine::hitUnit,
++ * as a shot at the body would), the weapon's melee sound, the game's check for casualties, and
++ * reaction fire.
 + * @param unit The soldier.
 + * @param weapon The weapon in the chosen hand.
 + * @param action The game's current action, to fill in.
 + * @return True if there was a body to hit (the blow was made, or refused with the reason
-+ *         shown); false if there's none in reach.
++ *         shown, a body under the crosshair out of reach too); false if there's none in reach.
 + */
 +bool FirstPersonMode::meleeDowned(BattleUnit *unit, BattleItem *weapon, BattleAction *action)
 +{
-+	// The body: in the tile the soldier faces (on its floor, or on the top of stairs below it,
-+	// as the game's melee looks), with no wall in between, or else at their feet.
-+	Position ahead;
-+	Pathfinding::directionToVector(unit->getDirection(), &ahead);
-+	Tile *ownTile = _save->getTile(unit->getPosition());
-+	Tile *aheadTile = _save->getTile(unit->getPosition() + ahead);
-+	if (aheadTile && aheadTile->hasNoFloor(_save) && _save->getBelowTile(aheadTile) && _save->getBelowTile(aheadTile)->getTerrainLevel() <= -16)
++	// The body, and the way to turn to it.
++	const MeleeAim aim = meleeDownedTarget(unit);
++	if (!aim.refusal.empty())
 +	{
-+		aheadTile = _save->getBelowTile(aheadTile);
++		_state->warning(aim.refusal);
++		return true;
 +	}
-+	if (ownTile && aheadTile && _save->getPathfinding()->isBlockedDirection(unit, ownTile, unit->getDirection()))
-+	{
-+		aheadTile = nullptr;
-+	}
-+	BattleUnit *body = nullptr;
-+	for (Tile *tile : { aheadTile, ownTile })
-+	{
-+		for (BattleItem *item : tile ? *tile->getInventory() : std::vector<BattleItem*>())
-+		{
-+			if (!body && item->getUnit() && item->getUnit() != unit && item->getUnit()->getStatus() == STATUS_UNCONSCIOUS)
-+			{
-+				body = item->getUnit();
-+			}
-+		}
-+	}
++	BattleUnit *body = aim.target;
 +	if (!body)
 +	{
 +		return false;
 +	}
 +
-+	// The cost: the game's time units for the blow and the weapon's ammo for it.
++	// The cost: the game's time units for the blow (and the turn before it, both wanted before
++	// either is spent) and the weapon's ammo for it.
 +	action->type = BA_HIT;
 +	action->targeting = false;
 +	action->target = body->getPosition();
 +	action->result.clear();
 +	action->updateTU();
 +	BattleItem *ammo = weapon->getAmmoForAction(BA_HIT, &action->result);
-+	if (!ammo || !action->spendTU(&action->result))
++	if (!ammo || !action->haveTU(&action->result))
 +	{
 +		_state->warning(action->result.empty() ? "STR_NOT_ENOUGH_TIME_UNITS" : action->result);
 +		action->type = BA_NONE;
 +		return true;
 +	}
++	if (!turnBeforeUse(unit, aim.direction, action->Time))
++	{
++		action->type = BA_NONE;
++		return true;
++	}
++	action->spendTU(&action->result);
 +	weapon->spendAmmoForAction(BA_HIT, _save);
 +
 +	// The hit (its power and damage type as the game works them out), its sound and the swing,
@@ -35576,8 +35571,97 @@ index 000000000..4edfcdbcf
 +}
 +
 +/**
++ * The body a melee blow at the downed would strike now (setting "Melee hits walls and the downed",
++ * see meleeDowned), by the crosshair first, as meleeTarget finds a standing unit (a player, GitHub
++ * issue #107: "Melee striking down bodies doesn't work diagonally": only a body in the tile the
++ * soldier faced was struck, and with "Turning costs TU" the head looks to a diagonal tile without
++ * the soldier turning): the body under the crosshair (its picture, see
++ * FirstPersonView::getBodyAtPointer) lying at the soldier's feet, or on a tile next to them any of
++ * the eight ways (the way needing the fewest eighths of a turn; on its floor, or on the top of
++ * stairs below it, as the game's melee looks; no wall in between), the soldier first turning to
++ * face it; one under the crosshair farther off, out of range. With no body under the crosshair, as
++ * before: one in the tile the soldier faces, or else at their feet.
++ * @param unit The soldier striking.
++ * @return The body struck (null if none, with the reason when the one under the crosshair is out
++ *   of reach), the tile it lies on and the way to turn to it (-1: no turn).
++ */
++FirstPersonMode::MeleeAim FirstPersonMode::meleeDownedTarget(BattleUnit *unit) const
++{
++	MeleeAim aim;
++	Tile *ownTile = _save->getTile(unit->getPosition());
++	// The unconscious unit lying on a tile (the first, or the one wanted), if any.
++	auto bodyOn = [&](Tile *tile, const BattleUnit *wanted) -> BattleUnit* {
++		for (BattleItem *item : tile ? *tile->getInventory() : std::vector<BattleItem*>())
++		{
++			BattleUnit *lying = item->getUnit();
++			if (lying && lying != unit && lying->getStatus() == STATUS_UNCONSCIOUS && (!wanted || lying == wanted))
++			{
++				return lying;
++			}
++		}
++		return nullptr;
++	};
++	// The tile next to the soldier a way (on its floor, or on the top of stairs below it, as the
++	// game's melee looks), or null with a wall in between.
++	auto tileTowards = [&](int direction) -> Tile* {
++		Position step;
++		Pathfinding::directionToVector(direction, &step);
++		Tile *tile = _save->getTile(unit->getPosition() + step);
++		if (tile && tile->hasNoFloor(_save) && _save->getBelowTile(tile) && _save->getBelowTile(tile)->getTerrainLevel() <= -16)
++		{
++			tile = _save->getBelowTile(tile);
++		}
++		return ownTile && tile && !_save->getPathfinding()->isBlockedDirection(unit, ownTile, direction) ? tile : nullptr;
++	};
++
++	// A body under the crosshair: at the feet, beside the soldier, or out of range.
++	BattleUnit *pointed = _view->getBodyAtPointer();
++	if (pointed && pointed != unit)
++	{
++		if (bodyOn(ownTile, pointed))
++		{
++			aim.target = pointed;
++			aim.tile = unit->getPosition();
++			return aim;
++		}
++		int bestEighths = 9;
++		for (int direction = 0; direction < 8; ++direction)
++		{
++			const int eighths = std::min((direction - unit->getDirection() + 8) % 8, (unit->getDirection() - direction + 8) % 8);
++			Tile *tile = eighths < bestEighths ? tileTowards(direction) : nullptr;
++			if (tile && bodyOn(tile, pointed))
++			{
++				bestEighths = eighths;
++				aim.direction = direction;
++				aim.tile = tile->getPosition();
++			}
++		}
++		if (aim.direction < 0)
++		{
++			aim.refusal = "STR_OUT_OF_RANGE";
++			return aim;
++		}
++		aim.target = pointed;
++		return aim;
++	}
++
++	// None under the crosshair: one in the tile the soldier faces, or else at their feet.
++	for (Tile *tile : { tileTowards(unit->getDirection()), ownTile })
++	{
++		if (BattleUnit *body = bodyOn(tile, nullptr))
++		{
++			aim.target = body;
++			aim.tile = tile->getPosition();
++			return aim;
++		}
++	}
++	return aim;
++}
++
++/**
 + * Turns the soldier to face a way before using something on a neighbour (a medi-kit's patient, a
-+ * melee blow's target or the terrain it strikes, see useItemDirectly and fire). With "Turning
++ * melee blow's target, the body or the terrain it strikes, see useItemDirectly, fire and
++ * meleeDowned). With "Turning
 + * costs TU" an eighth at a time the shorter way round, each the armor's turn cost (as the game's
 + * turn charges it; nothing in Doom mode), the turn and the use both wanting their time units
 + * before either is spent; with free turning for nothing.
@@ -35817,7 +35901,8 @@ index 000000000..4edfcdbcf
 + * directionTo: the eighth it lies in), an eighth at a time the shorter way round, each eighth
 + * costing the armor's turn cost (a tank's turret turns instead, for 1), as UnitTurnBState
 + * charges it. A melee blow turns the soldier the same way to the unit under the crosshair beside
-+ * them, or to the wall, door or object under it (see fire, turnBeforeUse). Turning by the rules
++ * them, or to the wall, door or object under it, or to a body under it beside them (see fire,
++ * meleeDowned, turnBeforeUse). Turning by the rules
 + * only: with free turning the soldier faces the target for free first (see fire). Nothing for
 + * psi (no turn) or in Doom mode (time units don't run out).
 + * @param unit The soldier aiming.
@@ -35847,9 +35932,11 @@ index 000000000..4edfcdbcf
 +	if (mode == BA_HIT)
 +	{
 +		// A melee blow: the turn to the unit under the crosshair beside the soldier, or to the
-+		// wall, door or object under it within reach, as fire takes them.
++		// wall, door or object under it within reach, or, with no one standing in reach the way
++		// the soldier faces, to a body under it beside them (setting "Melee hits walls and the
++		// downed"), as fire takes them.
 +		const MeleeAim aim = meleeTarget(unit);
-+		Position struck;
++		Position struck, facedTile;
 +		int part = V_EMPTY;
 +		if (aim.target)
 +		{
@@ -35858,6 +35945,11 @@ index 000000000..4edfcdbcf
 +		else if (aim.refusal.empty() && meleeStrikesTerrain(weapon) && crosshairTerrainMelee(unit, struck, part, Options::fpsMeleeFloors))
 +		{
 +			direction = unit->directionTo(struck.toTile());
++		}
++		else if (aim.refusal.empty() && Options::fpsMeleeTerrain
++			&& !_save->getTileEngine()->validMeleeRange(unit->getPosition(), unit->getDirection(), unit, nullptr, &facedTile))
++		{
++			direction = meleeDownedTarget(unit).direction;
 +		}
 +		if (direction < 0 || direction == unit->getDirection())
 +		{
@@ -37040,7 +37132,8 @@ index 000000000..4edfcdbcf
 +	// setting "Melee hits floors", the floor or ceiling under it too (see meleeFloor); a unit
 +	// straight above or below the game's line reaches (see meleeTarget); with the crosshair on none of
 +	// these (open floor, the sky, out of reach), as the game does it: who is in reach the way the
-+	// soldier faces, then (that setting) a body lying in front (see meleeDowned). The turn goes
++	// soldier faces, then (that setting) a body lying down: the one under the crosshair beside the
++	// soldier, turning to it, or else in front or at the feet (see meleeDowned). The turn goes
 +	// by the rules or is free (turnBeforeUse), and the game does the attack as its own action,
 +	// which needs no target click.
 +	if (mode == BA_HIT)
