@@ -132,7 +132,7 @@ struct VoxelUnitModel
 	int hitFrom[3] = {}, hitSize[3] = {};
 	/// Whether a shot meets the body at a point (voxels to the body's right, ahead and up from the middle of its feet)
 	/// coming from direction (0-7) at the body's height (level) or from above.
-	bool hitAt(float right, float ahead, float up, int direction, bool level) const;
+	bool hitAt(float across, float along, float height, int direction, bool level) const;
 };
 
 /// The voxel bodies of the units seen so far in a battle, one for each unit and pose. A body is made

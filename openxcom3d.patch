@@ -61028,10 +61028,10 @@ index 000000000..bfab474b7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..badb3b092
+index 000000000..376082f5f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,1842 @@
+@@ -0,0 +1,1927 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -61155,6 +61155,10 @@ index 000000000..badb3b092
 +constexpr float WholeHip = 0.42f, WholeMiddle = 0.12f;
 +/// A body down (its last death frame's pose) is at most this much of its standing height (see fitFall).
 +constexpr float DownAtMost = 0.4f;
++/// A piece added for a view (see matchViews) keeps to the body's own surface: a depth's agreement with the other views
++/// counts BodyPull less for each voxel it lies from it (up to FarSteps half voxels: farther counts as that far).
++constexpr float BodyPull = 1.0f;
++constexpr Uint8 FarSteps = 24;
 +
 +const Routine Routines[] = {
 +	{ 0, false, true, true, true, { 1, 0, -1, 0, 1, 0, -1, 0 } },
@@ -62296,11 +62300,16 @@ index 000000000..badb3b092
 +/// quite agree on one shape (a claw, a tail, a crest drawn a little differently in each), so seen from one of the 8
 +/// directions the body shows only its voxels inside that direction's drawing (along the slant for a camera above, level
 +/// for one at the unit's height: see VoxelUnitModel::views), and what the drawing has that they leave bare is added for
-+/// that view: each connected piece of it on its pixels' lines of sight, at the one depth where the most other views
-+/// (their neighbours the most) have it inside their drawing, four voxels to a pixel; of the part on top there, coloured as the
-+/// drawing; and shown from every view whose drawing it falls inside, coloured there by that drawing. A big unit's own
-+/// voxels show where its solid drawing is (solidOnTop: without the fine detail, see keepSolid): the sparks of a hover
-+/// field below a disc are the views' pieces, not the disc's shape seen there.
++/// that direction: each pixel of it on its line of sight, at the depth where the most other views (their neighbours the
++/// most) have it inside their drawing and the fewest off the unit (outside their drawing's row), as near the body's own
++/// surface as that allows (BodyPull: a claw stays on the arm it's drawn on, a hover field's sparks under the disc); the
++/// depths then evened out over each connected piece of it (each the middle one of its 3x3 neighbours' in the piece: the
++/// piece follows the body's surface, not one flat layer); four voxels to a pixel, of the part on top there, coloured as
++/// the drawing. A piece shows from its own direction only (level and slanted): seen from another it lies along that
++/// view's line of sight, and seen from beside that, it would stretch into a streak. A pixel whose line of sight never
++/// enters the body's space (a big unit's lowest rows, read level on their tile's floor: below the ground) gets none. A
++/// big unit's own voxels show where its solid drawing is (solidOnTop: without the fine detail, see keepSolid): the
++/// sparks of a hover field below a disc are the views' pieces, not the disc's shape seen there.
 +void matchViews(VoxelUnitModel &model, const PartFrames parts[PartCount], const std::vector<int> onTop[8], const std::vector<int> solidOnTop[8])
 +{
 +	const float half = AcrossFrom < 0.0f ? -AcrossFrom : 14.0f, top = UpFrom + GridUp * Cell;
@@ -62324,7 +62333,60 @@ index 000000000..badb3b092
 +	model.views.resize(own);
 +	for (size_t k = 0; k < own; ++k) model.views[k] = viewsAt(solidOnTop, model.right[k], model.ahead[k], model.up[k]);
 +	model.addedFrom = own;
-+	std::vector<Uint8> bare(FrameSize * FrameSize);
++	// Each direction's drawing's rows, from their first drawn pixel to their last: a place outside its row is off the unit.
++	int rowFirst[8][FrameSize], rowLast[8][FrameSize];
++	for (int d = 0; d < 8; ++d)
++	{
++		for (int row = 0; row < FrameSize; ++row)
++		{
++			rowFirst[d][row] = FrameSize;
++			rowLast[d][row] = -1;
++			for (int column = 0; column < FrameSize; ++column)
++			{
++				if (onTop[d][row * FrameSize + column] < 0) continue;
++				rowFirst[d][row] = std::min(rowFirst[d][row], column);
++				rowLast[d][row] = column;
++			}
++		}
++	}
++	auto offUnit = [&](int d, float column, float row) {
++		const int c = (int)std::floor(column), r = (int)std::floor(row);
++		return r < 0 || r >= FrameSize || c < rowFirst[d][r] || c > rowLast[d][r];
++	};
++	// How far each cell of the grid is from the body's own surface: steps along the grid's axes (from its surface voxels'
++	// cells outwards), up to FarSteps.
++	auto cellOf = [&](float right, float ahead, float up) {
++		const int across = (int)std::floor((right - AcrossFrom) / Cell), along = (int)std::floor((ahead - AlongFrom) / Cell);
++		const int height = (int)std::floor((up - UpFrom) / Cell);
++		return across < 0 || along < 0 || height < 0 || across >= GridAcross || along >= GridAlong || height >= GridUp ? -1 : cellIndex(across, along, height);
++	};
++	std::vector<Uint8> away(GridCells, FarSteps);
++	std::vector<int> wave;
++	for (size_t k = 0; k < own; ++k)
++	{
++		const int cell = cellOf(model.right[k], model.ahead[k], model.up[k]);
++		if (cell < 0 || !away[cell]) continue;
++		away[cell] = 0;
++		wave.push_back(cell);
++	}
++	for (size_t next = 0; next < wave.size(); ++next)
++	{
++		const int cell = wave[next], height = cell % GridUp, along = (cell / GridUp) % GridAlong, across = cell / (GridUp * GridAlong);
++		if (away[cell] + 1 >= FarSteps) continue;
++		const int around[6][3] = { { across - 1, along, height }, { across + 1, along, height }, { across, along - 1, height }, { across, along + 1, height },
++			{ across, along, height - 1 }, { across, along, height + 1 } };
++		for (const auto &place : around)
++		{
++			if (place[0] < 0 || place[1] < 0 || place[2] < 0 || place[0] >= GridAcross || place[1] >= GridAlong || place[2] >= GridUp) continue;
++			Uint8 &there = away[cellIndex(place[0], place[1], place[2])];
++			if (there <= away[cell] + 1) continue;
++			there = (Uint8)(away[cell] + 1);
++			wave.push_back(cellIndex(place[0], place[1], place[2]));
++		}
++	}
++	constexpr float NoPlace = -1e9f;
++	std::vector<Uint8> bare(FrameSize * FrameSize), inPiece(FrameSize * FrameSize, 0);
++	std::vector<float> depth(FrameSize * FrameSize, NoPlace), evened;
 +	std::vector<int> piece;
 +	for (int reading = 0; reading < 2; ++reading)
 +	{
@@ -62332,6 +62394,7 @@ index 000000000..badb3b092
 +		for (int d = 0; d < 8; ++d)
 +		{
 +			const int slot = viewSlot(d, level);
++			const Uint16 ownDirection = (Uint16)((1u << viewSlot(d, true)) | (1u << viewSlot(d, false)));
 +			// the drawing's pixels no voxel shown in this view covers
 +			for (int i = 0; i < FrameSize * FrameSize; ++i) bare[i] = onTop[d][i] >= 0;
 +			for (size_t k = 0; k < model.part.size(); ++k)
@@ -62342,7 +62405,36 @@ index 000000000..badb3b092
 +				const int c = (int)std::floor(column), r = (int)std::floor(row);
 +				if (c >= 0 && r >= 0 && c < FrameSize && r < FrameSize) bare[r * FrameSize + c] = 0;
 +			}
-+			// in connected pieces, each at its depth
++			// each one's depth on its line of sight: where the other views agree most it's on the unit, near the body's surface
++			for (int pixel = 0; pixel < FrameSize * FrameSize; ++pixel)
++			{
++				depth[pixel] = NoPlace;
++				if (!bare[pixel]) continue;
++				float best = -1e30f;
++				for (float nearness = -26.0f; nearness <= 26.0f; nearness += 0.5f)
++				{
++					float right, ahead, up;
++					unproject(pixel % FrameSize + 0.5f, pixel / FrameSize + 0.5f, nearness, d, level, right, ahead, up);
++					if (std::abs(right) > half || std::abs(ahead) > half || up < UpFrom || up > top) continue;
++					const int cell = cellOf(right, ahead, up);
++					float score = -BodyPull * (cell < 0 ? FarSteps : away[cell]) * Cell - 0.01f * planeLength(right, ahead); // (alike: nearest the middle)
++					for (int e = 0; e < 8; ++e)
++					{
++						if (e == d) continue;
++						float column, row, other;
++						project(right, ahead, up, e, level, column, row, other);
++						const float weight = e == (d + 1) % 8 || e == (d + 7) % 8 ? 2.0f : 1.0f;
++						if (drawn(e, column, row)) score += weight;
++						else if (offUnit(e, column, row)) score -= weight;
++					}
++					if (score > best)
++					{
++						best = score;
++						depth[pixel] = nearness;
++					}
++				}
++			}
++			// in connected pieces, the depths evened out, and the pieces added
 +			for (int start = 0; start < FrameSize * FrameSize; ++start)
 +			{
 +				if (!bare[start]) continue;
@@ -62360,47 +62452,38 @@ index 000000000..badb3b092
 +							piece.push_back(r * FrameSize + c);
 +						}
 +				}
-+				float bestNearness = 0.0f, bestScore = -1e30f;
-+				for (float nearness = -26.0f; nearness <= 26.0f; nearness += 0.5f)
++				for (int pixel : piece) inPiece[pixel] = 1;
++				evened.assign(piece.size(), NoPlace);
++				for (size_t i = 0; i < piece.size(); ++i)
 +				{
-+					float score = 0.0f, spread = 0.0f;
-+					for (int pixel : piece)
-+					{
-+						float right, ahead, up;
-+						unproject(pixel % FrameSize + 0.5f, pixel / FrameSize + 0.5f, nearness, d, level, right, ahead, up);
-+						if (std::abs(right) > half || std::abs(ahead) > half || up < UpFrom || up > top)
++					if (depth[piece[i]] == NoPlace) continue;
++					float around[9];
++					int many = 0;
++					const int column = piece[i] % FrameSize, row = piece[i] / FrameSize;
++					for (int dy = -1; dy <= 1; ++dy)
++						for (int dx = -1; dx <= 1; ++dx)
 +						{
-+							score -= 1000.0f;
-+							continue;
++							const int c = column + dx, r = row + dy;
++							if (c < 0 || r < 0 || c >= FrameSize || r >= FrameSize || !inPiece[r * FrameSize + c] || depth[r * FrameSize + c] == NoPlace) continue;
++							around[many++] = depth[r * FrameSize + c];
 +						}
-+						spread += planeLength(right, ahead);
-+						for (int e = 0; e < 8; ++e)
-+						{
-+							if (e == d) continue;
-+							float column, row, other;
-+							project(right, ahead, up, e, level, column, row, other);
-+							if (drawn(e, column, row)) score += e == (d + 1) % 8 || e == (d + 7) % 8 ? 2.0f : 1.0f;
-+						}
-+					}
-+					score -= 0.01f * spread / piece.size(); // (alike: nearest the body's middle)
-+					if (score > bestScore)
-+					{
-+						bestScore = score;
-+						bestNearness = nearness;
-+					}
++					std::nth_element(around, around + many / 2, around + many);
++					evened[i] = around[many / 2];
 +				}
-+				for (int pixel : piece)
++				for (int pixel : piece) inPiece[pixel] = 0;
++				for (size_t i = 0; i < piece.size(); ++i)
 +				{
-+					const int part = onTop[d][pixel];
++					if (evened[i] == NoPlace) continue;
++					const int pixel = piece[i], part = onTop[d][pixel];
 +					for (int quarter = 0; quarter < 4; ++quarter)
 +					{
 +						// (four to a pixel, at its quarters' middles: nearer each other than a voxel's square is wide, no gaps up close)
 +						float right, ahead, up;
-+						unproject(pixel % FrameSize + 0.25f + 0.5f * (quarter % 2), pixel / FrameSize + 0.25f + 0.5f * (quarter / 2), bestNearness, d, level,
++						unproject(pixel % FrameSize + 0.25f + 0.5f * (quarter % 2), pixel / FrameSize + 0.25f + 0.5f * (quarter / 2), evened[i], d, level,
 +							right, ahead, up);
 +						Uint8 colours[16];
 +						std::fill(colours, colours + 16, parts[part].frame[d][pixel]);
-+						const Uint16 views = fits(right, ahead, up, colours) | (Uint16)(1u << slot);
++						const Uint16 views = (fits(right, ahead, up, colours) | (Uint16)(1u << slot)) & ownDirection;
 +						colours[slot] = parts[part].frame[d][pixel];
 +						model.right.push_back(right);
 +						model.ahead.push_back(ahead);
@@ -62465,8 +62548,10 @@ index 000000000..badb3b092
 +		PartFrames solid = parts[0];
 +		if (routine.big) keepSolid(solid);
 +		// (a big unit's rows aren't heights: its four tiles' pictures stand on floors 8 rows apart, see tileFloorRows; its
-+		// shape is the 8 views' alone)
-+		const std::vector<Uint8> shape = routine.big ? std::vector<Uint8>(GridCells, 1) : limb(solid, RightSide), hull = carve(solid, routine.big ? 0 : 1, shape);
++		// shape is the 8 views' alone, strictly, but for a big walker's: its frames, as a one-tile unit's, don't quite
++		// agree, and a strict hull of them lost its shell and horns)
++		const std::vector<Uint8> shape = routine.big ? std::vector<Uint8>(GridCells, 1) : limb(solid, RightSide);
++		const std::vector<Uint8> hull = carve(solid, routine.big && !routine.legsSwing ? 0 : 1, shape);
 +		for (int i = 0; i < GridCells; ++i) if (shape[i] && hull[i]) owner[i] = PartCodes[0];
 +	}
 +	else
@@ -62821,14 +62906,14 @@ index 000000000..badb3b092
 +
 +/**
 + * Whether a shot meets the body at a point (see hits): a solid voxel there that shows from where the shot comes.
-+ * @param right, ahead, up The point: voxels to the body's right, ahead and up from the middle of its feet.
++ * @param across, along, height The point: voxels to the body's right, ahead and up from the middle of its feet.
 + * @param direction The view the shot comes from (0-7, as the colours' direction: see colour).
 + * @param level From about the body's height (else from above).
 + * @return True if the shot meets it there.
 + */
-+bool VoxelUnitModel::hitAt(float right, float ahead, float up, int direction, bool level) const
++bool VoxelUnitModel::hitAt(float across, float along, float height, int direction, bool level) const
 +{
-+	const int x = (int)std::floor(right) - hitFrom[0], y = (int)std::floor(ahead) - hitFrom[1], z = (int)std::floor(up) - hitFrom[2];
++	const int x = (int)std::floor(across) - hitFrom[0], y = (int)std::floor(along) - hitFrom[1], z = (int)std::floor(height) - hitFrom[2];
 +	if (hits.empty() || x < 0 || y < 0 || z < 0 || x >= hitSize[0] || y >= hitSize[1] || z >= hitSize[2]) return false;
 +	return hits[((size_t)x * hitSize[1] + y) * hitSize[2] + z] >> ((level ? 0 : 8) + direction) & 1;
 +}
@@ -63957,7 +64042,7 @@ index 000000000..af346e49f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.h b/src/FirstPerson/FirstPersonVoxelUnits.h
 new file mode 100644
-index 000000000..aeb8f4d53
+index 000000000..60d1a93c2
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.h
 @@ -0,0 +1,202 @@
@@ -64095,7 +64180,7 @@ index 000000000..aeb8f4d53
 +	int hitFrom[3] = {}, hitSize[3] = {};
 +	/// Whether a shot meets the body at a point (voxels to the body's right, ahead and up from the middle of its feet)
 +	/// coming from direction (0-7) at the body's height (level) or from above.
-+	bool hitAt(float right, float ahead, float up, int direction, bool level) const;
++	bool hitAt(float across, float along, float height, int direction, bool level) const;
 +};
 +
 +/// The voxel bodies of the units seen so far in a battle, one for each unit and pose. A body is made
