@@ -207,21 +207,12 @@ void FirstPersonView::spawnBattleEffects(float elapsedSeconds)
 
 /**
  * Reacts to the explosions that appeared on the map since the last frame (each one only
- * once). The camera shakes if one is close. A big one (a grenade, a rocket, a blown-up tile)
- * blackens the ground around it and throws out a flash, embers and (with Modern smoke) puffs of
- * smoke; a small one (a bullet's hit, a blow) throws a few sparks, but not a blow or psi attack
- * that missed (a player, GitHub issue #60: "MELEE swing should only emit spark particles on
- * successful hit"; Explosion::isMiss), whose animation still plays as on the map.
- *
- * The particles are thrown with FirstPersonParticles::burst, whose arguments are, in order:
- * where, how many, kind, group, the colours and how many of them, the slowest and fastest
- * speed (voxels per second), the upward bias of the directions, gravity (voxels per second
- * squared, negative rises), drag (share of the speed lost per second), the shortest and
- * longest life (seconds), and the size (pixels at one tile's distance).
+ * once), and to the fireballs of a chain of explosions settled at once that started since
+ * (setting "Instant chain explosions": each sprite as a blown-up tile's, see
+ * FirstPersonChains.cpp): see spawnBlastEffects.
  */
 void FirstPersonView::spawnExplosionEffects()
 {
-	typedef FirstPersonParticles P; // short for the particle system: its kinds (P::GLOW...) and groups (P::EFFECT...)
 	// The explosions on the map this frame; next frame, these count as already seen.
 	std::set<const Explosion*> currentExplosions;
 	if (_map)
@@ -233,53 +224,85 @@ void FirstPersonView::spawnExplosionEffects()
 			{
 				continue;
 			}
-			// A new explosion: where it is (in voxels), and how close to the eye. Closeness is 1
-			// at the eye and falls to 0 at 260 voxels (about 16 tiles) for a big one, 90 voxels
-			// for a small one; within that reach the camera shakes, harder the closer it is.
 			const Position position = explosion->getPosition();
 			const float centre[3] = { (float)position.x, (float)position.y, (float)position.z };
-			const float dx = centre[0] - (float)_eye[0], dy = centre[1] - (float)_eye[1], dz = centre[2] - (float)_eye[2]; // from the eye
-			const float closeness = 1.0f - std::sqrt(dx * dx + dy * dy + dz * dz) / (explosion->isBig() ? 260.0f : 90.0f);
-			if (closeness > 0.0f)
-			{
-				addShake(closeness * (explosion->isBig() ? 3.0f : 1.0f));
-			}
-			if (explosion->isBig())
-			{
-				// The ground around it is blackened: a scorch of 14 voxels' radius on top of its
-				// level's floor, if it went off near the floor (up to 60 scorches are kept).
-				const float floorZ = std::floor(centre[2] / 24.0f) * 24.0f + GroundTop;
-				if (centre[2] - floorZ < 18.0f && _scorches.size() < 60)
-				{
-					_scorches.push_back({ { centre[0], centre[1], floorZ }, 14.0f });
-				}
-				const Uint8 smokeColors[2] = { _colors.smoke, shadeColor(_colors.smoke, 3) };
-				// The flash: a few big blobs in the two hottest fire colours, barely moving and
-				// gone within a fifth of a second (not with the setting "Muzzle flashes" off).
-				if (Options::fpsMuzzleFlash)
-				{
-					_particles.burst(centre, 18, P::GLOW, P::EFFECT, _colors.fire, 2, 10, 40, 0, 0, 3, 0.08f, 0.2f, 6);
-				}
-				// Embers in all four fire colours, flung out fast (mostly upwards), falling back
-				// and glowing for a second or so.
-				_particles.burst(centre, 60, P::GLOW, P::EFFECT, _colors.fire, 4, 40, 140, 0.5f, 150, 0.6f, 0.6f, 1.5f, 2);
-				// Big puffs of smoke in two greys, rising slowly and hanging for a few seconds: with
-				// the setting "Smoke" on Modern only (Original shows the game's own smoke that the
-				// explosion leaves on the tiles, and nothing of ours, as for burning tiles).
-				if (FirstPerson::smokeMode() == 2)
-				{
-					_particles.burst(centre, 26, P::LIT, P::EFFECT, smokeColors, 2, 6, 24, 0.7f, -12, 0.8f, 2.0f, 3.5f, 5);
-				}
-			}
-			else if (!explosion->isMiss())
-			{
-				// A small explosion (a hit): a few sparks, falling and gone within half a second.
-				const Uint8 sparkColors[2] = { _colors.spark, _colors.fire[1] };
-				_particles.burst(centre, 8, P::GLOW, P::EFFECT, sparkColors, 2, 20, 60, 0.3f, 120, 1.0f, 0.15f, 0.4f, 2);
-			}
+			spawnBlastEffects(centre, explosion->isBig(), explosion->isMiss());
 		}
 	}
 	_seenExplosions.swap(currentExplosions);
+	// A chain's fireball sprites come in the order they start: those after the last one seen are new.
+	for (const FirstPerson::ChainFireball &fireball : _chainFireballs)
+	{
+		if (fireball.serial > _chainFireballsSeen)
+		{
+			const float centre[3] = { (float)fireball.position.x, (float)fireball.position.y, (float)fireball.position.z };
+			spawnBlastEffects(centre, true, false);
+			_chainFireballsSeen = fireball.serial;
+		}
+	}
+}
+
+/**
+ * What one new explosion sprite throws out. The camera shakes if it is close. A big one (a
+ * grenade, a rocket, a blown-up tile) blackens the ground around it and throws out a flash,
+ * embers and (with Modern smoke) puffs of smoke; a small one (a bullet's hit, a blow) throws a few
+ * sparks, but not a blow or psi attack that missed (a player, GitHub issue #60: "MELEE swing should
+ * only emit spark particles on successful hit"; Explosion::isMiss), whose animation still plays as
+ * on the map.
+ *
+ * The particles are thrown with FirstPersonParticles::burst, whose arguments are, in order:
+ * where, how many, kind, group, the colours and how many of them, the slowest and fastest
+ * speed (voxels per second), the upward bias of the directions, gravity (voxels per second
+ * squared, negative rises), drag (share of the speed lost per second), the shortest and
+ * longest life (seconds), and the size (pixels at one tile's distance).
+ * @param centre Where it is, in voxels.
+ * @param big A big one (a blast)?
+ * @param miss The animation of a blow or psi attack that missed?
+ */
+void FirstPersonView::spawnBlastEffects(const float centre[3], bool big, bool miss)
+{
+	typedef FirstPersonParticles P; // short for the particle system: its kinds (P::GLOW...) and groups (P::EFFECT...)
+	// How close to the eye: 1 at the eye, falling to 0 at 260 voxels (about 16 tiles) for a big
+	// one, 90 voxels for a small one; within that reach the camera shakes, harder the closer it is.
+	const float dx = centre[0] - (float)_eye[0], dy = centre[1] - (float)_eye[1], dz = centre[2] - (float)_eye[2]; // from the eye
+	const float closeness = 1.0f - std::sqrt(dx * dx + dy * dy + dz * dz) / (big ? 260.0f : 90.0f);
+	if (closeness > 0.0f)
+	{
+		addShake(closeness * (big ? 3.0f : 1.0f));
+	}
+	if (big)
+	{
+		// The ground around it is blackened: a scorch of 14 voxels' radius on top of its
+		// level's floor, if it went off near the floor (up to 60 scorches are kept).
+		const float floorZ = std::floor(centre[2] / 24.0f) * 24.0f + GroundTop;
+		if (centre[2] - floorZ < 18.0f && _scorches.size() < 60)
+		{
+			_scorches.push_back({ { centre[0], centre[1], floorZ }, 14.0f });
+		}
+		const Uint8 smokeColors[2] = { _colors.smoke, shadeColor(_colors.smoke, 3) };
+		// The flash: a few big blobs in the two hottest fire colours, barely moving and
+		// gone within a fifth of a second (not with the setting "Muzzle flashes" off).
+		if (Options::fpsMuzzleFlash)
+		{
+			_particles.burst(centre, 18, P::GLOW, P::EFFECT, _colors.fire, 2, 10, 40, 0, 0, 3, 0.08f, 0.2f, 6);
+		}
+		// Embers in all four fire colours, flung out fast (mostly upwards), falling back
+		// and glowing for a second or so.
+		_particles.burst(centre, 60, P::GLOW, P::EFFECT, _colors.fire, 4, 40, 140, 0.5f, 150, 0.6f, 0.6f, 1.5f, 2);
+		// Big puffs of smoke in two greys, rising slowly and hanging for a few seconds: with
+		// the setting "Smoke" on Modern only (Original shows the game's own smoke that the
+		// explosion leaves on the tiles, and nothing of ours, as for burning tiles).
+		if (FirstPerson::smokeMode() == 2)
+		{
+			_particles.burst(centre, 26, P::LIT, P::EFFECT, smokeColors, 2, 6, 24, 0.7f, -12, 0.8f, 2.0f, 3.5f, 5);
+		}
+	}
+	else if (!miss)
+	{
+		// A small explosion (a hit): a few sparks, falling and gone within half a second.
+		const Uint8 sparkColors[2] = { _colors.spark, _colors.fire[1] };
+		_particles.burst(centre, 8, P::GLOW, P::EFFECT, sparkColors, 2, 20, 60, 0.3f, 120, 1.0f, 0.15f, 0.4f, 2);
+	}
 }
 
 /**
@@ -296,7 +319,7 @@ void FirstPersonView::spawnTileFireAndSmoke(float elapsedSeconds)
 	for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
 	{
 		Tile *tile = _save->getTile(tileIndex);
-		if ((!tile->getFire() && !tile->getSmoke()) || !_tileViews[tileIndex].discovered)
+		if ((!shownFire(tileIndex, tile) && !tile->getSmoke()) || !_tileViews[tileIndex].discovered)
 		{
 			continue;
 		}
@@ -310,8 +333,9 @@ void FirstPersonView::spawnTileFireAndSmoke(float elapsedSeconds)
 			continue;
 		}
 		// Fire: about ten flames a second, rising fast from somewhere on the tile and glowing
-		// for a second or so in the fire colours.
-		if (tile->getFire() && _particles.random() < 10.0f * elapsedSeconds)
+		// for a second or so in the fire colours (a chain of explosions' fire once its ripple has
+		// passed over the tile: see shownFire).
+		if (shownFire(tileIndex, tile) && _particles.random() < 10.0f * elapsedSeconds)
 		{
 			P::Particle flame;
 			flame.pos[0] = centreX + _particles.random(-6, 6);

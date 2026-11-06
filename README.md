@@ -52,7 +52,10 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 - **Enemies by your soldier's own eyes:** an enemy only squadmates see isn't drawn through smoke, only its marker.
 - **A tank's turret switch:** **TURRET** on the top bar turns the turret alone, at the turret's cost; off, the whole tank turns as before.
 - **Live motion scanner**, a setting (off, on with the FPS playstyle): off, the scanner is one look from where it's used, as in the game.
-- **Fixed:** T'leth's first stage and the artifact site's second have their own dark green rock overhead, not black; the game's Bug Hunt and debug line sits under the top bar, not over its buttons; flying with *Falling* off goes sideways through the air again; touching down keeps flight on (Page Down on the ground switches it off).
+- **Finer sprites up close:** *Sprite upscaling*'s new top choice, **Finest** (the default), draws units, items and effects six times finer, with softer shading and small eyes and highlights kept; *Smooth* and *Smooth + detail* are cleaner too.
+- **Chain explosions as one blast:** with *Instant chain explosions* on, a chain of explosives resolves at once, shown as a fireball at each explosive in quick succession with a single explosion sound; the damage is the game's own, and an explosion that sets nothing off is unchanged.
+- **A melee blow's hit chance** by the crosshair, as a shot's (**MELEE 23% 4TU**).
+- **Fixed:** T'leth's first stage and the artifact site's second have their own dark green rock overhead, not black; the game's Bug Hunt and debug line sits under the top bar, not over its buttons; flying with *Falling* off goes sideways through the air again; touching down keeps flight on (Page Down on the ground switches it off); Ctrl+End's debug light lights the 3D view as it lights the map; a melee blow strikes a body lying on a diagonal tile too.
 - **The logo** in every download: its picture, a sharper icon (256 pixels), and on Windows an icon for a shortcut.
 
 ## Earlier versions

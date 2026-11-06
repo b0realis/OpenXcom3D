@@ -243,9 +243,20 @@ bool airFallLandsOn(const SavedBattleGame *save, const Tile *tile);
 /// Setting "Shotgun pellets in flight": do a shotgun's pellets fly beside its round (in 3D and on
 /// the map), rather than all landing at once? They're traced as the round is fired, and hit as it lands.
 bool pelletsInFlight(BattlescapeState *state);
-/// Setting "Instant chain explosions": does a terrain explosion set off by a blast settle at once,
-/// with the rest of its chain, without blasts to watch (in 3D only)?
+/// Setting "Instant chain explosions": do the explosives a blast sets off go up at once, the whole
+/// chain one event under that blast, the 3D view showing it as one big blast (in 3D only)?
 bool instantChains(BattlescapeState *state);
+/// Setting "Instant chain explosions" (a player, GitHub issue #105: "1 big boom"): an explosive of a
+/// chain settling at once goes up, noted for the 3D view's ripple of fireballs before its blast
+/// changes the map (the chain's first keeps the map and the units as they were, see
+/// FirstPersonChains.cpp).
+void chainLink(SavedBattleGame *save, const Position &centre, int power, bool first);
+/// Setting "Instant chain explosions": the chain's last explosive has settled (none other set off):
+/// its picture is worked out, before the 3D view's next frame (see FirstPersonChains.cpp).
+void chainSettled(SavedBattleGame *save);
+/// Setting "Instant chain explosions": does the battle wait while the 3D view shows a chain settled
+/// at once rippling through (its dead fall after it)?
+bool chainRippleHolds(BattlescapeState *state);
 /// Setting "Each pellet on its own": do a shotgun's pellets and a volley's two rounds each land on
 /// their own (in either view), none lost when the lead pellet leaves the map?
 bool eachPellet(BattlescapeState *state);
@@ -324,6 +335,9 @@ inline void freeAimOrigin(BattlescapeState *, const BattleAction &, Position &) 
 inline bool fastShots(BattlescapeState *, const BattleUnit *) { return false; }
 inline bool pelletsInFlight(BattlescapeState *) { return false; }
 inline bool instantChains(BattlescapeState *) { return false; }
+inline void chainLink(SavedBattleGame *, const Position &, int, bool) { }
+inline void chainSettled(SavedBattleGame *) { }
+inline bool chainRippleHolds(BattlescapeState *) { return false; }
 inline bool eachPellet(BattlescapeState *) { return false; }
 enum StatBar { STAT_TU, STAT_ENERGY, STAT_HEALTH, STAT_MORALE, STAT_MANA };
 inline double statBarScale(BattlescapeState *, int, int, int) { return 1.0; }

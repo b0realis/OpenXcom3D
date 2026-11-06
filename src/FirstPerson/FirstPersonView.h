@@ -63,6 +63,7 @@
 #include <vector>
 #include "../Battlescape/Position.h"
 #include "../Engine/InteractiveSurface.h"
+#include "FirstPersonChains.h"
 #include "FirstPersonParticles.h"
 #include "FirstPersonVoxelModel.h"
 #include "FirstPersonVoxelUnits.h"
@@ -658,6 +659,10 @@ private:
 	void startWatchingTile(int index, Tile *tile);
 	/// One tile's snapshot: models, animation, light, what has been seen.
 	void snapshotTile(int index, Tile *tile, bool trackWalls);
+	/// A tile's part as the view shows it: as it was before a chain of explosions while the chain's ripple hasn't passed over it.
+	const MapData *shownPart(int index, Tile *tile, int part) const;
+	/// A tile's fire as the view shows it: as it was before a chain of explosions while the chain's ripple hasn't passed over it.
+	int shownFire(int index, const Tile *tile) const;
 	/// Notes the light sources and UFO machinery on a tile near the camera.
 	void noteLightsAndDevices(const Tile *tile, const TileView &tileView);
 	/// Keeps only the lights nearest the camera.
@@ -696,6 +701,10 @@ private:
 	bool airless() const { return _sky == SkySpace || _sky == SkyOrbit || _sky == SkyMoon; }
 	/// Picks this frame's colours from the palette, for the time of day.
 	void updateColors();
+	/// The isometric map's debug vision mode (Ctrl+End): 0 off, 1 the light halved, 2 full bright.
+	int debugVision() const;
+	/// A shade of the game's light as the isometric map shows it now: in its debug vision modes, or with night vision.
+	int mapShade(int gameShade) const;
 	/// The game's light at a point, blended between tile centres (0 bright .. 15 dark); also a UFO's light there.
 	float lightAt(float x, float y, float z, float *ufoGlow = nullptr) const;
 	/// Is there anything solid between two points? (A shadow ray.)
@@ -989,7 +998,7 @@ private:
 
 	struct Upscaled { Surface *surface; Uint32 used; };
 	std::unordered_map<Uint64, Upscaled> _upscaledSprites; // the upscaled frames made so far, by their pixels
-	struct UpscaleJob { Uint64 key; int w, h; bool detail; std::vector<Uint8> pixels; std::vector<SDL_Color> palette; Uint64 paletteHash; };
+	struct UpscaleJob { Uint64 key; int w, h, factor; bool detail, keepFeatures; std::vector<Uint8> pixels; std::vector<SDL_Color> palette; Uint64 paletteHash; };
 	std::thread _upscaleThread;                         // the worker thread (started on first use)
 	std::mutex _upscaleMutex;                           // guards the job queue and the finished results
 	std::condition_variable _upscaleWake;               // wakes the worker when there's a job (or it should stop)
@@ -1003,8 +1012,10 @@ private:
 
 	/// The upscaling worker thread: makes the bigger versions of queued sprite frames.
 	void upscaleWorker();
-	/// A sprite frame's upscaled version, or the original until it's ready.
-	const Surface *upscaled(const Surface *sprite);
+	/// A sprite frame's upscaled version (factor times bigger), or null until it's ready.
+	const Surface *upscaled(const Surface *sprite, int factor);
+	/// How much bigger units', items' and effects' frames are made for the setting (4, or 6 with "Finest").
+	int spriteUpscaleFactor() const;
 	/// Is a sprite at this point big enough on screen to be worth upscaling?
 	bool upscaleHere(const double world[3], double scale) const;
 	/// Draws a sprite, upscaled when it's close.
@@ -1026,6 +1037,9 @@ private:
 	std::vector<float> _glowDepth, _glowDepthScratch;  // the same for the glow's distance (summed, weighted by the glow): how far away the light is
 	std::vector<float> _glowHue, _glowHueScratch;      // the shining pixels' colour, red, green, blue and their weight per cell of a grid half as fine, blurred: the glow's own colour (see drawLightHalos)
 	std::set<const Explosion*> _seenExplosions;        // explosions already seen (each spawns its particles once)
+	FirstPerson::ChainHeldTiles _chainHeld;            // this frame: the tiles a chain of explosions' ripple hasn't passed over yet, as they were (setting "Instant chain explosions")
+	std::vector<FirstPerson::ChainFireball> _chainFireballs; // this frame: the chain's fireballs showing
+	Uint32 _chainFireballsSeen = 0;                    // the last of its fireball sprites seen (each spawns its particles once)
 
 	/// Is there open sky above this point?
 	bool openSky(float x, float y, float z) const;
@@ -1037,6 +1051,8 @@ private:
 	void spawnBattleEffects(float elapsedSeconds);
 	/// Spawns fire, embers, smoke and sparks for new explosions.
 	void spawnExplosionEffects();
+	/// What one new explosion sprite throws out: the shake, and a big one's scorch, flash, embers and smoke, a small one's sparks.
+	void spawnBlastEffects(const float centre[3], bool big, bool miss);
 	/// Spawns flames and smoke from burning and smoky tiles near the camera.
 	void spawnTileFireAndSmoke(float elapsedSeconds);
 	/// Spawns flames on burning units in sight.
@@ -1132,6 +1148,8 @@ private:
 	void advanceShot(Projectile *projectile);
 	/// Draws the flying projectile (or thrown item) and the explosions.
 	void drawProjectilesAndExplosions();
+	/// Draws the fireballs of a chain of explosions rippling through (setting "Instant chain explosions").
+	void drawChainFireballs();
 	/// The voxel model of an item's kind, made from its inventory picture the first time.
 	const ItemModel &itemModel(BattleItem *item);
 	/// Draws a thrown item in flight as its voxel model, tumbling (at a voxel, flying from another); false if it has none.

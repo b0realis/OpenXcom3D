@@ -326,11 +326,11 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		}
 		return *option.asBool() ? std::string(tr("STR_YES")) : std::string(tr("STR_NO"));
 	case OPTION_INT:
-		// Sprite upscaling is a choice of three, shown by name.
+		// Sprite upscaling is a choice of four, shown by name.
 		if (option.id() == "fpsSpriteUpscale")
 		{
-			static const char *const upscaleNames[] = { "STR_FPS_UPSCALE_OFF", "STR_FPS_UPSCALE_SMOOTH", "STR_FPS_UPSCALE_DETAIL" };
-			return std::string(tr(upscaleNames[std::clamp(*option.asInt(), 0, 2)]));
+			static const char *const upscaleNames[] = { "STR_FPS_UPSCALE_OFF", "STR_FPS_UPSCALE_SMOOTH", "STR_FPS_UPSCALE_DETAIL", "STR_FPS_UPSCALE_FINEST" };
+			return std::string(tr(upscaleNames[std::clamp(*option.asInt(), 0, 3)]));
 		}
 		// Particles are a choice of three, shown by name.
 		if (option.id() == "fpsParticles")
@@ -675,10 +675,10 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		{
 			*value = (*value + direction + 3) % 3;
 		}
-		// Sprite upscaling (off, smooth, smooth + detail): round and round too.
+		// Sprite upscaling (off, smooth, smooth + detail, finest): round and round too.
 		else if (value == &Options::fpsSpriteUpscale)
 		{
-			*value = (*value + direction + 3) % 3;
+			*value = (*value + direction + 4) % 4;
 		}
 		// How many voxels the camera sits below the game's eye height: 0 to 6.
 		else if (value == &Options::fpsEyeLower)

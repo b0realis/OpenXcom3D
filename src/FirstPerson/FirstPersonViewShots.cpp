@@ -436,6 +436,33 @@ void FirstPersonView::drawProjectilesAndExplosions()
 			drawSpriteBlend(sprite, nextSprite, blend, 15, explosion->isHit() ? 25 : 15, world, 12.0, 0);
 		}
 	}
+	drawChainFireballs();
+}
+
+/**
+ * Draws the fireballs of a chain of explosions settled at once rippling through it (setting
+ * "Instant chain explosions", see FirstPersonChains.cpp): each sprite a big explosion's, as the
+ * map's own blasts are drawn (above), each frame dissolving into the next over the game's frame
+ * time.
+ */
+void FirstPersonView::drawChainFireballs()
+{
+	if (_chainFireballs.empty())
+	{
+		return;
+	}
+	SurfaceSet *spriteSet = _game->getMod()->getSurfaceSet("X1.PCK");
+	for (const FirstPerson::ChainFireball &fireball : _chainFireballs)
+	{
+		const Surface *sprite = fireball.frame >= 0 && fireball.frame < (int)spriteSet->getTotalFrames() ? spriteSet->getFrame(fireball.frame) : nullptr;
+		if (!sprite)
+		{
+			continue;
+		}
+		const Surface *nextSprite = fireball.frame + 1 <= fireball.lastFrame && fireball.frame + 1 < (int)spriteSet->getTotalFrames() ? spriteSet->getFrame(fireball.frame + 1) : nullptr;
+		const double world[3] = { (double)fireball.position.x, (double)fireball.position.y, (double)fireball.position.z };
+		drawSpriteBlend(sprite, nextSprite, fireball.blend, sprite->getWidth() / 2, sprite->getHeight() / 2, world, 24.0, 0);
+	}
 }
 
 /**
