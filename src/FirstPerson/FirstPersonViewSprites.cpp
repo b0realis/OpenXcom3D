@@ -1007,11 +1007,13 @@ void FirstPersonView::drawUnits()
 		unitSprite.setViewRotation(3 - cameraDirection);
 
 		// The light on it, at its chest: the game's light, lamps, flashlight and flares, and
-		// the flash of a hit.
+		// the flash of a hit; in the map's first debug vision mode no darker than
+		// NightVisionShade, as the map draws units then (see debugVision).
 		_spriteBuffer->clear();
 		const float chest[3] = { (float)feet[0], (float)feet[1], (float)feet[2] + 12.0f };
-		const int shade = (int)std::lround(std::clamp(lightAt(chest[0], chest[1], chest[2]) - pointLight(chest, nullptr, false)
+		int shade = (int)std::lround(std::clamp(lightAt(chest[0], chest[1], chest[2]) - pointLight(chest, nullptr, false)
 			- flareLight(chest, nullptr, false) * 8.0f - flash * HitFlashShade, 0.0f, 15.0f));
+		if (debugVision() == 1) shade = std::min(shade, NightVisionShade);
 		if (Options::fpsShadows)
 		{
 			recordUnitShadow(feet, 5.5 * unitSize); // flying units too: the shadow on the ground shows where they hover

@@ -60,6 +60,7 @@
 #endif
 #include <SDL.h>
 #include "FirstPersonApi.h"
+#include "../Battlescape/Map.h"
 #include "../Engine/Logger.h"
 #include "../Engine/Options.h"
 #include "../Engine/Palette.h"
@@ -190,13 +191,14 @@ void FirstPersonView::updateColors()
 	};
 
 	// The time of day comes from the battle's global shade (0 bright day .. 15 dark night):
-	// full day up to shade 3, full night from shade 12. Night vision brightens open ground.
+	// full day up to shade 3, full night from shade 12. Night vision and the map's debug vision
+	// (see mapShade) brighten open ground, as they do the map's tiles.
 	const int globalShade = std::clamp(_save->getGlobalShade(), 0, 15);
 	_colors.night = std::clamp((globalShade - 3) / 9.0f, 0.0f, 1.0f);
 	_colors.underwater = _sky == SkySea;
 	// Rain and snow fall from clouds that cover the Earth's sky (GitHub issue #94).
 	_colors.overcast = _sky == SkyEarth && (_weather == "rain" || _weather == "snow");
-	_colors.ambient = _nightVision ? std::min(globalShade, 4) : globalShade;
+	_colors.ambient = mapShade(globalShade);
 	_colors.cloudTime = SDL_GetTicks() / 1000.0f; // seconds, to drift the clouds and ripple the sea floor's light
 	// This frame's waves on the sea (see waveHeight): each train's sine-table steps per voxel east
 	// and south, and how far it has run (kept within one turn); and its crests' bend: the steps per
@@ -443,6 +445,36 @@ void FirstPersonView::updateColors()
 	}
 	// The UFOs' lights for this frame (the UFO lights option).
 	updateUfos();
+}
+
+/**
+ * The isometric map's debug vision mode, which Ctrl+End steps through (OXCE's, see Map::reShade):
+ * 0 off, 1 the light halved ("Reaver's tests"), 2 everything at full light (Meridian's debug
+ * helper). The view lights its picture by it as the map does (a player, GitHub issue #104: the
+ * map's full bright left the 3D view as dark as before).
+ * @return The mode.
+ */
+int FirstPersonView::debugVision() const
+{
+	return _map ? _map->getDebugVisionMode() : 0;
+}
+
+/**
+ * A shade of the game's light (0 brightest .. 15 darkest; a tile's, or the open sky's on the
+ * ground) as the isometric map shows it now (see Map::reShade): halved, or at full light, in its
+ * debug vision modes (see debugVision); otherwise the game's own, no darker than
+ * NightVisionShade with night vision.
+ * @param gameShade The game's shade.
+ * @return The shade the view lights by.
+ */
+int FirstPersonView::mapShade(int gameShade) const
+{
+	switch (debugVision())
+	{
+	case 1: return std::clamp(gameShade, 0, 15) / 2;
+	case 2: return 0;
+	default: return std::clamp(gameShade, 0, _nightVision ? NightVisionShade : 15);
+	}
 }
 
 /**

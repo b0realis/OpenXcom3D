@@ -19328,7 +19328,7 @@ index 3665cd199..dee7728fd 100644
  	Position relativePosition;
  
 diff --git a/src/Battlescape/Map.h b/src/Battlescape/Map.h
-index 0fdf2ca16..dfa37a64f 100644
+index 0fdf2ca16..86ea6f563 100644
 --- a/src/Battlescape/Map.h
 +++ b/src/Battlescape/Map.h
 @@ -24,6 +24,7 @@
@@ -19430,7 +19430,7 @@ index 0fdf2ca16..dfa37a64f 100644
  	/// Reset the camera smoothing bool.
  	void resetCameraSmoothing();
  	/// Set whether the screen should "flash" or not.
-@@ -210,6 +254,10 @@ public:
+@@ -210,7 +254,13 @@ public:
  	/// toggle the night-vision mode
  	void enableNightVision();
  	void toggleNightVision();
@@ -19439,8 +19439,11 @@ index 0fdf2ca16..dfa37a64f 100644
 +	/// Is night vision switched on (the toggle, not the hold key)?
 +	bool isNightVisionOn() const { return _nightVisionOn; }
  	void toggleDebugVisionMode();
++	/// Gets the debug vision mode Ctrl+End steps through: 0 off, 1 the light halved, 2 full bright (see reShade).
++	int getDebugVisionMode() const { return _debugVisionMode; }
  	void persistToggles();
  	/// Resets obstacle markers.
+ 	void resetObstacles();
 diff --git a/src/Battlescape/MeleeAttackBState.cpp b/src/Battlescape/MeleeAttackBState.cpp
 index 490a43774..6d3ed3d24 100644
 --- a/src/Battlescape/MeleeAttackBState.cpp
@@ -33661,10 +33664,10 @@ index 000000000..3486db61a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..91a1d5ac8
+index 000000000..779a3562b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,4980 @@
+@@ -0,0 +1,4992 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -37718,7 +37721,8 @@ index 000000000..91a1d5ac8
 + * burst size), then the hit chance at what's under the crosshair and the time unit cost.
 + * The hit chance is worked out as the game's own isometric cursor does it (the game's firing
 + * accuracy, then its range dropoff, a mod's penalty for a target out of the soldier's line of
-+ * sight, and its maximum range), so the two agree. The
++ * sight, and its maximum range), so the two agree; a melee blow's as the game's action menu
++ * shows it (the map has no cursor for a blow). The
 + * crosshair is yellow when the soldier can do it, red when he can't (time units, ammo, range),
 + * purple for psi, and grey when it's not his move. Under it the accuracy line (in FPS style
 + * the spread, instead of odds).
@@ -37850,6 +37854,17 @@ index 000000000..91a1d5ac8
 +			}
 +			shotInfo << accuracy << "%  ";
 +			lineAccuracy = accuracy;
++		}
++		// A melee blow's hit chance (a player, GitHub issue #106: guns showed theirs, melee none): the
++		// soldier's melee accuracy with this weapon, as the game's action menu shows it for the blow
++		// (ActionMenuState, "Acc>"), in either targeting style (a blow always rolls the game's
++		// accuracy); red at nothing.
++		else if (mode == BA_HIT)
++		{
++			const BattleActionAttack attack = BattleActionAttack::GetBeforeShoot(mode, unit, weapon);
++			accuracy = std::max(0, BattleUnit::getFiringAccuracy(attack, _game->getMod()));
++			if (accuracy == 0) accuracyColor = redText;
++			shotInfo << accuracy << "%  ";
 +		}
 +
 +		// Then the time units it costs (both guns' with dual wield).
@@ -43404,10 +43419,10 @@ index 000000000..8e3e499bf
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..8d7d1cddf
+index 000000000..309e9a58a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1323 @@
+@@ -0,0 +1,1327 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -44102,6 +44117,10 @@ index 000000000..8d7d1cddf
 +	bool airless() const { return _sky == SkySpace || _sky == SkyOrbit || _sky == SkyMoon; }
 +	/// Picks this frame's colours from the palette, for the time of day.
 +	void updateColors();
++	/// The isometric map's debug vision mode (Ctrl+End): 0 off, 1 the light halved, 2 full bright.
++	int debugVision() const;
++	/// A shade of the game's light as the isometric map shows it now: in its debug vision modes, or with night vision.
++	int mapShade(int gameShade) const;
 +	/// The game's light at a point, blended between tile centres (0 bright .. 15 dark); also a UFO's light there.
 +	float lightAt(float x, float y, float z, float *ufoGlow = nullptr) const;
 +	/// Is there anything solid between two points? (A shadow ray.)
@@ -46205,10 +46224,10 @@ index 000000000..77a3cc4ed
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..3ced366be
+index 000000000..3ba5a2c1b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,1817 @@
+@@ -0,0 +1,1849 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -46271,6 +46290,7 @@ index 000000000..3ced366be
 +#endif
 +#include <SDL.h>
 +#include "FirstPersonApi.h"
++#include "../Battlescape/Map.h"
 +#include "../Engine/Logger.h"
 +#include "../Engine/Options.h"
 +#include "../Engine/Palette.h"
@@ -46401,13 +46421,14 @@ index 000000000..3ced366be
 +	};
 +
 +	// The time of day comes from the battle's global shade (0 bright day .. 15 dark night):
-+	// full day up to shade 3, full night from shade 12. Night vision brightens open ground.
++	// full day up to shade 3, full night from shade 12. Night vision and the map's debug vision
++	// (see mapShade) brighten open ground, as they do the map's tiles.
 +	const int globalShade = std::clamp(_save->getGlobalShade(), 0, 15);
 +	_colors.night = std::clamp((globalShade - 3) / 9.0f, 0.0f, 1.0f);
 +	_colors.underwater = _sky == SkySea;
 +	// Rain and snow fall from clouds that cover the Earth's sky (GitHub issue #94).
 +	_colors.overcast = _sky == SkyEarth && (_weather == "rain" || _weather == "snow");
-+	_colors.ambient = _nightVision ? std::min(globalShade, 4) : globalShade;
++	_colors.ambient = mapShade(globalShade);
 +	_colors.cloudTime = SDL_GetTicks() / 1000.0f; // seconds, to drift the clouds and ripple the sea floor's light
 +	// This frame's waves on the sea (see waveHeight): each train's sine-table steps per voxel east
 +	// and south, and how far it has run (kept within one turn); and its crests' bend: the steps per
@@ -46654,6 +46675,36 @@ index 000000000..3ced366be
 +	}
 +	// The UFOs' lights for this frame (the UFO lights option).
 +	updateUfos();
++}
++
++/**
++ * The isometric map's debug vision mode, which Ctrl+End steps through (OXCE's, see Map::reShade):
++ * 0 off, 1 the light halved ("Reaver's tests"), 2 everything at full light (Meridian's debug
++ * helper). The view lights its picture by it as the map does (a player, GitHub issue #104: the
++ * map's full bright left the 3D view as dark as before).
++ * @return The mode.
++ */
++int FirstPersonView::debugVision() const
++{
++	return _map ? _map->getDebugVisionMode() : 0;
++}
++
++/**
++ * A shade of the game's light (0 brightest .. 15 darkest; a tile's, or the open sky's on the
++ * ground) as the isometric map shows it now (see Map::reShade): halved, or at full light, in its
++ * debug vision modes (see debugVision); otherwise the game's own, no darker than
++ * NightVisionShade with night vision.
++ * @param gameShade The game's shade.
++ * @return The shade the view lights by.
++ */
++int FirstPersonView::mapShade(int gameShade) const
++{
++	switch (debugVision())
++	{
++	case 1: return std::clamp(gameShade, 0, 15) / 2;
++	case 2: return 0;
++	default: return std::clamp(gameShade, 0, _nightVision ? NightVisionShade : 15);
++	}
 +}
 +
 +/**
@@ -49316,10 +49367,10 @@ index 000000000..986e42728
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..ceb28a6f1
+index 000000000..39517e062
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,531 @@
+@@ -0,0 +1,535 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -49719,6 +49770,10 @@ index 000000000..ceb28a6f1
 +/// DarkOverflowTo (all of it), dithered between. A lit house is 2, the Piratez hideout's rooms
 +/// about 4.5, a night field at the edge of a soldier's light about 6.5, far from it 15.
 +const float DarkOverflowFrom = 5.0f, DarkOverflowTo = 8.0f;
++/// The darkest shade (0 brightest .. 15 darkest) the isometric map's night vision leaves near the
++/// soldiers (Map::NIGHT_VISION_SHADE): the 3D view's night vision lights the tiles and the open
++/// ground no darker, and the units too in the map's first debug vision mode (see mapShade).
++const int NightVisionShade = 4;
 +/// A ceiling under rock (see underRock) whose plain colour is this far down its group (its shade,
 +/// 0 brightest .. 15 darkest) or further shows its top's pattern, its middle shade stopping
 +/// RockMottleShades short of the darkest, as the rock beyond the map (see shadeHit): dark rock
@@ -52011,10 +52066,10 @@ index 000000000..17ff3d48d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..01fd88d34
+index 000000000..be06ad81a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,2946 @@
+@@ -0,0 +1,2948 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -53024,11 +53079,13 @@ index 000000000..01fd88d34
 +		unitSprite.setViewRotation(3 - cameraDirection);
 +
 +		// The light on it, at its chest: the game's light, lamps, flashlight and flares, and
-+		// the flash of a hit.
++		// the flash of a hit; in the map's first debug vision mode no darker than
++		// NightVisionShade, as the map draws units then (see debugVision).
 +		_spriteBuffer->clear();
 +		const float chest[3] = { (float)feet[0], (float)feet[1], (float)feet[2] + 12.0f };
-+		const int shade = (int)std::lround(std::clamp(lightAt(chest[0], chest[1], chest[2]) - pointLight(chest, nullptr, false)
++		int shade = (int)std::lround(std::clamp(lightAt(chest[0], chest[1], chest[2]) - pointLight(chest, nullptr, false)
 +			- flareLight(chest, nullptr, false) * 8.0f - flash * HitFlashShade, 0.0f, 15.0f));
++		if (debugVision() == 1) shade = std::min(shade, NightVisionShade);
 +		if (Options::fpsShadows)
 +		{
 +			recordUnitShadow(feet, 5.5 * unitSize); // flying units too: the shadow on the ground shows where they hover
@@ -54963,10 +55020,10 @@ index 000000000..01fd88d34
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..f705ca55b
+index 000000000..53fd5e8c0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,3762 @@
+@@ -0,0 +1,3763 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -58383,10 +58440,11 @@ index 000000000..f705ca55b
 +	}
 +	tileView.solid = memo.solid;
 +
-+	// The game's shade for the tile (with night vision no darker than 4), and the fog of
-+	// war: the floor and the object are seen with the floor, each wall on its own (a wall is
-+	// seen from either side, as on the isometric map).
-+	tileView.light = (Uint8)std::clamp(tile->getShade(), 0, _nightVision ? 4 : 15);
++	// The game's shade for the tile as the map shows it (with night vision no darker than
++	// NightVisionShade, and the map's debug vision: see mapShade), and the fog of war: the floor
++	// and the object are seen with the floor, each wall on its own (a wall is seen from either
++	// side, as on the isometric map).
++	tileView.light = (Uint8)mapShade(tile->getShade());
 +	// A UFO's light (the UFO lights option), once that UFO has been seen (see findUfos).
 +	tileView.ufoGlow = _ufoLightsOn && _ufoOfTile[index] && _ufos[_ufoOfTile[index] - 1].seen ? _ufoGlowOfTile[index] : 0;
 +	tileView.discovered = debug || tile->isDiscovered(O_FLOOR);

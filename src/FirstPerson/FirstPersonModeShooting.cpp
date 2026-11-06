@@ -4051,7 +4051,8 @@ std::string FirstPersonMode::renamedAction(const RuleItem *rules, BattleActionTy
  * burst size), then the hit chance at what's under the crosshair and the time unit cost.
  * The hit chance is worked out as the game's own isometric cursor does it (the game's firing
  * accuracy, then its range dropoff, a mod's penalty for a target out of the soldier's line of
- * sight, and its maximum range), so the two agree. The
+ * sight, and its maximum range), so the two agree; a melee blow's as the game's action menu
+ * shows it (the map has no cursor for a blow). The
  * crosshair is yellow when the soldier can do it, red when he can't (time units, ammo, range),
  * purple for psi, and grey when it's not his move. Under it the accuracy line (in FPS style
  * the spread, instead of odds).
@@ -4183,6 +4184,17 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 			}
 			shotInfo << accuracy << "%  ";
 			lineAccuracy = accuracy;
+		}
+		// A melee blow's hit chance (a player, GitHub issue #106: guns showed theirs, melee none): the
+		// soldier's melee accuracy with this weapon, as the game's action menu shows it for the blow
+		// (ActionMenuState, "Acc>"), in either targeting style (a blow always rolls the game's
+		// accuracy); red at nothing.
+		else if (mode == BA_HIT)
+		{
+			const BattleActionAttack attack = BattleActionAttack::GetBeforeShoot(mode, unit, weapon);
+			accuracy = std::max(0, BattleUnit::getFiringAccuracy(attack, _game->getMod()));
+			if (accuracy == 0) accuracyColor = redText;
+			shotInfo << accuracy << "%  ";
 		}
 
 		// Then the time units it costs (both guns' with dual wield).

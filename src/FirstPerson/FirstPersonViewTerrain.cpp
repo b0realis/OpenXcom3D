@@ -3414,10 +3414,11 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 	}
 	tileView.solid = memo.solid;
 
-	// The game's shade for the tile (with night vision no darker than 4), and the fog of
-	// war: the floor and the object are seen with the floor, each wall on its own (a wall is
-	// seen from either side, as on the isometric map).
-	tileView.light = (Uint8)std::clamp(tile->getShade(), 0, _nightVision ? 4 : 15);
+	// The game's shade for the tile as the map shows it (with night vision no darker than
+	// NightVisionShade, and the map's debug vision: see mapShade), and the fog of war: the floor
+	// and the object are seen with the floor, each wall on its own (a wall is seen from either
+	// side, as on the isometric map).
+	tileView.light = (Uint8)mapShade(tile->getShade());
 	// A UFO's light (the UFO lights option), once that UFO has been seen (see findUfos).
 	tileView.ufoGlow = _ufoLightsOn && _ufoOfTile[index] && _ufos[_ufoOfTile[index] - 1].seen ? _ufoGlowOfTile[index] : 0;
 	tileView.discovered = debug || tile->isDiscovered(O_FLOOR);

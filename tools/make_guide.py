@@ -185,7 +185,7 @@ SETTINGS = [
     ]),
     ('HUD', [
         ('Crosshair', 'YES', 'YES / NO', 'The crosshair; its shape tells the fire mode.', ''),
-        ('Shot info', 'YES', 'YES / NO', 'The fire mode, hit chance and time units right of the crosshair.', 'Yellow: you can; red: you can\'t.'),
+        ('Shot info', 'YES', 'YES / NO', 'The fire mode, hit chance and time units right of the crosshair (a melee blow\'s hit chance as the map\'s action menu gives it).', 'Yellow: you can; red: you can\'t.'),
         ('Expanded crosshair info', 'YES', 'YES / NO', 'The action\'s other costs under it: energy, health, stun, morale, mana.', 'The big mods\' weapons often cost energy.'),
         ('Shot damage', 'NO', 'YES / NO', 'The shot\'s damage range under the hit chance, as the map shows it with Alt: your soldier\'s stats and the distance counted, in the damage type\'s colour.', ''),
         ('Accuracy line', 'YES', 'YES / NO', 'A green line under the crosshair: with the game\'s own targeting, bright where a hit lands and dotted out to where a miss can stray; in FPS style, the spread.',
@@ -234,7 +234,7 @@ CROSSHAIRS = [('Snap', 'An open cross'), ('Aimed', 'A scope ring'), ('Auto', 'Br
               ('A door', 'A little green door, at the left')]
 SIGNS = [
     ('The crosshair\'s colour', 'Yellow: you can do it. Red: you can\'t (time units, ammo, range). Purple: psi. Grey: not your move.'),
-    ('The shot info', 'SNAP 40% 15TU: the fire mode, the hit chance (green; yellow with range or sight penalties; red when it can\'t be taken) and the time units. With two guns DUAL (round by round), VOLLEY (both at once) or IN TURN (an arcing pair, gun after gun) in front.'),
+    ('The shot info', 'SNAP 40% 15TU: the fire mode, the hit chance (green; yellow with range or sight penalties; red when it can\'t be taken) and the time units; a melee blow\'s hit chance (MELEE 23% 4TU) as the map\'s action menu gives it. With two guns DUAL (round by round), VOLLEY (both at once) or IN TURN (an arcing pair, gun after gun) in front.'),
     ('The other costs', 'EN 6 STUN 2 under the shot info: energy, health, stun, morale, mana. A cost you can\'t pay is red, and the game would refuse the action.'),
     ('Shot damage', 'With the setting <i>Shot damage</i>: the shot\'s damage range under the hit chance, as the map shows it with Alt, in the damage type\'s colour.'),
     ('The accuracy line', 'A green line under the crosshair, a notch up at each end: with the game\'s own targeting bright as far to either side as a successful roll can stray, and dotted on out to where a miss can; in FPS style the spread, widening as you fire. Grey when it\'s not your move.'),

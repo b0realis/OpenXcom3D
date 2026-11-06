@@ -692,6 +692,10 @@ private:
 	bool airless() const { return _sky == SkySpace || _sky == SkyOrbit || _sky == SkyMoon; }
 	/// Picks this frame's colours from the palette, for the time of day.
 	void updateColors();
+	/// The isometric map's debug vision mode (Ctrl+End): 0 off, 1 the light halved, 2 full bright.
+	int debugVision() const;
+	/// A shade of the game's light as the isometric map shows it now: in its debug vision modes, or with night vision.
+	int mapShade(int gameShade) const;
 	/// The game's light at a point, blended between tile centres (0 bright .. 15 dark); also a UFO's light there.
 	float lightAt(float x, float y, float z, float *ufoGlow = nullptr) const;
 	/// Is there anything solid between two points? (A shadow ray.)
