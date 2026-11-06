@@ -291,6 +291,9 @@ public:
 	/// Uses another view's voxel models instead of building its own (a small extra view). Set
 	/// before the battle, so the models aren't built twice.
 	void shareCache(FirstPersonView *owner);
+	/// Draws the units' voxel bodies from these (the 3D mode's: one body for each unit for all its views and the battle's
+	/// hits) instead of its own; null: its own. Set before the battle.
+	void useVoxelUnits(VoxelUnits *units) { _voxelUnits = units ? units : &_ownVoxelUnits; }
 	/// Turns particles (sparks, smoke, weather...) on or off for this view.
 	void setParticles(bool on) { _particlesOn = on; }
 	/// Blends the game's per-tile light smoothly instead of tile by tile.
@@ -885,7 +888,8 @@ private:
 	double collapseFall(const BattleUnit *unit, Uint32 now) const;
 	/// Draws a recorded voxel body's splats, all of them or those on the screen rows from bandTop up to bandBottom.
 	void drawVoxelUnit(const DrawStep &step, int bandTop, int bandBottom);
-	VoxelUnits _voxelUnits;             // the units' voxel bodies made so far this battle
+	VoxelUnits _ownVoxelUnits;          // the units' voxel bodies made so far this battle (a view on its own)
+	VoxelUnits *_voxelUnits = &_ownVoxelUnits; // the bodies it draws: its own, or the 3D mode's (see useVoxelUnits)
 	std::vector<VoxelSplat> _voxelSplats; // the recorded voxel bodies' splats (see DrawStep::voxelFirst), emptied with the steps
 	/// The recorded steps over bands of rows taken from the shared counter (a job for runOnAllThreads).
 	void drawListBands();

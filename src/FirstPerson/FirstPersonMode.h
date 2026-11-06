@@ -47,6 +47,7 @@
  * (its code is in the FirstPersonMode*.cpp files, one per topic).
  */
 #include <map>
+#include <memory>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -73,6 +74,7 @@ class NumberText;
 class SavedBattleGame;
 class Surface;
 class Tile;
+class VoxelUnits;
 class Text;
 class TextButton;
 
@@ -139,6 +141,9 @@ public:
 	static bool instantChains(BattlescapeState *state);
 	/// Setting "Full sprite hitboxes": are units hit by their pictures in this battle (see FirstPerson::spriteHitboxes)?
 	static bool spriteHitboxes(BattlescapeState *state);
+	/// The units' voxel bodies of the battle on this screen (setting "Voxel units"), or null: what a shot meets with
+	/// "Full sprite hitboxes" (see FirstPerson::spriteHit).
+	static VoxelUnits *voxelUnits(BattlescapeState *state);
 	/// Setting "Quick deaths": are deaths quick in this battle (see FirstPerson::quickDeaths)?
 	static bool quickDeaths(BattlescapeState *state);
 	/// Akimbo on the map (Ctrl+Shift+click on a hand's weapon): steps the soldier's two guns through firing together there.
@@ -190,6 +195,10 @@ private:
 	BattlescapeState *_state;              // the battlescape screen our surfaces are added to
 	SavedBattleGame *_save;                // the battle being played
 	FirstPersonView *_view = nullptr;      // the full-screen 3D view
+	std::unique_ptr<VoxelUnits> _voxelUnits; // the units' voxel bodies (setting "Voxel units"), the views' and the battle's
+	Surface *_bodySurface = nullptr;       // where the unit drawer draws while bodies are made for the battle (see makeVoxelBodies)
+	/// Setting "Voxel units" with "Full sprite hitboxes" (a shot hits the body): every unit's body made, a few a frame.
+	void makeVoxelBodies();
 	FirstPersonSounds *_sounds = nullptr;  // the sounds we make ourselves (hitmarker, heartbeat, near-miss whizz...)
 	bool _wants3D;                         // the player switched to 3D
 	std::string _missionAtStart;           // the battle's mission type when this screen was made (another at the end: its next stage)

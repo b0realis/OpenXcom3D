@@ -381,6 +381,9 @@ const Uint32 ZombieCamTime = 4200;
 const Uint32 BreakdownPauseTime = 2000, BreakdownMinTime = 2600, ComeToTime = 1200;
 
 const double Pi = 3.14159265358979323846;
+/// With "Voxel units" and "Full sprite hitboxes" (a shot hits the body), at most this many units' bodies are made a frame
+/// for the battle's hits, seen or not (see FirstPersonMode::makeVoxelBodies; the 3D views make theirs too, VoxelBuildsPerFrame).
+const int VoxelBodiesPerFrame = 2;
 /// The ammo tag's colour by damage type (see FirstPersonMode::ammoTag; GitHub issue #51): none, armor piercing (grey-white),
 /// incendiary (red), high explosive (orange), laser (pink), plasma (green), stun (light blue), melee (grey), acid
 /// (yellow-green), smoke (grey); a mod's own types (10 to 19) AmmoTagModColor (purple).

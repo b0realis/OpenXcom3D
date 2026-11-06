@@ -59,6 +59,8 @@
 #include "FirstPersonScanner.h"
 #include "FirstPersonSounds.h"
 #include "FirstPersonView.h"
+#include "FirstPersonVoxelBodies.h"
+#include "FirstPersonVoxelUnits.h"
 #include "RuleFirstPerson.h"
 #include "../Battlescape/BattlescapeGame.h"
 #include "../Battlescape/ExplosionBState.h"
@@ -67,6 +69,7 @@
 #include "../Battlescape/Map.h"
 #include "../Battlescape/Pathfinding.h"
 #include "../Battlescape/TileEngine.h"
+#include "../Battlescape/UnitSprite.h"
 #include "../Battlescape/WarningMessage.h"
 #include "../Engine/Action.h"
 #include "../Engine/Game.h"
@@ -148,6 +151,7 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
 	FirstPerson::settleOptions(); // (the smoke's first value, from an older setting)
 	FirstPerson::clearQuickFalls(); // (a new battle, or one loaded: none of the last one's falls)
 	FirstPerson::clearAirFalls();
+	_voxelUnits = std::make_unique<VoxelUnits>(); // (before the views: they share it)
 
 	// Our surfaces, in drawing order: each one goes on top of the ones made before it.
 	createView();
@@ -215,6 +219,7 @@ void FirstPersonMode::createView()
 	// The state adds a surface at the end (on top of everything): move it to right after the
 	// isometric map instead.
 	_view = new FirstPersonView(_game, viewWidth, viewHeight, 0, 0);
+	_view->useVoxelUnits(_voxelUnits.get());
 	_state->add(_view);
 	auto &surfaces = _state->_surfaces;
 	surfaces.pop_back();
@@ -565,6 +570,7 @@ void FirstPersonMode::createSoldierCard()
 	_preview = new FirstPersonView(_game, PreviewW, PreviewH, 0, CardY + 36);
 	_state->add(_preview);
 	_preview->shareCache(_view); // (first: then the battle doesn't build models of its own)
+	_preview->useVoxelUnits(_voxelUnits.get());
 	_preview->setSavedBattleGame(_save);
 	_preview->setMap(_state->_map);
 	_preview->setMaxDistance(std::min(30, mod->getFirstPerson().getMaxViewDistance()));
@@ -703,6 +709,7 @@ void FirstPersonMode::makeSoldierCamView()
 	FirstPersonView *camera = new FirstPersonView(_game, _soldierCamWidth, _soldierCamHeight, 0, 0);
 	camera->setPalette(_state->getPalette());
 	camera->shareCache(_view); // (first: then the battle doesn't build models of its own)
+	camera->useVoxelUnits(_voxelUnits.get());
 	camera->setSavedBattleGame(_save);
 	camera->setMap(_state->_map);
 	camera->setMaxDistance(std::min(30, mod->getFirstPerson().getMaxViewDistance()));
@@ -815,6 +822,7 @@ void FirstPersonMode::makeMapCamera(int size)
 	FirstPersonView *camera = new FirstPersonView(_game, pictureWidth, pictureHeight, 0, 0);
 	camera->setPalette(_state->getPalette());
 	camera->shareCache(_view); // (first: then the battle doesn't build models of its own)
+	camera->useVoxelUnits(_voxelUnits.get());
 	camera->setSavedBattleGame(_save);
 	camera->setMap(_state->_map);
 	camera->setMaxDistance(std::min(30, mod->getFirstPerson().getMaxViewDistance()));
@@ -946,6 +954,7 @@ void FirstPersonMode::resized(int widthChange, int heightChange)
 	}
 	FirstPersonView *newView = new FirstPersonView(_game, canvasWidth(), canvasHeight(), 0, 0);
 	newView->setPalette(_state->getPalette());
+	newView->useVoxelUnits(_voxelUnits.get());
 	newView->setSavedBattleGame(_save);
 	newView->setMap(_state->_map);
 	newView->setMaxDistance(_game->getMod()->getFirstPerson().getMaxViewDistance());
@@ -1225,6 +1234,7 @@ FirstPersonMode::~FirstPersonMode()
 	// What isn't owned by the state.
 	delete _heldSprite; // not added to the state
 	delete _offHandSprite;
+	delete _bodySurface;
 	delete _scanner;
 	delete _sounds;
 	delete _canvas;
@@ -1896,6 +1906,31 @@ void FirstPersonMode::updateMusic(Uint32 now)
  * around only, setting "Alien turn in 3D") and shows whatever that soldier's squad can see.
  * While a soldier goes down or breaks down, the death or breakdown camera takes the frame over.
  */
+/**
+ * Setting "Voxel units" with "Full sprite hitboxes": a shot hits a unit where its body is (see FirstPerson::spriteHit), so
+ * every unit's body is made from the battle's start, not only those the 3D view has seen: each frame, VoxelBodiesPerFrame
+ * at most of those still without a body for how they stand now (see VoxelUnits::modelFor; the builder's thread makes
+ * them). A unit without one yet is hit by its picture.
+ */
+void FirstPersonMode::makeVoxelBodies()
+{
+	if (!_bodySurface)
+	{
+		_bodySurface = new Surface(VoxelBodies::FrameSize, VoxelBodies::FrameSize);
+	}
+	UnitSprite unitSprite(_bodySurface, _game->getMod(), _save, _save->getAnimFrame(), _save->getDepth() != 0, 0, 0);
+	int builds = VoxelBodiesPerFrame;
+	for (BattleUnit *unit : *_save->getUnits())
+	{
+		if (builds <= 0) break;
+		if (!VoxelUnits::suits(unit) || unit->getStatus() == STATUS_WALKING || unit->getStatus() == STATUS_FLYING) continue;
+		int walkPhase;
+		_voxelUnits->modelFor(unit, unitSprite, _game->getMod()->getSurfaceSet("BIGOBS.PCK"), _game->getMod()->getSurfaceSet("FLOOROB.PCK"), _save,
+			_state->getPalette(), builds, walkPhase);
+	}
+	_bodySurface->clear();
+}
+
 void FirstPersonMode::think()
 {
 	// The frame's time: now, and the seconds since the last frame (at most a tenth of a second,
@@ -1911,6 +1946,12 @@ void FirstPersonMode::think()
 
 	// Explosions in 3D at the isometric map's pace (the battle's timer catching up).
 	catchUp();
+
+	// With "Voxel units" and "Full sprite hitboxes" a shot hits a unit's body: every unit's made, not only those seen.
+	if (Options::fpsVoxelUnits && Options::fpsSpriteHitboxes)
+	{
+		makeVoxelBodies();
+	}
 
 	// The right button may have been let go while another screen had the mouse, or the view
 	// changed: then the zoom it held and the drag look end too.

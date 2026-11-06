@@ -594,6 +594,9 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 	for (size_t k = 0; k < body.part.size(); ++k)
 	{
 		if (!items && body.part[k] == VoxelUnitModel::Item) continue;
+		// (seen from one of the 8 directions, what fits its drawing and the pieces added for it, see VoxelUnitModel::views;
+		// going down or lying, the body's own shape)
+		if (falling ? k >= body.addedFrom : !body.shows(k, direction, level)) continue;
 		float across = right[k], along = ahead[k], height = up[k];
 		if (falling) body.posed(pose, across, along, height);
 		const double toRight = across * scale, toAhead = along * scale;
@@ -1174,7 +1177,7 @@ void FirstPersonView::drawUnits()
 			// far as the fall has come: by the clock, at the quick fall's pace (QuickFallFrameTime a frame; the game's own
 			// frames go faster); down while it comes down from the air. (Its corpse then lies so, finishing a fall the game
 			// is done with: see drawFloorItems.) A big unit falls in its own frames.
-			body = _voxelUnits.lastBody(unit);
+			body = _voxelUnits->lastBody(unit);
 			if (collapsing)
 			{
 				_collapseStarts.emplace(unit, now);
@@ -1197,7 +1200,7 @@ void FirstPersonView::drawUnits()
 			const double reach = seen ? 24.0 * unitScale * (getWidth() / 2.0) / _halfFovTangent / middleDepth : 0.0;
 			int noBuilds = 0;
 			int &builds = seen && middleX > -reach && middleX < getWidth() + reach && middleY > -reach && middleY < getHeight() + reach ? voxelBuilds : noBuilds;
-			body = _voxelUnits.modelFor(unit, unitSprite, _game->getMod()->getSurfaceSet("BIGOBS.PCK"), _game->getMod()->getSurfaceSet("FLOOROB.PCK"), _save,
+			body = _voxelUnits->modelFor(unit, unitSprite, _game->getMod()->getSurfaceSet("BIGOBS.PCK"), _game->getMod()->getSurfaceSet("FLOOROB.PCK"), _save,
 				getPalette(), builds, walkPhase);
 			unitSprite.setViewRotation(3 - cameraDirection);
 			_spriteBuffer->clear(); // (anything the drawer drew there while the body was made: its sprite, if drawn instead, starts clean)
@@ -1883,7 +1886,7 @@ void FirstPersonView::drawFloorItems()
 		// the pile); not while faint (see-through corpses), nor under a floor it would poke through.
 		BattleUnit *owner = item->getUnit();
 		const VoxelUnitModel *lying = Options::fpsVoxelUnits && owner && owner->isOut() && !wholeCorpse && !step.sprite.seeThrough
-			&& step.sprite.standingSquash >= 1.0 && owner->getArmor()->getSize() == 1 ? _voxelUnits.lastBody(owner) : nullptr;
+			&& step.sprite.standingSquash >= 1.0 && owner->getArmor()->getSize() == 1 ? _voxelUnits->lastBody(owner) : nullptr;
 		if (lying)
 		{
 			auto well = _facingsWell.find(owner);

@@ -115,6 +115,24 @@ struct VoxelUnitModel
 	int fallFrameAt(double progress) const;
 	/// The colour of voxel k seen from direction (0-7) with level painting (or slanted).
 	Uint8 colour(size_t k, int direction, bool level) const { return colours[k * 16 + (level ? 0 : 8) + direction]; }
+	/// The views each voxel shows in, a bit for each of the 16 colours' views (level, then slanted: the bit of colour slot
+	/// (level ? 0 : 8) + direction): the hand drawn frames don't quite agree on one shape, so seen from one of the 8
+	/// directions the body shows only its voxels inside that direction's drawing, and pieces are added for what the
+	/// drawing has that they leave bare (see matchViews in FirstPersonVoxelBodies.cpp): from each direction the body
+	/// has its sprite's outline.
+	std::vector<Uint16> views;
+	/// The voxels from addedFrom on are such added pieces (left out of a fall: the body falls as its own shape).
+	size_t addedFrom = (size_t)-1;
+	/// Whether voxel k shows from direction (0-7) with level painting (or slanted).
+	bool shows(size_t k, int direction, bool level) const { return views.empty() || (views[k] >> ((level ? 0 : 8) + direction) & 1); }
+	/// What a shot meets (settings "Voxel units" and "Full sprite hitboxes": the body is the hitbox): the body's solid
+	/// voxels, whole voxels (right, ahead, up) from hitFrom, hitSize of them each way, each the views it shows in (as
+	/// views; 0: empty).
+	std::vector<Uint16> hits;
+	int hitFrom[3] = {}, hitSize[3] = {};
+	/// Whether a shot meets the body at a point (voxels to the body's right, ahead and up from the middle of its feet)
+	/// coming from direction (0-7) at the body's height (level) or from above.
+	bool hitAt(float right, float ahead, float up, int direction, bool level) const;
 };
 
 /// The voxel bodies of the units seen so far in a battle, one for each unit and pose. A body is made
@@ -137,6 +155,11 @@ public:
 		const SavedBattleGame *save, const SDL_Color *palette, int &builds, int &walkPhase);
 	/// The body a unit was last drawn with (for its fall, and its corpse lying where it fell), or null.
 	const VoxelUnitModel *lastBody(const BattleUnit *unit) const;
+	/// The body for a unit as it is now, if it's made (none is made here: see modelFor), or null; a unit walking, its
+	/// standing body.
+	const VoxelUnitModel *bodyNow(const BattleUnit *unit);
+	/// The bodies are for this battle: every body forgotten if they were another's.
+	void forBattle(const SavedBattleGame *save);
 	/// Forgets every body, and those being made (a new battle).
 	void clear();
 private:
@@ -163,6 +186,7 @@ private:
 	std::deque<std::unique_ptr<Job>> _jobs;
 	std::vector<std::pair<Uint64, std::shared_ptr<VoxelUnitModel>>> _made;
 	unsigned _battle = 0;
+	const SavedBattleGame *_battleSave = nullptr; // (the battle the bodies are for, see forBattle)
 	bool _stopping = false;
 	std::thread _builder;
 	/// The builder's loop: makes the bodies queued, until stopped.

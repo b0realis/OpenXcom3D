@@ -21815,10 +21815,10 @@ index bc5f08f46..5ddf353f4 100644
  			playMovementSound();
  			if (_parent->getSave()->isPreview())
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 839f80345..462eff130 100644
+index 839f80345..02ddf7e9e 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -441,10 +441,46 @@ set ( rapidyaml_src
+@@ -441,10 +441,47 @@ set ( rapidyaml_src
  
  )
  
@@ -21848,6 +21848,7 @@ index 839f80345..462eff130 100644
 +    FirstPerson/FirstPersonViewTerrain.cpp
 +    FirstPerson/FirstPersonViewUfo.cpp
 +    FirstPerson/FirstPersonViewUpscaling.cpp
++    FirstPerson/FirstPersonVoxelBodies.cpp
 +    FirstPerson/FirstPersonVoxelModel.cpp
 +    FirstPerson/FirstPersonVoxelUnits.cpp
 +    FirstPerson/OptionsFirstPersonState.cpp
@@ -21865,7 +21866,7 @@ index 839f80345..462eff130 100644
      ${engine_src}
      ${geoscape_src}
      ${interface_src}
-@@ -627,7 +663,10 @@ if (WIN32)
+@@ -627,7 +664,10 @@ if (WIN32)
    set(WIN32_LIBS imagehlp dbghelp)
  endif(WIN32)
  
@@ -23920,10 +23921,10 @@ index 000000000..9a3a667c9
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..edc73bad5
+index 000000000..a9f7fbda5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2884 @@
+@@ -0,0 +1,2925 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -23985,6 +23986,8 @@ index 000000000..edc73bad5
 +#include "FirstPersonScanner.h"
 +#include "FirstPersonSounds.h"
 +#include "FirstPersonView.h"
++#include "FirstPersonVoxelBodies.h"
++#include "FirstPersonVoxelUnits.h"
 +#include "RuleFirstPerson.h"
 +#include "../Battlescape/BattlescapeGame.h"
 +#include "../Battlescape/ExplosionBState.h"
@@ -23993,6 +23996,7 @@ index 000000000..edc73bad5
 +#include "../Battlescape/Map.h"
 +#include "../Battlescape/Pathfinding.h"
 +#include "../Battlescape/TileEngine.h"
++#include "../Battlescape/UnitSprite.h"
 +#include "../Battlescape/WarningMessage.h"
 +#include "../Engine/Action.h"
 +#include "../Engine/Game.h"
@@ -24074,6 +24078,7 @@ index 000000000..edc73bad5
 +	FirstPerson::settleOptions(); // (the smoke's first value, from an older setting)
 +	FirstPerson::clearQuickFalls(); // (a new battle, or one loaded: none of the last one's falls)
 +	FirstPerson::clearAirFalls();
++	_voxelUnits = std::make_unique<VoxelUnits>(); // (before the views: they share it)
 +
 +	// Our surfaces, in drawing order: each one goes on top of the ones made before it.
 +	createView();
@@ -24141,6 +24146,7 @@ index 000000000..edc73bad5
 +	// The state adds a surface at the end (on top of everything): move it to right after the
 +	// isometric map instead.
 +	_view = new FirstPersonView(_game, viewWidth, viewHeight, 0, 0);
++	_view->useVoxelUnits(_voxelUnits.get());
 +	_state->add(_view);
 +	auto &surfaces = _state->_surfaces;
 +	surfaces.pop_back();
@@ -24491,6 +24497,7 @@ index 000000000..edc73bad5
 +	_preview = new FirstPersonView(_game, PreviewW, PreviewH, 0, CardY + 36);
 +	_state->add(_preview);
 +	_preview->shareCache(_view); // (first: then the battle doesn't build models of its own)
++	_preview->useVoxelUnits(_voxelUnits.get());
 +	_preview->setSavedBattleGame(_save);
 +	_preview->setMap(_state->_map);
 +	_preview->setMaxDistance(std::min(30, mod->getFirstPerson().getMaxViewDistance()));
@@ -24629,6 +24636,7 @@ index 000000000..edc73bad5
 +	FirstPersonView *camera = new FirstPersonView(_game, _soldierCamWidth, _soldierCamHeight, 0, 0);
 +	camera->setPalette(_state->getPalette());
 +	camera->shareCache(_view); // (first: then the battle doesn't build models of its own)
++	camera->useVoxelUnits(_voxelUnits.get());
 +	camera->setSavedBattleGame(_save);
 +	camera->setMap(_state->_map);
 +	camera->setMaxDistance(std::min(30, mod->getFirstPerson().getMaxViewDistance()));
@@ -24741,6 +24749,7 @@ index 000000000..edc73bad5
 +	FirstPersonView *camera = new FirstPersonView(_game, pictureWidth, pictureHeight, 0, 0);
 +	camera->setPalette(_state->getPalette());
 +	camera->shareCache(_view); // (first: then the battle doesn't build models of its own)
++	camera->useVoxelUnits(_voxelUnits.get());
 +	camera->setSavedBattleGame(_save);
 +	camera->setMap(_state->_map);
 +	camera->setMaxDistance(std::min(30, mod->getFirstPerson().getMaxViewDistance()));
@@ -24872,6 +24881,7 @@ index 000000000..edc73bad5
 +	}
 +	FirstPersonView *newView = new FirstPersonView(_game, canvasWidth(), canvasHeight(), 0, 0);
 +	newView->setPalette(_state->getPalette());
++	newView->useVoxelUnits(_voxelUnits.get());
 +	newView->setSavedBattleGame(_save);
 +	newView->setMap(_state->_map);
 +	newView->setMaxDistance(_game->getMod()->getFirstPerson().getMaxViewDistance());
@@ -25151,6 +25161,7 @@ index 000000000..edc73bad5
 +	// What isn't owned by the state.
 +	delete _heldSprite; // not added to the state
 +	delete _offHandSprite;
++	delete _bodySurface;
 +	delete _scanner;
 +	delete _sounds;
 +	delete _canvas;
@@ -25822,6 +25833,31 @@ index 000000000..edc73bad5
 + * around only, setting "Alien turn in 3D") and shows whatever that soldier's squad can see.
 + * While a soldier goes down or breaks down, the death or breakdown camera takes the frame over.
 + */
++/**
++ * Setting "Voxel units" with "Full sprite hitboxes": a shot hits a unit where its body is (see FirstPerson::spriteHit), so
++ * every unit's body is made from the battle's start, not only those the 3D view has seen: each frame, VoxelBodiesPerFrame
++ * at most of those still without a body for how they stand now (see VoxelUnits::modelFor; the builder's thread makes
++ * them). A unit without one yet is hit by its picture.
++ */
++void FirstPersonMode::makeVoxelBodies()
++{
++	if (!_bodySurface)
++	{
++		_bodySurface = new Surface(VoxelBodies::FrameSize, VoxelBodies::FrameSize);
++	}
++	UnitSprite unitSprite(_bodySurface, _game->getMod(), _save, _save->getAnimFrame(), _save->getDepth() != 0, 0, 0);
++	int builds = VoxelBodiesPerFrame;
++	for (BattleUnit *unit : *_save->getUnits())
++	{
++		if (builds <= 0) break;
++		if (!VoxelUnits::suits(unit) || unit->getStatus() == STATUS_WALKING || unit->getStatus() == STATUS_FLYING) continue;
++		int walkPhase;
++		_voxelUnits->modelFor(unit, unitSprite, _game->getMod()->getSurfaceSet("BIGOBS.PCK"), _game->getMod()->getSurfaceSet("FLOOROB.PCK"), _save,
++			_state->getPalette(), builds, walkPhase);
++	}
++	_bodySurface->clear();
++}
++
 +void FirstPersonMode::think()
 +{
 +	// The frame's time: now, and the seconds since the last frame (at most a tenth of a second,
@@ -25837,6 +25873,12 @@ index 000000000..edc73bad5
 +
 +	// Explosions in 3D at the isometric map's pace (the battle's timer catching up).
 +	catchUp();
++
++	// With "Voxel units" and "Full sprite hitboxes" a shot hits a unit's body: every unit's made, not only those seen.
++	if (Options::fpsVoxelUnits && Options::fpsSpriteHitboxes)
++	{
++		makeVoxelBodies();
++	}
 +
 +	// The right button may have been let go while another screen had the mouse, or the view
 +	// changed: then the zoom it held and the drag look end too.
@@ -26810,10 +26852,10 @@ index 000000000..edc73bad5
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..0d167822a
+index 000000000..d8a296177
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1261 @@
+@@ -0,0 +1,1270 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -26863,6 +26905,7 @@ index 000000000..0d167822a
 + * (its code is in the FirstPersonMode*.cpp files, one per topic).
 + */
 +#include <map>
++#include <memory>
 +#include <unordered_map>
 +#include <unordered_set>
 +#include <vector>
@@ -26889,6 +26932,7 @@ index 000000000..0d167822a
 +class SavedBattleGame;
 +class Surface;
 +class Tile;
++class VoxelUnits;
 +class Text;
 +class TextButton;
 +
@@ -26955,6 +26999,9 @@ index 000000000..0d167822a
 +	static bool instantChains(BattlescapeState *state);
 +	/// Setting "Full sprite hitboxes": are units hit by their pictures in this battle (see FirstPerson::spriteHitboxes)?
 +	static bool spriteHitboxes(BattlescapeState *state);
++	/// The units' voxel bodies of the battle on this screen (setting "Voxel units"), or null: what a shot meets with
++	/// "Full sprite hitboxes" (see FirstPerson::spriteHit).
++	static VoxelUnits *voxelUnits(BattlescapeState *state);
 +	/// Setting "Quick deaths": are deaths quick in this battle (see FirstPerson::quickDeaths)?
 +	static bool quickDeaths(BattlescapeState *state);
 +	/// Akimbo on the map (Ctrl+Shift+click on a hand's weapon): steps the soldier's two guns through firing together there.
@@ -27006,6 +27053,10 @@ index 000000000..0d167822a
 +	BattlescapeState *_state;              // the battlescape screen our surfaces are added to
 +	SavedBattleGame *_save;                // the battle being played
 +	FirstPersonView *_view = nullptr;      // the full-screen 3D view
++	std::unique_ptr<VoxelUnits> _voxelUnits; // the units' voxel bodies (setting "Voxel units"), the views' and the battle's
++	Surface *_bodySurface = nullptr;       // where the unit drawer draws while bodies are made for the battle (see makeVoxelBodies)
++	/// Setting "Voxel units" with "Full sprite hitboxes" (a shot hits the body): every unit's body made, a few a frame.
++	void makeVoxelBodies();
 +	FirstPersonSounds *_sounds = nullptr;  // the sounds we make ourselves (hitmarker, heartbeat, near-miss whizz...)
 +	bool _wants3D;                         // the player switched to 3D
 +	std::string _missionAtStart;           // the battle's mission type when this screen was made (another at the end: its next stage)
@@ -33496,10 +33547,10 @@ index 000000000..7e2596427
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..3486db61a
+index 000000000..52909a11d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,489 @@
+@@ -0,0 +1,492 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -33883,6 +33934,9 @@ index 000000000..3486db61a
 +const Uint32 BreakdownPauseTime = 2000, BreakdownMinTime = 2600, ComeToTime = 1200;
 +
 +const double Pi = 3.14159265358979323846;
++/// With "Voxel units" and "Full sprite hitboxes" (a shot hits the body), at most this many units' bodies are made a frame
++/// for the battle's hits, seen or not (see FirstPersonMode::makeVoxelBodies; the 3D views make theirs too, VoxelBuildsPerFrame).
++const int VoxelBodiesPerFrame = 2;
 +/// The ammo tag's colour by damage type (see FirstPersonMode::ammoTag; GitHub issue #51): none, armor piercing (grey-white),
 +/// incendiary (red), high explosive (orange), laser (pink), plasma (green), stun (light blue), melee (grey), acid
 +/// (yellow-green), smoke (grey); a mod's own types (10 to 19) AmmoTagModColor (purple).
@@ -33991,10 +34045,10 @@ index 000000000..3486db61a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..91a1d5ac8
+index 000000000..2e2ef9f18
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,4980 @@
+@@ -0,0 +1,4991 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -37564,6 +37618,17 @@ index 000000000..91a1d5ac8
 +bool FirstPersonMode::spriteHitboxes(BattlescapeState *state)
 +{
 +	return Options::fpsSpriteHitboxes && state && state->_firstPerson;
++}
++
++/**
++ * The units' voxel bodies of the battle on this screen (setting "Voxel units"): the 3D views' and, with "Full sprite
++ * hitboxes", what a shot meets (see FirstPerson::spriteHit).
++ * @param state The battlescape screen.
++ * @return The bodies, or null without the mod's 3D view.
++ */
++VoxelUnits *FirstPersonMode::voxelUnits(BattlescapeState *state)
++{
++	return state && state->_firstPerson ? state->_firstPerson->_voxelUnits.get() : nullptr;
 +}
 +
 +/**
@@ -42849,10 +42914,10 @@ index 000000000..44a6559e0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonSpriteHits.cpp b/src/FirstPerson/FirstPersonSpriteHits.cpp
 new file mode 100644
-index 000000000..d7aa46be4
+index 000000000..8da863dbd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonSpriteHits.cpp
-@@ -0,0 +1,266 @@
+@@ -0,0 +1,326 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -42897,7 +42962,8 @@ index 000000000..d7aa46be4
 + * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +/*
-+ * FirstPersonSpriteHits.cpp: setting "Full sprite hitboxes": a unit is hit where its picture shows.
++ * FirstPersonSpriteHits.cpp: setting "Full sprite hitboxes": a unit is hit where its picture shows (with "Voxel units",
++ * where its body is).
 + */
 +#include "FirstPersonApi.h"
 +#include <algorithm>
@@ -42907,6 +42973,7 @@ index 000000000..d7aa46be4
 +#include <vector>
 +#include "FirstPersonMode.h"
 +#include "FirstPersonViewShared.h"
++#include "FirstPersonVoxelUnits.h"
 +#include "../Battlescape/BattlescapeState.h"
 +#include "../Battlescape/UnitSprite.h"
 +#include "../Engine/GraphSubset.h"
@@ -43004,6 +43071,64 @@ index 000000000..d7aa46be4
 +}
 +
 +/**
++ * Where a unit stands for its hits: the middle of its tiles, on the highest of their ground (terrain levels are
++ * negative), as the game's own hit shape stands (see TileEngine::voxelCheck).
++ * @param save The battle.
++ * @param unit The unit.
++ * @param middleX, middleY, feet Set to its middle and the height of its feet, in voxels.
++ */
++void standingPlace(SavedBattleGame *save, const BattleUnit *unit, double &middleX, double &middleY, double &feet)
++{
++	const int size = unit->getArmor()->getSize();
++	int terrainHeight = 0;
++	for (int x = 0; x < size; ++x)
++	{
++		for (int y = 0; y < size; ++y)
++		{
++			const Tile *tile = save->getTile(unit->getPosition() + Position(x, y, 0));
++			if (tile) terrainHeight = std::min(terrainHeight, tile->getTerrainLevel());
++		}
++	}
++	middleX = unit->getPosition().x * 16.0 + 8.0 * size;
++	middleY = unit->getPosition().y * 16.0 + 8.0 * size;
++	feet = unit->getPosition().z * 24.0 - terrainHeight;
++}
++
++/**
++ * Does this voxel of a line of fire hit the unit's voxel body (settings "Voxel units" and "Full sprite hitboxes", the
++ * owner's: "hit-boxes should be their whole bodies")? The body stands as the 3D view draws it: in the middle of the
++ * unit's tiles on its floor, turned to the way it faces, at the setting "Unit size", and as it shows to an eye at the
++ * line's start (from that side, level with it or from above: see VoxelUnitModel::views); the voxel hits where the body
++ * is solid.
++ * @param body The unit's body.
++ * @param save The battle.
++ * @param unit The unit.
++ * @param voxel The voxel.
++ * @param origin Where the line starts.
++ * @return True if the voxel hits the body.
++ */
++bool bodyHit(const VoxelUnitModel &body, SavedBattleGame *save, const BattleUnit *unit, const Position &voxel, const Position &origin)
++{
++	double middleX, middleY, feet;
++	standingPlace(save, unit, middleX, middleY, feet);
++	// the voxel in the body's own right, ahead and up (the view turns the body by the way it faces: see
++	// FirstPersonView::recordVoxelUnit), at the unit's size
++	const double scale = std::clamp(Options::fpsUnitSize, 80, 100) / 100.0;
++	const double angle = unit->getDirection() * Pi / 4.0, cosine = std::cos(angle), sine = std::sin(angle);
++	const double relativeX = voxel.x + 0.5 - middleX, relativeY = voxel.y + 0.5 - middleY;
++	const float right = (float)((relativeX * cosine + relativeY * sine) / scale), ahead = (float)((relativeX * sine - relativeY * cosine) / scale);
++	const float up = (float)((voxel.z + 0.5 - feet) / scale);
++	// the side it shows to the line's start, as the view picks it for an eye there (see FirstPersonView::drawUnits)
++	const double towardsX = origin.x + 0.5 - middleX, towardsY = origin.y + 0.5 - middleY;
++	const double toEyeDegrees = std::atan2(towardsY, towardsX) * 180.0 / Pi;
++	const int eyeDirection = (((int)std::lround((toEyeDegrees + 90.0) / 45.0)) % 8 + 8) % 8;
++	const int direction = ((unit->getDirection() + 3 - eyeDirection) % 8 + 8) % 8;
++	const double flat = std::max(1.0, std::hypot(towardsX, towardsY));
++	const bool level = std::atan2((origin.z + 0.5 - (feet + 12.0)) * ZScale, flat) < VoxelSlantAbove * Pi / 180.0;
++	return body.hitAt(right, ahead, up, direction, level);
++}
++
++/**
 + * Setting "Full sprite hitboxes" (the owner's, GitHub issue #42: "Setting for hit-boxes the same size
 + * as sprites!"; the battle's rule, for everyone's shots and the game's line of fire checks, and so
 + * its sight too, which walks the same lines (TileEngine::visible, canTargetUnit), in 3D and on the
@@ -43038,20 +43163,20 @@ index 000000000..d7aa46be4
 +	{
 +		return true;
 +	}
-+	// Where the unit stands: the middle of its tiles, on the highest of their ground (terrain
-+	// levels are negative), as the game's own hit shape stands (see TileEngine::voxelCheck).
-+	const int size = unit->getArmor()->getSize();
-+	int terrainHeight = 0;
-+	for (int x = 0; x < size; ++x)
++	// With "Voxel units", a unit whose body is made is hit where its body is (they're made for every unit from the
++	// battle's start: see FirstPersonMode::makeVoxelBodies); else by its picture.
++	if (Options::fpsVoxelUnits)
 +	{
-+		for (int y = 0; y < size; ++y)
++		VoxelUnits *bodies = FirstPersonMode::voxelUnits(save->getBattleState());
++		if (const VoxelUnitModel *body = bodies && VoxelUnits::suits(unit) ? bodies->bodyNow(unit) : nullptr)
 +		{
-+			const Tile *tile = save->getTile(unit->getPosition() + Position(x, y, 0));
-+			if (tile) terrainHeight = std::min(terrainHeight, tile->getTerrainLevel());
++			return bodyHit(*body, save, unit, voxel, origin);
 +		}
 +	}
-+	const double middleX = unit->getPosition().x * 16.0 + 8.0 * size, middleY = unit->getPosition().y * 16.0 + 8.0 * size;
-+	const double feet = unit->getPosition().z * 24.0 - terrainHeight;
++	// Where the unit stands.
++	const int size = unit->getArmor()->getSize();
++	double middleX, middleY, feet;
++	standingPlace(save, unit, middleX, middleY, feet);
 +
 +	// The card faces the line's start (straight above or below it, the way the map shows units,
 +	// from the south-east).
@@ -43121,7 +43246,7 @@ index 000000000..d7aa46be4
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..db799fb26
+index 000000000..24d572976
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
 @@ -0,0 +1,632 @@
@@ -43270,7 +43395,7 @@ index 000000000..db799fb26
 +	_softSmokeBlends.clear();
 +	_models.clear();
 +	_ghostModels.clear();
-+	_voxelUnits.clear();
++	_voxelUnits->forBattle(save);
 +	_collapseStarts.clear();
 +	_facingsWell.clear();
 +	_leafyModels.clear();
@@ -43759,10 +43884,10 @@ index 000000000..db799fb26
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..cecde58ef
+index 000000000..6b48a1d42
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1341 @@
+@@ -0,0 +1,1345 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -44056,6 +44181,9 @@ index 000000000..cecde58ef
 +	/// Uses another view's voxel models instead of building its own (a small extra view). Set
 +	/// before the battle, so the models aren't built twice.
 +	void shareCache(FirstPersonView *owner);
++	/// Draws the units' voxel bodies from these (the 3D mode's: one body for each unit for all its views and the battle's
++	/// hits) instead of its own; null: its own. Set before the battle.
++	void useVoxelUnits(VoxelUnits *units) { _voxelUnits = units ? units : &_ownVoxelUnits; }
 +	/// Turns particles (sparks, smoke, weather...) on or off for this view.
 +	void setParticles(bool on) { _particlesOn = on; }
 +	/// Blends the game's per-tile light smoothly instead of tile by tile.
@@ -44650,7 +44778,8 @@ index 000000000..cecde58ef
 +	double collapseFall(const BattleUnit *unit, Uint32 now) const;
 +	/// Draws a recorded voxel body's splats, all of them or those on the screen rows from bandTop up to bandBottom.
 +	void drawVoxelUnit(const DrawStep &step, int bandTop, int bandBottom);
-+	VoxelUnits _voxelUnits;             // the units' voxel bodies made so far this battle
++	VoxelUnits _ownVoxelUnits;          // the units' voxel bodies made so far this battle (a view on its own)
++	VoxelUnits *_voxelUnits = &_ownVoxelUnits; // the bodies it draws: its own, or the 3D mode's (see useVoxelUnits)
 +	std::vector<VoxelSplat> _voxelSplats; // the recorded voxel bodies' splats (see DrawStep::voxelFirst), emptied with the steps
 +	/// The recorded steps over bands of rows taken from the shared counter (a job for runOnAllThreads).
 +	void drawListBands();
@@ -52395,10 +52524,10 @@ index 000000000..17ff3d48d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..3957f63f1
+index 000000000..db45e017e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,3213 @@
+@@ -0,0 +1,3216 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -52995,6 +53124,9 @@ index 000000000..3957f63f1
 +	for (size_t k = 0; k < body.part.size(); ++k)
 +	{
 +		if (!items && body.part[k] == VoxelUnitModel::Item) continue;
++		// (seen from one of the 8 directions, what fits its drawing and the pieces added for it, see VoxelUnitModel::views;
++		// going down or lying, the body's own shape)
++		if (falling ? k >= body.addedFrom : !body.shows(k, direction, level)) continue;
 +		float across = right[k], along = ahead[k], height = up[k];
 +		if (falling) body.posed(pose, across, along, height);
 +		const double toRight = across * scale, toAhead = along * scale;
@@ -53575,7 +53707,7 @@ index 000000000..3957f63f1
 +			// far as the fall has come: by the clock, at the quick fall's pace (QuickFallFrameTime a frame; the game's own
 +			// frames go faster); down while it comes down from the air. (Its corpse then lies so, finishing a fall the game
 +			// is done with: see drawFloorItems.) A big unit falls in its own frames.
-+			body = _voxelUnits.lastBody(unit);
++			body = _voxelUnits->lastBody(unit);
 +			if (collapsing)
 +			{
 +				_collapseStarts.emplace(unit, now);
@@ -53598,7 +53730,7 @@ index 000000000..3957f63f1
 +			const double reach = seen ? 24.0 * unitScale * (getWidth() / 2.0) / _halfFovTangent / middleDepth : 0.0;
 +			int noBuilds = 0;
 +			int &builds = seen && middleX > -reach && middleX < getWidth() + reach && middleY > -reach && middleY < getHeight() + reach ? voxelBuilds : noBuilds;
-+			body = _voxelUnits.modelFor(unit, unitSprite, _game->getMod()->getSurfaceSet("BIGOBS.PCK"), _game->getMod()->getSurfaceSet("FLOOROB.PCK"), _save,
++			body = _voxelUnits->modelFor(unit, unitSprite, _game->getMod()->getSurfaceSet("BIGOBS.PCK"), _game->getMod()->getSurfaceSet("FLOOROB.PCK"), _save,
 +				getPalette(), builds, walkPhase);
 +			unitSprite.setViewRotation(3 - cameraDirection);
 +			_spriteBuffer->clear(); // (anything the drawer drew there while the body was made: its sprite, if drawn instead, starts clean)
@@ -54284,7 +54416,7 @@ index 000000000..3957f63f1
 +		// the pile); not while faint (see-through corpses), nor under a floor it would poke through.
 +		BattleUnit *owner = item->getUnit();
 +		const VoxelUnitModel *lying = Options::fpsVoxelUnits && owner && owner->isOut() && !wholeCorpse && !step.sprite.seeThrough
-+			&& step.sprite.standingSquash >= 1.0 && owner->getArmor()->getSize() == 1 ? _voxelUnits.lastBody(owner) : nullptr;
++			&& step.sprite.standingSquash >= 1.0 && owner->getArmor()->getSize() == 1 ? _voxelUnits->lastBody(owner) : nullptr;
 +		if (lying)
 +		{
 +			auto well = _facingsWell.find(owner);
@@ -60894,12 +61026,12 @@ index 000000000..bfab474b7
 +}
 +
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
-diff --git a/src/FirstPerson/FirstPersonVoxelModel.cpp b/src/FirstPerson/FirstPersonVoxelModel.cpp
+diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..bf9645fcf
+index 000000000..badb3b092
 --- /dev/null
-+++ b/src/FirstPerson/FirstPersonVoxelModel.cpp
-@@ -0,0 +1,238 @@
++++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
+@@ -0,0 +1,1842 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -60945,332 +61077,7 @@ index 000000000..bf9645fcf
 + */
 +
 +/*
-+ * FirstPersonVoxelModel.cpp: an item's inventory picture made into a voxel model (see the
-+ * header).
-+ */
-+#include "FirstPersonVoxelModel.h"
-+#include <algorithm>
-+#include <cmath>
-+#include "../Engine/Surface.h"
-+#include "../Mod/RuleItem.h"
-+#include "../Mod/RuleDamageType.h"
-+#include "RuleFirstPerson.h"
-+
-+namespace OpenXcom
-+{
-+
-+namespace
-+{
-+
-+/// A melee weapon whose picture is nowhere further than this from its outline (in steps, see
-+/// stepsToOutside) is thin enough to be a blade, a flat plate (unless it's blunt).
-+const int BladeMaxThickness = 4;
-+
-+/**
-+ * How many steps each opaque pixel of a picture is from the outside (counting the 8
-+ * neighbours): the edge pixels are 1, found first, then a breadth-first walk goes inwards from
-+ * them; transparent pixels are 0.
-+ * @param picture The picture (palette colours, 0 transparent).
-+ * @param steps Set to each pixel's steps (index y * width + x).
-+ */
-+void stepsToOutside(Surface *picture, std::vector<int> &steps)
-+{
-+	const int width = picture->getWidth(), height = picture->getHeight();
-+	steps.assign(width * height, 0);
-+	std::vector<int> queue; // pixel indices (y * width + x), walked in order
-+	auto solid = [&](int x, int y) { return x >= 0 && y >= 0 && x < width && y < height && picture->getPixel(x, y) != 0; };
-+	for (int y = 0; y < height; ++y)
-+	{
-+		for (int x = 0; x < width; ++x)
-+		{
-+			// An edge pixel has a transparent pixel (or the picture's border) next to it.
-+			if (!solid(x, y)) continue;
-+			bool onEdge = false;
-+			for (int offsetY = -1; offsetY <= 1 && !onEdge; ++offsetY)
-+				for (int offsetX = -1; offsetX <= 1 && !onEdge; ++offsetX)
-+					onEdge = !solid(x + offsetX, y + offsetY);
-+			if (onEdge)
-+			{
-+				steps[y * width + x] = 1;
-+				queue.push_back(y * width + x);
-+			}
-+		}
-+	}
-+	for (size_t head = 0; head < queue.size(); ++head)
-+	{
-+		// Each opaque neighbour not reached yet is one step further in.
-+		const int x = queue[head] % width, y = queue[head] / width;
-+		for (int offsetY = -1; offsetY <= 1; ++offsetY)
-+			for (int offsetX = -1; offsetX <= 1; ++offsetX)
-+				if (solid(x + offsetX, y + offsetY) && !steps[(y + offsetY) * width + x + offsetX])
-+				{
-+					steps[(y + offsetY) * width + x + offsetX] = steps[queue[head]] + 1;
-+					queue.push_back((y + offsetY) * width + x + offsetX);
-+				}
-+	}
-+}
-+
-+} // namespace
-+
-+/**
-+ * Is an item's picture given volume as a flat plate, one voxel thick (a blade: a sword, a knife,
-+ * an axe), rather than a cushion? The item table (`firstPerson: items:`, held: plate or
-+ * cushion) decides first. Otherwise a melee weapon is a plate when it isn't blunt (its damage
-+ * isn't the clubs' and the stun rods': concussive or stun, high explosive and stun in the
-+ * original games) and its picture is thin everywhere (BladeMaxThickness): the big mods' swords,
-+ * knives and axes, not their maces, knuckles or shields.
-+ * @param table The 3D view's rules (the item table).
-+ * @param item The item (null: a cushion).
-+ * @param picture Its inventory picture.
-+ * @return True for a plate.
-+ */
-+bool pictureIsPlate(const RuleFirstPerson &table, const RuleItem *item, Surface *picture)
-+{
-+	if (!item)
-+	{
-+		return false;
-+	}
-+	if (const RuleFirstPerson::ItemLook *look = table.getItemLook(item->getType()))
-+	{
-+		if (look->held != RuleFirstPerson::HELD_AUTO) return look->held == RuleFirstPerson::HELD_PLATE;
-+	}
-+	const ItemDamageType damage = item->getDamageType()->ResistType;
-+	if (item->getBattleType() != BT_MELEE || damage == DT_HE || damage == DT_STUN)
-+	{
-+		return false;
-+	}
-+	std::vector<int> steps;
-+	stepsToOutside(picture, steps);
-+	const int thickest = steps.empty() ? 0 : *std::max_element(steps.begin(), steps.end());
-+	return thickest > 0 && thickest <= BladeMaxThickness;
-+}
-+
-+/**
-+ * Gives a picture volume, cushion style: each picture pixel becomes a column of voxels in
-+ * depth, its half depth growing with the square root of its distance to the outline (one voxel
-+ * at the edge, at most four), so the model is thickest in the middle. Or a blade's, a flat
-+ * plate: every column one voxel. Only the faces between a voxel and empty space are kept, with
-+ * corners in picture x, y and depth (depth centred on 0).
-+ * @param picture The picture (palette colours, 0 transparent).
-+ * @param faces Set to the model's faces.
-+ * @param plate A flat plate one voxel thick instead of a cushion.
-+ */
-+void voxelizePicture(Surface *picture, std::vector<VoxelFace> &faces, bool plate)
-+{
-+	faces.clear();
-+	const int width = picture->getWidth(), height = picture->getHeight();
-+	const int MaxHalfDepth = 4, fullDepth = 2 * MaxHalfDepth + 1; // in voxels
-+
-+	// How many steps each opaque pixel is from the outside (0: transparent).
-+	std::vector<int> steps;
-+	stepsToOutside(picture, steps);
-+	auto solid = [&](int x, int y) { return x >= 0 && y >= 0 && x < width && y < height && steps[y * width + x] > 0; };
-+
-+	// Fill the voxel grid (width x height x fullDepth, 0 = empty, else the pixel's colour):
-+	// each pixel's column reaches its half depth to either side of the middle layer (a plate's:
-+	// the middle layer only).
-+	std::vector<Uint8> voxels(width * height * fullDepth, 0);
-+	auto voxelAt = [&](int x, int y, int z) -> Uint8 {
-+		return x >= 0 && y >= 0 && z >= 0 && x < width && y < height && z < fullDepth ? voxels[(z * height + y) * width + x] : 0;
-+	};
-+	for (int y = 0; y < height; ++y)
-+	{
-+		for (int x = 0; x < width; ++x)
-+		{
-+			if (!steps[y * width + x]) continue;
-+			const int halfDepth = plate ? 0 : std::clamp((int)std::lround(1.2 * std::sqrt((double)steps[y * width + x])), 1, MaxHalfDepth);
-+			for (int z = MaxHalfDepth - halfDepth; z <= MaxHalfDepth + halfDepth; ++z) voxels[(z * height + y) * width + x] = picture->getPixel(x, y);
-+		}
-+	}
-+
-+	// A face for every side of a voxel that's open to the air, its corners wound so that the
-+	// cross product of its first two edges points outwards (the drawing culls by that).
-+	for (int z = 0; z < fullDepth; ++z)
-+	{
-+		for (int y = 0; y < height; ++y)
-+		{
-+			for (int x = 0; x < width; ++x)
-+			{
-+				const Uint8 color = voxelAt(x, y, z);
-+				if (!color) continue;
-+				const int voxel[3] = { x, y, z };
-+
-+				// The six sides: each axis, towards minus and plus.
-+				for (int axis = 0; axis < 3; ++axis)
-+				{
-+					for (int side = -1; side <= 1; side += 2)
-+					{
-+						// Hidden behind a neighbouring voxel: no face.
-+						int neighbour[3] = { x, y, z };
-+						neighbour[axis] += side;
-+						if (voxelAt(neighbour[0], neighbour[1], neighbour[2])) continue;
-+
-+						// The other two axes, in the order that winds the face outwards.
-+						const int tangent1 = side > 0 ? (axis + 1) % 3 : (axis + 2) % 3, tangent2 = side > 0 ? (axis + 2) % 3 : (axis + 1) % 3;
-+						VoxelFace face;
-+						face.color = color;
-+						if (axis < 2)
-+						{
-+							// A side face (across the picture): the picture's dark outline stays on the
-+							// front and back faces, and the sides show the colour just inside it.
-+							const int insideX = x - (axis == 0 ? side : 0), insideY = y - (axis == 1 ? side : 0);
-+							if (solid(insideX, insideY)) face.color = picture->getPixel(insideX, insideY);
-+						}
-+
-+						// The four corners: the voxel spans +-0.5 around its centre, the face lies on
-+						// its minus or plus side, and the corners go round the two other axes.
-+						for (int cornerIndex = 0; cornerIndex < 4; ++cornerIndex)
-+						{
-+							float cornerPos[3] = { voxel[0] - 0.5f, voxel[1] - 0.5f, voxel[2] - 0.5f - MaxHalfDepth };
-+							cornerPos[axis] += side > 0 ? 1.0f : 0.0f;
-+							if (cornerIndex == 1 || cornerIndex == 2) cornerPos[tangent1] += 1.0f;
-+							if (cornerIndex == 2 || cornerIndex == 3) cornerPos[tangent2] += 1.0f;
-+							std::copy(cornerPos, cornerPos + 3, face.corner[cornerIndex]);
-+						}
-+						faces.push_back(face);
-+					}
-+				}
-+			}
-+		}
-+	}
-+}
-+
-+}
-+
-+// Thanks mom and dad! You were the ones who exposed me to my first comp.
-diff --git a/src/FirstPerson/FirstPersonVoxelModel.h b/src/FirstPerson/FirstPersonVoxelModel.h
-new file mode 100644
-index 000000000..ae24ad8ad
---- /dev/null
-+++ b/src/FirstPerson/FirstPersonVoxelModel.h
-@@ -0,0 +1,75 @@
-+#pragma once
-+/*
-+ * ==============================================================================================
-+ *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
-+ * ==============================================================================================
-+ *
-+ *  Our philosophy
-+ *
-+ *  - Faithful first. The 3D view should feel as if it had shipped with UFO: Enemy Unknown on
-+ *    the day the game came out.
-+ *  - Another camera on the same battle. The original rules decide everything: time units,
-+ *    energy, accuracy, line of fire, reaction fire, doors and morale. The 3D view only shows
-+ *    what the game does.
-+ *  - Only the original assets: the game's own maps, voxel shapes, sprites, palette and sounds.
-+ *  - Every addition is a setting. Jumping, night vision as gear, falling, FPS-style shooting
-+ *    and dual wield can all be switched off.
-+ *  - Light on the engine. Our code lives in this folder, the core only gets small hooks, and
-+ *    without the OpenXcom3D mod nothing changes.
-+ *  - Runs anywhere: a software renderer on the CPU, no graphics card needed.
-+ *  - Written for people: descriptive names, and a comment for every function and every block.
-+ *
-+ *  Date: 2026-10-19
-+ *
-+ *  We wish everyone all the best and all health!
-+ * ==============================================================================================
-+ */
-+/*
-+ * Copyright 2010-2026 OpenXcom Developers.
-+ *
-+ * This file is part of OpenXcom.
-+ *
-+ * OpenXcom is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation, either version 3 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * OpenXcom is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+/*
-+ * FirstPersonVoxelModel.h: items given volume. An item's inventory picture (the game's own,
-+ * from BIGOBS.PCK) becomes a small voxel model, cushion style: each picture pixel a column of
-+ * voxels in depth, deepest in the middle; or a blade's, a flat plate one voxel thick. The
-+ * weapon or other item in the soldier's hand (FirstPersonMode) and an item thrown through the
-+ * air (FirstPersonView) are drawn from it.
-+ */
-+#include <vector>
-+#include <SDL.h>
-+
-+namespace OpenXcom
-+{
-+
-+class Surface;
-+class RuleFirstPerson;
-+class RuleItem;
-+
-+/// One face of a voxel model, between a voxel and the air: its four corners in picture x, y and
-+/// depth (depth centred on 0), wound so that the cross product of its first two edges points
-+/// outwards, and its palette colour.
-+struct VoxelFace { float corner[4][3]; Uint8 color; };
-+
-+/// Gives a picture volume: the faces of its voxel model (none for an empty picture), a cushion or a flat plate.
-+void voxelizePicture(Surface *picture, std::vector<VoxelFace> &faces, bool plate = false);
-+/// Is an item's picture given volume as a flat plate (a blade: a sword, a knife, an axe) rather than a cushion?
-+bool pictureIsPlate(const RuleFirstPerson &table, const RuleItem *item, Surface *picture);
-+
-+}
-+
-+// Thanks mom and dad! You were the ones who exposed me to my first comp.
-diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-new file mode 100644
-index 000000000..e6d6229e7
---- /dev/null
-+++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,1985 @@
-+/*
-+ * ==============================================================================================
-+ *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
-+ * ==============================================================================================
-+ *
-+ *  Our philosophy
-+ *
-+ *  - Faithful first. The 3D view should feel as if it had shipped with UFO: Enemy Unknown on
-+ *    the day the game came out.
-+ *  - Another camera on the same battle. The original rules decide everything: time units,
-+ *    energy, accuracy, line of fire, reaction fire, doors and morale. The 3D view only shows
-+ *    what the game does.
-+ *  - Only the original assets: the game's own maps, voxel shapes, sprites, palette and sounds.
-+ *  - Every addition is a setting. Jumping, night vision as gear, falling, FPS-style shooting
-+ *    and dual wield can all be switched off.
-+ *  - Light on the engine. Our code lives in this folder, the core only gets small hooks, and
-+ *    without the OpenXcom3D mod nothing changes.
-+ *  - Runs anywhere: a software renderer on the CPU, no graphics card needed.
-+ *  - Written for people: descriptive names, and a comment for every function and every block.
-+ *
-+ *  Date: 2026-10-19
-+ *
-+ *  We wish everyone all the best and all health!
-+ * ==============================================================================================
-+ */
-+/*
-+ * Copyright 2010-2026 OpenXcom Developers.
-+ *
-+ * This file is part of OpenXcom.
-+ *
-+ * OpenXcom is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation, either version 3 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * OpenXcom is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+/*
-+ * FirstPersonVoxelUnits.cpp: units given a body (see FirstPersonVoxelUnits.h).
++ * FirstPersonVoxelBodies.cpp: how a body is made (see FirstPersonVoxelBodies.h and FirstPersonVoxelUnits.h).
 + *
 + * The parts' frames come from the game's own unit drawer (UnitSprite), each part on a frame of its
 + * own (setPartCapture) for each of the 8 directions, with the unit's colours as the game draws them;
@@ -61280,27 +61087,16 @@ index 000000000..e6d6229e7
 + * row = 40 + (x + y) / 2 - up (in voxels from the middle of its tile's floor, on these 64x64
 + * frames), so each frame is the same body seen from 45 degrees further round.
 + */
-+#include "FirstPersonVoxelUnits.h"
++#include "FirstPersonVoxelBodies.h"
 +#include <algorithm>
 +#include <cmath>
 +#include <cstdio>
-+#include <cstdlib>
-+#include <string>
 +#include <utility>
-+#include "../Battlescape/UnitSprite.h"
-+#include "../Engine/GraphSubset.h"
-+#include "../Engine/Script.h"
-+#include "../Engine/Surface.h"
-+#include "../Engine/SurfaceSet.h"
-+#include "../Mod/Armor.h"
-+#include "../Mod/RuleItem.h"
-+#include "../Mod/Unit.h"
-+#include "../Savegame/BattleItem.h"
-+#include "../Savegame/BattleUnit.h"
-+#include "../Savegame/SavedBattleGame.h"
 +
 +namespace OpenXcom
 +{
++
++using namespace VoxelBodies;
 +
 +namespace
 +{
@@ -61319,10 +61115,12 @@ index 000000000..e6d6229e7
 +inline float cellUp(int up) { return UpFrom + (up + 0.5f) * Cell; }
 +
 +// ---- The frames ----
-+/// The parts are drawn on 64x64 frames with the unit at (16, 8), as the 3D view draws units: the
++/// The parts are drawn on FrameSize frames with the unit at (16, 8), as the 3D view draws units: the
 +/// middle of its tile's floor at (32, 40); a big unit's four tiles around their shared corner, at (32, 48).
-+constexpr int FrameSize = 64, FloorX = 32;
++constexpr int FloorX = 32;
 +int FloorY = 40;
++bool BigUnit = false; // (two tiles by two: see tileFloorRows)
++bool SlantOnly = false; // (a big walker: read along the slant from any height, see project)
 +
 +/// The grid and the floor's place on the frames for a unit of this size (in tiles across).
 +void useGrid(int size)
@@ -61332,16 +61130,10 @@ index 000000000..e6d6229e7
 +	AcrossFrom = AlongFrom = (float)-half;
 +	GridCells = GridAcross * GridAlong * GridUp;
 +	FloorY = size > 1 ? 48 : 40;
++	BigUnit = size > 1;
 +}
 +/// Sprite pixels a voxel across a frame (the projection's x - y along the unit's own axes).
 +constexpr float PixelsAcross = 1.41421356f;
-+/// Direction 3 faces the camera; direction 1 shows the unit's right side (its front to the right),
-+/// direction 5 its left side (its front to the left).
-+constexpr int Front = 3, RightSide = 1, LeftSide = 5;
-+/// The parts a body is made of, and the drawer's body parts they come from: the body's own (the first BodyParts), then
-+/// the items in the right and left hands (their frames only say where the hand holds them).
-+constexpr int PartCount = 6, BodyParts = 4, RightItem = 4, LeftItem = 5;
-+constexpr int PartSlots[PartCount] = { BODYPART_TORSO, BODYPART_LEFTARM, BODYPART_RIGHTARM, BODYPART_LEGS, BODYPART_ITEM_RIGHTHAND, BODYPART_ITEM_LEFTHAND };
 +constexpr Uint8 PartCodes[PartCount] = { VoxelUnitModel::Torso, VoxelUnitModel::LeftArm, VoxelUnitModel::RightArm, VoxelUnitModel::Legs, VoxelUnitModel::Item, VoxelUnitModel::Item };
 +/// Each palette block's 16 shades pushed this much further from the unit's mean shade in that block (the owner:
 +/// "put more contrast to the source sprite image to make it more recognisable"); the colours stay the palette's.
@@ -61364,14 +61156,6 @@ index 000000000..e6d6229e7
 +/// A body down (its last death frame's pose) is at most this much of its standing height (see fitFall).
 +constexpr float DownAtMost = 0.4f;
 +
-+/// How a unit's drawing routine draws it, for its voxel body: in parts on frames of their own, as routine 0 does (a
-+/// torso with the head, arms, legs: soldiers, Sectoids, Mutons, TFTD's aquanauts and aliens; the Floater without legs,
-+/// the Snakeman whose legs are its tail, the Chryssalid), or all of it on one frame (civilians, Ethereals and Zombies,
-+/// the walkers among them, and the creatures: Silacoid, Celatid, Biodrone, Tentaculat); and how it walks: whether its
-+/// legs swing (a one-frame walker's: its body below the hip), whether its free arms do, and the torso's bob (the
-+/// routine's own, as the game draws its walk: drawRoutine0's tables for 0, 10, 13-15, drawRoutine6's for the Snakeman;
-+/// the big walkers' once a footfall).
-+struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; };
 +const Routine Routines[] = {
 +	{ 0, false, true, true, true, { 1, 0, -1, 0, 1, 0, -1, 0 } },
 +	{ 10, false, true, true, true, { 1, 1, 0, 0, 1, 1, 0, 0 } },
@@ -61400,12 +61184,6 @@ index 000000000..e6d6229e7
 +	{ 22, true, false, false, false, { 0, 0, 0, 0, 0, 0, 0, 0 }, true },
 +};
 +
-+/// The routine's way of drawing, or null for one not given a voxel body.
-+const Routine *routineFor(int number)
-+{
-+	for (const Routine &routine : Routines) if (routine.number == number) return &routine;
-+	return nullptr;
-+}
 +/// An item in hand: as long as its widest hand frame draws it, its inventory picture slimmer across and through by
 +/// ItemSlim, and no thicker than a rifle's (whose picture rows are RifleScale voxels each); held in both hands, it lies
 +/// across the waist tilted ItemTilt, the muzzle to the unit's left and up.
@@ -61421,32 +61199,31 @@ index 000000000..e6d6229e7
 +constexpr float GripButt = 0.3f, GripFore = 0.68f, GripOne = 0.2f, GripBelow = 0.15f;
 +constexpr double Pi = 3.14159265358979323846;
 +
-+/// One part's frames for the 8 directions (palette colours, 0 empty).
-+struct PartFrames
-+{
-+	std::vector<Uint8> frame[8];
-+	bool any = false;
-+	Uint8 at(int direction, int column, int row) const
-+	{
-+		return column >= 0 && row >= 0 && column < FrameSize && row < FrameSize ? frame[direction][row * FrameSize + column] : 0;
-+	}
-+};
-+
 +/// The directions' turns: the unit's right and ahead as map x, y.
 +struct Turn { float cosine, sine; };
 +const Turn Turns[8] = { { 1, 0 }, { 0.70710678f, 0.70710678f }, { 0, 1 }, { -0.70710678f, 0.70710678f }, { -1, 0 },
 +	{ -0.70710678f, -0.70710678f }, { 0, -1 }, { 0.70710678f, -0.70710678f } };
 +
 +/// Where the view of direction d puts a body point on its frame: column, row and nearness to the camera (larger
-+/// nearer). Level: as a picture taken at the unit's height (the row by height alone, nearness along the ground);
-+/// else along the isometric view's slant.
++/// nearer). Level: as a picture taken at the unit's height (the row by height alone, a big unit's by height on its
++/// tile's own floor; nearness along the ground); else along the isometric view's slant. A big unit on legs (the
++/// Sectopod, the Reaper, the Triscene) is read along the slant from any height: its legs, drawn across the tiles' seams,
++/// come apart read level by tile.
++/// A big unit's frame is its four tiles' pictures, each standing on its own tile's floor (see VoxelUnits::modelFor): the
++/// rows below the frame's floor row that the floor of the tile a place (x, y on the map, turned to the view) is on lies:
++/// -8 the tile behind, 8 the one in front, 0 those beside; 0 for a unit one tile big.
++inline float tileFloorRows(float x, float y)
++{
++	return BigUnit ? ((x < 0.0f ? -8.0f : 8.0f) + (y < 0.0f ? -8.0f : 8.0f)) * 0.5f : 0.0f;
++}
++
 +inline void project(float right, float ahead, float up, int d, bool level, float &column, float &row, float &nearness)
 +{
 +	const float x = right * Turns[d].cosine + ahead * Turns[d].sine, y = right * Turns[d].sine - ahead * Turns[d].cosine;
 +	column = FloorX + (x - y);
-+	if (level)
++	if (level && !SlantOnly)
 +	{
-+		row = FloorY - up;
++		row = FloorY + tileFloorRows(x, y) - up;
 +		nearness = x + y;
 +	}
 +	else
@@ -61626,6 +61403,67 @@ index 000000000..e6d6229e7
 +	return (colour.r * 30 + colour.g * 59 + colour.b * 11) / 100;
 +}
 +
++/// A frame's solid drawing only (a big unit's: see makeModel): what's left of it where a 3x3 square of drawn pixels fits,
++/// grown back by those squares; fine detail, a pixel or two wide (sparks, streaks), cleared.
++void keepSolid(PartFrames &part)
++{
++	for (int d = 0; d < 8; ++d)
++	{
++		std::vector<Uint8> &frame = part.frame[d];
++		std::vector<Uint8> core(FrameSize * FrameSize, 0), kept(FrameSize * FrameSize, 0);
++		for (int row = 1; row < FrameSize - 1; ++row)
++			for (int column = 1; column < FrameSize - 1; ++column)
++			{
++				bool full = true;
++				for (int dy = -1; dy <= 1 && full; ++dy)
++					for (int dx = -1; dx <= 1 && full; ++dx) full = frame[(row + dy) * FrameSize + column + dx] != 0;
++				core[row * FrameSize + column] = full;
++			}
++		for (int row = 1; row < FrameSize - 1; ++row)
++			for (int column = 1; column < FrameSize - 1; ++column)
++			{
++				if (!core[row * FrameSize + column]) continue;
++				for (int dy = -1; dy <= 1; ++dy)
++					for (int dx = -1; dx <= 1; ++dx) kept[(row + dy) * FrameSize + column + dx] = 1;
++			}
++		for (int i = 0; i < FrameSize * FrameSize; ++i) if (!kept[i]) frame[i] = 0;
++	}
++}
++
++/// Each drawn pixel's shade the middle one of its own and its 8 neighbours' in the same palette block (as the body's
++/// colours are smoothed, see makeModel; edges between colours stay): for the pieces added for views, painted straight
++/// from the frames.
++void smoothFrames(PartFrames parts[PartCount])
++{
++	for (int p = 0; p < PartCount; ++p)
++	{
++		if (!parts[p].any) continue;
++		for (int d = 0; d < 8; ++d)
++		{
++			const std::vector<Uint8> before(parts[p].frame[d]);
++			for (int row = 0; row < FrameSize; ++row)
++				for (int column = 0; column < FrameSize; ++column)
++				{
++					const Uint8 colour = before[row * FrameSize + column];
++					if (!colour) continue;
++					int shades[9], count = 0;
++					for (int dy = -1; dy <= 1; ++dy)
++						for (int dx = -1; dx <= 1; ++dx)
++						{
++							const int c = column + dx, r = row + dy;
++							if (c < 0 || r < 0 || c >= FrameSize || r >= FrameSize) continue;
++							const Uint8 other = before[r * FrameSize + c];
++							if (other && other / 16 == colour / 16) shades[count++] = other % 16;
++						}
++					if (count < 3) continue;
++					std::nth_element(shades, shades + count / 2, shades + count);
++					const Uint8 middle = (Uint8)(colour / 16 * 16 + shades[count / 2]);
++					if (middle) parts[p].frame[d][row * FrameSize + column] = middle;
++				}
++		}
++	}
++}
++
 +/// The frames' outlines: a near black pixel with at most two near black neighbours (a line, not a black area such as
 +/// the Biodrone's dish) takes the colour most of its other neighbours have. Drawn in 2D at a silhouette's edges, they
 +/// would lie on the body's surface in 3D.
@@ -61716,17 +61554,6 @@ index 000000000..e6d6229e7
 +	}
 +}
 +
-+/// The walk as its frames show it (drawn with UnitSprite::setWalkOverride): for each phase and each of the two views it's
-+/// matched in (WalkViews: the right side, where a leg swings across the view, and the front right, where the near leg
-+/// and the far one part), the frame of its legs (of all of it, for a body drawn on one frame) and of each arm (right,
-+/// left). Empty for a unit that doesn't walk in its own frames.
-+constexpr int WalkViews[2] = { RightSide, 2 };
-+struct WalkFrames
-+{
-+	std::vector<Uint8> legs[8][2], arms[8][2][2];
-+	bool any = false;
-+};
-+
 +/// A pose of the walk: each thigh's swing (degrees; more, the foot forward) and knee's bend, each free arm's swing (more,
 +/// the hand forward), right then left; and the body's bob (voxels down).
 +struct WalkPose
@@ -61744,9 +61571,9 @@ index 000000000..e6d6229e7
 +/// routine's bob (see Routine).
 +void makeWalk(VoxelUnitModel &model, const Routine &routine, bool leftHolds, bool rightHolds, const WalkFrames &frames)
 +{
-+	const size_t count = model.part.size();
++	const size_t count = model.part.size(), own = std::min(count, model.addedFrom); // (the pieces added for a view: posed along, not fitted)
 +	float hip = -1e9f, footStanding = 1e9f;
-+	for (size_t k = 0; k < count; ++k)
++	for (size_t k = 0; k < own; ++k)
 +	{
 +		if (model.part[k] != VoxelUnitModel::Legs) continue;
 +		hip = std::max(hip, model.up[k]);
@@ -61766,7 +61593,7 @@ index 000000000..e6d6229e7
 +			leg[side][k] = model.part[k] == VoxelUnitModel::Legs && (model.right[k] > 0) == (side == 0);
 +			shin[side][k] = leg[side][k] && model.up[k] < knee;
 +			arm[side][k] = model.part[k] == armParts[side];
-+			if (arm[side][k]) shoulder[side] = std::max(shoulder[side], model.up[k]);
++			if (arm[side][k] && k < own) shoulder[side] = std::max(shoulder[side], model.up[k]);
 +		}
 +	}
 +	// A pose's places (the body's points moved).
@@ -61786,7 +61613,7 @@ index 000000000..e6d6229e7
 +		for (size_t k = 0; k < count; ++k)
 +		{
 +			if (model.part[k] != VoxelUnitModel::Legs) up[k] -= pose.bob;
-+			else footNow = std::min(footNow, up[k]);
++			else if (k < own) footNow = std::min(footNow, up[k]);
 +		}
 +		if (footNow < 1e8f) for (float &height : up) height += footStanding - footNow;
 +	};
@@ -61800,7 +61627,7 @@ index 000000000..e6d6229e7
 +			const std::vector<Uint8> &frame = *viewFrames[view];
 +			if (frame.empty()) continue;
 +			std::fill(outline.begin(), outline.end(), 0);
-+			for (size_t k = 0; k < count; k += 2)
++			for (size_t k = 0; k < own; k += 2)
 +			{
 +				if (which && !(*which)[k]) continue;
 +				float column, row, nearness;
@@ -61893,14 +61720,6 @@ index 000000000..e6d6229e7
 +		model.walkUp[phase] = std::move(up);
 +	}
 +}
-+
-+/// An item in a hand: its inventory picture, as the game draws it in the hand (palette colours, 0 empty), and how it's held.
-+struct HeldItem
-+{
-+	std::vector<Uint8> picture;
-+	int width = 0, height = 0;
-+	bool twoHanded = false;
-+};
 +
 +/// Where the 8 frames of a part agree its middle is (right, ahead, up): the point whose projections come nearest the
 +/// middles of its pixels in each frame (least squares); false if fewer than 2 frames show it.
@@ -62280,8 +62099,8 @@ index 000000000..e6d6229e7
 +		model.fallToward = 4;
 +		return;
 +	}
-+	std::vector<size_t> body; // (every other voxel: enough for an outline)
-+	for (size_t k = 0; k < count; k += 2) if (model.part[k] != VoxelUnitModel::Item) body.push_back(k);
++	std::vector<size_t> body; // (every other voxel of the body's own: enough for an outline)
++	for (size_t k = 0; k < std::min(count, model.addedFrom); k += 2) if (model.part[k] != VoxelUnitModel::Item) body.push_back(k);
 +	std::vector<Uint8> outline(FrameSize * FrameSize);
 +	float standingTop = 0.0f;
 +	for (size_t k : body) standingTop = std::max(standingTop, model.up[k]);
@@ -62363,13 +62182,276 @@ index 000000000..e6d6229e7
 +	}
 +}
 +
-+/// Makes a unit's body from its parts' frames, the items in its hands (right, left), its death frames, its corpse's
-+/// picture and its walk frames; null if it has no torso.
-+std::unique_ptr<VoxelUnitModel> makeModel(PartFrames parts[PartCount], const HeldItem items[2], const std::vector<std::vector<Uint8>> &deaths,
-+	const std::vector<Uint8> &corpse, const WalkFrames &walks, bool aiming, const Routine &routine, const SDL_Color *palette)
++/// The part each frame pixel shows, as the game lays the parts over each other (composite: its colour there is the top
++/// part's), for each direction; for a unit without one (drawn on one frame, a big unit's tiles), the first drawn there of
++/// the items, the arms, the torso and the legs. -1 where nothing is drawn.
++void partsOnTop(const PartFrames parts[PartCount], const std::vector<Uint8> composite[8], std::vector<int> onTop[8])
++{
++	const int preference[PartCount] = { RightItem, LeftItem, 2, 1, 0, 3 }; // (2 the right arm, 1 the left, 0 the torso, 3 the legs)
++	for (int d = 0; d < 8; ++d)
++	{
++		onTop[d].assign(FrameSize * FrameSize, -1);
++		for (int i = 0; i < FrameSize * FrameSize; ++i)
++		{
++			const Uint8 shown = composite[d].empty() ? 0 : composite[d][i];
++			for (int p : preference)
++			{
++				if (!parts[p].any || !parts[p].frame[d][i]) continue;
++				if (onTop[d][i] < 0) onTop[d][i] = p;
++				if (shown && parts[p].frame[d][i] == shown)
++				{
++					onTop[d][i] = p;
++					break;
++				}
++			}
++		}
++	}
++}
++
++/// A point on the line of sight of a frame's pixel (column, row: a place on the frame) in direction d's view, at a
++/// nearness to the camera (see project): to the body's right, ahead and up. Level: the frame read as a picture taken
++/// at the unit's height; else along the isometric view's slant.
++inline void unproject(float column, float row, float nearness, int d, bool level, float &right, float &ahead, float &up)
++{
++	// (x - y and x + y on the map, and the height, from the projection)
++	const float difference = column - FloorX;
++	level = level && !SlantOnly;
++	const float sum = level ? nearness : (nearness + (row - FloorY)) / 1.5f;
++	const float x = (sum + difference) * 0.5f, y = (sum - difference) * 0.5f;
++	up = level ? FloorY + tileFloorRows(x, y) - row : sum * 0.5f - (row - FloorY);
++	right = x * Turns[d].cosine + y * Turns[d].sine;
++	ahead = x * Turns[d].sine - y * Turns[d].cosine;
++}
++
++/// The colour slot (and the bit of VoxelUnitModel::views) of a view: direction d, level or slanted.
++inline int viewSlot(int d, bool level)
++{
++	return (level ? 0 : 8) + d;
++}
++
++/// Whether a frame pixel is drawn (some part shows there; see partsOnTop): column, row a place on direction d's frame.
++inline bool drawnAt(const std::vector<int> onTop[8], int d, float column, float row)
++{
++	const int c = (int)std::floor(column), r = (int)std::floor(row);
++	return c >= 0 && r >= 0 && c < FrameSize && r < FrameSize && onTop[d][r * FrameSize + c] >= 0;
++}
++
++/// The views (bits as VoxelUnitModel::views) whose drawing a place of the body falls inside: right, ahead, up.
++Uint16 viewsAt(const std::vector<int> onTop[8], float right, float ahead, float up)
++{
++	Uint16 views = 0;
++	for (int reading = 0; reading < 2; ++reading)
++	{
++		for (int d = 0; d < 8; ++d)
++		{
++			float column, row, nearness;
++			project(right, ahead, up, d, reading == 1, column, row, nearness);
++			if (drawnAt(onTop, d, column, row)) views |= (Uint16)(1u << viewSlot(d, reading == 1));
++		}
++	}
++	return views;
++}
++
++/// What a shot meets (see VoxelUnitModel::hits): the body's solid cells (owner: its filled half voxel cells, the inside
++/// too), the items in its hands and the pieces added for views, in whole voxels; each the views it shows in (a cell's,
++/// as its middle falls inside each view's solid drawing, see matchViews; a voxel's, as it shows).
++void makeHits(VoxelUnitModel &model, const std::vector<Uint8> &owner, const std::vector<int> solidOnTop[8])
++{
++	float low[3] = { 1e9f, 1e9f, 1e9f }, high[3] = { -1e9f, -1e9f, -1e9f };
++	auto grow = [&](float right, float ahead, float up) {
++		const float place[3] = { right, ahead, up };
++		for (int i = 0; i < 3; ++i)
++		{
++			low[i] = std::min(low[i], place[i]);
++			high[i] = std::max(high[i], place[i]);
++		}
++	};
++	for (int across = 0; across < GridAcross; ++across)
++		for (int along = 0; along < GridAlong; ++along)
++			for (int up = 0; up < GridUp; ++up)
++				if (owner[cellIndex(across, along, up)]) grow(cellRight(across), cellAhead(along), cellUp(up));
++	for (size_t k = 0; k < model.part.size(); ++k) grow(model.right[k], model.ahead[k], model.up[k]);
++	if (low[0] > high[0]) return;
++	for (int i = 0; i < 3; ++i)
++	{
++		model.hitFrom[i] = (int)std::floor(low[i]);
++		model.hitSize[i] = (int)std::floor(high[i]) - model.hitFrom[i] + 1;
++	}
++	model.hits.assign((size_t)model.hitSize[0] * model.hitSize[1] * model.hitSize[2], 0);
++	auto at = [&](float right, float ahead, float up) -> Uint16 & {
++		const int x = (int)std::floor(right) - model.hitFrom[0], y = (int)std::floor(ahead) - model.hitFrom[1], z = (int)std::floor(up) - model.hitFrom[2];
++		return model.hits[((size_t)x * model.hitSize[1] + y) * model.hitSize[2] + z];
++	};
++	for (int across = 0; across < GridAcross; ++across)
++		for (int along = 0; along < GridAlong; ++along)
++			for (int up = 0; up < GridUp; ++up)
++			{
++				if (!owner[cellIndex(across, along, up)]) continue;
++				at(cellRight(across), cellAhead(along), cellUp(up)) |= viewsAt(solidOnTop, cellRight(across), cellAhead(along), cellUp(up));
++			}
++	for (size_t k = 0; k < model.part.size(); ++k) at(model.right[k], model.ahead[k], model.up[k]) |= model.views[k];
++}
++
++/// The body matched to its drawings view by view (the owner's choice: "view-matched"). A hand drawn unit's 8 frames don't
++/// quite agree on one shape (a claw, a tail, a crest drawn a little differently in each), so seen from one of the 8
++/// directions the body shows only its voxels inside that direction's drawing (along the slant for a camera above, level
++/// for one at the unit's height: see VoxelUnitModel::views), and what the drawing has that they leave bare is added for
++/// that view: each connected piece of it on its pixels' lines of sight, at the one depth where the most other views
++/// (their neighbours the most) have it inside their drawing, four voxels to a pixel; of the part on top there, coloured as the
++/// drawing; and shown from every view whose drawing it falls inside, coloured there by that drawing. A big unit's own
++/// voxels show where its solid drawing is (solidOnTop: without the fine detail, see keepSolid): the sparks of a hover
++/// field below a disc are the views' pieces, not the disc's shape seen there.
++void matchViews(VoxelUnitModel &model, const PartFrames parts[PartCount], const std::vector<int> onTop[8], const std::vector<int> solidOnTop[8])
++{
++	const float half = AcrossFrom < 0.0f ? -AcrossFrom : 14.0f, top = UpFrom + GridUp * Cell;
++	auto drawn = [&](int d, float column, float row) { return drawnAt(onTop, d, column, row); };
++	// The views a voxel's place falls inside the drawing of, and its colour in each: the part on top's there.
++	auto fits = [&](float right, float ahead, float up, Uint8 colours[16]) {
++		for (int reading = 0; reading < 2; ++reading)
++		{
++			for (int d = 0; d < 8; ++d)
++			{
++				float column, row, nearness;
++				project(right, ahead, up, d, reading == 1, column, row, nearness);
++				if (!drawn(d, column, row)) continue;
++				const int pixel = (int)std::floor(row) * FrameSize + (int)std::floor(column);
++				colours[viewSlot(d, reading == 1)] = parts[onTop[d][pixel]].frame[d][pixel];
++			}
++		}
++		return viewsAt(onTop, right, ahead, up);
++	};
++	const size_t own = model.part.size();
++	model.views.resize(own);
++	for (size_t k = 0; k < own; ++k) model.views[k] = viewsAt(solidOnTop, model.right[k], model.ahead[k], model.up[k]);
++	model.addedFrom = own;
++	std::vector<Uint8> bare(FrameSize * FrameSize);
++	std::vector<int> piece;
++	for (int reading = 0; reading < 2; ++reading)
++	{
++		const bool level = reading == 1;
++		for (int d = 0; d < 8; ++d)
++		{
++			const int slot = viewSlot(d, level);
++			// the drawing's pixels no voxel shown in this view covers
++			for (int i = 0; i < FrameSize * FrameSize; ++i) bare[i] = onTop[d][i] >= 0;
++			for (size_t k = 0; k < model.part.size(); ++k)
++			{
++				if (!(model.views[k] >> slot & 1)) continue;
++				float column, row, nearness;
++				project(model.right[k], model.ahead[k], model.up[k], d, level, column, row, nearness);
++				const int c = (int)std::floor(column), r = (int)std::floor(row);
++				if (c >= 0 && r >= 0 && c < FrameSize && r < FrameSize) bare[r * FrameSize + c] = 0;
++			}
++			// in connected pieces, each at its depth
++			for (int start = 0; start < FrameSize * FrameSize; ++start)
++			{
++				if (!bare[start]) continue;
++				piece.assign(1, start);
++				bare[start] = 0;
++				for (size_t next = 0; next < piece.size(); ++next)
++				{
++					const int column = piece[next] % FrameSize, row = piece[next] / FrameSize;
++					for (int dy = -1; dy <= 1; ++dy)
++						for (int dx = -1; dx <= 1; ++dx)
++						{
++							const int c = column + dx, r = row + dy;
++							if (c < 0 || r < 0 || c >= FrameSize || r >= FrameSize || !bare[r * FrameSize + c]) continue;
++							bare[r * FrameSize + c] = 0;
++							piece.push_back(r * FrameSize + c);
++						}
++				}
++				float bestNearness = 0.0f, bestScore = -1e30f;
++				for (float nearness = -26.0f; nearness <= 26.0f; nearness += 0.5f)
++				{
++					float score = 0.0f, spread = 0.0f;
++					for (int pixel : piece)
++					{
++						float right, ahead, up;
++						unproject(pixel % FrameSize + 0.5f, pixel / FrameSize + 0.5f, nearness, d, level, right, ahead, up);
++						if (std::abs(right) > half || std::abs(ahead) > half || up < UpFrom || up > top)
++						{
++							score -= 1000.0f;
++							continue;
++						}
++						spread += planeLength(right, ahead);
++						for (int e = 0; e < 8; ++e)
++						{
++							if (e == d) continue;
++							float column, row, other;
++							project(right, ahead, up, e, level, column, row, other);
++							if (drawn(e, column, row)) score += e == (d + 1) % 8 || e == (d + 7) % 8 ? 2.0f : 1.0f;
++						}
++					}
++					score -= 0.01f * spread / piece.size(); // (alike: nearest the body's middle)
++					if (score > bestScore)
++					{
++						bestScore = score;
++						bestNearness = nearness;
++					}
++				}
++				for (int pixel : piece)
++				{
++					const int part = onTop[d][pixel];
++					for (int quarter = 0; quarter < 4; ++quarter)
++					{
++						// (four to a pixel, at its quarters' middles: nearer each other than a voxel's square is wide, no gaps up close)
++						float right, ahead, up;
++						unproject(pixel % FrameSize + 0.25f + 0.5f * (quarter % 2), pixel / FrameSize + 0.25f + 0.5f * (quarter / 2), bestNearness, d, level,
++							right, ahead, up);
++						Uint8 colours[16];
++						std::fill(colours, colours + 16, parts[part].frame[d][pixel]);
++						const Uint16 views = fits(right, ahead, up, colours) | (Uint16)(1u << slot);
++						colours[slot] = parts[part].frame[d][pixel];
++						model.right.push_back(right);
++						model.ahead.push_back(ahead);
++						model.up.push_back(up);
++						model.part.push_back(PartCodes[part]);
++						model.colours.insert(model.colours.end(), colours, colours + 16);
++						model.views.push_back(views);
++					}
++				}
++			}
++		}
++	}
++}
++
++}
++
++/**
++ * The routine's way of drawing (see Routine).
++ * @param number The drawing routine's number.
++ * @return Its way, or null for one not given a voxel body.
++ */
++const Routine *VoxelBodies::routineFor(int number)
++{
++	for (const Routine &routine : Routines) if (routine.number == number) return &routine;
++	return nullptr;
++}
++
++/// Makes a unit's body from its parts' frames (and, for a unit drawn in parts, the parts laid over each other as the game
++/// draws them, each direction's: which part shows where), the items in its hands (right, left), its death frames, its
++/// corpse's picture and its walk frames; null if it has no torso.
++std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCount], const std::vector<Uint8> composite[8], const HeldItem items[2],
++	const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse, const WalkFrames &walks, bool aiming, const Routine &routine,
++	const SDL_Color *palette)
 +{
 +	if (!parts[0].any) return nullptr;
 +	useGrid(routine.big ? 2 : 1);
++	SlantOnly = routine.big && routine.legsSwing;
++	std::vector<int> onTop[8], solidOnTop[8];
++	partsOnTop(parts, composite, onTop);
++	if (routine.big)
++	{
++		PartFrames solid = parts[0]; // (a big unit is drawn on one frame: see Routine)
++		keepSolid(solid);
++		PartFrames solidParts[PartCount];
++		solidParts[0] = solid;
++		partsOnTop(solidParts, composite, solidOnTop);
++	}
++	else
++	{
++		std::copy(onTop, onTop + 8, solidOnTop);
++	}
 +	removeOutlines(parts, palette);
 +	addContrast(parts, palette);
 +
@@ -62377,8 +62459,14 @@ index 000000000..e6d6229e7
 +	std::vector<Uint8> owner(GridCells, 0);
 +	if (routine.whole)
 +	{
-+		// all of it on one frame: each run of each row its own slice (two legs stay two, an arm beside the body its own)
-+		const std::vector<Uint8> shape = limb(parts[0], RightSide), hull = carve(parts[0], 1, shape);
++		// all of it on one frame: each run of each row its own slice (two legs stay two, an arm beside the body its own); a
++		// big unit's fine detail (the sparks and streaks of a hover field, a pixel or two wide) left out of its solid
++		// shape, for the views' pieces to show as the drawings do (see matchViews)
++		PartFrames solid = parts[0];
++		if (routine.big) keepSolid(solid);
++		// (a big unit's rows aren't heights: its four tiles' pictures stand on floors 8 rows apart, see tileFloorRows; its
++		// shape is the 8 views' alone)
++		const std::vector<Uint8> shape = routine.big ? std::vector<Uint8>(GridCells, 1) : limb(solid, RightSide), hull = carve(solid, routine.big ? 0 : 1, shape);
 +		for (int i = 0; i < GridCells; ++i) if (shape[i] && hull[i]) owner[i] = PartCodes[0];
 +	}
 +	else
@@ -62486,37 +62574,26 @@ index 000000000..e6d6229e7
 +	const size_t count = surfaceCells.size();
 +	if (count == 0) return nullptr;
 +
-+	// Colours: for each painting and direction, each part's frame paints the part's voxels it sees (the nearest at
-+	// each pixel and those within a voxel behind it).
++	// Colours: for each painting and direction, each part's frame paints the part's voxels on its drawn pixels, as a
++	// picture thrown along the view onto them (seen from that direction, what shows is the drawing; see matchViews);
++	// a voxel off its part's drawing but on another part's there, by that one's.
 +	model->colours.assign(count * 16, 0);
 +	for (int painting = 0; painting < 2; ++painting)
 +	{
 +		const bool level = painting == 0;
 +		for (int d = 0; d < 8; ++d)
 +		{
-+			for (int p = 0; p < BodyParts; ++p)
++			for (size_t k = 0; k < count; ++k)
 +			{
-+				if (!parts[p].any) continue;
-+				std::vector<float> front(FrameSize * FrameSize, -1e9f);
-+				std::vector<int> pixelOf(count, -1);
-+				std::vector<float> nearnessOf(count, 0.0f);
-+				for (size_t k = 0; k < count; ++k)
-+				{
-+					if (model->part[k] != PartCodes[p]) continue;
-+					float column, row, nearness;
-+					project(model->right[k], model->ahead[k], model->up[k], d, level, column, row, nearness);
-+					const int c = (int)std::floor(column), r = (int)std::floor(row);
-+					if (c < 0 || r < 0 || c >= FrameSize || r >= FrameSize) continue;
-+					pixelOf[k] = r * FrameSize + c;
-+					nearnessOf[k] = nearness;
-+					front[pixelOf[k]] = std::max(front[pixelOf[k]], nearness);
-+				}
-+				for (size_t k = 0; k < count; ++k)
-+				{
-+					if (pixelOf[k] < 0) continue;
-+					const Uint8 colour = parts[p].frame[d][pixelOf[k]];
-+					if (colour && nearnessOf[k] >= front[pixelOf[k]] - 1.0f) model->colours[k * 16 + painting * 8 + d] = colour;
-+				}
++				const int p = std::find(PartCodes, PartCodes + BodyParts, model->part[k]) - PartCodes;
++				float column, row, nearness;
++				project(model->right[k], model->ahead[k], model->up[k], d, level, column, row, nearness);
++				const int c = (int)std::floor(column), r = (int)std::floor(row);
++				if (c < 0 || r < 0 || c >= FrameSize || r >= FrameSize) continue;
++				const int pixel = r * FrameSize + c;
++				Uint8 colour = p < BodyParts && parts[p].any ? parts[p].frame[d][pixel] : 0;
++				if (!colour && onTop[d][pixel] >= 0) colour = parts[onTop[d][pixel]].frame[d][pixel];
++				if (colour) model->colours[k * 16 + painting * 8 + d] = colour;
 +			}
 +		}
 +	}
@@ -62591,12 +62668,6 @@ index 000000000..e6d6229e7
 +			std::copy(model->colours.begin() + nearest * 16 + painting * 8, model->colours.begin() + nearest * 16 + painting * 8 + 8, model->colours.begin() + k * 16 + painting * 8);
 +		}
 +	}
-+	// A big unit takes the slanted painting from any height: its four tiles' rows lie up to 8 rows apart for the same
-+	// height (the level painting reads the frames as pictures taken at a unit's height: a face's, one tile deep).
-+	if (routine.big)
-+	{
-+		for (size_t k = 0; k < count; ++k) std::copy(model->colours.begin() + k * 16 + 8, model->colours.begin() + k * 16 + 16, model->colours.begin() + k * 16);
-+	}
 +	// (one painting with nothing seen at all takes the other's; and failing everything, the body's first colour)
 +	Uint8 anyColour = 0;
 +	for (Uint8 colour : model->colours) if (colour) { anyColour = colour; break; }
@@ -62647,10 +62718,38 @@ index 000000000..e6d6229e7
 +			if (model->up[k] < top * WholeHip && std::abs(model->right[k]) > side * WholeMiddle) model->part[k] = VoxelUnitModel::Legs;
 +		}
 +	}
-+	// The items in hand, and the walk (an arm holding something held still, as the game's frames do: an item in both
-+	// hands holds both).
++	// The items in hand; the body matched to its drawings view by view; and the walk (an arm holding something held still,
++	// as the game's frames do: an item in both hands holds both).
++	const size_t itemsFrom = model->part.size();
 +	if (placed[0]) addItem(*model, items[0], places[0]);
 +	if (placed[1]) addItem(*model, items[1], places[1]);
++	// (an item in hand painted, as the body is, by the frames' drawing of it where it falls on it: seen from each
++	// direction it has the hand's item's look; its inventory picture's colours elsewhere)
++	for (size_t k = itemsFrom; k < model->part.size(); ++k)
++	{
++		for (int painting = 0; painting < 2; ++painting)
++			for (int d = 0; d < 8; ++d)
++			{
++				float column, row, nearness;
++				project(model->right[k], model->ahead[k], model->up[k], d, painting == 0, column, row, nearness);
++				const int c = (int)std::floor(column), r = (int)std::floor(row);
++				if (c < 0 || r < 0 || c >= FrameSize || r >= FrameSize) continue;
++				for (int p : { RightItem, LeftItem })
++				{
++					const Uint8 colour = parts[p].any ? parts[p].frame[d][r * FrameSize + c] : 0;
++					if (colour)
++					{
++						model->colours[k * 16 + painting * 8 + d] = colour;
++						break;
++					}
++				}
++			}
++	}
++	PartFrames smoothed[PartCount]; // (the added pieces' colours, smoothed as the body's)
++	std::copy(parts, parts + PartCount, smoothed);
++	smoothFrames(smoothed);
++	matchViews(*model, smoothed, onTop, solidOnTop);
++	makeHits(*model, owner, solidOnTop);
 +	const bool rightHolds = placed[0] || (placed[1] && items[1].twoHanded);
 +	const bool leftHolds = placed[1] || (placed[0] && items[0].twoHanded);
 +	makeWalk(*model, routine, leftHolds, rightHolds, walks);
@@ -62658,7 +62757,7 @@ index 000000000..e6d6229e7
 +	{
 +		const float sideways = (float)std::sin(toward * Pi / 4.0), forward = (float)std::cos(toward * Pi / 4.0);
 +		model->edge[toward] = -1e9f;
-+		for (size_t k = 0; k < model->part.size(); ++k)
++		for (size_t k = 0; k < model->addedFrom; ++k)
 +		{
 +			if (model->part[k] != VoxelUnitModel::Item) model->edge[toward] = std::max(model->edge[toward], model->right[k] * sideways + model->ahead[k] * forward);
 +		}
@@ -62667,31 +62766,6 @@ index 000000000..e6d6229e7
 +	return model;
 +}
 +
-+/// FNV-1a: a hash of what a body is made from, so units drawn alike share one.
-+void hashBytes(Uint64 &hash, const Uint8 *bytes, size_t count)
-+{
-+	for (size_t i = 0; i < count; ++i) hash = (hash ^ bytes[i]) * 1099511628211ULL;
-+}
-+
-+}
-+
-+/// What a body is made from, for the builder's thread: the unit's parts' frames, the items in its hands, its pose and
-+/// drawing routine, the battle's palette; and the hash of all that, the battle it's for.
-+struct VoxelUnits::Job
-+{
-+	PartFrames parts[PartCount];
-+	HeldItem items[2];
-+	std::vector<std::vector<Uint8>> deaths;
-+	std::vector<Uint8> corpse;
-+	WalkFrames walks;
-+	bool aiming = false;
-+	const Routine *routine = nullptr;
-+	int unitId = 0, status = 0; // (the unit's, for dump's file names)
-+	bool kneeled = false;
-+	SDL_Color palette[256];
-+	Uint64 hash = 0;
-+	unsigned battle = 0;
-+};
 +
 +/**
 + * The pose a body's fall has come to, between its frames' poses: standing at 0, each frame's pose in turn, the last at 1.
@@ -62743,6 +62817,638 @@ index 000000000..e6d6229e7
 +	if (fallColours.empty()) return -1;
 +	return std::min((int)std::lround(std::clamp(progress, 0.0, 1.0) * fall.size()) - 1, (int)fall.size() - 1);
 +}
++
++
++/**
++ * Whether a shot meets the body at a point (see hits): a solid voxel there that shows from where the shot comes.
++ * @param right, ahead, up The point: voxels to the body's right, ahead and up from the middle of its feet.
++ * @param direction The view the shot comes from (0-7, as the colours' direction: see colour).
++ * @param level From about the body's height (else from above).
++ * @return True if the shot meets it there.
++ */
++bool VoxelUnitModel::hitAt(float right, float ahead, float up, int direction, bool level) const
++{
++	const int x = (int)std::floor(right) - hitFrom[0], y = (int)std::floor(ahead) - hitFrom[1], z = (int)std::floor(up) - hitFrom[2];
++	if (hits.empty() || x < 0 || y < 0 || z < 0 || x >= hitSize[0] || y >= hitSize[1] || z >= hitSize[2]) return false;
++	return hits[((size_t)x * hitSize[1] + y) * hitSize[2] + z] >> ((level ? 0 : 8) + direction) & 1;
++}
++
++/**
++ * Writes a body into files (see VoxelUnits::dump): name.points, name.walk and name.fall.
++ * @param model The body.
++ * @param base The files' name, without its ending.
++ */
++void VoxelBodies::writeModel(const VoxelUnitModel &model, const std::string &base)
++{
++	const size_t count = model.part.size();
++	if (FILE *file = std::fopen((base + ".points").c_str(), "w"))
++	{
++		for (size_t k = 0; k < count; ++k)
++		{
++			std::fprintf(file, "%.2f %.2f %.2f %d", model.right[k], model.ahead[k], model.up[k], model.part[k]);
++			for (int slot = 0; slot < 16; ++slot) std::fprintf(file, " %d", model.colours[k * 16 + slot]);
++			std::fprintf(file, " %d %d\n", model.views.empty() ? 0xFFFF : model.views[k], k >= model.addedFrom);
++		}
++		std::fclose(file);
++	}
++	if (FILE *file = std::fopen((base + ".walk").c_str(), "w"))
++	{
++		for (int phase = 0; phase < 8; ++phase)
++			for (size_t k = 0; k < count; ++k) std::fprintf(file, "%d %.2f %.2f %.2f\n", phase, model.walkRight[phase][k], model.walkAhead[phase][k], model.walkUp[phase][k]);
++		std::fclose(file);
++	}
++	if (FILE *file = std::fopen((base + ".fall").c_str(), "w"))
++	{
++		std::fprintf(file, "%d %d\n", model.fallToward, (int)model.fall.size());
++		for (const auto &pose : model.fall) std::fprintf(file, "%.3f %.3f %.1f\n", pose.height, pose.spread, pose.angle);
++		for (float edge : model.edge) std::fprintf(file, "%.2f ", edge);
++		std::fprintf(file, "\n");
++		for (size_t pose = 0; pose < model.fall.size(); ++pose)
++		{
++			for (size_t k = 0; k < count; ++k) std::fprintf(file, "%d ", model.fallColours.empty() ? 0 : model.fallColours[pose * count + k]);
++			std::fprintf(file, "\n");
++		}
++		std::fclose(file);
++	}
++}
++
++}
++// Thanks mom and dad! You were the ones who exposed me to my first comp.
+diff --git a/src/FirstPerson/FirstPersonVoxelBodies.h b/src/FirstPerson/FirstPersonVoxelBodies.h
+new file mode 100644
+index 000000000..eec710df7
+--- /dev/null
++++ b/src/FirstPerson/FirstPersonVoxelBodies.h
+@@ -0,0 +1,127 @@
++/*
++ * ==============================================================================================
++ *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
++ * ==============================================================================================
++ *
++ *  Our philosophy
++ *
++ *  - Faithful first. The 3D view should feel as if it had shipped with UFO: Enemy Unknown on
++ *    the day the game came out.
++ *  - Another camera on the same battle. The original rules decide everything: time units,
++ *    energy, accuracy, line of fire, reaction fire, doors and morale. The 3D view only shows
++ *    what the game does.
++ *  - Only the original assets: the game's own maps, voxel shapes, sprites, palette and sounds.
++ *  - Every addition is a setting. Jumping, night vision as gear, falling, FPS-style shooting
++ *    and dual wield can all be switched off.
++ *  - Light on the engine. Our code lives in this folder, the core only gets small hooks, and
++ *    without the OpenXcom3D mod nothing changes.
++ *  - Runs anywhere: a software renderer on the CPU, no graphics card needed.
++ *  - Written for people: descriptive names, and a comment for every function and every block.
++ *
++ *  Date: 2026-10-19
++ *
++ *  We wish everyone all the best and all health!
++ * ==============================================================================================
++ */
++/*
++ * Copyright 2010-2026 OpenXcom Developers.
++ *
++ * This file is part of OpenXcom.
++ *
++ * OpenXcom is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * OpenXcom is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/*
++ * FirstPersonVoxelBodies.h: how a unit's voxel body is made (see FirstPersonVoxelUnits.h), from the frames the game's
++ * unit drawer gives of each of its parts in the 8 directions, its walk's and death's frames, its corpse's picture and
++ * the pictures of the items in its hands. Nothing of the battle is needed: the builder's thread makes bodies with it,
++ * and so do the developers' tools (tools/voxel_units: a body made again from the frames the game dumped).
++ */
++#include <memory>
++#include <string>
++#include <vector>
++#include <SDL.h>
++#include "FirstPersonVoxelUnits.h"
++
++namespace OpenXcom
++{
++
++namespace VoxelBodies
++{
++
++/// The frames are FrameSize pixels square.
++constexpr int FrameSize = 64;
++/// Direction 3 faces the camera; direction 1 shows the unit's right side (its front to the right),
++/// direction 5 its left side (its front to the left).
++constexpr int Front = 3, RightSide = 1, LeftSide = 5;
++/// The parts a body is made of: the body's own (the first BodyParts: torso, left arm, right arm, legs), then the items
++/// in the right and left hands (their frames only say where the hand holds them).
++constexpr int PartCount = 6, BodyParts = 4, RightItem = 4, LeftItem = 5;
++
++/// How a unit's drawing routine draws it, for its voxel body: in parts on frames of their own, as routine 0 does (a
++/// torso with the head, arms, legs: soldiers, Sectoids, Mutons, TFTD's aquanauts and aliens; the Floater without legs,
++/// the Snakeman whose legs are its tail, the Chryssalid), or all of it on one frame (civilians, Ethereals and Zombies,
++/// the walkers among them, and the creatures: Silacoid, Celatid, Biodrone, Tentaculat); and how it walks: whether its
++/// legs swing (a one-frame walker's: its body below the hip), whether its free arms do, and the torso's bob (the
++/// routine's own, as the game draws its walk: drawRoutine0's tables for 0, 10, 13-15, drawRoutine6's for the Snakeman;
++/// the big walkers' once a footfall).
++struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; };
++/// The routine's way of drawing, or null for one not given a voxel body.
++const Routine *routineFor(int number);
++
++/// One part's frames for the 8 directions (palette colours, 0 empty).
++struct PartFrames
++{
++	std::vector<Uint8> frame[8];
++	bool any = false;
++	Uint8 at(int direction, int column, int row) const
++	{
++		return column >= 0 && row >= 0 && column < FrameSize && row < FrameSize ? frame[direction][row * FrameSize + column] : 0;
++	}
++};
++
++/// The walk as its frames show it (drawn with UnitSprite::setWalkOverride): for each phase and each of the two views it's
++/// matched in (WalkViews: the right side, where a leg swings across the view, and the front right, where the near leg
++/// and the far one part), the frame of its legs (of all of it, for a body drawn on one frame) and of each arm (right,
++/// left). Empty for a unit that doesn't walk in its own frames.
++constexpr int WalkViews[2] = { RightSide, 2 };
++struct WalkFrames
++{
++	std::vector<Uint8> legs[8][2], arms[8][2][2];
++	bool any = false;
++};
++
++/// An item in a hand: its inventory picture, as the game draws it in the hand (palette colours, 0 empty), and how it's held.
++struct HeldItem
++{
++	std::vector<Uint8> picture;
++	int width = 0, height = 0;
++	bool twoHanded = false;
++};
++
++/// Makes a unit's body from its parts' frames (and, for a unit drawn in parts, the parts laid over each other as the game
++/// draws them, each direction's: which part shows where), the items in its hands (right, left), its death frames, its
++/// corpse's picture and its walk frames; null if it has no torso.
++std::unique_ptr<VoxelUnitModel> makeModel(PartFrames parts[PartCount], const std::vector<Uint8> composite[8], const HeldItem items[2],
++	const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse, const WalkFrames &walks, bool aiming, const Routine &routine,
++	const SDL_Color *palette);
++
++/// Writes a body into files named base and these endings (the viewers in tools/voxel_units read them): .points (each
++/// voxel: right ahead up part, its 16 colours, the views it shows in and 1 for a piece added for a view), .walk (each
++/// walk phase's places) and .fall (the fall's way, poses, edges and colours).
++void writeModel(const VoxelUnitModel &model, const std::string &base);
++
++}
++
++}
+diff --git a/src/FirstPerson/FirstPersonVoxelModel.cpp b/src/FirstPerson/FirstPersonVoxelModel.cpp
+new file mode 100644
+index 000000000..bf9645fcf
+--- /dev/null
++++ b/src/FirstPerson/FirstPersonVoxelModel.cpp
+@@ -0,0 +1,238 @@
++/*
++ * ==============================================================================================
++ *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
++ * ==============================================================================================
++ *
++ *  Our philosophy
++ *
++ *  - Faithful first. The 3D view should feel as if it had shipped with UFO: Enemy Unknown on
++ *    the day the game came out.
++ *  - Another camera on the same battle. The original rules decide everything: time units,
++ *    energy, accuracy, line of fire, reaction fire, doors and morale. The 3D view only shows
++ *    what the game does.
++ *  - Only the original assets: the game's own maps, voxel shapes, sprites, palette and sounds.
++ *  - Every addition is a setting. Jumping, night vision as gear, falling, FPS-style shooting
++ *    and dual wield can all be switched off.
++ *  - Light on the engine. Our code lives in this folder, the core only gets small hooks, and
++ *    without the OpenXcom3D mod nothing changes.
++ *  - Runs anywhere: a software renderer on the CPU, no graphics card needed.
++ *  - Written for people: descriptive names, and a comment for every function and every block.
++ *
++ *  Date: 2026-10-19
++ *
++ *  We wish everyone all the best and all health!
++ * ==============================================================================================
++ */
++/*
++ * Copyright 2010-2026 OpenXcom Developers.
++ *
++ * This file is part of OpenXcom.
++ *
++ * OpenXcom is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * OpenXcom is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/*
++ * FirstPersonVoxelModel.cpp: an item's inventory picture made into a voxel model (see the
++ * header).
++ */
++#include "FirstPersonVoxelModel.h"
++#include <algorithm>
++#include <cmath>
++#include "../Engine/Surface.h"
++#include "../Mod/RuleItem.h"
++#include "../Mod/RuleDamageType.h"
++#include "RuleFirstPerson.h"
++
++namespace OpenXcom
++{
++
++namespace
++{
++
++/// A melee weapon whose picture is nowhere further than this from its outline (in steps, see
++/// stepsToOutside) is thin enough to be a blade, a flat plate (unless it's blunt).
++const int BladeMaxThickness = 4;
++
++/**
++ * How many steps each opaque pixel of a picture is from the outside (counting the 8
++ * neighbours): the edge pixels are 1, found first, then a breadth-first walk goes inwards from
++ * them; transparent pixels are 0.
++ * @param picture The picture (palette colours, 0 transparent).
++ * @param steps Set to each pixel's steps (index y * width + x).
++ */
++void stepsToOutside(Surface *picture, std::vector<int> &steps)
++{
++	const int width = picture->getWidth(), height = picture->getHeight();
++	steps.assign(width * height, 0);
++	std::vector<int> queue; // pixel indices (y * width + x), walked in order
++	auto solid = [&](int x, int y) { return x >= 0 && y >= 0 && x < width && y < height && picture->getPixel(x, y) != 0; };
++	for (int y = 0; y < height; ++y)
++	{
++		for (int x = 0; x < width; ++x)
++		{
++			// An edge pixel has a transparent pixel (or the picture's border) next to it.
++			if (!solid(x, y)) continue;
++			bool onEdge = false;
++			for (int offsetY = -1; offsetY <= 1 && !onEdge; ++offsetY)
++				for (int offsetX = -1; offsetX <= 1 && !onEdge; ++offsetX)
++					onEdge = !solid(x + offsetX, y + offsetY);
++			if (onEdge)
++			{
++				steps[y * width + x] = 1;
++				queue.push_back(y * width + x);
++			}
++		}
++	}
++	for (size_t head = 0; head < queue.size(); ++head)
++	{
++		// Each opaque neighbour not reached yet is one step further in.
++		const int x = queue[head] % width, y = queue[head] / width;
++		for (int offsetY = -1; offsetY <= 1; ++offsetY)
++			for (int offsetX = -1; offsetX <= 1; ++offsetX)
++				if (solid(x + offsetX, y + offsetY) && !steps[(y + offsetY) * width + x + offsetX])
++				{
++					steps[(y + offsetY) * width + x + offsetX] = steps[queue[head]] + 1;
++					queue.push_back((y + offsetY) * width + x + offsetX);
++				}
++	}
++}
++
++} // namespace
++
++/**
++ * Is an item's picture given volume as a flat plate, one voxel thick (a blade: a sword, a knife,
++ * an axe), rather than a cushion? The item table (`firstPerson: items:`, held: plate or
++ * cushion) decides first. Otherwise a melee weapon is a plate when it isn't blunt (its damage
++ * isn't the clubs' and the stun rods': concussive or stun, high explosive and stun in the
++ * original games) and its picture is thin everywhere (BladeMaxThickness): the big mods' swords,
++ * knives and axes, not their maces, knuckles or shields.
++ * @param table The 3D view's rules (the item table).
++ * @param item The item (null: a cushion).
++ * @param picture Its inventory picture.
++ * @return True for a plate.
++ */
++bool pictureIsPlate(const RuleFirstPerson &table, const RuleItem *item, Surface *picture)
++{
++	if (!item)
++	{
++		return false;
++	}
++	if (const RuleFirstPerson::ItemLook *look = table.getItemLook(item->getType()))
++	{
++		if (look->held != RuleFirstPerson::HELD_AUTO) return look->held == RuleFirstPerson::HELD_PLATE;
++	}
++	const ItemDamageType damage = item->getDamageType()->ResistType;
++	if (item->getBattleType() != BT_MELEE || damage == DT_HE || damage == DT_STUN)
++	{
++		return false;
++	}
++	std::vector<int> steps;
++	stepsToOutside(picture, steps);
++	const int thickest = steps.empty() ? 0 : *std::max_element(steps.begin(), steps.end());
++	return thickest > 0 && thickest <= BladeMaxThickness;
++}
++
++/**
++ * Gives a picture volume, cushion style: each picture pixel becomes a column of voxels in
++ * depth, its half depth growing with the square root of its distance to the outline (one voxel
++ * at the edge, at most four), so the model is thickest in the middle. Or a blade's, a flat
++ * plate: every column one voxel. Only the faces between a voxel and empty space are kept, with
++ * corners in picture x, y and depth (depth centred on 0).
++ * @param picture The picture (palette colours, 0 transparent).
++ * @param faces Set to the model's faces.
++ * @param plate A flat plate one voxel thick instead of a cushion.
++ */
++void voxelizePicture(Surface *picture, std::vector<VoxelFace> &faces, bool plate)
++{
++	faces.clear();
++	const int width = picture->getWidth(), height = picture->getHeight();
++	const int MaxHalfDepth = 4, fullDepth = 2 * MaxHalfDepth + 1; // in voxels
++
++	// How many steps each opaque pixel is from the outside (0: transparent).
++	std::vector<int> steps;
++	stepsToOutside(picture, steps);
++	auto solid = [&](int x, int y) { return x >= 0 && y >= 0 && x < width && y < height && steps[y * width + x] > 0; };
++
++	// Fill the voxel grid (width x height x fullDepth, 0 = empty, else the pixel's colour):
++	// each pixel's column reaches its half depth to either side of the middle layer (a plate's:
++	// the middle layer only).
++	std::vector<Uint8> voxels(width * height * fullDepth, 0);
++	auto voxelAt = [&](int x, int y, int z) -> Uint8 {
++		return x >= 0 && y >= 0 && z >= 0 && x < width && y < height && z < fullDepth ? voxels[(z * height + y) * width + x] : 0;
++	};
++	for (int y = 0; y < height; ++y)
++	{
++		for (int x = 0; x < width; ++x)
++		{
++			if (!steps[y * width + x]) continue;
++			const int halfDepth = plate ? 0 : std::clamp((int)std::lround(1.2 * std::sqrt((double)steps[y * width + x])), 1, MaxHalfDepth);
++			for (int z = MaxHalfDepth - halfDepth; z <= MaxHalfDepth + halfDepth; ++z) voxels[(z * height + y) * width + x] = picture->getPixel(x, y);
++		}
++	}
++
++	// A face for every side of a voxel that's open to the air, its corners wound so that the
++	// cross product of its first two edges points outwards (the drawing culls by that).
++	for (int z = 0; z < fullDepth; ++z)
++	{
++		for (int y = 0; y < height; ++y)
++		{
++			for (int x = 0; x < width; ++x)
++			{
++				const Uint8 color = voxelAt(x, y, z);
++				if (!color) continue;
++				const int voxel[3] = { x, y, z };
++
++				// The six sides: each axis, towards minus and plus.
++				for (int axis = 0; axis < 3; ++axis)
++				{
++					for (int side = -1; side <= 1; side += 2)
++					{
++						// Hidden behind a neighbouring voxel: no face.
++						int neighbour[3] = { x, y, z };
++						neighbour[axis] += side;
++						if (voxelAt(neighbour[0], neighbour[1], neighbour[2])) continue;
++
++						// The other two axes, in the order that winds the face outwards.
++						const int tangent1 = side > 0 ? (axis + 1) % 3 : (axis + 2) % 3, tangent2 = side > 0 ? (axis + 2) % 3 : (axis + 1) % 3;
++						VoxelFace face;
++						face.color = color;
++						if (axis < 2)
++						{
++							// A side face (across the picture): the picture's dark outline stays on the
++							// front and back faces, and the sides show the colour just inside it.
++							const int insideX = x - (axis == 0 ? side : 0), insideY = y - (axis == 1 ? side : 0);
++							if (solid(insideX, insideY)) face.color = picture->getPixel(insideX, insideY);
++						}
++
++						// The four corners: the voxel spans +-0.5 around its centre, the face lies on
++						// its minus or plus side, and the corners go round the two other axes.
++						for (int cornerIndex = 0; cornerIndex < 4; ++cornerIndex)
++						{
++							float cornerPos[3] = { voxel[0] - 0.5f, voxel[1] - 0.5f, voxel[2] - 0.5f - MaxHalfDepth };
++							cornerPos[axis] += side > 0 ? 1.0f : 0.0f;
++							if (cornerIndex == 1 || cornerIndex == 2) cornerPos[tangent1] += 1.0f;
++							if (cornerIndex == 2 || cornerIndex == 3) cornerPos[tangent2] += 1.0f;
++							std::copy(cornerPos, cornerPos + 3, face.corner[cornerIndex]);
++						}
++						faces.push_back(face);
++					}
++				}
++			}
++		}
++	}
++}
++
++}
++
++// Thanks mom and dad! You were the ones who exposed me to my first comp.
+diff --git a/src/FirstPerson/FirstPersonVoxelModel.h b/src/FirstPerson/FirstPersonVoxelModel.h
+new file mode 100644
+index 000000000..ae24ad8ad
+--- /dev/null
++++ b/src/FirstPerson/FirstPersonVoxelModel.h
+@@ -0,0 +1,75 @@
++#pragma once
++/*
++ * ==============================================================================================
++ *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
++ * ==============================================================================================
++ *
++ *  Our philosophy
++ *
++ *  - Faithful first. The 3D view should feel as if it had shipped with UFO: Enemy Unknown on
++ *    the day the game came out.
++ *  - Another camera on the same battle. The original rules decide everything: time units,
++ *    energy, accuracy, line of fire, reaction fire, doors and morale. The 3D view only shows
++ *    what the game does.
++ *  - Only the original assets: the game's own maps, voxel shapes, sprites, palette and sounds.
++ *  - Every addition is a setting. Jumping, night vision as gear, falling, FPS-style shooting
++ *    and dual wield can all be switched off.
++ *  - Light on the engine. Our code lives in this folder, the core only gets small hooks, and
++ *    without the OpenXcom3D mod nothing changes.
++ *  - Runs anywhere: a software renderer on the CPU, no graphics card needed.
++ *  - Written for people: descriptive names, and a comment for every function and every block.
++ *
++ *  Date: 2026-10-19
++ *
++ *  We wish everyone all the best and all health!
++ * ==============================================================================================
++ */
++/*
++ * Copyright 2010-2026 OpenXcom Developers.
++ *
++ * This file is part of OpenXcom.
++ *
++ * OpenXcom is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * OpenXcom is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/*
++ * FirstPersonVoxelModel.h: items given volume. An item's inventory picture (the game's own,
++ * from BIGOBS.PCK) becomes a small voxel model, cushion style: each picture pixel a column of
++ * voxels in depth, deepest in the middle; or a blade's, a flat plate one voxel thick. The
++ * weapon or other item in the soldier's hand (FirstPersonMode) and an item thrown through the
++ * air (FirstPersonView) are drawn from it.
++ */
++#include <vector>
++#include <SDL.h>
++
++namespace OpenXcom
++{
++
++class Surface;
++class RuleFirstPerson;
++class RuleItem;
++
++/// One face of a voxel model, between a voxel and the air: its four corners in picture x, y and
++/// depth (depth centred on 0), wound so that the cross product of its first two edges points
++/// outwards, and its palette colour.
++struct VoxelFace { float corner[4][3]; Uint8 color; };
++
++/// Gives a picture volume: the faces of its voxel model (none for an empty picture), a cushion or a flat plate.
++void voxelizePicture(Surface *picture, std::vector<VoxelFace> &faces, bool plate = false);
++/// Is an item's picture given volume as a flat plate (a blade: a sword, a knife, an axe) rather than a cushion?
++bool pictureIsPlate(const RuleFirstPerson &table, const RuleItem *item, Surface *picture);
++
++}
++
++// Thanks mom and dad! You were the ones who exposed me to my first comp.
+diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
+new file mode 100644
+index 000000000..af346e49f
+--- /dev/null
++++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
+@@ -0,0 +1,617 @@
++/*
++ * ==============================================================================================
++ *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
++ * ==============================================================================================
++ *
++ *  Our philosophy
++ *
++ *  - Faithful first. The 3D view should feel as if it had shipped with UFO: Enemy Unknown on
++ *    the day the game came out.
++ *  - Another camera on the same battle. The original rules decide everything: time units,
++ *    energy, accuracy, line of fire, reaction fire, doors and morale. The 3D view only shows
++ *    what the game does.
++ *  - Only the original assets: the game's own maps, voxel shapes, sprites, palette and sounds.
++ *  - Every addition is a setting. Jumping, night vision as gear, falling, FPS-style shooting
++ *    and dual wield can all be switched off.
++ *  - Light on the engine. Our code lives in this folder, the core only gets small hooks, and
++ *    without the OpenXcom3D mod nothing changes.
++ *  - Runs anywhere: a software renderer on the CPU, no graphics card needed.
++ *  - Written for people: descriptive names, and a comment for every function and every block.
++ *
++ *  Date: 2026-10-19
++ *
++ *  We wish everyone all the best and all health!
++ * ==============================================================================================
++ */
++/*
++ * Copyright 2010-2026 OpenXcom Developers.
++ *
++ * This file is part of OpenXcom.
++ *
++ * OpenXcom is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * OpenXcom is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/*
++ * FirstPersonVoxelUnits.cpp: units given a body (see FirstPersonVoxelUnits.h).
++ *
++ * The parts' frames come from the game's own unit drawer (UnitSprite), each part on a frame of its
++ * own (setPartCapture) for each of the 8 directions, with the unit's colours as the game draws them;
++ * its walk's and death's frames likewise, the drawer told which to draw (setWalkOverride,
++ * setFallOverride: the unit itself left as it is).
++ * The bodies are made from them (FirstPersonVoxelBodies.cpp) on a thread of their own.
++ */
++#include "FirstPersonVoxelUnits.h"
++#include <algorithm>
++#include <cmath>
++#include <cstdio>
++#include <cstdlib>
++#include <string>
++#include <utility>
++#include "FirstPersonVoxelBodies.h"
++#include "../Battlescape/UnitSprite.h"
++#include "../Engine/GraphSubset.h"
++#include "../Engine/Script.h"
++#include "../Engine/Surface.h"
++#include "../Engine/SurfaceSet.h"
++#include "../Mod/Armor.h"
++#include "../Mod/RuleItem.h"
++#include "../Mod/Unit.h"
++#include "../Savegame/BattleItem.h"
++#include "../Savegame/BattleUnit.h"
++#include "../Savegame/SavedBattleGame.h"
++
++namespace OpenXcom
++{
++
++using namespace VoxelBodies;
++
++namespace
++{
++
++/// The drawer's body parts the body's parts come from (see PartCount).
++constexpr int PartSlots[PartCount] = { BODYPART_TORSO, BODYPART_LEFTARM, BODYPART_RIGHTARM, BODYPART_LEGS, BODYPART_ITEM_RIGHTHAND, BODYPART_ITEM_LEFTHAND };
++
++/// FNV-1a: a hash of what a body is made from, so units drawn alike share one.
++void hashBytes(Uint64 &hash, const Uint8 *bytes, size_t count)
++{
++	for (size_t i = 0; i < count; ++i) hash = (hash ^ bytes[i]) * 1099511628211ULL;
++}
++
++}
++
++/// What a body is made from, for the builder's thread: the unit's parts' frames, the items in its hands, its pose and
++/// drawing routine, the battle's palette; and the hash of all that, the battle it's for.
++struct VoxelUnits::Job
++{
++	PartFrames parts[PartCount];
++	/// The parts as the game lays them over each other, for each direction (one-tile units: which part hides which).
++	std::vector<Uint8> composite[8];
++	HeldItem items[2];
++	std::vector<std::vector<Uint8>> deaths;
++	std::vector<Uint8> corpse;
++	WalkFrames walks;
++	bool aiming = false;
++	const Routine *routine = nullptr;
++	int unitId = 0, status = 0; // (the unit's, for dump's file names)
++	bool kneeled = false;
++	SDL_Color palette[256];
++	Uint64 hash = 0;
++	unsigned battle = 0;
++};
 +
 +/**
 + * Whether a unit can be drawn as a voxel body: of a size and drawn by a routine the bodies know (see Routine), and up
@@ -62835,6 +63541,12 @@ index 000000000..e6d6229e7
 +		for (int slot = BODYPART_LARGE_TORSO; slot < BODYPART_LARGE_TURRET + 4; ++slot) capture[slot] = frames[0].get();
 +	}
 +	const GraphSubset mask(FrameSize, FrameSize);
++	// (and, for a unit in parts, all its parts on one frame, laid over each other as the game draws them)
++	std::vector<Uint8> composite[8];
++	Surface layered(FrameSize, FrameSize);
++	Surface *together[BODYPART_LARGE_TURRET + 4];
++	std::fill(std::begin(together), std::end(together), &discard);
++	for (int p = 0; p < PartCount; ++p) together[PartSlots[p]] = &layered;
 +	for (int d = 0; d < 8; ++d)
 +	{
 +		for (auto &frame : frames) frame->clear();
@@ -62864,6 +63576,16 @@ index 000000000..e6d6229e7
 +					parts[p].any |= pixels[row * FrameSize + column] != 0;
 +				}
 +			}
++		}
++		if (!routine->big && !routine->whole)
++		{
++			layered.clear();
++			unitSprite.setPartCapture(together);
++			unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
++			unitSprite.setPartCapture(nullptr);
++			composite[d].resize(FrameSize * FrameSize);
++			for (int row = 0; row < FrameSize; ++row)
++				for (int column = 0; column < FrameSize; ++column) composite[d][row * FrameSize + column] = layered.getPixel(column, row);
 +		}
 +	}
 +	// The death frames (the fall as the game draws it, facing the screen), for the body to fall as they show.
@@ -63006,6 +63728,7 @@ index 000000000..e6d6229e7
 +	{
 +		auto job = std::make_unique<Job>();
 +		std::move(std::begin(parts), std::end(parts), std::begin(job->parts));
++		std::move(std::begin(composite), std::end(composite), std::begin(job->composite));
 +		std::move(std::begin(items), std::end(items), std::begin(job->items));
 +		job->deaths = std::move(deaths);
 +		job->corpse = std::move(corpse);
@@ -63047,6 +63770,38 @@ index 000000000..e6d6229e7
 +{
 +	auto found = _lastBodies.find(unit->getId());
 +	return found != _lastBodies.end() ? found->second.get() : nullptr;
++}
++
++/**
++ * The body for a unit as it is now, if it's made (for what a shot meets: see FirstPerson::spriteHit); nothing is made
++ * here (see modelFor). A unit walking or flying: the body it stands in.
++ * @param unit The unit.
++ * @return The body, or null.
++ */
++const VoxelUnitModel *VoxelUnits::bodyNow(const BattleUnit *unit)
++{
++	collect();
++	const Key key = keyFor(unit, unit->getStatus() == STATUS_WALKING || unit->getStatus() == STATUS_FLYING);
++	auto found = _models.find(key);
++	if (found != _models.end()) return found->second.get();
++	auto waiting = _waiting.find(key);
++	if (waiting == _waiting.end()) return nullptr;
++	auto made = _byFrames.find(waiting->second);
++	return made != _byFrames.end() ? made->second.get() : nullptr;
++}
++
++/**
++ * The bodies are for this battle (each 3D view says so as it gets its battle): every body is forgotten if they were
++ * another battle's; views of the same battle share them.
++ * @param save The battle.
++ */
++void VoxelUnits::forBattle(const SavedBattleGame *save)
++{
++	if (save != _battleSave)
++	{
++		clear();
++		_battleSave = save;
++	}
 +}
 +
 +/**
@@ -63104,7 +63859,10 @@ index 000000000..e6d6229e7
 +			job = std::move(_jobs.front());
 +			_jobs.pop_front();
 +		}
-+		std::shared_ptr<VoxelUnitModel> model(makeModel(job->parts, job->items, job->deaths, job->corpse, job->walks, job->aiming, *job->routine, job->palette));
++		PartFrames parts[PartCount]; // (worked on: the job's stay as captured, for dump)
++		std::copy(std::begin(job->parts), std::end(job->parts), std::begin(parts));
++		std::shared_ptr<VoxelUnitModel> model(makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->walks, job->aiming, *job->routine,
++			job->palette));
 +		if (const char *folder = std::getenv("OXC3D_VOXELDUMP")) dump(*job, model.get(), folder);
 +		std::lock_guard<std::mutex> lock(_mutex);
 +		if (job->battle == _battle) _made.push_back({ job->hash, model });
@@ -63115,9 +63873,10 @@ index 000000000..e6d6229e7
 + * A developer's aid (the environment variable OXC3D_VOXELDUMP names a folder): writes what a body was made from and
 + * what it is, as unit<id>_<status>[k] (k: kneeling) and these endings: .frames (the parts' frames, 6 parts x 8
 + * directions x 64x64, then the two items' pictures: width, height, pixels), .deaths (the death frames and the corpse's
-+ * picture), .walkframes (the walk's frames: phase x view x legs, right arm, left arm), .points (each voxel: right ahead
-+ * up part and its 16 colours), .walk (each phase's places) and .fall (the fall's way, poses, edges and colours). The
-+ * viewers in tools/voxel_units read them.
++ * picture), .walkframes (the walk's frames: phase x view x legs, right arm, left arm), .composite (the parts laid over
++ * each other, as the game draws them, for each direction: a unit drawn in parts), .job (its drawing routine, pose and
++ * items, its death frames' count and the palette), and the body (see writeModel: .points, .walk, .fall). The viewers
++ * in tools/voxel_units read them, and tools/voxel_units/rebuild makes the body again from them.
 + * @param job What the body was made from.
 + * @param model The body (or null: none could be made).
 + * @param folder Where to write.
@@ -63143,6 +63902,22 @@ index 000000000..e6d6229e7
 +		if (!job.corpse.empty()) std::fwrite(job.corpse.data(), 1, job.corpse.size(), file);
 +		std::fclose(file);
 +	}
++	if (!job.composite[0].empty())
++	{
++		if (FILE *file = std::fopen((base + ".composite").c_str(), "wb"))
++		{
++			for (const auto &frame : job.composite) std::fwrite(frame.data(), 1, frame.size(), file);
++			std::fclose(file);
++		}
++	}
++
++	if (FILE *file = std::fopen((base + ".job").c_str(), "w"))
++	{
++		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d\n", job.routine->number, job.routine->whole, job.routine->big,
++			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty());
++		for (int i = 0; i < 256; ++i) std::fprintf(file, "%d %d %d\n", job.palette[i].r, job.palette[i].g, job.palette[i].b);
++		std::fclose(file);
++	}
 +	if (job.walks.any)
 +	{
 +		if (FILE *file = std::fopen((base + ".walkframes").c_str(), "wb"))
@@ -63157,37 +63932,7 @@ index 000000000..e6d6229e7
 +			std::fclose(file);
 +		}
 +	}
-+	if (!model) return;
-+	const size_t count = model->part.size();
-+	if (FILE *file = std::fopen((base + ".points").c_str(), "w"))
-+	{
-+		for (size_t k = 0; k < count; ++k)
-+		{
-+			std::fprintf(file, "%.2f %.2f %.2f %d", model->right[k], model->ahead[k], model->up[k], model->part[k]);
-+			for (int slot = 0; slot < 16; ++slot) std::fprintf(file, " %d", model->colours[k * 16 + slot]);
-+			std::fprintf(file, "\n");
-+		}
-+		std::fclose(file);
-+	}
-+	if (FILE *file = std::fopen((base + ".walk").c_str(), "w"))
-+	{
-+		for (int phase = 0; phase < 8; ++phase)
-+			for (size_t k = 0; k < count; ++k) std::fprintf(file, "%d %.2f %.2f %.2f\n", phase, model->walkRight[phase][k], model->walkAhead[phase][k], model->walkUp[phase][k]);
-+		std::fclose(file);
-+	}
-+	if (FILE *file = std::fopen((base + ".fall").c_str(), "w"))
-+	{
-+		std::fprintf(file, "%d %d\n", model->fallToward, (int)model->fall.size());
-+		for (const auto &pose : model->fall) std::fprintf(file, "%.3f %.3f %.1f\n", pose.height, pose.spread, pose.angle);
-+		for (float edge : model->edge) std::fprintf(file, "%.2f ", edge);
-+		std::fprintf(file, "\n");
-+		for (size_t pose = 0; pose < model->fall.size(); ++pose)
-+		{
-+			for (size_t k = 0; k < count; ++k) std::fprintf(file, "%d ", model->fallColours.empty() ? 0 : model->fallColours[pose * count + k]);
-+			std::fprintf(file, "\n");
-+		}
-+		std::fclose(file);
-+	}
++	if (model) writeModel(*model, base);
 +}
 +
 +/**
@@ -63212,10 +63957,10 @@ index 000000000..e6d6229e7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.h b/src/FirstPerson/FirstPersonVoxelUnits.h
 new file mode 100644
-index 000000000..06aed858b
+index 000000000..aeb8f4d53
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.h
-@@ -0,0 +1,178 @@
+@@ -0,0 +1,202 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -63333,6 +64078,24 @@ index 000000000..06aed858b
 +	int fallFrameAt(double progress) const;
 +	/// The colour of voxel k seen from direction (0-7) with level painting (or slanted).
 +	Uint8 colour(size_t k, int direction, bool level) const { return colours[k * 16 + (level ? 0 : 8) + direction]; }
++	/// The views each voxel shows in, a bit for each of the 16 colours' views (level, then slanted: the bit of colour slot
++	/// (level ? 0 : 8) + direction): the hand drawn frames don't quite agree on one shape, so seen from one of the 8
++	/// directions the body shows only its voxels inside that direction's drawing, and pieces are added for what the
++	/// drawing has that they leave bare (see matchViews in FirstPersonVoxelBodies.cpp): from each direction the body
++	/// has its sprite's outline.
++	std::vector<Uint16> views;
++	/// The voxels from addedFrom on are such added pieces (left out of a fall: the body falls as its own shape).
++	size_t addedFrom = (size_t)-1;
++	/// Whether voxel k shows from direction (0-7) with level painting (or slanted).
++	bool shows(size_t k, int direction, bool level) const { return views.empty() || (views[k] >> ((level ? 0 : 8) + direction) & 1); }
++	/// What a shot meets (settings "Voxel units" and "Full sprite hitboxes": the body is the hitbox): the body's solid
++	/// voxels, whole voxels (right, ahead, up) from hitFrom, hitSize of them each way, each the views it shows in (as
++	/// views; 0: empty).
++	std::vector<Uint16> hits;
++	int hitFrom[3] = {}, hitSize[3] = {};
++	/// Whether a shot meets the body at a point (voxels to the body's right, ahead and up from the middle of its feet)
++	/// coming from direction (0-7) at the body's height (level) or from above.
++	bool hitAt(float right, float ahead, float up, int direction, bool level) const;
 +};
 +
 +/// The voxel bodies of the units seen so far in a battle, one for each unit and pose. A body is made
@@ -63355,6 +64118,11 @@ index 000000000..06aed858b
 +		const SavedBattleGame *save, const SDL_Color *palette, int &builds, int &walkPhase);
 +	/// The body a unit was last drawn with (for its fall, and its corpse lying where it fell), or null.
 +	const VoxelUnitModel *lastBody(const BattleUnit *unit) const;
++	/// The body for a unit as it is now, if it's made (none is made here: see modelFor), or null; a unit walking, its
++	/// standing body.
++	const VoxelUnitModel *bodyNow(const BattleUnit *unit);
++	/// The bodies are for this battle: every body forgotten if they were another's.
++	void forBattle(const SavedBattleGame *save);
 +	/// Forgets every body, and those being made (a new battle).
 +	void clear();
 +private:
@@ -63381,6 +64149,7 @@ index 000000000..06aed858b
 +	std::deque<std::unique_ptr<Job>> _jobs;
 +	std::vector<std::pair<Uint64, std::shared_ptr<VoxelUnitModel>>> _made;
 +	unsigned _battle = 0;
++	const SavedBattleGame *_battleSave = nullptr; // (the battle the bodies are for, see forBattle)
 +	bool _stopping = false;
 +	std::thread _builder;
 +	/// The builder's loop: makes the bodies queued, until stopped.
@@ -64918,10 +65687,10 @@ index 2242d13f8..7fd17b1f2 100644
  	bool isManaBarEnabled() const { return _manaBattleUI; }
  	/// Is the mana trained as a primary skill (e.g. like firing accuracy)?
 diff --git a/src/OpenXcom.2010.vcxproj b/src/OpenXcom.2010.vcxproj
-index 99f24ce43..6f600065f 100644
+index 99f24ce43..bf6d0ce07 100644
 --- a/src/OpenXcom.2010.vcxproj
 +++ b/src/OpenXcom.2010.vcxproj
-@@ -431,6 +431,32 @@
+@@ -431,6 +431,33 @@
      <ClCompile Include="Battlescape\DebriefingState.cpp" />
      <ClCompile Include="Battlescape\ExperienceOverviewState.cpp" />
      <ClCompile Include="Battlescape\Explosion.cpp" />
@@ -64949,12 +65718,13 @@ index 99f24ce43..6f600065f 100644
 +    <ClCompile Include="FirstPerson\FirstPersonViewUfo.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonViewUpscaling.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonVoxelModel.cpp" />
++    <ClCompile Include="FirstPerson\FirstPersonVoxelBodies.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonVoxelUnits.cpp" />
 +    <ClCompile Include="FirstPerson\OptionsFirstPersonState.cpp" />
      <ClCompile Include="Battlescape\ExplosionBState.cpp" />
      <ClCompile Include="Battlescape\ExtendedBattlescapeLinksState.cpp" />
      <ClCompile Include="Battlescape\ExtendedInventoryLinksState.cpp" />
-@@ -910,6 +936,19 @@
+@@ -910,6 +937,20 @@
      <ClInclude Include="Battlescape\DebriefingState.h" />
      <ClInclude Include="Battlescape\ExperienceOverviewState.h" />
      <ClInclude Include="Battlescape\Explosion.h" />
@@ -64968,6 +65738,7 @@ index 99f24ce43..6f600065f 100644
 +    <ClInclude Include="FirstPerson\FirstPersonViewRayWalk.h" />
 +    <ClInclude Include="FirstPerson\FirstPersonViewShared.h" />
 +    <ClInclude Include="FirstPerson\FirstPersonVoxelModel.h" />
++    <ClInclude Include="FirstPerson\FirstPersonVoxelBodies.h" />
 +    <ClInclude Include="FirstPerson\FirstPersonVoxelUnits.h" />
 +    <ClInclude Include="FirstPerson\OptionsFirstPersonState.h" />
 +    <ClInclude Include="FirstPerson\RuleFirstPerson.h" />
@@ -64975,10 +65746,10 @@ index 99f24ce43..6f600065f 100644
      <ClInclude Include="Battlescape\ExtendedBattlescapeLinksState.h" />
      <ClInclude Include="Battlescape\ExtendedInventoryLinksState.h" />
 diff --git a/src/OpenXcom.2010.vcxproj.filters b/src/OpenXcom.2010.vcxproj.filters
-index 92dbcdf0a..47ca78b57 100644
+index 92dbcdf0a..f59f871c9 100644
 --- a/src/OpenXcom.2010.vcxproj.filters
 +++ b/src/OpenXcom.2010.vcxproj.filters
-@@ -329,6 +329,84 @@
+@@ -329,6 +329,87 @@
      <ClCompile Include="Battlescape\Explosion.cpp">
        <Filter>Battlescape</Filter>
      </ClCompile>
@@ -65054,6 +65825,9 @@ index 92dbcdf0a..47ca78b57 100644
 +    <ClCompile Include="FirstPerson\FirstPersonVoxelModel.cpp">
 +      <Filter>FirstPerson</Filter>
 +    </ClCompile>
++    <ClCompile Include="FirstPerson\FirstPersonVoxelBodies.cpp">
++      <Filter>FirstPerson</Filter>
++    </ClCompile>
 +    <ClCompile Include="FirstPerson\FirstPersonVoxelUnits.cpp">
 +      <Filter>FirstPerson</Filter>
 +    </ClCompile>
@@ -65063,7 +65837,7 @@ index 92dbcdf0a..47ca78b57 100644
      <ClCompile Include="Geoscape\ItemsArrivingState.cpp">
        <Filter>Geoscape</Filter>
      </ClCompile>
-@@ -1571,6 +1649,45 @@
+@@ -1571,6 +1652,48 @@
      <ClInclude Include="Battlescape\Explosion.h">
        <Filter>Battlescape</Filter>
      </ClInclude>
@@ -65097,6 +65871,9 @@ index 92dbcdf0a..47ca78b57 100644
 +    <ClInclude Include="FirstPerson\FirstPersonVoxelModel.h">
 +      <Filter>FirstPerson</Filter>
 +    </ClInclude>
++    <ClInclude Include="FirstPerson\FirstPersonVoxelBodies.h">
++      <Filter>FirstPerson</Filter>
++    </ClInclude>
 +    <ClInclude Include="FirstPerson\FirstPersonVoxelUnits.h">
 +      <Filter>FirstPerson</Filter>
 +    </ClInclude>
@@ -65109,7 +65886,7 @@ index 92dbcdf0a..47ca78b57 100644
      <ClInclude Include="Basescape\TransfersState.h">
        <Filter>Basescape</Filter>
      </ClInclude>
-@@ -2731,6 +2848,9 @@
+@@ -2731,6 +2854,9 @@
      <Filter Include="Battlescape">
        <UniqueIdentifier>{f7e493ce-c074-420c-8b38-40d81b2d0509}</UniqueIdentifier>
      </Filter>

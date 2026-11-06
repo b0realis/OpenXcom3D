@@ -42,7 +42,8 @@
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
 /*
- * FirstPersonSpriteHits.cpp: setting "Full sprite hitboxes": a unit is hit where its picture shows.
+ * FirstPersonSpriteHits.cpp: setting "Full sprite hitboxes": a unit is hit where its picture shows (with "Voxel units",
+ * where its body is).
  */
 #include "FirstPersonApi.h"
 #include <algorithm>
@@ -52,6 +53,7 @@
 #include <vector>
 #include "FirstPersonMode.h"
 #include "FirstPersonViewShared.h"
+#include "FirstPersonVoxelUnits.h"
 #include "../Battlescape/BattlescapeState.h"
 #include "../Battlescape/UnitSprite.h"
 #include "../Engine/GraphSubset.h"
@@ -149,6 +151,64 @@ const std::vector<Uint8> &spriteOf(SavedBattleGame *save, const BattleUnit *unit
 }
 
 /**
+ * Where a unit stands for its hits: the middle of its tiles, on the highest of their ground (terrain levels are
+ * negative), as the game's own hit shape stands (see TileEngine::voxelCheck).
+ * @param save The battle.
+ * @param unit The unit.
+ * @param middleX, middleY, feet Set to its middle and the height of its feet, in voxels.
+ */
+void standingPlace(SavedBattleGame *save, const BattleUnit *unit, double &middleX, double &middleY, double &feet)
+{
+	const int size = unit->getArmor()->getSize();
+	int terrainHeight = 0;
+	for (int x = 0; x < size; ++x)
+	{
+		for (int y = 0; y < size; ++y)
+		{
+			const Tile *tile = save->getTile(unit->getPosition() + Position(x, y, 0));
+			if (tile) terrainHeight = std::min(terrainHeight, tile->getTerrainLevel());
+		}
+	}
+	middleX = unit->getPosition().x * 16.0 + 8.0 * size;
+	middleY = unit->getPosition().y * 16.0 + 8.0 * size;
+	feet = unit->getPosition().z * 24.0 - terrainHeight;
+}
+
+/**
+ * Does this voxel of a line of fire hit the unit's voxel body (settings "Voxel units" and "Full sprite hitboxes", the
+ * owner's: "hit-boxes should be their whole bodies")? The body stands as the 3D view draws it: in the middle of the
+ * unit's tiles on its floor, turned to the way it faces, at the setting "Unit size", and as it shows to an eye at the
+ * line's start (from that side, level with it or from above: see VoxelUnitModel::views); the voxel hits where the body
+ * is solid.
+ * @param body The unit's body.
+ * @param save The battle.
+ * @param unit The unit.
+ * @param voxel The voxel.
+ * @param origin Where the line starts.
+ * @return True if the voxel hits the body.
+ */
+bool bodyHit(const VoxelUnitModel &body, SavedBattleGame *save, const BattleUnit *unit, const Position &voxel, const Position &origin)
+{
+	double middleX, middleY, feet;
+	standingPlace(save, unit, middleX, middleY, feet);
+	// the voxel in the body's own right, ahead and up (the view turns the body by the way it faces: see
+	// FirstPersonView::recordVoxelUnit), at the unit's size
+	const double scale = std::clamp(Options::fpsUnitSize, 80, 100) / 100.0;
+	const double angle = unit->getDirection() * Pi / 4.0, cosine = std::cos(angle), sine = std::sin(angle);
+	const double relativeX = voxel.x + 0.5 - middleX, relativeY = voxel.y + 0.5 - middleY;
+	const float right = (float)((relativeX * cosine + relativeY * sine) / scale), ahead = (float)((relativeX * sine - relativeY * cosine) / scale);
+	const float up = (float)((voxel.z + 0.5 - feet) / scale);
+	// the side it shows to the line's start, as the view picks it for an eye there (see FirstPersonView::drawUnits)
+	const double towardsX = origin.x + 0.5 - middleX, towardsY = origin.y + 0.5 - middleY;
+	const double toEyeDegrees = std::atan2(towardsY, towardsX) * 180.0 / Pi;
+	const int eyeDirection = (((int)std::lround((toEyeDegrees + 90.0) / 45.0)) % 8 + 8) % 8;
+	const int direction = ((unit->getDirection() + 3 - eyeDirection) % 8 + 8) % 8;
+	const double flat = std::max(1.0, std::hypot(towardsX, towardsY));
+	const bool level = std::atan2((origin.z + 0.5 - (feet + 12.0)) * ZScale, flat) < VoxelSlantAbove * Pi / 180.0;
+	return body.hitAt(right, ahead, up, direction, level);
+}
+
+/**
  * Setting "Full sprite hitboxes" (the owner's, GitHub issue #42: "Setting for hit-boxes the same size
  * as sprites!"; the battle's rule, for everyone's shots and the game's line of fire checks, and so
  * its sight too, which walks the same lines (TileEngine::visible, canTargetUnit), in 3D and on the
@@ -183,20 +243,20 @@ bool spriteHit(SavedBattleGame *save, const BattleUnit *unit, const Position &vo
 	{
 		return true;
 	}
-	// Where the unit stands: the middle of its tiles, on the highest of their ground (terrain
-	// levels are negative), as the game's own hit shape stands (see TileEngine::voxelCheck).
-	const int size = unit->getArmor()->getSize();
-	int terrainHeight = 0;
-	for (int x = 0; x < size; ++x)
+	// With "Voxel units", a unit whose body is made is hit where its body is (they're made for every unit from the
+	// battle's start: see FirstPersonMode::makeVoxelBodies); else by its picture.
+	if (Options::fpsVoxelUnits)
 	{
-		for (int y = 0; y < size; ++y)
+		VoxelUnits *bodies = FirstPersonMode::voxelUnits(save->getBattleState());
+		if (const VoxelUnitModel *body = bodies && VoxelUnits::suits(unit) ? bodies->bodyNow(unit) : nullptr)
 		{
-			const Tile *tile = save->getTile(unit->getPosition() + Position(x, y, 0));
-			if (tile) terrainHeight = std::min(terrainHeight, tile->getTerrainLevel());
+			return bodyHit(*body, save, unit, voxel, origin);
 		}
 	}
-	const double middleX = unit->getPosition().x * 16.0 + 8.0 * size, middleY = unit->getPosition().y * 16.0 + 8.0 * size;
-	const double feet = unit->getPosition().z * 24.0 - terrainHeight;
+	// Where the unit stands.
+	const int size = unit->getArmor()->getSize();
+	double middleX, middleY, feet;
+	standingPlace(save, unit, middleX, middleY, feet);
 
 	// The card faces the line's start (straight above or below it, the way the map shows units,
 	// from the south-east).

@@ -3570,6 +3570,17 @@ bool FirstPersonMode::spriteHitboxes(BattlescapeState *state)
 }
 
 /**
+ * The units' voxel bodies of the battle on this screen (setting "Voxel units"): the 3D views' and, with "Full sprite
+ * hitboxes", what a shot meets (see FirstPerson::spriteHit).
+ * @param state The battlescape screen.
+ * @return The bodies, or null without the mod's 3D view.
+ */
+VoxelUnits *FirstPersonMode::voxelUnits(BattlescapeState *state)
+{
+	return state && state->_firstPerson ? state->_firstPerson->_voxelUnits.get() : nullptr;
+}
+
+/**
  * Are deaths quick in this battle (setting "Quick deaths", see FirstPerson::quickDeaths): the
  * setting on, in a battle with the mod's 3D view (in 3D or on the map alike: the battle's rule)?
  * @param state The battlescape screen.
