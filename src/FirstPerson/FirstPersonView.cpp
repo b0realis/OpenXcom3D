@@ -535,6 +535,11 @@ void FirstPersonView::draw()
 		_flashlightPos[axis] = _dynamicFlashlight ? (float)(_eye[axis] - _up[axis] * 1.5 + _forward[axis] * 1.0)
 			: (float)(_eye[axis] + _right[axis] * 4.0 - _up[axis] * 4.0 + _forward[axis] * 2.0);
 	}
+	// A chain of explosions settled at once (setting "Instant chain explosions"): its fireballs
+	// showing now, and the tiles its ripple hasn't passed over yet, as they were (see
+	// FirstPersonChains.cpp).
+	_chainHeld = FirstPerson::chainHeldTiles(_save);
+	FirstPerson::chainFireballs(_save, _chainFireballs);
 	// What the world looks like this frame: the tiles, the ground beyond the map (chosen once),
 	// the palette colours for the time of day, and the particles moved on.
 	snapshotTiles();

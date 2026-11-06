@@ -3544,17 +3544,30 @@ bool FirstPersonMode::pelletsInFlight(BattlescapeState *state)
 }
 
 /**
- * Does a chain of terrain explosions settle at once, asked by the game as a blast sets one off:
- * with the setting "Instant chain explosions" (a player's request, GitHub issue #61: long chains of
- * explosive terrain are slow to watch and heavy on the computer, and a shooter shows the outcome)
- * while the 3D view shows. The first blast plays; the links it sets off settle in one frame, with
- * one sound, and the wreckage, smoke and fire they leave show. On the map, the game's own chain.
+ * Does a chain of terrain explosions settle at once, asked by the game as a blast sets explosives
+ * off: with the setting "Instant chain explosions" (a player's request, GitHub issue #61: long
+ * chains of explosive terrain are slow to watch and heavy on the computer, and a shooter shows the
+ * outcome) while the 3D view shows. The blast plays as ever, and the chain it sets off settles in
+ * the same moment, as one event; the 3D view shows it as one big blast rippling out from that one
+ * (GitHub issue #105, see FirstPersonChains.cpp). On the map, the game's own chain.
  * @param state The battlescape screen.
  * @return True if the chain settles at once.
  */
 bool FirstPersonMode::instantChains(BattlescapeState *state)
 {
 	return Options::fpsInstantChains && state && state->_firstPerson && state->_firstPerson->isActive();
+}
+
+/**
+ * Does the battle wait for a chain settled at once to ripple through (setting "Instant chain
+ * explosions"), so that its dead fall after it: while its ripple passes and the 3D view shows it
+ * (back on the map, the battle goes on at once).
+ * @param state The battlescape screen.
+ * @return True while the battle waits.
+ */
+bool FirstPersonMode::chainRippleHolds(BattlescapeState *state)
+{
+	return instantChains(state) && FirstPerson::chainRippleShowing(state->_firstPerson->_save);
 }
 
 /**

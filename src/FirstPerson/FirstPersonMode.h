@@ -137,6 +137,8 @@ public:
 	static bool pelletsInFlight(BattlescapeState *state);
 	/// Does a chain of terrain explosions settle at once (setting "Instant chain explosions", in 3D)?
 	static bool instantChains(BattlescapeState *state);
+	/// Does the battle wait for a chain settled at once to ripple through (its dead falling after it)?
+	static bool chainRippleHolds(BattlescapeState *state);
 	/// Setting "Full sprite hitboxes": are units hit by their pictures in this battle (see FirstPerson::spriteHitboxes)?
 	static bool spriteHitboxes(BattlescapeState *state);
 	/// Setting "Quick deaths": are deaths quick in this battle (see FirstPerson::quickDeaths)?

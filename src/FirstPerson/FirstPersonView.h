@@ -63,6 +63,7 @@
 #include <vector>
 #include "../Battlescape/Position.h"
 #include "../Engine/InteractiveSurface.h"
+#include "FirstPersonChains.h"
 #include "FirstPersonParticles.h"
 #include "FirstPersonVoxelModel.h"
 
@@ -654,6 +655,10 @@ private:
 	void startWatchingTile(int index, Tile *tile);
 	/// One tile's snapshot: models, animation, light, what has been seen.
 	void snapshotTile(int index, Tile *tile, bool trackWalls);
+	/// A tile's part as the view shows it: as it was before a chain of explosions while the chain's ripple hasn't passed over it.
+	const MapData *shownPart(int index, Tile *tile, int part) const;
+	/// A tile's fire as the view shows it: as it was before a chain of explosions while the chain's ripple hasn't passed over it.
+	int shownFire(int index, const Tile *tile) const;
 	/// Notes the light sources and UFO machinery on a tile near the camera.
 	void noteLightsAndDevices(const Tile *tile, const TileView &tileView);
 	/// Keeps only the lights nearest the camera.
@@ -1010,6 +1015,9 @@ private:
 	std::vector<float> _glowDepth, _glowDepthScratch;  // the same for the glow's distance (summed, weighted by the glow): how far away the light is
 	std::vector<float> _glowHue, _glowHueScratch;      // the shining pixels' colour, red, green, blue and their weight per cell of a grid half as fine, blurred: the glow's own colour (see drawLightHalos)
 	std::set<const Explosion*> _seenExplosions;        // explosions already seen (each spawns its particles once)
+	FirstPerson::ChainHeldTiles _chainHeld;            // this frame: the tiles a chain of explosions' ripple hasn't passed over yet, as they were (setting "Instant chain explosions")
+	std::vector<FirstPerson::ChainFireball> _chainFireballs; // this frame: the chain's fireballs showing
+	Uint32 _chainFireballsSeen = 0;                    // the last of its fireball sprites seen (each spawns its particles once)
 
 	/// Is there open sky above this point?
 	bool openSky(float x, float y, float z) const;
@@ -1021,6 +1029,8 @@ private:
 	void spawnBattleEffects(float elapsedSeconds);
 	/// Spawns fire, embers, smoke and sparks for new explosions.
 	void spawnExplosionEffects();
+	/// What one new explosion sprite throws out: the shake, and a big one's scorch, flash, embers and smoke, a small one's sparks.
+	void spawnBlastEffects(const float centre[3], bool big, bool miss);
 	/// Spawns flames and smoke from burning and smoky tiles near the camera.
 	void spawnTileFireAndSmoke(float elapsedSeconds);
 	/// Spawns flames on burning units in sight.
@@ -1116,6 +1126,8 @@ private:
 	void advanceShot(Projectile *projectile);
 	/// Draws the flying projectile (or thrown item) and the explosions.
 	void drawProjectilesAndExplosions();
+	/// Draws the fireballs of a chain of explosions rippling through (setting "Instant chain explosions").
+	void drawChainFireballs();
 	/// The voxel model of an item's kind, made from its inventory picture the first time.
 	const ItemModel &itemModel(BattleItem *item);
 	/// Draws a thrown item in flight as its voxel model, tumbling (at a voxel, flying from another); false if it has none.

@@ -901,16 +901,22 @@ void FirstPersonView::drawUnits()
 		// and in sight (any unit in debug mode). And one down a moment ago with "Quick deaths",
 		// still falling (on its own, see FirstPerson::quickFallPhase): drawn in that fall. And one
 		// gone down in the air, coming down to the ground (FirstPerson::airFallHeight): drawn
-		// falling, lying once its own fall frames are over.
-		const bool quickFall = unit->isOut() && FirstPerson::quickFallPhase(unit) >= 0;
+		// falling, lying once its own fall frames are over. And one a chain of explosions settled
+		// at once took down (setting "Instant chain explosions"): standing as it was until the
+		// chain's ripple has passed, the dead falling after it (FirstPerson::chainHeldStanding).
+		const int chainFacing = unit->isOut() ? FirstPerson::chainHeldStanding(_save, unit) : -1;
+		const bool chainHeld = chainFacing >= 0;
+		const bool quickFall = !chainHeld && unit->isOut() && FirstPerson::quickFallPhase(unit) >= 0;
 		Position airFallTile;
 		double airFallFeetZ = 0.0;
-		const bool airFall = FirstPerson::airFallHeight(unit, airFallTile, airFallFeetZ);
+		const bool airFall = !chainHeld && FirstPerson::airFallHeight(unit, airFallTile, airFallFeetZ);
 		const bool fallingDown = quickFall || (airFall && unit->isOut());
-		if ((unit->isOut() && !fallingDown) || unit == _cameraUnit || (!debug && !unit->getVisible()))
+		if ((unit->isOut() && !fallingDown && !chainHeld) || unit == _cameraUnit || (!debug && !unit->getVisible() && !chainHeld))
 		{
 			continue;
 		}
+		// (a unit held standing is up, as it was, for all that's drawn of it here)
+		const FirstPerson::ChainStandingPose chainPose(chainHeld ? unit : nullptr, chainFacing);
 		const int unitSize = unit->getArmor()->getSize(); // tiles across: 1, or 2 for big units
 		// Where the unit's feet are, in voxels: the middle of its tiles, on the floor (raised
 		// by the tile's terrain level, such as rubble or a slope).
@@ -1898,9 +1904,10 @@ void FirstPersonView::drawFire()
 	const int tileCount = _save->getMapSizeXYZ();
 	for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
 	{
-		// Only burning tiles (a burning tile has smoke too) that have been seen.
+		// Only burning tiles (a burning tile has smoke too) that have been seen (a chain of
+		// explosions' fire once its ripple has passed over the tile: see shownFire).
 		Tile *tile = _save->getTile(tileIndex);
-		if (!tile->getSmoke() || !tile->getFire() || !_tileViews[tileIndex].discovered)
+		if (!tile->getSmoke() || !shownFire(tileIndex, tile) || !_tileViews[tileIndex].discovered)
 		{
 			continue;
 		}

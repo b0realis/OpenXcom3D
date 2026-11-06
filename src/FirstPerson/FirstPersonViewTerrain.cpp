@@ -3178,7 +3178,7 @@ void FirstPersonView::noticeTileChanges(int index, Tile *tile)
 
 	// A fire burnt out here: the ground is left blackened (a scorch mark of radius 10 voxels on
 	// the floor's surface in the middle of the tile; at most 200 of them).
-	const bool burning = tile->getFire() > 0;
+	const bool burning = shownFire(index, tile) > 0;
 	if (_burningLastFrame[index] && !burning && _scorches.size() < 200)
 	{
 		const Position tilePos = tile->getPosition();
@@ -3189,9 +3189,10 @@ void FirstPersonView::noticeTileChanges(int index, Tile *tile)
 
 	// Something destroyed here since last frame (not a door opening): debris. A part counts as
 	// destroyed when it vanished or turned into its destroyed version (the record's "die MCD").
+	// (A chain of explosions' wreckage, as its ripple passes over it: see shownPart.)
 	for (int part = 0; part < 4; ++part)
 	{
-		const MapData *partBefore = _partsLastFrame[part][index], *partNow = tile->getMapData((TilePart)part);
+		const MapData *partBefore = _partsLastFrame[part][index], *partNow = shownPart(index, tile, part);
 		_partsLastFrame[part][index] = partNow;
 		if (!partBefore || partBefore == partNow || partBefore->isDoor() || partBefore->isUFODoor() || !partBefore->getDataset()) continue;
 		const MapData *destroyedVersion = partBefore->getDieMCD() ? partBefore->getDataset()->getObject(partBefore->getDieMCD()) : nullptr;
@@ -3220,8 +3221,37 @@ void FirstPersonView::startWatchingTile(int index, Tile *tile)
 {
 	_wallsLastFrame[0][index] = tile->getMapData(O_WESTWALL);
 	_wallsLastFrame[1][index] = tile->getMapData(O_NORTHWALL);
-	for (int part = 0; part < 4; ++part) _partsLastFrame[part][index] = tile->getMapData((TilePart)part);
-	_burningLastFrame[index] = tile->getFire() > 0;
+	for (int part = 0; part < 4; ++part) _partsLastFrame[part][index] = shownPart(index, tile, part);
+	_burningLastFrame[index] = shownFire(index, tile) > 0;
+}
+
+/**
+ * A tile's part as the view shows it this frame: the game's, but while a chain of explosions
+ * settled at once (setting "Instant chain explosions") hasn't rippled over the tile yet, the part
+ * as it was before the chain (its wreckage comes as the fireball nearest to it grows over it, see
+ * FirstPersonChains.cpp).
+ * @param index The tile's index in the map.
+ * @param tile The tile.
+ * @param part The part (floor, west wall, north wall, object).
+ * @return The part shown, or null for none.
+ */
+const MapData *FirstPersonView::shownPart(int index, Tile *tile, int part) const
+{
+	const FirstPerson::ChainHeldTile *held = _chainHeld.at(index);
+	return held ? held->parts[part] : tile->getMapData((TilePart)part);
+}
+
+/**
+ * A tile's fire as the view shows it this frame: the game's, but as it was before a chain of
+ * explosions while the chain's ripple hasn't passed over the tile yet (see shownPart).
+ * @param index The tile's index in the map.
+ * @param tile The tile.
+ * @return The fire shown (the game's number of turns it burns; 0 none).
+ */
+int FirstPersonView::shownFire(int index, const Tile *tile) const
+{
+	const FirstPerson::ChainHeldTile *held = _chainHeld.at(index);
+	return held ? held->fire : tile->getFire();
 }
 
 /**
@@ -3258,8 +3288,9 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 		tileView.part[part] = nullptr;
 		tileView.next[part] = nullptr;
 		// Nothing there, or the floor left out (the lift platform the camera rides through), or a
-		// part the eye is inside (Doom IDCLIP).
-		const MapData *mapData = tile->getMapData((TilePart)part);
+		// part the eye is inside (Doom IDCLIP). (A chain of explosions' ripple not over it yet: as it
+		// was, see shownPart.)
+		const MapData *mapData = shownPart(index, tile, part);
 		if (!mapData || (part == O_FLOOR && (int)index == _hiddenFloor)
 			|| (!_leftOutParts.empty() && std::find(_leftOutParts.begin(), _leftOutParts.end(), std::make_pair(index, part)) != _leftOutParts.end()))
 		{
@@ -3428,7 +3459,7 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 	// Its smoke, once the tile has been seen (as the map shows smoke only there), and whether
 	// it burns.
 	tileView.smoke = tileView.discovered ? (Uint8)std::clamp(tile->getSmoke(), 0, 255) : 0;
-	tileView.burning = tile->getFire() > 0;
+	tileView.burning = shownFire(index, tile) > 0;
 }
 
 /**

@@ -1087,6 +1087,18 @@ bool instantChains(BattlescapeState *state)
 }
 
 /**
+ * Called by the game before it gives the battle its time slice: does it wait while a chain of
+ * explosions settled at once ripples through in 3D (setting "Instant chain explosions"), so that
+ * its dead fall after it?
+ * @param state The battlescape screen.
+ * @return True while the battle waits.
+ */
+bool chainRippleHolds(BattlescapeState *state)
+{
+	return FirstPersonMode::chainRippleHolds(state);
+}
+
+/**
  * Called by the game as it fires a shotgun's round or an akimbo volley: does each pellet (and each
  * gun's round) land on its own (setting "Each pellet on its own"), rather than as the lead pellet
  * lands, the rest lost with it when it leaves the map?

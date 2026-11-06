@@ -18545,7 +18545,7 @@ zS5@`!3aHaZGtp45!Lxph$oiM+^CR%dVZh&K3*XTV@UN4gPwa!|{1W=Aba=<@`1p*z
 ih*j<5N1;eik|IX<zbW+g$UZrfr}=t{<U#TybpHoxAdk2J
 
 diff --git a/src/Battlescape/BattlescapeGame.cpp b/src/Battlescape/BattlescapeGame.cpp
-index b7e1111f3..2f66e5e04 100644
+index b7e1111f3..af2d48e91 100644
 --- a/src/Battlescape/BattlescapeGame.cpp
 +++ b/src/Battlescape/BattlescapeGame.cpp
 @@ -59,6 +59,7 @@
@@ -18556,25 +18556,22 @@ index b7e1111f3..2f66e5e04 100644
  
  namespace OpenXcom
  {
-@@ -1156,6 +1157,17 @@ void BattlescapeGame::handleState()
- 		else
+@@ -1146,6 +1147,14 @@ void BattlescapeGame::handleState()
+ {
+ 	if (!_states.empty())
+ 	{
++		// (OpenXcom3D: the battle waits while the 3D view shows a chain of explosions, settled at
++		// once, rippling out from its first blast, so its dead fall after it; a blast plays on, see
++		// FirstPerson::chainRippleHolds)
++		if (!dynamic_cast<ExplosionBState*>(_states.front()) && FirstPerson::chainRippleHolds(_parentState))
++		{
++			getMap()->invalidate();
++			return;
++		}
+ 		// end turn request?
+ 		if (_states.front() == 0)
  		{
- 			_states.front()->think();
-+			// (OpenXcom3D: the links of a chain settling at once all settle in this frame, see
-+			// ExplosionBState::setInstant; each pops itself, at most a thousand as a guard)
-+			for (int link = 0; link < 1000 && !_states.empty(); ++link)
-+			{
-+				auto *explosion = dynamic_cast<ExplosionBState*>(_states.front());
-+				if (!explosion || !explosion->isInstant())
-+				{
-+					break;
-+				}
-+				explosion->think();
-+			}
- 		}
- 		getMap()->invalidate(); // redraw map
- 	}
-@@ -1551,7 +1563,11 @@ bool BattlescapeGame::handlePanickingUnit(BattleUnit *unit)
+@@ -1551,7 +1560,11 @@ bool BattlescapeGame::handlePanickingUnit(BattleUnit *unit)
  
  	// show a little infobox with the name of the unit and "... is panicking"
  	Game *game = _parentState->getGame();
@@ -18587,7 +18584,7 @@ index b7e1111f3..2f66e5e04 100644
  	{
  		getMap()->getCamera()->centerOnPosition(unit->getPosition());
  		if (status == STATUS_PANICKING)
-@@ -1926,6 +1942,7 @@ void BattlescapeGame::primaryAction(Position pos)
+@@ -1926,6 +1939,7 @@ void BattlescapeGame::primaryAction(Position pos)
  
  			_parentState->getGame()->getCursor()->setVisible(false);
  			_currentAction.cameraPosition = getMap()->getCamera()->getMapOffset();
@@ -18892,7 +18889,7 @@ index 365e012fa..2f7d4751e 100644
  
  }
 diff --git a/src/Battlescape/ExplosionBState.cpp b/src/Battlescape/ExplosionBState.cpp
-index ff9973e6f..47d9091eb 100644
+index ff9973e6f..644372946 100644
 --- a/src/Battlescape/ExplosionBState.cpp
 +++ b/src/Battlescape/ExplosionBState.cpp
 @@ -31,6 +31,7 @@
@@ -18903,24 +18900,32 @@ index ff9973e6f..47d9091eb 100644
  
  namespace OpenXcom
  {
-@@ -224,6 +225,16 @@ void ExplosionBState::init()
- 				frameCount = itemRule->getHitAnimationFrames();
- 				optValue(sound, itemRule->getExplosionHitSound());
- 			}
-+			if (_instant)
+@@ -207,6 +208,10 @@ void ExplosionBState::init()
+ 		if (_power > 0)
+ 		{
+ 			_parent->getSave()->getTileEngine()->explode(_attack, _center, _power, _damageType, _radius, range);
++			if (_settledInPlace)
 +			{
-+				// (OpenXcom3D: a link of a chain settling at once: no blast to watch, the chain's first link sounding for all)
-+				if (_instantSound)
-+				{
-+					_parent->playSound(sound);
-+				}
-+				_parent->setStateInterval(1);
-+				return;
++				return; // (OpenXcom3D: a link of a chain settled at once under the blast that set it off: its damage only, see settleChain)
 +			}
- 			if (_parent->getDepth() > 0)
- 			{
- 				frame -= (frameCount > 0 ? frameCount : Explosion::EXPLODE_FRAMES);
-@@ -273,7 +284,12 @@ void ExplosionBState::init()
+ 
+ 			int powerForAnimation = _power;
+ 			if (itemRule && itemRule->getPowerForAnimation() > 0)
+@@ -256,6 +261,13 @@ void ExplosionBState::init()
+ 				explosionSpeed = 1; // maximum animation speed for long chain terrain explosions
+ 			}
+ 			_parent->setStateInterval(std::max(1, explosionSpeed));
++			// (OpenXcom3D: setting "Instant chain explosions": the explosives this blast set off go up at
++			// once, the whole chain as one event under it, the 3D view showing them ripple out from it;
++			// it sounds as the chain's big boom, see settleChain)
++			if (FirstPerson::instantChains(_parent->getSave()->getBattleState()) && settleChain() && sound == Mod::SMALL_EXPLOSION)
++			{
++				sound = Mod::LARGE_EXPLOSION;
++			}
+ 			// explosion sound
+ 			_parent->playSound(sound);
+ 			if (_parent->getMap()->getFollowProjectile() || _explosionCounter > 0)
+@@ -273,7 +285,12 @@ void ExplosionBState::init()
  	{
  		_parent->getSave()->getTileEngine()->hit(_attack, _center, _power, _damageType, range, _terrainMeleeTilePart);
  
@@ -18934,7 +18939,7 @@ index ff9973e6f..47d9091eb 100644
  		int anim = -1;
  		int animFrames = -1;
  		int sound = -1;
-@@ -349,6 +365,7 @@ void ExplosionBState::init()
+@@ -349,6 +366,7 @@ void ExplosionBState::init()
  		if (anim != -1)
  		{
  			Explosion *explosion = new Explosion(_center, anim, 0, false, (_hit || _psi), animFrames); // Don't burn the tile
@@ -18942,55 +18947,72 @@ index ff9973e6f..47d9091eb 100644
  			_parent->getMap()->getExplosions()->push_back(explosion);
  		}
  		if (_parent->getMap()->getFollowProjectile())
-@@ -379,6 +396,11 @@ void ExplosionBState::init()
-  */
- void ExplosionBState::think()
- {
-+	if (_instant)
-+	{
-+		explode(); // (OpenXcom3D: a link of a chain settling at once, see setInstant)
-+		return;
-+	}
- 	if (!_parent->getMap()->getBlastFlash())
- 	{
- 		if (_parent->getMap()->getExplosions()->empty())
-@@ -477,7 +499,12 @@ void ExplosionBState::explode()
- 	{
- 		Position p = t->getPosition().toVoxel();
- 		p += Position(8,8,0);
--		_parent->statePushFront(new ExplosionBState(_parent, p, BattleActionAttack{ BA_NONE, _attack.attacker, }, t, false, 0, _explosionCounter + 1));
-+		auto *link = new ExplosionBState(_parent, p, BattleActionAttack{ BA_NONE, _attack.attacker, }, t, false, 0, _explosionCounter + 1);
-+		if (_areaOfEffect && FirstPerson::instantChains(save->getBattleState()))
-+		{
-+			link->setInstant(!_instant); // (OpenXcom3D: set off by a blast, it settles at once; the chain's first link sounds for all)
-+		}
-+		_parent->statePushFront(link);
+@@ -469,6 +487,10 @@ void ExplosionBState::explode()
+ 		_parent->getSave()->removeItem(_attack.damage_item);
  	}
  
- 	// Spawn a unit if the item does that
++	if (_settledInPlace)
++	{
++		return; // (OpenXcom3D: a link settled in place is on no state list; settleChain goes on with the chain)
++	}
+ 	_parent->popState();
+ 
+ 	// check for terrain explosions
+@@ -493,4 +515,37 @@ void ExplosionBState::explode()
+ 	}
+ }
+ 
++/**
++ * Sets off at once the chain of explosives this blast set off (OpenXcom3D add-on, setting "Instant
++ * chain explosions", in 3D; GitHub issues #61 and #105): one after the other in the order the game
++ * would set them off, each a terrain explosion as the game's own (its power, damage type and
++ * reach from the tile), dealing its blast's damage and counting its dead as its explode() would,
++ * but without its animation, sound or state: the whole chain is one event, under this blast. The
++ * dead go down after this blast (their deaths queued behind it), and the 3D view shows the
++ * explosives' fireballs rippling out from it (see FirstPerson::chainLink). A blast that set none
++ * off plays as ever.
++ * @return Whether any explosive went up.
++ */
++bool ExplosionBState::settleChain()
++{
++	SavedBattleGame *save = _parent->getSave();
++	int links = 0;
++	// (at most a thousand, as a guard)
++	for (Tile *t = save->getTileEngine()->checkForTerrainExplosions(); t && links < 1000; t = save->getTileEngine()->checkForTerrainExplosions(), ++links)
++	{
++		Position p = t->getPosition().toVoxel();
++		p += Position(8,8,0);
++		FirstPerson::chainLink(save, p, t->getExplosive(), links == 0); // (noted for the 3D view's ripple before its blast changes the map)
++		ExplosionBState link(_parent, p, BattleActionAttack{ BA_NONE, _attack.attacker, }, t, false, 0, _explosionCounter + 1);
++		link._settledInPlace = true;
++		link.init();
++		link.explode();
++	}
++	if (links > 0)
++	{
++		FirstPerson::chainSettled(save);
++	}
++	return links > 0;
++}
++
+ }
 diff --git a/src/Battlescape/ExplosionBState.h b/src/Battlescape/ExplosionBState.h
-index c112ccbe8..f6edf25be 100644
+index c112ccbe8..0b212a6bc 100644
 --- a/src/Battlescape/ExplosionBState.h
 +++ b/src/Battlescape/ExplosionBState.h
-@@ -47,6 +47,7 @@ private:
+@@ -47,9 +47,12 @@ private:
  	int _radius;
  	int _range;
  	bool _areaOfEffect, _lowerWeapon, _hit, _psi;
-+	bool _instant = false, _instantSound = false; // (OpenXcom3D: a link of a chain settled at once, see setInstant)
++	bool _settledInPlace = false; // (OpenXcom3D: a link of a chain settled at once under the blast that set it off, see settleChain)
  
  	/// Calculates the effects of the explosion.
  	void explode();
-@@ -57,6 +58,10 @@ public:
- 	ExplosionBState(BattlescapeGame *parent, LastPositions center, BattleActionAttack attack, Tile *tile = 0, bool lowerWeapon = false, int range = 0, int explosionCounter = 0, int terrainMeleeTilePart = 0);
- 	/// Cleans up the ExplosionBState.
- 	~ExplosionBState();
-+	/// Makes this terrain explosion a link of a chain that settles at once (OpenXcom3D add-on, setting "Instant chain explosions"): no blast to watch, its sound only if asked.
-+	void setInstant(bool sound) { _instant = true; _instantSound = sound; }
-+	/// Checks if this explosion settles at once (see setInstant).
-+	bool isInstant() const { return _instant; }
- 	/// Initializes the state.
- 	void init() override;
- 	/// Handles a cancel request.
++	/// Sets off at once, under this blast, the chain of explosives it set off (OpenXcom3D add-on, setting "Instant chain explosions"); false if it set none off.
++	bool settleChain();
+ 	/// Set new value to reference if new value is not equal -1.
+ 	void optValue(int &oldValue, int newValue) const;
+ public:
 diff --git a/src/Battlescape/Map.cpp b/src/Battlescape/Map.cpp
 index 3665cd199..dee7728fd 100644
 --- a/src/Battlescape/Map.cpp
@@ -21495,10 +21517,10 @@ index bc5f08f46..5ddf353f4 100644
  			playMovementSound();
  			if (_parent->getSave()->isPreview())
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 839f80345..9d608adb1 100644
+index 839f80345..0cfb892f2 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -441,10 +441,45 @@ set ( rapidyaml_src
+@@ -441,10 +441,46 @@ set ( rapidyaml_src
  
  )
  
@@ -21506,6 +21528,7 @@ index 839f80345..9d608adb1 100644
 +if ( OXCE_FIRSTPERSON )
 +  set ( firstperson_src
 +    FirstPerson/FirstPersonApi.cpp
++    FirstPerson/FirstPersonChains.cpp
 +    FirstPerson/FirstPersonMode.cpp
 +    FirstPerson/FirstPersonModeCamera.cpp
 +    FirstPerson/FirstPersonModeHud.cpp
@@ -21544,7 +21567,7 @@ index 839f80345..9d608adb1 100644
      ${engine_src}
      ${geoscape_src}
      ${interface_src}
-@@ -627,7 +662,10 @@ if (WIN32)
+@@ -627,7 +663,10 @@ if (WIN32)
    set(WIN32_LIBS imagehlp dbghelp)
  endif(WIN32)
  
@@ -21907,10 +21930,10 @@ index 97e6bd495..77857158e 100644
  	/// Shows all the state surfaces.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..2884be5c9
+index 000000000..5aee88501
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1305 @@
+@@ -0,0 +1,1317 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -23000,6 +23023,18 @@ index 000000000..2884be5c9
 +}
 +
 +/**
++ * Called by the game before it gives the battle its time slice: does it wait while a chain of
++ * explosions settled at once ripples through in 3D (setting "Instant chain explosions"), so that
++ * its dead fall after it?
++ * @param state The battlescape screen.
++ * @return True while the battle waits.
++ */
++bool chainRippleHolds(BattlescapeState *state)
++{
++	return FirstPersonMode::chainRippleHolds(state);
++}
++
++/**
 + * Called by the game as it fires a shotgun's round or an akimbo volley: does each pellet (and each
 + * gun's round) land on its own (setting "Each pellet on its own"), rather than as the lead pellet
 + * lands, the rest lost with it when it leaves the map?
@@ -23218,10 +23253,10 @@ index 000000000..2884be5c9
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..2baff7d94
+index 000000000..71bce85c7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,372 @@
+@@ -0,0 +1,386 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -23465,9 +23500,20 @@ index 000000000..2baff7d94
 +/// Setting "Shotgun pellets in flight": do a shotgun's pellets fly beside its round (in 3D and on
 +/// the map), rather than all landing at once? They're traced as the round is fired, and hit as it lands.
 +bool pelletsInFlight(BattlescapeState *state);
-+/// Setting "Instant chain explosions": does a terrain explosion set off by a blast settle at once,
-+/// with the rest of its chain, without blasts to watch (in 3D only)?
++/// Setting "Instant chain explosions": do the explosives a blast sets off go up at once, the whole
++/// chain one event under that blast, the 3D view showing it as one big blast (in 3D only)?
 +bool instantChains(BattlescapeState *state);
++/// Setting "Instant chain explosions" (a player, GitHub issue #105: "1 big boom"): an explosive of a
++/// chain settling at once goes up, noted for the 3D view's ripple of fireballs before its blast
++/// changes the map (the chain's first keeps the map and the units as they were, see
++/// FirstPersonChains.cpp).
++void chainLink(SavedBattleGame *save, const Position &centre, int power, bool first);
++/// Setting "Instant chain explosions": the chain's last explosive has settled (none other set off):
++/// its picture is worked out, before the 3D view's next frame (see FirstPersonChains.cpp).
++void chainSettled(SavedBattleGame *save);
++/// Setting "Instant chain explosions": does the battle wait while the 3D view shows a chain settled
++/// at once rippling through (its dead fall after it)?
++bool chainRippleHolds(BattlescapeState *state);
 +/// Setting "Each pellet on its own": do a shotgun's pellets and a volley's two rounds each land on
 +/// their own (in either view), none lost when the lead pellet leaves the map?
 +bool eachPellet(BattlescapeState *state);
@@ -23546,6 +23592,9 @@ index 000000000..2baff7d94
 +inline bool fastShots(BattlescapeState *, const BattleUnit *) { return false; }
 +inline bool pelletsInFlight(BattlescapeState *) { return false; }
 +inline bool instantChains(BattlescapeState *) { return false; }
++inline void chainLink(SavedBattleGame *, const Position &, int, bool) { }
++inline void chainSettled(SavedBattleGame *) { }
++inline bool chainRippleHolds(BattlescapeState *) { return false; }
 +inline bool eachPellet(BattlescapeState *) { return false; }
 +enum StatBar { STAT_TU, STAT_ENERGY, STAT_HEALTH, STAT_MORALE, STAT_MANA };
 +inline double statBarScale(BattlescapeState *, int, int, int) { return 1.0; }
@@ -23594,12 +23643,620 @@ index 000000000..2baff7d94
 +}
 +
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
+diff --git a/src/FirstPerson/FirstPersonChains.cpp b/src/FirstPerson/FirstPersonChains.cpp
+new file mode 100644
+index 000000000..94d7c3528
+--- /dev/null
++++ b/src/FirstPerson/FirstPersonChains.cpp
+@@ -0,0 +1,459 @@
++/*
++ * ==============================================================================================
++ *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
++ * ==============================================================================================
++ *
++ *  Our philosophy
++ *
++ *  - Faithful first. The 3D view should feel as if it had shipped with UFO: Enemy Unknown on
++ *    the day the game came out.
++ *  - Another camera on the same battle. The original rules decide everything: time units,
++ *    energy, accuracy, line of fire, reaction fire, doors and morale. The 3D view only shows
++ *    what the game does.
++ *  - Only the original assets: the game's own maps, voxel shapes, sprites, palette and sounds.
++ *  - Every addition is a setting. Jumping, night vision as gear, falling, FPS-style shooting
++ *    and dual wield can all be switched off.
++ *  - Light on the engine. Our code lives in this folder, the core only gets small hooks, and
++ *    without the OpenXcom3D mod nothing changes.
++ *  - Runs anywhere: a software renderer on the CPU, no graphics card needed.
++ *  - Written for people: descriptive names, and a comment for every function and every block.
++ *
++ *  Date: 2026-10-19
++ *
++ *  We wish everyone all the best and all health!
++ * ==============================================================================================
++ */
++/*
++ * Copyright 2010-2026 OpenXcom Developers.
++ *
++ * This file is part of OpenXcom.
++ *
++ * OpenXcom is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * OpenXcom is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
++ */
++/*
++ * FirstPersonChains.cpp: setting "Instant chain explosions" (a player, GitHub issue #61: "massive
++ * chain explosives torture my cpu ... instantly calculate everything and give the final results";
++ * GitHub issue #105: a pile of barrels made two explosions "instead of 1 big boom"; the owner: "one
++ * big blast but explosions shown at each explosive and short delay between them to really
++ * emphasize the chain drama"). In 3D the explosives a blast sets off (a grenade's, a rocket's, or a
++ * barrel's that a shot set off) go up at once, the whole chain one event under that blast
++ * (ExplosionBState::settleChain): what it destroys and kills is the game's own. The blast itself
++ * plays as ever, sounding as the chain's big boom; the 3D views show the chain as one big blast
++ * rippling out from it: a fireball at each explosive, in the order the game sets them off,
++ * ChainRippleDelay apart, each a normal blast's sprites (fewer each when many go up); the wreckage
++ * and fire of each tile come as the fireball nearest to it grows over it, the map as it was until
++ * then; the units the chain takes down stand as they were until the ripple has passed, and the
++ * battle waits for it (once, not blast by blast), so they fall after it. A blast that sets nothing
++ * off is untouched.
++ */
++#include "FirstPersonChains.h"
++#include <algorithm>
++#include <climits>
++#include <random>
++#include "FirstPersonApi.h"
++#include "../Battlescape/BattlescapeState.h"
++#include "../Battlescape/Explosion.h"
++#include "../Mod/Mod.h"
++#include "../Savegame/BattleUnit.h"
++#include "../Savegame/SavedBattleGame.h"
++#include "../Savegame/Tile.h"
++
++namespace OpenXcom
++{
++
++namespace FirstPerson
++{
++
++namespace
++{
++
++/// A chain's explosives go up this far apart in its ripple, in ms (the owner: "explosions shown at
++/// each explosive and short delay between them to really emphasize the chain drama"): a pile of
++/// six to eight reads as one chain going up, not as a slow sequence.
++const Uint32 ChainRippleDelay = 120;
++/// The whole ripple lasts no longer than this, in ms: in a longer chain the explosives go up closer
++/// together (the big mods' chemical towers go up in dozens).
++const Uint32 ChainRippleLongest = 1500;
++/// The most fireball sprites a ripple has in all: each explosive's blast as many as the game's own
++/// (one for every 5 of its power), fewer each when many go up, but at least ChainLeastSprites.
++const int ChainRippleSprites = 160;
++const int ChainLeastSprites = 3;
++/// A tile's wreckage and fire show this long after the fireball nearest to it starts, in ms: once
++/// the fireball has grown over it.
++const Uint32 ChainRevealLag = 150;
++/// The battle goes on (the chain's dead fall) this long after the last explosive's fireball starts,
++/// in ms: as it fades.
++const Uint32 ChainRippleTail = 350;
++/// One frame of a fireball's sprites lasts as long as the game's own blast's, in ms (ExplosionBState::init).
++const Uint32 FireballFrameTime = BattlescapeState::DEFAULT_ANIM_SPEED / 2;
++
++/// An explosive of the chain: where it went up, its power, and when its fireball comes (SDL ticks).
++struct ChainLink
++{
++	Position centre;
++	int power;
++	Uint32 at;
++};
++
++/// One sprite of a fireball: where it is, its blast's first frame, when it starts (SDL ticks), and
++/// its count among all the fireball sprites (in the order they start).
++struct ChainSprite
++{
++	Position position;
++	int firstFrame;
++	Uint32 start;
++	Uint32 serial;
++};
++
++/// A unit as it was when the chain went off: its facing, and whether the player saw it.
++struct ChainUnit
++{
++	BattleUnit *unit;
++	int direction;
++	bool seen;
++};
++
++/// The chain shown: one at a time (one going off while another's ripple still passes takes over,
++/// the other's wreckage showing at once), its sprites kept until their frames are over.
++struct ChainPicture
++{
++	const SavedBattleGame *save = nullptr; // the battle (null: none yet)
++	bool settled = true;                   // its picture worked out (it's over in the battle)
++	Uint32 start = 0;                      // when it went off (SDL ticks)
++	Uint32 end = 0;                        // when the battle goes on, its dead falling
++	std::vector<ChainLink> links;          // its explosives, in the order the game set them off
++	std::vector<ChainHeldTile> before;     // every tile as it was when it went off (until settled)
++	std::vector<ChainUnit> standing;       // the units up when it went off (until settled)
++	std::vector<int> entries;              // per tile: its entry in held, or -1
++	std::vector<ChainHeldTile> held;       // the tiles it changed, as they were, until the ripple passes them
++	std::vector<ChainUnit> downed;         // the units it took down, as they were
++	std::vector<ChainSprite> sprites;      // the fireballs' sprites, in the order they start
++	Uint32 serials = 0;                    // fireball sprites counted so far
++};
++
++/// The chain shown (see ChainPicture).
++ChainPicture &chainPicture()
++{
++	static ChainPicture picture;
++	return picture;
++}
++
++/**
++ * Works out a chain's picture once it has settled in the battle: when each explosive's fireball
++ * comes, the fireballs' sprites, the tiles it changed (held as they were until the fireball
++ * nearest to them has grown over them) and the units it took down (standing until the ripple has
++ * passed, when the battle goes on).
++ * @param chain The chain.
++ * @param save Its battle.
++ */
++void settleChain(ChainPicture &chain, SavedBattleGame *save)
++{
++	chain.settled = true;
++	if (chain.links.empty())
++	{
++		chain.end = chain.start;
++		return;
++	}
++
++	// When each explosive's fireball comes: ChainRippleDelay apart, the first one after the blast
++	// that set them off (the game's own, at the start), closer together in a chain so long that its
++	// ripple would last more than ChainRippleLongest. The battle goes on once the last one fades
++	// (ChainRippleTail).
++	const int linkCount = (int)chain.links.size();
++	const Uint32 delay = std::min(ChainRippleDelay, ChainRippleLongest / (Uint32)linkCount);
++	for (int link = 0; link < linkCount; ++link)
++	{
++		chain.links[link].at = chain.start + delay * (link + 1);
++	}
++	chain.end = chain.links.back().at + ChainRippleTail;
++
++	// The fireballs: each explosive's blast as the game scatters it (ExplosionBState::init): a sprite
++	// for every 5 of its power, each up to half its power (in voxels) off its centre across, a frame
++	// later for every fifth of them; fewer each when many go up (ChainRippleSprites in all). The
++	// game's blast frames (X1.PCK; under the sea the ones before them). By the view's own dice: the
++	// battle's own are left alone.
++	std::minstd_rand dice(chain.start + 1);
++	const int mostEach = std::max(ChainLeastSprites, ChainRippleSprites / linkCount);
++	const int firstFrame = Mod::EXPLOSION_OFFSET - (save->getDepth() > 0 ? Explosion::EXPLODE_FRAMES : 0);
++	std::vector<ChainSprite> sprites;
++	for (const ChainLink &link : chain.links)
++	{
++		const int count = std::clamp(link.power / 5, 1, mostEach);
++		const int perStep = std::max(1, count / 5);
++		const int reach = std::max(1, link.power / 2);
++		std::uniform_int_distribution<int> across(-reach, reach);
++		for (int sprite = 0; sprite < count; ++sprite)
++		{
++			const Position offset(across(dice), across(dice), 0);
++			const Uint32 steps = sprite > 0 ? (Uint32)((sprite - 1) / perStep) : 0;
++			sprites.push_back({ link.centre + offset, firstFrame, link.at + steps * FireballFrameTime, 0 });
++		}
++	}
++	// Counted in the order they start, so a view knows the ones new since its last frame.
++	std::stable_sort(sprites.begin(), sprites.end(), [](const ChainSprite &a, const ChainSprite &b) { return a.start < b.start; });
++	for (ChainSprite &sprite : sprites)
++	{
++		sprite.serial = ++chain.serials;
++		chain.sprites.push_back(sprite);
++	}
++
++	// The tiles it changed (a part blown away or left as its wreckage, a fire started or put out):
++	// held as they were until the fireball nearest to them (from the tile's middle) has grown over
++	// them.
++	const int tileCount = save->getMapSizeXYZ();
++	chain.entries.assign(tileCount, -1);
++	chain.held.clear();
++	for (int index = 0; index < tileCount && index < (int)chain.before.size(); ++index)
++	{
++		Tile *tile = save->getTile(index);
++		ChainHeldTile was = chain.before[index];
++		bool changed = was.fire != tile->getFire();
++		for (int part = 0; part < 4 && !changed; ++part)
++		{
++			changed = was.parts[part] != tile->getMapData((TilePart)part);
++		}
++		if (!changed)
++		{
++			continue;
++		}
++		const Position middle = tile->getPosition().toVoxel() + Position(8, 8, 12);
++		int nearest = INT_MAX;
++		Uint32 nearestAt = chain.links.front().at;
++		for (const ChainLink &link : chain.links)
++		{
++			const int distance = Position::distanceSq(middle, link.centre);
++			if (distance < nearest)
++			{
++				nearest = distance;
++				nearestAt = link.at;
++			}
++		}
++		was.revealAt = nearestAt + ChainRevealLag;
++		chain.entries[index] = (int)chain.held.size();
++		chain.held.push_back(was);
++	}
++	chain.before.clear();
++
++	// The units it took down (dead or knocked out now): standing as they were until the ripple has
++	// passed.
++	chain.downed.clear();
++	for (const ChainUnit &was : chain.standing)
++	{
++		if (was.unit->isOut())
++		{
++			chain.downed.push_back(was);
++		}
++	}
++	chain.standing.clear();
++}
++
++}
++
++/**
++ * Called by the game as an explosive of a chain settling at once goes up (setting "Instant chain
++ * explosions", see ExplosionBState::settleChain), before its blast changes the map: noted for the
++ * ripple. The chain's first (a new chain) keeps the map and the units as they are now, after the
++ * blast that set it off and before any of its own: every tile's parts and fire, and the units
++ * still up (the blast's own dead are counted with the chain's), with their facing and whether the
++ * player sees them.
++ * @param save The battle.
++ * @param centre Where it goes up (the game's blast centre), in voxels.
++ * @param power Its power.
++ * @param first Is it the chain's first?
++ */
++void chainLink(SavedBattleGame *save, const Position &centre, int power, bool first)
++{
++	ChainPicture &chain = chainPicture();
++	const bool newBattle = chain.save != save;
++	if (newBattle || (first && chain.settled))
++	{
++		if (newBattle)
++		{
++			chain.sprites.clear();
++		}
++		chain.save = save;
++		chain.settled = false;
++		chain.start = SDL_GetTicks();
++		chain.links.clear();
++		chain.entries.clear();
++		chain.held.clear();
++		chain.downed.clear();
++		// Every tile as it is now.
++		const int tileCount = save->getMapSizeXYZ();
++		chain.before.resize(tileCount);
++		for (int index = 0; index < tileCount; ++index)
++		{
++			Tile *tile = save->getTile(index);
++			ChainHeldTile &was = chain.before[index];
++			for (int part = 0; part < 4; ++part)
++			{
++				was.parts[part] = tile->getMapData((TilePart)part);
++			}
++			was.fire = tile->getFire();
++			was.revealAt = 0;
++		}
++		// The units still up.
++		chain.standing.clear();
++		for (BattleUnit *unit : *save->getUnits())
++		{
++			if (!unit->isOut())
++			{
++				chain.standing.push_back({ unit, unit->getDirection(), unit->getVisible() || save->getDebugMode() });
++			}
++		}
++	}
++	chain.links.push_back({ centre, power, 0 });
++}
++
++/**
++ * Called by the game as a chain settling at once is over (its last explosive set off no other):
++ * its picture is worked out (see settleChain) before the 3D view's next frame.
++ * @param save The battle.
++ */
++void chainSettled(SavedBattleGame *save)
++{
++	ChainPicture &chain = chainPicture();
++	if (chain.save == save && !chain.settled)
++	{
++		settleChain(chain, save);
++	}
++}
++
++/**
++ * Is a chain's ripple still passing (its dead not fallen yet)? The battle waits for it while the
++ * 3D view shows it (see FirstPersonMode::chainRippleHolds).
++ * @param save The battle.
++ * @return True until the last explosive's fireball fades.
++ */
++bool chainRippleShowing(const SavedBattleGame *save)
++{
++	const ChainPicture &chain = chainPicture();
++	return chain.save == save && chain.settled && !chain.links.empty() && SDL_GetTicks() < chain.end;
++}
++
++/**
++ * The fireballs of a chain's ripple showing now (each sprite from its start to its blast's last
++ * frame), in the order they started; those whose frames are over are let go.
++ * @param save The battle.
++ * @param fireballs Set to them.
++ */
++void chainFireballs(const SavedBattleGame *save, std::vector<ChainFireball> &fireballs)
++{
++	fireballs.clear();
++	ChainPicture &chain = chainPicture();
++	if (chain.save != save || chain.sprites.empty())
++	{
++		return;
++	}
++	const Uint32 now = SDL_GetTicks();
++	const Uint32 lasting = FireballFrameTime * Explosion::EXPLODE_FRAMES;
++	chain.sprites.erase(std::remove_if(chain.sprites.begin(), chain.sprites.end(),
++		[&](const ChainSprite &sprite) { return now >= sprite.start + lasting; }), chain.sprites.end());
++	for (const ChainSprite &sprite : chain.sprites)
++	{
++		if (now < sprite.start)
++		{
++			continue;
++		}
++		const Uint32 age = now - sprite.start;
++		ChainFireball fireball;
++		fireball.position = sprite.position;
++		fireball.frame = sprite.firstFrame + (int)(age / FireballFrameTime);
++		fireball.lastFrame = sprite.firstFrame + Explosion::EXPLODE_FRAMES - 1;
++		fireball.blend = (age % FireballFrameTime) / (float)FireballFrameTime;
++		fireball.serial = sprite.serial;
++		fireballs.push_back(fireball);
++	}
++}
++
++/**
++ * The tiles a chain's ripple hasn't passed over yet, as they were: for a view to take once a frame.
++ * @param save The battle.
++ * @return The tiles held (none without a ripple passing).
++ */
++ChainHeldTiles chainHeldTiles(const SavedBattleGame *save)
++{
++	const ChainPicture &chain = chainPicture();
++	const Uint32 now = SDL_GetTicks();
++	if (chain.save != save || !chain.settled || chain.held.empty() || now >= chain.end)
++	{
++		return ChainHeldTiles();
++	}
++	return ChainHeldTiles(&chain.entries, &chain.held, now);
++}
++
++/**
++ * The facing a unit a chain took down had before it, to be drawn standing so until the ripple has
++ * passed (the dead fall after it, as the battle goes on); only one the player saw then.
++ * @param save The battle.
++ * @param unit The unit.
++ * @return Its facing then, or -1 for any other unit (or once the ripple has passed).
++ */
++int chainHeldStanding(const SavedBattleGame *save, const BattleUnit *unit)
++{
++	const ChainPicture &chain = chainPicture();
++	if (chain.save != save || !chain.settled || chain.downed.empty() || SDL_GetTicks() >= chain.end)
++	{
++		return -1;
++	}
++	for (const ChainUnit &was : chain.downed)
++	{
++		if (was.unit == unit)
++		{
++			return was.seen ? was.direction : -1;
++		}
++	}
++	return -1;
++}
++
++/**
++ * Forgets any chain: a battle starting, or one loaded (its map and units are new).
++ */
++void clearChains()
++{
++	chainPicture() = ChainPicture();
++}
++
++/**
++ * Stands a unit a chain took down up again for drawing, as it was before the chain: standing,
++ * facing as it did (the game turned it to face south-east as it went down).
++ * @param unit The unit (null: nothing).
++ * @param direction Its facing before the chain.
++ */
++ChainStandingPose::ChainStandingPose(BattleUnit *unit, int direction) : _unit(unit), _gameDirection(unit ? unit->getDirection() : 0)
++{
++	if (!_unit)
++	{
++		return;
++	}
++	_unit->abortTurn(); // (standing)
++	_unit->setDirection(direction);
++}
++
++/**
++ * Puts the unit back as the battle has it: its facing, and down at the end of its fall (dead, or
++ * knocked out with health left), as the game left it (BattleUnit::instaFalling).
++ */
++ChainStandingPose::~ChainStandingPose()
++{
++	if (_unit)
++	{
++		_unit->setDirection(_gameDirection);
++		_unit->instaFalling();
++	}
++}
++
++}
++
++}
+diff --git a/src/FirstPerson/FirstPersonChains.h b/src/FirstPerson/FirstPersonChains.h
+new file mode 100644
+index 000000000..64df06a0f
+--- /dev/null
++++ b/src/FirstPerson/FirstPersonChains.h
+@@ -0,0 +1,137 @@
++#pragma once
++/*
++ * ==============================================================================================
++ *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
++ * ==============================================================================================
++ *
++ *  Our philosophy
++ *
++ *  - Faithful first. The 3D view should feel as if it had shipped with UFO: Enemy Unknown on
++ *    the day the game came out.
++ *  - Another camera on the same battle. The original rules decide everything: time units,
++ *    energy, accuracy, line of fire, reaction fire, doors and morale. The 3D view only shows
++ *    what the game does.
++ *  - Only the original assets: the game's own maps, voxel shapes, sprites, palette and sounds.
++ *  - Every addition is a setting. Jumping, night vision as gear, falling, FPS-style shooting
++ *    and dual wield can all be switched off.
++ *  - Light on the engine. Our code lives in this folder, the core only gets small hooks, and
++ *    without the OpenXcom3D mod nothing changes.
++ *  - Runs anywhere: a software renderer on the CPU, no graphics card needed.
++ *  - Written for people: descriptive names, and a comment for every function and every block.
++ *
++ *  Date: 2026-10-19
++ *
++ *  We wish everyone all the best and all health!
++ * ==============================================================================================
++ */
++/*
++ * Copyright 2010-2026 OpenXcom Developers.
++ *
++ * This file is part of OpenXcom.
++ *
++ * OpenXcom is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * OpenXcom is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
++ */
++/*
++ * FirstPersonChains.h: setting "Instant chain explosions": what the 3D views ask of a chain of
++ * explosions settled at once (see FirstPersonChains.cpp): its fireballs rippling through it, the
++ * map as it was where the ripple hasn't passed yet, and its dead standing until it has.
++ */
++#include <vector>
++#include <SDL.h>
++#include "../Battlescape/Position.h"
++
++namespace OpenXcom
++{
++
++class BattleUnit;
++class MapData;
++class SavedBattleGame;
++
++namespace FirstPerson
++{
++
++/// One sprite of a chain's fireballs as it shows now: a frame of the game's explosion sprites
++/// (X1.PCK), where the game's own blast would scatter it (ExplosionBState::init).
++struct ChainFireball
++{
++	Position position; // in voxels
++	int frame;         // the frame shown now
++	int lastFrame;     // its blast's last frame (it doesn't dissolve past it)
++	float blend;       // how far it is into its next frame, 0..1
++	Uint32 serial;     // counts every fireball sprite, so a view knows the ones new since its last frame
++};
++
++/// A tile as it was before a chain went off, shown so until the chain's ripple passes over it: its
++/// parts and its fire (its smoke is the game's as ever).
++struct ChainHeldTile
++{
++	const MapData *parts[4]; // floor, west wall, north wall, object (null where none)
++	int fire;                // its fire (the game's number of turns)
++	Uint32 revealAt;         // when the ripple passes (SDL ticks): from then on, the tile as the battle has it
++};
++
++/// The tiles a chain's ripple hasn't passed over yet, as they were (see chainHeldTiles): taken
++/// once a frame by a view, each tile then looked up at no cost.
++class ChainHeldTiles
++{
++public:
++	ChainHeldTiles() = default;
++	ChainHeldTiles(const std::vector<int> *entries, const std::vector<ChainHeldTile> *tiles, Uint32 now) : _entries(entries), _tiles(tiles), _now(now) { }
++	/// The tile as it was, while the ripple hasn't passed over it; null for any other.
++	const ChainHeldTile *at(int tileIndex) const
++	{
++		if (!_entries || tileIndex < 0 || tileIndex >= (int)_entries->size())
++		{
++			return nullptr;
++		}
++		const int entry = (*_entries)[tileIndex];
++		return entry >= 0 && _now < (*_tiles)[entry].revealAt ? &(*_tiles)[entry] : nullptr;
++	}
++private:
++	const std::vector<int> *_entries = nullptr;          // per tile: its entry in _tiles, or -1 (none: nothing held)
++	const std::vector<ChainHeldTile> *_tiles = nullptr; // the tiles held
++	Uint32 _now = 0;                                    // the frame's time
++};
++
++/// The fireballs of a chain's ripple showing now, in the order they started (none without one).
++void chainFireballs(const SavedBattleGame *save, std::vector<ChainFireball> &fireballs);
++/// Is a chain's ripple still passing (its dead not fallen yet)?
++bool chainRippleShowing(const SavedBattleGame *save);
++/// The tiles a chain's ripple hasn't passed over yet, as they were (none without one).
++ChainHeldTiles chainHeldTiles(const SavedBattleGame *save);
++/// The facing a unit the chain took down had before it, to be drawn standing so until the ripple
++/// has passed (the dead fall after it); -1 for any other unit. Only one the player saw then.
++int chainHeldStanding(const SavedBattleGame *save, const BattleUnit *unit);
++/// Forgets any chain (a battle starting: its map and units are new).
++void clearChains();
++
++/// While it lives, a unit a chain took down is up as it was before the chain (standing, facing
++/// as it did), for drawing; then it's put back as the battle has it, down (see QuickFallPose).
++class ChainStandingPose
++{
++public:
++	/// Stands the unit up, facing that way (nothing for a null unit).
++	ChainStandingPose(BattleUnit *unit, int direction);
++	/// Puts the unit back down, as the battle has it.
++	~ChainStandingPose();
++	ChainStandingPose(const ChainStandingPose&) = delete;
++	ChainStandingPose &operator=(const ChainStandingPose&) = delete;
++private:
++	BattleUnit *_unit;   // the unit posed (null: none)
++	int _gameDirection;  // its facing as the battle has it, put back after
++};
++
++}
++
++}
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..edc73bad5
+index 000000000..728d1f697
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2884 @@
+@@ -0,0 +1,2885 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -23750,6 +24407,7 @@ index 000000000..edc73bad5
 +	FirstPerson::settleOptions(); // (the smoke's first value, from an older setting)
 +	FirstPerson::clearQuickFalls(); // (a new battle, or one loaded: none of the last one's falls)
 +	FirstPerson::clearAirFalls();
++	FirstPerson::clearChains(); // (nor its chain of explosions' ripple)
 +
 +	// Our surfaces, in drawing order: each one goes on top of the ones made before it.
 +	createView();
@@ -26486,10 +27144,10 @@ index 000000000..edc73bad5
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..0d167822a
+index 000000000..7cf2d6d21
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1261 @@
+@@ -0,0 +1,1263 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -26629,6 +27287,8 @@ index 000000000..0d167822a
 +	static bool pelletsInFlight(BattlescapeState *state);
 +	/// Does a chain of terrain explosions settle at once (setting "Instant chain explosions", in 3D)?
 +	static bool instantChains(BattlescapeState *state);
++	/// Does the battle wait for a chain settled at once to ripple through (its dead falling after it)?
++	static bool chainRippleHolds(BattlescapeState *state);
 +	/// Setting "Full sprite hitboxes": are units hit by their pictures in this battle (see FirstPerson::spriteHitboxes)?
 +	static bool spriteHitboxes(BattlescapeState *state);
 +	/// Setting "Quick deaths": are deaths quick in this battle (see FirstPerson::quickDeaths)?
@@ -33667,10 +34327,10 @@ index 000000000..3486db61a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..779a3562b
+index 000000000..4edfcdbcf
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,4992 @@
+@@ -0,0 +1,5005 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -37217,17 +37877,30 @@ index 000000000..779a3562b
 +}
 +
 +/**
-+ * Does a chain of terrain explosions settle at once, asked by the game as a blast sets one off:
-+ * with the setting "Instant chain explosions" (a player's request, GitHub issue #61: long chains of
-+ * explosive terrain are slow to watch and heavy on the computer, and a shooter shows the outcome)
-+ * while the 3D view shows. The first blast plays; the links it sets off settle in one frame, with
-+ * one sound, and the wreckage, smoke and fire they leave show. On the map, the game's own chain.
++ * Does a chain of terrain explosions settle at once, asked by the game as a blast sets explosives
++ * off: with the setting "Instant chain explosions" (a player's request, GitHub issue #61: long
++ * chains of explosive terrain are slow to watch and heavy on the computer, and a shooter shows the
++ * outcome) while the 3D view shows. The blast plays as ever, and the chain it sets off settles in
++ * the same moment, as one event; the 3D view shows it as one big blast rippling out from that one
++ * (GitHub issue #105, see FirstPersonChains.cpp). On the map, the game's own chain.
 + * @param state The battlescape screen.
 + * @return True if the chain settles at once.
 + */
 +bool FirstPersonMode::instantChains(BattlescapeState *state)
 +{
 +	return Options::fpsInstantChains && state && state->_firstPerson && state->_firstPerson->isActive();
++}
++
++/**
++ * Does the battle wait for a chain settled at once to ripple through (setting "Instant chain
++ * explosions"), so that its dead fall after it: while its ripple passes and the 3D view shows it
++ * (back on the map, the battle goes on at once).
++ * @param state The battlescape screen.
++ * @return True while the battle waits.
++ */
++bool FirstPersonMode::chainRippleHolds(BattlescapeState *state)
++{
++	return instantChains(state) && FirstPerson::chainRippleShowing(state->_firstPerson->_save);
 +}
 +
 +/**
@@ -42787,10 +43460,10 @@ index 000000000..d7aa46be4
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..8e3e499bf
+index 000000000..4db2c3c2e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,629 @@
+@@ -0,0 +1,634 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -43328,6 +44001,11 @@ index 000000000..8e3e499bf
 +		_flashlightPos[axis] = _dynamicFlashlight ? (float)(_eye[axis] - _up[axis] * 1.5 + _forward[axis] * 1.0)
 +			: (float)(_eye[axis] + _right[axis] * 4.0 - _up[axis] * 4.0 + _forward[axis] * 2.0);
 +	}
++	// A chain of explosions settled at once (setting "Instant chain explosions"): its fireballs
++	// showing now, and the tiles its ripple hasn't passed over yet, as they were (see
++	// FirstPersonChains.cpp).
++	_chainHeld = FirstPerson::chainHeldTiles(_save);
++	FirstPerson::chainFireballs(_save, _chainFireballs);
 +	// What the world looks like this frame: the tiles, the ground beyond the map (chosen once),
 +	// the palette colours for the time of day, and the particles moved on.
 +	snapshotTiles();
@@ -43422,10 +44100,10 @@ index 000000000..8e3e499bf
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..489a0a105
+index 000000000..1b28bfff4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1329 @@
+@@ -0,0 +1,1341 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -43491,6 +44169,7 @@ index 000000000..489a0a105
 +#include <vector>
 +#include "../Battlescape/Position.h"
 +#include "../Engine/InteractiveSurface.h"
++#include "FirstPersonChains.h"
 +#include "FirstPersonParticles.h"
 +#include "FirstPersonVoxelModel.h"
 +
@@ -44082,6 +44761,10 @@ index 000000000..489a0a105
 +	void startWatchingTile(int index, Tile *tile);
 +	/// One tile's snapshot: models, animation, light, what has been seen.
 +	void snapshotTile(int index, Tile *tile, bool trackWalls);
++	/// A tile's part as the view shows it: as it was before a chain of explosions while the chain's ripple hasn't passed over it.
++	const MapData *shownPart(int index, Tile *tile, int part) const;
++	/// A tile's fire as the view shows it: as it was before a chain of explosions while the chain's ripple hasn't passed over it.
++	int shownFire(int index, const Tile *tile) const;
 +	/// Notes the light sources and UFO machinery on a tile near the camera.
 +	void noteLightsAndDevices(const Tile *tile, const TileView &tileView);
 +	/// Keeps only the lights nearest the camera.
@@ -44438,6 +45121,9 @@ index 000000000..489a0a105
 +	std::vector<float> _glowDepth, _glowDepthScratch;  // the same for the glow's distance (summed, weighted by the glow): how far away the light is
 +	std::vector<float> _glowHue, _glowHueScratch;      // the shining pixels' colour, red, green, blue and their weight per cell of a grid half as fine, blurred: the glow's own colour (see drawLightHalos)
 +	std::set<const Explosion*> _seenExplosions;        // explosions already seen (each spawns its particles once)
++	FirstPerson::ChainHeldTiles _chainHeld;            // this frame: the tiles a chain of explosions' ripple hasn't passed over yet, as they were (setting "Instant chain explosions")
++	std::vector<FirstPerson::ChainFireball> _chainFireballs; // this frame: the chain's fireballs showing
++	Uint32 _chainFireballsSeen = 0;                    // the last of its fireball sprites seen (each spawns its particles once)
 +
 +	/// Is there open sky above this point?
 +	bool openSky(float x, float y, float z) const;
@@ -44449,6 +45135,8 @@ index 000000000..489a0a105
 +	void spawnBattleEffects(float elapsedSeconds);
 +	/// Spawns fire, embers, smoke and sparks for new explosions.
 +	void spawnExplosionEffects();
++	/// What one new explosion sprite throws out: the shake, and a big one's scorch, flash, embers and smoke, a small one's sparks.
++	void spawnBlastEffects(const float centre[3], bool big, bool miss);
 +	/// Spawns flames and smoke from burning and smoky tiles near the camera.
 +	void spawnTileFireAndSmoke(float elapsedSeconds);
 +	/// Spawns flames on burning units in sight.
@@ -44544,6 +45232,8 @@ index 000000000..489a0a105
 +	void advanceShot(Projectile *projectile);
 +	/// Draws the flying projectile (or thrown item) and the explosions.
 +	void drawProjectilesAndExplosions();
++	/// Draws the fireballs of a chain of explosions rippling through (setting "Instant chain explosions").
++	void drawChainFireballs();
 +	/// The voxel model of an item's kind, made from its inventory picture the first time.
 +	const ItemModel &itemModel(BattleItem *item);
 +	/// Draws a thrown item in flight as its voxel model, tumbling (at a voxel, flying from another); false if it has none.
@@ -44757,10 +45447,10 @@ index 000000000..489a0a105
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewEffects.cpp b/src/FirstPerson/FirstPersonViewEffects.cpp
 new file mode 100644
-index 000000000..331b006be
+index 000000000..2d6da7e78
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewEffects.cpp
-@@ -0,0 +1,1078 @@
+@@ -0,0 +1,1102 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -44970,21 +45660,12 @@ index 000000000..331b006be
 +
 +/**
 + * Reacts to the explosions that appeared on the map since the last frame (each one only
-+ * once). The camera shakes if one is close. A big one (a grenade, a rocket, a blown-up tile)
-+ * blackens the ground around it and throws out a flash, embers and (with Modern smoke) puffs of
-+ * smoke; a small one (a bullet's hit, a blow) throws a few sparks, but not a blow or psi attack
-+ * that missed (a player, GitHub issue #60: "MELEE swing should only emit spark particles on
-+ * successful hit"; Explosion::isMiss), whose animation still plays as on the map.
-+ *
-+ * The particles are thrown with FirstPersonParticles::burst, whose arguments are, in order:
-+ * where, how many, kind, group, the colours and how many of them, the slowest and fastest
-+ * speed (voxels per second), the upward bias of the directions, gravity (voxels per second
-+ * squared, negative rises), drag (share of the speed lost per second), the shortest and
-+ * longest life (seconds), and the size (pixels at one tile's distance).
++ * once), and to the fireballs of a chain of explosions settled at once that started since
++ * (setting "Instant chain explosions": each sprite as a blown-up tile's, see
++ * FirstPersonChains.cpp): see spawnBlastEffects.
 + */
 +void FirstPersonView::spawnExplosionEffects()
 +{
-+	typedef FirstPersonParticles P; // short for the particle system: its kinds (P::GLOW...) and groups (P::EFFECT...)
 +	// The explosions on the map this frame; next frame, these count as already seen.
 +	std::set<const Explosion*> currentExplosions;
 +	if (_map)
@@ -44996,53 +45677,85 @@ index 000000000..331b006be
 +			{
 +				continue;
 +			}
-+			// A new explosion: where it is (in voxels), and how close to the eye. Closeness is 1
-+			// at the eye and falls to 0 at 260 voxels (about 16 tiles) for a big one, 90 voxels
-+			// for a small one; within that reach the camera shakes, harder the closer it is.
 +			const Position position = explosion->getPosition();
 +			const float centre[3] = { (float)position.x, (float)position.y, (float)position.z };
-+			const float dx = centre[0] - (float)_eye[0], dy = centre[1] - (float)_eye[1], dz = centre[2] - (float)_eye[2]; // from the eye
-+			const float closeness = 1.0f - std::sqrt(dx * dx + dy * dy + dz * dz) / (explosion->isBig() ? 260.0f : 90.0f);
-+			if (closeness > 0.0f)
-+			{
-+				addShake(closeness * (explosion->isBig() ? 3.0f : 1.0f));
-+			}
-+			if (explosion->isBig())
-+			{
-+				// The ground around it is blackened: a scorch of 14 voxels' radius on top of its
-+				// level's floor, if it went off near the floor (up to 60 scorches are kept).
-+				const float floorZ = std::floor(centre[2] / 24.0f) * 24.0f + GroundTop;
-+				if (centre[2] - floorZ < 18.0f && _scorches.size() < 60)
-+				{
-+					_scorches.push_back({ { centre[0], centre[1], floorZ }, 14.0f });
-+				}
-+				const Uint8 smokeColors[2] = { _colors.smoke, shadeColor(_colors.smoke, 3) };
-+				// The flash: a few big blobs in the two hottest fire colours, barely moving and
-+				// gone within a fifth of a second (not with the setting "Muzzle flashes" off).
-+				if (Options::fpsMuzzleFlash)
-+				{
-+					_particles.burst(centre, 18, P::GLOW, P::EFFECT, _colors.fire, 2, 10, 40, 0, 0, 3, 0.08f, 0.2f, 6);
-+				}
-+				// Embers in all four fire colours, flung out fast (mostly upwards), falling back
-+				// and glowing for a second or so.
-+				_particles.burst(centre, 60, P::GLOW, P::EFFECT, _colors.fire, 4, 40, 140, 0.5f, 150, 0.6f, 0.6f, 1.5f, 2);
-+				// Big puffs of smoke in two greys, rising slowly and hanging for a few seconds: with
-+				// the setting "Smoke" on Modern only (Original shows the game's own smoke that the
-+				// explosion leaves on the tiles, and nothing of ours, as for burning tiles).
-+				if (FirstPerson::smokeMode() == 2)
-+				{
-+					_particles.burst(centre, 26, P::LIT, P::EFFECT, smokeColors, 2, 6, 24, 0.7f, -12, 0.8f, 2.0f, 3.5f, 5);
-+				}
-+			}
-+			else if (!explosion->isMiss())
-+			{
-+				// A small explosion (a hit): a few sparks, falling and gone within half a second.
-+				const Uint8 sparkColors[2] = { _colors.spark, _colors.fire[1] };
-+				_particles.burst(centre, 8, P::GLOW, P::EFFECT, sparkColors, 2, 20, 60, 0.3f, 120, 1.0f, 0.15f, 0.4f, 2);
-+			}
++			spawnBlastEffects(centre, explosion->isBig(), explosion->isMiss());
 +		}
 +	}
 +	_seenExplosions.swap(currentExplosions);
++	// A chain's fireball sprites come in the order they start: those after the last one seen are new.
++	for (const FirstPerson::ChainFireball &fireball : _chainFireballs)
++	{
++		if (fireball.serial > _chainFireballsSeen)
++		{
++			const float centre[3] = { (float)fireball.position.x, (float)fireball.position.y, (float)fireball.position.z };
++			spawnBlastEffects(centre, true, false);
++			_chainFireballsSeen = fireball.serial;
++		}
++	}
++}
++
++/**
++ * What one new explosion sprite throws out. The camera shakes if it is close. A big one (a
++ * grenade, a rocket, a blown-up tile) blackens the ground around it and throws out a flash,
++ * embers and (with Modern smoke) puffs of smoke; a small one (a bullet's hit, a blow) throws a few
++ * sparks, but not a blow or psi attack that missed (a player, GitHub issue #60: "MELEE swing should
++ * only emit spark particles on successful hit"; Explosion::isMiss), whose animation still plays as
++ * on the map.
++ *
++ * The particles are thrown with FirstPersonParticles::burst, whose arguments are, in order:
++ * where, how many, kind, group, the colours and how many of them, the slowest and fastest
++ * speed (voxels per second), the upward bias of the directions, gravity (voxels per second
++ * squared, negative rises), drag (share of the speed lost per second), the shortest and
++ * longest life (seconds), and the size (pixels at one tile's distance).
++ * @param centre Where it is, in voxels.
++ * @param big A big one (a blast)?
++ * @param miss The animation of a blow or psi attack that missed?
++ */
++void FirstPersonView::spawnBlastEffects(const float centre[3], bool big, bool miss)
++{
++	typedef FirstPersonParticles P; // short for the particle system: its kinds (P::GLOW...) and groups (P::EFFECT...)
++	// How close to the eye: 1 at the eye, falling to 0 at 260 voxels (about 16 tiles) for a big
++	// one, 90 voxels for a small one; within that reach the camera shakes, harder the closer it is.
++	const float dx = centre[0] - (float)_eye[0], dy = centre[1] - (float)_eye[1], dz = centre[2] - (float)_eye[2]; // from the eye
++	const float closeness = 1.0f - std::sqrt(dx * dx + dy * dy + dz * dz) / (big ? 260.0f : 90.0f);
++	if (closeness > 0.0f)
++	{
++		addShake(closeness * (big ? 3.0f : 1.0f));
++	}
++	if (big)
++	{
++		// The ground around it is blackened: a scorch of 14 voxels' radius on top of its
++		// level's floor, if it went off near the floor (up to 60 scorches are kept).
++		const float floorZ = std::floor(centre[2] / 24.0f) * 24.0f + GroundTop;
++		if (centre[2] - floorZ < 18.0f && _scorches.size() < 60)
++		{
++			_scorches.push_back({ { centre[0], centre[1], floorZ }, 14.0f });
++		}
++		const Uint8 smokeColors[2] = { _colors.smoke, shadeColor(_colors.smoke, 3) };
++		// The flash: a few big blobs in the two hottest fire colours, barely moving and
++		// gone within a fifth of a second (not with the setting "Muzzle flashes" off).
++		if (Options::fpsMuzzleFlash)
++		{
++			_particles.burst(centre, 18, P::GLOW, P::EFFECT, _colors.fire, 2, 10, 40, 0, 0, 3, 0.08f, 0.2f, 6);
++		}
++		// Embers in all four fire colours, flung out fast (mostly upwards), falling back
++		// and glowing for a second or so.
++		_particles.burst(centre, 60, P::GLOW, P::EFFECT, _colors.fire, 4, 40, 140, 0.5f, 150, 0.6f, 0.6f, 1.5f, 2);
++		// Big puffs of smoke in two greys, rising slowly and hanging for a few seconds: with
++		// the setting "Smoke" on Modern only (Original shows the game's own smoke that the
++		// explosion leaves on the tiles, and nothing of ours, as for burning tiles).
++		if (FirstPerson::smokeMode() == 2)
++		{
++			_particles.burst(centre, 26, P::LIT, P::EFFECT, smokeColors, 2, 6, 24, 0.7f, -12, 0.8f, 2.0f, 3.5f, 5);
++		}
++	}
++	else if (!miss)
++	{
++		// A small explosion (a hit): a few sparks, falling and gone within half a second.
++		const Uint8 sparkColors[2] = { _colors.spark, _colors.fire[1] };
++		_particles.burst(centre, 8, P::GLOW, P::EFFECT, sparkColors, 2, 20, 60, 0.3f, 120, 1.0f, 0.15f, 0.4f, 2);
++	}
 +}
 +
 +/**
@@ -45059,7 +45772,7 @@ index 000000000..331b006be
 +	for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
 +	{
 +		Tile *tile = _save->getTile(tileIndex);
-+		if ((!tile->getFire() && !tile->getSmoke()) || !_tileViews[tileIndex].discovered)
++		if ((!shownFire(tileIndex, tile) && !tile->getSmoke()) || !_tileViews[tileIndex].discovered)
 +		{
 +			continue;
 +		}
@@ -45073,8 +45786,9 @@ index 000000000..331b006be
 +			continue;
 +		}
 +		// Fire: about ten flames a second, rising fast from somewhere on the tile and glowing
-+		// for a second or so in the fire colours.
-+		if (tile->getFire() && _particles.random() < 10.0f * elapsedSeconds)
++		// for a second or so in the fire colours (a chain of explosions' fire once its ripple has
++		// passed over the tile: see shownFire).
++		if (shownFire(tileIndex, tile) && _particles.random() < 10.0f * elapsedSeconds)
 +		{
 +			P::Particle flame;
 +			flame.pos[0] = centreX + _particles.random(-6, 6);
@@ -49931,10 +50645,10 @@ index 000000000..837116e93
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShots.cpp b/src/FirstPerson/FirstPersonViewShots.cpp
 new file mode 100644
-index 000000000..17ff3d48d
+index 000000000..b8a8a8c17
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShots.cpp
-@@ -0,0 +1,2152 @@
+@@ -0,0 +1,2179 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -50372,6 +51086,33 @@ index 000000000..17ff3d48d
 +		{
 +			drawSpriteBlend(sprite, nextSprite, blend, 15, explosion->isHit() ? 25 : 15, world, 12.0, 0);
 +		}
++	}
++	drawChainFireballs();
++}
++
++/**
++ * Draws the fireballs of a chain of explosions settled at once rippling through it (setting
++ * "Instant chain explosions", see FirstPersonChains.cpp): each sprite a big explosion's, as the
++ * map's own blasts are drawn (above), each frame dissolving into the next over the game's frame
++ * time.
++ */
++void FirstPersonView::drawChainFireballs()
++{
++	if (_chainFireballs.empty())
++	{
++		return;
++	}
++	SurfaceSet *spriteSet = _game->getMod()->getSurfaceSet("X1.PCK");
++	for (const FirstPerson::ChainFireball &fireball : _chainFireballs)
++	{
++		const Surface *sprite = fireball.frame >= 0 && fireball.frame < (int)spriteSet->getTotalFrames() ? spriteSet->getFrame(fireball.frame) : nullptr;
++		if (!sprite)
++		{
++			continue;
++		}
++		const Surface *nextSprite = fireball.frame + 1 <= fireball.lastFrame && fireball.frame + 1 < (int)spriteSet->getTotalFrames() ? spriteSet->getFrame(fireball.frame + 1) : nullptr;
++		const double world[3] = { (double)fireball.position.x, (double)fireball.position.y, (double)fireball.position.z };
++		drawSpriteBlend(sprite, nextSprite, fireball.blend, sprite->getWidth() / 2, sprite->getHeight() / 2, world, 24.0, 0);
 +	}
 +}
 +
@@ -52089,10 +52830,10 @@ index 000000000..17ff3d48d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..b545e3f25
+index 000000000..b2e5e2aab
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,2948 @@
+@@ -0,0 +1,2955 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -52996,16 +53737,22 @@ index 000000000..b545e3f25
 +		// and in sight (any unit in debug mode). And one down a moment ago with "Quick deaths",
 +		// still falling (on its own, see FirstPerson::quickFallPhase): drawn in that fall. And one
 +		// gone down in the air, coming down to the ground (FirstPerson::airFallHeight): drawn
-+		// falling, lying once its own fall frames are over.
-+		const bool quickFall = unit->isOut() && FirstPerson::quickFallPhase(unit) >= 0;
++		// falling, lying once its own fall frames are over. And one a chain of explosions settled
++		// at once took down (setting "Instant chain explosions"): standing as it was until the
++		// chain's ripple has passed, the dead falling after it (FirstPerson::chainHeldStanding).
++		const int chainFacing = unit->isOut() ? FirstPerson::chainHeldStanding(_save, unit) : -1;
++		const bool chainHeld = chainFacing >= 0;
++		const bool quickFall = !chainHeld && unit->isOut() && FirstPerson::quickFallPhase(unit) >= 0;
 +		Position airFallTile;
 +		double airFallFeetZ = 0.0;
-+		const bool airFall = FirstPerson::airFallHeight(unit, airFallTile, airFallFeetZ);
++		const bool airFall = !chainHeld && FirstPerson::airFallHeight(unit, airFallTile, airFallFeetZ);
 +		const bool fallingDown = quickFall || (airFall && unit->isOut());
-+		if ((unit->isOut() && !fallingDown) || unit == _cameraUnit || (!debug && !unit->getVisible()))
++		if ((unit->isOut() && !fallingDown && !chainHeld) || unit == _cameraUnit || (!debug && !unit->getVisible() && !chainHeld))
 +		{
 +			continue;
 +		}
++		// (a unit held standing is up, as it was, for all that's drawn of it here)
++		const FirstPerson::ChainStandingPose chainPose(chainHeld ? unit : nullptr, chainFacing);
 +		const int unitSize = unit->getArmor()->getSize(); // tiles across: 1, or 2 for big units
 +		// Where the unit's feet are, in voxels: the middle of its tiles, on the floor (raised
 +		// by the tile's terrain level, such as rubble or a slope).
@@ -53993,9 +54740,10 @@ index 000000000..b545e3f25
 +	const int tileCount = _save->getMapSizeXYZ();
 +	for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
 +	{
-+		// Only burning tiles (a burning tile has smoke too) that have been seen.
++		// Only burning tiles (a burning tile has smoke too) that have been seen (a chain of
++		// explosions' fire once its ripple has passed over the tile: see shownFire).
 +		Tile *tile = _save->getTile(tileIndex);
-+		if (!tile->getSmoke() || !tile->getFire() || !_tileViews[tileIndex].discovered)
++		if (!tile->getSmoke() || !shownFire(tileIndex, tile) || !_tileViews[tileIndex].discovered)
 +		{
 +			continue;
 +		}
@@ -55043,10 +55791,10 @@ index 000000000..b545e3f25
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..53fd5e8c0
+index 000000000..9f3b9bb63
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,3763 @@
+@@ -0,0 +1,3794 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -58227,7 +58975,7 @@ index 000000000..53fd5e8c0
 +
 +	// A fire burnt out here: the ground is left blackened (a scorch mark of radius 10 voxels on
 +	// the floor's surface in the middle of the tile; at most 200 of them).
-+	const bool burning = tile->getFire() > 0;
++	const bool burning = shownFire(index, tile) > 0;
 +	if (_burningLastFrame[index] && !burning && _scorches.size() < 200)
 +	{
 +		const Position tilePos = tile->getPosition();
@@ -58238,9 +58986,10 @@ index 000000000..53fd5e8c0
 +
 +	// Something destroyed here since last frame (not a door opening): debris. A part counts as
 +	// destroyed when it vanished or turned into its destroyed version (the record's "die MCD").
++	// (A chain of explosions' wreckage, as its ripple passes over it: see shownPart.)
 +	for (int part = 0; part < 4; ++part)
 +	{
-+		const MapData *partBefore = _partsLastFrame[part][index], *partNow = tile->getMapData((TilePart)part);
++		const MapData *partBefore = _partsLastFrame[part][index], *partNow = shownPart(index, tile, part);
 +		_partsLastFrame[part][index] = partNow;
 +		if (!partBefore || partBefore == partNow || partBefore->isDoor() || partBefore->isUFODoor() || !partBefore->getDataset()) continue;
 +		const MapData *destroyedVersion = partBefore->getDieMCD() ? partBefore->getDataset()->getObject(partBefore->getDieMCD()) : nullptr;
@@ -58269,8 +59018,37 @@ index 000000000..53fd5e8c0
 +{
 +	_wallsLastFrame[0][index] = tile->getMapData(O_WESTWALL);
 +	_wallsLastFrame[1][index] = tile->getMapData(O_NORTHWALL);
-+	for (int part = 0; part < 4; ++part) _partsLastFrame[part][index] = tile->getMapData((TilePart)part);
-+	_burningLastFrame[index] = tile->getFire() > 0;
++	for (int part = 0; part < 4; ++part) _partsLastFrame[part][index] = shownPart(index, tile, part);
++	_burningLastFrame[index] = shownFire(index, tile) > 0;
++}
++
++/**
++ * A tile's part as the view shows it this frame: the game's, but while a chain of explosions
++ * settled at once (setting "Instant chain explosions") hasn't rippled over the tile yet, the part
++ * as it was before the chain (its wreckage comes as the fireball nearest to it grows over it, see
++ * FirstPersonChains.cpp).
++ * @param index The tile's index in the map.
++ * @param tile The tile.
++ * @param part The part (floor, west wall, north wall, object).
++ * @return The part shown, or null for none.
++ */
++const MapData *FirstPersonView::shownPart(int index, Tile *tile, int part) const
++{
++	const FirstPerson::ChainHeldTile *held = _chainHeld.at(index);
++	return held ? held->parts[part] : tile->getMapData((TilePart)part);
++}
++
++/**
++ * A tile's fire as the view shows it this frame: the game's, but as it was before a chain of
++ * explosions while the chain's ripple hasn't passed over the tile yet (see shownPart).
++ * @param index The tile's index in the map.
++ * @param tile The tile.
++ * @return The fire shown (the game's number of turns it burns; 0 none).
++ */
++int FirstPersonView::shownFire(int index, const Tile *tile) const
++{
++	const FirstPerson::ChainHeldTile *held = _chainHeld.at(index);
++	return held ? held->fire : tile->getFire();
 +}
 +
 +/**
@@ -58307,8 +59085,9 @@ index 000000000..53fd5e8c0
 +		tileView.part[part] = nullptr;
 +		tileView.next[part] = nullptr;
 +		// Nothing there, or the floor left out (the lift platform the camera rides through), or a
-+		// part the eye is inside (Doom IDCLIP).
-+		const MapData *mapData = tile->getMapData((TilePart)part);
++		// part the eye is inside (Doom IDCLIP). (A chain of explosions' ripple not over it yet: as it
++		// was, see shownPart.)
++		const MapData *mapData = shownPart(index, tile, part);
 +		if (!mapData || (part == O_FLOOR && (int)index == _hiddenFloor)
 +			|| (!_leftOutParts.empty() && std::find(_leftOutParts.begin(), _leftOutParts.end(), std::make_pair(index, part)) != _leftOutParts.end()))
 +		{
@@ -58477,7 +59256,7 @@ index 000000000..53fd5e8c0
 +	// Its smoke, once the tile has been seen (as the map shows smoke only there), and whether
 +	// it burns.
 +	tileView.smoke = tileView.discovered ? (Uint8)std::clamp(tile->getSmoke(), 0, 255) : 0;
-+	tileView.burning = tile->getFire() > 0;
++	tileView.burning = shownFire(index, tile) > 0;
 +}
 +
 +/**
@@ -62445,14 +63224,15 @@ index 2242d13f8..7fd17b1f2 100644
  	bool isManaBarEnabled() const { return _manaBattleUI; }
  	/// Is the mana trained as a primary skill (e.g. like firing accuracy)?
 diff --git a/src/OpenXcom.2010.vcxproj b/src/OpenXcom.2010.vcxproj
-index 99f24ce43..53de0c120 100644
+index 99f24ce43..5cbbda90b 100644
 --- a/src/OpenXcom.2010.vcxproj
 +++ b/src/OpenXcom.2010.vcxproj
-@@ -431,6 +431,31 @@
+@@ -431,6 +431,32 @@
      <ClCompile Include="Battlescape\DebriefingState.cpp" />
      <ClCompile Include="Battlescape\ExperienceOverviewState.cpp" />
      <ClCompile Include="Battlescape\Explosion.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonApi.cpp" />
++    <ClCompile Include="FirstPerson\FirstPersonChains.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonMode.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonModeCamera.cpp" />
 +    <ClCompile Include="FirstPerson\FirstPersonModeHud.cpp" />
@@ -62480,11 +63260,12 @@ index 99f24ce43..53de0c120 100644
      <ClCompile Include="Battlescape\ExplosionBState.cpp" />
      <ClCompile Include="Battlescape\ExtendedBattlescapeLinksState.cpp" />
      <ClCompile Include="Battlescape\ExtendedInventoryLinksState.cpp" />
-@@ -910,6 +935,18 @@
+@@ -910,6 +936,19 @@
      <ClInclude Include="Battlescape\DebriefingState.h" />
      <ClInclude Include="Battlescape\ExperienceOverviewState.h" />
      <ClInclude Include="Battlescape\Explosion.h" />
 +    <ClInclude Include="FirstPerson\FirstPersonApi.h" />
++    <ClInclude Include="FirstPerson\FirstPersonChains.h" />
 +    <ClInclude Include="FirstPerson\FirstPersonMode.h" />
 +    <ClInclude Include="FirstPerson\FirstPersonModeShared.h" />
 +    <ClInclude Include="FirstPerson\FirstPersonParticles.h" />
@@ -62500,14 +63281,17 @@ index 99f24ce43..53de0c120 100644
      <ClInclude Include="Battlescape\ExtendedBattlescapeLinksState.h" />
      <ClInclude Include="Battlescape\ExtendedInventoryLinksState.h" />
 diff --git a/src/OpenXcom.2010.vcxproj.filters b/src/OpenXcom.2010.vcxproj.filters
-index 92dbcdf0a..1f1f91f65 100644
+index 92dbcdf0a..61766d1a0 100644
 --- a/src/OpenXcom.2010.vcxproj.filters
 +++ b/src/OpenXcom.2010.vcxproj.filters
-@@ -329,6 +329,81 @@
+@@ -329,6 +329,84 @@
      <ClCompile Include="Battlescape\Explosion.cpp">
        <Filter>Battlescape</Filter>
      </ClCompile>
 +    <ClCompile Include="FirstPerson\FirstPersonApi.cpp">
++      <Filter>FirstPerson</Filter>
++    </ClCompile>
++    <ClCompile Include="FirstPerson\FirstPersonChains.cpp">
 +      <Filter>FirstPerson</Filter>
 +    </ClCompile>
 +    <ClCompile Include="FirstPerson\FirstPersonMode.cpp">
@@ -62585,11 +63369,14 @@ index 92dbcdf0a..1f1f91f65 100644
      <ClCompile Include="Geoscape\ItemsArrivingState.cpp">
        <Filter>Geoscape</Filter>
      </ClCompile>
-@@ -1571,6 +1646,42 @@
+@@ -1571,6 +1649,45 @@
      <ClInclude Include="Battlescape\Explosion.h">
        <Filter>Battlescape</Filter>
      </ClInclude>
 +    <ClInclude Include="FirstPerson\FirstPersonApi.h">
++      <Filter>FirstPerson</Filter>
++    </ClInclude>
++    <ClInclude Include="FirstPerson\FirstPersonChains.h">
 +      <Filter>FirstPerson</Filter>
 +    </ClInclude>
 +    <ClInclude Include="FirstPerson\FirstPersonMode.h">
@@ -62628,7 +63415,7 @@ index 92dbcdf0a..1f1f91f65 100644
      <ClInclude Include="Basescape\TransfersState.h">
        <Filter>Basescape</Filter>
      </ClInclude>
-@@ -2731,6 +2842,9 @@
+@@ -2731,6 +2848,9 @@
      <Filter Include="Battlescape">
        <UniqueIdentifier>{f7e493ce-c074-420c-8b38-40d81b2d0509}</UniqueIdentifier>
      </Filter>
