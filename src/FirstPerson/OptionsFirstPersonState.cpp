@@ -711,10 +711,11 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		{
 			*value = std::clamp(*value + direction, 0, 6);
 		}
-		// Pixel size: Auto (0), then 1 to 3.
+		// Pixel size (Auto (0), 1, 2, 3): round and round, past 3 back to Auto (the owner: "If you
+		// click to 3 you are stuck"), and the other way with the other button.
 		else if (value == &Options::fpsPixelSize)
 		{
-			*value = std::clamp(*value + direction, 0, 3);
+			*value = (std::clamp(*value, 0, 3) + direction + 4) % 4;
 		}
 		// Time units per level a flying soldier pays: 0 to 24.
 		else if (value == &Options::fpsFlightCost)
