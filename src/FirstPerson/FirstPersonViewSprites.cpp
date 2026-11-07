@@ -254,6 +254,9 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 	// keeps its colours under futuristic night vision; anything else solid (smoke more than
 	// half opaque) drawn over it takes that back (see _ownColours).
 	const Uint8 ownColours = draw.unit || draw.body || draw.pile ? 1 : 0;
+	// While the units are drawn with their outlines (see drawUnitOutlines): whose picture each pixel
+	// shows, an outlined unit's or not (0), and each row's first and last pixel of an outlined one.
+	Uint16 *const outlineOwner = _outlining ? _outlineOwner.data() : nullptr;
 	auto plot = [&](int pixelX, int pixelY, Uint8 color, float depth, int pixelOpacity) {
 		const int index = pixelY * width + pixelX;
 		float &depthHere = _depthBuffer[index];
@@ -294,6 +297,15 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 		_glowMask[index] = 0;
 		_unitVeil[index] = draw.unit ? UnitVeilMax : 255;
 		_ownColours[index] = ownColours;
+		if (outlineOwner)
+		{
+			outlineOwner[index] = draw.outline;
+			if (draw.outline)
+			{
+				_outlineRowLeft[pixelY] = std::min(_outlineRowLeft[pixelY], pixelX);
+				_outlineRowRight[pixelY] = std::max(_outlineRowRight[pixelY], pixelX);
+			}
+		}
 		const int patchX = pixelX - _pointerX + PointerReach, patchY = pixelY - _pointerY + PointerReach;
 		if (patchX >= 0 && patchY >= 0 && patchX <= 2 * PointerReach && patchY <= 2 * PointerReach)
 		{
@@ -864,8 +876,9 @@ void FirstPersonView::watchUnits()
  * Draws the visible units as billboards: the game's own unit sprites, standing where the unit
  * is, turned to show the side facing the camera. Walking units glide between tiles, and every
  * unit eases between the game's small steps; a hit unit flinches and flashes; each stands on a
- * soft shadow. Also notes where the numbered enemy markers go this frame (drawMarkers).
- * The unit being looked through is not drawn. Their pixels are noted as a unit's, so the
+ * soft shadow. Also notes where the numbered enemy markers go this frame (drawMarkers), and
+ * outlines their hitboxes (setting "Hitboxes"; with "Full sprite hitboxes", their pictures: see
+ * drawUnitOutlines). The unit being looked through is not drawn. Their pixels are noted as a unit's, so the
  * see-through smoke drawn later veils them only thinly (see _unitVeil).
  * Everything is worked out here, on the game's thread, and recorded (see DrawStep); then all of
  * it is drawn at once on all the view's threads (see replayDrawList).
@@ -890,6 +903,19 @@ void FirstPersonView::drawUnits()
 	const bool hitboxAimedOnly = Options::fpsHitboxes == 3;
 	const float hitboxOpacity = Options::fpsHitboxes == 2 || hitboxAimedOnly ? 1.0f
 		: Options::fpsHitboxes == 1 ? 0.5f + 0.5f * (float)std::cos((now % 1000) / 1000.0 * 2.0 * Pi) : 0.0f;
+	// With "Full sprite hitboxes" the hitbox is the picture: the same setting outlines that instead,
+	// a line round it (the owner: "the sprites should be then surrounded by red line to show where you
+	// can hit them"), noted while the units are drawn and drawn over them after (see drawUnitOutlines).
+	_outlining = hitboxOpacity > 0.05f && Options::fpsSpriteHitboxes;
+	_outlineColors.clear();
+	_outlineOpacity = hitboxOpacity;
+	if (_outlining)
+	{
+		const size_t pixels = (size_t)getWidth() * getHeight();
+		if (_outlineOwner.size() != pixels) _outlineOwner.assign(pixels, 0);
+		_outlineRowLeft.assign(getHeight(), getWidth());
+		_outlineRowRight.assign(getHeight(), -1);
+	}
 
 	// The units are recorded first (their shadows, sprites and hitboxes, in order), then drawn
 	// on all the view's threads at once (see replayDrawList). Each unit's frame is composed in
@@ -1069,8 +1095,17 @@ void FirstPersonView::drawUnits()
 		}
 		step.sprite.unit = unit;
 		useSmoothVersion(step.sprite);
+		// With full sprite hitboxes, its picture outlined where the box would be drawn; not one so close
+		// that it fades out, dithered (drawSprite: nearer than 10 voxels), where the holes would be outlined.
+		double screenX, screenY, screenDepth;
+		if (_outlining && (!hitboxAimedOnly || unit == _aimedUnit) && !fallingDown && _outlineColors.size() < 0xFFFF
+			&& projectToScreen(step.sprite.world, screenX, screenY, screenDepth) && screenDepth >= 10.0)
+		{
+			_outlineColors.push_back(_colors.hitbox[unit->getFaction() == FACTION_PLAYER ? 0 : unit->getFaction() == FACTION_HOSTILE ? 1 : 2]);
+			step.sprite.outline = (Uint16)_outlineColors.size();
+		}
 		_drawList.push_back(step);
-		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit) && !Options::fpsSpriteHitboxes && !fallingDown) // (with full sprite hitboxes the picture is the hitbox; one falling is down)
+		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit) && !Options::fpsSpriteHitboxes && !fallingDown) // (with full sprite hitboxes the picture is the hitbox, outlined above; one falling is down)
 		{
 			recordHitbox(unit, feet, hitboxOpacity);
 		}
@@ -1084,8 +1119,99 @@ void FirstPersonView::drawUnits()
 			_facingSpots.push_back(spot);
 		}
 	}
-	// Then draw them all.
+	// Then draw them all, and with full sprite hitboxes their pictures' outlines over them.
 	replayDrawList();
+	if (_outlining)
+	{
+		drawUnitOutlines();
+	}
+}
+
+/**
+ * Setting "Hitboxes" with "Full sprite hitboxes", where the hitbox is the unit's picture: outlines
+ * each picture noted while the units were drawn (see SpriteDraw::outline), a line a pixel wide just
+ * outside its edge in the colour of its side, as the boxes are drawn. A pixel is outlined when it
+ * isn't that unit's, borders one of its pixels (the eight round it) and what shows there is behind
+ * the unit (farther than that pixel of it): the picture's silhouette against what's behind it, so
+ * a wall or a unit in front of part of it is never outlined (nor the floor in front of its feet).
+ * A pixel bordering more than one outlined picture it's behind takes the nearest's colour. Like the
+ * boxes' lines it fades in and out with Blink (dithered), glows with "Glowing outlines", and
+ * whatever is drawn after the units (fire, smoke, shots) covers it. Then the notes are cleared.
+ * Only the rows the outlined pictures cover are looked at, a pixel either side of each row's.
+ */
+void FirstPersonView::drawUnitOutlines()
+{
+	if (!_outlineColors.empty())
+	{
+		runOnAllThreads(&FirstPersonView::outlineBands);
+	}
+	// Leave the notes all 0 for the next frame: only the rows' spans were written.
+	const int width = getWidth();
+	for (int row = 0; row < (int)_outlineRowLeft.size(); ++row)
+	{
+		if (_outlineRowLeft[row] <= _outlineRowRight[row])
+		{
+			std::fill(_outlineOwner.begin() + row * width + _outlineRowLeft[row], _outlineOwner.begin() + row * width + _outlineRowRight[row] + 1, (Uint16)0);
+		}
+	}
+	_outlining = false;
+}
+
+/**
+ * The outlines round the units' pictures (see drawUnitOutlines) over bands of the view's rows,
+ * taken one at a time from the shared counter until none are left: a job for all the view's
+ * threads (see runOnAllThreads). Each pixel is worked out from the notes and the depth buffer
+ * alone, which nothing here changes, so the bands don't depend on each other.
+ */
+void FirstPersonView::outlineBands()
+{
+	const int width = getWidth(), height = getHeight();
+	const int bandCount = (height + BandRows - 1) / BandRows;
+	const Uint8 glows = Options::fpsGlowingOutlines ? 1 : 0; // (setting "Glowing outlines")
+	for (int band = _rayWorkers.nextPiece++; band < bandCount; band = _rayWorkers.nextPiece++)
+	{
+		const int bandBottom = std::min(height, band * BandRows + BandRows);
+		for (int pixelY = band * BandRows; pixelY < bandBottom; ++pixelY)
+		{
+			// The pixels that may border an outlined picture: a pixel either side of the span of this
+			// row's, the row above's and the row below's.
+			int left = width, right = -1;
+			for (int row = std::max(0, pixelY - 1); row <= std::min(height - 1, pixelY + 1); ++row)
+			{
+				left = std::min(left, _outlineRowLeft[row] - 1);
+				right = std::max(right, _outlineRowRight[row] + 1);
+			}
+			left = std::max(0, left);
+			right = std::min(width - 1, right);
+			for (int pixelX = left; pixelX <= right; ++pixelX)
+			{
+				const int index = pixelY * width + pixelX;
+				const Uint16 here = _outlineOwner[index];
+				// The nearest outlined picture beside it that it's behind, if any.
+				Uint16 outline = 0;
+				float nearest = _depthBuffer[index];
+				for (int offsetY = -1; offsetY <= 1; ++offsetY)
+				{
+					const int y = pixelY + offsetY;
+					if (y < 0 || y >= height) continue;
+					for (int offsetX = -1; offsetX <= 1; ++offsetX)
+					{
+						const int x = pixelX + offsetX;
+						if (x < 0 || x >= width) continue;
+						const Uint16 owner = _outlineOwner[y * width + x];
+						if (owner && owner != here && _depthBuffer[y * width + x] < nearest)
+						{
+							outline = owner;
+							nearest = _depthBuffer[y * width + x];
+						}
+					}
+				}
+				if (!outline || (_outlineOpacity < 1.0f && dither(pixelX, pixelY) >= _outlineOpacity)) continue;
+				*getRaw(pixelX, pixelY) = _outlineColors[outline - 1];
+				_glowMask[index] = glows;
+			}
+		}
+	}
 }
 
 /**

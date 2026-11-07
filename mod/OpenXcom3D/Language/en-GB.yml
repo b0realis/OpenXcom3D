@@ -391,7 +391,7 @@ en-GB:
   STR_FPS_CONFIRM_FIRE_DESC: "The first click marks the target and shows the path; click the same spot again to fire. Right button: never mind."
   STR_FPS_CONFIRM_FIRE_HINT: "Click again to fire"
   STR_FPS_HITBOXES: "Hitboxes"
-  STR_FPS_HITBOXES_DESC: "Outlines where shots hit units: the one under the crosshair (Aimed at), all in sight blinking, or always."
+  STR_FPS_HITBOXES_DESC: "Outlines where shots hit units: the one under the crosshair (Aimed at), all in sight blinking, or always. Full sprite hitboxes: the sprite."
   STR_FPS_GLOWING_OUTLINES: "Glowing outlines"
   STR_FPS_GLOWING_OUTLINES_DESC: "YES: the hitboxes and the path of a throw glow. NO: plain lines."
   STR_FPS_HITBOXES_OFF: "Off"

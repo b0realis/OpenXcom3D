@@ -852,6 +852,7 @@ private:
 		const Tile *pile = nullptr;       // the floor tile whose pile it pictures (a big corpse's first), if any: it can be pointed at
 		double lyingSlope = 0.0;          // a lying sprite's floor rising towards the camera: voxels up for each voxel along (see lyingRise)
 		double floorCut = NoFloorCut;     // no part of a standing sprite below this height, in voxels: the underside of the floor a unit stands on (see floorUnderside)
+		Uint16 outline = 0;               // a unit's picture outlined this frame (see drawUnitOutlines): its number in _outlineColors + 1; 0 none
 	};
 	/// Draws a sprite standing in the world, depth-tested (or see-through, laid over what's there):
 	/// all of it, or only the screen rows from bandTop up to bandBottom.
@@ -908,6 +909,18 @@ private:
 	void recordFlareShadow(const BattleUnit *unit, const double feet[3], double radius);
 	/// Records the outline of the voxels the game counts as a unit when it's hit (setting "Hitboxes"), to be drawn with the units.
 	void recordHitbox(const BattleUnit *unit, const double feet[3], float opacity);
+	/// With "Full sprite hitboxes" the hitbox is the unit's picture (setting "Hitboxes"): while the units
+	/// are drawn, which outlined unit's picture shows on each pixel (its SpriteDraw::outline; 0 none) and
+	/// each row's first and last such pixel; then a line round each picture (see drawUnitOutlines).
+	bool _outlining = false;                 // the units are being drawn with their outlines noted
+	std::vector<Uint16> _outlineOwner;       // per pixel (kept all 0 between frames: only the rows' spans are written, and cleared after)
+	std::vector<int> _outlineRowLeft, _outlineRowRight; // per row, the first and last pixel an outlined picture shows on (none: the width, -1)
+	std::vector<Uint8> _outlineColors;       // this frame's outlined units' colours, their sides'
+	float _outlineOpacity = 1.0f;            // how much of the outlines shows (fading in and out with Blink)
+	/// Draws the outlines round the units' pictures noted while they were drawn, and clears the notes.
+	void drawUnitOutlines();
+	/// The outlines over bands of rows taken from the shared counter (a job for runOnAllThreads).
+	void outlineBands();
 	/// Darkens the ground in a soft disc (all of it, or only the screen rows from bandTop up to bandBottom).
 	void drawGroundShade(const double centre[3], double radius, int steps, float density, int bandTop = 0, int bandBottom = 1 << 30,
 		const double *away = nullptr, double length = 0.0);
