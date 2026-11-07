@@ -351,7 +351,7 @@ float FirstPersonView::flareLight(const float point[3], const float normal[3], b
 void FirstPersonView::drawFlares()
 {
 	const int width = getWidth(), height = getHeight();
-	const double focalLength = (width / 2.0) / _halfFovTangent; // pixels per voxel at one voxel's depth
+	const double focalLength = focalPixels(); // pixels per voxel at one voxel's depth
 	for (const auto &flare : _flares)
 	{
 		// Where the flare is on the view; not drawn behind the camera or right in front of it.

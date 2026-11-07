@@ -83,6 +83,44 @@ class Projectile;
 class RuleItem;
 class BattleItem;
 
+/// VR's weapon in hand (see FirstPersonView::setHeldModel): voxels across for each of the desktop weapon's own units. Held
+/// where the desktop draws it, its muzzle sits about 12 voxels (1.2 m) out, as far as the desktop's shots start from the
+/// eye (see beginShot), and its near end about a third of a metre in front of the eye; in a hand, a rifle is about 0.7 m.
+const double VrHeldScale = 1.55;
+
+/// VR: one face of the weapon (or item) in hand, drawn in each eye as part of a 3D object (see
+/// FirstPersonView::setHeldModel): its corners in the hand's space (x right, y down, z ahead, in the desktop weapon's own
+/// units: see VrHeldScale), its outward normal there (a unit vector) and its colour, already shaded as the desktop shades it.
+struct FirstPersonHeldQuad { float corners[4][3]; float normal[3]; Uint8 color; };
+/// VR: a muzzle flash of the weapon in hand: its middle and radius in the hand's space, and its look as the desktop's
+/// (FirstPersonMode::MuzzleFlash): its colours (core, middle, rim), its rays and how far they've turned (radians).
+struct FirstPersonHeldFlash { float middle[3]; float radius; Uint8 core, mid, rim; int rays; float spike, sharpness, turn; };
+/// VR: the weapon (or item) in hand for the eyes this frame: its faces and muzzle flashes, and where the muzzles of the
+/// guns in the hands are (the first the weapon's, the second dual wield's other gun), all in the hand's space.
+struct FirstPersonHeldModel
+{
+	std::vector<FirstPersonHeldQuad> quads;
+	std::vector<FirstPersonHeldFlash> flashes;
+	float muzzles[2][3] = {};
+	bool muzzleShown[2] = { false, false };
+};
+/// VR: where the hand's space is in the world: its origin (voxels) and its right, down and ahead (unit vectors, true
+/// proportions). A right hand's (the weapon held in it: its grip at the origin, its barrel ahead), or with none the head's,
+/// so the weapon is where the desktop's "Weapon in hand" puts it (the hand's space then the desktop weapon's camera space),
+/// pulled in towards the head's middle near a wall (pullIn; a hand's is slid back already, see FirstPersonMode::
+/// vrUpdateRifle).
+struct FirstPersonHeldFrame { double origin[3]; double right[3], down[3], ahead[3]; bool pullIn; };
+
+/// One eye of a stereo frame (VR, see FirstPersonView::renderEyes): where it is and which way it looks in the world, and
+/// its field of view, off centre as a headset's are (OpenXR's four angles, as their tangents).
+struct FirstPersonEyeCamera
+{
+	double eye[3];                       // the eye, in voxels
+	double forward[3], right[3], up[3];  // its axes: unit vectors in true proportions (see ZScale), x east, y south, z up
+	double tangentLeft, tangentRight;    // the field of view's left and right edges: the tangents of their angles (left negative)
+	double tangentUp, tangentDown;       // its top and bottom edges (down negative)
+};
+
 /**
  * First-person view of the battlescape.
  * Software ray caster over the LOFT voxel model (the same 16x16x24 voxels per tile
@@ -336,6 +374,49 @@ public:
 	void rayDirectionThrough(int pixelX, int pixelY, double out[3]) const;
 
 	// =====================================================================================
+	// VR: the view for two eyes (FirstPersonViewStereo.cpp)
+	// =====================================================================================
+
+	/// One eye of a stereo frame (see renderEyes and FirstPersonEyeCamera).
+	typedef FirstPersonEyeCamera EyeCamera;
+	/// VR: the weapon in hand's model and frame (see FirstPersonHeldModel, FirstPersonHeldFrame).
+	typedef FirstPersonHeldModel HeldModel;
+	typedef FirstPersonHeldFrame HeldFrame;
+	/// An eye's picture from renderEyes (see eyePicture): 8-bit in the view's palette, its size and row pitch; the field
+	/// of view it shows (the one asked for, widened on one axis where the picture's shape needs that for square pixels);
+	/// and where the aim point given to renderEyes is on it.
+	struct EyePicture
+	{
+		Uint8 *pixels = nullptr;                 // row by row (null before the first renderEyes)
+		int width = 0, height = 0, pitch = 0;    // its size in pixels, and bytes a row
+		double tangentLeft = 0.0, tangentRight = 0.0, tangentUp = 0.0, tangentDown = 0.0; // the field of view it shows
+		double aimX = 0.0, aimY = 0.0;           // the aim point on it, pixels
+		bool aimShown = false;                   // ...if that's in front of the eye
+		const float *depth = nullptr;            // its depth buffer: each pixel's distance along the view axis (voxels across, true proportions; the sky +infinity), width floats a row
+	};
+	/// Draws the view for two eyes (VR mode): the frame's shared work once, with the view's own camera (the head's
+	/// middle: the tile snapshot, the colours, the particles moved on, the shots followed), then each eye's own picture
+	/// (rays, units, smoke, glow, the wash), both of the same moment, with the same sparks and static. Each picture is
+	/// width x height pixels; the aim point (in voxels, or null) is where the crosshair is drawn into each. Last in each,
+	/// the weapon in hand (see setHeldModel) with the hand's space where the frame given puts it (null: none drawn).
+	void renderEyes(const EyeCamera eyes[2], int width, int height, const double aimPoint[3], const HeldFrame *hand);
+	/// An eye's picture from the last renderEyes: 0 the left eye, 1 the right.
+	EyePicture eyePicture(int eye);
+	/// VR: the camera looks along a head's own axes (unit vectors in true proportions, x east, y south, z up) instead of
+	/// by its yaw and pitch, with no limit (straight up too) and no recoil kick; the yaw, pitch and tilt the rest of the
+	/// view reads (the units' pictures, the sounds) follow them. Null: back to the yaw and pitch.
+	void setHeadAxes(const double forward[3], const double right[3], const double up[3]);
+	/// VR: a head's tilt (radians), a tilt under VrLevelRollDegrees made level (right and up replaced; 0 returned).
+	static double levelSmallTilt(const double forward[3], double right[3], double up[3]);
+	/// VR mode's comfort (the study: whatever else moves the eye goes): nothing shakes the camera.
+	void setComfort(bool on) { _comfort = on; }
+	/// VR: the weapon (or item) in hand to draw in each eye (see renderEyes), in the hand's space; no faces: none drawn.
+	void setHeldModel(HeldModel model) { _heldModel = std::move(model); }
+	/// VR: the weapon's laser for the next renderEyes, from its muzzle to where it points (voxels), dimmed where the
+	/// soldier can't fire; none unless set again before each.
+	void setLaser(const double from[3], const double to[3], bool dimmed);
+
+	// =====================================================================================
 	// What to show
 	// =====================================================================================
 
@@ -484,6 +565,15 @@ private:
 	// The battle, the camera and the frame (FirstPersonView.cpp)
 	// =====================================================================================
 
+#ifdef __ANDROID__
+	// The Android build's frame probe (the headset's test reports read it; see reportFrameTime).
+	Uint32 _probeSince = 0;                             // when the probe's present stretch began (SDL ticks)
+	int _probeFrames = 0;                               // frames drawn in it
+	double _probeTotalMs = 0.0, _probeWorstMs = 0.0;    // their time together, and the slowest one's
+	/// Adds a frame's time to the probe, and every few seconds reports the stretch to the log.
+	void reportFrameTime(Uint64 drawStart);
+#endif
+
 	Game *_game;                                        // the game: mod rules, options, palette
 	SavedBattleGame *_save = nullptr;                   // the battle drawn
 	Map *_map = nullptr;                                // the isometric map: projectiles and explosions come from it
@@ -517,6 +607,70 @@ private:
 	void updateCameraEffects();
 	/// Builds every voxel model the battle can show, before it's needed.
 	void preloadModels();
+	/// The frame's work every picture of it shares (the camera's effects and axes, the tile snapshot, the colours, the
+	/// particles moved on and the shots followed): draw's first half, renderEyes's once for both eyes.
+	void beginFrame();
+	/// One picture of the frame (the rays, what's in the world, the smoke, the glow, the wash, the marks over it): draw's
+	/// second half, renderEyes's once for each eye; the surface left locked for the facing rings, drawn after it.
+	void drawPass();
+
+	// ---- VR: two eyes a frame (FirstPersonViewStereo.cpp) ----
+
+	/// An eye's own picture and per-pixel buffers, swapped in for the view's own while that eye is drawn (see
+	/// swapEyeTarget): everything sized by the picture.
+	struct EyeTarget
+	{
+		Surface::UniqueBufferPtr buffer;        // the picture's pixels
+		Surface::UniqueSurfacePtr surface;      // ...as an 8-bit SDL surface, in the view's palette
+		Uint16 width = 0, height = 0, pitch = 0; // its size, and bytes a row
+		std::vector<float> depth;               // its _depthBuffer, _glowMask, _unitVeil, _smokeVeil and _ownColours
+		std::vector<Uint8> glow, unitVeil, smokeVeil, ownColours;
+		double tangents[4] = {};                // the field of view drawn: left, right, up, down
+		double aim[2] = {};                     // where the aim point is on it, pixels
+		bool aimShown = false;                  // ...if in front of the eye
+	};
+	EyeTarget _eyeTargets[2];                   // the left eye's and the right eye's
+	bool _eyePass = false;                      // drawing an eye's picture now: its own camera and off-centre field of view
+	bool _replayPass = false;                   // ...the second eye's: what moves on with the frame (the units' glides, the flames, the static, the hits watched) moved for the first already
+	double _eyeAxisX = 0.0, _eyeAxisY = 0.0;    // an eye pass's picture: where its view axis meets it, pixels
+	double _eyeFocal = 1.0;                     // ...and its pixels per unit of the image plane one unit ahead
+	double _spriteEye[3] = {};                  // in an eye pass: the head's middle, which units' pictures turn to face (both eyes see the same frame of them)
+	bool _headAxes = false;                     // VR: the camera looks along a head's axes (see setHeadAxes), not by its yaw and pitch
+	double _headForward[3] = {}, _headRight[3] = {}, _headUp[3] = {}; // those axes
+	bool _comfort = false;                      // VR mode: nothing shakes the camera (see setComfort)
+	Uint32 _stereoTimingSince = 0;              // renderEyes's times, summed since then (SDL ticks), logged every VrTimingLogTime
+	int _stereoFrames = 0;                      // ...how many frames
+	double _stereoTotal = 0.0, _stereoShared = 0.0, _stereoWorst = 0.0; // ...their times summed, the shared part's, and the slowest, ms
+	HeldModel _heldModel;                       // VR: the weapon in hand, in the hand's space (see setHeldModel)
+	struct HeldWorldQuad { double corners[4][3]; double normal[3]; Uint8 color; };
+	std::vector<HeldWorldQuad> _heldWorldQuads; // ...its faces in the world this frame: corners in voxels, normal in true proportions (see placeHeldModel)
+	struct HeldWorldFlash { double middle[3]; double radius; FirstPersonHeldFlash look; };
+	std::vector<HeldWorldFlash> _heldWorldFlashes; // ...its flashes: middle in voxels, radius in voxels across
+	float _heldMuzzleWorld[2][3] = {};          // ...where its muzzles are (voxels): our shots leave from there (see beginShot)
+	bool _heldMuzzleWorldShown[2] = { false, false }; // ...while renderEyes draws them
+	const HeldFrame *_heldFrame = nullptr;      // ...where the hand's space is, while renderEyes's beginFrame runs (see placeHeldModel)
+	bool _laserShown = false, _laserDimmed = false; // VR: the weapon's laser for the next renderEyes (see setLaser), and dimmed
+	float _laserFrom[3] = {}, _laserTo[3] = {};  // ...from its muzzle to where it points, voxels
+	/// Draws the weapon's laser in an eye's picture (see setLaser), at its depth.
+	void drawLaser();
+	/// Puts the weapon in hand into the world for this frame (beginFrame, in renderEyes): from the hand's space, pulled in
+	/// towards the hand's origin when a surface is nearer than its far parts.
+	void placeHeldModel(const HeldFrame &frame);
+	/// Draws the weapon in hand in an eye's picture: its faces far to near, each at its depth behind what's nearer, then
+	/// its muzzle flashes.
+	void drawHeldModel();
+	/// Swaps an eye's picture and buffers in for the view's own, or (called again) back.
+	void swapEyeTarget(EyeTarget &target);
+	/// Makes (or remakes, for a new size) an eye's picture and buffers.
+	void makeEyeTarget(EyeTarget &target, int width, int height);
+	/// Points the camera as an eye looks (its picture swapped in): its place, its axes, its off-centre field of view.
+	void useEyeCamera(const EyeCamera &eye, EyeTarget &target);
+	/// Pixels per unit of the image plane one unit in front of the eye: the view's own, or an eye pass's.
+	double focalPixels() const { return _eyePass ? _eyeFocal : (getWidth() / 2.0) / _halfFovTangent; }
+	/// The column where the view axis meets the picture (its middle on the desktop; an eye's is off centre).
+	double axisX() const { return _eyePass ? _eyeAxisX : getWidth() / 2.0; }
+	/// The row where the view axis meets the picture.
+	double axisY() const { return _eyePass ? _eyeAxisY : getHeight() / 2.0; }
 
 	// =====================================================================================
 	// The map as voxels: models, doors, the tile snapshot (FirstPersonViewTerrain.cpp)

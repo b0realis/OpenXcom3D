@@ -139,6 +139,9 @@ State *createOptionsTab(OptionsOrigin origin);
 /// Settles settings that take their first value from an older one (the smoke from "See-through
 /// smoke", the flashlight from 1.0's two flashlight settings, the next fire mode key from 1.0's).
 void settleOptions();
+/// Called once the player's options are read (Options::init): the Meta Quest build's defaults that
+/// changed, set once on a profile saved before them (see the function).
+void optionsLoaded();
 /// Setting "Playstyle": chooses Faithful (0), FPS (1) or Custom (2), setting its switches.
 void choosePlaystyle(int playstyle);
 /// Setting "Playstyle": notes one of its switches changed by hand (the playstyle the switches make now, Custom keeping them).
@@ -299,6 +302,11 @@ int shotgunBulletSprite(const Mod *mod, const RuleItem *ammo);
 /// A unit panics or goes berserk: returns true if the first-person view shows it its own way
 /// (the game then leaves out its "has panicked" box, which would freeze the view behind it).
 bool breakdown(BattlescapeState *state, BattleUnit *unit);
+/// A shot or a throw is fired at the target picked (BattlescapeGame::primaryAction, a spray burst's
+/// last point): true if the game should fire it without turning the shooter to face the target
+/// first (VR mode: nothing turns the soldier but the right stick; the 3D view fires only within his
+/// front arc, what he sees).
+bool shotKeepsFacing(BattlescapeState *state, const BattleAction &action);
 /// A close-quarters check failed: the shooter's shot is knocked aside at this tile, and the game
 /// has turned the shooter to face it. The first-person view looks there too, so the soldier
 /// isn't turned back to the old view afterwards (at a cost, with "Turning costs TU").
@@ -344,6 +352,7 @@ inline double statBarScale(BattlescapeState *, int, int, int) { return 1.0; }
 inline bool toggleMapAkimbo(BattlescapeState *, BattleUnit *) { return false; }
 inline void drawMapAkimbo(BattlescapeState *, BattleUnit *, Surface *, Surface *) { }
 inline void mapAkimbo(BattlescapeState *, BattleAction &) { }
+inline bool shotKeepsFacing(BattlescapeState *, const BattleAction &) { return false; }
 inline void reactionAkimbo(BattlescapeState *, BattleAction &) { }
 inline void unitStruck(BattlescapeState *, const BattleUnit *, int, int) { }
 inline void pelletLanded(BattlescapeState *, const Position &, const Position &, int, const BattleItem *, const BattleItem *, bool = true) { }

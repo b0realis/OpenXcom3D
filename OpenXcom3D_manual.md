@@ -493,6 +493,18 @@ The settings are listed under the same headings as in the game.
 - **Doom grenade fuse (seconds)** (3): in Doom mode, how long a grenade burns, from 1 to 5 seconds. The **SET FUSE** box in battle (the prime mode) changes it too, and it holds for every grenade until changed.
 - Insert switches every cheat that's on off in battle, and the same ones back on (Doom mode alone if none was on); the warning line says which, and the settings keep it (as for Y, akimbo, and the SET FUSE box). The names are a tribute to Doom, whose cheat codes they borrow (see [Thanks](#12-thanks)).
 
+### VR (experimental)
+
+> **VR game design experimentation — not for gaming at the moment.**
+
+The 3D view in stereo for a VR headset, with head tracking and controllers. The headset build is the Meta Quest 3's (built from source and installed with adb: [quest3/README.md](quest3/README.md)); on the desktop these settings only preview it. The section is at the end of the 3D VIEW tab.
+
+- **VR mode** (Off): **On** or **Preview**: the 3D view becomes two eye pictures side by side (on the headset, an immersive stereo view): the head only looks, the right controller holds the weapon, only turning (the right stick) turns the soldier, at the game's turning cost; the aliens' turn plays on the map. **Off**: nothing changes.
+- **VR eye picture** (360x390): each eye's size, 360x390, 460x500 or 710x770; sharper is slower (the Quest build starts at 460x500).
+- **VR weapon** (YES): the weapon in hand drawn in 3D in each eye. NO: none in VR.
+- **VR turning** (Smooth): the right stick turns the soldier smoothly, as far as it's pushed; **Snap**: 45 degrees a push.
+- **VR laser** (YES): a thin red laser from the weapon's muzzle to where it points, the crosshair at its end.
+
 ## 5. Fire modes per weapon (FPS-style shooting)
 
 With **Options → 3D VIEW → FPS-style shooting (easier)** on, the 3D view keeps the game's three fire-mode slots (keys Z / X / V, mouse wheel or J to cycle) but fires them FPS style. Each gun offers only the modes it has in the game; the table is generated from the game's rulesets (`items.rul`). Time units are the game's, as a percentage of the soldier's time units.
@@ -873,6 +885,8 @@ Every file starts with the project's philosophy and a description of what's in i
 | `FirstPersonViewScreenEffects.cpp` | On the screen itself: the hurt arc, blood, flames, colour washes, static |
 | `FirstPersonVoxelModel.{h,cpp}` | An item's inventory picture made into a voxel model, a cushion or a blade's flat plate (the weapon or item in hand, thrown items) |
 | `FirstPersonVoxelUnits.{h,cpp}` | Setting *Voxel units*: the units' bodies, one for each unit and pose, shared by the 3D views and the battle's hits; the frames captured from the game's unit drawer, the builder's thread |
+| `FirstPersonVr.{h,cpp}`, `FirstPersonModeVr.cpp`, `FirstPersonViewStereo.cpp` | VR mode (experimental): the headset's interface (head and hands in, eye pictures out), the VR rules (turning, walking, the weapon in the hand, the laser), the stereo eyes |
+| `FirstPersonSdl.h` | one code for SDL 1.2 (the desktop) and SDL2 (the Quest build): key names, key state, the wheel |
 | `FirstPersonVoxelBodies.{h,cpp}` | How a body is made from a unit's frames: its shape, painting, matching each direction's picture, walk, fall and hits |
 | `FirstPersonParticles.{h,cpp}` | The particle pool (sparks, smoke, weather...) |
 | `FirstPersonSounds.{h,cpp}` | Sounds made in code (no files): hitmarker, no-harm and kill ticks, heartbeat, dry-fire click, flare hiss, near-miss whizz, melee swoosh, the motion scanner's pulse and blips |

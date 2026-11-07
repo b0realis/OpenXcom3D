@@ -51,6 +51,7 @@
 #include <climits>
 #include <string>
 #include <SDL.h>
+#include "FirstPersonSdl.h"
 #include "../Mod/RuleItem.h"
 
 namespace OpenXcom
@@ -202,6 +203,18 @@ const double WeaponLens = 1.303;
 const double MuzzleScreen[2] = { 0.42 / WeaponLens, 0.45 / WeaponLens };
 /// How much of the line from the stock point to the muzzle the weapon in hand fills.
 const double WeaponScale = 0.9;
+/// VR's weapon in hand (setting "VR weapon"): an item held up in the corner (a grenade, a medi-kit) is placed this many
+/// times further out than the desktop's drawing puts it (one unit ahead, a lens's worth), the same look, so it isn't
+/// held against the eyes (with the eyes' VrHeldScale, about 60 cm out); in a hand, as big as that.
+const double VrHeldItemDepth = 4.0;
+/// VR, the weapon in the right hand: a gun is held this far back from its muzzle, of its length (its pistol grip); a
+/// melee weapon at GripAt.
+const double VrHandAt = 0.62;
+/// ...a recoil kick slides it back along its barrel this far at the full kick (the desktop weapon's units), and a dip
+/// (a reload, another weapon) lowers it this far a unit of the desktop's dip.
+const double VrKickBack = 0.5, VrDipDown = 0.012;
+/// ...with no gun drawn (another item, or "VR weapon" NO), the laser and the aim start this far ahead of the hand (voxels).
+const double VrBareMuzzleAhead = 1.5;
 /// A weapon picture whose long axis is within this many degrees of upright (or of level) is
 /// taken as exactly upright (or level): the games draw their weapons standing straight up, and a
 /// grip, a magazine or a bulky body only tips the measured axis off the barrel.
@@ -292,6 +305,10 @@ const Uint32 TileMoveStuck = 300;
 const double NumpadMoveSpeed = 160.0;
 /// Sprinting (its key): the walking pace times this, while the soldier runs (the game's run).
 const double SprintPace = 1.6;
+/// VR mode, free walking (setting "Movement": Free): a comfortable 1.5 metres a second in a headset, in voxels a second
+/// (a voxel across is 10 cm); the desktop's 4 tiles a second is 6 m/s, a sprint. (Tile moves are quick steps instead,
+/// a tile in a tenth of a second: NumpadMoveSpeed.) Sprinting is SprintPace times it.
+const double VrFreeWalkSpeed = 15.0;
 /// On a grav lift or a ladder, W climbs while the view looks up more than this many degrees,
 /// and goes down while it looks down as much (S the other way round); see updateClimb.
 const double ClimbPitch = 30.0;
@@ -464,7 +481,7 @@ inline Uint8 inkColor(const SDL_Color *palette, int red, int green, int blue)
  * A key's name in capitals, as the game spells key names (e.g. "PAGE UP"), for messages that
  * tell the player which key to press.
  */
-inline std::string keyLabel(SDLKey key)
+inline std::string keyLabel(SDL_Keycode key)
 {
 	// An unbound key has no name to show (SDL would say "UNKNOWN KEY").
 	if (key == SDLK_UNKNOWN)

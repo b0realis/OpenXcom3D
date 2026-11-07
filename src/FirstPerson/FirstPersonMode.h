@@ -54,7 +54,9 @@
 #include <SDL.h>
 #include "../Battlescape/Position.h"
 #include "../Mod/RuleItem.h"
+#include "FirstPersonSdl.h"
 #include "FirstPersonVoxelModel.h"
+#include "FirstPersonVr.h"
 
 namespace OpenXcom
 {
@@ -66,6 +68,9 @@ struct BattleAction;
 class BattlescapeState;
 class BattleUnit;
 class FirstPersonView;
+struct FirstPersonEyeCamera;
+struct FirstPersonHeldModel;
+struct FirstPersonHeldFrame;
 class FirstPersonScanner;
 class FirstPersonSounds;
 class Game;
@@ -114,6 +119,8 @@ public:
 	~FirstPersonMode();
 	/// Is the 3D view showing?
 	bool isActive() const;
+	/// Does the aliens' turn play in 3D (the setting "Alien turn in 3D"; never with VR mode on)?
+	bool alienTurn3D() const;
 	/// Switches between the isometric map and the 3D view.
 	void toggleView();
 	/// Per-frame update.
@@ -154,6 +161,9 @@ public:
 	static void drawMapAkimbo(BattlescapeState *state, BattleUnit *unit, Surface *leftHand, Surface *rightHand);
 	/// A shot fired on the map: with akimbo marked there, the other hand's gun fires along, as in 3D.
 	static void mapAkimbo(BattlescapeState *state, BattleAction &action);
+	/// The game's hook for a shot or throw being fired (see FirstPerson::shotKeepsFacing): VR mode, the soldier looked
+	/// through: fired without the game's turn to the target first.
+	static bool shotKeepsFacing(BattlescapeState *state, const BattleAction &action);
 	/// A reaction shot: with the soldier's akimbo marked, the other hand's gun fires along.
 	static void reactionAkimbo(BattlescapeState *state, BattleAction &action);
 	/// A round or a blow struck a unit: an enemy in sight it did no harm marks the crosshair.
@@ -187,6 +197,36 @@ public:
 	/// and for how long (ms). (Public so a remade screen of the same battle can take the burning
 	/// fuses over, see rememberChoices.)
 	struct DoomFuse { Uint32 lit, length; };
+
+	// =====================================================================================
+	// VR mode, as the OpenXR shell drives it (FirstPersonModeVr.cpp; see FirstPersonVr.h)
+	// =====================================================================================
+
+	/// Is VR mode on (the setting "VR mode": On, or with the desktop's Preview)?
+	static bool vrOn();
+	/// The battlescape's first-person mode the VR calls go to (the screen showing now), or null.
+	static FirstPersonMode *vrCurrent();
+	/// Does the 3D view show now, with VR mode on (something for vrRenderEyes to draw)?
+	bool vrStereoReady() const;
+	/// Is the player in the 3D view on his turn, with VR mode on (see FirstPerson::vrInThreeD)?
+	bool vrInThreeD() const;
+	/// The head's pose this frame, from the shell (the desktop's stand-in no longer turns it).
+	void vrSetHeadPose(const FirstPerson::VrPose &head);
+	/// Recentres: the soldier's facing where the head looks now, the soldier's eye where the head is now.
+	void vrRecentre();
+	/// Recentres on a way in the world (yaw in degrees, 0 east, 90 south): where the head looks now looks that way.
+	void vrRecentreOn(double worldYawDegrees);
+	/// Turns the soldier 45 degrees with the world round the player (-1 left, 1 right), at the game's turning cost.
+	void vrSnapTurn(int direction);
+	/// The controllers this frame, from the shell (see FirstPerson::vrSetHands).
+	void vrSetHands(const FirstPerson::VrPose *rightAim, const FirstPerson::VrPose *rightGrip, const FirstPerson::VrPose *leftAim, bool leftGripHeld);
+	/// The right stick's sideways push this frame, from the shell (see FirstPerson::vrSetTurnAxis).
+	void vrSetTurnAxis(double axis);
+	/// Draws both eyes for these views (each picture width x height), the crosshair in each at its depth, the weapon in
+	/// hand in them (its space at the hand's pose, the hook; null: the head's).
+	bool vrRenderEyes(const FirstPerson::VrEyeView views[2], int width, int height, FirstPerson::VrPicture pictures[2], const FirstPerson::VrPose *hand = nullptr);
+	/// The HUD as its own picture (as the last frame left it).
+	bool vrHudPicture(FirstPerson::VrPicture &picture);
 
 private:
 	// =====================================================================================
@@ -299,7 +339,7 @@ private:
 	/// The cheats that are on, as the info panel tags them ("DOOM MODE", "IDDQD IDKFA IDCLIP").
 	std::string cheatTag() const;
 	/// The modifier bits of the lean key while it's held as one (Shift, Ctrl or Alt; setting "Lean"), else none.
-	SDLMod leanModifierHeld() const;
+	SDL_Keymod leanModifierHeld() const;
 	/// Is a Ctrl or Alt held that is the game's (a shortcut), not the lean key?
 	bool gameModifierHeld() const;
 	/// Does the player's time unit reserve leave enough for a move, as the game's own walk checks it?
@@ -399,6 +439,8 @@ private:
 	void turnWithKeys(double elapsedSeconds);
 	/// Turns the soldier to face where the camera looks (free, or by the rules).
 	void faceLookDirection(BattleUnit *unit);
+	/// Turns the soldier to face a way at once, for free (a tank's turret alone, with its switch on).
+	void faceFreely(BattleUnit *unit, int direction, bool turret);
 	double _snapTurnDegrees = 0.0;          // a turn key's 45 degrees still to turn (negative: to the left)
 	bool _snapTurnFacing = false;           // a turn key was pressed: once the view has turned, the soldier faces where it looks
 	double _snapPitchDegrees = 0.0;         // a level look (the classic HUD's map level buttons) still to tilt (positive: up)
@@ -616,6 +658,7 @@ private:
 	Uint32 _tileMoveProgressAt = 0;      // when it last came closer
 	bool _tileMoveHeldOn = false;        // W, A, S or D held without a break since the last move started (walks on, but not through a closed door)
 	bool _keysHeldThroughAction = false; // move keys held while the game was busy with something else (a shot): no move until let go
+	Uint32 _vrStepNextAt = 0;            // VR mode: the next tile move (a quick step) starts then at the soonest: steps keep the walking pace
 
 	/// The movement keys' push: forward (1) or back (-1), right (1) or left (-1).
 	void movementKeys(double &forward, double &strafe) const;
@@ -813,8 +856,14 @@ private:
 	Uint8 damageTypeColor(ItemDamageType type) const;
 	/// Whether the accuracy line shows under the crosshair (the unit name and a downed unit's icons go under it).
 	bool accuracyLineShown() const;
-	/// The first voxel along the ray through a pixel, as a shot would see it; true if something is there.
+	/// The first voxel along the ray through a pixel, as a shot would see it; true if something is there. (VR with a
+	/// right hand: along the weapon's barrel from its muzzle, whatever the pixel: see aimRay.)
 	bool aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &voxel, int *voxelType = nullptr) const;
+	/// The aim's ray through a pixel: from the eye through it; in VR with a right hand from the weapon's muzzle along its
+	/// barrel (see vrUpdateRifle). The direction in the voxel grid, a unit vector.
+	void aimRay(int pixelX, int pixelY, double origin[3], double direction[3]) const;
+	/// The first voxel along a ray (from a point, in voxels; a unit direction in the voxel grid), as a shot would see it.
+	bool aimAlong(const double origin[3], const double rayDirection[3], BattleUnit *unit, Position &voxel, int *voxelType) const;
 	/// Does a line through a point, carried on past it, meet the shot's target first (its tile, a wall on its near side, or its unit)?
 	bool lineThroughMeetsTarget(BattleAction &shot, const Position &origin, const Position &point, const Position &targetTile, Position &hit);
 	/// How far along the crosshair's ray a shot at the open sky aims, in voxels (see aimAt).
@@ -986,6 +1035,10 @@ private:
 	void drawHeldItem(bool left, double bob[2], double dip, int shade);
 	/// Dual wield: swaps the other hand's gun in for drawing, and back.
 	void swapOffHand();
+	// VR (setting "VR weapon"): the weapon in hand as a 3D object in each eye, at its true depth (see updateWeaponInHand)
+	FirstPersonHeldModel *_vrHeldCollect = nullptr; // while drawing it for the eyes: its faces go here (its camera space), not onto its surface
+	double _heldMuzzleCamera[3] = {};       // where drawWeaponPlate put the muzzle, in its camera space (VR's muzzles and flashes)
+	double _heldAlongCamera[3] = {};        // ...and the barrel's way there, stock to muzzle (a unit vector)
 	/// Where a melee swing is: winding up, then striking; false if none.
 	bool swingPhase(double &windup, double &strike) const;
 
@@ -1267,6 +1320,102 @@ private:
 	bool breakdownCam(Uint32 now, double elapsedSeconds);
 	/// Takes a breakdown's banner down, and forgets it (or keeps it to show again).
 	void endBreakdown(bool forget = true);
+
+	// =====================================================================================
+	// VR mode (FirstPersonModeVr.cpp): the head looks (the shell's, or the desktop's stand-in:
+	// the mouse), the soldier turns after it by the game's rules, the eyes and the HUD are drawn
+	// =====================================================================================
+
+	static FirstPersonMode *_vrCurrent;    // the mode VR's calls go to (the battlescape screen made last, while it lives)
+	FirstPerson::VrPose _vrHead = { { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f, 1.0f } }; // the head's pose this frame (the shell's, or the stand-in's)
+	bool _vrShellHead = false;              // the shell feeds the head's pose (vrSetHeadPose); else the desktop's stand-in
+	Uint32 _vrShellHeadAt = 0;              // when it last did (SDL ticks)
+	double _vrYawOffset = 0.0;              // degrees: the world's yaw (0 east, 90 south) the headset's forward (-z) points along
+	float _vrHeadReference[3] = {};         // the head's place at the last recentring, metres: there the eye is the soldier's own
+	double _vrStandInYaw = 0.0;             // the desktop's stand-in head: how far the mouse turned it right, degrees
+	double _vrStandInPitch = 0.0;           // ...and up
+	double _vrSoldierEye[3] = {};           // this frame: the soldier's own eye (see vrPlaceEye), voxels
+	double _vrHeadOffset[3] = {};           // this frame: the head's move from it, voxels (at most VrHeadReach, stopped short of walls)
+	bool _vrWasOn = false;                  // VR mode was on last frame (off now: the view's camera goes back to its yaw and pitch)
+	// the hands (the shell's, see vrSetHands; or the desktop's stand-in: the mouse aims the right one, see vrStandIn)
+	FirstPerson::VrPose _vrRightAim = { { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f, 1.0f } }; // the right hand's aim pose (its -z the way it points)
+	FirstPerson::VrPose _vrRightGrip = { { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f, 1.0f } }; // ...its grip pose (where it holds the weapon)
+	FirstPerson::VrPose _vrLeftAim = { { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f, 1.0f } };  // the left hand's aim pose
+	bool _vrRightAimOk = false, _vrRightGripOk = false, _vrLeftAimOk = false; // ...which of them are tracked
+	bool _vrLeftGripHeld = false;           // the left grip held: two-handed aim (the barrel from the right hand through the left)
+	Uint32 _vrShellHandsAt = 0;             // when the shell last gave the hands (SDL ticks); 0 never
+	bool _vrHandsGiven = false;             // ...since the last vrRenderEyes (else its hand pose, the earlier hook, stands in)
+	double _vrStandInAimYaw = 0.0;          // the desktop's stand-in right hand: how far the mouse turned it right, degrees
+	double _vrStandInAimPitch = 0.0;        // ...and up
+	double _vrTurnAxis = 0.0;               // the right stick's sideways push from the shell (see vrSetTurnAxis), -1 .. 1
+	Uint32 _vrTurnAxisAt = 0;               // ...when it was last given (SDL ticks): while fresh, the turn keys don't turn
+	bool _vrTurnAxisSnapped = false;        // ...snap turning: it snapped, and must come back under half-way before the next
+	double _vrBodyYaw = 0.0;                // the soldier's way (degrees, 0 east, 90 south): only the right stick turns it, the world with it
+	Uint32 _vrArcWarned = 0;                // when the soldier was last said to be unable to fire outside his arc (SDL ticks)
+	struct VrRifle
+	{
+		bool held = false;                  // a right hand holds it (else the weapon is where the flat view has it, aiming with the head)
+		double grip[3] = {};                // where the hand holds it, voxels
+		double muzzle[3] = {};              // its muzzle, voxels: the laser, the aim and our shots start there
+		double ahead[3] = {}, up[3] = {}, right[3] = {}; // its barrel's way, its up and its right (unit vectors, true proportions)
+		double aimGrid[3] = {};             // its barrel's way in the voxel grid (a unit vector): the aim's (see aimRay)
+	};
+	VrRifle _vrRifle;                       // the weapon in the right hand, this frame (see vrUpdateRifle)
+	double _vrMuzzleAhead = 1.5;            // how far its muzzle is ahead of the hand along the barrel, voxels (as the weapon's model last had it)
+	bool _vrHandHeld = false;               // while drawing the weapon for the hand (see updateWeaponInHand): in the hand's space, not the head's
+	bool _vrModelInHand = false;            // the weapon's model this frame is for the right hand (else for the head: see vrHeldFrame)
+	Surface *_vrHud = nullptr;              // the HUD as its own picture (see vrComposeHud): our overlays, transparent where empty
+	SDL_Color _vrHudPalette[256];           // its palette (the state's)
+
+	/// The start of a frame in VR mode: the stand-in head moved on (the mouse, the lean keys), comfort, the head's look.
+	void vrBeginFrame(double elapsedSeconds);
+	/// The desktop's stand-in head and hands this frame: the head turned by the look keys, leaning with the lean keys; the
+	/// right hand aimed by the mouse (see turnByMouse); the right button held, the left hand two-handed where the head looks.
+	void vrStandIn(double elapsedSeconds);
+	/// The weapon in the right hand this frame: its grip, barrel and muzzle in the world (see _vrRifle); none without a hand.
+	void vrUpdateRifle(BattleUnit *unit);
+	/// Does the weapon in the right hand aim (VR, a hand tracked)?
+	bool vrRifleAims() const { return _vrRifle.held && vrOn(); }
+	/// A ray from the weapon's muzzle, off its barrel by tangents to its right and up (a round's spread): its way in the voxel grid.
+	void vrRifleRay(double tangentRight, double tangentUp, double origin[3], double direction[3]) const;
+	/// The soldier's way turned by the right stick this frame (smooth), and his facing after it by the game's rules.
+	void vrFaceBody(BattleUnit *unit, double elapsedSeconds);
+	/// A turn key pressed in VR: a snap turn when snap turning, the shell's stick not turning (held keys turn smoothly).
+	void vrTurnKey(int direction);
+	/// Does the shell's stick turn now (given lately: the turn keys then don't)?
+	bool vrTurnAxisFresh() const;
+	/// Turns the soldier's way (and the world with it) by so many degrees as the rules let it go this frame.
+	void vrTurnBody(BattleUnit *unit, double degrees);
+	/// Is a tile within the soldier's front arc (what he sees by the game's rules: a shot there needs no turn)?
+	bool vrInArc(const BattleUnit *unit, const Position &tile) const;
+	/// Says (at most every two seconds) that the soldier can't fire outside his arc.
+	void vrWarnArc();
+	/// The way the movement keys walk: the soldier's way in VR (see _vrBodyYaw), else where the view looks; degrees.
+	double moveYawDegrees() const;
+	/// The view looks the way the head does (its axes in the world), without moving the eye.
+	void vrApplyHeadAxes();
+	/// Places the eye in VR: the soldier's own (no bob, lunge, dip or keys' lean), moved as the head moved, short of walls.
+	void vrPlaceEye(BattleUnit *unit);
+	/// Moves the eye from the soldier's as the head moved since the recentring, short of walls (vrPlaceEye; again when drawing).
+	void vrMoveHead(BattleUnit *unit);
+	/// A direction in the headset's space (x right, y up, z back) as the world has it (true proportions: x east, y south, z up).
+	void vrToWorld(const double tracking[3], double world[3]) const;
+	/// A pose's axes in the world: forward, right and up.
+	void vrAxes(const float orientation[4], double forward[3], double right[3], double up[3]) const;
+	/// An eye of the shell's (or the stand-in's) as the 3D view's camera for it.
+	void vrEyeCamera(const FirstPerson::VrEyeView &view, FirstPersonEyeCamera &camera) const;
+	/// The desktop stand-in's two eyes: the stand-in head's, an eye distance apart, with a Quest 3's fields of view.
+	void vrStandInViews(FirstPerson::VrEyeView views[2]) const;
+	/// Makes the HUD's own picture for this frame (see _vrHud).
+	void vrComposeHud();
+	/// The desktop's VR preview: both eyes side by side on the screen, the HUD over each at its depth.
+	void vrBlitPreview(SDL_Surface *screen);
+	/// Our overlays (and with them the visible enemy buttons) onto a surface the screen's size: the screen, or the HUD's picture.
+	void drawOverlays(SDL_Surface *target, bool forHud);
+	/// Does VR draw both eyes now (the desktop's preview, or the shell's): the weapon in hand goes into them, not onto the screen?
+	bool vrEyesDrawn() const;
+	/// Where the hand's space is in the world, for VR's weapon in hand: the head's, as the eyes have it (or a hand's pose, the hook).
+	void vrHeldFrame(const FirstPerson::VrEyeView views[2], const FirstPerson::VrPose *hand, FirstPersonHeldFrame &frame) const;
 };
 
 }

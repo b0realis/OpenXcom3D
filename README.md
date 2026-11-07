@@ -84,6 +84,7 @@ You need your own copy of the original game data (*UFO: Enemy Unknown / X-COM: U
 - **Steam Deck:** the Linux archive, set up once in Desktop Mode and added to Steam, played in Game Mode with its own controller layout.
 - **macOS (Apple silicon and Intel, macOS 11 and newer):** the **macOS zip** from the latest release: unpack it and open **OpenXcom3D.app**. A first build, made by the [automatic builds](https://github.com/b0realis/OpenXcom3D/actions/workflows/build.yml?query=branch%3Amain) and not yet tried on a real Mac.
 - **From source:** `python3 install.py --from-source` clones OXCE at the commit below, applies the patch, builds and installs; the **[build guide](https://b0realis.github.io/OpenXcom3D/)** has every step by hand, for Linux and for Windows.
+- **Meta Quest 3 (experimental, *VR game design experimentation — not for gaming at the moment*):** a standalone headset build from source, installed with adb: [quest3/README.md](quest3/README.md).
 
 The first time, it finds *X-COM: UFO Defense* and *Terror From The Deep* in your Steam libraries by itself; otherwise put the game's folder next to it, named `UFO` (or `TFTD`). Its data is only linked, never copied or changed. Then start a game (or a **New Battle**) and press **F8** in battle: mouse to look, **W A S D** to walk, the left button to fire, **F8** back to the map.
 

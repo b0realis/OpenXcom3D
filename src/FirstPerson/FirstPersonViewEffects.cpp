@@ -984,7 +984,7 @@ void FirstPersonView::drawParticles()
 {
 	typedef FirstPersonParticles P; // short for the particle system: its kinds (P::GLOW...) and groups (P::EFFECT...)
 	const int width = getWidth(), height = getHeight();
-	const double focalLength = (width / 2.0) / _halfFovTangent; // in pixels
+	const double focalLength = focalPixels(); // in pixels
 	for (const auto &particle : _particles.all())
 	{
 		// The smoke's wisps are drawn with the smoke, see-through (see drawSeeThroughSmoke).

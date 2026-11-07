@@ -102,10 +102,11 @@ bool FirstPersonView::projectToScreen(const double world[3], double &screenX, do
 	{
 		return false;
 	}
-	// Perspective: the focal length is how many pixels one unit across is at a distance of one.
-	const double focalLength = (getWidth() / 2.0) / _halfFovTangent;
-	screenX = getWidth() / 2.0 + toRight * focalLength / ahead;
-	screenY = getHeight() / 2.0 - upward * focalLength / ahead;
+	// Perspective: the focal length is how many pixels one unit across is at a distance of one;
+	// the view axis meets the picture in its middle (in VR, an eye's off-centre point: see axisX).
+	const double focalLength = focalPixels();
+	screenX = axisX() + toRight * focalLength / ahead;
+	screenY = axisY() - upward * focalLength / ahead;
 	depth = ahead;
 	return true;
 }
@@ -175,7 +176,8 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 	}
 	const int width = getWidth(), height = getHeight();
 	const int spriteWidth = sprite->getWidth(), spriteHeight = sprite->getHeight();
-	const double focalLength = (width / 2.0) / _halfFovTangent;
+	const double focalLength = focalPixels();
+	const double viewAxisX = axisX(), viewAxisY = axisY(); // where the view axis meets the picture (its middle, but in VR)
 	auto dot = [](const double a[3], const double b[3]) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; };
 
 	// The card, in the camera's frame (true proportions, as projectToScreen works): the anchor
@@ -328,7 +330,7 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 					left = top = 0; right = width; bottom = height;
 					continue;
 				}
-				const double screenX = width / 2.0 + dot(corner, _right) * focalLength / depth, screenY = height / 2.0 - dot(corner, _up) * focalLength / depth;
+				const double screenX = viewAxisX + dot(corner, _right) * focalLength / depth, screenY = viewAxisY - dot(corner, _up) * focalLength / depth;
 				left = std::min(left, (int)std::floor(screenX)); right = std::max(right, (int)std::ceil(screenX));
 				top = std::min(top, (int)std::floor(screenY)); bottom = std::max(bottom, (int)std::ceil(screenY));
 			}
@@ -359,10 +361,10 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 		const double anchorRise = dot(anchor, _levelUp) / dot(anchor, _forward);
 		for (int pixelY = top; pixelY < bottom; ++pixelY)
 		{
-			const double rise = (height / 2.0 - (pixelY + 0.5)) / focalLength;
+			const double rise = (viewAxisY - (pixelY + 0.5)) / focalLength;
 			for (int pixelX = left; pixelX < right; ++pixelX)
 			{
-				const double across = (pixelX + 0.5 - width / 2.0) / focalLength;
+				const double across = (pixelX + 0.5 - viewAxisX) / focalLength;
 				const double ray[3] = { _forward[0] + across * _right[0] + rise * _up[0], _forward[1] + across * _right[1] + rise * _up[1],
 					_forward[2] + across * _right[2] + rise * _up[2] };
 				double distance, spriteRow;
@@ -380,7 +382,7 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 	// the camera reaches to the view's edge).
 	auto screenRowOf = [&](const double point[3], double behindCamera) {
 		const double depth = dot(point, _forward);
-		return depth > 1.0 ? height / 2.0 - dot(point, _up) * focalLength / depth : behindCamera;
+		return depth > 1.0 ? viewAxisY - dot(point, _up) * focalLength / depth : behindCamera;
 	};
 	double topPoint[3], bottomPoint[3];
 	for (int axis = 0; axis < 3; ++axis)
@@ -418,7 +420,7 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 	// (the card and the floor both run square across the view).
 	for (int pixelY = top; pixelY < bottom; ++pixelY)
 	{
-		const double rise = (height / 2.0 - (pixelY + 0.5)) / focalLength;
+		const double rise = (viewAxisY - (pixelY + 0.5)) / focalLength;
 		const double ray[3] = { _forward[0] + rise * _up[0], _forward[1] + rise * _up[1], _forward[2] + rise * _up[2] };
 		double distance, spriteRow;
 		if (!meetSprite(ray, pixelY + 0.5 > anchorScreenY, distance, spriteRow)) continue;
@@ -429,7 +431,7 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 		// side: each pixel's own column is worked out below, and anything outside the span is
 		// transparent anyway, so the edges never depend on rounding).
 		const double pixelsPerColumn = focalLength / distance * columnSize;
-		const double rowAnchorX = width / 2.0 + anchorAcross * focalLength / distance;
+		const double rowAnchorX = viewAxisX + anchorAcross * focalLength / distance;
 		const int left = std::max(std::max(0, (int)std::floor(rowAnchorX - anchorX * pixelsPerColumn)),
 			(int)std::floor(rowAnchorX + (spanFirst - anchorX) * pixelsPerColumn) - 1);
 		const int right = std::min(std::min(width, (int)std::ceil(rowAnchorX + (spriteWidth - anchorX) * pixelsPerColumn)),
@@ -578,7 +580,7 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 	const std::vector<float> &up = walking ? body.walkUp[walkPhase] : body.up;
 	// The unit's right and ahead on the map: east and north turned by its facing.
 	const double angle = facing * Pi / 4.0, cosine = std::cos(angle), sine = std::sin(angle);
-	const double focalLength = (getWidth() / 2.0) / _halfFovTangent;
+	const double focalLength = focalPixels();
 	const double halfSquare = 0.5 * VoxelSplatSize * scale * focalLength; // half a square at a depth of one
 	const bool falling = fall > 0.0;
 	const VoxelUnitModel::FallPose pose = body.poseAt(fall);
@@ -1024,14 +1026,17 @@ void FirstPersonView::drawUnits()
 	_markerSpots.clear();
 	_facingSpots.clear();
 	// Time since the last frame in seconds (at most a tenth, none the first time), for the gliding.
+	// (VR's second eye: the glides moved for the first eye already, this frame; see renderEyes.)
 	const Uint32 now = SDL_GetTicks();
 	const double elapsedSeconds = _unitLastTick ? std::min<Uint32>(100, now - _unitLastTick) / 1000.0 : 0.0;
-	_unitLastTick = now;
+	if (!_replayPass) _unitLastTick = now;
+	// Where the units' pictures turn to face: the eye; in VR the head's middle, so both eyes see the same frame of each.
+	const double *spriteEye = _eyePass ? _spriteEye : _eye;
 	// The units' size (setting "Unit size", 80 to 100% of the isometric map's: smaller, standing
 	// on the same spot), and their hitboxes (setting): always, fading in and out once a second, or
 	// only the unit pointed at (Aimed at, see setAimedUnit), steady.
 	const double unitScale = std::clamp(Options::fpsUnitSize, 80, 100) / 100.0;
-	int voxelBuilds = VoxelBuildsPerFrame; // (voxel bodies still to be made this frame, see below)
+	int voxelBuilds = _replayPass ? 0 : VoxelBuildsPerFrame; // (voxel bodies still to be made this frame, see below; VR's second eye makes none)
 	const bool hitboxAimedOnly = Options::fpsHitboxes == 3;
 	const float hitboxOpacity = Options::fpsHitboxes == 2 || hitboxAimedOnly ? 1.0f
 		: Options::fpsHitboxes == 1 ? 0.5f + 0.5f * (float)std::cos((now % 1000) / 1000.0 * 2.0 * Pi) : 0.0f;
@@ -1099,7 +1104,12 @@ void FirstPersonView::drawUnits()
 		// fall from the air as it is).
 		Glide &glide = _unitGlides[unit];
 		const double jump = std::abs(glide.pos[0] - feet[0]) + std::abs(glide.pos[1] - feet[1]) + std::abs(glide.pos[2] - feet[2]);
-		if (now - glide.seen > 250 || jump > 24.0 || airFall)
+		if (_replayPass)
+		{
+			// VR's second eye: where the first eye's pass left the glide this frame.
+			std::copy(glide.pos, glide.pos + 3, feet);
+		}
+		else if (now - glide.seen > 250 || jump > 24.0 || airFall)
 		{
 			std::copy(feet, feet + 3, glide.pos);
 		}
@@ -1114,7 +1124,7 @@ void FirstPersonView::drawUnits()
 				feet[axis] = glide.pos[axis];
 			}
 		}
-		glide.seen = now;
+		if (!_replayPass) glide.seen = now;
 		// A hit unit flinches back from the camera for a moment (HitFlinchTime, up to 3 voxels), and
 		// flashes (setting "Hit flash", and "Muzzle flashes", which turns every flash off).
 		float flash = 0.0f;
@@ -1153,7 +1163,7 @@ void FirstPersonView::drawUnits()
 		// Rotate the unit's facing so the side turned towards the camera is shown: the
 		// direction from the unit to the camera, in the game's eight directions (0 north,
 		// clockwise; atan2 measures from east, so a quarter turn is added).
-		const double toCameraDegrees = std::atan2(_eye[1] - feet[1], _eye[0] - feet[0]) * 180.0 / Pi;
+		const double toCameraDegrees = std::atan2(spriteEye[1] - feet[1], spriteEye[0] - feet[0]) * 180.0 / Pi;
 		const int cameraDirection = (((int)std::lround((toCameraDegrees + 90.0) / 45.0)) % 8 + 8) % 8;
 		unitSprite.setViewRotation(3 - cameraDirection);
 
@@ -1205,7 +1215,7 @@ void FirstPersonView::drawUnits()
 			double middleX, middleY, middleDepth;
 			const double middle[3] = { feet[0], feet[1], feet[2] + 12.0 };
 			const bool seen = projectToScreen(middle, middleX, middleY, middleDepth);
-			const double reach = seen ? 24.0 * unitScale * (getWidth() / 2.0) / _halfFovTangent / middleDepth : 0.0;
+			const double reach = !seen ? 0.0 : _eyePass ? 24.0 * unitScale * _eyeFocal / middleDepth : 24.0 * unitScale * (getWidth() / 2.0) / _halfFovTangent / middleDepth;
 			int noBuilds = 0;
 			int &builds = seen && middleX > -reach && middleX < getWidth() + reach && middleY > -reach && middleY < getHeight() + reach ? voxelBuilds : noBuilds;
 			body = _voxelUnits->modelFor(unit, unitSprite, _game->getMod()->getSurfaceSet("BIGOBS.PCK"), _game->getMod()->getSurfaceSet("FLOOROB.PCK"), _save,
@@ -1229,8 +1239,8 @@ void FirstPersonView::drawUnits()
 				_facingsWell[unit] = facing;
 			}
 			const bool fallen = fall > 0.5;
-			const double flat = std::max(1.0, std::hypot(_eye[0] - feet[0], _eye[1] - feet[1]));
-			const bool level = !fallen && std::atan2((_eye[2] - chest[2]) * ZScale, flat) < VoxelSlantAbove * Pi / 180.0;
+			const double flat = std::max(1.0, std::hypot(spriteEye[0] - feet[0], spriteEye[1] - feet[1]));
+			const bool level = !fallen && std::atan2((spriteEye[2] - chest[2]) * ZScale, flat) < VoxelSlantAbove * Pi / 180.0;
 			const int direction = fallen ? 3 : ((facing + 3 - cameraDirection) % 8 + 8) % 8;
 			const double standing[3] = { feet[0], feet[1], standingHeight(feet) };
 			recordVoxelUnit(*body, walkPhase, facing, direction, level, standing, floorUnderside(feet), shade, unitScale, unit, fall);
@@ -2123,7 +2133,7 @@ void FirstPersonView::drawEdgeDots()
 	}
 	const int width = getWidth(), height = getHeight();
 	const float mapX = _save->getMapSizeX() * 16.0f, mapY = _save->getMapSizeY() * 16.0f;
-	const double focalLength = (width / 2.0) / _halfFovTangent;
+	const double focalLength = focalPixels();
 	// One dot: projected, sized by its distance, drawn where nothing nearer is.
 	auto dot = [&](float x, float y) {
 		const double point[3] = { x, y, GroundTop };
@@ -2728,7 +2738,7 @@ void FirstPersonView::cullSmokeDraws()
 			farthest = std::max(farthest, depthRow[pixelX]);
 		}
 	}
-	const double focalLength = (width / 2.0) / _halfFovTangent;
+	const double focalLength = focalPixels();
 	const double level[2] = { std::cos(_yaw), std::sin(_yaw) };
 	auto dot = [](const double a[3], const double b[3]) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; };
 	auto cannotShow = [&](SmokeDraw &smoke)
@@ -2764,7 +2774,7 @@ void FirstPersonView::cullSmokeDraws()
 				{
 					return false;
 				}
-				const double screenX = width / 2.0 + dot(corner, _right) * focalLength / depth, screenY = height / 2.0 - dot(corner, _up) * focalLength / depth;
+				const double screenX = axisX() + dot(corner, _right) * focalLength / depth, screenY = axisY() - dot(corner, _up) * focalLength / depth;
 				left = std::min(left, screenX); right = std::max(right, screenX);
 				top = std::min(top, screenY); bottom = std::max(bottom, screenY);
 				nearest = std::min(nearest, depth);
@@ -3082,7 +3092,7 @@ void FirstPersonView::drawDownedIcons()
 	}
 	const int width = getWidth(), height = getHeight();
 	const int uiScale = std::max(1, _uiScale);
-	const double focalLength = (width / 2.0) / _halfFovTangent;
+	const double focalLength = focalPixels();
 	enum { Burning = 1, Bleeding = 2, Shock = 4, OutCold = 8 };
 
 	// Each body in view: where its icons go (their bottom, in the middle), what's the matter with

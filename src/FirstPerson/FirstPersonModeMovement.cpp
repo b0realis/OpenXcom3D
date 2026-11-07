@@ -588,11 +588,14 @@ bool FirstPersonMode::walkGuidedStep(BattleUnit *unit, double &newEyeX, double &
 			|| (_eyeY - sizeOffset - _trackedTile.y * 16.0 >= EdgeMargin && _trackedTile.y * 16.0 + 16.0 - (_eyeY - sizeOffset) >= EdgeMargin));
 
 	// The unit has moved on: walk through, straight on, at the walking speed setting (1 to 8
-	// tiles a second; a diagonal no faster), kept away from a door's frame on the other axis.
+	// tiles a second; a diagonal no faster), kept away from a door's frame on the other axis. (VR
+	// mode: a tile move's step as quickly as its quick step goes, NumpadMoveSpeed; free walking at
+	// VR's slower pace, VrFreeWalkSpeed.)
 	if (!stillHere && (cameraX != _trackedTile.x || cameraY != _trackedTile.y || !inside))
 	{
 		const double diagonal = (_guidedStepDirection[0] != 0 && _guidedStepDirection[1] != 0) ? std::sqrt(0.5) : 1.0;
-		const double distance = std::clamp(Options::fpsWalkSpeed, 1, 8) * 16.0 * elapsedSeconds * diagonal;
+		const double speed = vrOn() ? (_tileMove || Options::fpsMovement == 1 ? NumpadMoveSpeed : VrFreeWalkSpeed) : std::clamp(Options::fpsWalkSpeed, 1, 8) * 16.0;
+		const double distance = speed * elapsedSeconds * diagonal;
 		newEyeX = _eyeX + _guidedStepDirection[0] * distance;
 		newEyeY = _eyeY + _guidedStepDirection[1] * distance;
 		if (_guidedStepDirection[0] == 0) newEyeX = clampInsideTile(_trackedTile.x, newEyeX, sizeOffset);
@@ -649,10 +652,9 @@ void FirstPersonMode::movementKeys(double &forward, double &strafe) const
 		forward = strafe = 0.0;
 		return;
 	}
-	const Uint8 *keyStates = SDL_GetKeyState(nullptr);
-	forward = (keyStates[Options::keyFpsForward] ? 1.0 : 0.0) - (keyStates[Options::keyFpsBack] ? 1.0 : 0.0);
-	strafe = (keyStates[Options::keyFpsStrafeRight] ? 1.0 : 0.0) - (keyStates[Options::keyFpsStrafeLeft] ? 1.0 : 0.0);
-	if (Options::fpsLean > 0 && Options::keyFpsLeanHold != SDLK_UNKNOWN && keyStates[Options::keyFpsLeanHold])
+	forward = (isKeyHeld(Options::keyFpsForward) ? 1.0 : 0.0) - (isKeyHeld(Options::keyFpsBack) ? 1.0 : 0.0);
+	strafe = (isKeyHeld(Options::keyFpsStrafeRight) ? 1.0 : 0.0) - (isKeyHeld(Options::keyFpsStrafeLeft) ? 1.0 : 0.0);
+	if (Options::fpsLean > 0 && isKeyHeld(Options::keyFpsLeanHold))
 	{
 		strafe = 0.0;
 	}
@@ -666,14 +668,14 @@ void FirstPersonMode::movementKeys(double &forward, double &strafe) const
  */
 void FirstPersonMode::numpadKeys(int &forward, int &strafe) const
 {
-	const Uint8 *keyStates = SDL_GetKeyState(nullptr);
-	forward = (keyStates[SDLK_KP8] ? 1 : 0) - (keyStates[SDLK_KP2] ? 1 : 0);
-	strafe = (keyStates[SDLK_KP6] ? 1 : 0) - (keyStates[SDLK_KP4] ? 1 : 0);
+	forward = (isKeyHeld(KeypadKey8) ? 1 : 0) - (isKeyHeld(KeypadKey2) ? 1 : 0);
+	strafe = (isKeyHeld(KeypadKey6) ? 1 : 0) - (isKeyHeld(KeypadKey4) ? 1 : 0);
 }
 
 /**
  * Tile moves: a move walks exactly one tile, to the middle of the neighbour in the direction it
- * pushes (one of eight, relative to the view). The numpad makes such moves whatever the movement
+ * pushes (one of eight, relative to the view; in VR to the soldier's way, see moveYawDegrees).
+ * The numpad makes such moves whatever the movement
  * setting, almost at once (NumpadMoveSpeed), like a step on the isometric map: a press is
  * remembered until the move can start, and a key still held starts the next; a press waits
  * NumpadComboWait for a key of the other axis to join it, and keys held then join it too (a
@@ -692,6 +694,9 @@ void FirstPersonMode::numpadKeys(int &forward, int &strafe) const
  * stopping there without overshooting. A move that stops coming closer (the step refused, a
  * wall) is over, and so is one that a door or a vault took over. Between moves, with tile moves
  * set, the camera settles back to the middle of its tile.
+ * VR mode (the owner: "in vr tile movement would be quick steps"): W, A, S and D move quickly too,
+ * as the numpad does, and a key held walks on step by step at the walking pace (see
+ * _vrStepNextAt): each step a dash of a tenth of a second, a moment's rest between.
  * @param forward, strafe The movement keys' push (see movementKeys).
  * @param canMove Whether the keys may move the soldier now (see updateMovement).
  * @param walkSpeed The walking speed, in voxels a second.
@@ -772,13 +777,16 @@ bool FirstPersonMode::tileMoveVelocity(BattleUnit *unit, double forward, double 
 		{
 			moveForward = forward;
 			moveStrafe = strafe;
-			quick = false;
+			quick = vrOn(); // (VR mode: a quick step, as the numpad's, not a walk at walking speed)
 			heldOn = _tileMoveHeldOn;
 		}
-		if ((moveForward != 0.0 || moveStrafe != 0.0) && canMove && !_stepPending && canAct() && unit->getStatus() == STATUS_STANDING)
+		// (VR mode: each move a quick step, but no sooner than the walking pace allows after the last: a key held walks on
+		// in quick steps with a moment's rest between, at the setting's tiles a second; see _vrStepNextAt)
+		const bool vrStepWaits = vrOn() && now < _vrStepNextAt;
+		if ((moveForward != 0.0 || moveStrafe != 0.0) && canMove && !_stepPending && canAct() && unit->getStatus() == STATUS_STANDING && !vrStepWaits)
 		{
 			_numpadMove[0] = _numpadMove[1] = 0; // the press is used (or the way is blocked)
-			const double yaw = _view->getYawDegrees() * Pi / 180.0; // radians
+			const double yaw = moveYawDegrees() * Pi / 180.0; // radians (VR: the soldier's way, see moveYawDegrees)
 			const double pushX = std::cos(yaw) * moveForward - std::sin(yaw) * moveStrafe, pushY = std::sin(yaw) * moveForward + std::cos(yaw) * moveStrafe;
 			const double octant = std::round(std::atan2(pushY, pushX) / (Pi / 4.0)) * (Pi / 4.0);
 			const int stepX = (int)std::lround(std::cos(octant)), stepY = (int)std::lround(std::sin(octant));
@@ -795,6 +803,13 @@ bool FirstPersonMode::tileMoveVelocity(BattleUnit *unit, double forward, double 
 			{
 				_tileMove = true;
 				_tileMoveQuick = quick;
+				if (vrOn())
+				{
+					// VR mode: the next quick step no sooner than a tile at the walking pace (the setting's tiles a
+					// second, sprinting SprintPace times that) after this one's start.
+					const bool sprinting = _sprintOn && _sprintStepRan && unit->getArmor()->allowsRunning(unit->isSmallUnit());
+					_vrStepNextAt = now + (Uint32)std::lround(1000.0 / (std::clamp(Options::fpsWalkSpeed, 1, 8) * (sprinting ? SprintPace : 1.0)));
+				}
 				_tileMoveTarget = Position(_trackedTile.x + stepX, _trackedTile.y + stepY, 0);
 				_tileMoveClosest = 1e9;
 				_tileMoveProgressAt = now;
@@ -869,7 +884,7 @@ void FirstPersonMode::jump(BattleUnit *unit)
 	{
 		// The push turned from the view's frame onto the map (yaw 0 is east, 90 south), then
 		// snapped to the nearer grid axis: a vault goes straight along x or y, never diagonally.
-		const double yaw = _view->getYawDegrees() * Pi / 180.0; // radians
+		const double yaw = moveYawDegrees() * Pi / 180.0; // radians (VR: the soldier's way)
 		const double pushX = std::cos(yaw) * forward - std::sin(yaw) * strafe, pushY = std::sin(yaw) * forward + std::cos(yaw) * strafe;
 		const int stepX = std::abs(pushX) >= std::abs(pushY) ? (pushX > 0.0 ? 1 : -1) : 0;
 		const int stepY = std::abs(pushX) >= std::abs(pushY) ? 0 : (pushY > 0.0 ? 1 : -1);
@@ -1232,7 +1247,9 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 	const int sizeOffset = 8 * (unit->getArmor()->getSize() - 1);
 	double newEyeX = _eyeX, newEyeY = _eyeY;
 	const bool sprinting = _sprintOn && _sprintStepRan && unit->getArmor()->allowsRunning(unit->isSmallUnit());
-	const double walkSpeed = std::clamp(Options::fpsWalkSpeed, 1, 8) * 16.0 * (sprinting ? SprintPace : 1.0);
+	// (VR mode: walking slower, VrFreeWalkSpeed, comfortable in a headset; its tile moves are quick steps, see
+	// tileMoveVelocity)
+	const double walkSpeed = (vrOn() ? VrFreeWalkSpeed : std::clamp(Options::fpsWalkSpeed, 1, 8) * 16.0) * (sprinting ? SprintPace : 1.0);
 
 	// A vault in progress moves the camera on its own.
 	if (glideOverObstacle(unit, newEyeX, newEyeY))
@@ -1268,7 +1285,7 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 	}
 	else if (forward != 0.0 || strafe != 0.0)
 	{
-		const double yaw = _view->getYawDegrees() * Pi / 180.0; // radians
+		const double yaw = moveYawDegrees() * Pi / 180.0; // radians (VR: the soldier's way)
 		const double pushX = std::cos(yaw) * forward - std::sin(yaw) * strafe;
 		const double pushY = std::sin(yaw) * forward + std::cos(yaw) * strafe;
 		const double pushLength = std::sqrt(pushX * pushX + pushY * pushY);

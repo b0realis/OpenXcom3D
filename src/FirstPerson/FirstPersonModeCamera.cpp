@@ -88,6 +88,20 @@ void FirstPersonMode::turnByMouse(int mouseDeltaX, int mouseDeltaY)
 	// Sensitivity 1..20 gives 0.05..1 degree per pixel (zoomed in, that much less). Moving the
 	// mouse down tilts the view down, unless the mouse is inverted.
 	const double degreesPerPixel = std::clamp(Options::fpsMouseSensitivity, 1, 20) * 0.05 / _zoom;
+	// VR mode: in the desktop's preview the mouse aims the stand-in right hand, the weapon's (see vrStandIn), the look
+	// keys turning the stand-in head; with VR mode On it turns the stand-in head; up to straight up or down. A headset's
+	// head and controllers turn themselves (the shell's poses).
+	if (vrOn())
+	{
+		if (!_vrShellHead)
+		{
+			double &yaw = Options::fpsVrMode == 2 ? _vrStandInAimYaw : _vrStandInYaw;
+			double &pitch = Options::fpsVrMode == 2 ? _vrStandInAimPitch : _vrStandInPitch;
+			yaw = std::remainder(yaw + mouseDeltaX * degreesPerPixel, 360.0);
+			pitch = std::clamp(pitch + (Options::fpsInvertMouse ? mouseDeltaY : -mouseDeltaY) * degreesPerPixel, -90.0, 90.0);
+		}
+		return;
+	}
 	_view->rotate(mouseDeltaX * degreesPerPixel, (Options::fpsInvertMouse ? mouseDeltaY : -mouseDeltaY) * degreesPerPixel);
 }
 
@@ -103,9 +117,8 @@ void FirstPersonMode::turnByMouse(int mouseDeltaX, int mouseDeltaY)
  */
 void FirstPersonMode::updateZoom(double elapsedSeconds)
 {
-	const Uint8 *keyStates = SDL_GetKeyState(nullptr);
-	const bool keyHeld = Options::keyFpsZoom != SDLK_UNKNOWN && keyStates[Options::keyFpsZoom] && !gameModifierHeld();
-	const bool zoomedIn = Options::fpsZoom && isActive() && (keyHeld || (_zoomButtonHeld && _mouseLook));
+	const bool keyHeld = isKeyHeld(Options::keyFpsZoom) && !gameModifierHeld();
+	const bool zoomedIn = Options::fpsZoom && isActive() && (keyHeld || (_zoomButtonHeld && _mouseLook)) && !vrOn(); // (VR mode: the eyes see as wide as the headset shows)
 	const double logTarget = zoomedIn ? std::log(ZoomFactor) : 0.0, logStep = std::log(ZoomFactor) * elapsedSeconds / ZoomSeconds;
 	const double logZoom = std::log(_zoom);
 	_zoom = std::exp(logTarget > logZoom ? std::min(logTarget, logZoom + logStep) : std::max(logTarget, logZoom - logStep));
@@ -129,17 +142,29 @@ double FirstPersonMode::fieldOfViewNow() const
  */
 void FirstPersonMode::turnWithKeys(double elapsedSeconds)
 {
-	const Uint8 *keyStates = SDL_GetKeyState(nullptr);
 	const double turnSpeed = 90.0 / _zoom; // degrees per second (zoomed in, that much slower)
 
 	// Add up the turn of every key held: left and right turn, up and down tilt.
 	double yawDegrees = 0.0, pitchDegrees = 0.0;
 	// (the 3D view's own turn and look keys, the arrows; not the map's scroll keys, which a player
 	// may have put on W, A, S, D: GitHub issue #81)
-	if (Options::keyFpsLookLeft != SDLK_UNKNOWN && keyStates[Options::keyFpsLookLeft]) yawDegrees -= turnSpeed * elapsedSeconds;
-	if (Options::keyFpsLookRight != SDLK_UNKNOWN && keyStates[Options::keyFpsLookRight]) yawDegrees += turnSpeed * elapsedSeconds;
-	if (Options::keyFpsLookUp != SDLK_UNKNOWN && keyStates[Options::keyFpsLookUp]) pitchDegrees += turnSpeed * elapsedSeconds;
-	if (Options::keyFpsLookDown != SDLK_UNKNOWN && keyStates[Options::keyFpsLookDown]) pitchDegrees -= turnSpeed * elapsedSeconds;
+	if (isKeyHeld(Options::keyFpsLookLeft)) yawDegrees -= turnSpeed * elapsedSeconds;
+	if (isKeyHeld(Options::keyFpsLookRight)) yawDegrees += turnSpeed * elapsedSeconds;
+	if (isKeyHeld(Options::keyFpsLookUp)) pitchDegrees += turnSpeed * elapsedSeconds;
+	if (isKeyHeld(Options::keyFpsLookDown)) pitchDegrees -= turnSpeed * elapsedSeconds;
+
+	// VR mode: the head looks, nothing else turns the view (a glide to look at something is dropped; the turn keys turn
+	// the soldier and the world, see vrFaceBody, vrSnapTurn); the look keys turn the desktop's stand-in head.
+	if (vrOn())
+	{
+		_snapTurnDegrees = _snapPitchDegrees = 0.0;
+		if (!_vrShellHead)
+		{
+			_vrStandInYaw = std::remainder(_vrStandInYaw + yawDegrees, 360.0);
+			_vrStandInPitch = std::clamp(_vrStandInPitch + pitchDegrees, -90.0, 90.0);
+		}
+		return;
+	}
 
 	// A turn key's 45 degrees (comma and period by default) turn at SnapTurnSpeed, and so does a
 	// level look (the classic HUD's map level buttons) tilt.
@@ -182,6 +207,7 @@ void FirstPersonMode::turnWithKeys(double elapsedSeconds)
  *   paying for each; the owner: hold the head's limit).
  * - A tank with its turret switch on (see toggleTurret) turns only its turret, by the same rules:
  *   the turret's facing, the game's own turret turn (1 time unit an eighth), the hull left as it is.
+ * (VR mode turns the soldier by the right stick alone: see vrFaceBody.)
  */
 void FirstPersonMode::faceLookDirection(BattleUnit *unit)
 {
@@ -261,10 +287,20 @@ void FirstPersonMode::faceLookDirection(BattleUnit *unit)
 	{
 		return;
 	}
+	faceFreely(unit, direction, turret);
+}
 
-	// Turn the soldier (a tank with its turret switch on: the turret alone, by the game's own
-	// turret turn), then update what it sees, what others see of it (as UnitTurnBState does after
-	// a turn) and the classic HUD's soldier info.
+/**
+ * Turns the soldier to face a way at once, for free (free turning: the game's turn without its
+ * cost): a tank with its turret switch on turns the turret alone, by the game's own turret turn;
+ * then what it sees, what others see of it (as UnitTurnBState does after a turn) and the classic
+ * HUD's soldier info are worked out again.
+ * @param unit The soldier.
+ * @param direction The way to face (0 north .. 7, clockwise).
+ * @param turret True to turn the turret alone.
+ */
+void FirstPersonMode::faceFreely(BattleUnit *unit, int direction, bool turret)
+{
 	if (turret)
 	{
 		Position towards;
@@ -414,6 +450,12 @@ void FirstPersonMode::lookFromBestSpotter(int enemyIndex)
  */
 void FirstPersonMode::lookStraightAhead(const BattleUnit *unit)
 {
+	// VR mode: nothing turns the view but the head; straight ahead is where the head looks now (a recentring).
+	if (vrOn())
+	{
+		vrRecentre();
+		return;
+	}
 	// How far the view turns: to the soldier's facing (its direction counts from north,
 	// clockwise; the camera's yaw from east), the short way round, and back to level.
 	const double facingYaw = unit->getDirection() * 45.0 - 90.0;
@@ -497,6 +539,14 @@ void FirstPersonMode::updateCamera(BattleUnit *unit, bool canMove, double elapse
 			_view->setEye(_eyeX, _eyeY, _eyeZ);
 			lookAtUnit(_lookAtOnSwitch);
 			_lookAtOnSwitch = nullptr;
+			// VR mode: a cut to another soldier turns the world so that where the player looks is towards them.
+			if (vrOn()) vrRecentreOn(_view->getYawDegrees());
+		}
+		else if (vrOn())
+		{
+			// VR mode: a cut to another soldier (or into 3D) turns the world so that the soldier's facing is where the
+			// player looks (the study: "Entering 3D turns the world so that the soldier's facing is where the player looks").
+			vrRecentre();
 		}
 	}
 	else if (_stepPending)
@@ -631,6 +681,14 @@ void FirstPersonMode::updateCamera(BattleUnit *unit, bool canMove, double elapse
 		if (_rideStart) _view->setHiddenFloor(-1);
 		_rideStart = 0;
 		_eyeZ += (targetEyeZ - _eyeZ) * std::min(1.0, elapsedSeconds * 12.0);
+	}
+
+	// VR mode: the eye is the soldier's, moved as the head moves, and nothing else moves it (no head bob, no lunge, no
+	// landing dip, no lean from the keys: the head leans itself; see vrPlaceEye).
+	if (vrOn())
+	{
+		vrPlaceEye(unit);
+		return;
 	}
 
 	// Head bob (setting "Head bob"): a gentle dip of up to 0.6 voxels with every step (footsteps
@@ -792,8 +850,7 @@ double FirstPersonMode::eyeHeight(const BattleUnit *unit) const
 void FirstPersonMode::updateLean(BattleUnit *unit, bool canLean, double elapsedSeconds, double &dropBy)
 {
 	// Which way the keys lean: -1 left, 1 right, 0 for neither or both (or leaning off).
-	const Uint8 *keyStates = SDL_GetKeyState(nullptr);
-	auto held = [keyStates](SDLKey key) { return key != SDLK_UNKNOWN && keyStates[key]; };
+	auto held = [](SDL_Keycode key) { return isKeyHeld(key); };
 	double wanted = 0.0;
 	if (Options::fpsLean > 0 && canLean && !unit->isOut())
 	{

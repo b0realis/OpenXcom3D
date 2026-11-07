@@ -466,9 +466,9 @@ void FirstPersonMode::drawVoxelFaces(const double origin[3], const double stepPe
 		faceNormal[0] = (edge1[1] * edge2[2] - edge1[2] * edge2[1]) * windingSign;
 		faceNormal[1] = (edge1[2] * edge2[0] - edge1[0] * edge2[2]) * windingSign;
 		faceNormal[2] = (edge1[0] * edge2[1] - edge1[1] * edge2[0]) * windingSign;
-		if (faceNormal[0] * faceCentre[0] + faceNormal[1] * faceCentre[1] + faceNormal[2] * faceCentre[2] >= 0.0 || faceCentre[2] < 0.1)
+		if (!_vrHeldCollect && (faceNormal[0] * faceCentre[0] + faceNormal[1] * faceCentre[1] + faceNormal[2] * faceCentre[2] >= 0.0 || faceCentre[2] < 0.1))
 		{
-			continue; // turned away from the eye, or behind it
+			continue; // turned away from the eye, or behind it (VR's eyes each see for themselves: every face goes to them)
 		}
 
 		// Shading: up to 3 shades darker as it turns from the light, plus the surroundings'
@@ -481,6 +481,21 @@ void FirstPersonMode::drawVoxelFaces(const double origin[3], const double stepPe
 		Quad quad;
 		quad.depth = faceCentre[0] * faceCentre[0] + faceCentre[1] * faceCentre[1] + faceCentre[2] * faceCentre[2]; // squared distance
 		quad.color = (Uint8)((face.color & 0xF0) | std::min(15, (face.color & 15) + darkerBy));
+
+		// VR, the weapon drawn in the eyes (see updateWeaponInHand): the face as it is in camera space, its outward
+		// normal, shaded; each eye projects it itself (FirstPersonView::drawHeldModel).
+		if (_vrHeldCollect)
+		{
+			FirstPersonHeldQuad held;
+			for (int cornerIndex = 0; cornerIndex < 4; ++cornerIndex)
+				for (int axis = 0; axis < 3; ++axis)
+					held.corners[cornerIndex][axis] = (float)cameraCorners[cornerIndex][axis];
+			for (int axis = 0; axis < 3; ++axis)
+				held.normal[axis] = normalLength > 0.0 ? (float)(faceNormal[axis] / normalLength) : 0.0f;
+			held.color = quad.color;
+			_vrHeldCollect->quads.push_back(held);
+			continue;
+		}
 
 		// Its corners on the screen (perspective projection through the weapon's lens).
 		for (int cornerIndex = 0; cornerIndex < 4; ++cornerIndex)
@@ -580,7 +595,8 @@ void FirstPersonMode::drawWeaponPlate(bool left, double bob[2], double kick, dou
 	// The ends' depths: well back, so the weapon is mostly hidden. The recoil kicks it back
 	// towards the eye; a strike brings it nearer too, and with its smaller reach the muzzle
 	// swings in towards the crosshair.
-	const double zFar = (6.9 - kick * 0.65) * (1.0 - 0.3 * strike), zNear = (1.95 - kick * 0.22) * (1.0 - 0.15 * strike);
+	const double restFarDepth = 6.9, restNearDepth = 1.95;
+	const double zFar = (restFarDepth - kick * 0.65) * (1.0 - 0.3 * strike), zNear = (restNearDepth - kick * 0.22) * (1.0 - 0.15 * strike);
 
 	// The bob and the dip move both ends a little on the screen; the recoil and the wind-up also
 	// lift the muzzle.
@@ -588,6 +604,18 @@ void FirstPersonMode::drawWeaponPlate(bool left, double bob[2], double kick, dou
 	double farEnd[3] = { side * (MuzzleScreen[0] * reachFar + sway[0]) * zFar,
 		(MuzzleScreen[1] * reachFar + sway[1] - kick * 0.03 - 0.05 * windup) * zFar, zFar };
 	double nearEnd[3] = { side * (MuzzleScreen[0] * 2.5 * reachNear + sway[0]) * zNear, (MuzzleScreen[1] * 2.5 * reachNear + sway[1]) * zNear, zNear };
+
+	// VR, the weapon in the right hand (see vrUpdateRifle): along the hand's ahead (z), as long as that line at rest, its
+	// bore on it (the laser's); put in the hand once its size is settled (below).
+	if (_vrHandHeld)
+	{
+		const double restFar[3] = { MuzzleScreen[0] * restFarDepth, MuzzleScreen[1] * restFarDepth, restFarDepth };
+		const double restNear[3] = { MuzzleScreen[0] * 2.5 * restNearDepth, MuzzleScreen[1] * 2.5 * restNearDepth, restNearDepth };
+		const double restLength = std::sqrt((restFar[0] - restNear[0]) * (restFar[0] - restNear[0]) + (restFar[1] - restNear[1]) * (restFar[1] - restNear[1])
+			+ (restFar[2] - restNear[2]) * (restFar[2] - restNear[2]));
+		farEnd[0] = farEnd[1] = nearEnd[0] = nearEnd[1] = nearEnd[2] = 0.0;
+		farEnd[2] = restLength;
+	}
 
 	// The weapon is a little shorter than that line, towards the muzzle (still on the same ray).
 	for (int axis = 0; axis < 3; ++axis) nearEnd[axis] = farEnd[axis] + (nearEnd[axis] - farEnd[axis]) * WeaponScale;
@@ -634,6 +662,27 @@ void FirstPersonMode::drawWeaponPlate(bool left, double bob[2], double kick, dou
 		}
 	}
 
+	// VR, in the hand: held VrHandAt of the way back from its muzzle (a melee weapon at its grip), slid back by a kick and
+	// lowered by a dip.
+	if (_vrHandHeld)
+	{
+		const double handAt = shape.melee ? GripAt : VrHandAt;
+		double hand[3];
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			hand[axis] = farEnd[axis] + (nearEnd[axis] - farEnd[axis]) * handAt;
+		}
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			farEnd[axis] -= hand[axis];
+			nearEnd[axis] -= hand[axis];
+		}
+		farEnd[2] -= kick * VrKickBack;
+		nearEnd[2] -= kick * VrKickBack;
+		farEnd[1] += dip * VrDipDown;
+		nearEnd[1] += dip * VrDipDown;
+	}
+
 	// The weapon's axis from stock to muzzle, and its length in camera space.
 	double along[3], length = 0.0;
 	for (int axis = 0; axis < 3; ++axis) { along[axis] = farEnd[axis] - nearEnd[axis]; length += along[axis] * along[axis]; }
@@ -655,9 +704,15 @@ void FirstPersonMode::drawWeaponPlate(bool left, double bob[2], double kick, dou
 	const double normalLength = std::sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
 	for (int axis = 0; axis < 3; ++axis) normal[axis] /= normalLength;
 
-	// The muzzle's tip on the screen, for the muzzle flash and our shots' starting point.
+	// The muzzle's tip on the screen, for the muzzle flash and our shots' starting point (and in camera space, with the
+	// barrel's way there, for VR's muzzle flash in the eyes).
 	tip[0] = centreX + farEnd[0] / farEnd[2] * focalPixels;
 	tip[1] = centreY + farEnd[1] / farEnd[2] * focalPixels;
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		_heldMuzzleCamera[axis] = farEnd[axis];
+		_heldAlongCamera[axis] = along[axis] / length;
+	}
 
 	// The plate's four corners on the screen bound the pixels to fill (the plate reaches as far
 	// across from the bore as the picture does, either way; depth kept off the eye).
@@ -675,10 +730,10 @@ void FirstPersonMode::drawWeaponPlate(bool left, double bob[2], double kick, dou
 	}
 	minX = std::max(0, minX); minY = std::max(0, minY); maxX = std::min(width - 1, maxX); maxY = std::min(height - 1, maxY);
 
-	// The voxel weapon, if this weapon has voxels (the flat plate below is only the fallback).
-	if (!_heldFaces.empty())
+	// The voxel weapon, if this weapon has voxels (the flat plate below is only the fallback; none in VR's eyes).
+	if (!_heldFaces.empty() || _vrHeldCollect)
 	{
-		drawWeaponVoxels(nearEnd, along, up, normal, perPixel, shade);
+		if (!_heldFaces.empty()) drawWeaponVoxels(nearEnd, along, up, normal, perPixel, shade);
 		return;
 	}
 
@@ -791,8 +846,25 @@ void FirstPersonMode::drawHeldItem(bool left, double bob[2], double dip, int sha
 			stepPerDepth[axis] = turn[axis][2] * perPixel;
 			origin[axis] = middle[axis] - boxMiddleX * stepPerX[axis] - boxMiddleY * stepPerY[axis];
 		}
+		// (VR, in the eyes: the same look VrHeldItemDepth times further out, so it isn't held against the eyes; in the right
+		// hand as big, the box's middle in the hand)
+		if (_vrHeldCollect)
+		{
+			for (int axis = 0; axis < 3; ++axis)
+			{
+				stepPerX[axis] *= VrHeldItemDepth;
+				stepPerY[axis] *= VrHeldItemDepth;
+				stepPerDepth[axis] *= VrHeldItemDepth;
+				origin[axis] = _vrHandHeld ? -boxMiddleX * stepPerX[axis] - boxMiddleY * stepPerY[axis] + (axis == 1 ? dip * VrDipDown : 0.0)
+					: origin[axis] * VrHeldItemDepth;
+			}
+		}
 		drawVoxelFaces(origin, stepPerX, stepPerY, stepPerDepth, shade);
 		return;
+	}
+	if (_vrHeldCollect)
+	{
+		return; // (no flat picture in VR's eyes)
 	}
 
 	// The flat picture: where its top left corner goes on the canvas.
@@ -845,13 +917,22 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 	// Shown only in the 3D view with the setting on, the classic HUD off, a weapon in hand,
 	// nobody going down, and the game's inventory pictures (BIGOBS.PCK) at hand.
 	// (A built-in weapon with nothing to hold leaves the hands empty: see weaponShownInHand.)
+	// VR drawing both eyes (the desktop's preview, the shell's): the weapon goes into the eyes as a 3D object (setting
+	// "VR weapon"; NO: no weapon at all in VR), never onto the screen or the HUD; the desktop's setting rules the flat view.
 	BattleItem *weapon = unit ? activeWeapon(unit) : nullptr;
 	SurfaceSet *inventorySprites = _game->getMod()->getSurfaceSet("BIGOBS.PCK");
-	const bool show = Options::fpsViewModel && isActive() && !_classicHud && weapon && weaponShownInHand(unit, weapon) && !_deathUnit && inventorySprites
-		&& !_scanner->isUp(); // (the motion scanner held up takes its place, see updateScanner)
-	_weaponInHand->setVisible(show);
+	const bool vrEyes = vrEyesDrawn();
+	const bool show = (vrEyes ? Options::fpsVrWeapon : Options::fpsViewModel) && isActive() && !_classicHud && weapon && weaponShownInHand(unit, weapon) && !_deathUnit
+		&& inventorySprites && !_scanner->isUp(); // (the motion scanner held up takes its place, see updateScanner)
+	_weaponInHand->setVisible(show && !vrEyes);
 	_view->setMuzzlePoint(0.0, 0.0, false); // set again below while a gun is in hand
 	_view->setOffMuzzlePoint(0.0, 0.0, false);
+	if (vrOn())
+	{
+		_view->setHeldModel(FirstPersonHeldModel()); // (handed again below while one shows in the eyes)
+		_vrMuzzleAhead = VrBareMuzzleAhead; // (a gun's own below)
+		_vrModelInHand = vrEyes && vrRifleAims(); // (in the right hand, see vrUpdateRifle: drawn there, not where the desktop has it)
+	}
 	if (!show)
 	{
 		_heldItem = nullptr;
@@ -935,17 +1016,22 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 	// Looking far down, the weapon slides gently down out of sight (eased in from 45 to 72
 	// degrees below level, following the view), and back up as the view comes up: held low,
 	// it would cover the ground at the soldier's feet. Aiming and firing don't change.
-	// Zoomed in, it's lowered out of sight the same way, as far as the zoom has gone.
+	// Zoomed in, it's lowered out of sight the same way, as far as the zoom has gone. (Not in a
+	// VR hand, which holds it where it is.)
 	const double lookingDown = -_view->getPitchDegrees();
 	const double lookDownShare = std::clamp((lookingDown - LookDownSlideFrom) / (LookDownSlideTo - LookDownSlideFrom), 0.0, 1.0);
 	const double zoomShare = std::log(_zoom) / std::log(ZoomFactor);
-	const double slideShare = std::max(lookDownShare, zoomShare);
+	const double slideShare = _vrModelInHand && vrEyes ? 0.0 : std::max(lookDownShare, zoomShare);
 	if (slideShare > 0.0)
 	{
 		dip += slideShare * slideShare * (3.0 - 2.0 * slideShare) * _weaponInHand->getHeight() * 0.8;
 	}
 	_weaponInHand->clear();
 	_weaponInHand->lock();
+	// (VR's eyes: the faces gathered here, in the weapon's camera space, see drawVoxelFaces; its flashes and muzzles too)
+	FirstPersonHeldModel held;
+	_vrHeldCollect = vrEyes ? &held : nullptr;
+	_vrHandHeld = vrEyes && _vrModelInHand;
 
 	// A muzzle flash at a tip, behind the weapon (with the setting "Muzzle flashes"): a disc
 	// with rays that spin, its core, middle and rim in their own colours.
@@ -955,6 +1041,33 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 		// reach at most.
 		const int radius = std::max(5, (int)std::lround(_weaponInHand->getWidth() / 30.0 * flash.size));
 		const int reach = (int)std::ceil(radius * (1.0 + flash.spike));
+
+		// VR's eyes: the same flash in the weapon's camera space (drawWeaponPlate just put the muzzle there), as big as
+		// it looks on the desktop at the muzzle's depth (the pixels over the lens's focal length), centred as there half
+		// its radius from the bore towards the crosshair, and as far on along the barrel, so the muzzle covers the back
+		// of it; its rays turned as far.
+		if (vrEyes)
+		{
+			const double focalPixels = _weaponInHand->getWidth() / 2.0 * WeaponLens;
+			const double radiusAtMuzzle = radius / focalPixels * _heldMuzzleCamera[2];
+			const double offAxis = std::max(1e-6, std::sqrt(_heldMuzzleCamera[0] * _heldMuzzleCamera[0] + _heldMuzzleCamera[1] * _heldMuzzleCamera[1]));
+			FirstPersonHeldFlash heldFlash;
+			for (int axis = 0; axis < 3; ++axis)
+			{
+				const double towardsCrosshair = axis == 2 ? 0.0 : -_heldMuzzleCamera[axis] / offAxis;
+				heldFlash.middle[axis] = (float)(_heldMuzzleCamera[axis] + (towardsCrosshair + _heldAlongCamera[axis]) * radiusAtMuzzle * 0.5);
+			}
+			heldFlash.radius = (float)radiusAtMuzzle;
+			heldFlash.core = flash.core;
+			heldFlash.mid = flash.mid;
+			heldFlash.rim = flash.rim;
+			heldFlash.rays = flash.rays;
+			heldFlash.spike = (float)flash.spike;
+			heldFlash.sharpness = (float)flash.sharpness;
+			heldFlash.turn = (float)std::fmod(now * 0.05, 2.0 * Pi);
+			held.flashes.push_back(heldFlash);
+			return;
+		}
 
 		// Centred just ahead of the bore, along the barrel towards the crosshair (the screen's
 		// centre): the muzzle covers the back of it.
@@ -990,17 +1103,30 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 		// A gun or a club, pointing at the crosshair. Our shots leave its muzzle (the canvas
 		// point scaled to the 3D view's pixels), and it flashes when it fires.
 		double tip[2];
-		drawWeaponPlate(inLeftHand, bob, kick, dip, shade, tip);
+		drawWeaponPlate(inLeftHand && !_vrHandHeld, bob, kick, dip, shade, tip);
 		const double canvasToView = _view->getWidth() / (double)_weaponInHand->getWidth();
-		_view->setMuzzlePoint(tip[0] * canvasToView, tip[1] * canvasToView, true);
+		_view->setMuzzlePoint(tip[0] * canvasToView, tip[1] * canvasToView, !_vrHandHeld);
+		if (vrEyes)
+		{
+			std::copy(_heldMuzzleCamera, _heldMuzzleCamera + 3, held.muzzles[0]);
+			held.muzzleShown[0] = true;
+			if (_vrHandHeld)
+			{
+				// (the laser and the aim start at its muzzle, see vrUpdateRifle; dual wield's other gun fires from there too)
+				_vrMuzzleAhead = std::max(0.0, _heldMuzzleCamera[2]) * VrHeldScale;
+				std::copy(_heldMuzzleCamera, _heldMuzzleCamera + 3, held.muzzles[1]);
+				held.muzzleShown[1] = otherWeapon != nullptr;
+			}
+		}
 		if (Options::fpsMuzzleFlash && now < _muzzleFlashUntil)
 		{
 			drawFlash(tip, _muzzleFlash);
 		}
 
 		// Dual wield: the other gun, on the other side, swapped in for drawing (its picture is
-		// drawn and measured again when it's a different kind); its rounds leave its muzzle.
-		if (otherWeapon)
+		// drawn and measured again when it's a different kind); its rounds leave its muzzle. (Not
+		// in a VR hand: the one weapon there.)
+		if (otherWeapon && !_vrHandHeld)
 		{
 			swapOffHand();
 			if (otherWeapon->getRules() != _heldRules)
@@ -1014,6 +1140,11 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 				double otherTip[2];
 				drawWeaponPlate(!inLeftHand, bob, kick, dip, shade, otherTip);
 				_view->setOffMuzzlePoint(otherTip[0] * canvasToView, otherTip[1] * canvasToView, true, otherWeapon);
+				if (vrEyes)
+				{
+					std::copy(_heldMuzzleCamera, _heldMuzzleCamera + 3, held.muzzles[1]);
+					held.muzzleShown[1] = true;
+				}
 				if (Options::fpsMuzzleFlash && now < _offHandFlashUntil)
 				{
 					drawFlash(otherTip, _offHandFlash);
@@ -1025,9 +1156,18 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 	else
 	{
 		// Anything else (a grenade, a medi-kit...), held up in the corner.
-		drawHeldItem(inLeftHand, bob, dip, shade);
+		drawHeldItem(inLeftHand && !_vrHandHeld, bob, dip, shade);
 	}
 	_weaponInHand->unlock();
+
+	// VR's eyes: the weapon handed to the 3D view, in the hand's space, to draw in each eye (where the head is when
+	// they're drawn, see vrRenderEyes).
+	_vrHeldCollect = nullptr;
+	_vrHandHeld = false;
+	if (vrEyes)
+	{
+		_view->setHeldModel(std::move(held));
+	}
 }
 
 }

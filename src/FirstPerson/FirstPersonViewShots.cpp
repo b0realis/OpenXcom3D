@@ -199,7 +199,7 @@ bool FirstPersonView::drawThrownItem(const Position &current, const Position &be
 
 	// The eye in true proportions, and the view's focal length in pixels.
 	const double eye[3] = { _eye[0], _eye[1], _eye[2] * ZScale };
-	const double focalLength = (getWidth() / 2.0) / _halfFovTangent;
+	const double focalLength = focalPixels();
 
 	// Each face that shows: on the screen, with its shaded colour and its distance ahead.
 	struct Quad { float depth; double screen[4][2]; Uint8 color; };
@@ -256,8 +256,8 @@ bool FirstPersonView::drawThrownItem(const Position &current, const Position &be
 		quad.depth = (float)((ahead[0] + ahead[2]) * 0.5);
 		for (int cornerIndex = 0; cornerIndex < 4; ++cornerIndex)
 		{
-			quad.screen[cornerIndex][0] = getWidth() / 2.0 + toRight[cornerIndex] * focalLength / ahead[cornerIndex];
-			quad.screen[cornerIndex][1] = getHeight() / 2.0 - above[cornerIndex] * focalLength / ahead[cornerIndex];
+			quad.screen[cornerIndex][0] = axisX() + toRight[cornerIndex] * focalLength / ahead[cornerIndex];
+			quad.screen[cornerIndex][1] = axisY() - above[cornerIndex] * focalLength / ahead[cornerIndex];
 		}
 		quads.push_back(quad);
 	}
@@ -489,7 +489,8 @@ void FirstPersonView::addDecal(const float pos[3], int size, int darkness)
 void FirstPersonView::drawDecals()
 {
 	const int width = getWidth(), height = getHeight();
-	const double focalLength = (width / 2.0) / _halfFovTangent; // in pixels
+	const double focalLength = focalPixels(); // in pixels
+	const double viewAxisX = axisX(), viewAxisY = axisY(); // where the view axis meets the picture (its middle, but in VR)
 	// Scorched ground around big explosions: up to four shades darker in a soft disc.
 	for (const auto &scorch : _scorches)
 	{
@@ -509,7 +510,7 @@ void FirstPersonView::drawDecals()
 		const double world[3] = { decal.pos[0], decal.pos[1], decal.pos[2] };
 		double screenX, screenY, depth;
 		if (!projectToScreen(world, screenX, screenY, depth)) continue;
-		const double markRight = (screenX - width / 2.0) * depth / focalLength, markUp = (height / 2.0 - screenY) * depth / focalLength;
+		const double markRight = (screenX - viewAxisX) * depth / focalLength, markUp = (viewAxisY - screenY) * depth / focalLength;
 		const double radius = decal.size * MarkRadius;    // in voxels
 		const double pixelSpan = depth / focalLength;     // how much of the world one pixel spans there, in voxels
 		const int centreX = (int)std::floor(screenX), centreY = (int)std::floor(screenY);
@@ -517,7 +518,7 @@ void FirstPersonView::drawDecals()
 		auto distanceFromMark = [&](int x, int y)
 		{
 			const double sceneAhead = _depthBuffer[y * width + x];
-			const double sceneRight = (x + 0.5 - width / 2.0) * sceneAhead / focalLength, sceneUp = (height / 2.0 - (y + 0.5)) * sceneAhead / focalLength;
+			const double sceneRight = (x + 0.5 - viewAxisX) * sceneAhead / focalLength, sceneUp = (viewAxisY - (y + 0.5)) * sceneAhead / focalLength;
 			return std::sqrt((sceneAhead - depth) * (sceneAhead - depth) + (sceneRight - markRight) * (sceneRight - markRight) + (sceneUp - markUp) * (sceneUp - markUp));
 		};
 		// Darkens a pixel by some shades, within its own colour group (empty black pixels stay).
@@ -965,7 +966,7 @@ void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 c
 	bool overEverything)
 {
 	const int width = getWidth(), height = getHeight();
-	const double focalLength = (width / 2.0) / _halfFovTangent; // in pixels
+	const double focalLength = focalPixels(); // in pixels
 	// Clip the line against a near plane 3 voxels in front of the eye (depth along the view
 	// direction, in true proportions), so a beam from right beside the camera still draws.
 	double start[3] = { from[0], from[1], from[2] }, end[3] = { to[0], to[1], to[2] };
@@ -1419,7 +1420,7 @@ void FirstPersonView::drawShotDot(const float head[3], const float origin[3], Tr
 		return;
 	}
 	const int width = getWidth(), height = getHeight();
-	const double focalLength = (width / 2.0) / _halfFovTangent; // in pixels
+	const double focalLength = focalPixels(); // in pixels
 	const double size = (trail == TRAIL_PLASMA ? 3.5 : trail == TRAIL_SMOKE ? 1.1 : 0.9) * calibre;
 	const int radius = std::clamp((int)std::lround(size * focalLength / depth * 0.5), 1, 12);
 	// A round dot, depth-tested: the inner 40% in the centre colour, out to 70% the middle one,
@@ -1861,7 +1862,7 @@ void FirstPersonView::drawPellets()
 		shotHead(pellet, head);
 		drawLikeRound(pellet, head, round && pellet->getWeapon() != round->getWeapon() ? _partnerOrigin : _shotTrailOrigin);
 	}
-	_map->moveStrays(); // (the map moves them as it draws them, and in 3D it isn't drawn)
+	if (!_replayPass) _map->moveStrays(); // (the map moves them as it draws them, and in 3D it isn't drawn; VR's first eye moved them)
 	for (const Projectile *stray : _map->getStrays())
 	{
 		const Position at = stray->getPosition(0), start = stray->getPosition(-100000);
@@ -2057,7 +2058,16 @@ void FirstPersonView::beginShot(Projectile *projectile)
 	// along the ray through it. The offset from the game's start shrinks to nothing at the
 	// impact (see shotHead).
 	std::fill(_shotOffset, _shotOffset + 3, 0.0f);
-	if (ownShot && muzzleValid)
+	if (ownShot && _heldMuzzleWorldShown[fromOffHand ? 1 : 0])
+	{
+		// (VR, the weapon in hand drawn in the eyes: from its muzzle there, see placeHeldModel)
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			origin[axis] = _heldMuzzleWorld[fromOffHand ? 1 : 0][axis];
+			_shotOffset[axis] = origin[axis] - _shotFrom[axis];
+		}
+	}
+	else if (ownShot && muzzleValid)
 	{
 		double rayDirection[3];
 		getRayDirection((int)muzzleScreen[0], (int)muzzleScreen[1], rayDirection);

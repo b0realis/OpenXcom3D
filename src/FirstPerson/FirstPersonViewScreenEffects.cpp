@@ -124,11 +124,12 @@ void FirstPersonView::showHurt(const double *from, float amount, bool splatter)
  */
 void FirstPersonView::drawBurning()
 {
-	// Seconds since the last frame (at most a tenth of a second, nothing on the first frame).
+	// Seconds since the last frame (at most a tenth of a second, nothing on the first frame; and
+	// nothing for VR's second eye, whose flames moved on with the first's: see renderEyes).
 	// A flare-up dies down over a little under a second.
 	const Uint32 now = SDL_GetTicks();
-	const float elapsedSeconds = _flameLastTick ? std::min<Uint32>(100, now - _flameLastTick) / 1000.0f : 0.0f;
-	_flameLastTick = now;
+	const float elapsedSeconds = _flameLastTick && !_replayPass ? std::min<Uint32>(100, now - _flameLastTick) / 1000.0f : 0.0f;
+	if (!_replayPass) _flameLastTick = now;
 	_flameBurst = std::max(0.0f, _flameBurst - elapsedSeconds * 1.2f);
 	// Not burning: no flare-up either, and once the last heat and embers are gone, nothing to do.
 	if (_burningAmount <= 0.0f)
@@ -413,8 +414,9 @@ void FirstPersonView::applyScreenWash()
 	{
 		return;
 	}
-	// The static's pattern changes every frame: each row starts its own random numbers from this.
-	_staticSeed = _staticSeed * 1664525u + 1013904223u;
+	// The static's pattern changes every frame: each row starts its own random numbers from this
+	// (VR's second eye keeps the first eye's: both see the same static).
+	if (!_replayPass) _staticSeed = _staticSeed * 1664525u + 1013904223u;
 	runOnAllThreads(&FirstPersonView::washBands);
 }
 

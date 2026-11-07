@@ -54,6 +54,12 @@
 #include <cmath>
 #include <mutex>
 #include <SDL.h>
+#ifdef __ANDROID__
+#include <fstream>
+#include <sstream>
+#include <thread>
+#include <android/log.h>
+#endif
 #include "../Engine/Logger.h"
 #include "../Engine/Options.h"
 #include "../Engine/Sound.h"
@@ -370,6 +376,29 @@ void FirstPersonView::setMaxDistance(int tiles)
  */
 void FirstPersonView::updateBasis()
 {
+	// VR: a head's (or an eye's) own axes, as they are (see setHeadAxes): no pitch limit, no recoil kick. The level ones,
+	// for what stands square to the view, from its yaw: right along the ground, and up square to that and forward.
+	if (_headAxes)
+	{
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			_forward[axis] = _headForward[axis];
+			_right[axis] = _headRight[axis];
+			_up[axis] = _headUp[axis];
+		}
+		_levelRight[0] = -std::sin(_yaw); _levelRight[1] = std::cos(_yaw); _levelRight[2] = 0.0;
+		_levelUp[0] = -_forward[2] * _levelRight[1];
+		_levelUp[1] = _forward[2] * _levelRight[0];
+		_levelUp[2] = _forward[0] * _levelRight[1] - _forward[1] * _levelRight[0];
+		const double levelUpLength = std::sqrt(_levelUp[0] * _levelUp[0] + _levelUp[1] * _levelUp[1] + _levelUp[2] * _levelUp[2]);
+		for (double &component : _levelUp) component /= std::max(1e-9, levelUpLength);
+		const double forwardZInVoxels = _forward[2] / ZScale;
+		const double lengthInVoxels = std::sqrt(_forward[0] * _forward[0] + _forward[1] * _forward[1] + forwardZInVoxels * forwardZInVoxels);
+		_forwardInVoxels[0] = _forward[0] / lengthInVoxels;
+		_forwardInVoxels[1] = _forward[1] / lengthInVoxels;
+		_forwardInVoxels[2] = forwardZInVoxels / lengthInVoxels;
+		return;
+	}
 	// The pitch with the recoil kick added, within the same limits as rotate (MaxPitch).
 	const double viewPitch = std::clamp(_pitch + (Options::fpsRecoil ? _recoilKick : 0.0f) * Pi / 180.0, -MaxPitch * Pi / 180.0, MaxPitch * Pi / 180.0); // recoil shows, it doesn't stay (none with the setting "Recoil" off; the gun in hand still kicks)
 	const double cosYaw = std::cos(_yaw), sinYaw = std::sin(_yaw), cosPitch = std::cos(viewPitch), sinPitch = std::sin(viewPitch);
@@ -427,9 +456,11 @@ void FirstPersonView::rayDirectionThrough(int pixelX, int pixelY, double out[3])
 	// Where the pixel lies on an image plane one unit in front of the eye: planeX to the right,
 	// from -tan(half the field of view) to +tan; planeY up, over the same range shrunk by the
 	// view's height over its width.
+	// (In VR an eye's picture is off centre: its view axis meets it at (axisX, axisY), and a unit of the plane is
+	// focalPixels pixels.)
 	const int viewWidth = getWidth(), viewHeight = getHeight();
-	const double planeX = ((pixelX + 0.5) * 2.0 / viewWidth - 1.0) * _halfFovTangent;
-	const double planeY = (1.0 - (pixelY + 0.5) * 2.0 / viewHeight) * _halfFovTangent * viewHeight / viewWidth;
+	const double planeX = _eyePass ? (pixelX + 0.5 - _eyeAxisX) / _eyeFocal : ((pixelX + 0.5) * 2.0 / viewWidth - 1.0) * _halfFovTangent;
+	const double planeY = _eyePass ? (_eyeAxisY - (pixelY + 0.5)) / _eyeFocal : (1.0 - (pixelY + 0.5) * 2.0 / viewHeight) * _halfFovTangent * viewHeight / viewWidth;
 	double length = 0.0;
 	// The direction in true proportions: forward, plus that much right and up.
 	for (int axis = 0; axis < 3; ++axis)
@@ -523,6 +554,29 @@ void FirstPersonView::draw()
 	{
 		return;
 	}
+#ifdef __ANDROID__
+	// (The frame's start, for the Android build's frame probe.)
+	const Uint64 drawStart = SDL_GetPerformanceCounter();
+#endif
+	// The frame's shared work, then its one picture (VR's renderEyes draws two of them from the one shared part): all
+	// of it but the units' facing rings, which close it here (and each of renderEyes's), over everything.
+	beginFrame();
+	drawPass();
+	drawFacing();
+	unlock();
+#ifdef __ANDROID__
+	reportFrameTime(drawStart);
+#endif
+}
+
+/**
+ * The first half of a frame, the work every picture of it shares: the camera's effects (its shake, the recoil, a camera
+ * feed's static spells) and axes, the flashlight's place, a chain of explosions' ripple, this frame's snapshot of the
+ * tiles, the ground beyond the map (chosen once), the palette's colours for the time of day, and the particles moved
+ * on (the shots followed with them). Done with the view's own camera (in VR, the head's middle).
+ */
+void FirstPersonView::beginFrame()
+{
 	// Upscaled sprites used from now on belong to this frame (see upscaled).
 	_upscaleFrameStart = _upscaleClock + 1;
 
@@ -551,8 +605,23 @@ void FirstPersonView::draw()
 		chooseGround();
 	}
 	updateColors();
+	// VR's eyes: the weapon in hand put into the world among these tiles (see renderEyes), before the shots are
+	// followed: ours leave its muzzle.
+	if (_heldFrame)
+	{
+		placeHeldModel(*_heldFrame);
+	}
 	updateParticles();
+}
 
+/**
+ * The second half of a frame: one picture of it, drawn straight into the surface's pixels (in VR an eye's, swapped in
+ * for the view's own, see renderEyes). The world ray by ray, then what's in it as sprites, dots and lines, the
+ * see-through smoke, the particles and the glow; the effects on the finished picture; last the marks over everything,
+ * but for the units' facing rings: the caller draws those last and unlocks the surface (see draw).
+ */
+void FirstPersonView::drawPass()
+{
 	// Draw straight into the surface's pixels.
 	lock();
 	// The world: terrain, border and sky, ray by ray (fills the depth buffer).
@@ -566,7 +635,8 @@ void FirstPersonView::draw()
 	std::fill(&_pointerUnits[0][0], &_pointerUnits[0][0] + sizeof(_pointerUnits) / sizeof(_pointerUnits[0][0]), nullptr);
 	std::fill(&_pointerBodies[0][0], &_pointerBodies[0][0] + sizeof(_pointerBodies) / sizeof(_pointerBodies[0][0]), nullptr);
 	std::fill(&_pointerPiles[0][0], &_pointerPiles[0][0] + sizeof(_pointerPiles) / sizeof(_pointerPiles[0][0]), nullptr);
-	watchUnits();
+	// (VR's second eye: the hits were watched for the first already, once a frame)
+	if (!_replayPass) watchUnits();
 	drawDecals();
 	drawFloorItems();
 	drawEdgeDots();
@@ -578,7 +648,8 @@ void FirstPersonView::draw()
 	drawPellets();
 	drawTrajectory(false);
 	drawSeeThroughSmoke();
-	findUnitAtPointer();
+	// (VR's second eye: the unit pointed at is the first eye's, where the crosshair is)
+	if (!_replayPass) findUnitAtPointer();
 	drawParticles();
 	drawLightHalos();
 	// Effects on the finished picture (a camera's feed: its bad signal last). Under night vision
@@ -592,9 +663,60 @@ void FirstPersonView::draw()
 	drawDownedIcons();
 	drawMarkers();
 	drawSprayMarks();
-	drawFacing();
-	unlock();
 }
+
+#ifdef __ANDROID__
+/**
+ * The Android build's frame probe, for the tests on the headset: adds this frame's time and,
+ * every ProbeSeconds, writes the stretch's frames, average and slowest frame to the game's log
+ * and to the system log (tag OpenXcom3D, which `adb logcat -s OpenXcom3D` shows); the first
+ * time also the processors the game may run on (Cpus_allowed_list). Each 3D view reports its own
+ * (the soldier's view, and a soldier cam's or the map camera's when one is open).
+ * @param drawStart The frame's start (SDL_GetPerformanceCounter).
+ */
+void FirstPersonView::reportFrameTime(Uint64 drawStart)
+{
+	const int ProbeSeconds = 5;
+	const double frameMs = (SDL_GetPerformanceCounter() - drawStart) * 1000.0 / SDL_GetPerformanceFrequency();
+	const Uint32 now = SDL_GetTicks();
+	if (_probeFrames == 0)
+	{
+		_probeSince = now;
+	}
+	++_probeFrames;
+	_probeTotalMs += frameMs;
+	_probeWorstMs = std::max(_probeWorstMs, frameMs);
+	if (now - _probeSince < ProbeSeconds * 1000u)
+	{
+		return;
+	}
+
+	// Once: the processors the game may run on (the system decides how many an app gets).
+	static bool coresReported = false;
+	std::ostringstream report;
+	if (!coresReported)
+	{
+		coresReported = true;
+		std::ifstream status("/proc/self/status");
+		std::string line, allowed = "?";
+		while (std::getline(status, line))
+		{
+			if (line.rfind("Cpus_allowed_list:", 0) == 0) allowed = line.substr(line.find(':') + 1);
+		}
+		report << "processors: " << std::thread::hardware_concurrency() << ", allowed:" << allowed << "; ";
+	}
+
+	// The stretch: frames, their average and the slowest.
+	report.setf(std::ios::fixed);
+	report.precision(1);
+	report << "the " << getWidth() << "x" << getHeight() << " 3D view: " << _probeFrames << " frames in "
+		<< (now - _probeSince) / 1000.0 << " s, average " << _probeTotalMs / _probeFrames << " ms, slowest " << _probeWorstMs << " ms";
+	Log(LOG_INFO) << "OpenXcom3D: " << report.str();
+	__android_log_print(ANDROID_LOG_INFO, "OpenXcom3D", "%s", report.str().c_str());
+	_probeFrames = 0;
+	_probeTotalMs = _probeWorstMs = 0.0;
+}
+#endif
 
 /**
  * Moves the camera's effects on by one frame: the shake jitters the eye (smooth wobbles that
@@ -609,8 +731,8 @@ void FirstPersonView::updateCameraEffects()
 	const float elapsedSeconds = _shakeLastTick ? std::min<Uint32>(100, now - _shakeLastTick) / 1000.0f : 0.0f;
 	_shakeLastTick = now;
 	// Camera shake: the eye jitters for this frame only, dying away (halving about every tenth
-	// of a second). None with the setting "Screen shake" off.
-	if (_shake > 0.02f && Options::fpsScreenShake)
+	// of a second). None with the setting "Screen shake" off, nor in VR mode (comfort: see setComfort).
+	if (_shake > 0.02f && Options::fpsScreenShake && !_comfort)
 	{
 		// Smooth shaking (a few wobbles a second, from sines of the time), not a new random jolt
 		// every frame; less sideways than up and down.

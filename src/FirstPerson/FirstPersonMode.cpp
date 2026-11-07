@@ -52,6 +52,7 @@
  */
 #include "FirstPersonMode.h"
 #include <algorithm>
+#include <array>
 #include <climits>
 #include <cmath>
 #include <string>
@@ -203,6 +204,8 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
 		_mouseLook = !_classicHud;
 	}
 	rememberChoices();
+	// VR's calls (see FirstPersonVr.h) come to this screen's mode from now on.
+	_vrCurrent = this;
 }
 
 /**
@@ -1203,6 +1206,12 @@ void FirstPersonMode::syncShadows()
  */
 FirstPersonMode::~FirstPersonMode()
 {
+	// VR's calls (see FirstPersonVr.h) no longer come here; the HUD's own picture goes.
+	if (_vrCurrent == this)
+	{
+		_vrCurrent = nullptr;
+	}
+	delete _vrHud;
 	Timer::maxFrameSkip = Options::maxFrameSkip; // the player's own frame skipping again (see catchUp)
 	_state->_map->setSoundListener(nullptr);
 	_state->_map->setNightVisionHoldBlocked(false);
@@ -1250,6 +1259,17 @@ bool FirstPersonMode::isActive() const
 }
 
 /**
+ * Does the aliens' turn play in 3D, the view following them (the setting "Alien turn in 3D")?
+ * Never with VR mode on (the owner: "In vr mode alien turn is in iso mode not 3d ... as too much
+ * switching of camera"): the isometric map shows it, and 3D comes back with the player's turn.
+ * @return True if so.
+ */
+bool FirstPersonMode::alienTurn3D() const
+{
+	return Options::fpsAlienTurn3D && !vrOn();
+}
+
+/**
  * Switches between the isometric map and the 3D view (the 3D key or button), as the ISO/3D
  * button says: the map when the 3D view shows, else 3D. The switch itself happens in think(),
  * called right away, which also checks there is a soldier to look through. In the aliens' turn
@@ -1259,7 +1279,7 @@ bool FirstPersonMode::isActive() const
 void FirstPersonMode::toggleView()
 {
 	_wants3D = !isActive();
-	if (_wants3D && _save->getSide() != FACTION_PLAYER && !Options::fpsAlienTurn3D)
+	if (_wants3D && _save->getSide() != FACTION_PLAYER && !alienTurn3D())
 	{
 		_state->warning("STR_FPS_3D_NEXT_TURN");
 	}
@@ -1299,7 +1319,7 @@ void FirstPersonMode::setActive(bool active)
 	// Going into 3D, and back, the map forgets any arrow key it was scrolling with: a key let go
 	// in 3D, where the map doesn't get it, would leave it drifting. (Done both ways, as the map
 	// takes the release only while its cursor shows, which isn't so while the game is busy.)
-	for (SDLKey scrollKey : { Options::keyBattleLeft, Options::keyBattleRight, Options::keyBattleUp, Options::keyBattleDown })
+	for (SDL_Keycode scrollKey : { Options::keyBattleLeft, Options::keyBattleRight, Options::keyBattleUp, Options::keyBattleDown })
 	{
 		SDL_Event release = {};
 		release.type = SDL_KEYUP;
@@ -1452,7 +1472,7 @@ void FirstPersonMode::toggleEnPassant()
  * (Shift, Ctrl or Alt; Left Shift by default). None with leaning off, another lean key, or the
  * key not held.
  */
-SDLMod FirstPersonMode::leanModifierHeld() const
+SDL_Keymod FirstPersonMode::leanModifierHeld() const
 {
 	if (Options::fpsLean == 0)
 	{
@@ -1470,7 +1490,7 @@ SDLMod FirstPersonMode::leanModifierHeld() const
 	case SDLK_RALT: bits = KMOD_RALT; break;
 	default: return KMOD_NONE;
 	}
-	return (SDL_GetModState() & bits) ? (SDLMod)bits : KMOD_NONE;
+	return (SDL_GetModState() & bits) ? (SDL_Keymod)bits : KMOD_NONE;
 }
 
 /**
@@ -1945,6 +1965,10 @@ void FirstPersonMode::think()
 	const bool resumed = _lastFrameTick && now - _lastFrameTick > 250;
 	_lastFrameTick = now;
 
+	// VR mode: the head looks (the shell's, or the desktop's stand-in), first, for everything below that reads where the
+	// view looks; and nothing shakes the view (see vrBeginFrame). With it off, nothing.
+	vrBeginFrame(elapsedSeconds);
+
 	// Explosions in 3D at the isometric map's pace (the battle's timer catching up).
 	catchUp();
 
@@ -2016,7 +2040,7 @@ void FirstPersonMode::think()
 		_alienTurnCamera = nullptr;
 		_alertWatch.clear();
 	}
-	else if (Options::fpsAlienTurn3D && _wants3D)
+	else if (alienTurn3D() && _wants3D)
 	{
 		// (Only while the 3D view is wanted; with the map shown, see below.)
 		alienTurnView = alienTurnCamera(now);
@@ -2027,7 +2051,7 @@ void FirstPersonMode::think()
 		// The map shows the aliens' turn: the cameras pop up over it.
 		alienTurnMapCameras(now);
 	}
-	BattleUnit *unit = playerTurn ? selected : (Options::fpsAlienTurn3D ? (alienTurnView ? alienTurnView : _lastPlayerUnit) : nullptr);
+	BattleUnit *unit = playerTurn ? selected : (alienTurn3D() ? (alienTurnView ? alienTurnView : _lastPlayerUnit) : nullptr);
 	if (unit && unit->isOut())
 	{
 		unit = nullptr;
@@ -2085,8 +2109,7 @@ void FirstPersonMode::think()
 	updateZoom(elapsedSeconds);
 	// Which way the units face, while the key for it is held (Left Alt by default: it's the game's
 	// modifier, so held on its own it counts whatever else is held).
-	const Uint8 *heldKeys = SDL_GetKeyState(nullptr);
-	_view->setShowFacing(Options::keyFpsShowFacing != SDLK_UNKNOWN && heldKeys[Options::keyFpsShowFacing]);
+	_view->setShowFacing(isKeyHeld(Options::keyFpsShowFacing));
 	updateScope();
 	_view->setFieldOfView(fieldOfViewNow(), _zoom);
 	_view->setSmoothLighting(Options::fpsSmoothLighting);
@@ -2122,7 +2145,7 @@ void FirstPersonMode::think()
 	if (playerTurn)
 	{
 		openDoorAfterTurn(unit);
-		faceLookDirection(unit);
+		if (vrOn()) vrFaceBody(unit, elapsedSeconds); else faceLookDirection(unit);
 		updateFireMode(unit);
 		updateAim(unit);
 	}
@@ -2239,12 +2262,13 @@ bool FirstPersonMode::handle(Action *action)
 		return false;
 	}
 
-	// Keys go to the key handler; anything that's neither a key nor the mouse isn't ours.
+	// Keys go to the key handler; anything that's neither a key nor the mouse (its moves, buttons
+	// and wheel) isn't ours.
 	if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP)
 	{
 		return handleKey(action, active);
 	}
-	if (event.type != SDL_MOUSEMOTION && event.type != SDL_MOUSEBUTTONDOWN && event.type != SDL_MOUSEBUTTONUP)
+	if (event.type != SDL_MOUSEMOTION && !isMouseButtonOrWheel(event))
 	{
 		return false;
 	}
@@ -2296,17 +2320,17 @@ void FirstPersonMode::trackHover(Action *action)
 bool FirstPersonMode::handleKey(Action *action, bool active)
 {
 	const SDL_Event &event = *action->getDetails();
-	const SDLKey key = event.key.keysym.sym;
+	const SDL_Keycode key = event.key.keysym.sym;
 	// A key SDL can't name is never ours (an unbound action is SDLK_UNKNOWN too), nor one with
 	// the game's Ctrl or Alt held (a shortcut; see gameModifierHeld).
 	if (key == SDLK_UNKNOWN || gameModifierHeld())
 	{
 		return false;
 	}
-	// Went down (not up). Caps Lock and Num Lock are different: SDL 1.2 sends a lock key's
+	// Went down (not up). Caps Lock and Num Lock are different in SDL 1.2: it sends a lock key's
 	// "down" when its lock goes on and its "up" when it goes off, one or the other for each
-	// press, so for them either is a press.
-	const bool lockKey = key == SDLK_CAPSLOCK || key == SDLK_NUMLOCK;
+	// press, so for them either is a press (SDL2 sends both, as for any key).
+	const bool lockKey = LockKeysSendOneEvent && (key == SDLK_CAPSLOCK || key == NumLockKey);
 	const bool pressed = event.type == SDL_KEYDOWN || (lockKey && event.type == SDL_KEYUP);
 	// (While leaning with Left Shift, the game's own hotkeys stay quiet, as the game ignores a
 	// hotkey with Shift held: Q and E don't open a hand's menu in the middle of a lean.)
@@ -2338,6 +2362,11 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	// flashlight, sprinting and en passant, jump and night vision. (The flare and flashlight keys
 	// with their settings off say so on the warning line.)
 	if (key == Options::keyFpsMouseMode) { if (pressed) setMouseLook(!_mouseLook); return true; }
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	// Android's Back key (the Meta Quest controllers' B and Y) does the same: a controller has no
+	// middle button or keyboard to free the cursor with, for the top bar's buttons.
+	if (key == SDLK_AC_BACK) { if (pressed) setMouseLook(!_mouseLook); return true; }
+#endif
 	if (key == Options::keyFpsClassicHud) { if (pressed) setClassicHud(!_classicHud); return true; }
 	if (key == Options::keyFpsHideHud) { if (pressed) toggleHud(); return true; }
 	if (key == Options::keyFpsDoomMode) { if (pressed) toggleCheats(); return true; }
@@ -2346,8 +2375,10 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	if (key == Options::keyFpsModeAimed) { if (pressed) selectFireMode(BA_AIMEDSHOT); return true; }
 	if (key == Options::keyFpsModeAuto) { if (pressed) selectFireMode(BA_AUTOSHOT); return true; }
 	if (key == Options::keyFpsSwitchHand) { if (pressed) switchHand(); return true; }
-	if (key == Options::keyFpsTurnLeft) { if (pressed) { _snapTurnDegrees -= 45.0; _snapTurnFacing = true; } return true; }
-	if (key == Options::keyFpsTurnRight) { if (pressed) { _snapTurnDegrees += 45.0; _snapTurnFacing = true; } return true; }
+	// (the turn keys: in VR mode the right stick's turn, a snap turn of the soldier and the world if snap turning, else held
+	// for a smooth turn; see vrSnapTurn, vrFaceBody)
+	if (key == Options::keyFpsTurnLeft) { if (pressed) { if (vrOn()) vrTurnKey(-1); else { _snapTurnDegrees -= 45.0; _snapTurnFacing = true; } } return true; }
+	if (key == Options::keyFpsTurnRight) { if (pressed) { if (vrOn()) vrTurnKey(1); else { _snapTurnDegrees += 45.0; _snapTurnFacing = true; } } return true; }
 	if (key == Options::keyFpsAkimbo) { if (pressed) toggleAkimbo(); return true; }
 	if (key != SDLK_UNKNOWN && key == Options::keyFpsAkimboStyle) { if (pressed) toggleAkimboStyle(); return true; }
 	// The lean keys (setting "Lean") are read each frame while held (see updateLean); here they
@@ -2405,11 +2436,11 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	// S and D do); 7 and 9 a snap turn. A press is remembered until the move can start (see
 	// tileMoveVelocity), so a quick tap always counts; a key of the other axis pressed within
 	// NumpadComboWait of it joins it.
-	if (key == SDLK_KP8 || key == SDLK_KP2 || key == SDLK_KP4 || key == SDLK_KP6)
+	if (key == KeypadKey8 || key == KeypadKey2 || key == KeypadKey4 || key == KeypadKey6)
 	{
 		if (pressed && _save->getSide() == FACTION_PLAYER) // (not remembered through the aliens' turn)
 		{
-			const int forward = key == SDLK_KP8 ? 1 : key == SDLK_KP2 ? -1 : 0, strafe = key == SDLK_KP6 ? 1 : key == SDLK_KP4 ? -1 : 0;
+			const int forward = key == KeypadKey8 ? 1 : key == KeypadKey2 ? -1 : 0, strafe = key == KeypadKey6 ? 1 : key == KeypadKey4 ? -1 : 0;
 			const Uint32 now = SDL_GetTicks();
 			const bool joins = (_numpadMove[0] || _numpadMove[1]) && now - _numpadPressAt <= NumpadComboWait;
 			if (joins)
@@ -2426,11 +2457,15 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 		}
 		return true;
 	}
-	if (key == SDLK_KP7 || key == SDLK_KP9)
+	if (key == KeypadKey7 || key == KeypadKey9)
 	{
-		if (pressed)
+		if (pressed && vrOn())
 		{
-			_snapTurnDegrees += key == SDLK_KP7 ? -45.0 : 45.0;
+			vrSnapTurn(key == KeypadKey7 ? -1 : 1); // (VR mode: a snap turn of the soldier and the world, see vrSnapTurn)
+		}
+		else if (pressed)
+		{
+			_snapTurnDegrees += key == KeypadKey7 ? -45.0 : 45.0;
 			_snapTurnFacing = true;
 		}
 		return true;
@@ -2438,7 +2473,7 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 
 	// The game's "centre on enemy" keys (1 to 10) turn the view to that enemy instead (an
 	// unbound key, SDLK_UNKNOWN, matches nothing).
-	const SDLKey enemyKeys[] = { Options::keyBattleCenterEnemy1, Options::keyBattleCenterEnemy2, Options::keyBattleCenterEnemy3,
+	const SDL_Keycode enemyKeys[] = { Options::keyBattleCenterEnemy1, Options::keyBattleCenterEnemy2, Options::keyBattleCenterEnemy3,
 		Options::keyBattleCenterEnemy4, Options::keyBattleCenterEnemy5, Options::keyBattleCenterEnemy6, Options::keyBattleCenterEnemy7,
 		Options::keyBattleCenterEnemy8, Options::keyBattleCenterEnemy9, Options::keyBattleCenterEnemy10 };
 	for (int enemyIndex = 0; enemyIndex < 10; ++enemyIndex)
@@ -2464,8 +2499,7 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 bool FirstPersonMode::handleMouseLook(Action *action)
 {
 	const SDL_Event &event = *action->getDetails();
-	const bool wheelTurned = event.type == SDL_MOUSEBUTTONDOWN
-		&& (event.button.button == SDL_BUTTON_WHEELUP || event.button.button == SDL_BUTTON_WHEELDOWN);
+	const bool wheelTurned = wheelStep(event) != 0;
 
 	if (event.type == SDL_MOUSEMOTION)
 	{
@@ -2485,7 +2519,7 @@ bool FirstPersonMode::handleMouseLook(Action *action)
 	else if (wheelTurned)
 	{
 		// The wheel steps through the fire modes (up: the previous one).
-		cycleFireMode(event.button.button == SDL_BUTTON_WHEELUP ? -1 : 1);
+		cycleFireMode(wheelStep(event));
 	}
 	else if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_MIDDLE && !_dragLook)
 	{
@@ -2535,8 +2569,7 @@ bool FirstPersonMode::handleMouseLook(Action *action)
 bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 {
 	const SDL_Event &event = *action->getDetails();
-	const bool wheelTurned = event.type == SDL_MOUSEBUTTONDOWN
-		&& (event.button.button == SDL_BUTTON_WHEELUP || event.button.button == SDL_BUTTON_WHEELDOWN);
+	const bool wheelTurned = wheelStep(event) != 0;
 
 	// Moving over the map camera on the isometric map: the map's cursor stays where it was (and
 	// an aimed action's target with it, which the camera looks at), not under the picture.
@@ -2545,10 +2578,13 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 		return true;
 	}
 
-	if (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP)
+	if (isMouseButtonOrWheel(event))
 	{
-		// Where the click is, in the game's screen pixels, and which of our buttons is there.
-		action->setMouseAction(event.button.x, event.button.y, 0, 0);
+		// Where the click (or the wheel's notch) is, in the game's screen pixels, and which of our
+		// buttons is there.
+		int eventX = 0, eventY = 0;
+		mouseEventPosition(event, eventX, eventY);
+		action->setMouseAction(eventX, eventY, 0, 0);
 		const double mouseX = action->getAbsoluteXMouse(), mouseY = action->getAbsoluteYMouse();
 		TextButton *buttonUnderCursor = buttonAt(mouseX / _uiScale, mouseY / _uiScale); // our buttons are on the canvas
 
@@ -2569,12 +2605,12 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 		const bool overSoldier = buttonUnderCursor && std::find(_btnSquad.begin(), _btnSquad.end(), buttonUnderCursor) != _btnSquad.end();
 		if (wheelTurned && overSoldier)
 		{
-			browseSquad(event.button.button == SDL_BUTTON_WHEELUP ? -1 : 1, mouseX / _uiScale, mouseY / _uiScale);
+			browseSquad(wheelStep(event), mouseX / _uiScale, mouseY / _uiScale);
 			return true;
 		}
 		if (wheelTurned && (buttonUnderCursor == _btnPrev || buttonUnderCursor == _btnNext))
 		{
-			scrollSquad(event.button.button == SDL_BUTTON_WHEELUP ? -1 : 1);
+			scrollSquad(wheelStep(event));
 			return true;
 		}
 		if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_RIGHT && (buttonUnderCursor == _btnPrev || buttonUnderCursor == _btnNext))
@@ -2677,11 +2713,11 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 		// fire mode, the middle button goes back to mouse look, the right button starts a drag
 		// look, and the left button fires at the cursor.
 		const bool overClassicHud = _classicHud && mouseY >= _state->_icons->getY();
-		if (event.type == SDL_MOUSEBUTTONDOWN && !overClassicHud)
+		if ((event.type == SDL_MOUSEBUTTONDOWN || wheelTurned) && !overClassicHud) // (SDL2's wheel isn't a button)
 		{
 			if (wheelTurned)
 			{
-				cycleFireMode(event.button.button == SDL_BUTTON_WHEELUP ? -1 : 1);
+				cycleFireMode(wheelStep(event));
 				return true;
 			}
 			if (event.button.button == SDL_BUTTON_MIDDLE)
@@ -2723,9 +2759,23 @@ bool FirstPersonMode::blit()
 	SDL_Surface *screen = _game->getScreen()->getSurface();
 	const bool full3D = isActive() && !_classicHud;
 
+	// VR mode: the view looks as the head does, whatever turned it during the frame. The desktop's
+	// preview draws both eyes instead, the HUD in them (and that's the whole screen); with the
+	// shell drawing the eyes (see FirstPerson::vrRenderEyes), the view isn't drawn here at all.
+	const bool shellDrawsEyes = vrOn() && _vrShellHead;
+	if (vrOn())
+	{
+		vrApplyHeadAxes();
+		if (Options::fpsVrMode == 2 && full3D && !_vrShellHead)
+		{
+			vrBlitPreview(screen);
+			return true;
+		}
+	}
+
 	// The 3D view at the back, magnified on big screens: straight from the view, which is the
 	// canvas's size and in the same palette (no copy onto the canvas first).
-	if (_view->getVisible())
+	if (_view->getVisible() && !shellDrawsEyes)
 	{
 		if (_canvas)
 		{
@@ -2750,29 +2800,53 @@ bool FirstPersonMode::blit()
 		}
 	}
 
-	// Our overlays: straight onto the screen, or onto the cleared canvas and magnified (its
-	// empty pixels let what's under them show); with them, when the classic HUD that normally
-	// has them is hidden (and the 3D HUD isn't), the original's visible enemy buttons.
+	// Our overlays (see drawOverlays). VR mode with the shell drawing the eyes: the HUD's own
+	// picture too, for its quad layer.
+	drawOverlays(screen, false);
+	if (shellDrawsEyes)
+	{
+		vrComposeHud();
+	}
+	return true;
+}
+
+/**
+ * Our overlays onto a surface the screen's size: straight onto it, or onto the cleared canvas and
+ * magnified (its empty pixels let what's under them show); with them, when the classic HUD that
+ * normally has them is hidden (and the 3D HUD isn't), the original's visible enemy buttons. For
+ * VR's HUD picture (see vrComposeHud), without what the eyes draw themselves at its depth: the
+ * crosshair and its accuracy line, the zoom's scope cross, and the weapon in hand (a 3D object in the
+ * eyes, setting "VR weapon").
+ * @param target The screen, or the HUD's picture.
+ * @param forHud True for VR's HUD picture.
+ */
+void FirstPersonMode::drawOverlays(SDL_Surface *target, bool forHud)
+{
+	const bool full3D = isActive() && !_classicHud;
 	const bool enemyButtons = full3D && !hudHidden();
+	auto shown = [&](const Surface *surface)
+	{
+		return surface != _view && _ownSurfaces.count(const_cast<Surface*>(surface)) && !(hudHidden() && _topBarSurfaces.count(const_cast<Surface*>(surface)))
+			&& !(forHud && (surface == _crosshair || surface == _accuracyLine || surface == _scopeCross || surface == _weaponInHand));
+	};
 	if (!_canvas)
 	{
 		for (Surface *surface : _state->_surfaces)
 		{
-			if (surface != _view && _ownSurfaces.count(surface) && !(hudHidden() && _topBarSurfaces.count(surface))) surface->blit(screen);
+			if (shown(surface)) surface->blit(target);
 		}
-		if (enemyButtons) drawEnemyButtons(screen);
+		if (enemyButtons) drawEnemyButtons(target);
 	}
 	else
 	{
 		_canvas->clear();
 		for (Surface *surface : _state->_surfaces)
 		{
-			if (surface != _view && _ownSurfaces.count(surface) && !(hudHidden() && _topBarSurfaces.count(surface))) surface->blit(_canvas->getSurface());
+			if (shown(surface)) surface->blit(_canvas->getSurface());
 		}
 		if (enemyButtons) drawEnemyButtons(_canvas->getSurface());
-		magnify(screen, _canvas->getSurface(), true);
+		magnify(target, _canvas->getSurface(), true);
 	}
-	return true;
 }
 
 /**
@@ -2845,7 +2919,9 @@ void FirstPersonMode::drawEnemyButtons(SDL_Surface *target)
 /**
  * Copies a canvas-sized surface (the canvas with the overlays, or the 3D view itself) onto the
  * screen _uiScale times bigger, each of its pixels becoming a square of _uiScale x _uiScale
- * screen pixels (all are 8-bit surfaces in the state's palette: the colours are copied as they are).
+ * screen pixels. The sources are 8-bit surfaces in the state's palette: on an 8-bit screen their
+ * colours are copied as they are, on a 32-bit one (the Android build's screen always is) each
+ * goes through the palette.
  * @param screen The screen surface to draw on.
  * @param source The surface to magnify, the canvas's size.
  * @param transparent True to skip the source's empty pixels (colour 0), so what's on the screen
@@ -2867,6 +2943,19 @@ void FirstPersonMode::magnify(SDL_Surface *screen, SDL_Surface *source, bool tra
 	const int drawWidth = std::min(screen->w, source->w * _uiScale), drawHeight = std::min(screen->h, source->h * _uiScale);
 	SDL_LockSurface(screen);
 	SDL_LockSurface(source);
+
+	// A 32-bit screen's colour for each of the source's 256 (none needed for an 8-bit screen).
+	const bool trueColorScreen = screen->format->BytesPerPixel == 4;
+	std::array<Uint32, 256> screenColors{};
+	if (trueColorScreen)
+	{
+		const SDL_Palette *sourcePalette = source->format->palette;
+		for (int index = 0; sourcePalette && index < std::min(256, sourcePalette->ncolors); ++index)
+		{
+			const SDL_Color &color = sourcePalette->colors[index];
+			screenColors[index] = SDL_MapRGB(screen->format, color.r, color.g, color.b);
+		}
+	}
 
 	// Each source row is widened once, then laid on its _uiScale screen rows (copied whole
 	// where opaque).
@@ -2905,6 +2994,17 @@ void FirstPersonMode::magnify(SDL_Surface *screen, SDL_Surface *source, bool tra
 		// Lay it on each of its screen rows: all of it, or only its coloured pixels.
 		for (int screenY = sourceY * _uiScale; screenY < std::min(drawHeight, (sourceY + 1) * _uiScale); ++screenY)
 		{
+			// A 32-bit screen: each pixel in its colour (from the first to the last coloured
+			// pixel when transparent; that's the whole row when opaque).
+			if (trueColorScreen)
+			{
+				Uint32 *trueColorRow = (Uint32 *)((Uint8 *)screen->pixels + screenY * screen->pitch);
+				for (int screenX = firstScreenX; screenX < endScreenX; ++screenX)
+				{
+					if (!transparent || _magnifyRow[screenX]) trueColorRow[screenX] = screenColors[_magnifyRow[screenX]];
+				}
+				continue;
+			}
 			Uint8 *screenRow = (Uint8 *)screen->pixels + screenY * screen->pitch;
 			if (!transparent)
 			{

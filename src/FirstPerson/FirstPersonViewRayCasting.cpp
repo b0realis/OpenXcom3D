@@ -1594,6 +1594,10 @@ void FirstPersonView::renderRows()
 	const int width = getWidth(), height = getHeight();
 	const float halfPlaneWidth = (float)_halfFovTangent;
 	const float halfPlaneHeight = (float)(_halfFovTangent * height / width);
+	// In VR an eye's picture is off centre (see renderEyes): its view axis meets it at (eyeAxisX, eyeAxisY), and a unit
+	// of the image plane is eyeFocal pixels.
+	const bool eyePass = _eyePass;
+	const float eyeAxisX = (float)_eyeAxisX, eyeAxisY = (float)_eyeAxisY, eyeFocal = (float)_eyeFocal;
 	// What every ray walks through: this frame's tile snapshot and door swings.
 	RayContext rayContext;
 	rayContext.tiles = _tileViews.data();
@@ -1619,20 +1623,21 @@ void FirstPersonView::renderRows()
 	rayContext.solidGhostThreshold = 0.0f;
 
 	// With a pixel size above 1, one ray colours a block of pixels (pixelSize x pixelSize).
-	// Auto (0) picks 2 for views bigger than AutoPixelMaxWidth x AutoPixelMaxHeight, else 1.
-	const bool bigView = width > AutoPixelMaxWidth || height > AutoPixelMaxHeight;
+	// Auto (0) picks 2 for views bigger than AutoPixelMaxWidth x AutoPixelMaxHeight, else 1; an
+	// eye's picture in VR always 1 (its size is a setting of its own, "VR eye picture").
+	const bool bigView = !eyePass && (width > AutoPixelMaxWidth || height > AutoPixelMaxHeight);
 	const int pixelSize = Options::fpsPixelSize == 0 ? (bigView ? 2 : 1) : std::clamp(Options::fpsPixelSize, 1, 3);
 	const int blockRows = (height + pixelSize - 1) / pixelSize, blockColumns = (width + pixelSize - 1) / pixelSize;
 	for (int blockRow = _rayWorkers.nextPiece++; blockRow < blockRows; blockRow = _rayWorkers.nextPiece++)
 	{
 		// The block's top pixel row, and how far up the image plane its centre is.
 		const int topRow = blockRow * pixelSize;
-		const float planeV = (1.0f - (topRow + pixelSize * 0.5f) * 2.0f / height) * halfPlaneHeight;
+		const float planeV = eyePass ? (eyeAxisY - (topRow + pixelSize * 0.5f)) / eyeFocal : (1.0f - (topRow + pixelSize * 0.5f) * 2.0f / height) * halfPlaneHeight;
 		for (int blockColumn = 0; blockColumn < blockColumns; ++blockColumn)
 		{
 			// The block's left pixel column, and how far right on the image plane its centre is.
 			const int leftColumn = blockColumn * pixelSize;
-			const float planeU = ((leftColumn + pixelSize * 0.5f) * 2.0f / width - 1.0f) * halfPlaneWidth;
+			const float planeU = eyePass ? ((leftColumn + pixelSize * 0.5f) - eyeAxisX) / eyeFocal : ((leftColumn + pixelSize * 0.5f) * 2.0f / width - 1.0f) * halfPlaneWidth;
 			// The ray through the block's centre: forward, plus right and up across the plane.
 			float rayDirection[3];
 			for (int axis = 0; axis < 3; ++axis)
