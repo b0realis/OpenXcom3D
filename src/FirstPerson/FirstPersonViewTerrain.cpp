@@ -57,6 +57,7 @@
 #include <bitset>
 #include <climits>
 #include <cmath>
+#include <initializer_list>
 #include <map>
 #include <set>
 #include <SDL.h>
@@ -2028,6 +2029,377 @@ Uint8 FirstPersonView::mirroredColor(const Hit &hit, int axis, bool skinOnly, bo
 }
 
 /**
+ * Setting "Wall paint" (a player, GitHub issue #111): for each wall, which side its face the
+ * isometric art never shows looks onto, and which wall lends that face the paint of that side.
+ *
+ * The art shows a west wall from the east and a north wall from the south only, the room with its
+ * roof cut away: so a building's west and north outer walls are drawn in the paint of the rooms
+ * they close, its east and south ones in its outside paint (the city's brick house, beige inside;
+ * TFTD's island houses, pink plaster inside, white siding out). In 3D both faces of a wall show
+ * the one paint (see colorHiddenSides): from behind a house its rooms' beige, inside a room the
+ * brick of its front. Once per battle (with chooseGround, which knows the levels under rock):
+ * - each level's tiles fall into regions, the tiles reached from each other without crossing a
+ *   wall (a west or north wall part, a door, a window, a big object's wall along an edge; a big
+ *   object that fills its tile is in none). A region that reaches the map's edge, or is mostly
+ *   without a roof over it (as indoorsAt counts a roof: a floor or an object on a level above),
+ *   is the outdoors; none is under rock. The others are rooms, and rooms touching across walls,
+ *   or up and down, are a building;
+ * - a wall's tile is where its shown face looks, the tile west (north) of it where its hidden
+ *   face does. One whose shown face looks into a room and its hidden face outdoors (a building's
+ *   west or north outer wall) takes on its hidden face the paint of the nearest of the building's
+ *   outer walls whose shown face looks outdoors; one the other way round (an east or south outer
+ *   wall) the paint of the walls of that room that close it to the outdoors (else the building's):
+ *   the paint of the same kind of wall, so a barn's outer walls keep their brick inside, not the
+ *   wood of its stalls; and, with Every room, a wall between two rooms the paint of the walls
+ *   between rooms of the room it faces;
+ * - a donor is a plain wall: no door, no glass, no holes in its art, nearly full height; of the
+ *   same kind (west or north: the art shades the two sides differently) first, on the same level,
+ *   the nearest. Only the voxels of the wall's own paint take its colours: the colour group most
+ *   of the nearest plain wall on the same side shows (a window's frame, its glass and curtains,
+ *   painted panes, trims keep theirs). Doors keep theirs whole, and so do fences, ghosts, the
+ *   walls of crafts and UFOs (mirrored, see mirroredColor) and walls with no donor.
+ * Coordinates are tiles. A wall blown away later leaves its rubble as the art has it (see
+ * wallPaintColor), and the rest keep theirs: the regions stay as they were found (a saved battle
+ * loaded finds them anew, from the map as it is then: a room blown open is the outdoors then).
+ */
+void FirstPersonView::findWallPaints()
+{
+	const int mapSizeX = _save->getMapSizeX(), mapSizeY = _save->getMapSizeY(), mapSizeZ = _save->getMapSizeZ();
+	const int tilesPerLevel = mapSizeX * mapSizeY, tileCount = tilesPerLevel * mapSizeZ;
+	_wallPaints.clear();
+	_wallPaintOf.assign(tileCount * 2, 0);
+	const Uint32 startTick = SDL_GetTicks();
+	auto indexOf = [&](int x, int y, int z) { return (z * mapSizeY + y) * mapSizeX + x; };
+	auto bigWallOf = [&](int index) { const MapData *object = _save->getTile(index)->getMapData(O_OBJECT); return object ? object->getBigWall() : 0; };
+
+	// A roof over each tile: a floor or an object on any level above (as indoorsAt has it). Each
+	// column from the top down.
+	std::vector<char> roofed(tileCount, 0);
+	for (int column = 0; column < tilesPerLevel; ++column)
+	{
+		bool roofAbove = false;
+		for (int index = column + tileCount - tilesPerLevel; index >= 0; index -= tilesPerLevel)
+		{
+			roofed[index] = roofAbove;
+			const Tile *tile = _save->getTile(index);
+			roofAbove = roofAbove || tile->getMapData(O_FLOOR) || tile->getMapData(O_OBJECT);
+		}
+	}
+
+	// Is the edge between a tile and its neighbour a step (dx, dy) away walled: a west or north
+	// wall part on it, or a big object's wall along it (Pathfinding's BIGWALLWEST 4, NORTH 5, EAST
+	// 6, SOUTH 7, EASTANDSOUTH 8, WESTANDNORTH 9)? A big object that fills its tile (BIGWALLBLOCK 1,
+	// the diagonals 2 and 3) keeps its tile out of every region.
+	auto walled = [&](int x, int y, int z, int dx, int dy)
+	{
+		const int nx = x + dx, ny = y + dy;
+		const bool onMap = nx >= 0 && ny >= 0 && nx < mapSizeX && ny < mapSizeY;
+		const Tile *tile = _save->getTile(indexOf(x, y, z)), *next = onMap ? _save->getTile(indexOf(nx, ny, z)) : nullptr;
+		const int big = bigWallOf(indexOf(x, y, z)), nextBig = onMap ? bigWallOf(indexOf(nx, ny, z)) : 0;
+		if (dx == 1) return (next && next->getMapData(O_WESTWALL)) || big == 6 || big == 8 || nextBig == 4 || nextBig == 9;
+		if (dx == -1) return tile->getMapData(O_WESTWALL) || big == 4 || big == 9 || nextBig == 6 || nextBig == 8;
+		if (dy == 1) return (next && next->getMapData(O_NORTHWALL)) || big == 7 || big == 8 || nextBig == 5 || nextBig == 9;
+		return tile->getMapData(O_NORTHWALL) || big == 5 || big == 9 || nextBig == 7 || nextBig == 8;
+	};
+	auto fillsTile = [&](int index) { const int big = bigWallOf(index); return big >= 1 && big <= 3; };
+	static const int Steps[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+
+	// The regions of each level, by a flood fill from each tile not in one yet, and which of them
+	// are the outdoors.
+	std::vector<int> region(tileCount, -1);
+	std::vector<char> outdoors;
+	std::vector<int> stack;
+	for (int z = 0; z < mapSizeZ; ++z)
+	{
+		const bool underRockHere = _enclosed || z < _surfaceLevel;
+		for (int y0 = 0; y0 < mapSizeY; ++y0)
+			for (int x0 = 0; x0 < mapSizeX; ++x0)
+			{
+				const int seed = indexOf(x0, y0, z);
+				if (region[seed] >= 0 || fillsTile(seed)) continue;
+				const int id = (int)outdoors.size();
+				region[seed] = id;
+				stack.assign(1, seed);
+				int cells = 0, unroofed = 0;
+				bool reachesEdge = false;
+				while (!stack.empty())
+				{
+					const int index = stack.back();
+					stack.pop_back();
+					++cells;
+					unroofed += !roofed[index];
+					const int x = index % mapSizeX, y = (index / mapSizeX) % mapSizeY;
+					for (const auto &step : Steps)
+					{
+						if (walled(x, y, z, step[0], step[1])) continue;
+						const int nx = x + step[0], ny = y + step[1];
+						if (nx < 0 || ny < 0 || nx >= mapSizeX || ny >= mapSizeY)
+						{
+							reachesEdge = true;
+							continue;
+						}
+						const int next = indexOf(nx, ny, z);
+						if (region[next] >= 0 || fillsTile(next)) continue;
+						region[next] = id;
+						stack.push_back(next);
+					}
+				}
+				outdoors.push_back(!underRockHere && (reachesEdge || unroofed * 2 > cells));
+			}
+	}
+	auto indoors = [&](int index) { return index >= 0 && region[index] >= 0 && !outdoors[region[index]]; };
+
+	// The buildings: rooms touching across walls, and up and down (a flood fill over the rooms' tiles).
+	std::vector<int> building(tileCount, -1);
+	int buildingCount = 0;
+	for (int seed = 0; seed < tileCount; ++seed)
+	{
+		if (building[seed] >= 0 || !indoors(seed)) continue;
+		building[seed] = buildingCount;
+		stack.assign(1, seed);
+		while (!stack.empty())
+		{
+			const int index = stack.back();
+			stack.pop_back();
+			const int x = index % mapSizeX, y = (index / mapSizeX) % mapSizeY, z = index / tilesPerLevel;
+			const int nearby[6][3] = { { x + 1, y, z }, { x - 1, y, z }, { x, y + 1, z }, { x, y - 1, z }, { x, y, z + 1 }, { x, y, z - 1 } };
+			for (const auto &cell : nearby)
+			{
+				if (cell[0] < 0 || cell[1] < 0 || cell[2] < 0 || cell[0] >= mapSizeX || cell[1] >= mapSizeY || cell[2] >= mapSizeZ) continue;
+				const int next = indexOf(cell[0], cell[1], cell[2]);
+				if (building[next] >= 0 || !indoors(next)) continue;
+				building[next] = buildingCount;
+				stack.push_back(next);
+			}
+		}
+		++buildingCount;
+	}
+
+	// What a wall part can be here: 0 kept as it is (a door, a fence, a ghost, nothing to see), 1
+	// repainted, 2 repainted and a donor (a plain wall: no glass, no holes in its art, from the
+	// floor to nearly the top, its shown face nearly whole), 3 a window (glass or holes in its
+	// art): its frame and glass keep theirs, the wall round them may take the paint.
+	std::map<const MapData*, int> wallKinds;
+	auto wallKind = [&](const MapData *data)
+	{
+		auto found = wallKinds.find(data);
+		if (found != wallKinds.end()) return found->second;
+		const VoxelModel *model = getModel(data, -1, false);
+		int kind = 0;
+		if (!data->isDoor() && !data->isUFODoor() && !model->empty && !model->ghostly && !model->artFill)
+		{
+			bool seeThrough = model->openingGlass;
+			for (int z = 0; z < Position::TileZ && !seeThrough; ++z)
+				for (int y = 0; y < Position::TileXY && !seeThrough; ++y)
+					seeThrough = model->glass[z][y] || model->clear[z][y] || model->lookOnly[z][y];
+			int shownVoxels = 0;
+			for (int z = 0; z < Position::TileZ; ++z)
+				for (int along = 0; along < Position::TileXY; ++along)
+					shownVoxels += (data->getObjectType() == O_WESTWALL ? model->east[z][along] : model->south[z][along]) != 0;
+			kind = seeThrough ? 3 : model->max[2] >= 20 && model->min[2] <= 2 && shownVoxels >= 16 * 20 ? 2 : 1;
+		}
+		wallKinds[data] = kind;
+		return kind;
+	};
+
+	// Every wall part: its tile (where its shown face looks), the tile its hidden face looks onto
+	// (-1 off the map), and whether each is indoors. Not a craft's or a UFO's (mirrored), nor one
+	// beside a big object that fills its tile.
+	struct WallSide { int tile, hiddenTile, part; const MapData *data; bool shownIn, hiddenIn; };
+	std::vector<WallSide> walls;
+	for (int index = 0; index < tileCount; ++index)
+	{
+		if (!_mirrorOfTile.empty() && _mirrorOfTile[index] >= 0) continue;
+		const int x = index % mapSizeX, y = (index / mapSizeX) % mapSizeY, z = index / tilesPerLevel;
+		for (int part = O_WESTWALL; part <= O_NORTHWALL; ++part)
+		{
+			const MapData *data = _save->getTile(index)->getMapData((TilePart)part);
+			if (!data || data->getObjectType() != (TilePart)part) continue;
+			const int hiddenX = part == O_WESTWALL ? x - 1 : x, hiddenY = part == O_NORTHWALL ? y - 1 : y;
+			const int hidden = hiddenX >= 0 && hiddenY >= 0 ? indexOf(hiddenX, hiddenY, z) : -1;
+			if (region[index] < 0 || (hidden >= 0 && region[hidden] < 0)) continue;
+			walls.push_back({ index, hidden, part, data, indoors(index), indoors(hidden) });
+		}
+	}
+
+	// The donors, by the kind of wall they are: a building's outer walls whose shown face looks
+	// outdoors (its outside paint), by building; its outer walls whose shown face looks into a
+	// room (the inside paint of its outer walls), by room and by building; the walls between two
+	// rooms (a partition's paint), by the room their shown face looks into.
+	std::map<int, std::vector<int>> outsideOf, outerInsideOfRoom, outerInsideOfBuilding, partitionsOfRoom;
+	for (int wall = 0; wall < (int)walls.size(); ++wall)
+	{
+		const WallSide &side = walls[wall];
+		if (wallKind(side.data) != 2) continue;
+		if (!side.shownIn && side.hiddenIn) outsideOf[building[side.hiddenTile]].push_back(wall);
+		if (side.shownIn && !side.hiddenIn)
+		{
+			outerInsideOfRoom[region[side.tile]].push_back(wall);
+			outerInsideOfBuilding[building[side.tile]].push_back(wall);
+		}
+		if (side.shownIn && side.hiddenIn && region[side.tile] != region[side.hiddenTile]) partitionsOfRoom[region[side.tile]].push_back(wall);
+	}
+	auto listOf = [](std::map<int, std::vector<int>> &lists, int key) -> const std::vector<int>*
+	{
+		auto found = lists.find(key);
+		return found == lists.end() ? nullptr : &found->second;
+	};
+	// The nearest wall in a list to another: on the same level first, then the fewest tiles away;
+	// of the same kind (west or north) only, or of either. -1 for none.
+	auto nearestIn = [&](const WallSide &to, const std::vector<int> *list, bool sameKindOnly)
+	{
+		int best = -1, bestScore = INT_MAX;
+		if (!list) return best;
+		const int x = to.tile % mapSizeX, y = (to.tile / mapSizeX) % mapSizeY, z = to.tile / tilesPerLevel;
+		for (const int wall : *list)
+		{
+			const WallSide &from = walls[wall];
+			if (sameKindOnly && from.part != to.part) continue;
+			const int fromX = from.tile % mapSizeX, fromY = (from.tile / mapSizeX) % mapSizeY, fromZ = from.tile / tilesPerLevel;
+			const int score = std::abs(fromZ - z) * 1000 + std::abs(fromX - x) + std::abs(fromY - y);
+			if (score < bestScore)
+			{
+				bestScore = score;
+				best = wall;
+			}
+		}
+		return best;
+	};
+	// The nearest of the same kind from the first list that has one, else of either kind from the
+	// first that has any.
+	auto nearest = [&](const WallSide &to, std::initializer_list<const std::vector<int>*> lists)
+	{
+		for (const bool sameKindOnly : { true, false })
+			for (const std::vector<int> *list : lists)
+			{
+				const int found = nearestIn(to, list, sameKindOnly);
+				if (found >= 0) return found;
+			}
+		return -1;
+	};
+
+	// Each wall whose two faces look onto different sides: its donor, and the paint of its own side.
+	int kept = 0, outerCount = 0, betweenCount = 0;
+	for (const WallSide &side : walls)
+	{
+		if (!wallKind(side.data) || side.hiddenTile < 0) continue;
+		int donor = -1, reference = -1; // the wall lending its paint; a plain wall on this wall's own side, for its paint
+		Uint8 kind = 0;
+		if (side.shownIn && !side.hiddenIn)
+		{
+			// A building's west or north outer wall, drawn in the room's paint: outdoors, the building's outside.
+			kind = 1;
+			donor = nearest(side, { listOf(outsideOf, building[side.tile]) });
+			reference = nearest(side, { listOf(outerInsideOfRoom, region[side.tile]), listOf(outerInsideOfBuilding, building[side.tile]) });
+		}
+		else if (!side.shownIn && side.hiddenIn)
+		{
+			// An east or south outer wall, drawn in the outside paint: inside, that room's outer walls' paint, else the building's.
+			kind = 1;
+			donor = nearest(side, { listOf(outerInsideOfRoom, region[side.hiddenTile]), listOf(outerInsideOfBuilding, building[side.hiddenTile]) });
+			reference = nearest(side, { listOf(outsideOf, building[side.hiddenTile]) });
+		}
+		else if (side.shownIn && side.hiddenIn && region[side.tile] != region[side.hiddenTile])
+		{
+			// A wall between two rooms: the paint of the walls between rooms of the room it faces.
+			kind = 2;
+			donor = nearest(side, { listOf(partitionsOfRoom, region[side.hiddenTile]) });
+			reference = nearest(side, { listOf(partitionsOfRoom, region[side.tile]) });
+		}
+		if (!kind) continue;
+		if (donor < 0 || walls[donor].data == side.data || (reference < 0 && wallKind(side.data) == 3) || _wallPaints.size() >= 0xFFFF)
+		{
+			++kept;
+			continue;
+		}
+		// The paint of the wall's own side: the colour group most of the reference's shown face is
+		// in (a wall with none goes by its own).
+		const MapData *paintData = reference >= 0 ? walls[reference].data : side.data;
+		const bool paintWest = (reference >= 0 ? walls[reference].part : side.part) == O_WESTWALL;
+		const VoxelModel *paintModel = getModel(paintData, -1, false);
+		int groupCounts[16] = {};
+		for (int z = 0; z < Position::TileZ; ++z)
+			for (int along = 0; along < Position::TileXY; ++along)
+			{
+				const Uint8 color = paintWest ? paintModel->east[z][along] : paintModel->south[z][along];
+				if (color) ++groupCounts[color >> 4];
+			}
+		// Does the wall's line end at its north (west) end: no wall of its kind on the tile north (west) of it?
+		const int x = side.tile % mapSizeX, y = (side.tile / mapSizeX) % mapSizeY, z = side.tile / tilesPerLevel;
+		const int endX = side.part == O_NORTHWALL ? x - 1 : x, endY = side.part == O_WESTWALL ? y - 1 : y;
+		const bool openEnd = endX < 0 || endY < 0 || !_save->getTile(indexOf(endX, endY, z))->getMapData((TilePart)side.part);
+		_wallPaints.push_back({ getModel(side.data, -1, false), getModel(walls[donor].data, -1, false), walls[donor].part == O_WESTWALL, openEnd, kind,
+			(Uint8)(std::max_element(groupCounts, groupCounts + 16) - groupCounts) });
+		_wallPaintOf[side.tile * 2 + side.part - O_WESTWALL] = (Uint16)_wallPaints.size();
+		if (kind == 1) ++outerCount;
+		else ++betweenCount;
+	}
+	Log(LOG_INFO) << "OpenXcom3D: wall paint: " << buildingCount << " buildings, " << outerCount << " outer walls and " << betweenCount
+		<< " walls between rooms take the paint of the side they face (" << kept << " keep theirs), found in " << SDL_GetTicks() - startTick << " ms";
+}
+
+/**
+ * Setting "Wall paint": the colour a wall's face the isometric art never shows takes from the side
+ * it faces (see findWallPaints): the donor's shown face on the same row of voxels, read as one
+ * standing before it sees it (its left end on the left), the nearest column of it where it has
+ * nothing there. Only on the wall's back plane (its westmost or northmost voxels: the faces inside
+ * its thickness, a window opening's jambs, are seen alike from both sides), on the voxels of its
+ * own side's paint, and on the wall as the map was built (its rubble keeps its own). A wall's end
+ * standing in the other wall's plane (a west wall's north end inside the tile's north wall) is
+ * that wall's face; any other end takes the paint at a corner only (the wall's line ends there).
+ * @param hit A hit on a face looking west or north.
+ * @param tileView The hit tile's snapshot.
+ * @param ownColor The colour the face shows as the art has it.
+ * @return The colour; 0 to keep its own.
+ */
+Uint8 FirstPersonView::wallPaintColor(const Hit &hit, const TileView &tileView, Uint8 ownColor) const
+{
+	if (Options::fpsWallPaint <= 0 || (hit.part != O_WESTWALL && hit.part != O_NORTHWALL) || hit.ghost || !ownColor
+		|| hit.axis < 0 || hit.axis > 1 || _wallPaintOf.empty())
+	{
+		return 0;
+	}
+	const bool end = hit.axis != hit.part - O_WESTWALL; // a west wall's north end, a north wall's west end
+	if (end)
+	{
+		const int other = O_WESTWALL + O_NORTHWALL - hit.part;
+		const VoxelModel *otherWall = tileView.part[other];
+		if (otherWall && otherWall->color[hit.voxel[2]][hit.voxel[1]][hit.voxel[0]])
+		{
+			Hit asOther = hit;
+			asOther.part = other;
+			return wallPaintColor(asOther, tileView, ownColor);
+		}
+	}
+	const Uint16 paintIndex = _wallPaintOf[hit.tile * 2 + hit.part - O_WESTWALL];
+	if (!paintIndex)
+	{
+		return 0;
+	}
+	const WallPaint &paint = _wallPaints[paintIndex - 1];
+	if (paint.kind > Options::fpsWallPaint || tileView.part[hit.part] != paint.wall || (ownColor >> 4) != paint.paintGroup)
+	{
+		return 0;
+	}
+	// On the wall's back plane (its westmost or northmost voxels), or at its very end, at a corner.
+	if ((end && !paint.openEnd) || hit.voxel[hit.axis] != paint.wall->min[hit.axis])
+	{
+		return 0;
+	}
+	// The donor's column: seen from the west a west wall has north on the left, seen from the north
+	// a north wall east; the donor's shown face, seen from the east (south), south (west).
+	const int column = hit.part == O_WESTWALL ? (paint.donorWest ? 15 - hit.voxel[1] : hit.voxel[1]) : (paint.donorWest ? hit.voxel[0] : 15 - hit.voxel[0]);
+	const Uint8 *row = paint.donorWest ? paint.donor->east[hit.voxel[2]] : paint.donor->south[hit.voxel[2]];
+	static const int Nearby[] = { 0, -1, 1, -2, 2, -3, 3 };
+	for (const int offset : Nearby)
+	{
+		const int along = column + offset;
+		if (along >= 0 && along < Position::TileXY && row[along]) return row[along];
+	}
+	return 0;
+}
+
+/**
  * Gets the voxel colour model of a MapData record (a tile part) shown with a given sprite
  * (animation frame), building it on first use (see buildModel). A view that shares another
  * view's models (the small extra view) asks that view instead.
@@ -2798,7 +3170,8 @@ bool FirstPersonView::isDoorMoving(const Position &pos, int part)
  * In space (a station, a ship: see chooseSky) none of it: only space lies past the map's edge,
  * round it, under it and over it, however walled in its edges are.
  * Sets _surfaceLevel, _enclosed, _groundModel (left as it was if no floor qualifies),
- * _waterModel, _waterAtEdge, _waterColors and _groundChosen.
+ * _waterModel, _waterAtEdge, _waterColors and _groundChosen; then finds the walls' paints (see
+ * findWallPaints), which go by the levels under rock.
  */
 void FirstPersonView::chooseGround()
 {
@@ -2980,6 +3353,8 @@ void FirstPersonView::chooseGround()
 		seaModel = commonest(mapWaterCounts);
 	}
 	chooseWaterColors(seaModel);
+	// The walls' faces the art never shows, once the levels under rock are known (setting "Wall paint").
+	findWallPaints();
 }
 
 /**
@@ -3130,6 +3505,8 @@ void FirstPersonView::shareCache(FirstPersonView *owner)
 	_doorAnimations.clear();
 	_solidMasks.clear();
 	_paintedFloors.clear();
+	_wallPaints.clear(); // (found again with the ground, among the new owner's models)
+	_wallPaintOf.clear();
 	for (auto &memo : _tileMemos) memo = TileMemo{ {}, nullptr, {}, nullptr };
 	for (auto &memos : _partMemos) memos = std::array<PartMemo, 4>();
 }

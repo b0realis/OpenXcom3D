@@ -47,7 +47,8 @@
  *
  * Sparks, smoke and fire from explosions and burning tiles and units; the weather (rain, snow,
  * blowing sand, fireflies, dust motes); bubbles and marine snow under the sea; energy around UFO
- * power sources and blinking consoles; and the glow (bloom) around bright things.
+ * power sources and blinking consoles; and the glow (bloom) around bright things. And what the
+ * ambient sounds hear round the eye: the weather, the open sky, the fires (ambientScene).
  */
 #include "FirstPersonView.h"
 #include <algorithm>
@@ -57,6 +58,7 @@
 #include <set>
 #include <string>
 #include <SDL.h>
+#include "FirstPersonAmbience.h"
 #include "FirstPersonApi.h"
 #include "../Engine/Game.h"
 #include "../Engine/Options.h"
@@ -145,6 +147,164 @@ bool FirstPersonView::inWater(float x, float y, float z) const
 		return false;
 	}
 	return true;
+}
+
+/**
+ * What the soldier hears round them, for the ambient sounds (see FirstPersonAmbience), once the
+ * view has drawn the battle (its sky and its tiles looked up; until then the scene isn't ready):
+ * - the battle's weather, as the sky has it (see chooseSky), and whether the battle's terrain
+ *   plays an ambient loop of its own (TFTD's sea and coasts, a big mod's town);
+ * - how much the eye is out under the sky: all of it under the open sky (see openSky); under a
+ *   roof, how much of the open sky round it is heard: sixteen ways out from the eye along its
+ *   level, each going on (6 tiles at most) until it comes out under the sky, through the walls
+ *   it crosses (one that stops sight lets nothing through; a window, a fence or an open door
+ *   half), counting less the further the opening, and half again (by an opening the rain is
+ *   heard almost as in the open). So a porch or a shelter open on its sides is out in the open,
+ *   the front of a room open on one side half, a room with its door open a little, a cellar
+ *   not at all;
+ * - the fires: every burning tile the squad has seen within 9 tiles and a level of the eye, and
+ *   every burning unit in sight but our own soldier. Each is 0.7 a tile away and falls as
+ *   1/distance^0.9, gone past 9 tiles; together they add up by their power, are heard from the
+ *   way of their power-weighted middle (and lie to one side as much as that leans), and what is
+ *   between the eye and the loudest one is traced as the ways out are (on another level, half
+ *   of that comes through).
+ * @param scene Filled in (left as it is, not ready, before the view's first frame).
+ */
+void FirstPersonView::ambientScene(AmbientScene &scene) const
+{
+	if (!_skyChosen || !_save || (int)_tileViews.size() != _save->getMapSizeXYZ())
+	{
+		return;
+	}
+	scene.ready = true;
+	scene.weather = _weather;
+	scene.terrainAmbience = _save->getAmbientSound() != Mod::NO_SOUND;
+	// The eye (in voxels: a tile is 16 across, a level 24 high) and its tile.
+	const float eyeX = (float)_eye[0], eyeY = (float)_eye[1], eyeZ = (float)_eye[2];
+	const int eyeTileX = (int)std::floor(eyeX / 16), eyeTileY = (int)std::floor(eyeY / 16), eyeTileZ = (int)std::floor(eyeZ / 24);
+	// How much sound gets from a tile into the next one on a level along x or along y: all of
+	// it through nothing (or off the map), half through a wall that doesn't stop sight (a
+	// window, a fence, an open door), none through one that does; and into a tile filled by a
+	// big wall (a diagonal wall, a block) as through a wall.
+	auto crossing = [&](int x, int y, int toX, int toY, int z) {
+		float through = 1.0f;
+		const TilePart part = toX != x ? O_WESTWALL : O_NORTHWALL;
+		if (Tile *wallTile = _save->getTile(Position(std::max(x, toX), std::max(y, toY), z)))
+		{
+			const MapData *wall = wallTile->getMapData(part);
+			if (wall && !wallTile->isUfoDoorOpen(part)) through = wall->getBlock(DT_NONE) >= 255 ? 0.0f : 0.5f;
+		}
+		if (Tile *next = _save->getTile(Position(toX, toY, z)))
+		{
+			const MapData *object = next->getMapData(O_OBJECT);
+			if (object && object->getBigWall() != 0) through *= object->getBlock(DT_NONE) >= 255 ? 0.0f : 0.5f;
+		}
+		return through;
+	};
+	// Walks from the eye a way across the tiles of its level (fromX, fromY in tiles, the
+	// direction a unit vector), a quarter tile at a time, up to reach tiles; at each new tile
+	// what still comes through is handed to arrived(tileX, tileY, distance, through), which says
+	// whether to stop there. A step over a corner goes through the better of the two tiles
+	// beside it first (which may be out under the sky itself).
+	auto walk = [&](float fromX, float fromY, float dirX, float dirY, float reach, auto arrived) {
+		int tileX = (int)std::floor(fromX), tileY = (int)std::floor(fromY);
+		float through = 1.0f;
+		for (float distance = 0.25f; distance <= reach; distance += 0.25f)
+		{
+			const int nextX = (int)std::floor(fromX + dirX * distance), nextY = (int)std::floor(fromY + dirY * distance);
+			if (nextX == tileX && nextY == tileY) continue;
+			if (nextX != tileX && nextY != tileY)
+			{
+				const float viaX = crossing(tileX, tileY, nextX, tileY, eyeTileZ), viaY = crossing(tileX, tileY, tileX, nextY, eyeTileZ);
+				const bool alongX = viaX * crossing(nextX, tileY, nextX, nextY, eyeTileZ) >= viaY * crossing(tileX, nextY, nextX, nextY, eyeTileZ);
+				through *= alongX ? viaX : viaY;
+				if (alongX) tileX = nextX; else tileY = nextY;
+				if (through < 0.05f || arrived(tileX, tileY, distance, through)) return through;
+			}
+			through *= crossing(tileX, tileY, nextX, nextY, eyeTileZ);
+			tileX = nextX;
+			tileY = nextY;
+			if (through < 0.05f || arrived(tileX, tileY, distance, through)) return through;
+		}
+		return through;
+	};
+	// The open sky round the eye.
+	if (openSky(eyeX, eyeY, eyeZ))
+	{
+		scene.openSky = 1.0f;
+	}
+	else
+	{
+		const int Ways = 16;
+		float heard = 0.0f;
+		for (int way = 0; way < Ways; ++way)
+		{
+			const float angle = 2.0f * (float)Pi * way / Ways;
+			walk(eyeX / 16, eyeY / 16, std::cos(angle), std::sin(angle), 6.0f, [&](int tileX, int tileY, float distance, float through) {
+				if (!openSky(tileX * 16 + 8.0f, tileY * 16 + 8.0f, eyeZ)) return false;
+				heard += through * std::clamp(1.15f - 0.15f * distance, 0.3f, 1.0f); // (all of it within a tile, 0.4 at five)
+				return true;
+			});
+		}
+		// (Under a roof by an opening the rain is heard almost as in the open: half again.)
+		scene.openSky = std::min(1.0f, 1.5f * heard / Ways);
+	}
+	// The fires.
+	float power = 0.0f, towardsX = 0.0f, towardsY = 0.0f, loudest = 0.0f;
+	Position loudestAt;
+	scene.fireDistance = 99.0f;
+	auto hear = [&](const Position &where) {
+		const float dx = (where.x * 16 + 8.0f - eyeX) / 16, dy = (where.y * 16 + 8.0f - eyeY) / 16;
+		const float dz = (where.z * 24 + 8.0f - eyeZ) / 16; // (a level is a tile and a half up)
+		const float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
+		if (distance >= 9.0f) return;
+		const float gain = 0.7f / std::pow(std::max(distance, 1.0f), 0.9f) * std::clamp((9.0f - distance) / 2.0f, 0.0f, 1.0f);
+		const float length = std::max(distance, 0.3f);
+		power += gain * gain;
+		towardsX += gain * gain * dx / length;
+		towardsY += gain * gain * dy / length;
+		scene.fireDistance = std::min(scene.fireDistance, distance);
+		if (gain > loudest)
+		{
+			loudest = gain;
+			loudestAt = where;
+		}
+	};
+	const int mapSizeX = _save->getMapSizeX(), mapSizeY = _save->getMapSizeY(), mapSizeZ = _save->getMapSizeZ();
+	for (int z = std::max(0, eyeTileZ - 1); z <= std::min(mapSizeZ - 1, eyeTileZ + 1); ++z)
+	{
+		for (int y = std::max(0, eyeTileY - 9); y <= std::min(mapSizeY - 1, eyeTileY + 9); ++y)
+		{
+			for (int x = std::max(0, eyeTileX - 9); x <= std::min(mapSizeX - 1, eyeTileX + 9); ++x)
+			{
+				const int index = (z * mapSizeY + y) * mapSizeX + x;
+				Tile *tile = _save->getTile(index);
+				if (_tileViews[index].discovered && shownFire(index, tile) > 0) hear(tile->getPosition());
+			}
+		}
+	}
+	for (const BattleUnit *unit : *_save->getUnits())
+	{
+		if (unit->getFire() > 0 && !unit->isOut() && unit != _cameraUnit && (unit->getVisible() || _save->getDebugMode())) hear(unit->getPosition());
+	}
+	scene.fireLoudness = std::sqrt(power);
+	if (power > 0.0f)
+	{
+		const float lean = std::sqrt(towardsX * towardsX + towardsY * towardsY);
+		scene.fireFocus = std::min(1.0f, lean / power);
+		if (lean > 0.0f)
+		{
+			// The way, as soundAngle measures it: clockwise from where the camera faces.
+			const double angle = (std::atan2(towardsY, towardsX) - _yaw) * 180.0 / Pi;
+			scene.fireAngle = (float)std::fmod(angle + 720.0, 360.0);
+		}
+		// What is between the eye and the loudest fire.
+		const float toX = loudestAt.x + 0.5f - eyeX / 16, toY = loudestAt.y + 0.5f - eyeY / 16, flat = std::sqrt(toX * toX + toY * toY);
+		scene.fireThroughWalls = flat < 0.25f ? 1.0f : walk(eyeX / 16, eyeY / 16, toX / flat, toY / flat, flat, [&](int tileX, int tileY, float, float) {
+			return tileX == loudestAt.x && tileY == loudestAt.y;
+		});
+		if (loudestAt.z != eyeTileZ) scene.fireThroughWalls *= 0.5f;
+	}
 }
 
 /**

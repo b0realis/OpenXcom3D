@@ -53,6 +53,7 @@
 #include <SDL.h>
 #include "../Battlescape/Position.h"
 #include "../Mod/RuleItem.h"
+#include "FirstPersonDamageNumbers.h"
 #include "FirstPersonVoxelModel.h"
 
 namespace OpenXcom
@@ -64,9 +65,11 @@ class BattleItem;
 struct BattleAction;
 class BattlescapeState;
 class BattleUnit;
+class Camera;
 class FirstPersonView;
 class FirstPersonScanner;
 class FirstPersonSounds;
+class FirstPersonAmbience;
 class Game;
 class InteractiveSurface;
 class NumberText;
@@ -141,6 +144,8 @@ public:
 	static bool chainRippleHolds(BattlescapeState *state);
 	/// Setting "Full sprite hitboxes": are units hit by their pictures in this battle (see FirstPerson::spriteHitboxes)?
 	static bool spriteHitboxes(BattlescapeState *state);
+	/// Setting "Full sprite hitboxes": the 3D view while it shows the battle (its pictures are the ones hit, see FirstPersonSpriteHits.cpp); null on the map.
+	static const FirstPersonView *shootingView(BattlescapeState *state);
 	/// Setting "Quick deaths": are deaths quick in this battle (see FirstPerson::quickDeaths)?
 	static bool quickDeaths(BattlescapeState *state);
 	/// Akimbo on the map (Ctrl+Shift+click on a hand's weapon): steps the soldier's two guns through firing together there.
@@ -153,6 +158,10 @@ public:
 	static void reactionAkimbo(BattlescapeState *state, BattleAction &action);
 	/// A round or a blow struck a unit: an enemy in sight it did no harm marks the crosshair.
 	static void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefore, int stunBefore);
+	/// A shot, a blow or a blast hurt a unit (setting "Damage numbers"): its numbers to rise over it, if the squad sees it.
+	static void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken);
+	/// Setting "Damage numbers": draws the numbers rising over the units hit on the isometric map.
+	static void drawMapDamageNumbers(BattlescapeState *state, Surface *surface, const Camera *camera);
 	/// Do a shotgun's pellets and a volley's two rounds each land on their own (setting "Each pellet on its own")?
 	static bool eachPellet(BattlescapeState *state);
 	/// The scale a stat bar is drawn at, on the map or in 3D (setting "Stat bars").
@@ -193,6 +202,7 @@ private:
 	SavedBattleGame *_save;                // the battle being played
 	FirstPersonView *_view = nullptr;      // the full-screen 3D view
 	FirstPersonSounds *_sounds = nullptr;  // the sounds we make ourselves (hitmarker, heartbeat, near-miss whizz...)
+	FirstPersonAmbience *_ambience = nullptr; // the rain, the wind and the fires near the soldier (setting "Ambient sounds")
 	bool _wants3D;                         // the player switched to 3D
 	std::string _missionAtStart;           // the battle's mission type when this screen was made (another at the end: its next stage)
 	bool _classicHud = false;              // original bottom HUD drawn over the 3D view
@@ -635,6 +645,8 @@ private:
 	void toggleEnPassant();
 	/// Is this step the game's run (sprinting, and the soldier can run it), not a walk?
 	bool runsStep(BattleUnit *unit, const Position &from, int direction) const;
+	/// Is this step the game's sidestep (turning by the rules: to the side or half to the side, on one level)?
+	bool isSidestep(const BattleUnit *unit, const Position &from, int direction, const Position &target) const;
 	/// Makes the lines under the compass for the ways of walking, hidden.
 	void createWalkModeLines();
 	/// Shows the lines for the ways of walking switched on, under the compass (3D only).
@@ -909,6 +921,8 @@ private:
 	void startMapAim(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, const char *hint);
 	/// Follows an action aimed on the isometric map; back to 3D when it's done.
 	void updateMapAim();
+	/// Empties the game's waypoints, the action's and the map's marks together, and hides its launch button.
+	void clearGameWaypoints();
 	/// Is there a creature the player can see at this point?
 	bool creatureAt(const Position &voxel, const BattleUnit *self) const;
 
@@ -1136,12 +1150,34 @@ private:
 	void selectUnit(BattleUnit *unit);
 	/// Hands the 3D view the visible enemies to mark.
 	void updateEnemyMarkers();
+	/// Has the soldier a clear line to an enemy the squad sees and he doesn't (setting "Enemy markers": its yellow)?
+	bool clearLineOfFire(BattleUnit *viewer, BattleUnit *enemy) const;
 	/// Where a visible enemy button goes in full 3D: in a column at the right, those showing centred on the view's height.
 	void enemyButtonPlace(int index, int &x, int &y) const;
 	/// Is a point on the canvas on a visible enemy button where full 3D draws it?
 	bool onEnemyButton(int index, double canvasX, double canvasY) const;
 	/// Draws the visible enemy buttons, with their numbers, in their full 3D place.
 	void drawEnemyButtons(SDL_Surface *target);
+
+	// ---- setting "Enemy markers": which of the enemies only the squad sees are in a clear line of fire ----
+
+	/// An enemy's last line-of-fire answer (see clearLineOfFire), and what it was for.
+	struct LineOfFireAnswer
+	{
+		const BattleUnit *viewer = nullptr; // the soldier looked through,
+		Position from, to;                  // where he and the enemy stood,
+		int direction = -1;                 // the way he faced;
+		Uint32 time = 0;                    // when it was worked out (SDL ticks)
+		bool clear = false;                 // and the answer
+	};
+	std::unordered_map<const BattleUnit*, LineOfFireAnswer> _lineOfFire; // per enemy marked green or yellow now
+
+	// ---- setting "Damage numbers" ----
+
+	FirstPerson::DamageNumbers _damageNumbers;         // the hits whose numbers rise over the units hit now
+	/// Each frame, in either view: drops the numbers that have had their time, hands the rest to the 3D
+	/// view, and has the map redrawn while it shows them (it draws only when something changes).
+	void updateDamageNumbers(Uint32 now);
 
 	// =====================================================================================
 	// What happens to the soldier: hurt, burning, down, breakdowns

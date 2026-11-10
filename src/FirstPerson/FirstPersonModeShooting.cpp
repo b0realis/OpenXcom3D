@@ -59,6 +59,7 @@
 #include "FirstPersonSounds.h"
 #include "FirstPersonApi.h"
 #include "FirstPersonView.h"
+#include "FirstPersonSpriteHits.h"
 #include "../Battlescape/AlienInventoryState.h"
 #include "../Battlescape/BattleState.h"
 #include "../Battlescape/BattlescapeGame.h"
@@ -337,7 +338,9 @@ BattleItem *FirstPersonMode::emptyHandWeapon(BattleUnit *unit) const
 /**
  * The hand a weapon is used from: the hand holding it, the built-in weapon's, or for the
  * empty-hand weapon the hand it's used from now (an empty one: the left if it's empty, else
- * the right).
+ * the right). A built-in weapon that an empty hand uses too (XPiratez's nun: Holy Bolt) is the
+ * built-in weapon's while both hands hold items (a player, GitHub issue #110: picked on SPECIAL,
+ * it switched to a hand's gun), as the game's own SPECIAL button uses it then.
  * @param unit The soldier.
  * @param weapon The weapon.
  * @return 0 right, 1 left, 2 the built-in weapon.
@@ -347,7 +350,11 @@ int FirstPersonMode::handOf(BattleUnit *unit, const BattleItem *weapon) const
 	if (weapon && weapon == unit->getLeftHandWeapon()) return 1;
 	if (weapon && weapon == unit->getRightHandWeapon()) return 0;
 	BattleType specialType;
-	if (weapon && weapon == unit->getSpecialIconWeapon(specialType) && weapon != emptyHandWeapon(unit)) return 2;
+	if (weapon && weapon == unit->getSpecialIconWeapon(specialType)
+		&& (weapon != emptyHandWeapon(unit) || (unit->getLeftHandWeapon() && unit->getRightHandWeapon())))
+	{
+		return 2;
+	}
 	const int active = activeHand(unit);
 	if (weapon && weapon == emptyHandWeapon(unit) && (active == 0 || active == 1) && handWeapon(unit, active) == weapon) return active;
 	return unit->getLeftHandWeapon() ? 0 : 1;
@@ -1454,9 +1461,16 @@ bool FirstPersonMode::aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &
 
 	// Walk the game's line of fire out to 1500 voxels. Without storing the whole trajectory the
 	// game keeps only the point where the line stopped. The arguments after the trajectory:
-	// leave the soldier out, test every unit, and skip units the player can't see.
+	// leave the soldier out, test every unit, and skip units the player can't see. The line walks
+	// the voxels from the one the eye is in, whose middle can be half a voxel off the eye each
+	// way; with "Full sprite hitboxes" the units' pictures it meets are tested along the eye's own
+	// ray (see FirstPerson::ExactLine), so the crosshair finds a unit exactly where it shows.
 	std::vector<Position> trajectory;
-	const int hitType = _save->getTileEngine()->calculateLineVoxel(rayOrigin, farPoint, false, &trajectory, unit, nullptr, !_save->getDebugMode());
+	int hitType;
+	{
+		const FirstPerson::ExactLine exactLine(eye, rayDirection, rayOrigin);
+		hitType = _save->getTileEngine()->calculateLineVoxel(rayOrigin, farPoint, false, &trajectory, unit, nullptr, !_save->getDebugMode());
+	}
 	// Window glass the view draws before whatever the game's line meets (or before the sky): the
 	// aim stops on it, half a voxel into the pane (the owner, GitHub issue #75: "All aiming stops at
 	// glass"; the game's line may slip between the layers of a pane's voxels, where the view shows
@@ -3029,7 +3043,7 @@ void FirstPersonMode::launchShot(BattleUnit *unit, BattleItem *weapon, BattleAct
 	action->weapon = weapon;
 	action->type = mode;
 	action->targeting = true;
-	action->waypoints.clear();
+	clearGameWaypoints(); // (a missile's left from its aim on the map too: marks, launch button)
 	action->updateTU();
 
 	// Things the add-on adds to the action, read by the game's own shot code
@@ -3674,6 +3688,18 @@ bool FirstPersonMode::spriteHitboxes(BattlescapeState *state)
 }
 
 /**
+ * The 3D view while it shows the battle (setting "Full sprite hitboxes": the units stand as it draws
+ * them, and the looked-through soldier's own lines meet the very cards it draws; see
+ * FirstPersonSpriteHits.cpp).
+ * @param state The battlescape screen.
+ * @return The view, or null (no 3D view in the battle, or the map showing).
+ */
+const FirstPersonView *FirstPersonMode::shootingView(BattlescapeState *state)
+{
+	return state && state->_firstPerson && state->_firstPerson->isActive() ? state->_firstPerson->_view : nullptr;
+}
+
+/**
  * Are deaths quick in this battle (setting "Quick deaths", see FirstPerson::quickDeaths): the
  * setting on, in a battle with the mod's 3D view (in 3D or on the map alike: the battle's rule)?
  * @param state The battlescape screen.
@@ -3867,11 +3893,27 @@ void FirstPersonMode::freeAimTarget(const BattleAction &action, Position &target
 	const int pixelY = std::clamp((int)std::lround(viewHeight / 2.0 - std::tan(angleY) * focalPixels), 0, viewHeight - 1);
 
 	// The round goes for whatever the game's line of fire meets through that pixel; with
-	// nothing there (the sky), for a point far along the ray.
+	// nothing there (the sky), for a point far along the ray. A unit's picture met there (setting
+	// "Full sprite hitboxes"): through the very point of it, from where the round leaves (the
+	// round's own line crosses the picture there, see FirstPerson::spriteHitAt), far beyond.
 	Position hitVoxel;
-	if (aimAt(pixelX, pixelY, unit, hitVoxel))
+	int hitType = V_EMPTY;
+	double crossing[3];
+	if (aimAt(pixelX, pixelY, unit, hitVoxel, &hitType))
 	{
 		target = hitVoxel;
+		if (hitType == V_UNIT && FirstPerson::lastExactCrossing(crossing))
+		{
+			BattleAction round = action;
+			const Position origin = _save->getTileEngine()->getOriginVoxel(round, _save->getTile(unit->getPosition()));
+			const double towards[3] = { crossing[0] - (origin.x + 0.5), crossing[1] - (origin.y + 0.5), crossing[2] - (origin.z + 0.5) };
+			const double length = std::sqrt(towards[0] * towards[0] + towards[1] * towards[1] + towards[2] * towards[2]);
+			if (length > 1.0)
+			{
+				const double reach = FreeAimRoundReach / length;
+				target = origin + Position((int)std::lround(towards[0] * reach), (int)std::lround(towards[1] * reach), (int)std::lround(towards[2] * reach));
+			}
+		}
 	}
 	else
 	{
@@ -4364,6 +4406,14 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		{
 			modeText = _state->tr("STR_FPS_MODE_SPRAY").arg((int)gameAction->waypoints.size()).arg(weapon->getRules()->getSprayWaypoints());
 		}
+		// A guided missile being aimed (its waypoints placed on the map, the view back in 3D
+		// meanwhile): "WAYPOINTS 3/9", those placed of the most the game takes (the launcher's
+		// or its ammo's rules, see startMapAim), "WAYPOINTS 3/UNLIMITED" with no cap (-1).
+		if (mode == BA_LAUNCH && gameAction->targeting && gameAction->type == BA_LAUNCH && gameAction->actor == unit && gameAction->weapon == weapon)
+		{
+			const int placed = (int)gameAction->waypoints.size(), most = weapon->getCurrentWaypoints();
+			modeText = most < 0 ? _state->tr("STR_FPS_MODE_WAYPOINTS_UNLIMITED").arg(placed) : _state->tr("STR_FPS_MODE_WAYPOINTS").arg(placed).arg(most);
+		}
 		// Doom real-time grenades primed on throw: PRIME sets the fuse for every grenade, "FUSE 3s".
 		if (mode == BA_PRIME && doomModeOn() && Options::fpsDoomPrimeOnThrow && timedGrenade(weapon))
 		{
@@ -4681,14 +4731,26 @@ void FirstPersonMode::throwFlare()
  */
 void FirstPersonMode::startMapAim(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, const char *hint)
 {
-	// Set up the game's current action as its own menu would, with the targeting cursor.
+	// The same missile aimed again (its waypoints being placed on the map, the view switched back
+	// to 3D meanwhile and clicked): its waypoints stay, as the game's own menu keeps them when
+	// Launch is picked again, so their count goes on and the launcher's cap (its rules: the
+	// launcher's or its ammo's waypoints, the game's primaryAction) holds as on the map. Anything
+	// else starts afresh, the action's waypoints and the map's marks emptied together. (The owner,
+	// on the blaster launcher: "in 3d you can place many waypoints ... like in iso!": only the
+	// action's were emptied, so the cap counted from none again while the map kept its marks and
+	// its launch button, and back and forth a missile had any number of them.)
 	BattlescapeGame *battleGame = _state->_battleGame;
 	BattleAction *action = battleGame->getCurrentAction();
+	const bool sameLaunch = mode == BA_LAUNCH && action->targeting && action->type == BA_LAUNCH && action->actor == unit && action->weapon == weapon;
+	if (!sameLaunch)
+	{
+		clearGameWaypoints();
+	}
+	// Set up the game's current action as its own menu would, with the targeting cursor.
 	action->actor = unit;
 	action->weapon = weapon;
 	action->type = mode;
 	action->targeting = true;
-	action->waypoints.clear();
 	action->updateTU();
 	battleGame->setupCursor();
 
@@ -4699,6 +4761,19 @@ void FirstPersonMode::startMapAim(BattleUnit *unit, BattleItem *weapon, BattleAc
 	rememberChoices();
 	think();
 	_state->warning(hint);
+}
+
+/**
+ * Empties the game's waypoints (a guided missile's, a spray burst's, confirm fire's mark): the
+ * action's and the map's marks of them together, as the game's own cancel does (they're one
+ * list to the player; the cap counts the action's), and hides its launch button, which would
+ * launch along the action's.
+ */
+void FirstPersonMode::clearGameWaypoints()
+{
+	_state->_battleGame->getCurrentAction()->waypoints.clear();
+	_state->_map->getWaypoints()->clear();
+	_state->showLaunchButton(false);
 }
 
 /**

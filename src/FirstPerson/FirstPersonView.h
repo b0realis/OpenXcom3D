@@ -65,6 +65,7 @@
 #include "../Engine/InteractiveSurface.h"
 #include "FirstPersonChains.h"
 #include "FirstPersonParticles.h"
+#include "FirstPersonSpriteHits.h"
 #include "FirstPersonVoxelModel.h"
 
 namespace OpenXcom
@@ -81,6 +82,8 @@ class Explosion;
 class Projectile;
 class RuleItem;
 class BattleItem;
+namespace FirstPerson { class DamageNumbers; }
+struct AmbientScene;
 
 /**
  * First-person view of the battlescape.
@@ -99,7 +102,8 @@ class BattleItem;
  *                                     (the ray walk itself is in FirstPersonViewRayWalk.h)
  *   FirstPersonViewSprites.cpp        units, items and markers drawn as sprites in the 3D world
  *   FirstPersonViewUpscaling.cpp      smoother sprites up close, made on a worker thread
- *   FirstPersonViewEffects.cpp        particles: explosions, fire, smoke, weather, UFO devices, glows
+ *   FirstPersonViewEffects.cpp        particles: explosions, fire, smoke, weather, UFO devices, glows;
+ *                                     what the ambient sounds hear round the eye (ambientScene)
  *   FirstPersonViewShots.cpp          shots in flight, beams, impacts, bullet holes, explosions' sprites
  *   FirstPersonViewFlares.cpp         tactical flares and their light
  *   FirstPersonViewUfo.cpp            UFOs (an option): steady hulls with glowing lights, coloured light, an aura
@@ -250,6 +254,7 @@ public:
 		Uint8 speck;           // the white specks a rocket leaves hanging along its path
 		Uint8 glassShard[3];   // a window's shards (see spawnGlassShards): pale cyan, white, grey-blue
 		Uint8 marker, marine;
+		Uint8 markerSquadSeen, markerLineOfFire; // enemy markers: the game's green button's colour, and a yellow
 		Uint8 sprayMark, sprayNext; // a spray burst's marks and the line between them (light green), the stretch to the next (grey)
 		Uint8 hitbox[3];       // hitboxes (setting "Hitboxes"): X-COM's, the aliens', the civilians'
 		Uint8 downedIcon[5];   // icons over the downed: flame, its heart, blood, the shock's bolt, out cold
@@ -265,6 +270,7 @@ public:
 		Uint8 grey[4];         // TV static
 		Uint8 glitchGreen[2];  // a digital feed's broken blocks: bright and dark green
 		Uint8 flareTint[256];  // each colour in a flare's red light
+		Uint8 unseenTint[256]; // each colour as unexplored terrain shows it, drawn ("Unseen terrain": Visible): toned towards slate grey
 		Uint8 flareFire[3];    // flare flame: red, orange, yellow
 		static constexpr int HazeSteps = 8; // the distance haze blends colours towards the haze in this many steps
 		Uint8 hazeTint[HazeSteps + 1][256]; // each colour blended towards the haze, step 0 (itself) .. HazeSteps (the haze)
@@ -308,10 +314,24 @@ public:
 
 	/// Sets the unit being looked through (not drawn).
 	void setCameraUnit(const BattleUnit *unit) { _cameraUnit = unit; }
+	/// Gets the unit being looked through (null: none).
+	const BattleUnit *getCameraUnit() const { return _cameraUnit; }
+	/// Setting "Full sprite hitboxes": a unit's picture card as this view draws it standing at a point (see drawSprite): one picture column to the right and one row up, in voxels.
+	void cardAxes(const double world[3], double scale, double column[3], double row[3]) const;
+	/// Setting "Full sprite hitboxes": the height this view stands a unit on at a point (see standingHeight), if it has drawn the map.
+	bool standingHeightNow(const double world[3], double &height) const;
+	/// Setting "Full sprite hitboxes": where this view drew a unit's feet in its last frame (between the game's small steps as it
+	/// eases them, see drawUnits), if it drew it then.
+	bool drawnFeet(const BattleUnit *unit, double feet[3]) const;
+	/// Setting "Full sprite hitboxes": the smooth (upscaled) picture of a unit this view drew last, if it drew this very frame smooth
+	/// (seen from that side, those pixels; see drawUnits); null else. Its factor set.
+	const Surface *smoothPicture(const BattleUnit *unit, int rotation, const std::vector<Uint8> &pixels, int &factor) const;
 	/// Places the eye, in voxels.
 	void setEye(double x, double y, double z);
 	/// Gets the eye, in voxels.
 	void getEye(double out[3]) const;
+	/// Gets the eye without this frame's shake, in voxels: the side units are seen from (see unitViewRotation).
+	void getSteadyEye(double out[3]) const;
 	/// Looks along a unit direction (0 = north, clockwise), level.
 	void lookAlong(int unitDirection);
 	/// Turns the camera.
@@ -335,10 +355,18 @@ public:
 	// What to show
 	// =====================================================================================
 
+	/// How the soldier looked through knows an enemy it marks (setting "Enemy markers"; a player, GitHub issue #117):
+	/// as the game's buttons for it say, red: he sees it; green: only the squad does; yellow: only the squad does, and his
+	/// line to it is clear (smoke, the dark, camouflage or the distance hide it from him).
+	enum MarkerKind { MarkerSeen, MarkerSquadSeen, MarkerLineOfFire };
+	/// An enemy to mark: the unit, its button's number, and how the soldier knows it.
+	struct EnemyMarker { const BattleUnit *unit; int number; MarkerKind kind; };
 	/// Marks units (the visible enemies) with their numbers, over everything.
-	void setMarkers(const std::vector<std::pair<const BattleUnit*, int>> &markers) { _markers = markers; }
+	void setMarkers(const std::vector<EnemyMarker> &markers) { _markers = markers; }
 	/// A spray burst being marked (the game's "spray" auto shot): its points so far and the next one under the crosshair, in voxels (none: not marking).
 	void setSprayMarks(const std::vector<Position> &points, const Position &next) { _sprayPoints = points; _sprayNext = next; }
+	/// Setting "Damage numbers": the hits whose numbers rise over the units hit (the mode's, read as the view draws; null: none).
+	void setDamageNumbers(const FirstPerson::DamageNumbers *numbers) { _damageNumbers = numbers; }
 	/// Where the player points on the view: the crosshair, or the free cursor (pixels on the view),
 	/// and how many pixels of text (a unit's name) are under it.
 	void setPointer(int x, int y, int textBelow) { _pointerX = x; _pointerY = y; _pointerTextBelow = textBelow; }
@@ -432,6 +460,9 @@ public:
 	bool isDoorMoving(const Position &pos, int part);
 	/// The stereo angle of a sound from a tile, for this camera as the listener (0 ahead, 90 right).
 	int soundAngle(const Position &tile) const;
+	/// What the soldier hears round them for the ambient sounds: the weather, how open the sky
+	/// is round the eye, the fires near it (see FirstPersonAmbience).
+	void ambientScene(AmbientScene &scene) const;
 	/// The game's shade (0 bright .. 15 dark) where the camera is.
 	int getEyeShade() const;
 	/// How far the view is kicked up by recoil right now, in degrees.
@@ -485,6 +516,7 @@ private:
 	Map *_map = nullptr;                                // the isometric map: projectiles and explosions come from it
 	const BattleUnit *_cameraUnit = nullptr;            // the unit looked through (not drawn)
 	double _eye[3] = {};                                // the eye, in voxels
+	double _steadyEye[3] = {};                          // the eye as placed for this frame, before the shake jitters it
 	double _yaw = 0.0, _pitch = 0.0;                    // radians; yaw 0 = +x (east), pi/2 = +y (south)
 	double _forward[3] = {}, _right[3] = {}, _up[3] = {}; // camera axes, in true proportions (see ZScale)
 	double _roll = 0.0;                                 // radians the view is tilted by (a lean), positive to the left
@@ -614,6 +646,19 @@ private:
 	};
 	std::vector<Mirror> _mirrors;      // the crafts and UFOs on the map
 	std::vector<Sint16> _mirrorOfTile; // per tile: its craft in _mirrors, -1 none
+	// setting "Wall paint" (GitHub issue #111): a wall face the iso art never shows (a west wall's west face, a north
+	// wall's north face) that takes the paint of the side it faces, from another wall's face the art shows (see findWallPaints)
+	struct WallPaint
+	{
+		const VoxelModel *wall;  // the wall as the map was built (its first frame): only it is repainted, not its rubble
+		const VoxelModel *donor; // the wall whose face the art shows lends its colours, row by row
+		bool donorWest;          // the donor is a west wall (its east face lends), else a north wall (its south face)
+		bool openEnd;            // the wall's line ends at its north (a west wall) or west (a north wall) end, a corner: that end is repainted too
+		Uint8 kind;              // 1 a building's outer wall (Inside and out), 2 a wall between two of its rooms (Every room)
+		Uint8 paintGroup;        // only the wall's voxels of this colour group, the paint of its own side, take the donor's colours
+	};
+	std::vector<WallPaint> _wallPaints; // the walls whose hidden face takes another paint
+	std::vector<Uint16> _wallPaintOf;   // per tile, two (its west wall, its north wall): 1 + the wall's index in _wallPaints, 0 none
 
 	/// Gets (building on first use) the voxel model of a MapData record shown with a sprite.
 	const VoxelModel *getModel(const MapData *mapData, int spriteIndex = -1, bool cutout = false);
@@ -667,6 +712,10 @@ private:
 	void updateDoorSwings(int tileCount);
 	/// Finds the crafts and UFOs on the map, whose unseen sides are mirrored.
 	void findMirrors();
+	/// Setting "Wall paint": finds, for each wall's face the iso art never shows, the side it faces and the wall that lends it that side's paint.
+	void findWallPaints();
+	/// Setting "Wall paint": the colour a wall's face the iso art never shows takes from the side it faces (0: its own).
+	Uint8 wallPaintColor(const Hit &hit, const TileView &tileView, Uint8 ownColor) const;
 	/// The colour of whatever is solid at a world voxel this frame (0 if nothing), of any tile part or only one.
 	Uint8 voxelColorAt(int worldX, int worldY, int worldZ, bool nextFrame = false, int onlyPart = -1) const;
 	/// For a craft's west or north side: the colour of the side across from it.
@@ -717,6 +766,8 @@ private:
 	float hazeStart() const;
 	/// How much of the distance haze terrain this far away is in (0 none .. 1 all haze).
 	float terrainHaze(float distance) const;
+	/// How many shades darker the distance makes terrain this far away (see DistanceShadeVoxels).
+	float distanceShade(float distance) const;
 	/// A colour faded into the distance haze by an amount (0 none .. 1 all haze), dithered between neighbouring blend steps.
 	Uint8 hazeColor(Uint8 color, float haze, int pixelX, int pixelY) const;
 	/// How much of the soldier's sight the smoke on the line from the eye to a point uses up (1 or more: they can't see through it).
@@ -787,12 +838,12 @@ private:
 	Uint32 _hitMarkTick = 0;                            // when an enemy in sight was last hit
 	bool _hitMarkKill = false;                          // and whether that hit killed it
 	Uint32 _noHarmTick = 0;                             // when an enemy in sight was last struck to no harm
-	std::vector<std::pair<const BattleUnit*, int>> _markers; // visible enemies and their numbers
+	std::vector<EnemyMarker> _markers;                  // visible enemies, their numbers and how they're known
 	std::vector<Position> _sprayPoints;                 // a spray burst's marked points, in voxels (see setSprayMarks)
 	Position _sprayNext;                                // and the next one under the crosshair
 	/// Draws a spray burst's marked points, numbered, and the dotted line along them (see setSprayMarks).
 	void drawSprayMarks();
-	struct MarkerSpot { double pos[3]; int number; };
+	struct MarkerSpot { double pos[3]; int number; MarkerKind kind; };
 	std::vector<MarkerSpot> _markerSpots;               // where they are this frame
 	bool _showFacing = false;                           // which way the units face shown (the key for it held)
 	struct FacingSpot { double feet[3]; double radius; int direction; Uint8 color; };
@@ -852,7 +903,6 @@ private:
 		const Tile *pile = nullptr;       // the floor tile whose pile it pictures (a big corpse's first), if any: it can be pointed at
 		double lyingSlope = 0.0;          // a lying sprite's floor rising towards the camera: voxels up for each voxel along (see lyingRise)
 		double floorCut = NoFloorCut;     // no part of a standing sprite below this height, in voxels: the underside of the floor a unit stands on (see floorUnderside)
-		Uint16 outline = 0;               // a unit's picture outlined this frame (see drawUnitOutlines): its number in _outlineColors + 1; 0 none
 	};
 	/// Draws a sprite standing in the world, depth-tested (or see-through, laid over what's there):
 	/// all of it, or only the screen rows from bandTop up to bandBottom.
@@ -909,14 +959,40 @@ private:
 	void recordFlareShadow(const BattleUnit *unit, const double feet[3], double radius);
 	/// Records the outline of the voxels the game counts as a unit when it's hit (setting "Hitboxes"), to be drawn with the units.
 	void recordHitbox(const BattleUnit *unit, const double feet[3], float opacity);
-	/// With "Full sprite hitboxes" the hitbox is the unit's picture (setting "Hitboxes"): while the units
-	/// are drawn, which outlined unit's picture shows on each pixel (its SpriteDraw::outline; 0 none) and
-	/// each row's first and last such pixel; then a line round each picture (see drawUnitOutlines).
+	/// With "Full sprite hitboxes" the hitbox is the unit's picture (setting "Hitboxes"): once the units
+	/// are drawn, which outlined unit's tested picture shows on each pixel (its number; 0 none, see
+	/// noteTestedPictures) and each row's first and last such pixel; then a line round each (see drawUnitOutlines).
 	bool _outlining = false;                 // the units are being drawn with their outlines noted
 	std::vector<Uint16> _outlineOwner;       // per pixel (kept all 0 between frames: only the rows' spans are written, and cleared after)
 	std::vector<int> _outlineRowLeft, _outlineRowRight; // per row, the first and last pixel an outlined picture shows on (none: the width, -1)
 	std::vector<Uint8> _outlineColors;       // this frame's outlined units' colours, their sides'
 	float _outlineOpacity = 1.0f;            // how much of the outlines shows (fading in and out with Blink)
+	std::vector<float> _outlineDepth;        // per pixel noted, how far ahead the tested picture there is (the depth buffer's measure)
+	/// The units outlined this frame: each with its number in _outlineColors + 1, the card the lines from the eye test
+	/// for it (see FirstPerson::viewCard) and the screen box its picture may cover.
+	struct OutlinedUnit
+	{
+		const BattleUnit *unit;
+		Uint16 outline;
+		FirstPerson::SpriteCard card;
+		int left, top, right, bottom;
+	};
+	std::vector<OutlinedUnit> _outlinedUnits;
+	/// Setting "Full sprite hitboxes": the units drawn smooth (upscaled, up close) the last time, each frame's picture as drawn: the
+	/// battle's animation frame, the side seen from, its solid pixels as composed and the smooth version (see smoothPicture).
+	struct SmoothPicture
+	{
+		int animFrame, rotation;
+		std::vector<Uint8> pixels;
+		const Surface *smooth;
+		int factor;
+	};
+	std::unordered_map<const BattleUnit*, SmoothPicture> _smoothPictures;
+	float _testedPictureSlack = 0.5f;        // how much farther than what's drawn there a tested picture may be and still show (see noteTestedPictures)
+	/// Notes on the screen where the outlined units' tested pictures show (see drawUnits), for drawUnitOutlines.
+	void noteTestedPictures();
+	/// The tested pictures over bands of rows taken from the shared counter (a job for runOnAllThreads).
+	void testedPictureBands();
 	/// Draws the outlines round the units' pictures noted while they were drawn, and clears the notes.
 	void drawUnitOutlines();
 	/// The outlines over bands of rows taken from the shared counter (a job for runOnAllThreads).
@@ -979,6 +1055,9 @@ private:
 	void drawFacing();
 	/// Draws icons over the downed units in sight: burning, bleeding, shock, out cold (setting "Downed unit icons").
 	void drawDownedIcons();
+	const FirstPerson::DamageNumbers *_damageNumbers = nullptr; // setting "Damage numbers": the hits whose numbers rise over the units hit
+	/// Draws the numbers rising over the units hit, in the world (setting "Damage numbers").
+	void drawDamageNumbers();
 
 	// =====================================================================================
 	// Sprite upscaling (option): frames through xBRZ, back to the palette, optionally

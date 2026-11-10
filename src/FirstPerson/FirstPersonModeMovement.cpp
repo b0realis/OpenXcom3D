@@ -128,11 +128,29 @@ bool FirstPersonMode::stepAllowed(BattleUnit *unit, int stepX, int stepY)
 	if (_stepAllowedCache[direction] < 0)
 	{
 		// What the pathfinding charges for this one step, from the camera's tile on the unit's
-		// level, walked or (sprinting) run. A step that can't be made at all costs
-		// INVALID_MOVE_COST time units.
+		// level, as commitStep will have the game walk it: the game's sidestep (turning by the
+		// rules, see isSidestep), a run (sprinting, see runsStep) or a walk. A step that can't be
+		// made at all costs INVALID_MOVE_COST time units.
+		// A sidestep is priced as the game's strafe, with the pathfinding's surcharge for it,
+		// which it adds only while its strafe setting is on (a search for a strafe sets it, and
+		// it stays as the last search left it): on for this one question. Priced as a plain step
+		// (a player's report, GitHub issue #114), a soldier with the walk's time units and not
+		// the strafe's had every sidestep refused by the game after it started, and holding A or
+		// D lunged the camera at the edge and back several times a second.
 		const Position start(_trackedTile.x, _trackedTile.y, unit->getPosition().z);
-		const PathfindingStep stepCost = _save->getPathfinding()->getTUCost(start, direction, unit, nullptr,
-			runsStep(unit, start, direction) ? BAM_RUN : BAM_NORMAL);
+		Pathfinding *pathfinding = _save->getPathfinding();
+		PathfindingStep stepCost = pathfinding->getTUCost(start, direction, unit, nullptr, BAM_NORMAL);
+		if (stepCost.cost.time < Pathfinding::INVALID_MOVE_COST && isSidestep(unit, start, direction, stepCost.pos))
+		{
+			const bool strafeWas = pathfinding->getStrafeMove();
+			pathfinding->setStrafeMove(true);
+			stepCost = pathfinding->getTUCost(start, direction, unit, nullptr, BAM_STRAFE);
+			pathfinding->setStrafeMove(strafeWas);
+		}
+		else if (runsStep(unit, start, direction))
+		{
+			stepCost = pathfinding->getTUCost(start, direction, unit, nullptr, BAM_RUN);
+		}
 		bool allowed = stepCost.cost.time < Pathfinding::INVALID_MOVE_COST;
 
 		// Flight switched off (or falling switched off): don't step off a ledge into the air.
@@ -276,6 +294,26 @@ bool FirstPersonMode::runsStep(BattleUnit *unit, const Position &from, int direc
 }
 
 /**
+ * Is this step the game's own sidestep? Turning by the rules (setting "Turning costs TU"), a step
+ * to the side or half to the side is the game's strafe, as Ctrl walks on the map: the soldier
+ * keeps facing the way it faces, for one TU more than the step (the pathfinding's surcharge), not
+ * a turn to face the step and a paid turn back. Steps further round turn as the game turns, and
+ * so does a step up or down stairs (the game's strafe stays on one level). With free turning the
+ * game turns the soldier for the step, for free, and it faces the view again after
+ * (faceLookDirection). The step is priced (stepAllowed) and walked (commitStep) by this one test.
+ * @param unit The soldier.
+ * @param from The tile the step starts from.
+ * @param direction The step's direction (0 north .. 7, clockwise).
+ * @param target The tile the game's step that way ends on (see commitStep).
+ * @return True for a sidestep.
+ */
+bool FirstPersonMode::isSidestep(const BattleUnit *unit, const Position &from, int direction, const Position &target) const
+{
+	const int offFacing = std::min((direction - unit->getDirection() + 8) % 8, (unit->getDirection() - direction + 8) % 8);
+	return Options::fpsTurnCost && offFacing >= 1 && offFacing <= 2 && target.z == from.z;
+}
+
+/**
  * Commits one step of the unit into the neighbouring tile through the game's own walking state
  * (UnitWalkBState), the same one an order on the isometric map uses, so every original rule
  * applies: the time units and energy are paid, doors open, stairs are climbed, mines go off,
@@ -308,14 +346,10 @@ bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 	Pathfinding *pathfinding = _save->getPathfinding();
 	const PathfindingStep gameStep = pathfinding->getTUCost(from, direction, unit, nullptr, BAM_NORMAL);
 	const Position target = gameStep.cost.time < Pathfinding::INVALID_MOVE_COST ? gameStep.pos : levelTarget;
-	// Turning by the rules (setting "Turning costs TU"): a step to the side or half to the side
-	// is the game's own sidestep (its strafe, as Ctrl walks on the map: the soldier keeps facing
-	// the way it faces, for one TU more than the step), not a turn to face the step and a paid
-	// turn back. Steps further round turn as the game turns. With free turning the game turns
-	// the soldier for the step, for free, and it faces the view again after (faceLookDirection).
-	// Sprinting, any other step is the game's run (see runsStep); a sidestep stays one.
-	const int offFacing = std::min((direction - unit->getDirection() + 8) % 8, (unit->getDirection() - direction + 8) % 8);
-	const bool sidestep = Options::fpsTurnCost && offFacing >= 1 && offFacing <= 2 && target.z == from.z;
+	// Turning by the rules, a step to the side or half to the side is the game's own sidestep
+	// (see isSidestep). Sprinting, any other step is the game's run (see runsStep); a sidestep
+	// stays one.
+	const bool sidestep = isSidestep(unit, from, direction, target);
 	const bool run = !sidestep && runsStep(unit, from, direction);
 	if (_sprintOn && !sidestep)
 	{

@@ -160,6 +160,11 @@ const double SpriteHitSlab = 0.8;
 /// shooter for the armour side and body part it hits, in voxels (about the radius of the game's hit shape of a
 /// soldier, which would have stopped the round on its near side; see FirstPerson::spriteHitRelative).
 const double SpriteHitPush = 6.0;
+/// Setting "Hitboxes" with "Full sprite hitboxes": a unit's tested picture is outlined where it shows (see
+/// FirstPersonView::noteTestedPictures): no farther than what's drawn there and this much more, in voxels (in the
+/// view showing the battle the card tested is the one drawn, the picture as near; in another camera's it stands
+/// upright, a little off the leaning card drawn).
+const float TestedPictureDepthSlack = 0.5f, TestedPictureDepthSlackElsewhere = 4.0f;
 /// Setting "Quick deaths" (see FirstPersonQuickDeaths.cpp): how long each frame of a quick fall shows (ms: the game's own
 /// pace, BattlescapeState::DEFAULT_ANIM_SPEED a frame; GitHub issue #58: the fall needn't hurry, nothing waits for it),
 /// and the most fall frames it shows (a fall is surely over after that many: the armors have 3 or so, mods may give more).
@@ -325,6 +330,21 @@ const int BulletHoleCoreShades = 7;
 /// usual 20), at most UnexploredMistMax of the way, so far shapes are a soft blue-grey, never
 /// sky-coloured boxes; the distance haze still takes them fully at the view's reach.
 const float UnexploredMistFrom = 0.5f, UnexploredMistTo = 1.5f, UnexploredMistMax = 0.6f;
+/// Terrain is a shade darker for every DistanceShadeVoxels of distance (20 tiles), or for every
+/// DistanceShadeReachParts-th of the view's reach when that is longer (setting "View distance"), so
+/// terrain at the reach, and the ground beyond the map's edge out to the horizon, is no darker at
+/// 200 tiles than at 60 (at 200 the far ground sank into its darkest, all but black, shades before
+/// the haze reached it).
+const float DistanceShadeVoxels = 320.0f, DistanceShadeReachParts = 3.0f;
+/// The setting "Unseen terrain" (see shadeHit). Fog: the shapes grow a shade darker every
+/// UnseenFogDarkening voxels away (10 tiles, as 0.9 drew them), and a fog rises over them from the
+/// game's sight range (at most UnseenFogFromMax of the view's reach) to the reach, as thick as the
+/// setting "Distance haze" has it: all at Normal (UnseenFogNormal), half at Light (UnseenFogLight),
+/// none at Clear. Visible: drawn as seen terrain is, each colour then toned UnseenToneShare of the
+/// way to a slate grey (UnseenToneRgb's hue) as bright as itself (see updateColors).
+const float UnseenFogDarkening = 160.0f, UnseenFogFromMax = 0.5f, UnseenFogNormal = 1.0f, UnseenFogLight = 0.5f;
+const float UnseenToneShare = 0.4f;
+const float UnseenToneRgb[3] = { 78.0f, 88.0f, 110.0f };
 /// The sea's waves (the mod's water, TFTD's sea: see FirstPersonView::waveHeight): trains of waves
 /// crossing, each its length from crest to crest (voxels, 16 to a tile), its heading (radians
 /// from east towards south), its speed (voxels a second) and its share of the height (together
@@ -545,6 +565,11 @@ const Uint8 DigitFont[10][5] = {
 	{ 7, 5, 5, 5, 7 }, { 2, 6, 2, 2, 7 }, { 7, 1, 7, 4, 7 }, { 7, 1, 3, 1, 7 }, { 5, 5, 7, 1, 1 },
 	{ 7, 4, 7, 1, 7 }, { 7, 4, 7, 5, 7 }, { 7, 1, 1, 2, 2 }, { 7, 5, 7, 5, 7 }, { 7, 5, 7, 1, 7 } };
 const int TapeTextLength = sizeof(TapeText) / sizeof(TapeText[0]);
+/// The icons over the downed units with "Crosshair" (see FirstPersonView::drawDownedIcons): a body
+/// whose tile is narrower on the screen than this share of the view's width counts as far off (its
+/// picture only a few pixels across, about ten tiles off at the default field of view), taken
+/// within about a tile of where the player points when its picture isn't under the pointer.
+const double DownedFarTileShare = 0.05;
 
 }
 

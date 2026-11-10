@@ -61,6 +61,7 @@
 #include "../Mod/RuleDamageType.h"
 #include "../Mod/RuleItem.h"
 #include "../Savegame/BattleItem.h"
+#include "../Savegame/BattleUnit.h"
 
 namespace OpenXcom
 {
@@ -637,6 +638,20 @@ int smokeMode()
 }
 
 /**
+ * How far the big 3D view reaches (setting "View distance"): at its first value, 60, as far as
+ * the mod has it (maxViewDistance: 60 in ours, so nothing changes; a mod that wants a shorter or
+ * a longer view keeps it), else the distance chosen (10 to 200 tiles, as the mod's may be). The
+ * small views (the helmet and map cameras) keep their own, shorter reach.
+ * @param mod The game's rules.
+ * @return The reach, in tiles.
+ */
+int viewDistance(const Mod *mod)
+{
+	return Options::fpsViewDistance == DefaultViewDistance ? mod->getFirstPerson().getMaxViewDistance()
+		: std::clamp(Options::fpsViewDistance, 10, 200);
+}
+
+/**
  * Registers the add-on's options with the game's (called from Options::createOptionsOTHER, the
  * engine's place for a fork's own options), so they are loaded, saved and reset to their
  * defaults like any other option. Category STR_FIRST_PERSON is only listed by the 3D VIEW tab,
@@ -744,6 +759,30 @@ void createOptions(std::vector<OptionInfo> &options)
 	// The distance haze on land: normal (0), light (1), clear (2: only a thin fade where the
 	// view ends). Under the sea the murk stays.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHaze", &fpsHaze, 0, "STR_FPS_HAZE", category));
+	// Terrain the squad hasn't seen yet (the owner: three ways, from today's to the most costly, for
+	// whole-map screenshots too): Mist (0), slate shapes turning misty further off, as since 1.03;
+	// Fog (1), dark slate shapes (0.9's) in a fog rising from the edge of the game's sight to the
+	// view's reach, as thick as the distance haze has it; Visible (2), drawn as seen terrain is, a
+	// little greyer, in the usual haze. Units and items stay hidden until seen, whichever.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsUnseenTerrain", &fpsUnseenTerrain, 0, "STR_FPS_UNSEEN_TERRAIN", category));
+	// How far the 3D view reaches, in tiles (see viewDistance): 60, as the mod has it, or further
+	// (80, 100, 130, 160, 200), the haze closing in over the last stretch as before.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsViewDistance", &fpsViewDistance, DefaultViewDistance, "STR_FPS_VIEW_DISTANCE", category));
+	// The fog of war in 3D (a player, GitHub issue #115: going down stairs, the floor below stayed
+	// dark "despite looking directly at it" until the soldier stood on it): Off (0), terrain the view
+	// itself sees within the game's sight range is drawn as seen, explored or not (beyond it the
+	// setting "Unseen terrain" rules); As the map (1), only what the game has explored. The 3D view
+	// only: the map and the game's exploring stay the game's, and units and items stay hidden until
+	// seen, whichever.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsFogOfWar", &fpsFogOfWar, 0, "STR_FPS_FOG_OF_WAR", category));
+	// Wall paint (a player, GitHub issue #111: from behind a house its walls showed the beige of its
+	// rooms, not its outside): the faces of walls the isometric art never shows, a west wall's west face
+	// and a north wall's north face (see FirstPersonView::findWallPaints). As the art (0): the paint of
+	// the face it shows, as before. Inside and out (1): a building's outer walls in the paint of the side
+	// they face, its outside or the room inside. Every room (2): the walls between its rooms too, each
+	// face in its room's. The faces the map shows stay as it draws them; doors, and windows' frames and
+	// glass, keep theirs.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsWallPaint", &fpsWallPaint, 1, "STR_FPS_WALL_PAINT", category));
 	// The flashlight, a light of the 3D view's own (on and off with its key, F; the suit light
 	// stays the game's): none (0), a wide beam from the shoulder in the dark (1, on), or a light
 	// on the weapon, a tight spot on the crosshair at any time of day (2, dynamic). Unset (-1)
@@ -753,6 +792,10 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightVisionGear", &fpsNightVisionGear, false, "STR_FPS_NIGHT_VISION_GEAR", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCombatMusic", &fpsCombatMusic, true, "STR_FPS_COMBAT_MUSIC", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitSounds", &fpsHitSounds, true, "STR_FPS_HIT_SOUNDS", category));
+	// The 3D view's ambient sounds (the owner: "The weather effects should also have nonobtrusive
+	// sound. Namely rain and wind. The fire burning in front of you should also have a sound"),
+	// made by the game (see FirstPersonAmbience): Off (0), Quiet (1, half as loud), On (2).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsAmbientSounds", &fpsAmbientSounds, 2, "STR_FPS_AMBIENT_SOUNDS", category));
 	// The smoke: the original games' own frames, see-through where the soldier sees through the
 	// smoke and stacked where the sight runs out (1); soft clouds, solid where they block the
 	// soldier's sight (2). (1.0's Solid, 0, is gone.) Unset (-1) until settled (see settleOptions)
@@ -878,6 +921,16 @@ void createOptions(std::vector<OptionInfo> &options)
 	// Icons over the downed (unconscious) units in sight, for burning, bleeding, shock and
 	// stunned: off (0), over the body under the crosshair (1), over every body in sight (2).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDownedIcons", &fpsDownedIcons, 1, "STR_FPS_DOWNED_ICONS", category));
+	// The colours of the markers over the enemies (a player, GitHub issue #117: "markers should be red if visible, green
+	// if unseen, and perhaps yellow if viable line of fire, but otherwise unseen"; the owner: a setting): all red (0, as
+	// before), as the map's buttons for them (1: red if the soldier sees it, green if only the squad does), or that and
+	// yellow for those of the green ones he has a clear line to (2, the default: Line of fire). None over our own.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsEnemyMarkers", &fpsEnemyMarkers, 2, "STR_FPS_ENEMY_MARKERS", category));
+	// A hit's damage rising over the unit hit and fading (the owner's): the health it took after its
+	// armour in red, the armour it took off in blue, the stun in purple, a grey 0 when it did none of
+	// these; every hit on a unit the squad sees, whoever struck, in 3D (in the world, behind walls
+	// hidden) and on the map (see FirstPersonDamageNumbers.cpp). Off: none.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsDamageNumbers", &fpsDamageNumbers, false, "STR_FPS_DAMAGE_NUMBERS", category));
 	// Staying in the 3D view during the alien turn, starting battles in it, and the debug cheat
 	// "doom mode" (endless time units and energy), with its two extras, each doom mode plus
 	// more: IDKFA (endless ammo) and IDDQD (invincible soldiers); in doom mode grenades go off in
@@ -1159,6 +1212,48 @@ void reactionAkimbo(BattlescapeState *state, BattleAction &action)
 void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefore, int stunBefore)
 {
 	FirstPersonMode::unitStruck(state, unit, healthBefore, stunBefore);
+}
+
+/**
+ * Called by the game as a shot, a blow or a blast has hurt a unit (TileEngine::hitUnit): setting
+ * "Damage numbers" (see FirstPersonMode::unitDamaged).
+ * @param state The battlescape screen (null while the battle is being made).
+ * @param unit The unit hurt.
+ * @param healthLost The health it lost.
+ * @param armorLost The armour points it lost (the side struck).
+ * @param stunTaken The stun it took.
+ */
+void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken)
+{
+	FirstPersonMode::unitDamaged(state, unit, healthLost, armorLost, stunTaken);
+}
+
+/**
+ * A unit's armour, all its sides' points together, as they are now (the game lowers the side a hit
+ * strikes): read by the game before and after a hit for setting "Damage numbers".
+ * @param unit The unit.
+ * @return The points.
+ */
+int armorPoints(const BattleUnit *unit)
+{
+	int points = 0;
+	for (int side = 0; side < SIDE_MAX; ++side)
+	{
+		points += unit->getArmor((UnitSide)side);
+	}
+	return points;
+}
+
+/**
+ * Called by the game as it finishes drawing the isometric map: setting "Damage numbers" (see
+ * FirstPersonMode::drawMapDamageNumbers).
+ * @param state The battlescape screen.
+ * @param surface The map's surface (locked).
+ * @param camera The map's camera.
+ */
+void drawMapDamageNumbers(BattlescapeState *state, Surface *surface, const Camera *camera)
+{
+	FirstPersonMode::drawMapDamageNumbers(state, surface, camera);
 }
 
 /**

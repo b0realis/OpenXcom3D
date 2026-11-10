@@ -55,6 +55,7 @@
 #include <climits>
 #include <cmath>
 #include <string>
+#include "FirstPersonAmbience.h"
 #include "FirstPersonApi.h"
 #include "FirstPersonScanner.h"
 #include "FirstPersonSounds.h"
@@ -165,6 +166,7 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
 
 	// The mode's own sounds, and the canvas the overlays are drawn on before being magnified.
 	_sounds = new FirstPersonSounds();
+	_ambience = new FirstPersonAmbience(); // (its loops are made when the 3D view first shows the battle)
 	_scanner = new FirstPersonScanner(_game, _sounds);
 	makeCanvas();
 
@@ -222,10 +224,10 @@ void FirstPersonMode::createView()
 	surfaces.insert(std::find(surfaces.begin(), surfaces.end(), _state->_map) + 1, _view);
 
 	// What it shows: this battle, with the isometric map's shots and explosions, as far as the
-	// mod allows.
+	// setting "View distance" reaches (the mod's reach at its first value, see viewDistance).
 	_view->setSavedBattleGame(_save);
 	_view->setMap(_state->_map);
-	_view->setMaxDistance(mod->getFirstPerson().getMaxViewDistance());
+	_view->setMaxDistance(FirstPerson::viewDistance(mod));
 	_view->setVisible(false);
 	_ownSurfaces.insert(_view);
 }
@@ -949,7 +951,7 @@ void FirstPersonMode::resized(int widthChange, int heightChange)
 	newView->setPalette(_state->getPalette());
 	newView->setSavedBattleGame(_save);
 	newView->setMap(_state->_map);
-	newView->setMaxDistance(_game->getMod()->getFirstPerson().getMaxViewDistance());
+	newView->setMaxDistance(FirstPerson::viewDistance(_game->getMod()));
 	newView->setVisible(_view->getVisible());
 	replaceStateSurface(_view, newView);
 	_ownSurfaces.erase(_view);
@@ -1227,6 +1229,7 @@ FirstPersonMode::~FirstPersonMode()
 	delete _heldSprite; // not added to the state
 	delete _offHandSprite;
 	delete _scanner;
+	delete _ambience;
 	delete _sounds;
 	delete _canvas;
 }
@@ -1910,8 +1913,19 @@ void FirstPersonMode::think()
 	const bool resumed = _lastFrameTick && now - _lastFrameTick > 250;
 	_lastFrameTick = now;
 
+	// The rain, the wind and the fires near the soldier (setting "Ambient sounds"): heard in
+	// the 3D view, fading out on the map.
+	AmbientScene ambientScene;
+	if (isActive())
+	{
+		_view->ambientScene(ambientScene);
+	}
+	_ambience->update(ambientScene.ready ? &ambientScene : nullptr, elapsedSeconds);
+
 	// Explosions in 3D at the isometric map's pace (the battle's timer catching up).
 	catchUp();
+	// The numbers rising over the units hit (setting "Damage numbers"), in either view.
+	updateDamageNumbers(now);
 
 	// The right button may have been let go while another screen had the mouse, or the view
 	// changed: then the zoom it held and the drag look end too.
@@ -2049,6 +2063,7 @@ void FirstPersonMode::think()
 	updateScope();
 	_view->setFieldOfView(fieldOfViewNow(), _zoom);
 	_view->setSmoothLighting(Options::fpsSmoothLighting);
+	_view->setMaxDistance(FirstPerson::viewDistance(_game->getMod()));
 
 	// What happened to the soldier and around them: a new enemy spotted, hurt, on fire, a shot
 	// whizzing past; the recoil easing back, the game done aiming our last shot, and a held

@@ -57,6 +57,9 @@
 #include <vector>
 #include <SDL.h>
 #include "FirstPersonApi.h"
+#include "FirstPersonDamageNumbers.h"
+#include "FirstPersonMode.h"
+#include "../Engine/Font.h"
 #include "../Engine/Game.h"
 #include "../Engine/Options.h"
 #include "../Engine/Surface.h"
@@ -71,6 +74,7 @@
 #include "../Battlescape/Position.h"
 #include "../Battlescape/UnitSprite.h"
 #include "FirstPersonParticles.h"
+#include "FirstPersonSpriteHits.h"
 #include "FirstPersonViewShared.h"
 
 namespace OpenXcom
@@ -254,9 +258,6 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 	// keeps its colours under futuristic night vision; anything else solid (smoke more than
 	// half opaque) drawn over it takes that back (see _ownColours).
 	const Uint8 ownColours = draw.unit || draw.body || draw.pile ? 1 : 0;
-	// While the units are drawn with their outlines (see drawUnitOutlines): whose picture each pixel
-	// shows, an outlined unit's or not (0), and each row's first and last pixel of an outlined one.
-	Uint16 *const outlineOwner = _outlining ? _outlineOwner.data() : nullptr;
 	auto plot = [&](int pixelX, int pixelY, Uint8 color, float depth, int pixelOpacity) {
 		const int index = pixelY * width + pixelX;
 		float &depthHere = _depthBuffer[index];
@@ -297,15 +298,6 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 		_glowMask[index] = 0;
 		_unitVeil[index] = draw.unit ? UnitVeilMax : 255;
 		_ownColours[index] = ownColours;
-		if (outlineOwner)
-		{
-			outlineOwner[index] = draw.outline;
-			if (draw.outline)
-			{
-				_outlineRowLeft[pixelY] = std::min(_outlineRowLeft[pixelY], pixelX);
-				_outlineRowRight[pixelY] = std::max(_outlineRowRight[pixelY], pixelX);
-			}
-		}
 		const int patchX = pixelX - _pointerX + PointerReach, patchY = pixelY - _pointerY + PointerReach;
 		if (patchX >= 0 && patchY >= 0 && patchX <= 2 * PointerReach && patchY <= 2 * PointerReach)
 		{
@@ -564,6 +556,99 @@ double FirstPersonView::standingHeight(const double world[3]) const
 {
 	const int raise = riseOutOfSolid(world, StandRaiseMax);
 	return raise > 0 ? (int)std::floor(world[2]) + raise : world[2];
+}
+
+/**
+ * Setting "Full sprite hitboxes": the height this view stands a unit on at a point (see
+ * standingHeight), so that the lines of fire meet a unit's picture where the view draws it (see
+ * FirstPersonSpriteHits.cpp): only once it has drawn the map (its snapshot of the tiles is there).
+ * @param world The point on the ground, in voxels.
+ * @param height Set to the height, in voxels.
+ * @return False if the view hasn't drawn the map yet.
+ */
+/**
+ * Setting "Full sprite hitboxes": the smooth (upscaled) picture of a unit this view drew last (up
+ * close, setting "Sprite upscaling", see useSmoothVersion), if it drew this very frame smooth: the
+ * same animation frame, seen from the same side, the same pixels as composed. The lines of the
+ * soldier looked through meet that picture, as drawn (see FirstPersonSpriteHits.cpp).
+ * @param unit The unit.
+ * @param rotation The view rotation of its frame.
+ * @param pixels The frame's solid pixels, as composed (SpriteBufferSize square).
+ * @param factor Set to how many times bigger the smooth picture is.
+ * @return The smooth picture, or null (not drawn smooth, or another frame).
+ */
+const Surface *FirstPersonView::smoothPicture(const BattleUnit *unit, int rotation, const std::vector<Uint8> &pixels, int &factor) const
+{
+	auto noted = _smoothPictures.find(unit);
+	if (noted == _smoothPictures.end() || noted->second.animFrame != _save->getAnimFrame() || noted->second.rotation != rotation || noted->second.pixels != pixels)
+	{
+		return nullptr;
+	}
+	factor = noted->second.factor;
+	return noted->second.smooth;
+}
+
+/**
+ * Setting "Full sprite hitboxes": where this view drew a unit's feet in its last frame (see drawUnits:
+ * a unit on the move between the tiles of its step, every unit eased between the game's small steps;
+ * not the flinch of a hit), so that the lines of the soldier looked through meet its picture there.
+ * @param unit The unit.
+ * @param feet Set to the point, in voxels (on its floor, before the raise onto the floor's top).
+ * @return False if the last frame didn't draw it.
+ */
+bool FirstPersonView::drawnFeet(const BattleUnit *unit, double feet[3]) const
+{
+	auto glide = _unitGlides.find(unit);
+	if (glide == _unitGlides.end() || !_unitLastTick || glide->second.seen != _unitLastTick)
+	{
+		return false;
+	}
+	std::copy(glide->second.pos, glide->second.pos + 3, feet);
+	return true;
+}
+
+bool FirstPersonView::standingHeightNow(const double world[3], double &height) const
+{
+	if (!_save || (int)_tileViews.size() != _save->getMapSizeXYZ())
+	{
+		return false;
+	}
+	height = standingHeight(world);
+	return true;
+}
+
+/**
+ * Setting "Full sprite hitboxes": the card a unit's picture stands on at a point, as drawSprite
+ * draws it (the same reckoning): square to the view across the map, leaning back as the view looks
+ * down (up to CardTiltMax) and forward as it looks up (CardTiltUpMax; a card steeply above the eye
+ * leans towards it, up to CardTiltSteepMax). Gives one picture column to the right (SpritePixelX
+ * of a voxel across, level) and one picture row up the card (a voxel up, upright), in voxels, both
+ * times the scale, so that the lines of fire of the soldier looked through meet the very card drawn
+ * (see FirstPersonSpriteHits.cpp).
+ * @param world The anchor's point, in voxels.
+ * @param scale The picture's scale (setting "Unit size").
+ * @param column Set to one column to the right, in voxels.
+ * @param row Set to one row up the card, in voxels.
+ */
+void FirstPersonView::cardAxes(const double world[3], double scale, double column[3], double row[3]) const
+{
+	const double level[2] = { std::cos(_yaw), std::sin(_yaw) }; // straight ahead, along the ground
+	const double anchor[3] = { world[0] - _eye[0], world[1] - _eye[1], (world[2] - _eye[2]) * ZScale };
+	const double elevation = std::atan2(anchor[2], std::sqrt(anchor[0] * anchor[0] + anchor[1] * anchor[1]));
+	double tilt = std::clamp(_pitch, -CardTiltMax * Pi / 180.0, CardTiltUpMax * Pi / 180.0);
+	if (elevation > CardTiltUpMax * Pi / 180.0)
+	{
+		tilt = std::max(tilt, std::min(elevation - CardTiltUpMax * Pi / 180.0, CardTiltSteepMax * Pi / 180.0));
+	}
+	// A column along the level right; a row up the card (cardUp in true proportions, a row
+	// rowSize = scale * ZScale of it), its height back into voxels (divided by ZScale).
+	const double levelRight[2] = { -level[1], level[0] };
+	column[0] = levelRight[0] * SpritePixelX * scale;
+	column[1] = levelRight[1] * SpritePixelX * scale;
+	column[2] = 0.0;
+	row[0] = -std::sin(tilt) * level[0] * scale * ZScale;
+	row[1] = -std::sin(tilt) * level[1] * scale * ZScale;
+	row[2] = std::cos(tilt) * scale;
 }
 
 /**
@@ -835,12 +920,14 @@ void FirstPersonView::watchUnits()
 		}
 		const float dx = chest[0] - (float)_eye[0], dy = chest[1] - (float)_eye[1];
 		const float flatDistance = std::max(0.01f, std::sqrt(dx * dx + dy * dy));
-		// A hit starts the flinch, pushing it away from the camera.
+		// A hit starts the flinch, pushing it away from the camera (straight above or below it, no
+		// way across the map is away from the camera: none, see FirstPerson::unitViewRotation).
 		if (wasHit)
 		{
+			const bool straightAbove = flatDistance < 1.0f;
 			watch.hitTick = now;
-			watch.push[0] = dx / flatDistance;
-			watch.push[1] = dy / flatDistance;
+			watch.push[0] = straightAbove ? 0.0f : dx / flatDistance;
+			watch.push[1] = straightAbove ? 0.0f : dy / flatDistance;
 		}
 		if (seen && unit != _cameraUnit)
 		{
@@ -877,8 +964,8 @@ void FirstPersonView::watchUnits()
  * is, turned to show the side facing the camera. Walking units glide between tiles, and every
  * unit eases between the game's small steps; a hit unit flinches and flashes; each stands on a
  * soft shadow. Also notes where the numbered enemy markers go this frame (drawMarkers), and
- * outlines their hitboxes (setting "Hitboxes"; with "Full sprite hitboxes", their pictures: see
- * drawUnitOutlines). The unit being looked through is not drawn. Their pixels are noted as a unit's, so the
+ * outlines their hitboxes (setting "Hitboxes"; with "Full sprite hitboxes", the pictures the lines
+ * from the eye test: see noteTestedPictures, drawUnitOutlines). The unit being looked through is not drawn. Their pixels are noted as a unit's, so the
  * see-through smoke drawn later veils them only thinly (see _unitVeil).
  * Everything is worked out here, on the game's thread, and recorded (see DrawStep); then all of
  * it is drawn at once on all the view's threads (see replayDrawList).
@@ -905,14 +992,19 @@ void FirstPersonView::drawUnits()
 		: Options::fpsHitboxes == 1 ? 0.5f + 0.5f * (float)std::cos((now % 1000) / 1000.0 * 2.0 * Pi) : 0.0f;
 	// With "Full sprite hitboxes" the hitbox is the picture: the same setting outlines that instead,
 	// a line round it (the owner: "the sprites should be then surrounded by red line to show where you
-	// can hit them"), noted while the units are drawn and drawn over them after (see drawUnitOutlines).
+	// can hit them"): round what the lines from the eye test, from the test's own cards (a player:
+	// "a visualization of the actual hitbox would help"), noted once the units are drawn and drawn
+	// over them (see noteTestedPictures, drawUnitOutlines).
 	_outlining = hitboxOpacity > 0.05f && Options::fpsSpriteHitboxes;
 	_outlineColors.clear();
+	_outlinedUnits.clear();
+	_smoothPictures.clear(); // (noted afresh for the units drawn smooth this frame; a smooth picture unused for a frame may go)
 	_outlineOpacity = hitboxOpacity;
 	if (_outlining)
 	{
 		const size_t pixels = (size_t)getWidth() * getHeight();
 		if (_outlineOwner.size() != pixels) _outlineOwner.assign(pixels, 0);
+		if (_outlineDepth.size() != pixels) _outlineDepth.assign(pixels, 0.0f);
 		_outlineRowLeft.assign(getHeight(), getWidth());
 		_outlineRowRight.assign(getHeight(), -1);
 	}
@@ -996,6 +1088,7 @@ void FirstPersonView::drawUnits()
 			}
 		}
 		glide.seen = now;
+		const double placedFeet[3] = { feet[0], feet[1], feet[2] }; // (before a hit's flinch: the side it's seen from, below)
 		// A hit unit flinches back from the camera for a moment (HitFlinchTime, up to 3 voxels), and
 		// flashes (setting "Hit flash", and "Muzzle flashes", which turns every flash off).
 		float flash = 0.0f;
@@ -1011,9 +1104,9 @@ void FirstPersonView::drawUnits()
 		// A marked enemy's marker goes 5 voxels above its head (not over one falling: it's down).
 		for (const auto &marker : _markers)
 		{
-			if (marker.first == unit && !fallingDown)
+			if (marker.unit == unit && !fallingDown)
 			{
-				MarkerSpot spot = { { feet[0], feet[1], feet[2] + unit->getFloatHeight() + unit->getHeight() + 5.0 }, marker.second };
+				MarkerSpot spot = { { feet[0], feet[1], feet[2] + unit->getFloatHeight() + unit->getHeight() + 5.0 }, marker.number, marker.kind };
 				_markerSpots.push_back(spot);
 			}
 		}
@@ -1032,11 +1125,12 @@ void FirstPersonView::drawUnits()
 
 		// The isometric sprites show units as seen from the south-east (direction 3).
 		// Rotate the unit's facing so the side turned towards the camera is shown: the
-		// direction from the unit to the camera, in the game's eight directions (0 north,
-		// clockwise; atan2 measures from east, so a quarter turn is added).
-		const double toCameraDegrees = std::atan2(_eye[1] - feet[1], _eye[0] - feet[0]) * 180.0 / Pi;
-		const int cameraDirection = (((int)std::lround((toCameraDegrees + 90.0) / 45.0)) % 8 + 8) % 8;
-		unitSprite.setViewRotation(3 - cameraDirection);
+		// direction from the unit to the camera, in the game's eight directions, from the eye
+		// as placed to where the unit stands (neither a shake nor a hit's flinch turns it);
+		// straight above or below it, from the south-east, as the map shows it (see
+		// FirstPerson::unitViewRotation: the lines of fire test the same picture).
+		const int viewRotation = FirstPerson::unitViewRotation(_steadyEye, placedFeet);
+		unitSprite.setViewRotation(viewRotation);
 
 		// The light on it, at its chest: the game's light, lamps, flashlight and flares, and
 		// the flash of a hit; in the map's first debug vision mode no darker than
@@ -1095,14 +1189,41 @@ void FirstPersonView::drawUnits()
 		}
 		step.sprite.unit = unit;
 		useSmoothVersion(step.sprite);
-		// With full sprite hitboxes, its picture outlined where the box would be drawn; not one so close
-		// that it fades out, dithered (drawSprite: nearer than 10 voxels), where the holes would be outlined.
+		// With full sprite hitboxes, a picture drawn smooth (upscaled, up close) is the one the lines of the
+		// soldier looked through meet: noted with the frame it is (see smoothPicture).
+		if (Options::fpsSpriteHitboxes)
+		{
+			if (step.sprite.scale < unitScale)
+			{
+				SmoothPicture &noted = _smoothPictures[unit];
+				noted.animFrame = _save->getAnimFrame();
+				noted.rotation = viewRotation;
+				noted.pixels.resize((size_t)SpriteBufferSize * SpriteBufferSize);
+				const SDL_Surface *composed = _spriteBuffer->getSurface(); // (still the frame composed)
+				for (int y = 0; y < SpriteBufferSize; ++y)
+				{
+					for (int x = 0; x < SpriteBufferSize; ++x) noted.pixels[(size_t)y * SpriteBufferSize + x] = ((const Uint8 *)composed->pixels)[y * composed->pitch + x] != 0;
+				}
+				noted.smooth = step.sprite.sprite;
+				noted.factor = spriteUpscaleFactor();
+			}
+			else
+			{
+				_smoothPictures.erase(unit);
+			}
+		}
+		// With full sprite hitboxes, what the lines test outlined where the box would be drawn (see
+		// noteTestedPictures); not for one so close that it fades out, dithered (drawSprite: nearer
+		// than 10 voxels), where the holes would be outlined.
 		double screenX, screenY, screenDepth;
 		if (_outlining && (!hitboxAimedOnly || unit == _aimedUnit) && !fallingDown && _outlineColors.size() < 0xFFFF
 			&& projectToScreen(step.sprite.world, screenX, screenY, screenDepth) && screenDepth >= 10.0)
 		{
 			_outlineColors.push_back(_colors.hitbox[unit->getFaction() == FACTION_PLAYER ? 0 : unit->getFaction() == FACTION_HOSTILE ? 1 : 2]);
-			step.sprite.outline = (Uint16)_outlineColors.size();
+			OutlinedUnit outlined;
+			outlined.unit = unit;
+			outlined.outline = (Uint16)_outlineColors.size();
+			_outlinedUnits.push_back(outlined);
 		}
 		_drawList.push_back(step);
 		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit) && !Options::fpsSpriteHitboxes && !fallingDown) // (with full sprite hitboxes the picture is the hitbox, outlined above; one falling is down)
@@ -1119,17 +1240,128 @@ void FirstPersonView::drawUnits()
 			_facingSpots.push_back(spot);
 		}
 	}
-	// Then draw them all, and with full sprite hitboxes their pictures' outlines over them.
+	// Then draw them all, and with full sprite hitboxes the outlines of what the lines test over them.
 	replayDrawList();
 	if (_outlining)
 	{
+		noteTestedPictures();
 		drawUnitOutlines();
 	}
 }
 
 /**
+ * Setting "Hitboxes" with "Full sprite hitboxes": notes on the screen where each outlined unit's
+ * picture is hit by the lines from the eye (the test's own card, see FirstPerson::viewCard: in the
+ * view showing the battle, the very card drawn, its feet on the floor's top; the art below the feet
+ * lying on the floor is never hit, nor what the picture reaches below a floor), so that the outline
+ * goes round that (see drawUnitOutlines): which unit's on each pixel, how far ahead, and each row's
+ * first and last such pixel. Only where it shows: nothing nearer drawn there (a wall, a unit in
+ * front; its own drawn picture is as near). The cards are worked out here, on the game's thread;
+ * the pixels on all the view's threads (see testedPictureBands).
+ */
+void FirstPersonView::noteTestedPictures()
+{
+	const int width = getWidth(), height = getHeight();
+	// (in the view showing the battle the card tested is the one drawn: as near as its picture; in
+	// another camera's it stands upright, a little off the picture drawn)
+	_testedPictureSlack = this == FirstPersonMode::shootingView(_save->getBattleState()) ? TestedPictureDepthSlack : TestedPictureDepthSlackElsewhere;
+	std::vector<OutlinedUnit> cards;
+	for (OutlinedUnit &outlined : _outlinedUnits)
+	{
+		if (!FirstPerson::viewCard(_save, outlined.unit, this, outlined.card))
+		{
+			continue;
+		}
+		// The picture's solid pixels' bounds (the rows below the feet only when they count).
+		const FirstPerson::SpriteCard &card = outlined.card;
+		int firstColumn = SpriteBufferSize, lastColumn = -1, firstRow = SpriteBufferSize, lastRow = -1;
+		for (int row = 0; row < (card.rowsBelow ? SpriteBufferSize : card.anchorY); ++row)
+		{
+			for (int column = 0; column < SpriteBufferSize; ++column)
+			{
+				if (!(*card.picture)[(size_t)row * SpriteBufferSize + column]) continue;
+				firstColumn = std::min(firstColumn, column); lastColumn = std::max(lastColumn, column);
+				firstRow = std::min(firstRow, row); lastRow = std::max(lastRow, row);
+			}
+		}
+		if (lastColumn < 0)
+		{
+			continue;
+		}
+		// The screen box round those bounds' corners on the card (all of the view if one is behind the eye).
+		outlined.left = width; outlined.top = height; outlined.right = -1; outlined.bottom = -1;
+		for (const int column : { firstColumn, lastColumn + 1 })
+		{
+			for (const int row : { firstRow, lastRow + 1 })
+			{
+				double corner[3], screenX, screenY, depth;
+				for (int axis = 0; axis < 3; ++axis) corner[axis] = card.anchor[axis] + (column - card.anchorX) * card.column[axis] + (card.anchorY - row) * card.row[axis];
+				if (!projectToScreen(corner, screenX, screenY, depth))
+				{
+					outlined.left = 0; outlined.top = 0; outlined.right = width - 1; outlined.bottom = height - 1;
+					continue;
+				}
+				outlined.left = std::min(outlined.left, (int)std::floor(screenX) - 2);
+				outlined.right = std::max(outlined.right, (int)std::ceil(screenX) + 2);
+				outlined.top = std::min(outlined.top, (int)std::floor(screenY) - 2);
+				outlined.bottom = std::max(outlined.bottom, (int)std::ceil(screenY) + 2);
+			}
+		}
+		outlined.left = std::max(0, outlined.left); outlined.top = std::max(0, outlined.top);
+		outlined.right = std::min(width - 1, outlined.right); outlined.bottom = std::min(height - 1, outlined.bottom);
+		if (outlined.left <= outlined.right && outlined.top <= outlined.bottom)
+		{
+			cards.push_back(outlined);
+		}
+	}
+	_outlinedUnits.swap(cards);
+	if (!_outlinedUnits.empty())
+	{
+		runOnAllThreads(&FirstPersonView::testedPictureBands);
+	}
+}
+
+/**
+ * The tested pictures (see noteTestedPictures) over bands of the view's rows, taken one at a time
+ * from the shared counter until none are left: a job for all the view's threads. Each pixel's ray
+ * from the eye meets each card where FirstPerson::cardRay finds it, as a line of fire would; a
+ * solid pixel there that nothing nearer covers is noted (the nearest unit's, where two overlap).
+ */
+void FirstPersonView::testedPictureBands()
+{
+	const int width = getWidth(), height = getHeight();
+	const int bandCount = (height + BandRows - 1) / BandRows;
+	for (int band = _rayWorkers.nextPiece++; band < bandCount; band = _rayWorkers.nextPiece++)
+	{
+		const int bandBottom = std::min(height, band * BandRows + BandRows);
+		for (int pixelY = band * BandRows; pixelY < bandBottom; ++pixelY)
+		{
+			for (const OutlinedUnit &outlined : _outlinedUnits)
+			{
+				if (pixelY < outlined.top || pixelY > outlined.bottom) continue;
+				for (int pixelX = outlined.left; pixelX <= outlined.right; ++pixelX)
+				{
+					double ray[3], along;
+					rayDirectionThrough(pixelX, pixelY, ray);
+					if (!FirstPerson::cardRay(outlined.card, _eye, ray, along) || along <= 0.0) continue;
+					// How far ahead it is, as the depth buffer measures (true proportions, along the view).
+					const double ahead = ray[0] * along * _forward[0] + ray[1] * along * _forward[1] + ray[2] * along * ZScale * _forward[2];
+					const int index = pixelY * width + pixelX;
+					if (ahead < 1.0 || ahead > _depthBuffer[index] + _testedPictureSlack) continue;
+					if (_outlineOwner[index] && _outlineDepth[index] <= ahead) continue;
+					_outlineOwner[index] = outlined.outline;
+					_outlineDepth[index] = (float)ahead;
+					_outlineRowLeft[pixelY] = std::min(_outlineRowLeft[pixelY], pixelX);
+					_outlineRowRight[pixelY] = std::max(_outlineRowRight[pixelY], pixelX);
+				}
+			}
+		}
+	}
+}
+
+/**
  * Setting "Hitboxes" with "Full sprite hitboxes", where the hitbox is the unit's picture: outlines
- * each picture noted while the units were drawn (see SpriteDraw::outline), a line a pixel wide just
+ * what the lines from the eye test of each picture (noted by noteTestedPictures), a line a pixel wide just
  * outside its edge in the colour of its side, as the boxes are drawn. A pixel is outlined when it
  * isn't that unit's, borders one of its pixels (the eight round it) and what shows there is behind
  * the unit (farther than that pixel of it): the picture's silhouette against what's behind it, so
@@ -1187,7 +1419,8 @@ void FirstPersonView::outlineBands()
 			{
 				const int index = pixelY * width + pixelX;
 				const Uint16 here = _outlineOwner[index];
-				// The nearest outlined picture beside it that it's behind, if any.
+				// The nearest outlined picture beside it that it's behind, if any (by how far ahead the
+				// tested picture is there).
 				Uint16 outline = 0;
 				float nearest = _depthBuffer[index];
 				for (int offsetY = -1; offsetY <= 1; ++offsetY)
@@ -1199,10 +1432,10 @@ void FirstPersonView::outlineBands()
 						const int x = pixelX + offsetX;
 						if (x < 0 || x >= width) continue;
 						const Uint16 owner = _outlineOwner[y * width + x];
-						if (owner && owner != here && _depthBuffer[y * width + x] < nearest)
+						if (owner && owner != here && _outlineDepth[y * width + x] < nearest)
 						{
 							outline = owner;
-							nearest = _depthBuffer[y * width + x];
+							nearest = _outlineDepth[y * width + x];
 						}
 					}
 				}
@@ -2717,10 +2950,11 @@ void FirstPersonView::drawFacing()
 }
 
 /**
- * Marks the visible enemies like the iso map's indicators do: a red arrow over the head with
- * the enemy's number, drawn over everything (it's what the soldier knows, not what's in view),
- * kept at the screen edge when the enemy is off to the side. The pixel art is drawn bigger on
- * big screens (the UI scale).
+ * Marks the visible enemies like the iso map's indicators do: an arrow over the head with the
+ * enemy's number, drawn over everything (it's what the soldier knows, not what's in view), kept at
+ * the screen edge when the enemy is off to the side; red, or in the colour of how the soldier knows
+ * it (setting "Enemy markers": green as its button when only the squad sees it, yellow when his
+ * line to it is clear, see MarkerKind). The pixel art is drawn bigger on big screens (the UI scale).
  */
 void FirstPersonView::drawMarkers()
 {
@@ -2738,6 +2972,7 @@ void FirstPersonView::drawMarkers()
 	};
 	for (const auto &spot : _markerSpots)
 	{
+		const Uint8 markerColor = spot.kind == MarkerSquadSeen ? _colors.markerSquadSeen : spot.kind == MarkerLineOfFire ? _colors.markerLineOfFire : _colors.marker;
 		// Where the enemy's head is on the view (no marker if it's behind the camera), kept
 		// inside the view with room for the art around it: the arrow's tip.
 		double screenX, screenY, depth;
@@ -2751,7 +2986,7 @@ void FirstPersonView::drawMarkers()
 		scaleOriginY = tipY;
 		// An arrow pointing down, 7 wide at the top, outlined: first a black triangle one pixel
 		// bigger all round (one more row on top, every row one wider on each side), then the
-		// red triangle over it, then a black pixel under the red tip.
+		// coloured triangle over it, then a black pixel under its tip.
 		for (int pass = 0; pass < 2; ++pass)
 		{
 			for (int row = pass == 0 ? -1 : 0; row < 4; ++row)
@@ -2759,13 +2994,13 @@ void FirstPersonView::drawMarkers()
 				const int halfWidth = 3 - std::max(row, 0) + (pass == 0 ? 1 : 0);
 				for (int offset = -halfWidth; offset <= halfWidth; ++offset)
 				{
-					put(tipX + offset, tipY - 4 + row, pass == 0 ? _colors.tapeBlack : _colors.marker);
+					put(tipX + offset, tipY - 4 + row, pass == 0 ? _colors.tapeBlack : markerColor);
 				}
 			}
 		}
 		put(tipX, tipY, _colors.tapeBlack);
 		// The enemy's number above it, in the tiny 3x5 digits (4 pixels apart), centred: first
-		// a black outline around every lit dot, then the red dots.
+		// a black outline around every lit dot, then the coloured dots.
 		const std::string digits = std::to_string(spot.number);
 		const int textWidth = (int)digits.size() * 4 - 1;
 		const int textLeft = tipX - textWidth / 2, textTop = tipY - 11;
@@ -2789,7 +3024,7 @@ void FirstPersonView::drawMarkers()
 						}
 						else
 						{
-							put(dotX, dotY, _colors.marker);
+							put(dotX, dotY, markerColor);
 						}
 					}
 				}
@@ -2924,11 +3159,22 @@ void FirstPersonView::drawSprayMarks()
  * order the game's own floor indicators take (where a mod has them): burning (a flame),
  * bleeding (a drop of blood: fatal wounds), shock (a bolt: health draining away), and always out
  * cold (Zz). Our own pixel art, drawn over everything like the enemy markers and as much bigger
- * on big screens, a little above the body on the screen, but only where the body itself is in
- * view (not behind a wall, nor in smoke too thick to see through) and within the view's reach.
- * With "Crosshair", only for the body the player points at (the one nearest the crosshair, or
- * the free cursor, within about a tile), just under the crosshair, where the shot info is read
- * too. A unit whose mod switches its indicators off gets none.
+ * on big screens, on the body's near half (hanging from its middle on the screen: a unit standing
+ * right behind the body, its feet higher up the screen, doesn't wear them on its legs; a player,
+ * GitHub issue #116), but only where the body itself is in view (not behind a wall, nor in smoke
+ * too thick to see through) and within the view's reach.
+ * With "Crosshair", only for the body the player points at, just under the crosshair, where the
+ * shot info is read too, strictly by what the crosshair, or the free cursor, is on, nearest first
+ * (#116; the owner: "strictly pointing at the body if it is in-front of enemy behind it shows body
+ * icons"): the body whose own picture is right under it, nearer than anything else drawn there,
+ * even with the line of fire passing it to a unit standing behind (that unit's name shows, the
+ * shot would hit it); none while a standing unit is pointed at otherwise (the one named there, see
+ * FirstPersonMode::updatePointedUnit: a body in front of it made a fine unit look as if it bled
+ * and burned); else the body whose picture is within a few pixels (see findUnitAtPointer), as a
+ * melee blow and the medi-kit take it; else one far off (its tile narrower than
+ * DownedFarTileShare of the view: its picture only a few pixels) within about a tile of where the
+ * player points. A body drawn faint there ("See-through corpses": the line passes it) isn't
+ * what's pointed at. A unit whose mod switches its indicators off gets none.
  */
 void FirstPersonView::drawDownedIcons()
 {
@@ -2942,10 +3188,13 @@ void FirstPersonView::drawDownedIcons()
 	enum { Burning = 1, Bleeding = 2, Shock = 4, OutCold = 8 };
 
 	// Each body in view: where its icons go (their bottom, in the middle), what's the matter with
-	// it, and how far it is from where the player points (in about a tile's breadth on the
-	// screen there).
-	struct Downed { double screenX, screenY; int states; double fromPointer; };
+	// it, how far it is from where the player points (in about a tile's breadth on the screen
+	// there), that breadth, and whether its picture is the one pointed at.
+	struct Downed { double screenX, screenY; int states; double fromPointer, tileOnScreen; bool pictured; };
 	std::vector<Downed> downed;
+	// The body pointed at by its picture: with a standing unit pointed at too, only one whose
+	// picture is right under the pointer (on top there: drawn nearer); else the one nearest it.
+	const BattleUnit *pointedBody = _aimedUnit ? _pointerBodies[PointerReach][PointerReach] : _bodyAtPointer;
 	const int tileCount = _save->getMapSizeXYZ();
 	for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
 	{
@@ -2955,10 +3204,12 @@ void FirstPersonView::drawDownedIcons()
 			continue;
 		}
 		int states = 0;
+		bool pictured = false;
 		for (const BattleItem *item : *tile->getInventory())
 		{
 			const BattleUnit *unit = item->getUnit();
 			if (!unit || unit->getStatus() != STATUS_UNCONSCIOUS || !unit->indicatorsAreEnabled()) continue;
+			pictured = pictured || unit == pointedBody;
 			states |= OutCold;
 			if (unit->getFire() > 0) states |= Burning;
 			if (unit->getFatalWounds() > 0) states |= Bleeding;
@@ -2995,18 +3246,32 @@ void FirstPersonView::drawDownedIcons()
 		{
 			continue;
 		}
-		// The icons a little above it on the screen: a body lies low (a third of a tile's breadth
-		// there, at most 20 pixels of the art).
+		// The icons hanging from its middle on the screen, their outline's top there (whatever
+		// stands behind the body stands higher up the screen), kept on the view seen close by.
 		const double tileOnScreen = std::max(1.0, 12.0 * focalLength / depth);
-		downed.push_back({ screenX, screenY - std::min(tileOnScreen * 0.35, 20.0 * uiScale), states,
-			std::hypot(screenX - _pointerX, screenY - _pointerY) / tileOnScreen });
+		const double bottom = std::min(screenY + 8.0 * uiScale, (double)(height - uiScale));
+		downed.push_back({ screenX, bottom, states, std::hypot(screenX - _pointerX, screenY - _pointerY) / tileOnScreen, tileOnScreen, pictured });
 	}
 	// With "Crosshair", only the body pointed at, its icons just under the crosshair (which
-	// reaches about 8 pixels of the art round where it points), below any name shown there.
+	// reaches about 8 pixels of the art round where it points), below any name shown there:
+	// the body by its picture (see pointedBody); none while a standing unit is pointed at
+	// otherwise (its name there, the icons would read as its own); else one far off, within
+	// about a tile.
 	if (Options::fpsDownedIcons == 1)
 	{
-		auto pointedAt = std::min_element(downed.begin(), downed.end(), [](const Downed &a, const Downed &b) { return a.fromPointer < b.fromPointer; });
-		if (pointedAt == downed.end() || pointedAt->fromPointer > 1.0)
+		const double farTile = DownedFarTileShare * width;
+		auto nearest = [&](bool byPicture) {
+			const Downed *best = nullptr;
+			for (const Downed &body : downed)
+			{
+				const bool candidate = byPicture ? body.pictured : body.tileOnScreen < farTile && body.fromPointer <= 1.0;
+				if (candidate && (!best || body.fromPointer < best->fromPointer)) best = &body;
+			}
+			return best;
+		};
+		const Downed *pointedAt = nearest(true);
+		if (!pointedAt && !_aimedUnit) pointedAt = nearest(false);
+		if (!pointedAt)
 		{
 			return;
 		}
@@ -3072,6 +3337,55 @@ void FirstPersonView::drawDownedIcons()
 				}
 				left += icon.width + 2;
 			}
+		}
+	}
+}
+
+/**
+ * The numbers rising over the units hit (setting "Damage numbers", see
+ * FirstPersonDamageNumbers.cpp): each from the point just over the unit's head where it was hit,
+ * in the world: tested against the depth of what's drawn, so a wall or a unit in front hides it as
+ * it would anything there, but at a fixed size on the screen (the game's small font, as the HUD's
+ * text), so it reads far off too; within the view's reach. They rise from just over where the
+ * enemy marker's arrow and number go (drawn over everything after them), so neither hides the
+ * other. Numbers that would overlap step up over the newer ones (see placeDamageNumbers).
+ */
+void FirstPersonView::drawDamageNumbers()
+{
+	if (!_damageNumbers || _damageNumbers->numbers().empty())
+	{
+		return;
+	}
+	const std::vector<FirstPerson::DamageNumber> &numbers = _damageNumbers->numbers();
+	const Font *font = _game->getMod()->getFont("FONT_SMALL");
+	const FirstPerson::DamageNumberColors colors = FirstPerson::damageNumberColors(getPalette());
+	const Uint32 now = SDL_GetTicks();
+	const int uiScale = std::max(1, _uiScale);
+	const int markerClearance = 14; // (the marker's art reaches 13 pixels over the head, see drawMarkers)
+	// Where each one's point is on the view, and how far ahead (none behind the camera or past the view's reach).
+	std::vector<FirstPerson::DamageNumberSpot> spots(numbers.size());
+	std::vector<double> depths(numbers.size(), 0.0);
+	for (size_t index = 0; index < numbers.size(); ++index)
+	{
+		double screenX = 0.0, screenY = 0.0;
+		const bool shown = projectToScreen(numbers[index].head, screenX, screenY, depths[index]) && depths[index] <= _maxDistance;
+		spots[index] = { (int)std::lround(screenX), (int)std::lround(screenY) - markerClearance * uiScale, shown };
+	}
+	// Clear of the crosshair and the texts round it (drawn over the view after it: a unit struck
+	// right under the crosshair, its number rises over the crosshair rather than behind them): the
+	// crosshair's picture, the unit's name under it (see FirstPersonMode::updateUnitName), as wide
+	// as a name.
+	std::vector<FirstPerson::DamageNumberBox> keepClear;
+	if (_pointerX >= 0 && _pointerY >= 0)
+	{
+		keepClear.push_back({ _pointerX - 24 * uiScale, _pointerX + 24 * uiScale, _pointerY - 11 * uiScale, _pointerY + 10 * uiScale + _pointerTextBelow });
+	}
+	const std::vector<int> bottoms = FirstPerson::placeDamageNumbers(numbers, spots, font, uiScale, now, keepClear);
+	for (size_t index = 0; index < numbers.size(); ++index)
+	{
+		if (spots[index].shown)
+		{
+			FirstPerson::drawDamageNumber(this, font, numbers[index], spots[index].x, bottoms[index], uiScale, now, colors, _depthBuffer.data(), depths[index]);
 		}
 	}
 }

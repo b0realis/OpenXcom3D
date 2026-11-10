@@ -558,6 +558,7 @@ const Surface *FirstPersonView::upscaled(const Surface *sprite, int factor)
 		std::lock_guard<std::mutex> lock(_upscaleMutex);
 		for (auto &entry : _upscaledSprites) delete entry.second.surface;
 		_upscaledSprites.clear();
+		_smoothPictures.clear(); // (setting "Full sprite hitboxes": the pictures drawn smooth are gone too)
 		_upscaleDone.clear();
 		_upscaleQueued.clear();
 		_upscaleJobs.clear();

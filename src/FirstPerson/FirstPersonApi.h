@@ -67,6 +67,7 @@ struct BattleAction;
 class BattleItem;
 class BattlescapeState;
 class BattleUnit;
+class Camera;
 class FirstPersonMode;
 class Game;
 class Mod;
@@ -159,6 +160,12 @@ int flashlightMode();
 int akimboChoice();
 /// The longest Doom grenade fuse, in seconds (setting "Doom grenade fuse": 1 to this).
 const int DoomFuseMaxSeconds = 5;
+/// Setting "View distance": its first value (the reach the mod sets), and the steps it goes round, in tiles.
+const int DefaultViewDistance = 60;
+const int ViewDistanceSteps[] = { 60, 80, 100, 130, 160, 200 };
+/// How far the big 3D view reaches, in tiles (setting "View distance"): the mod's reach
+/// (maxViewDistance) at the first value, else the distance chosen.
+int viewDistance(const Mod *mod);
 
 // ---- The battle (ProjectileFlyBState.cpp, ExplosionBState.cpp, BattlescapeGame.cpp) ----
 
@@ -178,10 +185,17 @@ bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
 /// Setting "Full sprite hitboxes": is a unit hit where its picture shows, in a line of fire (the
 /// battle's rule, in 3D and on the map, whoever fires), rather than by the game's voxel shapes?
 bool spriteHitboxes(BattlescapeState *state);
-/// Setting "Full sprite hitboxes": does this voxel of a line of fire hit the unit's picture, a card
-/// through its middle facing the line's start (see FirstPersonSpriteHits.cpp)? A shot's impact
-/// (impact: its line already found the unit there) always does.
-bool spriteHit(SavedBattleGame *save, const BattleUnit *unit, const Position &voxel, const Position &origin, bool impact);
+/// Setting "Full sprite hitboxes": which unit's picture this voxel of a line of fire hits (the line
+/// from origin to target, the serial number TileEngine gave it; the unit left out, units unseen
+/// passed through, or only one tested, as the game asks): where the line crosses the picture's
+/// card, as the 3D view draws it, on a solid pixel; any unit's that reaches the line, not only the
+/// one on the voxel's tile (see FirstPersonSpriteHits.cpp). Null for none.
+BattleUnit *spriteHitAt(SavedBattleGame *save, const Position &voxel, const Position &origin, const Position &target, unsigned serial,
+	const BattleUnit *excludeUnit, bool onlyVisible, const BattleUnit *excludeAllBut);
+/// Setting "Full sprite hitboxes": where the game counts a round that met a unit's picture as
+/// stopping: the voxel, or the nearest of the unit's own tiles' (a picture reaching over a
+/// neighbouring tile, or above its level, was hit there; the hit is worked out on the unit's tile).
+Position spriteImpact(SavedBattleGame *save, const BattleUnit *unit, const Position &voxel);
 /// Setting "Full sprite hitboxes": where a round that met a unit's picture struck it, relative to
 /// its middle, for the armour side and body part hit: pushed out towards the shooter, as the
 /// game's own hit shape would have stopped it on that side.
@@ -279,6 +293,17 @@ void reactionAkimbo(BattlescapeState *state, BattleAction &action);
 /// A round or a blow struck a unit (TileEngine::hit, after the damage): an enemy in sight it did
 /// no harm marks the 3D view's crosshair (its health and stun before the strike given).
 void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefore, int stunBefore);
+/// Setting "Damage numbers": a shot, a blow or a blast hurt a unit, in either view (TileEngine::hitUnit,
+/// the one place each of them deals its damage, after it): the health it lost, the armour it took off
+/// (the side struck) and the stun it took, to rise over it in 3D and on the map if the squad sees it
+/// (see FirstPersonDamageNumbers.cpp).
+void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken);
+/// Setting "Damage numbers": a unit's armour, all its sides' points together (TileEngine::hitUnit reads
+/// it before and after a hit: what the hit took off the side it struck).
+int armorPoints(const BattleUnit *unit);
+/// Setting "Damage numbers": draws the numbers rising over the units hit on the isometric map, over
+/// all of it (Map::drawTerrain, last).
+void drawMapDamageNumbers(BattlescapeState *state, Surface *surface, const Camera *camera);
 /// A shotgun's pellet landed (ProjectileFlyBState::pelletLands), in either view: it's heard (a few
 /// to a volley; not one whose hit the explosion state brings, which sounds its own) and the 3D view
 /// marks where it struck (sparks, a bullet hole), as it does the round.
@@ -344,6 +369,9 @@ inline void drawMapAkimbo(BattlescapeState *, BattleUnit *, Surface *, Surface *
 inline void mapAkimbo(BattlescapeState *, BattleAction &) { }
 inline void reactionAkimbo(BattlescapeState *, BattleAction &) { }
 inline void unitStruck(BattlescapeState *, const BattleUnit *, int, int) { }
+inline void unitDamaged(BattlescapeState *, const BattleUnit *, int, int, int) { }
+inline int armorPoints(const BattleUnit *) { return 0; }
+inline void drawMapDamageNumbers(BattlescapeState *, Surface *, const Camera *) { }
 inline void pelletLanded(BattlescapeState *, const Position &, const Position &, int, const BattleItem *, const BattleItem *, bool = true) { }
 inline void roundPassed(BattlescapeState *, const Position &, const Position &) { }
 inline void blastReached(BattlescapeState *, const Position &, const std::map<Tile*, int> &) { }
@@ -354,7 +382,8 @@ inline bool endlessAmmo(BattlescapeState *, const BattleUnit *) { return false; 
 inline bool invincible(BattlescapeState *, const BattleUnit *) { return false; }
 inline bool noclipFloats(BattlescapeState *, const BattleUnit *) { return false; }
 inline bool spriteHitboxes(BattlescapeState *) { return false; }
-inline bool spriteHit(SavedBattleGame *, const BattleUnit *, const Position &, const Position &, bool) { return true; }
+inline BattleUnit *spriteHitAt(SavedBattleGame *, const Position &, const Position &, const Position &, unsigned, const BattleUnit *, bool, const BattleUnit *) { return nullptr; }
+inline Position spriteImpact(SavedBattleGame *, const BattleUnit *, const Position &voxel) { return voxel; }
 inline Position spriteHitRelative(const Position &relative, const BattleUnit *, const BattleUnit *) { return relative; }
 inline bool keepsFacingOnOwnTile() { return false; }
 inline bool autoEquipGunsFirst(const Mod *) { return false; }

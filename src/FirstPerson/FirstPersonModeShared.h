@@ -122,6 +122,10 @@ const int DoorMarkLightRed = 160, DoorMarkLightGreen = 240, DoorMarkLightBlue = 
 /// the ray leaves the map or the weapon's range ends. A point the soldier sees and can reach
 /// costs no penalty a nearer one wouldn't, and the round flies on past it along the same line.
 const double SkyAimReach = 320.0;
+/// An FPS-style round at a unit's picture (setting "Full sprite hitboxes") goes for a point this far beyond where
+/// it leaves, through the very point of the picture under the crosshair (see FirstPersonMode::freeAimTarget), in
+/// voxels: far enough that the whole voxels of the target keep its way true to a hundredth of a voxel at the picture.
+const double FreeAimRoundReach = 2000.0;
 /// An arcing shot or a throw at the open sky (GitHub issues #72 and #91; see FirstPersonMode::skyArcPoint): the points on
 /// the crosshair's ray tried, from the point of air back towards the eye, this many voxels apart, for one whose arc stays
 /// in the map and comes down on something.
@@ -188,6 +192,10 @@ const int BannerW = 304;
 /// above the one before, as the game stacks them, and the column at least this far from the compass's lines above
 /// it and from SCOPING at its left.
 const int EnemyButtonStep = 13, EnemyButtonsGap = 3;
+/// Setting "Enemy markers": an enemy's line-of-fire answer (see FirstPersonMode::clearLineOfFire) is kept for at most
+/// this many milliseconds while nothing it hangs on moves (a door may open, a wall fall), and at most one is worked out
+/// each frame (a line a wall blocks takes a fifth of a millisecond: ten at once would make a frame stutter).
+const Uint32 LineOfFireRefresh = 250;
 /// The grav lift arrows.
 const int LiftArrowW = 48, LiftArrowH = 14;
 
