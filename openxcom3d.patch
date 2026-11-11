@@ -21740,10 +21740,10 @@ index bc5f08f46..5ddf353f4 100644
  			playMovementSound();
  			if (_parent->getSave()->isPreview())
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 839f80345..e705b0b86 100644
+index 839f80345..0c7f4f8a1 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -441,10 +441,50 @@ set ( rapidyaml_src
+@@ -441,10 +441,51 @@ set ( rapidyaml_src
  
  )
  
@@ -21754,6 +21754,7 @@ index 839f80345..e705b0b86 100644
 +    FirstPerson/FirstPersonChains.cpp
 +    FirstPerson/FirstPersonDamageNumbers.cpp
 +    FirstPerson/FirstPersonGpu.cpp
++    FirstPerson/FirstPersonGpuWindows.cpp
 +    FirstPerson/FirstPersonMode.cpp
 +    FirstPerson/FirstPersonModeCamera.cpp
 +    FirstPerson/FirstPersonModeHud.cpp
@@ -21794,7 +21795,7 @@ index 839f80345..e705b0b86 100644
      ${engine_src}
      ${geoscape_src}
      ${interface_src}
-@@ -627,7 +667,10 @@ if (WIN32)
+@@ -627,7 +668,10 @@ if (WIN32)
    set(WIN32_LIBS imagehlp dbghelp)
  endif(WIN32)
  
@@ -26022,10 +26023,10 @@ index 000000000..989a6a6fa
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..624e28e42
+index 000000000..258bb1534
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,1352 @@
+@@ -0,0 +1,1354 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -26084,6 +26085,7 @@ index 000000000..624e28e42
 +#include "FirstPersonGpuGl.h"
 +#include "FirstPersonGpuShaders.h"
 +#include <cstdio>
++#include <cstdlib>
 +#include <array>
 +#include <chrono>
 +#include <condition_variable>
@@ -26395,12 +26397,12 @@ index 000000000..624e28e42
 +	return _name.find("Software") != std::string::npos;
 +}
 +
-+#else
++#elif !defined(_WIN32) // (Windows: FirstPersonGpuWindows.cpp)
 +
-+/// Not on this system yet: the CPU renderer draws.
++/// Not on this system: the CPU renderer draws.
 +bool GpuContext::create(int)
 +{
-+	Log(LOG_INFO) << "OpenXcom3D GPU: not on this system yet";
++	Log(LOG_INFO) << "OpenXcom3D GPU: not on this system";
 +	return false;
 +}
 +
@@ -26685,7 +26687,8 @@ index 000000000..624e28e42
 +	{
 +		return false;
 +	}
-+	if (context.software())
++	// (OPENXCOM3D_GPU_SOFTWARE: a software OpenGL will do, for tests on machines without a card.)
++	if (context.software() && !getenv("OPENXCOM3D_GPU_SOFTWARE"))
 +	{
 +		Log(LOG_INFO) << "OpenXcom3D GPU: " << context.name() << " draws on the CPU: not used";
 +		return false;
@@ -26727,7 +26730,7 @@ index 000000000..624e28e42
 +	modelInfo.assign(4, 0);
 +	solidRows.assign(MaskRows, 0);
 +	modelsChanged = solidsChanged = true;
-+	return Gl::GetError() == Gl::NO_ERROR;
++	return Gl::GetError() == Gl::NoError;
 +}
 +
 +/**
@@ -27271,7 +27274,7 @@ index 000000000..624e28e42
 +		timing->read = millisecondsSince(start);
 +	}
 +	const Gl::Enum error = Gl::GetError();
-+	if (error != Gl::NO_ERROR)
++	if (error != Gl::NoError)
 +	{
 +		Log(LOG_WARNING) << "OpenXcom3D GPU: OpenGL error " << std::hex << error;
 +		return false;
@@ -27540,10 +27543,10 @@ index 000000000..7b152b341
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuGl.h b/src/FirstPerson/FirstPersonGpuGl.h
 new file mode 100644
-index 000000000..423a06433
+index 000000000..d8167ed8d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuGl.h
-@@ -0,0 +1,171 @@
+@@ -0,0 +1,174 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -27595,7 +27598,7 @@ index 000000000..423a06433
 +
 +// The constants used (their values are OpenGL's own).
 +const Enum VENDOR = 0x1F00, RENDERER = 0x1F01, VERSION = 0x1F02;
-+const Enum NO_ERROR = 0;
++const Enum NoError = 0; // (GL_NO_ERROR: not spelt so, Windows has a macro of that name)
 +const Enum TEXTURE_2D = 0x0DE1, TEXTURE_BUFFER = 0x8C2A, TEXTURE0 = 0x84C0;
 +const Enum TEXTURE_MIN_FILTER = 0x2801, TEXTURE_MAG_FILTER = 0x2800, NEAREST = 0x2600;
 +const Enum TEXTURE_WRAP_S = 0x2802, TEXTURE_WRAP_T = 0x2803, CLAMP_TO_EDGE = 0x812F;
@@ -27688,7 +27691,8 @@ index 000000000..423a06433
 + * The GPU renderer's own OpenGL context: hidden, with no window, on the graphics card asked for.
 + * On Linux it comes from EGL (libEGL.so.1, opened at run time), on a device picked by number
 + * where the machine has more than one (a laptop's built-in graphics and its graphics card);
-+ * on macOS from CGL (the OpenGL framework, opened at run time). Windows: not yet.
++ * on macOS from CGL (the OpenGL framework, opened at run time); on Windows from WGL, on a
++ * hidden window (FirstPersonGpuWindows.cpp).
 + * It belongs to the thread that creates it: make it, use it and destroy it on that one thread.
 + */
 +class GpuContext
@@ -27706,6 +27710,8 @@ index 000000000..423a06433
 +	~GpuContext() { destroy(); }
 +private:
 +	bool loadFunctions();
++	void *_window = nullptr;   // Windows: the hidden window the context needs, and its device context
++	void *_deviceContext = nullptr;
 +	void *_library = nullptr;  // libEGL, or macOS's OpenGL framework
 +	void *_display = nullptr;
 +	void *_context = nullptr;
@@ -29114,6 +29120,181 @@ index 000000000..4182f2974
 +}
 +
 +}
+diff --git a/src/FirstPerson/FirstPersonGpuWindows.cpp b/src/FirstPerson/FirstPersonGpuWindows.cpp
+new file mode 100644
+index 000000000..6862c4de6
+--- /dev/null
++++ b/src/FirstPerson/FirstPersonGpuWindows.cpp
+@@ -0,0 +1,169 @@
++/*
++ * Copyright 2010-2026 OpenXcom Developers.
++ *
++ * This file is part of OpenXcom.
++ *
++ * OpenXcom is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * OpenXcom is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/*
++ * FirstPersonGpuWindows.cpp: the GPU renderer's hidden OpenGL context on Windows (see
++ * GpuContext in FirstPersonGpuGl.h; Linux's and macOS's are in FirstPersonGpu.cpp).
++ *
++ * Windows gives an OpenGL context only to a window, so the renderer makes one of its own, one
++ * pixel big and never shown, on its own thread; the rays are drawn into our own textures, never
++ * into it. A file of its own because it needs windows.h, whose many macros are best kept away
++ * from everything else.
++ */
++#ifdef _WIN32
++#ifndef NOMINMAX
++#define NOMINMAX
++#endif
++#define WIN32_LEAN_AND_MEAN
++#include <windows.h>
++#include "FirstPersonGpuGl.h"
++#include "../Engine/Logger.h"
++
++// Laptops with two graphics chips run a program on the built-in one unless it says otherwise:
++// these two names, exported from the program, ask NVIDIA's and AMD's drivers for the fast one.
++extern "C"
++{
++__declspec(dllexport) unsigned long NvOptimusEnablement = 1;
++__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
++}
++
++namespace OpenXcom
++{
++
++namespace
++{
++
++HMODULE openGlLibrary = nullptr; // opengl32.dll
++
++/// An OpenGL function by name: the driver's (wglGetProcAddress), or one of OpenGL 1.1's, which only opengl32.dll itself has.
++void *windowsFunction(const char *name)
++{
++	void *function = (void *)wglGetProcAddress(name);
++	const INT_PTR value = (INT_PTR)function;
++	if (value >= -1 && value <= 3) // (drivers answer 0, 1, 2, 3 or -1 for "none")
++	{
++		function = (void *)GetProcAddress(openGlLibrary, name);
++	}
++	return function;
++}
++
++}
++
++/**
++ * Opens a hidden OpenGL 3.3 core context through WGL: a window of our own, never shown, a
++ * plain context on it to ask the driver for the function that makes a core one, then that one.
++ * Windows has one renderer to offer a program (the driver's choice): device 0.
++ */
++bool GpuContext::create(int device)
++{
++	if (device > 0)
++	{
++		return false; // no such device
++	}
++	openGlLibrary = LoadLibraryA("opengl32.dll");
++	if (!openGlLibrary)
++	{
++		Log(LOG_INFO) << "OpenXcom3D GPU: no opengl32.dll on this machine";
++		return false;
++	}
++	_library = openGlLibrary;
++	_getProcAddress = windowsFunction;
++
++	// The hidden window and its pixel format.
++	WNDCLASSA windowClass = {};
++	windowClass.lpfnWndProc = DefWindowProcA;
++	windowClass.hInstance = GetModuleHandleA(nullptr);
++	windowClass.lpszClassName = "OpenXcom3DGpu";
++	windowClass.style = CS_OWNDC;
++	RegisterClassA(&windowClass); // (fails harmlessly when it is registered already)
++	const HWND window = CreateWindowExA(0, "OpenXcom3DGpu", "", WS_POPUP, 0, 0, 1, 1, nullptr, nullptr, windowClass.hInstance, nullptr);
++	const HDC deviceContext = window ? GetDC(window) : nullptr;
++	_window = window;
++	_deviceContext = deviceContext;
++	PIXELFORMATDESCRIPTOR format = {};
++	format.nSize = sizeof(format);
++	format.nVersion = 1;
++	format.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL;
++	format.iPixelType = PFD_TYPE_RGBA;
++	format.cColorBits = 24;
++	const int chosen = deviceContext ? ChoosePixelFormat(deviceContext, &format) : 0;
++	if (!chosen || !SetPixelFormat(deviceContext, chosen, &format))
++	{
++		Log(LOG_WARNING) << "OpenXcom3D GPU: no window for an OpenGL context (error " << GetLastError() << ")";
++		return false;
++	}
++
++	// A plain context first: only with one current does the driver hand out the function that makes a core one.
++	const HGLRC plain = wglCreateContext(deviceContext);
++	if (!plain || !wglMakeCurrent(deviceContext, plain))
++	{
++		Log(LOG_WARNING) << "OpenXcom3D GPU: no OpenGL on this machine (error " << GetLastError() << ")";
++		return false;
++	}
++	typedef HGLRC (WINAPI *CreateContextAttribs)(HDC, HGLRC, const int *);
++	const auto createContextAttribs = (CreateContextAttribs)(void *)wglGetProcAddress("wglCreateContextAttribsARB");
++	const int ContextMajor = 0x2091, ContextMinor = 0x2092, ContextProfile = 0x9126, CoreProfile = 1;
++	const int wanted[] = { ContextMajor, 3, ContextMinor, 3, ContextProfile, CoreProfile, 0 };
++	const HGLRC core = createContextAttribs ? createContextAttribs(deviceContext, nullptr, wanted) : nullptr;
++	wglMakeCurrent(nullptr, nullptr);
++	wglDeleteContext(plain);
++	if (!core || !wglMakeCurrent(deviceContext, core))
++	{
++		Log(LOG_WARNING) << "OpenXcom3D GPU: no OpenGL 3.3 context (this machine's driver is too old, or Windows' own)";
++		return false;
++	}
++	_context = core;
++	if (!loadFunctions())
++	{
++		return false;
++	}
++	_name = std::string((const char *)Gl::GetString(Gl::RENDERER)) + " (OpenGL " + (const char *)Gl::GetString(Gl::VERSION) + ")";
++	return true;
++}
++
++/**
++ * Closes the context and its hidden window.
++ */
++void GpuContext::destroy()
++{
++	if (!_library)
++	{
++		return;
++	}
++	wglMakeCurrent(nullptr, nullptr);
++	if (_context) wglDeleteContext((HGLRC)_context);
++	if (_window && _deviceContext) ReleaseDC((HWND)_window, (HDC)_deviceContext);
++	if (_window) DestroyWindow((HWND)_window);
++	_context = _window = _deviceContext = nullptr;
++	_library = nullptr; // (opengl32.dll stays loaded)
++}
++
++bool GpuContext::software() const
++{
++	// Windows' own OpenGL 1.1 ("GDI Generic") never gets this far; Mesa's software drivers might.
++	for (const char *name : { "llvmpipe", "softpipe", "SwiftShader", "GDI Generic", "Software" })
++	{
++		if (_name.find(name) != std::string::npos) return true;
++	}
++	return false;
++}
++
++}
++
++#endif
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
 index 000000000..b654d5de4

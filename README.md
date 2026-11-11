@@ -43,7 +43,7 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 
 ## In the source after 1.12 (no download yet)
 
-- **A GPU renderer** (setting *Renderer*: GPU; Linux, and macOS not yet tried on a Mac): the graphics card casts the 3D world's rays, the same walk and the same shading as the CPU's, checked pixel for pixel against it. The CPU renderer stays the default, and takes over by itself wherever the card can't.
+- **A GPU renderer** (setting *Renderer*: GPU; proved on Linux, new on Windows and macOS): the graphics card casts the 3D world's rays, the same walk and the same shading as the CPU's, checked pixel for pixel against it. The CPU renderer stays the default, and takes over by itself wherever the card can't.
 - **Full resolution:** the 3D world at the screen's own resolution, only the HUD magnified over it: a full 1920×1080 view at 60 frames a second and more on a graphics card.
 - **HUD scale:** the 3D HUD's magnification on big screens is yours to choose (Auto, x1 to x4).
 

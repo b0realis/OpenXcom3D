@@ -56,6 +56,7 @@
 #include "FirstPersonGpuGl.h"
 #include "FirstPersonGpuShaders.h"
 #include <cstdio>
+#include <cstdlib>
 #include <array>
 #include <chrono>
 #include <condition_variable>
@@ -367,12 +368,12 @@ bool GpuContext::software() const
 	return _name.find("Software") != std::string::npos;
 }
 
-#else
+#elif !defined(_WIN32) // (Windows: FirstPersonGpuWindows.cpp)
 
-/// Not on this system yet: the CPU renderer draws.
+/// Not on this system: the CPU renderer draws.
 bool GpuContext::create(int)
 {
-	Log(LOG_INFO) << "OpenXcom3D GPU: not on this system yet";
+	Log(LOG_INFO) << "OpenXcom3D GPU: not on this system";
 	return false;
 }
 
@@ -657,7 +658,8 @@ bool FirstPersonGpu::State::start(int device)
 	{
 		return false;
 	}
-	if (context.software())
+	// (OPENXCOM3D_GPU_SOFTWARE: a software OpenGL will do, for tests on machines without a card.)
+	if (context.software() && !getenv("OPENXCOM3D_GPU_SOFTWARE"))
 	{
 		Log(LOG_INFO) << "OpenXcom3D GPU: " << context.name() << " draws on the CPU: not used";
 		return false;
@@ -699,7 +701,7 @@ bool FirstPersonGpu::State::start(int device)
 	modelInfo.assign(4, 0);
 	solidRows.assign(MaskRows, 0);
 	modelsChanged = solidsChanged = true;
-	return Gl::GetError() == Gl::NO_ERROR;
+	return Gl::GetError() == Gl::NoError;
 }
 
 /**
@@ -1243,7 +1245,7 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 		timing->read = millisecondsSince(start);
 	}
 	const Gl::Enum error = Gl::GetError();
-	if (error != Gl::NO_ERROR)
+	if (error != Gl::NoError)
 	{
 		Log(LOG_WARNING) << "OpenXcom3D GPU: OpenGL error " << std::hex << error;
 		return false;

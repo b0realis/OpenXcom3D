@@ -232,7 +232,7 @@ SETTINGS = [
         ('Doom grenade fuse (seconds)', '3', '1 to 5', 'In Doom mode, how long a grenade burns.', ''),
     ]),
     ('Screen', [
-        ('Renderer', 'CPU', 'CPU / GPU', 'GPU: the graphics card casts the 3D world\'s rays, the same picture as the CPU\'s. Linux, and macOS not yet tried on a Mac; not in the 1.12 download yet; the CPU draws by itself wherever the card can\'t.',
+        ('Renderer', 'CPU', 'CPU / GPU', 'GPU: the graphics card casts the 3D world\'s rays, the same picture as the CPU\'s. Proved on Linux, new on Windows and macOS; not in the 1.12 download yet; the CPU draws by itself wherever the card can\'t.',
          'For big screens: with Full resolution the world at 1920×1080 runs at 60 frames a second and more.'),
         ('Full resolution', 'NO', 'YES / NO', 'The 3D world at the screen\'s own resolution, only the HUD magnified over it. Heavy on the CPU; made for Renderer GPU. Not in the 1.12 download yet.', ''),
         ('HUD scale', 'Auto', 'Auto / x1 / x2 / x3 / x4', 'How many times the 3D HUD is magnified on a big screen. Auto: as big as fits (x3 at 1920×1080). Not in the 1.12 download yet.', 'x2 on a big screen: a smaller HUD, more room.'),

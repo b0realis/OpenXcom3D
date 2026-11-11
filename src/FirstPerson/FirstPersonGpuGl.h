@@ -49,7 +49,7 @@ typedef std::ptrdiff_t IntPtr;
 
 // The constants used (their values are OpenGL's own).
 const Enum VENDOR = 0x1F00, RENDERER = 0x1F01, VERSION = 0x1F02;
-const Enum NO_ERROR = 0;
+const Enum NoError = 0; // (GL_NO_ERROR: not spelt so, Windows has a macro of that name)
 const Enum TEXTURE_2D = 0x0DE1, TEXTURE_BUFFER = 0x8C2A, TEXTURE0 = 0x84C0;
 const Enum TEXTURE_MIN_FILTER = 0x2801, TEXTURE_MAG_FILTER = 0x2800, NEAREST = 0x2600;
 const Enum TEXTURE_WRAP_S = 0x2802, TEXTURE_WRAP_T = 0x2803, CLAMP_TO_EDGE = 0x812F;
@@ -142,7 +142,8 @@ GL_FUNCTIONS(GL_DECLARE)
  * The GPU renderer's own OpenGL context: hidden, with no window, on the graphics card asked for.
  * On Linux it comes from EGL (libEGL.so.1, opened at run time), on a device picked by number
  * where the machine has more than one (a laptop's built-in graphics and its graphics card);
- * on macOS from CGL (the OpenGL framework, opened at run time). Windows: not yet.
+ * on macOS from CGL (the OpenGL framework, opened at run time); on Windows from WGL, on a
+ * hidden window (FirstPersonGpuWindows.cpp).
  * It belongs to the thread that creates it: make it, use it and destroy it on that one thread.
  */
 class GpuContext
@@ -160,6 +161,8 @@ public:
 	~GpuContext() { destroy(); }
 private:
 	bool loadFunctions();
+	void *_window = nullptr;   // Windows: the hidden window the context needs, and its device context
+	void *_deviceContext = nullptr;
 	void *_library = nullptr;  // libEGL, or macOS's OpenGL framework
 	void *_display = nullptr;
 	void *_context = nullptr;
