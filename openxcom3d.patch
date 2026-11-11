@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..b34231b4e
+index 000000000..0f604597d
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,528 @@
+@@ -0,0 +1,531 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -140,7 +140,7 @@ index 000000000..b34231b4e
 +  STR_FPS_SECTION_HUD: "HUD"
 +  STR_FPS_SECTION_SOUND: "SOUND"
 +  STR_FPS_SECTION_CHEATS: "CHEATS"
-+  STR_FPS_SECTION_GPU: "GRAPHICS CARD"
++  STR_FPS_SECTION_GPU: "SCREEN"
 +  STR_FPS_SECTION_OTHER: "OTHER"
 +  STR_FPS_SETTINGS: "Settings"
 +  STR_FPS_CONTROLS: "Controls"
@@ -261,6 +261,9 @@ index 000000000..b34231b4e
 +  STR_FPS_RENDERER_CPU: "CPU"
 +  STR_FPS_RENDERER_GPU: "GPU"
 +  STR_FPS_FULL_RESOLUTION: "Full resolution"
++  STR_FPS_HUD_SCALE: "HUD scale"
++  STR_FPS_HUD_SCALE_DESC: "How many times the 3D HUD is magnified on a big screen. Auto: as big as fits. Smaller: more room, a finer view."
++  STR_FPS_HUD_SCALE_AUTO: "Auto"
 +  STR_FPS_FULL_RESOLUTION_DESC: "The 3D world at the screen's own resolution, not the HUD's. Heavy without the graphics card."
 +  STR_FPS_PIXEL_SIZE: "Pixel size"
 +  STR_FPS_PIXEL_SIZE_DESC: "Auto: 2 for views over 640x400. 1: full detail. 2, 3: faster."
@@ -658,10 +661,10 @@ index 000000000..b34231b4e
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..0226b12d0
+index 000000000..7ecb22230
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,528 @@
+@@ -0,0 +1,531 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -674,7 +677,7 @@ index 000000000..0226b12d0
 +  STR_FPS_SECTION_HUD: "HUD"
 +  STR_FPS_SECTION_SOUND: "SOUND"
 +  STR_FPS_SECTION_CHEATS: "CHEATS"
-+  STR_FPS_SECTION_GPU: "GRAPHICS CARD"
++  STR_FPS_SECTION_GPU: "SCREEN"
 +  STR_FPS_SECTION_OTHER: "OTHER"
 +  STR_FPS_SETTINGS: "Settings"
 +  STR_FPS_CONTROLS: "Controls"
@@ -795,6 +798,9 @@ index 000000000..0226b12d0
 +  STR_FPS_RENDERER_CPU: "CPU"
 +  STR_FPS_RENDERER_GPU: "GPU"
 +  STR_FPS_FULL_RESOLUTION: "Full resolution"
++  STR_FPS_HUD_SCALE: "HUD scale"
++  STR_FPS_HUD_SCALE_DESC: "How many times the 3D HUD is magnified on a big screen. Auto: as big as fits. Smaller: more room, a finer view."
++  STR_FPS_HUD_SCALE_AUTO: "Auto"
 +  STR_FPS_FULL_RESOLUTION_DESC: "The 3D world at the screen's own resolution, not the HUD's. Heavy without the graphics card."
 +  STR_FPS_PIXEL_SIZE: "Pixel size"
 +  STR_FPS_PIXEL_SIZE_DESC: "Auto: 2 for views over 640x400. 1: full detail. 2, 3: faster."
@@ -22045,7 +22051,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..e3200f10e 100644
+index a08796ced..a8bd5c4c9 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -22063,7 +22069,7 @@ index a08796ced..e3200f10e 100644
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
 +OPT bool fpsFullResolution, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers;
-+OPT int fpsRenderer, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
++OPT int fpsRenderer, fpsHudScale, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsTurret, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
@@ -23006,10 +23012,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..c16c43744
+index 000000000..322ce1a34
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1436 @@
+@@ -0,0 +1,1437 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -23872,6 +23878,7 @@ index 000000000..c16c43744
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsDiscreetEdge", &fpsDiscreetEdge, false, "STR_FPS_DISCREET_EDGE", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsRenderer", &fpsRenderer, 0, "STR_FPS_RENDERER", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsFullResolution", &fpsFullResolution, false, "STR_FPS_FULL_RESOLUTION", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsHudScale", &fpsHudScale, 0, "STR_FPS_HUD_SCALE", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 0, "STR_FPS_PIXEL_SIZE", category));
 +	// The crosshair: shown or not, the shot info under it, aiming at the exact point under it
 +	// (YES) or at the tile, as the original game does (NO), and the units' hitboxes.
@@ -26015,10 +26022,10 @@ index 000000000..989a6a6fa
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..3e108cac3
+index 000000000..f3347c230
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,1129 @@
+@@ -0,0 +1,1291 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -26049,8 +26056,29 @@ index 000000000..3e108cac3
 + *  - every frame, the tile snapshot: the byte per tile the walk reads first, and two texels a
 + *    tile with its parts' model numbers, the box round its solid voxels, its solid mask and
 + *    what else the walk reads.
-+ * The shader (RaySource below) is castRay, traceTile and traceSwing of FirstPersonViewRayWalk.h,
-+ * line for line: change one, change the other.
++ *  - once each as well: a steady UFO model's open faces, the wall paints, the crafts' mirrors;
++ *  - every frame they changed: the scene's colour tables, and the camera and the scene's
++ *    numbers as uniforms.
++ * The shaders (FirstPersonGpuShaders.h) are the CPU renderer's functions line for line.
++ *
++ * How to change it:
++ *  - A change to the CPU's walk or shading (FirstPersonViewRayWalk.h, shadeHit and what it
++ *    calls): make the same change in the shader function of the same name. A new constant: add
++ *    it to shaderConstants below. Then prove it: OPENXCOM3D_GPU_SHADOW=1 runs both renderers
++ *    side by side and the log counts the rays and colours that differ (see FirstPersonViewGpu.cpp).
++ *  - New data for the shader: a field in Frame (FirstPersonGpu.h), filled in
++ *    FirstPersonViewGpuAccess::fillFrame; then here a uniform (setScene), a free number of a
++ *    tile's sixteen (encodeTiles), a row of the colour tables (encodeTables), or a buffer of
++ *    its own (the enum in State, start, build's sampler names).
++ *  - A look the CPU renderer doesn't have (the card can afford more): a setting, a uniform for
++ *    it, and a branch in the shader that leaves the CPU's path untouched when it is off, so
++ *    the check against the CPU still holds for the default.
++ *  - Another system's context: GpuContext::create and destroy (EGL on Linux, CGL on macOS).
++ *
++ * What can go wrong, and what happens then: no card, a software OpenGL, a missing function, a
++ * shader the driver won't build, an OpenGL error while drawing: the log says which, castRays
++ * returns false, and the view casts its rays on the CPU (for good, after a failure). A frame
++ * beyond the shader's fixed limits (see draw) is the CPU's too, that frame only.
 + */
 +#include "FirstPersonGpu.h"
 +#include "FirstPersonGpuGl.h"
@@ -26066,7 +26094,7 @@ index 000000000..3e108cac3
 +#include <thread>
 +#include <unordered_map>
 +#include <vector>
-+#if defined(__linux__) && !defined(__ANDROID__)
++#if (defined(__linux__) && !defined(__ANDROID__)) || defined(__APPLE__)
 +#include <dlfcn.h>
 +#endif
 +#include "../Engine/Logger.h"
@@ -26223,7 +26251,7 @@ index 000000000..3e108cac3
 +
 +bool GpuContext::software() const
 +{
-+	for (const char *name : { "llvmpipe", "softpipe", "SwiftShader", "swrast", "Software Rasterizer" })
++	for (const char *name : { "llvmpipe", "softpipe", "SwiftShader", "swrast", "Software" })
 +	{
 +		if (_name.find(name) != std::string::npos) return true;
 +	}
@@ -26256,6 +26284,112 @@ index 000000000..3e108cac3
 +	_display = _context = _surface = nullptr;
 +	// The library stays loaded: drivers leave threads and handlers behind that outlive a dlclose.
 +	_library = nullptr;
++}
++
++#elif defined(__APPLE__)
++
++namespace
++{
++/// macOS's OpenGL framework, once opened (its functions are looked up in it by name).
++void *appleOpenGl = nullptr;
++void *appleFunction(const char *name)
++{
++	return dlsym(appleOpenGl, name);
++}
++}
++
++/**
++ * Opens a hidden OpenGL context on macOS through CGL (the OpenGL framework, opened at run
++ * time): a core profile (4.1 on every Mac of the last ten years; ours asks for 3.3's features
++ * only), hardware-accelerated, with no window and no view: the rays are drawn into our own
++ * textures. macOS has one renderer to offer us, the system's: device 0.
++ */
++bool GpuContext::create(int device)
++{
++	if (device > 0)
++	{
++		return false; // no such device
++	}
++	// CGL's own types and constants (its values), kept local.
++	typedef int (*ChoosePixelFormat)(const int *, void **, int *);
++	typedef int (*DestroyPixelFormat)(void *);
++	typedef int (*CreateContext)(void *, void *, void **);
++	typedef int (*SetCurrentContext)(void *);
++	const int PfaAccelerated = 73, PfaAllowOfflineRenderers = 96, PfaOpenGlProfile = 99, PfaColorSize = 8;
++	const int ProfileGl4Core = 0x4100, ProfileGl3Core = 0x3200;
++
++	_library = dlopen("/System/Library/Frameworks/OpenGL.framework/OpenGL", RTLD_NOW | RTLD_LOCAL);
++	if (!_library)
++	{
++		Log(LOG_INFO) << "OpenXcom3D GPU: no OpenGL framework on this Mac";
++		return false;
++	}
++	appleOpenGl = _library;
++	_getProcAddress = appleFunction;
++	const auto choosePixelFormat = (ChoosePixelFormat)dlsym(_library, "CGLChoosePixelFormat");
++	const auto destroyPixelFormat = (DestroyPixelFormat)dlsym(_library, "CGLDestroyPixelFormat");
++	const auto createContext = (CreateContext)dlsym(_library, "CGLCreateContext");
++	const auto setCurrentContext = (SetCurrentContext)dlsym(_library, "CGLSetCurrentContext");
++	if (!choosePixelFormat || !destroyPixelFormat || !createContext || !setCurrentContext)
++	{
++		Log(LOG_WARNING) << "OpenXcom3D GPU: the OpenGL framework lacks a CGL function";
++		return false;
++	}
++	// The newest core profile the Mac has (4.1, else 3.2), on its graphics chip.
++	void *pixelFormat = nullptr;
++	int formatCount = 0, error = 0;
++	for (const int profile : { ProfileGl4Core, ProfileGl3Core })
++	{
++		const int wanted[] = { PfaOpenGlProfile, profile, PfaAccelerated, PfaAllowOfflineRenderers, PfaColorSize, 24, 0 };
++		error = choosePixelFormat(wanted, &pixelFormat, &formatCount);
++		if (!error && pixelFormat)
++		{
++			break;
++		}
++		pixelFormat = nullptr;
++	}
++	if (!pixelFormat)
++	{
++		Log(LOG_WARNING) << "OpenXcom3D GPU: no OpenGL core profile on this Mac (CGL error " << error << ")";
++		return false;
++	}
++	error = createContext(pixelFormat, nullptr, &_context);
++	destroyPixelFormat(pixelFormat);
++	if (error || !_context || setCurrentContext(_context))
++	{
++		Log(LOG_WARNING) << "OpenXcom3D GPU: no OpenGL context on this Mac (CGL error " << error << ")";
++		return false;
++	}
++	if (!loadFunctions())
++	{
++		return false;
++	}
++	_name = std::string((const char *)Gl::GetString(Gl::RENDERER)) + " (OpenGL " + (const char *)Gl::GetString(Gl::VERSION) + ")";
++	return true;
++}
++
++/**
++ * Closes the context.
++ */
++void GpuContext::destroy()
++{
++	if (!_library)
++	{
++		return;
++	}
++	typedef int (*SetCurrentContext)(void *);
++	typedef int (*DestroyContext)(void *);
++	const auto setCurrentContext = (SetCurrentContext)dlsym(_library, "CGLSetCurrentContext");
++	const auto destroyContext = (DestroyContext)dlsym(_library, "CGLDestroyContext");
++	if (setCurrentContext) setCurrentContext(nullptr);
++	if (_context && destroyContext) destroyContext(_context);
++	_context = nullptr;
++	_library = nullptr; // (the framework stays loaded)
++}
++
++bool GpuContext::software() const
++{
++	return _name.find("Software") != std::string::npos;
 +}
 +
 +#else
@@ -26373,7 +26507,9 @@ index 000000000..3e108cac3
 +	bool hasJob = false, stop = false;
 +
 +	GpuContext context;
-+	bool failed = false;
++	bool failed = false;    // the card failed: the CPU draws from now on
++	bool overLimit = false; // this frame holds more than the shader takes (see draw): the CPU draws it
++	bool limitLogged = false;
 +	// The rays' program, built twice: plain, and with the check's results as a fourth picture.
 +	struct Program
 +	{
@@ -26410,7 +26546,9 @@ index 000000000..3e108cac3
 +	// The tiles as sent last frame: a tile whose parts and mask are the same keeps their numbers.
 +	std::vector<std::array<const FirstPersonView::VoxelModel*, 8>> lastParts;
 +	std::vector<const void*> lastSolid;
-+	std::vector<Uint32> tileUints;
++	std::vector<Uint32> tileUints, tileUintsSent;
++	std::vector<Uint8> tileFlagsSent, tablesSent;
++	std::vector<Uint32> wallPaintTexelsSent;
 +	std::vector<Uint8> tables;
 +	std::vector<Uint32> wallPaintTexels;
 +	std::vector<Sint32> mirrorNumbers;
@@ -26754,8 +26892,12 @@ index 000000000..3e108cac3
 +		texel[2] = (paint.donorWest ? 1 : 0) | (paint.openEnd ? 2 : 0) | (Uint32)paint.kind << 8 | (Uint32)paint.paintGroup << 16;
 +		texel[3] = paint.wall->min[0] | (Uint32)paint.wall->min[1] << 8;
 +	}
-+	Gl::BindBuffer(Gl::ARRAY_BUFFER, buffers[WallPaints]);
-+	Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)(wallPaintTexels.size() * 4), wallPaintTexels.data(), Gl::STREAM_DRAW);
++	if (wallPaintTexels != wallPaintTexelsSent)
++	{
++		Gl::BindBuffer(Gl::ARRAY_BUFFER, buffers[WallPaints]);
++		Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)(wallPaintTexels.size() * 4), wallPaintTexels.data(), Gl::DYNAMIC_DRAW);
++		wallPaintTexelsSent = wallPaintTexels;
++	}
 +}
 +
 +/**
@@ -26949,7 +27091,21 @@ index 000000000..3e108cac3
 + */
 +bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timing *timing)
 +{
++	// More than the shader takes at once (doors swinging, UFOs with their own light, models: a part's
++	// number is sixteen bits): this frame is the CPU's. None of the games' maps comes near.
++	overLimit = frame.swingCount > MaxSwings || frame.ufoCount > MaxUfos || modelIds.size() >= 0xFFF0;
++	if (overLimit)
++	{
++		if (!limitLogged)
++		{
++			limitLogged = true;
++			Log(LOG_INFO) << "OpenXcom3D GPU: a frame beyond the card's limits (" << frame.swingCount << " doors swinging, " << frame.ufoCount << " UFOs, "
++				<< modelIds.size() << " models): the CPU draws such frames";
++		}
++		return false;
++	}
 +	// The world: this frame's tiles and colours, the camera and the scene, and any model or mask not sent before.
++	// What is the same as last frame isn't sent again (in a turn-based game, most frames most of it).
 +	auto start = std::chrono::steady_clock::now();
 +	program = &programs[output.results ? 1 : 0];
 +	Gl::UseProgram(program->id);
@@ -26964,12 +27120,24 @@ index 000000000..3e108cac3
 +		Log(LOG_WARNING) << "OpenXcom3D GPU: the world is bigger than this card's buffers take";
 +		return false;
 +	}
-+	Gl::BindBuffer(Gl::ARRAY_BUFFER, buffers[TileFlags]);
-+	Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)tileCount, frame.tileFlags, Gl::STREAM_DRAW);
-+	Gl::BindBuffer(Gl::ARRAY_BUFFER, buffers[Tiles]);
-+	Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)(tileUints.size() * 4), tileUints.data(), Gl::STREAM_DRAW);
-+	Gl::BindBuffer(Gl::ARRAY_BUFFER, buffers[Tables]);
-+	Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)tables.size(), tables.data(), Gl::STREAM_DRAW);
++	if (tileFlagsSent.size() != tileCount || std::memcmp(tileFlagsSent.data(), frame.tileFlags, tileCount) != 0)
++	{
++		Gl::BindBuffer(Gl::ARRAY_BUFFER, buffers[TileFlags]);
++		Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)tileCount, frame.tileFlags, Gl::DYNAMIC_DRAW);
++		tileFlagsSent.assign(frame.tileFlags, frame.tileFlags + tileCount);
++	}
++	if (tileUints != tileUintsSent)
++	{
++		Gl::BindBuffer(Gl::ARRAY_BUFFER, buffers[Tiles]);
++		Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)(tileUints.size() * 4), tileUints.data(), Gl::DYNAMIC_DRAW);
++		tileUintsSent = tileUints;
++	}
++	if (tables != tablesSent)
++	{
++		Gl::BindBuffer(Gl::ARRAY_BUFFER, buffers[Tables]);
++		Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)tables.size(), tables.data(), Gl::DYNAMIC_DRAW);
++		tablesSent = tables;
++	}
 +	sendModels();
 +	if (solidsChanged)
 +	{
@@ -27138,9 +27306,10 @@ index 000000000..3e108cac3
 +	}
 +	bool drawn = false;
 +	state.run([&] { drawn = state.draw(frame, output, timing); });
-+	if (!drawn)
++	if (!drawn && !state.overLimit)
 +	{
 +		state.failed = true;
++		Log(LOG_WARNING) << "OpenXcom3D GPU: the graphics card failed: the CPU draws from now on";
 +	}
 +	return drawn;
 +}
@@ -27310,10 +27479,10 @@ index 000000000..7b152b341
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuGl.h b/src/FirstPerson/FirstPersonGpuGl.h
 new file mode 100644
-index 000000000..e4543053a
+index 000000000..423a06433
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuGl.h
-@@ -0,0 +1,170 @@
+@@ -0,0 +1,171 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -27457,7 +27626,8 @@ index 000000000..e4543053a
 +/**
 + * The GPU renderer's own OpenGL context: hidden, with no window, on the graphics card asked for.
 + * On Linux it comes from EGL (libEGL.so.1, opened at run time), on a device picked by number
-+ * where the machine has more than one (a laptop's built-in graphics and its graphics card).
++ * where the machine has more than one (a laptop's built-in graphics and its graphics card);
++ * on macOS from CGL (the OpenGL framework, opened at run time). Windows: not yet.
 + * It belongs to the thread that creates it: make it, use it and destroy it on that one thread.
 + */
 +class GpuContext
@@ -27475,7 +27645,7 @@ index 000000000..e4543053a
 +	~GpuContext() { destroy(); }
 +private:
 +	bool loadFunctions();
-+	void *_library = nullptr;  // libEGL
++	void *_library = nullptr;  // libEGL, or macOS's OpenGL framework
 +	void *_display = nullptr;
 +	void *_context = nullptr;
 +	void *_surface = nullptr;
@@ -27486,7 +27656,7 @@ index 000000000..e4543053a
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..3c42b45a9
+index 000000000..4182f2974
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
 @@ -0,0 +1,1393 @@
@@ -27594,9 +27764,9 @@ index 000000000..3c42b45a9
 +
 +float dither(int x, int y) { return Bayer[(y & 3) * 4 + (x & 3)]; }
 +
-+float ghostOpacity(float distance)
++float ghostOpacity(float span)
 +{
-+	float fade = (distance - GhostNearDistance) / (GhostFarDistance - GhostNearDistance);
++	float fade = (span - GhostNearDistance) / (GhostFarDistance - GhostNearDistance);
 +	return GhostNearOpacity - clamp(fade, 0.0, 1.0) * (GhostNearOpacity - GhostFarOpacity);
 +}
 +
@@ -27711,7 +27881,7 @@ index 000000000..3c42b45a9
 +	}
 +
 +	// Set up the voxel walk.
-+	ivec3 voxel, step;
++	ivec3 voxel, stride;
 +	vec3 nextCrossing, crossingSpacing;
 +	for (int axis = 0; axis < 3; ++axis)
 +	{
@@ -27719,19 +27889,19 @@ index 000000000..3c42b45a9
 +		voxel[axis] = clamp(int(floor(entryPoint)), low[axis], high[axis]);
 +		if (rayDirection[axis] > 0.0)
 +		{
-+			step[axis] = 1;
++			stride[axis] = 1;
 +			crossingSpacing[axis] = inverseDirection[axis];
 +			nextCrossing[axis] = (float(voxel[axis] + 1) - rayOrigin[axis]) / rayDirection[axis];
 +		}
 +		else if (rayDirection[axis] < 0.0)
 +		{
-+			step[axis] = -1;
++			stride[axis] = -1;
 +			crossingSpacing[axis] = -inverseDirection[axis];
 +			nextCrossing[axis] = (float(voxel[axis]) - rayOrigin[axis]) / rayDirection[axis];
 +		}
 +		else
 +		{
-+			step[axis] = 0;
++			stride[axis] = 0;
 +			crossingSpacing[axis] = Infinity;
 +			nextCrossing[axis] = Infinity;
 +		}
@@ -27740,7 +27910,7 @@ index 000000000..3c42b45a9
 +	// Walk voxel by voxel until something solid, or out of the box (at most 16 + 16 + 24 steps).
 +	uint parts[4] = uint[4](tileA.x & 0xFFFFu, tileA.x >> 16, tileA.y & 0xFFFFu, tileA.y >> 16);
 +	int solidRows = int(tileA.w) * 384;
-+	float distance = entry;
++	float span = entry;
 +	for (int guard = 0; guard < 64; ++guard)
 +	{
 +		ivec3 local = voxel - corner;
@@ -27761,7 +27931,7 @@ index 000000000..3c42b45a9
 +					info = texelFetch(uModelInfo, int(model));
 +				}
 +				if (color == 0u) continue;
-+				if ((info.x & 1u) != 0u && ((info.x & 2u) != 0u ? 1.0 <= solidGhostThreshold : ghostOpacity(distance) <= ghostThreshold))
++				if ((info.x & 1u) != 0u && ((info.x & 2u) != 0u ? 1.0 <= solidGhostThreshold : ghostOpacity(span) <= ghostThreshold))
 +				{
 +					continue; // a ghost, seen through on this pixel
 +				}
@@ -27775,7 +27945,7 @@ index 000000000..3c42b45a9
 +					continue; // behind a hole in the art
 +				}
 +				hit.color = color;
-+				hit.t = distance;
++				hit.t = span;
 +				hit.axis = faceAxis;
 +				hit.part = part;
 +				hit.ghost = onGhost;
@@ -27787,9 +27957,9 @@ index 000000000..3c42b45a9
 +		}
 +		// Step into the neighbouring voxel across the nearest boundary (on a tie, the later axis).
 +		int axis = nextCrossing.x < nextCrossing.y ? (nextCrossing.x < nextCrossing.z ? 0 : 2) : (nextCrossing.y < nextCrossing.z ? 1 : 2);
-+		distance = nextCrossing[axis];
-+		if (distance > leave) return doorHit;
-+		voxel[axis] += step[axis];
++		span = nextCrossing[axis];
++		if (span > leave) return doorHit;
++		voxel[axis] += stride[axis];
 +		if (voxel[axis] < low[axis] || voxel[axis] > high[axis]) return doorHit;
 +		nextCrossing[axis] += crossingSpacing[axis];
 +		faceAxis = axis;
@@ -27809,7 +27979,7 @@ index 000000000..3c42b45a9
 +		rayDirection.z != 0.0 ? 1.0 / rayDirection.z : 0.0);
 +
 +	// Set up the tile walk.
-+	ivec3 tileCell, step;
++	ivec3 tileCell, stride;
 +	vec3 nextCrossing, crossingSpacing;
 +	for (int axis = 0; axis < 3; ++axis)
 +	{
@@ -27824,38 +27994,38 @@ index 000000000..3c42b45a9
 +		float directionInTiles = rayDirection[axis] / CellSize[axis];
 +		if (directionInTiles > 0.0)
 +		{
-+			step[axis] = 1;
++			stride[axis] = 1;
 +			crossingSpacing[axis] = 1.0 / directionInTiles;
 +			nextCrossing[axis] = (float(tileCell[axis] + 1) - positionInTiles) / directionInTiles;
 +		}
 +		else if (directionInTiles < 0.0)
 +		{
-+			step[axis] = -1;
++			stride[axis] = -1;
 +			crossingSpacing[axis] = -1.0 / directionInTiles;
 +			nextCrossing[axis] = (positionInTiles - float(tileCell[axis])) / -directionInTiles;
 +		}
 +		else
 +		{
-+			step[axis] = 0;
++			stride[axis] = 0;
 +			crossingSpacing[axis] = Infinity;
 +			nextCrossing[axis] = Infinity;
 +		}
 +	}
 +
 +	// Walk tile by tile, as far as the ray reaches.
-+	float distance = 0.0;
++	float span = 0.0;
 +	int enterAxis = -1;
 +	int tileIndex = (tileCell.z * uSize.y + tileCell.y) * uSize.x + tileCell.x;
-+	ivec3 indexStride = ivec3(step.x, step.y * uSize.x, step.z * uSize.x * uSize.y);
-+	for (int guard = 0; guard < 4096 && distance < maxDistance; ++guard)
++	ivec3 indexStride = ivec3(stride.x, stride.y * uSize.x, stride.z * uSize.x * uSize.y);
++	for (int guard = 0; guard < 4096 && span < maxDistance; ++guard)
 +	{
 +		uint flags = texelFetch(uTileFlags, tileIndex).r;
 +		if ((flags & 1u) != 0u)
 +		{
 +			float tileExit = min(nextCrossing.x, min(nextCrossing.y, nextCrossing.z));
 +			float solidTop = float(tileCell.z * 24 + int(flags >> 3) + 1) + 0.01;
-+			bool lookForSolid = (flags & 4u) != 0u || rayOrigin.z + rayDirection.z * distance <= solidTop || rayOrigin.z + rayDirection.z * tileExit <= solidTop;
-+			if (lookForSolid && traceTile(tileIndex, tileCell, rayOrigin, rayDirection, inverseDirection, distance, tileExit, enterAxis, ghostThreshold, solidGhostThreshold, hit))
++			bool lookForSolid = (flags & 4u) != 0u || rayOrigin.z + rayDirection.z * span <= solidTop || rayOrigin.z + rayDirection.z * tileExit <= solidTop;
++			if (lookForSolid && traceTile(tileIndex, tileCell, rayOrigin, rayDirection, inverseDirection, span, tileExit, enterAxis, ghostThreshold, solidGhostThreshold, hit))
 +			{
 +				hitTile = tileIndex;
 +				return RAY_HIT;
@@ -27863,19 +28033,19 @@ index 000000000..3c42b45a9
 +		}
 +		// Step into the neighbouring tile across the nearest boundary (on a tie, the later axis).
 +		int axis = nextCrossing.x < nextCrossing.y ? (nextCrossing.x < nextCrossing.z ? 0 : 2) : (nextCrossing.y < nextCrossing.z ? 1 : 2);
-+		distance = nextCrossing[axis];
-+		tileCell[axis] += step[axis];
++		span = nextCrossing[axis];
++		tileCell[axis] += stride[axis];
 +		tileIndex += indexStride[axis];
 +		if (tileCell[axis] < 0 || tileCell[axis] >= uSize[axis])
 +		{
-+			endDistance = distance;
++			endDistance = span;
 +			endAxis = axis;
-+			return axis == 2 ? (step.z < 0 ? RAY_BOTTOM : RAY_TOP) : RAY_SIDE;
++			return axis == 2 ? (stride.z < 0 ? RAY_BOTTOM : RAY_TOP) : RAY_SIDE;
 +		}
 +		nextCrossing[axis] += crossingSpacing[axis];
 +		enterAxis = axis;
 +	}
-+	endDistance = distance;
++	endDistance = span;
 +	endAxis = -1;
 +	return RAY_FAR;
 +}
@@ -27962,9 +28132,9 @@ index 000000000..3c42b45a9
 +	return valueNoise(x, y) * 0.55 + valueNoise(x * 2.1 + 17.0, y * 2.1) * 0.3 + valueNoise(x * 4.3, y * 4.3 + 31.0) * 0.15;
 +}
 +
-+float distanceShade(float distance)
++float distanceShade(float span)
 +{
-+	return distance / max(DistanceShadeVoxels, uMaxDistance / DistanceShadeReachParts);
++	return span / max(DistanceShadeVoxels, uMaxDistance / DistanceShadeReachParts);
 +}
 +
 +float hazeStart()
@@ -27972,9 +28142,9 @@ index 000000000..3c42b45a9
 +	return uHaze == 2 || airless() ? 0.9 : uHaze == 1 ? 0.75 : 0.45;
 +}
 +
-+float terrainHaze(float distance)
++float terrainHaze(float span)
 +{
-+	return uUnderwater != 0 ? smoothStep(uMaxDistance * 0.12, uMaxDistance * 0.65, distance) : smoothStep(uMaxDistance * hazeStart(), uMaxDistance, distance);
++	return uUnderwater != 0 ? smoothStep(uMaxDistance * 0.12, uMaxDistance * 0.65, span) : smoothStep(uMaxDistance * hazeStart(), uMaxDistance, span);
 +}
 +
 +uint hazeColor(uint color, float haze, int pixelX, int pixelY)
@@ -27983,8 +28153,8 @@ index 000000000..3c42b45a9
 +	{
 +		return color;
 +	}
-+	int step = clamp(int(haze * float(HazeSteps) + dither(pixelX, pixelY)), 0, HazeSteps);
-+	return table(HazeRow + step, color);
++	int stride = clamp(int(haze * float(HazeSteps) + dither(pixelX, pixelY)), 0, HazeSteps);
++	return table(HazeRow + stride, color);
 +}
 +
 +// A tile's light (texel 1) and its facts (texel 1's z: discovered, smoke, burning, roofed).
@@ -28033,16 +28203,16 @@ index 000000000..3c42b45a9
 +bool shadowed(vec3 from, vec3 to)
 +{
 +	vec3 direction = to - from;
-+	float distance = sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
-+	if (distance < 1.0)
++	float span = sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
++	if (span < 1.0)
 +	{
 +		return false;
 +	}
-+	direction /= distance;
++	direction /= span;
 +	Hit hit;
 +	int hitTile, endAxis;
 +	float endDistance;
-+	return castRay(from, direction, distance, 2.0, 2.0, hit, hitTile, endDistance, endAxis) == RAY_HIT && hit.t < distance;
++	return castRay(from, direction, span, 2.0, 2.0, hit, hitTile, endDistance, endAxis) == RAY_HIT && hit.t < span;
 +}
 +
 +float pointLight(vec3 point, vec3 normal, bool shadows)
@@ -28057,10 +28227,10 @@ index 000000000..3c42b45a9
 +		for (int lamp = 0; lamp < uLampCount; ++lamp)
 +		{
 +			float dx = uLamps[lamp].x - point.x, dy = uLamps[lamp].y - point.y, dz = uLamps[lamp].z - point.z;
-+			float distance = sqrt(dx * dx + dy * dy + dz * dz);
-+			if (distance > lampReach) continue;
-+			float power = uLamps[lamp].w * (1.0 - distance / lampReach) * (1.0 - distance / lampReach);
-+			if (power > brightestPower) { brightestPower = power; brightestLamp = lamp; brightestDistance = distance; }
++			float span = sqrt(dx * dx + dy * dy + dz * dz);
++			if (span > lampReach) continue;
++			float power = uLamps[lamp].w * (1.0 - span / lampReach) * (1.0 - span / lampReach);
++			if (power > brightestPower) { brightestPower = power; brightestLamp = lamp; brightestDistance = span; }
 +		}
 +		if (brightestLamp >= 0 && brightestPower > 0.03)
 +		{
@@ -28084,15 +28254,15 @@ index 000000000..3c42b45a9
 +	{
 +		float range = 16.0 * 20.0;
 +		vec3 fromLight = point - uFlashlightPos;
-+		float distance = sqrt(fromLight.x * fromLight.x + fromLight.y * fromLight.y + fromLight.z * fromLight.z);
-+		if (distance > 0.5 && distance < range)
++		float span = sqrt(fromLight.x * fromLight.x + fromLight.y * fromLight.y + fromLight.z * fromLight.z);
++		if (span > 0.5 && span < range)
 +		{
-+			float cosine = (fromLight.x * uForwardInVoxels.x + fromLight.y * uForwardInVoxels.y + fromLight.z * uForwardInVoxels.z) / distance;
++			float cosine = (fromLight.x * uForwardInVoxels.x + fromLight.y * uForwardInVoxels.y + fromLight.z * uForwardInVoxels.z) / span;
 +			if (cosine > 0.914)
 +			{
 +				float beam = smoothStep(0.974, 0.990, cosine) + 0.18 * smoothStep(0.914, 0.974, cosine);
-+				float falloff = 1.0 - 0.85 * distance / range;
-+				float facing = -(normal.x * fromLight.x + normal.y * fromLight.y + normal.z * fromLight.z) / distance;
++				float falloff = 1.0 - 0.85 * span / range;
++				float facing = -(normal.x * fromLight.x + normal.y * fromLight.y + normal.z * fromLight.z) / span;
 +				float power = beam * falloff * falloff * 13.0 * (0.4 + 0.6 * max(0.0, facing));
 +				if (power > 0.25 && facing > 0.0 && !(shadows && shadowed(point, uFlashlightPos)))
 +				{
@@ -28105,15 +28275,15 @@ index 000000000..3c42b45a9
 +	{
 +		float range = 16.0 * 14.0;
 +		vec3 fromLight = point - uFlashlightPos;
-+		float distance = sqrt(fromLight.x * fromLight.x + fromLight.y * fromLight.y + fromLight.z * fromLight.z);
-+		if (distance > 0.5 && distance < range)
++		float span = sqrt(fromLight.x * fromLight.x + fromLight.y * fromLight.y + fromLight.z * fromLight.z);
++		if (span > 0.5 && span < range)
 +		{
-+			float cosine = (fromLight.x * uForwardInVoxels.x + fromLight.y * uForwardInVoxels.y + fromLight.z * uForwardInVoxels.z) / distance;
++			float cosine = (fromLight.x * uForwardInVoxels.x + fromLight.y * uForwardInVoxels.y + fromLight.z * uForwardInVoxels.z) / span;
 +			if (cosine > 0.8)
 +			{
 +				float cone = smoothStep(0.8, 0.96, cosine);
-+				float falloff = 1.0 - distance / range;
-+				float facing = -(normal.x * fromLight.x + normal.y * fromLight.y + normal.z * fromLight.z) / distance;
++				float falloff = 1.0 - span / range;
++				float facing = -(normal.x * fromLight.x + normal.y * fromLight.y + normal.z * fromLight.z) / span;
 +				float power = cone * falloff * falloff * 10.0 * (0.35 + 0.65 * max(0.0, facing));
 +				if (power > 0.25 && facing > 0.0 && !(shadows && shadowed(point, uFlashlightPos)))
 +				{
@@ -28135,10 +28305,10 @@ index 000000000..3c42b45a9
 +	for (int flare = 0; flare < uFlareCount && count < 8; ++flare)
 +	{
 +		float dx = uFlares[flare].x - point.x, dy = uFlares[flare].y - point.y, dz = uFlares[flare].z - point.z;
-+		float distance = sqrt(dx * dx + dy * dy + dz * dz);
-+		if (distance > FlareReach || distance < 0.01) continue;
-+		float power = (1.0 - distance / FlareReach) * (1.0 - distance / FlareReach) * uFlares[flare].w * uFlareFlicker[flare] * darkness;
-+		float facing = (normal.x * dx + normal.y * dy + normal.z * dz) / distance;
++		float span = sqrt(dx * dx + dy * dy + dz * dz);
++		if (span > FlareReach || span < 0.01) continue;
++		float power = (1.0 - span / FlareReach) * (1.0 - span / FlareReach) * uFlares[flare].w * uFlareFlicker[flare] * darkness;
++		float facing = (normal.x * dx + normal.y * dy + normal.z * dz) / span;
 +		if (facing <= 0.0) continue;
 +		power *= 0.4 + 0.6 * facing;
 +		if (power < 0.02) continue;
@@ -28183,27 +28353,27 @@ index 000000000..3c42b45a9
 +	return (tileLightTexel((tileZ * uSize.y + tileY) * uSize.x + tileX).z & 0x20000u) != 0u;
 +}
 +
-+float waveHeight(float x, float y, float distance)
++float waveHeight(float x, float y, float span)
 +{
 +	float height = 0.0;
 +	for (int train = 0; train < 3; ++train)
 +	{
 +		float share = WaveTrains[train * 3], fadeFrom = WaveTrains[train * 3 + 1], fadeTo = WaveTrains[train * 3 + 2];
-+		if (distance >= fadeTo)
++		if (span >= fadeTo)
 +		{
 +			continue;
 +		}
-+		float fade = distance <= fadeFrom ? 1.0 : (fadeTo - distance) / (fadeTo - fadeFrom);
++		float fade = span <= fadeFrom ? 1.0 : (fadeTo - span) / (fadeTo - fadeFrom);
 +		float bend = texelFetch(uWaveSine, int(x * uWaveSteps[train * 6 + 3] + y * uWaveSteps[train * 6 + 4]) & (WaveSineSteps - 1)).r * uWaveSteps[train * 6 + 5];
-+		int step = int(x * uWaveSteps[train * 6] + y * uWaveSteps[train * 6 + 1] + uWaveSteps[train * 6 + 2] + bend);
-+		height += texelFetch(uWaveSine, step & (WaveSineSteps - 1)).r * share * fade;
++		int stride = int(x * uWaveSteps[train * 6] + y * uWaveSteps[train * 6 + 1] + uWaveSteps[train * 6 + 2] + bend);
++		height += texelFetch(uWaveSine, stride & (WaveSineSteps - 1)).r * share * fade;
 +	}
 +	return height;
 +}
 +
-+uint waterColor(float x, float y, float distance, int pixelX, int pixelY, out float shade)
++uint waterColor(float x, float y, float span, int pixelX, int pixelY, out float shade)
 +{
-+	float height = waveHeight(x, y, distance);
++	float height = waveHeight(x, y, span);
 +	shade = WaveShades * (1.0 - height);
 +	float threshold = dither(pixelX + 3, pixelY + 1);
 +	if (height > FoamFrom && (height - FoamFrom) / (1.0 - FoamFrom) > threshold)
@@ -28217,14 +28387,14 @@ index 000000000..3c42b45a9
 +	return scene(SceneWater);
 +}
 +
-+uint rockColor(float alongU, float alongV, int face, float distance, int pixelX, int pixelY)
++uint rockColor(float alongU, float alongV, int face, float span, int pixelX, int pixelY)
 +{
 +	float mottle = valueNoise(alongU / 12.0, alongV / 9.0) * 0.65 + valueNoise(alongU / 3.0, alongV / 3.0) * 0.35;
 +	uint rock = scene(SceneRockBase) != 0u ? scene(SceneRockBase) : scene(SceneRock);
 +	int darkest = 12 - int(rock & 15u);
 +	int lit = min(darkest - RockMottleShades, int(float(uAmbient) * 0.5 + uFaceShade[face]));
 +	int shades = min(darkest, lit + int(mottle * float(RockMottleShades) + dither(pixelX, pixelY)));
-+	return hazeColor(shadeColor(rock, shades), terrainHaze(distance), pixelX + 2, pixelY + 1);
++	return hazeColor(shadeColor(rock, shades), terrainHaze(span), pixelX + 2, pixelY + 1);
 +}
 +
 +uint airlessSkyColor(vec3 rayDirection, int pixelX, int pixelY)
@@ -28790,8 +28960,8 @@ index 000000000..3c42b45a9
 +	}
 +	if (ufoLighting >= 0 && ufoOuterShare <= 0.0 && onUfo)
 +	{
-+		int step = min(12, int(floor(ufoTint * 12.0 + 0.5)));
-+		if (step > 0) color = table(UfoRows + ufoLighting * RowsPerUfo + 2 + step - 1, color);
++		int stride = min(12, int(floor(ufoTint * 12.0 + 0.5)));
++		if (stride > 0) color = table(UfoRows + ufoLighting * RowsPerUfo + 2 + stride - 1, color);
 +	}
 +	else if (ufoTint > dither(pixelX + 3, pixelY + 2))
 +	{
@@ -28885,10 +29055,10 @@ index 000000000..3c42b45a9
 +}
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..9c0f0cb1c
+index 000000000..b654d5de4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2926 @@
+@@ -0,0 +1,2932 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -29880,7 +30050,9 @@ index 000000000..9c0f0cb1c
 + */
 +int FirstPersonMode::uiScaleFor(int width, int height)
 +{
-+	return std::max(1, std::min(height / 360, width / 320));
++	// The biggest magnification the canvas's layout still fits at; the setting "HUD scale" may ask for a smaller one.
++	const int biggest = std::max(1, std::min(height / 360, width / 320));
++	return Options::fpsHudScale > 0 ? std::min(Options::fpsHudScale, biggest) : biggest;
 +}
 +
 +/**
@@ -30822,6 +30994,10 @@ index 000000000..9c0f0cb1c
 +	const Uint32 now = SDL_GetTicks();
 +	lastThinkTicks = now;
 +	rememberChoices(); // (the fuses burning change all the time)
++	if (uiScaleFor(Options::baseXResolution, Options::baseYResolution) != _uiScale)
++	{
++		resized(0, 0); // (the setting "HUD scale" changed: the canvas, the overlays' places and the view anew)
++	}
 +	remakeViewIfResized(); // (the setting "Full resolution" switched)
 +	const double elapsedSeconds = _lastFrameTick ? std::min<Uint32>(100, now - _lastFrameTick) / 1000.0 : 0.0;
 +
@@ -53248,7 +53424,7 @@ index 000000000..77a3cc4ed
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..50368b75d
+index 000000000..da089bb3b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
 @@ -0,0 +1,472 @@
@@ -53446,8 +53622,8 @@ index 000000000..50368b75d
 +	std::copy(&view._ufoPulse[0][0], &view._ufoPulse[0][0] + 32, frame.ufoPulse);
 +	frame.ufoBreath = view._ufoBreath;
 +	std::copy(view._ufoFaceShade, view._ufoFaceShade + 64, frame.ufoFaceShade);
-+	frame.ufoCount = (int)std::min<size_t>(8, view._ufos.size());
-+	for (int ufo = 0; ufo < frame.ufoCount; ++ufo)
++	frame.ufoCount = (int)view._ufos.size(); // (more than eight: the CPU draws, see FirstPersonGpu's limits)
++	for (int ufo = 0; ufo < std::min(frame.ufoCount, 8); ++ufo)
 +	{
 +		frame.ufoTint[ufo] = &view._ufos[ufo].tint[0][0];
 +		frame.ufoSoftTint[ufo] = &view._ufos[ufo].softTint[0][0];
@@ -69565,10 +69741,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..e2b0b20e2
+index 000000000..abed9fa48
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,964 @@
+@@ -0,0 +1,975 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -69793,7 +69969,7 @@ index 000000000..e2b0b20e2
 +			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsMiddleClickIdentify" } },
 +		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 +		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
-+		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsFullResolution" } },
++		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsFullResolution", "fpsHudScale" } },
 +	};
 +	std::vector<bool> placed(gathered.size(), false);
 +	for (const auto &section : sections)
@@ -69926,6 +70102,12 @@ index 000000000..e2b0b20e2
 +		if (option.id() == "fpsFogOfWar")
 +		{
 +			return std::string(tr(*option.asInt() == 1 ? "STR_FPS_FOG_OF_WAR_MAP" : "STR_FPS_FOG_OF_WAR_OFF"));
++		}
++		// The HUD's scale: Auto, or the times it is magnified.
++		if (option.id() == "fpsHudScale")
++		{
++			const int scale = std::clamp(*option.asInt(), 0, 4);
++			return scale == 0 ? std::string(tr("STR_FPS_HUD_SCALE_AUTO")) : "x" + std::to_string(scale);
 +		}
 +		// The renderer is a choice of two, shown by name.
 +		if (option.id() == "fpsRenderer")
@@ -70206,6 +70388,11 @@ index 000000000..e2b0b20e2
 +		else if (value == &Options::fpsFogOfWar)
 +		{
 +			*value = *value == 1 ? 0 : 1;
++		}
++		// The HUD's scale (Auto, x1 .. x4): round and round.
++		else if (value == &Options::fpsHudScale)
++		{
++			*value = (std::clamp(*value, 0, 4) + direction + 5) % 5;
 +		}
 +		// The renderer (CPU, GPU): either button switches.
 +		else if (value == &Options::fpsRenderer)

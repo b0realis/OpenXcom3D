@@ -141,7 +141,8 @@ GL_FUNCTIONS(GL_DECLARE)
 /**
  * The GPU renderer's own OpenGL context: hidden, with no window, on the graphics card asked for.
  * On Linux it comes from EGL (libEGL.so.1, opened at run time), on a device picked by number
- * where the machine has more than one (a laptop's built-in graphics and its graphics card).
+ * where the machine has more than one (a laptop's built-in graphics and its graphics card);
+ * on macOS from CGL (the OpenGL framework, opened at run time). Windows: not yet.
  * It belongs to the thread that creates it: make it, use it and destroy it on that one thread.
  */
 class GpuContext
@@ -159,7 +160,7 @@ public:
 	~GpuContext() { destroy(); }
 private:
 	bool loadFunctions();
-	void *_library = nullptr;  // libEGL
+	void *_library = nullptr;  // libEGL, or macOS's OpenGL framework
 	void *_display = nullptr;
 	void *_context = nullptr;
 	void *_surface = nullptr;

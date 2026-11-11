@@ -192,8 +192,8 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 	std::copy(&view._ufoPulse[0][0], &view._ufoPulse[0][0] + 32, frame.ufoPulse);
 	frame.ufoBreath = view._ufoBreath;
 	std::copy(view._ufoFaceShade, view._ufoFaceShade + 64, frame.ufoFaceShade);
-	frame.ufoCount = (int)std::min<size_t>(8, view._ufos.size());
-	for (int ufo = 0; ufo < frame.ufoCount; ++ufo)
+	frame.ufoCount = (int)view._ufos.size(); // (more than eight: the CPU draws, see FirstPersonGpu's limits)
+	for (int ufo = 0; ufo < std::min(frame.ufoCount, 8); ++ufo)
 	{
 		frame.ufoTint[ufo] = &view._ufos[ufo].tint[0][0];
 		frame.ufoSoftTint[ufo] = &view._ufos[ufo].softTint[0][0];

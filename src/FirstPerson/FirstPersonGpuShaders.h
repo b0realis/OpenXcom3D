@@ -102,9 +102,9 @@ struct Hit
 
 float dither(int x, int y) { return Bayer[(y & 3) * 4 + (x & 3)]; }
 
-float ghostOpacity(float distance)
+float ghostOpacity(float span)
 {
-	float fade = (distance - GhostNearDistance) / (GhostFarDistance - GhostNearDistance);
+	float fade = (span - GhostNearDistance) / (GhostFarDistance - GhostNearDistance);
 	return GhostNearOpacity - clamp(fade, 0.0, 1.0) * (GhostNearOpacity - GhostFarOpacity);
 }
 
@@ -219,7 +219,7 @@ bool traceTile(int tileIndex, ivec3 tileCell, vec3 rayOrigin, vec3 rayDirection,
 	}
 
 	// Set up the voxel walk.
-	ivec3 voxel, step;
+	ivec3 voxel, stride;
 	vec3 nextCrossing, crossingSpacing;
 	for (int axis = 0; axis < 3; ++axis)
 	{
@@ -227,19 +227,19 @@ bool traceTile(int tileIndex, ivec3 tileCell, vec3 rayOrigin, vec3 rayDirection,
 		voxel[axis] = clamp(int(floor(entryPoint)), low[axis], high[axis]);
 		if (rayDirection[axis] > 0.0)
 		{
-			step[axis] = 1;
+			stride[axis] = 1;
 			crossingSpacing[axis] = inverseDirection[axis];
 			nextCrossing[axis] = (float(voxel[axis] + 1) - rayOrigin[axis]) / rayDirection[axis];
 		}
 		else if (rayDirection[axis] < 0.0)
 		{
-			step[axis] = -1;
+			stride[axis] = -1;
 			crossingSpacing[axis] = -inverseDirection[axis];
 			nextCrossing[axis] = (float(voxel[axis]) - rayOrigin[axis]) / rayDirection[axis];
 		}
 		else
 		{
-			step[axis] = 0;
+			stride[axis] = 0;
 			crossingSpacing[axis] = Infinity;
 			nextCrossing[axis] = Infinity;
 		}
@@ -248,7 +248,7 @@ bool traceTile(int tileIndex, ivec3 tileCell, vec3 rayOrigin, vec3 rayDirection,
 	// Walk voxel by voxel until something solid, or out of the box (at most 16 + 16 + 24 steps).
 	uint parts[4] = uint[4](tileA.x & 0xFFFFu, tileA.x >> 16, tileA.y & 0xFFFFu, tileA.y >> 16);
 	int solidRows = int(tileA.w) * 384;
-	float distance = entry;
+	float span = entry;
 	for (int guard = 0; guard < 64; ++guard)
 	{
 		ivec3 local = voxel - corner;
@@ -269,7 +269,7 @@ bool traceTile(int tileIndex, ivec3 tileCell, vec3 rayOrigin, vec3 rayDirection,
 					info = texelFetch(uModelInfo, int(model));
 				}
 				if (color == 0u) continue;
-				if ((info.x & 1u) != 0u && ((info.x & 2u) != 0u ? 1.0 <= solidGhostThreshold : ghostOpacity(distance) <= ghostThreshold))
+				if ((info.x & 1u) != 0u && ((info.x & 2u) != 0u ? 1.0 <= solidGhostThreshold : ghostOpacity(span) <= ghostThreshold))
 				{
 					continue; // a ghost, seen through on this pixel
 				}
@@ -283,7 +283,7 @@ bool traceTile(int tileIndex, ivec3 tileCell, vec3 rayOrigin, vec3 rayDirection,
 					continue; // behind a hole in the art
 				}
 				hit.color = color;
-				hit.t = distance;
+				hit.t = span;
 				hit.axis = faceAxis;
 				hit.part = part;
 				hit.ghost = onGhost;
@@ -295,9 +295,9 @@ bool traceTile(int tileIndex, ivec3 tileCell, vec3 rayOrigin, vec3 rayDirection,
 		}
 		// Step into the neighbouring voxel across the nearest boundary (on a tie, the later axis).
 		int axis = nextCrossing.x < nextCrossing.y ? (nextCrossing.x < nextCrossing.z ? 0 : 2) : (nextCrossing.y < nextCrossing.z ? 1 : 2);
-		distance = nextCrossing[axis];
-		if (distance > leave) return doorHit;
-		voxel[axis] += step[axis];
+		span = nextCrossing[axis];
+		if (span > leave) return doorHit;
+		voxel[axis] += stride[axis];
 		if (voxel[axis] < low[axis] || voxel[axis] > high[axis]) return doorHit;
 		nextCrossing[axis] += crossingSpacing[axis];
 		faceAxis = axis;
@@ -317,7 +317,7 @@ int castRay(vec3 rayOrigin, vec3 rayDirection, float maxDistance, float ghostThr
 		rayDirection.z != 0.0 ? 1.0 / rayDirection.z : 0.0);
 
 	// Set up the tile walk.
-	ivec3 tileCell, step;
+	ivec3 tileCell, stride;
 	vec3 nextCrossing, crossingSpacing;
 	for (int axis = 0; axis < 3; ++axis)
 	{
@@ -332,38 +332,38 @@ int castRay(vec3 rayOrigin, vec3 rayDirection, float maxDistance, float ghostThr
 		float directionInTiles = rayDirection[axis] / CellSize[axis];
 		if (directionInTiles > 0.0)
 		{
-			step[axis] = 1;
+			stride[axis] = 1;
 			crossingSpacing[axis] = 1.0 / directionInTiles;
 			nextCrossing[axis] = (float(tileCell[axis] + 1) - positionInTiles) / directionInTiles;
 		}
 		else if (directionInTiles < 0.0)
 		{
-			step[axis] = -1;
+			stride[axis] = -1;
 			crossingSpacing[axis] = -1.0 / directionInTiles;
 			nextCrossing[axis] = (positionInTiles - float(tileCell[axis])) / -directionInTiles;
 		}
 		else
 		{
-			step[axis] = 0;
+			stride[axis] = 0;
 			crossingSpacing[axis] = Infinity;
 			nextCrossing[axis] = Infinity;
 		}
 	}
 
 	// Walk tile by tile, as far as the ray reaches.
-	float distance = 0.0;
+	float span = 0.0;
 	int enterAxis = -1;
 	int tileIndex = (tileCell.z * uSize.y + tileCell.y) * uSize.x + tileCell.x;
-	ivec3 indexStride = ivec3(step.x, step.y * uSize.x, step.z * uSize.x * uSize.y);
-	for (int guard = 0; guard < 4096 && distance < maxDistance; ++guard)
+	ivec3 indexStride = ivec3(stride.x, stride.y * uSize.x, stride.z * uSize.x * uSize.y);
+	for (int guard = 0; guard < 4096 && span < maxDistance; ++guard)
 	{
 		uint flags = texelFetch(uTileFlags, tileIndex).r;
 		if ((flags & 1u) != 0u)
 		{
 			float tileExit = min(nextCrossing.x, min(nextCrossing.y, nextCrossing.z));
 			float solidTop = float(tileCell.z * 24 + int(flags >> 3) + 1) + 0.01;
-			bool lookForSolid = (flags & 4u) != 0u || rayOrigin.z + rayDirection.z * distance <= solidTop || rayOrigin.z + rayDirection.z * tileExit <= solidTop;
-			if (lookForSolid && traceTile(tileIndex, tileCell, rayOrigin, rayDirection, inverseDirection, distance, tileExit, enterAxis, ghostThreshold, solidGhostThreshold, hit))
+			bool lookForSolid = (flags & 4u) != 0u || rayOrigin.z + rayDirection.z * span <= solidTop || rayOrigin.z + rayDirection.z * tileExit <= solidTop;
+			if (lookForSolid && traceTile(tileIndex, tileCell, rayOrigin, rayDirection, inverseDirection, span, tileExit, enterAxis, ghostThreshold, solidGhostThreshold, hit))
 			{
 				hitTile = tileIndex;
 				return RAY_HIT;
@@ -371,19 +371,19 @@ int castRay(vec3 rayOrigin, vec3 rayDirection, float maxDistance, float ghostThr
 		}
 		// Step into the neighbouring tile across the nearest boundary (on a tie, the later axis).
 		int axis = nextCrossing.x < nextCrossing.y ? (nextCrossing.x < nextCrossing.z ? 0 : 2) : (nextCrossing.y < nextCrossing.z ? 1 : 2);
-		distance = nextCrossing[axis];
-		tileCell[axis] += step[axis];
+		span = nextCrossing[axis];
+		tileCell[axis] += stride[axis];
 		tileIndex += indexStride[axis];
 		if (tileCell[axis] < 0 || tileCell[axis] >= uSize[axis])
 		{
-			endDistance = distance;
+			endDistance = span;
 			endAxis = axis;
-			return axis == 2 ? (step.z < 0 ? RAY_BOTTOM : RAY_TOP) : RAY_SIDE;
+			return axis == 2 ? (stride.z < 0 ? RAY_BOTTOM : RAY_TOP) : RAY_SIDE;
 		}
 		nextCrossing[axis] += crossingSpacing[axis];
 		enterAxis = axis;
 	}
-	endDistance = distance;
+	endDistance = span;
 	endAxis = -1;
 	return RAY_FAR;
 }
@@ -470,9 +470,9 @@ float cloudNoise(float x, float y)
 	return valueNoise(x, y) * 0.55 + valueNoise(x * 2.1 + 17.0, y * 2.1) * 0.3 + valueNoise(x * 4.3, y * 4.3 + 31.0) * 0.15;
 }
 
-float distanceShade(float distance)
+float distanceShade(float span)
 {
-	return distance / max(DistanceShadeVoxels, uMaxDistance / DistanceShadeReachParts);
+	return span / max(DistanceShadeVoxels, uMaxDistance / DistanceShadeReachParts);
 }
 
 float hazeStart()
@@ -480,9 +480,9 @@ float hazeStart()
 	return uHaze == 2 || airless() ? 0.9 : uHaze == 1 ? 0.75 : 0.45;
 }
 
-float terrainHaze(float distance)
+float terrainHaze(float span)
 {
-	return uUnderwater != 0 ? smoothStep(uMaxDistance * 0.12, uMaxDistance * 0.65, distance) : smoothStep(uMaxDistance * hazeStart(), uMaxDistance, distance);
+	return uUnderwater != 0 ? smoothStep(uMaxDistance * 0.12, uMaxDistance * 0.65, span) : smoothStep(uMaxDistance * hazeStart(), uMaxDistance, span);
 }
 
 uint hazeColor(uint color, float haze, int pixelX, int pixelY)
@@ -491,8 +491,8 @@ uint hazeColor(uint color, float haze, int pixelX, int pixelY)
 	{
 		return color;
 	}
-	int step = clamp(int(haze * float(HazeSteps) + dither(pixelX, pixelY)), 0, HazeSteps);
-	return table(HazeRow + step, color);
+	int stride = clamp(int(haze * float(HazeSteps) + dither(pixelX, pixelY)), 0, HazeSteps);
+	return table(HazeRow + stride, color);
 }
 
 // A tile's light (texel 1) and its facts (texel 1's z: discovered, smoke, burning, roofed).
@@ -541,16 +541,16 @@ float lightAt(vec3 point, out float ufoGlow)
 bool shadowed(vec3 from, vec3 to)
 {
 	vec3 direction = to - from;
-	float distance = sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
-	if (distance < 1.0)
+	float span = sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
+	if (span < 1.0)
 	{
 		return false;
 	}
-	direction /= distance;
+	direction /= span;
 	Hit hit;
 	int hitTile, endAxis;
 	float endDistance;
-	return castRay(from, direction, distance, 2.0, 2.0, hit, hitTile, endDistance, endAxis) == RAY_HIT && hit.t < distance;
+	return castRay(from, direction, span, 2.0, 2.0, hit, hitTile, endDistance, endAxis) == RAY_HIT && hit.t < span;
 }
 
 float pointLight(vec3 point, vec3 normal, bool shadows)
@@ -565,10 +565,10 @@ float pointLight(vec3 point, vec3 normal, bool shadows)
 		for (int lamp = 0; lamp < uLampCount; ++lamp)
 		{
 			float dx = uLamps[lamp].x - point.x, dy = uLamps[lamp].y - point.y, dz = uLamps[lamp].z - point.z;
-			float distance = sqrt(dx * dx + dy * dy + dz * dz);
-			if (distance > lampReach) continue;
-			float power = uLamps[lamp].w * (1.0 - distance / lampReach) * (1.0 - distance / lampReach);
-			if (power > brightestPower) { brightestPower = power; brightestLamp = lamp; brightestDistance = distance; }
+			float span = sqrt(dx * dx + dy * dy + dz * dz);
+			if (span > lampReach) continue;
+			float power = uLamps[lamp].w * (1.0 - span / lampReach) * (1.0 - span / lampReach);
+			if (power > brightestPower) { brightestPower = power; brightestLamp = lamp; brightestDistance = span; }
 		}
 		if (brightestLamp >= 0 && brightestPower > 0.03)
 		{
@@ -592,15 +592,15 @@ float pointLight(vec3 point, vec3 normal, bool shadows)
 	{
 		float range = 16.0 * 20.0;
 		vec3 fromLight = point - uFlashlightPos;
-		float distance = sqrt(fromLight.x * fromLight.x + fromLight.y * fromLight.y + fromLight.z * fromLight.z);
-		if (distance > 0.5 && distance < range)
+		float span = sqrt(fromLight.x * fromLight.x + fromLight.y * fromLight.y + fromLight.z * fromLight.z);
+		if (span > 0.5 && span < range)
 		{
-			float cosine = (fromLight.x * uForwardInVoxels.x + fromLight.y * uForwardInVoxels.y + fromLight.z * uForwardInVoxels.z) / distance;
+			float cosine = (fromLight.x * uForwardInVoxels.x + fromLight.y * uForwardInVoxels.y + fromLight.z * uForwardInVoxels.z) / span;
 			if (cosine > 0.914)
 			{
 				float beam = smoothStep(0.974, 0.990, cosine) + 0.18 * smoothStep(0.914, 0.974, cosine);
-				float falloff = 1.0 - 0.85 * distance / range;
-				float facing = -(normal.x * fromLight.x + normal.y * fromLight.y + normal.z * fromLight.z) / distance;
+				float falloff = 1.0 - 0.85 * span / range;
+				float facing = -(normal.x * fromLight.x + normal.y * fromLight.y + normal.z * fromLight.z) / span;
 				float power = beam * falloff * falloff * 13.0 * (0.4 + 0.6 * max(0.0, facing));
 				if (power > 0.25 && facing > 0.0 && !(shadows && shadowed(point, uFlashlightPos)))
 				{
@@ -613,15 +613,15 @@ float pointLight(vec3 point, vec3 normal, bool shadows)
 	{
 		float range = 16.0 * 14.0;
 		vec3 fromLight = point - uFlashlightPos;
-		float distance = sqrt(fromLight.x * fromLight.x + fromLight.y * fromLight.y + fromLight.z * fromLight.z);
-		if (distance > 0.5 && distance < range)
+		float span = sqrt(fromLight.x * fromLight.x + fromLight.y * fromLight.y + fromLight.z * fromLight.z);
+		if (span > 0.5 && span < range)
 		{
-			float cosine = (fromLight.x * uForwardInVoxels.x + fromLight.y * uForwardInVoxels.y + fromLight.z * uForwardInVoxels.z) / distance;
+			float cosine = (fromLight.x * uForwardInVoxels.x + fromLight.y * uForwardInVoxels.y + fromLight.z * uForwardInVoxels.z) / span;
 			if (cosine > 0.8)
 			{
 				float cone = smoothStep(0.8, 0.96, cosine);
-				float falloff = 1.0 - distance / range;
-				float facing = -(normal.x * fromLight.x + normal.y * fromLight.y + normal.z * fromLight.z) / distance;
+				float falloff = 1.0 - span / range;
+				float facing = -(normal.x * fromLight.x + normal.y * fromLight.y + normal.z * fromLight.z) / span;
 				float power = cone * falloff * falloff * 10.0 * (0.35 + 0.65 * max(0.0, facing));
 				if (power > 0.25 && facing > 0.0 && !(shadows && shadowed(point, uFlashlightPos)))
 				{
@@ -643,10 +643,10 @@ float flareLight(vec3 point, vec3 normal, bool shadows)
 	for (int flare = 0; flare < uFlareCount && count < 8; ++flare)
 	{
 		float dx = uFlares[flare].x - point.x, dy = uFlares[flare].y - point.y, dz = uFlares[flare].z - point.z;
-		float distance = sqrt(dx * dx + dy * dy + dz * dz);
-		if (distance > FlareReach || distance < 0.01) continue;
-		float power = (1.0 - distance / FlareReach) * (1.0 - distance / FlareReach) * uFlares[flare].w * uFlareFlicker[flare] * darkness;
-		float facing = (normal.x * dx + normal.y * dy + normal.z * dz) / distance;
+		float span = sqrt(dx * dx + dy * dy + dz * dz);
+		if (span > FlareReach || span < 0.01) continue;
+		float power = (1.0 - span / FlareReach) * (1.0 - span / FlareReach) * uFlares[flare].w * uFlareFlicker[flare] * darkness;
+		float facing = (normal.x * dx + normal.y * dy + normal.z * dz) / span;
 		if (facing <= 0.0) continue;
 		power *= 0.4 + 0.6 * facing;
 		if (power < 0.02) continue;
@@ -691,27 +691,27 @@ bool indoorsAt(vec3 point)
 	return (tileLightTexel((tileZ * uSize.y + tileY) * uSize.x + tileX).z & 0x20000u) != 0u;
 }
 
-float waveHeight(float x, float y, float distance)
+float waveHeight(float x, float y, float span)
 {
 	float height = 0.0;
 	for (int train = 0; train < 3; ++train)
 	{
 		float share = WaveTrains[train * 3], fadeFrom = WaveTrains[train * 3 + 1], fadeTo = WaveTrains[train * 3 + 2];
-		if (distance >= fadeTo)
+		if (span >= fadeTo)
 		{
 			continue;
 		}
-		float fade = distance <= fadeFrom ? 1.0 : (fadeTo - distance) / (fadeTo - fadeFrom);
+		float fade = span <= fadeFrom ? 1.0 : (fadeTo - span) / (fadeTo - fadeFrom);
 		float bend = texelFetch(uWaveSine, int(x * uWaveSteps[train * 6 + 3] + y * uWaveSteps[train * 6 + 4]) & (WaveSineSteps - 1)).r * uWaveSteps[train * 6 + 5];
-		int step = int(x * uWaveSteps[train * 6] + y * uWaveSteps[train * 6 + 1] + uWaveSteps[train * 6 + 2] + bend);
-		height += texelFetch(uWaveSine, step & (WaveSineSteps - 1)).r * share * fade;
+		int stride = int(x * uWaveSteps[train * 6] + y * uWaveSteps[train * 6 + 1] + uWaveSteps[train * 6 + 2] + bend);
+		height += texelFetch(uWaveSine, stride & (WaveSineSteps - 1)).r * share * fade;
 	}
 	return height;
 }
 
-uint waterColor(float x, float y, float distance, int pixelX, int pixelY, out float shade)
+uint waterColor(float x, float y, float span, int pixelX, int pixelY, out float shade)
 {
-	float height = waveHeight(x, y, distance);
+	float height = waveHeight(x, y, span);
 	shade = WaveShades * (1.0 - height);
 	float threshold = dither(pixelX + 3, pixelY + 1);
 	if (height > FoamFrom && (height - FoamFrom) / (1.0 - FoamFrom) > threshold)
@@ -725,14 +725,14 @@ uint waterColor(float x, float y, float distance, int pixelX, int pixelY, out fl
 	return scene(SceneWater);
 }
 
-uint rockColor(float alongU, float alongV, int face, float distance, int pixelX, int pixelY)
+uint rockColor(float alongU, float alongV, int face, float span, int pixelX, int pixelY)
 {
 	float mottle = valueNoise(alongU / 12.0, alongV / 9.0) * 0.65 + valueNoise(alongU / 3.0, alongV / 3.0) * 0.35;
 	uint rock = scene(SceneRockBase) != 0u ? scene(SceneRockBase) : scene(SceneRock);
 	int darkest = 12 - int(rock & 15u);
 	int lit = min(darkest - RockMottleShades, int(float(uAmbient) * 0.5 + uFaceShade[face]));
 	int shades = min(darkest, lit + int(mottle * float(RockMottleShades) + dither(pixelX, pixelY)));
-	return hazeColor(shadeColor(rock, shades), terrainHaze(distance), pixelX + 2, pixelY + 1);
+	return hazeColor(shadeColor(rock, shades), terrainHaze(span), pixelX + 2, pixelY + 1);
 }
 
 uint airlessSkyColor(vec3 rayDirection, int pixelX, int pixelY)
@@ -1298,8 +1298,8 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 	}
 	if (ufoLighting >= 0 && ufoOuterShare <= 0.0 && onUfo)
 	{
-		int step = min(12, int(floor(ufoTint * 12.0 + 0.5)));
-		if (step > 0) color = table(UfoRows + ufoLighting * RowsPerUfo + 2 + step - 1, color);
+		int stride = min(12, int(floor(ufoTint * 12.0 + 0.5)));
+		if (stride > 0) color = table(UfoRows + ufoLighting * RowsPerUfo + 2 + stride - 1, color);
 	}
 	else if (ufoTint > dither(pixelX + 3, pixelY + 2))
 	{

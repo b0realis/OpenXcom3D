@@ -989,7 +989,9 @@ void FirstPersonMode::remakeViewIfResized()
  */
 int FirstPersonMode::uiScaleFor(int width, int height)
 {
-	return std::max(1, std::min(height / 360, width / 320));
+	// The biggest magnification the canvas's layout still fits at; the setting "HUD scale" may ask for a smaller one.
+	const int biggest = std::max(1, std::min(height / 360, width / 320));
+	return Options::fpsHudScale > 0 ? std::min(Options::fpsHudScale, biggest) : biggest;
 }
 
 /**
@@ -1931,6 +1933,10 @@ void FirstPersonMode::think()
 	const Uint32 now = SDL_GetTicks();
 	lastThinkTicks = now;
 	rememberChoices(); // (the fuses burning change all the time)
+	if (uiScaleFor(Options::baseXResolution, Options::baseYResolution) != _uiScale)
+	{
+		resized(0, 0); // (the setting "HUD scale" changed: the canvas, the overlays' places and the view anew)
+	}
 	remakeViewIfResized(); // (the setting "Full resolution" switched)
 	const double elapsedSeconds = _lastFrameTick ? std::min<Uint32>(100, now - _lastFrameTick) / 1000.0 : 0.0;
 

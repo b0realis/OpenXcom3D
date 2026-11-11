@@ -222,7 +222,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsMiddleClickIdentify" } },
 		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
-		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsFullResolution" } },
+		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsFullResolution", "fpsHudScale" } },
 	};
 	std::vector<bool> placed(gathered.size(), false);
 	for (const auto &section : sections)
@@ -355,6 +355,12 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		if (option.id() == "fpsFogOfWar")
 		{
 			return std::string(tr(*option.asInt() == 1 ? "STR_FPS_FOG_OF_WAR_MAP" : "STR_FPS_FOG_OF_WAR_OFF"));
+		}
+		// The HUD's scale: Auto, or the times it is magnified.
+		if (option.id() == "fpsHudScale")
+		{
+			const int scale = std::clamp(*option.asInt(), 0, 4);
+			return scale == 0 ? std::string(tr("STR_FPS_HUD_SCALE_AUTO")) : "x" + std::to_string(scale);
 		}
 		// The renderer is a choice of two, shown by name.
 		if (option.id() == "fpsRenderer")
@@ -635,6 +641,11 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		else if (value == &Options::fpsFogOfWar)
 		{
 			*value = *value == 1 ? 0 : 1;
+		}
+		// The HUD's scale (Auto, x1 .. x4): round and round.
+		else if (value == &Options::fpsHudScale)
+		{
+			*value = (std::clamp(*value, 0, 4) + direction + 5) % 5;
 		}
 		// The renderer (CPU, GPU): either button switches.
 		else if (value == &Options::fpsRenderer)

@@ -28,8 +28,29 @@
  *  - every frame, the tile snapshot: the byte per tile the walk reads first, and two texels a
  *    tile with its parts' model numbers, the box round its solid voxels, its solid mask and
  *    what else the walk reads.
- * The shader (RaySource below) is castRay, traceTile and traceSwing of FirstPersonViewRayWalk.h,
- * line for line: change one, change the other.
+ *  - once each as well: a steady UFO model's open faces, the wall paints, the crafts' mirrors;
+ *  - every frame they changed: the scene's colour tables, and the camera and the scene's
+ *    numbers as uniforms.
+ * The shaders (FirstPersonGpuShaders.h) are the CPU renderer's functions line for line.
+ *
+ * How to change it:
+ *  - A change to the CPU's walk or shading (FirstPersonViewRayWalk.h, shadeHit and what it
+ *    calls): make the same change in the shader function of the same name. A new constant: add
+ *    it to shaderConstants below. Then prove it: OPENXCOM3D_GPU_SHADOW=1 runs both renderers
+ *    side by side and the log counts the rays and colours that differ (see FirstPersonViewGpu.cpp).
+ *  - New data for the shader: a field in Frame (FirstPersonGpu.h), filled in
+ *    FirstPersonViewGpuAccess::fillFrame; then here a uniform (setScene), a free number of a
+ *    tile's sixteen (encodeTiles), a row of the colour tables (encodeTables), or a buffer of
+ *    its own (the enum in State, start, build's sampler names).
+ *  - A look the CPU renderer doesn't have (the card can afford more): a setting, a uniform for
+ *    it, and a branch in the shader that leaves the CPU's path untouched when it is off, so
+ *    the check against the CPU still holds for the default.
+ *  - Another system's context: GpuContext::create and destroy (EGL on Linux, CGL on macOS).
+ *
+ * What can go wrong, and what happens then: no card, a software OpenGL, a missing function, a
+ * shader the driver won't build, an OpenGL error while drawing: the log says which, castRays
+ * returns false, and the view casts its rays on the CPU (for good, after a failure). A frame
+ * beyond the shader's fixed limits (see draw) is the CPU's too, that frame only.
  */
 #include "FirstPersonGpu.h"
 #include "FirstPersonGpuGl.h"
@@ -45,7 +66,7 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
-#if defined(__linux__) && !defined(__ANDROID__)
+#if (defined(__linux__) && !defined(__ANDROID__)) || defined(__APPLE__)
 #include <dlfcn.h>
 #endif
 #include "../Engine/Logger.h"
@@ -202,7 +223,7 @@ bool GpuContext::create(int device)
 
 bool GpuContext::software() const
 {
-	for (const char *name : { "llvmpipe", "softpipe", "SwiftShader", "swrast", "Software Rasterizer" })
+	for (const char *name : { "llvmpipe", "softpipe", "SwiftShader", "swrast", "Software" })
 	{
 		if (_name.find(name) != std::string::npos) return true;
 	}
@@ -235,6 +256,112 @@ void GpuContext::destroy()
 	_display = _context = _surface = nullptr;
 	// The library stays loaded: drivers leave threads and handlers behind that outlive a dlclose.
 	_library = nullptr;
+}
+
+#elif defined(__APPLE__)
+
+namespace
+{
+/// macOS's OpenGL framework, once opened (its functions are looked up in it by name).
+void *appleOpenGl = nullptr;
+void *appleFunction(const char *name)
+{
+	return dlsym(appleOpenGl, name);
+}
+}
+
+/**
+ * Opens a hidden OpenGL context on macOS through CGL (the OpenGL framework, opened at run
+ * time): a core profile (4.1 on every Mac of the last ten years; ours asks for 3.3's features
+ * only), hardware-accelerated, with no window and no view: the rays are drawn into our own
+ * textures. macOS has one renderer to offer us, the system's: device 0.
+ */
+bool GpuContext::create(int device)
+{
+	if (device > 0)
+	{
+		return false; // no such device
+	}
+	// CGL's own types and constants (its values), kept local.
+	typedef int (*ChoosePixelFormat)(const int *, void **, int *);
+	typedef int (*DestroyPixelFormat)(void *);
+	typedef int (*CreateContext)(void *, void *, void **);
+	typedef int (*SetCurrentContext)(void *);
+	const int PfaAccelerated = 73, PfaAllowOfflineRenderers = 96, PfaOpenGlProfile = 99, PfaColorSize = 8;
+	const int ProfileGl4Core = 0x4100, ProfileGl3Core = 0x3200;
+
+	_library = dlopen("/System/Library/Frameworks/OpenGL.framework/OpenGL", RTLD_NOW | RTLD_LOCAL);
+	if (!_library)
+	{
+		Log(LOG_INFO) << "OpenXcom3D GPU: no OpenGL framework on this Mac";
+		return false;
+	}
+	appleOpenGl = _library;
+	_getProcAddress = appleFunction;
+	const auto choosePixelFormat = (ChoosePixelFormat)dlsym(_library, "CGLChoosePixelFormat");
+	const auto destroyPixelFormat = (DestroyPixelFormat)dlsym(_library, "CGLDestroyPixelFormat");
+	const auto createContext = (CreateContext)dlsym(_library, "CGLCreateContext");
+	const auto setCurrentContext = (SetCurrentContext)dlsym(_library, "CGLSetCurrentContext");
+	if (!choosePixelFormat || !destroyPixelFormat || !createContext || !setCurrentContext)
+	{
+		Log(LOG_WARNING) << "OpenXcom3D GPU: the OpenGL framework lacks a CGL function";
+		return false;
+	}
+	// The newest core profile the Mac has (4.1, else 3.2), on its graphics chip.
+	void *pixelFormat = nullptr;
+	int formatCount = 0, error = 0;
+	for (const int profile : { ProfileGl4Core, ProfileGl3Core })
+	{
+		const int wanted[] = { PfaOpenGlProfile, profile, PfaAccelerated, PfaAllowOfflineRenderers, PfaColorSize, 24, 0 };
+		error = choosePixelFormat(wanted, &pixelFormat, &formatCount);
+		if (!error && pixelFormat)
+		{
+			break;
+		}
+		pixelFormat = nullptr;
+	}
+	if (!pixelFormat)
+	{
+		Log(LOG_WARNING) << "OpenXcom3D GPU: no OpenGL core profile on this Mac (CGL error " << error << ")";
+		return false;
+	}
+	error = createContext(pixelFormat, nullptr, &_context);
+	destroyPixelFormat(pixelFormat);
+	if (error || !_context || setCurrentContext(_context))
+	{
+		Log(LOG_WARNING) << "OpenXcom3D GPU: no OpenGL context on this Mac (CGL error " << error << ")";
+		return false;
+	}
+	if (!loadFunctions())
+	{
+		return false;
+	}
+	_name = std::string((const char *)Gl::GetString(Gl::RENDERER)) + " (OpenGL " + (const char *)Gl::GetString(Gl::VERSION) + ")";
+	return true;
+}
+
+/**
+ * Closes the context.
+ */
+void GpuContext::destroy()
+{
+	if (!_library)
+	{
+		return;
+	}
+	typedef int (*SetCurrentContext)(void *);
+	typedef int (*DestroyContext)(void *);
+	const auto setCurrentContext = (SetCurrentContext)dlsym(_library, "CGLSetCurrentContext");
+	const auto destroyContext = (DestroyContext)dlsym(_library, "CGLDestroyContext");
+	if (setCurrentContext) setCurrentContext(nullptr);
+	if (_context && destroyContext) destroyContext(_context);
+	_context = nullptr;
+	_library = nullptr; // (the framework stays loaded)
+}
+
+bool GpuContext::software() const
+{
+	return _name.find("Software") != std::string::npos;
 }
 
 #else
@@ -352,7 +479,9 @@ struct FirstPersonGpu::State
 	bool hasJob = false, stop = false;
 
 	GpuContext context;
-	bool failed = false;
+	bool failed = false;    // the card failed: the CPU draws from now on
+	bool overLimit = false; // this frame holds more than the shader takes (see draw): the CPU draws it
+	bool limitLogged = false;
 	// The rays' program, built twice: plain, and with the check's results as a fourth picture.
 	struct Program
 	{
@@ -389,7 +518,9 @@ struct FirstPersonGpu::State
 	// The tiles as sent last frame: a tile whose parts and mask are the same keeps their numbers.
 	std::vector<std::array<const FirstPersonView::VoxelModel*, 8>> lastParts;
 	std::vector<const void*> lastSolid;
-	std::vector<Uint32> tileUints;
+	std::vector<Uint32> tileUints, tileUintsSent;
+	std::vector<Uint8> tileFlagsSent, tablesSent;
+	std::vector<Uint32> wallPaintTexelsSent;
 	std::vector<Uint8> tables;
 	std::vector<Uint32> wallPaintTexels;
 	std::vector<Sint32> mirrorNumbers;
@@ -733,8 +864,12 @@ void FirstPersonGpu::State::sendWallPaints(const Frame &frame)
 		texel[2] = (paint.donorWest ? 1 : 0) | (paint.openEnd ? 2 : 0) | (Uint32)paint.kind << 8 | (Uint32)paint.paintGroup << 16;
 		texel[3] = paint.wall->min[0] | (Uint32)paint.wall->min[1] << 8;
 	}
-	Gl::BindBuffer(Gl::ARRAY_BUFFER, buffers[WallPaints]);
-	Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)(wallPaintTexels.size() * 4), wallPaintTexels.data(), Gl::STREAM_DRAW);
+	if (wallPaintTexels != wallPaintTexelsSent)
+	{
+		Gl::BindBuffer(Gl::ARRAY_BUFFER, buffers[WallPaints]);
+		Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)(wallPaintTexels.size() * 4), wallPaintTexels.data(), Gl::DYNAMIC_DRAW);
+		wallPaintTexelsSent = wallPaintTexels;
+	}
 }
 
 /**
@@ -928,7 +1063,21 @@ bool FirstPersonGpu::State::setTargets(int width, int height, bool results)
  */
 bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timing *timing)
 {
+	// More than the shader takes at once (doors swinging, UFOs with their own light, models: a part's
+	// number is sixteen bits): this frame is the CPU's. None of the games' maps comes near.
+	overLimit = frame.swingCount > MaxSwings || frame.ufoCount > MaxUfos || modelIds.size() >= 0xFFF0;
+	if (overLimit)
+	{
+		if (!limitLogged)
+		{
+			limitLogged = true;
+			Log(LOG_INFO) << "OpenXcom3D GPU: a frame beyond the card's limits (" << frame.swingCount << " doors swinging, " << frame.ufoCount << " UFOs, "
+				<< modelIds.size() << " models): the CPU draws such frames";
+		}
+		return false;
+	}
 	// The world: this frame's tiles and colours, the camera and the scene, and any model or mask not sent before.
+	// What is the same as last frame isn't sent again (in a turn-based game, most frames most of it).
 	auto start = std::chrono::steady_clock::now();
 	program = &programs[output.results ? 1 : 0];
 	Gl::UseProgram(program->id);
@@ -943,12 +1092,24 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 		Log(LOG_WARNING) << "OpenXcom3D GPU: the world is bigger than this card's buffers take";
 		return false;
 	}
-	Gl::BindBuffer(Gl::ARRAY_BUFFER, buffers[TileFlags]);
-	Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)tileCount, frame.tileFlags, Gl::STREAM_DRAW);
-	Gl::BindBuffer(Gl::ARRAY_BUFFER, buffers[Tiles]);
-	Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)(tileUints.size() * 4), tileUints.data(), Gl::STREAM_DRAW);
-	Gl::BindBuffer(Gl::ARRAY_BUFFER, buffers[Tables]);
-	Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)tables.size(), tables.data(), Gl::STREAM_DRAW);
+	if (tileFlagsSent.size() != tileCount || std::memcmp(tileFlagsSent.data(), frame.tileFlags, tileCount) != 0)
+	{
+		Gl::BindBuffer(Gl::ARRAY_BUFFER, buffers[TileFlags]);
+		Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)tileCount, frame.tileFlags, Gl::DYNAMIC_DRAW);
+		tileFlagsSent.assign(frame.tileFlags, frame.tileFlags + tileCount);
+	}
+	if (tileUints != tileUintsSent)
+	{
+		Gl::BindBuffer(Gl::ARRAY_BUFFER, buffers[Tiles]);
+		Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)(tileUints.size() * 4), tileUints.data(), Gl::DYNAMIC_DRAW);
+		tileUintsSent = tileUints;
+	}
+	if (tables != tablesSent)
+	{
+		Gl::BindBuffer(Gl::ARRAY_BUFFER, buffers[Tables]);
+		Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)tables.size(), tables.data(), Gl::DYNAMIC_DRAW);
+		tablesSent = tables;
+	}
 	sendModels();
 	if (solidsChanged)
 	{
@@ -1117,9 +1278,10 @@ bool FirstPersonGpu::castRays(const Frame &frame, const Output &output, Timing *
 	}
 	bool drawn = false;
 	state.run([&] { drawn = state.draw(frame, output, timing); });
-	if (!drawn)
+	if (!drawn && !state.overLimit)
 	{
 		state.failed = true;
+		Log(LOG_WARNING) << "OpenXcom3D GPU: the graphics card failed: the CPU draws from now on";
 	}
 	return drawn;
 }
