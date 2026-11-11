@@ -69,6 +69,9 @@
 #if (defined(__linux__) && !defined(__ANDROID__)) || defined(__APPLE__)
 #include <dlfcn.h>
 #endif
+#ifndef _WIN32
+#include <pthread.h>
+#endif
 #include "../Engine/Logger.h"
 #include "FirstPersonViewShared.h"
 
@@ -469,10 +472,67 @@ double millisecondsSince(std::chrono::steady_clock::time_point start)
 
 // ---- The renderer's state, all of it used only on its own thread ----
 
+namespace
+{
+
+/**
+ * The renderer's thread, with a stack as big as a program's first thread has (16 MB). A
+ * graphics driver builds our shader on it, and a thread's usual stack is small (macOS gives
+ * every thread but the first half a megabyte): too little there would crash the game, not just
+ * fail.
+ */
+class RenderThread
+{
+public:
+	/// Starts it. False if the system won't.
+	template <typename Owner> bool start(Owner *owner, void (Owner::*loop)())
+	{
+		struct Entry { Owner *owner; void (Owner::*loop)(); };
+		Entry *entry = new Entry { owner, loop };
+#ifndef _WIN32
+		pthread_attr_t attributes;
+		pthread_attr_init(&attributes);
+		pthread_attr_setstacksize(&attributes, 16u << 20);
+		_started = pthread_create(&_thread, &attributes, [](void *given) -> void * {
+			Entry *mine = (Entry *)given;
+			(mine->owner->*(mine->loop))();
+			delete mine;
+			return nullptr;
+		}, entry) == 0;
+		pthread_attr_destroy(&attributes);
+		if (!_started) delete entry;
+#else
+		_thread = std::thread([entry] { (entry->owner->*(entry->loop))(); delete entry; });
+		_started = true;
+#endif
+		return _started;
+	}
+	/// Waits for it to end.
+	void join()
+	{
+		if (!_started) return;
+		_started = false;
+#ifndef _WIN32
+		pthread_join(_thread, nullptr);
+#else
+		_thread.join();
+#endif
+	}
+private:
+#ifndef _WIN32
+	pthread_t _thread;
+#else
+	std::thread _thread;
+#endif
+	bool _started = false;
+};
+
+}
+
 struct FirstPersonGpu::State
 {
 	// The thread that owns the context: it sleeps until handed a job, does it, and says so.
-	std::thread thread;
+	RenderThread thread;
 	std::mutex mutex;
 	std::condition_variable wake, finished;
 	std::function<void()> job;
@@ -1204,7 +1264,11 @@ std::unique_ptr<FirstPersonGpu> FirstPersonGpu::open(int device)
 {
 	std::unique_ptr<FirstPersonGpu> gpu(new FirstPersonGpu);
 	State &state = *gpu->_state;
-	state.thread = std::thread(&State::threadLoop, &state);
+	if (!state.thread.start(&state, &State::threadLoop))
+	{
+		Log(LOG_WARNING) << "OpenXcom3D GPU: no thread for the renderer";
+		return nullptr;
+	}
 	bool started = false;
 	state.run([&] { started = state.start(device); });
 	if (!started)
@@ -1238,10 +1302,7 @@ FirstPersonGpu::~FirstPersonGpu()
 		_state->stop = true;
 	}
 	_state->wake.notify_one();
-	if (_state->thread.joinable())
-	{
-		_state->thread.join();
-	}
+	_state->thread.join();
 }
 
 const std::string &FirstPersonGpu::name() const
