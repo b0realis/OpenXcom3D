@@ -329,8 +329,11 @@ private:
 
 	// ---- our surfaces: laid out on a canvas, magnified on big screens ----
 
-	int _uiScale = 1;                          // big screens: our overlays are laid out on a canvas of (screen / _uiScale) and drawn magnified
-	Surface *_canvas = nullptr;                // our overlays are drawn here, then magnified (none at scale 1)
+	int _uiScale = 1;                          // big screens: our overlays are laid out on a canvas of (its target / _uiScale) and drawn magnified
+	int _targetWidth = 0, _targetHeight = 0;   // what the canvas is magnified onto: the game's screen, or the display's picture area (see canvasTarget)
+	bool _canvasOnDisplay = false;             // onto the display: 3D shows at the display's size, and the HUD at a scale of its own there
+	Surface *_canvas = nullptr;                // our overlays are drawn here, then magnified (none at scale 1 on the game's screen)
+	Surface *_composed = nullptr;              // with the canvas on the display: the view with the overlays over it, the picture laid into the display
 	SDL_Color _canvasPalette[256];             // the palette the canvas was given
 	std::vector<Uint8> _magnifyRow;            // a canvas row widened for the screen
 	std::unordered_set<Surface*> _ownSurfaces; // all our surfaces, for blitting without the classic HUD
@@ -342,10 +345,22 @@ private:
 
 	/// How many times bigger our overlays are drawn on a screen of this size.
 	static int uiScaleFor(int width, int height);
-	/// The canvas's width: the screen's divided by the UI scale.
+	/// The canvas's width: its target's divided by the UI scale.
 	int canvasWidth() const;
-	/// The canvas's height: the screen's divided by the UI scale.
+	/// The canvas's height: its target's divided by the UI scale.
 	int canvasHeight() const;
+	/// What the canvas is magnified onto now, and its size: the game's screen (false) or the display (true).
+	bool canvasTarget(int &width, int &height) const;
+	/// Lays the overlays out again if the canvas's target or scale is no longer what they were laid out for.
+	void relayoutIfNeeded();
+	/// Lays the overlays out for the canvas as it should be now.
+	void relayout();
+	/// A point of the game's screen (the mouse, the game's surfaces) as the canvas's, across and down.
+	double toCanvasX(double screenX) const;
+	double toCanvasY(double screenY) const;
+	/// A length on the canvas in the game's screen's pixels, across and down.
+	int toScreenX(int canvasX) const;
+	int toScreenY(int canvasY) const;
 	/// The size the 3D view should have now, by the setting "3D resolution": the canvas's, the battlescape's or the display's.
 	void wantedViewSize(int &width, int &height) const;
 	/// Whether the view is the display's own size, shown past the game's screen (see FirstPerson::presentView).

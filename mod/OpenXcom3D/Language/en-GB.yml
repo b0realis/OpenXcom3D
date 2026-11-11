@@ -131,7 +131,7 @@ en-GB:
   STR_FPS_RENDERER_CPU: "CPU"
   STR_FPS_RENDERER_GPU: "GPU"
   STR_FPS_HUD_SCALE: "HUD scale"
-  STR_FPS_HUD_SCALE_DESC: "How many times the 3D HUD is magnified on a big screen. Auto: as big as fits. Smaller: more room, a finer view."
+  STR_FPS_HUD_SCALE_DESC: "How many times the 3D HUD is magnified on a big screen. Auto: as big as fits. Smaller: more room. With 3D resolution: Display it counts the display's pixels."
   STR_FPS_HUD_SCALE_AUTO: "Auto"
   STR_FPS_VIEW_RESOLUTION: "3D resolution"
   STR_FPS_VIEW_RESOLUTION_DESC: "The 3D world as fine as its HUD, as the battlescape, or as the display itself, whatever the battlescape's scale."

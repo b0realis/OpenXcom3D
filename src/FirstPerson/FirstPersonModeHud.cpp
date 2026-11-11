@@ -1661,7 +1661,7 @@ void FirstPersonMode::updateMapCamera()
 	}
 
 	// Its place: at the left under the top bar, or right of the touch buttons (screen pixels).
-	const int frameX = _state->_btnCtrl->getVisible() ? (MapCameraTouchClear + _uiScale - 1) / _uiScale : 1;
+	const int frameX = _state->_btnCtrl->getVisible() ? (int)std::ceil(toCanvasX(MapCameraTouchClear)) : 1;
 	_mapCameraFrame->setX(frameX);
 	_mapCameraFrame->setY(CardY);
 	_mapCamera->setX(frameX + MapCameraBorder);
@@ -1755,11 +1755,11 @@ bool FirstPersonMode::onMapCamera(int canvasX, int canvasY) const
  */
 void FirstPersonMode::placeGameLine()
 {
-	int x = _gameLineX, y = (BarY + BarH + GameLineGap) * _uiScale;
+	int x = _gameLineX, y = toScreenY(BarY + BarH + GameLineGap);
 	if (_mapCameraFrame->getVisible())
 	{
-		x = _mapCameraFrame->getX() * _uiScale;
-		y = (_mapCameraFrame->getY() + _mapCameraFrame->getHeight() + GameLineGap) * _uiScale;
+		x = toScreenX(_mapCameraFrame->getX());
+		y = toScreenY(_mapCameraFrame->getY() + _mapCameraFrame->getHeight() + GameLineGap);
 	}
 	else if (_state->_btnCtrl->getVisible())
 	{

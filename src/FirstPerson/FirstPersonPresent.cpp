@@ -23,11 +23,12 @@
  * The game draws everything onto a screen of its own, the battlescape's size (often a half or a
  * quarter of the display's), which the engine then enlarges onto the display. A 3D view drawn
  * into that screen can never be finer than it. So a view the display's size isn't drawn into it
- * at all: the mode fills the screen with a key value where the view is to show and draws the
- * HUD over that as ever (FirstPersonMode::blit); and when the engine shows the frame, every
- * pixel of the display where the screen still holds the key takes the view's pixel. The HUD,
- * the game's windows and the mouse pointer keep the screen's scale, on top; the view has the
- * display's. This is also where a picture in more colours than the palette's would go to the
+ * at all: the mode fills the screen with a key value where the view is to show (FirstPersonMode::blit); and when the engine shows the frame, every
+ * pixel of the display where the screen still holds the key takes the view's pixel. The game's
+ * windows and the mouse pointer keep the screen's scale, on top; the view has the display's.
+ * The mode's own HUD goes the same way as the view: its canvas is laid out for the display at a
+ * scale of its own and put over the view in one display-sized picture, and that picture is the
+ * "view" handed over here (FirstPersonMode::blit, canvasTarget). This is also where a picture in more colours than the palette's would go to the
  * display one day: it is the one place the 3D picture meets the display.
  *
  * The key: on an 8-bit screen, colour 0, which nothing draws (it is every surface's transparent
