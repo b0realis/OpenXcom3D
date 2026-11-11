@@ -231,6 +231,11 @@ SETTINGS = [
         ('Doom free grenades with airburst', 'NO', 'YES / NO', 'In Doom mode a grenade flies wherever the crosshair points and bursts in the air if its fuse runs out.', ''),
         ('Doom grenade fuse (seconds)', '3', '1 to 5', 'In Doom mode, how long a grenade burns.', ''),
     ]),
+    ('Graphics card', [
+        ('Renderer', 'CPU', 'CPU / GPU', 'GPU: the graphics card casts the 3D world\'s rays, the same picture as the CPU\'s. Linux for now, and not in the 1.12 download yet; the CPU draws by itself wherever the card can\'t.',
+         'For big screens: with Full resolution the world at 1920×1080 runs at 60 frames a second and more.'),
+        ('Full resolution', 'NO', 'YES / NO', 'The 3D world at the screen\'s own resolution, only the HUD magnified over it. Heavy on the CPU; made for Renderer GPU. Not in the 1.12 download yet.', ''),
+    ]),
 ]
 
 # ---------------------------------------------------------------------------------------------------------------------

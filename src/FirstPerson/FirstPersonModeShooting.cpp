@@ -4513,7 +4513,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	int reach = 0, missReach = 0;
 	if (unit && weapon && Options::fpsAccuracyLine && freeAimOn(mode))
 	{
-		const double focalPixels = (_view->getWidth() / 2.0) / std::tan(fieldOfViewNow() * Pi / 360.0);
+		const double focalPixels = (canvasWidth() / 2.0) / std::tan(fieldOfViewNow() * Pi / 360.0); // (the line is drawn on the canvas)
 		reach = std::clamp((int)std::lround(std::tan((spreadFor(unit, mode, dual && !eachFull) + _bloom) * Pi / 180.0) * focalPixels), AccuracyLineLeast, _accuracyLineHalf);
 	}
 	else if (unit && weapon && Options::fpsAccuracyLine && isShot(mode) && !weapon->getArcingShot(mode))
@@ -4628,7 +4628,7 @@ int FirstPersonMode::hitCloudReach(BattleUnit *unit, BattleItem *weapon, BattleA
 	// (the map's spread: a square of it on x and y, or a circle with uniform spread)
 	const double acrossReach = Options::oxceUniformShootingSpread ? across : across * (std::abs(right[0]) + std::abs(right[1]));
 
-	const double focalPixels = (_view->getWidth() / 2.0) / std::tan(fieldOfViewNow() * Pi / 360.0);
+	const double focalPixels = (canvasWidth() / 2.0) / std::tan(fieldOfViewNow() * Pi / 360.0); // (the line is drawn on the canvas)
 	if (accuracy >= 0 && accuracy < 100)
 	{
 		// A missed roll: the same, with the miss's largest deviation.
@@ -4847,13 +4847,13 @@ bool FirstPersonMode::creatureAt(const Position &voxel, const BattleUnit *self) 
 
 /**
  * Where the player points on the view: the crosshair, in the middle, with mouse look; the free
- * cursor otherwise (the view lies on our canvas, so its pixels are the canvas's).
+ * cursor otherwise (the cursor's canvas point as a pixel of the view, see viewScale).
  * @param pointerX, pointerY Set to the pixel on the view.
  */
 void FirstPersonMode::pointer(int &pointerX, int &pointerY) const
 {
-	pointerX = _mouseLook ? _view->getWidth() / 2 : _cursorX;
-	pointerY = _mouseLook ? _view->getHeight() / 2 : _cursorY;
+	pointerX = _mouseLook ? _view->getWidth() / 2 : _cursorX * viewScale();
+	pointerY = _mouseLook ? _view->getHeight() / 2 : _cursorY * viewScale();
 }
 
 /**
@@ -4939,7 +4939,7 @@ void FirstPersonMode::updateUnitName(BattleUnit *unit)
 	// updateCrosshair); a downed unit's icons under both.
 	const int lineRoom = accuracyLineShown() ? AccuracyLineRoom : 0;
 	const int below = std::max(linesUnderShot() * 10, lineRoom);
-	_view->setPointer(pointerX, pointerY, target ? _txtTarget->getHeight() + 1 + below : lineRoom);
+	_view->setPointer(pointerX, pointerY, (target ? _txtTarget->getHeight() + 1 + below : lineRoom) * viewScale());
 	if (!target)
 	{
 		return;
@@ -4951,8 +4951,8 @@ void FirstPersonMode::updateUnitName(BattleUnit *unit)
 	const std::string label = unitLabel(target);
 	if (_txtTarget->getText() != label) _txtTarget->setText(label);
 	// Centred under the crosshair, clear of its picture (about 8 pixels round the middle).
-	_txtTarget->setX(_view->getX() + pointerX - _txtTarget->getWidth() / 2);
-	_txtTarget->setY(_view->getY() + pointerY + 10 + below);
+	_txtTarget->setX(_view->getX() + pointerX / viewScale() - _txtTarget->getWidth() / 2); // (the view's pixel as the canvas's point)
+	_txtTarget->setY(_view->getY() + pointerY / viewScale() + 10 + below);
 }
 
 /**

@@ -52,7 +52,9 @@
  */
 #include "FirstPersonView.h"
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <thread>
 #include <vector>
 #ifdef __linux__
@@ -1799,7 +1801,37 @@ void FirstPersonView::castAllRays()
 	// The flares' light for this frame, which every ray hitting near a flare needs (the same for
 	// every thread).
 	prepareFlareLights();
-	runOnAllThreads(&FirstPersonView::renderRows);
+	// Setting "Renderer": GPU: the graphics card casts them; where it can't, the CPU as ever.
+	// (OPENXCOM3D_GPU_SHADOW: the CPU draws, the card beside it, checked and timed: see gpuShadowRays.)
+	static const bool gpuShadow = getenv("OPENXCOM3D_GPU_SHADOW") != nullptr;
+	// (OPENXCOM3D_RAY_TIME: the log gets the rays' time, averaged over 120 frames of the main view, whoever cast them.)
+	static const bool rayTime = getenv("OPENXCOM3D_RAY_TIME") != nullptr;
+	const auto started = std::chrono::steady_clock::now();
+	const bool onCard = !gpuShadow && Options::fpsRenderer == 1 && gpuCastAllRays();
+	if (!onCard)
+	{
+		runOnAllThreads(&FirstPersonView::renderRows);
+	}
+	if (rayTime && getWidth() >= 320)
+	{
+		static double sum = 0.0;
+		static int frames = 0;
+		sum += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+		if (++frames == 120)
+		{
+			Log(LOG_INFO) << "OpenXcom3D: the " << getWidth() << "x" << getHeight() << " view's rays take " << sum / frames << " ms on the " << (onCard ? "GPU" : "CPU");
+			sum = 0.0;
+			frames = 0;
+		}
+	}
+	if (onCard)
+	{
+		return;
+	}
+	if (gpuShadow)
+	{
+		gpuShadowRays(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
+	}
 }
 
 /**

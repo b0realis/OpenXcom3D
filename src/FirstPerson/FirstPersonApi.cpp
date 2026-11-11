@@ -858,6 +858,8 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCorpses", &fpsSeeThroughCorpses, false, "STR_FPS_SEE_THROUGH_CORPSES", category));
 	// The map's edge as small red dots on the floor, nothing beyond it, instead of the tape.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDiscreetEdge", &fpsDiscreetEdge, false, "STR_FPS_DISCREET_EDGE", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsRenderer", &fpsRenderer, 0, "STR_FPS_RENDERER", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsFullResolution", &fpsFullResolution, false, "STR_FPS_FULL_RESOLUTION", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 0, "STR_FPS_PIXEL_SIZE", category));
 	// The crosshair: shown or not, the shot info under it, aiming at the exact point under it
 	// (YES) or at the tile, as the original game does (NO), and the units' hitboxes.

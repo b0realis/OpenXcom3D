@@ -504,6 +504,13 @@ The settings are listed under the same headings as in the game.
 - **Doom grenade fuse (seconds)** (3): in Doom mode, how long a grenade burns, from 1 to 5 seconds. The **SET FUSE** box in battle (the prime mode) changes it too, and it holds for every grenade until changed.
 - Insert switches every cheat that's on off in battle, and the same ones back on (Doom mode alone if none was on); the warning line says which, and the settings keep it (as for Y, akimbo, and the SET FUSE box). The names are a tribute to Doom, whose cheat codes they borrow (see [Thanks](#12-thanks)).
 
+### Graphics card
+
+New after 1.12, in the source (no download yet). The CPU renderer stays the default and the reference: these two are options.
+
+- **Renderer** (CPU): **CPU** draws the 3D world on the processor, as ever, on any machine. **GPU** has the graphics card cast the world's rays: the same walk through the voxels and the same shading, as a shader, checked pixel for pixel against the CPU's picture (see [Performance](#8-performance)). Units, items, smoke, effects and the HUD are drawn as before, on the card's picture. Linux for now (it opens its own hidden OpenGL 3.3 context through EGL, whatever the game's display mode); on Windows and macOS, on a machine without a graphics card, with a software OpenGL, or if the card fails, the CPU draws by itself. The card is opened on the side the first time (its driver builds the shaders for a few seconds): the CPU draws until it is ready. The log (`openxcom.log`) names the card: `OpenXcom3D GPU: the ... 3D view's rays are cast on ...`.
+- **Full resolution** (NO): the 3D world at the screen's own resolution instead of the HUD's. On big screens the view is normally drawn at the HUD's size and magnified with it (640×360 on a 1920×1080 screen at *Battlescape scale* screen); YES draws the world at the battlescape's full size (1920×1080 there) and magnifies only the HUD over it. Nine times the rays in that case: heavy on the CPU (try *Pixel size* 2), light on a graphics card with *Renderer* GPU.
+
 ## 5. Fire modes per weapon (FPS-style shooting)
 
 With **Options → 3D VIEW → FPS-style shooting (easier)** on, the 3D view keeps the game's three fire-mode slots (keys Z / X / V, mouse wheel or J to cycle) but fires them FPS style. Each gun offers only the modes it has in the game; the table is generated from the game's rulesets (`items.rul`). Time units are the game's, as a percentage of the soldier's time units.
@@ -803,6 +810,15 @@ Sprite upscaling costs nothing measurable in a frame, *Finest* included: the big
 
 Smoke costs what it covers. A smoke grenade's cloud (about 90 tiles over two levels) in view adds about 1.8 ms a frame with *Smoke* Modern, 2.7 ms from inside it, and 1.3 ms with Original, 1.1 from inside (1920×1080, screen/2, the test machine's 22 threads); on a single core at 640×400 about 2 and 3 ms with Modern, 1.7 and 1.4 with Original. At night it costs the same (*Night smoke opacity* changes the look, not the work). All of it is drawn, but nothing that wouldn't show: puffs off the view or wholly behind a wall or a unit are left out, each puff is drawn only on the rows it covers, and only along its frame's coloured pixels (Original's dots leave most of a frame empty), the picture the same to the pixel. On a slow machine choose Original: one frame a tile, as the map draws it, it costs less than Modern's soft clouds, under half as much from inside a cloud.
 
+**On a graphics card** (new after 1.12, setting *Renderer*: GPU; Linux for now). The card casts the world's rays and hands the picture back; the rest of the frame is drawn on the CPU as before. Measured on the test laptop's GeForce RTX 4060 (a town, walking and turning):
+
+| 3D view | Rays on the CPU | Rays on the GPU | The whole 3D view on the GPU |
+|---|---|---|---|
+| 640×400 | 4.7–6.8 ms | 2.5–2.7 ms | |
+| 1920×1080 (*Full resolution* YES) | 35–38 ms | 6–9 ms | 10–13 ms (38 ms on the CPU) |
+
+So a full 1920×1080 view, which the CPU draws at about 25 frames a second, runs at 60 and more on the card. On built-in graphics the gain is smaller: the same laptop's Intel Arc casts a 1920×1080 view's rays in about 20 ms (the whole 3D view in 23–24 ms, about 40 frames a second), so there *Pixel size* 2 or a smaller *Battlescape scale* still helps. The picture is the CPU's: in every test save the two differ in under 0.1% of the pixels (a voxel's edge here and there, where the two round a number differently).
+
 ## 9. Known limits and ideas
 
 - **A real-time mode** will be attempted in the future: the battle running continuously instead of turn by turn, for those who want it, as a setting like everything else. Doom mode's real-time grenades are the first piece of it.
@@ -879,6 +895,8 @@ Every file starts with the project's philosophy and a description of what's in i
 | `FirstPersonViewRayCasting.cpp` | Colours for the time of day, light and shadow rays, shading what a ray hit, the border and the sky, the rays; the view's threads (one per CPU thread, up to 32, kept between frames), which also draw the units, items, see-through smoke and colour wash in bands of rows |
 | `FirstPersonViewSprites.cpp` | Units and items as the game's own sprites standing in the world (worked out on the game's thread, recorded, then drawn on all threads in bands of rows); the see-through smoke; enemy markers |
 | `FirstPersonViewUpscaling.cpp` | Optional smoother sprites up close (xBRZ on a worker thread) |
+| `FirstPersonGpu.{h,cpp}`, `FirstPersonGpuGl.h`, `FirstPersonGpuShaders.h` | Setting *Renderer*: GPU. The rays on the graphics card: the voxel models and each frame's tile snapshot go up as plain buffers, and a fragment shader walks and shades each pixel's ray. The shader is `castRay`, `traceTile`, `shadeHit`, `colorOutsideMap` and `skyColor` line for line, under the same names (change one, change the other; the constants are written into it from `FirstPersonViewShared.h`). Its own thread and hidden OpenGL 3.3 context (EGL, looked up at run time: no new build dependency) |
+| `FirstPersonViewGpu.cpp` | The view's side of it: the frame handed to the card, its picture, depth and glow into the view's own buffers; and the shadow run that proves it (`OPENXCOM3D_GPU_SHADOW=1`: the CPU draws, the card beside it, every thirtieth frame each ray and each colour compared, both timed in the log) |
 | `FirstPersonViewEffects.cpp` | Particles: explosions, fire, smoke, weather, UFO devices, bloom |
 | `FirstPersonViewShots.cpp` | Shots in flight, thrown items as tumbling voxel models, trails, beams, impacts, bullet holes and scorches, debris |
 | `FirstPersonViewFlares.cpp` | Tactical flares and their light |
@@ -946,6 +964,11 @@ What `FirstPersonView` draws:
 | `OpenXcom.2010.vcxproj{,.filters}` | The add-on's files |
 
 ## 11. Version history
+
+### After 1.12 (in the source: no download yet)
+
+- New setting: *Renderer* (CPU / GPU): the graphics card casts the 3D world's rays, the same picture as the CPU's (Linux for now; the CPU by itself anywhere else, and wherever the card can't). A full 1920×1080 view's rays take 6–9 ms on a GeForce RTX 4060 against 35–38 ms on the CPU.
+- New setting: *Full resolution*: the 3D world at the screen's own resolution, only the HUD magnified over it.
 
 ### 1.12 (2026-11-11)
 

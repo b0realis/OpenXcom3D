@@ -222,6 +222,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsMiddleClickIdentify" } },
 		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
+		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsFullResolution" } },
 	};
 	std::vector<bool> placed(gathered.size(), false);
 	for (const auto &section : sections)
@@ -354,6 +355,11 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		if (option.id() == "fpsFogOfWar")
 		{
 			return std::string(tr(*option.asInt() == 1 ? "STR_FPS_FOG_OF_WAR_MAP" : "STR_FPS_FOG_OF_WAR_OFF"));
+		}
+		// The renderer is a choice of two, shown by name.
+		if (option.id() == "fpsRenderer")
+		{
+			return std::string(tr(*option.asInt() == 1 ? "STR_FPS_RENDERER_GPU" : "STR_FPS_RENDERER_CPU"));
 		}
 		// Wall paint is a choice of three, shown by name.
 		if (option.id() == "fpsWallPaint")
@@ -627,6 +633,11 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		}
 		// The fog of war in 3D (off, as the map): either button switches.
 		else if (value == &Options::fpsFogOfWar)
+		{
+			*value = *value == 1 ? 0 : 1;
+		}
+		// The renderer (CPU, GPU): either button switches.
+		else if (value == &Options::fpsRenderer)
 		{
 			*value = *value == 1 ? 0 : 1;
 		}

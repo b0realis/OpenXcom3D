@@ -346,6 +346,10 @@ private:
 	int canvasWidth() const;
 	/// The canvas's height: the screen's divided by the UI scale.
 	int canvasHeight() const;
+	/// How many of the 3D view's pixels a canvas pixel spans: the UI scale with the setting "Full resolution", else 1.
+	int viewScale() const;
+	/// Makes the 3D view again when its size isn't what the canvas and the setting "Full resolution" ask for.
+	void remakeViewIfResized();
 	/// Makes the canvas our overlays are drawn on before being magnified.
 	void makeCanvas();
 	/// Moves our overlays for a canvas that grew by (dX, dY), each keeping to its corner.

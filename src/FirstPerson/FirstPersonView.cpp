@@ -50,6 +50,8 @@
  * the colour wash over the whole screen.
  */
 #include "FirstPersonView.h"
+#include <chrono>
+#include <cstdlib>
 #include <algorithm>
 #include <cmath>
 #include <mutex>
@@ -141,6 +143,8 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 	_stippleSmoke.clear();
 	for (auto &entry : _softSmokeBlends) delete entry.second.colors;
 	_softSmokeBlends.clear();
+	gpuWarmUp();
+	gpuForgetModels();
 	_models.clear();
 	_ghostModels.clear();
 	_leafyModels.clear();
@@ -532,6 +536,26 @@ void FirstPersonView::draw()
 		return;
 	}
 	_redraw = false;
+	// (OPENXCOM3D_RAY_TIME: the log gets the main view's whole drawing time too, averaged over 120 frames.)
+	static const bool drawTime = getenv("OPENXCOM3D_RAY_TIME") != nullptr;
+	struct DrawTimer
+	{
+		const FirstPersonView *view;
+		std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
+		~DrawTimer()
+		{
+			if (!view) return;
+			static double sum = 0.0;
+			static int frames = 0;
+			sum += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+			if (++frames == 120)
+			{
+				Log(LOG_INFO) << "OpenXcom3D: the " << view->getWidth() << "x" << view->getHeight() << " view's drawing takes " << sum / frames << " ms in all";
+				sum = 0.0;
+				frames = 0;
+			}
+		}
+	} drawTimer { drawTime && getWidth() >= 320 ? this : nullptr };
 	// A camera's feed with a bad signal may hold its last picture a moment (see updateSignalGlitches).
 	if (_signalGlitches && updateSignalGlitches())
 	{

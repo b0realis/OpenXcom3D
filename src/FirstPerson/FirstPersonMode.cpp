@@ -211,13 +211,14 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
  */
 void FirstPersonMode::createView()
 {
-	const int viewWidth = canvasWidth();
-	const int viewHeight = canvasHeight();
+	const int viewWidth = canvasWidth() * viewScale();
+	const int viewHeight = canvasHeight() * viewScale();
 	const Mod *mod = _game->getMod();
 
 	// The state adds a surface at the end (on top of everything): move it to right after the
 	// isometric map instead.
 	_view = new FirstPersonView(_game, viewWidth, viewHeight, 0, 0);
+	_view->setUiScale(viewScale());
 	_state->add(_view);
 	auto &surfaces = _state->_surfaces;
 	surfaces.pop_back();
@@ -938,16 +939,31 @@ void FirstPersonMode::resized(int widthChange, int heightChange)
 	makeWeaponInHand();
 	makeScopeCross();
 
-	// A new 3D view at the new canvas size, set up like the old one and put in its place (only
-	// when the canvas's size changed: the magnification can take up a change of screen size).
-	if (canvasWidth() == _view->getWidth() && canvasHeight() == _view->getHeight())
+	// A new 3D view at the new size (only when it changed: the magnification can take up a
+	// change of screen size).
+	remakeViewIfResized();
+
+	// The game's warning message: its own place moved with the HUD; in full 3D it goes above
+	// our info panel.
+	_warningY += heightChange; // the HUD's warning place moved with the HUD
+	_state->_warning->setY(isActive() && !_classicHud ? warningY() : _warningY);
+	layoutTopBar();
+}
+
+/**
+ * Makes the 3D view again, set up like the old one and put in its place, when its size isn't
+ * what it should be now: the canvas's, or with the setting "Full resolution" the screen's own
+ * (the canvas's times the UI scale). After the screen changed size, or the setting.
+ */
+void FirstPersonMode::remakeViewIfResized()
+{
+	const int viewWidth = canvasWidth() * viewScale(), viewHeight = canvasHeight() * viewScale();
+	if (viewWidth == _view->getWidth() && viewHeight == _view->getHeight())
 	{
-		_warningY += heightChange;
-		_state->_warning->setY(isActive() && !_classicHud ? warningY() : _warningY);
-		layoutTopBar();
 		return;
 	}
-	FirstPersonView *newView = new FirstPersonView(_game, canvasWidth(), canvasHeight(), 0, 0);
+	FirstPersonView *newView = new FirstPersonView(_game, viewWidth, viewHeight, 0, 0);
+	newView->setUiScale(viewScale());
 	newView->setPalette(_state->getPalette());
 	newView->setSavedBattleGame(_save);
 	newView->setMap(_state->_map);
@@ -962,12 +978,6 @@ void FirstPersonMode::resized(int widthChange, int heightChange)
 	_view = newView;
 	_trackedUnit = nullptr; // re-place the camera
 	makeSoldierCamView(); // (its size follows the canvas)
-
-	// The game's warning message: its own place moved with the HUD; in full 3D it goes above
-	// our info panel.
-	_warningY += heightChange; // the HUD's warning place moved with the HUD
-	_state->_warning->setY(isActive() && !_classicHud ? warningY() : _warningY);
-	layoutTopBar();
 }
 
 /**
@@ -998,6 +1008,17 @@ int FirstPersonMode::canvasWidth() const
 int FirstPersonMode::canvasHeight() const
 {
 	return Options::baseYResolution / _uiScale;
+}
+
+/**
+ * How many of the 3D view's pixels a canvas pixel spans. The view is the canvas's size, drawn
+ * magnified with the overlays; with the setting "Full resolution" it is the screen's own size,
+ * the overlays alone magnified over it: then a canvas pixel is the UI scale's square of the
+ * view's.
+ */
+int FirstPersonMode::viewScale() const
+{
+	return Options::fpsFullResolution ? _uiScale : 1;
 }
 
 /**
@@ -1910,6 +1931,7 @@ void FirstPersonMode::think()
 	const Uint32 now = SDL_GetTicks();
 	lastThinkTicks = now;
 	rememberChoices(); // (the fuses burning change all the time)
+	remakeViewIfResized(); // (the setting "Full resolution" switched)
 	const double elapsedSeconds = _lastFrameTick ? std::min<Uint32>(100, now - _lastFrameTick) / 1000.0 : 0.0;
 
 	// Another screen was on top (popup, next turn, inventory): it had the mouse released.
@@ -2673,7 +2695,7 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 			}
 			if (event.button.button == SDL_BUTTON_LEFT)
 			{
-				fire((int)(mouseX / _uiScale), (int)(mouseY / _uiScale)); // the view is on the canvas
+				fire((int)(mouseX * viewScale() / _uiScale), (int)(mouseY * viewScale() / _uiScale)); // the screen's point on the view
 				return true;
 			}
 		}
@@ -2701,10 +2723,11 @@ bool FirstPersonMode::blit()
 	const bool full3D = isActive() && !_classicHud;
 
 	// The 3D view at the back, magnified on big screens: straight from the view, which is the
-	// canvas's size and in the same palette (no copy onto the canvas first).
+	// canvas's size and in the same palette (no copy onto the canvas first); as it is where it
+	// is the screen's own size (setting "Full resolution").
 	if (_view->getVisible())
 	{
-		if (_canvas)
+		if (_canvas && viewScale() == 1)
 		{
 			if (_view->shown())
 			{

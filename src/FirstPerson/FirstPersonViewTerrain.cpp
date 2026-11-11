@@ -3503,6 +3503,7 @@ void FirstPersonView::shareCache(FirstPersonView *owner)
 	_waterModel = nullptr;
 	_groundChosen = false;
 	_doorAnimations.clear();
+	gpuForgetModels();
 	_solidMasks.clear();
 	_paintedFloors.clear();
 	_wallPaints.clear(); // (found again with the ground, among the new owner's models)

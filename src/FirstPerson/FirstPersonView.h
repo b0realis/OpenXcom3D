@@ -829,6 +829,16 @@ private:
 	void rayWorkerLoop();
 	/// Casts the rays for rows taken one at a time from the shared counter, until none are left.
 	void renderRows();
+	/// Casts the rays on the graphics card instead (setting "Renderer": GPU; FirstPersonViewGpu.cpp). False: it can't, the CPU must.
+	bool gpuCastAllRays();
+	/// The same rays on the graphics card, beside the CPU's, compared and timed.
+	void gpuShadowRays(double cpuMilliseconds);
+	friend struct FirstPersonViewGpuAccess;
+	bool _gpuLogged = false; // the log has this view's line about the graphics card
+	/// Opens the graphics card's renderer ahead of its first frame, if the setting asks for it.
+	static void gpuWarmUp();
+	/// The graphics card forgets the models it was sent (the view is about to build them anew).
+	static void gpuForgetModels();
 
 	// =====================================================================================
 	// Units, items and markers as sprites in the world (FirstPersonViewSprites.cpp)
