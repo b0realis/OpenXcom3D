@@ -55,6 +55,7 @@
 #include "../Battlescape/Position.h"
 #include "../Mod/RuleItem.h"
 #include "FirstPersonSdl.h"
+#include "FirstPersonDamageNumbers.h"
 #include "FirstPersonVoxelModel.h"
 #include "FirstPersonVr.h"
 
@@ -67,12 +68,14 @@ class BattleItem;
 struct BattleAction;
 class BattlescapeState;
 class BattleUnit;
+class Camera;
 class FirstPersonView;
 struct FirstPersonEyeCamera;
 struct FirstPersonHeldModel;
 struct FirstPersonHeldFrame;
 class FirstPersonScanner;
 class FirstPersonSounds;
+class FirstPersonAmbience;
 class Game;
 class InteractiveSurface;
 class NumberText;
@@ -153,6 +156,8 @@ public:
 	/// The units' voxel bodies of the battle on this screen (setting "Voxel units"), or null: what a shot meets with
 	/// "Full sprite hitboxes" (see FirstPerson::spriteHit).
 	static VoxelUnits *voxelUnits(BattlescapeState *state);
+	/// Setting "Full sprite hitboxes": the 3D view while it shows the battle (its pictures are the ones hit, see FirstPersonSpriteHits.cpp); null on the map.
+	static const FirstPersonView *shootingView(BattlescapeState *state);
 	/// Setting "Quick deaths": are deaths quick in this battle (see FirstPerson::quickDeaths)?
 	static bool quickDeaths(BattlescapeState *state);
 	/// Akimbo on the map (Ctrl+Shift+click on a hand's weapon): steps the soldier's two guns through firing together there.
@@ -168,6 +173,10 @@ public:
 	static void reactionAkimbo(BattlescapeState *state, BattleAction &action);
 	/// A round or a blow struck a unit: an enemy in sight it did no harm marks the crosshair.
 	static void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefore, int stunBefore);
+	/// A shot, a blow or a blast hurt a unit (setting "Damage numbers"): its numbers to rise over it, if the squad sees it.
+	static void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken);
+	/// Setting "Damage numbers": draws the numbers rising over the units hit on the isometric map.
+	static void drawMapDamageNumbers(BattlescapeState *state, Surface *surface, const Camera *camera);
 	/// Do a shotgun's pellets and a volley's two rounds each land on their own (setting "Each pellet on its own")?
 	static bool eachPellet(BattlescapeState *state);
 	/// The scale a stat bar is drawn at, on the map or in 3D (setting "Stat bars").
@@ -182,6 +191,8 @@ public:
 	static bool breakdown(BattlescapeState *state, BattleUnit *unit);
 	/// A close-quarters check knocked a shot aside, told by the game (see FirstPerson::closeQuartersDeflected).
 	static void deflected(BattlescapeState *state, const BattleUnit *shooter, const Position &target);
+	/// Reaction fire came at a unit, told by the game (see FirstPerson::reactionFiredAt).
+	static void firedAt(BattlescapeState *state, const BattleUnit *unit);
 	/// Turns the view to where a shot knocked aside goes.
 	void followDeflectedShot(const BattleUnit *shooter, const Position &target);
 	/// Doom IDKFA: does this unit's shot spend no ammo? Asked by the game (see FirstPerson::endlessAmmo).
@@ -242,6 +253,7 @@ private:
 	/// Setting "Voxel units" with "Full sprite hitboxes" (a shot hits the body): every unit's body made, a few a frame.
 	void makeVoxelBodies();
 	FirstPersonSounds *_sounds = nullptr;  // the sounds we make ourselves (hitmarker, heartbeat, near-miss whizz...)
+	FirstPersonAmbience *_ambience = nullptr; // the rain, the wind and the fires near the soldier (setting "Ambient sounds")
 	bool _wants3D;                         // the player switched to 3D
 	std::string _missionAtStart;           // the battle's mission type when this screen was made (another at the end: its next stage)
 	bool _classicHud = false;              // original bottom HUD drawn over the 3D view
@@ -668,12 +680,14 @@ private:
 	bool tileMoveVelocity(BattleUnit *unit, double forward, double strafe, bool canMove, double walkSpeed, double elapsedSeconds, double &velocityX, double &velocityY);
 	Uint32 _spottedUntil = 0;             // "enemy spotted" banner
 
-	/// Stops the walk when a new enemy comes into view (not en passant).
+	/// Stops the walk when a new enemy comes into view (not en passant, not sprinting).
 	void checkSpotted(BattleUnit *unit, bool playerTurn);
+	/// Stops the walk when the soldier is shot at (reaction fire), whatever the way of walking.
+	void stopWalkUnderFire(const BattleUnit *unit);
 
 	// ---- two ways of walking, each switched on and off with its key: sprinting (the game's
 	// run, at a faster pace) and en passant (walking on past enemies coming into sight, as Shift
-	// does on the map); each shows a line under the compass while on ----
+	// does on the map; sprinting does too); each shows a line under the compass while on ----
 
 	bool _sprintOn = false;              // sprinting switched on (key "Sprint")
 	bool _sprintStepRan = true;          // the last step was a run (false once a run couldn't be paid for: walking pace then)
@@ -687,6 +701,8 @@ private:
 	void toggleEnPassant();
 	/// Is this step the game's run (sprinting, and the soldier can run it), not a walk?
 	bool runsStep(BattleUnit *unit, const Position &from, int direction) const;
+	/// Is this step the game's sidestep (turning by the rules: to the side or half to the side, on one level)?
+	bool isSidestep(const BattleUnit *unit, const Position &from, int direction, const Position &target) const;
 	/// Makes the lines under the compass for the ways of walking, hidden.
 	void createWalkModeLines();
 	/// Shows the lines for the ways of walking switched on, under the compass (3D only).
@@ -967,6 +983,8 @@ private:
 	void startMapAim(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, const char *hint);
 	/// Follows an action aimed on the isometric map; back to 3D when it's done.
 	void updateMapAim();
+	/// Empties the game's waypoints, the action's and the map's marks together, and hides its launch button.
+	void clearGameWaypoints();
 	/// Is there a creature the player can see at this point?
 	bool creatureAt(const Position &voxel, const BattleUnit *self) const;
 
@@ -1196,14 +1214,36 @@ private:
 	void buttonClicked(TextButton *button, Action *action);
 	/// Selects a soldier from the squad bar.
 	void selectUnit(BattleUnit *unit);
-	/// Hands the 3D view the visible enemies to mark.
+	/// Hands the 3D view the visible enemies to mark, and our own wounded (setting "Wounded markers").
 	void updateEnemyMarkers();
+	/// Has the soldier a clear line to an enemy the squad sees and he doesn't (setting "Enemy markers": its yellow)?
+	bool clearLineOfFire(BattleUnit *viewer, BattleUnit *enemy) const;
 	/// Where a visible enemy button goes in full 3D: in a column at the right, those showing centred on the view's height.
 	void enemyButtonPlace(int index, int &x, int &y) const;
 	/// Is a point on the canvas on a visible enemy button where full 3D draws it?
 	bool onEnemyButton(int index, double canvasX, double canvasY) const;
 	/// Draws the visible enemy buttons, with their numbers, in their full 3D place.
 	void drawEnemyButtons(SDL_Surface *target);
+
+	// ---- setting "Enemy markers": which of the enemies only the squad sees are in a clear line of fire ----
+
+	/// An enemy's last line-of-fire answer (see clearLineOfFire), and what it was for.
+	struct LineOfFireAnswer
+	{
+		const BattleUnit *viewer = nullptr; // the soldier looked through,
+		Position from, to;                  // where he and the enemy stood,
+		int direction = -1;                 // the way he faced;
+		Uint32 time = 0;                    // when it was worked out (SDL ticks)
+		bool clear = false;                 // and the answer
+	};
+	std::unordered_map<const BattleUnit*, LineOfFireAnswer> _lineOfFire; // per enemy marked green or yellow now
+
+	// ---- setting "Damage numbers" ----
+
+	FirstPerson::DamageNumbers _damageNumbers;         // the hits whose numbers rise over the units hit now
+	/// Each frame, in either view: drops the numbers that have had their time, hands the rest to the 3D
+	/// view, and has the map redrawn while it shows them (it draws only when something changes).
+	void updateDamageNumbers(Uint32 now);
 
 	// =====================================================================================
 	// What happens to the soldier: hurt, burning, down, breakdowns

@@ -209,19 +209,19 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 	// at the end, under a heading of its own.
 	static const struct { const char *heading; std::vector<const char*> ids; } sections[] = {
 		{ "STR_FPS_SECTION_PLAYSTYLE", { "fpsPlaystyle" } },
-		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsCameraEyes", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView", "fpsZoom",
+		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsCameraEyes", "fpsCameraArtifacts", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView", "fpsZoom",
 			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
 		{ "STR_FPS_SECTION_MOVEMENT", { "fpsTurnCost", "fpsMovement", "fpsWalkSpeed", "fpsFlightCost", "fpsFlightCostOverride", "fpsVault",
 			"fpsFalling", "fpsSafeLanding" } },
 		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsRecoil", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsLean", "fpsMeleeTerrain",
 			"fpsMeleeFloors", "fpsAimExact", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
 			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear" } },
-		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
+		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
 			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsVoxelUnits", "fpsMuzzleFlash", "fpsHitFlash", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 			"fpsGhostParts", "fpsGhostOpacity", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
 		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
-			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsCompass", "fpsMiddleClickIdentify" } },
-		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds" } },
+			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsMiddleClickIdentify" } },
+		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
 		// (last: a section added at the end moves no row above it, which the tests click by position)
 		{ "STR_FPS_SECTION_VR", { "fpsVrMode", "fpsVrEyeSize", "fpsVrWeapon", "fpsVrTurning", "fpsVrLaser", "fpsVrSmoothing" } },
@@ -347,6 +347,23 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 			static const char *const hazeNames[] = { "STR_FPS_HAZE_NORMAL", "STR_FPS_HAZE_LIGHT", "STR_FPS_HAZE_CLEAR" };
 			return std::string(tr(hazeNames[std::clamp(*option.asInt(), 0, 2)]));
 		}
+		// Unseen terrain is a choice of three, shown by name.
+		if (option.id() == "fpsUnseenTerrain")
+		{
+			static const char *const unseenNames[] = { "STR_FPS_UNSEEN_MIST", "STR_FPS_UNSEEN_FOG", "STR_FPS_UNSEEN_VISIBLE" };
+			return std::string(tr(unseenNames[std::clamp(*option.asInt(), 0, 2)]));
+		}
+		// The fog of war in 3D is a choice of two, shown by name.
+		if (option.id() == "fpsFogOfWar")
+		{
+			return std::string(tr(*option.asInt() == 1 ? "STR_FPS_FOG_OF_WAR_MAP" : "STR_FPS_FOG_OF_WAR_OFF"));
+		}
+		// Wall paint is a choice of three, shown by name.
+		if (option.id() == "fpsWallPaint")
+		{
+			static const char *const paintNames[] = { "STR_FPS_WALL_PAINT_ART", "STR_FPS_WALL_PAINT_OUTSIDE", "STR_FPS_WALL_PAINT_ROOMS" };
+			return std::string(tr(paintNames[std::clamp(*option.asInt(), 0, 2)]));
+		}
 		// The unit size is a percentage.
 		if (option.id() == "fpsUnitSize")
 		{
@@ -386,17 +403,41 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		{
 			return std::to_string(*option.asInt()) + "%";
 		}
+		// The enemy markers' colours are a choice of three, shown by name.
+		if (option.id() == "fpsEnemyMarkers")
+		{
+			static const char *const markerNames[] = { "STR_FPS_ENEMY_MARKERS_RED", "STR_FPS_ENEMY_MARKERS_MAP", "STR_FPS_ENEMY_MARKERS_LINE" };
+			return std::string(tr(markerNames[std::clamp(*option.asInt(), 0, 2)]));
+		}
+		// The markers over our own wounded are off or on, shown by name.
+		if (option.id() == "fpsWoundedMarkers")
+		{
+			static const char *const woundedNames[] = { "STR_FPS_WOUNDED_MARKERS_OFF", "STR_FPS_WOUNDED_MARKERS_ON" };
+			return std::string(tr(woundedNames[std::clamp(*option.asInt(), 0, 1)]));
+		}
 		// The downed units' icons are a choice of three, shown by name.
 		if (option.id() == "fpsDownedIcons")
 		{
 			static const char *const iconNames[] = { "STR_FPS_DOWNED_ICONS_OFF", "STR_FPS_DOWNED_ICONS_CROSSHAIR", "STR_FPS_DOWNED_ICONS_ALWAYS" };
 			return std::string(tr(iconNames[std::clamp(*option.asInt(), 0, 2)]));
 		}
+		// The ambient sounds are a choice of three, shown by name.
+		if (option.id() == "fpsAmbientSounds")
+		{
+			static const char *const ambientNames[] = { "STR_FPS_AMBIENT_SOUNDS_OFF", "STR_FPS_AMBIENT_SOUNDS_QUIET", "STR_FPS_AMBIENT_SOUNDS_ON" };
+			return std::string(tr(ambientNames[std::clamp(*option.asInt(), 0, 2)]));
+		}
 		// The map camera is a choice of four, shown by name.
 		if (option.id() == "fpsMapCamera")
 		{
 			static const char *const sizeNames[] = { "STR_FPS_MAP_CAMERA_OFF", "STR_FPS_MAP_CAMERA_SMALL", "STR_FPS_MAP_CAMERA_MEDIUM", "STR_FPS_MAP_CAMERA_LARGE" };
 			return std::string(tr(sizeNames[std::clamp(*option.asInt(), 0, 3)]));
+		}
+		// The cameras' artifacts are a choice of three, shown by name.
+		if (option.id() == "fpsCameraArtifacts")
+		{
+			static const char *const artifactNames[] = { "STR_FPS_CAMERA_ARTIFACTS_NORMAL", "STR_FPS_CAMERA_ARTIFACTS_LIGHT", "STR_FPS_CAMERA_ARTIFACTS_NONE" };
+			return std::string(tr(artifactNames[std::clamp(*option.asInt(), 0, 2)]));
 		}
 		// The trajectory is a choice of three, shown by name.
 		if (option.id() == "fpsTrajectory")
@@ -600,6 +641,39 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		{
 			*value = (*value + direction + 3) % 3;
 		}
+		// Unseen terrain (mist, fog, visible): round and round.
+		else if (value == &Options::fpsUnseenTerrain)
+		{
+			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
+		}
+		// The fog of war in 3D (off, as the map): either button switches.
+		else if (value == &Options::fpsFogOfWar)
+		{
+			*value = *value == 1 ? 0 : 1;
+		}
+		// Wall paint (as the art, inside and out, every room): round and round.
+		else if (value == &Options::fpsWallPaint)
+		{
+			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
+		}
+		// View distance, in tiles (60, 80, 100, 130, 160, 200): round and round, past 200 back to 60
+		// and the other way with the other button; a distance that isn't one of the steps (a
+		// hand-edited 70) moves to the next step past it (none: round to the first or the last).
+		else if (value == &Options::fpsViewDistance)
+		{
+			const int stepCount = (int)(sizeof(FirstPerson::ViewDistanceSteps) / sizeof(FirstPerson::ViewDistanceSteps[0]));
+			int next = direction > 0 ? FirstPerson::ViewDistanceSteps[0] : FirstPerson::ViewDistanceSteps[stepCount - 1];
+			for (int index = 0; index < stepCount; ++index)
+			{
+				const int step = FirstPerson::ViewDistanceSteps[direction > 0 ? index : stepCount - 1 - index];
+				if (direction > 0 ? step > *value : step < *value)
+				{
+					next = step;
+					break;
+				}
+			}
+			*value = next;
+		}
 		// Unit size: 80 to 100%, in steps of 5.
 		else if (value == &Options::fpsUnitSize)
 		{
@@ -646,15 +720,35 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		{
 			*value = std::clamp(*value + 5 * direction, 5, 95);
 		}
+		// The enemy markers' colours (all red, as the map, line of fire): round and round.
+		else if (value == &Options::fpsEnemyMarkers)
+		{
+			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
+		}
+		// The markers over our own wounded (off, on): either button switches.
+		else if (value == &Options::fpsWoundedMarkers)
+		{
+			*value = *value == 1 ? 0 : 1;
+		}
 		// The downed units' icons (off, crosshair, always): round and round.
 		else if (value == &Options::fpsDownedIcons)
 		{
 			*value = (*value + direction + 3) % 3;
 		}
+		// The ambient sounds (off, quiet, on): round and round.
+		else if (value == &Options::fpsAmbientSounds)
+		{
+			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
+		}
 		// The map camera (off, small, medium, large): round and round.
 		else if (value == &Options::fpsMapCamera)
 		{
 			*value = (*value + direction + 4) % 4;
+		}
+		// The cameras' artifacts (normal, light, none): round and round.
+		else if (value == &Options::fpsCameraArtifacts)
+		{
+			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
 		}
 		// The trajectory (off, arcs, all): round and round.
 		else if (value == &Options::fpsTrajectory)

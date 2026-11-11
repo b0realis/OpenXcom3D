@@ -157,6 +157,8 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 	_frames.clear();
 	_solidMasks.clear();
 	_paintedFloors.clear();
+	_wallPaints.clear();
+	_wallPaintOf.clear();
 	_tileMemos.clear();
 	_partMemos.clear();
 	_tileFlags.clear();
@@ -234,6 +236,7 @@ void FirstPersonView::setEye(double x, double y, double z)
 	_eye[0] = x;
 	_eye[1] = y;
 	_eye[2] = z;
+	std::copy(_eye, _eye + 3, _steadyEye); // (until the next frame's shake, see updateCameraEffects)
 }
 
 /**
@@ -245,6 +248,20 @@ void FirstPersonView::getEye(double out[3]) const
 	for (int axis = 0; axis < 3; ++axis)
 	{
 		out[axis] = _eye[axis];
+	}
+}
+
+/**
+ * Gets the camera's eye as placed for this frame, before the shake jitters it (see
+ * updateCameraEffects), in voxels: the side units are drawn from is worked out from it, so a
+ * shake doesn't turn them (GitHub issue #112).
+ * @param out Receives the three coordinates.
+ */
+void FirstPersonView::getSteadyEye(double out[3]) const
+{
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		out[axis] = _steadyEye[axis];
 	}
 }
 
@@ -659,6 +676,9 @@ void FirstPersonView::drawPass()
 	if (_signalGlitches) applySignalGlitches();
 	drawBurning();
 	drawHurt();
+	// The numbers rising over the units hit (setting "Damage numbers"): in the world, walls in front
+	// hiding them, but over the screen's effects, so their colours read.
+	drawDamageNumbers();
 	// The icons over the downed units, the enemy markers and the units' facing rings, over everything.
 	drawDownedIcons();
 	drawMarkers();
@@ -731,7 +751,10 @@ void FirstPersonView::updateCameraEffects()
 	const float elapsedSeconds = _shakeLastTick ? std::min<Uint32>(100, now - _shakeLastTick) / 1000.0f : 0.0f;
 	_shakeLastTick = now;
 	// Camera shake: the eye jitters for this frame only, dying away (halving about every tenth
-	// of a second). None with the setting "Screen shake" off, nor in VR mode (comfort: see setComfort).
+	// of a second). None with the setting "Screen shake" off, nor in VR mode (comfort: see setComfort). The eye as
+	// placed is kept: the side units are seen from doesn't shake (a player, GitHub issue #112: shooting straight down
+	// at a unit, it spun round and twitched, the jitter tipping it from side to side).
+	std::copy(_eye, _eye + 3, _steadyEye);
 	if (_shake > 0.02f && Options::fpsScreenShake && !_comfort)
 	{
 		// Smooth shaking (a few wobbles a second, from sines of the time), not a new random jolt

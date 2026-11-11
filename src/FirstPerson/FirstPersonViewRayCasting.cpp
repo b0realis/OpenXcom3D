@@ -61,12 +61,15 @@
 #include <SDL.h>
 #include "FirstPersonApi.h"
 #include "../Battlescape/Map.h"
+#include "../Battlescape/TileEngine.h"
+#include "../Engine/Game.h"
 #include "../Engine/Logger.h"
 #include "../Engine/Options.h"
 #include "../Engine/Palette.h"
 #include "../Mod/MapDataSet.h"
 #include "../Mod/Mod.h"
 #include "../Mod/RuleEnviroEffects.h"
+#include "../Mod/RuleInterface.h"
 #include "../Savegame/BattleUnit.h" // not used here, but its PARTS_STRING constants are part of this file's object code
 #include "../Savegame/SavedBattleGame.h"
 #include "RuleFirstPerson.h"
@@ -327,6 +330,13 @@ void FirstPersonView::updateColors()
 	_colors.forcedDot = nearest(255, 245, 150);
 	_colors.laserRefused = nearest(125, 35, 30);
 	_colors.marker = nearest(235, 40, 30);
+	// (the enemies only the squad sees: the very colour of the game's green buttons for them, the interface's
+	// squadsightUnits; and those of them in a clear line of fire, yellow)
+	_colors.markerSquadSeen = _game->getMod()->getInterface("battlescape")->getElement("squadsightUnits")->color;
+	_colors.markerLineOfFire = nearest(250, 215, 40);
+	// (our own wounded and those about to pass out: the very colours of the game's blue and purple buttons for them)
+	_colors.markerWounded = _game->getMod()->getInterface("battlescape")->getElement("woundedUnits")->color;
+	_colors.markerPassingOut = _game->getMod()->getInterface("battlescape")->getElement("passingOutUnits")->color;
 	_colors.sprayMark = nearest(150, 245, 140);
 	_colors.sprayNext = nearest(160, 160, 170);
 	_colors.marine = nearest(150, 195, 190);
@@ -363,7 +373,16 @@ void FirstPersonView::updateColors()
 			_colors.greenTint[index] = nearest(15 + luminance * 0.3f, 35 + luminance * 0.7f, luminance * 0.2f);
 			_colors.purpleTint[index] = nearest(std::min(255.0f, 55 + luminance * 0.75f), luminance * 0.25f, std::min(255.0f, 75 + luminance * 0.85f));
 			_colors.flareTint[index] = nearest(std::min(255.0f, 70 + luminance * 1.15f), luminance * 0.32f, luminance * 0.24f);
+			// Unexplored terrain drawn (setting "Unseen terrain": Visible): toned UnseenToneShare of the
+			// way to a slate grey as bright as the colour, so it shows what is there and still reads
+			// as not yet seen.
+			const float slateLuminance = UnseenToneRgb[0] * 0.3f + UnseenToneRgb[1] * 0.59f + UnseenToneRgb[2] * 0.11f;
+			auto toned = [&](float channel, int axis) {
+				return channel + (std::min(255.0f, UnseenToneRgb[axis] * luminance / slateLuminance) - channel) * UnseenToneShare;
+			};
+			_colors.unseenTint[index] = nearest(toned(palette[index].r, 0), toned(palette[index].g, 1), toned(palette[index].b, 2));
 		}
+		_colors.unseenTint[0] = 0;
 		// Colour 0 (black on the screen): the blue, orange, white, green and purple washes colour
 		// even black, with a dark shade of their own; the red wash and the flare's light leave it
 		// black.
@@ -769,7 +788,8 @@ float FirstPersonView::pointLight(const float point[3], const float normal[3], b
  * flashlight, flares and muzzle flashes, and under the sea the sunlight rippling over the floor.
  * Lamps, lit screens and UFO lights shine whatever the light around them. The colour is the
  * voxel's own, except on faces the isometric art never shows (undersides, faces looking west or
- * north), which take the colour of a face the art does show; and an animated part part way
+ * north), which take the colour of a face the art does show (a wall's, with the setting "Wall
+ * paint", the paint of the side it faces: see wallPaintColor); and an animated part part way
  * into its next frame dissolves into it. The light is dithered to whole palette shades, then
  * the haze closes in towards the edge of the view.
  * @param hit What the ray hit; whether it shines (hit.emissive) is updated when the pixel shows
@@ -784,30 +804,59 @@ float FirstPersonView::pointLight(const float point[3], const float normal[3], b
 Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float rayDirection[3], int pixelX, int pixelY) const
 {
 	const TileView &tileView = _tileViews[hit.tile];
-	// Unexplored parts are slate-coloured shapes (see below). A wall belongs to the tile east or
-	// south of it, but it's seen from both sides, so each part has its own "seen" bit; a swinging
-	// door (part -1) goes by its tile.
-	if (hit.part >= 0 ? !((tileView.seen >> hit.part) & 1) : !tileView.discovered)
+	// Unexplored parts are drawn as the setting "Unseen terrain" has them (see below). A wall
+	// belongs to the tile east or south of it, but it's seen from both sides, so each part has its
+	// own "seen" bit; a swinging door (part -1) goes by its tile. With the fog of war off in 3D
+	// (setting "Fog of war in 3D"; a player, GitHub issue #115: going down stairs, the floor below
+	// stayed dark while the soldier looked straight at it), what the view itself sees within the
+	// game's sight range is drawn as seen, explored or not: as far as the game explores terrain
+	// from a soldier (its max view distance, across the ground). The map's fog of war stays.
+	auto seenByTheView = [&]() {
+		if (Options::fpsFogOfWar == 1) return false;
+		const float sight = _save->getTileEngine()->getMaxViewDistance() * (float)Position::TileXY; // in voxels
+		const float across = rayDirection[0] * hit.t, down = rayDirection[1] * hit.t;
+		return across * across + down * down <= sight * sight;
+	};
+	bool unseen = false; // unexplored, drawn as seen terrain is and toned (Unseen terrain: Visible, see the end)
+	if ((hit.part >= 0 ? !((tileView.seen >> hit.part) & 1) : !tileView.discovered) && !seenByTheView())
 	{
 		// The underside of an unexplored level seen from an explored room below is just its
 		// ceiling: draw it, lit by the room. Anything else unexplored is a plain shape.
 		const int tilesPerLevel = _save->getMapSizeX() * _save->getMapSizeY();
 		const bool exploredCeiling = hit.axis == 2 && rayDirection[2] > 0.0f && hit.tile >= tilesPerLevel
 			&& _tileViews[hit.tile - tilesPerLevel].discovered;
-		if (!exploredCeiling)
+		if (!exploredCeiling && Options::fpsUnseenTerrain == 2)
 		{
-			// Unexplored: shapes in a flat slate colour, shaded by the face like the rest, never
+			// Visible (the owner: for whole-map screenshots too): shaded below as seen terrain is,
+			// then toned towards slate grey, in the usual haze.
+			unseen = true;
+		}
+		else if (!exploredCeiling)
+		{
+			// Mist and Fog: shapes in a flat slate colour, shaded by the face like the rest, never
 			// textured (nothing of the art shows) and never black (black reads as something
-			// missing): the shade stops a few steps short of the colour group's end. Further off
-			// they turn misty (see UnexploredMistFrom): they once grew darker with distance and
-			// stood out against the sky as a skyline of buildings that weren't there (a player's
-			// report); a soft blue-grey reads as shapes in the haze. At the view's far reach they
-			// fade out fully, as explored terrain does.
+			// missing): the shade stops a few steps short of the colour group's end.
 			const int faceAxis = hit.axis >= 0 ? hit.axis : 2;
 			const int face = faceAxis * 2 + (rayDirection[faceAxis] > 0.0f ? 1 : 0);
 			const int darkest = 12 - (_colors.unexplored & 15);
-			const Uint8 slate = shadeColor(_colors.unexplored, std::min(darkest, (int)(_colors.ambient * 0.5f + _colors.faceShade[face] + dither(pixelX, pixelY))));
 			const float sight = _save->getMod()->getMaxViewDistance() * (float)Position::TileXY; // the game's sight range, in voxels
+			if (Options::fpsUnseenTerrain == 1)
+			{
+				// Fog: the shapes darker with distance, as 0.9 drew them (see UnseenFogDarkening),
+				// and a fog rising smoothly over them from the edge of the game's sight to all of
+				// it at the view's reach, as thick as the distance haze has it (none at Clear:
+				// the dark shapes all the way out; none out of the air, as the haze).
+				const Uint8 slate = shadeColor(_colors.unexplored, std::min(darkest, (int)(_colors.ambient * 0.5f + _colors.faceShade[face]
+					+ hit.t / UnseenFogDarkening + dither(pixelX, pixelY))));
+				const float fogShare = Options::fpsHaze == 2 || airless() ? 0.0f : Options::fpsHaze == 1 ? UnseenFogLight : UnseenFogNormal;
+				const float fog = fogShare * smoothstep(std::min(sight, _maxDistance * UnseenFogFromMax), _maxDistance, hit.t);
+				return hazeColor(slate, std::max(terrainHaze(hit.t), fog), pixelX + 2, pixelY + 1);
+			}
+			// Mist: further off the shapes turn misty (see UnexploredMistFrom): they once grew
+			// darker with distance and stood out against the sky as a skyline of buildings that
+			// weren't there (a player's report); a soft blue-grey reads as shapes in the haze. At
+			// the view's far reach they fade out fully, as explored terrain does.
+			const Uint8 slate = shadeColor(_colors.unexplored, std::min(darkest, (int)(_colors.ambient * 0.5f + _colors.faceShade[face] + dither(pixelX, pixelY))));
 			const float mist = UnexploredMistMax * smoothstep(sight * UnexploredMistFrom, sight * UnexploredMistTo, hit.t);
 			return hazeColor(slate, std::max(terrainHaze(hit.t), mist), pixelX + 2, pixelY + 1);
 		}
@@ -891,6 +940,9 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 			// from the other side (the colour seen from the east, or from the south).
 			shownColor = mirroredColor(hit, hit.axis, false, showNextFrame);
 			if (!shownColor) shownColor = hit.axis == 0 ? model.east[voxelZ][voxelY] : model.south[voxelZ][voxelX];
+			// Setting "Wall paint" (GitHub issue #111): a wall's face the art never shows in the paint of the
+			// side it faces (from behind a house its outside paint, not its rooms').
+			if (const Uint8 painted = wallPaintColor(hit, tileView, shownColor)) shownColor = painted;
 		}
 		else if (hit.axis >= 0 && hit.axis < 2)
 		{
@@ -931,9 +983,10 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 		if (((openFaces >> faceIndex) & 1) && _ufoFaceShade[openFaces] >= 0.0f) faceShading = _ufoFaceShade[openFaces];
 	}
 	// The shade (0 brightest .. 15 darkest): the game's light, the face's direction, one shade
-	// darker per 320 voxels (20 tiles) of distance, and on the sea its wave.
+	// darker per 320 voxels (20 tiles) of distance (more thinly spread over a longer view, see
+	// distanceShade), and on the sea its wave.
 	float ufoGlow = 0.0f; // a UFO's light here (the UFO lights option), 0..1
-	float shade = lightAt(surfacePoint[0], surfacePoint[1], surfacePoint[2], _ufoLightsOn ? &ufoGlow : nullptr) + faceShading + hit.t / 320.0f + waveShade;
+	float shade = lightAt(surfacePoint[0], surfacePoint[1], surfacePoint[2], _ufoLightsOn ? &ufoGlow : nullptr) + faceShading + distanceShade(hit.t) + waveShade;
 	float sunShadow = 0.0f; // the shade a sun shadow adds (not darkness of the place: see the end)
 	float flare = 0.0f; // red light from tactical flares
 	if (hit.emissive)
@@ -1023,7 +1076,7 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 	// the dark panels of the Harvester's gore tubes showed as black boxes.
 	int wholeShades = (int)std::max(0.0f, shade + dither(pixelX, pixelY));
 	const bool onSteadyUfo = hit.part >= 0 && tileView.part[hit.part] && tileView.part[hit.part]->exposed;
-	const float placeShade = shade - faceShading - hit.t / 320.0f - waveShade - sunShadow;
+	const float placeShade = shade - faceShading - distanceShade(hit.t) - waveShade - sunShadow;
 	const float blackShare = std::clamp((placeShade - DarkOverflowFrom) / (DarkOverflowTo - DarkOverflowFrom), 0.0f, 1.0f);
 	const bool darkEnoughForBlack = !onSteadyUfo && blackShare > dither(pixelX + 1, pixelY + 2);
 	if (rockCeilingMiddle >= 0 && !darkEnoughForBlack)
@@ -1050,6 +1103,11 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 	{
 		color = ufoLighting->tint[ufoOuterShare > dither(pixelX + 1, pixelY) ? 1 : 0][color]; // a UFO's light on the ground around it: its inner or outer colour, sparkling
 	}
+	// Unexplored terrain drawn (Unseen terrain: Visible) toned towards slate grey (see updateColors).
+	if (unseen)
+	{
+		color = _colors.unseenTint[color];
+	}
 	// Far away the haze takes over (see hazeColor and terrainHaze).
 	return hazeColor(color, terrainHaze(hit.t), pixelX + 2, pixelY + 1);
 }
@@ -1065,6 +1123,18 @@ float FirstPersonView::terrainHaze(float distance) const
 {
 	return _colors.underwater ? smoothstep(_maxDistance * 0.12f, _maxDistance * 0.65f, distance)
 		: smoothstep(_maxDistance * hazeStart(), _maxDistance, distance);
+}
+
+/**
+ * How many shades darker the distance makes terrain: one for every DistanceShadeVoxels (20 tiles),
+ * or for every third of the view's reach when that is longer (DistanceShadeReachParts), so a long view
+ * keeps the far ground lit (see DistanceShadeVoxels); at the usual reach of 60 tiles, as before.
+ * @param distance How far away, in voxels.
+ * @return The shades, 0 or more.
+ */
+float FirstPersonView::distanceShade(float distance) const
+{
+	return distance / std::max(DistanceShadeVoxels, _maxDistance / DistanceShadeReachParts);
 }
 
 /**
@@ -1215,7 +1285,7 @@ Uint8 FirstPersonView::colorOutsideMap(const float rayOrigin[3], const float ray
 			// Shaded past the darkest of its colour group, it turns black only where the open ground
 			// is really dark, as on the map (see shadeHit, DarkOverflowFrom); else it stays the
 			// darkest of its group (the sea's troughs at dusk were black blotches).
-			const int shades = (int)(_colors.ambient + _colors.faceShade[4] + waveShade + groundDistance / 320.0f + dither(pixelX, pixelY));
+			const int shades = (int)(_colors.ambient + _colors.faceShade[4] + waveShade + distanceShade(groundDistance) + dither(pixelX, pixelY));
 			// (The sea stops short of its groups' last shades, all but black: WaterDarkestShade.)
 			const float blackShare = std::clamp((_colors.ambient - DarkOverflowFrom) / (DarkOverflowTo - DarkOverflowFrom), 0.0f, 1.0f);
 			const int darkest = ground->water ? std::max(color & 15, WaterDarkestShade) : 15;

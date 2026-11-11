@@ -483,7 +483,8 @@ void FirstPersonView::washBands()
  * a UFO) there's a low static all the time (BadStaticFloor) and the spells come more often, longer
  * and stronger (the Bad... values). Their clock runs only while the camera shows: hidden, the next
  * spell (or the one going on) waits. None with "Muzzle flashes" off, which stops every flash and
- * flicker (the glitches' too). Sets _staticAmount for this frame.
+ * flicker (the glitches' too), nor with "Camera artifacts" None (a clean feed); with it Light, the
+ * low static and the spells' peaks lighter (see LightStaticFloorShare). Sets _staticAmount for this frame.
  */
 void FirstPersonView::updateStaticSpell()
 {
@@ -506,13 +507,14 @@ void FirstPersonView::updateStaticSpell()
 	}
 	_staticSpellTick = now;
 	_staticAmount = 0.0f;
-	if (!Options::fpsMuzzleFlash)
+	if (!Options::fpsMuzzleFlash || Options::fpsCameraArtifacts >= 2)
 	{
 		_staticSpellUntil = _staticSpellNextAt = 0;
 		return;
 	}
 	const bool bad = badSignal();
-	const float floor = bad ? BadStaticFloor : 0.0f;
+	const bool light = Options::fpsCameraArtifacts == 1;
+	const float floor = bad ? (light ? BadStaticFloor * LightStaticFloorShare : BadStaticFloor) : 0.0f;
 	_staticAmount = floor;
 	auto gap = [&]() { return bad ? random(BadStaticGapShortest, BadStaticGapLongest) : random(StaticGapShortest, StaticGapLongest); };
 	if (!_staticSpellNextAt)
@@ -552,7 +554,7 @@ void FirstPersonView::updateStaticSpell()
 	{
 		share = (float)(length - into) / _staticSpellFall;
 	}
-	_staticAmount = std::max(floor, _staticSpellPeak * smoothstep(0.0f, 1.0f, share));
+	_staticAmount = std::max(floor, (light ? _staticSpellPeak * LightStaticSpellShare : _staticSpellPeak) * smoothstep(0.0f, 1.0f, share));
 }
 
 /**
@@ -578,9 +580,10 @@ bool FirstPersonView::badSignal() const
  * (the owner's ask: more often than before, 1.5 to 5 s): enough to tell a camera's feed, never
  * enough to get in the way. With a bad signal (see badSignal: the hardest missions, inside a UFO)
  * a glitch every second or so, half as long again, in more and bigger patches, torn more often.
- * Never with Muzzle flashes off (the setting for those bothered by flashing light). A camera shown
- * again after a pause starts afresh: no glitch for a few seconds, and a freeze never holds an old
- * picture (it also ends when the camera moves to another soldier).
+ * Never with Muzzle flashes off (the setting for those bothered by flashing light), nor with Camera
+ * artifacts None; with it Light, each one shortened so none lasts over LightGlitchLongest. A camera
+ * shown again after a pause starts afresh: no glitch for a few seconds, and a freeze never holds an
+ * old picture (it also ends when the camera moves to another soldier).
  * Called at the start of every draw.
  * @return True while the picture is frozen (draw then keeps the last one).
  */
@@ -597,7 +600,7 @@ bool FirstPersonView::updateSignalGlitches()
 	// A bad signal (the hardest missions, inside a UFO) glitches every second or so, longer and
 	// in more and bigger patches; the usual one every few seconds, briefly.
 	const bool bad = badSignal();
-	if (!Options::fpsMuzzleFlash || !shownLately)
+	if (!Options::fpsMuzzleFlash || Options::fpsCameraArtifacts >= 2 || !shownLately)
 	{
 		_glitchKind = GLITCH_NONE;
 		_glitchNextAt = now + (bad ? random(500, 1500) : random(2000, 6000));
@@ -617,8 +620,12 @@ bool FirstPersonView::updateSignalGlitches()
 		const int roll = random(0, 99);
 		if (bad) _glitchKind = roll < 35 ? GLITCH_BLOCKS : roll < 55 ? GLITCH_GREEN : roll < 85 ? GLITCH_TEAR : GLITCH_FREEZE;
 		else _glitchKind = roll < 45 ? GLITCH_BLOCKS : roll < 70 ? GLITCH_GREEN : roll < 85 ? GLITCH_TEAR : GLITCH_FREEZE;
-		const int length = _glitchKind == GLITCH_BLOCKS ? random(120, 360) : _glitchKind == GLITCH_GREEN ? random(60, 200) : _glitchKind == GLITCH_TEAR ? random(80, 220) : random(200, 550);
-		_glitchUntil = now + (bad ? length * 3 / 2 : length);
+		// How long: in its kind's range (blocks 120 to 360 ms, green squares 60 to 200, a tear 80 to
+		// 220, a freeze 200 to 550), half as long again with a bad signal; with "Camera artifacts"
+		// Light shortened in proportion, the kind's longest LightGlitchLongest on any signal.
+		static const int shortestOfKind[] = { 0, 120, 60, 200, 80 }, longestOfKind[] = { 0, 360, 200, 550, 220 }; // (by GlitchKind)
+		const int length = random(shortestOfKind[_glitchKind], longestOfKind[_glitchKind]);
+		_glitchUntil = now + (Options::fpsCameraArtifacts == 1 ? length * LightGlitchLongest / longestOfKind[_glitchKind] : bad ? length * 3 / 2 : length);
 		_glitchNextAt = _glitchUntil + (bad ? random(300, 1500) : random(1500, 5000));
 		_glitchFrozenUnit = _cameraUnit;
 		// Its patches, in blocks: one to three small rectangles of coarse blocks (a third of the

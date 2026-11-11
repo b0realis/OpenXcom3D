@@ -44,14 +44,25 @@
 /*
  * FirstPersonSpriteHits.cpp: setting "Full sprite hitboxes": a unit is hit where its picture shows (with "Voxel units",
  * where its body is).
+ *
+ * A line of fire meets a unit's picture where it crosses the picture's card (see SpriteCard): the
+ * very pixel the line goes through counts, solid or see-through, wherever the card reaches (over
+ * the neighbouring tiles too: a bat's wings, a Cyberdisc's rim). The card stands as the 3D view
+ * draws the picture, its feet on the floor's top, and for the soldier looked through in 3D it is
+ * the card the view draws, leaning as it leans: what he sees is what he hits. With "Voxel units" a
+ * unit whose body is made is hit where its body is solid instead (see LineBody), the body standing
+ * and turned as the view draws it; a body has no card (nor an outline, see viewCard).
  */
 #include "FirstPersonApi.h"
+#include "FirstPersonSpriteHits.h"
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <map>
 #include <utility>
 #include <vector>
 #include "FirstPersonMode.h"
+#include "FirstPersonView.h"
 #include "FirstPersonViewShared.h"
 #include "FirstPersonVoxelUnits.h"
 #include "../Battlescape/BattlescapeState.h"
@@ -60,6 +71,9 @@
 #include "../Engine/Options.h"
 #include "../Engine/Surface.h"
 #include "../Mod/Armor.h"
+#include "../Mod/MapData.h"
+#include "../Mod/Mod.h"
+#include "../Savegame/BattleItem.h"
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/SavedBattleGame.h"
 #include "../Savegame/Tile.h"
@@ -72,16 +86,91 @@ namespace FirstPerson
 namespace
 {
 
+/// How far a unit's picture reaches across the map from the middle of its tiles, in voxels: half its
+/// 32 picture columns (a big unit's 64), SpritePixelX of a voxel each, and a voxel for the gate; a
+/// card that leans (the looked-through soldier's own lines) up to its rows' height along the ground
+/// more (53 rows, in true proportions).
+const double PictureReachSmall = 16 * SpritePixelX + 1.0, PictureReachBig = 32 * SpritePixelX + 1.0, PictureLeanReach = 53 * ZScale;
+/// How far below its anchor and above it a unit's picture reaches, in voxels: the rows under the
+/// anchor (24 at most) and over it (48 at most), and a voxel for the gate.
+const double PictureBelow = 25.0, PictureAbove = 48.0 + 1.0;
+/// How far the 3D view may draw a unit from where the game has it between its small steps (it eases
+/// after them, see FirstPersonView::drawUnits), in voxels: the looked-through soldier's own lines meet
+/// the picture where it's drawn.
+const double GlideReach = 8.0;
+/// A line's voxel meets a card where the line crosses it: the voxel's middle within this of the
+/// card's plane (a line steps up to a voxel along each axis at a time, up to 1.73 voxels across
+/// a tilted card, so a gate this wide is never stepped over) and of the crossing along the line.
+const double CardGate = 0.9, CardGateAlong = 1.5;
+/// A line counts as the looked-through soldier's own (his crosshair, his shots: see SpriteCard)
+/// when it starts within this of the 3D view's eye across the map, in voxels (the game's muzzle
+/// point is up to 7 from the middle of his tile).
+const double OwnLineReach = 12.0;
+/// A point within this of straight above or below a unit across the map, in voxels, sees it from
+/// no side: it's seen from the south-east, as the map shows it (see unitViewRotation, uprightCard).
+const double StraightAboveReach = 1.0;
+
+double dot(const double a[3], const double b[3])
+{
+	return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
 /**
- * The units' pictures as shooters see them, kept while the battle's animation frame lasts (a
- * tenth of a second: within it the AI weighs many lines at the same units): each unit's frame,
- * as the 3D view composes it from a side (see FirstPersonView::drawUnits), as its solid pixels.
+ * What of a unit picks its sprite frame, besides the battle's animation frame and the side it's
+ * seen from: its status (standing, walking, aiming...), facings, steps, falls, kneeling, hovering
+ * and what it holds. A unit's picture is made again when any of it changes.
  */
+struct Pose
+{
+	int status = -1, direction = 0, faceDirection = 0, turretDirection = 0, verticalDirection = 0;
+	int walkingPhase = 0, diagonalPhase = 0, fallingPhase = 0;
+	bool kneeled = false, floating = false;
+	const BattleItem *rightHand = nullptr, *leftHand = nullptr;
+
+	/// The unit's pose now.
+	explicit Pose(const BattleUnit *unit = nullptr)
+	{
+		if (!unit) return;
+		status = (int)unit->getStatus();
+		direction = unit->getDirection();
+		faceDirection = unit->getFaceDirection();
+		turretDirection = unit->getTurretDirection();
+		verticalDirection = unit->getVerticalDirection();
+		walkingPhase = unit->getWalkingPhase();
+		diagonalPhase = unit->getDiagonalWalkingPhase();
+		fallingPhase = unit->getFallingPhase();
+		kneeled = unit->isKneeled();
+		floating = unit->isFloating();
+		rightHand = unit->getRightHandWeapon();
+		leftHand = unit->getLeftHandWeapon();
+	}
+
+	/// The same pose?
+	bool operator==(const Pose &other) const
+	{
+		return status == other.status && direction == other.direction && faceDirection == other.faceDirection
+			&& turretDirection == other.turretDirection && verticalDirection == other.verticalDirection
+			&& walkingPhase == other.walkingPhase && diagonalPhase == other.diagonalPhase && fallingPhase == other.fallingPhase
+			&& kneeled == other.kneeled && floating == other.floating && rightHand == other.rightHand && leftHand == other.leftHand;
+	}
+};
+
+/**
+ * The units' pictures as lines see them, kept while the battle's animation frame lasts (a tenth
+ * of a second: within it the AI weighs many lines at the same units) and the unit keeps its pose
+ * (it turns, kneels, takes aim or steps on: made again, see Pose): each unit's frame, as the 3D
+ * view composes it from a side (see FirstPersonView::drawUnits), as its solid pixels.
+ */
+struct Picture
+{
+	Pose pose;
+	std::vector<Uint8> pixels; // SpriteBufferSize square, 1 for a solid pixel
+};
 struct SpriteCache
 {
 	const SavedBattleGame *save = nullptr;    // the battle they were made for
 	int animFrame = -1;                       // and its animation frame
-	std::map<std::pair<const BattleUnit*, int>, std::vector<Uint8>> pictures; // by unit and view rotation: 1 for a solid pixel
+	std::map<std::pair<const BattleUnit*, int>, Picture> pictures; // by unit and view rotation
 	Surface *buffer = nullptr;                // where a frame is composed
 };
 
@@ -113,10 +202,11 @@ const std::vector<Uint8> &spriteOf(SavedBattleGame *save, const BattleUnit *unit
 		cache.animFrame = save->getAnimFrame();
 		cache.pictures.clear();
 	}
-	auto known = cache.pictures.find({ unit, rotation });
-	if (known != cache.pictures.end())
+	const Pose pose(unit);
+	Picture &picture = cache.pictures[{ unit, rotation }];
+	if (!picture.pixels.empty() && picture.pose == pose)
 	{
-		return known->second;
+		return picture.pixels;
 	}
 	if (!cache.buffer)
 	{
@@ -137,75 +227,505 @@ const std::vector<Uint8> &spriteOf(SavedBattleGame *save, const BattleUnit *unit
 		unitSprite.draw(unit, 2, 0, 16, 0, mask, false);
 		unitSprite.draw(unit, 3, 16, 24, 0, mask, false);
 	}
-	std::vector<Uint8> &picture = cache.pictures[{ unit, rotation }];
-	picture.assign((size_t)SpriteBufferSize * SpriteBufferSize, 0);
+	picture.pose = pose;
+	picture.pixels.assign((size_t)SpriteBufferSize * SpriteBufferSize, 0);
 	cache.buffer->lock();
 	for (int y = 0; y < SpriteBufferSize; ++y)
 	{
-		for (int x = 0; x < SpriteBufferSize; ++x) picture[(size_t)y * SpriteBufferSize + x] = cache.buffer->getPixel(x, y) != 0;
+		for (int x = 0; x < SpriteBufferSize; ++x) picture.pixels[(size_t)y * SpriteBufferSize + x] = cache.buffer->getPixel(x, y) != 0;
 	}
 	cache.buffer->unlock();
-	return picture;
-}
-
+	return picture.pixels;
 }
 
 /**
- * Where a unit stands for its hits: the middle of its tiles, on the highest of their ground (terrain levels are
- * negative), as the game's own hit shape stands (see TileEngine::voxelCheck).
+ * Whether a voxel is solid in the game's own shapes of the terrain (as TileEngine::voxelCheck
+ * finds it: a part's line-of-fire template, an open UFO door left out; a grav lift's floor).
+ * @param save The battle.
+ * @param x, y, z The voxel.
+ * @return True if it's solid; false if open, or off the map.
+ */
+bool gameSolidVoxel(SavedBattleGame *save, int x, int y, int z)
+{
+	if (x < 0 || y < 0 || z < 0) return false;
+	const Tile *tile = save->getTile(Position(x / 16, y / 16, z / 24));
+	if (!tile) return false;
+	if (tile->hasGravLiftFloor() && z % 24 < 2)
+	{
+		const Tile *below = save->getBelowTile(tile);
+		if (!(below && below->hasGravLiftFloor())) return true;
+	}
+	const std::vector<Uint16> *voxelData = save->getMod()->getVoxelData();
+	for (int part = O_FLOOR; part <= O_OBJECT; ++part)
+	{
+		if ((part == O_WESTWALL || part == O_NORTHWALL) && tile->isUfoDoorOpen((TilePart)part)) continue;
+		const MapData *data = tile->getMapData((TilePart)part);
+		if (!data) continue;
+		const size_t index = (size_t)data->getLoftID((z % 24) / 2) * 16 + y % 16;
+		if (index < voxelData->size() && ((*voxelData)[index] & (1 << (15 - x % 16)))) return true;
+	}
+	return false;
+}
+
+/**
+ * Where a unit's picture stands (see SpriteCard), worked out afresh: the anchor pixel at the middle
+ * of its tiles, on its tile's floor (by the tile's terrain level; a unit on the move between the
+ * tiles of its step, where the 3D view draws it), raised out of the floor's solid voxels as the 3D
+ * view raises it (see FirstPersonView::standingHeight: it builds a floor two voxels
+ * thick and stands units on its top). While the view shows the battle, by the view's own reckoning;
+ * on the map the same way through the game's voxels (the same for every ordinary floor).
  * @param save The battle.
  * @param unit The unit.
- * @param middleX, middleY, feet Set to its middle and the height of its feet, in voxels.
+ * @param view The 3D view showing the battle, or null.
+ * @param anchor Set to the point, in voxels.
  */
-void standingPlace(SavedBattleGame *save, const BattleUnit *unit, double &middleX, double &middleY, double &feet)
+void standingAnchor(SavedBattleGame *save, const BattleUnit *unit, const FirstPersonView *view, double anchor[3])
 {
 	const int size = unit->getArmor()->getSize();
-	int terrainHeight = 0;
-	for (int x = 0; x < size; ++x)
+	// The middle of a unit's tiles at a position, on the floor (by the tile's terrain level).
+	auto place = [&](const Position &at, double out[3]) {
+		const Tile *tile = save->getTile(at);
+		out[0] = at.x * 16.0 + 8.0 * size;
+		out[1] = at.y * 16.0 + 8.0 * size;
+		out[2] = at.z * 24.0 - (tile ? tile->getTerrainLevel() : 0);
+	};
+	if (unit->getStatus() == STATUS_WALKING || unit->getStatus() == STATUS_FLYING)
 	{
-		for (int y = 0; y < size; ++y)
+		// On the move: between the tile it left and the one it's going to, by how far into the step
+		// the game is (a diagonal step takes twice as many phases), as the 3D view draws it (see
+		// FirstPersonView::drawUnits): not on the tile the game moves it to half way.
+		double from[3], to[3];
+		place(unit->getLastPosition(), from);
+		place(unit->getDestination(), to);
+		const double walkPhase = unit->getWalkingPhase() + unit->getDiagonalWalkingPhase();
+		const double progress = std::clamp(walkPhase / ((unit->getDirection() % 2) ? 16.0 : 8.0), 0.0, 1.0);
+		for (int axis = 0; axis < 3; ++axis) anchor[axis] = from[axis] + (to[axis] - from[axis]) * progress;
+	}
+	else
+	{
+		place(unit->getPosition(), anchor);
+	}
+	double height;
+	if (view && view->standingHeightNow(anchor, height))
+	{
+		anchor[2] = height;
+		return;
+	}
+	// (FirstPersonView::riseOutOfSolid in the game's voxels: the first open voxel up, StandRaiseMax at most)
+	const int x = (int)std::floor(anchor[0]), y = (int)std::floor(anchor[1]), z = (int)std::floor(anchor[2]);
+	if (x >= save->getMapSizeX() * 16 || y >= save->getMapSizeY() * 16) return;
+	for (int raise = 0; raise <= StandRaiseMax; ++raise)
+	{
+		if (z + raise >= save->getMapSizeZ() * 24) return;
+		if (!gameSolidVoxel(save, x, y, z + raise))
 		{
-			const Tile *tile = save->getTile(unit->getPosition() + Position(x, y, 0));
-			if (tile) terrainHeight = std::min(terrainHeight, tile->getTerrainLevel());
+			if (raise > 0) anchor[2] = z + raise;
+			return;
 		}
 	}
-	middleX = unit->getPosition().x * 16.0 + 8.0 * size;
-	middleY = unit->getPosition().y * 16.0 + 8.0 * size;
-	feet = unit->getPosition().z * 24.0 - terrainHeight;
 }
 
 /**
- * Does this voxel of a line of fire hit the unit's voxel body (settings "Voxel units" and "Full sprite hitboxes", the
- * owner's: "hit-boxes should be their whole bodies")? The body stands as the 3D view draws it: in the middle of the
- * unit's tiles on its floor, turned to the way it faces, at the setting "Unit size", and as it shows to an eye at the
- * line's start (from that side, level with it or from above: see VoxelUnitModel::views); the voxel hits where the body
- * is solid.
- * @param body The unit's body.
+ * Where a unit's picture stands (see standingAnchor), kept while the battle's animation frame lasts,
+ * the unit on the same tile and as far into its step, and the 3D view showing the battle or not, as
+ * it was: the lines ask it again and again.
  * @param save The battle.
  * @param unit The unit.
- * @param voxel The voxel.
- * @param origin Where the line starts.
- * @return True if the voxel hits the body.
+ * @param anchor Set to the point, in voxels.
  */
-bool bodyHit(const VoxelUnitModel &body, SavedBattleGame *save, const BattleUnit *unit, const Position &voxel, const Position &origin)
+void pictureAnchor(SavedBattleGame *save, const BattleUnit *unit, double anchor[3])
 {
-	double middleX, middleY, feet;
-	standingPlace(save, unit, middleX, middleY, feet);
-	// the voxel in the body's own right, ahead and up (the view turns the body by the way it faces: see
-	// FirstPersonView::recordVoxelUnit), at the unit's size
-	const double scale = std::clamp(Options::fpsUnitSize, 80, 100) / 100.0;
-	const double angle = unit->getDirection() * Pi / 4.0, cosine = std::cos(angle), sine = std::sin(angle);
-	const double relativeX = voxel.x + 0.5 - middleX, relativeY = voxel.y + 0.5 - middleY;
-	const float right = (float)((relativeX * cosine + relativeY * sine) / scale), ahead = (float)((relativeX * sine - relativeY * cosine) / scale);
-	const float up = (float)((voxel.z + 0.5 - feet) / scale);
-	// the side it shows to the line's start, as the view picks it for an eye there (see FirstPersonView::drawUnits)
-	const double towardsX = origin.x + 0.5 - middleX, towardsY = origin.y + 0.5 - middleY;
-	const double toEyeDegrees = std::atan2(towardsY, towardsX) * 180.0 / Pi;
-	const int eyeDirection = (((int)std::lround((toEyeDegrees + 90.0) / 45.0)) % 8 + 8) % 8;
-	const int direction = ((unit->getDirection() + 3 - eyeDirection) % 8 + 8) % 8;
-	const double flat = std::max(1.0, std::hypot(towardsX, towardsY));
-	const bool level = std::atan2((origin.z + 0.5 - (feet + 12.0)) * ZScale, flat) < VoxelSlantAbove * Pi / 180.0;
-	return body.hitAt(right, ahead, up, direction, level);
+	struct Anchor
+	{
+		const SavedBattleGame *save = nullptr;
+		int animFrame = -1, status = -1, phase = -1;
+		Position at;
+		bool viewed = false;
+		double point[3] = {};
+	};
+	static std::map<const BattleUnit*, Anchor> anchors;
+	static const SavedBattleGame *anchorsSave = nullptr;
+	if (anchorsSave != save)
+	{
+		anchors.clear(); // (a new battle's units)
+		anchorsSave = save;
+	}
+	const FirstPersonView *view = FirstPersonMode::shootingView(save->getBattleState());
+	Anchor &kept = anchors[unit];
+	const int status = (int)unit->getStatus(), phase = unit->getWalkingPhase() + 100 * unit->getDiagonalWalkingPhase();
+	if (kept.save != save || kept.animFrame != save->getAnimFrame() || kept.at != unit->getPosition() || kept.viewed != (view != nullptr)
+		|| kept.status != status || kept.phase != phase)
+	{
+		kept.save = save;
+		kept.animFrame = save->getAnimFrame();
+		kept.status = status;
+		kept.phase = phase;
+		kept.at = unit->getPosition();
+		kept.viewed = view != nullptr;
+		standingAnchor(save, unit, view, kept.point);
+	}
+	std::copy(kept.point, kept.point + 3, anchor);
+}
+
+/**
+ * The view rotation for a unit's frame seen from a point: the isometric art shows units from the
+ * south-east (direction 3); turned by the direction from the unit to the point (0 north,
+ * clockwise; atan2 measures from east, so a quarter turn is added), as the 3D view turns it.
+ * @param towardsX, towardsY The way from the unit to the point.
+ * @return The rotation.
+ */
+int rotationTowards(double towardsX, double towardsY)
+{
+	const double degrees = std::atan2(towardsY, towardsX) * 180.0 / Pi;
+	const int direction = (((int)std::lround((degrees + 90.0) / 45.0)) % 8 + 8) % 8;
+	return 3 - direction;
+}
+
+/**
+ * The parts of a card every card shares: the unit, where it stands, its anchor pixel and the
+ * setting "Unit size", and whether its art below the feet counts (a unit drawn standing in the
+ * air: on a floor that art lies flat on the floor, see FirstPersonView::drawUnits).
+ * @param save The battle.
+ * @param unit The unit.
+ * @param card The card to start.
+ * @return The card's scale (world size per picture pixel).
+ */
+double startCard(SavedBattleGame *save, const BattleUnit *unit, SpriteCard &card)
+{
+	card.unit = unit;
+	pictureAnchor(save, unit, card.anchor);
+	card.anchorX = 32;
+	card.anchorY = unit->getArmor()->getSize() == 1 ? 40 : 48; // the floor diamond's middle; a big unit's, the corner its four tiles share
+	card.rowsBelow = unit->haveNoFloorBelow() || unit->getStatus() == STATUS_FLYING;
+	return std::clamp(Options::fpsUnitSize, 80, 100) / 100.0;
+}
+
+/**
+ * A unit's card for a line from a point (everyone's but the looked-through soldier's own): upright,
+ * facing the point across the map (straight above or below it, the way the map shows units, from
+ * the south-east), its frame the one seen from that side.
+ * @param save The battle.
+ * @param unit The unit.
+ * @param from The point, in voxels.
+ * @param card Set to the card.
+ */
+void uprightCard(SavedBattleGame *save, const BattleUnit *unit, const double from[3], SpriteCard &card)
+{
+	const double scale = startCard(save, unit, card);
+	double towardsX = from[0] - card.anchor[0], towardsY = from[1] - card.anchor[1];
+	if (std::hypot(towardsX, towardsY) < StraightAboveReach)
+	{
+		towardsX = 1.0;
+		towardsY = 1.0;
+	}
+	const double length = std::hypot(towardsX, towardsY);
+	towardsX /= length;
+	towardsY /= length;
+	// Looking along minus towards, right is (towardsY, -towardsX); a picture pixel is SpritePixelX
+	// of a voxel across and one voxel up, as the isometric art draws, times the scale.
+	const double column[3] = { towardsY * SpritePixelX * scale, -towardsX * SpritePixelX * scale, 0.0 };
+	const double row[3] = { 0.0, 0.0, scale };
+	const double normal[3] = { towardsX, towardsY, 0.0 };
+	std::copy(column, column + 3, card.column);
+	std::copy(row, row + 3, card.row);
+	std::copy(normal, normal + 3, card.normal);
+	card.picture = &spriteOf(save, unit, rotationTowards(towardsX, towardsY));
+}
+
+/**
+ * A unit's card as the 3D view draws it (the looked-through soldier's own lines, see SpriteCard):
+ * where it drew it last (a unit on the move as it glides between the game's small steps),
+ * square to the view across the map, leaning as the view looks up or down (see FirstPersonView::
+ * cardAxes), its frame the one the view shows (smooth up close, as the view draws it: see
+ * FirstPersonView::smoothPicture).
+ * @param save The battle.
+ * @param unit The unit.
+ * @param view The view.
+ * @param card Set to the card.
+ */
+void drawnCard(SavedBattleGame *save, const BattleUnit *unit, const FirstPersonView *view, SpriteCard &card)
+{
+	const double scale = startCard(save, unit, card);
+	// Where the view drew it last (it eases each unit between the game's small steps, see
+	// FirstPersonView::drawUnits): there, its feet on the floor's top as the view stands it.
+	double feet[3], height;
+	if (view->drawnFeet(unit, feet) && view->standingHeightNow(feet, height))
+	{
+		card.anchor[0] = feet[0];
+		card.anchor[1] = feet[1];
+		card.anchor[2] = height;
+	}
+	view->cardAxes(card.anchor, scale, card.column, card.row);
+	// The normal: column cross row, made a unit vector.
+	double normal[3] = { card.column[1] * card.row[2] - card.column[2] * card.row[1], card.column[2] * card.row[0] - card.column[0] * card.row[2],
+		card.column[0] * card.row[1] - card.column[1] * card.row[0] };
+	const double length = std::sqrt(dot(normal, normal));
+	for (int axis = 0; axis < 3; ++axis) card.normal[axis] = length > 0.0 ? normal[axis] / length : 0.0;
+	double eye[3];
+	view->getSteadyEye(eye);
+	const int rotation = unitViewRotation(eye, card.anchor); // (the side the view draws it from)
+	card.picture = &spriteOf(save, unit, rotation);
+	// Drawn smooth up close (setting "Sprite upscaling"): that picture, the very frame (see FirstPersonView::smoothPicture).
+	card.smooth = view->smoothPicture(unit, rotation, *card.picture, card.factor);
+	if (!card.smooth) card.factor = 1;
+}
+
+/**
+ * The voxel body a unit is hit by (settings "Voxel units" and "Full sprite hitboxes", the owner's: "hit-boxes should be
+ * their whole bodies"): the one made for it as it is now (every unit's is made from the battle's start, see
+ * FirstPersonMode::makeVoxelBodies; a unit without one yet is hit by its picture).
+ * @param save The battle.
+ * @param unit The unit.
+ * @return The body, or null (hit by its picture).
+ */
+const VoxelUnitModel *hitBody(SavedBattleGame *save, const BattleUnit *unit)
+{
+	if (!Options::fpsVoxelUnits)
+	{
+		return nullptr;
+	}
+	VoxelUnits *bodies = FirstPersonMode::voxelUnits(save->getBattleState());
+	return bodies && VoxelUnits::suits(unit) ? bodies->bodyNow(unit) : nullptr;
+}
+
+/**
+ * A unit's voxel body as a line tests it (see hitBody): where it stands and how it's turned, worked out once for the
+ * line (see bodyStance), then tested voxel by voxel (see bodyHit).
+ */
+struct LineBody
+{
+	const VoxelUnitModel *body = nullptr;
+	double feet[3] = {};             // the middle of its feet, in voxels
+	double cosine = 1.0, sine = 0.0; // turned to the way it faces
+	double scale = 1.0;              // the setting "Unit size"
+	int direction = 0;               // the side it shows (its frames' direction, 0-7)
+	bool level = true;               // seen level with it, or from above
+};
+
+/**
+ * Where a unit's body stands for a line, and what of it shows to the line (see LineBody), as the 3D view draws it (see
+ * FirstPersonView::drawUnits, recordVoxelUnit): its feet where its picture's card would stand (see startCard and
+ * drawnCard: for the looked-through soldier's own lines where the view drew it last, else where it stands, on the move
+ * between the tiles of its step, on the floor's top), turned to the way it faces, at the setting "Unit size", showing
+ * the side turned towards the line's start (for his own lines, towards the view's steady eye; straight above or below
+ * it, from the south-east: see unitViewRotation), level with it or from higher than VoxelSlantAbove (see
+ * VoxelUnitModel::views).
+ * @param save The battle.
+ * @param unit The unit.
+ * @param body Its body.
+ * @param ownView The 3D view for the looked-through soldier's own lines, else null.
+ * @param from The line's start, in voxels (a step of a curve: the curve's start, see ArcLines).
+ * @param stance Set to the body as the line tests it.
+ */
+void bodyStance(SavedBattleGame *save, const BattleUnit *unit, const VoxelUnitModel *body, const FirstPersonView *ownView, const double from[3], LineBody &stance)
+{
+	stance.body = body;
+	SpriteCard card;
+	stance.scale = startCard(save, unit, card);
+	std::copy(card.anchor, card.anchor + 3, stance.feet);
+	double eye[3] = { from[0], from[1], from[2] };
+	if (ownView)
+	{
+		double feet[3], height;
+		if (ownView->drawnFeet(unit, feet) && ownView->standingHeightNow(feet, height))
+		{
+			stance.feet[0] = feet[0];
+			stance.feet[1] = feet[1];
+			stance.feet[2] = height;
+		}
+		ownView->getSteadyEye(eye);
+	}
+	const double angle = unit->getDirection() * Pi / 4.0;
+	stance.cosine = std::cos(angle);
+	stance.sine = std::sin(angle);
+	stance.direction = ((unit->getDirection() + unitViewRotation(eye, stance.feet)) % 8 + 8) % 8;
+	const double flat = std::max(1.0, std::hypot(eye[0] - stance.feet[0], eye[1] - stance.feet[1]));
+	stance.level = std::atan2((eye[2] - (stance.feet[2] + 12.0)) * ZScale, flat) < VoxelSlantAbove * Pi / 180.0;
+}
+
+/**
+ * Does a point of a line hit a unit's body where it stands for the line (see bodyStance)? Where the body is solid there
+ * (in its own right, ahead and up, at its size), as it shows from that side.
+ * @param stance The body as the line tests it.
+ * @param point The point (a voxel's middle), in voxels.
+ * @return True if it's hit there.
+ */
+bool bodyHit(const LineBody &stance, const double point[3])
+{
+	const double relativeX = point[0] - stance.feet[0], relativeY = point[1] - stance.feet[1];
+	const float right = (float)((relativeX * stance.cosine + relativeY * stance.sine) / stance.scale);
+	const float ahead = (float)((relativeX * stance.sine - relativeY * stance.cosine) / stance.scale);
+	const float up = (float)((point[2] - stance.feet[2]) / stance.scale);
+	return stance.body->hitAt(right, ahead, up, stance.direction, stance.level);
+}
+
+/**
+ * The line being walked (see spriteHitAt), worked out once for all its voxels: where it starts
+ * and which way it goes, and the cards of the units near enough to it, with where it crosses each
+ * and whether on a solid pixel (with "Voxel units", a unit hit by its body has its body instead,
+ * see LineBody). A line has a serial number from the game (TileEngine): a new one is worked out
+ * afresh.
+ */
+struct LineCard
+{
+	BattleUnit *unit;
+	SpriteCard card;
+	double along;  // where the line crosses the card, in voxels from its start
+	bool solid;    // on a solid pixel of the picture
+	LineBody body; // with "Voxel units": its body (body.body set), tested voxel by voxel instead of the card
+};
+struct LineContext
+{
+	const SavedBattleGame *save = nullptr;
+	unsigned serial = 0;
+	double start[3] = {}, direction[3] = {};
+	std::vector<LineCard> cards;
+	bool exact = false; // along the crosshair's exact ray (see ExactLine)
+};
+
+/**
+ * The line being walked now (one at a time: the game's thread).
+ */
+LineContext &lineContext()
+{
+	static LineContext line;
+	return line;
+}
+
+/**
+ * The crosshair's exact ray (see ExactLine): set while the aim's line is walked.
+ */
+struct ExactRay
+{
+	bool active = false;
+	double eye[3] = {}, direction[3] = {};
+	Position start;
+	bool crossed = false;   // the last exact line met a picture
+	double crossing[3] = {}; // where
+};
+ExactRay &exactRay()
+{
+	static ExactRay ray;
+	return ray;
+}
+
+/**
+ * The curve being walked (see ArcLines): while it is, the pictures its steps meet face its start.
+ */
+struct ArcFacing
+{
+	bool active = false;
+	double from[3] = {}; // the curve's start, in voxels (the middle of its first voxel)
+};
+ArcFacing &arcFacing()
+{
+	static ArcFacing facing;
+	return facing;
+}
+
+/**
+ * Works out a line afresh (see LineContext): its start and direction (between the middles of its
+ * first and last voxels; the crosshair's own exact ray instead, see ExactLine), whose line it is
+ * (the looked-through soldier's own when he is left out of it, the 3D view shows the battle and
+ * it starts at his eye: then the pictures are the cards the view draws), and the cards of the
+ * units it passes near, but the one left out (or all but the only one tested). A step of a curve
+ * (see ArcLines): the cards face the curve's start, the line itself still what crosses them (with
+ * "Voxel units", a body shows the curve's start its side, tested at the step's own voxels).
+ * @param save The battle.
+ * @param origin, target The line's first and last voxels.
+ * @param serial The line's serial number.
+ * @param excludeUnit The unit left out of it (or null).
+ * @param excludeAllBut The only unit it tests (or null: all).
+ */
+void prepareLine(SavedBattleGame *save, const Position &origin, const Position &target, unsigned serial, const BattleUnit *excludeUnit, const BattleUnit *excludeAllBut)
+{
+	LineContext &line = lineContext();
+	line.save = save;
+	line.serial = serial;
+	line.cards.clear();
+	const ExactRay &ray = exactRay();
+	line.exact = ray.active && origin == ray.start;
+	double length;
+	if (line.exact)
+	{
+		std::copy(ray.eye, ray.eye + 3, line.start);
+		std::copy(ray.direction, ray.direction + 3, line.direction);
+		length = std::sqrt(std::pow(target.x - origin.x, 2.0) + std::pow(target.y - origin.y, 2.0) + std::pow(target.z - origin.z, 2.0)) + 1.0;
+	}
+	else
+	{
+		const double start[3] = { origin.x + 0.5, origin.y + 0.5, origin.z + 0.5 };
+		const double end[3] = { target.x + 0.5, target.y + 0.5, target.z + 0.5 };
+		const double span[3] = { end[0] - start[0], end[1] - start[1], end[2] - start[2] };
+		length = std::sqrt(dot(span, span));
+		if (length < 1e-6) return; // (a line going nowhere crosses nothing)
+		std::copy(start, start + 3, line.start);
+		for (int axis = 0; axis < 3; ++axis) line.direction[axis] = span[axis] / length;
+	}
+	// Whose line: the looked-through soldier's own, from his eye, while the 3D view shows the battle.
+	const FirstPersonView *view = FirstPersonMode::shootingView(save->getBattleState());
+	bool own = false;
+	if (view && excludeUnit && excludeUnit == view->getCameraUnit())
+	{
+		double eye[3];
+		view->getEye(eye);
+		own = std::hypot(line.start[0] - eye[0], line.start[1] - eye[1]) <= OwnLineReach;
+	}
+	// The units whose pictures the line may reach (down or left out of it not): where the line is
+	// within the heights a unit's picture may have, from below its tile to above it, how near it
+	// comes to the middle of its tiles across the map, within the picture's reach.
+	// (first a box round the line, as far out as any picture reaches: most units lie outside it)
+	const double flat = line.direction[0] * line.direction[0] + line.direction[1] * line.direction[1];
+	const double boxReach = PictureReachBig + (own ? PictureLeanReach + GlideReach : 0.0) + 24.0;
+	const double end[3] = { line.start[0] + line.direction[0] * length, line.start[1] + line.direction[1] * length, line.start[2] + line.direction[2] * length };
+	const double boxLow[3] = { std::min(line.start[0], end[0]) - boxReach, std::min(line.start[1], end[1]) - boxReach, std::min(line.start[2], end[2]) - PictureAbove - 48.0 };
+	const double boxHigh[3] = { std::max(line.start[0], end[0]) + boxReach, std::max(line.start[1], end[1]) + boxReach, std::max(line.start[2], end[2]) + PictureBelow + 24.0 };
+	for (BattleUnit *unit : *save->getUnits())
+	{
+		const Position at = unit->getPosition();
+		if (at.x * 16.0 < boxLow[0] || at.x * 16.0 > boxHigh[0] || at.y * 16.0 < boxLow[1] || at.y * 16.0 > boxHigh[1] || at.z * 24.0 < boxLow[2] || at.z * 24.0 > boxHigh[2]) continue;
+		if (unit->isOut() || unit == excludeUnit || (excludeAllBut && unit != excludeAllBut) || !unit->getTile()) continue;
+		const int size = unit->getArmor()->getSize();
+		double anchor[3];
+		pictureAnchor(save, unit, anchor);
+		double from = -1.0, to = length + 1.0;
+		const double slack = own ? GlideReach : 0.0;
+		const double low = anchor[2] - PictureBelow - slack - line.start[2], high = anchor[2] + PictureAbove + slack - line.start[2];
+		if (std::abs(line.direction[2]) > 1e-9)
+		{
+			const double first = low / line.direction[2], last = high / line.direction[2];
+			from = std::max(from, std::min(first, last));
+			to = std::min(to, std::max(first, last));
+		}
+		else if (low > 0.0 || high < 0.0)
+		{
+			continue;
+		}
+		if (from > to) continue;
+		const double middleX = anchor[0] - line.start[0], middleY = anchor[1] - line.start[1];
+		const double nearest = std::clamp(flat > 1e-12 ? (middleX * line.direction[0] + middleY * line.direction[1]) / flat : from, from, to);
+		const double asideX = middleX - nearest * line.direction[0], asideY = middleY - nearest * line.direction[1];
+		const double reach = (size == 1 ? PictureReachSmall : PictureReachBig) + (own ? PictureLeanReach + GlideReach : 0.0);
+		if (asideX * asideX + asideY * asideY > reach * reach) continue;
+		LineCard lineCard;
+		lineCard.unit = unit;
+		if (const VoxelUnitModel *body = hitBody(save, unit))
+		{
+			// (with "Voxel units": its body, tested at each voxel of the line)
+			// (a step of a curve: the side shown to the curve's start, as a card faces it, see ArcLines)
+			bodyStance(save, unit, body, own ? view : nullptr, arcFacing().active ? arcFacing().from : line.start, lineCard.body);
+			lineCard.along = 0.0;
+			lineCard.solid = true;
+			line.cards.push_back(lineCard);
+			continue;
+		}
+		if (own) drawnCard(save, unit, view, lineCard.card);
+		else uprightCard(save, unit, arcFacing().active ? arcFacing().from : line.start, lineCard.card);
+		lineCard.solid = cardRay(lineCard.card, line.start, line.direction, lineCard.along);
+		if (lineCard.solid) line.cards.push_back(lineCard);
+	}
+}
+
 }
 
 /**
@@ -222,78 +742,265 @@ bool spriteHitboxes(BattlescapeState *state)
 }
 
 /**
- * Does this voxel of a line of fire hit the unit's picture (setting "Full sprite hitboxes")? The
- * picture stands as the 3D view draws it: a card through the middle of the unit's tiles, its feet
- * on the floor (the lowest of its tiles' ground), at the setting "Unit size", here upright and
- * facing the line's start (the shooter), its frame the one seen from the shooter's side. A voxel
- * hits where it lies on that card (within SpriteHitSlab of it) on one of the picture's solid
- * pixels; see-through pixels let the line on. One sprite pixel is SpritePixelX of a voxel across
- * and one voxel up, as the isometric art draws. A shot's impact (its line found the unit there,
- * and the game asks again for which part was hit) is always the unit's.
+ * Which unit's picture a voxel of a line of fire hits (setting "Full sprite hitboxes"): the line
+ * meets a picture where it crosses its card (see SpriteCard), on the very pixel it goes through
+ * there (see cardRay), at the voxel of the line at that crossing; see-through pixels let it on.
+ * Any unit's whose card reaches the line, not only the one on the voxel's tile: a picture
+ * reaching over a neighbouring tile is hit there too. With "Voxel units" a unit whose body is made
+ * is hit where its body is solid (see bodyHit), over a neighbouring tile too. Of two met at the
+ * same voxel, the nearer.
  * @param save The battle.
- * @param unit The unit on the voxel's tile.
  * @param voxel The voxel.
- * @param origin Where the line starts.
- * @param impact Whether it's a shot's impact.
- * @return True if the voxel hits the unit.
+ * @param origin, target The line's first and last voxels.
+ * @param serial The line's serial number (TileEngine counts the lines it walks).
+ * @param excludeUnit The unit left out of the line (or null).
+ * @param onlyVisible Whether only units the player sees count.
+ * @param excludeAllBut The only unit tested (or null: all).
+ * @return The unit hit, or null.
  */
-bool spriteHit(SavedBattleGame *save, const BattleUnit *unit, const Position &voxel, const Position &origin, bool impact)
+BattleUnit *spriteHitAt(SavedBattleGame *save, const Position &voxel, const Position &origin, const Position &target, unsigned serial,
+	const BattleUnit *excludeUnit, bool onlyVisible, const BattleUnit *excludeAllBut)
 {
-	if (impact)
+	LineContext &line = lineContext();
+	if (line.save != save || line.serial != serial)
 	{
-		return true;
+		prepareLine(save, origin, target, serial, excludeUnit, excludeAllBut);
 	}
-	// With "Voxel units", a unit whose body is made is hit where its body is (they're made for every unit from the
-	// battle's start: see FirstPersonMode::makeVoxelBodies); else by its picture.
-	if (Options::fpsVoxelUnits)
+	const double middle[3] = { voxel.x + 0.5, voxel.y + 0.5, voxel.z + 0.5 };
+	const double fromStart[3] = { middle[0] - line.start[0], middle[1] - line.start[1], middle[2] - line.start[2] };
+	const double voxelAlong = dot(fromStart, line.direction);
+	BattleUnit *hit = nullptr;
+	double hitAlong = std::numeric_limits<double>::max();
+	for (const LineCard &lineCard : line.cards)
 	{
-		VoxelUnits *bodies = FirstPersonMode::voxelUnits(save->getBattleState());
-		if (const VoxelUnitModel *body = bodies && VoxelUnits::suits(unit) ? bodies->bodyNow(unit) : nullptr)
+		if (onlyVisible && !lineCard.unit->getVisible()) continue;
+		double along;
+		if (lineCard.body.body)
 		{
-			return bodyHit(*body, save, unit, voxel, origin);
+			// A body (setting "Voxel units"): hit at the voxel itself where the body is solid.
+			if (!bodyHit(lineCard.body, middle)) continue;
+			along = voxelAlong;
+		}
+		else
+		{
+			const SpriteCard &card = lineCard.card;
+			const double fromAnchor[3] = { middle[0] - card.anchor[0], middle[1] - card.anchor[1], middle[2] - card.anchor[2] };
+			if (std::abs(dot(fromAnchor, card.normal)) > CardGate || std::abs(voxelAlong - lineCard.along) > CardGateAlong) continue;
+			along = lineCard.along;
+		}
+		if (along < hitAlong)
+		{
+			hit = lineCard.unit;
+			hitAlong = along;
 		}
 	}
-	// Where the unit stands.
+	if (hit && line.exact)
+	{
+		ExactRay &ray = exactRay();
+		ray.crossed = true;
+		for (int axis = 0; axis < 3; ++axis) ray.crossing[axis] = line.start[axis] + line.direction[axis] * hitAlong;
+	}
+	return hit;
+}
+
+/**
+ * Starts a curve's lines (see FirstPersonApi.h): with the setting on, the pictures they meet face
+ * the curve's start.
+ * @param save The battle.
+ * @param origin The curve's first voxel.
+ */
+ArcLines::ArcLines(SavedBattleGame *save, const Position &origin) : _set(save && spriteHitboxes(save->getBattleState()))
+{
+	ArcFacing &facing = arcFacing();
+	_outerActive = facing.active;
+	std::copy(facing.from, facing.from + 3, _outerFrom);
+	if (_set)
+	{
+		facing.active = true;
+		facing.from[0] = origin.x + 0.5;
+		facing.from[1] = origin.y + 0.5;
+		facing.from[2] = origin.z + 0.5;
+		lineContext().save = nullptr; // (worked out afresh, as ExactLine does)
+	}
+}
+
+/**
+ * Ends a curve's lines: the pictures face each line's own start again.
+ */
+ArcLines::~ArcLines()
+{
+	if (_set)
+	{
+		ArcFacing &facing = arcFacing();
+		facing.active = _outerActive;
+		std::copy(_outerFrom, _outerFrom + 3, facing.from);
+		lineContext().save = nullptr;
+	}
+}
+
+/**
+ * Where an arcing shot at a unit aims across the map (see FirstPersonApi.h): with the setting on, a
+ * big unit's middle (its picture stands there, see standingAnchor; the game aims at the tile's).
+ * @param state The battle's screen.
+ * @param unit The unit aimed at.
+ * @param aim The point aimed at, its across the map (x, y) set to the big unit's middle.
+ */
+void arcAimAtPicture(BattlescapeState *state, const BattleUnit *unit, Position &aim)
+{
+	const int size = unit ? unit->getArmor()->getSize() : 1;
+	if (size < 2 || !spriteHitboxes(state))
+	{
+		return;
+	}
+	aim.x = unit->getPosition().x * 16 + 8 * size;
+	aim.y = unit->getPosition().y * 16 + 8 * size;
+}
+
+/**
+ * Does a curve tried for an arcing shot land on the unit aimed at (see FirstPersonApi.h)? With the
+ * setting on, a shot's curve that met the unit on the aimed tile (its picture: see spriteImpact, the
+ * stop on one of its tiles) on any of its tiles.
+ * @param save The battle.
+ * @param thrown A throw's curve (never: an item stopped by a unit drops short of its tile).
+ * @param meets What the curve met (V_UNIT...).
+ * @param impact Where it stopped.
+ * @param aimTile The tile of the point aimed at.
+ * @return True if it lands on the unit aimed at.
+ */
+bool arcMeetsAimedUnit(SavedBattleGame *save, bool thrown, int meets, const Position &impact, const Position &aimTile)
+{
+	if (thrown || meets != V_UNIT || !spriteHitboxes(save->getBattleState()))
+	{
+		return false;
+	}
+	const Tile *aimed = save->getTile(aimTile), *stopped = save->getTile(impact.toTile());
+	const BattleUnit *unit = aimed ? aimed->getOverlappingUnit(save) : nullptr;
+	return unit && stopped && stopped->getOverlappingUnit(save) == unit;
+}
+
+/**
+ * Where the game is to count a round that met a unit's picture as stopping (setting "Full sprite
+ * hitboxes"; its hits, the body part and the blast are worked out from there, on the unit's tile):
+ * the voxel itself if it lies on one of the unit's tiles, else the nearest voxel of them (a picture
+ * reaching over a neighbouring tile, or above its level, was hit there).
+ * @param save The battle.
+ * @param unit The unit hit.
+ * @param voxel The voxel of the line where it met the picture.
+ * @return The voxel.
+ */
+Position spriteImpact(SavedBattleGame *save, const BattleUnit *unit, const Position &voxel)
+{
 	const int size = unit->getArmor()->getSize();
-	double middleX, middleY, feet;
-	standingPlace(save, unit, middleX, middleY, feet);
+	const Position at = unit->getPosition();
+	return Position(std::clamp<int>(voxel.x, at.x * 16, (at.x + size) * 16 - 1), std::clamp<int>(voxel.y, at.y * 16, (at.y + size) * 16 - 1),
+		std::clamp<int>(voxel.z, at.z * 24, at.z * 24 + 23));
+}
 
-	// The card faces the line's start (straight above or below it, the way the map shows units,
-	// from the south-east).
-	double towardsX = origin.x + 0.5 - middleX, towardsY = origin.y + 0.5 - middleY;
-	const double length = std::hypot(towardsX, towardsY);
-	if (length < 1.0)
+/**
+ * The side a unit's frame is drawn from in a 3D view (see FirstPersonSpriteHits.h).
+ */
+int unitViewRotation(const double eye[3], const double feet[3])
+{
+	const double towardsX = eye[0] - feet[0], towardsY = eye[1] - feet[1];
+	if (std::hypot(towardsX, towardsY) < StraightAboveReach)
 	{
-		towardsX = 1.0;
-		towardsY = 1.0;
+		return rotationTowards(1.0, 1.0); // from the south-east, as the map shows it
 	}
-	const double towardsLength = std::hypot(towardsX, towardsY);
-	towardsX /= towardsLength;
-	towardsY /= towardsLength;
+	return rotationTowards(towardsX, towardsY);
+}
 
-	// The voxel on the card: how far in front of it, how far right of its middle as the shooter
-	// sees it (looking along minus towards, right is (towardsY, -towardsX)), and how high.
-	const double relativeX = voxel.x + 0.5 - middleX, relativeY = voxel.y + 0.5 - middleY;
-	if (std::abs(relativeX * towardsX + relativeY * towardsY) > SpriteHitSlab)
+/**
+ * The card the lines from a 3D view's eye test for a unit (see FirstPersonSpriteHits.h).
+ */
+bool viewCard(SavedBattleGame *save, const BattleUnit *unit, const FirstPersonView *view, SpriteCard &card)
+{
+	if (!save || !unit || !view || unit->isOut() || !unit->getTile() || hitBody(save, unit))
+	{
+		return false; // (with "Voxel units" a unit hit by its body has no card: bodies aren't outlined)
+	}
+	if (view == FirstPersonMode::shootingView(save->getBattleState()))
+	{
+		drawnCard(save, unit, view, card);
+	}
+	else
+	{
+		double eye[3];
+		view->getEye(eye);
+		uprightCard(save, unit, eye, card);
+	}
+	return true;
+}
+
+/**
+ * Where a line crosses a card, and whether on a solid pixel (see FirstPersonSpriteHits.h): the
+ * point on the card's plane, its picture column and row (the floor of how many pixels across and
+ * down from the anchor pixel it lies, as the 3D view finds a pixel, see FirstPersonView::drawSprite).
+ */
+bool cardRay(const SpriteCard &card, const double start[3], const double direction[3], double &along)
+{
+	along = 0.0;
+	const double facing = dot(direction, card.normal);
+	if (std::abs(facing) < 1e-9 || !card.picture)
+	{
+		return false; // (a line along the card's plane: it's seen edge on)
+	}
+	const double toAnchor[3] = { card.anchor[0] - start[0], card.anchor[1] - start[1], card.anchor[2] - start[2] };
+	along = dot(toAnchor, card.normal) / facing;
+	const double fromAnchor[3] = { start[0] + direction[0] * along - card.anchor[0], start[1] + direction[1] * along - card.anchor[1],
+		start[2] + direction[2] * along - card.anchor[2] };
+	const double across = dot(fromAnchor, card.column) / dot(card.column, card.column);
+	const double up = dot(fromAnchor, card.row) / dot(card.row, card.row);
+	if (card.smooth)
+	{
+		// The smooth picture: factor times as many pixels each way, its anchor pixel as many times further in.
+		const SDL_Surface *surface = const_cast<Surface*>(card.smooth)->getSurface(); // read only
+		const double column = std::floor(card.factor * (card.anchorX + across)), row = std::floor(card.factor * (card.anchorY - up));
+		if (column < 0 || row < 0 || column >= surface->w || row >= surface->h || (row >= card.anchorY * card.factor && !card.rowsBelow))
+		{
+			return false;
+		}
+		return ((const Uint8 *)surface->pixels)[(size_t)row * surface->pitch + (size_t)column] != 0;
+	}
+	const double column = std::floor(card.anchorX + across), row = std::floor(card.anchorY - up);
+	if (column < 0 || row < 0 || column >= SpriteBufferSize || row >= SpriteBufferSize || (row >= card.anchorY && !card.rowsBelow))
 	{
 		return false;
 	}
-	const double right = relativeX * towardsY - relativeY * towardsX, up = voxel.z + 0.5 - feet;
+	return (*card.picture)[(size_t)row * SpriteBufferSize + (size_t)column] != 0;
+}
 
-	// The picture's pixel there: anchored at the floor diamond's middle (a big unit's, the corner
-	// its four tiles share), at the setting "Unit size".
-	const double scale = std::clamp(Options::fpsUnitSize, 80, 100) / 100.0;
-	const int anchorX = 32, anchorY = size == 1 ? 40 : 48;
-	const int column = (int)std::floor(anchorX + right / (SpritePixelX * scale)), row = (int)std::floor(anchorY - up / scale);
-	if (column < 0 || row < 0 || column >= SpriteBufferSize || row >= SpriteBufferSize)
-	{
-		return false;
-	}
-	// The frame from the shooter's side: the isometric art shows units from the south-east
-	// (direction 3); turned by the direction from the unit to the shooter (0 north, clockwise).
-	const double toShooterDegrees = std::atan2(towardsY, towardsX) * 180.0 / Pi;
-	const int shooterDirection = (((int)std::lround((toShooterDegrees + 90.0) / 45.0)) % 8 + 8) % 8;
-	return spriteOf(save, unit, 3 - shooterDirection)[(size_t)row * SpriteBufferSize + column] != 0;
+/**
+ * Starts the crosshair's exact ray (see FirstPersonSpriteHits.h).
+ */
+ExactLine::ExactLine(const double eye[3], const double direction[3], const Position &start)
+{
+	ExactRay &ray = exactRay();
+	ray.active = true;
+	std::copy(eye, eye + 3, ray.eye);
+	std::copy(direction, direction + 3, ray.direction);
+	ray.start = start;
+	ray.crossed = false;
+	lineContext().save = nullptr; // (worked out afresh: the same voxels may have been walked before without it)
+}
+
+/**
+ * Ends the crosshair's exact ray.
+ */
+ExactLine::~ExactLine()
+{
+	exactRay().active = false;
+	lineContext().save = nullptr;
+}
+
+/**
+ * Where the last exact line met a picture (see FirstPersonSpriteHits.h).
+ */
+bool lastExactCrossing(double point[3])
+{
+	const ExactRay &ray = exactRay();
+	if (!ray.crossed) return false;
+	std::copy(ray.crossing, ray.crossing + 3, point);
+	return true;
 }
 
 /**

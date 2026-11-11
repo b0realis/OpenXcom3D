@@ -56,6 +56,7 @@
 #include <climits>
 #include <cmath>
 #include <string>
+#include "FirstPersonAmbience.h"
 #include "FirstPersonApi.h"
 #include "FirstPersonScanner.h"
 #include "FirstPersonSounds.h"
@@ -170,6 +171,7 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
 
 	// The mode's own sounds, and the canvas the overlays are drawn on before being magnified.
 	_sounds = new FirstPersonSounds();
+	_ambience = new FirstPersonAmbience(); // (its loops are made when the 3D view first shows the battle)
 	_scanner = new FirstPersonScanner(_game, _sounds);
 	makeCanvas();
 
@@ -230,10 +232,10 @@ void FirstPersonMode::createView()
 	surfaces.insert(std::find(surfaces.begin(), surfaces.end(), _state->_map) + 1, _view);
 
 	// What it shows: this battle, with the isometric map's shots and explosions, as far as the
-	// mod allows.
+	// setting "View distance" reaches (the mod's reach at its first value, see viewDistance).
 	_view->setSavedBattleGame(_save);
 	_view->setMap(_state->_map);
-	_view->setMaxDistance(mod->getFirstPerson().getMaxViewDistance());
+	_view->setMaxDistance(FirstPerson::viewDistance(mod));
 	_view->setVisible(false);
 	_ownSurfaces.insert(_view);
 }
@@ -961,7 +963,7 @@ void FirstPersonMode::resized(int widthChange, int heightChange)
 	newView->useVoxelUnits(_voxelUnits.get());
 	newView->setSavedBattleGame(_save);
 	newView->setMap(_state->_map);
-	newView->setMaxDistance(_game->getMod()->getFirstPerson().getMaxViewDistance());
+	newView->setMaxDistance(FirstPerson::viewDistance(_game->getMod()));
 	newView->setVisible(_view->getVisible());
 	replaceStateSurface(_view, newView);
 	_ownSurfaces.erase(_view);
@@ -1246,6 +1248,7 @@ FirstPersonMode::~FirstPersonMode()
 	delete _offHandSprite;
 	delete _bodySurface;
 	delete _scanner;
+	delete _ambience;
 	delete _sounds;
 	delete _canvas;
 }
@@ -1446,7 +1449,9 @@ void FirstPersonMode::toggleFlashlight()
  * is the game's own run (Ctrl on the map), at a faster pace: by the default rules it costs
  * three quarters of a walk's time units and half as much energy again, and only an armor that
  * allows running runs. A soldier without the energy for a run walks the step instead (see
- * runsStep). "SPRINT" shows under the compass while it's on. Each battle starts with it off.
+ * runsStep). Sprinting walks on past enemies coming into sight, as en passant does (GitHub issue
+ * #118; on the map a run does so where the mod's rules say so); being shot at stops it. "SPRINT"
+ * shows under the compass while it's on. Each battle starts with it off.
  */
 void FirstPersonMode::toggleSprint()
 {
@@ -1458,8 +1463,9 @@ void FirstPersonMode::toggleSprint()
 /**
  * Switches en passant on or off (its key, the one left of 1 by default): while it's on, an enemy
  * coming into sight doesn't stop the walk, as moving with Shift held doesn't on the map (the
- * game's own rule, its "ignore spotted enemies"). The banner still says ENEMY SPOTTED. "EN
- * PASSANT" shows under the compass while it's on. Each battle starts with it off.
+ * game's own rule, its "ignore spotted enemies"); being shot at still does, as on the map. The
+ * banner still says ENEMY SPOTTED. Sprinting walks on the same way. "EN PASSANT" shows under the
+ * compass while it's on. Each battle starts with it off.
  */
 void FirstPersonMode::toggleEnPassant()
 {
@@ -1968,9 +1974,19 @@ void FirstPersonMode::think()
 	// VR mode: the head looks (the shell's, or the desktop's stand-in), first, for everything below that reads where the
 	// view looks; and nothing shakes the view (see vrBeginFrame). With it off, nothing.
 	vrBeginFrame(elapsedSeconds);
+	// The rain, the wind and the fires near the soldier (setting "Ambient sounds"): heard in
+	// the 3D view, fading out on the map.
+	AmbientScene ambientScene;
+	if (isActive())
+	{
+		_view->ambientScene(ambientScene);
+	}
+	_ambience->update(ambientScene.ready ? &ambientScene : nullptr, elapsedSeconds);
 
 	// Explosions in 3D at the isometric map's pace (the battle's timer catching up).
 	catchUp();
+	// The numbers rising over the units hit (setting "Damage numbers"), in either view.
+	updateDamageNumbers(now);
 
 	// With "Voxel units" and "Full sprite hitboxes" a shot hits a unit's body: every unit's made, not only those seen.
 	if (Options::fpsVoxelUnits && Options::fpsSpriteHitboxes)
@@ -2113,6 +2129,7 @@ void FirstPersonMode::think()
 	updateScope();
 	_view->setFieldOfView(fieldOfViewNow(), _zoom);
 	_view->setSmoothLighting(Options::fpsSmoothLighting);
+	_view->setMaxDistance(FirstPerson::viewDistance(_game->getMod()));
 
 	// What happened to the soldier and around them: a new enemy spotted, hurt, on fire, a shot
 	// whizzing past; the recoil easing back, the game done aiming our last shot, and a held

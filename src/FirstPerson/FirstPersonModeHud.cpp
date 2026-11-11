@@ -54,6 +54,7 @@
 #include <climits>
 #include <cmath>
 #include <iomanip>
+#include <iterator>
 #include <sstream>
 #include <string>
 #include "FirstPersonApi.h"
@@ -86,6 +87,7 @@
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/SavedBattleGame.h"
 #include "../Savegame/SavedGame.h"
+#include "../Savegame/Tile.h"
 #include "../Savegame/Soldier.h"
 #include "FirstPersonModeShared.h"
 
@@ -2329,22 +2331,243 @@ void FirstPersonMode::selectUnit(BattleUnit *unit)
 
 /**
  * Hands the 3D view the visible enemies with their numbers, so it marks them. The numbers are
- * those of the classic HUD's red buttons on the right (one per enemy in sight), so a marker in
- * the 3D view and a button on the classic HUD always agree.
+ * those of the classic HUD's buttons on the right (one per enemy the squad sees), so a marker in
+ * the 3D view and a button on the classic HUD always agree; and so do their colours (setting
+ * "Enemy markers", a player, GitHub issue #117: "to reflect iso parity"): the game lists first the
+ * enemies the selected soldier sees, its red buttons, then the others the squad sees, green (see
+ * BattlescapeState::updateSoldierInfo). As the map: the markers red and green as those buttons;
+ * Clear shot, the default: the green ones the soldier has a clear line to yellow (see
+ * clearLineOfFire); All red: every enemy's red, as before. An enemy nobody sees has no button, so
+ * no marker. The game's buttons for our own come after them, the wounded's blue (fatal wounds, or
+ * burning with the game's option to show it so), then purple for those about to pass out (stunned
+ * to three quarters of their health, or out cold with their health draining): with the setting
+ * "Wounded markers" (a player on #117: "wounded having their own markers as blue, as iso"), each
+ * of those buttons showing marks its unit too, in its colour, with its number; a body over where
+ * it lies, a body carried (it has no place: the game's button centres the map on whoever carries
+ * it) over its carrier. Never over the soldier looked through (the view doesn't mark the unit it
+ * looks through), and none of them with the HUD hidden, as the enemies' own.
  */
 void FirstPersonMode::updateEnemyMarkers()
 {
-	// Every red button showing, with a standing enemy behind it, numbered from 1.
-	std::vector<std::pair<const BattleUnit*, int>> markers;
-	for (int buttonIndex = 0; buttonIndex < BattlescapeState::VISIBLE_MAX; ++buttonIndex)
+	const int colors = std::clamp(Options::fpsEnemyMarkers, 0, 2);
+	BattleUnit *viewer = _save->getSelectedUnit();
+	std::vector<FirstPersonView::EnemyMarker> markers;
+	std::vector<BattleUnit*> squadSeen; // the enemies the soldier doesn't see, marked green or yellow
+	for (int buttonIndex = 0; buttonIndex < _state->_numberOfEnemiesTotal && buttonIndex < BattlescapeState::VISIBLE_MAX; ++buttonIndex)
 	{
 		BattleUnit *enemy = _state->_visibleUnit[buttonIndex];
-		if (enemy && !enemy->isOut() && _state->_btnVisibleUnit[buttonIndex]->getVisible() && !hudHidden())
+		if (!enemy || enemy->isOut() || !_state->_btnVisibleUnit[buttonIndex]->getVisible() || hudHidden())
 		{
-			markers.push_back({ enemy, buttonIndex + 1 });
+			continue;
+		}
+		FirstPersonView::MarkerKind kind = FirstPersonView::MarkerSeen;
+		if (colors > 0 && buttonIndex >= _state->_numberOfDirectlyVisibleUnits)
+		{
+			kind = FirstPersonView::MarkerSquadSeen;
+			if (colors == 2 && viewer && enemy->getFaction() == FACTION_HOSTILE)
+			{
+				squadSeen.push_back(enemy);
+			}
+		}
+		markers.push_back({ enemy, buttonIndex + 1, kind });
+	}
+
+	// Clear shot: the answers kept for the enemies still marked, the others let go; then one answer worked out
+	// afresh this frame, the most needed: one for an enemy with none (or one for another soldier, from another place
+	// or facing, or for the enemy elsewhere) first, else the oldest once older than LineOfFireRefresh. The others keep
+	// the answers they have (an enemy with none yet stays green for the frames until its turn).
+	for (auto answer = _lineOfFire.begin(); answer != _lineOfFire.end();)
+	{
+		answer = std::find(squadSeen.begin(), squadSeen.end(), answer->first) == squadSeen.end() ? _lineOfFire.erase(answer) : std::next(answer);
+	}
+	const Uint32 now = SDL_GetTicks();
+	BattleUnit *ask = nullptr;
+	bool askOutdated = false;
+	Uint32 askAge = 0;
+	for (BattleUnit *enemy : squadSeen)
+	{
+		auto known = _lineOfFire.find(enemy);
+		const bool outdated = known == _lineOfFire.end() || known->second.viewer != viewer || known->second.from != viewer->getPosition()
+			|| known->second.direction != viewer->getDirection() || known->second.to != enemy->getPosition();
+		const Uint32 age = outdated ? 0 : now - known->second.time;
+		if ((outdated && !askOutdated) || (!outdated && !askOutdated && age >= LineOfFireRefresh && age > askAge))
+		{
+			ask = enemy;
+			askOutdated = outdated;
+			askAge = age;
+		}
+	}
+	if (ask)
+	{
+		_lineOfFire[ask] = { viewer, viewer->getPosition(), ask->getPosition(), viewer->getDirection(), now, clearLineOfFire(viewer, ask) };
+	}
+	for (auto &marker : markers)
+	{
+		auto known = _lineOfFire.find(marker.unit);
+		if (marker.kind == FirstPersonView::MarkerSquadSeen && known != _lineOfFire.end() && known->second.viewer == viewer && known->second.clear)
+		{
+			marker.kind = FirstPersonView::MarkerLineOfFire;
+		}
+	}
+
+	// Wounded markers: our own the game shows a blue or purple button for, read off the buttons as the game colours
+	// them (see BattlescapeState::blinkVisibleUnitButtons).
+	if (Options::fpsWoundedMarkers == 1 && !hudHidden())
+	{
+		for (int buttonIndex = _state->_numberOfEnemiesTotal; buttonIndex < BattlescapeState::VISIBLE_MAX; ++buttonIndex)
+		{
+			BattleUnit *own = _state->_visibleUnit[buttonIndex];
+			if (!own || !_state->_btnVisibleUnit[buttonIndex]->getVisible())
+			{
+				continue;
+			}
+			const FirstPersonView::MarkerKind kind = buttonIndex < _state->_numberOfEnemiesTotalPlusWounded ? FirstPersonView::MarkerWounded : FirstPersonView::MarkerPassingOut;
+			// (a body carried: the unit with it in its inventory, as the game's button finds it, see BattlescapeState::btnVisibleUnitClick)
+			const BattleUnit *carrier = nullptr;
+			if (own->getPosition() == TileEngine::invalid)
+			{
+				for (BattleUnit *unit : *_save->getUnits())
+				{
+					if (!unit->isOut() && std::any_of(unit->getInventory()->begin(), unit->getInventory()->end(), [own](BattleItem *item) { return item->getUnit() == own; }))
+					{
+						carrier = unit;
+						break;
+					}
+				}
+			}
+			markers.push_back({ own, buttonIndex + 1, kind, carrier });
 		}
 	}
 	_view->setMarkers(markers);
+}
+
+/**
+ * Setting "Enemy markers", Clear shot: has the soldier a clear line to an enemy the squad sees
+ * and he doesn't? The first half of the game's own sight test (TileEngine::visible): the enemy in
+ * his view's cone (BattleUnit::checkViewSector, the game's 90 degrees) and a line from his eyes
+ * reaching some part of it past walls, objects and other units (TileEngine::canTargetUnit, the
+ * lines the game's sight and the aliens' aim walk). Then the second half failed for him: what
+ * smoke, fire, the dark, camouflage and the distance do to his sight. Only ever asked of an enemy
+ * the game shows (one with a green button): nothing about one nobody sees.
+ * @param viewer The soldier looked through.
+ * @param enemy The enemy.
+ * @return True if the line is clear.
+ */
+bool FirstPersonMode::clearLineOfFire(BattleUnit *viewer, BattleUnit *enemy) const
+{
+	TileEngine *tileEngine = _save->getTileEngine();
+	const bool turret = Options::strafe && viewer->getTurretType() > -1; // (as the game's own sight turns with a tank's turret)
+	Position eyes = tileEngine->getSightOriginVoxel(viewer);
+	const int size = enemy->getArmor()->getSize();
+	for (int x = 0; x < size; ++x)
+	{
+		for (int y = 0; y < size; ++y)
+		{
+			const Position part = enemy->getPosition() + Position(x, y, 0);
+			Tile *tile = _save->getTile(part);
+			Position reached;
+			if (tile && viewer->checkViewSector(part, turret) && tileEngine->canTargetUnit(&eyes, tile, &reached, viewer, false))
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+/**
+ * Setting "Damage numbers": a shot, a blow or a blast hurt a unit (TileEngine::hitUnit, after the
+ * damage: the health lost, the armour taken off and the stun taken are the game's own), in either
+ * view, whoever struck: its numbers rise over it from now on, in 3D and on the map (see
+ * FirstPersonDamageNumbers.cpp), if the squad sees it: a unit standing as the game says (our own
+ * always, an enemy or a civilian while in sight), a body lying on the floor if its tile is in
+ * sight of one of ours. They rise from just over the unit's head as it is (kneeling, flying), a
+ * body's from a little over the floor; a body carried has no place of its own and shows none.
+ * @param state The battlescape screen (null while the battle is made).
+ * @param unit The unit hurt.
+ * @param healthLost The health it lost.
+ * @param armorLost The armour points it lost (the side struck).
+ * @param stunTaken The stun it took.
+ */
+void FirstPersonMode::unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken)
+{
+	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
+	if (!mode || !Options::fpsDamageNumbers || !unit)
+	{
+		return;
+	}
+	const Position position = unit->getPosition();
+	const Tile *tile = mode->_save->getTile(position);
+	if (!tile)
+	{
+		return;
+	}
+	const bool lying = unit->getStatus() == STATUS_UNCONSCIOUS || unit->getStatus() == STATUS_DEAD;
+	if (lying ? tile->getVisible() <= 0 : !unit->getVisible())
+	{
+		return;
+	}
+	const int size = unit->getArmor()->getSize();
+	const double head[3] = { position.x * 16.0 + 8.0 * size, position.y * 16.0 + 8.0 * size,
+		position.z * 24.0 - tile->getTerrainLevel() + (lying ? 4.0 : unit->getFloatHeight() + unit->getHeight() + 2.0) };
+	mode->_damageNumbers.add(head, position.z, healthLost, armorLost, stunTaken, SDL_GetTicks());
+}
+
+/**
+ * Setting "Damage numbers": draws the numbers rising over the units hit on the isometric map
+ * (Map::drawTerrain, over all it draws): each from the point over the unit's head where it was
+ * hit, as the map's camera puts it on the screen, in the game's small font at the map's own size;
+ * none on a level above the one the map shows. Numbers that would overlap step up over the newer
+ * ones (see placeDamageNumbers).
+ * @param state The battlescape screen.
+ * @param surface The map's surface (locked).
+ * @param camera The map's camera.
+ */
+void FirstPersonMode::drawMapDamageNumbers(BattlescapeState *state, Surface *surface, const Camera *camera)
+{
+	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
+	if (!mode || mode->_damageNumbers.numbers().empty())
+	{
+		return;
+	}
+	const std::vector<FirstPerson::DamageNumber> &numbers = mode->_damageNumbers.numbers();
+	const Font *font = mode->_game->getMod()->getFont("FONT_SMALL");
+	const FirstPerson::DamageNumberColors colors = FirstPerson::damageNumberColors(surface->getPalette());
+	const Uint32 now = SDL_GetTicks();
+	std::vector<FirstPerson::DamageNumberSpot> spots(numbers.size());
+	for (size_t index = 0; index < numbers.size(); ++index)
+	{
+		const FirstPerson::DamageNumber &number = numbers[index];
+		Position screen;
+		camera->convertVoxelToScreen(Position((int)number.head[0], (int)number.head[1], (int)number.head[2]), &screen);
+		spots[index] = { screen.x, screen.y, number.level <= camera->getViewLevel() };
+	}
+	const std::vector<int> bottoms = FirstPerson::placeDamageNumbers(numbers, spots, font, 1, now, {});
+	for (size_t index = 0; index < numbers.size(); ++index)
+	{
+		if (spots[index].shown)
+		{
+			FirstPerson::drawDamageNumber(surface, font, numbers[index], spots[index].x, bottoms[index], 1, now, colors);
+		}
+	}
+}
+
+/**
+ * Setting "Damage numbers", each frame in either view: drops the numbers that have had their
+ * time, hands the rest to the 3D view (it draws them in the world), and while the map shows them
+ * has it redrawn every frame (it draws only when something on it changes), once more as the last
+ * goes.
+ * @param now The time (SDL ticks).
+ */
+void FirstPersonMode::updateDamageNumbers(Uint32 now)
+{
+	const bool wereShowing = !_damageNumbers.numbers().empty();
+	const bool showing = _damageNumbers.update(now);
+	_view->setDamageNumbers(&_damageNumbers);
+	if ((showing || wereShowing) && !isActive())
+	{
+		_state->_map->invalidate();
+	}
 }
 
 }
