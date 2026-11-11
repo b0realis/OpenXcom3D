@@ -391,13 +391,15 @@ cmake --build build -j 4</pre></div>
           </div>
           <div data-os="win">
             <p class="lead">In the <code>OpenXcom</code> folder (several minutes). The options matter, see below:</p>
-            <div class="term"><div class="term-bar"><span>MSYS2 UCRT64</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre class="cmds">cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DDEV_BUILD=OFF -DBUILD_PACKAGE=OFF -DDEPS_DIR=none -DPKG_CONFIG_ARGN=--static -DEXTRA_XCOM_LIBS="$(pkg-config --static --libs libpng16 libjpeg libtiff-4 libwebp vorbisfile libmikmod mad | tr -d '\r' | tr ' ' ';');-l:libFLAC.dll.a"
+            <div class="term"><div class="term-bar"><span>MSYS2 UCRT64</span><span class="copied"></span><button class="btn" type="button" data-copy>Copy</button></div><pre class="cmds">mkdir -p build/sdl &amp;&amp; cp /ucrt64/lib/libSDL.dll.a build/sdl/libSDL.a
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DDEV_BUILD=OFF -DBUILD_PACKAGE=OFF -DDEPS_DIR=none -DPKG_CONFIG_ARGN=--static -DEXTRA_XCOM_LIBS="-L$(cygpath -m "$PWD/build/sdl");$(pkg-config --static --libs libpng16 libjpeg libtiff-4 libwebp vorbisfile mad | tr -d '\r' | tr ' ' ';');-l:libFLAC.dll.a;-l:libmikmod.dll.a;-lwinmm"
 cmake --build build
-cp /ucrt64/bin/libFLAC.dll /ucrt64/bin/libogg-0.dll /ucrt64/bin/libwinpthread-1.dll build/bin/</pre></div>
+ldd build/bin/openxcom.exe | grep -o '/ucrt64/bin/[^ ]*' | xargs -r cp -t build/bin/</pre></div>
             <ul>
               <li><code>-DDEPS_DIR=none</code>: without it, OXCE takes the Visual Studio libraries folder (<code>deps</code>) in its source and fails to link.</li>
               <li>OXCE links MinGW builds statically, and MSYS2's SDL_image and SDL_mixer don't name the image and sound libraries they need. <code>-DPKG_CONFIG_ARGN=--static</code> and <code>EXTRA_XCOM_LIBS</code> add them.</li>
-              <li>FLAC comes from its DLL (MSYS2's SDL_mixer asks for it so), hence the three DLLs copied next to the game at the end.</li>
+              <li>MSYS2's SDL 1.2 is <code>sdl12-compat</code>, which has no static library: the first line copies its import library to <code>build/sdl/libSDL.a</code>, where the static link takes it, so the game uses <code>SDL.dll</code>.</li>
+              <li>FLAC and MikMod come from their DLLs (MSYS2's SDL_mixer asks for them so; <code>-lwinmm</code> is Windows' own MIDI, which the old SDL used to bring along), and sdl12-compat runs on <code>SDL2.dll</code> (sdl2-compat) and <code>SDL3.dll</code>: the last line copies every DLL the game needs from MSYS2 (<code>ldd</code> lists them) next to it.</li>
             </ul>
             <p>The game is <code>build/bin/openxcom.exe</code>, with OXCE's own data next to it in <code>build/bin/</code>.</p>
           </div>
@@ -479,8 +481,8 @@ build/bin/openxcom.exe -data build/bin/ -user ~/openxcom3d/ -cfg ~/openxcom3d/</
       <div><p>The build was configured without the options from step 4. Delete the <code>build</code> folder (<code>rm -rf build</code>) and run the <code>cmake -S . -B build …</code> line from step 4 as it is, all of it on one line.</p></div>
     </details>
     <details data-os="win">
-      <summary>“The code execution cannot proceed because libFLAC.dll was not found”</summary>
-      <div><p>The three DLLs aren't next to the game: run the <code>cp /ucrt64/bin/…</code> line from step 4. <code>ldd build/bin/openxcom.exe</code> lists every DLL the game loads; the ones under <code>/ucrt64/bin</code> go next to it.</p></div>
+      <summary>“The code execution cannot proceed because libFLAC.dll (or SDL.dll) was not found”</summary>
+      <div><p>The DLLs aren't next to the game: run the <code>ldd … | xargs -r cp -t build/bin/</code> line from step 4. <code>ldd build/bin/openxcom.exe</code> lists every DLL the game loads; the ones under <code>/ucrt64/bin</code> go next to it.</p></div>
     </details>
     <details>
       <summary>CMake: “Compatibility with CMake &lt; 3.10 has been removed”</summary>
