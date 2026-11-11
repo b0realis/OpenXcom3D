@@ -86,7 +86,7 @@ const size_t UpscaleCacheFrames = 400;
 /// the neighbours' Gaussian average.
 const int UpscaleSoftenShades = 1;
 const float UpscaleSoftenAmount = 1.0f;
-/// The detail pass ("Smooth + detail", "Finest"): each colour is pushed this much further away from
+/// The detail pass ("Smooth+", "Finest"): each colour is pushed this much further away from
 /// the average of its neighbours of the same ramp, where they differ by more than this (out of 255).
 const float UpscaleDetailAmount = 0.5f, UpscaleDetailThreshold = 3.0f;
 /// A small feature ("Finest" keeps them as xBRZ draws them): an original pixel brighter or darker
@@ -108,6 +108,10 @@ const Uint32 DoorSwingTime = 500, UfoDoorTime = 600;
 /// shown, the aliens' turn watched there, a screen on top) starts from now, or every round that
 /// landed meanwhile would flash its sparks and beam at once (see FirstPersonView::followShots).
 const Uint32 LandedShotsCatchUpTime = 1000;
+/// Without a weapon shown in hand, a straight shot's laser (the trajectory) starts this many voxels
+/// along the game's line, past the hand (see FirstPersonView::drawTrajectoryPath), and so does our own
+/// round that went unseen (see FirstPersonView::ownRoundLeft).
+const float TrajectorySkip = 14.0f;
 /// Animated terrain (water, machinery, the lights and lit floors of UFOs) steps to its next
 /// frame every CalmFrameTime milliseconds in the view, cross-fading over the whole step. The
 /// game steps every 100 ms, which up close made whole lit panels blink five to ten times a
@@ -398,6 +402,15 @@ const float BadStaticFloor = 0.03f;
 const int BadStaticGapShortest = 5000, BadStaticGapLongest = 40000;
 const int BadStaticSpellShortest = 3000, BadStaticSpellLongest = 10000;
 const float BadStaticPeakLeast = 0.5f, BadStaticPeakMost = 0.95f;
+/// The setting "Camera artifacts" Light (a player, GitHub issue #121: the feed "LESS neat when Camera
+/// becomes illegible for longer than say, 250ms"; the owner: lighter grain and static, and nothing
+/// unreadable for longer than 250 ms, the effect's character kept): the bad signal's low static at
+/// LightStaticFloorShare of Normal's, the spells as they come but at LightStaticSpellShare of their
+/// peak (at most 0.29 of the pixels: never a snowstorm), and each glitch (blocks, green squares, a
+/// tear, a freeze) shortened in proportion so its kind's longest lasts LightGlitchLongest ms, on
+/// any signal (a frame or two late to end, still well under 250 ms on the screen).
+const float LightStaticFloorShare = 0.5f, LightStaticSpellShare = 0.3f;
+const int LightGlitchLongest = 150;
 /// Under night vision the aimed path (see FirstPersonView::drawTrajectory) is light in the goggles,
 /// as a laser sight is: its core this share white, the rest the goggles' brightest green (dithered:
 /// a white-green, the owner's choice), in a green glare; a forced arc's dashes turn to dots

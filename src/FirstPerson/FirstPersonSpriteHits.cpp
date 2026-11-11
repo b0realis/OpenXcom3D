@@ -515,11 +515,26 @@ ExactRay &exactRay()
 }
 
 /**
+ * The curve being walked (see ArcLines): while it is, the pictures its steps meet face its start.
+ */
+struct ArcFacing
+{
+	bool active = false;
+	double from[3] = {}; // the curve's start, in voxels (the middle of its first voxel)
+};
+ArcFacing &arcFacing()
+{
+	static ArcFacing facing;
+	return facing;
+}
+
+/**
  * Works out a line afresh (see LineContext): its start and direction (between the middles of its
  * first and last voxels; the crosshair's own exact ray instead, see ExactLine), whose line it is
  * (the looked-through soldier's own when he is left out of it, the 3D view shows the battle and
  * it starts at his eye: then the pictures are the cards the view draws), and the cards of the
- * units it passes near, but the one left out (or all but the only one tested).
+ * units it passes near, but the one left out (or all but the only one tested). A step of a curve
+ * (see ArcLines): the cards face the curve's start, the line itself still what crosses them.
  * @param save The battle.
  * @param origin, target The line's first and last voxels.
  * @param serial The line's serial number.
@@ -599,7 +614,7 @@ void prepareLine(SavedBattleGame *save, const Position &origin, const Position &
 		LineCard lineCard;
 		lineCard.unit = unit;
 		if (own) drawnCard(save, unit, view, lineCard.card);
-		else uprightCard(save, unit, line.start, lineCard.card);
+		else uprightCard(save, unit, arcFacing().active ? arcFacing().from : line.start, lineCard.card);
 		lineCard.solid = cardRay(lineCard.card, line.start, line.direction, lineCard.along);
 		if (lineCard.solid) line.cards.push_back(lineCard);
 	}
@@ -667,6 +682,81 @@ BattleUnit *spriteHitAt(SavedBattleGame *save, const Position &voxel, const Posi
 		for (int axis = 0; axis < 3; ++axis) ray.crossing[axis] = line.start[axis] + line.direction[axis] * hitAlong;
 	}
 	return hit;
+}
+
+/**
+ * Starts a curve's lines (see FirstPersonApi.h): with the setting on, the pictures they meet face
+ * the curve's start.
+ * @param save The battle.
+ * @param origin The curve's first voxel.
+ */
+ArcLines::ArcLines(SavedBattleGame *save, const Position &origin) : _set(save && spriteHitboxes(save->getBattleState()))
+{
+	ArcFacing &facing = arcFacing();
+	_outerActive = facing.active;
+	std::copy(facing.from, facing.from + 3, _outerFrom);
+	if (_set)
+	{
+		facing.active = true;
+		facing.from[0] = origin.x + 0.5;
+		facing.from[1] = origin.y + 0.5;
+		facing.from[2] = origin.z + 0.5;
+		lineContext().save = nullptr; // (worked out afresh, as ExactLine does)
+	}
+}
+
+/**
+ * Ends a curve's lines: the pictures face each line's own start again.
+ */
+ArcLines::~ArcLines()
+{
+	if (_set)
+	{
+		ArcFacing &facing = arcFacing();
+		facing.active = _outerActive;
+		std::copy(_outerFrom, _outerFrom + 3, facing.from);
+		lineContext().save = nullptr;
+	}
+}
+
+/**
+ * Where an arcing shot at a unit aims across the map (see FirstPersonApi.h): with the setting on, a
+ * big unit's middle (its picture stands there, see standingAnchor; the game aims at the tile's).
+ * @param state The battle's screen.
+ * @param unit The unit aimed at.
+ * @param aim The point aimed at, its across the map (x, y) set to the big unit's middle.
+ */
+void arcAimAtPicture(BattlescapeState *state, const BattleUnit *unit, Position &aim)
+{
+	const int size = unit ? unit->getArmor()->getSize() : 1;
+	if (size < 2 || !spriteHitboxes(state))
+	{
+		return;
+	}
+	aim.x = unit->getPosition().x * 16 + 8 * size;
+	aim.y = unit->getPosition().y * 16 + 8 * size;
+}
+
+/**
+ * Does a curve tried for an arcing shot land on the unit aimed at (see FirstPersonApi.h)? With the
+ * setting on, a shot's curve that met the unit on the aimed tile (its picture: see spriteImpact, the
+ * stop on one of its tiles) on any of its tiles.
+ * @param save The battle.
+ * @param thrown A throw's curve (never: an item stopped by a unit drops short of its tile).
+ * @param meets What the curve met (V_UNIT...).
+ * @param impact Where it stopped.
+ * @param aimTile The tile of the point aimed at.
+ * @return True if it lands on the unit aimed at.
+ */
+bool arcMeetsAimedUnit(SavedBattleGame *save, bool thrown, int meets, const Position &impact, const Position &aimTile)
+{
+	if (thrown || meets != V_UNIT || !spriteHitboxes(save->getBattleState()))
+	{
+		return false;
+	}
+	const Tile *aimed = save->getTile(aimTile), *stopped = save->getTile(impact.toTile());
+	const BattleUnit *unit = aimed ? aimed->getOverlappingUnit(save) : nullptr;
+	return unit && stopped && stopped->getOverlappingUnit(save) == unit;
 }
 
 /**

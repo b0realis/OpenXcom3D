@@ -2336,7 +2336,7 @@ void FirstPersonMode::selectUnit(BattleUnit *unit)
  * "Enemy markers", a player, GitHub issue #117: "to reflect iso parity"): the game lists first the
  * enemies the selected soldier sees, its red buttons, then the others the squad sees, green (see
  * BattlescapeState::updateSoldierInfo). As the map: the markers red and green as those buttons;
- * Line of fire, the default: the green ones the soldier has a clear line to yellow (see
+ * Clear shot, the default: the green ones the soldier has a clear line to yellow (see
  * clearLineOfFire); All red: every enemy's red, as before. The game's buttons for our own wounded
  * (blue) and those about to pass out (purple) come after them: no marker over our own, whatever
  * the setting. An enemy nobody sees has no button, so no marker.
@@ -2366,7 +2366,7 @@ void FirstPersonMode::updateEnemyMarkers()
 		markers.push_back({ enemy, buttonIndex + 1, kind });
 	}
 
-	// Line of fire: the answers kept for the enemies still marked, the others let go; then one answer worked out
+	// Clear shot: the answers kept for the enemies still marked, the others let go; then one answer worked out
 	// afresh this frame, the most needed: one for an enemy with none (or one for another soldier, from another place
 	// or facing, or for the enemy elsewhere) first, else the oldest once older than LineOfFireRefresh. The others keep
 	// the answers they have (an enemy with none yet stays green for the frames until its turn).
@@ -2407,7 +2407,7 @@ void FirstPersonMode::updateEnemyMarkers()
 }
 
 /**
- * Setting "Enemy markers", Line of fire: has the soldier a clear line to an enemy the squad sees
+ * Setting "Enemy markers", Clear shot: has the soldier a clear line to an enemy the squad sees
  * and he doesn't? The first half of the game's own sight test (TileEngine::visible): the enemy in
  * his view's cone (BattleUnit::checkViewSector, the game's 90 degrees) and a line from his eyes
  * reaching some part of it past walls, objects and other units (TileEngine::canTargetUnit, the

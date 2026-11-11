@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..ea3b365d9
+index 000000000..cd9bb0f0c
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,512 @@
+@@ -0,0 +1,517 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -257,11 +257,16 @@ index 000000000..ea3b365d9
 +  STR_FPS_DISCREET_EDGE_DESC: "The map's edge as small red dots on the floor, instead of the yellow tape."
 +  STR_FPS_PIXEL_SIZE: "Pixel size"
 +  STR_FPS_PIXEL_SIZE_DESC: "Auto: 2 for views over 640x400. 1: full detail. 2, 3: faster."
-+  STR_FPS_SOLDIER_PREVIEW: "SOLDIER CAMERA PREVIEW"
++  STR_FPS_SOLDIER_PREVIEW: "Soldier camera preview"
 +  STR_FPS_SOLDIER_PREVIEW_DESC: "Soldier cards on the top bar show a live helmet camera."
 +  STR_FPS_MAP_CAMERA: "Map camera"
 +  STR_FPS_CAMERA_EYES: "Cameras see as the eyes"
 +  STR_FPS_CAMERA_EYES_DESC: "YES: the helmet cameras see through smoke with the soldier's heat vision, as the 3D view. NO: a camera, without it."
++  STR_FPS_CAMERA_ARTIFACTS: "Camera artefacts"
++  STR_FPS_CAMERA_ARTIFACTS_DESC: "The helmet cameras' static, glitches and freezes. Normal: all of it. Light: lighter, no glitch over 0.15 s. None: a clean feed."
++  STR_FPS_CAMERA_ARTIFACTS_NORMAL: "Normal"
++  STR_FPS_CAMERA_ARTIFACTS_LIGHT: "Light"
++  STR_FPS_CAMERA_ARTIFACTS_NONE: "None"
 +  STR_FPS_MAP_CAMERA_DESC: "On the map in your turn: the selected soldier's helmet camera, top left, on the target while you aim. Click: 3D view. Right click: bigger."
 +  STR_FPS_MAP_CAMERA_OFF: "Off"
 +  STR_FPS_MAP_CAMERA_SMALL: "Small"
@@ -295,14 +300,14 @@ index 000000000..ea3b365d9
 +  STR_FPS_VIEW_DISTANCE: "View distance"
 +  STR_FPS_VIEW_DISTANCE_DESC: "How far the 3D view reaches, in tiles, the haze closing in over the last stretch. Further is slower."
 +  STR_FPS_FOG_OF_WAR: "Fog of war in 3D"
-+  STR_FPS_FOG_OF_WAR_DESC: "Off: terrain the view sees in sight range shows as seen, explored or not. As the map: explored terrain only."
++  STR_FPS_FOG_OF_WAR_DESC: "Off: terrain the view sees in sight range shows as seen, explored or not. As map: explored terrain only."
 +  STR_FPS_FOG_OF_WAR_OFF: "Off"
-+  STR_FPS_FOG_OF_WAR_MAP: "As the map"
++  STR_FPS_FOG_OF_WAR_MAP: "As map"
 +  STR_FPS_WALL_PAINT: "Wall paint"
-+  STR_FPS_WALL_PAINT_DESC: "Wall faces the map never shows. As the art: like the face shown. Inside and out: as the side they face. Every room: rooms too."
++  STR_FPS_WALL_PAINT_DESC: "Wall faces the map never shows. As the art: like the face shown. Each side: as the side they face. All rooms: rooms too."
 +  STR_FPS_WALL_PAINT_ART: "As the art"
-+  STR_FPS_WALL_PAINT_OUTSIDE: "Inside and out"
-+  STR_FPS_WALL_PAINT_ROOMS: "Every room"
++  STR_FPS_WALL_PAINT_OUTSIDE: "Each side"
++  STR_FPS_WALL_PAINT_ROOMS: "All rooms"
 +  STR_FPS_FLASHLIGHT: "Flashlight"
 +  STR_FPS_FLASHLIGHT_DESC: "On and off with F (the suit light is separate). On: a wide beam in the dark. Dynamic: a spot on the crosshair, day or night."
 +  STR_FPS_FLASHLIGHT_OFF: "Off"
@@ -339,7 +344,7 @@ index 000000000..ea3b365d9
 +  STR_FPS_UNIT_SIZE_DESC: "Soldiers, aliens, corpses and items drawn smaller (80-100%). Hitboxes stay the same."
 +  STR_FPS_UPSCALE_OFF: "Off"
 +  STR_FPS_UPSCALE_SMOOTH: "Smooth"
-+  STR_FPS_UPSCALE_DETAIL: "Smooth + detail"
++  STR_FPS_UPSCALE_DETAIL: "Smooth+"
 +  STR_FPS_UPSCALE_FINEST: "Finest"
 +  STR_FPS_FPS_STYLE: "FPS-style shooting (easier)"
 +  STR_FPS_DUAL_WIELD: "Full akimbo"
@@ -562,10 +567,10 @@ index 000000000..ea3b365d9
 +  STR_FPS_UNIT_NAMES: "Unit names"
 +  STR_FPS_UNIT_NAMES_DESC: "The name of the unit under the crosshair."
 +  STR_FPS_STAT_BARS: "Stat bars"
-+  STR_FPS_STAT_BARS_DESC: "Scaled: a stat too long for the bar shrinks alike for all units. Percentage: full at its maximum. Game's own: cut off."
++  STR_FPS_STAT_BARS_DESC: "Scaled: a stat too long for the bar shrinks alike for all units. Percent: full at its maximum. Game's own: cut off."
 +  STR_FPS_STAT_BARS_GAME: "Game's own"
 +  STR_FPS_STAT_BARS_SCALED: "Scaled"
-+  STR_FPS_STAT_BARS_PERCENT: "Percentage"
++  STR_FPS_STAT_BARS_PERCENT: "Percent"
 +  STR_FPS_MIDDLE_CLICK_IDENTIFY: "Middle click identifies"
 +  STR_FPS_MIDDLE_CLICK_IDENTIFY_DESC: "Middle click on a unit shows it, as on the map."
 +  STR_FPS_DOWNED_ICONS: "Downed unit icons"
@@ -574,10 +579,10 @@ index 000000000..ea3b365d9
 +  STR_FPS_DOWNED_ICONS_CROSSHAIR: "Crosshair"
 +  STR_FPS_DOWNED_ICONS_ALWAYS: "Always"
 +  STR_FPS_ENEMY_MARKERS: "Enemy markers"
-+  STR_FPS_ENEMY_MARKERS_DESC: "Over enemies, as their buttons: red if he sees it, green if only the squad does. Line of fire: yellow if his line to a green one is clear."
++  STR_FPS_ENEMY_MARKERS_DESC: "Over enemies, as their buttons: red if he sees it, green if only the squad does. Clear shot: yellow if his line to a green one is clear."
 +  STR_FPS_ENEMY_MARKERS_RED: "All red"
-+  STR_FPS_ENEMY_MARKERS_MAP: "As the map"
-+  STR_FPS_ENEMY_MARKERS_LINE: "Line of fire"
++  STR_FPS_ENEMY_MARKERS_MAP: "As map"
++  STR_FPS_ENEMY_MARKERS_LINE: "Clear shot"
 +  STR_FPS_DAMAGE_NUMBERS: "Damage numbers"
 +  STR_FPS_DAMAGE_NUMBERS_DESC: "A hit's damage rises over the unit, in 3D and on the map: health lost red, armour blue, stun purple; a grey 0 when it did nothing."
 +  STR_FPS_ALIEN_TURN_3D: "Alien turn in 3D"
@@ -605,9 +610,9 @@ index 000000000..ea3b365d9
 +  STR_FPS_KEY_STRAFE_RIGHT: "Step right"
 +  STR_FPS_KEY_STRAFE_RIGHT_DESC: "Sidestep right."
 +  STR_FPS_KEY_SPRINT: "Sprint on/off"
-+  STR_FPS_KEY_SPRINT_DESC: "Run, not walk: faster, by the game's running rules (more energy)."
++  STR_FPS_KEY_SPRINT_DESC: "Run, not walk: faster, by the game's running rules (more energy), and on past enemies coming into sight, as en passant."
 +  STR_FPS_KEY_EN_PASSANT: "En passant on/off"
-+  STR_FPS_KEY_EN_PASSANT_DESC: "Walk on past enemies coming into sight, as Shift does on the map."
++  STR_FPS_KEY_EN_PASSANT_DESC: "Walk on past enemies coming into sight, as Shift does on the map. Being shot at still stops the walk."
 +  STR_FPS_KEY_NEXT_MODE: "Next fire mode"
 +  STR_FPS_KEY_NEXT_MODE_DESC: "Next fire mode (or the mouse wheel)."
 +  STR_FPS_KEY_MODE_SNAP: "Snap shot"
@@ -642,10 +647,10 @@ index 000000000..ea3b365d9
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..d1688423f
+index 000000000..1903849cb
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,512 @@
+@@ -0,0 +1,517 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -775,11 +780,16 @@ index 000000000..d1688423f
 +  STR_FPS_DISCREET_EDGE_DESC: "The map's edge as small red dots on the floor, instead of the yellow tape."
 +  STR_FPS_PIXEL_SIZE: "Pixel size"
 +  STR_FPS_PIXEL_SIZE_DESC: "Auto: 2 for views over 640x400. 1: full detail. 2, 3: faster."
-+  STR_FPS_SOLDIER_PREVIEW: "SOLDIER CAMERA PREVIEW"
++  STR_FPS_SOLDIER_PREVIEW: "Soldier camera preview"
 +  STR_FPS_SOLDIER_PREVIEW_DESC: "Soldier cards on the top bar show a live helmet camera."
 +  STR_FPS_MAP_CAMERA: "Map camera"
 +  STR_FPS_CAMERA_EYES: "Cameras see as the eyes"
 +  STR_FPS_CAMERA_EYES_DESC: "YES: the helmet cameras see through smoke with the soldier's heat vision, as the 3D view. NO: a camera, without it."
++  STR_FPS_CAMERA_ARTIFACTS: "Camera artifacts"
++  STR_FPS_CAMERA_ARTIFACTS_DESC: "The helmet cameras' static, glitches and freezes. Normal: all of it. Light: lighter, no glitch over 0.15 s. None: a clean feed."
++  STR_FPS_CAMERA_ARTIFACTS_NORMAL: "Normal"
++  STR_FPS_CAMERA_ARTIFACTS_LIGHT: "Light"
++  STR_FPS_CAMERA_ARTIFACTS_NONE: "None"
 +  STR_FPS_MAP_CAMERA_DESC: "On the map in your turn: the selected soldier's helmet camera, top left, on the target while you aim. Click: 3D view. Right click: bigger."
 +  STR_FPS_MAP_CAMERA_OFF: "Off"
 +  STR_FPS_MAP_CAMERA_SMALL: "Small"
@@ -813,14 +823,14 @@ index 000000000..d1688423f
 +  STR_FPS_VIEW_DISTANCE: "View distance"
 +  STR_FPS_VIEW_DISTANCE_DESC: "How far the 3D view reaches, in tiles, the haze closing in over the last stretch. Further is slower."
 +  STR_FPS_FOG_OF_WAR: "Fog of war in 3D"
-+  STR_FPS_FOG_OF_WAR_DESC: "Off: terrain the view sees in sight range shows as seen, explored or not. As the map: explored terrain only."
++  STR_FPS_FOG_OF_WAR_DESC: "Off: terrain the view sees in sight range shows as seen, explored or not. As map: explored terrain only."
 +  STR_FPS_FOG_OF_WAR_OFF: "Off"
-+  STR_FPS_FOG_OF_WAR_MAP: "As the map"
++  STR_FPS_FOG_OF_WAR_MAP: "As map"
 +  STR_FPS_WALL_PAINT: "Wall paint"
-+  STR_FPS_WALL_PAINT_DESC: "Wall faces the map never shows. As the art: like the face shown. Inside and out: as the side they face. Every room: rooms too."
++  STR_FPS_WALL_PAINT_DESC: "Wall faces the map never shows. As the art: like the face shown. Each side: as the side they face. All rooms: rooms too."
 +  STR_FPS_WALL_PAINT_ART: "As the art"
-+  STR_FPS_WALL_PAINT_OUTSIDE: "Inside and out"
-+  STR_FPS_WALL_PAINT_ROOMS: "Every room"
++  STR_FPS_WALL_PAINT_OUTSIDE: "Each side"
++  STR_FPS_WALL_PAINT_ROOMS: "All rooms"
 +  STR_FPS_FLASHLIGHT: "Flashlight"
 +  STR_FPS_FLASHLIGHT_DESC: "On and off with F (the suit light is separate). On: a wide beam in the dark. Dynamic: a spot on the crosshair, day or night."
 +  STR_FPS_FLASHLIGHT_OFF: "Off"
@@ -857,7 +867,7 @@ index 000000000..d1688423f
 +  STR_FPS_UNIT_SIZE_DESC: "Soldiers, aliens, corpses and items drawn smaller (80-100%). Hitboxes stay the same."
 +  STR_FPS_UPSCALE_OFF: "Off"
 +  STR_FPS_UPSCALE_SMOOTH: "Smooth"
-+  STR_FPS_UPSCALE_DETAIL: "Smooth + detail"
++  STR_FPS_UPSCALE_DETAIL: "Smooth+"
 +  STR_FPS_UPSCALE_FINEST: "Finest"
 +  STR_FPS_FPS_STYLE: "FPS-style shooting (easier)"
 +  STR_FPS_DUAL_WIELD: "Full akimbo"
@@ -1080,10 +1090,10 @@ index 000000000..d1688423f
 +  STR_FPS_UNIT_NAMES: "Unit names"
 +  STR_FPS_UNIT_NAMES_DESC: "The name of the unit under the crosshair."
 +  STR_FPS_STAT_BARS: "Stat bars"
-+  STR_FPS_STAT_BARS_DESC: "Scaled: a stat too long for the bar shrinks alike for all units. Percentage: full at its maximum. Game's own: cut off."
++  STR_FPS_STAT_BARS_DESC: "Scaled: a stat too long for the bar shrinks alike for all units. Percent: full at its maximum. Game's own: cut off."
 +  STR_FPS_STAT_BARS_GAME: "Game's own"
 +  STR_FPS_STAT_BARS_SCALED: "Scaled"
-+  STR_FPS_STAT_BARS_PERCENT: "Percentage"
++  STR_FPS_STAT_BARS_PERCENT: "Percent"
 +  STR_FPS_MIDDLE_CLICK_IDENTIFY: "Middle click identifies"
 +  STR_FPS_MIDDLE_CLICK_IDENTIFY_DESC: "Middle click on a unit shows it, as on the map."
 +  STR_FPS_DOWNED_ICONS: "Downed unit icons"
@@ -1092,10 +1102,10 @@ index 000000000..d1688423f
 +  STR_FPS_DOWNED_ICONS_CROSSHAIR: "Crosshair"
 +  STR_FPS_DOWNED_ICONS_ALWAYS: "Always"
 +  STR_FPS_ENEMY_MARKERS: "Enemy markers"
-+  STR_FPS_ENEMY_MARKERS_DESC: "Over enemies, as their buttons: red if he sees it, green if only the squad does. Line of fire: yellow if his line to a green one is clear."
++  STR_FPS_ENEMY_MARKERS_DESC: "Over enemies, as their buttons: red if he sees it, green if only the squad does. Clear shot: yellow if his line to a green one is clear."
 +  STR_FPS_ENEMY_MARKERS_RED: "All red"
-+  STR_FPS_ENEMY_MARKERS_MAP: "As the map"
-+  STR_FPS_ENEMY_MARKERS_LINE: "Line of fire"
++  STR_FPS_ENEMY_MARKERS_MAP: "As map"
++  STR_FPS_ENEMY_MARKERS_LINE: "Clear shot"
 +  STR_FPS_DAMAGE_NUMBERS: "Damage numbers"
 +  STR_FPS_DAMAGE_NUMBERS_DESC: "A hit's damage rises over the unit, in 3D and on the map: health lost red, armor blue, stun purple; a gray 0 when it did nothing."
 +  STR_FPS_ALIEN_TURN_3D: "Alien turn in 3D"
@@ -1123,9 +1133,9 @@ index 000000000..d1688423f
 +  STR_FPS_KEY_STRAFE_RIGHT: "Step right"
 +  STR_FPS_KEY_STRAFE_RIGHT_DESC: "Sidestep right."
 +  STR_FPS_KEY_SPRINT: "Sprint on/off"
-+  STR_FPS_KEY_SPRINT_DESC: "Run, not walk: faster, by the game's running rules (more energy)."
++  STR_FPS_KEY_SPRINT_DESC: "Run, not walk: faster, by the game's running rules (more energy), and on past enemies coming into sight, as en passant."
 +  STR_FPS_KEY_EN_PASSANT: "En passant on/off"
-+  STR_FPS_KEY_EN_PASSANT_DESC: "Walk on past enemies coming into sight, as Shift does on the map."
++  STR_FPS_KEY_EN_PASSANT_DESC: "Walk on past enemies coming into sight, as Shift does on the map. Being shot at still stops the walk."
 +  STR_FPS_KEY_NEXT_MODE: "Next fire mode"
 +  STR_FPS_KEY_NEXT_MODE_DESC: "Next fire mode (or the mouse wheel)."
 +  STR_FPS_KEY_MODE_SNAP: "Snap shot"
@@ -1356,7 +1366,7 @@ index 000000000..a70d41a13
 +        color: 144
 diff --git a/mod/OpenXcom3D/metadata.yml b/mod/OpenXcom3D/metadata.yml
 new file mode 100644
-index 000000000..d09210084
+index 000000000..95e9f8d23
 --- /dev/null
 +++ b/mod/OpenXcom3D/metadata.yml
 @@ -0,0 +1,11 @@
@@ -1364,13 +1374,13 @@ index 000000000..d09210084
 +# metadata.yml for OpenXcom3D
 +
 +name: "OpenXcom3D - First-Person View"
-+version: 1.11
++version: 1.12
 +description: "Adds a first-person 3D view of the battlescape (F8): mouse look, real-time movement paid with time units (WASD), firing from the crosshair, a squad bar with soldier camera cards, lights, shadows, flashlight, particles, weather, tactical flares, combat music and its own 3D View options tab. Needs the OpenXcom3D build of OXCE; on a standard OXCE build this mod reports an unsupported engine and stays off."
 +author: OpenXcom3D project
 +
 +master: "*"
 +requiredExtendedEngine: OpenXcom3D
-+requiredExtendedVersion: "1.0.11"
++requiredExtendedVersion: "1.0.12"
 diff --git a/res/linux/icons/openxcom.svg b/res/linux/icons/openxcom.svg
 index 444f7387b..9196ac813 100644
 --- a/res/linux/icons/openxcom.svg
@@ -19074,7 +19084,7 @@ index c112ccbe8..0b212a6bc 100644
  	void optValue(int &oldValue, int newValue) const;
  public:
 diff --git a/src/Battlescape/Map.cpp b/src/Battlescape/Map.cpp
-index 3665cd199..2124e3117 100644
+index 3665cd199..c65db3984 100644
 --- a/src/Battlescape/Map.cpp
 +++ b/src/Battlescape/Map.cpp
 @@ -52,6 +52,7 @@
@@ -19312,7 +19322,7 @@ index 3665cd199..2124e3117 100644
  	surface->unlock();
  }
  
-@@ -2330,12 +2403,87 @@ CursorType Map::getCursorType() const
+@@ -2330,12 +2403,88 @@ CursorType Map::getCursorType() const
  void Map::setProjectile(Projectile *projectile)
  {
  	_projectile = projectile;
@@ -19372,8 +19382,9 @@ index 3665cd199..2124e3117 100644
 +}
 +
 +/**
-+ * Notes a round landing (or a thrown item): where it ended and came from, and its ammo's and
-+ * weapon's rules (the items may be gone by the time they're read), for the first-person views
++ * Notes a round landing (or a thrown item): where it ended and came from, its ammo's and
++ * weapon's rules (the items may be gone by the time they're read) and which gun fired it (to
++ * tell a soldier's two guns apart, never read), for the first-person views
 + * (OpenXcom3D). They follow the projectile once a frame, so a round that starts and lands between
 + * two of their frames (a light minigun's, a turbo laser's, with the battle's timer catching up
 + * several steps a frame) went by unseen, leaving no hole (a player's report); they read these
@@ -19389,7 +19400,7 @@ index 3665cd199..2124e3117 100644
 +	}
 +	const BattleItem *ammo = projectile->getAmmo(), *weapon = projectile->getWeapon();
 +	_landedShots.push_back({ projectile, projectile->getPosition(0), projectile->getPosition(-100000), projectile->getItem() != nullptr, partner,
-+		ammo ? ammo->getRules() : nullptr, weapon ? weapon->getRules() : nullptr });
++		ammo ? ammo->getRules() : nullptr, weapon ? weapon->getRules() : nullptr, weapon });
 +	if (_landedShots.size() > LandedShotsKept)
 +	{
 +		_landedShots.erase(_landedShots.begin());
@@ -19400,7 +19411,7 @@ index 3665cd199..2124e3117 100644
  /**
   * Gets the current projectile sprite on the map.
   * @return Projectile or 0 if there is no projectile sprite on the map.
-@@ -2432,7 +2580,7 @@ void Map::scrollKey()
+@@ -2432,7 +2581,7 @@ void Map::scrollKey()
   */
  void Map::fadeShade()
  {
@@ -19409,7 +19420,7 @@ index 3665cd199..2124e3117 100644
  	if ((_nightVisionOn && !hold) || (!_nightVisionOn && hold))
  	{
  		_nvColor = Options::oxceNightVisionColor;
-@@ -2555,6 +2703,10 @@ int Map::getIconWidth() const
+@@ -2555,6 +2704,10 @@ int Map::getIconWidth() const
   */
  int Map::getSoundAngle(const Position& pos) const
  {
@@ -19421,7 +19432,7 @@ index 3665cd199..2124e3117 100644
  	Position relativePosition;
  
 diff --git a/src/Battlescape/Map.h b/src/Battlescape/Map.h
-index 0fdf2ca16..86ea6f563 100644
+index 0fdf2ca16..1b938e6c6 100644
 --- a/src/Battlescape/Map.h
 +++ b/src/Battlescape/Map.h
 @@ -24,6 +24,7 @@
@@ -19432,25 +19443,27 @@ index 0fdf2ca16..86ea6f563 100644
  
  namespace OpenXcom
  {
-@@ -33,6 +34,7 @@ class Surface;
+@@ -33,6 +34,8 @@ class Surface;
  class SurfaceSet;
  class BattleUnit;
  class Projectile;
 +class RuleItem;
++class BattleItem;
  class Explosion;
  class BattlescapeMessage;
  class Camera;
-@@ -47,6 +49,9 @@ enum TilePart : int;
+@@ -47,6 +50,10 @@ enum TilePart : int;
  /**
   * Helper class that returns all important data about the unit movement
   */
 +/// (OpenXcom3D) A round (or a thrown item) that has landed (see Map::noteShotLanded), for the first-person views.
-+struct LandedShot { const Projectile *projectile; Position end, origin; bool thrown, partner; const RuleItem *ammo, *weapon; };
++/// (gun: the weapon that fired it, only ever compared, never read: it may be gone by then)
++struct LandedShot { const Projectile *projectile; Position end, origin; bool thrown, partner; const RuleItem *ammo, *weapon; const BattleItem *gun; };
 +
  struct UnitWalkingOffset
  {
  	Position ScreenOffset;
-@@ -65,12 +70,16 @@ private:
+@@ -65,12 +72,16 @@ private:
  	static const int NIGHT_VISION_SHADE = 4;
  	static const int NIGHT_VISION_MAX_SHADE = 8;
  	static const int BULLET_SPRITES = 35;
@@ -19467,7 +19480,7 @@ index 0fdf2ca16..86ea6f563 100644
  	Game *_game;
  	SavedBattleGame *_save;
  	bool _isTFTD;
-@@ -88,6 +97,15 @@ private:
+@@ -88,6 +99,15 @@ private:
  	int _cacheHasLOS; // -1 = unknown, 0 = no LOS, 1 = has LOS
  	int _animFrame;
  	Projectile *_projectile;
@@ -19483,7 +19496,7 @@ index 0fdf2ca16..86ea6f563 100644
  	bool _followProjectile;
  	bool _projectileInFOV;
  	std::list<Explosion *> _explosions;
-@@ -155,6 +173,27 @@ public:
+@@ -155,6 +175,27 @@ public:
  	void setProjectile(Projectile *projectile);
  	/// Gets projectile.
  	Projectile *getProjectile() const;
@@ -19511,7 +19524,7 @@ index 0fdf2ca16..86ea6f563 100644
  	/// Sets follow projectile flag.
  	void setFollowProjectile(bool followProjectile) { _followProjectile = followProjectile; }
  	/// Gets follow projectile flag.
-@@ -198,6 +237,11 @@ public:
+@@ -198,6 +239,11 @@ public:
  	int getIconWidth() const;
  	/// Convert a map position to a sound angle.
  	int getSoundAngle(const Position& pos) const;
@@ -19523,7 +19536,7 @@ index 0fdf2ca16..86ea6f563 100644
  	/// Reset the camera smoothing bool.
  	void resetCameraSmoothing();
  	/// Set whether the screen should "flash" or not.
-@@ -210,7 +254,13 @@ public:
+@@ -210,7 +256,13 @@ public:
  	/// toggle the night-vision mode
  	void enableNightVision();
  	void toggleNightVision();
@@ -19695,7 +19708,7 @@ index 861c7702a..c27a96c33 100644
  	const std::vector<int> &getPath() const;
  	/// Makes a copy to the path.
 diff --git a/src/Battlescape/Projectile.cpp b/src/Battlescape/Projectile.cpp
-index 7f7697c1d..c7af3ff84 100644
+index 7f7697c1d..78d23f147 100644
 --- a/src/Battlescape/Projectile.cpp
 +++ b/src/Battlescape/Projectile.cpp
 @@ -31,6 +31,7 @@
@@ -19756,7 +19769,7 @@ index 7f7697c1d..c7af3ff84 100644
  
  	// finally do a line calculation and store this trajectory.
  	return _save->getTileEngine()->calculateLineVoxel(originVoxel, _targetVoxel, true, &_trajectory, bu);
-@@ -228,9 +250,10 @@ int Projectile::calculateThrow(double accuracy)
+@@ -228,15 +250,19 @@ int Projectile::calculateThrow(double accuracy)
  	else
  	{
  		BattleUnit *tu = targetTile->getOverlappingUnit(_save);
@@ -19769,7 +19782,16 @@ index 7f7697c1d..c7af3ff84 100644
  			forced = true;
  		}
  		else if (tu && ((_action.actor->getFaction() != FACTION_PLAYER) ||
-@@ -269,6 +292,11 @@ int Projectile::calculateThrow(double accuracy)
+ 			tu->getVisible()))
+ 		{ //unit
+ 			targetVoxel.z += tu->getFloatHeight(); //ground level is the base
++			// (OpenXcom3D: setting "Full sprite hitboxes": a big unit aimed at its middle, where its picture
++			// stands, rather than at the tile's; see FirstPerson::arcAimAtPicture)
++			FirstPerson::arcAimAtPicture(_save->getBattleState(), tu, targetVoxel);
+ 			targets.push_back(targetVoxel + Position(0, 0, tu->getHeight()/2 + 1));
+ 			targets.push_back(targetVoxel + Position(0, 0, 2));
+ 			targets.push_back(targetVoxel + Position(0, 0, tu->getHeight() - 1));
+@@ -269,6 +295,11 @@ int Projectile::calculateThrow(double accuracy)
  		{
  			targets.push_back(targetVoxel);
  		}
@@ -19781,7 +19803,7 @@ index 7f7697c1d..c7af3ff84 100644
  	}
  
  	_distance = 0.0f;
-@@ -305,7 +333,18 @@ int Projectile::calculateThrow(double accuracy)
+@@ -305,7 +336,18 @@ int Projectile::calculateThrow(double accuracy)
  
  
  		test = _save->getTileEngine()->calculateParabolaVoxel(originVoxel, targetVoxel, true, &_trajectory, _action.actor, curvature, deltas);
@@ -19801,7 +19823,7 @@ index 7f7697c1d..c7af3ff84 100644
  		Position endPoint = getPositionFromEnd(_trajectory, ItemDropVoxelOffset).toTile();
  		Tile *endTile = _save->getTile(endPoint);
  		// check if the item would land on a tile with a blocking object
-@@ -503,6 +542,9 @@ bool Projectile::move()
+@@ -503,6 +545,9 @@ bool Projectile::move()
  		}
  
  		_distance += TileEngine::trajectoryStepSize(_trajectory, _position);
@@ -21019,7 +21041,7 @@ index 067c7b3ba..9004c1ea8 100644
  public:
  	/// Creates a new ProjectileFly class
 diff --git a/src/Battlescape/TileEngine.cpp b/src/Battlescape/TileEngine.cpp
-index 6e6846977..6e6a38e4d 100644
+index 6e6846977..e1d48247e 100644
 --- a/src/Battlescape/TileEngine.cpp
 +++ b/src/Battlescape/TileEngine.cpp
 @@ -43,6 +43,7 @@
@@ -21087,7 +21109,18 @@ index 6e6846977..6e6a38e4d 100644
  			{
  				for (int x = 0; x <= targetSize; ++x)
  				{
-@@ -2882,6 +2906,7 @@ bool TileEngine::tryReaction(ReactionScore *reaction, BattleUnit *target, const
+@@ -2537,6 +2561,10 @@ bool TileEngine::checkReactionFire(BattleUnit *unit, const BattleAction &origina
+ 			reactor = getReactor(spotters, unit);
+ 		}
+ 	}
++	if (result)
++	{
++		FirstPerson::reactionFiredAt(_save->getBattleState(), unit); // (OpenXcom3D: a walk in 3D stops too, as one on the map)
++	}
+ 	return result;
+ }
+ 
+@@ -2882,6 +2910,7 @@ bool TileEngine::tryReaction(ReactionScore *reaction, BattleUnit *target, const
  				}
  				else
  				{
@@ -21095,7 +21128,7 @@ index 6e6846977..6e6a38e4d 100644
  					_save->getBattleGame()->statePushBack(new ProjectileFlyBState(_save->getBattleGame(), action));
  				}
  				return true;
-@@ -3144,11 +3169,13 @@ bool TileEngine::hitUnit(BattleActionAttack attack, BattleUnit *target, const Po
+@@ -3144,11 +3173,13 @@ bool TileEngine::hitUnit(BattleActionAttack attack, BattleUnit *target, const Po
  
  	const int healthOrig = target->getHealth();
  	const int stunLevelOrig = target->getStunlevel();
@@ -21109,7 +21142,7 @@ index 6e6846977..6e6a38e4d 100644
  
  	// hit log
  	if (attack.attacker)
-@@ -3229,7 +3256,7 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
+@@ -3229,7 +3260,7 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
  	}
  
  	voxelCheckFlush();
@@ -21118,7 +21151,7 @@ index 6e6846977..6e6a38e4d 100644
  	const int damage = type->getRandomDamage(power);
  	const int tileFinalDamage = type->getTileFinalDamage(type->getRandomDamageForTile(power, damage));
  	if (part >= V_FLOOR && part <= V_OBJECT)
-@@ -3280,9 +3307,18 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
+@@ -3280,9 +3311,18 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
  			}
  			const int sz = bu->getArmor()->getSize() * 8;
  			const Position target = bu->getPosition().toVoxel() + Position(sz,sz, bu->getFloatHeight() - tile->getTerrainLevel());
@@ -21138,7 +21171,7 @@ index 6e6846977..6e6a38e4d 100644
  			if (bu->getFire())
  			{
  				effectGenerated = 2;
-@@ -3512,6 +3548,7 @@ void TileEngine::explode(BattleActionAttack attack, Position center, int power,
+@@ -3512,6 +3552,7 @@ void TileEngine::explode(BattleActionAttack attack, Position center, int power,
  	// now detonate the tiles affected by explosion
  	if (type->ToTile > 0.0f)
  	{
@@ -21146,7 +21179,7 @@ index 6e6846977..6e6a38e4d 100644
  		for (auto& pair : tilesAffected)
  		{
  			if (detonate(pair.first, pair.second))
-@@ -4360,6 +4397,15 @@ int TileEngine::calculateLineTile(Position origin, Position target, std::vector<
+@@ -4360,6 +4401,15 @@ int TileEngine::calculateLineTile(Position origin, Position target, std::vector<
  VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool storeTrajectory, std::vector<Position> *trajectory, BattleUnit *excludeUnit, BattleUnit *excludeAllBut, bool onlyVisible)
  {
  	VoxelType result;
@@ -21162,7 +21195,7 @@ index 6e6846977..6e6a38e4d 100644
  	bool excludeAllUnits = false;
  	if (_save->isBeforeGame())
  	{
-@@ -4379,7 +4425,7 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
+@@ -4379,7 +4429,7 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
  			{
  				if (trajectory)
  				{ // store the position of impact
@@ -21171,7 +21204,7 @@ index 6e6846977..6e6a38e4d 100644
  				}
  				return true;
  			}
-@@ -4393,13 +4439,16 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
+@@ -4393,13 +4443,16 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
  			{
  				if (trajectory != 0)
  				{ // store the position of impact
@@ -21189,7 +21222,18 @@ index 6e6846977..6e6a38e4d 100644
  	if (hit)
  	{
  		return result;
-@@ -4526,7 +4575,7 @@ bool TileEngine::isVoxelVisible(Position voxel)
+@@ -4422,6 +4475,10 @@ int TileEngine::calculateParabolaVoxel(Position origin, Position target, bool st
+ {
+ 	if (target == origin) return V_EMPTY;//just in case
+ 
++	// (OpenXcom3D: setting "Full sprite hitboxes": the pictures the curve's steps meet face its start,
++	// as a straight line's do; see FirstPerson::ArcLines)
++	const FirstPerson::ArcLines arcLines(_save, origin);
++
+ 	int result = V_EMPTY;
+ 	Position lastPosition = origin;
+ 	Position nextPosition = lastPosition;
+@@ -4526,7 +4583,7 @@ bool TileEngine::isVoxelVisible(Position voxel)
   * @param excludeAllBut If set, the only unit to be considered for ray hits.
   * @return The objectnumber(0-3) or unit(4) or out of map (5) or -1 (hit nothing).
   */
@@ -21198,7 +21242,7 @@ index 6e6846977..6e6a38e4d 100644
  {
  	if (voxel.x < 0 || voxel.y < 0 || voxel.z < 0) //preliminary out of map
  	{
-@@ -4552,8 +4601,20 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
+@@ -4552,8 +4609,20 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
  		_cacheTileBelow = tileBelow;
   	}
  
@@ -21219,7 +21263,7 @@ index 6e6846977..6e6a38e4d 100644
  		return V_EMPTY;
  	}
  
-@@ -4584,12 +4645,21 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
+@@ -4584,12 +4653,21 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
  		}
  	}
  
@@ -21241,7 +21285,7 @@ index 6e6846977..6e6a38e4d 100644
  			Position tilepos;
  			Position unitpos = unit->getPosition();
  			int terrainHeight = 0;
-@@ -5383,7 +5453,13 @@ bool TileEngine::validMeleeRange(Position pos, int direction, BattleUnit *attack
+@@ -5383,7 +5461,13 @@ bool TileEngine::validMeleeRange(Position pos, int direction, BattleUnit *attack
  						Position originVoxel = Position(origin->getPosition().toVoxel())
  							+ Position(8,8,attacker->getHeight() + attacker->getFloatHeight() - 4 -origin->getTerrainLevel() + meleeOriginVoxelVerticalOffset);
  						Position targetVoxel;
@@ -21256,7 +21300,7 @@ index 6e6846977..6e6a38e4d 100644
  						{
  							if (dest)
  							{
-@@ -5705,6 +5781,13 @@ bool TileEngine::validateThrow(BattleAction &action, Position originVoxel, Posit
+@@ -5705,11 +5789,21 @@ bool TileEngine::validateThrow(BattleAction &action, Position originVoxel, Posit
  	{
  		trajectory.clear();
  		test = calculateParabolaVoxel(originVoxel, targetVoxel, true, &trajectory, action.actor, curvature, Position(0,0,0));
@@ -21270,7 +21314,16 @@ index 6e6846977..6e6a38e4d 100644
  		//position that item hit
  		Position hitPos = (trajectory.back() + Position(0,0,1)).toTile();
  		//position where item will land
-@@ -5867,6 +5950,8 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
+ 		Position tilePos = Projectile::getPositionFromEnd(trajectory, Projectile::ItemDropVoxelOffset).toTile();
+-		if (forced || (test != V_OUTOFBOUNDS && tilePos == targetPos))
++		// (OpenXcom3D: setting "Full sprite hitboxes": a shot's curve that meets the unit aimed at, on
++		// any of its tiles, lands on it; see FirstPerson::arcMeetsAimedUnit)
++		if (forced || (test != V_OUTOFBOUNDS && (tilePos == targetPos
++			|| FirstPerson::arcMeetsAimedUnit(_save, action.type == BA_THROW, test, trajectory.back(), targetPos))))
+ 		{
+ 			if (voxelType)
+ 			{
+@@ -5867,6 +5961,8 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
  					originVoxel.z--;
  				}
  				originVoxel.z -= 4;
@@ -21279,7 +21332,7 @@ index 6e6846977..6e6a38e4d 100644
  			}
  		}
  		int direction = getDirectionTo(origin, action.target);
-@@ -5891,6 +5976,12 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
+@@ -5891,6 +5987,12 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
  			originVoxel.y += ((2 * dirYshift[direction] + dirYshift[(direction + 1) % 8]) * action.actor->getArmor()->getSize() + 1) / 3;
  			break;
  		};
@@ -21900,7 +21953,7 @@ index a4c23b216..13d36e8f3 100644
  	{
  		_buttonsPressed |= SDL_BUTTON(button);
 diff --git a/src/Engine/ModInfo.cpp b/src/Engine/ModInfo.cpp
-index cca815d3e..5b4d3e00c 100644
+index cca815d3e..3ad494479 100644
 --- a/src/Engine/ModInfo.cpp
 +++ b/src/Engine/ModInfo.cpp
 @@ -181,6 +181,9 @@ struct EngineData
@@ -21908,7 +21961,7 @@ index cca815d3e..5b4d3e00c 100644
  const EngineData supportedEngines[] = {
  	{ OPENXCOM_VERSION_ENGINE, { OPENXCOM_VERSION_NUMBER }},
 +#ifndef OXCE_NO_FIRSTPERSON
-+	{ "OpenXcom3D", { 1, 0, 11, 0 } }, // first-person add-on 1.11, see src/FirstPerson
++	{ "OpenXcom3D", { 1, 0, 12, 0 } }, // first-person add-on 1.12, see src/FirstPerson
 +#endif
  	{ "", { 0, 0, 0, 0 } }, // assume that every engine support mods from base game, remove if its not true.
  };
@@ -21968,7 +22021,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..23b5f2b2c 100644
+index a08796ced..b14814f51 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -21986,7 +22039,7 @@ index a08796ced..23b5f2b2c 100644
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
 +OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers;
-+OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsAmbientSounds;
++OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsAmbientSounds, fpsCameraArtifacts;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsTurret, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
@@ -22929,10 +22982,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..5a2ab6577
+index 000000000..f90c6d34d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1412 @@
+@@ -0,0 +1,1429 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -23080,7 +23133,7 @@ index 000000000..5a2ab6577
 +}
 +
 +/**
-+ * The main menu with the mod on: its version (the mod's own metadata, "1.11") in small letters
++ * The main menu with the mod on: its version (the mod's own metadata, "1.12") in small letters
 + * just right of the title's first line, "OpenXcom3D", its foot on the big letters' foot (a player,
 + * GitHub issue #69: without the AppImage's name, no telling the version; the owner: "a smaller
 + * space and our version number besides OpenXcom3D", then "Make the version no. Smaller"). A text
@@ -23615,6 +23668,11 @@ index 000000000..5a2ab6577
 +	// and fire. Off (the owner: a realistic camera, as before, by default): a camera hasn't the
 +	// wearer's eyes.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCameraEyes", &fpsCameraEyes, false, "STR_FPS_CAMERA_EYES", category));
++	// The helmet cameras' artifacts (a player, GitHub issue #121: "Option to disable film grain in
++	// mini camera ... LESS neat when Camera becomes illegible for longer than say, 250ms"): the
++	// feeds' bad signal and spells of static as they are, Normal (0, the default); Light (1), a
++	// lighter static and no glitch longer than LightGlitchLongest; or None (2), a clean feed.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsCameraArtifacts", &fpsCameraArtifacts, 0, "STR_FPS_CAMERA_ARTIFACTS", category));
 +	// Mouse look: how fast the view turns (1 to 20), up and down swapped or not, and the field
 +	// of view across the screen, in degrees (50 to 110).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsMouseSensitivity", &fpsMouseSensitivity, 5, "STR_FPS_MOUSE_SENSITIVITY", category));
@@ -23713,8 +23771,8 @@ index 000000000..5a2ab6577
 +	// Wall paint (a player, GitHub issue #111: from behind a house its walls showed the beige of its
 +	// rooms, not its outside): the faces of walls the isometric art never shows, a west wall's west face
 +	// and a north wall's north face (see FirstPersonView::findWallPaints). As the art (0): the paint of
-+	// the face it shows, as before. Inside and out (1): a building's outer walls in the paint of the side
-+	// they face, its outside or the room inside. Every room (2): the walls between its rooms too, each
++	// the face it shows, as before. Each side (1): a building's outer walls in the paint of the side
++	// they face, its outside or the room inside. All rooms (2): the walls between its rooms too, each
 +	// face in its room's. The faces the map shows stay as it draws them; doors, and windows' frames and
 +	// glass, keep theirs.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsWallPaint", &fpsWallPaint, 1, "STR_FPS_WALL_PAINT", category));
@@ -23859,7 +23917,7 @@ index 000000000..5a2ab6577
 +	// The colours of the markers over the enemies (a player, GitHub issue #117: "markers should be red if visible, green
 +	// if unseen, and perhaps yellow if viable line of fire, but otherwise unseen"; the owner: a setting): all red (0, as
 +	// before), as the map's buttons for them (1: red if the soldier sees it, green if only the squad does), or that and
-+	// yellow for those of the green ones he has a clear line to (2, the default: Line of fire). None over our own.
++	// yellow for those of the green ones he has a clear line to (2, the default: Clear shot). None over our own.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsEnemyMarkers", &fpsEnemyMarkers, 2, "STR_FPS_ENEMY_MARKERS", category));
 +	// A hit's damage rising over the unit hit and fading (the owner's): the health it took after its
 +	// armour in red, the armour it took off in blue, the stun in purple, a grey 0 when it did none of
@@ -23911,8 +23969,8 @@ index 000000000..5a2ab6577
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsLookUp", &keyFpsLookUp, SDLK_UP, "STR_FPS_KEY_LOOK_UP", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsLookDown", &keyFpsLookDown, SDLK_DOWN, "STR_FPS_KEY_LOOK_DOWN", category));
 +	// Two ways of walking, each on and off with its key: sprinting (the game's run; Caps Lock,
-+	// Doom's own "always run" key) and en passant (walking on past enemies coming into sight, as
-+	// Shift does on the map; the key left of 1, as Shift is the lean key).
++	// Doom's own "always run" key; it walks on past enemies coming into sight too) and en passant
++	// (walking on past them, as Shift does on the map; the key left of 1, as Shift is the lean key).
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsSprint", &keyFpsSprint, SDLK_CAPSLOCK, "STR_FPS_KEY_SPRINT", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsEnPassant", &keyFpsEnPassant, SDLK_BACKQUOTE, "STR_FPS_KEY_EN_PASSANT", category));
 +	// Fire modes (the next one, or snap, aimed and auto directly) and switching hands. The next
@@ -24137,6 +24195,18 @@ index 000000000..5a2ab6577
 +}
 +
 +/**
++ * Called by the game after reaction fire came at a unit (TileEngine::checkReactionFire, when a
++ * reactor shot at it or struck it): in 3D, the soldier's walk stops (see
++ * FirstPersonMode::firedAt), as the game stops a walk on the map.
++ * @param state The battlescape screen.
++ * @param unit The unit fired at.
++ */
++void reactionFiredAt(BattlescapeState *state, const BattleUnit *unit)
++{
++	FirstPersonMode::firedAt(state, unit);
++}
++
++/**
 + * Called by the game after a round or a blow struck a unit (TileEngine::hit): one that did no
 + * harm to an enemy in sight marks the 3D view's crosshair (see FirstPersonMode::unitStruck).
 + * @param state The battlescape screen.
@@ -24347,10 +24417,10 @@ index 000000000..5a2ab6577
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..89cd8c816
+index 000000000..a7b8717cd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,415 @@
+@@ -0,0 +1,457 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -24553,6 +24623,36 @@ index 000000000..89cd8c816
 +/// its middle, for the armour side and body part hit: pushed out towards the shooter, as the
 +/// game's own hit shape would have stopped it on that side.
 +Position spriteHitRelative(const Position &relative, const BattleUnit *unit, const BattleUnit *shooter);
++/// Setting "Full sprite hitboxes": the curve of a throw or an arcing shot is walked as many short
++/// lines, a step of the curve each (TileEngine::calculateParabolaVoxel); while one of these lives,
++/// the pictures those lines meet face the curve's start (the hand it left), as a straight line's
++/// face its start, each step still tested where it crosses the picture. Each step's own start (the
++/// round itself) turned the picture to face it, and a curve met a picture only within a voxel of
++/// the unit's middle (a player, GitHub issue #119, XPiratez's bows: "you can CLEARLY see the arrow
++/// hit it but the game acts like I hit the ground next to it"). With the setting off, nothing.
++class ArcLines
++{
++public:
++	ArcLines(SavedBattleGame *save, const Position &origin);
++	~ArcLines();
++	ArcLines(const ArcLines&) = delete;
++	ArcLines &operator=(const ArcLines&) = delete;
++private:
++	bool _set;              // the setting was on: the curve's start set for its lines
++	bool _outerActive;      // the curve's start as it was before (none: no curve is walked inside another)
++	double _outerFrom[3];
++};
++/// Setting "Full sprite hitboxes": where an arcing shot at a unit aims across the map (the game aims
++/// at the tile's middle, Projectile::calculateThrow): a big unit at its own middle, where its tiles
++/// meet and its picture stands; any other left as it is. With the setting off, left as it is.
++void arcAimAtPicture(BattlescapeState *state, const BattleUnit *unit, Position &aim);
++/// Setting "Full sprite hitboxes": does a curve the game tries for an arcing shot land on what it's
++/// aimed at by meeting the unit on the aimed tile, on any of that unit's tiles (TileEngine::
++/// validateThrow takes only a curve that comes down on the aimed tile, and a big unit's picture,
++/// met in its middle, often stops it over another of its tiles: the curve went higher and higher
++/// until it came down on the floor beside the unit, GitHub issue #119)? Never for a throw (an item
++/// stopped by a unit drops short of its tile), nor with the setting off.
++bool arcMeetsAimedUnit(SavedBattleGame *save, bool thrown, int meets, const Position &impact, const Position &aimTile);
 +/// In a battle with the mod's 3D view, a unit turning to a point on its own tile (straight above
 +/// or below it) keeps its facing, where the game turned it south (BattleUnit::directionTo).
 +bool keepsFacingOnOwnTile();
@@ -24643,6 +24743,10 @@ index 000000000..89cd8c816
 +/// A reaction shot, as it's launched, in either view: with the soldier's akimbo marked on the map,
 +/// the other hand's gun fires along.
 +void reactionAkimbo(BattlescapeState *state, BattleAction &action);
++/// Reaction fire came at this unit (TileEngine::checkReactionFire: a reactor shot at it or struck
++/// it), in either view: as the game stops a walk on the map then, the 3D view stops the walk of the
++/// soldier it looks through (the movement keys are ignored until they're all let go).
++void reactionFiredAt(BattlescapeState *state, const BattleUnit *unit);
 +/// A round or a blow struck a unit (TileEngine::hit, after the damage): an enemy in sight it did
 +/// no harm marks the 3D view's crosshair (its health and stun before the strike given).
 +void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefore, int stunBefore);
@@ -24721,6 +24825,7 @@ index 000000000..89cd8c816
 +inline void drawMapAkimbo(BattlescapeState *, BattleUnit *, Surface *, Surface *) { }
 +inline void mapAkimbo(BattlescapeState *, BattleAction &) { }
 +inline void reactionAkimbo(BattlescapeState *, BattleAction &) { }
++inline void reactionFiredAt(BattlescapeState *, const BattleUnit *) { }
 +inline void unitStruck(BattlescapeState *, const BattleUnit *, int, int) { }
 +inline void unitDamaged(BattlescapeState *, const BattleUnit *, int, int, int) { }
 +inline int armorPoints(const BattleUnit *) { return 0; }
@@ -24738,6 +24843,13 @@ index 000000000..89cd8c816
 +inline BattleUnit *spriteHitAt(SavedBattleGame *, const Position &, const Position &, const Position &, unsigned, const BattleUnit *, bool, const BattleUnit *) { return nullptr; }
 +inline Position spriteImpact(SavedBattleGame *, const BattleUnit *, const Position &voxel) { return voxel; }
 +inline Position spriteHitRelative(const Position &relative, const BattleUnit *, const BattleUnit *) { return relative; }
++class ArcLines
++{
++public:
++	ArcLines(SavedBattleGame *, const Position &) { }
++};
++inline void arcAimAtPicture(BattlescapeState *, const BattleUnit *, Position &) { }
++inline bool arcMeetsAimedUnit(SavedBattleGame *, bool, int, const Position &, const Position &) { return false; }
 +inline bool keepsFacingOnOwnTile() { return false; }
 +inline bool autoEquipGunsFirst(const Mod *) { return false; }
 +inline void addMenuVersion(State *, Text *, const Mod *) { }
@@ -25872,10 +25984,10 @@ index 000000000..989a6a6fa
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..1cdeb52ae
+index 000000000..ca2656f9a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2900 @@
+@@ -0,0 +1,2903 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -27297,7 +27409,9 @@ index 000000000..1cdeb52ae
 + * is the game's own run (Ctrl on the map), at a faster pace: by the default rules it costs
 + * three quarters of a walk's time units and half as much energy again, and only an armor that
 + * allows running runs. A soldier without the energy for a run walks the step instead (see
-+ * runsStep). "SPRINT" shows under the compass while it's on. Each battle starts with it off.
++ * runsStep). Sprinting walks on past enemies coming into sight, as en passant does (GitHub issue
++ * #118; on the map a run does so where the mod's rules say so); being shot at stops it. "SPRINT"
++ * shows under the compass while it's on. Each battle starts with it off.
 + */
 +void FirstPersonMode::toggleSprint()
 +{
@@ -27309,8 +27423,9 @@ index 000000000..1cdeb52ae
 +/**
 + * Switches en passant on or off (its key, the one left of 1 by default): while it's on, an enemy
 + * coming into sight doesn't stop the walk, as moving with Shift held doesn't on the map (the
-+ * game's own rule, its "ignore spotted enemies"). The banner still says ENEMY SPOTTED. "EN
-+ * PASSANT" shows under the compass while it's on. Each battle starts with it off.
++ * game's own rule, its "ignore spotted enemies"); being shot at still does, as on the map. The
++ * banner still says ENEMY SPOTTED. Sprinting walks on the same way. "EN PASSANT" shows under the
++ * compass while it's on. Each battle starts with it off.
 + */
 +void FirstPersonMode::toggleEnPassant()
 +{
@@ -28778,10 +28893,10 @@ index 000000000..1cdeb52ae
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..4adbf33fe
+index 000000000..0fdc3df4d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1301 @@
+@@ -0,0 +1,1305 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -28960,6 +29075,8 @@ index 000000000..4adbf33fe
 +	static bool breakdown(BattlescapeState *state, BattleUnit *unit);
 +	/// A close-quarters check knocked a shot aside, told by the game (see FirstPerson::closeQuartersDeflected).
 +	static void deflected(BattlescapeState *state, const BattleUnit *shooter, const Position &target);
++	/// Reaction fire came at a unit, told by the game (see FirstPerson::reactionFiredAt).
++	static void firedAt(BattlescapeState *state, const BattleUnit *unit);
 +	/// Turns the view to where a shot knocked aside goes.
 +	void followDeflectedShot(const BattleUnit *shooter, const Position &target);
 +	/// Doom IDKFA: does this unit's shot spend no ammo? Asked by the game (see FirstPerson::endlessAmmo).
@@ -29410,12 +29527,14 @@ index 000000000..4adbf33fe
 +	bool tileMoveVelocity(BattleUnit *unit, double forward, double strafe, bool canMove, double walkSpeed, double elapsedSeconds, double &velocityX, double &velocityY);
 +	Uint32 _spottedUntil = 0;             // "enemy spotted" banner
 +
-+	/// Stops the walk when a new enemy comes into view (not en passant).
++	/// Stops the walk when a new enemy comes into view (not en passant, not sprinting).
 +	void checkSpotted(BattleUnit *unit, bool playerTurn);
++	/// Stops the walk when the soldier is shot at (reaction fire), whatever the way of walking.
++	void stopWalkUnderFire(const BattleUnit *unit);
 +
 +	// ---- two ways of walking, each switched on and off with its key: sprinting (the game's
 +	// run, at a faster pace) and en passant (walking on past enemies coming into sight, as Shift
-+	// does on the map); each shows a line under the compass while on ----
++	// does on the map; sprinting does too); each shows a line under the compass while on ----
 +
 +	bool _sprintOn = false;              // sprinting switched on (key "Sprint")
 +	bool _sprintStepRan = true;          // the last step was a run (false once a run couldn't be paid for: walking pace then)
@@ -30969,7 +31088,7 @@ index 000000000..f88b40451
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..e4008f22d
+index 000000000..43b9dce95
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
 @@ -0,0 +1,2540 @@
@@ -33311,7 +33430,7 @@ index 000000000..e4008f22d
 + * "Enemy markers", a player, GitHub issue #117: "to reflect iso parity"): the game lists first the
 + * enemies the selected soldier sees, its red buttons, then the others the squad sees, green (see
 + * BattlescapeState::updateSoldierInfo). As the map: the markers red and green as those buttons;
-+ * Line of fire, the default: the green ones the soldier has a clear line to yellow (see
++ * Clear shot, the default: the green ones the soldier has a clear line to yellow (see
 + * clearLineOfFire); All red: every enemy's red, as before. The game's buttons for our own wounded
 + * (blue) and those about to pass out (purple) come after them: no marker over our own, whatever
 + * the setting. An enemy nobody sees has no button, so no marker.
@@ -33341,7 +33460,7 @@ index 000000000..e4008f22d
 +		markers.push_back({ enemy, buttonIndex + 1, kind });
 +	}
 +
-+	// Line of fire: the answers kept for the enemies still marked, the others let go; then one answer worked out
++	// Clear shot: the answers kept for the enemies still marked, the others let go; then one answer worked out
 +	// afresh this frame, the most needed: one for an enemy with none (or one for another soldier, from another place
 +	// or facing, or for the enemy elsewhere) first, else the oldest once older than LineOfFireRefresh. The others keep
 +	// the answers they have (an enemy with none yet stays green for the frames until its turn).
@@ -33382,7 +33501,7 @@ index 000000000..e4008f22d
 +}
 +
 +/**
-+ * Setting "Enemy markers", Line of fire: has the soldier a clear line to an enemy the squad sees
++ * Setting "Enemy markers", Clear shot: has the soldier a clear line to an enemy the squad sees
 + * and he doesn't? The first half of the game's own sight test (TileEngine::visible): the enemy in
 + * his view's cone (BattleUnit::checkViewSector, the game's 90 degrees) and a line from his eyes
 + * reaching some part of it past walls, objects and other units (TileEngine::canTargetUnit, the
@@ -33515,10 +33634,10 @@ index 000000000..e4008f22d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeMovement.cpp b/src/FirstPerson/FirstPersonModeMovement.cpp
 new file mode 100644
-index 000000000..557d5d629
+index 000000000..70dbd440c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeMovement.cpp
-@@ -0,0 +1,2205 @@
+@@ -0,0 +1,2238 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -33568,7 +33687,8 @@ index 000000000..557d5d629
 + *
 + * Walking, with every tile entered paid for by the original rules (the game's own walking
 + * state); opening doors and walking through them; jumping, and vaulting over low obstacles;
-+ * riding grav lifts; flying; falling off ledges; and stopping when a new enemy is spotted.
++ * riding grav lifts; flying; falling off ledges; and stopping when a new enemy is spotted or
++ * when the soldier is shot at.
 + */
 +#include "FirstPersonMode.h"
 +#include <algorithm>
@@ -33913,9 +34033,10 @@ index 000000000..557d5d629
 +	walk.instantMove = true; // No step animation: the 3D view moves smoothly on its own.
 +	walk.strafe = pathfinding->getStrafeMove(); // the sidestep above, if the game allows it here
 +	walk.run = run && !walk.strafe;
-+	// Walking on past an enemy coming into sight: en passant, or a run where the mod's rules say
-+	// running does (as the map decides it for a move with Shift or a run).
-+	walk.ignoreSpottedEnemies = _enPassantOn || (walk.run && Mod::EXTENDED_RUNNING_COST);
++	// Walking on past an enemy coming into sight: en passant, or sprinting, in every game (as the
++	// map walks on with Shift, and a run does where the mod's rules say so; a player's report,
++	// GitHub issue #118). Being shot at still stops the walk (see stopWalkUnderFire).
++	walk.ignoreSpottedEnemies = _enPassantOn || _sprintOn;
 +	_sidestepFacing = walk.strafe ? unit->getDirection() : -1;
 +	_state->_battleGame->statePushBack(new UnitWalkBState(_state->_battleGame, walk));
 +
@@ -35691,9 +35812,10 @@ index 000000000..557d5d629
 + * Stops the walk when a new enemy comes into view, as spotting one interrupts a move on the
 + * isometric map: the movement keys are ignored until they're all let go (so holding a key
 + * doesn't carry the soldier on into fire), and an "enemy spotted" banner shows for 1.5 seconds
-+ * (see updateBanner). With en passant on (its key) the walk goes on and only the banner shows,
-+ * as moving with Shift held does on the map. A new enemy shows as a rise in the number of units
-+ * the soldier has spotted this turn. Called every frame.
++ * (see updateBanner). With en passant on (its key) or sprinting (its key) the walk goes on and
++ * only the banner shows, as moving with Shift held does on the map (and a run, where the mod's
++ * rules say so). A new enemy shows as a rise in the number of units the soldier has spotted this
++ * turn. Called every frame.
 + * @param unit The soldier we look through.
 + * @param playerTurn Whether it's the player's turn (only then is anything stopped).
 + */
@@ -35710,15 +35832,45 @@ index 000000000..557d5d629
 +		return;
 +	}
 +
-+	// More than before: stop, and say so. En passant (its key) only says so, and so does a run
-+	// where the mod's rules say running walks on past them (see commitStep).
++	// More than before: stop, and say so. En passant and sprinting (their keys) only say so (see
++	// commitStep).
 +	if (spottedCount > _enemiesSpottedCount)
 +	{
-+		const bool walksOn = _enPassantOn || (_sprintOn && _sprintStepRan && Mod::EXTENDED_RUNNING_COST);
++		const bool walksOn = _enPassantOn || _sprintOn;
 +		if (!walksOn) _movementHeld = true;
 +		_spottedUntil = SDL_GetTicks() + 1500;
 +	}
 +	_enemiesSpottedCount = spottedCount;
++}
++
++/**
++ * The game's hook for reaction fire at a unit (see FirstPerson::reactionFiredAt): passed on to
++ * the first-person mode if the 3D view is showing.
++ * @param state The battlescape screen (it owns the first-person mode).
++ * @param unit The unit fired at.
++ */
++void FirstPersonMode::firedAt(BattlescapeState *state, const BattleUnit *unit)
++{
++	if (state && state->_firstPerson && state->_firstPerson->isActive())
++	{
++		state->_firstPerson->stopWalkUnderFire(unit);
++	}
++}
++
++/**
++ * Stops the walk when the soldier we look through is shot at (reaction fire after a step, a fall,
++ * a kneel, a shot), as the game stops a walk on the map when the walker is fired upon: the movement
++ * keys are ignored until they're all let go, as after a newly spotted enemy (see checkSpotted),
++ * and a fresh press walks on. With en passant or sprinting too: they walk on past enemies coming
++ * into sight, not into their fire (GitHub issue #118). Only on the player's turn.
++ * @param unit The unit fired at.
++ */
++void FirstPersonMode::stopWalkUnderFire(const BattleUnit *unit)
++{
++	if (unit && unit == _save->getSelectedUnit() && _save->getSide() == FACTION_PLAYER)
++	{
++		_movementHeld = true;
++	}
 +}
 +
 +}
@@ -36229,10 +36381,10 @@ index 000000000..8faa52ad4
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..7685e02c2
+index 000000000..f17f3afd5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,5171 @@
+@@ -0,0 +1,5173 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -38297,7 +38449,8 @@ index 000000000..7685e02c2
 + * The curve the game's own aim finds for a throw or an arcing shot at a tile, as the game works
 + * it out (Projectile::calculateThrow) but without the accuracy roll: the points on the tile it
 + * tries, in its order (an arcing shot aimed at an exact point, see launchShot, that point first;
-+ * then a unit's middle, low and high; an object, a wall, each at a few heights; the floor; a
++ * then a unit's middle, low and high, with "Full sprite hitboxes" a big unit's across the map, see
++ * FirstPerson::arcAimAtPicture; an object, a wall, each at a few heights; the floor; a
 + * throw always the floor), from the game's origin voxel (the hand), the first one it finds a
 + * curve for that lands on the tile (TileEngine::validateThrow), and that curve followed to where
 + * it comes down (calculateParabolaVoxel). At a wall seen from the side no curve lands on its
@@ -38327,7 +38480,8 @@ index 000000000..7685e02c2
 +	}
 +	else if (targetUnit && targetUnit->getVisible())
 +	{
-+		const Position unitBase = floorPoint + Position(0, 0, targetUnit->getFloatHeight());
++		Position unitBase = floorPoint + Position(0, 0, targetUnit->getFloatHeight());
++		FirstPerson::arcAimAtPicture(_state, targetUnit, unitBase); // (as the game aims, see Projectile::calculateThrow)
 +		for (const int height : { targetUnit->getHeight() / 2 + 1, 2, targetUnit->getHeight() - 1 }) aimPoints.push_back(unitBase + Position(0, 0, height));
 +	}
 +	else if (tile->getMapData(O_OBJECT))
@@ -45256,10 +45410,10 @@ index 000000000..44a6559e0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonSpriteHits.cpp b/src/FirstPerson/FirstPersonSpriteHits.cpp
 new file mode 100644
-index 000000000..16428f86e
+index 000000000..96b0467e3
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonSpriteHits.cpp
-@@ -0,0 +1,824 @@
+@@ -0,0 +1,914 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -45777,11 +45931,26 @@ index 000000000..16428f86e
 +}
 +
 +/**
++ * The curve being walked (see ArcLines): while it is, the pictures its steps meet face its start.
++ */
++struct ArcFacing
++{
++	bool active = false;
++	double from[3] = {}; // the curve's start, in voxels (the middle of its first voxel)
++};
++ArcFacing &arcFacing()
++{
++	static ArcFacing facing;
++	return facing;
++}
++
++/**
 + * Works out a line afresh (see LineContext): its start and direction (between the middles of its
 + * first and last voxels; the crosshair's own exact ray instead, see ExactLine), whose line it is
 + * (the looked-through soldier's own when he is left out of it, the 3D view shows the battle and
 + * it starts at his eye: then the pictures are the cards the view draws), and the cards of the
-+ * units it passes near, but the one left out (or all but the only one tested).
++ * units it passes near, but the one left out (or all but the only one tested). A step of a curve
++ * (see ArcLines): the cards face the curve's start, the line itself still what crosses them.
 + * @param save The battle.
 + * @param origin, target The line's first and last voxels.
 + * @param serial The line's serial number.
@@ -45861,7 +46030,7 @@ index 000000000..16428f86e
 +		LineCard lineCard;
 +		lineCard.unit = unit;
 +		if (own) drawnCard(save, unit, view, lineCard.card);
-+		else uprightCard(save, unit, line.start, lineCard.card);
++		else uprightCard(save, unit, arcFacing().active ? arcFacing().from : line.start, lineCard.card);
 +		lineCard.solid = cardRay(lineCard.card, line.start, line.direction, lineCard.along);
 +		if (lineCard.solid) line.cards.push_back(lineCard);
 +	}
@@ -45929,6 +46098,81 @@ index 000000000..16428f86e
 +		for (int axis = 0; axis < 3; ++axis) ray.crossing[axis] = line.start[axis] + line.direction[axis] * hitAlong;
 +	}
 +	return hit;
++}
++
++/**
++ * Starts a curve's lines (see FirstPersonApi.h): with the setting on, the pictures they meet face
++ * the curve's start.
++ * @param save The battle.
++ * @param origin The curve's first voxel.
++ */
++ArcLines::ArcLines(SavedBattleGame *save, const Position &origin) : _set(save && spriteHitboxes(save->getBattleState()))
++{
++	ArcFacing &facing = arcFacing();
++	_outerActive = facing.active;
++	std::copy(facing.from, facing.from + 3, _outerFrom);
++	if (_set)
++	{
++		facing.active = true;
++		facing.from[0] = origin.x + 0.5;
++		facing.from[1] = origin.y + 0.5;
++		facing.from[2] = origin.z + 0.5;
++		lineContext().save = nullptr; // (worked out afresh, as ExactLine does)
++	}
++}
++
++/**
++ * Ends a curve's lines: the pictures face each line's own start again.
++ */
++ArcLines::~ArcLines()
++{
++	if (_set)
++	{
++		ArcFacing &facing = arcFacing();
++		facing.active = _outerActive;
++		std::copy(_outerFrom, _outerFrom + 3, facing.from);
++		lineContext().save = nullptr;
++	}
++}
++
++/**
++ * Where an arcing shot at a unit aims across the map (see FirstPersonApi.h): with the setting on, a
++ * big unit's middle (its picture stands there, see standingAnchor; the game aims at the tile's).
++ * @param state The battle's screen.
++ * @param unit The unit aimed at.
++ * @param aim The point aimed at, its across the map (x, y) set to the big unit's middle.
++ */
++void arcAimAtPicture(BattlescapeState *state, const BattleUnit *unit, Position &aim)
++{
++	const int size = unit ? unit->getArmor()->getSize() : 1;
++	if (size < 2 || !spriteHitboxes(state))
++	{
++		return;
++	}
++	aim.x = unit->getPosition().x * 16 + 8 * size;
++	aim.y = unit->getPosition().y * 16 + 8 * size;
++}
++
++/**
++ * Does a curve tried for an arcing shot land on the unit aimed at (see FirstPersonApi.h)? With the
++ * setting on, a shot's curve that met the unit on the aimed tile (its picture: see spriteImpact, the
++ * stop on one of its tiles) on any of its tiles.
++ * @param save The battle.
++ * @param thrown A throw's curve (never: an item stopped by a unit drops short of its tile).
++ * @param meets What the curve met (V_UNIT...).
++ * @param impact Where it stopped.
++ * @param aimTile The tile of the point aimed at.
++ * @return True if it lands on the unit aimed at.
++ */
++bool arcMeetsAimedUnit(SavedBattleGame *save, bool thrown, int meets, const Position &impact, const Position &aimTile)
++{
++	if (thrown || meets != V_UNIT || !spriteHitboxes(save->getBattleState()))
++	{
++		return false;
++	}
++	const Tile *aimed = save->getTile(aimTile), *stopped = save->getTile(impact.toTile());
++	const BattleUnit *unit = aimed ? aimed->getOverlappingUnit(save) : nullptr;
++	return unit && stopped && stopped->getOverlappingUnit(save) == unit;
 +}
 +
 +/**
@@ -46904,10 +47148,10 @@ index 000000000..58760aab7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..73c77284d
+index 000000000..20a47bb76
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1433 @@
+@@ -0,0 +1,1436 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -47357,7 +47601,8 @@ index 000000000..73c77284d
 +	void setStaticSpells(bool on) { _staticSpells = on; }
 +	/// A digital camera feed's bad signal (the helmet cameras): brief blocky patches, green
 +	/// squares and frozen pictures (see updateSignalGlitches); 0 none, 1 now and then, 2 a lot
-+	/// (the hardest missions, on the aliens' own ground).
++	/// (the hardest missions, on the aliens' own ground). The setting "Camera artifacts" makes
++	/// it and the static spells lighter and shorter (Light) or leaves them out (None).
 +	void setSignalGlitches(int level) { _signalGlitches = level; }
 +	/// Where a shotgun's pellet struck: sparks, chunks and a bullet hole, as for a round (see FirstPerson::pelletLanded).
 +	void markPelletImpact(const Position &at, const Position &from, const BattleItem *weapon, const BattleItem *ammo);
@@ -47564,7 +47809,7 @@ index 000000000..73c77284d
 +		const VoxelModel *donor; // the wall whose face the art shows lends its colours, row by row
 +		bool donorWest;          // the donor is a west wall (its east face lends), else a north wall (its south face)
 +		bool openEnd;            // the wall's line ends at its north (a west wall) or west (a north wall) end, a corner: that end is repainted too
-+		Uint8 kind;              // 1 a building's outer wall (Inside and out), 2 a wall between two of its rooms (Every room)
++		Uint8 kind;              // 1 a building's outer wall (Each side), 2 a wall between two of its rooms (All rooms)
 +		Uint8 paintGroup;        // only the wall's voxels of this colour group, the paint of its own side, take the donor's colours
 +	};
 +	std::vector<WallPaint> _wallPaints; // the walls whose hidden face takes another paint
@@ -48122,6 +48367,8 @@ index 000000000..73c77284d
 +	void finishShot();
 +	/// A round the map noted landing: the end of the one followed, or a round never seen at all.
 +	void landShot(const LandedShot &shot);
++	/// Our own round that landed unseen: drawn from its gun's muzzle, and the gun's flash and kick.
++	void ownRoundLeft(const LandedShot &shot, Trail trail, float from[3]);
 +	/// A new shot has left: its start, look, muzzle flash and kick.
 +	void beginShot(Projectile *projectile);
 +	/// The shot moved on: its trail grows, and it may whizz past the eye.
@@ -52482,10 +52729,10 @@ index 000000000..ae3f925b8
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewScreenEffects.cpp b/src/FirstPerson/FirstPersonViewScreenEffects.cpp
 new file mode 100644
-index 000000000..986e42728
+index 000000000..dc4e7ff65
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewScreenEffects.cpp
-@@ -0,0 +1,721 @@
+@@ -0,0 +1,728 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -52969,7 +53216,8 @@ index 000000000..986e42728
 + * a UFO) there's a low static all the time (BadStaticFloor) and the spells come more often, longer
 + * and stronger (the Bad... values). Their clock runs only while the camera shows: hidden, the next
 + * spell (or the one going on) waits. None with "Muzzle flashes" off, which stops every flash and
-+ * flicker (the glitches' too). Sets _staticAmount for this frame.
++ * flicker (the glitches' too), nor with "Camera artifacts" None (a clean feed); with it Light, the
++ * low static and the spells' peaks lighter (see LightStaticFloorShare). Sets _staticAmount for this frame.
 + */
 +void FirstPersonView::updateStaticSpell()
 +{
@@ -52992,13 +53240,14 @@ index 000000000..986e42728
 +	}
 +	_staticSpellTick = now;
 +	_staticAmount = 0.0f;
-+	if (!Options::fpsMuzzleFlash)
++	if (!Options::fpsMuzzleFlash || Options::fpsCameraArtifacts >= 2)
 +	{
 +		_staticSpellUntil = _staticSpellNextAt = 0;
 +		return;
 +	}
 +	const bool bad = badSignal();
-+	const float floor = bad ? BadStaticFloor : 0.0f;
++	const bool light = Options::fpsCameraArtifacts == 1;
++	const float floor = bad ? (light ? BadStaticFloor * LightStaticFloorShare : BadStaticFloor) : 0.0f;
 +	_staticAmount = floor;
 +	auto gap = [&]() { return bad ? random(BadStaticGapShortest, BadStaticGapLongest) : random(StaticGapShortest, StaticGapLongest); };
 +	if (!_staticSpellNextAt)
@@ -53038,7 +53287,7 @@ index 000000000..986e42728
 +	{
 +		share = (float)(length - into) / _staticSpellFall;
 +	}
-+	_staticAmount = std::max(floor, _staticSpellPeak * smoothstep(0.0f, 1.0f, share));
++	_staticAmount = std::max(floor, (light ? _staticSpellPeak * LightStaticSpellShare : _staticSpellPeak) * smoothstep(0.0f, 1.0f, share));
 +}
 +
 +/**
@@ -53064,9 +53313,10 @@ index 000000000..986e42728
 + * (the owner's ask: more often than before, 1.5 to 5 s): enough to tell a camera's feed, never
 + * enough to get in the way. With a bad signal (see badSignal: the hardest missions, inside a UFO)
 + * a glitch every second or so, half as long again, in more and bigger patches, torn more often.
-+ * Never with Muzzle flashes off (the setting for those bothered by flashing light). A camera shown
-+ * again after a pause starts afresh: no glitch for a few seconds, and a freeze never holds an old
-+ * picture (it also ends when the camera moves to another soldier).
++ * Never with Muzzle flashes off (the setting for those bothered by flashing light), nor with Camera
++ * artifacts None; with it Light, each one shortened so none lasts over LightGlitchLongest. A camera
++ * shown again after a pause starts afresh: no glitch for a few seconds, and a freeze never holds an
++ * old picture (it also ends when the camera moves to another soldier).
 + * Called at the start of every draw.
 + * @return True while the picture is frozen (draw then keeps the last one).
 + */
@@ -53083,7 +53333,7 @@ index 000000000..986e42728
 +	// A bad signal (the hardest missions, inside a UFO) glitches every second or so, longer and
 +	// in more and bigger patches; the usual one every few seconds, briefly.
 +	const bool bad = badSignal();
-+	if (!Options::fpsMuzzleFlash || !shownLately)
++	if (!Options::fpsMuzzleFlash || Options::fpsCameraArtifacts >= 2 || !shownLately)
 +	{
 +		_glitchKind = GLITCH_NONE;
 +		_glitchNextAt = now + (bad ? random(500, 1500) : random(2000, 6000));
@@ -53103,8 +53353,12 @@ index 000000000..986e42728
 +		const int roll = random(0, 99);
 +		if (bad) _glitchKind = roll < 35 ? GLITCH_BLOCKS : roll < 55 ? GLITCH_GREEN : roll < 85 ? GLITCH_TEAR : GLITCH_FREEZE;
 +		else _glitchKind = roll < 45 ? GLITCH_BLOCKS : roll < 70 ? GLITCH_GREEN : roll < 85 ? GLITCH_TEAR : GLITCH_FREEZE;
-+		const int length = _glitchKind == GLITCH_BLOCKS ? random(120, 360) : _glitchKind == GLITCH_GREEN ? random(60, 200) : _glitchKind == GLITCH_TEAR ? random(80, 220) : random(200, 550);
-+		_glitchUntil = now + (bad ? length * 3 / 2 : length);
++		// How long: in its kind's range (blocks 120 to 360 ms, green squares 60 to 200, a tear 80 to
++		// 220, a freeze 200 to 550), half as long again with a bad signal; with "Camera artifacts"
++		// Light shortened in proportion, the kind's longest LightGlitchLongest on any signal.
++		static const int shortestOfKind[] = { 0, 120, 60, 200, 80 }, longestOfKind[] = { 0, 360, 200, 550, 220 }; // (by GlitchKind)
++		const int length = random(shortestOfKind[_glitchKind], longestOfKind[_glitchKind]);
++		_glitchUntil = now + (Options::fpsCameraArtifacts == 1 ? length * LightGlitchLongest / longestOfKind[_glitchKind] : bad ? length * 3 / 2 : length);
 +		_glitchNextAt = _glitchUntil + (bad ? random(300, 1500) : random(1500, 5000));
 +		_glitchFrozenUnit = _cameraUnit;
 +		// Its patches, in blocks: one to three small rectangles of coarse blocks (a third of the
@@ -53209,10 +53463,10 @@ index 000000000..986e42728
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..c04671bbf
+index 000000000..3cecf5937
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,578 @@
+@@ -0,0 +1,591 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -53301,7 +53555,7 @@ index 000000000..c04671bbf
 +/// the neighbours' Gaussian average.
 +const int UpscaleSoftenShades = 1;
 +const float UpscaleSoftenAmount = 1.0f;
-+/// The detail pass ("Smooth + detail", "Finest"): each colour is pushed this much further away from
++/// The detail pass ("Smooth+", "Finest"): each colour is pushed this much further away from
 +/// the average of its neighbours of the same ramp, where they differ by more than this (out of 255).
 +const float UpscaleDetailAmount = 0.5f, UpscaleDetailThreshold = 3.0f;
 +/// A small feature ("Finest" keeps them as xBRZ draws them): an original pixel brighter or darker
@@ -53323,6 +53577,10 @@ index 000000000..c04671bbf
 +/// shown, the aliens' turn watched there, a screen on top) starts from now, or every round that
 +/// landed meanwhile would flash its sparks and beam at once (see FirstPersonView::followShots).
 +const Uint32 LandedShotsCatchUpTime = 1000;
++/// Without a weapon shown in hand, a straight shot's laser (the trajectory) starts this many voxels
++/// along the game's line, past the hand (see FirstPersonView::drawTrajectoryPath), and so does our own
++/// round that went unseen (see FirstPersonView::ownRoundLeft).
++const float TrajectorySkip = 14.0f;
 +/// Animated terrain (water, machinery, the lights and lit floors of UFOs) steps to its next
 +/// frame every CalmFrameTime milliseconds in the view, cross-fading over the whole step. The
 +/// game steps every 100 ms, which up close made whole lit panels blink five to ten times a
@@ -53613,6 +53871,15 @@ index 000000000..c04671bbf
 +const int BadStaticGapShortest = 5000, BadStaticGapLongest = 40000;
 +const int BadStaticSpellShortest = 3000, BadStaticSpellLongest = 10000;
 +const float BadStaticPeakLeast = 0.5f, BadStaticPeakMost = 0.95f;
++/// The setting "Camera artifacts" Light (a player, GitHub issue #121: the feed "LESS neat when Camera
++/// becomes illegible for longer than say, 250ms"; the owner: lighter grain and static, and nothing
++/// unreadable for longer than 250 ms, the effect's character kept): the bad signal's low static at
++/// LightStaticFloorShare of Normal's, the spells as they come but at LightStaticSpellShare of their
++/// peak (at most 0.29 of the pixels: never a snowstorm), and each glitch (blocks, green squares, a
++/// tear, a freeze) shortened in proportion so its kind's longest lasts LightGlitchLongest ms, on
++/// any signal (a frame or two late to end, still well under 250 ms on the screen).
++const float LightStaticFloorShare = 0.5f, LightStaticSpellShare = 0.3f;
++const int LightGlitchLongest = 150;
 +/// Under night vision the aimed path (see FirstPersonView::drawTrajectory) is light in the goggles,
 +/// as a laser sight is: its core this share white, the rest the goggles' brightest green (dithered:
 +/// a white-green, the owner's choice), in a green glare; a forced arc's dashes turn to dots
@@ -53793,10 +54060,10 @@ index 000000000..c04671bbf
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShots.cpp b/src/FirstPerson/FirstPersonViewShots.cpp
 new file mode 100644
-index 000000000..b8a8a8c17
+index 000000000..d03b143aa
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShots.cpp
-@@ -0,0 +1,2179 @@
+@@ -0,0 +1,2253 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -55406,7 +55673,7 @@ index 000000000..b8a8a8c17
 +	{
 +		return;
 +	}
-+	const float TrajectoryDash = 6.0f, TrajectorySkip = 14.0f;
++	const float TrajectoryDash = 6.0f;
 +	auto voxelCentreOf = [](const Position &voxel, float out[3]) { out[0] = voxel.x + 0.5f; out[1] = voxel.y + 0.5f; out[2] = voxel.z + 0.5f; };
 +	// The goggles' brightest green (night vision moves every colour into its group, keeping the shade).
 +	const Uint8 nightGreen = _nightVision ? (Uint8)((_nightVision - 1) * 16) : 0;
@@ -55687,8 +55954,9 @@ index 000000000..b8a8a8c17
 + * no holes, its rounds starting and landing between two frames, never seen by followShots): the
 + * round this view follows (its trail on to where it landed, then its end as any shot's, see
 + * finishShot), the other gun's (its sparks and mark there, a laser's beam fading), or one never
-+ * seen at all: its sparks and mark where it landed, a laser's beam fading out. A thrown item has
-+ * no mark.
++ * seen at all: its sparks and mark where it landed, a laser's beam fading out, from where the game's
++ * path starts, or for our own round from the gun in hand (see ownRoundLeft). A thrown item has no
++ * mark.
 + * @param shot The round, as noted.
 + */
 +void FirstPersonView::landShot(const LandedShot &shot)
@@ -55727,10 +55995,83 @@ index 000000000..b8a8a8c17
 +	Uint8 color;
 +	float calibre;
 +	trailFor(shot.ammo, shot.weapon, trail, color, calibre);
-+	if (inMap) spawnShotImpact(end, origin, trail);
++	// Our own round (starting within 20 voxels of the eye, as beginShot tells; a helmet camera's
++	// view has none) still leaves the gun in hand, and the gun flashes and kicks (a player, GitHub
++	// issue #120, "shooting trajectory not always lined with gun": a laser's covers some 6 tiles a
++	// step of the battle's timer, so a short one left and landed between two frames, and its beam came
++	// from the game's start of the path, at the tile's edge, into the zoomed view from a corner).
++	float from[3] = { origin[0], origin[1], origin[2] };
++	const double dx = origin[0] - _eye[0], dy = origin[1] - _eye[1], dz = origin[2] - _eye[2]; // from the eye
++	if (_particlesOn && dx * dx + dy * dy + dz * dz < 20.0 * 20.0)
++	{
++		ownRoundLeft(shot, trail, from);
++	}
++	if (inMap) spawnShotImpact(end, from, trail);
 +	if (trail == TRAIL_BEAM)
 +	{
-+		_beams.push_back({ { origin[0], origin[1], origin[2] }, { end[0], end[1], end[2] }, SDL_GetTicks(), color, calibre });
++		_beams.push_back({ { from[0], from[1], from[2] }, { end[0], end[1], end[2] }, SDL_GetTicks(), color, calibre });
++	}
++}
++
++/**
++ * Our own round that landed unseen (see landShot), as beginShot (or for akimbo's second round
++ * spawnPartnerEffects) would have had it leave: drawn from the muzzle of its gun in hand on the
++ * view, 12 voxels out along the ray through it (the other gun's for that gun's round: akimbo's
++ * second, or one of two guns taking turns), or with no gun shown from TrajectorySkip voxels along
++ * the game's line, where the trajectory's laser starts (see drawTrajectoryPath); the gun flashes
++ * (by what it fired), the muzzle flash lights the room (not for an object flying, an arrow), and
++ * the view kicks.
++ * @param shot The round, as noted.
++ * @param trail How it looks in flight (see trailFor).
++ * @param from The game's start of its path, in voxels; changed to where it's drawn from.
++ */
++void FirstPersonView::ownRoundLeft(const LandedShot &shot, Trail trail, float from[3])
++{
++	// Which gun fired it (as beginShot tells, and spends the mark of an arcing pair's second shot).
++	const bool fromOffHand = shot.partner || _nextShotOffHand || (_offHandWeapon && shot.gun == _offHandWeapon);
++	if (!shot.partner)
++	{
++		_nextShotOffHand = false;
++	}
++	const bool muzzleValid = fromOffHand ? _offHandMuzzleValid : _muzzleValid;
++	const double *muzzleScreen = fromOffHand ? _offHandMuzzleScreen : _muzzleScreen;
++	if (muzzleValid)
++	{
++		double rayDirection[3];
++		getRayDirection((int)muzzleScreen[0], (int)muzzleScreen[1], rayDirection);
++		for (int axis = 0; axis < 3; ++axis) from[axis] = (float)(_eye[axis] + rayDirection[axis] * 12.0);
++	}
++	else
++	{
++		const float way[3] = { shot.end.x - from[0], shot.end.y - from[1], shot.end.z - from[2] };
++		const float length = std::sqrt(way[0] * way[0] + way[1] * way[1] + way[2] * way[2]);
++		if (length > TrajectorySkip)
++		{
++			for (int axis = 0; axis < 3; ++axis) from[axis] += way[axis] / length * TrajectorySkip;
++		}
++	}
++
++	// It left: the gun's flash (the weapon in hand sees the time change), the light, and the kick,
++	// by the same rules as a round seen leaving.
++	const Uint32 now = SDL_GetTicks();
++	(fromOffHand ? _partnerShotTick : _ownShotTick) = now;
++	(fromOffHand ? _partnerShotAmmo : _ownShotAmmo) = shot.ammo;
++	const bool flying = flyingShot(shot.ammo, shot.weapon);
++	if (!flying)
++	{
++		std::copy(from, from + 3, _muzzleFlashPos);
++		_muzzleFlashTick = now;
++	}
++	const float power = shot.ammo ? (float)shot.ammo->getPower() : 30.0f;
++	if (shot.partner)
++	{
++		_recoilKick = std::min(_recoilKick + std::clamp(power / 30.0f, 0.5f, 2.5f) * (flying ? 0.3f : 1.0f), 6.0f);
++	}
++	else
++	{
++		const float weight = trail == TRAIL_BEAM ? 0.35f : flying ? 0.3f : trail == TRAIL_PLASMA ? 0.7f : 1.0f;
++		_recoilKick = std::min(_recoilKick + std::clamp(power / 22.0f, 0.8f, 3.5f) * weight, 6.0f);
++		addShake(0.25f + 0.1f * weight);
 +	}
 +}
 +
@@ -55978,7 +56319,7 @@ index 000000000..b8a8a8c17
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..b45962e6f
+index 000000000..84584731c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
 @@ -0,0 +1,3395 @@
@@ -58288,7 +58629,7 @@ index 000000000..b45962e6f
 +/**
 + * The colour of the game's smoke, from its frames for the thickest smoke: the colours of their
 + * dots mixed and turned most of the way to grey (as the see-through smoke's are, see
-+ * softSmokeFrame), so the wall of smoke the rays draw matches the see-through smoke over it.
++ * softSmokeFrame), so the puffs, trails and dust drawn in it match the game's smoke.
 + * Grey if the mod has no smoke frames.
 + * @param rgb Set to the colour (0 .. 255 per channel).
 + */
@@ -59379,7 +59720,7 @@ index 000000000..b45962e6f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..e773bac2c
+index 000000000..1f02cfcea
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
 @@ -0,0 +1,4171 @@
@@ -61435,7 +61776,7 @@ index 000000000..e773bac2c
 + *   outer walls whose shown face looks outdoors; one the other way round (an east or south outer
 + *   wall) the paint of the walls of that room that close it to the outdoors (else the building's):
 + *   the paint of the same kind of wall, so a barn's outer walls keep their brick inside, not the
-+ *   wood of its stalls; and, with Every room, a wall between two rooms the paint of the walls
++ *   wood of its stalls; and, with All rooms, a wall between two rooms the paint of the walls
 + *   between rooms of the room it faces;
 + * - a donor is a plain wall: no door, no glass, no holes in its art, nearly full height; of the
 + *   same kind (west or north: the art shades the two sides differently) first, on the same level,
@@ -64629,7 +64970,7 @@ index 000000000..59d44e25c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewUpscaling.cpp b/src/FirstPerson/FirstPersonViewUpscaling.cpp
 new file mode 100644
-index 000000000..2b97b9b1b
+index 000000000..b9121e322
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewUpscaling.cpp
 @@ -0,0 +1,708 @@
@@ -64686,7 +65027,7 @@ index 000000000..2b97b9b1b
 + * the 16-shade ramps the original has right there, so no stray colour of another ramp appears at
 + * an edge, and recolours and the view's shading (both work on ramps) treat it as the original.
 + * Inside a ramp the shading steps are softened (never across an outline or another colour), and
-+ * with "Smooth + detail" and "Finest" sharpened a little; "Finest" also keeps 1-pixel features
++ * with "Smooth+" and "Finest" sharpened a little; "Finest" also keeps 1-pixel features
 + * (eyes, highlights) at their own shade.
 + */
 +#include "FirstPersonView.h"
@@ -65153,7 +65494,7 @@ index 000000000..2b97b9b1b
 +/**
 + * Gets a sprite frame made bigger the way pixel art scales well (setting "Sprite upscaling":
 + * see upscaleFrame for the steps): "Smooth" makes it UpscaleFactor (4) times bigger with its
-+ * shading softened; "Smooth + detail" sharpens it a little too; "Finest" does that
++ * shading softened; "Smooth+" sharpens it a little too; "Finest" does that
 + * FinestUpscaleFactor (6) times bigger (for units, items and effects; the soft smoke frames ask
 + * for UpscaleFactor) and keeps 1-pixel features at their shade. The frame is made unshaded, so
 + * the light is applied when it's drawn.
@@ -65668,10 +66009,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..24ae6fdad
+index 000000000..cac3b53e8
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,931 @@
+@@ -0,0 +1,942 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -65882,7 +66223,7 @@ index 000000000..24ae6fdad
 +	// at the end, under a heading of its own.
 +	static const struct { const char *heading; std::vector<const char*> ids; } sections[] = {
 +		{ "STR_FPS_SECTION_PLAYSTYLE", { "fpsPlaystyle" } },
-+		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsCameraEyes", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView", "fpsZoom",
++		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsCameraEyes", "fpsCameraArtifacts", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView", "fpsZoom",
 +			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
 +		{ "STR_FPS_SECTION_MOVEMENT", { "fpsTurnCost", "fpsMovement", "fpsWalkSpeed", "fpsFlightCost", "fpsFlightCostOverride", "fpsVault",
 +			"fpsFalling", "fpsSafeLanding" } },
@@ -66097,6 +66438,12 @@ index 000000000..24ae6fdad
 +		{
 +			static const char *const sizeNames[] = { "STR_FPS_MAP_CAMERA_OFF", "STR_FPS_MAP_CAMERA_SMALL", "STR_FPS_MAP_CAMERA_MEDIUM", "STR_FPS_MAP_CAMERA_LARGE" };
 +			return std::string(tr(sizeNames[std::clamp(*option.asInt(), 0, 3)]));
++		}
++		// The cameras' artifacts are a choice of three, shown by name.
++		if (option.id() == "fpsCameraArtifacts")
++		{
++			static const char *const artifactNames[] = { "STR_FPS_CAMERA_ARTIFACTS_NORMAL", "STR_FPS_CAMERA_ARTIFACTS_LIGHT", "STR_FPS_CAMERA_ARTIFACTS_NONE" };
++			return std::string(tr(artifactNames[std::clamp(*option.asInt(), 0, 2)]));
 +		}
 +		// The trajectory is a choice of three, shown by name.
 +		if (option.id() == "fpsTrajectory")
@@ -66380,6 +66727,11 @@ index 000000000..24ae6fdad
 +		else if (value == &Options::fpsMapCamera)
 +		{
 +			*value = (*value + direction + 4) % 4;
++		}
++		// The cameras' artifacts (normal, light, none): round and round.
++		else if (value == &Options::fpsCameraArtifacts)
++		{
++			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
 +		}
 +		// The trajectory (off, arcs, all): round and round.
 +		else if (value == &Options::fpsTrajectory)

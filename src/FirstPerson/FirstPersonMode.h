@@ -176,6 +176,8 @@ public:
 	static bool breakdown(BattlescapeState *state, BattleUnit *unit);
 	/// A close-quarters check knocked a shot aside, told by the game (see FirstPerson::closeQuartersDeflected).
 	static void deflected(BattlescapeState *state, const BattleUnit *shooter, const Position &target);
+	/// Reaction fire came at a unit, told by the game (see FirstPerson::reactionFiredAt).
+	static void firedAt(BattlescapeState *state, const BattleUnit *unit);
 	/// Turns the view to where a shot knocked aside goes.
 	void followDeflectedShot(const BattleUnit *shooter, const Position &target);
 	/// Doom IDKFA: does this unit's shot spend no ammo? Asked by the game (see FirstPerson::endlessAmmo).
@@ -626,12 +628,14 @@ private:
 	bool tileMoveVelocity(BattleUnit *unit, double forward, double strafe, bool canMove, double walkSpeed, double elapsedSeconds, double &velocityX, double &velocityY);
 	Uint32 _spottedUntil = 0;             // "enemy spotted" banner
 
-	/// Stops the walk when a new enemy comes into view (not en passant).
+	/// Stops the walk when a new enemy comes into view (not en passant, not sprinting).
 	void checkSpotted(BattleUnit *unit, bool playerTurn);
+	/// Stops the walk when the soldier is shot at (reaction fire), whatever the way of walking.
+	void stopWalkUnderFire(const BattleUnit *unit);
 
 	// ---- two ways of walking, each switched on and off with its key: sprinting (the game's
 	// run, at a faster pace) and en passant (walking on past enemies coming into sight, as Shift
-	// does on the map); each shows a line under the compass while on ----
+	// does on the map; sprinting does too); each shows a line under the compass while on ----
 
 	bool _sprintOn = false;              // sprinting switched on (key "Sprint")
 	bool _sprintStepRan = true;          // the last step was a run (false once a run couldn't be paid for: walking pace then)

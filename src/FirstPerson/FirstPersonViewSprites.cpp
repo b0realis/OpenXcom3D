@@ -2304,7 +2304,7 @@ int FirstPersonView::firstSmokeFrame(int smoke) const
 /**
  * The colour of the game's smoke, from its frames for the thickest smoke: the colours of their
  * dots mixed and turned most of the way to grey (as the see-through smoke's are, see
- * softSmokeFrame), so the wall of smoke the rays draw matches the see-through smoke over it.
+ * softSmokeFrame), so the puffs, trails and dust drawn in it match the game's smoke.
  * Grey if the mod has no smoke frames.
  * @param rgb Set to the colour (0 .. 255 per channel).
  */

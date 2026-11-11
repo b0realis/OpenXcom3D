@@ -1419,7 +1419,9 @@ void FirstPersonMode::toggleFlashlight()
  * is the game's own run (Ctrl on the map), at a faster pace: by the default rules it costs
  * three quarters of a walk's time units and half as much energy again, and only an armor that
  * allows running runs. A soldier without the energy for a run walks the step instead (see
- * runsStep). "SPRINT" shows under the compass while it's on. Each battle starts with it off.
+ * runsStep). Sprinting walks on past enemies coming into sight, as en passant does (GitHub issue
+ * #118; on the map a run does so where the mod's rules say so); being shot at stops it. "SPRINT"
+ * shows under the compass while it's on. Each battle starts with it off.
  */
 void FirstPersonMode::toggleSprint()
 {
@@ -1431,8 +1433,9 @@ void FirstPersonMode::toggleSprint()
 /**
  * Switches en passant on or off (its key, the one left of 1 by default): while it's on, an enemy
  * coming into sight doesn't stop the walk, as moving with Shift held doesn't on the map (the
- * game's own rule, its "ignore spotted enemies"). The banner still says ENEMY SPOTTED. "EN
- * PASSANT" shows under the compass while it's on. Each battle starts with it off.
+ * game's own rule, its "ignore spotted enemies"); being shot at still does, as on the map. The
+ * banner still says ENEMY SPOTTED. Sprinting walks on the same way. "EN PASSANT" shows under the
+ * compass while it's on. Each battle starts with it off.
  */
 void FirstPersonMode::toggleEnPassant()
 {

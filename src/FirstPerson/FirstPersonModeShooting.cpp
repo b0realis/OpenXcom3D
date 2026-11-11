@@ -2062,7 +2062,8 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
  * The curve the game's own aim finds for a throw or an arcing shot at a tile, as the game works
  * it out (Projectile::calculateThrow) but without the accuracy roll: the points on the tile it
  * tries, in its order (an arcing shot aimed at an exact point, see launchShot, that point first;
- * then a unit's middle, low and high; an object, a wall, each at a few heights; the floor; a
+ * then a unit's middle, low and high, with "Full sprite hitboxes" a big unit's across the map, see
+ * FirstPerson::arcAimAtPicture; an object, a wall, each at a few heights; the floor; a
  * throw always the floor), from the game's origin voxel (the hand), the first one it finds a
  * curve for that lands on the tile (TileEngine::validateThrow), and that curve followed to where
  * it comes down (calculateParabolaVoxel). At a wall seen from the side no curve lands on its
@@ -2092,7 +2093,8 @@ bool FirstPersonMode::gameArcFound(BattleAction &shot, const Position &targetTil
 	}
 	else if (targetUnit && targetUnit->getVisible())
 	{
-		const Position unitBase = floorPoint + Position(0, 0, targetUnit->getFloatHeight());
+		Position unitBase = floorPoint + Position(0, 0, targetUnit->getFloatHeight());
+		FirstPerson::arcAimAtPicture(_state, targetUnit, unitBase); // (as the game aims, see Projectile::calculateThrow)
 		for (const int height : { targetUnit->getHeight() / 2 + 1, 2, targetUnit->getHeight() - 1 }) aimPoints.push_back(unitBase + Position(0, 0, height));
 	}
 	else if (tile->getMapData(O_OBJECT))

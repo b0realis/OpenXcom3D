@@ -145,7 +145,7 @@ bool autoEquipGunsFirst(const Mod *mod)
 }
 
 /**
- * The main menu with the mod on: its version (the mod's own metadata, "1.11") in small letters
+ * The main menu with the mod on: its version (the mod's own metadata, "1.12") in small letters
  * just right of the title's first line, "OpenXcom3D", its foot on the big letters' foot (a player,
  * GitHub issue #69: without the AppImage's name, no telling the version; the owner: "a smaller
  * space and our version number besides OpenXcom3D", then "Make the version no. Smaller"). A text
@@ -680,6 +680,11 @@ void createOptions(std::vector<OptionInfo> &options)
 	// and fire. Off (the owner: a realistic camera, as before, by default): a camera hasn't the
 	// wearer's eyes.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCameraEyes", &fpsCameraEyes, false, "STR_FPS_CAMERA_EYES", category));
+	// The helmet cameras' artifacts (a player, GitHub issue #121: "Option to disable film grain in
+	// mini camera ... LESS neat when Camera becomes illegible for longer than say, 250ms"): the
+	// feeds' bad signal and spells of static as they are, Normal (0, the default); Light (1), a
+	// lighter static and no glitch longer than LightGlitchLongest; or None (2), a clean feed.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsCameraArtifacts", &fpsCameraArtifacts, 0, "STR_FPS_CAMERA_ARTIFACTS", category));
 	// Mouse look: how fast the view turns (1 to 20), up and down swapped or not, and the field
 	// of view across the screen, in degrees (50 to 110).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMouseSensitivity", &fpsMouseSensitivity, 5, "STR_FPS_MOUSE_SENSITIVITY", category));
@@ -778,8 +783,8 @@ void createOptions(std::vector<OptionInfo> &options)
 	// Wall paint (a player, GitHub issue #111: from behind a house its walls showed the beige of its
 	// rooms, not its outside): the faces of walls the isometric art never shows, a west wall's west face
 	// and a north wall's north face (see FirstPersonView::findWallPaints). As the art (0): the paint of
-	// the face it shows, as before. Inside and out (1): a building's outer walls in the paint of the side
-	// they face, its outside or the room inside. Every room (2): the walls between its rooms too, each
+	// the face it shows, as before. Each side (1): a building's outer walls in the paint of the side
+	// they face, its outside or the room inside. All rooms (2): the walls between its rooms too, each
 	// face in its room's. The faces the map shows stay as it draws them; doors, and windows' frames and
 	// glass, keep theirs.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsWallPaint", &fpsWallPaint, 1, "STR_FPS_WALL_PAINT", category));
@@ -924,7 +929,7 @@ void createOptions(std::vector<OptionInfo> &options)
 	// The colours of the markers over the enemies (a player, GitHub issue #117: "markers should be red if visible, green
 	// if unseen, and perhaps yellow if viable line of fire, but otherwise unseen"; the owner: a setting): all red (0, as
 	// before), as the map's buttons for them (1: red if the soldier sees it, green if only the squad does), or that and
-	// yellow for those of the green ones he has a clear line to (2, the default: Line of fire). None over our own.
+	// yellow for those of the green ones he has a clear line to (2, the default: Clear shot). None over our own.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsEnemyMarkers", &fpsEnemyMarkers, 2, "STR_FPS_ENEMY_MARKERS", category));
 	// A hit's damage rising over the unit hit and fading (the owner's): the health it took after its
 	// armour in red, the armour it took off in blue, the stun in purple, a grey 0 when it did none of
@@ -976,8 +981,8 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsLookUp", &keyFpsLookUp, SDLK_UP, "STR_FPS_KEY_LOOK_UP", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsLookDown", &keyFpsLookDown, SDLK_DOWN, "STR_FPS_KEY_LOOK_DOWN", category));
 	// Two ways of walking, each on and off with its key: sprinting (the game's run; Caps Lock,
-	// Doom's own "always run" key) and en passant (walking on past enemies coming into sight, as
-	// Shift does on the map; the key left of 1, as Shift is the lean key).
+	// Doom's own "always run" key; it walks on past enemies coming into sight too) and en passant
+	// (walking on past them, as Shift does on the map; the key left of 1, as Shift is the lean key).
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsSprint", &keyFpsSprint, SDLK_CAPSLOCK, "STR_FPS_KEY_SPRINT", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsEnPassant", &keyFpsEnPassant, SDLK_BACKQUOTE, "STR_FPS_KEY_EN_PASSANT", category));
 	// Fire modes (the next one, or snap, aimed and auto directly) and switching hands. The next
@@ -1199,6 +1204,18 @@ bool toggleMapAkimbo(BattlescapeState *state, BattleUnit *unit)
 void reactionAkimbo(BattlescapeState *state, BattleAction &action)
 {
 	FirstPersonMode::reactionAkimbo(state, action);
+}
+
+/**
+ * Called by the game after reaction fire came at a unit (TileEngine::checkReactionFire, when a
+ * reactor shot at it or struck it): in 3D, the soldier's walk stops (see
+ * FirstPersonMode::firedAt), as the game stops a walk on the map.
+ * @param state The battlescape screen.
+ * @param unit The unit fired at.
+ */
+void reactionFiredAt(BattlescapeState *state, const BattleUnit *unit)
+{
+	FirstPersonMode::firedAt(state, unit);
 }
 
 /**

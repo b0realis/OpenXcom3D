@@ -2050,7 +2050,7 @@ Uint8 FirstPersonView::mirroredColor(const Hit &hit, int axis, bool skinOnly, bo
  *   outer walls whose shown face looks outdoors; one the other way round (an east or south outer
  *   wall) the paint of the walls of that room that close it to the outdoors (else the building's):
  *   the paint of the same kind of wall, so a barn's outer walls keep their brick inside, not the
- *   wood of its stalls; and, with Every room, a wall between two rooms the paint of the walls
+ *   wood of its stalls; and, with All rooms, a wall between two rooms the paint of the walls
  *   between rooms of the room it faces;
  * - a donor is a plain wall: no door, no glass, no holes in its art, nearly full height; of the
  *   same kind (west or north: the art shades the two sides differently) first, on the same level,

@@ -47,7 +47,8 @@
  *
  * Walking, with every tile entered paid for by the original rules (the game's own walking
  * state); opening doors and walking through them; jumping, and vaulting over low obstacles;
- * riding grav lifts; flying; falling off ledges; and stopping when a new enemy is spotted.
+ * riding grav lifts; flying; falling off ledges; and stopping when a new enemy is spotted or
+ * when the soldier is shot at.
  */
 #include "FirstPersonMode.h"
 #include <algorithm>
@@ -392,9 +393,10 @@ bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 	walk.instantMove = true; // No step animation: the 3D view moves smoothly on its own.
 	walk.strafe = pathfinding->getStrafeMove(); // the sidestep above, if the game allows it here
 	walk.run = run && !walk.strafe;
-	// Walking on past an enemy coming into sight: en passant, or a run where the mod's rules say
-	// running does (as the map decides it for a move with Shift or a run).
-	walk.ignoreSpottedEnemies = _enPassantOn || (walk.run && Mod::EXTENDED_RUNNING_COST);
+	// Walking on past an enemy coming into sight: en passant, or sprinting, in every game (as the
+	// map walks on with Shift, and a run does where the mod's rules say so; a player's report,
+	// GitHub issue #118). Being shot at still stops the walk (see stopWalkUnderFire).
+	walk.ignoreSpottedEnemies = _enPassantOn || _sprintOn;
 	_sidestepFacing = walk.strafe ? unit->getDirection() : -1;
 	_state->_battleGame->statePushBack(new UnitWalkBState(_state->_battleGame, walk));
 
@@ -2170,9 +2172,10 @@ void FirstPersonMode::openDoorAhead(BattleUnit *unit)
  * Stops the walk when a new enemy comes into view, as spotting one interrupts a move on the
  * isometric map: the movement keys are ignored until they're all let go (so holding a key
  * doesn't carry the soldier on into fire), and an "enemy spotted" banner shows for 1.5 seconds
- * (see updateBanner). With en passant on (its key) the walk goes on and only the banner shows,
- * as moving with Shift held does on the map. A new enemy shows as a rise in the number of units
- * the soldier has spotted this turn. Called every frame.
+ * (see updateBanner). With en passant on (its key) or sprinting (its key) the walk goes on and
+ * only the banner shows, as moving with Shift held does on the map (and a run, where the mod's
+ * rules say so). A new enemy shows as a rise in the number of units the soldier has spotted this
+ * turn. Called every frame.
  * @param unit The soldier we look through.
  * @param playerTurn Whether it's the player's turn (only then is anything stopped).
  */
@@ -2189,15 +2192,45 @@ void FirstPersonMode::checkSpotted(BattleUnit *unit, bool playerTurn)
 		return;
 	}
 
-	// More than before: stop, and say so. En passant (its key) only says so, and so does a run
-	// where the mod's rules say running walks on past them (see commitStep).
+	// More than before: stop, and say so. En passant and sprinting (their keys) only say so (see
+	// commitStep).
 	if (spottedCount > _enemiesSpottedCount)
 	{
-		const bool walksOn = _enPassantOn || (_sprintOn && _sprintStepRan && Mod::EXTENDED_RUNNING_COST);
+		const bool walksOn = _enPassantOn || _sprintOn;
 		if (!walksOn) _movementHeld = true;
 		_spottedUntil = SDL_GetTicks() + 1500;
 	}
 	_enemiesSpottedCount = spottedCount;
+}
+
+/**
+ * The game's hook for reaction fire at a unit (see FirstPerson::reactionFiredAt): passed on to
+ * the first-person mode if the 3D view is showing.
+ * @param state The battlescape screen (it owns the first-person mode).
+ * @param unit The unit fired at.
+ */
+void FirstPersonMode::firedAt(BattlescapeState *state, const BattleUnit *unit)
+{
+	if (state && state->_firstPerson && state->_firstPerson->isActive())
+	{
+		state->_firstPerson->stopWalkUnderFire(unit);
+	}
+}
+
+/**
+ * Stops the walk when the soldier we look through is shot at (reaction fire after a step, a fall,
+ * a kneel, a shot), as the game stops a walk on the map when the walker is fired upon: the movement
+ * keys are ignored until they're all let go, as after a newly spotted enemy (see checkSpotted),
+ * and a fresh press walks on. With en passant or sprinting too: they walk on past enemies coming
+ * into sight, not into their fire (GitHub issue #118). Only on the player's turn.
+ * @param unit The unit fired at.
+ */
+void FirstPersonMode::stopWalkUnderFire(const BattleUnit *unit)
+{
+	if (unit && unit == _save->getSelectedUnit() && _save->getSide() == FACTION_PLAYER)
+	{
+		_movementHeld = true;
+	}
 }
 
 }

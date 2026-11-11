@@ -208,7 +208,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 	// at the end, under a heading of its own.
 	static const struct { const char *heading; std::vector<const char*> ids; } sections[] = {
 		{ "STR_FPS_SECTION_PLAYSTYLE", { "fpsPlaystyle" } },
-		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsCameraEyes", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView", "fpsZoom",
+		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsCameraEyes", "fpsCameraArtifacts", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView", "fpsZoom",
 			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
 		{ "STR_FPS_SECTION_MOVEMENT", { "fpsTurnCost", "fpsMovement", "fpsWalkSpeed", "fpsFlightCost", "fpsFlightCostOverride", "fpsVault",
 			"fpsFalling", "fpsSafeLanding" } },
@@ -423,6 +423,12 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		{
 			static const char *const sizeNames[] = { "STR_FPS_MAP_CAMERA_OFF", "STR_FPS_MAP_CAMERA_SMALL", "STR_FPS_MAP_CAMERA_MEDIUM", "STR_FPS_MAP_CAMERA_LARGE" };
 			return std::string(tr(sizeNames[std::clamp(*option.asInt(), 0, 3)]));
+		}
+		// The cameras' artifacts are a choice of three, shown by name.
+		if (option.id() == "fpsCameraArtifacts")
+		{
+			static const char *const artifactNames[] = { "STR_FPS_CAMERA_ARTIFACTS_NORMAL", "STR_FPS_CAMERA_ARTIFACTS_LIGHT", "STR_FPS_CAMERA_ARTIFACTS_NONE" };
+			return std::string(tr(artifactNames[std::clamp(*option.asInt(), 0, 2)]));
 		}
 		// The trajectory is a choice of three, shown by name.
 		if (option.id() == "fpsTrajectory")
@@ -706,6 +712,11 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		else if (value == &Options::fpsMapCamera)
 		{
 			*value = (*value + direction + 4) % 4;
+		}
+		// The cameras' artifacts (normal, light, none): round and round.
+		else if (value == &Options::fpsCameraArtifacts)
+		{
+			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
 		}
 		// The trajectory (off, arcs, all): round and round.
 		else if (value == &Options::fpsTrajectory)

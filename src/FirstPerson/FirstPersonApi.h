@@ -200,6 +200,36 @@ Position spriteImpact(SavedBattleGame *save, const BattleUnit *unit, const Posit
 /// its middle, for the armour side and body part hit: pushed out towards the shooter, as the
 /// game's own hit shape would have stopped it on that side.
 Position spriteHitRelative(const Position &relative, const BattleUnit *unit, const BattleUnit *shooter);
+/// Setting "Full sprite hitboxes": the curve of a throw or an arcing shot is walked as many short
+/// lines, a step of the curve each (TileEngine::calculateParabolaVoxel); while one of these lives,
+/// the pictures those lines meet face the curve's start (the hand it left), as a straight line's
+/// face its start, each step still tested where it crosses the picture. Each step's own start (the
+/// round itself) turned the picture to face it, and a curve met a picture only within a voxel of
+/// the unit's middle (a player, GitHub issue #119, XPiratez's bows: "you can CLEARLY see the arrow
+/// hit it but the game acts like I hit the ground next to it"). With the setting off, nothing.
+class ArcLines
+{
+public:
+	ArcLines(SavedBattleGame *save, const Position &origin);
+	~ArcLines();
+	ArcLines(const ArcLines&) = delete;
+	ArcLines &operator=(const ArcLines&) = delete;
+private:
+	bool _set;              // the setting was on: the curve's start set for its lines
+	bool _outerActive;      // the curve's start as it was before (none: no curve is walked inside another)
+	double _outerFrom[3];
+};
+/// Setting "Full sprite hitboxes": where an arcing shot at a unit aims across the map (the game aims
+/// at the tile's middle, Projectile::calculateThrow): a big unit at its own middle, where its tiles
+/// meet and its picture stands; any other left as it is. With the setting off, left as it is.
+void arcAimAtPicture(BattlescapeState *state, const BattleUnit *unit, Position &aim);
+/// Setting "Full sprite hitboxes": does a curve the game tries for an arcing shot land on what it's
+/// aimed at by meeting the unit on the aimed tile, on any of that unit's tiles (TileEngine::
+/// validateThrow takes only a curve that comes down on the aimed tile, and a big unit's picture,
+/// met in its middle, often stops it over another of its tiles: the curve went higher and higher
+/// until it came down on the floor beside the unit, GitHub issue #119)? Never for a throw (an item
+/// stopped by a unit drops short of its tile), nor with the setting off.
+bool arcMeetsAimedUnit(SavedBattleGame *save, bool thrown, int meets, const Position &impact, const Position &aimTile);
 /// In a battle with the mod's 3D view, a unit turning to a point on its own tile (straight above
 /// or below it) keeps its facing, where the game turned it south (BattleUnit::directionTo).
 bool keepsFacingOnOwnTile();
@@ -290,6 +320,10 @@ void mapAkimbo(BattlescapeState *state, BattleAction &action);
 /// A reaction shot, as it's launched, in either view: with the soldier's akimbo marked on the map,
 /// the other hand's gun fires along.
 void reactionAkimbo(BattlescapeState *state, BattleAction &action);
+/// Reaction fire came at this unit (TileEngine::checkReactionFire: a reactor shot at it or struck
+/// it), in either view: as the game stops a walk on the map then, the 3D view stops the walk of the
+/// soldier it looks through (the movement keys are ignored until they're all let go).
+void reactionFiredAt(BattlescapeState *state, const BattleUnit *unit);
 /// A round or a blow struck a unit (TileEngine::hit, after the damage): an enemy in sight it did
 /// no harm marks the 3D view's crosshair (its health and stun before the strike given).
 void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefore, int stunBefore);
@@ -368,6 +402,7 @@ inline bool toggleMapAkimbo(BattlescapeState *, BattleUnit *) { return false; }
 inline void drawMapAkimbo(BattlescapeState *, BattleUnit *, Surface *, Surface *) { }
 inline void mapAkimbo(BattlescapeState *, BattleAction &) { }
 inline void reactionAkimbo(BattlescapeState *, BattleAction &) { }
+inline void reactionFiredAt(BattlescapeState *, const BattleUnit *) { }
 inline void unitStruck(BattlescapeState *, const BattleUnit *, int, int) { }
 inline void unitDamaged(BattlescapeState *, const BattleUnit *, int, int, int) { }
 inline int armorPoints(const BattleUnit *) { return 0; }
@@ -385,6 +420,13 @@ inline bool spriteHitboxes(BattlescapeState *) { return false; }
 inline BattleUnit *spriteHitAt(SavedBattleGame *, const Position &, const Position &, const Position &, unsigned, const BattleUnit *, bool, const BattleUnit *) { return nullptr; }
 inline Position spriteImpact(SavedBattleGame *, const BattleUnit *, const Position &voxel) { return voxel; }
 inline Position spriteHitRelative(const Position &relative, const BattleUnit *, const BattleUnit *) { return relative; }
+class ArcLines
+{
+public:
+	ArcLines(SavedBattleGame *, const Position &) { }
+};
+inline void arcAimAtPicture(BattlescapeState *, const BattleUnit *, Position &) { }
+inline bool arcMeetsAimedUnit(SavedBattleGame *, bool, int, const Position &, const Position &) { return false; }
 inline bool keepsFacingOnOwnTile() { return false; }
 inline bool autoEquipGunsFirst(const Mod *) { return false; }
 inline void addMenuVersion(State *, Text *, const Mod *) { }

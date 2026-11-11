@@ -6,7 +6,7 @@
 
 ![Night, through a soldier's eyes](docs/screenshots/night.png)
 
-*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.11**, for Linux, Windows and the Steam Deck, with a first, untested build for macOS.
+*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.12**, for Linux, Windows and the Steam Deck, with a first, untested build for macOS. 1.12 isn't in a download yet: the latest release is still 1.11 (see [New in 1.12](#new-in-112)).
 
 **Both games are supported,** *UFO: Enemy Unknown* and *X-COM: Terror From The Deep*, and the big mods built on OXCE run in it too (XPiratez is played and tested here).
 
@@ -21,10 +21,10 @@
 - **Switch at any moment:** **F8** takes you from the isometric map into the selected soldier's eyes and back, in the middle of a turn. Whatever you do in 3D is the game's own action, by its own rules: time units, energy, accuracy, reaction fire, line of sight, doors, morale.
 - **Move:** walk and step sideways with **W A S D** in real time, each tile paid as you cross into it, or a tile at a time; sprint, jump, vault a fence, drop off a ledge, climb ladders and ride grav lifts, fly with flying armor, open doors (a little green door by the crosshair says it's on one), and lean round a corner.
 - **Fight:** fire at the crosshair in every mode the weapon has (snap, aimed, auto, throw, launch, melee, psi), with the game's accuracy and line of fire, the path shown before you fire; or FPS style, each round where the crosshair points. Zoom in, fire two guns at once or one after the other, watch a shotgun's pellets fly, and in a tank turn the turret alone.
-- **See:** the original maps, sprites, palette and sounds, rebuilt in 3D from the game's own voxel data: light and shadow, a flashlight and flares, night vision gear, smoke as the map draws it, rain and snow under a grey sky, windows that shatter, swinging doors, glowing UFOs, bullet holes and scorch marks; the stars over XPiratez's space stations; under the sea, bubbles, marine snow and caustics.
+- **See:** the original maps, sprites, palette and sounds, rebuilt in 3D from the game's own voxel data: light and shadow, a flashlight and flares, night vision gear, smoke as the map draws it, rain and snow under a grey sky, windows that shatter, swinging doors, glowing UFOs, bullet holes and scorch marks, out to 200 tiles; the stars over XPiratez's space stations; under the sea, bubbles, marine snow and caustics.
 - **Lead the squad:** every soldier's live helmet camera on the top bar (hover for their card, right click for the big soldier cam), a camera window over the isometric map, and the aliens' turn watched through the eyes of whoever sees the alien.
-- **Feel it:** recoil and muzzle flashes, marks on the crosshair (white ticks for a hit, red for a kill, a blue shield when a strike does no harm), shots whizzing past, blood on the view and a heartbeat when badly hurt, panic and berserk through your soldier's own eyes, and a helmet camera dying in static.
-- **Make it yours:** 90 settings and 40 keys of its own (**Options → 3D VIEW**), and a controller layout made for the Steam Deck.
+- **Feel it:** recoil and muzzle flashes, marks on the crosshair (white ticks for a hit, red for a kill, a blue shield when a strike does no harm), each hit's damage rising over the unit, shots whizzing past, rain, wind and fires heard round you, blood on the view and a heartbeat when badly hurt, panic and berserk through your soldier's own eyes, and a helmet camera dying in static.
+- **Make it yours:** 96 settings and 39 keys of its own (**Options → 3D VIEW**; 88 settings in the 1.11 downloads), and a controller layout made for the Steam Deck.
 
 | | |
 |---|---|
@@ -40,6 +40,19 @@ The research and testing goal of this project was to bring the battlescape into 
 The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×40 pixel sprites, terrain is 16×16×24 voxels, and there are 256 colours. Good ideas for that are welcome (a few are listed in the manual, under [Known limits and ideas](OpenXcom3D_manual.md#9-known-limits-and-ideas)). Nevertheless the gameplay turned out to be quite engaging and deep: a dark UFO corridor, a door that slides open, a shape you can't make out yet, and your squad's time units ticking away.
 
 **But be careful!** It can be a traumatic experience.
+
+## New in 1.12
+
+Not in a download yet: no 1.12 release has been made, so the downloads are still 1.11. [Build it from source](https://b0realis.github.io/OpenXcom3D/) to play these now.
+
+- **Further, and the unseen in mist:** *View distance* reaches 60 to 200 tiles; *Unseen terrain* draws what your squad hasn't seen as slate shapes in a mist (or 0.9's fog, or as it is); with *Fog of war in 3D* off, the default, the floor below the stairs shows as you look at it.
+- **Walls in the paint of their side:** a wall's face the map never shows takes the paint of the side it faces, a house's outside from behind (*Wall paint*).
+- **Enemy markers in the buttons' colours:** red seen, green seen only by the squad, yellow hidden but in a clear line of fire.
+- **Damage numbers:** a hit's damage rises over the unit, in 3D and on the map: health red, armour blue, stun purple, a grey 0 when the armour stopped it.
+- **Ambient sounds:** rain and wind, muffled under a roof, and fires crackling near you.
+- **Camera artifacts:** the helmet cameras' static and glitches as they are, lighter (no glitch over 0.15 s) or gone; a fallen soldier's camera keeps its static.
+- **Hit as drawn:** with *Full sprite hitboxes* a unit is hit exactly where its picture shows, between two tiles while it walks or flies, by arrows and other arcing shots too (a big unit aimed at its middle); *Hitboxes* outlines what the shots test.
+- **Fixed:** a sprint walks on past enemies coming into sight, and any walk stops when the soldier is shot at, as on the map; a laser up close starts at the gun, with its flash and kick; a guided missile takes only its launcher's waypoints in 3D; a built-in weapon counts as one when both hands are full; a unit straight below or above no longer spins as you shoot it; a sidestep short of time units no longer jitters; downed unit icons only for the body under the crosshair; no red marker over your own wounded; *Pixel size* goes round; seven setting values renamed to fit their column (Each side, All rooms, Clear shot, As map, Percent, Smooth+).
 
 ## New in 1.11
 
@@ -107,7 +120,7 @@ OpenXcom3D stems from **OpenXcom Extended** at exactly this commit:
 All changes on top of it are in one file, [`openxcom3d.patch`](openxcom3d.patch) (it applies with `git apply` to a clean checkout of that commit):
 
 - [`src/FirstPerson/`](src/FirstPerson): the 3D view, an engine add-on (renderer, controller, sounds, options), one file per topic and commented throughout;
-- hooks in the core (48 files, about 1,800 lines, half of them the shot's own in `ProjectileFlyBState`): see the patch;
+- hooks in the core (48 files, about 1,900 lines, half of them the shot's own in `ProjectileFlyBState`): see the patch;
 - [`mod/OpenXcom3D/`](mod/OpenXcom3D): the data mod that switches it on.
 
 `src/` and `mod/` in this repository are the same files as in the patch, for reading. Built with `-DOXCE_FIRSTPERSON=OFF`, it is plain OXCE again.

@@ -447,7 +447,8 @@ public:
 	void setStaticSpells(bool on) { _staticSpells = on; }
 	/// A digital camera feed's bad signal (the helmet cameras): brief blocky patches, green
 	/// squares and frozen pictures (see updateSignalGlitches); 0 none, 1 now and then, 2 a lot
-	/// (the hardest missions, on the aliens' own ground).
+	/// (the hardest missions, on the aliens' own ground). The setting "Camera artifacts" makes
+	/// it and the static spells lighter and shorter (Light) or leaves them out (None).
 	void setSignalGlitches(int level) { _signalGlitches = level; }
 	/// Where a shotgun's pellet struck: sparks, chunks and a bullet hole, as for a round (see FirstPerson::pelletLanded).
 	void markPelletImpact(const Position &at, const Position &from, const BattleItem *weapon, const BattleItem *ammo);
@@ -654,7 +655,7 @@ private:
 		const VoxelModel *donor; // the wall whose face the art shows lends its colours, row by row
 		bool donorWest;          // the donor is a west wall (its east face lends), else a north wall (its south face)
 		bool openEnd;            // the wall's line ends at its north (a west wall) or west (a north wall) end, a corner: that end is repainted too
-		Uint8 kind;              // 1 a building's outer wall (Inside and out), 2 a wall between two of its rooms (Every room)
+		Uint8 kind;              // 1 a building's outer wall (Each side), 2 a wall between two of its rooms (All rooms)
 		Uint8 paintGroup;        // only the wall's voxels of this colour group, the paint of its own side, take the donor's colours
 	};
 	std::vector<WallPaint> _wallPaints; // the walls whose hidden face takes another paint
@@ -1212,6 +1213,8 @@ private:
 	void finishShot();
 	/// A round the map noted landing: the end of the one followed, or a round never seen at all.
 	void landShot(const LandedShot &shot);
+	/// Our own round that landed unseen: drawn from its gun's muzzle, and the gun's flash and kick.
+	void ownRoundLeft(const LandedShot &shot, Trail trail, float from[3]);
 	/// A new shot has left: its start, look, muzzle flash and kick.
 	void beginShot(Projectile *projectile);
 	/// The shot moved on: its trail grows, and it may whizz past the eye.

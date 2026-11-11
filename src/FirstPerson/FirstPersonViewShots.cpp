@@ -1607,7 +1607,7 @@ void FirstPersonView::drawTrajectoryPath(const std::vector<Position> &path, Traj
 	{
 		return;
 	}
-	const float TrajectoryDash = 6.0f, TrajectorySkip = 14.0f;
+	const float TrajectoryDash = 6.0f;
 	auto voxelCentreOf = [](const Position &voxel, float out[3]) { out[0] = voxel.x + 0.5f; out[1] = voxel.y + 0.5f; out[2] = voxel.z + 0.5f; };
 	// The goggles' brightest green (night vision moves every colour into its group, keeping the shade).
 	const Uint8 nightGreen = _nightVision ? (Uint8)((_nightVision - 1) * 16) : 0;
@@ -1888,8 +1888,9 @@ Projectile *FirstPersonView::flyingProjectile() const
  * no holes, its rounds starting and landing between two frames, never seen by followShots): the
  * round this view follows (its trail on to where it landed, then its end as any shot's, see
  * finishShot), the other gun's (its sparks and mark there, a laser's beam fading), or one never
- * seen at all: its sparks and mark where it landed, a laser's beam fading out. A thrown item has
- * no mark.
+ * seen at all: its sparks and mark where it landed, a laser's beam fading out, from where the game's
+ * path starts, or for our own round from the gun in hand (see ownRoundLeft). A thrown item has no
+ * mark.
  * @param shot The round, as noted.
  */
 void FirstPersonView::landShot(const LandedShot &shot)
@@ -1928,10 +1929,83 @@ void FirstPersonView::landShot(const LandedShot &shot)
 	Uint8 color;
 	float calibre;
 	trailFor(shot.ammo, shot.weapon, trail, color, calibre);
-	if (inMap) spawnShotImpact(end, origin, trail);
+	// Our own round (starting within 20 voxels of the eye, as beginShot tells; a helmet camera's
+	// view has none) still leaves the gun in hand, and the gun flashes and kicks (a player, GitHub
+	// issue #120, "shooting trajectory not always lined with gun": a laser's covers some 6 tiles a
+	// step of the battle's timer, so a short one left and landed between two frames, and its beam came
+	// from the game's start of the path, at the tile's edge, into the zoomed view from a corner).
+	float from[3] = { origin[0], origin[1], origin[2] };
+	const double dx = origin[0] - _eye[0], dy = origin[1] - _eye[1], dz = origin[2] - _eye[2]; // from the eye
+	if (_particlesOn && dx * dx + dy * dy + dz * dz < 20.0 * 20.0)
+	{
+		ownRoundLeft(shot, trail, from);
+	}
+	if (inMap) spawnShotImpact(end, from, trail);
 	if (trail == TRAIL_BEAM)
 	{
-		_beams.push_back({ { origin[0], origin[1], origin[2] }, { end[0], end[1], end[2] }, SDL_GetTicks(), color, calibre });
+		_beams.push_back({ { from[0], from[1], from[2] }, { end[0], end[1], end[2] }, SDL_GetTicks(), color, calibre });
+	}
+}
+
+/**
+ * Our own round that landed unseen (see landShot), as beginShot (or for akimbo's second round
+ * spawnPartnerEffects) would have had it leave: drawn from the muzzle of its gun in hand on the
+ * view, 12 voxels out along the ray through it (the other gun's for that gun's round: akimbo's
+ * second, or one of two guns taking turns), or with no gun shown from TrajectorySkip voxels along
+ * the game's line, where the trajectory's laser starts (see drawTrajectoryPath); the gun flashes
+ * (by what it fired), the muzzle flash lights the room (not for an object flying, an arrow), and
+ * the view kicks.
+ * @param shot The round, as noted.
+ * @param trail How it looks in flight (see trailFor).
+ * @param from The game's start of its path, in voxels; changed to where it's drawn from.
+ */
+void FirstPersonView::ownRoundLeft(const LandedShot &shot, Trail trail, float from[3])
+{
+	// Which gun fired it (as beginShot tells, and spends the mark of an arcing pair's second shot).
+	const bool fromOffHand = shot.partner || _nextShotOffHand || (_offHandWeapon && shot.gun == _offHandWeapon);
+	if (!shot.partner)
+	{
+		_nextShotOffHand = false;
+	}
+	const bool muzzleValid = fromOffHand ? _offHandMuzzleValid : _muzzleValid;
+	const double *muzzleScreen = fromOffHand ? _offHandMuzzleScreen : _muzzleScreen;
+	if (muzzleValid)
+	{
+		double rayDirection[3];
+		getRayDirection((int)muzzleScreen[0], (int)muzzleScreen[1], rayDirection);
+		for (int axis = 0; axis < 3; ++axis) from[axis] = (float)(_eye[axis] + rayDirection[axis] * 12.0);
+	}
+	else
+	{
+		const float way[3] = { shot.end.x - from[0], shot.end.y - from[1], shot.end.z - from[2] };
+		const float length = std::sqrt(way[0] * way[0] + way[1] * way[1] + way[2] * way[2]);
+		if (length > TrajectorySkip)
+		{
+			for (int axis = 0; axis < 3; ++axis) from[axis] += way[axis] / length * TrajectorySkip;
+		}
+	}
+
+	// It left: the gun's flash (the weapon in hand sees the time change), the light, and the kick,
+	// by the same rules as a round seen leaving.
+	const Uint32 now = SDL_GetTicks();
+	(fromOffHand ? _partnerShotTick : _ownShotTick) = now;
+	(fromOffHand ? _partnerShotAmmo : _ownShotAmmo) = shot.ammo;
+	const bool flying = flyingShot(shot.ammo, shot.weapon);
+	if (!flying)
+	{
+		std::copy(from, from + 3, _muzzleFlashPos);
+		_muzzleFlashTick = now;
+	}
+	const float power = shot.ammo ? (float)shot.ammo->getPower() : 30.0f;
+	if (shot.partner)
+	{
+		_recoilKick = std::min(_recoilKick + std::clamp(power / 30.0f, 0.5f, 2.5f) * (flying ? 0.3f : 1.0f), 6.0f);
+	}
+	else
+	{
+		const float weight = trail == TRAIL_BEAM ? 0.35f : flying ? 0.3f : trail == TRAIL_PLASMA ? 0.7f : 1.0f;
+		_recoilKick = std::min(_recoilKick + std::clamp(power / 22.0f, 0.8f, 3.5f) * weight, 6.0f);
+		addShake(0.25f + 0.1f * weight);
 	}
 }
 

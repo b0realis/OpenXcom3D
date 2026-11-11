@@ -51,7 +51,7 @@
  * the 16-shade ramps the original has right there, so no stray colour of another ramp appears at
  * an edge, and recolours and the view's shading (both work on ramps) treat it as the original.
  * Inside a ramp the shading steps are softened (never across an outline or another colour), and
- * with "Smooth + detail" and "Finest" sharpened a little; "Finest" also keeps 1-pixel features
+ * with "Smooth+" and "Finest" sharpened a little; "Finest" also keeps 1-pixel features
  * (eyes, highlights) at their own shade.
  */
 #include "FirstPersonView.h"
@@ -518,7 +518,7 @@ void FirstPersonView::useSmoothVersion(SpriteDraw &draw)
 /**
  * Gets a sprite frame made bigger the way pixel art scales well (setting "Sprite upscaling":
  * see upscaleFrame for the steps): "Smooth" makes it UpscaleFactor (4) times bigger with its
- * shading softened; "Smooth + detail" sharpens it a little too; "Finest" does that
+ * shading softened; "Smooth+" sharpens it a little too; "Finest" does that
  * FinestUpscaleFactor (6) times bigger (for units, items and effects; the soft smoke frames ask
  * for UpscaleFactor) and keeps 1-pixel features at their shade. The frame is made unshaded, so
  * the light is applied when it's drawn.
