@@ -2337,9 +2337,15 @@ void FirstPersonMode::selectUnit(BattleUnit *unit)
  * enemies the selected soldier sees, its red buttons, then the others the squad sees, green (see
  * BattlescapeState::updateSoldierInfo). As the map: the markers red and green as those buttons;
  * Clear shot, the default: the green ones the soldier has a clear line to yellow (see
- * clearLineOfFire); All red: every enemy's red, as before. The game's buttons for our own wounded
- * (blue) and those about to pass out (purple) come after them: no marker over our own, whatever
- * the setting. An enemy nobody sees has no button, so no marker.
+ * clearLineOfFire); All red: every enemy's red, as before. An enemy nobody sees has no button, so
+ * no marker. The game's buttons for our own come after them, the wounded's blue (fatal wounds, or
+ * burning with the game's option to show it so), then purple for those about to pass out (stunned
+ * to three quarters of their health, or out cold with their health draining): with the setting
+ * "Wounded markers" (a player on #117: "wounded having their own markers as blue, as iso"), each
+ * of those buttons showing marks its unit too, in its colour, with its number; a body over where
+ * it lies, a body carried (it has no place: the game's button centres the map on whoever carries
+ * it) over its carrier. Never over the soldier looked through (the view doesn't mark the unit it
+ * looks through), and none of them with the HUD hidden, as the enemies' own.
  */
 void FirstPersonMode::updateEnemyMarkers()
 {
@@ -2401,6 +2407,35 @@ void FirstPersonMode::updateEnemyMarkers()
 		if (marker.kind == FirstPersonView::MarkerSquadSeen && known != _lineOfFire.end() && known->second.viewer == viewer && known->second.clear)
 		{
 			marker.kind = FirstPersonView::MarkerLineOfFire;
+		}
+	}
+
+	// Wounded markers: our own the game shows a blue or purple button for, read off the buttons as the game colours
+	// them (see BattlescapeState::blinkVisibleUnitButtons).
+	if (Options::fpsWoundedMarkers == 1 && !hudHidden())
+	{
+		for (int buttonIndex = _state->_numberOfEnemiesTotal; buttonIndex < BattlescapeState::VISIBLE_MAX; ++buttonIndex)
+		{
+			BattleUnit *own = _state->_visibleUnit[buttonIndex];
+			if (!own || !_state->_btnVisibleUnit[buttonIndex]->getVisible())
+			{
+				continue;
+			}
+			const FirstPersonView::MarkerKind kind = buttonIndex < _state->_numberOfEnemiesTotalPlusWounded ? FirstPersonView::MarkerWounded : FirstPersonView::MarkerPassingOut;
+			// (a body carried: the unit with it in its inventory, as the game's button finds it, see BattlescapeState::btnVisibleUnitClick)
+			const BattleUnit *carrier = nullptr;
+			if (own->getPosition() == TileEngine::invalid)
+			{
+				for (BattleUnit *unit : *_save->getUnits())
+				{
+					if (!unit->isOut() && std::any_of(unit->getInventory()->begin(), unit->getInventory()->end(), [own](BattleItem *item) { return item->getUnit() == own; }))
+					{
+						carrier = unit;
+						break;
+					}
+				}
+			}
+			markers.push_back({ own, buttonIndex + 1, kind, carrier });
 		}
 	}
 	_view->setMarkers(markers);

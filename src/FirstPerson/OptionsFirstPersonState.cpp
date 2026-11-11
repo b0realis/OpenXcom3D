@@ -219,7 +219,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsHitFlash", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 			"fpsGhostParts", "fpsGhostOpacity", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
 		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
-			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsDamageNumbers", "fpsCompass", "fpsMiddleClickIdentify" } },
+			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsMiddleClickIdentify" } },
 		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
 	};
@@ -405,6 +405,12 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		{
 			static const char *const markerNames[] = { "STR_FPS_ENEMY_MARKERS_RED", "STR_FPS_ENEMY_MARKERS_MAP", "STR_FPS_ENEMY_MARKERS_LINE" };
 			return std::string(tr(markerNames[std::clamp(*option.asInt(), 0, 2)]));
+		}
+		// The markers over our own wounded are off or on, shown by name.
+		if (option.id() == "fpsWoundedMarkers")
+		{
+			static const char *const woundedNames[] = { "STR_FPS_WOUNDED_MARKERS_OFF", "STR_FPS_WOUNDED_MARKERS_ON" };
+			return std::string(tr(woundedNames[std::clamp(*option.asInt(), 0, 1)]));
 		}
 		// The downed units' icons are a choice of three, shown by name.
 		if (option.id() == "fpsDownedIcons")
@@ -697,6 +703,11 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		else if (value == &Options::fpsEnemyMarkers)
 		{
 			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
+		}
+		// The markers over our own wounded (off, on): either button switches.
+		else if (value == &Options::fpsWoundedMarkers)
+		{
+			*value = *value == 1 ? 0 : 1;
 		}
 		// The downed units' icons (off, crosshair, always): round and round.
 		else if (value == &Options::fpsDownedIcons)

@@ -929,8 +929,13 @@ void createOptions(std::vector<OptionInfo> &options)
 	// The colours of the markers over the enemies (a player, GitHub issue #117: "markers should be red if visible, green
 	// if unseen, and perhaps yellow if viable line of fire, but otherwise unseen"; the owner: a setting): all red (0, as
 	// before), as the map's buttons for them (1: red if the soldier sees it, green if only the squad does), or that and
-	// yellow for those of the green ones he has a clear line to (2, the default: Clear shot). None over our own.
+	// yellow for those of the green ones he has a clear line to (2, the default: Clear shot). None over our own: they
+	// have the next setting.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsEnemyMarkers", &fpsEnemyMarkers, 2, "STR_FPS_ENEMY_MARKERS", category));
+	// Markers over our own that the map flags after the enemies (a player on GitHub issue #117: "wounded having their own
+	// markers as blue, as iso, isn't a TERRIBLE idea"; the owner: a setting): off (0), or on (1, the default), each in its
+	// button's colour and with its number, blue for the wounded, purple for those about to pass out.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsWoundedMarkers", &fpsWoundedMarkers, 1, "STR_FPS_WOUNDED_MARKERS", category));
 	// A hit's damage rising over the unit hit and fading (the owner's): the health it took after its
 	// armour in red, the armour it took off in blue, the stun in purple, a grey 0 when it did none of
 	// these; every hit on a unit the squad sees, whoever struck, in 3D (in the world, behind walls

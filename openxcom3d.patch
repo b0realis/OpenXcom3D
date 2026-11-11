@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..cd9bb0f0c
+index 000000000..7ce551350
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,517 @@
+@@ -0,0 +1,521 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -583,6 +583,10 @@ index 000000000..cd9bb0f0c
 +  STR_FPS_ENEMY_MARKERS_RED: "All red"
 +  STR_FPS_ENEMY_MARKERS_MAP: "As map"
 +  STR_FPS_ENEMY_MARKERS_LINE: "Clear shot"
++  STR_FPS_WOUNDED_MARKERS: "Wounded markers"
++  STR_FPS_WOUNDED_MARKERS_DESC: "Over our own, as their buttons after the enemies': blue if wounded, purple if about to pass out, a body too; none over him."
++  STR_FPS_WOUNDED_MARKERS_OFF: "Off"
++  STR_FPS_WOUNDED_MARKERS_ON: "On"
 +  STR_FPS_DAMAGE_NUMBERS: "Damage numbers"
 +  STR_FPS_DAMAGE_NUMBERS_DESC: "A hit's damage rises over the unit, in 3D and on the map: health lost red, armour blue, stun purple; a grey 0 when it did nothing."
 +  STR_FPS_ALIEN_TURN_3D: "Alien turn in 3D"
@@ -647,10 +651,10 @@ index 000000000..cd9bb0f0c
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..1903849cb
+index 000000000..0ef75822b
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,517 @@
+@@ -0,0 +1,521 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1106,6 +1110,10 @@ index 000000000..1903849cb
 +  STR_FPS_ENEMY_MARKERS_RED: "All red"
 +  STR_FPS_ENEMY_MARKERS_MAP: "As map"
 +  STR_FPS_ENEMY_MARKERS_LINE: "Clear shot"
++  STR_FPS_WOUNDED_MARKERS: "Wounded markers"
++  STR_FPS_WOUNDED_MARKERS_DESC: "Over our own, as their buttons after the enemies': blue if wounded, purple if about to pass out, a body too; none over him."
++  STR_FPS_WOUNDED_MARKERS_OFF: "Off"
++  STR_FPS_WOUNDED_MARKERS_ON: "On"
 +  STR_FPS_DAMAGE_NUMBERS: "Damage numbers"
 +  STR_FPS_DAMAGE_NUMBERS_DESC: "A hit's damage rises over the unit, in 3D and on the map: health lost red, armor blue, stun purple; a gray 0 when it did nothing."
 +  STR_FPS_ALIEN_TURN_3D: "Alien turn in 3D"
@@ -22021,7 +22029,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..b14814f51 100644
+index a08796ced..a707b054d 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -22039,7 +22047,7 @@ index a08796ced..b14814f51 100644
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
 +OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers;
-+OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsAmbientSounds, fpsCameraArtifacts;
++OPT int fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsTurret, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
@@ -22982,10 +22990,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..f90c6d34d
+index 000000000..08d9ae8ff
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1429 @@
+@@ -0,0 +1,1434 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -23917,8 +23925,13 @@ index 000000000..f90c6d34d
 +	// The colours of the markers over the enemies (a player, GitHub issue #117: "markers should be red if visible, green
 +	// if unseen, and perhaps yellow if viable line of fire, but otherwise unseen"; the owner: a setting): all red (0, as
 +	// before), as the map's buttons for them (1: red if the soldier sees it, green if only the squad does), or that and
-+	// yellow for those of the green ones he has a clear line to (2, the default: Clear shot). None over our own.
++	// yellow for those of the green ones he has a clear line to (2, the default: Clear shot). None over our own: they
++	// have the next setting.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsEnemyMarkers", &fpsEnemyMarkers, 2, "STR_FPS_ENEMY_MARKERS", category));
++	// Markers over our own that the map flags after the enemies (a player on GitHub issue #117: "wounded having their own
++	// markers as blue, as iso, isn't a TERRIBLE idea"; the owner: a setting): off (0), or on (1, the default), each in its
++	// button's colour and with its number, blue for the wounded, purple for those about to pass out.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsWoundedMarkers", &fpsWoundedMarkers, 1, "STR_FPS_WOUNDED_MARKERS", category));
 +	// A hit's damage rising over the unit hit and fading (the owner's): the health it took after its
 +	// armour in red, the armour it took off in blue, the stun in purple, a grey 0 when it did none of
 +	// these; every hit on a unit the squad sees, whoever struck, in 3D (in the world, behind walls
@@ -28893,7 +28906,7 @@ index 000000000..ca2656f9a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..0fdc3df4d
+index 000000000..7ae4a7b84
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
 @@ -0,0 +1,1305 @@
@@ -30051,7 +30064,7 @@ index 000000000..0fdc3df4d
 +	void buttonClicked(TextButton *button, Action *action);
 +	/// Selects a soldier from the squad bar.
 +	void selectUnit(BattleUnit *unit);
-+	/// Hands the 3D view the visible enemies to mark.
++	/// Hands the 3D view the visible enemies to mark, and our own wounded (setting "Wounded markers").
 +	void updateEnemyMarkers();
 +	/// Has the soldier a clear line to an enemy the squad sees and he doesn't (setting "Enemy markers": its yellow)?
 +	bool clearLineOfFire(BattleUnit *viewer, BattleUnit *enemy) const;
@@ -31088,10 +31101,10 @@ index 000000000..f88b40451
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..43b9dce95
+index 000000000..95891e3b4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,2540 @@
+@@ -0,0 +1,2575 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -33431,9 +33444,15 @@ index 000000000..43b9dce95
 + * enemies the selected soldier sees, its red buttons, then the others the squad sees, green (see
 + * BattlescapeState::updateSoldierInfo). As the map: the markers red and green as those buttons;
 + * Clear shot, the default: the green ones the soldier has a clear line to yellow (see
-+ * clearLineOfFire); All red: every enemy's red, as before. The game's buttons for our own wounded
-+ * (blue) and those about to pass out (purple) come after them: no marker over our own, whatever
-+ * the setting. An enemy nobody sees has no button, so no marker.
++ * clearLineOfFire); All red: every enemy's red, as before. An enemy nobody sees has no button, so
++ * no marker. The game's buttons for our own come after them, the wounded's blue (fatal wounds, or
++ * burning with the game's option to show it so), then purple for those about to pass out (stunned
++ * to three quarters of their health, or out cold with their health draining): with the setting
++ * "Wounded markers" (a player on #117: "wounded having their own markers as blue, as iso"), each
++ * of those buttons showing marks its unit too, in its colour, with its number; a body over where
++ * it lies, a body carried (it has no place: the game's button centres the map on whoever carries
++ * it) over its carrier. Never over the soldier looked through (the view doesn't mark the unit it
++ * looks through), and none of them with the HUD hidden, as the enemies' own.
 + */
 +void FirstPersonMode::updateEnemyMarkers()
 +{
@@ -33495,6 +33514,35 @@ index 000000000..43b9dce95
 +		if (marker.kind == FirstPersonView::MarkerSquadSeen && known != _lineOfFire.end() && known->second.viewer == viewer && known->second.clear)
 +		{
 +			marker.kind = FirstPersonView::MarkerLineOfFire;
++		}
++	}
++
++	// Wounded markers: our own the game shows a blue or purple button for, read off the buttons as the game colours
++	// them (see BattlescapeState::blinkVisibleUnitButtons).
++	if (Options::fpsWoundedMarkers == 1 && !hudHidden())
++	{
++		for (int buttonIndex = _state->_numberOfEnemiesTotal; buttonIndex < BattlescapeState::VISIBLE_MAX; ++buttonIndex)
++		{
++			BattleUnit *own = _state->_visibleUnit[buttonIndex];
++			if (!own || !_state->_btnVisibleUnit[buttonIndex]->getVisible())
++			{
++				continue;
++			}
++			const FirstPersonView::MarkerKind kind = buttonIndex < _state->_numberOfEnemiesTotalPlusWounded ? FirstPersonView::MarkerWounded : FirstPersonView::MarkerPassingOut;
++			// (a body carried: the unit with it in its inventory, as the game's button finds it, see BattlescapeState::btnVisibleUnitClick)
++			const BattleUnit *carrier = nullptr;
++			if (own->getPosition() == TileEngine::invalid)
++			{
++				for (BattleUnit *unit : *_save->getUnits())
++				{
++					if (!unit->isOut() && std::any_of(unit->getInventory()->begin(), unit->getInventory()->end(), [own](BattleItem *item) { return item->getUnit() == own; }))
++					{
++						carrier = unit;
++						break;
++					}
++				}
++			}
++			markers.push_back({ own, buttonIndex + 1, kind, carrier });
 +		}
 +	}
 +	_view->setMarkers(markers);
@@ -47148,10 +47196,10 @@ index 000000000..58760aab7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..20a47bb76
+index 000000000..7edd58996
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1436 @@
+@@ -0,0 +1,1441 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -47409,6 +47457,7 @@ index 000000000..20a47bb76
 +		Uint8 glassShard[3];   // a window's shards (see spawnGlassShards): pale cyan, white, grey-blue
 +		Uint8 marker, marine;
 +		Uint8 markerSquadSeen, markerLineOfFire; // enemy markers: the game's green button's colour, and a yellow
++		Uint8 markerWounded, markerPassingOut;   // our own (setting "Wounded markers"): the game's blue and purple buttons' colours
 +		Uint8 sprayMark, sprayNext; // a spray burst's marks and the line between them (light green), the stretch to the next (grey)
 +		Uint8 hitbox[3];       // hitboxes (setting "Hitboxes"): X-COM's, the aliens', the civilians'
 +		Uint8 downedIcon[5];   // icons over the downed: flame, its heart, blood, the shock's bolt, out cold
@@ -47511,11 +47560,13 @@ index 000000000..20a47bb76
 +
 +	/// How the soldier looked through knows an enemy it marks (setting "Enemy markers"; a player, GitHub issue #117):
 +	/// as the game's buttons for it say, red: he sees it; green: only the squad does; yellow: only the squad does, and his
-+	/// line to it is clear (smoke, the dark, camouflage or the distance hide it from him).
-+	enum MarkerKind { MarkerSeen, MarkerSquadSeen, MarkerLineOfFire };
-+	/// An enemy to mark: the unit, its button's number, and how the soldier knows it.
-+	struct EnemyMarker { const BattleUnit *unit; int number; MarkerKind kind; };
-+	/// Marks units (the visible enemies) with their numbers, over everything.
++	/// line to it is clear (smoke, the dark, camouflage or the distance hide it from him). And one of our own the map
++	/// flags (setting "Wounded markers", #117 again): its blue button, wounded; its purple one, about to pass out.
++	enum MarkerKind { MarkerSeen, MarkerSquadSeen, MarkerLineOfFire, MarkerWounded, MarkerPassingOut };
++	/// A unit to mark: the unit, its button's number, and how the soldier knows it (an enemy) or what's the matter with
++	/// it (one of our own); and for a body carried (it has no place of its own), the unit carrying it, marked instead.
++	struct EnemyMarker { const BattleUnit *unit; int number; MarkerKind kind; const BattleUnit *carrier = nullptr; };
++	/// Marks units (the visible enemies, our own wounded) with their numbers, over everything.
 +	void setMarkers(const std::vector<EnemyMarker> &markers) { _markers = markers; }
 +	/// A spray burst being marked (the game's "spray" auto shot): its points so far and the next one under the crosshair, in voxels (none: not marking).
 +	void setSprayMarks(const std::vector<Position> &points, const Position &next) { _sprayPoints = points; _sprayNext = next; }
@@ -47993,12 +48044,14 @@ index 000000000..20a47bb76
 +	Uint32 _hitMarkTick = 0;                            // when an enemy in sight was last hit
 +	bool _hitMarkKill = false;                          // and whether that hit killed it
 +	Uint32 _noHarmTick = 0;                             // when an enemy in sight was last struck to no harm
-+	std::vector<EnemyMarker> _markers;                  // visible enemies, their numbers and how they're known
++	std::vector<EnemyMarker> _markers;                  // visible enemies (our own wounded), their numbers and how they're known
 +	std::vector<Position> _sprayPoints;                 // a spray burst's marked points, in voxels (see setSprayMarks)
 +	Position _sprayNext;                                // and the next one under the crosshair
 +	/// Draws a spray burst's marked points, numbered, and the dotted line along them (see setSprayMarks).
 +	void drawSprayMarks();
-+	struct MarkerSpot { double pos[3]; int number; MarkerKind kind; };
++	/// A marker's place this frame; a unit with more than one (two buttons: wounded and about to pass out) has them
++	/// stacked as the game stacks its buttons, the first at the bottom: this one's place in its stack, and how many.
++	struct MarkerSpot { double pos[3]; int number; MarkerKind kind; int stack; int stackSize; };
 +	std::vector<MarkerSpot> _markerSpots;               // where they are this frame
 +	bool _showFacing = false;                           // which way the units face shown (the key for it held)
 +	struct FacingSpot { double feet[3]; double radius; int direction; Uint8 color; };
@@ -50246,10 +50299,10 @@ index 000000000..77a3cc4ed
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..bd056d774
+index 000000000..d18f0064e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,1916 @@
+@@ -0,0 +1,1919 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -50586,6 +50639,9 @@ index 000000000..bd056d774
 +	// squadsightUnits; and those of them in a clear line of fire, yellow)
 +	_colors.markerSquadSeen = _game->getMod()->getInterface("battlescape")->getElement("squadsightUnits")->color;
 +	_colors.markerLineOfFire = nearest(250, 215, 40);
++	// (our own wounded and those about to pass out: the very colours of the game's blue and purple buttons for them)
++	_colors.markerWounded = _game->getMod()->getInterface("battlescape")->getElement("woundedUnits")->color;
++	_colors.markerPassingOut = _game->getMod()->getInterface("battlescape")->getElement("passingOutUnits")->color;
 +	_colors.sprayMark = nearest(150, 245, 140);
 +	_colors.sprayNext = nearest(160, 160, 170);
 +	_colors.marine = nearest(150, 195, 190);
@@ -53463,10 +53519,10 @@ index 000000000..dc4e7ff65
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..3cecf5937
+index 000000000..b0fb10d5e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,591 @@
+@@ -0,0 +1,595 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -54036,6 +54092,10 @@ index 000000000..3cecf5937
 +};
 +/// The tape's text, repeated along it, as glyphs of TapeFont: "X-COM  ".
 +const int TapeText[] = { 0, 1, 2, 3, 4, 5, 5 };
++/// The numbered markers' stack over a unit with more than one (see FirstPersonView::drawMarkers): each this many pixels
++/// (at the UI scale) over the one before, a pixel apart (the art is 13 pixels high, its tip the lowest), as the game stacks
++/// the buttons.
++const int MarkerStackStep = 14;
 +/// 3x5 digits for the numbered markers over the visible enemies, same layout as TapeFont.
 +/// A spray burst's marks (see FirstPersonView::drawSprayMarks): a dot of the line along them every
 +/// SprayDotSpacing voxels; each mark a pole SprayPoleVoxels high from the tile's floor (two thirds of a level; at least
@@ -56319,10 +56379,10 @@ index 000000000..d03b143aa
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..84584731c
+index 000000000..d8f57ff49
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,3395 @@
+@@ -0,0 +1,3431 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -57334,6 +57394,24 @@ index 000000000..84584731c
 +		_outlineRowRight.assign(getHeight(), -1);
 +	}
 +
++	// Notes the markers over a unit (see drawMarkers), at a point over it: one for each of its buttons that the mode
++	// marks (an enemy has one; one of our own can have two, wounded and about to pass out), stacked as the game stacks
++	// the buttons, the first at the bottom; and those of a body it carries (see EnemyMarker).
++	auto noteMarkers = [&](const BattleUnit *unit, const double over[3]) {
++		const size_t first = _markerSpots.size();
++		for (const auto &marker : _markers)
++		{
++			if ((marker.carrier ? marker.carrier : marker.unit) == unit)
++			{
++				_markerSpots.push_back({ { over[0], over[1], over[2] }, marker.number, marker.kind, (int)(_markerSpots.size() - first), 0 });
++			}
++		}
++		for (size_t spot = first; spot < _markerSpots.size(); ++spot)
++		{
++			_markerSpots[spot].stackSize = (int)(_markerSpots.size() - first);
++		}
++	};
++
 +	// The units are recorded first (their shadows, sprites and hitboxes, in order), then drawn
 +	// on all the view's threads at once (see replayDrawList). Each unit's frame is composed in
 +	// the sprite buffer, then kept in a frame of its own until then.
@@ -57354,7 +57432,22 @@ index 000000000..84584731c
 +		double airFallFeetZ = 0.0;
 +		const bool airFall = !chainHeld && FirstPerson::airFallHeight(unit, airFallTile, airFallFeetZ);
 +		const bool fallingDown = quickFall || (airFall && unit->isOut());
-+		if ((unit->isOut() && !fallingDown && !chainHeld) || unit == _cameraUnit || (!debug && !unit->getVisible() && !chainHeld))
++		const bool lying = unit->isOut() && !fallingDown && !chainHeld;
++		// One of our own lying out cold with markers (setting "Wounded markers": the game's blue or purple buttons for
++		// it), not drawn here: its markers over the body, 5 voxels over its middle where it lies on its tile (as
++		// drawDownedIcons finds it); a body carried has no tile (its markers go over the unit carrying it).
++		if (lying && !_markers.empty() && unit->getStatus() == STATUS_UNCONSCIOUS && unit != _cameraUnit)
++		{
++			const Position bodyTile = unit->getPosition();
++			if (const Tile *tile = _save->getTile(bodyTile))
++			{
++				const int bodySize = unit->getArmor()->getSize();
++				const double ground[3] = { bodyTile.x * 16.0 + 8.0 * bodySize, bodyTile.y * 16.0 + 8.0 * bodySize, bodyTile.z * 24.0 - tile->getTerrainLevel() };
++				const double overBody[3] = { ground[0], ground[1], standingHeight(ground) + 2.0 + 5.0 };
++				noteMarkers(unit, overBody);
++			}
++		}
++		if (lying || unit == _cameraUnit || (!debug && !unit->getVisible() && !chainHeld))
 +		{
 +			continue;
 +		}
@@ -57426,14 +57519,11 @@ index 000000000..84584731c
 +			flash = Options::fpsMuzzleFlash && Options::fpsHitFlash ? flinch : 0.0f;
 +		}
 +
-+		// A marked enemy's marker goes 5 voxels above its head (not over one falling: it's down).
-+		for (const auto &marker : _markers)
++		// A marked unit's markers go 5 voxels above its head (not over one falling: it's down).
++		if (!fallingDown)
 +		{
-+			if (marker.unit == unit && !fallingDown)
-+			{
-+				MarkerSpot spot = { { feet[0], feet[1], feet[2] + unit->getFloatHeight() + unit->getHeight() + 5.0 }, marker.number, marker.kind };
-+				_markerSpots.push_back(spot);
-+			}
++			const double overHead[3] = { feet[0], feet[1], feet[2] + unit->getFloatHeight() + unit->getHeight() + 5.0 };
++			noteMarkers(unit, overHead);
 +		}
 +		// An enemy the squad sees but the soldier looked through doesn't, with smoke on the line to
 +		// it: not drawn, only its marker, as for one behind a wall (a player's report, GitHub issue
@@ -59279,7 +59369,10 @@ index 000000000..84584731c
 + * enemy's number, drawn over everything (it's what the soldier knows, not what's in view), kept at
 + * the screen edge when the enemy is off to the side; red, or in the colour of how the soldier knows
 + * it (setting "Enemy markers": green as its button when only the squad sees it, yellow when his
-+ * line to it is clear, see MarkerKind). The pixel art is drawn bigger on big screens (the UI scale).
++ * line to it is clear, see MarkerKind). Our own the map flags the same way (setting "Wounded
++ * markers"), in their buttons' blue and purple; a unit with two buttons has its markers stacked, as
++ * the game stacks the buttons (each MarkerStackStep over the one before, the first at the bottom).
++ * The pixel art is drawn bigger on big screens (the UI scale).
 + */
 +void FirstPersonView::drawMarkers()
 +{
@@ -59297,16 +59390,19 @@ index 000000000..84584731c
 +	};
 +	for (const auto &spot : _markerSpots)
 +	{
-+		const Uint8 markerColor = spot.kind == MarkerSquadSeen ? _colors.markerSquadSeen : spot.kind == MarkerLineOfFire ? _colors.markerLineOfFire : _colors.marker;
-+		// Where the enemy's head is on the view (no marker if it's behind the camera), kept
-+		// inside the view with room for the art around it: the arrow's tip.
++		const Uint8 markerColor = spot.kind == MarkerSquadSeen ? _colors.markerSquadSeen : spot.kind == MarkerLineOfFire ? _colors.markerLineOfFire
++			: spot.kind == MarkerWounded ? _colors.markerWounded : spot.kind == MarkerPassingOut ? _colors.markerPassingOut : _colors.marker;
++		// Where the unit's head is on the view (no marker if it's behind the camera), kept
++		// inside the view with room for the art around it (all of its stack's): the arrow's tip,
++		// this marker's place in the stack over it.
 +		double screenX, screenY, depth;
 +		if (!projectToScreen(spot.pos, screenX, screenY, depth))
 +		{
 +			continue;
 +		}
++		const int stackRoom = std::min((14 + (spot.stackSize - 1) * MarkerStackStep) * uiScale, height - 4 * uiScale);
 +		const int tipX = std::clamp((int)screenX, 6 * uiScale, width - 7 * uiScale),
-+			tipY = std::clamp((int)screenY, 14 * uiScale, height - 4 * uiScale);
++			tipY = std::clamp((int)screenY, stackRoom, height - 4 * uiScale) - spot.stack * MarkerStackStep * uiScale;
 +		scaleOriginX = tipX;
 +		scaleOriginY = tipY;
 +		// An arrow pointing down, 7 wide at the top, outlined: first a black triangle one pixel
@@ -66009,10 +66105,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..cac3b53e8
+index 000000000..3bcb7a879
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,942 @@
+@@ -0,0 +1,953 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -66234,7 +66330,7 @@ index 000000000..cac3b53e8
 +			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsHitFlash", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 +			"fpsGhostParts", "fpsGhostOpacity", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
 +		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
-+			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsDamageNumbers", "fpsCompass", "fpsMiddleClickIdentify" } },
++			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsMiddleClickIdentify" } },
 +		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 +		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
 +	};
@@ -66420,6 +66516,12 @@ index 000000000..cac3b53e8
 +		{
 +			static const char *const markerNames[] = { "STR_FPS_ENEMY_MARKERS_RED", "STR_FPS_ENEMY_MARKERS_MAP", "STR_FPS_ENEMY_MARKERS_LINE" };
 +			return std::string(tr(markerNames[std::clamp(*option.asInt(), 0, 2)]));
++		}
++		// The markers over our own wounded are off or on, shown by name.
++		if (option.id() == "fpsWoundedMarkers")
++		{
++			static const char *const woundedNames[] = { "STR_FPS_WOUNDED_MARKERS_OFF", "STR_FPS_WOUNDED_MARKERS_ON" };
++			return std::string(tr(woundedNames[std::clamp(*option.asInt(), 0, 1)]));
 +		}
 +		// The downed units' icons are a choice of three, shown by name.
 +		if (option.id() == "fpsDownedIcons")
@@ -66712,6 +66814,11 @@ index 000000000..cac3b53e8
 +		else if (value == &Options::fpsEnemyMarkers)
 +		{
 +			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
++		}
++		// The markers over our own wounded (off, on): either button switches.
++		else if (value == &Options::fpsWoundedMarkers)
++		{
++			*value = *value == 1 ? 0 : 1;
 +		}
 +		// The downed units' icons (off, crosshair, always): round and round.
 +		else if (value == &Options::fpsDownedIcons)

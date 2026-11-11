@@ -24,7 +24,7 @@
 - **See:** the original maps, sprites, palette and sounds, rebuilt in 3D from the game's own voxel data: light and shadow, a flashlight and flares, night vision gear, smoke as the map draws it, rain and snow under a grey sky, windows that shatter, swinging doors, glowing UFOs, bullet holes and scorch marks, out to 200 tiles; the stars over XPiratez's space stations; under the sea, bubbles, marine snow and caustics.
 - **Lead the squad:** every soldier's live helmet camera on the top bar (hover for their card, right click for the big soldier cam), a camera window over the isometric map, and the aliens' turn watched through the eyes of whoever sees the alien.
 - **Feel it:** recoil and muzzle flashes, marks on the crosshair (white ticks for a hit, red for a kill, a blue shield when a strike does no harm), each hit's damage rising over the unit, shots whizzing past, rain, wind and fires heard round you, blood on the view and a heartbeat when badly hurt, panic and berserk through your soldier's own eyes, and a helmet camera dying in static.
-- **Make it yours:** 96 settings and 39 keys of its own (**Options → 3D VIEW**; 88 settings in the 1.11 downloads), and a controller layout made for the Steam Deck.
+- **Make it yours:** 97 settings and 39 keys of its own (**Options → 3D VIEW**; 88 settings in the 1.11 downloads), and a controller layout made for the Steam Deck.
 
 | | |
 |---|---|
@@ -48,6 +48,7 @@ Not in a download yet: no 1.12 release has been made, so the downloads are still
 - **Further, and the unseen in mist:** *View distance* reaches 60 to 200 tiles; *Unseen terrain* draws what your squad hasn't seen as slate shapes in a mist (or 0.9's fog, or as it is); with *Fog of war in 3D* off, the default, the floor below the stairs shows as you look at it.
 - **Walls in the paint of their side:** a wall's face the map never shows takes the paint of the side it faces, a house's outside from behind (*Wall paint*).
 - **Enemy markers in the buttons' colours:** red seen, green seen only by the squad, yellow hidden but in a clear line of fire.
+- **Wounded markers:** our own wounded in the map buttons' blue, those about to pass out in purple.
 - **Damage numbers:** a hit's damage rises over the unit, in 3D and on the map: health red, armour blue, stun purple, a grey 0 when the armour stopped it.
 - **Ambient sounds:** rain and wind, muffled under a roof, and fires crackling near you.
 - **Camera artifacts:** the helmet cameras' static and glitches as they are, lighter (no glitch over 0.15 s) or gone; a fallen soldier's camera keeps its static.

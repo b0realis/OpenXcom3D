@@ -255,6 +255,7 @@ public:
 		Uint8 glassShard[3];   // a window's shards (see spawnGlassShards): pale cyan, white, grey-blue
 		Uint8 marker, marine;
 		Uint8 markerSquadSeen, markerLineOfFire; // enemy markers: the game's green button's colour, and a yellow
+		Uint8 markerWounded, markerPassingOut;   // our own (setting "Wounded markers"): the game's blue and purple buttons' colours
 		Uint8 sprayMark, sprayNext; // a spray burst's marks and the line between them (light green), the stretch to the next (grey)
 		Uint8 hitbox[3];       // hitboxes (setting "Hitboxes"): X-COM's, the aliens', the civilians'
 		Uint8 downedIcon[5];   // icons over the downed: flame, its heart, blood, the shock's bolt, out cold
@@ -357,11 +358,13 @@ public:
 
 	/// How the soldier looked through knows an enemy it marks (setting "Enemy markers"; a player, GitHub issue #117):
 	/// as the game's buttons for it say, red: he sees it; green: only the squad does; yellow: only the squad does, and his
-	/// line to it is clear (smoke, the dark, camouflage or the distance hide it from him).
-	enum MarkerKind { MarkerSeen, MarkerSquadSeen, MarkerLineOfFire };
-	/// An enemy to mark: the unit, its button's number, and how the soldier knows it.
-	struct EnemyMarker { const BattleUnit *unit; int number; MarkerKind kind; };
-	/// Marks units (the visible enemies) with their numbers, over everything.
+	/// line to it is clear (smoke, the dark, camouflage or the distance hide it from him). And one of our own the map
+	/// flags (setting "Wounded markers", #117 again): its blue button, wounded; its purple one, about to pass out.
+	enum MarkerKind { MarkerSeen, MarkerSquadSeen, MarkerLineOfFire, MarkerWounded, MarkerPassingOut };
+	/// A unit to mark: the unit, its button's number, and how the soldier knows it (an enemy) or what's the matter with
+	/// it (one of our own); and for a body carried (it has no place of its own), the unit carrying it, marked instead.
+	struct EnemyMarker { const BattleUnit *unit; int number; MarkerKind kind; const BattleUnit *carrier = nullptr; };
+	/// Marks units (the visible enemies, our own wounded) with their numbers, over everything.
 	void setMarkers(const std::vector<EnemyMarker> &markers) { _markers = markers; }
 	/// A spray burst being marked (the game's "spray" auto shot): its points so far and the next one under the crosshair, in voxels (none: not marking).
 	void setSprayMarks(const std::vector<Position> &points, const Position &next) { _sprayPoints = points; _sprayNext = next; }
@@ -839,12 +842,14 @@ private:
 	Uint32 _hitMarkTick = 0;                            // when an enemy in sight was last hit
 	bool _hitMarkKill = false;                          // and whether that hit killed it
 	Uint32 _noHarmTick = 0;                             // when an enemy in sight was last struck to no harm
-	std::vector<EnemyMarker> _markers;                  // visible enemies, their numbers and how they're known
+	std::vector<EnemyMarker> _markers;                  // visible enemies (our own wounded), their numbers and how they're known
 	std::vector<Position> _sprayPoints;                 // a spray burst's marked points, in voxels (see setSprayMarks)
 	Position _sprayNext;                                // and the next one under the crosshair
 	/// Draws a spray burst's marked points, numbered, and the dotted line along them (see setSprayMarks).
 	void drawSprayMarks();
-	struct MarkerSpot { double pos[3]; int number; MarkerKind kind; };
+	/// A marker's place this frame; a unit with more than one (two buttons: wounded and about to pass out) has them
+	/// stacked as the game stacks its buttons, the first at the bottom: this one's place in its stack, and how many.
+	struct MarkerSpot { double pos[3]; int number; MarkerKind kind; int stack; int stackSize; };
 	std::vector<MarkerSpot> _markerSpots;               // where they are this frame
 	bool _showFacing = false;                           // which way the units face shown (the key for it held)
 	struct FacingSpot { double feet[3]; double radius; int direction; Uint8 color; };

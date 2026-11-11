@@ -334,6 +334,9 @@ void FirstPersonView::updateColors()
 	// squadsightUnits; and those of them in a clear line of fire, yellow)
 	_colors.markerSquadSeen = _game->getMod()->getInterface("battlescape")->getElement("squadsightUnits")->color;
 	_colors.markerLineOfFire = nearest(250, 215, 40);
+	// (our own wounded and those about to pass out: the very colours of the game's blue and purple buttons for them)
+	_colors.markerWounded = _game->getMod()->getInterface("battlescape")->getElement("woundedUnits")->color;
+	_colors.markerPassingOut = _game->getMod()->getInterface("battlescape")->getElement("passingOutUnits")->color;
 	_colors.sprayMark = nearest(150, 245, 140);
 	_colors.sprayNext = nearest(160, 160, 170);
 	_colors.marine = nearest(150, 195, 190);

@@ -567,6 +567,10 @@ const Uint8 TapeFont[][5] = {
 };
 /// The tape's text, repeated along it, as glyphs of TapeFont: "X-COM  ".
 const int TapeText[] = { 0, 1, 2, 3, 4, 5, 5 };
+/// The numbered markers' stack over a unit with more than one (see FirstPersonView::drawMarkers): each this many pixels
+/// (at the UI scale) over the one before, a pixel apart (the art is 13 pixels high, its tip the lowest), as the game stacks
+/// the buttons.
+const int MarkerStackStep = 14;
 /// 3x5 digits for the numbered markers over the visible enemies, same layout as TapeFont.
 /// A spray burst's marks (see FirstPersonView::drawSprayMarks): a dot of the line along them every
 /// SprayDotSpacing voxels; each mark a pole SprayPoleVoxels high from the tile's floor (two thirds of a level; at least

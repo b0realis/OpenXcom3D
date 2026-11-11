@@ -1009,6 +1009,24 @@ void FirstPersonView::drawUnits()
 		_outlineRowRight.assign(getHeight(), -1);
 	}
 
+	// Notes the markers over a unit (see drawMarkers), at a point over it: one for each of its buttons that the mode
+	// marks (an enemy has one; one of our own can have two, wounded and about to pass out), stacked as the game stacks
+	// the buttons, the first at the bottom; and those of a body it carries (see EnemyMarker).
+	auto noteMarkers = [&](const BattleUnit *unit, const double over[3]) {
+		const size_t first = _markerSpots.size();
+		for (const auto &marker : _markers)
+		{
+			if ((marker.carrier ? marker.carrier : marker.unit) == unit)
+			{
+				_markerSpots.push_back({ { over[0], over[1], over[2] }, marker.number, marker.kind, (int)(_markerSpots.size() - first), 0 });
+			}
+		}
+		for (size_t spot = first; spot < _markerSpots.size(); ++spot)
+		{
+			_markerSpots[spot].stackSize = (int)(_markerSpots.size() - first);
+		}
+	};
+
 	// The units are recorded first (their shadows, sprites and hitboxes, in order), then drawn
 	// on all the view's threads at once (see replayDrawList). Each unit's frame is composed in
 	// the sprite buffer, then kept in a frame of its own until then.
@@ -1029,7 +1047,22 @@ void FirstPersonView::drawUnits()
 		double airFallFeetZ = 0.0;
 		const bool airFall = !chainHeld && FirstPerson::airFallHeight(unit, airFallTile, airFallFeetZ);
 		const bool fallingDown = quickFall || (airFall && unit->isOut());
-		if ((unit->isOut() && !fallingDown && !chainHeld) || unit == _cameraUnit || (!debug && !unit->getVisible() && !chainHeld))
+		const bool lying = unit->isOut() && !fallingDown && !chainHeld;
+		// One of our own lying out cold with markers (setting "Wounded markers": the game's blue or purple buttons for
+		// it), not drawn here: its markers over the body, 5 voxels over its middle where it lies on its tile (as
+		// drawDownedIcons finds it); a body carried has no tile (its markers go over the unit carrying it).
+		if (lying && !_markers.empty() && unit->getStatus() == STATUS_UNCONSCIOUS && unit != _cameraUnit)
+		{
+			const Position bodyTile = unit->getPosition();
+			if (const Tile *tile = _save->getTile(bodyTile))
+			{
+				const int bodySize = unit->getArmor()->getSize();
+				const double ground[3] = { bodyTile.x * 16.0 + 8.0 * bodySize, bodyTile.y * 16.0 + 8.0 * bodySize, bodyTile.z * 24.0 - tile->getTerrainLevel() };
+				const double overBody[3] = { ground[0], ground[1], standingHeight(ground) + 2.0 + 5.0 };
+				noteMarkers(unit, overBody);
+			}
+		}
+		if (lying || unit == _cameraUnit || (!debug && !unit->getVisible() && !chainHeld))
 		{
 			continue;
 		}
@@ -1101,14 +1134,11 @@ void FirstPersonView::drawUnits()
 			flash = Options::fpsMuzzleFlash && Options::fpsHitFlash ? flinch : 0.0f;
 		}
 
-		// A marked enemy's marker goes 5 voxels above its head (not over one falling: it's down).
-		for (const auto &marker : _markers)
+		// A marked unit's markers go 5 voxels above its head (not over one falling: it's down).
+		if (!fallingDown)
 		{
-			if (marker.unit == unit && !fallingDown)
-			{
-				MarkerSpot spot = { { feet[0], feet[1], feet[2] + unit->getFloatHeight() + unit->getHeight() + 5.0 }, marker.number, marker.kind };
-				_markerSpots.push_back(spot);
-			}
+			const double overHead[3] = { feet[0], feet[1], feet[2] + unit->getFloatHeight() + unit->getHeight() + 5.0 };
+			noteMarkers(unit, overHead);
 		}
 		// An enemy the squad sees but the soldier looked through doesn't, with smoke on the line to
 		// it: not drawn, only its marker, as for one behind a wall (a player's report, GitHub issue
@@ -2954,7 +2984,10 @@ void FirstPersonView::drawFacing()
  * enemy's number, drawn over everything (it's what the soldier knows, not what's in view), kept at
  * the screen edge when the enemy is off to the side; red, or in the colour of how the soldier knows
  * it (setting "Enemy markers": green as its button when only the squad sees it, yellow when his
- * line to it is clear, see MarkerKind). The pixel art is drawn bigger on big screens (the UI scale).
+ * line to it is clear, see MarkerKind). Our own the map flags the same way (setting "Wounded
+ * markers"), in their buttons' blue and purple; a unit with two buttons has its markers stacked, as
+ * the game stacks the buttons (each MarkerStackStep over the one before, the first at the bottom).
+ * The pixel art is drawn bigger on big screens (the UI scale).
  */
 void FirstPersonView::drawMarkers()
 {
@@ -2972,16 +3005,19 @@ void FirstPersonView::drawMarkers()
 	};
 	for (const auto &spot : _markerSpots)
 	{
-		const Uint8 markerColor = spot.kind == MarkerSquadSeen ? _colors.markerSquadSeen : spot.kind == MarkerLineOfFire ? _colors.markerLineOfFire : _colors.marker;
-		// Where the enemy's head is on the view (no marker if it's behind the camera), kept
-		// inside the view with room for the art around it: the arrow's tip.
+		const Uint8 markerColor = spot.kind == MarkerSquadSeen ? _colors.markerSquadSeen : spot.kind == MarkerLineOfFire ? _colors.markerLineOfFire
+			: spot.kind == MarkerWounded ? _colors.markerWounded : spot.kind == MarkerPassingOut ? _colors.markerPassingOut : _colors.marker;
+		// Where the unit's head is on the view (no marker if it's behind the camera), kept
+		// inside the view with room for the art around it (all of its stack's): the arrow's tip,
+		// this marker's place in the stack over it.
 		double screenX, screenY, depth;
 		if (!projectToScreen(spot.pos, screenX, screenY, depth))
 		{
 			continue;
 		}
+		const int stackRoom = std::min((14 + (spot.stackSize - 1) * MarkerStackStep) * uiScale, height - 4 * uiScale);
 		const int tipX = std::clamp((int)screenX, 6 * uiScale, width - 7 * uiScale),
-			tipY = std::clamp((int)screenY, 14 * uiScale, height - 4 * uiScale);
+			tipY = std::clamp((int)screenY, stackRoom, height - 4 * uiScale) - spot.stack * MarkerStackStep * uiScale;
 		scaleOriginX = tipX;
 		scaleOriginY = tipY;
 		// An arrow pointing down, 7 wide at the top, outlined: first a black triangle one pixel

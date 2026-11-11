@@ -1152,7 +1152,7 @@ private:
 	void buttonClicked(TextButton *button, Action *action);
 	/// Selects a soldier from the squad bar.
 	void selectUnit(BattleUnit *unit);
-	/// Hands the 3D view the visible enemies to mark.
+	/// Hands the 3D view the visible enemies to mark, and our own wounded (setting "Wounded markers").
 	void updateEnemyMarkers();
 	/// Has the soldier a clear line to an enemy the squad sees and he doesn't (setting "Enemy markers": its yellow)?
 	bool clearLineOfFire(BattleUnit *viewer, BattleUnit *enemy) const;
