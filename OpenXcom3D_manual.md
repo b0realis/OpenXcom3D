@@ -509,7 +509,7 @@ The settings are listed under the same headings as in the game.
 New after 1.12, in the source (no download yet). The CPU renderer stays the default and the reference: these are options.
 
 - **Renderer** (CPU): **CPU** draws the 3D world on the processor, as ever, on any machine. **GPU** has the graphics card cast the world's rays: the same walk through the voxels and the same shading, as a shader, checked pixel for pixel against the CPU's picture (see [Performance](#8-performance)). Units, items, smoke, effects and the HUD are drawn as before, on the card's picture. On Linux, Windows and macOS: it opens its own hidden OpenGL context (EGL on Linux, WGL on Windows, CGL on macOS), whatever the game's display mode. Proved on Linux; the Windows side has run only under Wine so far, the macOS side not yet on a Mac. On a machine without a graphics card, with a software OpenGL, or if the card fails, the CPU draws by itself. On a Windows laptop with two graphics chips the game now asks for the fast one. The card is opened on the side the first time (its driver builds the shaders for a few seconds): the CPU draws until it is ready. The log (`openxcom.log`) names the card: `OpenXcom3D GPU: the ... 3D view's rays are cast on ...`.
-- **Full resolution** (NO): the 3D world at the screen's own resolution instead of the HUD's. On big screens the view is normally drawn at the HUD's size and magnified with it (640×360 on a 1920×1080 screen at *Battlescape scale* screen); YES draws the world at the battlescape's full size (1920×1080 there) and magnifies only the HUD over it. Nine times the rays in that case: heavy on the CPU (try *Pixel size* 2), light on a graphics card with *Renderer* GPU.
+- **3D resolution** (HUD): how fine the 3D world is drawn. **HUD**: as fine as its HUD, and magnified with it on a big screen (640×360 on a 1920×1080 screen at *Battlescape scale* screen): a big screen costs what a small one does. **Battlescape**: at the game's own battlescape size, only the HUD magnified over it. **Display**: at the display's own resolution, whatever the *Battlescape scale*: with the battlescape at a half or a quarter of the display (so the isometric map and the menus stay big), the 3D world is still drawn pixel for pixel. The view then isn't drawn into the game's screen at all: it is laid into the display when the frame is shown, under the HUD, the game's windows and the mouse pointer, which keep their scale (with the game's own output, with its HQX and xBRZ scalers, and with its OpenGL output). Display is many times the rays of HUD: heavy on the CPU (try *Pixel size* 2), made for *Renderer* GPU.
 - **HUD scale** (Auto): how many times the 3D HUD (its buttons, bars, texts and crosshair) is magnified on a big screen. **Auto** makes it as big as fits: ×2 from 720 lines, ×3 from 1080. **x1** to **x4** choose it (never bigger than fits): x2 on a 1920×1080 screen gives a smaller HUD and more room. Without *Full resolution* the 3D world is drawn at the HUD's size, so a smaller scale also makes it finer.
 
 ## 5. Fire modes per weapon (FPS-style shooting)
@@ -816,7 +816,7 @@ Smoke costs what it covers. A smoke grenade's cloud (about 90 tiles over two lev
 | 3D view | Rays on the CPU | Rays on the GPU | The whole 3D view on the GPU |
 |---|---|---|---|
 | 640×400 | 4.7–6.8 ms | 2.5–2.7 ms | |
-| 1920×1080 (*Full resolution* YES) | 35–38 ms | 6–9 ms | 10–13 ms (38 ms on the CPU) |
+| 1920×1080 (*3D resolution* Battlescape or Display) | 35–38 ms | 6–9 ms | 10–13 ms (38 ms on the CPU) |
 
 So a full 1920×1080 view, which the CPU draws at about 25 frames a second, runs at 60 and more on the card. On built-in graphics the gain is smaller: the same laptop's Intel Arc casts a 1920×1080 view's rays in about 20 ms (the whole 3D view in 23–24 ms, about 40 frames a second), so there *Pixel size* 2 or a smaller *Battlescape scale* still helps. The picture is the CPU's: in every test save the two differ in under 0.1% of the pixels (a voxel's edge here and there, where the two round a number differently).
 
@@ -898,6 +898,7 @@ Every file starts with the project's philosophy and a description of what's in i
 | `FirstPersonViewUpscaling.cpp` | Optional smoother sprites up close (xBRZ on a worker thread) |
 | `FirstPersonGpu.{h,cpp}`, `FirstPersonGpuGl.h`, `FirstPersonGpuShaders.h` | Setting *Renderer*: GPU. The rays on the graphics card: the voxel models and each frame's tile snapshot go up as plain buffers, and a fragment shader walks and shades each pixel's ray. The shader is `castRay`, `traceTile`, `shadeHit`, `colorOutsideMap` and `skyColor` line for line, under the same names (change one, change the other; the constants are written into it from `FirstPersonViewShared.h`). Its own thread and hidden OpenGL context (EGL on Linux, CGL on macOS, looked up at run time: no new build dependency; Windows' WGL in `FirstPersonGpuWindows.cpp`) |
 | `FirstPersonViewGpu.cpp` | The view's side of it: the frame handed to the card, its picture, depth and glow into the view's own buffers; and the shadow run that proves it (`OPENXCOM3D_GPU_SHADOW=1`: the CPU draws, the card beside it, every thirtieth frame each ray and each colour compared, both timed in the log) |
+| `FirstPersonPresent.cpp` | Setting *3D resolution*: Display. A view the display's size is not drawn into the game's screen: the mode fills the screen with a key where it is to show, and when the engine shows the frame (`Screen::flip`, or `Zoom::flipWithZoom` with OpenGL output) the display takes the view's pixels wherever the key still is |
 | `FirstPersonViewEffects.cpp` | Particles: explosions, fire, smoke, weather, UFO devices, bloom |
 | `FirstPersonViewShots.cpp` | Shots in flight, thrown items as tumbling voxel models, trails, beams, impacts, bullet holes and scorches, debris |
 | `FirstPersonViewFlares.cpp` | Tactical flares and their light |
@@ -969,7 +970,7 @@ What `FirstPersonView` draws:
 ### After 1.12 (in the source: no download yet)
 
 - New setting: *Renderer* (CPU / GPU): the graphics card casts the 3D world's rays, the same picture as the CPU's (Linux; Windows tried under Wine only, macOS not yet on a Mac; the CPU by itself wherever the card can't). A full 1920×1080 view's rays take 6–9 ms on a GeForce RTX 4060 against 35–38 ms on the CPU.
-- New setting: *Full resolution*: the 3D world at the screen's own resolution, only the HUD magnified over it.
+- New setting: *3D resolution* (HUD / Battlescape / Display): the 3D world as fine as its HUD, as the battlescape, or as the display itself whatever the battlescape's scale (the view laid into the display under the HUD when the frame is shown).
 - New setting: *HUD scale* (Auto, x1 to x4): the 3D HUD's magnification on big screens.
 
 ### 1.12 (2026-11-11)

@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..0f604597d
+index 000000000..4dd26ccad
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,531 @@
+@@ -0,0 +1,534 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -260,11 +260,14 @@ index 000000000..0f604597d
 +  STR_FPS_RENDERER_DESC: "CPU: runs anywhere. GPU: the graphics card draws the 3D world (Linux for now); CPU where it can't."
 +  STR_FPS_RENDERER_CPU: "CPU"
 +  STR_FPS_RENDERER_GPU: "GPU"
-+  STR_FPS_FULL_RESOLUTION: "Full resolution"
 +  STR_FPS_HUD_SCALE: "HUD scale"
 +  STR_FPS_HUD_SCALE_DESC: "How many times the 3D HUD is magnified on a big screen. Auto: as big as fits. Smaller: more room, a finer view."
 +  STR_FPS_HUD_SCALE_AUTO: "Auto"
-+  STR_FPS_FULL_RESOLUTION_DESC: "The 3D world at the screen's own resolution, not the HUD's. Heavy without the graphics card."
++  STR_FPS_VIEW_RESOLUTION: "3D resolution"
++  STR_FPS_VIEW_RESOLUTION_DESC: "The 3D world as fine as its HUD, as the battlescape, or as the display itself, whatever the battlescape's scale."
++  STR_FPS_VIEW_RESOLUTION_HUD: "HUD"
++  STR_FPS_VIEW_RESOLUTION_BATTLESCAPE: "Battlescape"
++  STR_FPS_VIEW_RESOLUTION_DISPLAY: "Display"
 +  STR_FPS_PIXEL_SIZE: "Pixel size"
 +  STR_FPS_PIXEL_SIZE_DESC: "Auto: 2 for views over 640x400. 1: full detail. 2, 3: faster."
 +  STR_FPS_SOLDIER_PREVIEW: "Soldier camera preview"
@@ -661,10 +664,10 @@ index 000000000..0f604597d
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..7ecb22230
+index 000000000..1c94ec4f2
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,531 @@
+@@ -0,0 +1,534 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -797,11 +800,14 @@ index 000000000..7ecb22230
 +  STR_FPS_RENDERER_DESC: "CPU: runs anywhere. GPU: the graphics card draws the 3D world (Linux for now); CPU where it can't."
 +  STR_FPS_RENDERER_CPU: "CPU"
 +  STR_FPS_RENDERER_GPU: "GPU"
-+  STR_FPS_FULL_RESOLUTION: "Full resolution"
 +  STR_FPS_HUD_SCALE: "HUD scale"
 +  STR_FPS_HUD_SCALE_DESC: "How many times the 3D HUD is magnified on a big screen. Auto: as big as fits. Smaller: more room, a finer view."
 +  STR_FPS_HUD_SCALE_AUTO: "Auto"
-+  STR_FPS_FULL_RESOLUTION_DESC: "The 3D world at the screen's own resolution, not the HUD's. Heavy without the graphics card."
++  STR_FPS_VIEW_RESOLUTION: "3D resolution"
++  STR_FPS_VIEW_RESOLUTION_DESC: "The 3D world as fine as its HUD, as the battlescape, or as the display itself, whatever the battlescape's scale."
++  STR_FPS_VIEW_RESOLUTION_HUD: "HUD"
++  STR_FPS_VIEW_RESOLUTION_BATTLESCAPE: "Battlescape"
++  STR_FPS_VIEW_RESOLUTION_DISPLAY: "Display"
 +  STR_FPS_PIXEL_SIZE: "Pixel size"
 +  STR_FPS_PIXEL_SIZE_DESC: "Auto: 2 for views over 640x400. 1: full detail. 2, 3: faster."
 +  STR_FPS_SOLDIER_PREVIEW: "Soldier camera preview"
@@ -21740,10 +21746,10 @@ index bc5f08f46..5ddf353f4 100644
  			playMovementSound();
  			if (_parent->getSave()->isPreview())
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 839f80345..0c7f4f8a1 100644
+index 839f80345..f5e822e10 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -441,10 +441,51 @@ set ( rapidyaml_src
+@@ -441,10 +441,52 @@ set ( rapidyaml_src
  
  )
  
@@ -21755,6 +21761,7 @@ index 839f80345..0c7f4f8a1 100644
 +    FirstPerson/FirstPersonDamageNumbers.cpp
 +    FirstPerson/FirstPersonGpu.cpp
 +    FirstPerson/FirstPersonGpuWindows.cpp
++    FirstPerson/FirstPersonPresent.cpp
 +    FirstPerson/FirstPersonMode.cpp
 +    FirstPerson/FirstPersonModeCamera.cpp
 +    FirstPerson/FirstPersonModeHud.cpp
@@ -21795,7 +21802,7 @@ index 839f80345..0c7f4f8a1 100644
      ${engine_src}
      ${geoscape_src}
      ${interface_src}
-@@ -627,7 +668,10 @@ if (WIN32)
+@@ -627,7 +669,10 @@ if (WIN32)
    set(WIN32_LIBS imagehlp dbghelp)
  endif(WIN32)
  
@@ -22052,7 +22059,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..a8bd5c4c9 100644
+index a08796ced..4c50f0635 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -22069,11 +22076,68 @@ index a08796ced..a8bd5c4c9 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsFullResolution, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers;
-+OPT int fpsRenderer, fpsHudScale, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
++OPT bool fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers;
++OPT int fpsRenderer, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsTurret, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
+diff --git a/src/Engine/Screen.cpp b/src/Engine/Screen.cpp
+index ae9083dcb..8dd6a03ff 100644
+--- a/src/Engine/Screen.cpp
++++ b/src/Engine/Screen.cpp
+@@ -17,6 +17,7 @@
+  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ #include "Screen.h"
++#include "../FirstPerson/FirstPersonApi.h" // OpenXcom3D: the 3D view at the display's size (see flip)
+ #include "../resource.h"
+ #include <algorithm>
+ #include <sstream>
+@@ -223,12 +224,31 @@ void Screen::flip()
+ 
+ 
+ 
++	// OpenXcom3D: a 3D view drawn at the display's own size is laid in now, under the HUD (not with OpenGL output).
++	if (!useOpenGL())
++	{
++		int pictureX, pictureY, pictureWidth, pictureHeight;
++		getPictureArea(pictureX, pictureY, pictureWidth, pictureHeight);
++		FirstPerson::presentAtFlip(_screen, pictureX, pictureY, pictureWidth, pictureHeight);
++	}
++
+ 	if (SDL_Flip(_screen) == -1)
+ 	{
+ 		throw Exception(SDL_GetError());
+ 	}
+ }
+ 
++/**
++ * OpenXcom3D: where on the display the game's picture is shown: the display without its black bands.
++ */
++void Screen::getPictureArea(int &x, int &y, int &width, int &height) const
++{
++	x = std::max(0, _leftBlackBand);
++	y = std::max(0, _topBlackBand);
++	width = _screen->w - x - std::max(0, _rightBlackBand);
++	height = _screen->h - y - std::max(0, _bottomBlackBand);
++}
++
+ /**
+  * Clears all the contents out of the internal buffer.
+  */
+diff --git a/src/Engine/Screen.h b/src/Engine/Screen.h
+index a9beefeb9..182897aee 100644
+--- a/src/Engine/Screen.h
++++ b/src/Engine/Screen.h
+@@ -63,6 +63,8 @@ public:
+ 	/// Cleans up the display screen.
+ 	~Screen();
+ 	/// Get horizontal offset.
++	/// OpenXcom3D: where on the display the game's picture is shown (inside any black bands), in display pixels.
++	void getPictureArea(int &x, int &y, int &width, int &height) const;
+ 	int getDX() const;
+ 	/// Get vertical offset.
+ 	int getDY() const;
 diff --git a/src/Engine/Script.h b/src/Engine/Script.h
 index e11f89dde..5658639bc 100644
 --- a/src/Engine/Script.h
@@ -22156,6 +22220,29 @@ index 97e6bd495..77857158e 100644
  	/// Hides all the state surfaces.
  	void hideAll();
  	/// Shows all the state surfaces.
+diff --git a/src/Engine/Zoom.cpp b/src/Engine/Zoom.cpp
+index c107c89d3..3ffe1f1fc 100644
+--- a/src/Engine/Zoom.cpp
++++ b/src/Engine/Zoom.cpp
+@@ -18,6 +18,8 @@
+  */
+ 
+ #include "Zoom.h"
++#include <algorithm>
++#include "../FirstPerson/FirstPersonApi.h" // OpenXcom3D: the 3D view at the display's size (see flipWithZoom)
+ 
+ #include "Surface.h"
+ #include "Logger.h"
+@@ -677,6 +679,9 @@ void Zoom::flipWithZoom(SDL_Surface *src, SDL_Surface *dst, int topBlackBand, in
+ 			SDL_BlitSurface(src, 0, glOut->surface.get(), 0); // TODO; this is less than ideal...
+ 
+ 			glOut->refresh(glOut->linear, glOut->iwidth, glOut->iheight, dst->w, dst->h, topBlackBand, bottomBlackBand, leftBlackBand, rightBlackBand);
++			// OpenXcom3D: a 3D view drawn at the display's own size goes over the picture area now, under the HUD.
++			FirstPerson::presentAtFlipOpenGl(src, std::max(0, leftBlackBand), std::max(0, topBlackBand), dst->w - std::max(0, leftBlackBand) - std::max(0, rightBlackBand),
++				dst->h - std::max(0, topBlackBand) - std::max(0, bottomBlackBand), dst->h);
+ 			SDL_GL_SwapBuffers();
+ 		}
+ #endif
 diff --git a/src/FirstPerson/FirstPersonAmbience.cpp b/src/FirstPerson/FirstPersonAmbience.cpp
 new file mode 100644
 index 000000000..f2b4d8b18
@@ -23013,10 +23100,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..322ce1a34
+index 000000000..1bf8981a0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1437 @@
+@@ -0,0 +1,1439 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -23066,6 +23153,8 @@ index 000000000..322ce1a34
 + * and its 3D VIEW options tab.
 + */
 +#include "FirstPersonApi.h"
++#include "../Engine/Screen.h"
++#include "../Engine/Surface.h"
 +#include <algorithm>
 +#include <map>
 +#include "FirstPersonMode.h"
@@ -23878,7 +23967,7 @@ index 000000000..322ce1a34
 +	// The map's edge as small red dots on the floor, nothing beyond it, instead of the tape.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsDiscreetEdge", &fpsDiscreetEdge, false, "STR_FPS_DISCREET_EDGE", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsRenderer", &fpsRenderer, 0, "STR_FPS_RENDERER", category));
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsFullResolution", &fpsFullResolution, false, "STR_FPS_FULL_RESOLUTION", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsViewResolution", &fpsViewResolution, 0, "STR_FPS_VIEW_RESOLUTION", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsHudScale", &fpsHudScale, 0, "STR_FPS_HUD_SCALE", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 0, "STR_FPS_PIXEL_SIZE", category));
 +	// The crosshair: shown or not, the shot info under it, aiming at the exact point under it
@@ -24456,10 +24545,10 @@ index 000000000..322ce1a34
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..a7b8717cd
+index 000000000..b333b425d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,457 @@
+@@ -0,0 +1,475 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -24567,6 +24656,22 @@ index 000000000..a7b8717cd
 +const int AutoEquipLeftoversPass = 5;
 +
 +#ifndef OXCE_NO_FIRSTPERSON
++
++// ---- A 3D view at the display's own size (FirstPersonPresent.cpp; hooks in Screen::flip and Zoom::flipWithZoom) ----
++
++/// Setting "3D resolution": the 3D view the size of its HUD's canvas (magnified with it), of the battlescape, or of the display.
++enum ViewResolution { ViewResolutionHud, ViewResolutionBattlescape, ViewResolutionDisplay };
++/// Whether a view the display's own size can be shown.
++bool canPresentAtDisplaySize();
++/// The value to fill the game's screen with where a view the display's size is to show through (see presentView).
++Uint32 presentKey(SDL_Surface *screen);
++/// Asks for a view (8-bit, the size of the display's picture area) to be laid into the display at this frame's flip, where the screen still holds presentKey.
++void presentView(const Surface *view);
++/// Screen::flip's hook: lays the view asked for into the display.
++void presentAtFlip(SDL_Surface *display, int x, int y, int width, int height);
++/// Zoom::flipWithZoom's hook, with the engine's OpenGL output: draws the view asked for over the window.
++void presentAtFlipOpenGl(SDL_Surface *screen, int x, int y, int width, int height, int displayHeight);
++
 +
 +// ---- The battlescape screen (BattlescapeState.cpp) ----
 +
@@ -24838,6 +24943,8 @@ index 000000000..a7b8717cd
 +#else
 +
 +// Stock OXCE: the add-on is left out, and every hook does nothing.
++inline void presentAtFlip(SDL_Surface *, int, int, int, int) { }
++inline void presentAtFlipOpenGl(SDL_Surface *, int, int, int, int, int) { }
 +inline FirstPersonMode *create(Game *, BattlescapeState *) { return nullptr; }
 +inline void destroy(FirstPersonMode *) { }
 +inline void think(FirstPersonMode *) { }
@@ -29297,10 +29404,10 @@ index 000000000..6862c4de6
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..a2a7ecb47
+index 000000000..5b26cd476
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2946 @@
+@@ -0,0 +1,3012 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -29514,14 +29621,14 @@ index 000000000..a2a7ecb47
 + */
 +void FirstPersonMode::createView()
 +{
-+	const int viewWidth = canvasWidth() * viewScale();
-+	const int viewHeight = canvasHeight() * viewScale();
++	int viewWidth, viewHeight;
++	wantedViewSize(viewWidth, viewHeight);
 +	const Mod *mod = _game->getMod();
 +
 +	// The state adds a surface at the end (on top of everything): move it to right after the
 +	// isometric map instead.
 +	_view = new FirstPersonView(_game, viewWidth, viewHeight, 0, 0);
-+	_view->setUiScale(viewScale());
++	_view->setUiScale(std::max(1, (int)std::lround(viewWidth / (double)canvasWidth())));
 +	_state->add(_view);
 +	auto &surfaces = _state->_surfaces;
 +	surfaces.pop_back();
@@ -30255,18 +30362,19 @@ index 000000000..a2a7ecb47
 +
 +/**
 + * Makes the 3D view again, set up like the old one and put in its place, when its size isn't
-+ * what it should be now: the canvas's, or with the setting "Full resolution" the screen's own
-+ * (the canvas's times the UI scale). After the screen changed size, or the setting.
++ * what it should be now (see wantedViewSize). After the screen or the display changed size, or
++ * the setting "3D resolution".
 + */
 +void FirstPersonMode::remakeViewIfResized()
 +{
-+	const int viewWidth = canvasWidth() * viewScale(), viewHeight = canvasHeight() * viewScale();
++	int viewWidth, viewHeight;
++	wantedViewSize(viewWidth, viewHeight);
 +	if (viewWidth == _view->getWidth() && viewHeight == _view->getHeight())
 +	{
 +		return;
 +	}
 +	FirstPersonView *newView = new FirstPersonView(_game, viewWidth, viewHeight, 0, 0);
-+	newView->setUiScale(viewScale());
++	newView->setUiScale(std::max(1, (int)std::lround(viewWidth / (double)canvasWidth())));
 +	newView->setPalette(_state->getPalette());
 +	newView->setSavedBattleGame(_save);
 +	newView->setMap(_state->_map);
@@ -30316,28 +30424,82 @@ index 000000000..a2a7ecb47
 +}
 +
 +/**
-+ * How many of the 3D view's pixels a canvas pixel spans. The view is the canvas's size, drawn
-+ * magnified with the overlays; with the setting "Full resolution" it is the screen's own size,
-+ * the overlays alone magnified over it: then a canvas pixel is the UI scale's square of the
-+ * view's.
++ * The size the 3D view should have now (setting "3D resolution"):
++ *  - HUD: the canvas's, drawn magnified with the overlays (a big screen costs what a small one does);
++ *  - Battlescape: the game's own screen's, the canvas's times the UI scale: only the overlays are magnified;
++ *  - Display: the display's own (its picture area, inside any black bands), whatever the
++ *    battlescape's size: the view is then shown past the game's screen (see blit and
++ *    FirstPerson::presentView).
 + */
-+int FirstPersonMode::viewScale() const
++void FirstPersonMode::wantedViewSize(int &width, int &height) const
 +{
-+	return Options::fpsFullResolution ? _uiScale : 1;
++	width = canvasWidth();
++	height = canvasHeight();
++	if (Options::fpsViewResolution == FirstPerson::ViewResolutionDisplay && FirstPerson::canPresentAtDisplaySize())
++	{
++		int x, y;
++		_game->getScreen()->getPictureArea(x, y, width, height);
++	}
++	else if (Options::fpsViewResolution != FirstPerson::ViewResolutionHud)
++	{
++		width *= _uiScale;
++		height *= _uiScale;
++	}
 +}
 +
 +/**
-+ * The view's pixel at the middle of a canvas pixel, along x or y. The crosshair, the free
-+ * cursor's place and the clicks are the canvas's; the view's rays go through its own pixels.
-+ * With the view the canvas's size they are the same pixels. With "Full resolution" a canvas
-+ * pixel covers viewScale x viewScale of the view's, and the one at its middle is taken (for an
-+ * even scale, the one just before the middle: half a view pixel off, a quarter of a canvas
-+ * pixel at x2), so a shot goes through the same point of the picture at either resolution.
++ * Whether the view is the display's own size and so shown past the game's screen: asked for by
++ * the setting, possible, and the view made that size (and not also the game's screen's size:
++ * then it is simply drawn into it).
 + */
-+int FirstPersonMode::viewPixel(int canvasPixel) const
++bool FirstPersonMode::viewAtDisplaySize() const
 +{
-+	const int scale = viewScale();
-+	return canvasPixel * scale + (scale - 1) / 2;
++	if (Options::fpsViewResolution != FirstPerson::ViewResolutionDisplay || !FirstPerson::canPresentAtDisplaySize())
++	{
++		return false;
++	}
++	int x, y, width, height;
++	_game->getScreen()->getPictureArea(x, y, width, height);
++	return _view->getWidth() == width && _view->getHeight() == height && (width != Options::baseXResolution || height != Options::baseYResolution);
++}
++
++/**
++ * About how many of the view's pixels a canvas pixel spans, 1 or more: the size of what the view
++ * and the mode draw by the pixel on it (its markers and icons, the room under the pointer).
++ */
++int FirstPersonMode::viewScale() const
++{
++	return std::max(1, (int)std::lround(_view->getWidth() / (double)canvasWidth()));
++}
++
++/**
++ * The view's pixel at the middle of a canvas pixel, across. The crosshair, the free cursor's
++ * place and the clicks are the canvas's; the view's rays go through its own pixels. With the
++ * view the canvas's size they are the same pixels; with a bigger view a canvas pixel covers
++ * several of the view's, and the one at its middle is taken, so a shot goes through the same
++ * point of the picture at any resolution (to within half a view pixel).
++ */
++int FirstPersonMode::viewPixelX(int canvasPixel) const
++{
++	return std::min(_view->getWidth() - 1, (int)((canvasPixel + 0.5) * _view->getWidth() / canvasWidth()));
++}
++
++/// The same, down.
++int FirstPersonMode::viewPixelY(int canvasPixel) const
++{
++	return std::min(_view->getHeight() - 1, (int)((canvasPixel + 0.5) * _view->getHeight() / canvasHeight()));
++}
++
++/// The canvas pixel a pixel of the view lies in, across.
++int FirstPersonMode::canvasPixelX(int viewPixel) const
++{
++	return (int)((long long)viewPixel * canvasWidth() / _view->getWidth());
++}
++
++/// The same, down.
++int FirstPersonMode::canvasPixelY(int viewPixel) const
++{
++	return (int)((long long)viewPixel * canvasHeight() / _view->getHeight());
 +}
 +
 +/**
@@ -31254,7 +31416,7 @@ index 000000000..a2a7ecb47
 +	{
 +		resized(0, 0); // (the setting "HUD scale" changed: the canvas, the overlays' places and the view anew)
 +	}
-+	remakeViewIfResized(); // (the setting "Full resolution" switched)
++	remakeViewIfResized(); // (the setting "3D resolution" switched)
 +	const double elapsedSeconds = _lastFrameTick ? std::min<Uint32>(100, now - _lastFrameTick) / 1000.0 : 0.0;
 +
 +	// Another screen was on top (popup, next turn, inventory): it had the mouse released.
@@ -31820,7 +31982,7 @@ index 000000000..a2a7ecb47
 +		// The left button pulls the trigger: a shot at the middle of the view (the crosshair).
 +		_triggerHeld = true;
 +		_burstConfirmed = false;
-+		fire(viewPixel(canvasWidth() / 2), viewPixel(canvasHeight() / 2));
++		fire(viewPixelX(canvasWidth() / 2), viewPixelY(canvasHeight() / 2));
 +	}
 +	else if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT)
 +	{
@@ -32018,7 +32180,7 @@ index 000000000..a2a7ecb47
 +			}
 +			if (event.button.button == SDL_BUTTON_LEFT)
 +			{
-+				fire(viewPixel((int)(mouseX / _uiScale)), viewPixel((int)(mouseY / _uiScale))); // the canvas's pixel under the cursor, on the view
++				fire(viewPixelX((int)(mouseX / _uiScale)), viewPixelY((int)(mouseY / _uiScale))); // the canvas's pixel under the cursor, on the view
 +				return true;
 +			}
 +		}
@@ -32045,12 +32207,23 @@ index 000000000..a2a7ecb47
 +	SDL_Surface *screen = _game->getScreen()->getSurface();
 +	const bool full3D = isActive() && !_classicHud;
 +
-+	// The 3D view at the back, magnified on big screens: straight from the view, which is the
-+	// canvas's size and in the same palette (no copy onto the canvas first); as it is where it
-+	// is the screen's own size (setting "Full resolution").
++	// The 3D view at the back. The display's own size (setting "3D resolution": Display): it isn't
++	// drawn here at all, but laid into the display when the engine shows the frame, wherever the
++	// screen still holds the key it is filled with now (see FirstPerson::presentView). The
++	// canvas's size on a big screen: magnified, straight from the view (it is in the same
++	// palette: no copy onto the canvas first). The screen's own size: drawn as it is.
 +	if (_view->getVisible())
 +	{
-+		if (_canvas && viewScale() == 1)
++		if (viewAtDisplaySize())
++		{
++			if (_view->shown())
++			{
++				_view->drawIfAsked();
++				SDL_FillRect(screen, nullptr, FirstPerson::presentKey(screen));
++				FirstPerson::presentView(_view);
++			}
++		}
++		else if (_canvas && _view->getWidth() == canvasWidth())
 +		{
 +			if (_view->shown())
 +			{
@@ -32249,10 +32422,10 @@ index 000000000..a2a7ecb47
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..c2534a6b8
+index 000000000..8ba51d3f2
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1311 @@
+@@ -0,0 +1,1319 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -32601,10 +32774,18 @@ index 000000000..c2534a6b8
 +	int canvasWidth() const;
 +	/// The canvas's height: the screen's divided by the UI scale.
 +	int canvasHeight() const;
-+	/// How many of the 3D view's pixels a canvas pixel spans: the UI scale with the setting "Full resolution", else 1.
++	/// The size the 3D view should have now, by the setting "3D resolution": the canvas's, the battlescape's or the display's.
++	void wantedViewSize(int &width, int &height) const;
++	/// Whether the view is the display's own size, shown past the game's screen (see FirstPerson::presentView).
++	bool viewAtDisplaySize() const;
++	/// About how many of the view's pixels a canvas pixel spans (1 or more): for its markers' and icons' size.
 +	int viewScale() const;
-+	/// The view's pixel at the middle of a canvas pixel (one coordinate): where the mode points into the view.
-+	int viewPixel(int canvasPixel) const;
++	/// The view's pixel at the middle of a canvas pixel, across and down: where the mode points into the view.
++	int viewPixelX(int canvasPixel) const;
++	int viewPixelY(int canvasPixel) const;
++	/// The canvas pixel a pixel of the view lies in, across and down.
++	int canvasPixelX(int viewPixel) const;
++	int canvasPixelY(int viewPixel) const;
 +	/// Makes the 3D view again when its size isn't what the canvas and the setting "Full resolution" ask for.
 +	void remakeViewIfResized();
 +	/// Makes the canvas our overlays are drawn on before being magnified.
@@ -39778,7 +39959,7 @@ index 000000000..8faa52ad4
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..651f97f35
+index 000000000..ad30ce5f4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
 @@ -0,0 +1,5173 @@
@@ -41188,7 +41369,7 @@ index 000000000..651f97f35
 +{
 +	// What the crosshair meets: a wall, a door or an object (or a floor), within reach.
 +	int hitType = V_EMPTY;
-+	if (!aimAt(viewPixel(canvasWidth() / 2), viewPixel(canvasHeight() / 2), unit, struck, &hitType)
++	if (!aimAt(viewPixelX(canvasWidth() / 2), viewPixelY(canvasHeight() / 2), unit, struck, &hitType)
 +		|| (hitType != V_WESTWALL && hitType != V_NORTHWALL && hitType != V_OBJECT && !(floors && hitType == V_FLOOR)))
 +	{
 +		return false;
@@ -41355,7 +41536,7 @@ index 000000000..651f97f35
 + */
 +void FirstPersonMode::updateAim(BattleUnit *unit)
 +{
-+	_aimHitsSomething = aimAt(viewPixel(canvasWidth() / 2), viewPixel(canvasHeight() / 2), unit, _aimVoxel, &_aimVoxelType);
++	_aimHitsSomething = aimAt(viewPixelX(canvasWidth() / 2), viewPixelY(canvasHeight() / 2), unit, _aimVoxel, &_aimVoxelType);
 +}
 +
 +/**
@@ -44493,7 +44674,7 @@ index 000000000..651f97f35
 +
 +	// Towards what's under the crosshair (a point far along the ray if nothing's hit).
 +	Position aimedVoxel;
-+	aimAt(viewPixel(canvasWidth() / 2), viewPixel(canvasHeight() / 2), unit, aimedVoxel);
++	aimAt(viewPixelX(canvasWidth() / 2), viewPixelY(canvasHeight() / 2), unit, aimedVoxel);
 +	const float flareTarget[3] = { (float)aimedVoxel.x, (float)aimedVoxel.y, (float)aimedVoxel.z };
 +	_view->throwFlare(flareTarget);
 +
@@ -44636,8 +44817,8 @@ index 000000000..651f97f35
 + */
 +void FirstPersonMode::pointer(int &pointerX, int &pointerY) const
 +{
-+	pointerX = viewPixel(_mouseLook ? canvasWidth() / 2 : _cursorX);
-+	pointerY = viewPixel(_mouseLook ? canvasHeight() / 2 : _cursorY);
++	pointerX = viewPixelX(_mouseLook ? canvasWidth() / 2 : _cursorX);
++	pointerY = viewPixelY(_mouseLook ? canvasHeight() / 2 : _cursorY);
 +}
 +
 +/**
@@ -44735,8 +44916,8 @@ index 000000000..651f97f35
 +	const std::string label = unitLabel(target);
 +	if (_txtTarget->getText() != label) _txtTarget->setText(label);
 +	// Centred under the crosshair, clear of its picture (about 8 pixels round the middle).
-+	_txtTarget->setX(_view->getX() + pointerX / viewScale() - _txtTarget->getWidth() / 2); // (the view's pixel as the canvas's point)
-+	_txtTarget->setY(_view->getY() + pointerY / viewScale() + 10 + below);
++	_txtTarget->setX(_view->getX() + canvasPixelX(pointerX) - _txtTarget->getWidth() / 2); // (the view's pixel as the canvas's point)
++	_txtTarget->setY(_view->getY() + canvasPixelY(pointerY) + 10 + below);
 +}
 +
 +/**
@@ -44943,7 +45124,7 @@ index 000000000..651f97f35
 +		BattleActionCost cost(BA_AUTOSHOT, unit, weapon);
 +		if (weapon && weapon->getAmmoForAction(BA_AUTOSHOT) && (doomModeOn() || cost.haveTU()))
 +		{
-+			fire(viewPixel(canvasWidth() / 2), viewPixel(canvasHeight() / 2));
++			fire(viewPixelX(canvasWidth() / 2), viewPixelY(canvasHeight() / 2));
 +		}
 +		else
 +		{
@@ -47509,6 +47690,240 @@ index 000000000..228618946
 +}
 +
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
+diff --git a/src/FirstPerson/FirstPersonPresent.cpp b/src/FirstPerson/FirstPersonPresent.cpp
+new file mode 100644
+index 000000000..1b1317b84
+--- /dev/null
++++ b/src/FirstPerson/FirstPersonPresent.cpp
+@@ -0,0 +1,228 @@
++/*
++ * Copyright 2010-2026 OpenXcom Developers.
++ *
++ * This file is part of OpenXcom.
++ *
++ * OpenXcom is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * OpenXcom is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/*
++ * FirstPersonPresent.cpp: a 3D view at the display's own size (setting "3D resolution": Display).
++ *
++ * The game draws everything onto a screen of its own, the battlescape's size (often a half or a
++ * quarter of the display's), which the engine then enlarges onto the display. A 3D view drawn
++ * into that screen can never be finer than it. So a view the display's size isn't drawn into it
++ * at all: the mode fills the screen with a key value where the view is to show and draws the
++ * HUD over that as ever (FirstPersonMode::blit); and when the engine shows the frame, every
++ * pixel of the display where the screen still holds the key takes the view's pixel. The HUD,
++ * the game's windows and the mouse pointer keep the screen's scale, on top; the view has the
++ * display's. This is also where a picture in more colours than the palette's would go to the
++ * display one day: it is the one place the 3D picture meets the display.
++ *
++ * The key: on an 8-bit screen, colour 0, which nothing draws (it is every surface's transparent
++ * colour). On a 32-bit one (the engine's HQX and xBRZ scalers, and its OpenGL output), a blue
++ * one step off black, which no palette colour is.
++ *
++ * The engine shows a frame in one of two ways, each with its hook:
++ *  - itself (Screen::flip): the screen enlarged into the display's own pixels; the view's are
++ *    put in after (presentAtFlip);
++ *  - through OpenGL (Zoom::flipWithZoom): the screen as a texture drawn over the window; the
++ *    view is drawn over that as a second texture, see-through where the screen has anything
++ *    (presentAtFlipOpenGl).
++ */
++#include "FirstPersonApi.h"
++#include <vector>
++#include <SDL.h>
++#include "../Engine/Screen.h"
++#include "../Engine/Surface.h"
++#ifndef __NO_OPENGL
++#include <SDL_opengl.h>
++#endif
++
++namespace OpenXcom
++{
++
++namespace FirstPerson
++{
++
++namespace
++{
++const Surface *viewToPresent = nullptr; // the view asked for this frame
++}
++
++bool canPresentAtDisplaySize()
++{
++	return true;
++}
++
++Uint32 presentKey(SDL_Surface *screen)
++{
++	return screen->format->BytesPerPixel == 1 ? 0 : SDL_MapRGB(screen->format, 0, 0, 1);
++}
++
++void presentView(const Surface *view)
++{
++	viewToPresent = view;
++}
++
++/**
++ * Lays the view asked for this frame into the display's own pixels: where the display's picture
++ * area still holds the key (nothing of the HUD was drawn there), the view's pixel, through the
++ * palette on a 32-bit display. Nothing if no view asked, or if it isn't the picture area's size
++ * (the display just changed: the next frame's view will be).
++ */
++void presentAtFlip(SDL_Surface *display, int x, int y, int width, int height)
++{
++	const Surface *view = viewToPresent;
++	viewToPresent = nullptr;
++	if (!view || !display || view->getWidth() != width || view->getHeight() != height || x < 0 || y < 0 || x + width > display->w || y + height > display->h)
++	{
++		return;
++	}
++	const int bytes = display->format->BytesPerPixel;
++	if (bytes != 1 && bytes != 4)
++	{
++		return;
++	}
++	if (SDL_MUSTLOCK(display) && SDL_LockSurface(display) != 0)
++	{
++		return;
++	}
++	if (bytes == 1)
++	{
++		for (int row = 0; row < height; ++row)
++		{
++			Uint8 *shown = (Uint8 *)display->pixels + (size_t)(y + row) * display->pitch + x;
++			const Uint8 *seen = view->getRaw(0, row);
++			for (int column = 0; column < width; ++column)
++			{
++				if (!shown[column]) shown[column] = seen[column];
++			}
++		}
++	}
++	else
++	{
++		// The palette as the display's pixels, and the key by its colour alone (whatever the display keeps in its spare byte).
++		Uint32 colors[256];
++		const SDL_Color *palette = view->getPalette();
++		for (int index = 0; index < 256; ++index)
++		{
++			colors[index] = SDL_MapRGB(display->format, palette[index].r, palette[index].g, palette[index].b);
++		}
++		const Uint32 colorBits = display->format->Rmask | display->format->Gmask | display->format->Bmask;
++		const Uint32 key = SDL_MapRGB(display->format, 0, 0, 1) & colorBits;
++		for (int row = 0; row < height; ++row)
++		{
++			Uint32 *shown = (Uint32 *)((Uint8 *)display->pixels + (size_t)(y + row) * display->pitch) + x;
++			const Uint8 *seen = view->getRaw(0, row);
++			for (int column = 0; column < width; ++column)
++			{
++				if ((shown[column] & colorBits) == key) shown[column] = colors[seen[column]];
++			}
++		}
++	}
++	if (SDL_MUSTLOCK(display)) SDL_UnlockSurface(display);
++}
++
++/**
++ * The same with the engine's OpenGL output: it has just drawn the game's screen over the window
++ * as a texture; the view goes over that as a texture of its own, the display's size, opaque
++ * where the screen holds the key and see-through elsewhere (worked out here from the screen's
++ * own pixels: the nearest one to each of the display's). Drawn with OpenGL's oldest calls, as
++ * the engine draws; the texture the engine had bound is bound again after.
++ * @param screen The game's screen as the engine hands it to OpenGL (32-bit).
++ * @param x, y, width, height The picture area on the display, from its top left.
++ * @param displayHeight The display's height (OpenGL counts from the bottom).
++ */
++void presentAtFlipOpenGl(SDL_Surface *screen, int x, int y, int width, int height, int displayHeight)
++{
++#ifndef __NO_OPENGL
++	const Surface *view = viewToPresent;
++	viewToPresent = nullptr;
++	if (!view || !screen || screen->format->BytesPerPixel != 4 || view->getWidth() != width || view->getHeight() != height || width <= 0 || height <= 0)
++	{
++		return;
++	}
++	// The view's picture as OpenGL takes it (blue, green, red, opacity: a byte each).
++	static std::vector<Uint32> picture;
++	static std::vector<int> screenColumn;
++	picture.resize((size_t)width * height);
++	screenColumn.resize(width);
++	for (int column = 0; column < width; ++column) screenColumn[column] = (int)((long long)column * screen->w / width);
++	Uint32 colors[256];
++	const SDL_Color *palette = view->getPalette();
++	for (int index = 0; index < 256; ++index)
++	{
++		colors[index] = 0xFF000000u | (Uint32)palette[index].r << 16 | (Uint32)palette[index].g << 8 | palette[index].b;
++	}
++	const Uint32 colorBits = screen->format->Rmask | screen->format->Gmask | screen->format->Bmask;
++	const Uint32 key = SDL_MapRGB(screen->format, 0, 0, 1) & colorBits;
++	for (int row = 0; row < height; ++row)
++	{
++		const Uint32 *screenRow = (const Uint32 *)((const Uint8 *)screen->pixels + (size_t)((long long)row * screen->h / height) * screen->pitch);
++		const Uint8 *seen = view->getRaw(0, row);
++		Uint32 *made = &picture[(size_t)row * width];
++		for (int column = 0; column < width; ++column)
++		{
++			made[column] = (screenRow[screenColumn[column]] & colorBits) == key ? colors[seen[column]] : 0;
++		}
++	}
++
++	// Its texture (made again when the size changes, or when the display was made anew and took the old one with it).
++	static GLuint texture = 0;
++	static int textureWidth = 0, textureHeight = 0;
++	GLint boundBefore = 0;
++	glGetIntegerv(GL_TEXTURE_BINDING_2D, &boundBefore);
++	if (!texture || !glIsTexture(texture) || textureWidth != width || textureHeight != height)
++	{
++		if (texture && glIsTexture(texture)) glDeleteTextures(1, &texture);
++		glGenTextures(1, &texture);
++		glBindTexture(GL_TEXTURE_2D, texture);
++		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
++		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
++		glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
++		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, picture.data());
++		textureWidth = width;
++		textureHeight = height;
++	}
++	else
++	{
++		glBindTexture(GL_TEXTURE_2D, texture);
++		glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
++		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, picture.data());
++	}
++	// Over the picture area (the engine left the window's pixels as the drawing's units, counted from the bottom left).
++	const int left = x, right = x + width, top = displayHeight - y, bottom = displayHeight - y - height;
++	glEnable(GL_TEXTURE_2D);
++	glEnable(GL_BLEND);
++	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
++	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
++	glBegin(GL_TRIANGLE_STRIP);
++	glTexCoord2f(0, 0); glVertex3i(left, top, 0);
++	glTexCoord2f(1, 0); glVertex3i(right, top, 0);
++	glTexCoord2f(0, 1); glVertex3i(left, bottom, 0);
++	glTexCoord2f(1, 1); glVertex3i(right, bottom, 0);
++	glEnd();
++	glDisable(GL_BLEND);
++	glBindTexture(GL_TEXTURE_2D, (GLuint)boundBefore);
++	while (glGetError() != GL_NO_ERROR); // (nothing of ours may trip the engine's own checks)
++#else
++	(void)screen; (void)x; (void)y; (void)width; (void)height; (void)displayHeight;
++	viewToPresent = nullptr;
++#endif
++}
++
++}
++
++}
 diff --git a/src/FirstPerson/FirstPersonQuickDeaths.cpp b/src/FirstPerson/FirstPersonQuickDeaths.cpp
 new file mode 100644
 index 000000000..c48616c78
@@ -69999,10 +70414,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..abed9fa48
+index 000000000..ef68d2e1b
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,975 @@
+@@ -0,0 +1,986 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -70227,7 +70642,7 @@ index 000000000..abed9fa48
 +			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsMiddleClickIdentify" } },
 +		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 +		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
-+		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsFullResolution", "fpsHudScale" } },
++		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale" } },
 +	};
 +	std::vector<bool> placed(gathered.size(), false);
 +	for (const auto &section : sections)
@@ -70360,6 +70775,12 @@ index 000000000..abed9fa48
 +		if (option.id() == "fpsFogOfWar")
 +		{
 +			return std::string(tr(*option.asInt() == 1 ? "STR_FPS_FOG_OF_WAR_MAP" : "STR_FPS_FOG_OF_WAR_OFF"));
++		}
++		// The 3D view's resolution is a choice of three, shown by name.
++		if (option.id() == "fpsViewResolution")
++		{
++			static const char *const resolutionNames[] = { "STR_FPS_VIEW_RESOLUTION_HUD", "STR_FPS_VIEW_RESOLUTION_BATTLESCAPE", "STR_FPS_VIEW_RESOLUTION_DISPLAY" };
++			return std::string(tr(resolutionNames[std::clamp(*option.asInt(), 0, 2)]));
 +		}
 +		// The HUD's scale: Auto, or the times it is magnified.
 +		if (option.id() == "fpsHudScale")
@@ -70646,6 +71067,11 @@ index 000000000..abed9fa48
 +		else if (value == &Options::fpsFogOfWar)
 +		{
 +			*value = *value == 1 ? 0 : 1;
++		}
++		// The 3D view's resolution (HUD, battlescape, display): round and round.
++		else if (value == &Options::fpsViewResolution)
++		{
++			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
 +		}
 +		// The HUD's scale (Auto, x1 .. x4): round and round.
 +		else if (value == &Options::fpsHudScale)

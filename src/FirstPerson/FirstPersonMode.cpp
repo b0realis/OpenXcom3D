@@ -211,14 +211,14 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
  */
 void FirstPersonMode::createView()
 {
-	const int viewWidth = canvasWidth() * viewScale();
-	const int viewHeight = canvasHeight() * viewScale();
+	int viewWidth, viewHeight;
+	wantedViewSize(viewWidth, viewHeight);
 	const Mod *mod = _game->getMod();
 
 	// The state adds a surface at the end (on top of everything): move it to right after the
 	// isometric map instead.
 	_view = new FirstPersonView(_game, viewWidth, viewHeight, 0, 0);
-	_view->setUiScale(viewScale());
+	_view->setUiScale(std::max(1, (int)std::lround(viewWidth / (double)canvasWidth())));
 	_state->add(_view);
 	auto &surfaces = _state->_surfaces;
 	surfaces.pop_back();
@@ -952,18 +952,19 @@ void FirstPersonMode::resized(int widthChange, int heightChange)
 
 /**
  * Makes the 3D view again, set up like the old one and put in its place, when its size isn't
- * what it should be now: the canvas's, or with the setting "Full resolution" the screen's own
- * (the canvas's times the UI scale). After the screen changed size, or the setting.
+ * what it should be now (see wantedViewSize). After the screen or the display changed size, or
+ * the setting "3D resolution".
  */
 void FirstPersonMode::remakeViewIfResized()
 {
-	const int viewWidth = canvasWidth() * viewScale(), viewHeight = canvasHeight() * viewScale();
+	int viewWidth, viewHeight;
+	wantedViewSize(viewWidth, viewHeight);
 	if (viewWidth == _view->getWidth() && viewHeight == _view->getHeight())
 	{
 		return;
 	}
 	FirstPersonView *newView = new FirstPersonView(_game, viewWidth, viewHeight, 0, 0);
-	newView->setUiScale(viewScale());
+	newView->setUiScale(std::max(1, (int)std::lround(viewWidth / (double)canvasWidth())));
 	newView->setPalette(_state->getPalette());
 	newView->setSavedBattleGame(_save);
 	newView->setMap(_state->_map);
@@ -1013,28 +1014,82 @@ int FirstPersonMode::canvasHeight() const
 }
 
 /**
- * How many of the 3D view's pixels a canvas pixel spans. The view is the canvas's size, drawn
- * magnified with the overlays; with the setting "Full resolution" it is the screen's own size,
- * the overlays alone magnified over it: then a canvas pixel is the UI scale's square of the
- * view's.
+ * The size the 3D view should have now (setting "3D resolution"):
+ *  - HUD: the canvas's, drawn magnified with the overlays (a big screen costs what a small one does);
+ *  - Battlescape: the game's own screen's, the canvas's times the UI scale: only the overlays are magnified;
+ *  - Display: the display's own (its picture area, inside any black bands), whatever the
+ *    battlescape's size: the view is then shown past the game's screen (see blit and
+ *    FirstPerson::presentView).
  */
-int FirstPersonMode::viewScale() const
+void FirstPersonMode::wantedViewSize(int &width, int &height) const
 {
-	return Options::fpsFullResolution ? _uiScale : 1;
+	width = canvasWidth();
+	height = canvasHeight();
+	if (Options::fpsViewResolution == FirstPerson::ViewResolutionDisplay && FirstPerson::canPresentAtDisplaySize())
+	{
+		int x, y;
+		_game->getScreen()->getPictureArea(x, y, width, height);
+	}
+	else if (Options::fpsViewResolution != FirstPerson::ViewResolutionHud)
+	{
+		width *= _uiScale;
+		height *= _uiScale;
+	}
 }
 
 /**
- * The view's pixel at the middle of a canvas pixel, along x or y. The crosshair, the free
- * cursor's place and the clicks are the canvas's; the view's rays go through its own pixels.
- * With the view the canvas's size they are the same pixels. With "Full resolution" a canvas
- * pixel covers viewScale x viewScale of the view's, and the one at its middle is taken (for an
- * even scale, the one just before the middle: half a view pixel off, a quarter of a canvas
- * pixel at x2), so a shot goes through the same point of the picture at either resolution.
+ * Whether the view is the display's own size and so shown past the game's screen: asked for by
+ * the setting, possible, and the view made that size (and not also the game's screen's size:
+ * then it is simply drawn into it).
  */
-int FirstPersonMode::viewPixel(int canvasPixel) const
+bool FirstPersonMode::viewAtDisplaySize() const
 {
-	const int scale = viewScale();
-	return canvasPixel * scale + (scale - 1) / 2;
+	if (Options::fpsViewResolution != FirstPerson::ViewResolutionDisplay || !FirstPerson::canPresentAtDisplaySize())
+	{
+		return false;
+	}
+	int x, y, width, height;
+	_game->getScreen()->getPictureArea(x, y, width, height);
+	return _view->getWidth() == width && _view->getHeight() == height && (width != Options::baseXResolution || height != Options::baseYResolution);
+}
+
+/**
+ * About how many of the view's pixels a canvas pixel spans, 1 or more: the size of what the view
+ * and the mode draw by the pixel on it (its markers and icons, the room under the pointer).
+ */
+int FirstPersonMode::viewScale() const
+{
+	return std::max(1, (int)std::lround(_view->getWidth() / (double)canvasWidth()));
+}
+
+/**
+ * The view's pixel at the middle of a canvas pixel, across. The crosshair, the free cursor's
+ * place and the clicks are the canvas's; the view's rays go through its own pixels. With the
+ * view the canvas's size they are the same pixels; with a bigger view a canvas pixel covers
+ * several of the view's, and the one at its middle is taken, so a shot goes through the same
+ * point of the picture at any resolution (to within half a view pixel).
+ */
+int FirstPersonMode::viewPixelX(int canvasPixel) const
+{
+	return std::min(_view->getWidth() - 1, (int)((canvasPixel + 0.5) * _view->getWidth() / canvasWidth()));
+}
+
+/// The same, down.
+int FirstPersonMode::viewPixelY(int canvasPixel) const
+{
+	return std::min(_view->getHeight() - 1, (int)((canvasPixel + 0.5) * _view->getHeight() / canvasHeight()));
+}
+
+/// The canvas pixel a pixel of the view lies in, across.
+int FirstPersonMode::canvasPixelX(int viewPixel) const
+{
+	return (int)((long long)viewPixel * canvasWidth() / _view->getWidth());
+}
+
+/// The same, down.
+int FirstPersonMode::canvasPixelY(int viewPixel) const
+{
+	return (int)((long long)viewPixel * canvasHeight() / _view->getHeight());
 }
 
 /**
@@ -1951,7 +2006,7 @@ void FirstPersonMode::think()
 	{
 		resized(0, 0); // (the setting "HUD scale" changed: the canvas, the overlays' places and the view anew)
 	}
-	remakeViewIfResized(); // (the setting "Full resolution" switched)
+	remakeViewIfResized(); // (the setting "3D resolution" switched)
 	const double elapsedSeconds = _lastFrameTick ? std::min<Uint32>(100, now - _lastFrameTick) / 1000.0 : 0.0;
 
 	// Another screen was on top (popup, next turn, inventory): it had the mouse released.
@@ -2517,7 +2572,7 @@ bool FirstPersonMode::handleMouseLook(Action *action)
 		// The left button pulls the trigger: a shot at the middle of the view (the crosshair).
 		_triggerHeld = true;
 		_burstConfirmed = false;
-		fire(viewPixel(canvasWidth() / 2), viewPixel(canvasHeight() / 2));
+		fire(viewPixelX(canvasWidth() / 2), viewPixelY(canvasHeight() / 2));
 	}
 	else if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT)
 	{
@@ -2715,7 +2770,7 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 			}
 			if (event.button.button == SDL_BUTTON_LEFT)
 			{
-				fire(viewPixel((int)(mouseX / _uiScale)), viewPixel((int)(mouseY / _uiScale))); // the canvas's pixel under the cursor, on the view
+				fire(viewPixelX((int)(mouseX / _uiScale)), viewPixelY((int)(mouseY / _uiScale))); // the canvas's pixel under the cursor, on the view
 				return true;
 			}
 		}
@@ -2742,12 +2797,23 @@ bool FirstPersonMode::blit()
 	SDL_Surface *screen = _game->getScreen()->getSurface();
 	const bool full3D = isActive() && !_classicHud;
 
-	// The 3D view at the back, magnified on big screens: straight from the view, which is the
-	// canvas's size and in the same palette (no copy onto the canvas first); as it is where it
-	// is the screen's own size (setting "Full resolution").
+	// The 3D view at the back. The display's own size (setting "3D resolution": Display): it isn't
+	// drawn here at all, but laid into the display when the engine shows the frame, wherever the
+	// screen still holds the key it is filled with now (see FirstPerson::presentView). The
+	// canvas's size on a big screen: magnified, straight from the view (it is in the same
+	// palette: no copy onto the canvas first). The screen's own size: drawn as it is.
 	if (_view->getVisible())
 	{
-		if (_canvas && viewScale() == 1)
+		if (viewAtDisplaySize())
+		{
+			if (_view->shown())
+			{
+				_view->drawIfAsked();
+				SDL_FillRect(screen, nullptr, FirstPerson::presentKey(screen));
+				FirstPerson::presentView(_view);
+			}
+		}
+		else if (_canvas && _view->getWidth() == canvasWidth())
 		{
 			if (_view->shown())
 			{

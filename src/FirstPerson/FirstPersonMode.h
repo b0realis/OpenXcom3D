@@ -346,10 +346,18 @@ private:
 	int canvasWidth() const;
 	/// The canvas's height: the screen's divided by the UI scale.
 	int canvasHeight() const;
-	/// How many of the 3D view's pixels a canvas pixel spans: the UI scale with the setting "Full resolution", else 1.
+	/// The size the 3D view should have now, by the setting "3D resolution": the canvas's, the battlescape's or the display's.
+	void wantedViewSize(int &width, int &height) const;
+	/// Whether the view is the display's own size, shown past the game's screen (see FirstPerson::presentView).
+	bool viewAtDisplaySize() const;
+	/// About how many of the view's pixels a canvas pixel spans (1 or more): for its markers' and icons' size.
 	int viewScale() const;
-	/// The view's pixel at the middle of a canvas pixel (one coordinate): where the mode points into the view.
-	int viewPixel(int canvasPixel) const;
+	/// The view's pixel at the middle of a canvas pixel, across and down: where the mode points into the view.
+	int viewPixelX(int canvasPixel) const;
+	int viewPixelY(int canvasPixel) const;
+	/// The canvas pixel a pixel of the view lies in, across and down.
+	int canvasPixelX(int viewPixel) const;
+	int canvasPixelY(int viewPixel) const;
 	/// Makes the 3D view again when its size isn't what the canvas and the setting "Full resolution" ask for.
 	void remakeViewIfResized();
 	/// Makes the canvas our overlays are drawn on before being magnified.

@@ -222,7 +222,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsMiddleClickIdentify" } },
 		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
-		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsFullResolution", "fpsHudScale" } },
+		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale" } },
 	};
 	std::vector<bool> placed(gathered.size(), false);
 	for (const auto &section : sections)
@@ -355,6 +355,12 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		if (option.id() == "fpsFogOfWar")
 		{
 			return std::string(tr(*option.asInt() == 1 ? "STR_FPS_FOG_OF_WAR_MAP" : "STR_FPS_FOG_OF_WAR_OFF"));
+		}
+		// The 3D view's resolution is a choice of three, shown by name.
+		if (option.id() == "fpsViewResolution")
+		{
+			static const char *const resolutionNames[] = { "STR_FPS_VIEW_RESOLUTION_HUD", "STR_FPS_VIEW_RESOLUTION_BATTLESCAPE", "STR_FPS_VIEW_RESOLUTION_DISPLAY" };
+			return std::string(tr(resolutionNames[std::clamp(*option.asInt(), 0, 2)]));
 		}
 		// The HUD's scale: Auto, or the times it is magnified.
 		if (option.id() == "fpsHudScale")
@@ -641,6 +647,11 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		else if (value == &Options::fpsFogOfWar)
 		{
 			*value = *value == 1 ? 0 : 1;
+		}
+		// The 3D view's resolution (HUD, battlescape, display): round and round.
+		else if (value == &Options::fpsViewResolution)
+		{
+			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
 		}
 		// The HUD's scale (Auto, x1 .. x4): round and round.
 		else if (value == &Options::fpsHudScale)

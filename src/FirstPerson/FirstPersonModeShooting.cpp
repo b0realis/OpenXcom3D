@@ -1404,7 +1404,7 @@ bool FirstPersonMode::crosshairTerrainMelee(BattleUnit *unit, Position &struck, 
 {
 	// What the crosshair meets: a wall, a door or an object (or a floor), within reach.
 	int hitType = V_EMPTY;
-	if (!aimAt(viewPixel(canvasWidth() / 2), viewPixel(canvasHeight() / 2), unit, struck, &hitType)
+	if (!aimAt(viewPixelX(canvasWidth() / 2), viewPixelY(canvasHeight() / 2), unit, struck, &hitType)
 		|| (hitType != V_WESTWALL && hitType != V_NORTHWALL && hitType != V_OBJECT && !(floors && hitType == V_FLOOR)))
 	{
 		return false;
@@ -1571,7 +1571,7 @@ double FirstPersonMode::skyReach(BattleUnit *unit) const
  */
 void FirstPersonMode::updateAim(BattleUnit *unit)
 {
-	_aimHitsSomething = aimAt(viewPixel(canvasWidth() / 2), viewPixel(canvasHeight() / 2), unit, _aimVoxel, &_aimVoxelType);
+	_aimHitsSomething = aimAt(viewPixelX(canvasWidth() / 2), viewPixelY(canvasHeight() / 2), unit, _aimVoxel, &_aimVoxelType);
 }
 
 /**
@@ -4709,7 +4709,7 @@ void FirstPersonMode::throwFlare()
 
 	// Towards what's under the crosshair (a point far along the ray if nothing's hit).
 	Position aimedVoxel;
-	aimAt(viewPixel(canvasWidth() / 2), viewPixel(canvasHeight() / 2), unit, aimedVoxel);
+	aimAt(viewPixelX(canvasWidth() / 2), viewPixelY(canvasHeight() / 2), unit, aimedVoxel);
 	const float flareTarget[3] = { (float)aimedVoxel.x, (float)aimedVoxel.y, (float)aimedVoxel.z };
 	_view->throwFlare(flareTarget);
 
@@ -4852,8 +4852,8 @@ bool FirstPersonMode::creatureAt(const Position &voxel, const BattleUnit *self) 
  */
 void FirstPersonMode::pointer(int &pointerX, int &pointerY) const
 {
-	pointerX = viewPixel(_mouseLook ? canvasWidth() / 2 : _cursorX);
-	pointerY = viewPixel(_mouseLook ? canvasHeight() / 2 : _cursorY);
+	pointerX = viewPixelX(_mouseLook ? canvasWidth() / 2 : _cursorX);
+	pointerY = viewPixelY(_mouseLook ? canvasHeight() / 2 : _cursorY);
 }
 
 /**
@@ -4951,8 +4951,8 @@ void FirstPersonMode::updateUnitName(BattleUnit *unit)
 	const std::string label = unitLabel(target);
 	if (_txtTarget->getText() != label) _txtTarget->setText(label);
 	// Centred under the crosshair, clear of its picture (about 8 pixels round the middle).
-	_txtTarget->setX(_view->getX() + pointerX / viewScale() - _txtTarget->getWidth() / 2); // (the view's pixel as the canvas's point)
-	_txtTarget->setY(_view->getY() + pointerY / viewScale() + 10 + below);
+	_txtTarget->setX(_view->getX() + canvasPixelX(pointerX) - _txtTarget->getWidth() / 2); // (the view's pixel as the canvas's point)
+	_txtTarget->setY(_view->getY() + canvasPixelY(pointerY) + 10 + below);
 }
 
 /**
@@ -5159,7 +5159,7 @@ void FirstPersonMode::keepFiringWhileHeld(BattleUnit *unit, bool playerTurn)
 		BattleActionCost cost(BA_AUTOSHOT, unit, weapon);
 		if (weapon && weapon->getAmmoForAction(BA_AUTOSHOT) && (doomModeOn() || cost.haveTU()))
 		{
-			fire(viewPixel(canvasWidth() / 2), viewPixel(canvasHeight() / 2));
+			fire(viewPixelX(canvasWidth() / 2), viewPixelY(canvasHeight() / 2));
 		}
 		else
 		{

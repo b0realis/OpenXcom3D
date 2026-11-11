@@ -106,6 +106,22 @@ const int AutoEquipLeftoversPass = 5;
 
 #ifndef OXCE_NO_FIRSTPERSON
 
+// ---- A 3D view at the display's own size (FirstPersonPresent.cpp; hooks in Screen::flip and Zoom::flipWithZoom) ----
+
+/// Setting "3D resolution": the 3D view the size of its HUD's canvas (magnified with it), of the battlescape, or of the display.
+enum ViewResolution { ViewResolutionHud, ViewResolutionBattlescape, ViewResolutionDisplay };
+/// Whether a view the display's own size can be shown.
+bool canPresentAtDisplaySize();
+/// The value to fill the game's screen with where a view the display's size is to show through (see presentView).
+Uint32 presentKey(SDL_Surface *screen);
+/// Asks for a view (8-bit, the size of the display's picture area) to be laid into the display at this frame's flip, where the screen still holds presentKey.
+void presentView(const Surface *view);
+/// Screen::flip's hook: lays the view asked for into the display.
+void presentAtFlip(SDL_Surface *display, int x, int y, int width, int height);
+/// Zoom::flipWithZoom's hook, with the engine's OpenGL output: draws the view asked for over the window.
+void presentAtFlipOpenGl(SDL_Surface *screen, int x, int y, int width, int height, int displayHeight);
+
+
 // ---- The battlescape screen (BattlescapeState.cpp) ----
 
 /// Creates the first-person mode for a battlescape screen, or returns nullptr unless an active
@@ -376,6 +392,8 @@ bool noclipFloats(BattlescapeState *state, const BattleUnit *unit);
 #else
 
 // Stock OXCE: the add-on is left out, and every hook does nothing.
+inline void presentAtFlip(SDL_Surface *, int, int, int, int) { }
+inline void presentAtFlipOpenGl(SDL_Surface *, int, int, int, int, int) { }
 inline FirstPersonMode *create(Game *, BattlescapeState *) { return nullptr; }
 inline void destroy(FirstPersonMode *) { }
 inline void think(FirstPersonMode *) { }

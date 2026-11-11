@@ -47,6 +47,8 @@
  * and its 3D VIEW options tab.
  */
 #include "FirstPersonApi.h"
+#include "../Engine/Screen.h"
+#include "../Engine/Surface.h"
 #include <algorithm>
 #include <map>
 #include "FirstPersonMode.h"
@@ -859,7 +861,7 @@ void createOptions(std::vector<OptionInfo> &options)
 	// The map's edge as small red dots on the floor, nothing beyond it, instead of the tape.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDiscreetEdge", &fpsDiscreetEdge, false, "STR_FPS_DISCREET_EDGE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsRenderer", &fpsRenderer, 0, "STR_FPS_RENDERER", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsFullResolution", &fpsFullResolution, false, "STR_FPS_FULL_RESOLUTION", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsViewResolution", &fpsViewResolution, 0, "STR_FPS_VIEW_RESOLUTION", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHudScale", &fpsHudScale, 0, "STR_FPS_HUD_SCALE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 0, "STR_FPS_PIXEL_SIZE", category));
 	// The crosshair: shown or not, the shot info under it, aiming at the exact point under it
