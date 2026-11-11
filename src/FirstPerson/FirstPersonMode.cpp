@@ -1024,6 +1024,20 @@ int FirstPersonMode::viewScale() const
 }
 
 /**
+ * The view's pixel at the middle of a canvas pixel, along x or y. The crosshair, the free
+ * cursor's place and the clicks are the canvas's; the view's rays go through its own pixels.
+ * With the view the canvas's size they are the same pixels. With "Full resolution" a canvas
+ * pixel covers viewScale x viewScale of the view's, and the one at its middle is taken (for an
+ * even scale, the one just before the middle: half a view pixel off, a quarter of a canvas
+ * pixel at x2), so a shot goes through the same point of the picture at either resolution.
+ */
+int FirstPersonMode::viewPixel(int canvasPixel) const
+{
+	const int scale = viewScale();
+	return canvasPixel * scale + (scale - 1) / 2;
+}
+
+/**
  * Makes (again) the canvas the overlays are drawn on before being magnified onto the screen.
  * At scale 1 none is needed: everything is drawn straight onto the screen.
  */
@@ -2503,7 +2517,7 @@ bool FirstPersonMode::handleMouseLook(Action *action)
 		// The left button pulls the trigger: a shot at the middle of the view (the crosshair).
 		_triggerHeld = true;
 		_burstConfirmed = false;
-		fire(_view->getWidth() / 2, _view->getHeight() / 2);
+		fire(viewPixel(canvasWidth() / 2), viewPixel(canvasHeight() / 2));
 	}
 	else if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT)
 	{
@@ -2701,7 +2715,7 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 			}
 			if (event.button.button == SDL_BUTTON_LEFT)
 			{
-				fire((int)(mouseX * viewScale() / _uiScale), (int)(mouseY * viewScale() / _uiScale)); // the screen's point on the view
+				fire(viewPixel((int)(mouseX / _uiScale)), viewPixel((int)(mouseY / _uiScale))); // the canvas's pixel under the cursor, on the view
 				return true;
 			}
 		}

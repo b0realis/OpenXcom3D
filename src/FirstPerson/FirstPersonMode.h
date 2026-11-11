@@ -348,6 +348,8 @@ private:
 	int canvasHeight() const;
 	/// How many of the 3D view's pixels a canvas pixel spans: the UI scale with the setting "Full resolution", else 1.
 	int viewScale() const;
+	/// The view's pixel at the middle of a canvas pixel (one coordinate): where the mode points into the view.
+	int viewPixel(int canvasPixel) const;
 	/// Makes the 3D view again when its size isn't what the canvas and the setting "Full resolution" ask for.
 	void remakeViewIfResized();
 	/// Makes the canvas our overlays are drawn on before being magnified.
@@ -1065,7 +1067,7 @@ private:
 	Bar *_cardBars[4] = {};                             // and their bars
 	int _hoveredSquadButton = -1;                       // squad button whose card shows: the one under the cursor (or the wheel's, see browseSquad), -1 none
 	const TextButton *_buttonUnderCursor = nullptr;     // the button the free cursor was last found over
-	int _cursorX = 0, _cursorY = 0;                     // where the free cursor is, on the canvas (and so on the view)
+	int _cursorX = 0, _cursorY = 0;                     // where the free cursor is, on the canvas (on the view: viewPixel of it)
 	int _cardDrawnHeight = 0;                           // what the frame was drawn for
 
 	// ---- the soldier cam: a right click on a squad button enlarges its card's camera ----

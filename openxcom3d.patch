@@ -29297,10 +29297,10 @@ index 000000000..6862c4de6
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..b654d5de4
+index 000000000..a2a7ecb47
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,2932 @@
+@@ -0,0 +1,2946 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -30324,6 +30324,20 @@ index 000000000..b654d5de4
 +int FirstPersonMode::viewScale() const
 +{
 +	return Options::fpsFullResolution ? _uiScale : 1;
++}
++
++/**
++ * The view's pixel at the middle of a canvas pixel, along x or y. The crosshair, the free
++ * cursor's place and the clicks are the canvas's; the view's rays go through its own pixels.
++ * With the view the canvas's size they are the same pixels. With "Full resolution" a canvas
++ * pixel covers viewScale x viewScale of the view's, and the one at its middle is taken (for an
++ * even scale, the one just before the middle: half a view pixel off, a quarter of a canvas
++ * pixel at x2), so a shot goes through the same point of the picture at either resolution.
++ */
++int FirstPersonMode::viewPixel(int canvasPixel) const
++{
++	const int scale = viewScale();
++	return canvasPixel * scale + (scale - 1) / 2;
 +}
 +
 +/**
@@ -31806,7 +31820,7 @@ index 000000000..b654d5de4
 +		// The left button pulls the trigger: a shot at the middle of the view (the crosshair).
 +		_triggerHeld = true;
 +		_burstConfirmed = false;
-+		fire(_view->getWidth() / 2, _view->getHeight() / 2);
++		fire(viewPixel(canvasWidth() / 2), viewPixel(canvasHeight() / 2));
 +	}
 +	else if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT)
 +	{
@@ -32004,7 +32018,7 @@ index 000000000..b654d5de4
 +			}
 +			if (event.button.button == SDL_BUTTON_LEFT)
 +			{
-+				fire((int)(mouseX * viewScale() / _uiScale), (int)(mouseY * viewScale() / _uiScale)); // the screen's point on the view
++				fire(viewPixel((int)(mouseX / _uiScale)), viewPixel((int)(mouseY / _uiScale))); // the canvas's pixel under the cursor, on the view
 +				return true;
 +			}
 +		}
@@ -32235,10 +32249,10 @@ index 000000000..b654d5de4
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..fcd0c7371
+index 000000000..c2534a6b8
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1309 @@
+@@ -0,0 +1,1311 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -32589,6 +32603,8 @@ index 000000000..fcd0c7371
 +	int canvasHeight() const;
 +	/// How many of the 3D view's pixels a canvas pixel spans: the UI scale with the setting "Full resolution", else 1.
 +	int viewScale() const;
++	/// The view's pixel at the middle of a canvas pixel (one coordinate): where the mode points into the view.
++	int viewPixel(int canvasPixel) const;
 +	/// Makes the 3D view again when its size isn't what the canvas and the setting "Full resolution" ask for.
 +	void remakeViewIfResized();
 +	/// Makes the canvas our overlays are drawn on before being magnified.
@@ -33306,7 +33322,7 @@ index 000000000..fcd0c7371
 +	Bar *_cardBars[4] = {};                             // and their bars
 +	int _hoveredSquadButton = -1;                       // squad button whose card shows: the one under the cursor (or the wheel's, see browseSquad), -1 none
 +	const TextButton *_buttonUnderCursor = nullptr;     // the button the free cursor was last found over
-+	int _cursorX = 0, _cursorY = 0;                     // where the free cursor is, on the canvas (and so on the view)
++	int _cursorX = 0, _cursorY = 0;                     // where the free cursor is, on the canvas (on the view: viewPixel of it)
 +	int _cardDrawnHeight = 0;                           // what the frame was drawn for
 +
 +	// ---- the soldier cam: a right click on a squad button enlarges its card's camera ----
@@ -39762,7 +39778,7 @@ index 000000000..8faa52ad4
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..f7b6e1f00
+index 000000000..651f97f35
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
 @@ -0,0 +1,5173 @@
@@ -41172,7 +41188,7 @@ index 000000000..f7b6e1f00
 +{
 +	// What the crosshair meets: a wall, a door or an object (or a floor), within reach.
 +	int hitType = V_EMPTY;
-+	if (!aimAt(_view->getWidth() / 2, _view->getHeight() / 2, unit, struck, &hitType)
++	if (!aimAt(viewPixel(canvasWidth() / 2), viewPixel(canvasHeight() / 2), unit, struck, &hitType)
 +		|| (hitType != V_WESTWALL && hitType != V_NORTHWALL && hitType != V_OBJECT && !(floors && hitType == V_FLOOR)))
 +	{
 +		return false;
@@ -41339,7 +41355,7 @@ index 000000000..f7b6e1f00
 + */
 +void FirstPersonMode::updateAim(BattleUnit *unit)
 +{
-+	_aimHitsSomething = aimAt(_view->getWidth() / 2, _view->getHeight() / 2, unit, _aimVoxel, &_aimVoxelType);
++	_aimHitsSomething = aimAt(viewPixel(canvasWidth() / 2), viewPixel(canvasHeight() / 2), unit, _aimVoxel, &_aimVoxelType);
 +}
 +
 +/**
@@ -44477,7 +44493,7 @@ index 000000000..f7b6e1f00
 +
 +	// Towards what's under the crosshair (a point far along the ray if nothing's hit).
 +	Position aimedVoxel;
-+	aimAt(_view->getWidth() / 2, _view->getHeight() / 2, unit, aimedVoxel);
++	aimAt(viewPixel(canvasWidth() / 2), viewPixel(canvasHeight() / 2), unit, aimedVoxel);
 +	const float flareTarget[3] = { (float)aimedVoxel.x, (float)aimedVoxel.y, (float)aimedVoxel.z };
 +	_view->throwFlare(flareTarget);
 +
@@ -44620,8 +44636,8 @@ index 000000000..f7b6e1f00
 + */
 +void FirstPersonMode::pointer(int &pointerX, int &pointerY) const
 +{
-+	pointerX = _mouseLook ? _view->getWidth() / 2 : _cursorX * viewScale();
-+	pointerY = _mouseLook ? _view->getHeight() / 2 : _cursorY * viewScale();
++	pointerX = viewPixel(_mouseLook ? canvasWidth() / 2 : _cursorX);
++	pointerY = viewPixel(_mouseLook ? canvasHeight() / 2 : _cursorY);
 +}
 +
 +/**
@@ -44927,7 +44943,7 @@ index 000000000..f7b6e1f00
 +		BattleActionCost cost(BA_AUTOSHOT, unit, weapon);
 +		if (weapon && weapon->getAmmoForAction(BA_AUTOSHOT) && (doomModeOn() || cost.haveTU()))
 +		{
-+			fire(_view->getWidth() / 2, _view->getHeight() / 2);
++			fire(viewPixel(canvasWidth() / 2), viewPixel(canvasHeight() / 2));
 +		}
 +		else
 +		{
