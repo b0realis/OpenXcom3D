@@ -361,6 +361,7 @@ FEATURES = [
 # The gallery at the end: the collages (pages/img/gallery/), (file, title, caption)
 GALLERY_IMG = 'img/gallery/'
 GALLERY = [
+    ('collage_112.png', 'Who\'s hurt, who\'s hidden: 1.12', 'A town out to 200 tiles with the unseen in mist, our wounded in blue and purple in an alien colony (TFTD), enemies in the buttons\' colours at dusk, a hit\'s damage rising on a cruise ship\'s deck (TFTD), a house from behind in its brick, the squad and two Aquatoids outlined as the shots test them (TFTD).'),
     ('collage_111.png', 'Under the right sky: 1.11', 'Snow under cloud, the Earth from orbit (XPiratez), the sea floor (TFTD), deep woods (X-Com Files), Cydonia, the city of T\'leth.'),
     ('collage_108.png', 'Field report 1.08', 'Terror From The Deep\'s sea past an island\'s edge, XPiratez\'s blunderbuss and two guns at once, a spray burst marked, akimbo in 3D and on the isometric map, a Gill Man on an island, and the map camera over the battle.'),
     ('collage_more.png', 'More from 1.08', 'The open sky at the map\'s edge, a peek past a corner in FPS style, the accuracy line, the landing warning by the sea, wading in XPiratez\'s sludge, the shop\'s racks as ghosts, a tilted lean, smoke, a grenade\'s arc.'),

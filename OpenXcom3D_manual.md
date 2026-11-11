@@ -947,7 +947,7 @@ What `FirstPersonView` draws:
 
 ## 11. Version history
 
-### 1.12 (not in a download yet)
+### 1.12 (2026-11-11)
 
 - New: *Unseen terrain* (Mist / Fog / Visible) and *View distance* (60 to 200 tiles).
 - New: *Fog of war in 3D* (Off by default): the floor below the stairs shows as you look at it (#115).
