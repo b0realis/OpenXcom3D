@@ -402,7 +402,7 @@ const int TileUints = 16;             // a tile's numbers (four texels of four)
 const int TableRows = 14;             // the rows of 256 bytes in the colour tables (see encodeTables)
 const int UfoTableRows = 14;          // ... and for each UFO after them: its two tints and twelve soft tints
 const int MaxUfos = 8;
-const int BufferCount = 12;
+const int BufferCount = 13;
 
 /// A number as GLSL reads a float (always with a decimal point or an exponent).
 std::string glslFloat(double value)
@@ -550,6 +550,7 @@ struct FirstPersonGpu::State
 		std::unordered_map<std::string, Gl::Int> locations; // its uniforms, by name
 	};
 	Program programs[2];
+	Gl::UInt resolveProgram = 0; // makes one picture of several rays a pixel (ResolveSource); 0: not built, one ray a pixel
 	Program *program = &programs[0];
 	Gl::UInt vertexArray = 0;
 	// The pictures the rays are drawn into, kept for each size asked (the main view's, the small camera views').
@@ -559,11 +560,11 @@ struct FirstPersonGpu::State
 		Gl::UInt textures[4] = {}; // colour, depth, glow, results
 		bool results = false;
 	};
-	std::map<std::pair<int, int>, Targets> targets;
+	std::map<std::array<int, 3>, Targets> targets; // by width, height, and which of a frame's pictures (0 the frame's own, 1.. one for each of several rays a pixel)
 	std::vector<Uint8> blockColors, blockGlow; // a ray each, before they are spread over their blocks of pixels
 	std::vector<float> blockDepths;
 	// The buffers and their textures: tile flags, tiles, model colours, model bits, model info, model sides, solid masks, colour tables, the waves' sines.
-	enum { TileFlags, Tiles, ModelColors, ModelBits, ModelInfo, ModelSides, Solids, Tables, WaveSines, Exposed, WallPaints, Mirrors };
+	enum { TileFlags, Tiles, ModelColors, ModelBits, ModelInfo, ModelSides, Solids, Tables, WaveSines, Exposed, WallPaints, Mirrors, Blend };
 	Gl::UInt buffers[BufferCount] = {}, textures[BufferCount] = {};
 	Gl::Int maxBufferTexels = 0;
 
@@ -583,6 +584,7 @@ struct FirstPersonGpu::State
 	std::vector<Uint8> tileFlagsSent, tablesSent;
 	std::vector<Uint32> wallPaintTexelsSent;
 	std::vector<Uint8> tables;
+	std::vector<Uint8> blendSent; // the palette the blending table was last made for (see sendBlend)
 	std::vector<Uint32> wallPaintTexels;
 	std::vector<Sint32> mirrorNumbers;
 	std::vector<const void*> mirrorsSent; // the rows of the mirrors as sent last (sent again when they are others)
@@ -597,10 +599,12 @@ struct FirstPersonGpu::State
 	void encodeTiles(const Frame &frame);
 	void encodeTables(const Frame &frame);
 	void sendWallPaints(const Frame &frame);
+	void sendBlend(const Frame &frame);
 	void sendMirrors(const Frame &frame);
 	void sendModels();
 	void setScene(const Frame &frame);
-	bool setTargets(int width, int height, bool results);
+	bool setTargets(int width, int height, bool results, int which = 0);
+	bool buildResolve();
 	bool draw(const Frame &frame, const Output &output, Timing *timing);
 };
 
@@ -665,7 +669,7 @@ bool FirstPersonGpu::State::start(int device)
 		return false;
 	}
 	const Gl::Enum formats[BufferCount] = { Gl::R8UI, Gl::RGBA32UI, Gl::R8UI, Gl::R16UI, Gl::RGBA32UI, Gl::R8UI, Gl::R16UI, Gl::R8UI, Gl::R32F,
-		Gl::R8UI, Gl::RGBA32UI, Gl::R32I };
+		Gl::R8UI, Gl::RGBA32UI, Gl::R32I, Gl::R8UI };
 	Gl::GenBuffers(BufferCount, buffers);
 	Gl::GenTextures(BufferCount, textures);
 	for (int unit = 0; unit < BufferCount; ++unit)
@@ -675,6 +679,10 @@ bool FirstPersonGpu::State::start(int device)
 		Gl::ActiveTexture(Gl::TEXTURE0 + unit);
 		Gl::BindTexture(Gl::TEXTURE_BUFFER, textures[unit]);
 		Gl::TexBuffer(Gl::TEXTURE_BUFFER, formats[unit], buffers[unit]);
+	}
+	if (!buildResolve())
+	{
+		Log(LOG_INFO) << "OpenXcom3D GPU: no supersampling on this card";
 	}
 	if (!build(programs[0], false) || !build(programs[1], true))
 	{
@@ -743,11 +751,59 @@ bool FirstPersonGpu::State::build(Program &built, bool results)
 	}
 	Gl::UseProgram(built.id);
 	const char *const samplers[BufferCount] = { "uTileFlags", "uTiles", "uModelColor", "uModelBits", "uModelInfo", "uModelSides", "uSolid", "uTables", "uWaveSine",
-		"uModelExposed", "uWallPaints", "uMirrors" };
+		"uModelExposed", "uWallPaints", "uMirrors", "uBlend" };
 	for (int unit = 0; unit < BufferCount; ++unit)
 	{
 		Gl::Uniform1i(Gl::GetUniformLocation(built.id, samplers[unit]), unit);
 	}
+	return true;
+}
+
+/**
+ * Builds the small program that makes one picture of several rays a pixel (ResolveSource), its
+ * pictures to read on the texture units after the buffers' (three for each ray: colour, depth,
+ * glow). Without it there is no supersampling; all else works.
+ */
+bool FirstPersonGpu::State::buildResolve()
+{
+	const char *sources[2] = { VertexSource, ResolveSource };
+	const Gl::Enum kinds[2] = { Gl::VERTEX_SHADER, Gl::FRAGMENT_SHADER };
+	const Gl::UInt built = Gl::CreateProgram();
+	for (int which = 0; which < 2; ++which)
+	{
+		const Gl::UInt shader = Gl::CreateShader(kinds[which]);
+		Gl::ShaderSource(shader, 1, &sources[which], nullptr);
+		Gl::CompileShader(shader);
+		Gl::Int compiled = 0;
+		Gl::GetShaderiv(shader, Gl::COMPILE_STATUS, &compiled);
+		if (!compiled)
+		{
+			char log[4096] = "";
+			Gl::GetShaderInfoLog(shader, sizeof(log), nullptr, log);
+			Log(LOG_ERROR) << "OpenXcom3D GPU: the supersampling shader would not compile: " << log;
+			return false;
+		}
+		Gl::AttachShader(built, shader);
+		Gl::DeleteShader(shader);
+	}
+	Gl::LinkProgram(built);
+	Gl::Int linked = 0;
+	Gl::GetProgramiv(built, Gl::LINK_STATUS, &linked);
+	if (!linked)
+	{
+		return false;
+	}
+	Gl::UseProgram(built);
+	Gl::Uniform1i(Gl::GetUniformLocation(built, "uBlend"), Blend);
+	const char *const kindNames[3] = { "uColor", "uDepth", "uGlow" };
+	for (int ray = 0; ray < 4; ++ray)
+	{
+		for (int which = 0; which < 3; ++which)
+		{
+			Gl::Uniform1i(Gl::GetUniformLocation(built, (std::string(kindNames[which]) + std::to_string(ray)).c_str()), BufferCount + 1 + ray * 3 + which);
+		}
+	}
+	resolveProgram = built;
 	return true;
 }
 
@@ -911,6 +967,42 @@ void FirstPersonGpu::State::encodeTables(const Frame &frame)
 }
 
 /**
+ * What several rays a pixel blend with (setting "Supersampling"): the palette's 256 colours, red,
+ * green and blue each, then for every colour of a 32 x 32 x 32 cube the palette colour nearest
+ * to it (never colour 0, the transparent one). The shader mixes its rays' colours and looks the
+ * mix up here. Made and sent again only when the palette is another one.
+ */
+void FirstPersonGpu::State::sendBlend(const Frame &frame)
+{
+	std::vector<Uint8> blend(768 + 32768);
+	for (int color = 0; color < 256; ++color)
+	{
+		blend[color * 3] = frame.palette[color].r;
+		blend[color * 3 + 1] = frame.palette[color].g;
+		blend[color * 3 + 2] = frame.palette[color].b;
+	}
+	if (blendSent.size() == 768 && std::equal(blendSent.begin(), blendSent.end(), blend.begin()))
+	{
+		return;
+	}
+	for (int cell = 0; cell < 32768; ++cell)
+	{
+		const int red = (cell >> 10) * 8 + 4, green = ((cell >> 5) & 31) * 8 + 4, blue = (cell & 31) * 8 + 4;
+		int nearest = 1, nearestDistance = 1 << 30;
+		for (int color = 1; color < 256; ++color)
+		{
+			const int dRed = red - blend[color * 3], dGreen = green - blend[color * 3 + 1], dBlue = blue - blend[color * 3 + 2];
+			const int distance = dRed * dRed + dGreen * dGreen + dBlue * dBlue;
+			if (distance < nearestDistance) { nearestDistance = distance; nearest = color; }
+		}
+		blend[768 + cell] = (Uint8)nearest;
+	}
+	Gl::BindBuffer(Gl::ARRAY_BUFFER, buffers[Blend]);
+	Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)blend.size(), blend.data(), Gl::DYNAMIC_DRAW);
+	blendSent.assign(blend.begin(), blend.begin() + 768);
+}
+
+/**
  * The wall paints, a texel each: the wall's model | the donor's | donorWest | openEnd << 1 |
  * kind << 8 | paintGroup << 16 | the wall's min x | min y << 8.
  */
@@ -1029,6 +1121,9 @@ void FirstPersonGpu::State::setScene(const Frame &frame)
 	Gl::Uniform1i(location("uShadows"), frame.shadows ? 1 : 0);
 	Gl::Uniform1i(location("uSmoothLighting"), frame.smoothLighting ? 1 : 0);
 	Gl::Uniform1i(location("uDiscreetEdge"), frame.discreetEdge ? 1 : 0);
+	Gl::Uniform1i(location("uSoftShadows"), frame.softShadows ? 1 : 0);
+	Gl::Uniform1i(location("uAllLightShadows"), frame.allLightShadows ? 1 : 0);
+	Gl::Uniform1i(location("uAmbientOcclusion"), frame.ambientOcclusion ? 1 : 0);
 	Gl::Uniform1i(location("uGroundModel"), (Gl::Int)modelId(frame.groundModel));
 	Gl::Uniform1i(location("uWaterModel"), (Gl::Int)modelId(frame.waterModel));
 	Gl::Uniform1f(location("uNight"), colors.night);
@@ -1074,9 +1169,9 @@ void FirstPersonGpu::State::setScene(const Frame &frame)
  * ray met) of the size asked the ones drawn into now; made the first time a size is asked for,
  * then kept (a few sizes: when there are many, all are made anew).
  */
-bool FirstPersonGpu::State::setTargets(int width, int height, bool results)
+bool FirstPersonGpu::State::setTargets(int width, int height, bool results, int layer)
 {
-	if (targets.size() > 12)
+	if (targets.size() > 40 && layer == 0)
 	{
 		for (auto &entry : targets)
 		{
@@ -1085,7 +1180,7 @@ bool FirstPersonGpu::State::setTargets(int width, int height, bool results)
 		}
 		targets.clear();
 	}
-	Targets &sized = targets[{ width, height }];
+	Targets &sized = targets[{ width, height, layer }];
 	if (!sized.framebuffer || (results && !sized.results))
 	{
 		if (sized.framebuffer)
@@ -1192,9 +1287,49 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 		start = std::chrono::steady_clock::now();
 	}
 
-	// The rays.
+	// The rays: one a pixel through its middle; or (setting "Supersampling") two or four, each set drawn into
+	// pictures of its own, and the frame's picture made of them (see ResolveSource). The check against the
+	// CPU's rays is of one ray a pixel.
 	Gl::Viewport(0, 0, blockColumns, blockRows);
-	Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+	const int samples = resolveProgram && frame.palette && !output.results ? (frame.samples >= 4 ? 4 : frame.samples >= 2 ? 2 : 1) : 1;
+	if (samples == 1)
+	{
+		Gl::Uniform2f(location("uRayOffset"), 0.0f, 0.0f);
+		Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+	}
+	else
+	{
+		// Where a pixel's rays go, from its middle: two on a diagonal, or four on a turned square.
+		static const float twoRays[2][2] = { { -0.25f, -0.25f }, { 0.25f, 0.25f } };
+		static const float fourRays[4][2] = { { -0.125f, -0.375f }, { 0.375f, -0.125f }, { -0.375f, 0.125f }, { 0.125f, 0.375f } };
+		sendBlend(frame);
+		for (int ray = 0; ray < samples; ++ray)
+		{
+			if (!setTargets(blockColumns, blockRows, false, 1 + ray))
+			{
+				Log(LOG_WARNING) << "OpenXcom3D GPU: this card can't draw into the pictures several rays a pixel need";
+				return false;
+			}
+			const float *offset = samples == 2 ? twoRays[ray] : fourRays[ray];
+			Gl::Uniform2f(location("uRayOffset"), offset[0], offset[1]);
+			Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+		}
+		setTargets(blockColumns, blockRows, false);
+		Gl::UseProgram(resolveProgram);
+		Gl::Uniform1i(Gl::GetUniformLocation(resolveProgram, "uSamples"), samples);
+		for (int ray = 0; ray < samples; ++ray)
+		{
+			const Targets &drawn = targets[{ blockColumns, blockRows, 1 + ray }];
+			for (int which = 0; which < 3; ++which)
+			{
+				Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 1 + ray * 3 + which);
+				Gl::BindTexture(Gl::TEXTURE_2D, drawn.textures[which]);
+			}
+		}
+		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
+		Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+		Gl::UseProgram(program->id);
+	}
 	if (timing)
 	{
 		Gl::Finish();

@@ -236,6 +236,10 @@ SETTINGS = [
          'For big screens: with 3D resolution at Display the world at 1920×1080 runs at 60 frames a second and more.'),
         ('3D resolution', 'HUD', 'HUD / Battlescape / Display', 'How fine the 3D world is drawn: as its HUD (magnified with it), as the battlescape, or as the display itself whatever the Battlescape scale. Display is heavy on the CPU; made for Renderer GPU. Not in the 1.12 download yet.', 'Display with a small Battlescape scale: a big map and menus, and a sharp 3D world.'),
         ('HUD scale', 'Auto', 'Auto / x1 / x2 / x3 / x4', 'How many times the 3D HUD is magnified on a big screen. Auto: as big as fits (x3 at 1920×1080). With 3D resolution at Display it counts the display\'s own pixels, whatever the Battlescape scale. Not in the 1.12 download yet.', 'x2 on a big screen: a smaller HUD, more room.'),
+        ('Supersampling', 'Off', 'Off / x2 / x4', 'Renderer GPU only. Two or four rays a pixel, blended: edges, far fences and fine texture stop shimmering as you turn. Costs as many times the rays. Not in the 1.12 download yet.', 'x2 costs little on a good card; x4 for the cleanest picture.'),
+        ('Soft sun shadows', 'NO', 'YES / NO', 'Renderer GPU only, with Shadows on. The sun\'s shadows get a soft edge, wider the further they fall. Not in the 1.12 download yet.', 'YES: cheap, and the stair-stepped shadow edges are gone.'),
+        ('Shadows from every light', 'NO', 'YES / NO', 'Renderer GPU only, with Shadows on. Every lamp and flare in reach throws shadows, not only the strongest. Not in the 1.12 download yet.', 'YES for night missions in towns.'),
+        ('Ambient occlusion', 'NO', 'YES / NO', 'Renderer GPU only. Corners, the foot of walls and the gaps between things are darker: the blocky world gets depth. Not in the 1.12 download yet.', 'YES: cheap, and rooms look solid.'),
     ]),
 ]
 

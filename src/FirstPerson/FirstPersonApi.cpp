@@ -863,6 +863,12 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsRenderer", &fpsRenderer, 0, "STR_FPS_RENDERER", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsViewResolution", &fpsViewResolution, 0, "STR_FPS_VIEW_RESOLUTION", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHudScale", &fpsHudScale, 0, "STR_FPS_HUD_SCALE", category));
+	// A finer picture than the old game's, on the graphics card only (Renderer: GPU), each off by default: several rays a
+	// pixel, the sun's shadows with soft edges, a shadow from every lamp and flare, and corners and creases darkened.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSupersampling", &fpsSupersampling, 0, "STR_FPS_SUPERSAMPLING", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSoftShadows", &fpsSoftShadows, false, "STR_FPS_SOFT_SHADOWS", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsAllLightShadows", &fpsAllLightShadows, false, "STR_FPS_ALL_LIGHT_SHADOWS", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsAmbientOcclusion", &fpsAmbientOcclusion, false, "STR_FPS_AMBIENT_OCCLUSION", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 0, "STR_FPS_PIXEL_SIZE", category));
 	// The crosshair: shown or not, the shot info under it, aiming at the exact point under it
 	// (YES) or at the tile, as the original game does (NO), and the units' hitboxes.

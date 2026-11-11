@@ -66,6 +66,7 @@ uniform vec3 uEye, uForward, uRight, uUp;
 uniform vec2 uHalfPlane;     // the image plane's half-width and half-height
 uniform ivec2 uViewSize;     // the view in pixels
 uniform int uPixelSize;      // pixels a ray colours each way
+uniform vec2 uRayOffset;     // where in its pixel the ray goes, from the middle (0, 0: the CPU's ray; else one of several, setting "Supersampling")
 uniform float uGhostScale;
 uniform int uSeeThroughCrops;
 uniform vec4 uSwingA[16];    // a swinging door: hinge x, y, direction x, y
@@ -410,6 +411,11 @@ uniform int uFlareCount;
 uniform float uMuzzleFlashLight;
 uniform vec3 uMuzzleFlashPos;
 uniform int uUfoLightsOn, uWallPaint;
+// The finer picture, on the card only (settings, all off by default: with them off the picture is the CPU's).
+uniform int uSoftShadows, uAllLightShadows, uAmbientOcclusion;
+const float SunDiscRadius = 0.04;  // the sun as a disc this wide (the tangent of its half-angle): the width of a shadow's soft edge, a 25th of the way it fell
+const float CreaseShades = 4.5;    // how many palette shades the deepest corner is darkened
+const float CreaseFadeFrom = 260.0, CreaseFadeTo = 420.0; // corners aren't darkened beyond this far (voxels): too fine to see, and they would shimmer
 uniform float uUfoPulse[32], uUfoBreath, uUfoFaceShade[64];
 
 const int SkyEarth = 0, SkySpace = 1, SkyOrbit = 2, SkyMoon = 3, SkyMars = 4, SkySea = 5, SkyVoid = 6;
@@ -570,22 +576,31 @@ float pointLight(vec3 point, vec3 normal, bool shadows)
 			float power = uLamps[lamp].w * (1.0 - span / lampReach) * (1.0 - span / lampReach);
 			if (power > brightestPower) { brightestPower = power; brightestLamp = lamp; brightestDistance = span; }
 		}
-		if (brightestLamp >= 0 && brightestPower > 0.03)
+		// The strongest lamp alone; with the setting "Shadows from every light", each lamp in reach: the strongest that
+		// lights the point lights it, the strongest it is hidden from darkens it (with one lamp, the same thing).
+		// (One loop for both, so the shader holds the shadow ray's walk once here.)
+		bool everyLamp = uAllLightShadows != 0;
+		int firstLamp = everyLamp ? 0 : brightestLamp, endLamp = everyLamp ? uLampCount : brightestLamp + 1;
+		if (!everyLamp && (brightestLamp < 0 || brightestPower <= 0.03)) endLamp = firstLamp;
+		float night = uUnderwater != 0 ? 1.0 : uNight, lit = 0.0, dark = 0.0;
+		for (int lamp = firstLamp; lamp < endLamp; ++lamp)
 		{
-			vec3 lampPos = uLamps[brightestLamp].xyz;
-			vec3 towardsLamp = vec3((lampPos.x - point.x) / brightestDistance, (lampPos.y - point.y) / brightestDistance, (lampPos.z - point.z) / brightestDistance);
+			vec3 lampPos = uLamps[lamp].xyz;
+			float dx = lampPos.x - point.x, dy = lampPos.y - point.y, dz = lampPos.z - point.z;
+			float span = sqrt(dx * dx + dy * dy + dz * dz);
+			if (span > lampReach || span < 0.01) continue;
+			float power = uLamps[lamp].w * (1.0 - span / lampReach) * (1.0 - span / lampReach);
+			if (power <= 0.03) continue;
+			vec3 towardsLamp = vec3(dx / span, dy / span, dz / span);
 			float facing = normal.x * towardsLamp.x + normal.y * towardsLamp.y + normal.z * towardsLamp.z;
+			float asLit = power * 6.0 * (0.4 + 0.6 * facing) * night, asDark = power * 3.0 * night;
 			vec3 nearLamp = vec3(lampPos.x - towardsLamp.x * 4.0, lampPos.y - towardsLamp.y * 4.0, lampPos.z - towardsLamp.z * 4.0);
-			float night = uUnderwater != 0 ? 1.0 : uNight;
-			if (facing <= 0.0 || (shadows && shadowed(point, nearLamp)))
-			{
-				light -= brightestPower * 3.0 * night;
-			}
-			else
-			{
-				light += brightestPower * 6.0 * (0.4 + 0.6 * facing) * night;
-			}
+			if (facing <= 0.0) dark = max(dark, asDark);
+			else if (everyLamp && asLit <= lit && asDark <= dark) continue; // (it would change nothing: no ray)
+			else if (shadows && shadowed(point, nearLamp)) dark = max(dark, asDark);
+			else lit = max(lit, asLit);
 		}
+		light += lit - dark;
 	}
 	// The flashlight: the dynamic one a tight spot on the crosshair, the shoulder one a cone.
 	if (uFlashlight == 2)
@@ -661,7 +676,7 @@ float flareLight(vec3 point, vec3 normal, bool shadows)
 			int swapped = order[rank - 1]; order[rank - 1] = order[rank]; order[rank] = swapped;
 		}
 	}
-	for (int rank = 0; rank < count && rank < 2; ++rank)
+	for (int rank = 0; rank < count && (rank < 2 || uAllLightShadows != 0); ++rank) // (setting "Shadows from every light": every flare gets its ray)
 	{
 		if (!shadows || powers[order[rank]] < 0.08 || !shadowed(point, uFlares[order[rank]].xyz))
 		{
@@ -1099,6 +1114,25 @@ uint undersideColor(uint plate, ivec3 voxel, bool undersideUnderRock, inout int 
 	return rockCeilingMiddle >= 0 ? plan : plain;
 }
 
+/**
+ * How closed in a point on a face is, 0 (open) to 1: the share of sixteen places round it, out
+ * from the face and to its sides, a ring near and a ring further, that hold a voxel. The foot
+ * of a wall, an inner corner, the gap between two crates.
+ */
+float crease(vec3 point, vec3 normal)
+{
+	vec3 sideA = normal.yzx, sideB = normal.zxy; // (the normal lies along an axis: these are the other two)
+	float closed = 0.0;
+	for (int place = 0; place < 16; ++place)
+	{
+		bool far = place >= 8;
+		float angle = float(place & 7) * 0.7853982 + (far ? 0.3926991 : 0.0);
+		vec3 at = point + normal * (far ? 3.0 : 1.0) + (cos(angle) * sideA + sin(angle) * sideB) * (far ? 4.5 : 1.6);
+		if (voxelColorAt(ivec3(floor(at)), false, -1) != 0u) closed += far ? 0.045 : 0.08;
+	}
+	return closed;
+}
+
 uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int pixelX, int pixelY)
 {
 	uvec4 tileParts = texelFetch(uTiles, hitTile * 4), tileFacts = tileLightTexel(hitTile), tileNext = texelFetch(uTiles, hitTile * 4 + 2);
@@ -1237,7 +1271,25 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 		float sunFacing = dot(normal, uSunDir);
 		if (!indoors && daylight > 0.3 && sunFacing > 0.05 && hit.t < 640.0)
 		{
-			if (shadowed(surfacePoint, surfacePoint + uSunDir * 260.0)) sunShadow = 3.0 * daylight;
+			// One ray at the sun; with the setting "Soft sun shadows", four at points round its disc, the ring of them
+			// turned from pixel to pixel: the share that is blocked is the shadow's depth, so its edge fades.
+			// (One loop for both, so the shader holds the shadow ray's walk once here.)
+			int sunRays = uSoftShadows != 0 ? 4 : 1;
+			vec3 across = normalize(cross(uSunDir, abs(uSunDir.z) < 0.9 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0)));
+			vec3 along = cross(uSunDir, across);
+			float turn = dither(pixelX + 1, pixelY + 3) * 1.5707963;
+			float blocked = 0.0;
+			for (int sunRay = 0; sunRay < sunRays; ++sunRay)
+			{
+				vec3 towardsSun = uSunDir;
+				if (sunRays > 1)
+				{
+					float angle = turn + float(sunRay) * 1.5707963;
+					towardsSun += (cos(angle) * across + sin(angle) * along) * (SunDiscRadius * ((sunRay & 1) != 0 ? 1.0 : 0.55));
+				}
+				if (shadowed(surfacePoint, surfacePoint + towardsSun * 260.0)) blocked += 1.0 / float(sunRays);
+			}
+			sunShadow = 3.0 * daylight * blocked;
 			shade += sunShadow;
 		}
 		shade -= pointLight(surfacePoint, normal, true);
@@ -1281,9 +1333,16 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 		float ripple = sin(surfacePoint.x * 0.31 + seconds * 1.7) + sin(surfacePoint.y * 0.27 - seconds * 1.3) + sin((surfacePoint.x - surfacePoint.y) * 0.19 + seconds * 0.9);
 		if (ripple > 1.3) shade -= (ripple - 1.3) * 1.8;
 	}
+	// (Setting "Ambient occlusion": corners and creases darker.)
+	float creaseShade = 0.0;
+	if (uAmbientOcclusion != 0 && !hit.emissive && !onSea && hit.t < CreaseFadeTo)
+	{
+		creaseShade = CreaseShades * crease(rayOrigin + rayDirection * hit.t + normal * 0.5, normal) * (1.0 - smoothStep(CreaseFadeFrom, CreaseFadeTo, hit.t));
+		shade += creaseShade;
+	}
 	// Whole palette shades, the fraction dithered; black only where the place is really dark.
 	int wholeShades = int(max(0.0, shade + dither(pixelX, pixelY)));
-	float placeShade = shade - faceShading - distanceShade(hit.t) - waveShade - sunShadow;
+	float placeShade = shade - faceShading - distanceShade(hit.t) - waveShade - sunShadow - creaseShade;
 	float blackShare = clamp((placeShade - DarkOverflowFrom) / (DarkOverflowTo - DarkOverflowFrom), 0.0, 1.0);
 	bool darkEnoughForBlack = !onSteadyUfo && blackShare > dither(pixelX + 1, pixelY + 2);
 	if (rockCeilingMiddle >= 0 && !darkEnoughForBlack)
@@ -1312,13 +1371,18 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 	return hazeColor(color, terrainHaze(hit.t), pixelX + 2, pixelY + 1);
 }
 
-void main()
+/**
+ * One ray through this fragment's block of pixels and what it shows.
+ * @param offset Where in the block it goes, from the block's middle, in blocks (0, 0: the middle, the CPU's ray).
+ * @param first The block's first ray: the one whose findings go to the check against the CPU's.
+ */
+void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, out uint rayGlow)
 {
-	// The block of pixels this ray colours (rows from the top), and its centre on the image plane.
+	// The block of pixels this ray colours (rows from the top), and its place on the image plane.
 	int blockColumn = int(gl_FragCoord.x), blockRow = int(gl_FragCoord.y);
 	int topRow = blockRow * uPixelSize, leftColumn = blockColumn * uPixelSize;
-	float planeV = (1.0 - (float(topRow) + float(uPixelSize) * 0.5) * 2.0 / float(uViewSize.y)) * uHalfPlane.y;
-	float planeU = ((float(leftColumn) + float(uPixelSize) * 0.5) * 2.0 / float(uViewSize.x) - 1.0) * uHalfPlane.x;
+	float planeV = (1.0 - (float(topRow) + float(uPixelSize) * (0.5 + offset.y)) * 2.0 / float(uViewSize.y)) * uHalfPlane.y;
+	float planeU = ((float(leftColumn) + float(uPixelSize) * (0.5 + offset.x)) * 2.0 / float(uViewSize.x) - 1.0) * uHalfPlane.x;
 	vec3 rayDirection = uForward + planeU * uRight + planeV * uUp;
 	rayDirection.z /= ZScale;
 	float directionLength = sqrt(rayDirection.x * rayDirection.x + rayDirection.y * rayDirection.y + rayDirection.z * rayDirection.z);
@@ -1333,7 +1397,7 @@ void main()
 	int rayEnd = castRay(uEye, rayDirection, uMaxDistance, ghostThreshold, solidGhostThreshold, hit, hitTile, endDistance, endAxis);
 	// What the walk found, before the shading changes any of it (for the check against the CPU's).
 #ifdef RESULTS
-	outResult = uvec4(uint(hitTile),
+	if (first) outResult = uvec4(uint(hitTile),
 		uint(rayEnd == RAY_HIT ? (hit.part & 7) : 0) | uint((rayEnd == RAY_HIT ? hit.axis : endAxis) + 1) << 4 | uint(hit.ghost) << 8 | uint(hit.glass) << 9 | uint(hit.emissive) << 10 | uint(rayEnd) << 12
 			| hit.color << 16,
 		uint(hit.voxel.x) | uint(hit.voxel.y) << 8 | uint(hit.voxel.z) << 16,
@@ -1380,11 +1444,71 @@ void main()
 	{
 		color = table(GlassRow, color);
 	}
-	outColor = color;
-	outDepth = distanceAlongRay / directionLength;
+	rayColor = color;
+	rayDepth = distanceAlongRay / directionLength;
 	// Whether it shines (a UFO's light counts three times in the bloom).
 	bool glowing = rayEnd == RAY_HIT && hit.emissive && distanceAlongRay < Infinity;
-	outGlow = !glowing ? 0u : hit.part >= 0 && (texelFetch(uModelInfo, int(texelFetch(uTiles, hitTile * 4)[hit.part / 2] >> uint(16 * (hit.part & 1))) & 0xFFFF).z >> 24) != 0u ? 3u : 1u;
+	rayGlow = !glowing ? 0u : hit.part >= 0 && (texelFetch(uModelInfo, int(texelFetch(uTiles, hitTile * 4)[hit.part / 2] >> uint(16 * (hit.part & 1))) & 0xFFFF).z >> 24) != 0u ? 3u : 1u;
+}
+
+void main()
+{
+	shadeRay(uRayOffset, true, outColor, outDepth, outGlow);
+}
+)";
+
+/*
+ * Several rays a pixel (setting "Supersampling"). The rays' program above casts one ray a pixel;
+ * for several it is run once for each, the ray set off from the pixel's middle (uRayOffset),
+ * each run into pictures of its own. This small program then makes the frame's picture of
+ * them: where a pixel's rays all show one colour, that colour (a flat surface comes out exactly
+ * as without them, dither and all); where they differ (an edge, a far fence, fine texture), the
+ * palette colour nearest the mix of theirs (uBlend: the palette, then the nearest colour for
+ * each cell of a 32 x 32 x 32 colour cube); the depth of the nearest; and it shines if any does.
+ * (It is its own program, not a loop over the rays in the one above: at least one driver took
+ * a minute to build that.)
+ */
+const char *const ResolveSource = R"(#version 330 core
+uniform usampler2D uColor0, uColor1, uColor2, uColor3;
+uniform sampler2D uDepth0, uDepth1, uDepth2, uDepth3;
+uniform usampler2D uGlow0, uGlow1, uGlow2, uGlow3;
+uniform usamplerBuffer uBlend;
+uniform int uSamples;
+layout(location = 0) out uint outColor;
+layout(location = 1) out float outDepth;
+layout(location = 2) out uint outGlow;
+
+void main()
+{
+	ivec2 at = ivec2(gl_FragCoord.xy);
+	uint colors[4] = uint[4](texelFetch(uColor0, at, 0).r, texelFetch(uColor1, at, 0).r, 0u, 0u);
+	float depths[4] = float[4](texelFetch(uDepth0, at, 0).r, texelFetch(uDepth1, at, 0).r, 0.0, 0.0);
+	uint glows[4] = uint[4](texelFetch(uGlow0, at, 0).r, texelFetch(uGlow1, at, 0).r, 0u, 0u);
+	if (uSamples > 2)
+	{
+		colors[2] = texelFetch(uColor2, at, 0).r; depths[2] = texelFetch(uDepth2, at, 0).r; glows[2] = texelFetch(uGlow2, at, 0).r;
+		colors[3] = texelFetch(uColor3, at, 0).r; depths[3] = texelFetch(uDepth3, at, 0).r; glows[3] = texelFetch(uGlow3, at, 0).r;
+	}
+	uint color = colors[0], glow = glows[0];
+	float depth = depths[0];
+	vec3 mixed = vec3(0.0);
+	bool allSame = true;
+	for (int ray = 0; ray < uSamples; ++ray)
+	{
+		if (colors[ray] != color) allSame = false;
+		int entry = int(colors[ray]) * 3;
+		mixed += vec3(float(texelFetch(uBlend, entry).r), float(texelFetch(uBlend, entry + 1).r), float(texelFetch(uBlend, entry + 2).r));
+		depth = min(depth, depths[ray]);
+		glow = max(glow, glows[ray]);
+	}
+	if (!allSame)
+	{
+		ivec3 cell = clamp(ivec3(mixed / float(uSamples)) >> 3, ivec3(0), ivec3(31));
+		color = texelFetch(uBlend, 768 + (cell.r << 10 | cell.g << 5 | cell.b)).r;
+	}
+	outColor = color;
+	outDepth = depth;
+	outGlow = glow;
 }
 )";
 

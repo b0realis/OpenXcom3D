@@ -85,6 +85,10 @@ public:
 		float sightView, sightMod;                // the game's sight ranges, in voxels (the tile engine's, the mod's)
 		int fogOfWar, unseenTerrain, haze;        // the settings
 		bool shadows, smoothLighting, discreetEdge;
+		// The finer picture (settings, all off: the picture is the CPU's). See FirstPersonGpuShaders.h.
+		int samples;                              // rays a pixel, blended: 1, 2 or 4 (setting "Supersampling")
+		bool softShadows, allLightShadows, ambientOcclusion; // settings "Soft sun shadows", "Shadows from every light", "Ambient occlusion"
+		const SDL_Color *palette;                 // the view's palette: what the samples' colours blend to (null: no blending)
 		float lamps[16][4];                       // the lamps nearby: position, strength
 		int lampCount;
 		int flashlight;                           // 0 off, 1 the shoulder flashlight, 2 the dynamic one

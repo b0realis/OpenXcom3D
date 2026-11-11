@@ -222,7 +222,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsMiddleClickIdentify" } },
 		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
-		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale" } },
+		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion" } },
 	};
 	std::vector<bool> placed(gathered.size(), false);
 	for (const auto &section : sections)
@@ -367,6 +367,12 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		{
 			const int scale = std::clamp(*option.asInt(), 0, 4);
 			return scale == 0 ? std::string(tr("STR_FPS_HUD_SCALE_AUTO")) : "x" + std::to_string(scale);
+		}
+		// Supersampling: off, or the rays a pixel.
+		if (option.id() == "fpsSupersampling")
+		{
+			const int level = std::clamp(*option.asInt(), 0, 2);
+			return level == 0 ? std::string(tr("STR_FPS_SUPERSAMPLING_OFF")) : level == 1 ? "x2" : "x4";
 		}
 		// The renderer is a choice of two, shown by name.
 		if (option.id() == "fpsRenderer")
@@ -657,6 +663,11 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		else if (value == &Options::fpsHudScale)
 		{
 			*value = (std::clamp(*value, 0, 4) + direction + 5) % 5;
+		}
+		// Supersampling (off, x2, x4): round and round.
+		else if (value == &Options::fpsSupersampling)
+		{
+			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
 		}
 		// The renderer (CPU, GPU): either button switches.
 		else if (value == &Options::fpsRenderer)

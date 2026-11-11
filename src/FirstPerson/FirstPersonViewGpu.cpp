@@ -162,6 +162,11 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 	frame.shadows = Options::fpsShadows;
 	frame.smoothLighting = view._smoothLighting;
 	frame.discreetEdge = Options::fpsDiscreetEdge;
+	frame.samples = Options::fpsSupersampling >= 2 ? 4 : Options::fpsSupersampling == 1 ? 2 : 1;
+	frame.softShadows = Options::fpsSoftShadows;
+	frame.allLightShadows = Options::fpsAllLightShadows;
+	frame.ambientOcclusion = Options::fpsAmbientOcclusion;
+	frame.palette = view.getPalette();
 	frame.lampCount = (int)std::min<size_t>(16, view._nearbyLights.size());
 	for (int lamp = 0; lamp < 16; ++lamp)
 	{
