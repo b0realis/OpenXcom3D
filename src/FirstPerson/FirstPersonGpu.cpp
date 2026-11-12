@@ -549,7 +549,10 @@ struct FirstPersonGpu::State
 		Gl::UInt id = 0;
 		std::unordered_map<std::string, Gl::Int> locations; // its uniforms, by name
 	};
+	// ... and again with the coloured lights and the reflections in it, when their settings are on (see programFor).
 	Program programs[2];
+	std::map<int, Program> extraPrograms; // by 1 coloured lights | 2 reflections
+	Program *programFor(const Frame &frame, bool results, bool laterRays = false);
 	Gl::UInt resolveProgram = 0; // makes one picture of several rays a pixel (ResolveSource); 0: not built, one ray a pixel
 	Program *program = &programs[0];
 	Gl::UInt vertexArray = 0;
@@ -592,7 +595,7 @@ struct FirstPersonGpu::State
 	void threadLoop();
 	void run(const std::function<void()> &work);
 	bool start(int device);
-	bool build(Program &built, bool results);
+	bool build(Program &built, bool results, int extras = 0);
 	Gl::Int location(const char *name);
 	Uint32 modelId(const FirstPersonView::VoxelModel *model);
 	Uint32 solidId(FirstPersonView::SolidRows solid);
@@ -716,9 +719,10 @@ bool FirstPersonGpu::State::start(int device)
  * Builds the rays' program: the picture-wide triangle, and the walk and the shading, with or
  * without the check's results; its samplers are pointed at the buffers' textures.
  */
-bool FirstPersonGpu::State::build(Program &built, bool results)
+bool FirstPersonGpu::State::build(Program &built, bool results, int extras)
 {
-	const std::string raySource = std::string("#version 330 core\n") + (results ? "#define RESULTS\n" : "") + HeaderSource + shaderConstants() + WalkSource + ShadeSource;
+	const std::string raySource = std::string("#version 330 core\n") + (results ? "#define RESULTS\n" : "") + ((extras & 1) ? "#define COLORED_LIGHTS\n" : "")
+		+ ((extras & 2) ? "#define REFLECTIONS\n" : "") + ((extras & 4) ? "#define LATER_RAYS\n" : "") + HeaderSource + shaderConstants() + WalkSource + ShadeSource;
 	const char *sources[2] = { VertexSource, raySource.c_str() };
 	const Gl::Enum kinds[2] = { Gl::VERTEX_SHADER, Gl::FRAGMENT_SHADER };
 	built.id = Gl::CreateProgram();
@@ -756,7 +760,44 @@ bool FirstPersonGpu::State::build(Program &built, bool results)
 	{
 		Gl::Uniform1i(Gl::GetUniformLocation(built.id, samplers[unit]), unit);
 	}
+	// (The first ray's pictures, for the program of a pixel's later rays: where the resolve reads them too.)
+	Gl::Uniform1i(Gl::GetUniformLocation(built.id, "uFirstColor"), BufferCount + 1);
+	Gl::Uniform1i(Gl::GetUniformLocation(built.id, "uFirstDepth"), BufferCount + 2);
+	Gl::Uniform1i(Gl::GetUniformLocation(built.id, "uFirstTrue"), BufferCount + 3);
 	return true;
+}
+
+/**
+ * The rays' program for a frame: the plain one (or the check's); or, when the frame has coloured lights or wants the
+ * sea's reflections, one with those built in, made the first frame their settings are on (the game waits while the
+ * driver builds it: some seconds, once; drivers keep what they built). If that one won't build, the plain one draws.
+ */
+FirstPersonGpu::State::Program *FirstPersonGpu::State::programFor(const Frame &frame, bool results, bool laterRays)
+{
+	if (results || !frame.palette)
+	{
+		return &programs[results ? 1 : 0];
+	}
+	auto built = [this](int extras) -> Program * {
+		if (!extras) return &programs[0];
+		auto found = extraPrograms.find(extras);
+		if (found == extraPrograms.end())
+		{
+			found = extraPrograms.emplace(extras, Program()).first;
+			if (!build(found->second, false, extras))
+			{
+				Log(LOG_WARNING) << "OpenXcom3D GPU: no coloured lights or reflections on this card";
+				found->second.id = 0;
+			}
+		}
+		return found->second.id ? &found->second : &programs[0];
+	};
+	// (With "Coloured lights" on, the program with them is built now, not when the first shot flies; it is used
+	// only for the frames that have a light.)
+	// (For a pixel's second and further rays, the program that casts them only where the first rays show an edge.)
+	const int mirrors = (frame.reflections ? 2 : 0) | (laterRays ? 4 : 0);
+	if (frame.colorLightsOn) built(mirrors | 1);
+	return built(mirrors | (frame.colorLightCount > 0 ? 1 : 0));
 }
 
 /**
@@ -1125,6 +1166,20 @@ void FirstPersonGpu::State::setScene(const Frame &frame)
 	Gl::Uniform1i(location("uAllLightShadows"), frame.allLightShadows ? 1 : 0);
 	Gl::Uniform1i(location("uAmbientOcclusion"), frame.ambientOcclusion ? 1 : 0);
 	Gl::Uniform1i(location("uSmoothLight"), frame.smoothLight && frame.palette ? 1 : 0);
+	Gl::Uniform1i(location("uReflections"), frame.reflections && frame.palette ? 1 : 0);
+	const int colorLightCount = frame.palette ? std::clamp(frame.colorLightCount, 0, 16) : 0;
+	Gl::Uniform1i(location("uColorLightCount"), colorLightCount);
+	if (colorLightCount > 0)
+	{
+		float places[16][4], hues[16][4];
+		for (int light = 0; light < colorLightCount; ++light)
+		{
+			std::copy(frame.colorLights[light], frame.colorLights[light] + 4, places[light]);
+			std::copy(frame.colorLights[light] + 4, frame.colorLights[light] + 8, hues[light]);
+		}
+		Gl::Uniform4fv(location("uColorLightAt"), colorLightCount, &places[0][0]);
+		Gl::Uniform4fv(location("uColorLightOf"), colorLightCount, &hues[0][0]);
+	}
 	Gl::Uniform1i(location("uGroundModel"), (Gl::Int)modelId(frame.groundModel));
 	Gl::Uniform1i(location("uWaterModel"), (Gl::Int)modelId(frame.waterModel));
 	Gl::Uniform1f(location("uNight"), colors.night);
@@ -1237,7 +1292,7 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	// The world: this frame's tiles and colours, the camera and the scene, and any model or mask not sent before.
 	// What is the same as last frame isn't sent again (in a turn-based game, most frames most of it).
 	auto start = std::chrono::steady_clock::now();
-	program = &programs[output.results ? 1 : 0];
+	program = programFor(frame, output.results != nullptr);
 	Gl::UseProgram(program->id);
 	const size_t tileCount = (size_t)frame.size[0] * frame.size[1] * frame.size[2];
 	encodeTiles(frame);
@@ -1310,6 +1365,27 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 			{
 				Log(LOG_WARNING) << "OpenXcom3D GPU: this card can't draw into the pictures several rays a pixel need";
 				return false;
+			}
+			if (ray == 1)
+			{
+				// The first ray's pictures, for the others to see where they are needed (see LATER_RAYS in the shader), and
+				// the program that looks (its own uniforms set as the first one's were).
+				const Targets &first = targets[{ blockColumns, blockRows, 1 }];
+				for (int which = 0; which < 3; ++which)
+				{
+					Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 1 + which);
+					Gl::BindTexture(Gl::TEXTURE_2D, first.textures[which == 2 ? 3 : which]);
+				}
+				Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
+				// (OPENXCOM3D_GPU_EVERY_RAY: every ray of every pixel cast, to compare.)
+				static const bool everyRay = getenv("OPENXCOM3D_GPU_EVERY_RAY") != nullptr;
+				Program *later = everyRay ? program : programFor(frame, false, true);
+				if (later != program)
+				{
+					program = later;
+					Gl::UseProgram(program->id);
+					setScene(frame);
+				}
 			}
 			const float *offset = samples == 2 ? twoRays[ray] : fourRays[ray];
 			Gl::Uniform2f(location("uRayOffset"), offset[0], offset[1]);
@@ -1421,6 +1497,25 @@ std::unique_ptr<FirstPersonGpu> FirstPersonGpu::open(int device)
 	}
 	Log(LOG_INFO) << "OpenXcom3D GPU: the 3D view's rays on " << state.context.name();
 	return gpu;
+}
+
+void FirstPersonGpu::prebuild(int extras)
+{
+	State &state = *_state;
+	state.run([&] {
+		Frame wanted = {};
+		SDL_Color anyPalette[1] = {};
+		wanted.palette = anyPalette;
+		for (int mask = 0; mask <= 3; ++mask)
+		{
+			if ((mask & extras) != mask) continue; // (only what the settings can ask for)
+			wanted.colorLightsOn = false;
+			wanted.colorLightCount = mask & 1;
+			wanted.reflections = (mask & 2) != 0;
+			if (mask) state.programFor(wanted, false);
+			if (extras & 4) state.programFor(wanted, false, true);
+		}
+	});
 }
 
 std::unique_ptr<FirstPersonGpu> FirstPersonGpu::openAny()

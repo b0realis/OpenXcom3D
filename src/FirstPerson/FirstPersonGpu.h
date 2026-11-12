@@ -89,6 +89,10 @@ public:
 		int samples;                              // rays a pixel, blended: 1, 2 or 4 (setting "Supersampling")
 		bool softShadows, allLightShadows, ambientOcclusion; // settings "Soft sun shadows", "Shadows from every light", "Ambient occlusion"
 		const SDL_Color *palette;                 // the view's palette: what the samples' colours blend to (null: no blending)
+		float colorLights[16][8];                 // setting "Coloured lights": each light's place (voxels), its reach, its colour (0..1 each) and strength
+		int colorLightCount;                      // ... how many this frame (0: none, or the setting off)
+		bool colorLightsOn;                       // ... the setting is on (the program for them is built ahead of the first light)
+		bool reflections;                         // setting "Reflections": the sea mirrors the sky and what stands in it (in full colour)
 		bool smoothLight;                         // setting "Smooth light": the full-colour picture blends where the palette's dithers
 		float lamps[16][4];                       // the lamps nearby: position, strength
 		int lampCount;
@@ -144,6 +148,9 @@ public:
 	~FirstPersonGpu();
 	/// The graphics card's name.
 	const std::string &name() const;
+	/// Builds ahead the programs that have the coloured lights (1) and the reflections (2) in them, and those for a
+	/// pixel's later rays (4, "Supersampling"), for the settings that are on: else the first frame that needs one waits while the driver builds it.
+	void prebuild(int extras);
 	/// Forgets every model sent up so far (a new battle: the view builds its models anew).
 	void forgetModels();
 	/// Casts the frame's rays, a ray for each block of pixelSize x pixelSize pixels, and fills the picture.

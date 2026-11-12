@@ -456,7 +456,13 @@ void FirstPersonView::updateColors()
 		{
 			const SDL_Color &color = seen[index];
 			const float luminance = color.r * 0.3f + color.g * 0.59f + color.b * 0.11f;
-			_colors.glassTint[index] = nearestSeen(color.r * 0.7f + 150 * 0.3f, color.g * 0.7f + 180 * 0.3f, color.b * 0.7f + 205 * 0.3f);
+			// (Through the goggles glass is only a touch paler: the 30% of pale blue it adds by eye lifted a dark room six
+			// shades of the goggles' sixteen. Before the goggles' own colours were used here (GitHub issue #122) it was worse:
+			// a dark colour's paler mix was often nearest a colour high in a dark group, and showed at full brightness, so
+			// an unlit ceiling seen through a window glared while the part of it a soldier's light fell on came out darker.)
+			const float glassShare = goggles ? 0.07f : 0.3f;
+			_colors.glassTint[index] = nearestSeen(color.r * (1.0f - glassShare) + 150 * glassShare, color.g * (1.0f - glassShare) + 180 * glassShare,
+				color.b * (1.0f - glassShare) + 205 * glassShare);
 			_colors.flareTint[index] = nearestSeen(std::min(255.0f, 70 + luminance * 1.15f), luminance * 0.32f, luminance * 0.24f);
 			auto toned = [&](float channel, int axis) {
 				return channel + (std::min(255.0f, UnseenToneRgb[axis] * luminance / slateLuminance) - channel) * UnseenToneShare;

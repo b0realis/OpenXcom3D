@@ -873,6 +873,10 @@ void createOptions(std::vector<OptionInfo> &options)
 	// light on it blended where the palette's picture dithers. Off by default.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsTrueColor", &fpsTrueColor, false, "STR_FPS_TRUE_COLOR", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmoothLight", &fpsSmoothLight, false, "STR_FPS_SMOOTH_LIGHT", category));
+	// In full colour: shots in flight, explosions, fires and a muzzle flash light what is round them in their own colour.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsColoredLights", &fpsColoredLights, false, "STR_FPS_COLORED_LIGHTS", category));
+	// In full colour: the sea mirrors the sky and what stands in it.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsReflections", &fpsReflections, false, "STR_FPS_REFLECTIONS", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 0, "STR_FPS_PIXEL_SIZE", category));
 	// The crosshair: shown or not, the shot info under it, aiming at the exact point under it
 	// (YES) or at the tile, as the original game does (NO), and the units' hitboxes.

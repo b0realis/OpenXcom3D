@@ -238,10 +238,12 @@ SETTINGS = [
         ('HUD scale', 'Auto', 'Auto / x1 / x2 / x3 / x4', 'How many times the 3D HUD is magnified on a big screen. Auto: as big as fits (x3 at 1920×1080). With 3D resolution at Display it counts the display\'s own pixels, whatever the Battlescape scale. Not in the 1.12 download yet.', 'x2 on a big screen: a smaller HUD, more room.'),
         ('Supersampling', 'Off', 'Off / x2 / x4', 'Renderer GPU only. Two or four rays a pixel, blended: edges, far fences and fine texture stop shimmering as you turn. Costs as many times the rays. Not in the 1.12 download yet.', 'x2 costs little on a good card; x4 for the cleanest picture.'),
         ('Soft sun shadows', 'NO', 'YES / NO', 'Renderer GPU only, with Shadows on. The sun\'s shadows get a soft edge, wider the further they fall. Not in the 1.12 download yet.', 'YES: cheap, and the stair-stepped shadow edges are gone.'),
-        ('Shadows from every light', 'NO', 'YES / NO', 'Renderer GPU only, with Shadows on. Every lamp and flare in reach throws shadows, not only the strongest. Not in the 1.12 download yet.', 'YES for night missions in towns.'),
+        ('Shadows from every light', 'NO', 'YES / NO', 'Renderer GPU only, with Shadows on. The three strongest lamps and every flare in reach throw shadows, not only the strongest. Not in the 1.12 download yet.', 'YES for night missions in towns.'),
         ('Ambient occlusion', 'NO', 'YES / NO', 'Renderer GPU only. Corners, the foot of walls and the gaps between things are darker: the blocky world gets depth. Not in the 1.12 download yet.', 'YES: cheap, and rooms look solid.'),
         ('True colour', 'NO', 'YES / NO', 'Renderer GPU, 3D resolution Display, and OpenGL output or a 32-bit scaler. The 3D world in full colour, past the palette\'s 256; units, effects and the HUD stay the palette\'s. Not in the 1.12 download yet.', 'YES with Smooth light and Supersampling: the cleanest picture.'),
         ('Smooth light', 'NO', 'YES / NO', 'With True colour. Light, shadows, haze and the sky blend smoothly where the palette\'s picture has a dot pattern. Not in the 1.12 download yet.', 'YES: no dots swimming over walls at high resolutions.'),
+        ('Coloured lights', 'NO', 'YES / NO', 'With True colour. Shots in flight, explosions, fires and muzzle flashes light the walls and ground round them in their own colour. Not in the 1.12 download yet.', 'YES: firefights at night look the part.'),
+        ('Reflections', 'NO', 'YES / NO', 'With True colour. The sea mirrors the sky, the clouds and what stands in it. Not in the 1.12 download yet.', 'YES for TFTD\'s surface missions.'),
     ]),
 ]
 

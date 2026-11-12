@@ -43,6 +43,10 @@
 #include <thread>
 #include "../Engine/Logger.h"
 #include "../Battlescape/TileEngine.h"
+#include "../Battlescape/Map.h"
+#include "../Battlescape/Projectile.h"
+#include "../Battlescape/Explosion.h"
+#include "../Savegame/Tile.h"
 #include "../Engine/Options.h"
 #include "../Mod/Mod.h"
 #include "../Savegame/SavedBattleGame.h"
@@ -81,6 +85,9 @@ FirstPersonGpu *sharedGpu(bool open)
 		shared.opening = std::thread([] {
 			const char *device = getenv("OPENXCOM3D_GPU_DEVICE");
 			shared.gpu = device ? FirstPersonGpu::open(atoi(device)) : FirstPersonGpu::openAny();
+			// (The programs for "Coloured lights" and "Reflections", if those are on, before the card is called ready.)
+			if (shared.gpu) shared.gpu->prebuild((Options::fpsTrueColor && Options::fpsColoredLights ? 1 : 0) | (Options::fpsTrueColor && Options::fpsReflections ? 2 : 0)
+				| (Options::fpsSupersampling > 0 ? 4 : 0));
 			shared.ready = shared.gpu.get();
 		});
 	}
@@ -168,6 +175,83 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 	frame.ambientOcclusion = Options::fpsAmbientOcclusion;
 	frame.palette = view.getPalette();
 	frame.smoothLight = Options::fpsSmoothLight && view._wantsTrueColor;
+	frame.reflections = Options::fpsReflections && view._wantsTrueColor && view._waterColors[0] != 0; // (only where there is a sea)
+	// The coloured lights (setting "Coloured lights", in full colour): the shots in flight (but plain bullets), the
+	// explosions, the muzzle flash, and the nearest fires; sixteen at most, in that order.
+	frame.colorLightCount = 0;
+	frame.colorLightsOn = Options::fpsColoredLights && view._wantsTrueColor;
+	if (Options::fpsColoredLights && view._wantsTrueColor && view._map)
+	{
+		const SDL_Color *palette = view.getPalette();
+		auto add = [&](float x, float y, float z, float reach, float red, float green, float blue, float strength)
+		{
+			if (frame.colorLightCount >= 16 || strength <= 0.0f) return;
+			const float light[8] = { x, y, z, reach, red / 255.0f, green / 255.0f, blue / 255.0f, strength };
+			std::copy(light, light + 8, frame.colorLights[frame.colorLightCount++]);
+		};
+		// A shot's colour: its trail's, made as bright as it goes (a dark red bolt still lights red).
+		auto addShot = [&](const float *head, FirstPersonView::Trail trail, Uint8 color, float calibre)
+		{
+			if (trail == FirstPersonView::TRAIL_NONE || trail == FirstPersonView::TRAIL_FLYING || trail == FirstPersonView::TRAIL_SMOKE) return;
+			float red = 255, green = 150, blue = 60; // (a rocket's flame, fire)
+			if (trail != FirstPersonView::TRAIL_FIRE && color)
+			{
+				const float top = std::max({ 1, (int)palette[color].r, (int)palette[color].g, (int)palette[color].b });
+				red = palette[color].r * 255.0f / top; green = palette[color].g * 255.0f / top; blue = palette[color].b * 255.0f / top;
+			}
+			add(head[0], head[1], head[2], 72.0f + 12.0f * std::min(3.0f, calibre), red, green, blue, 0.9f);
+		};
+		// (OPENXCOM3D_GPU_TESTLIGHT: an orange light three tiles ahead of the eye, to look at the lights without a fire at hand.)
+		static const bool testLight = getenv("OPENXCOM3D_GPU_TESTLIGHT") != nullptr;
+		if (testLight) add((float)(view._eye[0] + view._forward[0] * 48.0), (float)(view._eye[1] + view._forward[1] * 48.0), (float)view._eye[2], 120.0f, 255, 130, 45, 1.0f);
+		if (Projectile *projectile = view.flyingProjectile())
+		{
+			if (!projectile->getItem())
+			{
+				float head[3];
+				view.shotHead(projectile, head);
+				addShot(head, view._shotTrail, view._shotTrailColor, view._shotCalibre);
+			}
+		}
+		if (view._map->getPartnerProjectile()) addShot(view._partnerHead, view._partnerTrail, view._partnerColor, view._partnerCalibre);
+		for (const Explosion *explosion : *view._map->getExplosions())
+		{
+			const int step = explosion->getCurrentFrame();
+			if (step < 0) continue;
+			const Position at = explosion->getPosition();
+			const float fading = std::max(0.15f, 1.0f - step / 8.0f);
+			if (explosion->isBig()) add((float)at.x, (float)at.y, (float)at.z + 6.0f, 176.0f, 255, 170, 70, 1.6f * fading);
+			else add((float)at.x, (float)at.y, (float)at.z, 44.0f, 255, 215, 150, 0.6f * fading);
+		}
+		if (view._muzzleFlashLight > 0.0f) add(view._muzzleFlashPos[0], view._muzzleFlashPos[1], view._muzzleFlashPos[2], 96.0f, 255, 220, 150, 0.5f * view._muzzleFlashLight);
+		// The fires nearest the eye, each flickering by its own clock.
+		struct Fire { float distance; int tile; };
+		Fire nearest[8];
+		int fires = 0;
+		const int tileCount = view._save->getMapSizeXYZ();
+		for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
+		{
+			Tile *tile = view._save->getTile(tileIndex);
+			if (!tile->getFire() || !view._tileViews[tileIndex].discovered) continue;
+			const Position place = tile->getPosition();
+			const float dx = place.x * 16.0f + 8.0f - (float)view._eye[0], dy = place.y * 16.0f + 8.0f - (float)view._eye[1], dz = place.z * 24.0f + 8.0f - (float)view._eye[2];
+			const Fire fire = { dx * dx + dy * dy + dz * dz, tileIndex };
+			int slot;
+			if (fires < 8) slot = fires++;
+			else if (fire.distance < nearest[7].distance) slot = 7;
+			else continue;
+			while (slot > 0 && nearest[slot - 1].distance > fire.distance) { nearest[slot] = nearest[slot - 1]; --slot; }
+			nearest[slot] = fire;
+		}
+		const float seconds = SDL_GetTicks() / 1000.0f;
+		for (int fire = 0; fire < fires; ++fire)
+		{
+			Tile *tile = view._save->getTile(nearest[fire].tile);
+			const Position place = tile->getPosition();
+			const float flicker = 0.5f + 0.12f * std::sin(seconds * 9.0f + tile->getAnimationOffset() * 1.7f) + 0.06f * std::sin(seconds * 23.0f + nearest[fire].tile);
+			add(place.x * 16.0f + 8.0f, place.y * 16.0f + 8.0f, place.z * 24.0f - tile->getTerrainLevel() + 8.0f, 60.0f, 255, 135, 45, flicker);
+		}
+	}
 	frame.lampCount = (int)std::min<size_t>(16, view._nearbyLights.size());
 	for (int lamp = 0; lamp < 16; ++lamp)
 	{
@@ -283,9 +367,26 @@ bool FirstPersonView::gpuCastAllRays()
 	const bool fullColor = _wantsTrueColor && frame.pixelSize == 1;
 	if (fullColor) _trueColor.resize((size_t)getWidth() * getHeight());
 	output.trueColor = fullColor ? _trueColor.data() : nullptr;
-	if (!gpu->castRays(frame, output, nullptr))
+	// (OPENXCOM3D_GPU_TIMING: where the card's time goes, in the log every 60 frames: sending, drawing, reading back.
+	// The card is waited for after each step, so the frame is slower than it is without.)
+	static const bool timed = getenv("OPENXCOM3D_GPU_TIMING") != nullptr;
+	FirstPersonGpu::Timing timing;
+	if (!gpu->castRays(frame, output, timed ? &timing : nullptr))
 	{
 		return false;
+	}
+	if (timed && getWidth() >= 320)
+	{
+		static double upload = 0.0, draw = 0.0, read = 0.0;
+		static int frames = 0;
+		upload += timing.upload; draw += timing.draw; read += timing.read;
+		if (++frames == 60)
+		{
+			Log(LOG_INFO) << "OpenXcom3D GPU: the " << getWidth() << "x" << getHeight() << " view: sending " << upload / frames << " ms, drawing " << draw / frames
+				<< " ms, reading back " << read / frames << " ms";
+			upload = draw = read = 0.0;
+			frames = 0;
+		}
 	}
 	// The rays' palette colours are kept beside it: a pixel that still has its ray's colour when the frame is done
 	// (nothing was drawn over it, no wash went over it) is shown in its full colour (see trueColor).

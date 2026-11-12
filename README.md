@@ -46,7 +46,7 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 - **A GPU renderer** (setting *Renderer*: GPU; proved on Linux, new on Windows and macOS): the graphics card casts the 3D world's rays, the same walk and the same shading as the CPU's, checked pixel for pixel against it. The CPU renderer stays the default, and takes over by itself wherever the card can't.
 - **3D resolution:** the 3D world as fine as its HUD, as the battlescape, or as the display itself, whatever the battlescape's scale: a full 1920×1080 view at 60 frames a second and more on a graphics card.
 - **HUD scale:** the 3D HUD's magnification on big screens is yours to choose (Auto, x1 to x4); with 3D resolution at Display it has the display's pixels to itself, whatever the battlescape's scale.
-- **A finer picture on the graphics card** (all off by default): supersampling (two or four rays a pixel, blended), soft sun shadows, a shadow from every lamp and flare, and ambient occlusion (darker corners and creases), and the 3D world in true colour with smooth light (no dither dots).
+- **A finer picture on the graphics card** (all off by default): supersampling (two or four rays a pixel, blended), soft sun shadows, a shadow from every lamp and flare, and ambient occlusion (darker corners and creases), the 3D world in true colour with smooth light (no dither dots), coloured light from shots, explosions and fires, and a sea that mirrors the sky.
 
 ## New in 1.12
 

@@ -67,6 +67,13 @@ uniform vec3 uEye, uForward, uRight, uUp;
 uniform vec2 uHalfPlane;     // the image plane's half-width and half-height
 uniform ivec2 uViewSize;     // the view in pixels
 uniform int uPixelSize;      // pixels a ray colours each way
+#ifdef LATER_RAYS
+// For a pixel's second and further rays (setting "Supersampling"): the first ray's pictures. Where the first rays
+// show nothing to smooth (see main), the later ones aren't cast.
+uniform usampler2D uFirstColor;
+uniform sampler2D uFirstDepth, uFirstTrue;
+const float FlatContrast = 26.0 / 255.0; // a pixel within this of all its neighbours, a colour channel each, has nothing to smooth (two shades of a dither are nearer than this; the next voxel's colour mostly isn't)
+#endif
 uniform vec2 uRayOffset;     // where in its pixel the ray goes, from the middle (0, 0: the CPU's ray; else one of several, setting "Supersampling")
 uniform float uGhostScale;
 uniform int uSeeThroughCrops;
@@ -415,7 +422,16 @@ uniform vec3 uMuzzleFlashPos;
 uniform int uUfoLightsOn, uWallPaint;
 // The finer picture, on the card only (settings, all off by default: with them off the picture is the CPU's).
 uniform int uSoftShadows, uAllLightShadows, uAmbientOcclusion;
+#ifdef COLORED_LIGHTS
+uniform vec4 uColorLightAt[16]; // setting "Coloured lights": each light's place (voxels) and reach
+uniform vec4 uColorLightOf[16]; // ... its colour (0..1 each) and strength
+uniform int uColorLightCount;
+#endif
+uniform int uReflections;       // setting "Reflections": the sea mirrors the sky and what stands in it
 uniform int uSmoothLight; // setting "Smooth light": the full-colour picture blends between the palette's shades (and into the haze) where the palette's picture dithers
+// (The coloured lights and the reflections are built into the program only when their settings are on (COLORED_LIGHTS,
+// REFLECTIONS; see FirstPersonGpu.cpp, programFor): with their code merely present, one driver's program ran at half
+// the speed for everything else, ambient occlusion above all, though none of it was reached.)
 // The pixel in full colour, where the shading worked one out that the palette hasn't (see shadeHit); else it is the palette colour's own.
 vec3 fullColor;
 bool fullColorSet;
@@ -573,25 +589,29 @@ float pointLight(vec3 point, vec3 normal, bool shadows)
 	if (uLampCount > 0 && (uNight > 0.3 || uUnderwater != 0))
 	{
 		const float lampReach = 120.0;
-		int brightestLamp = -1;
-		float brightestPower = 0.0, brightestDistance = 0.0;
+		int brightestLamp = -1, nextLamp = -1, thirdLamp = -1; // (the second and third strongest: for "Shadows from every light")
+		float brightestPower = 0.0, nextPower = 0.0, thirdPower = 0.0;
 		for (int lamp = 0; lamp < uLampCount; ++lamp)
 		{
 			float dx = uLamps[lamp].x - point.x, dy = uLamps[lamp].y - point.y, dz = uLamps[lamp].z - point.z;
 			float span = sqrt(dx * dx + dy * dy + dz * dz);
 			if (span > lampReach) continue;
 			float power = uLamps[lamp].w * (1.0 - span / lampReach) * (1.0 - span / lampReach);
-			if (power > brightestPower) { brightestPower = power; brightestLamp = lamp; brightestDistance = span; }
+			if (power > brightestPower) { thirdPower = nextPower; thirdLamp = nextLamp; nextPower = brightestPower; nextLamp = brightestLamp; brightestPower = power; brightestLamp = lamp; }
+			else if (power > nextPower) { thirdPower = nextPower; thirdLamp = nextLamp; nextPower = power; nextLamp = lamp; }
+			else if (power > thirdPower) { thirdPower = power; thirdLamp = lamp; }
 		}
-		// The strongest lamp alone; with the setting "Shadows from every light", each lamp in reach: the strongest that
-		// lights the point lights it, the strongest it is hidden from darkens it (with one lamp, the same thing).
-		// (One loop for both, so the shader holds the shadow ray's walk once here.)
+		// The strongest lamp alone; with the setting "Shadows from every light", the three strongest in reach (a
+		// weaker one's light and shadow are under a shade: a ray for each of sixteen lamps cost a big lit base 19 ms a
+		// frame at 1080p): the strongest that lights the point lights it, the strongest it is hidden from darkens it
+		// (with one lamp, the same thing). (One loop for both, so the shader holds the shadow ray's walk once here.)
 		bool everyLamp = uAllLightShadows != 0;
 		int firstLamp = everyLamp ? 0 : brightestLamp, endLamp = everyLamp ? uLampCount : brightestLamp + 1;
-		if (!everyLamp && (brightestLamp < 0 || brightestPower <= 0.03)) endLamp = firstLamp;
+		if (brightestLamp < 0 || brightestPower <= 0.03) endLamp = firstLamp;
 		float night = uUnderwater != 0 ? 1.0 : uNight, lit = 0.0, dark = 0.0;
 		for (int lamp = firstLamp; lamp < endLamp; ++lamp)
 		{
+			if (lamp != brightestLamp && lamp != nextLamp && lamp != thirdLamp) continue;
 			vec3 lampPos = uLamps[lamp].xyz;
 			float dx = lampPos.x - point.x, dy = lampPos.y - point.y, dz = lampPos.z - point.z;
 			float span = sqrt(dx * dx + dy * dy + dz * dz);
@@ -655,6 +675,32 @@ float pointLight(vec3 point, vec3 normal, bool shadows)
 	return light;
 }
 
+#ifdef COLORED_LIGHTS
+/**
+ * The coloured lights' share of a point's full colour (setting "Coloured lights": a shot in flight, an explosion, a
+ * fire, a muzzle flash): each in reach that the face looks towards adds the surface's own colour in the light's, by
+ * the square of how near it is; and, with shadows on, only where it is in sight.
+ * @param rgb The point's colour so far (0..255 each).
+ * @param surface The surface's own colour, unshaded.
+ */
+vec3 coloredLight(vec3 rgb, vec3 surface, vec3 point, vec3 normal)
+{
+	for (int light = 0; light < uColorLightCount; ++light)
+	{
+		vec3 towards = uColorLightAt[light].xyz - point;
+		float span = length(towards), reach = uColorLightAt[light].w;
+		if (span >= reach) continue;
+		float facing = span > 0.5 ? dot(normal, towards) / span : 1.0;
+		if (facing <= 0.0) continue;
+		float power = (1.0 - span / reach) * (1.0 - span / reach) * uColorLightOf[light].w * (0.35 + 0.65 * facing);
+		if (power < 0.02) continue;
+		if (uShadows != 0 && span > 6.0 && shadowed(point, uColorLightAt[light].xyz - towards / span * 3.0)) continue;
+		rgb += (surface * 0.9 + vec3(40.0)) * uColorLightOf[light].rgb * power;
+	}
+	return min(rgb, vec3(255.0));
+}
+
+#endif
 float flareLight(vec3 point, vec3 normal, bool shadows)
 {
 	// Every flare in reach, strongest first; the strongest one or two get a shadow ray.
@@ -905,6 +951,38 @@ uint skyColor(vec3 rayDirection, int pixelX, int pixelY)
 	return color;
 }
 
+#ifdef REFLECTIONS
+/**
+ * The sky's full colour a way (for a reflection; the pixel's own full colour is left as it was).
+ */
+vec3 skyRgbTowards(vec3 direction, int pixelX, int pixelY)
+{
+	bool wasSet = fullColorSet;
+	vec3 kept = fullColor;
+	fullColorSet = false;
+	uint sky = skyColor(direction, pixelX, pixelY);
+	vec3 rgb = fullColorSet ? fullColor : paletteRgb(sky);
+	fullColorSet = wasSet;
+	fullColor = kept;
+	return rgb;
+}
+
+/**
+ * The way the sea mirrors a ray at a point (setting "Reflections"): off the water's face, tilted by the waves' slope
+ * there, never down into it; and how much of the mirrored picture shows, more the flatter the ray meets the water.
+ */
+vec3 seaMirror(vec3 rayDirection, float x, float y, float span, out float share)
+{
+	float slopeX = waveHeight(x + 1.0, y, span) - waveHeight(x - 1.0, y, span), slopeY = waveHeight(x, y + 1.0, span) - waveHeight(x, y - 1.0, span);
+	vec3 waterNormal = normalize(vec3(-slopeX * 0.5, -slopeY * 0.5, 1.0));
+	vec3 mirrored = reflect(rayDirection, waterNormal);
+	mirrored.z = max(mirrored.z, 0.03);
+	float glancing = 1.0 - clamp(-dot(rayDirection, waterNormal), 0.0, 1.0);
+	share = 0.1 + 0.65 * glancing * glancing * glancing;
+	return normalize(mirrored);
+}
+
+#endif
 uint colorOutsideMap(vec3 rayOrigin, vec3 rayDirection, float tExit, int exitAxis, int pixelX, int pixelY, out float depth)
 {
 	vec3 exitPoint = rayOrigin + rayDirection * tExit;
@@ -979,14 +1057,30 @@ uint colorOutsideMap(vec3 rayOrigin, vec3 rayDirection, float tExit, int exitAxi
 			color = blackShare > dither(pixelX + 1, pixelY + 2) ? shadeColor(color, shades) : ((color & 0xF0u) | uint(min(darkest, int(color & 15u) + max(0, shades))));
 			float haze = uUnderwater != 0 ? smoothStep(uMaxDistance * 0.12, uMaxDistance * 0.65, groundDistance)
 				: smoothStep(uMaxDistance * hazeStart() * 0.67, uMaxDistance * 1.6, groundDistance);
-			if (uSmoothLight != 0)
+#ifdef REFLECTIONS
+			bool mirrors = uReflections != 0 && groundIsWater && uUnderwater == 0;
+#else
+			bool mirrors = false;
+#endif
+			if (uSmoothLight != 0 || mirrors)
 			{
-				// (In full colour: the shade's fraction, the black of a dark place and the haze blended, as shadeHit does.)
+				// (In full colour: the shade's fraction, the black of a dark place and the haze blended, as shadeHit does;
+				// and the sea past the map's edge mirrors the sky.)
 				float exact = max(0.0, float(uAmbient) + uFaceShade[4] + waveShade + distanceShade(groundDistance));
+				if (uSmoothLight == 0) exact = floor(exact + dither(pixelX, pixelY));
 				int low = int(exact);
 				vec3 rgb = mix(paletteRgb((unlit & 0xF0u) | uint(min(darkest, int(unlit & 15u) + low))), paletteRgb((unlit & 0xF0u) | uint(min(darkest, int(unlit & 15u) + low + 1))), exact - float(low));
 				if (blackShare > 0.0) rgb = mix(rgb, mix(paletteRgb(shadeColor(unlit, low)), paletteRgb(shadeColor(unlit, low + 1)), exact - float(low)), blackShare);
-				fullColor = mix(rgb, paletteRgb(scene(SceneHaze)), haze);
+#ifdef REFLECTIONS
+				if (mirrors)
+				{
+					float share;
+					vec3 mirrored = seaMirror(rayDirection, groundX, groundY, groundDistance, share);
+					rgb = mix(rgb, skyRgbTowards(mirrored, pixelX, pixelY), share);
+				}
+#endif
+				float hazeShare = uSmoothLight != 0 ? haze : float(clamp(int(haze * float(HazeSteps) + dither(pixelX + 2, pixelY + 1)), 0, HazeSteps)) / float(HazeSteps);
+				fullColor = mix(rgb, paletteRgb(scene(SceneHaze)), hazeShare);
 				fullColorSet = true;
 			}
 			return hazeColor(color, haze, pixelX + 2, pixelY + 1);
@@ -1417,13 +1511,24 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 	{
 		color = table(UnseenRow, color);
 	}
-	if (uSmoothLight != 0)
+#ifdef REFLECTIONS
+	bool mirrors = uReflections != 0 && onSea && uUnderwater == 0;
+#else
+	bool mirrors = false;
+#endif
+#ifdef COLORED_LIGHTS
+	bool colorLit = uColorLightCount > 0;
+#else
+	bool colorLit = false;
+#endif
+	if (uSmoothLight != 0 || colorLit || mirrors)
 	{
 		// (Setting "Smooth light", for the full-colour picture: where the palette's picture dithers between two shades,
 		// the mix of the two by the shade's fraction; likewise into black where the place is dark, into the flare's red,
-		// and into the haze. A UFO's tint and unseen terrain keep the palette's colour; only their haze is smooth.)
+		// and into the haze. A UFO's tint and unseen terrain keep the palette's colour; only their haze is smooth.
+		// Setting "Coloured lights": their light added, before the haze.)
 		vec3 rgb = paletteRgb(color);
-		if (!unseen && ufoLighting < 0)
+		if (uSmoothLight != 0 && !unseen && ufoLighting < 0)
 		{
 			float exact = max(0.0, shade);
 			int low = int(exact);
@@ -1442,7 +1547,35 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 				rgb = mix(rgb, mix(paletteRgb(table(FlareRow, lowLit)), paletteRgb(table(FlareRow, highLit)), share), red);
 			}
 		}
+#ifdef COLORED_LIGHTS
+		if (colorLit && !hit.emissive && !unseen) rgb = coloredLight(rgb, paletteRgb(baseColor), surfacePoint, normal);
+#endif
+#ifdef REFLECTIONS
+		if (mirrors)
+		{
+			// (Setting "Reflections": one ray off the sea's face; what it meets in the game's light there, or the sky.)
+			float share;
+			vec3 mirrored = seaMirror(rayDirection, surfacePoint.x, surfacePoint.y, hit.t, share);
+			Hit met;
+			int metTile, metAxis;
+			float metDistance;
+			vec3 seen;
+			if (castRay(surfacePoint, mirrored, min(uMaxDistance, 640.0), 2.0, 2.0, met, metTile, metDistance, metAxis) == RAY_HIT)
+			{
+				float metGlow;
+				float metShade = max(0.0, lightAt(surfacePoint + mirrored * met.t, metGlow) + distanceShade(met.t) + 1.5);
+				seen = mix(paletteRgb((met.color & 0xF0u) | uint(min(15, int(met.color & 15u) + int(metShade)))),
+					paletteRgb((met.color & 0xF0u) | uint(min(15, int(met.color & 15u) + int(metShade) + 1))), metShade - floor(metShade));
+			}
+			else
+			{
+				seen = skyRgbTowards(mirrored, pixelX, pixelY);
+			}
+			rgb = mix(rgb, seen, share);
+		}
+#endif
 		float haze = terrainHaze(hit.t);
+		if (uSmoothLight == 0) haze = float(clamp(int(haze * float(HazeSteps) + dither(pixelX + 2, pixelY + 1)), 0, HazeSteps)) / float(HazeSteps); // (in the palette's steps, dithered as there)
 		if (haze > 0.0) rgb = mix(rgb, paletteRgb(scene(SceneHaze)), haze);
 		fullColor = rgb;
 		fullColorSet = true;
@@ -1535,6 +1668,31 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 
 void main()
 {
+#ifdef LATER_RAYS
+	// A second or further ray of the pixel: only where the first rays show an edge or texture: this pixel's full colour
+	// against its eight neighbours', and its depth. On a flat stretch (most of a picture at a high resolution, where a
+	// voxel covers many pixels) the pixel's first ray is handed on as it is: several rays there would all show the same.
+	ivec2 at = ivec2(gl_FragCoord.xy), last = textureSize(uFirstTrue, 0) - 1;
+	vec4 here = texelFetch(uFirstTrue, at, 0);
+	float hereDepth = texelFetch(uFirstDepth, at, 0).r;
+	float contrast = 0.0, depthStep = 0.0;
+	for (int side = 0; side < 8; ++side)
+	{
+		ivec2 beside = clamp(at + ivec2(side < 3 ? -1 : side < 5 ? 0 : 1, side == 0 || side == 3 || side == 5 ? -1 : side == 1 || side == 6 ? 0 : 1), ivec2(0), last);
+		vec3 apart = abs(texelFetch(uFirstTrue, beside, 0).rgb - here.rgb);
+		contrast = max(contrast, max(apart.r, max(apart.g, apart.b)));
+		float besideDepth = texelFetch(uFirstDepth, beside, 0).r;
+		depthStep = max(depthStep, abs(besideDepth - hereDepth) / max(1.0, min(besideDepth, hereDepth)));
+	}
+	if (contrast < FlatContrast && depthStep < 0.03)
+	{
+		outColor = texelFetch(uFirstColor, at, 0).r;
+		outDepth = hereDepth;
+		outGlow = uint(here.a * 255.0 + 0.5);
+		outTrue = here;
+		return;
+	}
+#endif
 	vec3 rayFullColor;
 	shadeRay(uRayOffset, true, outColor, outDepth, outGlow, rayFullColor);
 	outTrue = vec4(rayFullColor / 255.0, float(outGlow) / 255.0);

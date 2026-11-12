@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..85226401a
+index 000000000..301f70027
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,547 @@
+@@ -0,0 +1,551 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -269,13 +269,17 @@ index 000000000..85226401a
 +  STR_FPS_SOFT_SHADOWS: "Soft sun shadows"
 +  STR_FPS_SOFT_SHADOWS_DESC: "Renderer GPU only, with Shadows on. The sun's shadows get a soft edge, wider the further they fall."
 +  STR_FPS_ALL_LIGHT_SHADOWS: "Shadows from every light"
-+  STR_FPS_ALL_LIGHT_SHADOWS_DESC: "Renderer GPU only, with Shadows on. Every lamp and flare in reach throws shadows, not only the strongest."
++  STR_FPS_ALL_LIGHT_SHADOWS_DESC: "Renderer GPU only, with Shadows on. The three strongest lamps and every flare in reach throw shadows, not only the strongest."
 +  STR_FPS_AMBIENT_OCCLUSION: "Ambient occlusion"
 +  STR_FPS_AMBIENT_OCCLUSION_DESC: "Renderer GPU only. Corners, the foot of walls and the gaps between things are darker: the world gets depth."
 +  STR_FPS_TRUE_COLOR: "True colour"
 +  STR_FPS_TRUE_COLOR_DESC: "Renderer GPU, 3D resolution Display, and OpenGL output or a 32-bit scaler. The 3D world past the palette's 256 colours."
 +  STR_FPS_SMOOTH_LIGHT: "Smooth light"
 +  STR_FPS_SMOOTH_LIGHT_DESC: "With True colour. Light, shadows and haze blend smoothly where the palette's picture has a dot pattern."
++  STR_FPS_COLORED_LIGHTS: "Coloured lights"
++  STR_FPS_COLORED_LIGHTS_DESC: "With True colour. Shots in flight, explosions, fires and muzzle flashes light the walls and ground round them in their own colour."
++  STR_FPS_REFLECTIONS: "Reflections"
++  STR_FPS_REFLECTIONS_DESC: "With True colour. The sea mirrors the sky, the clouds and what stands in it, more the flatter you look at it."
 +  STR_FPS_VIEW_RESOLUTION: "3D resolution"
 +  STR_FPS_VIEW_RESOLUTION_DESC: "The 3D world as fine as its HUD, as the battlescape, or as the display itself, whatever the battlescape's scale."
 +  STR_FPS_VIEW_RESOLUTION_HUD: "HUD"
@@ -677,10 +681,10 @@ index 000000000..85226401a
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..9aabbc33b
+index 000000000..8db32f6d8
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,547 @@
+@@ -0,0 +1,551 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -822,13 +826,17 @@ index 000000000..9aabbc33b
 +  STR_FPS_SOFT_SHADOWS: "Soft sun shadows"
 +  STR_FPS_SOFT_SHADOWS_DESC: "Renderer GPU only, with Shadows on. The sun's shadows get a soft edge, wider the further they fall."
 +  STR_FPS_ALL_LIGHT_SHADOWS: "Shadows from every light"
-+  STR_FPS_ALL_LIGHT_SHADOWS_DESC: "Renderer GPU only, with Shadows on. Every lamp and flare in reach throws shadows, not only the strongest."
++  STR_FPS_ALL_LIGHT_SHADOWS_DESC: "Renderer GPU only, with Shadows on. The three strongest lamps and every flare in reach throw shadows, not only the strongest."
 +  STR_FPS_AMBIENT_OCCLUSION: "Ambient occlusion"
 +  STR_FPS_AMBIENT_OCCLUSION_DESC: "Renderer GPU only. Corners, the foot of walls and the gaps between things are darker: the world gets depth."
 +  STR_FPS_TRUE_COLOR: "True colour"
 +  STR_FPS_TRUE_COLOR_DESC: "Renderer GPU, 3D resolution Display, and OpenGL output or a 32-bit scaler. The 3D world past the palette's 256 colours."
 +  STR_FPS_SMOOTH_LIGHT: "Smooth light"
 +  STR_FPS_SMOOTH_LIGHT_DESC: "With True colour. Light, shadows and haze blend smoothly where the palette's picture has a dot pattern."
++  STR_FPS_COLORED_LIGHTS: "Coloured lights"
++  STR_FPS_COLORED_LIGHTS_DESC: "With True colour. Shots in flight, explosions, fires and muzzle flashes light the walls and ground round them in their own colour."
++  STR_FPS_REFLECTIONS: "Reflections"
++  STR_FPS_REFLECTIONS_DESC: "With True colour. The sea mirrors the sky, the clouds and what stands in it, more the flatter you look at it."
 +  STR_FPS_VIEW_RESOLUTION: "3D resolution"
 +  STR_FPS_VIEW_RESOLUTION_DESC: "The 3D world as fine as its HUD, as the battlescape, or as the display itself, whatever the battlescape's scale."
 +  STR_FPS_VIEW_RESOLUTION_HUD: "HUD"
@@ -22085,7 +22093,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..5a6bb70da 100644
+index a08796ced..bce39265a 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -22102,7 +22110,7 @@ index a08796ced..5a6bb70da 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsTrueColor, fpsSmoothLight, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers;
++OPT bool fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers;
 +OPT int fpsRenderer, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
@@ -23126,10 +23134,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..ce57b0b1e
+index 000000000..be8bf8c30
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1449 @@
+@@ -0,0 +1,1453 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24005,6 +24013,10 @@ index 000000000..ce57b0b1e
 +	// light on it blended where the palette's picture dithers. Off by default.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsTrueColor", &fpsTrueColor, false, "STR_FPS_TRUE_COLOR", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmoothLight", &fpsSmoothLight, false, "STR_FPS_SMOOTH_LIGHT", category));
++	// In full colour: shots in flight, explosions, fires and a muzzle flash light what is round them in their own colour.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsColoredLights", &fpsColoredLights, false, "STR_FPS_COLORED_LIGHTS", category));
++	// In full colour: the sea mirrors the sky and what stands in it.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsReflections", &fpsReflections, false, "STR_FPS_REFLECTIONS", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 0, "STR_FPS_PIXEL_SIZE", category));
 +	// The crosshair: shown or not, the shot info under it, aiming at the exact point under it
 +	// (YES) or at the tile, as the original game does (NO), and the units' hitboxes.
@@ -26166,10 +26178,10 @@ index 000000000..989a6a6fa
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..af1010c5b
+index 000000000..ae636780a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,1496 @@
+@@ -0,0 +1,1591 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -26721,7 +26733,10 @@ index 000000000..af1010c5b
 +		Gl::UInt id = 0;
 +		std::unordered_map<std::string, Gl::Int> locations; // its uniforms, by name
 +	};
++	// ... and again with the coloured lights and the reflections in it, when their settings are on (see programFor).
 +	Program programs[2];
++	std::map<int, Program> extraPrograms; // by 1 coloured lights | 2 reflections
++	Program *programFor(const Frame &frame, bool results, bool laterRays = false);
 +	Gl::UInt resolveProgram = 0; // makes one picture of several rays a pixel (ResolveSource); 0: not built, one ray a pixel
 +	Program *program = &programs[0];
 +	Gl::UInt vertexArray = 0;
@@ -26764,7 +26779,7 @@ index 000000000..af1010c5b
 +	void threadLoop();
 +	void run(const std::function<void()> &work);
 +	bool start(int device);
-+	bool build(Program &built, bool results);
++	bool build(Program &built, bool results, int extras = 0);
 +	Gl::Int location(const char *name);
 +	Uint32 modelId(const FirstPersonView::VoxelModel *model);
 +	Uint32 solidId(FirstPersonView::SolidRows solid);
@@ -26888,9 +26903,10 @@ index 000000000..af1010c5b
 + * Builds the rays' program: the picture-wide triangle, and the walk and the shading, with or
 + * without the check's results; its samplers are pointed at the buffers' textures.
 + */
-+bool FirstPersonGpu::State::build(Program &built, bool results)
++bool FirstPersonGpu::State::build(Program &built, bool results, int extras)
 +{
-+	const std::string raySource = std::string("#version 330 core\n") + (results ? "#define RESULTS\n" : "") + HeaderSource + shaderConstants() + WalkSource + ShadeSource;
++	const std::string raySource = std::string("#version 330 core\n") + (results ? "#define RESULTS\n" : "") + ((extras & 1) ? "#define COLORED_LIGHTS\n" : "")
++		+ ((extras & 2) ? "#define REFLECTIONS\n" : "") + ((extras & 4) ? "#define LATER_RAYS\n" : "") + HeaderSource + shaderConstants() + WalkSource + ShadeSource;
 +	const char *sources[2] = { VertexSource, raySource.c_str() };
 +	const Gl::Enum kinds[2] = { Gl::VERTEX_SHADER, Gl::FRAGMENT_SHADER };
 +	built.id = Gl::CreateProgram();
@@ -26928,7 +26944,44 @@ index 000000000..af1010c5b
 +	{
 +		Gl::Uniform1i(Gl::GetUniformLocation(built.id, samplers[unit]), unit);
 +	}
++	// (The first ray's pictures, for the program of a pixel's later rays: where the resolve reads them too.)
++	Gl::Uniform1i(Gl::GetUniformLocation(built.id, "uFirstColor"), BufferCount + 1);
++	Gl::Uniform1i(Gl::GetUniformLocation(built.id, "uFirstDepth"), BufferCount + 2);
++	Gl::Uniform1i(Gl::GetUniformLocation(built.id, "uFirstTrue"), BufferCount + 3);
 +	return true;
++}
++
++/**
++ * The rays' program for a frame: the plain one (or the check's); or, when the frame has coloured lights or wants the
++ * sea's reflections, one with those built in, made the first frame their settings are on (the game waits while the
++ * driver builds it: some seconds, once; drivers keep what they built). If that one won't build, the plain one draws.
++ */
++FirstPersonGpu::State::Program *FirstPersonGpu::State::programFor(const Frame &frame, bool results, bool laterRays)
++{
++	if (results || !frame.palette)
++	{
++		return &programs[results ? 1 : 0];
++	}
++	auto built = [this](int extras) -> Program * {
++		if (!extras) return &programs[0];
++		auto found = extraPrograms.find(extras);
++		if (found == extraPrograms.end())
++		{
++			found = extraPrograms.emplace(extras, Program()).first;
++			if (!build(found->second, false, extras))
++			{
++				Log(LOG_WARNING) << "OpenXcom3D GPU: no coloured lights or reflections on this card";
++				found->second.id = 0;
++			}
++		}
++		return found->second.id ? &found->second : &programs[0];
++	};
++	// (With "Coloured lights" on, the program with them is built now, not when the first shot flies; it is used
++	// only for the frames that have a light.)
++	// (For a pixel's second and further rays, the program that casts them only where the first rays show an edge.)
++	const int mirrors = (frame.reflections ? 2 : 0) | (laterRays ? 4 : 0);
++	if (frame.colorLightsOn) built(mirrors | 1);
++	return built(mirrors | (frame.colorLightCount > 0 ? 1 : 0));
 +}
 +
 +/**
@@ -27297,6 +27350,20 @@ index 000000000..af1010c5b
 +	Gl::Uniform1i(location("uAllLightShadows"), frame.allLightShadows ? 1 : 0);
 +	Gl::Uniform1i(location("uAmbientOcclusion"), frame.ambientOcclusion ? 1 : 0);
 +	Gl::Uniform1i(location("uSmoothLight"), frame.smoothLight && frame.palette ? 1 : 0);
++	Gl::Uniform1i(location("uReflections"), frame.reflections && frame.palette ? 1 : 0);
++	const int colorLightCount = frame.palette ? std::clamp(frame.colorLightCount, 0, 16) : 0;
++	Gl::Uniform1i(location("uColorLightCount"), colorLightCount);
++	if (colorLightCount > 0)
++	{
++		float places[16][4], hues[16][4];
++		for (int light = 0; light < colorLightCount; ++light)
++		{
++			std::copy(frame.colorLights[light], frame.colorLights[light] + 4, places[light]);
++			std::copy(frame.colorLights[light] + 4, frame.colorLights[light] + 8, hues[light]);
++		}
++		Gl::Uniform4fv(location("uColorLightAt"), colorLightCount, &places[0][0]);
++		Gl::Uniform4fv(location("uColorLightOf"), colorLightCount, &hues[0][0]);
++	}
 +	Gl::Uniform1i(location("uGroundModel"), (Gl::Int)modelId(frame.groundModel));
 +	Gl::Uniform1i(location("uWaterModel"), (Gl::Int)modelId(frame.waterModel));
 +	Gl::Uniform1f(location("uNight"), colors.night);
@@ -27409,7 +27476,7 @@ index 000000000..af1010c5b
 +	// The world: this frame's tiles and colours, the camera and the scene, and any model or mask not sent before.
 +	// What is the same as last frame isn't sent again (in a turn-based game, most frames most of it).
 +	auto start = std::chrono::steady_clock::now();
-+	program = &programs[output.results ? 1 : 0];
++	program = programFor(frame, output.results != nullptr);
 +	Gl::UseProgram(program->id);
 +	const size_t tileCount = (size_t)frame.size[0] * frame.size[1] * frame.size[2];
 +	encodeTiles(frame);
@@ -27482,6 +27549,27 @@ index 000000000..af1010c5b
 +			{
 +				Log(LOG_WARNING) << "OpenXcom3D GPU: this card can't draw into the pictures several rays a pixel need";
 +				return false;
++			}
++			if (ray == 1)
++			{
++				// The first ray's pictures, for the others to see where they are needed (see LATER_RAYS in the shader), and
++				// the program that looks (its own uniforms set as the first one's were).
++				const Targets &first = targets[{ blockColumns, blockRows, 1 }];
++				for (int which = 0; which < 3; ++which)
++				{
++					Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 1 + which);
++					Gl::BindTexture(Gl::TEXTURE_2D, first.textures[which == 2 ? 3 : which]);
++				}
++				Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
++				// (OPENXCOM3D_GPU_EVERY_RAY: every ray of every pixel cast, to compare.)
++				static const bool everyRay = getenv("OPENXCOM3D_GPU_EVERY_RAY") != nullptr;
++				Program *later = everyRay ? program : programFor(frame, false, true);
++				if (later != program)
++				{
++					program = later;
++					Gl::UseProgram(program->id);
++					setScene(frame);
++				}
 +			}
 +			const float *offset = samples == 2 ? twoRays[ray] : fourRays[ray];
 +			Gl::Uniform2f(location("uRayOffset"), offset[0], offset[1]);
@@ -27595,6 +27683,25 @@ index 000000000..af1010c5b
 +	return gpu;
 +}
 +
++void FirstPersonGpu::prebuild(int extras)
++{
++	State &state = *_state;
++	state.run([&] {
++		Frame wanted = {};
++		SDL_Color anyPalette[1] = {};
++		wanted.palette = anyPalette;
++		for (int mask = 0; mask <= 3; ++mask)
++		{
++			if ((mask & extras) != mask) continue; // (only what the settings can ask for)
++			wanted.colorLightsOn = false;
++			wanted.colorLightCount = mask & 1;
++			wanted.reflections = (mask & 2) != 0;
++			if (mask) state.programFor(wanted, false);
++			if (extras & 4) state.programFor(wanted, false, true);
++		}
++	});
++}
++
 +std::unique_ptr<FirstPersonGpu> FirstPersonGpu::openAny()
 +{
 +	for (int device = 0; device < 16; ++device)
@@ -27668,10 +27775,10 @@ index 000000000..af1010c5b
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.h b/src/FirstPerson/FirstPersonGpu.h
 new file mode 100644
-index 000000000..767cc6f2d
+index 000000000..d398ef899
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.h
-@@ -0,0 +1,160 @@
+@@ -0,0 +1,167 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -27763,6 +27870,10 @@ index 000000000..767cc6f2d
 +		int samples;                              // rays a pixel, blended: 1, 2 or 4 (setting "Supersampling")
 +		bool softShadows, allLightShadows, ambientOcclusion; // settings "Soft sun shadows", "Shadows from every light", "Ambient occlusion"
 +		const SDL_Color *palette;                 // the view's palette: what the samples' colours blend to (null: no blending)
++		float colorLights[16][8];                 // setting "Coloured lights": each light's place (voxels), its reach, its colour (0..1 each) and strength
++		int colorLightCount;                      // ... how many this frame (0: none, or the setting off)
++		bool colorLightsOn;                       // ... the setting is on (the program for them is built ahead of the first light)
++		bool reflections;                         // setting "Reflections": the sea mirrors the sky and what stands in it (in full colour)
 +		bool smoothLight;                         // setting "Smooth light": the full-colour picture blends where the palette's dithers
 +		float lamps[16][4];                       // the lamps nearby: position, strength
 +		int lampCount;
@@ -27818,6 +27929,9 @@ index 000000000..767cc6f2d
 +	~FirstPersonGpu();
 +	/// The graphics card's name.
 +	const std::string &name() const;
++	/// Builds ahead the programs that have the coloured lights (1) and the reflections (2) in them, and those for a
++	/// pixel's later rays (4, "Supersampling"), for the settings that are on: else the first frame that needs one waits while the driver builds it.
++	void prebuild(int extras);
 +	/// Forgets every model sent up so far (a new battle: the view builds its models anew).
 +	void forgetModels();
 +	/// Casts the frame's rays, a ray for each block of pixelSize x pixelSize pixels, and fills the picture.
@@ -28014,10 +28128,10 @@ index 000000000..b9c81b44f
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..5bf1f2084
+index 000000000..b292256d0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,1605 @@
+@@ -0,0 +1,1763 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -28087,6 +28201,13 @@ index 000000000..5bf1f2084
 +uniform vec2 uHalfPlane;     // the image plane's half-width and half-height
 +uniform ivec2 uViewSize;     // the view in pixels
 +uniform int uPixelSize;      // pixels a ray colours each way
++#ifdef LATER_RAYS
++// For a pixel's second and further rays (setting "Supersampling"): the first ray's pictures. Where the first rays
++// show nothing to smooth (see main), the later ones aren't cast.
++uniform usampler2D uFirstColor;
++uniform sampler2D uFirstDepth, uFirstTrue;
++const float FlatContrast = 26.0 / 255.0; // a pixel within this of all its neighbours, a colour channel each, has nothing to smooth (two shades of a dither are nearer than this; the next voxel's colour mostly isn't)
++#endif
 +uniform vec2 uRayOffset;     // where in its pixel the ray goes, from the middle (0, 0: the CPU's ray; else one of several, setting "Supersampling")
 +uniform float uGhostScale;
 +uniform int uSeeThroughCrops;
@@ -28435,7 +28556,16 @@ index 000000000..5bf1f2084
 +uniform int uUfoLightsOn, uWallPaint;
 +// The finer picture, on the card only (settings, all off by default: with them off the picture is the CPU's).
 +uniform int uSoftShadows, uAllLightShadows, uAmbientOcclusion;
++#ifdef COLORED_LIGHTS
++uniform vec4 uColorLightAt[16]; // setting "Coloured lights": each light's place (voxels) and reach
++uniform vec4 uColorLightOf[16]; // ... its colour (0..1 each) and strength
++uniform int uColorLightCount;
++#endif
++uniform int uReflections;       // setting "Reflections": the sea mirrors the sky and what stands in it
 +uniform int uSmoothLight; // setting "Smooth light": the full-colour picture blends between the palette's shades (and into the haze) where the palette's picture dithers
++// (The coloured lights and the reflections are built into the program only when their settings are on (COLORED_LIGHTS,
++// REFLECTIONS; see FirstPersonGpu.cpp, programFor): with their code merely present, one driver's program ran at half
++// the speed for everything else, ambient occlusion above all, though none of it was reached.)
 +// The pixel in full colour, where the shading worked one out that the palette hasn't (see shadeHit); else it is the palette colour's own.
 +vec3 fullColor;
 +bool fullColorSet;
@@ -28593,25 +28723,29 @@ index 000000000..5bf1f2084
 +	if (uLampCount > 0 && (uNight > 0.3 || uUnderwater != 0))
 +	{
 +		const float lampReach = 120.0;
-+		int brightestLamp = -1;
-+		float brightestPower = 0.0, brightestDistance = 0.0;
++		int brightestLamp = -1, nextLamp = -1, thirdLamp = -1; // (the second and third strongest: for "Shadows from every light")
++		float brightestPower = 0.0, nextPower = 0.0, thirdPower = 0.0;
 +		for (int lamp = 0; lamp < uLampCount; ++lamp)
 +		{
 +			float dx = uLamps[lamp].x - point.x, dy = uLamps[lamp].y - point.y, dz = uLamps[lamp].z - point.z;
 +			float span = sqrt(dx * dx + dy * dy + dz * dz);
 +			if (span > lampReach) continue;
 +			float power = uLamps[lamp].w * (1.0 - span / lampReach) * (1.0 - span / lampReach);
-+			if (power > brightestPower) { brightestPower = power; brightestLamp = lamp; brightestDistance = span; }
++			if (power > brightestPower) { thirdPower = nextPower; thirdLamp = nextLamp; nextPower = brightestPower; nextLamp = brightestLamp; brightestPower = power; brightestLamp = lamp; }
++			else if (power > nextPower) { thirdPower = nextPower; thirdLamp = nextLamp; nextPower = power; nextLamp = lamp; }
++			else if (power > thirdPower) { thirdPower = power; thirdLamp = lamp; }
 +		}
-+		// The strongest lamp alone; with the setting "Shadows from every light", each lamp in reach: the strongest that
-+		// lights the point lights it, the strongest it is hidden from darkens it (with one lamp, the same thing).
-+		// (One loop for both, so the shader holds the shadow ray's walk once here.)
++		// The strongest lamp alone; with the setting "Shadows from every light", the three strongest in reach (a
++		// weaker one's light and shadow are under a shade: a ray for each of sixteen lamps cost a big lit base 19 ms a
++		// frame at 1080p): the strongest that lights the point lights it, the strongest it is hidden from darkens it
++		// (with one lamp, the same thing). (One loop for both, so the shader holds the shadow ray's walk once here.)
 +		bool everyLamp = uAllLightShadows != 0;
 +		int firstLamp = everyLamp ? 0 : brightestLamp, endLamp = everyLamp ? uLampCount : brightestLamp + 1;
-+		if (!everyLamp && (brightestLamp < 0 || brightestPower <= 0.03)) endLamp = firstLamp;
++		if (brightestLamp < 0 || brightestPower <= 0.03) endLamp = firstLamp;
 +		float night = uUnderwater != 0 ? 1.0 : uNight, lit = 0.0, dark = 0.0;
 +		for (int lamp = firstLamp; lamp < endLamp; ++lamp)
 +		{
++			if (lamp != brightestLamp && lamp != nextLamp && lamp != thirdLamp) continue;
 +			vec3 lampPos = uLamps[lamp].xyz;
 +			float dx = lampPos.x - point.x, dy = lampPos.y - point.y, dz = lampPos.z - point.z;
 +			float span = sqrt(dx * dx + dy * dy + dz * dz);
@@ -28675,6 +28809,32 @@ index 000000000..5bf1f2084
 +	return light;
 +}
 +
++#ifdef COLORED_LIGHTS
++/**
++ * The coloured lights' share of a point's full colour (setting "Coloured lights": a shot in flight, an explosion, a
++ * fire, a muzzle flash): each in reach that the face looks towards adds the surface's own colour in the light's, by
++ * the square of how near it is; and, with shadows on, only where it is in sight.
++ * @param rgb The point's colour so far (0..255 each).
++ * @param surface The surface's own colour, unshaded.
++ */
++vec3 coloredLight(vec3 rgb, vec3 surface, vec3 point, vec3 normal)
++{
++	for (int light = 0; light < uColorLightCount; ++light)
++	{
++		vec3 towards = uColorLightAt[light].xyz - point;
++		float span = length(towards), reach = uColorLightAt[light].w;
++		if (span >= reach) continue;
++		float facing = span > 0.5 ? dot(normal, towards) / span : 1.0;
++		if (facing <= 0.0) continue;
++		float power = (1.0 - span / reach) * (1.0 - span / reach) * uColorLightOf[light].w * (0.35 + 0.65 * facing);
++		if (power < 0.02) continue;
++		if (uShadows != 0 && span > 6.0 && shadowed(point, uColorLightAt[light].xyz - towards / span * 3.0)) continue;
++		rgb += (surface * 0.9 + vec3(40.0)) * uColorLightOf[light].rgb * power;
++	}
++	return min(rgb, vec3(255.0));
++}
++
++#endif
 +float flareLight(vec3 point, vec3 normal, bool shadows)
 +{
 +	// Every flare in reach, strongest first; the strongest one or two get a shadow ray.
@@ -28925,6 +29085,38 @@ index 000000000..5bf1f2084
 +	return color;
 +}
 +
++#ifdef REFLECTIONS
++/**
++ * The sky's full colour a way (for a reflection; the pixel's own full colour is left as it was).
++ */
++vec3 skyRgbTowards(vec3 direction, int pixelX, int pixelY)
++{
++	bool wasSet = fullColorSet;
++	vec3 kept = fullColor;
++	fullColorSet = false;
++	uint sky = skyColor(direction, pixelX, pixelY);
++	vec3 rgb = fullColorSet ? fullColor : paletteRgb(sky);
++	fullColorSet = wasSet;
++	fullColor = kept;
++	return rgb;
++}
++
++/**
++ * The way the sea mirrors a ray at a point (setting "Reflections"): off the water's face, tilted by the waves' slope
++ * there, never down into it; and how much of the mirrored picture shows, more the flatter the ray meets the water.
++ */
++vec3 seaMirror(vec3 rayDirection, float x, float y, float span, out float share)
++{
++	float slopeX = waveHeight(x + 1.0, y, span) - waveHeight(x - 1.0, y, span), slopeY = waveHeight(x, y + 1.0, span) - waveHeight(x, y - 1.0, span);
++	vec3 waterNormal = normalize(vec3(-slopeX * 0.5, -slopeY * 0.5, 1.0));
++	vec3 mirrored = reflect(rayDirection, waterNormal);
++	mirrored.z = max(mirrored.z, 0.03);
++	float glancing = 1.0 - clamp(-dot(rayDirection, waterNormal), 0.0, 1.0);
++	share = 0.1 + 0.65 * glancing * glancing * glancing;
++	return normalize(mirrored);
++}
++
++#endif
 +uint colorOutsideMap(vec3 rayOrigin, vec3 rayDirection, float tExit, int exitAxis, int pixelX, int pixelY, out float depth)
 +{
 +	vec3 exitPoint = rayOrigin + rayDirection * tExit;
@@ -28999,14 +29191,30 @@ index 000000000..5bf1f2084
 +			color = blackShare > dither(pixelX + 1, pixelY + 2) ? shadeColor(color, shades) : ((color & 0xF0u) | uint(min(darkest, int(color & 15u) + max(0, shades))));
 +			float haze = uUnderwater != 0 ? smoothStep(uMaxDistance * 0.12, uMaxDistance * 0.65, groundDistance)
 +				: smoothStep(uMaxDistance * hazeStart() * 0.67, uMaxDistance * 1.6, groundDistance);
-+			if (uSmoothLight != 0)
++#ifdef REFLECTIONS
++			bool mirrors = uReflections != 0 && groundIsWater && uUnderwater == 0;
++#else
++			bool mirrors = false;
++#endif
++			if (uSmoothLight != 0 || mirrors)
 +			{
-+				// (In full colour: the shade's fraction, the black of a dark place and the haze blended, as shadeHit does.)
++				// (In full colour: the shade's fraction, the black of a dark place and the haze blended, as shadeHit does;
++				// and the sea past the map's edge mirrors the sky.)
 +				float exact = max(0.0, float(uAmbient) + uFaceShade[4] + waveShade + distanceShade(groundDistance));
++				if (uSmoothLight == 0) exact = floor(exact + dither(pixelX, pixelY));
 +				int low = int(exact);
 +				vec3 rgb = mix(paletteRgb((unlit & 0xF0u) | uint(min(darkest, int(unlit & 15u) + low))), paletteRgb((unlit & 0xF0u) | uint(min(darkest, int(unlit & 15u) + low + 1))), exact - float(low));
 +				if (blackShare > 0.0) rgb = mix(rgb, mix(paletteRgb(shadeColor(unlit, low)), paletteRgb(shadeColor(unlit, low + 1)), exact - float(low)), blackShare);
-+				fullColor = mix(rgb, paletteRgb(scene(SceneHaze)), haze);
++#ifdef REFLECTIONS
++				if (mirrors)
++				{
++					float share;
++					vec3 mirrored = seaMirror(rayDirection, groundX, groundY, groundDistance, share);
++					rgb = mix(rgb, skyRgbTowards(mirrored, pixelX, pixelY), share);
++				}
++#endif
++				float hazeShare = uSmoothLight != 0 ? haze : float(clamp(int(haze * float(HazeSteps) + dither(pixelX + 2, pixelY + 1)), 0, HazeSteps)) / float(HazeSteps);
++				fullColor = mix(rgb, paletteRgb(scene(SceneHaze)), hazeShare);
 +				fullColorSet = true;
 +			}
 +			return hazeColor(color, haze, pixelX + 2, pixelY + 1);
@@ -29437,13 +29645,24 @@ index 000000000..5bf1f2084
 +	{
 +		color = table(UnseenRow, color);
 +	}
-+	if (uSmoothLight != 0)
++#ifdef REFLECTIONS
++	bool mirrors = uReflections != 0 && onSea && uUnderwater == 0;
++#else
++	bool mirrors = false;
++#endif
++#ifdef COLORED_LIGHTS
++	bool colorLit = uColorLightCount > 0;
++#else
++	bool colorLit = false;
++#endif
++	if (uSmoothLight != 0 || colorLit || mirrors)
 +	{
 +		// (Setting "Smooth light", for the full-colour picture: where the palette's picture dithers between two shades,
 +		// the mix of the two by the shade's fraction; likewise into black where the place is dark, into the flare's red,
-+		// and into the haze. A UFO's tint and unseen terrain keep the palette's colour; only their haze is smooth.)
++		// and into the haze. A UFO's tint and unseen terrain keep the palette's colour; only their haze is smooth.
++		// Setting "Coloured lights": their light added, before the haze.)
 +		vec3 rgb = paletteRgb(color);
-+		if (!unseen && ufoLighting < 0)
++		if (uSmoothLight != 0 && !unseen && ufoLighting < 0)
 +		{
 +			float exact = max(0.0, shade);
 +			int low = int(exact);
@@ -29462,7 +29681,35 @@ index 000000000..5bf1f2084
 +				rgb = mix(rgb, mix(paletteRgb(table(FlareRow, lowLit)), paletteRgb(table(FlareRow, highLit)), share), red);
 +			}
 +		}
++#ifdef COLORED_LIGHTS
++		if (colorLit && !hit.emissive && !unseen) rgb = coloredLight(rgb, paletteRgb(baseColor), surfacePoint, normal);
++#endif
++#ifdef REFLECTIONS
++		if (mirrors)
++		{
++			// (Setting "Reflections": one ray off the sea's face; what it meets in the game's light there, or the sky.)
++			float share;
++			vec3 mirrored = seaMirror(rayDirection, surfacePoint.x, surfacePoint.y, hit.t, share);
++			Hit met;
++			int metTile, metAxis;
++			float metDistance;
++			vec3 seen;
++			if (castRay(surfacePoint, mirrored, min(uMaxDistance, 640.0), 2.0, 2.0, met, metTile, metDistance, metAxis) == RAY_HIT)
++			{
++				float metGlow;
++				float metShade = max(0.0, lightAt(surfacePoint + mirrored * met.t, metGlow) + distanceShade(met.t) + 1.5);
++				seen = mix(paletteRgb((met.color & 0xF0u) | uint(min(15, int(met.color & 15u) + int(metShade)))),
++					paletteRgb((met.color & 0xF0u) | uint(min(15, int(met.color & 15u) + int(metShade) + 1))), metShade - floor(metShade));
++			}
++			else
++			{
++				seen = skyRgbTowards(mirrored, pixelX, pixelY);
++			}
++			rgb = mix(rgb, seen, share);
++		}
++#endif
 +		float haze = terrainHaze(hit.t);
++		if (uSmoothLight == 0) haze = float(clamp(int(haze * float(HazeSteps) + dither(pixelX + 2, pixelY + 1)), 0, HazeSteps)) / float(HazeSteps); // (in the palette's steps, dithered as there)
 +		if (haze > 0.0) rgb = mix(rgb, paletteRgb(scene(SceneHaze)), haze);
 +		fullColor = rgb;
 +		fullColorSet = true;
@@ -29555,6 +29802,31 @@ index 000000000..5bf1f2084
 +
 +void main()
 +{
++#ifdef LATER_RAYS
++	// A second or further ray of the pixel: only where the first rays show an edge or texture: this pixel's full colour
++	// against its eight neighbours', and its depth. On a flat stretch (most of a picture at a high resolution, where a
++	// voxel covers many pixels) the pixel's first ray is handed on as it is: several rays there would all show the same.
++	ivec2 at = ivec2(gl_FragCoord.xy), last = textureSize(uFirstTrue, 0) - 1;
++	vec4 here = texelFetch(uFirstTrue, at, 0);
++	float hereDepth = texelFetch(uFirstDepth, at, 0).r;
++	float contrast = 0.0, depthStep = 0.0;
++	for (int side = 0; side < 8; ++side)
++	{
++		ivec2 beside = clamp(at + ivec2(side < 3 ? -1 : side < 5 ? 0 : 1, side == 0 || side == 3 || side == 5 ? -1 : side == 1 || side == 6 ? 0 : 1), ivec2(0), last);
++		vec3 apart = abs(texelFetch(uFirstTrue, beside, 0).rgb - here.rgb);
++		contrast = max(contrast, max(apart.r, max(apart.g, apart.b)));
++		float besideDepth = texelFetch(uFirstDepth, beside, 0).r;
++		depthStep = max(depthStep, abs(besideDepth - hereDepth) / max(1.0, min(besideDepth, hereDepth)));
++	}
++	if (contrast < FlatContrast && depthStep < 0.03)
++	{
++		outColor = texelFetch(uFirstColor, at, 0).r;
++		outDepth = hereDepth;
++		outGlow = uint(here.a * 255.0 + 0.5);
++		outTrue = here;
++		return;
++	}
++#endif
 +	vec3 rayFullColor;
 +	shadeRay(uRayOffset, true, outColor, outDepth, outGlow, rayFullColor);
 +	outTrue = vec4(rayFullColor / 255.0, float(outGlow) / 255.0);
@@ -54699,10 +54971,10 @@ index 000000000..77a3cc4ed
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..ac48f4cc9
+index 000000000..42b05ff15
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
-@@ -0,0 +1,493 @@
+@@ -0,0 +1,594 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -54748,6 +55020,10 @@ index 000000000..ac48f4cc9
 +#include <thread>
 +#include "../Engine/Logger.h"
 +#include "../Battlescape/TileEngine.h"
++#include "../Battlescape/Map.h"
++#include "../Battlescape/Projectile.h"
++#include "../Battlescape/Explosion.h"
++#include "../Savegame/Tile.h"
 +#include "../Engine/Options.h"
 +#include "../Mod/Mod.h"
 +#include "../Savegame/SavedBattleGame.h"
@@ -54786,6 +55062,9 @@ index 000000000..ac48f4cc9
 +		shared.opening = std::thread([] {
 +			const char *device = getenv("OPENXCOM3D_GPU_DEVICE");
 +			shared.gpu = device ? FirstPersonGpu::open(atoi(device)) : FirstPersonGpu::openAny();
++			// (The programs for "Coloured lights" and "Reflections", if those are on, before the card is called ready.)
++			if (shared.gpu) shared.gpu->prebuild((Options::fpsTrueColor && Options::fpsColoredLights ? 1 : 0) | (Options::fpsTrueColor && Options::fpsReflections ? 2 : 0)
++				| (Options::fpsSupersampling > 0 ? 4 : 0));
 +			shared.ready = shared.gpu.get();
 +		});
 +	}
@@ -54873,6 +55152,83 @@ index 000000000..ac48f4cc9
 +	frame.ambientOcclusion = Options::fpsAmbientOcclusion;
 +	frame.palette = view.getPalette();
 +	frame.smoothLight = Options::fpsSmoothLight && view._wantsTrueColor;
++	frame.reflections = Options::fpsReflections && view._wantsTrueColor && view._waterColors[0] != 0; // (only where there is a sea)
++	// The coloured lights (setting "Coloured lights", in full colour): the shots in flight (but plain bullets), the
++	// explosions, the muzzle flash, and the nearest fires; sixteen at most, in that order.
++	frame.colorLightCount = 0;
++	frame.colorLightsOn = Options::fpsColoredLights && view._wantsTrueColor;
++	if (Options::fpsColoredLights && view._wantsTrueColor && view._map)
++	{
++		const SDL_Color *palette = view.getPalette();
++		auto add = [&](float x, float y, float z, float reach, float red, float green, float blue, float strength)
++		{
++			if (frame.colorLightCount >= 16 || strength <= 0.0f) return;
++			const float light[8] = { x, y, z, reach, red / 255.0f, green / 255.0f, blue / 255.0f, strength };
++			std::copy(light, light + 8, frame.colorLights[frame.colorLightCount++]);
++		};
++		// A shot's colour: its trail's, made as bright as it goes (a dark red bolt still lights red).
++		auto addShot = [&](const float *head, FirstPersonView::Trail trail, Uint8 color, float calibre)
++		{
++			if (trail == FirstPersonView::TRAIL_NONE || trail == FirstPersonView::TRAIL_FLYING || trail == FirstPersonView::TRAIL_SMOKE) return;
++			float red = 255, green = 150, blue = 60; // (a rocket's flame, fire)
++			if (trail != FirstPersonView::TRAIL_FIRE && color)
++			{
++				const float top = std::max({ 1, (int)palette[color].r, (int)palette[color].g, (int)palette[color].b });
++				red = palette[color].r * 255.0f / top; green = palette[color].g * 255.0f / top; blue = palette[color].b * 255.0f / top;
++			}
++			add(head[0], head[1], head[2], 72.0f + 12.0f * std::min(3.0f, calibre), red, green, blue, 0.9f);
++		};
++		// (OPENXCOM3D_GPU_TESTLIGHT: an orange light three tiles ahead of the eye, to look at the lights without a fire at hand.)
++		static const bool testLight = getenv("OPENXCOM3D_GPU_TESTLIGHT") != nullptr;
++		if (testLight) add((float)(view._eye[0] + view._forward[0] * 48.0), (float)(view._eye[1] + view._forward[1] * 48.0), (float)view._eye[2], 120.0f, 255, 130, 45, 1.0f);
++		if (Projectile *projectile = view.flyingProjectile())
++		{
++			if (!projectile->getItem())
++			{
++				float head[3];
++				view.shotHead(projectile, head);
++				addShot(head, view._shotTrail, view._shotTrailColor, view._shotCalibre);
++			}
++		}
++		if (view._map->getPartnerProjectile()) addShot(view._partnerHead, view._partnerTrail, view._partnerColor, view._partnerCalibre);
++		for (const Explosion *explosion : *view._map->getExplosions())
++		{
++			const int step = explosion->getCurrentFrame();
++			if (step < 0) continue;
++			const Position at = explosion->getPosition();
++			const float fading = std::max(0.15f, 1.0f - step / 8.0f);
++			if (explosion->isBig()) add((float)at.x, (float)at.y, (float)at.z + 6.0f, 176.0f, 255, 170, 70, 1.6f * fading);
++			else add((float)at.x, (float)at.y, (float)at.z, 44.0f, 255, 215, 150, 0.6f * fading);
++		}
++		if (view._muzzleFlashLight > 0.0f) add(view._muzzleFlashPos[0], view._muzzleFlashPos[1], view._muzzleFlashPos[2], 96.0f, 255, 220, 150, 0.5f * view._muzzleFlashLight);
++		// The fires nearest the eye, each flickering by its own clock.
++		struct Fire { float distance; int tile; };
++		Fire nearest[8];
++		int fires = 0;
++		const int tileCount = view._save->getMapSizeXYZ();
++		for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
++		{
++			Tile *tile = view._save->getTile(tileIndex);
++			if (!tile->getFire() || !view._tileViews[tileIndex].discovered) continue;
++			const Position place = tile->getPosition();
++			const float dx = place.x * 16.0f + 8.0f - (float)view._eye[0], dy = place.y * 16.0f + 8.0f - (float)view._eye[1], dz = place.z * 24.0f + 8.0f - (float)view._eye[2];
++			const Fire fire = { dx * dx + dy * dy + dz * dz, tileIndex };
++			int slot;
++			if (fires < 8) slot = fires++;
++			else if (fire.distance < nearest[7].distance) slot = 7;
++			else continue;
++			while (slot > 0 && nearest[slot - 1].distance > fire.distance) { nearest[slot] = nearest[slot - 1]; --slot; }
++			nearest[slot] = fire;
++		}
++		const float seconds = SDL_GetTicks() / 1000.0f;
++		for (int fire = 0; fire < fires; ++fire)
++		{
++			Tile *tile = view._save->getTile(nearest[fire].tile);
++			const Position place = tile->getPosition();
++			const float flicker = 0.5f + 0.12f * std::sin(seconds * 9.0f + tile->getAnimationOffset() * 1.7f) + 0.06f * std::sin(seconds * 23.0f + nearest[fire].tile);
++			add(place.x * 16.0f + 8.0f, place.y * 16.0f + 8.0f, place.z * 24.0f - tile->getTerrainLevel() + 8.0f, 60.0f, 255, 135, 45, flicker);
++		}
++	}
 +	frame.lampCount = (int)std::min<size_t>(16, view._nearbyLights.size());
 +	for (int lamp = 0; lamp < 16; ++lamp)
 +	{
@@ -54988,9 +55344,26 @@ index 000000000..ac48f4cc9
 +	const bool fullColor = _wantsTrueColor && frame.pixelSize == 1;
 +	if (fullColor) _trueColor.resize((size_t)getWidth() * getHeight());
 +	output.trueColor = fullColor ? _trueColor.data() : nullptr;
-+	if (!gpu->castRays(frame, output, nullptr))
++	// (OPENXCOM3D_GPU_TIMING: where the card's time goes, in the log every 60 frames: sending, drawing, reading back.
++	// The card is waited for after each step, so the frame is slower than it is without.)
++	static const bool timed = getenv("OPENXCOM3D_GPU_TIMING") != nullptr;
++	FirstPersonGpu::Timing timing;
++	if (!gpu->castRays(frame, output, timed ? &timing : nullptr))
 +	{
 +		return false;
++	}
++	if (timed && getWidth() >= 320)
++	{
++		static double upload = 0.0, draw = 0.0, read = 0.0;
++		static int frames = 0;
++		upload += timing.upload; draw += timing.draw; read += timing.read;
++		if (++frames == 60)
++		{
++			Log(LOG_INFO) << "OpenXcom3D GPU: the " << getWidth() << "x" << getHeight() << " view: sending " << upload / frames << " ms, drawing " << draw / frames
++				<< " ms, reading back " << read / frames << " ms";
++			upload = draw = read = 0.0;
++			frames = 0;
++		}
 +	}
 +	// The rays' palette colours are kept beside it: a pixel that still has its ray's colour when the frame is done
 +	// (nothing was drawn over it, no wash went over it) is shown in its full colour (see trueColor).
@@ -55198,10 +55571,10 @@ index 000000000..ac48f4cc9
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..fa0ee4ca5
+index 000000000..a52b9fd7a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,1992 @@
+@@ -0,0 +1,1998 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -55660,7 +56033,13 @@ index 000000000..fa0ee4ca5
 +		{
 +			const SDL_Color &color = seen[index];
 +			const float luminance = color.r * 0.3f + color.g * 0.59f + color.b * 0.11f;
-+			_colors.glassTint[index] = nearestSeen(color.r * 0.7f + 150 * 0.3f, color.g * 0.7f + 180 * 0.3f, color.b * 0.7f + 205 * 0.3f);
++			// (Through the goggles glass is only a touch paler: the 30% of pale blue it adds by eye lifted a dark room six
++			// shades of the goggles' sixteen. Before the goggles' own colours were used here (GitHub issue #122) it was worse:
++			// a dark colour's paler mix was often nearest a colour high in a dark group, and showed at full brightness, so
++			// an unlit ceiling seen through a window glared while the part of it a soldier's light fell on came out darker.)
++			const float glassShare = goggles ? 0.07f : 0.3f;
++			_colors.glassTint[index] = nearestSeen(color.r * (1.0f - glassShare) + 150 * glassShare, color.g * (1.0f - glassShare) + 180 * glassShare,
++				color.b * (1.0f - glassShare) + 205 * glassShare);
 +			_colors.flareTint[index] = nearestSeen(std::min(255.0f, 70 + luminance * 1.15f), luminance * 0.32f, luminance * 0.24f);
 +			auto toned = [&](float channel, int axis) {
 +				return channel + (std::min(255.0f, UnseenToneRgb[axis] * luminance / slateLuminance) - channel) * UnseenToneShare;
@@ -71079,7 +71458,7 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..b699871af
+index 000000000..8da5dd7a5
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,997 @@
@@ -71307,7 +71686,7 @@ index 000000000..b699871af
 +			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsMiddleClickIdentify" } },
 +		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 +		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
-+		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion", "fpsTrueColor", "fpsSmoothLight" } },
++		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion", "fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections" } },
 +	};
 +	std::vector<bool> placed(gathered.size(), false);
 +	for (const auto &section : sections)
