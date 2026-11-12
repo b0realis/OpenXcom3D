@@ -51,6 +51,7 @@
  */
 #include "FirstPersonView.h"
 #include <chrono>
+#include <sstream>
 #include <cstdlib>
 #include <algorithm>
 #include <cmath>
@@ -591,10 +592,23 @@ void FirstPersonView::draw()
 	updateColors();
 	updateParticles();
 
+	// (OPENXCOM3D_PASS_TIME: the log gets each pass's share of the main view's drawing time, averaged over 120 frames.)
+	static const bool passTime = getenv("OPENXCOM3D_PASS_TIME") != nullptr;
+	static const char *const passNames[] = { "castAllRays", "watchUnits", "drawDecals", "drawFloorItems", "drawEdgeDots", "drawUnits", "drawFire", "drawProjectilesAndExplosions", "drawFlares", "drawBeams", "drawPellets", "drawTrajectory", "drawSeeThroughSmoke", "findUnitAtPointer", "drawParticles", "drawLightHalos", "applyScreenWash", "drawTrajectory", "applySignalGlitches", "drawBurning", "drawHurt", "drawDamageNumbers", "drawDownedIcons", "drawMarkers", "drawSprayMarks", "drawFacing" };
+	static double passSums[26] = {};
+	static int passFrames = 0;
+	double *const passTimes = passTime && getWidth() >= 320 ? passSums : nullptr;
+	struct PassTimer
+	{
+		double *sum;
+		std::chrono::steady_clock::time_point started;
+		PassTimer(double *sums, int pass) : sum(sums ? sums + pass : nullptr) { if (sum) started = std::chrono::steady_clock::now(); }
+		~PassTimer() { if (sum) *sum += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count(); }
+	};
 	// Draw straight into the surface's pixels.
 	lock();
 	// The world: terrain, border and sky, ray by ray (fills the depth buffer).
-	castAllRays();
+	{ PassTimer pass(passTimes, 0); castAllRays(); }
 	// What's in the world: first the units are checked for hits and kills (for their flinches
 	// and the hitmarker), then everything is drawn over the terrain as sprites, dots and lines.
 	// (No unit is on the screen yet, for the see-through smoke.)
@@ -604,37 +618,59 @@ void FirstPersonView::draw()
 	std::fill(&_pointerUnits[0][0], &_pointerUnits[0][0] + sizeof(_pointerUnits) / sizeof(_pointerUnits[0][0]), nullptr);
 	std::fill(&_pointerBodies[0][0], &_pointerBodies[0][0] + sizeof(_pointerBodies) / sizeof(_pointerBodies[0][0]), nullptr);
 	std::fill(&_pointerPiles[0][0], &_pointerPiles[0][0] + sizeof(_pointerPiles) / sizeof(_pointerPiles[0][0]), nullptr);
-	watchUnits();
-	drawDecals();
-	drawFloorItems();
-	drawEdgeDots();
-	drawUnits();
-	drawFire();
-	drawProjectilesAndExplosions();
-	drawFlares();
-	drawBeams();
-	drawPellets();
-	drawTrajectory(false);
-	drawSeeThroughSmoke();
-	findUnitAtPointer();
-	drawParticles();
-	drawLightHalos();
+	{ PassTimer pass(passTimes, 1); watchUnits(); }
+	{ PassTimer pass(passTimes, 2); drawDecals(); }
+	{ PassTimer pass(passTimes, 3); drawFloorItems(); }
+	{ PassTimer pass(passTimes, 4); drawEdgeDots(); }
+	{ PassTimer pass(passTimes, 5); drawUnits(); }
+	{ PassTimer pass(passTimes, 6); drawFire(); }
+	{ PassTimer pass(passTimes, 7); drawProjectilesAndExplosions(); }
+	{ PassTimer pass(passTimes, 8); drawFlares(); }
+	{ PassTimer pass(passTimes, 9); drawBeams(); }
+	{ PassTimer pass(passTimes, 10); drawPellets(); }
+	{ PassTimer pass(passTimes, 11); drawTrajectory(false); }
+	{ PassTimer pass(passTimes, 12); drawSeeThroughSmoke(); }
+	{ PassTimer pass(passTimes, 14); drawParticles(); }
+	// The passes so far were recorded for the graphics card (setting "Renderer": GPU): it draws them over its rays' picture now,
+	// and the bloom over that, and gives the finished one back. (Its check: the CPU's own bloom first, then the two compared.)
+	if (_gpuRecording && !_gpuChecking)
+	{
+		PassTimer pass(passTimes, 0);
+		gpuDrawEffects();
+	}
+	else
+	{
+		{ PassTimer pass(passTimes, 15); drawLightHalos(); }
+		if (_gpuRecording) gpuDrawEffects();
+	}
+	{ PassTimer pass(passTimes, 13); findUnitAtPointer(); }
 	// Effects on the finished picture (a camera's feed: its bad signal last). Under night vision
 	// the aimed path is light in the goggles: drawn again over the green, white-green.
-	applyScreenWash();
-	if (_nightVision) drawTrajectory(true);
-	if (_signalGlitches) applySignalGlitches();
-	drawBurning();
-	drawHurt();
+	{ PassTimer pass(passTimes, 16); applyScreenWash(); }
+	if (_nightVision) { PassTimer pass(passTimes, 17); drawTrajectory(true); }
+	if (_signalGlitches) { PassTimer pass(passTimes, 18); applySignalGlitches(); }
+	{ PassTimer pass(passTimes, 19); drawBurning(); }
+	{ PassTimer pass(passTimes, 20); drawHurt(); }
 	// The numbers rising over the units hit (setting "Damage numbers"): in the world, walls in front
 	// hiding them, but over the screen's effects, so their colours read.
-	drawDamageNumbers();
+	{ PassTimer pass(passTimes, 21); drawDamageNumbers(); }
 	// The icons over the downed units, the enemy markers and the units' facing rings, over everything.
-	drawDownedIcons();
-	drawMarkers();
-	drawSprayMarks();
-	drawFacing();
+	{ PassTimer pass(passTimes, 22); drawDownedIcons(); }
+	{ PassTimer pass(passTimes, 23); drawMarkers(); }
+	{ PassTimer pass(passTimes, 24); drawSprayMarks(); }
+	{ PassTimer pass(passTimes, 25); drawFacing(); }
 	unlock();
+	if (passTimes && ++passFrames == 120)
+	{
+		std::ostringstream line;
+		for (size_t pass = 0; pass < sizeof(passSums) / sizeof(passSums[0]); ++pass)
+		{
+			if (passSums[pass] / passFrames >= 0.005) line << " " << passNames[pass] << " " << std::lround(passSums[pass] / passFrames * 1000.0) / 1000.0;
+			passSums[pass] = 0.0;
+		}
+		passFrames = 0;
+		Log(LOG_INFO) << "OpenXcom3D: the " << getWidth() << "x" << getHeight() << " view's passes, ms:" << line.str();
+	}
 }
 
 /**

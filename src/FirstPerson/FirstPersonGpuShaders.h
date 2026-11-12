@@ -1909,6 +1909,365 @@ void main()
 }
 )";
 
+
+/**
+ * The units and effects, drawn on the card over the rays' picture (see FirstPersonGpu::drawEffects):
+ * a pixel walks the frame's primitives that can touch it, in the order the CPU's passes draw
+ * them, with the pixel's colour, depth, glow and veils as its own variables, started from the
+ * rays' pictures. A pixel never needs another pixel's state, so nothing is read from a picture
+ * being drawn: the pass needs no extension (OpenGL 3.3, OpenGL ES 3.2 and the Mac's 4.1 alike).
+ * Each kind is the CPU's routine for it, a pixel at a time: FirstPersonView::drawSprite (as its
+ * tilted path works a pixel out, from its own ray), drawGroundShade, drawDecals, drawLine3D.
+ * A primitive is EffectTexels texels of four floats (see FirstPersonViewGpuEffects.cpp, which
+ * writes them, for what each holds).
+ */
+const char *const EffectsSource = R"(
+uniform usampler2D uRayColor, uRayGlow; // the rays' pictures: the palette colour, the glow
+uniform sampler2D uRayDepth;            // ... the depth along the view axis
+uniform usampler2D uSeeThrough;         // a colour over another, by level: FirstPersonView's see-through tables end to end, 2048 bytes a row
+uniform samplerBuffer uPrims;           // the primitives, EffectTexels texels each
+uniform usamplerBuffer uBytes;          // the sprites' pixels and opacity maps
+uniform usamplerBuffer uBins;           // a number per bin of the screen (and one more): where its list starts; then the lists, a primitive's number each
+uniform vec3 uForward, uRight, uUp, uLevelRight, uLevelUp; // the camera, in true proportions (see FirstPersonView::updateBasis)
+uniform vec2 uLevel;                    // straight ahead along the ground
+uniform float uEyeZ, uFocal;            // the eye's height in voxels; the focal length in pixels
+uniform ivec2 uViewSize, uBinGrid;      // the view in pixels; the bins across and down
+uniform int uPixelSize;                 // pixels a ray coloured each way
+layout(location = 0) out uint outColor;
+layout(location = 1) out float outDepth;
+layout(location = 2) out uint outGlow;  // the glow (1, 3), and 64 where see-through smoke lies over the pixel
+layout(location = 3) out uvec4 outNotes; // the unit veil left, own colours | smoke veil << 1, and for the pointer: 1 + the last solid sprite's number, 1 + the last pile's
+
+const float Bayer[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+float dither(int x, int y) { return Bayer[(y & 3) * 4 + (x & 3)] / 16.0; }
+uint shadeColor(uint color, int shade)
+{
+	if (shade <= 0) return color;
+	uint shaded = color + uint(shade);
+	return shaded > 255u || ((shaded ^ color) & 0xF0u) != 0u ? 15u : shaded;
+}
+uint darkened(uint color, int shades) { return color == 0u ? color : (color & 0xF0u) | uint(min(15, int(color & 15u) + shades)); }
+uint seeThrough(int level, uint over, uint under)
+{
+	if (level >= SeeThroughLevels) return over;
+	if (level <= 0) return under;
+	int at = ((level - 1) << 16) | (int(over) << 8) | int(under); // (the tables end to end, 2048 bytes a row)
+	return texelFetch(uSeeThrough, ivec2(at & 2047, at >> 11), 0).r;
+}
+vec4 prim(int base, int texel) { return texelFetch(uPrims, base + texel); }
+
+void main()
+{
+	ivec2 pixel = ivec2(gl_FragCoord.xy), from = pixel / uPixelSize;
+	uint color = texelFetch(uRayColor, from, 0).r, glow = texelFetch(uRayGlow, from, 0).r;
+	float depth = texelFetch(uRayDepth, from, 0).r;
+	int veil = 255, smokeVeil = 0;
+	uint own = 0u, lastSolid = 0u, lastPile = 0u;
+	// The pixel's ray, reaching one unit ahead (so how far along it is the view depth too).
+	float across = (float(pixel.x) + 0.5 - float(uViewSize.x) * 0.5) / uFocal, rise = (float(uViewSize.y) * 0.5 - (float(pixel.y) + 0.5)) / uFocal;
+	vec3 ray = uForward + across * uRight + rise * uUp;
+	int bin = (pixel.y / EffectBin) * uBinGrid.x + pixel.x / EffectBin;
+	int listEnd = int(texelFetch(uBins, bin + 1).r);
+	for (int entry = int(texelFetch(uBins, bin).r); entry < listEnd; ++entry)
+	{
+		int number = int(texelFetch(uBins, entry).r), base = number * EffectTexels;
+		vec4 box = prim(base, 1);
+		if (float(pixel.x) < box.x || float(pixel.y) < box.y || float(pixel.x) >= box.z || float(pixel.y) >= box.w) continue;
+		vec4 head = prim(base, 0);
+		int kind = int(head.x), flags = int(head.y);
+		if (kind == EffectSprite)
+		{
+			// FirstPersonView::drawSprite: where the ray meets the sprite (its lying rows on the floor in
+			// front of the anchor, the rest on the card), which of its pixels that is, and the pixel put.
+			vec4 t2 = prim(base, 2), t3 = prim(base, 3), t4 = prim(base, 4), t5 = prim(base, 5), t6 = prim(base, 6), t7 = prim(base, 7), t8 = prim(base, 8);
+			vec3 anchor = t2.xyz, cardUp = t3.xyz, cardFacing = t4.xyz;
+			float anchorAcross = t2.w, anchorFacing = t3.w, anchorAlong = t4.w, columnSize = t5.x, rowSize = t5.y, lyingRowSize = t5.z, floorHeight = t5.w,
+				floorSlope = t6.x, anchorRise = t6.y, anchorX = t6.z, anchorY = t6.w;
+			int spriteWidth = int(t7.x), spriteHeight = int(t7.y), pixelsAt = int(t7.z), opacityAt = int(t7.w);
+			bool lying = (flags & 1) != 0, belowAnchor = dot(ray, uLevelUp) < anchorRise;
+			if (lying && belowAnchor && floorHeight >= 0.0) continue;
+			float distance = -1.0, spriteRow = 0.0;
+			float rayAlong = ray.x * uLevel.x + ray.y * uLevel.y, descent = ray.z + floorSlope * rayAlong;
+			if (lying && belowAnchor && descent < 0.0 && floorHeight < 0.0)
+			{
+				distance = (floorHeight + floorSlope * anchorAlong) / descent;
+				spriteRow = anchorY + (anchorAlong - rayAlong * distance) / lyingRowSize;
+			}
+			if (spriteRow < anchorY || distance < 0.0)
+			{
+				float facing = dot(ray, cardFacing);
+				if (facing <= 1e-9) continue;
+				distance = anchorFacing / facing;
+				spriteRow = anchorY - dot(ray * distance - anchor, cardUp) / rowSize;
+				if (ray.z * distance / ZScale < t8.x) continue; // (nothing of the card below the floor it stands on)
+			}
+			if (!(distance >= 1.0 && spriteRow >= 0.0 && spriteRow < float(spriteHeight))) continue;
+			int spriteX = int(floor(anchorX + (dot(ray, uLevelRight) * distance - anchorAcross) / columnSize));
+			if (spriteX < 0 || spriteX >= spriteWidth) continue;
+			int spriteAt = int(floor(spriteRow)) * spriteWidth + spriteX;
+			uint spriteColor = texelFetch(uBytes, pixelsAt + spriteAt).r;
+			float spriteDepth = max(1.0, distance - head.w);
+			if (spriteColor == 0u || spriteDepth >= depth) continue;
+			if ((flags & 8) != 0) lastPile = uint(number + 1);
+			uint ownColours = (flags & 4) != 0 ? 1u : 0u;
+			int shade = int(head.z);
+			int pixelOpacity = (flags & 16) == 0 ? SeeThroughLevels
+				: opacityAt >= 0 ? int(float(texelFetch(uBytes, opacityAt + spriteAt).r) * t8.z + 0.5) : int(float(SeeThroughLevels) * t8.z + 0.5);
+			if (pixelOpacity < SeeThroughLevels)
+			{
+				// See-through (the smoke): mixed over what's there, within what a unit under it and the
+				// smoke's cap leave; the depth stays.
+				int smokeCap = int(t8.w);
+				pixelOpacity = min(pixelOpacity, veil);
+				if (smokeCap > 0) pixelOpacity = min(pixelOpacity, smokeCap - smokeVeil);
+				if (pixelOpacity <= 0) continue;
+				if (veil != 255) veil -= pixelOpacity;
+				if (smokeCap > 0) smokeVeil += pixelOpacity;
+				color = seeThrough(pixelOpacity, shadeColor(spriteColor, shade), color);
+				if (pixelOpacity > SeeThroughLevels / 2)
+				{
+					glow = 0u;
+					own = ownColours;
+				}
+				continue;
+			}
+			if (t8.y < 1.0 && dither(pixel.x, pixel.y) >= t8.y) continue; // (right in front of the camera it fades out)
+			color = shadeColor(spriteColor, shade);
+			depth = spriteDepth;
+			glow = 0u;
+			veil = (flags & 2) != 0 ? UnitVeilMax : 255;
+			own = ownColours;
+			lastSolid = uint(number + 1);
+		}
+		else if (kind == EffectGroundShade)
+		{
+			// FirstPersonView::drawGroundShade: the ray down onto the ground plane; within the disc (or
+			// the patch stretched away from a light) and on the floor right there, darkened, dithered.
+			vec4 t2 = prim(base, 2), t3 = prim(base, 3);
+			vec3 voxelRay = vec3(ray.xy, ray.z / ZScale);
+			float voxelLength = length(voxelRay);
+			if (voxelRay.z / voxelLength > -1e-4) continue;
+			float along = t2.z / ray.z; // (how far along the ray, which reaches one unit ahead: the view depth there too)
+			if (along <= 0.0) continue;
+			vec2 offset = ray.xy * along - t2.xy;
+			float closeness;
+			if ((flags & 1) != 0)
+			{
+				float alongPatch = dot(offset, t3.xy), aside = abs(offset.x * t3.y - offset.y * t3.x);
+				if (alongPatch < 0.0 || alongPatch > t3.z) continue;
+				float share = alongPatch / t3.z, halfWidth = t2.w * (1.0 + (FlareShadowWidening - 1.0) * share);
+				if (aside > halfWidth) continue;
+				closeness = (1.0 - aside / halfWidth) * (1.0 - share);
+			}
+			else
+			{
+				float fromCentre = length(offset);
+				if (fromCentre > t2.w) continue;
+				closeness = 1.0 - fromCentre / t2.w;
+			}
+			if (abs(depth - along) > 3.0) continue;
+			if (closeness * head.w > dither(pixel.x, pixel.y)) color = darkened(color, int(head.z));
+		}
+		else if (kind == EffectDecal)
+		{
+			// FirstPersonView::drawDecals: the pixels whose point in the scene lies within the mark's radius.
+			vec4 t2 = prim(base, 2), t3 = prim(base, 3);
+			float sceneRight = (float(pixel.x) + 0.5 - float(uViewSize.x) * 0.5) * depth / uFocal, sceneUp = (float(uViewSize.y) * 0.5 - (float(pixel.y) + 0.5)) * depth / uFocal;
+			float fromMark = length(vec3(depth - t2.z, sceneRight - t3.x, sceneUp - t3.y));
+			if (pixel == ivec2(int(t2.x), int(t2.y)))
+			{
+				if (fromMark <= t2.w + 2.0 * t3.z + 1.0) color = darkened(color, int(head.z));
+				continue;
+			}
+			if (t2.w < t3.z * 0.5 || fromMark > t3.w) continue;
+			if ((flags & 1) != 0 && fromMark > t3.w * 0.6 && dither(pixel.x, pixel.y) > 0.5) continue; // (a ragged edge)
+			color = darkened(color, fromMark <= t3.w * 0.5 ? int(head.z) : int(head.w));
+		}
+		else if (kind == EffectLine)
+		{
+			// FirstPersonView::drawLine3D: its steps from one end to the other that cover this pixel
+			// (a square of its thickness round each), any of them in front of the scene.
+			vec4 t2 = prim(base, 2), t3 = prim(base, 3), t4 = prim(base, 4);
+			int steps = int(t3.z), thickness = int(head.w);
+			vec2 delta = t2.zw - t2.xy;
+			bool alongX = abs(delta.x) >= abs(delta.y);
+			float span = alongX ? delta.x : delta.y, here = alongX ? float(pixel.x) - t2.x : float(pixel.y) - t2.y;
+			int middle = abs(span) < 1.0 ? 0 : int(here * float(steps) / span);
+			int firstStep = abs(span) < 1.0 ? 0 : max(0, middle - thickness - 2), lastStep = abs(span) < 1.0 ? steps : min(steps, middle + thickness + 2);
+			bool drawn = false;
+			for (int step = firstStep; step <= lastStep && !drawn; ++step)
+			{
+				float progress = float(step) / float(steps);
+				int x = int(t2.x + delta.x * progress), y = int(t2.y + delta.y * progress);
+				float lineDepth = 1.0 / (t3.x + (t3.y - t3.x) * progress);
+				int pointThickness = t4.x > 0.0 ? clamp(int(floor(t4.x * uFocal / lineDepth + 0.5)), 1, thickness) : thickness;
+				int left = x - pointThickness / 2, top = y - pointThickness / 2;
+				if (pixel.x < left || pixel.y < top || pixel.x >= left + pointThickness || pixel.y >= top + pointThickness) continue;
+				drawn = (flags & 2) != 0 || lineDepth < depth + ((flags & 8) != 0 ? 0.0 : 1.0);
+			}
+			if (!drawn || (t3.w < 1.0 && dither(pixel.x, pixel.y) >= t3.w)) continue;
+			color = uint(head.z);
+			if ((flags & 4) == 0) glow = (flags & 1) != 0 ? 1u : 0u;
+		}
+		else if (kind == EffectDot)
+		{
+			// A square of pixels in front of the scene (an edge dot, a particle, the aimed path's dots).
+			vec4 t2 = prim(base, 2);
+			if ((flags & 4) != 0 && (pixel.x == int(box.x) || pixel.x == int(box.z) - 1) && (pixel.y == int(box.y) || pixel.y == int(box.w) - 1)) continue; // (its corners rounded off)
+			if ((flags & 8) != 0 ? head.w > depth + t2.x : head.w >= depth + t2.x) continue;
+			float threshold = dither(pixel.x, pixel.y);
+			if (t2.w > threshold) continue; // (faded into the haze)
+			color = t2.z < 0.0 || threshold < t2.z ? uint(head.z) : uint(t2.y);
+			if ((flags & 1) != 0) glow = 1u;
+			else if ((flags & 2) != 0) glow = 0u;
+		}
+		else if (kind == EffectDisc)
+		{
+			// A round dot in front of the scene, in rings (a shot's head, a flare), or only its rim (a bubble).
+			vec4 t2 = prim(base, 2), t3 = prim(base, 3);
+			vec2 at = vec2(pixel) + ((flags & 2) != 0 ? vec2(0.5) : vec2(0.0));
+			float fromCentre = length(at - t2.xy);
+			if (fromCentre > t2.z || head.w >= depth + t2.w) continue;
+			if ((flags & 4) != 0)
+			{
+				if (fromCentre > t2.z - 1.0) color = uint(head.z);
+				continue;
+			}
+			color = fromCentre < t2.z * t3.z ? uint(t3.x) : fromCentre < t2.z * t3.w ? uint(t3.y) : uint(head.z);
+			if ((flags & 1) != 0) glow = 1u;
+		}
+		else if (kind == EffectQuad)
+		{
+			// FirstPersonView::fillQuadAtDepth: the pixels whose centres lie inside its four corners, at one depth.
+			vec4 t2 = prim(base, 2), t3 = prim(base, 3);
+			vec2 corners[4] = vec2[4](t2.xy, t2.zw, t3.xy, t3.zw);
+			float rowCentre = float(pixel.y) + 0.5, leftX = 1e9, rightX = -1e9;
+			for (int corner = 0; corner < 4; ++corner)
+			{
+				vec2 edgeStart = corners[corner], edgeEnd = corners[(corner + 1) & 3];
+				if ((edgeStart.y <= rowCentre && edgeEnd.y > rowCentre) || (edgeEnd.y <= rowCentre && edgeStart.y > rowCentre))
+				{
+					float crossX = edgeStart.x + (rowCentre - edgeStart.y) / (edgeEnd.y - edgeStart.y) * (edgeEnd.x - edgeStart.x);
+					leftX = min(leftX, crossX);
+					rightX = max(rightX, crossX);
+				}
+			}
+			if (float(pixel.x) < ceil(leftX - 0.5) || float(pixel.x) > floor(rightX - 0.5) || head.w >= depth) continue;
+			color = uint(head.z);
+			depth = head.w;
+		}
+	}
+	outColor = color;
+	outDepth = depth;
+	outGlow = glow | (smokeVeil > 0 ? 64u : 0u);
+	outNotes = uvec4(uint(veil), own | uint(smokeVeil) << 1, lastSolid, lastPile);
+}
+)";
+
+
+/**
+ * The bloom on the card (FirstPersonView::drawLightHalos), after the units and effects, in three
+ * steps: the shining pixels gathered into a grid a quarter as fine (how much shines in each
+ * cell, and how far away it is) and their colours into one an eighth as fine; both blurred, across
+ * then down, twice; and the picture brightened where the blurred glow lands, as the CPU's
+ * brightenGlowBands does it.
+ */
+const char *const GlowGatherSource = R"(
+uniform usampler2D uColor, uGlow; // the finished picture's palette colours, its glow
+uniform sampler2D uDepth, uPalette; // its depth; the palette, a texel a colour
+uniform ivec2 uViewSize;
+uniform int uCell, uHue;          // the cell's size in pixels; 1: the colours' grid
+uniform float uMaxDistance;
+layout(location = 0) out vec4 outSum;
+
+void main()
+{
+	ivec2 cell = ivec2(gl_FragCoord.xy);
+	vec4 sum = vec4(0.0);
+	for (int y = 0; y < uCell; ++y)
+	{
+		for (int x = 0; x < uCell; ++x)
+		{
+			ivec2 at = cell * uCell + ivec2(x, y);
+			if (at.x >= uViewSize.x || at.y >= uViewSize.y) continue;
+			uint shines = texelFetch(uGlow, at, 0).r & 3u;
+			if (shines == 0u) continue;
+			float weight = float(shines) * (1.0 / 16.0);
+			if (uHue != 0) sum += vec4(weight * texelFetch(uPalette, ivec2(int(texelFetch(uColor, at, 0).r), 0), 0).rgb * 255.0, weight);
+			else sum.xy += vec2(weight, weight * min(texelFetch(uDepth, at, 0).r, uMaxDistance)); // (something shining in the sky counts as far away)
+		}
+	}
+	outSum = sum;
+}
+)";
+
+const char *const GlowBlurSource = R"(
+uniform sampler2D uSource;
+uniform ivec2 uStep;   // across or down
+uniform int uRadius;
+uniform float uScale;  // what the sum is multiplied by
+layout(location = 0) out vec4 outSum;
+
+void main()
+{
+	ivec2 at = ivec2(gl_FragCoord.xy), last = textureSize(uSource, 0) - 1;
+	vec4 sum = vec4(0.0);
+	for (int offset = -uRadius; offset <= uRadius; ++offset) sum += texelFetch(uSource, clamp(at + uStep * offset, ivec2(0), last), 0);
+	outSum = sum * uScale;
+}
+)";
+
+const char *const GlowBrightenSource = R"(
+uniform usampler2D uColor, uGlow, uNearest; // the finished picture; the palette colour nearest each 15-bit colour, 256 a row
+uniform sampler2D uDepth, uGrid, uHueGrid, uPalette;
+uniform float uGain;
+layout(location = 0) out uint outColor;
+layout(location = 1) out uint outGlow;
+
+const float Bayer[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+float dither(int x, int y) { return Bayer[(y & 3) * 4 + (x & 3)] / 16.0; }
+float luminanceOf(vec3 rgb) { return rgb.r * 0.3 + rgb.g * 0.59 + rgb.b * 0.11; }
+
+void main()
+{
+	ivec2 pixel = ivec2(gl_FragCoord.xy);
+	uint color = texelFetch(uColor, pixel, 0).r, glowBits = texelFetch(uGlow, pixel, 0).r;
+	outColor = color;
+	outGlow = glowBits;
+	if ((glowBits & 3u) != 0u || color == 0u) return; // (the shining pixels themselves and the empty ones stay)
+	// The glow here, blended between the four nearest cells, and how far away its light is.
+	ivec2 gridSize = textureSize(uGrid, 0);
+	vec2 grid = clamp((vec2(pixel) + 0.5) / 4.0 - 0.5, vec2(0.0), vec2(gridSize) - 1.001);
+	ivec2 cell = ivec2(grid), next = min(gridSize - 1, cell + 1);
+	vec2 blend = grid - vec2(cell);
+	vec2 above = texelFetch(uGrid, cell, 0).xy * (1.0 - blend.x) + texelFetch(uGrid, ivec2(next.x, cell.y), 0).xy * blend.x;
+	vec2 below = texelFetch(uGrid, ivec2(cell.x, next.y), 0).xy * (1.0 - blend.x) + texelFetch(uGrid, next, 0).xy * blend.x;
+	vec2 here = above * (1.0 - blend.y) + below * blend.y;
+	float glow = here.x;
+	if (glow > 0.0 && texelFetch(uDepth, pixel, 0).r < here.y / glow - 16.0) return; // (well in front of the light: it doesn't shine through)
+	float strength = glow * uGain;
+	if (strength <= dither(pixel.x, pixel.y)) return;
+	float second = dither(pixel.x + 1, pixel.y + 2);
+	int steps = strength > 2.0 + second ? 3 : strength > 1.0 + second ? 2 : 1;
+	// A pixel too dark to show its group's hue takes the light's own colour, the palette's nearest.
+	vec4 hue = texelFetch(uHueGrid, pixel / 8, 0);
+	float hueLuminance = hue.a > 0.0 ? luminanceOf(hue.rgb) / hue.a : 0.0;
+	vec3 dark = texelFetch(uPalette, ivec2(int(color), 0), 0).rgb * 255.0;
+	if (luminanceOf(dark) < DarkGlowLuma && hueLuminance >= 1.0)
+	{
+		float share = float(steps) * DarkGlowStepLuma / hueLuminance / hue.a;
+		ivec3 five = ivec3(floor(min(vec3(255.0), dark + hue.rgb * share) * 31.0 / 255.0 + 0.5));
+		int nearest = (five.r << 10) | (five.g << 5) | five.b;
+		outColor = texelFetch(uNearest, ivec2(nearest & 255, nearest >> 8), 0).r;
+	}
+	else
+	{
+		int brightest = (color & 0xF0u) == 0u ? 1 : 0;
+		outColor = (color & 0xF0u) | uint(max(brightest, int(color & 15u) - steps));
+	}
+}
+)";
+
 }
 
 }

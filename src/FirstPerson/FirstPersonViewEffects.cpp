@@ -1224,6 +1224,12 @@ void FirstPersonView::drawParticles()
 			double tailX, tailY, tailDepth;
 			if (!projectToScreen(tail, tailX, tailY, tailDepth)) continue;
 			const int steps = std::max(1, (int)std::max(std::abs(tailX - screenX), std::abs(tailY - screenY)));
+			if (_gpuRecording)
+			{
+				// (A line a pixel thick at the particle's depth all along, the glow left as it is.)
+				gpuRecordLine(screenX, screenY, depth, tailX, tailY, depth, steps, color, 1, 1.0f, 0.0f, false, false, true, true);
+				if (_gpuRecordOnly) continue;
+			}
 			for (int step = 0; step <= steps; ++step)
 			{
 				const int x = (int)(screenX + (tailX - screenX) * step / steps), y = (int)(screenY + (tailY - screenY) * step / steps);
@@ -1240,6 +1246,12 @@ void FirstPersonView::drawParticles()
 		{
 			// A bubble up close: a ring with a glint on its upper left.
 			const double ringRadius = dotSize * 0.5;
+			if (_gpuRecording)
+			{
+				gpuRecordDisc(screenX, screenY, ringRadius, depth, 0.0f, color, color, color, 0.0f, 0.0f, 2 | 4);
+				gpuRecordDot((int)(screenX - ringRadius * 0.35), (int)(screenY - ringRadius * 0.35), 1, 1, depth, shadeColor(particle.color, std::max(0, shade - 3)), 0);
+				if (_gpuRecordOnly) continue;
+			}
 			for (int y = (int)(screenY - ringRadius) - 1; y <= (int)(screenY + ringRadius) + 1; ++y)
 			{
 				for (int x = (int)(screenX - ringRadius) - 1; x <= (int)(screenX + ringRadius) + 1; ++x)
@@ -1264,6 +1276,11 @@ void FirstPersonView::drawParticles()
 		}
 		// Anything else: a square dot centred on the particle.
 		const int left = (int)screenX - dotSize / 2, top = (int)screenY - dotSize / 2;
+		if (_gpuRecording)
+		{
+			gpuRecordDot(left, top, dotSize, dotSize, depth, color, (particle.kind == P::GLOW || particle.kind == P::BLINK || particle.kind == P::MOTE ? 1 : 0) | (dotSize >= 3 ? 4 : 0));
+			if (_gpuRecordOnly) continue;
+		}
 		for (int y = top; y < top + dotSize; ++y)
 		{
 			for (int x = left; x < left + dotSize; ++x)

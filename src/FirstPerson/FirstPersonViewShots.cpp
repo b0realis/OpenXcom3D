@@ -280,6 +280,11 @@ bool FirstPersonView::drawThrownItem(const Position &current, const Position &be
  */
 void FirstPersonView::fillQuadAtDepth(const double corners[4][2], Uint8 color, float depth)
 {
+	if (_gpuRecording)
+	{
+		gpuRecordQuad(corners, color, depth);
+		if (_gpuRecordOnly) return;
+	}
 	const int width = getWidth(), height = getHeight();
 
 	// The rows it covers: those whose pixel centres lie between its top and bottom corners.
@@ -529,6 +534,14 @@ void FirstPersonView::drawDecals()
 		// A bullet hole's core is darker than its edge (it shows on busy textures such as sand);
 		// a scorch is even all over.
 		const int coreShades = decal.size == 1 ? BulletHoleCoreShades : decal.depth;
+		if (_gpuRecording)
+		{
+			// (The card darkens the pixels: a mark smaller than half a pixel only the one it falls on, see below.)
+			const double recordedRadius = std::min(radius, MarkMaxPixels * pixelSpan * _zoom);
+			gpuRecordDecal(screenX, screenY, depth, markRight, markUp, radius, pixelSpan, recordedRadius, radius < pixelSpan * 0.5 ? 0 : (int)std::ceil(recordedRadius / pixelSpan),
+				coreShades, decal.depth);
+			if (_gpuRecordOnly) continue;
+		}
 
 		// The pixel it falls on, as its core, if the scene there is the surface it marks (within
 		// its radius and two pixels' span of it, and a voxel more: the camera sees a step's edge or
@@ -988,6 +1001,12 @@ void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 c
 	if (!projectToScreen(start, startX, startY, startZ) || !projectToScreen(end, endX, endY, endZ)) return;
 	const int steps = std::max(1, (int)std::max(std::abs(endX - startX), std::abs(endY - startY)));
 	if (steps > 4000) return;
+	if (_gpuRecording)
+	{
+		gpuRecordLine(startX, startY, startZ, endX, endY, endZ, steps, color, thickness, opacity, worldWidth, glows, overEverything);
+		if (_gpuRecordOnly) return;
+	}
+	if (!overEverything) gpuNeedDepth();
 	for (int step = 0; step <= steps; ++step)
 	{
 		const double progress = (double)step / steps;
@@ -1422,6 +1441,11 @@ void FirstPersonView::drawShotDot(const float head[3], const float origin[3], Tr
 	const double focalLength = (width / 2.0) / _halfFovTangent; // in pixels
 	const double size = (trail == TRAIL_PLASMA ? 3.5 : trail == TRAIL_SMOKE ? 1.1 : 0.9) * calibre;
 	const int radius = std::clamp((int)std::lround(size * focalLength / depth * 0.5), 1, 12);
+	if (_gpuRecording)
+	{
+		gpuRecordDisc(screenX, screenY, radius, depth, 0.0f, rim, centre, middle, 0.4f, 0.7f, trail != TRAIL_NONE ? 1 : 0);
+		if (_gpuRecordOnly) return;
+	}
 	// A round dot, depth-tested: the inner 40% in the centre colour, out to 70% the middle one,
 	// the rest the rim.
 	for (int y = (int)screenY - radius; y <= (int)screenY + radius; ++y)
@@ -1603,6 +1627,7 @@ void FirstPersonView::drawTrajectory(bool asNightLight)
  */
 void FirstPersonView::drawTrajectoryPath(const std::vector<Position> &path, TrajectoryLook look, const double muzzleScreen[2], bool muzzleValid, bool asNightLight)
 {
+	if (!_gpuRecording) gpuNeedDepth(); // (drawn again over the wash under night vision: after the card's units and effects)
 	if (path.size() < 2)
 	{
 		return;
@@ -1632,6 +1657,7 @@ void FirstPersonView::drawTrajectoryPath(const std::vector<Position> &path, Traj
 	// the middle, white-green round it.
 	auto drawEndDot = [&](const float end[3], Uint8 middleColor, Uint8 rimColor)
 	{
+		if (!_gpuRecording) gpuNeedDepth();
 		double screenX, screenY, depth;
 		const double endWorld[3] = { end[0], end[1], end[2] };
 		if (!projectToScreen(endWorld, screenX, screenY, depth))
@@ -1643,8 +1669,15 @@ void FirstPersonView::drawTrajectoryPath(const std::vector<Position> &path, Traj
 		for (const auto &offset : dot)
 		{
 			const int pixelX = centreX + offset[0], pixelY = centreY + offset[1];
-			if (pixelX < 0 || pixelY < 0 || pixelX >= width || pixelY >= height || depth > _depthBuffer[pixelY * width + pixelX] + 2.0) continue;
 			const bool middle = offset[0] == 0 && offset[1] == 0;
+			if (_gpuRecording)
+			{
+				// (A pixel each, hidden only by what is more than two voxels nearer.)
+				if (asNightLight) gpuRecordDot(pixelX, pixelY, 1, 1, depth, _colors.nightLight, 8, 2.0f, nightGreen, refused ? 0.0f : middle ? 2.0f : NightLightWhiteShare);
+				else gpuRecordDot(pixelX, pixelY, 1, 1, depth, middle ? middleColor : rimColor, 8 | (_nightVision && Options::fpsGlowingOutlines && !refused ? 1 : 0), 2.0f);
+				if (_gpuRecordOnly) continue;
+			}
+			if (pixelX < 0 || pixelY < 0 || pixelX >= width || pixelY >= height || depth > _depthBuffer[pixelY * width + pixelX] + 2.0) continue;
 			if (asNightLight)
 			{
 				*getRaw(pixelX, pixelY) = !refused && (middle || dither(pixelX, pixelY) < NightLightWhiteShare) ? _colors.nightLight : nightGreen;
@@ -1761,6 +1794,13 @@ void FirstPersonView::drawTrajectoryPath(const std::vector<Position> &path, Traj
 			lastX = screenX; lastY = screenY; lastOnScreen = true;
 			if (sinceDot < NightForcedDotSpacing) continue;
 			sinceDot = 0.0f;
+			if (_gpuRecording)
+			{
+				const int dotLeft = (int)std::floor(screenX) - NightForcedDotSize / 2, dotTop = (int)std::floor(screenY) - NightForcedDotSize / 2;
+				if (asNightLight) gpuRecordDot(dotLeft, dotTop, NightForcedDotSize, NightForcedDotSize, depth, _colors.nightLight, 0, 1.0f, nightGreen, NightLightWhiteShare);
+				else gpuRecordDot(dotLeft, dotTop, NightForcedDotSize, NightForcedDotSize, depth, color, Options::fpsGlowingOutlines ? 1 : 2, 1.0f);
+				if (_gpuRecordOnly) continue;
+			}
 			for (int offsetY = 0; offsetY < NightForcedDotSize; ++offsetY)
 			{
 				for (int offsetX = 0; offsetX < NightForcedDotSize; ++offsetX)

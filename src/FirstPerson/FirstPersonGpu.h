@@ -38,6 +38,10 @@
 namespace OpenXcom
 {
 
+class FirstPersonGpu;
+/// The one renderer on the graphics card, once it is open and ready (see FirstPersonViewGpu.cpp); null before, and where there is none.
+FirstPersonGpu *readyFirstPersonGpu();
+
 class FirstPersonGpu
 {
 public:
@@ -136,6 +140,38 @@ public:
 		RayResult *results;  // what each ray met (a ray each, not a pixel), for the check against the CPU's; null: not asked
 		Uint32 *trueColor;   // the picture in full colour, a pixel each (0x00RRGGBB), width x height, rows from the top; null: not asked (setting "True colour")
 		bool perRay;         // the buffers hold a ray each (the blocks' columns x rows), not a pixel each: nothing is spread over blocks
+		int keep = 0;        // 1: nothing is read back, the pictures stay on the card for drawEffects, which fills these buffers when it is done; 2: read back as ever, and kept for it too (its check against the CPU's passes)
+	};
+	/// The frame's units and effects for the card: what the CPU's passes after the rays would draw, as primitives in
+	/// their drawing order (see FirstPersonViewGpuEffects.cpp, which records them, and EffectsSource, which draws them).
+	struct Effects
+	{
+		static const int Texels = 10;  // a primitive: this many texels of four floats
+		static const int Bin = 32;     // the screen in squares of this many pixels: each has the list of the primitives that may touch it
+		enum Kind { Sprite = 1, GroundShade, Decal, Line, Dot, Disc, Quad };
+		std::vector<float> prims;      // the primitives
+		const std::vector<Uint8> *bytes = nullptr; // the sprites' pixels and opacity maps, where the primitives say: kept from frame to frame, only added to,
+		Uint32 bytesGeneration = 0;    // ... until they are begun anew (another number here): what the card has of them stays good till then
+		std::vector<Uint32> bins;      // per bin (and one more) where its list starts in here; then the lists: a primitive's number each, in order
+		int binColumns = 0, binRows = 0;
+		float forward[3], right[3], up[3], levelRight[3], levelUp[3], level[2]; // the camera in true proportions (FirstPersonView::updateBasis)
+		float eyeZ, focal;             // the eye's height, in voxels; the focal length, in pixels
+		int width = 0, height = 0;     // the view, in pixels
+		const Uint8 *seeThrough = nullptr; // a colour over another, by level: FirstPersonView::_seeThroughTables
+		Uint32 paletteHash = 0;        // the palette they, and the two below, were made for (sent again when it changes)
+		// The bloom after them (FirstPersonView::drawLightHalos).
+		bool halos = false;            // drawn on the card too
+		float glowGain = 0.0f;         // how strongly the glow brightens
+		float maxDistance = 0.0f;      // the view's reach, in voxels (something shining in the sky counts as that far)
+		const SDL_Color *palette = nullptr; // the view's palette
+		const Uint8 *nearestRgb = nullptr;  // the palette colour nearest each 15-bit colour (FirstPersonView::_nearestRgb)
+		// What comes back beside the picture (the colour always; each of these only if asked).
+		bool readDepth = false;        // the depth, into Output::depth (else on demand: readEffectsDepth)
+		bool readGlow = false;         // the glow (1, 3; 64: see-through smoke lies over the pixel), into Output::glow
+		Uint8 *rayColors = nullptr;    // the palette colour each pixel had from its ray, before anything was drawn over it (for the full-colour picture)
+		Uint32 *notes = nullptr;       // four numbers a pixel: the unit veil left, own colours | smoke veil << 1, 1 + the last solid sprite's number, 1 + the last pile's; null: not asked
+		int patch[4] = {};             // ... or only those of a patch of the view (left, top, width, height; none wide: no patch), row by row from its top:
+		Uint32 *patchNotes = nullptr;  // what the player points at is read from the notes round the pointer
 	};
 	/// Where a frame's time went, in milliseconds.
 	struct Timing
@@ -159,6 +195,12 @@ public:
 	/// @param timing If not null, the card is waited for after each step and the times are noted (slower).
 	/// @return False if the card failed (the caller keeps to the CPU).
 	bool castRays(const Frame &frame, const Output &output, Timing *timing);
+	/// Draws the frame's units and effects over the rays' pictures kept on the card (castRays with Output::keep), and
+	/// reads the finished pictures back into the view's buffers.
+	/// @return False if the card failed (the caller keeps to the CPU from now on).
+	bool drawEffects(const Effects &effects, const Output &output, Timing *timing);
+	/// The depth of the units and effects last drawn for a view of this size, read back after all (see Effects::readDepth).
+	bool readEffectsDepth(int width, int height, float *depth);
 
 private:
 	FirstPersonGpu();

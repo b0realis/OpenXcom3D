@@ -156,6 +156,11 @@ bool FirstPersonView::projectToScreen(const double world[3], double &screenX, do
  */
 void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBottom)
 {
+	if (_gpuRecording)
+	{
+		gpuRecordSprite(draw); // (the card draws it: see FirstPersonViewGpuEffects.cpp)
+		if (_gpuRecordOnly) return;
+	}
 	const Surface *sprite = draw.sprite;
 	const int anchorX = draw.anchorX, anchorY = draw.anchorY, shade = draw.shade;
 	const double *world = draw.world;
@@ -506,7 +511,35 @@ void FirstPersonView::drawSprite(const Surface *sprite, int anchorX, int anchorY
  */
 void FirstPersonView::replayDrawList()
 {
-	if (!_drawList.empty())
+	if (_gpuRecording)
+	{
+		// (Recorded for the card, in order: the funnels write each step down. Its check has the CPU draw them too, below.)
+		const bool recordOnly = _gpuRecordOnly;
+		_gpuRecordOnly = true;
+		for (const DrawStep &step : _drawList)
+		{
+			switch (step.kind)
+			{
+			case DrawStep::Sprite:
+				drawSprite(step.sprite);
+				break;
+			case DrawStep::GroundShade:
+				drawGroundShade(step.centre, step.radius, step.steps, step.density, 0, 1 << 30, step.away, step.length);
+				break;
+			case DrawStep::Line:
+				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, 0, 1 << 30, step.glows);
+				break;
+			}
+		}
+		_gpuRecordOnly = recordOnly;
+		if (!recordOnly && !_drawList.empty())
+		{
+			_gpuRecording = false;
+			runOnAllThreads(&FirstPersonView::drawListBands);
+			_gpuRecording = true;
+		}
+	}
+	else if (!_drawList.empty())
 	{
 		runOnAllThreads(&FirstPersonView::drawListBands);
 	}
@@ -1696,6 +1729,11 @@ void FirstPersonView::recordFlareShadow(const BattleUnit *unit, const double fee
 void FirstPersonView::drawGroundShade(const double centre[3], double radius, int steps, float density, int bandTop, int bandBottom,
 	const double *away, double length)
 {
+	if (_gpuRecording)
+	{
+		gpuRecordGroundShade(centre, radius, steps, density, away, length);
+		if (_gpuRecordOnly) return;
+	}
 	// The screen rectangle around it: the four corners of the box around the disc, or around the
 	// stretched patch from its start to its end at its widest, projected (nothing drawn if any is
 	// behind the camera), cut to the view.
@@ -2251,6 +2289,11 @@ void FirstPersonView::drawEdgeDots()
 		const int size = std::max(2, (int)std::lround(EdgeDotSize * focalLength / depth));
 		const float haze = smoothstep(_maxDistance * 0.3f, _maxDistance, (float)depth);
 		const int left = (int)std::lround(screenX - size / 2.0), top = (int)std::lround(screenY - size / 2.0);
+		if (_gpuRecording)
+		{
+			gpuRecordDot(left, top, size, size, depth, shadeColor(_colors.edgeDot, (int)(_colors.ambient * 0.5f)), 0, 1.0f, 0, -1.0f, haze);
+			if (_gpuRecordOnly) return;
+		}
 		for (int pixelY = std::max(0, top); pixelY < std::min(height, top + size); ++pixelY)
 		{
 			for (int pixelX = std::max(0, left); pixelX < std::min(width, left + size); ++pixelX)
@@ -2807,10 +2850,32 @@ void FirstPersonView::drawSeeThroughSmoke()
 	} while (_smokeUpgrades != upgradesBefore);
 	// Only what can show, each puff in the rows it may reach (see cullSmokeDraws); then drawn on
 	// all the view's threads, each a band of rows at a time (see drawSmokeBands).
+	if (_gpuRecording)
+	{
+		// (For the card, every puff once, whole: its own depth test leaves out what can't show.)
+		for (const SmokeDraw &smoke : _smokeDraws)
+		{
+			const SeeThroughSprite seeThroughSprite = { smoke.soft->opacity.data(), smoke.opacity, nullptr, nullptr, nullptr, 0, (int)std::lround(smoke.cap * SeeThroughLevels) };
+			SpriteDraw draw;
+			draw.sprite = smoke.soft->colors;
+			draw.anchorX = 16 * UpscaleFactor;
+			draw.anchorY = smoke.anchorY * UpscaleFactor;
+			std::copy(smoke.world, smoke.world + 3, draw.world);
+			draw.depthBias = SmokeDepthBias;
+			draw.shade = smoke.shade;
+			draw.scale = smoke.scale / UpscaleFactor;
+			draw.seeThrough = &seeThroughSprite;
+			gpuRecordSprite(draw);
+		}
+		if (_gpuRecordOnly) return;
+	}
 	cullSmokeDraws();
 	if (!_smokeDraws.empty())
 	{
+		const bool recording = _gpuRecording;
+		_gpuRecording = false; // (the check: the CPU draws them too, on its threads, nothing recorded twice)
 		runOnAllThreads(&FirstPersonView::drawSmokeBands);
+		_gpuRecording = recording;
 	}
 }
 
@@ -3275,6 +3340,7 @@ void FirstPersonView::drawDownedIcons()
 			if (!projectToScreen(point, screenX, screenY, depth) || depth > _maxDistance) break;
 			const int pixelX = (int)screenX, pixelY = (int)screenY;
 			if (pixelX < 0 || pixelY < 0 || pixelX >= width || pixelY >= height) continue;
+			gpuNeedDepth();
 			inView = _depthBuffer[pixelY * width + pixelX] >= depth - 8.0;
 			break;
 		}
@@ -3421,6 +3487,7 @@ void FirstPersonView::drawDamageNumbers()
 	{
 		if (spots[index].shown)
 		{
+			gpuNeedDepth();
 			FirstPerson::drawDamageNumber(this, font, numbers[index], spots[index].x, bottoms[index], uiScale, now, colors, _depthBuffer.data(), depths[index]);
 		}
 	}

@@ -94,6 +94,16 @@ FirstPersonGpu *sharedGpu(bool open)
 	return shared.ready.load();
 }
 
+}
+
+FirstPersonGpu *readyFirstPersonGpu()
+{
+	return sharedGpu(false);
+}
+
+namespace
+{
+
 /// Sums over the shadow run's frames since its last line in the log.
 struct ShadowStats
 {
@@ -377,6 +387,9 @@ bool FirstPersonView::gpuCastAllRays()
 	output.glow = _glowMask.data();
 	output.results = nullptr;
 	output.perRay = false;
+	// The units and effects on the card too: the rays' pictures stay there, and come back finished (see gpuDrawEffects).
+	output.keep = gpuEffectsWanted();
+	_gpuRaysPixelSize = frame.pixelSize;
 	// The picture in full colour too, if the mode shows this view that way (setting "True colour"; a ray a pixel).
 	const bool fullColor = _wantsTrueColor && frame.pixelSize == 1;
 	if (fullColor) _trueColor.resize((size_t)getWidth() * getHeight());
@@ -404,7 +417,14 @@ bool FirstPersonView::gpuCastAllRays()
 	}
 	// The rays' palette colours are kept beside it: a pixel that still has its ray's colour when the frame is done
 	// (nothing was drawn over it, no wash went over it) is shown in its full colour (see trueColor).
-	if (fullColor)
+	if (output.keep)
+	{
+		_hasLightShafts = frame.lightShafts;
+		gpuBeginEffects();
+		_gpuChecking = output.keep == 2;
+		_gpuRecordOnly = !_gpuChecking;
+	}
+	if (output.keep != 1 && fullColor)
 	{
 		_rayColors.resize(_trueColor.size());
 		for (int row = 0; row < getHeight(); ++row)

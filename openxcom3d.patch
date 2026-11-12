@@ -21814,10 +21814,10 @@ index bc5f08f46..5ddf353f4 100644
  			playMovementSound();
  			if (_parent->getSave()->isPreview())
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 839f80345..f5e822e10 100644
+index 839f80345..b970bbb20 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -441,10 +441,52 @@ set ( rapidyaml_src
+@@ -441,10 +441,53 @@ set ( rapidyaml_src
  
  )
  
@@ -21846,6 +21846,7 @@ index 839f80345..f5e822e10 100644
 +    FirstPerson/FirstPersonView.cpp
 +    FirstPerson/FirstPersonViewEffects.cpp
 +    FirstPerson/FirstPersonViewGpu.cpp
++    FirstPerson/FirstPersonViewGpuEffects.cpp
 +    FirstPerson/FirstPersonViewFlares.cpp
 +    FirstPerson/FirstPersonViewRayCasting.cpp
 +    FirstPerson/FirstPersonViewScreenEffects.cpp
@@ -21870,7 +21871,7 @@ index 839f80345..f5e822e10 100644
      ${engine_src}
      ${geoscape_src}
      ${interface_src}
-@@ -627,7 +669,10 @@ if (WIN32)
+@@ -627,7 +670,10 @@ if (WIN32)
    set(WIN32_LIBS imagehlp dbghelp)
  endif(WIN32)
  
@@ -26290,10 +26291,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..c843968e0
+index 000000000..e4a015482
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,1674 @@
+@@ -0,0 +1,2200 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -26913,6 +26914,36 @@ index 000000000..c843968e0
 +	bool setTargets(int width, int height, bool results, int which = 0);
 +	bool buildResolve();
 +	bool draw(const Frame &frame, const Output &output, Timing *timing);
++
++	// The units and effects (see drawEffects): their program, their buffers (the primitives, the sprites' bytes, the
++	// bins) with a texture each, the see-through tables as a picture, and the pictures they are drawn into, by size.
++	Program effectsProgram;
++	Gl::UInt effectBuffers[3] = {}, effectTextures[3] = {}, seeThroughTexture = 0;
++	Uint32 seeThroughSent = 0;
++	size_t effectBytesSent = 0, effectBytesRoom = 0; // the sprites' bytes the card has, and the room its buffer has for them
++	Uint32 effectBytesGeneration = ~0u;
++	struct EffectTargets
++	{
++		Gl::UInt framebuffer = 0;
++		Gl::UInt textures[4] = {}; // colour, depth, glow, notes
++	};
++	std::map<std::array<int, 2>, EffectTargets> effectTargets;
++	int rayColumns = 0, rayRows = 0, rayPixelSize = 1; // the rays' pictures kept for the effects: their size, and the pixels a ray coloured
++	bool buildEffects();
++	bool drawEffects(const Effects &effects, const Output &output, Timing *timing);
++	// The bloom after them (see drawGlow): its three programs, the palette and its nearest colours as pictures, and
++	// for each size of view the two grids (each with a second to blur through) and the brightened picture with its glow.
++	Gl::UInt glowPrograms[3] = {}, paletteTexture = 0, nearestTexture = 0;
++	Uint32 glowPaletteSent = 0;
++	struct GlowTargets
++	{
++		Gl::UInt framebuffers[5] = {}; // the grid, its second, the colours' grid, its second, the picture
++		Gl::UInt textures[6] = {};     // ... and the picture's glow
++	};
++	std::map<std::array<int, 2>, GlowTargets> glowTargets;
++	Gl::UInt compileFragment(const std::string &source, const char *what);
++	bool buildGlow();
++	bool drawGlow(const Effects &effects, const EffectTargets &drawn, GlowTargets *&brightened);
 +};
 +
 +/**
@@ -27803,6 +27834,20 @@ index 000000000..c843968e0
 +	// The picture, back to the view: straight into its buffers with a ray a pixel; else a ray each
 +	// first, then spread over their blocks of pixels as the CPU's rays fill theirs.
 +	const bool blocks = frame.pixelSize > 1 && !output.perRay;
++	rayColumns = blockColumns;
++	rayRows = blockRows;
++	rayPixelSize = frame.pixelSize;
++	if (output.keep == 1)
++	{
++		// (The effects come next, on the card: see drawEffects, which reads the finished pictures back.)
++		const Gl::Enum error = Gl::GetError();
++		if (error != Gl::NoError)
++		{
++			Log(LOG_WARNING) << "OpenXcom3D GPU: OpenGL error " << std::hex << error;
++			return false;
++		}
++		return true;
++	}
 +	if (blocks)
 +	{
 +		blockColors.resize((size_t)blockColumns * blockRows);
@@ -27845,6 +27890,445 @@ index 000000000..c843968e0
 +	if (error != Gl::NoError)
 +	{
 +		Log(LOG_WARNING) << "OpenXcom3D GPU: OpenGL error " << std::hex << error;
++		return false;
++	}
++	return true;
++}
++
++// ---- The units and effects ----
++
++/**
++ * Builds the effects' program (see EffectsSource) and its buffers. The pictures it reads are on
++ * texture units 0 to 3, its buffers on the three after the rays' own.
++ */
++bool FirstPersonGpu::State::buildEffects()
++{
++	std::string constants;
++	auto number = [&](const char *name, double value) { constants += std::string("const float ") + name + " = " + glslFloat(value) + ";\n"; };
++	auto whole = [&](const char *name, int value) { constants += std::string("const int ") + name + " = " + std::to_string(value) + ";\n"; };
++	number("ZScale", ZScale);
++	number("FlareShadowWidening", FlareShadowWidening);
++	whole("UnitVeilMax", UnitVeilMax);
++	whole("SeeThroughLevels", 16);
++	whole("EffectTexels", Effects::Texels);
++	whole("EffectBin", Effects::Bin);
++	whole("EffectSprite", Effects::Sprite);
++	whole("EffectGroundShade", Effects::GroundShade);
++	whole("EffectDecal", Effects::Decal);
++	whole("EffectLine", Effects::Line);
++	whole("EffectDot", Effects::Dot);
++	whole("EffectDisc", Effects::Disc);
++	whole("EffectQuad", Effects::Quad);
++	const std::string vertexSource = shaderHead() + VertexSource, effectsSource = shaderHead() + constants + EffectsSource;
++	const char *sources[2] = { vertexSource.c_str(), effectsSource.c_str() };
++	const Gl::Enum kinds[2] = { Gl::VERTEX_SHADER, Gl::FRAGMENT_SHADER };
++	const Gl::UInt built = Gl::CreateProgram();
++	for (int which = 0; which < 2; ++which)
++	{
++		const Gl::UInt shader = Gl::CreateShader(kinds[which]);
++		Gl::ShaderSource(shader, 1, &sources[which], nullptr);
++		Gl::CompileShader(shader);
++		Gl::Int compiled = 0;
++		Gl::GetShaderiv(shader, Gl::COMPILE_STATUS, &compiled);
++		if (!compiled)
++		{
++			char log[4096] = "";
++			Gl::GetShaderInfoLog(shader, sizeof(log), nullptr, log);
++			Log(LOG_ERROR) << "OpenXcom3D GPU: the effects' shader would not compile: " << log;
++			return false;
++		}
++		Gl::AttachShader(built, shader);
++		Gl::DeleteShader(shader);
++	}
++	Gl::LinkProgram(built);
++	Gl::Int linked = 0;
++	Gl::GetProgramiv(built, Gl::LINK_STATUS, &linked);
++	if (!linked)
++	{
++		char log[4096] = "";
++		Gl::GetProgramInfoLog(built, sizeof(log), nullptr, log);
++		Log(LOG_ERROR) << "OpenXcom3D GPU: the effects' shader would not link: " << log;
++		return false;
++	}
++	Gl::UseProgram(built);
++	const char *const pictures[4] = { "uRayColor", "uRayDepth", "uRayGlow", "uSeeThrough" };
++	for (int unit = 0; unit < 4; ++unit) Gl::Uniform1i(Gl::GetUniformLocation(built, pictures[unit]), unit);
++	const char *const buffered[3] = { "uPrims", "uBytes", "uBins" };
++	const Gl::Enum formats[3] = { Gl::RGBA32F, Gl::R8UI, Gl::R32UI };
++	Gl::GenBuffers(3, effectBuffers);
++	Gl::GenTextures(3, effectTextures);
++	for (int which = 0; which < 3; ++which)
++	{
++		Gl::BindBuffer(Gl::ARRAY_BUFFER, effectBuffers[which]);
++		Gl::BufferData(Gl::ARRAY_BUFFER, 16, nullptr, Gl::DYNAMIC_DRAW);
++		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + which);
++		Gl::BindTexture(Gl::TEXTURE_BUFFER, effectTextures[which]);
++		Gl::TexBuffer(Gl::TEXTURE_BUFFER, formats[which], effectBuffers[which]);
++		Gl::Uniform1i(Gl::GetUniformLocation(built, buffered[which]), BufferCount + which);
++	}
++	// The see-through tables: 2048 across (the least a card's pictures may be wide), a table's 65536 bytes in 32 rows.
++	Gl::GenTextures(1, &seeThroughTexture);
++	Gl::ActiveTexture(Gl::TEXTURE0 + 3);
++	Gl::BindTexture(Gl::TEXTURE_2D, seeThroughTexture);
++	Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, 2048, 480, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
++	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
++	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
++	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
++	effectsProgram.id = built;
++	Gl::UseProgram(program->id);
++	return Gl::GetError() == Gl::NoError;
++}
++
++/**
++ * A program of the picture-wide triangle and a fragment shader. 0: it would not build (the log says why).
++ */
++Gl::UInt FirstPersonGpu::State::compileFragment(const std::string &source, const char *what)
++{
++	const std::string vertexSource = shaderHead() + VertexSource, fragmentSource = shaderHead() + source;
++	const char *sources[2] = { vertexSource.c_str(), fragmentSource.c_str() };
++	const Gl::Enum kinds[2] = { Gl::VERTEX_SHADER, Gl::FRAGMENT_SHADER };
++	const Gl::UInt built = Gl::CreateProgram();
++	for (int which = 0; which < 2; ++which)
++	{
++		const Gl::UInt shader = Gl::CreateShader(kinds[which]);
++		Gl::ShaderSource(shader, 1, &sources[which], nullptr);
++		Gl::CompileShader(shader);
++		Gl::Int compiled = 0;
++		Gl::GetShaderiv(shader, Gl::COMPILE_STATUS, &compiled);
++		if (!compiled)
++		{
++			char log[4096] = "";
++			Gl::GetShaderInfoLog(shader, sizeof(log), nullptr, log);
++			Log(LOG_ERROR) << "OpenXcom3D GPU: " << what << " would not compile: " << log;
++			return 0;
++		}
++		Gl::AttachShader(built, shader);
++		Gl::DeleteShader(shader);
++	}
++	Gl::LinkProgram(built);
++	Gl::Int linked = 0;
++	Gl::GetProgramiv(built, Gl::LINK_STATUS, &linked);
++	if (!linked)
++	{
++		char log[4096] = "";
++		Gl::GetProgramInfoLog(built, sizeof(log), nullptr, log);
++		Log(LOG_ERROR) << "OpenXcom3D GPU: " << what << " would not link: " << log;
++		return 0;
++	}
++	return built;
++}
++
++/**
++ * Builds the bloom's programs (gather, blur, brighten) and the two pictures of the palette. Their
++ * pictures are on texture units 0 to 6: the finished colour, depth and glow, the grid, the
++ * colours' grid, the palette, its nearest colours.
++ */
++bool FirstPersonGpu::State::buildGlow()
++{
++	const std::string constants = "const float DarkGlowLuma = " + glslFloat(DarkGlowLuma) + ";\nconst float DarkGlowStepLuma = " + glslFloat(DarkGlowStepLuma) + ";\n";
++	glowPrograms[0] = compileFragment(GlowGatherSource, "the bloom's gathering shader");
++	glowPrograms[1] = compileFragment(GlowBlurSource, "the bloom's blurring shader");
++	glowPrograms[2] = compileFragment(constants + GlowBrightenSource, "the bloom's brightening shader");
++	if (!glowPrograms[0] || !glowPrograms[1] || !glowPrograms[2])
++	{
++		return false;
++	}
++	const char *const names[8] = { "uColor", "uDepth", "uGlow", "uGrid", "uHueGrid", "uPalette", "uNearest", "uSource" };
++	const int units[8] = { 0, 1, 2, 3, 4, 5, 6, 3 };
++	for (const Gl::UInt built : glowPrograms)
++	{
++		Gl::UseProgram(built);
++		for (int which = 0; which < 8; ++which)
++		{
++			const Gl::Int at = Gl::GetUniformLocation(built, names[which]);
++			if (at >= 0) Gl::Uniform1i(at, units[which]);
++		}
++	}
++	Gl::GenTextures(1, &paletteTexture);
++	Gl::GenTextures(1, &nearestTexture);
++	Gl::ActiveTexture(Gl::TEXTURE0 + 5);
++	Gl::BindTexture(Gl::TEXTURE_2D, paletteTexture);
++	Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::RGBA8, 256, 1, 0, Gl::RGBA, Gl::UNSIGNED_BYTE, nullptr);
++	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
++	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
++	Gl::ActiveTexture(Gl::TEXTURE0 + 6);
++	Gl::BindTexture(Gl::TEXTURE_2D, nearestTexture);
++	Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, 256, 128, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
++	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
++	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
++	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
++	return Gl::GetError() == Gl::NoError;
++}
++
++/**
++ * The bloom over the finished units and effects (FirstPersonView::drawLightHalos, on the card):
++ * what shines gathered into the two grids, each blurred across and down twice through its second,
++ * and the picture brightened by them into one more, with its glow (the bit for a pixel no longer
++ * its ray's colour set where the bloom changed it).
++ * @param drawn The units and effects' pictures.
++ * @param brightened Set to the bloom's pictures: their fifth framebuffer has the picture (0) and its glow (1).
++ */
++bool FirstPersonGpu::State::drawGlow(const Effects &effects, const EffectTargets &drawn, GlowTargets *&brightened)
++{
++	if (!glowPrograms[0] && !buildGlow())
++	{
++		return false;
++	}
++	const int gridWidth = (effects.width + 3) / 4, gridHeight = (effects.height + 3) / 4, hueWidth = (effects.width + 7) / 8, hueHeight = (effects.height + 7) / 8;
++	GlowTargets &glow = glowTargets[{ effects.width, effects.height }];
++	if (!glow.framebuffers[0])
++	{
++		Gl::GenFramebuffers(5, glow.framebuffers);
++		Gl::GenTextures(6, glow.textures);
++		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
++		for (int which = 0; which < 6; ++which)
++		{
++			const bool grid = which < 4;
++			Gl::BindFramebuffer(Gl::FRAMEBUFFER, glow.framebuffers[std::min(which, 4)]);
++			Gl::BindTexture(Gl::TEXTURE_2D, glow.textures[which]);
++			if (grid) Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::RGBA32F, which < 2 ? gridWidth : hueWidth, which < 2 ? gridHeight : hueHeight, 0, Gl::RGBA, Gl::FLOAT, nullptr);
++			else Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, effects.width, effects.height, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
++			Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
++			Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
++			Gl::FramebufferTexture2D(Gl::FRAMEBUFFER, Gl::COLOR_ATTACHMENT0 + (which == 5 ? 1 : 0), Gl::TEXTURE_2D, glow.textures[which], 0);
++			if (which != 4 && Gl::CheckFramebufferStatus(Gl::FRAMEBUFFER) != Gl::FRAMEBUFFER_COMPLETE)
++			{
++				Log(LOG_WARNING) << "OpenXcom3D GPU: this card can't draw into the pictures the bloom needs";
++				return false;
++			}
++		}
++	}
++	// The palette and its nearest colours, when they change.
++	Gl::ActiveTexture(Gl::TEXTURE0 + 5);
++	Gl::BindTexture(Gl::TEXTURE_2D, paletteTexture);
++	if (effects.paletteHash != glowPaletteSent)
++	{
++		Uint8 colors[256 * 4];
++		for (int index = 0; index < 256; ++index)
++		{
++			colors[index * 4] = effects.palette[index].r; colors[index * 4 + 1] = effects.palette[index].g; colors[index * 4 + 2] = effects.palette[index].b; colors[index * 4 + 3] = 255;
++		}
++		Gl::TexSubImage2D(Gl::TEXTURE_2D, 0, 0, 0, 256, 1, Gl::RGBA, Gl::UNSIGNED_BYTE, colors);
++	}
++	Gl::ActiveTexture(Gl::TEXTURE0 + 6);
++	Gl::BindTexture(Gl::TEXTURE_2D, nearestTexture);
++	if (effects.paletteHash != glowPaletteSent)
++	{
++		Gl::TexSubImage2D(Gl::TEXTURE_2D, 0, 0, 0, 256, 128, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, effects.nearestRgb);
++		glowPaletteSent = effects.paletteHash;
++	}
++	for (int which = 0; which < 3; ++which)
++	{
++		Gl::ActiveTexture(Gl::TEXTURE0 + which);
++		Gl::BindTexture(Gl::TEXTURE_2D, drawn.textures[which]);
++	}
++	const Gl::Enum one[1] = { Gl::COLOR_ATTACHMENT0 };
++	// Each grid: gathered, then blurred through its second (across into it, down back, twice).
++	for (int hue = 0; hue < 2; ++hue)
++	{
++		const int first = hue * 2, width = hue ? hueWidth : gridWidth, height = hue ? hueHeight : gridHeight, radius = hue ? 2 : 3;
++		Gl::Viewport(0, 0, width, height);
++		Gl::UseProgram(glowPrograms[0]);
++		Gl::Uniform2i(Gl::GetUniformLocation(glowPrograms[0], "uViewSize"), effects.width, effects.height);
++		Gl::Uniform1i(Gl::GetUniformLocation(glowPrograms[0], "uCell"), hue ? 8 : 4);
++		Gl::Uniform1i(Gl::GetUniformLocation(glowPrograms[0], "uHue"), hue);
++		Gl::Uniform1f(Gl::GetUniformLocation(glowPrograms[0], "uMaxDistance"), effects.maxDistance);
++		Gl::BindFramebuffer(Gl::FRAMEBUFFER, glow.framebuffers[first]);
++		Gl::DrawBuffers(1, one);
++		Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
++		Gl::UseProgram(glowPrograms[1]);
++		Gl::Uniform1i(Gl::GetUniformLocation(glowPrograms[1], "uRadius"), radius);
++		Gl::Uniform1f(Gl::GetUniformLocation(glowPrograms[1], "uScale"), hue ? 1.0f : 1.0f / (2 * radius + 1));
++		Gl::ActiveTexture(Gl::TEXTURE0 + 3);
++		for (int pass = 0; pass < 4; ++pass)
++		{
++			const int from = first + (pass & 1), to = first + 1 - (pass & 1);
++			Gl::BindFramebuffer(Gl::FRAMEBUFFER, glow.framebuffers[to]);
++			Gl::DrawBuffers(1, one);
++			Gl::BindTexture(Gl::TEXTURE_2D, glow.textures[from]);
++			Gl::Uniform2i(Gl::GetUniformLocation(glowPrograms[1], "uStep"), (pass & 1) ? 0 : 1, (pass & 1) ? 1 : 0);
++			Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
++		}
++	}
++	// The picture brightened by them.
++	Gl::ActiveTexture(Gl::TEXTURE0 + 3);
++	Gl::BindTexture(Gl::TEXTURE_2D, glow.textures[0]);
++	Gl::ActiveTexture(Gl::TEXTURE0 + 4);
++	Gl::BindTexture(Gl::TEXTURE_2D, glow.textures[2]);
++	Gl::BindFramebuffer(Gl::FRAMEBUFFER, glow.framebuffers[4]);
++	if (Gl::CheckFramebufferStatus(Gl::FRAMEBUFFER) != Gl::FRAMEBUFFER_COMPLETE)
++	{
++		return false;
++	}
++	const Gl::Enum two[2] = { Gl::COLOR_ATTACHMENT0, Gl::COLOR_ATTACHMENT0 + 1 };
++	Gl::DrawBuffers(2, two);
++	Gl::Viewport(0, 0, effects.width, effects.height);
++	Gl::UseProgram(glowPrograms[2]);
++	Gl::Uniform1f(Gl::GetUniformLocation(glowPrograms[2], "uGain"), effects.glowGain);
++	Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
++	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
++	brightened = &glow;
++	return true;
++}
++
++/**
++ * The units and effects over the rays' pictures (kept on the card by the frame's draw, see
++ * Output::keep): the primitives, the sprites' bytes and the bins go up, one picture-wide triangle
++ * draws them (see EffectsSource), and the finished colour, depth and glow are read back where the
++ * rays' would have been; the full-colour picture is the rays' own (the glow's bit 128 says where
++ * the pixel is no longer its ray's).
++ */
++bool FirstPersonGpu::State::drawEffects(const Effects &effects, const Output &output, Timing *timing)
++{
++	auto start = std::chrono::steady_clock::now();
++	if (!effectsProgram.id && !buildEffects())
++	{
++		return false;
++	}
++	if (effects.prims.size() / 4 > (size_t)maxBufferTexels || effects.bytes->size() > std::min<size_t>((size_t)maxBufferTexels, 1 << 24) || effects.bins.size() > (size_t)maxBufferTexels)
++	{
++		Log(LOG_WARNING) << "OpenXcom3D GPU: a frame's units and effects are more than this card's buffers take";
++		return false;
++	}
++	const auto rays = targets.find({ rayColumns, rayRows, 0 });
++	if (rays == targets.end())
++	{
++		return false;
++	}
++	// The pictures drawn into, for this size of view.
++	EffectTargets &drawn = effectTargets[{ effects.width, effects.height }];
++	if (!drawn.framebuffer)
++	{
++		Gl::GenFramebuffers(1, &drawn.framebuffer);
++		Gl::BindFramebuffer(Gl::FRAMEBUFFER, drawn.framebuffer);
++		Gl::GenTextures(4, drawn.textures);
++		const Gl::Enum internal[4] = { Gl::R8UI, Gl::R32F, Gl::R8UI, Gl::RGBA16UI }, format[4] = { Gl::RED_INTEGER, Gl::RED, Gl::RED_INTEGER, Gl::RGBA_INTEGER },
++			type[4] = { Gl::UNSIGNED_BYTE, Gl::FLOAT, Gl::UNSIGNED_BYTE, Gl::UNSIGNED_SHORT };
++		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
++		for (int which = 0; which < 4; ++which)
++		{
++			Gl::BindTexture(Gl::TEXTURE_2D, drawn.textures[which]);
++			Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)internal[which], effects.width, effects.height, 0, format[which], type[which], nullptr);
++			Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
++			Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
++			Gl::FramebufferTexture2D(Gl::FRAMEBUFFER, Gl::COLOR_ATTACHMENT0 + which, Gl::TEXTURE_2D, drawn.textures[which], 0);
++		}
++		if (Gl::CheckFramebufferStatus(Gl::FRAMEBUFFER) != Gl::FRAMEBUFFER_COMPLETE)
++		{
++			Log(LOG_WARNING) << "OpenXcom3D GPU: this card can't draw into the pictures the units and effects need";
++			return false;
++		}
++	}
++	Gl::BindFramebuffer(Gl::FRAMEBUFFER, drawn.framebuffer);
++	const Gl::Enum attachments[4] = { Gl::COLOR_ATTACHMENT0, Gl::COLOR_ATTACHMENT0 + 1, Gl::COLOR_ATTACHMENT0 + 2, Gl::COLOR_ATTACHMENT0 + 3 };
++	Gl::DrawBuffers(4, attachments);
++	Gl::Viewport(0, 0, effects.width, effects.height);
++	Gl::UseProgram(effectsProgram.id);
++	// What it reads: the rays' pictures and the see-through tables; this frame's primitives, bytes and bins.
++	for (int which = 0; which < 3; ++which)
++	{
++		Gl::ActiveTexture(Gl::TEXTURE0 + which);
++		Gl::BindTexture(Gl::TEXTURE_2D, rays->second.textures[which]);
++	}
++	Gl::ActiveTexture(Gl::TEXTURE0 + 3);
++	Gl::BindTexture(Gl::TEXTURE_2D, seeThroughTexture);
++	if (effects.seeThrough && effects.paletteHash != seeThroughSent)
++	{
++		Gl::TexSubImage2D(Gl::TEXTURE_2D, 0, 0, 0, 2048, 480, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, effects.seeThrough);
++		seeThroughSent = effects.paletteHash;
++	}
++	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
++	static const float nothing[4] = {};
++	Gl::BindBuffer(Gl::ARRAY_BUFFER, effectBuffers[0]);
++	Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)std::max<size_t>(16, effects.prims.size() * 4), effects.prims.empty() ? (const void *)nothing : effects.prims.data(), Gl::DYNAMIC_DRAW);
++	// The sprites' bytes: only those added since the last frame, while they fit the buffer and weren't begun anew.
++	Gl::BindBuffer(Gl::ARRAY_BUFFER, effectBuffers[1]);
++	const std::vector<Uint8> &bytes = *effects.bytes;
++	if (effects.bytesGeneration != effectBytesGeneration || bytes.size() < effectBytesSent || bytes.size() > effectBytesRoom)
++	{
++		effectBytesRoom = std::max<size_t>(1 << 20, bytes.size() * 2);
++		Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)effectBytesRoom, nullptr, Gl::DYNAMIC_DRAW);
++		effectBytesSent = 0;
++		effectBytesGeneration = effects.bytesGeneration;
++	}
++	if (bytes.size() > effectBytesSent)
++	{
++		Gl::BufferSubData(Gl::ARRAY_BUFFER, (Gl::IntPtr)effectBytesSent, (Gl::SizeiPtr)(bytes.size() - effectBytesSent), bytes.data() + effectBytesSent);
++		effectBytesSent = bytes.size();
++	}
++	Gl::BindBuffer(Gl::ARRAY_BUFFER, effectBuffers[2]);
++	Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)(effects.bins.size() * 4), effects.bins.data(), Gl::DYNAMIC_DRAW);
++	Program *const raysProgram = program;
++	program = &effectsProgram;
++	Gl::Uniform3f(location("uForward"), effects.forward[0], effects.forward[1], effects.forward[2]);
++	Gl::Uniform3f(location("uRight"), effects.right[0], effects.right[1], effects.right[2]);
++	Gl::Uniform3f(location("uUp"), effects.up[0], effects.up[1], effects.up[2]);
++	Gl::Uniform3f(location("uLevelRight"), effects.levelRight[0], effects.levelRight[1], effects.levelRight[2]);
++	Gl::Uniform3f(location("uLevelUp"), effects.levelUp[0], effects.levelUp[1], effects.levelUp[2]);
++	Gl::Uniform2f(location("uLevel"), effects.level[0], effects.level[1]);
++	Gl::Uniform1f(location("uEyeZ"), effects.eyeZ);
++	Gl::Uniform1f(location("uFocal"), effects.focal);
++	Gl::Uniform2i(location("uViewSize"), effects.width, effects.height);
++	Gl::Uniform2i(location("uBinGrid"), effects.binColumns, effects.binRows);
++	Gl::Uniform1i(location("uPixelSize"), rayPixelSize);
++	program = raysProgram;
++	if (timing)
++	{
++		Gl::Finish();
++		timing->upload += millisecondsSince(start);
++		start = std::chrono::steady_clock::now();
++	}
++	Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
++	// The bloom over them (the picture and its glow are then the bloom's).
++	GlowTargets *brightened = nullptr;
++	if (effects.halos && !drawGlow(effects, drawn, brightened))
++	{
++		return false;
++	}
++	if (timing)
++	{
++		Gl::Finish();
++		timing->draw += millisecondsSince(start);
++		start = std::chrono::steady_clock::now();
++	}
++	// The finished pictures, back to the view.
++	if (brightened)
++	{
++		Gl::BindFramebuffer(Gl::FRAMEBUFFER, brightened->framebuffers[4]);
++		readPicture(0, effects.width, effects.height, 0, output.color, output.colorPitch);
++		if (effects.readGlow) readPicture(1, effects.width, effects.height, 0, output.glow, effects.width);
++		Gl::BindFramebuffer(Gl::FRAMEBUFFER, drawn.framebuffer);
++	}
++	else
++	{
++		readPicture(0, effects.width, effects.height, 0, output.color, output.colorPitch);
++		if (effects.readGlow) readPicture(2, effects.width, effects.height, 0, output.glow, effects.width);
++	}
++	if (effects.readDepth) readPicture(1, effects.width, effects.height, 1, output.depth, effects.width);
++	if (effects.notes)
++	{
++		readPicture(3, effects.width, effects.height, 3, effects.notes, effects.width);
++	}
++	if (effects.patchNotes && effects.patch[2] > 0 && effects.patch[3] > 0)
++	{
++		Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0 + 3);
++		Gl::ReadPixels(effects.patch[0], effects.patch[1], effects.patch[2], effects.patch[3], Gl::RGBA_INTEGER, Gl::UNSIGNED_INT, effects.patchNotes);
++	}
++	if ((output.trueColor || effects.rayColors) && rayPixelSize == 1)
++	{
++		Gl::BindFramebuffer(Gl::FRAMEBUFFER, rays->second.framebuffer);
++		if (output.trueColor) readPicture(3, rayColumns, rayRows, 2, output.trueColor, rayColumns);
++		if (effects.rayColors) readPicture(0, rayColumns, rayRows, 0, effects.rayColors, rayColumns);
++	}
++	Gl::UseProgram(program->id);
++	if (timing)
++	{
++		timing->read += millisecondsSince(start);
++	}
++	const Gl::Enum error = Gl::GetError();
++	if (error != Gl::NoError)
++	{
++		Log(LOG_WARNING) << "OpenXcom3D GPU: OpenGL error " << std::hex << error << " drawing the units and effects";
 +		return false;
 +	}
 +	return true;
@@ -27965,15 +28449,58 @@ index 000000000..c843968e0
 +	return drawn;
 +}
 +
++
++/**
++ * The depth of the units and effects last drawn for a view of this size: read back when something
++ * drawn on the CPU after them needs it after all (an icon's or a number's place hidden or not).
++ */
++bool FirstPersonGpu::readEffectsDepth(int width, int height, float *depth)
++{
++	State &state = *_state;
++	if (state.failed)
++	{
++		return false;
++	}
++	bool read = false;
++	state.run([&] {
++		const auto drawn = state.effectTargets.find({ width, height });
++		if (drawn == state.effectTargets.end() || !drawn->second.framebuffer) return;
++		Gl::BindFramebuffer(Gl::FRAMEBUFFER, drawn->second.framebuffer);
++		state.readPicture(1, width, height, 1, depth, width);
++		read = Gl::GetError() == Gl::NoError;
++	});
++	return read;
++}
++
++/**
++ * The frame's units and effects on the card, over the rays' pictures kept there.
++ */
++bool FirstPersonGpu::drawEffects(const Effects &effects, const Output &output, Timing *timing)
++{
++	State &state = *_state;
++	if (state.failed)
++	{
++		return false;
++	}
++	bool drawn = false;
++	state.run([&] { drawn = state.drawEffects(effects, output, timing); });
++	if (!drawn)
++	{
++		state.failed = true;
++		Log(LOG_WARNING) << "OpenXcom3D GPU: the graphics card failed at the units and effects: the CPU draws from now on";
++	}
++	return drawn;
++}
++
 +}
 +
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.h b/src/FirstPerson/FirstPersonGpu.h
 new file mode 100644
-index 000000000..d8016717c
+index 000000000..4eab6ce4f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.h
-@@ -0,0 +1,169 @@
+@@ -0,0 +1,211 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -28013,6 +28540,10 @@ index 000000000..d8016717c
 +
 +namespace OpenXcom
 +{
++
++class FirstPersonGpu;
++/// The one renderer on the graphics card, once it is open and ready (see FirstPersonViewGpu.cpp); null before, and where there is none.
++FirstPersonGpu *readyFirstPersonGpu();
 +
 +class FirstPersonGpu
 +{
@@ -28112,6 +28643,38 @@ index 000000000..d8016717c
 +		RayResult *results;  // what each ray met (a ray each, not a pixel), for the check against the CPU's; null: not asked
 +		Uint32 *trueColor;   // the picture in full colour, a pixel each (0x00RRGGBB), width x height, rows from the top; null: not asked (setting "True colour")
 +		bool perRay;         // the buffers hold a ray each (the blocks' columns x rows), not a pixel each: nothing is spread over blocks
++		int keep = 0;        // 1: nothing is read back, the pictures stay on the card for drawEffects, which fills these buffers when it is done; 2: read back as ever, and kept for it too (its check against the CPU's passes)
++	};
++	/// The frame's units and effects for the card: what the CPU's passes after the rays would draw, as primitives in
++	/// their drawing order (see FirstPersonViewGpuEffects.cpp, which records them, and EffectsSource, which draws them).
++	struct Effects
++	{
++		static const int Texels = 10;  // a primitive: this many texels of four floats
++		static const int Bin = 32;     // the screen in squares of this many pixels: each has the list of the primitives that may touch it
++		enum Kind { Sprite = 1, GroundShade, Decal, Line, Dot, Disc, Quad };
++		std::vector<float> prims;      // the primitives
++		const std::vector<Uint8> *bytes = nullptr; // the sprites' pixels and opacity maps, where the primitives say: kept from frame to frame, only added to,
++		Uint32 bytesGeneration = 0;    // ... until they are begun anew (another number here): what the card has of them stays good till then
++		std::vector<Uint32> bins;      // per bin (and one more) where its list starts in here; then the lists: a primitive's number each, in order
++		int binColumns = 0, binRows = 0;
++		float forward[3], right[3], up[3], levelRight[3], levelUp[3], level[2]; // the camera in true proportions (FirstPersonView::updateBasis)
++		float eyeZ, focal;             // the eye's height, in voxels; the focal length, in pixels
++		int width = 0, height = 0;     // the view, in pixels
++		const Uint8 *seeThrough = nullptr; // a colour over another, by level: FirstPersonView::_seeThroughTables
++		Uint32 paletteHash = 0;        // the palette they, and the two below, were made for (sent again when it changes)
++		// The bloom after them (FirstPersonView::drawLightHalos).
++		bool halos = false;            // drawn on the card too
++		float glowGain = 0.0f;         // how strongly the glow brightens
++		float maxDistance = 0.0f;      // the view's reach, in voxels (something shining in the sky counts as that far)
++		const SDL_Color *palette = nullptr; // the view's palette
++		const Uint8 *nearestRgb = nullptr;  // the palette colour nearest each 15-bit colour (FirstPersonView::_nearestRgb)
++		// What comes back beside the picture (the colour always; each of these only if asked).
++		bool readDepth = false;        // the depth, into Output::depth (else on demand: readEffectsDepth)
++		bool readGlow = false;         // the glow (1, 3; 64: see-through smoke lies over the pixel), into Output::glow
++		Uint8 *rayColors = nullptr;    // the palette colour each pixel had from its ray, before anything was drawn over it (for the full-colour picture)
++		Uint32 *notes = nullptr;       // four numbers a pixel: the unit veil left, own colours | smoke veil << 1, 1 + the last solid sprite's number, 1 + the last pile's; null: not asked
++		int patch[4] = {};             // ... or only those of a patch of the view (left, top, width, height; none wide: no patch), row by row from its top:
++		Uint32 *patchNotes = nullptr;  // what the player points at is read from the notes round the pointer
 +	};
 +	/// Where a frame's time went, in milliseconds.
 +	struct Timing
@@ -28135,6 +28698,12 @@ index 000000000..d8016717c
 +	/// @param timing If not null, the card is waited for after each step and the times are noted (slower).
 +	/// @return False if the card failed (the caller keeps to the CPU).
 +	bool castRays(const Frame &frame, const Output &output, Timing *timing);
++	/// Draws the frame's units and effects over the rays' pictures kept on the card (castRays with Output::keep), and
++	/// reads the finished pictures back into the view's buffers.
++	/// @return False if the card failed (the caller keeps to the CPU from now on).
++	bool drawEffects(const Effects &effects, const Output &output, Timing *timing);
++	/// The depth of the units and effects last drawn for a view of this size, read back after all (see Effects::readDepth).
++	bool readEffectsDepth(int width, int height, float *depth);
 +
 +private:
 +	FirstPersonGpu();
@@ -28145,7 +28714,7 @@ index 000000000..d8016717c
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuGl.h b/src/FirstPerson/FirstPersonGpuGl.h
 new file mode 100644
-index 000000000..0c753a2bd
+index 000000000..62e379411
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuGl.h
 @@ -0,0 +1,176 @@
@@ -28204,7 +28773,7 @@ index 000000000..0c753a2bd
 +const Enum TEXTURE_2D = 0x0DE1, TEXTURE_BUFFER = 0x8C2A, TEXTURE0 = 0x84C0;
 +const Enum TEXTURE_MIN_FILTER = 0x2801, TEXTURE_MAG_FILTER = 0x2800, NEAREST = 0x2600;
 +const Enum TEXTURE_WRAP_S = 0x2802, TEXTURE_WRAP_T = 0x2803, CLAMP_TO_EDGE = 0x812F;
-+const Enum R8UI = 0x8232, R16UI = 0x8234, R32I = 0x8235, R32F = 0x822E, RGBA32UI = 0x8D70, RGBA32F = 0x8814;
++const Enum R8UI = 0x8232, R16UI = 0x8234, R32I = 0x8235, R32F = 0x822E, RGBA32UI = 0x8D70, RGBA32F = 0x8814, R32UI = 0x8236, RGBA16UI = 0x8D76;
 +const Enum RED = 0x1903, RED_INTEGER = 0x8D94, RGBA_INTEGER = 0x8D99, RGBA = 0x1908, RGBA8 = 0x8058, BGRA = 0x80E1, UNSIGNED_INT_8_8_8_8_REV = 0x8367;
 +const Enum UNSIGNED_BYTE = 0x1401, UNSIGNED_SHORT = 0x1403, UNSIGNED_INT = 0x1405, FLOAT = 0x1406;
 +const Enum ARRAY_BUFFER = 0x8892, STREAM_DRAW = 0x88E0, DYNAMIC_DRAW = 0x88E8;
@@ -28327,10 +28896,10 @@ index 000000000..0c753a2bd
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..ecb56d8bb
+index 000000000..b4a8e549f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,1914 @@
+@@ -0,0 +1,2273 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -30239,6 +30808,365 @@ index 000000000..ecb56d8bb
 +	outDepth = depth;
 +	outGlow = glow;
 +	outTrue = vec4(fullMixed / float(uSamples), float(glow) / 255.0); // (in full colour: the rays' own mix, no palette between)
++}
++)";
++
++
++/**
++ * The units and effects, drawn on the card over the rays' picture (see FirstPersonGpu::drawEffects):
++ * a pixel walks the frame's primitives that can touch it, in the order the CPU's passes draw
++ * them, with the pixel's colour, depth, glow and veils as its own variables, started from the
++ * rays' pictures. A pixel never needs another pixel's state, so nothing is read from a picture
++ * being drawn: the pass needs no extension (OpenGL 3.3, OpenGL ES 3.2 and the Mac's 4.1 alike).
++ * Each kind is the CPU's routine for it, a pixel at a time: FirstPersonView::drawSprite (as its
++ * tilted path works a pixel out, from its own ray), drawGroundShade, drawDecals, drawLine3D.
++ * A primitive is EffectTexels texels of four floats (see FirstPersonViewGpuEffects.cpp, which
++ * writes them, for what each holds).
++ */
++const char *const EffectsSource = R"(
++uniform usampler2D uRayColor, uRayGlow; // the rays' pictures: the palette colour, the glow
++uniform sampler2D uRayDepth;            // ... the depth along the view axis
++uniform usampler2D uSeeThrough;         // a colour over another, by level: FirstPersonView's see-through tables end to end, 2048 bytes a row
++uniform samplerBuffer uPrims;           // the primitives, EffectTexels texels each
++uniform usamplerBuffer uBytes;          // the sprites' pixels and opacity maps
++uniform usamplerBuffer uBins;           // a number per bin of the screen (and one more): where its list starts; then the lists, a primitive's number each
++uniform vec3 uForward, uRight, uUp, uLevelRight, uLevelUp; // the camera, in true proportions (see FirstPersonView::updateBasis)
++uniform vec2 uLevel;                    // straight ahead along the ground
++uniform float uEyeZ, uFocal;            // the eye's height in voxels; the focal length in pixels
++uniform ivec2 uViewSize, uBinGrid;      // the view in pixels; the bins across and down
++uniform int uPixelSize;                 // pixels a ray coloured each way
++layout(location = 0) out uint outColor;
++layout(location = 1) out float outDepth;
++layout(location = 2) out uint outGlow;  // the glow (1, 3), and 64 where see-through smoke lies over the pixel
++layout(location = 3) out uvec4 outNotes; // the unit veil left, own colours | smoke veil << 1, and for the pointer: 1 + the last solid sprite's number, 1 + the last pile's
++
++const float Bayer[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
++float dither(int x, int y) { return Bayer[(y & 3) * 4 + (x & 3)] / 16.0; }
++uint shadeColor(uint color, int shade)
++{
++	if (shade <= 0) return color;
++	uint shaded = color + uint(shade);
++	return shaded > 255u || ((shaded ^ color) & 0xF0u) != 0u ? 15u : shaded;
++}
++uint darkened(uint color, int shades) { return color == 0u ? color : (color & 0xF0u) | uint(min(15, int(color & 15u) + shades)); }
++uint seeThrough(int level, uint over, uint under)
++{
++	if (level >= SeeThroughLevels) return over;
++	if (level <= 0) return under;
++	int at = ((level - 1) << 16) | (int(over) << 8) | int(under); // (the tables end to end, 2048 bytes a row)
++	return texelFetch(uSeeThrough, ivec2(at & 2047, at >> 11), 0).r;
++}
++vec4 prim(int base, int texel) { return texelFetch(uPrims, base + texel); }
++
++void main()
++{
++	ivec2 pixel = ivec2(gl_FragCoord.xy), from = pixel / uPixelSize;
++	uint color = texelFetch(uRayColor, from, 0).r, glow = texelFetch(uRayGlow, from, 0).r;
++	float depth = texelFetch(uRayDepth, from, 0).r;
++	int veil = 255, smokeVeil = 0;
++	uint own = 0u, lastSolid = 0u, lastPile = 0u;
++	// The pixel's ray, reaching one unit ahead (so how far along it is the view depth too).
++	float across = (float(pixel.x) + 0.5 - float(uViewSize.x) * 0.5) / uFocal, rise = (float(uViewSize.y) * 0.5 - (float(pixel.y) + 0.5)) / uFocal;
++	vec3 ray = uForward + across * uRight + rise * uUp;
++	int bin = (pixel.y / EffectBin) * uBinGrid.x + pixel.x / EffectBin;
++	int listEnd = int(texelFetch(uBins, bin + 1).r);
++	for (int entry = int(texelFetch(uBins, bin).r); entry < listEnd; ++entry)
++	{
++		int number = int(texelFetch(uBins, entry).r), base = number * EffectTexels;
++		vec4 box = prim(base, 1);
++		if (float(pixel.x) < box.x || float(pixel.y) < box.y || float(pixel.x) >= box.z || float(pixel.y) >= box.w) continue;
++		vec4 head = prim(base, 0);
++		int kind = int(head.x), flags = int(head.y);
++		if (kind == EffectSprite)
++		{
++			// FirstPersonView::drawSprite: where the ray meets the sprite (its lying rows on the floor in
++			// front of the anchor, the rest on the card), which of its pixels that is, and the pixel put.
++			vec4 t2 = prim(base, 2), t3 = prim(base, 3), t4 = prim(base, 4), t5 = prim(base, 5), t6 = prim(base, 6), t7 = prim(base, 7), t8 = prim(base, 8);
++			vec3 anchor = t2.xyz, cardUp = t3.xyz, cardFacing = t4.xyz;
++			float anchorAcross = t2.w, anchorFacing = t3.w, anchorAlong = t4.w, columnSize = t5.x, rowSize = t5.y, lyingRowSize = t5.z, floorHeight = t5.w,
++				floorSlope = t6.x, anchorRise = t6.y, anchorX = t6.z, anchorY = t6.w;
++			int spriteWidth = int(t7.x), spriteHeight = int(t7.y), pixelsAt = int(t7.z), opacityAt = int(t7.w);
++			bool lying = (flags & 1) != 0, belowAnchor = dot(ray, uLevelUp) < anchorRise;
++			if (lying && belowAnchor && floorHeight >= 0.0) continue;
++			float distance = -1.0, spriteRow = 0.0;
++			float rayAlong = ray.x * uLevel.x + ray.y * uLevel.y, descent = ray.z + floorSlope * rayAlong;
++			if (lying && belowAnchor && descent < 0.0 && floorHeight < 0.0)
++			{
++				distance = (floorHeight + floorSlope * anchorAlong) / descent;
++				spriteRow = anchorY + (anchorAlong - rayAlong * distance) / lyingRowSize;
++			}
++			if (spriteRow < anchorY || distance < 0.0)
++			{
++				float facing = dot(ray, cardFacing);
++				if (facing <= 1e-9) continue;
++				distance = anchorFacing / facing;
++				spriteRow = anchorY - dot(ray * distance - anchor, cardUp) / rowSize;
++				if (ray.z * distance / ZScale < t8.x) continue; // (nothing of the card below the floor it stands on)
++			}
++			if (!(distance >= 1.0 && spriteRow >= 0.0 && spriteRow < float(spriteHeight))) continue;
++			int spriteX = int(floor(anchorX + (dot(ray, uLevelRight) * distance - anchorAcross) / columnSize));
++			if (spriteX < 0 || spriteX >= spriteWidth) continue;
++			int spriteAt = int(floor(spriteRow)) * spriteWidth + spriteX;
++			uint spriteColor = texelFetch(uBytes, pixelsAt + spriteAt).r;
++			float spriteDepth = max(1.0, distance - head.w);
++			if (spriteColor == 0u || spriteDepth >= depth) continue;
++			if ((flags & 8) != 0) lastPile = uint(number + 1);
++			uint ownColours = (flags & 4) != 0 ? 1u : 0u;
++			int shade = int(head.z);
++			int pixelOpacity = (flags & 16) == 0 ? SeeThroughLevels
++				: opacityAt >= 0 ? int(float(texelFetch(uBytes, opacityAt + spriteAt).r) * t8.z + 0.5) : int(float(SeeThroughLevels) * t8.z + 0.5);
++			if (pixelOpacity < SeeThroughLevels)
++			{
++				// See-through (the smoke): mixed over what's there, within what a unit under it and the
++				// smoke's cap leave; the depth stays.
++				int smokeCap = int(t8.w);
++				pixelOpacity = min(pixelOpacity, veil);
++				if (smokeCap > 0) pixelOpacity = min(pixelOpacity, smokeCap - smokeVeil);
++				if (pixelOpacity <= 0) continue;
++				if (veil != 255) veil -= pixelOpacity;
++				if (smokeCap > 0) smokeVeil += pixelOpacity;
++				color = seeThrough(pixelOpacity, shadeColor(spriteColor, shade), color);
++				if (pixelOpacity > SeeThroughLevels / 2)
++				{
++					glow = 0u;
++					own = ownColours;
++				}
++				continue;
++			}
++			if (t8.y < 1.0 && dither(pixel.x, pixel.y) >= t8.y) continue; // (right in front of the camera it fades out)
++			color = shadeColor(spriteColor, shade);
++			depth = spriteDepth;
++			glow = 0u;
++			veil = (flags & 2) != 0 ? UnitVeilMax : 255;
++			own = ownColours;
++			lastSolid = uint(number + 1);
++		}
++		else if (kind == EffectGroundShade)
++		{
++			// FirstPersonView::drawGroundShade: the ray down onto the ground plane; within the disc (or
++			// the patch stretched away from a light) and on the floor right there, darkened, dithered.
++			vec4 t2 = prim(base, 2), t3 = prim(base, 3);
++			vec3 voxelRay = vec3(ray.xy, ray.z / ZScale);
++			float voxelLength = length(voxelRay);
++			if (voxelRay.z / voxelLength > -1e-4) continue;
++			float along = t2.z / ray.z; // (how far along the ray, which reaches one unit ahead: the view depth there too)
++			if (along <= 0.0) continue;
++			vec2 offset = ray.xy * along - t2.xy;
++			float closeness;
++			if ((flags & 1) != 0)
++			{
++				float alongPatch = dot(offset, t3.xy), aside = abs(offset.x * t3.y - offset.y * t3.x);
++				if (alongPatch < 0.0 || alongPatch > t3.z) continue;
++				float share = alongPatch / t3.z, halfWidth = t2.w * (1.0 + (FlareShadowWidening - 1.0) * share);
++				if (aside > halfWidth) continue;
++				closeness = (1.0 - aside / halfWidth) * (1.0 - share);
++			}
++			else
++			{
++				float fromCentre = length(offset);
++				if (fromCentre > t2.w) continue;
++				closeness = 1.0 - fromCentre / t2.w;
++			}
++			if (abs(depth - along) > 3.0) continue;
++			if (closeness * head.w > dither(pixel.x, pixel.y)) color = darkened(color, int(head.z));
++		}
++		else if (kind == EffectDecal)
++		{
++			// FirstPersonView::drawDecals: the pixels whose point in the scene lies within the mark's radius.
++			vec4 t2 = prim(base, 2), t3 = prim(base, 3);
++			float sceneRight = (float(pixel.x) + 0.5 - float(uViewSize.x) * 0.5) * depth / uFocal, sceneUp = (float(uViewSize.y) * 0.5 - (float(pixel.y) + 0.5)) * depth / uFocal;
++			float fromMark = length(vec3(depth - t2.z, sceneRight - t3.x, sceneUp - t3.y));
++			if (pixel == ivec2(int(t2.x), int(t2.y)))
++			{
++				if (fromMark <= t2.w + 2.0 * t3.z + 1.0) color = darkened(color, int(head.z));
++				continue;
++			}
++			if (t2.w < t3.z * 0.5 || fromMark > t3.w) continue;
++			if ((flags & 1) != 0 && fromMark > t3.w * 0.6 && dither(pixel.x, pixel.y) > 0.5) continue; // (a ragged edge)
++			color = darkened(color, fromMark <= t3.w * 0.5 ? int(head.z) : int(head.w));
++		}
++		else if (kind == EffectLine)
++		{
++			// FirstPersonView::drawLine3D: its steps from one end to the other that cover this pixel
++			// (a square of its thickness round each), any of them in front of the scene.
++			vec4 t2 = prim(base, 2), t3 = prim(base, 3), t4 = prim(base, 4);
++			int steps = int(t3.z), thickness = int(head.w);
++			vec2 delta = t2.zw - t2.xy;
++			bool alongX = abs(delta.x) >= abs(delta.y);
++			float span = alongX ? delta.x : delta.y, here = alongX ? float(pixel.x) - t2.x : float(pixel.y) - t2.y;
++			int middle = abs(span) < 1.0 ? 0 : int(here * float(steps) / span);
++			int firstStep = abs(span) < 1.0 ? 0 : max(0, middle - thickness - 2), lastStep = abs(span) < 1.0 ? steps : min(steps, middle + thickness + 2);
++			bool drawn = false;
++			for (int step = firstStep; step <= lastStep && !drawn; ++step)
++			{
++				float progress = float(step) / float(steps);
++				int x = int(t2.x + delta.x * progress), y = int(t2.y + delta.y * progress);
++				float lineDepth = 1.0 / (t3.x + (t3.y - t3.x) * progress);
++				int pointThickness = t4.x > 0.0 ? clamp(int(floor(t4.x * uFocal / lineDepth + 0.5)), 1, thickness) : thickness;
++				int left = x - pointThickness / 2, top = y - pointThickness / 2;
++				if (pixel.x < left || pixel.y < top || pixel.x >= left + pointThickness || pixel.y >= top + pointThickness) continue;
++				drawn = (flags & 2) != 0 || lineDepth < depth + ((flags & 8) != 0 ? 0.0 : 1.0);
++			}
++			if (!drawn || (t3.w < 1.0 && dither(pixel.x, pixel.y) >= t3.w)) continue;
++			color = uint(head.z);
++			if ((flags & 4) == 0) glow = (flags & 1) != 0 ? 1u : 0u;
++		}
++		else if (kind == EffectDot)
++		{
++			// A square of pixels in front of the scene (an edge dot, a particle, the aimed path's dots).
++			vec4 t2 = prim(base, 2);
++			if ((flags & 4) != 0 && (pixel.x == int(box.x) || pixel.x == int(box.z) - 1) && (pixel.y == int(box.y) || pixel.y == int(box.w) - 1)) continue; // (its corners rounded off)
++			if ((flags & 8) != 0 ? head.w > depth + t2.x : head.w >= depth + t2.x) continue;
++			float threshold = dither(pixel.x, pixel.y);
++			if (t2.w > threshold) continue; // (faded into the haze)
++			color = t2.z < 0.0 || threshold < t2.z ? uint(head.z) : uint(t2.y);
++			if ((flags & 1) != 0) glow = 1u;
++			else if ((flags & 2) != 0) glow = 0u;
++		}
++		else if (kind == EffectDisc)
++		{
++			// A round dot in front of the scene, in rings (a shot's head, a flare), or only its rim (a bubble).
++			vec4 t2 = prim(base, 2), t3 = prim(base, 3);
++			vec2 at = vec2(pixel) + ((flags & 2) != 0 ? vec2(0.5) : vec2(0.0));
++			float fromCentre = length(at - t2.xy);
++			if (fromCentre > t2.z || head.w >= depth + t2.w) continue;
++			if ((flags & 4) != 0)
++			{
++				if (fromCentre > t2.z - 1.0) color = uint(head.z);
++				continue;
++			}
++			color = fromCentre < t2.z * t3.z ? uint(t3.x) : fromCentre < t2.z * t3.w ? uint(t3.y) : uint(head.z);
++			if ((flags & 1) != 0) glow = 1u;
++		}
++		else if (kind == EffectQuad)
++		{
++			// FirstPersonView::fillQuadAtDepth: the pixels whose centres lie inside its four corners, at one depth.
++			vec4 t2 = prim(base, 2), t3 = prim(base, 3);
++			vec2 corners[4] = vec2[4](t2.xy, t2.zw, t3.xy, t3.zw);
++			float rowCentre = float(pixel.y) + 0.5, leftX = 1e9, rightX = -1e9;
++			for (int corner = 0; corner < 4; ++corner)
++			{
++				vec2 edgeStart = corners[corner], edgeEnd = corners[(corner + 1) & 3];
++				if ((edgeStart.y <= rowCentre && edgeEnd.y > rowCentre) || (edgeEnd.y <= rowCentre && edgeStart.y > rowCentre))
++				{
++					float crossX = edgeStart.x + (rowCentre - edgeStart.y) / (edgeEnd.y - edgeStart.y) * (edgeEnd.x - edgeStart.x);
++					leftX = min(leftX, crossX);
++					rightX = max(rightX, crossX);
++				}
++			}
++			if (float(pixel.x) < ceil(leftX - 0.5) || float(pixel.x) > floor(rightX - 0.5) || head.w >= depth) continue;
++			color = uint(head.z);
++			depth = head.w;
++		}
++	}
++	outColor = color;
++	outDepth = depth;
++	outGlow = glow | (smokeVeil > 0 ? 64u : 0u);
++	outNotes = uvec4(uint(veil), own | uint(smokeVeil) << 1, lastSolid, lastPile);
++}
++)";
++
++
++/**
++ * The bloom on the card (FirstPersonView::drawLightHalos), after the units and effects, in three
++ * steps: the shining pixels gathered into a grid a quarter as fine (how much shines in each
++ * cell, and how far away it is) and their colours into one an eighth as fine; both blurred, across
++ * then down, twice; and the picture brightened where the blurred glow lands, as the CPU's
++ * brightenGlowBands does it.
++ */
++const char *const GlowGatherSource = R"(
++uniform usampler2D uColor, uGlow; // the finished picture's palette colours, its glow
++uniform sampler2D uDepth, uPalette; // its depth; the palette, a texel a colour
++uniform ivec2 uViewSize;
++uniform int uCell, uHue;          // the cell's size in pixels; 1: the colours' grid
++uniform float uMaxDistance;
++layout(location = 0) out vec4 outSum;
++
++void main()
++{
++	ivec2 cell = ivec2(gl_FragCoord.xy);
++	vec4 sum = vec4(0.0);
++	for (int y = 0; y < uCell; ++y)
++	{
++		for (int x = 0; x < uCell; ++x)
++		{
++			ivec2 at = cell * uCell + ivec2(x, y);
++			if (at.x >= uViewSize.x || at.y >= uViewSize.y) continue;
++			uint shines = texelFetch(uGlow, at, 0).r & 3u;
++			if (shines == 0u) continue;
++			float weight = float(shines) * (1.0 / 16.0);
++			if (uHue != 0) sum += vec4(weight * texelFetch(uPalette, ivec2(int(texelFetch(uColor, at, 0).r), 0), 0).rgb * 255.0, weight);
++			else sum.xy += vec2(weight, weight * min(texelFetch(uDepth, at, 0).r, uMaxDistance)); // (something shining in the sky counts as far away)
++		}
++	}
++	outSum = sum;
++}
++)";
++
++const char *const GlowBlurSource = R"(
++uniform sampler2D uSource;
++uniform ivec2 uStep;   // across or down
++uniform int uRadius;
++uniform float uScale;  // what the sum is multiplied by
++layout(location = 0) out vec4 outSum;
++
++void main()
++{
++	ivec2 at = ivec2(gl_FragCoord.xy), last = textureSize(uSource, 0) - 1;
++	vec4 sum = vec4(0.0);
++	for (int offset = -uRadius; offset <= uRadius; ++offset) sum += texelFetch(uSource, clamp(at + uStep * offset, ivec2(0), last), 0);
++	outSum = sum * uScale;
++}
++)";
++
++const char *const GlowBrightenSource = R"(
++uniform usampler2D uColor, uGlow, uNearest; // the finished picture; the palette colour nearest each 15-bit colour, 256 a row
++uniform sampler2D uDepth, uGrid, uHueGrid, uPalette;
++uniform float uGain;
++layout(location = 0) out uint outColor;
++layout(location = 1) out uint outGlow;
++
++const float Bayer[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
++float dither(int x, int y) { return Bayer[(y & 3) * 4 + (x & 3)] / 16.0; }
++float luminanceOf(vec3 rgb) { return rgb.r * 0.3 + rgb.g * 0.59 + rgb.b * 0.11; }
++
++void main()
++{
++	ivec2 pixel = ivec2(gl_FragCoord.xy);
++	uint color = texelFetch(uColor, pixel, 0).r, glowBits = texelFetch(uGlow, pixel, 0).r;
++	outColor = color;
++	outGlow = glowBits;
++	if ((glowBits & 3u) != 0u || color == 0u) return; // (the shining pixels themselves and the empty ones stay)
++	// The glow here, blended between the four nearest cells, and how far away its light is.
++	ivec2 gridSize = textureSize(uGrid, 0);
++	vec2 grid = clamp((vec2(pixel) + 0.5) / 4.0 - 0.5, vec2(0.0), vec2(gridSize) - 1.001);
++	ivec2 cell = ivec2(grid), next = min(gridSize - 1, cell + 1);
++	vec2 blend = grid - vec2(cell);
++	vec2 above = texelFetch(uGrid, cell, 0).xy * (1.0 - blend.x) + texelFetch(uGrid, ivec2(next.x, cell.y), 0).xy * blend.x;
++	vec2 below = texelFetch(uGrid, ivec2(cell.x, next.y), 0).xy * (1.0 - blend.x) + texelFetch(uGrid, next, 0).xy * blend.x;
++	vec2 here = above * (1.0 - blend.y) + below * blend.y;
++	float glow = here.x;
++	if (glow > 0.0 && texelFetch(uDepth, pixel, 0).r < here.y / glow - 16.0) return; // (well in front of the light: it doesn't shine through)
++	float strength = glow * uGain;
++	if (strength <= dither(pixel.x, pixel.y)) return;
++	float second = dither(pixel.x + 1, pixel.y + 2);
++	int steps = strength > 2.0 + second ? 3 : strength > 1.0 + second ? 2 : 1;
++	// A pixel too dark to show its group's hue takes the light's own colour, the palette's nearest.
++	vec4 hue = texelFetch(uHueGrid, pixel / 8, 0);
++	float hueLuminance = hue.a > 0.0 ? luminanceOf(hue.rgb) / hue.a : 0.0;
++	vec3 dark = texelFetch(uPalette, ivec2(int(color), 0), 0).rgb * 255.0;
++	if (luminanceOf(dark) < DarkGlowLuma && hueLuminance >= 1.0)
++	{
++		float share = float(steps) * DarkGlowStepLuma / hueLuminance / hue.a;
++		ivec3 five = ivec3(floor(min(vec3(255.0), dark + hue.rgb * share) * 31.0 / 255.0 + 0.5));
++		int nearest = (five.r << 10) | (five.g << 5) | five.b;
++		outColor = texelFetch(uNearest, ivec2(nearest & 255, nearest >> 8), 0).r;
++	}
++	else
++	{
++		int brightest = (color & 0xF0u) == 0u ? 1 : 0;
++		outColor = (color & 0xF0u) | uint(max(brightest, int(color & 15u) - steps));
++	}
 +}
 +)";
 +
@@ -52075,10 +53003,10 @@ index 000000000..7e1bbfcd2
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..f8e3d170f
+index 000000000..507afe9ef
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,681 @@
+@@ -0,0 +1,717 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -52132,6 +53060,7 @@ index 000000000..f8e3d170f
 + */
 +#include "FirstPersonView.h"
 +#include <chrono>
++#include <sstream>
 +#include <cstdlib>
 +#include <algorithm>
 +#include <cmath>
@@ -52672,10 +53601,23 @@ index 000000000..f8e3d170f
 +	updateColors();
 +	updateParticles();
 +
++	// (OPENXCOM3D_PASS_TIME: the log gets each pass's share of the main view's drawing time, averaged over 120 frames.)
++	static const bool passTime = getenv("OPENXCOM3D_PASS_TIME") != nullptr;
++	static const char *const passNames[] = { "castAllRays", "watchUnits", "drawDecals", "drawFloorItems", "drawEdgeDots", "drawUnits", "drawFire", "drawProjectilesAndExplosions", "drawFlares", "drawBeams", "drawPellets", "drawTrajectory", "drawSeeThroughSmoke", "findUnitAtPointer", "drawParticles", "drawLightHalos", "applyScreenWash", "drawTrajectory", "applySignalGlitches", "drawBurning", "drawHurt", "drawDamageNumbers", "drawDownedIcons", "drawMarkers", "drawSprayMarks", "drawFacing" };
++	static double passSums[26] = {};
++	static int passFrames = 0;
++	double *const passTimes = passTime && getWidth() >= 320 ? passSums : nullptr;
++	struct PassTimer
++	{
++		double *sum;
++		std::chrono::steady_clock::time_point started;
++		PassTimer(double *sums, int pass) : sum(sums ? sums + pass : nullptr) { if (sum) started = std::chrono::steady_clock::now(); }
++		~PassTimer() { if (sum) *sum += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count(); }
++	};
 +	// Draw straight into the surface's pixels.
 +	lock();
 +	// The world: terrain, border and sky, ray by ray (fills the depth buffer).
-+	castAllRays();
++	{ PassTimer pass(passTimes, 0); castAllRays(); }
 +	// What's in the world: first the units are checked for hits and kills (for their flinches
 +	// and the hitmarker), then everything is drawn over the terrain as sprites, dots and lines.
 +	// (No unit is on the screen yet, for the see-through smoke.)
@@ -52685,37 +53627,59 @@ index 000000000..f8e3d170f
 +	std::fill(&_pointerUnits[0][0], &_pointerUnits[0][0] + sizeof(_pointerUnits) / sizeof(_pointerUnits[0][0]), nullptr);
 +	std::fill(&_pointerBodies[0][0], &_pointerBodies[0][0] + sizeof(_pointerBodies) / sizeof(_pointerBodies[0][0]), nullptr);
 +	std::fill(&_pointerPiles[0][0], &_pointerPiles[0][0] + sizeof(_pointerPiles) / sizeof(_pointerPiles[0][0]), nullptr);
-+	watchUnits();
-+	drawDecals();
-+	drawFloorItems();
-+	drawEdgeDots();
-+	drawUnits();
-+	drawFire();
-+	drawProjectilesAndExplosions();
-+	drawFlares();
-+	drawBeams();
-+	drawPellets();
-+	drawTrajectory(false);
-+	drawSeeThroughSmoke();
-+	findUnitAtPointer();
-+	drawParticles();
-+	drawLightHalos();
++	{ PassTimer pass(passTimes, 1); watchUnits(); }
++	{ PassTimer pass(passTimes, 2); drawDecals(); }
++	{ PassTimer pass(passTimes, 3); drawFloorItems(); }
++	{ PassTimer pass(passTimes, 4); drawEdgeDots(); }
++	{ PassTimer pass(passTimes, 5); drawUnits(); }
++	{ PassTimer pass(passTimes, 6); drawFire(); }
++	{ PassTimer pass(passTimes, 7); drawProjectilesAndExplosions(); }
++	{ PassTimer pass(passTimes, 8); drawFlares(); }
++	{ PassTimer pass(passTimes, 9); drawBeams(); }
++	{ PassTimer pass(passTimes, 10); drawPellets(); }
++	{ PassTimer pass(passTimes, 11); drawTrajectory(false); }
++	{ PassTimer pass(passTimes, 12); drawSeeThroughSmoke(); }
++	{ PassTimer pass(passTimes, 14); drawParticles(); }
++	// The passes so far were recorded for the graphics card (setting "Renderer": GPU): it draws them over its rays' picture now,
++	// and the bloom over that, and gives the finished one back. (Its check: the CPU's own bloom first, then the two compared.)
++	if (_gpuRecording && !_gpuChecking)
++	{
++		PassTimer pass(passTimes, 0);
++		gpuDrawEffects();
++	}
++	else
++	{
++		{ PassTimer pass(passTimes, 15); drawLightHalos(); }
++		if (_gpuRecording) gpuDrawEffects();
++	}
++	{ PassTimer pass(passTimes, 13); findUnitAtPointer(); }
 +	// Effects on the finished picture (a camera's feed: its bad signal last). Under night vision
 +	// the aimed path is light in the goggles: drawn again over the green, white-green.
-+	applyScreenWash();
-+	if (_nightVision) drawTrajectory(true);
-+	if (_signalGlitches) applySignalGlitches();
-+	drawBurning();
-+	drawHurt();
++	{ PassTimer pass(passTimes, 16); applyScreenWash(); }
++	if (_nightVision) { PassTimer pass(passTimes, 17); drawTrajectory(true); }
++	if (_signalGlitches) { PassTimer pass(passTimes, 18); applySignalGlitches(); }
++	{ PassTimer pass(passTimes, 19); drawBurning(); }
++	{ PassTimer pass(passTimes, 20); drawHurt(); }
 +	// The numbers rising over the units hit (setting "Damage numbers"): in the world, walls in front
 +	// hiding them, but over the screen's effects, so their colours read.
-+	drawDamageNumbers();
++	{ PassTimer pass(passTimes, 21); drawDamageNumbers(); }
 +	// The icons over the downed units, the enemy markers and the units' facing rings, over everything.
-+	drawDownedIcons();
-+	drawMarkers();
-+	drawSprayMarks();
-+	drawFacing();
++	{ PassTimer pass(passTimes, 22); drawDownedIcons(); }
++	{ PassTimer pass(passTimes, 23); drawMarkers(); }
++	{ PassTimer pass(passTimes, 24); drawSprayMarks(); }
++	{ PassTimer pass(passTimes, 25); drawFacing(); }
 +	unlock();
++	if (passTimes && ++passFrames == 120)
++	{
++		std::ostringstream line;
++		for (size_t pass = 0; pass < sizeof(passSums) / sizeof(passSums[0]); ++pass)
++		{
++			if (passSums[pass] / passFrames >= 0.005) line << " " << passNames[pass] << " " << std::lround(passSums[pass] / passFrames * 1000.0) / 1000.0;
++			passSums[pass] = 0.0;
++		}
++		passFrames = 0;
++		Log(LOG_INFO) << "OpenXcom3D: the " << getWidth() << "x" << getHeight() << " view's passes, ms:" << line.str();
++	}
 +}
 +
 +/**
@@ -52762,10 +53726,10 @@ index 000000000..f8e3d170f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..9120b8c59
+index 000000000..f5ea284af
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1494 @@
+@@ -0,0 +1,1529 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -53730,6 +54694,41 @@ index 000000000..9120b8c59
 +	/// Draws a sprite standing in the world, depth-tested (or see-through, laid over what's there):
 +	/// all of it, or only the screen rows from bandTop up to bandBottom.
 +	void drawSprite(const SpriteDraw &draw, int bandTop = 0, int bandBottom = 1 << 30);
++	// The units and effects on the graphics card too (FirstPersonViewGpuEffects.cpp): while the view records, the
++	// passes' funnels write down what they would draw, and the card draws it over the rays' pictures kept there.
++	std::shared_ptr<struct GpuEffectList> _gpuEffects; // this frame's units and effects as recorded
++	bool _gpuRecording = false;                        // the funnels record (see gpuBeginEffects, gpuDrawEffects)
++	bool _gpuRecordOnly = true;                        // ... and draw nothing themselves (false: both, for the check of the card's picture against the CPU's)
++	bool _gpuChecking = false;                         // this frame the card's units and effects are checked against the CPU's (OPENXCOM3D_GPU_EFFECTS=check)
++	int _gpuRaysPixelSize = 1;                         // the pixels a ray of the pictures kept on the card coloured each way
++	/// Whether this frame's units and effects go to the card (with its rays).
++	int gpuEffectsWanted() const;
++	/// Starts recording the frame's units and effects.
++	void gpuBeginEffects();
++	/// Records a sprite standing in the world (see drawSprite).
++	void gpuRecordSprite(const SpriteDraw &draw);
++	/// Records a shade on the ground (see drawGroundShade).
++	void gpuRecordGroundShade(const double centre[3], double radius, int steps, float density, const double *away, double length);
++	/// Records a bullet hole or a scorch mark (see drawDecals).
++	void gpuRecordDecal(double screenX, double screenY, double depth, double markRight, double markUp, double radius, double pixelSpan,
++		double drawnRadius, int reach, int coreShades, int edgeShades);
++	/// Records a line in the world, its ends on the screen (see drawLine3D).
++	void gpuRecordLine(double startX, double startY, double startZ, double endX, double endY, double endZ, int steps, Uint8 color, int thickness, float opacity,
++		float worldWidth, bool glows, bool overEverything, bool keepsGlow = false, bool exactDepth = false);
++	/// Records a square of pixels in front of the scene.
++	void gpuRecordDot(int left, int top, int dotWidth, int dotHeight, double depth, Uint8 color, int flags, float leeway = 0.0f, Uint8 otherColor = 0, float firstShare = -1.0f, float haze = 0.0f);
++	/// Records a round dot in front of the scene, in rings or only its rim.
++	void gpuRecordDisc(double screenX, double screenY, double radius, double depth, float leeway, Uint8 rim, Uint8 centre, Uint8 middle, float centreShare, float middleShare, int flags);
++	/// Records a filled quad at one depth (see fillQuadAtDepth).
++	void gpuRecordQuad(const double corners[4][2], Uint8 color, float depth);
++	/// Has the card draw what was recorded and takes the finished pictures back; recording stops.
++	bool gpuDrawEffects();
++	bool _gpuDepthPending = false; // this frame's depth is still on the card (see gpuNeedDepth)
++	/// Before anything drawn after the units and effects reads the depth buffer: has it fetched from the card if it wasn't yet.
++	void gpuNeedDepth() { if (_gpuDepthPending) gpuFetchDepth(); }
++	void gpuFetchDepth();
++	/// The check of the card's units and effects against the CPU's passes, a pixel at a time.
++	void gpuCheckEffects();
 +	/// The same, with the sprite given piece by piece.
 +	void drawSprite(const Surface *sprite, int anchorX, int anchorY, const double world[3], double depthBias, int shade, double scale = 1.0,
 +		SpritePose pose = SpritePose::Standing, const SeeThroughSprite *seeThroughSprite = nullptr);
@@ -54262,10 +55261,10 @@ index 000000000..9120b8c59
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewEffects.cpp b/src/FirstPerson/FirstPersonViewEffects.cpp
 new file mode 100644
-index 000000000..280cc854c
+index 000000000..59fe1bc2c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewEffects.cpp
-@@ -0,0 +1,1283 @@
+@@ -0,0 +1,1300 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -55492,6 +56491,12 @@ index 000000000..280cc854c
 +			double tailX, tailY, tailDepth;
 +			if (!projectToScreen(tail, tailX, tailY, tailDepth)) continue;
 +			const int steps = std::max(1, (int)std::max(std::abs(tailX - screenX), std::abs(tailY - screenY)));
++			if (_gpuRecording)
++			{
++				// (A line a pixel thick at the particle's depth all along, the glow left as it is.)
++				gpuRecordLine(screenX, screenY, depth, tailX, tailY, depth, steps, color, 1, 1.0f, 0.0f, false, false, true, true);
++				if (_gpuRecordOnly) continue;
++			}
 +			for (int step = 0; step <= steps; ++step)
 +			{
 +				const int x = (int)(screenX + (tailX - screenX) * step / steps), y = (int)(screenY + (tailY - screenY) * step / steps);
@@ -55508,6 +56513,12 @@ index 000000000..280cc854c
 +		{
 +			// A bubble up close: a ring with a glint on its upper left.
 +			const double ringRadius = dotSize * 0.5;
++			if (_gpuRecording)
++			{
++				gpuRecordDisc(screenX, screenY, ringRadius, depth, 0.0f, color, color, color, 0.0f, 0.0f, 2 | 4);
++				gpuRecordDot((int)(screenX - ringRadius * 0.35), (int)(screenY - ringRadius * 0.35), 1, 1, depth, shadeColor(particle.color, std::max(0, shade - 3)), 0);
++				if (_gpuRecordOnly) continue;
++			}
 +			for (int y = (int)(screenY - ringRadius) - 1; y <= (int)(screenY + ringRadius) + 1; ++y)
 +			{
 +				for (int x = (int)(screenX - ringRadius) - 1; x <= (int)(screenX + ringRadius) + 1; ++x)
@@ -55532,6 +56543,11 @@ index 000000000..280cc854c
 +		}
 +		// Anything else: a square dot centred on the particle.
 +		const int left = (int)screenX - dotSize / 2, top = (int)screenY - dotSize / 2;
++		if (_gpuRecording)
++		{
++			gpuRecordDot(left, top, dotSize, dotSize, depth, color, (particle.kind == P::GLOW || particle.kind == P::BLINK || particle.kind == P::MOTE ? 1 : 0) | (dotSize >= 3 ? 4 : 0));
++			if (_gpuRecordOnly) continue;
++		}
 +		for (int y = top; y < top + dotSize; ++y)
 +		{
 +			for (int x = left; x < left + dotSize; ++x)
@@ -55551,10 +56567,10 @@ index 000000000..280cc854c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewFlares.cpp b/src/FirstPerson/FirstPersonViewFlares.cpp
 new file mode 100644
-index 000000000..77a3cc4ed
+index 000000000..5507f71e0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewFlares.cpp
-@@ -0,0 +1,382 @@
+@@ -0,0 +1,387 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -55919,6 +56935,11 @@ index 000000000..77a3cc4ed
 +		if (fade <= 0.0f) continue;
 +		// The glow's radius in pixels: a voxel's size on the screen there, 1 to 6 pixels.
 +		const int radius = std::clamp((int)std::lround(2.0 * focalLength / depth * 0.5), 1, 6);
++		if (_gpuRecording)
++		{
++			gpuRecordDisc(screenX, screenY, radius, depth, 1.0f, _colors.flareFire[0], _colors.flareFire[2], _colors.flareFire[2], 0.5f, 0.5f, 1);
++			if (_gpuRecordOnly) continue;
++		}
 +		// Fill the disc, pixel by pixel, where nothing nearer hides it (a voxel's leeway).
 +		for (int y = (int)screenY - radius; y <= (int)screenY + radius; ++y)
 +		{
@@ -55939,10 +56960,10 @@ index 000000000..77a3cc4ed
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..4eeedea4c
+index 000000000..b6fbee4f6
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
-@@ -0,0 +1,609 @@
+@@ -0,0 +1,629 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -56038,6 +57059,16 @@ index 000000000..4eeedea4c
 +	}
 +	return shared.ready.load();
 +}
++
++}
++
++FirstPersonGpu *readyFirstPersonGpu()
++{
++	return sharedGpu(false);
++}
++
++namespace
++{
 +
 +/// Sums over the shadow run's frames since its last line in the log.
 +struct ShadowStats
@@ -56322,6 +57353,9 @@ index 000000000..4eeedea4c
 +	output.glow = _glowMask.data();
 +	output.results = nullptr;
 +	output.perRay = false;
++	// The units and effects on the card too: the rays' pictures stay there, and come back finished (see gpuDrawEffects).
++	output.keep = gpuEffectsWanted();
++	_gpuRaysPixelSize = frame.pixelSize;
 +	// The picture in full colour too, if the mode shows this view that way (setting "True colour"; a ray a pixel).
 +	const bool fullColor = _wantsTrueColor && frame.pixelSize == 1;
 +	if (fullColor) _trueColor.resize((size_t)getWidth() * getHeight());
@@ -56349,7 +57383,14 @@ index 000000000..4eeedea4c
 +	}
 +	// The rays' palette colours are kept beside it: a pixel that still has its ray's colour when the frame is done
 +	// (nothing was drawn over it, no wash went over it) is shown in its full colour (see trueColor).
-+	if (fullColor)
++	if (output.keep)
++	{
++		_hasLightShafts = frame.lightShafts;
++		gpuBeginEffects();
++		_gpuChecking = output.keep == 2;
++		_gpuRecordOnly = !_gpuChecking;
++	}
++	if (output.keep != 1 && fullColor)
 +	{
 +		_rayColors.resize(_trueColor.size());
 +		for (int row = 0; row < getHeight(); ++row)
@@ -56552,6 +57593,758 @@ index 000000000..4eeedea4c
 +}
 +
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
+diff --git a/src/FirstPerson/FirstPersonViewGpuEffects.cpp b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
+new file mode 100644
+index 000000000..e83fe84e3
+--- /dev/null
++++ b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
+@@ -0,0 +1,746 @@
++/*
++ * Copyright 2010-2026 OpenXcom Developers.
++ *
++ * This file is part of OpenXcom.
++ *
++ * OpenXcom is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * OpenXcom is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
++ */
++/*
++ * The 3D view's units and effects on the graphics card (setting "Renderer": GPU).
++ *
++ * After the rays the view draws what is in the world over their picture: marks, items, units,
++ * fire, shots, smoke. On the CPU each of those passes reads and writes the view's buffers. With
++ * the rays on the card that meant reading their pictures back first, and at a high resolution the
++ * passes cost as much as the rays (smoke and the units most).
++ *
++ * Here the same passes run, but while the view records (_gpuRecording) their funnels (drawSprite,
++ * drawGroundShade, drawLine3D, the marks' and the dots' loops) write down what they would draw
++ * instead of drawing it: a primitive each, in the order drawn. The card then draws them over the
++ * rays' pictures, which never left it (FirstPersonGpu::drawEffects, EffectsSource), and the
++ * finished pictures come back once.
++ *
++ * A primitive is FirstPersonGpu::Effects::Texels texels of four floats; texel 0 is its kind, its
++ * flags and two numbers of its own, texel 1 its box on the screen (left, top, and one past its
++ * right and bottom), the rest as each record... function below lays them out. The camera's
++ * sums are done here in double precision, as the CPU's routines do them; the card works a pixel
++ * out in single precision, so a sprite's edge may fall a pixel off the CPU's now and then.
++ *
++ * OPENXCOM3D_GPU_EFFECTS=0: the old way (the rays read back, the passes on the CPU), to compare; =check: both, the CPU's
++ * shown, the card's compared with it a pixel at a time (see gpuCheckEffects).
++ * Still drawn the old way: a frame with the outlines round the units' pictures (setting "Full sprite hitboxes"),
++ * which look at the pixels beside each (see gpuEffectsWanted).
++ */
++#include "FirstPersonView.h"
++#include <algorithm>
++#include <array>
++#include <cmath>
++#include <cstdlib>
++#include <cstdio>
++#include <cstring>
++#include <string>
++#include <unordered_map>
++#include "../Engine/Logger.h"
++#include "../Engine/Options.h"
++#include "../Engine/Surface.h"
++#include "FirstPersonGpu.h"
++#include "FirstPersonViewShared.h"
++
++namespace OpenXcom
++{
++
++/**
++ * The sprites' bytes on the card (their pixels, and a see-through one's opacity map after them),
++ * shared by every view and kept from frame to frame: a sprite is sent up once, found again by
++ * what it is (a hash of its size and bytes; a frame composed for one unit is filled again for
++ * the next, so where it is says nothing). Past SpriteAtlasMost bytes they are begun anew.
++ */
++struct SpriteAtlas
++{
++	std::vector<Uint8> bytes;
++	std::unordered_map<Uint64, int> places; // where each sprite's bytes start, by their hash
++	Uint32 generation = 0;
++};
++static const size_t SpriteAtlasMost = 12u << 20;
++static SpriteAtlas &spriteAtlas()
++{
++	static SpriteAtlas atlas;
++	return atlas;
++}
++
++/**
++ * A frame's units and effects as recorded for the card, and what is needed to read its answer:
++ * each primitive's box on the screen (for the bins), where each sprite's bytes went, and whose
++ * picture each sprite is (the card says which sprite shows round the pointer, by number).
++ */
++struct GpuEffectList
++{
++	FirstPersonGpu::Effects effects;
++	std::vector<std::array<int, 4>> boxes;                 // each primitive's box: left, top, one past its right, one past its bottom
++	std::unordered_map<const void*, int> spritesByAddress; // this frame's see-through sprites, by where their opacity maps are: a cloud has hundreds of puffs of a few pictures, each looked up in the atlas once
++	struct Pictured { BattleUnit *unit, *body; const Tile *pile; };
++	std::vector<Pictured> pictured;                        // per primitive: whose picture it is
++	std::vector<Uint32> notes;                             // the card's notes, four numbers a pixel
++	std::vector<Uint32> patchNotes;                        // ... or only those round the pointer
++	std::vector<int> binCounts;
++
++	void clear()
++	{
++		effects.prims.clear();
++		boxes.clear();
++		spritesByAddress.clear();
++		SpriteAtlas &atlas = spriteAtlas();
++		if (atlas.bytes.size() > SpriteAtlasMost)
++		{
++			atlas.bytes.clear();
++			atlas.places.clear();
++			++atlas.generation;
++		}
++		effects.bytes = &atlas.bytes;
++		effects.bytesGeneration = atlas.generation;
++		pictured.clear();
++	}
++	/// A new primitive of a kind: its texels (all 0 but the kind and the box), and whose picture it is.
++	float *add(int kind, int left, int top, int right, int bottom)
++	{
++		const size_t at = effects.prims.size();
++		effects.prims.resize(at + FirstPersonGpu::Effects::Texels * 4, 0.0f);
++		float *texels = &effects.prims[at];
++		texels[0] = (float)kind;
++		texels[4] = (float)left; texels[5] = (float)top; texels[6] = (float)right; texels[7] = (float)bottom;
++		boxes.push_back({ left, top, right, bottom });
++		pictured.push_back({ nullptr, nullptr, nullptr });
++		return texels;
++	}
++};
++
++/**
++ * Whether this frame's units and effects go to the card: the rays do, and nothing the frame may
++ * draw is still the CPU's alone (then the whole frame is drawn the old way: a pass on the card
++ * can't follow one on the CPU without the picture going up again).
++ * @return 0 no; 1 yes; 2 yes, beside the CPU's own, which is shown, the two compared (OPENXCOM3D_GPU_EFFECTS=check).
++ */
++int FirstPersonView::gpuEffectsWanted() const
++{
++	static const char *const asked = getenv("OPENXCOM3D_GPU_EFFECTS");
++	const int mode = !asked ? 1 : !strcmp(asked, "check") ? 2 : atoi(asked) != 0 ? 1 : 0;
++	// The outlines round the units' pictures (settings "Hitboxes" with "Full sprite hitboxes") look at the pixels beside each.
++	if (Options::fpsSpriteHitboxes && Options::fpsHitboxes != 0)
++	{
++		return 0;
++	}
++	return mode;
++}
++
++/**
++ * Starts recording the frame's units and effects (the rays' pictures are kept on the card).
++ */
++void FirstPersonView::gpuBeginEffects()
++{
++	if (!_gpuEffects) _gpuEffects = std::make_shared<GpuEffectList>();
++	_gpuEffects->clear();
++	_gpuRecording = true;
++}
++
++/**
++ * Records a sprite standing in the world: the card as drawSprite sets it up (keep the two alike),
++ * in the camera's frame, and the sprite's bytes.
++ * Texel 0: kind, flags (1 lying, 2 a unit's, 4 keeps its own colours, 8 a pile's, 16 see-through), shade, depth bias.
++ * Texel 2: the anchor from the eye, and how far across it is; 3: the way up the card, and how far the anchor is along
++ * the way the card faces; 4: the way the card faces, and how far ahead the anchor is along the ground.
++ * Texel 5: a sprite pixel's size across, up the card and along the floor, and the floor's height; 6: the floor's slope,
++ * the anchor's rise on the image plane, the anchor's column and row.
++ * Texel 7: the sprite's width and height, where its bytes are, where its opacity map's are (-1: none).
++ * Texel 8: the height (from the eye) nothing of the card shows below, the opacity up close, the see-through opacity, the smoke's cap.
++ */
++void FirstPersonView::gpuRecordSprite(const SpriteDraw &draw)
++{
++	const Surface *sprite = draw.sprite;
++	const double *world = draw.world;
++	double anchorScreenX, anchorScreenY, viewDepth;
++	if (!sprite || !projectToScreen(world, anchorScreenX, anchorScreenY, viewDepth))
++	{
++		return;
++	}
++	const SeeThroughSprite *seeThroughSprite = draw.seeThrough;
++	const float opacity = (float)std::clamp((viewDepth - 4.0) / 6.0, 0.0, 1.0);
++	const float seeThroughOpacity = seeThroughSprite ? seeThroughSprite->opacity * opacity : 1.0f;
++	if (opacity <= 0.0f || seeThroughOpacity * SeeThroughLevels < 0.5f)
++	{
++		return;
++	}
++	const int width = getWidth(), height = getHeight();
++	const int spriteWidth = sprite->getWidth(), spriteHeight = sprite->getHeight();
++	const double focalLength = (width / 2.0) / _halfFovTangent;
++	auto dot = [](const double a[3], const double b[3]) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; };
++	const double level[2] = { std::cos(_yaw), std::sin(_yaw) };
++	const double anchor[3] = { world[0] - _eye[0], world[1] - _eye[1], (world[2] - _eye[2]) * ZScale };
++	const double elevation = std::atan2(anchor[2], std::sqrt(anchor[0] * anchor[0] + anchor[1] * anchor[1]));
++	double tilt = std::clamp(_pitch, -CardTiltMax * Pi / 180.0, CardTiltUpMax * Pi / 180.0);
++	if (elevation > CardTiltUpMax * Pi / 180.0)
++	{
++		tilt = std::max(tilt, std::min(elevation - CardTiltUpMax * Pi / 180.0, CardTiltSteepMax * Pi / 180.0));
++	}
++	const double cardUp[3] = { -std::sin(tilt) * level[0], -std::sin(tilt) * level[1], std::cos(tilt) };
++	const double cardFacing[3] = { std::cos(tilt) * level[0], std::cos(tilt) * level[1], std::sin(tilt) };
++	const double anchorAcross = dot(anchor, _levelRight), anchorFacing = dot(anchor, cardFacing);
++	const double columnSize = draw.scale * SpritePixelX, rowSize = draw.scale * ZScale * draw.standingSquash, lyingRowSize = draw.scale * LyingRowVoxels;
++	const double floorHeight = anchor[2] + 0.5 * ZScale;
++	const double floorSlope = draw.lyingSlope * ZScale;
++	const double anchorAlong = anchor[0] * level[0] + anchor[1] * level[1];
++	const bool lying = draw.pose == SpritePose::Lying;
++	const int anchorX = draw.anchorX, anchorY = draw.anchorY;
++
++	// Its box on the screen: round the card's corners and, lying, the floor's in front of the anchor
++	// (all of the view if one is behind the camera), a pixel more each way.
++	int left = width, right = 0, top = height, bottom = 0;
++	auto addCorners = [&](const double middle[3]) {
++		for (const double across : { -anchorX * columnSize, (spriteWidth - anchorX) * columnSize })
++		{
++			const double corner[3] = { middle[0] + _levelRight[0] * across, middle[1] + _levelRight[1] * across, middle[2] + _levelRight[2] * across };
++			const double depth = dot(corner, _forward);
++			if (depth <= 1.0)
++			{
++				left = top = 0; right = width; bottom = height;
++				continue;
++			}
++			const double screenX = width / 2.0 + dot(corner, _right) * focalLength / depth, screenY = height / 2.0 - dot(corner, _up) * focalLength / depth;
++			left = std::min(left, (int)std::floor(screenX)); right = std::max(right, (int)std::ceil(screenX));
++			top = std::min(top, (int)std::floor(screenY)); bottom = std::max(bottom, (int)std::ceil(screenY));
++		}
++	};
++	double topMiddle[3], bottomMiddle[3];
++	for (int axis = 0; axis < 3; ++axis)
++	{
++		topMiddle[axis] = anchor[axis] + cardUp[axis] * anchorY * rowSize;
++		bottomMiddle[axis] = anchor[axis] - cardUp[axis] * (spriteHeight - anchorY) * rowSize;
++	}
++	addCorners(topMiddle);
++	if (lying)
++	{
++		const double reach = (spriteHeight - anchorY) * lyingRowSize;
++		const double farFloor[3] = { anchor[0], anchor[1], floorHeight };
++		const double nearFloor[3] = { anchor[0] - level[0] * reach, anchor[1] - level[1] * reach, floorHeight + floorSlope * reach };
++		addCorners(anchor);
++		addCorners(farFloor);
++		addCorners(nearFloor);
++	}
++	else
++	{
++		addCorners(bottomMiddle);
++	}
++	left = std::max(0, left - 1); top = std::max(0, top - 1); right = std::min(width, right + 1); bottom = std::min(height, bottom + 1);
++	if (left >= right || top >= bottom)
++	{
++		return;
++	}
++
++	// Its bytes, in the atlas (see SpriteAtlas): found by their hash, sent up if new.
++	GpuEffectList &list = *_gpuEffects;
++	SpriteAtlas &atlas = spriteAtlas();
++	const SDL_Surface *surface = const_cast<Surface*>(sprite)->getSurface(); // read only
++	const size_t spriteBytes = (size_t)spriteWidth * spriteHeight;
++	const Uint8 *opacityMap = seeThroughSprite ? seeThroughSprite->opacityMap : nullptr;
++	auto placeInAtlas = [&]() {
++		Uint64 hash = 1469598103934665603ull ^ ((Uint64)spriteWidth << 32 | (Uint32)spriteHeight) ^ (opacityMap ? 0x9E3779B97F4A7C15ull : 0ull);
++		auto mix = [&hash](const Uint8 *bytes, size_t count) {
++			size_t at = 0;
++			for (; at + 8 <= count; at += 8)
++			{
++				Uint64 eight;
++				std::memcpy(&eight, bytes + at, 8);
++				hash = (hash ^ eight) * 1099511628211ull;
++				hash ^= hash >> 29;
++			}
++			for (; at < count; ++at) hash = (hash ^ bytes[at]) * 1099511628211ull;
++		};
++		for (int row = 0; row < spriteHeight; ++row) mix((const Uint8 *)surface->pixels + (size_t)row * surface->pitch, spriteWidth);
++		if (opacityMap) mix(opacityMap, spriteBytes);
++		auto known = atlas.places.find(hash);
++		if (known != atlas.places.end())
++		{
++			return known->second;
++		}
++		const int at = (int)atlas.bytes.size();
++		atlas.bytes.resize(at + spriteBytes);
++		for (int row = 0; row < spriteHeight; ++row)
++		{
++			std::memcpy(&atlas.bytes[at + (size_t)row * spriteWidth], (const Uint8 *)surface->pixels + (size_t)row * surface->pitch, spriteWidth);
++		}
++		if (opacityMap) atlas.bytes.insert(atlas.bytes.end(), opacityMap, opacityMap + spriteBytes);
++		atlas.places.emplace(hash, at);
++		return at;
++	};
++	int pixelsAt;
++	if (opacityMap)
++	{
++		auto known = list.spritesByAddress.find(opacityMap);
++		if (known == list.spritesByAddress.end())
++		{
++			known = list.spritesByAddress.emplace(opacityMap, placeInAtlas()).first;
++		}
++		pixelsAt = known->second;
++	}
++	else
++	{
++		pixelsAt = placeInAtlas();
++	}
++	const int opacityAt = opacityMap ? pixelsAt + (int)spriteBytes : -1;
++
++	float *texels = list.add(FirstPersonGpu::Effects::Sprite, left, top, right, bottom);
++	list.pictured.back() = { draw.unit, draw.body, draw.pile };
++	texels[1] = (float)((lying ? 1 : 0) | (draw.unit ? 2 : 0) | (draw.unit || draw.body || draw.pile ? 4 : 0) | (draw.pile ? 8 : 0) | (seeThroughSprite ? 16 : 0));
++	texels[2] = (float)draw.shade;
++	texels[3] = (float)draw.depthBias;
++	const double numbers[28] = {
++		anchor[0], anchor[1], anchor[2], anchorAcross,
++		cardUp[0], cardUp[1], cardUp[2], anchorFacing,
++		cardFacing[0], cardFacing[1], cardFacing[2], anchorAlong,
++		columnSize, rowSize, lyingRowSize, floorHeight,
++		floorSlope, dot(anchor, _levelUp) / dot(anchor, _forward), (double)anchorX, (double)anchorY,
++		(double)spriteWidth, (double)spriteHeight, (double)pixelsAt, (double)opacityAt,
++		std::max(-1e9, draw.floorCut - _eye[2]), opacity, seeThroughOpacity, (double)(seeThroughSprite ? seeThroughSprite->capLevels : 0) };
++	for (int which = 0; which < 28; ++which) texels[8 + which] = (float)numbers[which];
++}
++
++/**
++ * Records a shade on the ground (drawGroundShade: a unit's, a scorch): its box as there.
++ * Texel 0: kind, flags (1 stretched away from a light), the shades, the density.
++ * Texel 2: its centre from the eye (across the map), the ground's height from the eye in true proportions, its radius.
++ * Texel 3: the way it stretches, and how long.
++ */
++void FirstPersonView::gpuRecordGroundShade(const double centre[3], double radius, int steps, float density, const double *away, double length)
++{
++	const bool stretched = away && length > 0.0;
++	const double reach = stretched ? radius * FlareShadowWidening : radius;
++	const double endX = stretched ? centre[0] + away[0] * length : centre[0], endY = stretched ? centre[1] + away[1] * length : centre[1];
++	const int width = getWidth(), height = getHeight();
++	int left = width, top = height, right = -1, bottom = -1;
++	for (int corner = 0; corner < 4; ++corner)
++	{
++		const double cornerPoint[3] = { (corner & 1) ? std::max(centre[0], endX) + reach : std::min(centre[0], endX) - reach,
++			(corner & 2) ? std::max(centre[1], endY) + reach : std::min(centre[1], endY) - reach, centre[2] + 0.5 };
++		double screenX, screenY, cornerDepth;
++		if (!projectToScreen(cornerPoint, screenX, screenY, cornerDepth))
++		{
++			return;
++		}
++		left = std::min(left, (int)screenX); right = std::max(right, (int)screenX + 1);
++		top = std::min(top, (int)screenY); bottom = std::max(bottom, (int)screenY + 1);
++	}
++	left = std::max(0, left); top = std::max(0, top); right = std::min(width - 1, right); bottom = std::min(height - 1, bottom);
++	if (left > right || top > bottom)
++	{
++		return;
++	}
++	float *texels = _gpuEffects->add(FirstPersonGpu::Effects::GroundShade, left, top, right + 1, bottom + 1);
++	texels[1] = stretched ? 1.0f : 0.0f;
++	texels[2] = (float)steps;
++	texels[3] = density;
++	texels[8] = (float)(centre[0] - _eye[0]);
++	texels[9] = (float)(centre[1] - _eye[1]);
++	texels[10] = (float)((centre[2] + 0.5 - _eye[2]) * ZScale);
++	texels[11] = (float)radius;
++	texels[12] = stretched ? (float)away[0] : 0.0f;
++	texels[13] = stretched ? (float)away[1] : 0.0f;
++	texels[14] = stretched ? (float)length : 1.0f;
++}
++
++/**
++ * Records a bullet hole or a scorch mark (drawDecals).
++ * Texel 0: kind, flags (1 a ragged edge), its core's shades, its edge's.
++ * Texel 2: where it falls on the screen, its depth, its radius; 3: its place right and up of the view axis, a
++ * pixel's span there, the radius drawn.
++ */
++void FirstPersonView::gpuRecordDecal(double screenX, double screenY, double depth, double markRight, double markUp, double radius, double pixelSpan,
++	double drawnRadius, int reach, int coreShades, int edgeShades)
++{
++	const int centreX = (int)std::floor(screenX), centreY = (int)std::floor(screenY);
++	const int left = std::max(0, centreX - reach), top = std::max(0, centreY - reach), right = std::min(getWidth(), centreX + reach + 1), bottom = std::min(getHeight(), centreY + reach + 1);
++	if (left >= right || top >= bottom)
++	{
++		return;
++	}
++	float *texels = _gpuEffects->add(FirstPersonGpu::Effects::Decal, left, top, right, bottom);
++	texels[1] = reach > 1 ? 1.0f : 0.0f;
++	texels[2] = (float)coreShades;
++	texels[3] = (float)edgeShades;
++	texels[8] = (float)centreX; texels[9] = (float)centreY; texels[10] = (float)depth; texels[11] = (float)radius;
++	texels[12] = (float)markRight; texels[13] = (float)markUp; texels[14] = (float)pixelSpan; texels[15] = (float)drawnRadius;
++}
++
++/**
++ * Records a line in the world (drawLine3D, which clips it and takes its ends to the screen first).
++ * Texel 0: kind, flags (1 it glows, 2 over everything, 4 it leaves the glow as it is, 8 no voxel to spare in front of the scene), its colour, its thickness.
++ * Texel 2: its ends on the screen; 3: one over each end's depth, its steps, its opacity; 4: its width in the world (0: its thickness).
++ */
++void FirstPersonView::gpuRecordLine(double startX, double startY, double startZ, double endX, double endY, double endZ, int steps, Uint8 color, int thickness, float opacity,
++	float worldWidth, bool glows, bool overEverything, bool keepsGlow, bool exactDepth)
++{
++	const int left = std::max(0, (int)std::floor(std::min(startX, endX)) - thickness - 1), top = std::max(0, (int)std::floor(std::min(startY, endY)) - thickness - 1),
++		right = std::min(getWidth(), (int)std::ceil(std::max(startX, endX)) + thickness + 2), bottom = std::min(getHeight(), (int)std::ceil(std::max(startY, endY)) + thickness + 2);
++	if (left >= right || top >= bottom)
++	{
++		return;
++	}
++	float *texels = _gpuEffects->add(FirstPersonGpu::Effects::Line, left, top, right, bottom);
++	texels[1] = (float)((glows ? 1 : 0) | (overEverything ? 2 : 0) | (keepsGlow ? 4 : 0) | (exactDepth ? 8 : 0));
++	texels[2] = (float)color;
++	texels[3] = (float)thickness;
++	texels[8] = (float)startX; texels[9] = (float)startY; texels[10] = (float)endX; texels[11] = (float)endY;
++	texels[12] = (float)(1.0 / startZ); texels[13] = (float)(1.0 / endZ); texels[14] = (float)steps; texels[15] = opacity;
++	texels[16] = worldWidth;
++}
++
++/**
++ * Records a square of pixels in front of the scene (an edge dot, a particle, a dot of the aimed path).
++ * Texel 0: kind, flags (1 it glows, 2 it stops the glow, 4 its corners rounded off, 8 hidden only by what is nearer
++ * than its leeway, not as near), its colour, its depth. Texel 2: its leeway in front of the scene, in voxels; its
++ * other colour and the share of its pixels (by the dither) that are its first (below 0: all); how far it has faded
++ * into the haze (the dither's pixels below that are left out).
++ */
++void FirstPersonView::gpuRecordDot(int left, int top, int dotWidth, int dotHeight, double depth, Uint8 color, int flags, float leeway, Uint8 otherColor, float firstShare, float haze)
++{
++	const int right = std::min(getWidth(), left + dotWidth), bottom = std::min(getHeight(), top + dotHeight);
++	// (The box is the dot's own: the card finds its corners by it. One cut by the view's edge has no rounded corner there.)
++	if (std::max(0, left) >= right || std::max(0, top) >= bottom)
++	{
++		return;
++	}
++	float *texels = _gpuEffects->add(FirstPersonGpu::Effects::Dot, left, top, left + dotWidth, top + dotHeight);
++	_gpuEffects->boxes.back() = { std::max(0, left), std::max(0, top), right, bottom }; // (for the bins: what of it is in the view)
++	texels[1] = (float)flags;
++	texels[2] = (float)color;
++	texels[3] = (float)depth;
++	texels[8] = leeway; texels[9] = (float)otherColor; texels[10] = firstShare; texels[11] = haze;
++}
++
++/**
++ * Records a round dot in front of the scene (a shot's head, a flare; a bubble's ring).
++ * Texel 0: kind, flags (1 it glows, 2 measured from the pixels' middles, 4 only its rim, a pixel wide), its rim's
++ * colour, its depth. Texel 2: its middle on the screen, its radius, its leeway in front of the scene; 3: its centre's
++ * colour and the ring's round it, and how far out (of the radius) each reaches.
++ */
++void FirstPersonView::gpuRecordDisc(double screenX, double screenY, double radius, double depth, float leeway, Uint8 rim, Uint8 centre, Uint8 middle, float centreShare,
++	float middleShare, int flags)
++{
++	const int reach = (int)std::ceil(radius) + 2;
++	const int left = std::max(0, (int)screenX - reach), top = std::max(0, (int)screenY - reach), right = std::min(getWidth(), (int)screenX + reach + 1),
++		bottom = std::min(getHeight(), (int)screenY + reach + 1);
++	if (left >= right || top >= bottom)
++	{
++		return;
++	}
++	float *texels = _gpuEffects->add(FirstPersonGpu::Effects::Disc, left, top, right, bottom);
++	texels[1] = (float)flags;
++	texels[2] = (float)rim;
++	texels[3] = (float)depth;
++	texels[8] = (float)screenX; texels[9] = (float)screenY; texels[10] = (float)radius; texels[11] = leeway;
++	texels[12] = (float)centre; texels[13] = (float)middle; texels[14] = centreShare; texels[15] = middleShare;
++}
++
++/**
++ * Records a filled quad at one depth (fillQuadAtDepth).
++ * Texel 0: kind, 0, its colour, its depth. Texels 2 and 3: its four corners on the screen.
++ */
++void FirstPersonView::gpuRecordQuad(const double corners[4][2], Uint8 color, float depth)
++{
++	double low[2] = { corners[0][0], corners[0][1] }, high[2] = { corners[0][0], corners[0][1] };
++	for (int corner = 1; corner < 4; ++corner)
++	{
++		for (int axis = 0; axis < 2; ++axis)
++		{
++			low[axis] = std::min(low[axis], corners[corner][axis]);
++			high[axis] = std::max(high[axis], corners[corner][axis]);
++		}
++	}
++	const int left = std::max(0, (int)std::floor(std::max(-1e6, low[0])) - 1), top = std::max(0, (int)std::floor(std::max(-1e6, low[1])) - 1),
++		right = std::min(getWidth(), (int)std::ceil(std::min(1e6, high[0])) + 1), bottom = std::min(getHeight(), (int)std::ceil(std::min(1e6, high[1])) + 1);
++	if (left >= right || top >= bottom)
++	{
++		return;
++	}
++	float *texels = _gpuEffects->add(FirstPersonGpu::Effects::Quad, left, top, right, bottom);
++	texels[2] = (float)color;
++	texels[3] = depth;
++	for (int corner = 0; corner < 4; ++corner)
++	{
++		texels[8 + corner * 2] = (float)corners[corner][0];
++		texels[9 + corner * 2] = (float)corners[corner][1];
++	}
++}
++
++/**
++ * Hands the recorded units and effects to the card, which draws them over the rays' pictures and
++ * gives the finished ones back: the colour, the depth and the glow into the view's buffers, the
++ * veils and whose picture shows round the pointer from its notes. Recording stops.
++ * @return False if the card failed: the frame's rays are cast again on the CPU (what was recorded is lost for this
++ *         one frame; the CPU draws everything from the next).
++ */
++bool FirstPersonView::gpuDrawEffects()
++{
++	_gpuRecording = false;
++	GpuEffectList &list = *_gpuEffects;
++	FirstPersonGpu::Effects &effects = list.effects;
++	const int width = getWidth(), height = getHeight();
++	const int bin = FirstPersonGpu::Effects::Bin;
++	effects.width = width;
++	effects.height = height;
++	effects.binColumns = (width + bin - 1) / bin;
++	effects.binRows = (height + bin - 1) / bin;
++	// The bins: how many primitives touch each, then each one's list, in the order recorded.
++	const int binCount = effects.binColumns * effects.binRows;
++	list.binCounts.assign(binCount + 1, 0);
++	for (const auto &box : list.boxes)
++	{
++		for (int row = box[1] / bin; row <= (box[3] - 1) / bin; ++row)
++			for (int column = box[0] / bin; column <= (box[2] - 1) / bin; ++column) ++list.binCounts[row * effects.binColumns + column];
++	}
++	size_t entries = 0;
++	for (int which = 0; which < binCount; ++which) entries += list.binCounts[which];
++	effects.bins.resize(binCount + 1 + entries);
++	Uint32 next = (Uint32)(binCount + 1);
++	for (int which = 0; which < binCount; ++which)
++	{
++		effects.bins[which] = next;
++		next += (Uint32)list.binCounts[which];
++		list.binCounts[which] = (int)effects.bins[which]; // (from here: where its next entry goes)
++	}
++	effects.bins[binCount] = next;
++	for (size_t number = 0; number < list.boxes.size(); ++number)
++	{
++		const auto &box = list.boxes[number];
++		for (int row = box[1] / bin; row <= (box[3] - 1) / bin; ++row)
++			for (int column = box[0] / bin; column <= (box[2] - 1) / bin; ++column) effects.bins[list.binCounts[row * effects.binColumns + column]++] = (Uint32)number;
++	}
++	// The camera, as the CPU's routines have it.
++	for (int axis = 0; axis < 3; ++axis)
++	{
++		effects.forward[axis] = (float)_forward[axis];
++		effects.right[axis] = (float)_right[axis];
++		effects.up[axis] = (float)_up[axis];
++		effects.levelRight[axis] = (float)_levelRight[axis];
++		effects.levelUp[axis] = (float)_levelUp[axis];
++	}
++	effects.level[0] = (float)std::cos(_yaw);
++	effects.level[1] = (float)std::sin(_yaw);
++	effects.eyeZ = (float)_eye[2];
++	effects.focal = (float)((width / 2.0) / _halfFovTangent);
++	effects.seeThrough = _seeThroughTables.empty() ? nullptr : _seeThroughTables.data();
++	effects.paletteHash = _colors.paletteHash;
++	// The bloom after them, as drawLightHalos sets it up.
++	effects.halos = !_nearestRgb.empty();
++	effects.glowGain = _colors.underwater ? 45.0f : 18.0f + 42.0f * _colors.night;
++	effects.maxDistance = _maxDistance;
++	effects.palette = getPalette();
++	effects.nearestRgb = _nearestRgb.empty() ? nullptr : _nearestRgb.data();
++	// What comes back beside the picture: in the check every pixel's notes; else only those round the pointer (whose
++	// picture the player points at), and every pixel's when the wash needs the own colours (futuristic night vision).
++	const bool allNotes = _gpuChecking || (_nightVision && Options::fpsNightVisionUnits);
++	list.notes.resize(allNotes ? (size_t)width * height * 4 : 0);
++	effects.notes = allNotes ? list.notes.data() : nullptr;
++	const int patchLeft = std::max(0, _pointerX - PointerReach), patchTop = std::max(0, _pointerY - PointerReach),
++		patchRight = std::min(width, _pointerX + PointerReach + 1), patchBottom = std::min(height, _pointerY + PointerReach + 1);
++	const bool patched = !allNotes && patchLeft < patchRight && patchTop < patchBottom;
++	effects.patch[0] = patchLeft; effects.patch[1] = patchTop;
++	effects.patch[2] = patched ? patchRight - patchLeft : 0; effects.patch[3] = patched ? patchBottom - patchTop : 0;
++	list.patchNotes.resize((size_t)(2 * PointerReach + 1) * (2 * PointerReach + 1) * 4);
++	effects.patchNotes = patched ? list.patchNotes.data() : nullptr;
++
++	if (_gpuChecking)
++	{
++		gpuCheckEffects();
++		return true;
++	}
++	FirstPersonGpu::Output output;
++	output.color = getRaw(0, 0);
++	output.colorPitch = getPitch();
++	output.depth = _depthBuffer.data();
++	output.glow = _glowMask.data();
++	output.results = nullptr;
++	output.perRay = false;
++	const bool fullColor = _wantsTrueColor && _gpuRaysPixelSize == 1;
++	if (fullColor)
++	{
++		_trueColor.resize((size_t)width * height);
++		_rayColors.resize(_trueColor.size());
++	}
++	output.trueColor = fullColor ? _trueColor.data() : nullptr;
++	// Beside the picture: in full colour the rays' own palette colours (a pixel that still has its ray's is shown in
++	// the full one, see trueColor), and with light in the air where the smoke lies; the depth only if asked later.
++	const bool shaftSmoke = fullColor && _hasLightShafts && !allNotes;
++	effects.rayColors = fullColor ? _rayColors.data() : nullptr;
++	effects.readGlow = shaftSmoke;
++	effects.readDepth = false;
++	FirstPersonGpu *gpu = readyFirstPersonGpu();
++	// (OPENXCOM3D_GPU_TIMING: the effects' share of the card's time, in the log every 60 frames.)
++	static const bool timed = getenv("OPENXCOM3D_GPU_TIMING") != nullptr;
++	FirstPersonGpu::Timing timing;
++	if (!gpu || !gpu->drawEffects(effects, output, timed ? &timing : nullptr))
++	{
++		runOnAllThreads(&FirstPersonView::renderRows);
++		return false;
++	}
++	if (timed && width >= 320)
++	{
++		static double upload = 0.0, draw = 0.0, read = 0.0;
++		static int frames = 0;
++		upload += timing.upload; draw += timing.draw; read += timing.read;
++		if (++frames == 60)
++		{
++			Log(LOG_INFO) << "OpenXcom3D GPU: the " << width << "x" << height << " view's units and effects (" << list.boxes.size() << " primitives, " << effects.bytes->size()
++				<< " bytes of sprites kept): sending " << upload / frames << " ms, drawing " << draw / frames << " ms, reading back " << read / frames << " ms";
++			upload = draw = read = 0.0;
++			frames = 0;
++		}
++	}
++	// The notes: the veils, the own colours, and whose picture shows round the pointer.
++	for (int row = 0; allNotes && row < height; ++row)
++	{
++		const Uint32 *notes = &list.notes[(size_t)row * width * 4];
++		Uint8 *veil = &_unitVeil[(size_t)row * width], *smoke = &_smokeVeil[(size_t)row * width], *own = &_ownColours[(size_t)row * width];
++		for (int column = 0; column < width; ++column, notes += 4)
++		{
++			veil[column] = (Uint8)notes[0];
++			own[column] = (Uint8)(notes[1] & 1);
++			smoke[column] = (Uint8)(notes[1] >> 1);
++		}
++	}
++	for (int patchY = 0; patchY <= 2 * PointerReach; ++patchY)
++	{
++		for (int patchX = 0; patchX <= 2 * PointerReach; ++patchX)
++		{
++			const int pixelX = _pointerX - PointerReach + patchX, pixelY = _pointerY - PointerReach + patchY;
++			if (pixelX < 0 || pixelY < 0 || pixelX >= width || pixelY >= height) continue;
++			if (!allNotes && !patched) continue;
++			const Uint32 *notes = allNotes ? &list.notes[((size_t)pixelY * width + pixelX) * 4]
++				: &list.patchNotes[((size_t)(pixelY - patchTop) * effects.patch[2] + (pixelX - patchLeft)) * 4];
++			if (notes[2] && notes[2] <= list.pictured.size())
++			{
++				_pointerUnits[patchY][patchX] = list.pictured[notes[2] - 1].unit;
++				_pointerBodies[patchY][patchX] = list.pictured[notes[2] - 1].body;
++			}
++			if (notes[3] && notes[3] <= list.pictured.size())
++			{
++				_pointerPiles[patchY][patchX] = list.pictured[notes[3] - 1].pile;
++			}
++		}
++	}
++	// In full colour with light in the air (setting "Light shafts"), the mode lays that light on see-through smoke:
++	// where smoke lies over a pixel is the glow's bit 64.
++	if (shaftSmoke)
++	{
++		for (size_t index = 0; index < (size_t)width * height; ++index)
++		{
++			_smokeVeil[index] = (_glowMask[index] & 64) ? 1 : 0;
++		}
++	}
++	if (fullColor)
++	{
++		_hasTrueColor = true;
++	}
++	_gpuDepthPending = true; // (the depth stays on the card until something drawn after this asks: see gpuNeedDepth)
++	return true;
++}
++
++/**
++ * The depth of the frame's finished picture, fetched from the card the first time something drawn
++ * on the CPU after the units and effects needs it (a downed unit's icon, a damage number, the
++ * aimed path under night vision); most frames nothing does, and it is never read back.
++ */
++void FirstPersonView::gpuFetchDepth()
++{
++	_gpuDepthPending = false;
++	FirstPersonGpu *gpu = readyFirstPersonGpu();
++	if (!gpu || !gpu->readEffectsDepth(getWidth(), getHeight(), _depthBuffer.data()))
++	{
++		std::fill(_depthBuffer.begin(), _depthBuffer.end(), 0.0f); // (the card failed: everything counts as hidden this frame)
++	}
++}
++
++/**
++ * The check (OPENXCOM3D_GPU_EFFECTS=check): the CPU drew the passes as ever, and the frame shown
++ * is its own; the card draws what was recorded beside it, and the two are compared, a pixel at a
++ * time: the colour, the depth, the glow, the veils. The log gets the sums every 60 frames of the
++ * main view; OPENXCOM3D_GPU_DUMP=folder gets the last compared frame's two pictures (palette
++ * colours, a byte a pixel: cpu.bin, gpu.bin; size.bin; palette.bin).
++ */
++void FirstPersonView::gpuCheckEffects()
++{
++	GpuEffectList &list = *_gpuEffects;
++	const int width = getWidth(), height = getHeight();
++	const size_t pixels = (size_t)width * height;
++	std::vector<Uint8> colors(pixels), glow(pixels);
++	std::vector<float> depths(pixels);
++	FirstPersonGpu::Output output;
++	output.color = colors.data();
++	output.colorPitch = width;
++	output.depth = depths.data();
++	output.glow = glow.data();
++	output.results = nullptr;
++	output.trueColor = nullptr;
++	output.perRay = false;
++	list.effects.readDepth = list.effects.readGlow = true;
++	list.effects.rayColors = nullptr;
++	FirstPersonGpu *gpu = readyFirstPersonGpu();
++	if (!gpu || !gpu->drawEffects(list.effects, output, nullptr) || width < 320)
++	{
++		return;
++	}
++	static long frames = 0, checked = 0, differentColors = 0, differentDepths = 0, differentGlow = 0, differentVeils = 0, primitives = 0;
++	for (int row = 0; row < height; ++row)
++	{
++		const Uint8 *cpuColors = getRaw(0, row);
++		for (int column = 0; column < width; ++column)
++		{
++			const size_t index = (size_t)row * width + column;
++			const Uint32 *notes = &list.notes[index * 4];
++			differentColors += cpuColors[column] != colors[index];
++			differentDepths += std::abs(_depthBuffer[index] - depths[index]) > 0.01f * std::max(1.0f, std::min(_depthBuffer[index], 1e6f));
++			differentGlow += _glowMask[index] != (glow[index] & 3);
++			differentVeils += _unitVeil[index] != (Uint8)notes[0] || _ownColours[index] != (notes[1] & 1);
++		}
++	}
++	checked += (long)pixels;
++	primitives += (long)list.boxes.size();
++	if (++frames % 60 == 0)
++	{
++		Log(LOG_INFO) << "OpenXcom3D GPU: units and effects, " << primitives / 60 << " primitives a frame: of " << checked << " pixels " << differentColors << " colours differ ("
++			<< 100.0 * differentColors / checked << "%), " << differentDepths << " depths, " << differentGlow << " glows, " << differentVeils << " veils";
++		checked = differentColors = differentDepths = differentGlow = differentVeils = primitives = 0;
++		if (const char *folder = getenv("OPENXCOM3D_GPU_DUMP"))
++		{
++			auto write = [&](const char *name, const void *data, size_t size) {
++				if (FILE *file = fopen((std::string(folder) + "/" + name).c_str(), "wb"))
++				{
++					fwrite(data, 1, size, file);
++					fclose(file);
++				}
++			};
++			std::vector<Uint8> cpu(pixels), palette(768);
++			for (int row = 0; row < height; ++row) std::memcpy(&cpu[(size_t)row * width], getRaw(0, row), width);
++			const SDL_Color *shown = getPalette();
++			for (int index = 0; index < 256; ++index)
++			{
++				palette[index * 3] = shown[index].r; palette[index * 3 + 1] = shown[index].g; palette[index * 3 + 2] = shown[index].b;
++			}
++			const int size[2] = { width, height };
++			write("effects_size.bin", size, sizeof(size));
++			write("effects_cpu.bin", cpu.data(), pixels);
++			write("effects_gpu.bin", colors.data(), pixels);
++			write("effects_palette.bin", palette.data(), 768);
++		}
++	}
++}
++
++}
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
 index 000000000..8b657d8fe
@@ -60470,10 +62263,10 @@ index 000000000..f950d598a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShots.cpp b/src/FirstPerson/FirstPersonViewShots.cpp
 new file mode 100644
-index 000000000..d03b143aa
+index 000000000..bc286e32a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShots.cpp
-@@ -0,0 +1,2253 @@
+@@ -0,0 +1,2293 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -60756,6 +62549,11 @@ index 000000000..d03b143aa
 + */
 +void FirstPersonView::fillQuadAtDepth(const double corners[4][2], Uint8 color, float depth)
 +{
++	if (_gpuRecording)
++	{
++		gpuRecordQuad(corners, color, depth);
++		if (_gpuRecordOnly) return;
++	}
 +	const int width = getWidth(), height = getHeight();
 +
 +	// The rows it covers: those whose pixel centres lie between its top and bottom corners.
@@ -61005,6 +62803,14 @@ index 000000000..d03b143aa
 +		// A bullet hole's core is darker than its edge (it shows on busy textures such as sand);
 +		// a scorch is even all over.
 +		const int coreShades = decal.size == 1 ? BulletHoleCoreShades : decal.depth;
++		if (_gpuRecording)
++		{
++			// (The card darkens the pixels: a mark smaller than half a pixel only the one it falls on, see below.)
++			const double recordedRadius = std::min(radius, MarkMaxPixels * pixelSpan * _zoom);
++			gpuRecordDecal(screenX, screenY, depth, markRight, markUp, radius, pixelSpan, recordedRadius, radius < pixelSpan * 0.5 ? 0 : (int)std::ceil(recordedRadius / pixelSpan),
++				coreShades, decal.depth);
++			if (_gpuRecordOnly) continue;
++		}
 +
 +		// The pixel it falls on, as its core, if the scene there is the surface it marks (within
 +		// its radius and two pixels' span of it, and a voxel more: the camera sees a step's edge or
@@ -61464,6 +63270,12 @@ index 000000000..d03b143aa
 +	if (!projectToScreen(start, startX, startY, startZ) || !projectToScreen(end, endX, endY, endZ)) return;
 +	const int steps = std::max(1, (int)std::max(std::abs(endX - startX), std::abs(endY - startY)));
 +	if (steps > 4000) return;
++	if (_gpuRecording)
++	{
++		gpuRecordLine(startX, startY, startZ, endX, endY, endZ, steps, color, thickness, opacity, worldWidth, glows, overEverything);
++		if (_gpuRecordOnly) return;
++	}
++	if (!overEverything) gpuNeedDepth();
 +	for (int step = 0; step <= steps; ++step)
 +	{
 +		const double progress = (double)step / steps;
@@ -61898,6 +63710,11 @@ index 000000000..d03b143aa
 +	const double focalLength = (width / 2.0) / _halfFovTangent; // in pixels
 +	const double size = (trail == TRAIL_PLASMA ? 3.5 : trail == TRAIL_SMOKE ? 1.1 : 0.9) * calibre;
 +	const int radius = std::clamp((int)std::lround(size * focalLength / depth * 0.5), 1, 12);
++	if (_gpuRecording)
++	{
++		gpuRecordDisc(screenX, screenY, radius, depth, 0.0f, rim, centre, middle, 0.4f, 0.7f, trail != TRAIL_NONE ? 1 : 0);
++		if (_gpuRecordOnly) return;
++	}
 +	// A round dot, depth-tested: the inner 40% in the centre colour, out to 70% the middle one,
 +	// the rest the rim.
 +	for (int y = (int)screenY - radius; y <= (int)screenY + radius; ++y)
@@ -62079,6 +63896,7 @@ index 000000000..d03b143aa
 + */
 +void FirstPersonView::drawTrajectoryPath(const std::vector<Position> &path, TrajectoryLook look, const double muzzleScreen[2], bool muzzleValid, bool asNightLight)
 +{
++	if (!_gpuRecording) gpuNeedDepth(); // (drawn again over the wash under night vision: after the card's units and effects)
 +	if (path.size() < 2)
 +	{
 +		return;
@@ -62108,6 +63926,7 @@ index 000000000..d03b143aa
 +	// the middle, white-green round it.
 +	auto drawEndDot = [&](const float end[3], Uint8 middleColor, Uint8 rimColor)
 +	{
++		if (!_gpuRecording) gpuNeedDepth();
 +		double screenX, screenY, depth;
 +		const double endWorld[3] = { end[0], end[1], end[2] };
 +		if (!projectToScreen(endWorld, screenX, screenY, depth))
@@ -62119,8 +63938,15 @@ index 000000000..d03b143aa
 +		for (const auto &offset : dot)
 +		{
 +			const int pixelX = centreX + offset[0], pixelY = centreY + offset[1];
-+			if (pixelX < 0 || pixelY < 0 || pixelX >= width || pixelY >= height || depth > _depthBuffer[pixelY * width + pixelX] + 2.0) continue;
 +			const bool middle = offset[0] == 0 && offset[1] == 0;
++			if (_gpuRecording)
++			{
++				// (A pixel each, hidden only by what is more than two voxels nearer.)
++				if (asNightLight) gpuRecordDot(pixelX, pixelY, 1, 1, depth, _colors.nightLight, 8, 2.0f, nightGreen, refused ? 0.0f : middle ? 2.0f : NightLightWhiteShare);
++				else gpuRecordDot(pixelX, pixelY, 1, 1, depth, middle ? middleColor : rimColor, 8 | (_nightVision && Options::fpsGlowingOutlines && !refused ? 1 : 0), 2.0f);
++				if (_gpuRecordOnly) continue;
++			}
++			if (pixelX < 0 || pixelY < 0 || pixelX >= width || pixelY >= height || depth > _depthBuffer[pixelY * width + pixelX] + 2.0) continue;
 +			if (asNightLight)
 +			{
 +				*getRaw(pixelX, pixelY) = !refused && (middle || dither(pixelX, pixelY) < NightLightWhiteShare) ? _colors.nightLight : nightGreen;
@@ -62237,6 +64063,13 @@ index 000000000..d03b143aa
 +			lastX = screenX; lastY = screenY; lastOnScreen = true;
 +			if (sinceDot < NightForcedDotSpacing) continue;
 +			sinceDot = 0.0f;
++			if (_gpuRecording)
++			{
++				const int dotLeft = (int)std::floor(screenX) - NightForcedDotSize / 2, dotTop = (int)std::floor(screenY) - NightForcedDotSize / 2;
++				if (asNightLight) gpuRecordDot(dotLeft, dotTop, NightForcedDotSize, NightForcedDotSize, depth, _colors.nightLight, 0, 1.0f, nightGreen, NightLightWhiteShare);
++				else gpuRecordDot(dotLeft, dotTop, NightForcedDotSize, NightForcedDotSize, depth, color, Options::fpsGlowingOutlines ? 1 : 2, 1.0f);
++				if (_gpuRecordOnly) continue;
++			}
 +			for (int offsetY = 0; offsetY < NightForcedDotSize; ++offsetY)
 +			{
 +				for (int offsetX = 0; offsetX < NightForcedDotSize; ++offsetX)
@@ -62729,10 +64562,10 @@ index 000000000..d03b143aa
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..d8f57ff49
+index 000000000..77a768130
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,3431 @@
+@@ -0,0 +1,3498 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -62891,6 +64724,11 @@ index 000000000..d8f57ff49
 + */
 +void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBottom)
 +{
++	if (_gpuRecording)
++	{
++		gpuRecordSprite(draw); // (the card draws it: see FirstPersonViewGpuEffects.cpp)
++		if (_gpuRecordOnly) return;
++	}
 +	const Surface *sprite = draw.sprite;
 +	const int anchorX = draw.anchorX, anchorY = draw.anchorY, shade = draw.shade;
 +	const double *world = draw.world;
@@ -63241,7 +65079,35 @@ index 000000000..d8f57ff49
 + */
 +void FirstPersonView::replayDrawList()
 +{
-+	if (!_drawList.empty())
++	if (_gpuRecording)
++	{
++		// (Recorded for the card, in order: the funnels write each step down. Its check has the CPU draw them too, below.)
++		const bool recordOnly = _gpuRecordOnly;
++		_gpuRecordOnly = true;
++		for (const DrawStep &step : _drawList)
++		{
++			switch (step.kind)
++			{
++			case DrawStep::Sprite:
++				drawSprite(step.sprite);
++				break;
++			case DrawStep::GroundShade:
++				drawGroundShade(step.centre, step.radius, step.steps, step.density, 0, 1 << 30, step.away, step.length);
++				break;
++			case DrawStep::Line:
++				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, 0, 1 << 30, step.glows);
++				break;
++			}
++		}
++		_gpuRecordOnly = recordOnly;
++		if (!recordOnly && !_drawList.empty())
++		{
++			_gpuRecording = false;
++			runOnAllThreads(&FirstPersonView::drawListBands);
++			_gpuRecording = true;
++		}
++	}
++	else if (!_drawList.empty())
 +	{
 +		runOnAllThreads(&FirstPersonView::drawListBands);
 +	}
@@ -64431,6 +66297,11 @@ index 000000000..d8f57ff49
 +void FirstPersonView::drawGroundShade(const double centre[3], double radius, int steps, float density, int bandTop, int bandBottom,
 +	const double *away, double length)
 +{
++	if (_gpuRecording)
++	{
++		gpuRecordGroundShade(centre, radius, steps, density, away, length);
++		if (_gpuRecordOnly) return;
++	}
 +	// The screen rectangle around it: the four corners of the box around the disc, or around the
 +	// stretched patch from its start to its end at its widest, projected (nothing drawn if any is
 +	// behind the camera), cut to the view.
@@ -64986,6 +66857,11 @@ index 000000000..d8f57ff49
 +		const int size = std::max(2, (int)std::lround(EdgeDotSize * focalLength / depth));
 +		const float haze = smoothstep(_maxDistance * 0.3f, _maxDistance, (float)depth);
 +		const int left = (int)std::lround(screenX - size / 2.0), top = (int)std::lround(screenY - size / 2.0);
++		if (_gpuRecording)
++		{
++			gpuRecordDot(left, top, size, size, depth, shadeColor(_colors.edgeDot, (int)(_colors.ambient * 0.5f)), 0, 1.0f, 0, -1.0f, haze);
++			if (_gpuRecordOnly) return;
++		}
 +		for (int pixelY = std::max(0, top); pixelY < std::min(height, top + size); ++pixelY)
 +		{
 +			for (int pixelX = std::max(0, left); pixelX < std::min(width, left + size); ++pixelX)
@@ -65542,10 +67418,32 @@ index 000000000..d8f57ff49
 +	} while (_smokeUpgrades != upgradesBefore);
 +	// Only what can show, each puff in the rows it may reach (see cullSmokeDraws); then drawn on
 +	// all the view's threads, each a band of rows at a time (see drawSmokeBands).
++	if (_gpuRecording)
++	{
++		// (For the card, every puff once, whole: its own depth test leaves out what can't show.)
++		for (const SmokeDraw &smoke : _smokeDraws)
++		{
++			const SeeThroughSprite seeThroughSprite = { smoke.soft->opacity.data(), smoke.opacity, nullptr, nullptr, nullptr, 0, (int)std::lround(smoke.cap * SeeThroughLevels) };
++			SpriteDraw draw;
++			draw.sprite = smoke.soft->colors;
++			draw.anchorX = 16 * UpscaleFactor;
++			draw.anchorY = smoke.anchorY * UpscaleFactor;
++			std::copy(smoke.world, smoke.world + 3, draw.world);
++			draw.depthBias = SmokeDepthBias;
++			draw.shade = smoke.shade;
++			draw.scale = smoke.scale / UpscaleFactor;
++			draw.seeThrough = &seeThroughSprite;
++			gpuRecordSprite(draw);
++		}
++		if (_gpuRecordOnly) return;
++	}
 +	cullSmokeDraws();
 +	if (!_smokeDraws.empty())
 +	{
++		const bool recording = _gpuRecording;
++		_gpuRecording = false; // (the check: the CPU draws them too, on its threads, nothing recorded twice)
 +		runOnAllThreads(&FirstPersonView::drawSmokeBands);
++		_gpuRecording = recording;
 +	}
 +}
 +
@@ -66010,6 +67908,7 @@ index 000000000..d8f57ff49
 +			if (!projectToScreen(point, screenX, screenY, depth) || depth > _maxDistance) break;
 +			const int pixelX = (int)screenX, pixelY = (int)screenY;
 +			if (pixelX < 0 || pixelY < 0 || pixelX >= width || pixelY >= height) continue;
++			gpuNeedDepth();
 +			inView = _depthBuffer[pixelY * width + pixelX] >= depth - 8.0;
 +			break;
 +		}
@@ -66156,6 +68055,7 @@ index 000000000..d8f57ff49
 +	{
 +		if (spots[index].shown)
 +		{
++			gpuNeedDepth();
 +			FirstPerson::drawDamageNumber(this, font, numbers[index], spots[index].x, bottoms[index], uiScale, now, colors, _depthBuffer.data(), depths[index]);
 +		}
 +	}

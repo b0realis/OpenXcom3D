@@ -617,6 +617,36 @@ struct FirstPersonGpu::State
 	bool setTargets(int width, int height, bool results, int which = 0);
 	bool buildResolve();
 	bool draw(const Frame &frame, const Output &output, Timing *timing);
+
+	// The units and effects (see drawEffects): their program, their buffers (the primitives, the sprites' bytes, the
+	// bins) with a texture each, the see-through tables as a picture, and the pictures they are drawn into, by size.
+	Program effectsProgram;
+	Gl::UInt effectBuffers[3] = {}, effectTextures[3] = {}, seeThroughTexture = 0;
+	Uint32 seeThroughSent = 0;
+	size_t effectBytesSent = 0, effectBytesRoom = 0; // the sprites' bytes the card has, and the room its buffer has for them
+	Uint32 effectBytesGeneration = ~0u;
+	struct EffectTargets
+	{
+		Gl::UInt framebuffer = 0;
+		Gl::UInt textures[4] = {}; // colour, depth, glow, notes
+	};
+	std::map<std::array<int, 2>, EffectTargets> effectTargets;
+	int rayColumns = 0, rayRows = 0, rayPixelSize = 1; // the rays' pictures kept for the effects: their size, and the pixels a ray coloured
+	bool buildEffects();
+	bool drawEffects(const Effects &effects, const Output &output, Timing *timing);
+	// The bloom after them (see drawGlow): its three programs, the palette and its nearest colours as pictures, and
+	// for each size of view the two grids (each with a second to blur through) and the brightened picture with its glow.
+	Gl::UInt glowPrograms[3] = {}, paletteTexture = 0, nearestTexture = 0;
+	Uint32 glowPaletteSent = 0;
+	struct GlowTargets
+	{
+		Gl::UInt framebuffers[5] = {}; // the grid, its second, the colours' grid, its second, the picture
+		Gl::UInt textures[6] = {};     // ... and the picture's glow
+	};
+	std::map<std::array<int, 2>, GlowTargets> glowTargets;
+	Gl::UInt compileFragment(const std::string &source, const char *what);
+	bool buildGlow();
+	bool drawGlow(const Effects &effects, const EffectTargets &drawn, GlowTargets *&brightened);
 };
 
 /**
@@ -1507,6 +1537,20 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	// The picture, back to the view: straight into its buffers with a ray a pixel; else a ray each
 	// first, then spread over their blocks of pixels as the CPU's rays fill theirs.
 	const bool blocks = frame.pixelSize > 1 && !output.perRay;
+	rayColumns = blockColumns;
+	rayRows = blockRows;
+	rayPixelSize = frame.pixelSize;
+	if (output.keep == 1)
+	{
+		// (The effects come next, on the card: see drawEffects, which reads the finished pictures back.)
+		const Gl::Enum error = Gl::GetError();
+		if (error != Gl::NoError)
+		{
+			Log(LOG_WARNING) << "OpenXcom3D GPU: OpenGL error " << std::hex << error;
+			return false;
+		}
+		return true;
+	}
 	if (blocks)
 	{
 		blockColors.resize((size_t)blockColumns * blockRows);
@@ -1549,6 +1593,445 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	if (error != Gl::NoError)
 	{
 		Log(LOG_WARNING) << "OpenXcom3D GPU: OpenGL error " << std::hex << error;
+		return false;
+	}
+	return true;
+}
+
+// ---- The units and effects ----
+
+/**
+ * Builds the effects' program (see EffectsSource) and its buffers. The pictures it reads are on
+ * texture units 0 to 3, its buffers on the three after the rays' own.
+ */
+bool FirstPersonGpu::State::buildEffects()
+{
+	std::string constants;
+	auto number = [&](const char *name, double value) { constants += std::string("const float ") + name + " = " + glslFloat(value) + ";\n"; };
+	auto whole = [&](const char *name, int value) { constants += std::string("const int ") + name + " = " + std::to_string(value) + ";\n"; };
+	number("ZScale", ZScale);
+	number("FlareShadowWidening", FlareShadowWidening);
+	whole("UnitVeilMax", UnitVeilMax);
+	whole("SeeThroughLevels", 16);
+	whole("EffectTexels", Effects::Texels);
+	whole("EffectBin", Effects::Bin);
+	whole("EffectSprite", Effects::Sprite);
+	whole("EffectGroundShade", Effects::GroundShade);
+	whole("EffectDecal", Effects::Decal);
+	whole("EffectLine", Effects::Line);
+	whole("EffectDot", Effects::Dot);
+	whole("EffectDisc", Effects::Disc);
+	whole("EffectQuad", Effects::Quad);
+	const std::string vertexSource = shaderHead() + VertexSource, effectsSource = shaderHead() + constants + EffectsSource;
+	const char *sources[2] = { vertexSource.c_str(), effectsSource.c_str() };
+	const Gl::Enum kinds[2] = { Gl::VERTEX_SHADER, Gl::FRAGMENT_SHADER };
+	const Gl::UInt built = Gl::CreateProgram();
+	for (int which = 0; which < 2; ++which)
+	{
+		const Gl::UInt shader = Gl::CreateShader(kinds[which]);
+		Gl::ShaderSource(shader, 1, &sources[which], nullptr);
+		Gl::CompileShader(shader);
+		Gl::Int compiled = 0;
+		Gl::GetShaderiv(shader, Gl::COMPILE_STATUS, &compiled);
+		if (!compiled)
+		{
+			char log[4096] = "";
+			Gl::GetShaderInfoLog(shader, sizeof(log), nullptr, log);
+			Log(LOG_ERROR) << "OpenXcom3D GPU: the effects' shader would not compile: " << log;
+			return false;
+		}
+		Gl::AttachShader(built, shader);
+		Gl::DeleteShader(shader);
+	}
+	Gl::LinkProgram(built);
+	Gl::Int linked = 0;
+	Gl::GetProgramiv(built, Gl::LINK_STATUS, &linked);
+	if (!linked)
+	{
+		char log[4096] = "";
+		Gl::GetProgramInfoLog(built, sizeof(log), nullptr, log);
+		Log(LOG_ERROR) << "OpenXcom3D GPU: the effects' shader would not link: " << log;
+		return false;
+	}
+	Gl::UseProgram(built);
+	const char *const pictures[4] = { "uRayColor", "uRayDepth", "uRayGlow", "uSeeThrough" };
+	for (int unit = 0; unit < 4; ++unit) Gl::Uniform1i(Gl::GetUniformLocation(built, pictures[unit]), unit);
+	const char *const buffered[3] = { "uPrims", "uBytes", "uBins" };
+	const Gl::Enum formats[3] = { Gl::RGBA32F, Gl::R8UI, Gl::R32UI };
+	Gl::GenBuffers(3, effectBuffers);
+	Gl::GenTextures(3, effectTextures);
+	for (int which = 0; which < 3; ++which)
+	{
+		Gl::BindBuffer(Gl::ARRAY_BUFFER, effectBuffers[which]);
+		Gl::BufferData(Gl::ARRAY_BUFFER, 16, nullptr, Gl::DYNAMIC_DRAW);
+		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + which);
+		Gl::BindTexture(Gl::TEXTURE_BUFFER, effectTextures[which]);
+		Gl::TexBuffer(Gl::TEXTURE_BUFFER, formats[which], effectBuffers[which]);
+		Gl::Uniform1i(Gl::GetUniformLocation(built, buffered[which]), BufferCount + which);
+	}
+	// The see-through tables: 2048 across (the least a card's pictures may be wide), a table's 65536 bytes in 32 rows.
+	Gl::GenTextures(1, &seeThroughTexture);
+	Gl::ActiveTexture(Gl::TEXTURE0 + 3);
+	Gl::BindTexture(Gl::TEXTURE_2D, seeThroughTexture);
+	Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, 2048, 480, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
+	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
+	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
+	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
+	effectsProgram.id = built;
+	Gl::UseProgram(program->id);
+	return Gl::GetError() == Gl::NoError;
+}
+
+/**
+ * A program of the picture-wide triangle and a fragment shader. 0: it would not build (the log says why).
+ */
+Gl::UInt FirstPersonGpu::State::compileFragment(const std::string &source, const char *what)
+{
+	const std::string vertexSource = shaderHead() + VertexSource, fragmentSource = shaderHead() + source;
+	const char *sources[2] = { vertexSource.c_str(), fragmentSource.c_str() };
+	const Gl::Enum kinds[2] = { Gl::VERTEX_SHADER, Gl::FRAGMENT_SHADER };
+	const Gl::UInt built = Gl::CreateProgram();
+	for (int which = 0; which < 2; ++which)
+	{
+		const Gl::UInt shader = Gl::CreateShader(kinds[which]);
+		Gl::ShaderSource(shader, 1, &sources[which], nullptr);
+		Gl::CompileShader(shader);
+		Gl::Int compiled = 0;
+		Gl::GetShaderiv(shader, Gl::COMPILE_STATUS, &compiled);
+		if (!compiled)
+		{
+			char log[4096] = "";
+			Gl::GetShaderInfoLog(shader, sizeof(log), nullptr, log);
+			Log(LOG_ERROR) << "OpenXcom3D GPU: " << what << " would not compile: " << log;
+			return 0;
+		}
+		Gl::AttachShader(built, shader);
+		Gl::DeleteShader(shader);
+	}
+	Gl::LinkProgram(built);
+	Gl::Int linked = 0;
+	Gl::GetProgramiv(built, Gl::LINK_STATUS, &linked);
+	if (!linked)
+	{
+		char log[4096] = "";
+		Gl::GetProgramInfoLog(built, sizeof(log), nullptr, log);
+		Log(LOG_ERROR) << "OpenXcom3D GPU: " << what << " would not link: " << log;
+		return 0;
+	}
+	return built;
+}
+
+/**
+ * Builds the bloom's programs (gather, blur, brighten) and the two pictures of the palette. Their
+ * pictures are on texture units 0 to 6: the finished colour, depth and glow, the grid, the
+ * colours' grid, the palette, its nearest colours.
+ */
+bool FirstPersonGpu::State::buildGlow()
+{
+	const std::string constants = "const float DarkGlowLuma = " + glslFloat(DarkGlowLuma) + ";\nconst float DarkGlowStepLuma = " + glslFloat(DarkGlowStepLuma) + ";\n";
+	glowPrograms[0] = compileFragment(GlowGatherSource, "the bloom's gathering shader");
+	glowPrograms[1] = compileFragment(GlowBlurSource, "the bloom's blurring shader");
+	glowPrograms[2] = compileFragment(constants + GlowBrightenSource, "the bloom's brightening shader");
+	if (!glowPrograms[0] || !glowPrograms[1] || !glowPrograms[2])
+	{
+		return false;
+	}
+	const char *const names[8] = { "uColor", "uDepth", "uGlow", "uGrid", "uHueGrid", "uPalette", "uNearest", "uSource" };
+	const int units[8] = { 0, 1, 2, 3, 4, 5, 6, 3 };
+	for (const Gl::UInt built : glowPrograms)
+	{
+		Gl::UseProgram(built);
+		for (int which = 0; which < 8; ++which)
+		{
+			const Gl::Int at = Gl::GetUniformLocation(built, names[which]);
+			if (at >= 0) Gl::Uniform1i(at, units[which]);
+		}
+	}
+	Gl::GenTextures(1, &paletteTexture);
+	Gl::GenTextures(1, &nearestTexture);
+	Gl::ActiveTexture(Gl::TEXTURE0 + 5);
+	Gl::BindTexture(Gl::TEXTURE_2D, paletteTexture);
+	Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::RGBA8, 256, 1, 0, Gl::RGBA, Gl::UNSIGNED_BYTE, nullptr);
+	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
+	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
+	Gl::ActiveTexture(Gl::TEXTURE0 + 6);
+	Gl::BindTexture(Gl::TEXTURE_2D, nearestTexture);
+	Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, 256, 128, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
+	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
+	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
+	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
+	return Gl::GetError() == Gl::NoError;
+}
+
+/**
+ * The bloom over the finished units and effects (FirstPersonView::drawLightHalos, on the card):
+ * what shines gathered into the two grids, each blurred across and down twice through its second,
+ * and the picture brightened by them into one more, with its glow (the bit for a pixel no longer
+ * its ray's colour set where the bloom changed it).
+ * @param drawn The units and effects' pictures.
+ * @param brightened Set to the bloom's pictures: their fifth framebuffer has the picture (0) and its glow (1).
+ */
+bool FirstPersonGpu::State::drawGlow(const Effects &effects, const EffectTargets &drawn, GlowTargets *&brightened)
+{
+	if (!glowPrograms[0] && !buildGlow())
+	{
+		return false;
+	}
+	const int gridWidth = (effects.width + 3) / 4, gridHeight = (effects.height + 3) / 4, hueWidth = (effects.width + 7) / 8, hueHeight = (effects.height + 7) / 8;
+	GlowTargets &glow = glowTargets[{ effects.width, effects.height }];
+	if (!glow.framebuffers[0])
+	{
+		Gl::GenFramebuffers(5, glow.framebuffers);
+		Gl::GenTextures(6, glow.textures);
+		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
+		for (int which = 0; which < 6; ++which)
+		{
+			const bool grid = which < 4;
+			Gl::BindFramebuffer(Gl::FRAMEBUFFER, glow.framebuffers[std::min(which, 4)]);
+			Gl::BindTexture(Gl::TEXTURE_2D, glow.textures[which]);
+			if (grid) Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::RGBA32F, which < 2 ? gridWidth : hueWidth, which < 2 ? gridHeight : hueHeight, 0, Gl::RGBA, Gl::FLOAT, nullptr);
+			else Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, effects.width, effects.height, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
+			Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
+			Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
+			Gl::FramebufferTexture2D(Gl::FRAMEBUFFER, Gl::COLOR_ATTACHMENT0 + (which == 5 ? 1 : 0), Gl::TEXTURE_2D, glow.textures[which], 0);
+			if (which != 4 && Gl::CheckFramebufferStatus(Gl::FRAMEBUFFER) != Gl::FRAMEBUFFER_COMPLETE)
+			{
+				Log(LOG_WARNING) << "OpenXcom3D GPU: this card can't draw into the pictures the bloom needs";
+				return false;
+			}
+		}
+	}
+	// The palette and its nearest colours, when they change.
+	Gl::ActiveTexture(Gl::TEXTURE0 + 5);
+	Gl::BindTexture(Gl::TEXTURE_2D, paletteTexture);
+	if (effects.paletteHash != glowPaletteSent)
+	{
+		Uint8 colors[256 * 4];
+		for (int index = 0; index < 256; ++index)
+		{
+			colors[index * 4] = effects.palette[index].r; colors[index * 4 + 1] = effects.palette[index].g; colors[index * 4 + 2] = effects.palette[index].b; colors[index * 4 + 3] = 255;
+		}
+		Gl::TexSubImage2D(Gl::TEXTURE_2D, 0, 0, 0, 256, 1, Gl::RGBA, Gl::UNSIGNED_BYTE, colors);
+	}
+	Gl::ActiveTexture(Gl::TEXTURE0 + 6);
+	Gl::BindTexture(Gl::TEXTURE_2D, nearestTexture);
+	if (effects.paletteHash != glowPaletteSent)
+	{
+		Gl::TexSubImage2D(Gl::TEXTURE_2D, 0, 0, 0, 256, 128, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, effects.nearestRgb);
+		glowPaletteSent = effects.paletteHash;
+	}
+	for (int which = 0; which < 3; ++which)
+	{
+		Gl::ActiveTexture(Gl::TEXTURE0 + which);
+		Gl::BindTexture(Gl::TEXTURE_2D, drawn.textures[which]);
+	}
+	const Gl::Enum one[1] = { Gl::COLOR_ATTACHMENT0 };
+	// Each grid: gathered, then blurred through its second (across into it, down back, twice).
+	for (int hue = 0; hue < 2; ++hue)
+	{
+		const int first = hue * 2, width = hue ? hueWidth : gridWidth, height = hue ? hueHeight : gridHeight, radius = hue ? 2 : 3;
+		Gl::Viewport(0, 0, width, height);
+		Gl::UseProgram(glowPrograms[0]);
+		Gl::Uniform2i(Gl::GetUniformLocation(glowPrograms[0], "uViewSize"), effects.width, effects.height);
+		Gl::Uniform1i(Gl::GetUniformLocation(glowPrograms[0], "uCell"), hue ? 8 : 4);
+		Gl::Uniform1i(Gl::GetUniformLocation(glowPrograms[0], "uHue"), hue);
+		Gl::Uniform1f(Gl::GetUniformLocation(glowPrograms[0], "uMaxDistance"), effects.maxDistance);
+		Gl::BindFramebuffer(Gl::FRAMEBUFFER, glow.framebuffers[first]);
+		Gl::DrawBuffers(1, one);
+		Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+		Gl::UseProgram(glowPrograms[1]);
+		Gl::Uniform1i(Gl::GetUniformLocation(glowPrograms[1], "uRadius"), radius);
+		Gl::Uniform1f(Gl::GetUniformLocation(glowPrograms[1], "uScale"), hue ? 1.0f : 1.0f / (2 * radius + 1));
+		Gl::ActiveTexture(Gl::TEXTURE0 + 3);
+		for (int pass = 0; pass < 4; ++pass)
+		{
+			const int from = first + (pass & 1), to = first + 1 - (pass & 1);
+			Gl::BindFramebuffer(Gl::FRAMEBUFFER, glow.framebuffers[to]);
+			Gl::DrawBuffers(1, one);
+			Gl::BindTexture(Gl::TEXTURE_2D, glow.textures[from]);
+			Gl::Uniform2i(Gl::GetUniformLocation(glowPrograms[1], "uStep"), (pass & 1) ? 0 : 1, (pass & 1) ? 1 : 0);
+			Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+		}
+	}
+	// The picture brightened by them.
+	Gl::ActiveTexture(Gl::TEXTURE0 + 3);
+	Gl::BindTexture(Gl::TEXTURE_2D, glow.textures[0]);
+	Gl::ActiveTexture(Gl::TEXTURE0 + 4);
+	Gl::BindTexture(Gl::TEXTURE_2D, glow.textures[2]);
+	Gl::BindFramebuffer(Gl::FRAMEBUFFER, glow.framebuffers[4]);
+	if (Gl::CheckFramebufferStatus(Gl::FRAMEBUFFER) != Gl::FRAMEBUFFER_COMPLETE)
+	{
+		return false;
+	}
+	const Gl::Enum two[2] = { Gl::COLOR_ATTACHMENT0, Gl::COLOR_ATTACHMENT0 + 1 };
+	Gl::DrawBuffers(2, two);
+	Gl::Viewport(0, 0, effects.width, effects.height);
+	Gl::UseProgram(glowPrograms[2]);
+	Gl::Uniform1f(Gl::GetUniformLocation(glowPrograms[2], "uGain"), effects.glowGain);
+	Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
+	brightened = &glow;
+	return true;
+}
+
+/**
+ * The units and effects over the rays' pictures (kept on the card by the frame's draw, see
+ * Output::keep): the primitives, the sprites' bytes and the bins go up, one picture-wide triangle
+ * draws them (see EffectsSource), and the finished colour, depth and glow are read back where the
+ * rays' would have been; the full-colour picture is the rays' own (the glow's bit 128 says where
+ * the pixel is no longer its ray's).
+ */
+bool FirstPersonGpu::State::drawEffects(const Effects &effects, const Output &output, Timing *timing)
+{
+	auto start = std::chrono::steady_clock::now();
+	if (!effectsProgram.id && !buildEffects())
+	{
+		return false;
+	}
+	if (effects.prims.size() / 4 > (size_t)maxBufferTexels || effects.bytes->size() > std::min<size_t>((size_t)maxBufferTexels, 1 << 24) || effects.bins.size() > (size_t)maxBufferTexels)
+	{
+		Log(LOG_WARNING) << "OpenXcom3D GPU: a frame's units and effects are more than this card's buffers take";
+		return false;
+	}
+	const auto rays = targets.find({ rayColumns, rayRows, 0 });
+	if (rays == targets.end())
+	{
+		return false;
+	}
+	// The pictures drawn into, for this size of view.
+	EffectTargets &drawn = effectTargets[{ effects.width, effects.height }];
+	if (!drawn.framebuffer)
+	{
+		Gl::GenFramebuffers(1, &drawn.framebuffer);
+		Gl::BindFramebuffer(Gl::FRAMEBUFFER, drawn.framebuffer);
+		Gl::GenTextures(4, drawn.textures);
+		const Gl::Enum internal[4] = { Gl::R8UI, Gl::R32F, Gl::R8UI, Gl::RGBA16UI }, format[4] = { Gl::RED_INTEGER, Gl::RED, Gl::RED_INTEGER, Gl::RGBA_INTEGER },
+			type[4] = { Gl::UNSIGNED_BYTE, Gl::FLOAT, Gl::UNSIGNED_BYTE, Gl::UNSIGNED_SHORT };
+		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
+		for (int which = 0; which < 4; ++which)
+		{
+			Gl::BindTexture(Gl::TEXTURE_2D, drawn.textures[which]);
+			Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)internal[which], effects.width, effects.height, 0, format[which], type[which], nullptr);
+			Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
+			Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
+			Gl::FramebufferTexture2D(Gl::FRAMEBUFFER, Gl::COLOR_ATTACHMENT0 + which, Gl::TEXTURE_2D, drawn.textures[which], 0);
+		}
+		if (Gl::CheckFramebufferStatus(Gl::FRAMEBUFFER) != Gl::FRAMEBUFFER_COMPLETE)
+		{
+			Log(LOG_WARNING) << "OpenXcom3D GPU: this card can't draw into the pictures the units and effects need";
+			return false;
+		}
+	}
+	Gl::BindFramebuffer(Gl::FRAMEBUFFER, drawn.framebuffer);
+	const Gl::Enum attachments[4] = { Gl::COLOR_ATTACHMENT0, Gl::COLOR_ATTACHMENT0 + 1, Gl::COLOR_ATTACHMENT0 + 2, Gl::COLOR_ATTACHMENT0 + 3 };
+	Gl::DrawBuffers(4, attachments);
+	Gl::Viewport(0, 0, effects.width, effects.height);
+	Gl::UseProgram(effectsProgram.id);
+	// What it reads: the rays' pictures and the see-through tables; this frame's primitives, bytes and bins.
+	for (int which = 0; which < 3; ++which)
+	{
+		Gl::ActiveTexture(Gl::TEXTURE0 + which);
+		Gl::BindTexture(Gl::TEXTURE_2D, rays->second.textures[which]);
+	}
+	Gl::ActiveTexture(Gl::TEXTURE0 + 3);
+	Gl::BindTexture(Gl::TEXTURE_2D, seeThroughTexture);
+	if (effects.seeThrough && effects.paletteHash != seeThroughSent)
+	{
+		Gl::TexSubImage2D(Gl::TEXTURE_2D, 0, 0, 0, 2048, 480, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, effects.seeThrough);
+		seeThroughSent = effects.paletteHash;
+	}
+	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
+	static const float nothing[4] = {};
+	Gl::BindBuffer(Gl::ARRAY_BUFFER, effectBuffers[0]);
+	Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)std::max<size_t>(16, effects.prims.size() * 4), effects.prims.empty() ? (const void *)nothing : effects.prims.data(), Gl::DYNAMIC_DRAW);
+	// The sprites' bytes: only those added since the last frame, while they fit the buffer and weren't begun anew.
+	Gl::BindBuffer(Gl::ARRAY_BUFFER, effectBuffers[1]);
+	const std::vector<Uint8> &bytes = *effects.bytes;
+	if (effects.bytesGeneration != effectBytesGeneration || bytes.size() < effectBytesSent || bytes.size() > effectBytesRoom)
+	{
+		effectBytesRoom = std::max<size_t>(1 << 20, bytes.size() * 2);
+		Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)effectBytesRoom, nullptr, Gl::DYNAMIC_DRAW);
+		effectBytesSent = 0;
+		effectBytesGeneration = effects.bytesGeneration;
+	}
+	if (bytes.size() > effectBytesSent)
+	{
+		Gl::BufferSubData(Gl::ARRAY_BUFFER, (Gl::IntPtr)effectBytesSent, (Gl::SizeiPtr)(bytes.size() - effectBytesSent), bytes.data() + effectBytesSent);
+		effectBytesSent = bytes.size();
+	}
+	Gl::BindBuffer(Gl::ARRAY_BUFFER, effectBuffers[2]);
+	Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)(effects.bins.size() * 4), effects.bins.data(), Gl::DYNAMIC_DRAW);
+	Program *const raysProgram = program;
+	program = &effectsProgram;
+	Gl::Uniform3f(location("uForward"), effects.forward[0], effects.forward[1], effects.forward[2]);
+	Gl::Uniform3f(location("uRight"), effects.right[0], effects.right[1], effects.right[2]);
+	Gl::Uniform3f(location("uUp"), effects.up[0], effects.up[1], effects.up[2]);
+	Gl::Uniform3f(location("uLevelRight"), effects.levelRight[0], effects.levelRight[1], effects.levelRight[2]);
+	Gl::Uniform3f(location("uLevelUp"), effects.levelUp[0], effects.levelUp[1], effects.levelUp[2]);
+	Gl::Uniform2f(location("uLevel"), effects.level[0], effects.level[1]);
+	Gl::Uniform1f(location("uEyeZ"), effects.eyeZ);
+	Gl::Uniform1f(location("uFocal"), effects.focal);
+	Gl::Uniform2i(location("uViewSize"), effects.width, effects.height);
+	Gl::Uniform2i(location("uBinGrid"), effects.binColumns, effects.binRows);
+	Gl::Uniform1i(location("uPixelSize"), rayPixelSize);
+	program = raysProgram;
+	if (timing)
+	{
+		Gl::Finish();
+		timing->upload += millisecondsSince(start);
+		start = std::chrono::steady_clock::now();
+	}
+	Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+	// The bloom over them (the picture and its glow are then the bloom's).
+	GlowTargets *brightened = nullptr;
+	if (effects.halos && !drawGlow(effects, drawn, brightened))
+	{
+		return false;
+	}
+	if (timing)
+	{
+		Gl::Finish();
+		timing->draw += millisecondsSince(start);
+		start = std::chrono::steady_clock::now();
+	}
+	// The finished pictures, back to the view.
+	if (brightened)
+	{
+		Gl::BindFramebuffer(Gl::FRAMEBUFFER, brightened->framebuffers[4]);
+		readPicture(0, effects.width, effects.height, 0, output.color, output.colorPitch);
+		if (effects.readGlow) readPicture(1, effects.width, effects.height, 0, output.glow, effects.width);
+		Gl::BindFramebuffer(Gl::FRAMEBUFFER, drawn.framebuffer);
+	}
+	else
+	{
+		readPicture(0, effects.width, effects.height, 0, output.color, output.colorPitch);
+		if (effects.readGlow) readPicture(2, effects.width, effects.height, 0, output.glow, effects.width);
+	}
+	if (effects.readDepth) readPicture(1, effects.width, effects.height, 1, output.depth, effects.width);
+	if (effects.notes)
+	{
+		readPicture(3, effects.width, effects.height, 3, effects.notes, effects.width);
+	}
+	if (effects.patchNotes && effects.patch[2] > 0 && effects.patch[3] > 0)
+	{
+		Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0 + 3);
+		Gl::ReadPixels(effects.patch[0], effects.patch[1], effects.patch[2], effects.patch[3], Gl::RGBA_INTEGER, Gl::UNSIGNED_INT, effects.patchNotes);
+	}
+	if ((output.trueColor || effects.rayColors) && rayPixelSize == 1)
+	{
+		Gl::BindFramebuffer(Gl::FRAMEBUFFER, rays->second.framebuffer);
+		if (output.trueColor) readPicture(3, rayColumns, rayRows, 2, output.trueColor, rayColumns);
+		if (effects.rayColors) readPicture(0, rayColumns, rayRows, 0, effects.rayColors, rayColumns);
+	}
+	Gl::UseProgram(program->id);
+	if (timing)
+	{
+		timing->read += millisecondsSince(start);
+	}
+	const Gl::Enum error = Gl::GetError();
+	if (error != Gl::NoError)
+	{
+		Log(LOG_WARNING) << "OpenXcom3D GPU: OpenGL error " << std::hex << error << " drawing the units and effects";
 		return false;
 	}
 	return true;
@@ -1665,6 +2148,49 @@ bool FirstPersonGpu::castRays(const Frame &frame, const Output &output, Timing *
 	{
 		state.failed = true;
 		Log(LOG_WARNING) << "OpenXcom3D GPU: the graphics card failed: the CPU draws from now on";
+	}
+	return drawn;
+}
+
+
+/**
+ * The depth of the units and effects last drawn for a view of this size: read back when something
+ * drawn on the CPU after them needs it after all (an icon's or a number's place hidden or not).
+ */
+bool FirstPersonGpu::readEffectsDepth(int width, int height, float *depth)
+{
+	State &state = *_state;
+	if (state.failed)
+	{
+		return false;
+	}
+	bool read = false;
+	state.run([&] {
+		const auto drawn = state.effectTargets.find({ width, height });
+		if (drawn == state.effectTargets.end() || !drawn->second.framebuffer) return;
+		Gl::BindFramebuffer(Gl::FRAMEBUFFER, drawn->second.framebuffer);
+		state.readPicture(1, width, height, 1, depth, width);
+		read = Gl::GetError() == Gl::NoError;
+	});
+	return read;
+}
+
+/**
+ * The frame's units and effects on the card, over the rays' pictures kept there.
+ */
+bool FirstPersonGpu::drawEffects(const Effects &effects, const Output &output, Timing *timing)
+{
+	State &state = *_state;
+	if (state.failed)
+	{
+		return false;
+	}
+	bool drawn = false;
+	state.run([&] { drawn = state.drawEffects(effects, output, timing); });
+	if (!drawn)
+	{
+		state.failed = true;
+		Log(LOG_WARNING) << "OpenXcom3D GPU: the graphics card failed at the units and effects: the CPU draws from now on";
 	}
 	return drawn;
 }

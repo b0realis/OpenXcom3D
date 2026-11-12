@@ -962,6 +962,41 @@ private:
 	/// Draws a sprite standing in the world, depth-tested (or see-through, laid over what's there):
 	/// all of it, or only the screen rows from bandTop up to bandBottom.
 	void drawSprite(const SpriteDraw &draw, int bandTop = 0, int bandBottom = 1 << 30);
+	// The units and effects on the graphics card too (FirstPersonViewGpuEffects.cpp): while the view records, the
+	// passes' funnels write down what they would draw, and the card draws it over the rays' pictures kept there.
+	std::shared_ptr<struct GpuEffectList> _gpuEffects; // this frame's units and effects as recorded
+	bool _gpuRecording = false;                        // the funnels record (see gpuBeginEffects, gpuDrawEffects)
+	bool _gpuRecordOnly = true;                        // ... and draw nothing themselves (false: both, for the check of the card's picture against the CPU's)
+	bool _gpuChecking = false;                         // this frame the card's units and effects are checked against the CPU's (OPENXCOM3D_GPU_EFFECTS=check)
+	int _gpuRaysPixelSize = 1;                         // the pixels a ray of the pictures kept on the card coloured each way
+	/// Whether this frame's units and effects go to the card (with its rays).
+	int gpuEffectsWanted() const;
+	/// Starts recording the frame's units and effects.
+	void gpuBeginEffects();
+	/// Records a sprite standing in the world (see drawSprite).
+	void gpuRecordSprite(const SpriteDraw &draw);
+	/// Records a shade on the ground (see drawGroundShade).
+	void gpuRecordGroundShade(const double centre[3], double radius, int steps, float density, const double *away, double length);
+	/// Records a bullet hole or a scorch mark (see drawDecals).
+	void gpuRecordDecal(double screenX, double screenY, double depth, double markRight, double markUp, double radius, double pixelSpan,
+		double drawnRadius, int reach, int coreShades, int edgeShades);
+	/// Records a line in the world, its ends on the screen (see drawLine3D).
+	void gpuRecordLine(double startX, double startY, double startZ, double endX, double endY, double endZ, int steps, Uint8 color, int thickness, float opacity,
+		float worldWidth, bool glows, bool overEverything, bool keepsGlow = false, bool exactDepth = false);
+	/// Records a square of pixels in front of the scene.
+	void gpuRecordDot(int left, int top, int dotWidth, int dotHeight, double depth, Uint8 color, int flags, float leeway = 0.0f, Uint8 otherColor = 0, float firstShare = -1.0f, float haze = 0.0f);
+	/// Records a round dot in front of the scene, in rings or only its rim.
+	void gpuRecordDisc(double screenX, double screenY, double radius, double depth, float leeway, Uint8 rim, Uint8 centre, Uint8 middle, float centreShare, float middleShare, int flags);
+	/// Records a filled quad at one depth (see fillQuadAtDepth).
+	void gpuRecordQuad(const double corners[4][2], Uint8 color, float depth);
+	/// Has the card draw what was recorded and takes the finished pictures back; recording stops.
+	bool gpuDrawEffects();
+	bool _gpuDepthPending = false; // this frame's depth is still on the card (see gpuNeedDepth)
+	/// Before anything drawn after the units and effects reads the depth buffer: has it fetched from the card if it wasn't yet.
+	void gpuNeedDepth() { if (_gpuDepthPending) gpuFetchDepth(); }
+	void gpuFetchDepth();
+	/// The check of the card's units and effects against the CPU's passes, a pixel at a time.
+	void gpuCheckEffects();
 	/// The same, with the sprite given piece by piece.
 	void drawSprite(const Surface *sprite, int anchorX, int anchorY, const double world[3], double depthBias, int shade, double scale = 1.0,
 		SpritePose pose = SpritePose::Standing, const SeeThroughSprite *seeThroughSprite = nullptr);
