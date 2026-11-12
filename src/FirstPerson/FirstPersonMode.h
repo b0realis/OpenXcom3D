@@ -71,6 +71,7 @@ class FirstPersonScanner;
 class FirstPersonSounds;
 class FirstPersonAmbience;
 class Game;
+struct PathfindingStep;
 class InteractiveSurface;
 class NumberText;
 class SavedBattleGame;
@@ -454,8 +455,23 @@ private:
 	int _climbArrowsShown = -1;                  // what they show: up 1, down 2, lit (1 up, 2 down) times 4; -1 not drawn yet
 	Text *_compassLetters[4] = {};               // N, E, S, W, going round as the view turns
 	Text *_txtCompassTurn = nullptr;             // under it near the head's limit: "TURN 1 TU", or "NO TU"; or a shot's turn: "SHOT +2 TU"
-	int _compassDrawn[5] = { -1000, -1, -1, -1, -1 }; // what the dial shows: the view's bearing (degrees), the facing, the warning, the shot's facing, the shot's turn warning
+	int _compassDrawn[6] = { -1000, -1, -1, -1, -1, -1 }; // what the dial shows: the view's bearing (degrees), the facing, the warning, the shot's facing, the shot's turn warning, the turn's cost on the line (0: not shown)
 
+	Text *_compassCosts[8] = {};                 // round it, what a step each way costs (setting "Compass: step costs"), going round with the dial
+	Text *_climbCosts[2] = {};                   // left of the climb arrows, what a level up and a level down cost
+	int _compassCostsShown[10];                  // what those ten show: the time units times 4 plus the tone (see StepTone); -1 nothing
+	bool _compassCostsPlaced = false;            // the compass is laid out with room for them (see placeCompass)
+
+	/// How a step's cost is written round the compass: plain, onto dear ground, onto very dear ground, or more than the soldier can pay.
+	enum StepTone { TONE_PLAIN, TONE_DEAR, TONE_VERY_DEAR, TONE_CANT_PAY };
+	/// Puts the compass and what goes with it where they belong, with or without the room for the steps' costs.
+	void placeCompass();
+	/// Shows what a step each way, and a level up or down, would cost (setting "Compass: step costs").
+	void updateCompassCosts(BattleUnit *unit, bool playerTurn, int viewBearing);
+	/// What the soldier pays in time units for one of those moves, and how it's written; false where the move can't be made.
+	bool moveCostShown(BattleUnit *unit, int direction, int &time, StepTone &tone);
+	/// What a step would cost the soldier over plain, level ground, to tell dear ground by.
+	int plainStepTime(BattleUnit *unit, const Position &start, int direction, const Position &end, bool sidestep, bool run) const;
 	/// Shows the compass, redrawn when what it shows changes.
 	void updateCompass(BattleUnit *unit, bool playerTurn);
 	/// Draws the dial for a view bearing (degrees, 0 north, clockwise), a facing (0..7), a warning (0 none, 1 near the limit, 2 no time units to turn) and the facing a shot will turn to (-1 none).
@@ -534,6 +550,8 @@ private:
 	bool hiddenUnitOn(const BattleUnit *unit, const Position &destination) const;
 	/// Could the unit step into the neighbouring tile in this direction now, by the rules?
 	bool stepAllowed(BattleUnit *unit, int stepX, int stepY);
+	/// What the game charges for one step from a tile, walked as commitStep walks it (a sidestep, a run or a walk).
+	PathfindingStep stepPrice(BattleUnit *unit, const Position &start, int direction, bool *sidestep = nullptr) const;
 	/// Hands one step to the game's walking state; false if it couldn't start.
 	bool commitStep(BattleUnit *unit, int stepX, int stepY);
 	/// Keeps a coordinate inside a tile, away from its edges.

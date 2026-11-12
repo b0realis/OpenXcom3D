@@ -368,14 +368,13 @@ void FirstPersonMode::createScannerPanel()
  */
 void FirstPersonMode::createCompass()
 {
-	const int width = canvasWidth(); // our surfaces are laid out on the canvas (see makeCanvas)
-	const int compassX = width - CompassSize - 4, compassY = BarY + BarH + CompassGap;
-	_compass = new Surface(CompassSize, CompassArrowH + CompassSize, compassX, compassY);
+	// (Where they all go: see placeCompass, below.)
+	_compass = new Surface(CompassSize, CompassArrowH + CompassSize, 0, 0);
 	_state->add(_compass);
 	_compass->setVisible(false);
 	_ownSurfaces.insert(_compass);
 	// Beside the dial's left, level with its middle, the climb arrows (see updateClimbArrows).
-	_climbArrows = new Surface(ClimbArrowW, ClimbArrowsH, compassX - ClimbArrowW - ClimbArrowsGap, compassY + CompassArrowH + CompassSize / 2 - ClimbArrowsH / 2);
+	_climbArrows = new Surface(ClimbArrowW, ClimbArrowsH, 0, 0);
 	_state->add(_climbArrows);
 	_climbArrows->setVisible(false);
 	_ownSurfaces.insert(_climbArrows);
@@ -384,7 +383,7 @@ void FirstPersonMode::createCompass()
 	const char *const letters[4] = { "N", "E", "S", "W" };
 	for (int letter = 0; letter < 4; ++letter)
 	{
-		_compassLetters[letter] = addText(7, 8, compassX, compassY, "button", "firstPerson");
+		_compassLetters[letter] = addText(7, 8, 0, 0, "button", "firstPerson");
 		_compassLetters[letter]->setSmall();
 		_compassLetters[letter]->setAlign(ALIGN_CENTER);
 		_compassLetters[letter]->setText(letters[letter]);
@@ -394,9 +393,58 @@ void FirstPersonMode::createCompass()
 
 	// The warning line under the dial, ending at its right edge (the dial sits against the
 	// screen's right edge, and a line centred under it would run off it).
-	_txtCompassTurn = addText(CompassSize + 40, 9, compassX - 40, compassY + CompassArrowH + CompassSize + 1, "weapon", "firstPerson");
+	_txtCompassTurn = addText(CompassSize + 40, 9, 0, 0, "weapon", "firstPerson");
 	_txtCompassTurn->setAlign(ALIGN_RIGHT);
 	_txtCompassTurn->setVisible(false);
+
+	// What a step each way costs, round the dial, and a level up or down, left of the climb arrows
+	// (setting "Compass: step costs", see updateCompassCosts).
+	for (Text *&cost : _compassCosts)
+	{
+		cost = addText(CompassCostW, CompassCostH, 0, 0, "button", "firstPerson");
+		cost->setAlign(ALIGN_CENTER);
+	}
+	for (Text *&cost : _climbCosts)
+	{
+		cost = addText(CompassCostW, CompassCostH, 0, 0, "button", "firstPerson");
+		cost->setAlign(ALIGN_RIGHT);
+	}
+	for (Text *cost : std::initializer_list<Text*>{ _compassCosts[0], _compassCosts[1], _compassCosts[2], _compassCosts[3],
+		_compassCosts[4], _compassCosts[5], _compassCosts[6], _compassCosts[7], _climbCosts[0], _climbCosts[1] })
+	{
+		cost->setSmall();
+		cost->setVisible(false);
+	}
+	std::fill(std::begin(_compassCostsShown), std::end(_compassCostsShown), -1);
+	placeCompass();
+}
+
+/**
+ * Puts the compass where it belongs, at the top right under the top bar, with the climb arrows
+ * left of the dial and the warning line under it. With the steps' costs round the dial (setting
+ * "Compass: step costs") it all makes room for them: the dial moves in from the screen's edge and
+ * down, the climb arrows further left and the line further down. Called again when the setting
+ * changes (see updateCompass); the letters and the costs follow the dial on their own.
+ */
+void FirstPersonMode::placeCompass()
+{
+	_compassCostsPlaced = Options::fpsCompassCosts;
+	const int roomX = _compassCostsPlaced ? CompassCostRoomX : 0, roomY = _compassCostsPlaced ? CompassCostRoomY : 0;
+	// (The numbers above the dial clear the heading arrow, which the dial's surface already has room for.)
+	const int compassX = canvasWidth() - CompassSize - 4 - roomX, compassY = BarY + BarH + CompassGap + std::max(0, roomY - CompassArrowH);
+	_compass->setX(compassX);
+	_compass->setY(compassY);
+	const int arrowsX = compassX - roomX - ClimbArrowW - ClimbArrowsGap, arrowsY = compassY + CompassArrowH + CompassSize / 2 - ClimbArrowsH / 2;
+	_climbArrows->setX(arrowsX);
+	_climbArrows->setY(arrowsY);
+	for (int way = 0; way < 2; ++way)
+	{
+		_climbCosts[way]->setX(arrowsX - CompassCostW - 1);
+		_climbCosts[way]->setY(way == 0 ? arrowsY + 1 : arrowsY + ClimbArrowsH - CompassCostH);
+	}
+	_txtCompassTurn->setX(compassX + roomX - 40);
+	_txtCompassTurn->setY(compassY + CompassArrowH + CompassSize + 1 + roomY);
+	_compassDrawn[0] = -1000; // (the letters are put round the dial when it's next drawn)
 }
 
 /**
@@ -875,6 +923,8 @@ void FirstPersonMode::setResizeAnchors()
 	_anchors[_compass] = TOP_RIGHT;
 	_anchors[_climbArrows] = TOP_RIGHT;
 	for (Text *letter : _compassLetters) _anchors[letter] = TOP_RIGHT;
+	for (Text *cost : _compassCosts) _anchors[cost] = TOP_RIGHT;
+	for (Text *cost : _climbCosts) _anchors[cost] = TOP_RIGHT;
 	_anchors[_txtCompassTurn] = TOP_RIGHT;
 	_anchors[_txtSprint] = TOP_RIGHT;
 	_anchors[_txtEnPassant] = TOP_RIGHT;

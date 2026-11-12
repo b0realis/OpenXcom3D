@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..9593a464f
+index 000000000..31b4db7e6
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,555 @@
+@@ -0,0 +1,557 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -168,6 +168,8 @@ index 000000000..9593a464f
 +  STR_FPS_TURN_COST_DESC: "YES: looking past 45 degrees turns you, at the game's TU cost."
 +  STR_FPS_COMPASS: "Compass"
 +  STR_FPS_COMPASS_DESC: "A compass at the top right (with Turning costs TU: what looking further costs)."
++  STR_FPS_COMPASS_COSTS: "Compass: step costs"
++  STR_FPS_COMPASS_COSTS_DESC: "Round the compass, the time units a step each way costs now (the top is forward); a level up or down by the climb arrows, and what a turn costs under it. Yellow or red on costly ground, grey when you can't pay."
 +  STR_FPS_COMPASS_TURN: "TURN {0} TU"
 +  STR_FPS_COMPASS_NO_TU: "NO TU"
 +  STR_FPS_SPRINT: "SPRINT"
@@ -685,10 +687,10 @@ index 000000000..9593a464f
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..f1b5cda80
+index 000000000..2a23b57ef
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,555 @@
+@@ -0,0 +1,557 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -729,6 +731,8 @@ index 000000000..f1b5cda80
 +  STR_FPS_TURN_COST_DESC: "YES: looking past 45 degrees turns you, at the game's TU cost."
 +  STR_FPS_COMPASS: "Compass"
 +  STR_FPS_COMPASS_DESC: "A compass at the top right (with Turning costs TU: what looking further costs)."
++  STR_FPS_COMPASS_COSTS: "Compass: step costs"
++  STR_FPS_COMPASS_COSTS_DESC: "Round the compass, the time units a step each way costs now (the top is forward); a level up or down by the climb arrows, and what a turn costs under it. Yellow or red on costly ground, grey when you can't pay."
 +  STR_FPS_COMPASS_TURN: "TURN {0} TU"
 +  STR_FPS_COMPASS_NO_TU: "NO TU"
 +  STR_FPS_SPRINT: "SPRINT"
@@ -22101,7 +22105,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..3bdb584a8 100644
+index a08796ced..37d27b36d 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -22118,7 +22122,7 @@ index a08796ced..3bdb584a8 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers;
++OPT bool fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts;
 +OPT int fpsRenderer, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
@@ -23142,10 +23146,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..35a747011
+index 000000000..a26b70b78
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1457 @@
+@@ -0,0 +1,1459 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -23853,6 +23857,8 @@ index 000000000..35a747011
 +	// The compass at the top right: where you look, the soldier's facing, and turning by the
 +	// rules, when looking further will cost time units.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCompass", &fpsCompass, true, "STR_FPS_COMPASS", category));
++	// ...and round it, what a step each way costs in time units (and a level up or down, and a turn).
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsCompassCosts", &fpsCompassCosts, true, "STR_FPS_COMPASS_COSTS", category));
 +	// Moving: free walking or tile by tile (0 free, 1 tiles: a key press walks one tile), walking
 +	// speed in tiles per second (1 to 8; every tile still costs its time units),
 +	// the view bobbing with the steps, time units a flying soldier pays per level up or down
@@ -30220,10 +30226,10 @@ index 000000000..6862c4de6
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..63ed2fb0f
+index 000000000..a145c4fac
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,3183 @@
+@@ -0,0 +1,3233 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -30594,14 +30600,13 @@ index 000000000..63ed2fb0f
 + */
 +void FirstPersonMode::createCompass()
 +{
-+	const int width = canvasWidth(); // our surfaces are laid out on the canvas (see makeCanvas)
-+	const int compassX = width - CompassSize - 4, compassY = BarY + BarH + CompassGap;
-+	_compass = new Surface(CompassSize, CompassArrowH + CompassSize, compassX, compassY);
++	// (Where they all go: see placeCompass, below.)
++	_compass = new Surface(CompassSize, CompassArrowH + CompassSize, 0, 0);
 +	_state->add(_compass);
 +	_compass->setVisible(false);
 +	_ownSurfaces.insert(_compass);
 +	// Beside the dial's left, level with its middle, the climb arrows (see updateClimbArrows).
-+	_climbArrows = new Surface(ClimbArrowW, ClimbArrowsH, compassX - ClimbArrowW - ClimbArrowsGap, compassY + CompassArrowH + CompassSize / 2 - ClimbArrowsH / 2);
++	_climbArrows = new Surface(ClimbArrowW, ClimbArrowsH, 0, 0);
 +	_state->add(_climbArrows);
 +	_climbArrows->setVisible(false);
 +	_ownSurfaces.insert(_climbArrows);
@@ -30610,7 +30615,7 @@ index 000000000..63ed2fb0f
 +	const char *const letters[4] = { "N", "E", "S", "W" };
 +	for (int letter = 0; letter < 4; ++letter)
 +	{
-+		_compassLetters[letter] = addText(7, 8, compassX, compassY, "button", "firstPerson");
++		_compassLetters[letter] = addText(7, 8, 0, 0, "button", "firstPerson");
 +		_compassLetters[letter]->setSmall();
 +		_compassLetters[letter]->setAlign(ALIGN_CENTER);
 +		_compassLetters[letter]->setText(letters[letter]);
@@ -30620,9 +30625,58 @@ index 000000000..63ed2fb0f
 +
 +	// The warning line under the dial, ending at its right edge (the dial sits against the
 +	// screen's right edge, and a line centred under it would run off it).
-+	_txtCompassTurn = addText(CompassSize + 40, 9, compassX - 40, compassY + CompassArrowH + CompassSize + 1, "weapon", "firstPerson");
++	_txtCompassTurn = addText(CompassSize + 40, 9, 0, 0, "weapon", "firstPerson");
 +	_txtCompassTurn->setAlign(ALIGN_RIGHT);
 +	_txtCompassTurn->setVisible(false);
++
++	// What a step each way costs, round the dial, and a level up or down, left of the climb arrows
++	// (setting "Compass: step costs", see updateCompassCosts).
++	for (Text *&cost : _compassCosts)
++	{
++		cost = addText(CompassCostW, CompassCostH, 0, 0, "button", "firstPerson");
++		cost->setAlign(ALIGN_CENTER);
++	}
++	for (Text *&cost : _climbCosts)
++	{
++		cost = addText(CompassCostW, CompassCostH, 0, 0, "button", "firstPerson");
++		cost->setAlign(ALIGN_RIGHT);
++	}
++	for (Text *cost : std::initializer_list<Text*>{ _compassCosts[0], _compassCosts[1], _compassCosts[2], _compassCosts[3],
++		_compassCosts[4], _compassCosts[5], _compassCosts[6], _compassCosts[7], _climbCosts[0], _climbCosts[1] })
++	{
++		cost->setSmall();
++		cost->setVisible(false);
++	}
++	std::fill(std::begin(_compassCostsShown), std::end(_compassCostsShown), -1);
++	placeCompass();
++}
++
++/**
++ * Puts the compass where it belongs, at the top right under the top bar, with the climb arrows
++ * left of the dial and the warning line under it. With the steps' costs round the dial (setting
++ * "Compass: step costs") it all makes room for them: the dial moves in from the screen's edge and
++ * down, the climb arrows further left and the line further down. Called again when the setting
++ * changes (see updateCompass); the letters and the costs follow the dial on their own.
++ */
++void FirstPersonMode::placeCompass()
++{
++	_compassCostsPlaced = Options::fpsCompassCosts;
++	const int roomX = _compassCostsPlaced ? CompassCostRoomX : 0, roomY = _compassCostsPlaced ? CompassCostRoomY : 0;
++	// (The numbers above the dial clear the heading arrow, which the dial's surface already has room for.)
++	const int compassX = canvasWidth() - CompassSize - 4 - roomX, compassY = BarY + BarH + CompassGap + std::max(0, roomY - CompassArrowH);
++	_compass->setX(compassX);
++	_compass->setY(compassY);
++	const int arrowsX = compassX - roomX - ClimbArrowW - ClimbArrowsGap, arrowsY = compassY + CompassArrowH + CompassSize / 2 - ClimbArrowsH / 2;
++	_climbArrows->setX(arrowsX);
++	_climbArrows->setY(arrowsY);
++	for (int way = 0; way < 2; ++way)
++	{
++		_climbCosts[way]->setX(arrowsX - CompassCostW - 1);
++		_climbCosts[way]->setY(way == 0 ? arrowsY + 1 : arrowsY + ClimbArrowsH - CompassCostH);
++	}
++	_txtCompassTurn->setX(compassX + roomX - 40);
++	_txtCompassTurn->setY(compassY + CompassArrowH + CompassSize + 1 + roomY);
++	_compassDrawn[0] = -1000; // (the letters are put round the dial when it's next drawn)
 +}
 +
 +/**
@@ -31101,6 +31155,8 @@ index 000000000..63ed2fb0f
 +	_anchors[_compass] = TOP_RIGHT;
 +	_anchors[_climbArrows] = TOP_RIGHT;
 +	for (Text *letter : _compassLetters) _anchors[letter] = TOP_RIGHT;
++	for (Text *cost : _compassCosts) _anchors[cost] = TOP_RIGHT;
++	for (Text *cost : _climbCosts) _anchors[cost] = TOP_RIGHT;
 +	_anchors[_txtCompassTurn] = TOP_RIGHT;
 +	_anchors[_txtSprint] = TOP_RIGHT;
 +	_anchors[_txtEnPassant] = TOP_RIGHT;
@@ -33409,10 +33465,10 @@ index 000000000..63ed2fb0f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..85903c3aa
+index 000000000..fde930881
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1342 @@
+@@ -0,0 +1,1360 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -33486,6 +33542,7 @@ index 000000000..85903c3aa
 +class FirstPersonSounds;
 +class FirstPersonAmbience;
 +class Game;
++struct PathfindingStep;
 +class InteractiveSurface;
 +class NumberText;
 +class SavedBattleGame;
@@ -33869,8 +33926,23 @@ index 000000000..85903c3aa
 +	int _climbArrowsShown = -1;                  // what they show: up 1, down 2, lit (1 up, 2 down) times 4; -1 not drawn yet
 +	Text *_compassLetters[4] = {};               // N, E, S, W, going round as the view turns
 +	Text *_txtCompassTurn = nullptr;             // under it near the head's limit: "TURN 1 TU", or "NO TU"; or a shot's turn: "SHOT +2 TU"
-+	int _compassDrawn[5] = { -1000, -1, -1, -1, -1 }; // what the dial shows: the view's bearing (degrees), the facing, the warning, the shot's facing, the shot's turn warning
++	int _compassDrawn[6] = { -1000, -1, -1, -1, -1, -1 }; // what the dial shows: the view's bearing (degrees), the facing, the warning, the shot's facing, the shot's turn warning, the turn's cost on the line (0: not shown)
 +
++	Text *_compassCosts[8] = {};                 // round it, what a step each way costs (setting "Compass: step costs"), going round with the dial
++	Text *_climbCosts[2] = {};                   // left of the climb arrows, what a level up and a level down cost
++	int _compassCostsShown[10];                  // what those ten show: the time units times 4 plus the tone (see StepTone); -1 nothing
++	bool _compassCostsPlaced = false;            // the compass is laid out with room for them (see placeCompass)
++
++	/// How a step's cost is written round the compass: plain, onto dear ground, onto very dear ground, or more than the soldier can pay.
++	enum StepTone { TONE_PLAIN, TONE_DEAR, TONE_VERY_DEAR, TONE_CANT_PAY };
++	/// Puts the compass and what goes with it where they belong, with or without the room for the steps' costs.
++	void placeCompass();
++	/// Shows what a step each way, and a level up or down, would cost (setting "Compass: step costs").
++	void updateCompassCosts(BattleUnit *unit, bool playerTurn, int viewBearing);
++	/// What the soldier pays in time units for one of those moves, and how it's written; false where the move can't be made.
++	bool moveCostShown(BattleUnit *unit, int direction, int &time, StepTone &tone);
++	/// What a step would cost the soldier over plain, level ground, to tell dear ground by.
++	int plainStepTime(BattleUnit *unit, const Position &start, int direction, const Position &end, bool sidestep, bool run) const;
 +	/// Shows the compass, redrawn when what it shows changes.
 +	void updateCompass(BattleUnit *unit, bool playerTurn);
 +	/// Draws the dial for a view bearing (degrees, 0 north, clockwise), a facing (0..7), a warning (0 none, 1 near the limit, 2 no time units to turn) and the facing a shot will turn to (-1 none).
@@ -33949,6 +34021,8 @@ index 000000000..85903c3aa
 +	bool hiddenUnitOn(const BattleUnit *unit, const Position &destination) const;
 +	/// Could the unit step into the neighbouring tile in this direction now, by the rules?
 +	bool stepAllowed(BattleUnit *unit, int stepX, int stepY);
++	/// What the game charges for one step from a tile, walked as commitStep walks it (a sidestep, a run or a walk).
++	PathfindingStep stepPrice(BattleUnit *unit, const Position &start, int direction, bool *sidestep = nullptr) const;
 +	/// Hands one step to the game's walking state; false if it couldn't start.
 +	bool commitStep(BattleUnit *unit, int stepX, int stepY);
 +	/// Keeps a coordinate inside a tile, away from its edges.
@@ -35677,10 +35751,10 @@ index 000000000..e75c80475
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..b3b1075b7
+index 000000000..e3ef89a99
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,2575 @@
+@@ -0,0 +1,2740 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -35855,12 +35929,17 @@ index 000000000..b3b1075b7
 +void FirstPersonMode::updateCompass(BattleUnit *unit, bool playerTurn)
 +{
 +	const bool show = Options::fpsCompass && isActive() && !_hudHidden && unit;
++	if (_compassCostsPlaced != Options::fpsCompassCosts)
++	{
++		placeCompass(); // (the setting was switched: make the room for the costs, or take it back)
++	}
 +	_compass->setVisible(show);
 +	for (Text *letter : _compassLetters) letter->setVisible(show);
 +	updateClimbArrows(show && playerTurn ? unit : nullptr);
 +	if (!show)
 +	{
 +		_txtCompassTurn->setVisible(false);
++		updateCompassCosts(nullptr, false, 0);
 +		return;
 +	}
 +
@@ -35895,9 +35974,14 @@ index 000000000..b3b1075b7
 +		shotWarning = shotTurn ? (shotAffordable ? 1 : 2) : 0;
 +		if (!shotTurn) shotFacing = -1;
 +	}
++	// With the steps' costs shown, the line also says what a turn costs while nothing warns.
++	const int turnCost = turretTurning(unit) ? 1 : unit->getTurnCost();
++	const int turnShown = Options::fpsCompassCosts && Options::fpsTurnCost && playerTurn ? turnCost : 0;
++	updateCompassCosts(unit, playerTurn, viewBearing);
 +	if (viewBearing != _compassDrawn[0] || facing != _compassDrawn[1] || warning != _compassDrawn[2]
-+		|| shotFacing != _compassDrawn[3] || (shotTurn * 4 + shotWarning) * 2 + meleeTurn != _compassDrawn[4])
++		|| shotFacing != _compassDrawn[3] || (shotTurn * 4 + shotWarning) * 2 + meleeTurn != _compassDrawn[4] || turnShown != _compassDrawn[5])
 +	{
++		_compassDrawn[5] = turnShown;
 +		_compassDrawn[0] = viewBearing;
 +		_compassDrawn[1] = facing;
 +		_compassDrawn[2] = warning;
@@ -35918,7 +36002,7 @@ index 000000000..b3b1075b7
 +
 +		// The line under it: the shot's turn first (it's what the next click costs), else the
 +		// head's limit.
-+		_txtCompassTurn->setVisible(warning != 0 || shotWarning != 0);
++		_txtCompassTurn->setVisible(warning != 0 || shotWarning != 0 || turnShown != 0);
 +		if (shotWarning)
 +		{
 +			_txtCompassTurn->setColor(textColor(_state->getPalette(), shotWarning == 1 ? 250 : 230, shotWarning == 1 ? 160 : 60, shotWarning == 1 ? 60 : 50));
@@ -35927,9 +36011,164 @@ index 000000000..b3b1075b7
 +		else if (warning)
 +		{
 +			_txtCompassTurn->setColor(textColor(_state->getPalette(), warning == 1 ? 240 : 230, warning == 1 ? 210 : 60, warning == 1 ? 60 : 50));
-+			_txtCompassTurn->setText(warning == 1 ? std::string(_state->tr("STR_FPS_COMPASS_TURN").arg(turretTurning(unit) ? 1 : unit->getTurnCost())) : std::string(_state->tr("STR_FPS_COMPASS_NO_TU")));
++			_txtCompassTurn->setText(warning == 1 ? std::string(_state->tr("STR_FPS_COMPASS_TURN").arg(turnCost)) : std::string(_state->tr("STR_FPS_COMPASS_NO_TU")));
++		}
++		else if (turnShown)
++		{
++			_txtCompassTurn->setColor(textColor(_state->getPalette(), 200, 200, 210));
++			_txtCompassTurn->setText(_state->tr("STR_FPS_COMPASS_TURN").arg(turnCost));
 +		}
 +	}
++}
++
++/**
++ * The steps' costs round the compass (setting "Compass: step costs"; a player's request, GitHub
++ * issue #132: in first person it's harder to keep track of what moving costs). At each of the
++ * eight ways a soldier can step, outside the dial and going round with it, the time units that
++ * step would cost now, as the game will charge it: a walk, a sidestep (turning by the rules) or
++ * a run (sprinting). So the number at the top is the step forward, and those at the sides the
++ * steps to the side. Left of the climb arrows, what a level up and a level down cost (a lift, a
++ * ladder, flying). No number where the step can't be made. A step onto dear ground is yellow,
++ * onto very dear ground red (see moveCostShown), and one the soldier can't pay for grey.
++ * Only in the player's turn; while a step is walked the numbers stay as they were.
++ * @param unit The soldier the view looks through, or null to hide the numbers.
++ * @param playerTurn It's the player's turn.
++ * @param viewBearing The view's bearing, degrees (0 north, clockwise).
++ */
++void FirstPersonMode::updateCompassCosts(BattleUnit *unit, bool playerTurn, int viewBearing)
++{
++	const bool show = Options::fpsCompassCosts && unit && playerTurn && canAct() && !noclipOn(unit);
++	const bool standing = show && unit->getStatus() == STATUS_STANDING && !_stepPending;
++	bool up = false, down = false;
++	if (standing)
++	{
++		climbWays(unit, up, down);
++	}
++	// The dial's middle on the canvas.
++	const double centreX = _compass->getX() + (CompassSize - 1) / 2.0, centreY = _compass->getY() + CompassArrowH + (CompassSize - 1) / 2.0;
++	for (int move = 0; move < 10; ++move) // (the eight steps as the game numbers them, then up and down: Pathfinding::DIR_UP is 8)
++	{
++		const bool step = move < Pathfinding::DIR_UP;
++		Text *text = step ? _compassCosts[move] : _climbCosts[move - Pathfinding::DIR_UP];
++		int shown = show && step ? _compassCostsShown[move] : -1;
++		if (standing)
++		{
++			int time = 0;
++			StepTone tone = TONE_PLAIN;
++			const bool wayOpen = step || (move == Pathfinding::DIR_UP ? up : down);
++			shown = wayOpen && moveCostShown(unit, move, time, tone) ? time * 4 + tone : -1;
++		}
++		if (shown != _compassCostsShown[move])
++		{
++			_compassCostsShown[move] = shown;
++			if (shown >= 0)
++			{
++				const SDL_Color *palette = _state->getPalette();
++				const int tone = shown % 4;
++				text->setColor(tone == TONE_DEAR ? textColor(palette, 250, 220, 70) : tone == TONE_VERY_DEAR ? textColor(palette, 240, 70, 60)
++					: tone == TONE_CANT_PAY ? textColor(palette, 120, 120, 130) : textColor(palette, 225, 225, 235));
++				text->setText(std::to_string(shown / 4));
++			}
++		}
++		text->setVisible(shown >= 0);
++		if (step)
++		{
++			const double angle = (move * 45 - viewBearing) * Pi / 180.0;
++			text->setX((int)std::lround(centreX + CompassCostRadius * std::sin(angle) - CompassCostW / 2.0));
++			text->setY((int)std::lround(centreY - CompassCostRadius * std::cos(angle) - CompassCostH / 2.0));
++		}
++	}
++}
++
++/**
++ * What one move would cost the soldier now, for the numbers round the compass (see
++ * updateCompassCosts): a step priced as the game will walk it (see stepPrice), with the turn to
++ * face it where the armor's rules charge that before a walk; or a level up or down.
++ * The tone: grey when the soldier can't pay (the time units, the energy, or the time units
++ * reserved for a shot); else, for a step, against what the same step would cost this soldier
++ * over plain ground (see plainStepTime): yellow when dearer (sand, tall grass, rubble in the way)
++ * and red from CompassCostDearPercent of it (sludge).
++ * @param unit The soldier.
++ * @param direction The move: 0 (north) to 7 clockwise, Pathfinding::DIR_UP or Pathfinding::DIR_DOWN.
++ * @param time Set to the time units.
++ * @param tone Set to how the number is written.
++ * @return False where the move can't be made (no number).
++ */
++bool FirstPersonMode::moveCostShown(BattleUnit *unit, int direction, int &time, StepTone &tone)
++{
++	Pathfinding *pathfinding = _save->getPathfinding();
++	const bool step = direction < Pathfinding::DIR_UP;
++	const Position start = step ? Position(_trackedTile.x, _trackedTile.y, unit->getPosition().z) : unit->getPosition();
++	bool sidestep = false;
++	const PathfindingStep price = step ? stepPrice(unit, start, direction, &sidestep) : pathfinding->getTUCost(start, direction, unit, nullptr, BAM_NORMAL);
++	if (price.cost.time >= Pathfinding::INVALID_MOVE_COST)
++	{
++		return false;
++	}
++	time = price.cost.time;
++	if (step && !sidestep && unit->getArmor()->getTurnBeforeFirstStep())
++	{
++		const int eighths = std::min((direction - unit->getDirection() + 8) % 8, (unit->getDirection() - direction + 8) % 8);
++		time += eighths * unit->getTurnCost();
++	}
++	const bool canPay = doomModeOn() || (unit->getTimeUnits() >= time && unit->getEnergy() >= price.cost.energy && reserveAllows(unit, time, price.cost.energy));
++	if (!step)
++	{
++		tone = canPay ? TONE_PLAIN : TONE_CANT_PAY;
++		return true;
++	}
++	// A step refused for anything but its price (a ledge with falling off, a unit in the way that
++	// isn't seen) shows no number; an unsafe landing's does (a second push takes it).
++	Position way;
++	Pathfinding::directionToVector(direction, &way);
++	if (canPay && !stepAllowed(unit, way.x, way.y) && _stepAllowedCache[direction] != 2)
++	{
++		return false;
++	}
++	if (!canPay)
++	{
++		tone = TONE_CANT_PAY;
++		return true;
++	}
++	// Dearer than the same step over plain ground would be?
++	const int plain = plainStepTime(unit, start, direction, price.pos, sidestep, !sidestep && runsStep(unit, start, direction));
++	tone = price.cost.time * 100 >= plain * CompassCostDearPercent ? TONE_VERY_DEAR : price.cost.time > plain ? TONE_DEAR : TONE_PLAIN;
++	return true;
++}
++
++/**
++ * The time units a step would cost this soldier over plain, level ground, to tell dear ground by
++ * (see moveCostShown). Made as the pathfinding makes a step's price (Pathfinding::getTUCost):
++ * plain ground's time units (one more for a level climbed), half again on a diagonal, one more
++ * for a sidestep, times the soldier's and the armor's movement costs for the way the step is
++ * made (walked, run or sidestepped; on foot or flown), rounded as the mod's rules round.
++ * @param unit The soldier.
++ * @param start The tile the step starts from.
++ * @param direction The step's direction (0 north .. 7, clockwise).
++ * @param end The tile the step ends on.
++ * @param sidestep The step is the game's sidestep.
++ * @param run The step is the game's run.
++ * @return The time units, at least 1.
++ */
++int FirstPersonMode::plainStepTime(BattleUnit *unit, const Position &start, int direction, const Position &end, bool sidestep, bool run) const
++{
++	int ground = Pathfinding::DEFAULT_MOVE_COST + (end.z > start.z ? 1 : 0);
++	if (direction & 1) ground = ground * 3 / 2;
++	if (sidestep) ground += 1;
++
++	// Flown: a flyer with flight on, with no floor under the step's start or its end.
++	const Tile *startTile = _save->getTile(start), *endTile = _save->getTile(end);
++	const bool flown = canFly(unit) && flightOn(unit) && ((startTile && startTile->hasNoFloor(_save)) || (endTile && endTile->hasNoFloor(_save)));
++	const Armor *armor = unit->getArmor();
++	ArmorMoveCost cost = { ground, ground };
++	cost *= unit->getMoveCostBase();
++	cost *= flown ? unit->getMoveCostBaseFly() : unit->getMoveCostBaseNormal();
++	cost *= sidestep ? (flown ? armor->getMoveCostFlyStrafe() : armor->getMoveCostStrafe())
++		: run ? (flown ? armor->getMoveCostFlyRun() : armor->getMoveCostRun())
++		: (flown ? armor->getMoveCostFlyWalk() : armor->getMoveCostWalk());
++	const int percents = 100 * 100 * 100; // (three costs in percent)
++	const int rounding = Mod::EXTENDED_MOVEMENT_COST_ROUNDING;
++	return std::max(1, (cost.TimePercent + (rounding == 0 ? 0 : rounding == 1 ? percents / 2 : percents / 2 - 1)) / percents);
 +}
 +
 +/**
@@ -38258,10 +38497,10 @@ index 000000000..b3b1075b7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeMovement.cpp b/src/FirstPerson/FirstPersonModeMovement.cpp
 new file mode 100644
-index 000000000..d669eda00
+index 000000000..4d7df700b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeMovement.cpp
-@@ -0,0 +1,2271 @@
+@@ -0,0 +1,2287 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -38392,30 +38631,10 @@ index 000000000..d669eda00
 +	// Work the answer out only once per direction.
 +	if (_stepAllowedCache[direction] < 0)
 +	{
-+		// What the pathfinding charges for this one step, from the camera's tile on the unit's
-+		// level, as commitStep will have the game walk it: the game's sidestep (turning by the
-+		// rules, see isSidestep), a run (sprinting, see runsStep) or a walk. A step that can't be
-+		// made at all costs INVALID_MOVE_COST time units.
-+		// A sidestep is priced as the game's strafe, with the pathfinding's surcharge for it,
-+		// which it adds only while its strafe setting is on (a search for a strafe sets it, and
-+		// it stays as the last search left it): on for this one question. Priced as a plain step
-+		// (a player's report, GitHub issue #114), a soldier with the walk's time units and not
-+		// the strafe's had every sidestep refused by the game after it started, and holding A or
-+		// D lunged the camera at the edge and back several times a second.
++		// What the game charges for this one step, from the camera's tile on the unit's level
++		// (see stepPrice).
 +		const Position start(_trackedTile.x, _trackedTile.y, unit->getPosition().z);
-+		Pathfinding *pathfinding = _save->getPathfinding();
-+		PathfindingStep stepCost = pathfinding->getTUCost(start, direction, unit, nullptr, BAM_NORMAL);
-+		if (stepCost.cost.time < Pathfinding::INVALID_MOVE_COST && isSidestep(unit, start, direction, stepCost.pos))
-+		{
-+			const bool strafeWas = pathfinding->getStrafeMove();
-+			pathfinding->setStrafeMove(true);
-+			stepCost = pathfinding->getTUCost(start, direction, unit, nullptr, BAM_STRAFE);
-+			pathfinding->setStrafeMove(strafeWas);
-+		}
-+		else if (runsStep(unit, start, direction))
-+		{
-+			stepCost = pathfinding->getTUCost(start, direction, unit, nullptr, BAM_RUN);
-+		}
++		const PathfindingStep stepCost = stepPrice(unit, start, direction);
 +		bool allowed = stepCost.cost.time < Pathfinding::INVALID_MOVE_COST;
 +
 +		// A step the game refused for a unit the player doesn't see (the pathfinding counts only
@@ -38467,6 +38686,42 @@ index 000000000..d669eda00
 +		_stepAllowedCache[direction] = allowed ? 1 : unsafe ? 2 : 0;
 +	}
 +	return _stepAllowedCache[direction] == 1;
++}
++
++/**
++ * What the pathfinding charges for one step from a tile, as commitStep will have the game walk
++ * it: the game's sidestep (turning by the rules, see isSidestep), a run (sprinting, see runsStep)
++ * or a walk. A step that can't be made at all costs INVALID_MOVE_COST time units.
++ * A sidestep is priced as the game's strafe, with the pathfinding's surcharge for it, which it
++ * adds only while its strafe setting is on (a search for a strafe sets it, and it stays as the
++ * last search left it): on for this one question. Priced as a plain step (a player's report,
++ * GitHub issue #114), a soldier with the walk's time units and not the strafe's had every
++ * sidestep refused by the game after it started, and holding A or D lunged the camera at the edge
++ * and back several times a second.
++ * @param unit The soldier.
++ * @param start The tile the step starts from.
++ * @param direction The step's direction (0 north .. 7, clockwise).
++ * @param sidestep If given, set to whether the step is a sidestep.
++ * @return The step: its cost in time units and energy, and the tile it ends on.
++ */
++PathfindingStep FirstPersonMode::stepPrice(BattleUnit *unit, const Position &start, int direction, bool *sidestep) const
++{
++	Pathfinding *pathfinding = _save->getPathfinding();
++	PathfindingStep price = pathfinding->getTUCost(start, direction, unit, nullptr, BAM_NORMAL);
++	const bool toTheSide = price.cost.time < Pathfinding::INVALID_MOVE_COST && isSidestep(unit, start, direction, price.pos);
++	if (toTheSide)
++	{
++		const bool strafeWas = pathfinding->getStrafeMove();
++		pathfinding->setStrafeMove(true);
++		price = pathfinding->getTUCost(start, direction, unit, nullptr, BAM_STRAFE);
++		pathfinding->setStrafeMove(strafeWas);
++	}
++	else if (runsStep(unit, start, direction))
++	{
++		price = pathfinding->getTUCost(start, direction, unit, nullptr, BAM_RUN);
++	}
++	if (sidestep) *sidestep = toTheSide;
++	return price;
 +}
 +
 +/**
@@ -40535,10 +40790,10 @@ index 000000000..d669eda00
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..8faa52ad4
+index 000000000..f6374d177
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,497 @@
+@@ -0,0 +1,505 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -40615,6 +40870,14 @@ index 000000000..8faa52ad4
 +/// The climb arrows beside the compass (see FirstPersonMode::updateClimbArrows): each ClimbArrowW x
 +/// ClimbArrowH pixels, the pair ClimbArrowsH high, ClimbArrowsGap pixels left of the dial.
 +const int ClimbArrowW = 13, ClimbArrowH = 9, ClimbArrowsH = 26, ClimbArrowsGap = 2;
++/// The steps' costs round the compass (setting "Compass: step costs", see FirstPersonMode::updateCompassCosts):
++/// each number CompassCostW x CompassCostH pixels, its middle CompassCostRadius from the dial's (clear of the
++/// heading arrow on top of the dial), which takes CompassCostRoomX more room either side of the dial and
++/// CompassCostRoomY above and below it.
++const int CompassCostW = 14, CompassCostH = 8, CompassCostRadius = CompassSize / 2 + CompassArrowH + 4;
++const int CompassCostRoomX = CompassCostRadius + CompassCostW / 2 - CompassSize / 2, CompassCostRoomY = CompassCostRadius + CompassCostH / 2 - CompassSize / 2;
++/// A step onto ground dearer than plain ground's time units shows yellow, and red from this many percent of it.
++const int CompassCostDearPercent = 160;
 +/// Turning by the rules: the compass warns this many degrees before the view reaches the
 +/// head's limit (HeadTurn), where looking further turns the soldier.
 +const double CompassWarnDegrees = 10.0;
@@ -71749,7 +72012,7 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..399e5c659
+index 000000000..7461440d4
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,997 @@
@@ -71974,7 +72237,7 @@ index 000000000..399e5c659
 +			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsHitFlash", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 +			"fpsGhostParts", "fpsGhostOpacity", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
 +		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
-+			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsMiddleClickIdentify" } },
++			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
 +		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 +		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
 +		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion", "fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts" } },

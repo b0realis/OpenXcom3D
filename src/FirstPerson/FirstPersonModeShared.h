@@ -74,6 +74,14 @@ const int CompassSize = 40, CompassArrowH = 7, CompassGap = 2;
 /// The climb arrows beside the compass (see FirstPersonMode::updateClimbArrows): each ClimbArrowW x
 /// ClimbArrowH pixels, the pair ClimbArrowsH high, ClimbArrowsGap pixels left of the dial.
 const int ClimbArrowW = 13, ClimbArrowH = 9, ClimbArrowsH = 26, ClimbArrowsGap = 2;
+/// The steps' costs round the compass (setting "Compass: step costs", see FirstPersonMode::updateCompassCosts):
+/// each number CompassCostW x CompassCostH pixels, its middle CompassCostRadius from the dial's (clear of the
+/// heading arrow on top of the dial), which takes CompassCostRoomX more room either side of the dial and
+/// CompassCostRoomY above and below it.
+const int CompassCostW = 14, CompassCostH = 8, CompassCostRadius = CompassSize / 2 + CompassArrowH + 4;
+const int CompassCostRoomX = CompassCostRadius + CompassCostW / 2 - CompassSize / 2, CompassCostRoomY = CompassCostRadius + CompassCostH / 2 - CompassSize / 2;
+/// A step onto ground dearer than plain ground's time units shows yellow, and red from this many percent of it.
+const int CompassCostDearPercent = 160;
 /// Turning by the rules: the compass warns this many degrees before the view reaches the
 /// head's limit (HeadTurn), where looking further turns the soldier.
 const double CompassWarnDegrees = 10.0;

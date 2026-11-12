@@ -128,30 +128,10 @@ bool FirstPersonMode::stepAllowed(BattleUnit *unit, int stepX, int stepY)
 	// Work the answer out only once per direction.
 	if (_stepAllowedCache[direction] < 0)
 	{
-		// What the pathfinding charges for this one step, from the camera's tile on the unit's
-		// level, as commitStep will have the game walk it: the game's sidestep (turning by the
-		// rules, see isSidestep), a run (sprinting, see runsStep) or a walk. A step that can't be
-		// made at all costs INVALID_MOVE_COST time units.
-		// A sidestep is priced as the game's strafe, with the pathfinding's surcharge for it,
-		// which it adds only while its strafe setting is on (a search for a strafe sets it, and
-		// it stays as the last search left it): on for this one question. Priced as a plain step
-		// (a player's report, GitHub issue #114), a soldier with the walk's time units and not
-		// the strafe's had every sidestep refused by the game after it started, and holding A or
-		// D lunged the camera at the edge and back several times a second.
+		// What the game charges for this one step, from the camera's tile on the unit's level
+		// (see stepPrice).
 		const Position start(_trackedTile.x, _trackedTile.y, unit->getPosition().z);
-		Pathfinding *pathfinding = _save->getPathfinding();
-		PathfindingStep stepCost = pathfinding->getTUCost(start, direction, unit, nullptr, BAM_NORMAL);
-		if (stepCost.cost.time < Pathfinding::INVALID_MOVE_COST && isSidestep(unit, start, direction, stepCost.pos))
-		{
-			const bool strafeWas = pathfinding->getStrafeMove();
-			pathfinding->setStrafeMove(true);
-			stepCost = pathfinding->getTUCost(start, direction, unit, nullptr, BAM_STRAFE);
-			pathfinding->setStrafeMove(strafeWas);
-		}
-		else if (runsStep(unit, start, direction))
-		{
-			stepCost = pathfinding->getTUCost(start, direction, unit, nullptr, BAM_RUN);
-		}
+		const PathfindingStep stepCost = stepPrice(unit, start, direction);
 		bool allowed = stepCost.cost.time < Pathfinding::INVALID_MOVE_COST;
 
 		// A step the game refused for a unit the player doesn't see (the pathfinding counts only
@@ -203,6 +183,42 @@ bool FirstPersonMode::stepAllowed(BattleUnit *unit, int stepX, int stepY)
 		_stepAllowedCache[direction] = allowed ? 1 : unsafe ? 2 : 0;
 	}
 	return _stepAllowedCache[direction] == 1;
+}
+
+/**
+ * What the pathfinding charges for one step from a tile, as commitStep will have the game walk
+ * it: the game's sidestep (turning by the rules, see isSidestep), a run (sprinting, see runsStep)
+ * or a walk. A step that can't be made at all costs INVALID_MOVE_COST time units.
+ * A sidestep is priced as the game's strafe, with the pathfinding's surcharge for it, which it
+ * adds only while its strafe setting is on (a search for a strafe sets it, and it stays as the
+ * last search left it): on for this one question. Priced as a plain step (a player's report,
+ * GitHub issue #114), a soldier with the walk's time units and not the strafe's had every
+ * sidestep refused by the game after it started, and holding A or D lunged the camera at the edge
+ * and back several times a second.
+ * @param unit The soldier.
+ * @param start The tile the step starts from.
+ * @param direction The step's direction (0 north .. 7, clockwise).
+ * @param sidestep If given, set to whether the step is a sidestep.
+ * @return The step: its cost in time units and energy, and the tile it ends on.
+ */
+PathfindingStep FirstPersonMode::stepPrice(BattleUnit *unit, const Position &start, int direction, bool *sidestep) const
+{
+	Pathfinding *pathfinding = _save->getPathfinding();
+	PathfindingStep price = pathfinding->getTUCost(start, direction, unit, nullptr, BAM_NORMAL);
+	const bool toTheSide = price.cost.time < Pathfinding::INVALID_MOVE_COST && isSidestep(unit, start, direction, price.pos);
+	if (toTheSide)
+	{
+		const bool strafeWas = pathfinding->getStrafeMove();
+		pathfinding->setStrafeMove(true);
+		price = pathfinding->getTUCost(start, direction, unit, nullptr, BAM_STRAFE);
+		pathfinding->setStrafeMove(strafeWas);
+	}
+	else if (runsStep(unit, start, direction))
+	{
+		price = pathfinding->getTUCost(start, direction, unit, nullptr, BAM_RUN);
+	}
+	if (sidestep) *sidestep = toTheSide;
+	return price;
 }
 
 /**

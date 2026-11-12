@@ -38,6 +38,8 @@ en-GB:
   STR_FPS_TURN_COST_DESC: "YES: looking past 45 degrees turns you, at the game's TU cost."
   STR_FPS_COMPASS: "Compass"
   STR_FPS_COMPASS_DESC: "A compass at the top right (with Turning costs TU: what looking further costs)."
+  STR_FPS_COMPASS_COSTS: "Compass: step costs"
+  STR_FPS_COMPASS_COSTS_DESC: "Round the compass, the time units a step each way costs now (the top is forward); a level up or down by the climb arrows, and what a turn costs under it. Yellow or red on costly ground, grey when you can't pay."
   STR_FPS_COMPASS_TURN: "TURN {0} TU"
   STR_FPS_COMPASS_NO_TU: "NO TU"
   STR_FPS_SPRINT: "SPRINT"
