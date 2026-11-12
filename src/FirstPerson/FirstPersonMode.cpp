@@ -2988,11 +2988,14 @@ bool FirstPersonMode::blit()
 		magnify(picture, _canvas->getSurface(), true);
 		_composed->setPalette(_state->getPalette());
 		// In full colour (setting "True colour"): each pixel that still has the palette colour its ray gave it (no unit,
-		// effect or wash over it, no overlay) takes the card's full colour for it; the others stay the palette's.
+		// effect or wash over it, no overlay) takes the card's full colour for it; the others stay the palette's. But
+		// see-through smoke drawn over a ray's pixel takes the light the card found in the air there (setting "Light
+		// shafts": what the full colour has over the ray's palette colour), so a beam lights the smoke it crosses.
 		const Uint32 *fullColors = nullptr, *shownInFull = nullptr;
-		const Uint8 *rayColors = nullptr;
-		if (_view->shown() && _view->getWidth() == picture->w && _view->getHeight() == picture->h && _view->trueColor(fullColors, rayColors))
+		const Uint8 *rayColors = nullptr, *smokeVeil = nullptr;
+		if (_view->shown() && _view->getWidth() == picture->w && _view->getHeight() == picture->h && _view->trueColor(fullColors, rayColors, smokeVeil))
 		{
+			const SDL_Color *palette = _state->getPalette();
 			_truePicture.resize((size_t)picture->w * picture->h);
 			for (int row = 0; row < picture->h; ++row)
 			{
@@ -3001,7 +3004,21 @@ bool FirstPersonMode::blit()
 				Uint32 *out = &_truePicture[(size_t)row * picture->w];
 				for (int column = 0; column < picture->w; ++column)
 				{
-					out[column] = made[column] == rays[column] ? (full[column] | 0xFF000000u) : 0u;
+					if (made[column] == rays[column])
+					{
+						out[column] = full[column] | 0xFF000000u;
+					}
+					else if (smokeVeil && smokeVeil[(size_t)row * picture->w + column])
+					{
+						const SDL_Color &smoke = palette[made[column]], &ray = palette[rays[column]];
+						const int red = (int)((full[column] >> 16) & 0xFF) - ray.r, green = (int)((full[column] >> 8) & 0xFF) - ray.g, blue = (int)(full[column] & 0xFF) - ray.b;
+						out[column] = 0xFF000000u | (Uint32)std::min(255, smoke.r + std::max(0, red)) << 16 | (Uint32)std::min(255, smoke.g + std::max(0, green)) << 8
+							| (Uint32)std::min(255, smoke.b + std::max(0, blue));
+					}
+					else
+					{
+						out[column] = 0u;
+					}
 				}
 			}
 			shownInFull = _truePicture.data();

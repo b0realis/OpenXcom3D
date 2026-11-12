@@ -722,7 +722,7 @@ bool FirstPersonGpu::State::start(int device)
 bool FirstPersonGpu::State::build(Program &built, bool results, int extras)
 {
 	const std::string raySource = std::string("#version 330 core\n") + (results ? "#define RESULTS\n" : "") + ((extras & 1) ? "#define COLORED_LIGHTS\n" : "")
-		+ ((extras & 2) ? "#define REFLECTIONS\n" : "") + ((extras & 4) ? "#define LATER_RAYS\n" : "") + HeaderSource + shaderConstants() + WalkSource + ShadeSource;
+		+ ((extras & 2) ? "#define REFLECTIONS\n" : "") + ((extras & 4) ? "#define LATER_RAYS\n" : "") + ((extras & 8) ? "#define LIGHT_SHAFTS\n" : "") + HeaderSource + shaderConstants() + WalkSource + ShadeSource;
 	const char *sources[2] = { VertexSource, raySource.c_str() };
 	const Gl::Enum kinds[2] = { Gl::VERTEX_SHADER, Gl::FRAGMENT_SHADER };
 	built.id = Gl::CreateProgram();
@@ -786,7 +786,7 @@ FirstPersonGpu::State::Program *FirstPersonGpu::State::programFor(const Frame &f
 			found = extraPrograms.emplace(extras, Program()).first;
 			if (!build(found->second, false, extras))
 			{
-				Log(LOG_WARNING) << "OpenXcom3D GPU: no coloured lights or reflections on this card";
+				Log(LOG_WARNING) << "OpenXcom3D GPU: no coloured lights, reflections or light shafts on this card";
 				found->second.id = 0;
 			}
 		}
@@ -795,7 +795,7 @@ FirstPersonGpu::State::Program *FirstPersonGpu::State::programFor(const Frame &f
 	// (With "Coloured lights" on, the program with them is built now, not when the first shot flies; it is used
 	// only for the frames that have a light.)
 	// (For a pixel's second and further rays, the program that casts them only where the first rays show an edge.)
-	const int mirrors = (frame.reflections ? 2 : 0) | (laterRays ? 4 : 0);
+	const int mirrors = (frame.reflections ? 2 : 0) | (laterRays ? 4 : 0) | (frame.lightShafts ? 8 : 0);
 	if (frame.colorLightsOn) built(mirrors | 1);
 	return built(mirrors | (frame.colorLightCount > 0 ? 1 : 0));
 }
@@ -1167,6 +1167,8 @@ void FirstPersonGpu::State::setScene(const Frame &frame)
 	Gl::Uniform1i(location("uAmbientOcclusion"), frame.ambientOcclusion ? 1 : 0);
 	Gl::Uniform1i(location("uSmoothLight"), frame.smoothLight && frame.palette ? 1 : 0);
 	Gl::Uniform1i(location("uReflections"), frame.reflections && frame.palette ? 1 : 0);
+	Gl::Uniform1i(location("uShaftSmoke"), frame.shaftSmoke ? 1 : 0);
+	Gl::Uniform1f(location("uShaftAir"), frame.shaftAir);
 	const int colorLightCount = frame.palette ? std::clamp(frame.colorLightCount, 0, 16) : 0;
 	Gl::Uniform1i(location("uColorLightCount"), colorLightCount);
 	if (colorLightCount > 0)
@@ -1506,12 +1508,13 @@ void FirstPersonGpu::prebuild(int extras)
 		Frame wanted = {};
 		SDL_Color anyPalette[1] = {};
 		wanted.palette = anyPalette;
-		for (int mask = 0; mask <= 3; ++mask)
+		for (int mask = 0; mask <= 11; ++mask)
 		{
-			if ((mask & extras) != mask) continue; // (only what the settings can ask for)
+			if ((mask & 4) || (mask & extras) != mask) continue; // (only what the settings can ask for)
 			wanted.colorLightsOn = false;
 			wanted.colorLightCount = mask & 1;
 			wanted.reflections = (mask & 2) != 0;
+			wanted.lightShafts = (mask & 8) != 0;
 			if (mask) state.programFor(wanted, false);
 			if (extras & 4) state.programFor(wanted, false, true);
 		}

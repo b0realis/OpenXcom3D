@@ -300,11 +300,14 @@ public:
 	void setWantsTrueColor(bool wanted) { _wantsTrueColor = wanted; }
 	/// This frame's world in full colour, if the graphics card gave it: a 0x..RRGGBB number a pixel, and the palette colour each
 	/// pixel had from its ray; a pixel of the finished picture that still has that colour may be shown in the full one.
-	bool trueColor(const Uint32 *&fullColors, const Uint8 *&rayColors) const
+	/// @param smokeVeil Receives, in a frame with light in the air (setting "Light shafts"), how much see-through smoke
+	/// lies over each pixel (0: none): there the air's light belongs on the smoke drawn; else null.
+	bool trueColor(const Uint32 *&fullColors, const Uint8 *&rayColors, const Uint8 *&smokeVeil) const
 	{
 		if (!_hasTrueColor) return false;
 		fullColors = _trueColor.data();
 		rayColors = _rayColors.data();
+		smokeVeil = _hasLightShafts ? _smokeVeil.data() : nullptr;
 		return true;
 	}
 	/// Uses another view's voxel models instead of building its own (a small extra view). Set
@@ -847,6 +850,7 @@ private:
 	void gpuShadowRays(double cpuMilliseconds);
 	friend struct FirstPersonViewGpuAccess;
 	bool _gpuLogged = false; // the log has this view's line about the graphics card
+	bool _hasLightShafts = false;                        // ... and it has light in the air in it (setting "Light shafts")
 	bool _wantsTrueColor = false, _hasTrueColor = false; // the world in full colour too: asked for, and had for the frame drawn last
 	std::vector<Uint32> _trueColor;                      // ... a pixel each, from the card
 	std::vector<Uint8> _rayColors;                       // ... and the palette colour each pixel had from its ray
@@ -1137,6 +1141,8 @@ private:
 	std::vector<float> _glowBuffer, _glowScratch;      // quarter resolution glow, blurred into a bloom
 	std::vector<float> _glowDepth, _glowDepthScratch;  // the same for the glow's distance (summed, weighted by the glow): how far away the light is
 	std::vector<float> _glowHue, _glowHueScratch;      // the shining pixels' colour, red, green, blue and their weight per cell of a grid half as fine, blurred: the glow's own colour (see drawLightHalos)
+	std::vector<int> _glowFirstReached, _glowLastReached; // the first and last cell of each row of the glow's grid the glow reached (first > last: none)
+	float _glowGain = 0.0f, _glowLuminance[256] = {};   // how strongly the glow brightens this frame; each palette colour's luminance
 	std::set<const Explosion*> _seenExplosions;        // explosions already seen (each spawns its particles once)
 	FirstPerson::ChainHeldTiles _chainHeld;            // this frame: the tiles a chain of explosions' ripple hasn't passed over yet, as they were (setting "Instant chain explosions")
 	std::vector<FirstPerson::ChainFireball> _chainFireballs; // this frame: the chain's fireballs showing
@@ -1164,6 +1170,8 @@ private:
 	void spawnDevices(float elapsedSeconds);
 	/// Bloom: a soft glow around whatever shines.
 	void drawLightHalos();
+	/// ... its last step, the picture brightened, band by band on all the threads.
+	void brightenGlowBands();
 	/// Advances the particles and spawns new ones.
 	void updateParticles();
 	/// Draws the particles, depth-tested.

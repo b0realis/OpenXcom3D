@@ -244,6 +244,7 @@ SETTINGS = [
         ('Smooth light', 'NO', 'YES / NO', 'With True colour. Light, shadows, haze and the sky blend smoothly where the palette\'s picture has a dot pattern. Not in the 1.12 download yet.', 'YES: no dots swimming over walls at high resolutions.'),
         ('Coloured lights', 'NO', 'YES / NO', 'With True colour. Shots in flight, explosions, fires and muzzle flashes light the walls and ground round them in their own colour. Not in the 1.12 download yet.', 'YES: firefights at night look the part.'),
         ('Reflections', 'NO', 'YES / NO', 'With True colour. The sea mirrors the sky, the clouds and what stands in it. Not in the 1.12 download yet.', 'YES for TFTD\'s surface missions.'),
+        ('Light shafts', 'NO', 'YES / NO', 'With True colour. The flashlight, flares, lamps and coloured lights show as beams and glows in smoke, and everywhere under the sea. Not in the 1.12 download yet.', 'YES for night missions and TFTD.'),
     ]),
 ]
 

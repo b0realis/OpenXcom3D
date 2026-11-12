@@ -150,6 +150,8 @@ en-GB:
   STR_FPS_COLORED_LIGHTS_DESC: "With True colour. Shots in flight, explosions, fires and muzzle flashes light the walls and ground round them in their own colour."
   STR_FPS_REFLECTIONS: "Reflections"
   STR_FPS_REFLECTIONS_DESC: "With True colour. The sea mirrors the sky, the clouds and what stands in it, more the flatter you look at it."
+  STR_FPS_LIGHT_SHAFTS: "Light shafts"
+  STR_FPS_LIGHT_SHAFTS_DESC: "With True colour. The flashlight, flares, lamps and coloured lights show as beams and glows in smoke, and everywhere under the sea."
   STR_FPS_VIEW_RESOLUTION: "3D resolution"
   STR_FPS_VIEW_RESOLUTION_DESC: "The 3D world as fine as its HUD, as the battlescape, or as the display itself, whatever the battlescape's scale."
   STR_FPS_VIEW_RESOLUTION_HUD: "HUD"

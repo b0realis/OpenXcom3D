@@ -85,8 +85,8 @@ FirstPersonGpu *sharedGpu(bool open)
 		shared.opening = std::thread([] {
 			const char *device = getenv("OPENXCOM3D_GPU_DEVICE");
 			shared.gpu = device ? FirstPersonGpu::open(atoi(device)) : FirstPersonGpu::openAny();
-			// (The programs for "Coloured lights" and "Reflections", if those are on, before the card is called ready.)
-			if (shared.gpu) shared.gpu->prebuild((Options::fpsTrueColor && Options::fpsColoredLights ? 1 : 0) | (Options::fpsTrueColor && Options::fpsReflections ? 2 : 0)
+			// (The programs for "Coloured lights", "Reflections" and "Light shafts", if those are on, before the card is called ready.)
+			if (shared.gpu) shared.gpu->prebuild((Options::fpsTrueColor && Options::fpsColoredLights ? 1 : 0) | (Options::fpsTrueColor && Options::fpsReflections ? 2 : 0) | (Options::fpsTrueColor && Options::fpsLightShafts ? 8 : 0)
 				| (Options::fpsSupersampling > 0 ? 4 : 0));
 			shared.ready = shared.gpu.get();
 		});
@@ -267,6 +267,20 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 		frame.flares[flare][3] = burning ? view._flareLights[flare].fade : 0.0f;
 		frame.flareFlicker[flare] = burning ? view._flareLights[flare].flicker : 0.0f;
 	}
+	// Light shafts (setting "Light shafts", in full colour): only in a frame that has what shows them, smoke somewhere
+	// on the map or the sea all round, and a light to show (else the plain program draws, at its own speed).
+	frame.lightShafts = frame.shaftSmoke = false;
+	frame.shaftAir = view._colors.underwater ? 0.0005f : 0.0f;
+	if (Options::fpsLightShafts && view._wantsTrueColor)
+	{
+		const size_t tileCount = (size_t)view._save->getMapSizeXYZ();
+		for (size_t tile = 0; tile < tileCount && !frame.shaftSmoke; ++tile)
+		{
+			frame.shaftSmoke = view._tileViews[tile].smoke != 0;
+		}
+		const bool lampsShine = frame.lampCount > 0 && (view._colors.underwater || view._colors.night > 0.3f);
+		frame.lightShafts = (frame.shaftSmoke || view._colors.underwater) && (frame.flashlight || frame.flareCount > 0 || lampsShine || frame.colorLightCount > 0);
+	}
 	for (int axis = 0; axis < 3; ++axis)
 	{
 		frame.flashlightPos[axis] = view._flashlightPos[axis];
@@ -398,6 +412,7 @@ bool FirstPersonView::gpuCastAllRays()
 			std::memcpy(&_rayColors[(size_t)row * getWidth()], getRaw(0, row), getWidth());
 		}
 		_hasTrueColor = true;
+		_hasLightShafts = frame.lightShafts;
 	}
 	// (a line in the log the first time each view is drawn this way, as the CPU's threads have theirs)
 	if (!_gpuLogged)

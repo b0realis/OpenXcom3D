@@ -73,6 +73,7 @@ uniform int uPixelSize;      // pixels a ray colours each way
 uniform usampler2D uFirstColor;
 uniform sampler2D uFirstDepth, uFirstTrue;
 const float FlatContrast = 26.0 / 255.0; // a pixel within this of all its neighbours, a colour channel each, has nothing to smooth (two shades of a dither are nearer than this; the next voxel's colour mostly isn't)
+const float NearContrast = 64.0 / 255.0; // the same where a voxel covers several pixels: there its neighbours' colours are the texture drawn large, not shimmer, and only a strong line between two of them is worth more rays
 #endif
 uniform vec2 uRayOffset;     // where in its pixel the ray goes, from the middle (0, 0: the CPU's ray; else one of several, setting "Supersampling")
 uniform float uGhostScale;
@@ -427,15 +428,20 @@ uniform vec4 uColorLightAt[16]; // setting "Coloured lights": each light's place
 uniform vec4 uColorLightOf[16]; // ... its colour (0..1 each) and strength
 uniform int uColorLightCount;
 #endif
+#ifdef LIGHT_SHAFTS
+uniform int uShaftSmoke;        // setting "Light shafts": there is smoke on the map (else only the sea's water scatters light)
+uniform float uShaftAir;        // ... how much of the light a voxel of clear air or water throws towards the eye (0 above the sea)
+#endif
 uniform int uReflections;       // setting "Reflections": the sea mirrors the sky and what stands in it
 uniform int uSmoothLight; // setting "Smooth light": the full-colour picture blends between the palette's shades (and into the haze) where the palette's picture dithers
-// (The coloured lights and the reflections are built into the program only when their settings are on (COLORED_LIGHTS,
-// REFLECTIONS; see FirstPersonGpu.cpp, programFor): with their code merely present, one driver's program ran at half
+// (The coloured lights, the reflections and the light shafts are built into the program only when their settings are on
+// (COLORED_LIGHTS, REFLECTIONS, LIGHT_SHAFTS; see FirstPersonGpu.cpp, programFor): with their code merely present, one driver's program ran at half
 // the speed for everything else, ambient occlusion above all, though none of it was reached.)
 // The pixel in full colour, where the shading worked one out that the palette hasn't (see shadeHit); else it is the palette colour's own.
 vec3 fullColor;
 bool fullColorSet;
 vec3 paletteRgb(uint color) { int entry = int(color) * 3; return vec3(float(texelFetch(uBlend, entry).r), float(texelFetch(uBlend, entry + 1).r), float(texelFetch(uBlend, entry + 2).r)); }
+const float LampReach = 120.0;     // how far a lamp lights (voxels)
 const float SunDiscRadius = 0.04;  // the sun as a disc this wide (the tangent of its half-angle): the width of a shadow's soft edge, a 25th of the way it fell
 const float CreaseShades = 4.5;    // how many palette shades the deepest corner is darkened
 const float CreaseFadeFrom = 260.0, CreaseFadeTo = 420.0; // corners aren't darkened beyond this far (voxels): too fine to see, and they would shimmer
@@ -588,15 +594,14 @@ float pointLight(vec3 point, vec3 normal, bool shadows)
 	// Lamps: only the strongest in reach counts.
 	if (uLampCount > 0 && (uNight > 0.3 || uUnderwater != 0))
 	{
-		const float lampReach = 120.0;
 		int brightestLamp = -1, nextLamp = -1, thirdLamp = -1; // (the second and third strongest: for "Shadows from every light")
 		float brightestPower = 0.0, nextPower = 0.0, thirdPower = 0.0;
 		for (int lamp = 0; lamp < uLampCount; ++lamp)
 		{
 			float dx = uLamps[lamp].x - point.x, dy = uLamps[lamp].y - point.y, dz = uLamps[lamp].z - point.z;
 			float span = sqrt(dx * dx + dy * dy + dz * dz);
-			if (span > lampReach) continue;
-			float power = uLamps[lamp].w * (1.0 - span / lampReach) * (1.0 - span / lampReach);
+			if (span > LampReach) continue;
+			float power = uLamps[lamp].w * (1.0 - span / LampReach) * (1.0 - span / LampReach);
 			if (power > brightestPower) { thirdPower = nextPower; thirdLamp = nextLamp; nextPower = brightestPower; nextLamp = brightestLamp; brightestPower = power; brightestLamp = lamp; }
 			else if (power > nextPower) { thirdPower = nextPower; thirdLamp = nextLamp; nextPower = power; nextLamp = lamp; }
 			else if (power > thirdPower) { thirdPower = power; thirdLamp = lamp; }
@@ -615,8 +620,8 @@ float pointLight(vec3 point, vec3 normal, bool shadows)
 			vec3 lampPos = uLamps[lamp].xyz;
 			float dx = lampPos.x - point.x, dy = lampPos.y - point.y, dz = lampPos.z - point.z;
 			float span = sqrt(dx * dx + dy * dy + dz * dz);
-			if (span > lampReach || span < 0.01) continue;
-			float power = uLamps[lamp].w * (1.0 - span / lampReach) * (1.0 - span / lampReach);
+			if (span > LampReach || span < 0.01) continue;
+			float power = uLamps[lamp].w * (1.0 - span / LampReach) * (1.0 - span / LampReach);
 			if (power <= 0.03) continue;
 			vec3 towardsLamp = vec3(dx / span, dy / span, dz / span);
 			float facing = normal.x * towardsLamp.x + normal.y * towardsLamp.y + normal.z * towardsLamp.z;
@@ -1250,28 +1255,65 @@ uint undersideColor(uint plate, ivec3 voxel, bool undersideUnderRock, inout int 
 	return rockCeilingMiddle >= 0 ? plan : plain;
 }
 
+// Whether a voxel is filled, this frame's models only (crease's look-ups: cheaper than voxelColorAt's).
+float filledIn(uint parts[4], ivec3 local)
+{
+	for (int part = 0; part < 4; ++part)
+	{
+		if (parts[part] != 0u && modelColor(parts[part], local) != 0u) return 1.0;
+	}
+	return 0.0;
+}
+
+float filledAt(ivec3 world)
+{
+	if (world.x < 0 || world.y < 0 || world.z < 0 || world.x >= uSize.x * 16 || world.y >= uSize.y * 16 || world.z >= uSize.z * 24) return 0.0;
+	uvec4 now = texelFetch(uTiles, (((world.z / 24) * uSize.y + world.y / 16) * uSize.x + world.x / 16) * 4);
+	if (now.x == 0u && now.y == 0u) return 0.0;
+	return filledIn(uint[4](now.x & 0xFFFFu, now.x >> 16, now.y & 0xFFFFu, now.y >> 16), ivec3(world.x % 16, world.y % 16, world.z % 24));
+}
+
 /**
  * How closed in a point on a face is, 0 (open) to 1: the share of sixteen places round it, out
  * from the face and to its sides, a ring near and a ring further, that hold a voxel. The foot
- * of a wall, an inner corner, the gap between two crates. Each place counts the four voxels
- * round it in the face's plane by how near it is to each, so the darkening has no steps where
- * a place passes from one voxel to the next.
+ * of a wall, an inner corner, the gap between two crates. Each near place counts the four
+ * voxels round it in the face's plane by how near it is to each, so the darkening has no steps
+ * where a place passes from one voxel to the next; a far place counts its one voxel (its step
+ * is a fifth of a shade). Most places are in open air: the four voxels of one, when a single
+ * empty tile holds them all, cost one look-up.
  */
 float crease(vec3 point, vec3 normal)
 {
 	vec3 sideA = abs(normal.yzx), sideB = abs(normal.zxy); // (the normal lies along an axis: these are the other two)
+	ivec3 stepA = ivec3(sideA), stepB = ivec3(sideB), mapVoxels = uSize * CellVoxels;
 	float closed = 0.0;
-	for (int place = 0; place < 16; ++place)
+	for (int place = 0; place < 8; ++place)
 	{
-		bool far = place >= 8;
-		float angle = float(place & 7) * 0.7853982 + (far ? 0.3926991 : 0.0);
-		vec3 at = point + normal * (far ? 3.0 : 1.0) + (cos(angle) * sideA + sin(angle) * sideB) * (far ? 4.5 : 1.6) - 0.5 * (sideA + sideB);
+		float angle = float(place) * 0.7853982;
+		vec3 at = point + normal + (cos(angle) * sideA + sin(angle) * sideB) * 1.6 - 0.5 * (sideA + sideB);
 		vec3 cell = floor(at);
 		float alongA = dot(at - cell, sideA), alongB = dot(at - cell, sideB);
-		ivec3 corner = ivec3(cell), stepA = ivec3(sideA), stepB = ivec3(sideB);
-		float held = mix(mix(voxelColorAt(corner, false, -1) != 0u ? 1.0 : 0.0, voxelColorAt(corner + stepA, false, -1) != 0u ? 1.0 : 0.0, alongA),
-			mix(voxelColorAt(corner + stepB, false, -1) != 0u ? 1.0 : 0.0, voxelColorAt(corner + stepA + stepB, false, -1) != 0u ? 1.0 : 0.0, alongA), alongB);
-		closed += held * (far ? 0.045 : 0.08);
+		ivec3 corner = ivec3(cell), opposite = corner + stepA + stepB;
+		ivec3 cornerTile = corner / CellVoxels;
+		float held;
+		if (corner.x >= 0 && corner.y >= 0 && corner.z >= 0 && opposite.x < mapVoxels.x && opposite.y < mapVoxels.y && opposite.z < mapVoxels.z && cornerTile == opposite / CellVoxels)
+		{
+			uvec4 now = texelFetch(uTiles, ((cornerTile.z * uSize.y + cornerTile.y) * uSize.x + cornerTile.x) * 4);
+			if (now.x == 0u && now.y == 0u) continue;
+			uint parts[4] = uint[4](now.x & 0xFFFFu, now.x >> 16, now.y & 0xFFFFu, now.y >> 16);
+			ivec3 local = corner - cornerTile * CellVoxels;
+			held = mix(mix(filledIn(parts, local), filledIn(parts, local + stepA), alongA), mix(filledIn(parts, local + stepB), filledIn(parts, local + stepA + stepB), alongA), alongB);
+		}
+		else
+		{
+			held = mix(mix(filledAt(corner), filledAt(corner + stepA), alongA), mix(filledAt(corner + stepB), filledAt(opposite), alongA), alongB);
+		}
+		closed += held * 0.08;
+	}
+	for (int place = 0; place < 8; ++place)
+	{
+		float angle = float(place) * 0.7853982 + 0.3926991;
+		closed += filledAt(ivec3(floor(point + normal * 3.0 + (cos(angle) * sideA + sin(angle) * sideB) * 4.5))) * 0.045;
 	}
 	return closed;
 }
@@ -1583,6 +1625,90 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 	return hazeColor(color, terrainHaze(hit.t), pixelX + 2, pixelY + 1);
 }
 
+#ifdef LIGHT_SHAFTS
+const int ShaftSteps = 20;        // places along a ray where the light in the air is added up
+const float ShaftReach = 320.0;   // ... over this far at most (voxels)
+const float ShaftSmoke = 0.001;   // how much of the light a voxel of smoke throws towards the eye, for each of a tile's units of smoke
+
+// The smoke at a point: blended between the eight tiles round it, so a cloud's light has no tile's edges.
+float smokeAt(vec3 point)
+{
+	vec3 grid = point / CellSize - 0.5;
+	ivec3 low = ivec3(floor(grid));
+	vec3 along = grid - vec3(low);
+	float smoke = 0.0;
+	for (int corner = 0; corner < 8; ++corner)
+	{
+		ivec3 tile = low + ivec3(corner & 1, (corner >> 1) & 1, corner >> 2);
+		if (tile.x < 0 || tile.y < 0 || tile.z < 0 || tile.x >= uSize.x || tile.y >= uSize.y || tile.z >= uSize.z) continue;
+		float held = float((tileLightTexel((tile.z * uSize.y + tile.y) * uSize.x + tile.x).z >> 8) & 0xFFu);
+		vec3 share = mix(1.0 - along, along, vec3(corner & 1, (corner >> 1) & 1, corner >> 2));
+		smoke += held * share.x * share.y * share.z;
+	}
+	return smoke;
+}
+
+/**
+ * A ray's full colour with the light the air throws towards the eye on its way (setting "Light shafts"): the
+ * flashlight's cone, the flares, the lamps by night and the coloured lights show as beams and glows where there is
+ * smoke, and everywhere under the sea. The light is added up at ShaftSteps places along the ray, each by how much
+ * smoke (or water) is there. Nothing hides a light from the air here: no shadow rays (twenty a pixel would cost
+ * more than the whole picture), so a lamp behind a wall still glows in the smoke on this side of it.
+ * @param rgb The ray's colour (0..255 each).
+ * @param span How far the ray went (voxels).
+ */
+vec3 lightShafts(vec3 rgb, vec3 rayDirection, float span)
+{
+	float stride = min(span, ShaftReach) / float(ShaftSteps);
+	float night = uUnderwater != 0 ? 1.0 : uNight;
+	vec3 added = vec3(0.0);
+	for (int place = 0; place < ShaftSteps; ++place)
+	{
+		vec3 at = uEye + rayDirection * ((float(place) + 0.5) * stride);
+		float thick = uShaftAir + (uShaftSmoke != 0 ? smokeAt(at) * ShaftSmoke : 0.0);
+		if (thick <= 0.0) continue;
+		vec3 light = vec3(0.0);
+		if (uFlashlight != 0)
+		{
+			// (The flashlight's cone, as pointLight has it.)
+			float range = uFlashlight == 2 ? 16.0 * 20.0 : 16.0 * 14.0;
+			vec3 fromLight = at - uFlashlightPos;
+			float away = length(fromLight);
+			if (away > 0.5 && away < range)
+			{
+				float cosine = dot(fromLight, uForwardInVoxels) / away;
+				float beam = uFlashlight == 2 ? smoothStep(0.974, 0.990, cosine) + 0.18 * smoothStep(0.914, 0.974, cosine) : smoothStep(0.8, 0.96, cosine);
+				float falloff = 1.0 - (uFlashlight == 2 ? 0.85 : 1.0) * away / range;
+				// (Not right at the lamp: the air there, all but in the eye, would glare over the corner of the picture.)
+				light += vec3(0.88, 0.93, 1.0) * (beam * falloff * falloff * smoothStep(16.0, 96.0, away));
+			}
+		}
+		for (int flare = 0; flare < uFlareCount; ++flare)
+		{
+			float near = max(0.0, 1.0 - distance(uFlares[flare].xyz, at) / FlareReach);
+			light += vec3(1.0, 0.45, 0.3) * (near * near * uFlares[flare].w * uFlareFlicker[flare]);
+		}
+		if (night > 0.3)
+		{
+			for (int lamp = 0; lamp < uLampCount; ++lamp)
+			{
+				float near = max(0.0, 1.0 - distance(uLamps[lamp].xyz, at) / LampReach);
+				light += vec3(1.0, 0.9, 0.72) * (near * near * uLamps[lamp].w * night * 0.6);
+			}
+		}
+#ifdef COLORED_LIGHTS
+		for (int colored = 0; colored < uColorLightCount; ++colored)
+		{
+			float near = max(0.0, 1.0 - distance(uColorLightAt[colored].xyz, at) / uColorLightAt[colored].w);
+			light += uColorLightOf[colored].rgb * (near * near * uColorLightOf[colored].w);
+		}
+#endif
+		added += light * (thick * stride);
+	}
+	return min(rgb + added * 255.0, vec3(255.0));
+}
+#endif
+
 /**
  * One ray through this fragment's block of pixels and what it shows.
  * @param offset Where in the block it goes, from the block's middle, in blocks (0, 0: the middle, the CPU's ray).
@@ -1659,6 +1785,9 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 		fullColor = fullColor * 0.7 + vec3(150.0, 180.0, 205.0) * 0.3; // (as the glass table mixes each colour: a little paler and bluer)
 	}
 	rayFullColor = fullColorSet ? fullColor : paletteRgb(color);
+#ifdef LIGHT_SHAFTS
+	rayFullColor = lightShafts(rayFullColor, rayDirection, distanceAlongRay);
+#endif
 	rayColor = color;
 	rayDepth = distanceAlongRay / directionLength;
 	// Whether it shines (a UFO's light counts three times in the bloom).
@@ -1669,7 +1798,7 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 void main()
 {
 #ifdef LATER_RAYS
-	// A second or further ray of the pixel: only where the first rays show an edge or texture: this pixel's full colour
+	// A second or further ray of the pixel: only where the first rays show an edge or fine texture: this pixel's full colour
 	// against its eight neighbours', and its depth. On a flat stretch (most of a picture at a high resolution, where a
 	// voxel covers many pixels) the pixel's first ray is handed on as it is: several rays there would all show the same.
 	ivec2 at = ivec2(gl_FragCoord.xy), last = textureSize(uFirstTrue, 0) - 1;
@@ -1684,7 +1813,9 @@ void main()
 		float besideDepth = texelFetch(uFirstDepth, beside, 0).r;
 		depthStep = max(depthStep, abs(besideDepth - hereDepth) / max(1.0, min(besideDepth, hereDepth)));
 	}
-	if (contrast < FlatContrast && depthStep < 0.03)
+	// (How many voxels wide the pixel is where it hits: under half of one the texture is drawn large.)
+	float pixelSpan = hereDepth * 2.0 * uHalfPlane.x * float(uPixelSize) / float(uViewSize.x);
+	if (contrast < mix(NearContrast, FlatContrast, clamp(pixelSpan * 2.0, 0.0, 1.0)) && depthStep < 0.03)
 	{
 		outColor = texelFetch(uFirstColor, at, 0).r;
 		outDepth = hereDepth;
