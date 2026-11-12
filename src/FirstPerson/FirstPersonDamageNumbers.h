@@ -68,7 +68,8 @@ struct DamageNumber
 	int level;        // the level it was on (the map shows the levels up to the one looked at)
 	int health;       // the health it lost (red)
 	int armor;        // the armour points it took off the side struck (blue)
-	int stun;         // the stun it took (purple); none of the three: a grey 0
+	int stun;         // the stun it took (purple)
+	int shield;       // the points its energy shield lost (white; a mod's shields); none of the four: a grey 0
 	Uint32 start;     // when it was hit (SDL ticks)
 };
 
@@ -77,7 +78,7 @@ class DamageNumbers
 {
 public:
 	/// Notes a hit's numbers (see DamageNumber).
-	void add(const double head[3], int level, int health, int armor, int stun, Uint32 now);
+	void add(const double head[3], int level, int health, int armor, int stun, int shield, Uint32 now);
 	/// Drops the numbers that have had their time; true if any are left.
 	bool update(Uint32 now);
 	/// The numbers showing.
@@ -88,7 +89,7 @@ private:
 
 /// The palette colours the numbers are drawn in: the nearest to a clear red, blue, purple and grey,
 /// and black for their outline.
-struct DamageNumberColors { Uint8 health, armor, stun, none, outline; };
+struct DamageNumberColors { Uint8 health, armor, stun, shield, none, outline; };
 DamageNumberColors damageNumberColors(const SDL_Color *palette);
 
 /// Where a number's point is on the screen: the column it's centred on and the row it rises from

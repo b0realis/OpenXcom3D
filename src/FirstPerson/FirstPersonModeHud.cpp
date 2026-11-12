@@ -2655,8 +2655,9 @@ bool FirstPersonMode::clearLineOfFire(BattleUnit *viewer, BattleUnit *enemy) con
  * @param healthLost The health it lost.
  * @param armorLost The armour points it lost (the side struck).
  * @param stunTaken The stun it took.
+ * @param shieldLost The points its energy shield lost (a mod's, see FirstPerson::shieldPoints).
  */
-void FirstPersonMode::unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken)
+void FirstPersonMode::unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost)
 {
 	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
 	if (!mode || !Options::fpsDamageNumbers || !unit)
@@ -2677,7 +2678,7 @@ void FirstPersonMode::unitDamaged(BattlescapeState *state, const BattleUnit *uni
 	const int size = unit->getArmor()->getSize();
 	const double head[3] = { position.x * 16.0 + 8.0 * size, position.y * 16.0 + 8.0 * size,
 		position.z * 24.0 - tile->getTerrainLevel() + (lying ? 4.0 : unit->getFloatHeight() + unit->getHeight() + 2.0) };
-	mode->_damageNumbers.add(head, position.z, healthLost, armorLost, stunTaken, SDL_GetTicks());
+	mode->_damageNumbers.add(head, position.z, healthLost, armorLost, stunTaken, shieldLost, SDL_GetTicks());
 }
 
 /**

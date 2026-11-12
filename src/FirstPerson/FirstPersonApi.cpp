@@ -56,6 +56,8 @@
 #include "../Engine/Game.h"
 #include "../Engine/OptionInfo.h"
 #include "../Engine/Options.h"
+#include "../Battlescape/BattlescapeState.h"
+#include "../Engine/Script.h"
 #include "../Mod/Mod.h"
 #include "../Engine/State.h"
 #include "../Interface/Text.h"
@@ -1289,10 +1291,42 @@ void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefor
  * @param healthLost The health it lost.
  * @param armorLost The armour points it lost (the side struck).
  * @param stunTaken The stun it took.
+ * @param shieldLost The points its energy shield lost (see shieldPoints).
  */
-void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken)
+void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost)
 {
-	FirstPersonMode::unitDamaged(state, unit, healthLost, armorLost, stunTaken);
+	FirstPersonMode::unitDamaged(state, unit, healthLost, armorLost, stunTaken, shieldLost);
+}
+
+/**
+ * The points left in a unit's energy shields (setting "Damage numbers"; a player's report, GitHub
+ * issue #133: a hit a shield took whole showed a 0). The big mods' shields (X-Com Files,
+ * XPiratez) are made by one script, which keeps a shield's points in a tag on the unit (an
+ * armor's shield) and on an item (a shield held), and takes a hit off the left hand's, the right
+ * hand's and then the armor's: the three together are read here, before and after a hit, as the
+ * armour is. A game without those tags has no such shields: 0.
+ * @param state The battlescape screen (null while the battle is being made).
+ * @param unit The unit.
+ * @return The points.
+ */
+int shieldPoints(BattlescapeState *state, const BattleUnit *unit)
+{
+	if (!state || !Options::fpsDamageNumbers)
+	{
+		return 0;
+	}
+	const ScriptGlobal *scripts = state->getGame()->getMod()->getScriptGlobal();
+	const auto unitTag = scripts->getTag<ScriptValues<BattleUnit>::Tag>("Tag.UNIT_ENERGY_SHIELD_HP");
+	const auto itemTag = scripts->getTag<ScriptValues<BattleItem>::Tag>("Tag.ITEM_ENERGY_SHIELD_HP");
+	int points = unitTag ? unit->getScriptValues().get(unitTag) : 0;
+	if (itemTag)
+	{
+		for (const BattleItem *held : { unit->getLeftHandWeapon(), unit->getRightHandWeapon() })
+		{
+			if (held) points += held->getScriptValues().get(itemTag);
+		}
+	}
+	return points;
 }
 
 /**

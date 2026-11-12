@@ -162,7 +162,7 @@ public:
 	/// A round or a blow struck a unit: an enemy in sight it did no harm marks the crosshair.
 	static void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefore, int stunBefore);
 	/// A shot, a blow or a blast hurt a unit (setting "Damage numbers"): its numbers to rise over it, if the squad sees it.
-	static void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken);
+	static void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost);
 	/// Setting "Damage numbers": draws the numbers rising over the units hit on the isometric map.
 	static void drawMapDamageNumbers(BattlescapeState *state, Surface *surface, const Camera *camera);
 	/// Do a shotgun's pellets and a volley's two rounds each land on their own (setting "Each pellet on its own")?

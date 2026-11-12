@@ -87,7 +87,7 @@ const int KeepClearMargin = 16;
 const int DissolveOrder[4][4] = { { 0, 8, 2, 10 }, { 12, 4, 14, 6 }, { 3, 11, 1, 9 }, { 15, 7, 13, 5 } };
 
 /// What a cell of a number's picture is.
-enum NumberCell { CELL_NONE, CELL_OUTLINE, CELL_HEALTH, CELL_ARMOR, CELL_STUN, CELL_NO_HARM };
+enum NumberCell { CELL_NONE, CELL_OUTLINE, CELL_HEALTH, CELL_ARMOR, CELL_STUN, CELL_SHIELD, CELL_NO_HARM };
 
 /// A hit's numbers laid out in the small font, one cell a pixel (scale 1).
 struct NumberPicture
@@ -109,6 +109,7 @@ struct NumberPicture
 NumberPicture numberPicture(const Font *font, const DamageNumber &number)
 {
 	std::vector<std::pair<std::string, NumberCell>> parts;
+	if (number.shield > 0) parts.push_back({ std::to_string(number.shield), CELL_SHIELD }); // (first: the shield is struck first)
 	if (number.health > 0) parts.push_back({ std::to_string(number.health), CELL_HEALTH });
 	if (number.armor > 0) parts.push_back({ std::to_string(number.armor), CELL_ARMOR });
 	if (number.stun > 0) parts.push_back({ std::to_string(number.stun), CELL_STUN });
@@ -196,9 +197,10 @@ Uint8 nearestPaletteColor(const SDL_Color *palette, int red, int green, int blue
  * @param health The health it lost.
  * @param armor The armour points it lost.
  * @param stun The stun it took.
+ * @param shield The points its energy shield lost.
  * @param now The time (SDL ticks).
  */
-void DamageNumbers::add(const double head[3], int level, int health, int armor, int stun, Uint32 now)
+void DamageNumbers::add(const double head[3], int level, int health, int armor, int stun, int shield, Uint32 now)
 {
 	DamageNumber number;
 	std::copy(head, head + 3, number.head);
@@ -206,6 +208,7 @@ void DamageNumbers::add(const double head[3], int level, int health, int armor, 
 	number.health = std::max(0, health);
 	number.armor = std::max(0, armor);
 	number.stun = std::max(0, stun);
+	number.shield = std::max(0, shield);
 	number.start = now;
 	_numbers.push_back(number);
 }
@@ -223,7 +226,8 @@ bool DamageNumbers::update(Uint32 now)
 
 /**
  * The colours the numbers are drawn in, from a palette: the nearest to a clear red (health),
- * blue (armour), purple (stun) and grey (no harm), and to black for their outline.
+ * blue (armour), purple (stun), white (an energy shield) and grey (no harm), and to black for
+ * their outline.
  * @param palette The palette of the surface drawn on.
  * @return The colours.
  */
@@ -233,6 +237,7 @@ DamageNumberColors damageNumberColors(const SDL_Color *palette)
 	colors.health = nearestPaletteColor(palette, 255, 40, 40);
 	colors.armor = nearestPaletteColor(palette, 70, 130, 255);
 	colors.stun = nearestPaletteColor(palette, 190, 80, 230);
+	colors.shield = nearestPaletteColor(palette, 255, 255, 255);
 	colors.none = nearestPaletteColor(palette, 170, 170, 170);
 	colors.outline = nearestPaletteColor(palette, 0, 0, 0);
 	return colors;
@@ -325,7 +330,7 @@ void drawDamageNumber(Surface *surface, const Font *font, const DamageNumber &nu
 	const DamageNumberColors &colors, const float *depthBuffer, double depth)
 {
 	const NumberPicture picture = numberPicture(font, number);
-	const Uint8 cellColors[] = { 0, colors.outline, colors.health, colors.armor, colors.stun, colors.none };
+	const Uint8 cellColors[] = { 0, colors.outline, colors.health, colors.armor, colors.stun, colors.shield, colors.none };
 
 	// How much of it shows: all of it, then dissolving away.
 	const double share = (now - number.start) / (double)DamageNumberLife;

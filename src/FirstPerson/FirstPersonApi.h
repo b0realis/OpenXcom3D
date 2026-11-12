@@ -350,12 +350,16 @@ void reactionFiredAt(BattlescapeState *state, const BattleUnit *unit);
 void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefore, int stunBefore);
 /// Setting "Damage numbers": a shot, a blow or a blast hurt a unit, in either view (TileEngine::hitUnit,
 /// the one place each of them deals its damage, after it): the health it lost, the armour it took off
-/// (the side struck) and the stun it took, to rise over it in 3D and on the map if the squad sees it
-/// (see FirstPersonDamageNumbers.cpp).
-void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken);
+/// (the side struck), the stun it took and what its energy shield lost, to rise over it in 3D and on
+/// the map if the squad sees it (see FirstPersonDamageNumbers.cpp).
+void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost);
 /// Setting "Damage numbers": a unit's armour, all its sides' points together (TileEngine::hitUnit reads
 /// it before and after a hit: what the hit took off the side it struck).
 int armorPoints(const BattleUnit *unit);
+/// Setting "Damage numbers": the points left in a unit's energy shields, as the big mods' shield script
+/// keeps them (X-Com Files, XPiratez): the armor's and those of the items in its hands. 0 in a game
+/// without that script. Read before and after a hit, as the armour is.
+int shieldPoints(BattlescapeState *state, const BattleUnit *unit);
 /// Setting "Damage numbers": draws the numbers rising over the units hit on the isometric map, over
 /// all of it (Map::drawTerrain, last).
 void drawMapDamageNumbers(BattlescapeState *state, Surface *surface, const Camera *camera);
@@ -428,8 +432,9 @@ inline void mapAkimbo(BattlescapeState *, BattleAction &) { }
 inline void reactionAkimbo(BattlescapeState *, BattleAction &) { }
 inline void reactionFiredAt(BattlescapeState *, const BattleUnit *) { }
 inline void unitStruck(BattlescapeState *, const BattleUnit *, int, int) { }
-inline void unitDamaged(BattlescapeState *, const BattleUnit *, int, int, int) { }
+inline void unitDamaged(BattlescapeState *, const BattleUnit *, int, int, int, int) { }
 inline int armorPoints(const BattleUnit *) { return 0; }
+inline int shieldPoints(BattlescapeState *, const BattleUnit *) { return 0; }
 inline void drawMapDamageNumbers(BattlescapeState *, Surface *, const Camera *) { }
 inline void pelletLanded(BattlescapeState *, const Position &, const Position &, int, const BattleItem *, const BattleItem *, bool = true) { }
 inline void roundPassed(BattlescapeState *, const Position &, const Position &) { }

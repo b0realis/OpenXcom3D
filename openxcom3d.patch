@@ -21125,7 +21125,7 @@ index 067c7b3ba..9004c1ea8 100644
  public:
  	/// Creates a new ProjectileFly class
 diff --git a/src/Battlescape/TileEngine.cpp b/src/Battlescape/TileEngine.cpp
-index 6e6846977..1121df39f 100644
+index 6e6846977..f2e42c4b5 100644
 --- a/src/Battlescape/TileEngine.cpp
 +++ b/src/Battlescape/TileEngine.cpp
 @@ -43,6 +43,7 @@
@@ -21212,21 +21212,22 @@ index 6e6846977..1121df39f 100644
  					_save->getBattleGame()->statePushBack(new ProjectileFlyBState(_save->getBattleGame(), action));
  				}
  				return true;
-@@ -3144,11 +3173,13 @@ bool TileEngine::hitUnit(BattleActionAttack attack, BattleUnit *target, const Po
+@@ -3144,11 +3173,14 @@ bool TileEngine::hitUnit(BattleActionAttack attack, BattleUnit *target, const Po
  
  	const int healthOrig = target->getHealth();
  	const int stunLevelOrig = target->getStunlevel();
 +	const int armorOrig = FirstPerson::armorPoints(target); // (OpenXcom3D: setting "Damage numbers", the armour a hit takes off)
++	const int shieldOrig = FirstPerson::shieldPoints(_save->getBattleState(), target); // (and what it takes off a mod's energy shield)
  
  	target->damage(relative, damage, type, _save, attack);
  
  	const int healthDamage = healthOrig - target->getHealth();
  	const int stunDamage = target->getStunlevel() - stunLevelOrig;
-+	FirstPerson::unitDamaged(_save->getBattleState(), target, healthDamage, armorOrig - FirstPerson::armorPoints(target), stunDamage); // (OpenXcom3D: setting "Damage numbers")
++	FirstPerson::unitDamaged(_save->getBattleState(), target, healthDamage, armorOrig - FirstPerson::armorPoints(target), stunDamage, shieldOrig - FirstPerson::shieldPoints(_save->getBattleState(), target)); // (OpenXcom3D: setting "Damage numbers")
  
  	// hit log
  	if (attack.attacker)
-@@ -3229,7 +3260,7 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
+@@ -3229,7 +3261,7 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
  	}
  
  	voxelCheckFlush();
@@ -21235,7 +21236,7 @@ index 6e6846977..1121df39f 100644
  	const int damage = type->getRandomDamage(power);
  	const int tileFinalDamage = type->getTileFinalDamage(type->getRandomDamageForTile(power, damage));
  	if (part >= V_FLOOR && part <= V_OBJECT)
-@@ -3280,9 +3311,18 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
+@@ -3280,9 +3312,18 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
  			}
  			const int sz = bu->getArmor()->getSize() * 8;
  			const Position target = bu->getPosition().toVoxel() + Position(sz,sz, bu->getFloatHeight() - tile->getTerrainLevel());
@@ -21255,7 +21256,7 @@ index 6e6846977..1121df39f 100644
  			if (bu->getFire())
  			{
  				effectGenerated = 2;
-@@ -3512,6 +3552,7 @@ void TileEngine::explode(BattleActionAttack attack, Position center, int power,
+@@ -3512,6 +3553,7 @@ void TileEngine::explode(BattleActionAttack attack, Position center, int power,
  	// now detonate the tiles affected by explosion
  	if (type->ToTile > 0.0f)
  	{
@@ -21263,7 +21264,7 @@ index 6e6846977..1121df39f 100644
  		for (auto& pair : tilesAffected)
  		{
  			if (detonate(pair.first, pair.second))
-@@ -4360,6 +4401,15 @@ int TileEngine::calculateLineTile(Position origin, Position target, std::vector<
+@@ -4360,6 +4402,15 @@ int TileEngine::calculateLineTile(Position origin, Position target, std::vector<
  VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool storeTrajectory, std::vector<Position> *trajectory, BattleUnit *excludeUnit, BattleUnit *excludeAllBut, bool onlyVisible)
  {
  	VoxelType result;
@@ -21279,7 +21280,7 @@ index 6e6846977..1121df39f 100644
  	bool excludeAllUnits = false;
  	if (_save->isBeforeGame())
  	{
-@@ -4379,7 +4429,7 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
+@@ -4379,7 +4430,7 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
  			{
  				if (trajectory)
  				{ // store the position of impact
@@ -21288,7 +21289,7 @@ index 6e6846977..1121df39f 100644
  				}
  				return true;
  			}
-@@ -4393,13 +4443,16 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
+@@ -4393,13 +4444,16 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
  			{
  				if (trajectory != 0)
  				{ // store the position of impact
@@ -21306,7 +21307,7 @@ index 6e6846977..1121df39f 100644
  	if (hit)
  	{
  		return result;
-@@ -4422,6 +4475,10 @@ int TileEngine::calculateParabolaVoxel(Position origin, Position target, bool st
+@@ -4422,6 +4476,10 @@ int TileEngine::calculateParabolaVoxel(Position origin, Position target, bool st
  {
  	if (target == origin) return V_EMPTY;//just in case
  
@@ -21317,7 +21318,7 @@ index 6e6846977..1121df39f 100644
  	int result = V_EMPTY;
  	Position lastPosition = origin;
  	Position nextPosition = lastPosition;
-@@ -4526,7 +4583,7 @@ bool TileEngine::isVoxelVisible(Position voxel)
+@@ -4526,7 +4584,7 @@ bool TileEngine::isVoxelVisible(Position voxel)
   * @param excludeAllBut If set, the only unit to be considered for ray hits.
   * @return The objectnumber(0-3) or unit(4) or out of map (5) or -1 (hit nothing).
   */
@@ -21326,7 +21327,7 @@ index 6e6846977..1121df39f 100644
  {
  	if (voxel.x < 0 || voxel.y < 0 || voxel.z < 0) //preliminary out of map
  	{
-@@ -4552,8 +4609,20 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
+@@ -4552,8 +4610,20 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
  		_cacheTileBelow = tileBelow;
   	}
  
@@ -21347,7 +21348,7 @@ index 6e6846977..1121df39f 100644
  		return V_EMPTY;
  	}
  
-@@ -4584,12 +4653,21 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
+@@ -4584,12 +4654,21 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
  		}
  	}
  
@@ -21369,7 +21370,7 @@ index 6e6846977..1121df39f 100644
  			Position tilepos;
  			Position unitpos = unit->getPosition();
  			int terrainHeight = 0;
-@@ -5383,7 +5461,13 @@ bool TileEngine::validMeleeRange(Position pos, int direction, BattleUnit *attack
+@@ -5383,7 +5462,13 @@ bool TileEngine::validMeleeRange(Position pos, int direction, BattleUnit *attack
  						Position originVoxel = Position(origin->getPosition().toVoxel())
  							+ Position(8,8,attacker->getHeight() + attacker->getFloatHeight() - 4 -origin->getTerrainLevel() + meleeOriginVoxelVerticalOffset);
  						Position targetVoxel;
@@ -21384,7 +21385,7 @@ index 6e6846977..1121df39f 100644
  						{
  							if (dest)
  							{
-@@ -5705,11 +5789,21 @@ bool TileEngine::validateThrow(BattleAction &action, Position originVoxel, Posit
+@@ -5705,11 +5790,21 @@ bool TileEngine::validateThrow(BattleAction &action, Position originVoxel, Posit
  	{
  		trajectory.clear();
  		test = calculateParabolaVoxel(originVoxel, targetVoxel, true, &trajectory, action.actor, curvature, Position(0,0,0));
@@ -21407,7 +21408,7 @@ index 6e6846977..1121df39f 100644
  		{
  			if (voxelType)
  			{
-@@ -5867,6 +5961,8 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
+@@ -5867,6 +5962,8 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
  					originVoxel.z--;
  				}
  				originVoxel.z -= 4;
@@ -21416,7 +21417,7 @@ index 6e6846977..1121df39f 100644
  			}
  		}
  		int direction = getDirectionTo(origin, action.target);
-@@ -5891,6 +5987,15 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
+@@ -5891,6 +5988,15 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
  			originVoxel.y += ((2 * dirYshift[direction] + dirYshift[(direction + 1) % 8]) * action.actor->getArmor()->getSize() + 1) / 3;
  			break;
  		};
@@ -23153,10 +23154,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..cdcd59f2f
+index 000000000..c7a4625cd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1479 @@
+@@ -0,0 +1,1513 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -23215,6 +23216,8 @@ index 000000000..cdcd59f2f
 +#include "../Engine/Game.h"
 +#include "../Engine/OptionInfo.h"
 +#include "../Engine/Options.h"
++#include "../Battlescape/BattlescapeState.h"
++#include "../Engine/Script.h"
 +#include "../Mod/Mod.h"
 +#include "../Engine/State.h"
 +#include "../Interface/Text.h"
@@ -24448,10 +24451,42 @@ index 000000000..cdcd59f2f
 + * @param healthLost The health it lost.
 + * @param armorLost The armour points it lost (the side struck).
 + * @param stunTaken The stun it took.
++ * @param shieldLost The points its energy shield lost (see shieldPoints).
 + */
-+void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken)
++void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost)
 +{
-+	FirstPersonMode::unitDamaged(state, unit, healthLost, armorLost, stunTaken);
++	FirstPersonMode::unitDamaged(state, unit, healthLost, armorLost, stunTaken, shieldLost);
++}
++
++/**
++ * The points left in a unit's energy shields (setting "Damage numbers"; a player's report, GitHub
++ * issue #133: a hit a shield took whole showed a 0). The big mods' shields (X-Com Files,
++ * XPiratez) are made by one script, which keeps a shield's points in a tag on the unit (an
++ * armor's shield) and on an item (a shield held), and takes a hit off the left hand's, the right
++ * hand's and then the armor's: the three together are read here, before and after a hit, as the
++ * armour is. A game without those tags has no such shields: 0.
++ * @param state The battlescape screen (null while the battle is being made).
++ * @param unit The unit.
++ * @return The points.
++ */
++int shieldPoints(BattlescapeState *state, const BattleUnit *unit)
++{
++	if (!state || !Options::fpsDamageNumbers)
++	{
++		return 0;
++	}
++	const ScriptGlobal *scripts = state->getGame()->getMod()->getScriptGlobal();
++	const auto unitTag = scripts->getTag<ScriptValues<BattleUnit>::Tag>("Tag.UNIT_ENERGY_SHIELD_HP");
++	const auto itemTag = scripts->getTag<ScriptValues<BattleItem>::Tag>("Tag.ITEM_ENERGY_SHIELD_HP");
++	int points = unitTag ? unit->getScriptValues().get(unitTag) : 0;
++	if (itemTag)
++	{
++		for (const BattleItem *held : { unit->getLeftHandWeapon(), unit->getRightHandWeapon() })
++		{
++			if (held) points += held->getScriptValues().get(itemTag);
++		}
++	}
++	return points;
 +}
 +
 +/**
@@ -24638,10 +24673,10 @@ index 000000000..cdcd59f2f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..338c2d302
+index 000000000..c7a46048b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,481 @@
+@@ -0,0 +1,486 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -24994,12 +25029,16 @@ index 000000000..338c2d302
 +void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefore, int stunBefore);
 +/// Setting "Damage numbers": a shot, a blow or a blast hurt a unit, in either view (TileEngine::hitUnit,
 +/// the one place each of them deals its damage, after it): the health it lost, the armour it took off
-+/// (the side struck) and the stun it took, to rise over it in 3D and on the map if the squad sees it
-+/// (see FirstPersonDamageNumbers.cpp).
-+void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken);
++/// (the side struck), the stun it took and what its energy shield lost, to rise over it in 3D and on
++/// the map if the squad sees it (see FirstPersonDamageNumbers.cpp).
++void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost);
 +/// Setting "Damage numbers": a unit's armour, all its sides' points together (TileEngine::hitUnit reads
 +/// it before and after a hit: what the hit took off the side it struck).
 +int armorPoints(const BattleUnit *unit);
++/// Setting "Damage numbers": the points left in a unit's energy shields, as the big mods' shield script
++/// keeps them (X-Com Files, XPiratez): the armor's and those of the items in its hands. 0 in a game
++/// without that script. Read before and after a hit, as the armour is.
++int shieldPoints(BattlescapeState *state, const BattleUnit *unit);
 +/// Setting "Damage numbers": draws the numbers rising over the units hit on the isometric map, over
 +/// all of it (Map::drawTerrain, last).
 +void drawMapDamageNumbers(BattlescapeState *state, Surface *surface, const Camera *camera);
@@ -25072,8 +25111,9 @@ index 000000000..338c2d302
 +inline void reactionAkimbo(BattlescapeState *, BattleAction &) { }
 +inline void reactionFiredAt(BattlescapeState *, const BattleUnit *) { }
 +inline void unitStruck(BattlescapeState *, const BattleUnit *, int, int) { }
-+inline void unitDamaged(BattlescapeState *, const BattleUnit *, int, int, int) { }
++inline void unitDamaged(BattlescapeState *, const BattleUnit *, int, int, int, int) { }
 +inline int armorPoints(const BattleUnit *) { return 0; }
++inline int shieldPoints(BattlescapeState *, const BattleUnit *) { return 0; }
 +inline void drawMapDamageNumbers(BattlescapeState *, Surface *, const Camera *) { }
 +inline void pelletLanded(BattlescapeState *, const Position &, const Position &, int, const BattleItem *, const BattleItem *, bool = true) { }
 +inline void roundPassed(BattlescapeState *, const Position &, const Position &) { }
@@ -25733,10 +25773,10 @@ index 000000000..64df06a0f
 +}
 diff --git a/src/FirstPerson/FirstPersonDamageNumbers.cpp b/src/FirstPerson/FirstPersonDamageNumbers.cpp
 new file mode 100644
-index 000000000..6f19b3900
+index 000000000..f9a3a85a0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonDamageNumbers.cpp
-@@ -0,0 +1,364 @@
+@@ -0,0 +1,369 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -25826,7 +25866,7 @@ index 000000000..6f19b3900
 +const int DissolveOrder[4][4] = { { 0, 8, 2, 10 }, { 12, 4, 14, 6 }, { 3, 11, 1, 9 }, { 15, 7, 13, 5 } };
 +
 +/// What a cell of a number's picture is.
-+enum NumberCell { CELL_NONE, CELL_OUTLINE, CELL_HEALTH, CELL_ARMOR, CELL_STUN, CELL_NO_HARM };
++enum NumberCell { CELL_NONE, CELL_OUTLINE, CELL_HEALTH, CELL_ARMOR, CELL_STUN, CELL_SHIELD, CELL_NO_HARM };
 +
 +/// A hit's numbers laid out in the small font, one cell a pixel (scale 1).
 +struct NumberPicture
@@ -25848,6 +25888,7 @@ index 000000000..6f19b3900
 +NumberPicture numberPicture(const Font *font, const DamageNumber &number)
 +{
 +	std::vector<std::pair<std::string, NumberCell>> parts;
++	if (number.shield > 0) parts.push_back({ std::to_string(number.shield), CELL_SHIELD }); // (first: the shield is struck first)
 +	if (number.health > 0) parts.push_back({ std::to_string(number.health), CELL_HEALTH });
 +	if (number.armor > 0) parts.push_back({ std::to_string(number.armor), CELL_ARMOR });
 +	if (number.stun > 0) parts.push_back({ std::to_string(number.stun), CELL_STUN });
@@ -25935,9 +25976,10 @@ index 000000000..6f19b3900
 + * @param health The health it lost.
 + * @param armor The armour points it lost.
 + * @param stun The stun it took.
++ * @param shield The points its energy shield lost.
 + * @param now The time (SDL ticks).
 + */
-+void DamageNumbers::add(const double head[3], int level, int health, int armor, int stun, Uint32 now)
++void DamageNumbers::add(const double head[3], int level, int health, int armor, int stun, int shield, Uint32 now)
 +{
 +	DamageNumber number;
 +	std::copy(head, head + 3, number.head);
@@ -25945,6 +25987,7 @@ index 000000000..6f19b3900
 +	number.health = std::max(0, health);
 +	number.armor = std::max(0, armor);
 +	number.stun = std::max(0, stun);
++	number.shield = std::max(0, shield);
 +	number.start = now;
 +	_numbers.push_back(number);
 +}
@@ -25962,7 +26005,8 @@ index 000000000..6f19b3900
 +
 +/**
 + * The colours the numbers are drawn in, from a palette: the nearest to a clear red (health),
-+ * blue (armour), purple (stun) and grey (no harm), and to black for their outline.
++ * blue (armour), purple (stun), white (an energy shield) and grey (no harm), and to black for
++ * their outline.
 + * @param palette The palette of the surface drawn on.
 + * @return The colours.
 + */
@@ -25972,6 +26016,7 @@ index 000000000..6f19b3900
 +	colors.health = nearestPaletteColor(palette, 255, 40, 40);
 +	colors.armor = nearestPaletteColor(palette, 70, 130, 255);
 +	colors.stun = nearestPaletteColor(palette, 190, 80, 230);
++	colors.shield = nearestPaletteColor(palette, 255, 255, 255);
 +	colors.none = nearestPaletteColor(palette, 170, 170, 170);
 +	colors.outline = nearestPaletteColor(palette, 0, 0, 0);
 +	return colors;
@@ -26064,7 +26109,7 @@ index 000000000..6f19b3900
 +	const DamageNumberColors &colors, const float *depthBuffer, double depth)
 +{
 +	const NumberPicture picture = numberPicture(font, number);
-+	const Uint8 cellColors[] = { 0, colors.outline, colors.health, colors.armor, colors.stun, colors.none };
++	const Uint8 cellColors[] = { 0, colors.outline, colors.health, colors.armor, colors.stun, colors.shield, colors.none };
 +
 +	// How much of it shows: all of it, then dissolving away.
 +	const double share = (now - number.start) / (double)DamageNumberLife;
@@ -26103,10 +26148,10 @@ index 000000000..6f19b3900
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonDamageNumbers.h b/src/FirstPerson/FirstPersonDamageNumbers.h
 new file mode 100644
-index 000000000..989a6a6fa
+index 000000000..417029f4d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonDamageNumbers.h
-@@ -0,0 +1,120 @@
+@@ -0,0 +1,121 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -26177,7 +26222,8 @@ index 000000000..989a6a6fa
 +	int level;        // the level it was on (the map shows the levels up to the one looked at)
 +	int health;       // the health it lost (red)
 +	int armor;        // the armour points it took off the side struck (blue)
-+	int stun;         // the stun it took (purple); none of the three: a grey 0
++	int stun;         // the stun it took (purple)
++	int shield;       // the points its energy shield lost (white; a mod's shields); none of the four: a grey 0
 +	Uint32 start;     // when it was hit (SDL ticks)
 +};
 +
@@ -26186,7 +26232,7 @@ index 000000000..989a6a6fa
 +{
 +public:
 +	/// Notes a hit's numbers (see DamageNumber).
-+	void add(const double head[3], int level, int health, int armor, int stun, Uint32 now);
++	void add(const double head[3], int level, int health, int armor, int stun, int shield, Uint32 now);
 +	/// Drops the numbers that have had their time; true if any are left.
 +	bool update(Uint32 now);
 +	/// The numbers showing.
@@ -26197,7 +26243,7 @@ index 000000000..989a6a6fa
 +
 +/// The palette colours the numbers are drawn in: the nearest to a clear red, blue, purple and grey,
 +/// and black for their outline.
-+struct DamageNumberColors { Uint8 health, armor, stun, none, outline; };
++struct DamageNumberColors { Uint8 health, armor, stun, shield, none, outline; };
 +DamageNumberColors damageNumberColors(const SDL_Color *palette);
 +
 +/// Where a number's point is on the screen: the column it's centred on and the row it rises from
@@ -33498,7 +33544,7 @@ index 000000000..a145c4fac
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..23c712bd1
+index 000000000..33695af0e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
 @@ -0,0 +1,1362 @@
@@ -33666,7 +33712,7 @@ index 000000000..23c712bd1
 +	/// A round or a blow struck a unit: an enemy in sight it did no harm marks the crosshair.
 +	static void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefore, int stunBefore);
 +	/// A shot, a blow or a blast hurt a unit (setting "Damage numbers"): its numbers to rise over it, if the squad sees it.
-+	static void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken);
++	static void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost);
 +	/// Setting "Damage numbers": draws the numbers rising over the units hit on the isometric map.
 +	static void drawMapDamageNumbers(BattlescapeState *state, Surface *surface, const Camera *camera);
 +	/// Do a shotgun's pellets and a volley's two rounds each land on their own (setting "Each pellet on its own")?
@@ -35786,10 +35832,10 @@ index 000000000..e75c80475
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..84584138c
+index 000000000..34f1ba2ed
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,2742 @@
+@@ -0,0 +1,2743 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -38447,8 +38493,9 @@ index 000000000..84584138c
 + * @param healthLost The health it lost.
 + * @param armorLost The armour points it lost (the side struck).
 + * @param stunTaken The stun it took.
++ * @param shieldLost The points its energy shield lost (a mod's, see FirstPerson::shieldPoints).
 + */
-+void FirstPersonMode::unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken)
++void FirstPersonMode::unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost)
 +{
 +	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
 +	if (!mode || !Options::fpsDamageNumbers || !unit)
@@ -38469,7 +38516,7 @@ index 000000000..84584138c
 +	const int size = unit->getArmor()->getSize();
 +	const double head[3] = { position.x * 16.0 + 8.0 * size, position.y * 16.0 + 8.0 * size,
 +		position.z * 24.0 - tile->getTerrainLevel() + (lying ? 4.0 : unit->getFloatHeight() + unit->getHeight() + 2.0) };
-+	mode->_damageNumbers.add(head, position.z, healthLost, armorLost, stunTaken, SDL_GetTicks());
++	mode->_damageNumbers.add(head, position.z, healthLost, armorLost, stunTaken, shieldLost, SDL_GetTicks());
 +}
 +
 +/**
@@ -73989,6 +74036,19 @@ index af88e1829..760a449f2 100644
  	{
  		return;
  	}
+diff --git a/src/Savegame/BattleItem.h b/src/Savegame/BattleItem.h
+index 0a825f760..a753621bb 100644
+--- a/src/Savegame/BattleItem.h
++++ b/src/Savegame/BattleItem.h
+@@ -67,6 +67,8 @@ private:
+ 	ScriptValues<BattleItem> _scriptValues;
+ 
+ public:
++	/// The values the mod's scripts keep on the item (OpenXcom3D: read for a script-made shield's points).
++	const ScriptValues<BattleItem> &getScriptValues() const { return _scriptValues; }
+ 
+ 	/// Name of class used in script.
+ 	static constexpr const char *ScriptName = "BattleItem";
 diff --git a/src/Savegame/BattleUnit.cpp b/src/Savegame/BattleUnit.cpp
 index 46fbf1ffd..58f8bdd5f 100644
 --- a/src/Savegame/BattleUnit.cpp
@@ -74063,7 +74123,7 @@ index 46fbf1ffd..58f8bdd5f 100644
  	UnitBodyPart bodypart = BODYPART_TORSO;
  
 diff --git a/src/Savegame/BattleUnit.h b/src/Savegame/BattleUnit.h
-index ecc040fb6..cd4e7d546 100644
+index ecc040fb6..e4005c700 100644
 --- a/src/Savegame/BattleUnit.h
 +++ b/src/Savegame/BattleUnit.h
 @@ -117,6 +117,9 @@ private:
@@ -74076,7 +74136,19 @@ index ecc040fb6..cd4e7d546 100644
  	int _scannedTurn;
  	int _customMarker;
  	int _kills;
-@@ -563,6 +566,15 @@ public:
+@@ -194,6 +197,11 @@ private:
+ 	bool _skillMenuCheck;
+ 	ScriptValues<BattleUnit> _scriptValues;
+ 
++public:
++	/// The values the mod's scripts keep on the unit (OpenXcom3D: read for a script-made shield's points).
++	const ScriptValues<BattleUnit> &getScriptValues() const { return _scriptValues; }
++private:
++
+ 	/// Calculate stat improvement.
+ 	int improveStat(int exp) const;
+ 	/// Helper function initializing recolor vector.
+@@ -563,6 +571,15 @@ public:
  	void stimulant (int energy, int stun, int mana);
  	/// Get motion points for the motion scanner.
  	int getMotionPoints() const;
