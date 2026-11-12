@@ -124,7 +124,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..31b4db7e6
+index 000000000..12194b5b6
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,557 @@
@@ -169,7 +169,7 @@ index 000000000..31b4db7e6
 +  STR_FPS_COMPASS: "Compass"
 +  STR_FPS_COMPASS_DESC: "A compass at the top right (with Turning costs TU: what looking further costs)."
 +  STR_FPS_COMPASS_COSTS: "Compass: step costs"
-+  STR_FPS_COMPASS_COSTS_DESC: "Round the compass, the time units a step each way costs now (the top is forward); a level up or down by the climb arrows, and what a turn costs under it. Yellow or red on costly ground, grey when you can't pay."
++  STR_FPS_COMPASS_COSTS_DESC: "Round the compass, the time units a step each way costs now (the top is forward); a level up or down by the climb arrows, and what a turn costs under it. Light blue for a sidestep, yellow or red on costly ground, grey when you can't pay."
 +  STR_FPS_COMPASS_TURN: "TURN {0} TU"
 +  STR_FPS_COMPASS_NO_TU: "NO TU"
 +  STR_FPS_SPRINT: "SPRINT"
@@ -687,7 +687,7 @@ index 000000000..31b4db7e6
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..2a23b57ef
+index 000000000..dd482cd4c
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,557 @@
@@ -732,7 +732,7 @@ index 000000000..2a23b57ef
 +  STR_FPS_COMPASS: "Compass"
 +  STR_FPS_COMPASS_DESC: "A compass at the top right (with Turning costs TU: what looking further costs)."
 +  STR_FPS_COMPASS_COSTS: "Compass: step costs"
-+  STR_FPS_COMPASS_COSTS_DESC: "Round the compass, the time units a step each way costs now (the top is forward); a level up or down by the climb arrows, and what a turn costs under it. Yellow or red on costly ground, grey when you can't pay."
++  STR_FPS_COMPASS_COSTS_DESC: "Round the compass, the time units a step each way costs now (the top is forward); a level up or down by the climb arrows, and what a turn costs under it. Light blue for a sidestep, yellow or red on costly ground, grey when you can't pay."
 +  STR_FPS_COMPASS_TURN: "TURN {0} TU"
 +  STR_FPS_COMPASS_NO_TU: "NO TU"
 +  STR_FPS_SPRINT: "SPRINT"
@@ -33465,7 +33465,7 @@ index 000000000..a145c4fac
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..fde930881
+index 000000000..d9e22118d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
 @@ -0,0 +1,1360 @@
@@ -33930,11 +33930,11 @@ index 000000000..fde930881
 +
 +	Text *_compassCosts[8] = {};                 // round it, what a step each way costs (setting "Compass: step costs"), going round with the dial
 +	Text *_climbCosts[2] = {};                   // left of the climb arrows, what a level up and a level down cost
-+	int _compassCostsShown[10];                  // what those ten show: the time units times 4 plus the tone (see StepTone); -1 nothing
++	int _compassCostsShown[10];                  // what those ten show: the time units times ToneCount plus the tone (see StepTone); -1 nothing
 +	bool _compassCostsPlaced = false;            // the compass is laid out with room for them (see placeCompass)
 +
-+	/// How a step's cost is written round the compass: plain, onto dear ground, onto very dear ground, or more than the soldier can pay.
-+	enum StepTone { TONE_PLAIN, TONE_DEAR, TONE_VERY_DEAR, TONE_CANT_PAY };
++	/// How a step's cost is written round the compass: plain, a sidestep, onto dear ground, onto very dear ground, or more than the soldier can pay.
++	enum StepTone { TONE_PLAIN, TONE_SIDESTEP, TONE_DEAR, TONE_VERY_DEAR, TONE_CANT_PAY, ToneCount };
 +	/// Puts the compass and what goes with it where they belong, with or without the room for the steps' costs.
 +	void placeCompass();
 +	/// Shows what a step each way, and a level up or down, would cost (setting "Compass: step costs").
@@ -35751,10 +35751,10 @@ index 000000000..e75c80475
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..e3ef89a99
+index 000000000..84584138c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,2740 @@
+@@ -0,0 +1,2742 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -36029,7 +36029,8 @@ index 000000000..e3ef89a99
 + * a run (sprinting). So the number at the top is the step forward, and those at the sides the
 + * steps to the side. Left of the climb arrows, what a level up and a level down cost (a lift, a
 + * ladder, flying). No number where the step can't be made. A step onto dear ground is yellow,
-+ * onto very dear ground red (see moveCostShown), and one the soldier can't pay for grey.
++ * onto very dear ground red (see moveCostShown), and one the soldier can't pay for grey; a
++ * sidestep's (the dearer step that keeps the facing) is light blue, where none of those apply.
 + * Only in the player's turn; while a step is walked the numbers stay as they were.
 + * @param unit The soldier the view looks through, or null to hide the numbers.
 + * @param playerTurn It's the player's turn.
@@ -36056,7 +36057,7 @@ index 000000000..e3ef89a99
 +			int time = 0;
 +			StepTone tone = TONE_PLAIN;
 +			const bool wayOpen = step || (move == Pathfinding::DIR_UP ? up : down);
-+			shown = wayOpen && moveCostShown(unit, move, time, tone) ? time * 4 + tone : -1;
++			shown = wayOpen && moveCostShown(unit, move, time, tone) ? time * ToneCount + tone : -1;
 +		}
 +		if (shown != _compassCostsShown[move])
 +		{
@@ -36064,10 +36065,11 @@ index 000000000..e3ef89a99
 +			if (shown >= 0)
 +			{
 +				const SDL_Color *palette = _state->getPalette();
-+				const int tone = shown % 4;
++				const int tone = shown % ToneCount;
 +				text->setColor(tone == TONE_DEAR ? textColor(palette, 250, 220, 70) : tone == TONE_VERY_DEAR ? textColor(palette, 240, 70, 60)
-+					: tone == TONE_CANT_PAY ? textColor(palette, 120, 120, 130) : textColor(palette, 225, 225, 235));
-+				text->setText(std::to_string(shown / 4));
++					: tone == TONE_CANT_PAY ? textColor(palette, 120, 120, 130) : tone == TONE_SIDESTEP ? textColor(palette, 110, 200, 250)
++					: textColor(palette, 225, 225, 235));
++				text->setText(std::to_string(shown / ToneCount));
 +			}
 +		}
 +		text->setVisible(shown >= 0);
@@ -36132,7 +36134,7 @@ index 000000000..e3ef89a99
 +	}
 +	// Dearer than the same step over plain ground would be?
 +	const int plain = plainStepTime(unit, start, direction, price.pos, sidestep, !sidestep && runsStep(unit, start, direction));
-+	tone = price.cost.time * 100 >= plain * CompassCostDearPercent ? TONE_VERY_DEAR : price.cost.time > plain ? TONE_DEAR : TONE_PLAIN;
++	tone = price.cost.time * 100 >= plain * CompassCostDearPercent ? TONE_VERY_DEAR : price.cost.time > plain ? TONE_DEAR : sidestep ? TONE_SIDESTEP : TONE_PLAIN;
 +	return true;
 +}
 +

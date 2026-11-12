@@ -272,7 +272,8 @@ void FirstPersonMode::updateCompass(BattleUnit *unit, bool playerTurn)
  * a run (sprinting). So the number at the top is the step forward, and those at the sides the
  * steps to the side. Left of the climb arrows, what a level up and a level down cost (a lift, a
  * ladder, flying). No number where the step can't be made. A step onto dear ground is yellow,
- * onto very dear ground red (see moveCostShown), and one the soldier can't pay for grey.
+ * onto very dear ground red (see moveCostShown), and one the soldier can't pay for grey; a
+ * sidestep's (the dearer step that keeps the facing) is light blue, where none of those apply.
  * Only in the player's turn; while a step is walked the numbers stay as they were.
  * @param unit The soldier the view looks through, or null to hide the numbers.
  * @param playerTurn It's the player's turn.
@@ -299,7 +300,7 @@ void FirstPersonMode::updateCompassCosts(BattleUnit *unit, bool playerTurn, int 
 			int time = 0;
 			StepTone tone = TONE_PLAIN;
 			const bool wayOpen = step || (move == Pathfinding::DIR_UP ? up : down);
-			shown = wayOpen && moveCostShown(unit, move, time, tone) ? time * 4 + tone : -1;
+			shown = wayOpen && moveCostShown(unit, move, time, tone) ? time * ToneCount + tone : -1;
 		}
 		if (shown != _compassCostsShown[move])
 		{
@@ -307,10 +308,11 @@ void FirstPersonMode::updateCompassCosts(BattleUnit *unit, bool playerTurn, int 
 			if (shown >= 0)
 			{
 				const SDL_Color *palette = _state->getPalette();
-				const int tone = shown % 4;
+				const int tone = shown % ToneCount;
 				text->setColor(tone == TONE_DEAR ? textColor(palette, 250, 220, 70) : tone == TONE_VERY_DEAR ? textColor(palette, 240, 70, 60)
-					: tone == TONE_CANT_PAY ? textColor(palette, 120, 120, 130) : textColor(palette, 225, 225, 235));
-				text->setText(std::to_string(shown / 4));
+					: tone == TONE_CANT_PAY ? textColor(palette, 120, 120, 130) : tone == TONE_SIDESTEP ? textColor(palette, 110, 200, 250)
+					: textColor(palette, 225, 225, 235));
+				text->setText(std::to_string(shown / ToneCount));
 			}
 		}
 		text->setVisible(shown >= 0);
@@ -375,7 +377,7 @@ bool FirstPersonMode::moveCostShown(BattleUnit *unit, int direction, int &time, 
 	}
 	// Dearer than the same step over plain ground would be?
 	const int plain = plainStepTime(unit, start, direction, price.pos, sidestep, !sidestep && runsStep(unit, start, direction));
-	tone = price.cost.time * 100 >= plain * CompassCostDearPercent ? TONE_VERY_DEAR : price.cost.time > plain ? TONE_DEAR : TONE_PLAIN;
+	tone = price.cost.time * 100 >= plain * CompassCostDearPercent ? TONE_VERY_DEAR : price.cost.time > plain ? TONE_DEAR : sidestep ? TONE_SIDESTEP : TONE_PLAIN;
 	return true;
 }
 

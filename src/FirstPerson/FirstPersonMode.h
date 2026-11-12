@@ -459,11 +459,11 @@ private:
 
 	Text *_compassCosts[8] = {};                 // round it, what a step each way costs (setting "Compass: step costs"), going round with the dial
 	Text *_climbCosts[2] = {};                   // left of the climb arrows, what a level up and a level down cost
-	int _compassCostsShown[10];                  // what those ten show: the time units times 4 plus the tone (see StepTone); -1 nothing
+	int _compassCostsShown[10];                  // what those ten show: the time units times ToneCount plus the tone (see StepTone); -1 nothing
 	bool _compassCostsPlaced = false;            // the compass is laid out with room for them (see placeCompass)
 
-	/// How a step's cost is written round the compass: plain, onto dear ground, onto very dear ground, or more than the soldier can pay.
-	enum StepTone { TONE_PLAIN, TONE_DEAR, TONE_VERY_DEAR, TONE_CANT_PAY };
+	/// How a step's cost is written round the compass: plain, a sidestep, onto dear ground, onto very dear ground, or more than the soldier can pay.
+	enum StepTone { TONE_PLAIN, TONE_SIDESTEP, TONE_DEAR, TONE_VERY_DEAR, TONE_CANT_PAY, ToneCount };
 	/// Puts the compass and what goes with it where they belong, with or without the room for the steps' costs.
 	void placeCompass();
 	/// Shows what a step each way, and a level up or down, would cost (setting "Compass: step costs").
