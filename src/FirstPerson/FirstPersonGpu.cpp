@@ -646,6 +646,24 @@ struct FirstPersonGpu::State
 	};
 	std::map<std::array<int, 2>, GlowTargets> glowTargets;
 	Gl::UInt compileFragment(const std::string &source, const char *what);
+	// The screen wash after that (see drawWash): its program, the tint tables as a picture, the washed picture by size.
+	Gl::UInt washProgram = 0, tintsTexture = 0;
+	Uint32 tintsSent = 0;
+	struct WashTargets { Gl::UInt framebuffer = 0, texture = 0; };
+	std::map<std::array<int, 2>, WashTargets> washTargets;
+	bool drawWash(const Effects &effects, Gl::UInt colorTexture, Gl::UInt glowTexture, WashTargets *&washed);
+	// The frame put together on the card (see present): its program, its palette as a picture, and by size of view the
+	// pictures the last drawEffects left (the finished colour, its glow, the rays' full and palette colours), the overlay
+	// and the frame.
+	Gl::UInt presentProgram = 0, presentPalette = 0, presentFlameTint = 0;
+	Uint32 presentPaletteSent = 0;
+	struct PresentTargets
+	{
+		Gl::UInt color = 0, glow = 0, rayTrue = 0, rayColor = 0; // what drawEffects left
+		Gl::UInt framebuffer = 0, frame = 0, overlay = 0;
+	};
+	std::map<std::array<int, 2>, PresentTargets> presentTargets;
+	bool present(const Present &frame);
 	bool buildGlow();
 	bool drawGlow(const Effects &effects, const EffectTargets &drawn, GlowTargets *&brightened);
 };
@@ -1877,6 +1895,198 @@ bool FirstPersonGpu::State::drawGlow(const Effects &effects, const EffectTargets
 }
 
 /**
+ * The screen wash over the finished picture (FirstPersonView::applyScreenWash, on the card; see
+ * WashSource), into a picture of its own.
+ * @param colorTexture, glowTexture The picture so far and its glow.
+ * @param washed Set to the washed picture's.
+ */
+bool FirstPersonGpu::State::drawWash(const Effects &effects, Gl::UInt colorTexture, Gl::UInt glowTexture, WashTargets *&washed)
+{
+	if (!washProgram)
+	{
+		washProgram = compileFragment("const float ControlHazeFrom = " + glslFloat(ControlHazeFrom) + ";\n" + WashSource, "the screen wash's shader");
+		if (!washProgram)
+		{
+			return false;
+		}
+		Gl::UseProgram(washProgram);
+		Gl::Uniform1i(Gl::GetUniformLocation(washProgram, "uColor"), 0);
+		Gl::Uniform1i(Gl::GetUniformLocation(washProgram, "uGlow"), 2);
+		Gl::Uniform1i(Gl::GetUniformLocation(washProgram, "uTints"), 7);
+		Gl::GenTextures(1, &tintsTexture);
+		Gl::ActiveTexture(Gl::TEXTURE0 + 7);
+		Gl::BindTexture(Gl::TEXTURE_2D, tintsTexture);
+		Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, 256, 6, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
+		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
+		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
+		tintsSent = ~effects.paletteHash;
+	}
+	WashTargets &target = washTargets[{ effects.width, effects.height }];
+	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
+	if (!target.framebuffer)
+	{
+		Gl::GenFramebuffers(1, &target.framebuffer);
+		Gl::BindFramebuffer(Gl::FRAMEBUFFER, target.framebuffer);
+		Gl::GenTextures(1, &target.texture);
+		Gl::BindTexture(Gl::TEXTURE_2D, target.texture);
+		Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, effects.width, effects.height, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
+		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
+		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
+		Gl::FramebufferTexture2D(Gl::FRAMEBUFFER, Gl::COLOR_ATTACHMENT0, Gl::TEXTURE_2D, target.texture, 0);
+		if (Gl::CheckFramebufferStatus(Gl::FRAMEBUFFER) != Gl::FRAMEBUFFER_COMPLETE)
+		{
+			return false;
+		}
+	}
+	Gl::ActiveTexture(Gl::TEXTURE0 + 7);
+	Gl::BindTexture(Gl::TEXTURE_2D, tintsTexture);
+	if (tintsSent != effects.paletteHash)
+	{
+		for (int row = 0; row < 6; ++row) Gl::TexSubImage2D(Gl::TEXTURE_2D, 0, 0, row, 256, 1, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, effects.tints[row]);
+		tintsSent = effects.paletteHash;
+	}
+	Gl::ActiveTexture(Gl::TEXTURE0);
+	Gl::BindTexture(Gl::TEXTURE_2D, colorTexture);
+	Gl::ActiveTexture(Gl::TEXTURE0 + 2);
+	Gl::BindTexture(Gl::TEXTURE_2D, glowTexture);
+	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
+	Gl::BindFramebuffer(Gl::FRAMEBUFFER, target.framebuffer);
+	const Gl::Enum one[1] = { Gl::COLOR_ATTACHMENT0 };
+	Gl::DrawBuffers(1, one);
+	Gl::Viewport(0, 0, effects.width, effects.height);
+	Gl::UseProgram(washProgram);
+	auto at = [&](const char *name) { return Gl::GetUniformLocation(washProgram, name); };
+	Gl::Uniform2i(at("uViewSize"), effects.width, effects.height);
+	Gl::Uniform1i(at("uNightVision"), effects.nightVision);
+	Gl::Uniform1i(at("uOwnColours"), effects.ownColours ? 1 : 0);
+	Gl::Uniform1f(at("uTintAmount"), effects.tintAmount);
+	Gl::Uniform1f(at("uTintRedShare"), effects.tintRedShare);
+	Gl::Uniform1i(at("uTintRow"), std::clamp(effects.tintKind, 0, 4));
+	Gl::Uniform1f(at("uStaticAmount"), effects.staticAmount);
+	Gl::Uniform1ui(at("uStaticSeed"), effects.staticSeed);
+	Gl::Uniform4i(at("uGreys"), effects.greys[0], effects.greys[1], effects.greys[2], effects.greys[3]);
+	Gl::Uniform1f(at("uVignette"), effects.vignette);
+	Gl::Uniform1f(at("uControlHaze"), effects.controlHaze);
+	Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+	washed = &target;
+	return true;
+}
+
+/**
+ * The frame put together on the card (see PresentSource), from what the last drawEffects for a
+ * view of this size left there and the overlay the CPU drew since; read back if asked, else left
+ * in its texture for a display on this context to show.
+ */
+bool FirstPersonGpu::State::present(const Present &frame)
+{
+	const auto found = presentTargets.find({ frame.width, frame.height });
+	if (found == presentTargets.end() || !found->second.color)
+	{
+		return false;
+	}
+	PresentTargets &kept = found->second;
+	if (!presentProgram)
+	{
+		presentProgram = compileFragment(PresentSource, "the shader that puts the frame together");
+		if (!presentProgram)
+		{
+			return false;
+		}
+		Gl::UseProgram(presentProgram);
+		const char *const names[6] = { "uColor", "uOverlay", "uGlow", "uRayColor", "uRayTrue", "uPalette" };
+		for (int unit = 0; unit < 6; ++unit) Gl::Uniform1i(Gl::GetUniformLocation(presentProgram, names[unit]), unit);
+		Gl::GenTextures(1, &presentPalette);
+		Gl::ActiveTexture(Gl::TEXTURE0 + 5);
+		Gl::BindTexture(Gl::TEXTURE_2D, presentPalette);
+		Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::RGBA8, 256, 1, 0, Gl::RGBA, Gl::UNSIGNED_BYTE, nullptr);
+		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
+		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
+		Gl::Uniform1i(Gl::GetUniformLocation(presentProgram, "uFlameTint"), 6);
+		Gl::GenTextures(1, &presentFlameTint);
+		Gl::ActiveTexture(Gl::TEXTURE0 + 6);
+		Gl::BindTexture(Gl::TEXTURE_2D, presentFlameTint);
+		Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, 256, 1, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
+		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
+		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
+		presentPaletteSent = ~frame.paletteHash;
+	}
+	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
+	if (!kept.framebuffer)
+	{
+		Gl::GenFramebuffers(1, &kept.framebuffer);
+		Gl::BindFramebuffer(Gl::FRAMEBUFFER, kept.framebuffer);
+		Gl::GenTextures(1, &kept.frame);
+		Gl::BindTexture(Gl::TEXTURE_2D, kept.frame);
+		Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::RGBA8, frame.width, frame.height, 0, Gl::RGBA, Gl::UNSIGNED_BYTE, nullptr);
+		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
+		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
+		Gl::FramebufferTexture2D(Gl::FRAMEBUFFER, Gl::COLOR_ATTACHMENT0, Gl::TEXTURE_2D, kept.frame, 0);
+		Gl::GenTextures(1, &kept.overlay);
+		Gl::BindTexture(Gl::TEXTURE_2D, kept.overlay);
+		Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, frame.width, frame.height, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
+		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
+		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
+		if (Gl::CheckFramebufferStatus(Gl::FRAMEBUFFER) != Gl::FRAMEBUFFER_COMPLETE)
+		{
+			return false;
+		}
+	}
+	const bool full = frame.full && kept.rayTrue && kept.rayColor;
+	const Gl::UInt pictures[5] = { kept.color, kept.overlay, kept.glow, full ? kept.rayColor : kept.color, full ? kept.rayTrue : presentPalette };
+	for (int unit = 0; unit < 5; ++unit)
+	{
+		Gl::ActiveTexture(Gl::TEXTURE0 + unit);
+		Gl::BindTexture(Gl::TEXTURE_2D, pictures[unit]);
+		if (unit == 1)
+		{
+			Gl::PixelStorei(Gl::UNPACK_ROW_LENGTH, frame.overlayPitch);
+			Gl::TexSubImage2D(Gl::TEXTURE_2D, 0, 0, 0, frame.width, frame.height, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, frame.overlay);
+			Gl::PixelStorei(Gl::UNPACK_ROW_LENGTH, 0);
+		}
+	}
+	Gl::ActiveTexture(Gl::TEXTURE0 + 5);
+	Gl::BindTexture(Gl::TEXTURE_2D, presentPalette);
+	if (presentPaletteSent != frame.paletteHash)
+	{
+		Uint8 colors[256 * 4];
+		for (int index = 0; index < 256; ++index)
+		{
+			colors[index * 4] = frame.palette[index].r; colors[index * 4 + 1] = frame.palette[index].g; colors[index * 4 + 2] = frame.palette[index].b; colors[index * 4 + 3] = 255;
+		}
+		Gl::TexSubImage2D(Gl::TEXTURE_2D, 0, 0, 0, 256, 1, Gl::RGBA, Gl::UNSIGNED_BYTE, colors);
+		Gl::ActiveTexture(Gl::TEXTURE0 + 6);
+		Gl::BindTexture(Gl::TEXTURE_2D, presentFlameTint);
+		if (frame.flameTint) Gl::TexSubImage2D(Gl::TEXTURE_2D, 0, 0, 0, 256, 1, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, frame.flameTint);
+		presentPaletteSent = frame.paletteHash;
+	}
+	Gl::ActiveTexture(Gl::TEXTURE0 + 6);
+	Gl::BindTexture(Gl::TEXTURE_2D, presentFlameTint);
+	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
+	Gl::BindFramebuffer(Gl::FRAMEBUFFER, kept.framebuffer);
+	const Gl::Enum one[1] = { Gl::COLOR_ATTACHMENT0 };
+	Gl::DrawBuffers(1, one);
+	Gl::Viewport(0, 0, frame.width, frame.height);
+	Gl::UseProgram(presentProgram);
+	Gl::Uniform1i(Gl::GetUniformLocation(presentProgram, "uFull"), full ? 1 : 0);
+	Gl::Uniform1i(Gl::GetUniformLocation(presentProgram, "uShafts"), frame.shafts ? 1 : 0);
+	Gl::Uniform1f(Gl::GetUniformLocation(presentProgram, "uFlameGlow"), frame.flameTint ? frame.flameGlow : 0.0f);
+	Gl::Uniform2i(Gl::GetUniformLocation(presentProgram, "uViewSize"), frame.width, frame.height);
+	Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+	if (frame.pixels)
+	{
+		readPicture(0, frame.width, frame.height, 2, frame.pixels, frame.width);
+	}
+	Gl::UseProgram(program->id);
+	const Gl::Enum error = Gl::GetError();
+	if (error != Gl::NoError)
+	{
+		Log(LOG_WARNING) << "OpenXcom3D GPU: OpenGL error " << std::hex << error << " putting the frame together";
+		return false;
+	}
+	return true;
+}
+
+/**
  * The units and effects over the rays' pictures (kept on the card by the frame's draw, see
  * Output::keep): the primitives, the sprites' bytes and the bins go up, one picture-wide triangle
  * draws them (see EffectsSource), and the finished colour, depth and glow are read back where the
@@ -2026,6 +2236,12 @@ bool FirstPersonGpu::State::drawEffects(const Effects &effects, const Output &ou
 	{
 		return false;
 	}
+	// The screen wash over that (the picture is then the wash's; the glow stays where it was).
+	WashTargets *washed = nullptr;
+	if (effects.wash && !drawWash(effects, brightened ? brightened->textures[4] : drawn.textures[0], brightened ? brightened->textures[5] : drawn.textures[2], washed))
+	{
+		return false;
+	}
 	if (timing)
 	{
 		Gl::Finish();
@@ -2033,16 +2249,22 @@ bool FirstPersonGpu::State::drawEffects(const Effects &effects, const Output &ou
 		start = std::chrono::steady_clock::now();
 	}
 	// The finished pictures, back to the view.
+	if (washed && effects.readColor)
+	{
+		Gl::BindFramebuffer(Gl::FRAMEBUFFER, washed->framebuffer);
+		readPicture(0, effects.width, effects.height, 0, output.color, output.colorPitch);
+	}
 	if (brightened)
 	{
 		Gl::BindFramebuffer(Gl::FRAMEBUFFER, brightened->framebuffers[4]);
-		readPicture(0, effects.width, effects.height, 0, output.color, output.colorPitch);
+		if (!washed && effects.readColor) readPicture(0, effects.width, effects.height, 0, output.color, output.colorPitch);
 		if (effects.readGlow) readPicture(1, effects.width, effects.height, 0, output.glow, effects.width);
 		Gl::BindFramebuffer(Gl::FRAMEBUFFER, drawn.framebuffer);
 	}
 	else
 	{
-		readPicture(0, effects.width, effects.height, 0, output.color, output.colorPitch);
+		Gl::BindFramebuffer(Gl::FRAMEBUFFER, drawn.framebuffer);
+		if (!washed && effects.readColor) readPicture(0, effects.width, effects.height, 0, output.color, output.colorPitch);
 		if (effects.readGlow) readPicture(2, effects.width, effects.height, 0, output.glow, effects.width);
 	}
 	if (effects.readDepth) readPicture(1, effects.width, effects.height, 1, output.depth, effects.width);
@@ -2061,6 +2283,12 @@ bool FirstPersonGpu::State::drawEffects(const Effects &effects, const Output &ou
 		if (output.trueColor) readPicture(3, rayColumns, rayRows, 2, output.trueColor, rayColumns);
 		if (effects.rayColors) readPicture(0, rayColumns, rayRows, 0, effects.rayColors, rayColumns);
 	}
+	// (What the frame is put together from, if it is, on the card: see present.)
+	PresentTargets &kept = presentTargets[{ effects.width, effects.height }];
+	kept.color = washed ? washed->texture : brightened ? brightened->textures[4] : drawn.textures[0];
+	kept.glow = brightened ? brightened->textures[5] : drawn.textures[2];
+	kept.rayTrue = rayPixelSize == 1 ? rays->second.textures[3] : 0;
+	kept.rayColor = rayPixelSize == 1 ? rays->second.textures[0] : 0;
 	Gl::UseProgram(program->id);
 	if (timing)
 	{
@@ -2190,6 +2418,27 @@ bool FirstPersonGpu::castRays(const Frame &frame, const Output &output, Timing *
 	return drawn;
 }
 
+
+/**
+ * The frame put together on the card (see State::present).
+ */
+bool FirstPersonGpu::present(const Present &frame)
+{
+	State &state = *_state;
+	if (state.failed)
+	{
+		return false;
+	}
+	bool done = false;
+	state.run([&] { done = state.present(frame); });
+	return done;
+}
+
+unsigned FirstPersonGpu::presentedTexture(int width, int height)
+{
+	const auto found = _state->presentTargets.find({ width, height });
+	return found == _state->presentTargets.end() ? 0u : found->second.frame;
+}
 
 /**
  * The depth of the units and effects last drawn for a view of this size: read back when something

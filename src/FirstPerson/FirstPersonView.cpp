@@ -636,17 +636,18 @@ void FirstPersonView::draw()
 	if (_gpuRecording && !_gpuChecking)
 	{
 		PassTimer pass(passTimes, 0);
-		gpuDrawEffects();
+		gpuDrawEffects(); // (the bloom and the screen wash with them)
 	}
 	else
 	{
 		{ PassTimer pass(passTimes, 15); drawLightHalos(); }
+		// Effects on the finished picture (a camera's feed: its bad signal last).
+		{ PassTimer pass(passTimes, 16); applyScreenWash(); }
 		if (_gpuRecording) gpuDrawEffects();
 	}
 	{ PassTimer pass(passTimes, 13); findUnitAtPointer(); }
 	// Effects on the finished picture (a camera's feed: its bad signal last). Under night vision
 	// the aimed path is light in the goggles: drawn again over the green, white-green.
-	{ PassTimer pass(passTimes, 16); applyScreenWash(); }
 	if (_nightVision) { PassTimer pass(passTimes, 17); drawTrajectory(true); }
 	if (_signalGlitches) { PassTimer pass(passTimes, 18); applySignalGlitches(); }
 	{ PassTimer pass(passTimes, 19); drawBurning(); }
@@ -660,6 +661,7 @@ void FirstPersonView::draw()
 	{ PassTimer pass(passTimes, 24); drawSprayMarks(); }
 	{ PassTimer pass(passTimes, 25); drawFacing(); }
 	unlock();
+	if (_gpuPresenting) gpuPresent(); // (the frame put together on the card: see FirstPersonViewGpuEffects.cpp)
 	if (passTimes && ++passFrames == 120)
 	{
 		std::ostringstream line;

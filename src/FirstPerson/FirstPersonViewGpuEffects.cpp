@@ -610,6 +610,21 @@ bool FirstPersonView::gpuDrawEffects()
 	effects.maxDistance = _maxDistance;
 	effects.palette = getPalette();
 	effects.nearestRgb = _nearestRgb.empty() ? nullptr : _nearestRgb.data();
+	// The screen wash after that, as applyScreenWash has it (the static's pattern moved on by it, or here when the card washes alone).
+	effects.wash = _nightVision || _tintAmount > 0.0f || _vignette > 0.0f || _controlHaze > 0.0f || _staticAmount > 0.0f;
+	if (effects.wash && !_gpuChecking) _staticSeed = _staticSeed * 1664525u + 1013904223u;
+	effects.nightVision = _nightVision;
+	effects.ownColours = Options::fpsNightVisionUnits;
+	effects.tintAmount = _tintAmount;
+	effects.tintRedShare = _tintRedShare;
+	effects.tintKind = _tintKind;
+	effects.staticAmount = _staticAmount;
+	effects.staticSeed = _staticSeed;
+	std::copy(_colors.grey, _colors.grey + 4, effects.greys);
+	effects.vignette = _vignette;
+	effects.controlHaze = _controlHaze;
+	const Uint8 *const tints[6] = { _colors.redTint, _colors.blueTint, _colors.orangeTint, _colors.whiteTint, _colors.greenTint, _colors.purpleTint };
+	std::copy(tints, tints + 6, effects.tints);
 	// What comes back beside the picture: in the check every pixel's notes; else only those round the pointer (whose
 	// picture the player points at).
 	const bool allNotes = _gpuChecking;
@@ -644,10 +659,19 @@ bool FirstPersonView::gpuDrawEffects()
 	output.trueColor = fullColor ? _trueColor.data() : nullptr;
 	// Beside the picture: in full colour the rays' own palette colours (a pixel that still has its ray's is shown in
 	// the full one, see trueColor), and with light in the air where the smoke lies; the depth only if asked later.
-	const bool shaftSmoke = fullColor && _hasLightShafts;
-	const bool ownColours = _nightVision && Options::fpsNightVisionUnits; // (futuristic night vision: the wash leaves the units', bodies' and items' colours)
-	effects.rayColors = fullColor ? _rayColors.data() : nullptr;
-	effects.readGlow = shaftSmoke || ownColours;
+	// (OPENXCOM3D_GPU_PRESENT=1: in full colour the frame is put together on the card, see gpuPresent; =check: both ways, compared.)
+	static const char *const presentAsked = getenv("OPENXCOM3D_GPU_PRESENT");
+	_gpuPresenting = !presentAsked || !fullColor ? 0 : !strcmp(presentAsked, "check") ? 2 : atoi(presentAsked) != 0 ? 1 : 0;
+	// (Only a display with a byte for each of red, green and blue can show such a frame: on an 8-bit one the view's own
+	// palette picture is what is shown, and it must hold the world.)
+	const SDL_Surface *display = SDL_GetVideoSurface();
+	if (_gpuPresenting == 1 && (!display || display->format->BytesPerPixel != 4)) _gpuPresenting = 0;
+	const bool onCard = _gpuPresenting == 1;
+	const bool shaftSmoke = fullColor && _hasLightShafts && !onCard;
+	effects.rayColors = fullColor && !onCard ? _rayColors.data() : nullptr;
+	if (onCard) output.trueColor = nullptr;
+	effects.readColor = !onCard;
+	effects.readGlow = shaftSmoke;
 	effects.readDepth = false;
 	FirstPersonGpu *gpu = readyFirstPersonGpu();
 	// (OPENXCOM3D_GPU_TIMING: the effects' share of the card's time, in the log every 60 frames.)
@@ -712,17 +736,19 @@ bool FirstPersonView::gpuDrawEffects()
 			_smokeVeil[index] = (_glowMask[index] & 64) ? 1 : 0;
 		}
 	}
-	// ... and which pixels keep their own colours under the night vision's wash is its bit 32.
-	if (ownColours)
-	{
-		for (size_t index = 0; index < (size_t)width * height; ++index)
-		{
-			_ownColours[index] = (_glowMask[index] >> 5) & 1;
-		}
-	}
-	if (fullColor)
+	if (fullColor && !onCard)
 	{
 		_hasTrueColor = true;
+	}
+	if (onCard)
+	{
+		// The picture stays on the card: what is drawn from here on goes over an empty one (see gpuPresent).
+		for (int row = 0; row < height; ++row) std::memset(getRaw(0, row), 0, width);
+	}
+	else if (_gpuPresenting == 2)
+	{
+		_gpuBeforeLast.resize((size_t)width * height);
+		for (int row = 0; row < height; ++row) std::memcpy(&_gpuBeforeLast[(size_t)row * width], getRaw(0, row), width);
 	}
 	_gpuDepthPending = true; // (the depth stays on the card until something drawn after this asks: see gpuNeedDepth)
 	return true;
@@ -740,6 +766,96 @@ void FirstPersonView::gpuFetchDepth()
 	if (!gpu || !gpu->readEffectsDepth(getWidth(), getHeight(), _depthBuffer.data()))
 	{
 		std::fill(_depthBuffer.begin(), _depthBuffer.end(), 0.0f); // (the card failed: everything counts as hidden this frame)
+	}
+}
+
+/**
+ * Puts the frame together on the card (FirstPersonGpu::present), once the CPU's last passes (the
+ * aimed path under night vision, the flames and the blood on the view, the numbers, icons and
+ * markers) are drawn: they went over an empty picture, which goes up as the overlay, and the card
+ * lays it over its own finished picture, through the palette or in full colour. On the desktop the
+ * frame comes back once, as it is shown (see cardPicture); a display on the card's own context (a
+ * headset's) takes it from FirstPersonGpu::presentedTexture, and nothing comes back.
+ * The flames' orange light on the lower part of a burning soldier's view tints the picture under it: the card lays
+ * that on too (see drawBurning; not on what the CPU drew before the flames, the aimed path under night vision).
+ * The check (=check): the usual way is shown; the card gets as overlay what the last passes
+ * changed, and its frame is compared with what the mode would put together.
+ */
+void FirstPersonView::gpuPresent()
+{
+	const int presenting = _gpuPresenting;
+	_gpuPresenting = 0;
+	_hasCardPicture = false;
+	FirstPersonGpu *gpu = readyFirstPersonGpu();
+	if (!gpu)
+	{
+		return;
+	}
+	const int width = getWidth(), height = getHeight();
+	const size_t pixels = (size_t)width * height;
+	FirstPersonGpu::Present frame;
+	frame.width = width;
+	frame.height = height;
+	frame.full = true;
+	frame.shafts = _hasLightShafts;
+	frame.palette = getPalette();
+	frame.paletteHash = _colors.paletteHash;
+	_cardPicture.resize(pixels);
+	frame.pixels = _cardPicture.data();
+	if (presenting == 1)
+	{
+		frame.flameGlow = _gpuFlameGlow;
+		frame.flameTint = _colors.orangeTint;
+		frame.overlay = getRaw(0, 0);
+		frame.overlayPitch = getPitch();
+		_hasCardPicture = gpu->present(frame);
+		return;
+	}
+	// The check: the overlay is what the last passes changed.
+	std::vector<Uint8> overlay(pixels);
+	for (int row = 0; row < height; ++row)
+	{
+		const Uint8 *made = getRaw(0, row), *before = &_gpuBeforeLast[(size_t)row * width];
+		for (int column = 0; column < width; ++column) overlay[(size_t)row * width + column] = made[column] != before[column] ? made[column] : 0;
+	}
+	frame.overlay = overlay.data();
+	frame.overlayPitch = width;
+	if (!gpu->present(frame) || !_hasTrueColor || width < 320)
+	{
+		return;
+	}
+	// What the mode would show (see FirstPersonMode::blit), a channel may be one off (the card rounds a colour's fractions).
+	const SDL_Color *palette = getPalette();
+	static long frames = 0, checked = 0, different = 0;
+	for (int row = 0; row < height; ++row)
+	{
+		const Uint8 *made = getRaw(0, row);
+		for (int column = 0; column < width; ++column)
+		{
+			const size_t index = (size_t)row * width + column;
+			const SDL_Color &own = palette[made[column]];
+			int wanted[3] = { own.r, own.g, own.b };
+			const Uint32 full = _trueColor[index];
+			if (made[column] == _rayColors[index])
+			{
+				wanted[0] = (full >> 16) & 0xFF; wanted[1] = (full >> 8) & 0xFF; wanted[2] = full & 0xFF;
+			}
+			else if (_hasLightShafts && _smokeVeil[index])
+			{
+				const SDL_Color &ray = palette[_rayColors[index]];
+				wanted[0] = std::min(255, own.r + std::max(0, (int)((full >> 16) & 0xFF) - ray.r));
+				wanted[1] = std::min(255, own.g + std::max(0, (int)((full >> 8) & 0xFF) - ray.g));
+				wanted[2] = std::min(255, own.b + std::max(0, (int)(full & 0xFF) - ray.b));
+			}
+			const Uint32 got = _cardPicture[index];
+			different += std::abs((int)((got >> 16) & 0xFF) - wanted[0]) > 1 || std::abs((int)((got >> 8) & 0xFF) - wanted[1]) > 1 || std::abs((int)(got & 0xFF) - wanted[2]) > 1;
+		}
+	}
+	checked += (long)pixels;
+	if (++frames % 60 == 0)
+	{
+		Log(LOG_INFO) << "OpenXcom3D GPU: the frame put together on the card: of " << checked << " pixels " << different << " differ (" << 100.0 * different / checked << "%)";
+		checked = different = 0;
 	}
 }
 

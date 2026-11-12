@@ -3059,7 +3059,23 @@ bool FirstPersonMode::blit()
 		// shafts": what the full colour has over the ray's palette colour), so a beam lights the smoke it crosses.
 		const Uint32 *fullColors = nullptr, *shownInFull = nullptr;
 		const Uint8 *rayColors = nullptr, *smokeVeil = nullptr;
-		if (_view->shown() && _view->getWidth() == picture->w && _view->getHeight() == picture->h && _view->trueColor(fullColors, rayColors, smokeVeil))
+		const Uint32 *cardPicture = nullptr;
+		if (_view->shown() && _view->getWidth() == picture->w && _view->getHeight() == picture->h && _view->cardPicture(cardPicture))
+		{
+			// The frame as the graphics card put it together (see FirstPersonView::gpuPresent): the view's own surface holds
+			// only what was drawn last; wherever the overlays here didn't draw over that, the card's pixel.
+			SDL_Surface *seen = _view->getSurface();
+			_truePicture.resize((size_t)picture->w * picture->h);
+			for (int row = 0; row < picture->h; ++row)
+			{
+				const Uint8 *made = (const Uint8 *)picture->pixels + (size_t)row * picture->pitch, *own = (const Uint8 *)seen->pixels + (size_t)row * seen->pitch;
+				const Uint32 *card = cardPicture + (size_t)row * picture->w;
+				Uint32 *out = &_truePicture[(size_t)row * picture->w];
+				for (int column = 0; column < picture->w; ++column) out[column] = made[column] == own[column] ? card[column] | 0xFF000000u : 0u;
+			}
+			shownInFull = _truePicture.data();
+		}
+		else if (_view->shown() && _view->getWidth() == picture->w && _view->getHeight() == picture->h && _view->trueColor(fullColors, rayColors, smokeVeil))
 		{
 			const SDL_Color *palette = _state->getPalette();
 			_truePicture.resize((size_t)picture->w * picture->h);

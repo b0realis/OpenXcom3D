@@ -26291,10 +26291,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..a3ca91a2b
+index 000000000..44977eb83
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,2240 @@
+@@ -0,0 +1,2489 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -26943,6 +26943,24 @@ index 000000000..a3ca91a2b
 +	};
 +	std::map<std::array<int, 2>, GlowTargets> glowTargets;
 +	Gl::UInt compileFragment(const std::string &source, const char *what);
++	// The screen wash after that (see drawWash): its program, the tint tables as a picture, the washed picture by size.
++	Gl::UInt washProgram = 0, tintsTexture = 0;
++	Uint32 tintsSent = 0;
++	struct WashTargets { Gl::UInt framebuffer = 0, texture = 0; };
++	std::map<std::array<int, 2>, WashTargets> washTargets;
++	bool drawWash(const Effects &effects, Gl::UInt colorTexture, Gl::UInt glowTexture, WashTargets *&washed);
++	// The frame put together on the card (see present): its program, its palette as a picture, and by size of view the
++	// pictures the last drawEffects left (the finished colour, its glow, the rays' full and palette colours), the overlay
++	// and the frame.
++	Gl::UInt presentProgram = 0, presentPalette = 0, presentFlameTint = 0;
++	Uint32 presentPaletteSent = 0;
++	struct PresentTargets
++	{
++		Gl::UInt color = 0, glow = 0, rayTrue = 0, rayColor = 0; // what drawEffects left
++		Gl::UInt framebuffer = 0, frame = 0, overlay = 0;
++	};
++	std::map<std::array<int, 2>, PresentTargets> presentTargets;
++	bool present(const Present &frame);
 +	bool buildGlow();
 +	bool drawGlow(const Effects &effects, const EffectTargets &drawn, GlowTargets *&brightened);
 +};
@@ -28174,6 +28192,198 @@ index 000000000..a3ca91a2b
 +}
 +
 +/**
++ * The screen wash over the finished picture (FirstPersonView::applyScreenWash, on the card; see
++ * WashSource), into a picture of its own.
++ * @param colorTexture, glowTexture The picture so far and its glow.
++ * @param washed Set to the washed picture's.
++ */
++bool FirstPersonGpu::State::drawWash(const Effects &effects, Gl::UInt colorTexture, Gl::UInt glowTexture, WashTargets *&washed)
++{
++	if (!washProgram)
++	{
++		washProgram = compileFragment("const float ControlHazeFrom = " + glslFloat(ControlHazeFrom) + ";\n" + WashSource, "the screen wash's shader");
++		if (!washProgram)
++		{
++			return false;
++		}
++		Gl::UseProgram(washProgram);
++		Gl::Uniform1i(Gl::GetUniformLocation(washProgram, "uColor"), 0);
++		Gl::Uniform1i(Gl::GetUniformLocation(washProgram, "uGlow"), 2);
++		Gl::Uniform1i(Gl::GetUniformLocation(washProgram, "uTints"), 7);
++		Gl::GenTextures(1, &tintsTexture);
++		Gl::ActiveTexture(Gl::TEXTURE0 + 7);
++		Gl::BindTexture(Gl::TEXTURE_2D, tintsTexture);
++		Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, 256, 6, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
++		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
++		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
++		tintsSent = ~effects.paletteHash;
++	}
++	WashTargets &target = washTargets[{ effects.width, effects.height }];
++	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
++	if (!target.framebuffer)
++	{
++		Gl::GenFramebuffers(1, &target.framebuffer);
++		Gl::BindFramebuffer(Gl::FRAMEBUFFER, target.framebuffer);
++		Gl::GenTextures(1, &target.texture);
++		Gl::BindTexture(Gl::TEXTURE_2D, target.texture);
++		Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, effects.width, effects.height, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
++		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
++		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
++		Gl::FramebufferTexture2D(Gl::FRAMEBUFFER, Gl::COLOR_ATTACHMENT0, Gl::TEXTURE_2D, target.texture, 0);
++		if (Gl::CheckFramebufferStatus(Gl::FRAMEBUFFER) != Gl::FRAMEBUFFER_COMPLETE)
++		{
++			return false;
++		}
++	}
++	Gl::ActiveTexture(Gl::TEXTURE0 + 7);
++	Gl::BindTexture(Gl::TEXTURE_2D, tintsTexture);
++	if (tintsSent != effects.paletteHash)
++	{
++		for (int row = 0; row < 6; ++row) Gl::TexSubImage2D(Gl::TEXTURE_2D, 0, 0, row, 256, 1, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, effects.tints[row]);
++		tintsSent = effects.paletteHash;
++	}
++	Gl::ActiveTexture(Gl::TEXTURE0);
++	Gl::BindTexture(Gl::TEXTURE_2D, colorTexture);
++	Gl::ActiveTexture(Gl::TEXTURE0 + 2);
++	Gl::BindTexture(Gl::TEXTURE_2D, glowTexture);
++	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
++	Gl::BindFramebuffer(Gl::FRAMEBUFFER, target.framebuffer);
++	const Gl::Enum one[1] = { Gl::COLOR_ATTACHMENT0 };
++	Gl::DrawBuffers(1, one);
++	Gl::Viewport(0, 0, effects.width, effects.height);
++	Gl::UseProgram(washProgram);
++	auto at = [&](const char *name) { return Gl::GetUniformLocation(washProgram, name); };
++	Gl::Uniform2i(at("uViewSize"), effects.width, effects.height);
++	Gl::Uniform1i(at("uNightVision"), effects.nightVision);
++	Gl::Uniform1i(at("uOwnColours"), effects.ownColours ? 1 : 0);
++	Gl::Uniform1f(at("uTintAmount"), effects.tintAmount);
++	Gl::Uniform1f(at("uTintRedShare"), effects.tintRedShare);
++	Gl::Uniform1i(at("uTintRow"), std::clamp(effects.tintKind, 0, 4));
++	Gl::Uniform1f(at("uStaticAmount"), effects.staticAmount);
++	Gl::Uniform1ui(at("uStaticSeed"), effects.staticSeed);
++	Gl::Uniform4i(at("uGreys"), effects.greys[0], effects.greys[1], effects.greys[2], effects.greys[3]);
++	Gl::Uniform1f(at("uVignette"), effects.vignette);
++	Gl::Uniform1f(at("uControlHaze"), effects.controlHaze);
++	Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
++	washed = &target;
++	return true;
++}
++
++/**
++ * The frame put together on the card (see PresentSource), from what the last drawEffects for a
++ * view of this size left there and the overlay the CPU drew since; read back if asked, else left
++ * in its texture for a display on this context to show.
++ */
++bool FirstPersonGpu::State::present(const Present &frame)
++{
++	const auto found = presentTargets.find({ frame.width, frame.height });
++	if (found == presentTargets.end() || !found->second.color)
++	{
++		return false;
++	}
++	PresentTargets &kept = found->second;
++	if (!presentProgram)
++	{
++		presentProgram = compileFragment(PresentSource, "the shader that puts the frame together");
++		if (!presentProgram)
++		{
++			return false;
++		}
++		Gl::UseProgram(presentProgram);
++		const char *const names[6] = { "uColor", "uOverlay", "uGlow", "uRayColor", "uRayTrue", "uPalette" };
++		for (int unit = 0; unit < 6; ++unit) Gl::Uniform1i(Gl::GetUniformLocation(presentProgram, names[unit]), unit);
++		Gl::GenTextures(1, &presentPalette);
++		Gl::ActiveTexture(Gl::TEXTURE0 + 5);
++		Gl::BindTexture(Gl::TEXTURE_2D, presentPalette);
++		Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::RGBA8, 256, 1, 0, Gl::RGBA, Gl::UNSIGNED_BYTE, nullptr);
++		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
++		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
++		Gl::Uniform1i(Gl::GetUniformLocation(presentProgram, "uFlameTint"), 6);
++		Gl::GenTextures(1, &presentFlameTint);
++		Gl::ActiveTexture(Gl::TEXTURE0 + 6);
++		Gl::BindTexture(Gl::TEXTURE_2D, presentFlameTint);
++		Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, 256, 1, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
++		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
++		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
++		presentPaletteSent = ~frame.paletteHash;
++	}
++	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
++	if (!kept.framebuffer)
++	{
++		Gl::GenFramebuffers(1, &kept.framebuffer);
++		Gl::BindFramebuffer(Gl::FRAMEBUFFER, kept.framebuffer);
++		Gl::GenTextures(1, &kept.frame);
++		Gl::BindTexture(Gl::TEXTURE_2D, kept.frame);
++		Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::RGBA8, frame.width, frame.height, 0, Gl::RGBA, Gl::UNSIGNED_BYTE, nullptr);
++		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
++		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
++		Gl::FramebufferTexture2D(Gl::FRAMEBUFFER, Gl::COLOR_ATTACHMENT0, Gl::TEXTURE_2D, kept.frame, 0);
++		Gl::GenTextures(1, &kept.overlay);
++		Gl::BindTexture(Gl::TEXTURE_2D, kept.overlay);
++		Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, frame.width, frame.height, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
++		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
++		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
++		if (Gl::CheckFramebufferStatus(Gl::FRAMEBUFFER) != Gl::FRAMEBUFFER_COMPLETE)
++		{
++			return false;
++		}
++	}
++	const bool full = frame.full && kept.rayTrue && kept.rayColor;
++	const Gl::UInt pictures[5] = { kept.color, kept.overlay, kept.glow, full ? kept.rayColor : kept.color, full ? kept.rayTrue : presentPalette };
++	for (int unit = 0; unit < 5; ++unit)
++	{
++		Gl::ActiveTexture(Gl::TEXTURE0 + unit);
++		Gl::BindTexture(Gl::TEXTURE_2D, pictures[unit]);
++		if (unit == 1)
++		{
++			Gl::PixelStorei(Gl::UNPACK_ROW_LENGTH, frame.overlayPitch);
++			Gl::TexSubImage2D(Gl::TEXTURE_2D, 0, 0, 0, frame.width, frame.height, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, frame.overlay);
++			Gl::PixelStorei(Gl::UNPACK_ROW_LENGTH, 0);
++		}
++	}
++	Gl::ActiveTexture(Gl::TEXTURE0 + 5);
++	Gl::BindTexture(Gl::TEXTURE_2D, presentPalette);
++	if (presentPaletteSent != frame.paletteHash)
++	{
++		Uint8 colors[256 * 4];
++		for (int index = 0; index < 256; ++index)
++		{
++			colors[index * 4] = frame.palette[index].r; colors[index * 4 + 1] = frame.palette[index].g; colors[index * 4 + 2] = frame.palette[index].b; colors[index * 4 + 3] = 255;
++		}
++		Gl::TexSubImage2D(Gl::TEXTURE_2D, 0, 0, 0, 256, 1, Gl::RGBA, Gl::UNSIGNED_BYTE, colors);
++		Gl::ActiveTexture(Gl::TEXTURE0 + 6);
++		Gl::BindTexture(Gl::TEXTURE_2D, presentFlameTint);
++		if (frame.flameTint) Gl::TexSubImage2D(Gl::TEXTURE_2D, 0, 0, 0, 256, 1, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, frame.flameTint);
++		presentPaletteSent = frame.paletteHash;
++	}
++	Gl::ActiveTexture(Gl::TEXTURE0 + 6);
++	Gl::BindTexture(Gl::TEXTURE_2D, presentFlameTint);
++	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
++	Gl::BindFramebuffer(Gl::FRAMEBUFFER, kept.framebuffer);
++	const Gl::Enum one[1] = { Gl::COLOR_ATTACHMENT0 };
++	Gl::DrawBuffers(1, one);
++	Gl::Viewport(0, 0, frame.width, frame.height);
++	Gl::UseProgram(presentProgram);
++	Gl::Uniform1i(Gl::GetUniformLocation(presentProgram, "uFull"), full ? 1 : 0);
++	Gl::Uniform1i(Gl::GetUniformLocation(presentProgram, "uShafts"), frame.shafts ? 1 : 0);
++	Gl::Uniform1f(Gl::GetUniformLocation(presentProgram, "uFlameGlow"), frame.flameTint ? frame.flameGlow : 0.0f);
++	Gl::Uniform2i(Gl::GetUniformLocation(presentProgram, "uViewSize"), frame.width, frame.height);
++	Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
++	if (frame.pixels)
++	{
++		readPicture(0, frame.width, frame.height, 2, frame.pixels, frame.width);
++	}
++	Gl::UseProgram(program->id);
++	const Gl::Enum error = Gl::GetError();
++	if (error != Gl::NoError)
++	{
++		Log(LOG_WARNING) << "OpenXcom3D GPU: OpenGL error " << std::hex << error << " putting the frame together";
++		return false;
++	}
++	return true;
++}
++
++/**
 + * The units and effects over the rays' pictures (kept on the card by the frame's draw, see
 + * Output::keep): the primitives, the sprites' bytes and the bins go up, one picture-wide triangle
 + * draws them (see EffectsSource), and the finished colour, depth and glow are read back where the
@@ -28323,6 +28533,12 @@ index 000000000..a3ca91a2b
 +	{
 +		return false;
 +	}
++	// The screen wash over that (the picture is then the wash's; the glow stays where it was).
++	WashTargets *washed = nullptr;
++	if (effects.wash && !drawWash(effects, brightened ? brightened->textures[4] : drawn.textures[0], brightened ? brightened->textures[5] : drawn.textures[2], washed))
++	{
++		return false;
++	}
 +	if (timing)
 +	{
 +		Gl::Finish();
@@ -28330,16 +28546,22 @@ index 000000000..a3ca91a2b
 +		start = std::chrono::steady_clock::now();
 +	}
 +	// The finished pictures, back to the view.
++	if (washed && effects.readColor)
++	{
++		Gl::BindFramebuffer(Gl::FRAMEBUFFER, washed->framebuffer);
++		readPicture(0, effects.width, effects.height, 0, output.color, output.colorPitch);
++	}
 +	if (brightened)
 +	{
 +		Gl::BindFramebuffer(Gl::FRAMEBUFFER, brightened->framebuffers[4]);
-+		readPicture(0, effects.width, effects.height, 0, output.color, output.colorPitch);
++		if (!washed && effects.readColor) readPicture(0, effects.width, effects.height, 0, output.color, output.colorPitch);
 +		if (effects.readGlow) readPicture(1, effects.width, effects.height, 0, output.glow, effects.width);
 +		Gl::BindFramebuffer(Gl::FRAMEBUFFER, drawn.framebuffer);
 +	}
 +	else
 +	{
-+		readPicture(0, effects.width, effects.height, 0, output.color, output.colorPitch);
++		Gl::BindFramebuffer(Gl::FRAMEBUFFER, drawn.framebuffer);
++		if (!washed && effects.readColor) readPicture(0, effects.width, effects.height, 0, output.color, output.colorPitch);
 +		if (effects.readGlow) readPicture(2, effects.width, effects.height, 0, output.glow, effects.width);
 +	}
 +	if (effects.readDepth) readPicture(1, effects.width, effects.height, 1, output.depth, effects.width);
@@ -28358,6 +28580,12 @@ index 000000000..a3ca91a2b
 +		if (output.trueColor) readPicture(3, rayColumns, rayRows, 2, output.trueColor, rayColumns);
 +		if (effects.rayColors) readPicture(0, rayColumns, rayRows, 0, effects.rayColors, rayColumns);
 +	}
++	// (What the frame is put together from, if it is, on the card: see present.)
++	PresentTargets &kept = presentTargets[{ effects.width, effects.height }];
++	kept.color = washed ? washed->texture : brightened ? brightened->textures[4] : drawn.textures[0];
++	kept.glow = brightened ? brightened->textures[5] : drawn.textures[2];
++	kept.rayTrue = rayPixelSize == 1 ? rays->second.textures[3] : 0;
++	kept.rayColor = rayPixelSize == 1 ? rays->second.textures[0] : 0;
 +	Gl::UseProgram(program->id);
 +	if (timing)
 +	{
@@ -28489,6 +28717,27 @@ index 000000000..a3ca91a2b
 +
 +
 +/**
++ * The frame put together on the card (see State::present).
++ */
++bool FirstPersonGpu::present(const Present &frame)
++{
++	State &state = *_state;
++	if (state.failed)
++	{
++		return false;
++	}
++	bool done = false;
++	state.run([&] { done = state.present(frame); });
++	return done;
++}
++
++unsigned FirstPersonGpu::presentedTexture(int width, int height)
++{
++	const auto found = _state->presentTargets.find({ width, height });
++	return found == _state->presentTargets.end() ? 0u : found->second.frame;
++}
++
++/**
 + * The depth of the units and effects last drawn for a view of this size: read back when something
 + * drawn on the CPU after them needs it after all (an icon's or a number's place hidden or not).
 + */
@@ -28537,10 +28786,10 @@ index 000000000..a3ca91a2b
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.h b/src/FirstPerson/FirstPersonGpu.h
 new file mode 100644
-index 000000000..7b86d9f23
+index 000000000..75db00362
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.h
-@@ -0,0 +1,219 @@
+@@ -0,0 +1,251 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -28716,13 +28965,40 @@ index 000000000..7b86d9f23
 +		float maxDistance = 0.0f;      // the view's reach, in voxels (something shining in the sky counts as that far)
 +		const SDL_Color *palette = nullptr; // the view's palette
 +		const Uint8 *nearestRgb = nullptr;  // the palette colour nearest each 15-bit colour (FirstPersonView::_nearestRgb)
++		// The screen wash after that (FirstPersonView::applyScreenWash), if any of it is on.
++		bool wash = false;
++		int nightVision = 0;           // the night vision's colour group + 1 (0: off)
++		bool ownColours = false;       // ... futuristic: units', bodies' and items' pixels keep their colours
++		float tintAmount = 0.0f, tintRedShare = 0.0f;
++		int tintKind = 0;              // the colour wash's table: 0 red, 1 blue, 2 orange, 3 white, 4 green
++		float staticAmount = 0.0f;
++		Uint32 staticSeed = 0;
++		Uint8 greys[4] = {};
++		float vignette = 0.0f, controlHaze = 0.0f;
++		const Uint8 *tints[6] = {};    // the tint tables: red, blue, orange, white, green, purple (256 colours each)
 +		// What comes back beside the picture (the colour always; each of these only if asked).
++		bool readColor = true;         // the finished colour, into Output::color (not when the frame is put together on the card: see present)
 +		bool readDepth = false;        // the depth, into Output::depth (else on demand: readEffectsDepth)
 +		bool readGlow = false;         // the glow (1, 3; 32: the pixel keeps its own colours under night vision; 64: see-through smoke lies over it), into Output::glow
 +		Uint8 *rayColors = nullptr;    // the palette colour each pixel had from its ray, before anything was drawn over it (for the full-colour picture)
 +		Uint32 *notes = nullptr;       // four numbers a pixel: the unit veil left, own colours | smoke veil << 1, 1 + the last solid sprite's number, 1 + the last pile's; null: not asked
 +		int patch[4] = {};             // ... or only those of a patch of the view (left, top, width, height; none wide: no patch), row by row from its top:
 +		Uint32 *patchNotes = nullptr;  // what the player points at is read from the notes round the pointer
++	};
++	/// The frame as shown, put together on the card after the units and effects (see present): for a display fed
++	/// straight from the card (a headset's), nothing of the picture need come back at all.
++	struct Present
++	{
++		int width = 0, height = 0;     // the view, in pixels
++		const Uint8 *overlay = nullptr; // what the CPU drew last, over an empty picture: palette colours, 0 where nothing; rows from the top
++		int overlayPitch = 0;          // ... bytes from one row to the next
++		bool full = false;             // in full colour (setting "True colour"): the rays' own where a pixel still has its ray's colour
++		bool shafts = false;           // ... with light in the air this frame (setting "Light shafts"): laid on see-through smoke
++		const SDL_Color *palette = nullptr;
++		Uint32 paletteHash = 0;
++		float flameGlow = 0.0f;        // a burning soldier's flames light the lower part of the view this strongly (0: none)
++		const Uint8 *flameTint = nullptr; // ... each colour in that light (256)
++		Uint32 *pixels = nullptr;      // where the frame goes, a 0xFFRRGGBB number a pixel, rows from the top; null: it stays on the card (see presentedTexture)
 +	};
 +	/// Where a frame's time went, in milliseconds.
 +	struct Timing
@@ -28750,6 +29026,11 @@ index 000000000..7b86d9f23
 +	/// reads the finished pictures back into the view's buffers.
 +	/// @return False if the card failed (the caller keeps to the CPU from now on).
 +	bool drawEffects(const Effects &effects, const Output &output, Timing *timing);
++	/// Puts the frame together on the card from the pictures the last drawEffects for a view of this size left there.
++	bool present(const Present &frame);
++	/// The OpenGL texture (RGBA8, rows from the top) the last present for a view of this size drew into; 0: none. For a
++	/// display on the renderer's own context to show without reading anything back.
++	unsigned presentedTexture(int width, int height);
 +	/// The depth of the units and effects last drawn for a view of this size, read back after all (see Effects::readDepth).
 +	bool readEffectsDepth(int width, int height, float *depth);
 +
@@ -28762,10 +29043,10 @@ index 000000000..7b86d9f23
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuGl.h b/src/FirstPerson/FirstPersonGpuGl.h
 new file mode 100644
-index 000000000..62e379411
+index 000000000..326da83e2
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuGl.h
-@@ -0,0 +1,176 @@
+@@ -0,0 +1,179 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -28821,6 +29102,7 @@ index 000000000..62e379411
 +const Enum TEXTURE_2D = 0x0DE1, TEXTURE_BUFFER = 0x8C2A, TEXTURE0 = 0x84C0;
 +const Enum TEXTURE_MIN_FILTER = 0x2801, TEXTURE_MAG_FILTER = 0x2800, NEAREST = 0x2600;
 +const Enum TEXTURE_WRAP_S = 0x2802, TEXTURE_WRAP_T = 0x2803, CLAMP_TO_EDGE = 0x812F;
++const Enum UNPACK_ROW_LENGTH = 0x0CF2;
 +const Enum R8UI = 0x8232, R16UI = 0x8234, R32I = 0x8235, R32F = 0x822E, RGBA32UI = 0x8D70, RGBA32F = 0x8814, R32UI = 0x8236, RGBA16UI = 0x8D76;
 +const Enum RED = 0x1903, RED_INTEGER = 0x8D94, RGBA_INTEGER = 0x8D99, RGBA = 0x1908, RGBA8 = 0x8058, BGRA = 0x80E1, UNSIGNED_INT_8_8_8_8_REV = 0x8367;
 +const Enum UNSIGNED_BYTE = 0x1401, UNSIGNED_SHORT = 0x1403, UNSIGNED_INT = 0x1405, FLOAT = 0x1406;
@@ -28888,6 +29170,8 @@ index 000000000..62e379411
 +	X(void, Uniform1i, (Int location, Int a)) \
 +	X(void, Uniform2i, (Int location, Int a, Int b)) \
 +	X(void, Uniform3i, (Int location, Int a, Int b, Int c)) \
++	X(void, Uniform4i, (Int location, Int a, Int b, Int c, Int d)) \
++	X(void, Uniform1ui, (Int location, UInt a)) \
 +	X(void, Uniform1f, (Int location, Float a)) \
 +	X(void, Uniform2f, (Int location, Float a, Float b)) \
 +	X(void, Uniform3f, (Int location, Float a, Float b, Float c)) \
@@ -28944,10 +29228,10 @@ index 000000000..62e379411
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..731a1b0dd
+index 000000000..167cdb7dd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,2356 @@
+@@ -0,0 +1,2463 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -31301,6 +31585,113 @@ index 000000000..731a1b0dd
 +}
 +)";
 +
++
++/**
++ * The screen wash on the card (FirstPersonView::washBands), after the bloom: night vision's one
++ * colour group (a unit's, a body's or an item's pixel keeping its own with the futuristic kind),
++ * the colour wash, a camera feed's static, the hurt soldier's red edges and the purple ones of a
++ * unit under our mind control; each as there, in that order.
++ */
++const char *const WashSource = R"(
++uniform usampler2D uColor, uGlow, uTints; // the picture, its glow (bit 32: the pixel keeps its own colours); the six tint tables, a row each: red, blue, orange, white, green, purple
++uniform ivec2 uViewSize;
++uniform int uNightVision, uOwnColours;    // the night vision's colour group + 1 (0: off); 1: futuristic (own colours kept)
++uniform float uTintAmount, uTintRedShare; // the colour wash: its share of the pixels, and of those the share washed red instead
++uniform int uTintRow;                     // ... its table's row
++uniform float uStaticAmount;
++uniform uint uStaticSeed;
++uniform ivec4 uGreys;                     // the static's four greys
++uniform float uVignette, uControlHaze;
++layout(location = 0) out uint outColor;
++
++const float Bayer[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
++float dither(int x, int y) { return Bayer[(y & 3) * 4 + (x & 3)] / 16.0; }
++uint tinted(int row, uint color) { return texelFetch(uTints, ivec2(int(color), row), 0).r; }
++
++void main()
++{
++	ivec2 pixel = ivec2(gl_FragCoord.xy);
++	uint color = texelFetch(uColor, pixel, 0).r;
++	if (uNightVision != 0 && color != 0u && !(uOwnColours != 0 && (texelFetch(uGlow, pixel, 0).r & 32u) != 0u)) color = uint((uNightVision - 1) * 16) | (color & 15u);
++	if (uTintAmount > 0.0 && dither(pixel.x, pixel.y) < uTintAmount)
++	{
++		color = tinted(uTintRedShare > 0.0 && dither(pixel.y + 1, pixel.x + 2) < uTintRedShare ? 0 : uTintRow, color);
++	}
++	if (uStaticAmount > 0.0)
++	{
++		// The row's random numbers, a step a pixel from the row's own start: the pixel's, by squaring (the CPU steps along the row).
++		uint seed = uStaticSeed ^ (uint(pixel.y) * 2654435761u), mul = 1u, add = 0u, stepMul = 1664525u, stepAdd = 1013904223u;
++		for (uint steps = uint(pixel.x) + 1u; steps != 0u; steps >>= 1)
++		{
++			if ((steps & 1u) != 0u)
++			{
++				mul *= stepMul;
++				add = add * stepMul + stepAdd;
++			}
++			stepAdd = (stepMul + 1u) * stepAdd;
++			stepMul *= stepMul;
++		}
++		seed = seed * mul + add;
++		if (float((seed >> 8) & 255u) < uStaticAmount * 256.0) color = uint(uGreys[int(seed >> 30)]);
++	}
++	if (uVignette > 0.0 || uControlHaze > 0.0)
++	{
++		vec2 centre = vec2(uViewSize) * 0.5;
++		float share = length(vec2(pixel) - centre) / length(centre);
++		if (uVignette > 0.0 && smoothstep(0.55, 1.0, share) * uVignette > dither(pixel.x + 3, pixel.y + 1)) color = tinted(0, color);
++		else if (uControlHaze > 0.0 && smoothstep(ControlHazeFrom, 1.0, share) * uControlHaze > dither(pixel.x + 1, pixel.y + 2)) color = tinted(5, color);
++	}
++	outColor = color;
++}
++)";
++
++
++/**
++ * The frame as it is shown, put together on the card (FirstPersonGpu::present): the finished
++ * picture with what the CPU drew last laid over it (the overlay: 0 where it drew nothing), each
++ * pixel through the palette; or, in full colour, the rays' own full colour where the pixel still
++ * has its ray's palette colour, and over a ray's pixel under see-through smoke the light the card
++ * found in the air there (as FirstPersonMode::blit puts the full-colour picture together).
++ */
++const char *const PresentSource = R"(
++uniform usampler2D uColor, uGlow, uOverlay, uRayColor; // the finished picture, its glow (bit 64: smoke over the pixel), the overlay, the rays' own palette colours
++uniform sampler2D uRayTrue, uPalette;                  // the rays' full colours; the palette, a texel a colour
++uniform int uFull, uShafts;                            // 1: in full colour; 1: with light in the air
++uniform usampler2D uFlameTint;                         // each colour in the flames' orange light
++uniform float uFlameGlow;                              // a burning soldier's flames light the lower part of the view this strongly (0: none; see FirstPersonView::drawBurning)
++uniform ivec2 uViewSize;
++layout(location = 0) out vec4 outPixel;
++
++const float Bayer[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
++float dither(int x, int y) { return Bayer[(y & 3) * 4 + (x & 3)] / 16.0; }
++vec3 paletteColor(uint color) { return texelFetch(uPalette, ivec2(int(color), 0), 0).rgb; }
++
++void main()
++{
++	ivec2 pixel = ivec2(gl_FragCoord.xy);
++	uint made = texelFetch(uOverlay, pixel, 0).r;
++	if (made == 0u)
++	{
++		made = texelFetch(uColor, pixel, 0).r;
++		// The flames' light from below, on the picture under them: the bottom 30% of the view, more the lower, dithered in.
++		int glowRows = int(float(uViewSize.y) * 0.3), firstRow = uViewSize.y - glowRows;
++		if (uFlameGlow > 0.0 && pixel.y >= firstRow && dither(pixel.x, pixel.y) < pow(float(pixel.y - firstRow) / float(glowRows), 1.6) * uFlameGlow)
++		{
++			made = texelFetch(uFlameTint, ivec2(int(made), 0), 0).r;
++		}
++	}
++	vec3 shown = paletteColor(made);
++	if (uFull != 0)
++	{
++		uint ray = texelFetch(uRayColor, pixel, 0).r;
++		vec3 full = texelFetch(uRayTrue, pixel, 0).rgb;
++		if (made == ray) shown = full;
++		else if (uShafts != 0 && (texelFetch(uGlow, pixel, 0).r & 64u) != 0u) shown = min(vec3(1.0), shown + max(vec3(0.0), full - paletteColor(ray)));
++	}
++	outPixel = vec4(shown, 1.0);
++}
++)";
++
 +}
 +
 +}
@@ -31485,10 +31876,10 @@ index 000000000..eaa9f409a
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..36a86548c
+index 000000000..4c7ef3fd0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,3245 @@
+@@ -0,0 +1,3261 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -34550,7 +34941,23 @@ index 000000000..36a86548c
 +		// shafts": what the full colour has over the ray's palette colour), so a beam lights the smoke it crosses.
 +		const Uint32 *fullColors = nullptr, *shownInFull = nullptr;
 +		const Uint8 *rayColors = nullptr, *smokeVeil = nullptr;
-+		if (_view->shown() && _view->getWidth() == picture->w && _view->getHeight() == picture->h && _view->trueColor(fullColors, rayColors, smokeVeil))
++		const Uint32 *cardPicture = nullptr;
++		if (_view->shown() && _view->getWidth() == picture->w && _view->getHeight() == picture->h && _view->cardPicture(cardPicture))
++		{
++			// The frame as the graphics card put it together (see FirstPersonView::gpuPresent): the view's own surface holds
++			// only what was drawn last; wherever the overlays here didn't draw over that, the card's pixel.
++			SDL_Surface *seen = _view->getSurface();
++			_truePicture.resize((size_t)picture->w * picture->h);
++			for (int row = 0; row < picture->h; ++row)
++			{
++				const Uint8 *made = (const Uint8 *)picture->pixels + (size_t)row * picture->pitch, *own = (const Uint8 *)seen->pixels + (size_t)row * seen->pitch;
++				const Uint32 *card = cardPicture + (size_t)row * picture->w;
++				Uint32 *out = &_truePicture[(size_t)row * picture->w];
++				for (int column = 0; column < picture->w; ++column) out[column] = made[column] == own[column] ? card[column] | 0xFF000000u : 0u;
++			}
++			shownInFull = _truePicture.data();
++		}
++		else if (_view->shown() && _view->getWidth() == picture->w && _view->getHeight() == picture->h && _view->trueColor(fullColors, rayColors, smokeVeil))
 +		{
 +			const SDL_Color *palette = _state->getPalette();
 +			_truePicture.resize((size_t)picture->w * picture->h);
@@ -53134,10 +53541,10 @@ index 000000000..7e1bbfcd2
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..507afe9ef
+index 000000000..3fdaa5bed
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,717 @@
+@@ -0,0 +1,719 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -53776,17 +54183,18 @@ index 000000000..507afe9ef
 +	if (_gpuRecording && !_gpuChecking)
 +	{
 +		PassTimer pass(passTimes, 0);
-+		gpuDrawEffects();
++		gpuDrawEffects(); // (the bloom and the screen wash with them)
 +	}
 +	else
 +	{
 +		{ PassTimer pass(passTimes, 15); drawLightHalos(); }
++		// Effects on the finished picture (a camera's feed: its bad signal last).
++		{ PassTimer pass(passTimes, 16); applyScreenWash(); }
 +		if (_gpuRecording) gpuDrawEffects();
 +	}
 +	{ PassTimer pass(passTimes, 13); findUnitAtPointer(); }
 +	// Effects on the finished picture (a camera's feed: its bad signal last). Under night vision
 +	// the aimed path is light in the goggles: drawn again over the green, white-green.
-+	{ PassTimer pass(passTimes, 16); applyScreenWash(); }
 +	if (_nightVision) { PassTimer pass(passTimes, 17); drawTrajectory(true); }
 +	if (_signalGlitches) { PassTimer pass(passTimes, 18); applySignalGlitches(); }
 +	{ PassTimer pass(passTimes, 19); drawBurning(); }
@@ -53800,6 +54208,7 @@ index 000000000..507afe9ef
 +	{ PassTimer pass(passTimes, 24); drawSprayMarks(); }
 +	{ PassTimer pass(passTimes, 25); drawFacing(); }
 +	unlock();
++	if (_gpuPresenting) gpuPresent(); // (the frame put together on the card: see FirstPersonViewGpuEffects.cpp)
 +	if (passTimes && ++passFrames == 120)
 +	{
 +		std::ostringstream line;
@@ -53857,10 +54266,10 @@ index 000000000..507afe9ef
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..87efe1c67
+index 000000000..3eef64fd5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1531 @@
+@@ -0,0 +1,1548 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -54178,6 +54587,14 @@ index 000000000..87efe1c67
 +		fullColors = _trueColor.data();
 +		rayColors = _rayColors.data();
 +		smokeVeil = _hasLightShafts ? _smokeVeil.data() : nullptr;
++		return true;
++	}
++	/// This frame as the graphics card put it together (see gpuPresent), if it did: a 0xFFRRGGBB number a pixel. The view's own
++	/// surface then holds only what the CPU drew last (0 elsewhere).
++	bool cardPicture(const Uint32 *&pixels) const
++	{
++		if (!_hasCardPicture) return false;
++		pixels = _cardPicture.data();
 +		return true;
 +	}
 +	/// Uses another view's voxel models instead of building its own (a small extra view). Set
@@ -54857,6 +55274,15 @@ index 000000000..87efe1c67
 +	/// Has the card draw what was recorded and takes the finished pictures back; recording stops.
 +	bool gpuDrawEffects();
 +	bool _gpuDepthPending = false; // this frame's depth is still on the card (see gpuNeedDepth)
++	// The frame put together on the card (OPENXCOM3D_GPU_PRESENT; see gpuPresent): the picture never comes back as palette
++	// colours; what the CPU draws last goes over an empty picture, and the card lays that over its own and gives the frame.
++	int _gpuPresenting = 0;              // this frame: 0 no; 1 yes; 2 beside the usual way, the two compared
++	float _gpuFlameGlow = 0.0f;          // ... a burning soldier's flames light the lower part of the picture this strongly (see drawBurning)
++	bool _hasCardPicture = false;        // the frame drawn last was put together on the card
++	std::vector<Uint32> _cardPicture;    // ... it, a 0xFFRRGGBB number a pixel
++	std::vector<Uint8> _gpuBeforeLast;   // (the check) the picture before the CPU's last passes
++	/// Puts the frame together on the card, once the CPU's last passes are drawn.
++	void gpuPresent();
 +	/// Before anything drawn after the units and effects reads the depth buffer: has it fetched from the card if it wasn't yet.
 +	void gpuNeedDepth() { if (_gpuDepthPending) gpuFetchDepth(); }
 +	void gpuFetchDepth();
@@ -57728,10 +58154,10 @@ index 000000000..b6fbee4f6
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpuEffects.cpp b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 new file mode 100644
-index 000000000..377c9c017
+index 000000000..748612e46
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
-@@ -0,0 +1,821 @@
+@@ -0,0 +1,937 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -58344,6 +58770,21 @@ index 000000000..377c9c017
 +	effects.maxDistance = _maxDistance;
 +	effects.palette = getPalette();
 +	effects.nearestRgb = _nearestRgb.empty() ? nullptr : _nearestRgb.data();
++	// The screen wash after that, as applyScreenWash has it (the static's pattern moved on by it, or here when the card washes alone).
++	effects.wash = _nightVision || _tintAmount > 0.0f || _vignette > 0.0f || _controlHaze > 0.0f || _staticAmount > 0.0f;
++	if (effects.wash && !_gpuChecking) _staticSeed = _staticSeed * 1664525u + 1013904223u;
++	effects.nightVision = _nightVision;
++	effects.ownColours = Options::fpsNightVisionUnits;
++	effects.tintAmount = _tintAmount;
++	effects.tintRedShare = _tintRedShare;
++	effects.tintKind = _tintKind;
++	effects.staticAmount = _staticAmount;
++	effects.staticSeed = _staticSeed;
++	std::copy(_colors.grey, _colors.grey + 4, effects.greys);
++	effects.vignette = _vignette;
++	effects.controlHaze = _controlHaze;
++	const Uint8 *const tints[6] = { _colors.redTint, _colors.blueTint, _colors.orangeTint, _colors.whiteTint, _colors.greenTint, _colors.purpleTint };
++	std::copy(tints, tints + 6, effects.tints);
 +	// What comes back beside the picture: in the check every pixel's notes; else only those round the pointer (whose
 +	// picture the player points at).
 +	const bool allNotes = _gpuChecking;
@@ -58378,10 +58819,19 @@ index 000000000..377c9c017
 +	output.trueColor = fullColor ? _trueColor.data() : nullptr;
 +	// Beside the picture: in full colour the rays' own palette colours (a pixel that still has its ray's is shown in
 +	// the full one, see trueColor), and with light in the air where the smoke lies; the depth only if asked later.
-+	const bool shaftSmoke = fullColor && _hasLightShafts;
-+	const bool ownColours = _nightVision && Options::fpsNightVisionUnits; // (futuristic night vision: the wash leaves the units', bodies' and items' colours)
-+	effects.rayColors = fullColor ? _rayColors.data() : nullptr;
-+	effects.readGlow = shaftSmoke || ownColours;
++	// (OPENXCOM3D_GPU_PRESENT=1: in full colour the frame is put together on the card, see gpuPresent; =check: both ways, compared.)
++	static const char *const presentAsked = getenv("OPENXCOM3D_GPU_PRESENT");
++	_gpuPresenting = !presentAsked || !fullColor ? 0 : !strcmp(presentAsked, "check") ? 2 : atoi(presentAsked) != 0 ? 1 : 0;
++	// (Only a display with a byte for each of red, green and blue can show such a frame: on an 8-bit one the view's own
++	// palette picture is what is shown, and it must hold the world.)
++	const SDL_Surface *display = SDL_GetVideoSurface();
++	if (_gpuPresenting == 1 && (!display || display->format->BytesPerPixel != 4)) _gpuPresenting = 0;
++	const bool onCard = _gpuPresenting == 1;
++	const bool shaftSmoke = fullColor && _hasLightShafts && !onCard;
++	effects.rayColors = fullColor && !onCard ? _rayColors.data() : nullptr;
++	if (onCard) output.trueColor = nullptr;
++	effects.readColor = !onCard;
++	effects.readGlow = shaftSmoke;
 +	effects.readDepth = false;
 +	FirstPersonGpu *gpu = readyFirstPersonGpu();
 +	// (OPENXCOM3D_GPU_TIMING: the effects' share of the card's time, in the log every 60 frames.)
@@ -58446,17 +58896,19 @@ index 000000000..377c9c017
 +			_smokeVeil[index] = (_glowMask[index] & 64) ? 1 : 0;
 +		}
 +	}
-+	// ... and which pixels keep their own colours under the night vision's wash is its bit 32.
-+	if (ownColours)
-+	{
-+		for (size_t index = 0; index < (size_t)width * height; ++index)
-+		{
-+			_ownColours[index] = (_glowMask[index] >> 5) & 1;
-+		}
-+	}
-+	if (fullColor)
++	if (fullColor && !onCard)
 +	{
 +		_hasTrueColor = true;
++	}
++	if (onCard)
++	{
++		// The picture stays on the card: what is drawn from here on goes over an empty one (see gpuPresent).
++		for (int row = 0; row < height; ++row) std::memset(getRaw(0, row), 0, width);
++	}
++	else if (_gpuPresenting == 2)
++	{
++		_gpuBeforeLast.resize((size_t)width * height);
++		for (int row = 0; row < height; ++row) std::memcpy(&_gpuBeforeLast[(size_t)row * width], getRaw(0, row), width);
 +	}
 +	_gpuDepthPending = true; // (the depth stays on the card until something drawn after this asks: see gpuNeedDepth)
 +	return true;
@@ -58474,6 +58926,96 @@ index 000000000..377c9c017
 +	if (!gpu || !gpu->readEffectsDepth(getWidth(), getHeight(), _depthBuffer.data()))
 +	{
 +		std::fill(_depthBuffer.begin(), _depthBuffer.end(), 0.0f); // (the card failed: everything counts as hidden this frame)
++	}
++}
++
++/**
++ * Puts the frame together on the card (FirstPersonGpu::present), once the CPU's last passes (the
++ * aimed path under night vision, the flames and the blood on the view, the numbers, icons and
++ * markers) are drawn: they went over an empty picture, which goes up as the overlay, and the card
++ * lays it over its own finished picture, through the palette or in full colour. On the desktop the
++ * frame comes back once, as it is shown (see cardPicture); a display on the card's own context (a
++ * headset's) takes it from FirstPersonGpu::presentedTexture, and nothing comes back.
++ * The flames' orange light on the lower part of a burning soldier's view tints the picture under it: the card lays
++ * that on too (see drawBurning; not on what the CPU drew before the flames, the aimed path under night vision).
++ * The check (=check): the usual way is shown; the card gets as overlay what the last passes
++ * changed, and its frame is compared with what the mode would put together.
++ */
++void FirstPersonView::gpuPresent()
++{
++	const int presenting = _gpuPresenting;
++	_gpuPresenting = 0;
++	_hasCardPicture = false;
++	FirstPersonGpu *gpu = readyFirstPersonGpu();
++	if (!gpu)
++	{
++		return;
++	}
++	const int width = getWidth(), height = getHeight();
++	const size_t pixels = (size_t)width * height;
++	FirstPersonGpu::Present frame;
++	frame.width = width;
++	frame.height = height;
++	frame.full = true;
++	frame.shafts = _hasLightShafts;
++	frame.palette = getPalette();
++	frame.paletteHash = _colors.paletteHash;
++	_cardPicture.resize(pixels);
++	frame.pixels = _cardPicture.data();
++	if (presenting == 1)
++	{
++		frame.flameGlow = _gpuFlameGlow;
++		frame.flameTint = _colors.orangeTint;
++		frame.overlay = getRaw(0, 0);
++		frame.overlayPitch = getPitch();
++		_hasCardPicture = gpu->present(frame);
++		return;
++	}
++	// The check: the overlay is what the last passes changed.
++	std::vector<Uint8> overlay(pixels);
++	for (int row = 0; row < height; ++row)
++	{
++		const Uint8 *made = getRaw(0, row), *before = &_gpuBeforeLast[(size_t)row * width];
++		for (int column = 0; column < width; ++column) overlay[(size_t)row * width + column] = made[column] != before[column] ? made[column] : 0;
++	}
++	frame.overlay = overlay.data();
++	frame.overlayPitch = width;
++	if (!gpu->present(frame) || !_hasTrueColor || width < 320)
++	{
++		return;
++	}
++	// What the mode would show (see FirstPersonMode::blit), a channel may be one off (the card rounds a colour's fractions).
++	const SDL_Color *palette = getPalette();
++	static long frames = 0, checked = 0, different = 0;
++	for (int row = 0; row < height; ++row)
++	{
++		const Uint8 *made = getRaw(0, row);
++		for (int column = 0; column < width; ++column)
++		{
++			const size_t index = (size_t)row * width + column;
++			const SDL_Color &own = palette[made[column]];
++			int wanted[3] = { own.r, own.g, own.b };
++			const Uint32 full = _trueColor[index];
++			if (made[column] == _rayColors[index])
++			{
++				wanted[0] = (full >> 16) & 0xFF; wanted[1] = (full >> 8) & 0xFF; wanted[2] = full & 0xFF;
++			}
++			else if (_hasLightShafts && _smokeVeil[index])
++			{
++				const SDL_Color &ray = palette[_rayColors[index]];
++				wanted[0] = std::min(255, own.r + std::max(0, (int)((full >> 16) & 0xFF) - ray.r));
++				wanted[1] = std::min(255, own.g + std::max(0, (int)((full >> 8) & 0xFF) - ray.g));
++				wanted[2] = std::min(255, own.b + std::max(0, (int)(full & 0xFF) - ray.b));
++			}
++			const Uint32 got = _cardPicture[index];
++			different += std::abs((int)((got >> 16) & 0xFF) - wanted[0]) > 1 || std::abs((int)((got >> 8) & 0xFF) - wanted[1]) > 1 || std::abs((int)(got & 0xFF) - wanted[2]) > 1;
++		}
++	}
++	checked += (long)pixels;
++	if (++frames % 60 == 0)
++	{
++		Log(LOG_INFO) << "OpenXcom3D GPU: the frame put together on the card: of " << checked << " pixels " << different << " differ (" << 100.0 * different / checked << "%)";
++		checked = different = 0;
 +	}
 +}
 +
@@ -58555,10 +59097,10 @@ index 000000000..377c9c017
 +}
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..8b657d8fe
+index 000000000..6140a7187
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,2012 @@
+@@ -0,0 +1,2014 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -60429,6 +60971,8 @@ index 000000000..8b657d8fe
 +	static const bool rayTime = getenv("OPENXCOM3D_RAY_TIME") != nullptr;
 +	const auto started = std::chrono::steady_clock::now();
 +	_hasTrueColor = false; // (set again by the card when it gives the frame's picture in full colour too)
++	_hasCardPicture = false;
++	_gpuPresenting = 0;
 +	const bool onCard = !gpuShadow && Options::fpsRenderer == 1 && gpuCastAllRays();
 +	if (!onCard)
 +	{
@@ -61134,10 +61678,10 @@ index 000000000..ae3f925b8
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewScreenEffects.cpp b/src/FirstPerson/FirstPersonViewScreenEffects.cpp
 new file mode 100644
-index 000000000..dc4e7ff65
+index 000000000..e395d4757
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewScreenEffects.cpp
-@@ -0,0 +1,728 @@
+@@ -0,0 +1,733 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -61299,7 +61843,12 @@ index 000000000..dc4e7ff65
 +	const float flicker = 0.8f + 0.2f * std::sin(now * 0.031f) * std::sin(now * 0.017f + 1.0f);
 +	// The light of the flames, from below: the bottom 30% of the picture tinted orange, more
 +	// the lower (a curve, so it gathers near the bottom), dithered in.
-+	if (_burningAmount > 0.0f)
++	_gpuFlameGlow = 0.0f;
++	if (_burningAmount > 0.0f && _gpuPresenting == 1)
++	{
++		_gpuFlameGlow = 0.7f * fierceness * flicker; // (the picture is on the card: it lays the light on it, see gpuPresent)
++	}
++	else if (_burningAmount > 0.0f)
 +	{
 +		const int glowRows = (int)(viewHeight * 0.3f);
 +		for (int screenY = viewHeight - glowRows; screenY < viewHeight; ++screenY)

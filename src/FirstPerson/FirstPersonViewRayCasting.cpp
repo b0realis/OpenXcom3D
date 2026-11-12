@@ -1868,6 +1868,8 @@ void FirstPersonView::castAllRays()
 	static const bool rayTime = getenv("OPENXCOM3D_RAY_TIME") != nullptr;
 	const auto started = std::chrono::steady_clock::now();
 	_hasTrueColor = false; // (set again by the card when it gives the frame's picture in full colour too)
+	_hasCardPicture = false;
+	_gpuPresenting = 0;
 	const bool onCard = !gpuShadow && Options::fpsRenderer == 1 && gpuCastAllRays();
 	if (!onCard)
 	{

@@ -317,6 +317,14 @@ public:
 		smokeVeil = _hasLightShafts ? _smokeVeil.data() : nullptr;
 		return true;
 	}
+	/// This frame as the graphics card put it together (see gpuPresent), if it did: a 0xFFRRGGBB number a pixel. The view's own
+	/// surface then holds only what the CPU drew last (0 elsewhere).
+	bool cardPicture(const Uint32 *&pixels) const
+	{
+		if (!_hasCardPicture) return false;
+		pixels = _cardPicture.data();
+		return true;
+	}
 	/// Uses another view's voxel models instead of building its own (a small extra view). Set
 	/// before the battle, so the models aren't built twice.
 	void shareCache(FirstPersonView *owner);
@@ -994,6 +1002,15 @@ private:
 	/// Has the card draw what was recorded and takes the finished pictures back; recording stops.
 	bool gpuDrawEffects();
 	bool _gpuDepthPending = false; // this frame's depth is still on the card (see gpuNeedDepth)
+	// The frame put together on the card (OPENXCOM3D_GPU_PRESENT; see gpuPresent): the picture never comes back as palette
+	// colours; what the CPU draws last goes over an empty picture, and the card lays that over its own and gives the frame.
+	int _gpuPresenting = 0;              // this frame: 0 no; 1 yes; 2 beside the usual way, the two compared
+	float _gpuFlameGlow = 0.0f;          // ... a burning soldier's flames light the lower part of the picture this strongly (see drawBurning)
+	bool _hasCardPicture = false;        // the frame drawn last was put together on the card
+	std::vector<Uint32> _cardPicture;    // ... it, a 0xFFRRGGBB number a pixel
+	std::vector<Uint8> _gpuBeforeLast;   // (the check) the picture before the CPU's last passes
+	/// Puts the frame together on the card, once the CPU's last passes are drawn.
+	void gpuPresent();
 	/// Before anything drawn after the units and effects reads the depth buffer: has it fetched from the card if it wasn't yet.
 	void gpuNeedDepth() { if (_gpuDepthPending) gpuFetchDepth(); }
 	void gpuFetchDepth();

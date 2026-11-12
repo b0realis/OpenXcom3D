@@ -2351,6 +2351,113 @@ void main()
 }
 )";
 
+
+/**
+ * The screen wash on the card (FirstPersonView::washBands), after the bloom: night vision's one
+ * colour group (a unit's, a body's or an item's pixel keeping its own with the futuristic kind),
+ * the colour wash, a camera feed's static, the hurt soldier's red edges and the purple ones of a
+ * unit under our mind control; each as there, in that order.
+ */
+const char *const WashSource = R"(
+uniform usampler2D uColor, uGlow, uTints; // the picture, its glow (bit 32: the pixel keeps its own colours); the six tint tables, a row each: red, blue, orange, white, green, purple
+uniform ivec2 uViewSize;
+uniform int uNightVision, uOwnColours;    // the night vision's colour group + 1 (0: off); 1: futuristic (own colours kept)
+uniform float uTintAmount, uTintRedShare; // the colour wash: its share of the pixels, and of those the share washed red instead
+uniform int uTintRow;                     // ... its table's row
+uniform float uStaticAmount;
+uniform uint uStaticSeed;
+uniform ivec4 uGreys;                     // the static's four greys
+uniform float uVignette, uControlHaze;
+layout(location = 0) out uint outColor;
+
+const float Bayer[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+float dither(int x, int y) { return Bayer[(y & 3) * 4 + (x & 3)] / 16.0; }
+uint tinted(int row, uint color) { return texelFetch(uTints, ivec2(int(color), row), 0).r; }
+
+void main()
+{
+	ivec2 pixel = ivec2(gl_FragCoord.xy);
+	uint color = texelFetch(uColor, pixel, 0).r;
+	if (uNightVision != 0 && color != 0u && !(uOwnColours != 0 && (texelFetch(uGlow, pixel, 0).r & 32u) != 0u)) color = uint((uNightVision - 1) * 16) | (color & 15u);
+	if (uTintAmount > 0.0 && dither(pixel.x, pixel.y) < uTintAmount)
+	{
+		color = tinted(uTintRedShare > 0.0 && dither(pixel.y + 1, pixel.x + 2) < uTintRedShare ? 0 : uTintRow, color);
+	}
+	if (uStaticAmount > 0.0)
+	{
+		// The row's random numbers, a step a pixel from the row's own start: the pixel's, by squaring (the CPU steps along the row).
+		uint seed = uStaticSeed ^ (uint(pixel.y) * 2654435761u), mul = 1u, add = 0u, stepMul = 1664525u, stepAdd = 1013904223u;
+		for (uint steps = uint(pixel.x) + 1u; steps != 0u; steps >>= 1)
+		{
+			if ((steps & 1u) != 0u)
+			{
+				mul *= stepMul;
+				add = add * stepMul + stepAdd;
+			}
+			stepAdd = (stepMul + 1u) * stepAdd;
+			stepMul *= stepMul;
+		}
+		seed = seed * mul + add;
+		if (float((seed >> 8) & 255u) < uStaticAmount * 256.0) color = uint(uGreys[int(seed >> 30)]);
+	}
+	if (uVignette > 0.0 || uControlHaze > 0.0)
+	{
+		vec2 centre = vec2(uViewSize) * 0.5;
+		float share = length(vec2(pixel) - centre) / length(centre);
+		if (uVignette > 0.0 && smoothstep(0.55, 1.0, share) * uVignette > dither(pixel.x + 3, pixel.y + 1)) color = tinted(0, color);
+		else if (uControlHaze > 0.0 && smoothstep(ControlHazeFrom, 1.0, share) * uControlHaze > dither(pixel.x + 1, pixel.y + 2)) color = tinted(5, color);
+	}
+	outColor = color;
+}
+)";
+
+
+/**
+ * The frame as it is shown, put together on the card (FirstPersonGpu::present): the finished
+ * picture with what the CPU drew last laid over it (the overlay: 0 where it drew nothing), each
+ * pixel through the palette; or, in full colour, the rays' own full colour where the pixel still
+ * has its ray's palette colour, and over a ray's pixel under see-through smoke the light the card
+ * found in the air there (as FirstPersonMode::blit puts the full-colour picture together).
+ */
+const char *const PresentSource = R"(
+uniform usampler2D uColor, uGlow, uOverlay, uRayColor; // the finished picture, its glow (bit 64: smoke over the pixel), the overlay, the rays' own palette colours
+uniform sampler2D uRayTrue, uPalette;                  // the rays' full colours; the palette, a texel a colour
+uniform int uFull, uShafts;                            // 1: in full colour; 1: with light in the air
+uniform usampler2D uFlameTint;                         // each colour in the flames' orange light
+uniform float uFlameGlow;                              // a burning soldier's flames light the lower part of the view this strongly (0: none; see FirstPersonView::drawBurning)
+uniform ivec2 uViewSize;
+layout(location = 0) out vec4 outPixel;
+
+const float Bayer[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+float dither(int x, int y) { return Bayer[(y & 3) * 4 + (x & 3)] / 16.0; }
+vec3 paletteColor(uint color) { return texelFetch(uPalette, ivec2(int(color), 0), 0).rgb; }
+
+void main()
+{
+	ivec2 pixel = ivec2(gl_FragCoord.xy);
+	uint made = texelFetch(uOverlay, pixel, 0).r;
+	if (made == 0u)
+	{
+		made = texelFetch(uColor, pixel, 0).r;
+		// The flames' light from below, on the picture under them: the bottom 30% of the view, more the lower, dithered in.
+		int glowRows = int(float(uViewSize.y) * 0.3), firstRow = uViewSize.y - glowRows;
+		if (uFlameGlow > 0.0 && pixel.y >= firstRow && dither(pixel.x, pixel.y) < pow(float(pixel.y - firstRow) / float(glowRows), 1.6) * uFlameGlow)
+		{
+			made = texelFetch(uFlameTint, ivec2(int(made), 0), 0).r;
+		}
+	}
+	vec3 shown = paletteColor(made);
+	if (uFull != 0)
+	{
+		uint ray = texelFetch(uRayColor, pixel, 0).r;
+		vec3 full = texelFetch(uRayTrue, pixel, 0).rgb;
+		if (made == ray) shown = full;
+		else if (uShafts != 0 && (texelFetch(uGlow, pixel, 0).r & 64u) != 0u) shown = min(vec3(1.0), shown + max(vec3(0.0), full - paletteColor(ray)));
+	}
+	outPixel = vec4(shown, 1.0);
+}
+)";
+
 }
 
 }

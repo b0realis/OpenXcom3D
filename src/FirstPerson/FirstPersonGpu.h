@@ -173,13 +173,40 @@ public:
 		float maxDistance = 0.0f;      // the view's reach, in voxels (something shining in the sky counts as that far)
 		const SDL_Color *palette = nullptr; // the view's palette
 		const Uint8 *nearestRgb = nullptr;  // the palette colour nearest each 15-bit colour (FirstPersonView::_nearestRgb)
+		// The screen wash after that (FirstPersonView::applyScreenWash), if any of it is on.
+		bool wash = false;
+		int nightVision = 0;           // the night vision's colour group + 1 (0: off)
+		bool ownColours = false;       // ... futuristic: units', bodies' and items' pixels keep their colours
+		float tintAmount = 0.0f, tintRedShare = 0.0f;
+		int tintKind = 0;              // the colour wash's table: 0 red, 1 blue, 2 orange, 3 white, 4 green
+		float staticAmount = 0.0f;
+		Uint32 staticSeed = 0;
+		Uint8 greys[4] = {};
+		float vignette = 0.0f, controlHaze = 0.0f;
+		const Uint8 *tints[6] = {};    // the tint tables: red, blue, orange, white, green, purple (256 colours each)
 		// What comes back beside the picture (the colour always; each of these only if asked).
+		bool readColor = true;         // the finished colour, into Output::color (not when the frame is put together on the card: see present)
 		bool readDepth = false;        // the depth, into Output::depth (else on demand: readEffectsDepth)
 		bool readGlow = false;         // the glow (1, 3; 32: the pixel keeps its own colours under night vision; 64: see-through smoke lies over it), into Output::glow
 		Uint8 *rayColors = nullptr;    // the palette colour each pixel had from its ray, before anything was drawn over it (for the full-colour picture)
 		Uint32 *notes = nullptr;       // four numbers a pixel: the unit veil left, own colours | smoke veil << 1, 1 + the last solid sprite's number, 1 + the last pile's; null: not asked
 		int patch[4] = {};             // ... or only those of a patch of the view (left, top, width, height; none wide: no patch), row by row from its top:
 		Uint32 *patchNotes = nullptr;  // what the player points at is read from the notes round the pointer
+	};
+	/// The frame as shown, put together on the card after the units and effects (see present): for a display fed
+	/// straight from the card (a headset's), nothing of the picture need come back at all.
+	struct Present
+	{
+		int width = 0, height = 0;     // the view, in pixels
+		const Uint8 *overlay = nullptr; // what the CPU drew last, over an empty picture: palette colours, 0 where nothing; rows from the top
+		int overlayPitch = 0;          // ... bytes from one row to the next
+		bool full = false;             // in full colour (setting "True colour"): the rays' own where a pixel still has its ray's colour
+		bool shafts = false;           // ... with light in the air this frame (setting "Light shafts"): laid on see-through smoke
+		const SDL_Color *palette = nullptr;
+		Uint32 paletteHash = 0;
+		float flameGlow = 0.0f;        // a burning soldier's flames light the lower part of the view this strongly (0: none)
+		const Uint8 *flameTint = nullptr; // ... each colour in that light (256)
+		Uint32 *pixels = nullptr;      // where the frame goes, a 0xFFRRGGBB number a pixel, rows from the top; null: it stays on the card (see presentedTexture)
 	};
 	/// Where a frame's time went, in milliseconds.
 	struct Timing
@@ -207,6 +234,11 @@ public:
 	/// reads the finished pictures back into the view's buffers.
 	/// @return False if the card failed (the caller keeps to the CPU from now on).
 	bool drawEffects(const Effects &effects, const Output &output, Timing *timing);
+	/// Puts the frame together on the card from the pictures the last drawEffects for a view of this size left there.
+	bool present(const Present &frame);
+	/// The OpenGL texture (RGBA8, rows from the top) the last present for a view of this size drew into; 0: none. For a
+	/// display on the renderer's own context to show without reading anything back.
+	unsigned presentedTexture(int width, int height);
 	/// The depth of the units and effects last drawn for a view of this size, read back after all (see Effects::readDepth).
 	bool readEffectsDepth(int width, int height, float *depth);
 

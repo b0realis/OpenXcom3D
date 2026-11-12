@@ -53,6 +53,7 @@ const Enum NoError = 0; // (GL_NO_ERROR: not spelt so, Windows has a macro of th
 const Enum TEXTURE_2D = 0x0DE1, TEXTURE_BUFFER = 0x8C2A, TEXTURE0 = 0x84C0;
 const Enum TEXTURE_MIN_FILTER = 0x2801, TEXTURE_MAG_FILTER = 0x2800, NEAREST = 0x2600;
 const Enum TEXTURE_WRAP_S = 0x2802, TEXTURE_WRAP_T = 0x2803, CLAMP_TO_EDGE = 0x812F;
+const Enum UNPACK_ROW_LENGTH = 0x0CF2;
 const Enum R8UI = 0x8232, R16UI = 0x8234, R32I = 0x8235, R32F = 0x822E, RGBA32UI = 0x8D70, RGBA32F = 0x8814, R32UI = 0x8236, RGBA16UI = 0x8D76;
 const Enum RED = 0x1903, RED_INTEGER = 0x8D94, RGBA_INTEGER = 0x8D99, RGBA = 0x1908, RGBA8 = 0x8058, BGRA = 0x80E1, UNSIGNED_INT_8_8_8_8_REV = 0x8367;
 const Enum UNSIGNED_BYTE = 0x1401, UNSIGNED_SHORT = 0x1403, UNSIGNED_INT = 0x1405, FLOAT = 0x1406;
@@ -120,6 +121,8 @@ const Enum IMPLEMENTATION_COLOR_READ_TYPE = 0x8B9A, IMPLEMENTATION_COLOR_READ_FO
 	X(void, Uniform1i, (Int location, Int a)) \
 	X(void, Uniform2i, (Int location, Int a, Int b)) \
 	X(void, Uniform3i, (Int location, Int a, Int b, Int c)) \
+	X(void, Uniform4i, (Int location, Int a, Int b, Int c, Int d)) \
+	X(void, Uniform1ui, (Int location, UInt a)) \
 	X(void, Uniform1f, (Int location, Float a)) \
 	X(void, Uniform2f, (Int location, Float a, Float b)) \
 	X(void, Uniform3f, (Int location, Float a, Float b, Float c)) \
