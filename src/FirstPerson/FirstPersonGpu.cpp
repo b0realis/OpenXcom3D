@@ -110,7 +110,7 @@ bool GpuContext::loadFunctions()
  * machine's graphics devices as EGL lists them (EGL_EXT_device_enumeration), the one asked for
  * by number; where EGL can't list them, on its default display.
  */
-bool GpuContext::create(int device)
+bool GpuContext::create(int device, bool es)
 {
 	// EGL's own types and constants (its values), kept local: nothing else needs them.
 	typedef void *(*GetDisplay)(void *);
@@ -127,7 +127,8 @@ bool GpuContext::create(int device)
 	typedef const char *(*QueryDeviceString)(void *, int);
 	const int EglExtensions = 0x3055, EglNone = 0x3038, EglSurfaceType = 0x3033, EglPbufferBit = 1, EglRenderableType = 0x3040, EglOpenGlBit = 8;
 	const int EglContextMajor = 0x3098, EglContextMinor = 0x30FB, EglProfileMask = 0x30FD, EglCoreProfile = 1, EglWidth = 0x3057, EglHeight = 0x3056;
-	const unsigned EglOpenGlApi = 0x30A2, EglPlatformDevice = 0x313F;
+	const unsigned EglOpenGlApi = 0x30A2, EglOpenGlEsApi = 0x30A0, EglPlatformDevice = 0x313F;
+	const int EglOpenGlEs3Bit = 0x40;
 	const int EglDrmDeviceFile = 0x3233;
 
 	_library = dlopen("libEGL.so.1", RTLD_NOW | RTLD_LOCAL);
@@ -186,27 +187,30 @@ bool GpuContext::create(int device)
 		_display = getDisplay(nullptr);
 	}
 	int major = 0, minor = 0;
-	if (!_display || !initialize(_display, &major, &minor) || !bindApi(EglOpenGlApi))
+	if (!_display || !initialize(_display, &major, &minor) || !bindApi(es ? EglOpenGlEsApi : EglOpenGlApi))
 	{
 		Log(LOG_WARNING) << "OpenXcom3D GPU: EGL would not start (error " << std::hex << getError() << ")";
 		return false;
 	}
 
 	// A context with no window: on no surface at all where the driver allows, else on a 1x1 off-screen one.
-	const int configWanted[] = { EglSurfaceType, EglPbufferBit, EglRenderableType, EglOpenGlBit, EglNone };
+	const int configWanted[] = { EglSurfaceType, EglPbufferBit, EglRenderableType, es ? EglOpenGlEs3Bit : EglOpenGlBit, EglNone };
 	void *config = nullptr;
 	int configCount = 0;
 	if (!chooseConfig(_display, configWanted, &config, 1, &configCount) || configCount < 1)
 	{
 		config = nullptr; // no config: fine with EGL_KHR_no_config_context, and the surfaceless way below
 	}
+	// (OpenGL ES 3.2: the first with buffer textures, which hold the world for the shader.)
 	const int contextWanted[] = { EglContextMajor, 3, EglContextMinor, 3, EglProfileMask, EglCoreProfile, EglNone };
-	_context = createContext(_display, config, nullptr, contextWanted);
+	const int esContextWanted[] = { EglContextMajor, 3, EglContextMinor, 2, EglNone };
+	_context = createContext(_display, config, nullptr, es ? esContextWanted : contextWanted);
 	if (!_context)
 	{
-		Log(LOG_WARNING) << "OpenXcom3D GPU: no OpenGL 3.3 context (EGL error " << std::hex << getError() << ")";
+		Log(LOG_WARNING) << "OpenXcom3D GPU: no " << (es ? "OpenGL ES 3.2" : "OpenGL 3.3") << " context (EGL error " << std::hex << getError() << ")";
 		return false;
 	}
+	_es = es;
 	if (!makeCurrent(_display, nullptr, nullptr, _context))
 	{
 		const int surfaceWanted[] = { EglWidth, 1, EglHeight, 1, EglNone };
@@ -221,7 +225,8 @@ bool GpuContext::create(int device)
 	{
 		return false;
 	}
-	_name = std::string((const char *)Gl::GetString(Gl::RENDERER)) + " (OpenGL " + (const char *)Gl::GetString(Gl::VERSION) + ")";
+	const std::string version = (const char *)Gl::GetString(Gl::VERSION); // (an ES context's says "OpenGL ES" itself)
+	_name = std::string((const char *)Gl::GetString(Gl::RENDERER)) + " (" + (es ? "" : "OpenGL ") + version + ")";
 	return true;
 }
 
@@ -280,9 +285,9 @@ void *appleFunction(const char *name)
  * only), hardware-accelerated, with no window and no view: the rays are drawn into our own
  * textures. macOS has one renderer to offer us, the system's: device 0.
  */
-bool GpuContext::create(int device)
+bool GpuContext::create(int device, bool es)
 {
-	if (device > 0)
+	if (device > 0 || es) // (OpenGL ES: through EGL only)
 	{
 		return false; // no such device
 	}
@@ -371,7 +376,7 @@ bool GpuContext::software() const
 #elif !defined(_WIN32) // (Windows: FirstPersonGpuWindows.cpp)
 
 /// Not on this system: the CPU renderer draws.
-bool GpuContext::create(int)
+bool GpuContext::create(int, bool)
 {
 	Log(LOG_INFO) << "OpenXcom3D GPU: not on this system";
 	return false;
@@ -589,13 +594,15 @@ struct FirstPersonGpu::State
 	std::vector<Uint8> tables;
 	std::vector<Uint8> blendSent; // the palette the blending table was last made for (see sendBlend)
 	std::vector<Uint32> wallPaintTexels;
-	std::vector<Sint32> mirrorNumbers;
-	std::vector<const void*> mirrorsSent; // the rows of the mirrors as sent last (sent again when they are others)
+	std::vector<Sint32> mirrorNumbers, mirrorScratch; // the mirrors as the card has them (see sendMirrors), and this frame's, put together to compare
 
 	void threadLoop();
 	void run(const std::function<void()> &work);
 	bool start(int device);
 	bool build(Program &built, bool results, int extras = 0);
+	std::string shaderHead() const;
+	void readPicture(int attachment, int width, int height, int kind, void *pixels, int rowLength);
+	std::vector<Uint32> readScratch; // OpenGL ES: a picture read in the one format it must give, before it is narrowed
 	Gl::Int location(const char *name);
 	Uint32 modelId(const FirstPersonView::VoxelModel *model);
 	Uint32 solidId(FirstPersonView::SolidRows solid);
@@ -661,9 +668,16 @@ Gl::Int FirstPersonGpu::State::location(const char *name)
  */
 bool FirstPersonGpu::State::start(int device)
 {
-	if (!context.create(device))
+	// OpenGL; or OpenGL ES 3.2 where that is all the device has (an ARM board; the Quest's kind of
+	// card), or when asked for by OPENXCOM3D_GPU_GLES (to prove the ES way on a desktop card).
+	const bool esAsked = getenv("OPENXCOM3D_GPU_GLES") != nullptr;
+	if (!context.create(device, esAsked))
 	{
-		return false;
+		context.destroy();
+		if (esAsked || !context.create(device, true))
+		{
+			return false;
+		}
 	}
 	// (OPENXCOM3D_GPU_SOFTWARE: a software OpenGL will do, for tests on machines without a card.)
 	if (context.software() && !getenv("OPENXCOM3D_GPU_SOFTWARE"))
@@ -716,14 +730,27 @@ bool FirstPersonGpu::State::start(int device)
 }
 
 /**
+ * The first lines of every shader: the language's version, and for OpenGL ES the precisions it
+ * makes each shader state (all the highest: the walk counts in whole voxels across a map, and
+ * the numbers the buffers hold fill their 32 bits) and GLES defined, for the few places the two
+ * languages part.
+ */
+std::string FirstPersonGpu::State::shaderHead() const
+{
+	return context.es() ? "#version 320 es\n#define GLES\nprecision highp float;\nprecision highp int;\nprecision highp sampler2D;\nprecision highp usampler2D;\n"
+		"precision highp samplerBuffer;\nprecision highp usamplerBuffer;\nprecision highp isamplerBuffer;\n" : "#version 330 core\n";
+}
+
+/**
  * Builds the rays' program: the picture-wide triangle, and the walk and the shading, with or
  * without the check's results; its samplers are pointed at the buffers' textures.
  */
 bool FirstPersonGpu::State::build(Program &built, bool results, int extras)
 {
-	const std::string raySource = std::string("#version 330 core\n") + (results ? "#define RESULTS\n" : "") + ((extras & 1) ? "#define COLORED_LIGHTS\n" : "")
+	const std::string raySource = shaderHead() + (results ? "#define RESULTS\n" : "") + ((extras & 1) ? "#define COLORED_LIGHTS\n" : "")
 		+ ((extras & 2) ? "#define REFLECTIONS\n" : "") + ((extras & 4) ? "#define LATER_RAYS\n" : "") + ((extras & 8) ? "#define LIGHT_SHAFTS\n" : "") + HeaderSource + shaderConstants() + WalkSource + ShadeSource;
-	const char *sources[2] = { VertexSource, raySource.c_str() };
+	const std::string vertexSource = shaderHead() + VertexSource;
+	const char *sources[2] = { vertexSource.c_str(), raySource.c_str() };
 	const Gl::Enum kinds[2] = { Gl::VERTEX_SHADER, Gl::FRAGMENT_SHADER };
 	built.id = Gl::CreateProgram();
 	for (int which = 0; which < 2; ++which)
@@ -807,7 +834,8 @@ FirstPersonGpu::State::Program *FirstPersonGpu::State::programFor(const Frame &f
  */
 bool FirstPersonGpu::State::buildResolve()
 {
-	const char *sources[2] = { VertexSource, ResolveSource };
+	const std::string vertexSource = shaderHead() + VertexSource, resolveSource = shaderHead() + ResolveSource;
+	const char *sources[2] = { vertexSource.c_str(), resolveSource.c_str() };
 	const Gl::Enum kinds[2] = { Gl::VERTEX_SHADER, Gl::FRAGMENT_SHADER };
 	const Gl::UInt built = Gl::CreateProgram();
 	for (int which = 0; which < 2; ++which)
@@ -1070,27 +1098,15 @@ void FirstPersonGpu::State::sendWallPaints(const Frame &frame)
 /**
  * The crafts' mirrors, as one row of numbers: sixteen for each mirror (lo[3], size[3], sum[2],
  * symmetric[2], then per axis where its start, pos and outer rows begin in this row), then all
- * their rows. Sent again only when the view has made its mirrors anew.
+ * their rows. Put together every frame (some hundreds of numbers) and sent only when they are
+ * other numbers than the card has: told by what they hold, not by where the view keeps them (a
+ * mirror made anew in the same memory looked unchanged by its addresses, and the card kept the
+ * old one).
  */
 void FirstPersonGpu::State::sendMirrors(const Frame &frame)
 {
-	std::vector<const void*> rows;
-	for (int index = 0; index < frame.mirrorCount; ++index)
-	{
-		for (int axis = 0; axis < 2; ++axis)
-		{
-			rows.push_back(frame.mirrors[index].start[axis]);
-			rows.push_back(frame.mirrors[index].pos[axis]);
-			rows.push_back(frame.mirrors[index].outer[axis]);
-			rows.push_back((const void*)(frame.mirrors[index].posCount[axis] + frame.mirrors[index].startCount[axis]));
-		}
-	}
-	if (rows == mirrorsSent && !mirrorNumbers.empty())
-	{
-		return;
-	}
-	mirrorsSent = rows;
-	mirrorNumbers.assign((size_t)std::max(1, frame.mirrorCount) * 16, 0);
+	std::vector<Sint32> &numbers = mirrorScratch;
+	numbers.assign((size_t)std::max(1, frame.mirrorCount) * 16, 0);
 	for (int index = 0; index < frame.mirrorCount; ++index)
 	{
 		const Mirror &mirror = frame.mirrors[index];
@@ -1098,15 +1114,20 @@ void FirstPersonGpu::State::sendMirrors(const Frame &frame)
 			mirror.symmetric[0] ? 1 : 0, mirror.symmetric[1] ? 1 : 0 };
 		for (int axis = 0; axis < 2; ++axis)
 		{
-			header[10 + axis * 3] = (Sint32)mirrorNumbers.size();
-			mirrorNumbers.insert(mirrorNumbers.end(), mirror.start[axis], mirror.start[axis] + mirror.startCount[axis]);
-			header[11 + axis * 3] = (Sint32)mirrorNumbers.size();
-			mirrorNumbers.insert(mirrorNumbers.end(), mirror.pos[axis], mirror.pos[axis] + mirror.posCount[axis]);
-			header[12 + axis * 3] = (Sint32)mirrorNumbers.size();
-			mirrorNumbers.insert(mirrorNumbers.end(), mirror.outer[axis], mirror.outer[axis] + mirror.outerCount[axis]);
+			header[10 + axis * 3] = (Sint32)numbers.size();
+			numbers.insert(numbers.end(), mirror.start[axis], mirror.start[axis] + mirror.startCount[axis]);
+			header[11 + axis * 3] = (Sint32)numbers.size();
+			numbers.insert(numbers.end(), mirror.pos[axis], mirror.pos[axis] + mirror.posCount[axis]);
+			header[12 + axis * 3] = (Sint32)numbers.size();
+			numbers.insert(numbers.end(), mirror.outer[axis], mirror.outer[axis] + mirror.outerCount[axis]);
 		}
-		std::copy(header, header + 16, mirrorNumbers.begin() + (size_t)index * 16);
+		std::copy(header, header + 16, numbers.begin() + (size_t)index * 16);
 	}
+	if (numbers == mirrorNumbers)
+	{
+		return;
+	}
+	mirrorNumbers = numbers;
 	Gl::BindBuffer(Gl::ARRAY_BUFFER, buffers[Mirrors]);
 	Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)(mirrorNumbers.size() * 4), mirrorNumbers.data(), Gl::DYNAMIC_DRAW);
 }
@@ -1273,6 +1294,71 @@ bool FirstPersonGpu::State::setTargets(int width, int height, bool results, int 
 }
 
 /**
+ * Reads one of the pictures just drawn back into the view's memory. OpenGL gives each in the
+ * form asked for. OpenGL ES gives a picture of whole numbers only as four 32-bit numbers a
+ * pixel, a picture of fractions as four of those, and colours red first, unless the driver
+ * offers the narrow form itself (it says which one form more it has): so there the picture is
+ * read wide into readScratch and narrowed here, where it must be.
+ * @param attachment Which picture (0 colour, 1 depth, 2 glow, 3 full colour, 4 results).
+ * @param width Its width, in pixels.
+ * @param height Its height.
+ * @param kind What it holds: 0 a byte a pixel, 1 a float, 2 full colour (wanted blue first), 3 four 32-bit numbers.
+ * @param pixels Where to.
+ * @param rowLength The memory's row length, in pixels.
+ */
+void FirstPersonGpu::State::readPicture(int attachment, int width, int height, int kind, void *pixels, int rowLength)
+{
+	static const Gl::Enum formats[4] = { Gl::RED_INTEGER, Gl::RED, Gl::BGRA, Gl::RGBA_INTEGER };
+	static const Gl::Enum types[4] = { Gl::UNSIGNED_BYTE, Gl::FLOAT, Gl::UNSIGNED_INT_8_8_8_8_REV, Gl::UNSIGNED_INT };
+	Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0 + attachment);
+	bool direct = !context.es() || kind == 3;
+	if (!direct && kind < 2)
+	{
+		Gl::Int format = 0, type = 0;
+		Gl::GetIntegerv(Gl::IMPLEMENTATION_COLOR_READ_FORMAT, &format);
+		Gl::GetIntegerv(Gl::IMPLEMENTATION_COLOR_READ_TYPE, &type);
+		direct = (Gl::Enum)format == formats[kind] && (Gl::Enum)type == types[kind];
+	}
+	if (direct)
+	{
+		Gl::PixelStorei(Gl::PACK_ROW_LENGTH, rowLength == width ? 0 : rowLength);
+		Gl::ReadPixels(0, 0, width, height, formats[kind], types[kind], pixels);
+		Gl::PixelStorei(Gl::PACK_ROW_LENGTH, 0);
+		return;
+	}
+	const size_t count = (size_t)width * height;
+	if (kind == 2)
+	{
+		// Red first, as ES gives colours: into place, then red and blue changed over.
+		Gl::PixelStorei(Gl::PACK_ROW_LENGTH, rowLength == width ? 0 : rowLength);
+		Gl::ReadPixels(0, 0, width, height, Gl::RGBA, Gl::UNSIGNED_BYTE, pixels);
+		Gl::PixelStorei(Gl::PACK_ROW_LENGTH, 0);
+		for (int row = 0; row < height; ++row)
+		{
+			Uint8 *bytes = (Uint8 *)pixels + (size_t)row * rowLength * 4;
+			for (int column = 0; column < width; ++column, bytes += 4) std::swap(bytes[0], bytes[2]);
+		}
+		return;
+	}
+	readScratch.resize(count * 4);
+	Gl::ReadPixels(0, 0, width, height, kind == 1 ? Gl::RGBA : Gl::RGBA_INTEGER, kind == 1 ? Gl::FLOAT : Gl::UNSIGNED_INT, readScratch.data());
+	for (int row = 0; row < height; ++row)
+	{
+		const Uint32 *wide = readScratch.data() + (size_t)row * width * 4;
+		if (kind == 1)
+		{
+			Uint32 *narrow = (Uint32 *)pixels + (size_t)row * rowLength; // (a float's bits, moved as they are)
+			for (int column = 0; column < width; ++column) narrow[column] = wide[column * 4];
+		}
+		else
+		{
+			Uint8 *narrow = (Uint8 *)pixels + (size_t)row * rowLength;
+			for (int column = 0; column < width; ++column) narrow[column] = (Uint8)wide[column * 4];
+		}
+	}
+}
+
+/**
  * One frame on the card: sends up what changed, draws the rays, and reads the picture back into
  * the view's buffers.
  */
@@ -1425,24 +1511,17 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 		blockGlow.resize(blockColors.size());
 		blockDepths.resize(blockColors.size());
 	}
-	Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0);
-	Gl::PixelStorei(Gl::PACK_ROW_LENGTH, blocks ? 0 : output.colorPitch);
-	Gl::ReadPixels(0, 0, blockColumns, blockRows, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, blocks ? blockColors.data() : output.color);
-	Gl::PixelStorei(Gl::PACK_ROW_LENGTH, 0);
-	Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0 + 1);
-	Gl::ReadPixels(0, 0, blockColumns, blockRows, Gl::RED, Gl::FLOAT, blocks ? blockDepths.data() : output.depth);
-	Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0 + 2);
-	Gl::ReadPixels(0, 0, blockColumns, blockRows, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, blocks ? blockGlow.data() : output.glow);
+	readPicture(0, blockColumns, blockRows, 0, blocks ? blockColors.data() : output.color, blocks ? blockColumns : output.colorPitch);
+	readPicture(1, blockColumns, blockRows, 1, blocks ? blockDepths.data() : output.depth, blockColumns);
+	readPicture(2, blockColumns, blockRows, 0, blocks ? blockGlow.data() : output.glow, blockColumns);
 	if (output.results)
 	{
-		Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0 + 4);
-		Gl::ReadPixels(0, 0, blockColumns, blockRows, Gl::RGBA_INTEGER, Gl::UNSIGNED_INT, output.results);
+		readPicture(4, blockColumns, blockRows, 3, output.results, blockColumns);
 	}
 	if (output.trueColor && !blocks)
 	{
 		// The full-colour picture (blue, green, red, the glow: a 0xGGRRGGBB number a pixel as this machine reads it).
-		Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0 + 3);
-		Gl::ReadPixels(0, 0, blockColumns, blockRows, Gl::BGRA, Gl::UNSIGNED_INT_8_8_8_8_REV, output.trueColor);
+		readPicture(3, blockColumns, blockRows, 2, output.trueColor, blockColumns);
 	}
 	if (blocks)
 	{
@@ -1561,7 +1640,6 @@ void FirstPersonGpu::forgetModels()
 		state.modelColors.assign(ModelVoxels, 0);
 		state.modelSides.assign(ModelSideBytes, 0);
 		state.modelExposed.assign(ModelVoxels, 0);
-		state.mirrorsSent.clear();
 		state.mirrorNumbers.clear();
 		state.modelBits.assign(MaskRows * ModelMasks, 0);
 		state.modelInfo.assign(4, 0);

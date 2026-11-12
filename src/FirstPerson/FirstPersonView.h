@@ -363,9 +363,9 @@ public:
 	/// Gets how far the view looks up (negative: down), in degrees.
 	double getPitchDegrees() const;
 	/// Gets the (normalized) direction of the ray through a pixel of the view.
-	void getRayDirection(int pixelX, int pixelY, double out[3]);
+	void getRayDirection(double pixelX, double pixelY, double out[3]);
 	/// The same, with the camera's axes as they are (already worked out for this frame: while drawing it).
-	void rayDirectionThrough(int pixelX, int pixelY, double out[3]) const;
+	void rayDirectionThrough(double pixelX, double pixelY, double out[3]) const;
 
 	// =====================================================================================
 	// What to show
@@ -603,6 +603,10 @@ private:
 	Uint8 _rockBase = 0;                                // the rock's colour, from the map's own rock round its edge (0: the plain rock colour)
 	std::vector<TileView> _tileViews;                   // this frame's snapshot of every tile: what the rays read
 	int _hiddenFloor = -1;                              // a floor left out: the lift platform the camera rides through
+	// What the last snapshot of all the tiles was taken with (a change in any takes every tile's afresh), and the tiles a door swung through then
+	int _snapshotHiddenFloor = -1;
+	bool _snapshotDebug = false, _snapshotUfoLights = false, _snapshotLeftOut = false;
+	std::vector<int> _swungTiles;
 	std::vector<std::pair<int, int>> _leftOutParts;     // parts left out (tile index, part): the ones the eye is inside with Doom IDCLIP
 	std::vector<const MapData*> _wallsLastFrame[2];     // west/north wall of each tile last frame
 	std::vector<DoorAnimation> _doorAnimations;         // doors swinging open
@@ -623,6 +627,7 @@ private:
 		SolidRows solid;                        // and their solid mask
 		std::array<const VoxelModel*, 4> paintParts; // the parts the floor was last looked at for (see paintedFloor)
 		const VoxelModel *paintedFloor;              // that floor with the UFO's floor going on inside (null: as it is)
+		bool restless = true;                        // its snapshot is taken every frame (animated, a UFO door, glass that can break, a door swung through it; or not taken yet): see snapshotTiles
 	};
 	std::vector<TileMemo> _tileMemos;                   // per tile: its parts last frame, and their solid mask
 	/// Floors under a UFO's hull with its floor going on inside (see paintedFloor), by the four parts' models and the UFO floors on the four sides (null: none there).
@@ -714,7 +719,9 @@ private:
 	/// Takes this frame's snapshot of every tile, for the rays.
 	void snapshotTiles();
 	/// What changed on a tile since the last frame: doors, burnt-out fires, destruction.
-	void noticeTileChanges(int index, Tile *tile);
+	bool noticeTileChanges(int index, Tile *tile);
+	/// The part of a tile's snapshot that is read afresh every frame: its light, the fog of war, its smoke and fire.
+	void snapshotTileLight(int index, Tile *tile);
 	/// Notes a tile's parts and fire on the first frame, so later frames can tell changes.
 	void startWatchingTile(int index, Tile *tile);
 	/// One tile's snapshot: models, animation, light, what has been seen.

@@ -1454,7 +1454,7 @@ bool FirstPersonMode::aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &
 	// The ray from the eye through that pixel, in voxels (16 per tile across, 24 per level).
 	double eye[3], rayDirection[3];
 	_view->getEye(eye);
-	_view->getRayDirection(pixelX, pixelY, rayDirection);
+	_view->getRayDirection(pixelX + aimPixelShift(), pixelY + aimPixelShift(), rayDirection);
 	const Position rayOrigin((int)eye[0], (int)eye[1], (int)eye[2]);
 	const Position farPoint(rayOrigin.x + (int)(rayDirection[0] * 1500), rayOrigin.y + (int)(rayDirection[1] * 1500),
 		rayOrigin.z + (int)(rayDirection[2] * 1500));
@@ -4008,7 +4008,7 @@ void FirstPersonMode::freeAimTarget(const BattleAction &action, Position &target
 	{
 		double eye[3], rayDirection[3];
 		_view->getEye(eye);
-		_view->getRayDirection(pixelX, pixelY, rayDirection);
+		_view->getRayDirection(pixelX + aimPixelShift(), pixelY + aimPixelShift(), rayDirection);
 		target = Position((int)(eye[0] + rayDirection[0] * 1500), (int)(eye[1] + rayDirection[1] * 1500), (int)(eye[2] + rayDirection[2] * 1500));
 	}
 

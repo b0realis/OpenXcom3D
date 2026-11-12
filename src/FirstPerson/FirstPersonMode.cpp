@@ -1223,6 +1223,18 @@ int FirstPersonMode::viewPixelY(int canvasPixel) const
 	return std::min(_view->getHeight() - 1, (int)((canvasPixel + 0.5) * _view->getHeight() / canvasHeight()));
 }
 
+/**
+ * How far the aim's ray goes from the middle of the view's pixel (see viewPixelX), in view pixels.
+ * The crosshair's middle is the middle of a canvas pixel. With the view an odd number of times
+ * the canvas's size, a view pixel has its middle there too; with an even number (HUD scale x2,
+ * x4 with 3D resolution Display) that point is the corner of four view pixels, and the one
+ * taken has its middle half a pixel down and to the right of it: the ray goes back that half.
+ */
+double FirstPersonMode::aimPixelShift() const
+{
+	return viewScale() % 2 == 0 ? -0.5 : 0.0;
+}
+
 /// The canvas pixel a pixel of the view lies in, across.
 int FirstPersonMode::canvasPixelX(int viewPixel) const
 {

@@ -64,6 +64,7 @@ const Enum TRIANGLES = 0x0004, DEPTH_TEST = 0x0B71, BLEND = 0x0BE2, DITHER = 0x0
 const Enum PACK_ALIGNMENT = 0x0D05, UNPACK_ALIGNMENT = 0x0CF5, PACK_ROW_LENGTH = 0x0D02;
 const Enum MAX_TEXTURE_BUFFER_SIZE = 0x8C2B;
 const Enum TIME_ELAPSED = 0x88BF, QUERY_RESULT = 0x8866;
+const Enum IMPLEMENTATION_COLOR_READ_TYPE = 0x8B9A, IMPLEMENTATION_COLOR_READ_FORMAT = 0x8B9B;
 
 // The functions used: one line each, as OpenGL declares them. GL_FUNCTIONS(X) lists them for the
 // declarations below and for the loader (GpuContext::loadFunctions).
@@ -86,8 +87,6 @@ const Enum TIME_ELAPSED = 0x88BF, QUERY_RESULT = 0x8866;
 	X(void, BindBuffer, (Enum target, UInt buffer)) \
 	X(void, BufferData, (Enum target, SizeiPtr size, const void *data, Enum usage)) \
 	X(void, BufferSubData, (Enum target, IntPtr offset, SizeiPtr size, const void *data)) \
-	X(void *, MapBuffer, (Enum target, Enum access)) \
-	X(Boolean, UnmapBuffer, (Enum target)) \
 	X(void, GenTextures, (Sizei count, UInt *textures)) \
 	X(void, DeleteTextures, (Sizei count, const UInt *textures)) \
 	X(void, BindTexture, (Enum target, UInt texture)) \
@@ -149,9 +148,11 @@ GL_FUNCTIONS(GL_DECLARE)
 class GpuContext
 {
 public:
-	/// Opens the context (OpenGL 3.3, core) on a device by number. False where there is none to be had (no such
-	/// device: silently; else the reason is in the log).
-	bool create(int device);
+	/// Opens the context (OpenGL 3.3, core; or with `es`, OpenGL ES 3.2, on Linux's EGL only) on a device by number.
+	/// False where there is none to be had (no such device: silently; else the reason is in the log).
+	bool create(int device, bool es = false);
+	/// Whether it is an OpenGL ES context (the shaders and the read-back differ: see FirstPersonGpu.cpp).
+	bool es() const { return _es; }
 	/// Whether the context draws on the CPU (a software OpenGL such as Mesa's llvmpipe): no use to us.
 	bool software() const;
 	/// Closes it.
@@ -169,6 +170,7 @@ private:
 	void *_surface = nullptr;
 	void *(*_getProcAddress)(const char *) = nullptr;
 	std::string _name;
+	bool _es = false;
 };
 
 }

@@ -376,6 +376,8 @@ private:
 	/// The view's pixel at the middle of a canvas pixel, across and down: where the mode points into the view.
 	int viewPixelX(int canvasPixel) const;
 	int viewPixelY(int canvasPixel) const;
+	/// How far the aim's ray goes from the middle of the view's pixel, so it passes through the crosshair's exact middle.
+	double aimPixelShift() const;
 	/// The canvas pixel a pixel of the view lies in, across and down.
 	int canvasPixelX(int viewPixel) const;
 	int canvasPixelY(int viewPixel) const;

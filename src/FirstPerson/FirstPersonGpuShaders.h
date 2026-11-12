@@ -37,7 +37,7 @@ namespace OpenXcom
 namespace
 {
 
-const char *const VertexSource = R"(#version 330 core
+const char *const VertexSource = R"(
 // One triangle over the whole picture.
 void main()
 {
@@ -1458,14 +1458,17 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 		{
 			// One ray at the sun; with the setting "Soft sun shadows", four at points round its disc, the ring of them
 			// turned from pixel to pixel: the share that is blocked is the shadow's depth, so its edge fades.
-			// (One loop for both, so the shader holds the shadow ray's walk once here.)
+			// The two at the disc's rim, opposite each other, go first: where both see the sun, or neither
+			// does, the point is clear of a shadow's edge and the other two are not cast (most of a picture).
+			// (One loop for all of it, so the shader holds the shadow ray's walk once here.)
 			int sunRays = uSoftShadows != 0 ? 4 : 1;
 			vec3 across = normalize(cross(uSunDir, abs(uSunDir.z) < 0.9 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0)));
 			vec3 along = cross(uSunDir, across);
 			float turn = dither(pixelX + 1, pixelY + 3) * 1.5707963;
 			float blocked = 0.0;
-			for (int sunRay = 0; sunRay < sunRays; ++sunRay)
+			for (int turnOf = 0; turnOf < sunRays; ++turnOf)
 			{
+				int sunRay = turnOf < 2 ? turnOf * 2 + 1 : (turnOf - 2) * 2; // (the rim's two, then the inner two)
 				vec3 towardsSun = uSunDir;
 				if (sunRays > 1)
 				{
@@ -1473,6 +1476,11 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 					towardsSun += (cos(angle) * across + sin(angle) * along) * (SunDiscRadius * ((sunRay & 1) != 0 ? 1.0 : 0.55));
 				}
 				if (shadowed(surfacePoint, surfacePoint + towardsSun * 260.0)) blocked += 1.0 / float(sunRays);
+				if (turnOf == 1 && blocked != 1.0 / float(sunRays))
+				{
+					blocked *= 2.0; // (both rim rays agree: all four would)
+					break;
+				}
 			}
 			sunShadow = 3.0 * daylight * blocked;
 			shade += sunShadow;
@@ -1841,7 +1849,7 @@ void main()
  * (It is its own program, not a loop over the rays in the one above: at least one driver took
  * a minute to build that.)
  */
-const char *const ResolveSource = R"(#version 330 core
+const char *const ResolveSource = R"(
 uniform usampler2D uColor0, uColor1, uColor2, uColor3;
 uniform sampler2D uDepth0, uDepth1, uDepth2, uDepth3;
 uniform sampler2D uTrue0, uTrue1, uTrue2, uTrue3; // each ray in full colour, the glow with it (see outTrue)

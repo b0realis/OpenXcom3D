@@ -53,6 +53,7 @@
 #include "FirstPersonView.h"
 #include <memory>
 #include <algorithm>
+#include <chrono>
 #include <array>
 #include <bitset>
 #include <climits>
@@ -3445,6 +3446,22 @@ void FirstPersonView::snapshotTiles()
 	// look at first as they walk the map: anything to trace in the tile, smoke on it, and the
 	// height of its highest solid voxel (see castRay); and its light, close together with the
 	// others' for the shading (see lightAt).
+	// Every tile's snapshot is taken afresh on the first frame, and when something changed that
+	// any tile's may hang on: the map's debug vision, the UFO lights, the floor left out, parts
+	// left out. A tile a door swung through last frame (the swing writes into its snapshot, see
+	// updateDoorSwings) has its own taken afresh.
+	const bool debug = _save->getDebugMode(), leftOut = !_leftOutParts.empty();
+	const bool everyTile = !trackWalls || debug != _snapshotDebug || _ufoLightsOn != _snapshotUfoLights || _hiddenFloor != _snapshotHiddenFloor
+		|| leftOut || _snapshotLeftOut;
+	_snapshotDebug = debug;
+	_snapshotUfoLights = _ufoLightsOn;
+	_snapshotHiddenFloor = _hiddenFloor;
+	_snapshotLeftOut = leftOut;
+	for (int swung : _swungTiles)
+	{
+		if (swung < tileCount) _tileMemos[swung].restless = true;
+	}
+	_swungTiles.clear();
 	_nearbyLights.clear();
 	_nearbyDevices.clear();
 	_tileFlags.resize(tileCount);
@@ -3452,15 +3469,25 @@ void FirstPersonView::snapshotTiles()
 	for (int index = 0; index < tileCount; ++index)
 	{
 		Tile *tile = _save->getTile(index);
+		bool changed = true;
 		if (trackWalls)
 		{
-			noticeTileChanges(index, tile);
+			changed = noticeTileChanges(index, tile);
 		}
 		else
 		{
 			startWatchingTile(index, tile);
 		}
-		snapshotTile(index, tile, trackWalls);
+		// Tiles hardly ever change: one whose parts are last frame's, and that shows nothing that
+		// moves by itself (see TileMemo::restless), keeps its snapshot; only its light is read.
+		if (everyTile || changed || _tileMemos[index].restless)
+		{
+			snapshotTile(index, tile, trackWalls);
+		}
+		else
+		{
+			snapshotTileLight(index, tile);
+		}
 		const TileView &tileView = _tileViews[index];
 		noteLightsAndDevices(tile, tileView);
 		const int top = tileView.max[2] >= tileView.min[2] ? tileView.max[2] : 0;
@@ -3485,7 +3512,6 @@ void FirstPersonView::snapshotTiles()
 	// Then keep only the nearest lamps, and put the swinging doors into the snapshot (their
 	// tiles are marked in the flags too).
 	keepNearestLights();
-	updateDoorSwings(tileCount);
 }
 
 /**
@@ -3549,10 +3575,12 @@ FirstPersonView::SolidRows FirstPersonView::solidMaskOf(const std::array<const V
  * opening) throws debris if the camera is near enough (480 voxels, 30 tiles) to see it.
  * @param index The tile's index in the map.
  * @param tile The tile.
+ * @return True if one of its parts is another than last frame (see snapshotTiles).
  */
-void FirstPersonView::noticeTileChanges(int index, Tile *tile)
+bool FirstPersonView::noticeTileChanges(int index, Tile *tile)
 {
 	trackDoors(index, tile);
+	bool changed = false;
 
 	// A fire burnt out here: the ground is left blackened (a scorch mark of radius 10 voxels on
 	// the floor's surface in the middle of the tile; at most 200 of them).
@@ -3572,6 +3600,7 @@ void FirstPersonView::noticeTileChanges(int index, Tile *tile)
 	{
 		const MapData *partBefore = _partsLastFrame[part][index], *partNow = shownPart(index, tile, part);
 		_partsLastFrame[part][index] = partNow;
+		changed = changed || partBefore != partNow;
 		if (!partBefore || partBefore == partNow || partBefore->isDoor() || partBefore->isUFODoor() || !partBefore->getDataset()) continue;
 		const MapData *destroyedVersion = partBefore->getDieMCD() ? partBefore->getDataset()->getObject(partBefore->getDieMCD()) : nullptr;
 		if (partNow && partNow != destroyedVersion) continue;
@@ -3587,6 +3616,7 @@ void FirstPersonView::noticeTileChanges(int index, Tile *tile)
 			Log(LOG_VERBOSE) << "OpenXcom3D: a pane of glass destroyed at " << tilePos.x << "," << tilePos.y << "," << tilePos.z << ", part " << part; // (for the tests)
 		}
 	}
+	return changed;
 }
 
 /**
@@ -3649,11 +3679,12 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 {
 	// Start empty: no parts, no door swings (updateDoorSwings adds them later), nothing that
 	// shines, and an inverted bounding box.
-	const bool debug = _save->getDebugMode();
 	TileView &tileView = _tileViews[index];
 	tileView.empty = true;
 	tileView.swing[0] = tileView.swing[1] = -1;
 	tileView.emissive = 0;
+	// Does the tile show anything that changes without its parts changing (see snapshotTiles)?
+	bool restless = index == _hiddenFloor;
 	for (int axis = 0; axis < 3; ++axis)
 	{
 		tileView.min[axis] = 255;
@@ -3692,6 +3723,7 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 		// find whose pixels those are. Anything else that animates (water, lights, computers,
 		// the lit panels of UFOs) follows the view's calm clock instead (see CalmFrameTime).
 		const Frames &frames = *memo.frames;
+		restless = restless || frames.animated || mapData->isUFODoor(); // (its frames turn; a UFO door slides)
 		int frame = 0;
 		if (frames.animated && !mapData->isUFODoor())
 		{
@@ -3759,6 +3791,7 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 		}
 		// The glass in a window's opening broken (see breakGlassAt): the opening shown empty.
 		const VoxelModel *model = memo.model, *next = memo.next;
+		restless = restless || model->openingGlass; // (its glass may be broken any frame)
 		if (model->openingGlass && glassBroken(index, part))
 		{
 			model = openedModel(model);
@@ -3822,7 +3855,20 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 		memo.solid = solidMaskOf(parts);
 	}
 	tileView.solid = memo.solid;
+	memo.restless = restless;
+	snapshotTileLight(index, tile);
+}
 
+/**
+ * The part of a tile's snapshot read afresh every frame, whatever else of it is kept (see
+ * snapshotTiles): its light, the fog of war, its smoke and whether it burns.
+ * @param index The tile's index in the map.
+ * @param tile The tile.
+ */
+void FirstPersonView::snapshotTileLight(int index, Tile *tile)
+{
+	const bool debug = _save->getDebugMode();
+	TileView &tileView = _tileViews[index];
 	// The game's shade for the tile as the map shows it (with night vision no darker than
 	// NightVisionShade, and the map's debug vision: see mapShade), and the fog of war: the floor
 	// and the object are seen with the floor, each wall on its own (a wall is seen from either
@@ -4121,6 +4167,7 @@ void FirstPersonView::updateDoorSwings(int tileCount)
 		}
 		tileView.empty = false;
 		_tileFlags[tileIndex] |= TileTraced | TileSwinging; // the rays look into it, and always trace the door
+		_swungTiles.push_back(tileIndex); // (its snapshot is taken afresh next frame, see snapshotTiles)
 	};
 	for (auto door = _doorAnimations.begin(); door != _doorAnimations.end();)
 	{
@@ -4159,6 +4206,7 @@ void FirstPersonView::updateDoorSwings(int tileCount)
 		// In the door's own tile (it turns inside it): hide the door's new part and point the
 		// rays at the swing.
 		TileView &tileView = _tileViews[door->tile];
+		_swungTiles.push_back(door->tile);
 		tileView.part[door->hiddenPart] = nullptr;
 		tileView.next[door->hiddenPart] = nullptr;
 		addSwingTo(door->tile, (Sint16)_doorSwings.size());

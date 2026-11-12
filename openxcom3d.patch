@@ -26290,10 +26290,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..23f41f86f
+index 000000000..876241244
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,1594 @@
+@@ -0,0 +1,1672 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -26406,7 +26406,7 @@ index 000000000..23f41f86f
 + * machine's graphics devices as EGL lists them (EGL_EXT_device_enumeration), the one asked for
 + * by number; where EGL can't list them, on its default display.
 + */
-+bool GpuContext::create(int device)
++bool GpuContext::create(int device, bool es)
 +{
 +	// EGL's own types and constants (its values), kept local: nothing else needs them.
 +	typedef void *(*GetDisplay)(void *);
@@ -26423,7 +26423,8 @@ index 000000000..23f41f86f
 +	typedef const char *(*QueryDeviceString)(void *, int);
 +	const int EglExtensions = 0x3055, EglNone = 0x3038, EglSurfaceType = 0x3033, EglPbufferBit = 1, EglRenderableType = 0x3040, EglOpenGlBit = 8;
 +	const int EglContextMajor = 0x3098, EglContextMinor = 0x30FB, EglProfileMask = 0x30FD, EglCoreProfile = 1, EglWidth = 0x3057, EglHeight = 0x3056;
-+	const unsigned EglOpenGlApi = 0x30A2, EglPlatformDevice = 0x313F;
++	const unsigned EglOpenGlApi = 0x30A2, EglOpenGlEsApi = 0x30A0, EglPlatformDevice = 0x313F;
++	const int EglOpenGlEs3Bit = 0x40;
 +	const int EglDrmDeviceFile = 0x3233;
 +
 +	_library = dlopen("libEGL.so.1", RTLD_NOW | RTLD_LOCAL);
@@ -26482,27 +26483,30 @@ index 000000000..23f41f86f
 +		_display = getDisplay(nullptr);
 +	}
 +	int major = 0, minor = 0;
-+	if (!_display || !initialize(_display, &major, &minor) || !bindApi(EglOpenGlApi))
++	if (!_display || !initialize(_display, &major, &minor) || !bindApi(es ? EglOpenGlEsApi : EglOpenGlApi))
 +	{
 +		Log(LOG_WARNING) << "OpenXcom3D GPU: EGL would not start (error " << std::hex << getError() << ")";
 +		return false;
 +	}
 +
 +	// A context with no window: on no surface at all where the driver allows, else on a 1x1 off-screen one.
-+	const int configWanted[] = { EglSurfaceType, EglPbufferBit, EglRenderableType, EglOpenGlBit, EglNone };
++	const int configWanted[] = { EglSurfaceType, EglPbufferBit, EglRenderableType, es ? EglOpenGlEs3Bit : EglOpenGlBit, EglNone };
 +	void *config = nullptr;
 +	int configCount = 0;
 +	if (!chooseConfig(_display, configWanted, &config, 1, &configCount) || configCount < 1)
 +	{
 +		config = nullptr; // no config: fine with EGL_KHR_no_config_context, and the surfaceless way below
 +	}
++	// (OpenGL ES 3.2: the first with buffer textures, which hold the world for the shader.)
 +	const int contextWanted[] = { EglContextMajor, 3, EglContextMinor, 3, EglProfileMask, EglCoreProfile, EglNone };
-+	_context = createContext(_display, config, nullptr, contextWanted);
++	const int esContextWanted[] = { EglContextMajor, 3, EglContextMinor, 2, EglNone };
++	_context = createContext(_display, config, nullptr, es ? esContextWanted : contextWanted);
 +	if (!_context)
 +	{
-+		Log(LOG_WARNING) << "OpenXcom3D GPU: no OpenGL 3.3 context (EGL error " << std::hex << getError() << ")";
++		Log(LOG_WARNING) << "OpenXcom3D GPU: no " << (es ? "OpenGL ES 3.2" : "OpenGL 3.3") << " context (EGL error " << std::hex << getError() << ")";
 +		return false;
 +	}
++	_es = es;
 +	if (!makeCurrent(_display, nullptr, nullptr, _context))
 +	{
 +		const int surfaceWanted[] = { EglWidth, 1, EglHeight, 1, EglNone };
@@ -26517,7 +26521,8 @@ index 000000000..23f41f86f
 +	{
 +		return false;
 +	}
-+	_name = std::string((const char *)Gl::GetString(Gl::RENDERER)) + " (OpenGL " + (const char *)Gl::GetString(Gl::VERSION) + ")";
++	const std::string version = (const char *)Gl::GetString(Gl::VERSION); // (an ES context's says "OpenGL ES" itself)
++	_name = std::string((const char *)Gl::GetString(Gl::RENDERER)) + " (" + (es ? "" : "OpenGL ") + version + ")";
 +	return true;
 +}
 +
@@ -26576,9 +26581,9 @@ index 000000000..23f41f86f
 + * only), hardware-accelerated, with no window and no view: the rays are drawn into our own
 + * textures. macOS has one renderer to offer us, the system's: device 0.
 + */
-+bool GpuContext::create(int device)
++bool GpuContext::create(int device, bool es)
 +{
-+	if (device > 0)
++	if (device > 0 || es) // (OpenGL ES: through EGL only)
 +	{
 +		return false; // no such device
 +	}
@@ -26667,7 +26672,7 @@ index 000000000..23f41f86f
 +#elif !defined(_WIN32) // (Windows: FirstPersonGpuWindows.cpp)
 +
 +/// Not on this system: the CPU renderer draws.
-+bool GpuContext::create(int)
++bool GpuContext::create(int, bool)
 +{
 +	Log(LOG_INFO) << "OpenXcom3D GPU: not on this system";
 +	return false;
@@ -26885,13 +26890,15 @@ index 000000000..23f41f86f
 +	std::vector<Uint8> tables;
 +	std::vector<Uint8> blendSent; // the palette the blending table was last made for (see sendBlend)
 +	std::vector<Uint32> wallPaintTexels;
-+	std::vector<Sint32> mirrorNumbers;
-+	std::vector<const void*> mirrorsSent; // the rows of the mirrors as sent last (sent again when they are others)
++	std::vector<Sint32> mirrorNumbers, mirrorScratch; // the mirrors as the card has them (see sendMirrors), and this frame's, put together to compare
 +
 +	void threadLoop();
 +	void run(const std::function<void()> &work);
 +	bool start(int device);
 +	bool build(Program &built, bool results, int extras = 0);
++	std::string shaderHead() const;
++	void readPicture(int attachment, int width, int height, int kind, void *pixels, int rowLength);
++	std::vector<Uint32> readScratch; // OpenGL ES: a picture read in the one format it must give, before it is narrowed
 +	Gl::Int location(const char *name);
 +	Uint32 modelId(const FirstPersonView::VoxelModel *model);
 +	Uint32 solidId(FirstPersonView::SolidRows solid);
@@ -26957,9 +26964,16 @@ index 000000000..23f41f86f
 + */
 +bool FirstPersonGpu::State::start(int device)
 +{
-+	if (!context.create(device))
++	// OpenGL; or OpenGL ES 3.2 where that is all the device has (an ARM board; the Quest's kind of
++	// card), or when asked for by OPENXCOM3D_GPU_GLES (to prove the ES way on a desktop card).
++	const bool esAsked = getenv("OPENXCOM3D_GPU_GLES") != nullptr;
++	if (!context.create(device, esAsked))
 +	{
-+		return false;
++		context.destroy();
++		if (esAsked || !context.create(device, true))
++		{
++			return false;
++		}
 +	}
 +	// (OPENXCOM3D_GPU_SOFTWARE: a software OpenGL will do, for tests on machines without a card.)
 +	if (context.software() && !getenv("OPENXCOM3D_GPU_SOFTWARE"))
@@ -27012,14 +27026,27 @@ index 000000000..23f41f86f
 +}
 +
 +/**
++ * The first lines of every shader: the language's version, and for OpenGL ES the precisions it
++ * makes each shader state (all the highest: the walk counts in whole voxels across a map, and
++ * the numbers the buffers hold fill their 32 bits) and GLES defined, for the few places the two
++ * languages part.
++ */
++std::string FirstPersonGpu::State::shaderHead() const
++{
++	return context.es() ? "#version 320 es\n#define GLES\nprecision highp float;\nprecision highp int;\nprecision highp sampler2D;\nprecision highp usampler2D;\n"
++		"precision highp samplerBuffer;\nprecision highp usamplerBuffer;\nprecision highp isamplerBuffer;\n" : "#version 330 core\n";
++}
++
++/**
 + * Builds the rays' program: the picture-wide triangle, and the walk and the shading, with or
 + * without the check's results; its samplers are pointed at the buffers' textures.
 + */
 +bool FirstPersonGpu::State::build(Program &built, bool results, int extras)
 +{
-+	const std::string raySource = std::string("#version 330 core\n") + (results ? "#define RESULTS\n" : "") + ((extras & 1) ? "#define COLORED_LIGHTS\n" : "")
++	const std::string raySource = shaderHead() + (results ? "#define RESULTS\n" : "") + ((extras & 1) ? "#define COLORED_LIGHTS\n" : "")
 +		+ ((extras & 2) ? "#define REFLECTIONS\n" : "") + ((extras & 4) ? "#define LATER_RAYS\n" : "") + ((extras & 8) ? "#define LIGHT_SHAFTS\n" : "") + HeaderSource + shaderConstants() + WalkSource + ShadeSource;
-+	const char *sources[2] = { VertexSource, raySource.c_str() };
++	const std::string vertexSource = shaderHead() + VertexSource;
++	const char *sources[2] = { vertexSource.c_str(), raySource.c_str() };
 +	const Gl::Enum kinds[2] = { Gl::VERTEX_SHADER, Gl::FRAGMENT_SHADER };
 +	built.id = Gl::CreateProgram();
 +	for (int which = 0; which < 2; ++which)
@@ -27103,7 +27130,8 @@ index 000000000..23f41f86f
 + */
 +bool FirstPersonGpu::State::buildResolve()
 +{
-+	const char *sources[2] = { VertexSource, ResolveSource };
++	const std::string vertexSource = shaderHead() + VertexSource, resolveSource = shaderHead() + ResolveSource;
++	const char *sources[2] = { vertexSource.c_str(), resolveSource.c_str() };
 +	const Gl::Enum kinds[2] = { Gl::VERTEX_SHADER, Gl::FRAGMENT_SHADER };
 +	const Gl::UInt built = Gl::CreateProgram();
 +	for (int which = 0; which < 2; ++which)
@@ -27366,27 +27394,15 @@ index 000000000..23f41f86f
 +/**
 + * The crafts' mirrors, as one row of numbers: sixteen for each mirror (lo[3], size[3], sum[2],
 + * symmetric[2], then per axis where its start, pos and outer rows begin in this row), then all
-+ * their rows. Sent again only when the view has made its mirrors anew.
++ * their rows. Put together every frame (some hundreds of numbers) and sent only when they are
++ * other numbers than the card has: told by what they hold, not by where the view keeps them (a
++ * mirror made anew in the same memory looked unchanged by its addresses, and the card kept the
++ * old one).
 + */
 +void FirstPersonGpu::State::sendMirrors(const Frame &frame)
 +{
-+	std::vector<const void*> rows;
-+	for (int index = 0; index < frame.mirrorCount; ++index)
-+	{
-+		for (int axis = 0; axis < 2; ++axis)
-+		{
-+			rows.push_back(frame.mirrors[index].start[axis]);
-+			rows.push_back(frame.mirrors[index].pos[axis]);
-+			rows.push_back(frame.mirrors[index].outer[axis]);
-+			rows.push_back((const void*)(frame.mirrors[index].posCount[axis] + frame.mirrors[index].startCount[axis]));
-+		}
-+	}
-+	if (rows == mirrorsSent && !mirrorNumbers.empty())
-+	{
-+		return;
-+	}
-+	mirrorsSent = rows;
-+	mirrorNumbers.assign((size_t)std::max(1, frame.mirrorCount) * 16, 0);
++	std::vector<Sint32> &numbers = mirrorScratch;
++	numbers.assign((size_t)std::max(1, frame.mirrorCount) * 16, 0);
 +	for (int index = 0; index < frame.mirrorCount; ++index)
 +	{
 +		const Mirror &mirror = frame.mirrors[index];
@@ -27394,15 +27410,20 @@ index 000000000..23f41f86f
 +			mirror.symmetric[0] ? 1 : 0, mirror.symmetric[1] ? 1 : 0 };
 +		for (int axis = 0; axis < 2; ++axis)
 +		{
-+			header[10 + axis * 3] = (Sint32)mirrorNumbers.size();
-+			mirrorNumbers.insert(mirrorNumbers.end(), mirror.start[axis], mirror.start[axis] + mirror.startCount[axis]);
-+			header[11 + axis * 3] = (Sint32)mirrorNumbers.size();
-+			mirrorNumbers.insert(mirrorNumbers.end(), mirror.pos[axis], mirror.pos[axis] + mirror.posCount[axis]);
-+			header[12 + axis * 3] = (Sint32)mirrorNumbers.size();
-+			mirrorNumbers.insert(mirrorNumbers.end(), mirror.outer[axis], mirror.outer[axis] + mirror.outerCount[axis]);
++			header[10 + axis * 3] = (Sint32)numbers.size();
++			numbers.insert(numbers.end(), mirror.start[axis], mirror.start[axis] + mirror.startCount[axis]);
++			header[11 + axis * 3] = (Sint32)numbers.size();
++			numbers.insert(numbers.end(), mirror.pos[axis], mirror.pos[axis] + mirror.posCount[axis]);
++			header[12 + axis * 3] = (Sint32)numbers.size();
++			numbers.insert(numbers.end(), mirror.outer[axis], mirror.outer[axis] + mirror.outerCount[axis]);
 +		}
-+		std::copy(header, header + 16, mirrorNumbers.begin() + (size_t)index * 16);
++		std::copy(header, header + 16, numbers.begin() + (size_t)index * 16);
 +	}
++	if (numbers == mirrorNumbers)
++	{
++		return;
++	}
++	mirrorNumbers = numbers;
 +	Gl::BindBuffer(Gl::ARRAY_BUFFER, buffers[Mirrors]);
 +	Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)(mirrorNumbers.size() * 4), mirrorNumbers.data(), Gl::DYNAMIC_DRAW);
 +}
@@ -27569,6 +27590,71 @@ index 000000000..23f41f86f
 +}
 +
 +/**
++ * Reads one of the pictures just drawn back into the view's memory. OpenGL gives each in the
++ * form asked for. OpenGL ES gives a picture of whole numbers only as four 32-bit numbers a
++ * pixel, a picture of fractions as four of those, and colours red first, unless the driver
++ * offers the narrow form itself (it says which one form more it has): so there the picture is
++ * read wide into readScratch and narrowed here, where it must be.
++ * @param attachment Which picture (0 colour, 1 depth, 2 glow, 3 full colour, 4 results).
++ * @param width Its width, in pixels.
++ * @param height Its height.
++ * @param kind What it holds: 0 a byte a pixel, 1 a float, 2 full colour (wanted blue first), 3 four 32-bit numbers.
++ * @param pixels Where to.
++ * @param rowLength The memory's row length, in pixels.
++ */
++void FirstPersonGpu::State::readPicture(int attachment, int width, int height, int kind, void *pixels, int rowLength)
++{
++	static const Gl::Enum formats[4] = { Gl::RED_INTEGER, Gl::RED, Gl::BGRA, Gl::RGBA_INTEGER };
++	static const Gl::Enum types[4] = { Gl::UNSIGNED_BYTE, Gl::FLOAT, Gl::UNSIGNED_INT_8_8_8_8_REV, Gl::UNSIGNED_INT };
++	Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0 + attachment);
++	bool direct = !context.es() || kind == 3;
++	if (!direct && kind < 2)
++	{
++		Gl::Int format = 0, type = 0;
++		Gl::GetIntegerv(Gl::IMPLEMENTATION_COLOR_READ_FORMAT, &format);
++		Gl::GetIntegerv(Gl::IMPLEMENTATION_COLOR_READ_TYPE, &type);
++		direct = (Gl::Enum)format == formats[kind] && (Gl::Enum)type == types[kind];
++	}
++	if (direct)
++	{
++		Gl::PixelStorei(Gl::PACK_ROW_LENGTH, rowLength == width ? 0 : rowLength);
++		Gl::ReadPixels(0, 0, width, height, formats[kind], types[kind], pixels);
++		Gl::PixelStorei(Gl::PACK_ROW_LENGTH, 0);
++		return;
++	}
++	const size_t count = (size_t)width * height;
++	if (kind == 2)
++	{
++		// Red first, as ES gives colours: into place, then red and blue changed over.
++		Gl::PixelStorei(Gl::PACK_ROW_LENGTH, rowLength == width ? 0 : rowLength);
++		Gl::ReadPixels(0, 0, width, height, Gl::RGBA, Gl::UNSIGNED_BYTE, pixels);
++		Gl::PixelStorei(Gl::PACK_ROW_LENGTH, 0);
++		for (int row = 0; row < height; ++row)
++		{
++			Uint8 *bytes = (Uint8 *)pixels + (size_t)row * rowLength * 4;
++			for (int column = 0; column < width; ++column, bytes += 4) std::swap(bytes[0], bytes[2]);
++		}
++		return;
++	}
++	readScratch.resize(count * 4);
++	Gl::ReadPixels(0, 0, width, height, kind == 1 ? Gl::RGBA : Gl::RGBA_INTEGER, kind == 1 ? Gl::FLOAT : Gl::UNSIGNED_INT, readScratch.data());
++	for (int row = 0; row < height; ++row)
++	{
++		const Uint32 *wide = readScratch.data() + (size_t)row * width * 4;
++		if (kind == 1)
++		{
++			Uint32 *narrow = (Uint32 *)pixels + (size_t)row * rowLength; // (a float's bits, moved as they are)
++			for (int column = 0; column < width; ++column) narrow[column] = wide[column * 4];
++		}
++		else
++		{
++			Uint8 *narrow = (Uint8 *)pixels + (size_t)row * rowLength;
++			for (int column = 0; column < width; ++column) narrow[column] = (Uint8)wide[column * 4];
++		}
++	}
++}
++
++/**
 + * One frame on the card: sends up what changed, draws the rays, and reads the picture back into
 + * the view's buffers.
 + */
@@ -27721,24 +27807,17 @@ index 000000000..23f41f86f
 +		blockGlow.resize(blockColors.size());
 +		blockDepths.resize(blockColors.size());
 +	}
-+	Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0);
-+	Gl::PixelStorei(Gl::PACK_ROW_LENGTH, blocks ? 0 : output.colorPitch);
-+	Gl::ReadPixels(0, 0, blockColumns, blockRows, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, blocks ? blockColors.data() : output.color);
-+	Gl::PixelStorei(Gl::PACK_ROW_LENGTH, 0);
-+	Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0 + 1);
-+	Gl::ReadPixels(0, 0, blockColumns, blockRows, Gl::RED, Gl::FLOAT, blocks ? blockDepths.data() : output.depth);
-+	Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0 + 2);
-+	Gl::ReadPixels(0, 0, blockColumns, blockRows, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, blocks ? blockGlow.data() : output.glow);
++	readPicture(0, blockColumns, blockRows, 0, blocks ? blockColors.data() : output.color, blocks ? blockColumns : output.colorPitch);
++	readPicture(1, blockColumns, blockRows, 1, blocks ? blockDepths.data() : output.depth, blockColumns);
++	readPicture(2, blockColumns, blockRows, 0, blocks ? blockGlow.data() : output.glow, blockColumns);
 +	if (output.results)
 +	{
-+		Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0 + 4);
-+		Gl::ReadPixels(0, 0, blockColumns, blockRows, Gl::RGBA_INTEGER, Gl::UNSIGNED_INT, output.results);
++		readPicture(4, blockColumns, blockRows, 3, output.results, blockColumns);
 +	}
 +	if (output.trueColor && !blocks)
 +	{
 +		// The full-colour picture (blue, green, red, the glow: a 0xGGRRGGBB number a pixel as this machine reads it).
-+		Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0 + 3);
-+		Gl::ReadPixels(0, 0, blockColumns, blockRows, Gl::BGRA, Gl::UNSIGNED_INT_8_8_8_8_REV, output.trueColor);
++		readPicture(3, blockColumns, blockRows, 2, output.trueColor, blockColumns);
 +	}
 +	if (blocks)
 +	{
@@ -27857,7 +27936,6 @@ index 000000000..23f41f86f
 +		state.modelColors.assign(ModelVoxels, 0);
 +		state.modelSides.assign(ModelSideBytes, 0);
 +		state.modelExposed.assign(ModelVoxels, 0);
-+		state.mirrorsSent.clear();
 +		state.mirrorNumbers.clear();
 +		state.modelBits.assign(MaskRows * ModelMasks, 0);
 +		state.modelInfo.assign(4, 0);
@@ -28065,10 +28143,10 @@ index 000000000..d8016717c
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuGl.h b/src/FirstPerson/FirstPersonGpuGl.h
 new file mode 100644
-index 000000000..b9c81b44f
+index 000000000..0c753a2bd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuGl.h
-@@ -0,0 +1,174 @@
+@@ -0,0 +1,176 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -28135,6 +28213,7 @@ index 000000000..b9c81b44f
 +const Enum PACK_ALIGNMENT = 0x0D05, UNPACK_ALIGNMENT = 0x0CF5, PACK_ROW_LENGTH = 0x0D02;
 +const Enum MAX_TEXTURE_BUFFER_SIZE = 0x8C2B;
 +const Enum TIME_ELAPSED = 0x88BF, QUERY_RESULT = 0x8866;
++const Enum IMPLEMENTATION_COLOR_READ_TYPE = 0x8B9A, IMPLEMENTATION_COLOR_READ_FORMAT = 0x8B9B;
 +
 +// The functions used: one line each, as OpenGL declares them. GL_FUNCTIONS(X) lists them for the
 +// declarations below and for the loader (GpuContext::loadFunctions).
@@ -28157,8 +28236,6 @@ index 000000000..b9c81b44f
 +	X(void, BindBuffer, (Enum target, UInt buffer)) \
 +	X(void, BufferData, (Enum target, SizeiPtr size, const void *data, Enum usage)) \
 +	X(void, BufferSubData, (Enum target, IntPtr offset, SizeiPtr size, const void *data)) \
-+	X(void *, MapBuffer, (Enum target, Enum access)) \
-+	X(Boolean, UnmapBuffer, (Enum target)) \
 +	X(void, GenTextures, (Sizei count, UInt *textures)) \
 +	X(void, DeleteTextures, (Sizei count, const UInt *textures)) \
 +	X(void, BindTexture, (Enum target, UInt texture)) \
@@ -28220,9 +28297,11 @@ index 000000000..b9c81b44f
 +class GpuContext
 +{
 +public:
-+	/// Opens the context (OpenGL 3.3, core) on a device by number. False where there is none to be had (no such
-+	/// device: silently; else the reason is in the log).
-+	bool create(int device);
++	/// Opens the context (OpenGL 3.3, core; or with `es`, OpenGL ES 3.2, on Linux's EGL only) on a device by number.
++	/// False where there is none to be had (no such device: silently; else the reason is in the log).
++	bool create(int device, bool es = false);
++	/// Whether it is an OpenGL ES context (the shaders and the read-back differ: see FirstPersonGpu.cpp).
++	bool es() const { return _es; }
 +	/// Whether the context draws on the CPU (a software OpenGL such as Mesa's llvmpipe): no use to us.
 +	bool software() const;
 +	/// Closes it.
@@ -28240,15 +28319,16 @@ index 000000000..b9c81b44f
 +	void *_surface = nullptr;
 +	void *(*_getProcAddress)(const char *) = nullptr;
 +	std::string _name;
++	bool _es = false;
 +};
 +
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..d4f6594ce
+index 000000000..e26d441ac
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,1894 @@
+@@ -0,0 +1,1902 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -28288,7 +28368,7 @@ index 000000000..d4f6594ce
 +namespace
 +{
 +
-+const char *const VertexSource = R"(#version 330 core
++const char *const VertexSource = R"(
 +// One triangle over the whole picture.
 +void main()
 +{
@@ -29709,14 +29789,17 @@ index 000000000..d4f6594ce
 +		{
 +			// One ray at the sun; with the setting "Soft sun shadows", four at points round its disc, the ring of them
 +			// turned from pixel to pixel: the share that is blocked is the shadow's depth, so its edge fades.
-+			// (One loop for both, so the shader holds the shadow ray's walk once here.)
++			// The two at the disc's rim, opposite each other, go first: where both see the sun, or neither
++			// does, the point is clear of a shadow's edge and the other two are not cast (most of a picture).
++			// (One loop for all of it, so the shader holds the shadow ray's walk once here.)
 +			int sunRays = uSoftShadows != 0 ? 4 : 1;
 +			vec3 across = normalize(cross(uSunDir, abs(uSunDir.z) < 0.9 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0)));
 +			vec3 along = cross(uSunDir, across);
 +			float turn = dither(pixelX + 1, pixelY + 3) * 1.5707963;
 +			float blocked = 0.0;
-+			for (int sunRay = 0; sunRay < sunRays; ++sunRay)
++			for (int turnOf = 0; turnOf < sunRays; ++turnOf)
 +			{
++				int sunRay = turnOf < 2 ? turnOf * 2 + 1 : (turnOf - 2) * 2; // (the rim's two, then the inner two)
 +				vec3 towardsSun = uSunDir;
 +				if (sunRays > 1)
 +				{
@@ -29724,6 +29807,11 @@ index 000000000..d4f6594ce
 +					towardsSun += (cos(angle) * across + sin(angle) * along) * (SunDiscRadius * ((sunRay & 1) != 0 ? 1.0 : 0.55));
 +				}
 +				if (shadowed(surfacePoint, surfacePoint + towardsSun * 260.0)) blocked += 1.0 / float(sunRays);
++				if (turnOf == 1 && blocked != 1.0 / float(sunRays))
++				{
++					blocked *= 2.0; // (both rim rays agree: all four would)
++					break;
++				}
 +			}
 +			sunShadow = 3.0 * daylight * blocked;
 +			shade += sunShadow;
@@ -30092,7 +30180,7 @@ index 000000000..d4f6594ce
 + * (It is its own program, not a loop over the rays in the one above: at least one driver took
 + * a minute to build that.)
 + */
-+const char *const ResolveSource = R"(#version 330 core
++const char *const ResolveSource = R"(
 +uniform usampler2D uColor0, uColor1, uColor2, uColor3;
 +uniform sampler2D uDepth0, uDepth1, uDepth2, uDepth3;
 +uniform sampler2D uTrue0, uTrue1, uTrue2, uTrue3; // each ray in full colour, the glow with it (see outTrue)
@@ -30145,10 +30233,10 @@ index 000000000..d4f6594ce
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuWindows.cpp b/src/FirstPerson/FirstPersonGpuWindows.cpp
 new file mode 100644
-index 000000000..6862c4de6
+index 000000000..eaa9f409a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuWindows.cpp
-@@ -0,0 +1,169 @@
+@@ -0,0 +1,173 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -30221,8 +30309,12 @@ index 000000000..6862c4de6
 + * plain context on it to ask the driver for the function that makes a core one, then that one.
 + * Windows has one renderer to offer a program (the driver's choice): device 0.
 + */
-+bool GpuContext::create(int device)
++bool GpuContext::create(int device, bool es)
 +{
++	if (es)
++	{
++		return false; // (OpenGL ES: through EGL only)
++	}
 +	if (device > 0)
 +	{
 +		return false; // no such device
@@ -30320,10 +30412,10 @@ index 000000000..6862c4de6
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..a145c4fac
+index 000000000..36a86548c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,3233 @@
+@@ -0,0 +1,3245 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -31547,6 +31639,18 @@ index 000000000..a145c4fac
 +int FirstPersonMode::viewPixelY(int canvasPixel) const
 +{
 +	return std::min(_view->getHeight() - 1, (int)((canvasPixel + 0.5) * _view->getHeight() / canvasHeight()));
++}
++
++/**
++ * How far the aim's ray goes from the middle of the view's pixel (see viewPixelX), in view pixels.
++ * The crosshair's middle is the middle of a canvas pixel. With the view an odd number of times
++ * the canvas's size, a view pixel has its middle there too; with an even number (HUD scale x2,
++ * x4 with 3D resolution Display) that point is the corner of four view pixels, and the one
++ * taken has its middle half a pixel down and to the right of it: the ray goes back that half.
++ */
++double FirstPersonMode::aimPixelShift() const
++{
++	return viewScale() % 2 == 0 ? -0.5 : 0.0;
 +}
 +
 +/// The canvas pixel a pixel of the view lies in, across.
@@ -33559,10 +33663,10 @@ index 000000000..a145c4fac
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..58e27ba7d
+index 000000000..1cdfb2f14
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1366 @@
+@@ -0,0 +1,1368 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -33941,6 +34045,8 @@ index 000000000..58e27ba7d
 +	/// The view's pixel at the middle of a canvas pixel, across and down: where the mode points into the view.
 +	int viewPixelX(int canvasPixel) const;
 +	int viewPixelY(int canvasPixel) const;
++	/// How far the aim's ray goes from the middle of the view's pixel, so it passes through the crosshair's exact middle.
++	double aimPixelShift() const;
 +	/// The canvas pixel a pixel of the view lies in, across and down.
 +	int canvasPixelX(int viewPixel) const;
 +	int canvasPixelY(int viewPixel) const;
@@ -41408,7 +41514,7 @@ index 000000000..962673127
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..a3d02c303
+index 000000000..bd6be7f94
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
 @@ -0,0 +1,5260 @@
@@ -42868,7 +42974,7 @@ index 000000000..a3d02c303
 +	// The ray from the eye through that pixel, in voxels (16 per tile across, 24 per level).
 +	double eye[3], rayDirection[3];
 +	_view->getEye(eye);
-+	_view->getRayDirection(pixelX, pixelY, rayDirection);
++	_view->getRayDirection(pixelX + aimPixelShift(), pixelY + aimPixelShift(), rayDirection);
 +	const Position rayOrigin((int)eye[0], (int)eye[1], (int)eye[2]);
 +	const Position farPoint(rayOrigin.x + (int)(rayDirection[0] * 1500), rayOrigin.y + (int)(rayDirection[1] * 1500),
 +		rayOrigin.z + (int)(rayDirection[2] * 1500));
@@ -45422,7 +45528,7 @@ index 000000000..a3d02c303
 +	{
 +		double eye[3], rayDirection[3];
 +		_view->getEye(eye);
-+		_view->getRayDirection(pixelX, pixelY, rayDirection);
++		_view->getRayDirection(pixelX + aimPixelShift(), pixelY + aimPixelShift(), rayDirection);
 +		target = Position((int)(eye[0] + rayDirection[0] * 1500), (int)(eye[1] + rayDirection[1] * 1500), (int)(eye[2] + rayDirection[2] * 1500));
 +	}
 +
@@ -51955,7 +52061,7 @@ index 000000000..7e1bbfcd2
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..5894276e4
+index 000000000..f8e3d170f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
 @@ -0,0 +1,681 @@
@@ -52383,11 +52489,11 @@ index 000000000..5894276e4
 + * shots from the weapon's muzzle on the screen, and to lay shadows on the ground under units.
 + * The pixels are square: the vertical field of view follows from the horizontal one and the
 + * view's shape.
-+ * @param pixelX The pixel's column, from the left.
++ * @param pixelX The pixel's column, from the left (a fraction moves the ray off the pixel's centre: see FirstPersonMode::aimAt).
 + * @param pixelY The pixel's row, from the top.
 + * @param out Receives the direction (x east, y south, z up).
 + */
-+void FirstPersonView::getRayDirection(int pixelX, int pixelY, double out[3])
++void FirstPersonView::getRayDirection(double pixelX, double pixelY, double out[3])
 +{
 +	updateBasis();
 +	rayDirectionThrough(pixelX, pixelY, out);
@@ -52401,7 +52507,7 @@ index 000000000..5894276e4
 + * @param pixelY The pixel's row, from the top.
 + * @param out Receives the direction (x east, y south, z up).
 + */
-+void FirstPersonView::rayDirectionThrough(int pixelX, int pixelY, double out[3]) const
++void FirstPersonView::rayDirectionThrough(double pixelX, double pixelY, double out[3]) const
 +{
 +	// Where the pixel lies on an image plane one unit in front of the eye: planeX to the right,
 +	// from -tan(half the field of view) to +tan; planeY up, over the same range shrunk by the
@@ -52642,10 +52748,10 @@ index 000000000..5894276e4
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..1bbefdeba
+index 000000000..243dfb431
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1474 @@
+@@ -0,0 +1,1481 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -53011,9 +53117,9 @@ index 000000000..1bbefdeba
 +	/// Gets how far the view looks up (negative: down), in degrees.
 +	double getPitchDegrees() const;
 +	/// Gets the (normalized) direction of the ray through a pixel of the view.
-+	void getRayDirection(int pixelX, int pixelY, double out[3]);
++	void getRayDirection(double pixelX, double pixelY, double out[3]);
 +	/// The same, with the camera's axes as they are (already worked out for this frame: while drawing it).
-+	void rayDirectionThrough(int pixelX, int pixelY, double out[3]) const;
++	void rayDirectionThrough(double pixelX, double pixelY, double out[3]) const;
 +
 +	// =====================================================================================
 +	// What to show
@@ -53251,6 +53357,10 @@ index 000000000..1bbefdeba
 +	Uint8 _rockBase = 0;                                // the rock's colour, from the map's own rock round its edge (0: the plain rock colour)
 +	std::vector<TileView> _tileViews;                   // this frame's snapshot of every tile: what the rays read
 +	int _hiddenFloor = -1;                              // a floor left out: the lift platform the camera rides through
++	// What the last snapshot of all the tiles was taken with (a change in any takes every tile's afresh), and the tiles a door swung through then
++	int _snapshotHiddenFloor = -1;
++	bool _snapshotDebug = false, _snapshotUfoLights = false, _snapshotLeftOut = false;
++	std::vector<int> _swungTiles;
 +	std::vector<std::pair<int, int>> _leftOutParts;     // parts left out (tile index, part): the ones the eye is inside with Doom IDCLIP
 +	std::vector<const MapData*> _wallsLastFrame[2];     // west/north wall of each tile last frame
 +	std::vector<DoorAnimation> _doorAnimations;         // doors swinging open
@@ -53271,6 +53381,7 @@ index 000000000..1bbefdeba
 +		SolidRows solid;                        // and their solid mask
 +		std::array<const VoxelModel*, 4> paintParts; // the parts the floor was last looked at for (see paintedFloor)
 +		const VoxelModel *paintedFloor;              // that floor with the UFO's floor going on inside (null: as it is)
++		bool restless = true;                        // its snapshot is taken every frame (animated, a UFO door, glass that can break, a door swung through it; or not taken yet): see snapshotTiles
 +	};
 +	std::vector<TileMemo> _tileMemos;                   // per tile: its parts last frame, and their solid mask
 +	/// Floors under a UFO's hull with its floor going on inside (see paintedFloor), by the four parts' models and the UFO floors on the four sides (null: none there).
@@ -53362,7 +53473,9 @@ index 000000000..1bbefdeba
 +	/// Takes this frame's snapshot of every tile, for the rays.
 +	void snapshotTiles();
 +	/// What changed on a tile since the last frame: doors, burnt-out fires, destruction.
-+	void noticeTileChanges(int index, Tile *tile);
++	bool noticeTileChanges(int index, Tile *tile);
++	/// The part of a tile's snapshot that is read afresh every frame: its light, the fog of war, its smoke and fire.
++	void snapshotTileLight(int index, Tile *tile);
 +	/// Notes a tile's parts and fire on the first frame, so later frames can tell changes.
 +	void startWatchingTile(int index, Tile *tile);
 +	/// One tile's snapshot: models, animation, light, what has been seen.
@@ -66011,10 +66124,10 @@ index 000000000..d8f57ff49
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..86cc5ee35
+index 000000000..7746fab2b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,4172 @@
+@@ -0,0 +1,4220 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -66070,6 +66183,7 @@ index 000000000..86cc5ee35
 +#include "FirstPersonView.h"
 +#include <memory>
 +#include <algorithm>
++#include <chrono>
 +#include <array>
 +#include <bitset>
 +#include <climits>
@@ -69462,6 +69576,22 @@ index 000000000..86cc5ee35
 +	// look at first as they walk the map: anything to trace in the tile, smoke on it, and the
 +	// height of its highest solid voxel (see castRay); and its light, close together with the
 +	// others' for the shading (see lightAt).
++	// Every tile's snapshot is taken afresh on the first frame, and when something changed that
++	// any tile's may hang on: the map's debug vision, the UFO lights, the floor left out, parts
++	// left out. A tile a door swung through last frame (the swing writes into its snapshot, see
++	// updateDoorSwings) has its own taken afresh.
++	const bool debug = _save->getDebugMode(), leftOut = !_leftOutParts.empty();
++	const bool everyTile = !trackWalls || debug != _snapshotDebug || _ufoLightsOn != _snapshotUfoLights || _hiddenFloor != _snapshotHiddenFloor
++		|| leftOut || _snapshotLeftOut;
++	_snapshotDebug = debug;
++	_snapshotUfoLights = _ufoLightsOn;
++	_snapshotHiddenFloor = _hiddenFloor;
++	_snapshotLeftOut = leftOut;
++	for (int swung : _swungTiles)
++	{
++		if (swung < tileCount) _tileMemos[swung].restless = true;
++	}
++	_swungTiles.clear();
 +	_nearbyLights.clear();
 +	_nearbyDevices.clear();
 +	_tileFlags.resize(tileCount);
@@ -69469,15 +69599,25 @@ index 000000000..86cc5ee35
 +	for (int index = 0; index < tileCount; ++index)
 +	{
 +		Tile *tile = _save->getTile(index);
++		bool changed = true;
 +		if (trackWalls)
 +		{
-+			noticeTileChanges(index, tile);
++			changed = noticeTileChanges(index, tile);
 +		}
 +		else
 +		{
 +			startWatchingTile(index, tile);
 +		}
-+		snapshotTile(index, tile, trackWalls);
++		// Tiles hardly ever change: one whose parts are last frame's, and that shows nothing that
++		// moves by itself (see TileMemo::restless), keeps its snapshot; only its light is read.
++		if (everyTile || changed || _tileMemos[index].restless)
++		{
++			snapshotTile(index, tile, trackWalls);
++		}
++		else
++		{
++			snapshotTileLight(index, tile);
++		}
 +		const TileView &tileView = _tileViews[index];
 +		noteLightsAndDevices(tile, tileView);
 +		const int top = tileView.max[2] >= tileView.min[2] ? tileView.max[2] : 0;
@@ -69502,7 +69642,6 @@ index 000000000..86cc5ee35
 +	// Then keep only the nearest lamps, and put the swinging doors into the snapshot (their
 +	// tiles are marked in the flags too).
 +	keepNearestLights();
-+	updateDoorSwings(tileCount);
 +}
 +
 +/**
@@ -69566,10 +69705,12 @@ index 000000000..86cc5ee35
 + * opening) throws debris if the camera is near enough (480 voxels, 30 tiles) to see it.
 + * @param index The tile's index in the map.
 + * @param tile The tile.
++ * @return True if one of its parts is another than last frame (see snapshotTiles).
 + */
-+void FirstPersonView::noticeTileChanges(int index, Tile *tile)
++bool FirstPersonView::noticeTileChanges(int index, Tile *tile)
 +{
 +	trackDoors(index, tile);
++	bool changed = false;
 +
 +	// A fire burnt out here: the ground is left blackened (a scorch mark of radius 10 voxels on
 +	// the floor's surface in the middle of the tile; at most 200 of them).
@@ -69589,6 +69730,7 @@ index 000000000..86cc5ee35
 +	{
 +		const MapData *partBefore = _partsLastFrame[part][index], *partNow = shownPart(index, tile, part);
 +		_partsLastFrame[part][index] = partNow;
++		changed = changed || partBefore != partNow;
 +		if (!partBefore || partBefore == partNow || partBefore->isDoor() || partBefore->isUFODoor() || !partBefore->getDataset()) continue;
 +		const MapData *destroyedVersion = partBefore->getDieMCD() ? partBefore->getDataset()->getObject(partBefore->getDieMCD()) : nullptr;
 +		if (partNow && partNow != destroyedVersion) continue;
@@ -69604,6 +69746,7 @@ index 000000000..86cc5ee35
 +			Log(LOG_VERBOSE) << "OpenXcom3D: a pane of glass destroyed at " << tilePos.x << "," << tilePos.y << "," << tilePos.z << ", part " << part; // (for the tests)
 +		}
 +	}
++	return changed;
 +}
 +
 +/**
@@ -69666,11 +69809,12 @@ index 000000000..86cc5ee35
 +{
 +	// Start empty: no parts, no door swings (updateDoorSwings adds them later), nothing that
 +	// shines, and an inverted bounding box.
-+	const bool debug = _save->getDebugMode();
 +	TileView &tileView = _tileViews[index];
 +	tileView.empty = true;
 +	tileView.swing[0] = tileView.swing[1] = -1;
 +	tileView.emissive = 0;
++	// Does the tile show anything that changes without its parts changing (see snapshotTiles)?
++	bool restless = index == _hiddenFloor;
 +	for (int axis = 0; axis < 3; ++axis)
 +	{
 +		tileView.min[axis] = 255;
@@ -69709,6 +69853,7 @@ index 000000000..86cc5ee35
 +		// find whose pixels those are. Anything else that animates (water, lights, computers,
 +		// the lit panels of UFOs) follows the view's calm clock instead (see CalmFrameTime).
 +		const Frames &frames = *memo.frames;
++		restless = restless || frames.animated || mapData->isUFODoor(); // (its frames turn; a UFO door slides)
 +		int frame = 0;
 +		if (frames.animated && !mapData->isUFODoor())
 +		{
@@ -69776,6 +69921,7 @@ index 000000000..86cc5ee35
 +		}
 +		// The glass in a window's opening broken (see breakGlassAt): the opening shown empty.
 +		const VoxelModel *model = memo.model, *next = memo.next;
++		restless = restless || model->openingGlass; // (its glass may be broken any frame)
 +		if (model->openingGlass && glassBroken(index, part))
 +		{
 +			model = openedModel(model);
@@ -69839,7 +69985,20 @@ index 000000000..86cc5ee35
 +		memo.solid = solidMaskOf(parts);
 +	}
 +	tileView.solid = memo.solid;
++	memo.restless = restless;
++	snapshotTileLight(index, tile);
++}
 +
++/**
++ * The part of a tile's snapshot read afresh every frame, whatever else of it is kept (see
++ * snapshotTiles): its light, the fog of war, its smoke and whether it burns.
++ * @param index The tile's index in the map.
++ * @param tile The tile.
++ */
++void FirstPersonView::snapshotTileLight(int index, Tile *tile)
++{
++	const bool debug = _save->getDebugMode();
++	TileView &tileView = _tileViews[index];
 +	// The game's shade for the tile as the map shows it (with night vision no darker than
 +	// NightVisionShade, and the map's debug vision: see mapShade), and the fog of war: the floor
 +	// and the object are seen with the floor, each wall on its own (a wall is seen from either
@@ -70138,6 +70297,7 @@ index 000000000..86cc5ee35
 +		}
 +		tileView.empty = false;
 +		_tileFlags[tileIndex] |= TileTraced | TileSwinging; // the rays look into it, and always trace the door
++		_swungTiles.push_back(tileIndex); // (its snapshot is taken afresh next frame, see snapshotTiles)
 +	};
 +	for (auto door = _doorAnimations.begin(); door != _doorAnimations.end();)
 +	{
@@ -70176,6 +70336,7 @@ index 000000000..86cc5ee35
 +		// In the door's own tile (it turns inside it): hide the door's new part and point the
 +		// rays at the swing.
 +		TileView &tileView = _tileViews[door->tile];
++		_swungTiles.push_back(door->tile);
 +		tileView.part[door->hiddenPart] = nullptr;
 +		tileView.next[door->hiddenPart] = nullptr;
 +		addSwingTo(door->tile, (Sint16)_doorSwings.size());

@@ -422,11 +422,11 @@ void FirstPersonView::updateBasis()
  * shots from the weapon's muzzle on the screen, and to lay shadows on the ground under units.
  * The pixels are square: the vertical field of view follows from the horizontal one and the
  * view's shape.
- * @param pixelX The pixel's column, from the left.
+ * @param pixelX The pixel's column, from the left (a fraction moves the ray off the pixel's centre: see FirstPersonMode::aimAt).
  * @param pixelY The pixel's row, from the top.
  * @param out Receives the direction (x east, y south, z up).
  */
-void FirstPersonView::getRayDirection(int pixelX, int pixelY, double out[3])
+void FirstPersonView::getRayDirection(double pixelX, double pixelY, double out[3])
 {
 	updateBasis();
 	rayDirectionThrough(pixelX, pixelY, out);
@@ -440,7 +440,7 @@ void FirstPersonView::getRayDirection(int pixelX, int pixelY, double out[3])
  * @param pixelY The pixel's row, from the top.
  * @param out Receives the direction (x east, y south, z up).
  */
-void FirstPersonView::rayDirectionThrough(int pixelX, int pixelY, double out[3]) const
+void FirstPersonView::rayDirectionThrough(double pixelX, double pixelY, double out[3]) const
 {
 	// Where the pixel lies on an image plane one unit in front of the eye: planeX to the right,
 	// from -tan(half the field of view) to +tan; planeY up, over the same range shrunk by the

@@ -70,8 +70,12 @@ void *windowsFunction(const char *name)
  * plain context on it to ask the driver for the function that makes a core one, then that one.
  * Windows has one renderer to offer a program (the driver's choice): device 0.
  */
-bool GpuContext::create(int device)
+bool GpuContext::create(int device, bool es)
 {
+	if (es)
+	{
+		return false; // (OpenGL ES: through EGL only)
+	}
 	if (device > 0)
 	{
 		return false; // no such device
