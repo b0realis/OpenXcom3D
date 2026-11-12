@@ -106,7 +106,7 @@ SETTINGS = [
         ('Zoom', 'YES', 'YES / NO', 'Hold U or the right button to look four times closer.', 'Only the picture: the shot and the hit chance stay the same.'),
         ('Start battles in 3D', 'NO', 'YES / NO', 'Begin every battle in the first-person view.', ''),
         ('Alien turn in 3D', 'YES', 'YES / NO', 'Stay in 3D during the aliens\' turn, through your last soldier\'s eyes. NO: the map for their turn.', ''),
-        ('Alien turn: look as the soldier faces', 'YES', 'YES / NO', 'In the alien turn the view stays with your soldier\'s facing, at most 45 degrees to either side: you see what they can see. Not in the 1.12 download yet.', ''),
+        ('Alien turn: look as the soldier faces', 'NO', 'YES / NO', 'YES: in the alien turn the view stays with your soldier\'s facing, at most 45 degrees to either side: you see what they can see. Not in the 1.12 download yet.', ''),
         ('Aliens\' turn cameras', 'YES', 'YES / NO', 'In their turn the view cuts to where the action is: a soldier firing back, the nearest soldier who sees a moving alien, a soldier shot at by an alien nobody sees; helmet camera cards pop up for soldiers shot at, hit or mind controlled.', ''),
         ('Camera when a soldier falls', 'YES', 'YES / NO', 'With <i>Aliens\' turn cameras</i>, in their turn: a soldier going down out of view pops up their helmet camera card, DECEASED or UNCONSCIOUS.', ''),
         ('Eye height lowered by', '3', '0 to 6 voxels', 'Sits the 3D camera lower, so rooms feel less cramped. What the soldier sees by the rules doesn\'t change.', ''),
