@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..8a0afa888
+index 000000000..190a9ca13
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,559 @@
+@@ -0,0 +1,561 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -390,8 +390,10 @@ index 000000000..8a0afa888
 +  STR_FPS_AKIMBO_SETTING_OFF: "Akimbo is off in the settings"
 +  STR_FPS_AKIMBO_REALISTIC: "One-hand akimbo"
 +  STR_FPS_AKIMBO_NO_AIMED: "Two guns: no aimed shot ({0}: akimbo off)"
-+  STR_FPS_SMOOTH_ARC_START: "Arcs: smooth start"
-+  STR_FPS_SMOOTH_ARC_START_DESC: "A throw or an arcing shot from the 3D view leaves from a point that slides round the unit as you turn, not one of the game's eight (a large unit's arc jumped side to side). Shots ordered on the map are unchanged."
++  STR_FPS_THROWING: "Throwing"
++  STR_FPS_THROWING_DESC: "Throws and arcing shots from the 3D view. Classic: at a tile's middle, as on the map. Modern: at the exact point under the crosshair, the curve moving smoothly with the aim."
++  STR_FPS_THROWING_CLASSIC: "Classic (tile)"
++  STR_FPS_THROWING_MODERN: "Modern (continuous)"
 +  STR_FPS_LEAN_SHOTS: "Lean shots"
 +  STR_FPS_LEAN_SHOTS_DESC: "Movement Free: standing to one side of the tile shoots from that side, to peek (with the game's own targeting)."
 +  STR_FPS_LEAN: "Lean"
@@ -689,10 +691,10 @@ index 000000000..8a0afa888
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..291e218d3
+index 000000000..3290d51b9
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,559 @@
+@@ -0,0 +1,561 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -955,8 +957,10 @@ index 000000000..291e218d3
 +  STR_FPS_AKIMBO_SETTING_OFF: "Akimbo is off in the settings"
 +  STR_FPS_AKIMBO_REALISTIC: "One-hand akimbo"
 +  STR_FPS_AKIMBO_NO_AIMED: "Two guns: no aimed shot ({0}: akimbo off)"
-+  STR_FPS_SMOOTH_ARC_START: "Arcs: smooth start"
-+  STR_FPS_SMOOTH_ARC_START_DESC: "A throw or an arcing shot from the 3D view leaves from a point that slides round the unit as you turn, not one of the game's eight (a large unit's arc jumped side to side). Shots ordered on the map are unchanged."
++  STR_FPS_THROWING: "Throwing"
++  STR_FPS_THROWING_DESC: "Throws and arcing shots from the 3D view. Classic: at a tile's middle, as on the map. Modern: at the exact point under the crosshair, the curve moving smoothly with the aim."
++  STR_FPS_THROWING_CLASSIC: "Classic (tile)"
++  STR_FPS_THROWING_MODERN: "Modern (continuous)"
 +  STR_FPS_LEAN_SHOTS: "Lean shots"
 +  STR_FPS_LEAN_SHOTS_DESC: "Movement Free: standing to one side of the tile shoots from that side, to peek (with the game's own targeting)."
 +  STR_FPS_LEAN: "Lean"
@@ -19792,7 +19796,7 @@ index 861c7702a..c27a96c33 100644
  	const std::vector<int> &getPath() const;
  	/// Makes a copy to the path.
 diff --git a/src/Battlescape/Projectile.cpp b/src/Battlescape/Projectile.cpp
-index 7f7697c1d..78d23f147 100644
+index 7f7697c1d..8c514791f 100644
 --- a/src/Battlescape/Projectile.cpp
 +++ b/src/Battlescape/Projectile.cpp
 @@ -31,6 +31,7 @@
@@ -19853,7 +19857,14 @@ index 7f7697c1d..78d23f147 100644
  
  	// finally do a line calculation and store this trajectory.
  	return _save->getTileEngine()->calculateLineVoxel(originVoxel, _targetVoxel, true, &_trajectory, bu);
-@@ -228,15 +250,19 @@ int Projectile::calculateThrow(double accuracy)
+@@ -223,20 +245,26 @@ int Projectile::calculateThrow(double accuracy)
+ 
+ 	if (_action.type == BA_THROW)
+ 	{
++		// (OpenXcom3D: setting "Throwing" Modern: the exact point aimed at under the first-person crosshair first, then the tile's middle)
++		if (_action.targetVoxel.x >= 0) targets.push_back(_action.targetVoxel);
+ 		targets.push_back(targetVoxel);
+ 	}
  	else
  	{
  		BattleUnit *tu = targetTile->getOverlappingUnit(_save);
@@ -19875,7 +19886,7 @@ index 7f7697c1d..78d23f147 100644
  			targets.push_back(targetVoxel + Position(0, 0, tu->getHeight()/2 + 1));
  			targets.push_back(targetVoxel + Position(0, 0, 2));
  			targets.push_back(targetVoxel + Position(0, 0, tu->getHeight() - 1));
-@@ -269,6 +295,11 @@ int Projectile::calculateThrow(double accuracy)
+@@ -269,6 +297,11 @@ int Projectile::calculateThrow(double accuracy)
  		{
  			targets.push_back(targetVoxel);
  		}
@@ -19887,7 +19898,7 @@ index 7f7697c1d..78d23f147 100644
  	}
  
  	_distance = 0.0f;
-@@ -305,7 +336,18 @@ int Projectile::calculateThrow(double accuracy)
+@@ -305,7 +338,18 @@ int Projectile::calculateThrow(double accuracy)
  
  
  		test = _save->getTileEngine()->calculateParabolaVoxel(originVoxel, targetVoxel, true, &_trajectory, _action.actor, curvature, deltas);
@@ -19907,7 +19918,7 @@ index 7f7697c1d..78d23f147 100644
  		Position endPoint = getPositionFromEnd(_trajectory, ItemDropVoxelOffset).toTile();
  		Tile *endTile = _save->getTile(endPoint);
  		// check if the item would land on a tile with a blocking object
-@@ -503,6 +545,9 @@ bool Projectile::move()
+@@ -503,6 +547,9 @@ bool Projectile::move()
  		}
  
  		_distance += TileEngine::trajectoryStepSize(_trajectory, _position);
@@ -22113,7 +22124,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..3366727ac 100644
+index a08796ced..c60c9a12b 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -22130,8 +22141,8 @@ index a08796ced..3366727ac 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsSmoothArcStart;
-+OPT int fpsRenderer, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
++OPT bool fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts;
++OPT int fpsThrowing, fpsRenderer, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsTurret, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
@@ -23154,10 +23165,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..c7a4625cd
+index 000000000..00d1b8bf3
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1513 @@
+@@ -0,0 +1,1514 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -23914,9 +23925,10 @@ index 000000000..c7a4625cd
 +	// off-centre origins), to peek round corners; and leaning out with the lean keys: off (0),
 +	// the eye moves to the side (1, peek), and the view tilts with it (2, tilt).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsLeanShots", &fpsLeanShots, false, "STR_FPS_LEAN_SHOTS", category));
-+	// An arcing shot or a throw leaves from a point that slides round the unit with the aim (a
-+	// large unit's start jumped most of a tile between two of the game's eight points).
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmoothArcStart", &fpsSmoothArcStart, false, "STR_FPS_SMOOTH_ARC_START", category));
++	// Throws and arcing shots: Classic (0), aimed at a tile's middle from one of the game's
++	// eight points round the unit; or Modern (1), at the exact point under the crosshair from a
++	// point that slides round the unit with the view, so the curve moves smoothly with the aim.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsThrowing", &fpsThrowing, 0, "STR_FPS_THROWING", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsLean", &fpsLean, 0, "STR_FPS_LEAN", category));
 +	// Melee at the wall, door or object the soldier faces (the game's terrain melee, on even if
 +	// the mod leaves it off) and at a body lying in front.
@@ -24673,7 +24685,7 @@ index 000000000..c7a4625cd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..c7a46048b
+index 000000000..9696775c9
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
 @@ -0,0 +1,486 @@
@@ -24874,8 +24886,8 @@ index 000000000..c7a46048b
 +/// past a corner the round can reach. The game asks this as it works out where a shot leaves
 +/// from (TileEngine::getOriginVoxel); every other shot keeps the game's own muzzle point.
 +void freeAimOrigin(BattlescapeState *state, const BattleAction &action, Position &origin);
-+/// Where an arcing shot or a throw from the first-person view leaves from (setting "Arcs: smooth
-+/// start"): a point that slides round the unit's footprint with the exact bearing to the target,
++/// Where an arcing shot or a throw from the first-person view leaves from (setting "Throwing"
++/// Modern): a point that slides round the unit's footprint with the exact bearing to the target,
 +/// between the game's eight (given as their shifts across a tile, by direction). Asked by the
 +/// game after it picked its own point (TileEngine::getOriginVoxel).
 +void slidingOrigin(BattlescapeState *state, const BattleAction &action, const Position &from, const int shiftX[8], const int shiftY[8], Position &origin);
@@ -33544,10 +33556,10 @@ index 000000000..a145c4fac
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..33695af0e
+index 000000000..f392de5e3
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1362 @@
+@@ -0,0 +1,1364 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -33686,6 +33698,8 @@ index 000000000..33695af0e
 +	/// Where an FPS-style straight shot leaves from, asked by the game (see FirstPerson::freeAimOrigin).
 +	static void freeAimFrom(BattlescapeState *state, const BattleAction &action, Position &origin);
 +	/// Where an arcing shot or a throw leaves from, sliding round the footprint (see FirstPerson::slidingOrigin).
++	/// Where a throw lands with "Throwing" Modern: the crosshair's point on the target tile's floor.
++	Position throwPoint(const Position &targetTile, const Position &aimedVoxel) const;
 +	static void slidingOrigin(BattlescapeState *state, const BattleAction &action, const Position &from, const int shiftX[8], const int shiftY[8], Position &origin);
 +	/// Should this shot's bullet hits play quicker (an FPS-style shot of ours)?
 +	static bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
@@ -41385,10 +41399,10 @@ index 000000000..f6374d177
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..11680abea
+index 000000000..a3d02c303
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,5231 @@
+@@ -0,0 +1,5260 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -43372,11 +43386,14 @@ index 000000000..11680abea
 +	// (an arcing shot aims at the exact point as a straight one does, see launchShot; a throw at the tile)
 +	const bool arcing = arcs(weapon, mode);
 +	const bool exactArc = arcing && (Options::fpsAimExact || freeAimOn(mode)) && hitSomething && isShot(mode);
-+	const bool keyedPoint = !arcing || exactArc || !hitSomething || (otherWeapon && !arcs(otherWeapon, offMode)); // (at the open sky, an arc through the point: see skyArcPoint)
++	// ("Throwing" Modern: every arc and throw goes for the exact point, from a start that slides with the view: see throwPoint, slidingOrigin)
++	const bool modernArc = arcing && Options::fpsThrowing == 1;
++	const int startBearing = modernArc ? (int)std::lround(_view->getYawDegrees() * 4.0) : 0; // (quarter degrees: under a voxel of the start's slide)
++	const bool keyedPoint = !arcing || exactArc || modernArc || !hitSomething || (otherWeapon && !arcs(otherWeapon, offMode)); // (at the open sky, an arc through the point: see skyArcPoint)
 +	const std::vector<int> key = { arcing ? 1 : 2, targetTile.x, targetTile.y, targetTile.z, keyedPoint ? targetVoxel.x : 0, keyedPoint ? targetVoxel.y : 0,
 +		keyedPoint ? targetVoxel.z : 0, from.x, from.y, from.z, unit->getDirection(), unit->isKneeled() ? 1 : 0, weapon->getId(), (int)mode, (int)side,
 +		Options::fpsForceArcing ? 1 : 0, Options::fpsForceBlocked ? 1 : 0, Options::oxceEnableOffCentreShooting ? 1 : 0, hitSomething ? 1 : 0,
-+		otherWeapon ? otherWeapon->getId() : -1, (int)offMode, eyeVoxelX, eyeVoxelY };
++		otherWeapon ? otherWeapon->getId() : -1, (int)offMode, eyeVoxelX, eyeVoxelY, Options::fpsThrowing, startBearing };
 +	if (key == _trajectoryKey)
 +	{
 +		return;
@@ -43393,8 +43410,10 @@ index 000000000..11680abea
 +		preview.target = targetTile;
 +		preview.relativeOrigin = side;
 +		const bool gunArcs = arcs(gun, gunMode);
-+		const bool gunExactArc = gunArcs && (Options::fpsAimExact || freeAimOn(gunMode)) && hitSomething && isShot(gunMode);
++		const bool gunExactArc = gunArcs && (Options::fpsAimExact || freeAimOn(gunMode) || Options::fpsThrowing == 1) && hitSomething && isShot(gunMode);
 +		if (gunExactArc) preview.targetVoxel = targetVoxel;
++		// (a throw at the exact point too, with "Throwing" Modern: see throwPoint)
++		if (gunMode == BA_THROW && Options::fpsThrowing == 1 && hitSomething) preview.targetVoxel = throwPoint(targetTile, targetVoxel);
 +		FirstPersonView::TrajectoryLook look = FirstPersonView::TRAJECTORY_ARC;
 +		if (gunArcs && !hitSomething)
 +		{
@@ -43450,6 +43469,24 @@ index 000000000..11680abea
 +}
 +
 +/**
++ * Where a throw lands with setting "Throwing" Modern (the owner: "throwing classic tile / modern
++ * continuous"): the point under the crosshair, on the target tile's floor, where the game's own
++ * throw goes for the tile's middle. So the curve's end moves smoothly with the aim and doesn't
++ * snap from tile to tile. The point is kept inside the target tile (the tile an arc goes for
++ * isn't always the one the crosshair's point is in: a wall struck, see arcTargetTile). The
++ * game tries it first and falls back on the tile's middle (Projectile::calculateThrow).
++ * @param targetTile The tile the throw goes for.
++ * @param aimedVoxel The point under the crosshair.
++ * @return The point to throw at, in voxels.
++ */
++Position FirstPersonMode::throwPoint(const Position &targetTile, const Position &aimedVoxel) const
++{
++	const Tile *tile = _save->getTile(targetTile);
++	return Position(std::clamp<int>(aimedVoxel.x, targetTile.x * 16, targetTile.x * 16 + 15), std::clamp<int>(aimedVoxel.y, targetTile.y * 16, targetTile.y * 16 + 15),
++		targetTile.z * 24 + 1 - (tile ? tile->getTerrainLevel() : 0));
++}
++
++/**
 + * The curve the game's own aim finds for a throw or an arcing shot at a tile, as the game works
 + * it out (Projectile::calculateThrow) but without the accuracy roll: the points on the tile it
 + * tries, in its order (an arcing shot aimed at an exact point, see launchShot, that point first;
@@ -43474,9 +43511,9 @@ index 000000000..11680abea
 +	const Position floorPoint = targetTile.toVoxel() + Position(8, 8, 1 - tile->getTerrainLevel());
 +	std::vector<Position> aimPoints;
 +	const BattleUnit *targetUnit = shot.type == BA_THROW ? nullptr : tile->getOverlappingUnit(_save);
-+	if (shot.type != BA_THROW && shot.targetVoxel.x >= 0)
++	if (shot.targetVoxel.x >= 0)
 +	{
-+		aimPoints.push_back(shot.targetVoxel); // (an exact point aimed at: tried first)
++		aimPoints.push_back(shot.targetVoxel); // (an exact point aimed at: tried first; a throw's with "Throwing" Modern)
 +	}
 +	if (shot.type == BA_THROW)
 +	{
@@ -44448,9 +44485,15 @@ index 000000000..11680abea
 +	//   unit, an object...), or a straight shot on the open sky at the point of air on the
 +	//   crosshair's ray (see aimAt); the game's accuracy roll still applies to it.
 +	action->freeAim = freeAimOn(mode);
-+	if ((Options::fpsAimExact || action->freeAim) && (hitSomething || !weapon->getArcingShot(mode)) && isShot(mode))
++	if ((Options::fpsAimExact || action->freeAim || (Options::fpsThrowing == 1 && weapon->getArcingShot(mode))) && (hitSomething || !weapon->getArcingShot(mode)) && isShot(mode))
 +	{
 +		action->targetVoxel = aimedVoxel;
++	}
++	// Setting "Throwing" Modern: a throw goes for the exact point under the crosshair on the
++	// tile's floor (see throwPoint), and an arcing shot for its exact point (above).
++	if (Options::fpsThrowing == 1 && mode == BA_THROW && hitSomething)
++	{
++		action->targetVoxel = throwPoint(targetTile, aimedVoxel);
 +	}
 +	// Leaning (setting "Lean shots", or leaning out with the lean keys): a soldier whose eye is
 +	// to one side of the tile's middle shoots from that side (see leanSide).
@@ -44971,7 +45014,7 @@ index 000000000..11680abea
 +
 +/**
 + * The game's hook for where an arcing shot or a throw leaves from (see FirstPerson::slidingOrigin;
-+ * setting "Arcs: smooth start"; a player's report, GitHub issue #128: a tank's flamer arc came in
++ * setting "Throwing" Modern; a player's report, GitHub issue #128: a tank's flamer arc came in
 + * from the right, and from the left after a slight change of aim). The game launches from one of
 + * eight points round the unit's footprint, picked by the eighth of the compass the target lies
 + * in: for a 2x2 unit they are most of a tile apart, and the arc's start jumps as the aim crosses
@@ -44991,7 +45034,7 @@ index 000000000..11680abea
 + */
 +void FirstPersonMode::slidingOrigin(BattlescapeState *state, const BattleAction &action, const Position &from, const int shiftX[8], const int shiftY[8], Position &origin)
 +{
-+	if (!Options::fpsSmoothArcStart || !state || !state->_firstPerson || !state->_firstPerson->isActive()
++	if (Options::fpsThrowing != 1 || !state || !state->_firstPerson || !state->_firstPerson->isActive()
 +		|| !action.actor || action.actor != state->_firstPerson->_trackedUnit)
 +	{
 +		return;
@@ -72152,10 +72195,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..3728df5fc
+index 000000000..cb4ec3b39
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,997 @@
+@@ -0,0 +1,1007 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -72370,7 +72413,7 @@ index 000000000..3728df5fc
 +			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsAlienTurnFacing", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
 +		{ "STR_FPS_SECTION_MOVEMENT", { "fpsTurnCost", "fpsMovement", "fpsWalkSpeed", "fpsFlightCost", "fpsFlightCostOverride", "fpsVault",
 +			"fpsFalling", "fpsSafeLanding" } },
-+		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsRecoil", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsSmoothArcStart", "fpsLean", "fpsMeleeTerrain",
++		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsRecoil", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsThrowing", "fpsLean", "fpsMeleeTerrain",
 +			"fpsMeleeFloors", "fpsAimExact", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
 +			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear" } },
 +		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
@@ -72641,6 +72684,11 @@ index 000000000..3728df5fc
 +		{
 +			static const char *const leanNames[] = { "STR_FPS_LEAN_OFF", "STR_FPS_LEAN_PEEK", "STR_FPS_LEAN_TILT" };
 +			return std::string(tr(leanNames[std::clamp(*option.asInt(), 0, 2)]));
++		}
++		// Throwing is a choice of two, shown by name.
++		if (option.id() == "fpsThrowing")
++		{
++			return std::string(tr(*option.asInt() == 1 ? "STR_FPS_THROWING_MODERN" : "STR_FPS_THROWING_CLASSIC"));
 +		}
 +		// Movement is a choice of two, shown by name.
 +		if (option.id() == "fpsMovement")
@@ -72953,6 +73001,11 @@ index 000000000..3728df5fc
 +		}
 +		// Movement (free, tiles): either button switches.
 +		else if (value == &Options::fpsMovement)
++		{
++			*value = (*value + 1) % 2;
++		}
++		// Throwing (classic, modern): either button switches.
++		else if (value == &Options::fpsThrowing)
 +		{
 +			*value = (*value + 1) % 2;
 +		}

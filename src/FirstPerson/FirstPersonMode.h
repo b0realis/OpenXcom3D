@@ -136,6 +136,8 @@ public:
 	/// Where an FPS-style straight shot leaves from, asked by the game (see FirstPerson::freeAimOrigin).
 	static void freeAimFrom(BattlescapeState *state, const BattleAction &action, Position &origin);
 	/// Where an arcing shot or a throw leaves from, sliding round the footprint (see FirstPerson::slidingOrigin).
+	/// Where a throw lands with "Throwing" Modern: the crosshair's point on the target tile's floor.
+	Position throwPoint(const Position &targetTile, const Position &aimedVoxel) const;
 	static void slidingOrigin(BattlescapeState *state, const BattleAction &action, const Position &from, const int shiftX[8], const int shiftY[8], Position &origin);
 	/// Should this shot's bullet hits play quicker (an FPS-style shot of ours)?
 	static bool fastShots(BattlescapeState *state, const BattleUnit *attacker);

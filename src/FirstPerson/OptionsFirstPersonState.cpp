@@ -212,7 +212,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsAlienTurnFacing", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
 		{ "STR_FPS_SECTION_MOVEMENT", { "fpsTurnCost", "fpsMovement", "fpsWalkSpeed", "fpsFlightCost", "fpsFlightCostOverride", "fpsVault",
 			"fpsFalling", "fpsSafeLanding" } },
-		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsRecoil", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsSmoothArcStart", "fpsLean", "fpsMeleeTerrain",
+		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsRecoil", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsThrowing", "fpsLean", "fpsMeleeTerrain",
 			"fpsMeleeFloors", "fpsAimExact", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
 			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear" } },
 		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
@@ -483,6 +483,11 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		{
 			static const char *const leanNames[] = { "STR_FPS_LEAN_OFF", "STR_FPS_LEAN_PEEK", "STR_FPS_LEAN_TILT" };
 			return std::string(tr(leanNames[std::clamp(*option.asInt(), 0, 2)]));
+		}
+		// Throwing is a choice of two, shown by name.
+		if (option.id() == "fpsThrowing")
+		{
+			return std::string(tr(*option.asInt() == 1 ? "STR_FPS_THROWING_MODERN" : "STR_FPS_THROWING_CLASSIC"));
 		}
 		// Movement is a choice of two, shown by name.
 		if (option.id() == "fpsMovement")
@@ -795,6 +800,11 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		}
 		// Movement (free, tiles): either button switches.
 		else if (value == &Options::fpsMovement)
+		{
+			*value = (*value + 1) % 2;
+		}
+		// Throwing (classic, modern): either button switches.
+		else if (value == &Options::fpsThrowing)
 		{
 			*value = (*value + 1) % 2;
 		}

@@ -1981,11 +1981,14 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 	// (an arcing shot aims at the exact point as a straight one does, see launchShot; a throw at the tile)
 	const bool arcing = arcs(weapon, mode);
 	const bool exactArc = arcing && (Options::fpsAimExact || freeAimOn(mode)) && hitSomething && isShot(mode);
-	const bool keyedPoint = !arcing || exactArc || !hitSomething || (otherWeapon && !arcs(otherWeapon, offMode)); // (at the open sky, an arc through the point: see skyArcPoint)
+	// ("Throwing" Modern: every arc and throw goes for the exact point, from a start that slides with the view: see throwPoint, slidingOrigin)
+	const bool modernArc = arcing && Options::fpsThrowing == 1;
+	const int startBearing = modernArc ? (int)std::lround(_view->getYawDegrees() * 4.0) : 0; // (quarter degrees: under a voxel of the start's slide)
+	const bool keyedPoint = !arcing || exactArc || modernArc || !hitSomething || (otherWeapon && !arcs(otherWeapon, offMode)); // (at the open sky, an arc through the point: see skyArcPoint)
 	const std::vector<int> key = { arcing ? 1 : 2, targetTile.x, targetTile.y, targetTile.z, keyedPoint ? targetVoxel.x : 0, keyedPoint ? targetVoxel.y : 0,
 		keyedPoint ? targetVoxel.z : 0, from.x, from.y, from.z, unit->getDirection(), unit->isKneeled() ? 1 : 0, weapon->getId(), (int)mode, (int)side,
 		Options::fpsForceArcing ? 1 : 0, Options::fpsForceBlocked ? 1 : 0, Options::oxceEnableOffCentreShooting ? 1 : 0, hitSomething ? 1 : 0,
-		otherWeapon ? otherWeapon->getId() : -1, (int)offMode, eyeVoxelX, eyeVoxelY };
+		otherWeapon ? otherWeapon->getId() : -1, (int)offMode, eyeVoxelX, eyeVoxelY, Options::fpsThrowing, startBearing };
 	if (key == _trajectoryKey)
 	{
 		return;
@@ -2002,8 +2005,10 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 		preview.target = targetTile;
 		preview.relativeOrigin = side;
 		const bool gunArcs = arcs(gun, gunMode);
-		const bool gunExactArc = gunArcs && (Options::fpsAimExact || freeAimOn(gunMode)) && hitSomething && isShot(gunMode);
+		const bool gunExactArc = gunArcs && (Options::fpsAimExact || freeAimOn(gunMode) || Options::fpsThrowing == 1) && hitSomething && isShot(gunMode);
 		if (gunExactArc) preview.targetVoxel = targetVoxel;
+		// (a throw at the exact point too, with "Throwing" Modern: see throwPoint)
+		if (gunMode == BA_THROW && Options::fpsThrowing == 1 && hitSomething) preview.targetVoxel = throwPoint(targetTile, targetVoxel);
 		FirstPersonView::TrajectoryLook look = FirstPersonView::TRAJECTORY_ARC;
 		if (gunArcs && !hitSomething)
 		{
@@ -2059,6 +2064,24 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 }
 
 /**
+ * Where a throw lands with setting "Throwing" Modern (the owner: "throwing classic tile / modern
+ * continuous"): the point under the crosshair, on the target tile's floor, where the game's own
+ * throw goes for the tile's middle. So the curve's end moves smoothly with the aim and doesn't
+ * snap from tile to tile. The point is kept inside the target tile (the tile an arc goes for
+ * isn't always the one the crosshair's point is in: a wall struck, see arcTargetTile). The
+ * game tries it first and falls back on the tile's middle (Projectile::calculateThrow).
+ * @param targetTile The tile the throw goes for.
+ * @param aimedVoxel The point under the crosshair.
+ * @return The point to throw at, in voxels.
+ */
+Position FirstPersonMode::throwPoint(const Position &targetTile, const Position &aimedVoxel) const
+{
+	const Tile *tile = _save->getTile(targetTile);
+	return Position(std::clamp<int>(aimedVoxel.x, targetTile.x * 16, targetTile.x * 16 + 15), std::clamp<int>(aimedVoxel.y, targetTile.y * 16, targetTile.y * 16 + 15),
+		targetTile.z * 24 + 1 - (tile ? tile->getTerrainLevel() : 0));
+}
+
+/**
  * The curve the game's own aim finds for a throw or an arcing shot at a tile, as the game works
  * it out (Projectile::calculateThrow) but without the accuracy roll: the points on the tile it
  * tries, in its order (an arcing shot aimed at an exact point, see launchShot, that point first;
@@ -2083,9 +2106,9 @@ bool FirstPersonMode::gameArcFound(BattleAction &shot, const Position &targetTil
 	const Position floorPoint = targetTile.toVoxel() + Position(8, 8, 1 - tile->getTerrainLevel());
 	std::vector<Position> aimPoints;
 	const BattleUnit *targetUnit = shot.type == BA_THROW ? nullptr : tile->getOverlappingUnit(_save);
-	if (shot.type != BA_THROW && shot.targetVoxel.x >= 0)
+	if (shot.targetVoxel.x >= 0)
 	{
-		aimPoints.push_back(shot.targetVoxel); // (an exact point aimed at: tried first)
+		aimPoints.push_back(shot.targetVoxel); // (an exact point aimed at: tried first; a throw's with "Throwing" Modern)
 	}
 	if (shot.type == BA_THROW)
 	{
@@ -3057,9 +3080,15 @@ void FirstPersonMode::launchShot(BattleUnit *unit, BattleItem *weapon, BattleAct
 	//   unit, an object...), or a straight shot on the open sky at the point of air on the
 	//   crosshair's ray (see aimAt); the game's accuracy roll still applies to it.
 	action->freeAim = freeAimOn(mode);
-	if ((Options::fpsAimExact || action->freeAim) && (hitSomething || !weapon->getArcingShot(mode)) && isShot(mode))
+	if ((Options::fpsAimExact || action->freeAim || (Options::fpsThrowing == 1 && weapon->getArcingShot(mode))) && (hitSomething || !weapon->getArcingShot(mode)) && isShot(mode))
 	{
 		action->targetVoxel = aimedVoxel;
+	}
+	// Setting "Throwing" Modern: a throw goes for the exact point under the crosshair on the
+	// tile's floor (see throwPoint), and an arcing shot for its exact point (above).
+	if (Options::fpsThrowing == 1 && mode == BA_THROW && hitSomething)
+	{
+		action->targetVoxel = throwPoint(targetTile, aimedVoxel);
 	}
 	// Leaning (setting "Lean shots", or leaning out with the lean keys): a soldier whose eye is
 	// to one side of the tile's middle shoots from that side (see leanSide).
@@ -3580,7 +3609,7 @@ void FirstPersonMode::freeAimFrom(BattlescapeState *state, const BattleAction &a
 
 /**
  * The game's hook for where an arcing shot or a throw leaves from (see FirstPerson::slidingOrigin;
- * setting "Arcs: smooth start"; a player's report, GitHub issue #128: a tank's flamer arc came in
+ * setting "Throwing" Modern; a player's report, GitHub issue #128: a tank's flamer arc came in
  * from the right, and from the left after a slight change of aim). The game launches from one of
  * eight points round the unit's footprint, picked by the eighth of the compass the target lies
  * in: for a 2x2 unit they are most of a tile apart, and the arc's start jumps as the aim crosses
@@ -3600,7 +3629,7 @@ void FirstPersonMode::freeAimFrom(BattlescapeState *state, const BattleAction &a
  */
 void FirstPersonMode::slidingOrigin(BattlescapeState *state, const BattleAction &action, const Position &from, const int shiftX[8], const int shiftY[8], Position &origin)
 {
-	if (!Options::fpsSmoothArcStart || !state || !state->_firstPerson || !state->_firstPerson->isActive()
+	if (Options::fpsThrowing != 1 || !state || !state->_firstPerson || !state->_firstPerson->isActive()
 		|| !action.actor || action.actor != state->_firstPerson->_trackedUnit)
 	{
 		return;
