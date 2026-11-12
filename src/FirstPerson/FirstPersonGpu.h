@@ -149,11 +149,19 @@ public:
 		static const int Texels = 10;  // a primitive: this many texels of four floats
 		static const int Bin = 32;     // the screen in squares of this many pixels: each has the list of the primitives that may touch it
 		enum Kind { Sprite = 1, GroundShade, Decal, Line, Dot, Disc, Quad };
-		std::vector<float> prims;      // the primitives
+		static const int OutlineTexels = 7; // an outlined picture's record (see outlineAt)
+		std::vector<float> prims;      // the primitives (and after them the outlined pictures' records, if any)
+		int primCount = 0;             // how many primitives
 		const std::vector<Uint8> *bytes = nullptr; // the sprites' pixels and opacity maps, where the primitives say: kept from frame to frame, only added to,
 		Uint32 bytesGeneration = 0;    // ... until they are begun anew (another number here): what the card has of them stays good till then
 		std::vector<Uint32> bins;      // per bin (and one more) where its list starts in here; then the lists: a primitive's number each, in order
 		int binColumns = 0, binRows = 0;
+		// The outlines round the units' pictures (settings "Hitboxes" with "Full sprite hitboxes"), if the frame has them: drawn
+		// after the primitives before outlineAt, in a second go from the first one's pictures (an outline looks at the pixels beside it).
+		int outlineAt = -1;            // the number of the first primitive after them; -1: none
+		int outlineCount = 0;          // the outlined pictures: a record each after the primitives in prims (see FirstPersonView::gpuRecordOutlines)
+		float outlineOpacity = 1.0f, outlineSlack = 0.0f;
+		bool outlineGlows = false;
 		float forward[3], right[3], up[3], levelRight[3], levelUp[3], level[2]; // the camera in true proportions (FirstPersonView::updateBasis)
 		float eyeZ, focal;             // the eye's height, in voxels; the focal length, in pixels
 		int width = 0, height = 0;     // the view, in pixels

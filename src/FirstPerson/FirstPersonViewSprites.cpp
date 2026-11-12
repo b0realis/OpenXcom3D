@@ -1378,6 +1378,11 @@ void FirstPersonView::noteTestedPictures()
 		}
 	}
 	_outlinedUnits.swap(cards);
+	if (_gpuRecording)
+	{
+		gpuRecordOutlines(); // (the card finds the pictures' pixels and draws the outlines: see FirstPersonViewGpuEffects.cpp)
+		if (_gpuRecordOnly) return;
+	}
 	if (!_outlinedUnits.empty())
 	{
 		runOnAllThreads(&FirstPersonView::testedPictureBands);
@@ -1436,7 +1441,7 @@ void FirstPersonView::testedPictureBands()
  */
 void FirstPersonView::drawUnitOutlines()
 {
-	if (!_outlineColors.empty())
+	if (!_outlineColors.empty() && !(_gpuRecording && _gpuRecordOnly))
 	{
 		runOnAllThreads(&FirstPersonView::outlineBands);
 	}

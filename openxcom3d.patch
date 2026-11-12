@@ -26291,10 +26291,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..e4a015482
+index 000000000..a3ca91a2b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,2200 @@
+@@ -0,0 +1,2240 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -26927,7 +26927,8 @@ index 000000000..e4a015482
 +		Gl::UInt framebuffer = 0;
 +		Gl::UInt textures[4] = {}; // colour, depth, glow, notes
 +	};
-+	std::map<std::array<int, 2>, EffectTargets> effectTargets;
++	std::map<std::array<int, 3>, EffectTargets> effectTargets; // by width, height and go (0 the first, 1 the second: a frame with outlines)
++	std::map<std::array<int, 2>, int> effectsFinalGo;          // by width and height: the go that held the frame's finished pictures last
 +	int rayColumns = 0, rayRows = 0, rayPixelSize = 1; // the rays' pictures kept for the effects: their size, and the pixels a ray coloured
 +	bool buildEffects();
 +	bool drawEffects(const Effects &effects, const Output &output, Timing *timing);
@@ -27919,6 +27920,7 @@ index 000000000..e4a015482
 +	whole("EffectDot", Effects::Dot);
 +	whole("EffectDisc", Effects::Disc);
 +	whole("EffectQuad", Effects::Quad);
++	whole("EffectOutlineTexels", Effects::OutlineTexels);
 +	const std::string vertexSource = shaderHead() + VertexSource, effectsSource = shaderHead() + constants + EffectsSource;
 +	const char *sources[2] = { vertexSource.c_str(), effectsSource.c_str() };
 +	const Gl::Enum kinds[2] = { Gl::VERTEX_SHADER, Gl::FRAGMENT_SHADER };
@@ -27951,8 +27953,8 @@ index 000000000..e4a015482
 +		return false;
 +	}
 +	Gl::UseProgram(built);
-+	const char *const pictures[4] = { "uRayColor", "uRayDepth", "uRayGlow", "uSeeThrough" };
-+	for (int unit = 0; unit < 4; ++unit) Gl::Uniform1i(Gl::GetUniformLocation(built, pictures[unit]), unit);
++	const char *const pictures[5] = { "uRayColor", "uRayDepth", "uRayGlow", "uSeeThrough", "uNotes" };
++	for (int unit = 0; unit < 5; ++unit) Gl::Uniform1i(Gl::GetUniformLocation(built, pictures[unit]), unit);
 +	const char *const buffered[3] = { "uPrims", "uBytes", "uBins" };
 +	const Gl::Enum formats[3] = { Gl::RGBA32F, Gl::R8UI, Gl::R32UI };
 +	Gl::GenBuffers(3, effectBuffers);
@@ -28195,23 +28197,25 @@ index 000000000..e4a015482
 +	{
 +		return false;
 +	}
-+	// The pictures drawn into, for this size of view.
-+	EffectTargets &drawn = effectTargets[{ effects.width, effects.height }];
-+	if (!drawn.framebuffer)
++	// The pictures drawn into, for this size of view: one set, or two for a frame with outlines (the second go reads the first's).
++	const int goes = effects.outlineAt >= 0 ? 2 : 1;
++	for (int go = 0; go < goes; ++go)
 +	{
-+		Gl::GenFramebuffers(1, &drawn.framebuffer);
-+		Gl::BindFramebuffer(Gl::FRAMEBUFFER, drawn.framebuffer);
-+		Gl::GenTextures(4, drawn.textures);
++		EffectTargets &made = effectTargets[{ effects.width, effects.height, go }];
++		if (made.framebuffer) continue;
++		Gl::GenFramebuffers(1, &made.framebuffer);
++		Gl::BindFramebuffer(Gl::FRAMEBUFFER, made.framebuffer);
++		Gl::GenTextures(4, made.textures);
 +		const Gl::Enum internal[4] = { Gl::R8UI, Gl::R32F, Gl::R8UI, Gl::RGBA16UI }, format[4] = { Gl::RED_INTEGER, Gl::RED, Gl::RED_INTEGER, Gl::RGBA_INTEGER },
 +			type[4] = { Gl::UNSIGNED_BYTE, Gl::FLOAT, Gl::UNSIGNED_BYTE, Gl::UNSIGNED_SHORT };
 +		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
 +		for (int which = 0; which < 4; ++which)
 +		{
-+			Gl::BindTexture(Gl::TEXTURE_2D, drawn.textures[which]);
++			Gl::BindTexture(Gl::TEXTURE_2D, made.textures[which]);
 +			Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)internal[which], effects.width, effects.height, 0, format[which], type[which], nullptr);
 +			Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
 +			Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
-+			Gl::FramebufferTexture2D(Gl::FRAMEBUFFER, Gl::COLOR_ATTACHMENT0 + which, Gl::TEXTURE_2D, drawn.textures[which], 0);
++			Gl::FramebufferTexture2D(Gl::FRAMEBUFFER, Gl::COLOR_ATTACHMENT0 + which, Gl::TEXTURE_2D, made.textures[which], 0);
 +		}
 +		if (Gl::CheckFramebufferStatus(Gl::FRAMEBUFFER) != Gl::FRAMEBUFFER_COMPLETE)
 +		{
@@ -28219,7 +28223,10 @@ index 000000000..e4a015482
 +			return false;
 +		}
 +	}
-+	Gl::BindFramebuffer(Gl::FRAMEBUFFER, drawn.framebuffer);
++	const EffectTargets &firstGo = effectTargets[{ effects.width, effects.height, 0 }];
++	const EffectTargets &drawn = effectTargets[{ effects.width, effects.height, goes - 1 }]; // (the finished pictures)
++	effectsFinalGo[{ effects.width, effects.height }] = goes - 1;
++	Gl::BindFramebuffer(Gl::FRAMEBUFFER, firstGo.framebuffer);
 +	const Gl::Enum attachments[4] = { Gl::COLOR_ATTACHMENT0, Gl::COLOR_ATTACHMENT0 + 1, Gl::COLOR_ATTACHMENT0 + 2, Gl::COLOR_ATTACHMENT0 + 3 };
 +	Gl::DrawBuffers(4, attachments);
 +	Gl::Viewport(0, 0, effects.width, effects.height);
@@ -28230,6 +28237,8 @@ index 000000000..e4a015482
 +		Gl::ActiveTexture(Gl::TEXTURE0 + which);
 +		Gl::BindTexture(Gl::TEXTURE_2D, rays->second.textures[which]);
 +	}
++	Gl::ActiveTexture(Gl::TEXTURE0 + 4);
++	Gl::BindTexture(Gl::TEXTURE_2D, seeThroughTexture); // (the notes' place: not looked at in the first go)
 +	Gl::ActiveTexture(Gl::TEXTURE0 + 3);
 +	Gl::BindTexture(Gl::TEXTURE_2D, seeThroughTexture);
 +	if (effects.seeThrough && effects.paletteHash != seeThroughSent)
@@ -28271,7 +28280,11 @@ index 000000000..e4a015482
 +	Gl::Uniform2i(location("uViewSize"), effects.width, effects.height);
 +	Gl::Uniform2i(location("uBinGrid"), effects.binColumns, effects.binRows);
 +	Gl::Uniform1i(location("uPixelSize"), rayPixelSize);
-+	program = raysProgram;
++	const int primitives = effects.primCount;
++	Gl::Uniform1i(location("uContinue"), 0);
++	Gl::Uniform1i(location("uFirstPrim"), 0);
++	Gl::Uniform1i(location("uEndPrim"), goes == 2 ? effects.outlineAt : primitives);
++	Gl::Uniform1i(location("uOutlineCount"), 0);
 +	if (timing)
 +	{
 +		Gl::Finish();
@@ -28279,6 +28292,31 @@ index 000000000..e4a015482
 +		start = std::chrono::steady_clock::now();
 +	}
 +	Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
++	if (goes == 2)
++	{
++		// The second go: from the first one's pictures, the outlines and the primitives after them.
++		Gl::BindFramebuffer(Gl::FRAMEBUFFER, drawn.framebuffer);
++		Gl::DrawBuffers(4, attachments);
++		for (int which = 0; which < 3; ++which)
++		{
++			Gl::ActiveTexture(Gl::TEXTURE0 + which);
++			Gl::BindTexture(Gl::TEXTURE_2D, firstGo.textures[which]);
++		}
++		Gl::ActiveTexture(Gl::TEXTURE0 + 4);
++		Gl::BindTexture(Gl::TEXTURE_2D, firstGo.textures[3]);
++		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
++		Gl::Uniform1i(location("uPixelSize"), 1);
++		Gl::Uniform1i(location("uContinue"), 1);
++		Gl::Uniform1i(location("uFirstPrim"), effects.outlineAt);
++		Gl::Uniform1i(location("uEndPrim"), primitives);
++		Gl::Uniform1i(location("uOutlineBase"), primitives * Effects::Texels);
++		Gl::Uniform1i(location("uOutlineCount"), effects.outlineCount);
++		Gl::Uniform1f(location("uOutlineOpacity"), effects.outlineOpacity);
++		Gl::Uniform1f(location("uOutlineSlack"), effects.outlineSlack);
++		Gl::Uniform1i(location("uOutlineGlows"), effects.outlineGlows ? 1 : 0);
++		Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
++	}
++	program = raysProgram;
 +	// The bloom over them (the picture and its glow are then the bloom's).
 +	GlowTargets *brightened = nullptr;
 +	if (effects.halos && !drawGlow(effects, drawn, brightened))
@@ -28463,7 +28501,9 @@ index 000000000..e4a015482
 +	}
 +	bool read = false;
 +	state.run([&] {
-+		const auto drawn = state.effectTargets.find({ width, height });
++		const auto final = state.effectsFinalGo.find({ width, height });
++		if (final == state.effectsFinalGo.end()) return;
++		const auto drawn = state.effectTargets.find({ width, height, final->second });
 +		if (drawn == state.effectTargets.end() || !drawn->second.framebuffer) return;
 +		Gl::BindFramebuffer(Gl::FRAMEBUFFER, drawn->second.framebuffer);
 +		state.readPicture(1, width, height, 1, depth, width);
@@ -28497,10 +28537,10 @@ index 000000000..e4a015482
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.h b/src/FirstPerson/FirstPersonGpu.h
 new file mode 100644
-index 000000000..4eab6ce4f
+index 000000000..040672294
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.h
-@@ -0,0 +1,211 @@
+@@ -0,0 +1,219 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -28652,11 +28692,19 @@ index 000000000..4eab6ce4f
 +		static const int Texels = 10;  // a primitive: this many texels of four floats
 +		static const int Bin = 32;     // the screen in squares of this many pixels: each has the list of the primitives that may touch it
 +		enum Kind { Sprite = 1, GroundShade, Decal, Line, Dot, Disc, Quad };
-+		std::vector<float> prims;      // the primitives
++		static const int OutlineTexels = 7; // an outlined picture's record (see outlineAt)
++		std::vector<float> prims;      // the primitives (and after them the outlined pictures' records, if any)
++		int primCount = 0;             // how many primitives
 +		const std::vector<Uint8> *bytes = nullptr; // the sprites' pixels and opacity maps, where the primitives say: kept from frame to frame, only added to,
 +		Uint32 bytesGeneration = 0;    // ... until they are begun anew (another number here): what the card has of them stays good till then
 +		std::vector<Uint32> bins;      // per bin (and one more) where its list starts in here; then the lists: a primitive's number each, in order
 +		int binColumns = 0, binRows = 0;
++		// The outlines round the units' pictures (settings "Hitboxes" with "Full sprite hitboxes"), if the frame has them: drawn
++		// after the primitives before outlineAt, in a second go from the first one's pictures (an outline looks at the pixels beside it).
++		int outlineAt = -1;            // the number of the first primitive after them; -1: none
++		int outlineCount = 0;          // the outlined pictures: a record each after the primitives in prims (see FirstPersonView::gpuRecordOutlines)
++		float outlineOpacity = 1.0f, outlineSlack = 0.0f;
++		bool outlineGlows = false;
 +		float forward[3], right[3], up[3], levelRight[3], levelUp[3], level[2]; // the camera in true proportions (FirstPersonView::updateBasis)
 +		float eyeZ, focal;             // the eye's height, in voxels; the focal length, in pixels
 +		int width = 0, height = 0;     // the view, in pixels
@@ -28896,10 +28944,10 @@ index 000000000..62e379411
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..b4a8e549f
+index 000000000..5ba33866f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,2273 @@
+@@ -0,0 +1,2356 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -30835,6 +30883,15 @@ index 000000000..b4a8e549f
 +uniform float uEyeZ, uFocal;            // the eye's height in voxels; the focal length in pixels
 +uniform ivec2 uViewSize, uBinGrid;      // the view in pixels; the bins across and down
 +uniform int uPixelSize;                 // pixels a ray coloured each way
++// A frame with the outlines round the units' pictures (settings "Hitboxes" with "Full sprite hitboxes") is drawn in two goes:
++// the primitives up to the outlines, then, from that go's pictures (an outline looks at the pixels beside it), the outlines
++// and the rest.
++uniform usampler2D uNotes;              // the first go's notes (the second go starts from them)
++uniform int uContinue;                  // 1: the second go
++uniform int uFirstPrim, uEndPrim;       // this go's primitives: from the first up to (not including) the other
++uniform int uOutlineBase, uOutlineCount; // the outlined pictures' records (EffectOutlineTexels texels each, from this texel of uPrims), and how many: 0 none
++uniform float uOutlineOpacity, uOutlineSlack; // how much of the outlines shows; how much farther than the scene a tested picture may be
++uniform int uOutlineGlows;
 +layout(location = 0) out uint outColor;
 +layout(location = 1) out float outDepth;
 +layout(location = 2) out uint outGlow;  // the glow (1, 3), and 64 where see-through smoke lies over the pixel
@@ -30858,6 +30915,42 @@ index 000000000..b4a8e549f
 +}
 +vec4 prim(int base, int texel) { return texelFetch(uPrims, base + texel); }
 +
++// FirstPersonView::testedPictureBands for one pixel: the outlined picture the line from the eye through it hits (the
++// nearest, if several; its record's number + 1, 0 none) where it shows (no farther than the scene there, with the
++// slack), and how far ahead. See FirstPerson::cardRay.
++int outlineOwner(ivec2 at, out float ownerDepth, out uint ownerColor)
++{
++	ownerDepth = 0.0;
++	ownerColor = 0u;
++	int owner = 0;
++	if (at.x < 0 || at.y < 0 || at.x >= uViewSize.x || at.y >= uViewSize.y) return 0;
++	float sceneDepth = texelFetch(uRayDepth, at, 0).r;
++	float across = (float(at.x) + 0.5 - float(uViewSize.x) * 0.5) / uFocal, rise = (float(uViewSize.y) * 0.5 - (float(at.y) + 0.5)) / uFocal;
++	vec3 trueRay = uForward + across * uRight + rise * uUp, ray = vec3(trueRay.xy, trueRay.z / ZScale); // (in voxels; one unit ahead, so how far along is the view depth)
++	for (int record = 0; record < uOutlineCount; ++record)
++	{
++		int base = uOutlineBase + record * EffectOutlineTexels;
++		vec4 box = texelFetch(uPrims, base);
++		if (float(at.x) < box.x || float(at.y) < box.y || float(at.x) > box.z || float(at.y) > box.w) continue;
++		vec4 t1 = texelFetch(uPrims, base + 1), t2 = texelFetch(uPrims, base + 2), t3 = texelFetch(uPrims, base + 3), t4 = texelFetch(uPrims, base + 4),
++			t5 = texelFetch(uPrims, base + 5), t6 = texelFetch(uPrims, base + 6);
++		float facing = dot(ray, t4.xyz);
++		if (abs(facing) < 1e-9) continue;
++		float along = dot(t1.xyz, t4.xyz) / facing;
++		if (along <= 0.0) continue;
++		vec3 fromAnchor = ray * along - t1.xyz;
++		float column = floor(t5.x * (t3.w + dot(fromAnchor, t2.xyz) * t1.w)), row = floor(t5.x * (t4.w - dot(fromAnchor, t3.xyz) * t2.w));
++		if (column < 0.0 || row < 0.0 || column >= t5.w || row >= t6.x || (row >= t4.w * t5.x && t5.y == 0.0)) continue;
++		if (texelFetch(uBytes, int(t5.z) + int(row) * int(t5.w) + int(column)).r == 0u) continue;
++		if (along < 1.0 || along > sceneDepth + uOutlineSlack) continue;
++		if (owner != 0 && ownerDepth <= along) continue;
++		owner = int(t6.y);
++		ownerDepth = along;
++		ownerColor = uint(t6.z);
++	}
++	return owner;
++}
++
 +void main()
 +{
 +	ivec2 pixel = ivec2(gl_FragCoord.xy), from = pixel / uPixelSize;
@@ -30865,6 +30958,43 @@ index 000000000..b4a8e549f
 +	float depth = texelFetch(uRayDepth, from, 0).r;
 +	int veil = 255, smokeVeil = 0;
 +	uint own = 0u, lastSolid = 0u, lastPile = 0u;
++	if (uContinue != 0)
++	{
++		uvec4 notes = texelFetch(uNotes, pixel, 0);
++		veil = int(notes.r);
++		own = notes.g & 1u;
++		smokeVeil = int(notes.g >> 1);
++		lastSolid = notes.b;
++		lastPile = notes.a;
++		glow &= 3u;
++	}
++	if (uOutlineCount > 0)
++	{
++		// FirstPersonView::outlineBands: a pixel that isn't an outlined picture's, borders one and shows something behind it
++		// takes that picture's outline colour (the nearest such picture's).
++		float hereDepth, nearest = depth, besideDepth;
++		uint hereColor, besideColor, outlineColor = 0u;
++		int here = outlineOwner(pixel, hereDepth, hereColor);
++		bool outlined = false;
++		for (int offsetY = -1; offsetY <= 1; ++offsetY)
++		{
++			for (int offsetX = -1; offsetX <= 1; ++offsetX)
++			{
++				int beside = outlineOwner(pixel + ivec2(offsetX, offsetY), besideDepth, besideColor);
++				if (beside != 0 && beside != here && besideDepth < nearest)
++				{
++					outlined = true;
++					outlineColor = besideColor;
++					nearest = besideDepth;
++				}
++			}
++		}
++		if (outlined && !(uOutlineOpacity < 1.0 && dither(pixel.x, pixel.y) >= uOutlineOpacity))
++		{
++			color = outlineColor;
++			glow = uint(uOutlineGlows);
++		}
++	}
 +	// The pixel's ray, reaching one unit ahead (so how far along it is the view depth too).
 +	float across = (float(pixel.x) + 0.5 - float(uViewSize.x) * 0.5) / uFocal, rise = (float(uViewSize.y) * 0.5 - (float(pixel.y) + 0.5)) / uFocal;
 +	vec3 ray = uForward + across * uRight + rise * uUp;
@@ -30873,6 +31003,7 @@ index 000000000..b4a8e549f
 +	for (int entry = int(texelFetch(uBins, bin).r); entry < listEnd; ++entry)
 +	{
 +		int number = int(texelFetch(uBins, entry).r), base = number * EffectTexels;
++		if (number < uFirstPrim || number >= uEndPrim) continue;
 +		vec4 box = prim(base, 1);
 +		if (float(pixel.x) < box.x || float(pixel.y) < box.y || float(pixel.x) >= box.z || float(pixel.y) >= box.w) continue;
 +		vec4 head = prim(base, 0);
@@ -53726,10 +53857,10 @@ index 000000000..507afe9ef
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..f5ea284af
+index 000000000..87efe1c67
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1529 @@
+@@ -0,0 +1,1531 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -54721,6 +54852,8 @@ index 000000000..f5ea284af
 +	void gpuRecordDisc(double screenX, double screenY, double radius, double depth, float leeway, Uint8 rim, Uint8 centre, Uint8 middle, float centreShare, float middleShare, int flags);
 +	/// Records a filled quad at one depth (see fillQuadAtDepth).
 +	void gpuRecordQuad(const double corners[4][2], Uint8 color, float depth);
++	/// Records the outlines round the units' pictures (see noteTestedPictures, drawUnitOutlines).
++	void gpuRecordOutlines();
 +	/// Has the card draw what was recorded and takes the finished pictures back; recording stops.
 +	bool gpuDrawEffects();
 +	bool _gpuDepthPending = false; // this frame's depth is still on the card (see gpuNeedDepth)
@@ -57595,10 +57728,10 @@ index 000000000..b6fbee4f6
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpuEffects.cpp b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 new file mode 100644
-index 000000000..e83fe84e3
+index 000000000..b9667db8d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
-@@ -0,0 +1,746 @@
+@@ -0,0 +1,812 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -57639,8 +57772,6 @@ index 000000000..e83fe84e3
 + *
 + * OPENXCOM3D_GPU_EFFECTS=0: the old way (the rays read back, the passes on the CPU), to compare; =check: both, the CPU's
 + * shown, the card's compared with it a pixel at a time (see gpuCheckEffects).
-+ * Still drawn the old way: a frame with the outlines round the units' pictures (setting "Full sprite hitboxes"),
-+ * which look at the pixels beside each (see gpuEffectsWanted).
 + */
 +#include "FirstPersonView.h"
 +#include <algorithm>
@@ -57655,6 +57786,7 @@ index 000000000..e83fe84e3
 +#include "../Engine/Options.h"
 +#include "../Engine/Surface.h"
 +#include "FirstPersonGpu.h"
++#include "FirstPersonSpriteHits.h"
 +#include "FirstPersonViewShared.h"
 +
 +namespace OpenXcom
@@ -57680,6 +57812,45 @@ index 000000000..e83fe84e3
 +}
 +
 +/**
++ * Where a picture's bytes are in the atlas, added to it if new (see SpriteAtlas).
++ * @param pixels Its rows, pitch bytes from one to the next, width by height.
++ * @param opacityMap A see-through sprite's opacity map (width x height bytes, kept right after its pixels), or null.
++ */
++static int atlasPlace(const Uint8 *pixels, int pitch, int width, int height, const Uint8 *opacityMap)
++{
++	SpriteAtlas &atlas = spriteAtlas();
++	const size_t count = (size_t)width * height;
++	Uint64 hash = 1469598103934665603ull ^ ((Uint64)width << 32 | (Uint32)height) ^ (opacityMap ? 0x9E3779B97F4A7C15ull : 0ull);
++	auto mix = [&hash](const Uint8 *bytes, size_t size) {
++		size_t at = 0;
++		for (; at + 8 <= size; at += 8)
++		{
++			Uint64 eight;
++			std::memcpy(&eight, bytes + at, 8);
++			hash = (hash ^ eight) * 1099511628211ull;
++			hash ^= hash >> 29;
++		}
++		for (; at < size; ++at) hash = (hash ^ bytes[at]) * 1099511628211ull;
++	};
++	for (int row = 0; row < height; ++row) mix(pixels + (size_t)row * pitch, width);
++	if (opacityMap) mix(opacityMap, count);
++	const auto known = atlas.places.find(hash);
++	if (known != atlas.places.end())
++	{
++		return known->second;
++	}
++	const int at = (int)atlas.bytes.size();
++	atlas.bytes.resize(at + count);
++	for (int row = 0; row < height; ++row)
++	{
++		std::memcpy(&atlas.bytes[at + (size_t)row * width], pixels + (size_t)row * pitch, width);
++	}
++	if (opacityMap) atlas.bytes.insert(atlas.bytes.end(), opacityMap, opacityMap + count);
++	atlas.places.emplace(hash, at);
++	return at;
++}
++
++/**
 + * A frame's units and effects as recorded for the card, and what is needed to read its answer:
 + * each primitive's box on the screen (for the bins), where each sprite's bytes went, and whose
 + * picture each sprite is (the card says which sprite shows round the pointer, by number).
@@ -57694,10 +57865,14 @@ index 000000000..e83fe84e3
 +	std::vector<Uint32> notes;                             // the card's notes, four numbers a pixel
 +	std::vector<Uint32> patchNotes;                        // ... or only those round the pointer
 +	std::vector<int> binCounts;
++	std::vector<float> outlines;                           // the outlined pictures' records, if the frame has outlines (see gpuRecordOutlines)
 +
 +	void clear()
 +	{
 +		effects.prims.clear();
++		effects.outlineAt = -1;
++		effects.outlineCount = 0;
++		outlines.clear();
 +		boxes.clear();
 +		spritesByAddress.clear();
 +		SpriteAtlas &atlas = spriteAtlas();
@@ -57726,20 +57901,13 @@ index 000000000..e83fe84e3
 +};
 +
 +/**
-+ * Whether this frame's units and effects go to the card: the rays do, and nothing the frame may
-+ * draw is still the CPU's alone (then the whole frame is drawn the old way: a pass on the card
-+ * can't follow one on the CPU without the picture going up again).
++ * Whether this frame's units and effects go to the card, with its rays.
 + * @return 0 no; 1 yes; 2 yes, beside the CPU's own, which is shown, the two compared (OPENXCOM3D_GPU_EFFECTS=check).
 + */
 +int FirstPersonView::gpuEffectsWanted() const
 +{
 +	static const char *const asked = getenv("OPENXCOM3D_GPU_EFFECTS");
 +	const int mode = !asked ? 1 : !strcmp(asked, "check") ? 2 : atoi(asked) != 0 ? 1 : 0;
-+	// The outlines round the units' pictures (settings "Hitboxes" with "Full sprite hitboxes") look at the pixels beside each.
-+	if (Options::fpsSpriteHitboxes && Options::fpsHitboxes != 0)
-+	{
-+		return 0;
-+	}
 +	return mode;
 +}
 +
@@ -57848,40 +58016,10 @@ index 000000000..e83fe84e3
 +
 +	// Its bytes, in the atlas (see SpriteAtlas): found by their hash, sent up if new.
 +	GpuEffectList &list = *_gpuEffects;
-+	SpriteAtlas &atlas = spriteAtlas();
 +	const SDL_Surface *surface = const_cast<Surface*>(sprite)->getSurface(); // read only
 +	const size_t spriteBytes = (size_t)spriteWidth * spriteHeight;
 +	const Uint8 *opacityMap = seeThroughSprite ? seeThroughSprite->opacityMap : nullptr;
-+	auto placeInAtlas = [&]() {
-+		Uint64 hash = 1469598103934665603ull ^ ((Uint64)spriteWidth << 32 | (Uint32)spriteHeight) ^ (opacityMap ? 0x9E3779B97F4A7C15ull : 0ull);
-+		auto mix = [&hash](const Uint8 *bytes, size_t count) {
-+			size_t at = 0;
-+			for (; at + 8 <= count; at += 8)
-+			{
-+				Uint64 eight;
-+				std::memcpy(&eight, bytes + at, 8);
-+				hash = (hash ^ eight) * 1099511628211ull;
-+				hash ^= hash >> 29;
-+			}
-+			for (; at < count; ++at) hash = (hash ^ bytes[at]) * 1099511628211ull;
-+		};
-+		for (int row = 0; row < spriteHeight; ++row) mix((const Uint8 *)surface->pixels + (size_t)row * surface->pitch, spriteWidth);
-+		if (opacityMap) mix(opacityMap, spriteBytes);
-+		auto known = atlas.places.find(hash);
-+		if (known != atlas.places.end())
-+		{
-+			return known->second;
-+		}
-+		const int at = (int)atlas.bytes.size();
-+		atlas.bytes.resize(at + spriteBytes);
-+		for (int row = 0; row < spriteHeight; ++row)
-+		{
-+			std::memcpy(&atlas.bytes[at + (size_t)row * spriteWidth], (const Uint8 *)surface->pixels + (size_t)row * surface->pitch, spriteWidth);
-+		}
-+		if (opacityMap) atlas.bytes.insert(atlas.bytes.end(), opacityMap, opacityMap + spriteBytes);
-+		atlas.places.emplace(hash, at);
-+		return at;
-+	};
++	auto placeInAtlas = [&]() { return atlasPlace((const Uint8 *)surface->pixels, surface->pitch, spriteWidth, spriteHeight, opacityMap); };
 +	int pixelsAt;
 +	if (opacityMap)
 +	{
@@ -58082,6 +58220,65 @@ index 000000000..e83fe84e3
 +}
 +
 +/**
++ * Records the outlines round the units' pictures (settings "Hitboxes" with "Full sprite hitboxes";
++ * see noteTestedPictures, which worked out each outlined unit's card and its box on the screen, and
++ * drawUnitOutlines): they are drawn after everything recorded so far, in a second go on the card,
++ * from the first one's pictures. A record for each picture (Effects::OutlineTexels texels):
++ * 0: its box on the screen (its last column and row in it); 1: its anchor from the eye, in voxels, and one over its
++ * column vector's length squared; 2: one picture column to the right, and one over its row vector's length squared;
++ * 3: one picture row up, and the anchor's column; 4: the card's normal, and the anchor's row; 5: how many times finer
++ * the picture tested is (drawn smooth up close), whether its rows below the feet count, where its bytes are, its width;
++ * 6: its height, its outline's number, its outline's colour.
++ */
++void FirstPersonView::gpuRecordOutlines()
++{
++	GpuEffectList &list = *_gpuEffects;
++	if (_outlinedUnits.empty() || list.effects.outlineAt >= 0)
++	{
++		return;
++	}
++	auto dot = [](const double a[3], const double b[3]) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; };
++	for (const OutlinedUnit &outlined : _outlinedUnits)
++	{
++		const FirstPerson::SpriteCard &card = outlined.card;
++		if (!card.picture)
++		{
++			continue;
++		}
++		int pictureAt, pictureWidth, pictureHeight;
++		if (card.smooth)
++		{
++			const SDL_Surface *surface = const_cast<Surface*>(card.smooth)->getSurface(); // read only
++			pictureWidth = surface->w;
++			pictureHeight = surface->h;
++			pictureAt = atlasPlace((const Uint8 *)surface->pixels, surface->pitch, pictureWidth, pictureHeight, nullptr);
++		}
++		else
++		{
++			pictureWidth = pictureHeight = SpriteBufferSize;
++			pictureAt = atlasPlace(card.picture->data(), SpriteBufferSize, SpriteBufferSize, SpriteBufferSize, nullptr);
++		}
++		const double numbers[FirstPersonGpu::Effects::OutlineTexels * 4] = {
++			(double)outlined.left, (double)outlined.top, (double)outlined.right, (double)outlined.bottom,
++			card.anchor[0] - _eye[0], card.anchor[1] - _eye[1], card.anchor[2] - _eye[2], 1.0 / dot(card.column, card.column),
++			card.column[0], card.column[1], card.column[2], 1.0 / dot(card.row, card.row),
++			card.row[0], card.row[1], card.row[2], (double)card.anchorX,
++			card.normal[0], card.normal[1], card.normal[2], (double)card.anchorY,
++			card.smooth ? (double)card.factor : 1.0, card.rowsBelow ? 1.0 : 0.0, (double)pictureAt, (double)pictureWidth,
++			(double)pictureHeight, (double)outlined.outline, (double)_outlineColors[outlined.outline - 1], 0.0 };
++		for (const double number : numbers) list.outlines.push_back((float)number);
++		++list.effects.outlineCount;
++	}
++	if (list.effects.outlineCount > 0)
++	{
++		list.effects.outlineAt = (int)list.boxes.size();
++		list.effects.outlineOpacity = _outlineOpacity;
++		list.effects.outlineSlack = _testedPictureSlack;
++		list.effects.outlineGlows = Options::fpsGlowingOutlines;
++	}
++}
++
++/**
 + * Hands the recorded units and effects to the card, which draws them over the rays' pictures and
 + * gives the finished ones back: the colour, the depth and the glow into the view's buffers, the
 + * veils and whose picture shows round the pointer from its notes. Recording stops.
@@ -58097,6 +58294,8 @@ index 000000000..e83fe84e3
 +	const int bin = FirstPersonGpu::Effects::Bin;
 +	effects.width = width;
 +	effects.height = height;
++	effects.primCount = (int)list.boxes.size();
++	effects.prims.insert(effects.prims.end(), list.outlines.begin(), list.outlines.end()); // (the outlined pictures' records after the primitives)
 +	effects.binColumns = (width + bin - 1) / bin;
 +	effects.binRows = (height + bin - 1) / bin;
 +	// The bins: how many primitives touch each, then each one's list, in the order recorded.
@@ -64562,10 +64761,10 @@ index 000000000..bc286e32a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..77a768130
+index 000000000..ace544495
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,3498 @@
+@@ -0,0 +1,3503 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -65946,6 +66145,11 @@ index 000000000..77a768130
 +		}
 +	}
 +	_outlinedUnits.swap(cards);
++	if (_gpuRecording)
++	{
++		gpuRecordOutlines(); // (the card finds the pictures' pixels and draws the outlines: see FirstPersonViewGpuEffects.cpp)
++		if (_gpuRecordOnly) return;
++	}
 +	if (!_outlinedUnits.empty())
 +	{
 +		runOnAllThreads(&FirstPersonView::testedPictureBands);
@@ -66004,7 +66208,7 @@ index 000000000..77a768130
 + */
 +void FirstPersonView::drawUnitOutlines()
 +{
-+	if (!_outlineColors.empty())
++	if (!_outlineColors.empty() && !(_gpuRecording && _gpuRecordOnly))
 +	{
 +		runOnAllThreads(&FirstPersonView::outlineBands);
 +	}

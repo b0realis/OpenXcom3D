@@ -989,6 +989,8 @@ private:
 	void gpuRecordDisc(double screenX, double screenY, double radius, double depth, float leeway, Uint8 rim, Uint8 centre, Uint8 middle, float centreShare, float middleShare, int flags);
 	/// Records a filled quad at one depth (see fillQuadAtDepth).
 	void gpuRecordQuad(const double corners[4][2], Uint8 color, float depth);
+	/// Records the outlines round the units' pictures (see noteTestedPictures, drawUnitOutlines).
+	void gpuRecordOutlines();
 	/// Has the card draw what was recorded and takes the finished pictures back; recording stops.
 	bool gpuDrawEffects();
 	bool _gpuDepthPending = false; // this frame's depth is still on the card (see gpuNeedDepth)

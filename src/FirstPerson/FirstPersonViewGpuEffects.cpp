@@ -38,8 +38,6 @@
  *
  * OPENXCOM3D_GPU_EFFECTS=0: the old way (the rays read back, the passes on the CPU), to compare; =check: both, the CPU's
  * shown, the card's compared with it a pixel at a time (see gpuCheckEffects).
- * Still drawn the old way: a frame with the outlines round the units' pictures (setting "Full sprite hitboxes"),
- * which look at the pixels beside each (see gpuEffectsWanted).
  */
 #include "FirstPersonView.h"
 #include <algorithm>
@@ -54,6 +52,7 @@
 #include "../Engine/Options.h"
 #include "../Engine/Surface.h"
 #include "FirstPersonGpu.h"
+#include "FirstPersonSpriteHits.h"
 #include "FirstPersonViewShared.h"
 
 namespace OpenXcom
@@ -79,6 +78,45 @@ static SpriteAtlas &spriteAtlas()
 }
 
 /**
+ * Where a picture's bytes are in the atlas, added to it if new (see SpriteAtlas).
+ * @param pixels Its rows, pitch bytes from one to the next, width by height.
+ * @param opacityMap A see-through sprite's opacity map (width x height bytes, kept right after its pixels), or null.
+ */
+static int atlasPlace(const Uint8 *pixels, int pitch, int width, int height, const Uint8 *opacityMap)
+{
+	SpriteAtlas &atlas = spriteAtlas();
+	const size_t count = (size_t)width * height;
+	Uint64 hash = 1469598103934665603ull ^ ((Uint64)width << 32 | (Uint32)height) ^ (opacityMap ? 0x9E3779B97F4A7C15ull : 0ull);
+	auto mix = [&hash](const Uint8 *bytes, size_t size) {
+		size_t at = 0;
+		for (; at + 8 <= size; at += 8)
+		{
+			Uint64 eight;
+			std::memcpy(&eight, bytes + at, 8);
+			hash = (hash ^ eight) * 1099511628211ull;
+			hash ^= hash >> 29;
+		}
+		for (; at < size; ++at) hash = (hash ^ bytes[at]) * 1099511628211ull;
+	};
+	for (int row = 0; row < height; ++row) mix(pixels + (size_t)row * pitch, width);
+	if (opacityMap) mix(opacityMap, count);
+	const auto known = atlas.places.find(hash);
+	if (known != atlas.places.end())
+	{
+		return known->second;
+	}
+	const int at = (int)atlas.bytes.size();
+	atlas.bytes.resize(at + count);
+	for (int row = 0; row < height; ++row)
+	{
+		std::memcpy(&atlas.bytes[at + (size_t)row * width], pixels + (size_t)row * pitch, width);
+	}
+	if (opacityMap) atlas.bytes.insert(atlas.bytes.end(), opacityMap, opacityMap + count);
+	atlas.places.emplace(hash, at);
+	return at;
+}
+
+/**
  * A frame's units and effects as recorded for the card, and what is needed to read its answer:
  * each primitive's box on the screen (for the bins), where each sprite's bytes went, and whose
  * picture each sprite is (the card says which sprite shows round the pointer, by number).
@@ -93,10 +131,14 @@ struct GpuEffectList
 	std::vector<Uint32> notes;                             // the card's notes, four numbers a pixel
 	std::vector<Uint32> patchNotes;                        // ... or only those round the pointer
 	std::vector<int> binCounts;
+	std::vector<float> outlines;                           // the outlined pictures' records, if the frame has outlines (see gpuRecordOutlines)
 
 	void clear()
 	{
 		effects.prims.clear();
+		effects.outlineAt = -1;
+		effects.outlineCount = 0;
+		outlines.clear();
 		boxes.clear();
 		spritesByAddress.clear();
 		SpriteAtlas &atlas = spriteAtlas();
@@ -125,20 +167,13 @@ struct GpuEffectList
 };
 
 /**
- * Whether this frame's units and effects go to the card: the rays do, and nothing the frame may
- * draw is still the CPU's alone (then the whole frame is drawn the old way: a pass on the card
- * can't follow one on the CPU without the picture going up again).
+ * Whether this frame's units and effects go to the card, with its rays.
  * @return 0 no; 1 yes; 2 yes, beside the CPU's own, which is shown, the two compared (OPENXCOM3D_GPU_EFFECTS=check).
  */
 int FirstPersonView::gpuEffectsWanted() const
 {
 	static const char *const asked = getenv("OPENXCOM3D_GPU_EFFECTS");
 	const int mode = !asked ? 1 : !strcmp(asked, "check") ? 2 : atoi(asked) != 0 ? 1 : 0;
-	// The outlines round the units' pictures (settings "Hitboxes" with "Full sprite hitboxes") look at the pixels beside each.
-	if (Options::fpsSpriteHitboxes && Options::fpsHitboxes != 0)
-	{
-		return 0;
-	}
 	return mode;
 }
 
@@ -247,40 +282,10 @@ void FirstPersonView::gpuRecordSprite(const SpriteDraw &draw)
 
 	// Its bytes, in the atlas (see SpriteAtlas): found by their hash, sent up if new.
 	GpuEffectList &list = *_gpuEffects;
-	SpriteAtlas &atlas = spriteAtlas();
 	const SDL_Surface *surface = const_cast<Surface*>(sprite)->getSurface(); // read only
 	const size_t spriteBytes = (size_t)spriteWidth * spriteHeight;
 	const Uint8 *opacityMap = seeThroughSprite ? seeThroughSprite->opacityMap : nullptr;
-	auto placeInAtlas = [&]() {
-		Uint64 hash = 1469598103934665603ull ^ ((Uint64)spriteWidth << 32 | (Uint32)spriteHeight) ^ (opacityMap ? 0x9E3779B97F4A7C15ull : 0ull);
-		auto mix = [&hash](const Uint8 *bytes, size_t count) {
-			size_t at = 0;
-			for (; at + 8 <= count; at += 8)
-			{
-				Uint64 eight;
-				std::memcpy(&eight, bytes + at, 8);
-				hash = (hash ^ eight) * 1099511628211ull;
-				hash ^= hash >> 29;
-			}
-			for (; at < count; ++at) hash = (hash ^ bytes[at]) * 1099511628211ull;
-		};
-		for (int row = 0; row < spriteHeight; ++row) mix((const Uint8 *)surface->pixels + (size_t)row * surface->pitch, spriteWidth);
-		if (opacityMap) mix(opacityMap, spriteBytes);
-		auto known = atlas.places.find(hash);
-		if (known != atlas.places.end())
-		{
-			return known->second;
-		}
-		const int at = (int)atlas.bytes.size();
-		atlas.bytes.resize(at + spriteBytes);
-		for (int row = 0; row < spriteHeight; ++row)
-		{
-			std::memcpy(&atlas.bytes[at + (size_t)row * spriteWidth], (const Uint8 *)surface->pixels + (size_t)row * surface->pitch, spriteWidth);
-		}
-		if (opacityMap) atlas.bytes.insert(atlas.bytes.end(), opacityMap, opacityMap + spriteBytes);
-		atlas.places.emplace(hash, at);
-		return at;
-	};
+	auto placeInAtlas = [&]() { return atlasPlace((const Uint8 *)surface->pixels, surface->pitch, spriteWidth, spriteHeight, opacityMap); };
 	int pixelsAt;
 	if (opacityMap)
 	{
@@ -481,6 +486,65 @@ void FirstPersonView::gpuRecordQuad(const double corners[4][2], Uint8 color, flo
 }
 
 /**
+ * Records the outlines round the units' pictures (settings "Hitboxes" with "Full sprite hitboxes";
+ * see noteTestedPictures, which worked out each outlined unit's card and its box on the screen, and
+ * drawUnitOutlines): they are drawn after everything recorded so far, in a second go on the card,
+ * from the first one's pictures. A record for each picture (Effects::OutlineTexels texels):
+ * 0: its box on the screen (its last column and row in it); 1: its anchor from the eye, in voxels, and one over its
+ * column vector's length squared; 2: one picture column to the right, and one over its row vector's length squared;
+ * 3: one picture row up, and the anchor's column; 4: the card's normal, and the anchor's row; 5: how many times finer
+ * the picture tested is (drawn smooth up close), whether its rows below the feet count, where its bytes are, its width;
+ * 6: its height, its outline's number, its outline's colour.
+ */
+void FirstPersonView::gpuRecordOutlines()
+{
+	GpuEffectList &list = *_gpuEffects;
+	if (_outlinedUnits.empty() || list.effects.outlineAt >= 0)
+	{
+		return;
+	}
+	auto dot = [](const double a[3], const double b[3]) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; };
+	for (const OutlinedUnit &outlined : _outlinedUnits)
+	{
+		const FirstPerson::SpriteCard &card = outlined.card;
+		if (!card.picture)
+		{
+			continue;
+		}
+		int pictureAt, pictureWidth, pictureHeight;
+		if (card.smooth)
+		{
+			const SDL_Surface *surface = const_cast<Surface*>(card.smooth)->getSurface(); // read only
+			pictureWidth = surface->w;
+			pictureHeight = surface->h;
+			pictureAt = atlasPlace((const Uint8 *)surface->pixels, surface->pitch, pictureWidth, pictureHeight, nullptr);
+		}
+		else
+		{
+			pictureWidth = pictureHeight = SpriteBufferSize;
+			pictureAt = atlasPlace(card.picture->data(), SpriteBufferSize, SpriteBufferSize, SpriteBufferSize, nullptr);
+		}
+		const double numbers[FirstPersonGpu::Effects::OutlineTexels * 4] = {
+			(double)outlined.left, (double)outlined.top, (double)outlined.right, (double)outlined.bottom,
+			card.anchor[0] - _eye[0], card.anchor[1] - _eye[1], card.anchor[2] - _eye[2], 1.0 / dot(card.column, card.column),
+			card.column[0], card.column[1], card.column[2], 1.0 / dot(card.row, card.row),
+			card.row[0], card.row[1], card.row[2], (double)card.anchorX,
+			card.normal[0], card.normal[1], card.normal[2], (double)card.anchorY,
+			card.smooth ? (double)card.factor : 1.0, card.rowsBelow ? 1.0 : 0.0, (double)pictureAt, (double)pictureWidth,
+			(double)pictureHeight, (double)outlined.outline, (double)_outlineColors[outlined.outline - 1], 0.0 };
+		for (const double number : numbers) list.outlines.push_back((float)number);
+		++list.effects.outlineCount;
+	}
+	if (list.effects.outlineCount > 0)
+	{
+		list.effects.outlineAt = (int)list.boxes.size();
+		list.effects.outlineOpacity = _outlineOpacity;
+		list.effects.outlineSlack = _testedPictureSlack;
+		list.effects.outlineGlows = Options::fpsGlowingOutlines;
+	}
+}
+
+/**
  * Hands the recorded units and effects to the card, which draws them over the rays' pictures and
  * gives the finished ones back: the colour, the depth and the glow into the view's buffers, the
  * veils and whose picture shows round the pointer from its notes. Recording stops.
@@ -496,6 +560,8 @@ bool FirstPersonView::gpuDrawEffects()
 	const int bin = FirstPersonGpu::Effects::Bin;
 	effects.width = width;
 	effects.height = height;
+	effects.primCount = (int)list.boxes.size();
+	effects.prims.insert(effects.prims.end(), list.outlines.begin(), list.outlines.end()); // (the outlined pictures' records after the primitives)
 	effects.binColumns = (width + bin - 1) / bin;
 	effects.binRows = (height + bin - 1) / bin;
 	// The bins: how many primitives touch each, then each one's list, in the order recorded.

@@ -1933,6 +1933,15 @@ uniform vec2 uLevel;                    // straight ahead along the ground
 uniform float uEyeZ, uFocal;            // the eye's height in voxels; the focal length in pixels
 uniform ivec2 uViewSize, uBinGrid;      // the view in pixels; the bins across and down
 uniform int uPixelSize;                 // pixels a ray coloured each way
+// A frame with the outlines round the units' pictures (settings "Hitboxes" with "Full sprite hitboxes") is drawn in two goes:
+// the primitives up to the outlines, then, from that go's pictures (an outline looks at the pixels beside it), the outlines
+// and the rest.
+uniform usampler2D uNotes;              // the first go's notes (the second go starts from them)
+uniform int uContinue;                  // 1: the second go
+uniform int uFirstPrim, uEndPrim;       // this go's primitives: from the first up to (not including) the other
+uniform int uOutlineBase, uOutlineCount; // the outlined pictures' records (EffectOutlineTexels texels each, from this texel of uPrims), and how many: 0 none
+uniform float uOutlineOpacity, uOutlineSlack; // how much of the outlines shows; how much farther than the scene a tested picture may be
+uniform int uOutlineGlows;
 layout(location = 0) out uint outColor;
 layout(location = 1) out float outDepth;
 layout(location = 2) out uint outGlow;  // the glow (1, 3), and 64 where see-through smoke lies over the pixel
@@ -1956,6 +1965,42 @@ uint seeThrough(int level, uint over, uint under)
 }
 vec4 prim(int base, int texel) { return texelFetch(uPrims, base + texel); }
 
+// FirstPersonView::testedPictureBands for one pixel: the outlined picture the line from the eye through it hits (the
+// nearest, if several; its record's number + 1, 0 none) where it shows (no farther than the scene there, with the
+// slack), and how far ahead. See FirstPerson::cardRay.
+int outlineOwner(ivec2 at, out float ownerDepth, out uint ownerColor)
+{
+	ownerDepth = 0.0;
+	ownerColor = 0u;
+	int owner = 0;
+	if (at.x < 0 || at.y < 0 || at.x >= uViewSize.x || at.y >= uViewSize.y) return 0;
+	float sceneDepth = texelFetch(uRayDepth, at, 0).r;
+	float across = (float(at.x) + 0.5 - float(uViewSize.x) * 0.5) / uFocal, rise = (float(uViewSize.y) * 0.5 - (float(at.y) + 0.5)) / uFocal;
+	vec3 trueRay = uForward + across * uRight + rise * uUp, ray = vec3(trueRay.xy, trueRay.z / ZScale); // (in voxels; one unit ahead, so how far along is the view depth)
+	for (int record = 0; record < uOutlineCount; ++record)
+	{
+		int base = uOutlineBase + record * EffectOutlineTexels;
+		vec4 box = texelFetch(uPrims, base);
+		if (float(at.x) < box.x || float(at.y) < box.y || float(at.x) > box.z || float(at.y) > box.w) continue;
+		vec4 t1 = texelFetch(uPrims, base + 1), t2 = texelFetch(uPrims, base + 2), t3 = texelFetch(uPrims, base + 3), t4 = texelFetch(uPrims, base + 4),
+			t5 = texelFetch(uPrims, base + 5), t6 = texelFetch(uPrims, base + 6);
+		float facing = dot(ray, t4.xyz);
+		if (abs(facing) < 1e-9) continue;
+		float along = dot(t1.xyz, t4.xyz) / facing;
+		if (along <= 0.0) continue;
+		vec3 fromAnchor = ray * along - t1.xyz;
+		float column = floor(t5.x * (t3.w + dot(fromAnchor, t2.xyz) * t1.w)), row = floor(t5.x * (t4.w - dot(fromAnchor, t3.xyz) * t2.w));
+		if (column < 0.0 || row < 0.0 || column >= t5.w || row >= t6.x || (row >= t4.w * t5.x && t5.y == 0.0)) continue;
+		if (texelFetch(uBytes, int(t5.z) + int(row) * int(t5.w) + int(column)).r == 0u) continue;
+		if (along < 1.0 || along > sceneDepth + uOutlineSlack) continue;
+		if (owner != 0 && ownerDepth <= along) continue;
+		owner = int(t6.y);
+		ownerDepth = along;
+		ownerColor = uint(t6.z);
+	}
+	return owner;
+}
+
 void main()
 {
 	ivec2 pixel = ivec2(gl_FragCoord.xy), from = pixel / uPixelSize;
@@ -1963,6 +2008,43 @@ void main()
 	float depth = texelFetch(uRayDepth, from, 0).r;
 	int veil = 255, smokeVeil = 0;
 	uint own = 0u, lastSolid = 0u, lastPile = 0u;
+	if (uContinue != 0)
+	{
+		uvec4 notes = texelFetch(uNotes, pixel, 0);
+		veil = int(notes.r);
+		own = notes.g & 1u;
+		smokeVeil = int(notes.g >> 1);
+		lastSolid = notes.b;
+		lastPile = notes.a;
+		glow &= 3u;
+	}
+	if (uOutlineCount > 0)
+	{
+		// FirstPersonView::outlineBands: a pixel that isn't an outlined picture's, borders one and shows something behind it
+		// takes that picture's outline colour (the nearest such picture's).
+		float hereDepth, nearest = depth, besideDepth;
+		uint hereColor, besideColor, outlineColor = 0u;
+		int here = outlineOwner(pixel, hereDepth, hereColor);
+		bool outlined = false;
+		for (int offsetY = -1; offsetY <= 1; ++offsetY)
+		{
+			for (int offsetX = -1; offsetX <= 1; ++offsetX)
+			{
+				int beside = outlineOwner(pixel + ivec2(offsetX, offsetY), besideDepth, besideColor);
+				if (beside != 0 && beside != here && besideDepth < nearest)
+				{
+					outlined = true;
+					outlineColor = besideColor;
+					nearest = besideDepth;
+				}
+			}
+		}
+		if (outlined && !(uOutlineOpacity < 1.0 && dither(pixel.x, pixel.y) >= uOutlineOpacity))
+		{
+			color = outlineColor;
+			glow = uint(uOutlineGlows);
+		}
+	}
 	// The pixel's ray, reaching one unit ahead (so how far along it is the view depth too).
 	float across = (float(pixel.x) + 0.5 - float(uViewSize.x) * 0.5) / uFocal, rise = (float(uViewSize.y) * 0.5 - (float(pixel.y) + 0.5)) / uFocal;
 	vec3 ray = uForward + across * uRight + rise * uUp;
@@ -1971,6 +2053,7 @@ void main()
 	for (int entry = int(texelFetch(uBins, bin).r); entry < listEnd; ++entry)
 	{
 		int number = int(texelFetch(uBins, entry).r), base = number * EffectTexels;
+		if (number < uFirstPrim || number >= uEndPrim) continue;
 		vec4 box = prim(base, 1);
 		if (float(pixel.x) < box.x || float(pixel.y) < box.y || float(pixel.x) >= box.z || float(pixel.y) >= box.w) continue;
 		vec4 head = prim(base, 0);

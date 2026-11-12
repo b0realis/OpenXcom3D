@@ -630,7 +630,8 @@ struct FirstPersonGpu::State
 		Gl::UInt framebuffer = 0;
 		Gl::UInt textures[4] = {}; // colour, depth, glow, notes
 	};
-	std::map<std::array<int, 2>, EffectTargets> effectTargets;
+	std::map<std::array<int, 3>, EffectTargets> effectTargets; // by width, height and go (0 the first, 1 the second: a frame with outlines)
+	std::map<std::array<int, 2>, int> effectsFinalGo;          // by width and height: the go that held the frame's finished pictures last
 	int rayColumns = 0, rayRows = 0, rayPixelSize = 1; // the rays' pictures kept for the effects: their size, and the pixels a ray coloured
 	bool buildEffects();
 	bool drawEffects(const Effects &effects, const Output &output, Timing *timing);
@@ -1622,6 +1623,7 @@ bool FirstPersonGpu::State::buildEffects()
 	whole("EffectDot", Effects::Dot);
 	whole("EffectDisc", Effects::Disc);
 	whole("EffectQuad", Effects::Quad);
+	whole("EffectOutlineTexels", Effects::OutlineTexels);
 	const std::string vertexSource = shaderHead() + VertexSource, effectsSource = shaderHead() + constants + EffectsSource;
 	const char *sources[2] = { vertexSource.c_str(), effectsSource.c_str() };
 	const Gl::Enum kinds[2] = { Gl::VERTEX_SHADER, Gl::FRAGMENT_SHADER };
@@ -1654,8 +1656,8 @@ bool FirstPersonGpu::State::buildEffects()
 		return false;
 	}
 	Gl::UseProgram(built);
-	const char *const pictures[4] = { "uRayColor", "uRayDepth", "uRayGlow", "uSeeThrough" };
-	for (int unit = 0; unit < 4; ++unit) Gl::Uniform1i(Gl::GetUniformLocation(built, pictures[unit]), unit);
+	const char *const pictures[5] = { "uRayColor", "uRayDepth", "uRayGlow", "uSeeThrough", "uNotes" };
+	for (int unit = 0; unit < 5; ++unit) Gl::Uniform1i(Gl::GetUniformLocation(built, pictures[unit]), unit);
 	const char *const buffered[3] = { "uPrims", "uBytes", "uBins" };
 	const Gl::Enum formats[3] = { Gl::RGBA32F, Gl::R8UI, Gl::R32UI };
 	Gl::GenBuffers(3, effectBuffers);
@@ -1898,23 +1900,25 @@ bool FirstPersonGpu::State::drawEffects(const Effects &effects, const Output &ou
 	{
 		return false;
 	}
-	// The pictures drawn into, for this size of view.
-	EffectTargets &drawn = effectTargets[{ effects.width, effects.height }];
-	if (!drawn.framebuffer)
+	// The pictures drawn into, for this size of view: one set, or two for a frame with outlines (the second go reads the first's).
+	const int goes = effects.outlineAt >= 0 ? 2 : 1;
+	for (int go = 0; go < goes; ++go)
 	{
-		Gl::GenFramebuffers(1, &drawn.framebuffer);
-		Gl::BindFramebuffer(Gl::FRAMEBUFFER, drawn.framebuffer);
-		Gl::GenTextures(4, drawn.textures);
+		EffectTargets &made = effectTargets[{ effects.width, effects.height, go }];
+		if (made.framebuffer) continue;
+		Gl::GenFramebuffers(1, &made.framebuffer);
+		Gl::BindFramebuffer(Gl::FRAMEBUFFER, made.framebuffer);
+		Gl::GenTextures(4, made.textures);
 		const Gl::Enum internal[4] = { Gl::R8UI, Gl::R32F, Gl::R8UI, Gl::RGBA16UI }, format[4] = { Gl::RED_INTEGER, Gl::RED, Gl::RED_INTEGER, Gl::RGBA_INTEGER },
 			type[4] = { Gl::UNSIGNED_BYTE, Gl::FLOAT, Gl::UNSIGNED_BYTE, Gl::UNSIGNED_SHORT };
 		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
 		for (int which = 0; which < 4; ++which)
 		{
-			Gl::BindTexture(Gl::TEXTURE_2D, drawn.textures[which]);
+			Gl::BindTexture(Gl::TEXTURE_2D, made.textures[which]);
 			Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)internal[which], effects.width, effects.height, 0, format[which], type[which], nullptr);
 			Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
 			Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
-			Gl::FramebufferTexture2D(Gl::FRAMEBUFFER, Gl::COLOR_ATTACHMENT0 + which, Gl::TEXTURE_2D, drawn.textures[which], 0);
+			Gl::FramebufferTexture2D(Gl::FRAMEBUFFER, Gl::COLOR_ATTACHMENT0 + which, Gl::TEXTURE_2D, made.textures[which], 0);
 		}
 		if (Gl::CheckFramebufferStatus(Gl::FRAMEBUFFER) != Gl::FRAMEBUFFER_COMPLETE)
 		{
@@ -1922,7 +1926,10 @@ bool FirstPersonGpu::State::drawEffects(const Effects &effects, const Output &ou
 			return false;
 		}
 	}
-	Gl::BindFramebuffer(Gl::FRAMEBUFFER, drawn.framebuffer);
+	const EffectTargets &firstGo = effectTargets[{ effects.width, effects.height, 0 }];
+	const EffectTargets &drawn = effectTargets[{ effects.width, effects.height, goes - 1 }]; // (the finished pictures)
+	effectsFinalGo[{ effects.width, effects.height }] = goes - 1;
+	Gl::BindFramebuffer(Gl::FRAMEBUFFER, firstGo.framebuffer);
 	const Gl::Enum attachments[4] = { Gl::COLOR_ATTACHMENT0, Gl::COLOR_ATTACHMENT0 + 1, Gl::COLOR_ATTACHMENT0 + 2, Gl::COLOR_ATTACHMENT0 + 3 };
 	Gl::DrawBuffers(4, attachments);
 	Gl::Viewport(0, 0, effects.width, effects.height);
@@ -1933,6 +1940,8 @@ bool FirstPersonGpu::State::drawEffects(const Effects &effects, const Output &ou
 		Gl::ActiveTexture(Gl::TEXTURE0 + which);
 		Gl::BindTexture(Gl::TEXTURE_2D, rays->second.textures[which]);
 	}
+	Gl::ActiveTexture(Gl::TEXTURE0 + 4);
+	Gl::BindTexture(Gl::TEXTURE_2D, seeThroughTexture); // (the notes' place: not looked at in the first go)
 	Gl::ActiveTexture(Gl::TEXTURE0 + 3);
 	Gl::BindTexture(Gl::TEXTURE_2D, seeThroughTexture);
 	if (effects.seeThrough && effects.paletteHash != seeThroughSent)
@@ -1974,7 +1983,11 @@ bool FirstPersonGpu::State::drawEffects(const Effects &effects, const Output &ou
 	Gl::Uniform2i(location("uViewSize"), effects.width, effects.height);
 	Gl::Uniform2i(location("uBinGrid"), effects.binColumns, effects.binRows);
 	Gl::Uniform1i(location("uPixelSize"), rayPixelSize);
-	program = raysProgram;
+	const int primitives = effects.primCount;
+	Gl::Uniform1i(location("uContinue"), 0);
+	Gl::Uniform1i(location("uFirstPrim"), 0);
+	Gl::Uniform1i(location("uEndPrim"), goes == 2 ? effects.outlineAt : primitives);
+	Gl::Uniform1i(location("uOutlineCount"), 0);
 	if (timing)
 	{
 		Gl::Finish();
@@ -1982,6 +1995,31 @@ bool FirstPersonGpu::State::drawEffects(const Effects &effects, const Output &ou
 		start = std::chrono::steady_clock::now();
 	}
 	Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+	if (goes == 2)
+	{
+		// The second go: from the first one's pictures, the outlines and the primitives after them.
+		Gl::BindFramebuffer(Gl::FRAMEBUFFER, drawn.framebuffer);
+		Gl::DrawBuffers(4, attachments);
+		for (int which = 0; which < 3; ++which)
+		{
+			Gl::ActiveTexture(Gl::TEXTURE0 + which);
+			Gl::BindTexture(Gl::TEXTURE_2D, firstGo.textures[which]);
+		}
+		Gl::ActiveTexture(Gl::TEXTURE0 + 4);
+		Gl::BindTexture(Gl::TEXTURE_2D, firstGo.textures[3]);
+		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
+		Gl::Uniform1i(location("uPixelSize"), 1);
+		Gl::Uniform1i(location("uContinue"), 1);
+		Gl::Uniform1i(location("uFirstPrim"), effects.outlineAt);
+		Gl::Uniform1i(location("uEndPrim"), primitives);
+		Gl::Uniform1i(location("uOutlineBase"), primitives * Effects::Texels);
+		Gl::Uniform1i(location("uOutlineCount"), effects.outlineCount);
+		Gl::Uniform1f(location("uOutlineOpacity"), effects.outlineOpacity);
+		Gl::Uniform1f(location("uOutlineSlack"), effects.outlineSlack);
+		Gl::Uniform1i(location("uOutlineGlows"), effects.outlineGlows ? 1 : 0);
+		Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+	}
+	program = raysProgram;
 	// The bloom over them (the picture and its glow are then the bloom's).
 	GlowTargets *brightened = nullptr;
 	if (effects.halos && !drawGlow(effects, drawn, brightened))
@@ -2166,7 +2204,9 @@ bool FirstPersonGpu::readEffectsDepth(int width, int height, float *depth)
 	}
 	bool read = false;
 	state.run([&] {
-		const auto drawn = state.effectTargets.find({ width, height });
+		const auto final = state.effectsFinalGo.find({ width, height });
+		if (final == state.effectsFinalGo.end()) return;
+		const auto drawn = state.effectTargets.find({ width, height, final->second });
 		if (drawn == state.effectTargets.end() || !drawn->second.framebuffer) return;
 		Gl::BindFramebuffer(Gl::FRAMEBUFFER, drawn->second.framebuffer);
 		state.readPicture(1, width, height, 1, depth, width);
