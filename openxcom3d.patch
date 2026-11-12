@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..19549032d
+index 000000000..9593a464f
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,553 @@
+@@ -0,0 +1,555 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -623,6 +623,8 @@ index 000000000..19549032d
 +  STR_FPS_DAMAGE_NUMBERS_DESC: "A hit's damage rises over the unit, in 3D and on the map: health lost red, armour blue, stun purple; a grey 0 when it did nothing."
 +  STR_FPS_ALIEN_TURN_3D: "Alien turn in 3D"
 +  STR_FPS_ALIEN_TURN_3D_DESC: "Stay in 3D in the alien turn, through your soldier's eyes."
++  STR_FPS_ALIEN_TURN_FACING: "Alien turn: look as the soldier faces"
++  STR_FPS_ALIEN_TURN_FACING_DESC: "In the alien turn the view turns to your soldier's facing and looks at most 45 degrees to either side: you see what they can see."
 +  STR_FPS_ALIEN_TURN_CAMERAS: "Aliens' turn cameras"
 +  STR_FPS_ALIEN_TURN_CAMERAS_DESC: "Soldiers shot at, hit or mind controlled pop up a camera; so do those who see the alien or fire back (in 3D the view cuts to them)."
 +  STR_FPS_ALERT_TARGETED: "TARGETED"
@@ -683,10 +685,10 @@ index 000000000..19549032d
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..8ba1e379a
+index 000000000..f1b5cda80
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,553 @@
+@@ -0,0 +1,555 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1182,6 +1184,8 @@ index 000000000..8ba1e379a
 +  STR_FPS_DAMAGE_NUMBERS_DESC: "A hit's damage rises over the unit, in 3D and on the map: health lost red, armor blue, stun purple; a gray 0 when it did nothing."
 +  STR_FPS_ALIEN_TURN_3D: "Alien turn in 3D"
 +  STR_FPS_ALIEN_TURN_3D_DESC: "Stay in 3D in the alien turn, through your soldier's eyes."
++  STR_FPS_ALIEN_TURN_FACING: "Alien turn: look as the soldier faces"
++  STR_FPS_ALIEN_TURN_FACING_DESC: "In the alien turn the view turns to your soldier's facing and looks at most 45 degrees to either side: you see what they can see."
 +  STR_FPS_ALIEN_TURN_CAMERAS: "Aliens' turn cameras"
 +  STR_FPS_ALIEN_TURN_CAMERAS_DESC: "Soldiers shot at, hit or mind controlled pop up a camera; so do those who see the alien or fire back (in 3D the view cuts to them)."
 +  STR_FPS_ALERT_TARGETED: "TARGETED"
@@ -22097,7 +22101,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..f9a7432a5 100644
+index a08796ced..3bdb584a8 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -22114,7 +22118,7 @@ index a08796ced..f9a7432a5 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers;
++OPT bool fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers;
 +OPT int fpsRenderer, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
@@ -23138,10 +23142,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..635c23eb7
+index 000000000..18bc8b625
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1455 @@
+@@ -0,0 +1,1457 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24115,6 +24119,8 @@ index 000000000..635c23eb7
 +	// ...and in it, the view cuts to the soldier who sees the alien acting, or who fires back;
 +	// a soldier shot at, hit or taken over pops up their small camera.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsAlienTurnCameras", &fpsAlienTurnCameras, true, "STR_FPS_ALIEN_TURN_CAMERAS", category));
++	// ...and in the enemy's turn the view looks the way the soldier faces, at most the head's turn to either side.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsAlienTurnFacing", &fpsAlienTurnFacing, true, "STR_FPS_ALIEN_TURN_FACING", category));
 +	// ...and with them, a soldier of ours going down out of view pops up their camera (static).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsFallenSoldierCamera", &fpsFallenSoldierCamera, true, "STR_FPS_FALLEN_SOLDIER_CAMERA", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsStartInFirstPerson", &fpsStartInFirstPerson, false, "STR_FPS_START_IN_FIRST_PERSON", category));
@@ -30214,10 +30220,10 @@ index 000000000..6862c4de6
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..7b5ac5e32
+index 000000000..63ed2fb0f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,3179 @@
+@@ -0,0 +1,3183 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -32513,6 +32519,10 @@ index 000000000..7b5ac5e32
 +	// also faces where you look, and the fire mode and aim are kept up to date.
 +	updateCamera(unit, playerTurn, elapsedSeconds);
 +	updateNoclipView(unit);
++	if (!playerTurn)
++	{
++		holdViewToFacing(unit);
++	}
 +	if (playerTurn)
 +	{
 +		openDoorAfterTurn(unit);
@@ -33399,10 +33409,10 @@ index 000000000..7b5ac5e32
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..3e693cb21
+index 000000000..85903c3aa
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1335 @@
+@@ -0,0 +1,1342 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -33835,6 +33845,8 @@ index 000000000..3e693cb21
 +	double fieldOfViewNow() const;
 +	/// Turns the view with the scroll keys.
 +	void turnWithKeys(double elapsedSeconds);
++	/// In the enemy's turn: the view stays within the head's turn of the soldier's facing (setting).
++	void holdViewToFacing(BattleUnit *unit);
 +	/// Turns the soldier to face where the camera looks (free, or by the rules).
 +	void faceLookDirection(BattleUnit *unit);
 +	double _snapTurnDegrees = 0.0;          // a turn key's 45 degrees still to turn (negative: to the left)
@@ -33918,6 +33930,9 @@ index 000000000..3e693cb21
 +	unsigned _mouseReleasesSeen = 0;           // the game's mouse releases known (see think: one since means another screen was on top)
 +	int _sidestepFacing = -1;                  // the facing a soldier sidestepping keeps (the game's strafe), while the step is walked; -1 none
 +	Position _stepFrom;                        // the tile that step started from
++	const BattleUnit *_hiddenBlockUnit = nullptr;  // a step the game refused for a unit not in sight: whose step,
++	Position _hiddenBlockFrom;                 // ... from which tile,
++	int _hiddenBlockDirection = -1;            // ... and which way (-1: none); held back while that unit stands there (see stepAllowed)
 +	int _stepAllowedCache[8];                  // per frame: -1 unknown, 0 blocked, 1 allowed, 2 blocked for an unsafe landing (see landingSafe)
 +	// a step off a ledge onto an unsafe landing (setting "Check the landing"): the edge warned about
 +	// (the tile and direction), when, the keys let go since, and the next push confirmed
@@ -33930,6 +33945,8 @@ index 000000000..3e693cb21
 +
 +	/// Real-time movement with the movement keys, paying for each tile entered by the rules.
 +	void updateMovement(BattleUnit *unit, bool canMove, double elapsedSeconds);
++	/// Whether a unit the player doesn't see stands where a unit would step to.
++	bool hiddenUnitOn(const BattleUnit *unit, const Position &destination) const;
 +	/// Could the unit step into the neighbouring tile in this direction now, by the rules?
 +	bool stepAllowed(BattleUnit *unit, int stepX, int stepY);
 +	/// Hands one step to the game's walking state; false if it couldn't start.
@@ -34740,10 +34757,10 @@ index 000000000..3e693cb21
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeCamera.cpp b/src/FirstPerson/FirstPersonModeCamera.cpp
 new file mode 100644
-index 000000000..f88b40451
+index 000000000..e75c80475
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeCamera.cpp
-@@ -0,0 +1,878 @@
+@@ -0,0 +1,914 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -34906,6 +34923,31 @@ index 000000000..f88b40451
 +	if (yawDegrees != 0.0 || pitchDegrees != 0.0)
 +	{
 +		_view->rotate(yawDegrees, pitchDegrees);
++	}
++}
++
++/**
++ * In the enemy's turn the view stays with the way the soldier faces (setting "Alien turn: look as
++ * the soldier faces"; a player, GitHub issue #126: looking behind a soldier who can't turn shows
++ * what they don't see, which confuses). It may look up to HeadTurn degrees to either side of the
++ * facing (the head turns), no further, whoever turns it: the mouse, the keys, or the aliens' turn
++ * cameras looking at an attacker. When the soldier turns (to fire back), the view goes along.
++ * Called every frame of the enemy's turn.
++ * @param unit The unit being looked through.
++ */
++void FirstPersonMode::holdViewToFacing(BattleUnit *unit)
++{
++	if (!Options::fpsAlienTurnFacing || unit->getFaction() != FACTION_PLAYER)
++	{
++		return;
++	}
++	// The camera's yaw has 0 = east; a unit's direction has 0 = north, clockwise in 45 degree steps.
++	const double facingYaw = (turretTurning(unit) ? unit->getTurretDirection() : unit->getDirection()) * 45.0 - 90.0;
++	const double offFacing = std::remainder(_view->getYawDegrees() - facingYaw, 360.0);
++	if (std::abs(offFacing) > HeadTurn)
++	{
++		_view->rotate((offFacing > 0.0 ? HeadTurn : -HeadTurn) - offFacing, 0.0);
++		_snapTurnDegrees = 0.0; // (a snap turn further that way ends here)
 +	}
 +}
 +
@@ -35280,6 +35322,17 @@ index 000000000..f88b40451
 +			{
 +				// The step didn't happen (out of time units, an unseen unit in the way, ...): the
 +				// camera, which had walked on towards the edge, goes back inside the old tile.
++				// An unseen unit in the way holds that step back from now on, as a wall would (see
++				// stepAllowed): asked again and again while the key was held, the game refused it each
++				// time and the view lunged at the edge and back (a player, GitHub issue #129: a unit
++				// behind a curtain one walks through but doesn't see through).
++				const Position refusedTo(_trackedTile.x, _trackedTile.y, unitTile.z);
++				if (hiddenUnitOn(unit, refusedTo))
++				{
++					_hiddenBlockUnit = unit;
++					_hiddenBlockFrom = unitTile;
++					_hiddenBlockDirection = Pathfinding::vectorToDirection(refusedTo - unitTile);
++				}
 +				const int bigUnitOffset = 8 * (unit->getArmor()->getSize() - 1); // a 2x2 unit's middle is half a tile further on
 +				_eyeX = clampInsideTile(unitTile.x, _eyeX, bigUnitOffset);
 +				_eyeY = clampInsideTile(unitTile.y, _eyeY, bigUnitOffset);
@@ -38205,10 +38258,10 @@ index 000000000..b3b1075b7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeMovement.cpp b/src/FirstPerson/FirstPersonModeMovement.cpp
 new file mode 100644
-index 000000000..70dbd440c
+index 000000000..d669eda00
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeMovement.cpp
-@@ -0,0 +1,2238 @@
+@@ -0,0 +1,2271 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -38365,6 +38418,14 @@ index 000000000..70dbd440c
 +		}
 +		bool allowed = stepCost.cost.time < Pathfinding::INVALID_MOVE_COST;
 +
++		// A step the game refused for a unit the player doesn't see (the pathfinding counts only
++		// units in sight) stays refused while that unit stands there (see updateCamera).
++		if (allowed && unit == _hiddenBlockUnit && direction == _hiddenBlockDirection && start == _hiddenBlockFrom)
++		{
++			if (hiddenUnitOn(unit, start + Position(stepX, stepY, 0))) allowed = false;
++			else _hiddenBlockDirection = -1; // (it went away, or came into sight)
++		}
++
 +		// Flight switched off (or falling switched off): don't step off a ledge into the air.
 +		// The destination must have a floor, or the tile below it must be the top of a ramp or
 +		// of stairs going down: its ground raised at least half a level (the terrain level is
@@ -38448,6 +38509,31 @@ index 000000000..70dbd440c
 +		if (pathfinding->getTUCost(landing, direction, unit, nullptr, BAM_NORMAL).cost.time < Pathfinding::INVALID_MOVE_COST)
 +		{
 +			return true;
++		}
++	}
++	return false;
++}
++
++/**
++ * Whether a unit the player doesn't see stands where a unit would step to: on any tile of its
++ * footprint there (a big unit's four).
++ * @param unit The unit stepping.
++ * @param destination The tile it would step to (its footprint's north-west one).
++ * @return True if one does.
++ */
++bool FirstPersonMode::hiddenUnitOn(const BattleUnit *unit, const Position &destination) const
++{
++	const int size = unit->getArmor()->getSize();
++	for (int x = 0; x < size; ++x)
++	{
++		for (int y = 0; y < size; ++y)
++		{
++			const Tile *tile = _save->getTile(destination + Position(x, y, 0));
++			const BattleUnit *other = tile ? tile->getUnit() : nullptr;
++			if (other && other != unit && !other->getVisible())
++			{
++				return true;
++			}
 +		}
 +	}
 +	return false;
@@ -40952,10 +41038,10 @@ index 000000000..8faa52ad4
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..ad30ce5f4
+index 000000000..288ea335c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,5173 @@
+@@ -0,0 +1,5175 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -44557,14 +44643,16 @@ index 000000000..ad30ce5f4
 + * beside the soldier shoves the gun): the game has already turned the soldier to face it, so
 + * the view goes along, and the soldier isn't turned back to the old view afterwards. Knocked
 + * to the side, the view turns to that tile (the pitch stays); at the feet or straight up, it
-+ * tips down or up (the facing stays). Only for the soldier we look through.
++ * tips down or up (the facing stays). Only for the unit we look through, when it is the shooter.
 + * @param shooter The unit whose shot was knocked aside.
 + * @param target The tile the shot now goes at: a neighbour, the soldier's own (the feet) or the
 + *               one above it.
 + */
 +void FirstPersonMode::followDeflectedShot(const BattleUnit *shooter, const Position &target)
 +{
-+	if (!shooter || shooter != _save->getSelectedUnit())
++	// (The unit the camera is with, not the game's selected one: in the enemy's turn that is the enemy acting, and
++	// its shot knocked aside by our soldier threw the soldier's view round, GitHub issue #125.)
++	if (!shooter || shooter != _trackedUnit)
 +	{
 +		return;
 +	}
@@ -71661,7 +71749,7 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..58e156fc5
+index 000000000..399e5c659
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,997 @@
@@ -71876,7 +71964,7 @@ index 000000000..58e156fc5
 +	static const struct { const char *heading; std::vector<const char*> ids; } sections[] = {
 +		{ "STR_FPS_SECTION_PLAYSTYLE", { "fpsPlaystyle" } },
 +		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsCameraEyes", "fpsCameraArtifacts", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView", "fpsZoom",
-+			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
++			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsAlienTurnFacing", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
 +		{ "STR_FPS_SECTION_MOVEMENT", { "fpsTurnCost", "fpsMovement", "fpsWalkSpeed", "fpsFlightCost", "fpsFlightCostOverride", "fpsVault",
 +			"fpsFalling", "fpsSafeLanding" } },
 +		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsRecoil", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsLean", "fpsMeleeTerrain",

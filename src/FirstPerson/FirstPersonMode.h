@@ -430,6 +430,8 @@ private:
 	double fieldOfViewNow() const;
 	/// Turns the view with the scroll keys.
 	void turnWithKeys(double elapsedSeconds);
+	/// In the enemy's turn: the view stays within the head's turn of the soldier's facing (setting).
+	void holdViewToFacing(BattleUnit *unit);
 	/// Turns the soldier to face where the camera looks (free, or by the rules).
 	void faceLookDirection(BattleUnit *unit);
 	double _snapTurnDegrees = 0.0;          // a turn key's 45 degrees still to turn (negative: to the left)
@@ -513,6 +515,9 @@ private:
 	unsigned _mouseReleasesSeen = 0;           // the game's mouse releases known (see think: one since means another screen was on top)
 	int _sidestepFacing = -1;                  // the facing a soldier sidestepping keeps (the game's strafe), while the step is walked; -1 none
 	Position _stepFrom;                        // the tile that step started from
+	const BattleUnit *_hiddenBlockUnit = nullptr;  // a step the game refused for a unit not in sight: whose step,
+	Position _hiddenBlockFrom;                 // ... from which tile,
+	int _hiddenBlockDirection = -1;            // ... and which way (-1: none); held back while that unit stands there (see stepAllowed)
 	int _stepAllowedCache[8];                  // per frame: -1 unknown, 0 blocked, 1 allowed, 2 blocked for an unsafe landing (see landingSafe)
 	// a step off a ledge onto an unsafe landing (setting "Check the landing"): the edge warned about
 	// (the tile and direction), when, the keys let go since, and the next push confirmed
@@ -525,6 +530,8 @@ private:
 
 	/// Real-time movement with the movement keys, paying for each tile entered by the rules.
 	void updateMovement(BattleUnit *unit, bool canMove, double elapsedSeconds);
+	/// Whether a unit the player doesn't see stands where a unit would step to.
+	bool hiddenUnitOn(const BattleUnit *unit, const Position &destination) const;
 	/// Could the unit step into the neighbouring tile in this direction now, by the rules?
 	bool stepAllowed(BattleUnit *unit, int stepX, int stepY);
 	/// Hands one step to the game's walking state; false if it couldn't start.

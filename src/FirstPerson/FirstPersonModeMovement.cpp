@@ -154,6 +154,14 @@ bool FirstPersonMode::stepAllowed(BattleUnit *unit, int stepX, int stepY)
 		}
 		bool allowed = stepCost.cost.time < Pathfinding::INVALID_MOVE_COST;
 
+		// A step the game refused for a unit the player doesn't see (the pathfinding counts only
+		// units in sight) stays refused while that unit stands there (see updateCamera).
+		if (allowed && unit == _hiddenBlockUnit && direction == _hiddenBlockDirection && start == _hiddenBlockFrom)
+		{
+			if (hiddenUnitOn(unit, start + Position(stepX, stepY, 0))) allowed = false;
+			else _hiddenBlockDirection = -1; // (it went away, or came into sight)
+		}
+
 		// Flight switched off (or falling switched off): don't step off a ledge into the air.
 		// The destination must have a floor, or the tile below it must be the top of a ramp or
 		// of stairs going down: its ground raised at least half a level (the terrain level is
@@ -237,6 +245,31 @@ bool FirstPersonMode::landingSafe(BattleUnit *unit, const Position &ahead) const
 		if (pathfinding->getTUCost(landing, direction, unit, nullptr, BAM_NORMAL).cost.time < Pathfinding::INVALID_MOVE_COST)
 		{
 			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Whether a unit the player doesn't see stands where a unit would step to: on any tile of its
+ * footprint there (a big unit's four).
+ * @param unit The unit stepping.
+ * @param destination The tile it would step to (its footprint's north-west one).
+ * @return True if one does.
+ */
+bool FirstPersonMode::hiddenUnitOn(const BattleUnit *unit, const Position &destination) const
+{
+	const int size = unit->getArmor()->getSize();
+	for (int x = 0; x < size; ++x)
+	{
+		for (int y = 0; y < size; ++y)
+		{
+			const Tile *tile = _save->getTile(destination + Position(x, y, 0));
+			const BattleUnit *other = tile ? tile->getUnit() : nullptr;
+			if (other && other != unit && !other->getVisible())
+			{
+				return true;
+			}
 		}
 	}
 	return false;

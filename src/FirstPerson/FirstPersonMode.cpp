@@ -2293,6 +2293,10 @@ void FirstPersonMode::think()
 	// also faces where you look, and the fire mode and aim are kept up to date.
 	updateCamera(unit, playerTurn, elapsedSeconds);
 	updateNoclipView(unit);
+	if (!playerTurn)
+	{
+		holdViewToFacing(unit);
+	}
 	if (playerTurn)
 	{
 		openDoorAfterTurn(unit);

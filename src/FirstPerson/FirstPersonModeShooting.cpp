@@ -3599,14 +3599,16 @@ void FirstPersonMode::deflected(BattlescapeState *state, const BattleUnit *shoot
  * beside the soldier shoves the gun): the game has already turned the soldier to face it, so
  * the view goes along, and the soldier isn't turned back to the old view afterwards. Knocked
  * to the side, the view turns to that tile (the pitch stays); at the feet or straight up, it
- * tips down or up (the facing stays). Only for the soldier we look through.
+ * tips down or up (the facing stays). Only for the unit we look through, when it is the shooter.
  * @param shooter The unit whose shot was knocked aside.
  * @param target The tile the shot now goes at: a neighbour, the soldier's own (the feet) or the
  *               one above it.
  */
 void FirstPersonMode::followDeflectedShot(const BattleUnit *shooter, const Position &target)
 {
-	if (!shooter || shooter != _save->getSelectedUnit())
+	// (The unit the camera is with, not the game's selected one: in the enemy's turn that is the enemy acting, and
+	// its shot knocked aside by our soldier threw the soldier's view round, GitHub issue #125.)
+	if (!shooter || shooter != _trackedUnit)
 	{
 		return;
 	}

@@ -971,6 +971,8 @@ void createOptions(std::vector<OptionInfo> &options)
 	// ...and in it, the view cuts to the soldier who sees the alien acting, or who fires back;
 	// a soldier shot at, hit or taken over pops up their small camera.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsAlienTurnCameras", &fpsAlienTurnCameras, true, "STR_FPS_ALIEN_TURN_CAMERAS", category));
+	// ...and in the enemy's turn the view looks the way the soldier faces, at most the head's turn to either side.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsAlienTurnFacing", &fpsAlienTurnFacing, true, "STR_FPS_ALIEN_TURN_FACING", category));
 	// ...and with them, a soldier of ours going down out of view pops up their camera (static).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFallenSoldierCamera", &fpsFallenSoldierCamera, true, "STR_FPS_FALLEN_SOLDIER_CAMERA", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsStartInFirstPerson", &fpsStartInFirstPerson, false, "STR_FPS_START_IN_FIRST_PERSON", category));
