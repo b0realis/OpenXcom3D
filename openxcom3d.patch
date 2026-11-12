@@ -46729,10 +46729,10 @@ index 000000000..9507fcd26
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeWeaponInHand.cpp b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
 new file mode 100644
-index 000000000..fa1d80173
+index 000000000..392937654
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
-@@ -0,0 +1,1035 @@
+@@ -0,0 +1,1044 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -47550,12 +47550,16 @@ index 000000000..fa1d80173
 +}
 +
 +/**
-+ * Is a weapon drawn in the soldier's hands? Not a built-in one: an item fixed to the unit (a
-+ * tank's cannon, an alien's claws) or the unit's special weapon (OXCE's, used from the SPECIAL
-+ * button or by an empty hand: fists, a dog's bite, a Lamia's spit). A tank or a machine has no
-+ * hands, and a bite has nothing to hold: the view's hands stay empty. A mod can name built-in
-+ * items drawn all the same (`firstPerson: builtInItemsShown:`, a shield, an arm cannon).
-+ * Aiming and firing work as with any weapon; only the picture is left out.
++ * Is a weapon drawn in the soldier's hands? Anything held is (a gun, a grenade, a body carried),
++ * whether or not the map has a picture of it in the hand. A built-in one, an item fixed to the
++ * unit (a tank's cannon, an alien's claws, a dog's bite) or the unit's special weapon (OXCE's,
++ * used from the SPECIAL button or by an empty hand: fists, a Lamia's spit), only if the map
++ * draws it in the unit's hand too (the item's `fixedWeaponShow`, with a hand picture: a
++ * shield, an arm cannon): a tank or a machine has no hands, and a bite has nothing to hold, so
++ * the view's hands stay empty (GitHub issue #123: not drawn only when it is both built-in and
++ * without a picture in the hand on the map; a dog doesn't carry its own head, a shield unit
++ * shows its shield). A mod can name more built-in items to draw (`firstPerson:
++ * builtInItemsShown:`). Aiming and firing work as with any weapon; only the picture is left out.
 + * @param unit The soldier.
 + * @param weapon The weapon in use.
 + */
@@ -47564,7 +47568,12 @@ index 000000000..fa1d80173
 +	const RuleItem *rules = weapon->getRules();
 +	const bool held = weapon == unit->getLeftHandWeapon() || weapon == unit->getRightHandWeapon();
 +	const bool builtIn = rules->isFixed() || !held;
-+	return !builtIn || _game->getMod()->getFirstPerson().showsBuiltInItem(rules->getType());
++	if (!builtIn)
++	{
++		return true;
++	}
++	const bool inHandOnMap = held && rules->getFixedShow() && rules->getHandSprite() != -1; // (as UnitSprite draws a hand's item)
++	return inHandOnMap || _game->getMod()->getFirstPerson().showsBuiltInItem(rules->getType());
 +}
 +
 +/**
@@ -51415,10 +51424,10 @@ index 000000000..5894276e4
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..685f17504
+index 000000000..abf700d82
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1451 @@
+@@ -0,0 +1,1452 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -51697,6 +51706,7 @@ index 000000000..685f17504
 +		static constexpr int HazeSteps = 8; // the distance haze blends colours towards the haze in this many steps
 +		Uint8 hazeTint[HazeSteps + 1][256]; // each colour blended towards the haze, step 0 (itself) .. HazeSteps (the haze)
 +		Uint32 hazeTintKey;    // the palette and haze colour the haze tables were made for
++		Uint32 worldTintKey = 0; // the palette and night vision's state the glass, flare and unseen tables were made for
 +	};
 +
 +	// =====================================================================================
@@ -54528,7 +54538,7 @@ index 000000000..77a3cc4ed
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..458b3c7d2
+index 000000000..4f717b034
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
 @@ -0,0 +1,477 @@
@@ -54668,8 +54678,8 @@ index 000000000..458b3c7d2
 +	frame.halfPlaneHeight = (float)(view._halfFovTangent * height / width);
 +	frame.width = width;
 +	frame.height = height;
-+	const bool bigView = width > AutoPixelMaxWidth || height > AutoPixelMaxHeight;
-+	frame.pixelSize = scale > 1 ? 1 : Options::fpsPixelSize == 0 ? (bigView ? 2 : 1) : std::clamp(Options::fpsPixelSize, 1, 3);
++	// (Auto on the card: a ray a pixel whatever the view's size, which is what the card is for; a small view always has one.)
++	frame.pixelSize = scale > 1 || width * height <= SmallViewPixels || Options::fpsPixelSize == 0 ? 1 : std::clamp(Options::fpsPixelSize, 1, 3);
 +	frame.ghostScale = std::clamp(Options::fpsGhostOpacity, 10, 100) / (GhostNearOpacity * 100.0f);
 +	frame.seeThroughCrops = Options::fpsSeeThroughCrops;
 +	// The scene, as shadeHit and colorOutsideMap read it.
@@ -55011,10 +55021,10 @@ index 000000000..458b3c7d2
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..ded969c5c
+index 000000000..63fae132f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,1951 @@
+@@ -0,0 +1,1991 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -55207,6 +55217,31 @@ index 000000000..ded969c5c
 +	// undid its tint.
 +	auto nearest = [&](float red, float green, float blue) { return nearestIn(palette, red, green, blue); };
 +	auto nearestSky = [&](float red, float green, float blue) { return nearestIn(_skyPalette ? _skyPalette : palette, red, green, blue); };
++	// Under night vision the goggles show every colour as the one of their own group with its shade (the low four bits:
++	// see applyScreenWash, as the map does it). That is right for the art's colours, whose groups run bright to dark; a
++	// colour picked here as the palette's nearest to some RGB (the sky, the haze, a colour seen through glass) can sit
++	// anywhere in its group, and came out as bright or dark as that happened to be: a night sky and the haze far away
++	// glaring, bright through a window (a player, GitHub issue #122). So with night vision on, the world's own colours
++	// and tables are picked as the goggles show them: each palette colour as its shade in the goggles' group (`seen`),
++	// and the nearest of the goggles' sixteen colours for the result (`nearestSeen`), whose shade is then its brightness.
++	const bool goggles = _nightVision != 0;
++	const int gogglesGroup = goggles ? (_nightVision - 1) * 16 : 0;
++	SDL_Color seen[256];
++	for (int index = 0; index < 256; ++index) seen[index] = goggles ? palette[gogglesGroup | (index & 15)] : palette[index];
++	auto nearestGoggles = [&](float red, float green, float blue) {
++		int best = gogglesGroup | 15;
++		float bestDistance = 1e9f;
++		for (int shade = gogglesGroup ? 0 : 1; shade < 16; ++shade)
++		{
++			const SDL_Color &color = palette[gogglesGroup | shade];
++			const float dr = color.r - red, dg = color.g - green, db = color.b - blue;
++			const float distance = dr * dr * 0.3f + dg * dg * 0.59f + db * db * 0.11f;
++			if (distance < bestDistance) { bestDistance = distance; best = gogglesGroup | shade; }
++		}
++		return (Uint8)best;
++	};
++	auto nearestSeen = [&](float red, float green, float blue) { return goggles ? nearestGoggles(red, green, blue) : nearest(red, green, blue); };
++	auto nearestSkySeen = [&](float red, float green, float blue) { return goggles ? nearestGoggles(red, green, blue) : nearestSky(red, green, blue); };
 +	// Mixes two RGB colours: amount 0 gives `from`, 1 gives `to`.
 +	auto mix = [](const float *from, const float *to, float amount, float *out) {
 +		for (int channel = 0; channel < 3; ++channel) out[channel] = from[channel] + (to[channel] - from[channel]) * amount;
@@ -55263,7 +55298,7 @@ index 000000000..ded969c5c
 +	{
 +		float color[3];
 +		mix(horizon, zenith, band / 31.0f, color);
-+		_colors.sky[band] = nearestSky(color[0], color[1], color[2]);
++		_colors.sky[band] = nearestSkySeen(color[0], color[1], color[2]);
 +	}
 +	// The clouds: 8 steps from their lit side to their shadowed side, darker at night.
 +	mix(cloudLit, cloudNightLit, _colors.night, litCloud);
@@ -55272,7 +55307,7 @@ index 000000000..ded969c5c
 +	{
 +		float color[3];
 +		mix(litCloud, darkCloud, level / 7.0f, color);
-+		_colors.cloud[level] = nearestSky(color[0], color[1], color[2]);
++		_colors.cloud[level] = nearestSkySeen(color[0], color[1], color[2]);
 +	}
 +	// The single colours: the haze far away is the sky at the horizon, the rest are picked
 +	// from fixed RGB values.
@@ -55287,10 +55322,11 @@ index 000000000..ded969c5c
 +			hazeKey = (hazeKey ^ (palette[index].r | (palette[index].g << 8) | (palette[index].b << 16))) * 16777619u;
 +		}
 +		hazeKey = (hazeKey ^ _colors.haze) * 16777619u;
++		hazeKey = (hazeKey ^ (Uint32)_nightVision) * 16777619u;
 +		if (hazeKey != _colors.hazeTintKey)
 +		{
 +			_colors.hazeTintKey = hazeKey;
-+			const SDL_Color &hazeRgb = palette[_colors.haze];
++			const SDL_Color &hazeRgb = seen[_colors.haze];
 +			for (int step = 0; step <= SceneColors::HazeSteps; ++step)
 +			{
 +				const float amount = step / (float)SceneColors::HazeSteps;
@@ -55298,8 +55334,8 @@ index 000000000..ded969c5c
 +				for (int index = 1; index < 256; ++index)
 +				{
 +					_colors.hazeTint[step][index] = step == 0 ? (Uint8)index : step == SceneColors::HazeSteps ? _colors.haze
-+						: nearest(palette[index].r + (hazeRgb.r - palette[index].r) * amount, palette[index].g + (hazeRgb.g - palette[index].g) * amount,
-+							palette[index].b + (hazeRgb.b - palette[index].b) * amount);
++						: nearestSeen(seen[index].r + (hazeRgb.r - seen[index].r) * amount, seen[index].g + (hazeRgb.g - seen[index].g) * amount,
++							seen[index].b + (hazeRgb.b - seen[index].b) * amount);
 +				}
 +			}
 +		}
@@ -55308,10 +55344,10 @@ index 000000000..ded969c5c
 +	_colors.faintStar = nearestSky(120, 122, 140);
 +	_colors.moon = nearestSky(228, 228, 210);
 +	_colors.sun = nearestSky(255, 248, 200);
-+	_colors.earth[0] = nearestSky(46, 96, 178);
-+	_colors.earth[1] = nearestSky(8, 12, 28);
-+	_colors.earth[2] = nearestSky(236, 238, 246);
-+	_colors.earth[3] = nearestSky(130, 180, 240);
++	_colors.earth[0] = nearestSkySeen(46, 96, 178);
++	_colors.earth[1] = nearestSkySeen(8, 12, 28);
++	_colors.earth[2] = nearestSkySeen(236, 238, 246);
++	_colors.earth[3] = nearestSkySeen(130, 180, 240);
 +	_colors.fire[0] = nearest(255, 250, 200);
 +	_colors.fire[1] = nearest(255, 210, 60);
 +	_colors.fire[2] = nearest(240, 120, 20);
@@ -55325,8 +55361,8 @@ index 000000000..ded969c5c
 +	_colors.downedIcon[3] = nearest(250, 240, 120);
 +	_colors.downedIcon[4] = nearest(170, 205, 255);
 +	_colors.edgeDot = nearest(225, 45, 35);
-+	_colors.unexplored = nearest(78, 88, 110);
-+	_colors.rock = nearest(108, 94, 80);
++	_colors.unexplored = nearestSeen(78, 88, 110);
++	_colors.rock = nearestSeen(108, 94, 80);
 +	_colors.spark = nearest(255, 240, 160);
 +	_colors.blood[0] = nearest(90, 0, 0);
 +	_colors.blood[1] = nearest(160, 12, 8);
@@ -55376,13 +55412,10 @@ index 000000000..ded969c5c
 +	if (hash != _colors.paletteHash)
 +	{
 +		_colors.paletteHash = hash;
-+		_colors.glassTint[0] = 0;
 +		// Every colour (but the transparent 0) as seen through window glass, a little paler and
 +		// bluer, and washed with each screen wash's colour by its brightness (luminance).
 +		for (int index = 1; index < 256; ++index)
 +		{
-+			_colors.glassTint[index] = nearest(palette[index].r * 0.7f + 150 * 0.3f, palette[index].g * 0.7f + 180 * 0.3f,
-+				palette[index].b * 0.7f + 205 * 0.3f);
 +			const float luminance = palette[index].r * 0.3f + palette[index].g * 0.59f + palette[index].b * 0.11f;
 +			_colors.redTint[index] = nearest(60 + luminance * 0.85f, luminance * 0.18f, luminance * 0.15f);
 +			_colors.blueTint[index] = nearest(luminance * 0.1f, luminance * 0.16f, 25 + luminance * 0.45f);
@@ -55391,17 +55424,7 @@ index 000000000..ded969c5c
 +				std::min(255.0f, 180 + luminance * 0.3f));
 +			_colors.greenTint[index] = nearest(15 + luminance * 0.3f, 35 + luminance * 0.7f, luminance * 0.2f);
 +			_colors.purpleTint[index] = nearest(std::min(255.0f, 55 + luminance * 0.75f), luminance * 0.25f, std::min(255.0f, 75 + luminance * 0.85f));
-+			_colors.flareTint[index] = nearest(std::min(255.0f, 70 + luminance * 1.15f), luminance * 0.32f, luminance * 0.24f);
-+			// Unexplored terrain drawn (setting "Unseen terrain": Visible): toned UnseenToneShare of the
-+			// way to a slate grey as bright as the colour, so it shows what is there and still reads
-+			// as not yet seen.
-+			const float slateLuminance = UnseenToneRgb[0] * 0.3f + UnseenToneRgb[1] * 0.59f + UnseenToneRgb[2] * 0.11f;
-+			auto toned = [&](float channel, int axis) {
-+				return channel + (std::min(255.0f, UnseenToneRgb[axis] * luminance / slateLuminance) - channel) * UnseenToneShare;
-+			};
-+			_colors.unseenTint[index] = nearest(toned(palette[index].r, 0), toned(palette[index].g, 1), toned(palette[index].b, 2));
 +		}
-+		_colors.unseenTint[0] = 0;
 +		// Colour 0 (black on the screen): the blue, orange, white, green and purple washes colour
 +		// even black, with a dark shade of their own; the red wash and the flare's light leave it
 +		// black.
@@ -55411,7 +55434,6 @@ index 000000000..ded969c5c
 +		_colors.whiteTint[0] = nearest(185, 185, 185);
 +		_colors.greenTint[0] = nearest(8, 22, 4);
 +		_colors.purpleTint[0] = nearest(40, 6, 58);
-+		_colors.flareTint[0] = 0;
 +		// Four greys, dark to light, for the TV static; two greens for a digital feed's broken blocks.
 +		for (int level = 0; level < 4; ++level) _colors.grey[level] = nearest(30 + 60 * level, 30 + 60 * level, 30 + 60 * level);
 +		_colors.glitchGreen[0] = nearest(40, 225, 70);
@@ -55445,6 +55467,32 @@ index 000000000..ded969c5c
 +				}
 +			}
 +		}
++	}
++
++	// The tables the world itself is coloured through, made again when the palette changes or night vision is switched
++	// (with it on, as the goggles show the colours: see `seen` above): every colour (but the transparent 0) as seen
++	// through window glass, a little paler and bluer; lit by a flare's red light; and unexplored terrain drawn
++	// (setting "Unseen terrain": Visible), toned UnseenToneShare of the way to a slate grey as bright as the colour,
++	// so it shows what is there and still reads as not yet seen.
++	const Uint32 worldTintKey = (hash ^ (Uint32)_nightVision) * 16777619u;
++	if (worldTintKey != _colors.worldTintKey)
++	{
++		_colors.worldTintKey = worldTintKey;
++		const float slateLuminance = UnseenToneRgb[0] * 0.3f + UnseenToneRgb[1] * 0.59f + UnseenToneRgb[2] * 0.11f;
++		for (int index = 1; index < 256; ++index)
++		{
++			const SDL_Color &color = seen[index];
++			const float luminance = color.r * 0.3f + color.g * 0.59f + color.b * 0.11f;
++			_colors.glassTint[index] = nearestSeen(color.r * 0.7f + 150 * 0.3f, color.g * 0.7f + 180 * 0.3f, color.b * 0.7f + 205 * 0.3f);
++			_colors.flareTint[index] = nearestSeen(std::min(255.0f, 70 + luminance * 1.15f), luminance * 0.32f, luminance * 0.24f);
++			auto toned = [&](float channel, int axis) {
++				return channel + (std::min(255.0f, UnseenToneRgb[axis] * luminance / slateLuminance) - channel) * UnseenToneShare;
++			};
++			_colors.unseenTint[index] = nearestSeen(toned(color.r, 0), toned(color.g, 1), toned(color.b, 2));
++		}
++		_colors.glassTint[0] = 0;
++		_colors.flareTint[0] = 0;
++		_colors.unseenTint[0] = 0;
 +	}
 +
 +	// The sun stands high in the north-west by day; at night there is only the moon, and the
@@ -56708,9 +56756,11 @@ index 000000000..ded969c5c
 +	rayContext.solidGhostThreshold = 0.0f;
 +
 +	// With a pixel size above 1, one ray colours a block of pixels (pixelSize x pixelSize).
-+	// Auto (0) picks 2 for views bigger than AutoPixelMaxWidth x AutoPixelMaxHeight, else 1.
++	// Auto (0) picks 2 for views bigger than AutoPixelMaxWidth x AutoPixelMaxHeight, else 1 (on the graphics card always 1: see gpuCastAllRays).
 +	const bool bigView = width > AutoPixelMaxWidth || height > AutoPixelMaxHeight;
-+	const int pixelSize = Options::fpsPixelSize == 0 ? (bigView ? 2 : 1) : std::clamp(Options::fpsPixelSize, 1, 3);
++	// A small view (a soldier's card camera, the map camera) always has a ray a pixel: bigger pixels made mush of it, and it costs little.
++	const bool smallView = width * height <= SmallViewPixels;
++	const int pixelSize = smallView ? 1 : Options::fpsPixelSize == 0 ? (bigView ? 2 : 1) : std::clamp(Options::fpsPixelSize, 1, 3);
 +	const int blockRows = (height + pixelSize - 1) / pixelSize, blockColumns = (width + pixelSize - 1) / pixelSize;
 +	for (int blockRow = _rayWorkers.nextPiece++; blockRow < blockRows; blockRow = _rayWorkers.nextPiece++)
 +	{
@@ -58263,10 +58313,10 @@ index 000000000..dc4e7ff65
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..b0fb10d5e
+index 000000000..4a220890e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,595 @@
+@@ -0,0 +1,596 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -58410,6 +58460,7 @@ index 000000000..b0fb10d5e
 +/// of 2. A 1920x1080 screen at the default battlescape scale makes a 960x540 view, which ran at
 +/// 40-51 FPS in a busy town; in blocks of 2 it holds 60 and looks almost the same.
 +const int AutoPixelMaxWidth = 640, AutoPixelMaxHeight = 400;
++const int SmallViewPixels = 320 * 200; // a view of at most this many pixels (the cards' cameras, the small and medium map camera) is never drawn with bigger pixels
 +
 +// ---- Proportions of the voxel world ----
 +

@@ -190,7 +190,7 @@ SETTINGS = [
         ('See-through crops', 'NO', 'YES / NO', 'Crops, flower beds and rubble without a real 3D shape, drawn solid as on the map, shown a bit see-through instead, so units in a field show.', ''),
         ('See-through corpses', 'NO', 'YES / NO', 'A corpse or item under the crosshair turns faint (at the ghost opacity) while you aim past it.', 'See past the big mods\' tall corpses to what your shot reaches.'),
         ('Discreet map edge', 'NO', 'YES / NO', 'Small red dots along the map\'s edge instead of the yellow tape.', ''),
-        ('Pixel size', 'Auto', 'Auto / 1 / 2 / 3', 'Each ray colours a block of pixels: chunkier, much faster on big screens.', 'Auto: full detail up to 640&times;400, blocks of 2 above. A click goes round them.'),
+        ('Pixel size', 'Auto', 'Auto / 1 / 2 / 3', 'Each ray colours a block of pixels: chunkier, much faster on big screens.', 'Auto: full detail up to 640&times;400, blocks of 2 above (with Renderer GPU always full detail). The small cameras always have full detail. A click goes round them.'),
         ('Frame rate limit', '60', '60 to 240, unlimited', 'The game\'s own frame rate cap.', 'Raise it for a 120 or 144 Hz screen if your computer keeps up.'),
         ('Frame counter', 'NO', 'YES / NO', 'The game\'s frames-per-second counter (as F7).', ''),
     ]),

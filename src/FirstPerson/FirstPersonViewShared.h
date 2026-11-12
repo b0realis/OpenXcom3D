@@ -141,6 +141,7 @@ const float FlareShadowShades = 8.0f, FlareShadowMinPower = 0.06f;
 /// of 2. A 1920x1080 screen at the default battlescape scale makes a 960x540 view, which ran at
 /// 40-51 FPS in a busy town; in blocks of 2 it holds 60 and looks almost the same.
 const int AutoPixelMaxWidth = 640, AutoPixelMaxHeight = 400;
+const int SmallViewPixels = 320 * 200; // a view of at most this many pixels (the cards' cameras, the small and medium map camera) is never drawn with bigger pixels
 
 // ---- Proportions of the voxel world ----
 

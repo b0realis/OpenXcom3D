@@ -815,12 +815,16 @@ void FirstPersonMode::drawHeldItem(bool left, double bob[2], double dip, int sha
 }
 
 /**
- * Is a weapon drawn in the soldier's hands? Not a built-in one: an item fixed to the unit (a
- * tank's cannon, an alien's claws) or the unit's special weapon (OXCE's, used from the SPECIAL
- * button or by an empty hand: fists, a dog's bite, a Lamia's spit). A tank or a machine has no
- * hands, and a bite has nothing to hold: the view's hands stay empty. A mod can name built-in
- * items drawn all the same (`firstPerson: builtInItemsShown:`, a shield, an arm cannon).
- * Aiming and firing work as with any weapon; only the picture is left out.
+ * Is a weapon drawn in the soldier's hands? Anything held is (a gun, a grenade, a body carried),
+ * whether or not the map has a picture of it in the hand. A built-in one, an item fixed to the
+ * unit (a tank's cannon, an alien's claws, a dog's bite) or the unit's special weapon (OXCE's,
+ * used from the SPECIAL button or by an empty hand: fists, a Lamia's spit), only if the map
+ * draws it in the unit's hand too (the item's `fixedWeaponShow`, with a hand picture: a
+ * shield, an arm cannon): a tank or a machine has no hands, and a bite has nothing to hold, so
+ * the view's hands stay empty (GitHub issue #123: not drawn only when it is both built-in and
+ * without a picture in the hand on the map; a dog doesn't carry its own head, a shield unit
+ * shows its shield). A mod can name more built-in items to draw (`firstPerson:
+ * builtInItemsShown:`). Aiming and firing work as with any weapon; only the picture is left out.
  * @param unit The soldier.
  * @param weapon The weapon in use.
  */
@@ -829,7 +833,12 @@ bool FirstPersonMode::weaponShownInHand(BattleUnit *unit, const BattleItem *weap
 	const RuleItem *rules = weapon->getRules();
 	const bool held = weapon == unit->getLeftHandWeapon() || weapon == unit->getRightHandWeapon();
 	const bool builtIn = rules->isFixed() || !held;
-	return !builtIn || _game->getMod()->getFirstPerson().showsBuiltInItem(rules->getType());
+	if (!builtIn)
+	{
+		return true;
+	}
+	const bool inHandOnMap = held && rules->getFixedShow() && rules->getHandSprite() != -1; // (as UnitSprite draws a hand's item)
+	return inHandOnMap || _game->getMod()->getFirstPerson().showsBuiltInItem(rules->getType());
 }
 
 /**

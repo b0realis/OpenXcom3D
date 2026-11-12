@@ -276,6 +276,7 @@ public:
 		static constexpr int HazeSteps = 8; // the distance haze blends colours towards the haze in this many steps
 		Uint8 hazeTint[HazeSteps + 1][256]; // each colour blended towards the haze, step 0 (itself) .. HazeSteps (the haze)
 		Uint32 hazeTintKey;    // the palette and haze colour the haze tables were made for
+		Uint32 worldTintKey = 0; // the palette and night vision's state the glass, flare and unseen tables were made for
 	};
 
 	// =====================================================================================
