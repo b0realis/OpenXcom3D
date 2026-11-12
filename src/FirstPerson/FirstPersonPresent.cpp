@@ -60,6 +60,7 @@ namespace FirstPerson
 namespace
 {
 const Surface *viewToPresent = nullptr; // the view asked for this frame
+const Uint32 *fullToPresent = nullptr;  // ... and its pixels in full colour (0xFFRRGGBB a pixel; 0: the palette's colour), or null
 }
 
 bool canPresentAtDisplaySize()
@@ -72,9 +73,10 @@ Uint32 presentKey(SDL_Surface *screen)
 	return screen->format->BytesPerPixel == 1 ? 0 : SDL_MapRGB(screen->format, 0, 0, 1);
 }
 
-void presentView(const Surface *view)
+void presentView(const Surface *view, const Uint32 *fullColors)
 {
 	viewToPresent = view;
+	fullToPresent = fullColors;
 }
 
 /**
@@ -86,7 +88,9 @@ void presentView(const Surface *view)
 void presentAtFlip(SDL_Surface *display, int x, int y, int width, int height)
 {
 	const Surface *view = viewToPresent;
+	const Uint32 *fullColors = fullToPresent;
 	viewToPresent = nullptr;
+	fullToPresent = nullptr;
 	if (!view || !display || view->getWidth() != width || view->getHeight() != height || x < 0 || y < 0 || x + width > display->w || y + height > display->h)
 	{
 		return;
@@ -123,13 +127,20 @@ void presentAtFlip(SDL_Surface *display, int x, int y, int width, int height)
 		}
 		const Uint32 colorBits = display->format->Rmask | display->format->Gmask | display->format->Bmask;
 		const Uint32 key = SDL_MapRGB(display->format, 0, 0, 1) & colorBits;
+		// (The full colours are red, green, blue from the top byte down: most displays' own order; else each is moved to its place.)
+		const SDL_PixelFormat *format = display->format;
+		const bool sameOrder = format->Rshift == 16 && format->Gshift == 8 && format->Bshift == 0;
 		for (int row = 0; row < height; ++row)
 		{
 			Uint32 *shown = (Uint32 *)((Uint8 *)display->pixels + (size_t)(y + row) * display->pitch) + x;
 			const Uint8 *seen = view->getRaw(0, row);
+			const Uint32 *full = fullColors ? fullColors + (size_t)row * width : nullptr;
 			for (int column = 0; column < width; ++column)
 			{
-				if ((shown[column] & colorBits) == key) shown[column] = colors[seen[column]];
+				if ((shown[column] & colorBits) != key) continue;
+				const Uint32 fullColor = full ? full[column] : 0;
+				shown[column] = !fullColor ? colors[seen[column]] : sameOrder ? (fullColor & 0xFFFFFFu)
+					: ((fullColor >> 16) & 255u) << format->Rshift | ((fullColor >> 8) & 255u) << format->Gshift | (fullColor & 255u) << format->Bshift;
 			}
 		}
 	}
@@ -150,7 +161,9 @@ void presentAtFlipOpenGl(SDL_Surface *screen, int x, int y, int width, int heigh
 {
 #ifndef __NO_OPENGL
 	const Surface *view = viewToPresent;
+	const Uint32 *fullColors = fullToPresent;
 	viewToPresent = nullptr;
+	fullToPresent = nullptr;
 	if (!view || !screen || screen->format->BytesPerPixel != 4 || view->getWidth() != width || view->getHeight() != height || width <= 0 || height <= 0)
 	{
 		return;
@@ -174,9 +187,10 @@ void presentAtFlipOpenGl(SDL_Surface *screen, int x, int y, int width, int heigh
 		const Uint32 *screenRow = (const Uint32 *)((const Uint8 *)screen->pixels + (size_t)((long long)row * screen->h / height) * screen->pitch);
 		const Uint8 *seen = view->getRaw(0, row);
 		Uint32 *made = &picture[(size_t)row * width];
+		const Uint32 *full = fullColors ? fullColors + (size_t)row * width : nullptr;
 		for (int column = 0; column < width; ++column)
 		{
-			made[column] = (screenRow[screenColumn[column]] & colorBits) == key ? colors[seen[column]] : 0;
+			made[column] = (screenRow[screenColumn[column]] & colorBits) != key ? 0 : full && full[column] ? full[column] : colors[seen[column]];
 		}
 	}
 
@@ -221,6 +235,7 @@ void presentAtFlipOpenGl(SDL_Surface *screen, int x, int y, int width, int heigh
 #else
 	(void)screen; (void)x; (void)y; (void)width; (void)height; (void)displayHeight;
 	viewToPresent = nullptr;
+	fullToPresent = nullptr;
 #endif
 }
 

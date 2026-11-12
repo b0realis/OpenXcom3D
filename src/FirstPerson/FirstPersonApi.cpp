@@ -869,6 +869,10 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSoftShadows", &fpsSoftShadows, false, "STR_FPS_SOFT_SHADOWS", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsAllLightShadows", &fpsAllLightShadows, false, "STR_FPS_ALL_LIGHT_SHADOWS", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsAmbientOcclusion", &fpsAmbientOcclusion, false, "STR_FPS_AMBIENT_OCCLUSION", category));
+	// The 3D world in full colour, past the palette (the graphics card, 3D resolution Display, a 32-bit display), and the
+	// light on it blended where the palette's picture dithers. Off by default.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsTrueColor", &fpsTrueColor, false, "STR_FPS_TRUE_COLOR", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmoothLight", &fpsSmoothLight, false, "STR_FPS_SMOOTH_LIGHT", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 0, "STR_FPS_PIXEL_SIZE", category));
 	// The crosshair: shown or not, the shot info under it, aiming at the exact point under it
 	// (YES) or at the tile, as the original game does (NO), and the units' hitboxes.

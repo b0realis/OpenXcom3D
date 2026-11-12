@@ -557,7 +557,7 @@ struct FirstPersonGpu::State
 	struct Targets
 	{
 		Gl::UInt framebuffer = 0;
-		Gl::UInt textures[4] = {}; // colour, depth, glow, results
+		Gl::UInt textures[5] = {}; // colour, depth, glow, full colour, results
 		bool results = false;
 	};
 	std::map<std::array<int, 3>, Targets> targets; // by width, height, and which of a frame's pictures (0 the frame's own, 1.. one for each of several rays a pixel)
@@ -795,7 +795,7 @@ bool FirstPersonGpu::State::buildResolve()
 	}
 	Gl::UseProgram(built);
 	Gl::Uniform1i(Gl::GetUniformLocation(built, "uBlend"), Blend);
-	const char *const kindNames[3] = { "uColor", "uDepth", "uGlow" };
+	const char *const kindNames[3] = { "uColor", "uDepth", "uTrue" };
 	for (int ray = 0; ray < 4; ++ray)
 	{
 		for (int which = 0; which < 3; ++which)
@@ -1124,6 +1124,7 @@ void FirstPersonGpu::State::setScene(const Frame &frame)
 	Gl::Uniform1i(location("uSoftShadows"), frame.softShadows ? 1 : 0);
 	Gl::Uniform1i(location("uAllLightShadows"), frame.allLightShadows ? 1 : 0);
 	Gl::Uniform1i(location("uAmbientOcclusion"), frame.ambientOcclusion ? 1 : 0);
+	Gl::Uniform1i(location("uSmoothLight"), frame.smoothLight && frame.palette ? 1 : 0);
 	Gl::Uniform1i(location("uGroundModel"), (Gl::Int)modelId(frame.groundModel));
 	Gl::Uniform1i(location("uWaterModel"), (Gl::Int)modelId(frame.waterModel));
 	Gl::Uniform1f(location("uNight"), colors.night);
@@ -1175,7 +1176,7 @@ bool FirstPersonGpu::State::setTargets(int width, int height, bool results, int 
 	{
 		for (auto &entry : targets)
 		{
-			Gl::DeleteTextures(4, entry.second.textures);
+			Gl::DeleteTextures(5, entry.second.textures);
 			Gl::DeleteFramebuffers(1, &entry.second.framebuffer);
 		}
 		targets.clear();
@@ -1185,16 +1186,16 @@ bool FirstPersonGpu::State::setTargets(int width, int height, bool results, int 
 	{
 		if (sized.framebuffer)
 		{
-			Gl::DeleteTextures(4, sized.textures);
+			Gl::DeleteTextures(5, sized.textures);
 			Gl::DeleteFramebuffers(1, &sized.framebuffer);
 		}
 		Gl::GenFramebuffers(1, &sized.framebuffer);
 		Gl::BindFramebuffer(Gl::FRAMEBUFFER, sized.framebuffer);
-		Gl::GenTextures(4, sized.textures);
-		const Gl::Enum internal[4] = { Gl::R8UI, Gl::R32F, Gl::R8UI, Gl::RGBA32UI }, format[4] = { Gl::RED_INTEGER, Gl::RED, Gl::RED_INTEGER, Gl::RGBA_INTEGER },
-			type[4] = { Gl::UNSIGNED_BYTE, Gl::FLOAT, Gl::UNSIGNED_BYTE, Gl::UNSIGNED_INT };
+		Gl::GenTextures(5, sized.textures);
+		const Gl::Enum internal[5] = { Gl::R8UI, Gl::R32F, Gl::R8UI, Gl::RGBA8, Gl::RGBA32UI }, format[5] = { Gl::RED_INTEGER, Gl::RED, Gl::RED_INTEGER, Gl::RGBA, Gl::RGBA_INTEGER },
+			type[5] = { Gl::UNSIGNED_BYTE, Gl::FLOAT, Gl::UNSIGNED_BYTE, Gl::UNSIGNED_BYTE, Gl::UNSIGNED_INT };
 		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
-		for (int which = 0; which < (results ? 4 : 3); ++which)
+		for (int which = 0; which < (results ? 5 : 4); ++which)
 		{
 			Gl::BindTexture(Gl::TEXTURE_2D, sized.textures[which]);
 			Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)internal[which], width, height, 0, format[which], type[which], nullptr);
@@ -1209,8 +1210,8 @@ bool FirstPersonGpu::State::setTargets(int width, int height, bool results, int 
 		}
 	}
 	Gl::BindFramebuffer(Gl::FRAMEBUFFER, sized.framebuffer);
-	const Gl::Enum drawn[4] = { Gl::COLOR_ATTACHMENT0, Gl::COLOR_ATTACHMENT0 + 1, Gl::COLOR_ATTACHMENT0 + 2, Gl::COLOR_ATTACHMENT0 + 3 };
-	Gl::DrawBuffers(results ? 4 : 3, drawn);
+	const Gl::Enum drawn[5] = { Gl::COLOR_ATTACHMENT0, Gl::COLOR_ATTACHMENT0 + 1, Gl::COLOR_ATTACHMENT0 + 2, Gl::COLOR_ATTACHMENT0 + 3, Gl::COLOR_ATTACHMENT0 + 4 };
+	Gl::DrawBuffers(results ? 5 : 4, drawn);
 	return true;
 }
 
@@ -1290,6 +1291,7 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	// The rays: one a pixel through its middle; or (setting "Supersampling") two or four, each set drawn into
 	// pictures of its own, and the frame's picture made of them (see ResolveSource). The check against the
 	// CPU's rays is of one ray a pixel.
+	if (frame.palette) sendBlend(frame); // (the palette: for the full-colour picture and for several rays a pixel)
 	Gl::Viewport(0, 0, blockColumns, blockRows);
 	const int samples = resolveProgram && frame.palette && !output.results ? (frame.samples >= 4 ? 4 : frame.samples >= 2 ? 2 : 1) : 1;
 	if (samples == 1)
@@ -1302,7 +1304,6 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 		// Where a pixel's rays go, from its middle: two on a diagonal, or four on a turned square.
 		static const float twoRays[2][2] = { { -0.25f, -0.25f }, { 0.25f, 0.25f } };
 		static const float fourRays[4][2] = { { -0.125f, -0.375f }, { 0.375f, -0.125f }, { -0.375f, 0.125f }, { 0.125f, 0.375f } };
-		sendBlend(frame);
 		for (int ray = 0; ray < samples; ++ray)
 		{
 			if (!setTargets(blockColumns, blockRows, false, 1 + ray))
@@ -1320,10 +1321,10 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 		for (int ray = 0; ray < samples; ++ray)
 		{
 			const Targets &drawn = targets[{ blockColumns, blockRows, 1 + ray }];
-			for (int which = 0; which < 3; ++which)
+			for (int which = 0; which < 3; ++which) // (colour, depth, and the full colour with the glow in it)
 			{
 				Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 1 + ray * 3 + which);
-				Gl::BindTexture(Gl::TEXTURE_2D, drawn.textures[which]);
+				Gl::BindTexture(Gl::TEXTURE_2D, drawn.textures[which == 2 ? 3 : which]);
 			}
 		}
 		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
@@ -1356,8 +1357,14 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	Gl::ReadPixels(0, 0, blockColumns, blockRows, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, blocks ? blockGlow.data() : output.glow);
 	if (output.results)
 	{
-		Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0 + 3);
+		Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0 + 4);
 		Gl::ReadPixels(0, 0, blockColumns, blockRows, Gl::RGBA_INTEGER, Gl::UNSIGNED_INT, output.results);
+	}
+	if (output.trueColor && !blocks)
+	{
+		// The full-colour picture (blue, green, red, the glow: a 0xGGRRGGBB number a pixel as this machine reads it).
+		Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0 + 3);
+		Gl::ReadPixels(0, 0, blockColumns, blockRows, Gl::BGRA, Gl::UNSIGNED_INT_8_8_8_8_REV, output.trueColor);
 	}
 	if (blocks)
 	{

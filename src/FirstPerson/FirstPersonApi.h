@@ -115,7 +115,7 @@ bool canPresentAtDisplaySize();
 /// The value to fill the game's screen with where a view the display's size is to show through (see presentView).
 Uint32 presentKey(SDL_Surface *screen);
 /// Asks for a view (8-bit, the size of the display's picture area) to be laid into the display at this frame's flip, where the screen still holds presentKey.
-void presentView(const Surface *view);
+void presentView(const Surface *view, const Uint32 *fullColors = nullptr);
 /// Screen::flip's hook: lays the view asked for into the display.
 void presentAtFlip(SDL_Surface *display, int x, int y, int width, int height);
 /// Zoom::flipWithZoom's hook, with the engine's OpenGL output: draws the view asked for over the window.

@@ -89,6 +89,7 @@ public:
 		int samples;                              // rays a pixel, blended: 1, 2 or 4 (setting "Supersampling")
 		bool softShadows, allLightShadows, ambientOcclusion; // settings "Soft sun shadows", "Shadows from every light", "Ambient occlusion"
 		const SDL_Color *palette;                 // the view's palette: what the samples' colours blend to (null: no blending)
+		bool smoothLight;                         // setting "Smooth light": the full-colour picture blends where the palette's dithers
 		float lamps[16][4];                       // the lamps nearby: position, strength
 		int lampCount;
 		int flashlight;                           // 0 off, 1 the shoulder flashlight, 2 the dynamic one
@@ -127,6 +128,7 @@ public:
 		float *depth;        // how far along the view axis, width x height
 		Uint8 *glow;         // 1 where the pixel shines, 3 a UFO's light; width x height
 		RayResult *results;  // what each ray met (a ray each, not a pixel), for the check against the CPU's; null: not asked
+		Uint32 *trueColor;   // the picture in full colour, a pixel each (0x00RRGGBB), width x height, rows from the top; null: not asked (setting "True colour")
 		bool perRay;         // the buffers hold a ray each (the blocks' columns x rows), not a pixel each: nothing is spread over blocks
 	};
 	/// Where a frame's time went, in milliseconds.

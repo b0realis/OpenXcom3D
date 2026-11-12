@@ -333,6 +333,7 @@ private:
 	int _targetWidth = 0, _targetHeight = 0;   // what the canvas is magnified onto: the game's screen, or the display's picture area (see canvasTarget)
 	bool _canvasOnDisplay = false;             // onto the display: 3D shows at the display's size, and the HUD at a scale of its own there
 	Surface *_canvas = nullptr;                // our overlays are drawn here, then magnified (none at scale 1 on the game's screen)
+	std::vector<Uint32> _truePicture;          // ... and its pixels in full colour (0xFFRRGGBB; 0: the palette's), setting "True colour"
 	Surface *_composed = nullptr;              // with the canvas on the display: the view with the overlays over it, the picture laid into the display
 	SDL_Color _canvasPalette[256];             // the palette the canvas was given
 	std::vector<Uint8> _magnifyRow;            // a canvas row widened for the screen

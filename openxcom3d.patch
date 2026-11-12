@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..da1007288
+index 000000000..85226401a
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,543 @@
+@@ -0,0 +1,547 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -272,6 +272,10 @@ index 000000000..da1007288
 +  STR_FPS_ALL_LIGHT_SHADOWS_DESC: "Renderer GPU only, with Shadows on. Every lamp and flare in reach throws shadows, not only the strongest."
 +  STR_FPS_AMBIENT_OCCLUSION: "Ambient occlusion"
 +  STR_FPS_AMBIENT_OCCLUSION_DESC: "Renderer GPU only. Corners, the foot of walls and the gaps between things are darker: the world gets depth."
++  STR_FPS_TRUE_COLOR: "True colour"
++  STR_FPS_TRUE_COLOR_DESC: "Renderer GPU, 3D resolution Display, and OpenGL output or a 32-bit scaler. The 3D world past the palette's 256 colours."
++  STR_FPS_SMOOTH_LIGHT: "Smooth light"
++  STR_FPS_SMOOTH_LIGHT_DESC: "With True colour. Light, shadows and haze blend smoothly where the palette's picture has a dot pattern."
 +  STR_FPS_VIEW_RESOLUTION: "3D resolution"
 +  STR_FPS_VIEW_RESOLUTION_DESC: "The 3D world as fine as its HUD, as the battlescape, or as the display itself, whatever the battlescape's scale."
 +  STR_FPS_VIEW_RESOLUTION_HUD: "HUD"
@@ -673,10 +677,10 @@ index 000000000..da1007288
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..9c36a0c4e
+index 000000000..9aabbc33b
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,543 @@
+@@ -0,0 +1,547 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -821,6 +825,10 @@ index 000000000..9c36a0c4e
 +  STR_FPS_ALL_LIGHT_SHADOWS_DESC: "Renderer GPU only, with Shadows on. Every lamp and flare in reach throws shadows, not only the strongest."
 +  STR_FPS_AMBIENT_OCCLUSION: "Ambient occlusion"
 +  STR_FPS_AMBIENT_OCCLUSION_DESC: "Renderer GPU only. Corners, the foot of walls and the gaps between things are darker: the world gets depth."
++  STR_FPS_TRUE_COLOR: "True colour"
++  STR_FPS_TRUE_COLOR_DESC: "Renderer GPU, 3D resolution Display, and OpenGL output or a 32-bit scaler. The 3D world past the palette's 256 colours."
++  STR_FPS_SMOOTH_LIGHT: "Smooth light"
++  STR_FPS_SMOOTH_LIGHT_DESC: "With True colour. Light, shadows and haze blend smoothly where the palette's picture has a dot pattern."
 +  STR_FPS_VIEW_RESOLUTION: "3D resolution"
 +  STR_FPS_VIEW_RESOLUTION_DESC: "The 3D world as fine as its HUD, as the battlescape, or as the display itself, whatever the battlescape's scale."
 +  STR_FPS_VIEW_RESOLUTION_HUD: "HUD"
@@ -22077,7 +22085,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..e1f4d8d69 100644
+index a08796ced..5a6bb70da 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -22094,7 +22102,7 @@ index a08796ced..e1f4d8d69 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers;
++OPT bool fpsTrueColor, fpsSmoothLight, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers;
 +OPT int fpsRenderer, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
@@ -23118,10 +23126,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..0375811c4
+index 000000000..ce57b0b1e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1445 @@
+@@ -0,0 +1,1449 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -23993,6 +24001,10 @@ index 000000000..0375811c4
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsSoftShadows", &fpsSoftShadows, false, "STR_FPS_SOFT_SHADOWS", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsAllLightShadows", &fpsAllLightShadows, false, "STR_FPS_ALL_LIGHT_SHADOWS", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsAmbientOcclusion", &fpsAmbientOcclusion, false, "STR_FPS_AMBIENT_OCCLUSION", category));
++	// The 3D world in full colour, past the palette (the graphics card, 3D resolution Display, a 32-bit display), and the
++	// light on it blended where the palette's picture dithers. Off by default.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsTrueColor", &fpsTrueColor, false, "STR_FPS_TRUE_COLOR", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmoothLight", &fpsSmoothLight, false, "STR_FPS_SMOOTH_LIGHT", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 0, "STR_FPS_PIXEL_SIZE", category));
 +	// The crosshair: shown or not, the shot info under it, aiming at the exact point under it
 +	// (YES) or at the tile, as the original game does (NO), and the units' hitboxes.
@@ -24569,7 +24581,7 @@ index 000000000..0375811c4
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..b333b425d
+index 000000000..ad3a07b65
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
 @@ -0,0 +1,475 @@
@@ -24690,7 +24702,7 @@ index 000000000..b333b425d
 +/// The value to fill the game's screen with where a view the display's size is to show through (see presentView).
 +Uint32 presentKey(SDL_Surface *screen);
 +/// Asks for a view (8-bit, the size of the display's picture area) to be laid into the display at this frame's flip, where the screen still holds presentKey.
-+void presentView(const Surface *view);
++void presentView(const Surface *view, const Uint32 *fullColors = nullptr);
 +/// Screen::flip's hook: lays the view asked for into the display.
 +void presentAtFlip(SDL_Surface *display, int x, int y, int width, int height);
 +/// Zoom::flipWithZoom's hook, with the engine's OpenGL output: draws the view asked for over the window.
@@ -26154,10 +26166,10 @@ index 000000000..989a6a6fa
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..d04d8002f
+index 000000000..af1010c5b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,1489 @@
+@@ -0,0 +1,1496 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -26717,7 +26729,7 @@ index 000000000..d04d8002f
 +	struct Targets
 +	{
 +		Gl::UInt framebuffer = 0;
-+		Gl::UInt textures[4] = {}; // colour, depth, glow, results
++		Gl::UInt textures[5] = {}; // colour, depth, glow, full colour, results
 +		bool results = false;
 +	};
 +	std::map<std::array<int, 3>, Targets> targets; // by width, height, and which of a frame's pictures (0 the frame's own, 1.. one for each of several rays a pixel)
@@ -26955,7 +26967,7 @@ index 000000000..d04d8002f
 +	}
 +	Gl::UseProgram(built);
 +	Gl::Uniform1i(Gl::GetUniformLocation(built, "uBlend"), Blend);
-+	const char *const kindNames[3] = { "uColor", "uDepth", "uGlow" };
++	const char *const kindNames[3] = { "uColor", "uDepth", "uTrue" };
 +	for (int ray = 0; ray < 4; ++ray)
 +	{
 +		for (int which = 0; which < 3; ++which)
@@ -27284,6 +27296,7 @@ index 000000000..d04d8002f
 +	Gl::Uniform1i(location("uSoftShadows"), frame.softShadows ? 1 : 0);
 +	Gl::Uniform1i(location("uAllLightShadows"), frame.allLightShadows ? 1 : 0);
 +	Gl::Uniform1i(location("uAmbientOcclusion"), frame.ambientOcclusion ? 1 : 0);
++	Gl::Uniform1i(location("uSmoothLight"), frame.smoothLight && frame.palette ? 1 : 0);
 +	Gl::Uniform1i(location("uGroundModel"), (Gl::Int)modelId(frame.groundModel));
 +	Gl::Uniform1i(location("uWaterModel"), (Gl::Int)modelId(frame.waterModel));
 +	Gl::Uniform1f(location("uNight"), colors.night);
@@ -27335,7 +27348,7 @@ index 000000000..d04d8002f
 +	{
 +		for (auto &entry : targets)
 +		{
-+			Gl::DeleteTextures(4, entry.second.textures);
++			Gl::DeleteTextures(5, entry.second.textures);
 +			Gl::DeleteFramebuffers(1, &entry.second.framebuffer);
 +		}
 +		targets.clear();
@@ -27345,16 +27358,16 @@ index 000000000..d04d8002f
 +	{
 +		if (sized.framebuffer)
 +		{
-+			Gl::DeleteTextures(4, sized.textures);
++			Gl::DeleteTextures(5, sized.textures);
 +			Gl::DeleteFramebuffers(1, &sized.framebuffer);
 +		}
 +		Gl::GenFramebuffers(1, &sized.framebuffer);
 +		Gl::BindFramebuffer(Gl::FRAMEBUFFER, sized.framebuffer);
-+		Gl::GenTextures(4, sized.textures);
-+		const Gl::Enum internal[4] = { Gl::R8UI, Gl::R32F, Gl::R8UI, Gl::RGBA32UI }, format[4] = { Gl::RED_INTEGER, Gl::RED, Gl::RED_INTEGER, Gl::RGBA_INTEGER },
-+			type[4] = { Gl::UNSIGNED_BYTE, Gl::FLOAT, Gl::UNSIGNED_BYTE, Gl::UNSIGNED_INT };
++		Gl::GenTextures(5, sized.textures);
++		const Gl::Enum internal[5] = { Gl::R8UI, Gl::R32F, Gl::R8UI, Gl::RGBA8, Gl::RGBA32UI }, format[5] = { Gl::RED_INTEGER, Gl::RED, Gl::RED_INTEGER, Gl::RGBA, Gl::RGBA_INTEGER },
++			type[5] = { Gl::UNSIGNED_BYTE, Gl::FLOAT, Gl::UNSIGNED_BYTE, Gl::UNSIGNED_BYTE, Gl::UNSIGNED_INT };
 +		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
-+		for (int which = 0; which < (results ? 4 : 3); ++which)
++		for (int which = 0; which < (results ? 5 : 4); ++which)
 +		{
 +			Gl::BindTexture(Gl::TEXTURE_2D, sized.textures[which]);
 +			Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)internal[which], width, height, 0, format[which], type[which], nullptr);
@@ -27369,8 +27382,8 @@ index 000000000..d04d8002f
 +		}
 +	}
 +	Gl::BindFramebuffer(Gl::FRAMEBUFFER, sized.framebuffer);
-+	const Gl::Enum drawn[4] = { Gl::COLOR_ATTACHMENT0, Gl::COLOR_ATTACHMENT0 + 1, Gl::COLOR_ATTACHMENT0 + 2, Gl::COLOR_ATTACHMENT0 + 3 };
-+	Gl::DrawBuffers(results ? 4 : 3, drawn);
++	const Gl::Enum drawn[5] = { Gl::COLOR_ATTACHMENT0, Gl::COLOR_ATTACHMENT0 + 1, Gl::COLOR_ATTACHMENT0 + 2, Gl::COLOR_ATTACHMENT0 + 3, Gl::COLOR_ATTACHMENT0 + 4 };
++	Gl::DrawBuffers(results ? 5 : 4, drawn);
 +	return true;
 +}
 +
@@ -27450,6 +27463,7 @@ index 000000000..d04d8002f
 +	// The rays: one a pixel through its middle; or (setting "Supersampling") two or four, each set drawn into
 +	// pictures of its own, and the frame's picture made of them (see ResolveSource). The check against the
 +	// CPU's rays is of one ray a pixel.
++	if (frame.palette) sendBlend(frame); // (the palette: for the full-colour picture and for several rays a pixel)
 +	Gl::Viewport(0, 0, blockColumns, blockRows);
 +	const int samples = resolveProgram && frame.palette && !output.results ? (frame.samples >= 4 ? 4 : frame.samples >= 2 ? 2 : 1) : 1;
 +	if (samples == 1)
@@ -27462,7 +27476,6 @@ index 000000000..d04d8002f
 +		// Where a pixel's rays go, from its middle: two on a diagonal, or four on a turned square.
 +		static const float twoRays[2][2] = { { -0.25f, -0.25f }, { 0.25f, 0.25f } };
 +		static const float fourRays[4][2] = { { -0.125f, -0.375f }, { 0.375f, -0.125f }, { -0.375f, 0.125f }, { 0.125f, 0.375f } };
-+		sendBlend(frame);
 +		for (int ray = 0; ray < samples; ++ray)
 +		{
 +			if (!setTargets(blockColumns, blockRows, false, 1 + ray))
@@ -27480,10 +27493,10 @@ index 000000000..d04d8002f
 +		for (int ray = 0; ray < samples; ++ray)
 +		{
 +			const Targets &drawn = targets[{ blockColumns, blockRows, 1 + ray }];
-+			for (int which = 0; which < 3; ++which)
++			for (int which = 0; which < 3; ++which) // (colour, depth, and the full colour with the glow in it)
 +			{
 +				Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 1 + ray * 3 + which);
-+				Gl::BindTexture(Gl::TEXTURE_2D, drawn.textures[which]);
++				Gl::BindTexture(Gl::TEXTURE_2D, drawn.textures[which == 2 ? 3 : which]);
 +			}
 +		}
 +		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
@@ -27516,8 +27529,14 @@ index 000000000..d04d8002f
 +	Gl::ReadPixels(0, 0, blockColumns, blockRows, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, blocks ? blockGlow.data() : output.glow);
 +	if (output.results)
 +	{
-+		Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0 + 3);
++		Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0 + 4);
 +		Gl::ReadPixels(0, 0, blockColumns, blockRows, Gl::RGBA_INTEGER, Gl::UNSIGNED_INT, output.results);
++	}
++	if (output.trueColor && !blocks)
++	{
++		// The full-colour picture (blue, green, red, the glow: a 0xGGRRGGBB number a pixel as this machine reads it).
++		Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0 + 3);
++		Gl::ReadPixels(0, 0, blockColumns, blockRows, Gl::BGRA, Gl::UNSIGNED_INT_8_8_8_8_REV, output.trueColor);
 +	}
 +	if (blocks)
 +	{
@@ -27649,10 +27668,10 @@ index 000000000..d04d8002f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.h b/src/FirstPerson/FirstPersonGpu.h
 new file mode 100644
-index 000000000..9df92c463
+index 000000000..767cc6f2d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.h
-@@ -0,0 +1,158 @@
+@@ -0,0 +1,160 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -27744,6 +27763,7 @@ index 000000000..9df92c463
 +		int samples;                              // rays a pixel, blended: 1, 2 or 4 (setting "Supersampling")
 +		bool softShadows, allLightShadows, ambientOcclusion; // settings "Soft sun shadows", "Shadows from every light", "Ambient occlusion"
 +		const SDL_Color *palette;                 // the view's palette: what the samples' colours blend to (null: no blending)
++		bool smoothLight;                         // setting "Smooth light": the full-colour picture blends where the palette's dithers
 +		float lamps[16][4];                       // the lamps nearby: position, strength
 +		int lampCount;
 +		int flashlight;                           // 0 off, 1 the shoulder flashlight, 2 the dynamic one
@@ -27782,6 +27802,7 @@ index 000000000..9df92c463
 +		float *depth;        // how far along the view axis, width x height
 +		Uint8 *glow;         // 1 where the pixel shines, 3 a UFO's light; width x height
 +		RayResult *results;  // what each ray met (a ray each, not a pixel), for the check against the CPU's; null: not asked
++		Uint32 *trueColor;   // the picture in full colour, a pixel each (0x00RRGGBB), width x height, rows from the top; null: not asked (setting "True colour")
 +		bool perRay;         // the buffers hold a ray each (the blocks' columns x rows), not a pixel each: nothing is spread over blocks
 +	};
 +	/// Where a frame's time went, in milliseconds.
@@ -27813,7 +27834,7 @@ index 000000000..9df92c463
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuGl.h b/src/FirstPerson/FirstPersonGpuGl.h
 new file mode 100644
-index 000000000..d8167ed8d
+index 000000000..b9c81b44f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuGl.h
 @@ -0,0 +1,174 @@
@@ -27873,7 +27894,7 @@ index 000000000..d8167ed8d
 +const Enum TEXTURE_MIN_FILTER = 0x2801, TEXTURE_MAG_FILTER = 0x2800, NEAREST = 0x2600;
 +const Enum TEXTURE_WRAP_S = 0x2802, TEXTURE_WRAP_T = 0x2803, CLAMP_TO_EDGE = 0x812F;
 +const Enum R8UI = 0x8232, R16UI = 0x8234, R32I = 0x8235, R32F = 0x822E, RGBA32UI = 0x8D70, RGBA32F = 0x8814;
-+const Enum RED = 0x1903, RED_INTEGER = 0x8D94, RGBA_INTEGER = 0x8D99, RGBA = 0x1908;
++const Enum RED = 0x1903, RED_INTEGER = 0x8D94, RGBA_INTEGER = 0x8D99, RGBA = 0x1908, RGBA8 = 0x8058, BGRA = 0x80E1, UNSIGNED_INT_8_8_8_8_REV = 0x8367;
 +const Enum UNSIGNED_BYTE = 0x1401, UNSIGNED_SHORT = 0x1403, UNSIGNED_INT = 0x1405, FLOAT = 0x1406;
 +const Enum ARRAY_BUFFER = 0x8892, STREAM_DRAW = 0x88E0, DYNAMIC_DRAW = 0x88E8;
 +const Enum PIXEL_PACK_BUFFER = 0x88EB, STREAM_READ = 0x88E1, READ_ONLY = 0x88B8;
@@ -27993,10 +28014,10 @@ index 000000000..d8167ed8d
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..fdd215ee3
+index 000000000..5bf1f2084
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,1517 @@
+@@ -0,0 +1,1605 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -28058,6 +28079,7 @@ index 000000000..fdd215ee3
 +uniform isamplerBuffer uMirrors;    // the crafts' mirrors: sixteen numbers each, then their rows (see FirstPersonGpu.cpp, encodeMirrors)
 +uniform usamplerBuffer uTables;     // rows of 256 bytes: the haze steps, the tints, the scene's colours (see FirstPersonGpu.cpp, encodeTables)
 +uniform samplerBuffer uWaveSine;    // the waves' sine table
++uniform usamplerBuffer uBlend;      // the palette (768 bytes: red, green, blue of each colour), then the palette colour nearest each colour of a 32 x 32 x 32 cube
 +
 +uniform ivec3 uSize;         // the map in tiles
 +uniform float uMaxDistance;  // how far rays go, in voxels
@@ -28074,8 +28096,9 @@ index 000000000..fdd215ee3
 +layout(location = 0) out uint outColor;   // the palette colour
 +layout(location = 1) out float outDepth;  // along the view axis
 +layout(location = 2) out uint outGlow;    // 1 where the pixel shines, 3 a UFO's light (for the bloom)
++layout(location = 3) out vec4 outTrue;    // the pixel in full colour (setting "True colour"): red, green, blue; and the glow again (as outGlow / 255)
 +#ifdef RESULTS
-+layout(location = 3) out uvec4 outResult; // FirstPersonGpu::RayResult (the check against the CPU's rays only)
++layout(location = 4) out uvec4 outResult; // FirstPersonGpu::RayResult (the check against the CPU's rays only)
 +#endif
 +
 +const float Infinity = uintBitsToFloat(0x7F800000u);
@@ -28412,6 +28435,11 @@ index 000000000..fdd215ee3
 +uniform int uUfoLightsOn, uWallPaint;
 +// The finer picture, on the card only (settings, all off by default: with them off the picture is the CPU's).
 +uniform int uSoftShadows, uAllLightShadows, uAmbientOcclusion;
++uniform int uSmoothLight; // setting "Smooth light": the full-colour picture blends between the palette's shades (and into the haze) where the palette's picture dithers
++// The pixel in full colour, where the shading worked one out that the palette hasn't (see shadeHit); else it is the palette colour's own.
++vec3 fullColor;
++bool fullColorSet;
++vec3 paletteRgb(uint color) { int entry = int(color) * 3; return vec3(float(texelFetch(uBlend, entry).r), float(texelFetch(uBlend, entry + 1).r), float(texelFetch(uBlend, entry + 2).r)); }
 +const float SunDiscRadius = 0.04;  // the sun as a disc this wide (the tangent of its half-angle): the width of a shadow's soft edge, a 25th of the way it fell
 +const float CreaseShades = 4.5;    // how many palette shades the deepest corner is darkened
 +const float CreaseFadeFrom = 260.0, CreaseFadeTo = 420.0; // corners aren't darkened beyond this far (voxels): too fine to see, and they would shimmer
@@ -28827,9 +28855,24 @@ index 000000000..fdd215ee3
 +		float drift = uCloudTime * (uSky == SkyVoid ? 0.01 : 0.05);
 +		float deck = cloudNoise(rayDirection.x * layerDistance * 0.9 + drift, rayDirection.y * layerDistance * 0.9 + drift * 0.4);
 +		float mottle = (deck - 0.5) * 2.0 * CloudDeckMottle * smoothStep(0.0, 0.3, elevation);
++		if (uSmoothLight != 0)
++		{
++			float band = clamp(gradient + mottle, 0.0, 31.0);
++			fullColor = mix(paletteRgb(scene(SceneSky + int(band))), paletteRgb(scene(SceneSky + min(31, int(band) + 1))), band - floor(band));
++			fullColorSet = true;
++		}
 +		return scene(SceneSky + clamp(int(gradient + mottle + dither(pixelX, pixelY)), 0, 31));
 +	}
 +	uint color = scene(SceneSky + clamp(int(gradient + dither(pixelX, pixelY)), 0, 31));
++	// (In full colour, setting "Smooth light": the sky's bands and the clouds' edges blended; the sun, the moon and the stars as they are.)
++	vec3 skyRgb = vec3(0.0);
++	if (uSmoothLight != 0)
++	{
++		float band = clamp(gradient, 0.0, 31.0);
++		skyRgb = mix(paletteRgb(scene(SceneSky + int(band))), paletteRgb(scene(SceneSky + min(31, int(band) + 1))), band - floor(band));
++		fullColor = skyRgb;
++		fullColorSet = true;
++	}
 +	if (uUnderwater != 0)
 +	{
 +		return color;
@@ -28838,6 +28881,7 @@ index 000000000..fdd215ee3
 +	float sunDot = dot(rayDirection, uSunDir);
 +	if (daylight > 0.4 && sunDot > (uSky == SkyMars ? 0.9998 : 0.9995))
 +	{
++		fullColorSet = false;
 +		return scene(SceneSun);
 +	}
 +	if (uNight > 0.4 && uSky != SkyMars)
@@ -28845,6 +28889,7 @@ index 000000000..fdd215ee3
 +		float moonDot = dot(rayDirection, uMoonDir);
 +		if (moonDot > 0.9992)
 +		{
++			fullColorSet = false;
 +			return scene(SceneMoon);
 +		}
 +	}
@@ -28855,6 +28900,12 @@ index 000000000..fdd215ee3
 +		float cloudV = rayDirection.y * layerDistance * 1.6;
 +		float density = cloudNoise(cloudU, cloudV);
 +		float coverage = smoothStep(0.52, 0.72, density) * smoothStep(0.02, 0.2, elevation);
++		if (uSmoothLight != 0 && coverage > 0.0)
++		{
++			float level = clamp((0.8 - density) * 10.0, 0.0, 7.0);
++			vec3 cloudRgb = mix(paletteRgb(scene(SceneCloud + int(level))), paletteRgb(scene(SceneCloud + min(7, int(level) + 1))), level - floor(level));
++			fullColor = mix(skyRgb, cloudRgb, coverage);
++		}
 +		if (coverage > dither(pixelX + 1, pixelY + 3))
 +		{
 +			float darkness = clamp((0.8 - density) * 10.0, 0.0, 7.0);
@@ -28867,6 +28918,7 @@ index 000000000..fdd215ee3
 +		uint cellHash = hash2(int(floor(azimuth * 160.0)), int(floor(elevationAngle * 160.0)));
 +		if ((cellHash % 1000u) < 6u)
 +		{
++			fullColorSet = false;
 +			return scene(SceneStar);
 +		}
 +	}
@@ -28943,9 +28995,20 @@ index 000000000..fdd215ee3
 +			int shades = int(float(uAmbient) + uFaceShade[4] + waveShade + distanceShade(groundDistance) + dither(pixelX, pixelY));
 +			float blackShare = clamp((float(uAmbient) - DarkOverflowFrom) / (DarkOverflowTo - DarkOverflowFrom), 0.0, 1.0);
 +			int darkest = groundIsWater ? max(int(color & 15u), WaterDarkestShade) : 15;
++			uint unlit = color;
 +			color = blackShare > dither(pixelX + 1, pixelY + 2) ? shadeColor(color, shades) : ((color & 0xF0u) | uint(min(darkest, int(color & 15u) + max(0, shades))));
 +			float haze = uUnderwater != 0 ? smoothStep(uMaxDistance * 0.12, uMaxDistance * 0.65, groundDistance)
 +				: smoothStep(uMaxDistance * hazeStart() * 0.67, uMaxDistance * 1.6, groundDistance);
++			if (uSmoothLight != 0)
++			{
++				// (In full colour: the shade's fraction, the black of a dark place and the haze blended, as shadeHit does.)
++				float exact = max(0.0, float(uAmbient) + uFaceShade[4] + waveShade + distanceShade(groundDistance));
++				int low = int(exact);
++				vec3 rgb = mix(paletteRgb((unlit & 0xF0u) | uint(min(darkest, int(unlit & 15u) + low))), paletteRgb((unlit & 0xF0u) | uint(min(darkest, int(unlit & 15u) + low + 1))), exact - float(low));
++				if (blackShare > 0.0) rgb = mix(rgb, mix(paletteRgb(shadeColor(unlit, low)), paletteRgb(shadeColor(unlit, low + 1)), exact - float(low)), blackShare);
++				fullColor = mix(rgb, paletteRgb(scene(SceneHaze)), haze);
++				fullColorSet = true;
++			}
 +			return hazeColor(color, haze, pixelX + 2, pixelY + 1);
 +		}
 +	}
@@ -29116,18 +29179,25 @@ index 000000000..fdd215ee3
 +/**
 + * How closed in a point on a face is, 0 (open) to 1: the share of sixteen places round it, out
 + * from the face and to its sides, a ring near and a ring further, that hold a voxel. The foot
-+ * of a wall, an inner corner, the gap between two crates.
++ * of a wall, an inner corner, the gap between two crates. Each place counts the four voxels
++ * round it in the face's plane by how near it is to each, so the darkening has no steps where
++ * a place passes from one voxel to the next.
 + */
 +float crease(vec3 point, vec3 normal)
 +{
-+	vec3 sideA = normal.yzx, sideB = normal.zxy; // (the normal lies along an axis: these are the other two)
++	vec3 sideA = abs(normal.yzx), sideB = abs(normal.zxy); // (the normal lies along an axis: these are the other two)
 +	float closed = 0.0;
 +	for (int place = 0; place < 16; ++place)
 +	{
 +		bool far = place >= 8;
 +		float angle = float(place & 7) * 0.7853982 + (far ? 0.3926991 : 0.0);
-+		vec3 at = point + normal * (far ? 3.0 : 1.0) + (cos(angle) * sideA + sin(angle) * sideB) * (far ? 4.5 : 1.6);
-+		if (voxelColorAt(ivec3(floor(at)), false, -1) != 0u) closed += far ? 0.045 : 0.08;
++		vec3 at = point + normal * (far ? 3.0 : 1.0) + (cos(angle) * sideA + sin(angle) * sideB) * (far ? 4.5 : 1.6) - 0.5 * (sideA + sideB);
++		vec3 cell = floor(at);
++		float alongA = dot(at - cell, sideA), alongB = dot(at - cell, sideB);
++		ivec3 corner = ivec3(cell), stepA = ivec3(sideA), stepB = ivec3(sideB);
++		float held = mix(mix(voxelColorAt(corner, false, -1) != 0u ? 1.0 : 0.0, voxelColorAt(corner + stepA, false, -1) != 0u ? 1.0 : 0.0, alongA),
++			mix(voxelColorAt(corner + stepB, false, -1) != 0u ? 1.0 : 0.0, voxelColorAt(corner + stepA + stepB, false, -1) != 0u ? 1.0 : 0.0, alongA), alongB);
++		closed += held * (far ? 0.045 : 0.08);
 +	}
 +	return closed;
 +}
@@ -29367,6 +29437,36 @@ index 000000000..fdd215ee3
 +	{
 +		color = table(UnseenRow, color);
 +	}
++	if (uSmoothLight != 0)
++	{
++		// (Setting "Smooth light", for the full-colour picture: where the palette's picture dithers between two shades,
++		// the mix of the two by the shade's fraction; likewise into black where the place is dark, into the flare's red,
++		// and into the haze. A UFO's tint and unseen terrain keep the palette's colour; only their haze is smooth.)
++		vec3 rgb = paletteRgb(color);
++		if (!unseen && ufoLighting < 0)
++		{
++			float exact = max(0.0, shade);
++			int low = int(exact);
++			float share = exact - float(low);
++			int cap = rockCeilingMiddle >= 0 ? max(0, 15 - RockMottleShades - rockCeilingMiddle) : 99;
++			uint lowLit = (baseColor & 0xF0u) | uint(min(darkest, int(baseColor & 15u) + min(low, cap)));
++			uint highLit = (baseColor & 0xF0u) | uint(min(darkest, int(baseColor & 15u) + min(low + 1, cap)));
++			rgb = mix(paletteRgb(lowLit), paletteRgb(highLit), share);
++			if (!onSteadyUfo && blackShare > 0.0)
++			{
++				rgb = mix(rgb, mix(paletteRgb(shadeColor(baseColor, low)), paletteRgb(shadeColor(baseColor, low + 1)), share), blackShare);
++			}
++			float red = clamp(flare * 1.5 - 0.04, 0.0, 1.0);
++			if (red > 0.0)
++			{
++				rgb = mix(rgb, mix(paletteRgb(table(FlareRow, lowLit)), paletteRgb(table(FlareRow, highLit)), share), red);
++			}
++		}
++		float haze = terrainHaze(hit.t);
++		if (haze > 0.0) rgb = mix(rgb, paletteRgb(scene(SceneHaze)), haze);
++		fullColor = rgb;
++		fullColorSet = true;
++	}
 +	return hazeColor(color, terrainHaze(hit.t), pixelX + 2, pixelY + 1);
 +}
 +
@@ -29375,8 +29475,9 @@ index 000000000..fdd215ee3
 + * @param offset Where in the block it goes, from the block's middle, in blocks (0, 0: the middle, the CPU's ray).
 + * @param first The block's first ray: the one whose findings go to the check against the CPU's.
 + */
-+void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, out uint rayGlow)
++void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, out uint rayGlow, out vec3 rayFullColor)
 +{
++	fullColorSet = false;
 +	// The block of pixels this ray colours (rows from the top), and its place on the image plane.
 +	int blockColumn = int(gl_FragCoord.x), blockRow = int(gl_FragCoord.y);
 +	int topRow = blockRow * uPixelSize, leftColumn = blockColumn * uPixelSize;
@@ -29442,7 +29543,9 @@ index 000000000..fdd215ee3
 +	if (hit.glass)
 +	{
 +		color = table(GlassRow, color);
++		fullColor = fullColor * 0.7 + vec3(150.0, 180.0, 205.0) * 0.3; // (as the glass table mixes each colour: a little paler and bluer)
 +	}
++	rayFullColor = fullColorSet ? fullColor : paletteRgb(color);
 +	rayColor = color;
 +	rayDepth = distanceAlongRay / directionLength;
 +	// Whether it shines (a UFO's light counts three times in the bloom).
@@ -29452,7 +29555,9 @@ index 000000000..fdd215ee3
 +
 +void main()
 +{
-+	shadeRay(uRayOffset, true, outColor, outDepth, outGlow);
++	vec3 rayFullColor;
++	shadeRay(uRayOffset, true, outColor, outDepth, outGlow, rayFullColor);
++	outTrue = vec4(rayFullColor / 255.0, float(outGlow) / 255.0);
 +}
 +)";
 +
@@ -29470,33 +29575,36 @@ index 000000000..fdd215ee3
 +const char *const ResolveSource = R"(#version 330 core
 +uniform usampler2D uColor0, uColor1, uColor2, uColor3;
 +uniform sampler2D uDepth0, uDepth1, uDepth2, uDepth3;
-+uniform usampler2D uGlow0, uGlow1, uGlow2, uGlow3;
++uniform sampler2D uTrue0, uTrue1, uTrue2, uTrue3; // each ray in full colour, the glow with it (see outTrue)
 +uniform usamplerBuffer uBlend;
 +uniform int uSamples;
 +layout(location = 0) out uint outColor;
 +layout(location = 1) out float outDepth;
 +layout(location = 2) out uint outGlow;
++layout(location = 3) out vec4 outTrue;
 +
 +void main()
 +{
 +	ivec2 at = ivec2(gl_FragCoord.xy);
 +	uint colors[4] = uint[4](texelFetch(uColor0, at, 0).r, texelFetch(uColor1, at, 0).r, 0u, 0u);
 +	float depths[4] = float[4](texelFetch(uDepth0, at, 0).r, texelFetch(uDepth1, at, 0).r, 0.0, 0.0);
-+	uint glows[4] = uint[4](texelFetch(uGlow0, at, 0).r, texelFetch(uGlow1, at, 0).r, 0u, 0u);
++	vec4 full[4] = vec4[4](texelFetch(uTrue0, at, 0), texelFetch(uTrue1, at, 0), vec4(0.0), vec4(0.0));
 +	if (uSamples > 2)
 +	{
-+		colors[2] = texelFetch(uColor2, at, 0).r; depths[2] = texelFetch(uDepth2, at, 0).r; glows[2] = texelFetch(uGlow2, at, 0).r;
-+		colors[3] = texelFetch(uColor3, at, 0).r; depths[3] = texelFetch(uDepth3, at, 0).r; glows[3] = texelFetch(uGlow3, at, 0).r;
++		colors[2] = texelFetch(uColor2, at, 0).r; depths[2] = texelFetch(uDepth2, at, 0).r; full[2] = texelFetch(uTrue2, at, 0);
++		colors[3] = texelFetch(uColor3, at, 0).r; depths[3] = texelFetch(uDepth3, at, 0).r; full[3] = texelFetch(uTrue3, at, 0);
 +	}
++	uint glows[4] = uint[4](uint(full[0].a * 255.0 + 0.5), uint(full[1].a * 255.0 + 0.5), uint(full[2].a * 255.0 + 0.5), uint(full[3].a * 255.0 + 0.5));
 +	uint color = colors[0], glow = glows[0];
 +	float depth = depths[0];
-+	vec3 mixed = vec3(0.0);
++	vec3 mixed = vec3(0.0), fullMixed = vec3(0.0);
 +	bool allSame = true;
 +	for (int ray = 0; ray < uSamples; ++ray)
 +	{
 +		if (colors[ray] != color) allSame = false;
 +		int entry = int(colors[ray]) * 3;
 +		mixed += vec3(float(texelFetch(uBlend, entry).r), float(texelFetch(uBlend, entry + 1).r), float(texelFetch(uBlend, entry + 2).r));
++		fullMixed += full[ray].rgb;
 +		depth = min(depth, depths[ray]);
 +		glow = max(glow, glows[ray]);
 +	}
@@ -29508,6 +29616,7 @@ index 000000000..fdd215ee3
 +	outColor = color;
 +	outDepth = depth;
 +	outGlow = glow;
++	outTrue = vec4(fullMixed / float(uSamples), float(glow) / 255.0); // (in full colour: the rays' own mix, no palette between)
 +}
 +)";
 +
@@ -29691,10 +29800,10 @@ index 000000000..6862c4de6
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..1467cfa12
+index 000000000..b99b8b2ae
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,3140 @@
+@@ -0,0 +1,3162 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -30652,7 +30761,9 @@ index 000000000..1467cfa12
 +	}
 +	int x, y, pictureWidth, pictureHeight;
 +	_game->getScreen()->getPictureArea(x, y, pictureWidth, pictureHeight);
-+	if (pictureWidth <= 0 || pictureHeight <= 0 || (pictureWidth == width && pictureHeight == height))
++	// (A picture area the screen's own size needs no laying in, but for the full-colour picture, which the 8-bit screen can't hold.)
++	const bool fullColor = Options::fpsTrueColor && Options::fpsRenderer == 1;
++	if (pictureWidth <= 0 || pictureHeight <= 0 || (pictureWidth == width && pictureHeight == height && !fullColor))
 +	{
 +		return false;
 +	}
@@ -31801,6 +31912,7 @@ index 000000000..1467cfa12
 +	lastThinkTicks = now;
 +	rememberChoices(); // (the fuses burning change all the time)
 +	relayoutIfNeeded(); // (the setting "HUD scale" or "3D resolution" changed, or the display)
++	_view->setWantsTrueColor(Options::fpsTrueColor && Options::fpsRenderer == 1 && _canvasOnDisplay); // (shown only where the mode lays the view into the display)
 +	const double elapsedSeconds = _lastFrameTick ? std::min<Uint32>(100, now - _lastFrameTick) / 1000.0 : 0.0;
 +
 +	// Another screen was on top (popup, next turn, inventory): it had the mouse released.
@@ -32681,7 +32793,26 @@ index 000000000..1467cfa12
 +		}
 +		magnify(picture, _canvas->getSurface(), true);
 +		_composed->setPalette(_state->getPalette());
-+		FirstPerson::presentView(_composed);
++		// In full colour (setting "True colour"): each pixel that still has the palette colour its ray gave it (no unit,
++		// effect or wash over it, no overlay) takes the card's full colour for it; the others stay the palette's.
++		const Uint32 *fullColors = nullptr, *shownInFull = nullptr;
++		const Uint8 *rayColors = nullptr;
++		if (_view->shown() && _view->getWidth() == picture->w && _view->getHeight() == picture->h && _view->trueColor(fullColors, rayColors))
++		{
++			_truePicture.resize((size_t)picture->w * picture->h);
++			for (int row = 0; row < picture->h; ++row)
++			{
++				const Uint8 *made = (const Uint8 *)picture->pixels + (size_t)row * picture->pitch, *rays = rayColors + (size_t)row * picture->w;
++				const Uint32 *full = fullColors + (size_t)row * picture->w;
++				Uint32 *out = &_truePicture[(size_t)row * picture->w];
++				for (int column = 0; column < picture->w; ++column)
++				{
++					out[column] = made[column] == rays[column] ? (full[column] | 0xFF000000u) : 0u;
++				}
++			}
++			shownInFull = _truePicture.data();
++		}
++		FirstPerson::presentView(_composed, shownInFull);
 +	}
 +	return true;
 +}
@@ -32837,10 +32968,10 @@ index 000000000..1467cfa12
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..35798a9e3
+index 000000000..3e693cb21
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1334 @@
+@@ -0,0 +1,1335 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -33176,6 +33307,7 @@ index 000000000..35798a9e3
 +	int _targetWidth = 0, _targetHeight = 0;   // what the canvas is magnified onto: the game's screen, or the display's picture area (see canvasTarget)
 +	bool _canvasOnDisplay = false;             // onto the display: 3D shows at the display's size, and the HUD at a scale of its own there
 +	Surface *_canvas = nullptr;                // our overlays are drawn here, then magnified (none at scale 1 on the game's screen)
++	std::vector<Uint32> _truePicture;          // ... and its pixels in full colour (0xFFRRGGBB; 0: the palette's), setting "True colour"
 +	Surface *_composed = nullptr;              // with the canvas on the display: the view with the overlays over it, the picture laid into the display
 +	SDL_Color _canvasPalette[256];             // the palette the canvas was given
 +	std::vector<Uint8> _magnifyRow;            // a canvas row widened for the screen
@@ -48131,10 +48263,10 @@ index 000000000..228618946
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonPresent.cpp b/src/FirstPerson/FirstPersonPresent.cpp
 new file mode 100644
-index 000000000..9217693b2
+index 000000000..71063f2fd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonPresent.cpp
-@@ -0,0 +1,229 @@
+@@ -0,0 +1,244 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -48197,6 +48329,7 @@ index 000000000..9217693b2
 +namespace
 +{
 +const Surface *viewToPresent = nullptr; // the view asked for this frame
++const Uint32 *fullToPresent = nullptr;  // ... and its pixels in full colour (0xFFRRGGBB a pixel; 0: the palette's colour), or null
 +}
 +
 +bool canPresentAtDisplaySize()
@@ -48209,9 +48342,10 @@ index 000000000..9217693b2
 +	return screen->format->BytesPerPixel == 1 ? 0 : SDL_MapRGB(screen->format, 0, 0, 1);
 +}
 +
-+void presentView(const Surface *view)
++void presentView(const Surface *view, const Uint32 *fullColors)
 +{
 +	viewToPresent = view;
++	fullToPresent = fullColors;
 +}
 +
 +/**
@@ -48223,7 +48357,9 @@ index 000000000..9217693b2
 +void presentAtFlip(SDL_Surface *display, int x, int y, int width, int height)
 +{
 +	const Surface *view = viewToPresent;
++	const Uint32 *fullColors = fullToPresent;
 +	viewToPresent = nullptr;
++	fullToPresent = nullptr;
 +	if (!view || !display || view->getWidth() != width || view->getHeight() != height || x < 0 || y < 0 || x + width > display->w || y + height > display->h)
 +	{
 +		return;
@@ -48260,13 +48396,20 @@ index 000000000..9217693b2
 +		}
 +		const Uint32 colorBits = display->format->Rmask | display->format->Gmask | display->format->Bmask;
 +		const Uint32 key = SDL_MapRGB(display->format, 0, 0, 1) & colorBits;
++		// (The full colours are red, green, blue from the top byte down: most displays' own order; else each is moved to its place.)
++		const SDL_PixelFormat *format = display->format;
++		const bool sameOrder = format->Rshift == 16 && format->Gshift == 8 && format->Bshift == 0;
 +		for (int row = 0; row < height; ++row)
 +		{
 +			Uint32 *shown = (Uint32 *)((Uint8 *)display->pixels + (size_t)(y + row) * display->pitch) + x;
 +			const Uint8 *seen = view->getRaw(0, row);
++			const Uint32 *full = fullColors ? fullColors + (size_t)row * width : nullptr;
 +			for (int column = 0; column < width; ++column)
 +			{
-+				if ((shown[column] & colorBits) == key) shown[column] = colors[seen[column]];
++				if ((shown[column] & colorBits) != key) continue;
++				const Uint32 fullColor = full ? full[column] : 0;
++				shown[column] = !fullColor ? colors[seen[column]] : sameOrder ? (fullColor & 0xFFFFFFu)
++					: ((fullColor >> 16) & 255u) << format->Rshift | ((fullColor >> 8) & 255u) << format->Gshift | (fullColor & 255u) << format->Bshift;
 +			}
 +		}
 +	}
@@ -48287,7 +48430,9 @@ index 000000000..9217693b2
 +{
 +#ifndef __NO_OPENGL
 +	const Surface *view = viewToPresent;
++	const Uint32 *fullColors = fullToPresent;
 +	viewToPresent = nullptr;
++	fullToPresent = nullptr;
 +	if (!view || !screen || screen->format->BytesPerPixel != 4 || view->getWidth() != width || view->getHeight() != height || width <= 0 || height <= 0)
 +	{
 +		return;
@@ -48311,9 +48456,10 @@ index 000000000..9217693b2
 +		const Uint32 *screenRow = (const Uint32 *)((const Uint8 *)screen->pixels + (size_t)((long long)row * screen->h / height) * screen->pitch);
 +		const Uint8 *seen = view->getRaw(0, row);
 +		Uint32 *made = &picture[(size_t)row * width];
++		const Uint32 *full = fullColors ? fullColors + (size_t)row * width : nullptr;
 +		for (int column = 0; column < width; ++column)
 +		{
-+			made[column] = (screenRow[screenColumn[column]] & colorBits) == key ? colors[seen[column]] : 0;
++			made[column] = (screenRow[screenColumn[column]] & colorBits) != key ? 0 : full && full[column] ? full[column] : colors[seen[column]];
 +		}
 +	}
 +
@@ -48358,6 +48504,7 @@ index 000000000..9217693b2
 +#else
 +	(void)screen; (void)x; (void)y; (void)width; (void)height; (void)displayHeight;
 +	viewToPresent = nullptr;
++	fullToPresent = nullptr;
 +#endif
 +}
 +
@@ -51424,10 +51571,10 @@ index 000000000..5894276e4
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..abf700d82
+index 000000000..b75d74c3f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1452 @@
+@@ -0,0 +1,1466 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -51726,6 +51873,17 @@ index 000000000..abf700d82
 +	void drawIfAsked() { if (_redraw) draw(); }
 +	/// Whether the view is shown at all (visible and not hidden), as blit has it.
 +	bool shown() const { return getVisible() && !_hidden; }
++	/// Asks for the world in full colour too (setting "True colour"): the mode, for the view it lays into the display itself.
++	void setWantsTrueColor(bool wanted) { _wantsTrueColor = wanted; }
++	/// This frame's world in full colour, if the graphics card gave it: a 0x..RRGGBB number a pixel, and the palette colour each
++	/// pixel had from its ray; a pixel of the finished picture that still has that colour may be shown in the full one.
++	bool trueColor(const Uint32 *&fullColors, const Uint8 *&rayColors) const
++	{
++		if (!_hasTrueColor) return false;
++		fullColors = _trueColor.data();
++		rayColors = _rayColors.data();
++		return true;
++	}
 +	/// Uses another view's voxel models instead of building its own (a small extra view). Set
 +	/// before the battle, so the models aren't built twice.
 +	void shareCache(FirstPersonView *owner);
@@ -52266,6 +52424,9 @@ index 000000000..abf700d82
 +	void gpuShadowRays(double cpuMilliseconds);
 +	friend struct FirstPersonViewGpuAccess;
 +	bool _gpuLogged = false; // the log has this view's line about the graphics card
++	bool _wantsTrueColor = false, _hasTrueColor = false; // the world in full colour too: asked for, and had for the frame drawn last
++	std::vector<Uint32> _trueColor;                      // ... a pixel each, from the card
++	std::vector<Uint8> _rayColors;                       // ... and the palette colour each pixel had from its ray
 +	/// Opens the graphics card's renderer ahead of its first frame, if the setting asks for it.
 +	static void gpuWarmUp();
 +	/// The graphics card forgets the models it was sent (the view is about to build them anew).
@@ -54538,10 +54699,10 @@ index 000000000..77a3cc4ed
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..4f717b034
+index 000000000..ac48f4cc9
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
-@@ -0,0 +1,477 @@
+@@ -0,0 +1,493 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -54711,6 +54872,7 @@ index 000000000..4f717b034
 +	frame.allLightShadows = Options::fpsAllLightShadows;
 +	frame.ambientOcclusion = Options::fpsAmbientOcclusion;
 +	frame.palette = view.getPalette();
++	frame.smoothLight = Options::fpsSmoothLight && view._wantsTrueColor;
 +	frame.lampCount = (int)std::min<size_t>(16, view._nearbyLights.size());
 +	for (int lamp = 0; lamp < 16; ++lamp)
 +	{
@@ -54822,9 +54984,24 @@ index 000000000..4f717b034
 +	output.glow = _glowMask.data();
 +	output.results = nullptr;
 +	output.perRay = false;
++	// The picture in full colour too, if the mode shows this view that way (setting "True colour"; a ray a pixel).
++	const bool fullColor = _wantsTrueColor && frame.pixelSize == 1;
++	if (fullColor) _trueColor.resize((size_t)getWidth() * getHeight());
++	output.trueColor = fullColor ? _trueColor.data() : nullptr;
 +	if (!gpu->castRays(frame, output, nullptr))
 +	{
 +		return false;
++	}
++	// The rays' palette colours are kept beside it: a pixel that still has its ray's colour when the frame is done
++	// (nothing was drawn over it, no wash went over it) is shown in its full colour (see trueColor).
++	if (fullColor)
++	{
++		_rayColors.resize(_trueColor.size());
++		for (int row = 0; row < getHeight(); ++row)
++		{
++			std::memcpy(&_rayColors[(size_t)row * getWidth()], getRaw(0, row), getWidth());
++		}
++		_hasTrueColor = true;
 +	}
 +	// (a line in the log the first time each view is drawn this way, as the CPU's threads have theirs)
 +	if (!_gpuLogged)
@@ -54868,7 +55045,7 @@ index 000000000..4f717b034
 +
 +	FirstPersonGpu::Timing timing;
 +	const bool check = stats.frames % 30 == 0;
-+	FirstPersonGpu::Output output = { colors.data(), blockColumns, depths.data(), glows.data(), check ? results.data() : nullptr, true };
++	FirstPersonGpu::Output output = { colors.data(), blockColumns, depths.data(), glows.data(), check ? results.data() : nullptr, nullptr, true };
 +	if (!gpu->castRays(frame, output, &timing))
 +	{
 +		return;
@@ -55021,10 +55198,10 @@ index 000000000..4f717b034
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..63fae132f
+index 000000000..fa0ee4ca5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,1991 @@
+@@ -0,0 +1,1992 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -56874,6 +57051,7 @@ index 000000000..63fae132f
 +	// (OPENXCOM3D_RAY_TIME: the log gets the rays' time, averaged over 120 frames of the main view, whoever cast them.)
 +	static const bool rayTime = getenv("OPENXCOM3D_RAY_TIME") != nullptr;
 +	const auto started = std::chrono::steady_clock::now();
++	_hasTrueColor = false; // (set again by the card when it gives the frame's picture in full colour too)
 +	const bool onCard = !gpuShadow && Options::fpsRenderer == 1 && gpuCastAllRays();
 +	if (!onCard)
 +	{
@@ -70901,7 +71079,7 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..85b1bbb2d
+index 000000000..b699871af
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,997 @@
@@ -71129,7 +71307,7 @@ index 000000000..85b1bbb2d
 +			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsMiddleClickIdentify" } },
 +		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 +		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
-+		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion" } },
++		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion", "fpsTrueColor", "fpsSmoothLight" } },
 +	};
 +	std::vector<bool> placed(gathered.size(), false);
 +	for (const auto &section : sections)

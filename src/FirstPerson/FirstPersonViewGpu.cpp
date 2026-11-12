@@ -167,6 +167,7 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 	frame.allLightShadows = Options::fpsAllLightShadows;
 	frame.ambientOcclusion = Options::fpsAmbientOcclusion;
 	frame.palette = view.getPalette();
+	frame.smoothLight = Options::fpsSmoothLight && view._wantsTrueColor;
 	frame.lampCount = (int)std::min<size_t>(16, view._nearbyLights.size());
 	for (int lamp = 0; lamp < 16; ++lamp)
 	{
@@ -278,9 +279,24 @@ bool FirstPersonView::gpuCastAllRays()
 	output.glow = _glowMask.data();
 	output.results = nullptr;
 	output.perRay = false;
+	// The picture in full colour too, if the mode shows this view that way (setting "True colour"; a ray a pixel).
+	const bool fullColor = _wantsTrueColor && frame.pixelSize == 1;
+	if (fullColor) _trueColor.resize((size_t)getWidth() * getHeight());
+	output.trueColor = fullColor ? _trueColor.data() : nullptr;
 	if (!gpu->castRays(frame, output, nullptr))
 	{
 		return false;
+	}
+	// The rays' palette colours are kept beside it: a pixel that still has its ray's colour when the frame is done
+	// (nothing was drawn over it, no wash went over it) is shown in its full colour (see trueColor).
+	if (fullColor)
+	{
+		_rayColors.resize(_trueColor.size());
+		for (int row = 0; row < getHeight(); ++row)
+		{
+			std::memcpy(&_rayColors[(size_t)row * getWidth()], getRaw(0, row), getWidth());
+		}
+		_hasTrueColor = true;
 	}
 	// (a line in the log the first time each view is drawn this way, as the CPU's threads have theirs)
 	if (!_gpuLogged)
@@ -324,7 +340,7 @@ void FirstPersonView::gpuShadowRays(double cpuMilliseconds)
 
 	FirstPersonGpu::Timing timing;
 	const bool check = stats.frames % 30 == 0;
-	FirstPersonGpu::Output output = { colors.data(), blockColumns, depths.data(), glows.data(), check ? results.data() : nullptr, true };
+	FirstPersonGpu::Output output = { colors.data(), blockColumns, depths.data(), glows.data(), check ? results.data() : nullptr, nullptr, true };
 	if (!gpu->castRays(frame, output, &timing))
 	{
 		return;

@@ -296,6 +296,17 @@ public:
 	void drawIfAsked() { if (_redraw) draw(); }
 	/// Whether the view is shown at all (visible and not hidden), as blit has it.
 	bool shown() const { return getVisible() && !_hidden; }
+	/// Asks for the world in full colour too (setting "True colour"): the mode, for the view it lays into the display itself.
+	void setWantsTrueColor(bool wanted) { _wantsTrueColor = wanted; }
+	/// This frame's world in full colour, if the graphics card gave it: a 0x..RRGGBB number a pixel, and the palette colour each
+	/// pixel had from its ray; a pixel of the finished picture that still has that colour may be shown in the full one.
+	bool trueColor(const Uint32 *&fullColors, const Uint8 *&rayColors) const
+	{
+		if (!_hasTrueColor) return false;
+		fullColors = _trueColor.data();
+		rayColors = _rayColors.data();
+		return true;
+	}
 	/// Uses another view's voxel models instead of building its own (a small extra view). Set
 	/// before the battle, so the models aren't built twice.
 	void shareCache(FirstPersonView *owner);
@@ -836,6 +847,9 @@ private:
 	void gpuShadowRays(double cpuMilliseconds);
 	friend struct FirstPersonViewGpuAccess;
 	bool _gpuLogged = false; // the log has this view's line about the graphics card
+	bool _wantsTrueColor = false, _hasTrueColor = false; // the world in full colour too: asked for, and had for the frame drawn last
+	std::vector<Uint32> _trueColor;                      // ... a pixel each, from the card
+	std::vector<Uint8> _rayColors;                       // ... and the palette colour each pixel had from its ray
 	/// Opens the graphics card's renderer ahead of its first frame, if the setting asks for it.
 	static void gpuWarmUp();
 	/// The graphics card forgets the models it was sent (the view is about to build them anew).

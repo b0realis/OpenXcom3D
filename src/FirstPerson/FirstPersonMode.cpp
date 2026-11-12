@@ -955,7 +955,9 @@ bool FirstPersonMode::canvasTarget(int &width, int &height) const
 	}
 	int x, y, pictureWidth, pictureHeight;
 	_game->getScreen()->getPictureArea(x, y, pictureWidth, pictureHeight);
-	if (pictureWidth <= 0 || pictureHeight <= 0 || (pictureWidth == width && pictureHeight == height))
+	// (A picture area the screen's own size needs no laying in, but for the full-colour picture, which the 8-bit screen can't hold.)
+	const bool fullColor = Options::fpsTrueColor && Options::fpsRenderer == 1;
+	if (pictureWidth <= 0 || pictureHeight <= 0 || (pictureWidth == width && pictureHeight == height && !fullColor))
 	{
 		return false;
 	}
@@ -2104,6 +2106,7 @@ void FirstPersonMode::think()
 	lastThinkTicks = now;
 	rememberChoices(); // (the fuses burning change all the time)
 	relayoutIfNeeded(); // (the setting "HUD scale" or "3D resolution" changed, or the display)
+	_view->setWantsTrueColor(Options::fpsTrueColor && Options::fpsRenderer == 1 && _canvasOnDisplay); // (shown only where the mode lays the view into the display)
 	const double elapsedSeconds = _lastFrameTick ? std::min<Uint32>(100, now - _lastFrameTick) / 1000.0 : 0.0;
 
 	// Another screen was on top (popup, next turn, inventory): it had the mouse released.
@@ -2984,7 +2987,26 @@ bool FirstPersonMode::blit()
 		}
 		magnify(picture, _canvas->getSurface(), true);
 		_composed->setPalette(_state->getPalette());
-		FirstPerson::presentView(_composed);
+		// In full colour (setting "True colour"): each pixel that still has the palette colour its ray gave it (no unit,
+		// effect or wash over it, no overlay) takes the card's full colour for it; the others stay the palette's.
+		const Uint32 *fullColors = nullptr, *shownInFull = nullptr;
+		const Uint8 *rayColors = nullptr;
+		if (_view->shown() && _view->getWidth() == picture->w && _view->getHeight() == picture->h && _view->trueColor(fullColors, rayColors))
+		{
+			_truePicture.resize((size_t)picture->w * picture->h);
+			for (int row = 0; row < picture->h; ++row)
+			{
+				const Uint8 *made = (const Uint8 *)picture->pixels + (size_t)row * picture->pitch, *rays = rayColors + (size_t)row * picture->w;
+				const Uint32 *full = fullColors + (size_t)row * picture->w;
+				Uint32 *out = &_truePicture[(size_t)row * picture->w];
+				for (int column = 0; column < picture->w; ++column)
+				{
+					out[column] = made[column] == rays[column] ? (full[column] | 0xFF000000u) : 0u;
+				}
+			}
+			shownInFull = _truePicture.data();
+		}
+		FirstPerson::presentView(_composed, shownInFull);
 	}
 	return true;
 }

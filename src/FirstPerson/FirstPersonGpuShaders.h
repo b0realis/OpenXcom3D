@@ -59,6 +59,7 @@ uniform usamplerBuffer uWallPaints; // a texel per wall paint: the wall's model,
 uniform isamplerBuffer uMirrors;    // the crafts' mirrors: sixteen numbers each, then their rows (see FirstPersonGpu.cpp, encodeMirrors)
 uniform usamplerBuffer uTables;     // rows of 256 bytes: the haze steps, the tints, the scene's colours (see FirstPersonGpu.cpp, encodeTables)
 uniform samplerBuffer uWaveSine;    // the waves' sine table
+uniform usamplerBuffer uBlend;      // the palette (768 bytes: red, green, blue of each colour), then the palette colour nearest each colour of a 32 x 32 x 32 cube
 
 uniform ivec3 uSize;         // the map in tiles
 uniform float uMaxDistance;  // how far rays go, in voxels
@@ -75,8 +76,9 @@ uniform vec4 uSwingB[16];    // ... z0, z1, its model's number, 1 if it was a we
 layout(location = 0) out uint outColor;   // the palette colour
 layout(location = 1) out float outDepth;  // along the view axis
 layout(location = 2) out uint outGlow;    // 1 where the pixel shines, 3 a UFO's light (for the bloom)
+layout(location = 3) out vec4 outTrue;    // the pixel in full colour (setting "True colour"): red, green, blue; and the glow again (as outGlow / 255)
 #ifdef RESULTS
-layout(location = 3) out uvec4 outResult; // FirstPersonGpu::RayResult (the check against the CPU's rays only)
+layout(location = 4) out uvec4 outResult; // FirstPersonGpu::RayResult (the check against the CPU's rays only)
 #endif
 
 const float Infinity = uintBitsToFloat(0x7F800000u);
@@ -413,6 +415,11 @@ uniform vec3 uMuzzleFlashPos;
 uniform int uUfoLightsOn, uWallPaint;
 // The finer picture, on the card only (settings, all off by default: with them off the picture is the CPU's).
 uniform int uSoftShadows, uAllLightShadows, uAmbientOcclusion;
+uniform int uSmoothLight; // setting "Smooth light": the full-colour picture blends between the palette's shades (and into the haze) where the palette's picture dithers
+// The pixel in full colour, where the shading worked one out that the palette hasn't (see shadeHit); else it is the palette colour's own.
+vec3 fullColor;
+bool fullColorSet;
+vec3 paletteRgb(uint color) { int entry = int(color) * 3; return vec3(float(texelFetch(uBlend, entry).r), float(texelFetch(uBlend, entry + 1).r), float(texelFetch(uBlend, entry + 2).r)); }
 const float SunDiscRadius = 0.04;  // the sun as a disc this wide (the tangent of its half-angle): the width of a shadow's soft edge, a 25th of the way it fell
 const float CreaseShades = 4.5;    // how many palette shades the deepest corner is darkened
 const float CreaseFadeFrom = 260.0, CreaseFadeTo = 420.0; // corners aren't darkened beyond this far (voxels): too fine to see, and they would shimmer
@@ -828,9 +835,24 @@ uint skyColor(vec3 rayDirection, int pixelX, int pixelY)
 		float drift = uCloudTime * (uSky == SkyVoid ? 0.01 : 0.05);
 		float deck = cloudNoise(rayDirection.x * layerDistance * 0.9 + drift, rayDirection.y * layerDistance * 0.9 + drift * 0.4);
 		float mottle = (deck - 0.5) * 2.0 * CloudDeckMottle * smoothStep(0.0, 0.3, elevation);
+		if (uSmoothLight != 0)
+		{
+			float band = clamp(gradient + mottle, 0.0, 31.0);
+			fullColor = mix(paletteRgb(scene(SceneSky + int(band))), paletteRgb(scene(SceneSky + min(31, int(band) + 1))), band - floor(band));
+			fullColorSet = true;
+		}
 		return scene(SceneSky + clamp(int(gradient + mottle + dither(pixelX, pixelY)), 0, 31));
 	}
 	uint color = scene(SceneSky + clamp(int(gradient + dither(pixelX, pixelY)), 0, 31));
+	// (In full colour, setting "Smooth light": the sky's bands and the clouds' edges blended; the sun, the moon and the stars as they are.)
+	vec3 skyRgb = vec3(0.0);
+	if (uSmoothLight != 0)
+	{
+		float band = clamp(gradient, 0.0, 31.0);
+		skyRgb = mix(paletteRgb(scene(SceneSky + int(band))), paletteRgb(scene(SceneSky + min(31, int(band) + 1))), band - floor(band));
+		fullColor = skyRgb;
+		fullColorSet = true;
+	}
 	if (uUnderwater != 0)
 	{
 		return color;
@@ -839,6 +861,7 @@ uint skyColor(vec3 rayDirection, int pixelX, int pixelY)
 	float sunDot = dot(rayDirection, uSunDir);
 	if (daylight > 0.4 && sunDot > (uSky == SkyMars ? 0.9998 : 0.9995))
 	{
+		fullColorSet = false;
 		return scene(SceneSun);
 	}
 	if (uNight > 0.4 && uSky != SkyMars)
@@ -846,6 +869,7 @@ uint skyColor(vec3 rayDirection, int pixelX, int pixelY)
 		float moonDot = dot(rayDirection, uMoonDir);
 		if (moonDot > 0.9992)
 		{
+			fullColorSet = false;
 			return scene(SceneMoon);
 		}
 	}
@@ -856,6 +880,12 @@ uint skyColor(vec3 rayDirection, int pixelX, int pixelY)
 		float cloudV = rayDirection.y * layerDistance * 1.6;
 		float density = cloudNoise(cloudU, cloudV);
 		float coverage = smoothStep(0.52, 0.72, density) * smoothStep(0.02, 0.2, elevation);
+		if (uSmoothLight != 0 && coverage > 0.0)
+		{
+			float level = clamp((0.8 - density) * 10.0, 0.0, 7.0);
+			vec3 cloudRgb = mix(paletteRgb(scene(SceneCloud + int(level))), paletteRgb(scene(SceneCloud + min(7, int(level) + 1))), level - floor(level));
+			fullColor = mix(skyRgb, cloudRgb, coverage);
+		}
 		if (coverage > dither(pixelX + 1, pixelY + 3))
 		{
 			float darkness = clamp((0.8 - density) * 10.0, 0.0, 7.0);
@@ -868,6 +898,7 @@ uint skyColor(vec3 rayDirection, int pixelX, int pixelY)
 		uint cellHash = hash2(int(floor(azimuth * 160.0)), int(floor(elevationAngle * 160.0)));
 		if ((cellHash % 1000u) < 6u)
 		{
+			fullColorSet = false;
 			return scene(SceneStar);
 		}
 	}
@@ -944,9 +975,20 @@ uint colorOutsideMap(vec3 rayOrigin, vec3 rayDirection, float tExit, int exitAxi
 			int shades = int(float(uAmbient) + uFaceShade[4] + waveShade + distanceShade(groundDistance) + dither(pixelX, pixelY));
 			float blackShare = clamp((float(uAmbient) - DarkOverflowFrom) / (DarkOverflowTo - DarkOverflowFrom), 0.0, 1.0);
 			int darkest = groundIsWater ? max(int(color & 15u), WaterDarkestShade) : 15;
+			uint unlit = color;
 			color = blackShare > dither(pixelX + 1, pixelY + 2) ? shadeColor(color, shades) : ((color & 0xF0u) | uint(min(darkest, int(color & 15u) + max(0, shades))));
 			float haze = uUnderwater != 0 ? smoothStep(uMaxDistance * 0.12, uMaxDistance * 0.65, groundDistance)
 				: smoothStep(uMaxDistance * hazeStart() * 0.67, uMaxDistance * 1.6, groundDistance);
+			if (uSmoothLight != 0)
+			{
+				// (In full colour: the shade's fraction, the black of a dark place and the haze blended, as shadeHit does.)
+				float exact = max(0.0, float(uAmbient) + uFaceShade[4] + waveShade + distanceShade(groundDistance));
+				int low = int(exact);
+				vec3 rgb = mix(paletteRgb((unlit & 0xF0u) | uint(min(darkest, int(unlit & 15u) + low))), paletteRgb((unlit & 0xF0u) | uint(min(darkest, int(unlit & 15u) + low + 1))), exact - float(low));
+				if (blackShare > 0.0) rgb = mix(rgb, mix(paletteRgb(shadeColor(unlit, low)), paletteRgb(shadeColor(unlit, low + 1)), exact - float(low)), blackShare);
+				fullColor = mix(rgb, paletteRgb(scene(SceneHaze)), haze);
+				fullColorSet = true;
+			}
 			return hazeColor(color, haze, pixelX + 2, pixelY + 1);
 		}
 	}
@@ -1117,18 +1159,25 @@ uint undersideColor(uint plate, ivec3 voxel, bool undersideUnderRock, inout int 
 /**
  * How closed in a point on a face is, 0 (open) to 1: the share of sixteen places round it, out
  * from the face and to its sides, a ring near and a ring further, that hold a voxel. The foot
- * of a wall, an inner corner, the gap between two crates.
+ * of a wall, an inner corner, the gap between two crates. Each place counts the four voxels
+ * round it in the face's plane by how near it is to each, so the darkening has no steps where
+ * a place passes from one voxel to the next.
  */
 float crease(vec3 point, vec3 normal)
 {
-	vec3 sideA = normal.yzx, sideB = normal.zxy; // (the normal lies along an axis: these are the other two)
+	vec3 sideA = abs(normal.yzx), sideB = abs(normal.zxy); // (the normal lies along an axis: these are the other two)
 	float closed = 0.0;
 	for (int place = 0; place < 16; ++place)
 	{
 		bool far = place >= 8;
 		float angle = float(place & 7) * 0.7853982 + (far ? 0.3926991 : 0.0);
-		vec3 at = point + normal * (far ? 3.0 : 1.0) + (cos(angle) * sideA + sin(angle) * sideB) * (far ? 4.5 : 1.6);
-		if (voxelColorAt(ivec3(floor(at)), false, -1) != 0u) closed += far ? 0.045 : 0.08;
+		vec3 at = point + normal * (far ? 3.0 : 1.0) + (cos(angle) * sideA + sin(angle) * sideB) * (far ? 4.5 : 1.6) - 0.5 * (sideA + sideB);
+		vec3 cell = floor(at);
+		float alongA = dot(at - cell, sideA), alongB = dot(at - cell, sideB);
+		ivec3 corner = ivec3(cell), stepA = ivec3(sideA), stepB = ivec3(sideB);
+		float held = mix(mix(voxelColorAt(corner, false, -1) != 0u ? 1.0 : 0.0, voxelColorAt(corner + stepA, false, -1) != 0u ? 1.0 : 0.0, alongA),
+			mix(voxelColorAt(corner + stepB, false, -1) != 0u ? 1.0 : 0.0, voxelColorAt(corner + stepA + stepB, false, -1) != 0u ? 1.0 : 0.0, alongA), alongB);
+		closed += held * (far ? 0.045 : 0.08);
 	}
 	return closed;
 }
@@ -1368,6 +1417,36 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 	{
 		color = table(UnseenRow, color);
 	}
+	if (uSmoothLight != 0)
+	{
+		// (Setting "Smooth light", for the full-colour picture: where the palette's picture dithers between two shades,
+		// the mix of the two by the shade's fraction; likewise into black where the place is dark, into the flare's red,
+		// and into the haze. A UFO's tint and unseen terrain keep the palette's colour; only their haze is smooth.)
+		vec3 rgb = paletteRgb(color);
+		if (!unseen && ufoLighting < 0)
+		{
+			float exact = max(0.0, shade);
+			int low = int(exact);
+			float share = exact - float(low);
+			int cap = rockCeilingMiddle >= 0 ? max(0, 15 - RockMottleShades - rockCeilingMiddle) : 99;
+			uint lowLit = (baseColor & 0xF0u) | uint(min(darkest, int(baseColor & 15u) + min(low, cap)));
+			uint highLit = (baseColor & 0xF0u) | uint(min(darkest, int(baseColor & 15u) + min(low + 1, cap)));
+			rgb = mix(paletteRgb(lowLit), paletteRgb(highLit), share);
+			if (!onSteadyUfo && blackShare > 0.0)
+			{
+				rgb = mix(rgb, mix(paletteRgb(shadeColor(baseColor, low)), paletteRgb(shadeColor(baseColor, low + 1)), share), blackShare);
+			}
+			float red = clamp(flare * 1.5 - 0.04, 0.0, 1.0);
+			if (red > 0.0)
+			{
+				rgb = mix(rgb, mix(paletteRgb(table(FlareRow, lowLit)), paletteRgb(table(FlareRow, highLit)), share), red);
+			}
+		}
+		float haze = terrainHaze(hit.t);
+		if (haze > 0.0) rgb = mix(rgb, paletteRgb(scene(SceneHaze)), haze);
+		fullColor = rgb;
+		fullColorSet = true;
+	}
 	return hazeColor(color, terrainHaze(hit.t), pixelX + 2, pixelY + 1);
 }
 
@@ -1376,8 +1455,9 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
  * @param offset Where in the block it goes, from the block's middle, in blocks (0, 0: the middle, the CPU's ray).
  * @param first The block's first ray: the one whose findings go to the check against the CPU's.
  */
-void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, out uint rayGlow)
+void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, out uint rayGlow, out vec3 rayFullColor)
 {
+	fullColorSet = false;
 	// The block of pixels this ray colours (rows from the top), and its place on the image plane.
 	int blockColumn = int(gl_FragCoord.x), blockRow = int(gl_FragCoord.y);
 	int topRow = blockRow * uPixelSize, leftColumn = blockColumn * uPixelSize;
@@ -1443,7 +1523,9 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 	if (hit.glass)
 	{
 		color = table(GlassRow, color);
+		fullColor = fullColor * 0.7 + vec3(150.0, 180.0, 205.0) * 0.3; // (as the glass table mixes each colour: a little paler and bluer)
 	}
+	rayFullColor = fullColorSet ? fullColor : paletteRgb(color);
 	rayColor = color;
 	rayDepth = distanceAlongRay / directionLength;
 	// Whether it shines (a UFO's light counts three times in the bloom).
@@ -1453,7 +1535,9 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 
 void main()
 {
-	shadeRay(uRayOffset, true, outColor, outDepth, outGlow);
+	vec3 rayFullColor;
+	shadeRay(uRayOffset, true, outColor, outDepth, outGlow, rayFullColor);
+	outTrue = vec4(rayFullColor / 255.0, float(outGlow) / 255.0);
 }
 )";
 
@@ -1471,33 +1555,36 @@ void main()
 const char *const ResolveSource = R"(#version 330 core
 uniform usampler2D uColor0, uColor1, uColor2, uColor3;
 uniform sampler2D uDepth0, uDepth1, uDepth2, uDepth3;
-uniform usampler2D uGlow0, uGlow1, uGlow2, uGlow3;
+uniform sampler2D uTrue0, uTrue1, uTrue2, uTrue3; // each ray in full colour, the glow with it (see outTrue)
 uniform usamplerBuffer uBlend;
 uniform int uSamples;
 layout(location = 0) out uint outColor;
 layout(location = 1) out float outDepth;
 layout(location = 2) out uint outGlow;
+layout(location = 3) out vec4 outTrue;
 
 void main()
 {
 	ivec2 at = ivec2(gl_FragCoord.xy);
 	uint colors[4] = uint[4](texelFetch(uColor0, at, 0).r, texelFetch(uColor1, at, 0).r, 0u, 0u);
 	float depths[4] = float[4](texelFetch(uDepth0, at, 0).r, texelFetch(uDepth1, at, 0).r, 0.0, 0.0);
-	uint glows[4] = uint[4](texelFetch(uGlow0, at, 0).r, texelFetch(uGlow1, at, 0).r, 0u, 0u);
+	vec4 full[4] = vec4[4](texelFetch(uTrue0, at, 0), texelFetch(uTrue1, at, 0), vec4(0.0), vec4(0.0));
 	if (uSamples > 2)
 	{
-		colors[2] = texelFetch(uColor2, at, 0).r; depths[2] = texelFetch(uDepth2, at, 0).r; glows[2] = texelFetch(uGlow2, at, 0).r;
-		colors[3] = texelFetch(uColor3, at, 0).r; depths[3] = texelFetch(uDepth3, at, 0).r; glows[3] = texelFetch(uGlow3, at, 0).r;
+		colors[2] = texelFetch(uColor2, at, 0).r; depths[2] = texelFetch(uDepth2, at, 0).r; full[2] = texelFetch(uTrue2, at, 0);
+		colors[3] = texelFetch(uColor3, at, 0).r; depths[3] = texelFetch(uDepth3, at, 0).r; full[3] = texelFetch(uTrue3, at, 0);
 	}
+	uint glows[4] = uint[4](uint(full[0].a * 255.0 + 0.5), uint(full[1].a * 255.0 + 0.5), uint(full[2].a * 255.0 + 0.5), uint(full[3].a * 255.0 + 0.5));
 	uint color = colors[0], glow = glows[0];
 	float depth = depths[0];
-	vec3 mixed = vec3(0.0);
+	vec3 mixed = vec3(0.0), fullMixed = vec3(0.0);
 	bool allSame = true;
 	for (int ray = 0; ray < uSamples; ++ray)
 	{
 		if (colors[ray] != color) allSame = false;
 		int entry = int(colors[ray]) * 3;
 		mixed += vec3(float(texelFetch(uBlend, entry).r), float(texelFetch(uBlend, entry + 1).r), float(texelFetch(uBlend, entry + 2).r));
+		fullMixed += full[ray].rgb;
 		depth = min(depth, depths[ray]);
 		glow = max(glow, glows[ray]);
 	}
@@ -1509,6 +1596,7 @@ void main()
 	outColor = color;
 	outDepth = depth;
 	outGlow = glow;
+	outTrue = vec4(fullMixed / float(uSamples), float(glow) / 255.0); // (in full colour: the rays' own mix, no palette between)
 }
 )";
 

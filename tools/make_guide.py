@@ -240,6 +240,8 @@ SETTINGS = [
         ('Soft sun shadows', 'NO', 'YES / NO', 'Renderer GPU only, with Shadows on. The sun\'s shadows get a soft edge, wider the further they fall. Not in the 1.12 download yet.', 'YES: cheap, and the stair-stepped shadow edges are gone.'),
         ('Shadows from every light', 'NO', 'YES / NO', 'Renderer GPU only, with Shadows on. Every lamp and flare in reach throws shadows, not only the strongest. Not in the 1.12 download yet.', 'YES for night missions in towns.'),
         ('Ambient occlusion', 'NO', 'YES / NO', 'Renderer GPU only. Corners, the foot of walls and the gaps between things are darker: the blocky world gets depth. Not in the 1.12 download yet.', 'YES: cheap, and rooms look solid.'),
+        ('True colour', 'NO', 'YES / NO', 'Renderer GPU, 3D resolution Display, and OpenGL output or a 32-bit scaler. The 3D world in full colour, past the palette\'s 256; units, effects and the HUD stay the palette\'s. Not in the 1.12 download yet.', 'YES with Smooth light and Supersampling: the cleanest picture.'),
+        ('Smooth light', 'NO', 'YES / NO', 'With True colour. Light, shadows, haze and the sky blend smoothly where the palette\'s picture has a dot pattern. Not in the 1.12 download yet.', 'YES: no dots swimming over walls at high resolutions.'),
     ]),
 ]
 
