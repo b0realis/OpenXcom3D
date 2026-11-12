@@ -1258,10 +1258,10 @@ index 000000000..3290d51b9
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..a70d41a13
+index 000000000..da6adfb14
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,190 @@
+@@ -0,0 +1,193 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1422,6 +1422,9 @@ index 000000000..a70d41a13
 +  #                  the throwing skill and not the firing skill, as the big mods' bows, and for
 +  #                  guns firing an arrow picture drawn mostly for those, as their crossbows)
 +  #   shot: powder   a gun's round, with a muzzle flash (worked out for every other gun)
++  #   bow: true      held as a bow: upright, its curve towards the crosshair, the arrow leaving
++  #                  from the curve's middle (worked out for a ranged weapon with BOW in its type
++  #                  that isn't a crossbow: CROSSBOW, XBOW); bow: false holds it as a gun
 +  # A later entry (or a later mod's) overrides what it sets.
 +  items:
 +    # XPiratez: wide blades (too broad in their pictures to be worked out as blades)
@@ -33556,10 +33559,10 @@ index 000000000..a145c4fac
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..f392de5e3
+index 000000000..58e27ba7d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1364 @@
+@@ -0,0 +1,1366 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -34566,7 +34569,7 @@ index 000000000..f392de5e3
 +	MuzzleFlash _muzzleFlash = {}; // the weapon's muzzle flash
 +	Uint32 _heldShotSeen = 0;      // our last shot the weapon flashed for
 +	// the weapon's inventory picture, measured: its long axis, which end is the muzzle, which side is up
-+	struct WeaponShape { double mean[2], along[2], across[2], stock, muzzle, minAcross, maxAcross, bore, boxMin[2], boxMax[2]; int upSign; bool gun, melee; }; // bore: across, where the barrel ends; box: the opaque pixels' bounds; melee: held tip up, swung down
++	struct WeaponShape { double mean[2], along[2], across[2], stock, muzzle, minAcross, maxAcross, bore, boxMin[2], boxMax[2]; int upSign; bool gun, melee, bow; }; // bore: across, where the barrel ends; box: the opaque pixels' bounds; melee: held tip up, swung down; bow: "along" runs from the string to the curve's middle (see analyzeWeapon)
 +	WeaponShape _heldShape = {};                        // the measured shape of the weapon's picture
 +	// ...and given volume: voxels, each picture pixel as deep as its distance from the outline
 +	// allows (a cushion), as the faces that show (see FirstPersonVoxelModel.h)
@@ -34597,7 +34600,9 @@ index 000000000..f392de5e3
 +	/// Is this weapon drawn in the hands? Not a built-in one with nothing to hold (see the definition).
 +	bool weaponShownInHand(BattleUnit *unit, const BattleItem *weapon) const;
 +	/// Measures the weapon's picture: its long axis, muzzle end and up side.
-+	void analyzeWeapon(bool gun, bool melee = false);
++	void analyzeWeapon(bool gun, bool melee = false, bool bow = false);
++	/// Is a weapon held as a bow: upright, its curve towards the crosshair?
++	bool heldAsBow(const RuleItem *weapon) const;
 +	/// Draws an item's inventory picture whole into a 32x48 picture (not shifted as the hand slot does).
 +	void drawHeldPicture(const BattleItem *item, const SurfaceSet *inventorySprites, Surface *picture) const;
 +	/// Gives the held picture (weapon or other item) volume as voxels.
@@ -40888,10 +40893,10 @@ index 000000000..4d7df700b
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..f6374d177
+index 000000000..78c03f92a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,505 @@
+@@ -0,0 +1,509 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -41150,6 +41155,10 @@ index 000000000..f6374d177
 +/// crosshair).
 +const double RiflePixels = 41.0;
 +const double SizeCurve = 0.6;
++/// A bow in the hands (see FirstPersonMode::analyzeWeapon), against a gun as long: it stands across the view.
++const double BowScale = 0.5;
++/// ...where it is held on the weapon's line (0 the far end .. 1 the near), how far its curve is turned in from that line (degrees), and how far it is lifted (of half its height).
++const double BowAt = 0.15, BowTurn = 40.0, BowLift = 0.7;
 +const double GripAt = 0.3;
 +
 +// ---- Moving ----
@@ -47826,10 +47835,10 @@ index 000000000..9507fcd26
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeWeaponInHand.cpp b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
 new file mode 100644
-index 000000000..392937654
+index 000000000..40fd816b2
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
-@@ -0,0 +1,1044 @@
+@@ -0,0 +1,1141 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -47999,6 +48008,32 @@ index 000000000..392937654
 +}
 +
 +/**
++ * Is a weapon held as a bow (see analyzeWeapon)? As the mod's item table says (`bow: true` or
++ * `false` in an entry of `items:`), or else by its name: a ranged weapon whose type has BOW in it
++ * and isn't a crossbow (CROSSBOW, XBOW), nor a word that only contains it (ELBOW, RAINBOW, BOWL).
++ * @param weapon The weapon's rules.
++ * @return True for a bow.
++ */
++bool FirstPersonMode::heldAsBow(const RuleItem *weapon) const
++{
++	const RuleFirstPerson::ItemLook *look = _game->getMod()->getFirstPerson().getItemLook(weapon->getType());
++	if (look && look->bow != RuleFirstPerson::BOW_AUTO)
++	{
++		return look->bow == RuleFirstPerson::BOW_YES;
++	}
++	if (weapon->getBattleType() != BT_FIREARM)
++	{
++		return false;
++	}
++	const std::string &type = weapon->getType();
++	for (const char *other : { "CROSSBOW", "XBOW", "ELBOW", "RAINBOW", "BOWL" })
++	{
++		if (type.find(other) != std::string::npos) return false;
++	}
++	return type.find("BOW") != std::string::npos;
++}
++
++/**
 + * Measures the weapon's inventory picture (the game's own, from BIGOBS.PCK, already drawn into
 + * _heldSprite, see drawHeldPicture), so it can be drawn with its barrel on the line to the crosshair: its long axis
 + * (the direction its pixels spread out furthest), its muzzle end, and the side with the grip and
@@ -48014,14 +48049,23 @@ index 000000000..392937654
 + * thick, the left. A blade leaning or lying in the picture (the big mods' swords) has its edge
 + * on its lower side, and the edge leads the strike.
 + * @param gun It's a gun or a club, drawn pointing at the crosshair (false: held up like an item).
++ * A bow is the exception (the owner: "the curved side towards the crosshair and where projectile
++ * leaves. It is special rule for bows"): its picture's long axis is the bow itself, limb to limb,
++ * and the arrow leaves across it, from the string through the middle of the curve. So a bow's
++ * "along" is turned a quarter: it runs from the string's side to the curve's, the muzzle the
++ * curve's outermost point (its middle, where the arrow rests), and "across" is the bow's length,
++ * held upright (see drawWeaponPlate). The curve's side is the one the bow's middle lies towards,
++ * from its two tips.
 + * @param melee It's a melee weapon: held tip up, and swung down at the crosshair (see drawWeaponPlate).
++ * @param bow It's a bow (see heldAsBow).
 + */
-+void FirstPersonMode::analyzeWeapon(bool gun, bool melee)
++void FirstPersonMode::analyzeWeapon(bool gun, bool melee, bool bow)
 +{
 +	WeaponShape &shape = _heldShape;
 +	shape = WeaponShape();
 +	shape.gun = gun;
 +	shape.melee = melee && gun;
++	shape.bow = bow && gun && !melee;
 +	_heldFaces.clear(); // a picture too small to measure gets none
 +
 +	// Every opaque pixel of the picture (colour 0 is transparent); too few to measure, and
@@ -48081,6 +48125,32 @@ index 000000000..392937654
 +	shape.mean[0] = meanX; shape.mean[1] = meanY;
 +	shape.along[0] = std::cos(axisAngle); shape.along[1] = std::sin(axisAngle);
 +	shape.across[0] = -std::sin(axisAngle); shape.across[1] = std::cos(axisAngle);
++	// A bow: "along" turned a quarter, towards the curve's side. That's where the bow's middle
++	// third lies, across its length, from where its two end thirds do (the tips sit back at the
++	// string).
++	if (shape.bow)
++	{
++		double lowEnd = 1e9, highEnd = -1e9;
++		for (const auto &pixel : pixels)
++		{
++			const double posAlong = (pixel.first - meanX) * shape.along[0] + (pixel.second - meanY) * shape.along[1];
++			lowEnd = std::min(lowEnd, posAlong); highEnd = std::max(highEnd, posAlong);
++		}
++		const double third = (highEnd - lowEnd) / 3.0;
++		double middleSum = 0.0, tipsSum = 0.0;
++		int middleCount = 0, tipsCount = 0;
++		for (const auto &pixel : pixels)
++		{
++			const double dx = pixel.first - meanX, dy = pixel.second - meanY;
++			const double posAlong = dx * shape.along[0] + dy * shape.along[1], posAcross = dx * shape.across[0] + dy * shape.across[1];
++			if (posAlong > lowEnd + third && posAlong < highEnd - third) { middleSum += posAcross; ++middleCount; }
++			else { tipsSum += posAcross; ++tipsCount; }
++		}
++		const double towardsCurve = middleCount && tipsCount && middleSum / middleCount < tipsSum / tipsCount ? -1.0 : 1.0;
++		const double length[2] = { shape.along[0], shape.along[1] };
++		shape.along[0] = shape.across[0] * towardsCurve; shape.along[1] = shape.across[1] * towardsCurve;
++		shape.across[0] = length[0]; shape.across[1] = length[1];
++	}
 +
 +	// How far the picture reaches along the axis and across it, both ways from the centre.
 +	double minAlong = 1e9, maxAlong = -1e9, minAcross = 1e9, maxAcross = -1e9;
@@ -48109,7 +48179,8 @@ index 000000000..392937654
 +	const double lowSpread = lowMax - lowMin, highSpread = highMax - highMin;
 +	const bool standingUp = std::abs(shape.along[1]) > std::abs(shape.along[0]);
 +	bool muzzleHigh;
-+	if (standingUp) muzzleHigh = shape.along[1] < 0;
++	if (shape.bow) muzzleHigh = true; // (the curve's outermost point: "along" runs towards it)
++	else if (standingUp) muzzleHigh = shape.along[1] < 0;
 +	else if (highSpread < lowSpread - 1.0) muzzleHigh = true;
 +	else if (lowSpread < highSpread - 1.0) muzzleHigh = false;
 +	else muzzleHigh = shape.along[0] < 0;
@@ -48125,6 +48196,11 @@ index 000000000..392937654
 +	// leads: it faces away at rest and comes down first in the strike (the weapon's "down" side,
 +	// see drawWeaponPlate), so that side goes down. Standing straight up, the rule above stands.
 +	if (shape.melee && std::abs(shape.across[1]) > 1e-6)
++	{
++		shape.upSign = shape.across[1] > 0 ? -1 : 1;
++	}
++	// A bow stands as its picture does: the picture's upper tip up.
++	if (shape.bow)
 +	{
 +		shape.upSign = shape.across[1] > 0 ? -1 : 1;
 +	}
@@ -48426,7 +48502,9 @@ index 000000000..392937654
 +
 +	// A weapon shorter than the rifle shrinks about its grip (still on the line at the
 +	// crosshair), by its picture length's share of the rifle's to the power SizeCurve.
-+	const double sizeFactor = std::pow(std::clamp(std::abs(shape.muzzle - shape.stock) / RiflePixels, 0.4, 1.0), SizeCurve);
++	// (A bow is as long as its picture is across: limb to limb.)
++	const double pictureLength = shape.bow ? shape.maxAcross - shape.minAcross : std::abs(shape.muzzle - shape.stock);
++	const double sizeFactor = std::pow(std::clamp(pictureLength / RiflePixels, 0.4, 1.0), SizeCurve);
 +	for (int axis = 0; axis < 3; ++axis)
 +	{
 +		const double pivot = farEnd[axis] + (nearEnd[axis] - farEnd[axis]) * GripAt;
@@ -48470,7 +48548,35 @@ index 000000000..392937654
 +	double along[3], length = 0.0;
 +	for (int axis = 0; axis < 3; ++axis) { along[axis] = farEnd[axis] - nearEnd[axis]; length += along[axis] * along[axis]; }
 +	length = std::sqrt(length);
-+	const double pixelsLong = std::max(4.0, std::abs(shape.muzzle - shape.stock));
++	double pixelsLong = std::max(4.0, std::abs(shape.muzzle - shape.stock));
++	// A bow is held upright, part way down the weapon's line (BowAt), at the scale a gun as long
++	// as the bow would have (BowScale of it: it stands across the view, where a gun runs away
++	// from the eye). Its curve points along the line at the crosshair, turned BowTurn degrees
++	// in towards the middle of the view: seen straight from behind a bow is only a stick, so it
++	// is held a little open, and its curve shows, leaning towards the crosshair. The line is kept
++	// only as long as the bow is deep, from the string to the curve. It is lifted by BowLift of
++	// half its height, so most of it shows over the screen's bottom edge.
++	if (shape.bow)
++	{
++		const double perBowPixel = length / std::max(4.0, pictureLength) * BowScale;
++		const double turn = BowTurn * Pi / 180.0, inwards[3] = { -side, 0.0, 0.0 };
++		double grip[3], towards[3], towardsLength = 0.0;
++		for (int axis = 0; axis < 3; ++axis)
++		{
++			grip[axis] = farEnd[axis] - along[axis] * BowAt;
++			if (axis == 1) grip[axis] -= pictureLength * 0.5 * perBowPixel * BowLift; // (lifted: most of the bow on the screen)
++			towards[axis] = along[axis] / length * std::cos(turn) + inwards[axis] * std::sin(turn);
++			towardsLength += towards[axis] * towards[axis];
++		}
++		towardsLength = std::sqrt(towardsLength);
++		length = pixelsLong * perBowPixel;
++		for (int axis = 0; axis < 3; ++axis)
++		{
++			along[axis] = towards[axis] / towardsLength * length;
++			farEnd[axis] = grip[axis] + along[axis] * 0.5;
++			nearEnd[axis] = farEnd[axis] - along[axis];
++		}
++	}
 +
 +	// Across (and in depth) the same scale as along: the weapon keeps its proportions.
 +	const double perPixel = length / pixelsLong;
@@ -48726,7 +48832,7 @@ index 000000000..392937654
 +	{
 +		_heldRules = weapon->getRules();
 +		drawHeldPicture(weapon, inventorySprites, _heldSprite);
-+		analyzeWeapon(battleType == BT_FIREARM || battleType == BT_MELEE, battleType == BT_MELEE);
++		analyzeWeapon(battleType == BT_FIREARM || battleType == BT_MELEE, battleType == BT_MELEE, heldAsBow(weapon->getRules()));
 +	}
 +
 +	// The game's shade where the eye is (at most 9 shades darker, so it stays visible in the
@@ -48848,7 +48954,7 @@ index 000000000..392937654
 +			{
 +				_heldRules = otherWeapon->getRules();
 +				drawHeldPicture(otherWeapon, inventorySprites, _heldSprite);
-+				analyzeWeapon(true);
++				analyzeWeapon(true, false, heldAsBow(otherWeapon->getRules()));
 +			}
 +			if (_heldShape.gun)
 +			{
@@ -73325,10 +73431,10 @@ index 000000000..69bc23727
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..5d4205c1b
+index 000000000..eef5261c3
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
-@@ -0,0 +1,375 @@
+@@ -0,0 +1,381 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -73424,6 +73530,8 @@ index 000000000..5d4205c1b
 +	};
 +	/// How an item's picture is given volume in 3D: worked out (AUTO), rounded (CUSHION) or flat (PLATE: a blade).
 +	enum HeldShape { HELD_AUTO = -1, HELD_CUSHION, HELD_PLATE };
++	/// Whether a weapon is held as a bow (upright, its curve to the target): worked out from its name (AUTO), or said (NO, YES).
++	enum HeldAsBow { BOW_AUTO = -1, BOW_NO, BOW_YES };
 +	/// What a weapon's shots are: worked out (AUTO), a gun's rounds (POWDER) or objects flying (OBJECT: arrows, bolts, harpoons).
 +	enum ShotKind { SHOT_AUTO = -1, SHOT_POWDER, SHOT_OBJECT };
 +	/// One item's entry in the item table (`items:`): what the 3D view isn't left to work out.
@@ -73431,6 +73539,7 @@ index 000000000..5d4205c1b
 +	{
 +		HeldShape held = HELD_AUTO; // how its picture is given volume
 +		ShotKind shot = SHOT_AUTO;  // what its shots are (a weapon's, or an ammo's)
++		HeldAsBow bow = BOW_AUTO;   // held as a bow
 +	};
 +private:
 +	bool _enabled;
@@ -73556,7 +73665,7 @@ index 000000000..5d4205c1b
 +		}
 +
 +		// The item table: groups of item types (as the mods name them), each with what it sets:
-+		// held (cushion, plate, or auto) and shot (powder, object, or auto). A later entry
++		// held (cushion, plate, or auto), shot (powder, object, or auto) and bow (true or false: held as a bow or not). A later entry
 +		// overrides what it sets for an item, and leaves the rest.
 +		if (const auto& items = reader["items"])
 +		{
@@ -73564,6 +73673,8 @@ index 000000000..5d4205c1b
 +			{
 +				std::vector<std::string> types;
 +				std::string held, shot;
++				bool bow = false;
++				const bool bowSaid = entry.tryRead("bow", bow);
 +				entry.tryRead("types", types);
 +				entry.tryRead("held", held);
 +				entry.tryRead("shot", shot);
@@ -73572,6 +73683,7 @@ index 000000000..5d4205c1b
 +					ItemLook &look = _itemLooks[type];
 +					if (!held.empty()) look.held = held == "plate" ? HELD_PLATE : held == "cushion" ? HELD_CUSHION : HELD_AUTO;
 +					if (!shot.empty()) look.shot = shot == "object" ? SHOT_OBJECT : shot == "powder" ? SHOT_POWDER : SHOT_AUTO;
++					if (bowSaid) look.bow = bow ? BOW_YES : BOW_NO;
 +				}
 +			}
 +		}

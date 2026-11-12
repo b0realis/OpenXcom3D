@@ -1004,7 +1004,7 @@ private:
 	MuzzleFlash _muzzleFlash = {}; // the weapon's muzzle flash
 	Uint32 _heldShotSeen = 0;      // our last shot the weapon flashed for
 	// the weapon's inventory picture, measured: its long axis, which end is the muzzle, which side is up
-	struct WeaponShape { double mean[2], along[2], across[2], stock, muzzle, minAcross, maxAcross, bore, boxMin[2], boxMax[2]; int upSign; bool gun, melee; }; // bore: across, where the barrel ends; box: the opaque pixels' bounds; melee: held tip up, swung down
+	struct WeaponShape { double mean[2], along[2], across[2], stock, muzzle, minAcross, maxAcross, bore, boxMin[2], boxMax[2]; int upSign; bool gun, melee, bow; }; // bore: across, where the barrel ends; box: the opaque pixels' bounds; melee: held tip up, swung down; bow: "along" runs from the string to the curve's middle (see analyzeWeapon)
 	WeaponShape _heldShape = {};                        // the measured shape of the weapon's picture
 	// ...and given volume: voxels, each picture pixel as deep as its distance from the outline
 	// allows (a cushion), as the faces that show (see FirstPersonVoxelModel.h)
@@ -1035,7 +1035,9 @@ private:
 	/// Is this weapon drawn in the hands? Not a built-in one with nothing to hold (see the definition).
 	bool weaponShownInHand(BattleUnit *unit, const BattleItem *weapon) const;
 	/// Measures the weapon's picture: its long axis, muzzle end and up side.
-	void analyzeWeapon(bool gun, bool melee = false);
+	void analyzeWeapon(bool gun, bool melee = false, bool bow = false);
+	/// Is a weapon held as a bow: upright, its curve towards the crosshair?
+	bool heldAsBow(const RuleItem *weapon) const;
 	/// Draws an item's inventory picture whole into a 32x48 picture (not shifted as the hand slot does).
 	void drawHeldPicture(const BattleItem *item, const SurfaceSet *inventorySprites, Surface *picture) const;
 	/// Gives the held picture (weapon or other item) volume as voxels.

@@ -752,6 +752,7 @@ How an item looks in 3D is worked out from its rules and its inventory picture, 
 
 - `held:` **plate** (a flat piece one voxel thick) or **cushion** (rounded, thickest in the middle), how the picture is given volume in the hand and when thrown. Worked out: a melee weapon that isn't blunt (its damage isn't concussive or stun, the clubs' and stun rods') and whose picture is thin everywhere is a plate (swords, knives, axes); everything else a cushion.
 - `shot:` **object** (flies as an object, with no powder: no muzzle flash, barely a kick, and a white streak unless it carries fire, acid or a shock, which keep their own look) or **powder** (a gun's round, with its flash). Worked out: weapons aimed with the throwing skill and not the firing skill (the big mods' bows, blowpipes, javelins) fire objects, and so do guns firing an arrow picture drawn mostly for those (the big mods' crossbows); every other gun fires powder.
+- `bow:` **true** or **false**: whether the weapon is held as a bow (upright, its curve towards the crosshair, the arrow leaving from the curve's middle) or as a gun. Worked out: a ranged weapon with BOW in its type that isn't a crossbow (CROSSBOW, XBOW).
 
 Our mod's table has the XPiratez items the automatic rules get wrong (its wide blades, its gloves and claws, its harpoon guns and crossbows). A mod can add its own; a later entry overrides what it sets and leaves the rest:
 
@@ -993,6 +994,7 @@ What `FirstPersonView` draws:
 - New setting *Alien turn: look as the soldier faces* (off by default): in the alien turn the view stays within 45 degrees of your soldier's facing (GitHub issue #126).
 - New setting *Compass: step costs* (off by default): what a step each way, a level up or down and a turn cost in time units, round the compass (GitHub issue #132).
 - New setting *Throwing*: Classic (tile), the default, or Modern (continuous): throws and arcing shots go for the exact point under the crosshair, from a start that slides round the unit, so the curve moves smoothly with the aim and a large unit's arc no longer jumps from side to side (GitHub issue #128).
+- A bow is held as a bow: upright, its curve towards the crosshair and the string behind, the arrow leaving from the curve's middle (it was held like a gun, a limb's tip pointing at the target). Worked out from the weapon's name; a mod can say `bow: true` or `false` for an item in the 3D item table.
 - *Damage numbers*: a hit on an energy shield (X-Com Files, XPiratez) shows what the shield lost, in white, before the health, armour and stun; a hit the shield took whole no longer shows a 0 (GitHub issue #133).
 - An enemy's shot knocked aside by your soldier's close-quarters check no longer throws that soldier's view round; the view follows a knocked-aside shot only for the unit that fired it (GitHub issue #125).
 - Walking into a unit you don't see (behind a curtain you can walk through but not see through) stops at the tile's edge as at a wall, where the view lunged forward and snapped back for as long as the key was held (GitHub issue #129).

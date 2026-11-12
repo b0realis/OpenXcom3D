@@ -93,6 +93,8 @@ public:
 	};
 	/// How an item's picture is given volume in 3D: worked out (AUTO), rounded (CUSHION) or flat (PLATE: a blade).
 	enum HeldShape { HELD_AUTO = -1, HELD_CUSHION, HELD_PLATE };
+	/// Whether a weapon is held as a bow (upright, its curve to the target): worked out from its name (AUTO), or said (NO, YES).
+	enum HeldAsBow { BOW_AUTO = -1, BOW_NO, BOW_YES };
 	/// What a weapon's shots are: worked out (AUTO), a gun's rounds (POWDER) or objects flying (OBJECT: arrows, bolts, harpoons).
 	enum ShotKind { SHOT_AUTO = -1, SHOT_POWDER, SHOT_OBJECT };
 	/// One item's entry in the item table (`items:`): what the 3D view isn't left to work out.
@@ -100,6 +102,7 @@ public:
 	{
 		HeldShape held = HELD_AUTO; // how its picture is given volume
 		ShotKind shot = SHOT_AUTO;  // what its shots are (a weapon's, or an ammo's)
+		HeldAsBow bow = BOW_AUTO;   // held as a bow
 	};
 private:
 	bool _enabled;
@@ -225,7 +228,7 @@ public:
 		}
 
 		// The item table: groups of item types (as the mods name them), each with what it sets:
-		// held (cushion, plate, or auto) and shot (powder, object, or auto). A later entry
+		// held (cushion, plate, or auto), shot (powder, object, or auto) and bow (true or false: held as a bow or not). A later entry
 		// overrides what it sets for an item, and leaves the rest.
 		if (const auto& items = reader["items"])
 		{
@@ -233,6 +236,8 @@ public:
 			{
 				std::vector<std::string> types;
 				std::string held, shot;
+				bool bow = false;
+				const bool bowSaid = entry.tryRead("bow", bow);
 				entry.tryRead("types", types);
 				entry.tryRead("held", held);
 				entry.tryRead("shot", shot);
@@ -241,6 +246,7 @@ public:
 					ItemLook &look = _itemLooks[type];
 					if (!held.empty()) look.held = held == "plate" ? HELD_PLATE : held == "cushion" ? HELD_CUSHION : HELD_AUTO;
 					if (!shot.empty()) look.shot = shot == "object" ? SHOT_OBJECT : shot == "powder" ? SHOT_POWDER : SHOT_AUTO;
+					if (bowSaid) look.bow = bow ? BOW_YES : BOW_NO;
 				}
 			}
 		}
