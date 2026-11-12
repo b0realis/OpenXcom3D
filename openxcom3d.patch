@@ -28537,7 +28537,7 @@ index 000000000..a3ca91a2b
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.h b/src/FirstPerson/FirstPersonGpu.h
 new file mode 100644
-index 000000000..040672294
+index 000000000..7b86d9f23
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.h
 @@ -0,0 +1,219 @@
@@ -28718,7 +28718,7 @@ index 000000000..040672294
 +		const Uint8 *nearestRgb = nullptr;  // the palette colour nearest each 15-bit colour (FirstPersonView::_nearestRgb)
 +		// What comes back beside the picture (the colour always; each of these only if asked).
 +		bool readDepth = false;        // the depth, into Output::depth (else on demand: readEffectsDepth)
-+		bool readGlow = false;         // the glow (1, 3; 64: see-through smoke lies over the pixel), into Output::glow
++		bool readGlow = false;         // the glow (1, 3; 32: the pixel keeps its own colours under night vision; 64: see-through smoke lies over it), into Output::glow
 +		Uint8 *rayColors = nullptr;    // the palette colour each pixel had from its ray, before anything was drawn over it (for the full-colour picture)
 +		Uint32 *notes = nullptr;       // four numbers a pixel: the unit veil left, own colours | smoke veil << 1, 1 + the last solid sprite's number, 1 + the last pile's; null: not asked
 +		int patch[4] = {};             // ... or only those of a patch of the view (left, top, width, height; none wide: no patch), row by row from its top:
@@ -28944,7 +28944,7 @@ index 000000000..62e379411
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..5ba33866f
+index 000000000..731a1b0dd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
 @@ -0,0 +1,2356 @@
@@ -30894,7 +30894,7 @@ index 000000000..5ba33866f
 +uniform int uOutlineGlows;
 +layout(location = 0) out uint outColor;
 +layout(location = 1) out float outDepth;
-+layout(location = 2) out uint outGlow;  // the glow (1, 3), and 64 where see-through smoke lies over the pixel
++layout(location = 2) out uint outGlow;  // the glow (1, 3), 32 where the pixel keeps its own colours under night vision, 64 where see-through smoke lies over it
 +layout(location = 3) out uvec4 outNotes; // the unit veil left, own colours | smoke veil << 1, and for the pointer: 1 + the last solid sprite's number, 1 + the last pile's
 +
 +const float Bayer[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
@@ -31192,7 +31192,7 @@ index 000000000..5ba33866f
 +	}
 +	outColor = color;
 +	outDepth = depth;
-+	outGlow = glow | (smokeVeil > 0 ? 64u : 0u);
++	outGlow = glow | (own << 5) | (smokeVeil > 0 ? 64u : 0u);
 +	outNotes = uvec4(uint(veil), own | uint(smokeVeil) << 1, lastSolid, lastPile);
 +}
 +)";
@@ -57728,10 +57728,10 @@ index 000000000..b6fbee4f6
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpuEffects.cpp b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 new file mode 100644
-index 000000000..b9667db8d
+index 000000000..377c9c017
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
-@@ -0,0 +1,812 @@
+@@ -0,0 +1,821 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -58345,8 +58345,8 @@ index 000000000..b9667db8d
 +	effects.palette = getPalette();
 +	effects.nearestRgb = _nearestRgb.empty() ? nullptr : _nearestRgb.data();
 +	// What comes back beside the picture: in the check every pixel's notes; else only those round the pointer (whose
-+	// picture the player points at), and every pixel's when the wash needs the own colours (futuristic night vision).
-+	const bool allNotes = _gpuChecking || (_nightVision && Options::fpsNightVisionUnits);
++	// picture the player points at).
++	const bool allNotes = _gpuChecking;
 +	list.notes.resize(allNotes ? (size_t)width * height * 4 : 0);
 +	effects.notes = allNotes ? list.notes.data() : nullptr;
 +	const int patchLeft = std::max(0, _pointerX - PointerReach), patchTop = std::max(0, _pointerY - PointerReach),
@@ -58378,9 +58378,10 @@ index 000000000..b9667db8d
 +	output.trueColor = fullColor ? _trueColor.data() : nullptr;
 +	// Beside the picture: in full colour the rays' own palette colours (a pixel that still has its ray's is shown in
 +	// the full one, see trueColor), and with light in the air where the smoke lies; the depth only if asked later.
-+	const bool shaftSmoke = fullColor && _hasLightShafts && !allNotes;
++	const bool shaftSmoke = fullColor && _hasLightShafts;
++	const bool ownColours = _nightVision && Options::fpsNightVisionUnits; // (futuristic night vision: the wash leaves the units', bodies' and items' colours)
 +	effects.rayColors = fullColor ? _rayColors.data() : nullptr;
-+	effects.readGlow = shaftSmoke;
++	effects.readGlow = shaftSmoke || ownColours;
 +	effects.readDepth = false;
 +	FirstPersonGpu *gpu = readyFirstPersonGpu();
 +	// (OPENXCOM3D_GPU_TIMING: the effects' share of the card's time, in the log every 60 frames.)
@@ -58443,6 +58444,14 @@ index 000000000..b9667db8d
 +		for (size_t index = 0; index < (size_t)width * height; ++index)
 +		{
 +			_smokeVeil[index] = (_glowMask[index] & 64) ? 1 : 0;
++		}
++	}
++	// ... and which pixels keep their own colours under the night vision's wash is its bit 32.
++	if (ownColours)
++	{
++		for (size_t index = 0; index < (size_t)width * height; ++index)
++		{
++			_ownColours[index] = (_glowMask[index] >> 5) & 1;
 +		}
 +	}
 +	if (fullColor)

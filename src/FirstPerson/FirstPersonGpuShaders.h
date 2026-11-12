@@ -1944,7 +1944,7 @@ uniform float uOutlineOpacity, uOutlineSlack; // how much of the outlines shows;
 uniform int uOutlineGlows;
 layout(location = 0) out uint outColor;
 layout(location = 1) out float outDepth;
-layout(location = 2) out uint outGlow;  // the glow (1, 3), and 64 where see-through smoke lies over the pixel
+layout(location = 2) out uint outGlow;  // the glow (1, 3), 32 where the pixel keeps its own colours under night vision, 64 where see-through smoke lies over it
 layout(location = 3) out uvec4 outNotes; // the unit veil left, own colours | smoke veil << 1, and for the pointer: 1 + the last solid sprite's number, 1 + the last pile's
 
 const float Bayer[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
@@ -2242,7 +2242,7 @@ void main()
 	}
 	outColor = color;
 	outDepth = depth;
-	outGlow = glow | (smokeVeil > 0 ? 64u : 0u);
+	outGlow = glow | (own << 5) | (smokeVeil > 0 ? 64u : 0u);
 	outNotes = uvec4(uint(veil), own | uint(smokeVeil) << 1, lastSolid, lastPile);
 }
 )";

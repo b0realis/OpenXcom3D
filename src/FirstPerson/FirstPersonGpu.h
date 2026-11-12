@@ -175,7 +175,7 @@ public:
 		const Uint8 *nearestRgb = nullptr;  // the palette colour nearest each 15-bit colour (FirstPersonView::_nearestRgb)
 		// What comes back beside the picture (the colour always; each of these only if asked).
 		bool readDepth = false;        // the depth, into Output::depth (else on demand: readEffectsDepth)
-		bool readGlow = false;         // the glow (1, 3; 64: see-through smoke lies over the pixel), into Output::glow
+		bool readGlow = false;         // the glow (1, 3; 32: the pixel keeps its own colours under night vision; 64: see-through smoke lies over it), into Output::glow
 		Uint8 *rayColors = nullptr;    // the palette colour each pixel had from its ray, before anything was drawn over it (for the full-colour picture)
 		Uint32 *notes = nullptr;       // four numbers a pixel: the unit veil left, own colours | smoke veil << 1, 1 + the last solid sprite's number, 1 + the last pile's; null: not asked
 		int patch[4] = {};             // ... or only those of a patch of the view (left, top, width, height; none wide: no patch), row by row from its top:

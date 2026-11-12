@@ -611,8 +611,8 @@ bool FirstPersonView::gpuDrawEffects()
 	effects.palette = getPalette();
 	effects.nearestRgb = _nearestRgb.empty() ? nullptr : _nearestRgb.data();
 	// What comes back beside the picture: in the check every pixel's notes; else only those round the pointer (whose
-	// picture the player points at), and every pixel's when the wash needs the own colours (futuristic night vision).
-	const bool allNotes = _gpuChecking || (_nightVision && Options::fpsNightVisionUnits);
+	// picture the player points at).
+	const bool allNotes = _gpuChecking;
 	list.notes.resize(allNotes ? (size_t)width * height * 4 : 0);
 	effects.notes = allNotes ? list.notes.data() : nullptr;
 	const int patchLeft = std::max(0, _pointerX - PointerReach), patchTop = std::max(0, _pointerY - PointerReach),
@@ -644,9 +644,10 @@ bool FirstPersonView::gpuDrawEffects()
 	output.trueColor = fullColor ? _trueColor.data() : nullptr;
 	// Beside the picture: in full colour the rays' own palette colours (a pixel that still has its ray's is shown in
 	// the full one, see trueColor), and with light in the air where the smoke lies; the depth only if asked later.
-	const bool shaftSmoke = fullColor && _hasLightShafts && !allNotes;
+	const bool shaftSmoke = fullColor && _hasLightShafts;
+	const bool ownColours = _nightVision && Options::fpsNightVisionUnits; // (futuristic night vision: the wash leaves the units', bodies' and items' colours)
 	effects.rayColors = fullColor ? _rayColors.data() : nullptr;
-	effects.readGlow = shaftSmoke;
+	effects.readGlow = shaftSmoke || ownColours;
 	effects.readDepth = false;
 	FirstPersonGpu *gpu = readyFirstPersonGpu();
 	// (OPENXCOM3D_GPU_TIMING: the effects' share of the card's time, in the log every 60 frames.)
@@ -709,6 +710,14 @@ bool FirstPersonView::gpuDrawEffects()
 		for (size_t index = 0; index < (size_t)width * height; ++index)
 		{
 			_smokeVeil[index] = (_glowMask[index] & 64) ? 1 : 0;
+		}
+	}
+	// ... and which pixels keep their own colours under the night vision's wash is its bit 32.
+	if (ownColours)
+	{
+		for (size_t index = 0; index < (size_t)width * height; ++index)
+		{
+			_ownColours[index] = (_glowMask[index] >> 5) & 1;
 		}
 	}
 	if (fullColor)
