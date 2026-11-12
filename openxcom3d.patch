@@ -26291,10 +26291,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..146360411
+index 000000000..7e88139ba
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,2507 @@
+@@ -0,0 +1,2509 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -26393,17 +26393,19 @@ index 000000000..146360411
 +{
 +	bool all = true;
 +	// (Android: EGL may hand out only the extensions' functions; the rest are in the OpenGL ES library itself.)
-+	void *fallback = nullptr;
 +#ifdef __ANDROID__
-+	fallback = dlopen("libGLESv3.so", RTLD_NOW | RTLD_LOCAL);
++	void *const fallback = dlopen("libGLESv3.so", RTLD_NOW | RTLD_LOCAL);
++#define GL_FALLBACK(name) if (!Gl::name && fallback) Gl::name = (decltype(Gl::name))dlsym(fallback, "gl" #name);
++#else
++#define GL_FALLBACK(name)
 +#endif
-+	(void)fallback;
 +#define GL_LOAD(result, name, arguments) \
 +	Gl::name = (decltype(Gl::name))_getProcAddress("gl" #name); \
-+	if (!Gl::name && fallback) Gl::name = (decltype(Gl::name))dlsym(fallback, "gl" #name); \
++	GL_FALLBACK(name) \
 +	if (!Gl::name) { Log(LOG_WARNING) << "OpenXcom3D GPU: the driver has no gl" #name; all = false; }
 +	GL_FUNCTIONS(GL_LOAD)
 +#undef GL_LOAD
++#undef GL_FALLBACK
 +	return all;
 +}
 +

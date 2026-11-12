@@ -96,17 +96,19 @@ bool GpuContext::loadFunctions()
 {
 	bool all = true;
 	// (Android: EGL may hand out only the extensions' functions; the rest are in the OpenGL ES library itself.)
-	void *fallback = nullptr;
 #ifdef __ANDROID__
-	fallback = dlopen("libGLESv3.so", RTLD_NOW | RTLD_LOCAL);
+	void *const fallback = dlopen("libGLESv3.so", RTLD_NOW | RTLD_LOCAL);
+#define GL_FALLBACK(name) if (!Gl::name && fallback) Gl::name = (decltype(Gl::name))dlsym(fallback, "gl" #name);
+#else
+#define GL_FALLBACK(name)
 #endif
-	(void)fallback;
 #define GL_LOAD(result, name, arguments) \
 	Gl::name = (decltype(Gl::name))_getProcAddress("gl" #name); \
-	if (!Gl::name && fallback) Gl::name = (decltype(Gl::name))dlsym(fallback, "gl" #name); \
+	GL_FALLBACK(name) \
 	if (!Gl::name) { Log(LOG_WARNING) << "OpenXcom3D GPU: the driver has no gl" #name; all = false; }
 	GL_FUNCTIONS(GL_LOAD)
 #undef GL_LOAD
+#undef GL_FALLBACK
 	return all;
 }
 
