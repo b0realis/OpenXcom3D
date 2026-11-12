@@ -449,6 +449,7 @@ const float CloudDeckMottle = 14.0f;
 /// DarkOverflowTo (all of it), dithered between. A lit house is 2, the Piratez hideout's rooms
 /// about 4.5, a night field at the edge of a soldier's light about 6.5, far from it 15.
 const float DarkOverflowFrom = 5.0f, DarkOverflowTo = 8.0f;
+
 /// The darkest shade (0 brightest .. 15 darkest) the isometric map's night vision leaves near the
 /// soldiers (Map::NIGHT_VISION_SHADE): the 3D view's night vision lights the tiles and the open
 /// ground no darker, and the units too in the map's first debug vision mode (see mapShade).

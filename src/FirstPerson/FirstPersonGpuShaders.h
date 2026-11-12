@@ -449,7 +449,7 @@ uniform float uUfoPulse[32], uUfoBreath, uUfoFaceShade[64];
 
 const int SkyEarth = 0, SkySpace = 1, SkyOrbit = 2, SkyMoon = 3, SkyMars = 4, SkySea = 5, SkyVoid = 6;
 // The rows of uTables.
-const int HazeRow = 0, GlassRow = 9, UnseenRow = 10, FlareRow = 11, SceneRow = 12, BlackRow = 13, UfoRows = 14, RowsPerUfo = 14;
+const int HazeRow = 0, GlassRow = 9, UnseenRow = 10, FlareRow = 11, SceneRow = 12, BlackRow = 13, DarkFadeRow = 14, UfoRows = 14 + DarkFadeSteps, RowsPerUfo = 14;
 // Where the scene's colours sit in their row.
 const int SceneSky = 0, SceneCloud = 32, SceneHaze = 40, SceneStar = 41, SceneMoon = 42, SceneSun = 43, SceneTapeYellow = 44, SceneTapeBlack = 45,
 	ScenePost = 46, SceneFaintStar = 47, SceneEarth = 48, SceneUnexplored = 52, SceneRock = 53, SceneWater = 54, SceneRockBase = 57;
@@ -459,6 +459,12 @@ const int TapeTextLength = 7;
 
 uint table(int row, uint color) { return texelFetch(uTables, row * 256 + int(color)).r; }
 uint scene(int index) { return texelFetch(uTables, SceneRow * 256 + index).r; }
+// A group's darkest colour on its way to black by how dark the place is, through the palette's darker colours (see the view's fadedToBlack).
+uint fadedToBlack(uint groupEnd, float blackShare, float threshold)
+{
+	int fadeStep = int(blackShare * float(DarkFadeSteps + 1) + threshold);
+	return fadeStep <= 0 ? groupEnd : fadeStep > DarkFadeSteps ? 0x0Fu : table(DarkFadeRow + fadeStep - 1, groupEnd);
+}
 bool airless() { return uSky == SkySpace || uSky == SkyOrbit || uSky == SkyMoon; }
 
 uint shadeColor(uint color, int shade)
@@ -1059,7 +1065,9 @@ uint colorOutsideMap(vec3 rayOrigin, vec3 rayDirection, float tExit, int exitAxi
 			float blackShare = clamp((float(uAmbient) - DarkOverflowFrom) / (DarkOverflowTo - DarkOverflowFrom), 0.0, 1.0);
 			int darkest = groundIsWater ? max(int(color & 15u), WaterDarkestShade) : 15;
 			uint unlit = color;
-			color = blackShare > dither(pixelX + 1, pixelY + 2) ? shadeColor(color, shades) : ((color & 0xF0u) | uint(min(darkest, int(color & 15u) + max(0, shades))));
+			bool pastGroup = !groundIsWater && int(color & 15u) + shades > 15;
+			color = pastGroup ? fadedToBlack(color | 15u, blackShare, dither(pixelX + 1, pixelY + 2))
+				: blackShare > dither(pixelX + 1, pixelY + 2) ? shadeColor(color, shades) : ((color & 0xF0u) | uint(min(darkest, int(color & 15u) + max(0, shades))));
 			float haze = uUnderwater != 0 ? smoothStep(uMaxDistance * 0.12, uMaxDistance * 0.65, groundDistance)
 				: smoothStep(uMaxDistance * hazeStart() * 0.67, uMaxDistance * 1.6, groundDistance);
 #ifdef REFLECTIONS
@@ -1544,6 +1552,10 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 	}
 	int darkest = onSea ? max(int(baseColor & 15u), WaterDarkestShade) : 15;
 	uint color = darkEnoughForBlack ? shadeColor(baseColor, wholeShades) : ((baseColor & 0xF0u) | uint(min(darkest, int(baseColor & 15u) + wholeShades)));
+	if (!onSea && !onSteadyUfo && int(baseColor & 15u) + wholeShades > 15)
+	{
+		color = fadedToBlack(baseColor | 15u, blackShare, dither(pixelX + 1, pixelY + 2));
+	}
 	if (flare * 1.5 > 0.04 + dither(pixelX + 1, pixelY + 3))
 	{
 		color = table(FlareRow, color); // the flare's light is red

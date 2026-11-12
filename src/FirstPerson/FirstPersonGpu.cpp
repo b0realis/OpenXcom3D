@@ -404,7 +404,7 @@ const int ModelMasks = 4;             // a model's masks: glass, look-only glass
 const int ModelSideBytes = 1024;      // a model's colours for the faces the art never shows: plan, east, south
 const int MaxSwings = 16;             // the doors swinging at once the shader takes
 const int TileUints = 16;             // a tile's numbers (four texels of four)
-const int TableRows = 14;             // the rows of 256 bytes in the colour tables (see encodeTables)
+const int TableRows = 14 + FirstPersonView::DarkFadeSteps;             // the rows of 256 bytes in the colour tables (see encodeTables)
 const int UfoTableRows = 14;          // ... and for each UFO after them: its two tints and twelve soft tints
 const int MaxUfos = 8;
 const int BufferCount = 13;
@@ -443,6 +443,7 @@ std::string shaderConstants()
 	number("CloudDeckMottle", CloudDeckMottle);
 	number("DarkOverflowFrom", DarkOverflowFrom);
 	number("DarkOverflowTo", DarkOverflowTo);
+	whole("DarkFadeSteps", FirstPersonView::DarkFadeSteps);
 	number("UnseenFogDarkening", UnseenFogDarkening);
 	number("UnseenFogFromMax", UnseenFogFromMax);
 	number("UnseenFogNormal", UnseenFogNormal);
@@ -1008,7 +1009,7 @@ void FirstPersonGpu::State::encodeTiles(const Frame &frame)
  * The scene's colour tables, rows of 256 bytes: 0-8 the haze's steps, 9 through glass, 10 unseen
  * terrain's tone, 11 a flare's red; 12 the scene's single colours (the sky's 32, the clouds' 8,
  * then the rest, in the order of the shader's Scene... constants); 13 which colours are all but
- * black; then fourteen rows for each UFO: its inner and outer tints, and its twelve soft tints.
+ * black, 14 on a colour's steps to black (darkFade); then fourteen rows for each UFO: its inner and outer tints, and its twelve soft tints.
  */
 void FirstPersonGpu::State::encodeTables(const Frame &frame)
 {
@@ -1027,6 +1028,7 @@ void FirstPersonGpu::State::encodeTables(const Frame &frame)
 		frame.waterColors[0], frame.waterColors[1], frame.waterColors[2], frame.rockBase };
 	std::memcpy(scene + 40, rest, sizeof(rest));
 	std::memcpy(&tables[13 * 256], frame.black, 256);
+	std::memcpy(&tables[14 * 256], colors.darkFade, FirstPersonView::DarkFadeSteps * 256);
 	for (int ufo = 0; ufo < ufoCount; ++ufo)
 	{
 		Uint8 *rows = &tables[(TableRows + ufo * UfoTableRows) * 256];

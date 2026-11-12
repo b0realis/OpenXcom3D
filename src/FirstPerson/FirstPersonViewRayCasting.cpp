@@ -468,10 +468,16 @@ void FirstPersonView::updateColors()
 				return channel + (std::min(255.0f, UnseenToneRgb[axis] * luminance / slateLuminance) - channel) * UnseenToneShare;
 			};
 			_colors.unseenTint[index] = nearestSeen(toned(color.r, 0), toned(color.g, 1), toned(color.b, 2));
+			for (int step = 0; step < DarkFadeSteps; ++step)
+			{
+				const float kept = 1.0f - (step + 1) / (float)(DarkFadeSteps + 1);
+				_colors.darkFade[step][index] = nearestSeen(color.r * kept, color.g * kept, color.b * kept);
+			}
 		}
 		_colors.glassTint[0] = 0;
 		_colors.flareTint[0] = 0;
 		_colors.unseenTint[0] = 0;
+		for (int step = 0; step < DarkFadeSteps; ++step) _colors.darkFade[step][0] = 0;
 	}
 
 	// The sun stands high in the north-west by day; at night there is only the moon, and the
@@ -1134,6 +1140,12 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 	// (The sea stops short of its groups' last shades, all but black, see WaterDarkestShade.)
 	const int darkest = onSea ? std::max(baseColor & 15, WaterDarkestShade) : 15;
 	Uint8 color = darkEnoughForBlack ? shadeColor(baseColor, wholeShades) : (Uint8)((baseColor & 0xF0) | std::min(darkest, (baseColor & 15) + wholeShades));
+	if (!onSea && !onSteadyUfo && (baseColor & 15) + wholeShades > 15)
+	{
+		// Past its group's end it goes to black by way of the palette's darker colours, the
+		// darker the place (see DarkFadeSteps), not straight from the group's darkest.
+		color = fadedToBlack((Uint8)(baseColor | 15), blackShare, dither(pixelX + 1, pixelY + 2));
+	}
 	if (flare * 1.5f > 0.04f + dither(pixelX + 1, pixelY + 3))
 	{
 		color = _colors.flareTint[color]; // the flare's light is red
@@ -1335,7 +1347,9 @@ Uint8 FirstPersonView::colorOutsideMap(const float rayOrigin[3], const float ray
 			// (The sea stops short of its groups' last shades, all but black: WaterDarkestShade.)
 			const float blackShare = std::clamp((_colors.ambient - DarkOverflowFrom) / (DarkOverflowTo - DarkOverflowFrom), 0.0f, 1.0f);
 			const int darkest = ground->water ? std::max(color & 15, WaterDarkestShade) : 15;
-			color = blackShare > dither(pixelX + 1, pixelY + 2) ? shadeColor(color, shades) : (Uint8)((color & 0xF0) | std::min(darkest, (color & 15) + std::max(0, shades)));
+			const bool pastGroup = !ground->water && (color & 15) + shades > 15;
+			color = pastGroup ? fadedToBlack((Uint8)(color | 15), blackShare, dither(pixelX + 1, pixelY + 2)) // (by way of the palette's darker colours: see DarkFadeSteps)
+				: blackShare > dither(pixelX + 1, pixelY + 2) ? shadeColor(color, shades) : (Uint8)((color & 0xF0) | std::min(darkest, (color & 15) + std::max(0, shades)));
 			// The haze closes in towards the horizon, spread over a longer distance than on the
 			// map so the ground fades out gradually; under the sea the murk closes in as on the map.
 			const float haze = _colors.underwater ? smoothstep(_maxDistance * 0.12f, _maxDistance * 0.65f, groundDistance)

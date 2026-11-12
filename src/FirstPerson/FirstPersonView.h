@@ -221,6 +221,12 @@ public:
 		bool glass;     // the ray went through window glass on the way
 		bool emissive;  // hit the bright part of a light source
 	};
+	/// On its way to black a colour passes through this many darker colours of the palette (each
+	/// the nearest to it dimmed a step further, see SceneColors::darkFade), dithered between
+	/// neighbours. Straight from the group's darkest to black, the groups that end well short of
+	/// black (the reds end at a clear dark red) showed a dark room as red dots on black (a player's
+	/// soldier camera in an XPiratez mansion).
+	static const int DarkFadeSteps = 3;
 	/// Palette colours picked for the current palette and time of day.
 	struct SceneColors
 	{
@@ -271,6 +277,7 @@ public:
 		Uint8 grey[4];         // TV static
 		Uint8 glitchGreen[2];  // a digital feed's broken blocks: bright and dark green
 		Uint8 flareTint[256];  // each colour in a flare's red light
+		Uint8 darkFade[DarkFadeSteps][256]; // each colour on its way to black: dimmed by 1 .. DarkFadeSteps of the DarkFadeSteps + 1 steps there
 		Uint8 unseenTint[256]; // each colour as unexplored terrain shows it, drawn ("Unseen terrain": Visible): toned towards slate grey
 		Uint8 flareFire[3];    // flare flame: red, orange, yellow
 		static constexpr int HazeSteps = 8; // the distance haze blends colours towards the haze in this many steps
@@ -794,6 +801,12 @@ private:
 	float terrainHaze(float distance) const;
 	/// How many shades darker the distance makes terrain this far away (see DistanceShadeVoxels).
 	float distanceShade(float distance) const;
+	/// A group's darkest colour on its way to black by how dark the place is (0 itself .. 1 black), through the palette's darker colours (see DarkFadeSteps), dithered by the pixel's threshold.
+	Uint8 fadedToBlack(Uint8 groupEnd, float blackShare, float threshold) const
+	{
+		const int step = (int)(blackShare * (DarkFadeSteps + 1) + threshold);
+		return step <= 0 ? groupEnd : step > DarkFadeSteps ? (Uint8)0x0F : _colors.darkFade[step - 1][groupEnd];
+	}
 	/// A colour faded into the distance haze by an amount (0 none .. 1 all haze), dithered between neighbouring blend steps.
 	Uint8 hazeColor(Uint8 color, float haze, int pixelX, int pixelY) const;
 	/// How much of the soldier's sight the smoke on the line from the eye to a point uses up (1 or more: they can't see through it).

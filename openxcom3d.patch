@@ -26290,10 +26290,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..876241244
+index 000000000..c843968e0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,1672 @@
+@@ -0,0 +1,1674 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -26700,7 +26700,7 @@ index 000000000..876241244
 +const int ModelSideBytes = 1024;      // a model's colours for the faces the art never shows: plan, east, south
 +const int MaxSwings = 16;             // the doors swinging at once the shader takes
 +const int TileUints = 16;             // a tile's numbers (four texels of four)
-+const int TableRows = 14;             // the rows of 256 bytes in the colour tables (see encodeTables)
++const int TableRows = 14 + FirstPersonView::DarkFadeSteps;             // the rows of 256 bytes in the colour tables (see encodeTables)
 +const int UfoTableRows = 14;          // ... and for each UFO after them: its two tints and twelve soft tints
 +const int MaxUfos = 8;
 +const int BufferCount = 13;
@@ -26739,6 +26739,7 @@ index 000000000..876241244
 +	number("CloudDeckMottle", CloudDeckMottle);
 +	number("DarkOverflowFrom", DarkOverflowFrom);
 +	number("DarkOverflowTo", DarkOverflowTo);
++	whole("DarkFadeSteps", FirstPersonView::DarkFadeSteps);
 +	number("UnseenFogDarkening", UnseenFogDarkening);
 +	number("UnseenFogFromMax", UnseenFogFromMax);
 +	number("UnseenFogNormal", UnseenFogNormal);
@@ -27304,7 +27305,7 @@ index 000000000..876241244
 + * The scene's colour tables, rows of 256 bytes: 0-8 the haze's steps, 9 through glass, 10 unseen
 + * terrain's tone, 11 a flare's red; 12 the scene's single colours (the sky's 32, the clouds' 8,
 + * then the rest, in the order of the shader's Scene... constants); 13 which colours are all but
-+ * black; then fourteen rows for each UFO: its inner and outer tints, and its twelve soft tints.
++ * black, 14 on a colour's steps to black (darkFade); then fourteen rows for each UFO: its inner and outer tints, and its twelve soft tints.
 + */
 +void FirstPersonGpu::State::encodeTables(const Frame &frame)
 +{
@@ -27323,6 +27324,7 @@ index 000000000..876241244
 +		frame.waterColors[0], frame.waterColors[1], frame.waterColors[2], frame.rockBase };
 +	std::memcpy(scene + 40, rest, sizeof(rest));
 +	std::memcpy(&tables[13 * 256], frame.black, 256);
++	std::memcpy(&tables[14 * 256], colors.darkFade, FirstPersonView::DarkFadeSteps * 256);
 +	for (int ufo = 0; ufo < ufoCount; ++ufo)
 +	{
 +		Uint8 *rows = &tables[(TableRows + ufo * UfoTableRows) * 256];
@@ -28325,10 +28327,10 @@ index 000000000..0c753a2bd
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..e26d441ac
+index 000000000..ecb56d8bb
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,1902 @@
+@@ -0,0 +1,1914 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -28780,7 +28782,7 @@ index 000000000..e26d441ac
 +
 +const int SkyEarth = 0, SkySpace = 1, SkyOrbit = 2, SkyMoon = 3, SkyMars = 4, SkySea = 5, SkyVoid = 6;
 +// The rows of uTables.
-+const int HazeRow = 0, GlassRow = 9, UnseenRow = 10, FlareRow = 11, SceneRow = 12, BlackRow = 13, UfoRows = 14, RowsPerUfo = 14;
++const int HazeRow = 0, GlassRow = 9, UnseenRow = 10, FlareRow = 11, SceneRow = 12, BlackRow = 13, DarkFadeRow = 14, UfoRows = 14 + DarkFadeSteps, RowsPerUfo = 14;
 +// Where the scene's colours sit in their row.
 +const int SceneSky = 0, SceneCloud = 32, SceneHaze = 40, SceneStar = 41, SceneMoon = 42, SceneSun = 43, SceneTapeYellow = 44, SceneTapeBlack = 45,
 +	ScenePost = 46, SceneFaintStar = 47, SceneEarth = 48, SceneUnexplored = 52, SceneRock = 53, SceneWater = 54, SceneRockBase = 57;
@@ -28790,6 +28792,12 @@ index 000000000..e26d441ac
 +
 +uint table(int row, uint color) { return texelFetch(uTables, row * 256 + int(color)).r; }
 +uint scene(int index) { return texelFetch(uTables, SceneRow * 256 + index).r; }
++// A group's darkest colour on its way to black by how dark the place is, through the palette's darker colours (see the view's fadedToBlack).
++uint fadedToBlack(uint groupEnd, float blackShare, float threshold)
++{
++	int fadeStep = int(blackShare * float(DarkFadeSteps + 1) + threshold);
++	return fadeStep <= 0 ? groupEnd : fadeStep > DarkFadeSteps ? 0x0Fu : table(DarkFadeRow + fadeStep - 1, groupEnd);
++}
 +bool airless() { return uSky == SkySpace || uSky == SkyOrbit || uSky == SkyMoon; }
 +
 +uint shadeColor(uint color, int shade)
@@ -29390,7 +29398,9 @@ index 000000000..e26d441ac
 +			float blackShare = clamp((float(uAmbient) - DarkOverflowFrom) / (DarkOverflowTo - DarkOverflowFrom), 0.0, 1.0);
 +			int darkest = groundIsWater ? max(int(color & 15u), WaterDarkestShade) : 15;
 +			uint unlit = color;
-+			color = blackShare > dither(pixelX + 1, pixelY + 2) ? shadeColor(color, shades) : ((color & 0xF0u) | uint(min(darkest, int(color & 15u) + max(0, shades))));
++			bool pastGroup = !groundIsWater && int(color & 15u) + shades > 15;
++			color = pastGroup ? fadedToBlack(color | 15u, blackShare, dither(pixelX + 1, pixelY + 2))
++				: blackShare > dither(pixelX + 1, pixelY + 2) ? shadeColor(color, shades) : ((color & 0xF0u) | uint(min(darkest, int(color & 15u) + max(0, shades))));
 +			float haze = uUnderwater != 0 ? smoothStep(uMaxDistance * 0.12, uMaxDistance * 0.65, groundDistance)
 +				: smoothStep(uMaxDistance * hazeStart() * 0.67, uMaxDistance * 1.6, groundDistance);
 +#ifdef REFLECTIONS
@@ -29875,6 +29885,10 @@ index 000000000..e26d441ac
 +	}
 +	int darkest = onSea ? max(int(baseColor & 15u), WaterDarkestShade) : 15;
 +	uint color = darkEnoughForBlack ? shadeColor(baseColor, wholeShades) : ((baseColor & 0xF0u) | uint(min(darkest, int(baseColor & 15u) + wholeShades)));
++	if (!onSea && !onSteadyUfo && int(baseColor & 15u) + wholeShades > 15)
++	{
++		color = fadedToBlack(baseColor | 15u, blackShare, dither(pixelX + 1, pixelY + 2));
++	}
 +	if (flare * 1.5 > 0.04 + dither(pixelX + 1, pixelY + 3))
 +	{
 +		color = table(FlareRow, color); // the flare's light is red
@@ -52748,10 +52762,10 @@ index 000000000..f8e3d170f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..243dfb431
+index 000000000..9120b8c59
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1481 @@
+@@ -0,0 +1,1494 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -52975,6 +52989,12 @@ index 000000000..243dfb431
 +		bool glass;     // the ray went through window glass on the way
 +		bool emissive;  // hit the bright part of a light source
 +	};
++	/// On its way to black a colour passes through this many darker colours of the palette (each
++	/// the nearest to it dimmed a step further, see SceneColors::darkFade), dithered between
++	/// neighbours. Straight from the group's darkest to black, the groups that end well short of
++	/// black (the reds end at a clear dark red) showed a dark room as red dots on black (a player's
++	/// soldier camera in an XPiratez mansion).
++	static const int DarkFadeSteps = 3;
 +	/// Palette colours picked for the current palette and time of day.
 +	struct SceneColors
 +	{
@@ -53025,6 +53045,7 @@ index 000000000..243dfb431
 +		Uint8 grey[4];         // TV static
 +		Uint8 glitchGreen[2];  // a digital feed's broken blocks: bright and dark green
 +		Uint8 flareTint[256];  // each colour in a flare's red light
++		Uint8 darkFade[DarkFadeSteps][256]; // each colour on its way to black: dimmed by 1 .. DarkFadeSteps of the DarkFadeSteps + 1 steps there
 +		Uint8 unseenTint[256]; // each colour as unexplored terrain shows it, drawn ("Unseen terrain": Visible): toned towards slate grey
 +		Uint8 flareFire[3];    // flare flame: red, orange, yellow
 +		static constexpr int HazeSteps = 8; // the distance haze blends colours towards the haze in this many steps
@@ -53548,6 +53569,12 @@ index 000000000..243dfb431
 +	float terrainHaze(float distance) const;
 +	/// How many shades darker the distance makes terrain this far away (see DistanceShadeVoxels).
 +	float distanceShade(float distance) const;
++	/// A group's darkest colour on its way to black by how dark the place is (0 itself .. 1 black), through the palette's darker colours (see DarkFadeSteps), dithered by the pixel's threshold.
++	Uint8 fadedToBlack(Uint8 groupEnd, float blackShare, float threshold) const
++	{
++		const int step = (int)(blackShare * (DarkFadeSteps + 1) + threshold);
++		return step <= 0 ? groupEnd : step > DarkFadeSteps ? (Uint8)0x0F : _colors.darkFade[step - 1][groupEnd];
++	}
 +	/// A colour faded into the distance haze by an amount (0 none .. 1 all haze), dithered between neighbouring blend steps.
 +	Uint8 hazeColor(Uint8 color, float haze, int pixelX, int pixelY) const;
 +	/// How much of the soldier's sight the smoke on the line from the eye to a point uses up (1 or more: they can't see through it).
@@ -56527,10 +56554,10 @@ index 000000000..4eeedea4c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..a52b9fd7a
+index 000000000..8b657d8fe
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,1998 @@
+@@ -0,0 +1,2012 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -57001,10 +57028,16 @@ index 000000000..a52b9fd7a
 +				return channel + (std::min(255.0f, UnseenToneRgb[axis] * luminance / slateLuminance) - channel) * UnseenToneShare;
 +			};
 +			_colors.unseenTint[index] = nearestSeen(toned(color.r, 0), toned(color.g, 1), toned(color.b, 2));
++			for (int step = 0; step < DarkFadeSteps; ++step)
++			{
++				const float kept = 1.0f - (step + 1) / (float)(DarkFadeSteps + 1);
++				_colors.darkFade[step][index] = nearestSeen(color.r * kept, color.g * kept, color.b * kept);
++			}
 +		}
 +		_colors.glassTint[0] = 0;
 +		_colors.flareTint[0] = 0;
 +		_colors.unseenTint[0] = 0;
++		for (int step = 0; step < DarkFadeSteps; ++step) _colors.darkFade[step][0] = 0;
 +	}
 +
 +	// The sun stands high in the north-west by day; at night there is only the moon, and the
@@ -57667,6 +57700,12 @@ index 000000000..a52b9fd7a
 +	// (The sea stops short of its groups' last shades, all but black, see WaterDarkestShade.)
 +	const int darkest = onSea ? std::max(baseColor & 15, WaterDarkestShade) : 15;
 +	Uint8 color = darkEnoughForBlack ? shadeColor(baseColor, wholeShades) : (Uint8)((baseColor & 0xF0) | std::min(darkest, (baseColor & 15) + wholeShades));
++	if (!onSea && !onSteadyUfo && (baseColor & 15) + wholeShades > 15)
++	{
++		// Past its group's end it goes to black by way of the palette's darker colours, the
++		// darker the place (see DarkFadeSteps), not straight from the group's darkest.
++		color = fadedToBlack((Uint8)(baseColor | 15), blackShare, dither(pixelX + 1, pixelY + 2));
++	}
 +	if (flare * 1.5f > 0.04f + dither(pixelX + 1, pixelY + 3))
 +	{
 +		color = _colors.flareTint[color]; // the flare's light is red
@@ -57868,7 +57907,9 @@ index 000000000..a52b9fd7a
 +			// (The sea stops short of its groups' last shades, all but black: WaterDarkestShade.)
 +			const float blackShare = std::clamp((_colors.ambient - DarkOverflowFrom) / (DarkOverflowTo - DarkOverflowFrom), 0.0f, 1.0f);
 +			const int darkest = ground->water ? std::max(color & 15, WaterDarkestShade) : 15;
-+			color = blackShare > dither(pixelX + 1, pixelY + 2) ? shadeColor(color, shades) : (Uint8)((color & 0xF0) | std::min(darkest, (color & 15) + std::max(0, shades)));
++			const bool pastGroup = !ground->water && (color & 15) + shades > 15;
++			color = pastGroup ? fadedToBlack((Uint8)(color | 15), blackShare, dither(pixelX + 1, pixelY + 2)) // (by way of the palette's darker colours: see DarkFadeSteps)
++				: blackShare > dither(pixelX + 1, pixelY + 2) ? shadeColor(color, shades) : (Uint8)((color & 0xF0) | std::min(darkest, (color & 15) + std::max(0, shades)));
 +			// The haze closes in towards the horizon, spread over a longer distance than on the
 +			// map so the ground fades out gradually; under the sea the murk closes in as on the map.
 +			const float haze = _colors.underwater ? smoothstep(_maxDistance * 0.12f, _maxDistance * 0.65f, groundDistance)
@@ -59826,10 +59867,10 @@ index 000000000..dc4e7ff65
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..4a220890e
+index 000000000..f950d598a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,596 @@
+@@ -0,0 +1,597 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -60281,6 +60322,7 @@ index 000000000..4a220890e
 +/// DarkOverflowTo (all of it), dithered between. A lit house is 2, the Piratez hideout's rooms
 +/// about 4.5, a night field at the edge of a soldier's light about 6.5, far from it 15.
 +const float DarkOverflowFrom = 5.0f, DarkOverflowTo = 8.0f;
++
 +/// The darkest shade (0 brightest .. 15 darkest) the isometric map's night vision leaves near the
 +/// soldiers (Map::NIGHT_VISION_SHADE): the 3D view's night vision lights the tiles and the open
 +/// ground no darker, and the units too in the map's first debug vision mode (see mapShade).
