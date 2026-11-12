@@ -327,6 +327,27 @@ void FirstPersonView::findUfos()
 		}
 		// Too small to be a UFO (stray debris), or without a UFO's hull (an alien base).
 		if (ufo.tiles.size() < UfoMinTiles || !hull) continue;
+		// A building the mod's rules list among its UFOs (XPiratez lands its enemies in plants,
+		// mansions and bunkers that way: a player saw the UFO's coloured light dithered over and
+		// inside one) is no UFO to light up: a UFO has its machinery, a power source, a
+		// navigation console or a grav lift, and a building has none of them.
+		bool machinery = false;
+		for (size_t index = 0; index < ufo.tiles.size() && !machinery; ++index)
+		{
+			const Tile *tile = _save->getTile(ufo.tiles[index]);
+			for (int part = 0; part < 4 && !machinery; ++part)
+			{
+				const MapData *mapData = tile->getMapData((TilePart)part);
+				if (!mapData) continue;
+				const SpecialTileType special = mapData->getSpecialType();
+				machinery = special == UFO_POWER_SOURCE || special == UFO_NAVIGATION || (part == O_FLOOR && mapData->isGravLift());
+			}
+		}
+		if (!machinery)
+		{
+			Log(LOG_INFO) << "OpenXcom3D: a building of " << ufo.tiles.size() << " tiles from a UFO's map (no power source, navigation or grav lift): not lit as a UFO";
+			continue;
+		}
 
 		// Its footprint (the middle and half the size of its box, in voxels) and its height.
 		ufo.centre[0] = (low[0] + high[0] + 1) * 8.0f;
