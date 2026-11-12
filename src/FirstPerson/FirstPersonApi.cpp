@@ -706,7 +706,7 @@ void createOptions(std::vector<OptionInfo> &options)
 	// rules, when looking further will cost time units.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCompass", &fpsCompass, true, "STR_FPS_COMPASS", category));
 	// ...and round it, what a step each way costs in time units (and a level up or down, and a turn).
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsCompassCosts", &fpsCompassCosts, true, "STR_FPS_COMPASS_COSTS", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsCompassCosts", &fpsCompassCosts, false, "STR_FPS_COMPASS_COSTS", category));
 	// Moving: free walking or tile by tile (0 free, 1 tiles: a key press walks one tile), walking
 	// speed in tiles per second (1 to 8; every tile still costs its time units),
 	// the view bobbing with the steps, time units a flying soldier pays per level up or down

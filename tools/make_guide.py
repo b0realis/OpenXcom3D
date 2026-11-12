@@ -216,7 +216,7 @@ SETTINGS = [
          'See at a glance who needs the medi-kit, and where.'),
         ('Damage numbers', 'NO', 'YES / NO', 'A hit\'s damage rises over the unit and fades: the health lost after the armour in red, the armour it wore off in blue, the stun in purple, a grey 0 when the armour stopped it all. In 3D over the unit\'s head (behind walls hidden) and on the map, for every hit on a unit your squad sees, whoever struck.', 'The game\'s own numbers: see at once what a burst or a blast really did, and how worn a Muton\'s armour is.'),
         ('Compass', 'YES', 'YES / NO', 'A compass at the top right: your heading, the way the soldier faces, and (with turning at a cost) how far the head turns for free.', ''),
-        ('Compass: step costs', 'YES', 'YES / NO', 'Round the compass, the time units a step each way costs right now (the top is forward), a level up or down by the climb arrows, and what a turn costs under it. Yellow or red on costly ground, grey when the soldier can\'t pay.', ''),
+        ('Compass: step costs', 'NO', 'YES / NO', 'YES: round the compass, the time units a step each way costs right now (the top is forward), a level up or down by the climb arrows, and what a turn costs under it. Yellow or red on costly ground, grey when the soldier can\'t pay.', ''),
         ('Middle click identifies', 'YES', 'YES / NO', 'A middle click on a unit opens the game\'s unit screen, as on the map.', ''),
     ]),
     ('Sound', [
