@@ -257,9 +257,9 @@ const double HeldItemScale = 2.6, HeldItemMinPixels = 20.0, HeldItemYaw = 22.0, 
 const double RiflePixels = 41.0;
 const double SizeCurve = 0.6;
 /// A bow in the hands (see FirstPersonMode::analyzeWeapon), against a gun as long: it stands across the view.
-const double BowScale = 0.85;
+const double BowScale = 0.5;
 /// ...where it is held on the weapon's line (0 the far end .. 1 the near), and how far its curve is turned in from that line (degrees).
-const double BowAt = 0.15, BowTurn = 40.0;
+const double BowAt = 0.5, BowTurn = 40.0;
 const double GripAt = 0.3;
 
 // ---- Moving ----

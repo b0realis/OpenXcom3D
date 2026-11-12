@@ -713,9 +713,9 @@ void FirstPersonMode::drawWeaponPlate(bool left, double bob[2], double kick, dou
 	// from the eye). Its curve points along the line at the crosshair, turned BowTurn degrees
 	// in towards the middle of the view: seen straight from behind a bow is only a stick, so it
 	// is held a little open, and its curve shows, leaning towards the crosshair. The line is kept
-	// only as long as the bow is deep, from the string to the curve. Its middle sits on the
-	// screen's bottom edge, so its lower half is hidden below it (the owner: "the bow should sit
-	// half hidden below screen").
+	// only as long as the bow is deep, from the string to the curve. Half way down the
+	// line its lower half is below the screen's bottom edge (the owner: "the bow should sit half
+	// hidden below screen").
 	if (shape.bow)
 	{
 		const double perBowPixel = length / std::max(4.0, pictureLength) * BowScale;
@@ -728,7 +728,6 @@ void FirstPersonMode::drawWeaponPlate(bool left, double bob[2], double kick, dou
 			towardsLength += towards[axis] * towards[axis];
 		}
 		towardsLength = std::sqrt(towardsLength);
-		grip[1] = ((height - centreY) / focalPixels + sway[1]) * grip[2]; // (on the screen's bottom edge, moving with the bob and the dip)
 		length = pixelsLong * perBowPixel;
 		for (int axis = 0; axis < 3; ++axis)
 		{
