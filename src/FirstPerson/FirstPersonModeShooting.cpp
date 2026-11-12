@@ -3579,6 +3579,54 @@ void FirstPersonMode::freeAimFrom(BattlescapeState *state, const BattleAction &a
 }
 
 /**
+ * The game's hook for where an arcing shot or a throw leaves from (see FirstPerson::slidingOrigin;
+ * setting "Arcs: smooth start"; a player's report, GitHub issue #128: a tank's flamer arc came in
+ * from the right, and from the left after a slight change of aim). The game launches from one of
+ * eight points round the unit's footprint, picked by the eighth of the compass the target lies
+ * in: for a 2x2 unit they are most of a tile apart, and the arc's start jumps as the aim crosses
+ * from one eighth to the next. Here the point slides instead: by the exact bearing from the
+ * footprint's middle to the target tile's, between the two points either side of it. Looking
+ * straight along one of the eight directions it is the game's own point. A lean's off-centre
+ * origin (BattleActionOrigin LEFT or RIGHT: the game's point a third of the way to its
+ * neighbour) is the bearing a third of an eighth to that side. The height stays the game's.
+ * Only the unit the 3D view is with, so the preview and the shot agree; shots ordered on the
+ * map keep the game's point.
+ * @param state The battlescape screen (it owns the first-person mode).
+ * @param action The shot or throw.
+ * @param from The tile it leaves from (a large unit's: its first).
+ * @param shiftX The game's eight points across a tile, by direction: along x, in voxels.
+ * @param shiftY The same along y.
+ * @param origin The game's origin, in voxels, to change.
+ */
+void FirstPersonMode::slidingOrigin(BattlescapeState *state, const BattleAction &action, const Position &from, const int shiftX[8], const int shiftY[8], Position &origin)
+{
+	if (!Options::fpsSmoothArcStart || !state || !state->_firstPerson || !state->_firstPerson->isActive()
+		|| !action.actor || action.actor != state->_firstPerson->_trackedUnit)
+	{
+		return;
+	}
+	if (action.type != BA_THROW && !(action.weapon && action.weapon->getArcingShot(action.type)))
+	{
+		return;
+	}
+	// The bearing in eighths of a turn (0 north, clockwise; the map's y points south).
+	const int size = action.actor->getArmor()->getSize();
+	const double towardsX = (action.target.x * 16 + 8) - (from.x * 16 + 8 * size), towardsY = (action.target.y * 16 + 8) - (from.y * 16 + 8 * size);
+	if (towardsX == 0.0 && towardsY == 0.0)
+	{
+		return; // (at its own feet: the game's point)
+	}
+	double eighths = std::atan2(towardsX, -towardsY) / (Pi / 4.0);
+	if (action.relativeOrigin == BattleActionOrigin::LEFT) eighths -= 1.0 / 3.0;
+	if (action.relativeOrigin == BattleActionOrigin::RIGHT) eighths += 1.0 / 3.0;
+	eighths -= 8.0 * std::floor(eighths / 8.0); // 0 to 8
+	const int before = (int)eighths % 8, after = (before + 1) % 8;
+	const double along = eighths - std::floor(eighths);
+	origin.x = from.x * 16 + (int)std::lround((shiftX[before] + (shiftX[after] - shiftX[before]) * along) * size);
+	origin.y = from.y * 16 + (int)std::lround((shiftY[before] + (shiftY[after] - shiftY[before]) * along) * size);
+}
+
+/**
  * The game's hook for a shot knocked aside by a failed close-quarters check (see
  * FirstPerson::closeQuartersDeflected): passed on to the first-person mode if the 3D view is
  * showing.

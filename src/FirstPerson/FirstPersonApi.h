@@ -195,6 +195,11 @@ void freeAimTarget(BattlescapeState *state, const BattleAction &action, Position
 /// past a corner the round can reach. The game asks this as it works out where a shot leaves
 /// from (TileEngine::getOriginVoxel); every other shot keeps the game's own muzzle point.
 void freeAimOrigin(BattlescapeState *state, const BattleAction &action, Position &origin);
+/// Where an arcing shot or a throw from the first-person view leaves from (setting "Arcs: smooth
+/// start"): a point that slides round the unit's footprint with the exact bearing to the target,
+/// between the game's eight (given as their shifts across a tile, by direction). Asked by the
+/// game after it picked its own point (TileEngine::getOriginVoxel).
+void slidingOrigin(BattlescapeState *state, const BattleAction &action, const Position &from, const int shiftX[8], const int shiftY[8], Position &origin);
 /// Is FPS-style shooting on for this unit's shots in the first-person view? Their bullet hits
 /// then play quicker (a burst at a bullet's pace).
 bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
@@ -407,6 +412,7 @@ inline State *createOptionsTab(OptionsOrigin) { return nullptr; }
 inline bool activeWhenNew(const std::string &) { return false; }
 inline void freeAimTarget(BattlescapeState *, const BattleAction &, Position &) { }
 inline void freeAimOrigin(BattlescapeState *, const BattleAction &, Position &) { }
+inline void slidingOrigin(BattlescapeState *, const BattleAction &, const Position &, const int[8], const int[8], Position &) { }
 inline bool fastShots(BattlescapeState *, const BattleUnit *) { return false; }
 inline bool pelletsInFlight(BattlescapeState *) { return false; }
 inline bool instantChains(BattlescapeState *) { return false; }

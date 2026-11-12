@@ -134,6 +134,7 @@ SETTINGS = [
         ('Akimbo volley', 'NO', 'YES / NO', 'NO: two guns take turns round by round, each round resolved before the next. YES: both at once, a volley, their hits landing together.',
          'In turns a burst can kill one alien and go on to the next.'),
         ('Lean shots', 'NO', 'YES / NO', 'Standing to one side of the tile shoots from that side: the game\'s own off-centre origins.', 'Peek and shoot round a corner (with the game\'s own targeting; FPS style always shoots from the eye).'),
+        ('Arcs: smooth start', 'NO', 'YES / NO', 'YES: a throw or an arcing shot from the 3D view leaves from a point that slides round the unit as you turn, not one of the game\'s eight fixed points (a large unit\'s arc jumped from side to side). Shots ordered on the map are unchanged.', ''),
         ('Lean', 'Off', 'Off / Peek / Tilt', 'Left Shift with A or D leans out to peek; Tilt tilts the view too.', 'Shows round corners; a shot from a lean leaves from that side.'),
         ('Melee hits walls and downed', 'NO', 'YES / NO', 'A blow at the wall, door or object under the crosshair strikes it; a blow can hit a body lying beside you, diagonally too.', 'Break through a wall with a hammer, as the map\'s terrain melee does in some mods.'),
         ('Melee hits floors', 'YES', 'YES / NO', 'With terrain melee on: the floor or ceiling you aim at takes the blow too.', 'Break through the floor at your feet or the ceiling above.'),

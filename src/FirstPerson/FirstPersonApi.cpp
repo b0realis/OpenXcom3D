@@ -752,6 +752,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	// off-centre origins), to peek round corners; and leaning out with the lean keys: off (0),
 	// the eye moves to the side (1, peek), and the view tilts with it (2, tilt).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsLeanShots", &fpsLeanShots, false, "STR_FPS_LEAN_SHOTS", category));
+	// An arcing shot or a throw leaves from a point that slides round the unit with the aim (a
+	// large unit's start jumped most of a tile between two of the game's eight points).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmoothArcStart", &fpsSmoothArcStart, false, "STR_FPS_SMOOTH_ARC_START", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsLean", &fpsLean, 0, "STR_FPS_LEAN", category));
 	// Melee at the wall, door or object the soldier faces (the game's terrain melee, on even if
 	// the mod leaves it off) and at a body lying in front.
@@ -1125,6 +1128,23 @@ void freeAimTarget(BattlescapeState *state, const BattleAction &action, Position
 void freeAimOrigin(BattlescapeState *state, const BattleAction &action, Position &origin)
 {
 	FirstPersonMode::freeAimFrom(state, action, origin);
+}
+
+/**
+ * Called by the game as it works out where a shot leaves from (TileEngine::getOriginVoxel), after
+ * it picked its own point: an arcing shot's or a throw's slides round the footprint instead (see
+ * FirstPersonMode::slidingOrigin). Nothing changes for any other shot, with the setting off, or
+ * while the 3D view isn't showing.
+ * @param state The battlescape screen.
+ * @param action The shot.
+ * @param from The tile it leaves from (a large unit's: its first).
+ * @param shiftX The game's eight points across a tile, by direction: along x, in voxels.
+ * @param shiftY The same along y.
+ * @param origin The game's origin, in voxels; changed in place.
+ */
+void slidingOrigin(BattlescapeState *state, const BattleAction &action, const Position &from, const int shiftX[8], const int shiftY[8], Position &origin)
+{
+	FirstPersonMode::slidingOrigin(state, action, from, shiftX, shiftY, origin);
 }
 
 /**
