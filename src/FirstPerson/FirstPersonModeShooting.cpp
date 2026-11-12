@@ -3584,8 +3584,8 @@ void FirstPersonMode::freeAimFrom(BattlescapeState *state, const BattleAction &a
  * from the right, and from the left after a slight change of aim). The game launches from one of
  * eight points round the unit's footprint, picked by the eighth of the compass the target lies
  * in: for a 2x2 unit they are most of a tile apart, and the arc's start jumps as the aim crosses
- * from one eighth to the next. Here the point slides instead: by the exact bearing from the
- * footprint's middle to the target tile's, between the two points either side of it. Looking
+ * from one eighth to the next. Here the point slides instead: by the exact bearing (the
+ * view's own, see below), between the two points either side of it. Looking
  * straight along one of the eight directions it is the game's own point. A lean's off-centre
  * origin (BattleActionOrigin LEFT or RIGHT: the game's point a third of the way to its
  * neighbour) is the bearing a third of an eighth to that side. The height stays the game's.
@@ -3609,14 +3609,22 @@ void FirstPersonMode::slidingOrigin(BattlescapeState *state, const BattleAction 
 	{
 		return;
 	}
-	// The bearing in eighths of a turn (0 north, clockwise; the map's y points south).
+	// The bearing in eighths of a turn (0 north, clockwise; the map's y points south). In the
+	// player's turn it is the view's own: the crosshair picks the target, and the view turns
+	// smoothly where the bearing to a target tile would step from tile to tile. Otherwise (a
+	// reaction shot) the bearing from the footprint's middle to the target tile's.
+	const FirstPersonMode *firstPerson = state->_firstPerson;
 	const int size = action.actor->getArmor()->getSize();
-	const double towardsX = (action.target.x * 16 + 8) - (from.x * 16 + 8 * size), towardsY = (action.target.y * 16 + 8) - (from.y * 16 + 8 * size);
-	if (towardsX == 0.0 && towardsY == 0.0)
+	double eighths = (firstPerson->_view->getYawDegrees() + 90.0) / 45.0;
+	if (firstPerson->_save->getSide() != FACTION_PLAYER)
 	{
-		return; // (at its own feet: the game's point)
+		const double towardsX = (action.target.x * 16 + 8) - (from.x * 16 + 8 * size), towardsY = (action.target.y * 16 + 8) - (from.y * 16 + 8 * size);
+		if (towardsX == 0.0 && towardsY == 0.0)
+		{
+			return; // (at its own feet: the game's point)
+		}
+		eighths = std::atan2(towardsX, -towardsY) / (Pi / 4.0);
 	}
-	double eighths = std::atan2(towardsX, -towardsY) / (Pi / 4.0);
 	if (action.relativeOrigin == BattleActionOrigin::LEFT) eighths -= 1.0 / 3.0;
 	if (action.relativeOrigin == BattleActionOrigin::RIGHT) eighths += 1.0 / 3.0;
 	eighths -= 8.0 * std::floor(eighths / 8.0); // 0 to 8
