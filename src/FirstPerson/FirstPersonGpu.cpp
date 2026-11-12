@@ -67,7 +67,7 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
-#if (defined(__linux__) && !defined(__ANDROID__)) || defined(__APPLE__)
+#if defined(__linux__) || defined(__APPLE__)
 #include <dlfcn.h>
 #endif
 #ifndef _WIN32
@@ -95,23 +95,41 @@ GL_FUNCTIONS(GL_DEFINE)
 bool GpuContext::loadFunctions()
 {
 	bool all = true;
+	// (Android: EGL may hand out only the extensions' functions; the rest are in the OpenGL ES library itself.)
+	void *fallback = nullptr;
+#ifdef __ANDROID__
+	fallback = dlopen("libGLESv3.so", RTLD_NOW | RTLD_LOCAL);
+#endif
+	(void)fallback;
 #define GL_LOAD(result, name, arguments) \
 	Gl::name = (decltype(Gl::name))_getProcAddress("gl" #name); \
+	if (!Gl::name && fallback) Gl::name = (decltype(Gl::name))dlsym(fallback, "gl" #name); \
 	if (!Gl::name) { Log(LOG_WARNING) << "OpenXcom3D GPU: the driver has no gl" #name; all = false; }
 	GL_FUNCTIONS(GL_LOAD)
 #undef GL_LOAD
 	return all;
 }
 
-#if defined(__linux__) && !defined(__ANDROID__)
+#if defined(__linux__)
 
 /**
  * Opens a hidden OpenGL 3.3 context through EGL, with no window and no X server: on the
  * machine's graphics devices as EGL lists them (EGL_EXT_device_enumeration), the one asked for
  * by number; where EGL can't list them, on its default display.
+ * Android (a Quest headset): EGL's default display, which is the headset's own graphics chip, and
+ * OpenGL ES 3.2, the only kind it has; the context is the renderer's own, beside the app's.
+ * (OPENXCOM3D_GPU_DEFAULT_DISPLAY: that same way on a desktop, no device asked for by number, to try it.)
  */
 bool GpuContext::create(int device, bool es)
 {
+#ifdef __ANDROID__
+	const bool defaultDisplay = true;
+	const char *const libraryName = "libEGL.so";
+	es = true;
+#else
+	const bool defaultDisplay = getenv("OPENXCOM3D_GPU_DEFAULT_DISPLAY") != nullptr;
+	const char *const libraryName = "libEGL.so.1";
+#endif
 	// EGL's own types and constants (its values), kept local: nothing else needs them.
 	typedef void *(*GetDisplay)(void *);
 	typedef unsigned (*Initialize)(void *, int *, int *);
@@ -131,10 +149,10 @@ bool GpuContext::create(int device, bool es)
 	const int EglOpenGlEs3Bit = 0x40;
 	const int EglDrmDeviceFile = 0x3233;
 
-	_library = dlopen("libEGL.so.1", RTLD_NOW | RTLD_LOCAL);
+	_library = dlopen(libraryName, RTLD_NOW | RTLD_LOCAL);
 	if (!_library)
 	{
-		Log(LOG_INFO) << "OpenXcom3D GPU: no libEGL.so.1 on this machine";
+		Log(LOG_INFO) << "OpenXcom3D GPU: no " << libraryName << " on this machine";
 		return false;
 	}
 	auto symbol = [this](const char *name) { return dlsym(_library, name); };
@@ -150,14 +168,14 @@ bool GpuContext::create(int device, bool es)
 	_getProcAddress = (void *(*)(const char *))symbol("eglGetProcAddress");
 	if (!getDisplay || !initialize || !bindApi || !chooseConfig || !createContext || !createPbuffer || !makeCurrent || !queryString || !getError || !_getProcAddress)
 	{
-		Log(LOG_WARNING) << "OpenXcom3D GPU: libEGL.so.1 lacks a function";
+		Log(LOG_WARNING) << "OpenXcom3D GPU: " << libraryName << " lacks a function";
 		return false;
 	}
 
 	// The machine's graphics devices, where EGL lists them: the one asked for.
 	const char *clientExtensions = queryString(nullptr, EglExtensions);
 	const std::string extensions = clientExtensions ? clientExtensions : "";
-	if (extensions.find("EGL_EXT_device_enumeration") != std::string::npos && extensions.find("EGL_EXT_platform_device") != std::string::npos)
+	if (!defaultDisplay && extensions.find("EGL_EXT_device_enumeration") != std::string::npos && extensions.find("EGL_EXT_platform_device") != std::string::npos)
 	{
 		const auto queryDevices = (QueryDevices)_getProcAddress("eglQueryDevicesEXT");
 		const auto getPlatformDisplay = (GetPlatformDisplay)_getProcAddress("eglGetPlatformDisplayEXT");
@@ -178,7 +196,7 @@ bool GpuContext::create(int device, bool es)
 			_display = getPlatformDisplay(EglPlatformDevice, devices[std::max(device, 0)], nullptr);
 		}
 	}
-	if (!_display && device > 0)
+	if (!_display && device > 0 && !defaultDisplay)
 	{
 		return false; // EGL can't list devices: only its default one
 	}

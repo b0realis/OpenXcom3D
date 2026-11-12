@@ -36,6 +36,8 @@
  * sums are done here in double precision, as the CPU's routines do them; the card works a pixel
  * out in single precision, so a sprite's edge may fall a pixel off the CPU's now and then.
  *
+ * In full colour on a display that shows it (setting "True colour", 32 bits), the frame itself is put together on the card
+ * too (gpuPresent): one picture comes back, as it is shown. OPENXCOM3D_GPU_PRESENT=0: by the mode on the CPU, as before.
  * OPENXCOM3D_GPU_EFFECTS=0: the old way (the rays read back, the passes on the CPU), to compare; =check: both, the CPU's
  * shown, the card's compared with it a pixel at a time (see gpuCheckEffects).
  */
@@ -659,9 +661,10 @@ bool FirstPersonView::gpuDrawEffects()
 	output.trueColor = fullColor ? _trueColor.data() : nullptr;
 	// Beside the picture: in full colour the rays' own palette colours (a pixel that still has its ray's is shown in
 	// the full one, see trueColor), and with light in the air where the smoke lies; the depth only if asked later.
-	// (OPENXCOM3D_GPU_PRESENT=1: in full colour the frame is put together on the card, see gpuPresent; =check: both ways, compared.)
+	// In full colour the frame is put together on the card (see gpuPresent). (OPENXCOM3D_GPU_PRESENT=0: on the CPU, by the mode,
+	// as before; =check: both ways, compared.)
 	static const char *const presentAsked = getenv("OPENXCOM3D_GPU_PRESENT");
-	_gpuPresenting = !presentAsked || !fullColor ? 0 : !strcmp(presentAsked, "check") ? 2 : atoi(presentAsked) != 0 ? 1 : 0;
+	_gpuPresenting = !fullColor ? 0 : !presentAsked ? 1 : !strcmp(presentAsked, "check") ? 2 : atoi(presentAsked) != 0 ? 1 : 0;
 	// (Only a display with a byte for each of red, green and blue can show such a frame: on an 8-bit one the view's own
 	// palette picture is what is shown, and it must hold the world.)
 	const SDL_Surface *display = SDL_GetVideoSurface();

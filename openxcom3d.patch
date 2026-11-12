@@ -26291,10 +26291,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..44977eb83
+index 000000000..146360411
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,2489 @@
+@@ -0,0 +1,2507 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -26364,7 +26364,7 @@ index 000000000..44977eb83
 +#include <thread>
 +#include <unordered_map>
 +#include <vector>
-+#if (defined(__linux__) && !defined(__ANDROID__)) || defined(__APPLE__)
++#if defined(__linux__) || defined(__APPLE__)
 +#include <dlfcn.h>
 +#endif
 +#ifndef _WIN32
@@ -26392,23 +26392,41 @@ index 000000000..44977eb83
 +bool GpuContext::loadFunctions()
 +{
 +	bool all = true;
++	// (Android: EGL may hand out only the extensions' functions; the rest are in the OpenGL ES library itself.)
++	void *fallback = nullptr;
++#ifdef __ANDROID__
++	fallback = dlopen("libGLESv3.so", RTLD_NOW | RTLD_LOCAL);
++#endif
++	(void)fallback;
 +#define GL_LOAD(result, name, arguments) \
 +	Gl::name = (decltype(Gl::name))_getProcAddress("gl" #name); \
++	if (!Gl::name && fallback) Gl::name = (decltype(Gl::name))dlsym(fallback, "gl" #name); \
 +	if (!Gl::name) { Log(LOG_WARNING) << "OpenXcom3D GPU: the driver has no gl" #name; all = false; }
 +	GL_FUNCTIONS(GL_LOAD)
 +#undef GL_LOAD
 +	return all;
 +}
 +
-+#if defined(__linux__) && !defined(__ANDROID__)
++#if defined(__linux__)
 +
 +/**
 + * Opens a hidden OpenGL 3.3 context through EGL, with no window and no X server: on the
 + * machine's graphics devices as EGL lists them (EGL_EXT_device_enumeration), the one asked for
 + * by number; where EGL can't list them, on its default display.
++ * Android (a Quest headset): EGL's default display, which is the headset's own graphics chip, and
++ * OpenGL ES 3.2, the only kind it has; the context is the renderer's own, beside the app's.
++ * (OPENXCOM3D_GPU_DEFAULT_DISPLAY: that same way on a desktop, no device asked for by number, to try it.)
 + */
 +bool GpuContext::create(int device, bool es)
 +{
++#ifdef __ANDROID__
++	const bool defaultDisplay = true;
++	const char *const libraryName = "libEGL.so";
++	es = true;
++#else
++	const bool defaultDisplay = getenv("OPENXCOM3D_GPU_DEFAULT_DISPLAY") != nullptr;
++	const char *const libraryName = "libEGL.so.1";
++#endif
 +	// EGL's own types and constants (its values), kept local: nothing else needs them.
 +	typedef void *(*GetDisplay)(void *);
 +	typedef unsigned (*Initialize)(void *, int *, int *);
@@ -26428,10 +26446,10 @@ index 000000000..44977eb83
 +	const int EglOpenGlEs3Bit = 0x40;
 +	const int EglDrmDeviceFile = 0x3233;
 +
-+	_library = dlopen("libEGL.so.1", RTLD_NOW | RTLD_LOCAL);
++	_library = dlopen(libraryName, RTLD_NOW | RTLD_LOCAL);
 +	if (!_library)
 +	{
-+		Log(LOG_INFO) << "OpenXcom3D GPU: no libEGL.so.1 on this machine";
++		Log(LOG_INFO) << "OpenXcom3D GPU: no " << libraryName << " on this machine";
 +		return false;
 +	}
 +	auto symbol = [this](const char *name) { return dlsym(_library, name); };
@@ -26447,14 +26465,14 @@ index 000000000..44977eb83
 +	_getProcAddress = (void *(*)(const char *))symbol("eglGetProcAddress");
 +	if (!getDisplay || !initialize || !bindApi || !chooseConfig || !createContext || !createPbuffer || !makeCurrent || !queryString || !getError || !_getProcAddress)
 +	{
-+		Log(LOG_WARNING) << "OpenXcom3D GPU: libEGL.so.1 lacks a function";
++		Log(LOG_WARNING) << "OpenXcom3D GPU: " << libraryName << " lacks a function";
 +		return false;
 +	}
 +
 +	// The machine's graphics devices, where EGL lists them: the one asked for.
 +	const char *clientExtensions = queryString(nullptr, EglExtensions);
 +	const std::string extensions = clientExtensions ? clientExtensions : "";
-+	if (extensions.find("EGL_EXT_device_enumeration") != std::string::npos && extensions.find("EGL_EXT_platform_device") != std::string::npos)
++	if (!defaultDisplay && extensions.find("EGL_EXT_device_enumeration") != std::string::npos && extensions.find("EGL_EXT_platform_device") != std::string::npos)
 +	{
 +		const auto queryDevices = (QueryDevices)_getProcAddress("eglQueryDevicesEXT");
 +		const auto getPlatformDisplay = (GetPlatformDisplay)_getProcAddress("eglGetPlatformDisplayEXT");
@@ -26475,7 +26493,7 @@ index 000000000..44977eb83
 +			_display = getPlatformDisplay(EglPlatformDevice, devices[std::max(device, 0)], nullptr);
 +		}
 +	}
-+	if (!_display && device > 0)
++	if (!_display && device > 0 && !defaultDisplay)
 +	{
 +		return false; // EGL can't list devices: only its default one
 +	}
@@ -58154,10 +58172,10 @@ index 000000000..b6fbee4f6
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpuEffects.cpp b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 new file mode 100644
-index 000000000..748612e46
+index 000000000..f3700eac1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
-@@ -0,0 +1,937 @@
+@@ -0,0 +1,940 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -58196,6 +58214,8 @@ index 000000000..748612e46
 + * sums are done here in double precision, as the CPU's routines do them; the card works a pixel
 + * out in single precision, so a sprite's edge may fall a pixel off the CPU's now and then.
 + *
++ * In full colour on a display that shows it (setting "True colour", 32 bits), the frame itself is put together on the card
++ * too (gpuPresent): one picture comes back, as it is shown. OPENXCOM3D_GPU_PRESENT=0: by the mode on the CPU, as before.
 + * OPENXCOM3D_GPU_EFFECTS=0: the old way (the rays read back, the passes on the CPU), to compare; =check: both, the CPU's
 + * shown, the card's compared with it a pixel at a time (see gpuCheckEffects).
 + */
@@ -58819,9 +58839,10 @@ index 000000000..748612e46
 +	output.trueColor = fullColor ? _trueColor.data() : nullptr;
 +	// Beside the picture: in full colour the rays' own palette colours (a pixel that still has its ray's is shown in
 +	// the full one, see trueColor), and with light in the air where the smoke lies; the depth only if asked later.
-+	// (OPENXCOM3D_GPU_PRESENT=1: in full colour the frame is put together on the card, see gpuPresent; =check: both ways, compared.)
++	// In full colour the frame is put together on the card (see gpuPresent). (OPENXCOM3D_GPU_PRESENT=0: on the CPU, by the mode,
++	// as before; =check: both ways, compared.)
 +	static const char *const presentAsked = getenv("OPENXCOM3D_GPU_PRESENT");
-+	_gpuPresenting = !presentAsked || !fullColor ? 0 : !strcmp(presentAsked, "check") ? 2 : atoi(presentAsked) != 0 ? 1 : 0;
++	_gpuPresenting = !fullColor ? 0 : !presentAsked ? 1 : !strcmp(presentAsked, "check") ? 2 : atoi(presentAsked) != 0 ? 1 : 0;
 +	// (Only a display with a byte for each of red, green and blue can show such a frame: on an 8-bit one the view's own
 +	// palette picture is what is shown, and it must hold the world.)
 +	const SDL_Surface *display = SDL_GetVideoSurface();
