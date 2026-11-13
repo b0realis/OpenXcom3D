@@ -4350,7 +4350,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		if (_txtRange->getText() != rangeText) _txtRange->setText(rangeText);
 		_txtRange->setColor(yellowText);
 	}
-	// The analogue kind: the scale under and left of the crosshair, its curve as high over its line at each mark as a
+	// The analogue kind: the scale left of the crosshair, its curve as high over its line at each mark as a
 	// unit RangeSubjectVoxels tall (a standing soldier, at the setting "Unit size") shows that many tiles away. Its five
 	// marks are the ladder's first whose heights fit the scale through the lens not zoomed in; zoomed in (the owner:
 	// "analogue should enlarge"), the marks stay and the curve grows with the picture, upwards from the line, so it
@@ -4365,9 +4365,10 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		const double tilePixels = focalPixels * subject; // how high the subject shows a tile away, now
 		int first = 0;
 		while (first + 5 < ladderCount && plainFocal * subject / ladder[first] > _rangeScaleHeight) ++first;
-		// The line keeps its place, just under the curve's height not zoomed in; the surface reaches up from there.
-		_rangeScale->setX(centreX - 24 - _rangeScaleWidth);
-		_rangeScale->setY(centreY + 16 + _rangeScaleHeight - (_rangeScale->getHeight() - 4));
+		// Left of the crosshair, beside it (the owner: "to the left of normal reticle"): the line keeps its place, three
+		// quarters of the curve's height not zoomed in below the crosshair's middle; the surface reaches up from there.
+		_rangeScale->setX(centreX - RangeScaleGap - _rangeScaleWidth);
+		_rangeScale->setY(centreY + _rangeScaleHeight * 3 / 4 - (_rangeScale->getHeight() - 4));
 		const Uint64 scaleKey = (Uint64)std::lround(tilePixels * 16.0) | ((Uint64)first << 32) | ((Uint64)yellow << 40) | ((Uint64)shadow << 48);
 		if (scaleKey != _rangeScaleDrawnFor)
 		{
@@ -4670,8 +4671,8 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 /**
  * Draws the analogue rangefinder (setting "Rangefinder") onto its surface and places its numbers, in the manner of the
  * PSO-1 scope's: a level line with small ticks, and over it a dotted curve that falls from right to left, as high over
- * the line at each of five marks as the subject (a unit 1.7 m tall, the label at the line's right end) shows at that
- * mark's range. A unit standing on the line with its head at the curve is as many tiles away as the number there.
+ * the line at each of five marks as the subject (a unit 1.7 m tall, the label over the line's right end) shows at that
+ * mark's range, in tiles. A unit standing on the line with its head at the curve is as many tiles away as the number there.
  * The line is the surface's fourth row from the bottom; the curve may rise to the surface's top (zoomed in).
  * Between the marks the range runs evenly by ratio, so the curve is smooth. Each pixel has a shadow one down and to the
  * right, so it reads on any background. The surface's place must be set before (the numbers are laid out from it).
@@ -4710,7 +4711,7 @@ void FirstPersonMode::drawRangeScale(const int marks[5], double tilePixels, Uint
 	{
 		const int x = width - mark * width / 4, y = base - (int)std::lround(heightAt(x));
 		for (int drop = 0; drop <= 2 && y + drop < base; ++drop) points.insert({ x, y + drop });
-		// Its number sits over the curve there; the subject's height right of the line's end.
+		// Its number sits over the curve there; the subject's height over the line's right end, under the curve.
 		Text *number = _rangeMarks[mark];
 		const std::string text = std::to_string(marks[mark]);
 		if (number->getText() != text) number->setText(text);
@@ -4720,8 +4721,8 @@ void FirstPersonMode::drawRangeScale(const int marks[5], double tilePixels, Uint
 	Text *subject = _rangeMarks[5];
 	const std::string subjectText = _state->tr("STR_FPS_RANGE_SUBJECT");
 	if (subject->getText() != subjectText) subject->setText(subjectText);
-	subject->setX(_rangeScale->getX() + width + 4);
-	subject->setY(_rangeScale->getY() + base - 7);
+	subject->setX(_rangeScale->getX() + width - subject->getWidth());
+	subject->setY(_rangeScale->getY() + base - 14);
 	_rangeScale->clear();
 	_rangeScale->lock();
 	for (const auto &point : points) _rangeScale->setPixel(point.first + 1, point.second + 1, shadow);

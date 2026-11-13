@@ -110,6 +110,8 @@ const int CrosshairSize = 47;
 /// to the top of the head, in voxels (measured on the view: soldiers put 12 and 20 tiles off stand 25 voxels tall).
 const double RangeSubjectVoxels = 25.0;
 /// One voxel up is this much of a voxel across, as the view draws it (the view's own ZScale, FirstPersonViewShared.h).
+/// How far left of the crosshair's middle the analogue rangefinder's line ends, in canvas pixels.
+const int RangeScaleGap = 28;
 const double RangeVoxelRise = 0.81649658092772603;
 /// How long a hit, a kill or a strike that did no harm marks the crosshair, in milliseconds.
 const Uint32 HitMarkTime = 280;

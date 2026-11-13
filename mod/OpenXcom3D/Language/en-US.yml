@@ -435,7 +435,7 @@ en-US:
   STR_FPS_CROSSHAIR_COSTS: "Expanded crosshair info"
   STR_FPS_CROSSHAIR_DAMAGE: "Shot damage"
   STR_FPS_RANGEFINDER: "Rangefinder"
-  STR_FPS_RANGEFINDER_DESC: "Digital: the tiles to the point under the crosshair. Analog: a scope's scale; stand a unit on its line, read the tiles at its head."
+  STR_FPS_RANGEFINDER_DESC: "Units: tiles. Digital: the range to the point under the crosshair. Analog: a scope's scale; stand a unit on its line, read the range at its head."
   STR_FPS_RANGEFINDER_OFF: "Off"
   STR_FPS_RANGEFINDER_DIGITAL: "Digital"
   STR_FPS_RANGEFINDER_ANALOGUE: "Analog"

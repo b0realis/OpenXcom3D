@@ -944,7 +944,7 @@ private:
 	Text *_txtMode = nullptr, *_txtShot = nullptr; // the fire mode, and the shot's odds and cost, beside the crosshair
 	Text *_txtCosts = nullptr;                      // and under them its other costs (setting "Expanded crosshair info")
 	Text *_txtRange = nullptr;                      // left of the crosshair, how far off the point under it is, in tiles (setting "Rangefinder" Digital, or its key held)
-	Surface *_rangeScale = nullptr;                 // the analogue rangefinder's scale, left of and below the crosshair (see drawRangeScale)
+	Surface *_rangeScale = nullptr;                 // the analogue rangefinder's scale, left of the crosshair (see drawRangeScale)
 	std::vector<Text*> _rangeMarks;                 // its numbers, the nearest mark's first, and last the height it is drawn for ("1.7m")
 	int _rangeScaleWidth = 0, _rangeScaleHeight = 0; // its line's length and its curve's greatest height not zoomed in, in canvas pixels
 	Uint64 _rangeScaleDrawnFor = ~(Uint64)0;        // what it shows, to redraw only on change

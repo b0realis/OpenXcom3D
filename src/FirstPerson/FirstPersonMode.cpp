@@ -306,7 +306,7 @@ void FirstPersonMode::createCrosshairAndBanner()
 	for (int mark = 0; mark < 6; ++mark)
 	{
 		_rangeMarks.push_back(addText(mark < 5 ? 24 : 40, 9, 0, 0, "crosshairText", "firstPerson"));
-		if (mark < 5) _rangeMarks.back()->setAlign(ALIGN_CENTER);
+		_rangeMarks.back()->setAlign(mark < 5 ? ALIGN_CENTER : ALIGN_RIGHT);
 		_rangeMarks.back()->setVisible(false);
 	}
 	_txtBanner->setAlign(ALIGN_CENTER);

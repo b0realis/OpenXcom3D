@@ -124,7 +124,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..cb9fe4b09
+index 000000000..dbcd30cd6
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,574 @@
@@ -565,7 +565,7 @@ index 000000000..cb9fe4b09
 +  STR_FPS_CROSSHAIR_COSTS: "Expanded crosshair info"
 +  STR_FPS_CROSSHAIR_DAMAGE: "Shot damage"
 +  STR_FPS_RANGEFINDER: "Rangefinder"
-+  STR_FPS_RANGEFINDER_DESC: "Digital: the tiles to the point under the crosshair. Analogue: a scope's scale; stand a unit on its line, read the tiles at its head."
++  STR_FPS_RANGEFINDER_DESC: "Units: tiles. Digital: the range to the point under the crosshair. Analogue: a scope's scale; stand a unit on its line, read the range at its head."
 +  STR_FPS_RANGEFINDER_OFF: "Off"
 +  STR_FPS_RANGEFINDER_DIGITAL: "Digital"
 +  STR_FPS_RANGEFINDER_ANALOGUE: "Analogue"
@@ -704,7 +704,7 @@ index 000000000..cb9fe4b09
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..03ea84721
+index 000000000..858ff8923
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,574 @@
@@ -1145,7 +1145,7 @@ index 000000000..03ea84721
 +  STR_FPS_CROSSHAIR_COSTS: "Expanded crosshair info"
 +  STR_FPS_CROSSHAIR_DAMAGE: "Shot damage"
 +  STR_FPS_RANGEFINDER: "Rangefinder"
-+  STR_FPS_RANGEFINDER_DESC: "Digital: the tiles to the point under the crosshair. Analog: a scope's scale; stand a unit on its line, read the tiles at its head."
++  STR_FPS_RANGEFINDER_DESC: "Units: tiles. Digital: the range to the point under the crosshair. Analog: a scope's scale; stand a unit on its line, read the range at its head."
 +  STR_FPS_RANGEFINDER_OFF: "Off"
 +  STR_FPS_RANGEFINDER_DIGITAL: "Digital"
 +  STR_FPS_RANGEFINDER_ANALOGUE: "Analog"
@@ -31945,7 +31945,7 @@ index 000000000..eaa9f409a
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..347095273
+index 000000000..cc890a1c5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
 @@ -0,0 +1,3285 @@
@@ -32257,7 +32257,7 @@ index 000000000..347095273
 +	for (int mark = 0; mark < 6; ++mark)
 +	{
 +		_rangeMarks.push_back(addText(mark < 5 ? 24 : 40, 9, 0, 0, "crosshairText", "firstPerson"));
-+		if (mark < 5) _rangeMarks.back()->setAlign(ALIGN_CENTER);
++		_rangeMarks.back()->setAlign(mark < 5 ? ALIGN_CENTER : ALIGN_RIGHT);
 +		_rangeMarks.back()->setVisible(false);
 +	}
 +	_txtBanner->setAlign(ALIGN_CENTER);
@@ -35236,7 +35236,7 @@ index 000000000..347095273
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..b1dd009d3
+index 000000000..acca1fef3
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
 @@ -0,0 +1,1384 @@
@@ -36186,7 +36186,7 @@ index 000000000..b1dd009d3
 +	Text *_txtMode = nullptr, *_txtShot = nullptr; // the fire mode, and the shot's odds and cost, beside the crosshair
 +	Text *_txtCosts = nullptr;                      // and under them its other costs (setting "Expanded crosshair info")
 +	Text *_txtRange = nullptr;                      // left of the crosshair, how far off the point under it is, in tiles (setting "Rangefinder" Digital, or its key held)
-+	Surface *_rangeScale = nullptr;                 // the analogue rangefinder's scale, left of and below the crosshair (see drawRangeScale)
++	Surface *_rangeScale = nullptr;                 // the analogue rangefinder's scale, left of the crosshair (see drawRangeScale)
 +	std::vector<Text*> _rangeMarks;                 // its numbers, the nearest mark's first, and last the height it is drawn for ("1.7m")
 +	int _rangeScaleWidth = 0, _rangeScaleHeight = 0; // its line's length and its curve's greatest height not zoomed in, in canvas pixels
 +	Uint64 _rangeScaleDrawnFor = ~(Uint64)0;        // what it shows, to redraw only on change
@@ -42675,10 +42675,10 @@ index 000000000..ae2ea6125
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..c9a9098da
+index 000000000..4e3f5e38b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,518 @@
+@@ -0,0 +1,520 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -42791,6 +42791,8 @@ index 000000000..c9a9098da
 +/// to the top of the head, in voxels (measured on the view: soldiers put 12 and 20 tiles off stand 25 voxels tall).
 +const double RangeSubjectVoxels = 25.0;
 +/// One voxel up is this much of a voxel across, as the view draws it (the view's own ZScale, FirstPersonViewShared.h).
++/// How far left of the crosshair's middle the analogue rangefinder's line ends, in canvas pixels.
++const int RangeScaleGap = 28;
 +const double RangeVoxelRise = 0.81649658092772603;
 +/// How long a hit, a kill or a strike that did no harm marks the crosshair, in milliseconds.
 +const Uint32 HitMarkTime = 280;
@@ -43199,10 +43201,10 @@ index 000000000..c9a9098da
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..c05689ad9
+index 000000000..ff6efb91e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,5369 @@
+@@ -0,0 +1,5370 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -47555,7 +47557,7 @@ index 000000000..c05689ad9
 +		if (_txtRange->getText() != rangeText) _txtRange->setText(rangeText);
 +		_txtRange->setColor(yellowText);
 +	}
-+	// The analogue kind: the scale under and left of the crosshair, its curve as high over its line at each mark as a
++	// The analogue kind: the scale left of the crosshair, its curve as high over its line at each mark as a
 +	// unit RangeSubjectVoxels tall (a standing soldier, at the setting "Unit size") shows that many tiles away. Its five
 +	// marks are the ladder's first whose heights fit the scale through the lens not zoomed in; zoomed in (the owner:
 +	// "analogue should enlarge"), the marks stay and the curve grows with the picture, upwards from the line, so it
@@ -47570,9 +47572,10 @@ index 000000000..c05689ad9
 +		const double tilePixels = focalPixels * subject; // how high the subject shows a tile away, now
 +		int first = 0;
 +		while (first + 5 < ladderCount && plainFocal * subject / ladder[first] > _rangeScaleHeight) ++first;
-+		// The line keeps its place, just under the curve's height not zoomed in; the surface reaches up from there.
-+		_rangeScale->setX(centreX - 24 - _rangeScaleWidth);
-+		_rangeScale->setY(centreY + 16 + _rangeScaleHeight - (_rangeScale->getHeight() - 4));
++		// Left of the crosshair, beside it (the owner: "to the left of normal reticle"): the line keeps its place, three
++		// quarters of the curve's height not zoomed in below the crosshair's middle; the surface reaches up from there.
++		_rangeScale->setX(centreX - RangeScaleGap - _rangeScaleWidth);
++		_rangeScale->setY(centreY + _rangeScaleHeight * 3 / 4 - (_rangeScale->getHeight() - 4));
 +		const Uint64 scaleKey = (Uint64)std::lround(tilePixels * 16.0) | ((Uint64)first << 32) | ((Uint64)yellow << 40) | ((Uint64)shadow << 48);
 +		if (scaleKey != _rangeScaleDrawnFor)
 +		{
@@ -47875,8 +47878,8 @@ index 000000000..c05689ad9
 +/**
 + * Draws the analogue rangefinder (setting "Rangefinder") onto its surface and places its numbers, in the manner of the
 + * PSO-1 scope's: a level line with small ticks, and over it a dotted curve that falls from right to left, as high over
-+ * the line at each of five marks as the subject (a unit 1.7 m tall, the label at the line's right end) shows at that
-+ * mark's range. A unit standing on the line with its head at the curve is as many tiles away as the number there.
++ * the line at each of five marks as the subject (a unit 1.7 m tall, the label over the line's right end) shows at that
++ * mark's range, in tiles. A unit standing on the line with its head at the curve is as many tiles away as the number there.
 + * The line is the surface's fourth row from the bottom; the curve may rise to the surface's top (zoomed in).
 + * Between the marks the range runs evenly by ratio, so the curve is smooth. Each pixel has a shadow one down and to the
 + * right, so it reads on any background. The surface's place must be set before (the numbers are laid out from it).
@@ -47915,7 +47918,7 @@ index 000000000..c05689ad9
 +	{
 +		const int x = width - mark * width / 4, y = base - (int)std::lround(heightAt(x));
 +		for (int drop = 0; drop <= 2 && y + drop < base; ++drop) points.insert({ x, y + drop });
-+		// Its number sits over the curve there; the subject's height right of the line's end.
++		// Its number sits over the curve there; the subject's height over the line's right end, under the curve.
 +		Text *number = _rangeMarks[mark];
 +		const std::string text = std::to_string(marks[mark]);
 +		if (number->getText() != text) number->setText(text);
@@ -47925,8 +47928,8 @@ index 000000000..c05689ad9
 +	Text *subject = _rangeMarks[5];
 +	const std::string subjectText = _state->tr("STR_FPS_RANGE_SUBJECT");
 +	if (subject->getText() != subjectText) subject->setText(subjectText);
-+	subject->setX(_rangeScale->getX() + width + 4);
-+	subject->setY(_rangeScale->getY() + base - 7);
++	subject->setX(_rangeScale->getX() + width - subject->getWidth());
++	subject->setY(_rangeScale->getY() + base - 14);
 +	_rangeScale->clear();
 +	_rangeScale->lock();
 +	for (const auto &point : points) _rangeScale->setPixel(point.first + 1, point.second + 1, shadow);

@@ -204,7 +204,7 @@ SETTINGS = [
         ('Shot info', 'YES', 'YES / NO', 'The fire mode, hit chance and time units right of the crosshair (a melee blow\'s hit chance as the map\'s action menu gives it).', 'Yellow: you can; red: you can\'t.'),
         ('Expanded crosshair info', 'YES', 'YES / NO', 'The action\'s other costs under it: energy, health, stun, morale, mana.', 'The big mods\' weapons often cost energy.'),
         ('Shot damage', 'NO', 'YES / NO', 'The shot\'s damage range under the hit chance, as the map shows it with Alt: your soldier\'s stats and the distance counted, in the damage type\'s colour.', ''),
-        ('Rangefinder', 'Off', 'Off / Digital / Analogue', 'Digital: left of the crosshair, how many tiles away the point under it is. Analogue: a scope\'s scale; stand a unit on its line and read the tiles where its head meets the curve. It grows with the zoom.', 'The game counts a shot\'s range and its accuracy dropoff in these tiles.'),
+        ('Rangefinder', 'Off', 'Off / Digital / Analogue', 'The range in tiles. Digital: left of the crosshair, how many tiles away the point under it is. Analogue: a scope\'s scale; stand a unit on its line and read the tiles where its head meets the curve. It grows with the zoom.', 'The game counts a shot\'s range and its accuracy dropoff in these tiles.'),
         ('Accuracy line', 'YES', 'YES / NO', 'A green line under the crosshair: with the game\'s own targeting, bright where a hit lands and dotted out to where a miss can stray; in FPS style, the spread.',
          'The lower the hit chance, the more rounds miss and spray out to the dotted ends.'),
         ('Unit names', 'YES', 'YES / NO', 'The name of the unit you point at, under the crosshair.', ''),
