@@ -252,6 +252,8 @@ void clearModel(FirstPersonView::VoxelModel &model)
 	model.artFill = false;
 	model.openingGlass = false;
 	model.cropBlock = 0;
+	model.ghostKind = 0;
+	model.reliefRises = false;
 	model.foliage = false;
 	model.ghost = nullptr;
 	for (int axis = 0; axis < 3; ++axis)
@@ -2436,9 +2438,12 @@ const FirstPersonView::VoxelModel *FirstPersonView::getModel(const MapData *mapD
 	auto found = _models.find(key);
 	if (found == _models.end())
 	{
-		// Not built yet: build it in place (the map keeps it at the same address from then on).
+		// Not built yet: build it in place (the map keeps it at the same address from then on). A later frame of a
+		// part that animates is built as the kind of part its first frame is (see buildModel).
+		const int firstSprite = mapData->getSprite(0);
+		const VoxelModel *const firstFrame = spriteIndex != firstSprite ? getModel(mapData, firstSprite, cutout) : nullptr;
 		found = _models.emplace(key, VoxelModel()).first;
-		buildModel(mapData, spriteIndex, cutout, found->second);
+		buildModel(mapData, spriteIndex, cutout, found->second, firstFrame);
 		// The part's own ghost (VoxelModel::ghost): a floor drawn as a box of liquid, its surface
 		// (see buildLiquid); a floor or wall whose voxels leave out most of its art, the rest of it
 		// (see buildArtFill); an object the art draws as a block of crops, the block (see
@@ -2539,7 +2544,7 @@ const FirstPersonView::Frames &FirstPersonView::getFrames(const MapData *mapData
  * @param cutout Leave out the voxels whose pixel is transparent (a sliding UFO door's frames).
  * @param model Where to build it.
  */
-void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model) const
+void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model, const VoxelModel *firstFrame) const
 {
 	clearModel(model);
 
@@ -2767,26 +2772,46 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	{
 		const bool ghostShape = shape && shape->ghost;
 		bool rises = false;
-		const bool low = mapData->getObjectType() == O_OBJECT && lowArt(sprite, yOffset, rises);
-		const int block = cutout ? 0 : cropBlockOf(nullptr, mapData, sprite, yOffset);
-		const bool ghostWanted = Options::fpsGhostParts == 2
+		bool low = mapData->getObjectType() == O_OBJECT && lowArt(sprite, yOffset, rises);
+		int block = cutout ? 0 : cropBlockOf(nullptr, mapData, sprite, yOffset);
+		bool ghostWanted = Options::fpsGhostParts == 2
 			|| (Options::fpsGhostParts == 1 && (ghostShape || mapData->isGravLift() || cageArt(sprite, mapData->getObjectType(), yOffset) || low || block));
+		// A part that animates is what its first frame is, in every frame: what kind of ghost it gets is read off the
+		// art (how low it is, how like a block or a cage), and a frame whose art falls just the other side of a line
+		// (a fireplace's flames, one frame in four; a player, GitHub issue #134) lost its ghost, or stood as another kind.
+		if (firstFrame && firstFrame->empty == false && firstFrame->ghostKind == 0)
+		{
+			firstFrame = nullptr; // (the first frame has voxels of its own, this one's art none: nothing to follow)
+		}
+		if (firstFrame)
+		{
+			ghostWanted = firstFrame->ghostKind != 0;
+			block = firstFrame->ghostKind == 2 ? std::max<int>(1, block ? block : firstFrame->cropBlock) : 0;
+			low = firstFrame->ghostKind == 3;
+			if (low) rises = firstFrame->reliefRises;
+		}
 		if (ghostWanted && !cutout)
 		{
 			if (ghostShape)
 			{
+				model.ghostKind = 1;
 				buildShape(model, sprite, *shape, yOffset);
 			}
 			else if (block)
 			{
+				model.ghostKind = 2;
+				model.cropBlock = (Uint8)block; // (kept for the frames after the first: see above)
 				buildCropBlock(model, sprite, block, yOffset);
 			}
 			else if (low)
 			{
+				model.ghostKind = 3;
+				model.reliefRises = rises;
 				buildRelief(model, sprite, yOffset, rises);
 			}
 			else
 			{
+				model.ghostKind = 4;
 				buildGhost(model, sprite, mapData->getObjectType(), yOffset);
 			}
 			if (!model.empty) colorHiddenSides(model, sprite);
@@ -2816,10 +2841,16 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	// liquidHeightOf): the game's thin slab stays the floor, its top (the bottom under the liquid)
 	// a few shades darker; the liquid's surface is a ghost model of its own (see getModel).
 	const int walkCost = mapData->getTUCost(MT_WALK);
+	// (As for a part without voxels: one that animates is in every frame what its first frame is, a floor of liquid, a
+	// part with the rest of its art as a ghost, a block of crops, a mass of foliage; see firstFrame above.)
+	if (firstFrame && (firstFrame->empty || firstFrame->ghostKind != 0))
+	{
+		firstFrame = nullptr;
+	}
 	if (mapData->getObjectType() == O_FLOOR && !model.empty && model.max[2] <= 3 && !cutout
 		&& walkCost > PlainFloorWalkCost && walkCost < Pathfinding::INVALID_MOVE_COST)
 	{
-		model.liquidHeight = (Uint8)liquidHeightOf(sprite, yOffset);
+		model.liquidHeight = firstFrame ? firstFrame->liquidHeight : (Uint8)liquidHeightOf(sprite, yOffset);
 		// (with "Parts without shape" off, no surface: the floor as it is)
 		for (int y = 0; model.liquidHeight && Options::fpsGhostParts != 0 && y < Position::TileXY; ++y)
 		{
@@ -2837,16 +2868,16 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	// would stand as a ghost across the doorway; TFTD's liner).
 	if (!model.liquidHeight && !cutout && !mapData->isDoor() && !mapData->isUFODoor() && mapData->getAltMCD() == 0)
 	{
-		model.artFill = sparseArt(model, sprite, mapData->getObjectType(), yOffset);
+		model.artFill = firstFrame ? firstFrame->artFill : sparseArt(model, sprite, mapData->getObjectType(), yOffset);
 	}
 	// An object the art draws as a block of crops though the game gives it only a few voxels
 	// (X-Com Files' wheat: see cropBlockOf): the block is a ghost model of its own (see getModel).
 	if (!model.empty && !cutout)
 	{
-		model.cropBlock = (Uint8)cropBlockOf(&model, mapData, sprite, yOffset);
+		model.cropBlock = firstFrame ? firstFrame->cropBlock : (Uint8)cropBlockOf(&model, mapData, sprite, yOffset);
 	}
 	// A mass of foliage: drawn leafy on a tile without a floor (see foliageArt, leafyModel).
-	model.foliage = mapData->getObjectType() == O_OBJECT && !cutout && foliageArt(model, sprite, getPalette());
+	model.foliage = firstFrame ? firstFrame->foliage : mapData->getObjectType() == O_OBJECT && !cutout && foliageArt(model, sprite, getPalette());
 	colorHiddenSides(model, sprite);
 	findGlow(model);
 	model.water = waterFloor && !model.empty;

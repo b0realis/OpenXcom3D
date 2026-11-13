@@ -159,6 +159,8 @@ public:
 		bool openingGlass;        // glass filled into an opening of the game's shape (lookOnly bits, see fillPaneOpenings): a round going through breaks it (see breakGlassAt)
 		bool foliage;             // a mass of foliage (see foliageArt): drawn leafy on a tile without a floor (leafyModel)
 		Uint8 cropBlock;          // an object the art draws as a block of crops (X-Com Files' wheat, see cropBlockOf): the block's height in voxels; 0 for none
+		Uint8 ghostKind;          // how a part without voxels was built (see buildModel): 0 not at all, 1 the mod's ghost shape, 2 a block of crops, 3 low art standing up, 4 a plain ghost
+		bool reliefRises;         // ... low art that rises (see lowArt)
 		const VoxelModel *ghost;  // a ghost model of the part's own, in the same tile where the part has no voxels: the liquid's surface (buildLiquid), the rest of the art (buildArtFill) or a block of crops (buildCropBlock); null for none
 		float glow[3]; // centre of the brightest voxels in the top third (a lamp's bulb), in the tile
 		int glowCount;
@@ -708,7 +710,7 @@ private:
 	/// Is the glass in the openings of a tile part's window broken (see breakGlassAt)?
 	bool glassBroken(int tileIndex, int part) const;
 	/// Builds a voxel model: shapes from the LOFT templates, colours from the isometric sprite.
-	void buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model) const;
+	void buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model, const VoxelModel *firstFrame = nullptr) const;
 	/// What a pane of glass breaks into keeps the pane's edges in its frame (see paneOfGlass).
 	void addBrokenPaneEdges(const MapData *mapData, VoxelModel &model) const;
 	/// A pane of glass's openings in the game's shape filled with glass, a look only.
