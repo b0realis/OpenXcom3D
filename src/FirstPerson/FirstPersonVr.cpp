@@ -62,9 +62,11 @@ namespace FirstPerson
 namespace
 {
 
-/// The eyes' pictures for the setting "VR eye picture" (0 to 2), in pixels: the study's sizes for the Quest 3's CPU
-/// (about 2.8, 3.6 and 5.6 pixels a degree), each shaped as a Quest 3 eye's field of view, so its pixels stay square.
-const int VrEyeSizes[3][2] = { { 360, 390 }, { 460, 500 }, { 710, 770 } };
+/// The eyes' pictures for the setting "VR eye picture" (0 to 4), in pixels, each shaped as a Quest 3 eye's field of view,
+/// so its pixels stay square: the study's three sizes for the Quest 3's CPU (about 2.8, 3.6 and 5.6 pixels a degree), and
+/// two for the graphics card (setting "Renderer": GPU), 8.3 pixels a degree and the headset's own recommended height.
+const int VrEyeSizeCount = 5;
+const int VrEyeSizes[VrEyeSizeCount][2] = { { 360, 390 }, { 460, 500 }, { 710, 770 }, { 1050, 1140 }, { 1620, 1760 } };
 
 /// The mode to hand a call to: the one showing now, with VR mode on; else null.
 FirstPersonMode *modeForVr()
@@ -191,7 +193,7 @@ void vrSnapTurn(int direction)
  * @param hand Where the weapon in hand's space is (the hook for a controller's hand); null: the head's.
  * @return False with nothing to draw (pictures left empty).
  */
-bool vrRenderEyes(const VrEyeView views[2], int width, int height, VrPicture pictures[2], const VrPose *hand)
+bool vrRenderEyes(const VrEyeView views[2], int width, int height, VrPicture pictures[2], const VrPose *hand, int cardSlot, bool cardCheck)
 {
 	FirstPersonMode *mode = modeForVr();
 	if (!mode)
@@ -199,7 +201,7 @@ bool vrRenderEyes(const VrEyeView views[2], int width, int height, VrPicture pic
 		pictures[0] = pictures[1] = VrPicture();
 		return false;
 	}
-	return mode->vrRenderEyes(views, width, height, pictures, hand);
+	return mode->vrRenderEyes(views, width, height, pictures, hand, cardSlot, cardCheck);
 }
 
 /**
@@ -247,13 +249,13 @@ void vrSetTurnAxis(double axis)
 
 /**
  * The pixels of each eye's picture for a choice of the setting "VR eye picture".
- * @param choice 0 to 2 (others are kept to that).
+ * @param choice 0 to 4 (others are kept to that).
  * @param width Set to the width.
  * @param height Set to the height.
  */
 void vrEyeSize(int choice, int &width, int &height)
 {
-	const int index = std::clamp(choice, 0, 2);
+	const int index = std::clamp(choice, 0, VrEyeSizeCount - 1);
 	width = VrEyeSizes[index][0];
 	height = VrEyeSizes[index][1];
 }

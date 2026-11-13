@@ -1010,77 +1010,98 @@ void FirstPersonView::drawLightHalos()
 				}
 	}
 	// Each palette colour's luminance: which pixels are too dark to show their group's hue.
-	float luminance[256];
-	for (int index = 0; index < 256; ++index) luminance[index] = palette[index].r * 0.3f + palette[index].g * 0.59f + palette[index].b * 0.11f;
+	for (int index = 0; index < 256; ++index) _glowLuminance[index] = palette[index].r * 0.3f + palette[index].g * 0.59f + palette[index].b * 0.11f;
 
 	// How strongly the glow brightens: more at night, and most under the sea. It is steady
 	// (a flickering bloom makes the dithered glow shimmer).
-	const float gain = _colors.underwater ? 45.0f : 18.0f + 42.0f * _colors.night;
+	_glowGain = _colors.underwater ? 45.0f : 18.0f + 42.0f * _colors.night;
 	// Where in each row of the grid the glow reached at all (the blur spreads it only so far):
 	// its first and last cell (first > last: not at all). Pixels outside those cells (and the
 	// one beside them, which the blend still reaches) are left alone at once, which makes the
 	// bloom cheap when only a few small lights shine.
-	std::vector<int> firstReached(gridHeight, gridWidth), lastReached(gridHeight, -1);
+	_glowFirstReached.assign(gridHeight, gridWidth);
+	_glowLastReached.assign(gridHeight, -1);
 	for (int gridRow = 0; gridRow < gridHeight; ++gridRow)
 	{
 		for (int gridColumn = 0; gridColumn < gridWidth; ++gridColumn)
 		{
 			if (_glowBuffer[gridRow * gridWidth + gridColumn] <= 0.0f) continue;
-			firstReached[gridRow] = std::min(firstReached[gridRow], gridColumn);
-			lastReached[gridRow] = gridColumn;
+			_glowFirstReached[gridRow] = std::min(_glowFirstReached[gridRow], gridColumn);
+			_glowLastReached[gridRow] = gridColumn;
 		}
 	}
-	// Brighten every pixel the glow reaches, except the shining pixels themselves and empty
-	// (black, index 0) ones. The glow at a pixel is blended between the four nearest cells.
-	for (int y = 0; y < height; ++y)
+	// Brighten the picture by it, on all the view's threads (see brightenGlowBands).
+	runOnAllThreads(&FirstPersonView::brightenGlowBands);
+}
+
+/**
+ * The bloom's last step, as a job for all the view's threads (see runOnAllThreads and
+ * drawLightHalos, which prepared the blurred grids): brightens every pixel the glow reaches,
+ * except the shining pixels themselves and empty (black, index 0) ones. The glow at a pixel is
+ * blended between the four nearest cells. A piece is a band of GlowBandRows pixel rows; a row
+ * reads the grids and writes only its own pixels.
+ */
+void FirstPersonView::brightenGlowBands()
+{
+	const int width = getWidth(), height = getHeight();
+	const int cellSize = 4, gridWidth = (width + cellSize - 1) / cellSize, gridHeight = (height + cellSize - 1) / cellSize;
+	const int hueCellSize = cellSize * 2, hueWidth = (width + hueCellSize - 1) / hueCellSize;
+	const int GlowBandRows = 16;
+	const SDL_Color *palette = getPalette();
+	const float gain = _glowGain;
+	const float *luminance = _glowLuminance;
+	for (int band = _rayWorkers.nextPiece++; band * GlowBandRows < height; band = _rayWorkers.nextPiece++)
 	{
-		Uint8 *pixels = getRaw(0, y);
-		// The pixel row's place in the grid: the cell row above it and how far towards the next.
-		const float gridY = std::clamp((y + 0.5f) / cellSize - 0.5f, 0.0f, gridHeight - 1.001f);
-		const int gridRow = (int)gridY;
-		const float blendY = gridY - gridRow;
-		const int nextRow = std::min(gridHeight - 1, gridRow + 1);
-		const int firstCell = std::min(firstReached[gridRow], firstReached[nextRow]), lastCell = std::max(lastReached[gridRow], lastReached[nextRow]);
-		if (firstCell > lastCell) continue;
-		const float *glowAbove = &_glowBuffer[gridRow * gridWidth], *glowBelow = &_glowBuffer[nextRow * gridWidth];
-		const float *depthAbove = &_glowDepth[gridRow * gridWidth], *depthBelow = &_glowDepth[nextRow * gridWidth];
-		for (int x = std::max(0, (firstCell - 1) * cellSize); x < std::min(width, (lastCell + 2) * cellSize); ++x)
+		for (int y = band * GlowBandRows; y < std::min(height, (band + 1) * GlowBandRows); ++y)
 		{
-			if (_glowMask[y * width + x] || !pixels[x]) continue;
-			// The same across: the cell column to the left of the pixel and how far towards the next.
-			const float gridX = std::clamp((x + 0.5f) / cellSize - 0.5f, 0.0f, gridWidth - 1.001f);
-			const int gridColumn = (int)gridX;
-			const float blendX = gridX - gridColumn;
-			const int nextColumn = std::min(gridWidth - 1, gridColumn + 1);
-			const float glow = (glowAbove[gridColumn] * (1 - blendX) + glowAbove[nextColumn] * blendX) * (1 - blendY)
-				+ (glowBelow[gridColumn] * (1 - blendX) + glowBelow[nextColumn] * blendX) * blendY;
-			// How far away the light is, here (its glow-weighted distance): a pixel more than a
-			// tile in front of it isn't lit by it.
-			const float weightedDepth = (depthAbove[gridColumn] * (1 - blendX) + depthAbove[nextColumn] * blendX) * (1 - blendY)
-				+ (depthBelow[gridColumn] * (1 - blendX) + depthBelow[nextColumn] * blendX) * blendY;
-			if (glow > 0.0f && _depthBuffer[y * width + x] < weightedDepth / glow - 16.0f) continue;
-			// The glow in shades, dithered: one shade brighter from a dithered threshold up, two
-			// past 1, three past 2. A lower index within a colour group is a brighter shade; the
-			// first group's brightest is 1 (0 is the empty, black one: white would turn black).
-			const float strength = glow * gain;
-			if (strength <= dither(x, y)) continue;
-			const int steps = strength > 2.0f + dither(x + 1, y + 2) ? 3 : strength > 1.0f + dither(x + 1, y + 2) ? 2 : 1;
-			// A pixel too dark to show its group's hue (black) takes the light's own colour, as
-			// much of it for each step as brightens by DarkGlowStepLuma (a shade up a dark group),
-			// the palette's nearest (a player's report: on TFTD's night black a green hitbox, the
-			// laser and fireflies glowed a creepy red, the black's group climbing to red).
-			const float *hue = &_glowHue[((y / hueCellSize) * hueWidth + x / hueCellSize) * 4];
-			const float hueLuminance = hue[3] > 0.0f ? (hue[0] * 0.3f + hue[1] * 0.59f + hue[2] * 0.11f) / hue[3] : 0.0f;
-			if (luminance[pixels[x]] < DarkGlowLuma && hueLuminance >= 1.0f)
+			Uint8 *pixels = getRaw(0, y);
+			// The pixel row's place in the grid: the cell row above it and how far towards the next.
+			const float gridY = std::clamp((y + 0.5f) / cellSize - 0.5f, 0.0f, gridHeight - 1.001f);
+			const int gridRow = (int)gridY;
+			const float blendY = gridY - gridRow;
+			const int nextRow = std::min(gridHeight - 1, gridRow + 1);
+			const int firstCell = std::min(_glowFirstReached[gridRow], _glowFirstReached[nextRow]), lastCell = std::max(_glowLastReached[gridRow], _glowLastReached[nextRow]);
+			if (firstCell > lastCell) continue;
+			const float *glowAbove = &_glowBuffer[gridRow * gridWidth], *glowBelow = &_glowBuffer[nextRow * gridWidth];
+			const float *depthAbove = &_glowDepth[gridRow * gridWidth], *depthBelow = &_glowDepth[nextRow * gridWidth];
+			for (int x = std::max(0, (firstCell - 1) * cellSize); x < std::min(width, (lastCell + 2) * cellSize); ++x)
 			{
-				const SDL_Color &dark = palette[pixels[x]];
-				const float share = steps * DarkGlowStepLuma / hueLuminance / hue[3];
-				auto channel = [&](float darkValue, float light) { return (int)std::lround(std::min(255.0f, darkValue + light * share) * 31.0f / 255.0f); };
-				pixels[x] = _nearestRgb[(channel(dark.r, hue[0]) << 10) | (channel(dark.g, hue[1]) << 5) | channel(dark.b, hue[2])];
-				continue;
+				if (_glowMask[y * width + x] || !pixels[x]) continue;
+				// The same across: the cell column to the left of the pixel and how far towards the next.
+				const float gridX = std::clamp((x + 0.5f) / cellSize - 0.5f, 0.0f, gridWidth - 1.001f);
+				const int gridColumn = (int)gridX;
+				const float blendX = gridX - gridColumn;
+				const int nextColumn = std::min(gridWidth - 1, gridColumn + 1);
+				const float glow = (glowAbove[gridColumn] * (1 - blendX) + glowAbove[nextColumn] * blendX) * (1 - blendY)
+					+ (glowBelow[gridColumn] * (1 - blendX) + glowBelow[nextColumn] * blendX) * blendY;
+				// How far away the light is, here (its glow-weighted distance): a pixel more than a
+				// tile in front of it isn't lit by it.
+				const float weightedDepth = (depthAbove[gridColumn] * (1 - blendX) + depthAbove[nextColumn] * blendX) * (1 - blendY)
+					+ (depthBelow[gridColumn] * (1 - blendX) + depthBelow[nextColumn] * blendX) * blendY;
+				if (glow > 0.0f && _depthBuffer[y * width + x] < weightedDepth / glow - 16.0f) continue;
+				// The glow in shades, dithered: one shade brighter from a dithered threshold up, two
+				// past 1, three past 2. A lower index within a colour group is a brighter shade; the
+				// first group's brightest is 1 (0 is the empty, black one: white would turn black).
+				const float strength = glow * gain;
+				if (strength <= dither(x, y)) continue;
+				const int steps = strength > 2.0f + dither(x + 1, y + 2) ? 3 : strength > 1.0f + dither(x + 1, y + 2) ? 2 : 1;
+				// A pixel too dark to show its group's hue (black) takes the light's own colour, as
+				// much of it for each step as brightens by DarkGlowStepLuma (a shade up a dark group),
+				// the palette's nearest (a player's report: on TFTD's night black a green hitbox, the
+				// laser and fireflies glowed a creepy red, the black's group climbing to red).
+				const float *hue = &_glowHue[((y / hueCellSize) * hueWidth + x / hueCellSize) * 4];
+				const float hueLuminance = hue[3] > 0.0f ? (hue[0] * 0.3f + hue[1] * 0.59f + hue[2] * 0.11f) / hue[3] : 0.0f;
+				if (luminance[pixels[x]] < DarkGlowLuma && hueLuminance >= 1.0f)
+				{
+					const SDL_Color &dark = palette[pixels[x]];
+					const float share = steps * DarkGlowStepLuma / hueLuminance / hue[3];
+					auto channel = [&](float darkValue, float light) { return (int)std::lround(std::min(255.0f, darkValue + light * share) * 31.0f / 255.0f); };
+					pixels[x] = _nearestRgb[(channel(dark.r, hue[0]) << 10) | (channel(dark.g, hue[1]) << 5) | channel(dark.b, hue[2])];
+					continue;
+				}
+				const int brightest = (pixels[x] & 0xF0) == 0 ? 1 : 0;
+				pixels[x] = (Uint8)((pixels[x] & 0xF0) | std::max(brightest, (pixels[x] & 15) - steps));
 			}
-			const int brightest = (pixels[x] & 0xF0) == 0 ? 1 : 0;
-			pixels[x] = (Uint8)((pixels[x] & 0xF0) | std::max(brightest, (pixels[x] & 15) - steps));
 		}
 	}
 }
@@ -1203,6 +1224,12 @@ void FirstPersonView::drawParticles()
 			double tailX, tailY, tailDepth;
 			if (!projectToScreen(tail, tailX, tailY, tailDepth)) continue;
 			const int steps = std::max(1, (int)std::max(std::abs(tailX - screenX), std::abs(tailY - screenY)));
+			if (_gpuRecording)
+			{
+				// (A line a pixel thick at the particle's depth all along, the glow left as it is.)
+				gpuRecordLine(screenX, screenY, depth, tailX, tailY, depth, steps, color, 1, 1.0f, 0.0f, false, false, true, true);
+				if (_gpuRecordOnly) continue;
+			}
 			for (int step = 0; step <= steps; ++step)
 			{
 				const int x = (int)(screenX + (tailX - screenX) * step / steps), y = (int)(screenY + (tailY - screenY) * step / steps);
@@ -1219,6 +1246,12 @@ void FirstPersonView::drawParticles()
 		{
 			// A bubble up close: a ring with a glint on its upper left.
 			const double ringRadius = dotSize * 0.5;
+			if (_gpuRecording)
+			{
+				gpuRecordDisc(screenX, screenY, ringRadius, depth, 0.0f, color, color, color, 0.0f, 0.0f, 2 | 4);
+				gpuRecordDot((int)(screenX - ringRadius * 0.35), (int)(screenY - ringRadius * 0.35), 1, 1, depth, shadeColor(particle.color, std::max(0, shade - 3)), 0);
+				if (_gpuRecordOnly) continue;
+			}
 			for (int y = (int)(screenY - ringRadius) - 1; y <= (int)(screenY + ringRadius) + 1; ++y)
 			{
 				for (int x = (int)(screenX - ringRadius) - 1; x <= (int)(screenX + ringRadius) + 1; ++x)
@@ -1243,6 +1276,11 @@ void FirstPersonView::drawParticles()
 		}
 		// Anything else: a square dot centred on the particle.
 		const int left = (int)screenX - dotSize / 2, top = (int)screenY - dotSize / 2;
+		if (_gpuRecording)
+		{
+			gpuRecordDot(left, top, dotSize, dotSize, depth, color, (particle.kind == P::GLOW || particle.kind == P::BLINK || particle.kind == P::MOTE ? 1 : 0) | (dotSize >= 3 ? 4 : 0));
+			if (_gpuRecordOnly) continue;
+		}
 		for (int y = top; y < top + dotSize; ++y)
 		{
 			for (int x = left; x < left + dotSize; ++x)

@@ -57,6 +57,12 @@
  * in hand as a 3D object at its true depth (see setHeldModel, placeHeldModel). A head tilted less
  * than VrLevelRollDegrees is drawn level (see setHeadAxes).
  *
+ * With the setting "Renderer": GPU each eye's rays, units and effects are the graphics card's, as the flat view's are
+ * (see FirstPersonViewGpu.cpp, FirstPersonViewGpuEffects.cpp): the card's image plane and the recorded primitives take
+ * the eye's off-centre field of view, each eye records its own primitives in its own pass, and its finished picture
+ * and depth come back before the next eye's is cast (the card keeps one frame's pictures at a time). What is drawn
+ * last in an eye (the facing rings, the weapon in hand, the laser) goes over the picture that came back.
+ *
  * Nothing here runs unless VR mode asks for it: with it off, the view draws as it always has.
  */
 #include "FirstPersonView.h"
@@ -66,7 +72,9 @@
 #include <iomanip>
 #include <SDL.h>
 #include "../Engine/Logger.h"
+#include "FirstPersonGpu.h"
 #include "FirstPersonSdl.h"
+#include "FirstPersonVr.h"
 #include "FirstPersonViewShared.h"
 
 namespace OpenXcom
@@ -257,8 +265,11 @@ void FirstPersonView::useEyeCamera(const EyeCamera &eye, EyeTarget &target)
  * @param aimPoint The point the crosshair is on, in voxels (null: none).
  * @param hand Where the hand's space is in the world, for the weapon in hand (null: none drawn).
  */
-void FirstPersonView::renderEyes(const EyeCamera eyes[2], int width, int height, const double aimPoint[3], const HeldFrame *hand)
+void FirstPersonView::renderEyes(const EyeCamera eyes[2], int width, int height, const double aimPoint[3], const HeldFrame *hand, const CardRequest *card)
 {
+	const EyesOnCard onCard = card ? card->mode : EyesOnCard::No;
+	_cardEyesKept = false;
+	int eyesKept = 0;
 	// Each eye's picture, at this size, in the view's palette.
 	for (EyeTarget &target : _eyeTargets)
 	{
@@ -271,6 +282,7 @@ void FirstPersonView::renderEyes(const EyeCamera eyes[2], int width, int height,
 		{
 			std::fill((Uint8 *)target.surface->pixels, (Uint8 *)target.surface->pixels + (size_t)target.pitch * target.height, (Uint8)0);
 			target.aimShown = false;
+			target.onCard = target.checked = false;
 		}
 		return;
 	}
@@ -298,6 +310,10 @@ void FirstPersonView::renderEyes(const EyeCamera eyes[2], int width, int height,
 	const bool muzzleValid = _muzzleValid, offHandMuzzleValid = _offHandMuzzleValid;
 	_muzzleValid = _offHandMuzzleValid = false;
 	std::copy(headEye, headEye + 3, _spriteEye);
+	// An eye's picture is the palette's (see FirstPerson::VrPicture): on the graphics card too (setting "Renderer": GPU),
+	// whatever the flat view is asked for (setting "True colour").
+	const bool wantsTrueColor = _wantsTrueColor;
+	_wantsTrueColor = false;
 
 	// Each eye's picture: its target swapped in, its camera, the pointer where the aim point is on it, and the frame's
 	// second half (the second eye's moving nothing on).
@@ -329,17 +345,98 @@ void FirstPersonView::renderEyes(const EyeCamera eyes[2], int width, int height,
 			}
 		}
 		_replayPass = eyeIndex == 1;
+		const auto eyeStarted = std::chrono::steady_clock::now();
+		// Kept on the graphics card (see EyesOnCard): the card reads no colour back, the marks go over an empty picture.
+		_eyeOnCard = onCard == EyesOnCard::Yes;
+		_gpuEyeKept = false;
 		drawPass();
-		drawFacing();
-		drawHeldModel(); // (the weapon in hand last, as the desktop draws it over the view)
-		drawLaser();
-		unlock();
+		_eyeOnCard = false;
+		target.onCard = onCard == EyesOnCard::Yes && _gpuEyeKept;
+		target.checked = onCard == EyesOnCard::Check && _gpuEyeKept;
+		target.depthWhole = false;
+		const auto passesDone = std::chrono::steady_clock::now();
+		auto depthDone = passesDone;
+		if (target.onCard)
+		{
+			// The marks and the facing rings are on the eye's picture, over nothing. If one of them fetched the scene's
+			// depth, the weapon is drawn among them, tested against it here; else on a picture of its own, each pixel
+			// with the depth it was drawn at, and the card tests it against the scene (see presentEyesOnCard).
+			drawFacing();
+			target.depthWhole = !_gpuDepthPending;
+			_gpuDepthPending = false; // (the depth stays on the card: the weapon's own lines must not fetch it)
+			if (target.depthWhole)
+			{
+				drawHeldModel();
+				drawLaser();
+			}
+			else
+			{
+				drawHeldOnItsOwn(eyeIndex);
+			}
+			unlock();
+			target.flameGlow = _gpuFlameGlow;
+		}
+		else
+		{
+			// (Drawn on the graphics card, the eye's depth is still there: the weapon in hand, the laser and the headset's
+			// own reprojection need it, and the next eye's picture takes its place on the card.)
+			const bool marksFetchedDepth = !_gpuDepthPending;
+			gpuNeedDepth();
+			depthDone = std::chrono::steady_clock::now();
+			if (target.checked) _checkSceneDepth = _depthBuffer;
+			drawFacing();
+			drawHeldModel(); // (the weapon in hand last, as the desktop draws it over the view)
+			drawLaser();
+			unlock();
+			if (target.checked)
+			{
+				// The check: the same marks again as the card gets them, over an empty picture of their own (nothing
+				// moves on: as for the second eye), with the scene's depth as it was if one of them had fetched it; then
+				// the weapon as above.
+				EyeTarget &marks = _markTargets[eyeIndex];
+				makeEyeTarget(marks, getWidth(), getHeight());
+				std::fill((Uint8 *)marks.surface->pixels, (Uint8 *)marks.surface->pixels + (size_t)marks.pitch * marks.height, (Uint8)0);
+				marks.depth = _checkSceneDepth;
+				swapEyeTarget(marks);
+				const bool replay = _replayPass;
+				_replayPass = _eyeOnCard = true;
+				drawLastMarks(nullptr);
+				drawFacing();
+				target.depthWhole = marksFetchedDepth;
+				if (target.depthWhole)
+				{
+					drawHeldModel();
+					drawLaser();
+				}
+				target.flameGlow = _gpuFlameGlow;
+				_replayPass = replay;
+				_eyeOnCard = false;
+				swapEyeTarget(marks);
+				if (!target.depthWhole) drawHeldOnItsOwn(eyeIndex);
+			}
+		}
+		_stereoPasses += std::chrono::duration<double, std::milli>(passesDone - eyeStarted).count();
+		_stereoDepth += std::chrono::duration<double, std::milli>(depthDone - passesDone).count();
+		_stereoLast += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - depthDone).count();
 		swapEyeTarget(target);
+		// Kept on the card: what the caller draws last, then finished there (before the next eye's world takes its place).
+		if (target.onCard || target.checked)
+		{
+			if (card->drawnLast) card->drawnLast(eyeIndex);
+			eyesKept += presentEyeOnCard(eyeIndex, *card) ? 1 : 0;
+		}
+	}
+	if (eyesKept == 2)
+	{
+		FirstPersonGpu *gpu = readyFirstPersonGpu();
+		_cardEyes.fence = gpu ? gpu->eyeFence(card->slot) : nullptr;
+		_cardEyesKept = _cardEyes.fence != nullptr;
 	}
 
 	// The head's camera back, as the mode set it.
 	_replayPass = false;
 	_eyePass = false;
+	_wantsTrueColor = wantsTrueColor;
 	std::copy(headEye, headEye + 3, _eye);
 	_yaw = headYaw;
 	_pitch = headPitch;
@@ -375,10 +472,11 @@ void FirstPersonView::renderEyes(const EyeCamera eyes[2], int width, int height,
 		const double frames = _stereoFrames;
 		Log(LOG_INFO) << "OpenXcom3D: VR, two eyes of " << width << "x" << height << ": " << std::fixed << std::setprecision(2) << _stereoTotal / frames
 			<< " ms a frame (the shared part " << _stereoShared / frames << ", each eye " << (_stereoTotal - _stereoShared) / frames / 2.0
-			<< "), the slowest " << _stereoWorst << " ms, over " << _stereoFrames << " frames";
+			<< ": its passes " << _stereoPasses / frames / 2.0 << ", its depth fetched from the card " << _stereoDepth / frames / 2.0 << ", what is drawn last "
+			<< _stereoLast / frames / 2.0 << "), the slowest " << _stereoWorst << " ms, over " << _stereoFrames << " frames";
 		_stereoTimingSince = now;
 		_stereoFrames = 0;
-		_stereoTotal = _stereoShared = _stereoWorst = 0.0;
+		_stereoTotal = _stereoShared = _stereoWorst = _stereoPasses = _stereoDepth = _stereoLast = 0.0;
 	}
 }
 
@@ -597,6 +695,7 @@ void FirstPersonView::drawHeldModel()
 				const double edgeRadius = radius * (1.0 + look.spike * rayStrength);
 				if (distance > edgeRadius) continue;
 				*getRaw(pixelX, pixelY) = distance < edgeRadius * 0.35 ? look.core : distance < edgeRadius * 0.7 ? look.mid : look.rim;
+				if (_heldTest) _heldTest[pixelY * width + pixelX] = (float)depth;
 			}
 		}
 	}
@@ -637,6 +736,165 @@ void FirstPersonView::drawLaser()
 }
 
 /**
+ * Draws the weapon in hand, its muzzle flashes and its laser on the eye's own picture of them (an eye kept on the
+ * graphics card, see EyesOnCard): the picture emptied where it held anything last, its depth infinite there, so each
+ * of their pixels is tested against the others only, and notes the depth it was drawn at (see _heldTest); the card
+ * tests it against the scene. The caller's picture and buffers are swapped back in after.
+ * @param eye 0 the left eye, 1 the right.
+ */
+void FirstPersonView::drawHeldOnItsOwn(int eye)
+{
+	EyeTarget &held = _heldTargets[eye];
+	std::vector<float> &tests = _heldTests[eye];
+	const int width = getWidth(), height = getHeight();
+	int *box = _heldBoxes[eye];
+	const bool made = !held.surface || held.width != width || held.height != height || tests.size() != (size_t)width * height;
+	makeEyeTarget(held, width, height);
+	if (made || !_heldBoxFound[eye])
+	{
+		tests.assign((size_t)width * height, 0.0f);
+		box[0] = box[1] = 0;
+		box[2] = width;
+		box[3] = height;
+	}
+	for (int row = box[1]; row < box[3]; ++row)
+	{
+		std::fill((Uint8 *)held.surface->pixels + (size_t)row * held.pitch + box[0], (Uint8 *)held.surface->pixels + (size_t)row * held.pitch + box[2], (Uint8)0);
+		std::fill(held.depth.begin() + (size_t)row * width + box[0], held.depth.begin() + (size_t)row * width + box[2], Infinity);
+		std::fill(tests.begin() + (size_t)row * width + box[0], tests.begin() + (size_t)row * width + box[2], 0.0f);
+	}
+	_heldBoxFound[eye] = false;
+	swapEyeTarget(held);
+	_heldTest = tests.data();
+	drawHeldModel();
+	drawLaser();
+	_heldTest = nullptr;
+	swapEyeTarget(held);
+}
+
+/**
+ * Finishes an eye on the graphics card and leaves it there (see EyesOnCard, FirstPersonGpu::presentEye): its marks
+ * (its own picture: the card kept the world's), its weapon's picture where that holds anything (found here, row by
+ * row, after the caller drew the crosshair into it), the depths. The check: the eye's textures read back and compared
+ * with the CPU's finished picture, through the palette, and with its depth as the headset takes it; the log gets the
+ * sums every 60 eyes.
+ */
+bool FirstPersonView::presentEyeOnCard(int eye, const CardRequest &card)
+{
+	FirstPersonGpu *gpu = readyFirstPersonGpu();
+	if (!gpu)
+	{
+		return false;
+	}
+	const float depthToMetres = card.depthToMetres, nearMetres = card.nearMetres, farMetres = card.farMetres;
+	std::vector<Uint32> cardPixels;
+	std::vector<float> cardDepth;
+	{
+		EyeTarget &target = _eyeTargets[eye];
+		if (!target.onCard && !target.checked)
+		{
+			return false;
+		}
+		const EyeTarget &marks = target.checked ? _markTargets[eye] : target;
+		const EyeTarget &held = _heldTargets[eye];
+		const int width = target.width, height = target.height;
+		FirstPersonGpu::EyeFrame frame;
+		frame.width = width;
+		frame.height = height;
+		frame.slot = card.slot;
+		frame.eye = eye;
+		frame.marks = (const Uint8 *)marks.surface->pixels;
+		frame.marksPitch = marks.pitch;
+		frame.depthWhole = target.depthWhole;
+		if (target.depthWhole)
+		{
+			frame.heldDepth = marks.depth.data();
+		}
+		else
+		{
+			// Where the weapon's picture holds anything: its first and last rows and columns that do.
+			int *box = _heldBoxes[eye];
+			box[0] = width; box[1] = height; box[2] = box[3] = 0;
+			for (int row = 0; row < height; ++row)
+			{
+				const Uint8 *pixels = (const Uint8 *)held.surface->pixels + (size_t)row * held.pitch;
+				int first = 0, last = width;
+				while (first < width && !pixels[first]) ++first;
+				if (first == width) continue;
+				while (!pixels[last - 1]) --last;
+				box[0] = std::min(box[0], first); box[2] = std::max(box[2], last);
+				box[1] = std::min(box[1], row); box[3] = row + 1;
+			}
+			if (box[2] <= box[0]) box[0] = box[1] = box[2] = box[3] = 0;
+			_heldBoxFound[eye] = true;
+			std::copy(box, box + 4, frame.box);
+			frame.held = (const Uint8 *)held.surface->pixels;
+			frame.heldPitch = held.pitch;
+			frame.heldTest = _heldTests[eye].data();
+			frame.heldDepth = held.depth.data();
+		}
+		frame.palette = getPalette();
+		frame.paletteHash = _colors.paletteHash;
+		frame.flameGlow = target.flameGlow;
+		frame.flameTint = _colors.orangeTint;
+		frame.depthToMetres = depthToMetres;
+		frame.nearMetres = nearMetres;
+		frame.farMetres = farMetres;
+		if (target.checked)
+		{
+			cardPixels.resize((size_t)width * height);
+			cardDepth.resize((size_t)width * height);
+			frame.pixels = cardPixels.data();
+			frame.depth = cardDepth.data();
+		}
+		if (!gpu->presentEye(frame))
+		{
+			return false;
+		}
+		_cardEyes.colorTextures[eye] = frame.colorTexture;
+		_cardEyes.depthTextures[eye] = frame.depthTexture;
+		if (target.checked)
+		{
+			// The card's eye against the CPU's (the bottom row first on the card).
+			static long checkedEyes = 0, pixels = 0, differentColors = 0, differentDepths = 0;
+			static float mostApart = 0.0f;
+			const SDL_Color *palette = getPalette();
+			for (int row = 0; row < height; ++row)
+			{
+				const Uint8 *cpuRow = (const Uint8 *)target.surface->pixels + (size_t)row * target.pitch;
+				const float *cpuDepth = &target.depth[(size_t)row * width];
+				const Uint32 *cardRow = &cardPixels[(size_t)(height - 1 - row) * width];
+				const float *cardDepthRow = &cardDepth[(size_t)(height - 1 - row) * width];
+				for (int column = 0; column < width; ++column)
+				{
+					const SDL_Color &color = palette[cpuRow[column]];
+					const Uint8 *card = (const Uint8 *)&cardRow[column];
+					differentColors += card[0] != color.r || card[1] != color.g || card[2] != color.b;
+					const float apart = std::abs(cardDepthRow[column] - FirstPerson::vrProjectionDepth(cpuDepth[column] * depthToMetres, nearMetres, farMetres));
+					differentDepths += apart > 1e-5f;
+					mostApart = std::max(mostApart, apart);
+				}
+			}
+			pixels += (long)width * height;
+			if (++checkedEyes % 60 == 0)
+			{
+				Log(LOG_INFO) << "OpenXcom3D GPU: VR's eyes kept on the card, " << width << "x" << height << ": of " << pixels << " pixels " << differentColors
+					<< " colours differ from the CPU's finished eyes, " << differentDepths << " depths (the most apart " << mostApart << ")";
+				pixels = differentColors = differentDepths = 0;
+				mostApart = 0.0f;
+			}
+		}
+	}
+	return true;
+}
+
+bool FirstPersonView::cardEyes(CardEyes &eyes) const
+{
+	if (_cardEyesKept) eyes = _cardEyes;
+	return _cardEyesKept;
+}
+
+/**
  * An eye's picture from the last renderEyes: its pixels (in the view's palette), its size, the
  * field of view it shows, where the aim point is on it, and its depth buffer (the world's, the
  * units' and the weapon in hand's depths, as the view draws them: for the shell's depth layer).
@@ -663,6 +921,19 @@ FirstPersonView::EyePicture FirstPersonView::eyePicture(int eye)
 	picture.aimY = target.aim[1];
 	picture.aimShown = target.aimShown;
 	picture.depth = target.depth.size() >= (size_t)target.width * target.height ? target.depth.data() : nullptr;
+	// Kept on the graphics card: what is drawn over the eye last goes on the weapon's own picture, over everything
+	// (or among the marks, where the weapon is too); and the eye's own pixels and depth are not the finished ones.
+	if (target.onCard || target.checked)
+	{
+		const EyeTarget &marks = target.checked ? _markTargets[std::clamp(eye, 0, 1)] : target;
+		picture.cardPixels = (Uint8 *)(target.depthWhole ? marks.surface->pixels : _heldTargets[std::clamp(eye, 0, 1)].surface->pixels);
+		picture.cardTest = target.depthWhole ? nullptr : _heldTests[std::clamp(eye, 0, 1)].data();
+	}
+	if (target.onCard)
+	{
+		picture.pixels = nullptr;
+		picture.depth = nullptr;
+	}
 	return picture;
 }
 

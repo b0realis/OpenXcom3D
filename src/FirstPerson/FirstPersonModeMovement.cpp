@@ -128,31 +128,19 @@ bool FirstPersonMode::stepAllowed(BattleUnit *unit, int stepX, int stepY)
 	// Work the answer out only once per direction.
 	if (_stepAllowedCache[direction] < 0)
 	{
-		// What the pathfinding charges for this one step, from the camera's tile on the unit's
-		// level, as commitStep will have the game walk it: the game's sidestep (turning by the
-		// rules, see isSidestep), a run (sprinting, see runsStep) or a walk. A step that can't be
-		// made at all costs INVALID_MOVE_COST time units.
-		// A sidestep is priced as the game's strafe, with the pathfinding's surcharge for it,
-		// which it adds only while its strafe setting is on (a search for a strafe sets it, and
-		// it stays as the last search left it): on for this one question. Priced as a plain step
-		// (a player's report, GitHub issue #114), a soldier with the walk's time units and not
-		// the strafe's had every sidestep refused by the game after it started, and holding A or
-		// D lunged the camera at the edge and back several times a second.
+		// What the game charges for this one step, from the camera's tile on the unit's level
+		// (see stepPrice).
 		const Position start(_trackedTile.x, _trackedTile.y, unit->getPosition().z);
-		Pathfinding *pathfinding = _save->getPathfinding();
-		PathfindingStep stepCost = pathfinding->getTUCost(start, direction, unit, nullptr, BAM_NORMAL);
-		if (stepCost.cost.time < Pathfinding::INVALID_MOVE_COST && isSidestep(unit, start, direction, stepCost.pos))
-		{
-			const bool strafeWas = pathfinding->getStrafeMove();
-			pathfinding->setStrafeMove(true);
-			stepCost = pathfinding->getTUCost(start, direction, unit, nullptr, BAM_STRAFE);
-			pathfinding->setStrafeMove(strafeWas);
-		}
-		else if (runsStep(unit, start, direction))
-		{
-			stepCost = pathfinding->getTUCost(start, direction, unit, nullptr, BAM_RUN);
-		}
+		const PathfindingStep stepCost = stepPrice(unit, start, direction);
 		bool allowed = stepCost.cost.time < Pathfinding::INVALID_MOVE_COST;
+
+		// A step the game refused for a unit the player doesn't see (the pathfinding counts only
+		// units in sight) stays refused while that unit stands there (see updateCamera).
+		if (allowed && unit == _hiddenBlockUnit && direction == _hiddenBlockDirection && start == _hiddenBlockFrom)
+		{
+			if (hiddenUnitOn(unit, start + Position(stepX, stepY, 0))) allowed = false;
+			else _hiddenBlockDirection = -1; // (it went away, or came into sight)
+		}
 
 		// Flight switched off (or falling switched off): don't step off a ledge into the air.
 		// The destination must have a floor, or the tile below it must be the top of a ramp or
@@ -198,6 +186,42 @@ bool FirstPersonMode::stepAllowed(BattleUnit *unit, int stepX, int stepY)
 }
 
 /**
+ * What the pathfinding charges for one step from a tile, as commitStep will have the game walk
+ * it: the game's sidestep (turning by the rules, see isSidestep), a run (sprinting, see runsStep)
+ * or a walk. A step that can't be made at all costs INVALID_MOVE_COST time units.
+ * A sidestep is priced as the game's strafe, with the pathfinding's surcharge for it, which it
+ * adds only while its strafe setting is on (a search for a strafe sets it, and it stays as the
+ * last search left it): on for this one question. Priced as a plain step (a player's report,
+ * GitHub issue #114), a soldier with the walk's time units and not the strafe's had every
+ * sidestep refused by the game after it started, and holding A or D lunged the camera at the edge
+ * and back several times a second.
+ * @param unit The soldier.
+ * @param start The tile the step starts from.
+ * @param direction The step's direction (0 north .. 7, clockwise).
+ * @param sidestep If given, set to whether the step is a sidestep.
+ * @return The step: its cost in time units and energy, and the tile it ends on.
+ */
+PathfindingStep FirstPersonMode::stepPrice(BattleUnit *unit, const Position &start, int direction, bool *sidestep) const
+{
+	Pathfinding *pathfinding = _save->getPathfinding();
+	PathfindingStep price = pathfinding->getTUCost(start, direction, unit, nullptr, BAM_NORMAL);
+	const bool toTheSide = price.cost.time < Pathfinding::INVALID_MOVE_COST && isSidestep(unit, start, direction, price.pos);
+	if (toTheSide)
+	{
+		const bool strafeWas = pathfinding->getStrafeMove();
+		pathfinding->setStrafeMove(true);
+		price = pathfinding->getTUCost(start, direction, unit, nullptr, BAM_STRAFE);
+		pathfinding->setStrafeMove(strafeWas);
+	}
+	else if (runsStep(unit, start, direction))
+	{
+		price = pathfinding->getTUCost(start, direction, unit, nullptr, BAM_RUN);
+	}
+	if (sidestep) *sidestep = toTheSide;
+	return price;
+}
+
+/**
  * Is the landing of a step off a ledge safe (setting "Check the landing")? The soldier falls
  * straight down from the tile ahead to the first with a floor (the game's own fall). It's unsafe
  * where no one can walk (a floor or an object the rules give no walking cost: TFTD's sea, X-Com
@@ -237,6 +261,31 @@ bool FirstPersonMode::landingSafe(BattleUnit *unit, const Position &ahead) const
 		if (pathfinding->getTUCost(landing, direction, unit, nullptr, BAM_NORMAL).cost.time < Pathfinding::INVALID_MOVE_COST)
 		{
 			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Whether a unit the player doesn't see stands where a unit would step to: on any tile of its
+ * footprint there (a big unit's four).
+ * @param unit The unit stepping.
+ * @param destination The tile it would step to (its footprint's north-west one).
+ * @return True if one does.
+ */
+bool FirstPersonMode::hiddenUnitOn(const BattleUnit *unit, const Position &destination) const
+{
+	const int size = unit->getArmor()->getSize();
+	for (int x = 0; x < size; ++x)
+	{
+		for (int y = 0; y < size; ++y)
+		{
+			const Tile *tile = _save->getTile(destination + Position(x, y, 0));
+			const BattleUnit *other = tile ? tile->getUnit() : nullptr;
+			if (other && other != unit && !other->getVisible())
+			{
+				return true;
+			}
 		}
 	}
 	return false;

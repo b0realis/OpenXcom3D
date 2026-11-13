@@ -167,6 +167,32 @@ void FirstPersonMode::drawHeldPicture(const BattleItem *item, const SurfaceSet *
 }
 
 /**
+ * Is a weapon held as a bow (see analyzeWeapon)? As the mod's item table says (`bow: true` or
+ * `false` in an entry of `items:`), or else by its name: a ranged weapon whose type has BOW in it
+ * and isn't a crossbow (CROSSBOW, XBOW), nor a word that only contains it (ELBOW, RAINBOW, BOWL).
+ * @param weapon The weapon's rules.
+ * @return True for a bow.
+ */
+bool FirstPersonMode::heldAsBow(const RuleItem *weapon) const
+{
+	const RuleFirstPerson::ItemLook *look = _game->getMod()->getFirstPerson().getItemLook(weapon->getType());
+	if (look && look->bow != RuleFirstPerson::BOW_AUTO)
+	{
+		return look->bow == RuleFirstPerson::BOW_YES;
+	}
+	if (weapon->getBattleType() != BT_FIREARM)
+	{
+		return false;
+	}
+	const std::string &type = weapon->getType();
+	for (const char *other : { "CROSSBOW", "XBOW", "ELBOW", "RAINBOW", "BOWL" })
+	{
+		if (type.find(other) != std::string::npos) return false;
+	}
+	return type.find("BOW") != std::string::npos;
+}
+
+/**
  * Measures the weapon's inventory picture (the game's own, from BIGOBS.PCK, already drawn into
  * _heldSprite, see drawHeldPicture), so it can be drawn with its barrel on the line to the crosshair: its long axis
  * (the direction its pixels spread out furthest), its muzzle end, and the side with the grip and
@@ -182,14 +208,23 @@ void FirstPersonMode::drawHeldPicture(const BattleItem *item, const SurfaceSet *
  * thick, the left. A blade leaning or lying in the picture (the big mods' swords) has its edge
  * on its lower side, and the edge leads the strike.
  * @param gun It's a gun or a club, drawn pointing at the crosshair (false: held up like an item).
+ * A bow is the exception (the owner: "the curved side towards the crosshair and where projectile
+ * leaves. It is special rule for bows"): its picture's long axis is the bow itself, limb to limb,
+ * and the arrow leaves across it, from the string through the middle of the curve. So a bow's
+ * "along" is turned a quarter: it runs from the string's side to the curve's, the muzzle the
+ * curve's outermost point (its middle, where the arrow rests), and "across" is the bow's length,
+ * held upright (see drawWeaponPlate). The curve's side is the one the bow's middle lies towards,
+ * from its two tips.
  * @param melee It's a melee weapon: held tip up, and swung down at the crosshair (see drawWeaponPlate).
+ * @param bow It's a bow (see heldAsBow).
  */
-void FirstPersonMode::analyzeWeapon(bool gun, bool melee)
+void FirstPersonMode::analyzeWeapon(bool gun, bool melee, bool bow)
 {
 	WeaponShape &shape = _heldShape;
 	shape = WeaponShape();
 	shape.gun = gun;
 	shape.melee = melee && gun;
+	shape.bow = bow && gun && !melee;
 	_heldFaces.clear(); // a picture too small to measure gets none
 
 	// Every opaque pixel of the picture (colour 0 is transparent); too few to measure, and
@@ -249,6 +284,32 @@ void FirstPersonMode::analyzeWeapon(bool gun, bool melee)
 	shape.mean[0] = meanX; shape.mean[1] = meanY;
 	shape.along[0] = std::cos(axisAngle); shape.along[1] = std::sin(axisAngle);
 	shape.across[0] = -std::sin(axisAngle); shape.across[1] = std::cos(axisAngle);
+	// A bow: "along" turned a quarter, towards the curve's side. That's where the bow's middle
+	// third lies, across its length, from where its two end thirds do (the tips sit back at the
+	// string).
+	if (shape.bow)
+	{
+		double lowEnd = 1e9, highEnd = -1e9;
+		for (const auto &pixel : pixels)
+		{
+			const double posAlong = (pixel.first - meanX) * shape.along[0] + (pixel.second - meanY) * shape.along[1];
+			lowEnd = std::min(lowEnd, posAlong); highEnd = std::max(highEnd, posAlong);
+		}
+		const double third = (highEnd - lowEnd) / 3.0;
+		double middleSum = 0.0, tipsSum = 0.0;
+		int middleCount = 0, tipsCount = 0;
+		for (const auto &pixel : pixels)
+		{
+			const double dx = pixel.first - meanX, dy = pixel.second - meanY;
+			const double posAlong = dx * shape.along[0] + dy * shape.along[1], posAcross = dx * shape.across[0] + dy * shape.across[1];
+			if (posAlong > lowEnd + third && posAlong < highEnd - third) { middleSum += posAcross; ++middleCount; }
+			else { tipsSum += posAcross; ++tipsCount; }
+		}
+		const double towardsCurve = middleCount && tipsCount && middleSum / middleCount < tipsSum / tipsCount ? -1.0 : 1.0;
+		const double length[2] = { shape.along[0], shape.along[1] };
+		shape.along[0] = shape.across[0] * towardsCurve; shape.along[1] = shape.across[1] * towardsCurve;
+		shape.across[0] = length[0]; shape.across[1] = length[1];
+	}
 
 	// How far the picture reaches along the axis and across it, both ways from the centre.
 	double minAlong = 1e9, maxAlong = -1e9, minAcross = 1e9, maxAcross = -1e9;
@@ -277,7 +338,8 @@ void FirstPersonMode::analyzeWeapon(bool gun, bool melee)
 	const double lowSpread = lowMax - lowMin, highSpread = highMax - highMin;
 	const bool standingUp = std::abs(shape.along[1]) > std::abs(shape.along[0]);
 	bool muzzleHigh;
-	if (standingUp) muzzleHigh = shape.along[1] < 0;
+	if (shape.bow) muzzleHigh = true; // (the curve's outermost point: "along" runs towards it)
+	else if (standingUp) muzzleHigh = shape.along[1] < 0;
 	else if (highSpread < lowSpread - 1.0) muzzleHigh = true;
 	else if (lowSpread < highSpread - 1.0) muzzleHigh = false;
 	else muzzleHigh = shape.along[0] < 0;
@@ -293,6 +355,11 @@ void FirstPersonMode::analyzeWeapon(bool gun, bool melee)
 	// leads: it faces away at rest and comes down first in the strike (the weapon's "down" side,
 	// see drawWeaponPlate), so that side goes down. Standing straight up, the rule above stands.
 	if (shape.melee && std::abs(shape.across[1]) > 1e-6)
+	{
+		shape.upSign = shape.across[1] > 0 ? -1 : 1;
+	}
+	// A bow stands as its picture does: the picture's upper tip up.
+	if (shape.bow)
 	{
 		shape.upSign = shape.across[1] > 0 ? -1 : 1;
 	}
@@ -622,7 +689,9 @@ void FirstPersonMode::drawWeaponPlate(bool left, double bob[2], double kick, dou
 
 	// A weapon shorter than the rifle shrinks about its grip (still on the line at the
 	// crosshair), by its picture length's share of the rifle's to the power SizeCurve.
-	const double sizeFactor = std::pow(std::clamp(std::abs(shape.muzzle - shape.stock) / RiflePixels, 0.4, 1.0), SizeCurve);
+	// (A bow is as long as its picture is across: limb to limb.)
+	const double pictureLength = shape.bow ? shape.maxAcross - shape.minAcross : std::abs(shape.muzzle - shape.stock);
+	const double sizeFactor = std::pow(std::clamp(pictureLength / RiflePixels, 0.4, 1.0), SizeCurve);
 	for (int axis = 0; axis < 3; ++axis)
 	{
 		const double pivot = farEnd[axis] + (nearEnd[axis] - farEnd[axis]) * GripAt;
@@ -687,7 +756,35 @@ void FirstPersonMode::drawWeaponPlate(bool left, double bob[2], double kick, dou
 	double along[3], length = 0.0;
 	for (int axis = 0; axis < 3; ++axis) { along[axis] = farEnd[axis] - nearEnd[axis]; length += along[axis] * along[axis]; }
 	length = std::sqrt(length);
-	const double pixelsLong = std::max(4.0, std::abs(shape.muzzle - shape.stock));
+	double pixelsLong = std::max(4.0, std::abs(shape.muzzle - shape.stock));
+	// A bow is held upright, part way down the weapon's line (BowAt), at the scale a gun as long
+	// as the bow would have (BowScale of it: it stands across the view, where a gun runs away
+	// from the eye). Its curve points along the line at the crosshair, turned BowTurn degrees
+	// in towards the middle of the view: seen straight from behind a bow is only a stick, so it
+	// is held a little open, and its curve shows, leaning towards the crosshair. The line is kept
+	// only as long as the bow is deep, from the string to the curve. Half way down the
+	// line its lower half is below the screen's bottom edge (the owner: "the bow should sit half
+	// hidden below screen").
+	if (shape.bow)
+	{
+		const double perBowPixel = length / std::max(4.0, pictureLength) * BowScale;
+		const double turn = BowTurn * Pi / 180.0, inwards[3] = { -side, 0.0, 0.0 };
+		double grip[3], towards[3], towardsLength = 0.0;
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			grip[axis] = farEnd[axis] - along[axis] * BowAt;
+			towards[axis] = along[axis] / length * std::cos(turn) + inwards[axis] * std::sin(turn);
+			towardsLength += towards[axis] * towards[axis];
+		}
+		towardsLength = std::sqrt(towardsLength);
+		length = pixelsLong * perBowPixel;
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			along[axis] = towards[axis] / towardsLength * length;
+			farEnd[axis] = grip[axis] + along[axis] * 0.5;
+			nearEnd[axis] = farEnd[axis] - along[axis];
+		}
+	}
 
 	// Across (and in depth) the same scale as along: the weapon keeps its proportions.
 	const double perPixel = length / pixelsLong;
@@ -887,12 +984,16 @@ void FirstPersonMode::drawHeldItem(bool left, double bob[2], double dip, int sha
 }
 
 /**
- * Is a weapon drawn in the soldier's hands? Not a built-in one: an item fixed to the unit (a
- * tank's cannon, an alien's claws) or the unit's special weapon (OXCE's, used from the SPECIAL
- * button or by an empty hand: fists, a dog's bite, a Lamia's spit). A tank or a machine has no
- * hands, and a bite has nothing to hold: the view's hands stay empty. A mod can name built-in
- * items drawn all the same (`firstPerson: builtInItemsShown:`, a shield, an arm cannon).
- * Aiming and firing work as with any weapon; only the picture is left out.
+ * Is a weapon drawn in the soldier's hands? Anything held is (a gun, a grenade, a body carried),
+ * whether or not the map has a picture of it in the hand. A built-in one, an item fixed to the
+ * unit (a tank's cannon, an alien's claws, a dog's bite) or the unit's special weapon (OXCE's,
+ * used from the SPECIAL button or by an empty hand: fists, a Lamia's spit), only if the map
+ * draws it in the unit's hand too (the item's `fixedWeaponShow`, with a hand picture: a
+ * shield, an arm cannon): a tank or a machine has no hands, and a bite has nothing to hold, so
+ * the view's hands stay empty (GitHub issue #123: not drawn only when it is both built-in and
+ * without a picture in the hand on the map; a dog doesn't carry its own head, a shield unit
+ * shows its shield). A mod can name more built-in items to draw (`firstPerson:
+ * builtInItemsShown:`). Aiming and firing work as with any weapon; only the picture is left out.
  * @param unit The soldier.
  * @param weapon The weapon in use.
  */
@@ -901,7 +1002,12 @@ bool FirstPersonMode::weaponShownInHand(BattleUnit *unit, const BattleItem *weap
 	const RuleItem *rules = weapon->getRules();
 	const bool held = weapon == unit->getLeftHandWeapon() || weapon == unit->getRightHandWeapon();
 	const bool builtIn = rules->isFixed() || !held;
-	return !builtIn || _game->getMod()->getFirstPerson().showsBuiltInItem(rules->getType());
+	if (!builtIn)
+	{
+		return true;
+	}
+	const bool inHandOnMap = held && rules->getFixedShow() && rules->getHandSprite() != -1; // (as UnitSprite draws a hand's item)
+	return inHandOnMap || _game->getMod()->getFirstPerson().showsBuiltInItem(rules->getType());
 }
 
 /**
@@ -966,7 +1072,7 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 	{
 		_heldRules = weapon->getRules();
 		drawHeldPicture(weapon, inventorySprites, _heldSprite);
-		analyzeWeapon(battleType == BT_FIREARM || battleType == BT_MELEE, battleType == BT_MELEE);
+		analyzeWeapon(battleType == BT_FIREARM || battleType == BT_MELEE, battleType == BT_MELEE, heldAsBow(weapon->getRules()));
 	}
 
 	// The game's shade where the eye is (at most 9 shades darker, so it stays visible in the
@@ -1133,7 +1239,7 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 			{
 				_heldRules = otherWeapon->getRules();
 				drawHeldPicture(otherWeapon, inventorySprites, _heldSprite);
-				analyzeWeapon(true);
+				analyzeWeapon(true, false, heldAsBow(otherWeapon->getRules()));
 			}
 			if (_heldShape.gun)
 			{

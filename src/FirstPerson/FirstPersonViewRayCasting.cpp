@@ -52,7 +52,9 @@
  */
 #include "FirstPersonView.h"
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <thread>
 #include <vector>
 #ifdef __linux__
@@ -188,6 +190,31 @@ void FirstPersonView::updateColors()
 	// undid its tint.
 	auto nearest = [&](float red, float green, float blue) { return nearestIn(palette, red, green, blue); };
 	auto nearestSky = [&](float red, float green, float blue) { return nearestIn(_skyPalette ? _skyPalette : palette, red, green, blue); };
+	// Under night vision the goggles show every colour as the one of their own group with its shade (the low four bits:
+	// see applyScreenWash, as the map does it). That is right for the art's colours, whose groups run bright to dark; a
+	// colour picked here as the palette's nearest to some RGB (the sky, the haze, a colour seen through glass) can sit
+	// anywhere in its group, and came out as bright or dark as that happened to be: a night sky and the haze far away
+	// glaring, bright through a window (a player, GitHub issue #122). So with night vision on, the world's own colours
+	// and tables are picked as the goggles show them: each palette colour as its shade in the goggles' group (`seen`),
+	// and the nearest of the goggles' sixteen colours for the result (`nearestSeen`), whose shade is then its brightness.
+	const bool goggles = _nightVision != 0;
+	const int gogglesGroup = goggles ? (_nightVision - 1) * 16 : 0;
+	SDL_Color seen[256];
+	for (int index = 0; index < 256; ++index) seen[index] = goggles ? palette[gogglesGroup | (index & 15)] : palette[index];
+	auto nearestGoggles = [&](float red, float green, float blue) {
+		int best = gogglesGroup | 15;
+		float bestDistance = 1e9f;
+		for (int shade = gogglesGroup ? 0 : 1; shade < 16; ++shade)
+		{
+			const SDL_Color &color = palette[gogglesGroup | shade];
+			const float dr = color.r - red, dg = color.g - green, db = color.b - blue;
+			const float distance = dr * dr * 0.3f + dg * dg * 0.59f + db * db * 0.11f;
+			if (distance < bestDistance) { bestDistance = distance; best = gogglesGroup | shade; }
+		}
+		return (Uint8)best;
+	};
+	auto nearestSeen = [&](float red, float green, float blue) { return goggles ? nearestGoggles(red, green, blue) : nearest(red, green, blue); };
+	auto nearestSkySeen = [&](float red, float green, float blue) { return goggles ? nearestGoggles(red, green, blue) : nearestSky(red, green, blue); };
 	// Mixes two RGB colours: amount 0 gives `from`, 1 gives `to`.
 	auto mix = [](const float *from, const float *to, float amount, float *out) {
 		for (int channel = 0; channel < 3; ++channel) out[channel] = from[channel] + (to[channel] - from[channel]) * amount;
@@ -244,7 +271,7 @@ void FirstPersonView::updateColors()
 	{
 		float color[3];
 		mix(horizon, zenith, band / 31.0f, color);
-		_colors.sky[band] = nearestSky(color[0], color[1], color[2]);
+		_colors.sky[band] = nearestSkySeen(color[0], color[1], color[2]);
 	}
 	// The clouds: 8 steps from their lit side to their shadowed side, darker at night.
 	mix(cloudLit, cloudNightLit, _colors.night, litCloud);
@@ -253,7 +280,7 @@ void FirstPersonView::updateColors()
 	{
 		float color[3];
 		mix(litCloud, darkCloud, level / 7.0f, color);
-		_colors.cloud[level] = nearestSky(color[0], color[1], color[2]);
+		_colors.cloud[level] = nearestSkySeen(color[0], color[1], color[2]);
 	}
 	// The single colours: the haze far away is the sky at the horizon, the rest are picked
 	// from fixed RGB values.
@@ -268,10 +295,11 @@ void FirstPersonView::updateColors()
 			hazeKey = (hazeKey ^ (palette[index].r | (palette[index].g << 8) | (palette[index].b << 16))) * 16777619u;
 		}
 		hazeKey = (hazeKey ^ _colors.haze) * 16777619u;
+		hazeKey = (hazeKey ^ (Uint32)_nightVision) * 16777619u;
 		if (hazeKey != _colors.hazeTintKey)
 		{
 			_colors.hazeTintKey = hazeKey;
-			const SDL_Color &hazeRgb = palette[_colors.haze];
+			const SDL_Color &hazeRgb = seen[_colors.haze];
 			for (int step = 0; step <= SceneColors::HazeSteps; ++step)
 			{
 				const float amount = step / (float)SceneColors::HazeSteps;
@@ -279,8 +307,8 @@ void FirstPersonView::updateColors()
 				for (int index = 1; index < 256; ++index)
 				{
 					_colors.hazeTint[step][index] = step == 0 ? (Uint8)index : step == SceneColors::HazeSteps ? _colors.haze
-						: nearest(palette[index].r + (hazeRgb.r - palette[index].r) * amount, palette[index].g + (hazeRgb.g - palette[index].g) * amount,
-							palette[index].b + (hazeRgb.b - palette[index].b) * amount);
+						: nearestSeen(seen[index].r + (hazeRgb.r - seen[index].r) * amount, seen[index].g + (hazeRgb.g - seen[index].g) * amount,
+							seen[index].b + (hazeRgb.b - seen[index].b) * amount);
 				}
 			}
 		}
@@ -289,10 +317,10 @@ void FirstPersonView::updateColors()
 	_colors.faintStar = nearestSky(120, 122, 140);
 	_colors.moon = nearestSky(228, 228, 210);
 	_colors.sun = nearestSky(255, 248, 200);
-	_colors.earth[0] = nearestSky(46, 96, 178);
-	_colors.earth[1] = nearestSky(8, 12, 28);
-	_colors.earth[2] = nearestSky(236, 238, 246);
-	_colors.earth[3] = nearestSky(130, 180, 240);
+	_colors.earth[0] = nearestSkySeen(46, 96, 178);
+	_colors.earth[1] = nearestSkySeen(8, 12, 28);
+	_colors.earth[2] = nearestSkySeen(236, 238, 246);
+	_colors.earth[3] = nearestSkySeen(130, 180, 240);
 	_colors.fire[0] = nearest(255, 250, 200);
 	_colors.fire[1] = nearest(255, 210, 60);
 	_colors.fire[2] = nearest(240, 120, 20);
@@ -306,8 +334,8 @@ void FirstPersonView::updateColors()
 	_colors.downedIcon[3] = nearest(250, 240, 120);
 	_colors.downedIcon[4] = nearest(170, 205, 255);
 	_colors.edgeDot = nearest(225, 45, 35);
-	_colors.unexplored = nearest(78, 88, 110);
-	_colors.rock = nearest(108, 94, 80);
+	_colors.unexplored = nearestSeen(78, 88, 110);
+	_colors.rock = nearestSeen(108, 94, 80);
 	_colors.spark = nearest(255, 240, 160);
 	_colors.blood[0] = nearest(90, 0, 0);
 	_colors.blood[1] = nearest(160, 12, 8);
@@ -357,13 +385,10 @@ void FirstPersonView::updateColors()
 	if (hash != _colors.paletteHash)
 	{
 		_colors.paletteHash = hash;
-		_colors.glassTint[0] = 0;
 		// Every colour (but the transparent 0) as seen through window glass, a little paler and
 		// bluer, and washed with each screen wash's colour by its brightness (luminance).
 		for (int index = 1; index < 256; ++index)
 		{
-			_colors.glassTint[index] = nearest(palette[index].r * 0.7f + 150 * 0.3f, palette[index].g * 0.7f + 180 * 0.3f,
-				palette[index].b * 0.7f + 205 * 0.3f);
 			const float luminance = palette[index].r * 0.3f + palette[index].g * 0.59f + palette[index].b * 0.11f;
 			_colors.redTint[index] = nearest(60 + luminance * 0.85f, luminance * 0.18f, luminance * 0.15f);
 			_colors.blueTint[index] = nearest(luminance * 0.1f, luminance * 0.16f, 25 + luminance * 0.45f);
@@ -372,17 +397,7 @@ void FirstPersonView::updateColors()
 				std::min(255.0f, 180 + luminance * 0.3f));
 			_colors.greenTint[index] = nearest(15 + luminance * 0.3f, 35 + luminance * 0.7f, luminance * 0.2f);
 			_colors.purpleTint[index] = nearest(std::min(255.0f, 55 + luminance * 0.75f), luminance * 0.25f, std::min(255.0f, 75 + luminance * 0.85f));
-			_colors.flareTint[index] = nearest(std::min(255.0f, 70 + luminance * 1.15f), luminance * 0.32f, luminance * 0.24f);
-			// Unexplored terrain drawn (setting "Unseen terrain": Visible): toned UnseenToneShare of the
-			// way to a slate grey as bright as the colour, so it shows what is there and still reads
-			// as not yet seen.
-			const float slateLuminance = UnseenToneRgb[0] * 0.3f + UnseenToneRgb[1] * 0.59f + UnseenToneRgb[2] * 0.11f;
-			auto toned = [&](float channel, int axis) {
-				return channel + (std::min(255.0f, UnseenToneRgb[axis] * luminance / slateLuminance) - channel) * UnseenToneShare;
-			};
-			_colors.unseenTint[index] = nearest(toned(palette[index].r, 0), toned(palette[index].g, 1), toned(palette[index].b, 2));
 		}
-		_colors.unseenTint[0] = 0;
 		// Colour 0 (black on the screen): the blue, orange, white, green and purple washes colour
 		// even black, with a dark shade of their own; the red wash and the flare's light leave it
 		// black.
@@ -392,7 +407,6 @@ void FirstPersonView::updateColors()
 		_colors.whiteTint[0] = nearest(185, 185, 185);
 		_colors.greenTint[0] = nearest(8, 22, 4);
 		_colors.purpleTint[0] = nearest(40, 6, 58);
-		_colors.flareTint[0] = 0;
 		// Four greys, dark to light, for the TV static; two greens for a digital feed's broken blocks.
 		for (int level = 0; level < 4; ++level) _colors.grey[level] = nearest(30 + 60 * level, 30 + 60 * level, 30 + 60 * level);
 		_colors.glitchGreen[0] = nearest(40, 225, 70);
@@ -426,6 +440,44 @@ void FirstPersonView::updateColors()
 				}
 			}
 		}
+	}
+
+	// The tables the world itself is coloured through, made again when the palette changes or night vision is switched
+	// (with it on, as the goggles show the colours: see `seen` above): every colour (but the transparent 0) as seen
+	// through window glass, a little paler and bluer; lit by a flare's red light; and unexplored terrain drawn
+	// (setting "Unseen terrain": Visible), toned UnseenToneShare of the way to a slate grey as bright as the colour,
+	// so it shows what is there and still reads as not yet seen.
+	const Uint32 worldTintKey = (hash ^ (Uint32)_nightVision) * 16777619u;
+	if (worldTintKey != _colors.worldTintKey)
+	{
+		_colors.worldTintKey = worldTintKey;
+		const float slateLuminance = UnseenToneRgb[0] * 0.3f + UnseenToneRgb[1] * 0.59f + UnseenToneRgb[2] * 0.11f;
+		for (int index = 1; index < 256; ++index)
+		{
+			const SDL_Color &color = seen[index];
+			const float luminance = color.r * 0.3f + color.g * 0.59f + color.b * 0.11f;
+			// (Through the goggles glass is only a touch paler: the 30% of pale blue it adds by eye lifted a dark room six
+			// shades of the goggles' sixteen. Before the goggles' own colours were used here (GitHub issue #122) it was worse:
+			// a dark colour's paler mix was often nearest a colour high in a dark group, and showed at full brightness, so
+			// an unlit ceiling seen through a window glared while the part of it a soldier's light fell on came out darker.)
+			const float glassShare = goggles ? 0.07f : 0.3f;
+			_colors.glassTint[index] = nearestSeen(color.r * (1.0f - glassShare) + 150 * glassShare, color.g * (1.0f - glassShare) + 180 * glassShare,
+				color.b * (1.0f - glassShare) + 205 * glassShare);
+			_colors.flareTint[index] = nearestSeen(std::min(255.0f, 70 + luminance * 1.15f), luminance * 0.32f, luminance * 0.24f);
+			auto toned = [&](float channel, int axis) {
+				return channel + (std::min(255.0f, UnseenToneRgb[axis] * luminance / slateLuminance) - channel) * UnseenToneShare;
+			};
+			_colors.unseenTint[index] = nearestSeen(toned(color.r, 0), toned(color.g, 1), toned(color.b, 2));
+			for (int step = 0; step < DarkFadeSteps; ++step)
+			{
+				const float kept = 1.0f - (step + 1) / (float)(DarkFadeSteps + 1);
+				_colors.darkFade[step][index] = nearestSeen(color.r * kept, color.g * kept, color.b * kept);
+			}
+		}
+		_colors.glassTint[0] = 0;
+		_colors.flareTint[0] = 0;
+		_colors.unseenTint[0] = 0;
+		for (int step = 0; step < DarkFadeSteps; ++step) _colors.darkFade[step][0] = 0;
 	}
 
 	// The sun stands high in the north-west by day; at night there is only the moon, and the
@@ -1088,6 +1140,12 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 	// (The sea stops short of its groups' last shades, all but black, see WaterDarkestShade.)
 	const int darkest = onSea ? std::max(baseColor & 15, WaterDarkestShade) : 15;
 	Uint8 color = darkEnoughForBlack ? shadeColor(baseColor, wholeShades) : (Uint8)((baseColor & 0xF0) | std::min(darkest, (baseColor & 15) + wholeShades));
+	if (!onSea && !onSteadyUfo && (baseColor & 15) + wholeShades > 15)
+	{
+		// Past its group's end it goes to black by way of the palette's darker colours, the
+		// darker the place (see DarkFadeSteps), not straight from the group's darkest.
+		color = fadedToBlack((Uint8)(baseColor | 15), blackShare, dither(pixelX + 1, pixelY + 2));
+	}
 	if (flare * 1.5f > 0.04f + dither(pixelX + 1, pixelY + 3))
 	{
 		color = _colors.flareTint[color]; // the flare's light is red
@@ -1289,7 +1347,9 @@ Uint8 FirstPersonView::colorOutsideMap(const float rayOrigin[3], const float ray
 			// (The sea stops short of its groups' last shades, all but black: WaterDarkestShade.)
 			const float blackShare = std::clamp((_colors.ambient - DarkOverflowFrom) / (DarkOverflowTo - DarkOverflowFrom), 0.0f, 1.0f);
 			const int darkest = ground->water ? std::max(color & 15, WaterDarkestShade) : 15;
-			color = blackShare > dither(pixelX + 1, pixelY + 2) ? shadeColor(color, shades) : (Uint8)((color & 0xF0) | std::min(darkest, (color & 15) + std::max(0, shades)));
+			const bool pastGroup = !ground->water && (color & 15) + shades > 15;
+			color = pastGroup ? fadedToBlack((Uint8)(color | 15), blackShare, dither(pixelX + 1, pixelY + 2)) // (by way of the palette's darker colours: see DarkFadeSteps)
+				: blackShare > dither(pixelX + 1, pixelY + 2) ? shadeColor(color, shades) : (Uint8)((color & 0xF0) | std::min(darkest, (color & 15) + std::max(0, shades)));
 			// The haze closes in towards the horizon, spread over a longer distance than on the
 			// map so the ground fades out gradually; under the sea the murk closes in as on the map.
 			const float haze = _colors.underwater ? smoothstep(_maxDistance * 0.12f, _maxDistance * 0.65f, groundDistance)
@@ -1693,10 +1753,12 @@ void FirstPersonView::renderRows()
 	rayContext.solidGhostThreshold = 0.0f;
 
 	// With a pixel size above 1, one ray colours a block of pixels (pixelSize x pixelSize).
-	// Auto (0) picks 2 for views bigger than AutoPixelMaxWidth x AutoPixelMaxHeight, else 1; an
-	// eye's picture in VR always 1 (its size is a setting of its own, "VR eye picture").
+	// Auto (0) picks 2 for views bigger than AutoPixelMaxWidth x AutoPixelMaxHeight, else 1 (on the graphics card always 1: see
+	// gpuCastAllRays); an eye's picture in VR always 1 (its size is a setting of its own, "VR eye picture").
 	const bool bigView = !eyePass && (width > AutoPixelMaxWidth || height > AutoPixelMaxHeight);
-	const int pixelSize = Options::fpsPixelSize == 0 ? (bigView ? 2 : 1) : std::clamp(Options::fpsPixelSize, 1, 3);
+	// A small view (a soldier's card camera, the map camera) always has a ray a pixel: bigger pixels made mush of it, and it costs little.
+	const bool smallView = width * height <= SmallViewPixels;
+	const int pixelSize = smallView ? 1 : Options::fpsPixelSize == 0 ? (bigView ? 2 : 1) : std::clamp(Options::fpsPixelSize, 1, 3);
 	const int blockRows = (height + pixelSize - 1) / pixelSize, blockColumns = (width + pixelSize - 1) / pixelSize;
 	for (int blockRow = _rayWorkers.nextPiece++; blockRow < blockRows; blockRow = _rayWorkers.nextPiece++)
 	{
@@ -1804,7 +1866,40 @@ void FirstPersonView::castAllRays()
 	// The flares' light for this frame, which every ray hitting near a flare needs (the same for
 	// every thread).
 	prepareFlareLights();
-	runOnAllThreads(&FirstPersonView::renderRows);
+	// Setting "Renderer": GPU: the graphics card casts them; where it can't, the CPU as ever.
+	// (OPENXCOM3D_GPU_SHADOW: the CPU draws, the card beside it, checked and timed: see gpuShadowRays.)
+	static const bool gpuShadow = getenv("OPENXCOM3D_GPU_SHADOW") != nullptr;
+	// (OPENXCOM3D_RAY_TIME: the log gets the rays' time, averaged over 120 frames of the main view, whoever cast them.)
+	static const bool rayTime = getenv("OPENXCOM3D_RAY_TIME") != nullptr;
+	const auto started = std::chrono::steady_clock::now();
+	_hasTrueColor = false; // (set again by the card when it gives the frame's picture in full colour too)
+	_hasCardPicture = false;
+	_gpuPresenting = 0;
+	const bool onCard = !gpuShadow && Options::fpsRenderer == 1 && gpuCastAllRays();
+	if (!onCard)
+	{
+		runOnAllThreads(&FirstPersonView::renderRows);
+	}
+	if (rayTime && getWidth() >= 320)
+	{
+		static double sum = 0.0;
+		static int frames = 0;
+		sum += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+		if (++frames == 120)
+		{
+			Log(LOG_INFO) << "OpenXcom3D: the " << getWidth() << "x" << getHeight() << " view's rays take " << sum / frames << " ms on the " << (onCard ? "GPU" : "CPU");
+			sum = 0.0;
+			frames = 0;
+		}
+	}
+	if (onCard)
+	{
+		return;
+	}
+	if (gpuShadow)
+	{
+		gpuShadowRays(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
+	}
 }
 
 /**

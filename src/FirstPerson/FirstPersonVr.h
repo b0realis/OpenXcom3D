@@ -83,6 +83,8 @@
  * voxels, x east, y south, z up; a voxel across is VrMetresPerVoxel (10 cm: a tile 1.6 m, a soldier
  * 1.8 m tall), a voxel up ZScale of that (the isometric art's flattened height).
  */
+#include <algorithm>
+#include <cmath>
 #include <SDL.h>
 
 namespace OpenXcom
@@ -124,7 +126,25 @@ struct VrPicture
 	const float *depth = nullptr;
 	int depthPitch = 0;
 	float depthToMetres = 0.0f;
+	// An eye kept on the graphics card (vrRenderEyes with a card slot; setting "Renderer": GPU): its finished picture
+	// and depth as OpenGL textures in the renderer's share group (RGBA8; R32F, the depth as vrProjectionDepth has it;
+	// both with the bottom row first), to read once the fence has passed (an OpenGL sync object; the same for both
+	// eyes). Then pixels and depth are null, but with the check asked for, which gives both.
+	unsigned colorTexture = 0, depthTexture = 0;
+	void *fence = nullptr;
 };
+
+/// The depth an eye's picture is handed to a headset with (OpenXR's XR_KHR_composition_layer_depth): as a standard
+/// perspective projection with these near and far planes (metres) has it, 0 at the near plane and 1 at the far one (and
+/// beyond: the sky).
+const float VrDepthNearMetres = 0.05f, VrDepthFarMetres = 1000.0f;
+/// That depth for a point so many metres ahead of the eye (d = f / (f - n) * (1 - n / z); the graphics card works the
+/// same out for the eyes it keeps: FirstPersonGpuShaders.h, EyeSource).
+inline float vrProjectionDepth(float metres, float nearMetres = VrDepthNearMetres, float farMetres = VrDepthFarMetres)
+{
+	const float depth = metres <= nearMetres ? 0.0f : (std::isinf(metres) ? 1.0f : farMetres / (farMetres - nearMetres) * (1.0f - nearMetres / metres));
+	return std::min(std::max(depth, 0.0f), 1.0f);
+}
 
 /// How big a voxel across is, in metres (10 cm: a tile 16 of them, 1.6 m; a soldier 22 voxels up, 1.8 m tall).
 const double VrMetresPerVoxel = 0.1;
@@ -165,7 +185,11 @@ void vrSnapTurn(int direction);
 /// width x height pixels: the weapon in the right hand (setting "VR weapon"), its laser and the crosshair where it points,
 /// each at its depth. False (pictures left empty) with nothing to draw. (hand, the earlier hook: a right hand's pose for
 /// this frame, taken as its aim and grip when vrSetHands gave none; null: none.)
-bool vrRenderEyes(const VrEyeView views[2], int width, int height, VrPicture pictures[2], const VrPose *hand = nullptr);
+/// cardSlot: with "Renderer": GPU, keep the eyes on the graphics card, in this one of its three slots (0 to 2: the caller
+/// hands a slot on to its display and gives another next time; see VrPicture's textures); -1: the pictures come back.
+/// Where the card can't keep them the pictures come back as ever. cardCheck: both, the card's read back and compared
+/// with the pictures (the log has the counts).
+bool vrRenderEyes(const VrEyeView views[2], int width, int height, VrPicture pictures[2], const VrPose *hand = nullptr, int cardSlot = -1, bool cardCheck = false);
 /// The HUD as its own picture (index 0 transparent), as the last frame left it; false with nothing to show. It never has
 /// the weapon in hand (that's in the eyes, or with "VR weapon" off nowhere).
 bool vrHudPicture(VrPicture &picture);

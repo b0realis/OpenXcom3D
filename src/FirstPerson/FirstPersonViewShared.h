@@ -141,6 +141,7 @@ const float FlareShadowShades = 8.0f, FlareShadowMinPower = 0.06f;
 /// of 2. A 1920x1080 screen at the default battlescape scale makes a 960x540 view, which ran at
 /// 40-51 FPS in a busy town; in blocks of 2 it holds 60 and looks almost the same.
 const int AutoPixelMaxWidth = 640, AutoPixelMaxHeight = 400;
+const int SmallViewPixels = 320 * 200; // a view of at most this many pixels (the cards' cameras, the small and medium map camera) is never drawn with bigger pixels
 
 // ---- Proportions of the voxel world ----
 
@@ -459,6 +460,7 @@ const float CloudDeckMottle = 14.0f;
 /// DarkOverflowTo (all of it), dithered between. A lit house is 2, the Piratez hideout's rooms
 /// about 4.5, a night field at the edge of a soldier's light about 6.5, far from it 15.
 const float DarkOverflowFrom = 5.0f, DarkOverflowTo = 8.0f;
+
 /// The darkest shade (0 brightest .. 15 darkest) the isometric map's night vision leaves near the
 /// soldiers (Map::NIGHT_VISION_SHADE): the 3D view's night vision lights the tiles and the open
 /// ground no darker, and the units too in the map's first debug vision mode (see mapShade).

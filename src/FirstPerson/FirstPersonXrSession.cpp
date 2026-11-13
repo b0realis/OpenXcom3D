@@ -87,7 +87,7 @@
 #include <unistd.h>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
-#include <GLES3/gl3.h>
+#include <GLES3/gl32.h>
 #define XR_USE_PLATFORM_ANDROID
 #define XR_USE_GRAPHICS_API_OPENGL_ES
 #include <openxr/openxr.h>
@@ -118,6 +118,9 @@ const SmoothingFilter EyeSmoothingFilter = SmoothingFilter::Sabr;
 const GLenum TimeElapsedQuery = 0x88BF /* GL_TIME_ELAPSED_EXT */, GpuDisjoint = 0x8FBB /* GL_GPU_DISJOINT_EXT */;
 /// The frame statistics go to the log this often (seconds), as the game's frame probe does.
 const int StatsSeconds = 5;
+/// How long the OpenXR thread waits for the renderer to finish an eye pair kept on the graphics card (nanoseconds): a
+/// pair's whole drawing time on a slow frame, and no longer (the headset's frames must go on).
+const GLuint64 CardFenceWaitNs = 250000000;
 /// Asked to end, the session gets this long to end by itself before the thread leaves anyway (ms).
 const int ExitTimeoutMs = 3000;
 /// OpenGL ES's sRGB format (what the compositor should get our colours as) and the plain one (the fallback).
@@ -267,6 +270,9 @@ private:
 	bool createInstance();
 	/// Makes our own OpenGL ES 3 context, current on this thread from now on.
 	bool createGraphics();
+	/// The context itself, for a config: in the renderer's share group where that can be had (see rendererShareContext),
+	/// so eyes kept on the graphics card can be shown from their textures; else on its own.
+	bool makeContext();
 	/// Makes the session on our context, and its spaces.
 	bool createSession();
 	/// Makes the controllers' actions, suggests where they are, and attaches them to the session.
@@ -296,8 +302,19 @@ private:
 #ifdef OPENXCOM3D_XR_FAKE_SESSION
 	/// The emulator test build's stand-in for the whole session (see its comment).
 	void fakeLoop();
-	/// The emulator test build: an eye picture smoothed as the headset's would be, saved (see its comment).
-	void saveSmoothedTestPicture(const LayerPicture &picture, const char *name);
+	/// The emulator test build: an eye picture smoothed as the headset's would be (see its comment).
+	bool smoothTestPicture(const uint32_t *pixels, GLuint cardTexture, int width, int height, LayerPicture &smoothed);
+	/// The emulator test build: a pair taken as the real loop takes it, into textures standing in for the swapchains' images.
+	void takeTestPair(const EyePictures &pictures);
+	/// The emulator test build: a pair kept on the graphics card read back, compared with its pictures, and saved.
+	void checkCardPair(const EyePictures &pictures, bool save);
+	GLuint _standInColour[2] = {}, _standInDepth[2] = {}; // the test build's stand-ins for the eyes' swapchain images
+	int _standInWidth = 0, _standInHeight = 0;
+	GLuint _readFramebuffer = 0;
+	double _statsPairMs = 0.0;             // the time taking the pairs took here (drawn, the chip waited for)
+	int _statsPairs = 0;
+	long _checkPixels = 0, _checkColours = 0, _checkDepths = 0;
+	float _checkDepthApart = 0.0f;
 #endif
 
 	// ---- Helpers ----
@@ -391,6 +408,17 @@ private:
 	bool smootherReady();
 	/// Draws a new eye pair (and its depth) smoothed into the eye swapchains; false when it couldn't (none shown).
 	bool smoothPair(const EyePictures &pictures, bool withDepth, bool &depthDone);
+
+	// The eyes kept on the graphics card (the renderer's textures, shared: see EyePictures).
+	bool _sharesTextures = false;          // our context is in the renderer's share group
+	bool _cardLogged = false;
+	int _statsCardPairs = 0, _statsCardLate = 0;
+	/// Waits for a pair's fence (the renderer has finished its textures); false if it didn't pass in time (the pair is left out).
+	bool waitForCardPair(const EyePictures &pictures);
+	/// Draws an eye kept on the card into a colour texture (a swapchain image) of the target size: smoothed, or as it is.
+	bool drawCardEye(const EyePictures &pictures, int eye, GLuint target, int targetWidth, int targetHeight, bool smoothed);
+	/// Shows a new eye pair kept on the card: into the eye swapchains (smoothed bigger, or as it is) and its depth.
+	bool showCardPair(const EyePictures &pictures, bool withDepth, bool &depthDone);
 	/// Reads the GPU timers that have finished (the smoothing's time, for the statistics).
 	void readSmoothingTimers();
 };
@@ -623,11 +651,7 @@ bool Session::createGraphics()
 		log(ANDROID_LOG_ERROR, "EGL: no ES 3 config with 8 bits a colour and no multisampling (of %d)", configCount);
 		return false;
 	}
-	const EGLint contextAttributes[] = { EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE };
-	_context = eglCreateContext(_display, _config, EGL_NO_CONTEXT, contextAttributes);
-	const EGLint surfaceAttributes[] = { EGL_WIDTH, 16, EGL_HEIGHT, 16, EGL_NONE };
-	_surface = _context != EGL_NO_CONTEXT ? eglCreatePbufferSurface(_display, _config, surfaceAttributes) : EGL_NO_SURFACE;
-	if (_surface == EGL_NO_SURFACE || !eglMakeCurrent(_display, _surface, _surface, _context))
+	if (!makeContext())
 	{
 		log(ANDROID_LOG_ERROR, "EGL: no context of our own (error 0x%x)", eglGetError());
 		return false;
@@ -635,6 +659,40 @@ bool Session::createGraphics()
 	log(ANDROID_LOG_INFO, "OpenGL ES: %s, %s (the runtime asks for %u.%u to %u.%u)", (const char *)glGetString(GL_VERSION), (const char *)glGetString(GL_RENDERER),
 		XR_VERSION_MAJOR(requirements.minApiVersionSupported), XR_VERSION_MINOR(requirements.minApiVersionSupported),
 		XR_VERSION_MAJOR(requirements.maxApiVersionSupported), XR_VERSION_MINOR(requirements.maxApiVersionSupported));
+	return true;
+}
+
+/**
+ * Makes the context for the config chosen, with a tiny off-screen surface, current on this thread. First in the share
+ * group of the 3D view's renderer on the graphics card (FirstPersonGpu::shareContext: an OpenGL ES 3.2 context, as the
+ * renderer's is), so the eyes it keeps there are textures here too; where that fails (no such context, a driver that
+ * won't share, or the setting "VR eyes kept on the card" NO when the session starts), an OpenGL ES 3 context on its
+ * own, as before, and the eyes come as pictures.
+ * @return False with no context at all.
+ */
+bool Session::makeContext()
+{
+	_sharesTextures = false;
+	if (EGLContext shareWith = shared().cardEyesWanted ? (EGLContext)rendererShareContext() : EGL_NO_CONTEXT)
+	{
+		const EGLint sharedAttributes[] = { EGL_CONTEXT_MAJOR_VERSION_KHR, 3, EGL_CONTEXT_MINOR_VERSION_KHR, 2, EGL_NONE };
+		_context = eglCreateContext(_display, _config, shareWith, sharedAttributes);
+		_sharesTextures = _context != EGL_NO_CONTEXT;
+		if (!_sharesTextures) log(ANDROID_LOG_WARN, "EGL: no context sharing the renderer's textures (error 0x%x): the eyes come as pictures", eglGetError());
+	}
+	if (_context == EGL_NO_CONTEXT)
+	{
+		const EGLint contextAttributes[] = { EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE };
+		_context = eglCreateContext(_display, _config, EGL_NO_CONTEXT, contextAttributes);
+	}
+	const EGLint surfaceAttributes[] = { EGL_WIDTH, 16, EGL_HEIGHT, 16, EGL_NONE };
+	_surface = _context != EGL_NO_CONTEXT ? eglCreatePbufferSurface(_display, _config, surfaceAttributes) : EGL_NO_SURFACE;
+	if (_surface == EGL_NO_SURFACE || !eglMakeCurrent(_display, _surface, _surface, _context))
+	{
+		return false;
+	}
+	shared().cardEyes = _sharesTextures;
+	if (_sharesTextures) log(ANDROID_LOG_INFO, "EGL: our context shares the 3D view's renderer's textures (eyes kept on the graphics card are shown from there)");
 	return true;
 }
 
@@ -1328,7 +1386,14 @@ void Session::uploadPictures()
 		const EyePictures &pictures = box.eyes.front();
 		bool both = true;
 		bool depthBoth = _depthFormat && !pictures.depth[0].empty() && !pictures.depth[1].empty();
-		if (box.smoothing && smootherReady())
+		if (pictures.onCard)
+		{
+			// Kept on the graphics card: from its textures, once the renderer has finished them (else the pair is left out).
+			bool depthDone = false;
+			both = waitForCardPair(pictures) && showCardPair(pictures, _depthFormat != 0, depthDone);
+			depthBoth = both && depthDone;
+		}
+		else if (box.smoothing && smootherReady())
 		{
 			// Smoothed by the graphics chip, bigger, the depth with them (see smoothPair).
 			bool depthDone = false;
@@ -1426,6 +1491,26 @@ void Session::reportStatistics()
 			EyeSmoothingFilter == SmoothingFilter::Sabr ? "SABR" : "FSR 1", _statsSmoothed, _statsSmoothTimed ? _statsSmoothGpuMs / _statsSmoothTimed : 0.0,
 			_statsSmoothGpuWorstMs, _statsSmoothTimed);
 	}
+	if (_statsCardPairs > 0 || _statsCardLate > 0)
+	{
+		log(ANDROID_LOG_INFO, "eyes from the graphics card's textures: %d pairs, %d left out (not finished in time)", _statsCardPairs, _statsCardLate);
+	}
+	_statsCardPairs = _statsCardLate = 0;
+#ifdef OPENXCOM3D_XR_FAKE_SESSION
+	if (_statsPairs > 0)
+	{
+		log(ANDROID_LOG_INFO, "TEST BUILD: taking a pair here (into the swapchains' stand-ins, the chip waited for): %.2f ms on average, %d pairs", _statsPairMs / _statsPairs, _statsPairs);
+	}
+	if (_checkPixels > 0)
+	{
+		log(ANDROID_LOG_INFO, "TEST BUILD: the graphics card's eyes against the pictures of the same frames: of %ld pixels %ld colours differ, %ld depths (the most apart %g)",
+			_checkPixels, _checkColours, _checkDepths, _checkDepthApart);
+	}
+	_statsPairMs = 0.0;
+	_statsPairs = 0;
+	_checkPixels = _checkColours = _checkDepths = 0;
+	_checkDepthApart = 0.0f;
+#endif
 	_statsSmoothed = _statsSmoothTimed = 0;
 	_statsSmoothGpuMs = _statsSmoothGpuWorstMs = 0.0;
 	_statsSince = now;
@@ -1483,41 +1568,22 @@ void saveTestPicture(const LayerPicture &picture, const char *name)
 
 /**
  * THE EMULATOR TEST BUILD ONLY: an eye picture smoothed by the emulator's graphics as the headset's would be (the same
- * filter, into an sRGB texture as an eye's swapchain image is), read back and saved as a BMP; and the time it took.
- * Our own context is made for it (no OpenXR here), as createGraphics makes it.
- * @param picture The eye picture.
- * @param name The file's name.
+ * filter, into an sRGB texture as an eye's swapchain image is) and read back; from its pixels, uploaded, or from the
+ * texture the 3D view's renderer kept it in on the graphics card.
+ * @param pixels The eye picture (null: the card's texture).
+ * @param cardTexture The card's texture of it (with pixels null).
+ * @param smoothed Set to the smoothed picture.
+ * @return False if it couldn't be drawn.
  */
-void Session::saveSmoothedTestPicture(const LayerPicture &picture, const char *name)
+bool Session::smoothTestPicture(const uint32_t *pixels, GLuint cardTexture, int width, int height, LayerPicture &smoothed)
 {
-	if (_context == EGL_NO_CONTEXT)
+	if (_context == EGL_NO_CONTEXT || !smootherReady())
 	{
-		_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-		EGLint major = 0, minor = 0, count = 0;
-		const EGLint configAttributes[] = { EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT_KHR, EGL_SURFACE_TYPE, EGL_PBUFFER_BIT, EGL_NONE };
-		const EGLint contextAttributes[] = { EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE };
-		const EGLint surfaceAttributes[] = { EGL_WIDTH, 16, EGL_HEIGHT, 16, EGL_NONE };
-		if (!eglInitialize(_display, &major, &minor) || !eglChooseConfig(_display, configAttributes, &_config, 1, &count) || count < 1)
-		{
-			log(ANDROID_LOG_ERROR, "TEST BUILD: no EGL config for the smoothing's test");
-			return;
-		}
-		_context = eglCreateContext(_display, _config, EGL_NO_CONTEXT, contextAttributes);
-		_surface = _context != EGL_NO_CONTEXT ? eglCreatePbufferSurface(_display, _config, surfaceAttributes) : EGL_NO_SURFACE;
-		if (_surface == EGL_NO_SURFACE || !eglMakeCurrent(_display, _surface, _surface, _context))
-		{
-			log(ANDROID_LOG_ERROR, "TEST BUILD: no context for the smoothing's test");
-			return;
-		}
+		return false;
 	}
-	if (!smootherReady())
-	{
-		return;
-	}
-	const int scale = smoothingScaleFor(picture.width, picture.height);
-	LayerPicture smoothed;
-	smoothed.width = picture.width * scale;
-	smoothed.height = picture.height * scale;
+	const int scale = smoothingScaleFor(width, height);
+	smoothed.width = width * scale;
+	smoothed.height = height * scale;
 	smoothed.pixels.resize((size_t)smoothed.width * smoothed.height);
 	GLuint target = 0, framebuffer = 0;
 	glGenTextures(1, &target);
@@ -1525,7 +1591,8 @@ void Session::saveSmoothedTestPicture(const LayerPicture &picture, const char *n
 	glTexStorage2D(GL_TEXTURE_2D, 1, GL_SRGB8_ALPHA8, smoothed.width, smoothed.height);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	const Clock::time_point start = Clock::now();
-	const bool drawn = _smoother.drawColour(picture.pixels.data(), picture.width, picture.height, target, smoothed.width, smoothed.height, true);
+	const bool drawn = pixels ? _smoother.drawColour(pixels, width, height, target, smoothed.width, smoothed.height, true)
+		: _smoother.drawColourFrom(cardTexture, width, height, target, smoothed.width, smoothed.height, true);
 	glFinish();
 	const double ms = millisecondsBetween(start, Clock::now());
 	glGenFramebuffers(1, &framebuffer);
@@ -1535,11 +1602,176 @@ void Session::saveSmoothedTestPicture(const LayerPicture &picture, const char *n
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glDeleteFramebuffers(1, &framebuffer);
 	glDeleteTextures(1, &target);
-	log(ANDROID_LOG_INFO, "TEST BUILD: an eye smoothed (%s): %dx%d into %dx%d, %s, %.1f ms on the emulator's graphics",
-		EyeSmoothingFilter == SmoothingFilter::Sabr ? "SABR" : "FSR 1", picture.width, picture.height, smoothed.width, smoothed.height, drawn ? "drawn" : "FAILED", ms);
-	if (drawn)
+	log(ANDROID_LOG_INFO, "TEST BUILD: an eye smoothed (%s, from %s): %dx%d into %dx%d, %s, %.1f ms on the emulator's graphics",
+		EyeSmoothingFilter == SmoothingFilter::Sabr ? "SABR" : "FSR 1", pixels ? "its picture, uploaded" : "the graphics card's texture", width, height,
+		smoothed.width, smoothed.height, drawn ? "drawn" : "FAILED", ms);
+	return drawn;
+}
+
+/**
+ * THE EMULATOR TEST BUILD ONLY: a new eye pair taken as the real loop takes it (uploadPictures, smoothPair,
+ * showCardPair), but into textures standing in for the swapchains' images (an sRGB one and a depth one an eye, at the
+ * size the swapchains would have): a pair kept on the graphics card from its textures once its fence has passed,
+ * else its pictures uploaded; smoothed or as it is, with its depth. The chip is waited for after, and the time summed
+ * (the statistics' "taking a pair").
+ */
+void Session::takeTestPair(const EyePictures &pictures)
+{
+	Shared &box = shared();
+	if (_context == EGL_NO_CONTEXT || pictures.eyes[0].width <= 0)
 	{
-		saveTestPicture(smoothed, name);
+		return;
+	}
+	const Clock::time_point start = Clock::now();
+	const bool smoothed = box.smoothing && smootherReady();
+	const int scale = smoothed ? smoothingScaleFor(pictures.eyes[0].width, pictures.eyes[0].height) : 1;
+	const int width = pictures.eyes[0].width * scale, height = pictures.eyes[0].height * scale;
+	if (width != _standInWidth || height != _standInHeight)
+	{
+		if (_standInColour[0])
+		{
+			glDeleteTextures(2, _standInColour);
+			glDeleteTextures(2, _standInDepth);
+		}
+		glGenTextures(2, _standInColour);
+		glGenTextures(2, _standInDepth);
+		for (int eye = 0; eye < 2; ++eye)
+		{
+			glBindTexture(GL_TEXTURE_2D, _standInColour[eye]);
+			glTexStorage2D(GL_TEXTURE_2D, 1, GL_SRGB8_ALPHA8, width, height);
+			glBindTexture(GL_TEXTURE_2D, _standInDepth[eye]);
+			glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH_COMPONENT32F, width, height);
+		}
+		glBindTexture(GL_TEXTURE_2D, 0);
+		_standInWidth = width;
+		_standInHeight = height;
+	}
+	bool taken = !pictures.onCard || waitForCardPair(pictures);
+	for (int eye = 0; eye < 2 && taken; ++eye)
+	{
+		const LayerPicture &picture = pictures.eyes[eye];
+		if (pictures.onCard)
+		{
+			taken = drawCardEye(pictures, eye, _standInColour[eye], width, height, smoothed)
+				&& (!smootherReady() || _smoother.drawDepthFrom(pictures.cardDepth[eye], picture.width, picture.height, _standInDepth[eye], width, height));
+		}
+		else if (smoothed)
+		{
+			taken = _smoother.drawColour(picture.pixels.data(), picture.width, picture.height, _standInColour[eye], width, height, true)
+				&& (pictures.depth[eye].empty() || _smoother.drawDepth(pictures.depth[eye].data(), picture.width, picture.height, _standInDepth[eye], width, height));
+		}
+		else
+		{
+			glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+			glBindTexture(GL_TEXTURE_2D, _standInColour[eye]);
+			glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, picture.pixels.data());
+			if (!pictures.depth[eye].empty())
+			{
+				glBindTexture(GL_TEXTURE_2D, _standInDepth[eye]);
+				glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_DEPTH_COMPONENT, GL_FLOAT, pictures.depth[eye].data());
+			}
+			glBindTexture(GL_TEXTURE_2D, 0);
+		}
+	}
+	glFinish();
+	const GLenum error = glGetError();
+	if ((!taken || error != GL_NO_ERROR) && !_glErrorLogged)
+	{
+		_glErrorLogged = true;
+		log(ANDROID_LOG_ERROR, "TEST BUILD: a pair couldn't be taken (%s; OpenGL error 0x%x; logged once)", pictures.onCard ? "from the graphics card" : "from its pictures", error);
+	}
+	if (taken && pictures.onCard && !_cardLogged)
+	{
+		_cardLogged = true;
+		log(ANDROID_LOG_INFO, "eyes: shown from the graphics card's textures, %dx%d%s", pictures.eyes[0].width, pictures.eyes[0].height, smoothed ? ", smoothed" : "");
+	}
+	_statsPairMs += millisecondsBetween(start, Clock::now());
+	++_statsPairs;
+}
+
+/**
+ * THE EMULATOR TEST BUILD ONLY: a pair kept on the graphics card read back here, on this thread's own context (the
+ * proof that it shares the renderer's textures and that the fence holds), and compared a pixel at a time with the
+ * pair's pictures and depths, which the game's thread hands over too when the check is asked for (the file
+ * vrtest_card_check): the sums go to the statistics. With save, the card's eyes are saved (vrtest_eye_*_card.bmp), and
+ * the left one smoothed from its texture (vrtest_eye_left_card_smoothed.bmp), compared with the same smoothed from
+ * its picture.
+ */
+void Session::checkCardPair(const EyePictures &pictures, bool save)
+{
+	if (_context == EGL_NO_CONTEXT || !pictures.onCard || !waitForCardPair(pictures))
+	{
+		return;
+	}
+	if (!_readFramebuffer) glGenFramebuffers(1, &_readFramebuffer);
+	std::vector<float> wide;
+	for (int eye = 0; eye < 2; ++eye)
+	{
+		const int width = pictures.eyes[eye].width, height = pictures.eyes[eye].height;
+		const size_t count = (size_t)width * height;
+		LayerPicture card;
+		card.width = width;
+		card.height = height;
+		card.pixels.resize(count);
+		glBindFramebuffer(GL_FRAMEBUFFER, _readFramebuffer);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pictures.cardColour[eye], 0);
+		glReadBuffer(GL_COLOR_ATTACHMENT0);
+		glPixelStorei(GL_PACK_ALIGNMENT, 4);
+		glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, card.pixels.data());
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pictures.cardDepth[eye], 0);
+		wide.resize(count * 4);
+		glReadPixels(0, 0, width, height, GL_RGBA, GL_FLOAT, wide.data());
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		if (pictures.eyes[eye].pixels.size() >= count && pictures.depth[eye].size() >= count)
+		{
+			for (size_t i = 0; i < count; ++i)
+			{
+				_checkColours += (card.pixels[i] & 0xFFFFFFu) != (pictures.eyes[eye].pixels[i] & 0xFFFFFFu);
+				const float apart = std::fabs(wide[i * 4] - pictures.depth[eye][i]);
+				_checkDepths += apart > 1e-5f;
+				_checkDepthApart = std::max(_checkDepthApart, apart);
+			}
+			_checkPixels += (long)count;
+		}
+		if (save)
+		{
+			saveTestPicture(card, eye == 0 ? "vrtest_eye_left_card.bmp" : "vrtest_eye_right_card.bmp");
+		}
+		if (save && eye == 0 && !shared().smoothing && _standInColour[0] && _standInWidth == width && _standInHeight == height && pictures.eyes[0].pixels.size() >= count)
+		{
+			// As it is (no smoothing): the stand-in the pair was just copied into (see takeTestPair) against its picture.
+			std::vector<Uint32> copied(count);
+			glBindFramebuffer(GL_FRAMEBUFFER, _readFramebuffer);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _standInColour[0], 0);
+			glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, copied.data());
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			long different = 0;
+			for (size_t i = 0; i < count; ++i) different += (copied[i] & 0xFFFFFFu) != (pictures.eyes[0].pixels[i] & 0xFFFFFFu);
+			log(ANDROID_LOG_INFO, "TEST BUILD: the left eye copied as it is from the graphics card's texture into a swapchain image's stand-in against its picture: of %zu pixels %ld differ",
+				count, different);
+		}
+		if (save && eye == 0 && shared().smoothing)
+		{
+			LayerPicture fromCard, fromPicture;
+			if (smoothTestPicture(nullptr, pictures.cardColour[0], width, height, fromCard))
+			{
+				saveTestPicture(fromCard, "vrtest_eye_left_card_smoothed.bmp");
+				if (pictures.eyes[0].pixels.size() >= count && smoothTestPicture(pictures.eyes[0].pixels.data(), 0, width, height, fromPicture))
+				{
+					long different = 0;
+					for (size_t i = 0; i < fromCard.pixels.size(); ++i) different += (fromCard.pixels[i] & 0xFFFFFFu) != (fromPicture.pixels[i] & 0xFFFFFFu);
+					log(ANDROID_LOG_INFO, "TEST BUILD: the left eye smoothed from the graphics card's texture against the same smoothed from its picture: of %zu pixels %ld differ",
+						fromCard.pixels.size(), different);
+				}
+			}
+		}
+	}
+	const GLenum error = glGetError();
+	if (error != GL_NO_ERROR)
+	{
+		log(ANDROID_LOG_ERROR, "TEST BUILD: reading the graphics card's eyes back: OpenGL error 0x%x", error);
 	}
 }
 
@@ -1555,6 +1787,21 @@ void Session::fakeLoop()
 {
 	Shared &box = shared();
 	log(ANDROID_LOG_WARN, "TEST BUILD: a session acted out, no OpenXR");
+	// Our own context, as createGraphics makes it (no OpenXR here to ask): for the pairs taken as the real loop takes them.
+	_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+	EGLint eglMajor = 0, eglMinor = 0, configCount = 0;
+	const EGLint configAttributes[] = { EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT_KHR, EGL_SURFACE_TYPE, EGL_PBUFFER_BIT, EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8,
+		EGL_ALPHA_SIZE, 8, EGL_NONE };
+	if (_display == EGL_NO_DISPLAY || !eglInitialize(_display, &eglMajor, &eglMinor) || !eglChooseConfig(_display, configAttributes, &_config, 1, &configCount) || configCount < 1
+		|| !makeContext())
+	{
+		log(ANDROID_LOG_ERROR, "TEST BUILD: no context for the pairs (EGL error 0x%x): they are only counted", eglGetError());
+		_context = EGL_NO_CONTEXT;
+	}
+	else
+	{
+		log(ANDROID_LOG_INFO, "OpenGL ES: %s, %s", (const char *)glGetString(GL_VERSION), (const char *)glGetString(GL_RENDERER));
+	}
 	box.running = true;
 	const Clock::time_point start = Clock::now();
 	_statsSince = _lastFrameEnd = start;
@@ -1577,7 +1824,7 @@ void Session::fakeLoop()
 		std::fclose(script);
 	}
 	log(ANDROID_LOG_INFO, "TEST BUILD: the script: %s", headsetScript ? "the headset's (A, A, B)" : (endsTheTurn ? "Y ends the turn" : "B at 18 s"));
-	bool smoothedSaved = false, hudHeldWas = false;
+	bool smoothedSaved = false, hudHeldWas = false, eyesSaved = false;
 	while (!box.stopRequested)
 	{
 		std::this_thread::sleep_for(std::chrono::microseconds(13889));
@@ -1699,15 +1946,24 @@ void Session::fakeLoop()
 				log(ANDROID_LOG_INFO, "TEST BUILD: the left eye's depth: %zu values, the nearest %.4f (%.2f m), sky %zu",
 					pictures.depth[0].size(), nearest, nearest < 1.0f ? DepthNearMetres / (1.0f - nearest * (DepthFarMetres - DepthNearMetres) / DepthFarMetres) : 0.0f, sky);
 			}
-			if (between(2.0f, 2.1f))
+			takeTestPair(pictures);
+			// (Saved: the first pair two seconds into the session or later; another screen may be up before.)
+			const bool saving = seconds >= 2.0f && !eyesSaved;
+			eyesSaved = eyesSaved || saving;
+			if (saving && !pictures.eyes[0].pixels.empty())
 			{
 				saveTestPicture(pictures.eyes[0], "vrtest_eye_left.bmp");
 				saveTestPicture(pictures.eyes[1], "vrtest_eye_right.bmp");
-				if (box.smoothing && !smoothedSaved)
+				LayerPicture smoothed;
+				if (box.smoothing && !smoothedSaved && smoothTestPicture(pictures.eyes[0].pixels.data(), 0, pictures.eyes[0].width, pictures.eyes[0].height, smoothed))
 				{
 					smoothedSaved = true;
-					saveSmoothedTestPicture(pictures.eyes[0], "vrtest_eye_left_smoothed.bmp");
+					saveTestPicture(smoothed, "vrtest_eye_left_smoothed.bmp");
 				}
+			}
+			if (pictures.onCard && (saving || !pictures.eyes[0].pixels.empty()))
+			{
+				checkCardPair(pictures, saving);
 			}
 		}
 		if (box.hud.take())
@@ -1933,6 +2189,115 @@ bool Session::smoothPair(const EyePictures &pictures, bool withDepth, bool &dept
 }
 
 /**
+ * Waits until the renderer has finished a pair it kept on the graphics card: its fence (an OpenGL sync object of the
+ * renderer's context, shared with ours as its textures are). The renderer made it and flushed before the pair was
+ * handed over, so it passes within the pair's drawing time; one that doesn't in CardFenceWaitNs is left out (the last
+ * pair stays shown).
+ * @return True when the pair's textures may be read.
+ */
+bool Session::waitForCardPair(const EyePictures &pictures)
+{
+	const GLenum waited = pictures.cardFence ? glClientWaitSync((GLsync)pictures.cardFence, GL_SYNC_FLUSH_COMMANDS_BIT, CardFenceWaitNs) : GL_WAIT_FAILED;
+	if (waited == GL_ALREADY_SIGNALED || waited == GL_CONDITION_SATISFIED)
+	{
+		return true;
+	}
+	++_statsCardLate;
+	if (!_glErrorLogged)
+	{
+		_glErrorLogged = true;
+		log(ANDROID_LOG_WARN, "an eye pair on the graphics card wasn't ready in time (0x%x, OpenGL error 0x%x): left out (logged once)", waited, glGetError());
+	}
+	return false;
+}
+
+/**
+ * Draws an eye kept on the graphics card into a colour texture of the target size: smoothed by the filter, or (the
+ * same size) copied as it is, byte for byte (the texture's bytes are what an uploaded picture's would be; OpenGL ES
+ * 3.2's copy, which a context sharing the renderer's always has).
+ */
+bool Session::drawCardEye(const EyePictures &pictures, int eye, GLuint target, int targetWidth, int targetHeight, bool smoothed)
+{
+	const int width = pictures.eyes[eye].width, height = pictures.eyes[eye].height;
+	if (smoothed)
+	{
+		return _smoother.drawColourFrom(pictures.cardColour[eye], width, height, target, targetWidth, targetHeight, _format == FormatSrgb);
+	}
+	// (The same bytes, whatever the two textures' colour encodings: RGBA8 and sRGB8_ALPHA8 copy one to one.)
+	glCopyImageSubData(pictures.cardColour[eye], GL_TEXTURE_2D, 0, 0, 0, 0, target, GL_TEXTURE_2D, 0, 0, 0, 0, width, height, 1);
+	return glGetError() == GL_NO_ERROR;
+}
+
+/**
+ * Shows a new eye pair kept on the graphics card: each eye's texture drawn into its swapchain's next image (smoothed
+ * bigger with the setting "VR smoothing", else as it is) and its depth texture into the depth swapchain's, nothing
+ * uploaded. The depth is drawn by the smoother's depth pass either way.
+ * @param pictures The pair (its textures, its sizes).
+ * @param withDepth Its depth to go too.
+ * @param depthDone Set to whether the depth went.
+ * @return False when the pair couldn't go in.
+ */
+bool Session::showCardPair(const EyePictures &pictures, bool withDepth, bool &depthDone)
+{
+	Shared &box = shared();
+	const bool smoothed = box.smoothing && smootherReady();
+	depthDone = withDepth && smootherReady();
+	bool both = true;
+	for (int eye = 0; eye < 2 && both; ++eye)
+	{
+		const int scale = smoothed ? smoothingScaleFor(pictures.eyes[eye].width, pictures.eyes[eye].height) : 1;
+		const int width = pictures.eyes[eye].width * scale, height = pictures.eyes[eye].height * scale;
+		uint32_t index = 0;
+		if (!makeSwapchain(_eyeChains[eye], width, height) || !acquireImage(_eyeChains[eye], index))
+		{
+			both = false;
+			break;
+		}
+		const bool drawn = drawCardEye(pictures, eye, _eyeChains[eye].images[index].image, width, height, smoothed);
+		XrSwapchainImageReleaseInfo releaseInfo = { XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
+		const bool released = check(xrReleaseSwapchainImage(_eyeChains[eye].handle, &releaseInfo), "xrReleaseSwapchainImage");
+		_eyeChains[eye].hasImage = _eyeChains[eye].hasImage || released;
+		both = drawn && released;
+		if (!drawn)
+		{
+			// (From now on the eyes come as pictures: the game's thread reads this.)
+			box.cardEyes = false;
+			log(ANDROID_LOG_ERROR, "an eye on the graphics card couldn't be drawn into its swapchain (OpenGL); the eyes come as pictures from now on");
+		}
+		if (both && depthDone)
+		{
+			uint32_t depthIndex = 0;
+			if (!makeSwapchain(_depthChains[eye], width, height, true) || !acquireImage(_depthChains[eye], depthIndex))
+			{
+				depthDone = false;
+				continue;
+			}
+			const bool depthDrawn = _smoother.drawDepthFrom(pictures.cardDepth[eye], pictures.eyes[eye].width, pictures.eyes[eye].height, _depthChains[eye].images[depthIndex].image, width, height);
+			const bool depthReleased = check(xrReleaseSwapchainImage(_depthChains[eye].handle, &releaseInfo), "xrReleaseSwapchainImage");
+			_depthChains[eye].hasImage = _depthChains[eye].hasImage || depthReleased;
+			if (!depthDrawn && _depthFormat)
+			{
+				log(ANDROID_LOG_WARN, "the eyes' depth couldn't be drawn from the graphics card's; the eyes go on without depth");
+				_depthFormat = 0;
+			}
+			depthDone = depthDrawn && depthReleased;
+		}
+	}
+	if (both)
+	{
+		++_statsCardPairs;
+		if (smoothed) ++_statsSmoothed;
+		if (!_cardLogged)
+		{
+			_cardLogged = true;
+			log(ANDROID_LOG_INFO, "eyes: shown from the graphics card's textures, %dx%d%s", pictures.eyes[0].width, pictures.eyes[0].height, smoothed ? ", smoothed" : "");
+		}
+	}
+	depthDone = depthDone && both;
+	return both;
+}
+
+/**
  * Reads the GPU timers round the smoothing that have finished (a timer the chip says was disturbed is dropped), for the
  * statistics.
  */
@@ -2102,10 +2467,12 @@ bool Session::upload(Swapchain &chain, const LayerPicture &picture)
  */
 void Session::destroy()
 {
+	shared().cardEyes = false;
 	if (_context != EGL_NO_CONTEXT)
 	{
 		glFinish();
 		_smoother.destroy();
+
 		if (_hasTimerQuery)
 		{
 			glDeleteQueries(4, _smoothQueries);

@@ -160,7 +160,12 @@ void FirstPersonView::drawBurning()
 	const float flicker = 0.8f + 0.2f * std::sin(now * 0.031f) * std::sin(now * 0.017f + 1.0f);
 	// The light of the flames, from below: the bottom 30% of the picture tinted orange, more
 	// the lower (a curve, so it gathers near the bottom), dithered in.
-	if (_burningAmount > 0.0f)
+	_gpuFlameGlow = 0.0f;
+	if (_burningAmount > 0.0f && (_gpuPresenting == 1 || (_eyeOnCard && _gpuEyeKept)))
+	{
+		_gpuFlameGlow = 0.7f * fierceness * flicker; // (the picture is on the card: it lays the light on it, see gpuPresent)
+	}
+	else if (_burningAmount > 0.0f)
 	{
 		const int glowRows = (int)(viewHeight * 0.3f);
 		for (int screenY = viewHeight - glowRows; screenY < viewHeight; ++screenY)

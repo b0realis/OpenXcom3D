@@ -542,12 +542,27 @@ bool EyeSmoother::drawColour(const uint32_t *pixels, int width, int height, unsi
 	glBindTexture(GL_TEXTURE_2D, _source);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+	return drawColourFrom(_source, width, height, target, targetWidth, targetHeight, srgbTarget);
+}
+
+/**
+ * Draws a picture that is a texture already bigger into a colour texture: FSR's two passes or SABR's one (see drawColour).
+ * @param source The picture's texture (RGBA8, the bottom row first).
+ */
+bool EyeSmoother::drawColourFrom(unsigned int source, int width, int height, unsigned int target, int targetWidth, int targetHeight, bool srgbTarget)
+{
+	if (!_ready || width <= 0 || height <= 0 || !source)
+	{
+		return false;
+	}
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, source);
 	bool drawn;
 	if (_filter == SmoothingFilter::Fsr)
 	{
 		makeTexture(_middle, _middleWidth, _middleHeight, targetWidth, targetHeight, GL_RGBA8);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, _source);
+		glBindTexture(GL_TEXTURE_2D, source);
 		setPassUniforms(_firstPass, width, height, targetWidth, targetHeight, false);
 		drawn = drawPass(_framebuffer, _vertexArray, _middle, targetWidth, targetHeight, false);
 		glBindTexture(GL_TEXTURE_2D, _middle);
@@ -586,6 +601,21 @@ bool EyeSmoother::drawDepth(const float *depth, int width, int height, unsigned 
 	glBindTexture(GL_TEXTURE_2D, _depthSource);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RED, GL_FLOAT, depth);
+	return drawDepthFrom(_depthSource, width, height, target, targetWidth, targetHeight);
+}
+
+/**
+ * Draws a depth picture that is a texture already bigger into a depth texture (see drawDepth).
+ * @param source The depth's texture (R32F, 0 to 1, the bottom row first).
+ */
+bool EyeSmoother::drawDepthFrom(unsigned int source, int width, int height, unsigned int target, int targetWidth, int targetHeight)
+{
+	if (!_ready || width <= 0 || height <= 0 || !source)
+	{
+		return false;
+	}
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, source);
 	setPassUniforms(_depthPass, width, height, targetWidth, targetHeight, false);
 	const bool drawn = drawPass(_framebuffer, _vertexArray, target, targetWidth, targetHeight, true);
 	glDisable(GL_DEPTH_TEST);

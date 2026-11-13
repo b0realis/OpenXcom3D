@@ -210,21 +210,22 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 	static const struct { const char *heading; std::vector<const char*> ids; } sections[] = {
 		{ "STR_FPS_SECTION_PLAYSTYLE", { "fpsPlaystyle" } },
 		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsCameraEyes", "fpsCameraArtifacts", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView", "fpsZoom",
-			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
+			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsAlienTurnFacing", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
 		{ "STR_FPS_SECTION_MOVEMENT", { "fpsTurnCost", "fpsMovement", "fpsWalkSpeed", "fpsFlightCost", "fpsFlightCostOverride", "fpsVault",
 			"fpsFalling", "fpsSafeLanding" } },
-		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsRecoil", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsLean", "fpsMeleeTerrain",
+		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsRecoil", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsThrowing", "fpsLean", "fpsMeleeTerrain",
 			"fpsMeleeFloors", "fpsAimExact", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
 			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear" } },
 		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
 			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsVoxelUnits", "fpsMuzzleFlash", "fpsHitFlash", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 			"fpsGhostParts", "fpsGhostOpacity", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
 		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
-			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsMiddleClickIdentify" } },
+			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
 		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
-		// (last: a section added at the end moves no row above it, which the tests click by position)
+		// (the last two: a section added at the end moves no row above it, which the tests click by position)
 		{ "STR_FPS_SECTION_VR", { "fpsVrMode", "fpsVrEyeSize", "fpsVrWeapon", "fpsVrTurning", "fpsVrLaser", "fpsVrSmoothing" } },
+		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion", "fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts", "fpsVrCardEyes" } },
 	};
 	std::vector<bool> placed(gathered.size(), false);
 	for (const auto &section : sections)
@@ -358,6 +359,29 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		{
 			return std::string(tr(*option.asInt() == 1 ? "STR_FPS_FOG_OF_WAR_MAP" : "STR_FPS_FOG_OF_WAR_OFF"));
 		}
+		// The 3D view's resolution is a choice of three, shown by name.
+		if (option.id() == "fpsViewResolution")
+		{
+			static const char *const resolutionNames[] = { "STR_FPS_VIEW_RESOLUTION_HUD", "STR_FPS_VIEW_RESOLUTION_BATTLESCAPE", "STR_FPS_VIEW_RESOLUTION_DISPLAY" };
+			return std::string(tr(resolutionNames[std::clamp(*option.asInt(), 0, 2)]));
+		}
+		// The HUD's scale: Auto, or the times it is magnified.
+		if (option.id() == "fpsHudScale")
+		{
+			const int scale = std::clamp(*option.asInt(), 0, 4);
+			return scale == 0 ? std::string(tr("STR_FPS_HUD_SCALE_AUTO")) : "x" + std::to_string(scale);
+		}
+		// Supersampling: off, or the rays a pixel.
+		if (option.id() == "fpsSupersampling")
+		{
+			const int level = std::clamp(*option.asInt(), 0, 2);
+			return level == 0 ? std::string(tr("STR_FPS_SUPERSAMPLING_OFF")) : level == 1 ? "x2" : "x4";
+		}
+		// The renderer is a choice of two, shown by name.
+		if (option.id() == "fpsRenderer")
+		{
+			return std::string(tr(*option.asInt() == 1 ? "STR_FPS_RENDERER_GPU" : "STR_FPS_RENDERER_CPU"));
+		}
 		// Wall paint is a choice of three, shown by name.
 		if (option.id() == "fpsWallPaint")
 		{
@@ -463,6 +487,11 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 			static const char *const leanNames[] = { "STR_FPS_LEAN_OFF", "STR_FPS_LEAN_PEEK", "STR_FPS_LEAN_TILT" };
 			return std::string(tr(leanNames[std::clamp(*option.asInt(), 0, 2)]));
 		}
+		// Throwing is a choice of two, shown by name.
+		if (option.id() == "fpsThrowing")
+		{
+			return std::string(tr(*option.asInt() == 1 ? "STR_FPS_THROWING_MODERN" : "STR_FPS_THROWING_CLASSIC"));
+		}
 		// Movement is a choice of two, shown by name.
 		if (option.id() == "fpsMovement")
 		{
@@ -479,7 +508,7 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		{
 			return std::string(tr(*option.asInt() == 1 ? "STR_FPS_VR_TURNING_SNAP" : "STR_FPS_VR_TURNING_SMOOTH"));
 		}
-		// The VR eye size is a choice of three, shown as the pixels of each eye's picture.
+		// The VR eye size is a choice of five, shown as the pixels of each eye's picture.
 		if (option.id() == "fpsVrEyeSize")
 		{
 			int eyeWidth, eyeHeight;
@@ -651,6 +680,26 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		{
 			*value = *value == 1 ? 0 : 1;
 		}
+		// The 3D view's resolution (HUD, battlescape, display): round and round.
+		else if (value == &Options::fpsViewResolution)
+		{
+			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
+		}
+		// The HUD's scale (Auto, x1 .. x4): round and round.
+		else if (value == &Options::fpsHudScale)
+		{
+			*value = (std::clamp(*value, 0, 4) + direction + 5) % 5;
+		}
+		// Supersampling (off, x2, x4): round and round.
+		else if (value == &Options::fpsSupersampling)
+		{
+			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
+		}
+		// The renderer (CPU, GPU): either button switches.
+		else if (value == &Options::fpsRenderer)
+		{
+			*value = *value == 1 ? 0 : 1;
+		}
 		// Wall paint (as the art, inside and out, every room): round and round.
 		else if (value == &Options::fpsWallPaint)
 		{
@@ -775,10 +824,20 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		{
 			*value = (*value + 1) % 2;
 		}
-		// VR mode (off, on, on with the desktop preview) and its eye size (three sizes): round and round.
-		else if (value == &Options::fpsVrMode || value == &Options::fpsVrEyeSize)
+		// VR mode (off, on, on with the desktop preview): round and round.
+		else if (value == &Options::fpsVrMode)
 		{
 			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
+		}
+		// The VR eye size (five sizes): round and round.
+		else if (value == &Options::fpsVrEyeSize)
+		{
+			*value = (std::clamp(*value, 0, 4) + direction + 5) % 5;
+		}
+		// Throwing (classic, modern): either button switches.
+		else if (value == &Options::fpsThrowing)
+		{
+			*value = (*value + 1) % 2;
 		}
 		// The Doom grenade fuse: 1 to 5 seconds, round and round.
 		else if (value == &Options::fpsDoomGrenadeFuse)

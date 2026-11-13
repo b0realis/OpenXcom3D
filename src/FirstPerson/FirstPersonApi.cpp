@@ -47,6 +47,11 @@
  * and its 3D VIEW options tab.
  */
 #include "FirstPersonApi.h"
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include "../Engine/Screen.h"
+#include "../Engine/Surface.h"
 #include <algorithm>
 #include <map>
 #include "FirstPersonMode.h"
@@ -55,6 +60,8 @@
 #include "../Engine/Logger.h"
 #include "../Engine/OptionInfo.h"
 #include "../Engine/Options.h"
+#include "../Battlescape/BattlescapeState.h"
+#include "../Engine/Script.h"
 #include "../Mod/Mod.h"
 #include "../Engine/State.h"
 #include "../Interface/Text.h"
@@ -604,10 +611,30 @@ bool isPlaystyleSwitch(const std::string &id)
  * "VR eye picture" 460x500, "Sprite upscaling" Smooth+) are set once on a profile from
  * before (a profile keeps every value it saved, the old defaults too); the unlisted
  * fpsQuestDefaults then says so, and the player's own choices after that stay. Elsewhere nothing.
+ * Also on that build: the add-on's diagnostic switches, which a desktop takes from the environment
+ * (OPENXCOM3D_GPU_TIMING, OPENXCOM3D_PASS_TIME, OPENXCOM3D_GPU_EFFECTS...), from a file an Android
+ * app can be given: the profile folder's environment.txt, a NAME=VALUE a line, only names starting
+ * OPENXCOM3D_. No file: nothing set.
  */
 void optionsLoaded()
 {
 #ifdef __ANDROID__
+	if (FILE *file = std::fopen((Options::getMasterUserFolder() + "environment.txt").c_str(), "r"))
+	{
+		char line[256];
+		while (std::fgets(line, sizeof(line), file))
+		{
+			line[std::strcspn(line, "\r\n")] = 0;
+			char *equals = std::strchr(line, '=');
+			if (equals && std::strncmp(line, "OPENXCOM3D_", 11) == 0)
+			{
+				*equals = 0;
+				setenv(line, equals + 1, 1);
+				Log(LOG_INFO) << "OpenXcom3D: environment.txt sets " << line << " to " << equals + 1;
+			}
+		}
+		std::fclose(file);
+	}
 	if (Options::fpsQuestDefaults < QuestDefaultsVersion)
 	{
 		Options::fpsVrEyeSize = 1;     // 460x500
@@ -755,6 +782,8 @@ void createOptions(std::vector<OptionInfo> &options)
 	// The compass at the top right: where you look, the soldier's facing, and turning by the
 	// rules, when looking further will cost time units.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCompass", &fpsCompass, true, "STR_FPS_COMPASS", category));
+	// ...and round it, what a step each way costs in time units (and a level up or down, and a turn).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsCompassCosts", &fpsCompassCosts, false, "STR_FPS_COMPASS_COSTS", category));
 	// Moving: free walking or tile by tile (0 free, 1 tiles: a key press walks one tile), walking
 	// speed in tiles per second (1 to 8; every tile still costs its time units),
 	// the view bobbing with the steps, time units a flying soldier pays per level up or down
@@ -800,6 +829,10 @@ void createOptions(std::vector<OptionInfo> &options)
 	// off-centre origins), to peek round corners; and leaning out with the lean keys: off (0),
 	// the eye moves to the side (1, peek), and the view tilts with it (2, tilt).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsLeanShots", &fpsLeanShots, false, "STR_FPS_LEAN_SHOTS", category));
+	// Throws and arcing shots: Classic (0), aimed at a tile's middle from one of the game's
+	// eight points round the unit; or Modern (1), at the exact point under the crosshair from a
+	// point that slides round the unit with the view, so the curve moves smoothly with the aim.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsThrowing", &fpsThrowing, 0, "STR_FPS_THROWING", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsLean", &fpsLean, 0, "STR_FPS_LEAN", category));
 	// Melee at the wall, door or object the soldier faces (the game's terrain melee, on even if
 	// the mod leaves it off) and at a body lying in front.
@@ -913,6 +946,28 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCorpses", &fpsSeeThroughCorpses, false, "STR_FPS_SEE_THROUGH_CORPSES", category));
 	// The map's edge as small red dots on the floor, nothing beyond it, instead of the tape.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDiscreetEdge", &fpsDiscreetEdge, false, "STR_FPS_DISCREET_EDGE", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsRenderer", &fpsRenderer, 0, "STR_FPS_RENDERER", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsViewResolution", &fpsViewResolution, 0, "STR_FPS_VIEW_RESOLUTION", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsHudScale", &fpsHudScale, 0, "STR_FPS_HUD_SCALE", category));
+	// A finer picture than the old game's, on the graphics card only (Renderer: GPU), each off by default: several rays a
+	// pixel, the sun's shadows with soft edges, a shadow from every lamp and flare, and corners and creases darkened.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSupersampling", &fpsSupersampling, 0, "STR_FPS_SUPERSAMPLING", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSoftShadows", &fpsSoftShadows, false, "STR_FPS_SOFT_SHADOWS", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsAllLightShadows", &fpsAllLightShadows, false, "STR_FPS_ALL_LIGHT_SHADOWS", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsAmbientOcclusion", &fpsAmbientOcclusion, false, "STR_FPS_AMBIENT_OCCLUSION", category));
+	// The 3D world in full colour, past the palette (the graphics card, 3D resolution Display, a 32-bit display), and the
+	// light on it blended where the palette's picture dithers. Off by default.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsTrueColor", &fpsTrueColor, false, "STR_FPS_TRUE_COLOR", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmoothLight", &fpsSmoothLight, false, "STR_FPS_SMOOTH_LIGHT", category));
+	// In full colour: shots in flight, explosions, fires and a muzzle flash light what is round them in their own colour.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsColoredLights", &fpsColoredLights, false, "STR_FPS_COLORED_LIGHTS", category));
+	// In full colour: the sea mirrors the sky and what stands in it.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsReflections", &fpsReflections, false, "STR_FPS_REFLECTIONS", category));
+	// In full colour: the flashlight, flares, lamps and coloured lights show as beams and glows in smoke and under the sea.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsLightShafts", &fpsLightShafts, false, "STR_FPS_LIGHT_SHAFTS", category));
+	// VR with "Renderer": GPU, on a headset: the eyes' pictures stay on the graphics card and go to the headset's display
+	// from there (nothing read back, nothing uploaded again). NO: read back and uploaded, as the CPU's eyes are.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsVrCardEyes", &fpsVrCardEyes, true, "STR_FPS_VR_CARD_EYES", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 0, "STR_FPS_PIXEL_SIZE", category));
 	// The crosshair: shown or not, the shot info under it, aiming at the exact point under it
 	// (YES) or at the tile, as the original game does (NO), and the units' hitboxes.
@@ -1005,6 +1060,8 @@ void createOptions(std::vector<OptionInfo> &options)
 	// ...and in it, the view cuts to the soldier who sees the alien acting, or who fires back;
 	// a soldier shot at, hit or taken over pops up their small camera.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsAlienTurnCameras", &fpsAlienTurnCameras, true, "STR_FPS_ALIEN_TURN_CAMERAS", category));
+	// ...and in the enemy's turn the view looks the way the soldier faces, at most the head's turn to either side.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsAlienTurnFacing", &fpsAlienTurnFacing, false, "STR_FPS_ALIEN_TURN_FACING", category));
 	// ...and with them, a soldier of ours going down out of view pops up their camera (static).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFallenSoldierCamera", &fpsFallenSoldierCamera, true, "STR_FPS_FALLEN_SOLDIER_CAMERA", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsStartInFirstPerson", &fpsStartInFirstPerson, false, "STR_FPS_START_IN_FIRST_PERSON", category));
@@ -1187,6 +1244,23 @@ void freeAimOrigin(BattlescapeState *state, const BattleAction &action, Position
 }
 
 /**
+ * Called by the game as it works out where a shot leaves from (TileEngine::getOriginVoxel), after
+ * it picked its own point: an arcing shot's or a throw's slides round the footprint instead (see
+ * FirstPersonMode::slidingOrigin). Nothing changes for any other shot, with the setting off, or
+ * while the 3D view isn't showing.
+ * @param state The battlescape screen.
+ * @param action The shot.
+ * @param from The tile it leaves from (a large unit's: its first).
+ * @param shiftX The game's eight points across a tile, by direction: along x, in voxels.
+ * @param shiftY The same along y.
+ * @param origin The game's origin, in voxels; changed in place.
+ */
+void slidingOrigin(BattlescapeState *state, const BattleAction &action, const Position &from, const int shiftX[8], const int shiftY[8], Position &origin)
+{
+	FirstPersonMode::slidingOrigin(state, action, from, shiftX, shiftY, origin);
+}
+
+/**
  * Called by the game when a close-quarters check knocks a shot aside: the 3D view looks where
  * the shot now goes (see FirstPersonMode::followDeflectedShot).
  * @param state The battlescape screen.
@@ -1328,10 +1402,42 @@ void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefor
  * @param healthLost The health it lost.
  * @param armorLost The armour points it lost (the side struck).
  * @param stunTaken The stun it took.
+ * @param shieldLost The points its energy shield lost (see shieldPoints).
  */
-void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken)
+void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost)
 {
-	FirstPersonMode::unitDamaged(state, unit, healthLost, armorLost, stunTaken);
+	FirstPersonMode::unitDamaged(state, unit, healthLost, armorLost, stunTaken, shieldLost);
+}
+
+/**
+ * The points left in a unit's energy shields (setting "Damage numbers"; a player's report, GitHub
+ * issue #133: a hit a shield took whole showed a 0). The big mods' shields (X-Com Files,
+ * XPiratez) are made by one script, which keeps a shield's points in a tag on the unit (an
+ * armor's shield) and on an item (a shield held), and takes a hit off the left hand's, the right
+ * hand's and then the armor's: the three together are read here, before and after a hit, as the
+ * armour is. A game without those tags has no such shields: 0.
+ * @param state The battlescape screen (null while the battle is being made).
+ * @param unit The unit.
+ * @return The points.
+ */
+int shieldPoints(BattlescapeState *state, const BattleUnit *unit)
+{
+	if (!state || !Options::fpsDamageNumbers)
+	{
+		return 0;
+	}
+	const ScriptGlobal *scripts = state->getGame()->getMod()->getScriptGlobal();
+	const auto unitTag = scripts->getTag<ScriptValues<BattleUnit>::Tag>("Tag.UNIT_ENERGY_SHIELD_HP");
+	const auto itemTag = scripts->getTag<ScriptValues<BattleItem>::Tag>("Tag.ITEM_ENERGY_SHIELD_HP");
+	int points = unitTag ? unit->getScriptValues().get(unitTag) : 0;
+	if (itemTag)
+	{
+		for (const BattleItem *held : { unit->getLeftHandWeapon(), unit->getRightHandWeapon() })
+		{
+			if (held) points += held->getScriptValues().get(itemTag);
+		}
+	}
+	return points;
 }
 
 /**

@@ -77,6 +77,7 @@ class FirstPersonScanner;
 class FirstPersonSounds;
 class FirstPersonAmbience;
 class Game;
+struct PathfindingStep;
 class InteractiveSurface;
 class NumberText;
 class SavedBattleGame;
@@ -143,6 +144,10 @@ public:
 	static void freeAim(BattlescapeState *state, const BattleAction &action, Position &target);
 	/// Where an FPS-style straight shot leaves from, asked by the game (see FirstPerson::freeAimOrigin).
 	static void freeAimFrom(BattlescapeState *state, const BattleAction &action, Position &origin);
+	/// Where an arcing shot or a throw leaves from, sliding round the footprint (see FirstPerson::slidingOrigin).
+	/// Where a throw lands with "Throwing" Modern: the crosshair's point on the target tile's floor.
+	Position throwPoint(const Position &targetTile, const Position &aimedVoxel) const;
+	static void slidingOrigin(BattlescapeState *state, const BattleAction &action, const Position &from, const int shiftX[8], const int shiftY[8], Position &origin);
 	/// Should this shot's bullet hits play quicker (an FPS-style shot of ours)?
 	static bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
 	/// Do a shotgun's pellets fly beside its round (setting "Shotgun pellets in flight", the 3D view showing)?
@@ -174,7 +179,7 @@ public:
 	/// A round or a blow struck a unit: an enemy in sight it did no harm marks the crosshair.
 	static void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefore, int stunBefore);
 	/// A shot, a blow or a blast hurt a unit (setting "Damage numbers"): its numbers to rise over it, if the squad sees it.
-	static void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken);
+	static void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost);
 	/// Setting "Damage numbers": draws the numbers rising over the units hit on the isometric map.
 	static void drawMapDamageNumbers(BattlescapeState *state, Surface *surface, const Camera *camera);
 	/// Do a shotgun's pellets and a volley's two rounds each land on their own (setting "Each pellet on its own")?
@@ -235,7 +240,8 @@ public:
 	void vrSetTurnAxis(double axis);
 	/// Draws both eyes for these views (each picture width x height), the crosshair in each at its depth, the weapon in
 	/// hand in them (its space at the hand's pose, the hook; null: the head's).
-	bool vrRenderEyes(const FirstPerson::VrEyeView views[2], int width, int height, FirstPerson::VrPicture pictures[2], const FirstPerson::VrPose *hand = nullptr);
+	bool vrRenderEyes(const FirstPerson::VrEyeView views[2], int width, int height, FirstPerson::VrPicture pictures[2], const FirstPerson::VrPose *hand = nullptr,
+		int cardSlot = -1, bool cardCheck = false);
 	/// The HUD as its own picture (as the last frame left it).
 	bool vrHudPicture(FirstPerson::VrPicture &picture);
 
@@ -378,8 +384,12 @@ private:
 
 	// ---- our surfaces: laid out on a canvas, magnified on big screens ----
 
-	int _uiScale = 1;                          // big screens: our overlays are laid out on a canvas of (screen / _uiScale) and drawn magnified
-	Surface *_canvas = nullptr;                // our overlays are drawn here, then magnified (none at scale 1)
+	int _uiScale = 1;                          // big screens: our overlays are laid out on a canvas of (its target / _uiScale) and drawn magnified
+	int _targetWidth = 0, _targetHeight = 0;   // what the canvas is magnified onto: the game's screen, or the display's picture area (see canvasTarget)
+	bool _canvasOnDisplay = false;             // onto the display: 3D shows at the display's size, and the HUD at a scale of its own there
+	Surface *_canvas = nullptr;                // our overlays are drawn here, then magnified (none at scale 1 on the game's screen)
+	std::vector<Uint32> _truePicture;          // ... and its pixels in full colour (0xFFRRGGBB; 0: the palette's), setting "True colour"
+	Surface *_composed = nullptr;              // with the canvas on the display: the view with the overlays over it, the picture laid into the display
 	SDL_Color _canvasPalette[256];             // the palette the canvas was given
 	std::vector<Uint8> _magnifyRow;            // a canvas row widened for the screen
 	std::unordered_set<Surface*> _ownSurfaces; // all our surfaces, for blitting without the classic HUD
@@ -391,10 +401,38 @@ private:
 
 	/// How many times bigger our overlays are drawn on a screen of this size.
 	static int uiScaleFor(int width, int height);
-	/// The canvas's width: the screen's divided by the UI scale.
+	/// The canvas's width: its target's divided by the UI scale.
 	int canvasWidth() const;
-	/// The canvas's height: the screen's divided by the UI scale.
+	/// The canvas's height: its target's divided by the UI scale.
 	int canvasHeight() const;
+	/// What the canvas is magnified onto now, and its size: the game's screen (false) or the display (true).
+	bool canvasTarget(int &width, int &height) const;
+	/// Lays the overlays out again if the canvas's target or scale is no longer what they were laid out for.
+	void relayoutIfNeeded();
+	/// Lays the overlays out for the canvas as it should be now.
+	void relayout();
+	/// A point of the game's screen (the mouse, the game's surfaces) as the canvas's, across and down.
+	double toCanvasX(double screenX) const;
+	double toCanvasY(double screenY) const;
+	/// A length on the canvas in the game's screen's pixels, across and down.
+	int toScreenX(int canvasX) const;
+	int toScreenY(int canvasY) const;
+	/// The size the 3D view should have now, by the setting "3D resolution": the canvas's, the battlescape's or the display's.
+	void wantedViewSize(int &width, int &height) const;
+	/// Whether the view is the display's own size, shown past the game's screen (see FirstPerson::presentView).
+	bool viewAtDisplaySize() const;
+	/// About how many of the view's pixels a canvas pixel spans (1 or more): for its markers' and icons' size.
+	int viewScale() const;
+	/// The view's pixel at the middle of a canvas pixel, across and down: where the mode points into the view.
+	int viewPixelX(int canvasPixel) const;
+	int viewPixelY(int canvasPixel) const;
+	/// How far the aim's ray goes from the middle of the view's pixel, so it passes through the crosshair's exact middle.
+	double aimPixelShift() const;
+	/// The canvas pixel a pixel of the view lies in, across and down.
+	int canvasPixelX(int viewPixel) const;
+	int canvasPixelY(int viewPixel) const;
+	/// Makes the 3D view again when its size isn't what the canvas and the setting "Full resolution" ask for.
+	void remakeViewIfResized();
 	/// Makes the canvas our overlays are drawn on before being magnified.
 	void makeCanvas();
 	/// Moves our overlays for a canvas that grew by (dX, dY), each keeping to its corner.
@@ -449,6 +487,8 @@ private:
 	double fieldOfViewNow() const;
 	/// Turns the view with the scroll keys.
 	void turnWithKeys(double elapsedSeconds);
+	/// In the enemy's turn: the view stays within the head's turn of the soldier's facing (setting).
+	void holdViewToFacing(BattleUnit *unit);
 	/// Turns the soldier to face where the camera looks (free, or by the rules).
 	void faceLookDirection(BattleUnit *unit);
 	/// Turns the soldier to face a way at once, for free (a tank's turret alone, with its switch on).
@@ -473,8 +513,23 @@ private:
 	int _climbArrowsShown = -1;                  // what they show: up 1, down 2, lit (1 up, 2 down) times 4; -1 not drawn yet
 	Text *_compassLetters[4] = {};               // N, E, S, W, going round as the view turns
 	Text *_txtCompassTurn = nullptr;             // under it near the head's limit: "TURN 1 TU", or "NO TU"; or a shot's turn: "SHOT +2 TU"
-	int _compassDrawn[5] = { -1000, -1, -1, -1, -1 }; // what the dial shows: the view's bearing (degrees), the facing, the warning, the shot's facing, the shot's turn warning
+	int _compassDrawn[6] = { -1000, -1, -1, -1, -1, -1 }; // what the dial shows: the view's bearing (degrees), the facing, the warning, the shot's facing, the shot's turn warning, the turn's cost on the line (0: not shown)
 
+	Text *_compassCosts[8] = {};                 // round it, what a step each way costs (setting "Compass: step costs"), going round with the dial
+	Text *_climbCosts[2] = {};                   // left of the climb arrows, what a level up and a level down cost
+	int _compassCostsShown[10];                  // what those ten show: the time units times ToneCount plus the tone (see StepTone); -1 nothing
+	bool _compassCostsPlaced = false;            // the compass is laid out with room for them (see placeCompass)
+
+	/// How a step's cost is written round the compass: plain, a sidestep, onto dear ground, onto very dear ground, or more than the soldier can pay.
+	enum StepTone { TONE_PLAIN, TONE_SIDESTEP, TONE_DEAR, TONE_VERY_DEAR, TONE_CANT_PAY, ToneCount };
+	/// Puts the compass and what goes with it where they belong, with or without the room for the steps' costs.
+	void placeCompass();
+	/// Shows what a step each way, and a level up or down, would cost (setting "Compass: step costs").
+	void updateCompassCosts(BattleUnit *unit, bool playerTurn, int viewBearing);
+	/// What the soldier pays in time units for one of those moves, and how it's written; false where the move can't be made.
+	bool moveCostShown(BattleUnit *unit, int direction, int &time, StepTone &tone);
+	/// What a step would cost the soldier over plain, level ground, to tell dear ground by.
+	int plainStepTime(BattleUnit *unit, const Position &start, int direction, const Position &end, bool sidestep, bool run) const;
 	/// Shows the compass, redrawn when what it shows changes.
 	void updateCompass(BattleUnit *unit, bool playerTurn);
 	/// Draws the dial for a view bearing (degrees, 0 north, clockwise), a facing (0..7), a warning (0 none, 1 near the limit, 2 no time units to turn) and the facing a shot will turn to (-1 none).
@@ -534,6 +589,9 @@ private:
 	unsigned _mouseReleasesSeen = 0;           // the game's mouse releases known (see think: one since means another screen was on top)
 	int _sidestepFacing = -1;                  // the facing a soldier sidestepping keeps (the game's strafe), while the step is walked; -1 none
 	Position _stepFrom;                        // the tile that step started from
+	const BattleUnit *_hiddenBlockUnit = nullptr;  // a step the game refused for a unit not in sight: whose step,
+	Position _hiddenBlockFrom;                 // ... from which tile,
+	int _hiddenBlockDirection = -1;            // ... and which way (-1: none); held back while that unit stands there (see stepAllowed)
 	int _stepAllowedCache[8];                  // per frame: -1 unknown, 0 blocked, 1 allowed, 2 blocked for an unsafe landing (see landingSafe)
 	// a step off a ledge onto an unsafe landing (setting "Check the landing"): the edge warned about
 	// (the tile and direction), when, the keys let go since, and the next push confirmed
@@ -546,8 +604,12 @@ private:
 
 	/// Real-time movement with the movement keys, paying for each tile entered by the rules.
 	void updateMovement(BattleUnit *unit, bool canMove, double elapsedSeconds);
+	/// Whether a unit the player doesn't see stands where a unit would step to.
+	bool hiddenUnitOn(const BattleUnit *unit, const Position &destination) const;
 	/// Could the unit step into the neighbouring tile in this direction now, by the rules?
 	bool stepAllowed(BattleUnit *unit, int stepX, int stepY);
+	/// What the game charges for one step from a tile, walked as commitStep walks it (a sidestep, a run or a walk).
+	PathfindingStep stepPrice(BattleUnit *unit, const Position &start, int direction, bool *sidestep = nullptr) const;
 	/// Hands one step to the game's walking state; false if it couldn't start.
 	bool commitStep(BattleUnit *unit, int stepX, int stepY);
 	/// Keeps a coordinate inside a tile, away from its edges.
@@ -1003,7 +1065,7 @@ private:
 	MuzzleFlash _muzzleFlash = {}; // the weapon's muzzle flash
 	Uint32 _heldShotSeen = 0;      // our last shot the weapon flashed for
 	// the weapon's inventory picture, measured: its long axis, which end is the muzzle, which side is up
-	struct WeaponShape { double mean[2], along[2], across[2], stock, muzzle, minAcross, maxAcross, bore, boxMin[2], boxMax[2]; int upSign; bool gun, melee; }; // bore: across, where the barrel ends; box: the opaque pixels' bounds; melee: held tip up, swung down
+	struct WeaponShape { double mean[2], along[2], across[2], stock, muzzle, minAcross, maxAcross, bore, boxMin[2], boxMax[2]; int upSign; bool gun, melee, bow; }; // bore: across, where the barrel ends; box: the opaque pixels' bounds; melee: held tip up, swung down; bow: "along" runs from the string to the curve's middle (see analyzeWeapon)
 	WeaponShape _heldShape = {};                        // the measured shape of the weapon's picture
 	// ...and given volume: voxels, each picture pixel as deep as its distance from the outline
 	// allows (a cushion), as the faces that show (see FirstPersonVoxelModel.h)
@@ -1034,7 +1096,9 @@ private:
 	/// Is this weapon drawn in the hands? Not a built-in one with nothing to hold (see the definition).
 	bool weaponShownInHand(BattleUnit *unit, const BattleItem *weapon) const;
 	/// Measures the weapon's picture: its long axis, muzzle end and up side.
-	void analyzeWeapon(bool gun, bool melee = false);
+	void analyzeWeapon(bool gun, bool melee = false, bool bow = false);
+	/// Is a weapon held as a bow: upright, its curve towards the crosshair?
+	bool heldAsBow(const RuleItem *weapon) const;
 	/// Draws an item's inventory picture whole into a 32x48 picture (not shifted as the hand slot does).
 	void drawHeldPicture(const BattleItem *item, const SurfaceSet *inventorySprites, Surface *picture) const;
 	/// Gives the held picture (weapon or other item) volume as voxels.
@@ -1123,7 +1187,7 @@ private:
 	Bar *_cardBars[4] = {};                             // and their bars
 	int _hoveredSquadButton = -1;                       // squad button whose card shows: the one under the cursor (or the wheel's, see browseSquad), -1 none
 	const TextButton *_buttonUnderCursor = nullptr;     // the button the free cursor was last found over
-	int _cursorX = 0, _cursorY = 0;                     // where the free cursor is, on the canvas (and so on the view)
+	int _cursorX = 0, _cursorY = 0;                     // where the free cursor is, on the canvas (on the view: viewPixel of it)
 	int _cardDrawnHeight = 0;                           // what the frame was drawn for
 
 	// ---- the soldier cam: a right click on a squad button enlarges its card's camera ----
@@ -1451,7 +1515,7 @@ private:
 	/// The desktop's VR preview: both eyes side by side on the screen, the HUD over each at its depth.
 	void vrBlitPreview(SDL_Surface *screen);
 	/// Our overlays (and with them the visible enemy buttons) onto a surface the screen's size: the screen, or the HUD's picture.
-	void drawOverlays(SDL_Surface *target, bool forHud);
+	void drawOverlays(SDL_Surface *target, bool forHud, bool composing);
 	/// Does VR draw both eyes now (the desktop's preview, or the shell's): the weapon in hand goes into them, not onto the screen?
 	bool vrEyesDrawn() const;
 	/// Where the hand's space is in the world, for VR's weapon in hand: the head's, as the eyes have it (or a hand's pose, the hook).

@@ -158,6 +158,9 @@ firstPerson:
   #                  the throwing skill and not the firing skill, as the big mods' bows, and for
   #                  guns firing an arrow picture drawn mostly for those, as their crossbows)
   #   shot: powder   a gun's round, with a muzzle flash (worked out for every other gun)
+  #   bow: true      held as a bow: upright, its curve towards the crosshair, the arrow leaving
+  #                  from the curve's middle (worked out for a ranged weapon with BOW in its type
+  #                  that isn't a crossbow: CROSSBOW, XBOW); bow: false holds it as a gun
   # A later entry (or a later mod's) overrides what it sets.
   items:
     # XPiratez: wide blades (too broad in their pictures to be worked out as blades)

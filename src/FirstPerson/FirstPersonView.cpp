@@ -50,6 +50,9 @@
  * the colour wash over the whole screen.
  */
 #include "FirstPersonView.h"
+#include <chrono>
+#include <sstream>
+#include <cstdlib>
 #include <algorithm>
 #include <cmath>
 #include <mutex>
@@ -147,6 +150,8 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 	_stippleSmoke.clear();
 	for (auto &entry : _softSmokeBlends) delete entry.second.colors;
 	_softSmokeBlends.clear();
+	gpuWarmUp();
+	gpuForgetModels();
 	_models.clear();
 	_ghostModels.clear();
 	_voxelUnits->forBattle(save);
@@ -450,11 +455,11 @@ void FirstPersonView::updateBasis()
  * shots from the weapon's muzzle on the screen, and to lay shadows on the ground under units.
  * The pixels are square: the vertical field of view follows from the horizontal one and the
  * view's shape.
- * @param pixelX The pixel's column, from the left.
+ * @param pixelX The pixel's column, from the left (a fraction moves the ray off the pixel's centre: see FirstPersonMode::aimAt).
  * @param pixelY The pixel's row, from the top.
  * @param out Receives the direction (x east, y south, z up).
  */
-void FirstPersonView::getRayDirection(int pixelX, int pixelY, double out[3])
+void FirstPersonView::getRayDirection(double pixelX, double pixelY, double out[3])
 {
 	updateBasis();
 	rayDirectionThrough(pixelX, pixelY, out);
@@ -468,7 +473,7 @@ void FirstPersonView::getRayDirection(int pixelX, int pixelY, double out[3])
  * @param pixelY The pixel's row, from the top.
  * @param out Receives the direction (x east, y south, z up).
  */
-void FirstPersonView::rayDirectionThrough(int pixelX, int pixelY, double out[3]) const
+void FirstPersonView::rayDirectionThrough(double pixelX, double pixelY, double out[3]) const
 {
 	// Where the pixel lies on an image plane one unit in front of the eye: planeX to the right,
 	// from -tan(half the field of view) to +tan; planeY up, over the same range shrunk by the
@@ -566,6 +571,26 @@ void FirstPersonView::draw()
 		return;
 	}
 	_redraw = false;
+	// (OPENXCOM3D_RAY_TIME: the log gets the main view's whole drawing time too, averaged over 120 frames.)
+	static const bool drawTime = getenv("OPENXCOM3D_RAY_TIME") != nullptr;
+	struct DrawTimer
+	{
+		const FirstPersonView *view;
+		std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
+		~DrawTimer()
+		{
+			if (!view) return;
+			static double sum = 0.0;
+			static int frames = 0;
+			sum += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+			if (++frames == 120)
+			{
+				Log(LOG_INFO) << "OpenXcom3D: the " << view->getWidth() << "x" << view->getHeight() << " view's drawing takes " << sum / frames << " ms in all";
+				sum = 0.0;
+				frames = 0;
+			}
+		}
+	} drawTimer { drawTime && getWidth() >= 320 ? this : nullptr };
 	// A camera's feed with a bad signal may hold its last picture a moment (see updateSignalGlitches).
 	if (_signalGlitches && updateSignalGlitches())
 	{
@@ -581,6 +606,7 @@ void FirstPersonView::draw()
 	drawPass();
 	drawFacing();
 	unlock();
+	if (_gpuPresenting) gpuPresent(); // (the frame put together on the card: see FirstPersonViewGpuEffects.cpp)
 #ifdef __ANDROID__
 	reportFrameTime(drawStart);
 #endif
@@ -631,6 +657,18 @@ void FirstPersonView::beginFrame()
 	updateParticles();
 }
 
+namespace
+{
+/// Adds the time a pass took to its sum (OPENXCOM3D_PASS_TIME, see drawPass); nothing without sums.
+struct PassTimer
+{
+	double *sum;
+	std::chrono::steady_clock::time_point started;
+	PassTimer(double *sums, int pass) : sum(sums ? sums + pass : nullptr) { if (sum) started = std::chrono::steady_clock::now(); }
+	~PassTimer() { if (sum) *sum += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count(); }
+};
+}
+
 /**
  * The second half of a frame: one picture of it, drawn straight into the surface's pixels (in VR an eye's, swapped in
  * for the view's own, see renderEyes). The world ray by ray, then what's in it as sprites, dots and lines, the
@@ -639,10 +677,17 @@ void FirstPersonView::beginFrame()
  */
 void FirstPersonView::drawPass()
 {
+	// (OPENXCOM3D_PASS_TIME: the log gets each pass's share of the main view's drawing time, averaged over 120 frames;
+	// the facing rings, which the caller draws after this, are not among them.)
+	static const bool passTime = getenv("OPENXCOM3D_PASS_TIME") != nullptr;
+	static const char *const passNames[] = { "castAllRays", "watchUnits", "drawDecals", "drawFloorItems", "drawEdgeDots", "drawUnits", "drawFire", "drawProjectilesAndExplosions", "drawFlares", "drawBeams", "drawPellets", "drawTrajectory", "drawSeeThroughSmoke", "findUnitAtPointer", "drawParticles", "drawLightHalos", "applyScreenWash", "drawTrajectory", "applySignalGlitches", "drawBurning", "drawHurt", "drawDamageNumbers", "drawDownedIcons", "drawMarkers", "drawSprayMarks" };
+	static double passSums[25] = {};
+	static int passFrames = 0;
+	double *const passTimes = passTime && getWidth() >= 320 ? passSums : nullptr;
 	// Draw straight into the surface's pixels.
 	lock();
 	// The world: terrain, border and sky, ray by ray (fills the depth buffer).
-	castAllRays();
+	{ PassTimer pass(passTimes, 0); castAllRays(); }
 	// What's in the world: first the units are checked for hits and kills (for their flinches
 	// and the hitmarker), then everything is drawn over the terrain as sprites, dots and lines.
 	// (No unit is on the screen yet, for the see-through smoke.)
@@ -653,36 +698,70 @@ void FirstPersonView::drawPass()
 	std::fill(&_pointerBodies[0][0], &_pointerBodies[0][0] + sizeof(_pointerBodies) / sizeof(_pointerBodies[0][0]), nullptr);
 	std::fill(&_pointerPiles[0][0], &_pointerPiles[0][0] + sizeof(_pointerPiles) / sizeof(_pointerPiles[0][0]), nullptr);
 	// (VR's second eye: the hits were watched for the first already, once a frame)
-	if (!_replayPass) watchUnits();
-	drawDecals();
-	drawFloorItems();
-	drawEdgeDots();
-	drawUnits();
-	drawFire();
-	drawProjectilesAndExplosions();
-	drawFlares();
-	drawBeams();
-	drawPellets();
-	drawTrajectory(false);
-	drawSeeThroughSmoke();
+	if (!_replayPass) { PassTimer pass(passTimes, 1); watchUnits(); }
+	{ PassTimer pass(passTimes, 2); drawDecals(); }
+	{ PassTimer pass(passTimes, 3); drawFloorItems(); }
+	{ PassTimer pass(passTimes, 4); drawEdgeDots(); }
+	{ PassTimer pass(passTimes, 5); drawUnits(); }
+	{ PassTimer pass(passTimes, 6); drawFire(); }
+	{ PassTimer pass(passTimes, 7); drawProjectilesAndExplosions(); }
+	{ PassTimer pass(passTimes, 8); drawFlares(); }
+	{ PassTimer pass(passTimes, 9); drawBeams(); }
+	{ PassTimer pass(passTimes, 10); drawPellets(); }
+	{ PassTimer pass(passTimes, 11); drawTrajectory(false); }
+	{ PassTimer pass(passTimes, 12); drawSeeThroughSmoke(); }
+	{ PassTimer pass(passTimes, 14); drawParticles(); }
+	// The passes so far were recorded for the graphics card (setting "Renderer": GPU): it draws them over its rays' picture now,
+	// and the bloom over that, and gives the finished one back. (Its check: the CPU's own bloom first, then the two compared.)
+	if (_gpuRecording && !_gpuChecking)
+	{
+		PassTimer pass(passTimes, 0);
+		gpuDrawEffects(); // (the bloom and the screen wash with them)
+	}
+	else
+	{
+		{ PassTimer pass(passTimes, 15); drawLightHalos(); }
+		// Effects on the finished picture (a camera's feed: its bad signal last).
+		{ PassTimer pass(passTimes, 16); applyScreenWash(); }
+		if (_gpuRecording) gpuDrawEffects();
+	}
 	// (VR's second eye: the unit pointed at is the first eye's, where the crosshair is)
-	if (!_replayPass) findUnitAtPointer();
-	drawParticles();
-	drawLightHalos();
+	if (!_replayPass) { PassTimer pass(passTimes, 13); findUnitAtPointer(); }
+	drawLastMarks(passTimes);
+	if (passTimes && ++passFrames == 120)
+	{
+		std::ostringstream line;
+		for (size_t pass = 0; pass < sizeof(passSums) / sizeof(passSums[0]); ++pass)
+		{
+			if (passSums[pass] / passFrames >= 0.005) line << " " << passNames[pass] << " " << std::lround(passSums[pass] / passFrames * 1000.0) / 1000.0;
+			passSums[pass] = 0.0;
+		}
+		passFrames = 0;
+		Log(LOG_INFO) << "OpenXcom3D: the " << getWidth() << "x" << getHeight() << " view's passes, ms:" << line.str();
+	}
+}
+
+/**
+ * The marks over the finished picture, drawn last in a pass (see drawPass), on the CPU whoever drew the picture: with
+ * the picture kept on the graphics card they go over an empty one, which the card lays over its own (see gpuPresent,
+ * and for VR's eyes presentEyesOnCard, whose check draws them a second time).
+ * @param passTimes Where each one's time is summed (OPENXCOM3D_PASS_TIME), or null.
+ */
+void FirstPersonView::drawLastMarks(double *passTimes)
+{
 	// Effects on the finished picture (a camera's feed: its bad signal last). Under night vision
 	// the aimed path is light in the goggles: drawn again over the green, white-green.
-	applyScreenWash();
-	if (_nightVision) drawTrajectory(true);
-	if (_signalGlitches) applySignalGlitches();
-	drawBurning();
-	drawHurt();
+	if (_nightVision) { PassTimer pass(passTimes, 17); drawTrajectory(true); }
+	if (_signalGlitches) { PassTimer pass(passTimes, 18); applySignalGlitches(); }
+	{ PassTimer pass(passTimes, 19); drawBurning(); }
+	{ PassTimer pass(passTimes, 20); drawHurt(); }
 	// The numbers rising over the units hit (setting "Damage numbers"): in the world, walls in front
 	// hiding them, but over the screen's effects, so their colours read.
-	drawDamageNumbers();
+	{ PassTimer pass(passTimes, 21); drawDamageNumbers(); }
 	// The icons over the downed units, the enemy markers and the units' facing rings, over everything.
-	drawDownedIcons();
-	drawMarkers();
-	drawSprayMarks();
+	{ PassTimer pass(passTimes, 22); drawDownedIcons(); }
+	{ PassTimer pass(passTimes, 23); drawMarkers(); }
+	{ PassTimer pass(passTimes, 24); drawSprayMarks(); }
 }
 
 #ifdef __ANDROID__

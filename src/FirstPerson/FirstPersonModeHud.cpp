@@ -172,12 +172,17 @@ void FirstPersonMode::toggleNightVision(BattleUnit *unit)
 void FirstPersonMode::updateCompass(BattleUnit *unit, bool playerTurn)
 {
 	const bool show = Options::fpsCompass && isActive() && !_hudHidden && unit;
+	if (_compassCostsPlaced != Options::fpsCompassCosts)
+	{
+		placeCompass(); // (the setting was switched: make the room for the costs, or take it back)
+	}
 	_compass->setVisible(show);
 	for (Text *letter : _compassLetters) letter->setVisible(show);
 	updateClimbArrows(show && playerTurn ? unit : nullptr);
 	if (!show)
 	{
 		_txtCompassTurn->setVisible(false);
+		updateCompassCosts(nullptr, false, 0);
 		return;
 	}
 
@@ -212,9 +217,14 @@ void FirstPersonMode::updateCompass(BattleUnit *unit, bool playerTurn)
 		shotWarning = shotTurn ? (shotAffordable ? 1 : 2) : 0;
 		if (!shotTurn) shotFacing = -1;
 	}
+	// With the steps' costs shown, the line also says what a turn costs while nothing warns.
+	const int turnCost = turretTurning(unit) ? 1 : unit->getTurnCost();
+	const int turnShown = Options::fpsCompassCosts && Options::fpsTurnCost && playerTurn ? turnCost : 0;
+	updateCompassCosts(unit, playerTurn, viewBearing);
 	if (viewBearing != _compassDrawn[0] || facing != _compassDrawn[1] || warning != _compassDrawn[2]
-		|| shotFacing != _compassDrawn[3] || (shotTurn * 4 + shotWarning) * 2 + meleeTurn != _compassDrawn[4])
+		|| shotFacing != _compassDrawn[3] || (shotTurn * 4 + shotWarning) * 2 + meleeTurn != _compassDrawn[4] || turnShown != _compassDrawn[5])
 	{
+		_compassDrawn[5] = turnShown;
 		_compassDrawn[0] = viewBearing;
 		_compassDrawn[1] = facing;
 		_compassDrawn[2] = warning;
@@ -235,7 +245,7 @@ void FirstPersonMode::updateCompass(BattleUnit *unit, bool playerTurn)
 
 		// The line under it: the shot's turn first (it's what the next click costs), else the
 		// head's limit.
-		_txtCompassTurn->setVisible(warning != 0 || shotWarning != 0);
+		_txtCompassTurn->setVisible(warning != 0 || shotWarning != 0 || turnShown != 0);
 		if (shotWarning)
 		{
 			_txtCompassTurn->setColor(textColor(_state->getPalette(), shotWarning == 1 ? 250 : 230, shotWarning == 1 ? 160 : 60, shotWarning == 1 ? 60 : 50));
@@ -244,9 +254,166 @@ void FirstPersonMode::updateCompass(BattleUnit *unit, bool playerTurn)
 		else if (warning)
 		{
 			_txtCompassTurn->setColor(textColor(_state->getPalette(), warning == 1 ? 240 : 230, warning == 1 ? 210 : 60, warning == 1 ? 60 : 50));
-			_txtCompassTurn->setText(warning == 1 ? std::string(_state->tr("STR_FPS_COMPASS_TURN").arg(turretTurning(unit) ? 1 : unit->getTurnCost())) : std::string(_state->tr("STR_FPS_COMPASS_NO_TU")));
+			_txtCompassTurn->setText(warning == 1 ? std::string(_state->tr("STR_FPS_COMPASS_TURN").arg(turnCost)) : std::string(_state->tr("STR_FPS_COMPASS_NO_TU")));
+		}
+		else if (turnShown)
+		{
+			_txtCompassTurn->setColor(textColor(_state->getPalette(), 200, 200, 210));
+			_txtCompassTurn->setText(_state->tr("STR_FPS_COMPASS_TURN").arg(turnCost));
 		}
 	}
+}
+
+/**
+ * The steps' costs round the compass (setting "Compass: step costs"; a player's request, GitHub
+ * issue #132: in first person it's harder to keep track of what moving costs). At each of the
+ * eight ways a soldier can step, outside the dial and going round with it, the time units that
+ * step would cost now, as the game will charge it: a walk, a sidestep (turning by the rules) or
+ * a run (sprinting). So the number at the top is the step forward, and those at the sides the
+ * steps to the side. Left of the climb arrows, what a level up and a level down cost (a lift, a
+ * ladder, flying). No number where the step can't be made. A step onto dear ground is yellow,
+ * onto very dear ground red (see moveCostShown), and one the soldier can't pay for grey; a
+ * sidestep's (the dearer step that keeps the facing) is light blue, where none of those apply.
+ * Only in the player's turn; while a step is walked the numbers stay as they were.
+ * @param unit The soldier the view looks through, or null to hide the numbers.
+ * @param playerTurn It's the player's turn.
+ * @param viewBearing The view's bearing, degrees (0 north, clockwise).
+ */
+void FirstPersonMode::updateCompassCosts(BattleUnit *unit, bool playerTurn, int viewBearing)
+{
+	const bool show = Options::fpsCompassCosts && unit && playerTurn && canAct() && !noclipOn(unit);
+	const bool standing = show && unit->getStatus() == STATUS_STANDING && !_stepPending;
+	bool up = false, down = false;
+	if (standing)
+	{
+		climbWays(unit, up, down);
+	}
+	// The dial's middle on the canvas.
+	const double centreX = _compass->getX() + (CompassSize - 1) / 2.0, centreY = _compass->getY() + CompassArrowH + (CompassSize - 1) / 2.0;
+	for (int move = 0; move < 10; ++move) // (the eight steps as the game numbers them, then up and down: Pathfinding::DIR_UP is 8)
+	{
+		const bool step = move < Pathfinding::DIR_UP;
+		Text *text = step ? _compassCosts[move] : _climbCosts[move - Pathfinding::DIR_UP];
+		int shown = show && step ? _compassCostsShown[move] : -1;
+		if (standing)
+		{
+			int time = 0;
+			StepTone tone = TONE_PLAIN;
+			const bool wayOpen = step || (move == Pathfinding::DIR_UP ? up : down);
+			shown = wayOpen && moveCostShown(unit, move, time, tone) ? time * ToneCount + tone : -1;
+		}
+		if (shown != _compassCostsShown[move])
+		{
+			_compassCostsShown[move] = shown;
+			if (shown >= 0)
+			{
+				const SDL_Color *palette = _state->getPalette();
+				const int tone = shown % ToneCount;
+				text->setColor(tone == TONE_DEAR ? textColor(palette, 250, 220, 70) : tone == TONE_VERY_DEAR ? textColor(palette, 240, 70, 60)
+					: tone == TONE_CANT_PAY ? textColor(palette, 120, 120, 130) : tone == TONE_SIDESTEP ? textColor(palette, 110, 200, 250)
+					: textColor(palette, 225, 225, 235));
+				text->setText(std::to_string(shown / ToneCount));
+			}
+		}
+		text->setVisible(shown >= 0);
+		if (step)
+		{
+			const double angle = (move * 45 - viewBearing) * Pi / 180.0;
+			text->setX((int)std::lround(centreX + CompassCostRadius * std::sin(angle) - CompassCostW / 2.0));
+			text->setY((int)std::lround(centreY - CompassCostRadius * std::cos(angle) - CompassCostH / 2.0));
+		}
+	}
+}
+
+/**
+ * What one move would cost the soldier now, for the numbers round the compass (see
+ * updateCompassCosts): a step priced as the game will walk it (see stepPrice), with the turn to
+ * face it where the armor's rules charge that before a walk; or a level up or down.
+ * The tone: grey when the soldier can't pay (the time units, the energy, or the time units
+ * reserved for a shot); else, for a step, against what the same step would cost this soldier
+ * over plain ground (see plainStepTime): yellow when dearer (sand, tall grass, rubble in the way)
+ * and red from CompassCostDearPercent of it (sludge).
+ * @param unit The soldier.
+ * @param direction The move: 0 (north) to 7 clockwise, Pathfinding::DIR_UP or Pathfinding::DIR_DOWN.
+ * @param time Set to the time units.
+ * @param tone Set to how the number is written.
+ * @return False where the move can't be made (no number).
+ */
+bool FirstPersonMode::moveCostShown(BattleUnit *unit, int direction, int &time, StepTone &tone)
+{
+	Pathfinding *pathfinding = _save->getPathfinding();
+	const bool step = direction < Pathfinding::DIR_UP;
+	const Position start = step ? Position(_trackedTile.x, _trackedTile.y, unit->getPosition().z) : unit->getPosition();
+	bool sidestep = false;
+	const PathfindingStep price = step ? stepPrice(unit, start, direction, &sidestep) : pathfinding->getTUCost(start, direction, unit, nullptr, BAM_NORMAL);
+	if (price.cost.time >= Pathfinding::INVALID_MOVE_COST)
+	{
+		return false;
+	}
+	time = price.cost.time;
+	if (step && !sidestep && unit->getArmor()->getTurnBeforeFirstStep())
+	{
+		const int eighths = std::min((direction - unit->getDirection() + 8) % 8, (unit->getDirection() - direction + 8) % 8);
+		time += eighths * unit->getTurnCost();
+	}
+	const bool canPay = doomModeOn() || (unit->getTimeUnits() >= time && unit->getEnergy() >= price.cost.energy && reserveAllows(unit, time, price.cost.energy));
+	if (!step)
+	{
+		tone = canPay ? TONE_PLAIN : TONE_CANT_PAY;
+		return true;
+	}
+	// A step refused for anything but its price (a ledge with falling off, a unit in the way that
+	// isn't seen) shows no number; an unsafe landing's does (a second push takes it).
+	Position way;
+	Pathfinding::directionToVector(direction, &way);
+	if (canPay && !stepAllowed(unit, way.x, way.y) && _stepAllowedCache[direction] != 2)
+	{
+		return false;
+	}
+	if (!canPay)
+	{
+		tone = TONE_CANT_PAY;
+		return true;
+	}
+	// Dearer than the same step over plain ground would be?
+	const int plain = plainStepTime(unit, start, direction, price.pos, sidestep, !sidestep && runsStep(unit, start, direction));
+	tone = price.cost.time * 100 >= plain * CompassCostDearPercent ? TONE_VERY_DEAR : price.cost.time > plain ? TONE_DEAR : sidestep ? TONE_SIDESTEP : TONE_PLAIN;
+	return true;
+}
+
+/**
+ * The time units a step would cost this soldier over plain, level ground, to tell dear ground by
+ * (see moveCostShown). Made as the pathfinding makes a step's price (Pathfinding::getTUCost):
+ * plain ground's time units (one more for a level climbed), half again on a diagonal, one more
+ * for a sidestep, times the soldier's and the armor's movement costs for the way the step is
+ * made (walked, run or sidestepped; on foot or flown), rounded as the mod's rules round.
+ * @param unit The soldier.
+ * @param start The tile the step starts from.
+ * @param direction The step's direction (0 north .. 7, clockwise).
+ * @param end The tile the step ends on.
+ * @param sidestep The step is the game's sidestep.
+ * @param run The step is the game's run.
+ * @return The time units, at least 1.
+ */
+int FirstPersonMode::plainStepTime(BattleUnit *unit, const Position &start, int direction, const Position &end, bool sidestep, bool run) const
+{
+	int ground = Pathfinding::DEFAULT_MOVE_COST + (end.z > start.z ? 1 : 0);
+	if (direction & 1) ground = ground * 3 / 2;
+	if (sidestep) ground += 1;
+
+	// Flown: a flyer with flight on, with no floor under the step's start or its end.
+	const Tile *startTile = _save->getTile(start), *endTile = _save->getTile(end);
+	const bool flown = canFly(unit) && flightOn(unit) && ((startTile && startTile->hasNoFloor(_save)) || (endTile && endTile->hasNoFloor(_save)));
+	const Armor *armor = unit->getArmor();
+	ArmorMoveCost cost = { ground, ground };
+	cost *= unit->getMoveCostBase();
+	cost *= flown ? unit->getMoveCostBaseFly() : unit->getMoveCostBaseNormal();
+	cost *= sidestep ? (flown ? armor->getMoveCostFlyStrafe() : armor->getMoveCostStrafe())
+		: run ? (flown ? armor->getMoveCostFlyRun() : armor->getMoveCostRun())
+		: (flown ? armor->getMoveCostFlyWalk() : armor->getMoveCostWalk());
+	const int percents = 100 * 100 * 100; // (three costs in percent)
+	const int rounding = Mod::EXTENDED_MOVEMENT_COST_ROUNDING;
+	return std::max(1, (cost.TimePercent + (rounding == 0 ? 0 : rounding == 1 ? percents / 2 : percents / 2 - 1)) / percents);
 }
 
 /**
@@ -1661,7 +1828,7 @@ void FirstPersonMode::updateMapCamera()
 	}
 
 	// Its place: at the left under the top bar, or right of the touch buttons (screen pixels).
-	const int frameX = _state->_btnCtrl->getVisible() ? (MapCameraTouchClear + _uiScale - 1) / _uiScale : 1;
+	const int frameX = _state->_btnCtrl->getVisible() ? (int)std::ceil(toCanvasX(MapCameraTouchClear)) : 1;
 	_mapCameraFrame->setX(frameX);
 	_mapCameraFrame->setY(CardY);
 	_mapCamera->setX(frameX + MapCameraBorder);
@@ -1755,11 +1922,11 @@ bool FirstPersonMode::onMapCamera(int canvasX, int canvasY) const
  */
 void FirstPersonMode::placeGameLine()
 {
-	int x = _gameLineX, y = (BarY + BarH + GameLineGap) * _uiScale;
+	int x = _gameLineX, y = toScreenY(BarY + BarH + GameLineGap);
 	if (_mapCameraFrame->getVisible())
 	{
-		x = _mapCameraFrame->getX() * _uiScale;
-		y = (_mapCameraFrame->getY() + _mapCameraFrame->getHeight() + GameLineGap) * _uiScale;
+		x = toScreenX(_mapCameraFrame->getX());
+		y = toScreenY(_mapCameraFrame->getY() + _mapCameraFrame->getHeight() + GameLineGap);
 	}
 	else if (_state->_btnCtrl->getVisible())
 	{
@@ -2488,8 +2655,9 @@ bool FirstPersonMode::clearLineOfFire(BattleUnit *viewer, BattleUnit *enemy) con
  * @param healthLost The health it lost.
  * @param armorLost The armour points it lost (the side struck).
  * @param stunTaken The stun it took.
+ * @param shieldLost The points its energy shield lost (a mod's, see FirstPerson::shieldPoints).
  */
-void FirstPersonMode::unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken)
+void FirstPersonMode::unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost)
 {
 	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
 	if (!mode || !Options::fpsDamageNumbers || !unit)
@@ -2510,7 +2678,7 @@ void FirstPersonMode::unitDamaged(BattlescapeState *state, const BattleUnit *uni
 	const int size = unit->getArmor()->getSize();
 	const double head[3] = { position.x * 16.0 + 8.0 * size, position.y * 16.0 + 8.0 * size,
 		position.z * 24.0 - tile->getTerrainLevel() + (lying ? 4.0 : unit->getFloatHeight() + unit->getHeight() + 2.0) };
-	mode->_damageNumbers.add(head, position.z, healthLost, armorLost, stunTaken, SDL_GetTicks());
+	mode->_damageNumbers.add(head, position.z, healthLost, armorLost, stunTaken, shieldLost, SDL_GetTicks());
 }
 
 /**

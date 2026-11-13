@@ -104,6 +104,7 @@
 #include <unistd.h>
 #include <SDL_system.h>
 #include "FirstPersonXr.h"
+#include "FirstPersonGpu.h"
 #include "FirstPersonVr.h"
 #include "../Battlescape/BattlescapeState.h"
 #include "../Engine/Game.h"
@@ -202,7 +203,8 @@ struct Shell
 	// The probe (see reportProbe).
 	Uint32 probeSince = 0;
 	int probePairs = 0, probeMonitors = 0, probeHuds = 0, probeFrames = 0;
-	double probeTotalMs = 0.0, probeWorstMs = 0.0;
+	double probeTotalMs = 0.0, probeWorstMs = 0.0, probeHandOverMs = 0.0; // (the last: making the pair ready for the OpenXR thread)
+	int eyesOnCard = -1;               // the last pair was kept on the graphics card (1) or handed over as pictures (0); -1: none yet (logged when it changes)
 };
 Shell shell;
 
@@ -482,8 +484,6 @@ void convertDepth(const VrPicture &picture, std::vector<float> &out)
 		out.clear();
 		return;
 	}
-	const float nearZ = Xr::DepthNearMetres, farZ = Xr::DepthFarMetres;
-	const float scale = farZ / (farZ - nearZ);
 	out.resize((size_t)picture.width * picture.height);
 	for (int y = 0; y < picture.height; ++y)
 	{
@@ -491,10 +491,7 @@ void convertDepth(const VrPicture &picture, std::vector<float> &out)
 		float *to = out.data() + (size_t)(picture.height - 1 - y) * picture.width;
 		for (int x = 0; x < picture.width; ++x)
 		{
-			const float metres = from[x] * picture.depthToMetres;
-			// (d = f / (f - n) * (1 - n / z): 0 at the near plane, 1 at the far one; the sky and beyond 1)
-			const float depth = metres <= nearZ ? 0.0f : (std::isinf(metres) ? 1.0f : scale * (1.0f - nearZ / metres));
-			to[x] = std::min(std::max(depth, 0.0f), 1.0f);
+			to[x] = vrProjectionDepth(from[x] * picture.depthToMetres);
 		}
 	}
 }
@@ -915,13 +912,14 @@ void reportProbe()
 	if (shell.probePairs)
 	{
 		const double average = shell.probeTotalMs / shell.probePairs;
-		report << ", drawing a pair " << average << " ms on average (" << average / 2.0 << " an eye), the slowest " << shell.probeWorstMs << " ms";
+		report << ", drawing a pair " << average << " ms on average (" << average / 2.0 << " an eye), the slowest " << shell.probeWorstMs << " ms"
+			<< ", handing it over " << shell.probeHandOverMs / shell.probePairs << " ms";
 	}
 	report << "; the monitor " << shell.probeMonitors << " times, the HUD " << shell.probeHuds << " times; game frames " << shell.probeFrames;
 	logBoth(report.str());
 	shell.probeSince = now;
 	shell.probePairs = shell.probeMonitors = shell.probeHuds = shell.probeFrames = 0;
-	shell.probeTotalMs = shell.probeWorstMs = 0.0;
+	shell.probeTotalMs = shell.probeWorstMs = shell.probeHandOverMs = 0.0;
 }
 
 /**
@@ -976,22 +974,59 @@ void feedImmersive(SDL_Surface *screen)
 		int width = 0, height = 0;
 		vrEyeSize(width, height);
 		VrPicture pictures[2];
+		// Kept on the graphics card (setting "VR eyes kept on the card", with "Renderer": GPU), where the OpenXR thread's
+		// context shares the renderer's textures: in the slot the pair goes over in. Else they come back as pictures.
+		FirstPersonGpu *const gpu = Options::fpsRenderer == 1 ? readyFirstPersonGpu() : nullptr;
+		const bool onCard = Options::fpsVrCardEyes && box.cardEyes && gpu && gpu->sharesContext();
+#ifdef OPENXCOM3D_XR_FAKE_SESSION
+		// (The emulator test build's check, asked for by a file: both ways, for the OpenXR thread to compare.)
+		static const bool cardCheck = access("/sdcard/openxcom3d/vrtest_card_check", F_OK) == 0;
+#else
+		const bool cardCheck = false;
+#endif
 		const Uint64 start = SDL_GetPerformanceCounter();
-		const bool drawn = vrRenderEyes(sample.views, width, height, pictures);
+		const bool drawn = vrRenderEyes(sample.views, width, height, pictures, nullptr, onCard ? box.eyes.backIndex() : -1, onCard && cardCheck);
 		const double drawMs = (SDL_GetPerformanceCounter() - start) * 1000.0 / SDL_GetPerformanceFrequency();
 		if (drawn)
 		{
 			Xr::EyePictures &out = box.eyes.back();
-			if (convertIndexed(pictures[0], false, out.eyes[0]) && convertIndexed(pictures[1], false, out.eyes[1]))
+			out.onCard = pictures[0].colorTexture && pictures[1].colorTexture && pictures[0].fence;
+			out.cardFence = pictures[0].fence;
+			bool ready = out.onCard;
+			if (pictures[0].pixels && pictures[1].pixels)
+			{
+				ready = convertIndexed(pictures[0], false, out.eyes[0]) && convertIndexed(pictures[1], false, out.eyes[1]);
+			}
+			if (shell.eyesOnCard != (out.onCard ? 1 : 0))
+			{
+				shell.eyesOnCard = out.onCard ? 1 : 0;
+				logBoth(out.onCard ? "eyes: kept on the graphics card, shown from its textures (nothing read back or uploaded)"
+					: "eyes: handed over as pictures (read back from the graphics card, or the CPU's)");
+			}
+			if (ready)
 			{
 				for (int eye = 0; eye < 2; ++eye)
 				{
 					out.views[eye].pose = sample.views[eye].pose;
 					out.views[eye].fov = pictures[eye].fov;
-					convertDepth(pictures[eye], out.depth[eye]);
+					out.cardColour[eye] = pictures[eye].colorTexture;
+					out.cardDepth[eye] = pictures[eye].depthTexture;
+					if (pictures[eye].pixels)
+					{
+						convertDepth(pictures[eye], out.depth[eye]);
+					}
+					else
+					{
+						// (Only its size: the picture is the card's.)
+						out.eyes[eye].width = pictures[eye].width;
+						out.eyes[eye].height = pictures[eye].height;
+						out.eyes[eye].pixels.clear();
+						out.depth[eye].clear();
+					}
 				}
 				box.eyes.publish();
 				++shell.probePairs;
+				shell.probeHandOverMs += (SDL_GetPerformanceCounter() - start) * 1000.0 / SDL_GetPerformanceFrequency() - drawMs;
 				shell.probeTotalMs += drawMs;
 				shell.probeWorstMs = std::max(shell.probeWorstMs, drawMs);
 			}
@@ -1027,6 +1062,7 @@ void feedImmersive(SDL_Surface *screen)
 	// smoothed by the graphics chip as the setting says.
 	box.hudHeld = battle && cursorFree();
 	box.smoothing = Options::fpsVrSmoothing;
+	box.cardEyesWanted = Options::fpsVrCardEyes && Options::fpsRenderer == 1;
 
 	// The log: another screen coming over the battle and going, the cursor freed and mouse look back.
 	ControllerInput &input = shell.input;
@@ -1080,6 +1116,7 @@ bool enterImmersive()
 	logBoth("the 3D view in VR mode: starting the immersive activity");
 	Xr::Shared &box = Xr::shared();
 	box.gameThreadId = (int)gettid();
+	box.cardEyesWanted = Options::fpsVrCardEyes && Options::fpsRenderer == 1; // (read when the session's context is made)
 	box.finished = false;
 	box.failed = false;
 	box.running = false;
@@ -1367,6 +1404,16 @@ bool xrShellFlip(SDL_Surface *screen)
 		return true;
 	}
 	return false;
+}
+
+namespace Xr
+{
+
+void *rendererShareContext()
+{
+	return FirstPersonGpu::shareContext();
+}
+
 }
 
 }

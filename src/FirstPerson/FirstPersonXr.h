@@ -126,6 +126,12 @@ public:
 	{
 		return _slots[_front];
 	}
+	/// Which of the three slots the maker fills now (0 to 2): what it keeps outside the slot itself (the eyes' textures
+	/// on the graphics card) goes by this number. The maker's thread only.
+	int backIndex() const
+	{
+		return _back;
+	}
 	/// Forgets anything published but not taken (for a new session).
 	void clear()
 	{
@@ -140,19 +146,25 @@ private:
 	bool _fresh = false;
 };
 
-/// The depth the eyes' pictures are handed over with (XR_KHR_composition_layer_depth): as a
-/// standard perspective projection with these near and far planes (metres) has it, 0 at the near
-/// plane and 1 at the far one (and beyond: the sky).
-const float DepthNearMetres = 0.05f, DepthFarMetres = 1000.0f;
+/// The depth the eyes' pictures are handed over with (XR_KHR_composition_layer_depth): the renderer's (see
+/// vrProjectionDepth), 0 at the near plane and 1 at the far one (and beyond: the sky).
+const float DepthNearMetres = VrDepthNearMetres, DepthFarMetres = VrDepthFarMetres;
 
 /// Both eyes' pictures for the projection layer, with the views they were drawn for: each eye's
 /// pose (in the session's LOCAL space) and the field of view its picture shows; and each eye's
 /// depth (see DepthNearMetres; the bottom row first, as the pictures; empty without one).
+/// Or, with the eyes kept on the graphics card (setting "VR eyes kept on the card", "Renderer": GPU): each eye's picture
+/// and depth as textures of the renderer's context, which the OpenXR thread's context shares (the colour RGBA8 as a
+/// layer's picture, the depth R32F, 0 to 1; the bottom row first), to read once the pair's fence has passed (an OpenGL
+/// sync object). The pictures then hold only their sizes, but in the emulator test build's check, which hands over both.
 struct EyePictures
 {
 	LayerPicture eyes[2];
 	VrEyeView views[2];
 	std::vector<float> depth[2];
+	bool onCard = false;
+	unsigned int cardColour[2] = {}, cardDepth[2] = {};
+	void *cardFence = nullptr;
 };
 
 /// Where the OpenXR thread last found the head and the eyes (at a frame's predicted display
@@ -211,6 +223,7 @@ struct Shared
 	std::atomic<int> gameThreadId{0};      // the game's thread (Linux's id), for the runtime's scheduling
 	std::atomic<bool> smoothing{true};     // the eyes smoothed by the graphics chip (setting "VR smoothing")
 	std::atomic<bool> hudHeld{false};      // the cursor is free: the HUD holds still in the room (else fixed where the head looks)
+	std::atomic<bool> cardEyesWanted{false}; // setting "VR eyes kept on the card" with "Renderer": GPU: the next session's context joins the renderer's share group
 
 	// From the OpenXR thread to the game's thread.
 	std::mutex sampleMutex;
@@ -221,10 +234,15 @@ struct Shared
 	std::atomic<bool> finished{false};     // the thread is over (left, failed, or ended by the system)
 	std::atomic<bool> failed{false};       // it couldn't start (no OpenXR runtime, no session...)
 	std::atomic<int> recentres{0};         // the headset's recentrings so far (the game recentres for each)
+	std::atomic<bool> cardEyes{false};     // its context shares the renderer's textures and can show eyes kept on the graphics card
 };
 
 /// The one shared block.
 Shared &shared();
+
+/// The context whose share group the OpenXR thread's context joins to read the renderer's textures (an EGLContext;
+/// null: none). See FirstPersonGpu::shareContext.
+void *rendererShareContext();
 
 /// Starts the OpenXR thread for the immersive activity (from its onCreate, on Android's UI thread).
 void startSession(JNIEnv *env, jobject activity);

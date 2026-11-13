@@ -100,6 +100,10 @@ public:
 	/// Draws a depth picture (0 to 1, the bottom row first) into a depth texture of the target size, each value over its
 	/// block. False on an error.
 	bool drawDepth(const float *depth, int width, int height, unsigned int target, int targetWidth, int targetHeight);
+	/// The same two from pictures that are textures already (an eye the 3D view's renderer kept on the graphics chip:
+	/// RGBA8, and R32F for the depth; the bottom row first): nothing is uploaded.
+	bool drawColourFrom(unsigned int source, int width, int height, unsigned int target, int targetWidth, int targetHeight, bool srgbTarget);
+	bool drawDepthFrom(unsigned int source, int width, int height, unsigned int target, int targetWidth, int targetHeight);
 
 private:
 	bool _ready = false;

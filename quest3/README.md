@@ -4,9 +4,11 @@
 
 An experiment: OpenXcom3D (the `voxel_units` branch) as a standalone Meta Quest 3 app. The whole game runs on a
 floating pane like any Android app on the headset; with the setting **VR mode** on, the 3D view becomes an immersive
-stereo view with head tracking and the controllers. It works, but it isn't playable yet: the 3D view is drawn by the
-CPU, and the Quest's CPU manages only a coarse picture (460x500 an eye at about 20 pictures a second, 710x770 at about
-8). A renderer on the headset's GPU is the next step; until then this is for trying out VR game design, not for playing.
+stereo view with head tracking and the controllers. It works, but it isn't proven playable yet. Drawn by the CPU, the
+Quest manages only a coarse picture (460x500 an eye at about 20 pictures a second, 710x770 at about 8). This build can
+draw the eyes on the headset's graphics chip instead (setting **Renderer: GPU**, with **VR eyes kept on the card**), at
+eye pictures up to 1620x1760: that path has run on an Android emulator only, not yet on a headset, so its speed there
+is unknown. Until it is tried, this is for trying out VR game design, not for playing.
 
 There is no download: you build the app yourself and install it over USB with `adb`. You also need the original game's
 data (UFO: Enemy Unknown and/or Terror from the Deep), as for the desktop version.

@@ -46,6 +46,7 @@
  * FirstPersonView.h: the 3D view, the software ray caster that draws the battlescape in first
  * person (its code is in the FirstPersonView*.cpp files, one per topic).
  */
+#include <functional>
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -260,6 +261,12 @@ public:
 		bool glass;     // the ray went through window glass on the way
 		bool emissive;  // hit the bright part of a light source
 	};
+	/// On its way to black a colour passes through this many darker colours of the palette (each
+	/// the nearest to it dimmed a step further, see SceneColors::darkFade), dithered between
+	/// neighbours. Straight from the group's darkest to black, the groups that end well short of
+	/// black (the reds end at a clear dark red) showed a dark room as red dots on black (a player's
+	/// soldier camera in an XPiratez mansion).
+	static const int DarkFadeSteps = 3;
 	/// Palette colours picked for the current palette and time of day.
 	struct SceneColors
 	{
@@ -310,11 +317,13 @@ public:
 		Uint8 grey[4];         // TV static
 		Uint8 glitchGreen[2];  // a digital feed's broken blocks: bright and dark green
 		Uint8 flareTint[256];  // each colour in a flare's red light
+		Uint8 darkFade[DarkFadeSteps][256]; // each colour on its way to black: dimmed by 1 .. DarkFadeSteps of the DarkFadeSteps + 1 steps there
 		Uint8 unseenTint[256]; // each colour as unexplored terrain shows it, drawn ("Unseen terrain": Visible): toned towards slate grey
 		Uint8 flareFire[3];    // flare flame: red, orange, yellow
 		static constexpr int HazeSteps = 8; // the distance haze blends colours towards the haze in this many steps
 		Uint8 hazeTint[HazeSteps + 1][256]; // each colour blended towards the haze, step 0 (itself) .. HazeSteps (the haze)
 		Uint32 hazeTintKey;    // the palette and haze colour the haze tables were made for
+		Uint32 worldTintKey = 0; // the palette and night vision's state the glass, flare and unseen tables were made for
 	};
 
 	// =====================================================================================
@@ -334,6 +343,28 @@ public:
 	void drawIfAsked() { if (_redraw) draw(); }
 	/// Whether the view is shown at all (visible and not hidden), as blit has it.
 	bool shown() const { return getVisible() && !_hidden; }
+	/// Asks for the world in full colour too (setting "True colour"): the mode, for the view it lays into the display itself.
+	void setWantsTrueColor(bool wanted) { _wantsTrueColor = wanted; }
+	/// This frame's world in full colour, if the graphics card gave it: a 0x..RRGGBB number a pixel, and the palette colour each
+	/// pixel had from its ray; a pixel of the finished picture that still has that colour may be shown in the full one.
+	/// @param smokeVeil Receives, in a frame with light in the air (setting "Light shafts"), how much see-through smoke
+	/// lies over each pixel (0: none): there the air's light belongs on the smoke drawn; else null.
+	bool trueColor(const Uint32 *&fullColors, const Uint8 *&rayColors, const Uint8 *&smokeVeil) const
+	{
+		if (!_hasTrueColor) return false;
+		fullColors = _trueColor.data();
+		rayColors = _rayColors.data();
+		smokeVeil = _hasLightShafts ? _smokeVeil.data() : nullptr;
+		return true;
+	}
+	/// This frame as the graphics card put it together (see gpuPresent), if it did: a 0xFFRRGGBB number a pixel. The view's own
+	/// surface then holds only what the CPU drew last (0 elsewhere).
+	bool cardPicture(const Uint32 *&pixels) const
+	{
+		if (!_hasCardPicture) return false;
+		pixels = _cardPicture.data();
+		return true;
+	}
 	/// Uses another view's voxel models instead of building its own (a small extra view). Set
 	/// before the battle, so the models aren't built twice.
 	void shareCache(FirstPersonView *owner);
@@ -390,9 +421,9 @@ public:
 	/// Gets how far the view looks up (negative: down), in degrees.
 	double getPitchDegrees() const;
 	/// Gets the (normalized) direction of the ray through a pixel of the view.
-	void getRayDirection(int pixelX, int pixelY, double out[3]);
+	void getRayDirection(double pixelX, double pixelY, double out[3]);
 	/// The same, with the camera's axes as they are (already worked out for this frame: while drawing it).
-	void rayDirectionThrough(int pixelX, int pixelY, double out[3]) const;
+	void rayDirectionThrough(double pixelX, double pixelY, double out[3]) const;
 
 	// =====================================================================================
 	// VR: the view for two eyes (FirstPersonViewStereo.cpp)
@@ -414,13 +445,42 @@ public:
 		double aimX = 0.0, aimY = 0.0;           // the aim point on it, pixels
 		bool aimShown = false;                   // ...if that's in front of the eye
 		const float *depth = nullptr;            // its depth buffer: each pixel's distance along the view axis (voxels across, true proportions; the sky +infinity), width floats a row
+		Uint8 *cardPixels = nullptr;             // kept on the graphics card (see EyesOnCard): the picture what is drawn over the eye last goes into (the crosshair), same size and pitch; null: into pixels
+		float *cardTest = nullptr;               // ...and where such a pixel says it is over everything (0 written with it; width floats a row); null: no need
+	};
+	/// VR's eyes on the graphics card (setting "Renderer": GPU), for a headset whose display shares the card's textures:
+	/// No: each eye's picture and depth come back from the card, as ever (eyePicture has them). Yes: they stay on the
+	/// card (eyePicture's pixels and depth are null; presentEyesOnCard finishes them there). Check: both, each eye's
+	/// textures read back and compared with its picture and depth (the log has the counts).
+	enum class EyesOnCard { No, Yes, Check };
+	/// The eyes' pictures as the card keeps them: OpenGL textures in the renderer's share group (the colour RGBA8, the
+	/// depth R32F as the headset takes it, both with the bottom row first), and the fence to wait on before reading them.
+	struct CardEyes
+	{
+		unsigned colorTextures[2] = {}, depthTextures[2] = {};
+		void *fence = nullptr;
 	};
 	/// Draws the view for two eyes (VR mode): the frame's shared work once, with the view's own camera (the head's
 	/// middle: the tile snapshot, the colours, the particles moved on, the shots followed), then each eye's own picture
 	/// (rays, units, smoke, glow, the wash), both of the same moment, with the same sparks and static. Each picture is
 	/// width x height pixels; the aim point (in voxels, or null) is where the crosshair is drawn into each. Last in each,
 	/// the weapon in hand (see setHeldModel) with the hand's space where the frame given puts it (null: none drawn).
-	void renderEyes(const EyeCamera eyes[2], int width, int height, const double aimPoint[3], const HeldFrame *hand);
+	/// How renderEyes is to keep the eyes on the card: in which of the card's three slots (see FirstPersonGpu::EyeFrame),
+	/// the depth as a headset takes it (voxels to metres, its near and far planes), and what the caller draws over each
+	/// eye last (its crosshair: see EyePicture::cardPixels), called for an eye once the view has drawn it and before
+	/// the card finishes it (the card keeps one eye's world at a time).
+	struct CardRequest
+	{
+		EyesOnCard mode = EyesOnCard::No;
+		int slot = 0;
+		float depthToMetres = 0.0f, nearMetres = 0.0f, farMetres = 0.0f;
+		std::function<void(int eye)> drawnLast;
+	};
+	/// card: see CardRequest (null: the pictures come back; and so does one the card can't keep: see cardEyes).
+	void renderEyes(const EyeCamera eyes[2], int width, int height, const double aimPoint[3], const HeldFrame *hand, const CardRequest *card = nullptr);
+	/// The eyes as the last renderEyes left them on the card; false if it left none there (not asked, or the card
+	/// couldn't: then an eye whose eyePicture has no pixels has no picture this frame).
+	bool cardEyes(CardEyes &eyes) const;
 	/// An eye's picture from the last renderEyes: 0 the left eye, 1 the right.
 	EyePicture eyePicture(int eye);
 	/// VR: the camera looks along a head's own axes (unit vectors in true proportions, x east, y south, z up) instead of
@@ -649,6 +709,8 @@ private:
 	/// One picture of the frame (the rays, what's in the world, the smoke, the glow, the wash, the marks over it): draw's
 	/// second half, renderEyes's once for each eye; the surface left locked for the facing rings, drawn after it.
 	void drawPass();
+	/// The marks drawn last in a pass, over the finished picture (or over an empty one, the picture kept on the card).
+	void drawLastMarks(double *passTimes);
 
 	// ---- VR: two eyes a frame (FirstPersonViewStereo.cpp) ----
 
@@ -662,6 +724,10 @@ private:
 		std::vector<float> depth;               // its _depthBuffer, _glowMask, _unitVeil, _smokeVeil and _ownColours
 		std::vector<Uint8> glow, unitVeil, smokeVeil, ownColours;
 		double tangents[4] = {};                // the field of view drawn: left, right, up, down
+		bool onCard = false;                    // kept on the graphics card: the surface holds only the last marks, over nothing (see EyesOnCard)
+		bool depthWhole = false;                // ...and the scene's depth was fetched for one of them: the weapon in hand is among the marks, the depth whole
+		bool checked = false;                   // (the check) the surface and the depth are the CPU's finished ones, to compare the card's with
+		float flameGlow = 0.0f;                 // ...the flames' light the card lays on (see drawBurning)
 		double aim[2] = {};                     // where the aim point is on it, pixels
 		bool aimShown = false;                  // ...if in front of the eye
 	};
@@ -677,6 +743,23 @@ private:
 	Uint32 _stereoTimingSince = 0;              // renderEyes's times, summed since then (SDL ticks), logged every VrTimingLogTime
 	int _stereoFrames = 0;                      // ...how many frames
 	double _stereoTotal = 0.0, _stereoShared = 0.0, _stereoWorst = 0.0; // ...their times summed, the shared part's, and the slowest, ms
+	double _stereoPasses = 0.0, _stereoDepth = 0.0, _stereoLast = 0.0;  // ...and of the eyes' own: the passes, the depth fetched from the card, what is drawn last
+	// The eyes kept on the graphics card (see EyesOnCard and presentEyesOnCard).
+	bool _eyeOnCard = false;                    // this eye pass: the card keeps the finished picture (gpuDrawEffects reads no colour back; the marks go over an empty picture)
+	bool _gpuEyeKept = false;                   // ...and it did: this pass's units and effects were drawn on the card
+	EyeTarget _heldTargets[2];                  // each eye's weapon in hand, laser and crosshair on a picture of their own, with the depth they wrote (infinite where none)
+	std::vector<float> _heldTests[2];           // ...and the depth each of their pixels was drawn at (see FirstPersonGpu::EyeFrame::heldTest)
+	int _heldBoxes[2][4] = {};                  // ...the part of those that held anything last (emptied before the next)
+	bool _heldBoxFound[2] = { false, false };   // ...found since they were last drawn (else all of them is emptied)
+	float *_heldTest = nullptr;                 // while the weapon is drawn on its own picture: where each pixel notes the depth it was drawn at
+	EyeTarget _markTargets[2];                  // (the check) each eye's last marks drawn again over an empty picture, as the card gets them
+	std::vector<float> _checkSceneDepth;        // (the check) the scene's depth before the weapon wrote into it
+	/// Draws the weapon in hand and its laser on the eye's own picture of them (see _heldTargets), emptied first.
+	void drawHeldOnItsOwn(int eye);
+	CardEyes _cardEyes;                         // the eyes the last renderEyes finished on the card...
+	bool _cardEyesKept = false;                 // ...if it did, both
+	/// Finishes an eye on the card and leaves it there (see CardRequest); false if the card failed.
+	bool presentEyeOnCard(int eye, const CardRequest &card);
 	HeldModel _heldModel;                       // VR: the weapon in hand, in the hand's space (see setHeldModel)
 	struct HeldWorldQuad { double corners[4][3]; double normal[3]; Uint8 color; };
 	std::vector<HeldWorldQuad> _heldWorldQuads; // ...its faces in the world this frame: corners in voxels, normal in true proportions (see placeHeldModel)
@@ -746,6 +829,10 @@ private:
 	Uint8 _rockBase = 0;                                // the rock's colour, from the map's own rock round its edge (0: the plain rock colour)
 	std::vector<TileView> _tileViews;                   // this frame's snapshot of every tile: what the rays read
 	int _hiddenFloor = -1;                              // a floor left out: the lift platform the camera rides through
+	// What the last snapshot of all the tiles was taken with (a change in any takes every tile's afresh), and the tiles a door swung through then
+	int _snapshotHiddenFloor = -1;
+	bool _snapshotDebug = false, _snapshotUfoLights = false, _snapshotLeftOut = false;
+	std::vector<int> _swungTiles;
 	std::vector<std::pair<int, int>> _leftOutParts;     // parts left out (tile index, part): the ones the eye is inside with Doom IDCLIP
 	std::vector<const MapData*> _wallsLastFrame[2];     // west/north wall of each tile last frame
 	std::vector<DoorAnimation> _doorAnimations;         // doors swinging open
@@ -766,6 +853,7 @@ private:
 		SolidRows solid;                        // and their solid mask
 		std::array<const VoxelModel*, 4> paintParts; // the parts the floor was last looked at for (see paintedFloor)
 		const VoxelModel *paintedFloor;              // that floor with the UFO's floor going on inside (null: as it is)
+		bool restless = true;                        // its snapshot is taken every frame (animated, a UFO door, glass that can break, a door swung through it; or not taken yet): see snapshotTiles
 	};
 	std::vector<TileMemo> _tileMemos;                   // per tile: its parts last frame, and their solid mask
 	/// Floors under a UFO's hull with its floor going on inside (see paintedFloor), by the four parts' models and the UFO floors on the four sides (null: none there).
@@ -857,7 +945,9 @@ private:
 	/// Takes this frame's snapshot of every tile, for the rays.
 	void snapshotTiles();
 	/// What changed on a tile since the last frame: doors, burnt-out fires, destruction.
-	void noticeTileChanges(int index, Tile *tile);
+	bool noticeTileChanges(int index, Tile *tile);
+	/// The part of a tile's snapshot that is read afresh every frame: its light, the fog of war, its smoke and fire.
+	void snapshotTileLight(int index, Tile *tile);
 	/// Notes a tile's parts and fire on the first frame, so later frames can tell changes.
 	void startWatchingTile(int index, Tile *tile);
 	/// One tile's snapshot: models, animation, light, what has been seen.
@@ -930,6 +1020,12 @@ private:
 	float terrainHaze(float distance) const;
 	/// How many shades darker the distance makes terrain this far away (see DistanceShadeVoxels).
 	float distanceShade(float distance) const;
+	/// A group's darkest colour on its way to black by how dark the place is (0 itself .. 1 black), through the palette's darker colours (see DarkFadeSteps), dithered by the pixel's threshold.
+	Uint8 fadedToBlack(Uint8 groupEnd, float blackShare, float threshold) const
+	{
+		const int step = (int)(blackShare * (DarkFadeSteps + 1) + threshold);
+		return step <= 0 ? groupEnd : step > DarkFadeSteps ? (Uint8)0x0F : _colors.darkFade[step - 1][groupEnd];
+	}
 	/// A colour faded into the distance haze by an amount (0 none .. 1 all haze), dithered between neighbouring blend steps.
 	Uint8 hazeColor(Uint8 color, float haze, int pixelX, int pixelY) const;
 	/// How much of the soldier's sight the smoke on the line from the eye to a point uses up (1 or more: they can't see through it).
@@ -987,6 +1083,20 @@ private:
 	void rayWorkerLoop();
 	/// Casts the rays for rows taken one at a time from the shared counter, until none are left.
 	void renderRows();
+	/// Casts the rays on the graphics card instead (setting "Renderer": GPU; FirstPersonViewGpu.cpp). False: it can't, the CPU must.
+	bool gpuCastAllRays();
+	/// The same rays on the graphics card, beside the CPU's, compared and timed.
+	void gpuShadowRays(double cpuMilliseconds);
+	friend struct FirstPersonViewGpuAccess;
+	bool _gpuLogged = false; // the log has this view's line about the graphics card
+	bool _hasLightShafts = false;                        // ... and it has light in the air in it (setting "Light shafts")
+	bool _wantsTrueColor = false, _hasTrueColor = false; // the world in full colour too: asked for, and had for the frame drawn last
+	std::vector<Uint32> _trueColor;                      // ... a pixel each, from the card
+	std::vector<Uint8> _rayColors;                       // ... and the palette colour each pixel had from its ray
+	/// Opens the graphics card's renderer ahead of its first frame, if the setting asks for it.
+	static void gpuWarmUp();
+	/// The graphics card forgets the models it was sent (the view is about to build them anew).
+	static void gpuForgetModels();
 
 	// =====================================================================================
 	// Units, items and markers as sprites in the world (FirstPersonViewSprites.cpp)
@@ -1071,6 +1181,52 @@ private:
 	/// Draws a sprite standing in the world, depth-tested (or see-through, laid over what's there):
 	/// all of it, or only the screen rows from bandTop up to bandBottom.
 	void drawSprite(const SpriteDraw &draw, int bandTop = 0, int bandBottom = 1 << 30);
+	// The units and effects on the graphics card too (FirstPersonViewGpuEffects.cpp): while the view records, the
+	// passes' funnels write down what they would draw, and the card draws it over the rays' pictures kept there.
+	std::shared_ptr<struct GpuEffectList> _gpuEffects; // this frame's units and effects as recorded
+	bool _gpuRecording = false;                        // the funnels record (see gpuBeginEffects, gpuDrawEffects)
+	bool _gpuRecordOnly = true;                        // ... and draw nothing themselves (false: both, for the check of the card's picture against the CPU's)
+	bool _gpuChecking = false;                         // this frame the card's units and effects are checked against the CPU's (OPENXCOM3D_GPU_EFFECTS=check)
+	int _gpuRaysPixelSize = 1;                         // the pixels a ray of the pictures kept on the card coloured each way
+	/// Whether this frame's units and effects go to the card (with its rays).
+	int gpuEffectsWanted() const;
+	/// Starts recording the frame's units and effects.
+	void gpuBeginEffects();
+	/// Records a sprite standing in the world (see drawSprite).
+	void gpuRecordSprite(const SpriteDraw &draw);
+	/// Records a shade on the ground (see drawGroundShade).
+	void gpuRecordGroundShade(const double centre[3], double radius, int steps, float density, const double *away, double length);
+	/// Records a bullet hole or a scorch mark (see drawDecals).
+	void gpuRecordDecal(double screenX, double screenY, double depth, double markRight, double markUp, double radius, double pixelSpan,
+		double drawnRadius, int reach, int coreShades, int edgeShades);
+	/// Records a line in the world, its ends on the screen (see drawLine3D).
+	void gpuRecordLine(double startX, double startY, double startZ, double endX, double endY, double endZ, int steps, Uint8 color, int thickness, float opacity,
+		float worldWidth, bool glows, bool overEverything, bool keepsGlow = false, bool exactDepth = false);
+	/// Records a square of pixels in front of the scene.
+	void gpuRecordDot(int left, int top, int dotWidth, int dotHeight, double depth, Uint8 color, int flags, float leeway = 0.0f, Uint8 otherColor = 0, float firstShare = -1.0f, float haze = 0.0f);
+	/// Records a round dot in front of the scene, in rings or only its rim.
+	void gpuRecordDisc(double screenX, double screenY, double radius, double depth, float leeway, Uint8 rim, Uint8 centre, Uint8 middle, float centreShare, float middleShare, int flags);
+	/// Records a filled quad at one depth (see fillQuadAtDepth).
+	void gpuRecordQuad(const double corners[4][2], Uint8 color, float depth);
+	/// Records the outlines round the units' pictures (see noteTestedPictures, drawUnitOutlines).
+	void gpuRecordOutlines();
+	/// Has the card draw what was recorded and takes the finished pictures back; recording stops.
+	bool gpuDrawEffects();
+	bool _gpuDepthPending = false; // this frame's depth is still on the card (see gpuNeedDepth)
+	// The frame put together on the card (OPENXCOM3D_GPU_PRESENT; see gpuPresent): the picture never comes back as palette
+	// colours; what the CPU draws last goes over an empty picture, and the card lays that over its own and gives the frame.
+	int _gpuPresenting = 0;              // this frame: 0 no; 1 yes; 2 beside the usual way, the two compared
+	float _gpuFlameGlow = 0.0f;          // ... a burning soldier's flames light the lower part of the picture this strongly (see drawBurning)
+	bool _hasCardPicture = false;        // the frame drawn last was put together on the card
+	std::vector<Uint32> _cardPicture;    // ... it, a 0xFFRRGGBB number a pixel
+	std::vector<Uint8> _gpuBeforeLast;   // (the check) the picture before the CPU's last passes
+	/// Puts the frame together on the card, once the CPU's last passes are drawn.
+	void gpuPresent();
+	/// Before anything drawn after the units and effects reads the depth buffer: has it fetched from the card if it wasn't yet.
+	void gpuNeedDepth() { if (_gpuDepthPending) gpuFetchDepth(); }
+	void gpuFetchDepth();
+	/// The check of the card's units and effects against the CPU's passes, a pixel at a time.
+	void gpuCheckEffects();
 	/// The same, with the sprite given piece by piece.
 	void drawSprite(const Surface *sprite, int anchorX, int anchorY, const double world[3], double depthBias, int shade, double scale = 1.0,
 		SpritePose pose = SpritePose::Standing, const SeeThroughSprite *seeThroughSprite = nullptr);
@@ -1288,6 +1444,8 @@ private:
 	std::vector<float> _glowBuffer, _glowScratch;      // quarter resolution glow, blurred into a bloom
 	std::vector<float> _glowDepth, _glowDepthScratch;  // the same for the glow's distance (summed, weighted by the glow): how far away the light is
 	std::vector<float> _glowHue, _glowHueScratch;      // the shining pixels' colour, red, green, blue and their weight per cell of a grid half as fine, blurred: the glow's own colour (see drawLightHalos)
+	std::vector<int> _glowFirstReached, _glowLastReached; // the first and last cell of each row of the glow's grid the glow reached (first > last: none)
+	float _glowGain = 0.0f, _glowLuminance[256] = {};   // how strongly the glow brightens this frame; each palette colour's luminance
 	std::set<const Explosion*> _seenExplosions;        // explosions already seen (each spawns its particles once)
 	FirstPerson::ChainHeldTiles _chainHeld;            // this frame: the tiles a chain of explosions' ripple hasn't passed over yet, as they were (setting "Instant chain explosions")
 	std::vector<FirstPerson::ChainFireball> _chainFireballs; // this frame: the chain's fireballs showing
@@ -1315,6 +1473,8 @@ private:
 	void spawnDevices(float elapsedSeconds);
 	/// Bloom: a soft glow around whatever shines.
 	void drawLightHalos();
+	/// ... its last step, the picture brightened, band by band on all the threads.
+	void brightenGlowBands();
 	/// Advances the particles and spawns new ones.
 	void updateParticles();
 	/// Draws the particles, depth-tested.

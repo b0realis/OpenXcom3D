@@ -106,6 +106,24 @@ const int AutoEquipLeftoversPass = 5;
 
 #ifndef OXCE_NO_FIRSTPERSON
 
+// ---- A 3D view at the display's own size (FirstPersonPresent.cpp; hooks in Screen::flip and Zoom::flipWithZoom) ----
+
+/// Setting "3D resolution": the 3D view the size of its HUD's canvas (magnified with it), of the battlescape, or of the display.
+enum ViewResolution { ViewResolutionHud, ViewResolutionBattlescape, ViewResolutionDisplay };
+/// Whether a view the display's own size can be shown.
+bool canPresentAtDisplaySize();
+/// Whether the display has a byte for each of red, green and blue (a frame in full colour can be laid into it).
+bool displayTakesFullColor();
+/// The value to fill the game's screen with where a view the display's size is to show through (see presentView).
+Uint32 presentKey(SDL_Surface *screen);
+/// Asks for a view (8-bit, the size of the display's picture area) to be laid into the display at this frame's flip, where the screen still holds presentKey.
+void presentView(const Surface *view, const Uint32 *fullColors = nullptr);
+/// Screen::flip's hook: lays the view asked for into the display.
+void presentAtFlip(SDL_Surface *display, int x, int y, int width, int height);
+/// Zoom::flipWithZoom's hook, with the engine's OpenGL output: draws the view asked for over the window.
+void presentAtFlipOpenGl(SDL_Surface *screen, int x, int y, int width, int height, int displayHeight);
+
+
 // ---- The battlescape screen (BattlescapeState.cpp) ----
 
 /// Creates the first-person mode for a battlescape screen, or returns nullptr unless an active
@@ -182,6 +200,11 @@ void freeAimTarget(BattlescapeState *state, const BattleAction &action, Position
 /// past a corner the round can reach. The game asks this as it works out where a shot leaves
 /// from (TileEngine::getOriginVoxel); every other shot keeps the game's own muzzle point.
 void freeAimOrigin(BattlescapeState *state, const BattleAction &action, Position &origin);
+/// Where an arcing shot or a throw from the first-person view leaves from (setting "Throwing"
+/// Modern): a point that slides round the unit's footprint with the exact bearing to the target,
+/// between the game's eight (given as their shifts across a tile, by direction). Asked by the
+/// game after it picked its own point (TileEngine::getOriginVoxel).
+void slidingOrigin(BattlescapeState *state, const BattleAction &action, const Position &from, const int shiftX[8], const int shiftY[8], Position &origin);
 /// Is FPS-style shooting on for this unit's shots in the first-person view? Their bullet hits
 /// then play quicker (a burst at a bullet's pace).
 bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
@@ -334,12 +357,16 @@ void reactionFiredAt(BattlescapeState *state, const BattleUnit *unit);
 void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefore, int stunBefore);
 /// Setting "Damage numbers": a shot, a blow or a blast hurt a unit, in either view (TileEngine::hitUnit,
 /// the one place each of them deals its damage, after it): the health it lost, the armour it took off
-/// (the side struck) and the stun it took, to rise over it in 3D and on the map if the squad sees it
-/// (see FirstPersonDamageNumbers.cpp).
-void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken);
+/// (the side struck), the stun it took and what its energy shield lost, to rise over it in 3D and on
+/// the map if the squad sees it (see FirstPersonDamageNumbers.cpp).
+void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost);
 /// Setting "Damage numbers": a unit's armour, all its sides' points together (TileEngine::hitUnit reads
 /// it before and after a hit: what the hit took off the side it struck).
 int armorPoints(const BattleUnit *unit);
+/// Setting "Damage numbers": the points left in a unit's energy shields, as the big mods' shield script
+/// keeps them (X-Com Files, XPiratez): the armor's and those of the items in its hands. 0 in a game
+/// without that script. Read before and after a hit, as the armour is.
+int shieldPoints(BattlescapeState *state, const BattleUnit *unit);
 /// Setting "Damage numbers": draws the numbers rising over the units hit on the isometric map, over
 /// all of it (Map::drawTerrain, last).
 void drawMapDamageNumbers(BattlescapeState *state, Surface *surface, const Camera *camera);
@@ -386,6 +413,8 @@ bool noclipFloats(BattlescapeState *state, const BattleUnit *unit);
 #else
 
 // Stock OXCE: the add-on is left out, and every hook does nothing.
+inline void presentAtFlip(SDL_Surface *, int, int, int, int) { }
+inline void presentAtFlipOpenGl(SDL_Surface *, int, int, int, int, int) { }
 inline FirstPersonMode *create(Game *, BattlescapeState *) { return nullptr; }
 inline void destroy(FirstPersonMode *) { }
 inline void think(FirstPersonMode *) { }
@@ -399,6 +428,7 @@ inline State *createOptionsTab(OptionsOrigin) { return nullptr; }
 inline bool activeWhenNew(const std::string &) { return false; }
 inline void freeAimTarget(BattlescapeState *, const BattleAction &, Position &) { }
 inline void freeAimOrigin(BattlescapeState *, const BattleAction &, Position &) { }
+inline void slidingOrigin(BattlescapeState *, const BattleAction &, const Position &, const int[8], const int[8], Position &) { }
 inline bool fastShots(BattlescapeState *, const BattleUnit *) { return false; }
 inline bool pelletsInFlight(BattlescapeState *) { return false; }
 inline bool instantChains(BattlescapeState *) { return false; }
@@ -415,8 +445,9 @@ inline bool shotKeepsFacing(BattlescapeState *, const BattleAction &) { return f
 inline void reactionAkimbo(BattlescapeState *, BattleAction &) { }
 inline void reactionFiredAt(BattlescapeState *, const BattleUnit *) { }
 inline void unitStruck(BattlescapeState *, const BattleUnit *, int, int) { }
-inline void unitDamaged(BattlescapeState *, const BattleUnit *, int, int, int) { }
+inline void unitDamaged(BattlescapeState *, const BattleUnit *, int, int, int, int) { }
 inline int armorPoints(const BattleUnit *) { return 0; }
+inline int shieldPoints(BattlescapeState *, const BattleUnit *) { return 0; }
 inline void drawMapDamageNumbers(BattlescapeState *, Surface *, const Camera *) { }
 inline void pelletLanded(BattlescapeState *, const Position &, const Position &, int, const BattleItem *, const BattleItem *, bool = true) { }
 inline void roundPassed(BattlescapeState *, const Position &, const Position &) { }

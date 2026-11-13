@@ -189,6 +189,31 @@ void FirstPersonMode::turnWithKeys(double elapsedSeconds)
 }
 
 /**
+ * In the enemy's turn the view stays with the way the soldier faces (setting "Alien turn: look as
+ * the soldier faces"; a player, GitHub issue #126: looking behind a soldier who can't turn shows
+ * what they don't see, which confuses). It may look up to HeadTurn degrees to either side of the
+ * facing (the head turns), no further, whoever turns it: the mouse, the keys, or the aliens' turn
+ * cameras looking at an attacker. When the soldier turns (to fire back), the view goes along.
+ * Called every frame of the enemy's turn.
+ * @param unit The unit being looked through.
+ */
+void FirstPersonMode::holdViewToFacing(BattleUnit *unit)
+{
+	if (!Options::fpsAlienTurnFacing || unit->getFaction() != FACTION_PLAYER)
+	{
+		return;
+	}
+	// The camera's yaw has 0 = east; a unit's direction has 0 = north, clockwise in 45 degree steps.
+	const double facingYaw = (turretTurning(unit) ? unit->getTurretDirection() : unit->getDirection()) * 45.0 - 90.0;
+	const double offFacing = std::remainder(_view->getYawDegrees() - facingYaw, 360.0);
+	if (std::abs(offFacing) > HeadTurn)
+	{
+		_view->rotate((offFacing > 0.0 ? HeadTurn : -HeadTurn) - offFacing, 0.0);
+		_snapTurnDegrees = 0.0; // (a snap turn further that way ends here)
+	}
+}
+
+/**
  * Looking around turns the soldier to face where the camera looks. Called every frame on the
  * player's turn. Nothing happens while the player can't act, while the soldier isn't simply
  * standing (walking, turning, falling...), or when the selected unit can't be played.
@@ -584,6 +609,17 @@ void FirstPersonMode::updateCamera(BattleUnit *unit, bool canMove, double elapse
 			{
 				// The step didn't happen (out of time units, an unseen unit in the way, ...): the
 				// camera, which had walked on towards the edge, goes back inside the old tile.
+				// An unseen unit in the way holds that step back from now on, as a wall would (see
+				// stepAllowed): asked again and again while the key was held, the game refused it each
+				// time and the view lunged at the edge and back (a player, GitHub issue #129: a unit
+				// behind a curtain one walks through but doesn't see through).
+				const Position refusedTo(_trackedTile.x, _trackedTile.y, unitTile.z);
+				if (hiddenUnitOn(unit, refusedTo))
+				{
+					_hiddenBlockUnit = unit;
+					_hiddenBlockFrom = unitTile;
+					_hiddenBlockDirection = Pathfinding::vectorToDirection(refusedTo - unitTile);
+				}
 				const int bigUnitOffset = 8 * (unit->getArmor()->getSize() - 1); // a 2x2 unit's middle is half a tile further on
 				_eyeX = clampInsideTile(unitTile.x, _eyeX, bigUnitOffset);
 				_eyeY = clampInsideTile(unitTile.y, _eyeY, bigUnitOffset);

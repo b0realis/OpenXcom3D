@@ -55,6 +55,7 @@
 #include <array>
 #include <climits>
 #include <cmath>
+#include <cstring>
 #include <string>
 #include "FirstPersonAmbience.h"
 #include "FirstPersonApi.h"
@@ -148,7 +149,9 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
 {
 	// The overlays are laid out on a canvas; on big screens it's drawn magnified (see blit).
 	// Whether each step is allowed is not known yet (see stepAllowed).
-	_uiScale = uiScaleFor(Options::baseXResolution, Options::baseYResolution);
+	_targetWidth = Options::baseXResolution; // (the canvas goes to the display only once 3D shows: see relayoutIfNeeded)
+	_targetHeight = Options::baseYResolution;
+	_uiScale = uiScaleFor(_targetWidth, _targetHeight);
 	std::fill(std::begin(_stepAllowedCache), std::end(_stepAllowedCache), -1);
 	FirstPerson::settleOptions(); // (the smoke's first value, from an older setting)
 	FirstPerson::clearQuickFalls(); // (a new battle, or one loaded: none of the last one's falls)
@@ -218,14 +221,15 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
  */
 void FirstPersonMode::createView()
 {
-	const int viewWidth = canvasWidth();
-	const int viewHeight = canvasHeight();
+	int viewWidth, viewHeight;
+	wantedViewSize(viewWidth, viewHeight);
 	const Mod *mod = _game->getMod();
 
 	// The state adds a surface at the end (on top of everything): move it to right after the
 	// isometric map instead.
 	_view = new FirstPersonView(_game, viewWidth, viewHeight, 0, 0);
 	_view->useVoxelUnits(_voxelUnits.get());
+	_view->setUiScale(std::max(1, (int)std::lround(viewWidth / (double)canvasWidth())));
 	_state->add(_view);
 	auto &surfaces = _state->_surfaces;
 	surfaces.pop_back();
@@ -372,14 +376,13 @@ void FirstPersonMode::createScannerPanel()
  */
 void FirstPersonMode::createCompass()
 {
-	const int width = canvasWidth(); // our surfaces are laid out on the canvas (see makeCanvas)
-	const int compassX = width - CompassSize - 4, compassY = BarY + BarH + CompassGap;
-	_compass = new Surface(CompassSize, CompassArrowH + CompassSize, compassX, compassY);
+	// (Where they all go: see placeCompass, below.)
+	_compass = new Surface(CompassSize, CompassArrowH + CompassSize, 0, 0);
 	_state->add(_compass);
 	_compass->setVisible(false);
 	_ownSurfaces.insert(_compass);
 	// Beside the dial's left, level with its middle, the climb arrows (see updateClimbArrows).
-	_climbArrows = new Surface(ClimbArrowW, ClimbArrowsH, compassX - ClimbArrowW - ClimbArrowsGap, compassY + CompassArrowH + CompassSize / 2 - ClimbArrowsH / 2);
+	_climbArrows = new Surface(ClimbArrowW, ClimbArrowsH, 0, 0);
 	_state->add(_climbArrows);
 	_climbArrows->setVisible(false);
 	_ownSurfaces.insert(_climbArrows);
@@ -388,7 +391,7 @@ void FirstPersonMode::createCompass()
 	const char *const letters[4] = { "N", "E", "S", "W" };
 	for (int letter = 0; letter < 4; ++letter)
 	{
-		_compassLetters[letter] = addText(7, 8, compassX, compassY, "button", "firstPerson");
+		_compassLetters[letter] = addText(7, 8, 0, 0, "button", "firstPerson");
 		_compassLetters[letter]->setSmall();
 		_compassLetters[letter]->setAlign(ALIGN_CENTER);
 		_compassLetters[letter]->setText(letters[letter]);
@@ -398,9 +401,58 @@ void FirstPersonMode::createCompass()
 
 	// The warning line under the dial, ending at its right edge (the dial sits against the
 	// screen's right edge, and a line centred under it would run off it).
-	_txtCompassTurn = addText(CompassSize + 40, 9, compassX - 40, compassY + CompassArrowH + CompassSize + 1, "weapon", "firstPerson");
+	_txtCompassTurn = addText(CompassSize + 40, 9, 0, 0, "weapon", "firstPerson");
 	_txtCompassTurn->setAlign(ALIGN_RIGHT);
 	_txtCompassTurn->setVisible(false);
+
+	// What a step each way costs, round the dial, and a level up or down, left of the climb arrows
+	// (setting "Compass: step costs", see updateCompassCosts).
+	for (Text *&cost : _compassCosts)
+	{
+		cost = addText(CompassCostW, CompassCostH, 0, 0, "button", "firstPerson");
+		cost->setAlign(ALIGN_CENTER);
+	}
+	for (Text *&cost : _climbCosts)
+	{
+		cost = addText(CompassCostW, CompassCostH, 0, 0, "button", "firstPerson");
+		cost->setAlign(ALIGN_RIGHT);
+	}
+	for (Text *cost : std::initializer_list<Text*>{ _compassCosts[0], _compassCosts[1], _compassCosts[2], _compassCosts[3],
+		_compassCosts[4], _compassCosts[5], _compassCosts[6], _compassCosts[7], _climbCosts[0], _climbCosts[1] })
+	{
+		cost->setSmall();
+		cost->setVisible(false);
+	}
+	std::fill(std::begin(_compassCostsShown), std::end(_compassCostsShown), -1);
+	placeCompass();
+}
+
+/**
+ * Puts the compass where it belongs, at the top right under the top bar, with the climb arrows
+ * left of the dial and the warning line under it. With the steps' costs round the dial (setting
+ * "Compass: step costs") it all makes room for them: the dial moves in from the screen's edge and
+ * down, the climb arrows further left and the line further down. Called again when the setting
+ * changes (see updateCompass); the letters and the costs follow the dial on their own.
+ */
+void FirstPersonMode::placeCompass()
+{
+	_compassCostsPlaced = Options::fpsCompassCosts;
+	const int roomX = _compassCostsPlaced ? CompassCostRoomX : 0, roomY = _compassCostsPlaced ? CompassCostRoomY : 0;
+	// (The numbers above the dial clear the heading arrow, which the dial's surface already has room for.)
+	const int compassX = canvasWidth() - CompassSize - 4 - roomX, compassY = BarY + BarH + CompassGap + std::max(0, roomY - CompassArrowH);
+	_compass->setX(compassX);
+	_compass->setY(compassY);
+	const int arrowsX = compassX - roomX - ClimbArrowW - ClimbArrowsGap, arrowsY = compassY + CompassArrowH + CompassSize / 2 - ClimbArrowsH / 2;
+	_climbArrows->setX(arrowsX);
+	_climbArrows->setY(arrowsY);
+	for (int way = 0; way < 2; ++way)
+	{
+		_climbCosts[way]->setX(arrowsX - CompassCostW - 1);
+		_climbCosts[way]->setY(way == 0 ? arrowsY + 1 : arrowsY + ClimbArrowsH - CompassCostH);
+	}
+	_txtCompassTurn->setX(compassX + roomX - 40);
+	_txtCompassTurn->setY(compassY + CompassArrowH + CompassSize + 1 + roomY);
+	_compassDrawn[0] = -1000; // (the letters are put round the dial when it's next drawn)
 }
 
 /**
@@ -882,6 +934,8 @@ void FirstPersonMode::setResizeAnchors()
 	_anchors[_compass] = TOP_RIGHT;
 	_anchors[_climbArrows] = TOP_RIGHT;
 	for (Text *letter : _compassLetters) _anchors[letter] = TOP_RIGHT;
+	for (Text *cost : _compassCosts) _anchors[cost] = TOP_RIGHT;
+	for (Text *cost : _climbCosts) _anchors[cost] = TOP_RIGHT;
 	_anchors[_txtCompassTurn] = TOP_RIGHT;
 	_anchors[_txtSprint] = TOP_RIGHT;
 	_anchors[_txtEnPassant] = TOP_RIGHT;
@@ -940,25 +994,104 @@ void FirstPersonMode::resized(int widthChange, int heightChange)
 		surface->setY(surface->getY() - heightChange);
 	}
 
-	// The magnification may change with the screen size: work out how much the canvas grew,
-	// move each overlay with its corner, and make the canvas and the weapon in hand again.
-	const int oldWidth = (Options::baseXResolution - widthChange) / _uiScale, oldHeight = (Options::baseYResolution - heightChange) / _uiScale;
-	_uiScale = uiScaleFor(Options::baseXResolution, Options::baseYResolution);
+	_warningY += heightChange; // the HUD's warning place moved with the HUD
+	relayout();
+}
+
+/**
+ * What the canvas is magnified onto now: the game's screen; or, while 3D shows at the display's
+ * own size (setting "3D resolution": Display), the display's picture area, so the HUD has a
+ * scale of its own there, whatever the battlescape's (see blit). Over the isometric map the
+ * overlays stay on the game's screen with the map.
+ * @param width, height Its size, in its own pixels.
+ * @return True for the display.
+ */
+bool FirstPersonMode::canvasTarget(int &width, int &height) const
+{
+	width = Options::baseXResolution;
+	height = Options::baseYResolution;
+	if (!isActive() || Options::fpsViewResolution != FirstPerson::ViewResolutionDisplay || !FirstPerson::canPresentAtDisplaySize())
+	{
+		return false;
+	}
+	int x, y, pictureWidth, pictureHeight;
+	_game->getScreen()->getPictureArea(x, y, pictureWidth, pictureHeight);
+	// (A picture area the screen's own size needs no laying in, but for the full-colour picture, which the 8-bit screen can't hold.)
+	const bool fullColor = Options::fpsTrueColor && Options::fpsRenderer == 1;
+	if (pictureWidth <= 0 || pictureHeight <= 0 || (pictureWidth == width && pictureHeight == height && !fullColor))
+	{
+		return false;
+	}
+	width = pictureWidth;
+	height = pictureHeight;
+	return true;
+}
+
+/**
+ * Lays the overlays out again if what the canvas is magnified onto, or by how much, is no longer
+ * what it was laid out for: the setting "HUD scale" or "3D resolution" changed, the display
+ * did, or 3D was switched to or from with the view at the display's size.
+ */
+void FirstPersonMode::relayoutIfNeeded()
+{
+	int width, height;
+	const bool onDisplay = canvasTarget(width, height);
+	if (onDisplay != _canvasOnDisplay || width != _targetWidth || height != _targetHeight || uiScaleFor(width, height) != _uiScale)
+	{
+		relayout();
+	}
+	else
+	{
+		remakeViewIfResized(); // (the setting "3D resolution" between HUD and Battlescape: only the view's size)
+	}
+}
+
+/**
+ * Lays the overlays out for the canvas as it should be now (see canvasTarget and uiScaleFor):
+ * works out how much the canvas grew, moves each overlay with its corner, and makes the canvas,
+ * the weapon in hand and whatever else has the canvas's measure again; a new 3D view if its
+ * size changed.
+ */
+void FirstPersonMode::relayout()
+{
+	const int oldWidth = canvasWidth(), oldHeight = canvasHeight();
+	_canvasOnDisplay = canvasTarget(_targetWidth, _targetHeight);
+	_uiScale = uiScaleFor(_targetWidth, _targetHeight);
 	shiftAnchored(canvasWidth() - oldWidth, canvasHeight() - oldHeight);
 	makeCanvas();
 	makeWeaponInHand();
 	makeScopeCross();
 
-	// A new 3D view at the new canvas size, set up like the old one and put in its place (only
-	// when the canvas's size changed: the magnification can take up a change of screen size).
-	if (canvasWidth() == _view->getWidth() && canvasHeight() == _view->getHeight())
+	// A new 3D view at the new size (only when it changed: the magnification can take up a
+	// change of screen size); the same view keeps its size but not its pixels to the canvas's.
+	const FirstPersonView *viewBefore = _view;
+	remakeViewIfResized();
+	if (_view == viewBefore && (canvasWidth() != oldWidth || canvasHeight() != oldHeight))
 	{
-		_warningY += heightChange;
-		_state->_warning->setY(isActive() && !_classicHud ? warningY() : _warningY);
-		layoutTopBar();
+		_view->setUiScale(viewScale());
+		makeSoldierCamView(); // (its size follows the canvas)
+	}
+
+	// The game's warning message: in full 3D it goes above our info panel.
+	_state->_warning->setY(isActive() && !_classicHud ? warningY() : _warningY);
+	layoutTopBar();
+}
+
+/**
+ * Makes the 3D view again, set up like the old one and put in its place, when its size isn't
+ * what it should be now (see wantedViewSize). After the screen or the display changed size, or
+ * the setting "3D resolution".
+ */
+void FirstPersonMode::remakeViewIfResized()
+{
+	int viewWidth, viewHeight;
+	wantedViewSize(viewWidth, viewHeight);
+	if (viewWidth == _view->getWidth() && viewHeight == _view->getHeight())
+	{
 		return;
 	}
-	FirstPersonView *newView = new FirstPersonView(_game, canvasWidth(), canvasHeight(), 0, 0);
+	FirstPersonView *newView = new FirstPersonView(_game, viewWidth, viewHeight, 0, 0);
+	newView->setUiScale(std::max(1, (int)std::lround(viewWidth / (double)canvasWidth())));
 	newView->setPalette(_state->getPalette());
 	newView->useVoxelUnits(_voxelUnits.get());
 	newView->setSavedBattleGame(_save);
@@ -974,12 +1107,6 @@ void FirstPersonMode::resized(int widthChange, int heightChange)
 	_view = newView;
 	_trackedUnit = nullptr; // re-place the camera
 	makeSoldierCamView(); // (its size follows the canvas)
-
-	// The game's warning message: its own place moved with the HUD; in full 3D it goes above
-	// our info panel.
-	_warningY += heightChange; // the HUD's warning place moved with the HUD
-	_state->_warning->setY(isActive() && !_classicHud ? warningY() : _warningY);
-	layoutTopBar();
 }
 
 /**
@@ -991,36 +1118,164 @@ void FirstPersonMode::resized(int widthChange, int heightChange)
  */
 int FirstPersonMode::uiScaleFor(int width, int height)
 {
-	return std::max(1, std::min(height / 360, width / 320));
+	// The biggest magnification the canvas's layout still fits at; the setting "HUD scale" may ask for a smaller one.
+	const int biggest = std::max(1, std::min(height / 360, width / 320));
+	return Options::fpsHudScale > 0 ? std::min(Options::fpsHudScale, biggest) : biggest;
 }
 
 /**
- * Gets the width of the canvas our overlays are laid out on: the game's screen width divided
- * by the magnification (the screen's own width at scale 1).
+ * Gets the width of the canvas our overlays are laid out on: the width of what it is magnified
+ * onto (the game's screen, or the display: see canvasTarget) divided by the magnification.
  */
 int FirstPersonMode::canvasWidth() const
 {
-	return Options::baseXResolution / _uiScale;
+	return _targetWidth / _uiScale;
 }
 
 /**
- * Gets the height of the canvas our overlays are laid out on: the game's screen height divided
- * by the magnification.
+ * Gets the height of the canvas our overlays are laid out on, likewise.
  */
 int FirstPersonMode::canvasHeight() const
 {
-	return Options::baseYResolution / _uiScale;
+	return _targetHeight / _uiScale;
+}
+
+/**
+ * The size the 3D view should have now (setting "3D resolution"):
+ *  - HUD: the canvas's, drawn magnified with the overlays (a big screen costs what a small one does);
+ *  - Battlescape: the game's own screen's, the canvas's times the UI scale: only the overlays are magnified;
+ *  - Display: the display's own (its picture area, inside any black bands), whatever the
+ *    battlescape's size: the view is then shown past the game's screen (see blit and
+ *    FirstPerson::presentView).
+ */
+void FirstPersonMode::wantedViewSize(int &width, int &height) const
+{
+	width = canvasWidth();
+	height = canvasHeight();
+	if (Options::fpsViewResolution == FirstPerson::ViewResolutionDisplay && FirstPerson::canPresentAtDisplaySize())
+	{
+		int x, y;
+		_game->getScreen()->getPictureArea(x, y, width, height);
+	}
+	else if (Options::fpsViewResolution != FirstPerson::ViewResolutionHud)
+	{
+		width *= _uiScale;
+		height *= _uiScale;
+	}
+}
+
+/**
+ * A point of the game's screen (where the mouse is reported, and the game's own surfaces are
+ * placed) as the canvas's, across: divided by the magnification; with the canvas on the display
+ * (see canvasTarget) also by how many display pixels a screen pixel takes.
+ */
+double FirstPersonMode::toCanvasX(double screenX) const
+{
+	return _canvasOnDisplay ? screenX * _targetWidth / ((double)Options::baseXResolution * _uiScale) : screenX / _uiScale;
+}
+
+/// The same, down.
+double FirstPersonMode::toCanvasY(double screenY) const
+{
+	return _canvasOnDisplay ? screenY * _targetHeight / ((double)Options::baseYResolution * _uiScale) : screenY / _uiScale;
+}
+
+/// A length on the canvas in the game's screen's pixels, across (rounded up: room for it).
+int FirstPersonMode::toScreenX(int canvasX) const
+{
+	return _canvasOnDisplay ? (int)std::ceil(canvasX * (double)_uiScale * Options::baseXResolution / _targetWidth) : canvasX * _uiScale;
+}
+
+/// The same, down.
+int FirstPersonMode::toScreenY(int canvasY) const
+{
+	return _canvasOnDisplay ? (int)std::ceil(canvasY * (double)_uiScale * Options::baseYResolution / _targetHeight) : canvasY * _uiScale;
+}
+
+/**
+ * Whether the view is the display's own size and so shown past the game's screen: asked for by
+ * the setting, possible, and the view made that size (and not also the game's screen's size:
+ * then it is simply drawn into it).
+ */
+bool FirstPersonMode::viewAtDisplaySize() const
+{
+	if (Options::fpsViewResolution != FirstPerson::ViewResolutionDisplay || !FirstPerson::canPresentAtDisplaySize())
+	{
+		return false;
+	}
+	int x, y, width, height;
+	_game->getScreen()->getPictureArea(x, y, width, height);
+	return _view->getWidth() == width && _view->getHeight() == height && (width != Options::baseXResolution || height != Options::baseYResolution);
+}
+
+/**
+ * About how many of the view's pixels a canvas pixel spans, 1 or more: the size of what the view
+ * and the mode draw by the pixel on it (its markers and icons, the room under the pointer).
+ */
+int FirstPersonMode::viewScale() const
+{
+	return std::max(1, (int)std::lround(_view->getWidth() / (double)canvasWidth()));
+}
+
+/**
+ * The view's pixel at the middle of a canvas pixel, across. The crosshair, the free cursor's
+ * place and the clicks are the canvas's; the view's rays go through its own pixels. With the
+ * view the canvas's size they are the same pixels; with a bigger view a canvas pixel covers
+ * several of the view's, and the one at its middle is taken, so a shot goes through the same
+ * point of the picture at any resolution (to within half a view pixel).
+ */
+int FirstPersonMode::viewPixelX(int canvasPixel) const
+{
+	return std::min(_view->getWidth() - 1, (int)((canvasPixel + 0.5) * _view->getWidth() / canvasWidth()));
+}
+
+/// The same, down.
+int FirstPersonMode::viewPixelY(int canvasPixel) const
+{
+	return std::min(_view->getHeight() - 1, (int)((canvasPixel + 0.5) * _view->getHeight() / canvasHeight()));
+}
+
+/**
+ * How far the aim's ray goes from the middle of the view's pixel (see viewPixelX), in view pixels.
+ * The crosshair's middle is the middle of a canvas pixel. With the view an odd number of times
+ * the canvas's size, a view pixel has its middle there too; with an even number (HUD scale x2,
+ * x4 with 3D resolution Display) that point is the corner of four view pixels, and the one
+ * taken has its middle half a pixel down and to the right of it: the ray goes back that half.
+ */
+double FirstPersonMode::aimPixelShift() const
+{
+	return viewScale() % 2 == 0 ? -0.5 : 0.0;
+}
+
+/// The canvas pixel a pixel of the view lies in, across.
+int FirstPersonMode::canvasPixelX(int viewPixel) const
+{
+	return (int)((long long)viewPixel * canvasWidth() / _view->getWidth());
+}
+
+/// The same, down.
+int FirstPersonMode::canvasPixelY(int viewPixel) const
+{
+	return (int)((long long)viewPixel * canvasHeight() / _view->getHeight());
 }
 
 /**
  * Makes (again) the canvas the overlays are drawn on before being magnified onto the screen.
- * At scale 1 none is needed: everything is drawn straight onto the screen.
+ * At scale 1 none is needed: everything is drawn straight onto the screen. With the canvas on
+ * the display (see canvasTarget) there is always one, and the display-sized picture it is put
+ * together on with the view (see blit).
  */
 void FirstPersonMode::makeCanvas()
 {
 	delete _canvas;
 	_canvas = nullptr;
-	if (_uiScale > 1)
+	delete _composed;
+	_composed = nullptr;
+	if (_canvasOnDisplay)
+	{
+		_composed = new Surface(_targetWidth, _targetHeight, 0, 0);
+	}
+	if (_uiScale > 1 || _canvasOnDisplay)
 	{
 		// The canvas keeps its own copy of the palette (see magnify, which keeps it current).
 		_canvas = new Surface(canvasWidth(), canvasHeight(), 0, 0);
@@ -1061,7 +1316,7 @@ void FirstPersonMode::shiftAnchored(int widthChange, int heightChange)
 void FirstPersonMode::handleOnCanvas(TextButton *button, Action *action)
 {
 	// Not magnified: the canvas is the screen.
-	if (_uiScale == 1)
+	if (_uiScale == 1 && !_canvasOnDisplay)
 	{
 		button->handle(action, _state);
 		return;
@@ -1070,7 +1325,7 @@ void FirstPersonMode::handleOnCanvas(TextButton *button, Action *action)
 	// Where the mouse is on the canvas, turned back into window pixels as if the game's screen
 	// were the canvas: the Action made from that event then reports the canvas point.
 	SDL_Event event = *action->getDetails();
-	const double canvasX = action->getAbsoluteXMouse() / _uiScale, canvasY = action->getAbsoluteYMouse() / _uiScale;
+	const double canvasX = toCanvasX(action->getAbsoluteXMouse()), canvasY = toCanvasY(action->getAbsoluteYMouse());
 	event.button.x = (Uint16)std::lround(canvasX * action->getXScale() + action->getLeftBlackBand());
 	event.button.y = (Uint16)std::lround(canvasY * action->getYScale() + action->getTopBlackBand());
 	Action scaledAction(&event, action->getXScale(), action->getYScale(), action->getTopBlackBand(), action->getLeftBlackBand());
@@ -1083,7 +1338,7 @@ void FirstPersonMode::handleOnCanvas(TextButton *button, Action *action)
  */
 int FirstPersonMode::warningY() const
 {
-	return Options::baseYResolution - PanelH * _uiScale - 28;
+	return Options::baseYResolution - toScreenY(PanelH) - 28;
 }
 
 /**
@@ -1251,6 +1506,7 @@ FirstPersonMode::~FirstPersonMode()
 	delete _ambience;
 	delete _sounds;
 	delete _canvas;
+	delete _composed;
 }
 
 /**
@@ -1350,6 +1606,7 @@ void FirstPersonMode::setActive(bool active)
 	_dragLook = false;
 	_mouseLook = active && !_classicHud;
 	_trackedUnit = nullptr; // re-place the camera on the unit
+	relayoutIfNeeded(); // (with the view at the display's size the overlays are laid out for the display in 3D, for the screen over the map)
 
 	// Keep warnings ("not enough time units"...) visible above the panel when the classic HUD is hidden.
 	_state->_warning->setY(active && !_classicHud ? warningY() : _warningY);
@@ -1965,6 +2222,8 @@ void FirstPersonMode::think()
 	const Uint32 now = SDL_GetTicks();
 	lastThinkTicks = now;
 	rememberChoices(); // (the fuses burning change all the time)
+	relayoutIfNeeded(); // (the setting "HUD scale" or "3D resolution" changed, or the display)
+	_view->setWantsTrueColor(Options::fpsTrueColor && Options::fpsRenderer == 1 && _canvasOnDisplay); // (shown only where the mode lays the view into the display)
 	const double elapsedSeconds = _lastFrameTick ? std::min<Uint32>(100, now - _lastFrameTick) / 1000.0 : 0.0;
 
 	// Another screen was on top (popup, next turn, inventory): it had the mouse released.
@@ -2159,6 +2418,10 @@ void FirstPersonMode::think()
 	// also faces where you look, and the fire mode and aim are kept up to date.
 	updateCamera(unit, playerTurn, elapsedSeconds);
 	updateNoclipView(unit);
+	if (!playerTurn)
+	{
+		holdViewToFacing(unit);
+	}
 	if (playerTurn)
 	{
 		openDoorAfterTurn(unit);
@@ -2308,10 +2571,10 @@ void FirstPersonMode::trackHover(Action *action)
 	// what the free cursor points at).
 	const SDL_Event &event = *action->getDetails();
 	action->setMouseAction(event.motion.x, event.motion.y, 0, 0);
-	_cursorX = (int)(action->getAbsoluteXMouse() / _uiScale);
-	_cursorY = (int)(action->getAbsoluteYMouse() / _uiScale);
-	const TextButton *hoveredButton = buttonAt(action->getAbsoluteXMouse() / _uiScale, action->getAbsoluteYMouse() / _uiScale);
-	_liftArrowHovered = liftArrowAt(action->getAbsoluteXMouse() / _uiScale, action->getAbsoluteYMouse() / _uiScale);
+	_cursorX = (int)(toCanvasX(action->getAbsoluteXMouse()));
+	_cursorY = (int)(toCanvasY(action->getAbsoluteYMouse()));
+	const TextButton *hoveredButton = buttonAt(toCanvasX(action->getAbsoluteXMouse()), toCanvasY(action->getAbsoluteYMouse()));
+	_liftArrowHovered = liftArrowAt(toCanvasX(action->getAbsoluteXMouse()), toCanvasY(action->getAbsoluteYMouse()));
 
 	// Which squad button that is, if any (-1: none). Only when the cursor comes onto another
 	// button: the wheel may have moved the card on from the one under it (see browseSquad).
@@ -2549,7 +2812,7 @@ bool FirstPersonMode::handleMouseLook(Action *action)
 		// The left button pulls the trigger: a shot at the middle of the view (the crosshair).
 		_triggerHeld = true;
 		_burstConfirmed = false;
-		fire(_view->getWidth() / 2, _view->getHeight() / 2);
+		fire(viewPixelX(canvasWidth() / 2), viewPixelY(canvasHeight() / 2));
 	}
 	else if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT)
 	{
@@ -2603,7 +2866,7 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 		mouseEventPosition(event, eventX, eventY);
 		action->setMouseAction(eventX, eventY, 0, 0);
 		const double mouseX = action->getAbsoluteXMouse(), mouseY = action->getAbsoluteYMouse();
-		TextButton *buttonUnderCursor = buttonAt(mouseX / _uiScale, mouseY / _uiScale); // our buttons are on the canvas
+		TextButton *buttonUnderCursor = buttonAt(toCanvasX(mouseX), toCanvasY(mouseY)); // our buttons are on the canvas
 
 		// Let every button see the release, so none stays drawn pressed.
 		if (event.type == SDL_MOUSEBUTTONUP)
@@ -2622,7 +2885,7 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 		const bool overSoldier = buttonUnderCursor && std::find(_btnSquad.begin(), _btnSquad.end(), buttonUnderCursor) != _btnSquad.end();
 		if (wheelTurned && overSoldier)
 		{
-			browseSquad(wheelStep(event), mouseX / _uiScale, mouseY / _uiScale);
+			browseSquad(wheelStep(event), toCanvasX(mouseX), toCanvasY(mouseY));
 			return true;
 		}
 		if (wheelTurned && (buttonUnderCursor == _btnPrev || buttonUnderCursor == _btnNext))
@@ -2658,7 +2921,7 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 		// On the isometric map, the map camera: a left click on it goes to the 3D view (the
 		// selected soldier's), a right click opens the soldier cam in its place, or closes it. The
 		// map under it gets nothing: no soldier walks off by a click on the picture.
-		if (!active && onMapCamera((int)(mouseX / _uiScale), (int)(mouseY / _uiScale)))
+		if (!active && onMapCamera((int)(toCanvasX(mouseX)), (int)(toCanvasY(mouseY))))
 		{
 			if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT)
 			{
@@ -2679,7 +2942,7 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 		}
 
 		// The lift arrows ride the lift (the up/down keys do the same).
-		if (const int liftArrow = liftArrowAt(mouseX / _uiScale, mouseY / _uiScale)) // 1 up, -1 down
+		if (const int liftArrow = liftArrowAt(toCanvasX(mouseX), toCanvasY(mouseY))) // 1 up, -1 down
 		{
 			if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT)
 			{
@@ -2706,7 +2969,7 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 			for (int enemyIndex = 0; enemyIndex < BattlescapeState::VISIBLE_MAX && (_classicHud || !hudHidden()); ++enemyIndex)
 			{
 				// (in full 3D where drawEnemyButtons draws them, with the classic HUD in its own place)
-				if (_classicHud ? !under(_state->_btnVisibleUnit[enemyIndex]) : !onEnemyButton(enemyIndex, mouseX / _uiScale, mouseY / _uiScale)) continue;
+				if (_classicHud ? !under(_state->_btnVisibleUnit[enemyIndex]) : !onEnemyButton(enemyIndex, toCanvasX(mouseX), toCanvasY(mouseY))) continue;
 				if (press && event.button.button == SDL_BUTTON_LEFT) lookAtEnemy(enemyIndex);
 				if (press && event.button.button == SDL_BUTTON_RIGHT) lookFromBestSpotter(enemyIndex);
 				return true;
@@ -2749,7 +3012,7 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 			}
 			if (event.button.button == SDL_BUTTON_LEFT)
 			{
-				fire((int)(mouseX / _uiScale), (int)(mouseY / _uiScale)); // the view is on the canvas
+				fire(viewPixelX((int)(toCanvasX(mouseX))), viewPixelY((int)(toCanvasY(mouseY)))); // the canvas's pixel under the cursor, on the view
 				return true;
 			}
 		}
@@ -2790,11 +3053,31 @@ bool FirstPersonMode::blit()
 		}
 	}
 
-	// The 3D view at the back, magnified on big screens: straight from the view, which is the
-	// canvas's size and in the same palette (no copy onto the canvas first).
-	if (_view->getVisible() && !shellDrawsEyes)
+	// The 3D view at the back. The display's own size (setting "3D resolution": Display): it isn't
+	// drawn here at all, but laid into the display when the engine shows the frame, wherever the
+	// screen still holds the key it is filled with now (see FirstPerson::presentView). The
+	// canvas's size on a big screen: magnified, straight from the view (it is in the same
+	// palette: no copy onto the canvas first). The screen's own size: drawn as it is.
+	// (With the shell drawing VR's eyes, neither: the view isn't shown on the screen.)
+	const bool composing = _canvasOnDisplay && _composed && _canvas && _view->getVisible() && !shellDrawsEyes;
+	if (composing)
 	{
-		if (_canvas)
+		// (With the canvas on the display too: the view and the overlays are put together below, and that is laid in.)
+		if (_view->shown()) _view->drawIfAsked();
+		SDL_FillRect(screen, nullptr, FirstPerson::presentKey(screen));
+	}
+	else if (_view->getVisible() && !shellDrawsEyes)
+	{
+		if (viewAtDisplaySize())
+		{
+			if (_view->shown())
+			{
+				_view->drawIfAsked();
+				SDL_FillRect(screen, nullptr, FirstPerson::presentKey(screen));
+				FirstPerson::presentView(_view);
+			}
+		}
+		else if (_canvas && _view->getWidth() == canvasWidth())
 		{
 			if (_view->shown())
 			{
@@ -2819,7 +3102,7 @@ bool FirstPersonMode::blit()
 
 	// Our overlays (see drawOverlays). VR mode with the shell drawing the eyes: the HUD's own
 	// picture too, for its quad layer.
-	drawOverlays(screen, false);
+	drawOverlays(screen, false, composing);
 	if (shellDrawsEyes)
 	{
 		vrComposeHud();
@@ -2834,10 +3117,14 @@ bool FirstPersonMode::blit()
  * VR's HUD picture (see vrComposeHud), without what the eyes draw themselves at its depth: the
  * crosshair and its accuracy line, the zoom's scope cross, and the weapon in hand (a 3D object in the
  * eyes, setting "VR weapon").
+ * With the canvas on the display (setting "3D resolution": Display) the screen's frame is put
+ * together here instead: the view with the overlays magnified over it, laid into the display when
+ * the engine shows the frame (see FirstPerson::presentView).
  * @param target The screen, or the HUD's picture.
  * @param forHud True for VR's HUD picture.
+ * @param composing True to put the display's frame together (see blit); never for the HUD's picture.
  */
-void FirstPersonMode::drawOverlays(SDL_Surface *target, bool forHud)
+void FirstPersonMode::drawOverlays(SDL_Surface *target, bool forHud, bool composing)
 {
 	const bool full3D = isActive() && !_classicHud;
 	const bool enemyButtons = full3D && !hudHidden();
@@ -2862,7 +3149,83 @@ void FirstPersonMode::drawOverlays(SDL_Surface *target, bool forHud)
 			if (shown(surface)) surface->blit(_canvas->getSurface());
 		}
 		if (enemyButtons) drawEnemyButtons(_canvas->getSurface());
-		magnify(target, _canvas->getSurface(), true);
+		if (!composing)
+		{
+			magnify(target, _canvas->getSurface(), true);
+			return;
+		}
+
+		// The canvas on the display: the frame's picture is the view with the overlays magnified
+		// over it at their own scale, the display's size, and that is what is laid into the
+		// display under whatever the game's screen holds (its warnings, windows and pointer).
+		SDL_Surface *picture = _composed->getSurface();
+		if (_view->shown() && _view->getWidth() == picture->w && _view->getHeight() == picture->h)
+		{
+			SDL_Surface *seen = _view->getSurface();
+			for (int row = 0; row < picture->h; ++row)
+			{
+				std::memcpy((Uint8 *)picture->pixels + (size_t)row * picture->pitch, (const Uint8 *)seen->pixels + (size_t)row * seen->pitch, picture->w);
+			}
+		}
+		else
+		{
+			SDL_FillRect(picture, nullptr, 0); // (no view this frame: the palette's first colour, black)
+		}
+		magnify(picture, _canvas->getSurface(), true);
+		_composed->setPalette(_state->getPalette());
+		// In full colour (setting "True colour"): each pixel that still has the palette colour its ray gave it (no unit,
+		// effect or wash over it, no overlay) takes the card's full colour for it; the others stay the palette's. But
+		// see-through smoke drawn over a ray's pixel takes the light the card found in the air there (setting "Light
+		// shafts": what the full colour has over the ray's palette colour), so a beam lights the smoke it crosses.
+		const Uint32 *fullColors = nullptr, *shownInFull = nullptr;
+		const Uint8 *rayColors = nullptr, *smokeVeil = nullptr;
+		const Uint32 *cardPicture = nullptr;
+		if (_view->shown() && _view->getWidth() == picture->w && _view->getHeight() == picture->h && _view->cardPicture(cardPicture))
+		{
+			// The frame as the graphics card put it together (see FirstPersonView::gpuPresent): the view's own surface holds
+			// only what was drawn last; wherever the overlays here didn't draw over that, the card's pixel.
+			SDL_Surface *seen = _view->getSurface();
+			_truePicture.resize((size_t)picture->w * picture->h);
+			for (int row = 0; row < picture->h; ++row)
+			{
+				const Uint8 *made = (const Uint8 *)picture->pixels + (size_t)row * picture->pitch, *own = (const Uint8 *)seen->pixels + (size_t)row * seen->pitch;
+				const Uint32 *card = cardPicture + (size_t)row * picture->w;
+				Uint32 *out = &_truePicture[(size_t)row * picture->w];
+				for (int column = 0; column < picture->w; ++column) out[column] = made[column] == own[column] ? card[column] | 0xFF000000u : 0u;
+			}
+			shownInFull = _truePicture.data();
+		}
+		else if (_view->shown() && _view->getWidth() == picture->w && _view->getHeight() == picture->h && _view->trueColor(fullColors, rayColors, smokeVeil))
+		{
+			const SDL_Color *palette = _state->getPalette();
+			_truePicture.resize((size_t)picture->w * picture->h);
+			for (int row = 0; row < picture->h; ++row)
+			{
+				const Uint8 *made = (const Uint8 *)picture->pixels + (size_t)row * picture->pitch, *rays = rayColors + (size_t)row * picture->w;
+				const Uint32 *full = fullColors + (size_t)row * picture->w;
+				Uint32 *out = &_truePicture[(size_t)row * picture->w];
+				for (int column = 0; column < picture->w; ++column)
+				{
+					if (made[column] == rays[column])
+					{
+						out[column] = full[column] | 0xFF000000u;
+					}
+					else if (smokeVeil && smokeVeil[(size_t)row * picture->w + column])
+					{
+						const SDL_Color &smoke = palette[made[column]], &ray = palette[rays[column]];
+						const int red = (int)((full[column] >> 16) & 0xFF) - ray.r, green = (int)((full[column] >> 8) & 0xFF) - ray.g, blue = (int)(full[column] & 0xFF) - ray.b;
+						out[column] = 0xFF000000u | (Uint32)std::min(255, smoke.r + std::max(0, red)) << 16 | (Uint32)std::min(255, smoke.g + std::max(0, green)) << 8
+							| (Uint32)std::min(255, smoke.b + std::max(0, blue));
+					}
+					else
+					{
+						out[column] = 0u;
+					}
+				}
+			}
+			shownInFull = _truePicture.data();
+		}
+		FirstPerson::presentView(_composed, shownInFull);
 	}
 }
 

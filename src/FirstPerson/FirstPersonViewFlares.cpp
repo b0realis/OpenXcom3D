@@ -362,6 +362,11 @@ void FirstPersonView::drawFlares()
 		if (fade <= 0.0f) continue;
 		// The glow's radius in pixels: a voxel's size on the screen there, 1 to 6 pixels.
 		const int radius = std::clamp((int)std::lround(2.0 * focalLength / depth * 0.5), 1, 6);
+		if (_gpuRecording)
+		{
+			gpuRecordDisc(screenX, screenY, radius, depth, 1.0f, _colors.flareFire[0], _colors.flareFire[2], _colors.flareFire[2], 0.5f, 0.5f, 1);
+			if (_gpuRecordOnly) continue;
+		}
 		// Fill the disc, pixel by pixel, where nothing nearer hides it (a voxel's leeway).
 		for (int y = (int)screenY - radius; y <= (int)screenY + radius; ++y)
 		{

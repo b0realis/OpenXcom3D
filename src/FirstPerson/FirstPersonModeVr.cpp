@@ -87,6 +87,8 @@
 #include "FirstPersonMode.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
 #include "FirstPersonView.h"
 #include "../Battlescape/BattlescapeState.h"
 #include "../Battlescape/TileEngine.h"
@@ -960,7 +962,8 @@ void FirstPersonMode::vrStandInViews(FirstPerson::VrEyeView views[2]) const
  * @param hand The hook for a controller's hand: the weapon's space at this pose (null: the head's).
  * @return False with nothing to draw (the pictures left empty).
  */
-bool FirstPersonMode::vrRenderEyes(const FirstPerson::VrEyeView views[2], int width, int height, FirstPerson::VrPicture pictures[2], const FirstPerson::VrPose *hand)
+bool FirstPersonMode::vrRenderEyes(const FirstPerson::VrEyeView views[2], int width, int height, FirstPerson::VrPicture pictures[2], const FirstPerson::VrPose *hand,
+	int cardSlot, bool cardCheck)
 {
 	pictures[0] = pictures[1] = FirstPerson::VrPicture();
 	if (!vrStereoReady() || width < 16 || height < 16)
@@ -1004,14 +1007,12 @@ bool FirstPersonMode::vrRenderEyes(const FirstPerson::VrEyeView views[2], int wi
 	}
 	FirstPersonHeldFrame handFrame;
 	vrHeldFrame(views, hand, handFrame);
-	_view->renderEyes(cameras, width, height, aim, &handFrame);
-
-	// Each picture, with the crosshair (its surface's pixels, every one of them a square of `scale` pixels: as many as
+	// Each picture gets the crosshair (its surface's pixels, every one of them a square of `scale` pixels: as many as
 	// the eye's pixels a degree are times the desktop view's) where the aim point is on it; dimmed, each colour a few
 	// shades darker in its group of sixteen.
 	const double desktopFocal = (_view->getWidth() / 2.0) / std::tan(std::clamp(Options::fpsFieldOfView, 50, 110) * Pi / 360.0);
 	SDL_Surface *crosshair = _crosshair->getSurface();
-	for (int eye = 0; eye < 2; ++eye)
+	auto drawCrosshair = [&](int eye)
 	{
 		const FirstPersonView::EyePicture picture = _view->eyePicture(eye);
 		if (picture.aimShown && _crosshair->getVisible())
@@ -1030,13 +1031,33 @@ bool FirstPersonMode::vrRenderEyes(const FirstPerson::VrEyeView views[2], int wi
 						if (y < 0 || y >= picture.height) continue;
 						for (int x = left + crossX * scale; x < left + (crossX + 1) * scale; ++x)
 						{
-							if (x >= 0 && x < picture.width) picture.pixels[y * picture.pitch + x] = dimmed
-								? (Uint8)((crossRow[crossX] & 0xF0) | std::min(15, (crossRow[crossX] & 15) + VrDimShades)) : crossRow[crossX];
+							if (x < 0 || x >= picture.width) continue;
+							const Uint8 color = dimmed ? (Uint8)((crossRow[crossX] & 0xF0) | std::min(15, (crossRow[crossX] & 15) + VrDimShades)) : crossRow[crossX];
+							if (picture.pixels) picture.pixels[y * picture.pitch + x] = color;
+							// (An eye kept on the graphics card: over everything on the picture the card lays over its own.)
+							if (picture.cardPixels) picture.cardPixels[y * picture.pitch + x] = color;
+							if (picture.cardTest) picture.cardTest[y * picture.width + x] = 0.0f;
 						}
 					}
 				}
 			}
 		}
+	};
+	// Kept on the graphics card, if the caller has a display that takes them from there (setting "Renderer": GPU): then
+	// the view calls for each eye's crosshair before the card finishes that eye; else it goes on the pictures after.
+	FirstPersonView::CardRequest card;
+	card.mode = cardSlot < 0 || Options::fpsRenderer != 1 ? FirstPersonView::EyesOnCard::No : cardCheck ? FirstPersonView::EyesOnCard::Check : FirstPersonView::EyesOnCard::Yes;
+	card.slot = std::max(0, cardSlot);
+	card.depthToMetres = (float)FirstPerson::VrMetresPerVoxel;
+	card.nearMetres = FirstPerson::VrDepthNearMetres;
+	card.farMetres = FirstPerson::VrDepthFarMetres;
+	bool crosshairDrawn[2] = { false, false };
+	card.drawnLast = [&](int eye) { drawCrosshair(eye); crosshairDrawn[eye] = true; };
+	_view->renderEyes(cameras, width, height, aim, &handFrame, card.mode != FirstPersonView::EyesOnCard::No ? &card : nullptr);
+	for (int eye = 0; eye < 2; ++eye)
+	{
+		if (!crosshairDrawn[eye]) drawCrosshair(eye);
+		const FirstPersonView::EyePicture picture = _view->eyePicture(eye);
 		pictures[eye].pixels = picture.pixels;
 		pictures[eye].width = picture.width;
 		pictures[eye].height = picture.height;
@@ -1049,6 +1070,22 @@ bool FirstPersonMode::vrRenderEyes(const FirstPerson::VrEyeView views[2], int wi
 		pictures[eye].depth = picture.depth;
 		pictures[eye].depthPitch = picture.depth ? picture.width : 0;
 		pictures[eye].depthToMetres = (float)FirstPerson::VrMetresPerVoxel;
+	}
+	// The eyes the card kept: its textures and their fence. An eye it was to keep and couldn't has no picture: no pair
+	// this frame (the next comes back the usual way: the view then keeps none on the card).
+	FirstPersonView::CardEyes kept;
+	if (_view->cardEyes(kept))
+	{
+		for (int eye = 0; eye < 2; ++eye)
+		{
+			pictures[eye].colorTexture = kept.colorTextures[eye];
+			pictures[eye].depthTexture = kept.depthTextures[eye];
+			pictures[eye].fence = kept.fence;
+		}
+	}
+	else if (!pictures[0].pixels || !pictures[1].pixels)
+	{
+		return false;
 	}
 	return true;
 }
@@ -1156,7 +1193,7 @@ void FirstPersonMode::vrComposeHud()
 	std::copy(_state->getPalette(), _state->getPalette() + 256, _vrHudPalette);
 	_vrHud->setPalette(_vrHudPalette);
 	_vrHud->clear();
-	drawOverlays(_vrHud->getSurface(), true);
+	drawOverlays(_vrHud->getSurface(), true, false);
 	if (isActive() && !_classicHud)
 	{
 		_state->_warning->blit(_vrHud->getSurface());
@@ -1201,7 +1238,13 @@ void FirstPersonMode::vrBlitPreview(SDL_Surface *screen)
 	int width, height;
 	FirstPerson::vrEyeSize(width, height);
 	FirstPerson::VrPicture pictures[2];
-	if (!vrRenderEyes(views, width, height, pictures))
+	// (OPENXCOM3D_GPU_VR_CARD=check: with "Renderer": GPU each eye is also finished on the card as a headset's display
+	// would take it, read back and compared with the picture shown here; the log has the counts.)
+	static const char *const cardAsked = getenv("OPENXCOM3D_GPU_VR_CARD");
+	static const bool cardCheck = cardAsked && !strcmp(cardAsked, "check");
+	static int cardSlot = 0;
+	cardSlot = (cardSlot + 1) % 3;
+	if (!vrRenderEyes(views, width, height, pictures, nullptr, cardCheck ? cardSlot : -1, cardCheck))
 	{
 		return;
 	}
