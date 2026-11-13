@@ -189,6 +189,7 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 	preloadModels();
 	findMirrors();
 	findUfos();
+	findLifts();
 }
 
 /**

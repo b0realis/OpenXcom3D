@@ -122,6 +122,8 @@ en-GB:
   STR_FPS_GHOST_PARTS_ALL: "All"
   STR_FPS_GHOST_OPACITY: "Ghost opacity"
   STR_FPS_GHOST_OPACITY_DESC: "How solid the parts without shape look up close: 50% as before, 100% solid. Far off, 60% of that."
+  STR_FPS_LIFT_BEAMS: "Lift beams"
+  STR_FPS_LIFT_BEAMS_DESC: "Every lift shows a beam of light rising through it, in its pad's colours (needs Particles; a UFO's lift has its own with UFO lights)."
   STR_FPS_SEE_THROUGH_CROPS: "See-through crops"
   STR_FPS_SEE_THROUGH_CROPS_DESC: "Crops, flower beds and rubble without a real 3D shape drawn a bit see-through, so units in a field show."
   STR_FPS_SEE_THROUGH_CORPSES: "See-through corpses"

@@ -1083,6 +1083,108 @@ void FirstPersonView::spawnUfoAura(float elapsedSeconds)
 	}
 }
 
+
+/**
+ * Finds the lifts on the map, once per battle: every floor the game lets units float up through
+ * (a UFO's grav lift, an alien base's, a building's elevator: XPiratez's mansion has blue pads
+ * with yellow lines striking up), each with the height its beam starts at, the first floor below
+ * it, and where it ends, the level above it. Their colours are picked when first needed.
+ */
+void FirstPersonView::findLifts()
+{
+	_lifts.clear();
+	if (!_save)
+	{
+		return;
+	}
+	const int perLevel = _save->getMapSizeX() * _save->getMapSizeY(), tileCount = perLevel * _save->getMapSizeZ();
+	for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
+	{
+		const MapData *floor = _save->getTile(tileIndex)->getMapData(O_FLOOR);
+		if (!floor || !floor->isGravLift()) continue;
+		const int liftLevel = tileIndex / perLevel, column = tileIndex % perLevel;
+		int bottomLevel = liftLevel;
+		for (int level = liftLevel - 1; level >= 0; --level)
+		{
+			const MapData *below = _save->getTile(level * perLevel + column)->getMapData(O_FLOOR);
+			bottomLevel = level;
+			if (below && !below->isGravLift()) break;
+		}
+		LiftSpot lift = { tileIndex, bottomLevel * 24.0f + GroundTop, (liftLevel + 1) * 24.0f + 8.0f, { 0, 0 }, false };
+		_lifts.push_back(lift);
+	}
+}
+
+/**
+ * The beams of the lifts in sight (setting "Lift beams"; the owner, of XPiratez's blue lift pads
+ * with their yellow lines striking up: "more smooth and cool"): through each lift whose tile has
+ * been seen, within 50 tiles, a column of motes turning slowly as they rise and streaks of light
+ * striking up, in the pad's own colours (its art's commonest colour and its brightest). A lift of
+ * a UFO that glows has that UFO's beam instead (see spawnUfoAura). Past UfoAuraParticleCap
+ * particles in all, the beams wait.
+ * @param elapsedSeconds Seconds since the last frame: the spawn rates are per second.
+ */
+void FirstPersonView::spawnLiftBeams(float elapsedSeconds)
+{
+	typedef FirstPersonParticles P;
+	if (_lifts.empty() || _particles.all().size() >= UfoAuraParticleCap)
+	{
+		return;
+	}
+	const int mapSizeX = _save->getMapSizeX(), mapSizeY = _save->getMapSizeY();
+	const float rate = Options::fpsParticles > 1 ? 26.0f : 12.0f; // a lift, a second
+	for (LiftSpot &lift : _lifts)
+	{
+		const float x = (lift.tile % mapSizeX) * 16.0f + 8.0f, y = ((lift.tile / mapSizeX) % mapSizeY) * 16.0f + 8.0f;
+		const float dx = x - (float)_eye[0], dy = y - (float)_eye[1];
+		if (dx * dx + dy * dy > 800.0f * 800.0f || lift.tile >= (int)_tileViews.size() || !_tileViews[lift.tile].discovered) continue;
+		// (A glowing UFO's lift: its own beam, in the UFO's colours.)
+		if (_ufoLightsOn && lift.tile < (int)_ufoPhaseOfTile.size() && (_ufoPhaseOfTile[lift.tile] & UfoTileBit)) continue;
+		if (!lift.colorsChosen)
+		{
+			// The pad's colours, off its art: the commonest, and the brightest by the palette.
+			lift.colorsChosen = true;
+			const MapData *floor = _save->getTile(lift.tile)->getMapData(O_FLOOR);
+			const Surface *art = floor && floor->getDataset() && floor->getDataset()->getSurfaceset() ? floor->getDataset()->getSurfaceset()->getFrame(floor->getSprite(0)) : nullptr;
+			const SDL_Color *palette = getPalette();
+			int counts[256] = {}, brightest = 0, brightestLight = -1;
+			for (int artY = 0; art && artY < art->getHeight(); ++artY)
+				for (int artX = 0; artX < art->getWidth(); ++artX)
+				{
+					const Uint8 color = art->getPixel(artX, artY);
+					if (!color) continue;
+					++counts[color];
+					const int light = palette[color].r * 30 + palette[color].g * 59 + palette[color].b * 11;
+					if (light > brightestLight)
+					{
+						brightestLight = light;
+						brightest = color;
+					}
+				}
+			lift.colors[0] = (Uint8)(std::max_element(counts + 1, counts + 256) - counts);
+			lift.colors[1] = (Uint8)brightest;
+			if (brightestLight < 0) lift.colors[0] = lift.colors[1] = _colors.nightLight; // (no art: a plain light)
+		}
+		const int count = (int)(elapsedSeconds * rate + _particles.random());
+		for (int i = 0; i < count; ++i)
+		{
+			P::Particle mote;
+			const float angle = _particles.random(0, 2.0f * (float)Pi), radius = _particles.random(0.5f, 5.5f);
+			const bool streak = _particles.random() < 0.35f; // (the lines striking up)
+			mote.pos[0] = x + std::cos(angle) * radius;
+			mote.pos[1] = y + std::sin(angle) * radius;
+			mote.pos[2] = lift.bottom + _particles.random() * (lift.top - lift.bottom) * 0.8f;
+			mote.vel[0] = streak ? 0.0f : -std::sin(angle) * 3.0f;
+			mote.vel[1] = streak ? 0.0f : std::cos(angle) * 3.0f;
+			mote.vel[2] = streak ? _particles.random(30, 45) : _particles.random(9, 14);
+			mote.age = 0; mote.life = std::clamp((lift.top - mote.pos[2]) / mote.vel[2], 0.2f, 4.0f); mote.gravity = 0; mote.drag = 0.0f;
+			mote.color = streak || _particles.random() < 0.3f ? lift.colors[1] : lift.colors[0];
+			mote.size = _particles.random() < 0.5f ? 4 : 3;
+			mote.kind = streak ? P::STREAK : P::MOTE; mote.group = P::EFFECT;
+			_particles.add(mote);
+		}
+	}
+}
 }
 
 // Thanks mom and dad! You were the ones who exposed me to my first comp.

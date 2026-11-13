@@ -1546,6 +1546,19 @@ private:
 	void updateUfos();
 	/// Spawns the motes drifting around the UFOs in sight.
 	void spawnUfoAura(float elapsedSeconds);
+	/// A lift on the map (a floor the game lets units float up through), for its beam of light (setting "Lift beams").
+	struct LiftSpot
+	{
+		int tile;            // the lift's tile
+		float bottom, top;   // the beam: from the floor below the lift up to the level above it, in voxels
+		Uint8 colors[2];     // the pad's own colours: its commonest, and its brightest (the sparks)
+		bool colorsChosen;   // ... picked (once the palette is known)
+	};
+	std::vector<LiftSpot> _lifts;
+	/// Finds the map's lifts, once per battle (after the UFOs).
+	void findLifts();
+	/// Spawns the beams of the lifts in sight.
+	void spawnLiftBeams(float elapsedSeconds);
 	/// Draws the flames rising up the view while the soldier burns.
 	void drawBurning();
 	/// Draws the arc towards where a hit came from, and blood on the view.
