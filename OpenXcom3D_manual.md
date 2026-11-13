@@ -1,6 +1,6 @@
 # OpenXcom3D manual
 
-Version 1.12. OpenXcom3D is **OpenXcom Extended (OXCE)** with a first-person 3D battlescape: an engine add-on (`src/FirstPerson/`, with small hooks in the core) and a data mod (`OpenXcom3D`) that switches it on.
+Version 1.14. OpenXcom3D is **OpenXcom Extended (OXCE)** with a first-person 3D battlescape: an engine add-on (`src/FirstPerson/`, with small hooks in the core) and a data mod (`OpenXcom3D`) that switches it on.
 
 In short, with pictures: the [play guide](https://b0realis.github.io/OpenXcom3D/play.html) has [every key](https://b0realis.github.io/OpenXcom3D/play.html#keys), [every setting](https://b0realis.github.io/OpenXcom3D/play.html#settings) and how each plays, what's on the screen, and every feature. This manual has the whole story.
 
@@ -857,7 +857,7 @@ So a full 1920×1080 view, which the CPU draws at about 25 frames a second, runs
 | Branch | **`oxce-plus`** |
 | Commit | **`f0134ef8065799c7723953d64b565f7832bfd782`** — 2026-09-29 15:04:49 +0200, author Meridian, "Merge remote-tracking branch 'SupSuper/master' into oxce-plus" |
 | Version string | **OpenXcom Extended 8.7.1 (v2026-09-19)** |
-| OpenXcom3D | engine add-on and mod version **1.12** (`requiredExtendedEngine: OpenXcom3D`, `requiredExtendedVersion: "1.0.12"`: OXCE would read "1.09" as 1.9, so the engine counts 1.0.9, 1.0.10, 1.0.11, 1.0.12) |
+| OpenXcom3D | engine add-on and mod version **1.14** (`requiredExtendedEngine: OpenXcom3D`, `requiredExtendedVersion: "1.0.14"`: OXCE would read "1.09" as 1.9, so the engine counts 1.0.9, 1.0.10, 1.0.11, 1.0.12) |
 
 `openxcom3d.patch` holds every change on top of that commit:
 
@@ -974,7 +974,7 @@ What `FirstPersonView` draws:
 | `OptionInfo.cpp` | Loading a key binding clears Shift, Alt and Ctrl, except for `keyFpsLeanHold` (the lean key, held with the strafe keys, Left Shift by default) |
 | `OptionsBaseState.{h,cpp}` | 3D VIEW tab via `FirstPerson::hasOptionsTab/createOptionsTab` |
 | `Mod.{h,cpp}` | Parses `firstPerson:` at the end of `Mod::loadFile` |
-| `ModInfo.cpp` | Engine row `{"OpenXcom3D", 1.0.12}` (add-on builds only; 1.12) |
+| `ModInfo.cpp` | Engine row `{"OpenXcom3D", 1.0.14}` (add-on builds only; 1.14) |
 | `CrossPlatform.cpp` | Add-on builds use their own user/config folders (`~/.local/share/openxcom3d`, `~/.config/openxcom3d`, `Documents/OpenXcom3D`, …). Data folders are shared with stock OXCE |
 | `OpenXcom.2010.vcxproj{,.filters}` | The add-on's files |
 

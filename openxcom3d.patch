@@ -1461,7 +1461,7 @@ index 000000000..da6adfb14
 +        color: 144
 diff --git a/mod/OpenXcom3D/metadata.yml b/mod/OpenXcom3D/metadata.yml
 new file mode 100644
-index 000000000..95e9f8d23
+index 000000000..bd14ebcdd
 --- /dev/null
 +++ b/mod/OpenXcom3D/metadata.yml
 @@ -0,0 +1,11 @@
@@ -1469,13 +1469,13 @@ index 000000000..95e9f8d23
 +# metadata.yml for OpenXcom3D
 +
 +name: "OpenXcom3D - First-Person View"
-+version: 1.12
++version: 1.14
 +description: "Adds a first-person 3D view of the battlescape (F8): mouse look, real-time movement paid with time units (WASD), firing from the crosshair, a squad bar with soldier camera cards, lights, shadows, flashlight, particles, weather, tactical flares, combat music and its own 3D View options tab. Needs the OpenXcom3D build of OXCE; on a standard OXCE build this mod reports an unsupported engine and stays off."
 +author: OpenXcom3D project
 +
 +master: "*"
 +requiredExtendedEngine: OpenXcom3D
-+requiredExtendedVersion: "1.0.12"
++requiredExtendedVersion: "1.0.14"
 diff --git a/res/linux/icons/openxcom.svg b/res/linux/icons/openxcom.svg
 index 444f7387b..9196ac813 100644
 --- a/res/linux/icons/openxcom.svg
@@ -22064,7 +22064,7 @@ index a4c23b216..13d36e8f3 100644
  	{
  		_buttonsPressed |= SDL_BUTTON(button);
 diff --git a/src/Engine/ModInfo.cpp b/src/Engine/ModInfo.cpp
-index cca815d3e..3ad494479 100644
+index cca815d3e..a3c685b7c 100644
 --- a/src/Engine/ModInfo.cpp
 +++ b/src/Engine/ModInfo.cpp
 @@ -181,6 +181,9 @@ struct EngineData
@@ -22072,7 +22072,7 @@ index cca815d3e..3ad494479 100644
  const EngineData supportedEngines[] = {
  	{ OPENXCOM_VERSION_ENGINE, { OPENXCOM_VERSION_NUMBER }},
 +#ifndef OXCE_NO_FIRSTPERSON
-+	{ "OpenXcom3D", { 1, 0, 12, 0 } }, // first-person add-on 1.12, see src/FirstPerson
++	{ "OpenXcom3D", { 1, 0, 14, 0 } }, // first-person add-on 1.14, see src/FirstPerson
 +#endif
  	{ "", { 0, 0, 0, 0 } }, // assume that every engine support mods from base game, remove if its not true.
  };
@@ -23173,7 +23173,7 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..d7f9c5a6e
+index 000000000..575133bab
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
 @@ -0,0 +1,1517 @@
@@ -23328,7 +23328,7 @@ index 000000000..d7f9c5a6e
 +}
 +
 +/**
-+ * The main menu with the mod on: its version (the mod's own metadata, "1.12") in small letters
++ * The main menu with the mod on: its version (the mod's own metadata, "1.14") in small letters
 + * just right of the title's first line, "OpenXcom3D", its foot on the big letters' foot (a player,
 + * GitHub issue #69: without the AppImage's name, no telling the version; the owner: "a smaller
 + * space and our version number besides OpenXcom3D", then "Make the version no. Smaller"). A text
