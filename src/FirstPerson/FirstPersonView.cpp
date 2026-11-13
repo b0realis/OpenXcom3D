@@ -232,7 +232,10 @@ void FirstPersonView::preloadModels()
 		}
 	}
 	Log(LOG_INFO) << "OpenXcom3D: " << _models.size() << " voxel models ready in " << SDL_GetTicks() - startTick << " ms";
-	if (!_flameParts.empty()) Log(LOG_INFO) << "OpenXcom3D: " << _flameParts.size() << " kinds of flame on the map are drawn as sprites";
+	if (!_flameParts.empty())
+	{
+		Log(LOG_INFO) << "OpenXcom3D: " << _flameParts.size() << " kinds of flame on the map are drawn as sprites";
+	}
 }
 
 /**

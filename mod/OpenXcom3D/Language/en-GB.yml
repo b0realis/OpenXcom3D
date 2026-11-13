@@ -185,7 +185,7 @@ en-GB:
   STR_FPS_VIEW_RESOLUTION: "3D resolution"
   STR_FPS_VIEW_RESOLUTION_DESC: "The 3D world as fine as its HUD, as the battlescape, or as the display itself, whatever the battlescape's scale."
   STR_FPS_VIEW_RESOLUTION_HUD: "HUD"
-  STR_FPS_VIEW_RESOLUTION_BATTLESCAPE: "Battlescape"
+  STR_FPS_VIEW_RESOLUTION_BATTLESCAPE: "Battle"
   STR_FPS_VIEW_RESOLUTION_DISPLAY: "Display"
   STR_FPS_PIXEL_SIZE: "Pixel size"
   STR_FPS_PIXEL_SIZE_DESC: "Auto: 2 for views over 640x400. 1: full detail. 2, 3: faster."

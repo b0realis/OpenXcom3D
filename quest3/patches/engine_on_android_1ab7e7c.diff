@@ -162,7 +162,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..997d0444b
+index 000000000..de4192952
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,591 @@
@@ -353,7 +353,7 @@ index 000000000..997d0444b
 +  STR_FPS_VIEW_RESOLUTION: "3D resolution"
 +  STR_FPS_VIEW_RESOLUTION_DESC: "The 3D world as fine as its HUD, as the battlescape, or as the display itself, whatever the battlescape's scale."
 +  STR_FPS_VIEW_RESOLUTION_HUD: "HUD"
-+  STR_FPS_VIEW_RESOLUTION_BATTLESCAPE: "Battlescape"
++  STR_FPS_VIEW_RESOLUTION_BATTLESCAPE: "Battle"
 +  STR_FPS_VIEW_RESOLUTION_DISPLAY: "Display"
 +  STR_FPS_PIXEL_SIZE: "Pixel size"
 +  STR_FPS_PIXEL_SIZE_DESC: "Auto: 2 for views over 640x400. 1: full detail. 2, 3: faster."
@@ -759,7 +759,7 @@ index 000000000..997d0444b
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..ea25d8ef3
+index 000000000..7b5a31339
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,591 @@
@@ -950,7 +950,7 @@ index 000000000..ea25d8ef3
 +  STR_FPS_VIEW_RESOLUTION: "3D resolution"
 +  STR_FPS_VIEW_RESOLUTION_DESC: "The 3D world as fine as its HUD, as the battlescape, or as the display itself, whatever the battlescape's scale."
 +  STR_FPS_VIEW_RESOLUTION_HUD: "HUD"
-+  STR_FPS_VIEW_RESOLUTION_BATTLESCAPE: "Battlescape"
++  STR_FPS_VIEW_RESOLUTION_BATTLESCAPE: "Battle"
 +  STR_FPS_VIEW_RESOLUTION_DISPLAY: "Display"
 +  STR_FPS_PIXEL_SIZE: "Pixel size"
 +  STR_FPS_PIXEL_SIZE_DESC: "Auto: 2 for views over 640x400. 1: full detail. 2, 3: faster."
@@ -57057,7 +57057,7 @@ index 000000000..44a6559e0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonSpriteHits.cpp b/src/FirstPerson/FirstPersonSpriteHits.cpp
 new file mode 100644
-index 000000000..457639a64
+index 000000000..9fbf6a3cb
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonSpriteHits.cpp
 @@ -0,0 +1,1033 @@
@@ -57951,7 +57951,7 @@ index 000000000..457639a64
 + * @param voxel The voxel of the line where it met the picture.
 + * @return The voxel.
 + */
-+Position spriteImpact(SavedBattleGame *save, const BattleUnit *unit, const Position &voxel)
++Position spriteImpact(SavedBattleGame *, const BattleUnit *unit, const Position &voxel)
 +{
 +	const int size = unit->getArmor()->getSize();
 +	const Position at = unit->getPosition();
@@ -58252,10 +58252,10 @@ index 000000000..43e779494
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..f77bcc488
+index 000000000..62c97eea2
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,867 @@
+@@ -0,0 +1,870 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -58490,7 +58490,10 @@ index 000000000..f77bcc488
 +		}
 +	}
 +	Log(LOG_INFO) << "OpenXcom3D: " << _models.size() << " voxel models ready in " << SDL_GetTicks() - startTick << " ms";
-+	if (!_flameParts.empty()) Log(LOG_INFO) << "OpenXcom3D: " << _flameParts.size() << " kinds of flame on the map are drawn as sprites";
++	if (!_flameParts.empty())
++	{
++		Log(LOG_INFO) << "OpenXcom3D: " << _flameParts.size() << " kinds of flame on the map are drawn as sprites";
++	}
 +}
 +
 +/**
@@ -75444,7 +75447,7 @@ index 000000000..c98895a8a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..d4b19ec55
+index 000000000..290968a58
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
 @@ -0,0 +1,4317 @@
@@ -77184,11 +77187,11 @@ index 000000000..d4b19ec55
 +	// A view that borrows another's models (the soldier's card, the cameras: see shareCache) takes
 +	// its map of the crafts too, once that view has made it for this battle: the map is the same
 +	// for every view, and making it took some 20 ms each, four or five times at a battle's start.
-+	const FirstPersonView *owner = _sharedModelsOwner;
-+	if (owner && owner->_save == _save && (int)owner->_mirrorOfTile.size() == tileCount)
++	const FirstPersonView *sharedWith = _sharedModelsOwner;
++	if (sharedWith && sharedWith->_save == _save && (int)sharedWith->_mirrorOfTile.size() == tileCount)
 +	{
-+		_mirrors = owner->_mirrors;
-+		_mirrorOfTile = owner->_mirrorOfTile;
++		_mirrors = sharedWith->_mirrors;
++		_mirrorOfTile = sharedWith->_mirrorOfTile;
 +		return;
 +	}
 +	const Uint32 startTick = SDL_GetTicks();
