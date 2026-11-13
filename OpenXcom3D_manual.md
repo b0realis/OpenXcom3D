@@ -982,6 +982,8 @@ What `FirstPersonView` draws:
 
 ### After 1.12 (in the source: no download yet)
 
+- Free movement: walking diagonally no longer stutters (a straight step put the camera back inside its tile on the other axis), and two straight steps round a corner cost what the one diagonal step costs (6 time units on plain ground, not 8), where the game would let the soldier walk that diagonal.
+- *Renderer* GPU: the frames with a coloured light, with light in the air, and the screen wash are drawn once where a battle begins, so the driver doesn't stop the game at the first shot or hit.
 - New setting: *Renderer* (CPU / GPU): the graphics card casts the 3D world's rays, the same picture as the CPU's (Linux; Windows tried under Wine only, macOS not yet on a Mac; the CPU by itself wherever the card can't). A full 1920×1080 view's rays take 6–9 ms on a GeForce RTX 4060 against 35–38 ms on the CPU.
 - New setting: *3D resolution* (HUD / Battlescape / Display): the 3D world as fine as its HUD, as the battlescape, or as the display itself whatever the battlescape's scale (the view laid into the display under the HUD when the frame is shown).
 - New setting: *HUD scale* (Auto, x1 to x4): the 3D HUD's magnification on big screens. With *3D resolution* Display it counts the display's pixels, whatever the battlescape's scale.

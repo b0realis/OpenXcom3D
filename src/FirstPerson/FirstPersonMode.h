@@ -537,6 +537,13 @@ private:
 	unsigned _mouseReleasesSeen = 0;           // the game's mouse releases known (see think: one since means another screen was on top)
 	int _sidestepFacing = -1;                  // the facing a soldier sidestepping keeps (the game's strafe), while the step is walked; -1 none
 	Position _stepFrom;                        // the tile that step started from
+	// Two straight steps round a corner cost what the one diagonal step costs (see cornerDiscount): the last straight
+	// step walked (from, to, its price; none: _cornerOpen false), and what the step now walked was given for it.
+	bool _cornerOpen = false;
+	const BattleUnit *_cornerUnit = nullptr;
+	Position _cornerFrom, _cornerVia;
+	int _cornerTime = 0, _cornerEnergy = 0, _cornerTurn = 0;
+	int _grantedTime = 0, _grantedEnergy = 0;
 	const BattleUnit *_hiddenBlockUnit = nullptr;  // a step the game refused for a unit not in sight: whose step,
 	Position _hiddenBlockFrom;                 // ... from which tile,
 	int _hiddenBlockDirection = -1;            // ... and which way (-1: none); held back while that unit stands there (see stepAllowed)
@@ -558,6 +565,8 @@ private:
 	bool stepAllowed(BattleUnit *unit, int stepX, int stepY);
 	/// What the game charges for one step from a tile, walked as commitStep walks it (a sidestep, a run or a walk).
 	PathfindingStep stepPrice(BattleUnit *unit, const Position &start, int direction, bool *sidestep = nullptr) const;
+	/// What a straight step is cheaper by when it and the last one make a diagonal the soldier could have walked.
+	void cornerDiscount(BattleUnit *unit, const Position &start, int direction, const PathfindingStep &price, int &time, int &energy) const;
 	/// Hands one step to the game's walking state; false if it couldn't start.
 	bool commitStep(BattleUnit *unit, int stepX, int stepY);
 	/// Keeps a coordinate inside a tile, away from its edges.

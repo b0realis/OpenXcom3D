@@ -177,8 +177,11 @@ bool FirstPersonMode::stepAllowed(BattleUnit *unit, int stepX, int stepY)
 		// (endless time units, energy and ammo) skips this.
 		if (allowed && !doomModeOn())
 		{
-			allowed = unit->getTimeUnits() >= stepCost.cost.time && unit->getEnergy() >= stepCost.cost.energy
-				&& reserveAllows(unit, stepCost.cost.time, stepCost.cost.energy);
+			// (less what the step is cheaper by as the second half of a diagonal, see cornerDiscount)
+			int lessTime = 0, lessEnergy = 0;
+			cornerDiscount(unit, start, direction, stepCost, lessTime, lessEnergy);
+			const int time = stepCost.cost.time - lessTime, energy = stepCost.cost.energy - lessEnergy;
+			allowed = unit->getTimeUnits() >= time && unit->getEnergy() >= energy && reserveAllows(unit, time, energy);
 		}
 		_stepAllowedCache[direction] = allowed ? 1 : unsafe ? 2 : 0;
 	}
@@ -219,6 +222,39 @@ PathfindingStep FirstPersonMode::stepPrice(BattleUnit *unit, const Position &sta
 	}
 	if (sidestep) *sidestep = toTheSide;
 	return price;
+}
+
+/**
+ * Walking freely, the camera seldom crosses a tile's corner exactly: a diagonal walk goes over one
+ * edge and then the other, two straight steps where the map would walk one diagonal step, and by
+ * the rules two straight steps cost more (8 time units for 6 on plain ground). So the second
+ * straight step of such a pair costs only what is left of the diagonal's price (the owner's ask:
+ * a diagonal should cost a diagonal). It counts when the last step walked was straight, this one
+ * goes on from where that ended to the tile diagonally across from where it began, on the same
+ * level and in the same turn, and the game would let the soldier walk that diagonal in one step.
+ * A step is half of one pair only.
+ * @param start, direction, price The step asked about, and its price (see stepPrice).
+ * @param time, energy Set to what it is cheaper by (0: nothing).
+ */
+void FirstPersonMode::cornerDiscount(BattleUnit *unit, const Position &start, int direction, const PathfindingStep &price, int &time, int &energy) const
+{
+	time = energy = 0;
+	if (!_cornerOpen || unit != _cornerUnit || start != _cornerVia || _cornerTurn != _save->getTurn() || (direction & 1) || price.cost.time >= Pathfinding::INVALID_MOVE_COST)
+	{
+		return;
+	}
+	const Position across = price.pos - _cornerFrom;
+	if (std::abs(across.x) != 1 || std::abs(across.y) != 1 || across.z != 0)
+	{
+		return;
+	}
+	const PathfindingStep diagonal = stepPrice(unit, _cornerFrom, Pathfinding::vectorToDirection(across));
+	if (diagonal.cost.time >= Pathfinding::INVALID_MOVE_COST || diagonal.pos != price.pos)
+	{
+		return;
+	}
+	time = std::clamp(_cornerTime + price.cost.time - diagonal.cost.time, 0, (int)price.cost.time);
+	energy = std::clamp(_cornerEnergy + price.cost.energy - diagonal.cost.energy, 0, (int)price.cost.energy);
 }
 
 /**
@@ -433,6 +469,23 @@ bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 	_fallFromZ = stepsOffLedge ? from.z : -1; // The level the fall starts from, for the damage on landing.
 	_unsafeDirection = -1; // (an unsafe landing's go-ahead is used, or no longer needed)
 	_unsafeConfirmed = false;
+
+	// The second straight step of a diagonal costs what is left of the diagonal's price (see
+	// cornerDiscount): the game's walk charges its own price, so the soldier is given the difference
+	// first (taken back if the step isn't walked after all, see updateCamera). And a straight step
+	// may be the first half of the next pair.
+	const PathfindingStep price = stepPrice(unit, from, direction);
+	cornerDiscount(unit, from, direction, price, _grantedTime, _grantedEnergy);
+	if (doomModeOn() || stepsOffLedge) _grantedTime = _grantedEnergy = 0;
+	_cornerOpen = !(direction & 1) && !_grantedTime && !_grantedEnergy && !stepsOffLedge && price.cost.time < Pathfinding::INVALID_MOVE_COST && price.pos.z == from.z;
+	_cornerUnit = unit;
+	_cornerFrom = from;
+	_cornerVia = price.pos;
+	_cornerTime = price.cost.time;
+	_cornerEnergy = price.cost.energy;
+	_cornerTurn = _save->getTurn();
+	if (_grantedTime) unit->setTimeUnits(unit->getTimeUnits() + _grantedTime);
+	if (_grantedEnergy) unit->spendEnergy(-_grantedEnergy);
 
 	// Hand the step to the game's walking state.
 	BattleAction walk;
