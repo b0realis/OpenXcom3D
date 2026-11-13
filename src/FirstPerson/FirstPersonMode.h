@@ -943,6 +943,7 @@ private:
 	Uint64 _accuracyLineDrawnFor = ~(Uint64)0;     // what it shows, to redraw only on change
 	Text *_txtMode = nullptr, *_txtShot = nullptr; // the fire mode, and the shot's odds and cost, beside the crosshair
 	Text *_txtCosts = nullptr;                      // and under them its other costs (setting "Expanded crosshair info")
+	Text *_txtRange = nullptr;                      // left of the crosshair, how far off the point under it is, in tiles (setting "Range", or its key held)
 	Text *_txtDamage = nullptr;                     // and under the hit chance the shot's damage range (setting "Shot damage")
 	Uint32 _hitMarkerHeard = 0;                    // the last hitmarker that ticked
 	Uint32 _noHarmHeard = 0;                       // the last strike to no harm that ticked

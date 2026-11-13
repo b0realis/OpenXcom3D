@@ -4306,6 +4306,10 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	_txtShot->setVisible(show && Options::fpsCrosshairInfo && playerTurn);
 	_txtCosts->setVisible(show && Options::fpsCrosshairInfo && Options::fpsCrosshairCosts && playerTurn);
 	_txtDamage->setVisible(show && Options::fpsCrosshairInfo && Options::fpsCrosshairDamage && playerTurn);
+	// The rangefinder (GitHub issue #139): with its setting among the shot's lines, or while its key is held (then
+	// whatever the settings, in the aliens' turn too).
+	const bool rangeHeld = Options::keyFpsRange != SDLK_UNKNOWN && SDL_GetKeyState(nullptr)[Options::keyFpsRange] && !gameModifierHeld();
+	_txtRange->setVisible(show && unit && ((Options::fpsCrosshairInfo && Options::fpsCrosshairRange && playerTurn) || rangeHeld));
 	if (!show)
 	{
 		return;
@@ -4321,6 +4325,8 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	_txtDamage->setX(centreX + 14);
 	_txtDamage->setY(linesTop + 20);
 	_txtCosts->setX(centreX + 14); // (its line: below, once the damage line is known)
+	_txtRange->setX(centreX - 14 - _txtRange->getWidth()); // (left of the crosshair, on the hit chance's row)
+	_txtRange->setY(linesTop + 10);
 
 	// The colours, picked from the current palette: plain ones for the crosshair, and text
 	// colour groups for the lines.
@@ -4329,6 +4335,16 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	const Uint8 grey = nearestColor(palette, 150, 150, 150), shadow = nearestColor(palette, 8, 8, 8), psi = nearestColor(palette, 200, 120, 255);
 	const Uint8 yellowText = textColor(palette, 255, 216, 64), redText = textColor(palette, 240, 70, 50);
 	const Uint8 greyText = textColor(palette, 170, 170, 170), psiText = textColor(palette, 200, 120, 255), greenText = textColor(palette, 130, 230, 100);
+
+	// The range: from the unit to the tile under the crosshair, in tiles, counted as the game counts a shot's range (the
+	// hit chance's dropoff, a weapon's reach); a dash at the sky.
+	if (_txtRange->getVisible())
+	{
+		const int range = _aimHitsSomething ? (int)std::ceil(std::sqrt((double)unit->distance3dToPositionSq(_aimVoxel.toTile()))) : -1;
+		const std::string rangeText = _state->tr("STR_FPS_RANGE").arg(range < 0 ? std::string("-") : std::to_string(range));
+		if (_txtRange->getText() != rangeText) _txtRange->setText(rangeText);
+		_txtRange->setColor(yellowText);
+	}
 
 	// The weapon: the one in hand, or the item of an action picked from a menu that's being
 	// aimed now.

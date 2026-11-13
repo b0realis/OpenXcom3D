@@ -902,6 +902,10 @@ void createOptions(std::vector<OptionInfo> &options)
 	// The shot's damage range under the hit chance, as the map shows it with Alt (a player, GitHub
 	// issue #50; the owner: a setting, off).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshairDamage", &fpsCrosshairDamage, false, "STR_FPS_CROSSHAIR_DAMAGE", category));
+	// A rangefinder (a player, GitHub issue #139: "option to display tile distance from unit to
+	// target"): left of the crosshair, how many tiles off the point under it is, as the game counts
+	// a shot's range. Off by default; the key below shows it while held, whatever the setting.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshairRange", &fpsCrosshairRange, false, "STR_FPS_CROSSHAIR_RANGE", category));
 	// The soldier cards show each soldier's little figure from the craft screen, when the mod draws
 	// one for the armor (a player, GitHub issue #53; the owner: the cards only, a setting, on).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCraftIcons", &fpsCraftIcons, true, "STR_FPS_CRAFT_ICONS", category));
@@ -1069,6 +1073,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsNightVision", &keyFpsNightVision, SDLK_n, "STR_FPS_KEY_NIGHT_VISION", category));
 	// Zoom, held (U: free in the game and the add-on).
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsZoom", &keyFpsZoom, SDLK_u, "STR_FPS_KEY_ZOOM", category));
+	// The rangefinder on demand, held (setting "Range"; GitHub issue #139): no key until the
+	// player gives it one (every letter is taken by the game or the add-on).
+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsRange", &keyFpsRange, SDLK_UNKNOWN, "STR_FPS_KEY_RANGE", category));
 	// Which way the units in sight face, held (Left Alt, as the map's own Alt shows its unit
 	// indicators): a ring with an arrow on the floor round each, over everything.
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsShowFacing", &keyFpsShowFacing, SDLK_LALT, "STR_FPS_KEY_SHOW_FACING", category));

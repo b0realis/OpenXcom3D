@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..0464e97e4
+index 000000000..5bf277d5e
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,565 @@
+@@ -0,0 +1,570 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -564,6 +564,11 @@ index 000000000..0464e97e4
 +  STR_FPS_CROSSHAIR_INFO_DESC: "Fire mode, hit chance and TU cost by the crosshair."
 +  STR_FPS_CROSSHAIR_COSTS: "Expanded crosshair info"
 +  STR_FPS_CROSSHAIR_DAMAGE: "Shot damage"
++  STR_FPS_CROSSHAIR_RANGE: "Range"
++  STR_FPS_CROSSHAIR_RANGE_DESC: "Left of the crosshair, how many tiles away the point under it is. Its key shows it while held."
++  STR_FPS_RANGE: "RANGE {0}"
++  STR_FPS_KEY_RANGE: "Range (hold)"
++  STR_FPS_KEY_RANGE_DESC: "Held: left of the crosshair, how many tiles away the point under it is."
 +  STR_FPS_CRAFT_ICONS: "Craft icons"
 +  STR_FPS_CRAFT_ICONS_DESC: "On the soldier cards, each soldier's figure from the craft screen, when the mod draws its armor one (X-Com Files)."
 +  STR_FPS_CROSSHAIR_DAMAGE_DESC: "Under the hit chance, the shot's damage range, as the map shows it with Alt: your soldier's stats, the distance."
@@ -695,10 +700,10 @@ index 000000000..0464e97e4
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..27955cdfd
+index 000000000..ba5d996e7
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,565 @@
+@@ -0,0 +1,570 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1135,6 +1140,11 @@ index 000000000..27955cdfd
 +  STR_FPS_CROSSHAIR_INFO_DESC: "Fire mode, hit chance and TU cost by the crosshair."
 +  STR_FPS_CROSSHAIR_COSTS: "Expanded crosshair info"
 +  STR_FPS_CROSSHAIR_DAMAGE: "Shot damage"
++  STR_FPS_CROSSHAIR_RANGE: "Range"
++  STR_FPS_CROSSHAIR_RANGE_DESC: "Left of the crosshair, how many tiles away the point under it is. Its key shows it while held."
++  STR_FPS_RANGE: "RANGE {0}"
++  STR_FPS_KEY_RANGE: "Range (hold)"
++  STR_FPS_KEY_RANGE_DESC: "Held: left of the crosshair, how many tiles away the point under it is."
 +  STR_FPS_CRAFT_ICONS: "Craft icons"
 +  STR_FPS_CRAFT_ICONS_DESC: "On the soldier cards, each soldier's figure from the craft screen, when the mod draws its armor one (X-Com Files)."
 +  STR_FPS_CROSSHAIR_DAMAGE_DESC: "Under the hit chance, the shot's damage range, as the map shows it with Alt: your soldier's stats, the distance."
@@ -22136,7 +22146,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..9dd93e4b5 100644
+index a08796ced..7b598a2ab 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -22153,11 +22163,11 @@ index a08796ced..9dd93e4b5 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts;
++OPT bool fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCrosshairRange, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts;
 +OPT int fpsThrowing, fpsRenderer, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
-+OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsTurret, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
++OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsTurret, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsRange, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
 diff --git a/src/Engine/Screen.cpp b/src/Engine/Screen.cpp
 index ae9083dcb..8dd6a03ff 100644
 --- a/src/Engine/Screen.cpp
@@ -23177,10 +23187,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..dd0726cec
+index 000000000..47b8cbfcd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1520 @@
+@@ -0,0 +1,1527 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24085,6 +24095,10 @@ index 000000000..dd0726cec
 +	// The shot's damage range under the hit chance, as the map shows it with Alt (a player, GitHub
 +	// issue #50; the owner: a setting, off).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshairDamage", &fpsCrosshairDamage, false, "STR_FPS_CROSSHAIR_DAMAGE", category));
++	// A rangefinder (a player, GitHub issue #139: "option to display tile distance from unit to
++	// target"): left of the crosshair, how many tiles off the point under it is, as the game counts
++	// a shot's range. Off by default; the key below shows it while held, whatever the setting.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshairRange", &fpsCrosshairRange, false, "STR_FPS_CROSSHAIR_RANGE", category));
 +	// The soldier cards show each soldier's little figure from the craft screen, when the mod draws
 +	// one for the armor (a player, GitHub issue #53; the owner: the cards only, a setting, on).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCraftIcons", &fpsCraftIcons, true, "STR_FPS_CRAFT_ICONS", category));
@@ -24252,6 +24266,9 @@ index 000000000..dd0726cec
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsNightVision", &keyFpsNightVision, SDLK_n, "STR_FPS_KEY_NIGHT_VISION", category));
 +	// Zoom, held (U: free in the game and the add-on).
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsZoom", &keyFpsZoom, SDLK_u, "STR_FPS_KEY_ZOOM", category));
++	// The rangefinder on demand, held (setting "Range"; GitHub issue #139): no key until the
++	// player gives it one (every letter is taken by the game or the add-on).
++	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsRange", &keyFpsRange, SDLK_UNKNOWN, "STR_FPS_KEY_RANGE", category));
 +	// Which way the units in sight face, held (Left Alt, as the map's own Alt shows its unit
 +	// indicators): a ring with an arrow on the floor round each, over everything.
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsShowFacing", &keyFpsShowFacing, SDLK_LALT, "STR_FPS_KEY_SHOW_FACING", category));
@@ -31918,10 +31935,10 @@ index 000000000..eaa9f409a
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..4c7ef3fd0
+index 000000000..5aa5a1718
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,3261 @@
+@@ -0,0 +1,3266 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -32213,6 +32230,9 @@ index 000000000..4c7ef3fd0
 +	_txtCosts = addText(160, 9, width / 2 + 14, height / 2 + 11, "crosshairText", "firstPerson");
 +	// Under the hit chance, the shot's damage range (setting "Shot damage"), the costs a line lower.
 +	_txtDamage = addText(120, 9, width / 2 + 14, height / 2 + 11, "crosshairText", "firstPerson");
++	// Left of the crosshair, the range to what it points at (setting "Range", or its key held).
++	_txtRange = addText(90, 9, width / 2 - 104, height / 2 + 1, "crosshairText", "firstPerson");
++	_txtRange->setAlign(ALIGN_RIGHT);
 +	_txtBanner->setAlign(ALIGN_CENTER);
 +	// The name of the unit pointed at, under the crosshair (it follows the free cursor).
 +	_txtTarget = addText(160, 9, width / 2 - 80, height / 2 + 10, "crosshairText", "firstPerson");
@@ -32223,7 +32243,7 @@ index 000000000..4c7ef3fd0
 +	_txtScoping->setAlign(ALIGN_RIGHT);
 +
 +	// All hidden until there's something to show.
-+	for (Text *text : { _txtMode, _txtShot, _txtCosts, _txtDamage, _txtBanner, _txtTarget, _txtScoping })
++	for (Text *text : { _txtMode, _txtShot, _txtCosts, _txtDamage, _txtRange, _txtBanner, _txtTarget, _txtScoping })
 +	{
 +		text->setVisible(false);
 +	}
@@ -32839,6 +32859,7 @@ index 000000000..4c7ef3fd0
 +	_anchors[_txtShot] = CENTER;
 +	_anchors[_txtCosts] = CENTER;
 +	_anchors[_txtDamage] = CENTER;
++	_anchors[_txtRange] = CENTER;
 +	_anchors[_txtScoping] = RIGHT_CENTER;
 +
 +	// END and the suit's buttons keep to the top right, and so does the compass; the info panel
@@ -34519,6 +34540,7 @@ index 000000000..4c7ef3fd0
 +	if (Options::fpsLean > 0 && key != SDLK_UNKNOWN && (key == Options::keyFpsLeanHold || key == Options::keyFpsLeanLeftOwn || key == Options::keyFpsLeanRightOwn)) return true;
 +	if (Options::fpsZoom && key != SDLK_UNKNOWN && key == Options::keyFpsZoom) return true; // (held: see updateZoom)
 +	if (key != SDLK_UNKNOWN && key == Options::keyFpsShowFacing) return true; // (held: see think)
++	if (key != SDLK_UNKNOWN && key == Options::keyFpsRange) return true; // (held: see updateCrosshair)
 +	if (key == Options::keyFpsOpenDoor) { if (pressed) openDoor(_save->getSelectedUnit()); return true; }
 +	if (key == Options::keyFpsFlare) { if (pressed) { if (Options::fpsFlares) throwFlare(); else _state->warning("STR_FPS_FLARES_OFF"); } return true; }
 +	if (key == Options::keyFpsUp) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_UP, action, true); return true; }
@@ -35185,10 +35207,10 @@ index 000000000..4c7ef3fd0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..6beba86f6
+index 000000000..184d0d9e1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1377 @@
+@@ -0,0 +1,1378 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -36134,6 +36156,7 @@ index 000000000..6beba86f6
 +	Uint64 _accuracyLineDrawnFor = ~(Uint64)0;     // what it shows, to redraw only on change
 +	Text *_txtMode = nullptr, *_txtShot = nullptr; // the fire mode, and the shot's odds and cost, beside the crosshair
 +	Text *_txtCosts = nullptr;                      // and under them its other costs (setting "Expanded crosshair info")
++	Text *_txtRange = nullptr;                      // left of the crosshair, how far off the point under it is, in tiles (setting "Range", or its key held)
 +	Text *_txtDamage = nullptr;                     // and under the hit chance the shot's damage range (setting "Shot damage")
 +	Uint32 _hitMarkerHeard = 0;                    // the last hitmarker that ticked
 +	Uint32 _noHarmHeard = 0;                       // the last strike to no harm that ticked
@@ -43136,10 +43159,10 @@ index 000000000..a0931f438
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..bd6be7f94
+index 000000000..815514ee7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,5260 @@
+@@ -0,0 +1,5276 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -47448,6 +47471,10 @@ index 000000000..bd6be7f94
 +	_txtShot->setVisible(show && Options::fpsCrosshairInfo && playerTurn);
 +	_txtCosts->setVisible(show && Options::fpsCrosshairInfo && Options::fpsCrosshairCosts && playerTurn);
 +	_txtDamage->setVisible(show && Options::fpsCrosshairInfo && Options::fpsCrosshairDamage && playerTurn);
++	// The rangefinder (GitHub issue #139): with its setting among the shot's lines, or while its key is held (then
++	// whatever the settings, in the aliens' turn too).
++	const bool rangeHeld = Options::keyFpsRange != SDLK_UNKNOWN && SDL_GetKeyState(nullptr)[Options::keyFpsRange] && !gameModifierHeld();
++	_txtRange->setVisible(show && unit && ((Options::fpsCrosshairInfo && Options::fpsCrosshairRange && playerTurn) || rangeHeld));
 +	if (!show)
 +	{
 +		return;
@@ -47463,6 +47490,8 @@ index 000000000..bd6be7f94
 +	_txtDamage->setX(centreX + 14);
 +	_txtDamage->setY(linesTop + 20);
 +	_txtCosts->setX(centreX + 14); // (its line: below, once the damage line is known)
++	_txtRange->setX(centreX - 14 - _txtRange->getWidth()); // (left of the crosshair, on the hit chance's row)
++	_txtRange->setY(linesTop + 10);
 +
 +	// The colours, picked from the current palette: plain ones for the crosshair, and text
 +	// colour groups for the lines.
@@ -47471,6 +47500,16 @@ index 000000000..bd6be7f94
 +	const Uint8 grey = nearestColor(palette, 150, 150, 150), shadow = nearestColor(palette, 8, 8, 8), psi = nearestColor(palette, 200, 120, 255);
 +	const Uint8 yellowText = textColor(palette, 255, 216, 64), redText = textColor(palette, 240, 70, 50);
 +	const Uint8 greyText = textColor(palette, 170, 170, 170), psiText = textColor(palette, 200, 120, 255), greenText = textColor(palette, 130, 230, 100);
++
++	// The range: from the unit to the tile under the crosshair, in tiles, counted as the game counts a shot's range (the
++	// hit chance's dropoff, a weapon's reach); a dash at the sky.
++	if (_txtRange->getVisible())
++	{
++		const int range = _aimHitsSomething ? (int)std::ceil(std::sqrt((double)unit->distance3dToPositionSq(_aimVoxel.toTile()))) : -1;
++		const std::string rangeText = _state->tr("STR_FPS_RANGE").arg(range < 0 ? std::string("-") : std::to_string(range));
++		if (_txtRange->getText() != rangeText) _txtRange->setText(rangeText);
++		_txtRange->setColor(yellowText);
++	}
 +
 +	// The weapon: the one in hand, or the item of an action picked from a menu that's being
 +	// aimed now.
@@ -48402,10 +48441,10 @@ index 000000000..bd6be7f94
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeSoldierStates.cpp b/src/FirstPerson/FirstPersonModeSoldierStates.cpp
 new file mode 100644
-index 000000000..9507fcd26
+index 000000000..9d817138d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeSoldierStates.cpp
-@@ -0,0 +1,1155 @@
+@@ -0,0 +1,1157 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -48790,6 +48829,7 @@ index 000000000..9507fcd26
 +		_txtShot->setVisible(false);
 +		_txtCosts->setVisible(false);
 +		_txtDamage->setVisible(false);
++		_txtRange->setVisible(false);
 +		_txtTarget->setVisible(false);
 +		_crosshair->setVisible(false);
 +		_accuracyLine->setVisible(false);
@@ -49082,6 +49122,7 @@ index 000000000..9507fcd26
 +		_txtShot->setVisible(false);
 +		_txtCosts->setVisible(false);
 +		_txtDamage->setVisible(false);
++		_txtRange->setVisible(false);
 +		_txtTarget->setVisible(false);
 +		_crosshair->setVisible(false);
 +		_accuracyLine->setVisible(false);
@@ -75700,7 +75741,7 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..681fb8982
+index 000000000..7480c9aeb
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,1007 @@
@@ -75924,7 +75965,7 @@ index 000000000..681fb8982
 +		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
 +			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsHitFlash", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 +			"fpsGhostParts", "fpsGhostOpacity", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
-+		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
++		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsCrosshairRange", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
 +			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
 +		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 +		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },

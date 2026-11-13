@@ -289,6 +289,9 @@ void FirstPersonMode::createCrosshairAndBanner()
 	_txtCosts = addText(160, 9, width / 2 + 14, height / 2 + 11, "crosshairText", "firstPerson");
 	// Under the hit chance, the shot's damage range (setting "Shot damage"), the costs a line lower.
 	_txtDamage = addText(120, 9, width / 2 + 14, height / 2 + 11, "crosshairText", "firstPerson");
+	// Left of the crosshair, the range to what it points at (setting "Range", or its key held).
+	_txtRange = addText(90, 9, width / 2 - 104, height / 2 + 1, "crosshairText", "firstPerson");
+	_txtRange->setAlign(ALIGN_RIGHT);
 	_txtBanner->setAlign(ALIGN_CENTER);
 	// The name of the unit pointed at, under the crosshair (it follows the free cursor).
 	_txtTarget = addText(160, 9, width / 2 - 80, height / 2 + 10, "crosshairText", "firstPerson");
@@ -299,7 +302,7 @@ void FirstPersonMode::createCrosshairAndBanner()
 	_txtScoping->setAlign(ALIGN_RIGHT);
 
 	// All hidden until there's something to show.
-	for (Text *text : { _txtMode, _txtShot, _txtCosts, _txtDamage, _txtBanner, _txtTarget, _txtScoping })
+	for (Text *text : { _txtMode, _txtShot, _txtCosts, _txtDamage, _txtRange, _txtBanner, _txtTarget, _txtScoping })
 	{
 		text->setVisible(false);
 	}
@@ -915,6 +918,7 @@ void FirstPersonMode::setResizeAnchors()
 	_anchors[_txtShot] = CENTER;
 	_anchors[_txtCosts] = CENTER;
 	_anchors[_txtDamage] = CENTER;
+	_anchors[_txtRange] = CENTER;
 	_anchors[_txtScoping] = RIGHT_CENTER;
 
 	// END and the suit's buttons keep to the top right, and so does the compass; the info panel
@@ -2595,6 +2599,7 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	if (Options::fpsLean > 0 && key != SDLK_UNKNOWN && (key == Options::keyFpsLeanHold || key == Options::keyFpsLeanLeftOwn || key == Options::keyFpsLeanRightOwn)) return true;
 	if (Options::fpsZoom && key != SDLK_UNKNOWN && key == Options::keyFpsZoom) return true; // (held: see updateZoom)
 	if (key != SDLK_UNKNOWN && key == Options::keyFpsShowFacing) return true; // (held: see think)
+	if (key != SDLK_UNKNOWN && key == Options::keyFpsRange) return true; // (held: see updateCrosshair)
 	if (key == Options::keyFpsOpenDoor) { if (pressed) openDoor(_save->getSelectedUnit()); return true; }
 	if (key == Options::keyFpsFlare) { if (pressed) { if (Options::fpsFlares) throwFlare(); else _state->warning("STR_FPS_FLARES_OFF"); } return true; }
 	if (key == Options::keyFpsUp) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_UP, action, true); return true; }
