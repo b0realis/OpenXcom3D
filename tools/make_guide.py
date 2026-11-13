@@ -106,7 +106,7 @@ SETTINGS = [
         ('Zoom', 'YES', 'YES / NO', 'Hold U or the right button to look four times closer.', 'Only the picture: the shot and the hit chance stay the same.'),
         ('Start battles in 3D', 'NO', 'YES / NO', 'Begin every battle in the first-person view.', ''),
         ('Alien turn in 3D', 'YES', 'YES / NO', 'Stay in 3D during the aliens\' turn, through your last soldier\'s eyes. NO: the map for their turn.', ''),
-        ('Alien turn: look as the soldier faces', 'NO', 'YES / NO', 'YES: in the alien turn the view stays with your soldier\'s facing, at most 45 degrees to either side: you see what they can see. Not in the 1.12 download yet.', ''),
+        ('Alien turn: look as the soldier faces', 'NO', 'YES / NO', 'YES: in the alien turn the view stays with your soldier\'s facing, at most 45 degrees to either side: you see what they can see.', ''),
         ('Aliens\' turn cameras', 'YES', 'YES / NO', 'In their turn the view cuts to where the action is: a soldier firing back, the nearest soldier who sees a moving alien, a soldier shot at by an alien nobody sees; helmet camera cards pop up for soldiers shot at, hit or mind controlled.', ''),
         ('Camera when a soldier falls', 'YES', 'YES / NO', 'With <i>Aliens\' turn cameras</i>, in their turn: a soldier going down out of view pops up their helmet camera card, DECEASED or UNCONSCIOUS.', ''),
         ('Eye height lowered by', '3', '0 to 6 voxels', 'Sits the 3D camera lower, so rooms feel less cramped. What the soldier sees by the rules doesn\'t change.', ''),
@@ -236,19 +236,19 @@ SETTINGS = [
         ('Doom grenade fuse (seconds)', '3', '1 to 5', 'In Doom mode, how long a grenade burns.', ''),
     ]),
     ('Screen', [
-        ('Renderer', 'CPU', 'CPU / GPU', 'GPU: the graphics card casts the 3D world\'s rays, the same picture as the CPU\'s. Proved on Linux, new on Windows and macOS; not in the 1.12 download yet; the CPU draws by itself wherever the card can\'t.',
+        ('Renderer', 'CPU', 'CPU / GPU', 'GPU: the graphics card casts the 3D world\'s rays, the same picture as the CPU\'s. Proved on Linux and on an Apple silicon Mac, new on Windows; the CPU draws by itself wherever the card can\'t.',
          'For big screens: with 3D resolution at Display the world at 1920×1080 runs at 60 frames a second and more.'),
-        ('3D resolution', 'HUD', 'HUD / Battlescape / Display', 'How fine the 3D world is drawn: as its HUD (magnified with it), as the battlescape, or as the display itself whatever the Battlescape scale. Display is heavy on the CPU; made for Renderer GPU. Not in the 1.12 download yet.', 'Display with a small Battlescape scale: a big map and menus, and a sharp 3D world.'),
-        ('HUD scale', 'Auto', 'Auto / x1 / x2 / x3 / x4', 'How many times the 3D HUD is magnified on a big screen. Auto: as big as fits (x3 at 1920×1080). With 3D resolution at Display it counts the display\'s own pixels, whatever the Battlescape scale. Not in the 1.12 download yet.', 'x2 on a big screen: a smaller HUD, more room.'),
-        ('Supersampling', 'Off', 'Off / x2 / x4', 'Renderer GPU only. Two or four rays a pixel, blended: edges, far fences and fine texture stop shimmering as you turn. Costs as many times the rays. Not in the 1.12 download yet.', 'x2 costs little on a good card; x4 for the cleanest picture.'),
-        ('Soft sun shadows', 'NO', 'YES / NO', 'Renderer GPU only, with Shadows on. The sun\'s shadows get a soft edge, wider the further they fall. Not in the 1.12 download yet.', 'YES: cheap, and the stair-stepped shadow edges are gone.'),
-        ('Shadows from every light', 'NO', 'YES / NO', 'Renderer GPU only, with Shadows on. The three strongest lamps and every flare in reach throw shadows, not only the strongest. Not in the 1.12 download yet.', 'YES for night missions in towns.'),
-        ('Ambient occlusion', 'NO', 'YES / NO', 'Renderer GPU only. Corners, the foot of walls and the gaps between things are darker: the blocky world gets depth. Not in the 1.12 download yet.', 'YES: cheap, and rooms look solid.'),
-        ('True colour', 'NO', 'YES / NO', 'Renderer GPU, 3D resolution Display, and OpenGL output or a 32-bit scaler. The 3D world in full colour, past the palette\'s 256; units, effects and the HUD stay the palette\'s. Not in the 1.12 download yet.', 'YES with Smooth light and Supersampling: the cleanest picture.'),
-        ('Smooth light', 'NO', 'YES / NO', 'With True colour. Light, shadows, haze and the sky blend smoothly where the palette\'s picture has a dot pattern. Not in the 1.12 download yet.', 'YES: no dots swimming over walls at high resolutions.'),
-        ('Coloured lights', 'NO', 'YES / NO', 'With True colour. Shots in flight, explosions, fires and muzzle flashes light the walls and ground round them in their own colour. Not in the 1.12 download yet.', 'YES: firefights at night look the part.'),
-        ('Reflections', 'NO', 'YES / NO', 'With True colour. The sea mirrors the sky, the clouds and what stands in it. Not in the 1.12 download yet.', 'YES for TFTD\'s surface missions.'),
-        ('Light shafts', 'NO', 'YES / NO', 'With True colour. The flashlight, flares, lamps and coloured lights show as beams and glows in smoke, and everywhere under the sea. Not in the 1.12 download yet.', 'YES for night missions and TFTD.'),
+        ('3D resolution', 'HUD', 'HUD / Battle / Display', 'How fine the 3D world is drawn: as its HUD (magnified with it), as the battlescape, or as the display itself whatever the Battlescape scale. Display is heavy on the CPU; made for Renderer GPU.', 'Display with a small Battlescape scale: a big map and menus, and a sharp 3D world.'),
+        ('HUD scale', 'Auto', 'Auto / x1 / x2 / x3 / x4', 'How many times the 3D HUD is magnified on a big screen. Auto: as big as fits (x3 at 1920×1080). With 3D resolution at Display it counts the display\'s own pixels, whatever the Battlescape scale.', 'x2 on a big screen: a smaller HUD, more room.'),
+        ('Supersampling', 'Off', 'Off / x2 / x4', 'Renderer GPU only. Two or four rays a pixel, blended: edges, far fences and fine texture stop shimmering as you turn. Costs as many times the rays.', 'x2 costs little on a good card; x4 for the cleanest picture.'),
+        ('Soft sun shadows', 'NO', 'YES / NO', 'Renderer GPU only, with Shadows on. The sun\'s shadows get a soft edge, wider the further they fall.', 'YES: cheap, and the stair-stepped shadow edges are gone.'),
+        ('Shadows from every light', 'NO', 'YES / NO', 'Renderer GPU only, with Shadows on. The three strongest lamps and every flare in reach throw shadows, not only the strongest.', 'YES for night missions in towns.'),
+        ('Ambient occlusion', 'NO', 'YES / NO', 'Renderer GPU only. Corners, the foot of walls and the gaps between things are darker: the blocky world gets depth.', 'YES: cheap, and rooms look solid.'),
+        ('True colour', 'NO', 'YES / NO', 'Renderer GPU, 3D resolution Display, and OpenGL output or a 32-bit scaler. The 3D world in full colour, past the palette\'s 256; units, effects and the HUD stay the palette\'s.', 'YES with Smooth light and Supersampling: the cleanest picture.'),
+        ('Smooth light', 'NO', 'YES / NO', 'With True colour. Light, shadows, haze and the sky blend smoothly where the palette\'s picture has a dot pattern.', 'YES: no dots swimming over walls at high resolutions.'),
+        ('Coloured lights', 'NO', 'YES / NO', 'With True colour. Shots in flight, explosions, fires and muzzle flashes light the walls and ground round them in their own colour.', 'YES: firefights at night look the part.'),
+        ('Reflections', 'NO', 'YES / NO', 'With True colour. The sea mirrors the sky, the clouds and what stands in it.', 'YES for TFTD\'s surface missions.'),
+        ('Light shafts', 'NO', 'YES / NO', 'With True colour. The flashlight, flares, lamps and coloured lights show as beams and glows in smoke, and everywhere under the sea.', 'YES for night missions and TFTD.'),
     ]),
 ]
 
@@ -380,6 +380,7 @@ FEATURES = [
 # The gallery at the end: the collages (pages/img/gallery/), (file, title, caption)
 GALLERY_IMG = 'img/gallery/'
 GALLERY = [
+    ('street_114.png', 'On the graphics card: 1.14', 'A street at dusk drawn by the graphics card with every new setting on: true colour, smooth light, soft shadows, a shadow from every lamp, ambient occlusion, coloured lights, light shafts.'),
     ('collage_112.png', 'Who\'s hurt, who\'s hidden: 1.12', 'A town out to 200 tiles with the unseen in mist, our wounded in blue and purple in an alien colony (TFTD), enemies in the buttons\' colours at dusk, a hit\'s damage rising on a cruise ship\'s deck (TFTD), a house from behind in its brick, the squad and two Aquatoids outlined as the shots test them (TFTD).'),
     ('collage_111.png', 'Under the right sky: 1.11', 'Snow under cloud, the Earth from orbit (XPiratez), the sea floor (TFTD), deep woods (X-Com Files), Cydonia, the city of T\'leth.'),
     ('collage_108.png', 'Field report 1.08', 'Terror From The Deep\'s sea past an island\'s edge, XPiratez\'s blunderbuss and two guns at once, a spray burst marked, akimbo in 3D and on the isometric map, a Gill Man on an island, and the map camera over the battle.'),

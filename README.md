@@ -24,7 +24,7 @@
 - **See:** the original maps, sprites, palette and sounds, rebuilt in 3D from the game's own voxel data: light and shadow, a flashlight and flares, night vision gear, smoke as the map draws it, rain and snow under a grey sky, windows that shatter, swinging doors, glowing UFOs, bullet holes and scorch marks, out to 200 tiles; the stars over XPiratez's space stations; under the sea, bubbles, marine snow and caustics.
 - **Lead the squad:** every soldier's live helmet camera on the top bar (hover for their card, right click for the big soldier cam), a camera window over the isometric map, and the aliens' turn watched through the eyes of whoever sees the alien.
 - **Feel it:** recoil and muzzle flashes, marks on the crosshair (white ticks for a hit, red for a kill, a blue shield when a strike does no harm), each hit's damage rising over the unit, shots whizzing past, rain, wind and fires heard round you, blood on the view and a heartbeat when badly hurt, panic and berserk through your soldier's own eyes, and a helmet camera dying in static.
-- **Make it yours:** 100 settings and 39 keys of its own (**Options → 3D VIEW**), and a controller layout made for the Steam Deck.
+- **Make it yours:** 115 settings and 41 keys of its own (**Options → 3D VIEW**), and a controller layout made for the Steam Deck.
 
 | | |
 |---|---|
@@ -41,12 +41,17 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 
 **But be careful!** It can be a traumatic experience.
 
-## In the source after 1.12 (no download yet)
+## New in 1.14
 
-- **A GPU renderer** (setting *Renderer*: GPU; proved on Linux, new on Windows and macOS): the graphics card casts the 3D world's rays, the same walk and the same shading as the CPU's, checked pixel for pixel against it. The CPU renderer stays the default, and takes over by itself wherever the card can't.
+- **A GPU renderer** (setting *Renderer*: GPU; proved on Linux and on an Apple silicon Mac, new on Windows): the graphics card casts the 3D world's rays, the same walk and the same shading as the CPU's, checked pixel for pixel against it, and draws the units and effects over them. The CPU renderer stays the default, and takes over by itself wherever the card can't.
 - **3D resolution:** the 3D world as fine as its HUD, as the battlescape, or as the display itself, whatever the battlescape's scale: a full 1920×1080 view at 60 frames a second and more on a graphics card.
-- **HUD scale:** the 3D HUD's magnification on big screens is yours to choose (Auto, x1 to x4); with 3D resolution at Display it has the display's pixels to itself, whatever the battlescape's scale.
-- **A finer picture on the graphics card** (all off by default): supersampling (two or four rays a pixel, blended), soft sun shadows, a shadow from every lamp and flare, and ambient occlusion (darker corners and creases), the 3D world in true colour with smooth light (no dither dots), coloured light from shots, explosions and fires, and a sea that mirrors the sky.
+- **HUD scale:** the 3D HUD's magnification on big screens is yours to choose (Auto, x1 to x4).
+- **A finer picture on the graphics card** (all off by default): supersampling, soft sun shadows, a shadow from every lamp and flare, ambient occlusion; the 3D world in true colour with smooth light (no dither dots), coloured light from shots, explosions and fires, a sea that mirrors the sky, and light shafts in smoke and under the sea.
+- **Lift beams:** a grav lift's floor sends motes and streaks of light up its shaft.
+- **Throwing:** Classic (by tile) or Modern: throws and arcing shots go for the exact point under the crosshair.
+- **Step costs round the compass**, and **the alien turn seen as your soldier faces**, both settings.
+- **Smoother:** fire's flames blend from frame to frame; walking diagonally no longer stutters and costs a diagonal's time units; dark places fade to black through the palette's darker colours.
+- **Fixed:** a bow is held as a bow; a mod's flames and campfires no longer flicker between shapes; a hit on an energy shield shows what the shield lost; walking into a unit you can't see stops as at a wall; buildings a mod lists among its UFOs are no longer lit as UFOs.
 
 ## New in 1.12
 

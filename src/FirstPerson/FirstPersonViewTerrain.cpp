@@ -1734,11 +1734,11 @@ void FirstPersonView::findMirrors()
 	// A view that borrows another's models (the soldier's card, the cameras: see shareCache) takes
 	// its map of the crafts too, once that view has made it for this battle: the map is the same
 	// for every view, and making it took some 20 ms each, four or five times at a battle's start.
-	const FirstPersonView *owner = _sharedModelsOwner;
-	if (owner && owner->_save == _save && (int)owner->_mirrorOfTile.size() == tileCount)
+	const FirstPersonView *sharedWith = _sharedModelsOwner;
+	if (sharedWith && sharedWith->_save == _save && (int)sharedWith->_mirrorOfTile.size() == tileCount)
 	{
-		_mirrors = owner->_mirrors;
-		_mirrorOfTile = owner->_mirrorOfTile;
+		_mirrors = sharedWith->_mirrors;
+		_mirrorOfTile = sharedWith->_mirrorOfTile;
 		return;
 	}
 	const Uint32 startTick = SDL_GetTicks();

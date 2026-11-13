@@ -769,7 +769,7 @@ bool arcMeetsAimedUnit(SavedBattleGame *save, bool thrown, int meets, const Posi
  * @param voxel The voxel of the line where it met the picture.
  * @return The voxel.
  */
-Position spriteImpact(SavedBattleGame *save, const BattleUnit *unit, const Position &voxel)
+Position spriteImpact(SavedBattleGame *, const BattleUnit *unit, const Position &voxel)
 {
 	const int size = unit->getArmor()->getSize();
 	const Position at = unit->getPosition();
