@@ -383,6 +383,8 @@ bool FirstPersonMode::deathCam(Uint32 now, double elapsedSeconds)
 		_txtCosts->setVisible(false);
 		_txtDamage->setVisible(false);
 		_txtRange->setVisible(false);
+		_rangeScale->setVisible(false);
+		for (Text *mark : _rangeMarks) mark->setVisible(false);
 		_txtTarget->setVisible(false);
 		_crosshair->setVisible(false);
 		_accuracyLine->setVisible(false);
@@ -676,6 +678,8 @@ bool FirstPersonMode::breakdownCam(Uint32 now, double elapsedSeconds)
 		_txtCosts->setVisible(false);
 		_txtDamage->setVisible(false);
 		_txtRange->setVisible(false);
+		_rangeScale->setVisible(false);
+		for (Text *mark : _rangeMarks) mark->setVisible(false);
 		_txtTarget->setVisible(false);
 		_crosshair->setVisible(false);
 		_accuracyLine->setVisible(false);

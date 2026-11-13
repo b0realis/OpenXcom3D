@@ -106,6 +106,11 @@ const int PanelW = 150, PanelH = 54, PanelLineW = PanelW - 6;
 const int PanelManaX = 3, PanelManaY = 41, PanelManaW = 141, PanelManaH = 3;
 /// The crosshair's surface (square; room for the door mark left of the widest fire mode's shape, see DoorMarkX).
 const int CrosshairSize = 47;
+/// The analogue rangefinder's subject (setting "Rangefinder"), the scale's "1.7m": a standing soldier's picture from feet
+/// to the top of the head, in voxels (measured on the view: soldiers put 12 and 20 tiles off stand 25 voxels tall).
+const double RangeSubjectVoxels = 25.0;
+/// One voxel up is this much of a voxel across, as the view draws it (the view's own ZScale, FirstPersonViewShared.h).
+const double RangeVoxelRise = 0.81649658092772603;
 /// How long a hit, a kill or a strike that did no harm marks the crosshair, in milliseconds.
 const Uint32 HitMarkTime = 280;
 /// A strike that did no harm (GitHub issue #82; the owner: "a mini blue shield to the lower left of the crosshair"): a

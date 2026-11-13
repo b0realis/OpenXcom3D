@@ -218,7 +218,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
 			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsHitFlash", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 			"fpsGhostParts", "fpsGhostOpacity", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
-		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsCrosshairRange", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
+		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsRangefinder", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
 			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
 		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
@@ -483,6 +483,12 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		{
 			static const char *const leanNames[] = { "STR_FPS_LEAN_OFF", "STR_FPS_LEAN_PEEK", "STR_FPS_LEAN_TILT" };
 			return std::string(tr(leanNames[std::clamp(*option.asInt(), 0, 2)]));
+		}
+		// The rangefinder is a choice of three, shown by name.
+		if (option.id() == "fpsRangefinder")
+		{
+			static const char *const rangeNames[] = { "STR_FPS_RANGEFINDER_OFF", "STR_FPS_RANGEFINDER_DIGITAL", "STR_FPS_RANGEFINDER_ANALOGUE" };
+			return std::string(tr(rangeNames[std::clamp(*option.asInt(), 0, 2)]));
 		}
 		// Throwing is a choice of two, shown by name.
 		if (option.id() == "fpsThrowing")
@@ -795,6 +801,11 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		}
 		// Leaning out (off, peek, tilt): round and round.
 		else if (value == &Options::fpsLean)
+		{
+			*value = (*value + direction + 3) % 3;
+		}
+		// The rangefinder (off, digital, analogue): round and round.
+		else if (value == &Options::fpsRangefinder)
 		{
 			*value = (*value + direction + 3) % 3;
 		}

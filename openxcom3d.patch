@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..5bf277d5e
+index 000000000..cb9fe4b09
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,570 @@
+@@ -0,0 +1,574 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -564,11 +564,15 @@ index 000000000..5bf277d5e
 +  STR_FPS_CROSSHAIR_INFO_DESC: "Fire mode, hit chance and TU cost by the crosshair."
 +  STR_FPS_CROSSHAIR_COSTS: "Expanded crosshair info"
 +  STR_FPS_CROSSHAIR_DAMAGE: "Shot damage"
-+  STR_FPS_CROSSHAIR_RANGE: "Range"
-+  STR_FPS_CROSSHAIR_RANGE_DESC: "Left of the crosshair, how many tiles away the point under it is. Its key shows it while held."
++  STR_FPS_RANGEFINDER: "Rangefinder"
++  STR_FPS_RANGEFINDER_DESC: "Digital: the tiles to the point under the crosshair. Analogue: a scope's scale; stand a unit on its line, read the tiles at its head."
++  STR_FPS_RANGEFINDER_OFF: "Off"
++  STR_FPS_RANGEFINDER_DIGITAL: "Digital"
++  STR_FPS_RANGEFINDER_ANALOGUE: "Analogue"
++  STR_FPS_RANGE_SUBJECT: "1.7m"
 +  STR_FPS_RANGE: "RANGE {0}"
 +  STR_FPS_KEY_RANGE: "Range (hold)"
-+  STR_FPS_KEY_RANGE_DESC: "Held: left of the crosshair, how many tiles away the point under it is."
++  STR_FPS_KEY_RANGE_DESC: "Held: shows the rangefinder (setting Rangefinder; Digital when that is Off)."
 +  STR_FPS_CRAFT_ICONS: "Craft icons"
 +  STR_FPS_CRAFT_ICONS_DESC: "On the soldier cards, each soldier's figure from the craft screen, when the mod draws its armor one (X-Com Files)."
 +  STR_FPS_CROSSHAIR_DAMAGE_DESC: "Under the hit chance, the shot's damage range, as the map shows it with Alt: your soldier's stats, the distance."
@@ -700,10 +704,10 @@ index 000000000..5bf277d5e
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..ba5d996e7
+index 000000000..03ea84721
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,570 @@
+@@ -0,0 +1,574 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1140,11 +1144,15 @@ index 000000000..ba5d996e7
 +  STR_FPS_CROSSHAIR_INFO_DESC: "Fire mode, hit chance and TU cost by the crosshair."
 +  STR_FPS_CROSSHAIR_COSTS: "Expanded crosshair info"
 +  STR_FPS_CROSSHAIR_DAMAGE: "Shot damage"
-+  STR_FPS_CROSSHAIR_RANGE: "Range"
-+  STR_FPS_CROSSHAIR_RANGE_DESC: "Left of the crosshair, how many tiles away the point under it is. Its key shows it while held."
++  STR_FPS_RANGEFINDER: "Rangefinder"
++  STR_FPS_RANGEFINDER_DESC: "Digital: the tiles to the point under the crosshair. Analog: a scope's scale; stand a unit on its line, read the tiles at its head."
++  STR_FPS_RANGEFINDER_OFF: "Off"
++  STR_FPS_RANGEFINDER_DIGITAL: "Digital"
++  STR_FPS_RANGEFINDER_ANALOGUE: "Analog"
++  STR_FPS_RANGE_SUBJECT: "1.7m"
 +  STR_FPS_RANGE: "RANGE {0}"
 +  STR_FPS_KEY_RANGE: "Range (hold)"
-+  STR_FPS_KEY_RANGE_DESC: "Held: left of the crosshair, how many tiles away the point under it is."
++  STR_FPS_KEY_RANGE_DESC: "Held: shows the rangefinder (setting Rangefinder; Digital when that is Off)."
 +  STR_FPS_CRAFT_ICONS: "Craft icons"
 +  STR_FPS_CRAFT_ICONS_DESC: "On the soldier cards, each soldier's figure from the craft screen, when the mod draws its armor one (X-Com Files)."
 +  STR_FPS_CROSSHAIR_DAMAGE_DESC: "Under the hit chance, the shot's damage range, as the map shows it with Alt: your soldier's stats, the distance."
@@ -22146,7 +22154,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..7b598a2ab 100644
+index a08796ced..8548b0d60 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -22163,8 +22171,8 @@ index a08796ced..7b598a2ab 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCrosshairRange, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts;
-+OPT int fpsThrowing, fpsRenderer, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
++OPT bool fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts;
++OPT int fpsThrowing, fpsRangefinder, fpsRenderer, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsTurret, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsRange, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
@@ -23187,10 +23195,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..47b8cbfcd
+index 000000000..2af78f7d4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1527 @@
+@@ -0,0 +1,1529 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24096,9 +24104,11 @@ index 000000000..47b8cbfcd
 +	// issue #50; the owner: a setting, off).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshairDamage", &fpsCrosshairDamage, false, "STR_FPS_CROSSHAIR_DAMAGE", category));
 +	// A rangefinder (a player, GitHub issue #139: "option to display tile distance from unit to
-+	// target"): left of the crosshair, how many tiles off the point under it is, as the game counts
-+	// a shot's range. Off by default; the key below shows it while held, whatever the setting.
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshairRange", &fpsCrosshairRange, false, "STR_FPS_CROSSHAIR_RANGE", category));
++	// target"; the owner: "3 options: no, digital, analogue"): 0 off; 1 digital, left of the
++	// crosshair the tiles to the point under it, as the game counts a shot's range; 2 analogue, a
++	// scale in the manner of the PSO-1 scope's: stand a unit on its line, and where the head meets
++	// the curve reads the tiles. The key below shows it while held, whatever the setting.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsRangefinder", &fpsRangefinder, 0, "STR_FPS_RANGEFINDER", category));
 +	// The soldier cards show each soldier's little figure from the craft screen, when the mod draws
 +	// one for the armor (a player, GitHub issue #53; the owner: the cards only, a setting, on).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCraftIcons", &fpsCraftIcons, true, "STR_FPS_CRAFT_ICONS", category));
@@ -24266,7 +24276,7 @@ index 000000000..47b8cbfcd
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsNightVision", &keyFpsNightVision, SDLK_n, "STR_FPS_KEY_NIGHT_VISION", category));
 +	// Zoom, held (U: free in the game and the add-on).
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsZoom", &keyFpsZoom, SDLK_u, "STR_FPS_KEY_ZOOM", category));
-+	// The rangefinder on demand, held (setting "Range"; GitHub issue #139): no key until the
++	// The rangefinder on demand, held (setting "Rangefinder"; GitHub issue #139): no key until the
 +	// player gives it one (every letter is taken by the game or the add-on).
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsRange", &keyFpsRange, SDLK_UNKNOWN, "STR_FPS_KEY_RANGE", category));
 +	// Which way the units in sight face, held (Left Alt, as the map's own Alt shows its unit
@@ -31935,10 +31945,10 @@ index 000000000..eaa9f409a
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..5aa5a1718
+index 000000000..347095273
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,3266 @@
+@@ -0,0 +1,3285 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -32230,9 +32240,26 @@ index 000000000..5aa5a1718
 +	_txtCosts = addText(160, 9, width / 2 + 14, height / 2 + 11, "crosshairText", "firstPerson");
 +	// Under the hit chance, the shot's damage range (setting "Shot damage"), the costs a line lower.
 +	_txtDamage = addText(120, 9, width / 2 + 14, height / 2 + 11, "crosshairText", "firstPerson");
-+	// Left of the crosshair, the range to what it points at (setting "Range", or its key held).
++	// Left of the crosshair, the range to what it points at (setting "Rangefinder", or its key held).
 +	_txtRange = addText(90, 9, width / 2 - 104, height / 2 + 1, "crosshairText", "firstPerson");
 +	_txtRange->setAlign(ALIGN_RIGHT);
++	// The analogue rangefinder (drawn in drawRangeScale): its line a fifth of the view wide, its curve at most an eighth
++	// of the view high not zoomed in and ZoomFactor times that zoomed in, with room for the line's shadow; five
++	// numbers over the curve and the height it is drawn for at the line's end.
++	_rangeScaleWidth = width / 5;
++	_rangeScaleHeight = height / 8;
++	_rangeScale = new Surface(_rangeScaleWidth + 3, (int)(_rangeScaleHeight * ZoomFactor) + 8, 0, 0);
++	_state->add(_rangeScale);
++	_rangeScale->setVisible(false);
++	_ownSurfaces.insert(_rangeScale);
++	_rangeScaleDrawnFor = ~(Uint64)0;
++	_rangeMarks.clear();
++	for (int mark = 0; mark < 6; ++mark)
++	{
++		_rangeMarks.push_back(addText(mark < 5 ? 24 : 40, 9, 0, 0, "crosshairText", "firstPerson"));
++		if (mark < 5) _rangeMarks.back()->setAlign(ALIGN_CENTER);
++		_rangeMarks.back()->setVisible(false);
++	}
 +	_txtBanner->setAlign(ALIGN_CENTER);
 +	// The name of the unit pointed at, under the crosshair (it follows the free cursor).
 +	_txtTarget = addText(160, 9, width / 2 - 80, height / 2 + 10, "crosshairText", "firstPerson");
@@ -32860,6 +32887,8 @@ index 000000000..5aa5a1718
 +	_anchors[_txtCosts] = CENTER;
 +	_anchors[_txtDamage] = CENTER;
 +	_anchors[_txtRange] = CENTER;
++	_anchors[_rangeScale] = CENTER;
++	for (Text *mark : _rangeMarks) _anchors[mark] = CENTER;
 +	_anchors[_txtScoping] = RIGHT_CENTER;
 +
 +	// END and the suit's buttons keep to the top right, and so does the compass; the info panel
@@ -35207,10 +35236,10 @@ index 000000000..5aa5a1718
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..184d0d9e1
+index 000000000..b1dd009d3
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1378 @@
+@@ -0,0 +1,1384 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -36156,7 +36185,11 @@ index 000000000..184d0d9e1
 +	Uint64 _accuracyLineDrawnFor = ~(Uint64)0;     // what it shows, to redraw only on change
 +	Text *_txtMode = nullptr, *_txtShot = nullptr; // the fire mode, and the shot's odds and cost, beside the crosshair
 +	Text *_txtCosts = nullptr;                      // and under them its other costs (setting "Expanded crosshair info")
-+	Text *_txtRange = nullptr;                      // left of the crosshair, how far off the point under it is, in tiles (setting "Range", or its key held)
++	Text *_txtRange = nullptr;                      // left of the crosshair, how far off the point under it is, in tiles (setting "Rangefinder" Digital, or its key held)
++	Surface *_rangeScale = nullptr;                 // the analogue rangefinder's scale, left of and below the crosshair (see drawRangeScale)
++	std::vector<Text*> _rangeMarks;                 // its numbers, the nearest mark's first, and last the height it is drawn for ("1.7m")
++	int _rangeScaleWidth = 0, _rangeScaleHeight = 0; // its line's length and its curve's greatest height not zoomed in, in canvas pixels
++	Uint64 _rangeScaleDrawnFor = ~(Uint64)0;        // what it shows, to redraw only on change
 +	Text *_txtDamage = nullptr;                     // and under the hit chance the shot's damage range (setting "Shot damage")
 +	Uint32 _hitMarkerHeard = 0;                    // the last hitmarker that ticked
 +	Uint32 _noHarmHeard = 0;                       // the last strike to no harm that ticked
@@ -36173,6 +36206,8 @@ index 000000000..184d0d9e1
 +	int hitCloudReach(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, int accuracy, int &missReach);
 +	/// Draws the accuracy line: a level line as wide as the reach to either side, a notch up at each end.
 +	void drawAccuracyLine(int reach, int missReach, Uint8 color, Uint8 missColor, Uint8 shadow);
++	/// Draws the analogue rangefinder's scale and places its numbers.
++	void drawRangeScale(const int marks[5], double tilePixels, Uint8 color, Uint8 shadow);
 +	/// A mod's own name for an action of an item, in capitals for the crosshair; empty if it keeps the game's name.
 +	std::string renamedAction(const RuleItem *rules, BattleActionType mode) const;
 +	/// Does the soldier have a line of sight to the aimed tile, as a shot checks it?
@@ -42640,10 +42675,10 @@ index 000000000..ae2ea6125
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..a0931f438
+index 000000000..c9a9098da
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,513 @@
+@@ -0,0 +1,518 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -42752,6 +42787,11 @@ index 000000000..a0931f438
 +const int PanelManaX = 3, PanelManaY = 41, PanelManaW = 141, PanelManaH = 3;
 +/// The crosshair's surface (square; room for the door mark left of the widest fire mode's shape, see DoorMarkX).
 +const int CrosshairSize = 47;
++/// The analogue rangefinder's subject (setting "Rangefinder"), the scale's "1.7m": a standing soldier's picture from feet
++/// to the top of the head, in voxels (measured on the view: soldiers put 12 and 20 tiles off stand 25 voxels tall).
++const double RangeSubjectVoxels = 25.0;
++/// One voxel up is this much of a voxel across, as the view draws it (the view's own ZScale, FirstPersonViewShared.h).
++const double RangeVoxelRise = 0.81649658092772603;
 +/// How long a hit, a kill or a strike that did no harm marks the crosshair, in milliseconds.
 +const Uint32 HitMarkTime = 280;
 +/// A strike that did no harm (GitHub issue #82; the owner: "a mini blue shield to the lower left of the crosshair"): a
@@ -43159,10 +43199,10 @@ index 000000000..a0931f438
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..815514ee7
+index 000000000..c05689ad9
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,5276 @@
+@@ -0,0 +1,5369 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -43224,6 +43264,7 @@ index 000000000..815514ee7
 +#include "FirstPersonSounds.h"
 +#include "FirstPersonApi.h"
 +#include "FirstPersonView.h"
++#include <set>
 +#include "FirstPersonSpriteHits.h"
 +#include "../Battlescape/AlienInventoryState.h"
 +#include "../Battlescape/BattleState.h"
@@ -47471,10 +47512,14 @@ index 000000000..815514ee7
 +	_txtShot->setVisible(show && Options::fpsCrosshairInfo && playerTurn);
 +	_txtCosts->setVisible(show && Options::fpsCrosshairInfo && Options::fpsCrosshairCosts && playerTurn);
 +	_txtDamage->setVisible(show && Options::fpsCrosshairInfo && Options::fpsCrosshairDamage && playerTurn);
-+	// The rangefinder (GitHub issue #139): with its setting among the shot's lines, or while its key is held (then
-+	// whatever the settings, in the aliens' turn too).
++	// The rangefinder (GitHub issue #139; setting "Rangefinder"): in the player's turn with its setting, or while its
++	// key is held (then whatever the settings, in the aliens' turn too; the digital kind with the setting off).
 +	const bool rangeHeld = Options::keyFpsRange != SDLK_UNKNOWN && SDL_GetKeyState(nullptr)[Options::keyFpsRange] && !gameModifierHeld();
-+	_txtRange->setVisible(show && unit && ((Options::fpsCrosshairInfo && Options::fpsCrosshairRange && playerTurn) || rangeHeld));
++	const bool rangeShown = show && unit && ((Options::fpsRangefinder != 0 && playerTurn) || rangeHeld);
++	const bool rangeAnalogue = rangeShown && Options::fpsRangefinder == 2;
++	_txtRange->setVisible(rangeShown && !rangeAnalogue);
++	_rangeScale->setVisible(rangeAnalogue);
++	for (Text *mark : _rangeMarks) mark->setVisible(rangeAnalogue);
 +	if (!show)
 +	{
 +		return;
@@ -47509,6 +47554,32 @@ index 000000000..815514ee7
 +		const std::string rangeText = _state->tr("STR_FPS_RANGE").arg(range < 0 ? std::string("-") : std::to_string(range));
 +		if (_txtRange->getText() != rangeText) _txtRange->setText(rangeText);
 +		_txtRange->setColor(yellowText);
++	}
++	// The analogue kind: the scale under and left of the crosshair, its curve as high over its line at each mark as a
++	// unit RangeSubjectVoxels tall (a standing soldier, at the setting "Unit size") shows that many tiles away. Its five
++	// marks are the ladder's first whose heights fit the scale through the lens not zoomed in; zoomed in (the owner:
++	// "analogue should enlarge"), the marks stay and the curve grows with the picture, upwards from the line, so it
++	// reads true at any magnification.
++	if (rangeAnalogue)
++	{
++		static const int ladder[] = { 2, 3, 4, 6, 8, 10, 12, 15, 20, 30, 40, 60, 80, 120 };
++		const int ladderCount = (int)(sizeof(ladder) / sizeof(ladder[0]));
++		const double subject = RangeSubjectVoxels * RangeVoxelRise * (std::clamp(Options::fpsUnitSize, 80, 100) / 100.0) / Position::TileXY; // the subject's height, in tiles
++		const double plainFocal = (canvasWidth() / 2.0) / std::tan(std::clamp(Options::fpsFieldOfView, 50, 110) * Pi / 360.0); // (the scale is drawn on the canvas)
++		const double focalPixels = (canvasWidth() / 2.0) / std::tan(fieldOfViewNow() * Pi / 360.0);
++		const double tilePixels = focalPixels * subject; // how high the subject shows a tile away, now
++		int first = 0;
++		while (first + 5 < ladderCount && plainFocal * subject / ladder[first] > _rangeScaleHeight) ++first;
++		// The line keeps its place, just under the curve's height not zoomed in; the surface reaches up from there.
++		_rangeScale->setX(centreX - 24 - _rangeScaleWidth);
++		_rangeScale->setY(centreY + 16 + _rangeScaleHeight - (_rangeScale->getHeight() - 4));
++		const Uint64 scaleKey = (Uint64)std::lround(tilePixels * 16.0) | ((Uint64)first << 32) | ((Uint64)yellow << 40) | ((Uint64)shadow << 48);
++		if (scaleKey != _rangeScaleDrawnFor)
++		{
++			_rangeScaleDrawnFor = scaleKey;
++			drawRangeScale(ladder + first, tilePixels, yellow, shadow);
++		}
++		for (Text *mark : _rangeMarks) mark->setColor(yellowText);
 +	}
 +
 +	// The weapon: the one in hand, or the item of an action picked from a menu that's being
@@ -47799,6 +47870,68 @@ index 000000000..815514ee7
 +		_accuracyLineDrawnFor = lineKey;
 +		drawAccuracyLine(reach, missReach, lineColor, missColor, shadow);
 +	}
++}
++
++/**
++ * Draws the analogue rangefinder (setting "Rangefinder") onto its surface and places its numbers, in the manner of the
++ * PSO-1 scope's: a level line with small ticks, and over it a dotted curve that falls from right to left, as high over
++ * the line at each of five marks as the subject (a unit 1.7 m tall, the label at the line's right end) shows at that
++ * mark's range. A unit standing on the line with its head at the curve is as many tiles away as the number there.
++ * The line is the surface's fourth row from the bottom; the curve may rise to the surface's top (zoomed in).
++ * Between the marks the range runs evenly by ratio, so the curve is smooth. Each pixel has a shadow one down and to the
++ * right, so it reads on any background. The surface's place must be set before (the numbers are laid out from it).
++ * @param marks The five ranges marked, in tiles, the nearest first (at the right).
++ * @param tilePixels How high the subject shows one tile away now, in canvas pixels.
++ * @param color Palette colour of the scale.
++ * @param shadow Palette colour of its shadow.
++ */
++void FirstPersonMode::drawRangeScale(const int marks[5], double tilePixels, Uint8 color, Uint8 shadow)
++{
++	// The line's row on the surface, and the curve's height over it at a column (0: the left end, the farthest mark).
++	const int width = _rangeScaleWidth, base = _rangeScale->getHeight() - 4, highest = base - 1;
++	auto heightAt = [&](double column)
++	{
++		const double along = std::clamp((width - column) * 4.0 / width, 0.0, 4.0); // marks from the right, a fraction between two
++		const int mark = std::min(3, (int)along);
++		const double range = marks[mark] * std::pow((double)marks[mark + 1] / marks[mark], along - mark);
++		return std::min<double>(highest, tilePixels / range);
++	};
++	std::set<std::pair<int, int>> points;
++	// The line, a small tick up at every eighth and a taller one at each end.
++	for (int x = 0; x <= width; ++x) points.insert({ x, base });
++	for (int eighth = 0; eighth <= 8; ++eighth)
++	{
++		const int x = eighth * width / 8;
++		for (int rise = 1; rise <= (eighth == 0 || eighth == 8 ? 4 : 2); ++rise) points.insert({ x, base - rise });
++	}
++	// The curve, dotted (every other pixel along it, by its place on the surface), a quarter of a column a step so its
++	// steep end has no gaps; and a tick down from it at each mark.
++	for (int step = 0; step <= width * 4; ++step)
++	{
++		const int x = (int)std::lround(step / 4.0), y = base - (int)std::lround(heightAt(step / 4.0));
++		if (((x + y) & 1) == 0) points.insert({ x, y });
++	}
++	for (int mark = 0; mark < 5; ++mark)
++	{
++		const int x = width - mark * width / 4, y = base - (int)std::lround(heightAt(x));
++		for (int drop = 0; drop <= 2 && y + drop < base; ++drop) points.insert({ x, y + drop });
++		// Its number sits over the curve there; the subject's height right of the line's end.
++		Text *number = _rangeMarks[mark];
++		const std::string text = std::to_string(marks[mark]);
++		if (number->getText() != text) number->setText(text);
++		number->setX(_rangeScale->getX() + x - number->getWidth() / 2 + 1);
++		number->setY(_rangeScale->getY() + y - 9);
++	}
++	Text *subject = _rangeMarks[5];
++	const std::string subjectText = _state->tr("STR_FPS_RANGE_SUBJECT");
++	if (subject->getText() != subjectText) subject->setText(subjectText);
++	subject->setX(_rangeScale->getX() + width + 4);
++	subject->setY(_rangeScale->getY() + base - 7);
++	_rangeScale->clear();
++	_rangeScale->lock();
++	for (const auto &point : points) _rangeScale->setPixel(point.first + 1, point.second + 1, shadow);
++	for (const auto &point : points) _rangeScale->setPixel(point.first, point.second, color);
++	_rangeScale->unlock();
 +}
 +
 +/**
@@ -48441,10 +48574,10 @@ index 000000000..815514ee7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeSoldierStates.cpp b/src/FirstPerson/FirstPersonModeSoldierStates.cpp
 new file mode 100644
-index 000000000..9d817138d
+index 000000000..7740fb7f7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeSoldierStates.cpp
-@@ -0,0 +1,1157 @@
+@@ -0,0 +1,1161 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -48830,6 +48963,8 @@ index 000000000..9d817138d
 +		_txtCosts->setVisible(false);
 +		_txtDamage->setVisible(false);
 +		_txtRange->setVisible(false);
++		_rangeScale->setVisible(false);
++		for (Text *mark : _rangeMarks) mark->setVisible(false);
 +		_txtTarget->setVisible(false);
 +		_crosshair->setVisible(false);
 +		_accuracyLine->setVisible(false);
@@ -49123,6 +49258,8 @@ index 000000000..9d817138d
 +		_txtCosts->setVisible(false);
 +		_txtDamage->setVisible(false);
 +		_txtRange->setVisible(false);
++		_rangeScale->setVisible(false);
++		for (Text *mark : _rangeMarks) mark->setVisible(false);
 +		_txtTarget->setVisible(false);
 +		_crosshair->setVisible(false);
 +		_accuracyLine->setVisible(false);
@@ -75741,10 +75878,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..7480c9aeb
+index 000000000..e2ac5931b
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,1007 @@
+@@ -0,0 +1,1018 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -75965,7 +76102,7 @@ index 000000000..7480c9aeb
 +		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
 +			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsHitFlash", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 +			"fpsGhostParts", "fpsGhostOpacity", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
-+		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsCrosshairRange", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
++		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsRangefinder", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
 +			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
 +		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 +		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
@@ -76230,6 +76367,12 @@ index 000000000..7480c9aeb
 +		{
 +			static const char *const leanNames[] = { "STR_FPS_LEAN_OFF", "STR_FPS_LEAN_PEEK", "STR_FPS_LEAN_TILT" };
 +			return std::string(tr(leanNames[std::clamp(*option.asInt(), 0, 2)]));
++		}
++		// The rangefinder is a choice of three, shown by name.
++		if (option.id() == "fpsRangefinder")
++		{
++			static const char *const rangeNames[] = { "STR_FPS_RANGEFINDER_OFF", "STR_FPS_RANGEFINDER_DIGITAL", "STR_FPS_RANGEFINDER_ANALOGUE" };
++			return std::string(tr(rangeNames[std::clamp(*option.asInt(), 0, 2)]));
 +		}
 +		// Throwing is a choice of two, shown by name.
 +		if (option.id() == "fpsThrowing")
@@ -76542,6 +76685,11 @@ index 000000000..7480c9aeb
 +		}
 +		// Leaning out (off, peek, tilt): round and round.
 +		else if (value == &Options::fpsLean)
++		{
++			*value = (*value + direction + 3) % 3;
++		}
++		// The rangefinder (off, digital, analogue): round and round.
++		else if (value == &Options::fpsRangefinder)
 +		{
 +			*value = (*value + direction + 3) % 3;
 +		}

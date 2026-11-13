@@ -943,7 +943,11 @@ private:
 	Uint64 _accuracyLineDrawnFor = ~(Uint64)0;     // what it shows, to redraw only on change
 	Text *_txtMode = nullptr, *_txtShot = nullptr; // the fire mode, and the shot's odds and cost, beside the crosshair
 	Text *_txtCosts = nullptr;                      // and under them its other costs (setting "Expanded crosshair info")
-	Text *_txtRange = nullptr;                      // left of the crosshair, how far off the point under it is, in tiles (setting "Range", or its key held)
+	Text *_txtRange = nullptr;                      // left of the crosshair, how far off the point under it is, in tiles (setting "Rangefinder" Digital, or its key held)
+	Surface *_rangeScale = nullptr;                 // the analogue rangefinder's scale, left of and below the crosshair (see drawRangeScale)
+	std::vector<Text*> _rangeMarks;                 // its numbers, the nearest mark's first, and last the height it is drawn for ("1.7m")
+	int _rangeScaleWidth = 0, _rangeScaleHeight = 0; // its line's length and its curve's greatest height not zoomed in, in canvas pixels
+	Uint64 _rangeScaleDrawnFor = ~(Uint64)0;        // what it shows, to redraw only on change
 	Text *_txtDamage = nullptr;                     // and under the hit chance the shot's damage range (setting "Shot damage")
 	Uint32 _hitMarkerHeard = 0;                    // the last hitmarker that ticked
 	Uint32 _noHarmHeard = 0;                       // the last strike to no harm that ticked
@@ -960,6 +964,8 @@ private:
 	int hitCloudReach(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, int accuracy, int &missReach);
 	/// Draws the accuracy line: a level line as wide as the reach to either side, a notch up at each end.
 	void drawAccuracyLine(int reach, int missReach, Uint8 color, Uint8 missColor, Uint8 shadow);
+	/// Draws the analogue rangefinder's scale and places its numbers.
+	void drawRangeScale(const int marks[5], double tilePixels, Uint8 color, Uint8 shadow);
 	/// A mod's own name for an action of an item, in capitals for the crosshair; empty if it keeps the game's name.
 	std::string renamedAction(const RuleItem *rules, BattleActionType mode) const;
 	/// Does the soldier have a line of sight to the aimed tile, as a shot checks it?

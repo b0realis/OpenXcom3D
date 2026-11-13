@@ -289,9 +289,26 @@ void FirstPersonMode::createCrosshairAndBanner()
 	_txtCosts = addText(160, 9, width / 2 + 14, height / 2 + 11, "crosshairText", "firstPerson");
 	// Under the hit chance, the shot's damage range (setting "Shot damage"), the costs a line lower.
 	_txtDamage = addText(120, 9, width / 2 + 14, height / 2 + 11, "crosshairText", "firstPerson");
-	// Left of the crosshair, the range to what it points at (setting "Range", or its key held).
+	// Left of the crosshair, the range to what it points at (setting "Rangefinder", or its key held).
 	_txtRange = addText(90, 9, width / 2 - 104, height / 2 + 1, "crosshairText", "firstPerson");
 	_txtRange->setAlign(ALIGN_RIGHT);
+	// The analogue rangefinder (drawn in drawRangeScale): its line a fifth of the view wide, its curve at most an eighth
+	// of the view high not zoomed in and ZoomFactor times that zoomed in, with room for the line's shadow; five
+	// numbers over the curve and the height it is drawn for at the line's end.
+	_rangeScaleWidth = width / 5;
+	_rangeScaleHeight = height / 8;
+	_rangeScale = new Surface(_rangeScaleWidth + 3, (int)(_rangeScaleHeight * ZoomFactor) + 8, 0, 0);
+	_state->add(_rangeScale);
+	_rangeScale->setVisible(false);
+	_ownSurfaces.insert(_rangeScale);
+	_rangeScaleDrawnFor = ~(Uint64)0;
+	_rangeMarks.clear();
+	for (int mark = 0; mark < 6; ++mark)
+	{
+		_rangeMarks.push_back(addText(mark < 5 ? 24 : 40, 9, 0, 0, "crosshairText", "firstPerson"));
+		if (mark < 5) _rangeMarks.back()->setAlign(ALIGN_CENTER);
+		_rangeMarks.back()->setVisible(false);
+	}
 	_txtBanner->setAlign(ALIGN_CENTER);
 	// The name of the unit pointed at, under the crosshair (it follows the free cursor).
 	_txtTarget = addText(160, 9, width / 2 - 80, height / 2 + 10, "crosshairText", "firstPerson");
@@ -919,6 +936,8 @@ void FirstPersonMode::setResizeAnchors()
 	_anchors[_txtCosts] = CENTER;
 	_anchors[_txtDamage] = CENTER;
 	_anchors[_txtRange] = CENTER;
+	_anchors[_rangeScale] = CENTER;
+	for (Text *mark : _rangeMarks) _anchors[mark] = CENTER;
 	_anchors[_txtScoping] = RIGHT_CENTER;
 
 	// END and the suit's buttons keep to the top right, and so does the compass; the info panel

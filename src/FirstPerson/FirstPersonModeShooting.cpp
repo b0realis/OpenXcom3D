@@ -59,6 +59,7 @@
 #include "FirstPersonSounds.h"
 #include "FirstPersonApi.h"
 #include "FirstPersonView.h"
+#include <set>
 #include "FirstPersonSpriteHits.h"
 #include "../Battlescape/AlienInventoryState.h"
 #include "../Battlescape/BattleState.h"
@@ -4306,10 +4307,14 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	_txtShot->setVisible(show && Options::fpsCrosshairInfo && playerTurn);
 	_txtCosts->setVisible(show && Options::fpsCrosshairInfo && Options::fpsCrosshairCosts && playerTurn);
 	_txtDamage->setVisible(show && Options::fpsCrosshairInfo && Options::fpsCrosshairDamage && playerTurn);
-	// The rangefinder (GitHub issue #139): with its setting among the shot's lines, or while its key is held (then
-	// whatever the settings, in the aliens' turn too).
+	// The rangefinder (GitHub issue #139; setting "Rangefinder"): in the player's turn with its setting, or while its
+	// key is held (then whatever the settings, in the aliens' turn too; the digital kind with the setting off).
 	const bool rangeHeld = Options::keyFpsRange != SDLK_UNKNOWN && SDL_GetKeyState(nullptr)[Options::keyFpsRange] && !gameModifierHeld();
-	_txtRange->setVisible(show && unit && ((Options::fpsCrosshairInfo && Options::fpsCrosshairRange && playerTurn) || rangeHeld));
+	const bool rangeShown = show && unit && ((Options::fpsRangefinder != 0 && playerTurn) || rangeHeld);
+	const bool rangeAnalogue = rangeShown && Options::fpsRangefinder == 2;
+	_txtRange->setVisible(rangeShown && !rangeAnalogue);
+	_rangeScale->setVisible(rangeAnalogue);
+	for (Text *mark : _rangeMarks) mark->setVisible(rangeAnalogue);
 	if (!show)
 	{
 		return;
@@ -4344,6 +4349,32 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		const std::string rangeText = _state->tr("STR_FPS_RANGE").arg(range < 0 ? std::string("-") : std::to_string(range));
 		if (_txtRange->getText() != rangeText) _txtRange->setText(rangeText);
 		_txtRange->setColor(yellowText);
+	}
+	// The analogue kind: the scale under and left of the crosshair, its curve as high over its line at each mark as a
+	// unit RangeSubjectVoxels tall (a standing soldier, at the setting "Unit size") shows that many tiles away. Its five
+	// marks are the ladder's first whose heights fit the scale through the lens not zoomed in; zoomed in (the owner:
+	// "analogue should enlarge"), the marks stay and the curve grows with the picture, upwards from the line, so it
+	// reads true at any magnification.
+	if (rangeAnalogue)
+	{
+		static const int ladder[] = { 2, 3, 4, 6, 8, 10, 12, 15, 20, 30, 40, 60, 80, 120 };
+		const int ladderCount = (int)(sizeof(ladder) / sizeof(ladder[0]));
+		const double subject = RangeSubjectVoxels * RangeVoxelRise * (std::clamp(Options::fpsUnitSize, 80, 100) / 100.0) / Position::TileXY; // the subject's height, in tiles
+		const double plainFocal = (canvasWidth() / 2.0) / std::tan(std::clamp(Options::fpsFieldOfView, 50, 110) * Pi / 360.0); // (the scale is drawn on the canvas)
+		const double focalPixels = (canvasWidth() / 2.0) / std::tan(fieldOfViewNow() * Pi / 360.0);
+		const double tilePixels = focalPixels * subject; // how high the subject shows a tile away, now
+		int first = 0;
+		while (first + 5 < ladderCount && plainFocal * subject / ladder[first] > _rangeScaleHeight) ++first;
+		// The line keeps its place, just under the curve's height not zoomed in; the surface reaches up from there.
+		_rangeScale->setX(centreX - 24 - _rangeScaleWidth);
+		_rangeScale->setY(centreY + 16 + _rangeScaleHeight - (_rangeScale->getHeight() - 4));
+		const Uint64 scaleKey = (Uint64)std::lround(tilePixels * 16.0) | ((Uint64)first << 32) | ((Uint64)yellow << 40) | ((Uint64)shadow << 48);
+		if (scaleKey != _rangeScaleDrawnFor)
+		{
+			_rangeScaleDrawnFor = scaleKey;
+			drawRangeScale(ladder + first, tilePixels, yellow, shadow);
+		}
+		for (Text *mark : _rangeMarks) mark->setColor(yellowText);
 	}
 
 	// The weapon: the one in hand, or the item of an action picked from a menu that's being
@@ -4634,6 +4665,68 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		_accuracyLineDrawnFor = lineKey;
 		drawAccuracyLine(reach, missReach, lineColor, missColor, shadow);
 	}
+}
+
+/**
+ * Draws the analogue rangefinder (setting "Rangefinder") onto its surface and places its numbers, in the manner of the
+ * PSO-1 scope's: a level line with small ticks, and over it a dotted curve that falls from right to left, as high over
+ * the line at each of five marks as the subject (a unit 1.7 m tall, the label at the line's right end) shows at that
+ * mark's range. A unit standing on the line with its head at the curve is as many tiles away as the number there.
+ * The line is the surface's fourth row from the bottom; the curve may rise to the surface's top (zoomed in).
+ * Between the marks the range runs evenly by ratio, so the curve is smooth. Each pixel has a shadow one down and to the
+ * right, so it reads on any background. The surface's place must be set before (the numbers are laid out from it).
+ * @param marks The five ranges marked, in tiles, the nearest first (at the right).
+ * @param tilePixels How high the subject shows one tile away now, in canvas pixels.
+ * @param color Palette colour of the scale.
+ * @param shadow Palette colour of its shadow.
+ */
+void FirstPersonMode::drawRangeScale(const int marks[5], double tilePixels, Uint8 color, Uint8 shadow)
+{
+	// The line's row on the surface, and the curve's height over it at a column (0: the left end, the farthest mark).
+	const int width = _rangeScaleWidth, base = _rangeScale->getHeight() - 4, highest = base - 1;
+	auto heightAt = [&](double column)
+	{
+		const double along = std::clamp((width - column) * 4.0 / width, 0.0, 4.0); // marks from the right, a fraction between two
+		const int mark = std::min(3, (int)along);
+		const double range = marks[mark] * std::pow((double)marks[mark + 1] / marks[mark], along - mark);
+		return std::min<double>(highest, tilePixels / range);
+	};
+	std::set<std::pair<int, int>> points;
+	// The line, a small tick up at every eighth and a taller one at each end.
+	for (int x = 0; x <= width; ++x) points.insert({ x, base });
+	for (int eighth = 0; eighth <= 8; ++eighth)
+	{
+		const int x = eighth * width / 8;
+		for (int rise = 1; rise <= (eighth == 0 || eighth == 8 ? 4 : 2); ++rise) points.insert({ x, base - rise });
+	}
+	// The curve, dotted (every other pixel along it, by its place on the surface), a quarter of a column a step so its
+	// steep end has no gaps; and a tick down from it at each mark.
+	for (int step = 0; step <= width * 4; ++step)
+	{
+		const int x = (int)std::lround(step / 4.0), y = base - (int)std::lround(heightAt(step / 4.0));
+		if (((x + y) & 1) == 0) points.insert({ x, y });
+	}
+	for (int mark = 0; mark < 5; ++mark)
+	{
+		const int x = width - mark * width / 4, y = base - (int)std::lround(heightAt(x));
+		for (int drop = 0; drop <= 2 && y + drop < base; ++drop) points.insert({ x, y + drop });
+		// Its number sits over the curve there; the subject's height right of the line's end.
+		Text *number = _rangeMarks[mark];
+		const std::string text = std::to_string(marks[mark]);
+		if (number->getText() != text) number->setText(text);
+		number->setX(_rangeScale->getX() + x - number->getWidth() / 2 + 1);
+		number->setY(_rangeScale->getY() + y - 9);
+	}
+	Text *subject = _rangeMarks[5];
+	const std::string subjectText = _state->tr("STR_FPS_RANGE_SUBJECT");
+	if (subject->getText() != subjectText) subject->setText(subjectText);
+	subject->setX(_rangeScale->getX() + width + 4);
+	subject->setY(_rangeScale->getY() + base - 7);
+	_rangeScale->clear();
+	_rangeScale->lock();
+	for (const auto &point : points) _rangeScale->setPixel(point.first + 1, point.second + 1, shadow);
+	for (const auto &point : points) _rangeScale->setPixel(point.first, point.second, color);
+	_rangeScale->unlock();
 }
 
 /**
