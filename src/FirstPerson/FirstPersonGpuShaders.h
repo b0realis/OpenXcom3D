@@ -76,6 +76,7 @@ uniform sampler2D uFirstDepth, uFirstTrue;
 const float FlatContrast = 26.0 / 255.0; // a pixel within this of all its neighbours, a colour channel each, has nothing to smooth (two shades of a dither are nearer than this; the next voxel's colour mostly isn't)
 const float NearContrast = 64.0 / 255.0; // the same where a voxel covers several pixels: there its neighbours' colours are the texture drawn large, not shimmer, and only a strong line between two of them is worth more rays
 #endif
+uniform vec2 uFovea;         // an eye's picture in VR, setting "VR foveation": out to x of its half width from the view axis a ray a pixel, to y one for 2 x 2, beyond one for 4 x 4; x 0: off
 uniform vec2 uRayOffset;     // where in its pixel the ray goes, from the middle (0, 0: the CPU's ray; else one of several, setting "Supersampling")
 uniform float uGhostScale;
 uniform int uSeeThroughCrops;
@@ -1819,8 +1820,30 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 	rayGlow = !glowing ? 0u : hit.part >= 0 && (texelFetch(uModelInfo, int(texelFetch(uTiles, hitTile * 4)[hit.part / 2] >> uint(16 * (hit.part & 1))) & 0xFFFF).z >> 24) != 0u ? 3u : 1u;
 }
 
+/**
+ * Setting "VR foveation": how many pixels each way one ray colours where this pixel is, 1, 2 or 4, by how far from the
+ * eye's view axis its cell of 4 x 4 pixels starts (a cell's pixels all answer alike). A headset's lens is sharp only
+ * round the axis, so the rays are spent there. (FoveaFillSource has the same: keep the two alike.)
+ */
+int foveaStep(ivec2 at)
+{
+	if (uFovea.x <= 0.0 || uEyePlane.z <= 0.0) return 1;
+	vec2 cell = vec2((at / 4) * 4) + 2.0;
+	float away = length(cell * float(uPixelSize) - uEyePlane.xy) / (float(uViewSize.x) * 0.5);
+	return away < uFovea.x ? 1 : away < uFovea.y ? 2 : 4;
+}
+
 void main()
 {
+	// With "VR foveation", away from the eye's view axis only the first pixel of each 2 x 2 or 4 x 4 casts a ray, through
+	// the middle of them; the others are filled from it after (see FoveaFillSource).
+	vec2 rayOffset = uRayOffset;
+	int coarse = foveaStep(ivec2(gl_FragCoord.xy));
+	if (coarse > 1)
+	{
+		if ((int(gl_FragCoord.x) & (coarse - 1)) != 0 || (int(gl_FragCoord.y) & (coarse - 1)) != 0) discard;
+		rayOffset += vec2(float(coarse - 1) * 0.5);
+	}
 #ifdef LATER_RAYS
 	// A second or further ray of the pixel: only where the first rays show an edge or fine texture: this pixel's full colour
 	// against its eight neighbours', and its depth. On a flat stretch (most of a picture at a high resolution, where a
@@ -1849,8 +1872,46 @@ void main()
 	}
 #endif
 	vec3 rayFullColor;
-	shadeRay(uRayOffset, true, outColor, outDepth, outGlow, rayFullColor);
+	shadeRay(rayOffset, true, outColor, outDepth, outGlow, rayFullColor);
 	outTrue = vec4(rayFullColor / 255.0, float(outGlow) / 255.0);
+}
+)";
+
+/**
+ * Setting "VR foveation": the rays' pictures made whole. Away from the eye's view axis only the first pixel of each
+ * 2 x 2 or 4 x 4 has a ray (see the rays' main); here every pixel takes its ray's colour, depth, glow and full colour
+ * from there, into the pictures the passes after read.
+ */
+const char *const FoveaFillSource = R"(
+uniform usampler2D uColor, uGlow;
+uniform sampler2D uDepth, uTrue;
+uniform vec2 uFovea;
+uniform vec3 uEyePlane;
+uniform ivec2 uViewSize;
+uniform int uPixelSize;
+layout(location = 0) out uint outColor;
+layout(location = 1) out float outDepth;
+layout(location = 2) out uint outGlow;
+layout(location = 3) out vec4 outTrue;
+
+// (As in the rays' program: keep the two alike.)
+int foveaStep(ivec2 at)
+{
+	if (uFovea.x <= 0.0 || uEyePlane.z <= 0.0) return 1;
+	vec2 cell = vec2((at / 4) * 4) + 2.0;
+	float away = length(cell * float(uPixelSize) - uEyePlane.xy) / (float(uViewSize.x) * 0.5);
+	return away < uFovea.x ? 1 : away < uFovea.y ? 2 : 4;
+}
+
+void main()
+{
+	ivec2 at = ivec2(gl_FragCoord.xy);
+	int coarse = foveaStep(at);
+	ivec2 from = (at / coarse) * coarse;
+	outColor = texelFetch(uColor, from, 0).r;
+	outDepth = texelFetch(uDepth, from, 0).r;
+	outGlow = texelFetch(uGlow, from, 0).r;
+	outTrue = texelFetch(uTrue, from, 0);
 }
 )";
 

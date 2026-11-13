@@ -162,10 +162,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..b81fe33c8
+index 000000000..997d0444b
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,586 @@
+@@ -0,0 +1,591 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -246,6 +246,11 @@ index 000000000..b81fe33c8
 +  STR_FPS_VR_TURNING_SNAP: "Snap"
 +  STR_FPS_VR_LASER: "VR laser"
 +  STR_FPS_VR_LASER_DESC: "YES: a laser from the weapon's muzzle to where it points. The crosshair is at that point either way, dimmed where the soldier can't fire (outside his arc)."
++  STR_FPS_VR_FOVEATION: "VR foveation"
++  STR_FPS_VR_FOVEATION_DESC: "Renderer GPU only. The middle of each eye's picture keeps full detail; toward the edge, where a headset's lens is soft anyway, one ray colours 2 x 2 and then 4 x 4 pixels. Light casts about a third of the rays, Strong about a fifth: the way to a bigger VR eye picture at a playable speed."
++  STR_FPS_VR_FOVEATION_OFF: "Off"
++  STR_FPS_VR_FOVEATION_LIGHT: "Light"
++  STR_FPS_VR_FOVEATION_STRONG: "Strong"
 +  STR_FPS_VR_SMOOTHING: "VR smoothing"
 +  STR_FPS_VR_SMOOTHING_DESC: "YES: the headset's graphics chip smooths each eye's picture (drawn three times bigger, its pixel steps turned into smooth edges). NO: the pixels as they are."
 +  STR_FPS_VR_OUT_OF_ARC: "Outside his arc: turn him with the stick"
@@ -754,10 +759,10 @@ index 000000000..b81fe33c8
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..854feb1c3
+index 000000000..ea25d8ef3
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,586 @@
+@@ -0,0 +1,591 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -838,6 +843,11 @@ index 000000000..854feb1c3
 +  STR_FPS_VR_TURNING_SNAP: "Snap"
 +  STR_FPS_VR_LASER: "VR laser"
 +  STR_FPS_VR_LASER_DESC: "YES: a laser from the weapon's muzzle to where it points. The crosshair is at that point either way, dimmed where the soldier can't fire (outside his arc)."
++  STR_FPS_VR_FOVEATION: "VR foveation"
++  STR_FPS_VR_FOVEATION_DESC: "Renderer GPU only. The middle of each eye's picture keeps full detail; toward the edge, where a headset's lens is soft anyway, one ray colours 2 x 2 and then 4 x 4 pixels. Light casts about a third of the rays, Strong about a fifth: the way to a bigger VR eye picture at a playable speed."
++  STR_FPS_VR_FOVEATION_OFF: "Off"
++  STR_FPS_VR_FOVEATION_LIGHT: "Light"
++  STR_FPS_VR_FOVEATION_STRONG: "Strong"
 +  STR_FPS_VR_SMOOTHING: "VR smoothing"
 +  STR_FPS_VR_SMOOTHING_DESC: "YES: the headset's graphics chip smooths each eye's picture (drawn three times bigger, its pixel steps turned into smooth edges). NO: the pixels as they are."
 +  STR_FPS_VR_OUT_OF_ARC: "Outside his arc: turn him with the stick"
@@ -22676,7 +22686,7 @@ index d6d327c0a..6accd397e 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index 0467dd243..a0b496076 100644
+index 0467dd243..4cbac9d41 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -125,6 +125,7 @@ OPT int oxceCrashedOrLanded;
@@ -22694,7 +22704,7 @@ index 0467dd243..a0b496076 100644
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
 +OPT bool fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes, fpsDamageNumbers, fpsCompassCosts;
-+OPT int fpsThrowing, fpsRenderer, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsVrMode, fpsVrEyeSize, fpsVrTurning, fpsQuestDefaults, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
++OPT int fpsVrFoveation, fpsThrowing, fpsRenderer, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsVrMode, fpsVrEyeSize, fpsVrTurning, fpsQuestDefaults, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDL_Keycode keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
 +OPT SDL_Keycode keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsTurret, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
@@ -23723,10 +23733,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..63d54b8bf
+index 000000000..45c220407
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1636 @@
+@@ -0,0 +1,1637 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24832,6 +24842,7 @@ index 000000000..63d54b8bf
 +	// YES, each eye's picture drawn three times bigger with an edge-smoothing filter (FirstPersonXrSmoothing.cpp); NO,
 +	// the pixels as they are. Last in the VR section, so no row above it moves.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsVrSmoothing", &fpsVrSmoothing, true, "STR_FPS_VR_SMOOTHING", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsVrFoveation", &fpsVrFoveation, 0, "STR_FPS_VR_FOVEATION", category));
 +	// Doom mode's real-time grenades: armed as they're thrown, burning from leaving the hand (YES), or primed with a click and
 +	// burning in the hand (NO, "cooking");
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomPrimeOnThrow", &fpsDoomPrimeOnThrow, true, "STR_FPS_DOOM_PRIME_ON_THROW", category));
@@ -27437,10 +27448,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..a92ca7909
+index 000000000..44a97f0fa
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,2786 @@
+@@ -0,0 +1,2838 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -28092,6 +28103,12 @@ index 000000000..a92ca7909
 +	void sendModels();
 +	void setScene(const Frame &frame);
 +	bool setTargets(int width, int height, bool results, int which = 0);
++	// Setting "VR foveation" (see FoveaFillSource): the layer of targets the rays with holes go into, the program that
++	// fills the frame's own from them, and whether this frame's rays are cast that way (set by the frame's draw).
++	static const int FoveaLayer = 9;
++	Gl::UInt foveaProgram = 0;
++	bool foveaNow = false;
++	bool fillFovea(const Frame &frame, int columns, int rows);
 +	bool buildResolve();
 +	bool draw(const Frame &frame, const Output &output, Timing *timing);
 +
@@ -28705,6 +28722,7 @@ index 000000000..a92ca7909
 +	Gl::Uniform3f(location("uUp"), frame.up[0], frame.up[1], frame.up[2]);
 +	Gl::Uniform2f(location("uHalfPlane"), frame.halfPlaneWidth, frame.halfPlaneHeight);
 +	Gl::Uniform3f(location("uEyePlane"), frame.eyeAxis[0], frame.eyeAxis[1], frame.eyeFocal);
++	Gl::Uniform2f(location("uFovea"), foveaNow ? frame.fovea[0] : 0.0f, foveaNow ? frame.fovea[1] : 0.0f);
 +	Gl::Uniform2i(location("uViewSize"), frame.width, frame.height);
 +	Gl::Uniform1i(location("uPixelSize"), frame.pixelSize);
 +	Gl::Uniform1f(location("uGhostScale"), frame.ghostScale);
@@ -28918,6 +28936,7 @@ index 000000000..a92ca7909
 +	// The world: this frame's tiles and colours, the camera and the scene, and any model or mask not sent before.
 +	// What is the same as last frame isn't sent again (in a turn-based game, most frames most of it).
 +	auto start = std::chrono::steady_clock::now();
++	foveaNow = frame.fovea[0] > 0.0f && frame.eyeFocal > 0.0f && !output.results && output.keep != 2; // (never in a check against the CPU's picture)
 +	program = programFor(frame, output.results != nullptr);
 +	Gl::UseProgram(program->id);
 +	const size_t tileCount = (size_t)frame.size[0] * frame.size[1] * frame.size[2];
@@ -28957,7 +28976,9 @@ index 000000000..a92ca7909
 +		solidsChanged = false;
 +	}
 +	const int blockColumns = (frame.width + frame.pixelSize - 1) / frame.pixelSize, blockRows = (frame.height + frame.pixelSize - 1) / frame.pixelSize;
-+	if (!setTargets(blockColumns, blockRows, output.results != nullptr))
++	// (With "VR foveation" the rays' own pictures are a set aside, with holes; the frame's are filled from them after.)
++	const bool foveated = foveaNow;
++	if (!setTargets(blockColumns, blockRows, output.results != nullptr, foveated ? FoveaLayer : 0))
 +	{
 +		Log(LOG_WARNING) << "OpenXcom3D GPU: this card can't draw into the pictures the rays need";
 +		return false;
@@ -29017,7 +29038,7 @@ index 000000000..a92ca7909
 +			Gl::Uniform2f(location("uRayOffset"), offset[0], offset[1]);
 +			Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
 +		}
-+		setTargets(blockColumns, blockRows, false);
++		setTargets(blockColumns, blockRows, false, foveated ? FoveaLayer : 0);
 +		Gl::UseProgram(resolveProgram);
 +		Gl::Uniform1i(Gl::GetUniformLocation(resolveProgram, "uSamples"), samples);
 +		for (int ray = 0; ray < samples; ++ray)
@@ -29032,6 +29053,10 @@ index 000000000..a92ca7909
 +		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
 +		Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
 +		Gl::UseProgram(program->id);
++	}
++	if (foveated && !fillFovea(frame, blockColumns, blockRows))
++	{
++		return false;
 +	}
 +	if (timing)
 +	{
@@ -29187,6 +29212,44 @@ index 000000000..a92ca7909
 +	effectsProgram.id = built;
 +	Gl::UseProgram(program->id);
 +	return Gl::GetError() == Gl::NoError;
++}
++
++/**
++ * Setting "VR foveation": the frame's own ray pictures filled from the set the rays were cast into, where away from
++ * the eye's view axis only one pixel in four or in sixteen has a ray (see FoveaFillSource).
++ */
++bool FirstPersonGpu::State::fillFovea(const Frame &frame, int columns, int rows)
++{
++	if (!foveaProgram)
++	{
++		foveaProgram = compileFragment(FoveaFillSource, "the shader that fills the foveated rays' pictures");
++		if (!foveaProgram)
++		{
++			return false;
++		}
++		Gl::UseProgram(foveaProgram);
++		const char *const names[4] = { "uColor", "uDepth", "uGlow", "uTrue" };
++		for (int which = 0; which < 4; ++which) Gl::Uniform1i(Gl::GetUniformLocation(foveaProgram, names[which]), BufferCount + 1 + which);
++	}
++	const Targets cast = targets[{ columns, rows, FoveaLayer }];
++	if (!setTargets(columns, rows, false))
++	{
++		return false;
++	}
++	for (int which = 0; which < 4; ++which)
++	{
++		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 1 + which);
++		Gl::BindTexture(Gl::TEXTURE_2D, cast.textures[which]);
++	}
++	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
++	Gl::UseProgram(foveaProgram);
++	Gl::Uniform2f(Gl::GetUniformLocation(foveaProgram, "uFovea"), frame.fovea[0], frame.fovea[1]);
++	Gl::Uniform3f(Gl::GetUniformLocation(foveaProgram, "uEyePlane"), frame.eyeAxis[0], frame.eyeAxis[1], frame.eyeFocal);
++	Gl::Uniform2i(Gl::GetUniformLocation(foveaProgram, "uViewSize"), frame.width, frame.height);
++	Gl::Uniform1i(Gl::GetUniformLocation(foveaProgram, "uPixelSize"), frame.pixelSize);
++	Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
++	Gl::UseProgram(program->id);
++	return true;
 +}
 +
 +/**
@@ -30229,10 +30292,10 @@ index 000000000..a92ca7909
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.h b/src/FirstPerson/FirstPersonGpu.h
 new file mode 100644
-index 000000000..0655281dd
+index 000000000..24f857690
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.h
-@@ -0,0 +1,291 @@
+@@ -0,0 +1,292 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -30308,6 +30371,7 @@ index 000000000..0655281dd
 +		float eye[3], forward[3], right[3], up[3];
 +		float halfPlaneWidth, halfPlaneHeight;    // the image plane one voxel in front of the eye
 +		float eyeAxis[2], eyeFocal;               // an eye's picture (VR), off centre: where its view axis meets it, in pixels, and its pixels per unit of the image plane (0: the view's own, by the half plane)
++		float fovea[2];                           // setting "VR foveation", an eye's picture only: full detail out to [0] of its half width from the view axis, a ray for 2 x 2 pixels to [1], for 4 x 4 beyond; [0] 0: off
 +		int width, height, pixelSize;             // the view in pixels, and how many pixels a ray colours each way
 +		float ghostScale;                         // setting "Ghost opacity" (see renderRows)
 +		bool seeThroughCrops;                     // setting "See-through crops"
@@ -30717,10 +30781,10 @@ index 000000000..282068d15
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..152431c1c
+index 000000000..c64d1c52f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,2547 @@
+@@ -0,0 +1,2608 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -30799,6 +30863,7 @@ index 000000000..152431c1c
 +const float FlatContrast = 26.0 / 255.0; // a pixel within this of all its neighbours, a colour channel each, has nothing to smooth (two shades of a dither are nearer than this; the next voxel's colour mostly isn't)
 +const float NearContrast = 64.0 / 255.0; // the same where a voxel covers several pixels: there its neighbours' colours are the texture drawn large, not shimmer, and only a strong line between two of them is worth more rays
 +#endif
++uniform vec2 uFovea;         // an eye's picture in VR, setting "VR foveation": out to x of its half width from the view axis a ray a pixel, to y one for 2 x 2, beyond one for 4 x 4; x 0: off
 +uniform vec2 uRayOffset;     // where in its pixel the ray goes, from the middle (0, 0: the CPU's ray; else one of several, setting "Supersampling")
 +uniform float uGhostScale;
 +uniform int uSeeThroughCrops;
@@ -32542,8 +32607,30 @@ index 000000000..152431c1c
 +	rayGlow = !glowing ? 0u : hit.part >= 0 && (texelFetch(uModelInfo, int(texelFetch(uTiles, hitTile * 4)[hit.part / 2] >> uint(16 * (hit.part & 1))) & 0xFFFF).z >> 24) != 0u ? 3u : 1u;
 +}
 +
++/**
++ * Setting "VR foveation": how many pixels each way one ray colours where this pixel is, 1, 2 or 4, by how far from the
++ * eye's view axis its cell of 4 x 4 pixels starts (a cell's pixels all answer alike). A headset's lens is sharp only
++ * round the axis, so the rays are spent there. (FoveaFillSource has the same: keep the two alike.)
++ */
++int foveaStep(ivec2 at)
++{
++	if (uFovea.x <= 0.0 || uEyePlane.z <= 0.0) return 1;
++	vec2 cell = vec2((at / 4) * 4) + 2.0;
++	float away = length(cell * float(uPixelSize) - uEyePlane.xy) / (float(uViewSize.x) * 0.5);
++	return away < uFovea.x ? 1 : away < uFovea.y ? 2 : 4;
++}
++
 +void main()
 +{
++	// With "VR foveation", away from the eye's view axis only the first pixel of each 2 x 2 or 4 x 4 casts a ray, through
++	// the middle of them; the others are filled from it after (see FoveaFillSource).
++	vec2 rayOffset = uRayOffset;
++	int coarse = foveaStep(ivec2(gl_FragCoord.xy));
++	if (coarse > 1)
++	{
++		if ((int(gl_FragCoord.x) & (coarse - 1)) != 0 || (int(gl_FragCoord.y) & (coarse - 1)) != 0) discard;
++		rayOffset += vec2(float(coarse - 1) * 0.5);
++	}
 +#ifdef LATER_RAYS
 +	// A second or further ray of the pixel: only where the first rays show an edge or fine texture: this pixel's full colour
 +	// against its eight neighbours', and its depth. On a flat stretch (most of a picture at a high resolution, where a
@@ -32572,8 +32659,46 @@ index 000000000..152431c1c
 +	}
 +#endif
 +	vec3 rayFullColor;
-+	shadeRay(uRayOffset, true, outColor, outDepth, outGlow, rayFullColor);
++	shadeRay(rayOffset, true, outColor, outDepth, outGlow, rayFullColor);
 +	outTrue = vec4(rayFullColor / 255.0, float(outGlow) / 255.0);
++}
++)";
++
++/**
++ * Setting "VR foveation": the rays' pictures made whole. Away from the eye's view axis only the first pixel of each
++ * 2 x 2 or 4 x 4 has a ray (see the rays' main); here every pixel takes its ray's colour, depth, glow and full colour
++ * from there, into the pictures the passes after read.
++ */
++const char *const FoveaFillSource = R"(
++uniform usampler2D uColor, uGlow;
++uniform sampler2D uDepth, uTrue;
++uniform vec2 uFovea;
++uniform vec3 uEyePlane;
++uniform ivec2 uViewSize;
++uniform int uPixelSize;
++layout(location = 0) out uint outColor;
++layout(location = 1) out float outDepth;
++layout(location = 2) out uint outGlow;
++layout(location = 3) out vec4 outTrue;
++
++// (As in the rays' program: keep the two alike.)
++int foveaStep(ivec2 at)
++{
++	if (uFovea.x <= 0.0 || uEyePlane.z <= 0.0) return 1;
++	vec2 cell = vec2((at / 4) * 4) + 2.0;
++	float away = length(cell * float(uPixelSize) - uEyePlane.xy) / (float(uViewSize.x) * 0.5);
++	return away < uFovea.x ? 1 : away < uFovea.y ? 2 : 4;
++}
++
++void main()
++{
++	ivec2 at = ivec2(gl_FragCoord.xy);
++	int coarse = foveaStep(at);
++	ivec2 from = (at / coarse) * coarse;
++	outColor = texelFetch(uColor, from, 0).r;
++	outDepth = texelFetch(uDepth, from, 0).r;
++	outGlow = texelFetch(uGlow, from, 0).r;
++	outTrue = texelFetch(uTrue, from, 0);
 +}
 +)";
 +
@@ -61922,10 +62047,10 @@ index 000000000..f54b84f9c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..b6c1cbcf6
+index 000000000..0940bde72
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
-@@ -0,0 +1,676 @@
+@@ -0,0 +1,680 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -62083,6 +62208,10 @@ index 000000000..b6c1cbcf6
 +	frame.eyeAxis[0] = view._eyePass ? (float)view._eyeAxisX * scale : 0.0f;
 +	frame.eyeAxis[1] = view._eyePass ? (float)view._eyeAxisY * scale : 0.0f;
 +	frame.eyeFocal = view._eyePass ? (float)view._eyeFocal * scale : 0.0f;
++	// Setting "VR foveation": an eye's rays thinned away from its view axis (see FirstPersonGpuShaders.h, foveaStep).
++	const int foveation = view._eyePass ? std::clamp(Options::fpsVrFoveation, 0, 2) : 0;
++	frame.fovea[0] = foveation == 2 ? 0.38f : foveation == 1 ? 0.55f : 0.0f;
++	frame.fovea[1] = foveation == 2 ? 0.65f : 0.85f;
 +	frame.width = width;
 +	frame.height = height;
 +	// (Auto on the card: a ray a pixel whatever the view's size, which is what the card is for; a small view always has one,
@@ -87655,7 +87784,7 @@ index 000000000..6f6458667
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonXrShell.cpp b/src/FirstPerson/FirstPersonXrShell.cpp
 new file mode 100644
-index 000000000..cd0b1c6c1
+index 000000000..a26299f71
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonXrShell.cpp
 @@ -0,0 +1,1448 @@
@@ -88781,8 +88910,8 @@ index 000000000..cd0b1c6c1
 +		int eyeWidth = 0, eyeHeight = 0;
 +		vrEyeSize(eyeWidth, eyeHeight);
 +		char line[256];
-+		snprintf(line, sizeof(line), "settings: VR eye picture %dx%d, VR smoothing %s, Renderer %s, VR eyes kept on the card %s, True colour %s, Supersampling %d",
-+			eyeWidth, eyeHeight, Options::fpsVrSmoothing ? "yes" : "no", Options::fpsRenderer == 1 ? "GPU" : "CPU", Options::fpsVrCardEyes ? "yes" : "no",
++		snprintf(line, sizeof(line), "settings: VR eye picture %dx%d, VR smoothing %s, VR foveation %d, Renderer %s, VR eyes kept on the card %s, True colour %s, Supersampling %d",
++			eyeWidth, eyeHeight, Options::fpsVrSmoothing ? "yes" : "no", Options::fpsVrFoveation, Options::fpsRenderer == 1 ? "GPU" : "CPU", Options::fpsVrCardEyes ? "yes" : "no",
 +			Options::fpsTrueColor ? "yes" : "no", Options::fpsSupersampling);
 +		logBoth(line);
 +	}
@@ -89964,10 +90093,10 @@ index 000000000..3559cb7dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..4e2a5d5e2
+index 000000000..0bc82c334
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,1038 @@
+@@ -0,0 +1,1048 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -90194,7 +90323,7 @@ index 000000000..4e2a5d5e2
 +		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 +		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
 +		// (the last two: a section added at the end moves no row above it, which the tests click by position)
-+		{ "STR_FPS_SECTION_VR", { "fpsVrMode", "fpsVrEyeSize", "fpsVrWeapon", "fpsVrTurning", "fpsVrLaser", "fpsVrSmoothing" } },
++		{ "STR_FPS_SECTION_VR", { "fpsVrMode", "fpsVrEyeSize", "fpsVrWeapon", "fpsVrTurning", "fpsVrLaser", "fpsVrSmoothing", "fpsVrFoveation" } },
 +		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion", "fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts", "fpsVrCardEyes" } },
 +	};
 +	std::vector<bool> placed(gathered.size(), false);
@@ -90477,6 +90606,11 @@ index 000000000..4e2a5d5e2
 +		if (option.id() == "fpsVrTurning")
 +		{
 +			return std::string(tr(*option.asInt() == 1 ? "STR_FPS_VR_TURNING_SNAP" : "STR_FPS_VR_TURNING_SMOOTH"));
++		}
++		// VR foveation is a choice of three, shown by name.
++		if (option.id() == "fpsVrFoveation")
++		{
++			return std::string(tr(*option.asInt() == 2 ? "STR_FPS_VR_FOVEATION_STRONG" : *option.asInt() == 1 ? "STR_FPS_VR_FOVEATION_LIGHT" : "STR_FPS_VR_FOVEATION_OFF"));
 +		}
 +		// The VR eye size is a choice of five, shown as the pixels of each eye's picture.
 +		if (option.id() == "fpsVrEyeSize")
@@ -90796,6 +90930,11 @@ index 000000000..4e2a5d5e2
 +		}
 +		// VR mode (off, on, on with the desktop preview): round and round.
 +		else if (value == &Options::fpsVrMode)
++		{
++			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
++		}
++		// VR foveation (off, light, strong): round and round.
++		else if (value == &Options::fpsVrFoveation)
 +		{
 +			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
 +		}

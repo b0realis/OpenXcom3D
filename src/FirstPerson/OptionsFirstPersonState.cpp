@@ -224,7 +224,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
 		// (the last two: a section added at the end moves no row above it, which the tests click by position)
-		{ "STR_FPS_SECTION_VR", { "fpsVrMode", "fpsVrEyeSize", "fpsVrWeapon", "fpsVrTurning", "fpsVrLaser", "fpsVrSmoothing" } },
+		{ "STR_FPS_SECTION_VR", { "fpsVrMode", "fpsVrEyeSize", "fpsVrWeapon", "fpsVrTurning", "fpsVrLaser", "fpsVrSmoothing", "fpsVrFoveation" } },
 		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion", "fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts", "fpsVrCardEyes" } },
 	};
 	std::vector<bool> placed(gathered.size(), false);
@@ -507,6 +507,11 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		if (option.id() == "fpsVrTurning")
 		{
 			return std::string(tr(*option.asInt() == 1 ? "STR_FPS_VR_TURNING_SNAP" : "STR_FPS_VR_TURNING_SMOOTH"));
+		}
+		// VR foveation is a choice of three, shown by name.
+		if (option.id() == "fpsVrFoveation")
+		{
+			return std::string(tr(*option.asInt() == 2 ? "STR_FPS_VR_FOVEATION_STRONG" : *option.asInt() == 1 ? "STR_FPS_VR_FOVEATION_LIGHT" : "STR_FPS_VR_FOVEATION_OFF"));
 		}
 		// The VR eye size is a choice of five, shown as the pixels of each eye's picture.
 		if (option.id() == "fpsVrEyeSize")
@@ -826,6 +831,11 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		}
 		// VR mode (off, on, on with the desktop preview): round and round.
 		else if (value == &Options::fpsVrMode)
+		{
+			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
+		}
+		// VR foveation (off, light, strong): round and round.
+		else if (value == &Options::fpsVrFoveation)
 		{
 			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
 		}

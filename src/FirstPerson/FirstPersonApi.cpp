@@ -1103,6 +1103,7 @@ void createOptions(std::vector<OptionInfo> &options)
 	// YES, each eye's picture drawn three times bigger with an edge-smoothing filter (FirstPersonXrSmoothing.cpp); NO,
 	// the pixels as they are. Last in the VR section, so no row above it moves.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsVrSmoothing", &fpsVrSmoothing, true, "STR_FPS_VR_SMOOTHING", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsVrFoveation", &fpsVrFoveation, 0, "STR_FPS_VR_FOVEATION", category));
 	// Doom mode's real-time grenades: armed as they're thrown, burning from leaving the hand (YES), or primed with a click and
 	// burning in the hand (NO, "cooking");
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomPrimeOnThrow", &fpsDoomPrimeOnThrow, true, "STR_FPS_DOOM_PRIME_ON_THROW", category));

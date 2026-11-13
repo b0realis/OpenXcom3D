@@ -73,6 +73,7 @@ public:
 		float eye[3], forward[3], right[3], up[3];
 		float halfPlaneWidth, halfPlaneHeight;    // the image plane one voxel in front of the eye
 		float eyeAxis[2], eyeFocal;               // an eye's picture (VR), off centre: where its view axis meets it, in pixels, and its pixels per unit of the image plane (0: the view's own, by the half plane)
+		float fovea[2];                           // setting "VR foveation", an eye's picture only: full detail out to [0] of its half width from the view axis, a ray for 2 x 2 pixels to [1], for 4 x 4 beyond; [0] 0: off
 		int width, height, pixelSize;             // the view in pixels, and how many pixels a ray colours each way
 		float ghostScale;                         // setting "Ghost opacity" (see renderRows)
 		bool seeThroughCrops;                     // setting "See-through crops"

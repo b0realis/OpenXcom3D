@@ -155,6 +155,10 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 	frame.eyeAxis[0] = view._eyePass ? (float)view._eyeAxisX * scale : 0.0f;
 	frame.eyeAxis[1] = view._eyePass ? (float)view._eyeAxisY * scale : 0.0f;
 	frame.eyeFocal = view._eyePass ? (float)view._eyeFocal * scale : 0.0f;
+	// Setting "VR foveation": an eye's rays thinned away from its view axis (see FirstPersonGpuShaders.h, foveaStep).
+	const int foveation = view._eyePass ? std::clamp(Options::fpsVrFoveation, 0, 2) : 0;
+	frame.fovea[0] = foveation == 2 ? 0.38f : foveation == 1 ? 0.55f : 0.0f;
+	frame.fovea[1] = foveation == 2 ? 0.65f : 0.85f;
 	frame.width = width;
 	frame.height = height;
 	// (Auto on the card: a ray a pixel whatever the view's size, which is what the card is for; a small view always has one,

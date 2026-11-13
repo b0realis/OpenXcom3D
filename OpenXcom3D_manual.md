@@ -1002,6 +1002,7 @@ What `FirstPersonView` draws:
 
 ### After 1.12 (in the source: no download yet)
 
+- New setting: *VR foveation* (Off / Light / Strong; *Renderer* GPU): the middle of each eye's picture keeps a ray a pixel, and toward the edge one ray colours 2×2 and then 4×4 pixels (about a third, or a fifth, of the rays), so a bigger *VR eye picture* costs less. Not yet tried on a headset.
 - VR with *Renderer* GPU (from a first run on a Quest 3): the headset's graphics chip is asked for its high power level while it draws the 3D world (it was held at the lowest, from when it only showed pictures); an eye pair the card hasn't finished is shown a frame later instead of being waited for a quarter of a second and left out (a stutter, or a black frame); eyes kept on the card are in full colour with *True colour*, and *Smooth light*, *Coloured lights*, *Reflections* and *Light shafts* work in them; the log has a session's settings.
 - Free movement: walking diagonally no longer stutters (a straight step put the camera back inside its tile on the other axis), and two straight steps round a corner cost what the one diagonal step costs (6 time units on plain ground, not 8), where the game would let the soldier walk that diagonal.
 - *Renderer* GPU: the frames with a coloured light, with light in the air, and the screen wash are drawn once where a battle begins, so the driver doesn't stop the game at the first shot or hit.

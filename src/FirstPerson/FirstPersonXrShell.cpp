@@ -1120,8 +1120,8 @@ bool enterImmersive()
 		int eyeWidth = 0, eyeHeight = 0;
 		vrEyeSize(eyeWidth, eyeHeight);
 		char line[256];
-		snprintf(line, sizeof(line), "settings: VR eye picture %dx%d, VR smoothing %s, Renderer %s, VR eyes kept on the card %s, True colour %s, Supersampling %d",
-			eyeWidth, eyeHeight, Options::fpsVrSmoothing ? "yes" : "no", Options::fpsRenderer == 1 ? "GPU" : "CPU", Options::fpsVrCardEyes ? "yes" : "no",
+		snprintf(line, sizeof(line), "settings: VR eye picture %dx%d, VR smoothing %s, VR foveation %d, Renderer %s, VR eyes kept on the card %s, True colour %s, Supersampling %d",
+			eyeWidth, eyeHeight, Options::fpsVrSmoothing ? "yes" : "no", Options::fpsVrFoveation, Options::fpsRenderer == 1 ? "GPU" : "CPU", Options::fpsVrCardEyes ? "yes" : "no",
 			Options::fpsTrueColor ? "yes" : "no", Options::fpsSupersampling);
 		logBoth(line);
 	}

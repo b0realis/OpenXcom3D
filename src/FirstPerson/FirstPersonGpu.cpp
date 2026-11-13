@@ -649,6 +649,12 @@ struct FirstPersonGpu::State
 	void sendModels();
 	void setScene(const Frame &frame);
 	bool setTargets(int width, int height, bool results, int which = 0);
+	// Setting "VR foveation" (see FoveaFillSource): the layer of targets the rays with holes go into, the program that
+	// fills the frame's own from them, and whether this frame's rays are cast that way (set by the frame's draw).
+	static const int FoveaLayer = 9;
+	Gl::UInt foveaProgram = 0;
+	bool foveaNow = false;
+	bool fillFovea(const Frame &frame, int columns, int rows);
 	bool buildResolve();
 	bool draw(const Frame &frame, const Output &output, Timing *timing);
 
@@ -1262,6 +1268,7 @@ void FirstPersonGpu::State::setScene(const Frame &frame)
 	Gl::Uniform3f(location("uUp"), frame.up[0], frame.up[1], frame.up[2]);
 	Gl::Uniform2f(location("uHalfPlane"), frame.halfPlaneWidth, frame.halfPlaneHeight);
 	Gl::Uniform3f(location("uEyePlane"), frame.eyeAxis[0], frame.eyeAxis[1], frame.eyeFocal);
+	Gl::Uniform2f(location("uFovea"), foveaNow ? frame.fovea[0] : 0.0f, foveaNow ? frame.fovea[1] : 0.0f);
 	Gl::Uniform2i(location("uViewSize"), frame.width, frame.height);
 	Gl::Uniform1i(location("uPixelSize"), frame.pixelSize);
 	Gl::Uniform1f(location("uGhostScale"), frame.ghostScale);
@@ -1475,6 +1482,7 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	// The world: this frame's tiles and colours, the camera and the scene, and any model or mask not sent before.
 	// What is the same as last frame isn't sent again (in a turn-based game, most frames most of it).
 	auto start = std::chrono::steady_clock::now();
+	foveaNow = frame.fovea[0] > 0.0f && frame.eyeFocal > 0.0f && !output.results && output.keep != 2; // (never in a check against the CPU's picture)
 	program = programFor(frame, output.results != nullptr);
 	Gl::UseProgram(program->id);
 	const size_t tileCount = (size_t)frame.size[0] * frame.size[1] * frame.size[2];
@@ -1514,7 +1522,9 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 		solidsChanged = false;
 	}
 	const int blockColumns = (frame.width + frame.pixelSize - 1) / frame.pixelSize, blockRows = (frame.height + frame.pixelSize - 1) / frame.pixelSize;
-	if (!setTargets(blockColumns, blockRows, output.results != nullptr))
+	// (With "VR foveation" the rays' own pictures are a set aside, with holes; the frame's are filled from them after.)
+	const bool foveated = foveaNow;
+	if (!setTargets(blockColumns, blockRows, output.results != nullptr, foveated ? FoveaLayer : 0))
 	{
 		Log(LOG_WARNING) << "OpenXcom3D GPU: this card can't draw into the pictures the rays need";
 		return false;
@@ -1574,7 +1584,7 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 			Gl::Uniform2f(location("uRayOffset"), offset[0], offset[1]);
 			Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
 		}
-		setTargets(blockColumns, blockRows, false);
+		setTargets(blockColumns, blockRows, false, foveated ? FoveaLayer : 0);
 		Gl::UseProgram(resolveProgram);
 		Gl::Uniform1i(Gl::GetUniformLocation(resolveProgram, "uSamples"), samples);
 		for (int ray = 0; ray < samples; ++ray)
@@ -1589,6 +1599,10 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
 		Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
 		Gl::UseProgram(program->id);
+	}
+	if (foveated && !fillFovea(frame, blockColumns, blockRows))
+	{
+		return false;
 	}
 	if (timing)
 	{
@@ -1744,6 +1758,44 @@ bool FirstPersonGpu::State::buildEffects()
 	effectsProgram.id = built;
 	Gl::UseProgram(program->id);
 	return Gl::GetError() == Gl::NoError;
+}
+
+/**
+ * Setting "VR foveation": the frame's own ray pictures filled from the set the rays were cast into, where away from
+ * the eye's view axis only one pixel in four or in sixteen has a ray (see FoveaFillSource).
+ */
+bool FirstPersonGpu::State::fillFovea(const Frame &frame, int columns, int rows)
+{
+	if (!foveaProgram)
+	{
+		foveaProgram = compileFragment(FoveaFillSource, "the shader that fills the foveated rays' pictures");
+		if (!foveaProgram)
+		{
+			return false;
+		}
+		Gl::UseProgram(foveaProgram);
+		const char *const names[4] = { "uColor", "uDepth", "uGlow", "uTrue" };
+		for (int which = 0; which < 4; ++which) Gl::Uniform1i(Gl::GetUniformLocation(foveaProgram, names[which]), BufferCount + 1 + which);
+	}
+	const Targets cast = targets[{ columns, rows, FoveaLayer }];
+	if (!setTargets(columns, rows, false))
+	{
+		return false;
+	}
+	for (int which = 0; which < 4; ++which)
+	{
+		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 1 + which);
+		Gl::BindTexture(Gl::TEXTURE_2D, cast.textures[which]);
+	}
+	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
+	Gl::UseProgram(foveaProgram);
+	Gl::Uniform2f(Gl::GetUniformLocation(foveaProgram, "uFovea"), frame.fovea[0], frame.fovea[1]);
+	Gl::Uniform3f(Gl::GetUniformLocation(foveaProgram, "uEyePlane"), frame.eyeAxis[0], frame.eyeAxis[1], frame.eyeFocal);
+	Gl::Uniform2i(Gl::GetUniformLocation(foveaProgram, "uViewSize"), frame.width, frame.height);
+	Gl::Uniform1i(Gl::GetUniformLocation(foveaProgram, "uPixelSize"), frame.pixelSize);
+	Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+	Gl::UseProgram(program->id);
+	return true;
 }
 
 /**
