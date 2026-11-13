@@ -289,7 +289,7 @@ void FirstPersonView::gpuRecordSprite(const SpriteDraw &draw)
 	const Uint8 *opacityMap = seeThroughSprite ? seeThroughSprite->opacityMap : nullptr;
 	auto placeInAtlas = [&]() { return atlasPlace((const Uint8 *)surface->pixels, surface->pitch, spriteWidth, spriteHeight, opacityMap); };
 	int pixelsAt;
-	if (opacityMap)
+	if (opacityMap && seeThroughSprite->steady)
 	{
 		auto known = list.spritesByAddress.find(opacityMap);
 		if (known == list.spritesByAddress.end())

@@ -112,6 +112,7 @@ FirstPersonView::~FirstPersonView()
 	for (Surface *frame : _composedFrames) delete frame;
 	delete _itemPicture;
 	for (Surface *buffer : _blendBuffers) delete buffer;
+	delete _blendEdge;
 	for (auto &entry : _softSmoke) delete entry.second.colors;
 	for (auto &entry : _stippleSmoke) delete entry.second.colors;
 	for (auto &entry : _softSmokeBlends) delete entry.second.colors;
@@ -149,6 +150,8 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 	_models.clear();
 	_ghostModels.clear();
 	_leafyModels.clear();
+	_partKinds.clear();
+	_flameParts.clear();
 	_openedModels.clear();
 	_frames.clear();
 	_solidMasks.clear();
@@ -219,6 +222,7 @@ void FirstPersonView::preloadModels()
 		}
 	}
 	Log(LOG_INFO) << "OpenXcom3D: " << _models.size() << " voxel models ready in " << SDL_GetTicks() - startTick << " ms";
+	if (!_flameParts.empty()) Log(LOG_INFO) << "OpenXcom3D: " << _flameParts.size() << " kinds of flame on the map are drawn as sprites";
 }
 
 /**

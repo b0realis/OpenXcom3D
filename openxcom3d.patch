@@ -53561,10 +53561,10 @@ index 000000000..7e1bbfcd2
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..3fdaa5bed
+index 000000000..0a235ab58
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,719 @@
+@@ -0,0 +1,723 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -53679,6 +53679,7 @@ index 000000000..3fdaa5bed
 +	for (Surface *frame : _composedFrames) delete frame;
 +	delete _itemPicture;
 +	for (Surface *buffer : _blendBuffers) delete buffer;
++	delete _blendEdge;
 +	for (auto &entry : _softSmoke) delete entry.second.colors;
 +	for (auto &entry : _stippleSmoke) delete entry.second.colors;
 +	for (auto &entry : _softSmokeBlends) delete entry.second.colors;
@@ -53716,6 +53717,8 @@ index 000000000..3fdaa5bed
 +	_models.clear();
 +	_ghostModels.clear();
 +	_leafyModels.clear();
++	_partKinds.clear();
++	_flameParts.clear();
 +	_openedModels.clear();
 +	_frames.clear();
 +	_solidMasks.clear();
@@ -53786,6 +53789,7 @@ index 000000000..3fdaa5bed
 +		}
 +	}
 +	Log(LOG_INFO) << "OpenXcom3D: " << _models.size() << " voxel models ready in " << SDL_GetTicks() - startTick << " ms";
++	if (!_flameParts.empty()) Log(LOG_INFO) << "OpenXcom3D: " << _flameParts.size() << " kinds of flame on the map are drawn as sprites";
 +}
 +
 +/**
@@ -54286,10 +54290,10 @@ index 000000000..3fdaa5bed
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..fb839ac73
+index 000000000..2b7b0e0cd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1550 @@
+@@ -0,0 +1,1557 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -54451,7 +54455,7 @@ index 000000000..fb839ac73
 +		bool openingGlass;        // glass filled into an opening of the game's shape (lookOnly bits, see fillPaneOpenings): a round going through breaks it (see breakGlassAt)
 +		bool foliage;             // a mass of foliage (see foliageArt): drawn leafy on a tile without a floor (leafyModel)
 +		Uint8 cropBlock;          // an object the art draws as a block of crops (X-Com Files' wheat, see cropBlockOf): the block's height in voxels; 0 for none
-+		Uint8 ghostKind;          // how a part without voxels was built (see buildModel): 0 not at all, 1 the mod's ghost shape, 2 a block of crops, 3 low art standing up, 4 a plain ghost
++		Uint8 ghostKind;          // how a part without voxels was built (see buildModel): 0 not at all, 1 the mod's ghost shape, 2 a block of crops, 3 low art standing up, 4 a plain ghost, 5 not as a model: a flame, its art drawn as a sprite (see partKind)
 +		bool reliefRises;         // ... low art that rises (see lowArt)
 +		const VoxelModel *ghost;  // a ghost model of the part's own, in the same tile where the part has no voxels: the liquid's surface (buildLiquid), the rest of the art (buildArtFill) or a block of crops (buildCropBlock); null for none
 +		float glow[3]; // centre of the brightest voxels in the top third (a lamp's bulb), in the tile
@@ -55003,6 +55007,10 @@ index 000000000..fb839ac73
 +	bool glassBroken(int tileIndex, int part) const;
 +	/// Builds a voxel model: shapes from the LOFT templates, colours from the isometric sprite.
 +	void buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model, const VoxelModel *firstFrame = nullptr) const;
++	/// The kind of ghost a part that animates and has no voxels is, in all its frames (null: not such a part).
++	const VoxelModel *partKind(const MapData *mapData, bool cutout);
++	std::unordered_map<Uint64, VoxelModel> _partKinds; // ... by MapData and cut-out
++	std::set<const MapData*> _flameParts;              // the records drawn as flames: their own art as a sprite standing on the tile (see partKind, drawFire)
 +	/// What a pane of glass breaks into keeps the pane's edges in its frame (see paneOfGlass).
 +	void addBrokenPaneEdges(const MapData *mapData, VoxelModel &model) const;
 +	/// A pane of glass's openings in the game's shape filled with glass, a look only.
@@ -55221,6 +55229,8 @@ index 000000000..fb839ac73
 +	Surface *_spriteBuffer;                             // scratch surface for drawing a unit's sprite before it goes into the world
 +	std::vector<Surface*> _blendBuffers;                // sprites dissolving into their next frame, one per sprite size
 +	std::vector<int> _blendColumns;                     // drawSpriteBlend's source column and row lookups
++	Surface *_blendEdge = nullptr;                      // ... the pixels only one of two mixed frames has, which fade (see drawSpriteBlend)
++	std::vector<Uint8> _blendOpacity;                   // ... and how opaque each is
 +	struct SpriteBox { int x0, y0, x1, y1; bool valid; }; // where a sprite frame's pixels are
 +	std::map<const Surface*, SpriteBox> _spriteBoxes;   // measured once per sprite frame
 +
@@ -55239,6 +55249,7 @@ index 000000000..fb839ac73
 +		const float *depthBlocks = nullptr;            // if given, the farthest depth drawn in each SmokeCullBlock square of the view:
 +		int depthBlockColumns = 0;                     // a square where everything is nearer than the sprite isn't looked at (see cullSmokeDraws)
 +		int capLevels = 0;                             // above 0: see-through smoke builds up on a pixel to this (of SeeThroughLevels) and no further (see _smokeVeil)
++		bool steady = false;                           // the sprite and its opacity map stay as they are and where they are through the frame (the smoke's, kept by the view): the card looks them up by where they are
 +	};
 +	SeeThroughSprite _faintPile = { nullptr, 1.0f };    // how the pile pointed at past is drawn (see drawFloorItems)
 +	/// A standing sprite isn't cut off below any floor (see SpriteDraw::floorCut, floorUnderside).
@@ -55347,7 +55358,7 @@ index 000000000..fb839ac73
 +	/// The ground under something lying at a point: the plane through its surface round it, its height there and its slope.
 +	bool groundPlane(const double world[3], double reach, double &height, double slope[2]) const;
 +	/// Draws a sprite part way through dissolving into the next animation frame (ordered dither).
-+	void drawSpriteBlend(const Surface *from, const Surface *to, double blend, int anchorX, int anchorY, const double world[3], double depthBias, int shade);
++	void drawSpriteBlend(const Surface *from, const Surface *to, double blend, int anchorX, int anchorY, const double world[3], double depthBias, int shade, bool mixColours = false);
 +	/// The box around a sprite frame's pixels.
 +	const SpriteBox &spriteBox(const Surface *sprite);
 +	/// Watches the units for hits and kills (flinches, blood, hitmarkers).
@@ -58176,7 +58187,7 @@ index 000000000..b6fbee4f6
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpuEffects.cpp b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 new file mode 100644
-index 000000000..f3700eac1
+index 000000000..61007d479
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 @@ -0,0 +1,940 @@
@@ -58471,7 +58482,7 @@ index 000000000..f3700eac1
 +	const Uint8 *opacityMap = seeThroughSprite ? seeThroughSprite->opacityMap : nullptr;
 +	auto placeInAtlas = [&]() { return atlasPlace((const Uint8 *)surface->pixels, surface->pitch, spriteWidth, spriteHeight, opacityMap); };
 +	int pixelsAt;
-+	if (opacityMap)
++	if (opacityMap && seeThroughSprite->steady)
 +	{
 +		auto known = list.spritesByAddress.find(opacityMap);
 +		if (known == list.spritesByAddress.end())
@@ -65345,10 +65356,10 @@ index 000000000..bc286e32a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..ace544495
+index 000000000..b43777e6c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,3503 @@
+@@ -0,0 +1,3580 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -65410,6 +65421,7 @@ index 000000000..ace544495
 +#include "FirstPersonApi.h"
 +#include "FirstPersonDamageNumbers.h"
 +#include "FirstPersonMode.h"
++#include "../Mod/MapDataSet.h"
 +#include "../Engine/Font.h"
 +#include "../Engine/Game.h"
 +#include "../Engine/Options.h"
@@ -67460,9 +67472,13 @@ index 000000000..ace544495
 + * @param world The point, in voxels.
 + * @param depthBias How much nearer than the point it counts for the depth test, in voxels.
 + * @param shade Palette shades to darken it by.
++ * @param mixColours Where both frames have a pixel, the two colours are mixed by the blend (the palette's nearest to the
++ *        mix, in FlameMixSteps steps) instead of one or the other being picked by the dither: fire flows from frame to
++ *        frame without the speckle (the owner: "make classic fire animation a bit smoother"). Where only one frame has a
++ *        pixel, the dither still brings it in or takes it out.
 + */
 +void FirstPersonView::drawSpriteBlend(const Surface *from, const Surface *to, double blend, int anchorX, int anchorY, const double world[3],
-+	double depthBias, int shade)
++	double depthBias, int shade, bool mixColours)
 +{
 +	if (!from)
 +	{
@@ -67511,6 +67527,26 @@ index 000000000..ace544495
 +	// is below the threshold show the next frame.
 +	static const int bayerLevels[4][4] = { { 0, 8, 2, 10 }, { 12, 4, 14, 6 }, { 3, 11, 1, 9 }, { 15, 7, 13, 5 } };
 +	const int threshold = (int)(blend * 16.0);
++	// (Mixing colours: how far, in whole steps, and the palette to mix in.)
++	const int FlameMixSteps = 32;
++	const bool mixed = mixColours && !_nearestRgb.empty();
++	const int mixStep = (int)(blend * FlameMixSteps);
++	const SDL_Color *palette = getPalette();
++	const int fadeLevel = (int)(blend * SeeThroughLevels);
++	bool fading = false;
++	SDL_Surface *edgeSurface = nullptr;
++	if (mixed)
++	{
++		// (The picture and the opacities of the pixels that fade: of the frames' size, cleared.)
++		if (!_blendEdge || _blendEdge->getWidth() != width || _blendEdge->getHeight() != height)
++		{
++			delete _blendEdge;
++			_blendEdge = new Surface(width, height);
++		}
++		edgeSurface = _blendEdge->getSurface();
++		for (int y = 0; y < height; ++y) std::fill_n((Uint8 *)edgeSurface->pixels + y * edgeSurface->pitch, width, (Uint8)0);
++		_blendOpacity.assign((size_t)width * height, 0);
++	}
 +	// And the shapes meet half way: both frames stretched to the size in between, around the base
 +	// they rise from, so a growing explosion is one shape growing, not two ghosting into each other.
 +	const SDL_Surface *fromSurface = const_cast<Surface*>(from)->getSurface(), // read only
@@ -67588,11 +67624,41 @@ index 000000000..ace544495
 +		const int *ditherRow = bayerLevels[y & 3];
 +		for (int x = left; x <= right; ++x)
 +		{
-+			if (ditherRow[x & 3] < threshold) outRow[x] = toLine && toColumns[x] >= 0 ? toLine[toColumns[x]] : 0;
-+			else outRow[x] = fromLine && fromColumns[x] >= 0 ? fromLine[fromColumns[x]] : 0;
++			const Uint8 toColor = toLine && toColumns[x] >= 0 ? toLine[toColumns[x]] : 0, fromColor = fromLine && fromColumns[x] >= 0 ? fromLine[fromColumns[x]] : 0;
++			if (!mixed)
++			{
++				outRow[x] = ditherRow[x & 3] < threshold ? toColor : fromColor;
++			}
++			else if (toColor && fromColor)
++			{
++				// Both frames draw here: the colour part way from one to the other, solid.
++				const SDL_Color &start = palette[fromColor], &end = palette[toColor];
++				auto channel = [&](int startValue, int endValue) { return (startValue * (FlameMixSteps - mixStep) + endValue * mixStep) / FlameMixSteps * 31 / 255; };
++				outRow[x] = toColor == fromColor ? fromColor : _nearestRgb[(channel(start.r, end.r) << 10) | (channel(start.g, end.g) << 5) | channel(start.b, end.b)];
++			}
++			else
++			{
++				// Only one frame draws here: its pixel fades out, or the next one's in (see below), on a picture of its own.
++				outRow[x] = 0;
++				const int level = fromColor ? SeeThroughLevels - fadeLevel : toColor ? fadeLevel : 0;
++				if (level > 0)
++				{
++					Uint8 *edgeRow = (Uint8 *)edgeSurface->pixels + y * edgeSurface->pitch;
++					edgeRow[x] = fromColor ? fromColor : toColor;
++					_blendOpacity[(size_t)y * width + x] = (Uint8)level;
++					fading = true;
++				}
++			}
 +		}
 +	}
 +	drawSprite(buffer, anchorX, anchorY, world, depthBias, shade, scale);
++	// The pixels only one of the two frames has, laid over what is behind them by how far they have faded: see-through,
++	// as the smoke is, so a flame's edge comes and goes softly instead of in dots.
++	if (fading)
++	{
++		const SeeThroughSprite fadingPixels = { _blendOpacity.data(), 1.0f };
++		drawSprite(_blendEdge, anchorX, anchorY, world, depthBias, shade, scale, SpritePose::Standing, &fadingPixels);
++	}
 +}
 +
 +/**
@@ -67708,7 +67774,29 @@ index 000000000..ace544495
 +		const double ground[3] = { tilePosition.x * 16.0 + 8.0, tilePosition.y * 16.0 + 8.0,
 +			tilePosition.z * 24.0 - tile->getTerrainLevel() };
 +		drawSpriteBlend(smokeSprites->getFrame(firstFrame + phase), smokeSprites->getFrame(firstFrame + (phase + 1) % 4), blend, 16, 32,
-+			ground, 2.0, shade);
++			ground, 2.0, shade, true);
++	}
++	// The map's own flames (see partKind: a campfire, a torch's fire; objects that light their surroundings and have no
++	// voxels): the part's art standing on its tile, unshaded, the frame the view's calm clock shows flowing into the next.
++	const std::set<const MapData*> &flameParts = (_sharedModelsOwner ? _sharedModelsOwner : this)->_flameParts;
++	for (int tileIndex = 0; !flameParts.empty() && tileIndex < tileCount; ++tileIndex)
++	{
++		Tile *tile = _save->getTile(tileIndex);
++		const MapData *object = tile->getMapData(O_OBJECT);
++		if (!object || !flameParts.count(object) || !_tileViews[tileIndex].discovered || !object->getDataset() || !object->getDataset()->getSurfaceset())
++		{
++			continue;
++		}
++		const Position tilePosition = tile->getPosition();
++		const double ground[3] = { tilePosition.x * 16.0 + 8.0, tilePosition.y * 16.0 + 8.0, tilePosition.z * 24.0 - tile->getTerrainLevel() };
++		if (std::abs(ground[0] - _eye[0]) > _maxDistance || std::abs(ground[1] - _eye[1]) > _maxDistance)
++		{
++			continue;
++		}
++		SurfaceSet *art = object->getDataset()->getSurfaceset();
++		// (The sprite's pixel that stands on the middle of the tile's floor, as buildModel lands the voxels on the art.)
++		drawSpriteBlend(art->getFrame(object->getSprite(_calmFrame)), art->getFrame(object->getSprite((_calmFrame + 1) % 8)), _animationBlend, 16, 32 + object->getYOffset(),
++			ground, 2.0, 0, true);
 +	}
 +}
 +
@@ -68211,7 +68299,7 @@ index 000000000..ace544495
 +		// (For the card, every puff once, whole: its own depth test leaves out what can't show.)
 +		for (const SmokeDraw &smoke : _smokeDraws)
 +		{
-+			const SeeThroughSprite seeThroughSprite = { smoke.soft->opacity.data(), smoke.opacity, nullptr, nullptr, nullptr, 0, (int)std::lround(smoke.cap * SeeThroughLevels) };
++			const SeeThroughSprite seeThroughSprite = { smoke.soft->opacity.data(), smoke.opacity, nullptr, nullptr, nullptr, 0, (int)std::lround(smoke.cap * SeeThroughLevels), true };
 +			SpriteDraw draw;
 +			draw.sprite = smoke.soft->colors;
 +			draw.anchorX = 16 * UpscaleFactor;
@@ -68854,10 +68942,10 @@ index 000000000..ace544495
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..cb05abf92
+index 000000000..d4b19ec55
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,4261 @@
+@@ -0,0 +1,4317 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -71300,8 +71388,10 @@ index 000000000..cb05abf92
 +	{
 +		// Not built yet: build it in place (the map keeps it at the same address from then on). A later frame of a
 +		// part that animates is built as the kind of part its first frame is (see buildModel).
++		// And a part without voxels is, in every frame, the kind of ghost any one of its frames makes it (see partKind).
 +		const int firstSprite = mapData->getSprite(0);
-+		const VoxelModel *const firstFrame = spriteIndex != firstSprite ? getModel(mapData, firstSprite, cutout) : nullptr;
++		const VoxelModel *firstFrame = spriteIndex != firstSprite ? getModel(mapData, firstSprite, cutout) : nullptr;
++		if (const VoxelModel *kind = partKind(mapData, cutout)) firstFrame = kind;
 +		found = _models.emplace(key, VoxelModel()).first;
 +		buildModel(mapData, spriteIndex, cutout, found->second, firstFrame);
 +		// The part's own ghost (VoxelModel::ghost): a floor drawn as a box of liquid, its surface
@@ -71329,6 +71419,56 @@ index 000000000..cb05abf92
 +		}
 +	}
 +	return &found->second;
++}
++
++/**
++ * The kind of ghost a part that animates and has no voxels is drawn as, in all its frames: what
++ * the first of its frames that gets a ghost at all is made (low art standing up, a block, a plain
++ * ghost: see buildModel), read off that frame's art. A flame's frames differ enough that some
++ * were low art, drawn solid, some a see-through ghost and some nothing: XPiratez's campfire
++ * stood as a yellow pillar, then as red streaks, then vanished (a player, GitHub issue #134).
++ * Worked out once for a record and kept.
++ * @return A model holding the kind (its ghostKind, reliefRises and cropBlock; nothing else of it
++ *         is meant to be drawn), or null for a part that doesn't animate or has voxels of its own.
++ */
++const FirstPersonView::VoxelModel *FirstPersonView::partKind(const MapData *mapData, bool cutout)
++{
++	bool animates = false;
++	for (int frame = 1; frame < 8 && !animates; ++frame) animates = mapData->getSprite(frame) != mapData->getSprite(0);
++	if (!animates)
++	{
++		return nullptr;
++	}
++	const Uint64 key = ((Uint64)(uintptr_t)mapData << 1) | (cutout ? 1 : 0);
++	auto found = _partKinds.find(key);
++	if (found == _partKinds.end())
++	{
++		found = _partKinds.emplace(key, VoxelModel()).first;
++		VoxelModel &kind = found->second;
++		for (int frame = 0; frame < 8; ++frame)
++		{
++			buildModel(mapData, mapData->getSprite(frame), cutout, kind);
++			if (kind.ghostKind != 0 || !kind.empty)
++			{
++				break; // (a ghost: that kind; or voxels of its own: it follows its first frame instead, see getModel)
++			}
++		}
++		// A flame (an object that lights its surroundings, by the game's rules, and has no voxels: a campfire, a torch's
++		// fire) is no ghost of any kind: its art stands on the tile as a sprite, each frame flowing into the next, as
++		// the game's own fire does (see drawFire). With "Parts without shape" off it isn't drawn, as any such part.
++		if (kind.empty || kind.ghostKind != 0)
++		{
++			if (Options::fpsGhostParts != 0 && !cutout && mapData->getObjectType() == O_OBJECT && mapData->getLightSource() > 0)
++			{
++				clearModel(kind);
++				kind.ghostKind = 5;
++				_flameParts.insert(mapData);
++				Log(LOG_VERBOSE) << "OpenXcom3D: a flame drawn as a sprite: " << mapData->getDataset()->getName() << ", its art's frames " << mapData->getSprite(0) << " to " << mapData->getSprite(7);
++			}
++		}
++	}
++	const VoxelModel &kind = found->second;
++	return kind.ghostKind != 0 || kind.empty ? &kind : nullptr;
 +}
 +
 +/**
@@ -71642,6 +71782,10 @@ index 000000000..cb05abf92
 +		if (firstFrame && firstFrame->empty == false && firstFrame->ghostKind == 0)
 +		{
 +			firstFrame = nullptr; // (the first frame has voxels of its own, this one's art none: nothing to follow)
++		}
++		if (firstFrame && firstFrame->ghostKind == 5)
++		{
++			return; // (a flame: no model, its art is drawn as a sprite; see partKind)
 +		}
 +		if (firstFrame)
 +		{

@@ -159,7 +159,7 @@ public:
 		bool openingGlass;        // glass filled into an opening of the game's shape (lookOnly bits, see fillPaneOpenings): a round going through breaks it (see breakGlassAt)
 		bool foliage;             // a mass of foliage (see foliageArt): drawn leafy on a tile without a floor (leafyModel)
 		Uint8 cropBlock;          // an object the art draws as a block of crops (X-Com Files' wheat, see cropBlockOf): the block's height in voxels; 0 for none
-		Uint8 ghostKind;          // how a part without voxels was built (see buildModel): 0 not at all, 1 the mod's ghost shape, 2 a block of crops, 3 low art standing up, 4 a plain ghost
+		Uint8 ghostKind;          // how a part without voxels was built (see buildModel): 0 not at all, 1 the mod's ghost shape, 2 a block of crops, 3 low art standing up, 4 a plain ghost, 5 not as a model: a flame, its art drawn as a sprite (see partKind)
 		bool reliefRises;         // ... low art that rises (see lowArt)
 		const VoxelModel *ghost;  // a ghost model of the part's own, in the same tile where the part has no voxels: the liquid's surface (buildLiquid), the rest of the art (buildArtFill) or a block of crops (buildCropBlock); null for none
 		float glow[3]; // centre of the brightest voxels in the top third (a lamp's bulb), in the tile
@@ -711,6 +711,10 @@ private:
 	bool glassBroken(int tileIndex, int part) const;
 	/// Builds a voxel model: shapes from the LOFT templates, colours from the isometric sprite.
 	void buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model, const VoxelModel *firstFrame = nullptr) const;
+	/// The kind of ghost a part that animates and has no voxels is, in all its frames (null: not such a part).
+	const VoxelModel *partKind(const MapData *mapData, bool cutout);
+	std::unordered_map<Uint64, VoxelModel> _partKinds; // ... by MapData and cut-out
+	std::set<const MapData*> _flameParts;              // the records drawn as flames: their own art as a sprite standing on the tile (see partKind, drawFire)
 	/// What a pane of glass breaks into keeps the pane's edges in its frame (see paneOfGlass).
 	void addBrokenPaneEdges(const MapData *mapData, VoxelModel &model) const;
 	/// A pane of glass's openings in the game's shape filled with glass, a look only.
@@ -929,6 +933,8 @@ private:
 	Surface *_spriteBuffer;                             // scratch surface for drawing a unit's sprite before it goes into the world
 	std::vector<Surface*> _blendBuffers;                // sprites dissolving into their next frame, one per sprite size
 	std::vector<int> _blendColumns;                     // drawSpriteBlend's source column and row lookups
+	Surface *_blendEdge = nullptr;                      // ... the pixels only one of two mixed frames has, which fade (see drawSpriteBlend)
+	std::vector<Uint8> _blendOpacity;                   // ... and how opaque each is
 	struct SpriteBox { int x0, y0, x1, y1; bool valid; }; // where a sprite frame's pixels are
 	std::map<const Surface*, SpriteBox> _spriteBoxes;   // measured once per sprite frame
 
@@ -947,6 +953,7 @@ private:
 		const float *depthBlocks = nullptr;            // if given, the farthest depth drawn in each SmokeCullBlock square of the view:
 		int depthBlockColumns = 0;                     // a square where everything is nearer than the sprite isn't looked at (see cullSmokeDraws)
 		int capLevels = 0;                             // above 0: see-through smoke builds up on a pixel to this (of SeeThroughLevels) and no further (see _smokeVeil)
+		bool steady = false;                           // the sprite and its opacity map stay as they are and where they are through the frame (the smoke's, kept by the view): the card looks them up by where they are
 	};
 	SeeThroughSprite _faintPile = { nullptr, 1.0f };    // how the pile pointed at past is drawn (see drawFloorItems)
 	/// A standing sprite isn't cut off below any floor (see SpriteDraw::floorCut, floorUnderside).
@@ -1055,7 +1062,7 @@ private:
 	/// The ground under something lying at a point: the plane through its surface round it, its height there and its slope.
 	bool groundPlane(const double world[3], double reach, double &height, double slope[2]) const;
 	/// Draws a sprite part way through dissolving into the next animation frame (ordered dither).
-	void drawSpriteBlend(const Surface *from, const Surface *to, double blend, int anchorX, int anchorY, const double world[3], double depthBias, int shade);
+	void drawSpriteBlend(const Surface *from, const Surface *to, double blend, int anchorX, int anchorY, const double world[3], double depthBias, int shade, bool mixColours = false);
 	/// The box around a sprite frame's pixels.
 	const SpriteBox &spriteBox(const Surface *sprite);
 	/// Watches the units for hits and kills (flinches, blood, hitmarkers).

@@ -2440,8 +2440,10 @@ const FirstPersonView::VoxelModel *FirstPersonView::getModel(const MapData *mapD
 	{
 		// Not built yet: build it in place (the map keeps it at the same address from then on). A later frame of a
 		// part that animates is built as the kind of part its first frame is (see buildModel).
+		// And a part without voxels is, in every frame, the kind of ghost any one of its frames makes it (see partKind).
 		const int firstSprite = mapData->getSprite(0);
-		const VoxelModel *const firstFrame = spriteIndex != firstSprite ? getModel(mapData, firstSprite, cutout) : nullptr;
+		const VoxelModel *firstFrame = spriteIndex != firstSprite ? getModel(mapData, firstSprite, cutout) : nullptr;
+		if (const VoxelModel *kind = partKind(mapData, cutout)) firstFrame = kind;
 		found = _models.emplace(key, VoxelModel()).first;
 		buildModel(mapData, spriteIndex, cutout, found->second, firstFrame);
 		// The part's own ghost (VoxelModel::ghost): a floor drawn as a box of liquid, its surface
@@ -2469,6 +2471,56 @@ const FirstPersonView::VoxelModel *FirstPersonView::getModel(const MapData *mapD
 		}
 	}
 	return &found->second;
+}
+
+/**
+ * The kind of ghost a part that animates and has no voxels is drawn as, in all its frames: what
+ * the first of its frames that gets a ghost at all is made (low art standing up, a block, a plain
+ * ghost: see buildModel), read off that frame's art. A flame's frames differ enough that some
+ * were low art, drawn solid, some a see-through ghost and some nothing: XPiratez's campfire
+ * stood as a yellow pillar, then as red streaks, then vanished (a player, GitHub issue #134).
+ * Worked out once for a record and kept.
+ * @return A model holding the kind (its ghostKind, reliefRises and cropBlock; nothing else of it
+ *         is meant to be drawn), or null for a part that doesn't animate or has voxels of its own.
+ */
+const FirstPersonView::VoxelModel *FirstPersonView::partKind(const MapData *mapData, bool cutout)
+{
+	bool animates = false;
+	for (int frame = 1; frame < 8 && !animates; ++frame) animates = mapData->getSprite(frame) != mapData->getSprite(0);
+	if (!animates)
+	{
+		return nullptr;
+	}
+	const Uint64 key = ((Uint64)(uintptr_t)mapData << 1) | (cutout ? 1 : 0);
+	auto found = _partKinds.find(key);
+	if (found == _partKinds.end())
+	{
+		found = _partKinds.emplace(key, VoxelModel()).first;
+		VoxelModel &kind = found->second;
+		for (int frame = 0; frame < 8; ++frame)
+		{
+			buildModel(mapData, mapData->getSprite(frame), cutout, kind);
+			if (kind.ghostKind != 0 || !kind.empty)
+			{
+				break; // (a ghost: that kind; or voxels of its own: it follows its first frame instead, see getModel)
+			}
+		}
+		// A flame (an object that lights its surroundings, by the game's rules, and has no voxels: a campfire, a torch's
+		// fire) is no ghost of any kind: its art stands on the tile as a sprite, each frame flowing into the next, as
+		// the game's own fire does (see drawFire). With "Parts without shape" off it isn't drawn, as any such part.
+		if (kind.empty || kind.ghostKind != 0)
+		{
+			if (Options::fpsGhostParts != 0 && !cutout && mapData->getObjectType() == O_OBJECT && mapData->getLightSource() > 0)
+			{
+				clearModel(kind);
+				kind.ghostKind = 5;
+				_flameParts.insert(mapData);
+				Log(LOG_VERBOSE) << "OpenXcom3D: a flame drawn as a sprite: " << mapData->getDataset()->getName() << ", its art's frames " << mapData->getSprite(0) << " to " << mapData->getSprite(7);
+			}
+		}
+	}
+	const VoxelModel &kind = found->second;
+	return kind.ghostKind != 0 || kind.empty ? &kind : nullptr;
 }
 
 /**
@@ -2782,6 +2834,10 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 		if (firstFrame && firstFrame->empty == false && firstFrame->ghostKind == 0)
 		{
 			firstFrame = nullptr; // (the first frame has voxels of its own, this one's art none: nothing to follow)
+		}
+		if (firstFrame && firstFrame->ghostKind == 5)
+		{
+			return; // (a flame: no model, its art is drawn as a sprite; see partKind)
 		}
 		if (firstFrame)
 		{
