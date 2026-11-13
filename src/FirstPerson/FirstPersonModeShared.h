@@ -289,6 +289,10 @@ const double LeanTiltDegrees = 10.0;
 
 /// How close (in voxels) the camera may get to a tile edge it can't cross.
 const double EdgeMargin = 5.0;
+
+/// How far over a tile's edge the camera may walk while the game is still busy with the last step
+/// (see updateMovement), in voxels.
+const double StepLead = 5.0;
 /// Doom IDCLIP: a wall or object part whose voxels (the game's shape of it) come this near the eye, in voxels, is left
 /// out of the picture (the eye is inside it, or as good as: its 3D picture can stand a little wider than its voxels).
 const int NoclipReach = 2;

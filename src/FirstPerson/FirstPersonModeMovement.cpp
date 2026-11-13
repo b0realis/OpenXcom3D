@@ -1435,6 +1435,21 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 		return;
 	}
 
+	// Whatever holds the camera back below (an edge it may not cross, a wall's margin) never makes it
+	// jump: put back from where it already was past the line, it walks there at its own pace. (The
+	// owner's report: walking diagonally stuttered, as if the soldier snapped to the tile now and
+	// then. Each straight step put the camera back EdgeMargin voxels inside the tile on the other
+	// axis, though it may well be nearer that edge when the step sideways is open too.)
+	const double pace = std::clamp(Options::fpsWalkSpeed, 1, 8) * 16.0 * elapsedSeconds;
+	auto heldAbove = [pace](double from, double to, double line) // (kept at or above the line)
+	{
+		return to >= line ? to : std::max(to, std::min(line, from + pace));
+	};
+	auto heldBelow = [pace](double from, double to, double line)
+	{
+		return to <= line ? to : std::min(to, std::max(line, from - pace));
+	};
+
 	// Which neighbouring tile the new position falls into, per axis: -1, 0 (still this tile) or 1.
 	const int crossingX = std::clamp((int)std::floor((newEyeX - sizeOffset) / 16.0) - _trackedTile.x, -1, 1);
 	const int crossingY = std::clamp((int)std::floor((newEyeY - sizeOffset) / 16.0) - _trackedTile.y, -1, 1);
@@ -1457,20 +1472,33 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 				const Position oldTile = _trackedTile;
 				if (commitStep(unit, stepX, stepY))
 				{
-					// Keep moving along the axes the step goes, but stay inside the old tile on
-					// the other one.
-					if (stepX == 0) newEyeX = clampInsideTile(oldTile.x, newEyeX, sizeOffset);
-					if (stepY == 0) newEyeY = clampInsideTile(oldTile.y, newEyeY, sizeOffset);
+					// Keep moving along the axes the step goes, but stay within the old tile's row
+					// or column on the other one (anywhere in it: the new tile's own walls keep
+					// their margin below).
+					const double within = 0.01;
+					if (stepX == 0) newEyeX = std::clamp(newEyeX, oldTile.x * 16.0 + sizeOffset + within, oldTile.x * 16.0 + 16.0 + sizeOffset - within);
+					if (stepY == 0) newEyeY = std::clamp(newEyeY, oldTile.y * 16.0 + sizeOffset + within, oldTile.y * 16.0 + 16.0 + sizeOffset - within);
 					stepped = true;
 				}
 			}
 		}
 
-		// No step: stay inside this tile on the axes that would have left it.
+		// No step: stay inside this tile on the axes that would have left it. But not while the game
+		// is still walking the last step and this one looks open: then the camera walks on, up to
+		// StepLead voxels over the edge, and the step is taken as soon as the game is free (in a
+		// frame or two); walking diagonally, the camera often crosses a second edge right after
+		// the first.
 		if (!stepped)
 		{
-			if (crossingX != 0) newEyeX = clampInsideTile(_trackedTile.x, newEyeX, sizeOffset);
-			if (crossingY != 0) newEyeY = clampInsideTile(_trackedTile.y, newEyeY, sizeOffset);
+			const bool waiting = _stepPending && driving && canMove;
+			const bool diagonalOpen = waiting && crossingX != 0 && crossingY != 0 && stepAllowed(unit, crossingX, crossingY);
+			auto held = [&](int tile, double from, double to, bool mayLead)
+			{
+				const double lead = mayLead ? StepLead : -EdgeMargin;
+				return heldBelow(from, heldAbove(from, to, tile * 16.0 + sizeOffset - lead), tile * 16.0 + 16.0 + sizeOffset + lead);
+			};
+			if (crossingX != 0) newEyeX = held(_trackedTile.x, _eyeX, newEyeX, waiting && (diagonalOpen || stepAllowed(unit, crossingX, 0)));
+			if (crossingY != 0) newEyeY = held(_trackedTile.y, _eyeY, newEyeY, waiting && (diagonalOpen || stepAllowed(unit, 0, crossingY)));
 		}
 	}
 
@@ -1490,10 +1518,10 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 			unsafeEdgeSeen = true;
 		}
 	};
-	if (newEyeX < westEdgeX + EdgeMargin && !stepAllowed(unit, -1, 0)) { newEyeX = westEdgeX + EdgeMargin; stopAtEdge(-1, 0); }
-	if (newEyeX > westEdgeX + 16.0 - EdgeMargin && !stepAllowed(unit, 1, 0)) { newEyeX = westEdgeX + 16.0 - EdgeMargin; stopAtEdge(1, 0); }
-	if (newEyeY < northEdgeY + EdgeMargin && !stepAllowed(unit, 0, -1)) { newEyeY = northEdgeY + EdgeMargin; stopAtEdge(0, -1); }
-	if (newEyeY > northEdgeY + 16.0 - EdgeMargin && !stepAllowed(unit, 0, 1)) { newEyeY = northEdgeY + 16.0 - EdgeMargin; stopAtEdge(0, 1); }
+	if (newEyeX < westEdgeX + EdgeMargin && !stepAllowed(unit, -1, 0)) { newEyeX = heldAbove(_eyeX, newEyeX, westEdgeX + EdgeMargin); stopAtEdge(-1, 0); }
+	if (newEyeX > westEdgeX + 16.0 - EdgeMargin && !stepAllowed(unit, 1, 0)) { newEyeX = heldBelow(_eyeX, newEyeX, westEdgeX + 16.0 - EdgeMargin); stopAtEdge(1, 0); }
+	if (newEyeY < northEdgeY + EdgeMargin && !stepAllowed(unit, 0, -1)) { newEyeY = heldAbove(_eyeY, newEyeY, northEdgeY + EdgeMargin); stopAtEdge(0, -1); }
+	if (newEyeY > northEdgeY + 16.0 - EdgeMargin && !stepAllowed(unit, 0, 1)) { newEyeY = heldBelow(_eyeY, newEyeY, northEdgeY + 16.0 - EdgeMargin); stopAtEdge(0, 1); }
 
 	// Whatever stopped us (walls, edges, a step not taken) takes the momentum out on that axis:
 	// where the camera really moved slower than the momentum (by more than half a voxel a

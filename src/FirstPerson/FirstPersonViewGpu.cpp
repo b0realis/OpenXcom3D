@@ -39,6 +39,8 @@
 #include <cstdio>
 #include <atomic>
 #include <cstdlib>
+#include <chrono>
+#include <set>
 #include <sstream>
 #include <thread>
 #include "../Engine/Logger.h"
@@ -398,6 +400,43 @@ bool FirstPersonView::gpuCastAllRays()
 	// The card is waited for after each step, so the frame is slower than it is without.)
 	static const bool timed = getenv("OPENXCOM3D_GPU_TIMING") != nullptr;
 	FirstPersonGpu::Timing timing;
+	// Each kind of frame the settings can ask for is drawn once before the first frame that is shown: with a coloured
+	// light, with light in the air, with both. A driver finishes a program the first time something is drawn with
+	// it (Apple's takes a second or more over each), and the game would stand still at the first shot, the first
+	// lamp in smoke. So it waits here instead, where a battle begins. The real frame is drawn over these.
+	{
+		static std::set<int> warmed; // (the card is one for every view)
+		const bool shaftsOn = Options::fpsLightShafts && _wantsTrueColor;
+		const int settings = (frame.reflections ? 4 : 0) | frame.samples << 3 | (frame.pixelSize == 1 ? 64 : 0) | (output.keep ? 128 : 0);
+		const auto start = std::chrono::steady_clock::now();
+		int drawn = 0;
+		for (int kind = 0; kind < 4; ++kind)
+		{
+			const bool light = (kind & 1) != 0, shafts = (kind & 2) != 0;
+			if ((light && !frame.colorLightsOn) || (shafts && !shaftsOn) || !warmed.insert(settings | kind).second)
+			{
+				continue;
+			}
+			FirstPersonGpu::Frame like = frame;
+			if (light && !like.colorLightCount)
+			{
+				std::fill(like.colorLights[0], like.colorLights[0] + 8, 0.0f); // (a light of no strength)
+				like.colorLightCount = 1;
+			}
+			else if (!light) like.colorLightCount = 0;
+			like.lightShafts = shafts;
+			if (!gpu->castRays(like, output, nullptr))
+			{
+				return false;
+			}
+			++drawn;
+		}
+		const double milliseconds = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+		if (drawn && milliseconds >= 50.0)
+		{
+			Log(LOG_INFO) << "OpenXcom3D GPU: " << drawn << " kinds of frame drawn ahead in " << (int)milliseconds << " ms";
+		}
+	}
 	if (!gpu->castRays(frame, output, timed ? &timing : nullptr))
 	{
 		return false;

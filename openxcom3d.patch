@@ -40213,10 +40213,10 @@ index 000000000..34f1ba2ed
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeMovement.cpp b/src/FirstPerson/FirstPersonModeMovement.cpp
 new file mode 100644
-index 000000000..4d7df700b
+index 000000000..8b5fe5725
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeMovement.cpp
-@@ -0,0 +1,2287 @@
+@@ -0,0 +1,2315 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -41654,6 +41654,21 @@ index 000000000..4d7df700b
 +		return;
 +	}
 +
++	// Whatever holds the camera back below (an edge it may not cross, a wall's margin) never makes it
++	// jump: put back from where it already was past the line, it walks there at its own pace. (The
++	// owner's report: walking diagonally stuttered, as if the soldier snapped to the tile now and
++	// then. Each straight step put the camera back EdgeMargin voxels inside the tile on the other
++	// axis, though it may well be nearer that edge when the step sideways is open too.)
++	const double pace = std::clamp(Options::fpsWalkSpeed, 1, 8) * 16.0 * elapsedSeconds;
++	auto heldAbove = [pace](double from, double to, double line) // (kept at or above the line)
++	{
++		return to >= line ? to : std::max(to, std::min(line, from + pace));
++	};
++	auto heldBelow = [pace](double from, double to, double line)
++	{
++		return to <= line ? to : std::min(to, std::max(line, from - pace));
++	};
++
 +	// Which neighbouring tile the new position falls into, per axis: -1, 0 (still this tile) or 1.
 +	const int crossingX = std::clamp((int)std::floor((newEyeX - sizeOffset) / 16.0) - _trackedTile.x, -1, 1);
 +	const int crossingY = std::clamp((int)std::floor((newEyeY - sizeOffset) / 16.0) - _trackedTile.y, -1, 1);
@@ -41676,20 +41691,33 @@ index 000000000..4d7df700b
 +				const Position oldTile = _trackedTile;
 +				if (commitStep(unit, stepX, stepY))
 +				{
-+					// Keep moving along the axes the step goes, but stay inside the old tile on
-+					// the other one.
-+					if (stepX == 0) newEyeX = clampInsideTile(oldTile.x, newEyeX, sizeOffset);
-+					if (stepY == 0) newEyeY = clampInsideTile(oldTile.y, newEyeY, sizeOffset);
++					// Keep moving along the axes the step goes, but stay within the old tile's row
++					// or column on the other one (anywhere in it: the new tile's own walls keep
++					// their margin below).
++					const double within = 0.01;
++					if (stepX == 0) newEyeX = std::clamp(newEyeX, oldTile.x * 16.0 + sizeOffset + within, oldTile.x * 16.0 + 16.0 + sizeOffset - within);
++					if (stepY == 0) newEyeY = std::clamp(newEyeY, oldTile.y * 16.0 + sizeOffset + within, oldTile.y * 16.0 + 16.0 + sizeOffset - within);
 +					stepped = true;
 +				}
 +			}
 +		}
 +
-+		// No step: stay inside this tile on the axes that would have left it.
++		// No step: stay inside this tile on the axes that would have left it. But not while the game
++		// is still walking the last step and this one looks open: then the camera walks on, up to
++		// StepLead voxels over the edge, and the step is taken as soon as the game is free (in a
++		// frame or two); walking diagonally, the camera often crosses a second edge right after
++		// the first.
 +		if (!stepped)
 +		{
-+			if (crossingX != 0) newEyeX = clampInsideTile(_trackedTile.x, newEyeX, sizeOffset);
-+			if (crossingY != 0) newEyeY = clampInsideTile(_trackedTile.y, newEyeY, sizeOffset);
++			const bool waiting = _stepPending && driving && canMove;
++			const bool diagonalOpen = waiting && crossingX != 0 && crossingY != 0 && stepAllowed(unit, crossingX, crossingY);
++			auto held = [&](int tile, double from, double to, bool mayLead)
++			{
++				const double lead = mayLead ? StepLead : -EdgeMargin;
++				return heldBelow(from, heldAbove(from, to, tile * 16.0 + sizeOffset - lead), tile * 16.0 + 16.0 + sizeOffset + lead);
++			};
++			if (crossingX != 0) newEyeX = held(_trackedTile.x, _eyeX, newEyeX, waiting && (diagonalOpen || stepAllowed(unit, crossingX, 0)));
++			if (crossingY != 0) newEyeY = held(_trackedTile.y, _eyeY, newEyeY, waiting && (diagonalOpen || stepAllowed(unit, 0, crossingY)));
 +		}
 +	}
 +
@@ -41709,10 +41737,10 @@ index 000000000..4d7df700b
 +			unsafeEdgeSeen = true;
 +		}
 +	};
-+	if (newEyeX < westEdgeX + EdgeMargin && !stepAllowed(unit, -1, 0)) { newEyeX = westEdgeX + EdgeMargin; stopAtEdge(-1, 0); }
-+	if (newEyeX > westEdgeX + 16.0 - EdgeMargin && !stepAllowed(unit, 1, 0)) { newEyeX = westEdgeX + 16.0 - EdgeMargin; stopAtEdge(1, 0); }
-+	if (newEyeY < northEdgeY + EdgeMargin && !stepAllowed(unit, 0, -1)) { newEyeY = northEdgeY + EdgeMargin; stopAtEdge(0, -1); }
-+	if (newEyeY > northEdgeY + 16.0 - EdgeMargin && !stepAllowed(unit, 0, 1)) { newEyeY = northEdgeY + 16.0 - EdgeMargin; stopAtEdge(0, 1); }
++	if (newEyeX < westEdgeX + EdgeMargin && !stepAllowed(unit, -1, 0)) { newEyeX = heldAbove(_eyeX, newEyeX, westEdgeX + EdgeMargin); stopAtEdge(-1, 0); }
++	if (newEyeX > westEdgeX + 16.0 - EdgeMargin && !stepAllowed(unit, 1, 0)) { newEyeX = heldBelow(_eyeX, newEyeX, westEdgeX + 16.0 - EdgeMargin); stopAtEdge(1, 0); }
++	if (newEyeY < northEdgeY + EdgeMargin && !stepAllowed(unit, 0, -1)) { newEyeY = heldAbove(_eyeY, newEyeY, northEdgeY + EdgeMargin); stopAtEdge(0, -1); }
++	if (newEyeY > northEdgeY + 16.0 - EdgeMargin && !stepAllowed(unit, 0, 1)) { newEyeY = heldBelow(_eyeY, newEyeY, northEdgeY + 16.0 - EdgeMargin); stopAtEdge(0, 1); }
 +
 +	// Whatever stopped us (walls, edges, a step not taken) takes the momentum out on that axis:
 +	// where the camera really moved slower than the momentum (by more than half a voxel a
@@ -42506,10 +42534,10 @@ index 000000000..4d7df700b
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..962673127
+index 000000000..a0931f438
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,509 @@
+@@ -0,0 +1,513 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -42801,6 +42829,10 @@ index 000000000..962673127
 +
 +/// How close (in voxels) the camera may get to a tile edge it can't cross.
 +const double EdgeMargin = 5.0;
++
++/// How far over a tile's edge the camera may walk while the game is still busy with the last step
++/// (see updateMovement), in voxels.
++const double StepLead = 5.0;
 +/// Doom IDCLIP: a wall or object part whose voxels (the game's shape of it) come this near the eye, in voxels, is left
 +/// out of the picture (the eye is inside it, or as good as: its 3D picture can stand a little wider than its voxels).
 +const int NoclipReach = 2;
@@ -57577,10 +57609,10 @@ index 000000000..5507f71e0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..b6fbee4f6
+index 000000000..20968dded
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
-@@ -0,0 +1,629 @@
+@@ -0,0 +1,668 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -57622,6 +57654,8 @@ index 000000000..b6fbee4f6
 +#include <cstdio>
 +#include <atomic>
 +#include <cstdlib>
++#include <chrono>
++#include <set>
 +#include <sstream>
 +#include <thread>
 +#include "../Engine/Logger.h"
@@ -57981,6 +58015,43 @@ index 000000000..b6fbee4f6
 +	// The card is waited for after each step, so the frame is slower than it is without.)
 +	static const bool timed = getenv("OPENXCOM3D_GPU_TIMING") != nullptr;
 +	FirstPersonGpu::Timing timing;
++	// Each kind of frame the settings can ask for is drawn once before the first frame that is shown: with a coloured
++	// light, with light in the air, with both. A driver finishes a program the first time something is drawn with
++	// it (Apple's takes a second or more over each), and the game would stand still at the first shot, the first
++	// lamp in smoke. So it waits here instead, where a battle begins. The real frame is drawn over these.
++	{
++		static std::set<int> warmed; // (the card is one for every view)
++		const bool shaftsOn = Options::fpsLightShafts && _wantsTrueColor;
++		const int settings = (frame.reflections ? 4 : 0) | frame.samples << 3 | (frame.pixelSize == 1 ? 64 : 0) | (output.keep ? 128 : 0);
++		const auto start = std::chrono::steady_clock::now();
++		int drawn = 0;
++		for (int kind = 0; kind < 4; ++kind)
++		{
++			const bool light = (kind & 1) != 0, shafts = (kind & 2) != 0;
++			if ((light && !frame.colorLightsOn) || (shafts && !shaftsOn) || !warmed.insert(settings | kind).second)
++			{
++				continue;
++			}
++			FirstPersonGpu::Frame like = frame;
++			if (light && !like.colorLightCount)
++			{
++				std::fill(like.colorLights[0], like.colorLights[0] + 8, 0.0f); // (a light of no strength)
++				like.colorLightCount = 1;
++			}
++			else if (!light) like.colorLightCount = 0;
++			like.lightShafts = shafts;
++			if (!gpu->castRays(like, output, nullptr))
++			{
++				return false;
++			}
++			++drawn;
++		}
++		const double milliseconds = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
++		if (drawn && milliseconds >= 50.0)
++		{
++			Log(LOG_INFO) << "OpenXcom3D GPU: " << drawn << " kinds of frame drawn ahead in " << (int)milliseconds << " ms";
++		}
++	}
 +	if (!gpu->castRays(frame, output, timed ? &timing : nullptr))
 +	{
 +		return false;
@@ -58212,10 +58283,10 @@ index 000000000..b6fbee4f6
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpuEffects.cpp b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 new file mode 100644
-index 000000000..61007d479
+index 000000000..b2099f55c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
-@@ -0,0 +1,940 @@
+@@ -0,0 +1,950 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -58898,6 +58969,16 @@ index 000000000..61007d479
 +	// (OPENXCOM3D_GPU_TIMING: the effects' share of the card's time, in the log every 60 frames.)
 +	static const bool timed = getenv("OPENXCOM3D_GPU_TIMING") != nullptr;
 +	FirstPersonGpu::Timing timing;
++	// (The screen wash is drawn once ahead too, as the kinds of frame are in gpuCastAllRays: else the game would stand
++	// still while the driver finishes its program at the first hit taken, the first look through the goggles.)
++	static bool washDrawn = false;
++	if (gpu && !washDrawn && !effects.wash)
++	{
++		effects.wash = true;
++		gpu->drawEffects(effects, output, nullptr);
++		effects.wash = false;
++	}
++	washDrawn = true;
 +	if (!gpu || !gpu->drawEffects(effects, output, timed ? &timing : nullptr))
 +	{
 +		runOnAllThreads(&FirstPersonView::renderRows);
