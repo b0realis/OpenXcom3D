@@ -981,13 +981,10 @@ What `FirstPersonView` draws:
 
 ## 11. Version history
 
-### After 1.14
+### 1.14 (2026-11-13)
 
 - New setting *Fall damage* (Combat, YES by default, as before): NO lets a soldier step off ledges with *Falling* and land unhurt; before, the only way to have no fall damage was *Falling* off, which also stopped every step off a ledge (GitHub issue #137). `fallDamage` (FirstPersonModeMovement.cpp).
 - *Futuristic night vision* with *See-through corpses*: a body or a pile of items gone faint under the crosshair keeps its own colours over the green world; it went green with it (GitHub issue #136). A faint picture that keeps its colours is mixed over the world already in the night vision's colours and marked as its own (`plot` in FirstPersonViewSprites.cpp, the same in the card's `EffectsSource`).
-
-### 1.14 (2026-11-13)
-
 - Free movement: walking diagonally no longer stutters (a straight step put the camera back inside its tile on the other axis), and two straight steps round a corner cost what the one diagonal step costs (6 time units on plain ground, not 8), where the game would let the soldier walk that diagonal.
 - *Renderer* GPU: the frames with a coloured light, with light in the air, and the screen wash are drawn once where a battle begins, so the driver doesn't stop the game at the first shot or hit.
 - New setting: *Renderer* (CPU / GPU): the graphics card casts the 3D world's rays, the same picture as the CPU's (Linux, and an Apple silicon Mac; Windows tried under Wine only; the CPU by itself wherever the card can't). A full 1920×1080 view's rays take 6–9 ms on a GeForce RTX 4060 against 35–38 ms on the CPU.
