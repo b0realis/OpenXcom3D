@@ -1063,6 +1063,7 @@ void feedImmersive(SDL_Surface *screen)
 	box.hudHeld = battle && cursorFree();
 	box.smoothing = Options::fpsVrSmoothing;
 	box.cardEyesWanted = Options::fpsVrCardEyes && Options::fpsRenderer == 1;
+	box.cardRenders = Options::fpsRenderer == 1;
 
 	// The log: another screen coming over the battle and going, the cursor freed and mouse look back.
 	ControllerInput &input = shell.input;
@@ -1114,9 +1115,20 @@ bool enterImmersive()
 		return false;
 	}
 	logBoth("the 3D view in VR mode: starting the immersive activity");
+	{
+		// (The settings this session runs with: a report's log says what the player had on.)
+		int eyeWidth = 0, eyeHeight = 0;
+		vrEyeSize(eyeWidth, eyeHeight);
+		char line[256];
+		snprintf(line, sizeof(line), "settings: VR eye picture %dx%d, VR smoothing %s, Renderer %s, VR eyes kept on the card %s, True colour %s, Supersampling %d",
+			eyeWidth, eyeHeight, Options::fpsVrSmoothing ? "yes" : "no", Options::fpsRenderer == 1 ? "GPU" : "CPU", Options::fpsVrCardEyes ? "yes" : "no",
+			Options::fpsTrueColor ? "yes" : "no", Options::fpsSupersampling);
+		logBoth(line);
+	}
 	Xr::Shared &box = Xr::shared();
 	box.gameThreadId = (int)gettid();
 	box.cardEyesWanted = Options::fpsVrCardEyes && Options::fpsRenderer == 1; // (read when the session's context is made)
+	box.cardRenders = Options::fpsRenderer == 1;
 	box.finished = false;
 	box.failed = false;
 	box.running = false;

@@ -223,6 +223,7 @@ struct Shared
 	std::atomic<int> gameThreadId{0};      // the game's thread (Linux's id), for the runtime's scheduling
 	std::atomic<bool> smoothing{true};     // the eyes smoothed by the graphics chip (setting "VR smoothing")
 	std::atomic<bool> hudHeld{false};      // the cursor is free: the HUD holds still in the room (else fixed where the head looks)
+	std::atomic<bool> cardRenders{false};    // setting "Renderer": GPU: the graphics chip draws the 3D world (the session asks for its high power level)
 	std::atomic<bool> cardEyesWanted{false}; // setting "VR eyes kept on the card" with "Renderer": GPU: the next session's context joins the renderer's share group
 
 	// From the OpenXR thread to the game's thread.

@@ -227,6 +227,7 @@ public:
 		const float *heldDepth = nullptr;  // ... the depth they wrote (infinite where none); with depthWhole the eye's whole finished depth
 		int box[4] = {};                   // the part of the picture they are in: left, top, one past the right, one past the bottom (empty: none)
 		bool depthWhole = false;           // the scene's depth was fetched for a mark: the weapon is among the marks, tested on the CPU
+		bool full = false, shafts = false; // in full colour (setting "True colour"), with light in the air this frame: as Present has them
 		const SDL_Color *palette = nullptr;
 		Uint32 paletteHash = 0;
 		float flameGlow = 0.0f;            // a burning soldier's flames light the lower part of the view (see Present)

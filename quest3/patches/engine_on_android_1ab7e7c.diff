@@ -27437,10 +27437,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..ac1bfc80c
+index 000000000..a92ca7909
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,2781 @@
+@@ -0,0 +1,2786 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -29601,8 +29601,8 @@ index 000000000..ac1bfc80c
 +			return false;
 +		}
 +		Gl::UseProgram(eyeProgram);
-+		const char *const names[8] = { "uColor", "uMarks", "uHeld", "uSceneDepth", "uHeldTest", "uHeldDepth", "uPalette", "uFlameTint" };
-+		for (int unit = 0; unit < 8; ++unit) Gl::Uniform1i(Gl::GetUniformLocation(eyeProgram, names[unit]), unit);
++		const char *const names[11] = { "uColor", "uMarks", "uHeld", "uSceneDepth", "uHeldTest", "uHeldDepth", "uPalette", "uFlameTint", "uRayColor", "uRayTrue", "uGlow" };
++		for (int unit = 0; unit < 11; ++unit) Gl::Uniform1i(Gl::GetUniformLocation(eyeProgram, names[unit]), unit);
 +	}
 +	// The palette and the flames' tint, as pictures (present's own, made here if no frame was put together yet).
 +	if (!presentPalette)
@@ -29706,8 +29706,11 @@ index 000000000..ac1bfc80c
 +			return false;
 +		}
 +	}
-+	const Gl::UInt pictures[8] = { kept->second.color, uploads.marks, uploads.held, drawn->second.textures[1], uploads.heldTest, uploads.heldDepth, presentPalette, presentFlameTint };
-+	for (int unit = 0; unit < 8; ++unit)
++	// (In full colour only with the rays' own pictures at hand: a ray a pixel.)
++	const bool full = frame.full && kept->second.rayTrue && kept->second.rayColor;
++	const Gl::UInt pictures[11] = { kept->second.color, uploads.marks, uploads.held, drawn->second.textures[1], uploads.heldTest, uploads.heldDepth, presentPalette, presentFlameTint,
++		full ? kept->second.rayColor : kept->second.color, full ? kept->second.rayTrue : presentPalette, kept->second.glow ? kept->second.glow : kept->second.color };
++	for (int unit = 0; unit < 11; ++unit)
 +	{
 +		Gl::ActiveTexture(Gl::TEXTURE0 + unit);
 +		Gl::BindTexture(Gl::TEXTURE_2D, pictures[unit]);
@@ -29722,6 +29725,8 @@ index 000000000..ac1bfc80c
 +	Gl::Uniform2i(Gl::GetUniformLocation(eyeProgram, "uViewSize"), width, height);
 +	Gl::Uniform4i(Gl::GetUniformLocation(eyeProgram, "uHeldBox"), boxed ? frame.box[0] : 0, boxed ? frame.box[1] : 0, boxed ? frame.box[2] : 0, boxed ? frame.box[3] : 0);
 +	Gl::Uniform1i(Gl::GetUniformLocation(eyeProgram, "uDepthWhole"), frame.depthWhole ? 1 : 0);
++	Gl::Uniform1i(Gl::GetUniformLocation(eyeProgram, "uFull"), full ? 1 : 0);
++	Gl::Uniform1i(Gl::GetUniformLocation(eyeProgram, "uShafts"), full && frame.shafts ? 1 : 0);
 +	Gl::Uniform3f(Gl::GetUniformLocation(eyeProgram, "uDepthPlanes"), frame.depthToMetres, frame.nearMetres, frame.farMetres);
 +	Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
 +	if (frame.pixels)
@@ -30224,10 +30229,10 @@ index 000000000..ac1bfc80c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.h b/src/FirstPerson/FirstPersonGpu.h
 new file mode 100644
-index 000000000..38618a3eb
+index 000000000..0655281dd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.h
-@@ -0,0 +1,290 @@
+@@ -0,0 +1,291 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -30457,6 +30462,7 @@ index 000000000..38618a3eb
 +		const float *heldDepth = nullptr;  // ... the depth they wrote (infinite where none); with depthWhole the eye's whole finished depth
 +		int box[4] = {};                   // the part of the picture they are in: left, top, one past the right, one past the bottom (empty: none)
 +		bool depthWhole = false;           // the scene's depth was fetched for a mark: the weapon is among the marks, tested on the CPU
++		bool full = false, shafts = false; // in full colour (setting "True colour"), with light in the air this frame: as Present has them
 +		const SDL_Color *palette = nullptr;
 +		Uint32 paletteHash = 0;
 +		float flameGlow = 0.0f;            // a burning soldier's flames light the lower part of the view (see Present)
@@ -30711,10 +30717,10 @@ index 000000000..282068d15
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..eb06ccc91
+index 000000000..152431c1c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,2529 @@
+@@ -0,0 +1,2547 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -33189,6 +33195,9 @@ index 000000000..eb06ccc91
 + */
 +const char *const EyeSource = R"(
 +uniform usampler2D uColor, uMarks, uHeld; // the finished picture, the CPU's marks, the weapon in hand (palette colours; 0: nothing)
++uniform usampler2D uRayColor, uGlow;      // in full colour: the rays' own palette colours, and the picture's glow (bit 64: smoke over the pixel)
++uniform sampler2D uRayTrue;               // ... the rays' full colours
++uniform int uFull, uShafts;               // 1: in full colour (setting "True colour"), as PresentSource shows it; 1: with light in the air
 +uniform sampler2D uSceneDepth, uHeldTest, uHeldDepth, uPalette; // the scene's depth; what depth each of the weapon's pixels was drawn at, and the depth it wrote; the palette
 +uniform usampler2D uFlameTint;            // each colour in the flames' orange light (see PresentSource)
 +uniform float uFlameGlow;
@@ -33208,6 +33217,7 @@ index 000000000..eb06ccc91
 +	ivec2 pixel = ivec2(int(gl_FragCoord.x), uViewSize.y - 1 - int(gl_FragCoord.y));
 +	float depth = texelFetch(uSceneDepth, pixel, 0).r;
 +	uint made = texelFetch(uMarks, pixel, 0).r;
++	bool world = made == 0u; // (the pixel is the world's own, not a mark's or the weapon's: it may show in full colour)
 +	if (made == 0u)
 +	{
 +		made = texelFetch(uColor, pixel, 0).r;
@@ -33229,12 +33239,26 @@ index 000000000..eb06ccc91
 +			// Hidden where the scene is nearer (the laser with a voxel to spare), as the CPU tests it; 0: over everything.
 +			float drawnAt = texelFetch(uHeldTest, pixel, 0).r;
 +			float spare = drawnAt < 0.0 ? 1.0 : 0.0;
-+			if (!(abs(drawnAt) >= depth + spare)) made = held;
++			if (!(abs(drawnAt) >= depth + spare))
++			{
++				made = held;
++				world = false;
++			}
 +		}
 +		// (The depth the weapon's faces wrote, where they are nearer than the scene: the nearest wins, as in a depth buffer.)
 +		depth = min(depth, texelFetch(uHeldDepth, pixel, 0).r);
 +	}
-+	outPixel = vec4(texelFetch(uPalette, ivec2(int(made), 0), 0).rgb, 1.0);
++	vec3 shown = texelFetch(uPalette, ivec2(int(made), 0), 0).rgb;
++	if (uFull != 0 && world)
++	{
++		// In full colour: the ray's own where the pixel still has its ray's palette colour; under see-through smoke the
++		// light the card found in the air there, laid on (as PresentSource has both).
++		uint ray = texelFetch(uRayColor, pixel, 0).r;
++		vec3 full = texelFetch(uRayTrue, pixel, 0).rgb;
++		if (made == ray) shown = full;
++		else if (uShafts != 0 && (texelFetch(uGlow, pixel, 0).r & 64u) != 0u) shown = min(vec3(1.0), shown + max(vec3(0.0), full - texelFetch(uPalette, ivec2(int(ray), 0), 0).rgb));
++	}
++	outPixel = vec4(shown, 1.0);
 +	float metres = depth * uDepthPlanes.x;
 +	float projected = metres <= uDepthPlanes.y ? 0.0 : (isinf(metres) ? 1.0 : uDepthPlanes.z / (uDepthPlanes.z - uDepthPlanes.y) * (1.0 - uDepthPlanes.y / metres));
 +	outDepth = min(max(projected, 0.0), 1.0);
@@ -58389,10 +58413,10 @@ index 000000000..8dc4fd0a4
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..5776546ab
+index 000000000..6eaf0b877
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1799 @@
+@@ -0,0 +1,1800 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -59619,6 +59643,7 @@ index 000000000..5776546ab
 +	bool _gpuDepthPending = false; // this frame's depth is still on the card (see gpuNeedDepth)
 +	// The frame put together on the card (OPENXCOM3D_GPU_PRESENT; see gpuPresent): the picture never comes back as palette
 +	// colours; what the CPU draws last goes over an empty picture, and the card lays that over its own and gives the frame.
++	bool _eyesFull = false;              // VR: this frame's eyes are kept on the card in full colour (see renderStereo)
 +	int _gpuPresenting = 0;              // this frame: 0 no; 1 yes; 2 beside the usual way, the two compared
 +	float _gpuFlameGlow = 0.0f;          // ... a burning soldier's flames light the lower part of the picture this strongly (see drawBurning)
 +	bool _hasCardPicture = false;        // the frame drawn last was put together on the card
@@ -73677,10 +73702,10 @@ index 000000000..a4fabff1c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewStereo.cpp b/src/FirstPerson/FirstPersonViewStereo.cpp
 new file mode 100644
-index 000000000..f39602245
+index 000000000..af6f2f9eb
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewStereo.cpp
-@@ -0,0 +1,942 @@
+@@ -0,0 +1,949 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -73749,6 +73774,7 @@ index 000000000..f39602245
 + * Nothing here runs unless VR mode asks for it: with it off, the view draws as it always has.
 + */
 +#include "FirstPersonView.h"
++#include "../Engine/Options.h"
 +#include <algorithm>
 +#include <chrono>
 +#include <cmath>
@@ -73993,10 +74019,13 @@ index 000000000..f39602245
 +	const bool muzzleValid = _muzzleValid, offHandMuzzleValid = _offHandMuzzleValid;
 +	_muzzleValid = _offHandMuzzleValid = false;
 +	std::copy(headEye, headEye + 3, _spriteEye);
-+	// An eye's picture is the palette's (see FirstPerson::VrPicture): on the graphics card too (setting "Renderer": GPU),
-+	// whatever the flat view is asked for (setting "True colour").
++	// An eye's picture is the palette's (see FirstPerson::VrPicture), whatever the flat view is asked for; but an eye
++	// kept on the graphics card (finished there, see presentEyeOnCard) is in full colour with the setting "True colour",
++	// and with it come "Smooth light", "Coloured lights", "Reflections" and "Light shafts" (the owner's report from a
++	// Quest 3: those settings changed nothing in the headset).
 +	const bool wantsTrueColor = _wantsTrueColor;
-+	_wantsTrueColor = false;
++	_eyesFull = onCard == EyesOnCard::Yes && Options::fpsTrueColor && gpuEffectsWanted() == 1;
++	_wantsTrueColor = _eyesFull;
 +
 +	// Each eye's picture: its target swapped in, its camera, the pointer where the aim point is on it, and the frame's
 +	// second half (the second eye's moving nothing on).
@@ -74120,6 +74149,7 @@ index 000000000..f39602245
 +	_replayPass = false;
 +	_eyePass = false;
 +	_wantsTrueColor = wantsTrueColor;
++	_gpuPresenting = 0; // (an eye in full colour is finished by presentEyeOnCard, not as the flat view's frame)
 +	std::copy(headEye, headEye + 3, _eye);
 +	_yaw = headYaw;
 +	_pitch = headPitch;
@@ -74489,6 +74519,8 @@ index 000000000..f39602245
 +		frame.marks = (const Uint8 *)marks.surface->pixels;
 +		frame.marksPitch = marks.pitch;
 +		frame.depthWhole = target.depthWhole;
++		frame.full = target.onCard && _eyesFull;
++		frame.shafts = _hasLightShafts;
 +		if (target.depthWhole)
 +		{
 +			frame.heldDepth = marks.depth.data();
@@ -84574,10 +84606,10 @@ index 000000000..718063752
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonXr.h b/src/FirstPerson/FirstPersonXr.h
 new file mode 100644
-index 000000000..99c3a589f
+index 000000000..b4093afc3
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonXr.h
-@@ -0,0 +1,274 @@
+@@ -0,0 +1,275 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -84803,6 +84835,7 @@ index 000000000..99c3a589f
 +	std::atomic<int> gameThreadId{0};      // the game's thread (Linux's id), for the runtime's scheduling
 +	std::atomic<bool> smoothing{true};     // the eyes smoothed by the graphics chip (setting "VR smoothing")
 +	std::atomic<bool> hudHeld{false};      // the cursor is free: the HUD holds still in the room (else fixed where the head looks)
++	std::atomic<bool> cardRenders{false};    // setting "Renderer": GPU: the graphics chip draws the 3D world (the session asks for its high power level)
 +	std::atomic<bool> cardEyesWanted{false}; // setting "VR eyes kept on the card" with "Renderer": GPU: the next session's context joins the renderer's share group
 +
 +	// From the OpenXR thread to the game's thread.
@@ -84854,10 +84887,10 @@ index 000000000..99c3a589f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonXrSession.cpp b/src/FirstPerson/FirstPersonXrSession.cpp
 new file mode 100644
-index 000000000..099f91c43
+index 000000000..6f6458667
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonXrSession.cpp
-@@ -0,0 +1,2745 @@
+@@ -0,0 +1,2762 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -84980,7 +85013,7 @@ index 000000000..099f91c43
 +const int StatsSeconds = 5;
 +/// How long the OpenXR thread waits for the renderer to finish an eye pair kept on the graphics card (nanoseconds): a
 +/// pair's whole drawing time on a slow frame, and no longer (the headset's frames must go on).
-+const GLuint64 CardFenceWaitNs = 250000000;
++const GLuint64 CardFenceWaitNs = 2000000;
 +/// Asked to end, the session gets this long to end by itself before the thread leaves anyway (ms).
 +const int ExitTimeoutMs = 3000;
 +/// OpenGL ES's sRGB format (what the compositor should get our colours as) and the plain one (the fallback).
@@ -85273,6 +85306,7 @@ index 000000000..099f91c43
 +	bool _sharesTextures = false;          // our context is in the renderer's share group
 +	bool _cardLogged = false;
 +	int _statsCardPairs = 0, _statsCardLate = 0;
++	bool _cardPairWaited = false;           // the pair taken last wasn't finished on the card: asked for again next frame
 +	/// Waits for a pair's fence (the renderer has finished its textures); false if it didn't pass in time (the pair is left out).
 +	bool waitForCardPair(const EyePictures &pictures);
 +	/// Draws an eye kept on the card into a colour texture (a swapchain image) of the target size: smoothed, or as it is.
@@ -85799,8 +85833,10 @@ index 000000000..099f91c43
 +			log(ANDROID_LOG_INFO, "session: %s", (unsigned)_state < 9 ? names[_state] : "?");
 +			if (_state == XR_SESSION_STATE_READY && !_exitAsked)
 +			{
-+				// Begin: the frames start; the CPU at its highest steady level (our 3D view is drawn by it),
-+				// the GPU at its lowest (we only upload pictures); our two threads' roles for the scheduler.
++				// Begin: the frames start; the CPU at its highest steady level (our 3D view is drawn by it, or its
++				// passes are recorded by it); the GPU at its lowest when we only upload pictures, at its highest
++				// steady level when it casts the world's rays (setting "Renderer": GPU; at the lowest an eye of
++				// 460x500 took a Quest 3 over 20 ms); our two threads' roles for the scheduler.
 +				XrSessionBeginInfo beginInfo = { XR_TYPE_SESSION_BEGIN_INFO };
 +				beginInfo.primaryViewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
 +				if (check(xrBeginSession(_session, &beginInfo), "xrBeginSession"))
@@ -85810,7 +85846,9 @@ index 000000000..099f91c43
 +					if (_setPerformanceLevel)
 +					{
 +						check(_setPerformanceLevel(_session, XR_PERF_SETTINGS_DOMAIN_CPU_EXT, XR_PERF_SETTINGS_LEVEL_SUSTAINED_HIGH_EXT), "CPU level");
-+						check(_setPerformanceLevel(_session, XR_PERF_SETTINGS_DOMAIN_GPU_EXT, XR_PERF_SETTINGS_LEVEL_SUSTAINED_LOW_EXT), "GPU level");
++						const bool cardRenders = box.cardRenders;
++						check(_setPerformanceLevel(_session, XR_PERF_SETTINGS_DOMAIN_GPU_EXT, cardRenders ? XR_PERF_SETTINGS_LEVEL_SUSTAINED_HIGH_EXT : XR_PERF_SETTINGS_LEVEL_SUSTAINED_LOW_EXT), "GPU level");
++						log(ANDROID_LOG_INFO, "performance levels: the CPU sustained high, the graphics chip sustained %s", cardRenders ? "high (it draws the 3D world)" : "low");
 +					}
 +					if (_setApplicationThread)
 +					{
@@ -86241,16 +86279,29 @@ index 000000000..099f91c43
 +	readSmoothingTimers();
 +	const Clock::time_point start = Clock::now();
 +	bool uploaded = false;
-+	if (box.eyes.take())
++	// A pair kept on the card that the renderer hasn't finished yet is asked for again, frame after frame, until it is
++	// or a newer one has come. The display's frames never wait for it, and the last pair shows on meanwhile. (Waited
++	// for up to a quarter of a second and then left out with nothing shown in its place, a late pair made the headset
++	// stutter or go black: the owner's report from a Quest 3.)
++	const bool waitedFor = _cardPairWaited;
++	_cardPairWaited = false;
++	bool pairTaken = box.eyes.take() || waitedFor;
++	if (pairTaken && box.eyes.front().onCard && !waitForCardPair(box.eyes.front()))
++	{
++		_cardPairWaited = true;
++		if (!waitedFor) ++_statsCardLate;
++		pairTaken = false;
++	}
++	if (pairTaken)
 +	{
 +		const EyePictures &pictures = box.eyes.front();
 +		bool both = true;
 +		bool depthBoth = _depthFormat && !pictures.depth[0].empty() && !pictures.depth[1].empty();
 +		if (pictures.onCard)
 +		{
-+			// Kept on the graphics card: from its textures, once the renderer has finished them (else the pair is left out).
++			// Kept on the graphics card: from its textures, which the renderer has finished.
 +			bool depthDone = false;
-+			both = waitForCardPair(pictures) && showCardPair(pictures, _depthFormat != 0, depthDone);
++			both = showCardPair(pictures, _depthFormat != 0, depthDone);
 +			depthBoth = both && depthDone;
 +		}
 +		else if (box.smoothing && smootherReady())
@@ -86353,7 +86404,7 @@ index 000000000..099f91c43
 +	}
 +	if (_statsCardPairs > 0 || _statsCardLate > 0)
 +	{
-+		log(ANDROID_LOG_INFO, "eyes from the graphics card's textures: %d pairs, %d left out (not finished in time)", _statsCardPairs, _statsCardLate);
++		log(ANDROID_LOG_INFO, "eyes from the graphics card's textures: %d pairs, %d shown a frame or more late (not finished in time)", _statsCardPairs, _statsCardLate);
 +	}
 +	_statsCardPairs = _statsCardLate = 0;
 +#ifdef OPENXCOM3D_XR_FAKE_SESSION
@@ -87062,11 +87113,10 @@ index 000000000..099f91c43
 +	{
 +		return true;
 +	}
-+	++_statsCardLate;
-+	if (!_glErrorLogged)
++	if (waited != GL_TIMEOUT_EXPIRED && !_glErrorLogged)
 +	{
 +		_glErrorLogged = true;
-+		log(ANDROID_LOG_WARN, "an eye pair on the graphics card wasn't ready in time (0x%x, OpenGL error 0x%x): left out (logged once)", waited, glGetError());
++		log(ANDROID_LOG_WARN, "waiting for an eye pair on the graphics card failed (0x%x, OpenGL error 0x%x; logged once)", waited, glGetError());
 +	}
 +	return false;
 +}
@@ -87605,10 +87655,10 @@ index 000000000..099f91c43
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonXrShell.cpp b/src/FirstPerson/FirstPersonXrShell.cpp
 new file mode 100644
-index 000000000..208633aa6
+index 000000000..cd0b1c6c1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonXrShell.cpp
-@@ -0,0 +1,1436 @@
+@@ -0,0 +1,1448 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -88674,6 +88724,7 @@ index 000000000..208633aa6
 +	box.hudHeld = battle && cursorFree();
 +	box.smoothing = Options::fpsVrSmoothing;
 +	box.cardEyesWanted = Options::fpsVrCardEyes && Options::fpsRenderer == 1;
++	box.cardRenders = Options::fpsRenderer == 1;
 +
 +	// The log: another screen coming over the battle and going, the cursor freed and mouse look back.
 +	ControllerInput &input = shell.input;
@@ -88725,9 +88776,20 @@ index 000000000..208633aa6
 +		return false;
 +	}
 +	logBoth("the 3D view in VR mode: starting the immersive activity");
++	{
++		// (The settings this session runs with: a report's log says what the player had on.)
++		int eyeWidth = 0, eyeHeight = 0;
++		vrEyeSize(eyeWidth, eyeHeight);
++		char line[256];
++		snprintf(line, sizeof(line), "settings: VR eye picture %dx%d, VR smoothing %s, Renderer %s, VR eyes kept on the card %s, True colour %s, Supersampling %d",
++			eyeWidth, eyeHeight, Options::fpsVrSmoothing ? "yes" : "no", Options::fpsRenderer == 1 ? "GPU" : "CPU", Options::fpsVrCardEyes ? "yes" : "no",
++			Options::fpsTrueColor ? "yes" : "no", Options::fpsSupersampling);
++		logBoth(line);
++	}
 +	Xr::Shared &box = Xr::shared();
 +	box.gameThreadId = (int)gettid();
 +	box.cardEyesWanted = Options::fpsVrCardEyes && Options::fpsRenderer == 1; // (read when the session's context is made)
++	box.cardRenders = Options::fpsRenderer == 1;
 +	box.finished = false;
 +	box.failed = false;
 +	box.running = false;

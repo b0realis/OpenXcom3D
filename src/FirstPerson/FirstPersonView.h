@@ -1224,6 +1224,7 @@ private:
 	bool _gpuDepthPending = false; // this frame's depth is still on the card (see gpuNeedDepth)
 	// The frame put together on the card (OPENXCOM3D_GPU_PRESENT; see gpuPresent): the picture never comes back as palette
 	// colours; what the CPU draws last goes over an empty picture, and the card lays that over its own and gives the frame.
+	bool _eyesFull = false;              // VR: this frame's eyes are kept on the card in full colour (see renderStereo)
 	int _gpuPresenting = 0;              // this frame: 0 no; 1 yes; 2 beside the usual way, the two compared
 	float _gpuFlameGlow = 0.0f;          // ... a burning soldier's flames light the lower part of the picture this strongly (see drawBurning)
 	bool _hasCardPicture = false;        // the frame drawn last was put together on the card

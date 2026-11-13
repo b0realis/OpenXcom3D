@@ -2472,6 +2472,9 @@ void main()
  */
 const char *const EyeSource = R"(
 uniform usampler2D uColor, uMarks, uHeld; // the finished picture, the CPU's marks, the weapon in hand (palette colours; 0: nothing)
+uniform usampler2D uRayColor, uGlow;      // in full colour: the rays' own palette colours, and the picture's glow (bit 64: smoke over the pixel)
+uniform sampler2D uRayTrue;               // ... the rays' full colours
+uniform int uFull, uShafts;               // 1: in full colour (setting "True colour"), as PresentSource shows it; 1: with light in the air
 uniform sampler2D uSceneDepth, uHeldTest, uHeldDepth, uPalette; // the scene's depth; what depth each of the weapon's pixels was drawn at, and the depth it wrote; the palette
 uniform usampler2D uFlameTint;            // each colour in the flames' orange light (see PresentSource)
 uniform float uFlameGlow;
@@ -2491,6 +2494,7 @@ void main()
 	ivec2 pixel = ivec2(int(gl_FragCoord.x), uViewSize.y - 1 - int(gl_FragCoord.y));
 	float depth = texelFetch(uSceneDepth, pixel, 0).r;
 	uint made = texelFetch(uMarks, pixel, 0).r;
+	bool world = made == 0u; // (the pixel is the world's own, not a mark's or the weapon's: it may show in full colour)
 	if (made == 0u)
 	{
 		made = texelFetch(uColor, pixel, 0).r;
@@ -2512,12 +2516,26 @@ void main()
 			// Hidden where the scene is nearer (the laser with a voxel to spare), as the CPU tests it; 0: over everything.
 			float drawnAt = texelFetch(uHeldTest, pixel, 0).r;
 			float spare = drawnAt < 0.0 ? 1.0 : 0.0;
-			if (!(abs(drawnAt) >= depth + spare)) made = held;
+			if (!(abs(drawnAt) >= depth + spare))
+			{
+				made = held;
+				world = false;
+			}
 		}
 		// (The depth the weapon's faces wrote, where they are nearer than the scene: the nearest wins, as in a depth buffer.)
 		depth = min(depth, texelFetch(uHeldDepth, pixel, 0).r);
 	}
-	outPixel = vec4(texelFetch(uPalette, ivec2(int(made), 0), 0).rgb, 1.0);
+	vec3 shown = texelFetch(uPalette, ivec2(int(made), 0), 0).rgb;
+	if (uFull != 0 && world)
+	{
+		// In full colour: the ray's own where the pixel still has its ray's palette colour; under see-through smoke the
+		// light the card found in the air there, laid on (as PresentSource has both).
+		uint ray = texelFetch(uRayColor, pixel, 0).r;
+		vec3 full = texelFetch(uRayTrue, pixel, 0).rgb;
+		if (made == ray) shown = full;
+		else if (uShafts != 0 && (texelFetch(uGlow, pixel, 0).r & 64u) != 0u) shown = min(vec3(1.0), shown + max(vec3(0.0), full - texelFetch(uPalette, ivec2(int(ray), 0), 0).rgb));
+	}
+	outPixel = vec4(shown, 1.0);
 	float metres = depth * uDepthPlanes.x;
 	float projected = metres <= uDepthPlanes.y ? 0.0 : (isinf(metres) ? 1.0 : uDepthPlanes.z / (uDepthPlanes.z - uDepthPlanes.y) * (1.0 - uDepthPlanes.y / metres));
 	outDepth = min(max(projected, 0.0), 1.0);

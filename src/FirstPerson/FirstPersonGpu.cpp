@@ -2158,8 +2158,8 @@ bool FirstPersonGpu::State::presentEye(EyeFrame &frame)
 			return false;
 		}
 		Gl::UseProgram(eyeProgram);
-		const char *const names[8] = { "uColor", "uMarks", "uHeld", "uSceneDepth", "uHeldTest", "uHeldDepth", "uPalette", "uFlameTint" };
-		for (int unit = 0; unit < 8; ++unit) Gl::Uniform1i(Gl::GetUniformLocation(eyeProgram, names[unit]), unit);
+		const char *const names[11] = { "uColor", "uMarks", "uHeld", "uSceneDepth", "uHeldTest", "uHeldDepth", "uPalette", "uFlameTint", "uRayColor", "uRayTrue", "uGlow" };
+		for (int unit = 0; unit < 11; ++unit) Gl::Uniform1i(Gl::GetUniformLocation(eyeProgram, names[unit]), unit);
 	}
 	// The palette and the flames' tint, as pictures (present's own, made here if no frame was put together yet).
 	if (!presentPalette)
@@ -2263,8 +2263,11 @@ bool FirstPersonGpu::State::presentEye(EyeFrame &frame)
 			return false;
 		}
 	}
-	const Gl::UInt pictures[8] = { kept->second.color, uploads.marks, uploads.held, drawn->second.textures[1], uploads.heldTest, uploads.heldDepth, presentPalette, presentFlameTint };
-	for (int unit = 0; unit < 8; ++unit)
+	// (In full colour only with the rays' own pictures at hand: a ray a pixel.)
+	const bool full = frame.full && kept->second.rayTrue && kept->second.rayColor;
+	const Gl::UInt pictures[11] = { kept->second.color, uploads.marks, uploads.held, drawn->second.textures[1], uploads.heldTest, uploads.heldDepth, presentPalette, presentFlameTint,
+		full ? kept->second.rayColor : kept->second.color, full ? kept->second.rayTrue : presentPalette, kept->second.glow ? kept->second.glow : kept->second.color };
+	for (int unit = 0; unit < 11; ++unit)
 	{
 		Gl::ActiveTexture(Gl::TEXTURE0 + unit);
 		Gl::BindTexture(Gl::TEXTURE_2D, pictures[unit]);
@@ -2279,6 +2282,8 @@ bool FirstPersonGpu::State::presentEye(EyeFrame &frame)
 	Gl::Uniform2i(Gl::GetUniformLocation(eyeProgram, "uViewSize"), width, height);
 	Gl::Uniform4i(Gl::GetUniformLocation(eyeProgram, "uHeldBox"), boxed ? frame.box[0] : 0, boxed ? frame.box[1] : 0, boxed ? frame.box[2] : 0, boxed ? frame.box[3] : 0);
 	Gl::Uniform1i(Gl::GetUniformLocation(eyeProgram, "uDepthWhole"), frame.depthWhole ? 1 : 0);
+	Gl::Uniform1i(Gl::GetUniformLocation(eyeProgram, "uFull"), full ? 1 : 0);
+	Gl::Uniform1i(Gl::GetUniformLocation(eyeProgram, "uShafts"), full && frame.shafts ? 1 : 0);
 	Gl::Uniform3f(Gl::GetUniformLocation(eyeProgram, "uDepthPlanes"), frame.depthToMetres, frame.nearMetres, frame.farMetres);
 	Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
 	if (frame.pixels)

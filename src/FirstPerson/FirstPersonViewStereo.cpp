@@ -66,6 +66,7 @@
  * Nothing here runs unless VR mode asks for it: with it off, the view draws as it always has.
  */
 #include "FirstPersonView.h"
+#include "../Engine/Options.h"
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -310,10 +311,13 @@ void FirstPersonView::renderEyes(const EyeCamera eyes[2], int width, int height,
 	const bool muzzleValid = _muzzleValid, offHandMuzzleValid = _offHandMuzzleValid;
 	_muzzleValid = _offHandMuzzleValid = false;
 	std::copy(headEye, headEye + 3, _spriteEye);
-	// An eye's picture is the palette's (see FirstPerson::VrPicture): on the graphics card too (setting "Renderer": GPU),
-	// whatever the flat view is asked for (setting "True colour").
+	// An eye's picture is the palette's (see FirstPerson::VrPicture), whatever the flat view is asked for; but an eye
+	// kept on the graphics card (finished there, see presentEyeOnCard) is in full colour with the setting "True colour",
+	// and with it come "Smooth light", "Coloured lights", "Reflections" and "Light shafts" (the owner's report from a
+	// Quest 3: those settings changed nothing in the headset).
 	const bool wantsTrueColor = _wantsTrueColor;
-	_wantsTrueColor = false;
+	_eyesFull = onCard == EyesOnCard::Yes && Options::fpsTrueColor && gpuEffectsWanted() == 1;
+	_wantsTrueColor = _eyesFull;
 
 	// Each eye's picture: its target swapped in, its camera, the pointer where the aim point is on it, and the frame's
 	// second half (the second eye's moving nothing on).
@@ -437,6 +441,7 @@ void FirstPersonView::renderEyes(const EyeCamera eyes[2], int width, int height,
 	_replayPass = false;
 	_eyePass = false;
 	_wantsTrueColor = wantsTrueColor;
+	_gpuPresenting = 0; // (an eye in full colour is finished by presentEyeOnCard, not as the flat view's frame)
 	std::copy(headEye, headEye + 3, _eye);
 	_yaw = headYaw;
 	_pitch = headPitch;
@@ -806,6 +811,8 @@ bool FirstPersonView::presentEyeOnCard(int eye, const CardRequest &card)
 		frame.marks = (const Uint8 *)marks.surface->pixels;
 		frame.marksPitch = marks.pitch;
 		frame.depthWhole = target.depthWhole;
+		frame.full = target.onCard && _eyesFull;
+		frame.shafts = _hasLightShafts;
 		if (target.depthWhole)
 		{
 			frame.heldDepth = marks.depth.data();

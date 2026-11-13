@@ -120,7 +120,7 @@ const GLenum TimeElapsedQuery = 0x88BF /* GL_TIME_ELAPSED_EXT */, GpuDisjoint = 
 const int StatsSeconds = 5;
 /// How long the OpenXR thread waits for the renderer to finish an eye pair kept on the graphics card (nanoseconds): a
 /// pair's whole drawing time on a slow frame, and no longer (the headset's frames must go on).
-const GLuint64 CardFenceWaitNs = 250000000;
+const GLuint64 CardFenceWaitNs = 2000000;
 /// Asked to end, the session gets this long to end by itself before the thread leaves anyway (ms).
 const int ExitTimeoutMs = 3000;
 /// OpenGL ES's sRGB format (what the compositor should get our colours as) and the plain one (the fallback).
@@ -413,6 +413,7 @@ private:
 	bool _sharesTextures = false;          // our context is in the renderer's share group
 	bool _cardLogged = false;
 	int _statsCardPairs = 0, _statsCardLate = 0;
+	bool _cardPairWaited = false;           // the pair taken last wasn't finished on the card: asked for again next frame
 	/// Waits for a pair's fence (the renderer has finished its textures); false if it didn't pass in time (the pair is left out).
 	bool waitForCardPair(const EyePictures &pictures);
 	/// Draws an eye kept on the card into a colour texture (a swapchain image) of the target size: smoothed, or as it is.
@@ -939,8 +940,10 @@ void Session::pollEvents()
 			log(ANDROID_LOG_INFO, "session: %s", (unsigned)_state < 9 ? names[_state] : "?");
 			if (_state == XR_SESSION_STATE_READY && !_exitAsked)
 			{
-				// Begin: the frames start; the CPU at its highest steady level (our 3D view is drawn by it),
-				// the GPU at its lowest (we only upload pictures); our two threads' roles for the scheduler.
+				// Begin: the frames start; the CPU at its highest steady level (our 3D view is drawn by it, or its
+				// passes are recorded by it); the GPU at its lowest when we only upload pictures, at its highest
+				// steady level when it casts the world's rays (setting "Renderer": GPU; at the lowest an eye of
+				// 460x500 took a Quest 3 over 20 ms); our two threads' roles for the scheduler.
 				XrSessionBeginInfo beginInfo = { XR_TYPE_SESSION_BEGIN_INFO };
 				beginInfo.primaryViewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
 				if (check(xrBeginSession(_session, &beginInfo), "xrBeginSession"))
@@ -950,7 +953,9 @@ void Session::pollEvents()
 					if (_setPerformanceLevel)
 					{
 						check(_setPerformanceLevel(_session, XR_PERF_SETTINGS_DOMAIN_CPU_EXT, XR_PERF_SETTINGS_LEVEL_SUSTAINED_HIGH_EXT), "CPU level");
-						check(_setPerformanceLevel(_session, XR_PERF_SETTINGS_DOMAIN_GPU_EXT, XR_PERF_SETTINGS_LEVEL_SUSTAINED_LOW_EXT), "GPU level");
+						const bool cardRenders = box.cardRenders;
+						check(_setPerformanceLevel(_session, XR_PERF_SETTINGS_DOMAIN_GPU_EXT, cardRenders ? XR_PERF_SETTINGS_LEVEL_SUSTAINED_HIGH_EXT : XR_PERF_SETTINGS_LEVEL_SUSTAINED_LOW_EXT), "GPU level");
+						log(ANDROID_LOG_INFO, "performance levels: the CPU sustained high, the graphics chip sustained %s", cardRenders ? "high (it draws the 3D world)" : "low");
 					}
 					if (_setApplicationThread)
 					{
@@ -1381,16 +1386,29 @@ void Session::uploadPictures()
 	readSmoothingTimers();
 	const Clock::time_point start = Clock::now();
 	bool uploaded = false;
-	if (box.eyes.take())
+	// A pair kept on the card that the renderer hasn't finished yet is asked for again, frame after frame, until it is
+	// or a newer one has come. The display's frames never wait for it, and the last pair shows on meanwhile. (Waited
+	// for up to a quarter of a second and then left out with nothing shown in its place, a late pair made the headset
+	// stutter or go black: the owner's report from a Quest 3.)
+	const bool waitedFor = _cardPairWaited;
+	_cardPairWaited = false;
+	bool pairTaken = box.eyes.take() || waitedFor;
+	if (pairTaken && box.eyes.front().onCard && !waitForCardPair(box.eyes.front()))
+	{
+		_cardPairWaited = true;
+		if (!waitedFor) ++_statsCardLate;
+		pairTaken = false;
+	}
+	if (pairTaken)
 	{
 		const EyePictures &pictures = box.eyes.front();
 		bool both = true;
 		bool depthBoth = _depthFormat && !pictures.depth[0].empty() && !pictures.depth[1].empty();
 		if (pictures.onCard)
 		{
-			// Kept on the graphics card: from its textures, once the renderer has finished them (else the pair is left out).
+			// Kept on the graphics card: from its textures, which the renderer has finished.
 			bool depthDone = false;
-			both = waitForCardPair(pictures) && showCardPair(pictures, _depthFormat != 0, depthDone);
+			both = showCardPair(pictures, _depthFormat != 0, depthDone);
 			depthBoth = both && depthDone;
 		}
 		else if (box.smoothing && smootherReady())
@@ -1493,7 +1511,7 @@ void Session::reportStatistics()
 	}
 	if (_statsCardPairs > 0 || _statsCardLate > 0)
 	{
-		log(ANDROID_LOG_INFO, "eyes from the graphics card's textures: %d pairs, %d left out (not finished in time)", _statsCardPairs, _statsCardLate);
+		log(ANDROID_LOG_INFO, "eyes from the graphics card's textures: %d pairs, %d shown a frame or more late (not finished in time)", _statsCardPairs, _statsCardLate);
 	}
 	_statsCardPairs = _statsCardLate = 0;
 #ifdef OPENXCOM3D_XR_FAKE_SESSION
@@ -2202,11 +2220,10 @@ bool Session::waitForCardPair(const EyePictures &pictures)
 	{
 		return true;
 	}
-	++_statsCardLate;
-	if (!_glErrorLogged)
+	if (waited != GL_TIMEOUT_EXPIRED && !_glErrorLogged)
 	{
 		_glErrorLogged = true;
-		log(ANDROID_LOG_WARN, "an eye pair on the graphics card wasn't ready in time (0x%x, OpenGL error 0x%x): left out (logged once)", waited, glGetError());
+		log(ANDROID_LOG_WARN, "waiting for an eye pair on the graphics card failed (0x%x, OpenGL error 0x%x; logged once)", waited, glGetError());
 	}
 	return false;
 }
