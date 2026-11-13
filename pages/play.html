@@ -1012,13 +1012,13 @@ ln -s "/path/to/XCOM" ~/.local/share/openxcom3d/UFO</pre></div>
 </article>
 <article class="feature row" id="f-move"><h3>Walking, jumping, falling</h3>
 <div class="shots"><figure><a href="img/guide/landing_warning.png"><img src="img/guide/landing_warning.png" width="1280" height="800" loading="lazy" alt="TFTD, Check the landing: a step towards the sea stops at the edge, UNSAFE LANDING! PUSH AGAIN"></a><figcaption>TFTD, Check the landing: a step towards the sea stops at the edge, UNSAFE LANDING! PUSH AGAIN</figcaption></figure><figure><a href="img/guide/sprint_dusk.png"><img src="img/guide/sprint_dusk.png" width="1280" height="800" loading="lazy" alt="Sprinting down a street at dusk"></a><figcaption>Sprinting down a street at dusk</figcaption></figure></div>
-<p>Walk freely or tile by tile, every tile at its time units. Space vaults low obstacles; walking off a ledge falls to the level below, hurt by the height. A step onto ground no one can walk on, or where no step leads on, asks first.</p>
+<p>Walk freely or tile by tile, every tile at its time units. Space vaults low obstacles; walking off a ledge falls to the level below, hurt by the height. A step onto ground no one can walk on, or where no step leads on, asks first. Walking diagonally costs a diagonal step's time units, as on the map. <i>Compass: step costs</i> (off by default) writes what a step each way, a level up or down and a turn would cost, round the compass.</p>
 <p class="meta"><span>Keys</span> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>, numpad, <kbd>Space</kbd>, <kbd>Caps Lock</kbd>, <kbd>`</kbd></p>
 <p class="meta"><span>How it plays</span> Falls and vaults are shortcuts the map doesn't have (each a setting). Sprint costs less time and more energy, and like en passant keeps walking when an enemy shows up; being shot at stops any walk, as on the map.</p>
 </article>
 <article class="feature row" id="f-fly"><h3>Lifts, ladders and flight</h3>
 <div class="shots"><figure><a href="img/guide/ufo_flight_climb_arrow.png"><img src="img/guide/ufo_flight_climb_arrow.png" width="1280" height="800" loading="lazy" alt="A flying suit: the arrow left of the compass lit yellow, W climbs"></a><figcaption>A flying suit: the arrow left of the compass lit yellow, W climbs</figcaption></figure></div>
-<p>Ride a grav lift, climb a ladder, fly with SUIT FLY on: W looking up climbs, looking down sinks, each level paid as on the map. Purple arrows show the ways. Flight stays on through a save and a load, and when you touch down: Page Down on the ground switches it off.</p>
+<p>Ride a grav lift, climb a ladder, fly with SUIT FLY on: W looking up climbs, looking down sinks, each level paid as on the map. Purple arrows show the ways. Flight stays on through a save and a load, and when you touch down: Page Down on the ground switches it off. With <i>Lift beams</i> (and <i>Particles</i>), motes and streaks of light rise from a grav lift's floor.</p>
 <p class="meta"><span>Keys</span> <kbd>Page Up</kbd> <kbd>Page Down</kbd>, <kbd>B</kbd>, <kbd>W</kbd> looking up</p>
 </article>
 <article class="feature row" id="f-tank"><h3>Tanks and their turrets</h3>
@@ -1103,8 +1103,42 @@ ln -s "/path/to/XCOM" ~/.local/share/openxcom3d/UFO</pre></div>
 <p>Bars that read: with <i>Scaled</i> a stat whose longest maximum won't fit shrinks for all your units alike, on the map and in 3D.</p>
 <p class="meta"><span>How it plays</span> Two soldiers' bars stay comparable.</p>
 </article>
+<article class="feature row" id="f-markers"><h3>Enemy and wounded markers</h3>
+<div class="shots"><figure><a href="img/guide/enemy_markers_112.png"><img src="img/guide/enemy_markers_112.png" width="640" height="400" loading="lazy" alt="A street at dusk: enemies marked red (seen), yellow (hidden in the smoke, but a clear shot) and green (seen only by the squad)"></a><figcaption>A street at dusk: enemies marked red (seen), yellow (hidden in the smoke, but a clear shot) and green (seen only by the squad)</figcaption></figure><figure><a href="img/guide/wounded_markers_112.png"><img src="img/guide/wounded_markers_112.png" width="640" height="400" loading="lazy" alt="TFTD: our own wounded marked in blue, one about to pass out in purple"></a><figcaption>TFTD: our own wounded marked in blue, one about to pass out in purple</figcaption></figure></div>
+<p>Numbered arrows over the units the game gives a button at the right, in that button's colour, as on the map. Enemies: <b>red</b>, the soldier you look through sees it; <b>green</b>, only the squad does; <b>yellow</b> (with <i>Enemy markers</i> at Clear shot), one of the green ones this soldier has a clear line of fire to, hidden in smoke, the dark or camouflage. Your own: <b>blue</b>, wounded; <b>purple</b>, about to pass out. A body out cold has its marker where it lies.</p>
+<p class="meta"><span>Keys</span> Settings <i>Enemy markers</i> and <i>Wounded markers</i></p>
+<p class="meta"><span>How it plays</span> Who to shoot, who to patch up, without leaving the soldier's eyes.</p>
+</article>
+<article class="feature row" id="f-damage"><h3>Damage numbers</h3>
+<div class="shots"><figure><a href="img/guide/damage_numbers_112.png"><img src="img/guide/damage_numbers_112.png" width="640" height="400" loading="lazy" alt="TFTD: a hit's damage rising over a Calcinite on a cruise ship's deck"></a><figcaption>TFTD: a hit's damage rising over a Calcinite on a cruise ship's deck</figcaption></figure></div>
+<p>When a unit is hit, numbers rise over it and fade in a second and a half, in 3D and on the map: the health taken in <b>red</b>, the armour worn off the side that was hit in <b>blue</b>, the stun in <b>purple</b>, what an energy shield lost in white (the big mods' shields), and a grey <b>0</b> when the armour stopped it all.</p>
+<p class="meta"><span>Keys</span> Setting <i>Damage numbers</i> (off by default)</p>
+<p class="meta"><span>How it plays</span> See at once whether a weapon gets through.</p>
+</article>
+<article class="feature row" id="f-far"><h3>Seeing far, and what you haven't seen</h3>
+<div class="shots"><figure><a href="img/guide/long_view_112.png"><img src="img/guide/long_view_112.png" width="640" height="400" loading="lazy" alt="A town out to 200 tiles, the unseen in mist"></a><figcaption>A town out to 200 tiles, the unseen in mist</figcaption></figure><figure><a href="img/guide/wall_paint_112.png"><img src="img/guide/wall_paint_112.png" width="640" height="400" loading="lazy" alt="A brick house from behind, in its own brick"></a><figcaption>A brick house from behind, in its own brick</figcaption></figure></div>
+<p><i>View distance</i> reaches 60 to 200 tiles, with a slight mist over the last stretch. <i>Unseen terrain</i> draws what your squad hasn't explored as plain slate shapes in a mist, as darker shapes in a fog, or as it is (units and items there stay hidden either way). With <i>Fog of war in 3D</i> off, what the view itself sees within your soldiers' sight is drawn as seen: the floor below the stairs shows as you look at it. <i>Wall paint</i> gives a wall's face the map never shows the paint of the side it faces: a house from behind is its outside, not its rooms' wallpaper.</p>
+<p class="meta"><span>Keys</span> Settings <i>View distance</i>, <i>Unseen terrain</i>, <i>Fog of war in 3D</i>, <i>Wall paint</i></p>
+<p class="meta"><span>How it plays</span> The long, clear view: <i>View distance</i> 200, <i>Distance haze</i> Clear, <i>Unseen terrain</i> Visible. As the map plays: <i>Fog of war in 3D</i> As map.</p>
+</article>
+<article class="feature row" id="f-hitboxes"><h3>Hit as drawn</h3>
+<div class="shots"><figure><a href="img/guide/hitbox_outlines_112.png"><img src="img/guide/hitbox_outlines_112.png" width="640" height="400" loading="lazy" alt="TFTD: the squad and two Aquatoids outlined as the shots test them"></a><figcaption>TFTD: the squad and two Aquatoids outlined as the shots test them</figcaption></figure></div>
+<p>With <i>Full sprite hitboxes</i> a unit is hit exactly where its picture shows, between two tiles while it walks or flies, by arrows and other arcing shots too. <i>Hitboxes</i> (Off, Aimed, Always, Blink) outlines what the shots really test, in the colour of the unit's side; <i>Glowing outlines</i> makes the outline shine.</p>
+<p class="meta"><span>Keys</span> Settings <i>Full sprite hitboxes</i> and <i>Hitboxes</i></p>
+<p class="meta"><span>How it plays</span> Aim at what you see; check a doubtful shot with the outline.</p>
+</article>
+<article class="feature row" id="f-sounds"><h3>Ambient sounds</h3>
+<p>Rain, wind and the fires near you, made by the game itself: rain in the jungle, wind in snow and blowing sand, in slow gusts. Under a roof it is muffled, the rain drumming above you; a fire crackles from its side.</p>
+<p class="meta"><span>Keys</span> Setting <i>Ambient sounds</i></p>
+</article>
+<article class="feature row" id="f-gpu"><h3>On the graphics card</h3>
+<div class="shots"><figure><a href="img/guide/gpu_street_114.png"><img src="img/guide/gpu_street_114.png" width="1280" height="800" loading="lazy" alt="A street at dusk, Renderer GPU with everything on: true colour, smooth light, soft shadows, a shadow from every lamp, ambient occlusion, coloured lights, light shafts"></a><figcaption>A street at dusk, Renderer GPU with everything on: true colour, smooth light, soft shadows, a shadow from every lamp, ambient occlusion, coloured lights, light shafts</figcaption></figure></div>
+<p><i>Renderer</i> GPU has the graphics card draw the 3D world and the units and effects in it: the same picture as the CPU's, much faster on a big screen; the CPU takes over by itself where a card can't. <i>3D resolution</i> draws the world as fine as the HUD, the battlescape or the display itself; <i>HUD scale</i> sizes the HUD on a big screen. On the card the picture can be finer than the old game's: <i>Supersampling</i>, <i>Soft sun shadows</i>, <i>Shadows from every light</i>, <i>Ambient occlusion</i>; and with <i>True colour</i>, past the palette's 256 colours: <i>Smooth light</i> (no dither dots), <i>Coloured lights</i> (shots, explosions and fires light what is round them), <i>Reflections</i> (the sea mirrors the sky) and <i>Light shafts</i> (beams in smoke, and under the sea).</p>
+<p class="meta"><span>Keys</span> Settings <i>Renderer</i>, <i>3D resolution</i>, <i>HUD scale</i>, and the finer picture's (all off by default)</p>
+<p class="meta"><span>How it plays</span> A big screen: <i>Renderer</i> GPU and <i>3D resolution</i> Display. The old game's look, only faster: leave the rest off.</p>
+</article>
 <article class="feature row" id="f-perf"><h3>Performance</h3>
-<p><i>Pixel size</i> 2 or 3 colours a block of pixels per ray, much faster on big screens; <i>Shadows</i> and <i>Particles</i> off help slow machines; the frame rate cap is the game's own.</p>
+<p><i>Renderer</i> GPU is the big one where there is a graphics card. On the CPU, <i>Pixel size</i> 2 or 3 colours a block of pixels per ray, much faster on big screens; <i>Shadows</i> and <i>Particles</i> off help slow machines; the frame rate cap is the game's own.</p>
 </article>
 </div></section>
 <section id="gallery" class="sec gutter"><div class="col gallery">
