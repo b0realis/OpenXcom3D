@@ -983,12 +983,9 @@ What `FirstPersonView` draws:
 
 ## 11. Version history
 
-### After 1.14
-
-- New setting *Rangefinder* (HUD: Off, Digital, Analogue; Off by default) and key *Range (hold)* (unbound) (GitHub issue #139). Digital: the tiles from the unit to the point under the crosshair, left of it (`_txtRange`). Analogue: a stadiametric scale as in the PSO-1 scope (`drawRangeScale`, FirstPersonModeShooting.cpp): a line and a dotted curve as high over it at each of five marks as a standing soldier (`RangeSubjectVoxels`, 25 voxels, "1.7m") shows at that many tiles; the marks are the first five of a ladder (2 to 120 tiles) that fit an eighth of the view's height through the lens not zoomed in, and zoomed in the curve grows with the picture (up to 4 times), so it reads true at any magnification.
-
 ### 1.14 (2026-11-13)
 
+- New setting *Rangefinder* (HUD: Off, Digital, Analogue; Off by default) and key *Range (hold)* (unbound) (GitHub issue #139). Digital: the tiles from the unit to the point under the crosshair, left of it (`_txtRange`). Analogue: a stadiametric scale as in the PSO-1 scope (`drawRangeScale`, FirstPersonModeShooting.cpp): a line and a dotted curve as high over it at each of five marks as a standing soldier (`RangeSubjectVoxels`, 25 voxels, "1.7m") shows at that many tiles; the marks are the first five of a ladder (2 to 120 tiles) that fit an eighth of the view's height through the lens not zoomed in, and zoomed in the curve grows with the picture (up to 4 times), so it reads true at any magnification.
 - New setting *Fall damage* (Combat, YES by default, as before): NO lets a soldier step off ledges with *Falling* and land unhurt; before, the only way to have no fall damage was *Falling* off, which also stopped every step off a ledge (GitHub issue #137). `fallDamage` (FirstPersonModeMovement.cpp).
 - *Futuristic night vision* with *See-through corpses*: a body or a pile of items gone faint under the crosshair keeps its own colours over the green world; it went green with it (GitHub issue #136). A faint picture that keeps its colours is mixed over the world already in the night vision's colours and marked as its own (`plot` in FirstPersonViewSprites.cpp, the same in the card's `EffectsSource`).
 - Free movement: walking diagonally no longer stutters (a straight step put the camera back inside its tile on the other axis), and two straight steps round a corner cost what the one diagonal step costs (6 time units on plain ground, not 8), where the game would let the soldier walk that diagonal.

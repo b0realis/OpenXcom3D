@@ -49,7 +49,7 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 - **A finer picture on the graphics card** (all off by default): supersampling, soft sun shadows, a shadow from every lamp and flare, ambient occlusion; the 3D world in true colour with smooth light (no dither dots), coloured light from shots, explosions and fires, a sea that mirrors the sky, and light shafts in smoke and under the sea.
 - **Lift beams:** a grav lift's floor sends motes and streaks of light up its shaft.
 - **Throwing:** Classic (by tile) or Modern: throws and arcing shots go for the exact point under the crosshair.
-- **Step costs round the compass**, **the alien turn seen as your soldier faces**, and **fall damage** apart from *Falling*, each a setting.
+- **Step costs round the compass**, **the alien turn seen as your soldier faces**, **fall damage** apart from *Falling*, and a **rangefinder** (digital, or an analogue scope scale), each a setting.
 - **Smoother:** fire's flames blend from frame to frame; walking diagonally no longer stutters and costs a diagonal's time units; dark places fade to black through the palette's darker colours.
 - **Fixed:** a bow is held as a bow; a mod's flames and campfires no longer flicker between shapes; a hit on an energy shield shows what the shield lost; walking into a unit you can't see stops as at a wall; buildings a mod lists among its UFOs are no longer lit as UFOs.
 
