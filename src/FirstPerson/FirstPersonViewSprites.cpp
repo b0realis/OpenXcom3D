@@ -3707,8 +3707,7 @@ void FirstPersonView::drawDownedIcons()
 			if (!projectToScreen(point, screenX, screenY, depth) || depth > _maxDistance) break;
 			const int pixelX = (int)screenX, pixelY = (int)screenY;
 			if (pixelX < 0 || pixelY < 0 || pixelX >= width || pixelY >= height) continue;
-			gpuNeedDepth();
-			inView = _depthBuffer[pixelY * width + pixelX] >= depth - 8.0;
+			inView = gpuDepthAt(pixelX, pixelY) >= depth - 8.0; // (one pixel: the depth picture stays on the card)
 			break;
 		}
 		if (!inView)

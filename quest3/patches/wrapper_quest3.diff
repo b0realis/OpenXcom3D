@@ -13,7 +13,7 @@ index 82dc586..e063ca7 100644
 +app/src/main/assets/5_openxcom3d_mod.zip
 +app/src/main/assets/5_openxcom3d_mod.zip.MD5
 diff --git a/app/build.gradle b/app/build.gradle
-index 8a05411..8cca5aa 100644
+index 8a05411..03a4998 100644
 --- a/app/build.gradle
 +++ b/app/build.gradle
 @@ -1,23 +1,57 @@
@@ -66,7 +66,7 @@ index 8a05411..8cca5aa 100644
 +// The version code: the Quest builds' own counter, one up for every build that goes to the
 +// headset (an update must not go down; 1.11's panel build, phase A, was 111). The version name
 +// stays the mod's.
-+def questVersionCode = 124
++def questVersionCode = 125
  
 -def getRevision() {
 -    def proc = ['git', 'rev-parse', '--short=7', 'HEAD'].execute(null, rootDir)

@@ -222,6 +222,7 @@ public:
 		int slot = 0, eye = 0;             // which of the three pairs kept (one being made, one ready, one shown), and which eye of it
 		const Uint8 *marks = nullptr;      // what the CPU drew over everything after the card's passes, over an empty picture: palette colours, 0 where nothing
 		int marksPitch = 0;                // ... bytes from one row to the next
+		int marksBox[4] = {};              // ... the part of the picture that holds anything: left, top, one past the right, one past the bottom (empty: nothing); only that part is sent up
 		const Uint8 *held = nullptr;       // the weapon in hand, its laser and the crosshair, over an empty picture of their own
 		int heldPitch = 0;
 		const float *heldTest = nullptr;   // ... the depth each of those pixels was drawn at (0: over everything; below 0: that far, with a voxel to spare); width floats a row
@@ -282,6 +283,9 @@ public:
 	static void *shareContext();
 	/// The depth of the units and effects last drawn for a view of this size, read back after all (see Effects::readDepth).
 	bool readEffectsDepth(int width, int height, float *depth);
+	/// One pixel of that depth (the column and the row from the top): for a mark that asks about a single spot, so the
+	/// whole picture need not come back (and, for VR's eyes, need not go up again: see FirstPersonView::gpuDepthAt).
+	bool readEffectsDepthAt(int width, int height, int pixelX, int pixelY, float &depth);
 
 private:
 	FirstPersonGpu();

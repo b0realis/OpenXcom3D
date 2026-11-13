@@ -70,6 +70,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstring>
 #include <iomanip>
 #include <SDL.h>
 #include "../Engine/Logger.h"
@@ -103,6 +104,42 @@ const double VrHeldNearest = 0.2;
 /// picture (and at least one).
 const float VrLaserWidth = 0.06f;
 const int VrLaserMostPixels = 2;
+
+/**
+ * The box round what a palette picture holds (colour 0: nothing), for sending only that part of it to the card: its
+ * first and last rows and columns that hold anything. A row is looked through eight pixels at a time while they hold
+ * nothing (most rows of the marks' picture and of the weapon's hold nothing at all).
+ * @param pixels The picture's rows, pitch bytes from one to the next, width by height.
+ * @param box Set to: left, top, one past the right, one past the bottom; all 0 when the picture holds nothing.
+ */
+void filledBox(const Uint8 *pixels, int pitch, int width, int height, int box[4])
+{
+	box[0] = width; box[1] = height; box[2] = box[3] = 0;
+	for (int row = 0; row < height; ++row)
+	{
+		const Uint8 *rowPixels = pixels + (size_t)row * pitch;
+		Uint64 eight = 0;
+		int first = 0, last = width;
+		while (first + 8 <= width)
+		{
+			std::memcpy(&eight, rowPixels + first, 8);
+			if (eight) break;
+			first += 8;
+		}
+		while (first < width && !rowPixels[first]) ++first;
+		if (first == width) continue;
+		while (last - 8 > first)
+		{
+			std::memcpy(&eight, rowPixels + last - 8, 8);
+			if (eight) break;
+			last -= 8;
+		}
+		while (!rowPixels[last - 1]) --last;
+		box[0] = std::min(box[0], first); box[2] = std::max(box[2], last);
+		box[1] = std::min(box[1], row); box[3] = row + 1;
+	}
+	if (box[2] <= box[0]) box[0] = box[1] = box[2] = box[3] = 0;
+}
 
 }
 
@@ -259,7 +296,11 @@ void FirstPersonView::useEyeCamera(const EyeCamera &eye, EyeTarget &target)
  * picture, and the frame's second half; the second eye's moving nothing on. The view's own
  * camera is put back after, and its own picture is left as it was (not drawn this frame). Last in
  * each eye, the weapon in hand (see setHeldModel), put into the world once (see placeHeldModel).
- * The time it all took is summed, and logged every VrTimingLogTime.
+ * The time it all took is summed, and logged every VrTimingLogTime: the frame's shared part, and of each eye its passes
+ * (with the card drawing: the recording, and the wait for the card where the pointer's notes are read back), what is
+ * drawn last, and for an eye kept on the card its finishing there (the marks and the weapon sent up), then the pair's
+ * fence. (What the card itself spends on each stage: OPENXCOM3D_GPU_STAGES, see FirstPersonGpu.cpp; each pass's share
+ * on this thread: OPENXCOM3D_PASS_TIME, see drawPass.)
  * @param eyes The two eyes: the left, the right.
  * @param width Each eye's picture's width, in pixels.
  * @param height Its height.
@@ -426,15 +467,19 @@ void FirstPersonView::renderEyes(const EyeCamera eyes[2], int width, int height,
 		// Kept on the card: what the caller draws last, then finished there (before the next eye's world takes its place).
 		if (target.onCard || target.checked)
 		{
+			const auto finishStarted = std::chrono::steady_clock::now();
 			if (card->drawnLast) card->drawnLast(eyeIndex);
 			eyesKept += presentEyeOnCard(eyeIndex, *card) ? 1 : 0;
+			_stereoFinish += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - finishStarted).count();
 		}
 	}
 	if (eyesKept == 2)
 	{
+		const auto fenceStarted = std::chrono::steady_clock::now();
 		FirstPersonGpu *gpu = readyFirstPersonGpu();
 		_cardEyes.fence = gpu ? gpu->eyeFence(card->slot) : nullptr;
 		_cardEyesKept = _cardEyes.fence != nullptr;
+		_stereoFence += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - fenceStarted).count();
 	}
 
 	// The head's camera back, as the mode set it.
@@ -478,10 +523,11 @@ void FirstPersonView::renderEyes(const EyeCamera eyes[2], int width, int height,
 		Log(LOG_INFO) << "OpenXcom3D: VR, two eyes of " << width << "x" << height << ": " << std::fixed << std::setprecision(2) << _stereoTotal / frames
 			<< " ms a frame (the shared part " << _stereoShared / frames << ", each eye " << (_stereoTotal - _stereoShared) / frames / 2.0
 			<< ": its passes " << _stereoPasses / frames / 2.0 << ", its depth fetched from the card " << _stereoDepth / frames / 2.0 << ", what is drawn last "
-			<< _stereoLast / frames / 2.0 << "), the slowest " << _stereoWorst << " ms, over " << _stereoFrames << " frames";
+			<< _stereoLast / frames / 2.0 << ", finishing it on the card " << _stereoFinish / frames / 2.0 << "; the pair's fence " << _stereoFence / frames
+			<< "), the slowest " << _stereoWorst << " ms, over " << _stereoFrames << " frames";
 		_stereoTimingSince = now;
 		_stereoFrames = 0;
-		_stereoTotal = _stereoShared = _stereoWorst = _stereoPasses = _stereoDepth = _stereoLast = 0.0;
+		_stereoTotal = _stereoShared = _stereoWorst = _stereoPasses = _stereoDepth = _stereoLast = _stereoFinish = _stereoFence = 0.0;
 	}
 }
 
@@ -810,6 +856,7 @@ bool FirstPersonView::presentEyeOnCard(int eye, const CardRequest &card)
 		frame.eye = eye;
 		frame.marks = (const Uint8 *)marks.surface->pixels;
 		frame.marksPitch = marks.pitch;
+		filledBox(frame.marks, marks.pitch, width, height, frame.marksBox); // (after the caller drew the crosshair, if it went among them)
 		frame.depthWhole = target.depthWhole;
 		frame.full = target.onCard && _eyesFull;
 		frame.shafts = _hasLightShafts;
@@ -821,18 +868,7 @@ bool FirstPersonView::presentEyeOnCard(int eye, const CardRequest &card)
 		{
 			// Where the weapon's picture holds anything: its first and last rows and columns that do.
 			int *box = _heldBoxes[eye];
-			box[0] = width; box[1] = height; box[2] = box[3] = 0;
-			for (int row = 0; row < height; ++row)
-			{
-				const Uint8 *pixels = (const Uint8 *)held.surface->pixels + (size_t)row * held.pitch;
-				int first = 0, last = width;
-				while (first < width && !pixels[first]) ++first;
-				if (first == width) continue;
-				while (!pixels[last - 1]) --last;
-				box[0] = std::min(box[0], first); box[2] = std::max(box[2], last);
-				box[1] = std::min(box[1], row); box[3] = row + 1;
-			}
-			if (box[2] <= box[0]) box[0] = box[1] = box[2] = box[3] = 0;
+			filledBox((const Uint8 *)held.surface->pixels, held.pitch, width, height, box);
 			_heldBoxFound[eye] = true;
 			std::copy(box, box + 4, frame.box);
 			frame.held = (const Uint8 *)held.surface->pixels;

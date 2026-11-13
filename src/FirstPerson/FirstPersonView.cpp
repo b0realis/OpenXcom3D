@@ -685,8 +685,8 @@ void FirstPersonView::drawPass()
 	// (OPENXCOM3D_PASS_TIME: the log gets each pass's share of the main view's drawing time, averaged over 120 frames;
 	// the facing rings, which the caller draws after this, are not among them.)
 	static const bool passTime = getenv("OPENXCOM3D_PASS_TIME") != nullptr;
-	static const char *const passNames[] = { "castAllRays", "watchUnits", "drawDecals", "drawFloorItems", "drawEdgeDots", "drawUnits", "drawFire", "drawProjectilesAndExplosions", "drawFlares", "drawBeams", "drawPellets", "drawTrajectory", "drawSeeThroughSmoke", "findUnitAtPointer", "drawParticles", "drawLightHalos", "applyScreenWash", "drawTrajectory", "applySignalGlitches", "drawBurning", "drawHurt", "drawDamageNumbers", "drawDownedIcons", "drawMarkers", "drawSprayMarks" };
-	static double passSums[25] = {};
+	static const char *const passNames[] = { "castAllRays", "watchUnits", "drawDecals", "drawFloorItems", "drawEdgeDots", "drawUnits", "drawFire", "drawProjectilesAndExplosions", "drawFlares", "drawBeams", "drawPellets", "drawTrajectory", "drawSeeThroughSmoke", "findUnitAtPointer", "drawParticles", "drawLightHalos", "applyScreenWash", "drawTrajectory", "applySignalGlitches", "drawBurning", "drawHurt", "drawDamageNumbers", "drawDownedIcons", "drawMarkers", "drawSprayMarks", "gpuDrawEffects" };
+	static double passSums[26] = {};
 	static int passFrames = 0;
 	double *const passTimes = passTime && getWidth() >= 320 ? passSums : nullptr;
 	// Draw straight into the surface's pixels.
@@ -720,7 +720,8 @@ void FirstPersonView::drawPass()
 	// and the bloom over that, and gives the finished one back. (Its check: the CPU's own bloom first, then the two compared.)
 	if (_gpuRecording && !_gpuChecking)
 	{
-		PassTimer pass(passTimes, 0);
+		// (Its own time, apart from the rays': the bins made, the primitives sent, and the wait for the card where anything is read back.)
+		PassTimer pass(passTimes, 25);
 		gpuDrawEffects(); // (the bloom and the screen wash with them)
 	}
 	else

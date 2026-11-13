@@ -618,7 +618,10 @@ bool FirstPersonView::gpuDrawEffects()
 	effects.seeThrough = _seeThroughTables.empty() ? nullptr : _seeThroughTables.data();
 	effects.paletteHash = _colors.paletteHash;
 	// The bloom after them, as drawLightHalos sets it up.
-	effects.halos = !_nearestRgb.empty();
+	// (OPENXCOM3D_GPU_SKIP_BLOOM, a measurement for a headset's log, not a way to play: the frame without the bloom's
+	// eleven passes, to see what they cost there; nothing glows round the lights.)
+	static const bool skipBloom = getenv("OPENXCOM3D_GPU_SKIP_BLOOM") != nullptr;
+	effects.halos = !_nearestRgb.empty() && !skipBloom;
 	effects.glowGain = _colors.underwater ? 45.0f : 18.0f + 42.0f * _colors.night;
 	effects.maxDistance = _maxDistance;
 	effects.palette = getPalette();
@@ -646,7 +649,11 @@ bool FirstPersonView::gpuDrawEffects()
 	effects.notes = allNotes ? list.notes.data() : nullptr;
 	const int patchLeft = std::max(0, _pointerX - PointerReach), patchTop = std::max(0, _pointerY - PointerReach),
 		patchRight = std::min(width, _pointerX + PointerReach + 1), patchBottom = std::min(height, _pointerY + PointerReach + 1);
-	const bool patched = !allNotes && patchLeft < patchRight && patchTop < patchBottom;
+	// (OPENXCOM3D_GPU_SKIP_POINTER_NOTES, a measurement for a headset's log, not a way to play: the patch isn't read back,
+	// so nothing is found under the pointer, and the game's thread no longer waits here for the card to finish the
+	// picture; the frame rate with it against the rate without says what reading the notes without waiting would gain.)
+	static const bool skipPointerNotes = getenv("OPENXCOM3D_GPU_SKIP_POINTER_NOTES") != nullptr;
+	const bool patched = !allNotes && !skipPointerNotes && patchLeft < patchRight && patchTop < patchBottom;
 	effects.patch[0] = patchLeft; effects.patch[1] = patchTop;
 	effects.patch[2] = patched ? patchRight - patchLeft : 0; effects.patch[3] = patched ? patchBottom - patchTop : 0;
 	list.patchNotes.resize((size_t)(2 * PointerReach + 1) * (2 * PointerReach + 1) * 4);
@@ -792,6 +799,31 @@ void FirstPersonView::gpuFetchDepth()
 	{
 		std::fill(_depthBuffer.begin(), _depthBuffer.end(), 0.0f); // (the card failed: everything counts as hidden this frame)
 	}
+}
+
+/**
+ * The frame's finished depth at one pixel (which must be on the view), for a mark that only asks about a single spot (a
+ * downed unit's icons: is the body's place in view?). With the depth still on the card that one pixel is read from
+ * there and the rest stays: the whole picture came back for it before, and then, for an eye of VR kept on the card,
+ * went up again as the eye's finished depth with the weapon tested here on the CPU (see FirstPersonView::renderEyes):
+ * megabytes each way for one number. The answer is the same number. If the card can't say, the whole depth is fetched
+ * as before.
+ */
+float FirstPersonView::gpuDepthAt(int pixelX, int pixelY)
+{
+	const size_t index = (size_t)pixelY * getWidth() + pixelX;
+	if (!_gpuDepthPending)
+	{
+		return _depthBuffer[index];
+	}
+	FirstPersonGpu *gpu = readyFirstPersonGpu();
+	float depth = 0.0f;
+	if (gpu && gpu->readEffectsDepthAt(getWidth(), getHeight(), pixelX, pixelY, depth))
+	{
+		return depth;
+	}
+	gpuFetchDepth();
+	return _depthBuffer[index];
 }
 
 /**

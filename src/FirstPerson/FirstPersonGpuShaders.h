@@ -77,6 +77,7 @@ const float FlatContrast = 26.0 / 255.0; // a pixel within this of all its neigh
 const float NearContrast = 64.0 / 255.0; // the same where a voxel covers several pixels: there its neighbours' colours are the texture drawn large, not shimmer, and only a strong line between two of them is worth more rays
 #endif
 uniform vec2 uFovea;         // an eye's picture in VR, setting "VR foveation": out to x of its half width from the view axis a ray a pixel, to y one for 2 x 2, beyond one for 4 x 4; x 0: off
+uniform int uFoveaCoarse;    // "VR foveation" cast in three goes (see FirstPersonGpu.cpp, castFoveaLayers): this go's picture has a pixel for each block of this many pixels each way of the eye's picture (1, 2 or 4); 0: not that way
 uniform vec2 uRayOffset;     // where in its pixel the ray goes, from the middle (0, 0: the CPU's ray; else one of several, setting "Supersampling")
 uniform float uGhostScale;
 uniform int uSeeThroughCrops;
@@ -1731,6 +1732,10 @@ vec3 lightShafts(vec3 rgb, vec3 rayDirection, float span)
 }
 #endif
 
+// The pixel of the view this fragment's ray is cast for (its block's first): the fragment's own place, but in one of
+// "VR foveation"'s three goes, where the picture drawn into is smaller than the eye's (see main).
+ivec2 rayPixel;
+
 /**
  * One ray through this fragment's block of pixels and what it shows.
  * @param offset Where in the block it goes, from the block's middle, in blocks (0, 0: the middle, the CPU's ray).
@@ -1740,7 +1745,7 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 {
 	fullColorSet = false;
 	// The block of pixels this ray colours (rows from the top), and its place on the image plane.
-	int blockColumn = int(gl_FragCoord.x), blockRow = int(gl_FragCoord.y);
+	int blockColumn = rayPixel.x, blockRow = rayPixel.y;
 	int topRow = blockRow * uPixelSize, leftColumn = blockColumn * uPixelSize;
 	// (An eye's picture in VR is off centre: as FirstPersonView::renderRows has it for an eye.)
 	float planeV = uEyePlane.z > 0.0 ? (uEyePlane.y - (float(topRow) + float(uPixelSize) * (0.5 + offset.y))) / uEyePlane.z
@@ -1838,11 +1843,27 @@ void main()
 	// With "VR foveation", away from the eye's view axis only the first pixel of each 2 x 2 or 4 x 4 casts a ray, through
 	// the middle of them; the others are filled from it after (see FoveaFillSource).
 	vec2 rayOffset = uRayOffset;
-	int coarse = foveaStep(ivec2(gl_FragCoord.xy));
-	if (coarse > 1)
+	rayPixel = ivec2(gl_FragCoord.xy);
+	if (uFoveaCoarse > 0)
 	{
-		if ((int(gl_FragCoord.x) & (coarse - 1)) != 0 || (int(gl_FragCoord.y) & (coarse - 1)) != 0) discard;
-		rayOffset += vec2(float(coarse - 1) * 0.5);
+		// Cast in three goes, one for each size of block, each into a picture with a pixel a block: here every pixel
+		// drawn is a ray wanted, but for those of another go's zone, which lie together (a card works through a
+		// picture in groups of neighbouring pixels, and a group is done only when its last ray is: one ray wanted
+		// among its pixels and it takes as long as if all were, which is why thinning them out of one big picture,
+		// below, saves next to nothing; a group with no ray wanted at all is done at once).
+		rayPixel *= uFoveaCoarse;
+		if (foveaStep(rayPixel) != uFoveaCoarse) discard;
+		rayOffset += vec2(float(uFoveaCoarse - 1) * 0.5);
+	}
+	else
+	{
+		// In one go, into a picture as big as the eye's (with "Supersampling" too: its later rays look at their neighbours).
+		int coarse = foveaStep(rayPixel);
+		if (coarse > 1)
+		{
+			if ((rayPixel.x & (coarse - 1)) != 0 || (rayPixel.y & (coarse - 1)) != 0) discard;
+			rayOffset += vec2(float(coarse - 1) * 0.5);
+		}
 	}
 #ifdef LATER_RAYS
 	// A second or further ray of the pixel: only where the first rays show an edge or fine texture: this pixel's full colour
@@ -1880,11 +1901,14 @@ void main()
 /**
  * Setting "VR foveation": the rays' pictures made whole. Away from the eye's view axis only the first pixel of each
  * 2 x 2 or 4 x 4 has a ray (see the rays' main); here every pixel takes its ray's colour, depth, glow and full colour
- * from there, into the pictures the passes after read.
+ * from there, into the pictures the passes after read. The rays were cast in three goes into three sets of pictures, one
+ * for each size of block, a pixel a block (uLayers 1); or in one go into one set as big as the eye's (uLayers 0: then
+ * the three sets here are that one).
  */
 const char *const FoveaFillSource = R"(
-uniform usampler2D uColor, uGlow;
-uniform sampler2D uDepth, uTrue;
+uniform usampler2D uColor, uGlow, uColorHalf, uGlowHalf, uColorQuarter, uGlowQuarter;
+uniform sampler2D uDepth, uTrue, uDepthHalf, uTrueHalf, uDepthQuarter, uTrueQuarter;
+uniform int uLayers;
 uniform vec2 uFovea;
 uniform vec3 uEyePlane;
 uniform ivec2 uViewSize;
@@ -1907,11 +1931,29 @@ void main()
 {
 	ivec2 at = ivec2(gl_FragCoord.xy);
 	int coarse = foveaStep(at);
-	ivec2 from = (at / coarse) * coarse;
-	outColor = texelFetch(uColor, from, 0).r;
-	outDepth = texelFetch(uDepth, from, 0).r;
-	outGlow = texelFetch(uGlow, from, 0).r;
-	outTrue = texelFetch(uTrue, from, 0);
+	// The pixel's block: its first pixel in the one big set, or its own pixel in its size's set.
+	ivec2 from = uLayers != 0 ? at / coarse : (at / coarse) * coarse;
+	if (coarse == 1)
+	{
+		outColor = texelFetch(uColor, from, 0).r;
+		outDepth = texelFetch(uDepth, from, 0).r;
+		outGlow = texelFetch(uGlow, from, 0).r;
+		outTrue = texelFetch(uTrue, from, 0);
+	}
+	else if (coarse == 2)
+	{
+		outColor = texelFetch(uColorHalf, from, 0).r;
+		outDepth = texelFetch(uDepthHalf, from, 0).r;
+		outGlow = texelFetch(uGlowHalf, from, 0).r;
+		outTrue = texelFetch(uTrueHalf, from, 0);
+	}
+	else
+	{
+		outColor = texelFetch(uColorQuarter, from, 0).r;
+		outDepth = texelFetch(uDepthQuarter, from, 0).r;
+		outGlow = texelFetch(uGlowQuarter, from, 0).r;
+		outTrue = texelFetch(uTrueQuarter, from, 0);
+	}
 }
 )";
 
@@ -2541,6 +2583,7 @@ uniform usampler2D uFlameTint;            // each colour in the flames' orange l
 uniform float uFlameGlow;
 uniform ivec2 uViewSize;
 uniform ivec4 uHeldBox;                   // where the weapon's pictures hold anything: left, top, one past the right, one past the bottom
+uniform ivec4 uMarksBox;                  // where the marks' picture holds anything, likewise (only that part was sent up: outside it the picture on the card is an earlier frame's, and isn't looked at)
 uniform int uDepthWhole;                  // 1: uHeldDepth is the eye's whole finished depth (the weapon is among the marks)
 uniform vec3 uDepthPlanes;                // voxels to metres, the near plane and the far one (metres)
 layout(location = 0) out vec4 outPixel;
@@ -2554,7 +2597,7 @@ void main()
 	// (The view's pictures have the top row first; the eye's texture the bottom one.)
 	ivec2 pixel = ivec2(int(gl_FragCoord.x), uViewSize.y - 1 - int(gl_FragCoord.y));
 	float depth = texelFetch(uSceneDepth, pixel, 0).r;
-	uint made = texelFetch(uMarks, pixel, 0).r;
+	uint made = pixel.x >= uMarksBox.x && pixel.y >= uMarksBox.y && pixel.x < uMarksBox.z && pixel.y < uMarksBox.w ? texelFetch(uMarks, pixel, 0).r : 0u;
 	bool world = made == 0u; // (the pixel is the world's own, not a mark's or the weapon's: it may show in full colour)
 	if (made == 0u)
 	{

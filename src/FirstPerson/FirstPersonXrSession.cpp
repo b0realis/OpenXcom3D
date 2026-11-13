@@ -2259,6 +2259,14 @@ bool Session::showCardPair(const EyePictures &pictures, bool withDepth, bool &de
 	Shared &box = shared();
 	const bool smoothed = box.smoothing && smootherReady();
 	depthDone = withDepth && smootherReady();
+	// A GPU timer round it all, when there is one free, as smoothPair has one (the statistics said "0 timed" for eyes
+	// from the card: only smoothPair's pairs were timed).
+	GLuint query = 0;
+	if (_hasTimerQuery && !_smoothQueryBusy[_smoothQueryNext])
+	{
+		query = _smoothQueries[_smoothQueryNext];
+		_beginQuery(TimeElapsedQuery, query);
+	}
 	bool both = true;
 	for (int eye = 0; eye < 2 && both; ++eye)
 	{
@@ -2299,6 +2307,12 @@ bool Session::showCardPair(const EyePictures &pictures, bool withDepth, bool &de
 			}
 			depthDone = depthDrawn && depthReleased;
 		}
+	}
+	if (query)
+	{
+		_endQuery(TimeElapsedQuery);
+		_smoothQueryBusy[_smoothQueryNext] = true;
+		_smoothQueryNext = (_smoothQueryNext + 1) % 4;
 	}
 	if (both)
 	{

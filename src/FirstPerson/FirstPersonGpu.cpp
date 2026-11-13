@@ -64,6 +64,7 @@
 #include <functional>
 #include <map>
 #include <mutex>
+#include <sstream>
 #include <thread>
 #include <unordered_map>
 #include <vector>
@@ -85,6 +86,7 @@ namespace Gl
 {
 #define GL_DEFINE(result, name, arguments) result (GL_CALL *name) arguments = nullptr;
 GL_FUNCTIONS(GL_DEFINE)
+GL_OPTIONAL_FUNCTIONS(GL_DEFINE)
 #undef GL_DEFINE
 }
 
@@ -108,6 +110,12 @@ bool GpuContext::loadFunctions()
 	if (!Gl::name) { Log(LOG_WARNING) << "OpenXcom3D GPU: the driver has no gl" #name; all = false; }
 	GL_FUNCTIONS(GL_LOAD)
 #undef GL_LOAD
+	// (The ones it can do without: null where the driver has none, and nobody is told.)
+#define GL_LOAD_OPTIONAL(result, name, arguments) \
+	Gl::name = (decltype(Gl::name))_getProcAddress("gl" #name); \
+	GL_FALLBACK(name)
+	GL_OPTIONAL_FUNCTIONS(GL_LOAD_OPTIONAL)
+#undef GL_LOAD_OPTIONAL
 #undef GL_FALLBACK
 	return all;
 }
@@ -570,6 +578,271 @@ private:
 
 }
 
+namespace
+{
+
+/// The stages a picture goes through on the card, each timed on its own with OPENXCOM3D_GPU_STAGES (see StageClock).
+enum Stage
+{
+	StageWorldSent,    // the tiles, tables and scene made ready and sent (see State::draw)
+	StageRays,         // the rays cast (several a pixel and their resolve too)
+	StageFoveaFill,    // setting "VR foveation": the rays' pictures made whole
+	StageEffectsSent,  // the units and effects' primitives, sprites and bins sent
+	StageEffects,      // ... drawn (both goes of a frame with outlines)
+	StageBloom,        // the bloom's eleven little passes
+	StageWash,         // the screen wash
+	StageReadBack,     // anything read back after them: the pointer's patch of notes, the pictures (this is where our thread waits for the card)
+	StageDepthFetched, // the whole depth read back for a mark the CPU draws last (see FirstPersonGpu::readEffectsDepth)
+	StageDepthAsked,   // ... or one pixel of it (see FirstPersonGpu::readEffectsDepthAt)
+	StageEyeSent,      // VR: an eye's marks and weapon sent
+	StageEyeFinish,    // ... and the eye finished
+	StagePresent,      // the flat view's frame put together (and read back)
+	StageFence,        // VR: a pair's fence made and the card told to get on with it
+	StageCount
+};
+const char *const StageNames[StageCount] = { "the world sent", "rays", "fovea fill", "primitives sent", "units and effects", "bloom", "wash", "read back", "depth fetched for a mark", "depth asked at a spot",
+	"an eye's marks and weapon sent", "eye finish", "frame put together", "pair's fence" };
+
+/**
+ * Where a picture's time goes on the card, stage by stage, for the log (OPENXCOM3D_GPU_STAGES; on Android from the
+ * profile folder's environment.txt). Each stage is timed two ways. On the renderer's thread: how long its OpenGL calls
+ * took to come back, which is where a call that waits for the card shows (a read-back, an upload into a picture the
+ * card still uses). And on the card's own clock, where it has one (OpenGL's timers; OpenGL ES with
+ * GL_EXT_disjoint_timer_query): how long the card worked on what the stage drew, asked for without waiting and read
+ * when it is known, some frames later. A tile-based chip (a headset's) draws a pass when it is flushed, not when it is
+ * issued, so only the card's clock says what each pass costs there.
+ * OPENXCOM3D_GPU_STAGES=wait: the card is also waited for (glFinish) at each stage's end, so the thread's own time for a
+ * stage holds all the card's work for it, on a chip without timers too; the frame is slower for it, the stages' shares
+ * stay true.
+ * The sums are kept by the picture's size (an eye's, the flat view's, a small camera's) and written every StageLogSeconds.
+ * Nothing is done, asked or logged without the variable.
+ */
+class StageClock
+{
+public:
+	/// Reads the variable and, when it is set, makes the card's timers and says what will be measured. Call with the context current.
+	void start(bool es)
+	{
+		const char *const asked = getenv("OPENXCOM3D_GPU_STAGES");
+		_mode = !asked || !strcmp(asked, "0") ? 0 : !strcmp(asked, "wait") ? 2 : 1;
+		if (!_mode)
+		{
+			return;
+		}
+		_es = es;
+		// (OpenGL ES lists its extensions in one string; OpenGL 3.3 has the timers itself.)
+		const char *const extensions = es ? (const char *)Gl::GetString(Gl::EXTENSIONS) : nullptr;
+		_cardTimers = Gl::GenQueries && Gl::BeginQuery && Gl::EndQuery && Gl::GetQueryObjectuiv && (!es || (extensions && strstr(extensions, "GL_EXT_disjoint_timer_query")));
+		if (_cardTimers)
+		{
+			Gl::UInt queries[TimerCount] = {};
+			Gl::GenQueries(TimerCount, queries);
+			for (int timer = 0; timer < TimerCount; ++timer) _timers[timer].query = queries[timer];
+		}
+		_lastLog = std::chrono::steady_clock::now();
+		Log(LOG_INFO) << "OpenXcom3D GPU: stage times in the log every " << StageLogSeconds << " s: on the renderer's thread" << (_mode == 2 ? ", the card waited for after each stage" : "")
+			<< (_cardTimers ? ", and on the card's own clock" : "; the card has no timers of its own (OPENXCOM3D_GPU_STAGES=wait puts its work into the thread's times)");
+		// What the chip offers for the next steps (a headset's log is the only place to learn it): each named extension it has.
+		if (extensions)
+		{
+			std::string offered;
+			for (const char *name : { "GL_EXT_disjoint_timer_query", "GL_QCOM_texture_foveated", "GL_QCOM_texture_foveated2", "GL_QCOM_texture_foveated_subsampled_layout",
+				"GL_QCOM_shading_rate", "GL_EXT_fragment_shading_rate", "GL_QCOM_tiled_rendering", "GL_EXT_shader_framebuffer_fetch", "GL_EXT_buffer_storage", "GL_OVR_multiview2",
+				"GL_EXT_color_buffer_float", "GL_EXT_color_buffer_half_float" })
+			{
+				// (A whole name: "GL_QCOM_texture_foveated" is also the start of two others.)
+				const size_t length = strlen(name);
+				for (const char *found = strstr(extensions, name); found; found = strstr(found + 1, name))
+				{
+					if (found[length] == ' ' || found[length] == 0)
+					{
+						offered += std::string(offered.empty() ? "" : ", ") + name;
+						break;
+					}
+				}
+			}
+			Log(LOG_INFO) << "OpenXcom3D GPU: of the extensions the next steps could use, this chip has: " << (offered.empty() ? "none" : offered);
+		}
+	}
+	/// Whether anything is measured.
+	bool on() const { return _mode != 0; }
+	/// The picture the stages from here on belong to; `counted`: a new picture of that size begins (the rays' job), not a later job on the same one.
+	void picture(int width, int height, bool counted)
+	{
+		if (!_mode)
+		{
+			return;
+		}
+		end();
+		_sums = &_bySize[{ width, height }];
+		if (counted)
+		{
+			++_sums->pictures;
+			collect();
+			report();
+		}
+	}
+	/// Notes how much a picture's units and effects hold (the time they take follows it): its primitives, and the entries
+	/// of its bins' lists (a primitive is in the list of every bin of the screen it may touch).
+	void holds(size_t primitives, size_t binEntries)
+	{
+		if (_mode && _sums)
+		{
+			_sums->primitives += (double)primitives;
+			_sums->binEntries += (double)binEntries;
+		}
+	}
+	/// Begins a stage (ending the one before, if it is still open).
+	void begin(Stage stage)
+	{
+		if (!_mode || !_sums)
+		{
+			return;
+		}
+		end();
+		_stage = stage;
+		// (Only a stage that draws: one that sends or reads back gives the card nothing to time.)
+		const bool draws = stage == StageRays || stage == StageFoveaFill || stage == StageEffects || stage == StageBloom || stage == StageWash || stage == StageEyeFinish
+			|| stage == StagePresent;
+		if (_cardTimers && draws)
+		{
+			// A timer that isn't waiting to be read, if there is one (else this stage's work on the card goes untimed, once).
+			for (int timer = 0; timer < TimerCount; ++timer)
+			{
+				if (_timers[timer].busy) continue;
+				_timers[timer].sums = _sums;
+				_timers[timer].stage = stage;
+				Gl::BeginQuery(Gl::TIME_ELAPSED, _timers[timer].query);
+				_open = timer;
+				break;
+			}
+		}
+		_stageStart = std::chrono::steady_clock::now();
+	}
+	/// Ends the stage that is open, if any.
+	void end()
+	{
+		if (_stage < 0)
+		{
+			return;
+		}
+		if (_open >= 0)
+		{
+			Gl::EndQuery(Gl::TIME_ELAPSED);
+			_timers[_open].busy = true;
+			_open = -1;
+		}
+		if (_mode == 2) Gl::Finish();
+		_sums->thread[_stage] += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - _stageStart).count();
+		++_sums->entered[_stage];
+		_stage = -1;
+	}
+
+private:
+	static const int TimerCount = 96;      // the card's timers: a picture uses up to ten, and each is read some frames later
+	static const int StageLogSeconds = 5;
+	struct Sums
+	{
+		int pictures = 0;                  // the pictures begun (see picture)
+		double thread[StageCount] = {};    // each stage's time on the renderer's thread, ms, summed
+		int entered[StageCount] = {};      // ... and how many times it ran
+		double card[StageCount] = {};      // each stage's time on the card's clock, ms, summed over those read
+		int cardTimed[StageCount] = {};    // ... and how many were
+		double primitives = 0.0, binEntries = 0.0; // what the units and effects held, summed (see holds)
+	};
+	struct Timer
+	{
+		Gl::UInt query = 0;
+		Sums *sums = nullptr;              // whose stage it times (a map's entry: it stays where it is)
+		int stage = 0;
+		bool busy = false;                 // ended, not read yet
+	};
+	int _mode = 0;                         // 0 off, 1 timed, 2 timed and the card waited for after each stage
+	bool _es = false, _cardTimers = false;
+	std::map<std::array<int, 2>, Sums> _bySize;
+	Sums *_sums = nullptr;                 // the picture the stages belong to now
+	int _stage = -1, _open = -1;           // the stage that is open (-1: none), and its timer on the card (-1: none)
+	std::chrono::steady_clock::time_point _stageStart, _lastLog;
+	Timer _timers[TimerCount];
+	int _disturbed = 0;                    // timers dropped since the last log: the chip said its clock was disturbed
+
+	/// Reads the card's timers that are known by now. One the chip says was disturbed (OpenGL ES: its clock stopped or
+	/// jumped, a change of power level) is dropped.
+	void collect()
+	{
+		if (!_cardTimers)
+		{
+			return;
+		}
+		Gl::Int disjoint = 0;
+		if (_es) Gl::GetIntegerv(Gl::GPU_DISJOINT, &disjoint); // (asking clears it)
+		for (Timer &timer : _timers)
+		{
+			if (!timer.busy) continue;
+			Gl::UInt available = 0;
+			Gl::GetQueryObjectuiv(timer.query, Gl::QUERY_RESULT_AVAILABLE, &available);
+			if (!available) continue;
+			Gl::UInt nanoseconds = 0;
+			Gl::GetQueryObjectuiv(timer.query, Gl::QUERY_RESULT, &nanoseconds);
+			timer.busy = false;
+			if (disjoint)
+			{
+				++_disturbed;
+				continue;
+			}
+			timer.sums->card[timer.stage] += nanoseconds / 1.0e6;
+			++timer.sums->cardTimed[timer.stage];
+		}
+	}
+	/// Every StageLogSeconds: a line for each size of picture drawn since the last, each stage's time a picture (a stage
+	/// that ran for only some of them is spread over all, and says for how many it ran), and the sums begun anew.
+	void report()
+	{
+		const auto now = std::chrono::steady_clock::now();
+		if (std::chrono::duration<double>(now - _lastLog).count() < StageLogSeconds)
+		{
+			return;
+		}
+		_lastLog = now;
+		for (auto &entry : _bySize)
+		{
+			Sums &sums = entry.second;
+			if (sums.pictures == 0) continue;
+			std::ostringstream line;
+			line.setf(std::ios::fixed);
+			line.precision(2);
+			double threadTotal = 0.0, cardTotal = 0.0;
+			for (int stage = 0; stage < StageCount; ++stage)
+			{
+				if (!sums.entered[stage]) continue;
+				const double threadEach = sums.thread[stage] / sums.pictures;
+				threadTotal += threadEach;
+				line << "; " << StageNames[stage] << " " << threadEach;
+				if (sums.cardTimed[stage])
+				{
+					const double cardEach = sums.card[stage] / sums.cardTimed[stage] * sums.entered[stage] / sums.pictures;
+					cardTotal += cardEach;
+					line << " / " << cardEach;
+				}
+				if (sums.entered[stage] != sums.pictures) line << " (ran " << sums.entered[stage] << " times)";
+			}
+			if (threadTotal == 0.0) continue; // (begun, none of its stages over yet: with the next line)
+			line << "; in all " << threadTotal;
+			if (_cardTimers) line << " / " << cardTotal;
+			line << ", over " << sums.pictures << " pictures";
+			line.precision(0);
+			if (sums.primitives > 0.0) line << " of " << sums.primitives / sums.pictures << " primitives in " << sums.binEntries / sums.pictures << " bin entries each";
+			if (_disturbed) line << ", " << _disturbed << " of the card's timers dropped as disturbed";
+			Log(LOG_INFO) << "OpenXcom3D GPU: the " << entry.first[0] << "x" << entry.first[1] << " picture's stages, ms a picture, the renderer's thread" << (_mode == 2 ? " (the card waited for)" : "")
+				<< (_cardTimers ? " / the card's own clock" : "") << line.str();
+			sums = Sums();
+		}
+		_disturbed = 0;
+	}
+};
+
+}
+
 struct FirstPersonGpu::State
 {
 	// The thread that owns the context: it sleeps until handed a job, does it, and says so.
@@ -580,6 +853,7 @@ struct FirstPersonGpu::State
 	bool hasJob = false, stop = false;
 
 	GpuContext context;
+	StageClock stages;      // where a picture's time goes, for the log (OPENXCOM3D_GPU_STAGES)
 	bool failed = false;    // the card failed: the CPU draws from now on
 	bool overLimit = false; // this frame holds more than the shader takes (see draw): the CPU draws it
 	bool limitLogged = false;
@@ -649,12 +923,18 @@ struct FirstPersonGpu::State
 	void sendModels();
 	void setScene(const Frame &frame);
 	bool setTargets(int width, int height, bool results, int which = 0);
+	bool forgetsTargets = false; // OPENXCOM3D_GPU_FORGET_TARGETS on OpenGL ES: the card is told a picture's old contents aren't needed before it is drawn over (see drawOver)
+	void drawOver(int pictures);
 	// Setting "VR foveation" (see FoveaFillSource): the layer of targets the rays with holes go into, the program that
 	// fills the frame's own from them, and whether this frame's rays are cast that way (set by the frame's draw).
-	static const int FoveaLayer = 9;
+	static const int FoveaLayer = 9; // (and the two after it: the sets for the blocks of 2 x 2 and of 4 x 4 pixels, see castFoveaLayers)
 	Gl::UInt foveaProgram = 0;
 	bool foveaNow = false;
-	bool fillFovea(const Frame &frame, int columns, int rows);
+	bool foveaInLayers = true;       // the rays are cast in three goes, one for each size of block (OPENXCOM3D_GPU_FOVEA_ONE_PASS: in one, as build 124 did)
+	bool foveaChecked = false;       // OPENXCOM3D_GPU_FOVEA_CHECK: each frame cast both ways and the pictures compared, for the log
+	bool castFoveaLayers(const Frame &frame, int columns, int rows);
+	bool fillFovea(const Frame &frame, int columns, int rows, bool layers);
+	void checkFovea(const Frame &frame, int columns, int rows);
 	bool buildResolve();
 	bool draw(const Frame &frame, const Output &output, Timing *timing);
 
@@ -825,6 +1105,16 @@ bool FirstPersonGpu::State::start(int device)
 	modelInfo.assign(4, 0);
 	solidRows.assign(MaskRows, 0);
 	modelsChanged = solidsChanged = true;
+	stages.start(context.es());
+	foveaInLayers = getenv("OPENXCOM3D_GPU_FOVEA_ONE_PASS") == nullptr;
+	foveaChecked = foveaInLayers && getenv("OPENXCOM3D_GPU_FOVEA_CHECK") != nullptr;
+	// (OPENXCOM3D_GPU_FORGET_TARGETS: see drawOver. Asked for, not the rule, until a headset's log has shown what it gains there.)
+	const char *const forgetAsked = getenv("OPENXCOM3D_GPU_FORGET_TARGETS");
+	forgetsTargets = context.es() && Gl::InvalidateFramebuffer && forgetAsked && strcmp(forgetAsked, "0") != 0;
+	if (forgetsTargets)
+	{
+		Log(LOG_INFO) << "OpenXcom3D GPU: each picture's old contents are given up before it is drawn over (OPENXCOM3D_GPU_FORGET_TARGETS)";
+	}
 	return Gl::GetError() == Gl::NoError;
 }
 
@@ -1269,6 +1559,7 @@ void FirstPersonGpu::State::setScene(const Frame &frame)
 	Gl::Uniform2f(location("uHalfPlane"), frame.halfPlaneWidth, frame.halfPlaneHeight);
 	Gl::Uniform3f(location("uEyePlane"), frame.eyeAxis[0], frame.eyeAxis[1], frame.eyeFocal);
 	Gl::Uniform2f(location("uFovea"), foveaNow ? frame.fovea[0] : 0.0f, foveaNow ? frame.fovea[1] : 0.0f);
+	Gl::Uniform1i(location("uFoveaCoarse"), 0); // (castFoveaLayers sets it for each of its goes)
 	Gl::Uniform2i(location("uViewSize"), frame.width, frame.height);
 	Gl::Uniform1i(location("uPixelSize"), frame.pixelSize);
 	Gl::Uniform1f(location("uGhostScale"), frame.ghostScale);
@@ -1396,6 +1687,27 @@ bool FirstPersonGpu::State::setTargets(int width, int height, bool results, int 
 }
 
 /**
+ * Draws the picture-wide triangle into the pictures bound for drawing (the framebuffer's first `pictures` attachments),
+ * every pixel of each written by it; or, where the rays are thinned for "VR foveation", the pixels left out are never
+ * looked at (see FoveaFillSource, which reads only the ones that got a ray).
+ * OPENXCOM3D_GPU_FORGET_TARGETS (OpenGL ES): the card is first told that their old contents aren't needed. A
+ * tile-based chip (a headset's) draws a picture tile by tile in a small fast memory of its own, and unless it is told
+ * otherwise it first fetches what the picture held into that memory, for every tile and every attachment, though all of
+ * it is then drawn over: time spent for nothing, a pass with four pictures four times over. The picture drawn is the
+ * same either way. (A desktop's card draws straight into the picture and has nothing to fetch.)
+ * @param pictures How many pictures are bound for drawing.
+ */
+void FirstPersonGpu::State::drawOver(int pictures)
+{
+	if (forgetsTargets)
+	{
+		static const Gl::Enum attachments[5] = { Gl::COLOR_ATTACHMENT0, Gl::COLOR_ATTACHMENT0 + 1, Gl::COLOR_ATTACHMENT0 + 2, Gl::COLOR_ATTACHMENT0 + 3, Gl::COLOR_ATTACHMENT0 + 4 };
+		Gl::InvalidateFramebuffer(Gl::FRAMEBUFFER, std::min(pictures, 5), attachments);
+	}
+	Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+}
+
+/**
  * Reads one of the pictures just drawn back into the view's memory. OpenGL gives each in the
  * form asked for. OpenGL ES gives a picture of whole numbers only as four 32-bit numbers a
  * pixel, a picture of fractions as four of those, and colours red first, unless the driver
@@ -1482,6 +1794,8 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	// The world: this frame's tiles and colours, the camera and the scene, and any model or mask not sent before.
 	// What is the same as last frame isn't sent again (in a turn-based game, most frames most of it).
 	auto start = std::chrono::steady_clock::now();
+	stages.picture(frame.width, frame.height, true);
+	stages.begin(StageWorldSent);
 	foveaNow = frame.fovea[0] > 0.0f && frame.eyeFocal > 0.0f && !output.results && output.keep != 2; // (never in a check against the CPU's picture)
 	program = programFor(frame, output.results != nullptr);
 	Gl::UseProgram(program->id);
@@ -1540,12 +1854,22 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	// pictures of its own, and the frame's picture made of them (see ResolveSource). The check against the
 	// CPU's rays is of one ray a pixel.
 	if (frame.palette) sendBlend(frame); // (the palette: for the full-colour picture and for several rays a pixel)
+	stages.begin(StageRays);
 	Gl::Viewport(0, 0, blockColumns, blockRows);
 	const int samples = resolveProgram && frame.palette && !output.results ? (frame.samples >= 4 ? 4 : frame.samples >= 2 ? 2 : 1) : 1;
-	if (samples == 1)
+	// (With "VR foveation" and a ray a pixel: in three goes into three smaller sets of pictures, see castFoveaLayers.)
+	const bool foveaLayers = foveated && foveaInLayers && samples == 1 && frame.pixelSize == 1;
+	if (foveaLayers)
+	{
+		if (!castFoveaLayers(frame, blockColumns, blockRows))
+		{
+			return false;
+		}
+	}
+	else if (samples == 1)
 	{
 		Gl::Uniform2f(location("uRayOffset"), 0.0f, 0.0f);
-		Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+		drawOver(output.results ? 5 : 4);
 	}
 	else
 	{
@@ -1582,6 +1906,8 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 			}
 			const float *offset = samples == 2 ? twoRays[ray] : fourRays[ray];
 			Gl::Uniform2f(location("uRayOffset"), offset[0], offset[1]);
+			// (Not drawOver: with "VR foveation" too, the later rays and the resolve look at pixels of these pictures that
+			// got no ray this frame, and see what an earlier frame left there; so their old contents are kept, as ever.)
 			Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
 		}
 		setTargets(blockColumns, blockRows, false, foveated ? FoveaLayer : 0);
@@ -1597,13 +1923,16 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 			}
 		}
 		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
-		Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+		drawOver(4);
 		Gl::UseProgram(program->id);
 	}
-	if (foveated && !fillFovea(frame, blockColumns, blockRows))
+	if (foveated) stages.begin(StageFoveaFill);
+	if (foveated && !fillFovea(frame, blockColumns, blockRows, foveaLayers))
 	{
 		return false;
 	}
+	stages.end();
+	if (foveaLayers && foveaChecked) checkFovea(frame, blockColumns, blockRows);
 	if (timing)
 	{
 		Gl::Finish();
@@ -1634,6 +1963,7 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 		blockGlow.resize(blockColors.size());
 		blockDepths.resize(blockColors.size());
 	}
+	stages.begin(StageReadBack);
 	readPicture(0, blockColumns, blockRows, 0, blocks ? blockColors.data() : output.color, blocks ? blockColumns : output.colorPitch);
 	readPicture(1, blockColumns, blockRows, 1, blocks ? blockDepths.data() : output.depth, blockColumns);
 	readPicture(2, blockColumns, blockRows, 0, blocks ? blockGlow.data() : output.glow, blockColumns);
@@ -1662,6 +1992,7 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 			}
 		}
 	}
+	stages.end();
 	if (timing)
 	{
 		timing->read = millisecondsSince(start);
@@ -1761,10 +2092,56 @@ bool FirstPersonGpu::State::buildEffects()
 }
 
 /**
- * Setting "VR foveation": the frame's own ray pictures filled from the set the rays were cast into, where away from
- * the eye's view axis only one pixel in four or in sixteen has a ray (see FoveaFillSource).
+ * Setting "VR foveation", the rays cast in three goes: one for the pixels round the eye's view axis that get a ray each,
+ * one for the blocks of 2 x 2 pixels farther out, one for the blocks of 4 x 4 beyond (see the shader's foveaStep), each
+ * into a set of pictures with a pixel a block (the eye's size, half of it, a quarter of it each way), and the first
+ * two limited to the box their zone lies in. So the card only works where a ray is wanted. Cast in one go into one set
+ * as big as the eye's, the rays not wanted thrown away pixel by pixel (build 124's way, OPENXCOM3D_GPU_FOVEA_ONE_PASS),
+ * the thinning saved next to nothing: a card works through a picture in groups of neighbouring pixels and a group
+ * takes as long as its longest ray, so a group with one ray wanted in four, or in sixteen, cost as much as a full one
+ * (measured: a 710x770 eye's rays took an Intel chip 4.4 ms unthinned and 4.9 ms thinned to a third or to a fifth).
+ * The rays are the same ones, through the same points, so the filled pictures are the same to the last bit
+ * (OPENXCOM3D_GPU_FOVEA_CHECK compares them, see checkFovea).
+ * @param columns, rows The eye's picture, in pixels.
  */
-bool FirstPersonGpu::State::fillFovea(const Frame &frame, int columns, int rows)
+bool FirstPersonGpu::State::castFoveaLayers(const Frame &frame, int columns, int rows)
+{
+	Gl::Uniform2f(location("uRayOffset"), 0.0f, 0.0f);
+	for (int go = 0; go < 3; ++go)
+	{
+		const int coarse = 1 << go;
+		const int goColumns = (columns + coarse - 1) / coarse, goRows = (rows + coarse - 1) / coarse;
+		if (!setTargets(goColumns, goRows, false, FoveaLayer + go))
+		{
+			Log(LOG_WARNING) << "OpenXcom3D GPU: this card can't draw into the pictures the foveated rays need";
+			return false;
+		}
+		Gl::Viewport(0, 0, goColumns, goRows);
+		// The box round this go's zone: its outer edge is a circle round the view axis (the last go's zone is all the
+		// rest). A cell of 4 x 4 pixels counts by its middle, two pixels from its edges; two more to spare.
+		const bool boxed = go < 2;
+		if (boxed)
+		{
+			const float reach = frame.fovea[go] * frame.width * 0.5f + 4.0f;
+			const int left = std::max(0, (int)std::floor((frame.eyeAxis[0] - reach) / coarse)), top = std::max(0, (int)std::floor((frame.eyeAxis[1] - reach) / coarse));
+			const int right = std::min(goColumns, (int)std::ceil((frame.eyeAxis[0] + reach) / coarse) + 1), bottom = std::min(goRows, (int)std::ceil((frame.eyeAxis[1] + reach) / coarse) + 1);
+			Gl::Enable(Gl::SCISSOR_TEST);
+			Gl::Scissor(left, top, std::max(0, right - left), std::max(0, bottom - top));
+		}
+		Gl::Uniform1i(location("uFoveaCoarse"), coarse);
+		drawOver(4);
+		if (boxed) Gl::Disable(Gl::SCISSOR_TEST);
+	}
+	Gl::Uniform1i(location("uFoveaCoarse"), 0);
+	return true;
+}
+
+/**
+ * Setting "VR foveation": the frame's own ray pictures filled from the sets the rays were cast into, where away from
+ * the eye's view axis only one pixel in four or in sixteen has a ray (see FoveaFillSource).
+ * @param layers The rays were cast in three goes into three sets (see castFoveaLayers); else in one go into one.
+ */
+bool FirstPersonGpu::State::fillFovea(const Frame &frame, int columns, int rows, bool layers)
 {
 	if (!foveaProgram)
 	{
@@ -1774,28 +2151,88 @@ bool FirstPersonGpu::State::fillFovea(const Frame &frame, int columns, int rows)
 			return false;
 		}
 		Gl::UseProgram(foveaProgram);
-		const char *const names[4] = { "uColor", "uDepth", "uGlow", "uTrue" };
-		for (int which = 0; which < 4; ++which) Gl::Uniform1i(Gl::GetUniformLocation(foveaProgram, names[which]), BufferCount + 1 + which);
+		const char *const names[12] = { "uColor", "uDepth", "uGlow", "uTrue", "uColorHalf", "uDepthHalf", "uGlowHalf", "uTrueHalf", "uColorQuarter", "uDepthQuarter", "uGlowQuarter", "uTrueQuarter" };
+		for (int which = 0; which < 12; ++which) Gl::Uniform1i(Gl::GetUniformLocation(foveaProgram, names[which]), BufferCount + 1 + which);
 	}
-	const Targets cast = targets[{ columns, rows, FoveaLayer }];
+	// The sets cast into: one for each size of block, or the one big set three times.
+	Targets cast[3];
+	for (int go = 0; go < 3; ++go)
+	{
+		const int coarse = layers ? 1 << go : 1;
+		cast[go] = targets[{ (columns + coarse - 1) / coarse, (rows + coarse - 1) / coarse, layers ? FoveaLayer + go : FoveaLayer }];
+	}
 	if (!setTargets(columns, rows, false))
 	{
 		return false;
 	}
-	for (int which = 0; which < 4; ++which)
+	for (int which = 0; which < 12; ++which)
 	{
 		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 1 + which);
-		Gl::BindTexture(Gl::TEXTURE_2D, cast.textures[which]);
+		Gl::BindTexture(Gl::TEXTURE_2D, cast[which / 4].textures[which % 4]);
 	}
 	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
+	Gl::Viewport(0, 0, columns, rows);
 	Gl::UseProgram(foveaProgram);
+	Gl::Uniform1i(Gl::GetUniformLocation(foveaProgram, "uLayers"), layers ? 1 : 0);
 	Gl::Uniform2f(Gl::GetUniformLocation(foveaProgram, "uFovea"), frame.fovea[0], frame.fovea[1]);
 	Gl::Uniform3f(Gl::GetUniformLocation(foveaProgram, "uEyePlane"), frame.eyeAxis[0], frame.eyeAxis[1], frame.eyeFocal);
 	Gl::Uniform2i(Gl::GetUniformLocation(foveaProgram, "uViewSize"), frame.width, frame.height);
 	Gl::Uniform1i(Gl::GetUniformLocation(foveaProgram, "uPixelSize"), frame.pixelSize);
-	Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+	drawOver(4);
 	Gl::UseProgram(program->id);
 	return true;
+}
+
+/**
+ * OPENXCOM3D_GPU_FOVEA_CHECK: the frame's filled pictures (cast in three goes, see castFoveaLayers) read back, the same
+ * frame cast again in one go as build 124 did and filled, and the two compared a pixel at a time: the palette colour,
+ * the depth, the glow, the full colour. The log gets the sums every 60 pictures. (The frame goes on with the second's
+ * pictures: the same, if the check says so.)
+ */
+void FirstPersonGpu::State::checkFovea(const Frame &frame, int columns, int rows)
+{
+	const size_t count = (size_t)columns * rows;
+	std::vector<Uint8> colors[2], glows[2];
+	std::vector<Uint32> depths[2], fulls[2];
+	auto read = [&](int which) {
+		colors[which].resize(count);
+		glows[which].resize(count);
+		depths[which].resize(count);
+		fulls[which].resize(count);
+		readPicture(0, columns, rows, 0, colors[which].data(), columns);
+		readPicture(1, columns, rows, 1, depths[which].data(), columns); // (a float's bits each: compared as they are)
+		readPicture(2, columns, rows, 0, glows[which].data(), columns);
+		readPicture(3, columns, rows, 2, fulls[which].data(), columns);
+	};
+	read(0);
+	// The one go, into the one big set, and the fill from it.
+	if (!setTargets(columns, rows, false, FoveaLayer))
+	{
+		return;
+	}
+	Gl::Viewport(0, 0, columns, rows);
+	Gl::Uniform2f(location("uRayOffset"), 0.0f, 0.0f);
+	drawOver(4);
+	if (!fillFovea(frame, columns, rows, false))
+	{
+		return;
+	}
+	read(1);
+	static long pictures = 0, pixels = 0, differentColors = 0, differentDepths = 0, differentGlows = 0, differentFulls = 0;
+	for (size_t index = 0; index < count; ++index)
+	{
+		differentColors += colors[0][index] != colors[1][index];
+		differentDepths += depths[0][index] != depths[1][index];
+		differentGlows += glows[0][index] != glows[1][index];
+		differentFulls += fulls[0][index] != fulls[1][index];
+	}
+	pixels += (long)count;
+	if (++pictures % 60 == 0)
+	{
+		Log(LOG_INFO) << "OpenXcom3D GPU: foveated rays cast in three goes against one, " << columns << "x" << rows << ": of " << pixels << " pixels " << differentColors
+			<< " colours differ, " << differentDepths << " depths, " << differentGlows << " glows, " << differentFulls << " full colours";
+		pixels = differentColors = differentDepths = differentGlows = differentFulls = 0;
+	}
 }
 
 /**
@@ -1954,7 +2391,7 @@ bool FirstPersonGpu::State::drawGlow(const Effects &effects, const EffectTargets
 		Gl::Uniform1f(Gl::GetUniformLocation(glowPrograms[0], "uMaxDistance"), effects.maxDistance);
 		Gl::BindFramebuffer(Gl::FRAMEBUFFER, glow.framebuffers[first]);
 		Gl::DrawBuffers(1, one);
-		Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+		drawOver(1);
 		Gl::UseProgram(glowPrograms[1]);
 		Gl::Uniform1i(Gl::GetUniformLocation(glowPrograms[1], "uRadius"), radius);
 		Gl::Uniform1f(Gl::GetUniformLocation(glowPrograms[1], "uScale"), hue ? 1.0f : 1.0f / (2 * radius + 1));
@@ -1966,7 +2403,7 @@ bool FirstPersonGpu::State::drawGlow(const Effects &effects, const EffectTargets
 			Gl::DrawBuffers(1, one);
 			Gl::BindTexture(Gl::TEXTURE_2D, glow.textures[from]);
 			Gl::Uniform2i(Gl::GetUniformLocation(glowPrograms[1], "uStep"), (pass & 1) ? 0 : 1, (pass & 1) ? 1 : 0);
-			Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+			drawOver(1);
 		}
 	}
 	// The picture brightened by them.
@@ -1984,7 +2421,7 @@ bool FirstPersonGpu::State::drawGlow(const Effects &effects, const EffectTargets
 	Gl::Viewport(0, 0, effects.width, effects.height);
 	Gl::UseProgram(glowPrograms[2]);
 	Gl::Uniform1f(Gl::GetUniformLocation(glowPrograms[2], "uGain"), effects.glowGain);
-	Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+	drawOver(2);
 	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
 	brightened = &glow;
 	return true;
@@ -2063,7 +2500,7 @@ bool FirstPersonGpu::State::drawWash(const Effects &effects, Gl::UInt colorTextu
 	Gl::Uniform4i(at("uGreys"), effects.greys[0], effects.greys[1], effects.greys[2], effects.greys[3]);
 	Gl::Uniform1f(at("uVignette"), effects.vignette);
 	Gl::Uniform1f(at("uControlHaze"), effects.controlHaze);
-	Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+	drawOver(1);
 	washed = &target;
 	return true;
 }
@@ -2081,6 +2518,8 @@ bool FirstPersonGpu::State::present(const Present &frame)
 		return false;
 	}
 	PresentTargets &kept = found->second;
+	stages.picture(frame.width, frame.height, false);
+	stages.begin(StagePresent);
 	if (!presentProgram)
 	{
 		presentProgram = compileFragment(PresentSource, "the shader that puts the frame together");
@@ -2167,11 +2606,12 @@ bool FirstPersonGpu::State::present(const Present &frame)
 	Gl::Uniform1i(Gl::GetUniformLocation(presentProgram, "uShafts"), frame.shafts ? 1 : 0);
 	Gl::Uniform1f(Gl::GetUniformLocation(presentProgram, "uFlameGlow"), frame.flameTint ? frame.flameGlow : 0.0f);
 	Gl::Uniform2i(Gl::GetUniformLocation(presentProgram, "uViewSize"), frame.width, frame.height);
-	Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+	drawOver(1);
 	if (frame.pixels)
 	{
 		readPicture(0, frame.width, frame.height, 2, frame.pixels, frame.width);
 	}
+	stages.end();
 	Gl::UseProgram(program->id);
 	const Gl::Enum error = Gl::GetError();
 	if (error != Gl::NoError)
@@ -2202,6 +2642,8 @@ bool FirstPersonGpu::State::presentEye(EyeFrame &frame)
 	{
 		return false;
 	}
+	stages.picture(width, height, false);
+	stages.begin(StageEyeSent);
 	if (!eyeProgram)
 	{
 		eyeProgram = compileFragment(EyeSource, "the shader that finishes an eye's picture");
@@ -2253,7 +2695,7 @@ bool FirstPersonGpu::State::presentEye(EyeFrame &frame)
 		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_WRAP_S, (Gl::Int)Gl::CLAMP_TO_EDGE);
 		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_WRAP_T, (Gl::Int)Gl::CLAMP_TO_EDGE);
 	};
-	// The CPU's part, sent up: the marks whole; the weapon's pictures where they hold anything (or the whole depth).
+	// The CPU's part, sent up: the marks and the weapon's pictures where they hold anything (or the whole depth).
 	EyeUploads &uploads = eyeUploads[{ width, height }];
 	if (!uploads.marks)
 	{
@@ -2263,9 +2705,15 @@ bool FirstPersonGpu::State::presentEye(EyeFrame &frame)
 		makePicture(uploads.heldDepth, Gl::R32F, Gl::RED, Gl::FLOAT);
 	}
 	Gl::PixelStorei(Gl::UNPACK_ALIGNMENT, 1);
-	Gl::BindTexture(Gl::TEXTURE_2D, uploads.marks);
-	Gl::PixelStorei(Gl::UNPACK_ROW_LENGTH, frame.marksPitch);
-	Gl::TexSubImage2D(Gl::TEXTURE_2D, 0, 0, 0, width, height, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, frame.marks);
+	// (Most frames the marks are a few icons or nothing at all: a whole eye-sized picture went up for them, each eye.)
+	const int marksLeft = frame.marksBox[0], marksTop = frame.marksBox[1], marksWidth = frame.marksBox[2] - frame.marksBox[0], marksHeight = frame.marksBox[3] - frame.marksBox[1];
+	const bool marked = marksWidth > 0 && marksHeight > 0;
+	if (marked)
+	{
+		Gl::BindTexture(Gl::TEXTURE_2D, uploads.marks);
+		Gl::PixelStorei(Gl::UNPACK_ROW_LENGTH, frame.marksPitch);
+		Gl::TexSubImage2D(Gl::TEXTURE_2D, 0, marksLeft, marksTop, marksWidth, marksHeight, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, frame.marks + (size_t)marksTop * frame.marksPitch + marksLeft);
+	}
 	const int left = frame.box[0], top = frame.box[1], boxWidth = frame.box[2] - frame.box[0], boxHeight = frame.box[3] - frame.box[1];
 	const bool boxed = !frame.depthWhole && boxWidth > 0 && boxHeight > 0;
 	if (boxed)
@@ -2316,6 +2764,7 @@ bool FirstPersonGpu::State::presentEye(EyeFrame &frame)
 		}
 	}
 	// (In full colour only with the rays' own pictures at hand: a ray a pixel.)
+	stages.begin(StageEyeFinish);
 	const bool full = frame.full && kept->second.rayTrue && kept->second.rayColor;
 	const Gl::UInt pictures[11] = { kept->second.color, uploads.marks, uploads.held, drawn->second.textures[1], uploads.heldTest, uploads.heldDepth, presentPalette, presentFlameTint,
 		full ? kept->second.rayColor : kept->second.color, full ? kept->second.rayTrue : presentPalette, kept->second.glow ? kept->second.glow : kept->second.color };
@@ -2333,11 +2782,14 @@ bool FirstPersonGpu::State::presentEye(EyeFrame &frame)
 	Gl::Uniform1f(Gl::GetUniformLocation(eyeProgram, "uFlameGlow"), frame.flameTint ? frame.flameGlow : 0.0f);
 	Gl::Uniform2i(Gl::GetUniformLocation(eyeProgram, "uViewSize"), width, height);
 	Gl::Uniform4i(Gl::GetUniformLocation(eyeProgram, "uHeldBox"), boxed ? frame.box[0] : 0, boxed ? frame.box[1] : 0, boxed ? frame.box[2] : 0, boxed ? frame.box[3] : 0);
+	Gl::Uniform4i(Gl::GetUniformLocation(eyeProgram, "uMarksBox"), marked ? frame.marksBox[0] : 0, marked ? frame.marksBox[1] : 0, marked ? frame.marksBox[2] : 0, marked ? frame.marksBox[3] : 0);
 	Gl::Uniform1i(Gl::GetUniformLocation(eyeProgram, "uDepthWhole"), frame.depthWhole ? 1 : 0);
 	Gl::Uniform1i(Gl::GetUniformLocation(eyeProgram, "uFull"), full ? 1 : 0);
 	Gl::Uniform1i(Gl::GetUniformLocation(eyeProgram, "uShafts"), full && frame.shafts ? 1 : 0);
 	Gl::Uniform3f(Gl::GetUniformLocation(eyeProgram, "uDepthPlanes"), frame.depthToMetres, frame.nearMetres, frame.farMetres);
-	Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+	drawOver(2);
+	stages.end();
+	if (frame.pixels || frame.depth) stages.begin(StageReadBack);
 	if (frame.pixels)
 	{
 		Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0);
@@ -2347,6 +2799,7 @@ bool FirstPersonGpu::State::presentEye(EyeFrame &frame)
 	{
 		readPicture(1, width, height, 1, frame.depth, width);
 	}
+	stages.end();
 	frame.colorTexture = target.color;
 	frame.depthTexture = target.depth;
 	Gl::UseProgram(program->id);
@@ -2369,6 +2822,9 @@ bool FirstPersonGpu::State::presentEye(EyeFrame &frame)
 bool FirstPersonGpu::State::drawEffects(const Effects &effects, const Output &output, Timing *timing)
 {
 	auto start = std::chrono::steady_clock::now();
+	stages.picture(effects.width, effects.height, false);
+	stages.holds((size_t)effects.primCount, effects.bins.size() > (size_t)effects.binColumns * effects.binRows + 1 ? effects.bins.size() - ((size_t)effects.binColumns * effects.binRows + 1) : 0);
+	stages.begin(StageEffectsSent);
 	if (!effectsProgram.id && !buildEffects())
 	{
 		return false;
@@ -2478,7 +2934,8 @@ bool FirstPersonGpu::State::drawEffects(const Effects &effects, const Output &ou
 		timing->upload += millisecondsSince(start);
 		start = std::chrono::steady_clock::now();
 	}
-	Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+	stages.begin(StageEffects);
+	drawOver(4);
 	if (goes == 2)
 	{
 		// The second go: from the first one's pictures, the outlines and the primitives after them.
@@ -2501,21 +2958,24 @@ bool FirstPersonGpu::State::drawEffects(const Effects &effects, const Output &ou
 		Gl::Uniform1f(location("uOutlineOpacity"), effects.outlineOpacity);
 		Gl::Uniform1f(location("uOutlineSlack"), effects.outlineSlack);
 		Gl::Uniform1i(location("uOutlineGlows"), effects.outlineGlows ? 1 : 0);
-		Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+		drawOver(4);
 	}
 	program = raysProgram;
 	// The bloom over them (the picture and its glow are then the bloom's).
 	GlowTargets *brightened = nullptr;
+	if (effects.halos) stages.begin(StageBloom);
 	if (effects.halos && !drawGlow(effects, drawn, brightened))
 	{
 		return false;
 	}
 	// The screen wash over that (the picture is then the wash's; the glow stays where it was).
 	WashTargets *washed = nullptr;
+	if (effects.wash) stages.begin(StageWash);
 	if (effects.wash && !drawWash(effects, brightened ? brightened->textures[4] : drawn.textures[0], brightened ? brightened->textures[5] : drawn.textures[2], washed))
 	{
 		return false;
 	}
+	stages.end();
 	if (timing)
 	{
 		Gl::Finish();
@@ -2523,6 +2983,9 @@ bool FirstPersonGpu::State::drawEffects(const Effects &effects, const Output &ou
 		start = std::chrono::steady_clock::now();
 	}
 	// The finished pictures, back to the view.
+	const bool reads = effects.readColor || effects.readGlow || effects.readDepth || effects.notes || (effects.patchNotes && effects.patch[2] > 0 && effects.patch[3] > 0)
+		|| ((output.trueColor || effects.rayColors) && rayPixelSize == 1);
+	if (reads) stages.begin(StageReadBack);
 	if (washed && effects.readColor)
 	{
 		Gl::BindFramebuffer(Gl::FRAMEBUFFER, washed->framebuffer);
@@ -2564,6 +3027,7 @@ bool FirstPersonGpu::State::drawEffects(const Effects &effects, const Output &ou
 	kept.rayTrue = rayPixelSize == 1 ? rays->second.textures[3] : 0;
 	kept.rayColor = rayPixelSize == 1 ? rays->second.textures[0] : 0;
 	Gl::UseProgram(program->id);
+	stages.end();
 	if (timing)
 	{
 		timing->read += millisecondsSince(start);
@@ -2730,9 +3194,11 @@ void *FirstPersonGpu::eyeFence(int slot)
 	void *fence = nullptr;
 	state.run([&] {
 		// (The slot's last fence: nobody waits on it any more, the display's thread holds another slot.)
+		state.stages.begin(StageFence);
 		if (state.eyeFences[slot]) Gl::DeleteSync(state.eyeFences[slot]);
 		fence = state.eyeFences[slot] = Gl::FenceSync(Gl::SYNC_GPU_COMMANDS_COMPLETE, 0);
 		Gl::Flush(); // (so the fence is on its way: the waiter is in another context)
+		state.stages.end();
 	});
 	return fence;
 }
@@ -2806,8 +3272,41 @@ bool FirstPersonGpu::readEffectsDepth(int width, int height, float *depth)
 		if (final == state.effectsFinalGo.end()) return;
 		const auto drawn = state.effectTargets.find({ width, height, final->second });
 		if (drawn == state.effectTargets.end() || !drawn->second.framebuffer) return;
+		state.stages.picture(width, height, false);
+		state.stages.begin(StageDepthFetched);
 		Gl::BindFramebuffer(Gl::FRAMEBUFFER, drawn->second.framebuffer);
 		state.readPicture(1, width, height, 1, depth, width);
+		state.stages.end();
+		read = Gl::GetError() == Gl::NoError;
+	});
+	return read;
+}
+
+/**
+ * One pixel of the depth of the units and effects last drawn for a view of this size (see readEffectsDepth): read as
+ * four floats, the form every kind of OpenGL gives a picture of fractions in.
+ */
+bool FirstPersonGpu::readEffectsDepthAt(int width, int height, int pixelX, int pixelY, float &depth)
+{
+	State &state = *_state;
+	if (state.failed || pixelX < 0 || pixelY < 0 || pixelX >= width || pixelY >= height)
+	{
+		return false;
+	}
+	bool read = false;
+	state.run([&] {
+		const auto final = state.effectsFinalGo.find({ width, height });
+		if (final == state.effectsFinalGo.end()) return;
+		const auto drawn = state.effectTargets.find({ width, height, final->second });
+		if (drawn == state.effectTargets.end() || !drawn->second.framebuffer) return;
+		state.stages.picture(width, height, false);
+		state.stages.begin(StageDepthAsked);
+		Gl::BindFramebuffer(Gl::FRAMEBUFFER, drawn->second.framebuffer);
+		Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0 + 1);
+		float four[4] = {};
+		Gl::ReadPixels(pixelX, pixelY, 1, 1, Gl::RGBA, Gl::FLOAT, four);
+		state.stages.end();
+		depth = four[0];
 		read = Gl::GetError() == Gl::NoError;
 	});
 	return read;

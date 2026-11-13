@@ -612,7 +612,7 @@ bool isPlaystyleSwitch(const std::string &id)
  * before (a profile keeps every value it saved, the old defaults too); the unlisted
  * fpsQuestDefaults then says so, and the player's own choices after that stay. Elsewhere nothing.
  * Also on that build: the add-on's diagnostic switches, which a desktop takes from the environment
- * (OPENXCOM3D_GPU_TIMING, OPENXCOM3D_PASS_TIME, OPENXCOM3D_GPU_EFFECTS...), from a file an Android
+ * (OPENXCOM3D_GPU_STAGES, OPENXCOM3D_GPU_TIMING, OPENXCOM3D_PASS_TIME, OPENXCOM3D_GPU_EFFECTS...), from a file an Android
  * app can be given: the profile folder's environment.txt, a NAME=VALUE a line, only names starting
  * OPENXCOM3D_. No file: nothing set.
  */

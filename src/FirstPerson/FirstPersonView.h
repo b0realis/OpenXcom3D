@@ -746,6 +746,7 @@ private:
 	int _stereoFrames = 0;                      // ...how many frames
 	double _stereoTotal = 0.0, _stereoShared = 0.0, _stereoWorst = 0.0; // ...their times summed, the shared part's, and the slowest, ms
 	double _stereoPasses = 0.0, _stereoDepth = 0.0, _stereoLast = 0.0;  // ...and of the eyes' own: the passes, the depth fetched from the card, what is drawn last
+	double _stereoFinish = 0.0, _stereoFence = 0.0;                     // ...an eye kept on the card finished there (the caller's last drawing, the marks and weapon sent), and the pair's fence
 	// The eyes kept on the graphics card (see EyesOnCard and presentEyesOnCard).
 	bool _eyeOnCard = false;                    // this eye pass: the card keeps the finished picture (gpuDrawEffects reads no colour back; the marks go over an empty picture)
 	bool _gpuEyeKept = false;                   // ...and it did: this pass's units and effects were drawn on the card
@@ -1235,6 +1236,9 @@ private:
 	/// Before anything drawn after the units and effects reads the depth buffer: has it fetched from the card if it wasn't yet.
 	void gpuNeedDepth() { if (_gpuDepthPending) gpuFetchDepth(); }
 	void gpuFetchDepth();
+	/// The frame's finished depth at one pixel, for a mark that asks about a single spot: the depth buffer's if it is
+	/// here, else that one pixel from the card (the rest stays there).
+	float gpuDepthAt(int pixelX, int pixelY);
 	/// The check of the card's units and effects against the CPU's passes, a pixel at a time.
 	void gpuCheckEffects();
 	/// The same, with the sprite given piece by piece.
