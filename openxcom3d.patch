@@ -59120,10 +59120,10 @@ index 000000000..f3700eac1
 +}
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..6140a7187
+index 000000000..c06eb48aa
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,2014 @@
+@@ -0,0 +1,2015 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -60996,6 +60996,7 @@ index 000000000..6140a7187
 +	_hasTrueColor = false; // (set again by the card when it gives the frame's picture in full colour too)
 +	_hasCardPicture = false;
 +	_gpuPresenting = 0;
++	_gpuDepthPending = false; // (a frame the CPU draws has its depth here already: nothing of an earlier frame's is fetched from the card)
 +	const bool onCard = !gpuShadow && Options::fpsRenderer == 1 && gpuCastAllRays();
 +	if (!onCard)
 +	{
