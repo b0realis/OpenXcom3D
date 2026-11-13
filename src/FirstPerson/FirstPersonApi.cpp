@@ -724,6 +724,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlightCostOverride", &fpsFlightCostOverride, false, "STR_FPS_FLIGHT_COST_OVERRIDE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsVault", &fpsVault, false, "STR_FPS_VAULT", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFalling", &fpsFalling, true, "STR_FPS_FALLING", category));
+	// Fall damage, on its own (a player, GitHub issue #137: "Falling" off to play without the
+	// damage also stopped every step off a ledge): off, a landing only jolts the view.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsFallDamage", &fpsFallDamage, true, "STR_FPS_FALL_DAMAGE", category));
 	// A step off a ledge onto ground no one can walk on, or where no step leads out (a player's
 	// report: X-Com Files' blood moat, which the map never lets a soldier into, soft-locked one),
 	// stops at the edge with a warning; pushing that way again (or jumping) goes over.

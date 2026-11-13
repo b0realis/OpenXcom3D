@@ -2215,6 +2215,8 @@ bool FirstPersonGpu::State::drawEffects(const Effects &effects, const Output &ou
 	Gl::Uniform1i(location("uPixelSize"), rayPixelSize);
 	const int primitives = effects.primCount;
 	Gl::Uniform1i(location("uContinue"), 0);
+	// Futuristic night vision's colour group + 1 (0: any other time): a see-through picture that keeps its colours is mixed over that.
+	Gl::Uniform1i(location("uOwnOverNight"), effects.ownColours ? effects.nightVision : 0);
 	Gl::Uniform1i(location("uFirstPrim"), 0);
 	Gl::Uniform1i(location("uEndPrim"), goes == 2 ? effects.outlineAt : primitives);
 	Gl::Uniform1i(location("uOutlineCount"), 0);

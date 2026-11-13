@@ -410,7 +410,7 @@ The settings are listed under the same headings as in the game.
 - **Flight cost per level (TU)** (0): the time units a flying (or, under the sea, swimming) soldier pays to rise or sink one level with SUIT FLY switched on in 3D, from 0 (free) to 24. The original game charges about 8.
 - **Flight cost overrides rules** (NO): YES: every flying soldier pays the flight cost above to rise or sink a level. NO: each unit pays what the game charges it (its armor's own cost, 8 for the flying suit), so units that fly slower stay slower.
 - **Jump over low obstacles** (NO): YES: jumping (Space) while walking into something low (a fence, a table, a crate, a rock: up to waist height) takes the soldier over it. The jump itself is free: only the walk to the far side costs its normal time units. It bends the rules a little, which is why it's a setting. NO: Space is just a hop, and the original rules decide what blocks you.
-- **Falling** (YES): YES: you can walk off a ledge and fall to the level below, by the game's own fall, hurt by the height (a little from one level, a lot from two or more; armor takes some of it). NO: ledges stop you, as the map's paths do; a soldier flying (flight on) still crosses the air, as on the map.
+- **Falling** (YES): YES: you can walk off a ledge and fall to the level below, by the game's own fall, hurt by the height with *Fall damage* (Combat). NO: ledges stop you, as the map's paths do; a soldier flying (flight on) still crosses the air, as on the map.
 - **Check the landing** (YES): with *Falling*, a step off a ledge first looks where the soldier lands. Onto ground no one can walk on (a blood moat, the sea, the craft's hull: places the map never lets a soldier walk onto) or where not a single step leads on, the soldier stops at the edge with **UNSAFE LANDING! PUSH AGAIN** (a player's report: X-Com Files' vampire castle, a soldier soft-locked in its blood moat). Let go of the movement key and push that way again within 6 seconds, or jump (Space) while pushing, to go over anyway. NO: every ledge can be stepped off, as before.
 
 ### Aiming and combat
@@ -441,6 +441,7 @@ The settings are listed under the same headings as in the game.
 
 ### Graphics and light
 
+- **Fall damage** (YES): with *Falling*, the landing hurts by the height fallen (a little from one level, a lot from two or more; armor takes some of it). NO: a fall never hurts; the view still jolts.
 - **Smooth lighting** (YES): YES: the battlescape's light (sun, flares, fires, personal lights) blends smoothly from tile to tile. NO: tile by tile, as the isometric map shades it.
 - **Shadows** (YES): ray-traced shadows from the sun by day, from street lamps, your flashlight and tactical flares at night, and under every unit; a unit lit by a flare also throws a soft shadow along the ground away from it (longer the lower the flare, up to three tiles). Turn them off on slow machines.
 - **Distance haze** (Normal): how soon far terrain fades into the haze, the sky's colour at the horizon. **Normal** from about half the view's reach (27 tiles at the usual 60), **Light** from three quarters, **Clear** only in the last tenth, so the world doesn't stop with a hard edge where the view ends; the reach is *View distance*. The fade blends the colours step by step, so far walls fade evenly. It also sets how thick the fog over unseen terrain is with *Unseen terrain* Fog: all of it at Normal, half at Light, none at Clear. Under the sea the murk stays as it is.
@@ -980,6 +981,11 @@ What `FirstPersonView` draws:
 
 ## 11. Version history
 
+### After 1.14
+
+- New setting *Fall damage* (Combat, YES by default, as before): NO lets a soldier step off ledges with *Falling* and land unhurt; before, the only way to have no fall damage was *Falling* off, which also stopped every step off a ledge (GitHub issue #137). `fallDamage` (FirstPersonModeMovement.cpp).
+- *Futuristic night vision* with *See-through corpses*: a body or a pile of items gone faint under the crosshair keeps its own colours over the green world; it went green with it (GitHub issue #136). A faint picture that keeps its colours is mixed over the world already in the night vision's colours and marked as its own (`plot` in FirstPersonViewSprites.cpp, the same in the card's `EffectsSource`).
+
 ### 1.14 (2026-11-13)
 
 - Free movement: walking diagonally no longer stutters (a straight step put the camera back inside its tile on the other axis), and two straight steps round a corner cost what the one diagonal step costs (6 time units on plain ground, not 8), where the game would let the soldier walk that diagonal.
@@ -1393,7 +1399,7 @@ A veteran player's two play-test reports on 0.8.2 (played with Piratez too), tur
 ### 0.6 (2026-10-18)
 
 - **Sprite upscaling** (setting): soldiers, aliens, items, explosions and smoke up close scaled the way pixel art scales well (xBRZ, back into the game's palette, optionally sharpened), made on a worker thread so nothing stalls a frame.
-- **Falling** (setting): walk off a ledge and the game's own fall takes the soldier down, hurt by the height.
+- **Falling** (setting): walk off a ledge and the game's own fall takes the soldier down, hurt by the height (setting *Fall damage*).
 - **FPS-style shooting** (setting "Faithful X-COM targeting" off): rounds fly along the crosshair with a spread, recoil climbs, quick = burst, aimed, auto while the trigger is held; each gun offers only the modes it has; rounds fly at a bullet's pace.
 - **Dual wield** (setting): a gun in each hand, both fired at the same moment, round for round, each half as accurate; the second gun drawn on the other side.
 - **Eye height** (setting): the 3D camera a little lower than the game's sight line, for headroom.

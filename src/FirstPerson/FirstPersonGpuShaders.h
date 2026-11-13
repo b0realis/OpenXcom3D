@@ -1942,6 +1942,7 @@ uniform int uFirstPrim, uEndPrim;       // this go's primitives: from the first 
 uniform int uOutlineBase, uOutlineCount; // the outlined pictures' records (EffectOutlineTexels texels each, from this texel of uPrims), and how many: 0 none
 uniform float uOutlineOpacity, uOutlineSlack; // how much of the outlines shows; how much farther than the scene a tested picture may be
 uniform int uOutlineGlows;
+uniform int uOwnOverNight;              // futuristic night vision's colour group + 1 (0: any other time)
 layout(location = 0) out uint outColor;
 layout(location = 1) out float outDepth;
 layout(location = 2) out uint outGlow;  // the glow (1, 3), 32 where the pixel keeps its own colours under night vision, 64 where see-through smoke lies over it
@@ -2106,12 +2107,17 @@ void main()
 				if (pixelOpacity <= 0) continue;
 				if (veil != 255) veil -= pixelOpacity;
 				if (smokeCap > 0) smokeVeil += pixelOpacity;
+				// A faint picture that keeps its colours under futuristic night vision (a body or a pile
+				// pointed past, setting "See-through corpses"): over the world in the night vision's colours.
+				bool ownOverNight = ownColours != 0u && uOwnOverNight != 0;
+				if (ownOverNight && own == 0u && color != 0u) color = uint((uOwnOverNight - 1) * 16) | (color & 15u);
 				color = seeThrough(pixelOpacity, shadeColor(spriteColor, shade), color);
 				if (pixelOpacity > SeeThroughLevels / 2)
 				{
 					glow = 0u;
 					own = ownColours;
 				}
+				else if (ownOverNight) own = 1u;
 				continue;
 			}
 			if (t8.y < 1.0 && dither(pixel.x, pixel.y) >= t8.y) continue; // (right in front of the camera it fades out)

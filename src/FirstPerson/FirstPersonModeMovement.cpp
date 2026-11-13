@@ -1810,6 +1810,7 @@ int FirstPersonMode::liftArrowAt(double x, double y) const
  * leg from below: the armor counts for half and isn't worn down, half the power also stuns, and
  * from two levels up the leg may be wounded. Then the game checks for casualties, as after any
  * hit (the fall can kill or knock out).
+ * With the setting "Fall damage" off, only the jolt and the footfall.
  * @param levels How many levels the soldier fell.
  */
 void FirstPersonMode::fallDamage(BattleUnit *unit, int levels)
@@ -1817,7 +1818,7 @@ void FirstPersonMode::fallDamage(BattleUnit *unit, int levels)
 	// The landing: a jolt (harder from higher up) and a footfall.
 	_view->addShake(1.5f + levels);
 	playFootsteps(unit, 8.0);
-	if (unit->isOut())
+	if (unit->isOut() || !Options::fpsFallDamage)
 	{
 		return;
 	}

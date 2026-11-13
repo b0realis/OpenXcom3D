@@ -264,6 +264,8 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 	// keeps its colours under futuristic night vision; anything else solid (smoke more than
 	// half opaque) drawn over it takes that back (see _ownColours).
 	const Uint8 ownColours = draw.unit || draw.body || draw.pile ? 1 : 0;
+	const bool ownOverNight = ownColours && _nightVision && Options::fpsNightVisionUnits;
+	const Uint8 nightGroup = _nightVision ? (Uint8)((_nightVision - 1) * 16) : 0;
 	auto plot = [&](int pixelX, int pixelY, Uint8 color, float depth, int pixelOpacity) {
 		const int index = pixelY * width + pixelX;
 		float &depthHere = _depthBuffer[index];
@@ -290,12 +292,18 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 			if (veilLeft != 255) veilLeft -= pixelOpacity;
 			if (smokeCap > 0) _smokeVeil[index] += (Uint8)pixelOpacity;
 			Uint8 *pixel = getRaw(pixelX, pixelY);
+			// A faint picture that keeps its colours under futuristic night vision (a body or a pile
+			// pointed past, setting "See-through corpses"; a player, GitHub issue #136: it went green
+			// with the world): mixed over the world in the night vision's colours, and left alone by
+			// the wash after (see washBands).
+			if (ownOverNight && !_ownColours[index] && *pixel) *pixel = nightGroup | (*pixel & 15);
 			*pixel = seeThrough(pixelOpacity, shadeColor(color, shade), *pixel);
 			if (pixelOpacity > SeeThroughLevels / 2)
 			{
 				_glowMask[index] = 0;
 				_ownColours[index] = ownColours;
 			}
+			else if (ownOverNight) _ownColours[index] = 1;
 			return;
 		}
 		if (opacity < 1.0f && dither(pixelX, pixelY) >= opacity) return;

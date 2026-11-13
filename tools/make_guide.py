@@ -121,7 +121,7 @@ SETTINGS = [
         ('Flight cost per level (TU)', '0', '0 to 24', 'What a flying (or swimming) soldier pays to rise or sink a level in 3D.', 'The original game charges about 8.'),
         ('Flight cost overrides rules', 'NO', 'YES / NO', 'YES: every flyer pays the cost above. NO: each pays its armor\'s own cost.', 'NO keeps the game\'s slower flyers slow.'),
         ('Jump over low obstacles', 'NO', 'YES / NO', 'Space while walking into something low vaults over it, paying only the walk.', 'Bends the rules a little: on the map a fence makes you walk round.'),
-        ('Falling', 'YES', 'YES / NO', 'Walk off a ledge and fall to the level below, hurt by the height.', 'A shortcut the map never offers, at the price of the fall.'),
+        ('Falling', 'YES', 'YES / NO', 'Walk off a ledge and fall to the level below.', 'A shortcut the map never offers, at the price of the fall.'),
         ('Check the landing', 'YES', 'YES / NO', 'A step off a ledge onto ground no one can walk on (a moat, the sea) or where no step leads on stops at the edge: UNSAFE LANDING! PUSH AGAIN.',
          'Keeps a soldier out of places they could never leave.'),
     ]),
@@ -156,6 +156,7 @@ SETTINGS = [
         ('Auto-equip guns first', 'NO', 'YES / NO', 'Soldiers with no saved loadout take guns before melee weapons, the hardest-hitting first, launchers last. NO: OpenXcom\'s own auto-equip.', 'OXCE has no ranking: its order changes between builds, so in XPiratez or X-Com Files it often hands out staffs and swords first.'),
         ('Unlimited tactical flares', 'YES', 'YES / NO', 'T throws a red flare at the crosshair, free and as often as you like.', 'Lights the 3D view only.'),
         ('Night vision needs gear', 'NO', 'YES / NO', 'Only soldiers with night vision gear (power suits, flying suits...) get NIGHT VISION in 3D. NO: everyone.', 'YES keeps the night dark for the unequipped.'),
+        ('Fall damage', 'YES', 'YES / NO', 'With Falling, the landing hurts by the height fallen. NO: a fall never hurts.', 'NO makes every ledge a free shortcut.'),
     ]),
     ('Graphics and light', [
         ('Smooth lighting', 'YES', 'YES / NO', 'The battle\'s light blends smoothly from tile to tile. NO: tile by tile, as the map shades it.', ''),
