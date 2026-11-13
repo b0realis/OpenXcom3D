@@ -1149,6 +1149,10 @@ void FirstPersonView::updateParticles()
 	{
 		spawnUfoAura(elapsedSeconds);
 	}
+	if (Options::fpsLiftBeams && Options::fpsParticles > 0)
+	{
+		spawnLiftBeams(elapsedSeconds);
+	}
 	if (Options::fpsParticles > 1)
 	{
 		spawnAmbient(elapsedSeconds);

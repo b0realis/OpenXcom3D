@@ -177,8 +177,11 @@ bool FirstPersonMode::stepAllowed(BattleUnit *unit, int stepX, int stepY)
 		// (endless time units, energy and ammo) skips this.
 		if (allowed && !doomModeOn())
 		{
-			allowed = unit->getTimeUnits() >= stepCost.cost.time && unit->getEnergy() >= stepCost.cost.energy
-				&& reserveAllows(unit, stepCost.cost.time, stepCost.cost.energy);
+			// (less what the step is cheaper by as the second half of a diagonal, see cornerDiscount)
+			int lessTime = 0, lessEnergy = 0;
+			cornerDiscount(unit, start, direction, stepCost, lessTime, lessEnergy);
+			const int time = stepCost.cost.time - lessTime, energy = stepCost.cost.energy - lessEnergy;
+			allowed = unit->getTimeUnits() >= time && unit->getEnergy() >= energy && reserveAllows(unit, time, energy);
 		}
 		_stepAllowedCache[direction] = allowed ? 1 : unsafe ? 2 : 0;
 	}
@@ -219,6 +222,39 @@ PathfindingStep FirstPersonMode::stepPrice(BattleUnit *unit, const Position &sta
 	}
 	if (sidestep) *sidestep = toTheSide;
 	return price;
+}
+
+/**
+ * Walking freely, the camera seldom crosses a tile's corner exactly: a diagonal walk goes over one
+ * edge and then the other, two straight steps where the map would walk one diagonal step, and by
+ * the rules two straight steps cost more (8 time units for 6 on plain ground). So the second
+ * straight step of such a pair costs only what is left of the diagonal's price (the owner's ask:
+ * a diagonal should cost a diagonal). It counts when the last step walked was straight, this one
+ * goes on from where that ended to the tile diagonally across from where it began, on the same
+ * level and in the same turn, and the game would let the soldier walk that diagonal in one step.
+ * A step is half of one pair only.
+ * @param start, direction, price The step asked about, and its price (see stepPrice).
+ * @param time, energy Set to what it is cheaper by (0: nothing).
+ */
+void FirstPersonMode::cornerDiscount(BattleUnit *unit, const Position &start, int direction, const PathfindingStep &price, int &time, int &energy) const
+{
+	time = energy = 0;
+	if (!_cornerOpen || unit != _cornerUnit || start != _cornerVia || _cornerTurn != _save->getTurn() || (direction & 1) || price.cost.time >= Pathfinding::INVALID_MOVE_COST)
+	{
+		return;
+	}
+	const Position across = price.pos - _cornerFrom;
+	if (std::abs(across.x) != 1 || std::abs(across.y) != 1 || across.z != 0)
+	{
+		return;
+	}
+	const PathfindingStep diagonal = stepPrice(unit, _cornerFrom, Pathfinding::vectorToDirection(across));
+	if (diagonal.cost.time >= Pathfinding::INVALID_MOVE_COST || diagonal.pos != price.pos)
+	{
+		return;
+	}
+	time = std::clamp(_cornerTime + price.cost.time - diagonal.cost.time, 0, (int)price.cost.time);
+	energy = std::clamp(_cornerEnergy + price.cost.energy - diagonal.cost.energy, 0, (int)price.cost.energy);
 }
 
 /**
@@ -433,6 +469,23 @@ bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 	_fallFromZ = stepsOffLedge ? from.z : -1; // The level the fall starts from, for the damage on landing.
 	_unsafeDirection = -1; // (an unsafe landing's go-ahead is used, or no longer needed)
 	_unsafeConfirmed = false;
+
+	// The second straight step of a diagonal costs what is left of the diagonal's price (see
+	// cornerDiscount): the game's walk charges its own price, so the soldier is given the difference
+	// first (taken back if the step isn't walked after all, see updateCamera). And a straight step
+	// may be the first half of the next pair.
+	const PathfindingStep price = stepPrice(unit, from, direction);
+	cornerDiscount(unit, from, direction, price, _grantedTime, _grantedEnergy);
+	if (doomModeOn() || stepsOffLedge) _grantedTime = _grantedEnergy = 0;
+	_cornerOpen = !(direction & 1) && !_grantedTime && !_grantedEnergy && !stepsOffLedge && price.cost.time < Pathfinding::INVALID_MOVE_COST && price.pos.z == from.z;
+	_cornerUnit = unit;
+	_cornerFrom = from;
+	_cornerVia = price.pos;
+	_cornerTime = price.cost.time;
+	_cornerEnergy = price.cost.energy;
+	_cornerTurn = _save->getTurn();
+	if (_grantedTime) unit->setTimeUnits(unit->getTimeUnits() + _grantedTime);
+	if (_grantedEnergy) unit->spendEnergy(-_grantedEnergy);
 
 	// Hand the step to the game's walking state.
 	BattleAction walk;
@@ -1452,6 +1505,21 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 		return;
 	}
 
+	// Whatever holds the camera back below (an edge it may not cross, a wall's margin) never makes it
+	// jump: put back from where it already was past the line, it walks there at its own pace. (The
+	// owner's report: walking diagonally stuttered, as if the soldier snapped to the tile now and
+	// then. Each straight step put the camera back EdgeMargin voxels inside the tile on the other
+	// axis, though it may well be nearer that edge when the step sideways is open too.)
+	const double pace = std::clamp(Options::fpsWalkSpeed, 1, 8) * 16.0 * elapsedSeconds;
+	auto heldAbove = [pace](double from, double to, double line) // (kept at or above the line)
+	{
+		return to >= line ? to : std::max(to, std::min(line, from + pace));
+	};
+	auto heldBelow = [pace](double from, double to, double line)
+	{
+		return to <= line ? to : std::min(to, std::max(line, from - pace));
+	};
+
 	// Which neighbouring tile the new position falls into, per axis: -1, 0 (still this tile) or 1.
 	const int crossingX = std::clamp((int)std::floor((newEyeX - sizeOffset) / 16.0) - _trackedTile.x, -1, 1);
 	const int crossingY = std::clamp((int)std::floor((newEyeY - sizeOffset) / 16.0) - _trackedTile.y, -1, 1);
@@ -1474,20 +1542,33 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 				const Position oldTile = _trackedTile;
 				if (commitStep(unit, stepX, stepY))
 				{
-					// Keep moving along the axes the step goes, but stay inside the old tile on
-					// the other one.
-					if (stepX == 0) newEyeX = clampInsideTile(oldTile.x, newEyeX, sizeOffset);
-					if (stepY == 0) newEyeY = clampInsideTile(oldTile.y, newEyeY, sizeOffset);
+					// Keep moving along the axes the step goes, but stay within the old tile's row
+					// or column on the other one (anywhere in it: the new tile's own walls keep
+					// their margin below).
+					const double within = 0.01;
+					if (stepX == 0) newEyeX = std::clamp(newEyeX, oldTile.x * 16.0 + sizeOffset + within, oldTile.x * 16.0 + 16.0 + sizeOffset - within);
+					if (stepY == 0) newEyeY = std::clamp(newEyeY, oldTile.y * 16.0 + sizeOffset + within, oldTile.y * 16.0 + 16.0 + sizeOffset - within);
 					stepped = true;
 				}
 			}
 		}
 
-		// No step: stay inside this tile on the axes that would have left it.
+		// No step: stay inside this tile on the axes that would have left it. But not while the game
+		// is still walking the last step and this one looks open: then the camera walks on, up to
+		// StepLead voxels over the edge, and the step is taken as soon as the game is free (in a
+		// frame or two); walking diagonally, the camera often crosses a second edge right after
+		// the first.
 		if (!stepped)
 		{
-			if (crossingX != 0) newEyeX = clampInsideTile(_trackedTile.x, newEyeX, sizeOffset);
-			if (crossingY != 0) newEyeY = clampInsideTile(_trackedTile.y, newEyeY, sizeOffset);
+			const bool waiting = _stepPending && driving && canMove;
+			const bool diagonalOpen = waiting && crossingX != 0 && crossingY != 0 && stepAllowed(unit, crossingX, crossingY);
+			auto held = [&](int tile, double from, double to, bool mayLead)
+			{
+				const double lead = mayLead ? StepLead : -EdgeMargin;
+				return heldBelow(from, heldAbove(from, to, tile * 16.0 + sizeOffset - lead), tile * 16.0 + 16.0 + sizeOffset + lead);
+			};
+			if (crossingX != 0) newEyeX = held(_trackedTile.x, _eyeX, newEyeX, waiting && (diagonalOpen || stepAllowed(unit, crossingX, 0)));
+			if (crossingY != 0) newEyeY = held(_trackedTile.y, _eyeY, newEyeY, waiting && (diagonalOpen || stepAllowed(unit, 0, crossingY)));
 		}
 	}
 
@@ -1507,10 +1588,10 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 			unsafeEdgeSeen = true;
 		}
 	};
-	if (newEyeX < westEdgeX + EdgeMargin && !stepAllowed(unit, -1, 0)) { newEyeX = westEdgeX + EdgeMargin; stopAtEdge(-1, 0); }
-	if (newEyeX > westEdgeX + 16.0 - EdgeMargin && !stepAllowed(unit, 1, 0)) { newEyeX = westEdgeX + 16.0 - EdgeMargin; stopAtEdge(1, 0); }
-	if (newEyeY < northEdgeY + EdgeMargin && !stepAllowed(unit, 0, -1)) { newEyeY = northEdgeY + EdgeMargin; stopAtEdge(0, -1); }
-	if (newEyeY > northEdgeY + 16.0 - EdgeMargin && !stepAllowed(unit, 0, 1)) { newEyeY = northEdgeY + 16.0 - EdgeMargin; stopAtEdge(0, 1); }
+	if (newEyeX < westEdgeX + EdgeMargin && !stepAllowed(unit, -1, 0)) { newEyeX = heldAbove(_eyeX, newEyeX, westEdgeX + EdgeMargin); stopAtEdge(-1, 0); }
+	if (newEyeX > westEdgeX + 16.0 - EdgeMargin && !stepAllowed(unit, 1, 0)) { newEyeX = heldBelow(_eyeX, newEyeX, westEdgeX + 16.0 - EdgeMargin); stopAtEdge(1, 0); }
+	if (newEyeY < northEdgeY + EdgeMargin && !stepAllowed(unit, 0, -1)) { newEyeY = heldAbove(_eyeY, newEyeY, northEdgeY + EdgeMargin); stopAtEdge(0, -1); }
+	if (newEyeY > northEdgeY + 16.0 - EdgeMargin && !stepAllowed(unit, 0, 1)) { newEyeY = heldBelow(_eyeY, newEyeY, northEdgeY + 16.0 - EdgeMargin); stopAtEdge(0, 1); }
 
 	// Whatever stopped us (walls, edges, a step not taken) takes the momentum out on that axis:
 	// where the camera really moved slower than the momentum (by more than half a voxel a

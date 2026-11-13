@@ -59,6 +59,7 @@
 #include "FirstPersonApi.h"
 #include "FirstPersonDamageNumbers.h"
 #include "FirstPersonMode.h"
+#include "../Mod/MapDataSet.h"
 #include "../Engine/Font.h"
 #include "../Engine/Game.h"
 #include "../Engine/Options.h"
@@ -2394,9 +2395,13 @@ Surface *FirstPersonView::keepComposedFrame(int &framesUsed)
  * @param world The point, in voxels.
  * @param depthBias How much nearer than the point it counts for the depth test, in voxels.
  * @param shade Palette shades to darken it by.
+ * @param mixColours Where both frames have a pixel, the two colours are mixed by the blend (the palette's nearest to the
+ *        mix, in FlameMixSteps steps) instead of one or the other being picked by the dither: fire flows from frame to
+ *        frame without the speckle (the owner: "make classic fire animation a bit smoother"). Where only one frame has a
+ *        pixel, the dither still brings it in or takes it out.
  */
 void FirstPersonView::drawSpriteBlend(const Surface *from, const Surface *to, double blend, int anchorX, int anchorY, const double world[3],
-	double depthBias, int shade)
+	double depthBias, int shade, bool mixColours)
 {
 	if (!from)
 	{
@@ -2445,6 +2450,26 @@ void FirstPersonView::drawSpriteBlend(const Surface *from, const Surface *to, do
 	// is below the threshold show the next frame.
 	static const int bayerLevels[4][4] = { { 0, 8, 2, 10 }, { 12, 4, 14, 6 }, { 3, 11, 1, 9 }, { 15, 7, 13, 5 } };
 	const int threshold = (int)(blend * 16.0);
+	// (Mixing colours: how far, in whole steps, and the palette to mix in.)
+	const int FlameMixSteps = 32;
+	const bool mixed = mixColours && !_nearestRgb.empty();
+	const int mixStep = (int)(blend * FlameMixSteps);
+	const SDL_Color *palette = getPalette();
+	const int fadeLevel = (int)(blend * SeeThroughLevels);
+	bool fading = false;
+	SDL_Surface *edgeSurface = nullptr;
+	if (mixed)
+	{
+		// (The picture and the opacities of the pixels that fade: of the frames' size, cleared.)
+		if (!_blendEdge || _blendEdge->getWidth() != width || _blendEdge->getHeight() != height)
+		{
+			delete _blendEdge;
+			_blendEdge = new Surface(width, height);
+		}
+		edgeSurface = _blendEdge->getSurface();
+		for (int y = 0; y < height; ++y) std::fill_n((Uint8 *)edgeSurface->pixels + y * edgeSurface->pitch, width, (Uint8)0);
+		_blendOpacity.assign((size_t)width * height, 0);
+	}
 	// And the shapes meet half way: both frames stretched to the size in between, around the base
 	// they rise from, so a growing explosion is one shape growing, not two ghosting into each other.
 	const SDL_Surface *fromSurface = const_cast<Surface*>(from)->getSurface(), // read only
@@ -2522,11 +2547,41 @@ void FirstPersonView::drawSpriteBlend(const Surface *from, const Surface *to, do
 		const int *ditherRow = bayerLevels[y & 3];
 		for (int x = left; x <= right; ++x)
 		{
-			if (ditherRow[x & 3] < threshold) outRow[x] = toLine && toColumns[x] >= 0 ? toLine[toColumns[x]] : 0;
-			else outRow[x] = fromLine && fromColumns[x] >= 0 ? fromLine[fromColumns[x]] : 0;
+			const Uint8 toColor = toLine && toColumns[x] >= 0 ? toLine[toColumns[x]] : 0, fromColor = fromLine && fromColumns[x] >= 0 ? fromLine[fromColumns[x]] : 0;
+			if (!mixed)
+			{
+				outRow[x] = ditherRow[x & 3] < threshold ? toColor : fromColor;
+			}
+			else if (toColor && fromColor)
+			{
+				// Both frames draw here: the colour part way from one to the other, solid.
+				const SDL_Color &start = palette[fromColor], &end = palette[toColor];
+				auto channel = [&](int startValue, int endValue) { return (startValue * (FlameMixSteps - mixStep) + endValue * mixStep) / FlameMixSteps * 31 / 255; };
+				outRow[x] = toColor == fromColor ? fromColor : _nearestRgb[(channel(start.r, end.r) << 10) | (channel(start.g, end.g) << 5) | channel(start.b, end.b)];
+			}
+			else
+			{
+				// Only one frame draws here: its pixel fades out, or the next one's in (see below), on a picture of its own.
+				outRow[x] = 0;
+				const int level = fromColor ? SeeThroughLevels - fadeLevel : toColor ? fadeLevel : 0;
+				if (level > 0)
+				{
+					Uint8 *edgeRow = (Uint8 *)edgeSurface->pixels + y * edgeSurface->pitch;
+					edgeRow[x] = fromColor ? fromColor : toColor;
+					_blendOpacity[(size_t)y * width + x] = (Uint8)level;
+					fading = true;
+				}
+			}
 		}
 	}
 	drawSprite(buffer, anchorX, anchorY, world, depthBias, shade, scale);
+	// The pixels only one of the two frames has, laid over what is behind them by how far they have faded: see-through,
+	// as the smoke is, so a flame's edge comes and goes softly instead of in dots.
+	if (fading)
+	{
+		const SeeThroughSprite fadingPixels = { _blendOpacity.data(), 1.0f };
+		drawSprite(_blendEdge, anchorX, anchorY, world, depthBias, shade, scale, SpritePose::Standing, &fadingPixels);
+	}
 }
 
 /**
@@ -2642,7 +2697,29 @@ void FirstPersonView::drawFire()
 		const double ground[3] = { tilePosition.x * 16.0 + 8.0, tilePosition.y * 16.0 + 8.0,
 			tilePosition.z * 24.0 - tile->getTerrainLevel() };
 		drawSpriteBlend(smokeSprites->getFrame(firstFrame + phase), smokeSprites->getFrame(firstFrame + (phase + 1) % 4), blend, 16, 32,
-			ground, 2.0, shade);
+			ground, 2.0, shade, true);
+	}
+	// The map's own flames (see partKind: a campfire, a torch's fire; objects that light their surroundings and have no
+	// voxels): the part's art standing on its tile, unshaded, the frame the view's calm clock shows flowing into the next.
+	const std::set<const MapData*> &flameParts = (_sharedModelsOwner ? _sharedModelsOwner : this)->_flameParts;
+	for (int tileIndex = 0; !flameParts.empty() && tileIndex < tileCount; ++tileIndex)
+	{
+		Tile *tile = _save->getTile(tileIndex);
+		const MapData *object = tile->getMapData(O_OBJECT);
+		if (!object || !flameParts.count(object) || !_tileViews[tileIndex].discovered || !object->getDataset() || !object->getDataset()->getSurfaceset())
+		{
+			continue;
+		}
+		const Position tilePosition = tile->getPosition();
+		const double ground[3] = { tilePosition.x * 16.0 + 8.0, tilePosition.y * 16.0 + 8.0, tilePosition.z * 24.0 - tile->getTerrainLevel() };
+		if (std::abs(ground[0] - _eye[0]) > _maxDistance || std::abs(ground[1] - _eye[1]) > _maxDistance)
+		{
+			continue;
+		}
+		SurfaceSet *art = object->getDataset()->getSurfaceset();
+		// (The sprite's pixel that stands on the middle of the tile's floor, as buildModel lands the voxels on the art.)
+		drawSpriteBlend(art->getFrame(object->getSprite(_calmFrame)), art->getFrame(object->getSprite((_calmFrame + 1) % 8)), _animationBlend, 16, 32 + object->getYOffset(),
+			ground, 2.0, 0, true);
 	}
 }
 
@@ -3145,7 +3222,7 @@ void FirstPersonView::drawSeeThroughSmoke()
 		// (For the card, every puff once, whole: its own depth test leaves out what can't show.)
 		for (const SmokeDraw &smoke : _smokeDraws)
 		{
-			const SeeThroughSprite seeThroughSprite = { smoke.soft->opacity.data(), smoke.opacity, nullptr, nullptr, nullptr, 0, (int)std::lround(smoke.cap * SeeThroughLevels) };
+			const SeeThroughSprite seeThroughSprite = { smoke.soft->opacity.data(), smoke.opacity, nullptr, nullptr, nullptr, 0, (int)std::lround(smoke.cap * SeeThroughLevels), true };
 			SpriteDraw draw;
 			draw.sprite = smoke.soft->colors;
 			draw.anchorX = 16 * UpscaleFactor;

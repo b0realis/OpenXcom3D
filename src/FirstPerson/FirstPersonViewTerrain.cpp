@@ -252,6 +252,8 @@ void clearModel(FirstPersonView::VoxelModel &model)
 	model.artFill = false;
 	model.openingGlass = false;
 	model.cropBlock = 0;
+	model.ghostKind = 0;
+	model.reliefRises = false;
 	model.foliage = false;
 	model.ghost = nullptr;
 	for (int axis = 0; axis < 3; ++axis)
@@ -2436,9 +2438,14 @@ const FirstPersonView::VoxelModel *FirstPersonView::getModel(const MapData *mapD
 	auto found = _models.find(key);
 	if (found == _models.end())
 	{
-		// Not built yet: build it in place (the map keeps it at the same address from then on).
+		// Not built yet: build it in place (the map keeps it at the same address from then on). A later frame of a
+		// part that animates is built as the kind of part its first frame is (see buildModel).
+		// And a part without voxels is, in every frame, the kind of ghost any one of its frames makes it (see partKind).
+		const int firstSprite = mapData->getSprite(0);
+		const VoxelModel *firstFrame = spriteIndex != firstSprite ? getModel(mapData, firstSprite, cutout) : nullptr;
+		if (const VoxelModel *kind = partKind(mapData, cutout)) firstFrame = kind;
 		found = _models.emplace(key, VoxelModel()).first;
-		buildModel(mapData, spriteIndex, cutout, found->second);
+		buildModel(mapData, spriteIndex, cutout, found->second, firstFrame);
 		// The part's own ghost (VoxelModel::ghost): a floor drawn as a box of liquid, its surface
 		// (see buildLiquid); a floor or wall whose voxels leave out most of its art, the rest of it
 		// (see buildArtFill); an object the art draws as a block of crops, the block (see
@@ -2464,6 +2471,56 @@ const FirstPersonView::VoxelModel *FirstPersonView::getModel(const MapData *mapD
 		}
 	}
 	return &found->second;
+}
+
+/**
+ * The kind of ghost a part that animates and has no voxels is drawn as, in all its frames: what
+ * the first of its frames that gets a ghost at all is made (low art standing up, a block, a plain
+ * ghost: see buildModel), read off that frame's art. A flame's frames differ enough that some
+ * were low art, drawn solid, some a see-through ghost and some nothing: XPiratez's campfire
+ * stood as a yellow pillar, then as red streaks, then vanished (a player, GitHub issue #134).
+ * Worked out once for a record and kept.
+ * @return A model holding the kind (its ghostKind, reliefRises and cropBlock; nothing else of it
+ *         is meant to be drawn), or null for a part that doesn't animate or has voxels of its own.
+ */
+const FirstPersonView::VoxelModel *FirstPersonView::partKind(const MapData *mapData, bool cutout)
+{
+	bool animates = false;
+	for (int frame = 1; frame < 8 && !animates; ++frame) animates = mapData->getSprite(frame) != mapData->getSprite(0);
+	if (!animates)
+	{
+		return nullptr;
+	}
+	const Uint64 key = ((Uint64)(uintptr_t)mapData << 1) | (cutout ? 1 : 0);
+	auto found = _partKinds.find(key);
+	if (found == _partKinds.end())
+	{
+		found = _partKinds.emplace(key, VoxelModel()).first;
+		VoxelModel &kind = found->second;
+		for (int frame = 0; frame < 8; ++frame)
+		{
+			buildModel(mapData, mapData->getSprite(frame), cutout, kind);
+			if (kind.ghostKind != 0 || !kind.empty)
+			{
+				break; // (a ghost: that kind; or voxels of its own: it follows its first frame instead, see getModel)
+			}
+		}
+		// A flame (an object that lights its surroundings, by the game's rules, and has no voxels: a campfire, a torch's
+		// fire) is no ghost of any kind: its art stands on the tile as a sprite, each frame flowing into the next, as
+		// the game's own fire does (see drawFire). With "Parts without shape" off it isn't drawn, as any such part.
+		if (kind.empty || kind.ghostKind != 0)
+		{
+			if (Options::fpsGhostParts != 0 && !cutout && mapData->getObjectType() == O_OBJECT && mapData->getLightSource() > 0)
+			{
+				clearModel(kind);
+				kind.ghostKind = 5;
+				_flameParts.insert(mapData);
+				Log(LOG_VERBOSE) << "OpenXcom3D: a flame drawn as a sprite: " << mapData->getDataset()->getName() << ", its art's frames " << mapData->getSprite(0) << " to " << mapData->getSprite(7);
+			}
+		}
+	}
+	const VoxelModel &kind = found->second;
+	return kind.ghostKind != 0 || kind.empty ? &kind : nullptr;
 }
 
 /**
@@ -2539,7 +2596,7 @@ const FirstPersonView::Frames &FirstPersonView::getFrames(const MapData *mapData
  * @param cutout Leave out the voxels whose pixel is transparent (a sliding UFO door's frames).
  * @param model Where to build it.
  */
-void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model) const
+void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model, const VoxelModel *firstFrame) const
 {
 	clearModel(model);
 
@@ -2767,26 +2824,50 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	{
 		const bool ghostShape = shape && shape->ghost;
 		bool rises = false;
-		const bool low = mapData->getObjectType() == O_OBJECT && lowArt(sprite, yOffset, rises);
-		const int block = cutout ? 0 : cropBlockOf(nullptr, mapData, sprite, yOffset);
-		const bool ghostWanted = Options::fpsGhostParts == 2
+		bool low = mapData->getObjectType() == O_OBJECT && lowArt(sprite, yOffset, rises);
+		int block = cutout ? 0 : cropBlockOf(nullptr, mapData, sprite, yOffset);
+		bool ghostWanted = Options::fpsGhostParts == 2
 			|| (Options::fpsGhostParts == 1 && (ghostShape || mapData->isGravLift() || cageArt(sprite, mapData->getObjectType(), yOffset) || low || block));
+		// A part that animates is what its first frame is, in every frame: what kind of ghost it gets is read off the
+		// art (how low it is, how like a block or a cage), and a frame whose art falls just the other side of a line
+		// (a fireplace's flames, one frame in four; a player, GitHub issue #134) lost its ghost, or stood as another kind.
+		if (firstFrame && firstFrame->empty == false && firstFrame->ghostKind == 0)
+		{
+			firstFrame = nullptr; // (the first frame has voxels of its own, this one's art none: nothing to follow)
+		}
+		if (firstFrame && firstFrame->ghostKind == 5)
+		{
+			return; // (a flame: no model, its art is drawn as a sprite; see partKind)
+		}
+		if (firstFrame)
+		{
+			ghostWanted = firstFrame->ghostKind != 0;
+			block = firstFrame->ghostKind == 2 ? std::max<int>(1, block ? block : firstFrame->cropBlock) : 0;
+			low = firstFrame->ghostKind == 3;
+			if (low) rises = firstFrame->reliefRises;
+		}
 		if (ghostWanted && !cutout)
 		{
 			if (ghostShape)
 			{
+				model.ghostKind = 1;
 				buildShape(model, sprite, *shape, yOffset);
 			}
 			else if (block)
 			{
+				model.ghostKind = 2;
+				model.cropBlock = (Uint8)block; // (kept for the frames after the first: see above)
 				buildCropBlock(model, sprite, block, yOffset);
 			}
 			else if (low)
 			{
+				model.ghostKind = 3;
+				model.reliefRises = rises;
 				buildRelief(model, sprite, yOffset, rises);
 			}
 			else
 			{
+				model.ghostKind = 4;
 				buildGhost(model, sprite, mapData->getObjectType(), yOffset);
 			}
 			if (!model.empty) colorHiddenSides(model, sprite);
@@ -2816,10 +2897,16 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	// liquidHeightOf): the game's thin slab stays the floor, its top (the bottom under the liquid)
 	// a few shades darker; the liquid's surface is a ghost model of its own (see getModel).
 	const int walkCost = mapData->getTUCost(MT_WALK);
+	// (As for a part without voxels: one that animates is in every frame what its first frame is, a floor of liquid, a
+	// part with the rest of its art as a ghost, a block of crops, a mass of foliage; see firstFrame above.)
+	if (firstFrame && (firstFrame->empty || firstFrame->ghostKind != 0))
+	{
+		firstFrame = nullptr;
+	}
 	if (mapData->getObjectType() == O_FLOOR && !model.empty && model.max[2] <= 3 && !cutout
 		&& walkCost > PlainFloorWalkCost && walkCost < Pathfinding::INVALID_MOVE_COST)
 	{
-		model.liquidHeight = (Uint8)liquidHeightOf(sprite, yOffset);
+		model.liquidHeight = firstFrame ? firstFrame->liquidHeight : (Uint8)liquidHeightOf(sprite, yOffset);
 		// (with "Parts without shape" off, no surface: the floor as it is)
 		for (int y = 0; model.liquidHeight && Options::fpsGhostParts != 0 && y < Position::TileXY; ++y)
 		{
@@ -2837,16 +2924,16 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	// would stand as a ghost across the doorway; TFTD's liner).
 	if (!model.liquidHeight && !cutout && !mapData->isDoor() && !mapData->isUFODoor() && mapData->getAltMCD() == 0)
 	{
-		model.artFill = sparseArt(model, sprite, mapData->getObjectType(), yOffset);
+		model.artFill = firstFrame ? firstFrame->artFill : sparseArt(model, sprite, mapData->getObjectType(), yOffset);
 	}
 	// An object the art draws as a block of crops though the game gives it only a few voxels
 	// (X-Com Files' wheat: see cropBlockOf): the block is a ghost model of its own (see getModel).
 	if (!model.empty && !cutout)
 	{
-		model.cropBlock = (Uint8)cropBlockOf(&model, mapData, sprite, yOffset);
+		model.cropBlock = firstFrame ? firstFrame->cropBlock : (Uint8)cropBlockOf(&model, mapData, sprite, yOffset);
 	}
 	// A mass of foliage: drawn leafy on a tile without a floor (see foliageArt, leafyModel).
-	model.foliage = mapData->getObjectType() == O_OBJECT && !cutout && foliageArt(model, sprite, getPalette());
+	model.foliage = firstFrame ? firstFrame->foliage : mapData->getObjectType() == O_OBJECT && !cutout && foliageArt(model, sprite, getPalette());
 	colorHiddenSides(model, sprite);
 	findGlow(model);
 	model.water = waterFloor && !model.empty;

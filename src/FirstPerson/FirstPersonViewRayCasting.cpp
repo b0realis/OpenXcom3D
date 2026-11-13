@@ -1875,6 +1875,7 @@ void FirstPersonView::castAllRays()
 	_hasTrueColor = false; // (set again by the card when it gives the frame's picture in full colour too)
 	_hasCardPicture = false;
 	_gpuPresenting = 0;
+	_gpuDepthPending = false; // (a frame the CPU draws has its depth here already: nothing of an earlier frame's is fetched from the card)
 	const bool onCard = !gpuShadow && Options::fpsRenderer == 1 && gpuCastAllRays();
 	if (!onCard)
 	{

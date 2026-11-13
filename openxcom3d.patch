@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..63e8f8653
+index 000000000..b81fe33c8
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,584 @@
+@@ -0,0 +1,586 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -271,6 +271,8 @@ index 000000000..63e8f8653
 +  STR_FPS_GHOST_PARTS_ALL: "All"
 +  STR_FPS_GHOST_OPACITY: "Ghost opacity"
 +  STR_FPS_GHOST_OPACITY_DESC: "How solid the parts without shape look up close: 50% as before, 100% solid. Far off, 60% of that."
++  STR_FPS_LIFT_BEAMS: "Lift beams"
++  STR_FPS_LIFT_BEAMS_DESC: "Every lift shows a beam of light rising through it, in its pad's colours (needs Particles; a UFO's lift has its own with UFO lights)."
 +  STR_FPS_SEE_THROUGH_CROPS: "See-through crops"
 +  STR_FPS_SEE_THROUGH_CROPS_DESC: "Crops, flower beds and rubble without a real 3D shape drawn a bit see-through, so units in a field show."
 +  STR_FPS_SEE_THROUGH_CORPSES: "See-through corpses"
@@ -714,10 +716,10 @@ index 000000000..63e8f8653
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..911877573
+index 000000000..854feb1c3
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,584 @@
+@@ -0,0 +1,586 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -861,6 +863,8 @@ index 000000000..911877573
 +  STR_FPS_GHOST_PARTS_ALL: "All"
 +  STR_FPS_GHOST_OPACITY: "Ghost opacity"
 +  STR_FPS_GHOST_OPACITY_DESC: "How solid the parts without shape look up close: 50% as before, 100% solid. Far off, 60% of that."
++  STR_FPS_LIFT_BEAMS: "Lift beams"
++  STR_FPS_LIFT_BEAMS_DESC: "Every lift shows a beam of light rising through it, in its pad's colours (needs Particles; a UFO's lift has its own with UFO lights)."
 +  STR_FPS_SEE_THROUGH_CROPS: "See-through crops"
 +  STR_FPS_SEE_THROUGH_CROPS_DESC: "Crops, flower beds and rubble without a real 3D shape drawn a bit see-through, so units in a field show."
 +  STR_FPS_SEE_THROUGH_CORPSES: "See-through corpses"
@@ -1503,7 +1507,7 @@ index 000000000..da6adfb14
 +        color: 144
 diff --git a/mod/OpenXcom3D/metadata.yml b/mod/OpenXcom3D/metadata.yml
 new file mode 100644
-index 000000000..95e9f8d23
+index 000000000..bd14ebcdd
 --- /dev/null
 +++ b/mod/OpenXcom3D/metadata.yml
 @@ -0,0 +1,11 @@
@@ -1511,13 +1515,13 @@ index 000000000..95e9f8d23
 +# metadata.yml for OpenXcom3D
 +
 +name: "OpenXcom3D - First-Person View"
-+version: 1.12
++version: 1.14
 +description: "Adds a first-person 3D view of the battlescape (F8): mouse look, real-time movement paid with time units (WASD), firing from the crosshair, a squad bar with soldier camera cards, lights, shadows, flashlight, particles, weather, tactical flares, combat music and its own 3D View options tab. Needs the OpenXcom3D build of OXCE; on a standard OXCE build this mod reports an unsupported engine and stays off."
 +author: OpenXcom3D project
 +
 +master: "*"
 +requiredExtendedEngine: OpenXcom3D
-+requiredExtendedVersion: "1.0.12"
++requiredExtendedVersion: "1.0.14"
 diff --git a/res/linux/icons/openxcom.svg b/res/linux/icons/openxcom.svg
 index 444f7387b..9196ac813 100644
 --- a/res/linux/icons/openxcom.svg
@@ -22461,7 +22465,7 @@ index a4c23b216..13d36e8f3 100644
  	{
  		_buttonsPressed |= SDL_BUTTON(button);
 diff --git a/src/Engine/ModInfo.cpp b/src/Engine/ModInfo.cpp
-index cca815d3e..3ad494479 100644
+index cca815d3e..a3c685b7c 100644
 --- a/src/Engine/ModInfo.cpp
 +++ b/src/Engine/ModInfo.cpp
 @@ -181,6 +181,9 @@ struct EngineData
@@ -22469,7 +22473,7 @@ index cca815d3e..3ad494479 100644
  const EngineData supportedEngines[] = {
  	{ OPENXCOM_VERSION_ENGINE, { OPENXCOM_VERSION_NUMBER }},
 +#ifndef OXCE_NO_FIRSTPERSON
-+	{ "OpenXcom3D", { 1, 0, 12, 0 } }, // first-person add-on 1.12, see src/FirstPerson
++	{ "OpenXcom3D", { 1, 0, 14, 0 } }, // first-person add-on 1.14, see src/FirstPerson
 +#endif
  	{ "", { 0, 0, 0, 0 } }, // assume that every engine support mods from base game, remove if its not true.
  };
@@ -22529,7 +22533,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..29360bfac 100644
+index a08796ced..467b34580 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -22546,7 +22550,7 @@ index a08796ced..29360bfac 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes, fpsDamageNumbers, fpsCompassCosts;
++OPT bool fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes, fpsDamageNumbers, fpsCompassCosts;
 +OPT int fpsThrowing, fpsRenderer, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsVrMode, fpsVrEyeSize, fpsVrTurning, fpsQuestDefaults, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
@@ -23570,10 +23574,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..33b6f4c50
+index 000000000..63d54b8bf
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1633 @@
+@@ -0,0 +1,1636 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -23760,7 +23764,7 @@ index 000000000..33b6f4c50
 +}
 +
 +/**
-+ * The main menu with the mod on: its version (the mod's own metadata, "1.12") in small letters
++ * The main menu with the mod on: its version (the mod's own metadata, "1.14") in small letters
 + * just right of the title's first line, "OpenXcom3D", its foot on the big letters' foot (a player,
 + * GitHub issue #69: without the AppImage's name, no telling the version; the owner: "a smaller
 + * space and our version number besides OpenXcom3D", then "Make the version no. Smaller"). A text
@@ -24516,6 +24520,9 @@ index 000000000..33b6f4c50
 +	// The crops, flower beds and rubble the game gives no real shape, drawn solid as on the map (see
 +	// buildRelief, buildCropBlock): a bit see-through instead (SeeThroughCropOpacity of the pixels),
 +	// so whoever stands in a field shows (the owner's ask, apart from the ghosts' opacity).
++	// A lift anywhere (a building's elevator, an alien base's; a UFO's has its own with "UFO lights and aura"): a beam of light
++	// rising through it, in the colours of its pad.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsLiftBeams", &fpsLiftBeams, true, "STR_FPS_LIFT_BEAMS", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCrops", &fpsSeeThroughCrops, false, "STR_FPS_SEE_THROUGH_CROPS", category));
 +	// A corpse or item pointed at, the game's line passing it to something behind: drawn faint, at
 +	// the ghost opacity (the game's shots pass through them).
@@ -36681,10 +36688,10 @@ index 000000000..152a80d78
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..5d9c40260
+index 000000000..21f4b0e89
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1527 @@
+@@ -0,0 +1,1536 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -37276,6 +37283,13 @@ index 000000000..5d9c40260
 +	unsigned _mouseReleasesSeen = 0;           // the game's mouse releases known (see think: one since means another screen was on top)
 +	int _sidestepFacing = -1;                  // the facing a soldier sidestepping keeps (the game's strafe), while the step is walked; -1 none
 +	Position _stepFrom;                        // the tile that step started from
++	// Two straight steps round a corner cost what the one diagonal step costs (see cornerDiscount): the last straight
++	// step walked (from, to, its price; none: _cornerOpen false), and what the step now walked was given for it.
++	bool _cornerOpen = false;
++	const BattleUnit *_cornerUnit = nullptr;
++	Position _cornerFrom, _cornerVia;
++	int _cornerTime = 0, _cornerEnergy = 0, _cornerTurn = 0;
++	int _grantedTime = 0, _grantedEnergy = 0;
 +	const BattleUnit *_hiddenBlockUnit = nullptr;  // a step the game refused for a unit not in sight: whose step,
 +	Position _hiddenBlockFrom;                 // ... from which tile,
 +	int _hiddenBlockDirection = -1;            // ... and which way (-1: none); held back while that unit stands there (see stepAllowed)
@@ -37297,6 +37311,8 @@ index 000000000..5d9c40260
 +	bool stepAllowed(BattleUnit *unit, int stepX, int stepY);
 +	/// What the game charges for one step from a tile, walked as commitStep walks it (a sidestep, a run or a walk).
 +	PathfindingStep stepPrice(BattleUnit *unit, const Position &start, int direction, bool *sidestep = nullptr) const;
++	/// What a straight step is cheaper by when it and the last one make a diagonal the soldier could have walked.
++	void cornerDiscount(BattleUnit *unit, const Position &start, int direction, const PathfindingStep &price, int &time, int &energy) const;
 +	/// Hands one step to the game's walking state; false if it couldn't start.
 +	bool commitStep(BattleUnit *unit, int stepX, int stepY);
 +	/// Keeps a coordinate inside a tile, away from its edges.
@@ -38214,10 +38230,10 @@ index 000000000..5d9c40260
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeCamera.cpp b/src/FirstPerson/FirstPersonModeCamera.cpp
 new file mode 100644
-index 000000000..3e2c4c474
+index 000000000..d1aa035e9
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeCamera.cpp
-@@ -0,0 +1,971 @@
+@@ -0,0 +1,976 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -38833,6 +38849,10 @@ index 000000000..3e2c4c474
 +				// stepAllowed): asked again and again while the key was held, the game refused it each
 +				// time and the view lunged at the edge and back (a player, GitHub issue #129: a unit
 +				// behind a curtain one walks through but doesn't see through).
++				// (What it was given as the second half of a diagonal goes back, and it is half of no pair.)
++				if (_grantedTime) unit->setTimeUnits(std::max(0, unit->getTimeUnits() - _grantedTime));
++				if (_grantedEnergy) unit->spendEnergy(std::min(unit->getEnergy(), _grantedEnergy));
++				_cornerOpen = false;
 +				const Position refusedTo(_trackedTile.x, _trackedTile.y, unitTile.z);
 +				if (hiddenUnitOn(unit, refusedTo))
 +				{
@@ -38844,6 +38864,7 @@ index 000000000..3e2c4c474
 +				_eyeX = clampInsideTile(unitTile.x, _eyeX, bigUnitOffset);
 +				_eyeY = clampInsideTile(unitTile.y, _eyeY, bigUnitOffset);
 +			}
++			_grantedTime = _grantedEnergy = 0;
 +			_trackedTile = unitTile;
 +		}
 +	}
@@ -41940,10 +41961,10 @@ index 000000000..34f1ba2ed
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeMovement.cpp b/src/FirstPerson/FirstPersonModeMovement.cpp
 new file mode 100644
-index 000000000..cd1875072
+index 000000000..0b7fb2ac8
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeMovement.cpp
-@@ -0,0 +1,2304 @@
+@@ -0,0 +1,2385 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -42123,8 +42144,11 @@ index 000000000..cd1875072
 +		// (endless time units, energy and ammo) skips this.
 +		if (allowed && !doomModeOn())
 +		{
-+			allowed = unit->getTimeUnits() >= stepCost.cost.time && unit->getEnergy() >= stepCost.cost.energy
-+				&& reserveAllows(unit, stepCost.cost.time, stepCost.cost.energy);
++			// (less what the step is cheaper by as the second half of a diagonal, see cornerDiscount)
++			int lessTime = 0, lessEnergy = 0;
++			cornerDiscount(unit, start, direction, stepCost, lessTime, lessEnergy);
++			const int time = stepCost.cost.time - lessTime, energy = stepCost.cost.energy - lessEnergy;
++			allowed = unit->getTimeUnits() >= time && unit->getEnergy() >= energy && reserveAllows(unit, time, energy);
 +		}
 +		_stepAllowedCache[direction] = allowed ? 1 : unsafe ? 2 : 0;
 +	}
@@ -42165,6 +42189,39 @@ index 000000000..cd1875072
 +	}
 +	if (sidestep) *sidestep = toTheSide;
 +	return price;
++}
++
++/**
++ * Walking freely, the camera seldom crosses a tile's corner exactly: a diagonal walk goes over one
++ * edge and then the other, two straight steps where the map would walk one diagonal step, and by
++ * the rules two straight steps cost more (8 time units for 6 on plain ground). So the second
++ * straight step of such a pair costs only what is left of the diagonal's price (the owner's ask:
++ * a diagonal should cost a diagonal). It counts when the last step walked was straight, this one
++ * goes on from where that ended to the tile diagonally across from where it began, on the same
++ * level and in the same turn, and the game would let the soldier walk that diagonal in one step.
++ * A step is half of one pair only.
++ * @param start, direction, price The step asked about, and its price (see stepPrice).
++ * @param time, energy Set to what it is cheaper by (0: nothing).
++ */
++void FirstPersonMode::cornerDiscount(BattleUnit *unit, const Position &start, int direction, const PathfindingStep &price, int &time, int &energy) const
++{
++	time = energy = 0;
++	if (!_cornerOpen || unit != _cornerUnit || start != _cornerVia || _cornerTurn != _save->getTurn() || (direction & 1) || price.cost.time >= Pathfinding::INVALID_MOVE_COST)
++	{
++		return;
++	}
++	const Position across = price.pos - _cornerFrom;
++	if (std::abs(across.x) != 1 || std::abs(across.y) != 1 || across.z != 0)
++	{
++		return;
++	}
++	const PathfindingStep diagonal = stepPrice(unit, _cornerFrom, Pathfinding::vectorToDirection(across));
++	if (diagonal.cost.time >= Pathfinding::INVALID_MOVE_COST || diagonal.pos != price.pos)
++	{
++		return;
++	}
++	time = std::clamp(_cornerTime + price.cost.time - diagonal.cost.time, 0, (int)price.cost.time);
++	energy = std::clamp(_cornerEnergy + price.cost.energy - diagonal.cost.energy, 0, (int)price.cost.energy);
 +}
 +
 +/**
@@ -42379,6 +42436,23 @@ index 000000000..cd1875072
 +	_fallFromZ = stepsOffLedge ? from.z : -1; // The level the fall starts from, for the damage on landing.
 +	_unsafeDirection = -1; // (an unsafe landing's go-ahead is used, or no longer needed)
 +	_unsafeConfirmed = false;
++
++	// The second straight step of a diagonal costs what is left of the diagonal's price (see
++	// cornerDiscount): the game's walk charges its own price, so the soldier is given the difference
++	// first (taken back if the step isn't walked after all, see updateCamera). And a straight step
++	// may be the first half of the next pair.
++	const PathfindingStep price = stepPrice(unit, from, direction);
++	cornerDiscount(unit, from, direction, price, _grantedTime, _grantedEnergy);
++	if (doomModeOn() || stepsOffLedge) _grantedTime = _grantedEnergy = 0;
++	_cornerOpen = !(direction & 1) && !_grantedTime && !_grantedEnergy && !stepsOffLedge && price.cost.time < Pathfinding::INVALID_MOVE_COST && price.pos.z == from.z;
++	_cornerUnit = unit;
++	_cornerFrom = from;
++	_cornerVia = price.pos;
++	_cornerTime = price.cost.time;
++	_cornerEnergy = price.cost.energy;
++	_cornerTurn = _save->getTurn();
++	if (_grantedTime) unit->setTimeUnits(unit->getTimeUnits() + _grantedTime);
++	if (_grantedEnergy) unit->spendEnergy(-_grantedEnergy);
 +
 +	// Hand the step to the game's walking state.
 +	BattleAction walk;
@@ -43398,6 +43472,21 @@ index 000000000..cd1875072
 +		return;
 +	}
 +
++	// Whatever holds the camera back below (an edge it may not cross, a wall's margin) never makes it
++	// jump: put back from where it already was past the line, it walks there at its own pace. (The
++	// owner's report: walking diagonally stuttered, as if the soldier snapped to the tile now and
++	// then. Each straight step put the camera back EdgeMargin voxels inside the tile on the other
++	// axis, though it may well be nearer that edge when the step sideways is open too.)
++	const double pace = std::clamp(Options::fpsWalkSpeed, 1, 8) * 16.0 * elapsedSeconds;
++	auto heldAbove = [pace](double from, double to, double line) // (kept at or above the line)
++	{
++		return to >= line ? to : std::max(to, std::min(line, from + pace));
++	};
++	auto heldBelow = [pace](double from, double to, double line)
++	{
++		return to <= line ? to : std::min(to, std::max(line, from - pace));
++	};
++
 +	// Which neighbouring tile the new position falls into, per axis: -1, 0 (still this tile) or 1.
 +	const int crossingX = std::clamp((int)std::floor((newEyeX - sizeOffset) / 16.0) - _trackedTile.x, -1, 1);
 +	const int crossingY = std::clamp((int)std::floor((newEyeY - sizeOffset) / 16.0) - _trackedTile.y, -1, 1);
@@ -43420,20 +43509,33 @@ index 000000000..cd1875072
 +				const Position oldTile = _trackedTile;
 +				if (commitStep(unit, stepX, stepY))
 +				{
-+					// Keep moving along the axes the step goes, but stay inside the old tile on
-+					// the other one.
-+					if (stepX == 0) newEyeX = clampInsideTile(oldTile.x, newEyeX, sizeOffset);
-+					if (stepY == 0) newEyeY = clampInsideTile(oldTile.y, newEyeY, sizeOffset);
++					// Keep moving along the axes the step goes, but stay within the old tile's row
++					// or column on the other one (anywhere in it: the new tile's own walls keep
++					// their margin below).
++					const double within = 0.01;
++					if (stepX == 0) newEyeX = std::clamp(newEyeX, oldTile.x * 16.0 + sizeOffset + within, oldTile.x * 16.0 + 16.0 + sizeOffset - within);
++					if (stepY == 0) newEyeY = std::clamp(newEyeY, oldTile.y * 16.0 + sizeOffset + within, oldTile.y * 16.0 + 16.0 + sizeOffset - within);
 +					stepped = true;
 +				}
 +			}
 +		}
 +
-+		// No step: stay inside this tile on the axes that would have left it.
++		// No step: stay inside this tile on the axes that would have left it. But not while the game
++		// is still walking the last step and this one looks open: then the camera walks on, up to
++		// StepLead voxels over the edge, and the step is taken as soon as the game is free (in a
++		// frame or two); walking diagonally, the camera often crosses a second edge right after
++		// the first.
 +		if (!stepped)
 +		{
-+			if (crossingX != 0) newEyeX = clampInsideTile(_trackedTile.x, newEyeX, sizeOffset);
-+			if (crossingY != 0) newEyeY = clampInsideTile(_trackedTile.y, newEyeY, sizeOffset);
++			const bool waiting = _stepPending && driving && canMove;
++			const bool diagonalOpen = waiting && crossingX != 0 && crossingY != 0 && stepAllowed(unit, crossingX, crossingY);
++			auto held = [&](int tile, double from, double to, bool mayLead)
++			{
++				const double lead = mayLead ? StepLead : -EdgeMargin;
++				return heldBelow(from, heldAbove(from, to, tile * 16.0 + sizeOffset - lead), tile * 16.0 + 16.0 + sizeOffset + lead);
++			};
++			if (crossingX != 0) newEyeX = held(_trackedTile.x, _eyeX, newEyeX, waiting && (diagonalOpen || stepAllowed(unit, crossingX, 0)));
++			if (crossingY != 0) newEyeY = held(_trackedTile.y, _eyeY, newEyeY, waiting && (diagonalOpen || stepAllowed(unit, 0, crossingY)));
 +		}
 +	}
 +
@@ -43453,10 +43555,10 @@ index 000000000..cd1875072
 +			unsafeEdgeSeen = true;
 +		}
 +	};
-+	if (newEyeX < westEdgeX + EdgeMargin && !stepAllowed(unit, -1, 0)) { newEyeX = westEdgeX + EdgeMargin; stopAtEdge(-1, 0); }
-+	if (newEyeX > westEdgeX + 16.0 - EdgeMargin && !stepAllowed(unit, 1, 0)) { newEyeX = westEdgeX + 16.0 - EdgeMargin; stopAtEdge(1, 0); }
-+	if (newEyeY < northEdgeY + EdgeMargin && !stepAllowed(unit, 0, -1)) { newEyeY = northEdgeY + EdgeMargin; stopAtEdge(0, -1); }
-+	if (newEyeY > northEdgeY + 16.0 - EdgeMargin && !stepAllowed(unit, 0, 1)) { newEyeY = northEdgeY + 16.0 - EdgeMargin; stopAtEdge(0, 1); }
++	if (newEyeX < westEdgeX + EdgeMargin && !stepAllowed(unit, -1, 0)) { newEyeX = heldAbove(_eyeX, newEyeX, westEdgeX + EdgeMargin); stopAtEdge(-1, 0); }
++	if (newEyeX > westEdgeX + 16.0 - EdgeMargin && !stepAllowed(unit, 1, 0)) { newEyeX = heldBelow(_eyeX, newEyeX, westEdgeX + 16.0 - EdgeMargin); stopAtEdge(1, 0); }
++	if (newEyeY < northEdgeY + EdgeMargin && !stepAllowed(unit, 0, -1)) { newEyeY = heldAbove(_eyeY, newEyeY, northEdgeY + EdgeMargin); stopAtEdge(0, -1); }
++	if (newEyeY > northEdgeY + 16.0 - EdgeMargin && !stepAllowed(unit, 0, 1)) { newEyeY = heldBelow(_eyeY, newEyeY, northEdgeY + 16.0 - EdgeMargin); stopAtEdge(0, 1); }
 +
 +	// Whatever stopped us (walls, edges, a step not taken) takes the momentum out on that axis:
 +	// where the camera really moved slower than the momentum (by more than half a voxel a
@@ -44250,10 +44352,10 @@ index 000000000..cd1875072
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..64b5dda8c
+index 000000000..e39d89975
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,529 @@
+@@ -0,0 +1,533 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -44558,6 +44660,10 @@ index 000000000..64b5dda8c
 +
 +/// How close (in voxels) the camera may get to a tile edge it can't cross.
 +const double EdgeMargin = 5.0;
++
++/// How far over a tile's edge the camera may walk while the game is still busy with the last step
++/// (see updateMovement), in voxels.
++const double StepLead = 5.0;
 +/// Doom IDCLIP: a wall or object part whose voxels (the game's shape of it) come this near the eye, in voxels, is left
 +/// out of the picture (the eye is inside it, or as good as: its 3D picture can stand a little wider than its voxels).
 +const int NoclipReach = 2;
@@ -57262,10 +57368,10 @@ index 000000000..43e779494
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..4972b30f5
+index 000000000..8dc4fd0a4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,861 @@
+@@ -0,0 +1,866 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -57386,6 +57492,7 @@ index 000000000..4972b30f5
 +	for (Surface *frame : _composedFrames) delete frame;
 +	delete _itemPicture;
 +	for (Surface *buffer : _blendBuffers) delete buffer;
++	delete _blendEdge;
 +	for (auto &entry : _softSmoke) delete entry.second.colors;
 +	for (auto &entry : _stippleSmoke) delete entry.second.colors;
 +	for (auto &entry : _softSmokeBlends) delete entry.second.colors;
@@ -57426,6 +57533,8 @@ index 000000000..4972b30f5
 +	_collapseStarts.clear();
 +	_facingsWell.clear();
 +	_leafyModels.clear();
++	_partKinds.clear();
++	_flameParts.clear();
 +	_openedModels.clear();
 +	_frames.clear();
 +	_solidMasks.clear();
@@ -57463,6 +57572,7 @@ index 000000000..4972b30f5
 +	preloadModels();
 +	findMirrors();
 +	findUfos();
++	findLifts();
 +}
 +
 +/**
@@ -57496,6 +57606,7 @@ index 000000000..4972b30f5
 +		}
 +	}
 +	Log(LOG_INFO) << "OpenXcom3D: " << _models.size() << " voxel models ready in " << SDL_GetTicks() - startTick << " ms";
++	if (!_flameParts.empty()) Log(LOG_INFO) << "OpenXcom3D: " << _flameParts.size() << " kinds of flame on the map are drawn as sprites";
 +}
 +
 +/**
@@ -58129,10 +58240,10 @@ index 000000000..4972b30f5
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..cf328d715
+index 000000000..5776546ab
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1777 @@
+@@ -0,0 +1,1799 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -58334,6 +58445,8 @@ index 000000000..cf328d715
 +		bool openingGlass;        // glass filled into an opening of the game's shape (lookOnly bits, see fillPaneOpenings): a round going through breaks it (see breakGlassAt)
 +		bool foliage;             // a mass of foliage (see foliageArt): drawn leafy on a tile without a floor (leafyModel)
 +		Uint8 cropBlock;          // an object the art draws as a block of crops (X-Com Files' wheat, see cropBlockOf): the block's height in voxels; 0 for none
++		Uint8 ghostKind;          // how a part without voxels was built (see buildModel): 0 not at all, 1 the mod's ghost shape, 2 a block of crops, 3 low art standing up, 4 a plain ghost, 5 not as a model: a flame, its art drawn as a sprite (see partKind)
++		bool reliefRises;         // ... low art that rises (see lowArt)
 +		const VoxelModel *ghost;  // a ghost model of the part's own, in the same tile where the part has no voxels: the liquid's surface (buildLiquid), the rest of the art (buildArtFill) or a block of crops (buildCropBlock); null for none
 +		float glow[3]; // centre of the brightest voxels in the top third (a lamp's bulb), in the tile
 +		int glowCount;
@@ -59054,7 +59167,11 @@ index 000000000..cf328d715
 +	/// Is the glass in the openings of a tile part's window broken (see breakGlassAt)?
 +	bool glassBroken(int tileIndex, int part) const;
 +	/// Builds a voxel model: shapes from the LOFT templates, colours from the isometric sprite.
-+	void buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model) const;
++	void buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model, const VoxelModel *firstFrame = nullptr) const;
++	/// The kind of ghost a part that animates and has no voxels is, in all its frames (null: not such a part).
++	const VoxelModel *partKind(const MapData *mapData, bool cutout);
++	std::unordered_map<Uint64, VoxelModel> _partKinds; // ... by MapData and cut-out
++	std::set<const MapData*> _flameParts;              // the records drawn as flames: their own art as a sprite standing on the tile (see partKind, drawFire)
 +	/// What a pane of glass breaks into keeps the pane's edges in its frame (see paneOfGlass).
 +	void addBrokenPaneEdges(const MapData *mapData, VoxelModel &model) const;
 +	/// A pane of glass's openings in the game's shape filled with glass, a look only.
@@ -59273,6 +59390,8 @@ index 000000000..cf328d715
 +	Surface *_spriteBuffer;                             // scratch surface for drawing a unit's sprite before it goes into the world
 +	std::vector<Surface*> _blendBuffers;                // sprites dissolving into their next frame, one per sprite size
 +	std::vector<int> _blendColumns;                     // drawSpriteBlend's source column and row lookups
++	Surface *_blendEdge = nullptr;                      // ... the pixels only one of two mixed frames has, which fade (see drawSpriteBlend)
++	std::vector<Uint8> _blendOpacity;                   // ... and how opaque each is
 +	struct SpriteBox { int x0, y0, x1, y1; bool valid; }; // where a sprite frame's pixels are
 +	std::map<const Surface*, SpriteBox> _spriteBoxes;   // measured once per sprite frame
 +
@@ -59291,6 +59410,7 @@ index 000000000..cf328d715
 +		const float *depthBlocks = nullptr;            // if given, the farthest depth drawn in each SmokeCullBlock square of the view:
 +		int depthBlockColumns = 0;                     // a square where everything is nearer than the sprite isn't looked at (see cullSmokeDraws)
 +		int capLevels = 0;                             // above 0: see-through smoke builds up on a pixel to this (of SeeThroughLevels) and no further (see _smokeVeil)
++		bool steady = false;                           // the sprite and its opacity map stay as they are and where they are through the frame (the smoke's, kept by the view): the card looks them up by where they are
 +	};
 +	SeeThroughSprite _faintPile = { nullptr, 1.0f };    // how the pile pointed at past is drawn (see drawFloorItems)
 +	/// A standing sprite isn't cut off below any floor (see SpriteDraw::floorCut, floorUnderside).
@@ -59417,7 +59537,7 @@ index 000000000..cf328d715
 +	/// The ground under something lying at a point: the plane through its surface round it, its height there and its slope.
 +	bool groundPlane(const double world[3], double reach, double &height, double slope[2]) const;
 +	/// Draws a sprite part way through dissolving into the next animation frame (ordered dither).
-+	void drawSpriteBlend(const Surface *from, const Surface *to, double blend, int anchorX, int anchorY, const double world[3], double depthBias, int shade);
++	void drawSpriteBlend(const Surface *from, const Surface *to, double blend, int anchorX, int anchorY, const double world[3], double depthBias, int shade, bool mixColours = false);
 +	/// The box around a sprite frame's pixels.
 +	const SpriteBox &spriteBox(const Surface *sprite);
 +	/// Watches the units for hits and kills (flinches, blood, hitmarkers).
@@ -59901,6 +60021,19 @@ index 000000000..cf328d715
 +	void updateUfos();
 +	/// Spawns the motes drifting around the UFOs in sight.
 +	void spawnUfoAura(float elapsedSeconds);
++	/// A lift on the map (a floor the game lets units float up through), for its beam of light (setting "Lift beams").
++	struct LiftSpot
++	{
++		int tile;            // the lift's tile
++		float bottom, top;   // the beam: from the floor below the lift up to the level above it, in voxels
++		Uint8 colors[2];     // the pad's own colours: its commonest, and its brightest (the sparks)
++		bool colorsChosen;   // ... picked (once the palette is known)
++	};
++	std::vector<LiftSpot> _lifts;
++	/// Finds the map's lifts, once per battle (after the UFOs).
++	void findLifts();
++	/// Spawns the beams of the lifts in sight.
++	void spawnLiftBeams(float elapsedSeconds);
 +	/// Draws the flames rising up the view while the soldier burns.
 +	void drawBurning();
 +	/// Draws the arc towards where a hit came from, and blood on the view.
@@ -59912,10 +60045,10 @@ index 000000000..cf328d715
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewEffects.cpp b/src/FirstPerson/FirstPersonViewEffects.cpp
 new file mode 100644
-index 000000000..c1d4f7173
+index 000000000..0d9ec1620
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewEffects.cpp
-@@ -0,0 +1,1300 @@
+@@ -0,0 +1,1304 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -61067,6 +61200,10 @@ index 000000000..c1d4f7173
 +	{
 +		spawnUfoAura(elapsedSeconds);
 +	}
++	if (Options::fpsLiftBeams && Options::fpsParticles > 0)
++	{
++		spawnLiftBeams(elapsedSeconds);
++	}
 +	if (Options::fpsParticles > 1)
 +	{
 +		spawnAmbient(elapsedSeconds);
@@ -61611,10 +61748,10 @@ index 000000000..f54b84f9c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..b16cd25af
+index 000000000..b6c1cbcf6
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
-@@ -0,0 +1,637 @@
+@@ -0,0 +1,676 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -61656,6 +61793,8 @@ index 000000000..b16cd25af
 +#include <cstdio>
 +#include <atomic>
 +#include <cstdlib>
++#include <chrono>
++#include <set>
 +#include <sstream>
 +#include <thread>
 +#include "../Engine/Logger.h"
@@ -62020,6 +62159,43 @@ index 000000000..b16cd25af
 +	// The card is waited for after each step, so the frame is slower than it is without.)
 +	static const bool timed = getenv("OPENXCOM3D_GPU_TIMING") != nullptr;
 +	FirstPersonGpu::Timing timing;
++	// Each kind of frame the settings can ask for is drawn once before the first frame that is shown: with a coloured
++	// light, with light in the air, with both. A driver finishes a program the first time something is drawn with
++	// it (Apple's takes a second or more over each), and the game would stand still at the first shot, the first
++	// lamp in smoke. So it waits here instead, where a battle begins. The real frame is drawn over these.
++	{
++		static std::set<int> warmed; // (the card is one for every view)
++		const bool shaftsOn = Options::fpsLightShafts && _wantsTrueColor;
++		const int settings = (frame.reflections ? 4 : 0) | frame.samples << 3 | (frame.pixelSize == 1 ? 64 : 0) | (output.keep ? 128 : 0);
++		const auto start = std::chrono::steady_clock::now();
++		int drawn = 0;
++		for (int kind = 0; kind < 4; ++kind)
++		{
++			const bool light = (kind & 1) != 0, shafts = (kind & 2) != 0;
++			if ((light && !frame.colorLightsOn) || (shafts && !shaftsOn) || !warmed.insert(settings | kind).second)
++			{
++				continue;
++			}
++			FirstPersonGpu::Frame like = frame;
++			if (light && !like.colorLightCount)
++			{
++				std::fill(like.colorLights[0], like.colorLights[0] + 8, 0.0f); // (a light of no strength)
++				like.colorLightCount = 1;
++			}
++			else if (!light) like.colorLightCount = 0;
++			like.lightShafts = shafts;
++			if (!gpu->castRays(like, output, nullptr))
++			{
++				return false;
++			}
++			++drawn;
++		}
++		const double milliseconds = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
++		if (drawn && milliseconds >= 50.0)
++		{
++			Log(LOG_INFO) << "OpenXcom3D GPU: " << drawn << " kinds of frame drawn ahead in " << (int)milliseconds << " ms";
++		}
++	}
 +	if (!gpu->castRays(frame, output, timed ? &timing : nullptr))
 +	{
 +		return false;
@@ -62254,10 +62430,10 @@ index 000000000..b16cd25af
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpuEffects.cpp b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 new file mode 100644
-index 000000000..0a4b5e43b
+index 000000000..da53c9d2a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
-@@ -0,0 +1,952 @@
+@@ -0,0 +1,962 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -62558,7 +62734,7 @@ index 000000000..0a4b5e43b
 +	const Uint8 *opacityMap = seeThroughSprite ? seeThroughSprite->opacityMap : nullptr;
 +	auto placeInAtlas = [&]() { return atlasPlace((const Uint8 *)surface->pixels, surface->pitch, spriteWidth, spriteHeight, opacityMap); };
 +	int pixelsAt;
-+	if (opacityMap)
++	if (opacityMap && seeThroughSprite->steady)
 +	{
 +		auto known = list.spritesByAddress.find(opacityMap);
 +		if (known == list.spritesByAddress.end())
@@ -62951,6 +63127,16 @@ index 000000000..0a4b5e43b
 +	// (OPENXCOM3D_GPU_TIMING: the effects' share of the card's time, in the log every 60 frames.)
 +	static const bool timed = getenv("OPENXCOM3D_GPU_TIMING") != nullptr;
 +	FirstPersonGpu::Timing timing;
++	// (The screen wash is drawn once ahead too, as the kinds of frame are in gpuCastAllRays: else the game would stand
++	// still while the driver finishes its program at the first hit taken, the first look through the goggles.)
++	static bool washDrawn = false;
++	if (gpu && !washDrawn && !effects.wash)
++	{
++		effects.wash = true;
++		gpu->drawEffects(effects, output, nullptr);
++		effects.wash = false;
++	}
++	washDrawn = true;
 +	if (!gpu || !gpu->drawEffects(effects, output, timed ? &timing : nullptr))
 +	{
 +		runOnAllThreads(&FirstPersonView::renderRows);
@@ -63212,10 +63398,10 @@ index 000000000..0a4b5e43b
 +}
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..86659c174
+index 000000000..141005507
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,2019 @@
+@@ -0,0 +1,2020 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -65093,6 +65279,7 @@ index 000000000..86659c174
 +	_hasTrueColor = false; // (set again by the card when it gives the frame's picture in full colour too)
 +	_hasCardPicture = false;
 +	_gpuPresenting = 0;
++	_gpuDepthPending = false; // (a frame the CPU draws has its depth here already: nothing of an earlier frame's is fetched from the card)
 +	const bool onCard = !gpuShadow && Options::fpsRenderer == 1 && gpuCastAllRays();
 +	if (!onCard)
 +	{
@@ -69470,10 +69657,10 @@ index 000000000..79f641d60
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..a5c32d3f9
+index 000000000..a4fabff1c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,3788 @@
+@@ -0,0 +1,3865 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -69535,6 +69722,7 @@ index 000000000..a5c32d3f9
 +#include "FirstPersonApi.h"
 +#include "FirstPersonDamageNumbers.h"
 +#include "FirstPersonMode.h"
++#include "../Mod/MapDataSet.h"
 +#include "../Engine/Font.h"
 +#include "../Engine/Game.h"
 +#include "../Engine/Options.h"
@@ -71870,9 +72058,13 @@ index 000000000..a5c32d3f9
 + * @param world The point, in voxels.
 + * @param depthBias How much nearer than the point it counts for the depth test, in voxels.
 + * @param shade Palette shades to darken it by.
++ * @param mixColours Where both frames have a pixel, the two colours are mixed by the blend (the palette's nearest to the
++ *        mix, in FlameMixSteps steps) instead of one or the other being picked by the dither: fire flows from frame to
++ *        frame without the speckle (the owner: "make classic fire animation a bit smoother"). Where only one frame has a
++ *        pixel, the dither still brings it in or takes it out.
 + */
 +void FirstPersonView::drawSpriteBlend(const Surface *from, const Surface *to, double blend, int anchorX, int anchorY, const double world[3],
-+	double depthBias, int shade)
++	double depthBias, int shade, bool mixColours)
 +{
 +	if (!from)
 +	{
@@ -71921,6 +72113,26 @@ index 000000000..a5c32d3f9
 +	// is below the threshold show the next frame.
 +	static const int bayerLevels[4][4] = { { 0, 8, 2, 10 }, { 12, 4, 14, 6 }, { 3, 11, 1, 9 }, { 15, 7, 13, 5 } };
 +	const int threshold = (int)(blend * 16.0);
++	// (Mixing colours: how far, in whole steps, and the palette to mix in.)
++	const int FlameMixSteps = 32;
++	const bool mixed = mixColours && !_nearestRgb.empty();
++	const int mixStep = (int)(blend * FlameMixSteps);
++	const SDL_Color *palette = getPalette();
++	const int fadeLevel = (int)(blend * SeeThroughLevels);
++	bool fading = false;
++	SDL_Surface *edgeSurface = nullptr;
++	if (mixed)
++	{
++		// (The picture and the opacities of the pixels that fade: of the frames' size, cleared.)
++		if (!_blendEdge || _blendEdge->getWidth() != width || _blendEdge->getHeight() != height)
++		{
++			delete _blendEdge;
++			_blendEdge = new Surface(width, height);
++		}
++		edgeSurface = _blendEdge->getSurface();
++		for (int y = 0; y < height; ++y) std::fill_n((Uint8 *)edgeSurface->pixels + y * edgeSurface->pitch, width, (Uint8)0);
++		_blendOpacity.assign((size_t)width * height, 0);
++	}
 +	// And the shapes meet half way: both frames stretched to the size in between, around the base
 +	// they rise from, so a growing explosion is one shape growing, not two ghosting into each other.
 +	const SDL_Surface *fromSurface = const_cast<Surface*>(from)->getSurface(), // read only
@@ -71998,11 +72210,41 @@ index 000000000..a5c32d3f9
 +		const int *ditherRow = bayerLevels[y & 3];
 +		for (int x = left; x <= right; ++x)
 +		{
-+			if (ditherRow[x & 3] < threshold) outRow[x] = toLine && toColumns[x] >= 0 ? toLine[toColumns[x]] : 0;
-+			else outRow[x] = fromLine && fromColumns[x] >= 0 ? fromLine[fromColumns[x]] : 0;
++			const Uint8 toColor = toLine && toColumns[x] >= 0 ? toLine[toColumns[x]] : 0, fromColor = fromLine && fromColumns[x] >= 0 ? fromLine[fromColumns[x]] : 0;
++			if (!mixed)
++			{
++				outRow[x] = ditherRow[x & 3] < threshold ? toColor : fromColor;
++			}
++			else if (toColor && fromColor)
++			{
++				// Both frames draw here: the colour part way from one to the other, solid.
++				const SDL_Color &start = palette[fromColor], &end = palette[toColor];
++				auto channel = [&](int startValue, int endValue) { return (startValue * (FlameMixSteps - mixStep) + endValue * mixStep) / FlameMixSteps * 31 / 255; };
++				outRow[x] = toColor == fromColor ? fromColor : _nearestRgb[(channel(start.r, end.r) << 10) | (channel(start.g, end.g) << 5) | channel(start.b, end.b)];
++			}
++			else
++			{
++				// Only one frame draws here: its pixel fades out, or the next one's in (see below), on a picture of its own.
++				outRow[x] = 0;
++				const int level = fromColor ? SeeThroughLevels - fadeLevel : toColor ? fadeLevel : 0;
++				if (level > 0)
++				{
++					Uint8 *edgeRow = (Uint8 *)edgeSurface->pixels + y * edgeSurface->pitch;
++					edgeRow[x] = fromColor ? fromColor : toColor;
++					_blendOpacity[(size_t)y * width + x] = (Uint8)level;
++					fading = true;
++				}
++			}
 +		}
 +	}
 +	drawSprite(buffer, anchorX, anchorY, world, depthBias, shade, scale);
++	// The pixels only one of the two frames has, laid over what is behind them by how far they have faded: see-through,
++	// as the smoke is, so a flame's edge comes and goes softly instead of in dots.
++	if (fading)
++	{
++		const SeeThroughSprite fadingPixels = { _blendOpacity.data(), 1.0f };
++		drawSprite(_blendEdge, anchorX, anchorY, world, depthBias, shade, scale, SpritePose::Standing, &fadingPixels);
++	}
 +}
 +
 +/**
@@ -72118,7 +72360,29 @@ index 000000000..a5c32d3f9
 +		const double ground[3] = { tilePosition.x * 16.0 + 8.0, tilePosition.y * 16.0 + 8.0,
 +			tilePosition.z * 24.0 - tile->getTerrainLevel() };
 +		drawSpriteBlend(smokeSprites->getFrame(firstFrame + phase), smokeSprites->getFrame(firstFrame + (phase + 1) % 4), blend, 16, 32,
-+			ground, 2.0, shade);
++			ground, 2.0, shade, true);
++	}
++	// The map's own flames (see partKind: a campfire, a torch's fire; objects that light their surroundings and have no
++	// voxels): the part's art standing on its tile, unshaded, the frame the view's calm clock shows flowing into the next.
++	const std::set<const MapData*> &flameParts = (_sharedModelsOwner ? _sharedModelsOwner : this)->_flameParts;
++	for (int tileIndex = 0; !flameParts.empty() && tileIndex < tileCount; ++tileIndex)
++	{
++		Tile *tile = _save->getTile(tileIndex);
++		const MapData *object = tile->getMapData(O_OBJECT);
++		if (!object || !flameParts.count(object) || !_tileViews[tileIndex].discovered || !object->getDataset() || !object->getDataset()->getSurfaceset())
++		{
++			continue;
++		}
++		const Position tilePosition = tile->getPosition();
++		const double ground[3] = { tilePosition.x * 16.0 + 8.0, tilePosition.y * 16.0 + 8.0, tilePosition.z * 24.0 - tile->getTerrainLevel() };
++		if (std::abs(ground[0] - _eye[0]) > _maxDistance || std::abs(ground[1] - _eye[1]) > _maxDistance)
++		{
++			continue;
++		}
++		SurfaceSet *art = object->getDataset()->getSurfaceset();
++		// (The sprite's pixel that stands on the middle of the tile's floor, as buildModel lands the voxels on the art.)
++		drawSpriteBlend(art->getFrame(object->getSprite(_calmFrame)), art->getFrame(object->getSprite((_calmFrame + 1) % 8)), _animationBlend, 16, 32 + object->getYOffset(),
++			ground, 2.0, 0, true);
 +	}
 +}
 +
@@ -72621,7 +72885,7 @@ index 000000000..a5c32d3f9
 +		// (For the card, every puff once, whole: its own depth test leaves out what can't show.)
 +		for (const SmokeDraw &smoke : _smokeDraws)
 +		{
-+			const SeeThroughSprite seeThroughSprite = { smoke.soft->opacity.data(), smoke.opacity, nullptr, nullptr, nullptr, 0, (int)std::lround(smoke.cap * SeeThroughLevels) };
++			const SeeThroughSprite seeThroughSprite = { smoke.soft->opacity.data(), smoke.opacity, nullptr, nullptr, nullptr, 0, (int)std::lround(smoke.cap * SeeThroughLevels), true };
 +			SpriteDraw draw;
 +			draw.sprite = smoke.soft->colors;
 +			draw.anchorX = 16 * UpscaleFactor;
@@ -74212,10 +74476,10 @@ index 000000000..f39602245
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..065918cdb
+index 000000000..d4b19ec55
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,4230 @@
+@@ -0,0 +1,4317 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -74470,6 +74734,8 @@ index 000000000..065918cdb
 +	model.artFill = false;
 +	model.openingGlass = false;
 +	model.cropBlock = 0;
++	model.ghostKind = 0;
++	model.reliefRises = false;
 +	model.foliage = false;
 +	model.ghost = nullptr;
 +	for (int axis = 0; axis < 3; ++axis)
@@ -76654,9 +76920,14 @@ index 000000000..065918cdb
 +	auto found = _models.find(key);
 +	if (found == _models.end())
 +	{
-+		// Not built yet: build it in place (the map keeps it at the same address from then on).
++		// Not built yet: build it in place (the map keeps it at the same address from then on). A later frame of a
++		// part that animates is built as the kind of part its first frame is (see buildModel).
++		// And a part without voxels is, in every frame, the kind of ghost any one of its frames makes it (see partKind).
++		const int firstSprite = mapData->getSprite(0);
++		const VoxelModel *firstFrame = spriteIndex != firstSprite ? getModel(mapData, firstSprite, cutout) : nullptr;
++		if (const VoxelModel *kind = partKind(mapData, cutout)) firstFrame = kind;
 +		found = _models.emplace(key, VoxelModel()).first;
-+		buildModel(mapData, spriteIndex, cutout, found->second);
++		buildModel(mapData, spriteIndex, cutout, found->second, firstFrame);
 +		// The part's own ghost (VoxelModel::ghost): a floor drawn as a box of liquid, its surface
 +		// (see buildLiquid); a floor or wall whose voxels leave out most of its art, the rest of it
 +		// (see buildArtFill); an object the art draws as a block of crops, the block (see
@@ -76682,6 +76953,56 @@ index 000000000..065918cdb
 +		}
 +	}
 +	return &found->second;
++}
++
++/**
++ * The kind of ghost a part that animates and has no voxels is drawn as, in all its frames: what
++ * the first of its frames that gets a ghost at all is made (low art standing up, a block, a plain
++ * ghost: see buildModel), read off that frame's art. A flame's frames differ enough that some
++ * were low art, drawn solid, some a see-through ghost and some nothing: XPiratez's campfire
++ * stood as a yellow pillar, then as red streaks, then vanished (a player, GitHub issue #134).
++ * Worked out once for a record and kept.
++ * @return A model holding the kind (its ghostKind, reliefRises and cropBlock; nothing else of it
++ *         is meant to be drawn), or null for a part that doesn't animate or has voxels of its own.
++ */
++const FirstPersonView::VoxelModel *FirstPersonView::partKind(const MapData *mapData, bool cutout)
++{
++	bool animates = false;
++	for (int frame = 1; frame < 8 && !animates; ++frame) animates = mapData->getSprite(frame) != mapData->getSprite(0);
++	if (!animates)
++	{
++		return nullptr;
++	}
++	const Uint64 key = ((Uint64)(uintptr_t)mapData << 1) | (cutout ? 1 : 0);
++	auto found = _partKinds.find(key);
++	if (found == _partKinds.end())
++	{
++		found = _partKinds.emplace(key, VoxelModel()).first;
++		VoxelModel &kind = found->second;
++		for (int frame = 0; frame < 8; ++frame)
++		{
++			buildModel(mapData, mapData->getSprite(frame), cutout, kind);
++			if (kind.ghostKind != 0 || !kind.empty)
++			{
++				break; // (a ghost: that kind; or voxels of its own: it follows its first frame instead, see getModel)
++			}
++		}
++		// A flame (an object that lights its surroundings, by the game's rules, and has no voxels: a campfire, a torch's
++		// fire) is no ghost of any kind: its art stands on the tile as a sprite, each frame flowing into the next, as
++		// the game's own fire does (see drawFire). With "Parts without shape" off it isn't drawn, as any such part.
++		if (kind.empty || kind.ghostKind != 0)
++		{
++			if (Options::fpsGhostParts != 0 && !cutout && mapData->getObjectType() == O_OBJECT && mapData->getLightSource() > 0)
++			{
++				clearModel(kind);
++				kind.ghostKind = 5;
++				_flameParts.insert(mapData);
++				Log(LOG_VERBOSE) << "OpenXcom3D: a flame drawn as a sprite: " << mapData->getDataset()->getName() << ", its art's frames " << mapData->getSprite(0) << " to " << mapData->getSprite(7);
++			}
++		}
++	}
++	const VoxelModel &kind = found->second;
++	return kind.ghostKind != 0 || kind.empty ? &kind : nullptr;
 +}
 +
 +/**
@@ -76757,7 +77078,7 @@ index 000000000..065918cdb
 + * @param cutout Leave out the voxels whose pixel is transparent (a sliding UFO door's frames).
 + * @param model Where to build it.
 + */
-+void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model) const
++void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model, const VoxelModel *firstFrame) const
 +{
 +	clearModel(model);
 +
@@ -76985,26 +77306,50 @@ index 000000000..065918cdb
 +	{
 +		const bool ghostShape = shape && shape->ghost;
 +		bool rises = false;
-+		const bool low = mapData->getObjectType() == O_OBJECT && lowArt(sprite, yOffset, rises);
-+		const int block = cutout ? 0 : cropBlockOf(nullptr, mapData, sprite, yOffset);
-+		const bool ghostWanted = Options::fpsGhostParts == 2
++		bool low = mapData->getObjectType() == O_OBJECT && lowArt(sprite, yOffset, rises);
++		int block = cutout ? 0 : cropBlockOf(nullptr, mapData, sprite, yOffset);
++		bool ghostWanted = Options::fpsGhostParts == 2
 +			|| (Options::fpsGhostParts == 1 && (ghostShape || mapData->isGravLift() || cageArt(sprite, mapData->getObjectType(), yOffset) || low || block));
++		// A part that animates is what its first frame is, in every frame: what kind of ghost it gets is read off the
++		// art (how low it is, how like a block or a cage), and a frame whose art falls just the other side of a line
++		// (a fireplace's flames, one frame in four; a player, GitHub issue #134) lost its ghost, or stood as another kind.
++		if (firstFrame && firstFrame->empty == false && firstFrame->ghostKind == 0)
++		{
++			firstFrame = nullptr; // (the first frame has voxels of its own, this one's art none: nothing to follow)
++		}
++		if (firstFrame && firstFrame->ghostKind == 5)
++		{
++			return; // (a flame: no model, its art is drawn as a sprite; see partKind)
++		}
++		if (firstFrame)
++		{
++			ghostWanted = firstFrame->ghostKind != 0;
++			block = firstFrame->ghostKind == 2 ? std::max<int>(1, block ? block : firstFrame->cropBlock) : 0;
++			low = firstFrame->ghostKind == 3;
++			if (low) rises = firstFrame->reliefRises;
++		}
 +		if (ghostWanted && !cutout)
 +		{
 +			if (ghostShape)
 +			{
++				model.ghostKind = 1;
 +				buildShape(model, sprite, *shape, yOffset);
 +			}
 +			else if (block)
 +			{
++				model.ghostKind = 2;
++				model.cropBlock = (Uint8)block; // (kept for the frames after the first: see above)
 +				buildCropBlock(model, sprite, block, yOffset);
 +			}
 +			else if (low)
 +			{
++				model.ghostKind = 3;
++				model.reliefRises = rises;
 +				buildRelief(model, sprite, yOffset, rises);
 +			}
 +			else
 +			{
++				model.ghostKind = 4;
 +				buildGhost(model, sprite, mapData->getObjectType(), yOffset);
 +			}
 +			if (!model.empty) colorHiddenSides(model, sprite);
@@ -77034,10 +77379,16 @@ index 000000000..065918cdb
 +	// liquidHeightOf): the game's thin slab stays the floor, its top (the bottom under the liquid)
 +	// a few shades darker; the liquid's surface is a ghost model of its own (see getModel).
 +	const int walkCost = mapData->getTUCost(MT_WALK);
++	// (As for a part without voxels: one that animates is in every frame what its first frame is, a floor of liquid, a
++	// part with the rest of its art as a ghost, a block of crops, a mass of foliage; see firstFrame above.)
++	if (firstFrame && (firstFrame->empty || firstFrame->ghostKind != 0))
++	{
++		firstFrame = nullptr;
++	}
 +	if (mapData->getObjectType() == O_FLOOR && !model.empty && model.max[2] <= 3 && !cutout
 +		&& walkCost > PlainFloorWalkCost && walkCost < Pathfinding::INVALID_MOVE_COST)
 +	{
-+		model.liquidHeight = (Uint8)liquidHeightOf(sprite, yOffset);
++		model.liquidHeight = firstFrame ? firstFrame->liquidHeight : (Uint8)liquidHeightOf(sprite, yOffset);
 +		// (with "Parts without shape" off, no surface: the floor as it is)
 +		for (int y = 0; model.liquidHeight && Options::fpsGhostParts != 0 && y < Position::TileXY; ++y)
 +		{
@@ -77055,16 +77406,16 @@ index 000000000..065918cdb
 +	// would stand as a ghost across the doorway; TFTD's liner).
 +	if (!model.liquidHeight && !cutout && !mapData->isDoor() && !mapData->isUFODoor() && mapData->getAltMCD() == 0)
 +	{
-+		model.artFill = sparseArt(model, sprite, mapData->getObjectType(), yOffset);
++		model.artFill = firstFrame ? firstFrame->artFill : sparseArt(model, sprite, mapData->getObjectType(), yOffset);
 +	}
 +	// An object the art draws as a block of crops though the game gives it only a few voxels
 +	// (X-Com Files' wheat: see cropBlockOf): the block is a ghost model of its own (see getModel).
 +	if (!model.empty && !cutout)
 +	{
-+		model.cropBlock = (Uint8)cropBlockOf(&model, mapData, sprite, yOffset);
++		model.cropBlock = firstFrame ? firstFrame->cropBlock : (Uint8)cropBlockOf(&model, mapData, sprite, yOffset);
 +	}
 +	// A mass of foliage: drawn leafy on a tile without a floor (see foliageArt, leafyModel).
-+	model.foliage = mapData->getObjectType() == O_OBJECT && !cutout && foliageArt(model, sprite, getPalette());
++	model.foliage = firstFrame ? firstFrame->foliage : mapData->getObjectType() == O_OBJECT && !cutout && foliageArt(model, sprite, getPalette());
 +	colorHiddenSides(model, sprite);
 +	findGlow(model);
 +	model.water = waterFloor && !model.empty;
@@ -78448,10 +78799,10 @@ index 000000000..065918cdb
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewUfo.cpp b/src/FirstPerson/FirstPersonViewUfo.cpp
 new file mode 100644
-index 000000000..e2e12dceb
+index 000000000..4878d9db9
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewUfo.cpp
-@@ -0,0 +1,1088 @@
+@@ -0,0 +1,1190 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -79537,6 +79888,108 @@ index 000000000..e2e12dceb
 +	}
 +}
 +
++
++/**
++ * Finds the lifts on the map, once per battle: every floor the game lets units float up through
++ * (a UFO's grav lift, an alien base's, a building's elevator: XPiratez's mansion has blue pads
++ * with yellow lines striking up), each with the height its beam starts at, the first floor below
++ * it, and where it ends, the level above it. Their colours are picked when first needed.
++ */
++void FirstPersonView::findLifts()
++{
++	_lifts.clear();
++	if (!_save)
++	{
++		return;
++	}
++	const int perLevel = _save->getMapSizeX() * _save->getMapSizeY(), tileCount = perLevel * _save->getMapSizeZ();
++	for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
++	{
++		const MapData *floor = _save->getTile(tileIndex)->getMapData(O_FLOOR);
++		if (!floor || !floor->isGravLift()) continue;
++		const int liftLevel = tileIndex / perLevel, column = tileIndex % perLevel;
++		int bottomLevel = liftLevel;
++		for (int level = liftLevel - 1; level >= 0; --level)
++		{
++			const MapData *below = _save->getTile(level * perLevel + column)->getMapData(O_FLOOR);
++			bottomLevel = level;
++			if (below && !below->isGravLift()) break;
++		}
++		LiftSpot lift = { tileIndex, bottomLevel * 24.0f + GroundTop, (liftLevel + 1) * 24.0f + 8.0f, { 0, 0 }, false };
++		_lifts.push_back(lift);
++	}
++}
++
++/**
++ * The beams of the lifts in sight (setting "Lift beams"; the owner, of XPiratez's blue lift pads
++ * with their yellow lines striking up: "more smooth and cool"): through each lift whose tile has
++ * been seen, within 50 tiles, a column of motes turning slowly as they rise and streaks of light
++ * striking up, in the pad's own colours (its art's commonest colour and its brightest). A lift of
++ * a UFO that glows has that UFO's beam instead (see spawnUfoAura). Past UfoAuraParticleCap
++ * particles in all, the beams wait.
++ * @param elapsedSeconds Seconds since the last frame: the spawn rates are per second.
++ */
++void FirstPersonView::spawnLiftBeams(float elapsedSeconds)
++{
++	typedef FirstPersonParticles P;
++	if (_lifts.empty() || _particles.all().size() >= UfoAuraParticleCap)
++	{
++		return;
++	}
++	const int mapSizeX = _save->getMapSizeX(), mapSizeY = _save->getMapSizeY();
++	const float rate = Options::fpsParticles > 1 ? 26.0f : 12.0f; // a lift, a second
++	for (LiftSpot &lift : _lifts)
++	{
++		const float x = (lift.tile % mapSizeX) * 16.0f + 8.0f, y = ((lift.tile / mapSizeX) % mapSizeY) * 16.0f + 8.0f;
++		const float dx = x - (float)_eye[0], dy = y - (float)_eye[1];
++		if (dx * dx + dy * dy > 800.0f * 800.0f || lift.tile >= (int)_tileViews.size() || !_tileViews[lift.tile].discovered) continue;
++		// (A glowing UFO's lift: its own beam, in the UFO's colours.)
++		if (_ufoLightsOn && lift.tile < (int)_ufoPhaseOfTile.size() && (_ufoPhaseOfTile[lift.tile] & UfoTileBit)) continue;
++		if (!lift.colorsChosen)
++		{
++			// The pad's colours, off its art: the commonest, and the brightest by the palette.
++			lift.colorsChosen = true;
++			const MapData *floor = _save->getTile(lift.tile)->getMapData(O_FLOOR);
++			const Surface *art = floor && floor->getDataset() && floor->getDataset()->getSurfaceset() ? floor->getDataset()->getSurfaceset()->getFrame(floor->getSprite(0)) : nullptr;
++			const SDL_Color *palette = getPalette();
++			int counts[256] = {}, brightest = 0, brightestLight = -1;
++			for (int artY = 0; art && artY < art->getHeight(); ++artY)
++				for (int artX = 0; artX < art->getWidth(); ++artX)
++				{
++					const Uint8 color = art->getPixel(artX, artY);
++					if (!color) continue;
++					++counts[color];
++					const int light = palette[color].r * 30 + palette[color].g * 59 + palette[color].b * 11;
++					if (light > brightestLight)
++					{
++						brightestLight = light;
++						brightest = color;
++					}
++				}
++			lift.colors[0] = (Uint8)(std::max_element(counts + 1, counts + 256) - counts);
++			lift.colors[1] = (Uint8)brightest;
++			if (brightestLight < 0) lift.colors[0] = lift.colors[1] = _colors.nightLight; // (no art: a plain light)
++		}
++		const int count = (int)(elapsedSeconds * rate + _particles.random());
++		for (int i = 0; i < count; ++i)
++		{
++			P::Particle mote;
++			const float angle = _particles.random(0, 2.0f * (float)Pi), radius = _particles.random(0.5f, 5.5f);
++			const bool streak = _particles.random() < 0.35f; // (the lines striking up)
++			mote.pos[0] = x + std::cos(angle) * radius;
++			mote.pos[1] = y + std::sin(angle) * radius;
++			mote.pos[2] = lift.bottom + _particles.random() * (lift.top - lift.bottom) * 0.8f;
++			mote.vel[0] = streak ? 0.0f : -std::sin(angle) * 3.0f;
++			mote.vel[1] = streak ? 0.0f : std::cos(angle) * 3.0f;
++			mote.vel[2] = streak ? _particles.random(30, 45) : _particles.random(9, 14);
++			mote.age = 0; mote.life = std::clamp((lift.top - mote.pos[2]) / mote.vel[2], 0.2f, 4.0f); mote.gravity = 0; mote.drag = 0.0f;
++			mote.color = streak || _particles.random() < 0.3f ? lift.colors[1] : lift.colors[0];
++			mote.size = _particles.random() < 0.5f ? 4 : 3;
++			mote.kind = streak ? P::STREAK : P::MOTE; mote.group = P::EFFECT;
++			_particles.add(mote);
++		}
++	}
++}
 +}
 +
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
@@ -89300,7 +89753,7 @@ index 000000000..3559cb7dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..e86093181
+index 000000000..4e2a5d5e2
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,1038 @@
@@ -89524,7 +89977,7 @@ index 000000000..e86093181
 +			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear" } },
 +		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
 +			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsVoxelUnits", "fpsMuzzleFlash", "fpsHitFlash", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
-+			"fpsGhostParts", "fpsGhostOpacity", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
++			"fpsGhostParts", "fpsGhostOpacity", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
 +		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
 +			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
 +		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },

@@ -298,7 +298,7 @@ void FirstPersonView::gpuRecordSprite(const SpriteDraw &draw)
 	const Uint8 *opacityMap = seeThroughSprite ? seeThroughSprite->opacityMap : nullptr;
 	auto placeInAtlas = [&]() { return atlasPlace((const Uint8 *)surface->pixels, surface->pitch, spriteWidth, spriteHeight, opacityMap); };
 	int pixelsAt;
-	if (opacityMap)
+	if (opacityMap && seeThroughSprite->steady)
 	{
 		auto known = list.spritesByAddress.find(opacityMap);
 		if (known == list.spritesByAddress.end())
@@ -691,6 +691,16 @@ bool FirstPersonView::gpuDrawEffects()
 	// (OPENXCOM3D_GPU_TIMING: the effects' share of the card's time, in the log every 60 frames.)
 	static const bool timed = getenv("OPENXCOM3D_GPU_TIMING") != nullptr;
 	FirstPersonGpu::Timing timing;
+	// (The screen wash is drawn once ahead too, as the kinds of frame are in gpuCastAllRays: else the game would stand
+	// still while the driver finishes its program at the first hit taken, the first look through the goggles.)
+	static bool washDrawn = false;
+	if (gpu && !washDrawn && !effects.wash)
+	{
+		effects.wash = true;
+		gpu->drawEffects(effects, output, nullptr);
+		effects.wash = false;
+	}
+	washDrawn = true;
 	if (!gpu || !gpu->drawEffects(effects, output, timed ? &timing : nullptr))
 	{
 		runOnAllThreads(&FirstPersonView::renderRows);

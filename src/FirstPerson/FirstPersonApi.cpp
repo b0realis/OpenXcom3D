@@ -184,7 +184,7 @@ bool autoEquipGunsFirst(const Mod *mod)
 }
 
 /**
- * The main menu with the mod on: its version (the mod's own metadata, "1.12") in small letters
+ * The main menu with the mod on: its version (the mod's own metadata, "1.14") in small letters
  * just right of the title's first line, "OpenXcom3D", its foot on the big letters' foot (a player,
  * GitHub issue #69: without the AppImage's name, no telling the version; the owner: "a smaller
  * space and our version number besides OpenXcom3D", then "Make the version no. Smaller"). A text
@@ -940,6 +940,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	// The crops, flower beds and rubble the game gives no real shape, drawn solid as on the map (see
 	// buildRelief, buildCropBlock): a bit see-through instead (SeeThroughCropOpacity of the pixels),
 	// so whoever stands in a field shows (the owner's ask, apart from the ghosts' opacity).
+	// A lift anywhere (a building's elevator, an alien base's; a UFO's has its own with "UFO lights and aura"): a beam of light
+	// rising through it, in the colours of its pad.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsLiftBeams", &fpsLiftBeams, true, "STR_FPS_LIFT_BEAMS", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCrops", &fpsSeeThroughCrops, false, "STR_FPS_SEE_THROUGH_CROPS", category));
 	// A corpse or item pointed at, the game's line passing it to something behind: drawn faint, at
 	// the ghost opacity (the game's shots pass through them).

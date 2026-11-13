@@ -613,6 +613,10 @@ void FirstPersonMode::updateCamera(BattleUnit *unit, bool canMove, double elapse
 				// stepAllowed): asked again and again while the key was held, the game refused it each
 				// time and the view lunged at the edge and back (a player, GitHub issue #129: a unit
 				// behind a curtain one walks through but doesn't see through).
+				// (What it was given as the second half of a diagonal goes back, and it is half of no pair.)
+				if (_grantedTime) unit->setTimeUnits(std::max(0, unit->getTimeUnits() - _grantedTime));
+				if (_grantedEnergy) unit->spendEnergy(std::min(unit->getEnergy(), _grantedEnergy));
+				_cornerOpen = false;
 				const Position refusedTo(_trackedTile.x, _trackedTile.y, unitTile.z);
 				if (hiddenUnitOn(unit, refusedTo))
 				{
@@ -624,6 +628,7 @@ void FirstPersonMode::updateCamera(BattleUnit *unit, bool canMove, double elapse
 				_eyeX = clampInsideTile(unitTile.x, _eyeX, bigUnitOffset);
 				_eyeY = clampInsideTile(unitTile.y, _eyeY, bigUnitOffset);
 			}
+			_grantedTime = _grantedEnergy = 0;
 			_trackedTile = unitTile;
 		}
 	}
