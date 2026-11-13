@@ -87,7 +87,7 @@ const bool QuestBuild = true;
 const bool QuestBuild = false;
 #endif
 /// The Quest build (its version code) whose changed defaults optionsLoaded sets once on a profile from before it.
-const int QuestDefaultsVersion = 115;
+const int QuestDefaultsVersion = 124;
 
 /**
  * Whether a battle with the mod's 3D view is on: its mode made (see create) and not yet
@@ -637,10 +637,34 @@ void optionsLoaded()
 	}
 	if (Options::fpsQuestDefaults < QuestDefaultsVersion)
 	{
-		Options::fpsVrEyeSize = 1;     // 460x500
-		Options::fpsSpriteUpscale = 2; // Smooth+
+		// The Quest's preset, set once when a build with a newer one first runs (the player changes what they like
+		// after). Build 124's is for the headset's graphics chip drawing the world: the sharpest picture that should
+		// still keep a decent frame rate there, by a Quest 3's log of build 121 (an eye of 460x500 took 6 to 27 ms with
+		// the chip at its low level). The eye is 710x770 with the rays thinned toward its edge (about a third of them
+		// cast, fewer than a plain 460x500 eye's), smoothed twice as big by the chip (1420x1540, near the headset's own
+		// 1680x1760), kept on the card and in full colour; what costs most for least (several rays a pixel, soft and
+		// extra shadows, ambient occlusion, light shafts, reflections) is off, and so are voxel units, whose bodies the
+		// CPU draws (the eyes would come back from the card).
+		Options::fpsRenderer = 1;          // GPU
+		Options::fpsVrCardEyes = true;
+		Options::fpsVrEyeSize = 2;         // 710x770
+		Options::fpsVrFoveation = 1;       // Light
+		Options::fpsVrSmoothing = true;
+		Options::fpsTrueColor = true;
+		Options::fpsSmoothLight = true;
+		Options::fpsColoredLights = true;
+		Options::fpsSupersampling = 0;
+		Options::fpsSoftShadows = false;
+		Options::fpsAllLightShadows = false;
+		Options::fpsAmbientOcclusion = false;
+		Options::fpsLightShafts = false;
+		Options::fpsReflections = false;
+		Options::fpsVoxelUnits = false;
+		Options::fpsSpriteUpscale = 2;     // Smooth+
 		Options::fpsQuestDefaults = QuestDefaultsVersion;
-		Log(LOG_INFO) << "OpenXcom3D: the Quest build " << QuestDefaultsVersion << "'s defaults, set once: VR eye picture 460x500, sprite upscaling Smooth+";
+		Log(LOG_INFO) << "OpenXcom3D: the Quest build " << QuestDefaultsVersion << "'s preset, set once: Renderer GPU, VR eye picture 710x770 with VR foveation Light and VR smoothing, "
+			"eyes kept on the card in True colour with Smooth light and Coloured lights; Supersampling, Soft sun shadows, Shadows from every light, Ambient occlusion, "
+			"Light shafts, Reflections and Voxel units off; sprite upscaling Smooth+";
 	}
 #endif
 }
