@@ -1003,10 +1003,7 @@ void FirstPersonMode::jump(BattleUnit *unit)
 
 	// Pushing towards a neighbouring tile while the soldier may act: if the rules block that
 	// step, try to vault over whatever blocks it.
-	// (A vault only forwards: the owner's "w(forward) + jump key", GitHub issue #124. Sideways and
-	// backwards the jump key is a hop.)
-	if (forward <= 0.0) strafe = 0.0;
-	if (forward > 0.0 && !_stepPending && canAct() && _state->playableUnitSelected())
+	if ((forward != 0.0 || strafe != 0.0) && !_stepPending && canAct() && _state->playableUnitSelected())
 	{
 		// The push turned from the view's frame onto the map (yaw 0 is east, 90 south), then
 		// snapped to the nearer grid axis: a vault goes straight along x or y, never diagonally.
@@ -1043,7 +1040,7 @@ void FirstPersonMode::jump(BattleUnit *unit)
  * Is this tile part something low enough to jump over? It must be a wall or an object, not a
  * door, standing on the floor (it doesn't raise the ground like stairs or a ramp), not a big
  * wall of the kinds that act as walls on some sides only (big wall kinds 2 to 9), and no higher
- * than VaultMaxHeight voxels (half a level's 24).
+ * than VaultMaxHeight voxels (15 of a level's 24; the game's shapes are in layers of two, so 14).
  * @param part The tile part to look at (a TilePart: O_WESTWALL, O_NORTHWALL or O_OBJECT).
  * @return True if the part is there and low enough to vault.
  */
@@ -1166,11 +1163,17 @@ bool FirstPersonMode::tryVault(BattleUnit *unit, int stepX, int stepY)
 	}
 
 	// The jump's own cost: what VaultTimeUnits is more than the walk, which the walking state
-	// charges as it goes (none in the debug "doom mode").
-	if (!doomModeOn())
+	// charges as it goes (none in the debug "doom mode"). Charged once the soldier is over (see
+	// glideOverObstacle): a walk the game stops before the step (a turn it can't pay for, an enemy
+	// coming into sight) costs no jump.
+	_vaultCharge = doomModeOn() ? 0 : std::max(0, VaultTimeUnits - pathfinding->getTotalTUCost());
+	_vaultUnit = unit;
+	// Free turning (no "Turning costs TU"): the soldier faces the way of the jump for free, as for
+	// a door, so the game's walk needn't turn first (a vault backwards was turned, charged for it
+	// and stopped); the next frame the soldier faces where the view looks again.
+	if (!Options::fpsTurnCost && direction != unit->getDirection())
 	{
-		const int jumpCost = VaultTimeUnits - pathfinding->getTotalTUCost();
-		if (jumpCost > 0) unit->spendTimeUnits(jumpCost);
+		unit->setDirection(direction);
 	}
 
 	// Hand the walk to the game's walking state, as commitStep does; the camera's tile is the
@@ -1225,6 +1228,14 @@ bool FirstPersonMode::glideOverObstacle(BattleUnit *, double &newEyeX, double &n
 	if (progress >= 1.0 && !_stepPending)
 	{
 		_vaulting = false;
+		// Over: the jump's own cost now (see tryVault), if the game walked the soldier there.
+		if (_vaultCharge > 0 && _vaultUnit && _vaultUnit == _trackedUnit
+			&& _vaultUnit->getPosition().x == (int)std::floor(_vaultTo[0] / 16.0) && _vaultUnit->getPosition().y == (int)std::floor(_vaultTo[1] / 16.0))
+		{
+			_vaultUnit->spendTimeUnits(std::min(_vaultCharge, _vaultUnit->getTimeUnits()));
+		}
+		_vaultCharge = 0;
+		_vaultUnit = nullptr;
 	}
 	return true;
 }
@@ -1280,6 +1291,8 @@ void FirstPersonMode::endVault()
 	_save->getPathfinding()->setVault(nullptr, {});
 	_vaulting = false;
 	_jumpStart = 0;
+	_vaultCharge = 0; // (cut short: no jump to pay for)
+	_vaultUnit = nullptr;
 }
 
 /**

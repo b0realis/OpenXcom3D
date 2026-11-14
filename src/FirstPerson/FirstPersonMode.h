@@ -605,6 +605,8 @@ private:
 	Uint32 _jumpTime = 0;                        // how long this jump lasts, ms
 	double _jumpHeight = 0.0;                    // voxels at the top
 	bool _vaulting = false;                      // the camera glides over the obstacle
+	int _vaultCharge = 0;                        // the jump's own time units, charged once the soldier is over (see tryVault, glideOverObstacle)
+	BattleUnit *_vaultUnit = nullptr;            // whose
 	double _vaultFrom[2] = {}, _vaultTo[2] = {}; // where the glide over the obstacle starts and lands (x, y in voxels)
 
 	/// Jumps, or vaults over a low obstacle straight ahead.

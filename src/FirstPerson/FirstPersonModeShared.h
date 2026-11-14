@@ -373,7 +373,7 @@ const Uint32 LandingDipTime = 250;
 const double JumpHeight = 6.0, VaultHeight = 9.0;
 const Uint32 JumpTime = 520;
 /// The highest obstacle a soldier can jump over, in voxels: waist high (a soldier is about 22).
-const int VaultMaxHeight = 12;
+const int VaultMaxHeight = 15;
 /// What a vault costs in time units, the walk over included (the owner, on GitHub issue #124: "30 TU"); more only if the
 /// walk itself costs more.
 const int VaultTimeUnits = 30;
