@@ -377,6 +377,8 @@ const int VaultMaxHeight = 15;
 /// What a vault costs in time units, the walk over included (the owner, on GitHub issue #124: "30 TU"); more only if the
 /// walk itself costs more.
 const int VaultTimeUnits = 30;
+/// What a plain hop on the spot costs, in time units (the owner, GitHub issue #124).
+const int HopTimeUnits = 1;
 
 // ---- Fighting ----
 

@@ -983,7 +983,7 @@ bool FirstPersonMode::tileMoveVelocity(BattleUnit *unit, double forward, double 
 
 /**
  * Jumps (the jump key): a free hop of the camera, JumpHeight voxels up and down again over
- * JumpTime ms, which costs nothing and changes nothing in the game. When the movement keys push
+ * JumpTime ms, which costs HopTimeUnits (1) and changes nothing else in the game. When the movement keys push
  * into a step that something low blocks (a fence, a table, a crate), the jump becomes a vault
  * over it instead (setting "Jump over low obstacles", see tryVault), whose walk the rules do
  * charge for.
@@ -1003,7 +1003,8 @@ void FirstPersonMode::jump(BattleUnit *unit)
 
 	// Pushing towards a neighbouring tile while the soldier may act: if the rules block that
 	// step, try to vault over whatever blocks it.
-	if ((forward != 0.0 || strafe != 0.0) && !_stepPending && canAct() && _state->playableUnitSelected())
+	// (Forwards or sideways, not backwards: the owner, on GitHub issue #124.)
+	if (forward >= 0.0 && (forward != 0.0 || strafe != 0.0) && !_stepPending && canAct() && _state->playableUnitSelected())
 	{
 		// The push turned from the view's frame onto the map (yaw 0 is east, 90 south), then
 		// snapped to the nearer grid axis: a vault goes straight along x or y, never diagonally.
@@ -1030,7 +1031,17 @@ void FirstPersonMode::jump(BattleUnit *unit)
 		}
 	}
 
-	// Otherwise a plain hop (currentJumpHeight lifts the eye along its arc).
+	// Otherwise a plain hop (currentJumpHeight lifts the eye along its arc): HopTimeUnits of the
+	// soldier's own, in his turn (the owner, on GitHub issue #124: "jump in place only 1 TU"); none
+	// left, no hop. Free while it isn't his move (the view of the aliens' turn), and in "doom mode".
+	if (canAct() && _state->playableUnitSelected() && !doomModeOn())
+	{
+		if (unit->getTimeUnits() < HopTimeUnits || !unit->spendTimeUnits(HopTimeUnits))
+		{
+			return;
+		}
+		_state->updateSoldierInfo(false);
+	}
 	_jumpStart = SDL_GetTicks();
 	_jumpTime = JumpTime;
 	_jumpHeight = JumpHeight;

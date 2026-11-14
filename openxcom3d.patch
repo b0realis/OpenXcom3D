@@ -124,7 +124,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..f5de1009c
+index 000000000..fc59e246e
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,580 @@
@@ -486,11 +486,11 @@ index 000000000..f5de1009c
 +  STR_FPS_ZOMBIE: "ZOMBIE"
 +  STR_FPS_SIGNAL_LOST: "SIGNAL LOST"
 +  STR_FPS_VAULT: "Jump over low obstacles"
-+  STR_FPS_VAULT_DESC: "Jump while walking into a fence, table or crate up to 15 voxels high (of a level's 24) takes the soldier over it, for 30 TU."
++  STR_FPS_VAULT_DESC: "Jump while walking forwards or sideways into a fence, table or crate up to 15 voxels high (of a level's 24) takes the soldier over it, for 30 TU."
 +  STR_FPS_NIGHT_VISION_GEAR: "Night vision needs gear"
 +  STR_FPS_NIGHT_VISION_GEAR_DESC: "Night vision only for soldiers with the gear."
 +  STR_FPS_KEY_JUMP: "Jump"
-+  STR_FPS_KEY_JUMP_DESC: "A free hop. While walking into a low obstacle: vaults over it (30 TU; setting Jump over low obstacles)."
++  STR_FPS_KEY_JUMP_DESC: "A hop on the spot (1 TU). While walking into a low obstacle: vaults over it (30 TU; setting Jump over low obstacles)."
 +  STR_FPS_KEY_NIGHT_VISION: "Night vision on/off"
 +  STR_FPS_KEY_NIGHT_VISION_DESC: "Night vision on/off, with the gear."
 +  STR_FPS_KEY_ZOOM: "Zoom (hold)"
@@ -710,7 +710,7 @@ index 000000000..f5de1009c
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..0d3ddb162
+index 000000000..dfe789afb
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,580 @@
@@ -1072,11 +1072,11 @@ index 000000000..0d3ddb162
 +  STR_FPS_ZOMBIE: "ZOMBIE"
 +  STR_FPS_SIGNAL_LOST: "SIGNAL LOST"
 +  STR_FPS_VAULT: "Jump over low obstacles"
-+  STR_FPS_VAULT_DESC: "Jump while walking into a fence, table or crate up to 15 voxels high (of a level's 24) takes the soldier over it, for 30 TU."
++  STR_FPS_VAULT_DESC: "Jump while walking forwards or sideways into a fence, table or crate up to 15 voxels high (of a level's 24) takes the soldier over it, for 30 TU."
 +  STR_FPS_NIGHT_VISION_GEAR: "Night vision needs gear"
 +  STR_FPS_NIGHT_VISION_GEAR_DESC: "Night vision only for soldiers with the gear."
 +  STR_FPS_KEY_JUMP: "Jump"
-+  STR_FPS_KEY_JUMP_DESC: "A free hop. While walking into a low obstacle: vaults over it (30 TU; setting Jump over low obstacles)."
++  STR_FPS_KEY_JUMP_DESC: "A hop on the spot (1 TU). While walking into a low obstacle: vaults over it (30 TU; setting Jump over low obstacles)."
 +  STR_FPS_KEY_NIGHT_VISION: "Night vision on/off"
 +  STR_FPS_KEY_NIGHT_VISION_DESC: "Night vision on/off, with the gear."
 +  STR_FPS_KEY_ZOOM: "Zoom (hold)"
@@ -40353,10 +40353,10 @@ index 000000000..0a35e2670
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeMovement.cpp b/src/FirstPerson/FirstPersonModeMovement.cpp
 new file mode 100644
-index 000000000..03eca5adb
+index 000000000..3b67e60c8
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeMovement.cpp
-@@ -0,0 +1,2394 @@
+@@ -0,0 +1,2405 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -41342,7 +41342,7 @@ index 000000000..03eca5adb
 +
 +/**
 + * Jumps (the jump key): a free hop of the camera, JumpHeight voxels up and down again over
-+ * JumpTime ms, which costs nothing and changes nothing in the game. When the movement keys push
++ * JumpTime ms, which costs HopTimeUnits (1) and changes nothing else in the game. When the movement keys push
 + * into a step that something low blocks (a fence, a table, a crate), the jump becomes a vault
 + * over it instead (setting "Jump over low obstacles", see tryVault), whose walk the rules do
 + * charge for.
@@ -41362,7 +41362,8 @@ index 000000000..03eca5adb
 +
 +	// Pushing towards a neighbouring tile while the soldier may act: if the rules block that
 +	// step, try to vault over whatever blocks it.
-+	if ((forward != 0.0 || strafe != 0.0) && !_stepPending && canAct() && _state->playableUnitSelected())
++	// (Forwards or sideways, not backwards: the owner, on GitHub issue #124.)
++	if (forward >= 0.0 && (forward != 0.0 || strafe != 0.0) && !_stepPending && canAct() && _state->playableUnitSelected())
 +	{
 +		// The push turned from the view's frame onto the map (yaw 0 is east, 90 south), then
 +		// snapped to the nearer grid axis: a vault goes straight along x or y, never diagonally.
@@ -41389,7 +41390,17 @@ index 000000000..03eca5adb
 +		}
 +	}
 +
-+	// Otherwise a plain hop (currentJumpHeight lifts the eye along its arc).
++	// Otherwise a plain hop (currentJumpHeight lifts the eye along its arc): HopTimeUnits of the
++	// soldier's own, in his turn (the owner, on GitHub issue #124: "jump in place only 1 TU"); none
++	// left, no hop. Free while it isn't his move (the view of the aliens' turn), and in "doom mode".
++	if (canAct() && _state->playableUnitSelected() && !doomModeOn())
++	{
++		if (unit->getTimeUnits() < HopTimeUnits || !unit->spendTimeUnits(HopTimeUnits))
++		{
++			return;
++		}
++		_state->updateSoldierInfo(false);
++	}
 +	_jumpStart = SDL_GetTicks();
 +	_jumpTime = JumpTime;
 +	_jumpHeight = JumpHeight;
@@ -42753,10 +42764,10 @@ index 000000000..03eca5adb
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..0196b0c97
+index 000000000..763fbd08a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,533 @@
+@@ -0,0 +1,535 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -43136,6 +43147,8 @@ index 000000000..0196b0c97
 +/// What a vault costs in time units, the walk over included (the owner, on GitHub issue #124: "30 TU"); more only if the
 +/// walk itself costs more.
 +const int VaultTimeUnits = 30;
++/// What a plain hop on the spot costs, in time units (the owner, GitHub issue #124).
++const int HopTimeUnits = 1;
 +
 +// ---- Fighting ----
 +
