@@ -362,6 +362,23 @@ int FirstPersonMode::handOf(BattleUnit *unit, const BattleItem *weapon) const
 }
 
 /**
+ * An item's name on the HUD: its own, or for someone unconscious their name, as the game's
+ * inventory names them (a player, GitHub issue #143: a living captive carried read as the corpse
+ * item's name, "dead").
+ * @param item The item.
+ * @return The name, translated.
+ */
+std::string FirstPersonMode::itemLabel(const BattleItem *item) const
+{
+	const BattleUnit *body = item->getUnit();
+	if (body && body->getStatus() == STATUS_UNCONSCIOUS)
+	{
+		return body->getName(_game->getLanguage());
+	}
+	return std::string(_state->tr(item->getRules()->getName()));
+}
+
+/**
  * The hand's letter in front of an item's name on the panel and the squad card: R or L for
  * the hands (an empty hand's weapon by the hand it's used from), S for the built-in (special)
  * weapon.

@@ -796,6 +796,8 @@ private:
 	int handOf(BattleUnit *unit, const BattleItem *weapon) const;
 	/// The hand's letter on the panel: "R: ", "L: ", or "S: " for the built-in (special) weapon.
 	std::string handLetter(BattleUnit *unit, const BattleItem *item) const;
+	/// An item's name on the HUD (someone unconscious by their own name).
+	std::string itemLabel(const BattleItem *item) const;
 	/// Leaning: the side a shot starts from, by where the eye is in the tile (setting "Lean shots", or leaning out).
 	BattleActionOrigin leanSide(const BattleUnit *unit, const Position &targetTile) const;
 	/// Melee at a body lying in front or at the feet (setting "Melee hits walls and the downed").

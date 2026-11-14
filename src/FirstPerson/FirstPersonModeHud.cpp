@@ -885,7 +885,7 @@ void FirstPersonMode::fillHandLine(Text *nameText, Text *ammoText, BattleUnit *u
 	int tagColor = -1;
 	const std::string ammo = ammoLabel(unit, item, mode, loaded, &tagColor);
 	const int nameRoom = PanelLineW - (ammo.empty() ? 0 : smallTextWidth(ammo) + gap);
-	const std::string name = fitText(handLetter(unit, item) + std::string(_state->tr(item->getRules()->getName())), nameRoom);
+	const std::string name = fitText(handLetter(unit, item) + itemLabel(item), nameRoom);
 	if (nameText->getText() != name) nameText->setText(name);
 	if (ammoText->getText() != ammo) ammoText->setText(ammo);
 	ammoText->setX(nameText->getX() + smallTextWidth(name) + gap);
@@ -1203,7 +1203,7 @@ std::string FirstPersonMode::weaponLabel(BattleUnit *unit, int *tagColor, int le
 		ammo = ammo.substr(0, spareClips);
 		nameRoom = CardW - 8 - lessRoom - smallTextWidth(" " + ammo);
 	}
-	const std::string name = fitText(handLetter(unit, weapon) + std::string(_state->tr(weapon->getRules()->getName())), nameRoom);
+	const std::string name = fitText(handLetter(unit, weapon) + itemLabel(weapon), nameRoom);
 	return ammo.empty() ? name : name + " " + ammo;
 }
 

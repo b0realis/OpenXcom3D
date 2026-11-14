@@ -831,7 +831,8 @@ void FirstPersonMode::drawWeaponPlate(bool left, double bob[2], double kick, dou
  * (its inventory picture given volume): in the bottom corner with its lower half below the
  * edge of the screen (so no hand needs drawing), turned so its depth shows (HeldItemYaw,
  * HeldItemPitch, HeldItemRoll), and shaded face by face like the weapon. A picture that gave no
- * voxels is drawn flat instead, three times as big.
+ * voxels is drawn flat instead, three times as big. A body is drawn bigger and higher (HeldBodyScale,
+ * HeldBodyLift).
  * @param left Held in the left hand: drawn bottom left, clear of the info panel.
  * @param bob The step bob, in canvas pixels (sideways, down).
  * @param dip How far it's dipped down for a change of item, in canvas pixels.
@@ -848,12 +849,16 @@ void FirstPersonMode::drawHeldItem(bool left, double bob[2], double dip, int sha
 		const int width = _weaponInHand->getWidth(), height = _weaponInHand->getHeight();
 		const double boxWidth = shape.boxMax[0] - shape.boxMin[0] + 1.0, boxHeight = shape.boxMax[1] - shape.boxMin[1] + 1.0;
 		const double canvasScale = height / 200.0;
-		const double scale = HeldItemScale * canvasScale * std::max(1.0, HeldItemMinPixels / std::max(boxWidth, boxHeight));
+		// A body (a corpse, someone unconscious) is carried, not held: bigger, as a grown body is
+		// next to a grenade, and lifted, as over the shoulder (a player, GitHub issue #143: "looks
+		// like a hobbit").
+		const bool body = _heldRules && _heldRules->getBattleType() == BT_CORPSE;
+		const double scale = HeldItemScale * canvasScale * std::max(1.0, HeldItemMinPixels / std::max(boxWidth, boxHeight)) * (body ? HeldBodyScale : 1.0);
 
 		// Where the middle of its box goes on the canvas: in the corner (the left hand's clear of
 		// the info panel), on the bottom edge, so the lower half is out of sight.
 		const double middleX = (left ? PanelW + 10 + boxWidth * scale / 2.0 : width - boxWidth * scale / 2.0 - 12.0 * canvasScale) + bob[0] * canvasScale;
-		const double middleY = height + (bob[1] + dip) * canvasScale;
+		const double middleY = height - (body ? boxHeight * scale * HeldBodyLift : 0.0) + (bob[1] + dip) * canvasScale;
 
 		// That point in camera space, one unit ahead of the eye (through the weapon's lens), and
 		// the camera-space length of one picture pixel there.
@@ -893,7 +898,7 @@ void FirstPersonMode::drawHeldItem(bool left, double bob[2], double dip, int sha
 	}
 
 	// The flat picture: where its top left corner goes on the canvas.
-	const int scale = 3, width = _weaponInHand->getWidth(), height = _weaponInHand->getHeight();
+	const int scale = _heldRules && _heldRules->getBattleType() == BT_CORPSE ? 5 : 3, width = _weaponInHand->getWidth(), height = _weaponInHand->getHeight(); // (a body bigger, as above)
 	const int spriteWidth = _heldSprite->getWidth(), spriteHeight = _heldSprite->getHeight();
 	const int itemX = (left ? PanelW + 10 : width - spriteWidth * scale - 12) + (int)bob[0]; // the left hand's clear of the info panel
 	const int itemY = height - spriteHeight * scale * 6 / 10 + (int)(bob[1] + dip);

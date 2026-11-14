@@ -35243,10 +35243,10 @@ index 000000000..cc890a1c5
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..acca1fef3
+index 000000000..c1d6f175a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1384 @@
+@@ -0,0 +1,1386 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -36045,6 +36045,8 @@ index 000000000..acca1fef3
 +	int handOf(BattleUnit *unit, const BattleItem *weapon) const;
 +	/// The hand's letter on the panel: "R: ", "L: ", or "S: " for the built-in (special) weapon.
 +	std::string handLetter(BattleUnit *unit, const BattleItem *item) const;
++	/// An item's name on the HUD (someone unconscious by their own name).
++	std::string itemLabel(const BattleItem *item) const;
 +	/// Leaning: the side a shot starts from, by where the eye is in the tile (setting "Lean shots", or leaning out).
 +	BattleActionOrigin leanSide(const BattleUnit *unit, const Position &targetTile) const;
 +	/// Melee at a body lying in front or at the feet (setting "Melee hits walls and the downed").
@@ -37558,7 +37560,7 @@ index 000000000..299e3528f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..34f1ba2ed
+index 000000000..0a35e2670
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
 @@ -0,0 +1,2743 @@
@@ -38449,7 +38451,7 @@ index 000000000..34f1ba2ed
 +	int tagColor = -1;
 +	const std::string ammo = ammoLabel(unit, item, mode, loaded, &tagColor);
 +	const int nameRoom = PanelLineW - (ammo.empty() ? 0 : smallTextWidth(ammo) + gap);
-+	const std::string name = fitText(handLetter(unit, item) + std::string(_state->tr(item->getRules()->getName())), nameRoom);
++	const std::string name = fitText(handLetter(unit, item) + itemLabel(item), nameRoom);
 +	if (nameText->getText() != name) nameText->setText(name);
 +	if (ammoText->getText() != ammo) ammoText->setText(ammo);
 +	ammoText->setX(nameText->getX() + smallTextWidth(name) + gap);
@@ -38767,7 +38769,7 @@ index 000000000..34f1ba2ed
 +		ammo = ammo.substr(0, spareClips);
 +		nameRoom = CardW - 8 - lessRoom - smallTextWidth(" " + ammo);
 +	}
-+	const std::string name = fitText(handLetter(unit, weapon) + std::string(_state->tr(weapon->getRules()->getName())), nameRoom);
++	const std::string name = fitText(handLetter(unit, weapon) + itemLabel(weapon), nameRoom);
 +	return ammo.empty() ? name : name + " " + ammo;
 +}
 +
@@ -42682,10 +42684,10 @@ index 000000000..ae2ea6125
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..4e3f5e38b
+index 000000000..70d92c2c2
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,520 @@
+@@ -0,0 +1,523 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -42945,6 +42947,9 @@ index 000000000..4e3f5e38b
 +/// across shown as big as that, and turned so its depth shows (degrees, for the right hand; the
 +/// left mirrors it): towards the screen's centre, its top tipped back, leaning in.
 +const double HeldItemScale = 2.6, HeldItemMinPixels = 20.0, HeldItemYaw = 22.0, HeldItemPitch = -14.0, HeldItemRoll = -10.0;
++/// A body carried (a corpse, someone unconscious): this many times an item's size, and its middle this
++/// share of its height above the screen's bottom edge (an item's is on the edge): over the shoulder.
++const double HeldBodyScale = 1.4, HeldBodyLift = 0.15;
 +/// A weapon shorter than the rifle (whose picture is about RiflePixels long) comes out smaller:
 +/// by its length to the power SizeCurve (a pistol, half a rifle's picture, at 70%), shrunk about
 +/// a point GripAt of the way from the muzzle towards the stock end (so it still points at the
@@ -43208,10 +43213,10 @@ index 000000000..4e3f5e38b
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..ff6efb91e
+index 000000000..4649cf471
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,5370 @@
+@@ -0,0 +1,5387 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -43573,6 +43578,23 @@ index 000000000..ff6efb91e
 +	const int active = activeHand(unit);
 +	if (weapon && weapon == emptyHandWeapon(unit) && (active == 0 || active == 1) && handWeapon(unit, active) == weapon) return active;
 +	return unit->getLeftHandWeapon() ? 0 : 1;
++}
++
++/**
++ * An item's name on the HUD: its own, or for someone unconscious their name, as the game's
++ * inventory names them (a player, GitHub issue #143: a living captive carried read as the corpse
++ * item's name, "dead").
++ * @param item The item.
++ * @return The name, translated.
++ */
++std::string FirstPersonMode::itemLabel(const BattleItem *item) const
++{
++	const BattleUnit *body = item->getUnit();
++	if (body && body->getStatus() == STATUS_UNCONSCIOUS)
++	{
++		return body->getName(_game->getLanguage());
++	}
++	return std::string(_state->tr(item->getRules()->getName()));
 +}
 +
 +/**
@@ -49751,10 +49773,10 @@ index 000000000..7740fb7f7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeWeaponInHand.cpp b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
 new file mode 100644
-index 000000000..866bc53f0
+index 000000000..b00523e44
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
-@@ -0,0 +1,1141 @@
+@@ -0,0 +1,1146 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -50588,7 +50610,8 @@ index 000000000..866bc53f0
 + * (its inventory picture given volume): in the bottom corner with its lower half below the
 + * edge of the screen (so no hand needs drawing), turned so its depth shows (HeldItemYaw,
 + * HeldItemPitch, HeldItemRoll), and shaded face by face like the weapon. A picture that gave no
-+ * voxels is drawn flat instead, three times as big.
++ * voxels is drawn flat instead, three times as big. A body is drawn bigger and higher (HeldBodyScale,
++ * HeldBodyLift).
 + * @param left Held in the left hand: drawn bottom left, clear of the info panel.
 + * @param bob The step bob, in canvas pixels (sideways, down).
 + * @param dip How far it's dipped down for a change of item, in canvas pixels.
@@ -50605,12 +50628,16 @@ index 000000000..866bc53f0
 +		const int width = _weaponInHand->getWidth(), height = _weaponInHand->getHeight();
 +		const double boxWidth = shape.boxMax[0] - shape.boxMin[0] + 1.0, boxHeight = shape.boxMax[1] - shape.boxMin[1] + 1.0;
 +		const double canvasScale = height / 200.0;
-+		const double scale = HeldItemScale * canvasScale * std::max(1.0, HeldItemMinPixels / std::max(boxWidth, boxHeight));
++		// A body (a corpse, someone unconscious) is carried, not held: bigger, as a grown body is
++		// next to a grenade, and lifted, as over the shoulder (a player, GitHub issue #143: "looks
++		// like a hobbit").
++		const bool body = _heldRules && _heldRules->getBattleType() == BT_CORPSE;
++		const double scale = HeldItemScale * canvasScale * std::max(1.0, HeldItemMinPixels / std::max(boxWidth, boxHeight)) * (body ? HeldBodyScale : 1.0);
 +
 +		// Where the middle of its box goes on the canvas: in the corner (the left hand's clear of
 +		// the info panel), on the bottom edge, so the lower half is out of sight.
 +		const double middleX = (left ? PanelW + 10 + boxWidth * scale / 2.0 : width - boxWidth * scale / 2.0 - 12.0 * canvasScale) + bob[0] * canvasScale;
-+		const double middleY = height + (bob[1] + dip) * canvasScale;
++		const double middleY = height - (body ? boxHeight * scale * HeldBodyLift : 0.0) + (bob[1] + dip) * canvasScale;
 +
 +		// That point in camera space, one unit ahead of the eye (through the weapon's lens), and
 +		// the camera-space length of one picture pixel there.
@@ -50650,7 +50677,7 @@ index 000000000..866bc53f0
 +	}
 +
 +	// The flat picture: where its top left corner goes on the canvas.
-+	const int scale = 3, width = _weaponInHand->getWidth(), height = _weaponInHand->getHeight();
++	const int scale = _heldRules && _heldRules->getBattleType() == BT_CORPSE ? 5 : 3, width = _weaponInHand->getWidth(), height = _weaponInHand->getHeight(); // (a body bigger, as above)
 +	const int spriteWidth = _heldSprite->getWidth(), spriteHeight = _heldSprite->getHeight();
 +	const int itemX = (left ? PanelW + 10 : width - spriteWidth * scale - 12) + (int)bob[0]; // the left hand's clear of the info panel
 +	const int itemY = height - spriteHeight * scale * 6 / 10 + (int)(bob[1] + dip);
