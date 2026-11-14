@@ -1109,7 +1109,7 @@ uint exposedAt(uvec4 info, ivec3 voxel)
 	return info.w == 0u ? 0u : texelFetch(uModelExposed, int(info.w) * 6144 + (voxel.z * 16 + voxel.y) * 16 + voxel.x).r;
 }
 
-uint voxelColorAt(ivec3 world, bool nextFrame, int onlyPart)
+uint voxelColorAt(ivec3 world, bool nextFrame, int onlyPart, bool noWaysThrough)
 {
 	if (world.x < 0 || world.y < 0 || world.z < 0 || world.x >= uSize.x * 16 || world.y >= uSize.y * 16 || world.z >= uSize.z * 24) return 0u;
 	int tile = ((world.z / 24) * uSize.y + world.y / 16) * uSize.x + world.x / 16;
@@ -1120,6 +1120,7 @@ uint voxelColorAt(ivec3 world, bool nextFrame, int onlyPart)
 	{
 		if (onlyPart >= 0 && part != onlyPart) continue;
 		uint model = nextFrame && nextParts[part] != 0u ? nextParts[part] : parts[part];
+		if (model != 0u && noWaysThrough && (texelFetch(uModelInfo, int(model)).x & 16u) != 0u) continue; // (a door, a curtain: VoxelModel::wayThrough)
 		uint color = model != 0u ? modelColor(model, ivec3(world.x % 16, world.y % 16, world.z % 24)) : 0u;
 		if (color != 0u) return color;
 	}
@@ -1197,7 +1198,7 @@ uint mirroredColor(Hit hit, int hitTile, int axis, bool skinOnly, bool nextFrame
 		sourceVoxel[axis] = bestPos;
 		sourceVoxel[1 - axis] = lo[1 - axis] + rowAcross;
 		sourceVoxel.z = lo.z + rowUp;
-		uint color = voxelColorAt(sourceVoxel, nextFrame, onSkin ? -1 : hit.part);
+		uint color = voxelColorAt(sourceVoxel, nextFrame, onSkin ? -1 : hit.part, true);
 		if (color != 0u && table(BlackRow, color) == 0u) return color;
 	}
 	return 0u;

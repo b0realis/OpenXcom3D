@@ -247,6 +247,7 @@ void clearModel(FirstPersonView::VoxelModel &model)
 	model.empty = true;
 	model.ghostly = false;
 	model.solidGhost = false;
+	model.wayThrough = false;
 	model.water = false;
 	model.liquidHeight = 0;
 	model.artFill = false;
@@ -2018,9 +2019,10 @@ void FirstPersonView::findMirrors()
  * @param worldZ Voxel height, from the bottom of the map (24 per level).
  * @param nextFrame Read an animated part's next frame instead (a pixel already dissolved into it).
  * @param onlyPart Only this tile part counts (0 floor, 1 west wall, 2 north wall, 3 object); -1 any.
+ * @param noWaysThrough A wall one goes through (a door, a curtain: VoxelModel::wayThrough) doesn't count.
  * @return The palette colour, 0 if nothing is there or the voxel is outside the map.
  */
-Uint8 FirstPersonView::voxelColorAt(int worldX, int worldY, int worldZ, bool nextFrame, int onlyPart) const
+Uint8 FirstPersonView::voxelColorAt(int worldX, int worldY, int worldZ, bool nextFrame, int onlyPart, bool noWaysThrough) const
 {
 	const int mapSizeX = _save->getMapSizeX(), mapSizeY = _save->getMapSizeY(), mapSizeZ = _save->getMapSizeZ();
 	if (worldX < 0 || worldY < 0 || worldZ < 0 || worldX >= mapSizeX * 16 || worldY >= mapSizeY * 16 || worldZ >= mapSizeZ * 24) return 0;
@@ -2031,6 +2033,7 @@ Uint8 FirstPersonView::voxelColorAt(int worldX, int worldY, int worldZ, bool nex
 	{
 		if (onlyPart >= 0 && part != onlyPart) continue;
 		const VoxelModel *model = nextFrame && tileView.next[part] ? tileView.next[part] : tileView.part[part];
+		if (model && noWaysThrough && model->wayThrough) continue;
 		const Uint8 color = model ? model->color[worldZ % 24][worldY % 16][worldX % 16] : 0;
 		if (color) return color;
 	}
@@ -2131,7 +2134,9 @@ Uint8 FirstPersonView::mirroredColor(const Hit &hit, int axis, bool skinOnly, bo
 		sourceVoxel[axis] = bestPos;
 		sourceVoxel[1 - axis] = mirror.lo[1 - axis] + rowAcross;
 		sourceVoxel[2] = mirror.lo[2] + rowUp;
-		const Uint8 color = voxelColorAt(sourceVoxel[0], sourceVoxel[1], sourceVoxel[2], nextFrame, onSkin ? -1 : hit.part); // (0 if it has been blown away since)
+		// (Never a door's or a curtain's look, a wall one goes through: a player, GitHub issue #147, XPiratez's
+		// temple, mirrored as a craft is, wore its curtain's red on the solid wall opposite, "OH A DOOR!!!....wait".)
+		const Uint8 color = voxelColorAt(sourceVoxel[0], sourceVoxel[1], sourceVoxel[2], nextFrame, onSkin ? -1 : hit.part, true); // (0 if it has been blown away since)
 		if (color && !isBlack(color)) return color;
 	}
 	return 0;
@@ -2284,7 +2289,7 @@ void FirstPersonView::findWallPaints()
 		++buildingCount;
 	}
 
-	// What a wall part can be here: 0 kept as it is (a door, a fence, a ghost, nothing to see), 1
+	// What a wall part can be here: 0 kept as it is (a door, a wall one walks through, a fence, a ghost, nothing to see), 1
 	// repainted, 2 repainted and a donor (a plain wall: no glass, no holes in its art, from the
 	// floor to nearly the top, its shown face nearly whole), 3 a window (glass or holes in its
 	// art): its frame and glass keep theirs, the wall round them may take the paint.
@@ -2295,7 +2300,11 @@ void FirstPersonView::findWallPaints()
 		if (found != wallKinds.end()) return found->second;
 		const VoxelModel *model = getModel(data, -1, false);
 		int kind = 0;
-		if (!data->isDoor() && !data->isUFODoor() && !model->empty && !model->ghostly && !model->artFill)
+		// (A wall one walks through, a curtain, is as a door: it keeps its own and lends none. A player,
+		// GitHub issue #147: XPiratez's temple walls wore its curtains' red on their hidden faces, a way
+		// through where there is none.)
+		const bool walkedThrough = data->getTUCost(MT_WALK) < Pathfinding::INVALID_MOVE_COST;
+		if (!data->isDoor() && !data->isUFODoor() && !walkedThrough && !model->empty && !model->ghostly && !model->artFill)
 		{
 			bool seeThrough = model->openingGlass;
 			for (int z = 0; z < Position::TileZ && !seeThrough; ++z)
@@ -2717,6 +2726,8 @@ const FirstPersonView::Frames &FirstPersonView::getFrames(const MapData *mapData
 void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model, const VoxelModel *firstFrame) const
 {
 	clearModel(model);
+	model.wayThrough = (mapData->getObjectType() == O_WESTWALL || mapData->getObjectType() == O_NORTHWALL)
+		&& (mapData->isDoor() || mapData->isUFODoor() || mapData->getTUCost(MT_WALK) < Pathfinding::INVALID_MOVE_COST);
 
 	// The sprite frame to colour it from; without one it stays empty.
 	const Surface *sprite = nullptr;

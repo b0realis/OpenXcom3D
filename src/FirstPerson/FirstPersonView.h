@@ -153,6 +153,7 @@ public:
 		bool empty;
 		bool ghostly;            // a ghost of a part with no voxels (setting "Parts without shape"): seen through on some pixels, never in the way (see buildGhost, buildShape)
 		bool solidGhost;         // a ghost the view draws solid, as the map draws it (low art, as crops: see buildRelief); still never in the way
+		bool wayThrough;         // a wall one goes through: a door, or a wall the game lets one walk through (a curtain); a hidden face never borrows its look (see mirroredColor)
 		bool water;              // a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea): its top is drawn as waves (see waterColor)
 		Uint8 liquidHeight;       // a floor the art draws as a box of liquid (XPiratez's sewer sludge, see liquidHeightOf): its surface's height in voxels; 0 for none
 		bool artFill;             // a floor or wall whose voxels leave out most of its art (a catwalk's grating, a fence: see sparseArt)
@@ -766,7 +767,7 @@ private:
 	/// Setting "Wall paint": the colour a wall's face the iso art never shows takes from the side it faces (0: its own).
 	Uint8 wallPaintColor(const Hit &hit, const TileView &tileView, Uint8 ownColor) const;
 	/// The colour of whatever is solid at a world voxel this frame (0 if nothing), of any tile part or only one.
-	Uint8 voxelColorAt(int worldX, int worldY, int worldZ, bool nextFrame = false, int onlyPart = -1) const;
+	Uint8 voxelColorAt(int worldX, int worldY, int worldZ, bool nextFrame = false, int onlyPart = -1, bool noWaysThrough = false) const;
 	/// For a craft's west or north side: the colour of the side across from it.
 	Uint8 mirroredColor(const Hit &hit, int axis, bool skinOnly = false, bool nextFrame = false) const;
 
