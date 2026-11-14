@@ -1022,6 +1022,73 @@ bool artLiesFlat(const Surface *sprite, int yOffset)
 	return drawn && rising * 4 <= drawn;
 }
 
+/**
+ * Tells whether an object without voxels is a body the art draws and the game lets no one walk
+ * through (a console, a rack of machines: the owner on GitHub issue #150, "make an object from the
+ * art"): not walkable, no lift, no door, and its art big, at least ArtBodyMinPixels drawn.
+ * @param mapData The object's record.
+ * @param sprite Its sprite frame.
+ * @return True if it is built as a body from its art (see buildArtBody).
+ */
+bool artBody(const MapData *mapData, const Surface *sprite)
+{
+	if (mapData->getObjectType() != O_OBJECT || mapData->isGravLift() || mapData->isDoor() || mapData->isUFODoor()
+		|| mapData->getTUCost(MT_WALK) < Pathfinding::INVALID_MOVE_COST)
+	{
+		return false;
+	}
+	int drawn = 0;
+	for (int spriteY = 0; spriteY < sprite->getHeight(); ++spriteY)
+		for (int spriteX = 0; spriteX < sprite->getWidth(); ++spriteX) drawn += sprite->getPixel(spriteX, spriteY) != 0;
+	return drawn >= ArtBodyMinPixels;
+}
+
+/**
+ * Builds an object without voxels as a body from its art (see artBody): every voxel of the tile
+ * whose pixel the art draws (the projection buildModel uses), up to the height the art reaches (its
+ * topmost drawn row, taken as the top's far corner, as a box's is), in that pixel's colour. From
+ * where the map looks its outline and picture are the art's exactly; from elsewhere it is the
+ * biggest body that looks so. A ghost the view draws solid (VoxelModel::solidGhost): the game's
+ * shots and sight go through it, as the game gives it no voxels.
+ * @param model The empty model to build it in.
+ * @param sprite The object's sprite frame.
+ * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
+ */
+void buildArtBody(FirstPersonView::VoxelModel &model, const Surface *sprite, int yOffset)
+{
+	const int width = sprite->getWidth(), height = sprite->getHeight();
+	int topRow = -1;
+	for (int spriteY = 0; spriteY < height && topRow < 0; ++spriteY)
+		for (int spriteX = 0; spriteX < width && topRow < 0; ++spriteX)
+			if (sprite->getPixel(spriteX, spriteY)) topRow = spriteY;
+	if (topRow < 0)
+	{
+		return;
+	}
+	const int top = std::clamp(24 + yOffset - topRow, 0, Position::TileZ - 1);
+	for (int z = 0; z <= top; ++z)
+	{
+		for (int y = 0; y < Position::TileXY; ++y)
+		{
+			for (int x = 0; x < Position::TileXY; ++x)
+			{
+				const int spriteX = 16 + x - y, spriteY = 24 + (x + y) / 2 - z + yOffset;
+				const Uint8 color = spriteX >= 0 && spriteY >= 0 && spriteX < width && spriteY < height ? sprite->getPixel(spriteX, spriteY) : 0;
+				if (!color) continue;
+				model.color[z][y][x] = color;
+				model.empty = false;
+				const int voxel[3] = { x, y, z };
+				for (int axis = 0; axis < 3; ++axis)
+				{
+					model.min[axis] = std::min<int>(model.min[axis], voxel[axis]);
+					model.max[axis] = std::max<int>(model.max[axis], voxel[axis]);
+				}
+			}
+		}
+	}
+	model.ghostly = model.solidGhost = !model.empty;
+}
+
 void buildGhost(FirstPersonView::VoxelModel &model, const Surface *sprite, int partType, int yOffset)
 {
 	// The colour of a voxel's pixel; 0 (transparent) outside the sprite.
@@ -2879,8 +2946,11 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 		// (An object that lights its surroundings shows with Lifts too, as its light does: a console, a
 		// lamp without shape. A flame among them isn't built here: see partKind.)
 		const bool lit = mapData->getObjectType() == O_OBJECT && mapData->getLightSource() > 0;
+		// An object the game lets no one walk through, its art big: a body made from the art, solid, with
+		// the setting on at all (see artBody).
+		bool body = !ghostShape && !low && !block && artBody(mapData, sprite);
 		bool ghostWanted = Options::fpsGhostParts == 2
-			|| (Options::fpsGhostParts == 1 && (ghostShape || mapData->isGravLift() || cageArt(sprite, mapData->getObjectType(), yOffset) || low || block || flatFloor || lit));
+			|| (Options::fpsGhostParts == 1 && (ghostShape || mapData->isGravLift() || cageArt(sprite, mapData->getObjectType(), yOffset) || low || block || flatFloor || lit || body));
 		// A part that animates is what its first frame is, in every frame: what kind of ghost it gets is read off the
 		// art (how low it is, how like a block or a cage), and a frame whose art falls just the other side of a line
 		// (a fireplace's flames, one frame in four; a player, GitHub issue #134) lost its ghost, or stood as another kind.
@@ -2899,6 +2969,7 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 			low = firstFrame->ghostKind == 3;
 			if (low) rises = firstFrame->reliefRises;
 			flatFloor = firstFrame->ghostKind == 6;
+			body = firstFrame->ghostKind == 7;
 		}
 		if (ghostWanted && !cutout)
 		{
@@ -2918,6 +2989,11 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 				model.ghostKind = 3;
 				model.reliefRises = rises;
 				buildRelief(model, sprite, yOffset, rises);
+			}
+			else if (body)
+			{
+				model.ghostKind = 7;
+				buildArtBody(model, sprite, yOffset);
 			}
 			else
 			{

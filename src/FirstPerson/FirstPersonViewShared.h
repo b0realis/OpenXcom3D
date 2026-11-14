@@ -282,6 +282,9 @@ const int LowArtFlatLayer = 2;
 /// CropBlockVoxelShare of the block (the wheat: a floor's slab and four thin posts; GitHub issue #56), stands as a
 /// solid block of it (see cropBlockOf, buildCropBlock); knee to waist high at most, and only one walks through.
 const int CropBlockMinHeight = 4, CropBlockMaxHeight = 16;
+/// An object without voxels that no one can walk through is built as a body from its art when the art draws at
+/// least this many pixels (of a frame's 32 x 40: a console, a rack; see artBody).
+const int ArtBodyMinPixels = 500;
 const float CropBlockMatch = 0.92f, CropBlockVoxelShare = 0.5f;
 /// A mass of foliage (a big tree's crown, see foliageArt; GitHub issue #59): at least FoliageGreenShare of its art's drawn
 /// pixels green (greener than red and blue by FoliageGreenMargin), its voxels filling FoliageBulkShare of the tile or
