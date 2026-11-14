@@ -124,7 +124,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..9dc194b5f
+index 000000000..c867ba5e4
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,578 @@
@@ -486,11 +486,11 @@ index 000000000..9dc194b5f
 +  STR_FPS_ZOMBIE: "ZOMBIE"
 +  STR_FPS_SIGNAL_LOST: "SIGNAL LOST"
 +  STR_FPS_VAULT: "Jump over low obstacles"
-+  STR_FPS_VAULT_DESC: "Jump over fences, tables and crates. Only the walk costs TU."
++  STR_FPS_VAULT_DESC: "Forward + Jump takes the soldier over a fence, table or crate up to half a level high, for 30 TU."
 +  STR_FPS_NIGHT_VISION_GEAR: "Night vision needs gear"
 +  STR_FPS_NIGHT_VISION_GEAR_DESC: "Night vision only for soldiers with the gear."
 +  STR_FPS_KEY_JUMP: "Jump"
-+  STR_FPS_KEY_JUMP_DESC: "A free hop. Into a low obstacle: vaults over it."
++  STR_FPS_KEY_JUMP_DESC: "A free hop. With Forward into a low obstacle: vaults over it (30 TU; setting Jump over low obstacles)."
 +  STR_FPS_KEY_NIGHT_VISION: "Night vision on/off"
 +  STR_FPS_KEY_NIGHT_VISION_DESC: "Night vision on/off, with the gear."
 +  STR_FPS_KEY_ZOOM: "Zoom (hold)"
@@ -708,7 +708,7 @@ index 000000000..9dc194b5f
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..eabd31fe7
+index 000000000..e5d31d486
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,578 @@
@@ -1070,11 +1070,11 @@ index 000000000..eabd31fe7
 +  STR_FPS_ZOMBIE: "ZOMBIE"
 +  STR_FPS_SIGNAL_LOST: "SIGNAL LOST"
 +  STR_FPS_VAULT: "Jump over low obstacles"
-+  STR_FPS_VAULT_DESC: "Jump over fences, tables and crates. Only the walk costs TU."
++  STR_FPS_VAULT_DESC: "Forward + Jump takes the soldier over a fence, table or crate up to half a level high, for 30 TU."
 +  STR_FPS_NIGHT_VISION_GEAR: "Night vision needs gear"
 +  STR_FPS_NIGHT_VISION_GEAR_DESC: "Night vision only for soldiers with the gear."
 +  STR_FPS_KEY_JUMP: "Jump"
-+  STR_FPS_KEY_JUMP_DESC: "A free hop. Into a low obstacle: vaults over it."
++  STR_FPS_KEY_JUMP_DESC: "A free hop. With Forward into a low obstacle: vaults over it (30 TU; setting Jump over low obstacles)."
 +  STR_FPS_KEY_NIGHT_VISION: "Night vision on/off"
 +  STR_FPS_KEY_NIGHT_VISION_DESC: "Night vision on/off, with the gear."
 +  STR_FPS_KEY_ZOOM: "Zoom (hold)"
@@ -40339,10 +40339,10 @@ index 000000000..0a35e2670
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeMovement.cpp b/src/FirstPerson/FirstPersonModeMovement.cpp
 new file mode 100644
-index 000000000..ae2ea6125
+index 000000000..217574985
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeMovement.cpp
-@@ -0,0 +1,2369 @@
+@@ -0,0 +1,2381 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -41348,7 +41348,10 @@ index 000000000..ae2ea6125
 +
 +	// Pushing towards a neighbouring tile while the soldier may act: if the rules block that
 +	// step, try to vault over whatever blocks it.
-+	if ((forward != 0.0 || strafe != 0.0) && !_stepPending && canAct() && _state->playableUnitSelected())
++	// (A vault only forwards: the owner's "w(forward) + jump key", GitHub issue #124. Sideways and
++	// backwards the jump key is a hop.)
++	if (forward <= 0.0) strafe = 0.0;
++	if (forward > 0.0 && !_stepPending && canAct() && _state->playableUnitSelected())
 +	{
 +		// The push turned from the view's frame onto the map (yaw 0 is east, 90 south), then
 +		// snapped to the nearer grid axis: a vault goes straight along x or y, never diagonally.
@@ -41385,7 +41388,7 @@ index 000000000..ae2ea6125
 + * Is this tile part something low enough to jump over? It must be a wall or an object, not a
 + * door, standing on the floor (it doesn't raise the ground like stairs or a ramp), not a big
 + * wall of the kinds that act as walls on some sides only (big wall kinds 2 to 9), and no higher
-+ * than VaultMaxHeight voxels (waist high, of a level's 24).
++ * than VaultMaxHeight voxels (half a level's 24).
 + * @param part The tile part to look at (a TilePart: O_WESTWALL, O_NORTHWALL or O_OBJECT).
 + * @return True if the part is there and low enough to vault.
 + */
@@ -41411,8 +41414,9 @@ index 000000000..ae2ea6125
 + * Vaults over a low obstacle straight ahead (setting "Jump over low obstacles"; only units one
 + * tile big): over a low wall onto the next tile, or over something low standing on the next
 + * tile onto the one beyond it (with any low walls on the way). The step is walked by the rules,
-+ * with the pathfinding told to let exactly those obstacles through: the jump itself is free, and
-+ * the walk costs its normal time units (as if the obstacles weren't there). Meanwhile the camera
++ * with the pathfinding told to let exactly those obstacles through; the vault costs VaultTimeUnits
++ * in all (the owner, GitHub issue #124: 30 TU), the walk's normal time units among them (more only
++ * if the walk itself costs more). Meanwhile the camera
 + * glides over the obstacle in a high arc (see glideOverObstacle and currentJumpHeight).
 + * @param stepX The direction along x (east is positive): -1, 0 or 1.
 + * @param stepY The direction along y (south is positive): -1, 0 or 1.
@@ -41490,7 +41494,7 @@ index 000000000..ae2ea6125
 +	// the walk when it runs out (see updateCamera). The debug "doom mode" skips this.
 +	if (canVault && !doomModeOn())
 +	{
-+		const int timeUnitCost = pathfinding->getTotalTUCost();
++		const int timeUnitCost = std::max(VaultTimeUnits, pathfinding->getTotalTUCost());
 +		canVault = unit->getTimeUnits() >= timeUnitCost && reserveAllows(unit, timeUnitCost, 0);
 +		if (!canVault)
 +		{
@@ -41504,6 +41508,14 @@ index 000000000..ae2ea6125
 +		pathfinding->abortPath();
 +		pathfinding->setVault(nullptr, {});
 +		return false;
++	}
++
++	// The jump's own cost: what VaultTimeUnits is more than the walk, which the walking state
++	// charges as it goes (none in the debug "doom mode").
++	if (!doomModeOn())
++	{
++		const int jumpCost = VaultTimeUnits - pathfinding->getTotalTUCost();
++		if (jumpCost > 0) unit->spendTimeUnits(jumpCost);
 +	}
 +
 +	// Hand the walk to the game's walking state, as commitStep does; the camera's tile is the
@@ -42714,10 +42726,10 @@ index 000000000..ae2ea6125
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..c866d0188
+index 000000000..9b0147679
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,528 @@
+@@ -0,0 +1,531 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -43091,7 +43103,10 @@ index 000000000..c866d0188
 +const double JumpHeight = 6.0, VaultHeight = 9.0;
 +const Uint32 JumpTime = 520;
 +/// The highest obstacle a soldier can jump over, in voxels: waist high (a soldier is about 22).
-+const int VaultMaxHeight = 14;
++const int VaultMaxHeight = 12;
++/// What a vault costs in time units, the walk over included (the owner, on GitHub issue #124: "30 TU"); more only if the
++/// walk itself costs more.
++const int VaultTimeUnits = 30;
 +
 +// ---- Fighting ----
 +

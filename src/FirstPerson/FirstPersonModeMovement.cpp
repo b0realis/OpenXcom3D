@@ -1003,7 +1003,10 @@ void FirstPersonMode::jump(BattleUnit *unit)
 
 	// Pushing towards a neighbouring tile while the soldier may act: if the rules block that
 	// step, try to vault over whatever blocks it.
-	if ((forward != 0.0 || strafe != 0.0) && !_stepPending && canAct() && _state->playableUnitSelected())
+	// (A vault only forwards: the owner's "w(forward) + jump key", GitHub issue #124. Sideways and
+	// backwards the jump key is a hop.)
+	if (forward <= 0.0) strafe = 0.0;
+	if (forward > 0.0 && !_stepPending && canAct() && _state->playableUnitSelected())
 	{
 		// The push turned from the view's frame onto the map (yaw 0 is east, 90 south), then
 		// snapped to the nearer grid axis: a vault goes straight along x or y, never diagonally.
@@ -1040,7 +1043,7 @@ void FirstPersonMode::jump(BattleUnit *unit)
  * Is this tile part something low enough to jump over? It must be a wall or an object, not a
  * door, standing on the floor (it doesn't raise the ground like stairs or a ramp), not a big
  * wall of the kinds that act as walls on some sides only (big wall kinds 2 to 9), and no higher
- * than VaultMaxHeight voxels (waist high, of a level's 24).
+ * than VaultMaxHeight voxels (half a level's 24).
  * @param part The tile part to look at (a TilePart: O_WESTWALL, O_NORTHWALL or O_OBJECT).
  * @return True if the part is there and low enough to vault.
  */
@@ -1066,8 +1069,9 @@ bool FirstPersonMode::isLowObstacle(const Tile *tile, int part) const
  * Vaults over a low obstacle straight ahead (setting "Jump over low obstacles"; only units one
  * tile big): over a low wall onto the next tile, or over something low standing on the next
  * tile onto the one beyond it (with any low walls on the way). The step is walked by the rules,
- * with the pathfinding told to let exactly those obstacles through: the jump itself is free, and
- * the walk costs its normal time units (as if the obstacles weren't there). Meanwhile the camera
+ * with the pathfinding told to let exactly those obstacles through; the vault costs VaultTimeUnits
+ * in all (the owner, GitHub issue #124: 30 TU), the walk's normal time units among them (more only
+ * if the walk itself costs more). Meanwhile the camera
  * glides over the obstacle in a high arc (see glideOverObstacle and currentJumpHeight).
  * @param stepX The direction along x (east is positive): -1, 0 or 1.
  * @param stepY The direction along y (south is positive): -1, 0 or 1.
@@ -1145,7 +1149,7 @@ bool FirstPersonMode::tryVault(BattleUnit *unit, int stepX, int stepY)
 	// the walk when it runs out (see updateCamera). The debug "doom mode" skips this.
 	if (canVault && !doomModeOn())
 	{
-		const int timeUnitCost = pathfinding->getTotalTUCost();
+		const int timeUnitCost = std::max(VaultTimeUnits, pathfinding->getTotalTUCost());
 		canVault = unit->getTimeUnits() >= timeUnitCost && reserveAllows(unit, timeUnitCost, 0);
 		if (!canVault)
 		{
@@ -1159,6 +1163,14 @@ bool FirstPersonMode::tryVault(BattleUnit *unit, int stepX, int stepY)
 		pathfinding->abortPath();
 		pathfinding->setVault(nullptr, {});
 		return false;
+	}
+
+	// The jump's own cost: what VaultTimeUnits is more than the walk, which the walking state
+	// charges as it goes (none in the debug "doom mode").
+	if (!doomModeOn())
+	{
+		const int jumpCost = VaultTimeUnits - pathfinding->getTotalTUCost();
+		if (jumpCost > 0) unit->spendTimeUnits(jumpCost);
 	}
 
 	// Hand the walk to the game's walking state, as commitStep does; the camera's tile is the
