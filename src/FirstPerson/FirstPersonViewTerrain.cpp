@@ -1000,6 +1000,28 @@ bool cageArt(const Surface *sprite, int partType, int yOffset)
  * @param partType Which part of a tile it is (O_FLOOR, O_WESTWALL, O_NORTHWALL, O_OBJECT).
  * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
  */
+/**
+ * Tells whether art lies on the floor as buildGhost reads it: no more than a quarter of its drawn
+ * pixels well above the floor's diamond (more than two rows above its top corner).
+ * @param sprite The part's sprite frame.
+ * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
+ * @return True if it lies flat (and something of it is drawn).
+ */
+bool artLiesFlat(const Surface *sprite, int yOffset)
+{
+	int drawn = 0, rising = 0;
+	for (int spriteY = 0; spriteY < sprite->getHeight(); ++spriteY)
+	{
+		for (int spriteX = 0; spriteX < sprite->getWidth(); ++spriteX)
+		{
+			if (!sprite->getPixel(spriteX, spriteY)) continue;
+			++drawn;
+			if (spriteY < 22 + yOffset) ++rising;
+		}
+	}
+	return drawn && rising * 4 <= drawn;
+}
+
 void buildGhost(FirstPersonView::VoxelModel &model, const Surface *sprite, int partType, int yOffset)
 {
 	// The colour of a voxel's pixel; 0 (transparent) outside the sprite.
@@ -2826,8 +2848,14 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 		bool rises = false;
 		bool low = mapData->getObjectType() == O_OBJECT && lowArt(sprite, yOffset, rises);
 		int block = cutout ? 0 : cropBlockOf(nullptr, mapData, sprite, yOffset);
+		// A floor without shape lying flat that is no lift's pad (a pool's water in XPiratez: no voxels,
+		// no floor to stand on): the map draws it whole, so it fills its tile here too, solid, with
+		// the setting on at all (a player, GitHub issue #142: half its pixels showed, "loose tiles of
+		// water"; with lifts and ladders only, nothing of it, a pit). A lift's pad stays see-through:
+		// who is above or below it is a threat to watch.
+		bool flatFloor = mapData->getObjectType() == O_FLOOR && !mapData->isGravLift() && !ghostShape && !cageArt(sprite, O_FLOOR, yOffset) && artLiesFlat(sprite, yOffset);
 		bool ghostWanted = Options::fpsGhostParts == 2
-			|| (Options::fpsGhostParts == 1 && (ghostShape || mapData->isGravLift() || cageArt(sprite, mapData->getObjectType(), yOffset) || low || block));
+			|| (Options::fpsGhostParts == 1 && (ghostShape || mapData->isGravLift() || cageArt(sprite, mapData->getObjectType(), yOffset) || low || block || flatFloor));
 		// A part that animates is what its first frame is, in every frame: what kind of ghost it gets is read off the
 		// art (how low it is, how like a block or a cage), and a frame whose art falls just the other side of a line
 		// (a fireplace's flames, one frame in four; a player, GitHub issue #134) lost its ghost, or stood as another kind.
@@ -2845,6 +2873,7 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 			block = firstFrame->ghostKind == 2 ? std::max<int>(1, block ? block : firstFrame->cropBlock) : 0;
 			low = firstFrame->ghostKind == 3;
 			if (low) rises = firstFrame->reliefRises;
+			flatFloor = firstFrame->ghostKind == 6;
 		}
 		if (ghostWanted && !cutout)
 		{
@@ -2867,8 +2896,9 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 			}
 			else
 			{
-				model.ghostKind = 4;
+				model.ghostKind = flatFloor ? 6 : 4;
 				buildGhost(model, sprite, mapData->getObjectType(), yOffset);
+				if (flatFloor) model.solidGhost = !model.empty;
 			}
 			if (!model.empty) colorHiddenSides(model, sprite);
 		}

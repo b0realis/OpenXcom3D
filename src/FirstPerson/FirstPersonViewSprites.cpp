@@ -280,24 +280,34 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 				_pointerPiles[pilePatchY][pilePatchX] = draw.pile;
 			}
 		}
-		if (pixelOpacity < SeeThroughLevels)
+		// Smoke builds up on a pixel to its cap and no further (settings "Smoke opacity" and
+		// "Night smoke opacity", a maximum); smoke with a cap is laid over what's there even where
+		// it is opaque (the settings at 100), so a unit the soldier sees stays clear under it.
+		const int smokeCap = seeThroughSprite ? seeThroughSprite->capLevels : 0;
+		if (pixelOpacity < SeeThroughLevels || smokeCap > 0)
 		{
 			Uint8 &veilLeft = _unitVeil[index];
 			pixelOpacity = std::min(pixelOpacity, (int)veilLeft);
-			// Smoke builds up on a pixel to its cap and no further (settings "Smoke opacity" and
-			// "Night smoke opacity", a maximum).
-			const int smokeCap = seeThroughSprite ? seeThroughSprite->capLevels : 0;
 			if (smokeCap > 0) pixelOpacity = std::min(pixelOpacity, smokeCap - (int)_smokeVeil[index]);
 			if (pixelOpacity <= 0) return;
 			if (veilLeft != 255) veilLeft -= pixelOpacity;
-			if (smokeCap > 0) _smokeVeil[index] += (Uint8)pixelOpacity;
+			// How much of what's there this layer takes: of what the smoke before it left showing, so
+			// that layers add up to exactly what they veil together (at the cap, the setting's share;
+			// with the setting at 100, nothing shows through).
+			int mixLevel = pixelOpacity;
+			if (smokeCap > 0)
+			{
+				const int showing = SeeThroughLevels - (int)_smokeVeil[index];
+				mixLevel = (pixelOpacity * SeeThroughLevels + showing / 2) / showing;
+				_smokeVeil[index] += (Uint8)pixelOpacity;
+			}
 			Uint8 *pixel = getRaw(pixelX, pixelY);
 			// A faint picture that keeps its colours under futuristic night vision (a body or a pile
 			// pointed past, setting "See-through corpses"; a player, GitHub issue #136: it went green
 			// with the world): mixed over the world in the night vision's colours, and left alone by
 			// the wash after (see washBands).
 			if (ownOverNight && !_ownColours[index] && *pixel) *pixel = nightGroup | (*pixel & 15);
-			*pixel = seeThrough(pixelOpacity, shadeColor(color, shade), *pixel);
+			*pixel = seeThrough(mixLevel, shadeColor(color, shade), *pixel);
 			if (pixelOpacity > SeeThroughLevels / 2)
 			{
 				_glowMask[index] = 0;
@@ -2791,13 +2801,26 @@ const FirstPersonView::SoftSmoke &FirstPersonView::softSmokeBlend(const Surface 
  * room by day; see SmokeNightFromShade). Only the smoke the soldier sees through: where their
  * sight runs out it stays solid.
  * @param shade The game's shade where the smoke hangs, 0 brightest .. 15 darkest.
- * @return The opacity, 0.05 .. 0.95.
+ * @return The opacity, 0 (none drawn) .. 1 (nothing seen through it).
  */
 float FirstPersonView::smokeOpacityAt(int shade) const
 {
 	const float darkness = std::max(_colors.night, std::clamp((shade - SmokeNightFromShade) / (SmokeNightToShade - SmokeNightFromShade), 0.0f, 1.0f));
-	const float day = std::clamp(Options::fpsSmokeOpacity, 5, 95) / 100.0f, night = std::clamp(Options::fpsNightSmokeOpacity, 5, 95) / 100.0f;
+	const float day = std::clamp(Options::fpsSmokeOpacity, 0, 100) / 100.0f, night = std::clamp(Options::fpsNightSmokeOpacity, 0, 100) / 100.0f;
 	return day + (night - day) * darkness;
+}
+
+/**
+ * The most see-through smoke may veil a pixel where it hangs, for these eyes (see smokeOpacityAt,
+ * setSmokeSight), in whole see-through steps as it is drawn: none with the setting at 0 (the
+ * smoke isn't drawn), else at least one step, SeeThroughLevels with the setting at 100 (opaque).
+ * @param shade The game's shade where the smoke hangs, 0 brightest .. 15 darkest.
+ * @return The cap, 0 .. 1 in steps of 1 / SeeThroughLevels.
+ */
+float FirstPersonView::smokeCapAt(int shade) const
+{
+	const float most = _smokeSeen * smokeOpacityAt(shade);
+	return most <= 0.0f ? 0.0f : std::max(1, (int)std::lround(most * SeeThroughLevels)) / (float)SeeThroughLevels;
 }
 
 void FirstPersonView::setSmokeSight(float sightVoxels, int throughSmoke, int throughFire)
@@ -2897,8 +2920,18 @@ void FirstPersonView::drawSeeThroughSmoke()
 		// sight rules do; see smokeOpacityAt, _smokeVeil). Original: the game's dots as they are,
 		// solid, one frame a tile, as the map draws them (the owner: "exactly as the map"; their
 		// holes are the see-through). Both thinner for eyes with heat vision (see setSmokeSight).
-		const float cap = original ? 0.0f : _smokeSeen * smokeOpacityAt(_tileViews[tileIndex].light);
-		const float opacity = original ? _smokeSeen : cap * std::clamp(0.45f + tile->getSmoke() * 0.025f, 0.0f, 0.85f) / 0.85f;
+		// Both follow the settings since GitHub issue #145 (the owner: "almost translucent at 5%",
+		// "completely opaque at 100%", 0 none): Original's dots as see-through as the setting says,
+		// at 100 solid as on the map (drawn as before, no cap needed); Modern's thinner smoke as
+		// opaque as the thickest at 100, a grey nothing is seen through.
+		const float most = smokeCapAt(_tileViews[tileIndex].light);
+		if (most <= 0.0f)
+		{
+			continue;
+		}
+		const bool opaque = most >= 1.0f;
+		const float cap = original && opaque ? 0.0f : most;
+		const float opacity = original || opaque ? most : most * std::clamp(0.45f + tile->getSmoke() * 0.025f, 0.0f, 0.85f) / 0.85f;
 		const int firstFrame = firstSmokeFrame(tile->getSmoke());
 		const double frameTime = seconds / FrameSeconds + tile->getAnimationOffset() + variation[2], scale = 1.14 + variation[3] * 0.12;
 		addPuff(world, 32, firstFrame, frameTime, opacity, cap, scale, _tileViews[tileIndex].light);
@@ -2915,7 +2948,11 @@ void FirstPersonView::drawSeeThroughSmoke()
 		const float fade = std::min(std::clamp(age / 0.25f, 0.0f, 1.0f), std::clamp((1.0f - age) / 0.5f, 0.0f, 1.0f));
 		const double world[3] = { particle.pos[0], particle.pos[1], particle.pos[2] };
 		const int shade = (int)std::lround(std::clamp(lightAt(particle.pos[0], particle.pos[1], particle.pos[2]), 0.0f, 15.0f));
-		const float cap = _smokeSeen * smokeOpacityAt(shade);
+		const float cap = smokeCapAt(shade);
+		if (cap <= 0.0f)
+		{
+			continue;
+		}
 		addPuff(world, 20, firstSmokeFrame(1), seconds / (FrameSeconds * 1.5) + particle.size, cap * (0.45f / 0.85f) * fade * fade * (3.0f - 2.0f * fade),
 			cap, 0.35 + 0.4 * age, shade);
 	}

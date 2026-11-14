@@ -159,7 +159,7 @@ public:
 		bool openingGlass;        // glass filled into an opening of the game's shape (lookOnly bits, see fillPaneOpenings): a round going through breaks it (see breakGlassAt)
 		bool foliage;             // a mass of foliage (see foliageArt): drawn leafy on a tile without a floor (leafyModel)
 		Uint8 cropBlock;          // an object the art draws as a block of crops (X-Com Files' wheat, see cropBlockOf): the block's height in voxels; 0 for none
-		Uint8 ghostKind;          // how a part without voxels was built (see buildModel): 0 not at all, 1 the mod's ghost shape, 2 a block of crops, 3 low art standing up, 4 a plain ghost, 5 not as a model: a flame, its art drawn as a sprite (see partKind)
+		Uint8 ghostKind;          // how a part without voxels was built (see buildModel): 0 not at all, 1 the mod's ghost shape, 2 a block of crops, 3 low art standing up, 4 a plain ghost, 6 a floor lying flat drawn solid (a pool's water), 5 not as a model: a flame, its art drawn as a sprite (see partKind)
 		bool reliefRises;         // ... low art that rises (see lowArt)
 		const VoxelModel *ghost;  // a ghost model of the part's own, in the same tile where the part has no voxels: the liquid's surface (buildLiquid), the rest of the art (buildArtFill) or a block of crops (buildCropBlock); null for none
 		float glow[3]; // centre of the brightest voxels in the top third (a lamp's bulb), in the tile
@@ -427,6 +427,8 @@ public:
 	void setSmokeSight(float sightVoxels, int throughSmoke, int throughFire);
 	/// The most opaque see-through smoke may get where it hangs (a maximum), by the settings "Smoke opacity" and "Night smoke opacity" and the game's shade there.
 	float smokeOpacityAt(int shade) const;
+	/// The most see-through smoke may veil a pixel where it hangs, for these eyes, in whole see-through steps (0: none drawn).
+	float smokeCapAt(int shade) const;
 	/// Where the weapon in hand's muzzle is on the view (pixels): our own shots flash and start their trails there.
 	void setMuzzlePoint(double x, double y, bool valid) { _muzzleScreen[0] = x; _muzzleScreen[1] = y; _muzzleValid = valid; }
 	/// The path a throw or shot aimed now would take, in voxels from the soldier to its end (see

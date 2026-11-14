@@ -749,10 +749,10 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		{
 			*value = std::clamp(*value + 10 * direction, 10, 100);
 		}
-		// The see-through smoke's opacity, by day and in the dark: 5 to 95%, in steps of 5.
+		// The smoke's opacity, by day and in the dark: 0 (none drawn) to 100% (opaque), in steps of 5.
 		else if (value == &Options::fpsSmokeOpacity || value == &Options::fpsNightSmokeOpacity)
 		{
-			*value = std::clamp(*value + 5 * direction, 5, 95);
+			*value = std::clamp(*value + 5 * direction, 0, 100);
 		}
 		// The enemy markers' colours (all red, as the map, line of fire): round and round.
 		else if (value == &Options::fpsEnemyMarkers)

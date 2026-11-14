@@ -2097,21 +2097,28 @@ void main()
 			int shade = int(head.z);
 			int pixelOpacity = (flags & 16) == 0 ? SeeThroughLevels
 				: opacityAt >= 0 ? int(float(texelFetch(uBytes, opacityAt + spriteAt).r) * t8.z + 0.5) : int(float(SeeThroughLevels) * t8.z + 0.5);
-			if (pixelOpacity < SeeThroughLevels)
+			int smokeCap = (flags & 16) == 0 ? 0 : int(t8.w);
+			if (pixelOpacity < SeeThroughLevels || smokeCap > 0)
 			{
 				// See-through (the smoke): mixed over what's there, within what a unit under it and the
-				// smoke's cap leave; the depth stays.
-				int smokeCap = int(t8.w);
+				// smoke's cap leave; the depth stays. (Smoke with a cap also where it is opaque.)
 				pixelOpacity = min(pixelOpacity, veil);
 				if (smokeCap > 0) pixelOpacity = min(pixelOpacity, smokeCap - smokeVeil);
 				if (pixelOpacity <= 0) continue;
 				if (veil != 255) veil -= pixelOpacity;
-				if (smokeCap > 0) smokeVeil += pixelOpacity;
+				// (Of what the smoke before it left showing: layers add up to what they veil together.)
+				int mixLevel = pixelOpacity;
+				if (smokeCap > 0)
+				{
+					int showing = SeeThroughLevels - smokeVeil;
+					mixLevel = (pixelOpacity * SeeThroughLevels + showing / 2) / showing;
+					smokeVeil += pixelOpacity;
+				}
 				// A faint picture that keeps its colours under futuristic night vision (a body or a pile
 				// pointed past, setting "See-through corpses"): over the world in the night vision's colours.
 				bool ownOverNight = ownColours != 0u && uOwnOverNight != 0;
 				if (ownOverNight && own == 0u && color != 0u) color = uint((uOwnOverNight - 1) * 16) | (color & 15u);
-				color = seeThrough(pixelOpacity, shadeColor(spriteColor, shade), color);
+				color = seeThrough(mixLevel, shadeColor(spriteColor, shade), color);
 				if (pixelOpacity > SeeThroughLevels / 2)
 				{
 					glow = 0u;

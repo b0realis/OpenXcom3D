@@ -231,7 +231,7 @@ en-US:
   STR_FPS_SMOKE: "Smoke"
   STR_FPS_SMOKE_DESC: "Original: the game's own smoke, as the map draws it. Modern: soft see-through clouds. Units as your soldier sees them."
   STR_FPS_SMOKE_OPACITY: "Smoke opacity"
-  STR_FPS_SMOKE_OPACITY_DESC: "The most solid Modern smoke gets (the thickest; thinner less): smoke over smoke never hides more than this."
+  STR_FPS_SMOKE_OPACITY_DESC: "The most smoke hides, smoke over smoke too. 0%: no smoke drawn. 5%: barely there. 100%: opaque (Original: the map's solid dots)."
   STR_FPS_NIGHT_SMOKE_OPACITY: "Night smoke opacity"
   STR_FPS_NIGHT_SMOKE_OPACITY_DESC: "The same in the dark: at night, on dark maps and in unlit rooms, by the light where the smoke hangs. Lower if smoke is blinding."
   STR_FPS_SMOKE_ORIGINAL: "Original"
