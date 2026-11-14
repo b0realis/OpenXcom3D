@@ -69449,10 +69449,10 @@ index 000000000..0a9d11c8b
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..98c2e6f6c
+index 000000000..6b416ece5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,4363 @@
+@@ -0,0 +1,4388 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -71982,12 +71982,34 @@ index 000000000..98c2e6f6c
 +				break; // (a ghost: that kind; or voxels of its own: it follows its first frame instead, see getModel)
 +			}
 +		}
-+		// A flame (an object that lights its surroundings, by the game's rules, and has no voxels: a campfire, a torch's
++		// A flame (an object that lights its surroundings, by the game's rules, has no voxels, and whose art's outline changes as it burns: a campfire, a torch's
 +		// fire) is no ghost of any kind: its art stands on the tile as a sprite, each frame flowing into the next, as
 +		// the game's own fire does (see drawFire). With "Parts without shape" off it isn't drawn, as any such part.
 +		if (kind.empty || kind.ghostKind != 0)
 +		{
-+			if (Options::fpsGhostParts != 0 && !cutout && mapData->getObjectType() == O_OBJECT && mapData->getLightSource() > 0)
++			// A flame's outline changes from frame to frame. A machine with lights that blink keeps its
++			// outline, and is a ghost as any part without shape (a player, GitHub issue #150: the consoles
++			// of XPiratez's radar room, which light the room, stood as flat pictures turned to the eye,
++			// and hung through the floor seen from below).
++			bool outlineChanges = false;
++			if (SurfaceSet *art = mapData->getDataset() ? mapData->getDataset()->getSurfaceset() : nullptr)
++			{
++				const Surface *first = art->getFrame(mapData->getSprite(0));
++				for (int frame = 1; first && frame < 8 && !outlineChanges; ++frame)
++				{
++					const Surface *other = art->getFrame(mapData->getSprite(frame));
++					if (!other || other == first) continue;
++					if (other->getWidth() != first->getWidth() || other->getHeight() != first->getHeight())
++					{
++						outlineChanges = true;
++						break;
++					}
++					for (int y = 0; y < first->getHeight() && !outlineChanges; ++y)
++						for (int x = 0; x < first->getWidth() && !outlineChanges; ++x)
++							outlineChanges = (first->getPixel(x, y) != 0) != (other->getPixel(x, y) != 0);
++				}
++			}
++			if (outlineChanges && Options::fpsGhostParts != 0 && !cutout && mapData->getObjectType() == O_OBJECT && mapData->getLightSource() > 0)
 +			{
 +				clearModel(kind);
 +				kind.ghostKind = 5;
@@ -72309,8 +72331,11 @@ index 000000000..98c2e6f6c
 +		// water"; with lifts and ladders only, nothing of it, a pit). A lift's pad stays see-through:
 +		// who is above or below it is a threat to watch.
 +		bool flatFloor = mapData->getObjectType() == O_FLOOR && !mapData->isGravLift() && !ghostShape && !cageArt(sprite, O_FLOOR, yOffset) && artLiesFlat(sprite, yOffset);
++		// (An object that lights its surroundings shows with Lifts too, as its light does: a console, a
++		// lamp without shape. A flame among them isn't built here: see partKind.)
++		const bool lit = mapData->getObjectType() == O_OBJECT && mapData->getLightSource() > 0;
 +		bool ghostWanted = Options::fpsGhostParts == 2
-+			|| (Options::fpsGhostParts == 1 && (ghostShape || mapData->isGravLift() || cageArt(sprite, mapData->getObjectType(), yOffset) || low || block || flatFloor));
++			|| (Options::fpsGhostParts == 1 && (ghostShape || mapData->isGravLift() || cageArt(sprite, mapData->getObjectType(), yOffset) || low || block || flatFloor || lit));
 +		// A part that animates is what its first frame is, in every frame: what kind of ghost it gets is read off the
 +		// art (how low it is, how like a block or a cage), and a frame whose art falls just the other side of a line
 +		// (a fireplace's flames, one frame in four; a player, GitHub issue #134) lost its ghost, or stood as another kind.
