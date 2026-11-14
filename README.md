@@ -51,7 +51,7 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 - **Throwing:** Classic (by tile) or Modern: throws and arcing shots go for the exact point under the crosshair.
 - **Step costs round the compass**, **the alien turn seen as your soldier faces**, **fall damage** apart from *Falling*, and a **rangefinder** (digital, or an analogue scope scale), each a setting.
 - **Smoother:** fire's flames blend from frame to frame; walking diagonally no longer stutters and costs a diagonal's time units; dark places fade to black through the palette's darker colours.
-- **Fixed:** a bow is held as a bow; a mod's flames and campfires no longer flicker between shapes; a hit on an energy shield shows what the shield lost; walking into a unit you can't see stops as at a wall; buildings a mod lists among its UFOs are no longer lit as UFOs.
+- **Fixed:** a bow is held as a bow; a mod's flames and campfires no longer flicker between shapes; a hit on an energy shield shows what the shield lost; walking into a unit you can't see stops as at a wall; buildings a mod lists among its UFOs are no longer lit as UFOs. Hot-fixed 2026-11-14: *Smoke opacity* from 0% to 100% for both smoke looks, flares bounce off glass, a pool's water fills its tiles, someone unconscious in hand shows their name, and *Smooth fire* is a setting.
 
 ## New in 1.12
 
