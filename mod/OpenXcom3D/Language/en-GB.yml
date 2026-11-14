@@ -303,6 +303,8 @@ en-GB:
   STR_FPS_EYE_LOWER_DESC: "Lowers the 3D camera, in voxels. The soldier's sight is unchanged."
   STR_FPS_MUZZLE_FLASH: "Muzzle flashes"
   STR_FPS_MUZZLE_FLASH_DESC: "Flashes from gunfire, hits and blasts. Off if flashes bother you."
+  STR_FPS_SMOOTH_FIRE: "Smooth fire"
+  STR_FPS_SMOOTH_FIRE_DESC: "Flames' colours blend from frame to frame. NO: the frames dissolve dot by dot, as before 1.14."
   STR_FPS_HIT_FLASH: "Hit flash"
   STR_FPS_HIT_FLASH_DESC: "A unit hit, standing or down, flashes for a moment (with Muzzle flashes on). NO: it only flinches."
   STR_FPS_SCREEN_SHAKE: "Screen shake"

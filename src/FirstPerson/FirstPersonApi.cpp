@@ -848,6 +848,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	// setting); off, it only flinches. "Muzzle flashes" off turns it off too (every flash: the
 	// setting for players whom flashing light bothers).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitFlash", &fpsHitFlash, true, "STR_FPS_HIT_FLASH", category));
+	// Fire's colours mixed from frame to frame (1.14's "Smoother fire", which had no setting: a
+	// player looked for it, GitHub issue #146); off, the frames dissolve dot by dot, as before 1.14.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmoothFire", &fpsSmoothFire, true, "STR_FPS_SMOOTH_FIRE", category));
 	// Screen shake (a player, GitHub issue #67): off, nothing shakes the view (explosions, hits,
 	// falls, landings, panic, one's own shots).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsScreenShake", &fpsScreenShake, true, "STR_FPS_SCREEN_SHAKE", category));

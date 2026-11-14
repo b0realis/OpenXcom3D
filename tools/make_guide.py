@@ -182,6 +182,7 @@ SETTINGS = [
         ('Weapon in hand', 'YES', 'YES / NO', 'The weapon in hand at the bottom of the view, built in 3D from its inventory picture, its barrel on the crosshair.', ''),
         ('Sprite upscaling', 'Finest', 'Finest / Smooth+ / Smooth / Off', 'Units, items and effects up close scaled the way pixel art scales well (xBRZ), each pixel a shade of the colours the art has there, the shading softened inside each colour. Finest: six times bigger instead of four, eyes and highlights kept.', 'The finest up close; Finest\'s frames take more memory (about 60 MB at most).'),
         ('Unit size', '100%', '80% to 100%', 'Soldiers, aliens, corpses and items drawn a little smaller, so tall sprites fit under low ceilings.', 'Only the picture: what shots hit stays the game\'s (see <i>Hitboxes</i>).'),
+        ('Smooth fire', 'YES', 'YES / NO', 'Flames\' colours blend from frame to frame. NO: the frames dissolve dot by dot, as before 1.14.', ''),
         ('Muzzle flashes', 'YES', 'YES / NO', 'Gunfire, hits and blasts flash. NO: no flashes, steady UFO lights, no camera glitches.', 'Off if flashing light bothers you.'),
         ('Hit flash', 'YES', 'YES / NO', 'A unit hit, standing or down, flashes for a moment (with Muzzle flashes on). NO: it only flinches.', ''),
         ('Screen shake', 'YES', 'YES / NO', 'Explosions, hits, falls and your own shots shake the view. NO: nothing shakes it.', ''),

@@ -2434,7 +2434,7 @@ void FirstPersonView::drawFire()
 		const double ground[3] = { tilePosition.x * 16.0 + 8.0, tilePosition.y * 16.0 + 8.0,
 			tilePosition.z * 24.0 - tile->getTerrainLevel() };
 		drawSpriteBlend(smokeSprites->getFrame(firstFrame + phase), smokeSprites->getFrame(firstFrame + (phase + 1) % 4), blend, 16, 32,
-			ground, 2.0, shade, true);
+			ground, 2.0, shade, Options::fpsSmoothFire);
 	}
 	// The map's own flames (see partKind: a campfire, a torch's fire; objects that light their surroundings and have no
 	// voxels): the part's art standing on its tile, unshaded, the frame the view's calm clock shows flowing into the next.
@@ -2456,7 +2456,7 @@ void FirstPersonView::drawFire()
 		SurfaceSet *art = object->getDataset()->getSurfaceset();
 		// (The sprite's pixel that stands on the middle of the tile's floor, as buildModel lands the voxels on the art.)
 		drawSpriteBlend(art->getFrame(object->getSprite(_calmFrame)), art->getFrame(object->getSprite((_calmFrame + 1) % 8)), _animationBlend, 16, 32 + object->getYOffset(),
-			ground, 2.0, 0, true);
+			ground, 2.0, 0, Options::fpsSmoothFire);
 	}
 }
 
