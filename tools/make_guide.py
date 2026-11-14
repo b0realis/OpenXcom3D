@@ -140,6 +140,7 @@ SETTINGS = [
         ('Melee hits walls and downed', 'NO', 'YES / NO', 'A blow at the wall, door or object under the crosshair strikes it; a blow can hit a body lying beside you, diagonally too.', 'Break through a wall with a hammer, as the map\'s terrain melee does in some mods.'),
         ('Melee hits floors', 'YES', 'YES / NO', 'With terrain melee on: the floor or ceiling you aim at takes the blow too.', 'Break through the floor at your feet or the ceiling above.'),
         ('Aim at exact point', 'YES', 'YES / NO', 'Shots go for the exact point under the crosshair (on the open sky, the air on its line). NO: for its tile, as in the original.',
+        ('Close range: from the eye', 'NO', 'YES / NO', 'Game\'s own targeting: a straight shot at something within 2 tiles leaves from your eye, so it goes where the crosshair is.', 'Up close the game\'s muzzle point often can\'t reach what you see (the laser then says OFF).'),
          'The game\'s accuracy applies either way.'),
         ('Show trajectory', 'Arcs', 'Arcs / All / Off', 'While aiming, the path the next throw or shot will take: a cyan arc for throws, a red laser for shots (All).', 'No surprise "No line of fire": a refused shot\'s laser shows dimmed.'),
         ('Confirm fire', 'NO', 'YES / NO', 'The first click marks the target and shows its path; a second click fires.', 'Never waste a shot on a slip of the mouse.'),

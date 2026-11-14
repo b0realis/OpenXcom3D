@@ -925,6 +925,10 @@ void createOptions(std::vector<OptionInfo> &options)
 	// longer than the bar, on the map and in 3D), or percentage (2: each bar full at its maximum).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsStatBars", &fpsStatBars, 1, "STR_FPS_STAT_BARS", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsAimExact", &fpsAimExact, true, "STR_FPS_AIM_EXACT", category));
+	// With the game's own targeting, a straight shot at something within two tiles leaves from the
+	// eye's place (the owner, on GitHub issue #148: "close range forced centre targeting"); off, from
+	// the game's muzzle point as ever.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsCloseEyeShots", &fpsCloseEyeShots, false, "STR_FPS_CLOSE_EYE_SHOTS", category));
 	// The path a throw or shot would take, drawn while aiming: off (0), throws and arcing
 	// shots (1), every shot too (2); and confirm fire: the first click marks the target and
 	// shows its path, a second click on it fires.

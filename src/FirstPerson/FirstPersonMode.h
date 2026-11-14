@@ -928,6 +928,8 @@ private:
 	double _bloom = 0.0;                         // extra spread from the last rounds (degrees, 95% circle)
 
 	/// Is this fire mode FPS style just now?
+	/// Does a straight shot at this point leave from the eye's place though the targeting is the game's (setting "Close range: from the eye")?
+	bool closeEyeShot(BattleActionType mode, const Position &aimedVoxel, bool hitSomething) const;
 	bool freeAimOn(BattleActionType mode) const;
 	/// How wide an FPS-style shot spreads, in degrees (95% of rounds).
 	double spreadFor(const BattleUnit *unit, BattleActionType mode, bool dual = false) const;

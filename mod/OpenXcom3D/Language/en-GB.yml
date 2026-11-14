@@ -453,6 +453,8 @@ en-GB:
   STR_FPS_CROSSHAIR_COSTS_DESC: "Under the shot info, the action's other costs: energy, health, stun, morale, mana."
   STR_FPS_ACCURACY_LINE: "Accuracy line"
   STR_FPS_ACCURACY_LINE_DESC: "A green line under the crosshair: where a hit lands, dotted out to where a miss can stray; in FPS style, the spread."
+  STR_FPS_CLOSE_EYE_SHOTS: "Close range: from the eye"
+  STR_FPS_CLOSE_EYE_SHOTS_DESC: "Game's own targeting: a straight shot at something within 2 tiles leaves from your eye, so it goes where the crosshair is. NO: from the weapon."
   STR_FPS_AIM_EXACT: "Aim at exact point"
   STR_FPS_AIM_EXACT_DESC: "Shots go for the point under the crosshair, on the open sky the air on its line. NO: for its tile (the game's own targeting)."
   STR_FPS_TRAJECTORY: "Show trajectory"

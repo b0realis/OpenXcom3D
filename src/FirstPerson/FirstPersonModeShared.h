@@ -264,6 +264,8 @@ const double HeldBodyScale = 1.4, HeldBodyLift = 0.15;
 /// under the crosshair at that point's distance: at least LaserAwayAngle (radians: far off, a voxel is nothing) and
 /// never needing more than LaserAwayMostAngle (right in front of the eye two voxels are a wide angle, and the miss
 /// plain to see).
+/// Setting "Close range: from the eye": how near the eye the point under the crosshair must be, in voxels (two tiles).
+const double CloseEyeRange = 32.0;
 const double LaserAwayVoxels = 2.0, LaserAwayAngle = 0.01, LaserAwayMostAngle = 0.04;
 /// A weapon shorter than the rifle (whose picture is about RiflePixels long) comes out smaller:
 /// by its length to the power SizeCurve (a pistol, half a rifle's picture, at 70%), shrunk about

@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..c867ba5e4
+index 000000000..b069796f1
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,578 @@
+@@ -0,0 +1,580 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -583,6 +583,8 @@ index 000000000..c867ba5e4
 +  STR_FPS_CROSSHAIR_COSTS_DESC: "Under the shot info, the action's other costs: energy, health, stun, morale, mana."
 +  STR_FPS_ACCURACY_LINE: "Accuracy line"
 +  STR_FPS_ACCURACY_LINE_DESC: "A green line under the crosshair: where a hit lands, dotted out to where a miss can stray; in FPS style, the spread."
++  STR_FPS_CLOSE_EYE_SHOTS: "Close range: from the eye"
++  STR_FPS_CLOSE_EYE_SHOTS_DESC: "Game's own targeting: a straight shot at something within 2 tiles leaves from your eye, so it goes where the crosshair is. NO: from the weapon."
 +  STR_FPS_AIM_EXACT: "Aim at exact point"
 +  STR_FPS_AIM_EXACT_DESC: "Shots go for the point under the crosshair, on the open sky the air on its line. NO: for its tile (the game's own targeting)."
 +  STR_FPS_TRAJECTORY: "Show trajectory"
@@ -708,10 +710,10 @@ index 000000000..c867ba5e4
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..e5d31d486
+index 000000000..07dfc6aa1
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,578 @@
+@@ -0,0 +1,580 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1167,6 +1169,8 @@ index 000000000..e5d31d486
 +  STR_FPS_CROSSHAIR_COSTS_DESC: "Under the shot info, the action's other costs: energy, health, stun, morale, mana."
 +  STR_FPS_ACCURACY_LINE: "Accuracy line"
 +  STR_FPS_ACCURACY_LINE_DESC: "A green line under the crosshair: where a hit lands, dotted out to where a miss can stray; in FPS style, the spread."
++  STR_FPS_CLOSE_EYE_SHOTS: "Close range: from the eye"
++  STR_FPS_CLOSE_EYE_SHOTS_DESC: "Game's own targeting: a straight shot at something within 2 tiles leaves from your eye, so it goes where the crosshair is. NO: from the weapon."
 +  STR_FPS_AIM_EXACT: "Aim at exact point"
 +  STR_FPS_AIM_EXACT_DESC: "Shots go for the point under the crosshair, on the open sky the air on its line. NO: for its tile (the game's own targeting)."
 +  STR_FPS_TRAJECTORY: "Show trajectory"
@@ -18788,16 +18792,17 @@ index b7e1111f3..af2d48e91 100644
  			statePushFront(new UnitTurnBState(this, _currentAction)); // first of all turn towards the target
  		}
 diff --git a/src/Battlescape/BattlescapeGame.h b/src/Battlescape/BattlescapeGame.h
-index 7af613cc7..286e4f3a5 100644
+index 7af613cc7..03b3cc0bb 100644
 --- a/src/Battlescape/BattlescapeGame.h
 +++ b/src/Battlescape/BattlescapeGame.h
-@@ -90,6 +90,14 @@ struct BattleAction : BattleActionCost
+@@ -90,6 +90,15 @@ struct BattleAction : BattleActionCost
  	bool sprayTargeting; // Used to separate waypoint checks between confirm firing mode and the "spray" autoshot
  	BattleActionOrigin relativeOrigin = BattleActionOrigin::CENTRE; // preferred origin voxel (centre, left or right)
  	int terrainMeleeTilePart = 0; // terrain melee
 +	Position targetVoxel = Position(-1, -1, -1); // exact point to aim at (first-person crosshair); x < 0 = pick one on the target tile
 +	bool instantMove = false; // walk without the step animation (first-person view)
 +	bool freeAim = false; // FPS-style shot (first-person view): each round goes where the view aims it, no accuracy roll
++	bool eyeOrigin = false; // the shot leaves from the 3D eye's place across the tile, as an FPS-style one does, the rest the game's (first-person view option: close range)
 +	bool forced = false; // forced shot (first-person view options): as with Ctrl held for force fire (an arcing shot at the target tile, whatever its curve meets; a straight one at targetVoxel, whatever is in the way)
 +	bool dualWield = false; // fired along with the gun in the other hand (first-person view option): less accurate (FirstPerson::DualWieldAccuracy)
 +	BattleItem *dualWeapon = nullptr; // ...that gun, and its fire mode: the two take turns round by round, each round resolved before the next leaves, as an auto burst's
@@ -20000,7 +20005,7 @@ index a263ca287..6a06e0148 100644
  	void skipTrajectory();
  	/// Gets the Position of origin for the projectile.
 diff --git a/src/Battlescape/ProjectileFlyBState.cpp b/src/Battlescape/ProjectileFlyBState.cpp
-index 529b7f282..0a0840016 100644
+index 529b7f282..974f427d5 100644
 --- a/src/Battlescape/ProjectileFlyBState.cpp
 +++ b/src/Battlescape/ProjectileFlyBState.cpp
 @@ -18,6 +18,7 @@
@@ -20025,7 +20030,7 @@ index 529b7f282..0a0840016 100644
  }
  
  /**
-@@ -270,11 +278,16 @@ void ProjectileFlyBState::init()
+@@ -270,11 +278,17 @@ void ProjectileFlyBState::init()
  
  					// Turn to look at new target
  					_action.target = closeQuartersFailedNewTarget;
@@ -20033,6 +20038,7 @@ index 529b7f282..0a0840016 100644
 +					// along the crosshair, gives way: the deflected shot goes where the check sends it.)
 +					_action.targetVoxel = Position(-1, -1, -1);
 +					_action.freeAim = false;
++					_action.eyeOrigin = false;
  					_unit->lookAt(_action.target, _unit->getTurretType() != -1);
  					while (_unit->getStatus() == STATUS_TURNING)
  					{
@@ -20042,7 +20048,7 @@ index 529b7f282..0a0840016 100644
  
  					// We're done, spend TUs and Energy; and don't check remaining CQB candidates anymore
  					bu->spendTimeUnits(_parent->getMod()->getCloseQuartersTuCostGlobal());
-@@ -286,7 +299,7 @@ void ProjectileFlyBState::init()
+@@ -286,7 +300,7 @@ void ProjectileFlyBState::init()
  	}
  
  	bool forceEnableObstacles = false;
@@ -20051,7 +20057,7 @@ index 529b7f282..0a0840016 100644
  	{
  		// target nothing, targets the middle of the tile
  		_targetVoxel = _action.target.toVoxel() + TileEngine::voxelTileCenter;
-@@ -303,6 +316,17 @@ void ProjectileFlyBState::init()
+@@ -303,6 +317,17 @@ void ProjectileFlyBState::init()
  				_targetVoxel.z += 4;
  			}
  		}
@@ -20069,7 +20075,7 @@ index 529b7f282..0a0840016 100644
  	}
  	else if (!_action.weapon->getArcingShot(_action.type))
  	{
-@@ -325,6 +349,15 @@ void ProjectileFlyBState::init()
+@@ -325,6 +350,15 @@ void ProjectileFlyBState::init()
  			{
  				bool foundLoF = _parent->getTileEngine()->canTargetUnit(&originVoxel, targetTile, &_targetVoxel, _unit, isPlayer);
  
@@ -20085,7 +20091,7 @@ index 529b7f282..0a0840016 100644
  				if (!foundLoF && Options::oxceEnableOffCentreShooting)
  				{
  					// If we can't target from the standard shooting position, try a bit left and right from the centre.
-@@ -391,6 +424,25 @@ void ProjectileFlyBState::init()
+@@ -391,6 +425,25 @@ void ProjectileFlyBState::init()
  		}
  	}
  
@@ -20111,7 +20117,7 @@ index 529b7f282..0a0840016 100644
  	if (createNewProjectile())
  	{
  		auto* conf = weapon->getActionConf(_action.type);
-@@ -417,7 +469,13 @@ void ProjectileFlyBState::init()
+@@ -417,7 +470,13 @@ void ProjectileFlyBState::init()
   */
  bool ProjectileFlyBState::createNewProjectile()
  {
@@ -20125,7 +20131,7 @@ index 529b7f282..0a0840016 100644
  
  	// Special handling for "spray" auto-attack, get target positions from the action's waypoints, starting from the back
  	if (_action.sprayTargeting)
-@@ -447,6 +505,12 @@ bool ProjectileFlyBState::createNewProjectile()
+@@ -447,6 +506,12 @@ bool ProjectileFlyBState::createNewProjectile()
  		_action.waypoints.pop_back();
  	}
  
@@ -20138,7 +20144,7 @@ index 529b7f282..0a0840016 100644
  	// create a new projectile
  	Projectile *projectile = new Projectile(_parent->getMod(), _parent->getSave(), _action, _origin, _targetVoxel, _ammo);
  
-@@ -465,6 +529,10 @@ bool ProjectileFlyBState::createNewProjectile()
+@@ -465,6 +530,10 @@ bool ProjectileFlyBState::createNewProjectile()
  	{
  		accuracyDivider = 200.0;
  	}
@@ -20149,7 +20155,7 @@ index 529b7f282..0a0840016 100644
  
  	BattleActionAttack attack = BattleActionAttack::GetAferShoot(_action, _ammo);
  	if (_action.type == BA_THROW)
-@@ -588,9 +656,695 @@ bool ProjectileFlyBState::createNewProjectile()
+@@ -588,9 +657,695 @@ bool ProjectileFlyBState::createNewProjectile()
  		_parent->getSave()->appendToHitLog(HITLOG_NEW_SHOT, _action.actor->getFaction());
  	}
  
@@ -20845,7 +20851,7 @@ index 529b7f282..0a0840016 100644
  /**
   * Deinitialize the state.
   */
-@@ -607,7 +1361,12 @@ void ProjectileFlyBState::deinit()
+@@ -607,7 +1362,12 @@ void ProjectileFlyBState::deinit()
  void ProjectileFlyBState::think()
  {
  	/// checks if a weapon has any more shots to fire.
@@ -20859,7 +20865,7 @@ index 529b7f282..0a0840016 100644
  
  	_parent->getSave()->getBattleState()->clearMouseScrollingState();
  	/* TODO refactoring : store the projectile in this state, instead of getting it from the map each time? */
-@@ -616,9 +1375,17 @@ void ProjectileFlyBState::think()
+@@ -616,9 +1376,17 @@ void ProjectileFlyBState::think()
  		bool hasFloor = _action.actor->haveNoFloorBelow() == false;
  		bool unitCanFly = _action.actor->getMovementType() == MT_FLY;
  
@@ -20879,7 +20885,7 @@ index 529b7f282..0a0840016 100644
  			&& (hasFloor || unitCanFly))
  		{
  			createNewProjectile();
-@@ -630,6 +1397,10 @@ void ProjectileFlyBState::think()
+@@ -630,6 +1398,10 @@ void ProjectileFlyBState::think()
  		}
  		else
  		{
@@ -20890,7 +20896,7 @@ index 529b7f282..0a0840016 100644
  			if (_action.cameraPosition.z != -1 && _action.waypoints.size() <= 1)
  			{
  				_parent->getMap()->getCamera()->setMapOffset(_action.cameraPosition);
-@@ -651,16 +1422,39 @@ void ProjectileFlyBState::think()
+@@ -651,16 +1423,39 @@ void ProjectileFlyBState::think()
  			_parent->popState();
  		}
  	}
@@ -20931,7 +20937,7 @@ index 529b7f282..0a0840016 100644
  			// impact !
  			if (_action.type == BA_THROW)
  			{
-@@ -742,6 +1536,7 @@ void ProjectileFlyBState::think()
+@@ -742,6 +1537,7 @@ void ProjectileFlyBState::think()
  						noMoreShotsToShoot(),
  						shotgun ? 0 : _range + _parent->getMap()->getProjectile()->getDistance()
  					));
@@ -20939,7 +20945,7 @@ index 529b7f282..0a0840016 100644
  
  					if (_projectileImpact == V_UNIT)
  					{
-@@ -754,83 +1549,72 @@ void ProjectileFlyBState::think()
+@@ -754,83 +1550,72 @@ void ProjectileFlyBState::think()
  					// special shotgun behaviour: trace extra projectile paths, and add bullet hits at their termination points.
  					if (shotgun)
  					{
@@ -21075,7 +21081,7 @@ index 529b7f282..0a0840016 100644
  					}
  
  					// nerf unit's XP values (gained via extra shotgun bullets)
-@@ -842,6 +1626,9 @@ void ProjectileFlyBState::think()
+@@ -842,6 +1627,9 @@ void ProjectileFlyBState::think()
  				}
  			}
  
@@ -21085,7 +21091,7 @@ index 529b7f282..0a0840016 100644
  			delete _parent->getMap()->getProjectile();
  			_parent->getMap()->setProjectile(0);
  		}
-@@ -857,6 +1644,9 @@ void ProjectileFlyBState::cancel()
+@@ -857,6 +1645,9 @@ void ProjectileFlyBState::cancel()
  	if (_parent->getMap()->getProjectile())
  	{
  		_parent->getMap()->getProjectile()->skipTrajectory();
@@ -21173,7 +21179,7 @@ index 067c7b3ba..9004c1ea8 100644
  public:
  	/// Creates a new ProjectileFly class
 diff --git a/src/Battlescape/TileEngine.cpp b/src/Battlescape/TileEngine.cpp
-index 6e6846977..f2e42c4b5 100644
+index 6e6846977..634be31e5 100644
 --- a/src/Battlescape/TileEngine.cpp
 +++ b/src/Battlescape/TileEngine.cpp
 @@ -43,6 +43,7 @@
@@ -21474,7 +21480,7 @@ index 6e6846977..f2e42c4b5 100644
 +		FirstPerson::slidingOrigin(_save->getBattleState(), action, tile->getPosition(), dirXshift, dirYshift, originVoxel);
 +		// (OpenXcom3D: an FPS-style straight shot from the first-person view leaves from the 3D eye's
 +		// place across the tile, at this height, so the round reaches what the crosshair sees.)
-+		if (action.freeAim)
++		if (action.freeAim || action.eyeOrigin)
 +		{
 +			FirstPerson::freeAimOrigin(_save->getBattleState(), action, originVoxel);
 +		}
@@ -22162,7 +22168,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..77c53f658 100644
+index a08796ced..540392b1a 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -22179,7 +22185,7 @@ index a08796ced..77c53f658 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts;
++OPT bool fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts;
 +OPT int fpsThrowing, fpsRangefinder, fpsRenderer, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
@@ -23203,10 +23209,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..876179599
+index 000000000..3549da300
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1532 @@
+@@ -0,0 +1,1536 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24134,6 +24140,10 @@ index 000000000..876179599
 +	// longer than the bar, on the map and in 3D), or percentage (2: each bar full at its maximum).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsStatBars", &fpsStatBars, 1, "STR_FPS_STAT_BARS", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsAimExact", &fpsAimExact, true, "STR_FPS_AIM_EXACT", category));
++	// With the game's own targeting, a straight shot at something within two tiles leaves from the
++	// eye's place (the owner, on GitHub issue #148: "close range forced centre targeting"); off, from
++	// the game's muzzle point as ever.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsCloseEyeShots", &fpsCloseEyeShots, false, "STR_FPS_CLOSE_EYE_SHOTS", category));
 +	// The path a throw or shot would take, drawn while aiming: off (0), throws and arcing
 +	// shots (1), every shot too (2); and confirm fire: the first click marks the target and
 +	// shows its path, a second click on it fires.
@@ -35270,10 +35280,10 @@ index 000000000..9145c7857
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..9d363a6cc
+index 000000000..fbbc1f3e6
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1389 @@
+@@ -0,0 +1,1391 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -36204,6 +36214,8 @@ index 000000000..9d363a6cc
 +	double _bloom = 0.0;                         // extra spread from the last rounds (degrees, 95% circle)
 +
 +	/// Is this fire mode FPS style just now?
++	/// Does a straight shot at this point leave from the eye's place though the targeting is the game's (setting "Close range: from the eye")?
++	bool closeEyeShot(BattleActionType mode, const Position &aimedVoxel, bool hitSomething) const;
 +	bool freeAimOn(BattleActionType mode) const;
 +	/// How wide an FPS-style shot spreads, in degrees (95% of rounds).
 +	double spreadFor(const BattleUnit *unit, BattleActionType mode, bool dual = false) const;
@@ -42726,10 +42738,10 @@ index 000000000..217574985
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..9b0147679
+index 000000000..0c9d118e1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,531 @@
+@@ -0,0 +1,533 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -42996,6 +43008,8 @@ index 000000000..9b0147679
 +/// under the crosshair at that point's distance: at least LaserAwayAngle (radians: far off, a voxel is nothing) and
 +/// never needing more than LaserAwayMostAngle (right in front of the eye two voxels are a wide angle, and the miss
 +/// plain to see).
++/// Setting "Close range: from the eye": how near the eye the point under the crosshair must be, in voxels (two tiles).
++const double CloseEyeRange = 32.0;
 +const double LaserAwayVoxels = 2.0, LaserAwayAngle = 0.01, LaserAwayMostAngle = 0.04;
 +/// A weapon shorter than the rifle (whose picture is about RiflePixels long) comes out smaller:
 +/// by its length to the power SizeCurve (a pistol, half a rifle's picture, at 70%), shrunk about
@@ -43263,10 +43277,10 @@ index 000000000..9b0147679
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..a7d3bd08c
+index 000000000..509e4a346
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,5421 @@
+@@ -0,0 +1,5448 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -45264,7 +45278,7 @@ index 000000000..a7d3bd08c
 +	// target's tile only, a line and an arcing shot at an exact point on the very point; an
 +	// FPS-style line on where the eye is too, its rounds leaving from there, see freeAimFrom).
 +	const Position from = unit->getPosition();
-+	const bool fromEye = freeAimOn(mode) || (otherWeapon && freeAimOn(offMode));
++	const bool fromEye = freeAimOn(mode) || (otherWeapon && freeAimOn(offMode)) || closeEyeShot(mode, targetVoxel, hitSomething);
 +	const int eyeVoxelX = fromEye ? (int)std::floor(_eyeX + _leanShift[0]) : 0, eyeVoxelY = fromEye ? (int)std::floor(_eyeY + _leanShift[1]) : 0;
 +	// (an arcing shot aims at the exact point as a straight one does, see launchShot; a throw at the tile)
 +	const bool arcing = arcs(weapon, mode);
@@ -45335,6 +45349,7 @@ index 000000000..a7d3bd08c
 +			// would take, dimmed, when the game will refuse it).
 +			// (FPS style: from the eye's place, as its rounds leave, see freeAimFrom)
 +			preview.freeAim = freeAimOn(gunMode);
++			preview.eyeOrigin = closeEyeShot(gunMode, targetVoxel, hitSomething); // (up close with its setting: from the eye too)
 +			Position origin = tileEngine->getOriginVoxel(preview, _save->getTile(from)), voxel = targetVoxel;
 +			const ShotAim aim = freeAimOn(gunMode) ? AIM_EXACT : aimFor(preview, targetTile, targetVoxel, origin, voxel);
 +			tileEngine->calculateLineVoxel(origin, voxel, true, &path, unit);
@@ -46391,6 +46406,7 @@ index 000000000..a7d3bd08c
 +	//   unit, an object...), or a straight shot on the open sky at the point of air on the
 +	//   crosshair's ray (see aimAt); the game's accuracy roll still applies to it.
 +	action->freeAim = freeAimOn(mode);
++	action->eyeOrigin = closeEyeShot(mode, aimedVoxel, hitSomething) && !weapon->getArcingShot(mode); // (setting "Close range: from the eye")
 +	if ((Options::fpsAimExact || action->freeAim || (Options::fpsThrowing == 1 && weapon->getArcingShot(mode))) && (hitSomething || !weapon->getArcingShot(mode)) && isShot(mode))
 +	{
 +		action->targetVoxel = aimedVoxel;
@@ -46479,6 +46495,7 @@ index 000000000..a7d3bd08c
 +	// Clear what we added, so the next action (one from the classic HUD, say) aims normally.
 +	action->targetVoxel = Position(-1, -1, -1);
 +	action->freeAim = false;
++	action->eyeOrigin = false;
 +	action->forced = false;
 +	action->relativeOrigin = BattleActionOrigin::CENTRE;
 +	action->dualWield = false;
@@ -46846,6 +46863,30 @@ index 000000000..a7d3bd08c
 +bool FirstPersonMode::freeAimOn(BattleActionType mode) const
 +{
 +	return !Options::fpsFaithfulTargeting && isShot(mode);
++}
++
++/**
++ * Setting "Close range: from the eye" (the owner, on GitHub issue #148): with the game's own
++ * targeting, a straight shot at a point within CloseEyeRange voxels of the eye leaves from the
++ * eye's place across the tile (as an FPS-style round does, see freeAimFrom), so the round goes
++ * where the crosshair is: up close the game's muzzle point, on the tile's edge and to a side with
++ * a lean, is too far from the eye for its line to reach what the eye sees. All else stays the
++ * game's: its accuracy roll, its line of fire from there.
++ * @param mode The fire mode.
++ * @param aimedVoxel The point under the crosshair.
++ * @param hitSomething The crosshair is on something (not the open sky).
++ * @return True if the shot leaves from the eye.
++ */
++bool FirstPersonMode::closeEyeShot(BattleActionType mode, const Position &aimedVoxel, bool hitSomething) const
++{
++	if (!Options::fpsCloseEyeShots || !Options::fpsFaithfulTargeting || !isShot(mode) || !hitSomething)
++	{
++		return false;
++	}
++	double eye[3];
++	_view->getEye(eye);
++	const double away[3] = { aimedVoxel.x + 0.5 - eye[0], aimedVoxel.y + 0.5 - eye[1], aimedVoxel.z + 0.5 - eye[2] };
++	return away[0] * away[0] + away[1] * away[1] + away[2] * away[2] <= CloseEyeRange * CloseEyeRange;
 +}
 +
 +/**
@@ -76299,7 +76340,7 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..41cb0b38f
+index 000000000..ab9d69f07
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,1018 @@
@@ -76518,7 +76559,7 @@ index 000000000..41cb0b38f
 +		{ "STR_FPS_SECTION_MOVEMENT", { "fpsTurnCost", "fpsMovement", "fpsWalkSpeed", "fpsFlightCost", "fpsFlightCostOverride", "fpsVault",
 +			"fpsFalling", "fpsSafeLanding" } },
 +		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsRecoil", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsThrowing", "fpsLean", "fpsMeleeTerrain",
-+			"fpsMeleeFloors", "fpsAimExact", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
++			"fpsMeleeFloors", "fpsAimExact", "fpsCloseEyeShots", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
 +			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear", "fpsFallDamage" } },
 +		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
 +			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsHitFlash", "fpsSmoothFire", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",

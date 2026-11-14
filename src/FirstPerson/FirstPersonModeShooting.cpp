@@ -1995,7 +1995,7 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 	// target's tile only, a line and an arcing shot at an exact point on the very point; an
 	// FPS-style line on where the eye is too, its rounds leaving from there, see freeAimFrom).
 	const Position from = unit->getPosition();
-	const bool fromEye = freeAimOn(mode) || (otherWeapon && freeAimOn(offMode));
+	const bool fromEye = freeAimOn(mode) || (otherWeapon && freeAimOn(offMode)) || closeEyeShot(mode, targetVoxel, hitSomething);
 	const int eyeVoxelX = fromEye ? (int)std::floor(_eyeX + _leanShift[0]) : 0, eyeVoxelY = fromEye ? (int)std::floor(_eyeY + _leanShift[1]) : 0;
 	// (an arcing shot aims at the exact point as a straight one does, see launchShot; a throw at the tile)
 	const bool arcing = arcs(weapon, mode);
@@ -2066,6 +2066,7 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 			// would take, dimmed, when the game will refuse it).
 			// (FPS style: from the eye's place, as its rounds leave, see freeAimFrom)
 			preview.freeAim = freeAimOn(gunMode);
+			preview.eyeOrigin = closeEyeShot(gunMode, targetVoxel, hitSomething); // (up close with its setting: from the eye too)
 			Position origin = tileEngine->getOriginVoxel(preview, _save->getTile(from)), voxel = targetVoxel;
 			const ShotAim aim = freeAimOn(gunMode) ? AIM_EXACT : aimFor(preview, targetTile, targetVoxel, origin, voxel);
 			tileEngine->calculateLineVoxel(origin, voxel, true, &path, unit);
@@ -3122,6 +3123,7 @@ void FirstPersonMode::launchShot(BattleUnit *unit, BattleItem *weapon, BattleAct
 	//   unit, an object...), or a straight shot on the open sky at the point of air on the
 	//   crosshair's ray (see aimAt); the game's accuracy roll still applies to it.
 	action->freeAim = freeAimOn(mode);
+	action->eyeOrigin = closeEyeShot(mode, aimedVoxel, hitSomething) && !weapon->getArcingShot(mode); // (setting "Close range: from the eye")
 	if ((Options::fpsAimExact || action->freeAim || (Options::fpsThrowing == 1 && weapon->getArcingShot(mode))) && (hitSomething || !weapon->getArcingShot(mode)) && isShot(mode))
 	{
 		action->targetVoxel = aimedVoxel;
@@ -3210,6 +3212,7 @@ void FirstPersonMode::launchShot(BattleUnit *unit, BattleItem *weapon, BattleAct
 	// Clear what we added, so the next action (one from the classic HUD, say) aims normally.
 	action->targetVoxel = Position(-1, -1, -1);
 	action->freeAim = false;
+	action->eyeOrigin = false;
 	action->forced = false;
 	action->relativeOrigin = BattleActionOrigin::CENTRE;
 	action->dualWield = false;
@@ -3577,6 +3580,30 @@ BattleActionOrigin FirstPersonMode::leanSide(const BattleUnit *unit, const Posit
 bool FirstPersonMode::freeAimOn(BattleActionType mode) const
 {
 	return !Options::fpsFaithfulTargeting && isShot(mode);
+}
+
+/**
+ * Setting "Close range: from the eye" (the owner, on GitHub issue #148): with the game's own
+ * targeting, a straight shot at a point within CloseEyeRange voxels of the eye leaves from the
+ * eye's place across the tile (as an FPS-style round does, see freeAimFrom), so the round goes
+ * where the crosshair is: up close the game's muzzle point, on the tile's edge and to a side with
+ * a lean, is too far from the eye for its line to reach what the eye sees. All else stays the
+ * game's: its accuracy roll, its line of fire from there.
+ * @param mode The fire mode.
+ * @param aimedVoxel The point under the crosshair.
+ * @param hitSomething The crosshair is on something (not the open sky).
+ * @return True if the shot leaves from the eye.
+ */
+bool FirstPersonMode::closeEyeShot(BattleActionType mode, const Position &aimedVoxel, bool hitSomething) const
+{
+	if (!Options::fpsCloseEyeShots || !Options::fpsFaithfulTargeting || !isShot(mode) || !hitSomething)
+	{
+		return false;
+	}
+	double eye[3];
+	_view->getEye(eye);
+	const double away[3] = { aimedVoxel.x + 0.5 - eye[0], aimedVoxel.y + 0.5 - eye[1], aimedVoxel.z + 0.5 - eye[2] };
+	return away[0] * away[0] + away[1] * away[1] + away[2] * away[2] <= CloseEyeRange * CloseEyeRange;
 }
 
 /**
