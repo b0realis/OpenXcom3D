@@ -435,7 +435,8 @@ public:
 	/// The path a throw or shot aimed now would take, in voxels from the soldier to its end (see
 	/// drawTrajectory); empty for none. Set again only when it changes.
 	/// How a trajectory is drawn: a throw's or an arcing shot's curve, one forced (as with Ctrl held), a straight shot's line.
-	enum TrajectoryLook { TRAJECTORY_ARC, TRAJECTORY_FORCED, TRAJECTORY_STRAIGHT, TRAJECTORY_FORCED_LINE, TRAJECTORY_REFUSED_LINE };
+	enum TrajectoryLook { TRAJECTORY_ARC, TRAJECTORY_FORCED, TRAJECTORY_STRAIGHT, TRAJECTORY_FORCED_LINE, TRAJECTORY_REFUSED_LINE,
+		TRAJECTORY_AWAY_LINE }; // (AWAY_LINE: a straight shot that will fly, but not to the point under the crosshair: dimmed, and marked at the crosshair)
 	void setTrajectory(const std::vector<Position> &path, TrajectoryLook look = TRAJECTORY_ARC) { _trajectory = path; _trajectoryLook = look; }
 	/// Dual wield: the other gun's path, drawn from its muzzle (see drawTrajectory); empty for none.
 	void setOtherTrajectory(const std::vector<Position> &path, TrajectoryLook look = TRAJECTORY_ARC) { _otherTrajectory = path; _otherTrajectoryLook = look; }

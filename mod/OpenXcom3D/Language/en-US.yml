@@ -443,6 +443,8 @@ en-US:
   STR_FPS_RANGEFINDER_ANALOGUE: "Analog"
   STR_FPS_RANGE_SUBJECT: "1.7m"
   STR_FPS_RANGE: "RANGE {0}"
+  STR_FPS_AIM_OFF: "OFF"
+  STR_FPS_AIM_BLOCKED: "BLOCKED"
   STR_FPS_KEY_RANGE: "Range (hold)"
   STR_FPS_KEY_RANGE_DESC: "Held: shows the rangefinder (setting Rangefinder; Digital when that is Off)."
   STR_FPS_CRAFT_ICONS: "Craft icons"

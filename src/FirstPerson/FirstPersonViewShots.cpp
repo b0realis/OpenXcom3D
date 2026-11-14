@@ -1691,7 +1691,8 @@ void FirstPersonView::drawTrajectoryPath(const std::vector<Position> &path, Traj
 	};
 	// A forced path (yellow by day) is dotted under night vision; a straight one is a line.
 	const bool forced = look == TRAJECTORY_FORCED || look == TRAJECTORY_FORCED_LINE;
-	const bool straight = look == TRAJECTORY_STRAIGHT || look == TRAJECTORY_FORCED_LINE || refused;
+	const bool away = look == TRAJECTORY_AWAY_LINE;
+	const bool straight = look == TRAJECTORY_STRAIGHT || look == TRAJECTORY_FORCED_LINE || refused || away;
 	const bool dotted = _nightVision && forced;
 
 	// A straight shot: the laser from the weapon's muzzle on the screen (12 voxels out along the
@@ -1723,7 +1724,7 @@ void FirstPersonView::drawTrajectoryPath(const std::vector<Position> &path, Traj
 			voxelCentreOf(path[first], start);
 		}
 		const Uint8 lineColor = forced ? _colors.trajectoryForced : refused ? _colors.laserRefused : _colors.laserSight;
-		drawStretch(start, end, lineColor, 1, refused ? RefusedLineOpacity : 1.0f);
+		drawStretch(start, end, lineColor, 1, refused || away ? RefusedLineOpacity : 1.0f);
 		drawEndDot(end, forced ? _colors.forcedDot : refused ? _colors.laserRefused : _colors.laserDot, lineColor);
 		return;
 	}

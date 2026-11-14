@@ -260,6 +260,11 @@ const double HeldItemScale = 2.6, HeldItemMinPixels = 20.0, HeldItemYaw = 22.0, 
 /// A body carried (a corpse, someone unconscious): this many times an item's size, and its middle this
 /// share of its height above the screen's bottom edge (an item's is on the edge): over the shoulder.
 const double HeldBodyScale = 1.4, HeldBodyLift = 0.15;
+/// The shot preview's laser is "away" when, seen from the eye, its end is more than this many voxels off the point
+/// under the crosshair at that point's distance: at least LaserAwayAngle (radians: far off, a voxel is nothing) and
+/// never needing more than LaserAwayMostAngle (right in front of the eye two voxels are a wide angle, and the miss
+/// plain to see).
+const double LaserAwayVoxels = 2.0, LaserAwayAngle = 0.01, LaserAwayMostAngle = 0.04;
 /// A weapon shorter than the rifle (whose picture is about RiflePixels long) comes out smaller:
 /// by its length to the power SizeCurve (a pistol, half a rifle's picture, at 70%), shrunk about
 /// a point GripAt of the way from the muzzle towards the stock end (so it still points at the

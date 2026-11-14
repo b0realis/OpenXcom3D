@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..bb48f3238
+index 000000000..9dc194b5f
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,576 @@
+@@ -0,0 +1,578 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -573,6 +573,8 @@ index 000000000..bb48f3238
 +  STR_FPS_RANGEFINDER_ANALOGUE: "Analogue"
 +  STR_FPS_RANGE_SUBJECT: "1.7m"
 +  STR_FPS_RANGE: "RANGE {0}"
++  STR_FPS_AIM_OFF: "OFF"
++  STR_FPS_AIM_BLOCKED: "BLOCKED"
 +  STR_FPS_KEY_RANGE: "Range (hold)"
 +  STR_FPS_KEY_RANGE_DESC: "Held: shows the rangefinder (setting Rangefinder; Digital when that is Off)."
 +  STR_FPS_CRAFT_ICONS: "Craft icons"
@@ -706,10 +708,10 @@ index 000000000..bb48f3238
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..c08c3758b
+index 000000000..eabd31fe7
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,576 @@
+@@ -0,0 +1,578 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1155,6 +1157,8 @@ index 000000000..c08c3758b
 +  STR_FPS_RANGEFINDER_ANALOGUE: "Analog"
 +  STR_FPS_RANGE_SUBJECT: "1.7m"
 +  STR_FPS_RANGE: "RANGE {0}"
++  STR_FPS_AIM_OFF: "OFF"
++  STR_FPS_AIM_BLOCKED: "BLOCKED"
 +  STR_FPS_KEY_RANGE: "Range (hold)"
 +  STR_FPS_KEY_RANGE_DESC: "Held: shows the rangefinder (setting Rangefinder; Digital when that is Off)."
 +  STR_FPS_CRAFT_ICONS: "Craft icons"
@@ -31970,10 +31974,10 @@ index 000000000..eaa9f409a
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..cc890a1c5
+index 000000000..9145c7857
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,3285 @@
+@@ -0,0 +1,3290 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -32268,6 +32272,10 @@ index 000000000..cc890a1c5
 +	// Left of the crosshair, the range to what it points at (setting "Rangefinder", or its key held).
 +	_txtRange = addText(90, 9, width / 2 - 104, height / 2 + 1, "crosshairText", "firstPerson");
 +	_txtRange->setAlign(ALIGN_RIGHT);
++	// Left of the crosshair, a line higher: the shot shown won't land under the crosshair (see updateTrajectory, _laserAway).
++	_txtAimOff = addText(90, 9, width / 2 - 104, height / 2 - 9, "crosshairText", "firstPerson");
++	_txtAimOff->setAlign(ALIGN_RIGHT);
++	_txtAimOff->setVisible(false);
 +	// The analogue rangefinder (drawn in drawRangeScale): its line a fifth of the view wide, its curve at most an eighth
 +	// of the view high not zoomed in and ZoomFactor times that zoomed in, with room for the line's shadow; five
 +	// numbers over the curve and the height it is drawn for at the line's end.
@@ -32295,7 +32303,7 @@ index 000000000..cc890a1c5
 +	_txtScoping->setAlign(ALIGN_RIGHT);
 +
 +	// All hidden until there's something to show.
-+	for (Text *text : { _txtMode, _txtShot, _txtCosts, _txtDamage, _txtRange, _txtBanner, _txtTarget, _txtScoping })
++	for (Text *text : { _txtMode, _txtShot, _txtCosts, _txtDamage, _txtRange, _txtAimOff, _txtBanner, _txtTarget, _txtScoping })
 +	{
 +		text->setVisible(false);
 +	}
@@ -32912,6 +32920,7 @@ index 000000000..cc890a1c5
 +	_anchors[_txtCosts] = CENTER;
 +	_anchors[_txtDamage] = CENTER;
 +	_anchors[_txtRange] = CENTER;
++	_anchors[_txtAimOff] = CENTER;
 +	_anchors[_rangeScale] = CENTER;
 +	for (Text *mark : _rangeMarks) _anchors[mark] = CENTER;
 +	_anchors[_txtScoping] = RIGHT_CENTER;
@@ -35261,10 +35270,10 @@ index 000000000..cc890a1c5
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..c1d6f175a
+index 000000000..9d363a6cc
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1386 @@
+@@ -0,0 +1,1389 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -36017,6 +36026,8 @@ index 000000000..c1d6f175a
 +	bool _aimHitsSomething = false;                     // something is under the crosshair (not just sky)
 +	// the path the next throw or shot would take (setting "Show trajectory"), and a target marked
 +	// for confirm fire (setting "Confirm fire"): the next click on the same tile fires
++	bool _laserRefused = false;                         // the straight shot previewed has no line of fire at all: the game will refuse it ("BLOCKED" by the crosshair)
++	bool _laserAway = false;                            // the straight shot previewed (the laser) will fly, but not to the point under the crosshair (GitHub issue #148)
 +	std::vector<int> _trajectoryKey;                    // what the path shown was worked out for (empty: none shown)
 +	Position _confirmTile = Position(-1, -1, -1);       // the marked target tile (x -1: none)
 +	Position _confirmVoxel;                             // the point marked on it
@@ -36212,6 +36223,7 @@ index 000000000..c1d6f175a
 +	Uint64 _accuracyLineDrawnFor = ~(Uint64)0;     // what it shows, to redraw only on change
 +	Text *_txtMode = nullptr, *_txtShot = nullptr; // the fire mode, and the shot's odds and cost, beside the crosshair
 +	Text *_txtCosts = nullptr;                      // and under them its other costs (setting "Expanded crosshair info")
++	Text *_txtAimOff = nullptr;                     // left of the crosshair: "OFF", the shot previewed won't land under it (see _laserAway)
 +	Text *_txtRange = nullptr;                      // left of the crosshair, how far off the point under it is, in tiles (setting "Rangefinder" Digital, or its key held)
 +	Surface *_rangeScale = nullptr;                 // the analogue rangefinder's scale, left of the crosshair (see drawRangeScale)
 +	std::vector<Text*> _rangeMarks;                 // its numbers, the nearest mark's first, and last the height it is drawn for ("1.7m")
@@ -42702,10 +42714,10 @@ index 000000000..ae2ea6125
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..70d92c2c2
+index 000000000..c866d0188
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,523 @@
+@@ -0,0 +1,528 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -42968,6 +42980,11 @@ index 000000000..70d92c2c2
 +/// A body carried (a corpse, someone unconscious): this many times an item's size, and its middle this
 +/// share of its height above the screen's bottom edge (an item's is on the edge): over the shoulder.
 +const double HeldBodyScale = 1.4, HeldBodyLift = 0.15;
++/// The shot preview's laser is "away" when, seen from the eye, its end is more than this many voxels off the point
++/// under the crosshair at that point's distance: at least LaserAwayAngle (radians: far off, a voxel is nothing) and
++/// never needing more than LaserAwayMostAngle (right in front of the eye two voxels are a wide angle, and the miss
++/// plain to see).
++const double LaserAwayVoxels = 2.0, LaserAwayAngle = 0.01, LaserAwayMostAngle = 0.04;
 +/// A weapon shorter than the rifle (whose picture is about RiflePixels long) comes out smaller:
 +/// by its length to the power SizeCurve (a pistol, half a rifle's picture, at 70%), shrunk about
 +/// a point GripAt of the way from the muzzle towards the stock end (so it still points at the
@@ -43231,10 +43248,10 @@ index 000000000..70d92c2c2
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..4649cf471
+index 000000000..a7d3bd08c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,5387 @@
+@@ -0,0 +1,5421 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -45208,6 +45225,7 @@ index 000000000..4649cf471
 +	}
 +	if (!show)
 +	{
++		_laserAway = _laserRefused = false;
 +		if (!_trajectoryKey.empty())
 +		{
 +			_trajectoryKey.clear();
@@ -45308,11 +45326,34 @@ index 000000000..4649cf471
 +			// (a shot the game will refuse shows dimmed: no surprise "No line of fire")
 +			look = aim == AIM_FORCED ? FirstPersonView::TRAJECTORY_FORCED_LINE : aim == AIM_REFUSED ? FirstPersonView::TRAJECTORY_REFUSED_LINE
 +				: FirstPersonView::TRAJECTORY_STRAIGHT;
++			// The game's own targeting, and the round won't land on the point under the crosshair (its
++			// line leaves from the weapon, not the eye: something close is in its way, or the game's aim
++			// went for another part of the target): seen from the eye its end is more than
++			// LaserAwayVoxels off that point (at least LaserAwayAngle). The laser says so: dimmed, and "OFF"
++			// left of the crosshair (see updateCrosshair; a player, GitHub issue #148, "off lasers";
++			// the owner: mark it clearly).
++			if (look == FirstPersonView::TRAJECTORY_STRAIGHT && !preview.freeAim && !path.empty())
++			{
++				double eye[3];
++				_view->getEye(eye);
++				const double toAimed[3] = { targetVoxel.x + 0.5 - eye[0], targetVoxel.y + 0.5 - eye[1], targetVoxel.z + 0.5 - eye[2] };
++				const double toEnd[3] = { path.back().x + 0.5 - eye[0], path.back().y + 0.5 - eye[1], path.back().z + 0.5 - eye[2] };
++				const double aimedLength = std::sqrt(toAimed[0] * toAimed[0] + toAimed[1] * toAimed[1] + toAimed[2] * toAimed[2]);
++				const double endLength = std::sqrt(toEnd[0] * toEnd[0] + toEnd[1] * toEnd[1] + toEnd[2] * toEnd[2]);
++				if (aimedLength > 0.0 && endLength > 0.0)
++				{
++					const double cosine = (toAimed[0] * toEnd[0] + toAimed[1] * toEnd[1] + toAimed[2] * toEnd[2]) / (aimedLength * endLength);
++					const double allowed = std::min(LaserAwayMostAngle, std::max(LaserAwayAngle, std::atan(LaserAwayVoxels / aimedLength)));
++					if (cosine < std::cos(allowed)) look = FirstPersonView::TRAJECTORY_AWAY_LINE;
++				}
++			}
 +		}
 +		return look;
 +	};
 +	std::vector<Position> path, otherPath;
 +	const FirstPersonView::TrajectoryLook look = pathOf(weapon, mode, path);
++	_laserAway = look == FirstPersonView::TRAJECTORY_AWAY_LINE;
++	_laserRefused = look == FirstPersonView::TRAJECTORY_REFUSED_LINE;
 +	const FirstPersonView::TrajectoryLook otherLook = otherWeapon ? pathOf(otherWeapon, offMode, otherPath) : FirstPersonView::TRAJECTORY_ARC;
 +	_view->setTrajectory(path, look);
 +	_view->setOtherTrajectory(otherPath, otherLook);
@@ -47567,6 +47608,8 @@ index 000000000..4649cf471
 +	const bool rangeShown = show && unit && ((Options::fpsRangefinder != 0 && playerTurn) || rangeHeld);
 +	const bool rangeAnalogue = rangeShown && Options::fpsRangefinder == 2;
 +	_txtRange->setVisible(rangeShown && !rangeAnalogue);
++	// "OFF": the laser shown ends away from the point under the crosshair (see updateTrajectory).
++	_txtAimOff->setVisible(show && playerTurn && (_laserAway || _laserRefused));
 +	_rangeScale->setVisible(rangeAnalogue);
 +	for (Text *mark : _rangeMarks) mark->setVisible(rangeAnalogue);
 +	if (!show)
@@ -47586,6 +47629,8 @@ index 000000000..4649cf471
 +	_txtCosts->setX(centreX + 14); // (its line: below, once the damage line is known)
 +	_txtRange->setX(centreX - 14 - _txtRange->getWidth()); // (left of the crosshair, on the hit chance's row)
 +	_txtRange->setY(linesTop + 10);
++	_txtAimOff->setX(centreX - 14 - _txtAimOff->getWidth()); // (left of the crosshair, on the fire mode's row)
++	_txtAimOff->setY(linesTop);
 +
 +	// The colours, picked from the current palette: plain ones for the crosshair, and text
 +	// colour groups for the lines.
@@ -47597,6 +47642,12 @@ index 000000000..4649cf471
 +
 +	// The range: from the unit to the tile under the crosshair, in tiles, counted as the game counts a shot's range (the
 +	// hit chance's dropoff, a weapon's reach); a dash at the sky.
++	if (_txtAimOff->getVisible())
++	{
++		const std::string offText = _state->tr(_laserRefused ? "STR_FPS_AIM_BLOCKED" : "STR_FPS_AIM_OFF");
++		if (_txtAimOff->getText() != offText) _txtAimOff->setText(offText);
++		_txtAimOff->setColor(redText);
++	}
 +	if (_txtRange->getVisible())
 +	{
 +		const int range = _aimHitsSomething ? (int)std::ceil(std::sqrt((double)unit->distance3dToPositionSq(_aimVoxel.toTile()))) : -1;
@@ -48624,10 +48675,10 @@ index 000000000..4649cf471
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeSoldierStates.cpp b/src/FirstPerson/FirstPersonModeSoldierStates.cpp
 new file mode 100644
-index 000000000..7740fb7f7
+index 000000000..d0cf9cbd2
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeSoldierStates.cpp
-@@ -0,0 +1,1161 @@
+@@ -0,0 +1,1163 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -49013,6 +49064,7 @@ index 000000000..7740fb7f7
 +		_txtCosts->setVisible(false);
 +		_txtDamage->setVisible(false);
 +		_txtRange->setVisible(false);
++		_txtAimOff->setVisible(false);
 +		_rangeScale->setVisible(false);
 +		for (Text *mark : _rangeMarks) mark->setVisible(false);
 +		_txtTarget->setVisible(false);
@@ -49308,6 +49360,7 @@ index 000000000..7740fb7f7
 +		_txtCosts->setVisible(false);
 +		_txtDamage->setVisible(false);
 +		_txtRange->setVisible(false);
++		_txtAimOff->setVisible(false);
 +		_rangeScale->setVisible(false);
 +		for (Text *mark : _rangeMarks) mark->setVisible(false);
 +		_txtTarget->setVisible(false);
@@ -54649,10 +54702,10 @@ index 000000000..dec6ed51f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..d9073af0b
+index 000000000..7c5441894
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1573 @@
+@@ -0,0 +1,1574 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -55090,7 +55143,8 @@ index 000000000..d9073af0b
 +	/// The path a throw or shot aimed now would take, in voxels from the soldier to its end (see
 +	/// drawTrajectory); empty for none. Set again only when it changes.
 +	/// How a trajectory is drawn: a throw's or an arcing shot's curve, one forced (as with Ctrl held), a straight shot's line.
-+	enum TrajectoryLook { TRAJECTORY_ARC, TRAJECTORY_FORCED, TRAJECTORY_STRAIGHT, TRAJECTORY_FORCED_LINE, TRAJECTORY_REFUSED_LINE };
++	enum TrajectoryLook { TRAJECTORY_ARC, TRAJECTORY_FORCED, TRAJECTORY_STRAIGHT, TRAJECTORY_FORCED_LINE, TRAJECTORY_REFUSED_LINE,
++		TRAJECTORY_AWAY_LINE }; // (AWAY_LINE: a straight shot that will fly, but not to the point under the crosshair: dimmed, and marked at the crosshair)
 +	void setTrajectory(const std::vector<Position> &path, TrajectoryLook look = TRAJECTORY_ARC) { _trajectory = path; _trajectoryLook = look; }
 +	/// Dual wield: the other gun's path, drawn from its muzzle (see drawTrajectory); empty for none.
 +	void setOtherTrajectory(const std::vector<Position> &path, TrajectoryLook look = TRAJECTORY_ARC) { _otherTrajectory = path; _otherTrajectoryLook = look; }
@@ -63522,10 +63576,10 @@ index 000000000..8ba46e44c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShots.cpp b/src/FirstPerson/FirstPersonViewShots.cpp
 new file mode 100644
-index 000000000..27e9f4057
+index 000000000..eafb28cfe
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShots.cpp
-@@ -0,0 +1,2295 @@
+@@ -0,0 +1,2296 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -65219,7 +65273,8 @@ index 000000000..27e9f4057
 +	};
 +	// A forced path (yellow by day) is dotted under night vision; a straight one is a line.
 +	const bool forced = look == TRAJECTORY_FORCED || look == TRAJECTORY_FORCED_LINE;
-+	const bool straight = look == TRAJECTORY_STRAIGHT || look == TRAJECTORY_FORCED_LINE || refused;
++	const bool away = look == TRAJECTORY_AWAY_LINE;
++	const bool straight = look == TRAJECTORY_STRAIGHT || look == TRAJECTORY_FORCED_LINE || refused || away;
 +	const bool dotted = _nightVision && forced;
 +
 +	// A straight shot: the laser from the weapon's muzzle on the screen (12 voxels out along the
@@ -65251,7 +65306,7 @@ index 000000000..27e9f4057
 +			voxelCentreOf(path[first], start);
 +		}
 +		const Uint8 lineColor = forced ? _colors.trajectoryForced : refused ? _colors.laserRefused : _colors.laserSight;
-+		drawStretch(start, end, lineColor, 1, refused ? RefusedLineOpacity : 1.0f);
++		drawStretch(start, end, lineColor, 1, refused || away ? RefusedLineOpacity : 1.0f);
 +		drawEndDot(end, forced ? _colors.forcedDot : refused ? _colors.laserRefused : _colors.laserDot, lineColor);
 +		return;
 +	}

@@ -1971,6 +1971,7 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 	}
 	if (!show)
 	{
+		_laserAway = _laserRefused = false;
 		if (!_trajectoryKey.empty())
 		{
 			_trajectoryKey.clear();
@@ -2071,11 +2072,34 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 			// (a shot the game will refuse shows dimmed: no surprise "No line of fire")
 			look = aim == AIM_FORCED ? FirstPersonView::TRAJECTORY_FORCED_LINE : aim == AIM_REFUSED ? FirstPersonView::TRAJECTORY_REFUSED_LINE
 				: FirstPersonView::TRAJECTORY_STRAIGHT;
+			// The game's own targeting, and the round won't land on the point under the crosshair (its
+			// line leaves from the weapon, not the eye: something close is in its way, or the game's aim
+			// went for another part of the target): seen from the eye its end is more than
+			// LaserAwayVoxels off that point (at least LaserAwayAngle). The laser says so: dimmed, and "OFF"
+			// left of the crosshair (see updateCrosshair; a player, GitHub issue #148, "off lasers";
+			// the owner: mark it clearly).
+			if (look == FirstPersonView::TRAJECTORY_STRAIGHT && !preview.freeAim && !path.empty())
+			{
+				double eye[3];
+				_view->getEye(eye);
+				const double toAimed[3] = { targetVoxel.x + 0.5 - eye[0], targetVoxel.y + 0.5 - eye[1], targetVoxel.z + 0.5 - eye[2] };
+				const double toEnd[3] = { path.back().x + 0.5 - eye[0], path.back().y + 0.5 - eye[1], path.back().z + 0.5 - eye[2] };
+				const double aimedLength = std::sqrt(toAimed[0] * toAimed[0] + toAimed[1] * toAimed[1] + toAimed[2] * toAimed[2]);
+				const double endLength = std::sqrt(toEnd[0] * toEnd[0] + toEnd[1] * toEnd[1] + toEnd[2] * toEnd[2]);
+				if (aimedLength > 0.0 && endLength > 0.0)
+				{
+					const double cosine = (toAimed[0] * toEnd[0] + toAimed[1] * toEnd[1] + toAimed[2] * toEnd[2]) / (aimedLength * endLength);
+					const double allowed = std::min(LaserAwayMostAngle, std::max(LaserAwayAngle, std::atan(LaserAwayVoxels / aimedLength)));
+					if (cosine < std::cos(allowed)) look = FirstPersonView::TRAJECTORY_AWAY_LINE;
+				}
+			}
 		}
 		return look;
 	};
 	std::vector<Position> path, otherPath;
 	const FirstPersonView::TrajectoryLook look = pathOf(weapon, mode, path);
+	_laserAway = look == FirstPersonView::TRAJECTORY_AWAY_LINE;
+	_laserRefused = look == FirstPersonView::TRAJECTORY_REFUSED_LINE;
 	const FirstPersonView::TrajectoryLook otherLook = otherWeapon ? pathOf(otherWeapon, offMode, otherPath) : FirstPersonView::TRAJECTORY_ARC;
 	_view->setTrajectory(path, look);
 	_view->setOtherTrajectory(otherPath, otherLook);
@@ -4330,6 +4354,8 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	const bool rangeShown = show && unit && ((Options::fpsRangefinder != 0 && playerTurn) || rangeHeld);
 	const bool rangeAnalogue = rangeShown && Options::fpsRangefinder == 2;
 	_txtRange->setVisible(rangeShown && !rangeAnalogue);
+	// "OFF": the laser shown ends away from the point under the crosshair (see updateTrajectory).
+	_txtAimOff->setVisible(show && playerTurn && (_laserAway || _laserRefused));
 	_rangeScale->setVisible(rangeAnalogue);
 	for (Text *mark : _rangeMarks) mark->setVisible(rangeAnalogue);
 	if (!show)
@@ -4349,6 +4375,8 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	_txtCosts->setX(centreX + 14); // (its line: below, once the damage line is known)
 	_txtRange->setX(centreX - 14 - _txtRange->getWidth()); // (left of the crosshair, on the hit chance's row)
 	_txtRange->setY(linesTop + 10);
+	_txtAimOff->setX(centreX - 14 - _txtAimOff->getWidth()); // (left of the crosshair, on the fire mode's row)
+	_txtAimOff->setY(linesTop);
 
 	// The colours, picked from the current palette: plain ones for the crosshair, and text
 	// colour groups for the lines.
@@ -4360,6 +4388,12 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 
 	// The range: from the unit to the tile under the crosshair, in tiles, counted as the game counts a shot's range (the
 	// hit chance's dropoff, a weapon's reach); a dash at the sky.
+	if (_txtAimOff->getVisible())
+	{
+		const std::string offText = _state->tr(_laserRefused ? "STR_FPS_AIM_BLOCKED" : "STR_FPS_AIM_OFF");
+		if (_txtAimOff->getText() != offText) _txtAimOff->setText(offText);
+		_txtAimOff->setColor(redText);
+	}
 	if (_txtRange->getVisible())
 	{
 		const int range = _aimHitsSomething ? (int)std::ceil(std::sqrt((double)unit->distance3dToPositionSq(_aimVoxel.toTile()))) : -1;

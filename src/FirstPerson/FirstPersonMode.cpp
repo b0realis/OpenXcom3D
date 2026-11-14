@@ -292,6 +292,10 @@ void FirstPersonMode::createCrosshairAndBanner()
 	// Left of the crosshair, the range to what it points at (setting "Rangefinder", or its key held).
 	_txtRange = addText(90, 9, width / 2 - 104, height / 2 + 1, "crosshairText", "firstPerson");
 	_txtRange->setAlign(ALIGN_RIGHT);
+	// Left of the crosshair, a line higher: the shot shown won't land under the crosshair (see updateTrajectory, _laserAway).
+	_txtAimOff = addText(90, 9, width / 2 - 104, height / 2 - 9, "crosshairText", "firstPerson");
+	_txtAimOff->setAlign(ALIGN_RIGHT);
+	_txtAimOff->setVisible(false);
 	// The analogue rangefinder (drawn in drawRangeScale): its line a fifth of the view wide, its curve at most an eighth
 	// of the view high not zoomed in and ZoomFactor times that zoomed in, with room for the line's shadow; five
 	// numbers over the curve and the height it is drawn for at the line's end.
@@ -319,7 +323,7 @@ void FirstPersonMode::createCrosshairAndBanner()
 	_txtScoping->setAlign(ALIGN_RIGHT);
 
 	// All hidden until there's something to show.
-	for (Text *text : { _txtMode, _txtShot, _txtCosts, _txtDamage, _txtRange, _txtBanner, _txtTarget, _txtScoping })
+	for (Text *text : { _txtMode, _txtShot, _txtCosts, _txtDamage, _txtRange, _txtAimOff, _txtBanner, _txtTarget, _txtScoping })
 	{
 		text->setVisible(false);
 	}
@@ -936,6 +940,7 @@ void FirstPersonMode::setResizeAnchors()
 	_anchors[_txtCosts] = CENTER;
 	_anchors[_txtDamage] = CENTER;
 	_anchors[_txtRange] = CENTER;
+	_anchors[_txtAimOff] = CENTER;
 	_anchors[_rangeScale] = CENTER;
 	for (Text *mark : _rangeMarks) _anchors[mark] = CENTER;
 	_anchors[_txtScoping] = RIGHT_CENTER;

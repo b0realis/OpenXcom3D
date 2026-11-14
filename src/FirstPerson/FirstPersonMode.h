@@ -750,6 +750,8 @@ private:
 	bool _aimHitsSomething = false;                     // something is under the crosshair (not just sky)
 	// the path the next throw or shot would take (setting "Show trajectory"), and a target marked
 	// for confirm fire (setting "Confirm fire"): the next click on the same tile fires
+	bool _laserRefused = false;                         // the straight shot previewed has no line of fire at all: the game will refuse it ("BLOCKED" by the crosshair)
+	bool _laserAway = false;                            // the straight shot previewed (the laser) will fly, but not to the point under the crosshair (GitHub issue #148)
 	std::vector<int> _trajectoryKey;                    // what the path shown was worked out for (empty: none shown)
 	Position _confirmTile = Position(-1, -1, -1);       // the marked target tile (x -1: none)
 	Position _confirmVoxel;                             // the point marked on it
@@ -945,6 +947,7 @@ private:
 	Uint64 _accuracyLineDrawnFor = ~(Uint64)0;     // what it shows, to redraw only on change
 	Text *_txtMode = nullptr, *_txtShot = nullptr; // the fire mode, and the shot's odds and cost, beside the crosshair
 	Text *_txtCosts = nullptr;                      // and under them its other costs (setting "Expanded crosshair info")
+	Text *_txtAimOff = nullptr;                     // left of the crosshair: "OFF", the shot previewed won't land under it (see _laserAway)
 	Text *_txtRange = nullptr;                      // left of the crosshair, how far off the point under it is, in tiles (setting "Rangefinder" Digital, or its key held)
 	Surface *_rangeScale = nullptr;                 // the analogue rangefinder's scale, left of the crosshair (see drawRangeScale)
 	std::vector<Text*> _rangeMarks;                 // its numbers, the nearest mark's first, and last the height it is drawn for ("1.7m")
