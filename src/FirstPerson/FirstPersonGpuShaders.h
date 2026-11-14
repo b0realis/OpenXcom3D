@@ -2063,6 +2063,12 @@ void main()
 		{
 			// FirstPersonView::drawSprite: where the ray meets the sprite (its lying rows on the floor in
 			// front of the anchor, the rest on the card), which of its pixels that is, and the pixel put.
+			// (Smoke where the pixel has its fill of it already adds nothing: passed over before anything is worked out.)
+			if ((flags & 16) != 0)
+			{
+				float fill = prim(base, 8).w;
+				if (fill > 0.0 && float(smokeVeil) >= fill) continue;
+			}
 			vec4 t2 = prim(base, 2), t3 = prim(base, 3), t4 = prim(base, 4), t5 = prim(base, 5), t6 = prim(base, 6), t7 = prim(base, 7), t8 = prim(base, 8);
 			vec3 anchor = t2.xyz, cardUp = t3.xyz, cardFacing = t4.xyz;
 			float anchorAcross = t2.w, anchorFacing = t3.w, anchorAlong = t4.w, columnSize = t5.x, rowSize = t5.y, lyingRowSize = t5.z, floorHeight = t5.w,

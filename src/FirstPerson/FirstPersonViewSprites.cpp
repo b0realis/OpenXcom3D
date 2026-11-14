@@ -467,10 +467,14 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 		// to endColumn. A block of the view where everything drawn is nearer than the row (see
 		// cullSmokeDraws) is passed over whole: every pixel of it would fail the depth test.
 		const float *rowBlocks = seeThroughSprite && seeThroughSprite->depthBlocks ? seeThroughSprite->depthBlocks + (pixelY / SmokeCullBlock) * seeThroughSprite->depthBlockColumns : nullptr;
+		// (Smoke where the pixel has its fill of it already adds nothing: passed over before anything is worked out.)
+		const int smokeFill = seeThroughSprite ? seeThroughSprite->capLevels : 0;
+		const Uint8 *smokeRow = &_smokeVeil[(size_t)pixelY * width];
 		auto drawColumns = [&](int from, int to, int firstColumn, int endColumn)
 		{
 			for (int pixelX = from; pixelX < to; ++pixelX)
 			{
+				if (smokeFill > 0 && smokeRow[pixelX] >= smokeFill) continue;
 				if (rowBlocks && rowBlocks[pixelX / SmokeCullBlock] <= rowDepth)
 				{
 					pixelX = pixelX / SmokeCullBlock * SmokeCullBlock + SmokeCullBlock - 1;
@@ -2913,25 +2917,24 @@ void FirstPersonView::drawSeeThroughSmoke()
 			ground[0] + (variation[0] - 0.5) * 4.0 + sway * 0.8 * std::sin(seconds * 0.5 + variation[1] * 2.0 * Pi),
 			ground[1] + (variation[1] - 0.5) * 4.0 + sway * 0.8 * std::cos(seconds * 0.4 + variation[2] * 2.0 * Pi),
 			ground[2] + sway * 1.0 * std::sin(seconds * 0.7 + variation[3] * 2.0 * Pi) };
-		// Modern: a little more opaque the thicker the smoke (a fresh smoke grenade makes about
-		// 15), the thickest as opaque as the settings "Smoke opacity" and "Night smoke opacity"
-		// allow by the light here, their maximum, which smoke over smoke builds up to and no
-		// further (a player's report, GitHub issue #98: stacked smoke hid more than the game's
-		// sight rules do; see smokeOpacityAt, _smokeVeil). Original: the game's dots as they are,
-		// solid, one frame a tile, as the map draws them (the owner: "exactly as the map"; their
-		// holes are the see-through). Both thinner for eyes with heat vision (see setSmokeSight).
+		// The most smoke may veil a pixel here: the settings "Smoke opacity" and "Night smoke
+		// opacity" by the light, a maximum smoke over smoke never passes (a player's report, GitHub
+		// issue #98: stacked smoke hid more than the game's sight rules do; see smokeOpacityAt,
+		// _smokeVeil), thinner for eyes with heat vision (see setSmokeSight).
 		// Both follow the settings since GitHub issue #145 (the owner: "almost translucent at 5%",
 		// "completely opaque at 100%", 0 none): Original's dots as see-through as the setting says,
-		// at 100 solid as on the map (drawn as before, no cap needed); Modern's thinner smoke as
-		// opaque as the thickest at 100, a grey nothing is seen through.
+		// at 100 solid as on the map (drawn as before, no cap needed). Modern: every cloud as opaque
+		// in its body as the setting says, on its own (the owner: "use stacking as minimally as
+		// possible"): the nearest cloud fills a pixel, and the clouds behind it are passed over
+		// there (see drawSprite), adding only where its soft edge left room. How thick the smoke is
+		// shows in its frame, as on the map (see firstSmokeFrame).
 		const float most = smokeCapAt(_tileViews[tileIndex].light);
 		if (most <= 0.0f)
 		{
 			continue;
 		}
-		const bool opaque = most >= 1.0f;
-		const float cap = original && opaque ? 0.0f : most;
-		const float opacity = original || opaque ? most : most * std::clamp(0.45f + tile->getSmoke() * 0.025f, 0.0f, 0.85f) / 0.85f;
+		const float cap = original && most >= 1.0f ? 0.0f : most;
+		const float opacity = most;
 		const int firstFrame = firstSmokeFrame(tile->getSmoke());
 		const double frameTime = seconds / FrameSeconds + tile->getAnimationOffset() + variation[2], scale = 1.14 + variation[3] * 0.12;
 		addPuff(world, 32, firstFrame, frameTime, opacity, cap, scale, _tileViews[tileIndex].light);
