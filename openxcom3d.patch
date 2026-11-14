@@ -124,7 +124,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..c56b71c08
+index 000000000..bb48f3238
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,576 @@
@@ -261,7 +261,7 @@ index 000000000..c56b71c08
 +  STR_FPS_DISCREET_EDGE: "Discreet map edge"
 +  STR_FPS_DISCREET_EDGE_DESC: "The map's edge as small red dots on the floor, instead of the yellow tape."
 +  STR_FPS_RENDERER: "Renderer"
-+  STR_FPS_RENDERER_DESC: "CPU: runs anywhere. GPU: the graphics card draws the 3D world (Linux for now); CPU where it can't."
++  STR_FPS_RENDERER_DESC: "CPU: runs anywhere. GPU: the graphics card draws the 3D world (Linux, Windows, macOS); the CPU takes over where it can't."
 +  STR_FPS_RENDERER_CPU: "CPU"
 +  STR_FPS_RENDERER_GPU: "GPU"
 +  STR_FPS_HUD_SCALE: "HUD scale"
@@ -706,7 +706,7 @@ index 000000000..c56b71c08
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..4785081d9
+index 000000000..c08c3758b
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,576 @@
@@ -843,7 +843,7 @@ index 000000000..4785081d9
 +  STR_FPS_DISCREET_EDGE: "Discreet map edge"
 +  STR_FPS_DISCREET_EDGE_DESC: "The map's edge as small red dots on the floor, instead of the yellow tape."
 +  STR_FPS_RENDERER: "Renderer"
-+  STR_FPS_RENDERER_DESC: "CPU: runs anywhere. GPU: the graphics card draws the 3D world (Linux for now); CPU where it can't."
++  STR_FPS_RENDERER_DESC: "CPU: runs anywhere. GPU: the graphics card draws the 3D world (Linux, Windows, macOS); the CPU takes over where it can't."
 +  STR_FPS_RENDERER_CPU: "CPU"
 +  STR_FPS_RENDERER_GPU: "GPU"
 +  STR_FPS_HUD_SCALE: "HUD scale"

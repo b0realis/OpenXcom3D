@@ -131,7 +131,7 @@ en-GB:
   STR_FPS_DISCREET_EDGE: "Discreet map edge"
   STR_FPS_DISCREET_EDGE_DESC: "The map's edge as small red dots on the floor, instead of the yellow tape."
   STR_FPS_RENDERER: "Renderer"
-  STR_FPS_RENDERER_DESC: "CPU: runs anywhere. GPU: the graphics card draws the 3D world (Linux for now); CPU where it can't."
+  STR_FPS_RENDERER_DESC: "CPU: runs anywhere. GPU: the graphics card draws the 3D world (Linux, Windows, macOS); the CPU takes over where it can't."
   STR_FPS_RENDERER_CPU: "CPU"
   STR_FPS_RENDERER_GPU: "GPU"
   STR_FPS_HUD_SCALE: "HUD scale"
