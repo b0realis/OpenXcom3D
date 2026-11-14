@@ -1160,11 +1160,18 @@ void buildGhost(FirstPersonView::VoxelModel &model, const Surface *sprite, int p
 		}
 	}
 
+	// An object's upright picture on the tile's west or north edge (a poster on the wall there) stands
+	// GhostWallClearance voxels into the tile: on the edge itself it is inside the wall's own voxels,
+	// and showed only once the wall was shot away (a player, GitHub issue #138). Its picture stays
+	// the one the edge's plane has.
+	const int shown = partType == O_OBJECT && axis >= 0 && offset < GhostWallClearance ? GhostWallClearance : offset;
+
 	// The voxels: each where its pixel is drawn, with that pixel's colour.
 	auto place = [&](int x, int y, int z)
 	{
 		const Uint8 color = pixelOf(x, y, z);
 		if (!color) return;
+		if (shown != offset) (axis == 0 ? x : y) = shown;
 		model.color[z][y][x] = color;
 		model.empty = false;
 		const int voxel[3] = { x, y, z };
@@ -3016,6 +3023,52 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	if (glassColors)
 	{
 		keepGlassInPanes(model, mapData->getObjectType());
+	}
+
+	// An object that is a flat picture on the tile's west or north edge (a poster: thinner than a
+	// wall, upright, XPiratez's pin-ups) stands GhostWallClearance voxels into the tile: on the edge
+	// it is inside the voxels of the wall it hangs on, which the rays meet first from either side,
+	// so it showed only once the wall was shot away (a player, GitHub issue #138; the map draws the
+	// object over the wall). Its colours are those its own place gave it. The game's own voxels
+	// for it stay where they are: the shift is the view's.
+	if (mapData->getObjectType() == O_OBJECT && !model.empty && !cutout && !glassColors && model.max[2] - model.min[2] >= PosterMinExtent)
+	{
+		for (int axis = 0; axis < 2; ++axis)
+		{
+			const int other = 1 - axis;
+			if (model.max[axis] >= GhostWallClearance || model.max[other] - model.min[other] < PosterMinExtent) continue;
+			for (int z = 0; z < Position::TileZ; ++z)
+			{
+				for (int y = Position::TileXY - 1; y >= 0; --y)
+				{
+					if (axis == 0)
+					{
+						for (int x = GhostWallClearance - 1; x >= 0; --x)
+						{
+							model.color[z][y][x + GhostWallClearance] = model.color[z][y][x];
+							model.color[z][y][x] = 0;
+						}
+						for (Uint16 *bits : { &model.glass[z][y], &model.lookOnly[z][y], &model.clear[z][y] }) *bits = (Uint16)(*bits << GhostWallClearance);
+					}
+					else if (y < GhostWallClearance)
+					{
+						for (int x = 0; x < Position::TileXY; ++x)
+						{
+							model.color[z][y + GhostWallClearance][x] = model.color[z][y][x];
+							model.color[z][y][x] = 0;
+						}
+						for (auto rows : { model.glass, model.lookOnly, model.clear })
+						{
+							rows[z][y + GhostWallClearance] = rows[z][y];
+							rows[z][y] = 0;
+						}
+					}
+				}
+			}
+			model.min[axis] += GhostWallClearance;
+			model.max[axis] += GhostWallClearance;
+			break;
+		}
 	}
 
 	// A thin plate (all its voxels in the bottom 4 layers) may be drawn as a raised slab: fit its top.
