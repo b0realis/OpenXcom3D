@@ -575,7 +575,7 @@ private:
 	std::vector<Uint8> _glowMask;                       // pixels showing something that shines (lit voxels, sparks)
 	std::vector<Uint8> _unitVeil;                       // per pixel, how much more see-through smoke may veil the unit seen there (in SeeThroughLevels; 255: no unit)
 	std::vector<Uint8> _smokeVeil;                      // per pixel, how much see-through smoke veils what's seen there this frame (in SeeThroughLevels; up to its cap)
-	std::vector<Uint8> _ownColours;                     // per pixel, 1: a unit's, a body's or an item's picture shows there (futuristic night vision leaves its colours, see washBands)
+	std::vector<Uint8> _ownColours;                     // per pixel, 1: a unit's, a body's or an item's picture shows there (futuristic night vision leaves its colours, see washBands); 2: a mark's (a hitbox's outline: every night vision leaves its colours)
 
 	/// Works out the camera's axes from its yaw and pitch.
 	void updateBasis();
@@ -1001,7 +1001,7 @@ private:
 		double drawnRadius, int reach, int coreShades, int edgeShades);
 	/// Records a line in the world, its ends on the screen (see drawLine3D).
 	void gpuRecordLine(double startX, double startY, double startZ, double endX, double endY, double endZ, int steps, Uint8 color, int thickness, float opacity,
-		float worldWidth, bool glows, bool overEverything, bool keepsGlow = false, bool exactDepth = false);
+		float worldWidth, bool glows, bool overEverything, bool keepsGlow = false, bool exactDepth = false, bool mark = false);
 	/// Records a square of pixels in front of the scene.
 	void gpuRecordDot(int left, int top, int dotWidth, int dotHeight, double depth, Uint8 color, int flags, float leeway = 0.0f, Uint8 otherColor = 0, float firstShare = -1.0f, float haze = 0.0f);
 	/// Records a round dot in front of the scene, in rings or only its rim.
@@ -1387,7 +1387,7 @@ private:
 	/// Draws a line in the world, depth-tested (all of it, or only the screen rows from bandTop up to bandBottom),
 	/// a set number of pixels thick, or as thick as worldWidth voxels look where it is (at most thickness); glowing, or plain.
 	void drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, float worldWidth = 0.0f, int bandTop = 0, int bandBottom = 1 << 30, bool glows = true,
-		bool overEverything = false);
+		bool overEverything = false, bool mark = false);
 	/// Leaves a bullet hole or scorch mark.
 	void addDecal(const float pos[3], int size, int darkness);
 	/// Draws the bullet holes, scorch marks and blackened ground.

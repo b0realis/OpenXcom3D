@@ -1945,7 +1945,7 @@ uniform int uOutlineGlows;
 uniform int uOwnOverNight;              // futuristic night vision's colour group + 1 (0: any other time)
 layout(location = 0) out uint outColor;
 layout(location = 1) out float outDepth;
-layout(location = 2) out uint outGlow;  // the glow (1, 3), 32 where the pixel keeps its own colours under night vision, 64 where see-through smoke lies over it
+layout(location = 2) out uint outGlow;  // the glow (1, 3), 32 where the pixel keeps its own colours under night vision, 64 where see-through smoke lies over it, 128 a mark's pixel (night vision leaves it)
 layout(location = 3) out uvec4 outNotes; // the unit veil left, own colours | smoke veil << 1, and for the pointer: 1 + the last solid sprite's number, 1 + the last pile's
 
 const float Bayer[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
@@ -2008,11 +2008,12 @@ void main()
 	uint color = texelFetch(uRayColor, from, 0).r, glow = texelFetch(uRayGlow, from, 0).r;
 	float depth = texelFetch(uRayDepth, from, 0).r;
 	int veil = 255, smokeVeil = 0;
-	uint own = 0u, lastSolid = 0u, lastPile = 0u;
+	uint own = 0u, mark = 0u, lastSolid = 0u, lastPile = 0u; // (mark: a hitbox's outline or line shows there, night vision leaves its colour)
 	if (uContinue != 0)
 	{
 		uvec4 notes = texelFetch(uNotes, pixel, 0);
-		veil = int(notes.r);
+		veil = int(notes.r & 255u);
+		mark = (notes.r >> 8) & 1u;
 		own = notes.g & 1u;
 		smokeVeil = int(notes.g >> 1);
 		lastSolid = notes.b;
@@ -2044,6 +2045,7 @@ void main()
 		{
 			color = outlineColor;
 			glow = uint(uOutlineGlows);
+			mark = 1u;
 		}
 	}
 	// The pixel's ray, reaching one unit ahead (so how far along it is the view depth too).
@@ -2139,6 +2141,7 @@ void main()
 			glow = 0u;
 			veil = (flags & 2) != 0 ? UnitVeilMax : 255;
 			own = ownColours;
+			mark = 0u;
 			lastSolid = uint(number + 1);
 		}
 		else if (kind == EffectGroundShade)
@@ -2210,6 +2213,7 @@ void main()
 			if (!drawn || (t3.w < 1.0 && dither(pixel.x, pixel.y) >= t3.w)) continue;
 			color = uint(head.z);
 			if ((flags & 4) == 0) glow = (flags & 1) != 0 ? 1u : 0u;
+			if ((flags & 16) != 0) mark = 1u;
 		}
 		else if (kind == EffectDot)
 		{
@@ -2261,8 +2265,8 @@ void main()
 	}
 	outColor = color;
 	outDepth = depth;
-	outGlow = glow | (own << 5) | (smokeVeil > 0 ? 64u : 0u);
-	outNotes = uvec4(uint(veil), own | uint(smokeVeil) << 1, lastSolid, lastPile);
+	outGlow = glow | (own << 5) | (smokeVeil > 0 ? 64u : 0u) | (mark << 7);
+	outNotes = uvec4(uint(veil) | (mark << 8), own | uint(smokeVeil) << 1, lastSolid, lastPile);
 }
 )";
 
@@ -2397,7 +2401,7 @@ void main()
 {
 	ivec2 pixel = ivec2(gl_FragCoord.xy);
 	uint color = texelFetch(uColor, pixel, 0).r;
-	if (uNightVision != 0 && color != 0u && !(uOwnColours != 0 && (texelFetch(uGlow, pixel, 0).r & 32u) != 0u)) color = uint((uNightVision - 1) * 16) | (color & 15u);
+	if (uNightVision != 0 && color != 0u && !((texelFetch(uGlow, pixel, 0).r & 128u) != 0u || (uOwnColours != 0 && (texelFetch(uGlow, pixel, 0).r & 32u) != 0u))) color = uint((uNightVision - 1) * 16) | (color & 15u);
 	if (uTintAmount > 0.0 && dither(pixel.x, pixel.y) < uTintAmount)
 	{
 		color = tinted(uTintRedShare > 0.0 && dither(pixel.y + 1, pixel.x + 2) < uTintRedShare ? 0 : uTintRow, color);

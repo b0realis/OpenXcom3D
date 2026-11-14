@@ -29298,10 +29298,10 @@ index 000000000..326da83e2
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..35ce993a2
+index 000000000..ba524a6ce
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,2482 @@
+@@ -0,0 +1,2486 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -31249,7 +31249,7 @@ index 000000000..35ce993a2
 +uniform int uOwnOverNight;              // futuristic night vision's colour group + 1 (0: any other time)
 +layout(location = 0) out uint outColor;
 +layout(location = 1) out float outDepth;
-+layout(location = 2) out uint outGlow;  // the glow (1, 3), 32 where the pixel keeps its own colours under night vision, 64 where see-through smoke lies over it
++layout(location = 2) out uint outGlow;  // the glow (1, 3), 32 where the pixel keeps its own colours under night vision, 64 where see-through smoke lies over it, 128 a mark's pixel (night vision leaves it)
 +layout(location = 3) out uvec4 outNotes; // the unit veil left, own colours | smoke veil << 1, and for the pointer: 1 + the last solid sprite's number, 1 + the last pile's
 +
 +const float Bayer[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
@@ -31312,11 +31312,12 @@ index 000000000..35ce993a2
 +	uint color = texelFetch(uRayColor, from, 0).r, glow = texelFetch(uRayGlow, from, 0).r;
 +	float depth = texelFetch(uRayDepth, from, 0).r;
 +	int veil = 255, smokeVeil = 0;
-+	uint own = 0u, lastSolid = 0u, lastPile = 0u;
++	uint own = 0u, mark = 0u, lastSolid = 0u, lastPile = 0u; // (mark: a hitbox's outline or line shows there, night vision leaves its colour)
 +	if (uContinue != 0)
 +	{
 +		uvec4 notes = texelFetch(uNotes, pixel, 0);
-+		veil = int(notes.r);
++		veil = int(notes.r & 255u);
++		mark = (notes.r >> 8) & 1u;
 +		own = notes.g & 1u;
 +		smokeVeil = int(notes.g >> 1);
 +		lastSolid = notes.b;
@@ -31348,6 +31349,7 @@ index 000000000..35ce993a2
 +		{
 +			color = outlineColor;
 +			glow = uint(uOutlineGlows);
++			mark = 1u;
 +		}
 +	}
 +	// The pixel's ray, reaching one unit ahead (so how far along it is the view depth too).
@@ -31443,6 +31445,7 @@ index 000000000..35ce993a2
 +			glow = 0u;
 +			veil = (flags & 2) != 0 ? UnitVeilMax : 255;
 +			own = ownColours;
++			mark = 0u;
 +			lastSolid = uint(number + 1);
 +		}
 +		else if (kind == EffectGroundShade)
@@ -31514,6 +31517,7 @@ index 000000000..35ce993a2
 +			if (!drawn || (t3.w < 1.0 && dither(pixel.x, pixel.y) >= t3.w)) continue;
 +			color = uint(head.z);
 +			if ((flags & 4) == 0) glow = (flags & 1) != 0 ? 1u : 0u;
++			if ((flags & 16) != 0) mark = 1u;
 +		}
 +		else if (kind == EffectDot)
 +		{
@@ -31565,8 +31569,8 @@ index 000000000..35ce993a2
 +	}
 +	outColor = color;
 +	outDepth = depth;
-+	outGlow = glow | (own << 5) | (smokeVeil > 0 ? 64u : 0u);
-+	outNotes = uvec4(uint(veil), own | uint(smokeVeil) << 1, lastSolid, lastPile);
++	outGlow = glow | (own << 5) | (smokeVeil > 0 ? 64u : 0u) | (mark << 7);
++	outNotes = uvec4(uint(veil) | (mark << 8), own | uint(smokeVeil) << 1, lastSolid, lastPile);
 +}
 +)";
 +
@@ -31701,7 +31705,7 @@ index 000000000..35ce993a2
 +{
 +	ivec2 pixel = ivec2(gl_FragCoord.xy);
 +	uint color = texelFetch(uColor, pixel, 0).r;
-+	if (uNightVision != 0 && color != 0u && !(uOwnColours != 0 && (texelFetch(uGlow, pixel, 0).r & 32u) != 0u)) color = uint((uNightVision - 1) * 16) | (color & 15u);
++	if (uNightVision != 0 && color != 0u && !((texelFetch(uGlow, pixel, 0).r & 128u) != 0u || (uOwnColours != 0 && (texelFetch(uGlow, pixel, 0).r & 32u) != 0u))) color = uint((uNightVision - 1) * 16) | (color & 15u);
 +	if (uTintAmount > 0.0 && dither(pixel.x, pixel.y) < uTintAmount)
 +	{
 +		color = tinted(uTintRedShare > 0.0 && dither(pixel.y + 1, pixel.x + 2) < uTintRedShare ? 0 : uTintRow, color);
@@ -54644,7 +54648,7 @@ index 000000000..dec6ed51f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..f9565c4fa
+index 000000000..fc4f76c9f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
 @@ -0,0 +1,1572 @@
@@ -55225,7 +55229,7 @@ index 000000000..f9565c4fa
 +	std::vector<Uint8> _glowMask;                       // pixels showing something that shines (lit voxels, sparks)
 +	std::vector<Uint8> _unitVeil;                       // per pixel, how much more see-through smoke may veil the unit seen there (in SeeThroughLevels; 255: no unit)
 +	std::vector<Uint8> _smokeVeil;                      // per pixel, how much see-through smoke veils what's seen there this frame (in SeeThroughLevels; up to its cap)
-+	std::vector<Uint8> _ownColours;                     // per pixel, 1: a unit's, a body's or an item's picture shows there (futuristic night vision leaves its colours, see washBands)
++	std::vector<Uint8> _ownColours;                     // per pixel, 1: a unit's, a body's or an item's picture shows there (futuristic night vision leaves its colours, see washBands); 2: a mark's (a hitbox's outline: every night vision leaves its colours)
 +
 +	/// Works out the camera's axes from its yaw and pitch.
 +	void updateBasis();
@@ -55651,7 +55655,7 @@ index 000000000..f9565c4fa
 +		double drawnRadius, int reach, int coreShades, int edgeShades);
 +	/// Records a line in the world, its ends on the screen (see drawLine3D).
 +	void gpuRecordLine(double startX, double startY, double startZ, double endX, double endY, double endZ, int steps, Uint8 color, int thickness, float opacity,
-+		float worldWidth, bool glows, bool overEverything, bool keepsGlow = false, bool exactDepth = false);
++		float worldWidth, bool glows, bool overEverything, bool keepsGlow = false, bool exactDepth = false, bool mark = false);
 +	/// Records a square of pixels in front of the scene.
 +	void gpuRecordDot(int left, int top, int dotWidth, int dotHeight, double depth, Uint8 color, int flags, float leeway = 0.0f, Uint8 otherColor = 0, float firstShare = -1.0f, float haze = 0.0f);
 +	/// Records a round dot in front of the scene, in rings or only its rim.
@@ -56037,7 +56041,7 @@ index 000000000..f9565c4fa
 +	/// Draws a line in the world, depth-tested (all of it, or only the screen rows from bandTop up to bandBottom),
 +	/// a set number of pixels thick, or as thick as worldWidth voxels look where it is (at most thickness); glowing, or plain.
 +	void drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, float worldWidth = 0.0f, int bandTop = 0, int bandBottom = 1 << 30, bool glows = true,
-+		bool overEverything = false);
++		bool overEverything = false, bool mark = false);
 +	/// Leaves a bullet hole or scorch mark.
 +	void addDecal(const float pos[3], int size, int darkness);
 +	/// Draws the bullet holes, scorch marks and blackened ground.
@@ -58613,7 +58617,7 @@ index 000000000..20968dded
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpuEffects.cpp b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 new file mode 100644
-index 000000000..b2099f55c
+index 000000000..16ca33731
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 @@ -0,0 +1,950 @@
@@ -59007,11 +59011,11 @@ index 000000000..b2099f55c
 +
 +/**
 + * Records a line in the world (drawLine3D, which clips it and takes its ends to the screen first).
-+ * Texel 0: kind, flags (1 it glows, 2 over everything, 4 it leaves the glow as it is, 8 no voxel to spare in front of the scene), its colour, its thickness.
++ * Texel 0: kind, flags (1 it glows, 2 over everything, 4 it leaves the glow as it is, 8 no voxel to spare in front of the scene, 16 a mark: night vision leaves its colour), its colour, its thickness.
 + * Texel 2: its ends on the screen; 3: one over each end's depth, its steps, its opacity; 4: its width in the world (0: its thickness).
 + */
 +void FirstPersonView::gpuRecordLine(double startX, double startY, double startZ, double endX, double endY, double endZ, int steps, Uint8 color, int thickness, float opacity,
-+	float worldWidth, bool glows, bool overEverything, bool keepsGlow, bool exactDepth)
++	float worldWidth, bool glows, bool overEverything, bool keepsGlow, bool exactDepth, bool mark)
 +{
 +	const int left = std::max(0, (int)std::floor(std::min(startX, endX)) - thickness - 1), top = std::max(0, (int)std::floor(std::min(startY, endY)) - thickness - 1),
 +		right = std::min(getWidth(), (int)std::ceil(std::max(startX, endX)) + thickness + 2), bottom = std::min(getHeight(), (int)std::ceil(std::max(startY, endY)) + thickness + 2);
@@ -59020,7 +59024,7 @@ index 000000000..b2099f55c
 +		return;
 +	}
 +	float *texels = _gpuEffects->add(FirstPersonGpu::Effects::Line, left, top, right, bottom);
-+	texels[1] = (float)((glows ? 1 : 0) | (overEverything ? 2 : 0) | (keepsGlow ? 4 : 0) | (exactDepth ? 8 : 0));
++	texels[1] = (float)((glows ? 1 : 0) | (overEverything ? 2 : 0) | (keepsGlow ? 4 : 0) | (exactDepth ? 8 : 0) | (mark ? 16 : 0));
 +	texels[2] = (float)color;
 +	texels[3] = (float)thickness;
 +	texels[8] = (float)startX; texels[9] = (float)startY; texels[10] = (float)endX; texels[11] = (float)endY;
@@ -59335,7 +59339,7 @@ index 000000000..b2099f55c
 +		for (int column = 0; column < width; ++column, notes += 4)
 +		{
 +			veil[column] = (Uint8)notes[0];
-+			own[column] = (Uint8)(notes[1] & 1);
++			own[column] = (notes[0] & 256) ? (Uint8)2 : (Uint8)(notes[1] & 1); // (2: a mark's pixel, see _ownColours)
 +			smoke[column] = (Uint8)(notes[1] >> 1);
 +		}
 +	}
@@ -59531,7 +59535,7 @@ index 000000000..b2099f55c
 +			differentColors += cpuColors[column] != colors[index];
 +			differentDepths += std::abs(_depthBuffer[index] - depths[index]) > 0.01f * std::max(1.0f, std::min(_depthBuffer[index], 1e6f));
 +			differentGlow += _glowMask[index] != (glow[index] & 3);
-+			differentVeils += _unitVeil[index] != (Uint8)notes[0] || _ownColours[index] != (notes[1] & 1);
++			differentVeils += _unitVeil[index] != (Uint8)notes[0] || _ownColours[index] != ((notes[0] & 256) ? 2u : (notes[1] & 1));
 +		}
 +	}
 +	checked += (long)pixels;
@@ -62165,7 +62169,7 @@ index 000000000..b476b3b31
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewScreenEffects.cpp b/src/FirstPerson/FirstPersonViewScreenEffects.cpp
 new file mode 100644
-index 000000000..e395d4757
+index 000000000..469b27858
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewScreenEffects.cpp
 @@ -0,0 +1,733 @@
@@ -62620,8 +62624,8 @@ index 000000000..e395d4757
 +			{
 +				// Night vision: the pixel's shade (the low four bits) moved into the night vision
 +				// group. Index 0 (transparent) stays as it is, and so does a unit's, a body's or an
-+				// item's pixel with futuristic night vision.
-+				if (_nightVision && row[x] && !(ownColours && _ownColours[y * viewWidth + x])) row[x] = nightGroup | (row[x] & 15);
++				// item's pixel with futuristic night vision, and a mark's (a hitbox's outline) always.
++				if (_nightVision && row[x] && !(_ownColours[y * viewWidth + x] == 2 || (ownColours && _ownColours[y * viewWidth + x]))) row[x] = nightGroup | (row[x] & 15);
 +				// The colour wash, on the share of pixels the dither pattern lets through; of those,
 +				// a share (by a second, shifted dither) is washed red instead.
 +				if (_tintAmount > 0.0f && dither(x, y) < _tintAmount)
@@ -63507,10 +63511,10 @@ index 000000000..f950d598a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShots.cpp b/src/FirstPerson/FirstPersonViewShots.cpp
 new file mode 100644
-index 000000000..bc286e32a
+index 000000000..27e9f4057
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShots.cpp
-@@ -0,0 +1,2293 @@
+@@ -0,0 +1,2295 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -64486,9 +64490,10 @@ index 000000000..bc286e32a
 + * @param glows Whether its pixels shine (feed the bloom).
 + * @param overEverything Drawn over whatever is there, not depth-tested (a marker such as the
 + *        units' facing rings, see drawFacing).
++ * @param mark A mark, not part of the world (a hitbox's line): night vision leaves its colour (a player, GitHub issue #152).
 + */
 +void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, float worldWidth, int bandTop, int bandBottom, bool glows,
-+	bool overEverything)
++	bool overEverything, bool mark)
 +{
 +	const int width = getWidth(), height = getHeight();
 +	const double focalLength = (width / 2.0) / _halfFovTangent; // in pixels
@@ -64516,7 +64521,7 @@ index 000000000..bc286e32a
 +	if (steps > 4000) return;
 +	if (_gpuRecording)
 +	{
-+		gpuRecordLine(startX, startY, startZ, endX, endY, endZ, steps, color, thickness, opacity, worldWidth, glows, overEverything);
++		gpuRecordLine(startX, startY, startZ, endX, endY, endZ, steps, color, thickness, opacity, worldWidth, glows, overEverything, false, false, mark);
 +		if (_gpuRecordOnly) return;
 +	}
 +	if (!overEverything) gpuNeedDepth();
@@ -64539,6 +64544,7 @@ index 000000000..bc286e32a
 +				if (opacity < 1.0f && dither(pixelX, pixelY) >= opacity) continue;
 +				*getRaw(pixelX, pixelY) = color;
 +				_glowMask[pixelY * width + pixelX] = glows ? 1 : 0;
++				if (mark) _ownColours[pixelY * width + pixelX] = 2; // (a mark keeps its colour under night vision: see washBands)
 +			}
 +		}
 +	}
@@ -65806,10 +65812,10 @@ index 000000000..bc286e32a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..7322504ae
+index 000000000..0a9d11c8b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,3628 @@
+@@ -0,0 +1,3631 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -66362,7 +66368,7 @@ index 000000000..7322504ae
 +				drawGroundShade(step.centre, step.radius, step.steps, step.density, 0, 1 << 30, step.away, step.length);
 +				break;
 +			case DrawStep::Line:
-+				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, 0, 1 << 30, step.glows);
++				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, 0, 1 << 30, step.glows, false, true);
 +				break;
 +			}
 +		}
@@ -66404,7 +66410,7 @@ index 000000000..7322504ae
 +				drawGroundShade(step.centre, step.radius, step.steps, step.density, bandTop, bandBottom, step.away, step.length);
 +				break;
 +			case DrawStep::Line:
-+				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, bandTop, bandBottom, step.glows);
++				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, bandTop, bandBottom, step.glows, false, true);
 +				break;
 +			}
 +		}
@@ -67345,6 +67351,7 @@ index 000000000..7322504ae
 +				if (!outline || (_outlineOpacity < 1.0f && dither(pixelX, pixelY) >= _outlineOpacity)) continue;
 +				*getRaw(pixelX, pixelY) = _outlineColors[outline - 1];
 +				_glowMask[index] = glows;
++				_ownColours[index] = 2; // (a mark keeps its colour under night vision: see washBands; a player, GitHub issue #152)
 +			}
 +		}
 +	}
@@ -69388,9 +69395,12 @@ index 000000000..7322504ae
 +/**
 + * The numbers rising over the units hit (setting "Damage numbers", see
 + * FirstPersonDamageNumbers.cpp): each from the point just over the unit's head where it was hit,
-+ * in the world: tested against the depth of what's drawn, so a wall or a unit in front hides it as
-+ * it would anything there, but at a fixed size on the screen (the game's small font, as the HUD's
-+ * text), so it reads far off too; within the view's reach. They rise from just over where the
++ * in the world, drawn over everything, as the enemy markers are (a player, GitHub issue #151: a
++ * big unit hit through a window, a third of it showing, had its number hidden behind the wall,
++ * where the point over the middle of its head is; they were tested against the depth of what's
++ * drawn), at a fixed size on the screen (the game's small font, as the HUD's text), so it reads
++ * far off too; within the view's reach. Only units the squad sees get one (see
++ * FirstPersonMode::unitDamaged). They rise from just over where the
 + * enemy marker's arrow and number go (drawn over everything after them), so neither hides the
 + * other. Numbers that would overlap step up over the newer ones (see placeDamageNumbers).
 + */
@@ -69429,8 +69439,7 @@ index 000000000..7322504ae
 +	{
 +		if (spots[index].shown)
 +		{
-+			gpuNeedDepth();
-+			FirstPerson::drawDamageNumber(this, font, numbers[index], spots[index].x, bottoms[index], uiScale, now, colors, _depthBuffer.data(), depths[index]);
++			FirstPerson::drawDamageNumber(this, font, numbers[index], spots[index].x, bottoms[index], uiScale, now, colors);
 +		}
 +	}
 +}
@@ -69440,10 +69449,10 @@ index 000000000..7322504ae
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..2567f346d
+index 000000000..98c2e6f6c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,4347 @@
+@@ -0,0 +1,4363 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -72555,7 +72564,8 @@ index 000000000..2567f346d
 + * the pane's edges: a jagged band of glass, one to three voxels wide, all round the inside of the
 + * frame (and the frame itself), solid, as shards left standing; the middle is open (the owner,
 + * GitHub issue #75: "when broken only voxels on the edges shown"). Its own voxels (the shards on
-+ * the floor) stay. The pane's model is built here, not taken from the models kept (that cache may
++ * the floor) stay. Only a pane, at least half the game's own glass: a wall with a window in it
++ * breaks into its rubble alone. The pane's model is built here, not taken from the models kept (that cache may
 + * grow while this one is being built).
 + * @param mapData The record being built.
 + * @param model Its model, its own voxels already in.
@@ -72581,10 +72591,25 @@ index 000000000..2567f346d
 +		auto paneModel = std::make_unique<VoxelModel>();
 +		buildModel(intact, intact->getSprite(0), false, *paneModel);
 +		searching = false;
-+		bool anyGlass = false;
-+		for (int z = 0; z < Position::TileZ && !anyGlass; ++z)
-+			for (int y = 0; y < Position::TileXY && !anyGlass; ++y) anyGlass = paneModel->glass[z][y] != 0;
-+		if (!anyGlass || paneModel->empty)
++		// A pane: most of it the game's own glass (not glass filled into an opening, a look only).
++		// A wall with a window in it is no pane: what it breaks into is the game's rubble and
++		// nothing more (a player, GitHub issue #149: XPiratez's temple walls shot down stood on as
++		// frames round a hole, the whole wall but its window, where the game has a low stump and
++		// rounds pass).
++		int glassVoxels = 0, allVoxels = 0;
++		for (int z = 0; z < Position::TileZ; ++z)
++		{
++			for (int y = 0; y < Position::TileXY; ++y)
++			{
++				for (int x = 0; x < Position::TileXY; ++x)
++				{
++					if (!paneModel->color[z][y][x] || ((paneModel->lookOnly[z][y] >> x) & 1)) continue;
++					++allVoxels;
++					if ((paneModel->glass[z][y] >> x) & 1) ++glassVoxels;
++				}
++			}
++		}
++		if (paneModel->empty || glassVoxels * 2 < allVoxels || !glassVoxels)
 +		{
 +			continue;
 +		}

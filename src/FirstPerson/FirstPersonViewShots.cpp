@@ -973,9 +973,10 @@ void FirstPersonView::spawnTrailSegment(const float from[3], const float to[3])
  * @param glows Whether its pixels shine (feed the bloom).
  * @param overEverything Drawn over whatever is there, not depth-tested (a marker such as the
  *        units' facing rings, see drawFacing).
+ * @param mark A mark, not part of the world (a hitbox's line): night vision leaves its colour (a player, GitHub issue #152).
  */
 void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, float worldWidth, int bandTop, int bandBottom, bool glows,
-	bool overEverything)
+	bool overEverything, bool mark)
 {
 	const int width = getWidth(), height = getHeight();
 	const double focalLength = (width / 2.0) / _halfFovTangent; // in pixels
@@ -1003,7 +1004,7 @@ void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 c
 	if (steps > 4000) return;
 	if (_gpuRecording)
 	{
-		gpuRecordLine(startX, startY, startZ, endX, endY, endZ, steps, color, thickness, opacity, worldWidth, glows, overEverything);
+		gpuRecordLine(startX, startY, startZ, endX, endY, endZ, steps, color, thickness, opacity, worldWidth, glows, overEverything, false, false, mark);
 		if (_gpuRecordOnly) return;
 	}
 	if (!overEverything) gpuNeedDepth();
@@ -1026,6 +1027,7 @@ void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 c
 				if (opacity < 1.0f && dither(pixelX, pixelY) >= opacity) continue;
 				*getRaw(pixelX, pixelY) = color;
 				_glowMask[pixelY * width + pixelX] = glows ? 1 : 0;
+				if (mark) _ownColours[pixelY * width + pixelX] = 2; // (a mark keeps its colour under night vision: see washBands)
 			}
 		}
 	}

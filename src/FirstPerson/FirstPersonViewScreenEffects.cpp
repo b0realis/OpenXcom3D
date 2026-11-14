@@ -449,8 +449,8 @@ void FirstPersonView::washBands()
 			{
 				// Night vision: the pixel's shade (the low four bits) moved into the night vision
 				// group. Index 0 (transparent) stays as it is, and so does a unit's, a body's or an
-				// item's pixel with futuristic night vision.
-				if (_nightVision && row[x] && !(ownColours && _ownColours[y * viewWidth + x])) row[x] = nightGroup | (row[x] & 15);
+				// item's pixel with futuristic night vision, and a mark's (a hitbox's outline) always.
+				if (_nightVision && row[x] && !(_ownColours[y * viewWidth + x] == 2 || (ownColours && _ownColours[y * viewWidth + x]))) row[x] = nightGroup | (row[x] & 15);
 				// The colour wash, on the share of pixels the dither pattern lets through; of those,
 				// a share (by a second, shifted dither) is washed red instead.
 				if (_tintAmount > 0.0f && dither(x, y) < _tintAmount)

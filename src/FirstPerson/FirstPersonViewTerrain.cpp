@@ -3109,7 +3109,8 @@ void FirstPersonView::fillPaneOpenings(const MapData *mapData, const Surface *sp
  * the pane's edges: a jagged band of glass, one to three voxels wide, all round the inside of the
  * frame (and the frame itself), solid, as shards left standing; the middle is open (the owner,
  * GitHub issue #75: "when broken only voxels on the edges shown"). Its own voxels (the shards on
- * the floor) stay. The pane's model is built here, not taken from the models kept (that cache may
+ * the floor) stay. Only a pane, at least half the game's own glass: a wall with a window in it
+ * breaks into its rubble alone. The pane's model is built here, not taken from the models kept (that cache may
  * grow while this one is being built).
  * @param mapData The record being built.
  * @param model Its model, its own voxels already in.
@@ -3135,10 +3136,25 @@ void FirstPersonView::addBrokenPaneEdges(const MapData *mapData, VoxelModel &mod
 		auto paneModel = std::make_unique<VoxelModel>();
 		buildModel(intact, intact->getSprite(0), false, *paneModel);
 		searching = false;
-		bool anyGlass = false;
-		for (int z = 0; z < Position::TileZ && !anyGlass; ++z)
-			for (int y = 0; y < Position::TileXY && !anyGlass; ++y) anyGlass = paneModel->glass[z][y] != 0;
-		if (!anyGlass || paneModel->empty)
+		// A pane: most of it the game's own glass (not glass filled into an opening, a look only).
+		// A wall with a window in it is no pane: what it breaks into is the game's rubble and
+		// nothing more (a player, GitHub issue #149: XPiratez's temple walls shot down stood on as
+		// frames round a hole, the whole wall but its window, where the game has a low stump and
+		// rounds pass).
+		int glassVoxels = 0, allVoxels = 0;
+		for (int z = 0; z < Position::TileZ; ++z)
+		{
+			for (int y = 0; y < Position::TileXY; ++y)
+			{
+				for (int x = 0; x < Position::TileXY; ++x)
+				{
+					if (!paneModel->color[z][y][x] || ((paneModel->lookOnly[z][y] >> x) & 1)) continue;
+					++allVoxels;
+					if ((paneModel->glass[z][y] >> x) & 1) ++glassVoxels;
+				}
+			}
+		}
+		if (paneModel->empty || glassVoxels * 2 < allVoxels || !glassVoxels)
 		{
 			continue;
 		}

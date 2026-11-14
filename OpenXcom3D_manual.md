@@ -1000,6 +1000,13 @@ What `FirstPersonView` draws:
 
 ## 11. Version history
 
+### After 1.14 (not released)
+
+- A wall with a window in it, destroyed, is the game's rubble and nothing more (GitHub issue #149: XPiratez's temple walls shot down stood on as frames round a hole, looking solid where rounds pass). `addBrokenPaneEdges` kept the intact part's voxels round its glass for whatever a part with any glass in it breaks into; it was meant for panes of glass (issue #75). Now only for a pane: at least half the intact part's voxels the game's own glass (glass filled into an opening, a look only, doesn't count).
+- Damage numbers are drawn over everything, as the enemy markers are (GitHub issue #151): a big unit hit through a window, a third of it showing, had its number hidden behind the wall, where the point over the middle of its head is. They were tested against the depth of what's drawn (`drawDamageNumbers`). Still only for units the squad sees.
+- Hitbox outlines and lines keep their colours under night vision, both kinds of hitbox (GitHub issue #152): they went green with the world. A mark's pixel is noted (`_ownColours` 2; on the card the glow's bit 128 and a bit of the notes) and the wash leaves it (`washBands`, the card's wash).
+- The *Renderer* setting's description no longer says "Linux for now" (the GPU renderer is on Linux, Windows and macOS).
+
 ### 1.14 (2026-11-13)
 
 Hot-fixed 2026-11-14 (the first five entries, folded into the release):

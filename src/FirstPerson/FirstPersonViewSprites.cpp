@@ -550,7 +550,7 @@ void FirstPersonView::replayDrawList()
 				drawGroundShade(step.centre, step.radius, step.steps, step.density, 0, 1 << 30, step.away, step.length);
 				break;
 			case DrawStep::Line:
-				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, 0, 1 << 30, step.glows);
+				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, 0, 1 << 30, step.glows, false, true);
 				break;
 			}
 		}
@@ -592,7 +592,7 @@ void FirstPersonView::drawListBands()
 				drawGroundShade(step.centre, step.radius, step.steps, step.density, bandTop, bandBottom, step.away, step.length);
 				break;
 			case DrawStep::Line:
-				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, bandTop, bandBottom, step.glows);
+				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, bandTop, bandBottom, step.glows, false, true);
 				break;
 			}
 		}
@@ -1533,6 +1533,7 @@ void FirstPersonView::outlineBands()
 				if (!outline || (_outlineOpacity < 1.0f && dither(pixelX, pixelY) >= _outlineOpacity)) continue;
 				*getRaw(pixelX, pixelY) = _outlineColors[outline - 1];
 				_glowMask[index] = glows;
+				_ownColours[index] = 2; // (a mark keeps its colour under night vision: see washBands; a player, GitHub issue #152)
 			}
 		}
 	}
@@ -3576,9 +3577,12 @@ void FirstPersonView::drawDownedIcons()
 /**
  * The numbers rising over the units hit (setting "Damage numbers", see
  * FirstPersonDamageNumbers.cpp): each from the point just over the unit's head where it was hit,
- * in the world: tested against the depth of what's drawn, so a wall or a unit in front hides it as
- * it would anything there, but at a fixed size on the screen (the game's small font, as the HUD's
- * text), so it reads far off too; within the view's reach. They rise from just over where the
+ * in the world, drawn over everything, as the enemy markers are (a player, GitHub issue #151: a
+ * big unit hit through a window, a third of it showing, had its number hidden behind the wall,
+ * where the point over the middle of its head is; they were tested against the depth of what's
+ * drawn), at a fixed size on the screen (the game's small font, as the HUD's text), so it reads
+ * far off too; within the view's reach. Only units the squad sees get one (see
+ * FirstPersonMode::unitDamaged). They rise from just over where the
  * enemy marker's arrow and number go (drawn over everything after them), so neither hides the
  * other. Numbers that would overlap step up over the newer ones (see placeDamageNumbers).
  */
@@ -3617,8 +3621,7 @@ void FirstPersonView::drawDamageNumbers()
 	{
 		if (spots[index].shown)
 		{
-			gpuNeedDepth();
-			FirstPerson::drawDamageNumber(this, font, numbers[index], spots[index].x, bottoms[index], uiScale, now, colors, _depthBuffer.data(), depths[index]);
+			FirstPerson::drawDamageNumber(this, font, numbers[index], spots[index].x, bottoms[index], uiScale, now, colors);
 		}
 	}
 }
