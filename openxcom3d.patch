@@ -22034,7 +22034,7 @@ index bea3b31f0..2c7eb8682 100644
  	}
  #endif
 diff --git a/src/Engine/Game.cpp b/src/Engine/Game.cpp
-index f3533971d..b4d8f49ed 100644
+index f3533971d..f0329c74a 100644
 --- a/src/Engine/Game.cpp
 +++ b/src/Engine/Game.cpp
 @@ -56,7 +56,7 @@ const double Game::VOLUME_GRADIENT = 10.0;
@@ -22046,14 +22046,15 @@ index f3533971d..b4d8f49ed 100644
  {
  	Options::reload = false;
  	Options::mute = false;
-@@ -181,6 +181,26 @@ void Game::run()
+@@ -181,6 +181,27 @@ void Game::run()
  		// Process events
  		while (SDL_PollEvent(&_event))
  		{
 +			// (OpenXcom3D: the mouse was just given back, see updateMouseCapture. Its first movement is from where the
 +			// cursor was put; one from far off is the system's stale place for it: the cursor is put back, and the
 +			// movement is one of nothing there. A few times at most, then the system has its way.)
-+			if (_releaseChecks > 0 && _event.type == SDL_MOUSEMOTION)
++			const Uint8 PlacedMouse = 255; // (see updateMouseCapture)
++			if (_releaseChecks > 0 && _event.type == SDL_MOUSEMOTION && _event.motion.which != PlacedMouse)
 +			{
 +				const SDL_Surface *video = SDL_GetVideoSurface();
 +				const int apart = video ? std::max(video->w, video->h) / 8 : 0;
@@ -22073,7 +22074,7 @@ index f3533971d..b4d8f49ed 100644
  			if (CrossPlatform::isQuitShortcut(_event))
  				_event.type = SDL_QUIT;
  			switch (_event.type)
-@@ -332,6 +352,7 @@ void Game::run()
+@@ -332,6 +353,7 @@ void Game::run()
  		{
  			// Process logic
  			_states.back()->think();
@@ -22081,7 +22082,7 @@ index f3533971d..b4d8f49ed 100644
  			_fpsCounter->think();
  			if (Options::FPS > 0 && !(Options::useOpenGL && Options::vSyncForOpenGL))
  			{
-@@ -382,6 +403,51 @@ void Game::run()
+@@ -382,6 +404,72 @@ void Game::run()
  	Options::save();
  }
  
@@ -22097,8 +22098,16 @@ index f3533971d..b4d8f49ed 100644
 + */
 +void Game::updateMouseCapture(bool capture)
 +{
++	const Uint8 PlacedMouse = 255; // the device number of the movement the game itself reports when it gives the mouse back
 +	if (capture == _mouseCaptured)
 +	{
++		// (Given back a frame or two ago: the cursor is put in its place again, for a system that was still
++		// letting go of the mouse when it was first put there.)
++		if (!capture && _releaseWarps > 0)
++		{
++			--_releaseWarps;
++			SDL_WarpMouse(_freeMouseX, _freeMouseY);
++		}
 +		return;
 +	}
 +	_mouseCaptured = capture;
@@ -22123,7 +22132,20 @@ index f3533971d..b4d8f49ed 100644
 +				_freeMouseY = video->h / 2;
 +			}
 +			SDL_WarpMouse(_freeMouseX, _freeMouseY);
++			_releaseWarps = 2;
 +			_releaseChecks = 3;
++			// The game's own cursor and whatever follows the mouse are told where it is now: they last heard of
++			// it from the captured mouse's movements, and not every system reports the cursor being put somewhere
++			// (the owner's Mac, after looking around: the cursor showed where those movements had left it, then
++			// jumped to its place at the first real movement). A movement of nothing, marked as ours (see run).
++			SDL_Event placed;
++			memset(&placed, 0, sizeof(placed));
++			placed.type = SDL_MOUSEMOTION;
++			placed.motion.which = PlacedMouse;
++			placed.motion.state = SDL_GetMouseState(nullptr, nullptr);
++			placed.motion.x = (Uint16)_freeMouseX;
++			placed.motion.y = (Uint16)_freeMouseY;
++			SDL_PushEvent(&placed);
 +		}
 +		_cursor->setHidden(false);
 +		++_mouseReleases; // (the state that wanted it back skips the cursor's jump, see getMouseReleases)
@@ -22134,16 +22156,17 @@ index f3533971d..b4d8f49ed 100644
   * Stops the state machine and the game is shut down.
   */
 diff --git a/src/Engine/Game.h b/src/Engine/Game.h
-index 9900ba326..05f2e6c80 100644
+index 9900ba326..3ac49d093 100644
 --- a/src/Engine/Game.h
 +++ b/src/Engine/Game.h
-@@ -58,9 +58,18 @@ private:
+@@ -58,9 +58,19 @@ private:
  	int _timeUntilNextFrame;
  	bool _ctrl, _alt, _shift, _rmb, _mmb;
  	int _scrollStep;
 +	bool _mouseCaptured;
 +	unsigned _mouseReleases;
 +	int _freeMouseX = -1, _freeMouseY = -1; // where the cursor was when the mouse was captured (it is given back there)
++	int _releaseWarps = 0;                  // frames the cursor is still to be put there again after the mouse is given back
 +	int _releaseChecks = 0;                 // movements still checked against that place after the mouse is given back (see run)
  	static const double VOLUME_GRADIENT;
  
