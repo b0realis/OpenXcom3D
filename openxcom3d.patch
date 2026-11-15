@@ -22034,7 +22034,7 @@ index bea3b31f0..2c7eb8682 100644
  	}
  #endif
 diff --git a/src/Engine/Game.cpp b/src/Engine/Game.cpp
-index f3533971d..bc485ee1a 100644
+index f3533971d..f0b8abf29 100644
 --- a/src/Engine/Game.cpp
 +++ b/src/Engine/Game.cpp
 @@ -56,7 +56,7 @@ const double Game::VOLUME_GRADIENT = 10.0;
@@ -22046,7 +22046,34 @@ index f3533971d..bc485ee1a 100644
  {
  	Options::reload = false;
  	Options::mute = false;
-@@ -332,6 +332,7 @@ void Game::run()
+@@ -181,6 +181,26 @@ void Game::run()
+ 		// Process events
+ 		while (SDL_PollEvent(&_event))
+ 		{
++			// (OpenXcom3D: the mouse was just given back, see updateMouseCapture. Its first movement is from where the
++			// cursor was put; one from far off is the system's stale place for it: the cursor is put back, and the
++			// movement is one of nothing there. A few times at most, then the system has its way.)
++			if (_releaseChecks > 0 && _event.type == SDL_MOUSEMOTION)
++			{
++				const SDL_Surface *video = SDL_GetVideoSurface();
++				const int far = video ? std::max(video->w, video->h) / 8 : 0;
++				if (video && (std::abs(_event.motion.x - _freeMouseX) > far || std::abs(_event.motion.y - _freeMouseY) > far))
++				{
++					--_releaseChecks;
++					SDL_WarpMouse(_freeMouseX, _freeMouseY);
++					_event.motion.x = (Uint16)_freeMouseX;
++					_event.motion.y = (Uint16)_freeMouseY;
++					_event.motion.xrel = _event.motion.yrel = 0;
++				}
++				else
++				{
++					_releaseChecks = 0;
++				}
++			}
+ 			if (CrossPlatform::isQuitShortcut(_event))
+ 				_event.type = SDL_QUIT;
+ 			switch (_event.type)
+@@ -332,6 +352,7 @@ void Game::run()
  		{
  			// Process logic
  			_states.back()->think();
@@ -22054,14 +22081,18 @@ index f3533971d..bc485ee1a 100644
  			_fpsCounter->think();
  			if (Options::FPS > 0 && !(Options::useOpenGL && Options::vSyncForOpenGL))
  			{
-@@ -382,6 +383,39 @@ void Game::run()
+@@ -382,6 +403,51 @@ void Game::run()
  	Options::save();
  }
  
 +/**
 + * Captures the mouse (hidden cursor + input grab = relative motion in SDL 1.2) while
 + * the top state wants it, e.g. for first-person mouse look, and gives it back with the
-+ * cursor in the middle of the window as soon as another state is on top.
++ * cursor where it was when it was captured (the first time: in the middle of the window) as
++ * soon as another state is on top. Where the system then still reports the cursor somewhere
++ * else with its first movement (the owner's Mac: it showed, and at the first movement jumped
++ * to the bottom right, where the captured mouse's sums had ended), it is put back once more
++ * (see run).
 + * @param capture Should the mouse be captured?
 + */
 +void Game::updateMouseCapture(bool capture)
@@ -22073,6 +22104,8 @@ index f3533971d..bc485ee1a 100644
 +	_mouseCaptured = capture;
 +	if (capture)
 +	{
++		SDL_GetMouseState(&_freeMouseX, &_freeMouseY);
++		_releaseChecks = 0;
 +		_cursor->setHidden(true);
 +		SDL_ShowCursor(SDL_DISABLE);
 +		SDL_WM_GrabInput(SDL_GRAB_ON);
@@ -22084,7 +22117,13 @@ index f3533971d..bc485ee1a 100644
 +		const SDL_Surface *video = SDL_GetVideoSurface();
 +		if (video)
 +		{
-+			SDL_WarpMouse(video->w / 2, video->h / 2);
++			if (_freeMouseX < 0 || _freeMouseY < 0 || _freeMouseX >= video->w || _freeMouseY >= video->h)
++			{
++				_freeMouseX = video->w / 2;
++				_freeMouseY = video->h / 2;
++			}
++			SDL_WarpMouse(_freeMouseX, _freeMouseY);
++			_releaseChecks = 3;
 +		}
 +		_cursor->setHidden(false);
 +		++_mouseReleases; // (the state that wanted it back skips the cursor's jump, see getMouseReleases)
@@ -22095,15 +22134,17 @@ index f3533971d..bc485ee1a 100644
   * Stops the state machine and the game is shut down.
   */
 diff --git a/src/Engine/Game.h b/src/Engine/Game.h
-index 9900ba326..bbb9b1d8f 100644
+index 9900ba326..05f2e6c80 100644
 --- a/src/Engine/Game.h
 +++ b/src/Engine/Game.h
-@@ -58,9 +58,16 @@ private:
+@@ -58,9 +58,18 @@ private:
  	int _timeUntilNextFrame;
  	bool _ctrl, _alt, _shift, _rmb, _mmb;
  	int _scrollStep;
 +	bool _mouseCaptured;
 +	unsigned _mouseReleases;
++	int _freeMouseX = -1, _freeMouseY = -1; // where the cursor was when the mouse was captured (it is given back there)
++	int _releaseChecks = 0;                 // movements still checked against that place after the mouse is given back (see run)
  	static const double VOLUME_GRADIENT;
  
 +	/// Captures or releases the mouse for relative motion, as the top state asks.

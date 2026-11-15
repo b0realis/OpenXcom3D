@@ -1004,6 +1004,7 @@ What `FirstPersonView` draws:
 
 ### After 1.14 (not released)
 
+- The free cursor comes back where you left it (the owner, on a Mac: pressing the cursor key, the cursor showed and at the first movement jumped to the bottom right of the screen). The game notes where the cursor is when the mouse is captured for looking around and gives it back there (the first time: in the middle; `Game::updateMouseCapture`), and if the system's first movement after that still reports it far off, it is put back, three times at most (`Game::run`). Seen working on Linux; the jump itself only showed on the Mac.
 - *Renderer* GPU: the programs for what comes after the rays (the units and effects, the bloom, the screen wash, the frame put together in full colour) are built when the card starts, as the battle loads, not with the first frame of the 3D view (the owner's Mac: the first click on 3D after installing a new version stood still for two seconds; Apple's driver builds each program slowly once and keeps it). The log says how long they took ("the programs after the rays built in ... ms"). What a driver still does at a program's first use is not moved by this.
 
 ### 1.14 (2026-11-13)
