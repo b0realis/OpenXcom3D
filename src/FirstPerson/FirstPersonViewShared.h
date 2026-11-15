@@ -141,6 +141,11 @@ const float FlareShadowShades = 8.0f, FlareShadowMinPower = 0.06f;
 /// of 2. A 1920x1080 screen at the default battlescape scale makes a 960x540 view, which ran at
 /// 40-51 FPS in a busy town; in blocks of 2 it holds 60 and looks almost the same.
 const int AutoPixelMaxWidth = 640, AutoPixelMaxHeight = 400;
+/// Setting "Render scale" on Auto: the scales it steps through (percent each way), finest first (see FirstPersonView::noteDrawTime).
+const int RenderScaleSteps[] = { 100, 85, 75, 67, 60, 50 };
+const int RenderScaleStepCount = sizeof(RenderScaleSteps) / sizeof(RenderScaleSteps[0]);
+const double RenderScaleBudget = 0.8; // the share of a frame's time (at the game's frame-rate limit) the view's drawing may take
+const double RenderScaleSpare = 0.85; // it goes a step finer when that step's time, reckoned from this one's, is under this share of the budget
 const int SmallViewPixels = 320 * 200; // a view of at most this many pixels (the cards' cameras, the small and medium map camera) is never drawn with bigger pixels
 
 // ---- Proportions of the voxel world ----

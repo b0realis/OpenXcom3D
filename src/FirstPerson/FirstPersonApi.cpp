@@ -880,6 +880,8 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsRenderer", &fpsRenderer, 0, "STR_FPS_RENDERER", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsViewResolution", &fpsViewResolution, 0, "STR_FPS_VIEW_RESOLUTION", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHudScale", &fpsHudScale, 0, "STR_FPS_HUD_SCALE", category));
+	// Fewer rays than pixels on the card, magnified (in percent each way; 0: Auto, by the frame rate): for a weak card.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsRenderScale", &fpsRenderScale, 100, "STR_FPS_RENDER_SCALE", category));
 	// A finer picture than the old game's, on the graphics card only (Renderer: GPU), each off by default: several rays a
 	// pixel, the sun's shadows with soft edges, a shadow from every lamp and flare, and corners and creases darkened.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSupersampling", &fpsSupersampling, 0, "STR_FPS_SUPERSAMPLING", category));

@@ -580,6 +580,7 @@ struct FirstPersonGpu::State
 	std::map<int, Program> extraPrograms; // by 1 coloured lights | 2 reflections
 	Program *programFor(const Frame &frame, bool results, bool laterRays = false);
 	Gl::UInt resolveProgram = 0; // makes one picture of several rays a pixel (ResolveSource); 0: not built, one ray a pixel
+	Gl::UInt upscaleProgram = 0; // magnifies a picture of fewer rays to the view's size (UpscaleSource, setting "Render scale"); 0: not built, a ray a pixel
 	Program *program = &programs[0];
 	Gl::UInt vertexArray = 0;
 	// The pictures the rays are drawn into, kept for each size asked (the main view's, the small camera views').
@@ -589,6 +590,7 @@ struct FirstPersonGpu::State
 		Gl::UInt textures[5] = {}; // colour, depth, glow, full colour, results
 		bool results = false;
 	};
+	bool keepTargets = false; // setTargets leaves the pictures it has, however many
 	std::map<std::array<int, 3>, Targets> targets; // by width, height, and which of a frame's pictures (0 the frame's own, 1.. one for each of several rays a pixel)
 	std::vector<Uint8> blockColors, blockGlow; // a ray each, before they are spread over their blocks of pixels
 	std::vector<float> blockDepths;
@@ -636,6 +638,7 @@ struct FirstPersonGpu::State
 	void setScene(const Frame &frame);
 	bool setTargets(int width, int height, bool results, int which = 0);
 	bool buildResolve();
+	bool buildUpscale();
 	bool draw(const Frame &frame, const Output &output, Timing *timing);
 
 	// The units and effects (see drawEffects): their program, their buffers (the primitives, the sprites' bytes, the
@@ -770,6 +773,10 @@ bool FirstPersonGpu::State::start(int device)
 	if (!buildResolve())
 	{
 		Log(LOG_INFO) << "OpenXcom3D GPU: no supersampling on this card";
+	}
+	if (!buildUpscale())
+	{
+		Log(LOG_INFO) << "OpenXcom3D GPU: no render scale on this card";
 	}
 	if (!build(programs[0], false) || !build(programs[1], true))
 	{
@@ -943,6 +950,28 @@ bool FirstPersonGpu::State::buildResolve()
 		}
 	}
 	resolveProgram = built;
+	return true;
+}
+
+/**
+ * Builds the small program that magnifies the pictures of fewer rays to the view's size
+ * (UpscaleSource, setting "Render scale"), its pictures to read on the texture units after the
+ * buffers'. Without it the setting does nothing: a ray a pixel.
+ */
+bool FirstPersonGpu::State::buildUpscale()
+{
+	const Gl::UInt built = compileFragment(UpscaleSource, "the render scale's shader");
+	if (!built)
+	{
+		return false;
+	}
+	Gl::UseProgram(built);
+	const char *const names[4] = { "uColor", "uDepth", "uGlow", "uTrue" };
+	for (int which = 0; which < 4; ++which)
+	{
+		Gl::Uniform1i(Gl::GetUniformLocation(built, names[which]), BufferCount + 1 + which);
+	}
+	upscaleProgram = built;
 	return true;
 }
 
@@ -1321,7 +1350,7 @@ void FirstPersonGpu::State::setScene(const Frame &frame)
  */
 bool FirstPersonGpu::State::setTargets(int width, int height, bool results, int layer)
 {
-	if (targets.size() > 40 && layer == 0)
+	if (targets.size() > 80 && layer == 0 && !keepTargets)
 	{
 		for (auto &entry : targets)
 		{
@@ -1435,6 +1464,20 @@ void FirstPersonGpu::State::readPicture(int attachment, int width, int height, i
  */
 bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timing *timing)
 {
+	// Setting "Render scale": fewer rays than the view has blocks of pixels, each through the middle of its share of
+	// the picture, and the pictures they make magnified to the view's size on the card (see UpscaleSource): all that
+	// comes after (the units and effects, the bloom, the frame) finds pictures of the view's size, as with a ray a block.
+	// Not for the check against the CPU's rays, which is a ray a block.
+	const int fullColumns = (frame.width + frame.pixelSize - 1) / frame.pixelSize, fullRows = (frame.height + frame.pixelSize - 1) / frame.pixelSize;
+	const bool scaled = upscaleProgram && frame.rayScale > 1.001f && frame.palette && !output.results && !output.perRay;
+	const int rayColumnsCast = scaled ? std::max(1, (int)std::lround(fullColumns / frame.rayScale)) : fullColumns;
+	const int rayRowsCast = scaled ? std::max(1, (int)std::lround(fullRows / frame.rayScale)) : fullRows;
+	Frame rays = frame; // (the frame as the rays' program has it: the view as large as the rays' grid)
+	if (scaled)
+	{
+		rays.width = rayColumnsCast * frame.pixelSize;
+		rays.height = rayRowsCast * frame.pixelSize;
+	}
 	// More than the shader takes at once (doors swinging, UFOs with their own light, models: a part's
 	// number is sixteen bits): this frame is the CPU's. None of the games' maps comes near.
 	overLimit = frame.swingCount > MaxSwings || frame.ufoCount > MaxUfos || modelIds.size() >= 0xFFF0;
@@ -1456,7 +1499,7 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	const size_t tileCount = (size_t)frame.size[0] * frame.size[1] * frame.size[2];
 	encodeTiles(frame);
 	encodeTables(frame);
-	setScene(frame);
+	setScene(rays);
 	sendWallPaints(frame);
 	sendMirrors(frame);
 	if (modelColors.size() > (size_t)maxBufferTexels || tileUints.size() / 4 > (size_t)maxBufferTexels)
@@ -1490,7 +1533,7 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 		solidsChanged = false;
 	}
 	const int blockColumns = (frame.width + frame.pixelSize - 1) / frame.pixelSize, blockRows = (frame.height + frame.pixelSize - 1) / frame.pixelSize;
-	if (!setTargets(blockColumns, blockRows, output.results != nullptr))
+	if (!setTargets(rayColumnsCast, rayRowsCast, output.results != nullptr))
 	{
 		Log(LOG_WARNING) << "OpenXcom3D GPU: this card can't draw into the pictures the rays need";
 		return false;
@@ -1506,7 +1549,7 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	// pictures of its own, and the frame's picture made of them (see ResolveSource). The check against the
 	// CPU's rays is of one ray a pixel.
 	if (frame.palette) sendBlend(frame); // (the palette: for the full-colour picture and for several rays a pixel)
-	Gl::Viewport(0, 0, blockColumns, blockRows);
+	Gl::Viewport(0, 0, rayColumnsCast, rayRowsCast);
 	const int samples = resolveProgram && frame.palette && !output.results ? (frame.samples >= 4 ? 4 : frame.samples >= 2 ? 2 : 1) : 1;
 	if (samples == 1)
 	{
@@ -1520,7 +1563,7 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 		static const float fourRays[4][2] = { { -0.125f, -0.375f }, { 0.375f, -0.125f }, { -0.375f, 0.125f }, { 0.125f, 0.375f } };
 		for (int ray = 0; ray < samples; ++ray)
 		{
-			if (!setTargets(blockColumns, blockRows, false, 1 + ray))
+			if (!setTargets(rayColumnsCast, rayRowsCast, false, 1 + ray))
 			{
 				Log(LOG_WARNING) << "OpenXcom3D GPU: this card can't draw into the pictures several rays a pixel need";
 				return false;
@@ -1529,7 +1572,7 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 			{
 				// The first ray's pictures, for the others to see where they are needed (see LATER_RAYS in the shader), and
 				// the program that looks (its own uniforms set as the first one's were).
-				const Targets &first = targets[{ blockColumns, blockRows, 1 }];
+				const Targets &first = targets[{ rayColumnsCast, rayRowsCast, 1 }];
 				for (int which = 0; which < 3; ++which)
 				{
 					Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 1 + which);
@@ -1543,24 +1586,47 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 				{
 					program = later;
 					Gl::UseProgram(program->id);
-					setScene(frame);
+					setScene(rays);
 				}
 			}
 			const float *offset = samples == 2 ? twoRays[ray] : fourRays[ray];
 			Gl::Uniform2f(location("uRayOffset"), offset[0], offset[1]);
 			Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
 		}
-		setTargets(blockColumns, blockRows, false);
+		setTargets(rayColumnsCast, rayRowsCast, false);
 		Gl::UseProgram(resolveProgram);
 		Gl::Uniform1i(Gl::GetUniformLocation(resolveProgram, "uSamples"), samples);
 		for (int ray = 0; ray < samples; ++ray)
 		{
-			const Targets &drawn = targets[{ blockColumns, blockRows, 1 + ray }];
+			const Targets &drawn = targets[{ rayColumnsCast, rayRowsCast, 1 + ray }];
 			for (int which = 0; which < 3; ++which) // (colour, depth, and the full colour with the glow in it)
 			{
 				Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 1 + ray * 3 + which);
 				Gl::BindTexture(Gl::TEXTURE_2D, drawn.textures[which == 2 ? 3 : which]);
 			}
+		}
+		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
+		Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+		Gl::UseProgram(program->id);
+	}
+	if (scaled)
+	{
+		const Targets cast = targets[{ rayColumnsCast, rayRowsCast, 0 }];
+		keepTargets = true; // (the rays' own pictures are read next)
+		const bool set = setTargets(blockColumns, blockRows, false);
+		keepTargets = false;
+		if (!set)
+		{
+			Log(LOG_WARNING) << "OpenXcom3D GPU: this card can't draw into the pictures the rays need";
+			return false;
+		}
+		Gl::Viewport(0, 0, blockColumns, blockRows);
+		Gl::UseProgram(upscaleProgram);
+		Gl::Uniform2f(Gl::GetUniformLocation(upscaleProgram, "uRaysPerBlock"), (float)rayColumnsCast / blockColumns, (float)rayRowsCast / blockRows);
+		for (int which = 0; which < 4; ++which) // (colour, depth, glow, full colour)
+		{
+			Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 1 + which);
+			Gl::BindTexture(Gl::TEXTURE_2D, cast.textures[which]);
 		}
 		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
 		Gl::DrawArrays(Gl::TRIANGLES, 0, 3);

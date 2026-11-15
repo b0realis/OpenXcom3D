@@ -222,7 +222,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
 		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
-		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion", "fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts" } },
+		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsRenderScale", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion", "fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts" } },
 	};
 	std::vector<bool> placed(gathered.size(), false);
 	for (const auto &section : sections)
@@ -367,6 +367,11 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		{
 			const int scale = std::clamp(*option.asInt(), 0, 4);
 			return scale == 0 ? std::string(tr("STR_FPS_HUD_SCALE_AUTO")) : "x" + std::to_string(scale);
+		}
+		// The render scale: Auto, or the percent.
+		if (option.id() == "fpsRenderScale")
+		{
+			return *option.asInt() == 0 ? std::string(tr("STR_FPS_RENDER_SCALE_AUTO")) : std::to_string(std::clamp(*option.asInt(), 50, 100)) + "%";
 		}
 		// Supersampling: off, or the rays a pixel.
 		if (option.id() == "fpsSupersampling")
@@ -674,6 +679,18 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		else if (value == &Options::fpsHudScale)
 		{
 			*value = (std::clamp(*value, 0, 4) + direction + 5) % 5;
+		}
+		// The render scale (Auto, 50% .. 100%): round and round, through its steps.
+		else if (value == &Options::fpsRenderScale)
+		{
+			static const int steps[] = { 0, 50, 60, 67, 75, 85, 100 };
+			const int count = sizeof(steps) / sizeof(steps[0]);
+			int at = count - 1;
+			for (int step = 0; step < count; ++step)
+			{
+				if (steps[step] == *value) at = step;
+			}
+			*value = steps[(at + direction + count) % count];
 		}
 		// Supersampling (off, x2, x4): round and round.
 		else if (value == &Options::fpsSupersampling)

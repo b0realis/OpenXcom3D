@@ -991,6 +991,16 @@ private:
 	bool _gpuRecordOnly = true;                        // ... and draw nothing themselves (false: both, for the check of the card's picture against the CPU's)
 	bool _gpuChecking = false;                         // this frame the card's units and effects are checked against the CPU's (OPENXCOM3D_GPU_EFFECTS=check)
 	int _gpuRaysPixelSize = 1;                         // the pixels a ray of the pictures kept on the card coloured each way
+	// Setting "Render scale" on Auto (see noteDrawTime): the step of RenderScaleSteps the card's rays are cast at now,
+	// the view's drawing time lately (ms, smoothed), and the frames to wait before the step may change, or go finer.
+	int _renderScaleStep = 0;
+	double _renderScaleTime = 0.0;
+	int _renderScaleWait = 90, _renderScaleHold = 0; // (the first frames on the card are slow ones: programs still being built)
+	bool _gpuCastRays = false;                         // this frame's rays were the card's
+	/// The share of the view's pixels, each way, the card casts rays for (setting "Render scale"), in percent.
+	int renderScalePercent() const;
+	/// Takes a frame's drawing time for the render scale on Auto.
+	void noteDrawTime(double milliseconds);
 	/// Whether this frame's units and effects go to the card (with its rays).
 	int gpuEffectsWanted() const;
 	/// Starts recording the frame's units and effects.

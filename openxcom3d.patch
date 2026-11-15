@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..7906939e5
+index 000000000..f74cab451
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,580 @@
+@@ -0,0 +1,583 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -267,6 +267,9 @@ index 000000000..7906939e5
 +  STR_FPS_HUD_SCALE: "HUD scale"
 +  STR_FPS_HUD_SCALE_DESC: "How many times the 3D HUD is magnified on a big screen. Auto: as big as fits. Smaller: more room. With 3D resolution: Display it counts the display's pixels."
 +  STR_FPS_HUD_SCALE_AUTO: "Auto"
++  STR_FPS_RENDER_SCALE: "Render scale"
++  STR_FPS_RENDER_SCALE_DESC: "Renderer GPU only. The 3D world drawn with fewer rays and magnified; units, effects and the HUD stay sharp. 50%: a quarter of the rays. Auto: as fine as holds the frame rate."
++  STR_FPS_RENDER_SCALE_AUTO: "Auto"
 +  STR_FPS_SUPERSAMPLING: "Supersampling"
 +  STR_FPS_SUPERSAMPLING_DESC: "Renderer GPU only. Two or four rays a pixel, blended: edges and far fences stop shimmering. Costs as many times the rays."
 +  STR_FPS_SUPERSAMPLING_OFF: "Off"
@@ -710,10 +713,10 @@ index 000000000..7906939e5
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..afabf3679
+index 000000000..a7cee45ab
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,580 @@
+@@ -0,0 +1,583 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -853,6 +856,9 @@ index 000000000..afabf3679
 +  STR_FPS_HUD_SCALE: "HUD scale"
 +  STR_FPS_HUD_SCALE_DESC: "How many times the 3D HUD is magnified on a big screen. Auto: as big as fits. Smaller: more room. With 3D resolution: Display it counts the display's pixels."
 +  STR_FPS_HUD_SCALE_AUTO: "Auto"
++  STR_FPS_RENDER_SCALE: "Render scale"
++  STR_FPS_RENDER_SCALE_DESC: "Renderer GPU only. The 3D world drawn with fewer rays and magnified; units, effects and the HUD stay sharp. 50%: a quarter of the rays. Auto: as fine as holds the frame rate."
++  STR_FPS_RENDER_SCALE_AUTO: "Auto"
 +  STR_FPS_SUPERSAMPLING: "Supersampling"
 +  STR_FPS_SUPERSAMPLING_DESC: "Renderer GPU only. Two or four rays a pixel, blended: edges and far fences stop shimmering. Costs as many times the rays."
 +  STR_FPS_SUPERSAMPLING_OFF: "Off"
@@ -22202,7 +22208,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..540392b1a 100644
+index a08796ced..64b70efe2 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -22220,7 +22226,7 @@ index a08796ced..540392b1a 100644
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
 +OPT bool fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts;
-+OPT int fpsThrowing, fpsRangefinder, fpsRenderer, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
++OPT int fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsTurret, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsRange, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
@@ -23270,10 +23276,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..3549da300
+index 000000000..da8187c04
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1536 @@
+@@ -0,0 +1,1538 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24156,6 +24162,8 @@ index 000000000..3549da300
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsRenderer", &fpsRenderer, 0, "STR_FPS_RENDERER", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsViewResolution", &fpsViewResolution, 0, "STR_FPS_VIEW_RESOLUTION", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsHudScale", &fpsHudScale, 0, "STR_FPS_HUD_SCALE", category));
++	// Fewer rays than pixels on the card, magnified (in percent each way; 0: Auto, by the frame rate): for a weak card.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsRenderScale", &fpsRenderScale, 100, "STR_FPS_RENDER_SCALE", category));
 +	// A finer picture than the old game's, on the graphics card only (Renderer: GPU), each off by default: several rays a
 +	// pixel, the sun's shadows with soft edges, a shadow from every lamp and flare, and corners and creases darkened.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsSupersampling", &fpsSupersampling, 0, "STR_FPS_SUPERSAMPLING", category));
@@ -26420,10 +26428,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..7263bb4c2
+index 000000000..b667d72c2
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,2511 @@
+@@ -0,0 +1,2577 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -27006,6 +27014,7 @@ index 000000000..7263bb4c2
 +	std::map<int, Program> extraPrograms; // by 1 coloured lights | 2 reflections
 +	Program *programFor(const Frame &frame, bool results, bool laterRays = false);
 +	Gl::UInt resolveProgram = 0; // makes one picture of several rays a pixel (ResolveSource); 0: not built, one ray a pixel
++	Gl::UInt upscaleProgram = 0; // magnifies a picture of fewer rays to the view's size (UpscaleSource, setting "Render scale"); 0: not built, a ray a pixel
 +	Program *program = &programs[0];
 +	Gl::UInt vertexArray = 0;
 +	// The pictures the rays are drawn into, kept for each size asked (the main view's, the small camera views').
@@ -27015,6 +27024,7 @@ index 000000000..7263bb4c2
 +		Gl::UInt textures[5] = {}; // colour, depth, glow, full colour, results
 +		bool results = false;
 +	};
++	bool keepTargets = false; // setTargets leaves the pictures it has, however many
 +	std::map<std::array<int, 3>, Targets> targets; // by width, height, and which of a frame's pictures (0 the frame's own, 1.. one for each of several rays a pixel)
 +	std::vector<Uint8> blockColors, blockGlow; // a ray each, before they are spread over their blocks of pixels
 +	std::vector<float> blockDepths;
@@ -27062,6 +27072,7 @@ index 000000000..7263bb4c2
 +	void setScene(const Frame &frame);
 +	bool setTargets(int width, int height, bool results, int which = 0);
 +	bool buildResolve();
++	bool buildUpscale();
 +	bool draw(const Frame &frame, const Output &output, Timing *timing);
 +
 +	// The units and effects (see drawEffects): their program, their buffers (the primitives, the sprites' bytes, the
@@ -27196,6 +27207,10 @@ index 000000000..7263bb4c2
 +	if (!buildResolve())
 +	{
 +		Log(LOG_INFO) << "OpenXcom3D GPU: no supersampling on this card";
++	}
++	if (!buildUpscale())
++	{
++		Log(LOG_INFO) << "OpenXcom3D GPU: no render scale on this card";
 +	}
 +	if (!build(programs[0], false) || !build(programs[1], true))
 +	{
@@ -27369,6 +27384,28 @@ index 000000000..7263bb4c2
 +		}
 +	}
 +	resolveProgram = built;
++	return true;
++}
++
++/**
++ * Builds the small program that magnifies the pictures of fewer rays to the view's size
++ * (UpscaleSource, setting "Render scale"), its pictures to read on the texture units after the
++ * buffers'. Without it the setting does nothing: a ray a pixel.
++ */
++bool FirstPersonGpu::State::buildUpscale()
++{
++	const Gl::UInt built = compileFragment(UpscaleSource, "the render scale's shader");
++	if (!built)
++	{
++		return false;
++	}
++	Gl::UseProgram(built);
++	const char *const names[4] = { "uColor", "uDepth", "uGlow", "uTrue" };
++	for (int which = 0; which < 4; ++which)
++	{
++		Gl::Uniform1i(Gl::GetUniformLocation(built, names[which]), BufferCount + 1 + which);
++	}
++	upscaleProgram = built;
 +	return true;
 +}
 +
@@ -27747,7 +27784,7 @@ index 000000000..7263bb4c2
 + */
 +bool FirstPersonGpu::State::setTargets(int width, int height, bool results, int layer)
 +{
-+	if (targets.size() > 40 && layer == 0)
++	if (targets.size() > 80 && layer == 0 && !keepTargets)
 +	{
 +		for (auto &entry : targets)
 +		{
@@ -27861,6 +27898,20 @@ index 000000000..7263bb4c2
 + */
 +bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timing *timing)
 +{
++	// Setting "Render scale": fewer rays than the view has blocks of pixels, each through the middle of its share of
++	// the picture, and the pictures they make magnified to the view's size on the card (see UpscaleSource): all that
++	// comes after (the units and effects, the bloom, the frame) finds pictures of the view's size, as with a ray a block.
++	// Not for the check against the CPU's rays, which is a ray a block.
++	const int fullColumns = (frame.width + frame.pixelSize - 1) / frame.pixelSize, fullRows = (frame.height + frame.pixelSize - 1) / frame.pixelSize;
++	const bool scaled = upscaleProgram && frame.rayScale > 1.001f && frame.palette && !output.results && !output.perRay;
++	const int rayColumnsCast = scaled ? std::max(1, (int)std::lround(fullColumns / frame.rayScale)) : fullColumns;
++	const int rayRowsCast = scaled ? std::max(1, (int)std::lround(fullRows / frame.rayScale)) : fullRows;
++	Frame rays = frame; // (the frame as the rays' program has it: the view as large as the rays' grid)
++	if (scaled)
++	{
++		rays.width = rayColumnsCast * frame.pixelSize;
++		rays.height = rayRowsCast * frame.pixelSize;
++	}
 +	// More than the shader takes at once (doors swinging, UFOs with their own light, models: a part's
 +	// number is sixteen bits): this frame is the CPU's. None of the games' maps comes near.
 +	overLimit = frame.swingCount > MaxSwings || frame.ufoCount > MaxUfos || modelIds.size() >= 0xFFF0;
@@ -27882,7 +27933,7 @@ index 000000000..7263bb4c2
 +	const size_t tileCount = (size_t)frame.size[0] * frame.size[1] * frame.size[2];
 +	encodeTiles(frame);
 +	encodeTables(frame);
-+	setScene(frame);
++	setScene(rays);
 +	sendWallPaints(frame);
 +	sendMirrors(frame);
 +	if (modelColors.size() > (size_t)maxBufferTexels || tileUints.size() / 4 > (size_t)maxBufferTexels)
@@ -27916,7 +27967,7 @@ index 000000000..7263bb4c2
 +		solidsChanged = false;
 +	}
 +	const int blockColumns = (frame.width + frame.pixelSize - 1) / frame.pixelSize, blockRows = (frame.height + frame.pixelSize - 1) / frame.pixelSize;
-+	if (!setTargets(blockColumns, blockRows, output.results != nullptr))
++	if (!setTargets(rayColumnsCast, rayRowsCast, output.results != nullptr))
 +	{
 +		Log(LOG_WARNING) << "OpenXcom3D GPU: this card can't draw into the pictures the rays need";
 +		return false;
@@ -27932,7 +27983,7 @@ index 000000000..7263bb4c2
 +	// pictures of its own, and the frame's picture made of them (see ResolveSource). The check against the
 +	// CPU's rays is of one ray a pixel.
 +	if (frame.palette) sendBlend(frame); // (the palette: for the full-colour picture and for several rays a pixel)
-+	Gl::Viewport(0, 0, blockColumns, blockRows);
++	Gl::Viewport(0, 0, rayColumnsCast, rayRowsCast);
 +	const int samples = resolveProgram && frame.palette && !output.results ? (frame.samples >= 4 ? 4 : frame.samples >= 2 ? 2 : 1) : 1;
 +	if (samples == 1)
 +	{
@@ -27946,7 +27997,7 @@ index 000000000..7263bb4c2
 +		static const float fourRays[4][2] = { { -0.125f, -0.375f }, { 0.375f, -0.125f }, { -0.375f, 0.125f }, { 0.125f, 0.375f } };
 +		for (int ray = 0; ray < samples; ++ray)
 +		{
-+			if (!setTargets(blockColumns, blockRows, false, 1 + ray))
++			if (!setTargets(rayColumnsCast, rayRowsCast, false, 1 + ray))
 +			{
 +				Log(LOG_WARNING) << "OpenXcom3D GPU: this card can't draw into the pictures several rays a pixel need";
 +				return false;
@@ -27955,7 +28006,7 @@ index 000000000..7263bb4c2
 +			{
 +				// The first ray's pictures, for the others to see where they are needed (see LATER_RAYS in the shader), and
 +				// the program that looks (its own uniforms set as the first one's were).
-+				const Targets &first = targets[{ blockColumns, blockRows, 1 }];
++				const Targets &first = targets[{ rayColumnsCast, rayRowsCast, 1 }];
 +				for (int which = 0; which < 3; ++which)
 +				{
 +					Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 1 + which);
@@ -27969,24 +28020,47 @@ index 000000000..7263bb4c2
 +				{
 +					program = later;
 +					Gl::UseProgram(program->id);
-+					setScene(frame);
++					setScene(rays);
 +				}
 +			}
 +			const float *offset = samples == 2 ? twoRays[ray] : fourRays[ray];
 +			Gl::Uniform2f(location("uRayOffset"), offset[0], offset[1]);
 +			Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
 +		}
-+		setTargets(blockColumns, blockRows, false);
++		setTargets(rayColumnsCast, rayRowsCast, false);
 +		Gl::UseProgram(resolveProgram);
 +		Gl::Uniform1i(Gl::GetUniformLocation(resolveProgram, "uSamples"), samples);
 +		for (int ray = 0; ray < samples; ++ray)
 +		{
-+			const Targets &drawn = targets[{ blockColumns, blockRows, 1 + ray }];
++			const Targets &drawn = targets[{ rayColumnsCast, rayRowsCast, 1 + ray }];
 +			for (int which = 0; which < 3; ++which) // (colour, depth, and the full colour with the glow in it)
 +			{
 +				Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 1 + ray * 3 + which);
 +				Gl::BindTexture(Gl::TEXTURE_2D, drawn.textures[which == 2 ? 3 : which]);
 +			}
++		}
++		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
++		Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
++		Gl::UseProgram(program->id);
++	}
++	if (scaled)
++	{
++		const Targets cast = targets[{ rayColumnsCast, rayRowsCast, 0 }];
++		keepTargets = true; // (the rays' own pictures are read next)
++		const bool set = setTargets(blockColumns, blockRows, false);
++		keepTargets = false;
++		if (!set)
++		{
++			Log(LOG_WARNING) << "OpenXcom3D GPU: this card can't draw into the pictures the rays need";
++			return false;
++		}
++		Gl::Viewport(0, 0, blockColumns, blockRows);
++		Gl::UseProgram(upscaleProgram);
++		Gl::Uniform2f(Gl::GetUniformLocation(upscaleProgram, "uRaysPerBlock"), (float)rayColumnsCast / blockColumns, (float)rayRowsCast / blockRows);
++		for (int which = 0; which < 4; ++which) // (colour, depth, glow, full colour)
++		{
++			Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 1 + which);
++			Gl::BindTexture(Gl::TEXTURE_2D, cast.textures[which]);
 +		}
 +		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
 +		Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
@@ -28937,10 +29011,10 @@ index 000000000..7263bb4c2
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.h b/src/FirstPerson/FirstPersonGpu.h
 new file mode 100644
-index 000000000..75db00362
+index 000000000..98e10e9c4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.h
-@@ -0,0 +1,251 @@
+@@ -0,0 +1,252 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -29016,6 +29090,7 @@ index 000000000..75db00362
 +		float eye[3], forward[3], right[3], up[3];
 +		float halfPlaneWidth, halfPlaneHeight;    // the image plane one voxel in front of the eye
 +		int width, height, pixelSize;             // the view in pixels, and how many pixels a ray colours each way
++		float rayScale = 1.0f;                    // setting "Render scale": the blocks a ray colours each way (1: a ray a block; 2: a quarter of the rays), magnified on the card
 +		float ghostScale;                         // setting "Ghost opacity" (see renderRows)
 +		bool seeThroughCrops;                     // setting "See-through crops"
 +		// The scene the shading reads (see FirstPersonView::shadeHit and colorOutsideMap).
@@ -29379,10 +29454,10 @@ index 000000000..326da83e2
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..47d02c2bc
+index 000000000..5ecce6690
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,2504 @@
+@@ -0,0 +1,2552 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -31312,6 +31387,54 @@ index 000000000..47d02c2bc
 +}
 +)";
 +
++
++/*
++ * Fewer rays than pixels (setting "Render scale"). The rays' program casts its rays on a grid
++ * smaller than the view; this small program then makes the view's pictures of theirs: each
++ * pixel takes the palette colour, the depth and the glow of the ray whose share of the picture
++ * it lies in (nothing is mixed: a palette colour is no number to mix, and a depth between a
++ * wall's and the sky's is nowhere), and for the full-colour picture (setting "True colour") the
++ * mix of the four rays round it by how near each is, leaving out those that hit something at
++ * another depth than its own ray: surfaces come out smooth, their edges stay sharp.
++ */
++const char *const UpscaleSource = R"(
++uniform usampler2D uColor, uGlow;
++uniform sampler2D uDepth, uTrue;
++uniform vec2 uRaysPerBlock; // the rays' grid over the view's, each way (under 1)
++layout(location = 0) out uint outColor;
++layout(location = 1) out float outDepth;
++layout(location = 2) out uint outGlow;
++layout(location = 3) out vec4 outTrue;
++
++void main()
++{
++	ivec2 last = textureSize(uColor, 0) - 1;
++	vec2 place = gl_FragCoord.xy * uRaysPerBlock; // (in rays: a ray's middle is at its number and a half)
++	ivec2 own = clamp(ivec2(place), ivec2(0), last);
++	float depth = texelFetch(uDepth, own, 0).r;
++	vec4 ownTrue = texelFetch(uTrue, own, 0);
++	outColor = texelFetch(uColor, own, 0).r;
++	outDepth = depth;
++	outGlow = texelFetch(uGlow, own, 0).r;
++	vec2 between = place - 0.5;
++	ivec2 low = ivec2(floor(between));
++	vec2 along = between - vec2(low);
++	vec3 mixed = vec3(0.0);
++	float weights = 0.0;
++	for (int corner = 0; corner < 4; ++corner)
++	{
++		ivec2 at = clamp(low + ivec2(corner & 1, corner >> 1), ivec2(0), last);
++		float cornerDepth = texelFetch(uDepth, at, 0).r;
++		// (The same surface: the same depth, give or take a tenth; the sky and the far haze, at no depth, with their like.)
++		bool alike = cornerDepth == depth || abs(cornerDepth - depth) <= 0.1 * max(1.0, min(cornerDepth, depth));
++		if (!alike) continue;
++		float weight = ((corner & 1) != 0 ? along.x : 1.0 - along.x) * ((corner >> 1) != 0 ? along.y : 1.0 - along.y);
++		mixed += texelFetch(uTrue, at, 0).rgb * weight;
++		weights += weight;
++	}
++	outTrue = vec4(weights > 0.001 ? mixed / weights : ownTrue.rgb, ownTrue.a);
++}
++)";
 +
 +/**
 + * The units and effects, drawn on the card over the rays' picture (see FirstPersonGpu::drawEffects):
@@ -54199,10 +54322,10 @@ index 000000000..7e1bbfcd2
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..ea2d2c44e
+index 000000000..7dedb46e1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,729 @@
+@@ -0,0 +1,737 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -54776,6 +54899,14 @@ index 000000000..ea2d2c44e
 +	{
 +		return;
 +	}
++	// (Setting "Render scale" on Auto goes by how long the frame took: see noteDrawTime.)
++	struct ScaleTimer
++	{
++		FirstPersonView *view;
++		std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
++		~ScaleTimer() { view->noteDrawTime(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count()); }
++	} scaleTimer { this };
++	_gpuCastRays = false;
 +	// Upscaled sprites used from now on belong to this frame (see upscaled).
 +	_upscaleFrameStart = _upscaleClock + 1;
 +
@@ -54934,10 +55065,10 @@ index 000000000..ea2d2c44e
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..4753621e2
+index 000000000..a693bf135
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1575 @@
+@@ -0,0 +1,1585 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -55931,6 +56062,16 @@ index 000000000..4753621e2
 +	bool _gpuRecordOnly = true;                        // ... and draw nothing themselves (false: both, for the check of the card's picture against the CPU's)
 +	bool _gpuChecking = false;                         // this frame the card's units and effects are checked against the CPU's (OPENXCOM3D_GPU_EFFECTS=check)
 +	int _gpuRaysPixelSize = 1;                         // the pixels a ray of the pictures kept on the card coloured each way
++	// Setting "Render scale" on Auto (see noteDrawTime): the step of RenderScaleSteps the card's rays are cast at now,
++	// the view's drawing time lately (ms, smoothed), and the frames to wait before the step may change, or go finer.
++	int _renderScaleStep = 0;
++	double _renderScaleTime = 0.0;
++	int _renderScaleWait = 90, _renderScaleHold = 0; // (the first frames on the card are slow ones: programs still being built)
++	bool _gpuCastRays = false;                         // this frame's rays were the card's
++	/// The share of the view's pixels, each way, the card casts rays for (setting "Render scale"), in percent.
++	int renderScalePercent() const;
++	/// Takes a frame's drawing time for the render scale on Auto.
++	void noteDrawTime(double milliseconds);
 +	/// Whether this frame's units and effects go to the card (with its rays).
 +	int gpuEffectsWanted() const;
 +	/// Starts recording the frame's units and effects.
@@ -58232,10 +58373,10 @@ index 000000000..98c97b3b5
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..20968dded
+index 000000000..c3f896296
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
-@@ -0,0 +1,668 @@
+@@ -0,0 +1,740 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -58393,6 +58534,7 @@ index 000000000..20968dded
 +	frame.height = height;
 +	// (Auto on the card: a ray a pixel whatever the view's size, which is what the card is for; a small view always has one.)
 +	frame.pixelSize = scale > 1 || width * height <= SmallViewPixels || Options::fpsPixelSize == 0 ? 1 : std::clamp(Options::fpsPixelSize, 1, 3);
++	frame.rayScale = scale > 1 ? 1.0f : 100.0f / view.renderScalePercent();
 +	frame.ghostScale = std::clamp(Options::fpsGhostOpacity, 10, 100) / (GhostNearOpacity * 100.0f);
 +	frame.seeThroughCrops = Options::fpsSeeThroughCrops;
 +	// The scene, as shadeHit and colorOutsideMap read it.
@@ -58607,6 +58749,76 @@ index 000000000..20968dded
 +}
 +
 +/**
++ * Setting "Render scale": the share of the view's pixels, each way, the card casts rays for, the
++ * rest magnified from them on the card (see FirstPersonGpu::Frame::rayScale): the setting's, or
++ * on Auto the step the frame rate allows (see noteDrawTime). A small view (a camera's) is
++ * always cast in full.
++ */
++int FirstPersonView::renderScalePercent() const
++{
++	if (getWidth() * getHeight() <= SmallViewPixels)
++	{
++		return 100;
++	}
++	return Options::fpsRenderScale == 0 ? RenderScaleSteps[std::clamp(_renderScaleStep, 0, RenderScaleStepCount - 1)] : std::clamp(Options::fpsRenderScale, 50, 100);
++}
++
++/**
++ * Setting "Render scale" on Auto (dynamic resolution): the card's rays as fine as the frame
++ * rate allows. A frame's time is the game's limit on the frame rate (60 a second if it has
++ * none); the view's drawing, the card's work with it (its pictures are read back before the
++ * frame is done), may take RenderScaleBudget of that. Over it, the rays go a step coarser;
++ * a step finer when that step's time, reckoned from this one's by the rays there are (too high:
++ * not all of a frame goes with the rays, so it errs towards staying), fits with room to spare.
++ * It goes by the time smoothed over the last frames, waits after each change for the new
++ * scale's times, and after a step back to coarser waits longer before it tries finer again,
++ * so the picture doesn't flick between two scales.
++ * A frame of several frames' time (a hitch) counts for nothing.
++ * @param milliseconds How long this frame's drawing took.
++ */
++void FirstPersonView::noteDrawTime(double milliseconds)
++{
++	if (Options::fpsRenderScale != 0 || !_gpuCastRays || getWidth() * getHeight() <= SmallViewPixels)
++	{
++		_renderScaleTime = 0.0;
++		return;
++	}
++	const double budget = 1000.0 / (Options::FPS > 0 ? Options::FPS : 60) * RenderScaleBudget;
++	// (A frame far over any other isn't the rays': the card building a program at a battle's start, a map loading.)
++	if (milliseconds > budget * 4.0)
++	{
++		_renderScaleWait = std::max(_renderScaleWait, 20);
++		return;
++	}
++	_renderScaleTime = _renderScaleTime > 0.0 ? _renderScaleTime * 0.85 + milliseconds * 0.15 : milliseconds;
++	if (_renderScaleHold > 0) --_renderScaleHold;
++	if (_renderScaleWait > 0)
++	{
++		--_renderScaleWait;
++		return;
++	}
++	auto rays = [](int step) { return (double)RenderScaleSteps[step] * RenderScaleSteps[step]; };
++	if (_renderScaleTime > budget && _renderScaleStep < RenderScaleStepCount - 1)
++	{
++		++_renderScaleStep;
++		_renderScaleHold = 240;
++	}
++	else if (_renderScaleStep > 0 && _renderScaleHold == 0 && _renderScaleTime * rays(_renderScaleStep - 1) / rays(_renderScaleStep) < budget * RenderScaleSpare)
++	{
++		--_renderScaleStep;
++	}
++	else
++	{
++		return;
++	}
++	_renderScaleWait = 20;
++	_renderScaleTime = 0.0;
++	// (OPENXCOM3D_GPU_TIMING: each change in the log.)
++	static const bool timed = getenv("OPENXCOM3D_GPU_TIMING") != nullptr;
++	if (timed) Log(LOG_INFO) << "OpenXcom3D GPU: render scale " << RenderScaleSteps[_renderScaleStep] << "% (a frame may take " << budget << " ms)";
++}
++
++/**
 + * Casts this frame's rays on the graphics card (setting "Renderer": GPU), into the view's own
 + * picture, depth buffer and glow mask.
 + * @return False where the card can't be had or failed: the caller casts them on the CPU.
@@ -58630,6 +58842,7 @@ index 000000000..20968dded
 +	// The units and effects on the card too: the rays' pictures stay there, and come back finished (see gpuDrawEffects).
 +	output.keep = gpuEffectsWanted();
 +	_gpuRaysPixelSize = frame.pixelSize;
++	_gpuCastRays = true;
 +	// The picture in full colour too, if the mode shows this view that way (setting "True colour"; a ray a pixel).
 +	const bool fullColor = _wantsTrueColor && frame.pixelSize == 1;
 +	if (fullColor) _trueColor.resize((size_t)getWidth() * getHeight());
@@ -63197,10 +63410,10 @@ index 000000000..469b27858
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..8ba46e44c
+index 000000000..53f992ec7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,606 @@
+@@ -0,0 +1,611 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -63344,6 +63557,11 @@ index 000000000..8ba46e44c
 +/// of 2. A 1920x1080 screen at the default battlescape scale makes a 960x540 view, which ran at
 +/// 40-51 FPS in a busy town; in blocks of 2 it holds 60 and looks almost the same.
 +const int AutoPixelMaxWidth = 640, AutoPixelMaxHeight = 400;
++/// Setting "Render scale" on Auto: the scales it steps through (percent each way), finest first (see FirstPersonView::noteDrawTime).
++const int RenderScaleSteps[] = { 100, 85, 75, 67, 60, 50 };
++const int RenderScaleStepCount = sizeof(RenderScaleSteps) / sizeof(RenderScaleSteps[0]);
++const double RenderScaleBudget = 0.8; // the share of a frame's time (at the game's frame-rate limit) the view's drawing may take
++const double RenderScaleSpare = 0.85; // it goes a step finer when that step's time, reckoned from this one's, is under this share of the budget
 +const int SmallViewPixels = 320 * 200; // a view of at most this many pixels (the cards' cameras, the small and medium map camera) is never drawn with bigger pixels
 +
 +// ---- Proportions of the voxel world ----
@@ -76606,10 +76824,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..ab9d69f07
+index 000000000..41c094d91
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,1018 @@
+@@ -0,0 +1,1035 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -76834,7 +77052,7 @@ index 000000000..ab9d69f07
 +			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
 +		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 +		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
-+		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion", "fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts" } },
++		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsRenderScale", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion", "fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts" } },
 +	};
 +	std::vector<bool> placed(gathered.size(), false);
 +	for (const auto &section : sections)
@@ -76979,6 +77197,11 @@ index 000000000..ab9d69f07
 +		{
 +			const int scale = std::clamp(*option.asInt(), 0, 4);
 +			return scale == 0 ? std::string(tr("STR_FPS_HUD_SCALE_AUTO")) : "x" + std::to_string(scale);
++		}
++		// The render scale: Auto, or the percent.
++		if (option.id() == "fpsRenderScale")
++		{
++			return *option.asInt() == 0 ? std::string(tr("STR_FPS_RENDER_SCALE_AUTO")) : std::to_string(std::clamp(*option.asInt(), 50, 100)) + "%";
 +		}
 +		// Supersampling: off, or the rays a pixel.
 +		if (option.id() == "fpsSupersampling")
@@ -77286,6 +77509,18 @@ index 000000000..ab9d69f07
 +		else if (value == &Options::fpsHudScale)
 +		{
 +			*value = (std::clamp(*value, 0, 4) + direction + 5) % 5;
++		}
++		// The render scale (Auto, 50% .. 100%): round and round, through its steps.
++		else if (value == &Options::fpsRenderScale)
++		{
++			static const int steps[] = { 0, 50, 60, 67, 75, 85, 100 };
++			const int count = sizeof(steps) / sizeof(steps[0]);
++			int at = count - 1;
++			for (int step = 0; step < count; ++step)
++			{
++				if (steps[step] == *value) at = step;
++			}
++			*value = steps[(at + direction + count) % count];
 +		}
 +		// Supersampling (off, x2, x4): round and round.
 +		else if (value == &Options::fpsSupersampling)

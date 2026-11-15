@@ -571,6 +571,14 @@ void FirstPersonView::draw()
 	{
 		return;
 	}
+	// (Setting "Render scale" on Auto goes by how long the frame took: see noteDrawTime.)
+	struct ScaleTimer
+	{
+		FirstPersonView *view;
+		std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
+		~ScaleTimer() { view->noteDrawTime(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count()); }
+	} scaleTimer { this };
+	_gpuCastRays = false;
 	// Upscaled sprites used from now on belong to this frame (see upscaled).
 	_upscaleFrameStart = _upscaleClock + 1;
 

@@ -1928,6 +1928,54 @@ void main()
 )";
 
 
+/*
+ * Fewer rays than pixels (setting "Render scale"). The rays' program casts its rays on a grid
+ * smaller than the view; this small program then makes the view's pictures of theirs: each
+ * pixel takes the palette colour, the depth and the glow of the ray whose share of the picture
+ * it lies in (nothing is mixed: a palette colour is no number to mix, and a depth between a
+ * wall's and the sky's is nowhere), and for the full-colour picture (setting "True colour") the
+ * mix of the four rays round it by how near each is, leaving out those that hit something at
+ * another depth than its own ray: surfaces come out smooth, their edges stay sharp.
+ */
+const char *const UpscaleSource = R"(
+uniform usampler2D uColor, uGlow;
+uniform sampler2D uDepth, uTrue;
+uniform vec2 uRaysPerBlock; // the rays' grid over the view's, each way (under 1)
+layout(location = 0) out uint outColor;
+layout(location = 1) out float outDepth;
+layout(location = 2) out uint outGlow;
+layout(location = 3) out vec4 outTrue;
+
+void main()
+{
+	ivec2 last = textureSize(uColor, 0) - 1;
+	vec2 place = gl_FragCoord.xy * uRaysPerBlock; // (in rays: a ray's middle is at its number and a half)
+	ivec2 own = clamp(ivec2(place), ivec2(0), last);
+	float depth = texelFetch(uDepth, own, 0).r;
+	vec4 ownTrue = texelFetch(uTrue, own, 0);
+	outColor = texelFetch(uColor, own, 0).r;
+	outDepth = depth;
+	outGlow = texelFetch(uGlow, own, 0).r;
+	vec2 between = place - 0.5;
+	ivec2 low = ivec2(floor(between));
+	vec2 along = between - vec2(low);
+	vec3 mixed = vec3(0.0);
+	float weights = 0.0;
+	for (int corner = 0; corner < 4; ++corner)
+	{
+		ivec2 at = clamp(low + ivec2(corner & 1, corner >> 1), ivec2(0), last);
+		float cornerDepth = texelFetch(uDepth, at, 0).r;
+		// (The same surface: the same depth, give or take a tenth; the sky and the far haze, at no depth, with their like.)
+		bool alike = cornerDepth == depth || abs(cornerDepth - depth) <= 0.1 * max(1.0, min(cornerDepth, depth));
+		if (!alike) continue;
+		float weight = ((corner & 1) != 0 ? along.x : 1.0 - along.x) * ((corner >> 1) != 0 ? along.y : 1.0 - along.y);
+		mixed += texelFetch(uTrue, at, 0).rgb * weight;
+		weights += weight;
+	}
+	outTrue = vec4(weights > 0.001 ? mixed / weights : ownTrue.rgb, ownTrue.a);
+}
+)";
+
 /**
  * The units and effects, drawn on the card over the rays' picture (see FirstPersonGpu::drawEffects):
  * a pixel walks the frame's primitives that can touch it, in the order the CPU's passes draw
