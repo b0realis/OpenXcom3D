@@ -18864,7 +18864,7 @@ index 1951ba749..45aa0e792 100644
  						{
  							iter = craftInv->erase(iter);
 diff --git a/src/Battlescape/BattlescapeState.cpp b/src/Battlescape/BattlescapeState.cpp
-index 7cd494130..f80b56335 100644
+index 7cd494130..533bbf5e2 100644
 --- a/src/Battlescape/BattlescapeState.cpp
 +++ b/src/Battlescape/BattlescapeState.cpp
 @@ -22,6 +22,7 @@
@@ -18911,7 +18911,41 @@ index 7cd494130..f80b56335 100644
  			if (popped)
  			{
  				_battleGame->handleNonTargetAction();
-@@ -1545,6 +1554,11 @@ void BattlescapeState::btnLeftHandItemClick(Action *action)
+@@ -913,14 +922,30 @@ void BattlescapeState::mapOver(Action *action)
+ 			return;
+ 		}
+ 
++		// (OpenXcom3D: a movement of nothing scrolls nothing and sets no cursor back: where setting
++		// the cursor back is itself reported as a movement, each one answered the last without end.)
++		if (action->getDetails()->motion.xrel == 0 && action->getDetails()->motion.yrel == 0)
++		{
++			return;
++		}
++
+ 		_isMouseScrolled = true;
+ 
+ 		if (Options::touchEnabled == false)
+ 		{
+ 			// Set the mouse cursor back
+-			SDL_EventState(SDL_MOUSEMOTION, SDL_IGNORE);
+-			SDL_WarpMouse(_game->getScreen()->getWidth() / 2, _game->getScreen()->getHeight() / 2 - _map->getIconHeight() / 2);
+-			SDL_EventState(SDL_MOUSEMOTION, SDL_ENABLE);
++			// (OpenXcom3D: only as it nears the screen's edge, which is what setting it back is for:
++			// the scroll goes by the movements added up, wherever the cursor is. A player, GitHub
++			// issue #158: fullscreen at a resolution that isn't the display's own, holding the drag
++			// scroll's button "absolutely tanks FPS", the cursor set back on every movement.)
++			const int screenWidth = _game->getScreen()->getWidth(), screenHeight = _game->getScreen()->getHeight();
++			const int mouseX = action->getDetails()->motion.x, mouseY = action->getDetails()->motion.y;
++			if (mouseX < screenWidth / 4 || mouseX >= screenWidth * 3 / 4 || mouseY < screenHeight / 4 || mouseY >= screenHeight * 3 / 4)
++			{
++				SDL_EventState(SDL_MOUSEMOTION, SDL_IGNORE);
++				SDL_WarpMouse(screenWidth / 2, screenHeight / 2 - _map->getIconHeight() / 2);
++				SDL_EventState(SDL_MOUSEMOTION, SDL_ENABLE);
++			}
+ 		}
+ 
+ 		// Check the threshold
+@@ -1545,6 +1570,11 @@ void BattlescapeState::btnLeftHandItemClick(Action *action)
  {
  	if (playableUnitSelected())
  	{
@@ -18923,7 +18957,7 @@ index 7cd494130..f80b56335 100644
  		// concession for touch devices:
  		// click on the item to cancel action, and don't pop up a menu to select a new one
  		// TODO: wrap this in an IFDEF ?
-@@ -1594,6 +1608,11 @@ void BattlescapeState::btnRightHandItemClick(Action *action)
+@@ -1594,6 +1624,11 @@ void BattlescapeState::btnRightHandItemClick(Action *action)
  {
  	if (playableUnitSelected())
  	{
@@ -18935,7 +18969,7 @@ index 7cd494130..f80b56335 100644
  		// concession for touch devices:
  		// click on the item to cancel action, and don't pop up a menu to select a new one
  		// TODO: wrap this in an IFDEF ?
-@@ -2111,6 +2130,7 @@ void BattlescapeState::drawHandsItems()
+@@ -2111,6 +2146,7 @@ void BattlescapeState::drawHandsItems()
  	}
  	drawItem(leftHandItem, _btnLeftHandItem, _numAmmoLeft, _numMedikitLeft, _numTwoHandedIndicatorLeft, left, left2);
  	drawItem(rightHandItem, _btnRightHandItem, _numAmmoRight, _numMedikitRight, _numTwoHandedIndicatorRight, right, right2);
@@ -18943,7 +18977,7 @@ index 7cd494130..f80b56335 100644
  }
  
  /**
-@@ -2282,7 +2302,13 @@ void BattlescapeState::updateSoldierInfo(bool checkFOV)
+@@ -2282,7 +2318,13 @@ void BattlescapeState::updateSoldierInfo(bool checkFOV)
  	{
  		_barMana->setMax(battleUnit->getBaseStats()->mana);
  		_barMana->setValue(battleUnit->getMana());
@@ -18957,7 +18991,7 @@ index 7cd494130..f80b56335 100644
  
  	toggleKneelButton(battleUnit);
  
-@@ -2547,6 +2573,25 @@ void BattlescapeState::animate()
+@@ -2547,6 +2589,25 @@ void BattlescapeState::animate()
  	}
  }
  
@@ -18983,7 +19017,7 @@ index 7cd494130..f80b56335 100644
  /**
   * Handles the battle game state.
   */
-@@ -2698,6 +2743,11 @@ inline void BattlescapeState::handle(Action *action)
+@@ -2698,6 +2759,11 @@ inline void BattlescapeState::handle(Action *action)
  {
  	if (!_firstInit)
  	{
@@ -18995,7 +19029,7 @@ index 7cd494130..f80b56335 100644
  		if (_game->getCursor()->getVisible() || ((action->getDetails()->type == SDL_MOUSEBUTTONDOWN || action->getDetails()->type == SDL_MOUSEBUTTONUP) && _game->isRightClick(action)))
  		{
  			State::handle(action);
-@@ -4078,6 +4128,7 @@ void BattlescapeState::resize(int &dX, int &dY)
+@@ -4078,6 +4144,7 @@ void BattlescapeState::resize(int &dX, int &dY)
  	{
  		pos += dX;
  	}
@@ -54165,10 +54199,10 @@ index 000000000..7e1bbfcd2
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..754c648f7
+index 000000000..ea2d2c44e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,728 @@
+@@ -0,0 +1,729 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -54832,14 +54866,15 @@ index 000000000..754c648f7
 +	if (_signalGlitches) { PassTimer pass(passTimes, 18); applySignalGlitches(); }
 +	{ PassTimer pass(passTimes, 19); drawBurning(); }
 +	{ PassTimer pass(passTimes, 20); drawHurt(); }
-+	// The numbers rising over the units hit (setting "Damage numbers"): in the world, walls in front
-+	// hiding them, but over the screen's effects, so their colours read.
-+	{ PassTimer pass(passTimes, 21); drawDamageNumbers(); }
 +	// The icons over the downed units, the enemy markers and the units' facing rings, over everything.
 +	{ PassTimer pass(passTimes, 22); drawDownedIcons(); }
 +	{ PassTimer pass(passTimes, 23); drawMarkers(); }
 +	{ PassTimer pass(passTimes, 24); drawSprayMarks(); }
 +	{ PassTimer pass(passTimes, 25); drawFacing(); }
++	// The numbers rising over the units hit (setting "Damage numbers"): over all of those too (a
++	// player, GitHub issue #160: "damage numbers should be top layer, given their temporary
++	// nature"; a stack of enemy markers over a unit hid its number).
++	{ PassTimer pass(passTimes, 21); drawDamageNumbers(); }
 +	unlock();
 +	if (_gpuPresenting) gpuPresent(); // (the frame put together on the card: see FirstPersonViewGpuEffects.cpp)
 +	if (passTimes && ++passFrames == 120)
@@ -66076,7 +66111,7 @@ index 000000000..eafb28cfe
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..0a9d11c8b
+index 000000000..5a33d5193
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
 @@ -0,0 +1,3631 @@
@@ -69665,8 +69700,8 @@ index 000000000..0a9d11c8b
 + * drawn), at a fixed size on the screen (the game's small font, as the HUD's text), so it reads
 + * far off too; within the view's reach. Only units the squad sees get one (see
 + * FirstPersonMode::unitDamaged). They rise from just over where the
-+ * enemy marker's arrow and number go (drawn over everything after them), so neither hides the
-+ * other. Numbers that would overlap step up over the newer ones (see placeDamageNumbers).
++ * enemy marker's arrow and number go, and are drawn after the markers, the downed icons and the
++ * facing rings (GitHub issue #160: a number is on top of all of them). Numbers that would overlap step up over the newer ones (see placeDamageNumbers).
 + */
 +void FirstPersonView::drawDamageNumbers()
 +{

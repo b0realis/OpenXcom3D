@@ -3583,8 +3583,8 @@ void FirstPersonView::drawDownedIcons()
  * drawn), at a fixed size on the screen (the game's small font, as the HUD's text), so it reads
  * far off too; within the view's reach. Only units the squad sees get one (see
  * FirstPersonMode::unitDamaged). They rise from just over where the
- * enemy marker's arrow and number go (drawn over everything after them), so neither hides the
- * other. Numbers that would overlap step up over the newer ones (see placeDamageNumbers).
+ * enemy marker's arrow and number go, and are drawn after the markers, the downed icons and the
+ * facing rings (GitHub issue #160: a number is on top of all of them). Numbers that would overlap step up over the newer ones (see placeDamageNumbers).
  */
 void FirstPersonView::drawDamageNumbers()
 {

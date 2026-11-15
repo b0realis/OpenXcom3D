@@ -661,14 +661,15 @@ void FirstPersonView::draw()
 	if (_signalGlitches) { PassTimer pass(passTimes, 18); applySignalGlitches(); }
 	{ PassTimer pass(passTimes, 19); drawBurning(); }
 	{ PassTimer pass(passTimes, 20); drawHurt(); }
-	// The numbers rising over the units hit (setting "Damage numbers"): in the world, walls in front
-	// hiding them, but over the screen's effects, so their colours read.
-	{ PassTimer pass(passTimes, 21); drawDamageNumbers(); }
 	// The icons over the downed units, the enemy markers and the units' facing rings, over everything.
 	{ PassTimer pass(passTimes, 22); drawDownedIcons(); }
 	{ PassTimer pass(passTimes, 23); drawMarkers(); }
 	{ PassTimer pass(passTimes, 24); drawSprayMarks(); }
 	{ PassTimer pass(passTimes, 25); drawFacing(); }
+	// The numbers rising over the units hit (setting "Damage numbers"): over all of those too (a
+	// player, GitHub issue #160: "damage numbers should be top layer, given their temporary
+	// nature"; a stack of enemy markers over a unit hid its number).
+	{ PassTimer pass(passTimes, 21); drawDamageNumbers(); }
 	unlock();
 	if (_gpuPresenting) gpuPresent(); // (the frame put together on the card: see FirstPersonViewGpuEffects.cpp)
 	if (passTimes && ++passFrames == 120)
