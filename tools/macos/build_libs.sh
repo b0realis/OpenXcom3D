@@ -84,7 +84,10 @@ echo "libvorbis";  unpack libvorbis;         sed -i '' 's/-force_cpusubtype_ALL/
 run_configure --disable-shared --enable-static --with-ogg="$PREFIX"; make -j$JOBS > /dev/null; make install > /dev/null
 echo "SDL2";       unpack SDL2;              cmake_configure -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST=OFF -DSDL_TESTS=OFF -B build
 cmake --build build -j$JOBS > /dev/null; cmake --install build > /dev/null
-echo "sdl12-compat"; unpack sdl12-compat;         cmake_configure -DSDL2_INCLUDE_DIR="$PREFIX/include/SDL2" -DSDL12TESTS=OFF -DSTATICDEVEL=OFF -B build
+# (sdl12-compat puts the pointer at twice the place asked for on a Retina display: see the patch's own words)
+echo "sdl12-compat"; unpack sdl12-compat;         patch -p1 -s < "$ROOT/tools/macos/sdl12-compat-hidpi-warp.patch"
+grep -q "GetRendererOutputSize" src/SDL12_compat.c || { echo "sdl12-compat: the pointer patch did not apply" >&2; exit 1; }
+cmake_configure -DSDL2_INCLUDE_DIR="$PREFIX/include/SDL2" -DSDL12TESTS=OFF -DSTATICDEVEL=OFF -B build
 cmake --build build -j$JOBS > /dev/null; cmake --install build > /dev/null
 cp "$PREFIX/lib/pkgconfig/sdl12_compat.pc" "$PREFIX/lib/pkgconfig/sdl.pc"
 # (SDL 1.2's add-ons: their configure would also run a test program built with SDL, which a

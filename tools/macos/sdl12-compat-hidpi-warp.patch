@@ -1,0 +1,42 @@
+The pointer on a high-DPI window (a Mac's Retina display), for sdl12-compat 1.2.74.
+SDL_WarpMouse scaled the place asked for into the pixels the renderer draws; SDL2 wants
+the window's points. On a Retina display there are two pixels to a point, so the pointer
+landed at twice the place asked for (the middle of the screen became its bottom right
+corner). Applied by tools/macos/build_libs.sh. The mouse's reported places were right
+already (SDL2's renderer converts those itself).
+
+--- a/src/SDL12_compat.c
++++ b/src/SDL12_compat.c
+@@ -7863,6 +7863,22 @@
+                 viewport.y = (int)SDL20_lroundf(viewport.y * scale_y);
+                 viewport.w = (int)SDL20_lroundf(viewport.w * scale_x);
+                 viewport.h = (int)SDL20_lroundf(viewport.h * scale_y);
++                {
++                    /* OpenXcom3D: the renderer counts the pixels it draws, the warp below
++                       the window's points: on a high-DPI window (a Mac's Retina display)
++                       they differ, and the pointer landed at twice the place asked for. */
++                    int window_w = 0, window_h = 0, output_w = 0, output_h = 0;
++                    SDL20_GetWindowSize(VideoWindow20, &window_w, &window_h);
++                    if (SDL20_GetRendererOutputSize(VideoRenderer20, &output_w, &output_h) == 0 &&
++                        window_w > 0 && window_h > 0 && output_w > 0 && output_h > 0) {
++                        const float points_x = (float)window_w / (float)output_w;
++                        const float points_y = (float)window_h / (float)output_h;
++                        viewport.x = (int)SDL20_lroundf(viewport.x * points_x);
++                        viewport.y = (int)SDL20_lroundf(viewport.y * points_y);
++                        scale_x *= points_x;
++                        scale_y *= points_y;
++                    }
++                }
+             }
+ 
+             x = (int)SDL20_lroundf(viewport.x + (x * scale_x));
+--- a/src/SDL20_syms.h
++++ b/src/SDL20_syms.h
+@@ -322,6 +322,7 @@
+ SDL20_SYM(SDL_Renderer *,CreateRenderer,(SDL_Window *a, int b, Uint32 c),(a,b,c),return)
+ SDL20_SYM(int,GetRendererInfo,(SDL_Renderer *a, SDL_RendererInfo *b),(a,b),return)
+ SDL20_SYM(void,RenderGetScale,(SDL_Renderer *a, float *b, float *c),(a,b,c),return)
++SDL20_SYM(int,GetRendererOutputSize,(SDL_Renderer *a, int *b, int *c),(a,b,c),return)
+ SDL20_SYM(void,RenderGetViewport,(SDL_Renderer *a, SDL_Rect *b),(a,b),return)
+ SDL20_SYM(SDL_Texture *,CreateTexture,(SDL_Renderer *a, Uint32 b, int c, int d, int e),(a,b,c,d,e),return)
+ SDL20_SYM(int,LockTexture,(SDL_Texture *a, const SDL_Rect *b, void **c, int *d),(a,b,c,d),return)
