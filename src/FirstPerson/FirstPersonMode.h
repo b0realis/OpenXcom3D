@@ -752,6 +752,7 @@ private:
 	bool _aimHitsSomething = false;                     // something is under the crosshair (not just sky)
 	// the path the next throw or shot would take (setting "Show trajectory"), and a target marked
 	// for confirm fire (setting "Confirm fire"): the next click on the same tile fires
+	bool _fullColorDisplay = false;                     // what the display was opened for (set when the mode is made; see think)
 	bool _laserRefused = false;                         // the straight shot previewed has no line of fire at all: the game will refuse it ("BLOCKED" by the crosshair)
 	bool _laserAway = false;                            // the straight shot previewed (the laser) will fly, but not to the point under the crosshair (GitHub issue #148)
 	std::vector<int> _trajectoryKey;                    // what the path shown was worked out for (empty: none shown)

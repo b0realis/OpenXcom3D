@@ -118,6 +118,10 @@ Uint32 presentKey(SDL_Surface *screen);
 void presentView(const Surface *view, const Uint32 *fullColors = nullptr);
 /// Screen::flip's hook: lays the view asked for into the display.
 void presentAtFlip(SDL_Surface *display, int x, int y, int width, int height);
+/// Do the settings ask for the 3D world in full colour (True colour on the card, at the display's size)? The display is then opened in full colour.
+bool wantsFullColorDisplay();
+/// The game's 32-bit screen copied onto a full-colour display opened for the 3D view, magnified to the picture area (the engine's plain output).
+void flipFullColor(SDL_Surface *screen, SDL_Surface *display, int x, int y, int width, int height);
 /// Zoom::flipWithZoom's hook, with the engine's OpenGL output: draws the view asked for over the window.
 void presentAtFlipOpenGl(SDL_Surface *screen, int x, int y, int width, int height, int displayHeight);
 
@@ -402,6 +406,8 @@ bool noclipFloats(BattlescapeState *state, const BattleUnit *unit);
 
 // Stock OXCE: the add-on is left out, and every hook does nothing.
 inline void presentAtFlip(SDL_Surface *, int, int, int, int) { }
+inline bool wantsFullColorDisplay() { return false; }
+inline void flipFullColor(SDL_Surface *, SDL_Surface *, int, int, int, int) { }
 inline void presentAtFlipOpenGl(SDL_Surface *, int, int, int, int, int) { }
 inline FirstPersonMode *create(Game *, BattlescapeState *) { return nullptr; }
 inline void destroy(FirstPersonMode *) { }

@@ -124,7 +124,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..fc59e246e
+index 000000000..7906939e5
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,580 @@
@@ -277,7 +277,7 @@ index 000000000..fc59e246e
 +  STR_FPS_AMBIENT_OCCLUSION: "Ambient occlusion"
 +  STR_FPS_AMBIENT_OCCLUSION_DESC: "Renderer GPU only. Corners, the foot of walls and the gaps between things are darker: the world gets depth."
 +  STR_FPS_TRUE_COLOR: "True colour"
-+  STR_FPS_TRUE_COLOR_DESC: "Renderer GPU, 3D resolution Display, and OpenGL output or a 32-bit scaler. The 3D world past the palette's 256 colours."
++  STR_FPS_TRUE_COLOR_DESC: "With Renderer GPU and 3D resolution Display: the 3D world past the palette's 256 colours."
 +  STR_FPS_SMOOTH_LIGHT: "Smooth light"
 +  STR_FPS_SMOOTH_LIGHT_DESC: "With True colour. Light, shadows and haze blend smoothly where the palette's picture has a dot pattern."
 +  STR_FPS_COLORED_LIGHTS: "Coloured lights"
@@ -710,7 +710,7 @@ index 000000000..fc59e246e
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..dfe789afb
+index 000000000..afabf3679
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,580 @@
@@ -863,7 +863,7 @@ index 000000000..dfe789afb
 +  STR_FPS_AMBIENT_OCCLUSION: "Ambient occlusion"
 +  STR_FPS_AMBIENT_OCCLUSION_DESC: "Renderer GPU only. Corners, the foot of walls and the gaps between things are darker: the world gets depth."
 +  STR_FPS_TRUE_COLOR: "True colour"
-+  STR_FPS_TRUE_COLOR_DESC: "Renderer GPU, 3D resolution Display, and OpenGL output or a 32-bit scaler. The 3D world past the palette's 256 colours."
++  STR_FPS_TRUE_COLOR_DESC: "With Renderer GPU and 3D resolution Display: the 3D world past the palette's 256 colours."
 +  STR_FPS_SMOOTH_LIGHT: "Smooth light"
 +  STR_FPS_SMOOTH_LIGHT_DESC: "With True colour. Light, shadows and haze blend smoothly where the palette's picture has a dot pattern."
 +  STR_FPS_COLORED_LIGHTS: "Coloured lights"
@@ -22191,7 +22191,7 @@ index a08796ced..540392b1a 100644
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsTurret, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsRange, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
 diff --git a/src/Engine/Screen.cpp b/src/Engine/Screen.cpp
-index ae9083dcb..8dd6a03ff 100644
+index ae9083dcb..d05fc2a32 100644
 --- a/src/Engine/Screen.cpp
 +++ b/src/Engine/Screen.cpp
 @@ -17,6 +17,7 @@
@@ -22202,7 +22202,34 @@ index ae9083dcb..8dd6a03ff 100644
  #include "../resource.h"
  #include <algorithm>
  #include <sstream>
-@@ -223,12 +224,31 @@ void Screen::flip()
+@@ -102,7 +103,8 @@ void Screen::makeVideoFlags()
+ 		_flags |= SDL_NOFRAME;
+ 	}
+ 
+-	_bpp = (use32bitScaler() || useOpenGL()) ? 32 : 8;
++	// (OpenXcom3D: the 3D view's full colours need a display in full colour, see FirstPerson::wantsFullColorDisplay.)
++	_bpp = (use32bitScaler() || useOpenGL() || FirstPerson::wantsFullColorDisplay()) ? 32 : 8;
+ 	_baseWidth = Options::baseXResolution;
+ 	_baseHeight = Options::baseYResolution;
+ }
+@@ -201,7 +203,15 @@ void Screen::flip()
+ 		_pushPalette = false;
+ 	}
+ 
+-	if (getWidth() != _baseWidth || getHeight() != _baseHeight || useOpenGL())
++	if (!useOpenGL() && !use32bitScaler() && _screen->format->BytesPerPixel == 4 && _surface->format->BytesPerPixel == 4)
++	{
++		// OpenXcom3D: a full-colour display with the game's plain output (opened for the 3D view's
++		// full colours): the engine's own magnifying is for an 8-bit screen or a 32-bit scaler.
++		int pictureX, pictureY, pictureWidth, pictureHeight;
++		getPictureArea(pictureX, pictureY, pictureWidth, pictureHeight);
++		FirstPerson::flipFullColor(_surface.get(), _screen, pictureX, pictureY, pictureWidth, pictureHeight);
++	}
++	else if (getWidth() != _baseWidth || getHeight() != _baseHeight || useOpenGL())
+ 	{
+ 		Zoom::flipWithZoom(_surface.get(), _screen, _topBlackBand, _bottomBlackBand, _leftBlackBand, _rightBlackBand, &glOutput);
+ 	}
+@@ -223,12 +233,31 @@ void Screen::flip()
  
  
  
@@ -24751,10 +24778,10 @@ index 000000000..3549da300
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..9696775c9
+index 000000000..e29b04d4c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,486 @@
+@@ -0,0 +1,492 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -24875,6 +24902,10 @@ index 000000000..9696775c9
 +void presentView(const Surface *view, const Uint32 *fullColors = nullptr);
 +/// Screen::flip's hook: lays the view asked for into the display.
 +void presentAtFlip(SDL_Surface *display, int x, int y, int width, int height);
++/// Do the settings ask for the 3D world in full colour (True colour on the card, at the display's size)? The display is then opened in full colour.
++bool wantsFullColorDisplay();
++/// The game's 32-bit screen copied onto a full-colour display opened for the 3D view, magnified to the picture area (the engine's plain output).
++void flipFullColor(SDL_Surface *screen, SDL_Surface *display, int x, int y, int width, int height);
 +/// Zoom::flipWithZoom's hook, with the engine's OpenGL output: draws the view asked for over the window.
 +void presentAtFlipOpenGl(SDL_Surface *screen, int x, int y, int width, int height, int displayHeight);
 +
@@ -25159,6 +25190,8 @@ index 000000000..9696775c9
 +
 +// Stock OXCE: the add-on is left out, and every hook does nothing.
 +inline void presentAtFlip(SDL_Surface *, int, int, int, int) { }
++inline bool wantsFullColorDisplay() { return false; }
++inline void flipFullColor(SDL_Surface *, SDL_Surface *, int, int, int, int) { }
 +inline void presentAtFlipOpenGl(SDL_Surface *, int, int, int, int, int) { }
 +inline FirstPersonMode *create(Game *, BattlescapeState *) { return nullptr; }
 +inline void destroy(FirstPersonMode *) { }
@@ -31984,10 +32017,10 @@ index 000000000..eaa9f409a
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..9145c7857
+index 000000000..5f88b3bac
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,3290 @@
+@@ -0,0 +1,3298 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -32133,6 +32166,7 @@ index 000000000..9145c7857
 +	_game(game), _state(state), _save(state->_save), _wants3D(Options::fpsStartInFirstPerson), _missionAtStart(state->_save->getMissionType()), _warningY(state->_warning->getY()),
 +	_gameLineX(state->_txtDebug->getX())
 +{
++	_fullColorDisplay = FirstPerson::wantsFullColorDisplay(); // (the display was opened by the settings as they are)
 +	// The overlays are laid out on a canvas; on big screens it's drawn magnified (see blit).
 +	// Whether each step is allowed is not known yet (see stepAllowed).
 +	_targetWidth = Options::baseXResolution; // (the canvas goes to the display only once 3D shows: see relayoutIfNeeded)
@@ -34185,6 +34219,13 @@ index 000000000..9145c7857
 +	const Uint32 now = SDL_GetTicks();
 +	lastThinkTicks = now;
 +	rememberChoices(); // (the fuses burning change all the time)
++	// The display follows "True colour" (with the card, at the display's size): opened in full colour
++	// when they ask for it, back as it was when they don't (see FirstPerson::wantsFullColorDisplay).
++	if (FirstPerson::wantsFullColorDisplay() != _fullColorDisplay)
++	{
++		_fullColorDisplay = FirstPerson::wantsFullColorDisplay();
++		_game->getScreen()->resetDisplay();
++	}
 +	relayoutIfNeeded(); // (the setting "HUD scale" or "3D resolution" changed, or the display)
 +	_view->setWantsTrueColor(Options::fpsTrueColor && Options::fpsRenderer == 1 && _canvasOnDisplay); // (shown only where the mode lays the view into the display)
 +	const double elapsedSeconds = _lastFrameTick ? std::min<Uint32>(100, now - _lastFrameTick) / 1000.0 : 0.0;
@@ -35280,10 +35321,10 @@ index 000000000..9145c7857
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..af03329f4
+index 000000000..a8e94ab30
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1393 @@
+@@ -0,0 +1,1394 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -36038,6 +36079,7 @@ index 000000000..af03329f4
 +	bool _aimHitsSomething = false;                     // something is under the crosshair (not just sky)
 +	// the path the next throw or shot would take (setting "Show trajectory"), and a target marked
 +	// for confirm fire (setting "Confirm fire"): the next click on the same tile fires
++	bool _fullColorDisplay = false;                     // what the display was opened for (set when the mode is made; see think)
 +	bool _laserRefused = false;                         // the straight shot previewed has no line of fire at all: the game will refuse it ("BLOCKED" by the crosshair)
 +	bool _laserAway = false;                            // the straight shot previewed (the laser) will fly, but not to the point under the crosshair (GitHub issue #148)
 +	std::vector<int> _trajectoryKey;                    // what the path shown was worked out for (empty: none shown)
@@ -51432,10 +51474,10 @@ index 000000000..228618946
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonPresent.cpp b/src/FirstPerson/FirstPersonPresent.cpp
 new file mode 100644
-index 000000000..71063f2fd
+index 000000000..3ee65a46f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonPresent.cpp
-@@ -0,0 +1,244 @@
+@@ -0,0 +1,297 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -51481,8 +51523,10 @@ index 000000000..71063f2fd
 + *    (presentAtFlipOpenGl).
 + */
 +#include "FirstPersonApi.h"
++#include <algorithm>
 +#include <vector>
 +#include <SDL.h>
++#include "../Engine/Options.h"
 +#include "../Engine/Screen.h"
 +#include "../Engine/Surface.h"
 +#ifndef __NO_OPENGL
@@ -51504,6 +51548,57 @@ index 000000000..71063f2fd
 +bool canPresentAtDisplaySize()
 +{
 +	return true;
++}
++
++/**
++ * Settings "True colour" with "Renderer" GPU and "3D resolution" Display: the 3D world's full
++ * colours can only show on a display in full colour. With the game's plain output the display is
++ * the palette's, 8 bits, and True colour and all that needs it (Smooth light, Coloured lights,
++ * Reflections, Light shafts) did nothing, without a word (players, GitHub issue #153: "GPU mode
++ * not seeming to make changes"). So the display is opened in full colour for them (Screen), and
++ * the game's screen, 32-bit too then, copied onto it (flipFullColor).
++ */
++bool wantsFullColorDisplay()
++{
++	return Options::fpsTrueColor && Options::fpsRenderer == 1 && Options::fpsViewResolution == ViewResolutionDisplay;
++}
++
++/**
++ * The game's screen on a full-colour display opened for the 3D view (see wantsFullColorDisplay),
++ * with the game's plain output: each pixel of the picture area takes the nearest pixel of the
++ * screen. (The engine's own magnifying is for its 8-bit screen, or one of its 32-bit scalers.)
++ * The screen is 32-bit too then, in the display's own format, and where it holds the view's key
++ * the display does after: a 3D view at the display's size is laid in there (presentAtFlip).
++ * @param screen The game's screen (32-bit).
++ * @param display The display (32-bit).
++ * @param x, y, width, height The picture area on the display.
++ */
++void flipFullColor(SDL_Surface *screen, SDL_Surface *display, int x, int y, int width, int height)
++{
++	if (!screen || !display || screen->format->BytesPerPixel != 4 || display->format->BytesPerPixel != 4
++		|| width <= 0 || height <= 0 || x < 0 || y < 0 || x + width > display->w || y + height > display->h)
++	{
++		return;
++	}
++	if (SDL_MUSTLOCK(display) && SDL_LockSurface(display) != 0)
++	{
++		return;
++	}
++	// (The screen's column for each of the picture's, worked out once.)
++	std::vector<int> columnOf(width);
++	for (int column = 0; column < width; ++column) columnOf[column] = std::min(screen->w - 1, column * screen->w / width);
++	for (int row = 0; row < height; ++row)
++	{
++		const Uint32 *from = (const Uint32 *)((const Uint8 *)screen->pixels + (size_t)std::min(screen->h - 1, row * screen->h / height) * screen->pitch);
++		Uint32 *to = (Uint32 *)((Uint8 *)display->pixels + (size_t)(y + row) * display->pitch) + x;
++		if (width == screen->w)
++		{
++			std::copy(from, from + width, to);
++			continue;
++		}
++		for (int column = 0; column < width; ++column) to[column] = from[columnOf[column]];
++	}
++	if (SDL_MUSTLOCK(display)) SDL_UnlockSurface(display);
 +}
 +
 +Uint32 presentKey(SDL_Surface *screen)

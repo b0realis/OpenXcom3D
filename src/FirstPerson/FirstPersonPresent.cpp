@@ -43,8 +43,10 @@
  *    (presentAtFlipOpenGl).
  */
 #include "FirstPersonApi.h"
+#include <algorithm>
 #include <vector>
 #include <SDL.h>
+#include "../Engine/Options.h"
 #include "../Engine/Screen.h"
 #include "../Engine/Surface.h"
 #ifndef __NO_OPENGL
@@ -66,6 +68,57 @@ const Uint32 *fullToPresent = nullptr;  // ... and its pixels in full colour (0x
 bool canPresentAtDisplaySize()
 {
 	return true;
+}
+
+/**
+ * Settings "True colour" with "Renderer" GPU and "3D resolution" Display: the 3D world's full
+ * colours can only show on a display in full colour. With the game's plain output the display is
+ * the palette's, 8 bits, and True colour and all that needs it (Smooth light, Coloured lights,
+ * Reflections, Light shafts) did nothing, without a word (players, GitHub issue #153: "GPU mode
+ * not seeming to make changes"). So the display is opened in full colour for them (Screen), and
+ * the game's screen, 32-bit too then, copied onto it (flipFullColor).
+ */
+bool wantsFullColorDisplay()
+{
+	return Options::fpsTrueColor && Options::fpsRenderer == 1 && Options::fpsViewResolution == ViewResolutionDisplay;
+}
+
+/**
+ * The game's screen on a full-colour display opened for the 3D view (see wantsFullColorDisplay),
+ * with the game's plain output: each pixel of the picture area takes the nearest pixel of the
+ * screen. (The engine's own magnifying is for its 8-bit screen, or one of its 32-bit scalers.)
+ * The screen is 32-bit too then, in the display's own format, and where it holds the view's key
+ * the display does after: a 3D view at the display's size is laid in there (presentAtFlip).
+ * @param screen The game's screen (32-bit).
+ * @param display The display (32-bit).
+ * @param x, y, width, height The picture area on the display.
+ */
+void flipFullColor(SDL_Surface *screen, SDL_Surface *display, int x, int y, int width, int height)
+{
+	if (!screen || !display || screen->format->BytesPerPixel != 4 || display->format->BytesPerPixel != 4
+		|| width <= 0 || height <= 0 || x < 0 || y < 0 || x + width > display->w || y + height > display->h)
+	{
+		return;
+	}
+	if (SDL_MUSTLOCK(display) && SDL_LockSurface(display) != 0)
+	{
+		return;
+	}
+	// (The screen's column for each of the picture's, worked out once.)
+	std::vector<int> columnOf(width);
+	for (int column = 0; column < width; ++column) columnOf[column] = std::min(screen->w - 1, column * screen->w / width);
+	for (int row = 0; row < height; ++row)
+	{
+		const Uint32 *from = (const Uint32 *)((const Uint8 *)screen->pixels + (size_t)std::min(screen->h - 1, row * screen->h / height) * screen->pitch);
+		Uint32 *to = (Uint32 *)((Uint8 *)display->pixels + (size_t)(y + row) * display->pitch) + x;
+		if (width == screen->w)
+		{
+			std::copy(from, from + width, to);
+			continue;
+		}
+		for (int column = 0; column < width; ++column) to[column] = from[columnOf[column]];
+	}
+	if (SDL_MUSTLOCK(display)) SDL_UnlockSurface(display);
 }
 
 Uint32 presentKey(SDL_Surface *screen)

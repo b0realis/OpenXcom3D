@@ -143,6 +143,7 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
 	_game(game), _state(state), _save(state->_save), _wants3D(Options::fpsStartInFirstPerson), _missionAtStart(state->_save->getMissionType()), _warningY(state->_warning->getY()),
 	_gameLineX(state->_txtDebug->getX())
 {
+	_fullColorDisplay = FirstPerson::wantsFullColorDisplay(); // (the display was opened by the settings as they are)
 	// The overlays are laid out on a canvas; on big screens it's drawn magnified (see blit).
 	// Whether each step is allowed is not known yet (see stepAllowed).
 	_targetWidth = Options::baseXResolution; // (the canvas goes to the display only once 3D shows: see relayoutIfNeeded)
@@ -2195,6 +2196,13 @@ void FirstPersonMode::think()
 	const Uint32 now = SDL_GetTicks();
 	lastThinkTicks = now;
 	rememberChoices(); // (the fuses burning change all the time)
+	// The display follows "True colour" (with the card, at the display's size): opened in full colour
+	// when they ask for it, back as it was when they don't (see FirstPerson::wantsFullColorDisplay).
+	if (FirstPerson::wantsFullColorDisplay() != _fullColorDisplay)
+	{
+		_fullColorDisplay = FirstPerson::wantsFullColorDisplay();
+		_game->getScreen()->resetDisplay();
+	}
 	relayoutIfNeeded(); // (the setting "HUD scale" or "3D resolution" changed, or the display)
 	_view->setWantsTrueColor(Options::fpsTrueColor && Options::fpsRenderer == 1 && _canvasOnDisplay); // (shown only where the mode lays the view into the display)
 	const double elapsedSeconds = _lastFrameTick ? std::min<Uint32>(100, now - _lastFrameTick) / 1000.0 : 0.0;
