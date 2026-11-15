@@ -1002,6 +1002,10 @@ What `FirstPersonView` draws:
 
 ## 11. Version history
 
+### After 1.14 (not released)
+
+- *Renderer* GPU: the programs for what comes after the rays (the units and effects, the bloom, the screen wash, the frame put together in full colour) are built when the card starts, as the battle loads, not with the first frame of the 3D view (the owner's Mac: the first click on 3D after installing a new version stood still for two seconds; Apple's driver builds each program slowly once and keeps it). The log says how long they took ("the programs after the rays built in ... ms"). What a driver still does at a program's first use is not moved by this.
+
 ### 1.14 (2026-11-13)
 
 Hot-fixed 2026-11-14, twice, and 2026-11-15, three times (the first 24 entries, folded into the release):

@@ -688,6 +688,9 @@ struct FirstPersonGpu::State
 	std::map<std::array<int, 2>, PresentTargets> presentTargets;
 	bool present(const Present &frame);
 	bool buildGlow();
+	bool buildWash();
+	bool buildPresent();
+	bool washFresh = false, presentFresh = false; // just built: their tables are still to be sent
 	bool drawGlow(const Effects &effects, const EffectTargets &drawn, GlowTargets *&brightened);
 };
 
@@ -803,7 +806,23 @@ bool FirstPersonGpu::State::start(int device)
 	modelInfo.assign(4, 0);
 	solidRows.assign(MaskRows, 0);
 	modelsChanged = solidsChanged = true;
-	return Gl::GetError() == Gl::NoError;
+	if (Gl::GetError() != Gl::NoError)
+	{
+		return false;
+	}
+	// The programs for what comes after the rays (the units and effects, the bloom, the screen wash, the frame put
+	// together in full colour) are built now too, while the battle loads, not with the first frame of the 3D view:
+	// a driver that builds slowly (Apple's, the first run of a new version: the owner's Mac stood still for two
+	// seconds at the first click on 3D) is then waited for where nobody is looking. One that won't build is tried
+	// again when it is first needed, and reported there.
+	const auto laterStart = std::chrono::steady_clock::now();
+	const bool laterBuilt[4] = { buildEffects(), buildGlow(), buildWash(), buildPresent() };
+	const double laterTime = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - laterStart).count();
+	Log(LOG_INFO) << "OpenXcom3D GPU: the programs after the rays built in " << (int)laterTime << " ms"
+		<< (laterBuilt[0] && laterBuilt[1] && laterBuilt[2] && laterBuilt[3] ? "" : " (not all of them)");
+	while (Gl::GetError() != Gl::NoError) { } // (a failure there is no failure of the rays)
+	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
+	return true;
 }
 
 /**
@@ -1981,6 +2000,31 @@ bool FirstPersonGpu::State::drawGlow(const Effects &effects, const EffectTargets
 }
 
 /**
+ * Builds the screen wash's program and its tint tables' picture (see drawWash): when the card
+ * starts, or failing that the first time a wash is drawn.
+ */
+bool FirstPersonGpu::State::buildWash()
+{
+	washProgram = compileFragment("const float ControlHazeFrom = " + glslFloat(ControlHazeFrom) + ";\n" + WashSource, "the screen wash's shader");
+	if (!washProgram)
+	{
+		return false;
+	}
+	Gl::UseProgram(washProgram);
+	Gl::Uniform1i(Gl::GetUniformLocation(washProgram, "uColor"), 0);
+	Gl::Uniform1i(Gl::GetUniformLocation(washProgram, "uGlow"), 2);
+	Gl::Uniform1i(Gl::GetUniformLocation(washProgram, "uTints"), 7);
+	Gl::GenTextures(1, &tintsTexture);
+	Gl::ActiveTexture(Gl::TEXTURE0 + 7);
+	Gl::BindTexture(Gl::TEXTURE_2D, tintsTexture);
+	Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, 256, 6, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
+	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
+	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
+	washFresh = true;
+	return true;
+}
+
+/**
  * The screen wash over the finished picture (FirstPersonView::applyScreenWash, on the card; see
  * WashSource), into a picture of its own.
  * @param colorTexture, glowTexture The picture so far and its glow.
@@ -1988,24 +2032,14 @@ bool FirstPersonGpu::State::drawGlow(const Effects &effects, const EffectTargets
  */
 bool FirstPersonGpu::State::drawWash(const Effects &effects, Gl::UInt colorTexture, Gl::UInt glowTexture, WashTargets *&washed)
 {
-	if (!washProgram)
+	if (!washProgram && !buildWash())
 	{
-		washProgram = compileFragment("const float ControlHazeFrom = " + glslFloat(ControlHazeFrom) + ";\n" + WashSource, "the screen wash's shader");
-		if (!washProgram)
-		{
-			return false;
-		}
-		Gl::UseProgram(washProgram);
-		Gl::Uniform1i(Gl::GetUniformLocation(washProgram, "uColor"), 0);
-		Gl::Uniform1i(Gl::GetUniformLocation(washProgram, "uGlow"), 2);
-		Gl::Uniform1i(Gl::GetUniformLocation(washProgram, "uTints"), 7);
-		Gl::GenTextures(1, &tintsTexture);
-		Gl::ActiveTexture(Gl::TEXTURE0 + 7);
-		Gl::BindTexture(Gl::TEXTURE_2D, tintsTexture);
-		Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, 256, 6, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
-		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
-		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
-		tintsSent = ~effects.paletteHash;
+		return false;
+	}
+	if (washFresh)
+	{
+		tintsSent = ~effects.paletteHash; // (its tables go up with the first wash)
+		washFresh = false;
 	}
 	WashTargets &target = washTargets[{ effects.width, effects.height }];
 	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
@@ -2059,6 +2093,37 @@ bool FirstPersonGpu::State::drawWash(const Effects &effects, Gl::UInt colorTextu
 }
 
 /**
+ * Builds the program that puts the frame together on the card, and its palette's and flame
+ * tint's pictures (see present): when the card starts, or failing that with the first such frame.
+ */
+bool FirstPersonGpu::State::buildPresent()
+{
+	presentProgram = compileFragment(PresentSource, "the shader that puts the frame together");
+	if (!presentProgram)
+	{
+		return false;
+	}
+	Gl::UseProgram(presentProgram);
+	const char *const names[6] = { "uColor", "uOverlay", "uGlow", "uRayColor", "uRayTrue", "uPalette" };
+	for (int unit = 0; unit < 6; ++unit) Gl::Uniform1i(Gl::GetUniformLocation(presentProgram, names[unit]), unit);
+	Gl::GenTextures(1, &presentPalette);
+	Gl::ActiveTexture(Gl::TEXTURE0 + 5);
+	Gl::BindTexture(Gl::TEXTURE_2D, presentPalette);
+	Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::RGBA8, 256, 1, 0, Gl::RGBA, Gl::UNSIGNED_BYTE, nullptr);
+	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
+	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
+	Gl::Uniform1i(Gl::GetUniformLocation(presentProgram, "uFlameTint"), 6);
+	Gl::GenTextures(1, &presentFlameTint);
+	Gl::ActiveTexture(Gl::TEXTURE0 + 6);
+	Gl::BindTexture(Gl::TEXTURE_2D, presentFlameTint);
+	Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, 256, 1, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
+	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
+	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
+	presentFresh = true;
+	return true;
+}
+
+/**
  * The frame put together on the card (see PresentSource), from what the last drawEffects for a
  * view of this size left there and the overlay the CPU drew since; read back if asked, else left
  * in its texture for a display on this context to show.
@@ -2071,30 +2136,14 @@ bool FirstPersonGpu::State::present(const Present &frame)
 		return false;
 	}
 	PresentTargets &kept = found->second;
-	if (!presentProgram)
+	if (!presentProgram && !buildPresent())
 	{
-		presentProgram = compileFragment(PresentSource, "the shader that puts the frame together");
-		if (!presentProgram)
-		{
-			return false;
-		}
-		Gl::UseProgram(presentProgram);
-		const char *const names[6] = { "uColor", "uOverlay", "uGlow", "uRayColor", "uRayTrue", "uPalette" };
-		for (int unit = 0; unit < 6; ++unit) Gl::Uniform1i(Gl::GetUniformLocation(presentProgram, names[unit]), unit);
-		Gl::GenTextures(1, &presentPalette);
-		Gl::ActiveTexture(Gl::TEXTURE0 + 5);
-		Gl::BindTexture(Gl::TEXTURE_2D, presentPalette);
-		Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::RGBA8, 256, 1, 0, Gl::RGBA, Gl::UNSIGNED_BYTE, nullptr);
-		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
-		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
-		Gl::Uniform1i(Gl::GetUniformLocation(presentProgram, "uFlameTint"), 6);
-		Gl::GenTextures(1, &presentFlameTint);
-		Gl::ActiveTexture(Gl::TEXTURE0 + 6);
-		Gl::BindTexture(Gl::TEXTURE_2D, presentFlameTint);
-		Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, 256, 1, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
-		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
-		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
-		presentPaletteSent = ~frame.paletteHash;
+		return false;
+	}
+	if (presentFresh)
+	{
+		presentPaletteSent = ~frame.paletteHash; // (its palette goes up with the first frame)
+		presentFresh = false;
 	}
 	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
 	if (!kept.framebuffer)
