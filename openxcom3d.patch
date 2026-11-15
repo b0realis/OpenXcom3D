@@ -22034,7 +22034,7 @@ index bea3b31f0..2c7eb8682 100644
  	}
  #endif
 diff --git a/src/Engine/Game.cpp b/src/Engine/Game.cpp
-index f3533971d..f0b8abf29 100644
+index f3533971d..b4d8f49ed 100644
 --- a/src/Engine/Game.cpp
 +++ b/src/Engine/Game.cpp
 @@ -56,7 +56,7 @@ const double Game::VOLUME_GRADIENT = 10.0;
@@ -22056,8 +22056,8 @@ index f3533971d..f0b8abf29 100644
 +			if (_releaseChecks > 0 && _event.type == SDL_MOUSEMOTION)
 +			{
 +				const SDL_Surface *video = SDL_GetVideoSurface();
-+				const int far = video ? std::max(video->w, video->h) / 8 : 0;
-+				if (video && (std::abs(_event.motion.x - _freeMouseX) > far || std::abs(_event.motion.y - _freeMouseY) > far))
++				const int apart = video ? std::max(video->w, video->h) / 8 : 0;
++				if (video && (std::abs(_event.motion.x - _freeMouseX) > apart || std::abs(_event.motion.y - _freeMouseY) > apart))
 +				{
 +					--_releaseChecks;
 +					SDL_WarpMouse(_freeMouseX, _freeMouseY);
