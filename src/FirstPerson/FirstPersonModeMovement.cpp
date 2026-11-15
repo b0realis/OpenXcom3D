@@ -387,6 +387,10 @@ bool FirstPersonMode::runsStep(BattleUnit *unit, const Position &from, int direc
  * so does a step up or down stairs (the game's strafe stays on one level). With free turning the
  * game turns the soldier for the step, for free, and it faces the view again after
  * (faceLookDirection). The step is priced (stepAllowed) and walked (commitStep) by this one test.
+ * A step the way the view looks (W alone) is never one: the soldier turns to face it as the
+ * game's walk turns (for nothing) and walks at the walk's price (a player, GitHub issue #161: looking south with
+ * the body still facing south-west, holding W sidestepped south tile after tile, a TU more each
+ * and the armour's side to the enemy; "movement should act like turn to shoot").
  * @param unit The soldier.
  * @param from The tile the step starts from.
  * @param direction The step's direction (0 north .. 7, clockwise).
@@ -396,7 +400,10 @@ bool FirstPersonMode::runsStep(BattleUnit *unit, const Position &from, int direc
 bool FirstPersonMode::isSidestep(const BattleUnit *unit, const Position &from, int direction, const Position &target) const
 {
 	const int offFacing = std::min((direction - unit->getDirection() + 8) % 8, (unit->getDirection() - direction + 8) % 8);
-	return Options::fpsTurnCost && offFacing >= 1 && offFacing <= 2 && target.z == from.z;
+	// The way the view looks, as a step (the nearest of the eight, as the keys' push is rounded: see tileMoveVelocity).
+	const double viewOctant = std::round(_view->getYawDegrees() / 45.0) * (Pi / 4.0);
+	const int viewDirection = Pathfinding::vectorToDirection(Position((int)std::lround(std::cos(viewOctant)), (int)std::lround(std::sin(viewOctant)), 0));
+	return Options::fpsTurnCost && offFacing >= 1 && offFacing <= 2 && target.z == from.z && direction != viewDirection;
 }
 
 /**
