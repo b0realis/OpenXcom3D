@@ -148,6 +148,7 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 	gpuWarmUp();
 	gpuForgetModels();
 	_models.clear();
+	_sameArtModels.clear();
 	_ghostModels.clear();
 	_leafyModels.clear();
 	_partKinds.clear();

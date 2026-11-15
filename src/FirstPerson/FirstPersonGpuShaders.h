@@ -1142,6 +1142,13 @@ uint mirroredColor(Hit hit, int hitTile, int axis, bool skinOnly, bool nextFrame
 	{
 		return 0u;
 	}
+	// (A wall one goes through keeps its own look on both faces: VoxelModel::wayThrough.)
+	if (hit.part >= 0)
+	{
+		uvec4 partsNow = texelFetch(uTiles, hitTile * 4);
+		uint own = hit.part == 0 ? partsNow.x & 0xFFFFu : hit.part == 1 ? partsNow.x >> 16 : hit.part == 2 ? partsNow.y & 0xFFFFu : partsNow.y >> 16;
+		if (own != 0u && (texelFetch(uModelInfo, int(own)).x & 16u) != 0u) return 0u;
+	}
 	ivec3 lo = ivec3(texelFetch(uMirrors, header).r, texelFetch(uMirrors, header + 1).r, texelFetch(uMirrors, header + 2).r);
 	ivec3 size = ivec3(texelFetch(uMirrors, header + 3).r, texelFetch(uMirrors, header + 4).r, texelFetch(uMirrors, header + 5).r);
 	int sum = texelFetch(uMirrors, header + 6 + axis).r;
@@ -1650,6 +1657,7 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 const int ShaftSteps = 20;        // places along a ray where the light in the air is added up
 const float ShaftReach = 320.0;   // ... over this far at most (voxels)
 const float ShaftSmoke = 0.001;   // how much of the light a voxel of smoke throws towards the eye, for each of a tile's units of smoke
+const float ShaftMost = 0.45;     // the most the air's light adds to a pixel, of full white
 
 // The smoke at a point: blended between the eight tiles round it, so a cloud's light has no tile's edges.
 float smokeAt(vec3 point)
@@ -1673,7 +1681,8 @@ float smokeAt(vec3 point)
  * A ray's full colour with the light the air throws towards the eye on its way (setting "Light shafts"): the
  * flashlight's cone, the flares, the lamps by night and the coloured lights show as beams and glows where there is
  * smoke, and everywhere under the sea. The light is added up at ShaftSteps places along the ray, each by how much
- * smoke (or water) is there. Nothing hides a light from the air here: no shadow rays (twenty a pixel would cost
+ * smoke (or water) is there, the air nearer the eye dimming what the air behind it adds, and never more than
+ * ShaftMost in all. Nothing hides a light from the air here: no shadow rays (twenty a pixel would cost
  * more than the whole picture), so a lamp behind a wall still glows in the smoke on this side of it.
  * @param rgb The ray's colour (0..255 each).
  * @param span How far the ray went (voxels).
@@ -1683,6 +1692,7 @@ vec3 lightShafts(vec3 rgb, vec3 rayDirection, float span)
 	float stride = min(span, ShaftReach) / float(ShaftSteps);
 	float night = uUnderwater != 0 ? 1.0 : uNight;
 	vec3 added = vec3(0.0);
+	float through = 1.0; // how much of what lies further off the air so far lets through
 	for (int place = 0; place < ShaftSteps; ++place)
 	{
 		vec3 at = uEye + rayDirection * ((float(place) + 0.5) * stride);
@@ -1724,9 +1734,16 @@ vec3 lightShafts(vec3 rgb, vec3 rayDirection, float span)
 			light += uColorLightOf[colored].rgb * (near * near * uColorLightOf[colored].w);
 		}
 #endif
-		added += light * (thick * stride);
+		// The air is no brighter than fully lit, however many lamps reach it; what a stretch of it
+		// throws towards the eye it also takes from what lies behind (thin air: thick * stride, as
+		// before; a thick cloud: no more than its light); and all of it together at most ShaftMost.
+		// (A player, GitHub issue #155: a cloud of liquid nitrogen over a space station's floor lamps
+		// was a white glare over two thirds of the view, each step and each lamp adding without end.)
+		float share = 1.0 - exp(-thick * stride);
+		added += min(light, vec3(1.0)) * (through * share);
+		through *= 1.0 - share;
 	}
-	return min(rgb + added * 255.0, vec3(255.0));
+	return min(rgb + min(added, vec3(ShaftMost)) * 255.0, vec3(255.0));
 }
 #endif
 

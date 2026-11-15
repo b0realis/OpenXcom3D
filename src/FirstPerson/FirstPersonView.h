@@ -608,6 +608,7 @@ private:
 		const MapData *openDoor;      // the door's record on hiddenPart: while it's there, the swing goes on
 	};
 	std::unordered_map<Uint64, VoxelModel> _models;     // by MapData, sprite and cut-out
+	std::unordered_map<Uint64, const VoxelModel*> _sameArtModels; // a later frame whose art is its first frame's, pixel for pixel: the first frame's model (see getModel)
 	std::unordered_map<Uint64, VoxelModel> _ghostModels; // the parts' own ghosts (VoxelModel::ghost), by the part's key in _models
 	std::unordered_map<Uint64, VoxelModel> _leafyModels; // the leafy models of foliage (see leafyModel), by the part's key in _models
 	std::unordered_map<const VoxelModel*, VoxelModel> _openedModels; // models with the glass in their openings broken out (see openedModel), by the whole one

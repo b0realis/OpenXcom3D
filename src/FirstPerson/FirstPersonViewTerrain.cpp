@@ -76,6 +76,10 @@
 #include "../Mod/RuleCraft.h"
 #include "../Mod/RuleTerrain.h"
 #include "../Mod/RuleUfo.h"
+#include "../Savegame/Ufo.h"
+#include "../Savegame/SavedGame.h"
+#include "../Savegame/Base.h"
+#include "../Savegame/Craft.h"
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/SavedBattleGame.h"
 #include "../Savegame/Tile.h"
@@ -1842,16 +1846,34 @@ void FirstPersonView::findMirrors()
 
 	// The names of the map data sets that crafts and UFOs are built from, minus any that an
 	// ordinary terrain uses too.
-	std::set<std::string> craftSets, terrainSets;
+	std::set<std::string> craftSets, terrainSets, ownCraftSets; // (ownCraftSets: the player's crafts' alone)
 	auto collect = [](RuleTerrain *terrain, std::set<std::string> &into)
 	{
 		if (!terrain) return;
 		for (const MapDataSet *dataSet : *terrain->getMapDataSets()) into.insert(dataSet->getName());
 	};
 	for (const auto &type : mod->getCraftsList()) collect(mod->getCraft(type)->getBattlescapeTerrainData(), craftSets);
+	// The player's own craft: the one landed in this battle (a mod may build other things from a
+	// craft's map data, XPiratez its temples); without one to ask, every craft the mod has.
+	// And whether a UFO is in this battle at all: on a mission site there is none, whatever its
+	// buildings are made of (lifts and all).
+	bool ufoInBattle = true;
+	if (SavedGame *game = _game->getSavedGame())
+	{
+		for (Base *base : *game->getBases())
+			for (Craft *craft : *base->getCrafts())
+				if (craft->isInBattlescape()) collect(craft->getRules()->getBattlescapeTerrainData(), ownCraftSets);
+		ufoInBattle = false;
+		for (Ufo *ufo : *game->getUfos()) ufoInBattle = ufoInBattle || ufo->isInBattlescape();
+	}
+	else
+	{
+		for (const auto &type : mod->getCraftsList()) collect(mod->getCraft(type)->getBattlescapeTerrainData(), ownCraftSets);
+	}
 	for (const auto &type : mod->getUfosList()) collect(mod->getUfo(type)->getBattlescapeTerrainData(), craftSets);
 	for (const auto &type : mod->getTerrainList()) collect(mod->getTerrain(type), terrainSets);
 	for (const auto &setName : terrainSets) craftSets.erase(setName); // (BLANKS and the like are everywhere)
+	for (const auto &setName : terrainSets) ownCraftSets.erase(setName);
 	if (craftSets.empty())
 	{
 		return;
@@ -1938,6 +1960,39 @@ void FirstPersonView::findMirrors()
 							toVisit.push_back(neighbour);
 						}
 					}
+		}
+		// A building the mod's rules list among its UFOs (XPiratez lands its enemies in temples,
+		// mansions and bunkers that way) is no craft to mirror: a building isn't symmetric as a hull
+		// is, and its walls came out in patches, the far side's look where the mirror found any and
+		// their own elsewhere (a player, GitHub issue #156: a tower room's stone wall wore the planks
+		// opposite in the outline of the stairs there). Told as the UFOs' lights tell it (see
+		// findUfos): a UFO has a power source, a navigation console or a grav lift, and there is one in
+		// the battle (a temple has its lifts too). The player's own craft, the one landed here, has
+		// none and is mirrored as ever. A building's walls take their paint by its
+		// rooms instead (see findWallPaints).
+		bool machinery = false, ownCraft = false;
+		for (const int tileIndex : craftTiles)
+		{
+			const Tile *tile = _save->getTile(tileIndex);
+			for (int part = 0; part < 4; ++part)
+			{
+				const MapData *mapData = tile->getMapData((TilePart)part);
+				if (!mapData) continue;
+				const SpecialTileType special = mapData->getSpecialType();
+				machinery = machinery || special == UFO_POWER_SOURCE || special == UFO_NAVIGATION || (part == O_FLOOR && mapData->isGravLift());
+				ownCraft = ownCraft || (mapData->getDataset() && ownCraftSets.count(mapData->getDataset()->getName()));
+			}
+		}
+		if (!ownCraft && !(machinery && ufoInBattle))
+		{
+			for (const int tileIndex : craftTiles)
+			{
+				_mirrorOfTile[tileIndex] = -1;
+				isCraftTile[tileIndex] = 0;
+			}
+			_mirrors.pop_back();
+			Log(LOG_INFO) << "OpenXcom3D: a building of " << craftTiles.size() << " tiles from a craft's or a UFO's map (" << (ufoInBattle ? "no power source, navigation or grav lift" : "no UFO in this battle") << "): not mirrored as a craft";
+			continue;
 		}
 		// The craft's box: its first voxel and its size along each axis.
 		for (int axis = 0; axis < 3; ++axis)
@@ -2066,6 +2121,14 @@ Uint8 FirstPersonView::mirroredColor(const Hit &hit, int axis, bool skinOnly, bo
 	if (craftId < 0 || !_mirrors[craftId].symmetric[axis])
 	{
 		return 0;
+	}
+	// A wall one goes through (a door, a curtain) keeps its own look on both its faces: it says
+	// "this way" from either side (a player, GitHub issue #156: a curtain was a curtain on one side
+	// only, the other the wall's opposite).
+	if (hit.part >= 0)
+	{
+		const VoxelModel *own = _tileViews[hit.tile].part[hit.part];
+		if (own && own->wayThrough) return 0;
 	}
 	const Mirror &mirror = _mirrors[craftId];
 
@@ -2543,10 +2606,36 @@ const FirstPersonView::VoxelModel *FirstPersonView::getModel(const MapData *mapD
 	auto found = _models.find(key);
 	if (found == _models.end())
 	{
+		// A later frame whose art is the first frame's, pixel for pixel (a mod's wall with two sprite
+		// numbers for one picture: XPiratez's NUKE_CITY_2), is the first frame's model: the part
+		// doesn't animate at all. As a model of its own it "pulsed" (a player, GitHub issue #157):
+		// what goes by the model, a wall's paint on its hidden face (see findWallPaints), held for
+		// the first frame only, one tick in eight.
+		const int firstSprite = mapData->getSprite(0);
+		auto sameArt = _sameArtModels.find(key);
+		if (sameArt != _sameArtModels.end())
+		{
+			return sameArt->second;
+		}
+		if (spriteIndex != firstSprite)
+		{
+			SurfaceSet *art = mapData->getDataset() ? mapData->getDataset()->getSurfaceset() : nullptr;
+			const Surface *first = art ? art->getFrame(firstSprite) : nullptr, *frame = art ? art->getFrame(spriteIndex) : nullptr;
+			bool same = first && frame && first->getWidth() == frame->getWidth() && first->getHeight() == frame->getHeight();
+			for (int y = 0; same && y < first->getHeight(); ++y)
+			{
+				same = std::equal(first->getRaw(0, y), first->getRaw(0, y) + first->getWidth(), frame->getRaw(0, y));
+			}
+			if (same)
+			{
+				const VoxelModel *firstModel = getModel(mapData, firstSprite, cutout);
+				_sameArtModels.emplace(key, firstModel);
+				return firstModel;
+			}
+		}
 		// Not built yet: build it in place (the map keeps it at the same address from then on). A later frame of a
 		// part that animates is built as the kind of part its first frame is (see buildModel).
 		// And a part without voxels is, in every frame, the kind of ghost any one of its frames makes it (see partKind).
-		const int firstSprite = mapData->getSprite(0);
 		const VoxelModel *firstFrame = spriteIndex != firstSprite ? getModel(mapData, firstSprite, cutout) : nullptr;
 		if (const VoxelModel *kind = partKind(mapData, cutout)) firstFrame = kind;
 		found = _models.emplace(key, VoxelModel()).first;

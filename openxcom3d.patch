@@ -29345,10 +29345,10 @@ index 000000000..326da83e2
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..0a2889e93
+index 000000000..47d02c2bc
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,2487 @@
+@@ -0,0 +1,2504 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -30493,6 +30493,13 @@ index 000000000..0a2889e93
 +	{
 +		return 0u;
 +	}
++	// (A wall one goes through keeps its own look on both faces: VoxelModel::wayThrough.)
++	if (hit.part >= 0)
++	{
++		uvec4 partsNow = texelFetch(uTiles, hitTile * 4);
++		uint own = hit.part == 0 ? partsNow.x & 0xFFFFu : hit.part == 1 ? partsNow.x >> 16 : hit.part == 2 ? partsNow.y & 0xFFFFu : partsNow.y >> 16;
++		if (own != 0u && (texelFetch(uModelInfo, int(own)).x & 16u) != 0u) return 0u;
++	}
 +	ivec3 lo = ivec3(texelFetch(uMirrors, header).r, texelFetch(uMirrors, header + 1).r, texelFetch(uMirrors, header + 2).r);
 +	ivec3 size = ivec3(texelFetch(uMirrors, header + 3).r, texelFetch(uMirrors, header + 4).r, texelFetch(uMirrors, header + 5).r);
 +	int sum = texelFetch(uMirrors, header + 6 + axis).r;
@@ -31001,6 +31008,7 @@ index 000000000..0a2889e93
 +const int ShaftSteps = 20;        // places along a ray where the light in the air is added up
 +const float ShaftReach = 320.0;   // ... over this far at most (voxels)
 +const float ShaftSmoke = 0.001;   // how much of the light a voxel of smoke throws towards the eye, for each of a tile's units of smoke
++const float ShaftMost = 0.45;     // the most the air's light adds to a pixel, of full white
 +
 +// The smoke at a point: blended between the eight tiles round it, so a cloud's light has no tile's edges.
 +float smokeAt(vec3 point)
@@ -31024,7 +31032,8 @@ index 000000000..0a2889e93
 + * A ray's full colour with the light the air throws towards the eye on its way (setting "Light shafts"): the
 + * flashlight's cone, the flares, the lamps by night and the coloured lights show as beams and glows where there is
 + * smoke, and everywhere under the sea. The light is added up at ShaftSteps places along the ray, each by how much
-+ * smoke (or water) is there. Nothing hides a light from the air here: no shadow rays (twenty a pixel would cost
++ * smoke (or water) is there, the air nearer the eye dimming what the air behind it adds, and never more than
++ * ShaftMost in all. Nothing hides a light from the air here: no shadow rays (twenty a pixel would cost
 + * more than the whole picture), so a lamp behind a wall still glows in the smoke on this side of it.
 + * @param rgb The ray's colour (0..255 each).
 + * @param span How far the ray went (voxels).
@@ -31034,6 +31043,7 @@ index 000000000..0a2889e93
 +	float stride = min(span, ShaftReach) / float(ShaftSteps);
 +	float night = uUnderwater != 0 ? 1.0 : uNight;
 +	vec3 added = vec3(0.0);
++	float through = 1.0; // how much of what lies further off the air so far lets through
 +	for (int place = 0; place < ShaftSteps; ++place)
 +	{
 +		vec3 at = uEye + rayDirection * ((float(place) + 0.5) * stride);
@@ -31075,9 +31085,16 @@ index 000000000..0a2889e93
 +			light += uColorLightOf[colored].rgb * (near * near * uColorLightOf[colored].w);
 +		}
 +#endif
-+		added += light * (thick * stride);
++		// The air is no brighter than fully lit, however many lamps reach it; what a stretch of it
++		// throws towards the eye it also takes from what lies behind (thin air: thick * stride, as
++		// before; a thick cloud: no more than its light); and all of it together at most ShaftMost.
++		// (A player, GitHub issue #155: a cloud of liquid nitrogen over a space station's floor lamps
++		// was a white glare over two thirds of the view, each step and each lamp adding without end.)
++		float share = 1.0 - exp(-thick * stride);
++		added += min(light, vec3(1.0)) * (through * share);
++		through *= 1.0 - share;
 +	}
-+	return min(rgb + added * 255.0, vec3(255.0));
++	return min(rgb + min(added, vec3(ShaftMost)) * 255.0, vec3(255.0));
 +}
 +#endif
 +
@@ -54148,10 +54165,10 @@ index 000000000..7e1bbfcd2
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..dec6ed51f
+index 000000000..754c648f7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,727 @@
+@@ -0,0 +1,728 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -54302,6 +54319,7 @@ index 000000000..dec6ed51f
 +	gpuWarmUp();
 +	gpuForgetModels();
 +	_models.clear();
++	_sameArtModels.clear();
 +	_ghostModels.clear();
 +	_leafyModels.clear();
 +	_partKinds.clear();
@@ -54881,10 +54899,10 @@ index 000000000..dec6ed51f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..7c5441894
+index 000000000..4753621e2
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1574 @@
+@@ -0,0 +1,1575 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -55495,6 +55513,7 @@ index 000000000..7c5441894
 +		const MapData *openDoor;      // the door's record on hiddenPart: while it's there, the swing goes on
 +	};
 +	std::unordered_map<Uint64, VoxelModel> _models;     // by MapData, sprite and cut-out
++	std::unordered_map<Uint64, const VoxelModel*> _sameArtModels; // a later frame whose art is its first frame's, pixel for pixel: the first frame's model (see getModel)
 +	std::unordered_map<Uint64, VoxelModel> _ghostModels; // the parts' own ghosts (VoxelModel::ghost), by the part's key in _models
 +	std::unordered_map<Uint64, VoxelModel> _leafyModels; // the leafy models of foliage (see leafyModel), by the part's key in _models
 +	std::unordered_map<const VoxelModel*, VoxelModel> _openedModels; // models with the glass in their openings broken out (see openedModel), by the whole one
@@ -69694,10 +69713,10 @@ index 000000000..0a9d11c8b
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..b0e64b412
+index 000000000..a9112b0ef
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,4528 @@
+@@ -0,0 +1,4617 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -69776,6 +69795,10 @@ index 000000000..b0e64b412
 +#include "../Mod/RuleCraft.h"
 +#include "../Mod/RuleTerrain.h"
 +#include "../Mod/RuleUfo.h"
++#include "../Savegame/Ufo.h"
++#include "../Savegame/SavedGame.h"
++#include "../Savegame/Base.h"
++#include "../Savegame/Craft.h"
 +#include "../Savegame/BattleUnit.h"
 +#include "../Savegame/SavedBattleGame.h"
 +#include "../Savegame/Tile.h"
@@ -71542,16 +71565,34 @@ index 000000000..b0e64b412
 +
 +	// The names of the map data sets that crafts and UFOs are built from, minus any that an
 +	// ordinary terrain uses too.
-+	std::set<std::string> craftSets, terrainSets;
++	std::set<std::string> craftSets, terrainSets, ownCraftSets; // (ownCraftSets: the player's crafts' alone)
 +	auto collect = [](RuleTerrain *terrain, std::set<std::string> &into)
 +	{
 +		if (!terrain) return;
 +		for (const MapDataSet *dataSet : *terrain->getMapDataSets()) into.insert(dataSet->getName());
 +	};
 +	for (const auto &type : mod->getCraftsList()) collect(mod->getCraft(type)->getBattlescapeTerrainData(), craftSets);
++	// The player's own craft: the one landed in this battle (a mod may build other things from a
++	// craft's map data, XPiratez its temples); without one to ask, every craft the mod has.
++	// And whether a UFO is in this battle at all: on a mission site there is none, whatever its
++	// buildings are made of (lifts and all).
++	bool ufoInBattle = true;
++	if (SavedGame *game = _game->getSavedGame())
++	{
++		for (Base *base : *game->getBases())
++			for (Craft *craft : *base->getCrafts())
++				if (craft->isInBattlescape()) collect(craft->getRules()->getBattlescapeTerrainData(), ownCraftSets);
++		ufoInBattle = false;
++		for (Ufo *ufo : *game->getUfos()) ufoInBattle = ufoInBattle || ufo->isInBattlescape();
++	}
++	else
++	{
++		for (const auto &type : mod->getCraftsList()) collect(mod->getCraft(type)->getBattlescapeTerrainData(), ownCraftSets);
++	}
 +	for (const auto &type : mod->getUfosList()) collect(mod->getUfo(type)->getBattlescapeTerrainData(), craftSets);
 +	for (const auto &type : mod->getTerrainList()) collect(mod->getTerrain(type), terrainSets);
 +	for (const auto &setName : terrainSets) craftSets.erase(setName); // (BLANKS and the like are everywhere)
++	for (const auto &setName : terrainSets) ownCraftSets.erase(setName);
 +	if (craftSets.empty())
 +	{
 +		return;
@@ -71638,6 +71679,39 @@ index 000000000..b0e64b412
 +							toVisit.push_back(neighbour);
 +						}
 +					}
++		}
++		// A building the mod's rules list among its UFOs (XPiratez lands its enemies in temples,
++		// mansions and bunkers that way) is no craft to mirror: a building isn't symmetric as a hull
++		// is, and its walls came out in patches, the far side's look where the mirror found any and
++		// their own elsewhere (a player, GitHub issue #156: a tower room's stone wall wore the planks
++		// opposite in the outline of the stairs there). Told as the UFOs' lights tell it (see
++		// findUfos): a UFO has a power source, a navigation console or a grav lift, and there is one in
++		// the battle (a temple has its lifts too). The player's own craft, the one landed here, has
++		// none and is mirrored as ever. A building's walls take their paint by its
++		// rooms instead (see findWallPaints).
++		bool machinery = false, ownCraft = false;
++		for (const int tileIndex : craftTiles)
++		{
++			const Tile *tile = _save->getTile(tileIndex);
++			for (int part = 0; part < 4; ++part)
++			{
++				const MapData *mapData = tile->getMapData((TilePart)part);
++				if (!mapData) continue;
++				const SpecialTileType special = mapData->getSpecialType();
++				machinery = machinery || special == UFO_POWER_SOURCE || special == UFO_NAVIGATION || (part == O_FLOOR && mapData->isGravLift());
++				ownCraft = ownCraft || (mapData->getDataset() && ownCraftSets.count(mapData->getDataset()->getName()));
++			}
++		}
++		if (!ownCraft && !(machinery && ufoInBattle))
++		{
++			for (const int tileIndex : craftTiles)
++			{
++				_mirrorOfTile[tileIndex] = -1;
++				isCraftTile[tileIndex] = 0;
++			}
++			_mirrors.pop_back();
++			Log(LOG_INFO) << "OpenXcom3D: a building of " << craftTiles.size() << " tiles from a craft's or a UFO's map (" << (ufoInBattle ? "no power source, navigation or grav lift" : "no UFO in this battle") << "): not mirrored as a craft";
++			continue;
 +		}
 +		// The craft's box: its first voxel and its size along each axis.
 +		for (int axis = 0; axis < 3; ++axis)
@@ -71766,6 +71840,14 @@ index 000000000..b0e64b412
 +	if (craftId < 0 || !_mirrors[craftId].symmetric[axis])
 +	{
 +		return 0;
++	}
++	// A wall one goes through (a door, a curtain) keeps its own look on both its faces: it says
++	// "this way" from either side (a player, GitHub issue #156: a curtain was a curtain on one side
++	// only, the other the wall's opposite).
++	if (hit.part >= 0)
++	{
++		const VoxelModel *own = _tileViews[hit.tile].part[hit.part];
++		if (own && own->wayThrough) return 0;
 +	}
 +	const Mirror &mirror = _mirrors[craftId];
 +
@@ -72243,10 +72325,36 @@ index 000000000..b0e64b412
 +	auto found = _models.find(key);
 +	if (found == _models.end())
 +	{
++		// A later frame whose art is the first frame's, pixel for pixel (a mod's wall with two sprite
++		// numbers for one picture: XPiratez's NUKE_CITY_2), is the first frame's model: the part
++		// doesn't animate at all. As a model of its own it "pulsed" (a player, GitHub issue #157):
++		// what goes by the model, a wall's paint on its hidden face (see findWallPaints), held for
++		// the first frame only, one tick in eight.
++		const int firstSprite = mapData->getSprite(0);
++		auto sameArt = _sameArtModels.find(key);
++		if (sameArt != _sameArtModels.end())
++		{
++			return sameArt->second;
++		}
++		if (spriteIndex != firstSprite)
++		{
++			SurfaceSet *art = mapData->getDataset() ? mapData->getDataset()->getSurfaceset() : nullptr;
++			const Surface *first = art ? art->getFrame(firstSprite) : nullptr, *frame = art ? art->getFrame(spriteIndex) : nullptr;
++			bool same = first && frame && first->getWidth() == frame->getWidth() && first->getHeight() == frame->getHeight();
++			for (int y = 0; same && y < first->getHeight(); ++y)
++			{
++				same = std::equal(first->getRaw(0, y), first->getRaw(0, y) + first->getWidth(), frame->getRaw(0, y));
++			}
++			if (same)
++			{
++				const VoxelModel *firstModel = getModel(mapData, firstSprite, cutout);
++				_sameArtModels.emplace(key, firstModel);
++				return firstModel;
++			}
++		}
 +		// Not built yet: build it in place (the map keeps it at the same address from then on). A later frame of a
 +		// part that animates is built as the kind of part its first frame is (see buildModel).
 +		// And a part without voxels is, in every frame, the kind of ghost any one of its frames makes it (see partKind).
-+		const int firstSprite = mapData->getSprite(0);
 +		const VoxelModel *firstFrame = spriteIndex != firstSprite ? getModel(mapData, firstSprite, cutout) : nullptr;
 +		if (const VoxelModel *kind = partKind(mapData, cutout)) firstFrame = kind;
 +		found = _models.emplace(key, VoxelModel()).first;
