@@ -22034,7 +22034,7 @@ index bea3b31f0..2c7eb8682 100644
  	}
  #endif
 diff --git a/src/Engine/Game.cpp b/src/Engine/Game.cpp
-index f3533971d..f0329c74a 100644
+index f3533971d..615982275 100644
 --- a/src/Engine/Game.cpp
 +++ b/src/Engine/Game.cpp
 @@ -56,7 +56,7 @@ const double Game::VOLUME_GRADIENT = 10.0;
@@ -22082,7 +22082,7 @@ index f3533971d..f0329c74a 100644
  			_fpsCounter->think();
  			if (Options::FPS > 0 && !(Options::useOpenGL && Options::vSyncForOpenGL))
  			{
-@@ -382,6 +404,72 @@ void Game::run()
+@@ -382,6 +404,88 @@ void Game::run()
  	Options::save();
  }
  
@@ -22115,7 +22115,20 @@ index f3533971d..f0329c74a 100644
 +	{
 +		SDL_GetMouseState(&_freeMouseX, &_freeMouseY);
 +		_releaseChecks = 0;
++		_releaseWarps = 0;
 +		_cursor->setHidden(true);
++#ifdef __APPLE__
++		// (On a Mac the system starts reporting the captured mouse's movements only while the pointer is over the
++		// window's own picture; left at an edge or over the top rows of a full screen, it waits for a click: the
++		// owner's Mac, "free look movement with mouse does not work. If you press on mouse and shoot it immediately
++		// starts working". So the pointer goes to the middle first, and the system hears of it before the capture.
++		// A workaround by what the system is known to do: not confirmed there as the cause.)
++		if (const SDL_Surface *video = SDL_GetVideoSurface())
++		{
++			SDL_WarpMouse(video->w / 2, video->h / 2);
++			SDL_PumpEvents();
++		}
++#endif
 +		SDL_ShowCursor(SDL_DISABLE);
 +		SDL_WM_GrabInput(SDL_GRAB_ON);
 +	}
@@ -22146,6 +22159,9 @@ index f3533971d..f0329c74a 100644
 +			placed.motion.x = (Uint16)_freeMouseX;
 +			placed.motion.y = (Uint16)_freeMouseY;
 +			SDL_PushEvent(&placed);
++			// (... and the cursor itself now, before it is drawn again: the reported movement is read next frame.)
++			Action placing = Action(&placed, _screen->getXScale(), _screen->getYScale(), _screen->getCursorTopBlackBand(), _screen->getCursorLeftBlackBand());
++			_cursor->handle(&placing);
 +		}
 +		_cursor->setHidden(false);
 +		++_mouseReleases; // (the state that wanted it back skips the cursor's jump, see getMouseReleases)
