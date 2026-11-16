@@ -124,7 +124,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..50c9ec643
+index 000000000..6c32c8b14
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,616 @@
@@ -427,9 +427,9 @@ index 000000000..50c9ec643
 +  STR_FPS_AKIMBO_REALISTIC: "One-hand akimbo"
 +  STR_FPS_AKIMBO_NO_AIMED: "Two guns: no aimed shot ({0}: akimbo off)"
 +  STR_FPS_THROWING: "Throwing"
-+  STR_FPS_THROWING_DESC: "Throws and arcing shots from the 3D view. Classic: at a tile's middle, as on the map. Modern: at the exact point under the crosshair, the curve moving smoothly with the aim."
-+  STR_FPS_THROWING_CLASSIC: "Classic (tile)"
-+  STR_FPS_THROWING_MODERN: "Modern (continuous)"
++  STR_FPS_THROWING_DESC: "Throws and arcing shots. Classic: by tile, as on the map. Modern: continuous, the exact point under the crosshair."
++  STR_FPS_THROWING_CLASSIC: "Classic"
++  STR_FPS_THROWING_MODERN: "Modern"
 +  STR_FPS_LEAN_SHOTS: "Lean shots"
 +  STR_FPS_LEAN_SHOTS_DESC: "Movement Free: standing to one side of the tile shoots from that side, to peek (with the game's own targeting)."
 +  STR_FPS_LEAN: "Lean"
@@ -746,7 +746,7 @@ index 000000000..50c9ec643
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..1b2283d67
+index 000000000..859a862d0
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,616 @@
@@ -1049,9 +1049,9 @@ index 000000000..1b2283d67
 +  STR_FPS_AKIMBO_REALISTIC: "One-hand akimbo"
 +  STR_FPS_AKIMBO_NO_AIMED: "Two guns: no aimed shot ({0}: akimbo off)"
 +  STR_FPS_THROWING: "Throwing"
-+  STR_FPS_THROWING_DESC: "Throws and arcing shots from the 3D view. Classic: at a tile's middle, as on the map. Modern: at the exact point under the crosshair, the curve moving smoothly with the aim."
-+  STR_FPS_THROWING_CLASSIC: "Classic (tile)"
-+  STR_FPS_THROWING_MODERN: "Modern (continuous)"
++  STR_FPS_THROWING_DESC: "Throws and arcing shots. Classic: by tile, as on the map. Modern: continuous, the exact point under the crosshair."
++  STR_FPS_THROWING_CLASSIC: "Classic"
++  STR_FPS_THROWING_MODERN: "Modern"
 +  STR_FPS_LEAN_SHOTS: "Lean shots"
 +  STR_FPS_LEAN_SHOTS_DESC: "Movement Free: standing to one side of the tile shoots from that side, to peek (with the game's own targeting)."
 +  STR_FPS_LEAN: "Lean"
