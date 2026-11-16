@@ -535,6 +535,14 @@ private:
 	double _velocityX = 0.0, _velocityY = 0.0; // walking momentum, voxels per second
 	bool _stepPending = false;                 // a step was handed to the game's walking state and is being walked
 	unsigned _mouseReleasesSeen = 0;           // the game's mouse releases known (see think: one since means another screen was on top)
+	// Setting "Sidesteps face the view" (see sidestepFacingFor): a step waiting for the soldier's turn to the facing it
+	// is walked with (the turn is the game's own, and may stop at a new enemy), and the facing a step back left
+	// the soldier side-on with, which the view may look past the head's limit of while it looks the same way.
+	BattleUnit *_facingStepUnit = nullptr;
+	Position _facingStepFrom;
+	Uint32 _facingStepSince = 0;
+	BattleUnit *_sideOnUnit = nullptr;
+	int _sideOnFacing = -1, _sideOnView = -1;
 	int _sidestepFacing = -1;                  // the facing a soldier sidestepping keeps (the game's strafe), while the step is walked; -1 none
 	Position _stepFrom;                        // the tile that step started from
 	// Two straight steps round a corner cost what the one diagonal step costs (see cornerDiscount): the last straight
@@ -723,6 +731,14 @@ private:
 	bool runsStep(BattleUnit *unit, const Position &from, int direction) const;
 	/// Is this step the game's sidestep (turning by the rules: to the side or half to the side, on one level)?
 	bool isSidestep(const BattleUnit *unit, const Position &from, int direction, const Position &target) const;
+	/// The step the view looks along (0 north .. 7).
+	int viewStepDirection() const;
+	/// The facing a sidestep that way is walked with (setting "Sidesteps face the view"), or -1: as the soldier stands.
+	int sidestepFacingFor(const BattleUnit *unit, int direction) const;
+	/// The time units of the turn to that facing before the step.
+	int sidestepTurnCost(const BattleUnit *unit, const Position &from, int direction, const Position &target) const;
+	/// Forgets a step that waited for the soldier's turn and wasn't walked.
+	void resumeFacingStep(BattleUnit *unit);
 	/// Makes the lines under the compass for the ways of walking, hidden.
 	void createWalkModeLines();
 	/// Shows the lines for the ways of walking switched on, under the compass (3D only).

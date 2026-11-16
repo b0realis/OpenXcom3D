@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..f74cab451
+index 000000000..c92bc2a96
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,583 @@
+@@ -0,0 +1,585 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -165,6 +165,8 @@ index 000000000..f74cab451
 +  STR_FPS_PLAYSTYLE_FPS: "FPS"
 +  STR_FPS_PLAYSTYLE_CUSTOM: "Custom"
 +  STR_FPS_TURN_COST: "Turning costs TU"
++  STR_FPS_SIDESTEP_FACE_VIEW: "Sidesteps face the view"
++  STR_FPS_SIDESTEP_FACE_VIEW_DESC: "With Turning costs TU. YES: before a sidestep you turn to face where you look (the turn costs TU); a step back is a sidestep side-on, never your back."
 +  STR_FPS_TURN_COST_DESC: "YES: looking past 45 degrees turns you, at the game's TU cost."
 +  STR_FPS_COMPASS: "Compass"
 +  STR_FPS_COMPASS_DESC: "A compass at the top right (with Turning costs TU: what looking further costs)."
@@ -713,10 +715,10 @@ index 000000000..f74cab451
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..a7cee45ab
+index 000000000..ed4bcd203
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,583 @@
+@@ -0,0 +1,585 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -754,6 +756,8 @@ index 000000000..a7cee45ab
 +  STR_FPS_PLAYSTYLE_FPS: "FPS"
 +  STR_FPS_PLAYSTYLE_CUSTOM: "Custom"
 +  STR_FPS_TURN_COST: "Turning costs TU"
++  STR_FPS_SIDESTEP_FACE_VIEW: "Sidesteps face the view"
++  STR_FPS_SIDESTEP_FACE_VIEW_DESC: "With Turning costs TU. YES: before a sidestep you turn to face where you look (the turn costs TU); a step back is a sidestep side-on, never your back."
 +  STR_FPS_TURN_COST_DESC: "YES: looking past 45 degrees turns you, at the game's TU cost."
 +  STR_FPS_COMPASS: "Compass"
 +  STR_FPS_COMPASS_DESC: "A compass at the top right (with Turning costs TU: what looking further costs)."
@@ -22235,7 +22239,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..64b70efe2 100644
+index a08796ced..593847253 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -22252,7 +22256,7 @@ index a08796ced..64b70efe2 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts;
++OPT bool fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts;
 +OPT int fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
@@ -23303,10 +23307,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..da8187c04
+index 000000000..6c1d7c2aa
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1538 @@
+@@ -0,0 +1,1540 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24013,6 +24017,8 @@ index 000000000..da8187c04
 +	// game's cost. YES by default (a player, GitHub issue #63: "It being off, is basically a cheat";
 +	// the defaults are the game's own mechanics).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsTurnCost", &fpsTurnCost, true, "STR_FPS_TURN_COST", category));
++	// Turning by the rules, a sidestep first turns the soldier to face the view (a step back: side-on), front armour to what is looked at.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsSidestepFaceView", &fpsSidestepFaceView, false, "STR_FPS_SIDESTEP_FACE_VIEW", category));
 +	// The compass at the top right: where you look, the soldier's facing, and turning by the
 +	// rules, when looking further will cost time units.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCompass", &fpsCompass, true, "STR_FPS_COMPASS", category));
@@ -35571,10 +35577,10 @@ index 000000000..5f88b3bac
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..a8e94ab30
+index 000000000..8ef4e1b6e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1394 @@
+@@ -0,0 +1,1410 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -36112,6 +36118,14 @@ index 000000000..a8e94ab30
 +	double _velocityX = 0.0, _velocityY = 0.0; // walking momentum, voxels per second
 +	bool _stepPending = false;                 // a step was handed to the game's walking state and is being walked
 +	unsigned _mouseReleasesSeen = 0;           // the game's mouse releases known (see think: one since means another screen was on top)
++	// Setting "Sidesteps face the view" (see sidestepFacingFor): a step waiting for the soldier's turn to the facing it
++	// is walked with (the turn is the game's own, and may stop at a new enemy), and the facing a step back left
++	// the soldier side-on with, which the view may look past the head's limit of while it looks the same way.
++	BattleUnit *_facingStepUnit = nullptr;
++	Position _facingStepFrom;
++	Uint32 _facingStepSince = 0;
++	BattleUnit *_sideOnUnit = nullptr;
++	int _sideOnFacing = -1, _sideOnView = -1;
 +	int _sidestepFacing = -1;                  // the facing a soldier sidestepping keeps (the game's strafe), while the step is walked; -1 none
 +	Position _stepFrom;                        // the tile that step started from
 +	// Two straight steps round a corner cost what the one diagonal step costs (see cornerDiscount): the last straight
@@ -36300,6 +36314,14 @@ index 000000000..a8e94ab30
 +	bool runsStep(BattleUnit *unit, const Position &from, int direction) const;
 +	/// Is this step the game's sidestep (turning by the rules: to the side or half to the side, on one level)?
 +	bool isSidestep(const BattleUnit *unit, const Position &from, int direction, const Position &target) const;
++	/// The step the view looks along (0 north .. 7).
++	int viewStepDirection() const;
++	/// The facing a sidestep that way is walked with (setting "Sidesteps face the view"), or -1: as the soldier stands.
++	int sidestepFacingFor(const BattleUnit *unit, int direction) const;
++	/// The time units of the turn to that facing before the step.
++	int sidestepTurnCost(const BattleUnit *unit, const Position &from, int direction, const Position &target) const;
++	/// Forgets a step that waited for the soldier's turn and wasn't walked.
++	void resumeFacingStep(BattleUnit *unit);
 +	/// Makes the lines under the compass for the ways of walking, hidden.
 +	void createWalkModeLines();
 +	/// Shows the lines for the ways of walking switched on, under the compass (3D only).
@@ -36971,10 +36993,10 @@ index 000000000..a8e94ab30
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeCamera.cpp b/src/FirstPerson/FirstPersonModeCamera.cpp
 new file mode 100644
-index 000000000..299e3528f
+index 000000000..ee236fe3a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeCamera.cpp
-@@ -0,0 +1,919 @@
+@@ -0,0 +1,935 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -37214,6 +37236,21 @@ index 000000000..299e3528f
 +	// 0 = north, clockwise in 45 degree steps.
 +	if (Options::fpsTurnCost)
 +	{
++		// Setting "Sidesteps face the view": a step back left the soldier side-on to the view, further off than the
++		// head turns. It stays so while the view looks the same way and the soldier hasn't turned since; a turn
++		// that is still to come before such a step is left alone too.
++		if (!turret && _facingStepUnit == unit)
++		{
++			return;
++		}
++		if (!turret && _sideOnUnit == unit)
++		{
++			if (_sideOnFacing == facingNow && _sideOnView == viewStepDirection() && Options::fpsSidestepFaceView)
++			{
++				return;
++			}
++			_sideOnUnit = nullptr;
++		}
 +		const double facingYaw = facingNow * 45.0 - 90.0;
 +		const double offFacing = std::remainder(_view->getYawDegrees() - facingYaw, 360.0);
 +		const bool snapTurnDone = _snapTurnFacing && _snapTurnDegrees == 0.0;
@@ -37476,6 +37513,7 @@ index 000000000..299e3528f
 +void FirstPersonMode::updateCamera(BattleUnit *unit, bool canMove, double elapsedSeconds)
 +{
 +	const Position unitTile = unit->getPosition();
++	resumeFacingStep(unit); // (setting "Sidesteps face the view": a step that waited for the soldier's turn)
 +
 +	// Work out where the camera stands, by what the unit has been doing since the last frame.
 +	if (unit != _trackedUnit)
@@ -37896,10 +37934,10 @@ index 000000000..299e3528f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..0a35e2670
+index 000000000..d11b21c09
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,2743 @@
+@@ -0,0 +1,2744 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -38253,6 +38291,7 @@ index 000000000..0a35e2670
 +		return false;
 +	}
 +	time = price.cost.time;
++	if (step && sidestep) time += sidestepTurnCost(unit, start, direction, price.pos); // (setting "Sidesteps face the view": the turn first)
 +	if (step && !sidestep && unit->getArmor()->getTurnBeforeFirstStep())
 +	{
 +		const int eighths = std::min((direction - unit->getDirection() + 8) % 8, (unit->getDirection() - direction + 8) % 8);
@@ -40645,10 +40684,10 @@ index 000000000..0a35e2670
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeMovement.cpp b/src/FirstPerson/FirstPersonModeMovement.cpp
 new file mode 100644
-index 000000000..af88c9773
+index 000000000..c6f284466
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeMovement.cpp
-@@ -0,0 +1,2412 @@
+@@ -0,0 +1,2527 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -40831,7 +40870,8 @@ index 000000000..af88c9773
 +			// (less what the step is cheaper by as the second half of a diagonal, see cornerDiscount)
 +			int lessTime = 0, lessEnergy = 0;
 +			cornerDiscount(unit, start, direction, stepCost, lessTime, lessEnergy);
-+			const int time = stepCost.cost.time - lessTime, energy = stepCost.cost.energy - lessEnergy;
++			// (... and with the turn before a sidestep, setting "Sidesteps face the view")
++			const int time = stepCost.cost.time - lessTime + sidestepTurnCost(unit, start, direction, stepCost.pos), energy = stepCost.cost.energy - lessEnergy;
 +			allowed = unit->getTimeUnits() >= time && unit->getEnergy() >= energy && reserveAllows(unit, time, energy);
 +		}
 +		_stepAllowedCache[direction] = allowed ? 1 : unsafe ? 2 : 0;
@@ -41050,11 +41090,102 @@ index 000000000..af88c9773
 + */
 +bool FirstPersonMode::isSidestep(const BattleUnit *unit, const Position &from, int direction, const Position &target) const
 +{
++	if (!Options::fpsTurnCost || target.z != from.z || direction == viewStepDirection())
++	{
++		return false;
++	}
++	// (Setting "Sidesteps face the view": every step but the one the view looks along is a sidestep, the soldier
++	// turned for it first, see sidestepFacingFor.)
++	if (Options::fpsSidestepFaceView)
++	{
++		return true;
++	}
 +	const int offFacing = std::min((direction - unit->getDirection() + 8) % 8, (unit->getDirection() - direction + 8) % 8);
-+	// The way the view looks, as a step (the nearest of the eight, as the keys' push is rounded: see tileMoveVelocity).
++	return offFacing >= 1 && offFacing <= 2;
++}
++
++/**
++ * The step the view looks along: the nearest of the eight, as the keys' push is rounded (see
++ * tileMoveVelocity).
++ */
++int FirstPersonMode::viewStepDirection() const
++{
 +	const double viewOctant = std::round(_view->getYawDegrees() / 45.0) * (Pi / 4.0);
-+	const int viewDirection = Pathfinding::vectorToDirection(Position((int)std::lround(std::cos(viewOctant)), (int)std::lround(std::sin(viewOctant)), 0));
-+	return Options::fpsTurnCost && offFacing >= 1 && offFacing <= 2 && target.z == from.z && direction != viewDirection;
++	return Pathfinding::vectorToDirection(Position((int)std::lround(std::cos(viewOctant)), (int)std::lround(std::sin(viewOctant)), 0));
++}
++
++/**
++ * Setting "Sidesteps face the view" (a player, GitHub issue #163: "strafe should always try to
++ * maintain looking towards mouse", "to keep forward facing to use the (usually best) front
++ * armor"; and for steps back, "turn, and strafe left / right: this presents a front / side
++ * profile rather than side / rear, which plays far better into surviving a reaction shot"):
++ * the facing a sidestep is walked with. The game sidesteps up to a quarter turn off the
++ * soldier's facing and no further, so:
++ *  - a step to the side or half to the side of the view: facing the view;
++ *  - a step half back: an eighth off the view, towards the step (the step is then a quarter
++ *    turn off the facing);
++ *  - a step straight back: a quarter turn off the view, side-on, to the side nearer the way
++ *    the soldier stands now (clockwise if neither is).
++ * The soldier is turned to it first (commitStep), at the game's price for the turn.
++ * @param unit The soldier.
++ * @param direction The step's direction (0 north .. 7, clockwise).
++ * @return The facing, or -1 with the setting off, or for the step the view looks along (a walk).
++ */
++int FirstPersonMode::sidestepFacingFor(const BattleUnit *unit, int direction) const
++{
++	const int view = viewStepDirection();
++	if (!Options::fpsSidestepFaceView || !Options::fpsTurnCost || direction < 0 || direction > 7 || direction == view)
++	{
++		return -1;
++	}
++	const int clockwise = (direction - view + 8) % 8; // the step, in eighths clockwise of the view
++	const int off = std::min(clockwise, 8 - clockwise);
++	if (off <= 2)
++	{
++		return view;
++	}
++	if (off == 3)
++	{
++		return (view + (clockwise < 4 ? 1 : 7)) % 8;
++	}
++	const int right = (view + 2) % 8, left = (view + 6) % 8;
++	auto apart = [unit](int facing) { return std::min((facing - unit->getDirection() + 8) % 8, (unit->getDirection() - facing + 8) % 8); };
++	return apart(left) < apart(right) ? left : right;
++}
++
++/**
++ * Setting "Sidesteps face the view": what the turn before a sidestep costs, the armour's price
++ * for each eighth (see sidestepFacingFor); nothing for any other step, or with the setting off.
++ */
++int FirstPersonMode::sidestepTurnCost(const BattleUnit *unit, const Position &from, int direction, const Position &target) const
++{
++	if (!isSidestep(unit, from, direction, target))
++	{
++		return 0;
++	}
++	const int facing = sidestepFacingFor(unit, direction);
++	if (facing < 0)
++	{
++		return 0;
++	}
++	return std::min((facing - unit->getDirection() + 8) % 8, (unit->getDirection() - facing + 8) % 8) * unit->getTurnCost();
++}
++
++/**
++ * Setting "Sidesteps face the view": a step waits for the soldier's turn (see commitStep), and
++ * the movement that asked for it asks again once the soldier stands (the camera is held at the
++ * tile's edge meanwhile, as before any step that can't start yet). Until it is walked the
++ * soldier is left facing as turned (see faceLookDirection); this forgets a wait that came to
++ * nothing: another soldier, another tile, or two seconds gone (the turn stopped at a new enemy,
++ * the key was let go).
++ */
++void FirstPersonMode::resumeFacingStep(BattleUnit *unit)
++{
++	if (_facingStepUnit && (unit != _facingStepUnit || Position(_trackedTile.x, _trackedTile.y, unit->getPosition().z) != _facingStepFrom
++		|| SDL_GetTicks() - _facingStepSince > 2000))
++	{
++		_facingStepUnit = nullptr;
++	}
 +}
 +
 +/**
@@ -41094,6 +41225,23 @@ index 000000000..af88c9773
 +	// (see isSidestep). Sprinting, any other step is the game's run (see runsStep); a sidestep
 +	// stays one.
 +	const bool sidestep = isSidestep(unit, from, direction, target);
++	// Setting "Sidesteps face the view": the soldier turns to the facing the sidestep is walked with first, through the
++	// game's own turning (the armour's price an eighth; it stops at a new enemy). The step isn't started: the game plans
++	// a sidestep by the facing the soldier has, so the movement asks again when the turn is done (see resumeFacingStep).
++	const int sidestepFacing = sidestep ? sidestepFacingFor(unit, direction) : -1;
++	if (sidestepFacing >= 0 && sidestepFacing != unit->getDirection())
++	{
++		Position towards;
++		Pathfinding::directionToVector(sidestepFacing, &towards);
++		BattleAction turn;
++		turn.actor = unit;
++		turn.target = unit->getPosition() + towards;
++		_state->_battleGame->statePushBack(new UnitTurnBState(_state->_battleGame, turn));
++		_facingStepUnit = unit;
++		_facingStepFrom = from;
++		_facingStepSince = SDL_GetTicks();
++		return false;
++	}
 +	const bool run = !sidestep && runsStep(unit, from, direction);
 +	if (_sprintOn && !sidestep)
 +	{
@@ -41158,6 +41306,11 @@ index 000000000..af88c9773
 +	// GitHub issue #118). Being shot at still stops the walk (see stopWalkUnderFire).
 +	walk.ignoreSpottedEnemies = _enPassantOn || _sprintOn;
 +	_sidestepFacing = walk.strafe ? unit->getDirection() : -1;
++	_facingStepUnit = nullptr; // (a step that waited for the soldier's turn is walked)
++	// (A step back or half back left the soldier off the view: the head may look that far while the view looks the same way, see faceLookDirection.)
++	_sideOnUnit = sidestepFacing >= 0 && sidestepFacing != viewStepDirection() ? unit : nullptr;
++	_sideOnFacing = sidestepFacing;
++	_sideOnView = viewStepDirection();
 +	_state->_battleGame->statePushBack(new UnitWalkBState(_state->_battleGame, walk));
 +
 +	// The camera's tile is the destination from now on. The step is pending until the game has
@@ -41506,8 +41659,9 @@ index 000000000..af88c9773
 +	int numpadForward = 0, numpadStrafe = 0;
 +	numpadKeys(numpadForward, numpadStrafe);
 +	// Busy with something besides the soldier's own step (a step of ours keeps the game busy
-+	// until it's walked): keys held now wait to be let go.
-+	const bool busyElsewhere = !canAct() && !_stepPending;
++	// until it's walked, and so does the turn before a sidestep, setting "Sidesteps face the
++	// view"): keys held now wait to be let go.
++	const bool busyElsewhere = !canAct() && !_stepPending && _facingStepUnit != unit;
 +	if (busyElsewhere && (pushing || numpadForward || numpadStrafe))
 +	{
 +		_keysHeldThroughAction = true;
@@ -76907,7 +77061,7 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..41c094d91
+index 000000000..ac5ef5956
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,1035 @@
@@ -77123,7 +77277,7 @@ index 000000000..41c094d91
 +		{ "STR_FPS_SECTION_PLAYSTYLE", { "fpsPlaystyle" } },
 +		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsCameraEyes", "fpsCameraArtifacts", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView", "fpsZoom",
 +			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsAlienTurnFacing", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
-+		{ "STR_FPS_SECTION_MOVEMENT", { "fpsTurnCost", "fpsMovement", "fpsWalkSpeed", "fpsFlightCost", "fpsFlightCostOverride", "fpsVault",
++		{ "STR_FPS_SECTION_MOVEMENT", { "fpsTurnCost", "fpsSidestepFaceView", "fpsMovement", "fpsWalkSpeed", "fpsFlightCost", "fpsFlightCostOverride", "fpsVault",
 +			"fpsFalling", "fpsSafeLanding" } },
 +		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsRecoil", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsThrowing", "fpsLean", "fpsMeleeTerrain",
 +			"fpsMeleeFloors", "fpsAimExact", "fpsCloseEyeShots", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",

@@ -704,6 +704,8 @@ void createOptions(std::vector<OptionInfo> &options)
 	// game's cost. YES by default (a player, GitHub issue #63: "It being off, is basically a cheat";
 	// the defaults are the game's own mechanics).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsTurnCost", &fpsTurnCost, true, "STR_FPS_TURN_COST", category));
+	// Turning by the rules, a sidestep first turns the soldier to face the view (a step back: side-on), front armour to what is looked at.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSidestepFaceView", &fpsSidestepFaceView, false, "STR_FPS_SIDESTEP_FACE_VIEW", category));
 	// The compass at the top right: where you look, the soldier's facing, and turning by the
 	// rules, when looking further will cost time units.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCompass", &fpsCompass, true, "STR_FPS_COMPASS", category));

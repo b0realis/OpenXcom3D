@@ -351,6 +351,7 @@ bool FirstPersonMode::moveCostShown(BattleUnit *unit, int direction, int &time, 
 		return false;
 	}
 	time = price.cost.time;
+	if (step && sidestep) time += sidestepTurnCost(unit, start, direction, price.pos); // (setting "Sidesteps face the view": the turn first)
 	if (step && !sidestep && unit->getArmor()->getTurnBeforeFirstStep())
 	{
 		const int eighths = std::min((direction - unit->getDirection() + 8) % 8, (unit->getDirection() - direction + 8) % 8);

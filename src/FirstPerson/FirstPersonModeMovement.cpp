@@ -180,7 +180,8 @@ bool FirstPersonMode::stepAllowed(BattleUnit *unit, int stepX, int stepY)
 			// (less what the step is cheaper by as the second half of a diagonal, see cornerDiscount)
 			int lessTime = 0, lessEnergy = 0;
 			cornerDiscount(unit, start, direction, stepCost, lessTime, lessEnergy);
-			const int time = stepCost.cost.time - lessTime, energy = stepCost.cost.energy - lessEnergy;
+			// (... and with the turn before a sidestep, setting "Sidesteps face the view")
+			const int time = stepCost.cost.time - lessTime + sidestepTurnCost(unit, start, direction, stepCost.pos), energy = stepCost.cost.energy - lessEnergy;
 			allowed = unit->getTimeUnits() >= time && unit->getEnergy() >= energy && reserveAllows(unit, time, energy);
 		}
 		_stepAllowedCache[direction] = allowed ? 1 : unsafe ? 2 : 0;
@@ -399,11 +400,102 @@ bool FirstPersonMode::runsStep(BattleUnit *unit, const Position &from, int direc
  */
 bool FirstPersonMode::isSidestep(const BattleUnit *unit, const Position &from, int direction, const Position &target) const
 {
+	if (!Options::fpsTurnCost || target.z != from.z || direction == viewStepDirection())
+	{
+		return false;
+	}
+	// (Setting "Sidesteps face the view": every step but the one the view looks along is a sidestep, the soldier
+	// turned for it first, see sidestepFacingFor.)
+	if (Options::fpsSidestepFaceView)
+	{
+		return true;
+	}
 	const int offFacing = std::min((direction - unit->getDirection() + 8) % 8, (unit->getDirection() - direction + 8) % 8);
-	// The way the view looks, as a step (the nearest of the eight, as the keys' push is rounded: see tileMoveVelocity).
+	return offFacing >= 1 && offFacing <= 2;
+}
+
+/**
+ * The step the view looks along: the nearest of the eight, as the keys' push is rounded (see
+ * tileMoveVelocity).
+ */
+int FirstPersonMode::viewStepDirection() const
+{
 	const double viewOctant = std::round(_view->getYawDegrees() / 45.0) * (Pi / 4.0);
-	const int viewDirection = Pathfinding::vectorToDirection(Position((int)std::lround(std::cos(viewOctant)), (int)std::lround(std::sin(viewOctant)), 0));
-	return Options::fpsTurnCost && offFacing >= 1 && offFacing <= 2 && target.z == from.z && direction != viewDirection;
+	return Pathfinding::vectorToDirection(Position((int)std::lround(std::cos(viewOctant)), (int)std::lround(std::sin(viewOctant)), 0));
+}
+
+/**
+ * Setting "Sidesteps face the view" (a player, GitHub issue #163: "strafe should always try to
+ * maintain looking towards mouse", "to keep forward facing to use the (usually best) front
+ * armor"; and for steps back, "turn, and strafe left / right: this presents a front / side
+ * profile rather than side / rear, which plays far better into surviving a reaction shot"):
+ * the facing a sidestep is walked with. The game sidesteps up to a quarter turn off the
+ * soldier's facing and no further, so:
+ *  - a step to the side or half to the side of the view: facing the view;
+ *  - a step half back: an eighth off the view, towards the step (the step is then a quarter
+ *    turn off the facing);
+ *  - a step straight back: a quarter turn off the view, side-on, to the side nearer the way
+ *    the soldier stands now (clockwise if neither is).
+ * The soldier is turned to it first (commitStep), at the game's price for the turn.
+ * @param unit The soldier.
+ * @param direction The step's direction (0 north .. 7, clockwise).
+ * @return The facing, or -1 with the setting off, or for the step the view looks along (a walk).
+ */
+int FirstPersonMode::sidestepFacingFor(const BattleUnit *unit, int direction) const
+{
+	const int view = viewStepDirection();
+	if (!Options::fpsSidestepFaceView || !Options::fpsTurnCost || direction < 0 || direction > 7 || direction == view)
+	{
+		return -1;
+	}
+	const int clockwise = (direction - view + 8) % 8; // the step, in eighths clockwise of the view
+	const int off = std::min(clockwise, 8 - clockwise);
+	if (off <= 2)
+	{
+		return view;
+	}
+	if (off == 3)
+	{
+		return (view + (clockwise < 4 ? 1 : 7)) % 8;
+	}
+	const int right = (view + 2) % 8, left = (view + 6) % 8;
+	auto apart = [unit](int facing) { return std::min((facing - unit->getDirection() + 8) % 8, (unit->getDirection() - facing + 8) % 8); };
+	return apart(left) < apart(right) ? left : right;
+}
+
+/**
+ * Setting "Sidesteps face the view": what the turn before a sidestep costs, the armour's price
+ * for each eighth (see sidestepFacingFor); nothing for any other step, or with the setting off.
+ */
+int FirstPersonMode::sidestepTurnCost(const BattleUnit *unit, const Position &from, int direction, const Position &target) const
+{
+	if (!isSidestep(unit, from, direction, target))
+	{
+		return 0;
+	}
+	const int facing = sidestepFacingFor(unit, direction);
+	if (facing < 0)
+	{
+		return 0;
+	}
+	return std::min((facing - unit->getDirection() + 8) % 8, (unit->getDirection() - facing + 8) % 8) * unit->getTurnCost();
+}
+
+/**
+ * Setting "Sidesteps face the view": a step waits for the soldier's turn (see commitStep), and
+ * the movement that asked for it asks again once the soldier stands (the camera is held at the
+ * tile's edge meanwhile, as before any step that can't start yet). Until it is walked the
+ * soldier is left facing as turned (see faceLookDirection); this forgets a wait that came to
+ * nothing: another soldier, another tile, or two seconds gone (the turn stopped at a new enemy,
+ * the key was let go).
+ */
+void FirstPersonMode::resumeFacingStep(BattleUnit *unit)
+{
+	if (_facingStepUnit && (unit != _facingStepUnit || Position(_trackedTile.x, _trackedTile.y, unit->getPosition().z) != _facingStepFrom
+		|| SDL_GetTicks() - _facingStepSince > 2000))
+	{
+		_facingStepUnit = nullptr;
+	}
 }
 
 /**
@@ -443,6 +535,23 @@ bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 	// (see isSidestep). Sprinting, any other step is the game's run (see runsStep); a sidestep
 	// stays one.
 	const bool sidestep = isSidestep(unit, from, direction, target);
+	// Setting "Sidesteps face the view": the soldier turns to the facing the sidestep is walked with first, through the
+	// game's own turning (the armour's price an eighth; it stops at a new enemy). The step isn't started: the game plans
+	// a sidestep by the facing the soldier has, so the movement asks again when the turn is done (see resumeFacingStep).
+	const int sidestepFacing = sidestep ? sidestepFacingFor(unit, direction) : -1;
+	if (sidestepFacing >= 0 && sidestepFacing != unit->getDirection())
+	{
+		Position towards;
+		Pathfinding::directionToVector(sidestepFacing, &towards);
+		BattleAction turn;
+		turn.actor = unit;
+		turn.target = unit->getPosition() + towards;
+		_state->_battleGame->statePushBack(new UnitTurnBState(_state->_battleGame, turn));
+		_facingStepUnit = unit;
+		_facingStepFrom = from;
+		_facingStepSince = SDL_GetTicks();
+		return false;
+	}
 	const bool run = !sidestep && runsStep(unit, from, direction);
 	if (_sprintOn && !sidestep)
 	{
@@ -507,6 +616,11 @@ bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 	// GitHub issue #118). Being shot at still stops the walk (see stopWalkUnderFire).
 	walk.ignoreSpottedEnemies = _enPassantOn || _sprintOn;
 	_sidestepFacing = walk.strafe ? unit->getDirection() : -1;
+	_facingStepUnit = nullptr; // (a step that waited for the soldier's turn is walked)
+	// (A step back or half back left the soldier off the view: the head may look that far while the view looks the same way, see faceLookDirection.)
+	_sideOnUnit = sidestepFacing >= 0 && sidestepFacing != viewStepDirection() ? unit : nullptr;
+	_sideOnFacing = sidestepFacing;
+	_sideOnView = viewStepDirection();
 	_state->_battleGame->statePushBack(new UnitWalkBState(_state->_battleGame, walk));
 
 	// The camera's tile is the destination from now on. The step is pending until the game has
@@ -855,8 +969,9 @@ bool FirstPersonMode::tileMoveVelocity(BattleUnit *unit, double forward, double 
 	int numpadForward = 0, numpadStrafe = 0;
 	numpadKeys(numpadForward, numpadStrafe);
 	// Busy with something besides the soldier's own step (a step of ours keeps the game busy
-	// until it's walked): keys held now wait to be let go.
-	const bool busyElsewhere = !canAct() && !_stepPending;
+	// until it's walked, and so does the turn before a sidestep, setting "Sidesteps face the
+	// view"): keys held now wait to be let go.
+	const bool busyElsewhere = !canAct() && !_stepPending && _facingStepUnit != unit;
 	if (busyElsewhere && (pushing || numpadForward || numpadStrafe))
 	{
 		_keysHeldThroughAction = true;

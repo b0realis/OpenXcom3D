@@ -114,6 +114,7 @@ SETTINGS = [
         ('Head bob', 'YES', 'YES / NO', 'The view bobs with the soldier\'s steps.', 'Off if it makes you queasy.'),
     ]),
     ('Movement', [
+        ('Sidesteps face the view', 'NO', 'YES / NO', 'With Turning costs TU. YES: before a sidestep the soldier turns to face where you look (the turn costs TU), front armour forward; a step back becomes a sidestep side-on, never the back.', 'YES to play defensively against reaction fire; NO for the cheapest steps.'),
         ('Turning costs TU', 'YES', 'YES / NO', 'YES: the head turns 45&deg; for free, beyond that the soldier turns at the game\'s cost, as on the map. NO: the soldier turns with the view for free.',
          'YES is the classic rule: facing costs time units and decides reaction fire. NO is relaxed play.'),
         ('Movement', 'Tiles', 'Free / Tiles', 'Free: walk anywhere, stepping into the next tile when you cross into it. Tiles: a press walks one tile.',

@@ -35,6 +35,8 @@ en-GB:
   STR_FPS_PLAYSTYLE_FPS: "FPS"
   STR_FPS_PLAYSTYLE_CUSTOM: "Custom"
   STR_FPS_TURN_COST: "Turning costs TU"
+  STR_FPS_SIDESTEP_FACE_VIEW: "Sidesteps face the view"
+  STR_FPS_SIDESTEP_FACE_VIEW_DESC: "With Turning costs TU. YES: before a sidestep you turn to face where you look (the turn costs TU); a step back is a sidestep side-on, never your back."
   STR_FPS_TURN_COST_DESC: "YES: looking past 45 degrees turns you, at the game's TU cost."
   STR_FPS_COMPASS: "Compass"
   STR_FPS_COMPASS_DESC: "A compass at the top right (with Turning costs TU: what looking further costs)."
