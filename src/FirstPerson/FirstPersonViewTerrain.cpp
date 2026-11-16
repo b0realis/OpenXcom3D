@@ -4154,7 +4154,22 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 				opening = _ufoDoorOpening.emplace(index * 4 + part, trackWalls ? SDL_GetTicks() : SDL_GetTicks() - 10 * UfoDoorTime).first;
 			}
 			const Uint32 age = SDL_GetTicks() - opening->second; // ms since it started sliding
-			frame = age < UfoDoorTime ? std::clamp(1 + (int)(age * 6 / UfoDoorTime), 1, 7) : 7;
+			// The frames of its sliding open: 1 to 7, or fewer where the record's list starts over (the
+			// Lightning's door has four pictures, listed twice: shut, three of opening, shut again, the
+			// three again. The map runs through all eight in a blink; here, at the view's pace, the door
+			// was seen to open, shut and open again: the owner, "as the door would open twice in 3d and
+			// skips a bit"). So only as far as each frame is a new picture, at the same pace a frame,
+			// and then the game's last frame, the door open.
+			int slidingFrames = 1;
+			while (slidingFrames < 7)
+			{
+				bool seen = false;
+				for (int earlier = 0; earlier <= slidingFrames; ++earlier) seen = seen || frames.sprite[earlier] == frames.sprite[slidingFrames + 1];
+				if (seen) break;
+				++slidingFrames;
+			}
+			const Uint32 slidingTime = UfoDoorTime * slidingFrames / 7;
+			frame = age < slidingTime ? std::clamp(1 + (int)(age * 6 / UfoDoorTime), 1, slidingFrames) : 7;
 		}
 		else if (ufoWall)
 		{
