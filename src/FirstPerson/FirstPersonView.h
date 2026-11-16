@@ -613,6 +613,7 @@ private:
 	std::unordered_map<Uint64, const VoxelModel*> _sameArtModels; // a later frame whose art is its first frame's, pixel for pixel: the first frame's model (see getModel)
 	std::unordered_map<Uint64, VoxelModel> _ghostModels; // the parts' own ghosts (VoxelModel::ghost), by the part's key in _models
 	std::unordered_map<Uint64, VoxelModel> _leafyModels; // the leafy models of foliage (see leafyModel), by the part's key in _models
+	std::unordered_map<const VoxelModel*, VoxelModel> _openDoorModels; // what is left of a sliding door once open, as a ghost (see openDoorModel), by the model it is made of
 	std::unordered_map<const VoxelModel*, VoxelModel> _openedModels; // models with the glass in their openings broken out (see openedModel), by the whole one
 	std::unordered_map<const MapData*, Frames> _frames; // by MapData: its animation frames
 	FirstPersonView *_sharedModelsOwner = nullptr;      // another view whose voxel models this one uses, or null
@@ -714,6 +715,8 @@ private:
 	const VoxelModel *leafyModel(const MapData *mapData, int spriteIndex);
 	/// Gets (building on first use) a model with the glass filled into its openings broken out.
 	const VoxelModel *openedModel(const VoxelModel *model);
+	/// What is left of a sliding door once it is open, as a ghost.
+	const VoxelModel *openDoorModel(const VoxelModel *model);
 	/// Is the glass in the openings of a tile part's window broken (see breakGlassAt)?
 	bool glassBroken(int tileIndex, int part) const;
 	/// Builds a voxel model: shapes from the LOFT templates, colours from the isometric sprite.

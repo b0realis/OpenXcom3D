@@ -67,6 +67,7 @@ uniform vec3 uEye, uForward, uRight, uUp;
 uniform vec2 uHalfPlane;     // the image plane's half-width and half-height
 uniform ivec2 uViewSize;     // the view in pixels
 uniform int uPixelSize;      // pixels a ray colours each way
+uniform int uGoggles;        // 1: night vision is on (the colours are the goggles' own)
 #ifdef LATER_RAYS
 // For a pixel's second and further rays (setting "Supersampling"): the first ray's pictures. Where the first rays
 // show nothing to smooth (see main), the later ones aren't cast.
@@ -1820,7 +1821,11 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 	if (hit.glass)
 	{
 		color = table(GlassRow, color);
-		fullColor = fullColor * 0.7 + vec3(150.0, 180.0, 205.0) * 0.3; // (as the glass table mixes each colour: a little paler and bluer)
+		// (As the glass table mixes each colour: a little paler and bluer. Through the goggles the table keeps to their
+		// colours, and so does this: a player, GitHub issue #166, "gun fire makes night vision flash windows not night
+		// vision": in full colour what was seen through a window stayed blue-grey among the goggles' green, and
+		// changed with every shot's light.)
+		fullColor = uGoggles != 0 ? paletteRgb(color) : fullColor * 0.7 + vec3(150.0, 180.0, 205.0) * 0.3;
 	}
 	rayFullColor = fullColorSet ? fullColor : paletteRgb(color);
 #ifdef LIGHT_SHAFTS

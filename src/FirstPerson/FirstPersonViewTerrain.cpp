@@ -3237,6 +3237,33 @@ bool FirstPersonView::glassBroken(int tileIndex, int part) const
 }
 
 /**
+ * What is left of a sliding door once it has slid open (a UFO's door, a mod's electric door:
+ * the last frame's picture, cut out where the door has gone), as a ghost: seen through and
+ * never in the way, as any part the game gives no shape (setting "Parts without shape"). The
+ * game has an open door as no obstacle and nothing to see past, and what the picture still
+ * shows of it stood solid in the doorway (a player, GitHub issue #165: "any voxels without
+ * hitbox should become ghost when open, to prevent visibility hampering"). Made the first time
+ * it's needed, kept as long as the models.
+ * @param model The open door's model.
+ * @return The same voxels as a ghost.
+ */
+const FirstPersonView::VoxelModel *FirstPersonView::openDoorModel(const VoxelModel *model)
+{
+	if (_sharedModelsOwner)
+	{
+		return _sharedModelsOwner->openDoorModel(model);
+	}
+	auto made = _openDoorModels.find(model);
+	if (made == _openDoorModels.end())
+	{
+		made = _openDoorModels.emplace(model, *model).first;
+		made->second.ghostly = true;
+		if (!made->second.ghostKind) made->second.ghostKind = 4; // (a plain ghost)
+	}
+	return &made->second;
+}
+
+/**
  * A model with the glass filled into its openings (VoxelModel::lookOnly, see fillPaneOpenings)
  * broken out, as a round going through left it (see breakGlassAt): the opening empty, as the
  * game has it (and as 1.09 showed it). Made the first time it's needed, and kept as long as the
@@ -4203,6 +4230,11 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 		}
 		// The glass in a window's opening broken (see breakGlassAt): the opening shown empty.
 		const VoxelModel *model = memo.model, *next = memo.next;
+		// A sliding door open, its sliding done: what is left of it a ghost (see openDoorModel).
+		if (cutout && frame == 7 && !model->empty && !model->ghostly)
+		{
+			model = openDoorModel(model);
+		}
 		restless = restless || model->openingGlass; // (its glass may be broken any frame)
 		if (model->openingGlass && glassBroken(index, part))
 		{

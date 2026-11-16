@@ -73,6 +73,7 @@ public:
 		float eye[3], forward[3], right[3], up[3];
 		float halfPlaneWidth, halfPlaneHeight;    // the image plane one voxel in front of the eye
 		int width, height, pixelSize;             // the view in pixels, and how many pixels a ray colours each way
+		bool goggles = false;                     // night vision is on: the world's colours are the goggles' (see FirstPersonView::updateColors)
 		float rayScale = 1.0f;                    // setting "Render scale": the blocks a ray colours each way (1: a ray a block; 2: a quarter of the rays), magnified on the card
 		float ghostScale;                         // setting "Ghost opacity" (see renderRows)
 		bool seeThroughCrops;                     // setting "See-through crops"

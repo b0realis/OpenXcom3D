@@ -26461,10 +26461,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..3ccfc944f
+index 000000000..237ada94b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,2626 @@
+@@ -0,0 +1,2627 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -27755,6 +27755,7 @@ index 000000000..3ccfc944f
 +	Gl::Uniform2f(location("uHalfPlane"), frame.halfPlaneWidth, frame.halfPlaneHeight);
 +	Gl::Uniform2i(location("uViewSize"), frame.width, frame.height);
 +	Gl::Uniform1i(location("uPixelSize"), frame.pixelSize);
++	Gl::Uniform1i(location("uGoggles"), frame.goggles ? 1 : 0);
 +	Gl::Uniform1f(location("uGhostScale"), frame.ghostScale);
 +	Gl::Uniform1i(location("uSeeThroughCrops"), frame.seeThroughCrops ? 1 : 0);
 +	Gl::Uniform1i(location("uSky"), frame.sky);
@@ -29093,10 +29094,10 @@ index 000000000..3ccfc944f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.h b/src/FirstPerson/FirstPersonGpu.h
 new file mode 100644
-index 000000000..98e10e9c4
+index 000000000..3cb1cf607
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.h
-@@ -0,0 +1,252 @@
+@@ -0,0 +1,253 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -29172,6 +29173,7 @@ index 000000000..98e10e9c4
 +		float eye[3], forward[3], right[3], up[3];
 +		float halfPlaneWidth, halfPlaneHeight;    // the image plane one voxel in front of the eye
 +		int width, height, pixelSize;             // the view in pixels, and how many pixels a ray colours each way
++		bool goggles = false;                     // night vision is on: the world's colours are the goggles' (see FirstPersonView::updateColors)
 +		float rayScale = 1.0f;                    // setting "Render scale": the blocks a ray colours each way (1: a ray a block; 2: a quarter of the rays), magnified on the card
 +		float ghostScale;                         // setting "Ghost opacity" (see renderRows)
 +		bool seeThroughCrops;                     // setting "See-through crops"
@@ -29536,10 +29538,10 @@ index 000000000..326da83e2
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..1514cb145
+index 000000000..1f1f484b9
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,2554 @@
+@@ -0,0 +1,2559 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -29609,6 +29611,7 @@ index 000000000..1514cb145
 +uniform vec2 uHalfPlane;     // the image plane's half-width and half-height
 +uniform ivec2 uViewSize;     // the view in pixels
 +uniform int uPixelSize;      // pixels a ray colours each way
++uniform int uGoggles;        // 1: night vision is on (the colours are the goggles' own)
 +#ifdef LATER_RAYS
 +// For a pixel's second and further rays (setting "Supersampling"): the first ray's pictures. Where the first rays
 +// show nothing to smooth (see main), the later ones aren't cast.
@@ -31362,7 +31365,11 @@ index 000000000..1514cb145
 +	if (hit.glass)
 +	{
 +		color = table(GlassRow, color);
-+		fullColor = fullColor * 0.7 + vec3(150.0, 180.0, 205.0) * 0.3; // (as the glass table mixes each colour: a little paler and bluer)
++		// (As the glass table mixes each colour: a little paler and bluer. Through the goggles the table keeps to their
++		// colours, and so does this: a player, GitHub issue #166, "gun fire makes night vision flash windows not night
++		// vision": in full colour what was seen through a window stayed blue-grey among the goggles' green, and
++		// changed with every shot's light.)
++		fullColor = uGoggles != 0 ? paletteRgb(color) : fullColor * 0.7 + vec3(150.0, 180.0, 205.0) * 0.3;
 +	}
 +	rayFullColor = fullColorSet ? fullColor : paletteRgb(color);
 +#ifdef LIGHT_SHAFTS
@@ -54602,10 +54609,10 @@ index 000000000..7e1bbfcd2
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..4f8223201
+index 000000000..413febe82
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,750 @@
+@@ -0,0 +1,751 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -54762,6 +54769,7 @@ index 000000000..4f8223201
 +	_partKinds.clear();
 +	_flameParts.clear();
 +	_openedModels.clear();
++	_openDoorModels.clear();
 +	_frames.clear();
 +	_solidMasks.clear();
 +	_paintedFloors.clear();
@@ -55358,10 +55366,10 @@ index 000000000..4f8223201
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..0ec27d40d
+index 000000000..124f60d11
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1587 @@
+@@ -0,0 +1,1590 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -55977,6 +55985,7 @@ index 000000000..0ec27d40d
 +	std::unordered_map<Uint64, const VoxelModel*> _sameArtModels; // a later frame whose art is its first frame's, pixel for pixel: the first frame's model (see getModel)
 +	std::unordered_map<Uint64, VoxelModel> _ghostModels; // the parts' own ghosts (VoxelModel::ghost), by the part's key in _models
 +	std::unordered_map<Uint64, VoxelModel> _leafyModels; // the leafy models of foliage (see leafyModel), by the part's key in _models
++	std::unordered_map<const VoxelModel*, VoxelModel> _openDoorModels; // what is left of a sliding door once open, as a ghost (see openDoorModel), by the model it is made of
 +	std::unordered_map<const VoxelModel*, VoxelModel> _openedModels; // models with the glass in their openings broken out (see openedModel), by the whole one
 +	std::unordered_map<const MapData*, Frames> _frames; // by MapData: its animation frames
 +	FirstPersonView *_sharedModelsOwner = nullptr;      // another view whose voxel models this one uses, or null
@@ -56078,6 +56087,8 @@ index 000000000..0ec27d40d
 +	const VoxelModel *leafyModel(const MapData *mapData, int spriteIndex);
 +	/// Gets (building on first use) a model with the glass filled into its openings broken out.
 +	const VoxelModel *openedModel(const VoxelModel *model);
++	/// What is left of a sliding door once it is open, as a ghost.
++	const VoxelModel *openDoorModel(const VoxelModel *model);
 +	/// Is the glass in the openings of a tile part's window broken (see breakGlassAt)?
 +	bool glassBroken(int tileIndex, int part) const;
 +	/// Builds a voxel model: shapes from the LOFT templates, colours from the isometric sprite.
@@ -58668,10 +58679,10 @@ index 000000000..98c97b3b5
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..c3f896296
+index 000000000..927774560
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
-@@ -0,0 +1,740 @@
+@@ -0,0 +1,741 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -58830,6 +58841,7 @@ index 000000000..c3f896296
 +	// (Auto on the card: a ray a pixel whatever the view's size, which is what the card is for; a small view always has one.)
 +	frame.pixelSize = scale > 1 || width * height <= SmallViewPixels || Options::fpsPixelSize == 0 ? 1 : std::clamp(Options::fpsPixelSize, 1, 3);
 +	frame.rayScale = scale > 1 ? 1.0f : 100.0f / view.renderScalePercent();
++	frame.goggles = view._nightVision != 0;
 +	frame.ghostScale = std::clamp(Options::fpsGhostOpacity, 10, 100) / (GhostNearOpacity * 100.0f);
 +	frame.seeThroughCrops = Options::fpsSeeThroughCrops;
 +	// The scene, as shadeHit and colorOutsideMap read it.
@@ -70261,10 +70273,10 @@ index 000000000..5a33d5193
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..7fc60f63c
+index 000000000..c7f267ffa
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,4632 @@
+@@ -0,0 +1,4664 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -73504,6 +73516,33 @@ index 000000000..7fc60f63c
 +}
 +
 +/**
++ * What is left of a sliding door once it has slid open (a UFO's door, a mod's electric door:
++ * the last frame's picture, cut out where the door has gone), as a ghost: seen through and
++ * never in the way, as any part the game gives no shape (setting "Parts without shape"). The
++ * game has an open door as no obstacle and nothing to see past, and what the picture still
++ * shows of it stood solid in the doorway (a player, GitHub issue #165: "any voxels without
++ * hitbox should become ghost when open, to prevent visibility hampering"). Made the first time
++ * it's needed, kept as long as the models.
++ * @param model The open door's model.
++ * @return The same voxels as a ghost.
++ */
++const FirstPersonView::VoxelModel *FirstPersonView::openDoorModel(const VoxelModel *model)
++{
++	if (_sharedModelsOwner)
++	{
++		return _sharedModelsOwner->openDoorModel(model);
++	}
++	auto made = _openDoorModels.find(model);
++	if (made == _openDoorModels.end())
++	{
++		made = _openDoorModels.emplace(model, *model).first;
++		made->second.ghostly = true;
++		if (!made->second.ghostKind) made->second.ghostKind = 4; // (a plain ghost)
++	}
++	return &made->second;
++}
++
++/**
 + * A model with the glass filled into its openings (VoxelModel::lookOnly, see fillPaneOpenings)
 + * broken out, as a round going through left it (see breakGlassAt): the opening empty, as the
 + * game has it (and as 1.09 showed it). Made the first time it's needed, and kept as long as the
@@ -74470,6 +74509,11 @@ index 000000000..7fc60f63c
 +		}
 +		// The glass in a window's opening broken (see breakGlassAt): the opening shown empty.
 +		const VoxelModel *model = memo.model, *next = memo.next;
++		// A sliding door open, its sliding done: what is left of it a ghost (see openDoorModel).
++		if (cutout && frame == 7 && !model->empty && !model->ghostly)
++		{
++			model = openDoorModel(model);
++		}
 +		restless = restless || model->openingGlass; // (its glass may be broken any frame)
 +		if (model->openingGlass && glassBroken(index, part))
 +		{

@@ -156,6 +156,7 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 	// (Auto on the card: a ray a pixel whatever the view's size, which is what the card is for; a small view always has one.)
 	frame.pixelSize = scale > 1 || width * height <= SmallViewPixels || Options::fpsPixelSize == 0 ? 1 : std::clamp(Options::fpsPixelSize, 1, 3);
 	frame.rayScale = scale > 1 ? 1.0f : 100.0f / view.renderScalePercent();
+	frame.goggles = view._nightVision != 0;
 	frame.ghostScale = std::clamp(Options::fpsGhostOpacity, 10, 100) / (GhostNearOpacity * 100.0f);
 	frame.seeThroughCrops = Options::fpsSeeThroughCrops;
 	// The scene, as shadeHit and colorOutsideMap read it.

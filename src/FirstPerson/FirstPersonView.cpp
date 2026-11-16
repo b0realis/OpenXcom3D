@@ -154,6 +154,7 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 	_partKinds.clear();
 	_flameParts.clear();
 	_openedModels.clear();
+	_openDoorModels.clear();
 	_frames.clear();
 	_solidMasks.clear();
 	_paintedFloors.clear();
