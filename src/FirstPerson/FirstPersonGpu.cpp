@@ -868,6 +868,7 @@ struct FirstPersonGpu::State
 	std::map<int, Program> extraPrograms; // by 1 coloured lights | 2 reflections
 	Program *programFor(const Frame &frame, bool results, bool laterRays = false);
 	Gl::UInt resolveProgram = 0; // makes one picture of several rays a pixel (ResolveSource); 0: not built, one ray a pixel
+	Gl::UInt upscaleProgram = 0; // magnifies a picture of fewer rays to the view's size (UpscaleSource, setting "Render scale"); 0: not built, a ray a pixel
 	Program *program = &programs[0];
 	Gl::UInt vertexArray = 0;
 	// The pictures the rays are drawn into, kept for each size asked (the main view's, the small camera views').
@@ -877,6 +878,7 @@ struct FirstPersonGpu::State
 		Gl::UInt textures[5] = {}; // colour, depth, glow, full colour, results
 		bool results = false;
 	};
+	bool keepTargets = false; // setTargets leaves the pictures it has, however many
 	std::map<std::array<int, 3>, Targets> targets; // by width, height, and which of a frame's pictures (0 the frame's own, 1.. one for each of several rays a pixel)
 	std::vector<Uint8> blockColors, blockGlow; // a ray each, before they are spread over their blocks of pixels
 	std::vector<float> blockDepths;
@@ -936,6 +938,7 @@ struct FirstPersonGpu::State
 	bool fillFovea(const Frame &frame, int columns, int rows, bool layers);
 	void checkFovea(const Frame &frame, int columns, int rows);
 	bool buildResolve();
+	bool buildUpscale();
 	bool draw(const Frame &frame, const Output &output, Timing *timing);
 
 	// The units and effects (see drawEffects): their program, their buffers (the primitives, the sprites' bytes, the
@@ -994,6 +997,9 @@ struct FirstPersonGpu::State
 	void *eyeFences[3] = {};
 	bool presentEye(EyeFrame &frame);
 	bool buildGlow();
+	bool buildWash();
+	bool buildPresent();
+	bool washFresh = false, presentFresh = false; // just built: their tables are still to be sent
 	bool drawGlow(const Effects &effects, const EffectTargets &drawn, GlowTargets *&brightened);
 };
 
@@ -1080,6 +1086,10 @@ bool FirstPersonGpu::State::start(int device)
 	{
 		Log(LOG_INFO) << "OpenXcom3D GPU: no supersampling on this card";
 	}
+	if (!buildUpscale())
+	{
+		Log(LOG_INFO) << "OpenXcom3D GPU: no render scale on this card";
+	}
 	if (!build(programs[0], false) || !build(programs[1], true))
 	{
 		return false;
@@ -1105,6 +1115,22 @@ bool FirstPersonGpu::State::start(int device)
 	modelInfo.assign(4, 0);
 	solidRows.assign(MaskRows, 0);
 	modelsChanged = solidsChanged = true;
+	if (Gl::GetError() != Gl::NoError)
+	{
+		return false;
+	}
+	// The programs for what comes after the rays (the units and effects, the bloom, the screen wash, the frame put
+	// together in full colour) are built now too, while the battle loads, not with the first frame of the 3D view:
+	// a driver that builds slowly (Apple's, the first run of a new version: the owner's Mac stood still for two
+	// seconds at the first click on 3D) is then waited for where nobody is looking. One that won't build is tried
+	// again when it is first needed, and reported there.
+	const auto laterStart = std::chrono::steady_clock::now();
+	const bool laterBuilt[4] = { buildEffects(), buildGlow(), buildWash(), buildPresent() };
+	const double laterTime = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - laterStart).count();
+	Log(LOG_INFO) << "OpenXcom3D GPU: the programs after the rays built in " << (int)laterTime << " ms"
+		<< (laterBuilt[0] && laterBuilt[1] && laterBuilt[2] && laterBuilt[3] ? "" : " (not all of them)");
+	while (Gl::GetError() != Gl::NoError) { } // (a failure there is no failure of the rays)
+	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
 	stages.start(context.es());
 	foveaInLayers = getenv("OPENXCOM3D_GPU_FOVEA_ONE_PASS") == nullptr;
 	foveaChecked = foveaInLayers && getenv("OPENXCOM3D_GPU_FOVEA_CHECK") != nullptr;
@@ -1266,6 +1292,28 @@ bool FirstPersonGpu::State::buildResolve()
 }
 
 /**
+ * Builds the small program that magnifies the pictures of fewer rays to the view's size
+ * (UpscaleSource, setting "Render scale"), its pictures to read on the texture units after the
+ * buffers'. Without it the setting does nothing: a ray a pixel.
+ */
+bool FirstPersonGpu::State::buildUpscale()
+{
+	const Gl::UInt built = compileFragment(UpscaleSource, "the render scale's shader");
+	if (!built)
+	{
+		return false;
+	}
+	Gl::UseProgram(built);
+	const char *const names[4] = { "uColor", "uDepth", "uGlow", "uTrue" };
+	for (int which = 0; which < 4; ++which)
+	{
+		Gl::Uniform1i(Gl::GetUniformLocation(built, names[which]), BufferCount + 1 + which);
+	}
+	upscaleProgram = built;
+	return true;
+}
+
+/**
  * The number the shader knows a model by, sending the model up the first time it is asked for
  * (and its own ghost with it). Per model: its colours; its masks (glass, look-only, holes,
  * lights); its sides (plan, east, south); and four numbers:
@@ -1302,7 +1350,7 @@ Uint32 FirstPersonGpu::State::modelId(const FirstPersonView::VoxelModel *model)
 	if (model->lit) std::memcpy(masks + MaskRows * 3, model->lit, MaskRows * 2);
 	else std::memset(masks + MaskRows * 3, 0, MaskRows * 2);
 	Uint32 *info = &modelInfo[(size_t)id * 4];
-	info[0] = (model->ghostly ? 1 : 0) | (model->solidGhost ? 2 : 0) | (model->lit ? 4 : 0) | (model->water ? 8 : 0);
+	info[0] = (model->ghostly ? 1 : 0) | (model->solidGhost ? 2 : 0) | (model->lit ? 4 : 0) | (model->water ? 8 : 0) | (model->wayThrough ? 16 : 0);
 	info[1] = ghostId;
 	info[2] = model->glowMinZ | (Uint32)model->ceiling << 8 | (Uint32)model->min[2] << 16 | (Uint32)model->pulseKind << 24;
 	info[3] = 0;
@@ -1562,6 +1610,7 @@ void FirstPersonGpu::State::setScene(const Frame &frame)
 	Gl::Uniform1i(location("uFoveaCoarse"), 0); // (castFoveaLayers sets it for each of its goes)
 	Gl::Uniform2i(location("uViewSize"), frame.width, frame.height);
 	Gl::Uniform1i(location("uPixelSize"), frame.pixelSize);
+	Gl::Uniform1i(location("uGoggles"), frame.goggles ? 1 : 0);
 	Gl::Uniform1f(location("uGhostScale"), frame.ghostScale);
 	Gl::Uniform1i(location("uSeeThroughCrops"), frame.seeThroughCrops ? 1 : 0);
 	Gl::Uniform1i(location("uSky"), frame.sky);
@@ -1643,7 +1692,7 @@ void FirstPersonGpu::State::setScene(const Frame &frame)
  */
 bool FirstPersonGpu::State::setTargets(int width, int height, bool results, int layer)
 {
-	if (targets.size() > 40 && layer == 0)
+	if (targets.size() > 80 && layer == 0 && !keepTargets)
 	{
 		for (auto &entry : targets)
 		{
@@ -1778,6 +1827,21 @@ void FirstPersonGpu::State::readPicture(int attachment, int width, int height, i
  */
 bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timing *timing)
 {
+	// Setting "Render scale": fewer rays than the view has blocks of pixels, each through the middle of its share of
+	// the picture, and the pictures they make magnified to the view's size on the card (see UpscaleSource): all that
+	// comes after (the units and effects, the bloom, the frame) finds pictures of the view's size, as with a ray a block.
+	// Not for the check against the CPU's rays, which is a ray a block.
+	const int fullColumns = (frame.width + frame.pixelSize - 1) / frame.pixelSize, fullRows = (frame.height + frame.pixelSize - 1) / frame.pixelSize;
+	// (Nor for a VR eye: its picture's size is the headset's, and "VR foveation" thins its rays its own way.)
+	const bool scaled = upscaleProgram && frame.rayScale > 1.001f && frame.palette && !output.results && !output.perRay && frame.eyeFocal <= 0.0f;
+	const int rayColumnsCast = scaled ? std::max(1, (int)std::lround(fullColumns / frame.rayScale)) : fullColumns;
+	const int rayRowsCast = scaled ? std::max(1, (int)std::lround(fullRows / frame.rayScale)) : fullRows;
+	Frame rays = frame; // (the frame as the rays' program has it: the view as large as the rays' grid)
+	if (scaled)
+	{
+		rays.width = rayColumnsCast * frame.pixelSize;
+		rays.height = rayRowsCast * frame.pixelSize;
+	}
 	// More than the shader takes at once (doors swinging, UFOs with their own light, models: a part's
 	// number is sixteen bits): this frame is the CPU's. None of the games' maps comes near.
 	overLimit = frame.swingCount > MaxSwings || frame.ufoCount > MaxUfos || modelIds.size() >= 0xFFF0;
@@ -1802,7 +1866,7 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	const size_t tileCount = (size_t)frame.size[0] * frame.size[1] * frame.size[2];
 	encodeTiles(frame);
 	encodeTables(frame);
-	setScene(frame);
+	setScene(rays);
 	sendWallPaints(frame);
 	sendMirrors(frame);
 	if (modelColors.size() > (size_t)maxBufferTexels || tileUints.size() / 4 > (size_t)maxBufferTexels)
@@ -1836,9 +1900,10 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 		solidsChanged = false;
 	}
 	const int blockColumns = (frame.width + frame.pixelSize - 1) / frame.pixelSize, blockRows = (frame.height + frame.pixelSize - 1) / frame.pixelSize;
-	// (With "VR foveation" the rays' own pictures are a set aside, with holes; the frame's are filled from them after.)
+	// (With "VR foveation" the rays' own pictures are a set aside, with holes; the frame's are filled from them after.
+	// A foveated frame is never scaled: see `scaled`.)
 	const bool foveated = foveaNow;
-	if (!setTargets(blockColumns, blockRows, output.results != nullptr, foveated ? FoveaLayer : 0))
+	if (!setTargets(rayColumnsCast, rayRowsCast, output.results != nullptr, foveated ? FoveaLayer : 0))
 	{
 		Log(LOG_WARNING) << "OpenXcom3D GPU: this card can't draw into the pictures the rays need";
 		return false;
@@ -1855,7 +1920,7 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	// CPU's rays is of one ray a pixel.
 	if (frame.palette) sendBlend(frame); // (the palette: for the full-colour picture and for several rays a pixel)
 	stages.begin(StageRays);
-	Gl::Viewport(0, 0, blockColumns, blockRows);
+	Gl::Viewport(0, 0, rayColumnsCast, rayRowsCast);
 	const int samples = resolveProgram && frame.palette && !output.results ? (frame.samples >= 4 ? 4 : frame.samples >= 2 ? 2 : 1) : 1;
 	// (With "VR foveation" and a ray a pixel: in three goes into three smaller sets of pictures, see castFoveaLayers.)
 	const bool foveaLayers = foveated && foveaInLayers && samples == 1 && frame.pixelSize == 1;
@@ -1878,7 +1943,7 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 		static const float fourRays[4][2] = { { -0.125f, -0.375f }, { 0.375f, -0.125f }, { -0.375f, 0.125f }, { 0.125f, 0.375f } };
 		for (int ray = 0; ray < samples; ++ray)
 		{
-			if (!setTargets(blockColumns, blockRows, false, 1 + ray))
+			if (!setTargets(rayColumnsCast, rayRowsCast, false, 1 + ray))
 			{
 				Log(LOG_WARNING) << "OpenXcom3D GPU: this card can't draw into the pictures several rays a pixel need";
 				return false;
@@ -1887,7 +1952,7 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 			{
 				// The first ray's pictures, for the others to see where they are needed (see LATER_RAYS in the shader), and
 				// the program that looks (its own uniforms set as the first one's were).
-				const Targets &first = targets[{ blockColumns, blockRows, 1 }];
+				const Targets &first = targets[{ rayColumnsCast, rayRowsCast, 1 }];
 				for (int which = 0; which < 3; ++which)
 				{
 					Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 1 + which);
@@ -1901,7 +1966,7 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 				{
 					program = later;
 					Gl::UseProgram(program->id);
-					setScene(frame);
+					setScene(rays);
 				}
 			}
 			const float *offset = samples == 2 ? twoRays[ray] : fourRays[ray];
@@ -1910,12 +1975,12 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 			// got no ray this frame, and see what an earlier frame left there; so their old contents are kept, as ever.)
 			Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
 		}
-		setTargets(blockColumns, blockRows, false, foveated ? FoveaLayer : 0);
+		setTargets(rayColumnsCast, rayRowsCast, false, foveated ? FoveaLayer : 0);
 		Gl::UseProgram(resolveProgram);
 		Gl::Uniform1i(Gl::GetUniformLocation(resolveProgram, "uSamples"), samples);
 		for (int ray = 0; ray < samples; ++ray)
 		{
-			const Targets &drawn = targets[{ blockColumns, blockRows, 1 + ray }];
+			const Targets &drawn = targets[{ rayColumnsCast, rayRowsCast, 1 + ray }];
 			for (int which = 0; which < 3; ++which) // (colour, depth, and the full colour with the glow in it)
 			{
 				Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 1 + ray * 3 + which);
@@ -1933,6 +1998,29 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	}
 	stages.end();
 	if (foveaLayers && foveaChecked) checkFovea(frame, blockColumns, blockRows);
+	if (scaled)
+	{
+		const Targets cast = targets[{ rayColumnsCast, rayRowsCast, 0 }];
+		keepTargets = true; // (the rays' own pictures are read next)
+		const bool set = setTargets(blockColumns, blockRows, false);
+		keepTargets = false;
+		if (!set)
+		{
+			Log(LOG_WARNING) << "OpenXcom3D GPU: this card can't draw into the pictures the rays need";
+			return false;
+		}
+		Gl::Viewport(0, 0, blockColumns, blockRows);
+		Gl::UseProgram(upscaleProgram);
+		Gl::Uniform2f(Gl::GetUniformLocation(upscaleProgram, "uRaysPerBlock"), (float)rayColumnsCast / blockColumns, (float)rayRowsCast / blockRows);
+		for (int which = 0; which < 4; ++which) // (colour, depth, glow, full colour)
+		{
+			Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 1 + which);
+			Gl::BindTexture(Gl::TEXTURE_2D, cast.textures[which]);
+		}
+		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
+		Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+		Gl::UseProgram(program->id);
+	}
 	if (timing)
 	{
 		Gl::Finish();
@@ -2428,6 +2516,31 @@ bool FirstPersonGpu::State::drawGlow(const Effects &effects, const EffectTargets
 }
 
 /**
+ * Builds the screen wash's program and its tint tables' picture (see drawWash): when the card
+ * starts, or failing that the first time a wash is drawn.
+ */
+bool FirstPersonGpu::State::buildWash()
+{
+	washProgram = compileFragment("const float ControlHazeFrom = " + glslFloat(ControlHazeFrom) + ";\n" + WashSource, "the screen wash's shader");
+	if (!washProgram)
+	{
+		return false;
+	}
+	Gl::UseProgram(washProgram);
+	Gl::Uniform1i(Gl::GetUniformLocation(washProgram, "uColor"), 0);
+	Gl::Uniform1i(Gl::GetUniformLocation(washProgram, "uGlow"), 2);
+	Gl::Uniform1i(Gl::GetUniformLocation(washProgram, "uTints"), 7);
+	Gl::GenTextures(1, &tintsTexture);
+	Gl::ActiveTexture(Gl::TEXTURE0 + 7);
+	Gl::BindTexture(Gl::TEXTURE_2D, tintsTexture);
+	Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, 256, 6, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
+	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
+	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
+	washFresh = true;
+	return true;
+}
+
+/**
  * The screen wash over the finished picture (FirstPersonView::applyScreenWash, on the card; see
  * WashSource), into a picture of its own.
  * @param colorTexture, glowTexture The picture so far and its glow.
@@ -2435,24 +2548,14 @@ bool FirstPersonGpu::State::drawGlow(const Effects &effects, const EffectTargets
  */
 bool FirstPersonGpu::State::drawWash(const Effects &effects, Gl::UInt colorTexture, Gl::UInt glowTexture, WashTargets *&washed)
 {
-	if (!washProgram)
+	if (!washProgram && !buildWash())
 	{
-		washProgram = compileFragment("const float ControlHazeFrom = " + glslFloat(ControlHazeFrom) + ";\n" + WashSource, "the screen wash's shader");
-		if (!washProgram)
-		{
-			return false;
-		}
-		Gl::UseProgram(washProgram);
-		Gl::Uniform1i(Gl::GetUniformLocation(washProgram, "uColor"), 0);
-		Gl::Uniform1i(Gl::GetUniformLocation(washProgram, "uGlow"), 2);
-		Gl::Uniform1i(Gl::GetUniformLocation(washProgram, "uTints"), 7);
-		Gl::GenTextures(1, &tintsTexture);
-		Gl::ActiveTexture(Gl::TEXTURE0 + 7);
-		Gl::BindTexture(Gl::TEXTURE_2D, tintsTexture);
-		Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, 256, 6, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
-		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
-		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
-		tintsSent = ~effects.paletteHash;
+		return false;
+	}
+	if (washFresh)
+	{
+		tintsSent = ~effects.paletteHash; // (its tables go up with the first wash)
+		washFresh = false;
 	}
 	WashTargets &target = washTargets[{ effects.width, effects.height }];
 	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
@@ -2506,6 +2609,37 @@ bool FirstPersonGpu::State::drawWash(const Effects &effects, Gl::UInt colorTextu
 }
 
 /**
+ * Builds the program that puts the frame together on the card, and its palette's and flame
+ * tint's pictures (see present): when the card starts, or failing that with the first such frame.
+ */
+bool FirstPersonGpu::State::buildPresent()
+{
+	presentProgram = compileFragment(PresentSource, "the shader that puts the frame together");
+	if (!presentProgram)
+	{
+		return false;
+	}
+	Gl::UseProgram(presentProgram);
+	const char *const names[6] = { "uColor", "uOverlay", "uGlow", "uRayColor", "uRayTrue", "uPalette" };
+	for (int unit = 0; unit < 6; ++unit) Gl::Uniform1i(Gl::GetUniformLocation(presentProgram, names[unit]), unit);
+	Gl::GenTextures(1, &presentPalette);
+	Gl::ActiveTexture(Gl::TEXTURE0 + 5);
+	Gl::BindTexture(Gl::TEXTURE_2D, presentPalette);
+	Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::RGBA8, 256, 1, 0, Gl::RGBA, Gl::UNSIGNED_BYTE, nullptr);
+	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
+	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
+	Gl::Uniform1i(Gl::GetUniformLocation(presentProgram, "uFlameTint"), 6);
+	Gl::GenTextures(1, &presentFlameTint);
+	Gl::ActiveTexture(Gl::TEXTURE0 + 6);
+	Gl::BindTexture(Gl::TEXTURE_2D, presentFlameTint);
+	Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, 256, 1, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
+	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
+	Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
+	presentFresh = true;
+	return true;
+}
+
+/**
  * The frame put together on the card (see PresentSource), from what the last drawEffects for a
  * view of this size left there and the overlay the CPU drew since; read back if asked, else left
  * in its texture for a display on this context to show.
@@ -2520,30 +2654,14 @@ bool FirstPersonGpu::State::present(const Present &frame)
 	PresentTargets &kept = found->second;
 	stages.picture(frame.width, frame.height, false);
 	stages.begin(StagePresent);
-	if (!presentProgram)
+	if (!presentProgram && !buildPresent())
 	{
-		presentProgram = compileFragment(PresentSource, "the shader that puts the frame together");
-		if (!presentProgram)
-		{
-			return false;
-		}
-		Gl::UseProgram(presentProgram);
-		const char *const names[6] = { "uColor", "uOverlay", "uGlow", "uRayColor", "uRayTrue", "uPalette" };
-		for (int unit = 0; unit < 6; ++unit) Gl::Uniform1i(Gl::GetUniformLocation(presentProgram, names[unit]), unit);
-		Gl::GenTextures(1, &presentPalette);
-		Gl::ActiveTexture(Gl::TEXTURE0 + 5);
-		Gl::BindTexture(Gl::TEXTURE_2D, presentPalette);
-		Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::RGBA8, 256, 1, 0, Gl::RGBA, Gl::UNSIGNED_BYTE, nullptr);
-		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
-		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
-		Gl::Uniform1i(Gl::GetUniformLocation(presentProgram, "uFlameTint"), 6);
-		Gl::GenTextures(1, &presentFlameTint);
-		Gl::ActiveTexture(Gl::TEXTURE0 + 6);
-		Gl::BindTexture(Gl::TEXTURE_2D, presentFlameTint);
-		Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, 256, 1, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
-		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
-		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
-		presentPaletteSent = ~frame.paletteHash;
+		return false;
+	}
+	if (presentFresh)
+	{
+		presentPaletteSent = ~frame.paletteHash; // (its palette goes up with the first frame)
+		presentFresh = false;
 	}
 	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
 	if (!kept.framebuffer)
@@ -2925,6 +3043,8 @@ bool FirstPersonGpu::State::drawEffects(const Effects &effects, const Output &ou
 	Gl::Uniform1i(location("uPixelSize"), rayPixelSize);
 	const int primitives = effects.primCount;
 	Gl::Uniform1i(location("uContinue"), 0);
+	// Futuristic night vision's colour group + 1 (0: any other time): a see-through picture that keeps its colours is mixed over that.
+	Gl::Uniform1i(location("uOwnOverNight"), effects.ownColours ? effects.nightVision : 0);
 	Gl::Uniform1i(location("uFirstPrim"), 0);
 	Gl::Uniform1i(location("uEndPrim"), goes == 2 ? effects.outlineAt : primitives);
 	Gl::Uniform1i(location("uOutlineCount"), 0);

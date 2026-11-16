@@ -120,6 +120,10 @@ Uint32 presentKey(SDL_Surface *screen);
 void presentView(const Surface *view, const Uint32 *fullColors = nullptr);
 /// Screen::flip's hook: lays the view asked for into the display.
 void presentAtFlip(SDL_Surface *display, int x, int y, int width, int height);
+/// Do the settings ask for the 3D world in full colour (True colour on the card, at the display's size)? The display is then opened in full colour.
+bool wantsFullColorDisplay();
+/// The game's 32-bit screen copied onto a full-colour display opened for the 3D view, magnified to the picture area (the engine's plain output).
+void flipFullColor(SDL_Surface *screen, SDL_Surface *display, int x, int y, int width, int height);
 /// Zoom::flipWithZoom's hook, with the engine's OpenGL output: draws the view asked for over the window.
 void presentAtFlipOpenGl(SDL_Surface *screen, int x, int y, int width, int height, int displayHeight);
 
@@ -161,14 +165,20 @@ void settleOptions();
 /// Called once the player's options are read (Options::init): the Meta Quest build's defaults that
 /// changed, set once on a profile saved before them (see the function).
 void optionsLoaded();
-/// Setting "Playstyle": chooses Faithful (0), FPS (1) or Custom (2), setting its switches.
-void choosePlaystyle(int playstyle);
-/// Setting "Playstyle": notes one of its switches changed by hand (the playstyle the switches make now, Custom keeping them).
-void playstyleSwitchChanged();
-/// Setting "Playstyle": whether a setting is one of the switches it sets.
-bool isPlaystyleSwitch(const std::string &id);
-/// Setting "Playstyle": settles it with the switches as they are (a profile from before it: Custom unless they match).
-void settlePlaystyle();
+/// The groups of presets on the first page of the 3D VIEW tab: how it plays, and how fine it is drawn.
+enum PresetGroup { PRESET_GAMEPLAY, PRESET_GRAPHICS };
+/// How many presets a group has by name; Custom is the number after the last.
+int presetCount(PresetGroup group);
+/// Chooses a preset of a group (its number for Custom), setting its settings.
+void choosePreset(PresetGroup group, int preset);
+/// Whether Custom can be chosen in a group (the player has a mix of their own).
+bool presetHasCustom(PresetGroup group);
+/// Notes a setting changed by hand: a group that sets it says the preset its settings make now, or Custom.
+void presetSwitchChanged(const std::string &id);
+/// The setting "Renderer" changed: a named "Graphics detail" is set again for it.
+void rendererChanged();
+/// Settles the presets' names with the settings as they are.
+void settlePresets();
 /// Does a mod the game finds for the first time (one not yet in the player's mod list) start
 /// switched on? Our own mod does, so a game set up by hand plays in 3D at once; switched off, it
 /// stays off.
@@ -414,6 +424,8 @@ bool noclipFloats(BattlescapeState *state, const BattleUnit *unit);
 
 // Stock OXCE: the add-on is left out, and every hook does nothing.
 inline void presentAtFlip(SDL_Surface *, int, int, int, int) { }
+inline bool wantsFullColorDisplay() { return false; }
+inline void flipFullColor(SDL_Surface *, SDL_Surface *, int, int, int, int) { }
 inline void presentAtFlipOpenGl(SDL_Surface *, int, int, int, int, int) { }
 inline FirstPersonMode *create(Game *, BattlescapeState *) { return nullptr; }
 inline void destroy(FirstPersonMode *) { }

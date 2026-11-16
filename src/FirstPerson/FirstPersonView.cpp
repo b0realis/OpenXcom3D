@@ -154,6 +154,7 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 	gpuWarmUp();
 	gpuForgetModels();
 	_models.clear();
+	_sameArtModels.clear();
 	_ghostModels.clear();
 	_voxelUnits->forBattle(save);
 	_collapseStarts.clear();
@@ -162,6 +163,7 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 	_partKinds.clear();
 	_flameParts.clear();
 	_openedModels.clear();
+	_openDoorModels.clear();
 	_frames.clear();
 	_solidMasks.clear();
 	_paintedFloors.clear();
@@ -527,6 +529,19 @@ int FirstPersonView::getEyeShade() const
 }
 
 /**
+ * The game's shade where the camera is, as getEyeShade has it but not cut to a whole shade
+ * (see FirstPersonMode::updateWeaponInHand, which steadies it).
+ */
+float FirstPersonView::getEyeLight() const
+{
+	if (!_save || (int)_tileLights.size() != _save->getMapSizeXYZ())
+	{
+		return 0.0f;
+	}
+	return lightAt((float)_eye[0], (float)_eye[1], (float)_eye[2]);
+}
+
+/**
  * Works out where a sound from a tile is heard, with this camera as the listener: the stereo
  * angle and how far away it sounds, packed into one number for Sound (see
  * Sound::packDistance). The angle is 0 straight ahead, 90 to the right, 180 behind, 270 to the
@@ -608,6 +623,14 @@ void FirstPersonView::draw()
 	// (The frame's start, for the Android build's frame probe.)
 	const Uint64 drawStart = SDL_GetPerformanceCounter();
 #endif
+	// (Setting "Render scale" on Auto goes by how long the frame took: see noteDrawTime.)
+	struct ScaleTimer
+	{
+		FirstPersonView *view;
+		std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
+		~ScaleTimer() { view->noteDrawTime(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count()); }
+	} scaleTimer { this };
+	_gpuCastRays = false;
 	// The frame's shared work, then its one picture (VR's renderEyes draws two of them from the one shared part): all
 	// of it but the units' facing rings, which close it here (and each of renderEyes's), over everything.
 	beginFrame();
@@ -764,13 +787,14 @@ void FirstPersonView::drawLastMarks(double *passTimes)
 	if (_signalGlitches) { PassTimer pass(passTimes, 18); applySignalGlitches(); }
 	{ PassTimer pass(passTimes, 19); drawBurning(); }
 	{ PassTimer pass(passTimes, 20); drawHurt(); }
-	// The numbers rising over the units hit (setting "Damage numbers"): in the world, walls in front
-	// hiding them, but over the screen's effects, so their colours read.
-	{ PassTimer pass(passTimes, 21); drawDamageNumbers(); }
-	// The icons over the downed units, the enemy markers and the units' facing rings, over everything.
+	// The icons over the downed units and the enemy markers, over everything.
 	{ PassTimer pass(passTimes, 22); drawDownedIcons(); }
 	{ PassTimer pass(passTimes, 23); drawMarkers(); }
 	{ PassTimer pass(passTimes, 24); drawSprayMarks(); }
+	// The numbers rising over the units hit (setting "Damage numbers"): over all of those too (a
+	// player, GitHub issue #160: "damage numbers should be top layer, given their temporary
+	// nature"; a stack of enemy markers over a unit hid its number).
+	{ PassTimer pass(passTimes, 21); drawDamageNumbers(); }
 }
 
 #ifdef __ANDROID__

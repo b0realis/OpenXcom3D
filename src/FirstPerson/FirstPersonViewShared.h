@@ -141,6 +141,11 @@ const float FlareShadowShades = 8.0f, FlareShadowMinPower = 0.06f;
 /// of 2. A 1920x1080 screen at the default battlescape scale makes a 960x540 view, which ran at
 /// 40-51 FPS in a busy town; in blocks of 2 it holds 60 and looks almost the same.
 const int AutoPixelMaxWidth = 640, AutoPixelMaxHeight = 400;
+/// Setting "Render scale" on Auto: the scales it steps through (percent each way), finest first (see FirstPersonView::noteDrawTime).
+const int RenderScaleSteps[] = { 100, 85, 75, 67, 60, 50 };
+const int RenderScaleStepCount = sizeof(RenderScaleSteps) / sizeof(RenderScaleSteps[0]);
+const double RenderScaleBudget = 0.8; // the share of a frame's time (at the game's frame-rate limit) the view's drawing may take
+const double RenderScaleSpare = 0.85; // it goes a step finer when that step's time, reckoned from this one's, is under this share of the budget
 const int SmallViewPixels = 320 * 200; // a view of at most this many pixels (the cards' cameras, the small and medium map camera) is never drawn with bigger pixels
 
 // ---- Proportions of the voxel world ----
@@ -293,6 +298,15 @@ const int LowArtFlatLayer = 2;
 /// CropBlockVoxelShare of the block (the wheat: a floor's slab and four thin posts; GitHub issue #56), stands as a
 /// solid block of it (see cropBlockOf, buildCropBlock); knee to waist high at most, and only one walks through.
 const int CropBlockMinHeight = 4, CropBlockMaxHeight = 16;
+/// An object's upright ghost on the tile's west or north edge stands this many voxels into the tile, clear of the
+/// wall there (a wall is two voxels thick; see buildGhost).
+const int GhostWallClearance = 2;
+/// An object with voxels is a flat picture on an edge (a poster, moved clear of the wall likewise, see buildModel)
+/// when it is thinner than that and at least this many voxels high and wide.
+const int PosterMinExtent = 6;
+/// An object without voxels that no one can walk through is built as a body from its art when the art draws at
+/// least this many pixels (of a frame's 32 x 40: a console, a rack; see artBody).
+const int ArtBodyMinPixels = 500;
 const float CropBlockMatch = 0.92f, CropBlockVoxelShare = 0.5f;
 /// A mass of foliage (a big tree's crown, see foliageArt; GitHub issue #59): at least FoliageGreenShare of its art's drawn
 /// pixels green (greener than red and blue by FoliageGreenMargin), its voxels filling FoliageBulkShare of the tile or

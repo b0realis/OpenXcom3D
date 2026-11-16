@@ -59,6 +59,7 @@
 #include "FirstPersonSounds.h"
 #include "FirstPersonApi.h"
 #include "FirstPersonView.h"
+#include <set>
 #include "FirstPersonSpriteHits.h"
 #include "../Battlescape/AlienInventoryState.h"
 #include "../Battlescape/BattleState.h"
@@ -358,6 +359,23 @@ int FirstPersonMode::handOf(BattleUnit *unit, const BattleItem *weapon) const
 	const int active = activeHand(unit);
 	if (weapon && weapon == emptyHandWeapon(unit) && (active == 0 || active == 1) && handWeapon(unit, active) == weapon) return active;
 	return unit->getLeftHandWeapon() ? 0 : 1;
+}
+
+/**
+ * An item's name on the HUD: its own, or for someone unconscious their name, as the game's
+ * inventory names them (a player, GitHub issue #143: a living captive carried read as the corpse
+ * item's name, "dead").
+ * @param item The item.
+ * @return The name, translated.
+ */
+std::string FirstPersonMode::itemLabel(const BattleItem *item) const
+{
+	const BattleUnit *body = item->getUnit();
+	if (body && body->getStatus() == STATUS_UNCONSCIOUS)
+	{
+		return body->getName(_game->getLanguage());
+	}
+	return std::string(_state->tr(item->getRules()->getName()));
 }
 
 /**
@@ -1996,6 +2014,7 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 	}
 	if (!show)
 	{
+		_laserAway = _laserRefused = false;
 		if (!_trajectoryKey.empty())
 		{
 			_trajectoryKey.clear();
@@ -2019,7 +2038,7 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 	// target's tile only, a line and an arcing shot at an exact point on the very point; an
 	// FPS-style line on where the eye is too, its rounds leaving from there, see freeAimFrom).
 	const Position from = unit->getPosition();
-	const bool fromEye = freeAimOn(mode) || (otherWeapon && freeAimOn(offMode));
+	const bool fromEye = freeAimOn(mode) || (otherWeapon && freeAimOn(offMode)) || closeEyeShot(mode, targetVoxel, hitSomething);
 	const int eyeVoxelX = fromEye ? (int)std::floor(_eyeX + _leanShift[0]) : 0, eyeVoxelY = fromEye ? (int)std::floor(_eyeY + _leanShift[1]) : 0;
 	// (an arcing shot aims at the exact point as a straight one does, see launchShot; a throw at the tile)
 	const bool arcing = arcs(weapon, mode);
@@ -2090,17 +2109,41 @@ void FirstPersonMode::updateTrajectory(BattleUnit *unit, bool playerTurn)
 			// would take, dimmed, when the game will refuse it).
 			// (FPS style: from the eye's place, as its rounds leave, see freeAimFrom)
 			preview.freeAim = freeAimOn(gunMode);
+			preview.eyeOrigin = closeEyeShot(gunMode, targetVoxel, hitSomething); // (up close with its setting: from the eye too)
 			Position origin = tileEngine->getOriginVoxel(preview, _save->getTile(from)), voxel = targetVoxel;
 			const ShotAim aim = freeAimOn(gunMode) ? AIM_EXACT : aimFor(preview, targetTile, targetVoxel, origin, voxel);
 			tileEngine->calculateLineVoxel(origin, voxel, true, &path, unit);
 			// (a shot the game will refuse shows dimmed: no surprise "No line of fire")
 			look = aim == AIM_FORCED ? FirstPersonView::TRAJECTORY_FORCED_LINE : aim == AIM_REFUSED ? FirstPersonView::TRAJECTORY_REFUSED_LINE
 				: FirstPersonView::TRAJECTORY_STRAIGHT;
+			// The game's own targeting, and the round won't land on the point under the crosshair (its
+			// line leaves from the weapon, not the eye: something close is in its way, or the game's aim
+			// went for another part of the target): seen from the eye its end is more than
+			// LaserAwayVoxels off that point (at least LaserAwayAngle). The laser says so: dimmed, and "OFF"
+			// left of the crosshair (see updateCrosshair; a player, GitHub issue #148, "off lasers";
+			// the owner: mark it clearly).
+			if (look == FirstPersonView::TRAJECTORY_STRAIGHT && !preview.freeAim && !path.empty())
+			{
+				double eye[3];
+				_view->getEye(eye);
+				const double toAimed[3] = { targetVoxel.x + 0.5 - eye[0], targetVoxel.y + 0.5 - eye[1], targetVoxel.z + 0.5 - eye[2] };
+				const double toEnd[3] = { path.back().x + 0.5 - eye[0], path.back().y + 0.5 - eye[1], path.back().z + 0.5 - eye[2] };
+				const double aimedLength = std::sqrt(toAimed[0] * toAimed[0] + toAimed[1] * toAimed[1] + toAimed[2] * toAimed[2]);
+				const double endLength = std::sqrt(toEnd[0] * toEnd[0] + toEnd[1] * toEnd[1] + toEnd[2] * toEnd[2]);
+				if (aimedLength > 0.0 && endLength > 0.0)
+				{
+					const double cosine = (toAimed[0] * toEnd[0] + toAimed[1] * toEnd[1] + toAimed[2] * toEnd[2]) / (aimedLength * endLength);
+					const double allowed = std::min(LaserAwayMostAngle, std::max(LaserAwayAngle, std::atan(LaserAwayVoxels / aimedLength)));
+					if (cosine < std::cos(allowed)) look = FirstPersonView::TRAJECTORY_AWAY_LINE;
+				}
+			}
 		}
 		return look;
 	};
 	std::vector<Position> path, otherPath;
 	const FirstPersonView::TrajectoryLook look = pathOf(weapon, mode, path);
+	_laserAway = look == FirstPersonView::TRAJECTORY_AWAY_LINE;
+	_laserRefused = look == FirstPersonView::TRAJECTORY_REFUSED_LINE;
 	const FirstPersonView::TrajectoryLook otherLook = otherWeapon ? pathOf(otherWeapon, offMode, otherPath) : FirstPersonView::TRAJECTORY_ARC;
 	_view->setTrajectory(path, look);
 	_view->setOtherTrajectory(otherPath, otherLook);
@@ -3140,6 +3183,7 @@ void FirstPersonMode::launchShot(BattleUnit *unit, BattleItem *weapon, BattleAct
 	//   unit, an object...), or a straight shot on the open sky at the point of air on the
 	//   crosshair's ray (see aimAt); the game's accuracy roll still applies to it.
 	action->freeAim = freeAimOn(mode);
+	action->eyeOrigin = closeEyeShot(mode, aimedVoxel, hitSomething) && !weapon->getArcingShot(mode); // (setting "Close range: from the eye")
 	if ((Options::fpsAimExact || action->freeAim || (Options::fpsThrowing == 1 && weapon->getArcingShot(mode))) && (hitSomething || !weapon->getArcingShot(mode)) && isShot(mode))
 	{
 		action->targetVoxel = aimedVoxel;
@@ -3229,6 +3273,7 @@ void FirstPersonMode::launchShot(BattleUnit *unit, BattleItem *weapon, BattleAct
 	// Clear what we added, so the next action (one from the classic HUD, say) aims normally.
 	action->targetVoxel = Position(-1, -1, -1);
 	action->freeAim = false;
+	action->eyeOrigin = false;
 	action->forced = false;
 	action->relativeOrigin = BattleActionOrigin::CENTRE;
 	action->dualWield = false;
@@ -3596,6 +3641,30 @@ BattleActionOrigin FirstPersonMode::leanSide(const BattleUnit *unit, const Posit
 bool FirstPersonMode::freeAimOn(BattleActionType mode) const
 {
 	return !Options::fpsFaithfulTargeting && isShot(mode);
+}
+
+/**
+ * Setting "Close range: from the eye" (the owner, on GitHub issue #148): with the game's own
+ * targeting, a straight shot at a point within CloseEyeRange voxels of the eye leaves from the
+ * eye's place across the tile (as an FPS-style round does, see freeAimFrom), so the round goes
+ * where the crosshair is: up close the game's muzzle point, on the tile's edge and to a side with
+ * a lean, is too far from the eye for its line to reach what the eye sees. All else stays the
+ * game's: its accuracy roll, its line of fire from there.
+ * @param mode The fire mode.
+ * @param aimedVoxel The point under the crosshair.
+ * @param hitSomething The crosshair is on something (not the open sky).
+ * @return True if the shot leaves from the eye.
+ */
+bool FirstPersonMode::closeEyeShot(BattleActionType mode, const Position &aimedVoxel, bool hitSomething) const
+{
+	if (!Options::fpsCloseEyeShots || !Options::fpsFaithfulTargeting || !isShot(mode) || !hitSomething)
+	{
+		return false;
+	}
+	double eye[3];
+	_view->getEye(eye);
+	const double away[3] = { aimedVoxel.x + 0.5 - eye[0], aimedVoxel.y + 0.5 - eye[1], aimedVoxel.z + 0.5 - eye[2] };
+	return away[0] * away[0] + away[1] * away[1] + away[2] * away[2] <= CloseEyeRange * CloseEyeRange;
 }
 
 /**
@@ -4419,6 +4488,16 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	_txtShot->setVisible(show && Options::fpsCrosshairInfo && playerTurn);
 	_txtCosts->setVisible(show && Options::fpsCrosshairInfo && Options::fpsCrosshairCosts && playerTurn);
 	_txtDamage->setVisible(show && Options::fpsCrosshairInfo && Options::fpsCrosshairDamage && playerTurn);
+	// The rangefinder (GitHub issue #139; setting "Rangefinder"): in the player's turn with its setting, or while its
+	// key is held (then whatever the settings, in the aliens' turn too; the digital kind with the setting off).
+	const bool rangeHeld = isKeyHeld(Options::keyFpsRange) && !gameModifierHeld();
+	const bool rangeShown = show && unit && ((Options::fpsRangefinder != 0 && playerTurn) || rangeHeld);
+	const bool rangeAnalogue = rangeShown && Options::fpsRangefinder == 2;
+	_txtRange->setVisible(rangeShown && !rangeAnalogue);
+	// "OFF": the laser shown ends away from the point under the crosshair (see updateTrajectory).
+	_txtAimOff->setVisible(show && playerTurn && (_laserAway || _laserRefused));
+	_rangeScale->setVisible(rangeAnalogue);
+	for (Text *mark : _rangeMarks) mark->setVisible(rangeAnalogue);
 	if (!show)
 	{
 		return;
@@ -4434,6 +4513,10 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	_txtDamage->setX(centreX + 14);
 	_txtDamage->setY(linesTop + 20);
 	_txtCosts->setX(centreX + 14); // (its line: below, once the damage line is known)
+	_txtRange->setX(centreX - 14 - _txtRange->getWidth()); // (left of the crosshair, on the hit chance's row)
+	_txtRange->setY(linesTop + 10);
+	_txtAimOff->setX(centreX - 14 - _txtAimOff->getWidth()); // (left of the crosshair, on the fire mode's row)
+	_txtAimOff->setY(linesTop);
 
 	// The colours, picked from the current palette: plain ones for the crosshair, and text
 	// colour groups for the lines.
@@ -4442,6 +4525,49 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	const Uint8 grey = nearestColor(palette, 150, 150, 150), shadow = nearestColor(palette, 8, 8, 8), psi = nearestColor(palette, 200, 120, 255);
 	const Uint8 yellowText = textColor(palette, 255, 216, 64), redText = textColor(palette, 240, 70, 50);
 	const Uint8 greyText = textColor(palette, 170, 170, 170), psiText = textColor(palette, 200, 120, 255), greenText = textColor(palette, 130, 230, 100);
+
+	// The range: from the unit to the tile under the crosshair, in tiles, counted as the game counts a shot's range (the
+	// hit chance's dropoff, a weapon's reach); a dash at the sky.
+	if (_txtAimOff->getVisible())
+	{
+		const std::string offText = _state->tr(_laserRefused ? "STR_FPS_AIM_BLOCKED" : "STR_FPS_AIM_OFF");
+		if (_txtAimOff->getText() != offText) _txtAimOff->setText(offText);
+		_txtAimOff->setColor(redText);
+	}
+	if (_txtRange->getVisible())
+	{
+		const int range = _aimHitsSomething ? (int)std::ceil(std::sqrt((double)unit->distance3dToPositionSq(_aimVoxel.toTile()))) : -1;
+		const std::string rangeText = _state->tr("STR_FPS_RANGE").arg(range < 0 ? std::string("-") : std::to_string(range));
+		if (_txtRange->getText() != rangeText) _txtRange->setText(rangeText);
+		_txtRange->setColor(yellowText);
+	}
+	// The analogue kind: the scale left of the crosshair, its curve as high over its line at each mark as a
+	// unit RangeSubjectVoxels tall (a standing soldier, at the setting "Unit size") shows that many tiles away. Its five
+	// marks are the ladder's first whose heights fit the scale through the lens not zoomed in; zoomed in (the owner:
+	// "analogue should enlarge"), the marks stay and the curve grows with the picture, upwards from the line, so it
+	// reads true at any magnification.
+	if (rangeAnalogue)
+	{
+		static const int ladder[] = { 2, 3, 4, 6, 8, 10, 12, 15, 20, 30, 40, 60, 80, 120 };
+		const int ladderCount = (int)(sizeof(ladder) / sizeof(ladder[0]));
+		const double subject = RangeSubjectVoxels * RangeVoxelRise * (std::clamp(Options::fpsUnitSize, 80, 100) / 100.0) / Position::TileXY; // the subject's height, in tiles
+		const double plainFocal = (canvasWidth() / 2.0) / std::tan(std::clamp(Options::fpsFieldOfView, 50, 110) * Pi / 360.0); // (the scale is drawn on the canvas)
+		const double focalPixels = (canvasWidth() / 2.0) / std::tan(fieldOfViewNow() * Pi / 360.0);
+		const double tilePixels = focalPixels * subject; // how high the subject shows a tile away, now
+		int first = 0;
+		while (first + 5 < ladderCount && plainFocal * subject / ladder[first] > _rangeScaleHeight) ++first;
+		// Left of the crosshair, beside it (the owner: "to the left of normal reticle"): the line keeps its place, three
+		// quarters of the curve's height not zoomed in below the crosshair's middle; the surface reaches up from there.
+		_rangeScale->setX(centreX - RangeScaleGap - _rangeScaleWidth);
+		_rangeScale->setY(centreY + _rangeScaleHeight * 3 / 4 - (_rangeScale->getHeight() - 4));
+		const Uint64 scaleKey = (Uint64)std::lround(tilePixels * 16.0) | ((Uint64)first << 32) | ((Uint64)yellow << 40) | ((Uint64)shadow << 48);
+		if (scaleKey != _rangeScaleDrawnFor)
+		{
+			_rangeScaleDrawnFor = scaleKey;
+			drawRangeScale(ladder + first, tilePixels, yellow, shadow);
+		}
+		for (Text *mark : _rangeMarks) mark->setColor(yellowText);
+	}
 
 	// The weapon: the one in hand, or the item of an action picked from a menu that's being
 	// aimed now.
@@ -4731,6 +4857,68 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 		_accuracyLineDrawnFor = lineKey;
 		drawAccuracyLine(reach, missReach, lineColor, missColor, shadow);
 	}
+}
+
+/**
+ * Draws the analogue rangefinder (setting "Rangefinder") onto its surface and places its numbers, in the manner of the
+ * PSO-1 scope's: a level line with small ticks, and over it a dotted curve that falls from right to left, as high over
+ * the line at each of five marks as the subject (a unit 1.7 m tall, the label over the line's right end) shows at that
+ * mark's range, in tiles. A unit standing on the line with its head at the curve is as many tiles away as the number there.
+ * The line is the surface's fourth row from the bottom; the curve may rise to the surface's top (zoomed in).
+ * Between the marks the range runs evenly by ratio, so the curve is smooth. Each pixel has a shadow one down and to the
+ * right, so it reads on any background. The surface's place must be set before (the numbers are laid out from it).
+ * @param marks The five ranges marked, in tiles, the nearest first (at the right).
+ * @param tilePixels How high the subject shows one tile away now, in canvas pixels.
+ * @param color Palette colour of the scale.
+ * @param shadow Palette colour of its shadow.
+ */
+void FirstPersonMode::drawRangeScale(const int marks[5], double tilePixels, Uint8 color, Uint8 shadow)
+{
+	// The line's row on the surface, and the curve's height over it at a column (0: the left end, the farthest mark).
+	const int width = _rangeScaleWidth, base = _rangeScale->getHeight() - 4, highest = base - 1;
+	auto heightAt = [&](double column)
+	{
+		const double along = std::clamp((width - column) * 4.0 / width, 0.0, 4.0); // marks from the right, a fraction between two
+		const int mark = std::min(3, (int)along);
+		const double range = marks[mark] * std::pow((double)marks[mark + 1] / marks[mark], along - mark);
+		return std::min<double>(highest, tilePixels / range);
+	};
+	std::set<std::pair<int, int>> points;
+	// The line, a small tick up at every eighth and a taller one at each end.
+	for (int x = 0; x <= width; ++x) points.insert({ x, base });
+	for (int eighth = 0; eighth <= 8; ++eighth)
+	{
+		const int x = eighth * width / 8;
+		for (int rise = 1; rise <= (eighth == 0 || eighth == 8 ? 4 : 2); ++rise) points.insert({ x, base - rise });
+	}
+	// The curve, dotted (every other pixel along it, by its place on the surface), a quarter of a column a step so its
+	// steep end has no gaps; and a tick down from it at each mark.
+	for (int step = 0; step <= width * 4; ++step)
+	{
+		const int x = (int)std::lround(step / 4.0), y = base - (int)std::lround(heightAt(step / 4.0));
+		if (((x + y) & 1) == 0) points.insert({ x, y });
+	}
+	for (int mark = 0; mark < 5; ++mark)
+	{
+		const int x = width - mark * width / 4, y = base - (int)std::lround(heightAt(x));
+		for (int drop = 0; drop <= 2 && y + drop < base; ++drop) points.insert({ x, y + drop });
+		// Its number sits over the curve there; the subject's height over the line's right end, under the curve.
+		Text *number = _rangeMarks[mark];
+		const std::string text = std::to_string(marks[mark]);
+		if (number->getText() != text) number->setText(text);
+		number->setX(_rangeScale->getX() + x - number->getWidth() / 2 + 1);
+		number->setY(_rangeScale->getY() + y - 9);
+	}
+	Text *subject = _rangeMarks[5];
+	const std::string subjectText = _state->tr("STR_FPS_RANGE_SUBJECT");
+	if (subject->getText() != subjectText) subject->setText(subjectText);
+	subject->setX(_rangeScale->getX() + width - subject->getWidth());
+	subject->setY(_rangeScale->getY() + base - 14);
+	_rangeScale->clear();
+	_rangeScale->lock();
+	for (const auto &point : points) _rangeScale->setPixel(point.first + 1, point.second + 1, shadow);
+	for (const auto &point : points) _rangeScale->setPixel(point.first, point.second, color);
+	_rangeScale->unlock();
 }
 
 /**

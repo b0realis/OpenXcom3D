@@ -180,7 +180,8 @@ bool FirstPersonMode::stepAllowed(BattleUnit *unit, int stepX, int stepY)
 			// (less what the step is cheaper by as the second half of a diagonal, see cornerDiscount)
 			int lessTime = 0, lessEnergy = 0;
 			cornerDiscount(unit, start, direction, stepCost, lessTime, lessEnergy);
-			const int time = stepCost.cost.time - lessTime, energy = stepCost.cost.energy - lessEnergy;
+			// (... and with the turn before a sidestep, setting "Sidesteps face the view")
+			const int time = stepCost.cost.time - lessTime + sidestepTurnCost(unit, start, direction, stepCost.pos), energy = stepCost.cost.energy - lessEnergy;
 			allowed = unit->getTimeUnits() >= time && unit->getEnergy() >= energy && reserveAllows(unit, time, energy);
 		}
 		_stepAllowedCache[direction] = allowed ? 1 : unsafe ? 2 : 0;
@@ -387,6 +388,10 @@ bool FirstPersonMode::runsStep(BattleUnit *unit, const Position &from, int direc
  * so does a step up or down stairs (the game's strafe stays on one level). With free turning the
  * game turns the soldier for the step, for free, and it faces the view again after
  * (faceLookDirection). The step is priced (stepAllowed) and walked (commitStep) by this one test.
+ * A step the way the view looks (W alone) is never one: the soldier turns to face it as the
+ * game's walk turns (for nothing) and walks at the walk's price (a player, GitHub issue #161: looking south with
+ * the body still facing south-west, holding W sidestepped south tile after tile, a TU more each
+ * and the armour's side to the enemy; "movement should act like turn to shoot").
  * @param unit The soldier.
  * @param from The tile the step starts from.
  * @param direction The step's direction (0 north .. 7, clockwise).
@@ -395,8 +400,102 @@ bool FirstPersonMode::runsStep(BattleUnit *unit, const Position &from, int direc
  */
 bool FirstPersonMode::isSidestep(const BattleUnit *unit, const Position &from, int direction, const Position &target) const
 {
+	if (!Options::fpsTurnCost || target.z != from.z || direction == viewStepDirection())
+	{
+		return false;
+	}
+	// (Setting "Sidesteps face the view": every step but the one the view looks along is a sidestep, the soldier
+	// turned for it first, see sidestepFacingFor.)
+	if (Options::fpsSidestepFaceView)
+	{
+		return true;
+	}
 	const int offFacing = std::min((direction - unit->getDirection() + 8) % 8, (unit->getDirection() - direction + 8) % 8);
-	return Options::fpsTurnCost && offFacing >= 1 && offFacing <= 2 && target.z == from.z;
+	return offFacing >= 1 && offFacing <= 2;
+}
+
+/**
+ * The step the view looks along: the nearest of the eight, as the keys' push is rounded (see
+ * tileMoveVelocity).
+ */
+int FirstPersonMode::viewStepDirection() const
+{
+	const double viewOctant = std::round(_view->getYawDegrees() / 45.0) * (Pi / 4.0);
+	return Pathfinding::vectorToDirection(Position((int)std::lround(std::cos(viewOctant)), (int)std::lround(std::sin(viewOctant)), 0));
+}
+
+/**
+ * Setting "Sidesteps face the view" (a player, GitHub issue #163: "strafe should always try to
+ * maintain looking towards mouse", "to keep forward facing to use the (usually best) front
+ * armor"; and for steps back, "turn, and strafe left / right: this presents a front / side
+ * profile rather than side / rear, which plays far better into surviving a reaction shot"):
+ * the facing a sidestep is walked with. The game sidesteps up to a quarter turn off the
+ * soldier's facing and no further, so:
+ *  - a step to the side or half to the side of the view: facing the view;
+ *  - a step half back: an eighth off the view, towards the step (the step is then a quarter
+ *    turn off the facing);
+ *  - a step straight back: a quarter turn off the view, side-on, to the side nearer the way
+ *    the soldier stands now (clockwise if neither is).
+ * The soldier is turned to it first (commitStep), at the game's price for the turn.
+ * @param unit The soldier.
+ * @param direction The step's direction (0 north .. 7, clockwise).
+ * @return The facing, or -1 with the setting off, or for the step the view looks along (a walk).
+ */
+int FirstPersonMode::sidestepFacingFor(const BattleUnit *unit, int direction) const
+{
+	const int view = viewStepDirection();
+	if (!Options::fpsSidestepFaceView || !Options::fpsTurnCost || direction < 0 || direction > 7 || direction == view)
+	{
+		return -1;
+	}
+	const int clockwise = (direction - view + 8) % 8; // the step, in eighths clockwise of the view
+	const int off = std::min(clockwise, 8 - clockwise);
+	if (off <= 2)
+	{
+		return view;
+	}
+	if (off == 3)
+	{
+		return (view + (clockwise < 4 ? 1 : 7)) % 8;
+	}
+	const int right = (view + 2) % 8, left = (view + 6) % 8;
+	auto apart = [unit](int facing) { return std::min((facing - unit->getDirection() + 8) % 8, (unit->getDirection() - facing + 8) % 8); };
+	return apart(left) < apart(right) ? left : right;
+}
+
+/**
+ * Setting "Sidesteps face the view": what the turn before a sidestep costs, the armour's price
+ * for each eighth (see sidestepFacingFor); nothing for any other step, or with the setting off.
+ */
+int FirstPersonMode::sidestepTurnCost(const BattleUnit *unit, const Position &from, int direction, const Position &target) const
+{
+	if (!isSidestep(unit, from, direction, target))
+	{
+		return 0;
+	}
+	const int facing = sidestepFacingFor(unit, direction);
+	if (facing < 0)
+	{
+		return 0;
+	}
+	return std::min((facing - unit->getDirection() + 8) % 8, (unit->getDirection() - facing + 8) % 8) * unit->getTurnCost();
+}
+
+/**
+ * Setting "Sidesteps face the view": a step waits for the soldier's turn (see commitStep), and
+ * the movement that asked for it asks again once the soldier stands (the camera is held at the
+ * tile's edge meanwhile, as before any step that can't start yet). Until it is walked the
+ * soldier is left facing as turned (see faceLookDirection); this forgets a wait that came to
+ * nothing: another soldier, another tile, or two seconds gone (the turn stopped at a new enemy,
+ * the key was let go).
+ */
+void FirstPersonMode::resumeFacingStep(BattleUnit *unit)
+{
+	if (_facingStepUnit && (unit != _facingStepUnit || Position(_trackedTile.x, _trackedTile.y, unit->getPosition().z) != _facingStepFrom
+		|| SDL_GetTicks() - _facingStepSince > 2000))
+	{
+		_facingStepUnit = nullptr;
+	}
 }
 
 /**
@@ -436,6 +535,23 @@ bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 	// (see isSidestep). Sprinting, any other step is the game's run (see runsStep); a sidestep
 	// stays one.
 	const bool sidestep = isSidestep(unit, from, direction, target);
+	// Setting "Sidesteps face the view": the soldier turns to the facing the sidestep is walked with first, through the
+	// game's own turning (the armour's price an eighth; it stops at a new enemy). The step isn't started: the game plans
+	// a sidestep by the facing the soldier has, so the movement asks again when the turn is done (see resumeFacingStep).
+	const int sidestepFacing = sidestep ? sidestepFacingFor(unit, direction) : -1;
+	if (sidestepFacing >= 0 && sidestepFacing != unit->getDirection())
+	{
+		Position towards;
+		Pathfinding::directionToVector(sidestepFacing, &towards);
+		BattleAction turn;
+		turn.actor = unit;
+		turn.target = unit->getPosition() + towards;
+		_state->_battleGame->statePushBack(new UnitTurnBState(_state->_battleGame, turn));
+		_facingStepUnit = unit;
+		_facingStepFrom = from;
+		_facingStepSince = SDL_GetTicks();
+		return false;
+	}
 	const bool run = !sidestep && runsStep(unit, from, direction);
 	if (_sprintOn && !sidestep)
 	{
@@ -500,6 +616,11 @@ bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 	// GitHub issue #118). Being shot at still stops the walk (see stopWalkUnderFire).
 	walk.ignoreSpottedEnemies = _enPassantOn || _sprintOn;
 	_sidestepFacing = walk.strafe ? unit->getDirection() : -1;
+	_facingStepUnit = nullptr; // (a step that waited for the soldier's turn is walked)
+	// (A step back or half back left the soldier off the view: the head may look that far while the view looks the same way, see faceLookDirection.)
+	_sideOnUnit = sidestepFacing >= 0 && sidestepFacing != viewStepDirection() ? unit : nullptr;
+	_sideOnFacing = sidestepFacing;
+	_sideOnView = viewStepDirection();
 	_state->_battleGame->statePushBack(new UnitWalkBState(_state->_battleGame, walk));
 
 	// The camera's tile is the destination from now on. The step is pending until the game has
@@ -853,8 +974,9 @@ bool FirstPersonMode::tileMoveVelocity(BattleUnit *unit, double forward, double 
 	int numpadForward = 0, numpadStrafe = 0;
 	numpadKeys(numpadForward, numpadStrafe);
 	// Busy with something besides the soldier's own step (a step of ours keeps the game busy
-	// until it's walked): keys held now wait to be let go.
-	const bool busyElsewhere = !canAct() && !_stepPending;
+	// until it's walked, and so does the turn before a sidestep, setting "Sidesteps face the
+	// view"): keys held now wait to be let go.
+	const bool busyElsewhere = !canAct() && !_stepPending && _facingStepUnit != unit;
 	if (busyElsewhere && (pushing || numpadForward || numpadStrafe))
 	{
 		_keysHeldThroughAction = true;
@@ -998,7 +1120,7 @@ bool FirstPersonMode::tileMoveVelocity(BattleUnit *unit, double forward, double 
 
 /**
  * Jumps (the jump key): a free hop of the camera, JumpHeight voxels up and down again over
- * JumpTime ms, which costs nothing and changes nothing in the game. When the movement keys push
+ * JumpTime ms, which costs HopTimeUnits (1) and changes nothing else in the game. When the movement keys push
  * into a step that something low blocks (a fence, a table, a crate), the jump becomes a vault
  * over it instead (setting "Jump over low obstacles", see tryVault), whose walk the rules do
  * charge for.
@@ -1018,7 +1140,8 @@ void FirstPersonMode::jump(BattleUnit *unit)
 
 	// Pushing towards a neighbouring tile while the soldier may act: if the rules block that
 	// step, try to vault over whatever blocks it.
-	if ((forward != 0.0 || strafe != 0.0) && !_stepPending && canAct() && _state->playableUnitSelected())
+	// (Forwards or sideways, not backwards: the owner, on GitHub issue #124.)
+	if (forward >= 0.0 && (forward != 0.0 || strafe != 0.0) && !_stepPending && canAct() && _state->playableUnitSelected())
 	{
 		// The push turned from the view's frame onto the map (yaw 0 is east, 90 south), then
 		// snapped to the nearer grid axis: a vault goes straight along x or y, never diagonally.
@@ -1045,7 +1168,17 @@ void FirstPersonMode::jump(BattleUnit *unit)
 		}
 	}
 
-	// Otherwise a plain hop (currentJumpHeight lifts the eye along its arc).
+	// Otherwise a plain hop (currentJumpHeight lifts the eye along its arc): HopTimeUnits of the
+	// soldier's own, in his turn (the owner, on GitHub issue #124: "jump in place only 1 TU"); none
+	// left, no hop. Free while it isn't his move (the view of the aliens' turn), and in "doom mode".
+	if (canAct() && _state->playableUnitSelected() && !doomModeOn())
+	{
+		if (unit->getTimeUnits() < HopTimeUnits || !unit->spendTimeUnits(HopTimeUnits))
+		{
+			return;
+		}
+		_state->updateSoldierInfo(false);
+	}
 	_jumpStart = SDL_GetTicks();
 	_jumpTime = JumpTime;
 	_jumpHeight = JumpHeight;
@@ -1055,7 +1188,7 @@ void FirstPersonMode::jump(BattleUnit *unit)
  * Is this tile part something low enough to jump over? It must be a wall or an object, not a
  * door, standing on the floor (it doesn't raise the ground like stairs or a ramp), not a big
  * wall of the kinds that act as walls on some sides only (big wall kinds 2 to 9), and no higher
- * than VaultMaxHeight voxels (waist high, of a level's 24).
+ * than VaultMaxHeight voxels (15 of a level's 24; the game's shapes are in layers of two, so 14).
  * @param part The tile part to look at (a TilePart: O_WESTWALL, O_NORTHWALL or O_OBJECT).
  * @return True if the part is there and low enough to vault.
  */
@@ -1081,8 +1214,9 @@ bool FirstPersonMode::isLowObstacle(const Tile *tile, int part) const
  * Vaults over a low obstacle straight ahead (setting "Jump over low obstacles"; only units one
  * tile big): over a low wall onto the next tile, or over something low standing on the next
  * tile onto the one beyond it (with any low walls on the way). The step is walked by the rules,
- * with the pathfinding told to let exactly those obstacles through: the jump itself is free, and
- * the walk costs its normal time units (as if the obstacles weren't there). Meanwhile the camera
+ * with the pathfinding told to let exactly those obstacles through; the vault costs VaultTimeUnits
+ * in all (the owner, GitHub issue #124: 30 TU), the walk's normal time units among them (more only
+ * if the walk itself costs more). Meanwhile the camera
  * glides over the obstacle in a high arc (see glideOverObstacle and currentJumpHeight).
  * @param stepX The direction along x (east is positive): -1, 0 or 1.
  * @param stepY The direction along y (south is positive): -1, 0 or 1.
@@ -1160,7 +1294,7 @@ bool FirstPersonMode::tryVault(BattleUnit *unit, int stepX, int stepY)
 	// the walk when it runs out (see updateCamera). The debug "doom mode" skips this.
 	if (canVault && !doomModeOn())
 	{
-		const int timeUnitCost = pathfinding->getTotalTUCost();
+		const int timeUnitCost = std::max(VaultTimeUnits, pathfinding->getTotalTUCost());
 		canVault = unit->getTimeUnits() >= timeUnitCost && reserveAllows(unit, timeUnitCost, 0);
 		if (!canVault)
 		{
@@ -1174,6 +1308,20 @@ bool FirstPersonMode::tryVault(BattleUnit *unit, int stepX, int stepY)
 		pathfinding->abortPath();
 		pathfinding->setVault(nullptr, {});
 		return false;
+	}
+
+	// The jump's own cost: what VaultTimeUnits is more than the walk, which the walking state
+	// charges as it goes (none in the debug "doom mode"). Charged once the soldier is over (see
+	// glideOverObstacle): a walk the game stops before the step (a turn it can't pay for, an enemy
+	// coming into sight) costs no jump.
+	_vaultCharge = doomModeOn() ? 0 : std::max(0, VaultTimeUnits - pathfinding->getTotalTUCost());
+	_vaultUnit = unit;
+	// Free turning (no "Turning costs TU"): the soldier faces the way of the jump for free, as for
+	// a door, so the game's walk needn't turn first (a vault backwards was turned, charged for it
+	// and stopped); the next frame the soldier faces where the view looks again.
+	if (!Options::fpsTurnCost && direction != unit->getDirection())
+	{
+		unit->setDirection(direction);
 	}
 
 	// Hand the walk to the game's walking state, as commitStep does; the camera's tile is the
@@ -1228,6 +1376,14 @@ bool FirstPersonMode::glideOverObstacle(BattleUnit *, double &newEyeX, double &n
 	if (progress >= 1.0 && !_stepPending)
 	{
 		_vaulting = false;
+		// Over: the jump's own cost now (see tryVault), if the game walked the soldier there.
+		if (_vaultCharge > 0 && _vaultUnit && _vaultUnit == _trackedUnit
+			&& _vaultUnit->getPosition().x == (int)std::floor(_vaultTo[0] / 16.0) && _vaultUnit->getPosition().y == (int)std::floor(_vaultTo[1] / 16.0))
+		{
+			_vaultUnit->spendTimeUnits(std::min(_vaultCharge, _vaultUnit->getTimeUnits()));
+		}
+		_vaultCharge = 0;
+		_vaultUnit = nullptr;
 	}
 	return true;
 }
@@ -1283,6 +1439,8 @@ void FirstPersonMode::endVault()
 	_save->getPathfinding()->setVault(nullptr, {});
 	_vaulting = false;
 	_jumpStart = 0;
+	_vaultCharge = 0; // (cut short: no jump to pay for)
+	_vaultUnit = nullptr;
 }
 
 /**
@@ -1827,6 +1985,7 @@ int FirstPersonMode::liftArrowAt(double x, double y) const
  * leg from below: the armor counts for half and isn't worn down, half the power also stuns, and
  * from two levels up the leg may be wounded. Then the game checks for casualties, as after any
  * hit (the fall can kill or knock out).
+ * With the setting "Fall damage" off, only the jolt and the footfall.
  * @param levels How many levels the soldier fell.
  */
 void FirstPersonMode::fallDamage(BattleUnit *unit, int levels)
@@ -1834,7 +1993,7 @@ void FirstPersonMode::fallDamage(BattleUnit *unit, int levels)
 	// The landing: a jolt (harder from higher up) and a footfall.
 	_view->addShake(1.5f + levels);
 	playFootsteps(unit, 8.0);
-	if (unit->isOut())
+	if (unit->isOut() || !Options::fpsFallDamage)
 	{
 		return;
 	}

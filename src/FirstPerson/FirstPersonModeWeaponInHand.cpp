@@ -886,7 +886,8 @@ void FirstPersonMode::drawWeaponPlate(bool left, double bob[2], double kick, dou
  * (its inventory picture given volume): in the bottom corner with its lower half below the
  * edge of the screen (so no hand needs drawing), turned so its depth shows (HeldItemYaw,
  * HeldItemPitch, HeldItemRoll), and shaded face by face like the weapon. A picture that gave no
- * voxels is drawn flat instead, three times as big.
+ * voxels is drawn flat instead, three times as big. A body is drawn bigger and higher (HeldBodyScale,
+ * HeldBodyLift).
  * @param left Held in the left hand: drawn bottom left, clear of the info panel.
  * @param bob The step bob, in canvas pixels (sideways, down).
  * @param dip How far it's dipped down for a change of item, in canvas pixels.
@@ -903,12 +904,16 @@ void FirstPersonMode::drawHeldItem(bool left, double bob[2], double dip, int sha
 		const int width = _weaponInHand->getWidth(), height = _weaponInHand->getHeight();
 		const double boxWidth = shape.boxMax[0] - shape.boxMin[0] + 1.0, boxHeight = shape.boxMax[1] - shape.boxMin[1] + 1.0;
 		const double canvasScale = height / 200.0;
-		const double scale = HeldItemScale * canvasScale * std::max(1.0, HeldItemMinPixels / std::max(boxWidth, boxHeight));
+		// A body (a corpse, someone unconscious) is carried, not held: bigger, as a grown body is
+		// next to a grenade, and lifted, as over the shoulder (a player, GitHub issue #143: "looks
+		// like a hobbit").
+		const bool body = _heldRules && _heldRules->getBattleType() == BT_CORPSE;
+		const double scale = HeldItemScale * canvasScale * std::max(1.0, HeldItemMinPixels / std::max(boxWidth, boxHeight)) * (body ? HeldBodyScale : 1.0);
 
 		// Where the middle of its box goes on the canvas: in the corner (the left hand's clear of
 		// the info panel), on the bottom edge, so the lower half is out of sight.
 		const double middleX = (left ? PanelW + 10 + boxWidth * scale / 2.0 : width - boxWidth * scale / 2.0 - 12.0 * canvasScale) + bob[0] * canvasScale;
-		const double middleY = height + (bob[1] + dip) * canvasScale;
+		const double middleY = height - (body ? boxHeight * scale * HeldBodyLift : 0.0) + (bob[1] + dip) * canvasScale;
 
 		// That point in camera space, one unit ahead of the eye (through the weapon's lens), and
 		// the camera-space length of one picture pixel there.
@@ -965,7 +970,7 @@ void FirstPersonMode::drawHeldItem(bool left, double bob[2], double dip, int sha
 	}
 
 	// The flat picture: where its top left corner goes on the canvas.
-	const int scale = 3, width = _weaponInHand->getWidth(), height = _weaponInHand->getHeight();
+	const int scale = _heldRules && _heldRules->getBattleType() == BT_CORPSE ? 5 : 3, width = _weaponInHand->getWidth(), height = _weaponInHand->getHeight(); // (a body bigger, as above)
 	const int spriteWidth = _heldSprite->getWidth(), spriteHeight = _heldSprite->getHeight();
 	const int itemX = (left ? PanelW + 10 : width - spriteWidth * scale - 12) + (int)bob[0]; // the left hand's clear of the info panel
 	const int itemY = height - spriteHeight * scale * 6 / 10 + (int)(bob[1] + dip);
@@ -1077,7 +1082,26 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 
 	// The game's shade where the eye is (at most 9 shades darker, so it stays visible in the
 	// dark), the hand, and with dual wield the other hand's gun (drawn on the other side).
-	const int shade = std::min(9, _view->getEyeShade());
+	// Steadied: the light where the eye is, followed over a quarter of a second, and the weapon's shade moved only
+	// when that is well into another shade. (The owner: "when walking in gpu renderer my weapon in first person
+	// flashes". The shade was the eye's light cut to a whole number each frame: walking, the eye bobs and moves
+	// between tiles, the light hovered at a shade's edge, and the whole weapon went a shade lighter and darker
+	// some four times a second, on either renderer.)
+	const Uint32 lightTick = SDL_GetTicks();
+	const float eyeLight = _view->getEyeLight();
+	if (unit != _weaponLightUnit || _weaponLight < 0.0f || lightTick - _weaponLightTick > 1000)
+	{
+		_weaponLightUnit = unit;
+		_weaponLight = eyeLight;
+		_weaponShade = (int)eyeLight;
+	}
+	else
+	{
+		_weaponLight += (eyeLight - _weaponLight) * (1.0f - std::exp(-(float)(lightTick - _weaponLightTick) / 250.0f));
+		if (std::abs(_weaponLight - (_weaponShade + 0.5f)) > 1.0f) _weaponShade = (int)_weaponLight;
+	}
+	_weaponLightTick = lightTick;
+	const int shade = std::clamp(_weaponShade, 0, 9);
 	const bool inLeftHand = handOf(unit, weapon) == 1;
 	BattleItem *otherWeapon = offHandWeapon(unit, weapon);
 

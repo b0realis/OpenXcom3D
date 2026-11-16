@@ -266,6 +266,8 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 	// keeps its colours under futuristic night vision; anything else solid (smoke more than
 	// half opaque) drawn over it takes that back (see _ownColours).
 	const Uint8 ownColours = draw.unit || draw.body || draw.pile ? 1 : 0;
+	const bool ownOverNight = ownColours && _nightVision && Options::fpsNightVisionUnits;
+	const Uint8 nightGroup = _nightVision ? (Uint8)((_nightVision - 1) * 16) : 0;
 	auto plot = [&](int pixelX, int pixelY, Uint8 color, float depth, int pixelOpacity) {
 		const int index = pixelY * width + pixelX;
 		float &depthHere = _depthBuffer[index];
@@ -280,24 +282,40 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 				_pointerPiles[pilePatchY][pilePatchX] = draw.pile;
 			}
 		}
-		if (pixelOpacity < SeeThroughLevels)
+		// Smoke builds up on a pixel to its cap and no further (settings "Smoke opacity" and
+		// "Night smoke opacity", a maximum); smoke with a cap is laid over what's there even where
+		// it is opaque (the settings at 100), so a unit the soldier sees stays clear under it.
+		const int smokeCap = seeThroughSprite ? seeThroughSprite->capLevels : 0;
+		if (pixelOpacity < SeeThroughLevels || smokeCap > 0)
 		{
 			Uint8 &veilLeft = _unitVeil[index];
 			pixelOpacity = std::min(pixelOpacity, (int)veilLeft);
-			// Smoke builds up on a pixel to its cap and no further (settings "Smoke opacity" and
-			// "Night smoke opacity", a maximum).
-			const int smokeCap = seeThroughSprite ? seeThroughSprite->capLevels : 0;
 			if (smokeCap > 0) pixelOpacity = std::min(pixelOpacity, smokeCap - (int)_smokeVeil[index]);
 			if (pixelOpacity <= 0) return;
 			if (veilLeft != 255) veilLeft -= pixelOpacity;
-			if (smokeCap > 0) _smokeVeil[index] += (Uint8)pixelOpacity;
+			// How much of what's there this layer takes: of what the smoke before it left showing, so
+			// that layers add up to exactly what they veil together (at the cap, the setting's share;
+			// with the setting at 100, nothing shows through).
+			int mixLevel = pixelOpacity;
+			if (smokeCap > 0)
+			{
+				const int showing = SeeThroughLevels - (int)_smokeVeil[index];
+				mixLevel = (pixelOpacity * SeeThroughLevels + showing / 2) / showing;
+				_smokeVeil[index] += (Uint8)pixelOpacity;
+			}
 			Uint8 *pixel = getRaw(pixelX, pixelY);
-			*pixel = seeThrough(pixelOpacity, shadeColor(color, shade), *pixel);
+			// A faint picture that keeps its colours under futuristic night vision (a body or a pile
+			// pointed past, setting "See-through corpses"; a player, GitHub issue #136: it went green
+			// with the world): mixed over the world in the night vision's colours, and left alone by
+			// the wash after (see washBands).
+			if (ownOverNight && !_ownColours[index] && *pixel) *pixel = nightGroup | (*pixel & 15);
+			*pixel = seeThrough(mixLevel, shadeColor(color, shade), *pixel);
 			if (pixelOpacity > SeeThroughLevels / 2)
 			{
 				_glowMask[index] = 0;
 				_ownColours[index] = ownColours;
 			}
+			else if (ownOverNight) _ownColours[index] = 1;
 			return;
 		}
 		if (opacity < 1.0f && dither(pixelX, pixelY) >= opacity) return;
@@ -451,10 +469,14 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 		// to endColumn. A block of the view where everything drawn is nearer than the row (see
 		// cullSmokeDraws) is passed over whole: every pixel of it would fail the depth test.
 		const float *rowBlocks = seeThroughSprite && seeThroughSprite->depthBlocks ? seeThroughSprite->depthBlocks + (pixelY / SmokeCullBlock) * seeThroughSprite->depthBlockColumns : nullptr;
+		// (Smoke where the pixel has its fill of it already adds nothing: passed over before anything is worked out.)
+		const int smokeFill = seeThroughSprite ? seeThroughSprite->capLevels : 0;
+		const Uint8 *smokeRow = &_smokeVeil[(size_t)pixelY * width];
 		auto drawColumns = [&](int from, int to, int firstColumn, int endColumn)
 		{
 			for (int pixelX = from; pixelX < to; ++pixelX)
 			{
+				if (smokeFill > 0 && smokeRow[pixelX] >= smokeFill) continue;
 				if (rowBlocks && rowBlocks[pixelX / SmokeCullBlock] <= rowDepth)
 				{
 					pixelX = pixelX / SmokeCullBlock * SmokeCullBlock + SmokeCullBlock - 1;
@@ -530,7 +552,7 @@ void FirstPersonView::replayDrawList()
 				drawGroundShade(step.centre, step.radius, step.steps, step.density, 0, 1 << 30, step.away, step.length);
 				break;
 			case DrawStep::Line:
-				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, 0, 1 << 30, step.glows);
+				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, 0, 1 << 30, step.glows, false, true);
 				break;
 			case DrawStep::VoxelUnit:
 				break; // (never while recording: with voxel units on, the passes stay on the CPU, see gpuEffectsWanted)
@@ -575,7 +597,7 @@ void FirstPersonView::drawListBands()
 				drawGroundShade(step.centre, step.radius, step.steps, step.density, bandTop, bandBottom, step.away, step.length);
 				break;
 			case DrawStep::Line:
-				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, bandTop, bandBottom, step.glows);
+				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, bandTop, bandBottom, step.glows, false, true);
 				break;
 			case DrawStep::VoxelUnit:
 				drawVoxelUnit(step, bandTop, bandBottom);
@@ -1782,6 +1804,7 @@ void FirstPersonView::outlineBands()
 				if (!outline || (_outlineOpacity < 1.0f && dither(pixelX, pixelY) >= _outlineOpacity)) continue;
 				*getRaw(pixelX, pixelY) = _outlineColors[outline - 1];
 				_glowMask[index] = glows;
+				_ownColours[index] = 2; // (a mark keeps its colour under night vision: see washBands; a player, GitHub issue #152)
 			}
 		}
 	}
@@ -2697,7 +2720,7 @@ void FirstPersonView::drawFire()
 		const double ground[3] = { tilePosition.x * 16.0 + 8.0, tilePosition.y * 16.0 + 8.0,
 			tilePosition.z * 24.0 - tile->getTerrainLevel() };
 		drawSpriteBlend(smokeSprites->getFrame(firstFrame + phase), smokeSprites->getFrame(firstFrame + (phase + 1) % 4), blend, 16, 32,
-			ground, 2.0, shade, true);
+			ground, 2.0, shade, Options::fpsSmoothFire);
 	}
 	// The map's own flames (see partKind: a campfire, a torch's fire; objects that light their surroundings and have no
 	// voxels): the part's art standing on its tile, unshaded, the frame the view's calm clock shows flowing into the next.
@@ -2719,7 +2742,7 @@ void FirstPersonView::drawFire()
 		SurfaceSet *art = object->getDataset()->getSurfaceset();
 		// (The sprite's pixel that stands on the middle of the tile's floor, as buildModel lands the voxels on the art.)
 		drawSpriteBlend(art->getFrame(object->getSprite(_calmFrame)), art->getFrame(object->getSprite((_calmFrame + 1) % 8)), _animationBlend, 16, 32 + object->getYOffset(),
-			ground, 2.0, 0, true);
+			ground, 2.0, 0, Options::fpsSmoothFire);
 	}
 }
 
@@ -3068,13 +3091,26 @@ const FirstPersonView::SoftSmoke &FirstPersonView::softSmokeBlend(const Surface 
  * room by day; see SmokeNightFromShade). Only the smoke the soldier sees through: where their
  * sight runs out it stays solid.
  * @param shade The game's shade where the smoke hangs, 0 brightest .. 15 darkest.
- * @return The opacity, 0.05 .. 0.95.
+ * @return The opacity, 0 (none drawn) .. 1 (nothing seen through it).
  */
 float FirstPersonView::smokeOpacityAt(int shade) const
 {
 	const float darkness = std::max(_colors.night, std::clamp((shade - SmokeNightFromShade) / (SmokeNightToShade - SmokeNightFromShade), 0.0f, 1.0f));
-	const float day = std::clamp(Options::fpsSmokeOpacity, 5, 95) / 100.0f, night = std::clamp(Options::fpsNightSmokeOpacity, 5, 95) / 100.0f;
+	const float day = std::clamp(Options::fpsSmokeOpacity, 0, 100) / 100.0f, night = std::clamp(Options::fpsNightSmokeOpacity, 0, 100) / 100.0f;
 	return day + (night - day) * darkness;
+}
+
+/**
+ * The most see-through smoke may veil a pixel where it hangs, for these eyes (see smokeOpacityAt,
+ * setSmokeSight), in whole see-through steps as it is drawn: none with the setting at 0 (the
+ * smoke isn't drawn), else at least one step, SeeThroughLevels with the setting at 100 (opaque).
+ * @param shade The game's shade where the smoke hangs, 0 brightest .. 15 darkest.
+ * @return The cap, 0 .. 1 in steps of 1 / SeeThroughLevels.
+ */
+float FirstPersonView::smokeCapAt(int shade) const
+{
+	const float most = _smokeSeen * smokeOpacityAt(shade);
+	return most <= 0.0f ? 0.0f : std::max(1, (int)std::lround(most * SeeThroughLevels)) / (float)SeeThroughLevels;
 }
 
 void FirstPersonView::setSmokeSight(float sightVoxels, int throughSmoke, int throughFire)
@@ -3167,15 +3203,24 @@ void FirstPersonView::drawSeeThroughSmoke()
 			ground[0] + (variation[0] - 0.5) * 4.0 + sway * 0.8 * std::sin(seconds * 0.5 + variation[1] * 2.0 * Pi),
 			ground[1] + (variation[1] - 0.5) * 4.0 + sway * 0.8 * std::cos(seconds * 0.4 + variation[2] * 2.0 * Pi),
 			ground[2] + sway * 1.0 * std::sin(seconds * 0.7 + variation[3] * 2.0 * Pi) };
-		// Modern: a little more opaque the thicker the smoke (a fresh smoke grenade makes about
-		// 15), the thickest as opaque as the settings "Smoke opacity" and "Night smoke opacity"
-		// allow by the light here, their maximum, which smoke over smoke builds up to and no
-		// further (a player's report, GitHub issue #98: stacked smoke hid more than the game's
-		// sight rules do; see smokeOpacityAt, _smokeVeil). Original: the game's dots as they are,
-		// solid, one frame a tile, as the map draws them (the owner: "exactly as the map"; their
-		// holes are the see-through). Both thinner for eyes with heat vision (see setSmokeSight).
-		const float cap = original ? 0.0f : _smokeSeen * smokeOpacityAt(_tileViews[tileIndex].light);
-		const float opacity = original ? _smokeSeen : cap * std::clamp(0.45f + tile->getSmoke() * 0.025f, 0.0f, 0.85f) / 0.85f;
+		// The most smoke may veil a pixel here: the settings "Smoke opacity" and "Night smoke
+		// opacity" by the light, a maximum smoke over smoke never passes (a player's report, GitHub
+		// issue #98: stacked smoke hid more than the game's sight rules do; see smokeOpacityAt,
+		// _smokeVeil), thinner for eyes with heat vision (see setSmokeSight).
+		// Both follow the settings since GitHub issue #145 (the owner: "almost translucent at 5%",
+		// "completely opaque at 100%", 0 none): Original's dots as see-through as the setting says,
+		// at 100 solid as on the map (drawn as before, no cap needed). Modern: every cloud as opaque
+		// in its body as the setting says, on its own (the owner: "use stacking as minimally as
+		// possible"): the nearest cloud fills a pixel, and the clouds behind it are passed over
+		// there (see drawSprite), adding only where its soft edge left room. How thick the smoke is
+		// shows in its frame, as on the map (see firstSmokeFrame).
+		const float most = smokeCapAt(_tileViews[tileIndex].light);
+		if (most <= 0.0f)
+		{
+			continue;
+		}
+		const float cap = original && most >= 1.0f ? 0.0f : most;
+		const float opacity = most;
 		const int firstFrame = firstSmokeFrame(tile->getSmoke());
 		const double frameTime = seconds / FrameSeconds + tile->getAnimationOffset() + variation[2], scale = 1.14 + variation[3] * 0.12;
 		addPuff(world, 32, firstFrame, frameTime, opacity, cap, scale, _tileViews[tileIndex].light);
@@ -3192,7 +3237,11 @@ void FirstPersonView::drawSeeThroughSmoke()
 		const float fade = std::min(std::clamp(age / 0.25f, 0.0f, 1.0f), std::clamp((1.0f - age) / 0.5f, 0.0f, 1.0f));
 		const double world[3] = { particle.pos[0], particle.pos[1], particle.pos[2] };
 		const int shade = (int)std::lround(std::clamp(lightAt(particle.pos[0], particle.pos[1], particle.pos[2]), 0.0f, 15.0f));
-		const float cap = _smokeSeen * smokeOpacityAt(shade);
+		const float cap = smokeCapAt(shade);
+		if (cap <= 0.0f)
+		{
+			continue;
+		}
 		addPuff(world, 20, firstSmokeFrame(1), seconds / (FrameSeconds * 1.5) + particle.size, cap * (0.45f / 0.85f) * fade * fade * (3.0f - 2.0f * fade),
 			cap, 0.35 + 0.4 * age, shade);
 	}
@@ -3812,11 +3861,14 @@ void FirstPersonView::drawDownedIcons()
 /**
  * The numbers rising over the units hit (setting "Damage numbers", see
  * FirstPersonDamageNumbers.cpp): each from the point just over the unit's head where it was hit,
- * in the world: tested against the depth of what's drawn, so a wall or a unit in front hides it as
- * it would anything there, but at a fixed size on the screen (the game's small font, as the HUD's
- * text), so it reads far off too; within the view's reach. They rise from just over where the
- * enemy marker's arrow and number go (drawn over everything after them), so neither hides the
- * other. Numbers that would overlap step up over the newer ones (see placeDamageNumbers).
+ * in the world, drawn over everything, as the enemy markers are (a player, GitHub issue #151: a
+ * big unit hit through a window, a third of it showing, had its number hidden behind the wall,
+ * where the point over the middle of its head is; they were tested against the depth of what's
+ * drawn), at a fixed size on the screen (the game's small font, as the HUD's text), so it reads
+ * far off too; within the view's reach. Only units the squad sees get one (see
+ * FirstPersonMode::unitDamaged). They rise from just over where the
+ * enemy marker's arrow and number go, and are drawn after the markers, the downed icons and the
+ * facing rings (GitHub issue #160: a number is on top of all of them). Numbers that would overlap step up over the newer ones (see placeDamageNumbers).
  */
 void FirstPersonView::drawDamageNumbers()
 {
@@ -3853,8 +3905,7 @@ void FirstPersonView::drawDamageNumbers()
 	{
 		if (spots[index].shown)
 		{
-			gpuNeedDepth();
-			FirstPerson::drawDamageNumber(this, font, numbers[index], spots[index].x, bottoms[index], uiScale, now, colors, _depthBuffer.data(), depths[index]);
+			FirstPerson::drawDamageNumber(this, font, numbers[index], spots[index].x, bottoms[index], uiScale, now, colors);
 		}
 	}
 }

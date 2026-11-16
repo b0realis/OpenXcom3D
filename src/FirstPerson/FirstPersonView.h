@@ -193,13 +193,14 @@ public:
 		bool empty;
 		bool ghostly;            // a ghost of a part with no voxels (setting "Parts without shape"): seen through on some pixels, never in the way (see buildGhost, buildShape)
 		bool solidGhost;         // a ghost the view draws solid, as the map draws it (low art, as crops: see buildRelief); still never in the way
+		bool wayThrough;         // a wall one goes through: a door, or a wall the game lets one walk through (a curtain); a hidden face never borrows its look (see mirroredColor)
 		bool water;              // a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea): its top is drawn as waves (see waterColor)
 		Uint8 liquidHeight;       // a floor the art draws as a box of liquid (XPiratez's sewer sludge, see liquidHeightOf): its surface's height in voxels; 0 for none
 		bool artFill;             // a floor or wall whose voxels leave out most of its art (a catwalk's grating, a fence: see sparseArt)
 		bool openingGlass;        // glass filled into an opening of the game's shape (lookOnly bits, see fillPaneOpenings): a round going through breaks it (see breakGlassAt)
 		bool foliage;             // a mass of foliage (see foliageArt): drawn leafy on a tile without a floor (leafyModel)
 		Uint8 cropBlock;          // an object the art draws as a block of crops (X-Com Files' wheat, see cropBlockOf): the block's height in voxels; 0 for none
-		Uint8 ghostKind;          // how a part without voxels was built (see buildModel): 0 not at all, 1 the mod's ghost shape, 2 a block of crops, 3 low art standing up, 4 a plain ghost, 5 not as a model: a flame, its art drawn as a sprite (see partKind)
+		Uint8 ghostKind;          // how a part without voxels was built (see buildModel): 0 not at all, 1 the mod's ghost shape, 2 a block of crops, 3 low art standing up, 4 a plain ghost, 6 a floor lying flat drawn solid (a pool's water), 7 a body made from the art (a console no one walks through), 5 not as a model: a flame, its art drawn as a sprite (see partKind)
 		bool reliefRises;         // ... low art that rises (see lowArt)
 		const VoxelModel *ghost;  // a ghost model of the part's own, in the same tile where the part has no voxels: the liquid's surface (buildLiquid), the rest of the art (buildArtFill) or a block of crops (buildCropBlock); null for none
 		float glow[3]; // centre of the brightest voxels in the top third (a lamp's bulb), in the tile
@@ -542,12 +543,15 @@ public:
 	void setSmokeSight(float sightVoxels, int throughSmoke, int throughFire);
 	/// The most opaque see-through smoke may get where it hangs (a maximum), by the settings "Smoke opacity" and "Night smoke opacity" and the game's shade there.
 	float smokeOpacityAt(int shade) const;
+	/// The most see-through smoke may veil a pixel where it hangs, for these eyes, in whole see-through steps (0: none drawn).
+	float smokeCapAt(int shade) const;
 	/// Where the weapon in hand's muzzle is on the view (pixels): our own shots flash and start their trails there.
 	void setMuzzlePoint(double x, double y, bool valid) { _muzzleScreen[0] = x; _muzzleScreen[1] = y; _muzzleValid = valid; }
 	/// The path a throw or shot aimed now would take, in voxels from the soldier to its end (see
 	/// drawTrajectory); empty for none. Set again only when it changes.
 	/// How a trajectory is drawn: a throw's or an arcing shot's curve, one forced (as with Ctrl held), a straight shot's line.
-	enum TrajectoryLook { TRAJECTORY_ARC, TRAJECTORY_FORCED, TRAJECTORY_STRAIGHT, TRAJECTORY_FORCED_LINE, TRAJECTORY_REFUSED_LINE };
+	enum TrajectoryLook { TRAJECTORY_ARC, TRAJECTORY_FORCED, TRAJECTORY_STRAIGHT, TRAJECTORY_FORCED_LINE, TRAJECTORY_REFUSED_LINE,
+		TRAJECTORY_AWAY_LINE }; // (AWAY_LINE: a straight shot that will fly, but not to the point under the crosshair: dimmed, and marked at the crosshair)
 	void setTrajectory(const std::vector<Position> &path, TrajectoryLook look = TRAJECTORY_ARC) { _trajectory = path; _trajectoryLook = look; }
 	/// Dual wield: the other gun's path, drawn from its muzzle (see drawTrajectory); empty for none.
 	void setOtherTrajectory(const std::vector<Position> &path, TrajectoryLook look = TRAJECTORY_ARC) { _otherTrajectory = path; _otherTrajectoryLook = look; }
@@ -616,6 +620,8 @@ public:
 	void ambientScene(AmbientScene &scene) const;
 	/// The game's shade (0 bright .. 15 dark) where the camera is.
 	int getEyeShade() const;
+	/// The same, not rounded to a whole shade.
+	float getEyeLight() const;
 	/// How far the view is kicked up by recoil right now, in degrees.
 	float getRecoilKick() const { return _recoilKick; }
 	/// When an enemy in sight was last hit, and whether that hit killed it (for the hitmarker).
@@ -697,7 +703,7 @@ private:
 	std::vector<Uint8> _glowMask;                       // pixels showing something that shines (lit voxels, sparks)
 	std::vector<Uint8> _unitVeil;                       // per pixel, how much more see-through smoke may veil the unit seen there (in SeeThroughLevels; 255: no unit)
 	std::vector<Uint8> _smokeVeil;                      // per pixel, how much see-through smoke veils what's seen there this frame (in SeeThroughLevels; up to its cap)
-	std::vector<Uint8> _ownColours;                     // per pixel, 1: a unit's, a body's or an item's picture shows there (futuristic night vision leaves its colours, see washBands)
+	std::vector<Uint8> _ownColours;                     // per pixel, 1: a unit's, a body's or an item's picture shows there (futuristic night vision leaves its colours, see washBands); 2: a mark's (a hitbox's outline: every night vision leaves its colours)
 
 	/// Works out the camera's axes from its yaw and pitch.
 	void updateBasis();
@@ -816,8 +822,10 @@ private:
 		const MapData *openDoor;      // the door's record on hiddenPart: while it's there, the swing goes on
 	};
 	std::unordered_map<Uint64, VoxelModel> _models;     // by MapData, sprite and cut-out
+	std::unordered_map<Uint64, const VoxelModel*> _sameArtModels; // a later frame whose art is its first frame's, pixel for pixel: the first frame's model (see getModel)
 	std::unordered_map<Uint64, VoxelModel> _ghostModels; // the parts' own ghosts (VoxelModel::ghost), by the part's key in _models
 	std::unordered_map<Uint64, VoxelModel> _leafyModels; // the leafy models of foliage (see leafyModel), by the part's key in _models
+	std::unordered_map<const VoxelModel*, VoxelModel> _openDoorModels; // what is left of a sliding door once open, as a ghost (see openDoorModel), by the model it is made of
 	std::unordered_map<const VoxelModel*, VoxelModel> _openedModels; // models with the glass in their openings broken out (see openedModel), by the whole one
 	std::unordered_map<const MapData*, Frames> _frames; // by MapData: its animation frames
 	FirstPersonView *_sharedModelsOwner = nullptr;      // another view whose voxel models this one uses, or null
@@ -919,6 +927,8 @@ private:
 	const VoxelModel *leafyModel(const MapData *mapData, int spriteIndex);
 	/// Gets (building on first use) a model with the glass filled into its openings broken out.
 	const VoxelModel *openedModel(const VoxelModel *model);
+	/// What is left of a sliding door once it is open, as a ghost.
+	const VoxelModel *openDoorModel(const VoxelModel *model);
 	/// Is the glass in the openings of a tile part's window broken (see breakGlassAt)?
 	bool glassBroken(int tileIndex, int part) const;
 	/// Builds a voxel model: shapes from the LOFT templates, colours from the isometric sprite.
@@ -976,7 +986,7 @@ private:
 	/// Setting "Wall paint": the colour a wall's face the iso art never shows takes from the side it faces (0: its own).
 	Uint8 wallPaintColor(const Hit &hit, const TileView &tileView, Uint8 ownColor) const;
 	/// The colour of whatever is solid at a world voxel this frame (0 if nothing), of any tile part or only one.
-	Uint8 voxelColorAt(int worldX, int worldY, int worldZ, bool nextFrame = false, int onlyPart = -1) const;
+	Uint8 voxelColorAt(int worldX, int worldY, int worldZ, bool nextFrame = false, int onlyPart = -1, bool noWaysThrough = false) const;
 	/// For a craft's west or north side: the colour of the side across from it.
 	Uint8 mirroredColor(const Hit &hit, int axis, bool skinOnly = false, bool nextFrame = false) const;
 
@@ -1198,6 +1208,16 @@ private:
 	bool _gpuRecordOnly = true;                        // ... and draw nothing themselves (false: both, for the check of the card's picture against the CPU's)
 	bool _gpuChecking = false;                         // this frame the card's units and effects are checked against the CPU's (OPENXCOM3D_GPU_EFFECTS=check)
 	int _gpuRaysPixelSize = 1;                         // the pixels a ray of the pictures kept on the card coloured each way
+	// Setting "Render scale" on Auto (see noteDrawTime): the step of RenderScaleSteps the card's rays are cast at now,
+	// the view's drawing time lately (ms, smoothed), and the frames to wait before the step may change, or go finer.
+	int _renderScaleStep = 0;
+	double _renderScaleTime = 0.0;
+	int _renderScaleWait = 90, _renderScaleHold = 0; // (the first frames on the card are slow ones: programs still being built)
+	bool _gpuCastRays = false;                         // this frame's rays were the card's
+	/// The share of the view's pixels, each way, the card casts rays for (setting "Render scale"), in percent.
+	int renderScalePercent() const;
+	/// Takes a frame's drawing time for the render scale on Auto.
+	void noteDrawTime(double milliseconds);
 	/// Whether this frame's units and effects go to the card (with its rays).
 	int gpuEffectsWanted() const;
 	/// Starts recording the frame's units and effects.
@@ -1211,7 +1231,7 @@ private:
 		double drawnRadius, int reach, int coreShades, int edgeShades);
 	/// Records a line in the world, its ends on the screen (see drawLine3D).
 	void gpuRecordLine(double startX, double startY, double startZ, double endX, double endY, double endZ, int steps, Uint8 color, int thickness, float opacity,
-		float worldWidth, bool glows, bool overEverything, bool keepsGlow = false, bool exactDepth = false);
+		float worldWidth, bool glows, bool overEverything, bool keepsGlow = false, bool exactDepth = false, bool mark = false);
 	/// Records a square of pixels in front of the scene.
 	void gpuRecordDot(int left, int top, int dotWidth, int dotHeight, double depth, Uint8 color, int flags, float leeway = 0.0f, Uint8 otherColor = 0, float firstShare = -1.0f, float haze = 0.0f);
 	/// Records a round dot in front of the scene, in rings or only its rim.
@@ -1619,7 +1639,7 @@ private:
 	/// Draws a line in the world, depth-tested (all of it, or only the screen rows from bandTop up to bandBottom),
 	/// a set number of pixels thick, or as thick as worldWidth voxels look where it is (at most thickness); glowing, or plain.
 	void drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, float worldWidth = 0.0f, int bandTop = 0, int bandBottom = 1 << 30, bool glows = true,
-		bool overEverything = false);
+		bool overEverything = false, bool mark = false);
 	/// Leaves a bullet hole or scorch mark.
 	void addDecal(const float pos[3], int size, int darkness);
 	/// Draws the bullet holes, scorch marks and blackened ground.

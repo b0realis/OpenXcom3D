@@ -397,11 +397,11 @@ void FirstPersonView::gpuRecordDecal(double screenX, double screenY, double dept
 
 /**
  * Records a line in the world (drawLine3D, which clips it and takes its ends to the screen first).
- * Texel 0: kind, flags (1 it glows, 2 over everything, 4 it leaves the glow as it is, 8 no voxel to spare in front of the scene), its colour, its thickness.
+ * Texel 0: kind, flags (1 it glows, 2 over everything, 4 it leaves the glow as it is, 8 no voxel to spare in front of the scene, 16 a mark: night vision leaves its colour), its colour, its thickness.
  * Texel 2: its ends on the screen; 3: one over each end's depth, its steps, its opacity; 4: its width in the world (0: its thickness).
  */
 void FirstPersonView::gpuRecordLine(double startX, double startY, double startZ, double endX, double endY, double endZ, int steps, Uint8 color, int thickness, float opacity,
-	float worldWidth, bool glows, bool overEverything, bool keepsGlow, bool exactDepth)
+	float worldWidth, bool glows, bool overEverything, bool keepsGlow, bool exactDepth, bool mark)
 {
 	const int left = std::max(0, (int)std::floor(std::min(startX, endX)) - thickness - 1), top = std::max(0, (int)std::floor(std::min(startY, endY)) - thickness - 1),
 		right = std::min(getWidth(), (int)std::ceil(std::max(startX, endX)) + thickness + 2), bottom = std::min(getHeight(), (int)std::ceil(std::max(startY, endY)) + thickness + 2);
@@ -410,7 +410,7 @@ void FirstPersonView::gpuRecordLine(double startX, double startY, double startZ,
 		return;
 	}
 	float *texels = _gpuEffects->add(FirstPersonGpu::Effects::Line, left, top, right, bottom);
-	texels[1] = (float)((glows ? 1 : 0) | (overEverything ? 2 : 0) | (keepsGlow ? 4 : 0) | (exactDepth ? 8 : 0));
+	texels[1] = (float)((glows ? 1 : 0) | (overEverything ? 2 : 0) | (keepsGlow ? 4 : 0) | (exactDepth ? 8 : 0) | (mark ? 16 : 0));
 	texels[2] = (float)color;
 	texels[3] = (float)thickness;
 	texels[8] = (float)startX; texels[9] = (float)startY; texels[10] = (float)endX; texels[11] = (float)endY;
@@ -734,7 +734,7 @@ bool FirstPersonView::gpuDrawEffects()
 		for (int column = 0; column < width; ++column, notes += 4)
 		{
 			veil[column] = (Uint8)notes[0];
-			own[column] = (Uint8)(notes[1] & 1);
+			own[column] = (notes[0] & 256) ? (Uint8)2 : (Uint8)(notes[1] & 1); // (2: a mark's pixel, see _ownColours)
 			smoke[column] = (Uint8)(notes[1] >> 1);
 		}
 	}
@@ -956,7 +956,7 @@ void FirstPersonView::gpuCheckEffects()
 			differentColors += cpuColors[column] != colors[index];
 			differentDepths += std::abs(_depthBuffer[index] - depths[index]) > 0.01f * std::max(1.0f, std::min(_depthBuffer[index], 1e6f));
 			differentGlow += _glowMask[index] != (glow[index] & 3);
-			differentVeils += _unitVeil[index] != (Uint8)notes[0] || _ownColours[index] != (notes[1] & 1);
+			differentVeils += _unitVeil[index] != (Uint8)notes[0] || _ownColours[index] != ((notes[0] & 256) ? 2u : (notes[1] & 1));
 		}
 	}
 	checked += (long)pixels;

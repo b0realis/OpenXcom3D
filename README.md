@@ -24,7 +24,7 @@
 - **See:** the original maps, sprites, palette and sounds, rebuilt in 3D from the game's own voxel data: light and shadow, a flashlight and flares, night vision gear, smoke as the map draws it, rain and snow under a grey sky, windows that shatter, swinging doors, glowing UFOs, bullet holes and scorch marks, out to 200 tiles; the stars over XPiratez's space stations; under the sea, bubbles, marine snow and caustics.
 - **Lead the squad:** every soldier's live helmet camera on the top bar (hover for their card, right click for the big soldier cam), a camera window over the isometric map, and the aliens' turn watched through the eyes of whoever sees the alien.
 - **Feel it:** recoil and muzzle flashes, marks on the crosshair (white ticks for a hit, red for a kill, a blue shield when a strike does no harm), each hit's damage rising over the unit, shots whizzing past, rain, wind and fires heard round you, blood on the view and a heartbeat when badly hurt, panic and berserk through your soldier's own eyes, and a helmet camera dying in static.
-- **Make it yours:** 117 settings and 41 keys of its own (**Options → 3D VIEW**), and a controller layout made for the Steam Deck.
+- **Make it yours:** 125 settings and 43 keys of its own (**Options → 3D VIEW**), and a controller layout made for the Steam Deck.
 
 | | |
 |---|---|
@@ -49,9 +49,9 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 - **A finer picture on the graphics card** (all off by default): supersampling, soft sun shadows, a shadow from every lamp and flare, ambient occlusion; the 3D world in true colour with smooth light (no dither dots), coloured light from shots, explosions and fires, a sea that mirrors the sky, and light shafts in smoke and under the sea.
 - **Lift beams:** a grav lift's floor sends motes and streaks of light up its shaft.
 - **Throwing:** Classic (by tile) or Modern: throws and arcing shots go for the exact point under the crosshair.
-- **Step costs round the compass**, and **the alien turn seen as your soldier faces**, both settings.
+- **Step costs round the compass**, **the alien turn seen as your soldier faces**, **fall damage** apart from *Falling*, and a **rangefinder** (digital, or an analogue scope scale), each a setting.
 - **Smoother:** fire's flames blend from frame to frame; walking diagonally no longer stutters and costs a diagonal's time units; dark places fade to black through the palette's darker colours.
-- **Fixed:** a bow is held as a bow; a mod's flames and campfires no longer flicker between shapes; a hit on an energy shield shows what the shield lost; walking into a unit you can't see stops as at a wall; buildings a mod lists among its UFOs are no longer lit as UFOs.
+- **Fixed:** a bow is held as a bow; a mod's flames and campfires no longer flicker between shapes; a hit on an energy shield shows what the shield lost; walking into a unit you can't see stops as at a wall; buildings a mod lists among its UFOs are no longer lit as UFOs. Hot-fixed 2026-11-16: *Smoke opacity* from 0% to 100% for both smoke looks, flares bounce off glass, a pool's water fills its tiles, someone unconscious in hand shows their name,, *Smooth fire* and *Close range: from the eye* are settings, jumping over low obstacles costs 30 TU, consoles and racks without a shape are solid, posters show on their walls, a wrecked wall is only rubble, and the shot preview's laser says OFF when the round won't land under the crosshair. *True colour* and the settings that need it now show with the default video output; *Light shafts* no longer glare white in thick smoke over lamps, a mod's buildings on mission sites keep their own walls (they were mirrored as crafts), curtains look the same from both sides, walls with repeated frames no longer pulse, damage numbers are on top of the markers, drag scroll no longer sets the cursor back on every movement, walking the way you look is never a sidestep, and *Render scale* (50 to 100%, or Auto) is a new setting for weak graphics cards. The new setting *Sidesteps face the view*, the Lightning's door opens once, the weapon in hand no longer goes bright and dark as you walk, the free cursor comes back where you left it, and on a Mac the first switch to 3D no longer stalls and the pointer lands where it should on a Retina display.
 
 ## New in 1.12
 
@@ -75,7 +75,7 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 - **Smoke as the map draws it**, as in 0.8: no grey wall where your soldier's sight runs out, nothing stacked; Modern's soft clouds never more opaque than *Smoke opacity*, now a maximum (80% by day, 45% at night by default, up to 95%), Original's dots as on the map. And cheaper.
 - **Enemies by your soldier's own eyes:** an enemy only squadmates see isn't drawn through smoke, only its marker.
 - **A tank's turret switch:** **TURRET** on the top bar turns the turret alone, at the turret's cost; off, the whole tank turns as before.
-- **Live motion scanner**, a setting (off, on with the FPS playstyle): off, the scanner is one look from where it's used, as in the game.
+- **Live motion scanner**, a setting (off, on from the FullQoL preset): off, the scanner is one look from where it's used, as in the game.
 - **Finer sprites up close:** *Sprite upscaling*'s new top choice, **Finest** (the default), draws units, items and effects six times finer, with softer shading and small eyes and highlights kept; *Smooth* and *Smooth + detail* are cleaner too.
 - **Chain explosions as one blast:** with *Instant chain explosions* on, a chain of explosives resolves at once, shown as a fireball at each explosive in quick succession with a single explosion sound; the damage is the game's own, and an explosion that sets nothing off is unchanged.
 - **A melee blow's hit chance** by the crosshair, as a shot's (**MELEE 23% 4TU**).

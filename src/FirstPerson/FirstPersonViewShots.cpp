@@ -975,9 +975,10 @@ void FirstPersonView::spawnTrailSegment(const float from[3], const float to[3])
  * @param glows Whether its pixels shine (feed the bloom).
  * @param overEverything Drawn over whatever is there, not depth-tested (a marker such as the
  *        units' facing rings, see drawFacing).
+ * @param mark A mark, not part of the world (a hitbox's line): night vision leaves its colour (a player, GitHub issue #152).
  */
 void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 color, int thickness, float opacity, float worldWidth, int bandTop, int bandBottom, bool glows,
-	bool overEverything)
+	bool overEverything, bool mark)
 {
 	const int width = getWidth(), height = getHeight();
 	const double focalLength = focalPixels(); // in pixels
@@ -1005,7 +1006,7 @@ void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 c
 	if (steps > 4000) return;
 	if (_gpuRecording)
 	{
-		gpuRecordLine(startX, startY, startZ, endX, endY, endZ, steps, color, thickness, opacity, worldWidth, glows, overEverything);
+		gpuRecordLine(startX, startY, startZ, endX, endY, endZ, steps, color, thickness, opacity, worldWidth, glows, overEverything, false, false, mark);
 		if (_gpuRecordOnly) return;
 	}
 	if (!overEverything) gpuNeedDepth();
@@ -1029,6 +1030,7 @@ void FirstPersonView::drawLine3D(const float from[3], const float to[3], Uint8 c
 				*getRaw(pixelX, pixelY) = color;
 				_glowMask[pixelY * width + pixelX] = glows ? 1 : 0;
 				if (_heldTest) _heldTest[pixelY * width + pixelX] = overEverything ? 0.0f : -depth; // (below 0: with the voxel to spare)
+				if (mark) _ownColours[pixelY * width + pixelX] = 2; // (a mark keeps its colour under night vision: see washBands)
 			}
 		}
 	}
@@ -1692,7 +1694,8 @@ void FirstPersonView::drawTrajectoryPath(const std::vector<Position> &path, Traj
 	};
 	// A forced path (yellow by day) is dotted under night vision; a straight one is a line.
 	const bool forced = look == TRAJECTORY_FORCED || look == TRAJECTORY_FORCED_LINE;
-	const bool straight = look == TRAJECTORY_STRAIGHT || look == TRAJECTORY_FORCED_LINE || refused;
+	const bool away = look == TRAJECTORY_AWAY_LINE;
+	const bool straight = look == TRAJECTORY_STRAIGHT || look == TRAJECTORY_FORCED_LINE || refused || away;
 	const bool dotted = _nightVision && forced;
 
 	// A straight shot: the laser from the weapon's muzzle on the screen (12 voxels out along the
@@ -1724,7 +1727,7 @@ void FirstPersonView::drawTrajectoryPath(const std::vector<Position> &path, Traj
 			voxelCentreOf(path[first], start);
 		}
 		const Uint8 lineColor = forced ? _colors.trajectoryForced : refused ? _colors.laserRefused : _colors.laserSight;
-		drawStretch(start, end, lineColor, 1, refused ? RefusedLineOpacity : 1.0f);
+		drawStretch(start, end, lineColor, 1, refused || away ? RefusedLineOpacity : 1.0f);
 		drawEndDot(end, forced ? _colors.forcedDot : refused ? _colors.laserRefused : _colors.laserDot, lineColor);
 		return;
 	}

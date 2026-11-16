@@ -107,6 +107,13 @@ const int PanelW = 150, PanelH = 54, PanelLineW = PanelW - 6;
 const int PanelManaX = 3, PanelManaY = 41, PanelManaW = 141, PanelManaH = 3;
 /// The crosshair's surface (square; room for the door mark left of the widest fire mode's shape, see DoorMarkX).
 const int CrosshairSize = 47;
+/// The analogue rangefinder's subject (setting "Rangefinder"), the scale's "1.7m": a standing soldier's picture from feet
+/// to the top of the head, in voxels (measured on the view: soldiers put 12 and 20 tiles off stand 25 voxels tall).
+const double RangeSubjectVoxels = 25.0;
+/// One voxel up is this much of a voxel across, as the view draws it (the view's own ZScale, FirstPersonViewShared.h).
+/// How far left of the crosshair's middle the analogue rangefinder's line ends, in canvas pixels.
+const int RangeScaleGap = 28;
+const double RangeVoxelRise = 0.81649658092772603;
 /// How long a hit, a kill or a strike that did no harm marks the crosshair, in milliseconds.
 const Uint32 HitMarkTime = 280;
 /// A strike that did no harm (GitHub issue #82; the owner: "a mini blue shield to the lower left of the crosshair"): a
@@ -263,6 +270,16 @@ const double LookDownSlideFrom = 45.0, LookDownSlideTo = 72.0;
 /// across shown as big as that, and turned so its depth shows (degrees, for the right hand; the
 /// left mirrors it): towards the screen's centre, its top tipped back, leaning in.
 const double HeldItemScale = 2.6, HeldItemMinPixels = 20.0, HeldItemYaw = 22.0, HeldItemPitch = -14.0, HeldItemRoll = -10.0;
+/// A body carried (a corpse, someone unconscious): this many times an item's size, and its middle this
+/// share of its height above the screen's bottom edge (an item's is on the edge): over the shoulder.
+const double HeldBodyScale = 1.4, HeldBodyLift = 0.15;
+/// The shot preview's laser is "away" when, seen from the eye, its end is more than this many voxels off the point
+/// under the crosshair at that point's distance: at least LaserAwayAngle (radians: far off, a voxel is nothing) and
+/// never needing more than LaserAwayMostAngle (right in front of the eye two voxels are a wide angle, and the miss
+/// plain to see).
+/// Setting "Close range: from the eye": how near the eye the point under the crosshair must be, in voxels (two tiles).
+const double CloseEyeRange = 32.0;
+const double LaserAwayVoxels = 2.0, LaserAwayAngle = 0.01, LaserAwayMostAngle = 0.04;
 /// A weapon shorter than the rifle (whose picture is about RiflePixels long) comes out smaller:
 /// by its length to the power SizeCurve (a pistol, half a rifle's picture, at 70%), shrunk about
 /// a point GripAt of the way from the muzzle towards the stock end (so it still points at the
@@ -373,7 +390,12 @@ const Uint32 LandingDipTime = 250;
 const double JumpHeight = 6.0, VaultHeight = 9.0;
 const Uint32 JumpTime = 520;
 /// The highest obstacle a soldier can jump over, in voxels: waist high (a soldier is about 22).
-const int VaultMaxHeight = 14;
+const int VaultMaxHeight = 15;
+/// What a vault costs in time units, the walk over included (the owner, on GitHub issue #124: "30 TU"); more only if the
+/// walk itself costs more.
+const int VaultTimeUnits = 30;
+/// What a plain hop on the spot costs, in time units (the owner, GitHub issue #124).
+const int HopTimeUnits = 1;
 
 // ---- Fighting ----
 

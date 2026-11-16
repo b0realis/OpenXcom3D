@@ -68,6 +68,7 @@ uniform vec2 uHalfPlane;     // the image plane's half-width and half-height
 uniform vec3 uEyePlane;      // an eye's picture (VR): where its view axis meets it (x, y: pixels) and its pixels per unit of the image plane (z); z 0: the view's own, centred
 uniform ivec2 uViewSize;     // the view in pixels
 uniform int uPixelSize;      // pixels a ray colours each way
+uniform int uGoggles;        // 1: night vision is on (the colours are the goggles' own)
 #ifdef LATER_RAYS
 // For a pixel's second and further rays (setting "Supersampling"): the first ray's pictures. Where the first rays
 // show nothing to smooth (see main), the later ones aren't cast.
@@ -1112,7 +1113,7 @@ uint exposedAt(uvec4 info, ivec3 voxel)
 	return info.w == 0u ? 0u : texelFetch(uModelExposed, int(info.w) * 6144 + (voxel.z * 16 + voxel.y) * 16 + voxel.x).r;
 }
 
-uint voxelColorAt(ivec3 world, bool nextFrame, int onlyPart)
+uint voxelColorAt(ivec3 world, bool nextFrame, int onlyPart, bool noWaysThrough)
 {
 	if (world.x < 0 || world.y < 0 || world.z < 0 || world.x >= uSize.x * 16 || world.y >= uSize.y * 16 || world.z >= uSize.z * 24) return 0u;
 	int tile = ((world.z / 24) * uSize.y + world.y / 16) * uSize.x + world.x / 16;
@@ -1123,6 +1124,7 @@ uint voxelColorAt(ivec3 world, bool nextFrame, int onlyPart)
 	{
 		if (onlyPart >= 0 && part != onlyPart) continue;
 		uint model = nextFrame && nextParts[part] != 0u ? nextParts[part] : parts[part];
+		if (model != 0u && noWaysThrough && (texelFetch(uModelInfo, int(model)).x & 16u) != 0u) continue; // (a door, a curtain: VoxelModel::wayThrough)
 		uint color = model != 0u ? modelColor(model, ivec3(world.x % 16, world.y % 16, world.z % 24)) : 0u;
 		if (color != 0u) return color;
 	}
@@ -1143,6 +1145,13 @@ uint mirroredColor(Hit hit, int hitTile, int axis, bool skinOnly, bool nextFrame
 	if (texelFetch(uMirrors, header + 8 + axis).r == 0)
 	{
 		return 0u;
+	}
+	// (A wall one goes through keeps its own look on both faces: VoxelModel::wayThrough.)
+	if (hit.part >= 0)
+	{
+		uvec4 partsNow = texelFetch(uTiles, hitTile * 4);
+		uint own = hit.part == 0 ? partsNow.x & 0xFFFFu : hit.part == 1 ? partsNow.x >> 16 : hit.part == 2 ? partsNow.y & 0xFFFFu : partsNow.y >> 16;
+		if (own != 0u && (texelFetch(uModelInfo, int(own)).x & 16u) != 0u) return 0u;
 	}
 	ivec3 lo = ivec3(texelFetch(uMirrors, header).r, texelFetch(uMirrors, header + 1).r, texelFetch(uMirrors, header + 2).r);
 	ivec3 size = ivec3(texelFetch(uMirrors, header + 3).r, texelFetch(uMirrors, header + 4).r, texelFetch(uMirrors, header + 5).r);
@@ -1200,7 +1209,7 @@ uint mirroredColor(Hit hit, int hitTile, int axis, bool skinOnly, bool nextFrame
 		sourceVoxel[axis] = bestPos;
 		sourceVoxel[1 - axis] = lo[1 - axis] + rowAcross;
 		sourceVoxel.z = lo.z + rowUp;
-		uint color = voxelColorAt(sourceVoxel, nextFrame, onSkin ? -1 : hit.part);
+		uint color = voxelColorAt(sourceVoxel, nextFrame, onSkin ? -1 : hit.part, true);
 		if (color != 0u && table(BlackRow, color) == 0u) return color;
 	}
 	return 0u;
@@ -1652,6 +1661,7 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 const int ShaftSteps = 20;        // places along a ray where the light in the air is added up
 const float ShaftReach = 320.0;   // ... over this far at most (voxels)
 const float ShaftSmoke = 0.001;   // how much of the light a voxel of smoke throws towards the eye, for each of a tile's units of smoke
+const float ShaftMost = 0.45;     // the most the air's light adds to a pixel, of full white
 
 // The smoke at a point: blended between the eight tiles round it, so a cloud's light has no tile's edges.
 float smokeAt(vec3 point)
@@ -1675,7 +1685,8 @@ float smokeAt(vec3 point)
  * A ray's full colour with the light the air throws towards the eye on its way (setting "Light shafts"): the
  * flashlight's cone, the flares, the lamps by night and the coloured lights show as beams and glows where there is
  * smoke, and everywhere under the sea. The light is added up at ShaftSteps places along the ray, each by how much
- * smoke (or water) is there. Nothing hides a light from the air here: no shadow rays (twenty a pixel would cost
+ * smoke (or water) is there, the air nearer the eye dimming what the air behind it adds, and never more than
+ * ShaftMost in all. Nothing hides a light from the air here: no shadow rays (twenty a pixel would cost
  * more than the whole picture), so a lamp behind a wall still glows in the smoke on this side of it.
  * @param rgb The ray's colour (0..255 each).
  * @param span How far the ray went (voxels).
@@ -1685,6 +1696,7 @@ vec3 lightShafts(vec3 rgb, vec3 rayDirection, float span)
 	float stride = min(span, ShaftReach) / float(ShaftSteps);
 	float night = uUnderwater != 0 ? 1.0 : uNight;
 	vec3 added = vec3(0.0);
+	float through = 1.0; // how much of what lies further off the air so far lets through
 	for (int place = 0; place < ShaftSteps; ++place)
 	{
 		vec3 at = uEye + rayDirection * ((float(place) + 0.5) * stride);
@@ -1726,9 +1738,16 @@ vec3 lightShafts(vec3 rgb, vec3 rayDirection, float span)
 			light += uColorLightOf[colored].rgb * (near * near * uColorLightOf[colored].w);
 		}
 #endif
-		added += light * (thick * stride);
+		// The air is no brighter than fully lit, however many lamps reach it; what a stretch of it
+		// throws towards the eye it also takes from what lies behind (thin air: thick * stride, as
+		// before; a thick cloud: no more than its light); and all of it together at most ShaftMost.
+		// (A player, GitHub issue #155: a cloud of liquid nitrogen over a space station's floor lamps
+		// was a white glare over two thirds of the view, each step and each lamp adding without end.)
+		float share = 1.0 - exp(-thick * stride);
+		added += min(light, vec3(1.0)) * (through * share);
+		through *= 1.0 - share;
 	}
-	return min(rgb + added * 255.0, vec3(255.0));
+	return min(rgb + min(added, vec3(ShaftMost)) * 255.0, vec3(255.0));
 }
 #endif
 
@@ -1812,7 +1831,11 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 	if (hit.glass)
 	{
 		color = table(GlassRow, color);
-		fullColor = fullColor * 0.7 + vec3(150.0, 180.0, 205.0) * 0.3; // (as the glass table mixes each colour: a little paler and bluer)
+		// (As the glass table mixes each colour: a little paler and bluer. Through the goggles the table keeps to their
+		// colours, and so does this: a player, GitHub issue #166, "gun fire makes night vision flash windows not night
+		// vision": in full colour what was seen through a window stayed blue-grey among the goggles' green, and
+		// changed with every shot's light.)
+		fullColor = uGoggles != 0 ? paletteRgb(color) : fullColor * 0.7 + vec3(150.0, 180.0, 205.0) * 0.3;
 	}
 	rayFullColor = fullColorSet ? fullColor : paletteRgb(color);
 #ifdef LIGHT_SHAFTS
@@ -2017,6 +2040,54 @@ void main()
 )";
 
 
+/*
+ * Fewer rays than pixels (setting "Render scale"). The rays' program casts its rays on a grid
+ * smaller than the view; this small program then makes the view's pictures of theirs: each
+ * pixel takes the palette colour, the depth and the glow of the ray whose share of the picture
+ * it lies in (nothing is mixed: a palette colour is no number to mix, and a depth between a
+ * wall's and the sky's is nowhere), and for the full-colour picture (setting "True colour") the
+ * mix of the four rays round it by how near each is, leaving out those that hit something at
+ * another depth than its own ray: surfaces come out smooth, their edges stay sharp.
+ */
+const char *const UpscaleSource = R"(
+uniform usampler2D uColor, uGlow;
+uniform sampler2D uDepth, uTrue;
+uniform vec2 uRaysPerBlock; // the rays' grid over the view's, each way (under 1)
+layout(location = 0) out uint outColor;
+layout(location = 1) out float outDepth;
+layout(location = 2) out uint outGlow;
+layout(location = 3) out vec4 outTrue;
+
+void main()
+{
+	ivec2 last = textureSize(uColor, 0) - 1;
+	vec2 place = gl_FragCoord.xy * uRaysPerBlock; // (in rays: a ray's middle is at its number and a half)
+	ivec2 own = clamp(ivec2(place), ivec2(0), last);
+	float depth = texelFetch(uDepth, own, 0).r;
+	vec4 ownTrue = texelFetch(uTrue, own, 0);
+	outColor = texelFetch(uColor, own, 0).r;
+	outDepth = depth;
+	outGlow = texelFetch(uGlow, own, 0).r;
+	vec2 between = place - 0.5;
+	ivec2 low = ivec2(floor(between));
+	vec2 along = between - vec2(low);
+	vec3 mixed = vec3(0.0);
+	float weights = 0.0;
+	for (int corner = 0; corner < 4; ++corner)
+	{
+		ivec2 at = clamp(low + ivec2(corner & 1, corner >> 1), ivec2(0), last);
+		float cornerDepth = texelFetch(uDepth, at, 0).r;
+		// (The same surface: the same depth, give or take a tenth; the sky and the far haze, at no depth, with their like.)
+		bool alike = cornerDepth == depth || abs(cornerDepth - depth) <= 0.1 * max(1.0, min(cornerDepth, depth));
+		if (!alike) continue;
+		float weight = ((corner & 1) != 0 ? along.x : 1.0 - along.x) * ((corner >> 1) != 0 ? along.y : 1.0 - along.y);
+		mixed += texelFetch(uTrue, at, 0).rgb * weight;
+		weights += weight;
+	}
+	outTrue = vec4(weights > 0.001 ? mixed / weights : ownTrue.rgb, ownTrue.a);
+}
+)";
+
 /**
  * The units and effects, drawn on the card over the rays' picture (see FirstPersonGpu::drawEffects):
  * a pixel walks the frame's primitives that can touch it, in the order the CPU's passes draw
@@ -2050,9 +2121,10 @@ uniform int uFirstPrim, uEndPrim;       // this go's primitives: from the first 
 uniform int uOutlineBase, uOutlineCount; // the outlined pictures' records (EffectOutlineTexels texels each, from this texel of uPrims), and how many: 0 none
 uniform float uOutlineOpacity, uOutlineSlack; // how much of the outlines shows; how much farther than the scene a tested picture may be
 uniform int uOutlineGlows;
+uniform int uOwnOverNight;              // futuristic night vision's colour group + 1 (0: any other time)
 layout(location = 0) out uint outColor;
 layout(location = 1) out float outDepth;
-layout(location = 2) out uint outGlow;  // the glow (1, 3), 32 where the pixel keeps its own colours under night vision, 64 where see-through smoke lies over it
+layout(location = 2) out uint outGlow;  // the glow (1, 3), 32 where the pixel keeps its own colours under night vision, 64 where see-through smoke lies over it, 128 a mark's pixel (night vision leaves it)
 layout(location = 3) out uvec4 outNotes; // the unit veil left, own colours | smoke veil << 1, and for the pointer: 1 + the last solid sprite's number, 1 + the last pile's
 
 const float Bayer[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
@@ -2115,11 +2187,12 @@ void main()
 	uint color = texelFetch(uRayColor, from, 0).r, glow = texelFetch(uRayGlow, from, 0).r;
 	float depth = texelFetch(uRayDepth, from, 0).r;
 	int veil = 255, smokeVeil = 0;
-	uint own = 0u, lastSolid = 0u, lastPile = 0u;
+	uint own = 0u, mark = 0u, lastSolid = 0u, lastPile = 0u; // (mark: a hitbox's outline or line shows there, night vision leaves its colour)
 	if (uContinue != 0)
 	{
 		uvec4 notes = texelFetch(uNotes, pixel, 0);
-		veil = int(notes.r);
+		veil = int(notes.r & 255u);
+		mark = (notes.r >> 8) & 1u;
 		own = notes.g & 1u;
 		smokeVeil = int(notes.g >> 1);
 		lastSolid = notes.b;
@@ -2151,6 +2224,7 @@ void main()
 		{
 			color = outlineColor;
 			glow = uint(uOutlineGlows);
+			mark = 1u;
 		}
 	}
 	// The pixel's ray, reaching one unit ahead (so how far along it is the view depth too).
@@ -2170,6 +2244,12 @@ void main()
 		{
 			// FirstPersonView::drawSprite: where the ray meets the sprite (its lying rows on the floor in
 			// front of the anchor, the rest on the card), which of its pixels that is, and the pixel put.
+			// (Smoke where the pixel has its fill of it already adds nothing: passed over before anything is worked out.)
+			if ((flags & 16) != 0)
+			{
+				float fill = prim(base, 8).w;
+				if (fill > 0.0 && float(smokeVeil) >= fill) continue;
+			}
 			vec4 t2 = prim(base, 2), t3 = prim(base, 3), t4 = prim(base, 4), t5 = prim(base, 5), t6 = prim(base, 6), t7 = prim(base, 7), t8 = prim(base, 8);
 			vec3 anchor = t2.xyz, cardUp = t3.xyz, cardFacing = t4.xyz;
 			float anchorAcross = t2.w, anchorFacing = t3.w, anchorAlong = t4.w, columnSize = t5.x, rowSize = t5.y, lyingRowSize = t5.z, floorHeight = t5.w,
@@ -2204,22 +2284,34 @@ void main()
 			int shade = int(head.z);
 			int pixelOpacity = (flags & 16) == 0 ? SeeThroughLevels
 				: opacityAt >= 0 ? int(float(texelFetch(uBytes, opacityAt + spriteAt).r) * t8.z + 0.5) : int(float(SeeThroughLevels) * t8.z + 0.5);
-			if (pixelOpacity < SeeThroughLevels)
+			int smokeCap = (flags & 16) == 0 ? 0 : int(t8.w);
+			if (pixelOpacity < SeeThroughLevels || smokeCap > 0)
 			{
 				// See-through (the smoke): mixed over what's there, within what a unit under it and the
-				// smoke's cap leave; the depth stays.
-				int smokeCap = int(t8.w);
+				// smoke's cap leave; the depth stays. (Smoke with a cap also where it is opaque.)
 				pixelOpacity = min(pixelOpacity, veil);
 				if (smokeCap > 0) pixelOpacity = min(pixelOpacity, smokeCap - smokeVeil);
 				if (pixelOpacity <= 0) continue;
 				if (veil != 255) veil -= pixelOpacity;
-				if (smokeCap > 0) smokeVeil += pixelOpacity;
-				color = seeThrough(pixelOpacity, shadeColor(spriteColor, shade), color);
+				// (Of what the smoke before it left showing: layers add up to what they veil together.)
+				int mixLevel = pixelOpacity;
+				if (smokeCap > 0)
+				{
+					int showing = SeeThroughLevels - smokeVeil;
+					mixLevel = (pixelOpacity * SeeThroughLevels + showing / 2) / showing;
+					smokeVeil += pixelOpacity;
+				}
+				// A faint picture that keeps its colours under futuristic night vision (a body or a pile
+				// pointed past, setting "See-through corpses"): over the world in the night vision's colours.
+				bool ownOverNight = ownColours != 0u && uOwnOverNight != 0;
+				if (ownOverNight && own == 0u && color != 0u) color = uint((uOwnOverNight - 1) * 16) | (color & 15u);
+				color = seeThrough(mixLevel, shadeColor(spriteColor, shade), color);
 				if (pixelOpacity > SeeThroughLevels / 2)
 				{
 					glow = 0u;
 					own = ownColours;
 				}
+				else if (ownOverNight) own = 1u;
 				continue;
 			}
 			if (t8.y < 1.0 && dither(pixel.x, pixel.y) >= t8.y) continue; // (right in front of the camera it fades out)
@@ -2228,6 +2320,7 @@ void main()
 			glow = 0u;
 			veil = (flags & 2) != 0 ? UnitVeilMax : 255;
 			own = ownColours;
+			mark = 0u;
 			lastSolid = uint(number + 1);
 		}
 		else if (kind == EffectGroundShade)
@@ -2299,6 +2392,7 @@ void main()
 			if (!drawn || (t3.w < 1.0 && dither(pixel.x, pixel.y) >= t3.w)) continue;
 			color = uint(head.z);
 			if ((flags & 4) == 0) glow = (flags & 1) != 0 ? 1u : 0u;
+			if ((flags & 16) != 0) mark = 1u;
 		}
 		else if (kind == EffectDot)
 		{
@@ -2350,8 +2444,8 @@ void main()
 	}
 	outColor = color;
 	outDepth = depth;
-	outGlow = glow | (own << 5) | (smokeVeil > 0 ? 64u : 0u);
-	outNotes = uvec4(uint(veil), own | uint(smokeVeil) << 1, lastSolid, lastPile);
+	outGlow = glow | (own << 5) | (smokeVeil > 0 ? 64u : 0u) | (mark << 7);
+	outNotes = uvec4(uint(veil) | (mark << 8), own | uint(smokeVeil) << 1, lastSolid, lastPile);
 }
 )";
 
@@ -2486,7 +2580,7 @@ void main()
 {
 	ivec2 pixel = ivec2(gl_FragCoord.xy);
 	uint color = texelFetch(uColor, pixel, 0).r;
-	if (uNightVision != 0 && color != 0u && !(uOwnColours != 0 && (texelFetch(uGlow, pixel, 0).r & 32u) != 0u)) color = uint((uNightVision - 1) * 16) | (color & 15u);
+	if (uNightVision != 0 && color != 0u && !((texelFetch(uGlow, pixel, 0).r & 128u) != 0u || (uOwnColours != 0 && (texelFetch(uGlow, pixel, 0).r & 32u) != 0u))) color = uint((uNightVision - 1) * 16) | (color & 15u);
 	if (uTintAmount > 0.0 && dither(pixel.x, pixel.y) < uTintAmount)
 	{
 		color = tinted(uTintRedShare > 0.0 && dither(pixel.y + 1, pixel.x + 2) < uTintRedShare ? 0 : uTintRow, color);
@@ -2544,6 +2638,7 @@ void main()
 {
 	ivec2 pixel = ivec2(gl_FragCoord.xy);
 	uint made = texelFetch(uOverlay, pixel, 0).r;
+	bool overlaid = made != 0u; // (the overlay's pixel is the overlay's, whatever its colour: never the ray's full colour)
 	if (made == 0u)
 	{
 		made = texelFetch(uColor, pixel, 0).r;
@@ -2559,7 +2654,8 @@ void main()
 	{
 		uint ray = texelFetch(uRayColor, pixel, 0).r;
 		vec3 full = texelFetch(uRayTrue, pixel, 0).rgb;
-		if (made == ray) shown = full;
+		if (overlaid) { }
+		else if (made == ray) shown = full;
 		else if (uShafts != 0 && (texelFetch(uGlow, pixel, 0).r & 64u) != 0u) shown = min(vec3(1.0), shown + max(vec3(0.0), full - paletteColor(ray)));
 	}
 	outPixel = vec4(shown, 1.0);

@@ -164,6 +164,8 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 	// (Auto on the card: a ray a pixel whatever the view's size, which is what the card is for; a small view always has one,
 	// and so has an eye's picture.)
 	frame.pixelSize = scale > 1 || view._eyePass || width * height <= SmallViewPixels || Options::fpsPixelSize == 0 ? 1 : std::clamp(Options::fpsPixelSize, 1, 3);
+	frame.rayScale = scale > 1 ? 1.0f : 100.0f / view.renderScalePercent();
+	frame.goggles = view._nightVision != 0;
 	frame.ghostScale = std::clamp(Options::fpsGhostOpacity, 10, 100) / (GhostNearOpacity * 100.0f);
 	frame.seeThroughCrops = Options::fpsSeeThroughCrops;
 	// The scene, as shadeHit and colorOutsideMap read it.
@@ -378,6 +380,76 @@ void FirstPersonView::gpuForgetModels()
 }
 
 /**
+ * Setting "Render scale": the share of the view's pixels, each way, the card casts rays for, the
+ * rest magnified from them on the card (see FirstPersonGpu::Frame::rayScale): the setting's, or
+ * on Auto the step the frame rate allows (see noteDrawTime). A small view (a camera's) is
+ * always cast in full.
+ */
+int FirstPersonView::renderScalePercent() const
+{
+	if (getWidth() * getHeight() <= SmallViewPixels)
+	{
+		return 100;
+	}
+	return Options::fpsRenderScale == 0 ? RenderScaleSteps[std::clamp(_renderScaleStep, 0, RenderScaleStepCount - 1)] : std::clamp(Options::fpsRenderScale, 50, 100);
+}
+
+/**
+ * Setting "Render scale" on Auto (dynamic resolution): the card's rays as fine as the frame
+ * rate allows. A frame's time is the game's limit on the frame rate (60 a second if it has
+ * none); the view's drawing, the card's work with it (its pictures are read back before the
+ * frame is done), may take RenderScaleBudget of that. Over it, the rays go a step coarser;
+ * a step finer when that step's time, reckoned from this one's by the rays there are (too high:
+ * not all of a frame goes with the rays, so it errs towards staying), fits with room to spare.
+ * It goes by the time smoothed over the last frames, waits after each change for the new
+ * scale's times, and after a step back to coarser waits longer before it tries finer again,
+ * so the picture doesn't flick between two scales.
+ * A frame of several frames' time (a hitch) counts for nothing.
+ * @param milliseconds How long this frame's drawing took.
+ */
+void FirstPersonView::noteDrawTime(double milliseconds)
+{
+	if (Options::fpsRenderScale != 0 || !_gpuCastRays || getWidth() * getHeight() <= SmallViewPixels)
+	{
+		_renderScaleTime = 0.0;
+		return;
+	}
+	const double budget = 1000.0 / (Options::FPS > 0 ? Options::FPS : 60) * RenderScaleBudget;
+	// (A frame far over any other isn't the rays': the card building a program at a battle's start, a map loading.)
+	if (milliseconds > budget * 4.0)
+	{
+		_renderScaleWait = std::max(_renderScaleWait, 20);
+		return;
+	}
+	_renderScaleTime = _renderScaleTime > 0.0 ? _renderScaleTime * 0.85 + milliseconds * 0.15 : milliseconds;
+	if (_renderScaleHold > 0) --_renderScaleHold;
+	if (_renderScaleWait > 0)
+	{
+		--_renderScaleWait;
+		return;
+	}
+	auto rays = [](int step) { return (double)RenderScaleSteps[step] * RenderScaleSteps[step]; };
+	if (_renderScaleTime > budget && _renderScaleStep < RenderScaleStepCount - 1)
+	{
+		++_renderScaleStep;
+		_renderScaleHold = 240;
+	}
+	else if (_renderScaleStep > 0 && _renderScaleHold == 0 && _renderScaleTime * rays(_renderScaleStep - 1) / rays(_renderScaleStep) < budget * RenderScaleSpare)
+	{
+		--_renderScaleStep;
+	}
+	else
+	{
+		return;
+	}
+	_renderScaleWait = 20;
+	_renderScaleTime = 0.0;
+	// (OPENXCOM3D_GPU_TIMING: each change in the log.)
+	static const bool timed = getenv("OPENXCOM3D_GPU_TIMING") != nullptr;
+	if (timed) Log(LOG_INFO) << "OpenXcom3D GPU: render scale " << RenderScaleSteps[_renderScaleStep] << "% (a frame may take " << budget << " ms)";
+}
+
+/**
  * Casts this frame's rays on the graphics card (setting "Renderer": GPU), into the view's own
  * picture, depth buffer and glow mask.
  * @return False where the card can't be had or failed: the caller casts them on the CPU.
@@ -401,6 +473,7 @@ bool FirstPersonView::gpuCastAllRays()
 	// The units and effects on the card too: the rays' pictures stay there, and come back finished (see gpuDrawEffects).
 	output.keep = gpuEffectsWanted();
 	_gpuRaysPixelSize = frame.pixelSize;
+	_gpuCastRays = true;
 	// The picture in full colour too, if the mode shows this view that way (setting "True colour"; a ray a pixel).
 	const bool fullColor = _wantsTrueColor && frame.pixelSize == 1;
 	if (fullColor) _trueColor.resize((size_t)getWidth() * getHeight());

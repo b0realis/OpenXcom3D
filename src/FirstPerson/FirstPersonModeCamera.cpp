@@ -263,6 +263,21 @@ void FirstPersonMode::faceLookDirection(BattleUnit *unit)
 	// 0 = north, clockwise in 45 degree steps.
 	if (Options::fpsTurnCost)
 	{
+		// Setting "Sidesteps face the view": a step back left the soldier side-on to the view, further off than the
+		// head turns. It stays so while the view looks the same way and the soldier hasn't turned since; a turn
+		// that is still to come before such a step is left alone too.
+		if (!turret && _facingStepUnit == unit)
+		{
+			return;
+		}
+		if (!turret && _sideOnUnit == unit)
+		{
+			if (_sideOnFacing == facingNow && _sideOnView == viewStepDirection() && Options::fpsSidestepFaceView)
+			{
+				return;
+			}
+			_sideOnUnit = nullptr;
+		}
 		const double facingYaw = facingNow * 45.0 - 90.0;
 		const double offFacing = std::remainder(_view->getYawDegrees() - facingYaw, 360.0);
 		const bool snapTurnDone = _snapTurnFacing && _snapTurnDegrees == 0.0;
@@ -541,6 +556,7 @@ void FirstPersonMode::snapToTile(BattleUnit *unit)
 void FirstPersonMode::updateCamera(BattleUnit *unit, bool canMove, double elapsedSeconds)
 {
 	const Position unitTile = unit->getPosition();
+	resumeFacingStep(unit); // (setting "Sidesteps face the view": a step that waited for the soldier's turn)
 
 	// Work out where the camera stands, by what the unit has been doing since the last frame.
 	if (unit != _trackedUnit)

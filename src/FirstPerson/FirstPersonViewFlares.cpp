@@ -158,10 +158,24 @@ void FirstPersonView::updateFlares(float elapsedSeconds)
 				rayContext.swings = _doorSwings.data();
 				rayContext.size[0] = mapSizeX; rayContext.size[1] = mapSizeY; rayContext.size[2] = _save->getMapSizeZ();
 				rayContext.maxDistance = stepLength;
+				rayContext.thrown = true;
 				Hit hit;
 				float tEnd;   // where the ray left the map (not needed here)
 				int endAxis;  // through which side (not needed here)
-				if (castRay(rayContext, flare.pos, direction, hit, tEnd, endAxis) == RAY_HIT && hit.t < stepLength)
+				const bool stopped = castRay(rayContext, flare.pos, direction, hit, tEnd, endAxis) == RAY_HIT && hit.t < stepLength;
+				if (hit.glass)
+				{
+					// Glass filled into a window's opening on the way: it shatters (a player, GitHub
+					// issue #141; found along the step, half a voxel at a time).
+					const float reach = stopped ? hit.t : stepLength;
+					for (float along = 0.0f; along <= reach; along += 0.5f)
+					{
+						const Position voxel((int)std::floor(flare.pos[0] + direction[0] * along), (int)std::floor(flare.pos[1] + direction[1] * along),
+							(int)std::floor(flare.pos[2] + direction[2] * along));
+						if (breakGlassAt(voxel, flare.vel, true)) break;
+					}
+				}
+				if (stopped)
 				{
 					// It hit something: stop half a voxel short of it and bounce off, losing most
 					// of the speed into the surface and half of the speed along it. Landing on a

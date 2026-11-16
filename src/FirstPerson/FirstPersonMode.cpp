@@ -147,6 +147,7 @@ FirstPersonMode::FirstPersonMode(Game *game, BattlescapeState *state) :
 	_game(game), _state(state), _save(state->_save), _wants3D(Options::fpsStartInFirstPerson), _missionAtStart(state->_save->getMissionType()), _warningY(state->_warning->getY()),
 	_gameLineX(state->_txtDebug->getX())
 {
+	_fullColorDisplay = FirstPerson::wantsFullColorDisplay(); // (the display was opened by the settings as they are)
 	// The overlays are laid out on a canvas; on big screens it's drawn magnified (see blit).
 	// Whether each step is allowed is not known yet (see stepAllowed).
 	_targetWidth = Options::baseXResolution; // (the canvas goes to the display only once 3D shows: see relayoutIfNeeded)
@@ -297,6 +298,30 @@ void FirstPersonMode::createCrosshairAndBanner()
 	_txtCosts = addText(160, 9, width / 2 + 14, height / 2 + 11, "crosshairText", "firstPerson");
 	// Under the hit chance, the shot's damage range (setting "Shot damage"), the costs a line lower.
 	_txtDamage = addText(120, 9, width / 2 + 14, height / 2 + 11, "crosshairText", "firstPerson");
+	// Left of the crosshair, the range to what it points at (setting "Rangefinder", or its key held).
+	_txtRange = addText(90, 9, width / 2 - 104, height / 2 + 1, "crosshairText", "firstPerson");
+	_txtRange->setAlign(ALIGN_RIGHT);
+	// Left of the crosshair, a line higher: the shot shown won't land under the crosshair (see updateTrajectory, _laserAway).
+	_txtAimOff = addText(90, 9, width / 2 - 104, height / 2 - 9, "crosshairText", "firstPerson");
+	_txtAimOff->setAlign(ALIGN_RIGHT);
+	_txtAimOff->setVisible(false);
+	// The analogue rangefinder (drawn in drawRangeScale): its line a fifth of the view wide, its curve at most an eighth
+	// of the view high not zoomed in and ZoomFactor times that zoomed in, with room for the line's shadow; five
+	// numbers over the curve and the height it is drawn for at the line's end.
+	_rangeScaleWidth = width / 5;
+	_rangeScaleHeight = height / 8;
+	_rangeScale = new Surface(_rangeScaleWidth + 3, (int)(_rangeScaleHeight * ZoomFactor) + 8, 0, 0);
+	_state->add(_rangeScale);
+	_rangeScale->setVisible(false);
+	_ownSurfaces.insert(_rangeScale);
+	_rangeScaleDrawnFor = ~(Uint64)0;
+	_rangeMarks.clear();
+	for (int mark = 0; mark < 6; ++mark)
+	{
+		_rangeMarks.push_back(addText(mark < 5 ? 24 : 40, 9, 0, 0, "crosshairText", "firstPerson"));
+		_rangeMarks.back()->setAlign(mark < 5 ? ALIGN_CENTER : ALIGN_RIGHT);
+		_rangeMarks.back()->setVisible(false);
+	}
 	_txtBanner->setAlign(ALIGN_CENTER);
 	// The name of the unit pointed at, under the crosshair (it follows the free cursor).
 	_txtTarget = addText(160, 9, width / 2 - 80, height / 2 + 10, "crosshairText", "firstPerson");
@@ -307,7 +332,7 @@ void FirstPersonMode::createCrosshairAndBanner()
 	_txtScoping->setAlign(ALIGN_RIGHT);
 
 	// All hidden until there's something to show.
-	for (Text *text : { _txtMode, _txtShot, _txtCosts, _txtDamage, _txtBanner, _txtTarget, _txtScoping })
+	for (Text *text : { _txtMode, _txtShot, _txtCosts, _txtDamage, _txtRange, _txtAimOff, _txtBanner, _txtTarget, _txtScoping })
 	{
 		text->setVisible(false);
 	}
@@ -926,6 +951,10 @@ void FirstPersonMode::setResizeAnchors()
 	_anchors[_txtShot] = CENTER;
 	_anchors[_txtCosts] = CENTER;
 	_anchors[_txtDamage] = CENTER;
+	_anchors[_txtRange] = CENTER;
+	_anchors[_txtAimOff] = CENTER;
+	_anchors[_rangeScale] = CENTER;
+	for (Text *mark : _rangeMarks) _anchors[mark] = CENTER;
 	_anchors[_txtScoping] = RIGHT_CENTER;
 
 	// END and the suit's buttons keep to the top right, and so does the compass; the info panel
@@ -2222,6 +2251,13 @@ void FirstPersonMode::think()
 	const Uint32 now = SDL_GetTicks();
 	lastThinkTicks = now;
 	rememberChoices(); // (the fuses burning change all the time)
+	// The display follows "True colour" (with the card, at the display's size): opened in full colour
+	// when they ask for it, back as it was when they don't (see FirstPerson::wantsFullColorDisplay).
+	if (FirstPerson::wantsFullColorDisplay() != _fullColorDisplay)
+	{
+		_fullColorDisplay = FirstPerson::wantsFullColorDisplay();
+		_game->getScreen()->resetDisplay();
+	}
 	relayoutIfNeeded(); // (the setting "HUD scale" or "3D resolution" changed, or the display)
 	_view->setWantsTrueColor(Options::fpsTrueColor && Options::fpsRenderer == 1 && _canvasOnDisplay); // (shown only where the mode lays the view into the display)
 	const double elapsedSeconds = _lastFrameTick ? std::min<Uint32>(100, now - _lastFrameTick) / 1000.0 : 0.0;
@@ -2617,7 +2653,7 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 
 	// The 3D key works in both views; on the isometric map, the 3D HUD key shows or hides the
 	// map camera.
-	if (key == Options::keyBattleFirstPerson)
+	if (key == Options::keyBattleFirstPerson || (key == Options::keyBattleFirstPerson2 && key != SDLK_UNKNOWN))
 	{
 		if (pressed) toggleView();
 		return true;
@@ -2666,6 +2702,7 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	if (Options::fpsLean > 0 && key != SDLK_UNKNOWN && (key == Options::keyFpsLeanHold || key == Options::keyFpsLeanLeftOwn || key == Options::keyFpsLeanRightOwn)) return true;
 	if (Options::fpsZoom && key != SDLK_UNKNOWN && key == Options::keyFpsZoom) return true; // (held: see updateZoom)
 	if (key != SDLK_UNKNOWN && key == Options::keyFpsShowFacing) return true; // (held: see think)
+	if (key != SDLK_UNKNOWN && key == Options::keyFpsRange) return true; // (held: see updateCrosshair)
 	if (key == Options::keyFpsOpenDoor) { if (pressed) openDoor(_save->getSelectedUnit()); return true; }
 	if (key == Options::keyFpsFlare) { if (pressed) { if (Options::fpsFlares) throwFlare(); else _state->warning("STR_FPS_FLARES_OFF"); } return true; }
 	if (key == Options::keyFpsUp) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_UP, action, true); return true; }
@@ -3177,6 +3214,17 @@ void FirstPersonMode::drawOverlays(SDL_Surface *target, bool forHud, bool compos
 		// effect or wash over it, no overlay) takes the card's full colour for it; the others stay the palette's. But
 		// see-through smoke drawn over a ray's pixel takes the light the card found in the air there (setting "Light
 		// shafts": what the full colour has over the ray's palette colour), so a beam lights the smoke it crosses.
+		// A pixel the overlays drew (the weapon in hand, the HUD) is theirs whatever its colour: told by the canvas, not
+		// by the colour having changed. (The owner, with True colour: "when walking in gpu renderer my weapon in first
+		// person flashes". Where a pixel of the gun had the very palette colour of the ground behind it, it counted as
+		// untouched and took the ground's full colour, lit as the ground is: specks on the gun that came and went
+		// with every step.)
+		const SDL_Surface *canvas = _canvas->getSurface();
+		const int uiScale = std::max(1, _uiScale);
+		auto overlayRow = [canvas, uiScale](int row) -> const Uint8 * {
+			return row / uiScale < canvas->h ? (const Uint8 *)canvas->pixels + (size_t)(row / uiScale) * canvas->pitch : nullptr;
+		};
+		auto overlaid = [canvas, uiScale](const Uint8 *over, int column) { return over && column / uiScale < canvas->w && over[column / uiScale] != 0; };
 		const Uint32 *fullColors = nullptr, *shownInFull = nullptr;
 		const Uint8 *rayColors = nullptr, *smokeVeil = nullptr;
 		const Uint32 *cardPicture = nullptr;
@@ -3191,7 +3239,8 @@ void FirstPersonMode::drawOverlays(SDL_Surface *target, bool forHud, bool compos
 				const Uint8 *made = (const Uint8 *)picture->pixels + (size_t)row * picture->pitch, *own = (const Uint8 *)seen->pixels + (size_t)row * seen->pitch;
 				const Uint32 *card = cardPicture + (size_t)row * picture->w;
 				Uint32 *out = &_truePicture[(size_t)row * picture->w];
-				for (int column = 0; column < picture->w; ++column) out[column] = made[column] == own[column] ? card[column] | 0xFF000000u : 0u;
+				const Uint8 *over = overlayRow(row);
+				for (int column = 0; column < picture->w; ++column) out[column] = made[column] == own[column] && !overlaid(over, column) ? card[column] | 0xFF000000u : 0u;
 			}
 			shownInFull = _truePicture.data();
 		}
@@ -3204,9 +3253,14 @@ void FirstPersonMode::drawOverlays(SDL_Surface *target, bool forHud, bool compos
 				const Uint8 *made = (const Uint8 *)picture->pixels + (size_t)row * picture->pitch, *rays = rayColors + (size_t)row * picture->w;
 				const Uint32 *full = fullColors + (size_t)row * picture->w;
 				Uint32 *out = &_truePicture[(size_t)row * picture->w];
+				const Uint8 *over = overlayRow(row);
 				for (int column = 0; column < picture->w; ++column)
 				{
-					if (made[column] == rays[column])
+					if (overlaid(over, column))
+					{
+						out[column] = 0u;
+					}
+					else if (made[column] == rays[column])
 					{
 						out[column] = full[column] | 0xFF000000u;
 					}

@@ -437,7 +437,6 @@ void resized(FirstPersonMode *mode, int widthChange, int heightChange)
  */
 void settleOptions()
 {
-	settlePlaystyle();
 	Options::fpsSmoke = smokeMode();
 	Options::fpsFlashlightMode = flashlightMode();
 	Options::fpsAkimbo = akimboChoice();
@@ -450,159 +449,310 @@ void settleOptions()
 		Options::keyFpsNextFireMode = Options::keyFpsNextMode;
 		Options::keyFpsNextMode = SDLK_f;
 	}
+	// The second key for the isometric / 3D switch is V by default, which the auto shot had: a profile that still has
+	// the auto shot on it (any profile from before) keeps the auto shot there, and has no second key until one is chosen.
+	if (Options::keyBattleFirstPerson2 != SDLK_UNKNOWN && Options::keyBattleFirstPerson2 == Options::keyFpsModeAuto)
+	{
+		Options::keyBattleFirstPerson2 = SDLK_UNKNOWN;
+	}
+	settlePresets(); // (after the akimbo setting has its value: the gameplay presets set it)
 }
 
 namespace
 {
 
 /**
- * One of the switches the setting "Playstyle" sets: its option (a switch or a number), and its
- * value under Faithful (the game's own way, the defaults) and under FPS (a shooter's).
+ * One of the settings a preset sets: its option (a switch or a number) and its value under
+ * each of the group's presets, in their order.
  */
-struct PlaystyleSwitch
+struct PresetSwitch
 {
 	const char *id;
 	bool *flag;
 	int *number;
-	int faithful, fps;
+	std::vector<int> values;
 };
 
 /**
- * The switches the setting "Playstyle" sets (the owner's choice: shooting and turning, moving,
- * the feel of combat; the cheats stay apart): FPS-style shooting, turning by the rules, movement
- * tile by tile, jumping over low obstacles, leaning (Peek) and lean shots, full sprite hitboxes,
- * quick deaths, melee hitting walls and the downed, and the live motion scanner.
- * @return The switches.
+ * A group of presets: the option that says which is chosen (0 .. the presets' number - 1, and
+ * that number itself for Custom), the option that keeps the player's own mix ("id=value;..."),
+ * and the settings they set.
  */
-const std::vector<PlaystyleSwitch> &playstyleSwitches()
+struct Presets
 {
-	static const std::vector<PlaystyleSwitch> switches = {
-		{ "fpsFaithfulTargeting", &Options::fpsFaithfulTargeting, nullptr, 1, 0 },
-		{ "fpsTurnCost", &Options::fpsTurnCost, nullptr, 1, 0 },
-		{ "fpsMovement", nullptr, &Options::fpsMovement, 1, 0 },
-		{ "fpsVault", &Options::fpsVault, nullptr, 0, 1 },
-		{ "fpsLean", nullptr, &Options::fpsLean, 0, 1 },
-		{ "fpsLeanShots", &Options::fpsLeanShots, nullptr, 0, 1 },
-		{ "fpsSpriteHitboxes", &Options::fpsSpriteHitboxes, nullptr, 0, 1 },
-		{ "fpsQuickDeaths", &Options::fpsQuickDeaths, nullptr, 0, 1 },
-		{ "fpsMeleeTerrain", &Options::fpsMeleeTerrain, nullptr, 0, 1 },
-		{ "fpsLiveScanner", &Options::fpsLiveScanner, nullptr, 0, 1 },
+	int *chosen;
+	std::string *mix;
+	int count;
+	const std::vector<PresetSwitch> &(*switches)();
+};
+
+/**
+ * The settings the gameplay presets set (setting "Gameplay", the first page of the 3D VIEW tab;
+ * after GitHub issue #168, each keeping what the one before it set unless it says otherwise),
+ * a column each:
+ *  - FAITHFUL: soldiers' 3D view on top of OXCE, a graphics layer over the game;
+ *  - Extended+: additional features, the intended play for most, and the defaults (the map
+ *    camera, names, every shot's line, hitboxes always);
+ *  - TACTICUS: a fuller tactical picture, information dense, fewer frills (cameras as the eyes
+ *    see, the accuracy line, the rangefinder);
+ *  - XMbl: TACTICUS for the veteran (akimbo, lean shots, modern throwing, damage numbers, a
+ *    clearer and farther view);
+ *  - FullQoL: every feature on that leaves the game's rules of turning, moving and shooting
+ *    alone (sound, music, UFO lights, jumping, leaning, the live scanner, the volley, instant
+ *    chains, every room painted, the downed always marked);
+ *  - FPS: a shooter's rules on top (free turning, free walking, FPS-style shooting, quick
+ *    deaths).
+ * Aiming at the exact point is on in every one but FAITHFUL; full sprite hitboxes (a shot hits
+ * what is drawn there) from XMbl on.
+ * A setting no preset changes isn't listed: it is the player's alone (every shot's line is
+ * shown in all of them, FAITHFUL too, and so are all the parts without shape; the helmet
+ * cameras' artifacts are Light and night vision is the futuristic one: those are the defaults).
+ * The compass's step costs are TACTICUS's and XMbl's; sidesteps facing the view are XMbl's
+ * alone; fall damage is FPS's alone.
+ * @return The settings.
+ */
+const std::vector<PresetSwitch> &gameplaySwitches()
+{
+	using namespace Options;
+	const int plain = DefaultViewDistance;
+	static const std::vector<PresetSwitch> switches = {
+		//                                                  FAITHFUL  Ext+  TACT  XMbl  QoL   FPS
+		{ "fpsFaithfulTargeting", &fpsFaithfulTargeting, nullptr, { 1,    1,    1,    1,    1,    0 } },
+		{ "fpsTurnCost",          &fpsTurnCost,          nullptr, { 1,    1,    1,    1,    1,    0 } },
+		{ "fpsMovement",          nullptr, &fpsMovement,          { 1,    1,    1,    1,    1,    0 } },
+		{ "fpsVault",             &fpsVault,             nullptr, { 0,    0,    0,    0,    1,    1 } },
+		{ "fpsLean",              nullptr, &fpsLean,              { 0,    0,    0,    0,    1,    1 } },
+		{ "fpsLeanShots",         &fpsLeanShots,         nullptr, { 0,    0,    0,    1,    1,    1 } },
+		{ "fpsSpriteHitboxes",    &fpsSpriteHitboxes,    nullptr, { 0,    0,    0,    1,    1,    1 } },
+		{ "fpsAimExact",          &fpsAimExact,          nullptr, { 0,    1,    1,    1,    1,    1 } },
+		{ "fpsQuickDeaths",       &fpsQuickDeaths,       nullptr, { 0,    0,    0,    0,    0,    1 } },
+		{ "fpsMeleeTerrain",      &fpsMeleeTerrain,      nullptr, { 0,    0,    0,    1,    1,    1 } },
+		{ "fpsLiveScanner",       &fpsLiveScanner,       nullptr, { 0,    0,    0,    0,    1,    1 } },
+		{ "fpsFallDamage",        &fpsFallDamage,        nullptr, { 0,    0,    0,    0,    0,    1 } },
+		{ "fpsAkimbo",            nullptr, &fpsAkimbo,            { 0,    0,    0,    1,    1,    1 } },
+		{ "fpsThrowing",          nullptr, &fpsThrowing,          { 0,    0,    0,    1,    1,    1 } },
+		{ "fpsCloseEyeShots",     &fpsCloseEyeShots,     nullptr, { 0,    0,    0,    1,    1,    1 } },
+		{ "fpsAkimboVolley",      &fpsAkimboVolley,      nullptr, { 0,    0,    0,    0,    1,    1 } },
+		{ "fpsForceBlocked",      &fpsForceBlocked,      nullptr, { 0,    0,    0,    0,    1,    1 } },
+		{ "fpsInstantChains",     &fpsInstantChains,     nullptr, { 0,    0,    0,    0,    1,    1 } },
+		{ "fpsAutoEquipGunsFirst", &fpsAutoEquipGunsFirst, nullptr, { 0,  0,    0,    0,    1,    1 } },
+		{ "fpsSidestepFaceView",  &fpsSidestepFaceView,  nullptr, { 0,    0,    0,    1,    0,    0 } },
+		{ "fpsMapCamera",         nullptr, &fpsMapCamera,         { 0,    1,    1,    1,    1,    1 } },
+		{ "fpsCameraEyes",        &fpsCameraEyes,        nullptr, { 0,    0,    1,    1,    1,    1 } },
+		{ "fpsAlienTurnFacing",   &fpsAlienTurnFacing,   nullptr, { 0,    0,    0,    1,    1,    1 } },
+		{ "fpsUnitNames",         &fpsUnitNames,         nullptr, { 0,    1,    1,    1,    1,    1 } },
+		{ "fpsCompassCosts",      &fpsCompassCosts,      nullptr, { 0,    0,    1,    1,    0,    0 } },
+		{ "fpsHitboxes",          nullptr, &fpsHitboxes,          { 3,    2,    1,    1,    1,    1 } },
+		{ "fpsAccuracyLine",      &fpsAccuracyLine,      nullptr, { 0,    0,    1,    1,    1,    1 } },
+		{ "fpsRangefinder",       nullptr, &fpsRangefinder,       { 0,    0,    1,    1,    1,    1 } },
+		{ "fpsDamageNumbers",     &fpsDamageNumbers,     nullptr, { 0,    0,    0,    1,    1,    1 } },
+		{ "fpsCrosshairDamage",   &fpsCrosshairDamage,   nullptr, { 0,    0,    0,    1,    1,    1 } },
+		{ "fpsGlowingOutlines",   &fpsGlowingOutlines,   nullptr, { 0,    0,    0,    1,    1,    1 } },
+		{ "fpsDownedIcons",       nullptr, &fpsDownedIcons,       { 1,    1,    1,    1,    2,    2 } },
+		{ "fpsWallPaint",         nullptr, &fpsWallPaint,         { 1,    1,    1,    1,    2,    2 } },
+		{ "fpsSeeThroughCrops",   &fpsSeeThroughCrops,   nullptr, { 0,    1,    1,    1,    1,    1 } },
+		{ "fpsSeeThroughCorpses", &fpsSeeThroughCorpses, nullptr, { 0,    1,    1,    1,    1,    1 } },
+		{ "fpsUnseenTerrain",     nullptr, &fpsUnseenTerrain,     { 0,    0,    2,    2,    2,    2 } },
+		{ "fpsHaze",              nullptr, &fpsHaze,              { 0,    0,    0,    2,    2,    2 } },
+		{ "fpsViewDistance",      nullptr, &fpsViewDistance,      { plain, plain, plain, 130, 130, 130 } },
+		{ "fpsSmokeOpacity",      nullptr, &fpsSmokeOpacity,      { 80,   80,   80,   65,   65,   65 } },
+		{ "fpsNightSmokeOpacity", nullptr, &fpsNightSmokeOpacity, { 45,   45,   45,   65,   65,   65 } },
+		{ "fpsUnitSize",          nullptr, &fpsUnitSize,          { 100,  100,  100,  90,   90,   90 } },
+		{ "fpsDiscreetEdge",      &fpsDiscreetEdge,      nullptr, { 0,    0,    0,    1,    1,    1 } },
+		{ "fpsUfoLights",         &fpsUfoLights,         nullptr, { 0,    0,    0,    0,    1,    1 } },
+		{ "fpsHitSounds",         &fpsHitSounds,         nullptr, { 0,    0,    1,    0,    1,    1 } },
+		{ "fpsCombatMusic",       &fpsCombatMusic,       nullptr, { 0,    0,    0,    0,    1,    1 } },
 	};
 	return switches;
 }
 
 /**
- * A playstyle switch's value now (a switch as 0 or 1).
- * @param playstyleSwitch The switch.
- * @return The value.
+ * The settings "Graphics detail" sets (the first page of the 3D VIEW tab): how fine the 3D
+ * world is drawn and what the graphics card adds, at Low, Medium and High. What a level means
+ * goes by the setting "Renderer", so there are two tables. A ray colours one pixel at every
+ * level but the CPU's Low (blocks of two). On the CPU: Low has those blocks and no sun shadows,
+ * Medium the HUD's resolution (the defaults), High the battlescape's. On the card: Low is the
+ * CPU's Medium picture drawn fast, Medium the display's own resolution with "Render scale" on
+ * Auto (as fine as the frame rate allows), High that with full colour, smooth light, soft
+ * shadows, ambient occlusion and the lights' effects. Supersampling is Off at every level.
+ * @return The settings, for the renderer chosen now.
  */
-int switchValue(const PlaystyleSwitch &playstyleSwitch)
+const std::vector<PresetSwitch> &graphicsSwitches()
 {
-	return playstyleSwitch.flag ? (*playstyleSwitch.flag ? 1 : 0) : *playstyleSwitch.number;
+	using namespace Options;
+	static const std::vector<PresetSwitch> onCpu = {
+		//                                                       Low   Med   High
+		{ "fpsViewResolution",  nullptr, &fpsViewResolution,   { 0,    0,    1 } },
+		{ "fpsPixelSize",       nullptr, &fpsPixelSize,        { 2,    1,    1 } },
+		{ "fpsRenderScale",     nullptr, &fpsRenderScale,      { 100,  100,  100 } },
+		{ "fpsShadows",         &fpsShadows,         nullptr,  { 0,    1,    1 } },
+		{ "fpsSupersampling",   nullptr, &fpsSupersampling,    { 0,    0,    0 } },
+		{ "fpsSoftShadows",     &fpsSoftShadows,     nullptr,  { 0,    0,    0 } },
+		{ "fpsAllLightShadows", &fpsAllLightShadows, nullptr,  { 0,    0,    0 } },
+		{ "fpsAmbientOcclusion", &fpsAmbientOcclusion, nullptr, { 0,   0,    0 } },
+		{ "fpsTrueColor",       &fpsTrueColor,       nullptr,  { 0,    0,    0 } },
+		{ "fpsSmoothLight",     &fpsSmoothLight,     nullptr,  { 0,    0,    0 } },
+		{ "fpsColoredLights",   &fpsColoredLights,   nullptr,  { 0,    0,    0 } },
+		{ "fpsReflections",     &fpsReflections,     nullptr,  { 0,    0,    0 } },
+		{ "fpsLightShafts",     &fpsLightShafts,     nullptr,  { 0,    0,    0 } },
+	};
+	static const std::vector<PresetSwitch> onCard = {
+		//                                                       Low   Med   High
+		{ "fpsViewResolution",  nullptr, &fpsViewResolution,   { 0,    2,    2 } },
+		{ "fpsPixelSize",       nullptr, &fpsPixelSize,        { 1,    1,    1 } },
+		{ "fpsRenderScale",     nullptr, &fpsRenderScale,      { 100,  0,    0 } },
+		{ "fpsShadows",         &fpsShadows,         nullptr,  { 1,    1,    1 } },
+		{ "fpsSupersampling",   nullptr, &fpsSupersampling,    { 0,    0,    0 } },
+		{ "fpsSoftShadows",     &fpsSoftShadows,     nullptr,  { 0,    0,    1 } },
+		{ "fpsAllLightShadows", &fpsAllLightShadows, nullptr,  { 0,    0,    1 } },
+		{ "fpsAmbientOcclusion", &fpsAmbientOcclusion, nullptr, { 0,   0,    1 } },
+		{ "fpsTrueColor",       &fpsTrueColor,       nullptr,  { 0,    0,    1 } },
+		{ "fpsSmoothLight",     &fpsSmoothLight,     nullptr,  { 0,    0,    1 } },
+		{ "fpsColoredLights",   &fpsColoredLights,   nullptr,  { 0,    0,    1 } },
+		{ "fpsReflections",     &fpsReflections,     nullptr,  { 0,    0,    1 } },
+		{ "fpsLightShafts",     &fpsLightShafts,     nullptr,  { 0,    0,    1 } },
+	};
+	return fpsRenderer == 1 ? onCard : onCpu;
 }
 
 /**
- * Sets a playstyle switch.
- * @param playstyleSwitch The switch.
- * @param value Its value (a switch: 0 or not).
+ * A group of presets.
+ * @param group Which.
+ * @return It.
  */
-void setSwitch(const PlaystyleSwitch &playstyleSwitch, int value)
+const Presets &presetsOf(PresetGroup group)
 {
-	if (playstyleSwitch.flag) *playstyleSwitch.flag = value != 0;
-	else *playstyleSwitch.number = value;
+	static const Presets gameplay = { &Options::fpsPreset, &Options::fpsCustomPreset, 6, gameplaySwitches };
+	static const Presets graphics = { &Options::fpsGraphicsDetail, &Options::fpsCustomGraphics, 3, graphicsSwitches };
+	return group == PRESET_GRAPHICS ? graphics : gameplay;
 }
 
-/**
- * The playstyle switches as they are now, as Custom keeps them: "fpsTurnCost=0;fpsMovement=0;...".
- * @return The text.
- */
-std::string currentMix()
+/// A preset's setting as it is now (a switch as 0 or 1).
+int switchValue(const PresetSwitch &presetSwitch)
+{
+	// (Akimbo not yet settled, the defaults just restored: Off, see akimboChoice.)
+	if (presetSwitch.number == &Options::fpsAkimbo && *presetSwitch.number < 0) return 0;
+	return presetSwitch.flag ? (*presetSwitch.flag ? 1 : 0) : *presetSwitch.number;
+}
+
+/// Sets a preset's setting (a switch: 0 or not).
+void setSwitch(const PresetSwitch &presetSwitch, int value)
+{
+	if (presetSwitch.flag) *presetSwitch.flag = value != 0;
+	else *presetSwitch.number = value;
+}
+
+/// A group's settings as they are now, as Custom keeps them: "fpsTurnCost=0;fpsMovement=0;...".
+std::string currentMix(const Presets &presets)
 {
 	std::string mix;
-	for (const PlaystyleSwitch &playstyleSwitch : playstyleSwitches())
+	for (const PresetSwitch &presetSwitch : presets.switches())
 	{
-		mix += std::string(playstyleSwitch.id) + "=" + std::to_string(switchValue(playstyleSwitch)) + ";";
+		mix += std::string(presetSwitch.id) + "=" + std::to_string(switchValue(presetSwitch)) + ";";
 	}
 	return mix;
 }
 
-/**
- * The playstyle the switches are in now: Faithful (0) if all of them are as Faithful has them,
- * FPS (1) if all are as FPS has them, else Custom (2).
- * @return The playstyle.
- */
-int playstyleOfSwitches()
+/// The preset a group's settings make now: the first whose values they all have, else Custom (the presets' number).
+int presetOfSwitches(const Presets &presets)
 {
-	bool faithful = true, fps = true;
-	for (const PlaystyleSwitch &playstyleSwitch : playstyleSwitches())
+	for (int preset = 0; preset < presets.count; ++preset)
 	{
-		faithful = faithful && switchValue(playstyleSwitch) == playstyleSwitch.faithful;
-		fps = fps && switchValue(playstyleSwitch) == playstyleSwitch.fps;
-	}
-	return faithful ? 0 : fps ? 1 : 2;
-}
-
-}
-
-/**
- * Chooses a playstyle (setting "Playstyle", the owner's ask: "Faithful has all that we have now
- * defaults (close to iso play but in 3d). Doom mode pushes multiple switches for easier FPS
- * gameplay. And third setting custom - it is a mix of player own settings and remembers player
- * settings in next start"): Faithful and FPS set their switches (see playstyleSwitches); Custom
- * sets them back as the player had them (Options::fpsCustomPlaystyle). Leaving Custom keeps the
- * mix first, so flipping to Faithful or FPS and back loses nothing.
- * @param playstyle Faithful (0), FPS (1) or Custom (2).
- */
-void choosePlaystyle(int playstyle)
-{
-	if (Options::fpsPlaystyle == 2)
-	{
-		Options::fpsCustomPlaystyle = currentMix();
-	}
-	Options::fpsPlaystyle = std::clamp(playstyle, 0, 2);
-	for (const PlaystyleSwitch &playstyleSwitch : playstyleSwitches())
-	{
-		if (Options::fpsPlaystyle < 2)
+		bool all = true;
+		for (const PresetSwitch &presetSwitch : presets.switches())
 		{
-			setSwitch(playstyleSwitch, Options::fpsPlaystyle == 0 ? playstyleSwitch.faithful : playstyleSwitch.fps);
+			all = all && switchValue(presetSwitch) == presetSwitch.values[preset];
+		}
+		if (all) return preset;
+	}
+	return presets.count;
+}
+
+}
+
+/**
+ * How many presets a group has by name; Custom is the number after the last.
+ */
+int presetCount(PresetGroup group)
+{
+	return presetsOf(group).count;
+}
+
+/**
+ * Chooses a preset (settings "Gameplay" and "Graphics detail"): a named one sets its settings;
+ * Custom sets them back as the player had them (the group's kept mix). Leaving Custom keeps
+ * the mix first, so trying a preset and coming back loses nothing. Nothing but the group's
+ * settings is touched.
+ * @param group Which presets.
+ * @param preset One of them (0 ..), or their number for Custom.
+ */
+void choosePreset(PresetGroup group, int preset)
+{
+	const Presets &presets = presetsOf(group);
+	if (*presets.chosen == presets.count)
+	{
+		*presets.mix = currentMix(presets);
+	}
+	*presets.chosen = std::clamp(preset, 0, presets.count);
+	for (const PresetSwitch &presetSwitch : presets.switches())
+	{
+		if (*presets.chosen < presets.count)
+		{
+			setSwitch(presetSwitch, presetSwitch.values[*presets.chosen]);
 			continue;
 		}
 		// Custom: the kept value, where there is one ("id=value;").
-		const std::string key = std::string(playstyleSwitch.id) + "=";
-		const size_t at = Options::fpsCustomPlaystyle.find(key);
-		if (at != std::string::npos && (at == 0 || Options::fpsCustomPlaystyle[at - 1] == ';'))
+		const std::string key = std::string(presetSwitch.id) + "=";
+		const size_t at = presets.mix->find(key);
+		if (at != std::string::npos && (at == 0 || (*presets.mix)[at - 1] == ';'))
 		{
-			setSwitch(playstyleSwitch, std::atoi(Options::fpsCustomPlaystyle.c_str() + at + key.size()));
+			setSwitch(presetSwitch, std::atoi(presets.mix->c_str() + at + key.size()));
 		}
 	}
 }
 
 /**
- * Notes a playstyle switch changed by hand (setting "Playstyle"): the playstyle becomes the one
- * the switches now make (Faithful or FPS if they are all as those have them), else Custom,
- * keeping the mix.
+ * Whether Custom can be chosen in a group: only once the player has a mix of their own (with
+ * none kept, Custom would show its name over the last preset's settings).
  */
-void playstyleSwitchChanged()
+bool presetHasCustom(PresetGroup group)
 {
-	Options::fpsPlaystyle = playstyleOfSwitches();
-	if (Options::fpsPlaystyle == 2)
+	const Presets &presets = presetsOf(group);
+	return *presets.chosen == presets.count || !presets.mix->empty();
+}
+
+/**
+ * Notes a setting changed by hand: each group that sets it becomes the preset its settings now
+ * make (a named one if they are all as it has them), else Custom, keeping the mix.
+ * @param id The setting.
+ */
+void presetSwitchChanged(const std::string &id)
+{
+	for (PresetGroup group : { PRESET_GAMEPLAY, PRESET_GRAPHICS })
 	{
-		Options::fpsCustomPlaystyle = currentMix();
+		const Presets &presets = presetsOf(group);
+		bool member = false;
+		for (const PresetSwitch &presetSwitch : presets.switches()) member = member || id == presetSwitch.id;
+		if (!member) continue;
+		*presets.chosen = presetOfSwitches(presets);
+		if (*presets.chosen == presets.count)
+		{
+			*presets.mix = currentMix(presets);
+		}
 	}
 }
 
 /**
- * Whether a setting is one the setting "Playstyle" sets (see playstyleSwitches).
- * @param id The setting's id.
- * @return True if so.
+ * The setting "Renderer" changed: a named "Graphics detail" means other settings on the card
+ * than on the CPU (see graphicsSwitches), so it is set again for the new renderer, and Low
+ * stays Low. Custom is the player's own and stays as it is.
  */
-bool isPlaystyleSwitch(const std::string &id)
+void rendererChanged()
 {
-	for (const PlaystyleSwitch &playstyleSwitch : playstyleSwitches())
+	if (Options::fpsGraphicsDetail < presetCount(PRESET_GRAPHICS))
 	{
-		if (id == playstyleSwitch.id) return true;
+		choosePreset(PRESET_GRAPHICS, Options::fpsGraphicsDetail);
 	}
-	return false;
 }
 
 /**
@@ -670,22 +820,21 @@ void optionsLoaded()
 }
 
 /**
- * Settles the setting "Playstyle" with the switches as they are (a profile from before it, its
- * switches the player's own, or one edited by hand): Faithful or FPS only if the switches are all
- * as that playstyle has them, else Custom, keeping them as the mix. Custom stays Custom.
+ * Settles the presets with the settings as they are (a profile from before them, or one edited
+ * by hand): each group says the preset its settings make, or Custom, keeping them as the mix.
+ * Nothing but the two names changes: no setting of the player's is touched.
  */
-void settlePlaystyle()
+void settlePresets()
 {
-	// The live motion scanner joined the playstyle in 1.11 (GitHub issue #101): a profile from before
-	// it that says FPS gets it as FPS has it (switched off by hand, it would have said Custom).
-	if (Options::fpsPlaystyle == 1 && !Options::fpsLiveScanner)
+	for (PresetGroup group : { PRESET_GAMEPLAY, PRESET_GRAPHICS })
 	{
-		Options::fpsLiveScanner = true;
-	}
-	if (Options::fpsPlaystyle != 2 && playstyleOfSwitches() != Options::fpsPlaystyle)
-	{
-		Options::fpsPlaystyle = 2;
-		Options::fpsCustomPlaystyle = currentMix();
+		const Presets &presets = presetsOf(group);
+		const int made = presetOfSwitches(presets);
+		if (made != *presets.chosen)
+		{
+			*presets.chosen = made;
+			if (made == presets.count) *presets.mix = currentMix(presets);
+		}
 	}
 }
 
@@ -769,15 +918,17 @@ void createOptions(std::vector<OptionInfo> &options)
 
 	// The settings (YES/NO switches and numbers), in the order the Settings list shows them.
 	// First the headline feature: hovering a soldier's button shows that soldier's helmet camera.
-	// The playstyle (the owner's ask: a theme flipping the switches that make it play like the
-	// game or like a shooter, see choosePlaystyle): Faithful (0), FPS (1) or Custom (2), the
-	// player's own mix of those switches kept (unlisted: no description).
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsPlaystyle", &fpsPlaystyle, 0, "STR_FPS_PLAYSTYLE", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsCustomPlaystyle", &fpsCustomPlaystyle, "", "", category));
+	// The presets (see choosePreset): how it plays (FAITHFUL to FPS, Extended+ the default; Custom the number after the last)
+	// and how fine it is drawn (Low, Medium, High; Custom), each with the player's own mix of its settings kept
+	// (unlisted: no description).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsPreset", &fpsPreset, 1, "STR_FPS_PRESET", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsCustomPreset", &fpsCustomPreset, "", "", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsGraphicsDetail", &fpsGraphicsDetail, 1, "STR_FPS_GRAPHICS_DETAIL", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsCustomGraphics", &fpsCustomGraphics, "", "", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSoldierPreview", &fpsSoldierPreview, true, "STR_FPS_SOLDIER_PREVIEW", category));
 	// And on the isometric map, the selected soldier's helmet camera in a window: off, small,
 	// medium or large (0 to 3).
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsMapCamera", &fpsMapCamera, 0, "STR_FPS_MAP_CAMERA", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsMapCamera", &fpsMapCamera, 1, "STR_FPS_MAP_CAMERA", category));
 	// The helmet cameras see as the soldier's eyes do (a player, GitHub issue #90: an X-Com Files
 	// X-Bat's heat vision saw through smoke, its camera didn't): their heat vision through smoke
 	// and fire. Off (the owner: a realistic camera, as before, by default): a camera hasn't the
@@ -787,7 +938,7 @@ void createOptions(std::vector<OptionInfo> &options)
 	// mini camera ... LESS neat when Camera becomes illegible for longer than say, 250ms"): the
 	// feeds' bad signal and spells of static as they are, Normal (0, the default); Light (1), a
 	// lighter static and no glitch longer than LightGlitchLongest; or None (2), a clean feed.
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsCameraArtifacts", &fpsCameraArtifacts, 0, "STR_FPS_CAMERA_ARTIFACTS", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsCameraArtifacts", &fpsCameraArtifacts, 1, "STR_FPS_CAMERA_ARTIFACTS", category));
 	// Mouse look: how fast the view turns (1 to 20), up and down swapped or not, and the field
 	// of view across the screen, in degrees (50 to 110).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMouseSensitivity", &fpsMouseSensitivity, 5, "STR_FPS_MOUSE_SENSITIVITY", category));
@@ -803,6 +954,8 @@ void createOptions(std::vector<OptionInfo> &options)
 	// game's cost. YES by default (a player, GitHub issue #63: "It being off, is basically a cheat";
 	// the defaults are the game's own mechanics).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsTurnCost", &fpsTurnCost, true, "STR_FPS_TURN_COST", category));
+	// Turning by the rules, a sidestep first turns the soldier to face the view (a step back: side-on), front armour to what is looked at.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSidestepFaceView", &fpsSidestepFaceView, false, "STR_FPS_SIDESTEP_FACE_VIEW", category));
 	// The compass at the top right: where you look, the soldier's facing, and turning by the
 	// rules, when looking further will cost time units.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCompass", &fpsCompass, true, "STR_FPS_COMPASS", category));
@@ -823,6 +976,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlightCostOverride", &fpsFlightCostOverride, false, "STR_FPS_FLIGHT_COST_OVERRIDE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsVault", &fpsVault, false, "STR_FPS_VAULT", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFalling", &fpsFalling, true, "STR_FPS_FALLING", category));
+	// Fall damage, on its own (a player, GitHub issue #137: "Falling" off to play without the
+	// damage also stopped every step off a ledge): off, a landing only jolts the view.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsFallDamage", &fpsFallDamage, false, "STR_FPS_FALL_DAMAGE", category));
 	// A step off a ledge onto ground no one can walk on, or where no step leads out (a player's
 	// report: X-Com Files' blood moat, which the map never lets a soldier into, soft-locked one),
 	// stops at the edge with a warning; pushing that way again (or jumping) goes over.
@@ -904,8 +1060,8 @@ void createOptions(std::vector<OptionInfo> &options)
 	// as 1.0's YES/NO wouldn't load into a number).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlashlightMode", &fpsFlashlightMode, -1, "STR_FPS_FLASHLIGHT", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightVisionGear", &fpsNightVisionGear, false, "STR_FPS_NIGHT_VISION_GEAR", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsCombatMusic", &fpsCombatMusic, true, "STR_FPS_COMBAT_MUSIC", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitSounds", &fpsHitSounds, true, "STR_FPS_HIT_SOUNDS", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsCombatMusic", &fpsCombatMusic, false, "STR_FPS_COMBAT_MUSIC", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitSounds", &fpsHitSounds, false, "STR_FPS_HIT_SOUNDS", category));
 	// The 3D view's ambient sounds (the owner: "The weather effects should also have nonobtrusive
 	// sound. Namely rain and wind. The fire burning in front of you should also have a sound"),
 	// made by the game (see FirstPersonAmbience): Off (0), Quiet (1, half as loud), On (2).
@@ -947,35 +1103,42 @@ void createOptions(std::vector<OptionInfo> &options)
 	// setting); off, it only flinches. "Muzzle flashes" off turns it off too (every flash: the
 	// setting for players whom flashing light bothers).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitFlash", &fpsHitFlash, true, "STR_FPS_HIT_FLASH", category));
+	// Fire's colours mixed from frame to frame (1.14's "Smoother fire", which had no setting: a
+	// player looked for it, GitHub issue #146); off, the frames dissolve dot by dot, as before 1.14.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmoothFire", &fpsSmoothFire, true, "STR_FPS_SMOOTH_FIRE", category));
 	// Screen shake (a player, GitHub issue #67): off, nothing shakes the view (explosions, hits,
 	// falls, landings, panic, one's own shots).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsScreenShake", &fpsScreenShake, true, "STR_FPS_SCREEN_SHAKE", category));
 	// Futuristic night vision (a player, GitHub issue #88: the map's night vision leaves units and
 	// items their own colours): units, bodies and items keep theirs, the world goes green. Off (the
 	// owner: realistic, by default), everything goes green.
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightVisionUnits", &fpsNightVisionUnits, false, "STR_FPS_NIGHT_VISION_UNITS", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightVisionUnits", &fpsNightVisionUnits, true, "STR_FPS_NIGHT_VISION_UNITS", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsParticles", &fpsParticles, 2, "STR_FPS_PARTICLES", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsUfoLights", &fpsUfoLights, true, "STR_FPS_UFO_LIGHTS", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsUfoLights", &fpsUfoLights, false, "STR_FPS_UFO_LIGHTS", category));
 	// Parts the map draws but gives no shape (no voxels: ladders, lifts' pads, walls of laser
 	// beams), shown as see-through ghosts of their art: 0 none, 1 lifts and ladders (the parts
 	// with the grav lift flag), 2 all of them.
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsGhostParts", &fpsGhostParts, 1, "STR_FPS_GHOST_PARTS", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsGhostParts", &fpsGhostParts, 2, "STR_FPS_GHOST_PARTS", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsGhostOpacity", &fpsGhostOpacity, 50, "STR_FPS_GHOST_OPACITY", category));
+	// What is left of a sliding door once open, as a ghost: seen through, never in the way (see FirstPersonView::openDoorModel).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsGhostOpenDoors", &fpsGhostOpenDoors, true, "STR_FPS_GHOST_OPEN_DOORS", category));
 	// The crops, flower beds and rubble the game gives no real shape, drawn solid as on the map (see
 	// buildRelief, buildCropBlock): a bit see-through instead (SeeThroughCropOpacity of the pixels),
 	// so whoever stands in a field shows (the owner's ask, apart from the ghosts' opacity).
 	// A lift anywhere (a building's elevator, an alien base's; a UFO's has its own with "UFO lights and aura"): a beam of light
 	// rising through it, in the colours of its pad.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsLiftBeams", &fpsLiftBeams, true, "STR_FPS_LIFT_BEAMS", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCrops", &fpsSeeThroughCrops, false, "STR_FPS_SEE_THROUGH_CROPS", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCrops", &fpsSeeThroughCrops, true, "STR_FPS_SEE_THROUGH_CROPS", category));
 	// A corpse or item pointed at, the game's line passing it to something behind: drawn faint, at
 	// the ghost opacity (the game's shots pass through them).
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCorpses", &fpsSeeThroughCorpses, false, "STR_FPS_SEE_THROUGH_CORPSES", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCorpses", &fpsSeeThroughCorpses, true, "STR_FPS_SEE_THROUGH_CORPSES", category));
 	// The map's edge as small red dots on the floor, nothing beyond it, instead of the tape.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDiscreetEdge", &fpsDiscreetEdge, false, "STR_FPS_DISCREET_EDGE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsRenderer", &fpsRenderer, 0, "STR_FPS_RENDERER", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsViewResolution", &fpsViewResolution, 0, "STR_FPS_VIEW_RESOLUTION", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHudScale", &fpsHudScale, 0, "STR_FPS_HUD_SCALE", category));
+	// Fewer rays than pixels on the card, magnified (in percent each way; 0: Auto, by the frame rate): for a weak card.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsRenderScale", &fpsRenderScale, 100, "STR_FPS_RENDER_SCALE", category));
 	// A finer picture than the old game's, on the graphics card only (Renderer: GPU), each off by default: several rays a
 	// pixel, the sun's shadows with soft edges, a shadow from every lamp and flare, and corners and creases darkened.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSupersampling", &fpsSupersampling, 0, "STR_FPS_SUPERSAMPLING", category));
@@ -995,7 +1158,7 @@ void createOptions(std::vector<OptionInfo> &options)
 	// VR with "Renderer": GPU, on a headset: the eyes' pictures stay on the graphics card and go to the headset's display
 	// from there (nothing read back, nothing uploaded again). NO: read back and uploaded, as the CPU's eyes are.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsVrCardEyes", &fpsVrCardEyes, true, "STR_FPS_VR_CARD_EYES", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 0, "STR_FPS_PIXEL_SIZE", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 1, "STR_FPS_PIXEL_SIZE", category));
 	// The crosshair: shown or not, the shot info under it, aiming at the exact point under it
 	// (YES) or at the tile, as the original game does (NO), and the units' hitboxes.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshair", &fpsCrosshair, true, "STR_FPS_CROSSHAIR", category));
@@ -1004,12 +1167,18 @@ void createOptions(std::vector<OptionInfo> &options)
 	// The shot's damage range under the hit chance, as the map shows it with Alt (a player, GitHub
 	// issue #50; the owner: a setting, off).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshairDamage", &fpsCrosshairDamage, false, "STR_FPS_CROSSHAIR_DAMAGE", category));
+	// A rangefinder (a player, GitHub issue #139: "option to display tile distance from unit to
+	// target"; the owner: "3 options: no, digital, analogue"): 0 off; 1 digital, left of the
+	// crosshair the tiles to the point under it, as the game counts a shot's range; 2 analogue, a
+	// scale in the manner of the PSO-1 scope's: stand a unit on its line, and where the head meets
+	// the curve reads the tiles. The key below shows it while held, whatever the setting.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsRangefinder", &fpsRangefinder, 0, "STR_FPS_RANGEFINDER", category));
 	// The soldier cards show each soldier's little figure from the craft screen, when the mod draws
 	// one for the armor (a player, GitHub issue #53; the owner: the cards only, a setting, on).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCraftIcons", &fpsCraftIcons, true, "STR_FPS_CRAFT_ICONS", category));
 	// A line under the crosshair as wide as a shot strays to either side: with the game's own
 	// targeting, as far as a successful accuracy roll sends it at that range; in FPS style, the spread.
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsAccuracyLine", &fpsAccuracyLine, true, "STR_FPS_ACCURACY_LINE", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsAccuracyLine", &fpsAccuracyLine, false, "STR_FPS_ACCURACY_LINE", category));
 	// The name of the unit under the crosshair (or the free cursor), as the game names it.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsUnitNames", &fpsUnitNames, true, "STR_FPS_UNIT_NAMES", category));
 	// How the stat bars read, on the map and in 3D (a player's report: a 300-HP unit's bar looked
@@ -1018,10 +1187,14 @@ void createOptions(std::vector<OptionInfo> &options)
 	// longer than the bar, on the map and in 3D), or percentage (2: each bar full at its maximum).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsStatBars", &fpsStatBars, 1, "STR_FPS_STAT_BARS", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsAimExact", &fpsAimExact, true, "STR_FPS_AIM_EXACT", category));
+	// With the game's own targeting, a straight shot at something within two tiles leaves from the
+	// eye's place (the owner, on GitHub issue #148: "close range forced centre targeting"); off, from
+	// the game's muzzle point as ever.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsCloseEyeShots", &fpsCloseEyeShots, false, "STR_FPS_CLOSE_EYE_SHOTS", category));
 	// The path a throw or shot would take, drawn while aiming: off (0), throws and arcing
 	// shots (1), every shot too (2); and confirm fire: the first click marks the target and
 	// shows its path, a second click on it fires.
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsTrajectory", &fpsTrajectory, 1, "STR_FPS_TRAJECTORY", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsTrajectory", &fpsTrajectory, 2, "STR_FPS_TRAJECTORY", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsConfirmFire", &fpsConfirmFire, false, "STR_FPS_CONFIRM_FIRE", category));
 	// An arcing shot the game would refuse (no curve of its own lands on the target tile, as at
 	// a wall seen from the side) fires anyway, forced as with Ctrl held (its path drawn yellow).
@@ -1043,7 +1216,7 @@ void createOptions(std::vector<OptionInfo> &options)
 	// The units' hitboxes, outlined: off (0), fading in and out once a second (1), always (2), or
 	// only the unit pointed at (3, the first for new installs: a player's report, GitHub issue #27,
 	// new players aimed at a Sectoid's picture and missed its hitbox).
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitboxes", &fpsHitboxes, 3, "STR_FPS_HITBOXES", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitboxes", &fpsHitboxes, 2, "STR_FPS_HITBOXES", category));
 	// A unit hit where its picture shows (in a line of fire, a card facing the shooter; see
 	// FirstPersonSpriteHits.cpp), for everyone's shots, in 3D and on the map, instead of the game's
 	// voxel shapes (the owner's, GitHub issue #42). Off: the game's own.
@@ -1139,6 +1312,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	// The add-on's own keys, in the order the Controls list shows them, with their default keys.
 	// Switching views, freeing the cursor from mouse look, and showing the classic HUD.
 	options.push_back(keyOption(OPTION_OTHER, "keyBattleFirstPerson", &keyBattleFirstPerson, SDLK_F8, "STR_FPS_KEY_TOGGLE_VIEW", category));
+	// (A second key for it, under the left hand: GitHub issue #167. The auto shot, which had V, has no key of its own
+	// by default now: the wheel and the next fire mode key reach it.)
+	options.push_back(keyOption(OPTION_OTHER, "keyBattleFirstPerson2", &keyBattleFirstPerson2, SDLK_v, "STR_FPS_KEY_TOGGLE_VIEW_2", category));
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsMouseMode", &keyFpsMouseMode, SDLK_c, "STR_FPS_KEY_MOUSE_MODE", category));
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsClassicHud", &keyFpsClassicHud, SDLK_h, "STR_FPS_KEY_CLASSIC_HUD", category));
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsHideHud", &keyFpsHideHud, SDLK_p, "STR_FPS_KEY_HIDE_HUD", category));
@@ -1167,7 +1343,7 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsNextMode", &keyFpsNextMode, SDLK_f, "STR_FPS_KEY_NEXT_MODE", "STR_FIRST_PERSON_SAVED"));
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsModeSnap", &keyFpsModeSnap, SDLK_z, "STR_FPS_KEY_MODE_SNAP", category));
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsModeAimed", &keyFpsModeAimed, SDLK_x, "STR_FPS_KEY_MODE_AIMED", category));
-	options.push_back(keyOption(OPTION_OTHER, "keyFpsModeAuto", &keyFpsModeAuto, SDLK_v, "STR_FPS_KEY_MODE_AUTO", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsModeAuto", &keyFpsModeAuto, SDLK_UNKNOWN, "STR_FPS_KEY_MODE_AUTO", category));
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsSwitchHand", &keyFpsSwitchHand, SDLK_g, "STR_FPS_KEY_SWITCH_HAND", category));
 	// Akimbo on and off in battle (Y: one of the letters the battlescape leaves free).
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsAkimbo", &keyFpsAkimbo, SDLK_y, "STR_FPS_KEY_AKIMBO", category));
@@ -1201,6 +1377,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsNightVision", &keyFpsNightVision, SDLK_n, "STR_FPS_KEY_NIGHT_VISION", category));
 	// Zoom, held (U: free in the game and the add-on).
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsZoom", &keyFpsZoom, SDLK_u, "STR_FPS_KEY_ZOOM", category));
+	// The rangefinder on demand, held (setting "Rangefinder"; GitHub issue #139): no key until the
+	// player gives it one (every letter is taken by the game or the add-on).
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsRange", &keyFpsRange, SDLK_UNKNOWN, "STR_FPS_KEY_RANGE", category));
 	// Which way the units in sight face, held (Left Alt, as the map's own Alt shows its unit
 	// indicators): a ring with an arrow on the floor round each, over everything.
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsShowFacing", &keyFpsShowFacing, SDLK_LALT, "STR_FPS_KEY_SHOW_FACING", category));

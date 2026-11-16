@@ -587,6 +587,19 @@ private:
 	double _velocityX = 0.0, _velocityY = 0.0; // walking momentum, voxels per second
 	bool _stepPending = false;                 // a step was handed to the game's walking state and is being walked
 	unsigned _mouseReleasesSeen = 0;           // the game's mouse releases known (see think: one since means another screen was on top)
+	// Setting "Sidesteps face the view" (see sidestepFacingFor): a step waiting for the soldier's turn to the facing it
+	// is walked with (the turn is the game's own, and may stop at a new enemy), and the facing a step back left
+	// the soldier side-on with, which the view may look past the head's limit of while it looks the same way.
+	BattleUnit *_facingStepUnit = nullptr;
+	Position _facingStepFrom;
+	Uint32 _facingStepSince = 0;
+	BattleUnit *_sideOnUnit = nullptr;
+	int _sideOnFacing = -1, _sideOnView = -1;
+	// The weapon in hand's shade, steadied (see updateWeaponInHand): whose it is, the eye's light followed, the shade shown, when last.
+	const BattleUnit *_weaponLightUnit = nullptr;
+	float _weaponLight = -1.0f;
+	int _weaponShade = 0;
+	Uint32 _weaponLightTick = 0;
 	int _sidestepFacing = -1;                  // the facing a soldier sidestepping keeps (the game's strafe), while the step is walked; -1 none
 	Position _stepFrom;                        // the tile that step started from
 	// Two straight steps round a corner cost what the one diagonal step costs (see cornerDiscount): the last straight
@@ -657,6 +670,8 @@ private:
 	Uint32 _jumpTime = 0;                        // how long this jump lasts, ms
 	double _jumpHeight = 0.0;                    // voxels at the top
 	bool _vaulting = false;                      // the camera glides over the obstacle
+	int _vaultCharge = 0;                        // the jump's own time units, charged once the soldier is over (see tryVault, glideOverObstacle)
+	BattleUnit *_vaultUnit = nullptr;            // whose
 	double _vaultFrom[2] = {}, _vaultTo[2] = {}; // where the glide over the obstacle starts and lands (x, y in voxels)
 
 	/// Jumps, or vaults over a low obstacle straight ahead.
@@ -774,6 +789,14 @@ private:
 	bool runsStep(BattleUnit *unit, const Position &from, int direction) const;
 	/// Is this step the game's sidestep (turning by the rules: to the side or half to the side, on one level)?
 	bool isSidestep(const BattleUnit *unit, const Position &from, int direction, const Position &target) const;
+	/// The step the view looks along (0 north .. 7).
+	int viewStepDirection() const;
+	/// The facing a sidestep that way is walked with (setting "Sidesteps face the view"), or -1: as the soldier stands.
+	int sidestepFacingFor(const BattleUnit *unit, int direction) const;
+	/// The time units of the turn to that facing before the step.
+	int sidestepTurnCost(const BattleUnit *unit, const Position &from, int direction, const Position &target) const;
+	/// Forgets a step that waited for the soldier's turn and wasn't walked.
+	void resumeFacingStep(BattleUnit *unit);
 	/// Makes the lines under the compass for the ways of walking, hidden.
 	void createWalkModeLines();
 	/// Shows the lines for the ways of walking switched on, under the compass (3D only).
@@ -803,6 +826,9 @@ private:
 	bool _aimHitsSomething = false;                     // something is under the crosshair (not just sky)
 	// the path the next throw or shot would take (setting "Show trajectory"), and a target marked
 	// for confirm fire (setting "Confirm fire"): the next click on the same tile fires
+	bool _fullColorDisplay = false;                     // what the display was opened for (set when the mode is made; see think)
+	bool _laserRefused = false;                         // the straight shot previewed has no line of fire at all: the game will refuse it ("BLOCKED" by the crosshair)
+	bool _laserAway = false;                            // the straight shot previewed (the laser) will fly, but not to the point under the crosshair (GitHub issue #148)
 	std::vector<int> _trajectoryKey;                    // what the path shown was worked out for (empty: none shown)
 	Position _confirmTile = Position(-1, -1, -1);       // the marked target tile (x -1: none)
 	Position _confirmVoxel;                             // the point marked on it
@@ -849,6 +875,8 @@ private:
 	int handOf(BattleUnit *unit, const BattleItem *weapon) const;
 	/// The hand's letter on the panel: "R: ", "L: ", or "S: " for the built-in (special) weapon.
 	std::string handLetter(BattleUnit *unit, const BattleItem *item) const;
+	/// An item's name on the HUD (someone unconscious by their own name).
+	std::string itemLabel(const BattleItem *item) const;
 	/// Leaning: the side a shot starts from, by where the eye is in the tile (setting "Lean shots", or leaning out).
 	BattleActionOrigin leanSide(const BattleUnit *unit, const Position &targetTile) const;
 	/// Melee at a body lying in front or at the feet (setting "Melee hits walls and the downed").
@@ -983,6 +1011,8 @@ private:
 	double _bloom = 0.0;                         // extra spread from the last rounds (degrees, 95% circle)
 
 	/// Is this fire mode FPS style just now?
+	/// Does a straight shot at this point leave from the eye's place though the targeting is the game's (setting "Close range: from the eye")?
+	bool closeEyeShot(BattleActionType mode, const Position &aimedVoxel, bool hitSomething) const;
 	bool freeAimOn(BattleActionType mode) const;
 	/// How wide an FPS-style shot spreads, in degrees (95% of rounds).
 	double spreadFor(const BattleUnit *unit, BattleActionType mode, bool dual = false) const;
@@ -1002,6 +1032,12 @@ private:
 	Uint64 _accuracyLineDrawnFor = ~(Uint64)0;     // what it shows, to redraw only on change
 	Text *_txtMode = nullptr, *_txtShot = nullptr; // the fire mode, and the shot's odds and cost, beside the crosshair
 	Text *_txtCosts = nullptr;                      // and under them its other costs (setting "Expanded crosshair info")
+	Text *_txtAimOff = nullptr;                     // left of the crosshair: "OFF", the shot previewed won't land under it (see _laserAway)
+	Text *_txtRange = nullptr;                      // left of the crosshair, how far off the point under it is, in tiles (setting "Rangefinder" Digital, or its key held)
+	Surface *_rangeScale = nullptr;                 // the analogue rangefinder's scale, left of the crosshair (see drawRangeScale)
+	std::vector<Text*> _rangeMarks;                 // its numbers, the nearest mark's first, and last the height it is drawn for ("1.7m")
+	int _rangeScaleWidth = 0, _rangeScaleHeight = 0; // its line's length and its curve's greatest height not zoomed in, in canvas pixels
+	Uint64 _rangeScaleDrawnFor = ~(Uint64)0;        // what it shows, to redraw only on change
 	Text *_txtDamage = nullptr;                     // and under the hit chance the shot's damage range (setting "Shot damage")
 	Uint32 _hitMarkerHeard = 0;                    // the last hitmarker that ticked
 	Uint32 _noHarmHeard = 0;                       // the last strike to no harm that ticked
@@ -1018,6 +1054,8 @@ private:
 	int hitCloudReach(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, int accuracy, int &missReach);
 	/// Draws the accuracy line: a level line as wide as the reach to either side, a notch up at each end.
 	void drawAccuracyLine(int reach, int missReach, Uint8 color, Uint8 missColor, Uint8 shadow);
+	/// Draws the analogue rangefinder's scale and places its numbers.
+	void drawRangeScale(const int marks[5], double tilePixels, Uint8 color, Uint8 shadow);
 	/// A mod's own name for an action of an item, in capitals for the crosshair; empty if it keeps the game's name.
 	std::string renamedAction(const RuleItem *rules, BattleActionType mode) const;
 	/// Does the soldier have a line of sight to the aimed tile, as a shot checks it?

@@ -76,6 +76,10 @@
 #include "../Mod/RuleCraft.h"
 #include "../Mod/RuleTerrain.h"
 #include "../Mod/RuleUfo.h"
+#include "../Savegame/Ufo.h"
+#include "../Savegame/SavedGame.h"
+#include "../Savegame/Base.h"
+#include "../Savegame/Craft.h"
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/SavedBattleGame.h"
 #include "../Savegame/Tile.h"
@@ -247,6 +251,7 @@ void clearModel(FirstPersonView::VoxelModel &model)
 	model.empty = true;
 	model.ghostly = false;
 	model.solidGhost = false;
+	model.wayThrough = false;
 	model.water = false;
 	model.liquidHeight = 0;
 	model.artFill = false;
@@ -1000,6 +1005,95 @@ bool cageArt(const Surface *sprite, int partType, int yOffset)
  * @param partType Which part of a tile it is (O_FLOOR, O_WESTWALL, O_NORTHWALL, O_OBJECT).
  * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
  */
+/**
+ * Tells whether art lies on the floor as buildGhost reads it: no more than a quarter of its drawn
+ * pixels well above the floor's diamond (more than two rows above its top corner).
+ * @param sprite The part's sprite frame.
+ * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
+ * @return True if it lies flat (and something of it is drawn).
+ */
+bool artLiesFlat(const Surface *sprite, int yOffset)
+{
+	int drawn = 0, rising = 0;
+	for (int spriteY = 0; spriteY < sprite->getHeight(); ++spriteY)
+	{
+		for (int spriteX = 0; spriteX < sprite->getWidth(); ++spriteX)
+		{
+			if (!sprite->getPixel(spriteX, spriteY)) continue;
+			++drawn;
+			if (spriteY < 22 + yOffset) ++rising;
+		}
+	}
+	return drawn && rising * 4 <= drawn;
+}
+
+/**
+ * Tells whether an object without voxels is a body the art draws and the game lets no one walk
+ * through (a console, a rack of machines: the owner on GitHub issue #150, "make an object from the
+ * art"): not walkable, no lift, no door, and its art big, at least ArtBodyMinPixels drawn.
+ * @param mapData The object's record.
+ * @param sprite Its sprite frame.
+ * @return True if it is built as a body from its art (see buildArtBody).
+ */
+bool artBody(const MapData *mapData, const Surface *sprite)
+{
+	if (mapData->getObjectType() != O_OBJECT || mapData->isGravLift() || mapData->isDoor() || mapData->isUFODoor()
+		|| mapData->getTUCost(MT_WALK) < Pathfinding::INVALID_MOVE_COST)
+	{
+		return false;
+	}
+	int drawn = 0;
+	for (int spriteY = 0; spriteY < sprite->getHeight(); ++spriteY)
+		for (int spriteX = 0; spriteX < sprite->getWidth(); ++spriteX) drawn += sprite->getPixel(spriteX, spriteY) != 0;
+	return drawn >= ArtBodyMinPixels;
+}
+
+/**
+ * Builds an object without voxels as a body from its art (see artBody): every voxel of the tile
+ * whose pixel the art draws (the projection buildModel uses), up to the height the art reaches (its
+ * topmost drawn row, taken as the top's far corner, as a box's is), in that pixel's colour. From
+ * where the map looks its outline and picture are the art's exactly; from elsewhere it is the
+ * biggest body that looks so. A ghost the view draws solid (VoxelModel::solidGhost): the game's
+ * shots and sight go through it, as the game gives it no voxels.
+ * @param model The empty model to build it in.
+ * @param sprite The object's sprite frame.
+ * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
+ */
+void buildArtBody(FirstPersonView::VoxelModel &model, const Surface *sprite, int yOffset)
+{
+	const int width = sprite->getWidth(), height = sprite->getHeight();
+	int topRow = -1;
+	for (int spriteY = 0; spriteY < height && topRow < 0; ++spriteY)
+		for (int spriteX = 0; spriteX < width && topRow < 0; ++spriteX)
+			if (sprite->getPixel(spriteX, spriteY)) topRow = spriteY;
+	if (topRow < 0)
+	{
+		return;
+	}
+	const int top = std::clamp(24 + yOffset - topRow, 0, Position::TileZ - 1);
+	for (int z = 0; z <= top; ++z)
+	{
+		for (int y = 0; y < Position::TileXY; ++y)
+		{
+			for (int x = 0; x < Position::TileXY; ++x)
+			{
+				const int spriteX = 16 + x - y, spriteY = 24 + (x + y) / 2 - z + yOffset;
+				const Uint8 color = spriteX >= 0 && spriteY >= 0 && spriteX < width && spriteY < height ? sprite->getPixel(spriteX, spriteY) : 0;
+				if (!color) continue;
+				model.color[z][y][x] = color;
+				model.empty = false;
+				const int voxel[3] = { x, y, z };
+				for (int axis = 0; axis < 3; ++axis)
+				{
+					model.min[axis] = std::min<int>(model.min[axis], voxel[axis]);
+					model.max[axis] = std::max<int>(model.max[axis], voxel[axis]);
+				}
+			}
+		}
+	}
+	model.ghostly = model.solidGhost = !model.empty;
+}
+
 void buildGhost(FirstPersonView::VoxelModel &model, const Surface *sprite, int partType, int yOffset)
 {
 	// The colour of a voxel's pixel; 0 (transparent) outside the sprite.
@@ -1071,11 +1165,18 @@ void buildGhost(FirstPersonView::VoxelModel &model, const Surface *sprite, int p
 		}
 	}
 
+	// An object's upright picture on the tile's west or north edge (a poster on the wall there) stands
+	// GhostWallClearance voxels into the tile: on the edge itself it is inside the wall's own voxels,
+	// and showed only once the wall was shot away (a player, GitHub issue #138). Its picture stays
+	// the one the edge's plane has.
+	const int shown = partType == O_OBJECT && axis >= 0 && offset < GhostWallClearance ? GhostWallClearance : offset;
+
 	// The voxels: each where its pixel is drawn, with that pixel's colour.
 	auto place = [&](int x, int y, int z)
 	{
 		const Uint8 color = pixelOf(x, y, z);
 		if (!color) return;
+		if (shown != offset) (axis == 0 ? x : y) = shown;
 		model.color[z][y][x] = color;
 		model.empty = false;
 		const int voxel[3] = { x, y, z };
@@ -1745,16 +1846,34 @@ void FirstPersonView::findMirrors()
 
 	// The names of the map data sets that crafts and UFOs are built from, minus any that an
 	// ordinary terrain uses too.
-	std::set<std::string> craftSets, terrainSets;
+	std::set<std::string> craftSets, terrainSets, ownCraftSets; // (ownCraftSets: the player's crafts' alone)
 	auto collect = [](RuleTerrain *terrain, std::set<std::string> &into)
 	{
 		if (!terrain) return;
 		for (const MapDataSet *dataSet : *terrain->getMapDataSets()) into.insert(dataSet->getName());
 	};
 	for (const auto &type : mod->getCraftsList()) collect(mod->getCraft(type)->getBattlescapeTerrainData(), craftSets);
+	// The player's own craft: the one landed in this battle (a mod may build other things from a
+	// craft's map data, XPiratez its temples); without one to ask, every craft the mod has.
+	// And whether a UFO is in this battle at all: on a mission site there is none, whatever its
+	// buildings are made of (lifts and all).
+	bool ufoInBattle = true;
+	if (SavedGame *game = _game->getSavedGame())
+	{
+		for (Base *base : *game->getBases())
+			for (Craft *craft : *base->getCrafts())
+				if (craft->isInBattlescape()) collect(craft->getRules()->getBattlescapeTerrainData(), ownCraftSets);
+		ufoInBattle = false;
+		for (Ufo *ufo : *game->getUfos()) ufoInBattle = ufoInBattle || ufo->isInBattlescape();
+	}
+	else
+	{
+		for (const auto &type : mod->getCraftsList()) collect(mod->getCraft(type)->getBattlescapeTerrainData(), ownCraftSets);
+	}
 	for (const auto &type : mod->getUfosList()) collect(mod->getUfo(type)->getBattlescapeTerrainData(), craftSets);
 	for (const auto &type : mod->getTerrainList()) collect(mod->getTerrain(type), terrainSets);
 	for (const auto &setName : terrainSets) craftSets.erase(setName); // (BLANKS and the like are everywhere)
+	for (const auto &setName : terrainSets) ownCraftSets.erase(setName);
 	if (craftSets.empty())
 	{
 		return;
@@ -1842,6 +1961,39 @@ void FirstPersonView::findMirrors()
 						}
 					}
 		}
+		// A building the mod's rules list among its UFOs (XPiratez lands its enemies in temples,
+		// mansions and bunkers that way) is no craft to mirror: a building isn't symmetric as a hull
+		// is, and its walls came out in patches, the far side's look where the mirror found any and
+		// their own elsewhere (a player, GitHub issue #156: a tower room's stone wall wore the planks
+		// opposite in the outline of the stairs there). Told as the UFOs' lights tell it (see
+		// findUfos): a UFO has a power source, a navigation console or a grav lift, and there is one in
+		// the battle (a temple has its lifts too). The player's own craft, the one landed here, has
+		// none and is mirrored as ever. A building's walls take their paint by its
+		// rooms instead (see findWallPaints).
+		bool machinery = false, ownCraft = false;
+		for (const int tileIndex : craftTiles)
+		{
+			const Tile *tile = _save->getTile(tileIndex);
+			for (int part = 0; part < 4; ++part)
+			{
+				const MapData *mapData = tile->getMapData((TilePart)part);
+				if (!mapData) continue;
+				const SpecialTileType special = mapData->getSpecialType();
+				machinery = machinery || special == UFO_POWER_SOURCE || special == UFO_NAVIGATION || (part == O_FLOOR && mapData->isGravLift());
+				ownCraft = ownCraft || (mapData->getDataset() && ownCraftSets.count(mapData->getDataset()->getName()));
+			}
+		}
+		if (!ownCraft && !(machinery && ufoInBattle))
+		{
+			for (const int tileIndex : craftTiles)
+			{
+				_mirrorOfTile[tileIndex] = -1;
+				isCraftTile[tileIndex] = 0;
+			}
+			_mirrors.pop_back();
+			Log(LOG_INFO) << "OpenXcom3D: a building of " << craftTiles.size() << " tiles from a craft's or a UFO's map (" << (ufoInBattle ? "no power source, navigation or grav lift" : "no UFO in this battle") << "): not mirrored as a craft";
+			continue;
+		}
 		// The craft's box: its first voxel and its size along each axis.
 		for (int axis = 0; axis < 3; ++axis)
 		{
@@ -1922,9 +2074,10 @@ void FirstPersonView::findMirrors()
  * @param worldZ Voxel height, from the bottom of the map (24 per level).
  * @param nextFrame Read an animated part's next frame instead (a pixel already dissolved into it).
  * @param onlyPart Only this tile part counts (0 floor, 1 west wall, 2 north wall, 3 object); -1 any.
+ * @param noWaysThrough A wall one goes through (a door, a curtain: VoxelModel::wayThrough) doesn't count.
  * @return The palette colour, 0 if nothing is there or the voxel is outside the map.
  */
-Uint8 FirstPersonView::voxelColorAt(int worldX, int worldY, int worldZ, bool nextFrame, int onlyPart) const
+Uint8 FirstPersonView::voxelColorAt(int worldX, int worldY, int worldZ, bool nextFrame, int onlyPart, bool noWaysThrough) const
 {
 	const int mapSizeX = _save->getMapSizeX(), mapSizeY = _save->getMapSizeY(), mapSizeZ = _save->getMapSizeZ();
 	if (worldX < 0 || worldY < 0 || worldZ < 0 || worldX >= mapSizeX * 16 || worldY >= mapSizeY * 16 || worldZ >= mapSizeZ * 24) return 0;
@@ -1935,6 +2088,7 @@ Uint8 FirstPersonView::voxelColorAt(int worldX, int worldY, int worldZ, bool nex
 	{
 		if (onlyPart >= 0 && part != onlyPart) continue;
 		const VoxelModel *model = nextFrame && tileView.next[part] ? tileView.next[part] : tileView.part[part];
+		if (model && noWaysThrough && model->wayThrough) continue;
 		const Uint8 color = model ? model->color[worldZ % 24][worldY % 16][worldX % 16] : 0;
 		if (color) return color;
 	}
@@ -1967,6 +2121,14 @@ Uint8 FirstPersonView::mirroredColor(const Hit &hit, int axis, bool skinOnly, bo
 	if (craftId < 0 || !_mirrors[craftId].symmetric[axis])
 	{
 		return 0;
+	}
+	// A wall one goes through (a door, a curtain) keeps its own look on both its faces: it says
+	// "this way" from either side (a player, GitHub issue #156: a curtain was a curtain on one side
+	// only, the other the wall's opposite).
+	if (hit.part >= 0)
+	{
+		const VoxelModel *own = _tileViews[hit.tile].part[hit.part];
+		if (own && own->wayThrough) return 0;
 	}
 	const Mirror &mirror = _mirrors[craftId];
 
@@ -2035,7 +2197,9 @@ Uint8 FirstPersonView::mirroredColor(const Hit &hit, int axis, bool skinOnly, bo
 		sourceVoxel[axis] = bestPos;
 		sourceVoxel[1 - axis] = mirror.lo[1 - axis] + rowAcross;
 		sourceVoxel[2] = mirror.lo[2] + rowUp;
-		const Uint8 color = voxelColorAt(sourceVoxel[0], sourceVoxel[1], sourceVoxel[2], nextFrame, onSkin ? -1 : hit.part); // (0 if it has been blown away since)
+		// (Never a door's or a curtain's look, a wall one goes through: a player, GitHub issue #147, XPiratez's
+		// temple, mirrored as a craft is, wore its curtain's red on the solid wall opposite, "OH A DOOR!!!....wait".)
+		const Uint8 color = voxelColorAt(sourceVoxel[0], sourceVoxel[1], sourceVoxel[2], nextFrame, onSkin ? -1 : hit.part, true); // (0 if it has been blown away since)
 		if (color && !isBlack(color)) return color;
 	}
 	return 0;
@@ -2188,7 +2352,7 @@ void FirstPersonView::findWallPaints()
 		++buildingCount;
 	}
 
-	// What a wall part can be here: 0 kept as it is (a door, a fence, a ghost, nothing to see), 1
+	// What a wall part can be here: 0 kept as it is (a door, a wall one walks through, a fence, a ghost, nothing to see), 1
 	// repainted, 2 repainted and a donor (a plain wall: no glass, no holes in its art, from the
 	// floor to nearly the top, its shown face nearly whole), 3 a window (glass or holes in its
 	// art): its frame and glass keep theirs, the wall round them may take the paint.
@@ -2199,7 +2363,11 @@ void FirstPersonView::findWallPaints()
 		if (found != wallKinds.end()) return found->second;
 		const VoxelModel *model = getModel(data, -1, false);
 		int kind = 0;
-		if (!data->isDoor() && !data->isUFODoor() && !model->empty && !model->ghostly && !model->artFill)
+		// (A wall one walks through, a curtain, is as a door: it keeps its own and lends none. A player,
+		// GitHub issue #147: XPiratez's temple walls wore its curtains' red on their hidden faces, a way
+		// through where there is none.)
+		const bool walkedThrough = data->getTUCost(MT_WALK) < Pathfinding::INVALID_MOVE_COST;
+		if (!data->isDoor() && !data->isUFODoor() && !walkedThrough && !model->empty && !model->ghostly && !model->artFill)
 		{
 			bool seeThrough = model->openingGlass;
 			for (int z = 0; z < Position::TileZ && !seeThrough; ++z)
@@ -2438,10 +2606,36 @@ const FirstPersonView::VoxelModel *FirstPersonView::getModel(const MapData *mapD
 	auto found = _models.find(key);
 	if (found == _models.end())
 	{
+		// A later frame whose art is the first frame's, pixel for pixel (a mod's wall with two sprite
+		// numbers for one picture: XPiratez's NUKE_CITY_2), is the first frame's model: the part
+		// doesn't animate at all. As a model of its own it "pulsed" (a player, GitHub issue #157):
+		// what goes by the model, a wall's paint on its hidden face (see findWallPaints), held for
+		// the first frame only, one tick in eight.
+		const int firstSprite = mapData->getSprite(0);
+		auto sameArt = _sameArtModels.find(key);
+		if (sameArt != _sameArtModels.end())
+		{
+			return sameArt->second;
+		}
+		if (spriteIndex != firstSprite)
+		{
+			SurfaceSet *art = mapData->getDataset() ? mapData->getDataset()->getSurfaceset() : nullptr;
+			const Surface *first = art ? art->getFrame(firstSprite) : nullptr, *frame = art ? art->getFrame(spriteIndex) : nullptr;
+			bool same = first && frame && first->getWidth() == frame->getWidth() && first->getHeight() == frame->getHeight();
+			for (int y = 0; same && y < first->getHeight(); ++y)
+			{
+				same = std::equal(first->getRaw(0, y), first->getRaw(0, y) + first->getWidth(), frame->getRaw(0, y));
+			}
+			if (same)
+			{
+				const VoxelModel *firstModel = getModel(mapData, firstSprite, cutout);
+				_sameArtModels.emplace(key, firstModel);
+				return firstModel;
+			}
+		}
 		// Not built yet: build it in place (the map keeps it at the same address from then on). A later frame of a
 		// part that animates is built as the kind of part its first frame is (see buildModel).
 		// And a part without voxels is, in every frame, the kind of ghost any one of its frames makes it (see partKind).
-		const int firstSprite = mapData->getSprite(0);
 		const VoxelModel *firstFrame = spriteIndex != firstSprite ? getModel(mapData, firstSprite, cutout) : nullptr;
 		if (const VoxelModel *kind = partKind(mapData, cutout)) firstFrame = kind;
 		found = _models.emplace(key, VoxelModel()).first;
@@ -2505,12 +2699,34 @@ const FirstPersonView::VoxelModel *FirstPersonView::partKind(const MapData *mapD
 				break; // (a ghost: that kind; or voxels of its own: it follows its first frame instead, see getModel)
 			}
 		}
-		// A flame (an object that lights its surroundings, by the game's rules, and has no voxels: a campfire, a torch's
+		// A flame (an object that lights its surroundings, by the game's rules, has no voxels, and whose art's outline changes as it burns: a campfire, a torch's
 		// fire) is no ghost of any kind: its art stands on the tile as a sprite, each frame flowing into the next, as
 		// the game's own fire does (see drawFire). With "Parts without shape" off it isn't drawn, as any such part.
 		if (kind.empty || kind.ghostKind != 0)
 		{
-			if (Options::fpsGhostParts != 0 && !cutout && mapData->getObjectType() == O_OBJECT && mapData->getLightSource() > 0)
+			// A flame's outline changes from frame to frame. A machine with lights that blink keeps its
+			// outline, and is a ghost as any part without shape (a player, GitHub issue #150: the consoles
+			// of XPiratez's radar room, which light the room, stood as flat pictures turned to the eye,
+			// and hung through the floor seen from below).
+			bool outlineChanges = false;
+			if (SurfaceSet *art = mapData->getDataset() ? mapData->getDataset()->getSurfaceset() : nullptr)
+			{
+				const Surface *first = art->getFrame(mapData->getSprite(0));
+				for (int frame = 1; first && frame < 8 && !outlineChanges; ++frame)
+				{
+					const Surface *other = art->getFrame(mapData->getSprite(frame));
+					if (!other || other == first) continue;
+					if (other->getWidth() != first->getWidth() || other->getHeight() != first->getHeight())
+					{
+						outlineChanges = true;
+						break;
+					}
+					for (int y = 0; y < first->getHeight() && !outlineChanges; ++y)
+						for (int x = 0; x < first->getWidth() && !outlineChanges; ++x)
+							outlineChanges = (first->getPixel(x, y) != 0) != (other->getPixel(x, y) != 0);
+				}
+			}
+			if (outlineChanges && Options::fpsGhostParts != 0 && !cutout && mapData->getObjectType() == O_OBJECT && mapData->getLightSource() > 0)
 			{
 				clearModel(kind);
 				kind.ghostKind = 5;
@@ -2599,6 +2815,8 @@ const FirstPersonView::Frames &FirstPersonView::getFrames(const MapData *mapData
 void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model, const VoxelModel *firstFrame) const
 {
 	clearModel(model);
+	model.wayThrough = (mapData->getObjectType() == O_WESTWALL || mapData->getObjectType() == O_NORTHWALL)
+		&& (mapData->isDoor() || mapData->isUFODoor() || mapData->getTUCost(MT_WALK) < Pathfinding::INVALID_MOVE_COST);
 
 	// The sprite frame to colour it from; without one it stays empty.
 	const Surface *sprite = nullptr;
@@ -2826,8 +3044,20 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 		bool rises = false;
 		bool low = mapData->getObjectType() == O_OBJECT && lowArt(sprite, yOffset, rises);
 		int block = cutout ? 0 : cropBlockOf(nullptr, mapData, sprite, yOffset);
+		// A floor without shape lying flat that is no lift's pad (a pool's water in XPiratez: no voxels,
+		// no floor to stand on): the map draws it whole, so it fills its tile here too, solid, with
+		// the setting on at all (a player, GitHub issue #142: half its pixels showed, "loose tiles of
+		// water"; with lifts and ladders only, nothing of it, a pit). A lift's pad stays see-through:
+		// who is above or below it is a threat to watch.
+		bool flatFloor = mapData->getObjectType() == O_FLOOR && !mapData->isGravLift() && !ghostShape && !cageArt(sprite, O_FLOOR, yOffset) && artLiesFlat(sprite, yOffset);
+		// (An object that lights its surroundings shows with Lifts too, as its light does: a console, a
+		// lamp without shape. A flame among them isn't built here: see partKind.)
+		const bool lit = mapData->getObjectType() == O_OBJECT && mapData->getLightSource() > 0;
+		// An object the game lets no one walk through, its art big: a body made from the art, solid, with
+		// the setting on at all (see artBody).
+		bool body = !ghostShape && !low && !block && artBody(mapData, sprite);
 		bool ghostWanted = Options::fpsGhostParts == 2
-			|| (Options::fpsGhostParts == 1 && (ghostShape || mapData->isGravLift() || cageArt(sprite, mapData->getObjectType(), yOffset) || low || block));
+			|| (Options::fpsGhostParts == 1 && (ghostShape || mapData->isGravLift() || cageArt(sprite, mapData->getObjectType(), yOffset) || low || block || flatFloor || lit || body));
 		// A part that animates is what its first frame is, in every frame: what kind of ghost it gets is read off the
 		// art (how low it is, how like a block or a cage), and a frame whose art falls just the other side of a line
 		// (a fireplace's flames, one frame in four; a player, GitHub issue #134) lost its ghost, or stood as another kind.
@@ -2845,6 +3075,8 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 			block = firstFrame->ghostKind == 2 ? std::max<int>(1, block ? block : firstFrame->cropBlock) : 0;
 			low = firstFrame->ghostKind == 3;
 			if (low) rises = firstFrame->reliefRises;
+			flatFloor = firstFrame->ghostKind == 6;
+			body = firstFrame->ghostKind == 7;
 		}
 		if (ghostWanted && !cutout)
 		{
@@ -2865,10 +3097,16 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 				model.reliefRises = rises;
 				buildRelief(model, sprite, yOffset, rises);
 			}
+			else if (body)
+			{
+				model.ghostKind = 7;
+				buildArtBody(model, sprite, yOffset);
+			}
 			else
 			{
-				model.ghostKind = 4;
+				model.ghostKind = flatFloor ? 6 : 4;
 				buildGhost(model, sprite, mapData->getObjectType(), yOffset);
+				if (flatFloor) model.solidGhost = !model.empty;
 			}
 			if (!model.empty) colorHiddenSides(model, sprite);
 		}
@@ -2885,6 +3123,52 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	if (glassColors)
 	{
 		keepGlassInPanes(model, mapData->getObjectType());
+	}
+
+	// An object that is a flat picture on the tile's west or north edge (a poster: thinner than a
+	// wall, upright, XPiratez's pin-ups) stands GhostWallClearance voxels into the tile: on the edge
+	// it is inside the voxels of the wall it hangs on, which the rays meet first from either side,
+	// so it showed only once the wall was shot away (a player, GitHub issue #138; the map draws the
+	// object over the wall). Its colours are those its own place gave it. The game's own voxels
+	// for it stay where they are: the shift is the view's.
+	if (mapData->getObjectType() == O_OBJECT && !model.empty && !cutout && !glassColors && model.max[2] - model.min[2] >= PosterMinExtent)
+	{
+		for (int axis = 0; axis < 2; ++axis)
+		{
+			const int other = 1 - axis;
+			if (model.max[axis] >= GhostWallClearance || model.max[other] - model.min[other] < PosterMinExtent) continue;
+			for (int z = 0; z < Position::TileZ; ++z)
+			{
+				for (int y = Position::TileXY - 1; y >= 0; --y)
+				{
+					if (axis == 0)
+					{
+						for (int x = GhostWallClearance - 1; x >= 0; --x)
+						{
+							model.color[z][y][x + GhostWallClearance] = model.color[z][y][x];
+							model.color[z][y][x] = 0;
+						}
+						for (Uint16 *bits : { &model.glass[z][y], &model.lookOnly[z][y], &model.clear[z][y] }) *bits = (Uint16)(*bits << GhostWallClearance);
+					}
+					else if (y < GhostWallClearance)
+					{
+						for (int x = 0; x < Position::TileXY; ++x)
+						{
+							model.color[z][y + GhostWallClearance][x] = model.color[z][y][x];
+							model.color[z][y][x] = 0;
+						}
+						for (auto rows : { model.glass, model.lookOnly, model.clear })
+						{
+							rows[z][y + GhostWallClearance] = rows[z][y];
+							rows[z][y] = 0;
+						}
+					}
+				}
+			}
+			model.min[axis] += GhostWallClearance;
+			model.max[axis] += GhostWallClearance;
+			break;
+		}
 	}
 
 	// A thin plate (all its voxels in the bottom 4 layers) may be drawn as a raised slab: fit its top.
@@ -2950,6 +3234,34 @@ bool FirstPersonView::glassBroken(int tileIndex, int part) const
 {
 	const std::vector<int> &broken = _save->getBrokenGlass();
 	return std::binary_search(broken.begin(), broken.end(), tileIndex * 4 + part);
+}
+
+/**
+ * What is left of a sliding door once it has slid open (a UFO's door, a mod's electric door:
+ * the last frame's picture, cut out where the door has gone), as a ghost: seen through and
+ * never in the way, as any part the game gives no shape (setting "Parts without shape"). The
+ * Setting "Open doors as ghosts". The
+ * game has an open door as no obstacle and nothing to see past, and what the picture still
+ * shows of it stood solid in the doorway (a player, GitHub issue #165: "any voxels without
+ * hitbox should become ghost when open, to prevent visibility hampering"). Made the first time
+ * it's needed, kept as long as the models.
+ * @param model The open door's model.
+ * @return The same voxels as a ghost.
+ */
+const FirstPersonView::VoxelModel *FirstPersonView::openDoorModel(const VoxelModel *model)
+{
+	if (_sharedModelsOwner)
+	{
+		return _sharedModelsOwner->openDoorModel(model);
+	}
+	auto made = _openDoorModels.find(model);
+	if (made == _openDoorModels.end())
+	{
+		made = _openDoorModels.emplace(model, *model).first;
+		made->second.ghostly = true;
+		if (!made->second.ghostKind) made->second.ghostKind = 4; // (a plain ghost)
+	}
+	return &made->second;
 }
 
 /**
@@ -3079,7 +3391,8 @@ void FirstPersonView::fillPaneOpenings(const MapData *mapData, const Surface *sp
  * the pane's edges: a jagged band of glass, one to three voxels wide, all round the inside of the
  * frame (and the frame itself), solid, as shards left standing; the middle is open (the owner,
  * GitHub issue #75: "when broken only voxels on the edges shown"). Its own voxels (the shards on
- * the floor) stay. The pane's model is built here, not taken from the models kept (that cache may
+ * the floor) stay. Only a pane, at least half the game's own glass: a wall with a window in it
+ * breaks into its rubble alone. The pane's model is built here, not taken from the models kept (that cache may
  * grow while this one is being built).
  * @param mapData The record being built.
  * @param model Its model, its own voxels already in.
@@ -3105,10 +3418,25 @@ void FirstPersonView::addBrokenPaneEdges(const MapData *mapData, VoxelModel &mod
 		auto paneModel = std::make_unique<VoxelModel>();
 		buildModel(intact, intact->getSprite(0), false, *paneModel);
 		searching = false;
-		bool anyGlass = false;
-		for (int z = 0; z < Position::TileZ && !anyGlass; ++z)
-			for (int y = 0; y < Position::TileXY && !anyGlass; ++y) anyGlass = paneModel->glass[z][y] != 0;
-		if (!anyGlass || paneModel->empty)
+		// A pane: most of it the game's own glass (not glass filled into an opening, a look only).
+		// A wall with a window in it is no pane: what it breaks into is the game's rubble and
+		// nothing more (a player, GitHub issue #149: XPiratez's temple walls shot down stood on as
+		// frames round a hole, the whole wall but its window, where the game has a low stump and
+		// rounds pass).
+		int glassVoxels = 0, allVoxels = 0;
+		for (int z = 0; z < Position::TileZ; ++z)
+		{
+			for (int y = 0; y < Position::TileXY; ++y)
+			{
+				for (int x = 0; x < Position::TileXY; ++x)
+				{
+					if (!paneModel->color[z][y][x] || ((paneModel->lookOnly[z][y] >> x) & 1)) continue;
+					++allVoxels;
+					if ((paneModel->glass[z][y] >> x) & 1) ++glassVoxels;
+				}
+			}
+		}
+		if (paneModel->empty || glassVoxels * 2 < allVoxels || !glassVoxels)
 		{
 			continue;
 		}
@@ -3854,7 +4182,22 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 				opening = _ufoDoorOpening.emplace(index * 4 + part, trackWalls ? SDL_GetTicks() : SDL_GetTicks() - 10 * UfoDoorTime).first;
 			}
 			const Uint32 age = SDL_GetTicks() - opening->second; // ms since it started sliding
-			frame = age < UfoDoorTime ? std::clamp(1 + (int)(age * 6 / UfoDoorTime), 1, 7) : 7;
+			// The frames of its sliding open: 1 to 7, or fewer where the record's list starts over (the
+			// Lightning's door has four pictures, listed twice: shut, three of opening, shut again, the
+			// three again. The map runs through all eight in a blink; here, at the view's pace, the door
+			// was seen to open, shut and open again: the owner, "as the door would open twice in 3d and
+			// skips a bit"). So only as far as each frame is a new picture, at the same pace a frame,
+			// and then the game's last frame, the door open.
+			int slidingFrames = 1;
+			while (slidingFrames < 7)
+			{
+				bool seen = false;
+				for (int earlier = 0; earlier <= slidingFrames; ++earlier) seen = seen || frames.sprite[earlier] == frames.sprite[slidingFrames + 1];
+				if (seen) break;
+				++slidingFrames;
+			}
+			const Uint32 slidingTime = UfoDoorTime * slidingFrames / 7;
+			frame = age < slidingTime ? std::clamp(1 + (int)(age * 6 / UfoDoorTime), 1, slidingFrames) : 7;
 		}
 		else if (ufoWall)
 		{
@@ -3888,6 +4231,11 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 		}
 		// The glass in a window's opening broken (see breakGlassAt): the opening shown empty.
 		const VoxelModel *model = memo.model, *next = memo.next;
+		// A sliding door open, its sliding done: what is left of it a ghost (setting "Open doors as ghosts", see openDoorModel).
+		if (Options::fpsGhostOpenDoors && cutout && frame == 7 && !model->empty && !model->ghostly)
+		{
+			model = openDoorModel(model);
+		}
 		restless = restless || model->openingGlass; // (its glass may be broken any frame)
 		if (model->openingGlass && glassBroken(index, part))
 		{
