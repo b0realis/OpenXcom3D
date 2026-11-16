@@ -122,6 +122,8 @@ en-GB:
   STR_FPS_GHOST_PARTS_OFF: "Off"
   STR_FPS_GHOST_PARTS_LIFTS: "Lifts"
   STR_FPS_GHOST_PARTS_ALL: "All"
+  STR_FPS_GHOST_OPEN_DOORS: "Open doors as ghosts"
+  STR_FPS_GHOST_OPEN_DOORS_DESC: "YES: what is left of a sliding door once open (a UFO's, a mod's electric door) is seen through, as the parts without shape. NO: solid, as drawn."
   STR_FPS_GHOST_OPACITY: "Ghost opacity"
   STR_FPS_GHOST_OPACITY_DESC: "How solid the parts without shape look up close: 50% as before, 100% solid. Far off, 60% of that."
   STR_FPS_LIFT_BEAMS: "Lift beams"

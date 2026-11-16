@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..c92bc2a96
+index 000000000..ddf1ad732
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,585 @@
+@@ -0,0 +1,587 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -252,6 +252,8 @@ index 000000000..c92bc2a96
 +  STR_FPS_GHOST_PARTS_OFF: "Off"
 +  STR_FPS_GHOST_PARTS_LIFTS: "Lifts"
 +  STR_FPS_GHOST_PARTS_ALL: "All"
++  STR_FPS_GHOST_OPEN_DOORS: "Open doors as ghosts"
++  STR_FPS_GHOST_OPEN_DOORS_DESC: "YES: what is left of a sliding door once open (a UFO's, a mod's electric door) is seen through, as the parts without shape. NO: solid, as drawn."
 +  STR_FPS_GHOST_OPACITY: "Ghost opacity"
 +  STR_FPS_GHOST_OPACITY_DESC: "How solid the parts without shape look up close: 50% as before, 100% solid. Far off, 60% of that."
 +  STR_FPS_LIFT_BEAMS: "Lift beams"
@@ -715,10 +717,10 @@ index 000000000..c92bc2a96
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..ed4bcd203
+index 000000000..356e8cbbc
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,585 @@
+@@ -0,0 +1,587 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -843,6 +845,8 @@ index 000000000..ed4bcd203
 +  STR_FPS_GHOST_PARTS_OFF: "Off"
 +  STR_FPS_GHOST_PARTS_LIFTS: "Lifts"
 +  STR_FPS_GHOST_PARTS_ALL: "All"
++  STR_FPS_GHOST_OPEN_DOORS: "Open doors as ghosts"
++  STR_FPS_GHOST_OPEN_DOORS_DESC: "YES: what is left of a sliding door once open (a UFO's, a mod's electric door) is seen through, as the parts without shape. NO: solid, as drawn."
 +  STR_FPS_GHOST_OPACITY: "Ghost opacity"
 +  STR_FPS_GHOST_OPACITY_DESC: "How solid the parts without shape look up close: 50% as before, 100% solid. Far off, 60% of that."
 +  STR_FPS_LIFT_BEAMS: "Lift beams"
@@ -22239,7 +22243,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..593847253 100644
+index a08796ced..7bdfe8d40 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -22256,7 +22260,7 @@ index a08796ced..593847253 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts;
++OPT bool fpsGhostOpenDoors, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts;
 +OPT int fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
 +OPT std::string fpsCustomPlaystyle;
 +OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
@@ -23307,10 +23311,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..6c1d7c2aa
+index 000000000..0e83fe437
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1540 @@
+@@ -0,0 +1,1542 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24180,6 +24184,8 @@ index 000000000..6c1d7c2aa
 +	// with the grav lift flag), 2 all of them.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsGhostParts", &fpsGhostParts, 1, "STR_FPS_GHOST_PARTS", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsGhostOpacity", &fpsGhostOpacity, 50, "STR_FPS_GHOST_OPACITY", category));
++	// What is left of a sliding door once open, as a ghost: seen through, never in the way (see FirstPersonView::openDoorModel).
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsGhostOpenDoors", &fpsGhostOpenDoors, true, "STR_FPS_GHOST_OPEN_DOORS", category));
 +	// The crops, flower beds and rubble the game gives no real shape, drawn solid as on the map (see
 +	// buildRelief, buildCropBlock): a bit see-through instead (SeeThroughCropOpacity of the pixels),
 +	// so whoever stands in a field shows (the owner's ask, apart from the ghosts' opacity).
@@ -70273,10 +70279,10 @@ index 000000000..5a33d5193
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..c7f267ffa
+index 000000000..3e9e6b58a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,4664 @@
+@@ -0,0 +1,4665 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -73519,6 +73525,7 @@ index 000000000..c7f267ffa
 + * What is left of a sliding door once it has slid open (a UFO's door, a mod's electric door:
 + * the last frame's picture, cut out where the door has gone), as a ghost: seen through and
 + * never in the way, as any part the game gives no shape (setting "Parts without shape"). The
++ * Setting "Open doors as ghosts". The
 + * game has an open door as no obstacle and nothing to see past, and what the picture still
 + * shows of it stood solid in the doorway (a player, GitHub issue #165: "any voxels without
 + * hitbox should become ghost when open, to prevent visibility hampering"). Made the first time
@@ -74509,8 +74516,8 @@ index 000000000..c7f267ffa
 +		}
 +		// The glass in a window's opening broken (see breakGlassAt): the opening shown empty.
 +		const VoxelModel *model = memo.model, *next = memo.next;
-+		// A sliding door open, its sliding done: what is left of it a ghost (see openDoorModel).
-+		if (cutout && frame == 7 && !model->empty && !model->ghostly)
++		// A sliding door open, its sliding done: what is left of it a ghost (setting "Open doors as ghosts", see openDoorModel).
++		if (Options::fpsGhostOpenDoors && cutout && frame == 7 && !model->empty && !model->ghostly)
 +		{
 +			model = openDoorModel(model);
 +		}
@@ -77178,7 +77185,7 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..ac5ef5956
+index 000000000..87e2f6836
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,1035 @@
@@ -77401,7 +77408,7 @@ index 000000000..ac5ef5956
 +			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear", "fpsFallDamage" } },
 +		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
 +			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsHitFlash", "fpsSmoothFire", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
-+			"fpsGhostParts", "fpsGhostOpacity", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
++			"fpsGhostParts", "fpsGhostOpacity", "fpsGhostOpenDoors", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
 +		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsRangefinder", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
 +			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
 +		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
