@@ -1005,7 +1005,7 @@ What `FirstPersonView` draws:
 
 ### 1.14 (2026-11-13)
 
-Hot-fixed 2026-11-14, twice, 2026-11-15, three times, and 2026-11-16, the last time (the first 31 entries, folded into the release):
+Hot-fixed 2026-11-16 (the first 31 entries, folded into the release):
 
 - The Lightning's door opens once (the owner: "as the door would open twice in 3d and skips a bit"). Its record lists four pictures twice (shut, three of opening, shut again, the three again); the map runs through all eight in a blink, but at the 3D view's pace the door was seen to open, shut and open again. A sliding door now plays only as far as each frame is a new picture, at the same pace a frame, and then shows the game's last frame (`snapshotTile`, `slidingFrames`). Doors with eight different frames, the UFOs', slide as before.
 - The weapon in hand no longer flashes as you walk (the owner: "when walking in gpu renderer my weapon in first person flashes"). Its shade was the light where the eye is, cut to a whole shade every frame: walking, the eye bobs and moves between tiles, the light hovered at a shade's edge, and the whole weapon went a shade lighter and darker about four times a second (measured on a street at dusk: 26 changes in a five-second walk, on either renderer; now none). The light is followed over a quarter of a second and the shade moves only when it is well into another (`FirstPersonView::getEyeLight`, `_weaponLight`, `_weaponShade` in FirstPersonModeWeaponInHand.cpp).
