@@ -2589,7 +2589,7 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 
 	// The 3D key works in both views; on the isometric map, the 3D HUD key shows or hides the
 	// map camera.
-	if (key == Options::keyBattleFirstPerson)
+	if (key == Options::keyBattleFirstPerson || (key == Options::keyBattleFirstPerson2 && key != SDLK_UNKNOWN))
 	{
 		if (pressed) toggleView();
 		return true;

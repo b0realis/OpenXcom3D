@@ -1004,6 +1004,14 @@ What `FirstPersonView` draws:
 
 ## 11. Version history
 
+### After 1.14 (not released)
+
+- **The 3D VIEW tab redesigned** (GitHub issues #164, #167, #168: "we definitely have settings bloat"). Three sub-tabs: **Settings**, a first page of eight rows (Gameplay, Renderer, Graphics detail, Render scale, Show trajectory, Full sprite hitboxes, Mouse sensitivity, Start battles in 3D); **Controls**; and **Advanced**, every setting under its section, the sections and the settings in each by the alphabet. Nothing is removed. (The sections of this manual further up still describe the settings one by one; the *Playstyle* they mention is now *Gameplay*.)
+- **Gameplay** replaces *Playstyle*: six presets, each keeping what the one before it set: **FAITHFUL** (soldiers' 3D view on top of OXCE), **Extended+** (the default: the map camera, unit names, hitboxes shown, exact aim), **TACTICUS** (cameras as the eyes see, the accuracy line, the rangefinder, the compass's step costs), **XMbl** (akimbo, lean shots, modern throwing, full sprite hitboxes, damage numbers, sidesteps facing the view, a far clear view), **FullQoL** (every feature on that leaves the rules of turning, moving and shooting alone), **FPS** (free turning and walking, FPS-style shooting, quick deaths, fall damage). Changing one of their 45 settings by hand makes it **Custom**, and the mix is kept (`gameplaySwitches`, `choosePreset`, `presetSwitchChanged`, options `fpsPreset` and `fpsCustomPreset` in place of `fpsPlaystyle`).
+- **Graphics detail**: Low, Medium, High, by the *Renderer*. CPU: Low has pixels twice as big and no sun shadows, Medium the HUD's resolution, High the battlescape's. GPU: Low the HUD's resolution, Medium the display's with *Render scale* on Auto, High that with true colour, smooth light, soft shadows, ambient occlusion and the lights' effects. A ray colours one pixel at every level but the CPU's Low. Changing the *Renderer* sets the level again for it (`graphicsSwitches`, `rendererChanged`, option `fpsGraphicsDetail`).
+- **New defaults**, those of Extended+ and of issue #167: the map camera Small, hitboxes Always, parts without shape All, every shot's line shown, see-through crops and corpses, camera artifacts Light, futuristic night vision; UFO lights, hit sounds, combat music, the accuracy line and fall damage off; pixel size 1. A profile from before keeps every value it has, and reads Custom where they match no preset.
+- **V** is a second key for the isometric / 3D switch beside F8; the auto shot has no key of its own by default (the wheel and the next fire mode key reach it).
+
 ### 1.14 (2026-11-13)
 
 Hot-fixed 2026-11-16 (the first 33 entries, folded into the release):

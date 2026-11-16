@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..ddf1ad732
+index 000000000..50c9ec643
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,587 @@
+@@ -0,0 +1,616 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -144,6 +144,33 @@ index 000000000..ddf1ad732
 +  STR_FPS_SECTION_OTHER: "OTHER"
 +  STR_FPS_SETTINGS: "Settings"
 +  STR_FPS_CONTROLS: "Controls"
++  STR_FPS_ADVANCED: "Advanced"
++  STR_FPS_PRESET: "Gameplay"
++  STR_FPS_PRESET_FAITHFUL: "FAITHFUL"
++  STR_FPS_PRESET_EXTENDED: "Extended+"
++  STR_FPS_PRESET_TACTICUS: "TACTICUS"
++  STR_FPS_PRESET_XMBL: "XMbl"
++  STR_FPS_PRESET_FULLQOL: "FullQoL"
++  STR_FPS_PRESET_FPS: "FPS"
++  STR_FPS_PRESET_CUSTOM: "Custom"
++  STR_FPS_PRESET_FAITHFUL_DESC: "Soldiers' 3D view on top of OXCE: a graphics layer over the game, its rules and turns untouched."
++  STR_FPS_PRESET_EXTENDED_DESC: "Additional features, the intended play for most: map camera, unit names, hitboxes shown, exact aim. The default."
++  STR_FPS_PRESET_TACTICUS_DESC: "A fuller tactical picture, information dense, fewer frills: cameras see as the eyes, accuracy line, rangefinder, step costs."
++  STR_FPS_PRESET_XMBL_DESC: "TACTICUS for the veteran: akimbo, lean shots, modern throwing, full sprite hitboxes, damage numbers, a far clear view."
++  STR_FPS_PRESET_FULLQOL_DESC: "Every feature on: sound, music, UFO lights and aura, jumping, leaning, live scanner, akimbo volley, instant chains."
++  STR_FPS_PRESET_FPS_DESC: "FullQoL by a shooter's rules: free turning and walking, FPS-style shooting, quick deaths, fall damage."
++  STR_FPS_PRESET_CUSTOM_DESC: "Your own mix: a preset with a setting of its own changed under Advanced. Kept while you try the others."
++  STR_FPS_GRAPHICS_DETAIL: "Graphics detail"
++  STR_FPS_GRAPHICS_DETAIL_LOW: "Low"
++  STR_FPS_GRAPHICS_DETAIL_MEDIUM: "Medium"
++  STR_FPS_GRAPHICS_DETAIL_HIGH: "High"
++  STR_FPS_GRAPHICS_DETAIL_LOW_CPU_DESC: "Renderer CPU, Low: pixels twice as big and no sun shadows, about twice the frame rate."
++  STR_FPS_GRAPHICS_DETAIL_MEDIUM_CPU_DESC: "Renderer CPU, Medium: the 3D world as fine as its HUD, a ray for every pixel, sun shadows. The default."
++  STR_FPS_GRAPHICS_DETAIL_HIGH_CPU_DESC: "Renderer CPU, High: the 3D world as fine as the battlescape, a ray for every pixel. Heavy on a big screen."
++  STR_FPS_GRAPHICS_DETAIL_LOW_GPU_DESC: "Renderer GPU, Low: the 3D world at the HUD's resolution in the palette's colours. The fastest."
++  STR_FPS_GRAPHICS_DETAIL_MEDIUM_GPU_DESC: "Renderer GPU, Medium: the display's own resolution; Render scale on Auto keeps the frame rate."
++  STR_FPS_GRAPHICS_DETAIL_HIGH_GPU_DESC: "Renderer GPU, High: Medium with true colour, smooth light, soft shadows, ambient occlusion and the lights' effects."
++  STR_FPS_GRAPHICS_DETAIL_CUSTOM_DESC: "Your own mix of the SCREEN settings under Advanced. Kept while you try the levels."
 +  STR_FPS_BUTTON_3D: "3D"
 +  STR_FPS_BUTTON_ISO: "ISO"
 +  STR_FPS_BUTTON_HUD: "HUD"
@@ -272,7 +299,7 @@ index 000000000..ddf1ad732
 +  STR_FPS_HUD_SCALE_DESC: "How many times the 3D HUD is magnified on a big screen. Auto: as big as fits. Smaller: more room. With 3D resolution: Display it counts the display's pixels."
 +  STR_FPS_HUD_SCALE_AUTO: "Auto"
 +  STR_FPS_RENDER_SCALE: "Render scale"
-+  STR_FPS_RENDER_SCALE_DESC: "Renderer GPU only. The 3D world drawn with fewer rays and magnified; units, effects and the HUD stay sharp. 50%: a quarter of the rays. Auto: as fine as holds the frame rate."
++  STR_FPS_RENDER_SCALE_DESC: "GPU only: fewer rays, magnified. Less for an older or built-in card, 100% for a dedicated one. Auto picks it."
 +  STR_FPS_RENDER_SCALE_AUTO: "Auto"
 +  STR_FPS_SUPERSAMPLING: "Supersampling"
 +  STR_FPS_SUPERSAMPLING_DESC: "Renderer GPU only. Two or four rays a pixel, blended: edges and far fences stop shimmering. Costs as many times the rays."
@@ -595,7 +622,7 @@ index 000000000..ddf1ad732
 +  STR_FPS_AIM_EXACT: "Aim at exact point"
 +  STR_FPS_AIM_EXACT_DESC: "Shots go for the point under the crosshair, on the open sky the air on its line. NO: for its tile (the game's own targeting)."
 +  STR_FPS_TRAJECTORY: "Show trajectory"
-+  STR_FPS_TRAJECTORY_DESC: "While aiming, the path a throw or an arcing shot will take, to where it lands. All: every shot's line too."
++  STR_FPS_TRAJECTORY_DESC: "While aiming. Arcs: the trajectory of all throws and arcing weapons. All: that, and a laser sight for every other shot."
 +  STR_FPS_TRAJECTORY_OFF: "Off"
 +  STR_FPS_TRAJECTORY_ARCS: "Arcs"
 +  STR_FPS_TRAJECTORY_ALL: "All"
@@ -669,6 +696,8 @@ index 000000000..ddf1ad732
 +  STR_FPS_START_IN_FIRST_PERSON_DESC: "Begin each battle in the 3D view."
 +  STR_FPS_KEY_TOGGLE_VIEW: "Isometric / 3D view"
 +  STR_FPS_KEY_TOGGLE_VIEW_DESC: "Switches between the map and the 3D view."
++  STR_FPS_KEY_TOGGLE_VIEW_2: "Isometric / 3D view (second key)"
++  STR_FPS_KEY_TOGGLE_VIEW_2_DESC: "A second key that switches between the map and the 3D view."
 +  STR_FPS_KEY_MOUSE_MODE: "Mouse look / free cursor"
 +  STR_FPS_KEY_MOUSE_MODE_DESC: "Frees the cursor to click buttons (or middle button)."
 +  STR_FPS_KEY_FORWARD: "Walk forward"
@@ -717,10 +746,10 @@ index 000000000..ddf1ad732
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..356e8cbbc
+index 000000000..1b2283d67
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,587 @@
+@@ -0,0 +1,616 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -737,6 +766,33 @@ index 000000000..356e8cbbc
 +  STR_FPS_SECTION_OTHER: "OTHER"
 +  STR_FPS_SETTINGS: "Settings"
 +  STR_FPS_CONTROLS: "Controls"
++  STR_FPS_ADVANCED: "Advanced"
++  STR_FPS_PRESET: "Gameplay"
++  STR_FPS_PRESET_FAITHFUL: "FAITHFUL"
++  STR_FPS_PRESET_EXTENDED: "Extended+"
++  STR_FPS_PRESET_TACTICUS: "TACTICUS"
++  STR_FPS_PRESET_XMBL: "XMbl"
++  STR_FPS_PRESET_FULLQOL: "FullQoL"
++  STR_FPS_PRESET_FPS: "FPS"
++  STR_FPS_PRESET_CUSTOM: "Custom"
++  STR_FPS_PRESET_FAITHFUL_DESC: "Soldiers' 3D view on top of OXCE: a graphics layer over the game, its rules and turns untouched."
++  STR_FPS_PRESET_EXTENDED_DESC: "Additional features, the intended play for most: map camera, unit names, hitboxes shown, exact aim. The default."
++  STR_FPS_PRESET_TACTICUS_DESC: "A fuller tactical picture, information dense, fewer frills: cameras see as the eyes, accuracy line, rangefinder, step costs."
++  STR_FPS_PRESET_XMBL_DESC: "TACTICUS for the veteran: akimbo, lean shots, modern throwing, full sprite hitboxes, damage numbers, a far clear view."
++  STR_FPS_PRESET_FULLQOL_DESC: "Every feature on: sound, music, UFO lights and aura, jumping, leaning, live scanner, akimbo volley, instant chains."
++  STR_FPS_PRESET_FPS_DESC: "FullQoL by a shooter's rules: free turning and walking, FPS-style shooting, quick deaths, fall damage."
++  STR_FPS_PRESET_CUSTOM_DESC: "Your own mix: a preset with a setting of its own changed under Advanced. Kept while you try the others."
++  STR_FPS_GRAPHICS_DETAIL: "Graphics detail"
++  STR_FPS_GRAPHICS_DETAIL_LOW: "Low"
++  STR_FPS_GRAPHICS_DETAIL_MEDIUM: "Medium"
++  STR_FPS_GRAPHICS_DETAIL_HIGH: "High"
++  STR_FPS_GRAPHICS_DETAIL_LOW_CPU_DESC: "Renderer CPU, Low: pixels twice as big and no sun shadows, about twice the frame rate."
++  STR_FPS_GRAPHICS_DETAIL_MEDIUM_CPU_DESC: "Renderer CPU, Medium: the 3D world as fine as its HUD, a ray for every pixel, sun shadows. The default."
++  STR_FPS_GRAPHICS_DETAIL_HIGH_CPU_DESC: "Renderer CPU, High: the 3D world as fine as the battlescape, a ray for every pixel. Heavy on a big screen."
++  STR_FPS_GRAPHICS_DETAIL_LOW_GPU_DESC: "Renderer GPU, Low: the 3D world at the HUD's resolution in the palette's colours. The fastest."
++  STR_FPS_GRAPHICS_DETAIL_MEDIUM_GPU_DESC: "Renderer GPU, Medium: the display's own resolution; Render scale on Auto keeps the frame rate."
++  STR_FPS_GRAPHICS_DETAIL_HIGH_GPU_DESC: "Renderer GPU, High: Medium with true colour, smooth light, soft shadows, ambient occlusion and the lights' effects."
++  STR_FPS_GRAPHICS_DETAIL_CUSTOM_DESC: "Your own mix of the SCREEN settings under Advanced. Kept while you try the levels."
 +  STR_FPS_BUTTON_3D: "3D"
 +  STR_FPS_BUTTON_ISO: "ISO"
 +  STR_FPS_BUTTON_HUD: "HUD"
@@ -865,7 +921,7 @@ index 000000000..356e8cbbc
 +  STR_FPS_HUD_SCALE_DESC: "How many times the 3D HUD is magnified on a big screen. Auto: as big as fits. Smaller: more room. With 3D resolution: Display it counts the display's pixels."
 +  STR_FPS_HUD_SCALE_AUTO: "Auto"
 +  STR_FPS_RENDER_SCALE: "Render scale"
-+  STR_FPS_RENDER_SCALE_DESC: "Renderer GPU only. The 3D world drawn with fewer rays and magnified; units, effects and the HUD stay sharp. 50%: a quarter of the rays. Auto: as fine as holds the frame rate."
++  STR_FPS_RENDER_SCALE_DESC: "GPU only: fewer rays, magnified. Less for an older or built-in card, 100% for a dedicated one. Auto picks it."
 +  STR_FPS_RENDER_SCALE_AUTO: "Auto"
 +  STR_FPS_SUPERSAMPLING: "Supersampling"
 +  STR_FPS_SUPERSAMPLING_DESC: "Renderer GPU only. Two or four rays a pixel, blended: edges and far fences stop shimmering. Costs as many times the rays."
@@ -1188,7 +1244,7 @@ index 000000000..356e8cbbc
 +  STR_FPS_AIM_EXACT: "Aim at exact point"
 +  STR_FPS_AIM_EXACT_DESC: "Shots go for the point under the crosshair, on the open sky the air on its line. NO: for its tile (the game's own targeting)."
 +  STR_FPS_TRAJECTORY: "Show trajectory"
-+  STR_FPS_TRAJECTORY_DESC: "While aiming, the path a throw or an arcing shot will take, to where it lands. All: every shot's line too."
++  STR_FPS_TRAJECTORY_DESC: "While aiming. Arcs: the trajectory of all throws and arcing weapons. All: that, and a laser sight for every other shot."
 +  STR_FPS_TRAJECTORY_OFF: "Off"
 +  STR_FPS_TRAJECTORY_ARCS: "Arcs"
 +  STR_FPS_TRAJECTORY_ALL: "All"
@@ -1262,6 +1318,8 @@ index 000000000..356e8cbbc
 +  STR_FPS_START_IN_FIRST_PERSON_DESC: "Begin each battle in the 3D view."
 +  STR_FPS_KEY_TOGGLE_VIEW: "Isometric / 3D view"
 +  STR_FPS_KEY_TOGGLE_VIEW_DESC: "Switches between the map and the 3D view."
++  STR_FPS_KEY_TOGGLE_VIEW_2: "Isometric / 3D view (second key)"
++  STR_FPS_KEY_TOGGLE_VIEW_2_DESC: "A second key that switches between the map and the 3D view."
 +  STR_FPS_KEY_MOUSE_MODE: "Mouse look / free cursor"
 +  STR_FPS_KEY_MOUSE_MODE_DESC: "Frees the cursor to click buttons (or middle button)."
 +  STR_FPS_KEY_FORWARD: "Walk forward"
@@ -22243,7 +22301,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..7bdfe8d40 100644
+index a08796ced..7d08d28ae 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -22261,9 +22319,9 @@ index a08796ced..7bdfe8d40 100644
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
 +OPT bool fpsGhostOpenDoors, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts;
-+OPT int fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsPlaystyle, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
-+OPT std::string fpsCustomPlaystyle;
-+OPT SDLKey keyBattleFirstPerson, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
++OPT int fpsPreset, fpsGraphicsDetail, fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
++OPT std::string fpsCustomPreset, fpsCustomGraphics;
++OPT SDLKey keyBattleFirstPerson, keyBattleFirstPerson2, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsTurret, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsRange, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
 diff --git a/src/Engine/Screen.cpp b/src/Engine/Screen.cpp
 index ae9083dcb..d05fc2a32 100644
@@ -23311,10 +23369,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..0e83fe437
+index 000000000..cfaba7954
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1542 @@
+@@ -0,0 +1,1690 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -23719,7 +23777,6 @@ index 000000000..0e83fe437
 + */
 +void settleOptions()
 +{
-+	settlePlaystyle();
 +	Options::fpsSmoke = smokeMode();
 +	Options::fpsFlashlightMode = flashlightMode();
 +	Options::fpsAkimbo = akimboChoice();
@@ -23732,178 +23789,322 @@ index 000000000..0e83fe437
 +		Options::keyFpsNextFireMode = Options::keyFpsNextMode;
 +		Options::keyFpsNextMode = SDLK_f;
 +	}
++	settlePresets(); // (after the akimbo setting has its value: the gameplay presets set it)
 +}
 +
 +namespace
 +{
 +
 +/**
-+ * One of the switches the setting "Playstyle" sets: its option (a switch or a number), and its
-+ * value under Faithful (the game's own way, the defaults) and under FPS (a shooter's).
++ * One of the settings a preset sets: its option (a switch or a number) and its value under
++ * each of the group's presets, in their order.
 + */
-+struct PlaystyleSwitch
++struct PresetSwitch
 +{
 +	const char *id;
 +	bool *flag;
 +	int *number;
-+	int faithful, fps;
++	std::vector<int> values;
 +};
 +
 +/**
-+ * The switches the setting "Playstyle" sets (the owner's choice: shooting and turning, moving,
-+ * the feel of combat; the cheats stay apart): FPS-style shooting, turning by the rules, movement
-+ * tile by tile, jumping over low obstacles, leaning (Peek) and lean shots, full sprite hitboxes,
-+ * quick deaths, melee hitting walls and the downed, and the live motion scanner.
-+ * @return The switches.
++ * A group of presets: the option that says which is chosen (0 .. the presets' number - 1, and
++ * that number itself for Custom), the option that keeps the player's own mix ("id=value;..."),
++ * and the settings they set.
 + */
-+const std::vector<PlaystyleSwitch> &playstyleSwitches()
++struct Presets
 +{
-+	static const std::vector<PlaystyleSwitch> switches = {
-+		{ "fpsFaithfulTargeting", &Options::fpsFaithfulTargeting, nullptr, 1, 0 },
-+		{ "fpsTurnCost", &Options::fpsTurnCost, nullptr, 1, 0 },
-+		{ "fpsMovement", nullptr, &Options::fpsMovement, 1, 0 },
-+		{ "fpsVault", &Options::fpsVault, nullptr, 0, 1 },
-+		{ "fpsLean", nullptr, &Options::fpsLean, 0, 1 },
-+		{ "fpsLeanShots", &Options::fpsLeanShots, nullptr, 0, 1 },
-+		{ "fpsSpriteHitboxes", &Options::fpsSpriteHitboxes, nullptr, 0, 1 },
-+		{ "fpsQuickDeaths", &Options::fpsQuickDeaths, nullptr, 0, 1 },
-+		{ "fpsMeleeTerrain", &Options::fpsMeleeTerrain, nullptr, 0, 1 },
-+		{ "fpsLiveScanner", &Options::fpsLiveScanner, nullptr, 0, 1 },
++	int *chosen;
++	std::string *mix;
++	int count;
++	const std::vector<PresetSwitch> &(*switches)();
++};
++
++/**
++ * The settings the gameplay presets set (setting "Gameplay", the first page of the 3D VIEW tab;
++ * after GitHub issue #168, each keeping what the one before it set unless it says otherwise),
++ * a column each:
++ *  - FAITHFUL: soldiers' 3D view on top of OXCE, a graphics layer over the game;
++ *  - Extended+: additional features, the intended play for most, and the defaults (the map
++ *    camera, names, every shot's line, hitboxes always);
++ *  - TACTICUS: a fuller tactical picture, information dense, fewer frills (cameras as the eyes
++ *    see, the accuracy line, the rangefinder);
++ *  - XMbl: TACTICUS for the veteran (akimbo, lean shots, modern throwing, damage numbers, a
++ *    clearer and farther view);
++ *  - FullQoL: every feature on that leaves the game's rules of turning, moving and shooting
++ *    alone (sound, music, UFO lights, jumping, leaning, the live scanner, the volley, instant
++ *    chains, every room painted, the downed always marked);
++ *  - FPS: a shooter's rules on top (free turning, free walking, FPS-style shooting, quick
++ *    deaths).
++ * Aiming at the exact point is on in every one but FAITHFUL; full sprite hitboxes (a shot hits
++ * what is drawn there) from XMbl on.
++ * A setting no preset changes isn't listed: it is the player's alone (every shot's line is
++ * shown in all of them, FAITHFUL too, and so are all the parts without shape; the helmet
++ * cameras' artifacts are Light and night vision is the futuristic one: those are the defaults).
++ * The compass's step costs are TACTICUS's and XMbl's; sidesteps facing the view are XMbl's
++ * alone; fall damage is FPS's alone.
++ * @return The settings.
++ */
++const std::vector<PresetSwitch> &gameplaySwitches()
++{
++	using namespace Options;
++	const int plain = DefaultViewDistance;
++	static const std::vector<PresetSwitch> switches = {
++		//                                                  FAITHFUL  Ext+  TACT  XMbl  QoL   FPS
++		{ "fpsFaithfulTargeting", &fpsFaithfulTargeting, nullptr, { 1,    1,    1,    1,    1,    0 } },
++		{ "fpsTurnCost",          &fpsTurnCost,          nullptr, { 1,    1,    1,    1,    1,    0 } },
++		{ "fpsMovement",          nullptr, &fpsMovement,          { 1,    1,    1,    1,    1,    0 } },
++		{ "fpsVault",             &fpsVault,             nullptr, { 0,    0,    0,    0,    1,    1 } },
++		{ "fpsLean",              nullptr, &fpsLean,              { 0,    0,    0,    0,    1,    1 } },
++		{ "fpsLeanShots",         &fpsLeanShots,         nullptr, { 0,    0,    0,    1,    1,    1 } },
++		{ "fpsSpriteHitboxes",    &fpsSpriteHitboxes,    nullptr, { 0,    0,    0,    1,    1,    1 } },
++		{ "fpsAimExact",          &fpsAimExact,          nullptr, { 0,    1,    1,    1,    1,    1 } },
++		{ "fpsQuickDeaths",       &fpsQuickDeaths,       nullptr, { 0,    0,    0,    0,    0,    1 } },
++		{ "fpsMeleeTerrain",      &fpsMeleeTerrain,      nullptr, { 0,    0,    0,    1,    1,    1 } },
++		{ "fpsLiveScanner",       &fpsLiveScanner,       nullptr, { 0,    0,    0,    0,    1,    1 } },
++		{ "fpsFallDamage",        &fpsFallDamage,        nullptr, { 0,    0,    0,    0,    0,    1 } },
++		{ "fpsAkimbo",            nullptr, &fpsAkimbo,            { 0,    0,    0,    1,    1,    1 } },
++		{ "fpsThrowing",          nullptr, &fpsThrowing,          { 0,    0,    0,    1,    1,    1 } },
++		{ "fpsCloseEyeShots",     &fpsCloseEyeShots,     nullptr, { 0,    0,    0,    1,    1,    1 } },
++		{ "fpsAkimboVolley",      &fpsAkimboVolley,      nullptr, { 0,    0,    0,    0,    1,    1 } },
++		{ "fpsForceBlocked",      &fpsForceBlocked,      nullptr, { 0,    0,    0,    0,    1,    1 } },
++		{ "fpsInstantChains",     &fpsInstantChains,     nullptr, { 0,    0,    0,    0,    1,    1 } },
++		{ "fpsAutoEquipGunsFirst", &fpsAutoEquipGunsFirst, nullptr, { 0,  0,    0,    0,    1,    1 } },
++		{ "fpsSidestepFaceView",  &fpsSidestepFaceView,  nullptr, { 0,    0,    0,    1,    0,    0 } },
++		{ "fpsMapCamera",         nullptr, &fpsMapCamera,         { 0,    1,    1,    1,    1,    1 } },
++		{ "fpsCameraEyes",        &fpsCameraEyes,        nullptr, { 0,    0,    1,    1,    1,    1 } },
++		{ "fpsAlienTurnFacing",   &fpsAlienTurnFacing,   nullptr, { 0,    0,    0,    1,    1,    1 } },
++		{ "fpsUnitNames",         &fpsUnitNames,         nullptr, { 0,    1,    1,    1,    1,    1 } },
++		{ "fpsCompassCosts",      &fpsCompassCosts,      nullptr, { 0,    0,    1,    1,    0,    0 } },
++		{ "fpsHitboxes",          nullptr, &fpsHitboxes,          { 3,    2,    1,    1,    1,    1 } },
++		{ "fpsAccuracyLine",      &fpsAccuracyLine,      nullptr, { 0,    0,    1,    1,    1,    1 } },
++		{ "fpsRangefinder",       nullptr, &fpsRangefinder,       { 0,    0,    1,    1,    1,    1 } },
++		{ "fpsDamageNumbers",     &fpsDamageNumbers,     nullptr, { 0,    0,    0,    1,    1,    1 } },
++		{ "fpsCrosshairDamage",   &fpsCrosshairDamage,   nullptr, { 0,    0,    0,    1,    1,    1 } },
++		{ "fpsGlowingOutlines",   &fpsGlowingOutlines,   nullptr, { 0,    0,    0,    1,    1,    1 } },
++		{ "fpsDownedIcons",       nullptr, &fpsDownedIcons,       { 1,    1,    1,    1,    2,    2 } },
++		{ "fpsWallPaint",         nullptr, &fpsWallPaint,         { 1,    1,    1,    1,    2,    2 } },
++		{ "fpsSeeThroughCrops",   &fpsSeeThroughCrops,   nullptr, { 0,    1,    1,    1,    1,    1 } },
++		{ "fpsSeeThroughCorpses", &fpsSeeThroughCorpses, nullptr, { 0,    1,    1,    1,    1,    1 } },
++		{ "fpsUnseenTerrain",     nullptr, &fpsUnseenTerrain,     { 0,    0,    2,    2,    2,    2 } },
++		{ "fpsHaze",              nullptr, &fpsHaze,              { 0,    0,    0,    2,    2,    2 } },
++		{ "fpsViewDistance",      nullptr, &fpsViewDistance,      { plain, plain, plain, 130, 130, 130 } },
++		{ "fpsSmokeOpacity",      nullptr, &fpsSmokeOpacity,      { 80,   80,   80,   65,   65,   65 } },
++		{ "fpsNightSmokeOpacity", nullptr, &fpsNightSmokeOpacity, { 45,   45,   45,   65,   65,   65 } },
++		{ "fpsUnitSize",          nullptr, &fpsUnitSize,          { 100,  100,  100,  90,   90,   90 } },
++		{ "fpsDiscreetEdge",      &fpsDiscreetEdge,      nullptr, { 0,    0,    0,    1,    1,    1 } },
++		{ "fpsUfoLights",         &fpsUfoLights,         nullptr, { 0,    0,    0,    0,    1,    1 } },
++		{ "fpsHitSounds",         &fpsHitSounds,         nullptr, { 0,    0,    1,    0,    1,    1 } },
++		{ "fpsCombatMusic",       &fpsCombatMusic,       nullptr, { 0,    0,    0,    0,    1,    1 } },
 +	};
 +	return switches;
 +}
 +
 +/**
-+ * A playstyle switch's value now (a switch as 0 or 1).
-+ * @param playstyleSwitch The switch.
-+ * @return The value.
++ * The settings "Graphics detail" sets (the first page of the 3D VIEW tab): how fine the 3D
++ * world is drawn and what the graphics card adds, at Low, Medium and High. What a level means
++ * goes by the setting "Renderer", so there are two tables. A ray colours one pixel at every
++ * level but the CPU's Low (blocks of two). On the CPU: Low has those blocks and no sun shadows,
++ * Medium the HUD's resolution (the defaults), High the battlescape's. On the card: Low is the
++ * CPU's Medium picture drawn fast, Medium the display's own resolution with "Render scale" on
++ * Auto (as fine as the frame rate allows), High that with full colour, smooth light, soft
++ * shadows, ambient occlusion and the lights' effects. Supersampling is Off at every level.
++ * @return The settings, for the renderer chosen now.
 + */
-+int switchValue(const PlaystyleSwitch &playstyleSwitch)
++const std::vector<PresetSwitch> &graphicsSwitches()
 +{
-+	return playstyleSwitch.flag ? (*playstyleSwitch.flag ? 1 : 0) : *playstyleSwitch.number;
++	using namespace Options;
++	static const std::vector<PresetSwitch> onCpu = {
++		//                                                       Low   Med   High
++		{ "fpsViewResolution",  nullptr, &fpsViewResolution,   { 0,    0,    1 } },
++		{ "fpsPixelSize",       nullptr, &fpsPixelSize,        { 2,    1,    1 } },
++		{ "fpsRenderScale",     nullptr, &fpsRenderScale,      { 100,  100,  100 } },
++		{ "fpsShadows",         &fpsShadows,         nullptr,  { 0,    1,    1 } },
++		{ "fpsSupersampling",   nullptr, &fpsSupersampling,    { 0,    0,    0 } },
++		{ "fpsSoftShadows",     &fpsSoftShadows,     nullptr,  { 0,    0,    0 } },
++		{ "fpsAllLightShadows", &fpsAllLightShadows, nullptr,  { 0,    0,    0 } },
++		{ "fpsAmbientOcclusion", &fpsAmbientOcclusion, nullptr, { 0,   0,    0 } },
++		{ "fpsTrueColor",       &fpsTrueColor,       nullptr,  { 0,    0,    0 } },
++		{ "fpsSmoothLight",     &fpsSmoothLight,     nullptr,  { 0,    0,    0 } },
++		{ "fpsColoredLights",   &fpsColoredLights,   nullptr,  { 0,    0,    0 } },
++		{ "fpsReflections",     &fpsReflections,     nullptr,  { 0,    0,    0 } },
++		{ "fpsLightShafts",     &fpsLightShafts,     nullptr,  { 0,    0,    0 } },
++	};
++	static const std::vector<PresetSwitch> onCard = {
++		//                                                       Low   Med   High
++		{ "fpsViewResolution",  nullptr, &fpsViewResolution,   { 0,    2,    2 } },
++		{ "fpsPixelSize",       nullptr, &fpsPixelSize,        { 1,    1,    1 } },
++		{ "fpsRenderScale",     nullptr, &fpsRenderScale,      { 100,  0,    0 } },
++		{ "fpsShadows",         &fpsShadows,         nullptr,  { 1,    1,    1 } },
++		{ "fpsSupersampling",   nullptr, &fpsSupersampling,    { 0,    0,    0 } },
++		{ "fpsSoftShadows",     &fpsSoftShadows,     nullptr,  { 0,    0,    1 } },
++		{ "fpsAllLightShadows", &fpsAllLightShadows, nullptr,  { 0,    0,    1 } },
++		{ "fpsAmbientOcclusion", &fpsAmbientOcclusion, nullptr, { 0,   0,    1 } },
++		{ "fpsTrueColor",       &fpsTrueColor,       nullptr,  { 0,    0,    1 } },
++		{ "fpsSmoothLight",     &fpsSmoothLight,     nullptr,  { 0,    0,    1 } },
++		{ "fpsColoredLights",   &fpsColoredLights,   nullptr,  { 0,    0,    1 } },
++		{ "fpsReflections",     &fpsReflections,     nullptr,  { 0,    0,    1 } },
++		{ "fpsLightShafts",     &fpsLightShafts,     nullptr,  { 0,    0,    1 } },
++	};
++	return fpsRenderer == 1 ? onCard : onCpu;
 +}
 +
 +/**
-+ * Sets a playstyle switch.
-+ * @param playstyleSwitch The switch.
-+ * @param value Its value (a switch: 0 or not).
++ * A group of presets.
++ * @param group Which.
++ * @return It.
 + */
-+void setSwitch(const PlaystyleSwitch &playstyleSwitch, int value)
++const Presets &presetsOf(PresetGroup group)
 +{
-+	if (playstyleSwitch.flag) *playstyleSwitch.flag = value != 0;
-+	else *playstyleSwitch.number = value;
++	static const Presets gameplay = { &Options::fpsPreset, &Options::fpsCustomPreset, 6, gameplaySwitches };
++	static const Presets graphics = { &Options::fpsGraphicsDetail, &Options::fpsCustomGraphics, 3, graphicsSwitches };
++	return group == PRESET_GRAPHICS ? graphics : gameplay;
 +}
 +
-+/**
-+ * The playstyle switches as they are now, as Custom keeps them: "fpsTurnCost=0;fpsMovement=0;...".
-+ * @return The text.
-+ */
-+std::string currentMix()
++/// A preset's setting as it is now (a switch as 0 or 1).
++int switchValue(const PresetSwitch &presetSwitch)
++{
++	// (Akimbo not yet settled, the defaults just restored: Off, see akimboChoice.)
++	if (presetSwitch.number == &Options::fpsAkimbo && *presetSwitch.number < 0) return 0;
++	return presetSwitch.flag ? (*presetSwitch.flag ? 1 : 0) : *presetSwitch.number;
++}
++
++/// Sets a preset's setting (a switch: 0 or not).
++void setSwitch(const PresetSwitch &presetSwitch, int value)
++{
++	if (presetSwitch.flag) *presetSwitch.flag = value != 0;
++	else *presetSwitch.number = value;
++}
++
++/// A group's settings as they are now, as Custom keeps them: "fpsTurnCost=0;fpsMovement=0;...".
++std::string currentMix(const Presets &presets)
 +{
 +	std::string mix;
-+	for (const PlaystyleSwitch &playstyleSwitch : playstyleSwitches())
++	for (const PresetSwitch &presetSwitch : presets.switches())
 +	{
-+		mix += std::string(playstyleSwitch.id) + "=" + std::to_string(switchValue(playstyleSwitch)) + ";";
++		mix += std::string(presetSwitch.id) + "=" + std::to_string(switchValue(presetSwitch)) + ";";
 +	}
 +	return mix;
 +}
 +
-+/**
-+ * The playstyle the switches are in now: Faithful (0) if all of them are as Faithful has them,
-+ * FPS (1) if all are as FPS has them, else Custom (2).
-+ * @return The playstyle.
-+ */
-+int playstyleOfSwitches()
++/// The preset a group's settings make now: the first whose values they all have, else Custom (the presets' number).
++int presetOfSwitches(const Presets &presets)
 +{
-+	bool faithful = true, fps = true;
-+	for (const PlaystyleSwitch &playstyleSwitch : playstyleSwitches())
++	for (int preset = 0; preset < presets.count; ++preset)
 +	{
-+		faithful = faithful && switchValue(playstyleSwitch) == playstyleSwitch.faithful;
-+		fps = fps && switchValue(playstyleSwitch) == playstyleSwitch.fps;
-+	}
-+	return faithful ? 0 : fps ? 1 : 2;
-+}
-+
-+}
-+
-+/**
-+ * Chooses a playstyle (setting "Playstyle", the owner's ask: "Faithful has all that we have now
-+ * defaults (close to iso play but in 3d). Doom mode pushes multiple switches for easier FPS
-+ * gameplay. And third setting custom - it is a mix of player own settings and remembers player
-+ * settings in next start"): Faithful and FPS set their switches (see playstyleSwitches); Custom
-+ * sets them back as the player had them (Options::fpsCustomPlaystyle). Leaving Custom keeps the
-+ * mix first, so flipping to Faithful or FPS and back loses nothing.
-+ * @param playstyle Faithful (0), FPS (1) or Custom (2).
-+ */
-+void choosePlaystyle(int playstyle)
-+{
-+	if (Options::fpsPlaystyle == 2)
-+	{
-+		Options::fpsCustomPlaystyle = currentMix();
-+	}
-+	Options::fpsPlaystyle = std::clamp(playstyle, 0, 2);
-+	for (const PlaystyleSwitch &playstyleSwitch : playstyleSwitches())
-+	{
-+		if (Options::fpsPlaystyle < 2)
++		bool all = true;
++		for (const PresetSwitch &presetSwitch : presets.switches())
 +		{
-+			setSwitch(playstyleSwitch, Options::fpsPlaystyle == 0 ? playstyleSwitch.faithful : playstyleSwitch.fps);
++			all = all && switchValue(presetSwitch) == presetSwitch.values[preset];
++		}
++		if (all) return preset;
++	}
++	return presets.count;
++}
++
++}
++
++/**
++ * How many presets a group has by name; Custom is the number after the last.
++ */
++int presetCount(PresetGroup group)
++{
++	return presetsOf(group).count;
++}
++
++/**
++ * Chooses a preset (settings "Gameplay" and "Graphics detail"): a named one sets its settings;
++ * Custom sets them back as the player had them (the group's kept mix). Leaving Custom keeps
++ * the mix first, so trying a preset and coming back loses nothing. Nothing but the group's
++ * settings is touched.
++ * @param group Which presets.
++ * @param preset One of them (0 ..), or their number for Custom.
++ */
++void choosePreset(PresetGroup group, int preset)
++{
++	const Presets &presets = presetsOf(group);
++	if (*presets.chosen == presets.count)
++	{
++		*presets.mix = currentMix(presets);
++	}
++	*presets.chosen = std::clamp(preset, 0, presets.count);
++	for (const PresetSwitch &presetSwitch : presets.switches())
++	{
++		if (*presets.chosen < presets.count)
++		{
++			setSwitch(presetSwitch, presetSwitch.values[*presets.chosen]);
 +			continue;
 +		}
 +		// Custom: the kept value, where there is one ("id=value;").
-+		const std::string key = std::string(playstyleSwitch.id) + "=";
-+		const size_t at = Options::fpsCustomPlaystyle.find(key);
-+		if (at != std::string::npos && (at == 0 || Options::fpsCustomPlaystyle[at - 1] == ';'))
++		const std::string key = std::string(presetSwitch.id) + "=";
++		const size_t at = presets.mix->find(key);
++		if (at != std::string::npos && (at == 0 || (*presets.mix)[at - 1] == ';'))
 +		{
-+			setSwitch(playstyleSwitch, std::atoi(Options::fpsCustomPlaystyle.c_str() + at + key.size()));
++			setSwitch(presetSwitch, std::atoi(presets.mix->c_str() + at + key.size()));
 +		}
 +	}
 +}
 +
 +/**
-+ * Notes a playstyle switch changed by hand (setting "Playstyle"): the playstyle becomes the one
-+ * the switches now make (Faithful or FPS if they are all as those have them), else Custom,
-+ * keeping the mix.
++ * Whether Custom can be chosen in a group: only once the player has a mix of their own (with
++ * none kept, Custom would show its name over the last preset's settings).
 + */
-+void playstyleSwitchChanged()
++bool presetHasCustom(PresetGroup group)
 +{
-+	Options::fpsPlaystyle = playstyleOfSwitches();
-+	if (Options::fpsPlaystyle == 2)
++	const Presets &presets = presetsOf(group);
++	return *presets.chosen == presets.count || !presets.mix->empty();
++}
++
++/**
++ * Notes a setting changed by hand: each group that sets it becomes the preset its settings now
++ * make (a named one if they are all as it has them), else Custom, keeping the mix.
++ * @param id The setting.
++ */
++void presetSwitchChanged(const std::string &id)
++{
++	for (PresetGroup group : { PRESET_GAMEPLAY, PRESET_GRAPHICS })
 +	{
-+		Options::fpsCustomPlaystyle = currentMix();
++		const Presets &presets = presetsOf(group);
++		bool member = false;
++		for (const PresetSwitch &presetSwitch : presets.switches()) member = member || id == presetSwitch.id;
++		if (!member) continue;
++		*presets.chosen = presetOfSwitches(presets);
++		if (*presets.chosen == presets.count)
++		{
++			*presets.mix = currentMix(presets);
++		}
 +	}
 +}
 +
 +/**
-+ * Whether a setting is one the setting "Playstyle" sets (see playstyleSwitches).
-+ * @param id The setting's id.
-+ * @return True if so.
++ * The setting "Renderer" changed: a named "Graphics detail" means other settings on the card
++ * than on the CPU (see graphicsSwitches), so it is set again for the new renderer, and Low
++ * stays Low. Custom is the player's own and stays as it is.
 + */
-+bool isPlaystyleSwitch(const std::string &id)
++void rendererChanged()
 +{
-+	for (const PlaystyleSwitch &playstyleSwitch : playstyleSwitches())
++	if (Options::fpsGraphicsDetail < presetCount(PRESET_GRAPHICS))
 +	{
-+		if (id == playstyleSwitch.id) return true;
++		choosePreset(PRESET_GRAPHICS, Options::fpsGraphicsDetail);
 +	}
-+	return false;
 +}
 +
 +/**
-+ * Settles the setting "Playstyle" with the switches as they are (a profile from before it, its
-+ * switches the player's own, or one edited by hand): Faithful or FPS only if the switches are all
-+ * as that playstyle has them, else Custom, keeping them as the mix. Custom stays Custom.
++ * Settles the presets with the settings as they are (a profile from before them, or one edited
++ * by hand): each group says the preset its settings make, or Custom, keeping them as the mix.
++ * Nothing but the two names changes: no setting of the player's is touched.
 + */
-+void settlePlaystyle()
++void settlePresets()
 +{
-+	// The live motion scanner joined the playstyle in 1.11 (GitHub issue #101): a profile from before
-+	// it that says FPS gets it as FPS has it (switched off by hand, it would have said Custom).
-+	if (Options::fpsPlaystyle == 1 && !Options::fpsLiveScanner)
++	for (PresetGroup group : { PRESET_GAMEPLAY, PRESET_GRAPHICS })
 +	{
-+		Options::fpsLiveScanner = true;
-+	}
-+	if (Options::fpsPlaystyle != 2 && playstyleOfSwitches() != Options::fpsPlaystyle)
-+	{
-+		Options::fpsPlaystyle = 2;
-+		Options::fpsCustomPlaystyle = currentMix();
++		const Presets &presets = presetsOf(group);
++		const int made = presetOfSwitches(presets);
++		if (made != *presets.chosen)
++		{
++			*presets.chosen = made;
++			if (made == presets.count) *presets.mix = currentMix(presets);
++		}
 +	}
 +}
 +
@@ -23987,15 +24188,17 @@ index 000000000..0e83fe437
 +
 +	// The settings (YES/NO switches and numbers), in the order the Settings list shows them.
 +	// First the headline feature: hovering a soldier's button shows that soldier's helmet camera.
-+	// The playstyle (the owner's ask: a theme flipping the switches that make it play like the
-+	// game or like a shooter, see choosePlaystyle): Faithful (0), FPS (1) or Custom (2), the
-+	// player's own mix of those switches kept (unlisted: no description).
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsPlaystyle", &fpsPlaystyle, 0, "STR_FPS_PLAYSTYLE", category));
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsCustomPlaystyle", &fpsCustomPlaystyle, "", "", category));
++	// The presets (see choosePreset): how it plays (FAITHFUL to FPS, Extended+ the default; Custom the number after the last)
++	// and how fine it is drawn (Low, Medium, High; Custom), each with the player's own mix of its settings kept
++	// (unlisted: no description).
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsPreset", &fpsPreset, 1, "STR_FPS_PRESET", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsCustomPreset", &fpsCustomPreset, "", "", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsGraphicsDetail", &fpsGraphicsDetail, 1, "STR_FPS_GRAPHICS_DETAIL", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsCustomGraphics", &fpsCustomGraphics, "", "", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsSoldierPreview", &fpsSoldierPreview, true, "STR_FPS_SOLDIER_PREVIEW", category));
 +	// And on the isometric map, the selected soldier's helmet camera in a window: off, small,
 +	// medium or large (0 to 3).
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsMapCamera", &fpsMapCamera, 0, "STR_FPS_MAP_CAMERA", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsMapCamera", &fpsMapCamera, 1, "STR_FPS_MAP_CAMERA", category));
 +	// The helmet cameras see as the soldier's eyes do (a player, GitHub issue #90: an X-Com Files
 +	// X-Bat's heat vision saw through smoke, its camera didn't): their heat vision through smoke
 +	// and fire. Off (the owner: a realistic camera, as before, by default): a camera hasn't the
@@ -24005,7 +24208,7 @@ index 000000000..0e83fe437
 +	// mini camera ... LESS neat when Camera becomes illegible for longer than say, 250ms"): the
 +	// feeds' bad signal and spells of static as they are, Normal (0, the default); Light (1), a
 +	// lighter static and no glitch longer than LightGlitchLongest; or None (2), a clean feed.
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsCameraArtifacts", &fpsCameraArtifacts, 0, "STR_FPS_CAMERA_ARTIFACTS", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsCameraArtifacts", &fpsCameraArtifacts, 1, "STR_FPS_CAMERA_ARTIFACTS", category));
 +	// Mouse look: how fast the view turns (1 to 20), up and down swapped or not, and the field
 +	// of view across the screen, in degrees (50 to 110).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsMouseSensitivity", &fpsMouseSensitivity, 5, "STR_FPS_MOUSE_SENSITIVITY", category));
@@ -24045,7 +24248,7 @@ index 000000000..0e83fe437
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsFalling", &fpsFalling, true, "STR_FPS_FALLING", category));
 +	// Fall damage, on its own (a player, GitHub issue #137: "Falling" off to play without the
 +	// damage also stopped every step off a ledge): off, a landing only jolts the view.
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsFallDamage", &fpsFallDamage, true, "STR_FPS_FALL_DAMAGE", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsFallDamage", &fpsFallDamage, false, "STR_FPS_FALL_DAMAGE", category));
 +	// A step off a ledge onto ground no one can walk on, or where no step leads out (a player's
 +	// report: X-Com Files' blood moat, which the map never lets a soldier into, soft-locked one),
 +	// stops at the edge with a warning; pushing that way again (or jumping) goes over.
@@ -24127,8 +24330,8 @@ index 000000000..0e83fe437
 +	// as 1.0's YES/NO wouldn't load into a number).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlashlightMode", &fpsFlashlightMode, -1, "STR_FPS_FLASHLIGHT", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightVisionGear", &fpsNightVisionGear, false, "STR_FPS_NIGHT_VISION_GEAR", category));
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsCombatMusic", &fpsCombatMusic, true, "STR_FPS_COMBAT_MUSIC", category));
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitSounds", &fpsHitSounds, true, "STR_FPS_HIT_SOUNDS", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsCombatMusic", &fpsCombatMusic, false, "STR_FPS_COMBAT_MUSIC", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitSounds", &fpsHitSounds, false, "STR_FPS_HIT_SOUNDS", category));
 +	// The 3D view's ambient sounds (the owner: "The weather effects should also have nonobtrusive
 +	// sound. Namely rain and wind. The fire burning in front of you should also have a sound"),
 +	// made by the game (see FirstPersonAmbience): Off (0), Quiet (1, half as loud), On (2).
@@ -24176,13 +24379,13 @@ index 000000000..0e83fe437
 +	// Futuristic night vision (a player, GitHub issue #88: the map's night vision leaves units and
 +	// items their own colours): units, bodies and items keep theirs, the world goes green. Off (the
 +	// owner: realistic, by default), everything goes green.
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightVisionUnits", &fpsNightVisionUnits, false, "STR_FPS_NIGHT_VISION_UNITS", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightVisionUnits", &fpsNightVisionUnits, true, "STR_FPS_NIGHT_VISION_UNITS", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsParticles", &fpsParticles, 2, "STR_FPS_PARTICLES", category));
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsUfoLights", &fpsUfoLights, true, "STR_FPS_UFO_LIGHTS", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsUfoLights", &fpsUfoLights, false, "STR_FPS_UFO_LIGHTS", category));
 +	// Parts the map draws but gives no shape (no voxels: ladders, lifts' pads, walls of laser
 +	// beams), shown as see-through ghosts of their art: 0 none, 1 lifts and ladders (the parts
 +	// with the grav lift flag), 2 all of them.
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsGhostParts", &fpsGhostParts, 1, "STR_FPS_GHOST_PARTS", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsGhostParts", &fpsGhostParts, 2, "STR_FPS_GHOST_PARTS", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsGhostOpacity", &fpsGhostOpacity, 50, "STR_FPS_GHOST_OPACITY", category));
 +	// What is left of a sliding door once open, as a ghost: seen through, never in the way (see FirstPersonView::openDoorModel).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsGhostOpenDoors", &fpsGhostOpenDoors, true, "STR_FPS_GHOST_OPEN_DOORS", category));
@@ -24192,10 +24395,10 @@ index 000000000..0e83fe437
 +	// A lift anywhere (a building's elevator, an alien base's; a UFO's has its own with "UFO lights and aura"): a beam of light
 +	// rising through it, in the colours of its pad.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsLiftBeams", &fpsLiftBeams, true, "STR_FPS_LIFT_BEAMS", category));
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCrops", &fpsSeeThroughCrops, false, "STR_FPS_SEE_THROUGH_CROPS", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCrops", &fpsSeeThroughCrops, true, "STR_FPS_SEE_THROUGH_CROPS", category));
 +	// A corpse or item pointed at, the game's line passing it to something behind: drawn faint, at
 +	// the ghost opacity (the game's shots pass through them).
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCorpses", &fpsSeeThroughCorpses, false, "STR_FPS_SEE_THROUGH_CORPSES", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCorpses", &fpsSeeThroughCorpses, true, "STR_FPS_SEE_THROUGH_CORPSES", category));
 +	// The map's edge as small red dots on the floor, nothing beyond it, instead of the tape.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsDiscreetEdge", &fpsDiscreetEdge, false, "STR_FPS_DISCREET_EDGE", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsRenderer", &fpsRenderer, 0, "STR_FPS_RENDERER", category));
@@ -24219,7 +24422,7 @@ index 000000000..0e83fe437
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsReflections", &fpsReflections, false, "STR_FPS_REFLECTIONS", category));
 +	// In full colour: the flashlight, flares, lamps and coloured lights show as beams and glows in smoke and under the sea.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsLightShafts", &fpsLightShafts, false, "STR_FPS_LIGHT_SHAFTS", category));
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 0, "STR_FPS_PIXEL_SIZE", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 1, "STR_FPS_PIXEL_SIZE", category));
 +	// The crosshair: shown or not, the shot info under it, aiming at the exact point under it
 +	// (YES) or at the tile, as the original game does (NO), and the units' hitboxes.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCrosshair", &fpsCrosshair, true, "STR_FPS_CROSSHAIR", category));
@@ -24239,7 +24442,7 @@ index 000000000..0e83fe437
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCraftIcons", &fpsCraftIcons, true, "STR_FPS_CRAFT_ICONS", category));
 +	// A line under the crosshair as wide as a shot strays to either side: with the game's own
 +	// targeting, as far as a successful accuracy roll sends it at that range; in FPS style, the spread.
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsAccuracyLine", &fpsAccuracyLine, true, "STR_FPS_ACCURACY_LINE", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsAccuracyLine", &fpsAccuracyLine, false, "STR_FPS_ACCURACY_LINE", category));
 +	// The name of the unit under the crosshair (or the free cursor), as the game names it.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsUnitNames", &fpsUnitNames, true, "STR_FPS_UNIT_NAMES", category));
 +	// How the stat bars read, on the map and in 3D (a player's report: a 300-HP unit's bar looked
@@ -24255,7 +24458,7 @@ index 000000000..0e83fe437
 +	// The path a throw or shot would take, drawn while aiming: off (0), throws and arcing
 +	// shots (1), every shot too (2); and confirm fire: the first click marks the target and
 +	// shows its path, a second click on it fires.
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsTrajectory", &fpsTrajectory, 1, "STR_FPS_TRAJECTORY", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsTrajectory", &fpsTrajectory, 2, "STR_FPS_TRAJECTORY", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsConfirmFire", &fpsConfirmFire, false, "STR_FPS_CONFIRM_FIRE", category));
 +	// An arcing shot the game would refuse (no curve of its own lands on the target tile, as at
 +	// a wall seen from the side) fires anyway, forced as with Ctrl held (its path drawn yellow).
@@ -24277,7 +24480,7 @@ index 000000000..0e83fe437
 +	// The units' hitboxes, outlined: off (0), fading in and out once a second (1), always (2), or
 +	// only the unit pointed at (3, the first for new installs: a player's report, GitHub issue #27,
 +	// new players aimed at a Sectoid's picture and missed its hitbox).
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitboxes", &fpsHitboxes, 3, "STR_FPS_HITBOXES", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitboxes", &fpsHitboxes, 2, "STR_FPS_HITBOXES", category));
 +	// A unit hit where its picture shows (in a line of fire, a card facing the shooter; see
 +	// FirstPersonSpriteHits.cpp), for everyone's shots, in 3D and on the map, instead of the game's
 +	// voxel shapes (the owner's, GitHub issue #42). Off: the game's own.
@@ -24343,6 +24546,9 @@ index 000000000..0e83fe437
 +	// The add-on's own keys, in the order the Controls list shows them, with their default keys.
 +	// Switching views, freeing the cursor from mouse look, and showing the classic HUD.
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyBattleFirstPerson", &keyBattleFirstPerson, SDLK_F8, "STR_FPS_KEY_TOGGLE_VIEW", category));
++	// (A second key for it, under the left hand: GitHub issue #167. The auto shot, which had V, has no key of its own
++	// by default now: the wheel and the next fire mode key reach it.)
++	options.push_back(OptionInfo(OPTION_OTHER, "keyBattleFirstPerson2", &keyBattleFirstPerson2, SDLK_v, "STR_FPS_KEY_TOGGLE_VIEW_2", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsMouseMode", &keyFpsMouseMode, SDLK_c, "STR_FPS_KEY_MOUSE_MODE", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsClassicHud", &keyFpsClassicHud, SDLK_h, "STR_FPS_KEY_CLASSIC_HUD", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsHideHud", &keyFpsHideHud, SDLK_p, "STR_FPS_KEY_HIDE_HUD", category));
@@ -24371,7 +24577,7 @@ index 000000000..0e83fe437
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsNextMode", &keyFpsNextMode, SDLK_f, "STR_FPS_KEY_NEXT_MODE", "STR_FIRST_PERSON_SAVED"));
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsModeSnap", &keyFpsModeSnap, SDLK_z, "STR_FPS_KEY_MODE_SNAP", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsModeAimed", &keyFpsModeAimed, SDLK_x, "STR_FPS_KEY_MODE_AIMED", category));
-+	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsModeAuto", &keyFpsModeAuto, SDLK_v, "STR_FPS_KEY_MODE_AUTO", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsModeAuto", &keyFpsModeAuto, SDLK_UNKNOWN, "STR_FPS_KEY_MODE_AUTO", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsSwitchHand", &keyFpsSwitchHand, SDLK_g, "STR_FPS_KEY_SWITCH_HAND", category));
 +	// Akimbo on and off in battle (Y: one of the letters the battlescape leaves free).
 +	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsAkimbo", &keyFpsAkimbo, SDLK_y, "STR_FPS_KEY_AKIMBO", category));
@@ -24859,10 +25065,10 @@ index 000000000..0e83fe437
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..e29b04d4c
+index 000000000..3d09171a4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,492 @@
+@@ -0,0 +1,498 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -25025,14 +25231,20 @@ index 000000000..e29b04d4c
 +/// Settles settings that take their first value from an older one (the smoke from "See-through
 +/// smoke", the flashlight from 1.0's two flashlight settings, the next fire mode key from 1.0's).
 +void settleOptions();
-+/// Setting "Playstyle": chooses Faithful (0), FPS (1) or Custom (2), setting its switches.
-+void choosePlaystyle(int playstyle);
-+/// Setting "Playstyle": notes one of its switches changed by hand (the playstyle the switches make now, Custom keeping them).
-+void playstyleSwitchChanged();
-+/// Setting "Playstyle": whether a setting is one of the switches it sets.
-+bool isPlaystyleSwitch(const std::string &id);
-+/// Setting "Playstyle": settles it with the switches as they are (a profile from before it: Custom unless they match).
-+void settlePlaystyle();
++/// The groups of presets on the first page of the 3D VIEW tab: how it plays, and how fine it is drawn.
++enum PresetGroup { PRESET_GAMEPLAY, PRESET_GRAPHICS };
++/// How many presets a group has by name; Custom is the number after the last.
++int presetCount(PresetGroup group);
++/// Chooses a preset of a group (its number for Custom), setting its settings.
++void choosePreset(PresetGroup group, int preset);
++/// Whether Custom can be chosen in a group (the player has a mix of their own).
++bool presetHasCustom(PresetGroup group);
++/// Notes a setting changed by hand: a group that sets it says the preset its settings make now, or Custom.
++void presetSwitchChanged(const std::string &id);
++/// The setting "Renderer" changed: a named "Graphics detail" is set again for it.
++void rendererChanged();
++/// Settles the presets' names with the settings as they are.
++void settlePresets();
 +/// Does a mod the game finds for the first time (one not yet in the player's mod list) start
 +/// switched on? Our own mod does, so a game set up by hand plays in 3D at once; switched off, it
 +/// stays off.
@@ -32288,7 +32500,7 @@ index 000000000..eaa9f409a
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..3afff8e72
+index 000000000..034c36048
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
 @@ -0,0 +1,3315 @@
@@ -34883,7 +35095,7 @@ index 000000000..3afff8e72
 +
 +	// The 3D key works in both views; on the isometric map, the 3D HUD key shows or hides the
 +	// map camera.
-+	if (key == Options::keyBattleFirstPerson)
++	if (key == Options::keyBattleFirstPerson || (key == Options::keyBattleFirstPerson2 && key != SDLK_UNKNOWN))
 +	{
 +		if (pressed) toggleView();
 +		return true;
@@ -77185,10 +77397,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..87e2f6836
+index 000000000..2925c7717
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,1035 @@
+@@ -0,0 +1,1087 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -77332,8 +77544,9 @@ index 000000000..87e2f6836
 +	// Same layout as the Controls and Advanced tabs: a row of sub-tab buttons over a scrolling
 +	// list (sizes and positions in pixels of the game's 320x200 screen, all centred on a bigger
 +	// one below). The Settings sub-tab is the one pressed at first.
-+	_btnSettings = new TextButton(70, 16, 94, 8);
-+	_btnControlsList = new TextButton(70, 16, 168, 8);
++	_btnSettings = new TextButton(66, 16, 94, 8);
++	_btnControlsList = new TextButton(66, 16, 161, 8);
++	_btnAdvanced = new TextButton(66, 16, 228, 8);
 +	_lstOptions = new TextList(200, 120, 94, 26);
 +	_owner = _btnSettings;
 +
@@ -77341,6 +77554,7 @@ index 000000000..87e2f6836
 +	// options were opened in a battle.
 +	add(_btnSettings, "button", "controlsMenu");
 +	add(_btnControlsList, "button", "controlsMenu");
++	add(_btnAdvanced, "button", "controlsMenu");
 +	if (origin != OPT_BATTLESCAPE)
 +	{
 +		add(_lstOptions, "optionLists", "controlsMenu");
@@ -77351,7 +77565,7 @@ index 000000000..87e2f6836
 +	}
 +	centerAllSurfaces();
 +
-+	// The two sub-tab buttons work as a group (one pressed at a time); pressing either one
++	// The three sub-tab buttons work as a group (one pressed at a time); pressing any one
 +	// refills the list.
 +	_btnSettings->setText(tr("STR_FPS_SETTINGS"));
 +	_btnSettings->setGroup(&_owner);
@@ -77360,6 +77574,10 @@ index 000000000..87e2f6836
 +	_btnControlsList->setText(tr("STR_FPS_CONTROLS"));
 +	_btnControlsList->setGroup(&_owner);
 +	_btnControlsList->onMousePress((ActionHandler)&OptionsFirstPersonState::btnListPress, SDL_BUTTON_LEFT);
++
++	_btnAdvanced->setText(tr("STR_FPS_ADVANCED"));
++	_btnAdvanced->setGroup(&_owner);
++	_btnAdvanced->onMousePress((ActionHandler)&OptionsFirstPersonState::btnListPress, SDL_BUTTON_LEFT);
 +
 +	// The list: names on the left (152 pixels wide), values right-aligned on the right (48
 +	// pixels). Clicks change values, key presses rebind keys, and hovering a row shows its
@@ -77394,31 +77612,49 @@ index 000000000..87e2f6836
 +			gathered.push_back(option);
 +		}
 +	}
-+	// The settings under their section headings, in this order (a player's report, GitHub issue
-+	// #27: "these could probably be separated into sections"); any setting not placed here goes
-+	// at the end, under a heading of its own.
++	// The first page (sub-tab Settings; GitHub issue #164: the presets, the renderer and a few most used settings,
++	// all the rest under Advanced): the two presets, the renderer, the render scale (the one number to turn for
++	// speed on a graphics card), two settings players commonly change (the shot's preview, full sprite hitboxes),
++	// and what goes by the hand and the habit, which no preset can know.
++	for (const char *id : { "fpsPreset", "fpsRenderer", "fpsGraphicsDetail", "fpsRenderScale", "fpsTrajectory", "fpsSpriteHitboxes", "fpsMouseSensitivity", "fpsStartInFirstPerson" })
++	{
++		for (const OptionInfo &option : gathered)
++		{
++			if (option.id() == id) _basics.push_back(option);
++		}
++	}
++	// Advanced: every setting but the two presets, under its section (a player's report, GitHub issue #27: "these
++	// could probably be separated into sections"); any setting not placed here goes under a heading of its own. The
++	// sections are listed by the alphabet, and so are the settings in each, by the names shown (the owner: "in their
++	// own logical groups and alphabetical"): a setting is found by its name, not by where it happened to be added.
 +	static const struct { const char *heading; std::vector<const char*> ids; } sections[] = {
-+		{ "STR_FPS_SECTION_PLAYSTYLE", { "fpsPlaystyle" } },
 +		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsCameraEyes", "fpsCameraArtifacts", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView", "fpsZoom",
 +			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsAlienTurnFacing", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
 +		{ "STR_FPS_SECTION_MOVEMENT", { "fpsTurnCost", "fpsSidestepFaceView", "fpsMovement", "fpsWalkSpeed", "fpsFlightCost", "fpsFlightCostOverride", "fpsVault",
-+			"fpsFalling", "fpsSafeLanding" } },
++			"fpsFalling", "fpsSafeLanding", "fpsFallDamage" } },
 +		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsRecoil", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsThrowing", "fpsLean", "fpsMeleeTerrain",
 +			"fpsMeleeFloors", "fpsAimExact", "fpsCloseEyeShots", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
-+			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear", "fpsFallDamage" } },
-+		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
++			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear" } },
++		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
 +			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsHitFlash", "fpsSmoothFire", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
-+			"fpsGhostParts", "fpsGhostOpacity", "fpsGhostOpenDoors", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
++			"fpsGhostParts", "fpsGhostOpacity", "fpsGhostOpenDoors", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge" } },
 +		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsRangefinder", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
 +			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
 +		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 +		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
-+		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsRenderScale", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion", "fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts" } },
++		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsRenderScale", "fpsPixelSize", "fpsShadows", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion",
++			"fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts", "FPS", "fpsCounter" } },
 +	};
++	struct Section { std::string heading, name; std::vector<OptionInfo> options; };
++	std::vector<Section> sorted;
 +	std::vector<bool> placed(gathered.size(), false);
++	for (size_t index = 0; index < gathered.size(); ++index)
++	{
++		placed[index] = gathered[index].id() == "fpsPreset" || gathered[index].id() == "fpsGraphicsDetail"; // (the first page's alone)
++	}
 +	for (const auto &section : sections)
 +	{
-+		_settingHeadings.push_back({ _settings.size(), section.heading });
++		sorted.push_back({ section.heading, std::string(tr(section.heading)), {} });
 +		for (const char *id : section.ids)
 +		{
 +			for (size_t index = 0; index < gathered.size(); ++index)
@@ -77426,19 +77662,23 @@ index 000000000..87e2f6836
 +				if (!placed[index] && gathered[index].id() == id)
 +				{
 +					placed[index] = true;
-+					_settings.push_back(gathered[index]);
++					sorted.back().options.push_back(gathered[index]);
 +				}
 +			}
 +		}
 +	}
++	Section other = { "STR_FPS_SECTION_OTHER", std::string(tr("STR_FPS_SECTION_OTHER")), {} };
 +	for (size_t index = 0; index < gathered.size(); ++index)
 +	{
-+		if (placed[index]) continue;
-+		if (_settingHeadings.back().first != _settings.size() && _settingHeadings.back().second != "STR_FPS_SECTION_OTHER")
-+		{
-+			_settingHeadings.push_back({ _settings.size(), "STR_FPS_SECTION_OTHER" });
-+		}
-+		_settings.push_back(gathered[index]);
++		if (!placed[index]) other.options.push_back(gathered[index]);
++	}
++	std::sort(sorted.begin(), sorted.end(), [](const Section &one, const Section &two) { return one.name < two.name; });
++	if (!other.options.empty()) sorted.push_back(other);
++	for (Section &section : sorted)
++	{
++		std::stable_sort(section.options.begin(), section.options.end(), [this](const OptionInfo &one, const OptionInfo &two) { return label(one) < label(two); });
++		_settingHeadings.push_back({ _settings.size(), section.heading });
++		_settings.insert(_settings.end(), section.options.begin(), section.options.end());
 +	}
 +	// After our own keys come the game's keys that work in 3D, in the order of GameKeys and
 +	// then the ten enemy keys.
@@ -77668,11 +77908,17 @@ index 000000000..87e2f6836
 +			static const char *const flashlightNames[] = { "STR_FPS_FLASHLIGHT_OFF", "STR_FPS_FLASHLIGHT_ON", "STR_FPS_FLASHLIGHT_DYNAMIC" };
 +			return std::string(tr(flashlightNames[FirstPerson::flashlightMode()]));
 +		}
-+		// The playstyle is a choice of three, shown by name.
-+		if (option.id() == "fpsPlaystyle")
++		// The presets, shown by name (Custom after the last of each).
++		if (option.id() == "fpsPreset")
 +		{
-+			static const char *const playstyleNames[] = { "STR_FPS_PLAYSTYLE_FAITHFUL", "STR_FPS_PLAYSTYLE_FPS", "STR_FPS_PLAYSTYLE_CUSTOM" };
-+			return std::string(tr(playstyleNames[std::clamp(*option.asInt(), 0, 2)]));
++			static const char *const presetNames[] = { "STR_FPS_PRESET_FAITHFUL", "STR_FPS_PRESET_EXTENDED", "STR_FPS_PRESET_TACTICUS", "STR_FPS_PRESET_XMBL", "STR_FPS_PRESET_FULLQOL",
++				"STR_FPS_PRESET_FPS", "STR_FPS_PRESET_CUSTOM" };
++			return std::string(tr(presetNames[std::clamp(*option.asInt(), 0, 6)]));
++		}
++		if (option.id() == "fpsGraphicsDetail")
++		{
++			static const char *const detailNames[] = { "STR_FPS_GRAPHICS_DETAIL_LOW", "STR_FPS_GRAPHICS_DETAIL_MEDIUM", "STR_FPS_GRAPHICS_DETAIL_HIGH", "STR_FPS_PRESET_CUSTOM" };
++			return std::string(tr(detailNames[std::clamp(*option.asInt(), 0, 3)]));
 +		}
 +		// Leaning out is a choice of three, shown by name.
 +		if (option.id() == "fpsLean")
@@ -77722,13 +77968,12 @@ index 000000000..87e2f6836
 +	_rowOptions.clear();
 +	_selectedKey = -1;
 +	_selKey = nullptr;
-+	const bool settings = _owner == _btnSettings;
-+	const std::vector<OptionInfo> &shownOptions = settings ? _settings : _keys;
-+	const std::vector<std::pair<size_t, std::string>> keyHeadings = { { _ownKeys, "STR_FPS_GAME_KEYS" } };
-+	const std::vector<std::pair<size_t, std::string>> &headings = settings ? _settingHeadings : keyHeadings;
-+	for (size_t optionIndex = 0; optionIndex < shownOptions.size(); ++optionIndex)
++	const std::vector<OptionInfo> &shown = shownOptions();
++	const std::vector<std::pair<size_t, std::string>> keyHeadings = { { _ownKeys, "STR_FPS_GAME_KEYS" } }, none;
++	const std::vector<std::pair<size_t, std::string>> &headings = _owner == _btnAdvanced ? _settingHeadings : _owner == _btnControlsList ? keyHeadings : none;
++	for (size_t optionIndex = 0; optionIndex < shown.size(); ++optionIndex)
 +	{
-+		const OptionInfo &option = shownOptions[optionIndex];
++		const OptionInfo &option = shown[optionIndex];
 +		// A heading over the options from here on.
 +		for (const auto &heading : headings)
 +		{
@@ -77754,13 +77999,20 @@ index 000000000..87e2f6836
 + */
 +OptionInfo *OptionsFirstPersonState::getEntry(int row, bool *isKey)
 +{
-+	std::vector<OptionInfo> &shownOptions = (_owner == _btnSettings) ? _settings : _keys;
-+	*isKey = (_owner != _btnSettings);
++	*isKey = (_owner == _btnControlsList);
 +	if (row < 0 || row >= (int)_rowOptions.size() || _rowOptions[row] < 0)
 +	{
 +		return nullptr;
 +	}
-+	return &shownOptions[_rowOptions[row]];
++	return &shownOptions()[_rowOptions[row]];
++}
++
++/**
++ * The options the sub-tab pressed now lists: the first page's, the keys, or every setting.
++ */
++std::vector<OptionInfo> &OptionsFirstPersonState::shownOptions()
++{
++	return _owner == _btnAdvanced ? _settings : _owner == _btnControlsList ? _keys : _basics;
 +}
 +
 +/**
@@ -78002,10 +78254,13 @@ index 000000000..87e2f6836
 +		{
 +			*value = (FirstPerson::flashlightMode() + direction + 3) % 3;
 +		}
-+		// The playstyle (Faithful, FPS, Custom): round and round, its switches set with it.
-+		else if (value == &Options::fpsPlaystyle)
++		// A preset: round and round through its names, its settings set with it, and Custom after the last
++		// once the player has a mix of their own to come back to.
++		else if (value == &Options::fpsPreset || value == &Options::fpsGraphicsDetail)
 +		{
-+			FirstPerson::choosePlaystyle((*value + direction + 3) % 3);
++			const FirstPerson::PresetGroup group = value == &Options::fpsPreset ? FirstPerson::PRESET_GAMEPLAY : FirstPerson::PRESET_GRAPHICS;
++			const int choices = FirstPerson::presetCount(group) + (FirstPerson::presetHasCustom(group) ? 1 : 0);
++			FirstPerson::choosePreset(group, (std::min(*value, choices - 1) + direction + choices) % choices);
 +		}
 +		// Leaning out (off, peek, tilt): round and round.
 +		else if (value == &Options::fpsLean)
@@ -78089,12 +78344,14 @@ index 000000000..87e2f6836
 +			}
 +		}
 +	}
-+	// A playstyle switch changed by hand: the playstyle follows (see playstyleSwitchChanged).
-+	if (FirstPerson::isPlaystyleSwitch(option->id()))
++	// The renderer changed: a named "Graphics detail" is set again for it. A setting a preset sets changed by
++	// hand: the preset follows (see presetSwitchChanged).
++	if (option->id() == "fpsRenderer")
 +	{
-+		FirstPerson::playstyleSwitchChanged();
++		FirstPerson::rendererChanged();
 +	}
-+	// Show the new value, and every other row's (the playstyle and its switches move together).
++	FirstPerson::presetSwitchChanged(option->id());
++	// Show the new value, and every other row's (a preset and its settings move together).
 +	for (int shownRow = 0; shownRow < (int)_rowOptions.size(); ++shownRow)
 +	{
 +		bool shownIsKey = false;
@@ -78103,6 +78360,7 @@ index 000000000..87e2f6836
 +			if (!shownIsKey) _lstOptions->setCellText(shownRow, 1, valueText(*shown));
 +		}
 +	}
++	lstOptionsMouseOver(nullptr); // (a preset's description is the chosen one's)
 +}
 +
 +/**
@@ -78188,7 +78446,13 @@ index 000000000..87e2f6836
 +	if (option)
 +	{
 +		const std::string gameKeyLabel = gameKeyName(option->id());
-+		tooltip = option->id() == "fpsCounter" ? std::string(tr("STR_FPS_FRAME_COUNTER_DESC"))
++		// A preset's line says what the one chosen now is (the graphics levels by the renderer, which they go by).
++		static const char *const presetKeys[] = { "FAITHFUL", "EXTENDED", "TACTICUS", "XMBL", "FULLQOL", "FPS", "CUSTOM" };
++		static const char *const detailKeys[] = { "LOW", "MEDIUM", "HIGH" };
++		tooltip = option->id() == "fpsPreset" ? std::string(tr(std::string("STR_FPS_PRESET_") + presetKeys[std::clamp(Options::fpsPreset, 0, 6)] + "_DESC"))
++			: option->id() == "fpsGraphicsDetail" ? std::string(tr(Options::fpsGraphicsDetail > 2 ? std::string("STR_FPS_GRAPHICS_DETAIL_CUSTOM_DESC")
++				: std::string("STR_FPS_GRAPHICS_DETAIL_") + detailKeys[std::clamp(Options::fpsGraphicsDetail, 0, 2)] + (Options::fpsRenderer == 1 ? "_GPU_DESC" : "_CPU_DESC")))
++			: option->id() == "fpsCounter" ? std::string(tr("STR_FPS_FRAME_COUNTER_DESC"))
 +			: option->id() == "FPS" ? std::string(tr("STR_FPS_FRAME_LIMIT_DESC"))
 +			: std::string(tr((gameKeyLabel.empty() ? option->description() : gameKeyLabel) + "_DESC"));
 +	}
@@ -78226,10 +78490,10 @@ index 000000000..87e2f6836
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.h b/src/FirstPerson/OptionsFirstPersonState.h
 new file mode 100644
-index 000000000..69bc23727
+index 000000000..b860f5356
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.h
-@@ -0,0 +1,111 @@
+@@ -0,0 +1,115 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -78289,16 +78553,18 @@ index 000000000..69bc23727
 +/**
 + * "3D View" options tab, only offered when the OpenXcom3D mod is active:
 + * first-person settings and key bindings (options in category STR_FIRST_PERSON).
-+ * Two sub-tabs share one list: Settings (the add-on's switches and numbers, plus the game's
-+ * frame rate limit and frame counter) and Controls (the add-on's keys, then the game's keys
-+ * that work in 3D). Left click raises or toggles a value, or picks a key to rebind; right
++ * Three sub-tabs share one list: Settings (the first page: the two presets, the renderer and
++ * the few settings that go by the player and the machine), Controls (the add-on's keys, then
++ * the game's keys that work in 3D) and Advanced (every setting, under its section, the
++ * sections and the settings in each by the alphabet; with them the game's frame rate limit
++ * and frame counter). Left click raises or toggles a value, or picks a key to rebind; right
 + * click lowers a value or clears a key.
 + */
 +class OptionsFirstPersonState : public OptionsBaseState
 +{
-+	TextButton *_btnSettings, *_btnControlsList, *_owner; // The sub-tab buttons, and the one pressed now.
++	TextButton *_btnSettings, *_btnControlsList, *_btnAdvanced, *_owner; // The sub-tab buttons, and the one pressed now.
 +	TextList *_lstOptions;                              // The list of settings or keys.
-+	std::vector<OptionInfo> _settings, _keys;           // Copies of the options' infos (they still point at the real options).
++	std::vector<OptionInfo> _basics, _settings, _keys;  // Copies of the options' infos (they still point at the real options): the first page's, every setting (Advanced), the keys.
 +	size_t _ownKeys = 0;                                // How many of _keys are the 3D view's own: they come first, then the game's keys that work in 3D (under a heading).
 +	std::vector<std::pair<size_t, std::string>> _settingHeadings; // The settings' section headings: the setting each one goes over, and its text.
 +	std::vector<int> _rowOptions;                       // For each row of the list shown: its option (an index into _settings or _keys), or -1 for a heading.
@@ -78307,6 +78573,8 @@ index 000000000..69bc23727
 +	OptionInfo *_selKey;                                // That key's option (nullptr: none).
 +	Uint8 _colorSel, _colorNormal;                      // Row colours: a key waiting for a new key, and normal.
 +
++	/// The options the sub-tab pressed now lists.
++	std::vector<OptionInfo> &shownOptions();
 +	/// Gets the option shown on a list row (nullptr for a heading); isKey says if the keys are showing.
 +	OptionInfo *getEntry(int row, bool *isKey);
 +	/// Text for an option's current value (YES/NO, a number or its name, a key's name).

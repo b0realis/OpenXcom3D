@@ -57,16 +57,18 @@ class TextList;
 /**
  * "3D View" options tab, only offered when the OpenXcom3D mod is active:
  * first-person settings and key bindings (options in category STR_FIRST_PERSON).
- * Two sub-tabs share one list: Settings (the add-on's switches and numbers, plus the game's
- * frame rate limit and frame counter) and Controls (the add-on's keys, then the game's keys
- * that work in 3D). Left click raises or toggles a value, or picks a key to rebind; right
+ * Three sub-tabs share one list: Settings (the first page: the two presets, the renderer and
+ * the few settings that go by the player and the machine), Controls (the add-on's keys, then
+ * the game's keys that work in 3D) and Advanced (every setting, under its section, the
+ * sections and the settings in each by the alphabet; with them the game's frame rate limit
+ * and frame counter). Left click raises or toggles a value, or picks a key to rebind; right
  * click lowers a value or clears a key.
  */
 class OptionsFirstPersonState : public OptionsBaseState
 {
-	TextButton *_btnSettings, *_btnControlsList, *_owner; // The sub-tab buttons, and the one pressed now.
+	TextButton *_btnSettings, *_btnControlsList, *_btnAdvanced, *_owner; // The sub-tab buttons, and the one pressed now.
 	TextList *_lstOptions;                              // The list of settings or keys.
-	std::vector<OptionInfo> _settings, _keys;           // Copies of the options' infos (they still point at the real options).
+	std::vector<OptionInfo> _basics, _settings, _keys;  // Copies of the options' infos (they still point at the real options): the first page's, every setting (Advanced), the keys.
 	size_t _ownKeys = 0;                                // How many of _keys are the 3D view's own: they come first, then the game's keys that work in 3D (under a heading).
 	std::vector<std::pair<size_t, std::string>> _settingHeadings; // The settings' section headings: the setting each one goes over, and its text.
 	std::vector<int> _rowOptions;                       // For each row of the list shown: its option (an index into _settings or _keys), or -1 for a heading.
@@ -75,6 +77,8 @@ class OptionsFirstPersonState : public OptionsBaseState
 	OptionInfo *_selKey;                                // That key's option (nullptr: none).
 	Uint8 _colorSel, _colorNormal;                      // Row colours: a key waiting for a new key, and normal.
 
+	/// The options the sub-tab pressed now lists.
+	std::vector<OptionInfo> &shownOptions();
 	/// Gets the option shown on a list row (nullptr for a heading); isKey says if the keys are showing.
 	OptionInfo *getEntry(int row, bool *isKey);
 	/// Text for an option's current value (YES/NO, a number or its name, a key's name).

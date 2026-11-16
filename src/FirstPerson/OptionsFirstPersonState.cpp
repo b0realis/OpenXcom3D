@@ -141,8 +141,9 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 	// Same layout as the Controls and Advanced tabs: a row of sub-tab buttons over a scrolling
 	// list (sizes and positions in pixels of the game's 320x200 screen, all centred on a bigger
 	// one below). The Settings sub-tab is the one pressed at first.
-	_btnSettings = new TextButton(70, 16, 94, 8);
-	_btnControlsList = new TextButton(70, 16, 168, 8);
+	_btnSettings = new TextButton(66, 16, 94, 8);
+	_btnControlsList = new TextButton(66, 16, 161, 8);
+	_btnAdvanced = new TextButton(66, 16, 228, 8);
 	_lstOptions = new TextList(200, 120, 94, 26);
 	_owner = _btnSettings;
 
@@ -150,6 +151,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 	// options were opened in a battle.
 	add(_btnSettings, "button", "controlsMenu");
 	add(_btnControlsList, "button", "controlsMenu");
+	add(_btnAdvanced, "button", "controlsMenu");
 	if (origin != OPT_BATTLESCAPE)
 	{
 		add(_lstOptions, "optionLists", "controlsMenu");
@@ -160,7 +162,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 	}
 	centerAllSurfaces();
 
-	// The two sub-tab buttons work as a group (one pressed at a time); pressing either one
+	// The three sub-tab buttons work as a group (one pressed at a time); pressing any one
 	// refills the list.
 	_btnSettings->setText(tr("STR_FPS_SETTINGS"));
 	_btnSettings->setGroup(&_owner);
@@ -169,6 +171,10 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 	_btnControlsList->setText(tr("STR_FPS_CONTROLS"));
 	_btnControlsList->setGroup(&_owner);
 	_btnControlsList->onMousePress((ActionHandler)&OptionsFirstPersonState::btnListPress, SDL_BUTTON_LEFT);
+
+	_btnAdvanced->setText(tr("STR_FPS_ADVANCED"));
+	_btnAdvanced->setGroup(&_owner);
+	_btnAdvanced->onMousePress((ActionHandler)&OptionsFirstPersonState::btnListPress, SDL_BUTTON_LEFT);
 
 	// The list: names on the left (152 pixels wide), values right-aligned on the right (48
 	// pixels). Clicks change values, key presses rebind keys, and hovering a row shows its
@@ -203,31 +209,49 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 			gathered.push_back(option);
 		}
 	}
-	// The settings under their section headings, in this order (a player's report, GitHub issue
-	// #27: "these could probably be separated into sections"); any setting not placed here goes
-	// at the end, under a heading of its own.
+	// The first page (sub-tab Settings; GitHub issue #164: the presets, the renderer and a few most used settings,
+	// all the rest under Advanced): the two presets, the renderer, the render scale (the one number to turn for
+	// speed on a graphics card), two settings players commonly change (the shot's preview, full sprite hitboxes),
+	// and what goes by the hand and the habit, which no preset can know.
+	for (const char *id : { "fpsPreset", "fpsRenderer", "fpsGraphicsDetail", "fpsRenderScale", "fpsTrajectory", "fpsSpriteHitboxes", "fpsMouseSensitivity", "fpsStartInFirstPerson" })
+	{
+		for (const OptionInfo &option : gathered)
+		{
+			if (option.id() == id) _basics.push_back(option);
+		}
+	}
+	// Advanced: every setting but the two presets, under its section (a player's report, GitHub issue #27: "these
+	// could probably be separated into sections"); any setting not placed here goes under a heading of its own. The
+	// sections are listed by the alphabet, and so are the settings in each, by the names shown (the owner: "in their
+	// own logical groups and alphabetical"): a setting is found by its name, not by where it happened to be added.
 	static const struct { const char *heading; std::vector<const char*> ids; } sections[] = {
-		{ "STR_FPS_SECTION_PLAYSTYLE", { "fpsPlaystyle" } },
 		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsCameraEyes", "fpsCameraArtifacts", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView", "fpsZoom",
 			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsAlienTurnFacing", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
 		{ "STR_FPS_SECTION_MOVEMENT", { "fpsTurnCost", "fpsSidestepFaceView", "fpsMovement", "fpsWalkSpeed", "fpsFlightCost", "fpsFlightCostOverride", "fpsVault",
-			"fpsFalling", "fpsSafeLanding" } },
+			"fpsFalling", "fpsSafeLanding", "fpsFallDamage" } },
 		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsRecoil", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsThrowing", "fpsLean", "fpsMeleeTerrain",
 			"fpsMeleeFloors", "fpsAimExact", "fpsCloseEyeShots", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
-			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear", "fpsFallDamage" } },
-		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsShadows", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
+			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear" } },
+		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
 			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsHitFlash", "fpsSmoothFire", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
-			"fpsGhostParts", "fpsGhostOpacity", "fpsGhostOpenDoors", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge", "fpsPixelSize", "FPS", "fpsCounter" } },
+			"fpsGhostParts", "fpsGhostOpacity", "fpsGhostOpenDoors", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge" } },
 		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsRangefinder", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
 			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
 		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
-		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsRenderScale", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion", "fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts" } },
+		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsRenderScale", "fpsPixelSize", "fpsShadows", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion",
+			"fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts", "FPS", "fpsCounter" } },
 	};
+	struct Section { std::string heading, name; std::vector<OptionInfo> options; };
+	std::vector<Section> sorted;
 	std::vector<bool> placed(gathered.size(), false);
+	for (size_t index = 0; index < gathered.size(); ++index)
+	{
+		placed[index] = gathered[index].id() == "fpsPreset" || gathered[index].id() == "fpsGraphicsDetail"; // (the first page's alone)
+	}
 	for (const auto &section : sections)
 	{
-		_settingHeadings.push_back({ _settings.size(), section.heading });
+		sorted.push_back({ section.heading, std::string(tr(section.heading)), {} });
 		for (const char *id : section.ids)
 		{
 			for (size_t index = 0; index < gathered.size(); ++index)
@@ -235,19 +259,23 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 				if (!placed[index] && gathered[index].id() == id)
 				{
 					placed[index] = true;
-					_settings.push_back(gathered[index]);
+					sorted.back().options.push_back(gathered[index]);
 				}
 			}
 		}
 	}
+	Section other = { "STR_FPS_SECTION_OTHER", std::string(tr("STR_FPS_SECTION_OTHER")), {} };
 	for (size_t index = 0; index < gathered.size(); ++index)
 	{
-		if (placed[index]) continue;
-		if (_settingHeadings.back().first != _settings.size() && _settingHeadings.back().second != "STR_FPS_SECTION_OTHER")
-		{
-			_settingHeadings.push_back({ _settings.size(), "STR_FPS_SECTION_OTHER" });
-		}
-		_settings.push_back(gathered[index]);
+		if (!placed[index]) other.options.push_back(gathered[index]);
+	}
+	std::sort(sorted.begin(), sorted.end(), [](const Section &one, const Section &two) { return one.name < two.name; });
+	if (!other.options.empty()) sorted.push_back(other);
+	for (Section &section : sorted)
+	{
+		std::stable_sort(section.options.begin(), section.options.end(), [this](const OptionInfo &one, const OptionInfo &two) { return label(one) < label(two); });
+		_settingHeadings.push_back({ _settings.size(), section.heading });
+		_settings.insert(_settings.end(), section.options.begin(), section.options.end());
 	}
 	// After our own keys come the game's keys that work in 3D, in the order of GameKeys and
 	// then the ten enemy keys.
@@ -477,11 +505,17 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 			static const char *const flashlightNames[] = { "STR_FPS_FLASHLIGHT_OFF", "STR_FPS_FLASHLIGHT_ON", "STR_FPS_FLASHLIGHT_DYNAMIC" };
 			return std::string(tr(flashlightNames[FirstPerson::flashlightMode()]));
 		}
-		// The playstyle is a choice of three, shown by name.
-		if (option.id() == "fpsPlaystyle")
+		// The presets, shown by name (Custom after the last of each).
+		if (option.id() == "fpsPreset")
 		{
-			static const char *const playstyleNames[] = { "STR_FPS_PLAYSTYLE_FAITHFUL", "STR_FPS_PLAYSTYLE_FPS", "STR_FPS_PLAYSTYLE_CUSTOM" };
-			return std::string(tr(playstyleNames[std::clamp(*option.asInt(), 0, 2)]));
+			static const char *const presetNames[] = { "STR_FPS_PRESET_FAITHFUL", "STR_FPS_PRESET_EXTENDED", "STR_FPS_PRESET_TACTICUS", "STR_FPS_PRESET_XMBL", "STR_FPS_PRESET_FULLQOL",
+				"STR_FPS_PRESET_FPS", "STR_FPS_PRESET_CUSTOM" };
+			return std::string(tr(presetNames[std::clamp(*option.asInt(), 0, 6)]));
+		}
+		if (option.id() == "fpsGraphicsDetail")
+		{
+			static const char *const detailNames[] = { "STR_FPS_GRAPHICS_DETAIL_LOW", "STR_FPS_GRAPHICS_DETAIL_MEDIUM", "STR_FPS_GRAPHICS_DETAIL_HIGH", "STR_FPS_PRESET_CUSTOM" };
+			return std::string(tr(detailNames[std::clamp(*option.asInt(), 0, 3)]));
 		}
 		// Leaning out is a choice of three, shown by name.
 		if (option.id() == "fpsLean")
@@ -531,13 +565,12 @@ void OptionsFirstPersonState::updateList()
 	_rowOptions.clear();
 	_selectedKey = -1;
 	_selKey = nullptr;
-	const bool settings = _owner == _btnSettings;
-	const std::vector<OptionInfo> &shownOptions = settings ? _settings : _keys;
-	const std::vector<std::pair<size_t, std::string>> keyHeadings = { { _ownKeys, "STR_FPS_GAME_KEYS" } };
-	const std::vector<std::pair<size_t, std::string>> &headings = settings ? _settingHeadings : keyHeadings;
-	for (size_t optionIndex = 0; optionIndex < shownOptions.size(); ++optionIndex)
+	const std::vector<OptionInfo> &shown = shownOptions();
+	const std::vector<std::pair<size_t, std::string>> keyHeadings = { { _ownKeys, "STR_FPS_GAME_KEYS" } }, none;
+	const std::vector<std::pair<size_t, std::string>> &headings = _owner == _btnAdvanced ? _settingHeadings : _owner == _btnControlsList ? keyHeadings : none;
+	for (size_t optionIndex = 0; optionIndex < shown.size(); ++optionIndex)
 	{
-		const OptionInfo &option = shownOptions[optionIndex];
+		const OptionInfo &option = shown[optionIndex];
 		// A heading over the options from here on.
 		for (const auto &heading : headings)
 		{
@@ -563,13 +596,20 @@ void OptionsFirstPersonState::updateList()
  */
 OptionInfo *OptionsFirstPersonState::getEntry(int row, bool *isKey)
 {
-	std::vector<OptionInfo> &shownOptions = (_owner == _btnSettings) ? _settings : _keys;
-	*isKey = (_owner != _btnSettings);
+	*isKey = (_owner == _btnControlsList);
 	if (row < 0 || row >= (int)_rowOptions.size() || _rowOptions[row] < 0)
 	{
 		return nullptr;
 	}
-	return &shownOptions[_rowOptions[row]];
+	return &shownOptions()[_rowOptions[row]];
+}
+
+/**
+ * The options the sub-tab pressed now lists: the first page's, the keys, or every setting.
+ */
+std::vector<OptionInfo> &OptionsFirstPersonState::shownOptions()
+{
+	return _owner == _btnAdvanced ? _settings : _owner == _btnControlsList ? _keys : _basics;
 }
 
 /**
@@ -811,10 +851,13 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		{
 			*value = (FirstPerson::flashlightMode() + direction + 3) % 3;
 		}
-		// The playstyle (Faithful, FPS, Custom): round and round, its switches set with it.
-		else if (value == &Options::fpsPlaystyle)
+		// A preset: round and round through its names, its settings set with it, and Custom after the last
+		// once the player has a mix of their own to come back to.
+		else if (value == &Options::fpsPreset || value == &Options::fpsGraphicsDetail)
 		{
-			FirstPerson::choosePlaystyle((*value + direction + 3) % 3);
+			const FirstPerson::PresetGroup group = value == &Options::fpsPreset ? FirstPerson::PRESET_GAMEPLAY : FirstPerson::PRESET_GRAPHICS;
+			const int choices = FirstPerson::presetCount(group) + (FirstPerson::presetHasCustom(group) ? 1 : 0);
+			FirstPerson::choosePreset(group, (std::min(*value, choices - 1) + direction + choices) % choices);
 		}
 		// Leaning out (off, peek, tilt): round and round.
 		else if (value == &Options::fpsLean)
@@ -898,12 +941,14 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 			}
 		}
 	}
-	// A playstyle switch changed by hand: the playstyle follows (see playstyleSwitchChanged).
-	if (FirstPerson::isPlaystyleSwitch(option->id()))
+	// The renderer changed: a named "Graphics detail" is set again for it. A setting a preset sets changed by
+	// hand: the preset follows (see presetSwitchChanged).
+	if (option->id() == "fpsRenderer")
 	{
-		FirstPerson::playstyleSwitchChanged();
+		FirstPerson::rendererChanged();
 	}
-	// Show the new value, and every other row's (the playstyle and its switches move together).
+	FirstPerson::presetSwitchChanged(option->id());
+	// Show the new value, and every other row's (a preset and its settings move together).
 	for (int shownRow = 0; shownRow < (int)_rowOptions.size(); ++shownRow)
 	{
 		bool shownIsKey = false;
@@ -912,6 +957,7 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 			if (!shownIsKey) _lstOptions->setCellText(shownRow, 1, valueText(*shown));
 		}
 	}
+	lstOptionsMouseOver(nullptr); // (a preset's description is the chosen one's)
 }
 
 /**
@@ -997,7 +1043,13 @@ void OptionsFirstPersonState::lstOptionsMouseOver(Action *)
 	if (option)
 	{
 		const std::string gameKeyLabel = gameKeyName(option->id());
-		tooltip = option->id() == "fpsCounter" ? std::string(tr("STR_FPS_FRAME_COUNTER_DESC"))
+		// A preset's line says what the one chosen now is (the graphics levels by the renderer, which they go by).
+		static const char *const presetKeys[] = { "FAITHFUL", "EXTENDED", "TACTICUS", "XMBL", "FULLQOL", "FPS", "CUSTOM" };
+		static const char *const detailKeys[] = { "LOW", "MEDIUM", "HIGH" };
+		tooltip = option->id() == "fpsPreset" ? std::string(tr(std::string("STR_FPS_PRESET_") + presetKeys[std::clamp(Options::fpsPreset, 0, 6)] + "_DESC"))
+			: option->id() == "fpsGraphicsDetail" ? std::string(tr(Options::fpsGraphicsDetail > 2 ? std::string("STR_FPS_GRAPHICS_DETAIL_CUSTOM_DESC")
+				: std::string("STR_FPS_GRAPHICS_DETAIL_") + detailKeys[std::clamp(Options::fpsGraphicsDetail, 0, 2)] + (Options::fpsRenderer == 1 ? "_GPU_DESC" : "_CPU_DESC")))
+			: option->id() == "fpsCounter" ? std::string(tr("STR_FPS_FRAME_COUNTER_DESC"))
 			: option->id() == "FPS" ? std::string(tr("STR_FPS_FRAME_LIMIT_DESC"))
 			: std::string(tr((gameKeyLabel.empty() ? option->description() : gameKeyLabel) + "_DESC"));
 	}

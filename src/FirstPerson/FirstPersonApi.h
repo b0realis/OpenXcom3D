@@ -160,14 +160,20 @@ State *createOptionsTab(OptionsOrigin origin);
 /// Settles settings that take their first value from an older one (the smoke from "See-through
 /// smoke", the flashlight from 1.0's two flashlight settings, the next fire mode key from 1.0's).
 void settleOptions();
-/// Setting "Playstyle": chooses Faithful (0), FPS (1) or Custom (2), setting its switches.
-void choosePlaystyle(int playstyle);
-/// Setting "Playstyle": notes one of its switches changed by hand (the playstyle the switches make now, Custom keeping them).
-void playstyleSwitchChanged();
-/// Setting "Playstyle": whether a setting is one of the switches it sets.
-bool isPlaystyleSwitch(const std::string &id);
-/// Setting "Playstyle": settles it with the switches as they are (a profile from before it: Custom unless they match).
-void settlePlaystyle();
+/// The groups of presets on the first page of the 3D VIEW tab: how it plays, and how fine it is drawn.
+enum PresetGroup { PRESET_GAMEPLAY, PRESET_GRAPHICS };
+/// How many presets a group has by name; Custom is the number after the last.
+int presetCount(PresetGroup group);
+/// Chooses a preset of a group (its number for Custom), setting its settings.
+void choosePreset(PresetGroup group, int preset);
+/// Whether Custom can be chosen in a group (the player has a mix of their own).
+bool presetHasCustom(PresetGroup group);
+/// Notes a setting changed by hand: a group that sets it says the preset its settings make now, or Custom.
+void presetSwitchChanged(const std::string &id);
+/// The setting "Renderer" changed: a named "Graphics detail" is set again for it.
+void rendererChanged();
+/// Settles the presets' names with the settings as they are.
+void settlePresets();
 /// Does a mod the game finds for the first time (one not yet in the player's mod list) start
 /// switched on? Our own mod does, so a game set up by hand plays in 3D at once; switched off, it
 /// stays off.
