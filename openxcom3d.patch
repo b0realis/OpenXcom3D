@@ -23369,10 +23369,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..cfaba7954
+index 000000000..744d50342
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1690 @@
+@@ -0,0 +1,1696 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -23788,6 +23788,12 @@ index 000000000..cfaba7954
 +	{
 +		Options::keyFpsNextFireMode = Options::keyFpsNextMode;
 +		Options::keyFpsNextMode = SDLK_f;
++	}
++	// The second key for the isometric / 3D switch is V by default, which the auto shot had: a profile that still has
++	// the auto shot on it (any profile from before) keeps the auto shot there, and has no second key until one is chosen.
++	if (Options::keyBattleFirstPerson2 != SDLK_UNKNOWN && Options::keyBattleFirstPerson2 == Options::keyFpsModeAuto)
++	{
++		Options::keyBattleFirstPerson2 = SDLK_UNKNOWN;
 +	}
 +	settlePresets(); // (after the akimbo setting has its value: the gameplay presets set it)
 +}
@@ -77397,10 +77403,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..2925c7717
+index 000000000..de7cbbcd1
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,1087 @@
+@@ -0,0 +1,1102 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -77451,6 +77457,7 @@ index 000000000..2925c7717
 +#include "OptionsFirstPersonState.h"
 +#include <cstring>
 +#include <algorithm>
++#include <fstream>
 +#include <cctype>
 +#include <string>
 +#include "FirstPersonApi.h"
@@ -77987,6 +77994,20 @@ index 000000000..2925c7717
 +		// The option's row: its name and its value.
 +		_lstOptions->addRow(2, label(option).c_str(), valueText(option).c_str());
 +		_rowOptions.push_back((int)optionIndex);
++	}
++	// (OPENXCOM3D_OPTION_ROWS=file: the rows just listed are written there, a line each: the option's id, or "-" for
++	// a heading, and the line of the list the row starts on (a long name takes two). For the tests, which find a
++	// setting's row by its id whatever the order and the wording: tools/testing/optid.py.)
++	static const char *const rowsFile = getenv("OPENXCOM3D_OPTION_ROWS");
++	if (rowsFile)
++	{
++		std::ofstream rows(rowsFile);
++		int line = 0;
++		for (size_t row = 0; row < _rowOptions.size(); ++row)
++		{
++			rows << (_rowOptions[row] < 0 ? std::string("-") : shown[_rowOptions[row]].id()) << " " << line << "\n";
++			line += _lstOptions->getNumTextLines(row);
++		}
 +	}
 +}
 +

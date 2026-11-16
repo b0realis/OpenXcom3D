@@ -414,6 +414,12 @@ void settleOptions()
 		Options::keyFpsNextFireMode = Options::keyFpsNextMode;
 		Options::keyFpsNextMode = SDLK_f;
 	}
+	// The second key for the isometric / 3D switch is V by default, which the auto shot had: a profile that still has
+	// the auto shot on it (any profile from before) keeps the auto shot there, and has no second key until one is chosen.
+	if (Options::keyBattleFirstPerson2 != SDLK_UNKNOWN && Options::keyBattleFirstPerson2 == Options::keyFpsModeAuto)
+	{
+		Options::keyBattleFirstPerson2 = SDLK_UNKNOWN;
+	}
 	settlePresets(); // (after the akimbo setting has its value: the gameplay presets set it)
 }
 

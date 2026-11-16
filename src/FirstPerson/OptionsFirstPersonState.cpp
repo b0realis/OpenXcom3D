@@ -48,6 +48,7 @@
 #include "OptionsFirstPersonState.h"
 #include <cstring>
 #include <algorithm>
+#include <fstream>
 #include <cctype>
 #include <string>
 #include "FirstPersonApi.h"
@@ -584,6 +585,20 @@ void OptionsFirstPersonState::updateList()
 		// The option's row: its name and its value.
 		_lstOptions->addRow(2, label(option).c_str(), valueText(option).c_str());
 		_rowOptions.push_back((int)optionIndex);
+	}
+	// (OPENXCOM3D_OPTION_ROWS=file: the rows just listed are written there, a line each: the option's id, or "-" for
+	// a heading, and the line of the list the row starts on (a long name takes two). For the tests, which find a
+	// setting's row by its id whatever the order and the wording: tools/testing/optid.py.)
+	static const char *const rowsFile = getenv("OPENXCOM3D_OPTION_ROWS");
+	if (rowsFile)
+	{
+		std::ofstream rows(rowsFile);
+		int line = 0;
+		for (size_t row = 0; row < _rowOptions.size(); ++row)
+		{
+			rows << (_rowOptions[row] < 0 ? std::string("-") : shown[_rowOptions[row]].id()) << " " << line << "\n";
+			line += _lstOptions->getNumTextLines(row);
+		}
 	}
 }
 
