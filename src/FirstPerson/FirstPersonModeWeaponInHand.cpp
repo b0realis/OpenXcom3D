@@ -1001,7 +1001,26 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 
 	// The game's shade where the eye is (at most 9 shades darker, so it stays visible in the
 	// dark), the hand, and with dual wield the other hand's gun (drawn on the other side).
-	const int shade = std::min(9, _view->getEyeShade());
+	// Steadied: the light where the eye is, followed over a quarter of a second, and the weapon's shade moved only
+	// when that is well into another shade. (The owner: "when walking in gpu renderer my weapon in first person
+	// flashes". The shade was the eye's light cut to a whole number each frame: walking, the eye bobs and moves
+	// between tiles, the light hovered at a shade's edge, and the whole weapon went a shade lighter and darker
+	// some four times a second, on either renderer.)
+	const Uint32 lightTick = SDL_GetTicks();
+	const float eyeLight = _view->getEyeLight();
+	if (unit != _weaponLightUnit || _weaponLight < 0.0f || lightTick - _weaponLightTick > 1000)
+	{
+		_weaponLightUnit = unit;
+		_weaponLight = eyeLight;
+		_weaponShade = (int)eyeLight;
+	}
+	else
+	{
+		_weaponLight += (eyeLight - _weaponLight) * (1.0f - std::exp(-(float)(lightTick - _weaponLightTick) / 250.0f));
+		if (std::abs(_weaponLight - (_weaponShade + 0.5f)) > 1.0f) _weaponShade = (int)_weaponLight;
+	}
+	_weaponLightTick = lightTick;
+	const int shade = std::clamp(_weaponShade, 0, 9);
 	const bool inLeftHand = handOf(unit, weapon) == 1;
 	BattleItem *otherWeapon = offHandWeapon(unit, weapon);
 

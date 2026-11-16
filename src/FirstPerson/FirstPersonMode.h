@@ -543,6 +543,11 @@ private:
 	Uint32 _facingStepSince = 0;
 	BattleUnit *_sideOnUnit = nullptr;
 	int _sideOnFacing = -1, _sideOnView = -1;
+	// The weapon in hand's shade, steadied (see updateWeaponInHand): whose it is, the eye's light followed, the shade shown, when last.
+	const BattleUnit *_weaponLightUnit = nullptr;
+	float _weaponLight = -1.0f;
+	int _weaponShade = 0;
+	Uint32 _weaponLightTick = 0;
 	int _sidestepFacing = -1;                  // the facing a soldier sidestepping keeps (the game's strafe), while the step is walked; -1 none
 	Position _stepFrom;                        // the tile that step started from
 	// Two straight steps round a corner cost what the one diagonal step costs (see cornerDiscount): the last straight

@@ -505,6 +505,8 @@ public:
 	void ambientScene(AmbientScene &scene) const;
 	/// The game's shade (0 bright .. 15 dark) where the camera is.
 	int getEyeShade() const;
+	/// The same, not rounded to a whole shade.
+	float getEyeLight() const;
 	/// How far the view is kicked up by recoil right now, in degrees.
 	float getRecoilKick() const { return _recoilKick; }
 	/// When an enemy in sight was last hit, and whether that hit killed it (for the hitmarker).

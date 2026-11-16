@@ -3094,6 +3094,17 @@ bool FirstPersonMode::blit()
 		// effect or wash over it, no overlay) takes the card's full colour for it; the others stay the palette's. But
 		// see-through smoke drawn over a ray's pixel takes the light the card found in the air there (setting "Light
 		// shafts": what the full colour has over the ray's palette colour), so a beam lights the smoke it crosses.
+		// A pixel the overlays drew (the weapon in hand, the HUD) is theirs whatever its colour: told by the canvas, not
+		// by the colour having changed. (The owner, with True colour: "when walking in gpu renderer my weapon in first
+		// person flashes". Where a pixel of the gun had the very palette colour of the ground behind it, it counted as
+		// untouched and took the ground's full colour, lit as the ground is: specks on the gun that came and went
+		// with every step.)
+		const SDL_Surface *canvas = _canvas->getSurface();
+		const int uiScale = std::max(1, _uiScale);
+		auto overlayRow = [canvas, uiScale](int row) -> const Uint8 * {
+			return row / uiScale < canvas->h ? (const Uint8 *)canvas->pixels + (size_t)(row / uiScale) * canvas->pitch : nullptr;
+		};
+		auto overlaid = [canvas, uiScale](const Uint8 *over, int column) { return over && column / uiScale < canvas->w && over[column / uiScale] != 0; };
 		const Uint32 *fullColors = nullptr, *shownInFull = nullptr;
 		const Uint8 *rayColors = nullptr, *smokeVeil = nullptr;
 		const Uint32 *cardPicture = nullptr;
@@ -3108,7 +3119,8 @@ bool FirstPersonMode::blit()
 				const Uint8 *made = (const Uint8 *)picture->pixels + (size_t)row * picture->pitch, *own = (const Uint8 *)seen->pixels + (size_t)row * seen->pitch;
 				const Uint32 *card = cardPicture + (size_t)row * picture->w;
 				Uint32 *out = &_truePicture[(size_t)row * picture->w];
-				for (int column = 0; column < picture->w; ++column) out[column] = made[column] == own[column] ? card[column] | 0xFF000000u : 0u;
+				const Uint8 *over = overlayRow(row);
+				for (int column = 0; column < picture->w; ++column) out[column] = made[column] == own[column] && !overlaid(over, column) ? card[column] | 0xFF000000u : 0u;
 			}
 			shownInFull = _truePicture.data();
 		}
@@ -3121,9 +3133,14 @@ bool FirstPersonMode::blit()
 				const Uint8 *made = (const Uint8 *)picture->pixels + (size_t)row * picture->pitch, *rays = rayColors + (size_t)row * picture->w;
 				const Uint32 *full = fullColors + (size_t)row * picture->w;
 				Uint32 *out = &_truePicture[(size_t)row * picture->w];
+				const Uint8 *over = overlayRow(row);
 				for (int column = 0; column < picture->w; ++column)
 				{
-					if (made[column] == rays[column])
+					if (overlaid(over, column))
+					{
+						out[column] = 0u;
+					}
+					else if (made[column] == rays[column])
 					{
 						out[column] = full[column] | 0xFF000000u;
 					}

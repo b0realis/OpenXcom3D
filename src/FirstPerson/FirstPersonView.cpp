@@ -494,6 +494,19 @@ int FirstPersonView::getEyeShade() const
 }
 
 /**
+ * The game's shade where the camera is, as getEyeShade has it but not cut to a whole shade
+ * (see FirstPersonMode::updateWeaponInHand, which steadies it).
+ */
+float FirstPersonView::getEyeLight() const
+{
+	if (!_save || (int)_tileLights.size() != _save->getMapSizeXYZ())
+	{
+		return 0.0f;
+	}
+	return lightAt((float)_eye[0], (float)_eye[1], (float)_eye[2]);
+}
+
+/**
  * Works out where a sound from a tile is heard, with this camera as the listener: the stereo
  * angle and how far away it sounds, packed into one number for Sound (see
  * Sound::packDistance). The angle is 0 straight ahead, 90 to the right, 180 behind, 270 to the

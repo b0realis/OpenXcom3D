@@ -29536,10 +29536,10 @@ index 000000000..326da83e2
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..5ecce6690
+index 000000000..1514cb145
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,2552 @@
+@@ -0,0 +1,2554 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -32067,6 +32067,7 @@ index 000000000..5ecce6690
 +{
 +	ivec2 pixel = ivec2(gl_FragCoord.xy);
 +	uint made = texelFetch(uOverlay, pixel, 0).r;
++	bool overlaid = made != 0u; // (the overlay's pixel is the overlay's, whatever its colour: never the ray's full colour)
 +	if (made == 0u)
 +	{
 +		made = texelFetch(uColor, pixel, 0).r;
@@ -32082,7 +32083,8 @@ index 000000000..5ecce6690
 +	{
 +		uint ray = texelFetch(uRayColor, pixel, 0).r;
 +		vec3 full = texelFetch(uRayTrue, pixel, 0).rgb;
-+		if (made == ray) shown = full;
++		if (overlaid) { }
++		else if (made == ray) shown = full;
 +		else if (uShafts != 0 && (texelFetch(uGlow, pixel, 0).r & 64u) != 0u) shown = min(vec3(1.0), shown + max(vec3(0.0), full - paletteColor(ray)));
 +	}
 +	outPixel = vec4(shown, 1.0);
@@ -32273,10 +32275,10 @@ index 000000000..eaa9f409a
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..5f88b3bac
+index 000000000..3afff8e72
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,3298 @@
+@@ -0,0 +1,3315 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -35373,6 +35375,17 @@ index 000000000..5f88b3bac
 +		// effect or wash over it, no overlay) takes the card's full colour for it; the others stay the palette's. But
 +		// see-through smoke drawn over a ray's pixel takes the light the card found in the air there (setting "Light
 +		// shafts": what the full colour has over the ray's palette colour), so a beam lights the smoke it crosses.
++		// A pixel the overlays drew (the weapon in hand, the HUD) is theirs whatever its colour: told by the canvas, not
++		// by the colour having changed. (The owner, with True colour: "when walking in gpu renderer my weapon in first
++		// person flashes". Where a pixel of the gun had the very palette colour of the ground behind it, it counted as
++		// untouched and took the ground's full colour, lit as the ground is: specks on the gun that came and went
++		// with every step.)
++		const SDL_Surface *canvas = _canvas->getSurface();
++		const int uiScale = std::max(1, _uiScale);
++		auto overlayRow = [canvas, uiScale](int row) -> const Uint8 * {
++			return row / uiScale < canvas->h ? (const Uint8 *)canvas->pixels + (size_t)(row / uiScale) * canvas->pitch : nullptr;
++		};
++		auto overlaid = [canvas, uiScale](const Uint8 *over, int column) { return over && column / uiScale < canvas->w && over[column / uiScale] != 0; };
 +		const Uint32 *fullColors = nullptr, *shownInFull = nullptr;
 +		const Uint8 *rayColors = nullptr, *smokeVeil = nullptr;
 +		const Uint32 *cardPicture = nullptr;
@@ -35387,7 +35400,8 @@ index 000000000..5f88b3bac
 +				const Uint8 *made = (const Uint8 *)picture->pixels + (size_t)row * picture->pitch, *own = (const Uint8 *)seen->pixels + (size_t)row * seen->pitch;
 +				const Uint32 *card = cardPicture + (size_t)row * picture->w;
 +				Uint32 *out = &_truePicture[(size_t)row * picture->w];
-+				for (int column = 0; column < picture->w; ++column) out[column] = made[column] == own[column] ? card[column] | 0xFF000000u : 0u;
++				const Uint8 *over = overlayRow(row);
++				for (int column = 0; column < picture->w; ++column) out[column] = made[column] == own[column] && !overlaid(over, column) ? card[column] | 0xFF000000u : 0u;
 +			}
 +			shownInFull = _truePicture.data();
 +		}
@@ -35400,9 +35414,14 @@ index 000000000..5f88b3bac
 +				const Uint8 *made = (const Uint8 *)picture->pixels + (size_t)row * picture->pitch, *rays = rayColors + (size_t)row * picture->w;
 +				const Uint32 *full = fullColors + (size_t)row * picture->w;
 +				Uint32 *out = &_truePicture[(size_t)row * picture->w];
++				const Uint8 *over = overlayRow(row);
 +				for (int column = 0; column < picture->w; ++column)
 +				{
-+					if (made[column] == rays[column])
++					if (overlaid(over, column))
++					{
++						out[column] = 0u;
++					}
++					else if (made[column] == rays[column])
 +					{
 +						out[column] = full[column] | 0xFF000000u;
 +					}
@@ -35577,10 +35596,10 @@ index 000000000..5f88b3bac
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..8ef4e1b6e
+index 000000000..b8c17e2ed
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1410 @@
+@@ -0,0 +1,1415 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -36126,6 +36145,11 @@ index 000000000..8ef4e1b6e
 +	Uint32 _facingStepSince = 0;
 +	BattleUnit *_sideOnUnit = nullptr;
 +	int _sideOnFacing = -1, _sideOnView = -1;
++	// The weapon in hand's shade, steadied (see updateWeaponInHand): whose it is, the eye's light followed, the shade shown, when last.
++	const BattleUnit *_weaponLightUnit = nullptr;
++	float _weaponLight = -1.0f;
++	int _weaponShade = 0;
++	Uint32 _weaponLightTick = 0;
 +	int _sidestepFacing = -1;                  // the facing a soldier sidestepping keeps (the game's strafe), while the step is walked; -1 none
 +	Position _stepFrom;                        // the tile that step started from
 +	// Two straight steps round a corner cost what the one diagonal step costs (see cornerDiscount): the last straight
@@ -50381,10 +50405,10 @@ index 000000000..d0cf9cbd2
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeWeaponInHand.cpp b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
 new file mode 100644
-index 000000000..b00523e44
+index 000000000..a94c207e1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
-@@ -0,0 +1,1146 @@
+@@ -0,0 +1,1165 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -51388,7 +51412,26 @@ index 000000000..b00523e44
 +
 +	// The game's shade where the eye is (at most 9 shades darker, so it stays visible in the
 +	// dark), the hand, and with dual wield the other hand's gun (drawn on the other side).
-+	const int shade = std::min(9, _view->getEyeShade());
++	// Steadied: the light where the eye is, followed over a quarter of a second, and the weapon's shade moved only
++	// when that is well into another shade. (The owner: "when walking in gpu renderer my weapon in first person
++	// flashes". The shade was the eye's light cut to a whole number each frame: walking, the eye bobs and moves
++	// between tiles, the light hovered at a shade's edge, and the whole weapon went a shade lighter and darker
++	// some four times a second, on either renderer.)
++	const Uint32 lightTick = SDL_GetTicks();
++	const float eyeLight = _view->getEyeLight();
++	if (unit != _weaponLightUnit || _weaponLight < 0.0f || lightTick - _weaponLightTick > 1000)
++	{
++		_weaponLightUnit = unit;
++		_weaponLight = eyeLight;
++		_weaponShade = (int)eyeLight;
++	}
++	else
++	{
++		_weaponLight += (eyeLight - _weaponLight) * (1.0f - std::exp(-(float)(lightTick - _weaponLightTick) / 250.0f));
++		if (std::abs(_weaponLight - (_weaponShade + 0.5f)) > 1.0f) _weaponShade = (int)_weaponLight;
++	}
++	_weaponLightTick = lightTick;
++	const int shade = std::clamp(_weaponShade, 0, 9);
 +	const bool inLeftHand = handOf(unit, weapon) == 1;
 +	BattleItem *otherWeapon = offHandWeapon(unit, weapon);
 +
@@ -54559,10 +54602,10 @@ index 000000000..7e1bbfcd2
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..7dedb46e1
+index 000000000..4f8223201
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,737 @@
+@@ -0,0 +1,750 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -55059,6 +55102,19 @@ index 000000000..7dedb46e1
 +}
 +
 +/**
++ * The game's shade where the camera is, as getEyeShade has it but not cut to a whole shade
++ * (see FirstPersonMode::updateWeaponInHand, which steadies it).
++ */
++float FirstPersonView::getEyeLight() const
++{
++	if (!_save || (int)_tileLights.size() != _save->getMapSizeXYZ())
++	{
++		return 0.0f;
++	}
++	return lightAt((float)_eye[0], (float)_eye[1], (float)_eye[2]);
++}
++
++/**
 + * Works out where a sound from a tile is heard, with this camera as the listener: the stereo
 + * angle and how far away it sounds, packed into one number for Sound (see
 + * Sound::packDistance). The angle is 0 straight ahead, 90 to the right, 180 behind, 270 to the
@@ -55302,10 +55358,10 @@ index 000000000..7dedb46e1
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..a693bf135
+index 000000000..0ec27d40d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1585 @@
+@@ -0,0 +1,1587 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -55813,6 +55869,8 @@ index 000000000..a693bf135
 +	void ambientScene(AmbientScene &scene) const;
 +	/// The game's shade (0 bright .. 15 dark) where the camera is.
 +	int getEyeShade() const;
++	/// The same, not rounded to a whole shade.
++	float getEyeLight() const;
 +	/// How far the view is kicked up by recoil right now, in degrees.
 +	float getRecoilKick() const { return _recoilKick; }
 +	/// When an enemy in sight was last hit, and whether that hit killed it (for the hitmarker).

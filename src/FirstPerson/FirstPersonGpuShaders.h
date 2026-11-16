@@ -2525,6 +2525,7 @@ void main()
 {
 	ivec2 pixel = ivec2(gl_FragCoord.xy);
 	uint made = texelFetch(uOverlay, pixel, 0).r;
+	bool overlaid = made != 0u; // (the overlay's pixel is the overlay's, whatever its colour: never the ray's full colour)
 	if (made == 0u)
 	{
 		made = texelFetch(uColor, pixel, 0).r;
@@ -2540,7 +2541,8 @@ void main()
 	{
 		uint ray = texelFetch(uRayColor, pixel, 0).r;
 		vec3 full = texelFetch(uRayTrue, pixel, 0).rgb;
-		if (made == ray) shown = full;
+		if (overlaid) { }
+		else if (made == ray) shown = full;
 		else if (uShafts != 0 && (texelFetch(uGlow, pixel, 0).r & 64u) != 0u) shown = min(vec3(1.0), shown + max(vec3(0.0), full - paletteColor(ray)));
 	}
 	outPixel = vec4(shown, 1.0);
