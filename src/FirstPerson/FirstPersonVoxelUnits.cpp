@@ -102,6 +102,7 @@ struct VoxelUnits::Job
 	HeldItem items[2];
 	std::vector<std::vector<Uint8>> deaths;
 	std::vector<Uint8> corpse;
+	HeldItem lying; // (the corpse's inventory picture: the body lying)
 	WalkFrames walks;
 	bool aiming = false;
 	bool fine = false; // (made twice as fine: see FineBodies)
@@ -335,6 +336,21 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 			if (!any) corpse.clear();
 		}
 	}
+	// And its corpse's picture in the inventory (BIGOBS.PCK): laid on the floor and given volume, the body lying.
+	HeldItem lying;
+	if (!routine->big && inventorySprites && !corpseItems.empty() && corpseItems.front())
+	{
+		if (const Surface *picture = inventorySprites->getFrame(corpseItems.front()->getBigSprite()))
+		{
+			lying.width = picture->getWidth();
+			lying.height = picture->getHeight();
+			lying.picture.resize(lying.width * lying.height);
+			bool any = false;
+			for (int y = 0; y < lying.height; ++y)
+				for (int x = 0; x < lying.width; ++x) any |= (lying.picture[y * lying.width + x] = picture->getPixel(x, y)) != 0;
+			if (!any) lying = HeldItem();
+		}
+	}
 
 	// The items in hand: their inventory pictures as the game draws them in a hand (with their own recolouring).
 	HeldItem items[2];
@@ -370,6 +386,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	}
 	for (const auto &death : deaths) hashBytes(hash, death.data(), death.size());
 	hashBytes(hash, corpse.data(), corpse.size());
+	hashBytes(hash, lying.picture.data(), lying.picture.size());
 	for (int phase = 0; phase < 8 && walks.any; ++phase)
 		for (int view = 0; view < 2; ++view)
 		{
@@ -395,6 +412,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		std::move(std::begin(items), std::end(items), std::begin(job->items));
 		job->deaths = std::move(deaths);
 		job->corpse = std::move(corpse);
+		job->lying = std::move(lying);
 		job->walks = std::move(walks);
 		job->aiming = aiming;
 		job->fine = FineBodies;
@@ -542,6 +560,9 @@ void VoxelUnits::build()
 			}
 			source.deaths = job->deaths;
 			source.corpse = job->corpse;
+			source.lyingPicture = job->lying.picture;
+			source.lyingWidth = job->lying.width;
+			source.lyingHeight = job->lying.height;
 			for (int phase = 0; phase < 8; ++phase)
 				for (int view = 0; view < 2; ++view)
 				{
@@ -555,7 +576,7 @@ void VoxelUnits::build()
 		}
 		else
 		{
-			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->walks, job->aiming, *job->routine, job->palette);
+			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->lying, job->walks, job->aiming, *job->routine, job->palette);
 		}
 		if (const char *folder = std::getenv("OXC3D_VOXELDUMP")) dump(*job, model.get(), folder);
 		std::lock_guard<std::mutex> lock(_mutex);
@@ -595,6 +616,16 @@ void VoxelUnits::dump(const Job &job, const VoxelUnitModel *model, const char *f
 		for (const auto &death : job.deaths) std::fwrite(death.data(), 1, death.size(), file);
 		if (!job.corpse.empty()) std::fwrite(job.corpse.data(), 1, job.corpse.size(), file);
 		std::fclose(file);
+	}
+	if (!job.lying.picture.empty())
+	{
+		if (FILE *file = std::fopen((base + ".lying").c_str(), "wb"))
+		{
+			const int size[2] = { job.lying.width, job.lying.height };
+			std::fwrite(size, sizeof(int), 2, file);
+			std::fwrite(job.lying.picture.data(), 1, job.lying.picture.size(), file);
+			std::fclose(file);
+		}
 	}
 	if (!job.composite[0].empty())
 	{

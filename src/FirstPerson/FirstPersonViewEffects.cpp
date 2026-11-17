@@ -657,8 +657,8 @@ void FirstPersonView::spawnBodyEffects(float elapsedSeconds)
 		if (std::abs(feet[0] - _eye[0]) > 320 || std::abs(feet[1] - _eye[1]) > 320) continue;
 		if (breathes)
 		{
-			// (about 12 bubbles a second from the head, wobbling up)
-			const int bubbles = (int)(elapsedSeconds * 12.0f + _particles.random());
+			// (a burst of bubbles from the head with each breath out, 36 a second while it lasts, wobbling up)
+			const int bubbles = (int)(elapsedSeconds * 36.0f + _particles.random());
 			for (int k = 0; k < bubbles; ++k)
 			{
 				P::Particle bubble;
@@ -666,31 +666,47 @@ void FirstPersonView::spawnBodyEffects(float elapsedSeconds)
 				bubble.pos[2] = feet[2] + (unit->getHeight() + unit->getFloatHeight()) * 0.9f;
 				bubble.vel[0] = _particles.random(-3, 3); bubble.vel[1] = _particles.random(-3, 3); bubble.vel[2] = _particles.random(8, 16);
 				bubble.age = 0; bubble.life = _particles.random(1.0f, 2.2f); bubble.gravity = -4; bubble.drag = 0.6f;
-				bubble.color = _colors.bubble; bubble.size = (Uint8)_particles.random(2, 4.99f); bubble.kind = P::BUBBLE; bubble.group = P::EFFECT;
+				bubble.color = _colors.bubble; bubble.size = (Uint8)_particles.random(2, 6.99f); bubble.kind = P::BUBBLE; bubble.group = P::EFFECT;
 				_particles.add(bubble);
 			}
 		}
 		if (hovers)
 		{
-			// (about 90 sparks a second under the hull, falling; a tenth as many puffs of dust blown outwards at the ground)
+			// (a hard rain of sparks under the hull, 450 a second: white-hot, yellow and pale blue, some thrown out sideways;
+			// and the dust it blows outwards along the ground, 30 puffs a second. The owner: "dramatic".)
 			const float hull = feet[2] + std::max(4.0f, (float)unit->getFloatHeight());
-			const int sparks = (int)(elapsedSeconds * 220.0f + _particles.random());
+			const int sparks = (int)(elapsedSeconds * 450.0f + _particles.random());
 			for (int k = 0; k < sparks; ++k)
 			{
 				P::Particle spark;
 				const float turn = _particles.random(0, 6.2832f), out = 12.0f * std::sqrt(_particles.random());
 				spark.pos[0] = feet[0] + std::cos(turn) * out; spark.pos[1] = feet[1] + std::sin(turn) * out; spark.pos[2] = hull + _particles.random(-1, 2);
-				spark.vel[0] = std::cos(turn) * _particles.random(0, 6); spark.vel[1] = std::sin(turn) * _particles.random(0, 6); spark.vel[2] = -_particles.random(10, 30);
-				spark.age = 0; spark.life = _particles.random(0.2f, 0.5f); spark.gravity = 20; spark.drag = 0.2f;
-				spark.color = _particles.random() < 0.5f ? _colors.spark : _colors.fire[0]; spark.size = (Uint8)_particles.random(2, 4.99f); spark.kind = P::GLOW; spark.group = P::EFFECT;
+				const float thrown = _particles.random() < 0.25f ? _particles.random(14, 34) : _particles.random(0, 7);
+				spark.vel[0] = std::cos(turn) * thrown; spark.vel[1] = std::sin(turn) * thrown; spark.vel[2] = -_particles.random(12, 36);
+				spark.age = 0; spark.life = _particles.random(0.25f, 0.7f); spark.gravity = 20; spark.drag = 0.2f;
+				const float pick = _particles.random();
+				spark.color = pick < 0.4f ? _colors.fire[0] : pick < 0.75f ? _colors.spark : _colors.glassShard[0]; spark.size = (Uint8)_particles.random(2, 6.99f); spark.kind = P::GLOW; spark.group = P::EFFECT;
 				_particles.add(spark);
 			}
-			if (_particles.random() < elapsedSeconds * 9.0f)
+			// (and the glare of it on the ground: 70 big short flashes a second under the hull)
+			const int flashes = (int)(elapsedSeconds * 70.0f + _particles.random());
+			for (int k = 0; k < flashes; ++k)
+			{
+				P::Particle flash;
+				const float turn = _particles.random(0, 6.2832f), out = 10.0f * std::sqrt(_particles.random());
+				flash.pos[0] = feet[0] + std::cos(turn) * out; flash.pos[1] = feet[1] + std::sin(turn) * out; flash.pos[2] = feet[2] + _particles.random(0.5f, 2.5f);
+				flash.vel[0] = flash.vel[1] = 0; flash.vel[2] = _particles.random(0, 3);
+				flash.age = 0; flash.life = _particles.random(0.12f, 0.3f); flash.gravity = 0; flash.drag = 0;
+				flash.color = _particles.random() < 0.5f ? _colors.fire[0] : _colors.glassShard[0]; flash.size = (Uint8)_particles.random(6, 11.99f); flash.kind = P::GLOW; flash.group = P::EFFECT;
+				_particles.add(flash);
+			}
+			const int puffs = (int)(elapsedSeconds * 30.0f + _particles.random());
+			for (int k = 0; k < puffs; ++k)
 			{
 				P::Particle dust;
 				const float turn = _particles.random(0, 6.2832f);
 				dust.pos[0] = feet[0] + std::cos(turn) * 10.0f; dust.pos[1] = feet[1] + std::sin(turn) * 10.0f; dust.pos[2] = feet[2] + 1.0f;
-				dust.vel[0] = std::cos(turn) * _particles.random(6, 14); dust.vel[1] = std::sin(turn) * _particles.random(6, 14); dust.vel[2] = _particles.random(1, 4);
+				dust.vel[0] = std::cos(turn) * _particles.random(8, 22); dust.vel[1] = std::sin(turn) * _particles.random(8, 22); dust.vel[2] = _particles.random(1, 4);
 				dust.age = 0; dust.life = _particles.random(0.6f, 1.2f); dust.gravity = 2; dust.drag = 1.2f;
 				dust.color = _colors.dust; dust.size = (Uint8)_particles.random(3, 5.99f); dust.kind = P::LIT; dust.group = P::EFFECT;
 				_particles.add(dust);

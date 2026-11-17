@@ -623,8 +623,8 @@ void FirstPersonView::drawListBands()
  * @param shade The shade of the light on it.
  * @param scale Its size (the setting "Unit size").
  * @param unit The unit (the pointer finds it in its pixels), or null for a body lying in a pile.
- * @param fall How far it has gone down: 0 standing, 1 down, in the poses its death frames show (crumpled, tipped over:
- *        see VoxelUnitModel::fall), each painted by its frame where the frame shows it.
+ * @param fall How far it has gone down: 0 standing, 1 down, in the shapes its death frames and its corpse's picture
+ *        give (see VoxelUnitModel::falls).
  * @param items With the items in its hands (a body lying in a pile has dropped them: they're in the pile).
  * @param lyingBody The unconscious unit lying in the pile it pictures, if any (the pointer finds it: a medi-kit's patient).
  * @param pile The floor tile whose pile it pictures, if any (the pointer finds it).
@@ -637,22 +637,21 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 	if (!projectToScreen(feet, anchorX, anchorY, anchorDepth)) return;
 	const float opacity = (float)(std::clamp((anchorDepth - 4.0) / 6.0, 0.0, 1.0) * faint);
 	if (opacity <= 0.0f) return;
-	const bool walking = walkPhase >= 0 && walkPhase < 8;
-	const std::vector<float> &right = walking ? body.walkRight[walkPhase] : body.right;
-	const std::vector<float> &ahead = walking ? body.walkAhead[walkPhase] : body.ahead;
-	const std::vector<float> &up = walking ? body.walkUp[walkPhase] : body.up;
+	// (going down or lying: the fall's shape for how far it has come, a body of its own, see VoxelUnitModel::falls)
+	const VoxelUnitModel::FallShape *fallen = fall > 0.0 ? body.fallAt(fall) : nullptr;
+	const bool walking = !fallen && walkPhase >= 0 && walkPhase < 8;
+	const std::vector<float> &right = fallen ? fallen->right : walking ? body.walkRight[walkPhase] : body.right;
+	const std::vector<float> &ahead = fallen ? fallen->ahead : walking ? body.walkAhead[walkPhase] : body.ahead;
+	const std::vector<float> &up = fallen ? fallen->up : walking ? body.walkUp[walkPhase] : body.up;
 	// The unit's right and ahead on the map: east and north turned by its facing.
 	const double angle = facing * Pi / 4.0, cosine = std::cos(angle), sine = std::sin(angle);
 	const double focalLength = focalPixels();
 	const double bodyUnit = body.unit; // (voxels to one of the body's own measures: half for a fine body)
-	const bool falling = fall > 0.0;
-	const VoxelUnitModel::FallPose pose = body.poseAt(fall);
 	// Each voxel is a little cube, the cell of the body's grid it fills: side by side they leave no gap from any side.
 	// On the screen a cube is the six-sided outline of its three half edges (to the body's right, ahead and up) thrown
 	// from its middle; those are taken once here, at the feet's depth, and shrink with each voxel's own depth. (A body
-	// walking or going down has its voxels moved off the grid, a little apart where a limb swings or the body spreads:
-	// their cubes are a little bigger, and one going down is drawn by the boxes round its cubes.)
-	const double halfEdge = 0.5 * VoxelCubeEdge * scale * bodyUnit * (falling ? 1.25 * std::max(1.0f, pose.spread) : walking ? 1.15 : 1.0);
+	// walking has its voxels moved off the grid, a little apart where a limb swings: their cubes are a little bigger.)
+	const double halfEdge = 0.5 * VoxelCubeEdge * scale * bodyUnit * (walking ? 1.15 : 1.0);
 	const double probe = 8.0; // (voxels each way from the feet: far enough to measure, near enough to stay in front of the eye)
 	const double axes[3][3] = { { cosine, sine, 0.0 }, { sine, -cosine, 0.0 }, { 0.0, 0.0, 1.0 } };
 	double edges[3][2], lean[3] = {}; // (lean: how much deeper each half edge goes; a cube off the view's middle shows it)
@@ -680,8 +679,7 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 		lean[0] = lean[1] = lean[2] = 0.0;
 	}
 	const double middleX = axisX(), middleY = axisY();
-	const int fallFrame = falling ? body.fallFrameAt(fall) : -1;
-	const size_t voxels = body.part.size();
+	const size_t voxels = right.size();
 	DrawStep step;
 	step.kind = DrawStep::VoxelUnit;
 	step.sprite.unit = unit;
@@ -689,14 +687,11 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 	step.sprite.pile = pile;
 	step.voxelFirst = _voxelSplats.size();
 	step.voxelOpacity = opacity;
-	for (size_t k = 0; k < body.part.size(); ++k)
+	for (size_t k = 0; k < voxels; ++k)
 	{
-		if (!items && body.part[k] == VoxelUnitModel::Item) continue;
-		// (seen from one of the 8 directions, what fits its drawing and the pieces added for it, see VoxelUnitModel::views;
-		// going down or lying, the body's own shape)
-		if (falling ? k >= body.addedFrom : !body.shows(k, direction, level)) continue;
-		float across = right[k], along = ahead[k], height = up[k];
-		if (falling) body.posed(pose, across, along, height);
+		// (seen from one of the 8 directions, what fits its drawing and the pieces added for it, see VoxelUnitModel::views)
+		if (!fallen && ((!items && body.part[k] == VoxelUnitModel::Item) || !body.shows(k, direction, level))) continue;
+		const float across = right[k], along = ahead[k], height = up[k];
 		const double toRight = across * scale * bodyUnit, toAhead = along * scale * bodyUnit;
 		const double world[3] = { feet[0] + toRight * cosine + toAhead * sine, feet[1] + toRight * sine - toAhead * cosine, feet[2] + height * scale * bodyUnit };
 		if (world[2] < floorCut) continue;
@@ -715,8 +710,7 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 		splat.halfX = (float)std::min(VoxelSplatHalfMax, reachX * splat.nearer);
 		splat.halfY = (float)std::min(VoxelSplatHalfMax, reachY * splat.nearer);
 		splat.depth = (float)depth;
-		const Uint8 fallen = fallFrame >= 0 ? body.fallColours[fallFrame * voxels + k] : 0;
-		splat.colour = shadeColor(fallen ? fallen : body.colour(k, direction, level), shade);
+		splat.colour = shadeColor(fallen ? fallen->colour[k] : body.colour(k, direction, level), shade);
 		step.voxelHalfMax = std::max(step.voxelHalfMax, splat.halfY);
 		_voxelSplats.push_back(splat);
 	}
@@ -724,7 +718,7 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 	if (step.voxelCount == 0) return;
 	// The cubes' outlines (see drawVoxelUnit): the three half edges as seen straight ahead at a depth of one, and how
 	// much deeper each goes.
-	step.voxelOutline = cubes && !falling;
+	step.voxelOutline = cubes;
 	for (int axis = 0; axis < 3; ++axis)
 	{
 		step.voxelEdges[axis][0] = (float)edges[axis][0];
@@ -1484,7 +1478,7 @@ void FirstPersonView::drawUnits()
 		if (Options::fpsVoxelUnits && unitSize == 1 && (collapsing || fallingDown || airFall))
 		{
 			// Going down (the game's own fall, a quick death's, a body coming down from the air): the body it was last
-			// drawn with goes down as its death frames show, to lie as its corpse's picture (see VoxelUnitModel::fall), as
+			// drawn with goes down as its death frames show, to lie as its corpse's picture (see VoxelUnitModel::falls), as
 			// far as the fall has come: by the clock, at the quick fall's pace (QuickFallFrameTime a frame; the game's own
 			// frames go faster); down while it comes down from the air. (Its corpse then lies so, finishing a fall the game
 			// is done with: see drawFloorItems.) A big unit falls in its own frames.

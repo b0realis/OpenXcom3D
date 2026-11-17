@@ -24,7 +24,8 @@ struct FineBodySource
 	int itemWidth[2] = {}, itemHeight[2] = {};
 	bool itemTwoHanded[2] = {};
 	std::vector<std::vector<Uint8>> deaths;
-	std::vector<Uint8> corpse;
+	std::vector<Uint8> corpse, lyingPicture;
+	int lyingWidth = 0, lyingHeight = 0;
 	std::vector<Uint8> walkLegs[8][2], walkArms[8][2][2];
 	bool walkAny = false, aiming = false;
 	int routine = 0;

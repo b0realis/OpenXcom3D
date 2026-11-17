@@ -62014,10 +62014,10 @@ index 000000000..28649205b
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewEffects.cpp b/src/FirstPerson/FirstPersonViewEffects.cpp
 new file mode 100644
-index 000000000..fa9359e81
+index 000000000..54d9b8135
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewEffects.cpp
-@@ -0,0 +1,1439 @@
+@@ -0,0 +1,1455 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -62677,8 +62677,8 @@ index 000000000..fa9359e81
 +		if (std::abs(feet[0] - _eye[0]) > 320 || std::abs(feet[1] - _eye[1]) > 320) continue;
 +		if (breathes)
 +		{
-+			// (about 12 bubbles a second from the head, wobbling up)
-+			const int bubbles = (int)(elapsedSeconds * 12.0f + _particles.random());
++			// (a burst of bubbles from the head with each breath out, 36 a second while it lasts, wobbling up)
++			const int bubbles = (int)(elapsedSeconds * 36.0f + _particles.random());
 +			for (int k = 0; k < bubbles; ++k)
 +			{
 +				P::Particle bubble;
@@ -62686,31 +62686,47 @@ index 000000000..fa9359e81
 +				bubble.pos[2] = feet[2] + (unit->getHeight() + unit->getFloatHeight()) * 0.9f;
 +				bubble.vel[0] = _particles.random(-3, 3); bubble.vel[1] = _particles.random(-3, 3); bubble.vel[2] = _particles.random(8, 16);
 +				bubble.age = 0; bubble.life = _particles.random(1.0f, 2.2f); bubble.gravity = -4; bubble.drag = 0.6f;
-+				bubble.color = _colors.bubble; bubble.size = (Uint8)_particles.random(2, 4.99f); bubble.kind = P::BUBBLE; bubble.group = P::EFFECT;
++				bubble.color = _colors.bubble; bubble.size = (Uint8)_particles.random(2, 6.99f); bubble.kind = P::BUBBLE; bubble.group = P::EFFECT;
 +				_particles.add(bubble);
 +			}
 +		}
 +		if (hovers)
 +		{
-+			// (about 90 sparks a second under the hull, falling; a tenth as many puffs of dust blown outwards at the ground)
++			// (a hard rain of sparks under the hull, 450 a second: white-hot, yellow and pale blue, some thrown out sideways;
++			// and the dust it blows outwards along the ground, 30 puffs a second. The owner: "dramatic".)
 +			const float hull = feet[2] + std::max(4.0f, (float)unit->getFloatHeight());
-+			const int sparks = (int)(elapsedSeconds * 220.0f + _particles.random());
++			const int sparks = (int)(elapsedSeconds * 450.0f + _particles.random());
 +			for (int k = 0; k < sparks; ++k)
 +			{
 +				P::Particle spark;
 +				const float turn = _particles.random(0, 6.2832f), out = 12.0f * std::sqrt(_particles.random());
 +				spark.pos[0] = feet[0] + std::cos(turn) * out; spark.pos[1] = feet[1] + std::sin(turn) * out; spark.pos[2] = hull + _particles.random(-1, 2);
-+				spark.vel[0] = std::cos(turn) * _particles.random(0, 6); spark.vel[1] = std::sin(turn) * _particles.random(0, 6); spark.vel[2] = -_particles.random(10, 30);
-+				spark.age = 0; spark.life = _particles.random(0.2f, 0.5f); spark.gravity = 20; spark.drag = 0.2f;
-+				spark.color = _particles.random() < 0.5f ? _colors.spark : _colors.fire[0]; spark.size = (Uint8)_particles.random(2, 4.99f); spark.kind = P::GLOW; spark.group = P::EFFECT;
++				const float thrown = _particles.random() < 0.25f ? _particles.random(14, 34) : _particles.random(0, 7);
++				spark.vel[0] = std::cos(turn) * thrown; spark.vel[1] = std::sin(turn) * thrown; spark.vel[2] = -_particles.random(12, 36);
++				spark.age = 0; spark.life = _particles.random(0.25f, 0.7f); spark.gravity = 20; spark.drag = 0.2f;
++				const float pick = _particles.random();
++				spark.color = pick < 0.4f ? _colors.fire[0] : pick < 0.75f ? _colors.spark : _colors.glassShard[0]; spark.size = (Uint8)_particles.random(2, 6.99f); spark.kind = P::GLOW; spark.group = P::EFFECT;
 +				_particles.add(spark);
 +			}
-+			if (_particles.random() < elapsedSeconds * 9.0f)
++			// (and the glare of it on the ground: 70 big short flashes a second under the hull)
++			const int flashes = (int)(elapsedSeconds * 70.0f + _particles.random());
++			for (int k = 0; k < flashes; ++k)
++			{
++				P::Particle flash;
++				const float turn = _particles.random(0, 6.2832f), out = 10.0f * std::sqrt(_particles.random());
++				flash.pos[0] = feet[0] + std::cos(turn) * out; flash.pos[1] = feet[1] + std::sin(turn) * out; flash.pos[2] = feet[2] + _particles.random(0.5f, 2.5f);
++				flash.vel[0] = flash.vel[1] = 0; flash.vel[2] = _particles.random(0, 3);
++				flash.age = 0; flash.life = _particles.random(0.12f, 0.3f); flash.gravity = 0; flash.drag = 0;
++				flash.color = _particles.random() < 0.5f ? _colors.fire[0] : _colors.glassShard[0]; flash.size = (Uint8)_particles.random(6, 11.99f); flash.kind = P::GLOW; flash.group = P::EFFECT;
++				_particles.add(flash);
++			}
++			const int puffs = (int)(elapsedSeconds * 30.0f + _particles.random());
++			for (int k = 0; k < puffs; ++k)
 +			{
 +				P::Particle dust;
 +				const float turn = _particles.random(0, 6.2832f);
 +				dust.pos[0] = feet[0] + std::cos(turn) * 10.0f; dust.pos[1] = feet[1] + std::sin(turn) * 10.0f; dust.pos[2] = feet[2] + 1.0f;
-+				dust.vel[0] = std::cos(turn) * _particles.random(6, 14); dust.vel[1] = std::sin(turn) * _particles.random(6, 14); dust.vel[2] = _particles.random(1, 4);
++				dust.vel[0] = std::cos(turn) * _particles.random(8, 22); dust.vel[1] = std::sin(turn) * _particles.random(8, 22); dust.vel[2] = _particles.random(1, 4);
 +				dust.age = 0; dust.life = _particles.random(0.6f, 1.2f); dust.gravity = 2; dust.drag = 1.2f;
 +				dust.color = _colors.dust; dust.size = (Uint8)_particles.random(3, 5.99f); dust.kind = P::LIT; dust.group = P::EFFECT;
 +				_particles.add(dust);
@@ -71962,10 +71978,10 @@ index 000000000..229bd966c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..53788aabe
+index 000000000..8f189b45c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,4002 @@
+@@ -0,0 +1,3996 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -72591,8 +72607,8 @@ index 000000000..53788aabe
 + * @param shade The shade of the light on it.
 + * @param scale Its size (the setting "Unit size").
 + * @param unit The unit (the pointer finds it in its pixels), or null for a body lying in a pile.
-+ * @param fall How far it has gone down: 0 standing, 1 down, in the poses its death frames show (crumpled, tipped over:
-+ *        see VoxelUnitModel::fall), each painted by its frame where the frame shows it.
++ * @param fall How far it has gone down: 0 standing, 1 down, in the shapes its death frames and its corpse's picture
++ *        give (see VoxelUnitModel::falls).
 + * @param items With the items in its hands (a body lying in a pile has dropped them: they're in the pile).
 + * @param lyingBody The unconscious unit lying in the pile it pictures, if any (the pointer finds it: a medi-kit's patient).
 + * @param pile The floor tile whose pile it pictures, if any (the pointer finds it).
@@ -72605,22 +72621,21 @@ index 000000000..53788aabe
 +	if (!projectToScreen(feet, anchorX, anchorY, anchorDepth)) return;
 +	const float opacity = (float)(std::clamp((anchorDepth - 4.0) / 6.0, 0.0, 1.0) * faint);
 +	if (opacity <= 0.0f) return;
-+	const bool walking = walkPhase >= 0 && walkPhase < 8;
-+	const std::vector<float> &right = walking ? body.walkRight[walkPhase] : body.right;
-+	const std::vector<float> &ahead = walking ? body.walkAhead[walkPhase] : body.ahead;
-+	const std::vector<float> &up = walking ? body.walkUp[walkPhase] : body.up;
++	// (going down or lying: the fall's shape for how far it has come, a body of its own, see VoxelUnitModel::falls)
++	const VoxelUnitModel::FallShape *fallen = fall > 0.0 ? body.fallAt(fall) : nullptr;
++	const bool walking = !fallen && walkPhase >= 0 && walkPhase < 8;
++	const std::vector<float> &right = fallen ? fallen->right : walking ? body.walkRight[walkPhase] : body.right;
++	const std::vector<float> &ahead = fallen ? fallen->ahead : walking ? body.walkAhead[walkPhase] : body.ahead;
++	const std::vector<float> &up = fallen ? fallen->up : walking ? body.walkUp[walkPhase] : body.up;
 +	// The unit's right and ahead on the map: east and north turned by its facing.
 +	const double angle = facing * Pi / 4.0, cosine = std::cos(angle), sine = std::sin(angle);
 +	const double focalLength = focalPixels();
 +	const double bodyUnit = body.unit; // (voxels to one of the body's own measures: half for a fine body)
-+	const bool falling = fall > 0.0;
-+	const VoxelUnitModel::FallPose pose = body.poseAt(fall);
 +	// Each voxel is a little cube, the cell of the body's grid it fills: side by side they leave no gap from any side.
 +	// On the screen a cube is the six-sided outline of its three half edges (to the body's right, ahead and up) thrown
 +	// from its middle; those are taken once here, at the feet's depth, and shrink with each voxel's own depth. (A body
-+	// walking or going down has its voxels moved off the grid, a little apart where a limb swings or the body spreads:
-+	// their cubes are a little bigger, and one going down is drawn by the boxes round its cubes.)
-+	const double halfEdge = 0.5 * VoxelCubeEdge * scale * bodyUnit * (falling ? 1.25 * std::max(1.0f, pose.spread) : walking ? 1.15 : 1.0);
++	// walking has its voxels moved off the grid, a little apart where a limb swings: their cubes are a little bigger.)
++	const double halfEdge = 0.5 * VoxelCubeEdge * scale * bodyUnit * (walking ? 1.15 : 1.0);
 +	const double probe = 8.0; // (voxels each way from the feet: far enough to measure, near enough to stay in front of the eye)
 +	const double axes[3][3] = { { cosine, sine, 0.0 }, { sine, -cosine, 0.0 }, { 0.0, 0.0, 1.0 } };
 +	double edges[3][2], lean[3] = {}; // (lean: how much deeper each half edge goes; a cube off the view's middle shows it)
@@ -72648,8 +72663,7 @@ index 000000000..53788aabe
 +		lean[0] = lean[1] = lean[2] = 0.0;
 +	}
 +	const double middleX = axisX(), middleY = axisY();
-+	const int fallFrame = falling ? body.fallFrameAt(fall) : -1;
-+	const size_t voxels = body.part.size();
++	const size_t voxels = right.size();
 +	DrawStep step;
 +	step.kind = DrawStep::VoxelUnit;
 +	step.sprite.unit = unit;
@@ -72657,14 +72671,11 @@ index 000000000..53788aabe
 +	step.sprite.pile = pile;
 +	step.voxelFirst = _voxelSplats.size();
 +	step.voxelOpacity = opacity;
-+	for (size_t k = 0; k < body.part.size(); ++k)
++	for (size_t k = 0; k < voxels; ++k)
 +	{
-+		if (!items && body.part[k] == VoxelUnitModel::Item) continue;
-+		// (seen from one of the 8 directions, what fits its drawing and the pieces added for it, see VoxelUnitModel::views;
-+		// going down or lying, the body's own shape)
-+		if (falling ? k >= body.addedFrom : !body.shows(k, direction, level)) continue;
-+		float across = right[k], along = ahead[k], height = up[k];
-+		if (falling) body.posed(pose, across, along, height);
++		// (seen from one of the 8 directions, what fits its drawing and the pieces added for it, see VoxelUnitModel::views)
++		if (!fallen && ((!items && body.part[k] == VoxelUnitModel::Item) || !body.shows(k, direction, level))) continue;
++		const float across = right[k], along = ahead[k], height = up[k];
 +		const double toRight = across * scale * bodyUnit, toAhead = along * scale * bodyUnit;
 +		const double world[3] = { feet[0] + toRight * cosine + toAhead * sine, feet[1] + toRight * sine - toAhead * cosine, feet[2] + height * scale * bodyUnit };
 +		if (world[2] < floorCut) continue;
@@ -72683,8 +72694,7 @@ index 000000000..53788aabe
 +		splat.halfX = (float)std::min(VoxelSplatHalfMax, reachX * splat.nearer);
 +		splat.halfY = (float)std::min(VoxelSplatHalfMax, reachY * splat.nearer);
 +		splat.depth = (float)depth;
-+		const Uint8 fallen = fallFrame >= 0 ? body.fallColours[fallFrame * voxels + k] : 0;
-+		splat.colour = shadeColor(fallen ? fallen : body.colour(k, direction, level), shade);
++		splat.colour = shadeColor(fallen ? fallen->colour[k] : body.colour(k, direction, level), shade);
 +		step.voxelHalfMax = std::max(step.voxelHalfMax, splat.halfY);
 +		_voxelSplats.push_back(splat);
 +	}
@@ -72692,7 +72702,7 @@ index 000000000..53788aabe
 +	if (step.voxelCount == 0) return;
 +	// The cubes' outlines (see drawVoxelUnit): the three half edges as seen straight ahead at a depth of one, and how
 +	// much deeper each goes.
-+	step.voxelOutline = cubes && !falling;
++	step.voxelOutline = cubes;
 +	for (int axis = 0; axis < 3; ++axis)
 +	{
 +		step.voxelEdges[axis][0] = (float)edges[axis][0];
@@ -73452,7 +73462,7 @@ index 000000000..53788aabe
 +		if (Options::fpsVoxelUnits && unitSize == 1 && (collapsing || fallingDown || airFall))
 +		{
 +			// Going down (the game's own fall, a quick death's, a body coming down from the air): the body it was last
-+			// drawn with goes down as its death frames show, to lie as its corpse's picture (see VoxelUnitModel::fall), as
++			// drawn with goes down as its death frames show, to lie as its corpse's picture (see VoxelUnitModel::falls), as
 +			// far as the fall has come: by the clock, at the quick fall's pace (QuickFallFrameTime a frame; the game's own
 +			// frames go faster); down while it comes down from the air. (Its corpse then lies so, finishing a fall the game
 +			// is done with: see drawFloorItems.) A big unit falls in its own frames.
@@ -83542,10 +83552,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..6bd8ac870
+index 000000000..95f184e1e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,2252 @@
+@@ -0,0 +1,2299 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -83668,8 +83678,15 @@ index 000000000..6bd8ac870
 +/// part of them from the middle stays with the body: between the legs).
 +constexpr double LegSwing = 22.0, KneeBend = 38.0, ArmSwing = 16.0;
 +constexpr float WholeHip = 0.42f, WholeMiddle = 0.12f;
-+/// A body down (its last death frame's pose) is at most this much of its standing height (see fitFall).
-+constexpr float DownAtMost = 0.6f;
++/// A body lying (see makeFalls) is at most this many voxels long, and this much thicker for each pixel inside its
++/// corpse's picture's outline (in the picture's own measure).
++constexpr float LyingLongest = 17.0f, LyingRound = 1.1f;
++/// A death frame's shape lies flat once its picture is this low, of the standing height (leaning from FallUpright of it
++/// on; see makeFalls).
++constexpr float FallUpright = 0.85f, FallFlat = 0.4f;
++/// The last death frame's shape leans back at least this many degrees, those before it in even steps; a low picture's
++/// at most FallMostLean (flat, it would lie half as long again as it is drawn).
++constexpr float FallLastLean = 50.0f, FallMostLean = 65.0f;
 +/// A piece added for a view (see matchViews) keeps to the body's own surface: a depth's agreement with the other views
 +/// counts BodyPull less for each voxel it lies from it (up to FarSteps half voxels: farther counts as that far).
 +constexpr float BodyPull = 1.0f;
@@ -84755,110 +84772,198 @@ index 000000000..6bd8ac870
 +			}
 +}
 +
-+/// The fall a body takes, as its death frames show it, ending as its corpse's picture lies: for each picture the pose
-+/// (see VoxelUnitModel::FallPose) whose outline seen as the picture sees it (direction 3, along the isometric slant)
-+/// agrees best with the picture's (the most of the two outlines in both), tipping the way the last shows (the body down:
-+/// no taller than DownAtMost of its standing height) all along; then each picture paints the body in its pose (the
-+/// voxels it sees, nearest first). Without either, it tips over backwards.
-+void fitFall(VoxelUnitModel &model, const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse)
++/// How deep inside a picture's outline each drawn pixel is: 1 at the outline, up to most (0: not drawn).
++std::vector<int> insideDepth(const std::vector<Uint8> &picture, int width, int height, int most)
 +{
-+	const size_t count = model.part.size();
-+	std::vector<const std::vector<Uint8>*> pictures;
-+	for (const auto &death : deaths) pictures.push_back(&death);
-+	if (!corpse.empty()) pictures.push_back(&corpse);
-+	if (pictures.empty())
++	std::vector<int> depth(width * height, 0);
++	std::vector<Uint8> inside(width * height);
++	for (int i = 0; i < width * height; ++i) inside[i] = picture[i] != 0;
++	auto at = [&](const std::vector<Uint8> &cells, int x, int y) { return x >= 0 && y >= 0 && x < width && y < height && cells[y * width + x]; };
++	for (int step = 1; step <= most; ++step)
 +	{
-+		model.fall.assign(1, VoxelUnitModel::FallPose{ 1.0f, 1.0f, 90.0f });
-+		model.fallToward = 4;
-+		return;
-+	}
-+	std::vector<size_t> body; // (every other voxel of the body's own: enough for an outline)
-+	for (size_t k = 0; k < std::min(count, model.addedFrom); k += 2) if (model.part[k] != VoxelUnitModel::Item) body.push_back(k);
-+	std::vector<Uint8> outline(FrameSize * FrameSize);
-+	float standingTop = 0.0f;
-+	for (size_t k : body) standingTop = std::max(standingTop, model.up[k]);
-+	auto agreement = [&](const VoxelUnitModel::FallPose &pose, const std::vector<Uint8> &death, float &top) {
-+		std::fill(outline.begin(), outline.end(), 0);
-+		top = 0.0f;
-+		for (size_t k : body)
++		std::vector<Uint8> deeper(width * height, 0);
++		bool any = false;
++		for (int y = 0; y < height; ++y)
 +		{
-+			float right = model.right[k], ahead = model.ahead[k], up = model.up[k], column, row, nearness;
-+			model.posed(pose, right, ahead, up);
-+			top = std::max(top, up);
-+			project(right, ahead, up, Front, false, column, row, nearness);
-+			const int c = (int)std::floor(column), r = (int)std::floor(row);
-+			if (c >= 0 && r >= 0 && c < FrameSize && r < FrameSize) outline[r * FrameSize + c] = 1;
-+		}
-+		int both = 0, either = 0;
-+		for (int i = 0; i < FrameSize * FrameSize; ++i)
-+		{
-+			const bool drawn = death[i] != 0;
-+			both += outline[i] && drawn;
-+			either += outline[i] || drawn;
-+		}
-+		return either ? (float)both / either : 0.0f;
-+	};
-+	// (A body keeps its volume going down: it sags a little and tips over, and lies as thick as it stood deep. It was
-+	// crumpled to a fifth of its height and spread out, a flat cake; the owner: "deaths should have volume too".)
-+	const float heights[] = { 1.0f, 0.9f, 0.8f, 0.7f }, spreads[] = { 1.0f, 1.1f, 1.2f };
-+	const float angles[] = { 0.0f, 15.0f, 30.0f, 45.0f, 60.0f, 75.0f, 90.0f };
-+	auto bestPose = [&](const std::vector<Uint8> &death, int firstToward, int lastToward, int &toward, bool down) {
-+		VoxelUnitModel::FallPose best;
-+		float bestAgreement = -1.0f;
-+		for (int way = firstToward; way <= lastToward; ++way)
-+		{
-+			model.fallToward = way;
-+			for (float angle : angles)
++			for (int x = 0; x < width; ++x)
 +			{
-+				if (angle == 0.0f && way != firstToward) continue; // (upright: the same whichever way)
-+				for (float height : heights)
-+					for (float spread : spreads)
-+					{
-+						const VoxelUnitModel::FallPose pose{ height, spread, angle };
-+						float top;
-+						const float here = agreement(pose, death, top);
-+						if (down && top > standingTop * DownAtMost) continue;
-+						if (here > bestAgreement) { bestAgreement = here; best = pose; toward = way; }
-+					}
++				if (!inside[y * width + x]) continue;
++				depth[y * width + x] = step;
++				any |= (deeper[y * width + x] = at(inside, x - 1, y) && at(inside, x + 1, y) && at(inside, x, y - 1) && at(inside, x, y + 1));
 +			}
 +		}
-+		if (down && bestAgreement < 0.0f) { best = VoxelUnitModel::FallPose{ 0.7f, 1.0f, 90.0f }; toward = firstToward; model.fallToward = firstToward; } // (too deep a body to be down by the rule: on its back all the same)
-+		return best;
++		if (!any) break;
++		inside.swap(deeper);
++	}
++	return depth;
++}
++
++/// A picture without its near black pixels' blotches (the sprites' outlines, see NearBlack): each takes a drawn
++/// neighbour's colour that isn't, if it has one.
++std::vector<Uint8> withoutOutline(const std::vector<Uint8> &picture, int width, int height, const SDL_Color *palette)
++{
++	std::vector<Uint8> out = picture;
++	auto dark = [&](Uint8 colour) { return luminance(palette[colour]) < NearBlack; };
++	for (int y = 0; y < height; ++y)
++	{
++		for (int x = 0; x < width; ++x)
++		{
++			const Uint8 colour = picture[y * width + x];
++			if (!colour || !dark(colour)) continue;
++			for (int n = 0; n < 8; ++n)
++			{
++				static const int dx[8] = { 0, 0, -1, 1, -1, 1, -1, 1 }, dy[8] = { -1, 1, 0, 0, -1, -1, 1, 1 };
++				const int nx = x + dx[n], ny = y + dy[n];
++				if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
++				const Uint8 beside = picture[ny * width + nx];
++				if (beside && !dark(beside)) { out[y * width + x] = beside; break; }
++			}
++		}
++	}
++	return out;
++}
++
++/// Fills a shape with the cells of the body's own grid (little cubes side by side, as the body's) in a box (low to
++/// high: right, ahead, up) that colourAt gives a colour (0: empty; asked at each cell's middle); its surface kept, the
++/// cells with an empty one beside them.
++template <typename ColourAt>
++void fillShape(VoxelUnitModel::FallShape &shape, const float low[3], const float high[3], ColourAt colourAt)
++{
++	const float from[3] = { AcrossFrom, AlongFrom, UpFrom };
++	int first[3], size[3];
++	for (int axis = 0; axis < 3; ++axis)
++	{
++		first[axis] = (int)std::floor((low[axis] - from[axis]) / Cell);
++		size[axis] = (int)std::floor((high[axis] - from[axis]) / Cell) + 1 - first[axis];
++		if (size[axis] <= 0 || size[axis] > 4096) return;
++	}
++	if ((double)size[0] * size[1] * size[2] > 4e7) return;
++	std::vector<Uint8> filled((size_t)size[0] * size[1] * size[2], 0);
++	auto cellAt = [&](int i, int j, int k) -> Uint8 { return i >= 0 && j >= 0 && k >= 0 && i < size[0] && j < size[1] && k < size[2] ? filled[((size_t)i * size[1] + j) * size[2] + k] : 0; };
++	for (int i = 0; i < size[0]; ++i)
++		for (int j = 0; j < size[1]; ++j)
++			for (int k = 0; k < size[2]; ++k)
++				filled[((size_t)i * size[1] + j) * size[2] + k] = colourAt(from[0] + (first[0] + i + 0.5f) * Cell, from[1] + (first[1] + j + 0.5f) * Cell, from[2] + (first[2] + k + 0.5f) * Cell);
++	for (int i = 0; i < size[0]; ++i)
++		for (int j = 0; j < size[1]; ++j)
++			for (int k = 0; k < size[2]; ++k)
++			{
++				const Uint8 colour = cellAt(i, j, k);
++				if (!colour || (cellAt(i - 1, j, k) && cellAt(i + 1, j, k) && cellAt(i, j - 1, k) && cellAt(i, j + 1, k) && cellAt(i, j, k - 1) && cellAt(i, j, k + 1))) continue;
++				shape.right.push_back(from[0] + (first[0] + i + 0.5f) * Cell);
++				shape.ahead.push_back(from[1] + (first[1] + j + 0.5f) * Cell);
++				shape.up.push_back(from[2] + (first[2] + k + 0.5f) * Cell);
++				shape.colour.push_back(colour);
++			}
++}
++
++/// A picture of the unit going down or lying, drawn as the map sees it (a death frame, or its corpse on the floor: the
++/// unit facing the camera, direction Front, along the isometric slant), given volume: the picture thrown along the
++/// view onto a slab through the unit's feet, leaning back by an angle (0 upright, 90 flat on the floor) and, in front
++/// of the feet, onto the floor (what the picture draws below the feet lies there); thicker inside the picture's outline
++/// and rounded at its edges (as an item's, see addItem), up to halfMost either side, its underside on the floor as it
++/// lies. Seen as the map sees it, it is the picture; from elsewhere it has the picture's volume.
++void fallRelief(VoxelUnitModel::FallShape &shape, const std::vector<Uint8> &picture, float degrees, float halfMost)
++{
++	const std::vector<int> depth = insideDepth(picture, FrameSize, FrameSize, (int)std::ceil(halfMost) + 1);
++	int left = FrameSize, right = -1;
++	for (int y = 0; y < FrameSize; ++y)
++		for (int x = 0; x < FrameSize; ++x)
++			if (picture[y * FrameSize + x]) { left = std::min(left, x); right = std::max(right, x); }
++	if (right < 0) return;
++	const float c = (float)std::cos(degrees * Pi / 180.0), s = (float)std::sin(degrees * Pi / 180.0);
++	// (direction Front: a column is the unit's right, turned about, times PixelsAcross)
++	const float low[3] = { -(right + 1 - FloorX) / PixelsAcross, -FrameSize * 0.75f, 0.0f };
++	const float high[3] = { -(left - 1 - FloorX) / PixelsAcross, FrameSize * 0.75f, (float)FloorY };
++	fillShape(shape, low, high, [&](float across, float along, float up) -> Uint8 {
++		// (off the slab's middle plane: ahead of it upright, above it lying)
++		const float off = along * c + up * s;
++		const bool onFloor = along > 0.0f && up <= halfMost;
++		if (!onFloor && (off > 2.0f * halfMost || off < -halfMost)) return 0;
++		float column, row, nearness;
++		project(across, along, up, Front, false, column, row, nearness);
++		const int x = (int)std::floor(column), y = (int)std::floor(row);
++		if (x < 0 || y < 0 || x >= FrameSize || y >= FrameSize) return 0;
++		const Uint8 colour = picture[y * FrameSize + x];
++		if (!colour) return 0;
++		const float half = std::max(Cell * 0.6f, std::min(halfMost, 0.2f * VOXELSCALE + 0.8f * depth[y * FrameSize + x]));
++		// (upright: half either side of the plane; lying: from the floor up; in front of the feet: on the floor)
++		return (off <= half * (1.0f + s) && off >= -half * (1.0f - s)) || (onFloor && up <= half) ? colour : 0;
++	});
++}
++
++/// The body lying: its corpse's inventory picture laid on the floor (the picture's top away behind the unit, where
++/// its head came down), as long as length, given volume as an item's: thicker inside the picture's outline, rounded at
++/// its edges, up to highMost off the floor.
++void lyingShape(VoxelUnitModel::FallShape &shape, const HeldItem &lying, float length, float highMost)
++{
++	const int width = lying.width, height = lying.height;
++	int top = height, bottom = -1, left = width, right = -1;
++	for (int y = 0; y < height; ++y)
++		for (int x = 0; x < width; ++x)
++			if (lying.picture[y * width + x]) { top = std::min(top, y); bottom = std::max(bottom, y); left = std::min(left, x); right = std::max(right, x); }
++	if (bottom < 0) return;
++	const float scale = length / std::max(4, std::max(bottom - top, right - left) + 1);
++	const float middleX = (left + right + 1) * 0.5f, middleY = (top + bottom + 1) * 0.5f;
++	const std::vector<int> depth = insideDepth(lying.picture, width, height, (int)std::ceil(highMost / scale) + 1);
++	const float low[3] = { (left - middleX) * scale, (top - middleY) * scale, 0.0f };
++	const float high[3] = { (right + 1 - middleX) * scale, (bottom + 1 - middleY) * scale, highMost };
++	fillShape(shape, low, high, [&](float across, float along, float up) -> Uint8 {
++		const int x = (int)std::floor(middleX - across / scale), y = (int)std::floor(middleY + along / scale);
++		if (x < 0 || y < 0 || x >= width || y >= height || up < 0.0f) return 0;
++		const Uint8 colour = lying.picture[y * width + x];
++		if (!colour) return 0;
++		return up <= std::max(Cell * 1.2f, std::min(highMost, (depth[y * width + x] - 0.3f) * scale * LyingRound)) ? colour : 0;
++	});
++}
++
++/// The fall a body takes: a shape for each of its death frames in turn (each frame's own picture given volume, upright
++/// while the picture stands tall, laid back as it gets low: the body goes down as its sprite does, not as a plank
++/// tipping over), then the body
++/// lying: its corpse's inventory picture laid on the floor and given volume (or, without one, its corpse's picture on
++/// the map's floor). The owner: "deaths should not be like planks! The body should organically collapse like in
++/// sprites - and the death should be like a dead body sprite (in equipment menu - just voxelised to give volume!)".
++void makeFalls(VoxelUnitModel &model, const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse, const HeldItem &lying, const SDL_Color *palette)
++{
++	// The standing body's height and depth: the fall's shapes are as thick as it stood deep, and it lies as long as it
++	// stood tall (not much longer than its tile: it lies in the tile's middle, not through the walls round it).
++	float top = 0.0f, back = 1e9f, fore = -1e9f;
++	for (size_t k = 0; k < std::min(model.part.size(), model.addedFrom); ++k)
++	{
++		if (model.part[k] == VoxelUnitModel::Item) continue;
++		top = std::max(top, model.up[k]);
++		if (model.part[k] == VoxelUnitModel::Torso) { back = std::min(back, model.ahead[k]); fore = std::max(fore, model.ahead[k]); }
++	}
++	const float halfMost = std::clamp((fore - back) * 0.5f, 1.5f * VOXELSCALE, 3.5f * VOXELSCALE);
++	const float length = std::min(top, LyingLongest * VOXELSCALE);
++	// How tall a frame's picture stands, of the standing height.
++	auto tallOf = [&](const std::vector<Uint8> &death) {
++		int topRow = FrameSize;
++		for (int i = 0; i < FrameSize * FrameSize && topRow == FrameSize; ++i) if (death[i]) topRow = i / FrameSize;
++		return top > 0.0f ? (FloorY - topRow) / top : 1.0f;
 +	};
-+	int toward = 4;
-+	model.fall.assign(pictures.size(), VoxelUnitModel::FallPose());
-+	model.fall.back() = bestPose(*pictures.back(), 0, 7, toward, true);
-+	model.fallToward = toward;
-+	for (size_t frame = 0; frame + 1 < pictures.size(); ++frame)
++	// (a "death" that ends standing isn't a fall: the Zombie's, a Chryssalid rising out of it; its shapes stay upright)
++	const bool goesDown = !deaths.empty() && tallOf(deaths.back()) < FallUpright;
++	float lean = 0.0f;
++	for (size_t frame = 0; frame < deaths.size(); ++frame)
 +	{
-+		int same = toward;
-+		model.fall[frame] = bestPose(*pictures[frame], toward, toward, same, false);
++		const auto &death = deaths[frame];
++		// How far back the frame's slab leans: a little more each frame (the last frames draw the body on the floor, as
++		// the map sees it), and more once its picture has come low; never back up.
++		if (goesDown) lean = std::max({ lean, FallMostLean * std::clamp((FallUpright - tallOf(death)) / (FallUpright - FallFlat), 0.0f, 1.0f), FallLastLean * (frame + 1) / deaths.size() });
++		VoxelUnitModel::FallShape shape;
++		fallRelief(shape, withoutOutline(death, FrameSize, FrameSize, palette), lean, halfMost);
++		if (!shape.colour.empty()) model.falls.push_back(std::move(shape));
 +	}
-+	model.fallToward = toward;
-+	// Each frame paints the body in its pose: the voxels nearest the frame's view at each pixel (and within a voxel of them).
-+	model.fallColours.assign(pictures.size() * count, 0);
-+	std::vector<int> pixelOf(count);
-+	std::vector<float> nearnessOf(count), front(FrameSize * FrameSize);
-+	for (size_t frame = 0; frame < pictures.size(); ++frame)
++	VoxelUnitModel::FallShape down;
++	if (!lying.picture.empty())
 +	{
-+		std::fill(front.begin(), front.end(), -1e9f);
-+		for (size_t k = 0; k < count; ++k)
-+		{
-+			// (the body's own voxels: the items keep their colours, and the views' pieces aren't drawn in a fall)
-+			pixelOf[k] = -1;
-+			if (k >= model.addedFrom || model.part[k] == VoxelUnitModel::Item) continue;
-+			float right = model.right[k], ahead = model.ahead[k], up = model.up[k], column, row;
-+			model.posed(model.fall[frame], right, ahead, up);
-+			project(right, ahead, up, Front, false, column, row, nearnessOf[k]);
-+			const int c = (int)std::floor(column), r = (int)std::floor(row);
-+			pixelOf[k] = c >= 0 && r >= 0 && c < FrameSize && r < FrameSize ? r * FrameSize + c : -1;
-+			if (pixelOf[k] >= 0) front[pixelOf[k]] = std::max(front[pixelOf[k]], nearnessOf[k]);
-+		}
-+		for (size_t k = 0; k < count; ++k)
-+		{
-+			if (pixelOf[k] >= 0 && nearnessOf[k] >= front[pixelOf[k]] - 1.0f * VOXELSCALE) model.fallColours[frame * count + k] = (*pictures[frame])[pixelOf[k]];
-+		}
++		HeldItem clean = lying;
++		clean.picture = withoutOutline(lying.picture, lying.width, lying.height, palette);
++		lyingShape(down, clean, length, halfMost * 1.6f);
 +	}
++	if (down.colour.empty() && !corpse.empty()) fallRelief(down, withoutOutline(corpse, FrameSize, FrameSize, palette), 90.0f, halfMost * 0.8f);
++	if (!down.colour.empty()) model.falls.push_back(std::move(down));
 +}
 +
 +/// The part each frame pixel shows, as the game lays the parts over each other (composite: its colour there is the top
@@ -85286,7 +85391,7 @@ index 000000000..6bd8ac870
 +}
 +
 +std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCount], const std::vector<Uint8> composite[8], const HeldItem items[2],
-+	const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse, const WalkFrames &walks, bool aiming, const Routine &routine,
++	const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse, const HeldItem &lying, const WalkFrames &walks, bool aiming, const Routine &routine,
 +	const SDL_Color *palette)
 +{
 +	if (!parts[0].any) return nullptr;
@@ -85675,72 +85780,22 @@ index 000000000..6bd8ac870
 +	const bool rightHolds = placed[0] || (placed[1] && items[1].twoHanded);
 +	const bool leftHolds = placed[1] || (placed[0] && items[0].twoHanded);
 +	makeWalk(*model, routine, leftHolds, rightHolds, walks);
-+	for (int toward = 0; toward < 8; ++toward)
-+	{
-+		const float sideways = (float)std::sin(toward * Pi / 4.0), forward = (float)std::cos(toward * Pi / 4.0);
-+		model->edge[toward] = -1e9f;
-+		for (size_t k = 0; k < model->addedFrom; ++k)
-+		{
-+			if (model->part[k] != VoxelUnitModel::Item) model->edge[toward] = std::max(model->edge[toward], model->right[k] * sideways + model->ahead[k] * forward);
-+		}
-+	}
-+	fitFall(*model, deaths, corpse);
++	makeFalls(*model, deaths, corpse, lying, palette);
 +	return model;
 +}
 +
 +
 +#if VOXELSCALE == 1 || defined(VOXELSCALE_ALONE) // (the model's own functions, once: this source is built a second time, see FirstPersonVoxelBodiesFine.cpp; ALONE: the offline tools' build at a scale)
 +/**
-+ * The pose a body's fall has come to, between its frames' poses: standing at 0, each frame's pose in turn, the last at 1.
-+ * @param progress How far the fall has come (0 to 1).
-+ * @return The pose.
++ * The shape a body going down has at a point of its fall: each death frame's in turn, then the body lying.
++ * @param progress How far the fall has come (0 standing, 1 down).
++ * @return The shape, or null (a body without death frames or a corpse: it stays as it stood).
 + */
-+VoxelUnitModel::FallPose VoxelUnitModel::poseAt(double progress) const
++const VoxelUnitModel::FallShape *VoxelUnitModel::fallAt(double progress) const
 +{
-+	if (fall.empty() || progress <= 0.0) return FallPose();
-+	const double at = std::min(progress, 1.0) * fall.size();
-+	const int frame = std::min((int)std::ceil(at) - 1, (int)fall.size() - 1);
-+	const FallPose from = frame > 0 ? fall[frame - 1] : FallPose(), &to = fall[frame];
-+	const float weight = (float)std::clamp(at - frame, 0.0, 1.0);
-+	return { from.height + (to.height - from.height) * weight, from.spread + (to.spread - from.spread) * weight, from.angle + (to.angle - from.angle) * weight };
++	if (falls.empty() || progress <= 0.0) return nullptr;
++	return &falls[std::min((size_t)(std::min(progress, 1.0) * falls.size()), falls.size() - 1)];
 +}
-+
-+/**
-+ * Puts a body point in a pose of its fall: crumpled (its height, its breadth), then tipped over about the body's edge on
-+ * the side it falls to.
-+ * @param pose The pose.
-+ * @param across In and out: voxels to the unit's right of the middle of its feet.
-+ * @param along In and out: ahead.
-+ * @param height In and out: up.
-+ */
-+void VoxelUnitModel::posed(const FallPose &pose, float &across, float &along, float &height) const
-+{
-+	across *= pose.spread;
-+	along *= pose.spread;
-+	height *= pose.height;
-+	if (pose.angle <= 0.0f) return;
-+	const float sideways = (float)std::sin(fallToward * Pi / 4.0), forward = (float)std::cos(fallToward * Pi / 4.0);
-+	const float toward = across * sideways + along * forward, aside = -across * forward + along * sideways;
-+	const float edgeHere = edge[fallToward] * pose.spread, fromEdge = toward - edgeHere;
-+	const float c = (float)std::cos(pose.angle * Pi / 180.0), s = (float)std::sin(pose.angle * Pi / 180.0);
-+	const float tipped = edgeHere + fromEdge * c + height * s;
-+	height = -fromEdge * s + height * c;
-+	across = tipped * sideways - aside * forward;
-+	along = tipped * forward + aside * sideways;
-+}
-+
-+/**
-+ * The fall's frame whose colours paint the body at this point of its fall (the frame it's nearest), or none before the
-+ * first half of the first.
-+ * @param progress How far the fall has come (0 to 1).
-+ * @return The frame, or -1 (the standing colours).
-+ */
-+int VoxelUnitModel::fallFrameAt(double progress) const
-+{
-+	if (fallColours.empty()) return -1;
-+	return std::min((int)std::lround(std::clamp(progress, 0.0, 1.0) * fall.size()) - 1, (int)fall.size() - 1);
-+}
-+
 +
 +/**
 + * Whether a shot meets the body at a point (see hits): a solid voxel there that shows from where the shot comes.
@@ -85781,18 +85836,20 @@ index 000000000..6bd8ac870
 +			for (size_t k = 0; k < count; ++k) std::fprintf(file, "%d %.2f %.2f %.2f\n", phase, model.walkRight[phase][k], model.walkAhead[phase][k], model.walkUp[phase][k]);
 +		std::fclose(file);
 +	}
-+	if (FILE *file = std::fopen((base + ".fall").c_str(), "w"))
++	// (each of the fall's shapes as a body of its own: fall0, fall1, ... in the .points' form)
++	for (size_t shape = 0; shape < model.falls.size(); ++shape)
 +	{
-+		std::fprintf(file, "%d %d\n", model.fallToward, (int)model.fall.size());
-+		for (const auto &pose : model.fall) std::fprintf(file, "%.3f %.3f %.1f\n", pose.height, pose.spread, pose.angle);
-+		for (float edge : model.edge) std::fprintf(file, "%.2f ", edge);
-+		std::fprintf(file, "\n");
-+		for (size_t pose = 0; pose < model.fall.size(); ++pose)
++		if (FILE *file = std::fopen((base + ".fall" + std::to_string(shape) + ".points").c_str(), "w"))
 +		{
-+			for (size_t k = 0; k < count; ++k) std::fprintf(file, "%d ", model.fallColours.empty() ? 0 : model.fallColours[pose * count + k]);
-+			std::fprintf(file, "\n");
++			const VoxelUnitModel::FallShape &fall = model.falls[shape];
++			for (size_t k = 0; k < fall.colour.size(); ++k)
++			{
++				std::fprintf(file, "%.2f %.2f %.2f %d", fall.right[k], fall.ahead[k], fall.up[k], VoxelUnitModel::Torso);
++				for (int slot = 0; slot < 16; ++slot) std::fprintf(file, " %d", fall.colour[k]);
++				std::fprintf(file, " %d 0\n", 0xFFFF);
++			}
++			std::fclose(file);
 +		}
-+		std::fclose(file);
 +	}
 +}
 +
@@ -85800,7 +85857,7 @@ index 000000000..6bd8ac870
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.h b/src/FirstPerson/FirstPersonVoxelBodies.h
 new file mode 100644
-index 000000000..47c7fae08
+index 000000000..505deb2a7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.h
 @@ -0,0 +1,132 @@
@@ -85923,14 +85980,14 @@ index 000000000..47c7fae08
 +
 +/// Makes a unit's body from its parts' frames (and, for a unit drawn in parts, the parts laid over each other as the game
 +/// draws them, each direction's: which part shows where), the items in its hands (right, left), its death frames, its
-+/// corpse's picture and its walk frames; null if it has no torso.
++/// corpse's picture on the map's floor and in the inventory (lying) and its walk frames; null if it has no torso.
 +std::unique_ptr<VoxelUnitModel> makeModel(PartFrames parts[PartCount], const std::vector<Uint8> composite[8], const HeldItem items[2],
-+	const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse, const WalkFrames &walks, bool aiming, const Routine &routine,
++	const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse, const HeldItem &lying, const WalkFrames &walks, bool aiming, const Routine &routine,
 +	const SDL_Color *palette);
 +
 +/// Writes a body into files named base and these endings (the viewers in tools/voxel_units read them): .points (each
 +/// voxel: right ahead up part, its 16 colours, the views it shows in and 1 for a piece added for a view), .walk (each
-+/// walk phase's places) and .fall (the fall's way, poses, edges and colours).
++/// walk phase's places) and .fallN.points (each of the fall's shapes, as a body).
 +void writeModel(const VoxelUnitModel &model, const std::string &base);
 +
 +}
@@ -85938,10 +85995,10 @@ index 000000000..47c7fae08
 +}
 diff --git a/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp b/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp
 new file mode 100644
-index 000000000..f2fee2f28
+index 000000000..1cebd94ec
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp
-@@ -0,0 +1,91 @@
+@@ -0,0 +1,95 @@
 +/*
 + * FirstPersonVoxelBodiesFine.cpp: the voxel bodies' builder a second time, twice as fine (see
 + * FirstPersonVoxelBodiesFine.h): the same source, FirstPersonVoxelBodies.cpp, with VOXELSCALE 2 and under a name of its
@@ -86017,6 +86074,10 @@ index 000000000..f2fee2f28
 +	std::vector<std::vector<Uint8>> deaths;
 +	for (const auto &death : source.deaths) deaths.push_back(enlarged(death));
 +	const std::vector<Uint8> corpse = enlarged(source.corpse);
++	HeldItem lying;
++	lying.picture = source.lyingPicture;
++	lying.width = source.lyingWidth;
++	lying.height = source.lyingHeight;
 +	WalkFrames walks;
 +	walks.any = source.walkAny;
 +	for (int phase = 0; phase < 8; ++phase)
@@ -86027,7 +86088,7 @@ index 000000000..f2fee2f28
 +			for (int side = 0; side < 2; ++side) walks.arms[phase][view][side] = enlarged(source.walkArms[phase][view][side]);
 +		}
 +	}
-+	std::unique_ptr<VoxelUnitModel> model = makeModel(parts, composite, items, deaths, corpse, walks, source.aiming, *routine, palette);
++	std::unique_ptr<VoxelUnitModel> model = makeModel(parts, composite, items, deaths, corpse, lying, walks, source.aiming, *routine, palette);
 +	if (model) model->unit = 1.0f / VOXELSCALE;
 +	return model;
 +}
@@ -86035,10 +86096,10 @@ index 000000000..f2fee2f28
 +}
 diff --git a/src/FirstPerson/FirstPersonVoxelBodiesFine.h b/src/FirstPerson/FirstPersonVoxelBodiesFine.h
 new file mode 100644
-index 000000000..7313bc1ab
+index 000000000..bca7476ef
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodiesFine.h
-@@ -0,0 +1,36 @@
+@@ -0,0 +1,37 @@
 +#pragma once
 +/*
 + * FirstPersonVoxelBodiesFine.h: the voxel bodies made twice as fine (see FineBodies): the builder of
@@ -86065,7 +86126,8 @@ index 000000000..7313bc1ab
 +	int itemWidth[2] = {}, itemHeight[2] = {};
 +	bool itemTwoHanded[2] = {};
 +	std::vector<std::vector<Uint8>> deaths;
-+	std::vector<Uint8> corpse;
++	std::vector<Uint8> corpse, lyingPicture;
++	int lyingWidth = 0, lyingHeight = 0;
 +	std::vector<Uint8> walkLegs[8][2], walkArms[8][2][2];
 +	bool walkAny = false, aiming = false;
 +	int routine = 0;
@@ -86402,10 +86464,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..8684205f5
+index 000000000..3de84a52e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,651 @@
+@@ -0,0 +1,682 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -86510,6 +86572,7 @@ index 000000000..8684205f5
 +	HeldItem items[2];
 +	std::vector<std::vector<Uint8>> deaths;
 +	std::vector<Uint8> corpse;
++	HeldItem lying; // (the corpse's inventory picture: the body lying)
 +	WalkFrames walks;
 +	bool aiming = false;
 +	bool fine = false; // (made twice as fine: see FineBodies)
@@ -86743,6 +86806,21 @@ index 000000000..8684205f5
 +			if (!any) corpse.clear();
 +		}
 +	}
++	// And its corpse's picture in the inventory (BIGOBS.PCK): laid on the floor and given volume, the body lying.
++	HeldItem lying;
++	if (!routine->big && inventorySprites && !corpseItems.empty() && corpseItems.front())
++	{
++		if (const Surface *picture = inventorySprites->getFrame(corpseItems.front()->getBigSprite()))
++		{
++			lying.width = picture->getWidth();
++			lying.height = picture->getHeight();
++			lying.picture.resize(lying.width * lying.height);
++			bool any = false;
++			for (int y = 0; y < lying.height; ++y)
++				for (int x = 0; x < lying.width; ++x) any |= (lying.picture[y * lying.width + x] = picture->getPixel(x, y)) != 0;
++			if (!any) lying = HeldItem();
++		}
++	}
 +
 +	// The items in hand: their inventory pictures as the game draws them in a hand (with their own recolouring).
 +	HeldItem items[2];
@@ -86778,6 +86856,7 @@ index 000000000..8684205f5
 +	}
 +	for (const auto &death : deaths) hashBytes(hash, death.data(), death.size());
 +	hashBytes(hash, corpse.data(), corpse.size());
++	hashBytes(hash, lying.picture.data(), lying.picture.size());
 +	for (int phase = 0; phase < 8 && walks.any; ++phase)
 +		for (int view = 0; view < 2; ++view)
 +		{
@@ -86803,6 +86882,7 @@ index 000000000..8684205f5
 +		std::move(std::begin(items), std::end(items), std::begin(job->items));
 +		job->deaths = std::move(deaths);
 +		job->corpse = std::move(corpse);
++		job->lying = std::move(lying);
 +		job->walks = std::move(walks);
 +		job->aiming = aiming;
 +		job->fine = FineBodies;
@@ -86950,6 +87030,9 @@ index 000000000..8684205f5
 +			}
 +			source.deaths = job->deaths;
 +			source.corpse = job->corpse;
++			source.lyingPicture = job->lying.picture;
++			source.lyingWidth = job->lying.width;
++			source.lyingHeight = job->lying.height;
 +			for (int phase = 0; phase < 8; ++phase)
 +				for (int view = 0; view < 2; ++view)
 +				{
@@ -86963,7 +87046,7 @@ index 000000000..8684205f5
 +		}
 +		else
 +		{
-+			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->walks, job->aiming, *job->routine, job->palette);
++			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->lying, job->walks, job->aiming, *job->routine, job->palette);
 +		}
 +		if (const char *folder = std::getenv("OXC3D_VOXELDUMP")) dump(*job, model.get(), folder);
 +		std::lock_guard<std::mutex> lock(_mutex);
@@ -87003,6 +87086,16 @@ index 000000000..8684205f5
 +		for (const auto &death : job.deaths) std::fwrite(death.data(), 1, death.size(), file);
 +		if (!job.corpse.empty()) std::fwrite(job.corpse.data(), 1, job.corpse.size(), file);
 +		std::fclose(file);
++	}
++	if (!job.lying.picture.empty())
++	{
++		if (FILE *file = std::fopen((base + ".lying").c_str(), "wb"))
++		{
++			const int size[2] = { job.lying.width, job.lying.height };
++			std::fwrite(size, sizeof(int), 2, file);
++			std::fwrite(job.lying.picture.data(), 1, job.lying.picture.size(), file);
++			std::fclose(file);
++		}
 +	}
 +	if (!job.composite[0].empty())
 +	{
@@ -87059,10 +87152,10 @@ index 000000000..8684205f5
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.h b/src/FirstPerson/FirstPersonVoxelUnits.h
 new file mode 100644
-index 000000000..dc9516dc7
+index 000000000..ab87e5532
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.h
-@@ -0,0 +1,213 @@
+@@ -0,0 +1,202 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -87162,25 +87255,14 @@ index 000000000..dc9516dc7
 +	std::vector<Uint8> colours;
 +	/// The walk: each of its 8 phases' places (the same voxels, legs and arms swung, the body bobbing).
 +	std::vector<float> walkRight[8], walkAhead[8], walkUp[8];
-+	/// A pose of the body going down: its standing body crumpled (its height times height, its breadth times spread),
-+	/// then tipped over by angle (degrees) towards fallToward (0 ahead, 2 its right, 4 back, 6 its left) about its edge
-+	/// on that side.
-+	struct FallPose { float height = 1.0f, spread = 1.0f, angle = 0.0f; };
-+	/// Going down as its death frames show it (the game's fall, drawn facing the screen): the pose each frame shows (none
-+	/// for a unit without death frames: it tips over backwards), the way it tips, and the colours each frame paints it
-+	/// in its pose (a voxel for each frame in turn; 0 where the frame doesn't show it: its standing colour).
-+	std::vector<FallPose> fall;
-+	int fallToward = 4;
-+	std::vector<Uint8> fallColours;
-+	/// How far the body reaches each way (0 ahead, clockwise by 45 degrees) from the middle of its feet, the items in its
-+	/// hands left out: the edge it tips over.
-+	float edge[8] = {};
-+	/// The pose a fall has come to (0 standing, 1 down), between its frames' poses.
-+	FallPose poseAt(double progress) const;
-+	/// Puts a body point (voxels from the middle of the feet: to the right, ahead, up) in a pose.
-+	void posed(const FallPose &pose, float &across, float &along, float &height) const;
-+	/// The fall's frame whose colours paint the body at this point of the fall, or -1 (its standing colours).
-+	int fallFrameAt(double progress) const;
++	/// A shape of the body going down or lying: cubes on the body's own grid, each one colour from every side.
++	struct FallShape { std::vector<float> right, ahead, up; std::vector<Uint8> colour; };
++	/// Going down as its death frames show it: each frame's own picture given volume (the unit collapses as its sprite
++	/// does, falling back from the way it faced), then the body lying: its corpse's inventory picture laid on the floor
++	/// and given volume. Empty for a unit with neither.
++	std::vector<FallShape> falls;
++	/// The shape at a point of the fall (0 standing, 1 down), or null (none: before it starts, or a body without any).
++	const FallShape *fallAt(double progress) const;
 +	/// The colour of voxel k seen from direction (0-7) with level painting (or slanted).
 +	Uint8 colour(size_t k, int direction, bool level) const { return colours[k * 16 + (level ? 0 : 8) + direction]; }
 +	/// The views each voxel shows in, a bit for each of the 16 colours' views (level, then slanted: the bit of colour slot
@@ -87189,7 +87271,7 @@ index 000000000..dc9516dc7
 +	/// drawing has that they leave bare (see matchViews in FirstPersonVoxelBodies.cpp): from each direction the body
 +	/// has its sprite's outline.
 +	std::vector<Uint16> views;
-+	/// The voxels from addedFrom on are such added pieces (left out of a fall: the body falls as its own shape).
++	/// The voxels from addedFrom on are such added pieces.
 +	size_t addedFrom = (size_t)-1;
 +	/// Whether voxel k shows from direction (0-7) with level painting (or slanted).
 +	bool shows(size_t k, int direction, bool level) const { return views.empty() || (views[k] >> ((level ? 0 : 8) + direction) & 1); }

@@ -117,14 +117,14 @@ struct HeldItem
 
 /// Makes a unit's body from its parts' frames (and, for a unit drawn in parts, the parts laid over each other as the game
 /// draws them, each direction's: which part shows where), the items in its hands (right, left), its death frames, its
-/// corpse's picture and its walk frames; null if it has no torso.
+/// corpse's picture on the map's floor and in the inventory (lying) and its walk frames; null if it has no torso.
 std::unique_ptr<VoxelUnitModel> makeModel(PartFrames parts[PartCount], const std::vector<Uint8> composite[8], const HeldItem items[2],
-	const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse, const WalkFrames &walks, bool aiming, const Routine &routine,
+	const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse, const HeldItem &lying, const WalkFrames &walks, bool aiming, const Routine &routine,
 	const SDL_Color *palette);
 
 /// Writes a body into files named base and these endings (the viewers in tools/voxel_units read them): .points (each
 /// voxel: right ahead up part, its 16 colours, the views it shows in and 1 for a piece added for a view), .walk (each
-/// walk phase's places) and .fall (the fall's way, poses, edges and colours).
+/// walk phase's places) and .fallN.points (each of the fall's shapes, as a body).
 void writeModel(const VoxelUnitModel &model, const std::string &base);
 
 }

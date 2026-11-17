@@ -97,25 +97,14 @@ struct VoxelUnitModel
 	std::vector<Uint8> colours;
 	/// The walk: each of its 8 phases' places (the same voxels, legs and arms swung, the body bobbing).
 	std::vector<float> walkRight[8], walkAhead[8], walkUp[8];
-	/// A pose of the body going down: its standing body crumpled (its height times height, its breadth times spread),
-	/// then tipped over by angle (degrees) towards fallToward (0 ahead, 2 its right, 4 back, 6 its left) about its edge
-	/// on that side.
-	struct FallPose { float height = 1.0f, spread = 1.0f, angle = 0.0f; };
-	/// Going down as its death frames show it (the game's fall, drawn facing the screen): the pose each frame shows (none
-	/// for a unit without death frames: it tips over backwards), the way it tips, and the colours each frame paints it
-	/// in its pose (a voxel for each frame in turn; 0 where the frame doesn't show it: its standing colour).
-	std::vector<FallPose> fall;
-	int fallToward = 4;
-	std::vector<Uint8> fallColours;
-	/// How far the body reaches each way (0 ahead, clockwise by 45 degrees) from the middle of its feet, the items in its
-	/// hands left out: the edge it tips over.
-	float edge[8] = {};
-	/// The pose a fall has come to (0 standing, 1 down), between its frames' poses.
-	FallPose poseAt(double progress) const;
-	/// Puts a body point (voxels from the middle of the feet: to the right, ahead, up) in a pose.
-	void posed(const FallPose &pose, float &across, float &along, float &height) const;
-	/// The fall's frame whose colours paint the body at this point of the fall, or -1 (its standing colours).
-	int fallFrameAt(double progress) const;
+	/// A shape of the body going down or lying: cubes on the body's own grid, each one colour from every side.
+	struct FallShape { std::vector<float> right, ahead, up; std::vector<Uint8> colour; };
+	/// Going down as its death frames show it: each frame's own picture given volume (the unit collapses as its sprite
+	/// does, falling back from the way it faced), then the body lying: its corpse's inventory picture laid on the floor
+	/// and given volume. Empty for a unit with neither.
+	std::vector<FallShape> falls;
+	/// The shape at a point of the fall (0 standing, 1 down), or null (none: before it starts, or a body without any).
+	const FallShape *fallAt(double progress) const;
 	/// The colour of voxel k seen from direction (0-7) with level painting (or slanted).
 	Uint8 colour(size_t k, int direction, bool level) const { return colours[k * 16 + (level ? 0 : 8) + direction]; }
 	/// The views each voxel shows in, a bit for each of the 16 colours' views (level, then slanted: the bit of colour slot
@@ -124,7 +113,7 @@ struct VoxelUnitModel
 	/// drawing has that they leave bare (see matchViews in FirstPersonVoxelBodies.cpp): from each direction the body
 	/// has its sprite's outline.
 	std::vector<Uint16> views;
-	/// The voxels from addedFrom on are such added pieces (left out of a fall: the body falls as its own shape).
+	/// The voxels from addedFrom on are such added pieces.
 	size_t addedFrom = (size_t)-1;
 	/// Whether voxel k shows from direction (0-7) with level painting (or slanted).
 	bool shows(size_t k, int direction, bool level) const { return views.empty() || (views[k] >> ((level ? 0 : 8) + direction) & 1); }
