@@ -659,6 +659,8 @@ public:
 	static bool handLaunched(const RuleItem *weapon);
 	/// Does a shot fly as an object (an arrow, a dart, a bolt), no powder in it: no muzzle flash, a white streak?
 	bool flyingShot(const RuleItem *ammo, const RuleItem *weapon);
+	/// Whether a thrown item burns on its way (a grenade of fire: a Molotov cocktail).
+	static bool burnsInFlight(const BattleItem *item);
 
 	/// Renders the view.
 	void draw() override;
@@ -1525,6 +1527,8 @@ private:
 	const Projectile *_lastProjectile = nullptr; // the shot in flight last frame
 	float _lastShotHead[3] = {};                 // where it was drawn
 	bool _lastProjectileThrown = false;          // it was a thrown item (no trail, no impact)
+	bool _lastThrownBurning = false;             // ...one that burns in flight (embers: see burnsInFlight)
+	Uint32 _freeGrenadeEmberTick = 0;            // a burning free grenade's last ember
 	Trail _shotTrail = TRAIL_NONE;               // how it looks in flight
 	Uint8 _shotTrailColor = 0;                   // its colour
 	float _shotCalibre = 1.0f;                   // how big it's drawn (see shotCalibre)

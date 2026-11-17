@@ -60248,10 +60248,10 @@ index 000000000..5eaac16dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..414aa6acf
+index 000000000..ca762407e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1824 @@
+@@ -0,0 +1,1828 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -60913,6 +60913,8 @@ index 000000000..414aa6acf
 +	static bool handLaunched(const RuleItem *weapon);
 +	/// Does a shot fly as an object (an arrow, a dart, a bolt), no powder in it: no muzzle flash, a white streak?
 +	bool flyingShot(const RuleItem *ammo, const RuleItem *weapon);
++	/// Whether a thrown item burns on its way (a grenade of fire: a Molotov cocktail).
++	static bool burnsInFlight(const BattleItem *item);
 +
 +	/// Renders the view.
 +	void draw() override;
@@ -61779,6 +61781,8 @@ index 000000000..414aa6acf
 +	const Projectile *_lastProjectile = nullptr; // the shot in flight last frame
 +	float _lastShotHead[3] = {};                 // where it was drawn
 +	bool _lastProjectileThrown = false;          // it was a thrown item (no trail, no impact)
++	bool _lastThrownBurning = false;             // ...one that burns in flight (embers: see burnsInFlight)
++	Uint32 _freeGrenadeEmberTick = 0;            // a burning free grenade's last ember
 +	Trail _shotTrail = TRAIL_NONE;               // how it looks in flight
 +	Uint8 _shotTrailColor = 0;                   // its colour
 +	float _shotCalibre = 1.0f;                   // how big it's drawn (see shotCalibre)
@@ -63795,10 +63799,10 @@ index 000000000..66b431a69
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..b362abf71
+index 000000000..d086476ff
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
-@@ -0,0 +1,753 @@
+@@ -0,0 +1,772 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -63850,6 +63854,8 @@ index 000000000..b362abf71
 +#include "../Battlescape/Projectile.h"
 +#include "../Battlescape/Explosion.h"
 +#include "../Savegame/Tile.h"
++#include "../Savegame/BattleItem.h"
++#include "../Mod/RuleItem.h"
 +#include "../Engine/Options.h"
 +#include "../Mod/Mod.h"
 +#include "../Savegame/SavedBattleGame.h"
@@ -64000,7 +64006,7 @@ index 000000000..b362abf71
 +	frame.palette = view.getPalette();
 +	frame.smoothLight = Options::fpsSmoothLight && view._wantsTrueColor;
 +	frame.reflections = Options::fpsReflections && view._wantsTrueColor && view._waterColors[0] != 0; // (only where there is a sea)
-+	// The coloured lights (setting "Coloured lights", in full colour): the shots in flight (but plain bullets), the
++	// The coloured lights (setting "Coloured lights", in full colour): the shots in flight (but plain bullets and arrows), a thrown thing that burns, the
 +	// explosions, the muzzle flash, and the nearest fires; sixteen at most, in that order.
 +	frame.colorLightCount = 0;
 +	frame.colorLightsOn = Options::fpsColoredLights && view._wantsTrueColor;
@@ -64013,12 +64019,14 @@ index 000000000..b362abf71
 +			const float light[8] = { x, y, z, reach, red / 255.0f, green / 255.0f, blue / 255.0f, strength };
 +			std::copy(light, light + 8, frame.colorLights[frame.colorLightCount++]);
 +		};
-+		// A shot's colour: its trail's, made as bright as it goes (a dark red bolt still lights red).
++		// A shot's colour: its trail's, made as bright as it goes (a dark red bolt still lights red). A rocket or
++		// another explosive round lights by the flame it flies on, not by its smoke's grey (a player: a rocket
++		// "should also make a light trail", as fire and plasma do; it was left out with the plain bullets).
 +		auto addShot = [&](const float *head, FirstPersonView::Trail trail, Uint8 color, float calibre)
 +		{
-+			if (trail == FirstPersonView::TRAIL_NONE || trail == FirstPersonView::TRAIL_FLYING || trail == FirstPersonView::TRAIL_SMOKE) return;
++			if (trail == FirstPersonView::TRAIL_NONE || trail == FirstPersonView::TRAIL_FLYING) return;
 +			float red = 255, green = 150, blue = 60; // (a rocket's flame, fire)
-+			if (trail != FirstPersonView::TRAIL_FIRE && color)
++			if (trail != FirstPersonView::TRAIL_FIRE && trail != FirstPersonView::TRAIL_SMOKE && color)
 +			{
 +				const float top = std::max({ 1, (int)palette[color].r, (int)palette[color].g, (int)palette[color].b });
 +				red = palette[color].r * 255.0f / top; green = palette[color].g * 255.0f / top; blue = palette[color].b * 255.0f / top;
@@ -64028,9 +64036,24 @@ index 000000000..b362abf71
 +		// (OPENXCOM3D_GPU_TESTLIGHT: an orange light three tiles ahead of the eye, to look at the lights without a fire at hand.)
 +		static const bool testLight = getenv("OPENXCOM3D_GPU_TESTLIGHT") != nullptr;
 +		if (testLight) add((float)(view._eye[0] + view._forward[0] * 48.0), (float)(view._eye[1] + view._forward[1] * 48.0), (float)view._eye[2], 120.0f, 255, 130, 45, 1.0f);
++		// A thrown thing that burns (a grenade whose damage is fire: a mod's Molotov cocktail, an incendiary grenade)
++		// lights as a round of fire does on its way (the owner, after the rockets: "Molotov yes", and all that
++		// burns in flight; a burning arrow is a round of fire already).
++		auto burning = [](const BattleItem *item) { return FirstPersonView::burnsInFlight(item); };
++		if (burning(view._freeGrenade))
++		{
++			const float seconds = std::min(0.05f, (SDL_GetTicks() - view._freeGrenadeTick) / 1000.0f);
++			add(view._freeGrenadePos[0] + view._freeGrenadeVelocity[0] * seconds, view._freeGrenadePos[1] + view._freeGrenadeVelocity[1] * seconds,
++				view._freeGrenadePos[2] + view._freeGrenadeVelocity[2] * seconds, 84.0f, 255, 150, 60, 0.9f);
++		}
 +		if (Projectile *projectile = view.flyingProjectile())
 +		{
-+			if (!projectile->getItem())
++			if (burning(projectile->getItem()))
++			{
++				const Position at = projectile->getPosition(0);
++				add((float)at.x, (float)at.y, (float)at.z, 84.0f, 255, 150, 60, 0.9f);
++			}
++			else if (!projectile->getItem())
 +			{
 +				float head[3];
 +				view.shotHead(projectile, head);
@@ -69524,10 +69547,10 @@ index 000000000..09d54d330
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShots.cpp b/src/FirstPerson/FirstPersonViewShots.cpp
 new file mode 100644
-index 000000000..0e91e2da0
+index 000000000..229bd966c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShots.cpp
-@@ -0,0 +1,2314 @@
+@@ -0,0 +1,2339 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -69872,6 +69895,30 @@ index 000000000..0e91e2da0
 +		(int)std::floor(_freeGrenadePos[2] + _freeGrenadeVelocity[2] * seconds));
 +	const Position before((int)std::floor(current.x - _freeGrenadeVelocity[0] * 0.05f), (int)std::floor(current.y - _freeGrenadeVelocity[1] * 0.05f), current.z);
 +	drawThrownItem(current, before, _freeGrenade, _freeGrenadeStart);
++	// One that burns sheds embers on its way, as a round of fire does (see spawnTrailSegment): about one a frame.
++	if (_particlesOn && burnsInFlight(_freeGrenade) && SDL_GetTicks() != _freeGrenadeEmberTick)
++	{
++		typedef FirstPersonParticles P;
++		_freeGrenadeEmberTick = SDL_GetTicks();
++		P::Particle ember;
++		ember.pos[0] = (float)current.x + _particles.random(-1, 1); ember.pos[1] = (float)current.y + _particles.random(-1, 1); ember.pos[2] = (float)current.z;
++		ember.vel[0] = _particles.random(-3, 3); ember.vel[1] = _particles.random(-3, 3); ember.vel[2] = _particles.random(2, 8);
++		ember.age = 0; ember.gravity = 0; ember.drag = 0; ember.group = P::EFFECT;
++		ember.life = _particles.random(0.3f, 0.7f); ember.color = _colors.fire[(int)_particles.random(0, 2.99f)];
++		ember.size = 2; ember.kind = P::GLOW;
++		_particles.add(ember);
++	}
++}
++
++/**
++ * Whether a thrown item burns on its way: a grenade whose damage is fire (a mod's Molotov cocktail, an
++ * incendiary grenade). Such a one sheds embers in flight and, with "Coloured lights", lights what it passes.
++ */
++bool FirstPersonView::burnsInFlight(const BattleItem *item)
++{
++	const RuleItem *rule = item ? item->getRules() : nullptr;
++	return rule && (rule->getBattleType() == BT_GRENADE || rule->getBattleType() == BT_PROXIMITYGRENADE)
++		&& rule->getDamageType() && rule->getDamageType()->ResistType == DT_IN;
 +}
 +
 +/**
@@ -70412,9 +70459,9 @@ index 000000000..0e91e2da0
 +		P::Particle particle;
 +		std::copy(point, point + 3, particle.pos);
 +		particle.age = 0; particle.gravity = 0; particle.drag = 0; particle.group = P::EFFECT;
-+		// The particle by the kind of trail (a thrown item leaves none).
++		// The particle by the kind of trail (a thrown item leaves none, but one that burns: embers, as a round of fire).
 +		bool keep = true;
-+		switch (_lastProjectileThrown ? TRAIL_NONE : _shotTrail)
++		switch (_lastProjectileThrown ? (_lastThrownBurning ? TRAIL_FIRE : TRAIL_NONE) : _shotTrail)
 +		{
 +		case TRAIL_FIRE:
 +			// Embers: drifting up a little, glowing in the hotter fire colours for half a second.
@@ -71677,6 +71724,7 @@ index 000000000..0e91e2da0
 +	const Position firedFrom = projectile->getPosition(-100000), current = projectile->getPosition(0);
 +	float origin[3] = { (float)firedFrom.x, (float)firedFrom.y, (float)firedFrom.z };
 +	_lastProjectileThrown = projectile->getItem() != nullptr;
++	_lastThrownBurning = burnsInFlight(projectile->getItem());
 +	if (_lastProjectileThrown)
 +	{
 +		_thrownStart = SDL_GetTicks(); // it tumbles from here

@@ -49,6 +49,8 @@
 #include "../Battlescape/Projectile.h"
 #include "../Battlescape/Explosion.h"
 #include "../Savegame/Tile.h"
+#include "../Savegame/BattleItem.h"
+#include "../Mod/RuleItem.h"
 #include "../Engine/Options.h"
 #include "../Mod/Mod.h"
 #include "../Savegame/SavedBattleGame.h"
@@ -199,7 +201,7 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 	frame.palette = view.getPalette();
 	frame.smoothLight = Options::fpsSmoothLight && view._wantsTrueColor;
 	frame.reflections = Options::fpsReflections && view._wantsTrueColor && view._waterColors[0] != 0; // (only where there is a sea)
-	// The coloured lights (setting "Coloured lights", in full colour): the shots in flight (but plain bullets), the
+	// The coloured lights (setting "Coloured lights", in full colour): the shots in flight (but plain bullets and arrows), a thrown thing that burns, the
 	// explosions, the muzzle flash, and the nearest fires; sixteen at most, in that order.
 	frame.colorLightCount = 0;
 	frame.colorLightsOn = Options::fpsColoredLights && view._wantsTrueColor;
@@ -212,12 +214,14 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 			const float light[8] = { x, y, z, reach, red / 255.0f, green / 255.0f, blue / 255.0f, strength };
 			std::copy(light, light + 8, frame.colorLights[frame.colorLightCount++]);
 		};
-		// A shot's colour: its trail's, made as bright as it goes (a dark red bolt still lights red).
+		// A shot's colour: its trail's, made as bright as it goes (a dark red bolt still lights red). A rocket or
+		// another explosive round lights by the flame it flies on, not by its smoke's grey (a player: a rocket
+		// "should also make a light trail", as fire and plasma do; it was left out with the plain bullets).
 		auto addShot = [&](const float *head, FirstPersonView::Trail trail, Uint8 color, float calibre)
 		{
-			if (trail == FirstPersonView::TRAIL_NONE || trail == FirstPersonView::TRAIL_FLYING || trail == FirstPersonView::TRAIL_SMOKE) return;
+			if (trail == FirstPersonView::TRAIL_NONE || trail == FirstPersonView::TRAIL_FLYING) return;
 			float red = 255, green = 150, blue = 60; // (a rocket's flame, fire)
-			if (trail != FirstPersonView::TRAIL_FIRE && color)
+			if (trail != FirstPersonView::TRAIL_FIRE && trail != FirstPersonView::TRAIL_SMOKE && color)
 			{
 				const float top = std::max({ 1, (int)palette[color].r, (int)palette[color].g, (int)palette[color].b });
 				red = palette[color].r * 255.0f / top; green = palette[color].g * 255.0f / top; blue = palette[color].b * 255.0f / top;
@@ -227,9 +231,24 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 		// (OPENXCOM3D_GPU_TESTLIGHT: an orange light three tiles ahead of the eye, to look at the lights without a fire at hand.)
 		static const bool testLight = getenv("OPENXCOM3D_GPU_TESTLIGHT") != nullptr;
 		if (testLight) add((float)(view._eye[0] + view._forward[0] * 48.0), (float)(view._eye[1] + view._forward[1] * 48.0), (float)view._eye[2], 120.0f, 255, 130, 45, 1.0f);
+		// A thrown thing that burns (a grenade whose damage is fire: a mod's Molotov cocktail, an incendiary grenade)
+		// lights as a round of fire does on its way (the owner, after the rockets: "Molotov yes", and all that
+		// burns in flight; a burning arrow is a round of fire already).
+		auto burning = [](const BattleItem *item) { return FirstPersonView::burnsInFlight(item); };
+		if (burning(view._freeGrenade))
+		{
+			const float seconds = std::min(0.05f, (SDL_GetTicks() - view._freeGrenadeTick) / 1000.0f);
+			add(view._freeGrenadePos[0] + view._freeGrenadeVelocity[0] * seconds, view._freeGrenadePos[1] + view._freeGrenadeVelocity[1] * seconds,
+				view._freeGrenadePos[2] + view._freeGrenadeVelocity[2] * seconds, 84.0f, 255, 150, 60, 0.9f);
+		}
 		if (Projectile *projectile = view.flyingProjectile())
 		{
-			if (!projectile->getItem())
+			if (burning(projectile->getItem()))
+			{
+				const Position at = projectile->getPosition(0);
+				add((float)at.x, (float)at.y, (float)at.z, 84.0f, 255, 150, 60, 0.9f);
+			}
+			else if (!projectile->getItem())
 			{
 				float head[3];
 				view.shotHead(projectile, head);
