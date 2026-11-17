@@ -58903,10 +58903,10 @@ index 000000000..98c97b3b5
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..927774560
+index 000000000..c210372c7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
-@@ -0,0 +1,741 @@
+@@ -0,0 +1,743 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -59099,7 +59099,7 @@ index 000000000..927774560
 +	frame.palette = view.getPalette();
 +	frame.smoothLight = Options::fpsSmoothLight && view._wantsTrueColor;
 +	frame.reflections = Options::fpsReflections && view._wantsTrueColor && view._waterColors[0] != 0; // (only where there is a sea)
-+	// The coloured lights (setting "Coloured lights", in full colour): the shots in flight (but plain bullets), the
++	// The coloured lights (setting "Coloured lights", in full colour): the shots in flight (but plain bullets and arrows), the
 +	// explosions, the muzzle flash, and the nearest fires; sixteen at most, in that order.
 +	frame.colorLightCount = 0;
 +	frame.colorLightsOn = Options::fpsColoredLights && view._wantsTrueColor;
@@ -59112,12 +59112,14 @@ index 000000000..927774560
 +			const float light[8] = { x, y, z, reach, red / 255.0f, green / 255.0f, blue / 255.0f, strength };
 +			std::copy(light, light + 8, frame.colorLights[frame.colorLightCount++]);
 +		};
-+		// A shot's colour: its trail's, made as bright as it goes (a dark red bolt still lights red).
++		// A shot's colour: its trail's, made as bright as it goes (a dark red bolt still lights red). A rocket or
++		// another explosive round lights by the flame it flies on, not by its smoke's grey (a player: a rocket
++		// "should also make a light trail", as fire and plasma do; it was left out with the plain bullets).
 +		auto addShot = [&](const float *head, FirstPersonView::Trail trail, Uint8 color, float calibre)
 +		{
-+			if (trail == FirstPersonView::TRAIL_NONE || trail == FirstPersonView::TRAIL_FLYING || trail == FirstPersonView::TRAIL_SMOKE) return;
++			if (trail == FirstPersonView::TRAIL_NONE || trail == FirstPersonView::TRAIL_FLYING) return;
 +			float red = 255, green = 150, blue = 60; // (a rocket's flame, fire)
-+			if (trail != FirstPersonView::TRAIL_FIRE && color)
++			if (trail != FirstPersonView::TRAIL_FIRE && trail != FirstPersonView::TRAIL_SMOKE && color)
 +			{
 +				const float top = std::max({ 1, (int)palette[color].r, (int)palette[color].g, (int)palette[color].b });
 +				red = palette[color].r * 255.0f / top; green = palette[color].g * 255.0f / top; blue = palette[color].b * 255.0f / top;

@@ -190,7 +190,7 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 	frame.palette = view.getPalette();
 	frame.smoothLight = Options::fpsSmoothLight && view._wantsTrueColor;
 	frame.reflections = Options::fpsReflections && view._wantsTrueColor && view._waterColors[0] != 0; // (only where there is a sea)
-	// The coloured lights (setting "Coloured lights", in full colour): the shots in flight (but plain bullets), the
+	// The coloured lights (setting "Coloured lights", in full colour): the shots in flight (but plain bullets and arrows), the
 	// explosions, the muzzle flash, and the nearest fires; sixteen at most, in that order.
 	frame.colorLightCount = 0;
 	frame.colorLightsOn = Options::fpsColoredLights && view._wantsTrueColor;
@@ -203,12 +203,14 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 			const float light[8] = { x, y, z, reach, red / 255.0f, green / 255.0f, blue / 255.0f, strength };
 			std::copy(light, light + 8, frame.colorLights[frame.colorLightCount++]);
 		};
-		// A shot's colour: its trail's, made as bright as it goes (a dark red bolt still lights red).
+		// A shot's colour: its trail's, made as bright as it goes (a dark red bolt still lights red). A rocket or
+		// another explosive round lights by the flame it flies on, not by its smoke's grey (a player: a rocket
+		// "should also make a light trail", as fire and plasma do; it was left out with the plain bullets).
 		auto addShot = [&](const float *head, FirstPersonView::Trail trail, Uint8 color, float calibre)
 		{
-			if (trail == FirstPersonView::TRAIL_NONE || trail == FirstPersonView::TRAIL_FLYING || trail == FirstPersonView::TRAIL_SMOKE) return;
+			if (trail == FirstPersonView::TRAIL_NONE || trail == FirstPersonView::TRAIL_FLYING) return;
 			float red = 255, green = 150, blue = 60; // (a rocket's flame, fire)
-			if (trail != FirstPersonView::TRAIL_FIRE && color)
+			if (trail != FirstPersonView::TRAIL_FIRE && trail != FirstPersonView::TRAIL_SMOKE && color)
 			{
 				const float top = std::max({ 1, (int)palette[color].r, (int)palette[color].g, (int)palette[color].b });
 				red = palette[color].r * 255.0f / top; green = palette[color].g * 255.0f / top; blue = palette[color].b * 255.0f / top;
