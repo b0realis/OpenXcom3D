@@ -341,6 +341,30 @@ void FirstPersonView::drawFreeGrenade()
 		(int)std::floor(_freeGrenadePos[2] + _freeGrenadeVelocity[2] * seconds));
 	const Position before((int)std::floor(current.x - _freeGrenadeVelocity[0] * 0.05f), (int)std::floor(current.y - _freeGrenadeVelocity[1] * 0.05f), current.z);
 	drawThrownItem(current, before, _freeGrenade, _freeGrenadeStart);
+	// One that burns sheds embers on its way, as a round of fire does (see spawnTrailSegment): about one a frame.
+	if (_particlesOn && burnsInFlight(_freeGrenade) && SDL_GetTicks() != _freeGrenadeEmberTick)
+	{
+		typedef FirstPersonParticles P;
+		_freeGrenadeEmberTick = SDL_GetTicks();
+		P::Particle ember;
+		ember.pos[0] = (float)current.x + _particles.random(-1, 1); ember.pos[1] = (float)current.y + _particles.random(-1, 1); ember.pos[2] = (float)current.z;
+		ember.vel[0] = _particles.random(-3, 3); ember.vel[1] = _particles.random(-3, 3); ember.vel[2] = _particles.random(2, 8);
+		ember.age = 0; ember.gravity = 0; ember.drag = 0; ember.group = P::EFFECT;
+		ember.life = _particles.random(0.3f, 0.7f); ember.color = _colors.fire[(int)_particles.random(0, 2.99f)];
+		ember.size = 2; ember.kind = P::GLOW;
+		_particles.add(ember);
+	}
+}
+
+/**
+ * Whether a thrown item burns on its way: a grenade whose damage is fire (a mod's Molotov cocktail, an
+ * incendiary grenade). Such a one sheds embers in flight and, with "Coloured lights", lights what it passes.
+ */
+bool FirstPersonView::burnsInFlight(const BattleItem *item)
+{
+	const RuleItem *rule = item ? item->getRules() : nullptr;
+	return rule && (rule->getBattleType() == BT_GRENADE || rule->getBattleType() == BT_PROXIMITYGRENADE)
+		&& rule->getDamageType() && rule->getDamageType()->ResistType == DT_IN;
 }
 
 /**
@@ -880,9 +904,9 @@ void FirstPersonView::spawnTrailSegment(const float from[3], const float to[3])
 		P::Particle particle;
 		std::copy(point, point + 3, particle.pos);
 		particle.age = 0; particle.gravity = 0; particle.drag = 0; particle.group = P::EFFECT;
-		// The particle by the kind of trail (a thrown item leaves none).
+		// The particle by the kind of trail (a thrown item leaves none, but one that burns: embers, as a round of fire).
 		bool keep = true;
-		switch (_lastProjectileThrown ? TRAIL_NONE : _shotTrail)
+		switch (_lastProjectileThrown ? (_lastThrownBurning ? TRAIL_FIRE : TRAIL_NONE) : _shotTrail)
 		{
 		case TRAIL_FIRE:
 			// Embers: drifting up a little, glowing in the hotter fire colours for half a second.
@@ -2138,6 +2162,7 @@ void FirstPersonView::beginShot(Projectile *projectile)
 	const Position firedFrom = projectile->getPosition(-100000), current = projectile->getPosition(0);
 	float origin[3] = { (float)firedFrom.x, (float)firedFrom.y, (float)firedFrom.z };
 	_lastProjectileThrown = projectile->getItem() != nullptr;
+	_lastThrownBurning = burnsInFlight(projectile->getItem());
 	if (_lastProjectileThrown)
 	{
 		_thrownStart = SDL_GetTicks(); // it tumbles from here

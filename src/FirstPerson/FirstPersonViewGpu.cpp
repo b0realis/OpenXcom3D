@@ -225,12 +225,7 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 		// A thrown thing that burns (a grenade whose damage is fire: a mod's Molotov cocktail, an incendiary grenade)
 		// lights as a round of fire does on its way (the owner, after the rockets: "Molotov yes", and all that
 		// burns in flight; a burning arrow is a round of fire already).
-		auto burning = [](const BattleItem *item)
-		{
-			const RuleItem *rule = item ? item->getRules() : nullptr;
-			return rule && (rule->getBattleType() == BT_GRENADE || rule->getBattleType() == BT_PROXIMITYGRENADE)
-				&& rule->getDamageType() && rule->getDamageType()->ResistType == DT_IN;
-		};
+		auto burning = [](const BattleItem *item) { return FirstPersonView::burnsInFlight(item); };
 		if (burning(view._freeGrenade))
 		{
 			const float seconds = std::min(0.05f, (SDL_GetTicks() - view._freeGrenadeTick) / 1000.0f);
