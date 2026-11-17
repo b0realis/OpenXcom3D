@@ -56110,10 +56110,10 @@ index 000000000..154fd87a8
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonParticles.h b/src/FirstPerson/FirstPersonParticles.h
 new file mode 100644
-index 000000000..228618946
+index 000000000..34a1dd4f7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonParticles.h
-@@ -0,0 +1,124 @@
+@@ -0,0 +1,125 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -56186,6 +56186,7 @@ index 000000000..228618946
 +		BUBBLE,  // Lit; drawn as a little ring when close, wobbling as it rises.
 +		MOTE,    // Self-lit and steady (a UFO's aura): full brightness for most of its life, fading only at the end.
 +		WISP,    // A wisp of the game's smoke, drawn see-through with the smoke (see FirstPersonView::drawSeeThroughSmoke).
++		FLAME,   // A tongue of flame: a round glow its size in voxels across, white-hot at first, reddening and shrinking as it ages.
 +	};
 +	/// Where a particle comes from, so a whole group can be counted and thinned out:
 +	/// EFFECT for what the battle makes (shots, impacts, explosions, fire, smoke),
@@ -60174,10 +60175,10 @@ index 000000000..5eaac16dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..7c62068df
+index 000000000..28649205b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1831 @@
+@@ -0,0 +1,1833 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -61686,6 +61687,8 @@ index 000000000..7c62068df
 +	void spawnTileFireAndSmoke(float elapsedSeconds);
 +	/// Spawns flames on burning units in sight.
 +	void spawnBurningUnitFlames(float elapsedSeconds);
++	/// Setting "Voxel units": a body's breath under the sea and the sparks under a hovering big unit, as particles.
++	void spawnBodyEffects(float elapsedSeconds);
 +	/// Spawns dust motes, fireflies, bubbles and weather around the camera.
 +	void spawnAmbient(float elapsedSeconds);
 +	/// Spawns energy and blinking lights around UFO machinery, and motes in lamplight.
@@ -62011,10 +62014,10 @@ index 000000000..7c62068df
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewEffects.cpp b/src/FirstPerson/FirstPersonViewEffects.cpp
 new file mode 100644
-index 000000000..0d9ec1620
+index 000000000..fa9359e81
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewEffects.cpp
-@@ -0,0 +1,1304 @@
+@@ -0,0 +1,1439 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -62080,6 +62083,7 @@ index 000000000..0d9ec1620
 +#include "../Engine/Game.h"
 +#include "../Engine/Options.h"
 +#include "../Engine/Surface.h"
++#include "FirstPersonVoxelUnits.h"
 +#include "../Mod/Armor.h"
 +#include "../Mod/MapData.h"
 +#include "../Mod/Mod.h"
@@ -62380,6 +62384,7 @@ index 000000000..0d9ec1620
 +	spawnExplosionEffects();
 +	spawnTileFireAndSmoke(elapsedSeconds);
 +	spawnBurningUnitFlames(elapsedSeconds);
++	spawnBodyEffects(elapsedSeconds);
 +}
 +
 +/**
@@ -62580,31 +62585,136 @@ index 000000000..0d9ec1620
 +		{
 +			continue;
 +		}
-+		// Flames: 45 a second per tile of the unit's size (the fraction carried by chance), from
-+		// anywhere on its body up to nine tenths of its height, rising fast and short-lived.
++		// A unit drawn as its voxel body (setting "Voxel units") burns all over that body, and hard: the owner, "burning
++		// of the unit and other effects should be dramatic". Flames start on the body's own voxels (at its facing and
++		// size), nearly twice as many, each a tongue of flame, longer lived and rising higher; sparks fly up and fall; the smoke is thick.
++		const VoxelUnitModel *body = Options::fpsVoxelUnits && _voxelUnits ? _voxelUnits->lastBody(unit) : nullptr;
++		if (body && (body->part.empty() || body->addedFrom == 0)) body = nullptr;
 +		const float height = (float)(unit->getHeight() + unit->getFloatHeight()); // in voxels, off the ground
-+		const int flameCount = (int)(elapsedSeconds * 45.0f * unitSize + _particles.random());
++		auto onBody = [&](float place[3]) {
++			auto well = _facingsWell.find(unit);
++			const double angle = (well != _facingsWell.end() ? well->second : unit->getDirection()) * M_PI / 4.0, cosine = std::cos(angle), sine = std::sin(angle);
++			const double measure = body->unit * std::clamp(Options::fpsUnitSize, 80, 100) / 100.0;
++			size_t k = 0;
++			for (int tries = 0; tries < 4; ++tries)
++			{
++				k = std::min(body->addedFrom - 1, (size_t)(_particles.random() * body->addedFrom));
++				if (body->part[k] != VoxelUnitModel::Item) break;
++			}
++			place[0] = feet[0] + (float)((body->right[k] * cosine + body->ahead[k] * sine) * measure);
++			place[1] = feet[1] + (float)((body->right[k] * sine - body->ahead[k] * cosine) * measure);
++			place[2] = feet[2] + (float)(body->up[k] * measure);
++		};
++		// Flames: 45 a second per tile of the unit's size (the fraction carried by chance; 80 on a voxel body), from
++		// anywhere on its body up to nine tenths of its height, rising fast and short-lived.
++		const int flameCount = (int)(elapsedSeconds * (body ? 80.0f : 45.0f) * unitSize + _particles.random());
 +		for (int k = 0; k < flameCount; ++k)
 +		{
 +			P::Particle flame;
-+			flame.pos[0] = feet[0] + _particles.random(-4, 4) * unitSize; flame.pos[1] = feet[1] + _particles.random(-4, 4) * unitSize;
-+			flame.pos[2] = feet[2] + height * _particles.random(0.05f, 0.9f);
-+			flame.vel[0] = _particles.random(-4, 4); flame.vel[1] = _particles.random(-4, 4); flame.vel[2] = _particles.random(16, 36);
-+			flame.age = 0; flame.life = _particles.random(0.35f, 0.8f); flame.gravity = -12; flame.drag = 0.8f;
-+			flame.color = _colors.fire[(int)_particles.random(0, 3.99f)]; flame.size = 3; flame.kind = P::GLOW; flame.group = P::EFFECT;
++			if (body)
++			{
++				onBody(flame.pos);
++			}
++			else
++			{
++				flame.pos[0] = feet[0] + _particles.random(-4, 4) * unitSize; flame.pos[1] = feet[1] + _particles.random(-4, 4) * unitSize;
++				flame.pos[2] = feet[2] + height * _particles.random(0.05f, 0.9f);
++			}
++			flame.vel[0] = _particles.random(-4, 4); flame.vel[1] = _particles.random(-4, 4); flame.vel[2] = body ? _particles.random(22, 48) : _particles.random(16, 36);
++			flame.age = 0; flame.life = body ? _particles.random(0.45f, 1.1f) : _particles.random(0.35f, 0.8f); flame.gravity = -12; flame.drag = 0.8f;
++			flame.color = _colors.fire[(int)_particles.random(0, 3.99f)]; flame.size = body ? (Uint8)_particles.random(2, 5.99f) : 3; flame.kind = body ? P::FLAME : P::GLOW; flame.group = P::EFFECT;
 +			_particles.add(flame);
 +		}
-+		// Smoke: about five puffs a second off the top of the unit, rising and drifting east (+x,
-+		// the way the rain slants).
-+		if (_particles.random() < elapsedSeconds * 5.0f)
++		// (sparks off a voxel body: about 30 a second, flung up and out, falling back)
++		const int sparkCount = body ? (int)(elapsedSeconds * 60.0f * unitSize + _particles.random()) : 0;
++		for (int k = 0; k < sparkCount; ++k)
++		{
++			P::Particle spark;
++			onBody(spark.pos);
++			spark.vel[0] = _particles.random(-14, 14); spark.vel[1] = _particles.random(-14, 14); spark.vel[2] = _particles.random(30, 70);
++			spark.age = 0; spark.life = _particles.random(0.6f, 1.4f); spark.gravity = 60; spark.drag = 0.3f;
++			spark.color = _colors.fire[(int)_particles.random(0, 1.99f)]; spark.size = (Uint8)_particles.random(2, 4.99f); spark.kind = P::GLOW; spark.group = P::EFFECT;
++			_particles.add(spark);
++		}
++		// Smoke: about five puffs a second off the top of the unit (fourteen, bigger, off a voxel body), rising and
++		// drifting east (+x, the way the rain slants).
++		if (_particles.random() < elapsedSeconds * (body ? 14.0f : 5.0f))
 +		{
 +			P::Particle puff;
 +			puff.pos[0] = feet[0] + _particles.random(-3, 3); puff.pos[1] = feet[1] + _particles.random(-3, 3);
 +			puff.pos[2] = feet[2] + height + 2.0f;
 +			puff.vel[0] = _particles.random(-3, 3) + 2; puff.vel[1] = _particles.random(-3, 3); puff.vel[2] = _particles.random(6, 12);
-+			puff.age = 0; puff.life = _particles.random(1.5f, 2.5f); puff.gravity = -3; puff.drag = 0.4f;
-+			puff.color = shadeColor(_colors.smoke, (int)_particles.random(1, 4)); puff.size = 5; puff.kind = P::LIT; puff.group = P::EFFECT;
++			puff.age = 0; puff.life = _particles.random(1.5f, body ? 3.5f : 2.5f); puff.gravity = -3; puff.drag = 0.4f;
++			puff.color = shadeColor(_colors.smoke, (int)_particles.random(1, 4)); puff.size = body ? (Uint8)_particles.random(5, 8.99f) : 5; puff.kind = P::LIT; puff.group = P::EFFECT;
 +			_particles.add(puff);
++		}
++	}
++}
++
++/**
++ * Setting "Voxel units", what else the game draws over a unit's picture, as particles on its body: the bubbles of its
++ * breath under the sea, rising from its head; and under a big unit that hovers (a hover tank, a Cyberdisc: the glow
++ * and sparks its pictures have under the hull, which its body leaves out), a rain of bright sparks down to the ground
++ * and the dust they raise. Units in sight, standing, within 20 tiles.
++ * @param elapsedSeconds Seconds since the last frame.
++ */
++void FirstPersonView::spawnBodyEffects(float elapsedSeconds)
++{
++	typedef FirstPersonParticles P;
++	if (!Options::fpsVoxelUnits) return;
++	const Uint32 now = SDL_GetTicks();
++	for (const BattleUnit *unit : *_save->getUnits())
++	{
++		if (unit->isOut() || unit == _cameraUnit || (!unit->getVisible() && !_save->getDebugMode())) continue;
++		const int unitSize = unit->getArmor()->getSize();
++		const bool hovers = unitSize > 1 && unit->getMovementType() == MT_FLY;
++		const bool breathes = unit->getBreathExhaleFrame() >= 0;
++		if (!hovers && !breathes) continue;
++		auto glide = _unitGlides.find(unit);
++		if (glide == _unitGlides.end() || now - glide->second.seen >= 250) continue;
++		float feet[3];
++		for (int axis = 0; axis < 3; ++axis) feet[axis] = (float)glide->second.pos[axis];
++		if (std::abs(feet[0] - _eye[0]) > 320 || std::abs(feet[1] - _eye[1]) > 320) continue;
++		if (breathes)
++		{
++			// (about 12 bubbles a second from the head, wobbling up)
++			const int bubbles = (int)(elapsedSeconds * 12.0f + _particles.random());
++			for (int k = 0; k < bubbles; ++k)
++			{
++				P::Particle bubble;
++				bubble.pos[0] = feet[0] + _particles.random(-2, 2); bubble.pos[1] = feet[1] + _particles.random(-2, 2);
++				bubble.pos[2] = feet[2] + (unit->getHeight() + unit->getFloatHeight()) * 0.9f;
++				bubble.vel[0] = _particles.random(-3, 3); bubble.vel[1] = _particles.random(-3, 3); bubble.vel[2] = _particles.random(8, 16);
++				bubble.age = 0; bubble.life = _particles.random(1.0f, 2.2f); bubble.gravity = -4; bubble.drag = 0.6f;
++				bubble.color = _colors.bubble; bubble.size = (Uint8)_particles.random(2, 4.99f); bubble.kind = P::BUBBLE; bubble.group = P::EFFECT;
++				_particles.add(bubble);
++			}
++		}
++		if (hovers)
++		{
++			// (about 90 sparks a second under the hull, falling; a tenth as many puffs of dust blown outwards at the ground)
++			const float hull = feet[2] + std::max(4.0f, (float)unit->getFloatHeight());
++			const int sparks = (int)(elapsedSeconds * 220.0f + _particles.random());
++			for (int k = 0; k < sparks; ++k)
++			{
++				P::Particle spark;
++				const float turn = _particles.random(0, 6.2832f), out = 12.0f * std::sqrt(_particles.random());
++				spark.pos[0] = feet[0] + std::cos(turn) * out; spark.pos[1] = feet[1] + std::sin(turn) * out; spark.pos[2] = hull + _particles.random(-1, 2);
++				spark.vel[0] = std::cos(turn) * _particles.random(0, 6); spark.vel[1] = std::sin(turn) * _particles.random(0, 6); spark.vel[2] = -_particles.random(10, 30);
++				spark.age = 0; spark.life = _particles.random(0.2f, 0.5f); spark.gravity = 20; spark.drag = 0.2f;
++				spark.color = _particles.random() < 0.5f ? _colors.spark : _colors.fire[0]; spark.size = (Uint8)_particles.random(2, 4.99f); spark.kind = P::GLOW; spark.group = P::EFFECT;
++				_particles.add(spark);
++			}
++			if (_particles.random() < elapsedSeconds * 9.0f)
++			{
++				P::Particle dust;
++				const float turn = _particles.random(0, 6.2832f);
++				dust.pos[0] = feet[0] + std::cos(turn) * 10.0f; dust.pos[1] = feet[1] + std::sin(turn) * 10.0f; dust.pos[2] = feet[2] + 1.0f;
++				dust.vel[0] = std::cos(turn) * _particles.random(6, 14); dust.vel[1] = std::sin(turn) * _particles.random(6, 14); dust.vel[2] = _particles.random(1, 4);
++				dust.age = 0; dust.life = _particles.random(0.6f, 1.2f); dust.gravity = 2; dust.drag = 1.2f;
++				dust.color = _colors.dust; dust.size = (Uint8)_particles.random(3, 5.99f); dust.kind = P::LIT; dust.group = P::EFFECT;
++				_particles.add(dust);
++			}
 +		}
 +	}
 +}
@@ -63123,6 +63233,9 @@ index 000000000..0d9ec1620
 +	}
 +}
 +
++/// How much nearer than it is a tongue of flame is drawn (see drawParticles), voxels.
++const double FlameNearer = 4.0;
++
 +/**
 + * Advances the particles by the time since the last frame and spawns the new ones, once per
 + * frame before drawing. With particles off for this view, or the particles option at 0, there
@@ -63256,6 +63369,31 @@ index 000000000..0d9ec1620
 +				const int x = (int)(screenX + (tailX - screenX) * step / steps), y = (int)(screenY + (tailY - screenY) * step / steps);
 +				if (x < 0 || y < 0 || x >= width || y >= height || depth >= _depthBuffer[y * width + x]) continue;
 +				*getRaw(x, y) = color;
++			}
++			continue;
++		}
++		if (particle.kind == P::FLAME)
++		{
++			// A tongue of flame (a burning voxel body's): a disc of the fire's colours, hotter in its middle, its edge
++			// ragged; it shines (blooms) and hides nothing behind it from later drawing (no depth written).
++			if (_gpuRecording && _gpuRecordOnly) continue;
++			// (a tongue: half again as tall as wide; yellow and orange at first, red at the end, white-hot only in the
++			// middle of a young one, which alone blooms: a fire all in bloom was a white ball hiding the unit)
++			const double radius = std::clamp(particle.size * focalLength / depth * 0.4 * (1.0 - 0.6 * fade), 1.0, 32.0), tall = radius * 1.5;
++			const int stage = std::min(3, 1 + (int)(fade * 3.0f));
++			const Uint8 rim = _colors.fire[stage], core = _colors.fire[stage - 1];
++			for (int y = (int)(screenY - tall); y <= (int)(screenY + tall); ++y)
++			{
++				for (int x = (int)(screenX - radius); x <= (int)(screenX + radius); ++x)
++				{
++					// (it starts on the body's surface: it licks in front of it, FlameNearer voxels nearer)
++					if (x < 0 || y < 0 || x >= width || y >= height || depth - FlameNearer >= _depthBuffer[y * width + x]) continue;
++					const double distance = std::hypot((x + 0.5 - screenX) / radius, (y + 0.5 - screenY) / tall);
++					if (distance > 1.0 || (distance > 0.6 && dither(x, y) < (distance - 0.6) * 2.5)) continue;
++					const bool hot = distance < 0.4;
++					*getRaw(x, y) = hot ? core : rim;
++					if (hot && fade < 0.4f) _glowMask[y * width + x] = 1;
++				}
 +			}
 +			continue;
 +		}
@@ -71824,10 +71962,10 @@ index 000000000..229bd966c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..464e210b3
+index 000000000..b0ca488a5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,3999 @@
+@@ -0,0 +1,4002 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -73370,7 +73508,10 @@ index 000000000..464e210b3
 +			// What the game draws over a unit's sprite, its flames when it burns and its breath's bubbles under the sea, is
 +			// drawn over its body: the drawer's overlay alone (the unit's parts drawn nowhere), standing at the unit, nearer
 +			// by VoxelOverlayNearer to show over the body's front; unshaded, as the game draws flames.
-+			if (unit->getFire() > 0 || unit->getBreathExhaleFrame() >= 0)
++			// With particles on, a body burns and breathes in particles instead (see spawnBurningUnitFlames,
++			// spawnBodyEffects): the owner, "we will not build burning from voxels but rather add particle effect burning
++			// to voxel models. And all the rest effects also!"
++			if ((unit->getFire() > 0 || unit->getBreathExhaleFrame() >= 0) && (!_particlesOn || Options::fpsParticles == 0))
 +			{
 +				_spriteBuffer->clear();
 +				Surface nowhere(SpriteBufferSize, SpriteBufferSize);
@@ -83401,10 +83542,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..98f6ca2c1
+index 000000000..6bd8ac870
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,2249 @@
+@@ -0,0 +1,2252 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -83528,7 +83669,7 @@ index 000000000..98f6ca2c1
 +constexpr double LegSwing = 22.0, KneeBend = 38.0, ArmSwing = 16.0;
 +constexpr float WholeHip = 0.42f, WholeMiddle = 0.12f;
 +/// A body down (its last death frame's pose) is at most this much of its standing height (see fitFall).
-+constexpr float DownAtMost = 0.4f;
++constexpr float DownAtMost = 0.6f;
 +/// A piece added for a view (see matchViews) keeps to the body's own surface: a depth's agreement with the other views
 +/// counts BodyPull less for each voxel it lies from it (up to FarSteps half voxels: farther counts as that far).
 +constexpr float BodyPull = 1.0f;
@@ -84657,7 +84798,9 @@ index 000000000..98f6ca2c1
 +		}
 +		return either ? (float)both / either : 0.0f;
 +	};
-+	const float heights[] = { 1.0f, 0.85f, 0.7f, 0.55f, 0.4f, 0.3f, 0.22f }, spreads[] = { 1.0f, 1.2f, 1.4f, 1.6f, 1.8f };
++	// (A body keeps its volume going down: it sags a little and tips over, and lies as thick as it stood deep. It was
++	// crumpled to a fifth of its height and spread out, a flat cake; the owner: "deaths should have volume too".)
++	const float heights[] = { 1.0f, 0.9f, 0.8f, 0.7f }, spreads[] = { 1.0f, 1.1f, 1.2f };
 +	const float angles[] = { 0.0f, 15.0f, 30.0f, 45.0f, 60.0f, 75.0f, 90.0f };
 +	auto bestPose = [&](const std::vector<Uint8> &death, int firstToward, int lastToward, int &toward, bool down) {
 +		VoxelUnitModel::FallPose best;
@@ -84679,6 +84822,7 @@ index 000000000..98f6ca2c1
 +					}
 +			}
 +		}
++		if (down && bestAgreement < 0.0f) { best = VoxelUnitModel::FallPose{ 0.7f, 1.0f, 90.0f }; toward = firstToward; model.fallToward = firstToward; } // (too deep a body to be down by the rule: on its back all the same)
 +		return best;
 +	};
 +	int toward = 4;

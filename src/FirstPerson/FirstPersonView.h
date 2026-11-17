@@ -1506,6 +1506,8 @@ private:
 	void spawnTileFireAndSmoke(float elapsedSeconds);
 	/// Spawns flames on burning units in sight.
 	void spawnBurningUnitFlames(float elapsedSeconds);
+	/// Setting "Voxel units": a body's breath under the sea and the sparks under a hovering big unit, as particles.
+	void spawnBodyEffects(float elapsedSeconds);
 	/// Spawns dust motes, fireflies, bubbles and weather around the camera.
 	void spawnAmbient(float elapsedSeconds);
 	/// Spawns energy and blinking lights around UFO machinery, and motes in lamplight.

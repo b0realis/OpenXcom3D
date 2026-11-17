@@ -121,7 +121,7 @@ constexpr int ChinRows = 3 * VOXELSCALE;
 constexpr double LegSwing = 22.0, KneeBend = 38.0, ArmSwing = 16.0;
 constexpr float WholeHip = 0.42f, WholeMiddle = 0.12f;
 /// A body down (its last death frame's pose) is at most this much of its standing height (see fitFall).
-constexpr float DownAtMost = 0.4f;
+constexpr float DownAtMost = 0.6f;
 /// A piece added for a view (see matchViews) keeps to the body's own surface: a depth's agreement with the other views
 /// counts BodyPull less for each voxel it lies from it (up to FarSteps half voxels: farther counts as that far).
 constexpr float BodyPull = 1.0f;
@@ -1250,7 +1250,9 @@ void fitFall(VoxelUnitModel &model, const std::vector<std::vector<Uint8>> &death
 		}
 		return either ? (float)both / either : 0.0f;
 	};
-	const float heights[] = { 1.0f, 0.85f, 0.7f, 0.55f, 0.4f, 0.3f, 0.22f }, spreads[] = { 1.0f, 1.2f, 1.4f, 1.6f, 1.8f };
+	// (A body keeps its volume going down: it sags a little and tips over, and lies as thick as it stood deep. It was
+	// crumpled to a fifth of its height and spread out, a flat cake; the owner: "deaths should have volume too".)
+	const float heights[] = { 1.0f, 0.9f, 0.8f, 0.7f }, spreads[] = { 1.0f, 1.1f, 1.2f };
 	const float angles[] = { 0.0f, 15.0f, 30.0f, 45.0f, 60.0f, 75.0f, 90.0f };
 	auto bestPose = [&](const std::vector<Uint8> &death, int firstToward, int lastToward, int &toward, bool down) {
 		VoxelUnitModel::FallPose best;
@@ -1272,6 +1274,7 @@ void fitFall(VoxelUnitModel &model, const std::vector<std::vector<Uint8>> &death
 					}
 			}
 		}
+		if (down && bestAgreement < 0.0f) { best = VoxelUnitModel::FallPose{ 0.7f, 1.0f, 90.0f }; toward = firstToward; model.fallToward = firstToward; } // (too deep a body to be down by the rule: on its back all the same)
 		return best;
 	};
 	int toward = 4;

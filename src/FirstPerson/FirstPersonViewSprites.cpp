@@ -1540,7 +1540,10 @@ void FirstPersonView::drawUnits()
 			// What the game draws over a unit's sprite, its flames when it burns and its breath's bubbles under the sea, is
 			// drawn over its body: the drawer's overlay alone (the unit's parts drawn nowhere), standing at the unit, nearer
 			// by VoxelOverlayNearer to show over the body's front; unshaded, as the game draws flames.
-			if (unit->getFire() > 0 || unit->getBreathExhaleFrame() >= 0)
+			// With particles on, a body burns and breathes in particles instead (see spawnBurningUnitFlames,
+			// spawnBodyEffects): the owner, "we will not build burning from voxels but rather add particle effect burning
+			// to voxel models. And all the rest effects also!"
+			if ((unit->getFire() > 0 || unit->getBreathExhaleFrame() >= 0) && (!_particlesOn || Options::fpsParticles == 0))
 			{
 				_spriteBuffer->clear();
 				Surface nowhere(SpriteBufferSize, SpriteBufferSize);
