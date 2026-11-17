@@ -59,6 +59,8 @@
 #include <string>
 #include <utility>
 #include "FirstPersonVoxelBodies.h"
+#include "FirstPersonVoxelBodiesFine.h"
+#include "../Engine/Options.h"
 #include "../Battlescape/UnitSprite.h"
 #include "../Engine/GraphSubset.h"
 #include "../Engine/Script.h"
@@ -102,6 +104,7 @@ struct VoxelUnits::Job
 	std::vector<Uint8> corpse;
 	WalkFrames walks;
 	bool aiming = false;
+	bool fine = false; // (made twice as fine: setting "Fine voxel units")
 	const Routine *routine = nullptr;
 	int unitId = 0, status = 0; // (the unit's, for dump's file names)
 	bool kneeled = false;
@@ -159,6 +162,12 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	const SavedBattleGame *save, const SDL_Color *palette, int &builds, int &walkPhase)
 {
 	walkPhase = -1;
+	// (the setting "Fine voxel units" changed: every body is made again)
+	if (Options::fpsVoxelFine != _fine)
+	{
+		clear();
+		_fine = Options::fpsVoxelFine;
+	}
 	collect();
 	if (unit->getStatus() == STATUS_WALKING || unit->getStatus() == STATUS_FLYING)
 	{
@@ -373,8 +382,8 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 			hashBytes(hash, walks.legs[phase][view].data(), walks.legs[phase][view].size());
 			for (int side = 0; side < 2; ++side) hashBytes(hash, walks.arms[phase][view][side].data(), walks.arms[phase][view][side].size());
 		}
-	const Uint8 pose[2] = { (Uint8)aiming, (Uint8)routine->number };
-	hashBytes(hash, pose, 2);
+	const Uint8 pose[3] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)Options::fpsVoxelFine };
+	hashBytes(hash, pose, 3);
 	auto alike = _byFrames.find(hash);
 	if (alike != _byFrames.end())
 	{
@@ -394,6 +403,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		job->corpse = std::move(corpse);
 		job->walks = std::move(walks);
 		job->aiming = aiming;
+		job->fine = Options::fpsVoxelFine;
 		job->routine = routine;
 		std::copy(palette, palette + 256, job->palette);
 		job->hash = hash;
@@ -521,8 +531,38 @@ void VoxelUnits::build()
 		}
 		PartFrames parts[PartCount]; // (worked on: the job's stay as captured, for dump)
 		std::copy(std::begin(job->parts), std::end(job->parts), std::begin(parts));
-		std::shared_ptr<VoxelUnitModel> model(makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->walks, job->aiming, *job->routine,
-			job->palette));
+		std::shared_ptr<VoxelUnitModel> model;
+		if (job->fine)
+		{
+			// (twice as fine: the other builder, on the frames enlarged twice: see FirstPersonVoxelBodiesFine.h)
+			FineBodySource source;
+			for (int p = 0; p < PartCount; ++p)
+				for (int d = 0; d < 8; ++d) source.parts[p][d] = job->parts[p].frame[d];
+			for (int d = 0; d < 8; ++d) source.composite[d] = job->composite[d];
+			for (int hand = 0; hand < 2; ++hand)
+			{
+				source.itemPictures[hand] = job->items[hand].picture;
+				source.itemWidth[hand] = job->items[hand].width;
+				source.itemHeight[hand] = job->items[hand].height;
+				source.itemTwoHanded[hand] = job->items[hand].twoHanded;
+			}
+			source.deaths = job->deaths;
+			source.corpse = job->corpse;
+			for (int phase = 0; phase < 8; ++phase)
+				for (int view = 0; view < 2; ++view)
+				{
+					source.walkLegs[phase][view] = job->walks.legs[phase][view];
+					for (int side = 0; side < 2; ++side) source.walkArms[phase][view][side] = job->walks.arms[phase][view][side];
+				}
+			source.walkAny = job->walks.any;
+			source.aiming = job->aiming;
+			source.routine = job->routine->number;
+			model = makeFineModel(source, job->palette);
+		}
+		else
+		{
+			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->walks, job->aiming, *job->routine, job->palette);
+		}
 		if (const char *folder = std::getenv("OXC3D_VOXELDUMP")) dump(*job, model.get(), folder);
 		std::lock_guard<std::mutex> lock(_mutex);
 		if (job->battle == _battle) _made.push_back({ job->hash, model });

@@ -310,6 +310,8 @@ en-GB:
   STR_FPS_UNIT_SIZE_DESC: "Soldiers, aliens, corpses and items drawn smaller (80-100%). Hitboxes stay the same."
   STR_FPS_VOXEL_UNITS: "Voxel units"
   STR_FPS_VOXEL_UNITS_DESC: "Soldiers, aliens and civilians, big ones too, as 3D bodies made from their own sprites (experimental)."
+  STR_FPS_VOXEL_FINE: "Fine voxel units"
+  STR_FPS_VOXEL_FINE_DESC: "With Voxel units: bodies twice as fine, rounder and sharper up close. NO: coarser, quicker to make and draw."
   STR_FPS_UPSCALE_OFF: "Off"
   STR_FPS_UPSCALE_SMOOTH: "Smooth"
   STR_FPS_UPSCALE_DETAIL: "Smooth+"

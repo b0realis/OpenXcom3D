@@ -643,9 +643,12 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 	// The unit's right and ahead on the map: east and north turned by its facing.
 	const double angle = facing * Pi / 4.0, cosine = std::cos(angle), sine = std::sin(angle);
 	const double focalLength = focalPixels();
-	const double halfSquare = 0.5 * VoxelSplatSize * scale * focalLength; // half a square at a depth of one
+	const double bodyUnit = body.unit; // (voxels to one of the body's own measures: half for a fine body)
 	const bool falling = fall > 0.0;
 	const VoxelUnitModel::FallPose pose = body.poseAt(fall);
+	// half a square at a depth of one (a body going down spreads out: its squares grow with it, or the floor showed
+	// through the slits between them)
+	const double halfSquare = 0.5 * VoxelSplatSize * scale * bodyUnit * focalLength * std::max(1.0f, pose.spread);
 	const int fallFrame = falling ? body.fallFrameAt(fall) : -1;
 	const size_t voxels = body.part.size();
 	DrawStep step;
@@ -663,8 +666,8 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 		if (falling ? k >= body.addedFrom : !body.shows(k, direction, level)) continue;
 		float across = right[k], along = ahead[k], height = up[k];
 		if (falling) body.posed(pose, across, along, height);
-		const double toRight = across * scale, toAhead = along * scale;
-		const double world[3] = { feet[0] + toRight * cosine + toAhead * sine, feet[1] + toRight * sine - toAhead * cosine, feet[2] + height * scale };
+		const double toRight = across * scale * bodyUnit, toAhead = along * scale * bodyUnit;
+		const double world[3] = { feet[0] + toRight * cosine + toAhead * sine, feet[1] + toRight * sine - toAhead * cosine, feet[2] + height * scale * bodyUnit };
 		if (world[2] < floorCut) continue;
 		double screenX, screenY, depth;
 		if (!projectToScreen(world, screenX, screenY, depth)) continue;

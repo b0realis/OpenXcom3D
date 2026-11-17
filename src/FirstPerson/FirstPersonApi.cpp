@@ -1098,6 +1098,14 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsUnitSize", &fpsUnitSize, 100, "STR_FPS_UNIT_SIZE", category));
 	// Units (one tile big or two by two) as 3D bodies made from their own sprites (see VoxelUnits; the owner's sub-project).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsVoxelUnits", &fpsVoxelUnits, false, "STR_FPS_VOXEL_UNITS", category));
+	// The bodies twice as fine: a quarter of a voxel a cell, from the sprites enlarged twice (the owner: "Lets go with 2x").
+	// (on by default, but not on a headset: four times the voxels to draw, for each eye)
+#ifdef __ANDROID__
+	const bool fineBodies = false;
+#else
+	const bool fineBodies = true;
+#endif
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsVoxelFine", &fpsVoxelFine, fineBodies, "STR_FPS_VOXEL_FINE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMuzzleFlash", &fpsMuzzleFlash, true, "STR_FPS_MUZZLE_FLASH", category));
 	// A unit hit, standing or down, flashes for a moment (the owner, on GitHub issue #74: its own
 	// setting); off, it only flinches. "Muzzle flashes" off turns it off too (every flash: the

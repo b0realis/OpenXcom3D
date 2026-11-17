@@ -86,6 +86,9 @@ struct VoxelUnitModel
 	enum Part : Uint8 { Torso = 1, LeftArm, RightArm, Legs, Item };
 	/// Each surface voxel's place from the middle of the unit's feet: to its right, ahead and up, in voxels.
 	std::vector<float> right, ahead, up;
+	/// How many voxels one of those is: 1, or 0.5 for a body made twice as fine (setting "Fine voxel units"; the walk,
+	/// the fall's edges and the hits are in the same measure).
+	float unit = 1.0f;
 	/// Which part each belongs to.
 	std::vector<Uint8> part;
 	/// What the sprites show at each voxel: 16 palette colours a voxel, the 8 directions' frames painted
@@ -186,6 +189,7 @@ private:
 	std::deque<std::unique_ptr<Job>> _jobs;
 	std::vector<std::pair<Uint64, std::shared_ptr<VoxelUnitModel>>> _made;
 	unsigned _battle = 0;
+	bool _fine = false; // (the setting "Fine voxel units" the bodies were made with)
 	const SavedBattleGame *_battleSave = nullptr; // (the battle the bodies are for, see forBattle)
 	bool _stopping = false;
 	std::thread _builder;

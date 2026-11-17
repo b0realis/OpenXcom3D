@@ -553,9 +553,10 @@ void bodyStance(SavedBattleGame *save, const BattleUnit *unit, const VoxelUnitMo
 bool bodyHit(const LineBody &stance, const double point[3])
 {
 	const double relativeX = point[0] - stance.feet[0], relativeY = point[1] - stance.feet[1];
-	const float right = (float)((relativeX * stance.cosine + relativeY * stance.sine) / stance.scale);
-	const float ahead = (float)((relativeX * stance.sine - relativeY * stance.cosine) / stance.scale);
-	const float up = (float)((point[2] - stance.feet[2]) / stance.scale);
+	const double measure = stance.scale * stance.body->unit; // (voxels to one of the body's own measures: half for a fine body)
+	const float right = (float)((relativeX * stance.cosine + relativeY * stance.sine) / measure);
+	const float ahead = (float)((relativeX * stance.sine - relativeY * stance.cosine) / measure);
+	const float up = (float)((point[2] - stance.feet[2]) / measure);
 	return stance.body->hitAt(right, ahead, up, stance.direction, stance.level);
 }
 

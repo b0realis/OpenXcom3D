@@ -61,7 +61,12 @@ namespace VoxelBodies
 {
 
 /// The frames are FrameSize pixels square.
-constexpr int FrameSize = 64;
+/// (VOXELSCALE: an experiment, off in the game: 2 makes bodies from frames enlarged twice, on cells half as big; then
+/// everything the builder gives is in half voxels. See tools/voxel_units.)
+#ifndef VOXELSCALE
+#define VOXELSCALE 1
+#endif
+constexpr int FrameSize = 64 * VOXELSCALE;
 /// Direction 3 faces the camera; direction 1 shows the unit's right side (its front to the right),
 /// direction 5 its left side (its front to the left).
 constexpr int Front = 3, RightSide = 1, LeftSide = 5;
