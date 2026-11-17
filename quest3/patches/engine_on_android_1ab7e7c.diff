@@ -23858,7 +23858,7 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..a7f4ac044
+index 000000000..ddef683cd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
 @@ -0,0 +1,1842 @@
@@ -24350,7 +24350,7 @@ index 000000000..a7f4ac044
 +	const std::vector<PresetSwitch> &(*switches)();
 +};
 +
-+// Thanks to mumble for your dedication and work.
++// Thanks mumble for your dedication and work.
 +/**
 + * The settings the gameplay presets set (setting "Gameplay", the first page of the 3D VIEW tab;
 + * after GitHub issue #168, each keeping what the one before it set unless it says otherwise),
