@@ -94,6 +94,8 @@ const double PictureReachSmall = 16 * SpritePixelX + 1.0, PictureReachBig = 32 *
 /// How far below its anchor and above it a unit's picture reaches, in voxels: the rows under the
 /// anchor (24 at most) and over it (48 at most), and a voxel for the gate.
 const double PictureBelow = 25.0, PictureAbove = 48.0 + 1.0;
+/// How much farther off its feet a body going down reaches than its picture standing, in voxels.
+const double FallReach = 12.0;
 /// How far the 3D view may draw a unit from where the game has it between its small steps (it eases
 /// after them, see FirstPersonView::drawUnits), in voxels: the looked-through soldier's own lines meet
 /// the picture where it's drawn.
@@ -473,19 +475,42 @@ void drawnCard(SavedBattleGame *save, const BattleUnit *unit, const FirstPersonV
 /**
  * The voxel body a unit is hit by (settings "Voxel units" and "Full sprite hitboxes", the owner's: "hit-boxes should be
  * their whole bodies"): the one made for it as it is now (every unit's is made from the battle's start, see
- * FirstPersonMode::makeVoxelBodies; a unit without one yet is hit by its picture).
+ * FirstPersonMode::makeVoxelBodies; a unit without one yet is hit by its picture). A unit going down (the game's own
+ * fall; one tile big, as the view draws the fall) is hit by the shape the body it was last drawn with has at the fall
+ * frame the game has come to (see VoxelUnitModel::falls), turned the way it last faced.
  * @param save The battle.
  * @param unit The unit.
+ * @param fall Set to the fall's shape for a unit going down, else null.
+ * @param facing Set to the way the body faces.
  * @return The body, or null (hit by its picture).
  */
-const VoxelUnitModel *hitBody(SavedBattleGame *save, const BattleUnit *unit)
+const VoxelUnitModel *hitBody(SavedBattleGame *save, const BattleUnit *unit, const VoxelUnitModel::FallShape *&fall, int &facing)
 {
+	fall = nullptr;
+	facing = unit->getDirection();
 	if (!Options::fpsVoxelUnits)
 	{
 		return nullptr;
 	}
 	VoxelUnits *bodies = FirstPersonMode::voxelUnits(save->getBattleState());
-	return bodies && VoxelUnits::suits(unit) ? bodies->bodyNow(unit) : nullptr;
+	if (!bodies) return nullptr;
+	if (unit->getStatus() == STATUS_COLLAPSING && unit->getArmor()->getSize() == 1)
+	{
+		const VoxelUnitModel *body = bodies->lastBody(unit);
+		const int frames = std::max(1, unit->getArmor()->getDeathFrames());
+		fall = body ? body->fallAt((unit->getFallingPhase() + 0.5) / (frames + 1)) : nullptr;
+		facing = bodies->lastFacing(unit);
+		return fall ? body : nullptr;
+	}
+	return VoxelUnits::suits(unit) ? bodies->bodyNow(unit) : nullptr;
+}
+
+/// The body a unit is hit by, whichever way (see above).
+const VoxelUnitModel *hitBody(SavedBattleGame *save, const BattleUnit *unit)
+{
+	const VoxelUnitModel::FallShape *fall;
+	int facing;
+	return hitBody(save, unit, fall, facing);
 }
 
 /**
@@ -495,6 +520,7 @@ const VoxelUnitModel *hitBody(SavedBattleGame *save, const BattleUnit *unit)
 struct LineBody
 {
 	const VoxelUnitModel *body = nullptr;
+	const VoxelUnitModel::FallShape *fall = nullptr; // going down: the fall's shape it's hit by
 	double feet[3] = {};             // the middle of its feet, in voxels
 	double cosine = 1.0, sine = 0.0; // turned to the way it faces
 	double scale = 1.0;              // the setting "Unit size"
@@ -513,13 +539,17 @@ struct LineBody
  * @param save The battle.
  * @param unit The unit.
  * @param body Its body.
+ * @param fall The fall's shape for a unit going down, else null.
+ * @param facing The way the body faces.
  * @param ownView The 3D view for the looked-through soldier's own lines, else null.
  * @param from The line's start, in voxels (a step of a curve: the curve's start, see ArcLines).
  * @param stance Set to the body as the line tests it.
  */
-void bodyStance(SavedBattleGame *save, const BattleUnit *unit, const VoxelUnitModel *body, const FirstPersonView *ownView, const double from[3], LineBody &stance)
+void bodyStance(SavedBattleGame *save, const BattleUnit *unit, const VoxelUnitModel *body, const VoxelUnitModel::FallShape *fall, int facing, const FirstPersonView *ownView,
+	const double from[3], LineBody &stance)
 {
 	stance.body = body;
+	stance.fall = fall;
 	SpriteCard card;
 	stance.scale = startCard(save, unit, card);
 	std::copy(card.anchor, card.anchor + 3, stance.feet);
@@ -535,10 +565,10 @@ void bodyStance(SavedBattleGame *save, const BattleUnit *unit, const VoxelUnitMo
 		}
 		ownView->getSteadyEye(eye);
 	}
-	const double angle = unit->getDirection() * Pi / 4.0;
+	const double angle = facing * Pi / 4.0;
 	stance.cosine = std::cos(angle);
 	stance.sine = std::sin(angle);
-	stance.direction = ((unit->getDirection() + unitViewRotation(eye, stance.feet)) % 8 + 8) % 8;
+	stance.direction = ((facing + unitViewRotation(eye, stance.feet)) % 8 + 8) % 8;
 	const double flat = std::max(1.0, std::hypot(eye[0] - stance.feet[0], eye[1] - stance.feet[1]));
 	stance.level = std::atan2((eye[2] - (stance.feet[2] + 12.0)) * ZScale, flat) < VoxelSlantAbove * Pi / 180.0;
 }
@@ -557,7 +587,7 @@ bool bodyHit(const LineBody &stance, const double point[3])
 	const float right = (float)((relativeX * stance.cosine + relativeY * stance.sine) / measure);
 	const float ahead = (float)((relativeX * stance.sine - relativeY * stance.cosine) / measure);
 	const float up = (float)((point[2] - stance.feet[2]) / measure);
-	return stance.body->hitAt(right, ahead, up, stance.direction, stance.level);
+	return stance.fall ? stance.fall->hitAt(right, ahead, up) : stance.body->hitAt(right, ahead, up, stance.direction, stance.level);
 }
 
 /**
@@ -706,15 +736,19 @@ void prepareLine(SavedBattleGame *save, const Position &origin, const Position &
 		const double middleX = anchor[0] - line.start[0], middleY = anchor[1] - line.start[1];
 		const double nearest = std::clamp(flat > 1e-12 ? (middleX * line.direction[0] + middleY * line.direction[1]) / flat : from, from, to);
 		const double asideX = middleX - nearest * line.direction[0], asideY = middleY - nearest * line.direction[1];
-		const double reach = (size == 1 ? PictureReachSmall : PictureReachBig) + (own ? PictureLeanReach + GlideReach : 0.0);
+		// (a body going down leans back off its feet, farther than its picture is wide: see hitBody)
+		const double reach = (size == 1 ? PictureReachSmall : PictureReachBig) + (own ? PictureLeanReach + GlideReach : 0.0)
+			+ (unit->getStatus() == STATUS_COLLAPSING ? FallReach : 0.0);
 		if (asideX * asideX + asideY * asideY > reach * reach) continue;
 		LineCard lineCard;
 		lineCard.unit = unit;
-		if (const VoxelUnitModel *body = hitBody(save, unit))
+		const VoxelUnitModel::FallShape *fall;
+		int facing;
+		if (const VoxelUnitModel *body = hitBody(save, unit, fall, facing))
 		{
 			// (with "Voxel units": its body, tested at each voxel of the line)
 			// (a step of a curve: the side shown to the curve's start, as a card faces it, see ArcLines)
-			bodyStance(save, unit, body, own ? view : nullptr, arcFacing().active ? arcFacing().from : line.start, lineCard.body);
+			bodyStance(save, unit, body, fall, facing, own ? view : nullptr, arcFacing().active ? arcFacing().from : line.start, lineCard.body);
 			lineCard.along = 0.0;
 			lineCard.solid = true;
 			line.cards.push_back(lineCard);

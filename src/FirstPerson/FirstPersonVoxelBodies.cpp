@@ -1406,6 +1406,25 @@ void makeFalls(VoxelUnitModel &model, const std::vector<std::vector<Uint8>> &dea
 	}
 	if (down.colour.empty() && !corpse.empty()) fallRelief(down, withoutOutline(corpse, FrameSize, FrameSize, palette), 90.0f, halfMost * 0.8f);
 	if (!down.colour.empty()) model.falls.push_back(std::move(down));
+	// What a shot meets of each (a unit going down is hit as it shows): the shape's cubes, in whole voxels.
+	for (VoxelUnitModel::FallShape &shape : model.falls)
+	{
+		const std::vector<float> *place[3] = { &shape.right, &shape.ahead, &shape.up };
+		int high[3];
+		for (int i = 0; i < 3; ++i)
+		{
+			const auto ends = std::minmax_element(place[i]->begin(), place[i]->end());
+			shape.hitFrom[i] = (int)std::floor(*ends.first);
+			high[i] = (int)std::floor(*ends.second);
+			shape.hitSize[i] = high[i] - shape.hitFrom[i] + 1;
+		}
+		shape.hits.assign((size_t)shape.hitSize[0] * shape.hitSize[1] * shape.hitSize[2], 0);
+		for (size_t k = 0; k < shape.colour.size(); ++k)
+		{
+			const int x = (int)std::floor(shape.right[k]) - shape.hitFrom[0], y = (int)std::floor(shape.ahead[k]) - shape.hitFrom[1], z = (int)std::floor(shape.up[k]) - shape.hitFrom[2];
+			shape.hits[((size_t)x * shape.hitSize[1] + y) * shape.hitSize[2] + z] = 1;
+		}
+	}
 }
 
 /// The part each frame pixel shows, as the game lays the parts over each other (composite: its colour there is the top
@@ -1480,7 +1499,9 @@ Uint16 viewsAt(const std::vector<int> onTop[8], float right, float ahead, float 
 
 /// What a shot meets (see VoxelUnitModel::hits): the body's solid cells (owner: its filled half voxel cells, the inside
 /// too), the items in its hands and the pieces added for views, in whole voxels; each the views it shows in (a cell's,
-/// as its middle falls inside each view's solid drawing, see matchViews; a voxel's, as it shows).
+/// as its middle falls inside each view's solid drawing, see matchViews; a voxel's, as it shows). Nothing floats here
+/// either: in each view, only the cells joined (within Joined cells, as dropFloating joins them) to a voxel that still
+/// shows there are met; a speck hidden from the drawing isn't hit.
 void makeHits(VoxelUnitModel &model, const std::vector<Uint8> &owner, const std::vector<int> solidOnTop[8])
 {
 	float low[3] = { 1e9f, 1e9f, 1e9f }, high[3] = { -1e9f, -1e9f, -1e9f };
@@ -1508,13 +1529,54 @@ void makeHits(VoxelUnitModel &model, const std::vector<Uint8> &owner, const std:
 		const int x = (int)std::floor(right) - model.hitFrom[0], y = (int)std::floor(ahead) - model.hitFrom[1], z = (int)std::floor(up) - model.hitFrom[2];
 		return model.hits[((size_t)x * model.hitSize[1] + y) * model.hitSize[2] + z];
 	};
+	// Each solid cell's views, and the views in which a voxel that shows (not an item) lies in it.
+	std::vector<Uint16> solid(GridCells, 0), shown(GridCells, 0), met(GridCells, 0);
+	std::vector<int> cells; // (the solid cells)
 	for (int across = 0; across < GridAcross; ++across)
 		for (int along = 0; along < GridAlong; ++along)
 			for (int up = 0; up < GridUp; ++up)
 			{
-				if (!owner[cellIndex(across, along, up)]) continue;
-				at(cellRight(across), cellAhead(along), cellUp(up)) |= viewsAt(solidOnTop, cellRight(across), cellAhead(along), cellUp(up));
+				const int cell = cellIndex(across, along, up);
+				if (!owner[cell]) continue;
+				solid[cell] = viewsAt(solidOnTop, cellRight(across), cellAhead(along), cellUp(up));
+				if (solid[cell]) cells.push_back(cell);
 			}
+	const bool matched = model.views.size() == model.part.size();
+	for (size_t k = 0; matched && k < model.part.size(); ++k)
+	{
+		if (model.part[k] == VoxelUnitModel::Item) continue;
+		const int across = (int)std::floor((model.right[k] - AcrossFrom) / Cell), along = (int)std::floor((model.ahead[k] - AlongFrom) / Cell),
+			up = (int)std::floor((model.up[k] - UpFrom) / Cell);
+		if (across >= 0 && along >= 0 && up >= 0 && across < GridAcross && along < GridAlong && up < GridUp) shown[cellIndex(across, along, up)] |= model.views[k];
+	}
+	std::vector<int> stack;
+	for (int view = 0; view < 16; ++view)
+	{
+		const Uint16 bit = (Uint16)(1u << view);
+		for (int cell : cells) if ((solid[cell] & bit) && (shown[cell] & bit)) { met[cell] |= bit; stack.push_back(cell); }
+		if (stack.empty())
+		{
+			for (int cell : cells) met[cell] |= solid[cell] & bit; // (a body unmatched, or nothing of it showing there: as it's solid)
+			continue;
+		}
+		while (!stack.empty())
+		{
+			const int cell = stack.back(), up = cell % GridUp, along = (cell / GridUp) % GridAlong, across = cell / (GridUp * GridAlong);
+			stack.pop_back();
+			for (int a = std::max(0, across - Joined); a <= std::min(GridAcross - 1, across + Joined); ++a)
+				for (int b = std::max(0, along - Joined); b <= std::min(GridAlong - 1, along + Joined); ++b)
+					for (int c = std::max(0, up - Joined); c <= std::min(GridUp - 1, up + Joined); ++c)
+					{
+						const int other = cellIndex(a, b, c);
+						if ((solid[other] & bit) && !(met[other] & bit)) { met[other] |= bit; stack.push_back(other); }
+					}
+		}
+	}
+	for (int cell : cells)
+	{
+		const int up = cell % GridUp, along = (cell / GridUp) % GridAlong, across = cell / (GridUp * GridAlong);
+		at(cellRight(across), cellAhead(along), cellUp(up)) |= met[cell];
+	}
 	for (size_t k = 0; k < model.part.size(); ++k) at(model.right[k], model.ahead[k], model.up[k]) |= model.views[k];
 }
 
@@ -2251,6 +2313,18 @@ bool VoxelUnitModel::hitAt(float across, float along, float height, int directio
 	const int x = (int)std::floor(across) - hitFrom[0], y = (int)std::floor(along) - hitFrom[1], z = (int)std::floor(height) - hitFrom[2];
 	if (hits.empty() || x < 0 || y < 0 || z < 0 || x >= hitSize[0] || y >= hitSize[1] || z >= hitSize[2]) return false;
 	return hits[((size_t)x * hitSize[1] + y) * hitSize[2] + z] >> ((level ? 0 : 8) + direction) & 1;
+}
+
+/**
+ * Whether a shot meets a body going down at a point: one of the shape's cubes there (a shape is the same from every side).
+ * @param across, along, height The point: voxels to the body's right, ahead and up from the middle of its feet.
+ * @return True if the shot meets it there.
+ */
+bool VoxelUnitModel::FallShape::hitAt(float across, float along, float height) const
+{
+	const int x = (int)std::floor(across) - hitFrom[0], y = (int)std::floor(along) - hitFrom[1], z = (int)std::floor(height) - hitFrom[2];
+	if (hits.empty() || x < 0 || y < 0 || z < 0 || x >= hitSize[0] || y >= hitSize[1] || z >= hitSize[2]) return false;
+	return hits[((size_t)x * hitSize[1] + y) * hitSize[2] + z] != 0;
 }
 #endif
 

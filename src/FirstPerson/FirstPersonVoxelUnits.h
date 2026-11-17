@@ -98,7 +98,16 @@ struct VoxelUnitModel
 	/// The walk: each of its 8 phases' places (the same voxels, legs and arms swung, the body bobbing).
 	std::vector<float> walkRight[8], walkAhead[8], walkUp[8];
 	/// A shape of the body going down or lying: cubes on the body's own grid, each one colour from every side.
-	struct FallShape { std::vector<float> right, ahead, up; std::vector<Uint8> colour; };
+	struct FallShape
+	{
+		std::vector<float> right, ahead, up;
+		std::vector<Uint8> colour;
+		/// What a shot meets of it (see VoxelUnitModel::hits): its cubes, in whole voxels from hitFrom, hitSize each way.
+		std::vector<Uint8> hits;
+		int hitFrom[3] = {}, hitSize[3] = {};
+		/// Whether a shot meets it at a point (voxels to the body's right, ahead and up from the middle of its feet).
+		bool hitAt(float across, float along, float height) const;
+	};
 	/// Going down as its death frames show it: each frame's own picture given volume (the unit collapses as its sprite
 	/// does, falling back from the way it faced), then the body lying: its corpse's inventory picture laid on the floor
 	/// and given volume. Empty for a unit with neither.
@@ -155,6 +164,8 @@ public:
 		const SavedBattleGame *save, const SDL_Color *palette, int &builds, int &walkPhase);
 	/// The body a unit was last drawn with (for its fall, and its corpse lying where it fell), or null.
 	const VoxelUnitModel *lastBody(const BattleUnit *unit) const;
+	/// The way a unit faced when it was last drawn as a body, up.
+	int lastFacing(const BattleUnit *unit) const;
 	/// The body for a unit as it is now, if it's made (none is made here: see modelFor), or null; a unit walking, its
 	/// standing body.
 	const VoxelUnitModel *bodyNow(const BattleUnit *unit);
@@ -174,6 +185,7 @@ private:
 	static Key keyFor(const BattleUnit *unit, bool standing);
 	/// The body each unit was last drawn with (by its id).
 	std::map<int, std::shared_ptr<VoxelUnitModel>> _lastBodies;
+	std::map<int, int> _lastFacings;
 	/// Notes a unit's body as the one it was last drawn with; gives the body.
 	const VoxelUnitModel *remember(const BattleUnit *unit, const std::shared_ptr<VoxelUnitModel> &body);
 	/// The bodies being made (by what they're made from), and the keys waiting for one.

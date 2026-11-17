@@ -23781,10 +23781,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..922deb991
+index 000000000..a7f4ac044
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1841 @@
+@@ -0,0 +1,1842 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24273,6 +24273,7 @@ index 000000000..922deb991
 +	const std::vector<PresetSwitch> &(*switches)();
 +};
 +
++// Thanks to mumble for your dedication and work.
 +/**
 + * The settings the gameplay presets set (setting "Gameplay", the first page of the 3D VIEW tab;
 + * after GitHub issue #168, each keeping what the one before it set unless it says otherwise),
@@ -58079,10 +58080,10 @@ index 000000000..44a6559e0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonSpriteHits.cpp b/src/FirstPerson/FirstPersonSpriteHits.cpp
 new file mode 100644
-index 000000000..00e2b860a
+index 000000000..e1b88905f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonSpriteHits.cpp
-@@ -0,0 +1,1034 @@
+@@ -0,0 +1,1068 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -58179,6 +58180,8 @@ index 000000000..00e2b860a
 +/// How far below its anchor and above it a unit's picture reaches, in voxels: the rows under the
 +/// anchor (24 at most) and over it (48 at most), and a voxel for the gate.
 +const double PictureBelow = 25.0, PictureAbove = 48.0 + 1.0;
++/// How much farther off its feet a body going down reaches than its picture standing, in voxels.
++const double FallReach = 12.0;
 +/// How far the 3D view may draw a unit from where the game has it between its small steps (it eases
 +/// after them, see FirstPersonView::drawUnits), in voxels: the looked-through soldier's own lines meet
 +/// the picture where it's drawn.
@@ -58558,19 +58561,42 @@ index 000000000..00e2b860a
 +/**
 + * The voxel body a unit is hit by (settings "Voxel units" and "Full sprite hitboxes", the owner's: "hit-boxes should be
 + * their whole bodies"): the one made for it as it is now (every unit's is made from the battle's start, see
-+ * FirstPersonMode::makeVoxelBodies; a unit without one yet is hit by its picture).
++ * FirstPersonMode::makeVoxelBodies; a unit without one yet is hit by its picture). A unit going down (the game's own
++ * fall; one tile big, as the view draws the fall) is hit by the shape the body it was last drawn with has at the fall
++ * frame the game has come to (see VoxelUnitModel::falls), turned the way it last faced.
 + * @param save The battle.
 + * @param unit The unit.
++ * @param fall Set to the fall's shape for a unit going down, else null.
++ * @param facing Set to the way the body faces.
 + * @return The body, or null (hit by its picture).
 + */
-+const VoxelUnitModel *hitBody(SavedBattleGame *save, const BattleUnit *unit)
++const VoxelUnitModel *hitBody(SavedBattleGame *save, const BattleUnit *unit, const VoxelUnitModel::FallShape *&fall, int &facing)
 +{
++	fall = nullptr;
++	facing = unit->getDirection();
 +	if (!Options::fpsVoxelUnits)
 +	{
 +		return nullptr;
 +	}
 +	VoxelUnits *bodies = FirstPersonMode::voxelUnits(save->getBattleState());
-+	return bodies && VoxelUnits::suits(unit) ? bodies->bodyNow(unit) : nullptr;
++	if (!bodies) return nullptr;
++	if (unit->getStatus() == STATUS_COLLAPSING && unit->getArmor()->getSize() == 1)
++	{
++		const VoxelUnitModel *body = bodies->lastBody(unit);
++		const int frames = std::max(1, unit->getArmor()->getDeathFrames());
++		fall = body ? body->fallAt((unit->getFallingPhase() + 0.5) / (frames + 1)) : nullptr;
++		facing = bodies->lastFacing(unit);
++		return fall ? body : nullptr;
++	}
++	return VoxelUnits::suits(unit) ? bodies->bodyNow(unit) : nullptr;
++}
++
++/// The body a unit is hit by, whichever way (see above).
++const VoxelUnitModel *hitBody(SavedBattleGame *save, const BattleUnit *unit)
++{
++	const VoxelUnitModel::FallShape *fall;
++	int facing;
++	return hitBody(save, unit, fall, facing);
 +}
 +
 +/**
@@ -58580,6 +58606,7 @@ index 000000000..00e2b860a
 +struct LineBody
 +{
 +	const VoxelUnitModel *body = nullptr;
++	const VoxelUnitModel::FallShape *fall = nullptr; // going down: the fall's shape it's hit by
 +	double feet[3] = {};             // the middle of its feet, in voxels
 +	double cosine = 1.0, sine = 0.0; // turned to the way it faces
 +	double scale = 1.0;              // the setting "Unit size"
@@ -58598,13 +58625,17 @@ index 000000000..00e2b860a
 + * @param save The battle.
 + * @param unit The unit.
 + * @param body Its body.
++ * @param fall The fall's shape for a unit going down, else null.
++ * @param facing The way the body faces.
 + * @param ownView The 3D view for the looked-through soldier's own lines, else null.
 + * @param from The line's start, in voxels (a step of a curve: the curve's start, see ArcLines).
 + * @param stance Set to the body as the line tests it.
 + */
-+void bodyStance(SavedBattleGame *save, const BattleUnit *unit, const VoxelUnitModel *body, const FirstPersonView *ownView, const double from[3], LineBody &stance)
++void bodyStance(SavedBattleGame *save, const BattleUnit *unit, const VoxelUnitModel *body, const VoxelUnitModel::FallShape *fall, int facing, const FirstPersonView *ownView,
++	const double from[3], LineBody &stance)
 +{
 +	stance.body = body;
++	stance.fall = fall;
 +	SpriteCard card;
 +	stance.scale = startCard(save, unit, card);
 +	std::copy(card.anchor, card.anchor + 3, stance.feet);
@@ -58620,10 +58651,10 @@ index 000000000..00e2b860a
 +		}
 +		ownView->getSteadyEye(eye);
 +	}
-+	const double angle = unit->getDirection() * Pi / 4.0;
++	const double angle = facing * Pi / 4.0;
 +	stance.cosine = std::cos(angle);
 +	stance.sine = std::sin(angle);
-+	stance.direction = ((unit->getDirection() + unitViewRotation(eye, stance.feet)) % 8 + 8) % 8;
++	stance.direction = ((facing + unitViewRotation(eye, stance.feet)) % 8 + 8) % 8;
 +	const double flat = std::max(1.0, std::hypot(eye[0] - stance.feet[0], eye[1] - stance.feet[1]));
 +	stance.level = std::atan2((eye[2] - (stance.feet[2] + 12.0)) * ZScale, flat) < VoxelSlantAbove * Pi / 180.0;
 +}
@@ -58642,7 +58673,7 @@ index 000000000..00e2b860a
 +	const float right = (float)((relativeX * stance.cosine + relativeY * stance.sine) / measure);
 +	const float ahead = (float)((relativeX * stance.sine - relativeY * stance.cosine) / measure);
 +	const float up = (float)((point[2] - stance.feet[2]) / measure);
-+	return stance.body->hitAt(right, ahead, up, stance.direction, stance.level);
++	return stance.fall ? stance.fall->hitAt(right, ahead, up) : stance.body->hitAt(right, ahead, up, stance.direction, stance.level);
 +}
 +
 +/**
@@ -58791,15 +58822,19 @@ index 000000000..00e2b860a
 +		const double middleX = anchor[0] - line.start[0], middleY = anchor[1] - line.start[1];
 +		const double nearest = std::clamp(flat > 1e-12 ? (middleX * line.direction[0] + middleY * line.direction[1]) / flat : from, from, to);
 +		const double asideX = middleX - nearest * line.direction[0], asideY = middleY - nearest * line.direction[1];
-+		const double reach = (size == 1 ? PictureReachSmall : PictureReachBig) + (own ? PictureLeanReach + GlideReach : 0.0);
++		// (a body going down leans back off its feet, farther than its picture is wide: see hitBody)
++		const double reach = (size == 1 ? PictureReachSmall : PictureReachBig) + (own ? PictureLeanReach + GlideReach : 0.0)
++			+ (unit->getStatus() == STATUS_COLLAPSING ? FallReach : 0.0);
 +		if (asideX * asideX + asideY * asideY > reach * reach) continue;
 +		LineCard lineCard;
 +		lineCard.unit = unit;
-+		if (const VoxelUnitModel *body = hitBody(save, unit))
++		const VoxelUnitModel::FallShape *fall;
++		int facing;
++		if (const VoxelUnitModel *body = hitBody(save, unit, fall, facing))
 +		{
 +			// (with "Voxel units": its body, tested at each voxel of the line)
 +			// (a step of a curve: the side shown to the curve's start, as a card faces it, see ArcLines)
-+			bodyStance(save, unit, body, own ? view : nullptr, arcFacing().active ? arcFacing().from : line.start, lineCard.body);
++			bodyStance(save, unit, body, fall, facing, own ? view : nullptr, arcFacing().active ? arcFacing().from : line.start, lineCard.body);
 +			lineCard.along = 0.0;
 +			lineCard.solid = true;
 +			line.cards.push_back(lineCard);
@@ -83552,10 +83587,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..95f184e1e
+index 000000000..681f87b22
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,2299 @@
+@@ -0,0 +1,2373 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -84964,6 +84999,25 @@ index 000000000..95f184e1e
 +	}
 +	if (down.colour.empty() && !corpse.empty()) fallRelief(down, withoutOutline(corpse, FrameSize, FrameSize, palette), 90.0f, halfMost * 0.8f);
 +	if (!down.colour.empty()) model.falls.push_back(std::move(down));
++	// What a shot meets of each (a unit going down is hit as it shows): the shape's cubes, in whole voxels.
++	for (VoxelUnitModel::FallShape &shape : model.falls)
++	{
++		const std::vector<float> *place[3] = { &shape.right, &shape.ahead, &shape.up };
++		int high[3];
++		for (int i = 0; i < 3; ++i)
++		{
++			const auto ends = std::minmax_element(place[i]->begin(), place[i]->end());
++			shape.hitFrom[i] = (int)std::floor(*ends.first);
++			high[i] = (int)std::floor(*ends.second);
++			shape.hitSize[i] = high[i] - shape.hitFrom[i] + 1;
++		}
++		shape.hits.assign((size_t)shape.hitSize[0] * shape.hitSize[1] * shape.hitSize[2], 0);
++		for (size_t k = 0; k < shape.colour.size(); ++k)
++		{
++			const int x = (int)std::floor(shape.right[k]) - shape.hitFrom[0], y = (int)std::floor(shape.ahead[k]) - shape.hitFrom[1], z = (int)std::floor(shape.up[k]) - shape.hitFrom[2];
++			shape.hits[((size_t)x * shape.hitSize[1] + y) * shape.hitSize[2] + z] = 1;
++		}
++	}
 +}
 +
 +/// The part each frame pixel shows, as the game lays the parts over each other (composite: its colour there is the top
@@ -85038,7 +85092,9 @@ index 000000000..95f184e1e
 +
 +/// What a shot meets (see VoxelUnitModel::hits): the body's solid cells (owner: its filled half voxel cells, the inside
 +/// too), the items in its hands and the pieces added for views, in whole voxels; each the views it shows in (a cell's,
-+/// as its middle falls inside each view's solid drawing, see matchViews; a voxel's, as it shows).
++/// as its middle falls inside each view's solid drawing, see matchViews; a voxel's, as it shows). Nothing floats here
++/// either: in each view, only the cells joined (within Joined cells, as dropFloating joins them) to a voxel that still
++/// shows there are met; a speck hidden from the drawing isn't hit.
 +void makeHits(VoxelUnitModel &model, const std::vector<Uint8> &owner, const std::vector<int> solidOnTop[8])
 +{
 +	float low[3] = { 1e9f, 1e9f, 1e9f }, high[3] = { -1e9f, -1e9f, -1e9f };
@@ -85066,13 +85122,54 @@ index 000000000..95f184e1e
 +		const int x = (int)std::floor(right) - model.hitFrom[0], y = (int)std::floor(ahead) - model.hitFrom[1], z = (int)std::floor(up) - model.hitFrom[2];
 +		return model.hits[((size_t)x * model.hitSize[1] + y) * model.hitSize[2] + z];
 +	};
++	// Each solid cell's views, and the views in which a voxel that shows (not an item) lies in it.
++	std::vector<Uint16> solid(GridCells, 0), shown(GridCells, 0), met(GridCells, 0);
++	std::vector<int> cells; // (the solid cells)
 +	for (int across = 0; across < GridAcross; ++across)
 +		for (int along = 0; along < GridAlong; ++along)
 +			for (int up = 0; up < GridUp; ++up)
 +			{
-+				if (!owner[cellIndex(across, along, up)]) continue;
-+				at(cellRight(across), cellAhead(along), cellUp(up)) |= viewsAt(solidOnTop, cellRight(across), cellAhead(along), cellUp(up));
++				const int cell = cellIndex(across, along, up);
++				if (!owner[cell]) continue;
++				solid[cell] = viewsAt(solidOnTop, cellRight(across), cellAhead(along), cellUp(up));
++				if (solid[cell]) cells.push_back(cell);
 +			}
++	const bool matched = model.views.size() == model.part.size();
++	for (size_t k = 0; matched && k < model.part.size(); ++k)
++	{
++		if (model.part[k] == VoxelUnitModel::Item) continue;
++		const int across = (int)std::floor((model.right[k] - AcrossFrom) / Cell), along = (int)std::floor((model.ahead[k] - AlongFrom) / Cell),
++			up = (int)std::floor((model.up[k] - UpFrom) / Cell);
++		if (across >= 0 && along >= 0 && up >= 0 && across < GridAcross && along < GridAlong && up < GridUp) shown[cellIndex(across, along, up)] |= model.views[k];
++	}
++	std::vector<int> stack;
++	for (int view = 0; view < 16; ++view)
++	{
++		const Uint16 bit = (Uint16)(1u << view);
++		for (int cell : cells) if ((solid[cell] & bit) && (shown[cell] & bit)) { met[cell] |= bit; stack.push_back(cell); }
++		if (stack.empty())
++		{
++			for (int cell : cells) met[cell] |= solid[cell] & bit; // (a body unmatched, or nothing of it showing there: as it's solid)
++			continue;
++		}
++		while (!stack.empty())
++		{
++			const int cell = stack.back(), up = cell % GridUp, along = (cell / GridUp) % GridAlong, across = cell / (GridUp * GridAlong);
++			stack.pop_back();
++			for (int a = std::max(0, across - Joined); a <= std::min(GridAcross - 1, across + Joined); ++a)
++				for (int b = std::max(0, along - Joined); b <= std::min(GridAlong - 1, along + Joined); ++b)
++					for (int c = std::max(0, up - Joined); c <= std::min(GridUp - 1, up + Joined); ++c)
++					{
++						const int other = cellIndex(a, b, c);
++						if ((solid[other] & bit) && !(met[other] & bit)) { met[other] |= bit; stack.push_back(other); }
++					}
++		}
++	}
++	for (int cell : cells)
++	{
++		const int up = cell % GridUp, along = (cell / GridUp) % GridAlong, across = cell / (GridUp * GridAlong);
++		at(cellRight(across), cellAhead(along), cellUp(up)) |= met[cell];
++	}
 +	for (size_t k = 0; k < model.part.size(); ++k) at(model.right[k], model.ahead[k], model.up[k]) |= model.views[k];
 +}
 +
@@ -85810,6 +85907,18 @@ index 000000000..95f184e1e
 +	if (hits.empty() || x < 0 || y < 0 || z < 0 || x >= hitSize[0] || y >= hitSize[1] || z >= hitSize[2]) return false;
 +	return hits[((size_t)x * hitSize[1] + y) * hitSize[2] + z] >> ((level ? 0 : 8) + direction) & 1;
 +}
++
++/**
++ * Whether a shot meets a body going down at a point: one of the shape's cubes there (a shape is the same from every side).
++ * @param across, along, height The point: voxels to the body's right, ahead and up from the middle of its feet.
++ * @return True if the shot meets it there.
++ */
++bool VoxelUnitModel::FallShape::hitAt(float across, float along, float height) const
++{
++	const int x = (int)std::floor(across) - hitFrom[0], y = (int)std::floor(along) - hitFrom[1], z = (int)std::floor(height) - hitFrom[2];
++	if (hits.empty() || x < 0 || y < 0 || z < 0 || x >= hitSize[0] || y >= hitSize[1] || z >= hitSize[2]) return false;
++	return hits[((size_t)x * hitSize[1] + y) * hitSize[2] + z] != 0;
++}
 +#endif
 +
 +/**
@@ -86464,10 +86573,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..3de84a52e
+index 000000000..b55f39e5d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,682 @@
+@@ -0,0 +1,698 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -86909,8 +87018,23 @@ index 000000000..3de84a52e
 + */
 +const VoxelUnitModel *VoxelUnits::remember(const BattleUnit *unit, const std::shared_ptr<VoxelUnitModel> &body)
 +{
-+	if (body) _lastBodies[unit->getId()] = body;
++	if (body)
++	{
++		_lastBodies[unit->getId()] = body;
++		if (!unit->isOutThresholdExceed()) _lastFacings[unit->getId()] = unit->getDirection(); // (the game turns one going down to face the screen)
++	}
 +	return body.get();
++}
++
++/**
++ * The way a unit faced when it was last drawn as a body, up (see lastBody).
++ * @param unit The unit.
++ * @return The direction (0-7); its own now if it was never drawn as one.
++ */
++int VoxelUnits::lastFacing(const BattleUnit *unit) const
++{
++	auto found = _lastFacings.find(unit->getId());
++	return found != _lastFacings.end() ? found->second : unit->getDirection();
 +}
 +
 +/**
@@ -86993,6 +87117,7 @@ index 000000000..3de84a52e
 +	_making.clear();
 +	_waiting.clear();
 +	_lastBodies.clear();
++	_lastFacings.clear();
 +}
 +
 +/**
@@ -87152,10 +87277,10 @@ index 000000000..3de84a52e
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.h b/src/FirstPerson/FirstPersonVoxelUnits.h
 new file mode 100644
-index 000000000..ab87e5532
+index 000000000..fea97e287
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.h
-@@ -0,0 +1,202 @@
+@@ -0,0 +1,214 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -87256,7 +87381,16 @@ index 000000000..ab87e5532
 +	/// The walk: each of its 8 phases' places (the same voxels, legs and arms swung, the body bobbing).
 +	std::vector<float> walkRight[8], walkAhead[8], walkUp[8];
 +	/// A shape of the body going down or lying: cubes on the body's own grid, each one colour from every side.
-+	struct FallShape { std::vector<float> right, ahead, up; std::vector<Uint8> colour; };
++	struct FallShape
++	{
++		std::vector<float> right, ahead, up;
++		std::vector<Uint8> colour;
++		/// What a shot meets of it (see VoxelUnitModel::hits): its cubes, in whole voxels from hitFrom, hitSize each way.
++		std::vector<Uint8> hits;
++		int hitFrom[3] = {}, hitSize[3] = {};
++		/// Whether a shot meets it at a point (voxels to the body's right, ahead and up from the middle of its feet).
++		bool hitAt(float across, float along, float height) const;
++	};
 +	/// Going down as its death frames show it: each frame's own picture given volume (the unit collapses as its sprite
 +	/// does, falling back from the way it faced), then the body lying: its corpse's inventory picture laid on the floor
 +	/// and given volume. Empty for a unit with neither.
@@ -87313,6 +87447,8 @@ index 000000000..ab87e5532
 +		const SavedBattleGame *save, const SDL_Color *palette, int &builds, int &walkPhase);
 +	/// The body a unit was last drawn with (for its fall, and its corpse lying where it fell), or null.
 +	const VoxelUnitModel *lastBody(const BattleUnit *unit) const;
++	/// The way a unit faced when it was last drawn as a body, up.
++	int lastFacing(const BattleUnit *unit) const;
 +	/// The body for a unit as it is now, if it's made (none is made here: see modelFor), or null; a unit walking, its
 +	/// standing body.
 +	const VoxelUnitModel *bodyNow(const BattleUnit *unit);
@@ -87332,6 +87468,7 @@ index 000000000..ab87e5532
 +	static Key keyFor(const BattleUnit *unit, bool standing);
 +	/// The body each unit was last drawn with (by its id).
 +	std::map<int, std::shared_ptr<VoxelUnitModel>> _lastBodies;
++	std::map<int, int> _lastFacings;
 +	/// Notes a unit's body as the one it was last drawn with; gives the body.
 +	const VoxelUnitModel *remember(const BattleUnit *unit, const std::shared_ptr<VoxelUnitModel> &body);
 +	/// The bodies being made (by what they're made from), and the keys waiting for one.

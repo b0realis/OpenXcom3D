@@ -486,6 +486,7 @@ struct Presets
 	const std::vector<PresetSwitch> &(*switches)();
 };
 
+// Thanks to mumble for your dedication and work.
 /**
  * The settings the gameplay presets set (setting "Gameplay", the first page of the 3D VIEW tab;
  * after GitHub issue #168, each keeping what the one before it set unless it says otherwise),

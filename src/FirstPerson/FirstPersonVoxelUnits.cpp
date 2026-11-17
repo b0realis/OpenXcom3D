@@ -439,8 +439,23 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
  */
 const VoxelUnitModel *VoxelUnits::remember(const BattleUnit *unit, const std::shared_ptr<VoxelUnitModel> &body)
 {
-	if (body) _lastBodies[unit->getId()] = body;
+	if (body)
+	{
+		_lastBodies[unit->getId()] = body;
+		if (!unit->isOutThresholdExceed()) _lastFacings[unit->getId()] = unit->getDirection(); // (the game turns one going down to face the screen)
+	}
 	return body.get();
+}
+
+/**
+ * The way a unit faced when it was last drawn as a body, up (see lastBody).
+ * @param unit The unit.
+ * @return The direction (0-7); its own now if it was never drawn as one.
+ */
+int VoxelUnits::lastFacing(const BattleUnit *unit) const
+{
+	auto found = _lastFacings.find(unit->getId());
+	return found != _lastFacings.end() ? found->second : unit->getDirection();
 }
 
 /**
@@ -523,6 +538,7 @@ void VoxelUnits::clear()
 	_making.clear();
 	_waiting.clear();
 	_lastBodies.clear();
+	_lastFacings.clear();
 }
 
 /**
