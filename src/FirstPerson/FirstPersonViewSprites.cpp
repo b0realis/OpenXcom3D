@@ -793,7 +793,7 @@ void FirstPersonView::drawVoxelUnit(const DrawStep &step, int bandTop, int bandB
 			{
 				for (int other = 0; other < 3; ++other)
 					if (other != axis) reach[axis] += std::abs(edge[axis][0] * edge[other][1] - edge[axis][1] * edge[other][0]);
-				reach[axis] += 0.5f * std::hypot(edge[axis][0], edge[axis][1]);
+				reach[axis] += 0.5f * std::sqrt(edge[axis][0] * edge[axis][0] + edge[axis][1] * edge[axis][1]); // (not hypot: for floats it needs a newer C library than the Linux release may ask for)
 			}
 		}
 		for (int y = y0; y < y1; ++y)

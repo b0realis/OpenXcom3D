@@ -71962,7 +71962,7 @@ index 000000000..229bd966c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..b0ca488a5
+index 000000000..53788aabe
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
 @@ -0,0 +1,4002 @@
@@ -72761,7 +72761,7 @@ index 000000000..b0ca488a5
 +			{
 +				for (int other = 0; other < 3; ++other)
 +					if (other != axis) reach[axis] += std::abs(edge[axis][0] * edge[other][1] - edge[axis][1] * edge[other][0]);
-+				reach[axis] += 0.5f * std::hypot(edge[axis][0], edge[axis][1]);
++				reach[axis] += 0.5f * std::sqrt(edge[axis][0] * edge[axis][0] + edge[axis][1] * edge[axis][1]); // (not hypot: for floats it needs a newer C library than the Linux release may ask for)
 +			}
 +		}
 +		for (int y = y0; y < y1; ++y)
