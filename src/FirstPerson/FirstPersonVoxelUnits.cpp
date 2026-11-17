@@ -104,7 +104,7 @@ struct VoxelUnits::Job
 	std::vector<Uint8> corpse;
 	WalkFrames walks;
 	bool aiming = false;
-	bool fine = false; // (made twice as fine: setting "Fine voxel units")
+	bool fine = false; // (made twice as fine: see FineBodies)
 	const Routine *routine = nullptr;
 	int unitId = 0, status = 0; // (the unit's, for dump's file names)
 	bool kneeled = false;
@@ -162,12 +162,6 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	const SavedBattleGame *save, const SDL_Color *palette, int &builds, int &walkPhase)
 {
 	walkPhase = -1;
-	// (the setting "Fine voxel units" changed: every body is made again)
-	if (Options::fpsVoxelFine != _fine)
-	{
-		clear();
-		_fine = Options::fpsVoxelFine;
-	}
 	collect();
 	if (unit->getStatus() == STATUS_WALKING || unit->getStatus() == STATUS_FLYING)
 	{
@@ -382,7 +376,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 			hashBytes(hash, walks.legs[phase][view].data(), walks.legs[phase][view].size());
 			for (int side = 0; side < 2; ++side) hashBytes(hash, walks.arms[phase][view][side].data(), walks.arms[phase][view][side].size());
 		}
-	const Uint8 pose[3] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)Options::fpsVoxelFine };
+	const Uint8 pose[3] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies };
 	hashBytes(hash, pose, 3);
 	auto alike = _byFrames.find(hash);
 	if (alike != _byFrames.end())
@@ -403,7 +397,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		job->corpse = std::move(corpse);
 		job->walks = std::move(walks);
 		job->aiming = aiming;
-		job->fine = Options::fpsVoxelFine;
+		job->fine = FineBodies;
 		job->routine = routine;
 		std::copy(palette, palette + 256, job->palette);
 		job->hash = hash;

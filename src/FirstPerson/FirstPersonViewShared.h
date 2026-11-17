@@ -164,7 +164,10 @@ const double ZScale = 0.81649658092772603;
 const double VoxelSlantAbove = 15.0;
 /// A voxel unit's voxel (half a voxel big) is drawn as a square this many voxels wide, so that no gaps show between them,
 /// and at most this many pixels from its middle (right up against the camera).
-const double VoxelSplatSize = 0.6, VoxelSplatHalfMax = 32.0;
+/// A voxel body's voxel: a cube this big (the body's own measure: a cell of its grid), drawn at most VoxelSplatHalfMax
+/// pixels each way from its middle, cut to its six-sided outline once it's over VoxelOutlineFrom pixels each way.
+const double VoxelCubeEdge = 0.5, VoxelSplatHalfMax = 48.0;
+const float VoxelOutlineFrom = 1.5f;
 /// At most this many voxel units' bodies are made a frame (each takes a few milliseconds; see VoxelUnits).
 const int VoxelBuildsPerFrame = 1;
 /// What the game draws over a voxel unit's sprite (flames, bubbles) is drawn this many voxels nearer than the unit, over

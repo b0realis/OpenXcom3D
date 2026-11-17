@@ -1,6 +1,6 @@
 #pragma once
 /*
- * FirstPersonVoxelBodiesFine.h: the voxel bodies made twice as fine (setting "Fine voxel units"): the builder of
+ * FirstPersonVoxelBodiesFine.h: the voxel bodies made twice as fine (see FineBodies): the builder of
  * FirstPersonVoxelBodies.cpp built a second time (FirstPersonVoxelBodiesFine.cpp) to work on the unit's frames enlarged
  * twice, on cells half as big: a quarter of a voxel each. What it gives is a body like any other whose places are in
  * half voxels (VoxelUnitModel::unit 0.5).

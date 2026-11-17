@@ -628,13 +628,14 @@ void FirstPersonView::drawListBands()
  * @param items With the items in its hands (a body lying in a pile has dropped them: they're in the pile).
  * @param lyingBody The unconscious unit lying in the pile it pictures, if any (the pointer finds it: a medi-kit's patient).
  * @param pile The floor tile whose pile it pictures, if any (the pointer finds it).
+ * @param faint How much of it shows (1 all; a pile made faint to see past it, setting "See-through corpses": dithered).
  */
 void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase, int facing, int direction, bool level, const double feet[3], double floorCut,
-	int shade, double scale, BattleUnit *unit, double fall, bool items, BattleUnit *lyingBody, const Tile *pile)
+	int shade, double scale, BattleUnit *unit, double fall, bool items, BattleUnit *lyingBody, const Tile *pile, double faint)
 {
 	double anchorX, anchorY, anchorDepth;
 	if (!projectToScreen(feet, anchorX, anchorY, anchorDepth)) return;
-	const float opacity = (float)std::clamp((anchorDepth - 4.0) / 6.0, 0.0, 1.0);
+	const float opacity = (float)(std::clamp((anchorDepth - 4.0) / 6.0, 0.0, 1.0) * faint);
 	if (opacity <= 0.0f) return;
 	const bool walking = walkPhase >= 0 && walkPhase < 8;
 	const std::vector<float> &right = walking ? body.walkRight[walkPhase] : body.right;
@@ -646,9 +647,39 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 	const double bodyUnit = body.unit; // (voxels to one of the body's own measures: half for a fine body)
 	const bool falling = fall > 0.0;
 	const VoxelUnitModel::FallPose pose = body.poseAt(fall);
-	// half a square at a depth of one (a body going down spreads out: its squares grow with it, or the floor showed
-	// through the slits between them)
-	const double halfSquare = 0.5 * VoxelSplatSize * scale * bodyUnit * focalLength * std::max(1.0f, pose.spread);
+	// Each voxel is a little cube, the cell of the body's grid it fills: side by side they leave no gap from any side.
+	// On the screen a cube is the six-sided outline of its three half edges (to the body's right, ahead and up) thrown
+	// from its middle; those are taken once here, at the feet's depth, and shrink with each voxel's own depth. (A body
+	// walking or going down has its voxels moved off the grid, a little apart where a limb swings or the body spreads:
+	// their cubes are a little bigger, and one going down is drawn by the boxes round its cubes.)
+	const double halfEdge = 0.5 * VoxelCubeEdge * scale * bodyUnit * (falling ? 1.25 * std::max(1.0f, pose.spread) : walking ? 1.15 : 1.0);
+	const double probe = 8.0; // (voxels each way from the feet: far enough to measure, near enough to stay in front of the eye)
+	const double axes[3][3] = { { cosine, sine, 0.0 }, { sine, -cosine, 0.0 }, { 0.0, 0.0, 1.0 } };
+	double edges[3][2], lean[3] = {}; // (lean: how much deeper each half edge goes; a cube off the view's middle shows it)
+	bool cubes = true;
+	for (int axis = 0; axis < 3 && cubes; ++axis)
+	{
+		const double far[3] = { feet[0] + axes[axis][0] * probe, feet[1] + axes[axis][1] * probe, feet[2] + axes[axis][2] * probe };
+		const double near[3] = { feet[0] - axes[axis][0] * probe, feet[1] - axes[axis][1] * probe, feet[2] - axes[axis][2] * probe };
+		double farX, farY, farDepth, nearX, nearY, nearDepth;
+		cubes = projectToScreen(far, farX, farY, farDepth) && projectToScreen(near, nearX, nearY, nearDepth) && farDepth > 1.0 && nearDepth > 1.0;
+		if (!cubes) break;
+		// (each end's offset from the feet as it would be at the feet's depth: the perspective's part taken out)
+		const double toFarX = (farX - anchorX) * farDepth / anchorDepth, toFarY = (farY - anchorY) * farDepth / anchorDepth;
+		const double toNearX = (nearX - anchorX) * nearDepth / anchorDepth, toNearY = (nearY - anchorY) * nearDepth / anchorDepth;
+		lean[axis] = (farDepth - nearDepth) / (2.0 * probe) * halfEdge;
+		// (as seen straight ahead, at a depth of one: the feet's place off the view's middle taken out)
+		edges[axis][0] = (toFarX - toNearX) / (2.0 * probe) * halfEdge * anchorDepth + (anchorX - axisX()) * lean[axis];
+		edges[axis][1] = (toFarY - toNearY) / (2.0 * probe) * halfEdge * anchorDepth + (anchorY - axisY()) * lean[axis];
+	}
+	if (!cubes)
+	{
+		// (too near to measure: squares facing the view, as wide as a cube seen corner on)
+		const double square = halfEdge * 1.5 * focalLength;
+		edges[0][0] = square; edges[0][1] = 0.0; edges[1][0] = 0.0; edges[1][1] = square; edges[2][0] = edges[2][1] = 0.0;
+		lean[0] = lean[1] = lean[2] = 0.0;
+	}
+	const double middleX = axisX(), middleY = axisY();
 	const int fallFrame = falling ? body.fallFrameAt(fall) : -1;
 	const size_t voxels = body.part.size();
 	DrawStep step;
@@ -674,15 +705,34 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 		VoxelSplat splat;
 		splat.x = (float)screenX;
 		splat.y = (float)screenY;
-		splat.half = (float)std::min(VoxelSplatHalfMax, halfSquare / depth);
+		splat.nearer = (float)(1.0 / depth);
+		double reachX = 0.0, reachY = 0.0;
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			reachX += std::abs(edges[axis][0] - (screenX - middleX) * lean[axis]);
+			reachY += std::abs(edges[axis][1] - (screenY - middleY) * lean[axis]);
+		}
+		splat.halfX = (float)std::min(VoxelSplatHalfMax, reachX * splat.nearer);
+		splat.halfY = (float)std::min(VoxelSplatHalfMax, reachY * splat.nearer);
 		splat.depth = (float)depth;
 		const Uint8 fallen = fallFrame >= 0 ? body.fallColours[fallFrame * voxels + k] : 0;
 		splat.colour = shadeColor(fallen ? fallen : body.colour(k, direction, level), shade);
-		step.voxelHalfMax = std::max(step.voxelHalfMax, splat.half);
+		step.voxelHalfMax = std::max(step.voxelHalfMax, splat.halfY);
 		_voxelSplats.push_back(splat);
 	}
 	step.voxelCount = _voxelSplats.size() - step.voxelFirst;
 	if (step.voxelCount == 0) return;
+	// The cubes' outlines (see drawVoxelUnit): the three half edges as seen straight ahead at a depth of one, and how
+	// much deeper each goes.
+	step.voxelOutline = cubes && !falling;
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		step.voxelEdges[axis][0] = (float)edges[axis][0];
+		step.voxelEdges[axis][1] = (float)edges[axis][1];
+		step.voxelLean[axis] = (float)lean[axis];
+	}
+	step.voxelMiddle[0] = (float)middleX;
+	step.voxelMiddle[1] = (float)middleY;
 	std::sort(_voxelSplats.begin() + step.voxelFirst, _voxelSplats.end(), [](const VoxelSplat &a, const VoxelSplat &b) { return a.y < b.y; });
 	_drawList.push_back(step);
 }
@@ -719,17 +769,47 @@ void FirstPersonView::drawVoxelUnit(const DrawStep &step, int bandTop, int bandB
 	auto splat = std::lower_bound(first, last, top - step.voxelHalfMax - 1.0f, [](const VoxelSplat &one, float row) { return one.y < row; });
 	for (; splat != last && splat->y < bottom + step.voxelHalfMax + 1.0f; ++splat)
 	{
-		// The pixels whose middles the square covers, and at least the one its middle is in.
+		// The pixels whose middles the cube covers (those of the box round it that lie in its outline, for a cube big
+		// enough on the screen to tell), and at least the one its middle is in.
 		const int middleX = (int)std::floor(splat->x), middleY = (int)std::floor(splat->y);
-		const int y0 = std::max(top, std::min(middleY, (int)std::ceil(splat->y - splat->half - 0.5f)));
-		const int y1 = std::min(bottom, std::max(middleY + 1, (int)std::floor(splat->y + splat->half - 0.5f) + 1));
+		const int y0 = std::max(top, std::min(middleY, (int)std::ceil(splat->y - splat->halfY - 0.5f)));
+		const int y1 = std::min(bottom, std::max(middleY + 1, (int)std::floor(splat->y + splat->halfY - 0.5f) + 1));
 		if (y0 >= y1) continue;
-		const int x0 = std::max(0, std::min(middleX, (int)std::ceil(splat->x - splat->half - 0.5f)));
-		const int x1 = std::min(width, std::max(middleX + 1, (int)std::floor(splat->x + splat->half - 0.5f) + 1));
+		const int x0 = std::max(0, std::min(middleX, (int)std::ceil(splat->x - splat->halfX - 0.5f)));
+		const int x1 = std::min(width, std::max(middleX + 1, (int)std::floor(splat->x + splat->halfX - 0.5f) + 1));
+		// A cube big enough to tell is cut to its outline: its three half edges on the screen (leaning by its place off
+		// the view's middle: seen a little from its side), six sides; a pixel is in it when, across each edge, it's no
+		// farther from the cube's middle than the other two edges reach (and half a pixel: none lost between two cubes).
+		const bool outlined = step.voxelOutline && (splat->halfX > VoxelOutlineFrom || splat->halfY > VoxelOutlineFrom);
+		float edge[3][2], reach[3] = {};
+		if (outlined)
+		{
+			for (int axis = 0; axis < 3; ++axis)
+			{
+				edge[axis][0] = (step.voxelEdges[axis][0] - (splat->x - step.voxelMiddle[0]) * step.voxelLean[axis]) * splat->nearer;
+				edge[axis][1] = (step.voxelEdges[axis][1] - (splat->y - step.voxelMiddle[1]) * step.voxelLean[axis]) * splat->nearer;
+			}
+			for (int axis = 0; axis < 3; ++axis)
+			{
+				for (int other = 0; other < 3; ++other)
+					if (other != axis) reach[axis] += std::abs(edge[axis][0] * edge[other][1] - edge[axis][1] * edge[other][0]);
+				reach[axis] += 0.5f * std::hypot(edge[axis][0], edge[axis][1]);
+			}
+		}
 		for (int y = y0; y < y1; ++y)
 		{
 			for (int x = x0; x < x1; ++x)
 			{
+				if (outlined && (x != middleX || y != middleY))
+				{
+					const float px = x + 0.5f - splat->x, py = y + 0.5f - splat->y;
+					bool inside = true;
+					for (int axis = 0; axis < 3 && inside; ++axis)
+					{
+						inside = std::abs(edge[axis][0] * py - edge[axis][1] * px) <= reach[axis];
+					}
+					if (!inside) continue;
+				}
 				const int index = y * width + x;
 				if (splat->depth >= _depthBuffer[index]) continue;
 				if (step.voxelOpacity < 1.0f && dither(x, y) >= step.voxelOpacity) continue;
@@ -2365,16 +2445,17 @@ void FirstPersonView::drawFloorItems()
 		}
 		// Setting "Voxel units": the corpse on top a unit's that was drawn as its voxel body (dead, or knocked out: one
 		// tile big) lies here as that body, on its back as it fell (see drawUnits), its hands empty (what it held is in
-		// the pile); not while faint (see-through corpses), nor under a floor it would poke through.
+		// the pile), faint when the pile is (see-through corpses); not under a floor it would poke through.
 		BattleUnit *owner = item->getUnit();
-		const VoxelUnitModel *lying = Options::fpsVoxelUnits && owner && owner->isOut() && !wholeCorpse && !step.sprite.seeThrough
+		const VoxelUnitModel *lying = Options::fpsVoxelUnits && owner && owner->isOut() && !wholeCorpse
 			&& step.sprite.standingSquash >= 1.0 && owner->getArmor()->getSize() == 1 ? _voxelUnits->lastBody(owner) : nullptr;
 		if (lying)
 		{
 			auto well = _facingsWell.find(owner);
 			const double fall = collapseFall(owner, SDL_GetTicks());
 			recordVoxelUnit(*lying, -1, well != _facingsWell.end() ? well->second : owner->getDirection(), 3, false, step.sprite.world, NoFloorCut,
-				step.sprite.shade, itemScale, nullptr, fall >= 0.0 ? fall : 1.0, false, step.sprite.body, step.sprite.pile);
+				step.sprite.shade, itemScale, nullptr, fall >= 0.0 ? fall : 1.0, false, step.sprite.body, step.sprite.pile,
+				step.sprite.seeThrough ? step.sprite.seeThrough->opacity : 1.0);
 			continue;
 		}
 		useSmoothVersion(step.sprite);

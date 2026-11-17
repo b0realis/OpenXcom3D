@@ -86,7 +86,7 @@ struct VoxelUnitModel
 	enum Part : Uint8 { Torso = 1, LeftArm, RightArm, Legs, Item };
 	/// Each surface voxel's place from the middle of the unit's feet: to its right, ahead and up, in voxels.
 	std::vector<float> right, ahead, up;
-	/// How many voxels one of those is: 1, or 0.5 for a body made twice as fine (setting "Fine voxel units"; the walk,
+	/// How many voxels one of those is: 1, or 0.5 for a body made twice as fine (see FineBodies; the walk,
 	/// the fall's edges and the hits are in the same measure).
 	float unit = 1.0f;
 	/// Which part each belongs to.
@@ -137,6 +137,14 @@ struct VoxelUnitModel
 	/// coming from direction (0-7) at the body's height (level) or from above.
 	bool hitAt(float across, float along, float height, int direction, bool level) const;
 };
+
+/// Whether the bodies are made fine: voxels half the size, from the frames enlarged with their edges kept (see
+/// makeFineModel). Not on a headset: four times the voxels to draw, for each eye.
+#ifdef __ANDROID__
+constexpr bool FineBodies = false;
+#else
+constexpr bool FineBodies = true;
+#endif
 
 /// The voxel bodies of the units seen so far in a battle, one for each unit and pose. A body is made
 /// on a thread of its own (a few to a hundred milliseconds; the thread started with the first), from
@@ -189,7 +197,6 @@ private:
 	std::deque<std::unique_ptr<Job>> _jobs;
 	std::vector<std::pair<Uint64, std::shared_ptr<VoxelUnitModel>>> _made;
 	unsigned _battle = 0;
-	bool _fine = false; // (the setting "Fine voxel units" the bodies were made with)
 	const SavedBattleGame *_battleSave = nullptr; // (the battle the bodies are for, see forBattle)
 	bool _stopping = false;
 	std::thread _builder;

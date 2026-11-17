@@ -215,7 +215,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 	// all the rest under Advanced): the two presets, the renderer, the render scale (the one number to turn for
 	// speed on a graphics card), two settings players commonly change (the shot's preview, full sprite hitboxes),
 	// and what goes by the hand and the habit, which no preset can know.
-	for (const char *id : { "fpsPreset", "fpsRenderer", "fpsGraphicsDetail", "fpsRenderScale", "fpsTrajectory", "fpsSpriteHitboxes", "fpsMouseSensitivity", "fpsStartInFirstPerson" })
+	for (const char *id : { "fpsPreset", "fpsRenderer", "fpsGraphicsDetail", "fpsRenderScale", "fpsTrajectory", "fpsSpriteHitboxes", "fpsVoxelUnits", "fpsMouseSensitivity", "fpsStartInFirstPerson" })
 	{
 		for (const OptionInfo &option : gathered)
 		{
@@ -235,7 +235,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 			"fpsMeleeFloors", "fpsAimExact", "fpsCloseEyeShots", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
 			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear" } },
 		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
-			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsVoxelUnits", "fpsVoxelFine", "fpsMuzzleFlash", "fpsHitFlash", "fpsSmoothFire", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
+			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsHitFlash", "fpsSmoothFire", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 			"fpsGhostParts", "fpsGhostOpacity", "fpsGhostOpenDoors", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge" } },
 		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsRangefinder", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
 			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },

@@ -162,10 +162,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..53fa9ecb5
+index 000000000..c046c2abd
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,646 @@
+@@ -0,0 +1,644 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -477,9 +477,7 @@ index 000000000..53fa9ecb5
 +  STR_FPS_UNIT_SIZE: "Unit size"
 +  STR_FPS_UNIT_SIZE_DESC: "Soldiers, aliens, corpses and items drawn smaller (80-100%). Hitboxes stay the same."
 +  STR_FPS_VOXEL_UNITS: "Voxel units"
-+  STR_FPS_VOXEL_UNITS_DESC: "Soldiers, aliens and civilians, big ones too, as 3D bodies made from their own sprites (experimental)."
-+  STR_FPS_VOXEL_FINE: "Fine voxel units"
-+  STR_FPS_VOXEL_FINE_DESC: "With Voxel units: bodies twice as fine, rounder and sharper up close. NO: coarser, quicker to make and draw."
++  STR_FPS_VOXEL_UNITS_DESC: "Units as 3D bodies of little cubes made from their sprites. Hit as a whole body only with Full sprite hitboxes."
 +  STR_FPS_UPSCALE_OFF: "Off"
 +  STR_FPS_UPSCALE_SMOOTH: "Smooth"
 +  STR_FPS_UPSCALE_DETAIL: "Smooth+"
@@ -716,7 +714,7 @@ index 000000000..53fa9ecb5
 +  STR_FPS_HITBOXES_ALWAYS: "Always"
 +  STR_FPS_HITBOXES_AIMED: "Aimed at"
 +  STR_FPS_SPRITE_HITBOXES: "Full sprite hitboxes"
-+  STR_FPS_SPRITE_HITBOXES_DESC: "Units are hit, and seen, wherever their full sprite shows, for everyone, in 3D and on the map. NO: the game's own hit shapes."
++  STR_FPS_SPRITE_HITBOXES_DESC: "YES: a unit is hit wherever its whole body shows (its sprite, or its 3D voxel body), for everyone. NO: the original game's hit shapes."
 +  STR_FPS_QUICK_DEATHS: "Quick deaths"
 +  STR_FPS_AUTO_EQUIP_GUNS_FIRST: "Auto-equip guns first"
 +  STR_FPS_AUTO_EQUIP_GUNS_FIRST_DESC: "Soldiers with no saved loadout take guns before melee weapons, the hardest-hitting first, launchers last. NO: OpenXcom's own."
@@ -814,10 +812,10 @@ index 000000000..53fa9ecb5
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..b03405765
+index 000000000..1f35bd1d9
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,646 @@
+@@ -0,0 +1,644 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1129,9 +1127,7 @@ index 000000000..b03405765
 +  STR_FPS_UNIT_SIZE: "Unit size"
 +  STR_FPS_UNIT_SIZE_DESC: "Soldiers, aliens, corpses and items drawn smaller (80-100%). Hitboxes stay the same."
 +  STR_FPS_VOXEL_UNITS: "Voxel units"
-+  STR_FPS_VOXEL_UNITS_DESC: "Soldiers, aliens and civilians, big ones too, as 3D bodies made from their own sprites (experimental)."
-+  STR_FPS_VOXEL_FINE: "Fine voxel units"
-+  STR_FPS_VOXEL_FINE_DESC: "With Voxel units: bodies twice as fine, rounder and sharper up close. NO: coarser, quicker to make and draw."
++  STR_FPS_VOXEL_UNITS_DESC: "Units as 3D bodies of little cubes made from their sprites. Hit as a whole body only with Full sprite hitboxes."
 +  STR_FPS_UPSCALE_OFF: "Off"
 +  STR_FPS_UPSCALE_SMOOTH: "Smooth"
 +  STR_FPS_UPSCALE_DETAIL: "Smooth+"
@@ -1368,7 +1364,7 @@ index 000000000..b03405765
 +  STR_FPS_HITBOXES_ALWAYS: "Always"
 +  STR_FPS_HITBOXES_AIMED: "Aimed at"
 +  STR_FPS_SPRITE_HITBOXES: "Full sprite hitboxes"
-+  STR_FPS_SPRITE_HITBOXES_DESC: "Units are hit, and seen, wherever their full sprite shows, for everyone, in 3D and on the map. NO: the game's own hit shapes."
++  STR_FPS_SPRITE_HITBOXES_DESC: "YES: a unit is hit wherever its whole body shows (its sprite, or its 3D voxel body), for everyone. NO: the original game's hit shapes."
 +  STR_FPS_QUICK_DEATHS: "Quick deaths"
 +  STR_FPS_AUTO_EQUIP_GUNS_FIRST: "Auto-equip guns first"
 +  STR_FPS_AUTO_EQUIP_GUNS_FIRST_DESC: "Soldiers with no saved loadout take guns before melee weapons, the hardest-hitting first, launchers last. NO: OpenXcom's own."
@@ -22815,7 +22811,7 @@ index d6d327c0a..6accd397e 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index 0467dd243..59185e84a 100644
+index 0467dd243..20e95d625 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -125,6 +125,7 @@ OPT int oxceCrashedOrLanded;
@@ -22832,7 +22828,7 @@ index 0467dd243..59185e84a 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsGhostOpenDoors, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVoxelFine, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes;
++OPT bool fpsGhostOpenDoors, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes;
 +OPT int fpsPreset, fpsGraphicsDetail, fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts, fpsVrFoveation, fpsVrMode, fpsVrEyeSize, fpsVrTurning, fpsQuestDefaults;
 +OPT std::string fpsCustomPreset, fpsCustomGraphics;
 +OPT SDL_Keycode keyBattleFirstPerson, keyBattleFirstPerson2, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
@@ -23862,10 +23858,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..a55953b2d
+index 000000000..922deb991
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1848 @@
+@@ -0,0 +1,1841 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24967,13 +24963,6 @@ index 000000000..a55953b2d
 +	// Units (one tile big or two by two) as 3D bodies made from their own sprites (see VoxelUnits; the owner's sub-project).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsVoxelUnits", &fpsVoxelUnits, false, "STR_FPS_VOXEL_UNITS", category));
 +	// The bodies twice as fine: a quarter of a voxel a cell, from the sprites enlarged twice (the owner: "Lets go with 2x").
-+	// (on by default, but not on a headset: four times the voxels to draw, for each eye)
-+#ifdef __ANDROID__
-+	const bool fineBodies = false;
-+#else
-+	const bool fineBodies = true;
-+#endif
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsVoxelFine", &fpsVoxelFine, fineBodies, "STR_FPS_VOXEL_FINE", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsMuzzleFlash", &fpsMuzzleFlash, true, "STR_FPS_MUZZLE_FLASH", category));
 +	// A unit hit, standing or down, flashes for a moment (the owner, on GitHub issue #74: its own
 +	// setting); off, it only flinches. "Muzzle flashes" off turns it off too (every flash: the
@@ -60262,10 +60251,10 @@ index 000000000..5eaac16dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..ca762407e
+index 000000000..7c62068df
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1828 @@
+@@ -0,0 +1,1831 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -61545,6 +61534,8 @@ index 000000000..ca762407e
 +		SpriteDraw sprite;                                                // Sprite (see drawSprite); a VoxelUnit's unit
 +		size_t voxelFirst = 0, voxelCount = 0;                            // VoxelUnit (see drawVoxelUnit): its splats in _voxelSplats,
 +		float voxelHalfMax = 0.0f, voxelOpacity = 1.0f;                   // the biggest one's half size, and its opacity (dithered up close)
++		float voxelEdges[3][2] = {}, voxelLean[3] = {}, voxelMiddle[2] = {}; // its cubes' three half edges seen straight ahead at a depth of one (pixels), how much deeper each goes, the view's middle
++		bool voxelOutline = false;                                        // ... whether the cubes are cut to their outlines (else the boxes round them)
 +		double centre[3]; double radius; int steps; float density;        // GroundShade (see drawGroundShade)
 +		double away[2]; double length;                                    // ... stretched away from a light that long (0: a disc)
 +		float from[3], to[3]; Uint8 color; int thickness; float opacity; bool glows; // Line (see drawLine3D)
@@ -61555,13 +61546,14 @@ index 000000000..ca762407e
 +	Surface *keepComposedFrame(int &framesUsed);
 +	/// Draws the recorded steps on all the view's threads, band by band, and empties the list.
 +	void replayDrawList();
-+	/// A voxel of a unit's voxel body on the screen: a square (its middle and half its size, pixels), its depth and colour.
-+	struct VoxelSplat { float x, y, half, depth; Uint8 colour; };
++	/// A voxel of a unit's voxel body on the screen: a cube (its middle, half the box round it, pixels; one over its depth),
++	/// its depth and colour.
++	struct VoxelSplat { float x, y, halfX, halfY, nearer, depth; Uint8 colour; };
 +	/// Records a unit drawn as its voxel body (setting "Voxel units"): its voxels projected, shaded and sorted by row;
 +	/// going down, tipped over backwards (fall 0 to 1: lying on its back), with or without the items in hand; a body lying
 +	/// in a pile pointed at as that pile (and the unconscious unit in it).
 +	void recordVoxelUnit(const VoxelUnitModel &body, int walkPhase, int facing, int direction, bool level, const double feet[3], double floorCut,
-+		int shade, double scale, BattleUnit *unit, double fall = 0.0, bool items = true, BattleUnit *lyingBody = nullptr, const Tile *pile = nullptr);
++		int shade, double scale, BattleUnit *unit, double fall = 0.0, bool items = true, BattleUnit *lyingBody = nullptr, const Tile *pile = nullptr, double faint = 1.0);
 +	std::map<const BattleUnit*, Uint32> _collapseStarts; // when each unit collapsing (the game's own fall) was first seen so
 +	std::map<const BattleUnit*, int> _facingsWell;       // the way each unit faced, last seen well (a voxel body going down keeps it)
 +	/// How far a voxel body going down by the game's own fall has come (see drawUnits): 0 to 1, or -1 if it isn't.
@@ -68933,10 +68925,10 @@ index 000000000..5ee90296f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..09d54d330
+index 000000000..cdb56561e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,622 @@
+@@ -0,0 +1,625 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -69103,7 +69095,10 @@ index 000000000..09d54d330
 +const double VoxelSlantAbove = 15.0;
 +/// A voxel unit's voxel (half a voxel big) is drawn as a square this many voxels wide, so that no gaps show between them,
 +/// and at most this many pixels from its middle (right up against the camera).
-+const double VoxelSplatSize = 0.6, VoxelSplatHalfMax = 32.0;
++/// A voxel body's voxel: a cube this big (the body's own measure: a cell of its grid), drawn at most VoxelSplatHalfMax
++/// pixels each way from its middle, cut to its six-sided outline once it's over VoxelOutlineFrom pixels each way.
++const double VoxelCubeEdge = 0.5, VoxelSplatHalfMax = 48.0;
++const float VoxelOutlineFrom = 1.5f;
 +/// At most this many voxel units' bodies are made a frame (each takes a few milliseconds; see VoxelUnits).
 +const int VoxelBuildsPerFrame = 1;
 +/// What the game draws over a voxel unit's sprite (flames, bubbles) is drawn this many voxels nearer than the unit, over
@@ -71906,10 +71901,10 @@ index 000000000..229bd966c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..4582a0b7b
+index 000000000..464e210b3
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,3918 @@
+@@ -0,0 +1,3999 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -72540,13 +72535,14 @@ index 000000000..4582a0b7b
 + * @param items With the items in its hands (a body lying in a pile has dropped them: they're in the pile).
 + * @param lyingBody The unconscious unit lying in the pile it pictures, if any (the pointer finds it: a medi-kit's patient).
 + * @param pile The floor tile whose pile it pictures, if any (the pointer finds it).
++ * @param faint How much of it shows (1 all; a pile made faint to see past it, setting "See-through corpses": dithered).
 + */
 +void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase, int facing, int direction, bool level, const double feet[3], double floorCut,
-+	int shade, double scale, BattleUnit *unit, double fall, bool items, BattleUnit *lyingBody, const Tile *pile)
++	int shade, double scale, BattleUnit *unit, double fall, bool items, BattleUnit *lyingBody, const Tile *pile, double faint)
 +{
 +	double anchorX, anchorY, anchorDepth;
 +	if (!projectToScreen(feet, anchorX, anchorY, anchorDepth)) return;
-+	const float opacity = (float)std::clamp((anchorDepth - 4.0) / 6.0, 0.0, 1.0);
++	const float opacity = (float)(std::clamp((anchorDepth - 4.0) / 6.0, 0.0, 1.0) * faint);
 +	if (opacity <= 0.0f) return;
 +	const bool walking = walkPhase >= 0 && walkPhase < 8;
 +	const std::vector<float> &right = walking ? body.walkRight[walkPhase] : body.right;
@@ -72558,9 +72554,39 @@ index 000000000..4582a0b7b
 +	const double bodyUnit = body.unit; // (voxels to one of the body's own measures: half for a fine body)
 +	const bool falling = fall > 0.0;
 +	const VoxelUnitModel::FallPose pose = body.poseAt(fall);
-+	// half a square at a depth of one (a body going down spreads out: its squares grow with it, or the floor showed
-+	// through the slits between them)
-+	const double halfSquare = 0.5 * VoxelSplatSize * scale * bodyUnit * focalLength * std::max(1.0f, pose.spread);
++	// Each voxel is a little cube, the cell of the body's grid it fills: side by side they leave no gap from any side.
++	// On the screen a cube is the six-sided outline of its three half edges (to the body's right, ahead and up) thrown
++	// from its middle; those are taken once here, at the feet's depth, and shrink with each voxel's own depth. (A body
++	// walking or going down has its voxels moved off the grid, a little apart where a limb swings or the body spreads:
++	// their cubes are a little bigger, and one going down is drawn by the boxes round its cubes.)
++	const double halfEdge = 0.5 * VoxelCubeEdge * scale * bodyUnit * (falling ? 1.25 * std::max(1.0f, pose.spread) : walking ? 1.15 : 1.0);
++	const double probe = 8.0; // (voxels each way from the feet: far enough to measure, near enough to stay in front of the eye)
++	const double axes[3][3] = { { cosine, sine, 0.0 }, { sine, -cosine, 0.0 }, { 0.0, 0.0, 1.0 } };
++	double edges[3][2], lean[3] = {}; // (lean: how much deeper each half edge goes; a cube off the view's middle shows it)
++	bool cubes = true;
++	for (int axis = 0; axis < 3 && cubes; ++axis)
++	{
++		const double far[3] = { feet[0] + axes[axis][0] * probe, feet[1] + axes[axis][1] * probe, feet[2] + axes[axis][2] * probe };
++		const double near[3] = { feet[0] - axes[axis][0] * probe, feet[1] - axes[axis][1] * probe, feet[2] - axes[axis][2] * probe };
++		double farX, farY, farDepth, nearX, nearY, nearDepth;
++		cubes = projectToScreen(far, farX, farY, farDepth) && projectToScreen(near, nearX, nearY, nearDepth) && farDepth > 1.0 && nearDepth > 1.0;
++		if (!cubes) break;
++		// (each end's offset from the feet as it would be at the feet's depth: the perspective's part taken out)
++		const double toFarX = (farX - anchorX) * farDepth / anchorDepth, toFarY = (farY - anchorY) * farDepth / anchorDepth;
++		const double toNearX = (nearX - anchorX) * nearDepth / anchorDepth, toNearY = (nearY - anchorY) * nearDepth / anchorDepth;
++		lean[axis] = (farDepth - nearDepth) / (2.0 * probe) * halfEdge;
++		// (as seen straight ahead, at a depth of one: the feet's place off the view's middle taken out)
++		edges[axis][0] = (toFarX - toNearX) / (2.0 * probe) * halfEdge * anchorDepth + (anchorX - axisX()) * lean[axis];
++		edges[axis][1] = (toFarY - toNearY) / (2.0 * probe) * halfEdge * anchorDepth + (anchorY - axisY()) * lean[axis];
++	}
++	if (!cubes)
++	{
++		// (too near to measure: squares facing the view, as wide as a cube seen corner on)
++		const double square = halfEdge * 1.5 * focalLength;
++		edges[0][0] = square; edges[0][1] = 0.0; edges[1][0] = 0.0; edges[1][1] = square; edges[2][0] = edges[2][1] = 0.0;
++		lean[0] = lean[1] = lean[2] = 0.0;
++	}
++	const double middleX = axisX(), middleY = axisY();
 +	const int fallFrame = falling ? body.fallFrameAt(fall) : -1;
 +	const size_t voxels = body.part.size();
 +	DrawStep step;
@@ -72586,15 +72612,34 @@ index 000000000..4582a0b7b
 +		VoxelSplat splat;
 +		splat.x = (float)screenX;
 +		splat.y = (float)screenY;
-+		splat.half = (float)std::min(VoxelSplatHalfMax, halfSquare / depth);
++		splat.nearer = (float)(1.0 / depth);
++		double reachX = 0.0, reachY = 0.0;
++		for (int axis = 0; axis < 3; ++axis)
++		{
++			reachX += std::abs(edges[axis][0] - (screenX - middleX) * lean[axis]);
++			reachY += std::abs(edges[axis][1] - (screenY - middleY) * lean[axis]);
++		}
++		splat.halfX = (float)std::min(VoxelSplatHalfMax, reachX * splat.nearer);
++		splat.halfY = (float)std::min(VoxelSplatHalfMax, reachY * splat.nearer);
 +		splat.depth = (float)depth;
 +		const Uint8 fallen = fallFrame >= 0 ? body.fallColours[fallFrame * voxels + k] : 0;
 +		splat.colour = shadeColor(fallen ? fallen : body.colour(k, direction, level), shade);
-+		step.voxelHalfMax = std::max(step.voxelHalfMax, splat.half);
++		step.voxelHalfMax = std::max(step.voxelHalfMax, splat.halfY);
 +		_voxelSplats.push_back(splat);
 +	}
 +	step.voxelCount = _voxelSplats.size() - step.voxelFirst;
 +	if (step.voxelCount == 0) return;
++	// The cubes' outlines (see drawVoxelUnit): the three half edges as seen straight ahead at a depth of one, and how
++	// much deeper each goes.
++	step.voxelOutline = cubes && !falling;
++	for (int axis = 0; axis < 3; ++axis)
++	{
++		step.voxelEdges[axis][0] = (float)edges[axis][0];
++		step.voxelEdges[axis][1] = (float)edges[axis][1];
++		step.voxelLean[axis] = (float)lean[axis];
++	}
++	step.voxelMiddle[0] = (float)middleX;
++	step.voxelMiddle[1] = (float)middleY;
 +	std::sort(_voxelSplats.begin() + step.voxelFirst, _voxelSplats.end(), [](const VoxelSplat &a, const VoxelSplat &b) { return a.y < b.y; });
 +	_drawList.push_back(step);
 +}
@@ -72631,17 +72676,47 @@ index 000000000..4582a0b7b
 +	auto splat = std::lower_bound(first, last, top - step.voxelHalfMax - 1.0f, [](const VoxelSplat &one, float row) { return one.y < row; });
 +	for (; splat != last && splat->y < bottom + step.voxelHalfMax + 1.0f; ++splat)
 +	{
-+		// The pixels whose middles the square covers, and at least the one its middle is in.
++		// The pixels whose middles the cube covers (those of the box round it that lie in its outline, for a cube big
++		// enough on the screen to tell), and at least the one its middle is in.
 +		const int middleX = (int)std::floor(splat->x), middleY = (int)std::floor(splat->y);
-+		const int y0 = std::max(top, std::min(middleY, (int)std::ceil(splat->y - splat->half - 0.5f)));
-+		const int y1 = std::min(bottom, std::max(middleY + 1, (int)std::floor(splat->y + splat->half - 0.5f) + 1));
++		const int y0 = std::max(top, std::min(middleY, (int)std::ceil(splat->y - splat->halfY - 0.5f)));
++		const int y1 = std::min(bottom, std::max(middleY + 1, (int)std::floor(splat->y + splat->halfY - 0.5f) + 1));
 +		if (y0 >= y1) continue;
-+		const int x0 = std::max(0, std::min(middleX, (int)std::ceil(splat->x - splat->half - 0.5f)));
-+		const int x1 = std::min(width, std::max(middleX + 1, (int)std::floor(splat->x + splat->half - 0.5f) + 1));
++		const int x0 = std::max(0, std::min(middleX, (int)std::ceil(splat->x - splat->halfX - 0.5f)));
++		const int x1 = std::min(width, std::max(middleX + 1, (int)std::floor(splat->x + splat->halfX - 0.5f) + 1));
++		// A cube big enough to tell is cut to its outline: its three half edges on the screen (leaning by its place off
++		// the view's middle: seen a little from its side), six sides; a pixel is in it when, across each edge, it's no
++		// farther from the cube's middle than the other two edges reach (and half a pixel: none lost between two cubes).
++		const bool outlined = step.voxelOutline && (splat->halfX > VoxelOutlineFrom || splat->halfY > VoxelOutlineFrom);
++		float edge[3][2], reach[3] = {};
++		if (outlined)
++		{
++			for (int axis = 0; axis < 3; ++axis)
++			{
++				edge[axis][0] = (step.voxelEdges[axis][0] - (splat->x - step.voxelMiddle[0]) * step.voxelLean[axis]) * splat->nearer;
++				edge[axis][1] = (step.voxelEdges[axis][1] - (splat->y - step.voxelMiddle[1]) * step.voxelLean[axis]) * splat->nearer;
++			}
++			for (int axis = 0; axis < 3; ++axis)
++			{
++				for (int other = 0; other < 3; ++other)
++					if (other != axis) reach[axis] += std::abs(edge[axis][0] * edge[other][1] - edge[axis][1] * edge[other][0]);
++				reach[axis] += 0.5f * std::hypot(edge[axis][0], edge[axis][1]);
++			}
++		}
 +		for (int y = y0; y < y1; ++y)
 +		{
 +			for (int x = x0; x < x1; ++x)
 +			{
++				if (outlined && (x != middleX || y != middleY))
++				{
++					const float px = x + 0.5f - splat->x, py = y + 0.5f - splat->y;
++					bool inside = true;
++					for (int axis = 0; axis < 3 && inside; ++axis)
++					{
++						inside = std::abs(edge[axis][0] * py - edge[axis][1] * px) <= reach[axis];
++					}
++					if (!inside) continue;
++				}
 +				const int index = y * width + x;
 +				if (splat->depth >= _depthBuffer[index]) continue;
 +				if (step.voxelOpacity < 1.0f && dither(x, y) >= step.voxelOpacity) continue;
@@ -74277,16 +74352,17 @@ index 000000000..4582a0b7b
 +		}
 +		// Setting "Voxel units": the corpse on top a unit's that was drawn as its voxel body (dead, or knocked out: one
 +		// tile big) lies here as that body, on its back as it fell (see drawUnits), its hands empty (what it held is in
-+		// the pile); not while faint (see-through corpses), nor under a floor it would poke through.
++		// the pile), faint when the pile is (see-through corpses); not under a floor it would poke through.
 +		BattleUnit *owner = item->getUnit();
-+		const VoxelUnitModel *lying = Options::fpsVoxelUnits && owner && owner->isOut() && !wholeCorpse && !step.sprite.seeThrough
++		const VoxelUnitModel *lying = Options::fpsVoxelUnits && owner && owner->isOut() && !wholeCorpse
 +			&& step.sprite.standingSquash >= 1.0 && owner->getArmor()->getSize() == 1 ? _voxelUnits->lastBody(owner) : nullptr;
 +		if (lying)
 +		{
 +			auto well = _facingsWell.find(owner);
 +			const double fall = collapseFall(owner, SDL_GetTicks());
 +			recordVoxelUnit(*lying, -1, well != _facingsWell.end() ? well->second : owner->getDirection(), 3, false, step.sprite.world, NoFloorCut,
-+				step.sprite.shade, itemScale, nullptr, fall >= 0.0 ? fall : 1.0, false, step.sprite.body, step.sprite.pile);
++				step.sprite.shade, itemScale, nullptr, fall >= 0.0 ? fall : 1.0, false, step.sprite.body, step.sprite.pile,
++				step.sprite.seeThrough ? step.sprite.seeThrough->opacity : 1.0);
 +			continue;
 +		}
 +		useSmoothVersion(step.sprite);
@@ -83402,10 +83478,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..6cd9bbc33
+index 000000000..98f6ca2c1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,2178 @@
+@@ -0,0 +1,2249 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -83462,6 +83538,7 @@ index 000000000..6cd9bbc33
 + * frames), so each frame is the same body seen from 45 degrees further round.
 + */
 +#include "FirstPersonVoxelBodies.h"
++#include <unordered_set>
 +#include <algorithm>
 +#include <cmath>
 +#include <cstdio>
@@ -83614,12 +83691,6 @@ index 000000000..6cd9bbc33
 +/// How deep behind a part's nearest voxel, along a direction's view, a voxel still takes that direction's picture (see the
 +/// painting in makeModel), voxels.
 +const float FaceDepth = 2.0f * VOXELSCALE;
-+
-+/// A filled cell is on the surface with an empty cell this many steps away or nearer (1: beside it, 2: also across an
-+/// edge). With 1, a surface lying diagonally to the grid is a single row of cells 1.4 cells apart, wider than the squares
-+/// they're drawn as (VoxelSplatSize): seen square on (from a diagonal direction, up close) one looked through the slits
-+/// between them at the body's far side, as thin vertical stripes. With 2 the cells behind the slits are there too.
-+const int SurfaceSteps = 2;
 +
 +/// A limb's slice among several in its row is at most this many times as deep as it is wide (see limb).
 +const float SliceDepthMost = 1.5f;
@@ -83887,9 +83958,9 @@ index 000000000..6cd9bbc33
 +		int width = 0;
 +		for (const auto &run : runs(torso, Front, row)) width += run.second - run.first + 1;
 +		if (row < shoulders) headWidest = std::max(headWidest, width);
-+		else if (row >= shoulders + 2) torsoWidest = std::max(torsoWidest, width);
++		else if (row >= shoulders + 2 * VOXELSCALE) torsoWidest = std::max(torsoWidest, width);
 +	}
-+	return headWidest >= HeadWidthMin && torsoWidest > 0 && torsoWidest <= NarrowTorso * headWidest ? shoulders + 2 : -1;
++	return headWidest >= HeadWidthMin && torsoWidest > 0 && torsoWidest <= NarrowTorso * headWidest ? shoulders + 2 * VOXELSCALE : -1;
 +}
 +
 +inline int luminance(const SDL_Color &colour)
@@ -84106,7 +84177,7 @@ index 000000000..6cd9bbc33
 +		float footNow = 1e9f;
 +		for (size_t k = 0; k < count; ++k)
 +		{
-+			if (model.part[k] != VoxelUnitModel::Legs) up[k] -= pose.bob;
++			if (model.part[k] != VoxelUnitModel::Legs) up[k] -= pose.bob * VOXELSCALE; // (the bob is in the frames' own pixels)
 +			else if (k < own) footNow = std::min(footNow, up[k]);
 +		}
 +		if (footNow < 1e8f) for (float &height : up) height += footStanding - footNow;
@@ -84551,29 +84622,73 @@ index 000000000..6cd9bbc33
 +	const float *along = place.along, *across = place.across, *through = place.through, *middle = place.middle;
 +	const float scale = place.length / std::max(1, bottom - top), thin = std::min(1.0f, scale / RifleScale);
 +	const float halfLength = (bottom - top) * scale * 0.5f, middleAcross = (left + right) * 0.5f;
++	// (The thickness is in the body's own measure whatever its fineness: on a fine body an item is half as thick in the
++	// world as on a coarse one, slim as the owner chose it from pictures.)
 +	auto halfThickness = [&](int x, int y) { return x >= 0 && y >= 0 && x < width && y < height && depth[y * width + x] ? std::min(1.4f, 0.45f + 0.35f * depth[y * width + x]) * thin : 0.0f; };
-+	for (int y = top; y <= bottom; ++y)
++	// The item fills the cells of the body's own grid (carried on past the grid's edges: a rifle reaches out of it):
++	// little cubes side by side as the body's are, no gaps between them from any side. A cell is the item's when its
++	// middle, in the item's own measures (along it, across it, through it), lies on a drawn pixel within the item's
++	// thickness there, or within most of a cell of the picture's plane: a thin item is a cell thick at the least.
++	const float (*frame[3]) = { along, across, through };
++	float inverse[3][3]; // (rows: what a place off the item's middle is along, across and through it)
 +	{
-+		for (int x = left; x <= right; ++x)
++		const float *u = frame[0], *v = frame[1], *w = frame[2];
++		const float det = u[0] * (v[1] * w[2] - v[2] * w[1]) - u[1] * (v[0] * w[2] - v[2] * w[0]) + u[2] * (v[0] * w[1] - v[1] * w[0]);
++		if (std::abs(det) < 1e-6f) return;
++		const float cross[3][3] = { { v[1] * w[2] - v[2] * w[1], v[2] * w[0] - v[0] * w[2], v[0] * w[1] - v[1] * w[0] },
++			{ w[1] * u[2] - w[2] * u[1], w[2] * u[0] - w[0] * u[2], w[0] * u[1] - w[1] * u[0] },
++			{ u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0] } };
++		for (int r = 0; r < 3; ++r) for (int c = 0; c < 3; ++c) inverse[r][c] = cross[r][c] / det;
++	}
++	// The box of cells round the item (its picture's corners, its greatest thickness).
++	const float halfAcross = (right - left + 1) * 0.5f * scale * ItemSlim, thickest = 1.4f * thin * ItemSlim + Cell;
++	float low[3] = { 1e9f, 1e9f, 1e9f }, high[3] = { -1e9f, -1e9f, -1e9f };
++	for (int corner = 0; corner < 8; ++corner)
++	{
++		const float a = (corner & 1 ? 1.0f : -1.0f) * (halfLength + scale), c = (corner & 2 ? 1.0f : -1.0f) * (halfAcross + scale), t = (corner & 4 ? 1.0f : -1.0f) * thickest;
++		for (int axis = 0; axis < 3; ++axis)
 +		{
-+			const Uint8 colour = held.picture[y * width + x];
-+			if (!colour) continue;
-+			const float half = halfThickness(x, y);
-+			const float sideways = std::min({ halfThickness(x - 1, y), halfThickness(x + 1, y), halfThickness(x, y - 1), halfThickness(x, y + 1) });
-+			const float a = (bottom - y) * scale - halfLength, c = (x - middleAcross) * scale * ItemSlim;
-+			for (float t = -half; t <= half + 1e-4f; t += Cell * thin)
++			const float at = middle[axis] + a * along[axis] + c * across[axis] + t * through[axis];
++			low[axis] = std::min(low[axis], at); high[axis] = std::max(high[axis], at);
++		}
++	}
++	const float from[3] = { AcrossFrom, AlongFrom, UpFrom };
++	int first[3], size[3];
++	for (int axis = 0; axis < 3; ++axis)
++	{
++		first[axis] = (int)std::floor((low[axis] - from[axis]) / Cell) - 1;
++		size[axis] = (int)std::floor((high[axis] - from[axis]) / Cell) + 2 - first[axis];
++		if (size[axis] <= 0 || size[axis] > 4096) return;
++	}
++	if ((double)size[0] * size[1] * size[2] > 8e6) return;
++	std::vector<Uint8> filled((size_t)size[0] * size[1] * size[2], 0);
++	auto cellAt = [&](int i, int j, int k) -> Uint8 { return i >= 0 && j >= 0 && k >= 0 && i < size[0] && j < size[1] && k < size[2] ? filled[((size_t)i * size[1] + j) * size[2] + k] : 0; };
++	for (int i = 0; i < size[0]; ++i)
++		for (int j = 0; j < size[1]; ++j)
++			for (int k = 0; k < size[2]; ++k)
 +			{
-+				// (a column's two ends, and its points that stand out beside a thinner neighbour or the outline)
-+				if (t > -half + 1e-4f && t + Cell * thin <= half + 1e-4f && std::abs(t) <= sideways) continue;
-+				const float thick = t * ItemSlim;
-+				model.right.push_back(middle[0] + a * along[0] + c * across[0] + thick * through[0]);
-+				model.ahead.push_back(middle[1] + a * along[1] + c * across[1] + thick * through[1]);
-+				model.up.push_back(middle[2] + a * along[2] + c * across[2] + thick * through[2]);
++				const float off[3] = { from[0] + (first[0] + i + 0.5f) * Cell - middle[0], from[1] + (first[1] + j + 0.5f) * Cell - middle[1], from[2] + (first[2] + k + 0.5f) * Cell - middle[2] };
++				const float a = inverse[0][0] * off[0] + inverse[0][1] * off[1] + inverse[0][2] * off[2];
++				const float c = inverse[1][0] * off[0] + inverse[1][1] * off[1] + inverse[1][2] * off[2];
++				const float t = inverse[2][0] * off[0] + inverse[2][1] * off[1] + inverse[2][2] * off[2];
++				const int y = bottom - (int)std::lround((a + halfLength) / scale), x = (int)std::lround(c / (scale * ItemSlim) + middleAcross);
++				if (x < 0 || y < 0 || x >= width || y >= height) continue;
++				const Uint8 colour = held.picture[y * width + x];
++				if (colour && std::abs(t) <= std::max(halfThickness(x, y) * ItemSlim, Cell * 0.6f)) filled[((size_t)i * size[1] + j) * size[2] + k] = colour;
++			}
++	// (its surface: the cells with an empty one beside them)
++	for (int i = 0; i < size[0]; ++i)
++		for (int j = 0; j < size[1]; ++j)
++			for (int k = 0; k < size[2]; ++k)
++			{
++				const Uint8 colour = cellAt(i, j, k);
++				if (!colour || (cellAt(i - 1, j, k) && cellAt(i + 1, j, k) && cellAt(i, j - 1, k) && cellAt(i, j + 1, k) && cellAt(i, j, k - 1) && cellAt(i, j, k + 1))) continue;
++				model.right.push_back(from[0] + (first[0] + i + 0.5f) * Cell);
++				model.ahead.push_back(from[1] + (first[1] + j + 0.5f) * Cell);
++				model.up.push_back(from[2] + (first[2] + k + 0.5f) * Cell);
 +				model.part.push_back(VoxelUnitModel::Item);
 +				model.colours.insert(model.colours.end(), 16, colour);
 +			}
-+		}
-+	}
 +}
 +
 +/// The fall a body takes, as its death frames show it, ending as its corpse's picture lies: for each picture the pose
@@ -84662,6 +84777,9 @@ index 000000000..6cd9bbc33
 +		std::fill(front.begin(), front.end(), -1e9f);
 +		for (size_t k = 0; k < count; ++k)
 +		{
++			// (the body's own voxels: the items keep their colours, and the views' pieces aren't drawn in a fall)
++			pixelOf[k] = -1;
++			if (k >= model.addedFrom || model.part[k] == VoxelUnitModel::Item) continue;
 +			float right = model.right[k], ahead = model.ahead[k], up = model.up[k], column, row;
 +			model.posed(model.fall[frame], right, ahead, up);
 +			project(right, ahead, up, Front, false, column, row, nearnessOf[k]);
@@ -84671,7 +84789,7 @@ index 000000000..6cd9bbc33
 +		}
 +		for (size_t k = 0; k < count; ++k)
 +		{
-+			if (pixelOf[k] >= 0 && nearnessOf[k] >= front[pixelOf[k]] - 1.0f) model.fallColours[frame * count + k] = (*pictures[frame])[pixelOf[k]];
++			if (pixelOf[k] >= 0 && nearnessOf[k] >= front[pixelOf[k]] - 1.0f * VOXELSCALE) model.fallColours[frame * count + k] = (*pictures[frame])[pixelOf[k]];
 +		}
 +	}
 +}
@@ -84819,6 +84937,7 @@ index 000000000..6cd9bbc33
 +		}
 +		return viewsAt(onTop, right, ahead, up);
 +	};
++	std::unordered_set<long long> pieceCells; // (the cells the views' pieces fill, with the view: see the end)
 +	const size_t own = model.part.size();
 +	model.views.resize(own);
 +	for (size_t k = 0; k < own; ++k) model.views[k] = viewsAt(solidOnTop, model.right[k], model.ahead[k], model.up[k]);
@@ -84901,7 +85020,7 @@ index 000000000..6cd9bbc33
 +				depth[pixel] = NoPlace;
 +				if (!bare[pixel]) continue;
 +				float best = -1e30f;
-+				for (float nearness = -26.0f; nearness <= 26.0f; nearness += 0.5f)
++				for (float nearness = -26.0f * VOXELSCALE; nearness <= 26.0f * VOXELSCALE; nearness += 0.5f)
 +				{
 +					float right, ahead, up;
 +					unproject(pixel % FrameSize + 0.5f, pixel / FrameSize + 0.5f, nearness, d, level, right, ahead, up);
@@ -84971,6 +85090,11 @@ index 000000000..6cd9bbc33
 +						float right, ahead, up;
 +						unproject(pixel % FrameSize + 0.25f + 0.5f * (quarter % 2), pixel / FrameSize + 0.25f + 0.5f * (quarter / 2), evened[i], d, level,
 +							right, ahead, up);
++						// (in the cell of the body's grid it falls in, a cube among the body's cubes; once for a view)
++						const int cellAcross = (int)std::floor((right - AcrossFrom) / Cell), cellAlong = (int)std::floor((ahead - AlongFrom) / Cell),
++							cellHigh = (int)std::floor((up - UpFrom) / Cell);
++						if (!pieceCells.insert((((long long)(cellAcross + 4096) << 26 | (long long)(cellAlong + 4096) << 13 | (long long)(cellHigh + 4096)) << 5) | slot).second) continue;
++						right = cellRight(cellAcross); ahead = cellAhead(cellAlong); up = cellUp(cellHigh);
 +						Uint8 colours[16];
 +						std::fill(colours, colours + 16, parts[part].frame[d][pixel]);
 +						const Uint16 views = (fits(right, ahead, up, colours) | (Uint16)(1u << slot)) & ownDirection;
@@ -85168,7 +85292,7 @@ index 000000000..6cd9bbc33
 +		}
 +		if (length <= 0.0f && found && !parts[3].any)
 +		{
-+			length = std::max(4.0f, shoulders / found * ArmNoLegs);
++			length = std::max(4.0f * VOXELSCALE, shoulders / found * ArmNoLegs);
 +		}
 +		else if (length <= 0.0f && found)
 +		{
@@ -85179,7 +85303,7 @@ index 000000000..6cd9bbc33
 +					if (!runs(parts[3], d, row).empty()) { legsTop = std::max(legsTop, (float)(FloorY - row)); break; }
 +				}
 +			}
-+			length = std::max(4.0f, (shoulders / found - legsTop) * ArmFromTorso);
++			length = std::max(4.0f * VOXELSCALE, (shoulders / found - legsTop) * ArmFromTorso);
 +		}
 +		for (const Arm &arm : arms)
 +		{
@@ -85254,26 +85378,43 @@ index 000000000..6cd9bbc33
 +		}
 +	}
 +
-+	// The surface: filled cells with an empty neighbour (see SurfaceSteps).
++	// The voxels: each a filled cell of the grid, a little cube; drawn side by side they pack without a gap. Kept are the
++	// cells of the body's skin: those with an empty cell beside them, and those that are skin in some view. (Seen from
++	// one of the 8 directions the body shows only its cells inside that direction's drawing, see matchViews: where a
++	// cell is left out there, the cell behind it is that view's skin. Without those one looked into the hollow body and
++	// out at its far side: thin slits up close.) A cell shows in the views it's skin in.
 +	auto model = std::make_unique<VoxelUnitModel>();
 +	std::vector<int> surfaceCells;
-+	for (int across = 0; across < GridAcross; ++across)
-+		for (int along = 0; along < GridAlong; ++along)
-+			for (int up = 0; up < GridUp; ++up)
-+			{
-+				if (!owner[cellIndex(across, along, up)]) continue;
-+				bool inside = true;
-+				for (int da = -1; da <= 1 && inside; ++da)
-+					for (int db = -1; db <= 1 && inside; ++db)
-+						for (int dc = -1; dc <= 1 && inside; ++dc)
-+							if (std::abs(da) + std::abs(db) + std::abs(dc) <= SurfaceSteps && !filled(across + da, along + db, up + dc)) inside = false;
-+				if (inside) continue;
-+				surfaceCells.push_back(cellIndex(across, along, up));
-+				model->right.push_back(cellRight(across));
-+				model->ahead.push_back(cellAhead(along));
-+				model->up.push_back(cellUp(up));
-+				model->part.push_back(owner[cellIndex(across, along, up)]);
-+			}
++	std::vector<Uint16> skin;
++	{
++		std::vector<Uint16> shown(GridCells, 0);
++		for (int across = 0; across < GridAcross; ++across)
++			for (int along = 0; along < GridAlong; ++along)
++				for (int up = 0; up < GridUp; ++up)
++					if (owner[cellIndex(across, along, up)]) shown[cellIndex(across, along, up)] = viewsAt(solidOnTop, cellRight(across), cellAhead(along), cellUp(up));
++		static const int Beside[6][3] = { { -1, 0, 0 }, { 1, 0, 0 }, { 0, -1, 0 }, { 0, 1, 0 }, { 0, 0, -1 }, { 0, 0, 1 } };
++		for (int across = 0; across < GridAcross; ++across)
++			for (int along = 0; along < GridAlong; ++along)
++				for (int up = 0; up < GridUp; ++up)
++				{
++					const int cell = cellIndex(across, along, up);
++					if (!owner[cell]) continue;
++					bool outside = false;
++					Uint16 bare = 0; // (the views a cell beside it is left out of)
++					for (const int *step : Beside)
++					{
++						if (!filled(across + step[0], along + step[1], up + step[2])) outside = true;
++						else bare |= (Uint16)~shown[cellIndex(across + step[0], along + step[1], up + step[2])];
++					}
++					if (!outside && !(bare & shown[cell])) continue;
++					surfaceCells.push_back(cell);
++					skin.push_back(outside ? (Uint16)0xFFFF : bare);
++					model->right.push_back(cellRight(across));
++					model->ahead.push_back(cellAhead(along));
++					model->up.push_back(cellUp(up));
++					model->part.push_back(owner[cell]);
++				}
++	}
 +	const size_t count = surfaceCells.size();
 +	if (count == 0) return nullptr;
 +
@@ -85429,14 +85570,14 @@ index 000000000..6cd9bbc33
 +		model->colours.swap(smoothed);
 +	}
 +	// A walker drawn on one frame: its legs, for the walk, the body below the hip, but for its middle.
++	float wholeTop = 0.0f, wholeSide = 0.0f;
 +	if (routine.whole && routine.humanoid)
 +	{
-+		float top = 0.0f, side = 0.0f;
-+		for (size_t k = 0; k < count; ++k) top = std::max(top, model->up[k]);
-+		for (size_t k = 0; k < count; ++k) if (model->up[k] < top * WholeHip) side = std::max(side, std::abs(model->right[k]));
++		for (size_t k = 0; k < count; ++k) wholeTop = std::max(wholeTop, model->up[k]);
++		for (size_t k = 0; k < count; ++k) if (model->up[k] < wholeTop * WholeHip) wholeSide = std::max(wholeSide, std::abs(model->right[k]));
 +		for (size_t k = 0; k < count; ++k)
 +		{
-+			if (model->up[k] < top * WholeHip && std::abs(model->right[k]) > side * WholeMiddle) model->part[k] = VoxelUnitModel::Legs;
++			if (model->up[k] < wholeTop * WholeHip && std::abs(model->right[k]) > wholeSide * WholeMiddle) model->part[k] = VoxelUnitModel::Legs;
 +		}
 +	}
 +	// The items in hand; the body matched to its drawings view by view; and the walk (an arm holding something held still,
@@ -85454,7 +85595,13 @@ index 000000000..6cd9bbc33
 +	// (A big unit that hovers: the views' pieces only where its solid drawing is. The sparks and the glow drawn under a
 +	// disc or a tank are left out: the owner, "lets just omit that floating effect and generate only main body".)
 +	matchViews(*model, smoothed, routine.big && !routine.legsSwing ? solidOnTop : onTop, solidOnTop);
++	for (size_t k = 0; k < count && k < model->views.size(); ++k) model->views[k] &= skin[k]; // (a cell inside the body shows where it's the view's skin)
 +	for (size_t k = itemsFrom; k < model->addedFrom && k < model->views.size(); ++k) model->views[k] = 0xFFFF; // (the items: whole from every view)
++	// (a one-frame walker's pieces over its legs are legs too: they swing with them)
++	for (size_t k = model->addedFrom; wholeTop > 0.0f && k < model->part.size(); ++k)
++	{
++		if (model->part[k] != VoxelUnitModel::Item && model->up[k] < wholeTop * WholeHip && std::abs(model->right[k]) > wholeSide * WholeMiddle) model->part[k] = VoxelUnitModel::Legs;
++	}
 +	dropFarPieces(*model, itemsFrom);
 +	dropFloating(*model);
 +	makeHits(*model, owner, solidOnTop);
@@ -85821,13 +85968,13 @@ index 000000000..f2fee2f28
 +}
 diff --git a/src/FirstPerson/FirstPersonVoxelBodiesFine.h b/src/FirstPerson/FirstPersonVoxelBodiesFine.h
 new file mode 100644
-index 000000000..9b6fd1abd
+index 000000000..7313bc1ab
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodiesFine.h
 @@ -0,0 +1,36 @@
 +#pragma once
 +/*
-+ * FirstPersonVoxelBodiesFine.h: the voxel bodies made twice as fine (setting "Fine voxel units"): the builder of
++ * FirstPersonVoxelBodiesFine.h: the voxel bodies made twice as fine (see FineBodies): the builder of
 + * FirstPersonVoxelBodies.cpp built a second time (FirstPersonVoxelBodiesFine.cpp) to work on the unit's frames enlarged
 + * twice, on cells half as big: a quarter of a voxel each. What it gives is a body like any other whose places are in
 + * half voxels (VoxelUnitModel::unit 0.5).
@@ -86188,10 +86335,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..38068f530
+index 000000000..8684205f5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,657 @@
+@@ -0,0 +1,651 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -86298,7 +86445,7 @@ index 000000000..38068f530
 +	std::vector<Uint8> corpse;
 +	WalkFrames walks;
 +	bool aiming = false;
-+	bool fine = false; // (made twice as fine: setting "Fine voxel units")
++	bool fine = false; // (made twice as fine: see FineBodies)
 +	const Routine *routine = nullptr;
 +	int unitId = 0, status = 0; // (the unit's, for dump's file names)
 +	bool kneeled = false;
@@ -86356,12 +86503,6 @@ index 000000000..38068f530
 +	const SavedBattleGame *save, const SDL_Color *palette, int &builds, int &walkPhase)
 +{
 +	walkPhase = -1;
-+	// (the setting "Fine voxel units" changed: every body is made again)
-+	if (Options::fpsVoxelFine != _fine)
-+	{
-+		clear();
-+		_fine = Options::fpsVoxelFine;
-+	}
 +	collect();
 +	if (unit->getStatus() == STATUS_WALKING || unit->getStatus() == STATUS_FLYING)
 +	{
@@ -86576,7 +86717,7 @@ index 000000000..38068f530
 +			hashBytes(hash, walks.legs[phase][view].data(), walks.legs[phase][view].size());
 +			for (int side = 0; side < 2; ++side) hashBytes(hash, walks.arms[phase][view][side].data(), walks.arms[phase][view][side].size());
 +		}
-+	const Uint8 pose[3] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)Options::fpsVoxelFine };
++	const Uint8 pose[3] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies };
 +	hashBytes(hash, pose, 3);
 +	auto alike = _byFrames.find(hash);
 +	if (alike != _byFrames.end())
@@ -86597,7 +86738,7 @@ index 000000000..38068f530
 +		job->corpse = std::move(corpse);
 +		job->walks = std::move(walks);
 +		job->aiming = aiming;
-+		job->fine = Options::fpsVoxelFine;
++		job->fine = FineBodies;
 +		job->routine = routine;
 +		std::copy(palette, palette + 256, job->palette);
 +		job->hash = hash;
@@ -86851,10 +86992,10 @@ index 000000000..38068f530
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.h b/src/FirstPerson/FirstPersonVoxelUnits.h
 new file mode 100644
-index 000000000..d34e192cb
+index 000000000..dc9516dc7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.h
-@@ -0,0 +1,206 @@
+@@ -0,0 +1,213 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -86943,7 +87084,7 @@ index 000000000..d34e192cb
 +	enum Part : Uint8 { Torso = 1, LeftArm, RightArm, Legs, Item };
 +	/// Each surface voxel's place from the middle of the unit's feet: to its right, ahead and up, in voxels.
 +	std::vector<float> right, ahead, up;
-+	/// How many voxels one of those is: 1, or 0.5 for a body made twice as fine (setting "Fine voxel units"; the walk,
++	/// How many voxels one of those is: 1, or 0.5 for a body made twice as fine (see FineBodies; the walk,
 +	/// the fall's edges and the hits are in the same measure).
 +	float unit = 1.0f;
 +	/// Which part each belongs to.
@@ -86994,6 +87135,14 @@ index 000000000..d34e192cb
 +	/// coming from direction (0-7) at the body's height (level) or from above.
 +	bool hitAt(float across, float along, float height, int direction, bool level) const;
 +};
++
++/// Whether the bodies are made fine: voxels half the size, from the frames enlarged with their edges kept (see
++/// makeFineModel). Not on a headset: four times the voxels to draw, for each eye.
++#ifdef __ANDROID__
++constexpr bool FineBodies = false;
++#else
++constexpr bool FineBodies = true;
++#endif
 +
 +/// The voxel bodies of the units seen so far in a battle, one for each unit and pose. A body is made
 +/// on a thread of its own (a few to a hundred milliseconds; the thread started with the first), from
@@ -87046,7 +87195,6 @@ index 000000000..d34e192cb
 +	std::deque<std::unique_ptr<Job>> _jobs;
 +	std::vector<std::pair<Uint64, std::shared_ptr<VoxelUnitModel>>> _made;
 +	unsigned _battle = 0;
-+	bool _fine = false; // (the setting "Fine voxel units" the bodies were made with)
 +	const SavedBattleGame *_battleSave = nullptr; // (the battle the bodies are for, see forBattle)
 +	bool _stopping = false;
 +	std::thread _builder;
@@ -92929,7 +93077,7 @@ index 000000000..3559cb7dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..a0da3dd7f
+index 000000000..ece35037a
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,1142 @@
@@ -93150,7 +93298,7 @@ index 000000000..a0da3dd7f
 +	// all the rest under Advanced): the two presets, the renderer, the render scale (the one number to turn for
 +	// speed on a graphics card), two settings players commonly change (the shot's preview, full sprite hitboxes),
 +	// and what goes by the hand and the habit, which no preset can know.
-+	for (const char *id : { "fpsPreset", "fpsRenderer", "fpsGraphicsDetail", "fpsRenderScale", "fpsTrajectory", "fpsSpriteHitboxes", "fpsMouseSensitivity", "fpsStartInFirstPerson" })
++	for (const char *id : { "fpsPreset", "fpsRenderer", "fpsGraphicsDetail", "fpsRenderScale", "fpsTrajectory", "fpsSpriteHitboxes", "fpsVoxelUnits", "fpsMouseSensitivity", "fpsStartInFirstPerson" })
 +	{
 +		for (const OptionInfo &option : gathered)
 +		{
@@ -93170,7 +93318,7 @@ index 000000000..a0da3dd7f
 +			"fpsMeleeFloors", "fpsAimExact", "fpsCloseEyeShots", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
 +			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear" } },
 +		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
-+			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsVoxelUnits", "fpsVoxelFine", "fpsMuzzleFlash", "fpsHitFlash", "fpsSmoothFire", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
++			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsHitFlash", "fpsSmoothFire", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 +			"fpsGhostParts", "fpsGhostOpacity", "fpsGhostOpenDoors", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge" } },
 +		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsRangefinder", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
 +			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },

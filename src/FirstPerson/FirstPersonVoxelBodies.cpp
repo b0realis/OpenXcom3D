@@ -54,6 +54,7 @@
  * frames), so each frame is the same body seen from 45 degrees further round.
  */
 #include "FirstPersonVoxelBodies.h"
+#include <unordered_set>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -206,12 +207,6 @@ inline void project(float right, float ahead, float up, int d, bool level, float
 /// How deep behind a part's nearest voxel, along a direction's view, a voxel still takes that direction's picture (see the
 /// painting in makeModel), voxels.
 const float FaceDepth = 2.0f * VOXELSCALE;
-
-/// A filled cell is on the surface with an empty cell this many steps away or nearer (1: beside it, 2: also across an
-/// edge). With 1, a surface lying diagonally to the grid is a single row of cells 1.4 cells apart, wider than the squares
-/// they're drawn as (VoxelSplatSize): seen square on (from a diagonal direction, up close) one looked through the slits
-/// between them at the body's far side, as thin vertical stripes. With 2 the cells behind the slits are there too.
-const int SurfaceSteps = 2;
 
 /// A limb's slice among several in its row is at most this many times as deep as it is wide (see limb).
 const float SliceDepthMost = 1.5f;
@@ -479,9 +474,9 @@ int chinEnd(const PartFrames &torso, const PartFrames &leftArm, const PartFrames
 		int width = 0;
 		for (const auto &run : runs(torso, Front, row)) width += run.second - run.first + 1;
 		if (row < shoulders) headWidest = std::max(headWidest, width);
-		else if (row >= shoulders + 2) torsoWidest = std::max(torsoWidest, width);
+		else if (row >= shoulders + 2 * VOXELSCALE) torsoWidest = std::max(torsoWidest, width);
 	}
-	return headWidest >= HeadWidthMin && torsoWidest > 0 && torsoWidest <= NarrowTorso * headWidest ? shoulders + 2 : -1;
+	return headWidest >= HeadWidthMin && torsoWidest > 0 && torsoWidest <= NarrowTorso * headWidest ? shoulders + 2 * VOXELSCALE : -1;
 }
 
 inline int luminance(const SDL_Color &colour)
@@ -698,7 +693,7 @@ void makeWalk(VoxelUnitModel &model, const Routine &routine, bool leftHolds, boo
 		float footNow = 1e9f;
 		for (size_t k = 0; k < count; ++k)
 		{
-			if (model.part[k] != VoxelUnitModel::Legs) up[k] -= pose.bob;
+			if (model.part[k] != VoxelUnitModel::Legs) up[k] -= pose.bob * VOXELSCALE; // (the bob is in the frames' own pixels)
 			else if (k < own) footNow = std::min(footNow, up[k]);
 		}
 		if (footNow < 1e8f) for (float &height : up) height += footStanding - footNow;
@@ -1143,29 +1138,73 @@ void addItem(VoxelUnitModel &model, const HeldItem &held, const ItemPlace &place
 	const float *along = place.along, *across = place.across, *through = place.through, *middle = place.middle;
 	const float scale = place.length / std::max(1, bottom - top), thin = std::min(1.0f, scale / RifleScale);
 	const float halfLength = (bottom - top) * scale * 0.5f, middleAcross = (left + right) * 0.5f;
+	// (The thickness is in the body's own measure whatever its fineness: on a fine body an item is half as thick in the
+	// world as on a coarse one, slim as the owner chose it from pictures.)
 	auto halfThickness = [&](int x, int y) { return x >= 0 && y >= 0 && x < width && y < height && depth[y * width + x] ? std::min(1.4f, 0.45f + 0.35f * depth[y * width + x]) * thin : 0.0f; };
-	for (int y = top; y <= bottom; ++y)
+	// The item fills the cells of the body's own grid (carried on past the grid's edges: a rifle reaches out of it):
+	// little cubes side by side as the body's are, no gaps between them from any side. A cell is the item's when its
+	// middle, in the item's own measures (along it, across it, through it), lies on a drawn pixel within the item's
+	// thickness there, or within most of a cell of the picture's plane: a thin item is a cell thick at the least.
+	const float (*frame[3]) = { along, across, through };
+	float inverse[3][3]; // (rows: what a place off the item's middle is along, across and through it)
 	{
-		for (int x = left; x <= right; ++x)
+		const float *u = frame[0], *v = frame[1], *w = frame[2];
+		const float det = u[0] * (v[1] * w[2] - v[2] * w[1]) - u[1] * (v[0] * w[2] - v[2] * w[0]) + u[2] * (v[0] * w[1] - v[1] * w[0]);
+		if (std::abs(det) < 1e-6f) return;
+		const float cross[3][3] = { { v[1] * w[2] - v[2] * w[1], v[2] * w[0] - v[0] * w[2], v[0] * w[1] - v[1] * w[0] },
+			{ w[1] * u[2] - w[2] * u[1], w[2] * u[0] - w[0] * u[2], w[0] * u[1] - w[1] * u[0] },
+			{ u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0] } };
+		for (int r = 0; r < 3; ++r) for (int c = 0; c < 3; ++c) inverse[r][c] = cross[r][c] / det;
+	}
+	// The box of cells round the item (its picture's corners, its greatest thickness).
+	const float halfAcross = (right - left + 1) * 0.5f * scale * ItemSlim, thickest = 1.4f * thin * ItemSlim + Cell;
+	float low[3] = { 1e9f, 1e9f, 1e9f }, high[3] = { -1e9f, -1e9f, -1e9f };
+	for (int corner = 0; corner < 8; ++corner)
+	{
+		const float a = (corner & 1 ? 1.0f : -1.0f) * (halfLength + scale), c = (corner & 2 ? 1.0f : -1.0f) * (halfAcross + scale), t = (corner & 4 ? 1.0f : -1.0f) * thickest;
+		for (int axis = 0; axis < 3; ++axis)
 		{
-			const Uint8 colour = held.picture[y * width + x];
-			if (!colour) continue;
-			const float half = halfThickness(x, y);
-			const float sideways = std::min({ halfThickness(x - 1, y), halfThickness(x + 1, y), halfThickness(x, y - 1), halfThickness(x, y + 1) });
-			const float a = (bottom - y) * scale - halfLength, c = (x - middleAcross) * scale * ItemSlim;
-			for (float t = -half; t <= half + 1e-4f; t += Cell * thin)
+			const float at = middle[axis] + a * along[axis] + c * across[axis] + t * through[axis];
+			low[axis] = std::min(low[axis], at); high[axis] = std::max(high[axis], at);
+		}
+	}
+	const float from[3] = { AcrossFrom, AlongFrom, UpFrom };
+	int first[3], size[3];
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		first[axis] = (int)std::floor((low[axis] - from[axis]) / Cell) - 1;
+		size[axis] = (int)std::floor((high[axis] - from[axis]) / Cell) + 2 - first[axis];
+		if (size[axis] <= 0 || size[axis] > 4096) return;
+	}
+	if ((double)size[0] * size[1] * size[2] > 8e6) return;
+	std::vector<Uint8> filled((size_t)size[0] * size[1] * size[2], 0);
+	auto cellAt = [&](int i, int j, int k) -> Uint8 { return i >= 0 && j >= 0 && k >= 0 && i < size[0] && j < size[1] && k < size[2] ? filled[((size_t)i * size[1] + j) * size[2] + k] : 0; };
+	for (int i = 0; i < size[0]; ++i)
+		for (int j = 0; j < size[1]; ++j)
+			for (int k = 0; k < size[2]; ++k)
 			{
-				// (a column's two ends, and its points that stand out beside a thinner neighbour or the outline)
-				if (t > -half + 1e-4f && t + Cell * thin <= half + 1e-4f && std::abs(t) <= sideways) continue;
-				const float thick = t * ItemSlim;
-				model.right.push_back(middle[0] + a * along[0] + c * across[0] + thick * through[0]);
-				model.ahead.push_back(middle[1] + a * along[1] + c * across[1] + thick * through[1]);
-				model.up.push_back(middle[2] + a * along[2] + c * across[2] + thick * through[2]);
+				const float off[3] = { from[0] + (first[0] + i + 0.5f) * Cell - middle[0], from[1] + (first[1] + j + 0.5f) * Cell - middle[1], from[2] + (first[2] + k + 0.5f) * Cell - middle[2] };
+				const float a = inverse[0][0] * off[0] + inverse[0][1] * off[1] + inverse[0][2] * off[2];
+				const float c = inverse[1][0] * off[0] + inverse[1][1] * off[1] + inverse[1][2] * off[2];
+				const float t = inverse[2][0] * off[0] + inverse[2][1] * off[1] + inverse[2][2] * off[2];
+				const int y = bottom - (int)std::lround((a + halfLength) / scale), x = (int)std::lround(c / (scale * ItemSlim) + middleAcross);
+				if (x < 0 || y < 0 || x >= width || y >= height) continue;
+				const Uint8 colour = held.picture[y * width + x];
+				if (colour && std::abs(t) <= std::max(halfThickness(x, y) * ItemSlim, Cell * 0.6f)) filled[((size_t)i * size[1] + j) * size[2] + k] = colour;
+			}
+	// (its surface: the cells with an empty one beside them)
+	for (int i = 0; i < size[0]; ++i)
+		for (int j = 0; j < size[1]; ++j)
+			for (int k = 0; k < size[2]; ++k)
+			{
+				const Uint8 colour = cellAt(i, j, k);
+				if (!colour || (cellAt(i - 1, j, k) && cellAt(i + 1, j, k) && cellAt(i, j - 1, k) && cellAt(i, j + 1, k) && cellAt(i, j, k - 1) && cellAt(i, j, k + 1))) continue;
+				model.right.push_back(from[0] + (first[0] + i + 0.5f) * Cell);
+				model.ahead.push_back(from[1] + (first[1] + j + 0.5f) * Cell);
+				model.up.push_back(from[2] + (first[2] + k + 0.5f) * Cell);
 				model.part.push_back(VoxelUnitModel::Item);
 				model.colours.insert(model.colours.end(), 16, colour);
 			}
-		}
-	}
 }
 
 /// The fall a body takes, as its death frames show it, ending as its corpse's picture lies: for each picture the pose
@@ -1254,6 +1293,9 @@ void fitFall(VoxelUnitModel &model, const std::vector<std::vector<Uint8>> &death
 		std::fill(front.begin(), front.end(), -1e9f);
 		for (size_t k = 0; k < count; ++k)
 		{
+			// (the body's own voxels: the items keep their colours, and the views' pieces aren't drawn in a fall)
+			pixelOf[k] = -1;
+			if (k >= model.addedFrom || model.part[k] == VoxelUnitModel::Item) continue;
 			float right = model.right[k], ahead = model.ahead[k], up = model.up[k], column, row;
 			model.posed(model.fall[frame], right, ahead, up);
 			project(right, ahead, up, Front, false, column, row, nearnessOf[k]);
@@ -1263,7 +1305,7 @@ void fitFall(VoxelUnitModel &model, const std::vector<std::vector<Uint8>> &death
 		}
 		for (size_t k = 0; k < count; ++k)
 		{
-			if (pixelOf[k] >= 0 && nearnessOf[k] >= front[pixelOf[k]] - 1.0f) model.fallColours[frame * count + k] = (*pictures[frame])[pixelOf[k]];
+			if (pixelOf[k] >= 0 && nearnessOf[k] >= front[pixelOf[k]] - 1.0f * VOXELSCALE) model.fallColours[frame * count + k] = (*pictures[frame])[pixelOf[k]];
 		}
 	}
 }
@@ -1411,6 +1453,7 @@ void matchViews(VoxelUnitModel &model, const PartFrames parts[PartCount], const 
 		}
 		return viewsAt(onTop, right, ahead, up);
 	};
+	std::unordered_set<long long> pieceCells; // (the cells the views' pieces fill, with the view: see the end)
 	const size_t own = model.part.size();
 	model.views.resize(own);
 	for (size_t k = 0; k < own; ++k) model.views[k] = viewsAt(solidOnTop, model.right[k], model.ahead[k], model.up[k]);
@@ -1493,7 +1536,7 @@ void matchViews(VoxelUnitModel &model, const PartFrames parts[PartCount], const 
 				depth[pixel] = NoPlace;
 				if (!bare[pixel]) continue;
 				float best = -1e30f;
-				for (float nearness = -26.0f; nearness <= 26.0f; nearness += 0.5f)
+				for (float nearness = -26.0f * VOXELSCALE; nearness <= 26.0f * VOXELSCALE; nearness += 0.5f)
 				{
 					float right, ahead, up;
 					unproject(pixel % FrameSize + 0.5f, pixel / FrameSize + 0.5f, nearness, d, level, right, ahead, up);
@@ -1563,6 +1606,11 @@ void matchViews(VoxelUnitModel &model, const PartFrames parts[PartCount], const 
 						float right, ahead, up;
 						unproject(pixel % FrameSize + 0.25f + 0.5f * (quarter % 2), pixel / FrameSize + 0.25f + 0.5f * (quarter / 2), evened[i], d, level,
 							right, ahead, up);
+						// (in the cell of the body's grid it falls in, a cube among the body's cubes; once for a view)
+						const int cellAcross = (int)std::floor((right - AcrossFrom) / Cell), cellAlong = (int)std::floor((ahead - AlongFrom) / Cell),
+							cellHigh = (int)std::floor((up - UpFrom) / Cell);
+						if (!pieceCells.insert((((long long)(cellAcross + 4096) << 26 | (long long)(cellAlong + 4096) << 13 | (long long)(cellHigh + 4096)) << 5) | slot).second) continue;
+						right = cellRight(cellAcross); ahead = cellAhead(cellAlong); up = cellUp(cellHigh);
 						Uint8 colours[16];
 						std::fill(colours, colours + 16, parts[part].frame[d][pixel]);
 						const Uint16 views = (fits(right, ahead, up, colours) | (Uint16)(1u << slot)) & ownDirection;
@@ -1760,7 +1808,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		}
 		if (length <= 0.0f && found && !parts[3].any)
 		{
-			length = std::max(4.0f, shoulders / found * ArmNoLegs);
+			length = std::max(4.0f * VOXELSCALE, shoulders / found * ArmNoLegs);
 		}
 		else if (length <= 0.0f && found)
 		{
@@ -1771,7 +1819,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 					if (!runs(parts[3], d, row).empty()) { legsTop = std::max(legsTop, (float)(FloorY - row)); break; }
 				}
 			}
-			length = std::max(4.0f, (shoulders / found - legsTop) * ArmFromTorso);
+			length = std::max(4.0f * VOXELSCALE, (shoulders / found - legsTop) * ArmFromTorso);
 		}
 		for (const Arm &arm : arms)
 		{
@@ -1846,26 +1894,43 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		}
 	}
 
-	// The surface: filled cells with an empty neighbour (see SurfaceSteps).
+	// The voxels: each a filled cell of the grid, a little cube; drawn side by side they pack without a gap. Kept are the
+	// cells of the body's skin: those with an empty cell beside them, and those that are skin in some view. (Seen from
+	// one of the 8 directions the body shows only its cells inside that direction's drawing, see matchViews: where a
+	// cell is left out there, the cell behind it is that view's skin. Without those one looked into the hollow body and
+	// out at its far side: thin slits up close.) A cell shows in the views it's skin in.
 	auto model = std::make_unique<VoxelUnitModel>();
 	std::vector<int> surfaceCells;
-	for (int across = 0; across < GridAcross; ++across)
-		for (int along = 0; along < GridAlong; ++along)
-			for (int up = 0; up < GridUp; ++up)
-			{
-				if (!owner[cellIndex(across, along, up)]) continue;
-				bool inside = true;
-				for (int da = -1; da <= 1 && inside; ++da)
-					for (int db = -1; db <= 1 && inside; ++db)
-						for (int dc = -1; dc <= 1 && inside; ++dc)
-							if (std::abs(da) + std::abs(db) + std::abs(dc) <= SurfaceSteps && !filled(across + da, along + db, up + dc)) inside = false;
-				if (inside) continue;
-				surfaceCells.push_back(cellIndex(across, along, up));
-				model->right.push_back(cellRight(across));
-				model->ahead.push_back(cellAhead(along));
-				model->up.push_back(cellUp(up));
-				model->part.push_back(owner[cellIndex(across, along, up)]);
-			}
+	std::vector<Uint16> skin;
+	{
+		std::vector<Uint16> shown(GridCells, 0);
+		for (int across = 0; across < GridAcross; ++across)
+			for (int along = 0; along < GridAlong; ++along)
+				for (int up = 0; up < GridUp; ++up)
+					if (owner[cellIndex(across, along, up)]) shown[cellIndex(across, along, up)] = viewsAt(solidOnTop, cellRight(across), cellAhead(along), cellUp(up));
+		static const int Beside[6][3] = { { -1, 0, 0 }, { 1, 0, 0 }, { 0, -1, 0 }, { 0, 1, 0 }, { 0, 0, -1 }, { 0, 0, 1 } };
+		for (int across = 0; across < GridAcross; ++across)
+			for (int along = 0; along < GridAlong; ++along)
+				for (int up = 0; up < GridUp; ++up)
+				{
+					const int cell = cellIndex(across, along, up);
+					if (!owner[cell]) continue;
+					bool outside = false;
+					Uint16 bare = 0; // (the views a cell beside it is left out of)
+					for (const int *step : Beside)
+					{
+						if (!filled(across + step[0], along + step[1], up + step[2])) outside = true;
+						else bare |= (Uint16)~shown[cellIndex(across + step[0], along + step[1], up + step[2])];
+					}
+					if (!outside && !(bare & shown[cell])) continue;
+					surfaceCells.push_back(cell);
+					skin.push_back(outside ? (Uint16)0xFFFF : bare);
+					model->right.push_back(cellRight(across));
+					model->ahead.push_back(cellAhead(along));
+					model->up.push_back(cellUp(up));
+					model->part.push_back(owner[cell]);
+				}
+	}
 	const size_t count = surfaceCells.size();
 	if (count == 0) return nullptr;
 
@@ -2021,14 +2086,14 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		model->colours.swap(smoothed);
 	}
 	// A walker drawn on one frame: its legs, for the walk, the body below the hip, but for its middle.
+	float wholeTop = 0.0f, wholeSide = 0.0f;
 	if (routine.whole && routine.humanoid)
 	{
-		float top = 0.0f, side = 0.0f;
-		for (size_t k = 0; k < count; ++k) top = std::max(top, model->up[k]);
-		for (size_t k = 0; k < count; ++k) if (model->up[k] < top * WholeHip) side = std::max(side, std::abs(model->right[k]));
+		for (size_t k = 0; k < count; ++k) wholeTop = std::max(wholeTop, model->up[k]);
+		for (size_t k = 0; k < count; ++k) if (model->up[k] < wholeTop * WholeHip) wholeSide = std::max(wholeSide, std::abs(model->right[k]));
 		for (size_t k = 0; k < count; ++k)
 		{
-			if (model->up[k] < top * WholeHip && std::abs(model->right[k]) > side * WholeMiddle) model->part[k] = VoxelUnitModel::Legs;
+			if (model->up[k] < wholeTop * WholeHip && std::abs(model->right[k]) > wholeSide * WholeMiddle) model->part[k] = VoxelUnitModel::Legs;
 		}
 	}
 	// The items in hand; the body matched to its drawings view by view; and the walk (an arm holding something held still,
@@ -2046,7 +2111,13 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	// (A big unit that hovers: the views' pieces only where its solid drawing is. The sparks and the glow drawn under a
 	// disc or a tank are left out: the owner, "lets just omit that floating effect and generate only main body".)
 	matchViews(*model, smoothed, routine.big && !routine.legsSwing ? solidOnTop : onTop, solidOnTop);
+	for (size_t k = 0; k < count && k < model->views.size(); ++k) model->views[k] &= skin[k]; // (a cell inside the body shows where it's the view's skin)
 	for (size_t k = itemsFrom; k < model->addedFrom && k < model->views.size(); ++k) model->views[k] = 0xFFFF; // (the items: whole from every view)
+	// (a one-frame walker's pieces over its legs are legs too: they swing with them)
+	for (size_t k = model->addedFrom; wholeTop > 0.0f && k < model->part.size(); ++k)
+	{
+		if (model->part[k] != VoxelUnitModel::Item && model->up[k] < wholeTop * WholeHip && std::abs(model->right[k]) > wholeSide * WholeMiddle) model->part[k] = VoxelUnitModel::Legs;
+	}
 	dropFarPieces(*model, itemsFrom);
 	dropFloating(*model);
 	makeHits(*model, owner, solidOnTop);
