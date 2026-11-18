@@ -60,6 +60,7 @@
 #include <utility>
 #include "FirstPersonVoxelBodies.h"
 #include "FirstPersonVoxelBodiesFine.h"
+#include "../Engine/Exception.h"
 #include "../Engine/Options.h"
 #include "../Battlescape/UnitSprite.h"
 #include "../Engine/GraphSubset.h"
@@ -296,7 +297,11 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	// The walk's frames, each phase from the right side and the front right (see WalkFrames), for the walk to follow them:
 	// its legs' (all of it, for a body drawn on one frame) and its arms'.
 	WalkFrames walks;
-	if (routine->legsSwing || routine->armsSwing)
+	// (Not of a unit that can't move: a turret drawn by a walker's routine has no walk frames in its sheet, and the game's
+	// drawer throws when asked for a missing frame. XPiratez's truck turret took the game down when its body was made. A
+	// sheet short of frames for a unit that may move: no walk frames either, the body stands.)
+	if ((routine->legsSwing || routine->armsSwing) && unit->getArmor()->allowsMoving())
+	try
 	{
 		auto pixelsOf = [](Surface *surface) {
 			std::vector<Uint8> pixels(FrameSize * FrameSize);
@@ -334,6 +339,12 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 			}
 		}
 		walks.any = true;
+	}
+	catch (const Exception &)
+	{
+		unitSprite.setPartCapture(nullptr);
+		unitSprite.setWalkOverride(-1);
+		walks = WalkFrames();
 	}
 	unitSprite.setViewRotation(0);
 	unitSprite.setDrawOut(false);

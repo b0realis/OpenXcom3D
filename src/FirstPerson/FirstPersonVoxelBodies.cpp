@@ -2054,7 +2054,10 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 {
 	if (!parts[0].any) return nullptr;
 	useGrid(routine.big ? 2 : 1);
-	SlantOnly = routine.big && routine.legsSwing;
+	// (a hull: a big unit that doesn't walk. One drawn by a walker's routine but without walk frames is a hull too: XPiratez's
+	// truck turret, a turret drawn by the Sectopod's routine that never moves.)
+	const bool bigHull = routine.big && !(routine.legsSwing && walks.any);
+	SlantOnly = routine.big && !bigHull;
 	std::vector<int> onTop[8], solidOnTop[8];
 	partsOnTop(parts, composite, onTop);
 	if (routine.big)
@@ -2085,8 +2088,8 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		// shape is the 8 views' alone, strictly, but for a big walker's: its frames, as a one-tile unit's, don't quite
 		// agree, and a strict hull of them lost its shell and horns)
 		const std::vector<Uint8> shape = routine.big ? std::vector<Uint8>(GridCells, 1) : limb(solid, RightSide);
-		std::vector<Uint8> hull = carve(solid, routine.big && !routine.legsSwing ? 0 : 1, shape);
-		if (routine.big && !routine.legsSwing) levelOff(solid, hull);
+		std::vector<Uint8> hull = carve(solid, bigHull ? 0 : 1, shape);
+		if (bigHull) levelOff(solid, hull);
 		for (int i = 0; i < GridCells; ++i) if (shape[i] && hull[i]) owner[i] = PartCodes[0];
 	}
 	else
@@ -2506,7 +2509,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		// its shape is read along that slant (see carve, levelOff): each of its voxels takes its pixel of the drawing that
 		// sees it best, of all eight, thrown along the slant onto the skin that drawing sees. So from where a drawing was
 		// made the body shows that drawing, cube for pixel. The skin each drawing sees: the nearest voxel on each pixel.)
-		const bool hull = routine.big && !routine.legsSwing;
+		const bool hull = bigHull;
 		std::vector<float> seenSkin[8];
 		auto slantPixel = [&](size_t k, int d, float &nearness) -> size_t {
 			float column, row;
@@ -2569,7 +2572,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	}
 	else
 	{
-	matchViews(*model, smoothed, routine.big && !routine.legsSwing ? solidOnTop : onTop, solidOnTop);
+	matchViews(*model, smoothed, bigHull ? solidOnTop : onTop, solidOnTop);
 	for (size_t k = 0; k < count && k < model->views.size(); ++k) model->views[k] &= skin[k]; // (a cell inside the body shows where it's the view's skin)
 	}
 	for (size_t k = itemsFrom; k < model->addedFrom && k < model->views.size(); ++k) model->views[k] = 0xFFFF; // (the items: whole from every view)
@@ -2587,7 +2590,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	const bool rightHolds = placed[0] || (placed[1] && items[1].twoHanded);
 	const bool leftHolds = placed[1] || (placed[0] && items[0].twoHanded);
 	makeWalk(*model, routine, leftHolds, rightHolds, walks);
-	makeFalls(*model, deaths, corpse, lying, palette, routine.big, routine.big && !routine.legsSwing);
+	makeFalls(*model, deaths, corpse, lying, palette, routine.big, bigHull);
 	return model;
 }
 
