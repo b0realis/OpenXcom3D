@@ -232,8 +232,8 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 			"fpsFalling", "fpsSafeLanding", "fpsFallDamage" } },
 		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsRecoil", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsThrowing", "fpsLean", "fpsMeleeTerrain",
 			"fpsMeleeFloors", "fpsAimExact", "fpsCloseEyeShots", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
-			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst", "fpsFlares" } },
-		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
+			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst" } },
+		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsSmoke", "fpsSmokeOpacity",
 			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsHitFlash", "fpsSmoothFire", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 			"fpsGhostParts", "fpsGhostOpacity", "fpsGhostOpenDoors", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge" } },
 		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsRangefinder", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
@@ -499,12 +499,6 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		{
 			static const char *const trajectoryNames[] = { "STR_FPS_TRAJECTORY_OFF", "STR_FPS_TRAJECTORY_ARCS", "STR_FPS_TRAJECTORY_ALL" };
 			return std::string(tr(trajectoryNames[std::clamp(*option.asInt(), 0, 2)]));
-		}
-		// The flashlight is a choice of three, shown by name.
-		if (option.id() == "fpsFlashlightMode")
-		{
-			static const char *const flashlightNames[] = { "STR_FPS_FLASHLIGHT_OFF", "STR_FPS_FLASHLIGHT_ON", "STR_FPS_FLASHLIGHT_DYNAMIC" };
-			return std::string(tr(flashlightNames[FirstPerson::flashlightMode()]));
 		}
 		// The presets, shown by name (Custom after the last of each).
 		if (option.id() == "fpsPreset")
@@ -860,11 +854,6 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		else if (value == &Options::fpsTrajectory)
 		{
 			*value = (*value + direction + 3) % 3;
-		}
-		// The flashlight (off, on, dynamic): round and round.
-		else if (value == &Options::fpsFlashlightMode)
-		{
-			*value = (FirstPerson::flashlightMode() + direction + 3) % 3;
 		}
 		// A preset: round and round through its names, its settings set with it, and Custom after the last
 		// once the player has a mix of their own to come back to.

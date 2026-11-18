@@ -394,7 +394,7 @@ void resized(FirstPersonMode *mode, int widthChange, int heightChange)
  * Settles settings that take their first value from an older one, once the options are loaded
  * (called when a battle or the 3D VIEW tab opens): the smoke (Original, Modern) from 0.9's
  * "See-through smoke": YES gives Modern, NO Original (1.0's Solid becomes Original too); the
- * flashlight (Off, On, Dynamic) from 1.0's "Flashlight" and "Tactical flashlight"; akimbo (Off,
+ * akimbo (Off,
  * Full, Realistic) from 1.08's "Full akimbo" and "Realistic akimbo" (and with akimbo Off, those
  * two, which now tell whether it's on just now, off: a hand-edited profile can't have two guns
  * fire with the setting Off, the akimbo key refusing to switch them off); and 1.0's next fire
@@ -403,7 +403,6 @@ void resized(FirstPersonMode *mode, int widthChange, int heightChange)
 void settleOptions()
 {
 	Options::fpsSmoke = smokeMode();
-	Options::fpsFlashlightMode = flashlightMode();
 	Options::fpsAkimbo = akimboChoice();
 	if (Options::fpsAkimbo == 0)
 	{
@@ -757,21 +756,6 @@ int akimboChoice()
 }
 
 /**
- * The flashlight setting as it stands: Off (0), On (1) or Dynamic (2). Unset (-1: a profile from
- * 1.0 not settled yet, or the defaults just restored on the 3D VIEW tab), it's what 1.0's two
- * settings say: "Tactical flashlight" YES Dynamic, else "Flashlight" YES On, NO Off.
- * @return 0, 1 or 2.
- */
-int flashlightMode()
-{
-	if (Options::fpsFlashlightMode >= 0 && Options::fpsFlashlightMode <= 2)
-	{
-		return Options::fpsFlashlightMode;
-	}
-	return Options::fpsTacticalFlashlight ? 2 : (Options::fpsFlashlight ? 1 : 0);
-}
-
-/**
  * The smoke setting as it stands: Original (1) or Modern (2). 1.0's Solid (0) is gone: it's
  * Original now. Unset (-1: a profile from 0.9 not settled yet, or the defaults just restored on
  * the 3D VIEW tab), it's what 0.9's "See-through smoke" says: YES Modern, NO Original.
@@ -953,12 +937,6 @@ void createOptions(std::vector<OptionInfo> &options)
 	// face in its room's. The faces the map shows stay as it draws them; doors, and windows' frames and
 	// glass, keep theirs.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsWallPaint", &fpsWallPaint, 1, "STR_FPS_WALL_PAINT", category));
-	// The flashlight, a light of the 3D view's own (on and off with its key, F; the suit light
-	// stays the game's): none (0), a wide beam from the shoulder in the dark (1, on), or a light
-	// on the weapon, a tight spot on the crosshair at any time of day (2, dynamic). Unset (-1)
-	// until settled (see settleOptions) from 1.0's two settings, kept below, unlisted (a new name,
-	// as 1.0's YES/NO wouldn't load into a number).
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlashlightMode", &fpsFlashlightMode, -1, "STR_FPS_FLASHLIGHT", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCombatMusic", &fpsCombatMusic, false, "STR_FPS_COMBAT_MUSIC", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitSounds", &fpsHitSounds, false, "STR_FPS_HIT_SOUNDS", category));
 	// The 3D view's ambient sounds (the owner: "The weather effects should also have nonobtrusive
@@ -977,14 +955,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	// maps), the two blended in between.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmokeOpacity", &fpsSmokeOpacity, 80, "STR_FPS_SMOKE_OPACITY", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightSmokeOpacity", &fpsNightSmokeOpacity, 45, "STR_FPS_NIGHT_SMOKE_OPACITY", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlares", &fpsFlares, true, "STR_FPS_FLARES", category));
 	// 0.9's "See-through smoke" (YES/NO), loaded and saved but listed nowhere (a category no
 	// options screen shows): it gives the smoke setting its first value.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughSmoke", &fpsSeeThroughSmoke, true, "STR_FPS_SEE_THROUGH_SMOKE", "STR_FIRST_PERSON_SAVED"));
-	// 1.0's "Flashlight" and "Tactical flashlight" (YES/NO), the same way: they give the
-	// flashlight setting its first value.
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlashlight", &fpsFlashlight, true, "STR_FPS_FLASHLIGHT", "STR_FIRST_PERSON_SAVED"));
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsTacticalFlashlight", &fpsTacticalFlashlight, false, "STR_FPS_FLASHLIGHT", "STR_FIRST_PERSON_SAVED"));
 	// Looks: the weapon in hand (always made of voxels), sprite upscaling (0 off, 1 smooth,
 	// 2 smooth + detail, 3 finest: six times bigger; the default, a profile saved before keeps its
 	// value), muzzle flashes, particles (0 none, 1 effects, 2 everything),
@@ -1233,7 +1206,7 @@ void createOptions(std::vector<OptionInfo> &options)
 	// A tank's turret switch (a player's report: turning the view turned the whole tank, at its full
 	// cost; the TURRET button on the top bar too): no key until the player gives it one.
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsTurret", &keyFpsTurret, SDLK_UNKNOWN, "STR_FPS_KEY_TURRET", category));
-	// The flashlight on and off (F, as in the first-person shooters; setting "Flashlight").
+	// The flashlight on and off (F, as in the first-person shooters).
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlashlight", &keyFpsFlashlight, SDLK_f, "STR_FPS_KEY_FLASHLIGHT", category));
 	// Space is the map's night vision hold key; in 3D it jumps, and night vision is gear (N).
 	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsJump", &keyFpsJump, SDLK_SPACE, "STR_FPS_KEY_JUMP", category));

@@ -4994,8 +4994,7 @@ bool FirstPersonMode::aimedTileInSight(BattleUnit *unit, BattleItem *weapon, Bat
 }
 
 /**
- * Tosses a tactical flare at the crosshair (the flare key, T by default, with the setting
- * "Unlimited tactical flares"). It's the add-on's own: free, unlimited, and no item or time units are used. The 3D
+ * Tosses a tactical flare at the crosshair (the flare key, T by default). It's the add-on's own: free, unlimited, and no item or time units are used. The 3D
  * view flies it, bounces it off walls and lets it burn with its light.
  */
 void FirstPersonMode::throwFlare()
@@ -5003,7 +5002,7 @@ void FirstPersonMode::throwFlare()
 	// From the soldier the view looks through (in the aliens' turn the game's selected unit is
 	// the alien acting, whose tile the throw's sound would give away).
 	BattleUnit *unit = _trackedUnit;
-	if (!Options::fpsFlares || !unit || !isActive() || _deathUnit)
+	if (!unit || !isActive() || _deathUnit)
 	{
 		return;
 	}

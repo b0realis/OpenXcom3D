@@ -123,9 +123,6 @@ Uint32 lastThinkTicks = 0;
 /// one it had, medium at first.
 int lastMapCameraSize = 2;
 
-/// The shoulder flashlight (setting "Flashlight": On) lights from the battle's shade 6 on (of 0
-/// bright .. 15 dark): at dusk and night.
-const int FlashlightDarkShade = 6;
 
 }
 
@@ -1677,27 +1674,15 @@ void FirstPersonMode::toggleMapCamera()
 
 /**
  * Switches the flashlight on or off (its key, F by default), with a click of the switch. It's
- * the 3D view's own light (setting "Flashlight": on, a wide beam from the shoulder in the dark;
- * dynamic, a spot on the crosshair at any time of day) and changes nothing in the game's rules;
+ * the 3D view's own light (a light on the weapon: a spot on the crosshair at any time of day) and changes nothing in the game's rules;
  * the suit light (L) is the game's personal light and stays separate. Each battle starts with
  * it on.
  */
 void FirstPersonMode::toggleFlashlight()
 {
-	// No flashlight (the setting is Off): say so, so the key doesn't seem dead.
-	if (FirstPerson::flashlightMode() == 0)
-	{
-		_state->warning("STR_FPS_FLASHLIGHT_SETTING_OFF");
-		return;
-	}
 	_flashlightOn = !_flashlightOn;
 	rememberChoices();
 	_sounds->play(FirstPersonSounds::LIGHT_SWITCH);
-	// The shoulder flashlight lights only in the dark: switched by day, a line says so.
-	if (FirstPerson::flashlightMode() == 1 && _save->getGlobalShade() < FlashlightDarkShade)
-	{
-		_state->warning("STR_FPS_FLASHLIGHT_DARK_ONLY");
-	}
 }
 
 /**
@@ -2380,12 +2365,9 @@ void FirstPersonMode::think()
 	// Smoke as this soldier's eyes see through it: the game's sight range, and the armor's heat
 	// vision (the see-through smoke thinner; enemies they don't see in smoke not drawn).
 	_view->setSmokeSight(_save->getTileEngine()->getMaxViewDistance() * 16.0f, unit->getVisibilityThroughSmoke(), unit->getVisibilityThroughFire());
-	// The flashlight (setting "Flashlight"), on and off with its own key (see toggleFlashlight):
-	// on, a wide beam from the shoulder, in the dark only (the battle's shade 6 or more, of 0
-	// bright .. 15 dark); dynamic, a spot on the crosshair, so it lights dark places by day too.
-	const int flashlightMode = FirstPerson::flashlightMode();
-	const bool dynamicFlashlight = flashlightMode == 2;
-	_view->setFlashlight(flashlightMode > 0 && _flashlightOn && (dynamicFlashlight || _save->getGlobalShade() >= FlashlightDarkShade), dynamicFlashlight);
+	// The flashlight, on and off with its own key (see toggleFlashlight): a spot on the crosshair,
+	// so it lights dark places by day too.
+	_view->setFlashlight(_flashlightOn, true);
 
 	// The camera follows the soldier (and walks them on your turn); on your turn the soldier
 	// also faces where you look, and the fire mode and aim are kept up to date.
@@ -2633,7 +2615,7 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	if (key != SDLK_UNKNOWN && key == Options::keyFpsShowFacing) return true; // (held: see think)
 	if (key != SDLK_UNKNOWN && key == Options::keyFpsRange) return true; // (held: see updateCrosshair)
 	if (key == Options::keyFpsOpenDoor) { if (pressed) openDoor(_save->getSelectedUnit()); return true; }
-	if (key == Options::keyFpsFlare) { if (pressed) { if (Options::fpsFlares) throwFlare(); else _state->warning("STR_FPS_FLARES_OFF"); } return true; }
+	if (key == Options::keyFpsFlare) { if (pressed) throwFlare(); return true; }
 	if (key == Options::keyFpsUp) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_UP, action, true); return true; }
 	if (key == Options::keyFpsDown) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_DOWN, action, true); return true; }
 	if (key == Options::keyFpsFlight) { if (pressed) toggleFlight(_save->getSelectedUnit()); return true; }
