@@ -197,6 +197,10 @@ const Uint32 QuickFallFrameTime = 100;
 /// this long, ms: at the frames' own pace the whole fall was over in a third of a second, and read as standing, then a
 /// pile (the owner: "does it have any death animation? It is perceived as standing - and a pile on floor").
 const Uint32 VoxelFallShapeTime = 170;
+/// Setting "See-through corpses" on a voxel body lying on the floor (see drawFloorItems): it is in the way of an aim whose
+/// line passes within this far of its middle on the ground, voxels (a heap; a big unit's wreck), and is drawn at this
+/// share of the ghost opacity.
+const double VoxelCorpseReach = 9.0, VoxelWreckReach = 18.0, VoxelCorpseFaint = 0.6;
 /// A Celatid's voxel body hovers as its picture's frames do: up and down by this much (voxels), once in this long (ms),
 /// swelling and shrinking by this share meanwhile (the owner: "Celatid should have some movement in voxel units also").
 const double CelatidBob = 1.2, CelatidSwell = 0.04;

@@ -2509,10 +2509,28 @@ void FirstPersonView::drawFloorItems()
 		// (A big unit's whole corpse, its four parts in their places: its wreck as the map draws it, given volume, lying
 		// as the map shows it whichever way the unit faced. Parts carried apart are their pictures.)
 		const VoxelUnitModel *wreck = Options::fpsVoxelUnits && owner && owner->isOut() && wholeCorpse ? _voxelUnits->lastBody(owner) : nullptr;
+		// (A body lying there stands up from the floor, where its picture lay flat: a heap hides the legs of who stands
+		// behind it, a wreck far more, and the picture's rule, the crosshair on it and the aim ending on another tile,
+		// rarely held: aiming at the enemy over a heap the crosshair is on the enemy, and a wreck's four tiles take
+		// nearly every line that crosses it. The owner saw all three: a heap solid before an enemy, a wreck never
+		// see-through, and "it does turn, but too faintly to notice". So a body is see-through whenever it lies in the
+		// way: the aim's line passes over it, within its reach on the ground, and ends beyond it; and fainter than a
+		// picture, VoxelCorpseFaint of the ghost opacity: its cubes stand a layer behind another.)
+		double bodyOpacity = step.sprite.seeThrough ? step.sprite.seeThrough->opacity : 1.0;
+		if ((lying || wreck) && Options::fpsSeeThroughCorpses && _pointerAimed)
+		{
+			const double reach = wreck ? VoxelWreckReach : VoxelCorpseReach;
+			const double wayX = _pointerAim.x + 0.5 - _eye[0], wayY = _pointerAim.y + 0.5 - _eye[1], length = std::hypot(wayX, wayY);
+			const double toX = step.sprite.world[0] - _eye[0], toY = step.sprite.world[1] - _eye[1];
+			const double along = length > 0.0 ? (toX * wayX + toY * wayY) / length : 0.0;
+			const double beside = length > 0.0 ? std::abs(toX * wayY - toY * wayX) / length : 1e9;
+			if (along > 0.0 && beside <= reach && length > along + reach) bodyOpacity = _faintPile.opacity;
+		}
+		if (bodyOpacity < 1.0) bodyOpacity *= VoxelCorpseFaint;
 		if (wreck && wreck->fallAt(1.0))
 		{
 			recordVoxelUnit(*wreck, -1, 3, 3, false, step.sprite.world, NoFloorCut, step.sprite.shade, itemScale, nullptr, 1.0, false,
-				step.sprite.body, step.sprite.pile, step.sprite.seeThrough ? step.sprite.seeThrough->opacity : 1.0);
+				step.sprite.body, step.sprite.pile, bodyOpacity);
 			continue;
 		}
 		if (lying)
@@ -2520,8 +2538,7 @@ void FirstPersonView::drawFloorItems()
 			auto well = _facingsWell.find(owner);
 			const double fall = collapseFall(owner, SDL_GetTicks());
 			recordVoxelUnit(*lying, -1, well != _facingsWell.end() ? well->second : owner->getDirection(), 3, false, step.sprite.world, NoFloorCut,
-				step.sprite.shade, itemScale, nullptr, fall >= 0.0 ? fall : 1.0, false, step.sprite.body, step.sprite.pile,
-				step.sprite.seeThrough ? step.sprite.seeThrough->opacity : 1.0);
+				step.sprite.shade, itemScale, nullptr, fall >= 0.0 ? fall : 1.0, false, step.sprite.body, step.sprite.pile, bodyOpacity);
 			continue;
 		}
 		useSmoothVersion(step.sprite);
