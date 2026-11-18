@@ -233,7 +233,7 @@ SETTINGS = [
     ]),
     ('Sound', [
         ('Dynamic music', 'NO', 'YES / NO', 'Tenser music while aliens are in sight.', ''),
-        ('Hit, kill and swing sounds', 'NO', 'YES / NO', 'A tick for a hit, a duller one for a hit that did no harm, a double tick for a kill, a swoosh for your swings, your heartbeat once hurt below half health, and window glass shattering.', ''),
+        ('Hit, kill and swing sounds', 'NO', 'YES / NO', 'A tick for a hit, a duller one for a hit that did no harm, a double tick for a kill, a swoosh for your swings, your heartbeat once hurt below half health, and window glass shattering.', 'These are the 3D view\'s own sounds, all on one switch. The game\'s own (a unit\'s death cry, a weapon\'s hit sound) play as ever, with this on or off.'),
         ('Ambient sounds', 'On', 'On / Quiet / Off', 'Rain and wind in the weather that has them, muffled under a roof, and the fires near you crackling from their side, louder as you come closer. Made by the game; Quiet: half as loud.', 'Hear the storm outside, and a fire before you see it.'),
     ]),
     ('Cheats', [
