@@ -1278,6 +1278,7 @@ private:
 		size_t voxelFirst = 0, voxelCount = 0;                            // VoxelUnit (see drawVoxelUnit): its splats in _voxelSplats,
 		float voxelHalfMax = 0.0f, voxelOpacity = 1.0f;                   // the biggest one's half size, and its opacity (dithered up close)
 		float voxelEdges[3][2] = {}, voxelLean[3] = {}, voxelMiddle[2] = {}; // its cubes' three half edges seen straight ahead at a depth of one (pixels), how much deeper each goes, the view's middle
+		Uint16 voxelHitOutline = 0;                                       // ... the hitbox outline drawn round it (its place in _outlineColors + 1; 0 none)
 		bool voxelOutline = false;                                        // ... whether the cubes are cut to their outlines (else the boxes round them)
 		double centre[3]; double radius; int steps; float density;        // GroundShade (see drawGroundShade)
 		double away[2]; double length;                                    // ... stretched away from a light that long (0: a disc)

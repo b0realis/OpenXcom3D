@@ -60302,10 +60302,10 @@ index 000000000..5eaac16dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..28649205b
+index 000000000..f95025f10
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1833 @@
+@@ -0,0 +1,1834 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -61586,6 +61586,7 @@ index 000000000..28649205b
 +		size_t voxelFirst = 0, voxelCount = 0;                            // VoxelUnit (see drawVoxelUnit): its splats in _voxelSplats,
 +		float voxelHalfMax = 0.0f, voxelOpacity = 1.0f;                   // the biggest one's half size, and its opacity (dithered up close)
 +		float voxelEdges[3][2] = {}, voxelLean[3] = {}, voxelMiddle[2] = {}; // its cubes' three half edges seen straight ahead at a depth of one (pixels), how much deeper each goes, the view's middle
++		Uint16 voxelHitOutline = 0;                                       // ... the hitbox outline drawn round it (its place in _outlineColors + 1; 0 none)
 +		bool voxelOutline = false;                                        // ... whether the cubes are cut to their outlines (else the boxes round them)
 +		double centre[3]; double radius; int steps; float density;        // GroundShade (see drawGroundShade)
 +		double away[2]; double length;                                    // ... stretched away from a light that long (0: a disc)
@@ -72105,10 +72106,10 @@ index 000000000..229bd966c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..c01a640c2
+index 000000000..8d74ba1ac
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,4008 @@
+@@ -0,0 +1,4027 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -72923,6 +72924,14 @@ index 000000000..c01a640c2
 +				_glowMask[index] = 0;
 +				_unitVeil[index] = step.sprite.unit ? UnitVeilMax : 255;
 +				_ownColours[index] = 1;
++				if (step.voxelHitOutline)
++				{
++					// (the hitbox's outline goes round these pixels, see drawUnitOutlines; a row is one band's alone)
++					_outlineOwner[index] = step.voxelHitOutline;
++					_outlineDepth[index] = splat->depth;
++					_outlineRowLeft[y] = std::min(_outlineRowLeft[y], x);
++					_outlineRowRight[y] = std::max(_outlineRowRight[y], x);
++				}
 +				const int patchX = x - _pointerX + PointerReach, patchY = y - _pointerY + PointerReach;
 +				if (patchX >= 0 && patchY >= 0 && patchX <= 2 * PointerReach && patchY <= 2 * PointerReach)
 +				{
@@ -73644,7 +73653,18 @@ index 000000000..c01a640c2
 +			const bool level = !fallen && std::atan2((spriteEye[2] - chest[2]) * ZScale, flat) < VoxelSlantAbove * Pi / 180.0;
 +			const int direction = fallen ? 3 : ((facing + viewRotation) % 8 + 8) % 8; // (viewRotation: 3 minus the direction to the camera)
 +			const double standing[3] = { feet[0], feet[1], standingHeight(feet) };
++			const size_t stepsBefore = _drawList.size();
 +			recordVoxelUnit(*body, walkPhase, facing, direction, level, standing, floorUnderside(feet), shade, unitScale, unit, fall);
++			// With full sprite hitboxes the body is what the lines test (see FirstPerson::spriteHitAt): outlined as a
++			// picture is (see drawUnitOutlines), round the pixels it's drawn on (noted as they're drawn, see
++			// drawVoxelUnit); not one going down, nor one so close that it fades out.
++			double bodyX, bodyY, bodyDepth;
++			if (_outlining && _drawList.size() > stepsBefore && (!hitboxAimedOnly || unit == _aimedUnit) && fall <= 0.0 && _outlineColors.size() < 0xFFFF
++				&& projectToScreen(standing, bodyX, bodyY, bodyDepth) && bodyDepth >= 10.0)
++			{
++				_outlineColors.push_back(_colors.hitbox[unit->getFaction() == FACTION_PLAYER ? 0 : unit->getFaction() == FACTION_HOSTILE ? 1 : 2]);
++				_drawList.back().voxelHitOutline = (Uint16)_outlineColors.size();
++			}
 +			// What the game draws over a unit's sprite, its flames when it burns and its breath's bubbles under the sea, is
 +			// drawn over its body: the drawer's overlay alone (the unit's parts drawn nowhere), standing at the unit, nearer
 +			// by VoxelOverlayNearer to show over the body's front; unshaded, as the game draws flames.
@@ -73790,8 +73810,8 @@ index 000000000..c01a640c2
 +	{
 +		started = started->first->getStatus() == STATUS_COLLAPSING || collapseFall(started->first, now) < 1.0 ? std::next(started) : _collapseStarts.erase(started);
 +	}
-+	// Then draw them all, and with full sprite hitboxes the outlines of what the lines test over them (pictures: a
-+	// voxel body isn't outlined, see FirstPerson::viewCard).
++	// Then draw them all, and with full sprite hitboxes the outlines of what the lines test over them (pictures, by
++	// their cards; a voxel body by the pixels it was drawn on, see drawVoxelUnit).
 +	replayDrawList();
 +	if (_outlining)
 +	{

@@ -812,6 +812,14 @@ void FirstPersonView::drawVoxelUnit(const DrawStep &step, int bandTop, int bandB
 				_glowMask[index] = 0;
 				_unitVeil[index] = step.sprite.unit ? UnitVeilMax : 255;
 				_ownColours[index] = 1;
+				if (step.voxelHitOutline)
+				{
+					// (the hitbox's outline goes round these pixels, see drawUnitOutlines; a row is one band's alone)
+					_outlineOwner[index] = step.voxelHitOutline;
+					_outlineDepth[index] = splat->depth;
+					_outlineRowLeft[y] = std::min(_outlineRowLeft[y], x);
+					_outlineRowRight[y] = std::max(_outlineRowRight[y], x);
+				}
 				const int patchX = x - _pointerX + PointerReach, patchY = y - _pointerY + PointerReach;
 				if (patchX >= 0 && patchY >= 0 && patchX <= 2 * PointerReach && patchY <= 2 * PointerReach)
 				{
@@ -1533,7 +1541,18 @@ void FirstPersonView::drawUnits()
 			const bool level = !fallen && std::atan2((spriteEye[2] - chest[2]) * ZScale, flat) < VoxelSlantAbove * Pi / 180.0;
 			const int direction = fallen ? 3 : ((facing + viewRotation) % 8 + 8) % 8; // (viewRotation: 3 minus the direction to the camera)
 			const double standing[3] = { feet[0], feet[1], standingHeight(feet) };
+			const size_t stepsBefore = _drawList.size();
 			recordVoxelUnit(*body, walkPhase, facing, direction, level, standing, floorUnderside(feet), shade, unitScale, unit, fall);
+			// With full sprite hitboxes the body is what the lines test (see FirstPerson::spriteHitAt): outlined as a
+			// picture is (see drawUnitOutlines), round the pixels it's drawn on (noted as they're drawn, see
+			// drawVoxelUnit); not one going down, nor one so close that it fades out.
+			double bodyX, bodyY, bodyDepth;
+			if (_outlining && _drawList.size() > stepsBefore && (!hitboxAimedOnly || unit == _aimedUnit) && fall <= 0.0 && _outlineColors.size() < 0xFFFF
+				&& projectToScreen(standing, bodyX, bodyY, bodyDepth) && bodyDepth >= 10.0)
+			{
+				_outlineColors.push_back(_colors.hitbox[unit->getFaction() == FACTION_PLAYER ? 0 : unit->getFaction() == FACTION_HOSTILE ? 1 : 2]);
+				_drawList.back().voxelHitOutline = (Uint16)_outlineColors.size();
+			}
 			// What the game draws over a unit's sprite, its flames when it burns and its breath's bubbles under the sea, is
 			// drawn over its body: the drawer's overlay alone (the unit's parts drawn nowhere), standing at the unit, nearer
 			// by VoxelOverlayNearer to show over the body's front; unshaded, as the game draws flames.
@@ -1679,8 +1698,8 @@ void FirstPersonView::drawUnits()
 	{
 		started = started->first->getStatus() == STATUS_COLLAPSING || collapseFall(started->first, now) < 1.0 ? std::next(started) : _collapseStarts.erase(started);
 	}
-	// Then draw them all, and with full sprite hitboxes the outlines of what the lines test over them (pictures: a
-	// voxel body isn't outlined, see FirstPerson::viewCard).
+	// Then draw them all, and with full sprite hitboxes the outlines of what the lines test over them (pictures, by
+	// their cards; a voxel body by the pixels it was drawn on, see drawVoxelUnit).
 	replayDrawList();
 	if (_outlining)
 	{
