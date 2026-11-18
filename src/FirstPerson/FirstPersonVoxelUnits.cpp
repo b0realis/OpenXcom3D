@@ -128,6 +128,20 @@ bool VoxelUnits::suits(const BattleUnit *unit)
 }
 
 /**
+ * Whether a unit that is down (dead or unconscious: in a battle loaded with it down already, or one never seen up) can
+ * have a body made all the same, as it stood, for its corpse to lie as (see FirstPersonMode::makeVoxelBodies): one
+ * loaded down lies as one that went down in view does.
+ * @param unit The unit.
+ * @return True if it can.
+ */
+bool VoxelUnits::suitsDown(const BattleUnit *unit)
+{
+	const Armor *armor = unit->getArmor();
+	const Routine *routine = routineFor(armor->getDrawingRoutine());
+	return routine && armor->getSize() == (routine->big ? 2 : 1) && (unit->getStatus() == STATUS_DEAD || unit->getStatus() == STATUS_UNCONSCIOUS);
+}
+
+/**
  * The key a unit's body is kept under: the unit, its armour, kneeling, aiming, flying, what it holds, and a big unit's
  * turret's turn from its hull.
  * @param unit The unit.
@@ -189,6 +203,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 
 	const Routine *routine = routineFor(unit->getArmor()->getDrawingRoutine());
 	if (!routine) return nullptr;
+	unitSprite.setDrawOut(unit->isOut()); // (a unit already down, see suitsDown: drawn as it stood)
 	// Each part on a frame of its own, for each direction (the drawer turned to it), with the game's colours; the
 	// drawer's other parts on a frame nobody looks at. A big unit's four tiles (and its turret, and what it floats on) on
 	// the torso's frame, laid out as the 3D view lays out its sprite.
@@ -321,6 +336,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		walks.any = true;
 	}
 	unitSprite.setViewRotation(0);
+	unitSprite.setDrawOut(false);
 	// And its corpse's picture on the floor (FLOOROB.PCK, as the map draws a corpse), for the body to end lying as it shows.
 	std::vector<Uint8> corpse;
 	const auto &corpseItems = unit->getArmor()->getCorpseBattlescape();

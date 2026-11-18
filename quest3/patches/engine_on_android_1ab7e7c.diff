@@ -21810,7 +21810,7 @@ index 3a1887ab7..c962ff06f 100644
  	/// Creates a new UnitDieBState class
  	UnitDieBState(BattlescapeGame *parent, BattleUnit *unit, const RuleDamageType *damageType, bool noSound);
 diff --git a/src/Battlescape/UnitSprite.cpp b/src/Battlescape/UnitSprite.cpp
-index 8fa87f892..839261340 100644
+index 8fa87f892..1a27f8f50 100644
 --- a/src/Battlescape/UnitSprite.cpp
 +++ b/src/Battlescape/UnitSprite.cpp
 @@ -49,12 +49,60 @@ UnitSprite::UnitSprite(Surface* dest, const Mod* mod, const SavedBattleGame* sav
@@ -21909,6 +21909,15 @@ index 8fa87f892..839261340 100644
  }
  
  /**
+@@ -188,7 +240,7 @@ void UnitSprite::draw(const BattleUnit* unit, int part, int x, int y, int shade,
+ 	_shade = shade;
+ 	_mask = mask;
+ 
+-	if (_unit->isOut())
++	if (_unit->isOut() && !_drawOut) // OpenXcom3D: unless asked for as it stood (see setDrawOut)
+ 	{
+ 		// unit is drawn as an item
+ 		return;
 @@ -368,13 +420,13 @@ void UnitSprite::drawRoutine0()
  	const int offXAiming = 0;
  	const int soldierHeight = 22;
@@ -22313,16 +22322,17 @@ index 8fa87f892..839261340 100644
  	blitBody(s);
  }
 diff --git a/src/Battlescape/UnitSprite.h b/src/Battlescape/UnitSprite.h
-index 599d9a24f..fe3eb3a05 100644
+index 599d9a24f..3a8b6d51d 100644
 --- a/src/Battlescape/UnitSprite.h
 +++ b/src/Battlescape/UnitSprite.h
-@@ -59,6 +59,15 @@ private:
+@@ -59,6 +59,16 @@ private:
  	bool _helmet;
  	int _red, _blue;
  	int _x, _y, _shade, _burn;
 +	int _viewRotation;
 +	Surface **_partCapture = nullptr; // OpenXcom3D: each part on a surface of its own (see setPartCapture)
 +	int _fallOverride = -1; // OpenXcom3D: the fall's frame drawn (see setFallOverride)
++	bool _drawOut = false; // OpenXcom3D: a unit that is down is drawn as it stood (see setDrawOut)
 +	int _walkOverride = -1; // OpenXcom3D: the walk's phase drawn (see setWalkOverride)
 +	/// OpenXcom3D: the unit is drawn falling (its own fall, or the override's frame), and in which frame; walking likewise.
 +	bool collapsing() const;
@@ -22332,7 +22342,7 @@ index 599d9a24f..fe3eb3a05 100644
  	GraphSubset _mask;
  
  	/// Drawing routine for XCom soldiers in overalls, sectoids (routine 0),
-@@ -99,6 +108,10 @@ private:
+@@ -99,6 +109,10 @@ private:
  	void drawRoutine21();
  	/// Sort two handed sprites out.
  	void sortRifles();
@@ -22343,7 +22353,7 @@ index 599d9a24f..fe3eb3a05 100644
  	/// Get graphic for unit part.
  	void selectUnit(Part& p, int index, int offset);
  	/// Get graphic for item part.
-@@ -114,6 +127,17 @@ public:
+@@ -114,6 +128,19 @@ public:
  	~UnitSprite();
  	/// Draws the unit.
  	void draw(const BattleUnit* unit, int part, int x, int y, int shade, GraphSubset mask, bool drawFacingIndicator);
@@ -22355,6 +22365,8 @@ index 599d9a24f..fe3eb3a05 100644
 +	/// OpenXcom3D: draws a unit one tile big in this frame of its fall (its death frames, facing the screen), whatever it's
 +	/// doing, the unit left as it is (-1: as it is: the 3D view's voxel units follow the fall frames, see VoxelUnits).
 +	void setFallOverride(int phase) { _fallOverride = phase; }
++	/// OpenXcom3D: draws a unit that is down (dead, unconscious) as it stood, not nothing (its voxel body is made from that).
++	void setDrawOut(bool drawOut) { _drawOut = drawOut; }
 +	/// OpenXcom3D: draws the unit in this phase of its walk (0-7), whatever it's doing, the unit left as it is (-1: as it
 +	/// is: the 3D view's voxel units follow the walk frames, see VoxelUnits).
 +	void setWalkOverride(int phase) { _walkOverride = phase; }
@@ -34696,10 +34708,10 @@ index 000000000..eaa9f409a
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..427986b43
+index 000000000..fb400a88b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,3462 @@
+@@ -0,0 +1,3464 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -36939,7 +36951,9 @@ index 000000000..427986b43
 +	for (BattleUnit *unit : *_save->getUnits())
 +	{
 +		if (builds <= 0) break;
-+		if (!VoxelUnits::suits(unit) || unit->getStatus() == STATUS_WALKING || unit->getStatus() == STATUS_FLYING) continue;
++		// (a unit down already has one made too, once: its corpse lies as its body, as one that went down in view)
++		if (VoxelUnits::suitsDown(unit) ? _voxelUnits->lastBody(unit) != nullptr : !VoxelUnits::suits(unit)) continue;
++		if (unit->getStatus() == STATUS_WALKING || unit->getStatus() == STATUS_FLYING) continue;
 +		int walkPhase;
 +		_voxelUnits->modelFor(unit, unitSprite, _game->getMod()->getSurfaceSet("BIGOBS.PCK"), _game->getMod()->getSurfaceSet("FLOOROB.PCK"), _save,
 +			_state->getPalette(), builds, walkPhase);
@@ -83677,10 +83691,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..7626819af
+index 000000000..df910c470
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,2446 @@
+@@ -0,0 +1,2484 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -85739,6 +85753,44 @@ index 000000000..7626819af
 +		}
 +	}
 +
++	// The waist: each part's shape narrows to nothing at its ends, and where the torso's lowest rows met the legs' highest
++	// the body pinched to a point (the owner on a Sectoid: "legs and torso join is too small. It looks like body is
++	// floating on top of legs"). The rows between the torso's fullest row near its foot and the legs' fullest near
++	// their top are filled out: the torso's section there, as far across as the legs reach.
++	if (!routine.whole && !routine.big)
++	{
++		std::vector<int> torsoCells(GridUp, 0), legCells(GridUp, 0);
++		for (int across = 0; across < GridAcross; ++across)
++			for (int along = 0; along < GridAlong; ++along)
++				for (int up = 0; up < GridUp; ++up)
++				{
++					const Uint8 part = owner[cellIndex(across, along, up)];
++					if (part == VoxelUnitModel::Torso) ++torsoCells[up];
++					else if (part == VoxelUnitModel::Legs) ++legCells[up];
++				}
++		int torsoLow = 0, legsHigh = GridUp - 1;
++		while (torsoLow < GridUp && !torsoCells[torsoLow]) ++torsoLow;
++		while (legsHigh >= 0 && !legCells[legsHigh]) --legsHigh;
++		const int look = 6 * VOXELSCALE; // (cells: three voxels of each part's end)
++		if (torsoLow < GridUp && legsHigh >= 0 && legsHigh < torsoLow + look)
++		{
++			int torsoRow = torsoLow, legsRow = legsHigh;
++			for (int up = torsoLow; up < std::min(GridUp, torsoLow + look); ++up) if (torsoCells[up] > torsoCells[torsoRow]) torsoRow = up;
++			for (int up = legsHigh; up >= std::max(0, legsHigh - look); --up) if (legCells[up] > legCells[legsRow]) legsRow = up;
++			int legsFrom = GridAcross, legsTo = -1;
++			for (int across = 0; across < GridAcross; ++across)
++				for (int along = 0; along < GridAlong; ++along)
++					if (owner[cellIndex(across, along, legsRow)] == VoxelUnitModel::Legs) { legsFrom = std::min(legsFrom, across); legsTo = std::max(legsTo, across); }
++			for (int up = legsRow + 1; up < torsoRow; ++up)
++				for (int across = legsFrom; across <= legsTo; ++across)
++					for (int along = 0; along < GridAlong; ++along)
++					{
++						Uint8 &cell = owner[cellIndex(across, along, up)];
++						if (!cell && owner[cellIndex(across, along, torsoRow)] == VoxelUnitModel::Torso) cell = up <= legsHigh ? VoxelUnitModel::Legs : VoxelUnitModel::Torso;
++					}
++		}
++	}
++
 +	// The voxels: each a filled cell of the grid, a little cube; drawn side by side they pack without a gap. Kept are the
 +	// cells of the body's skin: those with an empty cell beside them, and those that are skin in some view. (Seen from
 +	// one of the 8 directions the body shows only its cells inside that direction's drawing, see matchViews: where a
@@ -86736,10 +86788,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..a132e2b57
+index 000000000..272103ab0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,722 @@
+@@ -0,0 +1,738 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -86870,6 +86922,20 @@ index 000000000..a132e2b57
 +}
 +
 +/**
++ * Whether a unit that is down (dead or unconscious: in a battle loaded with it down already, or one never seen up) can
++ * have a body made all the same, as it stood, for its corpse to lie as (see FirstPersonMode::makeVoxelBodies): one
++ * loaded down lies as one that went down in view does.
++ * @param unit The unit.
++ * @return True if it can.
++ */
++bool VoxelUnits::suitsDown(const BattleUnit *unit)
++{
++	const Armor *armor = unit->getArmor();
++	const Routine *routine = routineFor(armor->getDrawingRoutine());
++	return routine && armor->getSize() == (routine->big ? 2 : 1) && (unit->getStatus() == STATUS_DEAD || unit->getStatus() == STATUS_UNCONSCIOUS);
++}
++
++/**
 + * The key a unit's body is kept under: the unit, its armour, kneeling, aiming, flying, what it holds, and a big unit's
 + * turret's turn from its hull.
 + * @param unit The unit.
@@ -86931,6 +86997,7 @@ index 000000000..a132e2b57
 +
 +	const Routine *routine = routineFor(unit->getArmor()->getDrawingRoutine());
 +	if (!routine) return nullptr;
++	unitSprite.setDrawOut(unit->isOut()); // (a unit already down, see suitsDown: drawn as it stood)
 +	// Each part on a frame of its own, for each direction (the drawer turned to it), with the game's colours; the
 +	// drawer's other parts on a frame nobody looks at. A big unit's four tiles (and its turret, and what it floats on) on
 +	// the torso's frame, laid out as the 3D view lays out its sprite.
@@ -87063,6 +87130,7 @@ index 000000000..a132e2b57
 +		walks.any = true;
 +	}
 +	unitSprite.setViewRotation(0);
++	unitSprite.setDrawOut(false);
 +	// And its corpse's picture on the floor (FLOOROB.PCK, as the map draws a corpse), for the body to end lying as it shows.
 +	std::vector<Uint8> corpse;
 +	const auto &corpseItems = unit->getArmor()->getCorpseBattlescape();
@@ -87464,10 +87532,10 @@ index 000000000..a132e2b57
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.h b/src/FirstPerson/FirstPersonVoxelUnits.h
 new file mode 100644
-index 000000000..d67b49733
+index 000000000..217853182
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.h
-@@ -0,0 +1,217 @@
+@@ -0,0 +1,219 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -87625,6 +87693,8 @@ index 000000000..d67b49733
 +	/// Whether a unit can be drawn as a voxel body: of a size and drawn by a routine the bodies know
 +	/// (see Routine), and up.
 +	static bool suits(const BattleUnit *unit);
++	/// Whether a unit that is down can have a body made as it stood, for its corpse to lie as.
++	static bool suitsDown(const BattleUnit *unit);
 +	/// The body for a unit as it is now, made the first time from its sprites (drawn with the unit
 +	/// sprite given, which is left turned to the unit's own direction, its other parts drawn nowhere)
 +	/// its items' inventory pictures (BIGOBS.PCK) and its corpse's (FLOOROB.PCK), in the battle's palette, while builds (counted

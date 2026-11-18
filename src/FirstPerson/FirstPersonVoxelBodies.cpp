@@ -2056,6 +2056,44 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		}
 	}
 
+	// The waist: each part's shape narrows to nothing at its ends, and where the torso's lowest rows met the legs' highest
+	// the body pinched to a point (the owner on a Sectoid: "legs and torso join is too small. It looks like body is
+	// floating on top of legs"). The rows between the torso's fullest row near its foot and the legs' fullest near
+	// their top are filled out: the torso's section there, as far across as the legs reach.
+	if (!routine.whole && !routine.big)
+	{
+		std::vector<int> torsoCells(GridUp, 0), legCells(GridUp, 0);
+		for (int across = 0; across < GridAcross; ++across)
+			for (int along = 0; along < GridAlong; ++along)
+				for (int up = 0; up < GridUp; ++up)
+				{
+					const Uint8 part = owner[cellIndex(across, along, up)];
+					if (part == VoxelUnitModel::Torso) ++torsoCells[up];
+					else if (part == VoxelUnitModel::Legs) ++legCells[up];
+				}
+		int torsoLow = 0, legsHigh = GridUp - 1;
+		while (torsoLow < GridUp && !torsoCells[torsoLow]) ++torsoLow;
+		while (legsHigh >= 0 && !legCells[legsHigh]) --legsHigh;
+		const int look = 6 * VOXELSCALE; // (cells: three voxels of each part's end)
+		if (torsoLow < GridUp && legsHigh >= 0 && legsHigh < torsoLow + look)
+		{
+			int torsoRow = torsoLow, legsRow = legsHigh;
+			for (int up = torsoLow; up < std::min(GridUp, torsoLow + look); ++up) if (torsoCells[up] > torsoCells[torsoRow]) torsoRow = up;
+			for (int up = legsHigh; up >= std::max(0, legsHigh - look); --up) if (legCells[up] > legCells[legsRow]) legsRow = up;
+			int legsFrom = GridAcross, legsTo = -1;
+			for (int across = 0; across < GridAcross; ++across)
+				for (int along = 0; along < GridAlong; ++along)
+					if (owner[cellIndex(across, along, legsRow)] == VoxelUnitModel::Legs) { legsFrom = std::min(legsFrom, across); legsTo = std::max(legsTo, across); }
+			for (int up = legsRow + 1; up < torsoRow; ++up)
+				for (int across = legsFrom; across <= legsTo; ++across)
+					for (int along = 0; along < GridAlong; ++along)
+					{
+						Uint8 &cell = owner[cellIndex(across, along, up)];
+						if (!cell && owner[cellIndex(across, along, torsoRow)] == VoxelUnitModel::Torso) cell = up <= legsHigh ? VoxelUnitModel::Legs : VoxelUnitModel::Torso;
+					}
+		}
+	}
+
 	// The voxels: each a filled cell of the grid, a little cube; drawn side by side they pack without a gap. Kept are the
 	// cells of the body's skin: those with an empty cell beside them, and those that are skin in some view. (Seen from
 	// one of the 8 directions the body shows only its cells inside that direction's drawing, see matchViews: where a

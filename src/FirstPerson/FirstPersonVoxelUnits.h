@@ -155,6 +155,8 @@ public:
 	/// Whether a unit can be drawn as a voxel body: of a size and drawn by a routine the bodies know
 	/// (see Routine), and up.
 	static bool suits(const BattleUnit *unit);
+	/// Whether a unit that is down can have a body made as it stood, for its corpse to lie as.
+	static bool suitsDown(const BattleUnit *unit);
 	/// The body for a unit as it is now, made the first time from its sprites (drawn with the unit
 	/// sprite given, which is left turned to the unit's own direction, its other parts drawn nowhere)
 	/// its items' inventory pictures (BIGOBS.PCK) and its corpse's (FLOOROB.PCK), in the battle's palette, while builds (counted

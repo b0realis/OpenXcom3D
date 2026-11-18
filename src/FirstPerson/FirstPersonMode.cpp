@@ -2237,7 +2237,9 @@ void FirstPersonMode::makeVoxelBodies()
 	for (BattleUnit *unit : *_save->getUnits())
 	{
 		if (builds <= 0) break;
-		if (!VoxelUnits::suits(unit) || unit->getStatus() == STATUS_WALKING || unit->getStatus() == STATUS_FLYING) continue;
+		// (a unit down already has one made too, once: its corpse lies as its body, as one that went down in view)
+		if (VoxelUnits::suitsDown(unit) ? _voxelUnits->lastBody(unit) != nullptr : !VoxelUnits::suits(unit)) continue;
+		if (unit->getStatus() == STATUS_WALKING || unit->getStatus() == STATUS_FLYING) continue;
 		int walkPhase;
 		_voxelUnits->modelFor(unit, unitSprite, _game->getMod()->getSurfaceSet("BIGOBS.PCK"), _game->getMod()->getSurfaceSet("FLOOROB.PCK"), _save,
 			_state->getPalette(), builds, walkPhase);
