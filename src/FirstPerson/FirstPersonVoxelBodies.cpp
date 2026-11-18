@@ -2318,7 +2318,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 				for (int b = -reach; b <= reach; ++b)
 					for (int c = -reach; c <= reach; ++c)
 						if (!filled(across + a, along + b, up + c)) { out[0] += a; out[1] += b; out[2] += c; }
-			const int painting = out[2] > std::hypot(out[0], out[1]) * 1.5f ? 1 : 0;
+			const int painting = out[2] > planeLength(out[0], out[1]) * 1.5f ? 1 : 0;
 			// (each direction's camera: towards its nearness, see project)
 			float fit[8];
 			for (int d = 0; d < 8; ++d) fit[d] = out[0] * (Turns[d].cosine + Turns[d].sine) + out[1] * (Turns[d].sine - Turns[d].cosine);
