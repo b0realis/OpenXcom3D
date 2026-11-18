@@ -69662,10 +69662,10 @@ index 000000000..5ee90296f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..de38dff49
+index 000000000..41555c26c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,629 @@
+@@ -0,0 +1,637 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -69861,6 +69861,14 @@ index 000000000..de38dff49
 +/// pace, BattlescapeState::DEFAULT_ANIM_SPEED a frame; GitHub issue #58: the fall needn't hurry, nothing waits for it),
 +/// and the most fall frames it shows (a fall is surely over after that many: the armors have 3 or so, mods may give more).
 +const Uint32 QuickFallFrameTime = 100;
++/// A voxel body going down by the game's own fall shows each of its fall's shapes (one for each death frame, then lying)
++/// this long, ms: at the frames' own pace the whole fall was over in a third of a second, and read as standing, then a
++/// pile (the owner: "does it have any death animation? It is perceived as standing - and a pile on floor").
++const Uint32 VoxelFallShapeTime = 170;
++/// A Celatid's voxel body hovers as its picture's frames do: up and down by this much (voxels), once in this long (ms),
++/// swelling and shrinking by this share meanwhile (the owner: "Celatid should have some movement in voxel units also").
++const double CelatidBob = 1.2, CelatidSwell = 0.04;
++const Uint32 CelatidBobTime = 1400;
 +/// A hit unit flinches back and flashes for this many milliseconds (see FirstPersonView::watchUnits), the flash up to
 +/// HitFlashShade shade steps brighter at the hit (settings "Hit flash" and "Muzzle flashes", which turns every flash
 +/// off); a downed unit's body flashes the same way.
@@ -72642,10 +72650,10 @@ index 000000000..229bd966c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..4e321bc17
+index 000000000..122b3a7d2
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,4055 @@
+@@ -0,0 +1,4062 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -73401,7 +73409,7 @@ index 000000000..4e321bc17
 +
 +/**
 + * How far a voxel body going down by the game's own fall (a unit collapsing) has come: by the clock since it was first
-+ * seen collapsing, at the quick fall's pace (QuickFallFrameTime for each of its death frames).
++ * seen collapsing, VoxelFallShapeTime for each of its fall's shapes (its death frames, then lying).
 + * @param unit The unit.
 + * @param now The time now (SDL ticks).
 + * @return 0 to 1 (lying), or -1 if it wasn't seen collapsing (or the fall is long forgotten).
@@ -73411,7 +73419,7 @@ index 000000000..4e321bc17
 +	auto started = _collapseStarts.find(unit);
 +	if (started == _collapseStarts.end()) return -1.0;
 +	const int frames = std::max(1, unit->getArmor()->getDeathFrames());
-+	return std::min(1.0, (now - started->second) / (double)(frames * QuickFallFrameTime));
++	return std::min(1.0, (now - started->second) / (double)((frames + 1) * VoxelFallShapeTime));
 +}
 +
 +/**
@@ -74214,9 +74222,16 @@ index 000000000..4e321bc17
 +			const double flat = std::max(1.0, std::hypot(spriteEye[0] - feet[0], spriteEye[1] - feet[1]));
 +			const bool level = !fallen && std::atan2((spriteEye[2] - chest[2]) * ZScale, flat) < VoxelSlantAbove * Pi / 180.0;
 +			const int direction = fallen ? 3 : ((facing + viewRotation) % 8 + 8) % 8; // (viewRotation: 3 minus the direction to the camera)
-+			const double standing[3] = { feet[0], feet[1], standingHeight(feet) };
++			double standing[3] = { feet[0], feet[1], standingHeight(feet) }, bodyScale = unitScale;
++			if (unit->getArmor()->getDrawingRoutine() == 9 && fall <= 0.0)
++			{
++				// (the Celatid, see CelatidBob: each one in its own step)
++				const double turn = (now + (Uint32)unit->getId() * 377u) % CelatidBobTime / (double)CelatidBobTime * 2.0 * Pi;
++				standing[2] += CelatidBob * (1.0 + std::sin(turn));
++				bodyScale *= 1.0 + CelatidSwell * std::sin(turn * 2.0);
++			}
 +			const size_t stepsBefore = _drawList.size();
-+			recordVoxelUnit(*body, walkPhase, facing, direction, level, standing, floorUnderside(feet), shade, unitScale, unit, fall);
++			recordVoxelUnit(*body, walkPhase, facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall);
 +			// With full sprite hitboxes the body is what the lines test (see FirstPerson::spriteHitAt): outlined as a
 +			// picture is (see drawUnitOutlines), round the pixels it's drawn on (noted as they're drawn, see
 +			// drawVoxelUnit); not one going down, nor one so close that it fades out.

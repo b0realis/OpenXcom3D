@@ -193,6 +193,14 @@ const float TestedPictureDepthSlack = 0.5f, TestedPictureDepthSlackElsewhere = 4
 /// pace, BattlescapeState::DEFAULT_ANIM_SPEED a frame; GitHub issue #58: the fall needn't hurry, nothing waits for it),
 /// and the most fall frames it shows (a fall is surely over after that many: the armors have 3 or so, mods may give more).
 const Uint32 QuickFallFrameTime = 100;
+/// A voxel body going down by the game's own fall shows each of its fall's shapes (one for each death frame, then lying)
+/// this long, ms: at the frames' own pace the whole fall was over in a third of a second, and read as standing, then a
+/// pile (the owner: "does it have any death animation? It is perceived as standing - and a pile on floor").
+const Uint32 VoxelFallShapeTime = 170;
+/// A Celatid's voxel body hovers as its picture's frames do: up and down by this much (voxels), once in this long (ms),
+/// swelling and shrinking by this share meanwhile (the owner: "Celatid should have some movement in voxel units also").
+const double CelatidBob = 1.2, CelatidSwell = 0.04;
+const Uint32 CelatidBobTime = 1400;
 /// A hit unit flinches back and flashes for this many milliseconds (see FirstPersonView::watchUnits), the flash up to
 /// HitFlashShade shade steps brighter at the hit (settings "Hit flash" and "Muzzle flashes", which turns every flash
 /// off); a downed unit's body flashes the same way.

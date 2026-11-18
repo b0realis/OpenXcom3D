@@ -753,7 +753,7 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 
 /**
  * How far a voxel body going down by the game's own fall (a unit collapsing) has come: by the clock since it was first
- * seen collapsing, at the quick fall's pace (QuickFallFrameTime for each of its death frames).
+ * seen collapsing, VoxelFallShapeTime for each of its fall's shapes (its death frames, then lying).
  * @param unit The unit.
  * @param now The time now (SDL ticks).
  * @return 0 to 1 (lying), or -1 if it wasn't seen collapsing (or the fall is long forgotten).
@@ -763,7 +763,7 @@ double FirstPersonView::collapseFall(const BattleUnit *unit, Uint32 now) const
 	auto started = _collapseStarts.find(unit);
 	if (started == _collapseStarts.end()) return -1.0;
 	const int frames = std::max(1, unit->getArmor()->getDeathFrames());
-	return std::min(1.0, (now - started->second) / (double)(frames * QuickFallFrameTime));
+	return std::min(1.0, (now - started->second) / (double)((frames + 1) * VoxelFallShapeTime));
 }
 
 /**
@@ -1566,9 +1566,16 @@ void FirstPersonView::drawUnits()
 			const double flat = std::max(1.0, std::hypot(spriteEye[0] - feet[0], spriteEye[1] - feet[1]));
 			const bool level = !fallen && std::atan2((spriteEye[2] - chest[2]) * ZScale, flat) < VoxelSlantAbove * Pi / 180.0;
 			const int direction = fallen ? 3 : ((facing + viewRotation) % 8 + 8) % 8; // (viewRotation: 3 minus the direction to the camera)
-			const double standing[3] = { feet[0], feet[1], standingHeight(feet) };
+			double standing[3] = { feet[0], feet[1], standingHeight(feet) }, bodyScale = unitScale;
+			if (unit->getArmor()->getDrawingRoutine() == 9 && fall <= 0.0)
+			{
+				// (the Celatid, see CelatidBob: each one in its own step)
+				const double turn = (now + (Uint32)unit->getId() * 377u) % CelatidBobTime / (double)CelatidBobTime * 2.0 * Pi;
+				standing[2] += CelatidBob * (1.0 + std::sin(turn));
+				bodyScale *= 1.0 + CelatidSwell * std::sin(turn * 2.0);
+			}
 			const size_t stepsBefore = _drawList.size();
-			recordVoxelUnit(*body, walkPhase, facing, direction, level, standing, floorUnderside(feet), shade, unitScale, unit, fall);
+			recordVoxelUnit(*body, walkPhase, facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall);
 			// With full sprite hitboxes the body is what the lines test (see FirstPerson::spriteHitAt): outlined as a
 			// picture is (see drawUnitOutlines), round the pixels it's drawn on (noted as they're drawn, see
 			// drawVoxelUnit); not one going down, nor one so close that it fades out.
