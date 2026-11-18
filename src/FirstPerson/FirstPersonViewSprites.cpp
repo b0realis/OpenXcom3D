@@ -53,6 +53,7 @@
 #include <algorithm>
 #include <cmath>
 #include <map>
+#include <unordered_set>
 #include <string>
 #include <vector>
 #include <SDL.h>
@@ -694,6 +695,47 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 	}
 	const double middleX = axisX(), middleY = axisY();
 	const size_t voxels = right.size();
+	// On the card (setting "Renderer": GPU) the card draws the cubes itself, from the body's own arrays (see
+	// gpuRecordBody): nothing is worked out for each of them here, unless its check has the CPU draw them too.
+	const bool onCard = _gpuRecording;
+	// Far away a cube is smaller than a pixel, and its neighbours fall on the same pixels: the body is drawn coarser
+	// there, a cube for each block of 2 or 4 cells each way (see VoxelUnitModel::Coarse), that many times as big. The
+	// processor then works out a quarter or a sixteenth of the cubes for the same picture, a pixel here and there apart
+	// (a player, GitHub issue #182: "I lose 15 fps using voxel models on cpu").
+	int stride = 1;
+	const VoxelUnitModel::Coarse *coarse = nullptr;
+	if (cubes && !onCard)
+	{
+		const double half = 0.5 * (std::abs(edges[0][0]) + std::abs(edges[1][0]) + std::abs(edges[2][0]) + std::abs(edges[0][1]) + std::abs(edges[1][1]) + std::abs(edges[2][1])) / anchorDepth;
+		stride = half < VoxelCoarseHalf / 2.0 ? 4 : half < VoxelCoarseHalf ? 2 : 1;
+		if (stride > 1 && (fallen || body.right.size() == voxels))
+		{
+			VoxelUnitModel::Coarse &made = fallen ? fallen->coarse[stride / 4] : body.coarse[stride / 4];
+			if (!made.made)
+			{
+				// (the blocks of the shape as it stands: the walk moves the same cubes)
+				const std::vector<float> &r = fallen ? fallen->right : body.right, &a = fallen ? fallen->ahead : body.ahead, &u = fallen ? fallen->up : body.up;
+				const float block = (float)VoxelCubeEdge * stride;
+				std::unordered_set<Uint64> taken;
+				for (size_t k = 0; k < r.size(); ++k)
+				{
+					if (!fallen && k < body.part.size() && body.part[k] == VoxelUnitModel::Item) continue; // (what it holds is drawn whole: thin, a block would fatten it)
+					const float at[3] = { std::floor(r[k] / block), std::floor(a[k] / block), std::floor(u[k] / block) };
+					const Uint64 key = ((Uint64)(Sint64)(at[0] + 4096.0f) << 42) | ((Uint64)(Sint64)(at[1] + 4096.0f) << 21) | (Uint64)(Sint64)(at[2] + 4096.0f);
+					if (!taken.insert(key).second) continue;
+					made.voxel.push_back((Uint32)k);
+					const float from[3] = { r[k], a[k], u[k] };
+					for (int axis = 0; axis < 3; ++axis) made.shift.push_back((at[axis] + 0.5f) * block - from[axis]);
+				}
+				made.made = true;
+			}
+			coarse = &made;
+		}
+		else
+		{
+			stride = 1;
+		}
+	}
 	DrawStep step;
 	step.kind = DrawStep::VoxelUnit;
 	step.sprite.unit = unit;
@@ -701,9 +743,6 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 	step.sprite.pile = pile;
 	step.voxelFirst = _voxelSplats.size();
 	step.voxelOpacity = opacity;
-	// On the card (setting "Renderer": GPU) the card draws the cubes itself, from the body's own arrays (see
-	// gpuRecordBody): nothing is worked out for each of them here, unless its check has the CPU draw them too.
-	const bool onCard = _gpuRecording;
 	if (onCard)
 	{
 		step.bodyRight = right.data(); step.bodyAhead = ahead.data(); step.bodyUp = up.data();
@@ -719,32 +758,124 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 		step.bodyItems = items;
 		step.bodyShade = shade;
 	}
-	for (size_t k = 0; k < voxels && !(onCard && _gpuRecordOnly); ++k)
+	// Each cube's place on the screen: the feet's in the camera's frame (ahead, to the right, up) and the body's three
+	// axes there, so a cube is three multiplications each way and one division (projectToScreen worked each out from
+	// the world's point: half the time a body took).
+	const double measure = scale * bodyUnit;
+	float base[3] = {}, toCamera[3][3] = {};
 	{
+		const double *frame[3] = { _forward, _right, _up };
+		const double relative[3] = { feet[0] - _eye[0], feet[1] - _eye[1], (feet[2] - _eye[2]) * ZScale };
+		const double bodyAxes[3][3] = { { cosine * measure, sine * measure, 0.0 }, { sine * measure, -cosine * measure, 0.0 }, { 0.0, 0.0, measure * ZScale } };
+		for (int way = 0; way < 3; ++way)
+		{
+			base[way] = (float)(relative[0] * frame[way][0] + relative[1] * frame[way][1] + relative[2] * frame[way][2]);
+			for (int axis = 0; axis < 3; ++axis)
+				toCamera[axis][way] = (float)(bodyAxes[axis][0] * frame[way][0] + bodyAxes[axis][1] * frame[way][1] + bodyAxes[axis][2] * frame[way][2]);
+		}
+	}
+	const float focal = (float)focalLength, axisAcross = (float)middleX, axisDown = (float)middleY;
+	const float cutBelow = (float)((floorCut - feet[2]) / measure); // (in the body's own measure, up from its feet)
+	float edgesNow[3][2], leanNow[3];
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		edges[axis][0] *= stride; edges[axis][1] *= stride; lean[axis] *= stride;
+		edgesNow[axis][0] = (float)edges[axis][0]; edgesNow[axis][1] = (float)edges[axis][1]; leanNow[axis] = (float)lean[axis];
+	}
+	// A cube that turns none of its bare faces to the eye is behind the body's near side: left out. Half a body's cubes
+	// are, and they were projected, sorted and tested against the depths for nothing: most of what a body cost the
+	// processor. (Standing or lying on its grid, drawn whole: the walk moves the cubes off the grid, a little apart.)
+	const std::vector<Uint8> *bare = nullptr;
+	float eyeAt[3] = {};
+	if (!onCard && !coarse && !walking && cubes)
+	{
+		std::vector<Uint8> &faces = fallen ? fallen->bare : body.bare;
+		if (faces.size() != voxels)
+		{
+			const float cell = (float)VoxelCubeEdge;
+			auto keyOf = [cell](float r, float a, float u) {
+				return ((Uint64)(Sint64)(std::floor(r / cell) + 4096.0f) << 42) | ((Uint64)(Sint64)(std::floor(a / cell) + 4096.0f) << 21) | (Uint64)(Sint64)(std::floor(u / cell) + 4096.0f);
+			};
+			std::unordered_set<Uint64> filled;
+			for (size_t k = 0; k < voxels; ++k) filled.insert(keyOf(right[k], ahead[k], up[k]));
+			faces.assign(voxels, 0x3F);
+			static const float Beside[6][3] = { { 1, 0, 0 }, { -1, 0, 0 }, { 0, 1, 0 }, { 0, -1, 0 }, { 0, 0, 1 }, { 0, 0, -1 } };
+			for (size_t k = 0; k < voxels; ++k)
+			{
+				if (!fallen && k < body.part.size() && body.part[k] == VoxelUnitModel::Item) continue; // (off the grid: never left out)
+				Uint8 found = 0;
+				for (int face = 0; face < 6; ++face)
+					if (!filled.count(keyOf(right[k] + Beside[face][0] * cell, ahead[k] + Beside[face][1] * cell, up[k] + Beside[face][2] * cell))) found |= (Uint8)(1 << face);
+				faces[k] = found ? found : 0x3F; // (a cube with none bare is skin by another rule: kept)
+			}
+		}
+		bare = &faces;
+		const double toEye[3] = { _eye[0] - feet[0], _eye[1] - feet[1], _eye[2] - feet[2] };
+		eyeAt[0] = (float)((toEye[0] * cosine + toEye[1] * sine) / measure);
+		eyeAt[1] = (float)((toEye[0] * sine - toEye[1] * cosine) / measure);
+		eyeAt[2] = (float)(toEye[2] / measure);
+	}
+	const float faceHalf = 0.5f * (float)VoxelCubeEdge;
+	const size_t drawn = coarse ? coarse->voxel.size() : voxels;
+	if (!(onCard && _gpuRecordOnly)) _voxelSplats.reserve(_voxelSplats.size() + drawn);
+	for (size_t i = 0; i < drawn && !(onCard && _gpuRecordOnly); ++i)
+	{
+		const size_t k = coarse ? coarse->voxel[i] : i;
 		// (seen from one of the 8 directions, what fits its drawing and the pieces added for it, see VoxelUnitModel::views)
 		if (!fallen && ((!items && body.part[k] == VoxelUnitModel::Item) || !body.shows(k, direction, level))) continue;
-		const float across = right[k], along = ahead[k], height = up[k];
-		const double toRight = across * scale * bodyUnit, toAhead = along * scale * bodyUnit;
-		const double world[3] = { feet[0] + toRight * cosine + toAhead * sine, feet[1] + toRight * sine - toAhead * cosine, feet[2] + height * scale * bodyUnit };
-		if (world[2] < floorCut) continue;
-		double screenX, screenY, depth;
-		if (!projectToScreen(world, screenX, screenY, depth)) continue;
+		float across = right[k], along = ahead[k], height = up[k];
+		if (coarse) { across += coarse->shift[i * 3]; along += coarse->shift[i * 3 + 1]; height += coarse->shift[i * 3 + 2]; }
+		if (height < cutBelow) continue;
+		if (bare)
+		{
+			const Uint8 turned = (Uint8)((eyeAt[0] > across + faceHalf ? 1 : 0) | (eyeAt[0] < across - faceHalf ? 2 : 0) | (eyeAt[1] > along + faceHalf ? 4 : 0)
+				| (eyeAt[1] < along - faceHalf ? 8 : 0) | (eyeAt[2] > height + faceHalf ? 16 : 0) | (eyeAt[2] < height - faceHalf ? 32 : 0));
+			if (!((*bare)[k] & turned)) continue;
+		}
+		const float depth = base[0] + across * toCamera[0][0] + along * toCamera[1][0] + height * toCamera[2][0];
+		if (depth < 4.0f) continue;
 		VoxelSplat splat;
-		splat.x = (float)screenX;
-		splat.y = (float)screenY;
-		splat.nearer = (float)(1.0 / depth);
-		double reachX = 0.0, reachY = 0.0;
+		splat.nearer = 1.0f / depth;
+		splat.x = axisAcross + (base[1] + across * toCamera[0][1] + along * toCamera[1][1] + height * toCamera[2][1]) * focal * splat.nearer;
+		splat.y = axisDown - (base[2] + across * toCamera[0][2] + along * toCamera[1][2] + height * toCamera[2][2]) * focal * splat.nearer;
+		float reachX = 0.0f, reachY = 0.0f;
 		for (int axis = 0; axis < 3; ++axis)
 		{
-			reachX += std::abs(edges[axis][0] - (screenX - middleX) * lean[axis]);
-			reachY += std::abs(edges[axis][1] - (screenY - middleY) * lean[axis]);
+			reachX += std::abs(edgesNow[axis][0] - (splat.x - axisAcross) * leanNow[axis]);
+			reachY += std::abs(edgesNow[axis][1] - (splat.y - axisDown) * leanNow[axis]);
 		}
-		splat.halfX = (float)std::min(VoxelSplatHalfMax, reachX * splat.nearer);
-		splat.halfY = (float)std::min(VoxelSplatHalfMax, reachY * splat.nearer);
-		splat.depth = (float)depth;
+		splat.halfX = std::min((float)VoxelSplatHalfMax, reachX * splat.nearer);
+		splat.halfY = std::min((float)VoxelSplatHalfMax, reachY * splat.nearer);
+		splat.depth = depth;
 		splat.colour = shadeColor(fallen ? fallen->colour[k] : body.colour(k, direction, level), shade);
 		step.voxelHalfMax = std::max(step.voxelHalfMax, splat.halfY);
 		_voxelSplats.push_back(splat);
+	}
+	// (what it holds, left out of the coarse blocks: its cubes whole, at their own size)
+	if (coarse && !fallen && items && !(onCard && _gpuRecordOnly))
+	{
+		for (size_t k = 0; k < voxels; ++k)
+		{
+			if (body.part[k] != VoxelUnitModel::Item || !body.shows(k, direction, level) || up[k] < cutBelow) continue;
+			const float depth = base[0] + right[k] * toCamera[0][0] + ahead[k] * toCamera[1][0] + up[k] * toCamera[2][0];
+			if (depth < 4.0f) continue;
+			VoxelSplat splat;
+			splat.nearer = 1.0f / depth;
+			splat.x = axisAcross + (base[1] + right[k] * toCamera[0][1] + ahead[k] * toCamera[1][1] + up[k] * toCamera[2][1]) * focal * splat.nearer;
+			splat.y = axisDown - (base[2] + right[k] * toCamera[0][2] + ahead[k] * toCamera[1][2] + up[k] * toCamera[2][2]) * focal * splat.nearer;
+			float reachX = 0.0f, reachY = 0.0f;
+			for (int axis = 0; axis < 3; ++axis)
+			{
+				reachX += std::abs(edgesNow[axis][0] - (splat.x - axisAcross) * leanNow[axis]);
+				reachY += std::abs(edgesNow[axis][1] - (splat.y - axisDown) * leanNow[axis]);
+			}
+			splat.halfX = std::min((float)VoxelSplatHalfMax, reachX * splat.nearer / stride);
+			splat.halfY = std::min((float)VoxelSplatHalfMax, reachY * splat.nearer / stride);
+			splat.depth = depth;
+			splat.colour = shadeColor(body.colour(k, direction, level), shade);
+			step.voxelHalfMax = std::max(step.voxelHalfMax, splat.halfY);
+			_voxelSplats.push_back(splat);
+		}
 	}
 	step.voxelCount = _voxelSplats.size() - step.voxelFirst;
 	if (step.voxelCount == 0 && !(onCard && voxels > 0)) return;
@@ -759,7 +890,21 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 	}
 	step.voxelMiddle[0] = (float)middleX;
 	step.voxelMiddle[1] = (float)middleY;
-	std::sort(_voxelSplats.begin() + step.voxelFirst, _voxelSplats.end(), [](const VoxelSplat &a, const VoxelSplat &b) { return a.y < b.y; });
+	// Sorted by row, for each band of the view to find its own (see drawVoxelUnit): into a bucket for each row, in one
+	// pass. (Sorting them one against another was four fifths of what a body's cubes took to make ready: a player,
+	// GitHub issue #182. Rows further off the view than a cube can reach share the first and the last bucket: no band
+	// looks for them.)
+	{
+		const int margin = (int)VoxelSplatHalfMax + 2, rows = getHeight() + 2 * margin;
+		auto rowOf = [margin, rows](const VoxelSplat &splat) { return std::clamp((int)std::floor(splat.y) + margin, 0, rows - 1); };
+		_voxelRowStarts.assign((size_t)rows + 1, 0);
+		const auto first = _voxelSplats.begin() + step.voxelFirst;
+		for (auto splat = first; splat != _voxelSplats.end(); ++splat) ++_voxelRowStarts[(size_t)rowOf(*splat) + 1];
+		for (int row = 0; row < rows; ++row) _voxelRowStarts[(size_t)row + 1] += _voxelRowStarts[row];
+		_voxelSorted.resize(step.voxelCount);
+		for (auto splat = first; splat != _voxelSplats.end(); ++splat) _voxelSorted[_voxelRowStarts[rowOf(*splat)]++] = *splat;
+		std::copy(_voxelSorted.begin(), _voxelSorted.end(), first);
+	}
 	_drawList.push_back(step);
 }
 

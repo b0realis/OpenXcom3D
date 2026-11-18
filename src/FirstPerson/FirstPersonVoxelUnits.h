@@ -97,9 +97,25 @@ struct VoxelUnitModel
 	std::vector<Uint8> colours;
 	/// The walk: each of its 8 phases' places (the same voxels, legs and arms swung, the body bobbing).
 	std::vector<float> walkRight[8], walkAhead[8], walkUp[8];
+	/// A shape's cubes taken coarser, for drawing it far away on the processor (see FirstPersonView::recordVoxelUnit):
+	/// one cube for each block of 2 (or 4) cells each way that has any, the cube standing for it and how far the
+	/// block's middle is from it (right, ahead, up). Made the first time it is drawn so, by the drawing thread alone.
+	struct Coarse
+	{
+		std::vector<Uint32> voxel;
+		std::vector<float> shift;
+		bool made = false;
+	};
+	mutable Coarse coarse[2];
+	/// Each cube's bare faces, a bit each (to its right, left, ahead, behind, up, down: no cube of the shape beside it
+	/// there), for the processor to leave out the cubes that show the eye none of them (see recordVoxelUnit). Made the
+	/// first time the shape is drawn, by the drawing thread alone; what it holds has every bit.
+	mutable std::vector<Uint8> bare;
 	/// A shape of the body going down or lying: cubes on the body's own grid, each one colour from every side.
 	struct FallShape
 	{
+		mutable Coarse coarse[2];
+		mutable std::vector<Uint8> bare;
 		std::vector<float> right, ahead, up;
 		std::vector<Uint8> colour;
 		/// What a shot meets of it (see VoxelUnitModel::hits): its cubes, in whole voxels from hitFrom, hitSize each way.

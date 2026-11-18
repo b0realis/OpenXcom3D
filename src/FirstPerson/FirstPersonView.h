@@ -1303,6 +1303,8 @@ private:
 	/// A voxel of a unit's voxel body on the screen: a cube (its middle, half the box round it, pixels; one over its depth),
 	/// its depth and colour.
 	struct VoxelSplat { float x, y, halfX, halfY, nearer, depth; Uint8 colour; };
+	std::vector<VoxelSplat> _voxelSorted;   // a body's cubes while they are put in their rows' order (see recordVoxelUnit)
+	std::vector<Uint32> _voxelRowStarts;    // ... and where each row's begin
 	/// Records a unit drawn as its voxel body (setting "Voxel units"): its voxels projected, shaded and sorted by row;
 	/// going down, tipped over backwards (fall 0 to 1: lying on its back), with or without the items in hand; a body lying
 	/// in a pile pointed at as that pile (and the unconscious unit in it).

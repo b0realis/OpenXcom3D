@@ -167,6 +167,9 @@ const double VoxelSlantAbove = 15.0;
 /// A voxel body's voxel: a cube this big (the body's own measure: a cell of its grid), drawn at most VoxelSplatHalfMax
 /// pixels each way from its middle, cut to its six-sided outline once it's over VoxelOutlineFrom pixels each way.
 const double VoxelCubeEdge = 0.5, VoxelSplatHalfMax = 48.0;
+/// On the processor a body whose cubes are smaller than this on the screen (half their width seen corner on, pixels)
+/// is drawn in blocks of 2 cells each way, under half of it in blocks of 4 (see recordVoxelUnit).
+const double VoxelCoarseHalf = 0.6;
 const float VoxelOutlineFrom = 1.5f;
 /// At most this many voxel units' bodies are made a frame (each takes a few milliseconds; see VoxelUnits).
 const int VoxelBuildsPerFrame = 1;
