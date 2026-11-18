@@ -162,7 +162,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..c046c2abd
+index 000000000..eec4dc149
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,644 @@
@@ -477,7 +477,7 @@ index 000000000..c046c2abd
 +  STR_FPS_UNIT_SIZE: "Unit size"
 +  STR_FPS_UNIT_SIZE_DESC: "Soldiers, aliens, corpses and items drawn smaller (80-100%). Hitboxes stay the same."
 +  STR_FPS_VOXEL_UNITS: "Voxel units"
-+  STR_FPS_VOXEL_UNITS_DESC: "Units as 3D bodies of little cubes made from their sprites. Hit as a whole body only with Full sprite hitboxes."
++  STR_FPS_VOXEL_UNITS_DESC: "Units as 3D bodies of little cubes made from their sprites. Hit as a whole body only with Full sprite hitboxes. {ALT}Takes a few seconds."
 +  STR_FPS_UPSCALE_OFF: "Off"
 +  STR_FPS_UPSCALE_SMOOTH: "Smooth"
 +  STR_FPS_UPSCALE_DETAIL: "Smooth+"
@@ -812,7 +812,7 @@ index 000000000..c046c2abd
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..1f35bd1d9
+index 000000000..381a8fa10
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,644 @@
@@ -1127,7 +1127,7 @@ index 000000000..1f35bd1d9
 +  STR_FPS_UNIT_SIZE: "Unit size"
 +  STR_FPS_UNIT_SIZE_DESC: "Soldiers, aliens, corpses and items drawn smaller (80-100%). Hitboxes stay the same."
 +  STR_FPS_VOXEL_UNITS: "Voxel units"
-+  STR_FPS_VOXEL_UNITS_DESC: "Units as 3D bodies of little cubes made from their sprites. Hit as a whole body only with Full sprite hitboxes."
++  STR_FPS_VOXEL_UNITS_DESC: "Units as 3D bodies of little cubes made from their sprites. Hit as a whole body only with Full sprite hitboxes. {ALT}Takes a few seconds."
 +  STR_FPS_UPSCALE_OFF: "Off"
 +  STR_FPS_UPSCALE_SMOOTH: "Smooth"
 +  STR_FPS_UPSCALE_DETAIL: "Smooth+"
@@ -72091,10 +72091,10 @@ index 000000000..229bd966c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..8f189b45c
+index 000000000..c01a640c2
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,3996 @@
+@@ -0,0 +1,4008 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -73572,7 +73572,7 @@ index 000000000..8f189b45c
 +		int walkPhase = -1;
 +		double fall = 0.0;
 +		const bool collapsing = unit->getStatus() == STATUS_COLLAPSING;
-+		if (Options::fpsVoxelUnits && unitSize == 1 && (collapsing || fallingDown || airFall))
++		if (Options::fpsVoxelUnits && (unitSize == 1 || collapsing) && (collapsing || fallingDown || airFall))
 +		{
 +			// Going down (the game's own fall, a quick death's, a body coming down from the air): the body it was last
 +			// drawn with goes down as its death frames show, to lie as its corpse's picture (see VoxelUnitModel::falls), as
@@ -73591,6 +73591,9 @@ index 000000000..8f189b45c
 +				fall = quick >= 0.0 ? quick : 1.0;
 +			}
 +			fall = std::clamp(fall, 0.0, 1.0);
++			// (A big unit has no fall's shapes yet: its body stands as it was while the game takes it down, then its wreck
++			// lies there, see drawFloorItems.)
++			if (unitSize != 1) fall = 0.0;
 +		}
 +		else if (Options::fpsVoxelUnits && !quickFall && !fallingDown && !airFall && VoxelUnits::suits(unit))
 +		{
@@ -74543,6 +74546,15 @@ index 000000000..8f189b45c
 +		BattleUnit *owner = item->getUnit();
 +		const VoxelUnitModel *lying = Options::fpsVoxelUnits && owner && owner->isOut() && !wholeCorpse
 +			&& step.sprite.standingSquash >= 1.0 && owner->getArmor()->getSize() == 1 ? _voxelUnits->lastBody(owner) : nullptr;
++		// (A big unit's whole corpse, its four parts in their places: its wreck as the map draws it, given volume, lying
++		// as the map shows it whichever way the unit faced. Parts carried apart are their pictures.)
++		const VoxelUnitModel *wreck = Options::fpsVoxelUnits && owner && owner->isOut() && wholeCorpse ? _voxelUnits->lastBody(owner) : nullptr;
++		if (wreck && wreck->fallAt(1.0))
++		{
++			recordVoxelUnit(*wreck, -1, 3, 3, false, step.sprite.world, NoFloorCut, step.sprite.shade, itemScale, nullptr, 1.0, false,
++				step.sprite.body, step.sprite.pile, step.sprite.seeThrough ? step.sprite.seeThrough->opacity : 1.0);
++			continue;
++		}
 +		if (lying)
 +		{
 +			auto well = _facingsWell.find(owner);
@@ -86651,10 +86663,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..c2be10682
+index 000000000..a132e2b57
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,710 @@
+@@ -0,0 +1,722 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -86796,7 +86808,9 @@ index 000000000..c2be10682
 +	auto held = [](const BattleItem *item) -> const RuleItem* {
 +		return item && (!item->getRules()->isFixed() || item->getRules()->getFixedShow()) ? item->getRules() : nullptr;
 +	};
-+	const int turret = unit->getArmor()->getSize() > 1 ? ((unit->getTurretDirection() - unit->getDirection()) % 8 + 8) % 8 : 0;
++	// (only a unit with a turret: the game moves every big unit's turret direction a step behind its own as it turns,
++	// and a Cyberdisc turning or setting off had no body for that step: it showed as its picture)
++	const int turret = unit->getArmor()->getSize() > 1 && unit->getTurretType() != -1 ? ((unit->getTurretDirection() - unit->getDirection()) % 8 + 8) % 8 : 0;
 +	return Key(unit->getId(), unit->getArmor(), !standing && unit->isKneeled(), !standing && unit->getStatus() == STATUS_AIMING,
 +		!standing && unit->isFloating(), held(unit->getRightHandWeapon()), held(unit->getLeftHandWeapon()), turret);
 +}
@@ -86979,13 +86993,23 @@ index 000000000..c2be10682
 +	// And its corpse's picture on the floor (FLOOROB.PCK, as the map draws a corpse), for the body to end lying as it shows.
 +	std::vector<Uint8> corpse;
 +	const auto &corpseItems = unit->getArmor()->getCorpseBattlescape();
-+	if (!routine->big && floorSprites && !corpseItems.empty() && corpseItems.front())
++	// (A big unit's: its four parts' pictures where the map draws them, as its own four tiles are laid out: the wreck whole.)
++	const bool wreck = routine->big && floorSprites && corpseItems.size() >= 4;
++	if (floorSprites && !corpseItems.empty() && corpseItems.front() && (!routine->big || wreck))
 +	{
 +		Surface *picture = floorSprites->getFrame(corpseItems.front()->getFloorSprite());
 +		if (picture)
 +		{
 +			frames[0]->clear();
-+			picture->blitNShade(frames[0].get(), 16, 8, 0);
++			if (wreck)
++			{
++				for (int part = 0; part < 4; ++part)
++				{
++					Surface *piece = corpseItems[part] ? floorSprites->getFrame(corpseItems[part]->getFloorSprite()) : nullptr;
++					if (piece) piece->blitNShade(frames[0].get(), 16 + (part % 2 - part / 2) * 16, 8 + (part % 2 + part / 2) * 8, 0);
++				}
++			}
++			else picture->blitNShade(frames[0].get(), 16, 8, 0);
 +			corpse.resize(FrameSize * FrameSize);
 +			bool any = false;
 +			for (int row = 0; row < FrameSize; ++row)

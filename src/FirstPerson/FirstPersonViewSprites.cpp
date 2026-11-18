@@ -1475,7 +1475,7 @@ void FirstPersonView::drawUnits()
 		int walkPhase = -1;
 		double fall = 0.0;
 		const bool collapsing = unit->getStatus() == STATUS_COLLAPSING;
-		if (Options::fpsVoxelUnits && unitSize == 1 && (collapsing || fallingDown || airFall))
+		if (Options::fpsVoxelUnits && (unitSize == 1 || collapsing) && (collapsing || fallingDown || airFall))
 		{
 			// Going down (the game's own fall, a quick death's, a body coming down from the air): the body it was last
 			// drawn with goes down as its death frames show, to lie as its corpse's picture (see VoxelUnitModel::falls), as
@@ -1494,6 +1494,9 @@ void FirstPersonView::drawUnits()
 				fall = quick >= 0.0 ? quick : 1.0;
 			}
 			fall = std::clamp(fall, 0.0, 1.0);
+			// (A big unit has no fall's shapes yet: its body stands as it was while the game takes it down, then its wreck
+			// lies there, see drawFloorItems.)
+			if (unitSize != 1) fall = 0.0;
 		}
 		else if (Options::fpsVoxelUnits && !quickFall && !fallingDown && !airFall && VoxelUnits::suits(unit))
 		{
@@ -2446,6 +2449,15 @@ void FirstPersonView::drawFloorItems()
 		BattleUnit *owner = item->getUnit();
 		const VoxelUnitModel *lying = Options::fpsVoxelUnits && owner && owner->isOut() && !wholeCorpse
 			&& step.sprite.standingSquash >= 1.0 && owner->getArmor()->getSize() == 1 ? _voxelUnits->lastBody(owner) : nullptr;
+		// (A big unit's whole corpse, its four parts in their places: its wreck as the map draws it, given volume, lying
+		// as the map shows it whichever way the unit faced. Parts carried apart are their pictures.)
+		const VoxelUnitModel *wreck = Options::fpsVoxelUnits && owner && owner->isOut() && wholeCorpse ? _voxelUnits->lastBody(owner) : nullptr;
+		if (wreck && wreck->fallAt(1.0))
+		{
+			recordVoxelUnit(*wreck, -1, 3, 3, false, step.sprite.world, NoFloorCut, step.sprite.shade, itemScale, nullptr, 1.0, false,
+				step.sprite.body, step.sprite.pile, step.sprite.seeThrough ? step.sprite.seeThrough->opacity : 1.0);
+			continue;
+		}
 		if (lying)
 		{
 			auto well = _facingsWell.find(owner);

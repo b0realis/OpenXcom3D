@@ -139,7 +139,9 @@ VoxelUnits::Key VoxelUnits::keyFor(const BattleUnit *unit, bool standing)
 	auto held = [](const BattleItem *item) -> const RuleItem* {
 		return item && (!item->getRules()->isFixed() || item->getRules()->getFixedShow()) ? item->getRules() : nullptr;
 	};
-	const int turret = unit->getArmor()->getSize() > 1 ? ((unit->getTurretDirection() - unit->getDirection()) % 8 + 8) % 8 : 0;
+	// (only a unit with a turret: the game moves every big unit's turret direction a step behind its own as it turns,
+	// and a Cyberdisc turning or setting off had no body for that step: it showed as its picture)
+	const int turret = unit->getArmor()->getSize() > 1 && unit->getTurretType() != -1 ? ((unit->getTurretDirection() - unit->getDirection()) % 8 + 8) % 8 : 0;
 	return Key(unit->getId(), unit->getArmor(), !standing && unit->isKneeled(), !standing && unit->getStatus() == STATUS_AIMING,
 		!standing && unit->isFloating(), held(unit->getRightHandWeapon()), held(unit->getLeftHandWeapon()), turret);
 }
@@ -322,13 +324,23 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	// And its corpse's picture on the floor (FLOOROB.PCK, as the map draws a corpse), for the body to end lying as it shows.
 	std::vector<Uint8> corpse;
 	const auto &corpseItems = unit->getArmor()->getCorpseBattlescape();
-	if (!routine->big && floorSprites && !corpseItems.empty() && corpseItems.front())
+	// (A big unit's: its four parts' pictures where the map draws them, as its own four tiles are laid out: the wreck whole.)
+	const bool wreck = routine->big && floorSprites && corpseItems.size() >= 4;
+	if (floorSprites && !corpseItems.empty() && corpseItems.front() && (!routine->big || wreck))
 	{
 		Surface *picture = floorSprites->getFrame(corpseItems.front()->getFloorSprite());
 		if (picture)
 		{
 			frames[0]->clear();
-			picture->blitNShade(frames[0].get(), 16, 8, 0);
+			if (wreck)
+			{
+				for (int part = 0; part < 4; ++part)
+				{
+					Surface *piece = corpseItems[part] ? floorSprites->getFrame(corpseItems[part]->getFloorSprite()) : nullptr;
+					if (piece) piece->blitNShade(frames[0].get(), 16 + (part % 2 - part / 2) * 16, 8 + (part % 2 + part / 2) * 8, 0);
+				}
+			}
+			else picture->blitNShade(frames[0].get(), 16, 8, 0);
 			corpse.resize(FrameSize * FrameSize);
 			bool any = false;
 			for (int row = 0; row < FrameSize; ++row)
