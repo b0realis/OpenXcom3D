@@ -310,7 +310,14 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 			// with the world): mixed over the world in the night vision's colours, and left alone by
 			// the wash after (see washBands).
 			if (ownOverNight && !_ownColours[index] && *pixel) *pixel = nightGroup | (*pixel & 15);
-			*pixel = seeThrough(mixLevel, shadeColor(color, shade), *pixel);
+			Uint8 over = shadeColor(color, shade);
+			if (_nightVision && smokeCap > 0)
+			{
+				// (smoke through the goggles: in their colours, and dull, see SmokeNightBrightest)
+				if (!_ownColours[index] && *pixel) *pixel = nightGroup | (*pixel & 15);
+				over = nightGroup | (Uint8)std::max((int)(over & 15), SmokeNightBrightest);
+			}
+			*pixel = seeThrough(mixLevel, over, *pixel);
 			if (pixelOpacity > SeeThroughLevels / 2)
 			{
 				_glowMask[index] = 0;

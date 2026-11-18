@@ -2268,6 +2268,7 @@ uniform int uFirstPrim, uEndPrim;       // this go's primitives: from the first 
 uniform int uOutlineBase, uOutlineCount; // the outlined pictures' records (EffectOutlineTexels texels each, from this texel of uPrims), and how many: 0 none
 uniform float uOutlineOpacity, uOutlineSlack; // how much of the outlines shows; how much farther than the scene a tested picture may be
 uniform int uOutlineGlows;
+uniform int uSmokeNight;            // the night vision's colour group + 1 (0: off): smoke is mixed in its colours
 uniform int uOwnOverNight;              // futuristic night vision's colour group + 1 (0: any other time)
 layout(location = 0) out uint outColor;
 layout(location = 1) out float outDepth;
@@ -2468,7 +2469,15 @@ void main()
 				// pointed past, setting "See-through corpses"): over the world in the night vision's colours.
 				bool ownOverNight = ownColours != 0u && uOwnOverNight != 0;
 				if (ownOverNight && own == 0u && color != 0u) color = uint((uOwnOverNight - 1) * 16) | (color & 15u);
-				color = seeThrough(mixLevel, shadeColor(spriteColor, shade), color);
+				uint over = shadeColor(spriteColor, shade);
+				if (uSmokeNight != 0 && smokeCap > 0)
+				{
+					// (smoke through the goggles: in their colours, and dull, see SmokeNightBrightest)
+					uint nightGroup = uint((uSmokeNight - 1) * 16);
+					if (own == 0u && color != 0u) color = nightGroup | (color & 15u);
+					over = nightGroup | uint(max(int(over & 15u), SmokeNightBrightest));
+				}
+				color = seeThrough(mixLevel, over, color);
 				if (pixelOpacity > SeeThroughLevels / 2)
 				{
 					glow = 0u;
