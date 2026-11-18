@@ -113,6 +113,8 @@ struct Hit
 	ivec3 voxel;
 	bool glass;
 	bool emissive;
+	float glassT;   // where the ray first went through window glass, and the face it went in by (setting "Reflections")
+	int glassAxis;
 };
 
 float dither(int x, int y) { return Bayer[(y & 3) * 4 + (x & 3)]; }
@@ -290,6 +292,7 @@ bool traceTile(int tileIndex, ivec3 tileCell, vec3 rayOrigin, vec3 rayDirection,
 				}
 				if ((modelRow(model, 0, local) & bit) != 0u)
 				{
+					if (!hit.glass) { hit.glassT = span; hit.glassAxis = faceAxis; }
 					hit.glass = true; // window glass: seen through, tinted
 					continue;
 				}
@@ -323,6 +326,7 @@ bool traceTile(int tileIndex, ivec3 tileCell, vec3 rayOrigin, vec3 rayDirection,
 int castRay(vec3 rayOrigin, vec3 rayDirection, float maxDistance, float ghostThreshold, float solidGhostThreshold, inout Hit hit, out int hitTile, out float endDistance, out int endAxis)
 {
 	hit.glass = false;
+	hit.glassAxis = -1;
 	hit.emissive = false;
 	hit.ghost = false;
 	hitTile = 0;
@@ -1777,7 +1781,7 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 	rayDirection /= directionLength;
 
 	Hit hit;
-	hit.color = 0u; hit.t = 0.0; hit.axis = -1; hit.part = 0; hit.voxel = ivec3(0);
+	hit.color = 0u; hit.t = 0.0; hit.axis = -1; hit.part = 0; hit.voxel = ivec3(0); hit.glassT = 0.0; hit.glassAxis = -1;
 	float ghostThreshold = dither(blockColumn, blockRow) / uGhostScale;
 	float solidGhostThreshold = uSeeThroughCrops != 0 ? dither(blockColumn, blockRow) / SeeThroughCropOpacity : 0.0;
 	int hitTile, endAxis;
@@ -1836,6 +1840,37 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 		// vision": in full colour what was seen through a window stayed blue-grey among the goggles' green, and
 		// changed with every shot's light.)
 		fullColor = uGoggles != 0 ? paletteRgb(color) : fullColor * 0.7 + vec3(150.0, 180.0, 205.0) * 0.3;
+#ifdef REFLECTIONS
+		if (uReflections != 0 && uGoggles == 0 && fullColorSet && hit.glassAxis >= 0)
+		{
+			// (Setting "Reflections", a player's wish, GitHub issue #174, "reflections on glass panes": one ray off the
+			// pane's face, from where the eye's ray went into it; what it meets in the game's light there, or the sky.
+			// Faint seen straight on, as glass is, and stronger the flatter the pane is looked along.)
+			vec3 pane = uEye + rayDirection * hit.glassT;
+			vec3 mirrored = rayDirection;
+			mirrored[hit.glassAxis] = -mirrored[hit.glassAxis];
+			float glancing = 1.0 - abs(rayDirection[hit.glassAxis]);
+			float share = 0.08 + 0.5 * glancing * glancing * glancing;
+			Hit met;
+			int metTile, metAxis;
+			float metDistance;
+			vec3 seen;
+			if (castRay(pane + mirrored * 0.5, mirrored, min(uMaxDistance, 480.0), 2.0, 2.0, met, metTile, metDistance, metAxis) == RAY_HIT)
+			{
+				float metGlow;
+				float metShade = max(0.0, lightAt(pane + mirrored * met.t, metGlow) + distanceShade(met.t) + 1.5);
+				seen = mix(paletteRgb((met.color & 0xF0u) | uint(min(15, int(met.color & 15u) + int(metShade)))),
+					paletteRgb((met.color & 0xF0u) | uint(min(15, int(met.color & 15u) + int(metShade) + 1))), metShade - floor(metShade));
+			}
+			else
+			{
+				vec3 kept = fullColor;
+				seen = skyRgbTowards(mirrored, blockColumn, blockRow);
+				fullColor = kept;
+			}
+			fullColor = mix(fullColor, seen, share);
+		}
+#endif
 	}
 	rayFullColor = fullColorSet ? fullColor : paletteRgb(color);
 #ifdef LIGHT_SHAFTS

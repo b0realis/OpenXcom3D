@@ -306,11 +306,11 @@ void FirstPersonMode::createCrosshairAndBanner()
 	_txtAimOff->setAlign(ALIGN_RIGHT);
 	_txtAimOff->setVisible(false);
 	// The analogue rangefinder (drawn in drawRangeScale): its line a fifth of the view wide, its curve at most an eighth
-	// of the view high not zoomed in and ZoomFactor times that zoomed in, with room for the line's shadow; five
+	// of the view high not zoomed in and up to ZoomBoostFactor times that zoomed in, with room for the line's shadow; five
 	// numbers over the curve and the height it is drawn for at the line's end.
 	_rangeScaleWidth = width / 5;
 	_rangeScaleHeight = height / 8;
-	_rangeScale = new Surface(_rangeScaleWidth + 3, (int)(_rangeScaleHeight * ZoomFactor) + 8, 0, 0);
+	_rangeScale = new Surface(_rangeScaleWidth + 3, (int)(_rangeScaleHeight * ZoomBoostFactor) + 8, 0, 0);
 	_state->add(_rangeScale);
 	_rangeScale->setVisible(false);
 	_ownSurfaces.insert(_rangeScale);
@@ -2717,7 +2717,7 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	if (key == Options::keyFpsFlashlight) { if (pressed) toggleFlashlight(); return true; }
 	if (key == Options::keyFpsSprint) { if (pressed) toggleSprint(); return true; }
 	if (key == Options::keyFpsEnPassant) { if (pressed) toggleEnPassant(); return true; }
-	if (key == Options::keyFpsJump) { if (pressed) jump(_save->getSelectedUnit()); return true; }
+	if (key == Options::keyFpsJump) { if (pressed && _zoom <= 1.05) jump(_save->getSelectedUnit()); return true; } // (zoomed in, it looks closer still: see updateZoom)
 	// Night vision: the gear of the soldier the view looks through (in the aliens' turn the
 	// game's selected unit is the alien acting); the game's own key (Scroll Lock) checks for it
 	// in 3D too.

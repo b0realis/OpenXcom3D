@@ -2996,11 +2996,11 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 				model.color[z][y][x] = color;
 				if (glassColors && glassColors->test(color))
 				{
-					model.glass[z][y] |= (Uint16)(1 << x);
+					model.glass[z][y] |= (Uint16)(1 << x), _anyGlass = true;
 				}
 				if (glassPane && spriteY >= 0 && spriteY < sprite->getHeight() && glassPixels[spriteY * sprite->getWidth() + spriteX])
 				{
-					model.glass[z][y] |= (Uint16)(1 << x);
+					model.glass[z][y] |= (Uint16)(1 << x), _anyGlass = true;
 				}
 				else if (hasArtHoles && spriteY >= 0 && spriteY < sprite->getHeight() && artHoles[spriteY * sprite->getWidth() + spriteX])
 				{
@@ -3372,7 +3372,7 @@ void FirstPersonView::fillPaneOpenings(const MapData *mapData, const Surface *sp
 				if (spriteY < 0 || spriteY >= height || !pane[spriteY * width + spriteX]) continue;
 				const Uint8 color = sprite->getPixel(spriteX, spriteY);
 				model.color[z][y][x] = color ? color : fallbackColor;
-				model.glass[z][y] |= (Uint16)(1 << x);
+				model.glass[z][y] |= (Uint16)(1 << x), _anyGlass = true;
 				model.lookOnly[z][y] |= (Uint16)(1 << x);
 				model.openingGlass = true;
 				const int voxel[3] = { x, y, z };
@@ -3957,6 +3957,7 @@ void FirstPersonView::shareCache(FirstPersonView *owner)
 	gpuForgetModels();
 	_solidMasks.clear();
 	_paintedFloors.clear();
+	_anyGlass = false;
 	_wallPaints.clear(); // (found again with the ground, among the new owner's models)
 	_wallPaintOf.clear();
 	for (auto &memo : _tileMemos) memo = TileMemo{ {}, nullptr, {}, nullptr };

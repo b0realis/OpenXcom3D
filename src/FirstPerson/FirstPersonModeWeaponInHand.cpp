@@ -1150,7 +1150,7 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 	// VR hand, which holds it where it is.)
 	const double lookingDown = -_view->getPitchDegrees();
 	const double lookDownShare = std::clamp((lookingDown - LookDownSlideFrom) / (LookDownSlideTo - LookDownSlideFrom), 0.0, 1.0);
-	const double zoomShare = std::log(_zoom) / std::log(ZoomFactor);
+	const double zoomShare = std::min(1.0, std::log(_zoom) / std::log(ZoomFactor));
 	const double slideShare = _vrModelInHand && vrEyes ? 0.0 : std::max(lookDownShare, zoomShare);
 	if (slideShare > 0.0)
 	{

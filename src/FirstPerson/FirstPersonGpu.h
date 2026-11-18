@@ -100,7 +100,7 @@ public:
 		float colorLights[16][8];                 // setting "Coloured lights": each light's place (voxels), its reach, its colour (0..1 each) and strength
 		int colorLightCount;                      // ... how many this frame (0: none, or the setting off)
 		bool colorLightsOn;                       // ... the setting is on (the program for them is built ahead of the first light)
-		bool reflections;                         // setting "Reflections": the sea mirrors the sky and what stands in it (in full colour)
+		bool reflections;                         // setting "Reflections": the sea mirrors the sky and what stands in it, window glass what is in front of it (in full colour)
 		bool lightShafts, shaftSmoke;             // setting "Light shafts": this frame has light in smoke or water to show (in full colour); there is smoke on the map
 		float shaftAir;                           // ... how much of the light a voxel of clear water throws towards the eye (0 above the sea)
 		bool smoothLight;                         // setting "Smooth light": the full-colour picture blends where the palette's dithers

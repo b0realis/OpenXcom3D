@@ -167,6 +167,7 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 	_frames.clear();
 	_solidMasks.clear();
 	_paintedFloors.clear();
+	_anyGlass = false;
 	_wallPaints.clear();
 	_wallPaintOf.clear();
 	_tileMemos.clear();

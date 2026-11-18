@@ -905,6 +905,8 @@ private:
 	MeleeAim meleeDownedTarget(BattleUnit *unit) const;
 	/// Turns the soldier to face a way before using something on a neighbour (by the rules, or for free); false without the time units for the turn and the use.
 	bool turnBeforeUse(BattleUnit *unit, int direction, int useTime);
+	/// The way a unit faces a point (the eighth it lies in from the unit's middle).
+	static int facingTo(const BattleUnit *unit, Position voxel);
 	/// Akimbo: the gun in the other hand that fires along, or null.
 	BattleItem *offHandWeapon(BattleUnit *unit, const BattleItem *weapon) const;
 	/// Has a unit lost health in this battle (not only carried over from earlier fights)?

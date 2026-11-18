@@ -253,6 +253,8 @@ const Uint32 AlienCameraHold = 1500, AlertTime = 3000;
 /// Zoom (setting "Zoom"): how much closer the view looks, and how many seconds it takes to glide
 /// all the way in (or out), so the SCOPING line's number can be read as it climbs.
 const double ZoomFactor = 4.0, ZoomSeconds = 0.7;
+/// Zoomed in, holding the jump key (Space) looks this many times closer instead (see updateZoom).
+const double ZoomBoostFactor = 8.0;
 /// The motion scanner held up in 3D (see FirstPersonScanner): how long its ring takes to sweep out to the
 /// edge and how often a sweep goes out (ms), how long a blip takes to fade after the ring finds it (ms), the least
 /// time between two pips (ms), and the round screen's radius on the game's scanner art (pixels of 320x200).
