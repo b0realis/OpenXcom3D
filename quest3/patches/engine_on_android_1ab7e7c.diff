@@ -83677,10 +83677,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..3292f61ce
+index 000000000..f2555e364
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,2373 @@
+@@ -0,0 +1,2446 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -83901,6 +83901,8 @@ index 000000000..3292f61ce
 +/// A limb's slice among several in its row is at most this many times as deep as it is wide (see limb).
 +const float SliceDepthMost = 1.5f;
 +
++/// One body, the same from every side (see makeModel); false: matched to each view's drawing (see matchViews).
++constexpr bool OneBody = true;
 +/// Cells this near each other (in cells, each way) are one piece of a body (see makeModel, dropFloating).
 +const int Joined = 2 * VOXELSCALE;
 +
@@ -85221,7 +85223,7 @@ index 000000000..3292f61ce
 +			{
 +				const int cell = cellIndex(across, along, up);
 +				if (!owner[cell]) continue;
-+				solid[cell] = viewsAt(solidOnTop, cellRight(across), cellAhead(along), cellUp(up));
++				solid[cell] = OneBody ? (Uint16)0xFFFF : viewsAt(solidOnTop, cellRight(across), cellAhead(along), cellUp(up));
 +				if (solid[cell]) cells.push_back(cell);
 +			}
 +	const bool matched = model.views.size() == model.part.size();
@@ -85765,7 +85767,7 @@ index 000000000..3292f61ce
 +						if (!filled(across + step[0], along + step[1], up + step[2])) outside = true;
 +						else bare |= (Uint16)~shown[cellIndex(across + step[0], along + step[1], up + step[2])];
 +					}
-+					if (!outside && !(bare & shown[cell])) continue;
++					if (!outside && (OneBody || !(bare & shown[cell]))) continue; // (one body: its outer skin alone)
 +					surfaceCells.push_back(cell);
 +					skin.push_back(outside ? (Uint16)0xFFFF : bare);
 +					model->right.push_back(cellRight(across));
@@ -85953,16 +85955,87 @@ index 000000000..3292f61ce
 +	smoothFrames(smoothed);
 +	// (A big unit that hovers: the views' pieces only where its solid drawing is. The sparks and the glow drawn under a
 +	// disc or a tank are left out: the owner, "lets just omit that floating effect and generate only main body".)
++	if (OneBody)
++	{
++		// One body, the same from every side (the owner: "the unit voxel model is as is in world ... It should just be one
++		// model no?"): the whole shape the eight drawings agree on, nothing cut to the view or added for it, and each
++		// voxel one colour, from the front drawing or the back one (the owner: "main colouring and detail take from
++		// frontal and back sprites"): the one its outward side (by the empty cells round it) is turned to, thrown
++		// straight through onto it, its own part's drawing first; the slanted painting's where it faces up (the top of a
++		// head as the drawing shows it). Where neither has it drawn (a part standing out past both outlines), the
++		// drawing of the direction it faces most that has.
++		model->views.assign(model->part.size(), 0xFFFF);
++		model->addedFrom = model->part.size();
++		const int Back = (Front + 4) % 8, reach = 2 * VOXELSCALE;
++		auto drawnColour = [&](size_t k, int d, int painting) -> Uint8 {
++			float column, row, nearness;
++			project(model->right[k], model->ahead[k], model->up[k], d, painting == 0, column, row, nearness);
++			const int c = (int)std::floor(column), r = (int)std::floor(row);
++			if (c < 0 || r < 0 || c >= FrameSize || r >= FrameSize) return 0;
++			const int pixel = r * FrameSize + c, part = (int)(std::find(PartCodes, PartCodes + BodyParts, model->part[k]) - PartCodes);
++			Uint8 colour = part < BodyParts && parts[part].any ? parts[part].frame[d][pixel] : 0;
++			if (!colour && onTop[d][pixel] >= 0) colour = parts[onTop[d][pixel]].frame[d][pixel];
++			return colour;
++		};
++		// (the body's skin seen from the front and from the back: the nearest of its voxels on each pixel)
++		std::vector<float> frontSkin((size_t)FrameSize * FrameSize + 1, -1e9f), backSkin((size_t)FrameSize * FrameSize + 1, -1e9f);
++		auto pixelAt = [&](size_t k, int d, float &nearness) -> size_t {
++			float column, row;
++			project(model->right[k], model->ahead[k], model->up[k], d, true, column, row, nearness);
++			const int c = (int)std::floor(column), r = (int)std::floor(row);
++			return c < 0 || r < 0 || c >= FrameSize || r >= FrameSize ? (size_t)FrameSize * FrameSize : (size_t)r * FrameSize + c;
++		};
++		for (size_t k = 0; k < count; ++k)
++		{
++			float nearness;
++			float &front = frontSkin[pixelAt(k, Front, nearness)];
++			front = std::max(front, nearness);
++			float &back = backSkin[pixelAt(k, Back, nearness)];
++			back = std::max(back, nearness);
++		}
++		for (size_t k = 0; k < count; ++k)
++		{
++			const int cell = surfaceCells[k], up = cell % GridUp, along = (cell / GridUp) % GridAlong, across = cell / (GridUp * GridAlong);
++			float out[3] = {};
++			for (int a = -reach; a <= reach; ++a)
++				for (int b = -reach; b <= reach; ++b)
++					for (int c = -reach; c <= reach; ++c)
++						if (!filled(across + a, along + b, up + c)) { out[0] += a; out[1] += b; out[2] += c; }
++			const int painting = out[2] > std::hypot(out[0], out[1]) * 1.5f ? 1 : 0;
++			// (each direction's camera: towards its nearness, see project)
++			float fit[8];
++			for (int d = 0; d < 8; ++d) fit[d] = out[0] * (Turns[d].cosine + Turns[d].sine) + out[1] * (Turns[d].sine - Turns[d].cosine);
++			int order[8] = { 0, 1, 2, 3, 4, 5, 6, 7 };
++			std::sort(order, order + 8, [&](int one, int other) { return fit[one] > fit[other]; });
++			// (front or back: the skin it lies nearer, along the line through the body from the front to the back; its
++			// outward side where it's as near both)
++			float nearFront, nearBack;
++			const float underFront = frontSkin[pixelAt(k, Front, nearFront)] - nearFront, underBack = backSkin[pixelAt(k, Back, nearBack)] - nearBack;
++			const int first = std::abs(underFront - underBack) < 1.0f * VOXELSCALE ? (fit[Front] >= fit[Back] ? Front : Back) : underFront < underBack ? Front : Back;
++			Uint8 colour = drawnColour(k, first, painting);
++			if (!colour) colour = drawnColour(k, first == Front ? Back : Front, painting);
++			for (int i = 0; i < 8 && !colour; ++i) colour = drawnColour(k, order[i], painting);
++			for (int i = 0; i < 8 && !colour; ++i) colour = drawnColour(k, order[i], 1 - painting);
++			for (int i = 0; i < 8 && !colour; ++i) colour = model->colours[k * 16 + order[i]];
++			std::fill(model->colours.begin() + k * 16, model->colours.begin() + k * 16 + 16, colour);
++		}
++	}
++	else
++	{
 +	matchViews(*model, smoothed, routine.big && !routine.legsSwing ? solidOnTop : onTop, solidOnTop);
 +	for (size_t k = 0; k < count && k < model->views.size(); ++k) model->views[k] &= skin[k]; // (a cell inside the body shows where it's the view's skin)
++	}
 +	for (size_t k = itemsFrom; k < model->addedFrom && k < model->views.size(); ++k) model->views[k] = 0xFFFF; // (the items: whole from every view)
 +	// (a one-frame walker's pieces over its legs are legs too: they swing with them)
 +	for (size_t k = model->addedFrom; wholeTop > 0.0f && k < model->part.size(); ++k)
 +	{
 +		if (model->part[k] != VoxelUnitModel::Item && model->up[k] < wholeTop * WholeHip && std::abs(model->right[k]) > wholeSide * WholeMiddle) model->part[k] = VoxelUnitModel::Legs;
 +	}
-+	dropFarPieces(*model, itemsFrom);
-+	dropFloating(*model);
++	if (!OneBody)
++	{
++		dropFarPieces(*model, itemsFrom);
++		dropFloating(*model);
++	}
 +	makeHits(*model, owner, solidOnTop);
 +	const bool rightHolds = placed[0] || (placed[1] && items[1].twoHanded);
 +	const bool leftHolds = placed[1] || (placed[0] && items[0].twoHanded);
