@@ -1006,7 +1006,7 @@ private:
 	const SDL_Color *_skyPalette = nullptr; // the battle's palette before its environment recoloured it (see updateColors), or null
 	bool _smoothLighting = true;    // blend the game's light between tiles (an option)
 	bool _flashlight = false;       // flashlight on (its key; the shoulder one only in dark battles)
-	bool _dynamicFlashlight = false; // it's the dynamic flashlight (setting "Flashlight": Dynamic): from under the eye, a tight spot on the crosshair
+	bool _dynamicFlashlight = false; // it's the dynamic flashlight (the one the game uses; off: a wide beam from the shoulder): from under the eye, a tight spot on the crosshair
 	float _flashlightPos[3] = {};   // where it is this frame
 	float _muzzleFlashPos[3] = {};  // where the last shot flashed, lighting its surroundings for a moment
 	Uint32 _muzzleFlashTick = 0;    // when it flashed

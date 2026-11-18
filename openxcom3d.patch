@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..825152e5a
+index 000000000..550340e71
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,639 @@
+@@ -0,0 +1,629 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -402,11 +402,6 @@ index 000000000..825152e5a
 +  STR_FPS_WALL_PAINT_ART: "As the art"
 +  STR_FPS_WALL_PAINT_OUTSIDE: "Each side"
 +  STR_FPS_WALL_PAINT_ROOMS: "All rooms"
-+  STR_FPS_FLASHLIGHT: "Flashlight"
-+  STR_FPS_FLASHLIGHT_DESC: "On and off with F (the suit light is separate). On: a wide beam in the dark. Dynamic: a spot on the crosshair, day or night."
-+  STR_FPS_FLASHLIGHT_OFF: "Off"
-+  STR_FPS_FLASHLIGHT_ON: "On"
-+  STR_FPS_FLASHLIGHT_DYNAMIC: "Dynamic"
 +  STR_FPS_COMBAT_MUSIC: "Dynamic music"
 +  STR_FPS_COMBAT_MUSIC_DESC: "YES: tenser music while aliens are in sight. NO: battle music only."
 +  STR_FPS_HIT_SOUNDS: "Hit, kill and swing sounds"
@@ -425,10 +420,8 @@ index 000000000..825152e5a
 +  STR_FPS_SMOKE_ORIGINAL: "Original"
 +  STR_FPS_SMOKE_MODERN: "Modern"
 +  STR_FPS_LAUNCH_HINT: "Place the missile's waypoints, then press the launch button"
-+  STR_FPS_FLARES: "Unlimited tactical flares"
-+  STR_FPS_FLARES_DESC: "Throw free flares (T). They light the 3D view only."
 +  STR_FPS_KEY_FLARE: "Throw flare"
-+  STR_FPS_KEY_FLARE_DESC: "Throws a flare at the crosshair (setting Unlimited tactical flares)."
++  STR_FPS_KEY_FLARE_DESC: "Throws a free flare at the crosshair. It lights the 3D view only."
 +  STR_FPS_PSI_HINT: "Pick the creature on the map"
 +  STR_FPS_VIEW_MODEL: "Weapon in hand"
 +  STR_FPS_VIEW_MODEL_DESC: "Shows the weapon in the soldier's hands (not with the classic HUD)."
@@ -512,7 +505,7 @@ index 000000000..825152e5a
 +  STR_FPS_KEY_TURRET: "Turret only (tanks)"
 +  STR_FPS_KEY_TURRET_DESC: "A tank's turret switch: the view turns only the turret, at the turret's cost. No key at first."
 +  STR_FPS_KEY_FLASHLIGHT: "Flashlight on/off"
-+  STR_FPS_KEY_FLASHLIGHT_DESC: "The flashlight on/off (setting Flashlight). The suit light is the game's personal light."
++  STR_FPS_KEY_FLASHLIGHT_DESC: "The flashlight on/off: a spot on the crosshair. The suit light is the game's personal light."
 +  STR_FPS_BUTTON_FLY: "SUIT FLY"
 +  STR_FPS_BUTTON_SWIM: "SUIT SWIM"
 +  STR_FPS_BUTTON_LIGHT: "SUIT LIGHT"
@@ -555,9 +548,6 @@ index 000000000..825152e5a
 +  STR_FPS_KEY_ZOOM_DESC: "Looks 4 times closer while held (or the right button in mouse look); 8 times with Jump held too."
 +  STR_FPS_BUTTON_NIGHT: "NIGHT VISION"
 +  STR_FPS_BUTTON_NIGHT_SHORT: "NV"
-+  STR_FPS_FLASHLIGHT_SETTING_OFF: "No flashlight: setting Flashlight is Off"
-+  STR_FPS_FLASHLIGHT_DARK_ONLY: "Flashlight: only in the dark (Dynamic: by day too)"
-+  STR_FPS_FLARES_OFF: "No flares: switch on Unlimited tactical flares"
 +  STR_FPS_CANNOT_FLY: "This armour can't fly"
 +  STR_FPS_CANNOT_SWIM: "This armour can't swim"
 +  STR_FPS_NO_SUCH_MODE: "Not with this weapon"
@@ -769,10 +759,10 @@ index 000000000..825152e5a
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..361f84811
+index 000000000..8c874c4f5
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,639 @@
+@@ -0,0 +1,629 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1047,11 +1037,6 @@ index 000000000..361f84811
 +  STR_FPS_WALL_PAINT_ART: "As the art"
 +  STR_FPS_WALL_PAINT_OUTSIDE: "Each side"
 +  STR_FPS_WALL_PAINT_ROOMS: "All rooms"
-+  STR_FPS_FLASHLIGHT: "Flashlight"
-+  STR_FPS_FLASHLIGHT_DESC: "On and off with F (the suit light is separate). On: a wide beam in the dark. Dynamic: a spot on the crosshair, day or night."
-+  STR_FPS_FLASHLIGHT_OFF: "Off"
-+  STR_FPS_FLASHLIGHT_ON: "On"
-+  STR_FPS_FLASHLIGHT_DYNAMIC: "Dynamic"
 +  STR_FPS_COMBAT_MUSIC: "Dynamic music"
 +  STR_FPS_COMBAT_MUSIC_DESC: "YES: tenser music while aliens are in sight. NO: battle music only."
 +  STR_FPS_HIT_SOUNDS: "Hit, kill and swing sounds"
@@ -1070,10 +1055,8 @@ index 000000000..361f84811
 +  STR_FPS_SMOKE_ORIGINAL: "Original"
 +  STR_FPS_SMOKE_MODERN: "Modern"
 +  STR_FPS_LAUNCH_HINT: "Place the missile's waypoints, then press the launch button"
-+  STR_FPS_FLARES: "Unlimited tactical flares"
-+  STR_FPS_FLARES_DESC: "Throw free flares (T). They light the 3D view only."
 +  STR_FPS_KEY_FLARE: "Throw flare"
-+  STR_FPS_KEY_FLARE_DESC: "Throws a flare at the crosshair (setting Unlimited tactical flares)."
++  STR_FPS_KEY_FLARE_DESC: "Throws a free flare at the crosshair. It lights the 3D view only."
 +  STR_FPS_PSI_HINT: "Pick the creature on the map"
 +  STR_FPS_VIEW_MODEL: "Weapon in hand"
 +  STR_FPS_VIEW_MODEL_DESC: "Shows the weapon in the soldier's hands (not with the classic HUD)."
@@ -1157,7 +1140,7 @@ index 000000000..361f84811
 +  STR_FPS_KEY_TURRET: "Turret only (tanks)"
 +  STR_FPS_KEY_TURRET_DESC: "A tank's turret switch: the view turns only the turret, at the turret's cost. No key at first."
 +  STR_FPS_KEY_FLASHLIGHT: "Flashlight on/off"
-+  STR_FPS_KEY_FLASHLIGHT_DESC: "The flashlight on/off (setting Flashlight). The suit light is the game's personal light."
++  STR_FPS_KEY_FLASHLIGHT_DESC: "The flashlight on/off: a spot on the crosshair. The suit light is the game's personal light."
 +  STR_FPS_BUTTON_FLY: "SUIT FLY"
 +  STR_FPS_BUTTON_SWIM: "SUIT SWIM"
 +  STR_FPS_BUTTON_LIGHT: "SUIT LIGHT"
@@ -1200,9 +1183,6 @@ index 000000000..361f84811
 +  STR_FPS_KEY_ZOOM_DESC: "Looks 4 times closer while held (or the right button in mouse look); 8 times with Jump held too."
 +  STR_FPS_BUTTON_NIGHT: "NIGHT VISION"
 +  STR_FPS_BUTTON_NIGHT_SHORT: "NV"
-+  STR_FPS_FLASHLIGHT_SETTING_OFF: "No flashlight: setting Flashlight is Off"
-+  STR_FPS_FLASHLIGHT_DARK_ONLY: "Flashlight: only in the dark (Dynamic: by day too)"
-+  STR_FPS_FLARES_OFF: "No flares: switch on Unlimited tactical flares"
 +  STR_FPS_CANNOT_FLY: "This armor can't fly"
 +  STR_FPS_CANNOT_SWIM: "This armor can't swim"
 +  STR_FPS_NO_SUCH_MODE: "Not with this weapon"
@@ -22714,7 +22694,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..e8298db8e 100644
+index a08796ced..832c8aa56 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -22731,8 +22711,8 @@ index a08796ced..e8298db8e 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsGhostOpenDoors, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes;
-+OPT int fpsPreset, fpsGraphicsDetail, fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts, fpsVrFoveation, fpsVrMode, fpsVrEyeSize, fpsVrTurning, fpsQuestDefaults;
++OPT bool fpsGhostOpenDoors, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes;
++OPT int fpsPreset, fpsGraphicsDetail, fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts, fpsVrFoveation, fpsVrMode, fpsVrEyeSize, fpsVrTurning, fpsQuestDefaults;
 +OPT std::string fpsCustomPreset, fpsCustomGraphics;
 +OPT SDLKey keyBattleFirstPerson, keyBattleFirstPerson2, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsTurret, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsRange, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
@@ -23782,10 +23762,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..c129eca21
+index 000000000..1f0ce48b5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1840 @@
+@@ -0,0 +1,1813 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24217,7 +24197,7 @@ index 000000000..c129eca21
 + * Settles settings that take their first value from an older one, once the options are loaded
 + * (called when a battle or the 3D VIEW tab opens): the smoke (Original, Modern) from 0.9's
 + * "See-through smoke": YES gives Modern, NO Original (1.0's Solid becomes Original too); the
-+ * flashlight (Off, On, Dynamic) from 1.0's "Flashlight" and "Tactical flashlight"; akimbo (Off,
++ * akimbo (Off,
 + * Full, Realistic) from 1.08's "Full akimbo" and "Realistic akimbo" (and with akimbo Off, those
 + * two, which now tell whether it's on just now, off: a hand-edited profile can't have two guns
 + * fire with the setting Off, the akimbo key refusing to switch them off); and 1.0's next fire
@@ -24226,7 +24206,6 @@ index 000000000..c129eca21
 +void settleOptions()
 +{
 +	Options::fpsSmoke = smokeMode();
-+	Options::fpsFlashlightMode = flashlightMode();
 +	Options::fpsAkimbo = akimboChoice();
 +	if (Options::fpsAkimbo == 0)
 +	{
@@ -24645,21 +24624,6 @@ index 000000000..c129eca21
 +}
 +
 +/**
-+ * The flashlight setting as it stands: Off (0), On (1) or Dynamic (2). Unset (-1: a profile from
-+ * 1.0 not settled yet, or the defaults just restored on the 3D VIEW tab), it's what 1.0's two
-+ * settings say: "Tactical flashlight" YES Dynamic, else "Flashlight" YES On, NO Off.
-+ * @return 0, 1 or 2.
-+ */
-+int flashlightMode()
-+{
-+	if (Options::fpsFlashlightMode >= 0 && Options::fpsFlashlightMode <= 2)
-+	{
-+		return Options::fpsFlashlightMode;
-+	}
-+	return Options::fpsTacticalFlashlight ? 2 : (Options::fpsFlashlight ? 1 : 0);
-+}
-+
-+/**
 + * The smoke setting as it stands: Original (1) or Modern (2). 1.0's Solid (0) is gone: it's
 + * Original now. Unset (-1: a profile from 0.9 not settled yet, or the defaults just restored on
 + * the 3D VIEW tab), it's what 0.9's "See-through smoke" says: YES Modern, NO Original.
@@ -24841,12 +24805,6 @@ index 000000000..c129eca21
 +	// face in its room's. The faces the map shows stay as it draws them; doors, and windows' frames and
 +	// glass, keep theirs.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsWallPaint", &fpsWallPaint, 1, "STR_FPS_WALL_PAINT", category));
-+	// The flashlight, a light of the 3D view's own (on and off with its key, F; the suit light
-+	// stays the game's): none (0), a wide beam from the shoulder in the dark (1, on), or a light
-+	// on the weapon, a tight spot on the crosshair at any time of day (2, dynamic). Unset (-1)
-+	// until settled (see settleOptions) from 1.0's two settings, kept below, unlisted (a new name,
-+	// as 1.0's YES/NO wouldn't load into a number).
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlashlightMode", &fpsFlashlightMode, -1, "STR_FPS_FLASHLIGHT", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCombatMusic", &fpsCombatMusic, false, "STR_FPS_COMBAT_MUSIC", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitSounds", &fpsHitSounds, false, "STR_FPS_HIT_SOUNDS", category));
 +	// The 3D view's ambient sounds (the owner: "The weather effects should also have nonobtrusive
@@ -24865,14 +24823,9 @@ index 000000000..c129eca21
 +	// maps), the two blended in between.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmokeOpacity", &fpsSmokeOpacity, 80, "STR_FPS_SMOKE_OPACITY", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightSmokeOpacity", &fpsNightSmokeOpacity, 45, "STR_FPS_NIGHT_SMOKE_OPACITY", category));
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlares", &fpsFlares, true, "STR_FPS_FLARES", category));
 +	// 0.9's "See-through smoke" (YES/NO), loaded and saved but listed nowhere (a category no
 +	// options screen shows): it gives the smoke setting its first value.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughSmoke", &fpsSeeThroughSmoke, true, "STR_FPS_SEE_THROUGH_SMOKE", "STR_FIRST_PERSON_SAVED"));
-+	// 1.0's "Flashlight" and "Tactical flashlight" (YES/NO), the same way: they give the
-+	// flashlight setting its first value.
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlashlight", &fpsFlashlight, true, "STR_FPS_FLASHLIGHT", "STR_FIRST_PERSON_SAVED"));
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsTacticalFlashlight", &fpsTacticalFlashlight, false, "STR_FPS_FLASHLIGHT", "STR_FIRST_PERSON_SAVED"));
 +	// Looks: the weapon in hand (always made of voxels), sprite upscaling (0 off, 1 smooth,
 +	// 2 smooth + detail, 3 finest: six times bigger; the default, a profile saved before keeps its
 +	// value), muzzle flashes, particles (0 none, 1 effects, 2 everything),
@@ -25158,7 +25111,7 @@ index 000000000..c129eca21
 +	// A tank's turret switch (a player's report: turning the view turned the whole tank, at its full
 +	// cost; the TURRET button on the top bar too): no key until the player gives it one.
 +	options.push_back(keyOption(OPTION_OTHER, "keyFpsTurret", &keyFpsTurret, SDLK_UNKNOWN, "STR_FPS_KEY_TURRET", category));
-+	// The flashlight on and off (F, as in the first-person shooters; setting "Flashlight").
++	// The flashlight on and off (F, as in the first-person shooters).
 +	options.push_back(keyOption(OPTION_OTHER, "keyFpsFlashlight", &keyFpsFlashlight, SDLK_f, "STR_FPS_KEY_FLASHLIGHT", category));
 +	// Space is the map's night vision hold key; in 3D it jumps, and night vision is gear (N).
 +	options.push_back(keyOption(OPTION_OTHER, "keyFpsJump", &keyFpsJump, SDLK_SPACE, "STR_FPS_KEY_JUMP", category));
@@ -25628,10 +25581,10 @@ index 000000000..c129eca21
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..5151605b4
+index 000000000..7ae2a0f02
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,511 @@
+@@ -0,0 +1,509 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -25819,8 +25772,6 @@ index 000000000..5151605b4
 +bool activeWhenNew(const std::string &modId);
 +/// The smoke setting as it stands: 1 Original, 2 Modern (unset, or 1.0's Solid: see the function).
 +int smokeMode();
-+/// The flashlight setting as it stands: 0 Off, 1 On, 2 Dynamic (unset: from 1.0's settings).
-+int flashlightMode();
 +/// The akimbo setting as it stands: 0 Off, 1 Full, 2 Realistic (unset: from 1.08's two settings).
 +int akimboChoice();
 +/// The longest Doom grenade fuse, in seconds (setting "Doom grenade fuse": 1 to this).
@@ -35095,10 +35046,10 @@ index 000000000..eaa9f409a
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..cab6f6d00
+index 000000000..b413f94d1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,3465 @@
+@@ -0,0 +1,3447 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -35228,9 +35179,6 @@ index 000000000..cab6f6d00
 +/// one it had, medium at first.
 +int lastMapCameraSize = 2;
 +
-+/// The shoulder flashlight (setting "Flashlight": On) lights from the battle's shade 6 on (of 0
-+/// bright .. 15 dark): at dusk and night.
-+const int FlashlightDarkShade = 6;
 +
 +}
 +
@@ -36808,27 +36756,15 @@ index 000000000..cab6f6d00
 +
 +/**
 + * Switches the flashlight on or off (its key, F by default), with a click of the switch. It's
-+ * the 3D view's own light (setting "Flashlight": on, a wide beam from the shoulder in the dark;
-+ * dynamic, a spot on the crosshair at any time of day) and changes nothing in the game's rules;
++ * the 3D view's own light (a light on the weapon: a spot on the crosshair at any time of day) and changes nothing in the game's rules;
 + * the suit light (L) is the game's personal light and stays separate. Each battle starts with
 + * it on.
 + */
 +void FirstPersonMode::toggleFlashlight()
 +{
-+	// No flashlight (the setting is Off): say so, so the key doesn't seem dead.
-+	if (FirstPerson::flashlightMode() == 0)
-+	{
-+		_state->warning("STR_FPS_FLASHLIGHT_SETTING_OFF");
-+		return;
-+	}
 +	_flashlightOn = !_flashlightOn;
 +	rememberChoices();
 +	_sounds->play(FirstPersonSounds::LIGHT_SWITCH);
-+	// The shoulder flashlight lights only in the dark: switched by day, a line says so.
-+	if (FirstPerson::flashlightMode() == 1 && _save->getGlobalShade() < FlashlightDarkShade)
-+	{
-+		_state->warning("STR_FPS_FLASHLIGHT_DARK_ONLY");
-+	}
 +}
 +
 +/**
@@ -37549,12 +37485,9 @@ index 000000000..cab6f6d00
 +	// Smoke as this soldier's eyes see through it: the game's sight range, and the armor's heat
 +	// vision (the see-through smoke thinner; enemies they don't see in smoke not drawn).
 +	_view->setSmokeSight(_save->getTileEngine()->getMaxViewDistance() * 16.0f, unit->getVisibilityThroughSmoke(), unit->getVisibilityThroughFire());
-+	// The flashlight (setting "Flashlight"), on and off with its own key (see toggleFlashlight):
-+	// on, a wide beam from the shoulder, in the dark only (the battle's shade 6 or more, of 0
-+	// bright .. 15 dark); dynamic, a spot on the crosshair, so it lights dark places by day too.
-+	const int flashlightMode = FirstPerson::flashlightMode();
-+	const bool dynamicFlashlight = flashlightMode == 2;
-+	_view->setFlashlight(flashlightMode > 0 && _flashlightOn && (dynamicFlashlight || _save->getGlobalShade() >= FlashlightDarkShade), dynamicFlashlight);
++	// The flashlight, on and off with its own key (see toggleFlashlight): a spot on the crosshair,
++	// so it lights dark places by day too.
++	_view->setFlashlight(_flashlightOn, true);
 +
 +	// The camera follows the soldier (and walks them on your turn); on your turn the soldier
 +	// also faces where you look, and the fire mode and aim are kept up to date.
@@ -37810,7 +37743,7 @@ index 000000000..cab6f6d00
 +	if (key != SDLK_UNKNOWN && key == Options::keyFpsShowFacing) return true; // (held: see think)
 +	if (key != SDLK_UNKNOWN && key == Options::keyFpsRange) return true; // (held: see updateCrosshair)
 +	if (key == Options::keyFpsOpenDoor) { if (pressed) openDoor(_save->getSelectedUnit()); return true; }
-+	if (key == Options::keyFpsFlare) { if (pressed) { if (Options::fpsFlares) throwFlare(); else _state->warning("STR_FPS_FLARES_OFF"); } return true; }
++	if (key == Options::keyFpsFlare) { if (pressed) throwFlare(); return true; }
 +	if (key == Options::keyFpsUp) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_UP, action, true); return true; }
 +	if (key == Options::keyFpsDown) { if (pressed) moveUpDown(_save->getSelectedUnit(), Pathfinding::DIR_DOWN, action, true); return true; }
 +	if (key == Options::keyFpsFlight) { if (pressed) toggleFlight(_save->getSelectedUnit()); return true; }
@@ -38566,7 +38499,7 @@ index 000000000..cab6f6d00
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..91f5cf08b
+index 000000000..5f58144ce
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
 @@ -0,0 +1,1574 @@
@@ -38850,7 +38783,7 @@ index 000000000..91f5cf08b
 +	int _gameLineX;                        // where the game's own line (debug, Bug Hunt) starts at the top left (screen pixels)
 +	BattleUnit *_lastPlayerUnit = nullptr; // the last soldier the player had (the view stays with them in the alien turn)
 +	bool _musicTense = false;              // the combat track is playing
-+	bool _flashlightOn = true;             // the flashlight (setting "Flashlight") switched on with its key (the suit light is the game's)
++	bool _flashlightOn = true;             // the flashlight switched on with its key (the suit light is the game's)
 +	Uint32 _lastEnemySeen = 0;             // when an alien was last in sight (the combat music stops 8 s later)
 +	int _pausedCheats = 0;                 // the cheats the doom mode key switched off, to switch back on (bits: 1 doom mode, 2 IDKFA, 4 IDDQD, 8 IDCLIP)
 +	bool _idclipWas = false;               // Doom IDCLIP was on last frame (switched off, the soldiers in the air fall: see applyNoclipEnd)
@@ -38912,7 +38845,7 @@ index 000000000..91f5cf08b
 +	void setClassicHud(bool on);
 +	/// Hides or shows the 3D HUD (the hide HUD key).
 +	void toggleHud();
-+	/// Switches the flashlight on or off (its key, with the setting "Flashlight" on).
++	/// Switches the flashlight on or off (its key).
 +	void toggleFlashlight();
 +	/// Is the 3D HUD hidden right now (in the 3D view, with the hide HUD key)?
 +	bool hudHidden() const;
@@ -46963,10 +46896,10 @@ index 000000000..638cf76d5
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..7b82bf852
+index 000000000..93d609b5e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,5587 @@
+@@ -0,0 +1,5586 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -52076,8 +52009,7 @@ index 000000000..7b82bf852
 +}
 +
 +/**
-+ * Tosses a tactical flare at the crosshair (the flare key, T by default, with the setting
-+ * "Unlimited tactical flares"). It's the add-on's own: free, unlimited, and no item or time units are used. The 3D
++ * Tosses a tactical flare at the crosshair (the flare key, T by default). It's the add-on's own: free, unlimited, and no item or time units are used. The 3D
 + * view flies it, bounces it off walls and lets it burn with its light.
 + */
 +void FirstPersonMode::throwFlare()
@@ -52085,7 +52017,7 @@ index 000000000..7b82bf852
 +	// From the soldier the view looks through (in the aliens' turn the game's selected unit is
 +	// the alien acting, whose tile the throw's sound would give away).
 +	BattleUnit *unit = _trackedUnit;
-+	if (!Options::fpsFlares || !unit || !isActive() || _deathUnit)
++	if (!unit || !isActive() || _deathUnit)
 +	{
 +		return;
 +	}
@@ -60699,7 +60631,7 @@ index 000000000..bd8108f56
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..d3848b9e2
+index 000000000..03827674b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
 @@ -0,0 +1,1847 @@
@@ -61711,7 +61643,7 @@ index 000000000..d3848b9e2
 +	const SDL_Color *_skyPalette = nullptr; // the battle's palette before its environment recoloured it (see updateColors), or null
 +	bool _smoothLighting = true;    // blend the game's light between tiles (an option)
 +	bool _flashlight = false;       // flashlight on (its key; the shoulder one only in dark battles)
-+	bool _dynamicFlashlight = false; // it's the dynamic flashlight (setting "Flashlight": Dynamic): from under the eye, a tight spot on the crosshair
++	bool _dynamicFlashlight = false; // it's the dynamic flashlight (the one the game uses; off: a wide beam from the shoulder): from under the eye, a tight spot on the crosshair
 +	float _flashlightPos[3] = {};   // where it is this frame
 +	float _muzzleFlashPos[3] = {};  // where the last shot flashed, lighting its surroundings for a moment
 +	Uint32 _muzzleFlashTick = 0;    // when it flashed
@@ -94684,10 +94616,10 @@ index 000000000..3559cb7dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..39580f68d
+index 000000000..dcfc3a088
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,1142 @@
+@@ -0,0 +1,1131 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -94923,8 +94855,8 @@ index 000000000..39580f68d
 +			"fpsFalling", "fpsSafeLanding", "fpsFallDamage" } },
 +		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsRecoil", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsThrowing", "fpsLean", "fpsMeleeTerrain",
 +			"fpsMeleeFloors", "fpsAimExact", "fpsCloseEyeShots", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
-+			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst", "fpsFlares" } },
-+		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
++			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst" } },
++		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsSmoke", "fpsSmokeOpacity",
 +			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsHitFlash", "fpsSmoothFire", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 +			"fpsGhostParts", "fpsGhostOpacity", "fpsGhostOpenDoors", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge" } },
 +		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsRangefinder", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
@@ -95191,12 +95123,6 @@ index 000000000..39580f68d
 +		{
 +			static const char *const trajectoryNames[] = { "STR_FPS_TRAJECTORY_OFF", "STR_FPS_TRAJECTORY_ARCS", "STR_FPS_TRAJECTORY_ALL" };
 +			return std::string(tr(trajectoryNames[std::clamp(*option.asInt(), 0, 2)]));
-+		}
-+		// The flashlight is a choice of three, shown by name.
-+		if (option.id() == "fpsFlashlightMode")
-+		{
-+			static const char *const flashlightNames[] = { "STR_FPS_FLASHLIGHT_OFF", "STR_FPS_FLASHLIGHT_ON", "STR_FPS_FLASHLIGHT_DYNAMIC" };
-+			return std::string(tr(flashlightNames[FirstPerson::flashlightMode()]));
 +		}
 +		// The presets, shown by name (Custom after the last of each).
 +		if (option.id() == "fpsPreset")
@@ -95575,11 +95501,6 @@ index 000000000..39580f68d
 +		else if (value == &Options::fpsTrajectory)
 +		{
 +			*value = (*value + direction + 3) % 3;
-+		}
-+		// The flashlight (off, on, dynamic): round and round.
-+		else if (value == &Options::fpsFlashlightMode)
-+		{
-+			*value = (FirstPerson::flashlightMode() + direction + 3) % 3;
 +		}
 +		// A preset: round and round through its names, its settings set with it, and Custom after the last
 +		// once the player has a mix of their own to come back to.

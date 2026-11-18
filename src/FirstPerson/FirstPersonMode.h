@@ -278,7 +278,7 @@ private:
 	int _gameLineX;                        // where the game's own line (debug, Bug Hunt) starts at the top left (screen pixels)
 	BattleUnit *_lastPlayerUnit = nullptr; // the last soldier the player had (the view stays with them in the alien turn)
 	bool _musicTense = false;              // the combat track is playing
-	bool _flashlightOn = true;             // the flashlight (setting "Flashlight") switched on with its key (the suit light is the game's)
+	bool _flashlightOn = true;             // the flashlight switched on with its key (the suit light is the game's)
 	Uint32 _lastEnemySeen = 0;             // when an alien was last in sight (the combat music stops 8 s later)
 	int _pausedCheats = 0;                 // the cheats the doom mode key switched off, to switch back on (bits: 1 doom mode, 2 IDKFA, 4 IDDQD, 8 IDCLIP)
 	bool _idclipWas = false;               // Doom IDCLIP was on last frame (switched off, the soldiers in the air fall: see applyNoclipEnd)
@@ -340,7 +340,7 @@ private:
 	void setClassicHud(bool on);
 	/// Hides or shows the 3D HUD (the hide HUD key).
 	void toggleHud();
-	/// Switches the flashlight on or off (its key, with the setting "Flashlight" on).
+	/// Switches the flashlight on or off (its key).
 	void toggleFlashlight();
 	/// Is the 3D HUD hidden right now (in the 3D view, with the hide HUD key)?
 	bool hudHidden() const;

@@ -50,7 +50,7 @@ KEYS = [
         ('<kbd>Left Alt</kbd>, held', 'Show facing: a ring round every unit in sight with an arrow the way it faces, in its side\'s colour.', 'Where an alien looks decides whether it reacts to you.'),
         ('<i>Range (hold)</i>: a key of your choice', 'The rangefinder while held (setting <i>Rangefinder</i>; the digital one when that is Off).', 'No key until you give it one in Options, 3D VIEW.'),
         ('<kbd>N</kbd> or <kbd>Scroll Lock</kbd>', 'Night vision on/off (Scroll Lock: the game\'s own key for it).', ''),
-        ('<kbd>F</kbd>', 'The flashlight on/off (setting <i>Flashlight</i>).', 'Only the 3D view is lit: aliens don\'t see you any better for it.'),
+        ('<kbd>F</kbd>', 'The flashlight on/off: a spot on the crosshair, day or night.', 'Only the 3D view is lit: aliens don\'t see you any better for it.'),
     ]),
     ('Fighting', [
         ('Left button', 'Fire at the crosshair in the current fire mode.', ''),
@@ -61,7 +61,7 @@ KEYS = [
         ('<i>Akimbo style</i> (unbound)', 'Switch two guns between taking turns round by round and firing at once (<i>Akimbo volley</i>).', ''),
         ('<kbd>Ctrl</kbd>+<kbd>Shift</kbd> + click', 'With a spray weapon\'s auto shot (X-Com Files\' miniguns): mark the spray burst\'s points, as on the map.', ''),
         ('Right button', 'Cancel the current action, or forget a target marked for <i>Confirm fire</i>; with nothing to cancel, hold to zoom (with a free cursor: hold and drag to look round).', ''),
-        ('<kbd>T</kbd>', 'Throw a tactical flare (setting <i>Unlimited tactical flares</i>).', 'Lights the 3D view only.'),
+        ('<kbd>T</kbd>', 'Throw a tactical flare: free, as often as you like.', 'Lights the 3D view only.'),
         ('<kbd>Insert</kbd>', 'The Doom cheats off, and the same ones back on.', ''),
     ]),
     ('The screen', [
@@ -158,7 +158,6 @@ SETTINGS = [
         ('Quick deaths', 'NO', 'YES / NO', 'Units killed or knocked out are down at once: bursts fire on, falls play on their own and together, in 3D and on the map; your soldier falls on their camera card while the view goes on to the next.', 'Doom-style pace: chaingun through a group without waiting for each fall.'),
         ('Live motion scanner', 'NO', 'YES / NO', 'YES: the motion scanner stays up as you move and through the aliens\' turn, a live radar for one use. NO: one look from where it was used, as the game\'s own scanner.', 'An edge the game never gives; on from the FullQoL preset.'),
         ('Auto-equip guns first', 'NO', 'YES / NO', 'Soldiers with no saved loadout take guns before melee weapons, the hardest-hitting first, launchers last. NO: OpenXcom\'s own auto-equip.', 'OXCE has no ranking: its order changes between builds, so in XPiratez or X-Com Files it often hands out staffs and swords first.'),
-        ('Unlimited tactical flares', 'YES', 'YES / NO', 'T throws a red flare at the crosshair, free and as often as you like.', 'Lights the 3D view only.'),
         ('Fall damage', 'NO', 'YES / NO', 'With Falling, the landing hurts by the height fallen. NO: a fall never hurts.', 'NO makes every ledge a free shortcut.'),
     ]),
     ('Graphics and light', [
@@ -173,8 +172,6 @@ SETTINGS = [
          'The 3D view only: the map and its exploring stay the game\'s; units stay hidden until seen.'),
         ('Wall paint', 'Each side', 'As the art / Each side / All rooms', 'The wall faces the map never shows. Each side: in the paint of the side they face (from behind a house its outside, inside a room the room\'s). All rooms: the walls between rooms too. As the art: as the face the map shows.',
          'The faces the map shows stay as it draws them; doors keep theirs, windows their frames and glass.'),
-        ('Flashlight', 'On', 'On / Dynamic / Off', 'The 3D view\'s own light, on F. On: a wide beam from the shoulder, in the dark. Dynamic: a tight spot on the crosshair, day or night.',
-         'Lights only the 3D view: what the soldiers see by the rules doesn\'t change.'),
         ('Smoke', 'Modern', 'Modern / Original', 'Modern: the game\'s smoke as soft see-through clouds. Original: the games\' own smoke animation, as the map draws it.',
          'Either way units the game hides stay hidden.'),
         ('Smoke opacity', '80%', '0% to 100%', 'The most smoke hides, smoke over smoke too, for both looks. 0%: no smoke drawn. 5%: barely there. 100%: opaque.',
@@ -352,7 +349,7 @@ FEATURES = [
      '<kbd>U</kbd> or the right button, held', 'The view glides in four times closer, the weapon lowers, the mouse slows.', 'Only the picture: the shot and its odds don\'t change.'),
     ('light', 'Light and night', [('night_vision_laser.png', 'Night vision: the laser sight light in the goggles')],
      '<kbd>F</kbd>, <kbd>N</kbd>, <kbd>T</kbd>, <kbd>L</kbd>',
-     'Your flashlight (on F, wide or a tight spot on the crosshair), night vision (all green, or with <i>Futuristic night vision</i> units and items in their own colours), red tactical flares, and the game\'s suit light (L). Light and shadow come from lamps, the sun, your flashlight and flares, a unit lit by a flare throwing a long soft shadow; indoors (a roof overhead, or rock) no sun shines, and rooms are lit by their own light, as on the map. <i>Smooth fire</i>: flames\' colours blend from frame to frame (off: the dotted dissolve).',
+     'Your flashlight (on F, a tight spot on the crosshair), night vision (all green, or with <i>Futuristic night vision</i> units and items in their own colours), red tactical flares, and the game\'s suit light (L). Light and shadow come from lamps, the sun, your flashlight and flares, a unit lit by a flare throwing a long soft shadow; indoors (a roof overhead, or rock) no sun shines, and rooms are lit by their own light, as on the map. <i>Smooth fire</i>: flames\' colours blend from frame to frame (off: the dotted dissolve).',
      'The flashlight and flares light only your view; the suit light is the game\'s, and lets aliens see your soldiers at night.'),
     ('smoke', 'Smoke', [('smoke.png', 'Modern smoke: soft see-through clouds')],
      '', 'Smoke is drawn as the map draws it. Modern: soft clouds you see through. Original: the game\'s own dots. Neither hides more than <i>Smoke opacity</i> (80% by day, 45% at night; 0% no smoke, 100% opaque). The game hides units in smoke, not the world: an enemy your soldier can\'t see through it isn\'t drawn, only its marker. Heat vision sees smoke thinner. <i>Smoke opacity</i> and <i>Night smoke opacity</i> go from 0% (no smoke drawn) to 100% (opaque) for both looks, and smoke over smoke never hides more than the setting.',
