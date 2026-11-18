@@ -2516,7 +2516,10 @@ void FirstPersonView::drawFloorItems()
 		// see-through, and "it does turn, but too faintly to notice". So a body is see-through whenever it lies in the
 		// way: the aim's line passes over it, within its reach on the ground, and ends beyond it; and fainter than a
 		// picture, VoxelCorpseFaint of the ghost opacity: its cubes stand a layer behind another.)
-		double bodyOpacity = step.sprite.seeThrough ? step.sprite.seeThrough->opacity : 1.0;
+		// (By where it lies and where the aim goes alone, not by whether its pixels are under the crosshair: drawn
+		// see-through it leaves holes there, the crosshair found no body in them the next frame, and it was solid again:
+		// the owner, a downed Cyberdisc "flashes transparent when I am near but turns solid again".)
+		double bodyOpacity = 1.0;
 		if ((lying || wreck) && Options::fpsSeeThroughCorpses && _pointerAimed)
 		{
 			const double reach = wreck ? VoxelWreckReach : VoxelCorpseReach;
