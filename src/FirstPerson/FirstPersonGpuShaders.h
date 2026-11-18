@@ -2611,6 +2611,16 @@ void main()
 		{
 			// A round dot in front of the scene, in rings (a shot's head, a flare), or only its rim (a bubble).
 			vec4 t2 = prim(base, 2), t3 = prim(base, 3);
+			if ((flags & 8) != 0)
+			{
+				// A tongue of flame (FirstPersonView::drawParticles, a burning voxel body's): half again as tall as wide,
+				// its edge ragged by the dither, its middle the hotter colour, which alone may glow.
+				float along = length((vec2(pixel) + vec2(0.5) - t2.xy) / vec2(t2.z, t2.z * 1.5));
+				if (along > 1.0 || head.w >= depth + t2.w || (along > 0.6 && dither(pixel.x, pixel.y) < (along - 0.6) * 2.5)) continue;
+				color = along < 0.4 ? uint(t3.x) : uint(head.z);
+				if (along < 0.4 && (flags & 1) != 0) glow = 1u;
+				continue;
+			}
 			vec2 at = vec2(pixel) + ((flags & 2) != 0 ? vec2(0.5) : vec2(0.0));
 			float fromCentre = length(at - t2.xy);
 			if (fromCentre > t2.z || head.w >= depth + t2.w) continue;

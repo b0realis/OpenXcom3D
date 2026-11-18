@@ -1372,12 +1372,17 @@ void FirstPersonView::drawParticles()
 		{
 			// A tongue of flame (a burning voxel body's): a disc of the fire's colours, hotter in its middle, its edge
 			// ragged; it shines (blooms) and hides nothing behind it from later drawing (no depth written).
-			if (_gpuRecording && _gpuRecordOnly) continue;
 			// (a tongue: half again as tall as wide; yellow and orange at first, red at the end, white-hot only in the
 			// middle of a young one, which alone blooms: a fire all in bloom was a white ball hiding the unit)
 			const double radius = std::clamp(particle.size * focalLength / depth * 0.4 * (1.0 - 0.6 * fade), 1.0, 32.0), tall = radius * 1.5;
 			const int stage = std::min(3, 1 + (int)(fade * 3.0f));
 			const Uint8 rim = _colors.fire[stage], core = _colors.fire[stage - 1];
+			if (_gpuRecording)
+			{
+				// (GitHub issue #186, "new fire effect only triggers on CPU": the tongues were never handed to the GPU renderer)
+				gpuRecordDisc(screenX, screenY, radius, depth, (float)FlameNearer, rim, core, core, 0.4f, 0.4f, 8 | (fade < 0.4f ? 1 : 0));
+				if (_gpuRecordOnly) continue;
+			}
 			for (int y = (int)(screenY - tall); y <= (int)(screenY + tall); ++y)
 			{
 				for (int x = (int)(screenX - radius); x <= (int)(screenX + radius); ++x)

@@ -524,14 +524,15 @@ void FirstPersonView::gpuRecordDot(int left, int top, int dotWidth, int dotHeigh
 
 /**
  * Records a round dot in front of the scene (a shot's head, a flare; a bubble's ring).
- * Texel 0: kind, flags (1 it glows, 2 measured from the pixels' middles, 4 only its rim, a pixel wide), its rim's
- * colour, its depth. Texel 2: its middle on the screen, its radius, its leeway in front of the scene; 3: its centre's
+ * Texel 0: kind, flags (1 it glows, 2 measured from the pixels' middles, 4 only its rim, a pixel wide, 8 a tongue of
+ * flame: half again as tall as wide, ragged at the edge, its centre's colour within 0.4 of the radius, only that
+ * glowing), its rim's colour, its depth. Texel 2: its middle on the screen, its radius, its leeway in front of the scene; 3: its centre's
  * colour and the ring's round it, and how far out (of the radius) each reaches.
  */
 void FirstPersonView::gpuRecordDisc(double screenX, double screenY, double radius, double depth, float leeway, Uint8 rim, Uint8 centre, Uint8 middle, float centreShare,
 	float middleShare, int flags)
 {
-	const int reach = (int)std::ceil(radius) + 2;
+	const int reach = (int)std::ceil(radius * ((flags & 8) ? 1.5 : 1.0)) + 2;
 	const int left = std::max(0, (int)screenX - reach), top = std::max(0, (int)screenY - reach), right = std::min(getWidth(), (int)screenX + reach + 1),
 		bottom = std::min(getHeight(), (int)screenY + reach + 1);
 	if (left >= right || top >= bottom)

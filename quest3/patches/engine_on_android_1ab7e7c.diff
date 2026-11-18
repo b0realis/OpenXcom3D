@@ -31990,10 +31990,10 @@ index 000000000..82e9da00f
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..681cb447b
+index 000000000..a3cdd9219
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,2948 @@
+@@ -0,0 +1,2958 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -34607,6 +34607,16 @@ index 000000000..681cb447b
 +		{
 +			// A round dot in front of the scene, in rings (a shot's head, a flare), or only its rim (a bubble).
 +			vec4 t2 = prim(base, 2), t3 = prim(base, 3);
++			if ((flags & 8) != 0)
++			{
++				// A tongue of flame (FirstPersonView::drawParticles, a burning voxel body's): half again as tall as wide,
++				// its edge ragged by the dither, its middle the hotter colour, which alone may glow.
++				float along = length((vec2(pixel) + vec2(0.5) - t2.xy) / vec2(t2.z, t2.z * 1.5));
++				if (along > 1.0 || head.w >= depth + t2.w || (along > 0.6 && dither(pixel.x, pixel.y) < (along - 0.6) * 2.5)) continue;
++				color = along < 0.4 ? uint(t3.x) : uint(head.z);
++				if (along < 0.4 && (flags & 1) != 0) glow = 1u;
++				continue;
++			}
 +			vec2 at = vec2(pixel) + ((flags & 2) != 0 ? vec2(0.5) : vec2(0.0));
 +			float fromCentre = length(at - t2.xy);
 +			if (fromCentre > t2.z || head.w >= depth + t2.w) continue;
@@ -62561,10 +62571,10 @@ index 000000000..03827674b
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewEffects.cpp b/src/FirstPerson/FirstPersonViewEffects.cpp
 new file mode 100644
-index 000000000..54d9b8135
+index 000000000..9cb70a667
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewEffects.cpp
-@@ -0,0 +1,1455 @@
+@@ -0,0 +1,1460 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -63939,12 +63949,17 @@ index 000000000..54d9b8135
 +		{
 +			// A tongue of flame (a burning voxel body's): a disc of the fire's colours, hotter in its middle, its edge
 +			// ragged; it shines (blooms) and hides nothing behind it from later drawing (no depth written).
-+			if (_gpuRecording && _gpuRecordOnly) continue;
 +			// (a tongue: half again as tall as wide; yellow and orange at first, red at the end, white-hot only in the
 +			// middle of a young one, which alone blooms: a fire all in bloom was a white ball hiding the unit)
 +			const double radius = std::clamp(particle.size * focalLength / depth * 0.4 * (1.0 - 0.6 * fade), 1.0, 32.0), tall = radius * 1.5;
 +			const int stage = std::min(3, 1 + (int)(fade * 3.0f));
 +			const Uint8 rim = _colors.fire[stage], core = _colors.fire[stage - 1];
++			if (_gpuRecording)
++			{
++				// (GitHub issue #186, "new fire effect only triggers on CPU": the tongues were never handed to the GPU renderer)
++				gpuRecordDisc(screenX, screenY, radius, depth, (float)FlameNearer, rim, core, core, 0.4f, 0.4f, 8 | (fade < 0.4f ? 1 : 0));
++				if (_gpuRecordOnly) continue;
++			}
 +			for (int y = (int)(screenY - tall); y <= (int)(screenY + tall); ++y)
 +			{
 +				for (int x = (int)(screenX - radius); x <= (int)(screenX + radius); ++x)
@@ -65207,10 +65222,10 @@ index 000000000..d5a05cb89
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpuEffects.cpp b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 new file mode 100644
-index 000000000..edcdf5429
+index 000000000..fd51605dc
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
-@@ -0,0 +1,1075 @@
+@@ -0,0 +1,1076 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -65737,14 +65752,15 @@ index 000000000..edcdf5429
 +
 +/**
 + * Records a round dot in front of the scene (a shot's head, a flare; a bubble's ring).
-+ * Texel 0: kind, flags (1 it glows, 2 measured from the pixels' middles, 4 only its rim, a pixel wide), its rim's
-+ * colour, its depth. Texel 2: its middle on the screen, its radius, its leeway in front of the scene; 3: its centre's
++ * Texel 0: kind, flags (1 it glows, 2 measured from the pixels' middles, 4 only its rim, a pixel wide, 8 a tongue of
++ * flame: half again as tall as wide, ragged at the edge, its centre's colour within 0.4 of the radius, only that
++ * glowing), its rim's colour, its depth. Texel 2: its middle on the screen, its radius, its leeway in front of the scene; 3: its centre's
 + * colour and the ring's round it, and how far out (of the radius) each reaches.
 + */
 +void FirstPersonView::gpuRecordDisc(double screenX, double screenY, double radius, double depth, float leeway, Uint8 rim, Uint8 centre, Uint8 middle, float centreShare,
 +	float middleShare, int flags)
 +{
-+	const int reach = (int)std::ceil(radius) + 2;
++	const int reach = (int)std::ceil(radius * ((flags & 8) ? 1.5 : 1.0)) + 2;
 +	const int left = std::max(0, (int)screenX - reach), top = std::max(0, (int)screenY - reach), right = std::min(getWidth(), (int)screenX + reach + 1),
 +		bottom = std::min(getHeight(), (int)screenY + reach + 1);
 +	if (left >= right || top >= bottom)

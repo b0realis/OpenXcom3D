@@ -1029,6 +1029,7 @@ What `FirstPersonView` draws:
 
 ### After 1.14 (not released)
 
+- *Voxel units*: **a burning body's flames show on the GPU renderer too** (GitHub issue #186, "new fire effect only triggers on CPU"). The tongues of flame on a burning voxel body were drawn by the CPU renderer only; with *Renderer* GPU just the sparks and smoke showed.
 - **The flashlight and the flares are always there: the settings *Flashlight* and *Unlimited tactical flares* are gone** (the owner: "Flashlight: assume on dynamic. The other light is personal lights, and can be toggled off. Also flashlight has a key binding"). The flashlight is the light on the weapon, a spot on the crosshair by day and night (the wide shoulder beam, the old *On*, is gone); **F** switches it and **T** throws a flare, and either key can be unbound.
 - **Zoom is always there: the setting *Zoom* is gone** (the owner: "Its on a control, just don't hit it"). Hold **U**, or the right button in mouse look, as before.
 - **Night vision for everyone: the setting *Night vision needs gear* is gone** (the owner: "Nobody uses the option night vision needs gear... Night vision is available period"). Every unit has the NIGHT VISION button and the N key in 3D, as on the isometric map; the mod's `nightVision:` list of armors and items is no longer read.
