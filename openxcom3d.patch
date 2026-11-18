@@ -57076,10 +57076,10 @@ index 000000000..75dd0fb08
 +}
 diff --git a/src/FirstPerson/FirstPersonQuickDeaths.cpp b/src/FirstPerson/FirstPersonQuickDeaths.cpp
 new file mode 100644
-index 000000000..d775609f4
+index 000000000..35ce614c8
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonQuickDeaths.cpp
-@@ -0,0 +1,391 @@
+@@ -0,0 +1,395 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -57398,9 +57398,13 @@ index 000000000..d775609f4
 +		if (fall.unit != unit) continue;
 +		const double dropped = airFallDropped(fall, now);
 +		const bool down = unit->getStatus() == STATUS_DEAD || unit->getStatus() == STATUS_UNCONSCIOUS || unit->getStatus() == STATUS_COLLAPSING;
-+		if (!down || unit->getAlreadyRespawned() || dropped >= fall.fromZ - fall.landZ) return false;
++		if (!down || unit->getAlreadyRespawned()) return false;
++		// (Landed while the game still has it collapsing up where it hovered: it stays on the ground. Let go there, it
++		// was drawn up at its tile again for the rest of its fall frames: a body that dropped, then rose.)
++		const bool landed = dropped >= fall.fromZ - fall.landZ;
++		if (landed && unit->getStatus() != STATUS_COLLAPSING) return false;
 +		tile = fall.from;
-+		feetZ = fall.fromZ - dropped;
++		feetZ = landed ? fall.landZ : fall.fromZ - dropped;
 +		return true;
 +	}
 +	return false;
