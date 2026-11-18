@@ -83691,10 +83691,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..df910c470
+index 000000000..7ddcff426
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,2484 @@
+@@ -0,0 +1,2516 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -85064,7 +85064,7 @@ index 000000000..df910c470
 +/// lying: its corpse's inventory picture laid on the floor and given volume (or, without one, its corpse's picture on
 +/// the map's floor). The owner: "deaths should not be like planks! The body should organically collapse like in
 +/// sprites - and the death should be like a dead body sprite (in equipment menu - just voxelised to give volume!)".
-+void makeFalls(VoxelUnitModel &model, const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse, const HeldItem &lying, const SDL_Color *palette)
++void makeFalls(VoxelUnitModel &model, const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse, const HeldItem &lying, const SDL_Color *palette, bool hull)
 +{
 +	// The standing body's height and depth: the fall's shapes are as thick as it stood deep, and it lies as long as it
 +	// stood tall (not much longer than its tile: it lies in the tile's middle, not through the walls round it).
@@ -85102,6 +85102,38 @@ index 000000000..df910c470
 +		HeldItem clean = lying;
 +		clean.picture = withoutOutline(lying.picture, lying.width, lying.height, palette);
 +		lyingShape(down, clean, length, halfMost * 1.6f);
++	}
++	// A big unit that is a hull (a Cyberdisc, a tank: not a walker) lies as that same hull, set down on the ground and
++	// painted as its wreck's picture shows it from the map's side (the owner: "It should be the same cyberdisc with a
++	// hole on top sitting on the ground"): the picture's dents and holes on the body it had, its own colours where the
++	// picture has none.
++	if (hull && !corpse.empty())
++	{
++		const size_t own = std::min(model.part.size(), model.addedFrom);
++		// (Down to its widest row: a hull that hovered has under its rim only what the drawings' outlines left there, a
++		// cone down to the floor; set down, that is under the ground and left out.)
++		std::vector<int> wide(GridUp, 0);
++		for (size_t k = 0; k < own; ++k)
++		{
++			const int row = (int)std::floor((model.up[k] - UpFrom) / Cell);
++			if (model.part[k] != VoxelUnitModel::Item && row >= 0 && row < GridUp) ++wide[row];
++		}
++		const int rim = (int)(std::max_element(wide.begin(), wide.end()) - wide.begin());
++		const float drop = std::max(0.0f, std::floor((cellUp(rim) - 1.0f * VOXELSCALE) / Cell) * Cell); // (whole cells: the cubes stay on the grid)
++		for (size_t k = 0; k < own; ++k)
++		{
++			if (model.part[k] == VoxelUnitModel::Item) continue;
++			const float up = model.up[k] - drop;
++			if (up < 0.0f) continue;
++			float column, row, nearness;
++			project(model.right[k], model.ahead[k], up, Front, false, column, row, nearness);
++			const int c = (int)std::floor(column), r = (int)std::floor(row);
++			const Uint8 painted = c >= 0 && r >= 0 && c < FrameSize && r < FrameSize ? corpse[(size_t)r * FrameSize + c] : 0;
++			down.right.push_back(model.right[k]);
++			down.ahead.push_back(model.ahead[k]);
++			down.up.push_back(up);
++			down.colour.push_back(painted ? painted : model.colours[k * 16]);
++		}
 +	}
 +	if (down.colour.empty() && !corpse.empty()) fallRelief(down, withoutOutline(corpse, FrameSize, FrameSize, palette), 90.0f, halfMost * 0.8f);
 +	if (!down.colour.empty()) model.falls.push_back(std::move(down));
@@ -86092,7 +86124,7 @@ index 000000000..df910c470
 +	const bool rightHolds = placed[0] || (placed[1] && items[1].twoHanded);
 +	const bool leftHolds = placed[1] || (placed[0] && items[0].twoHanded);
 +	makeWalk(*model, routine, leftHolds, rightHolds, walks);
-+	makeFalls(*model, deaths, corpse, lying, palette);
++	makeFalls(*model, deaths, corpse, lying, palette, routine.big && !routine.legsSwing);
 +	return model;
 +}
 +
