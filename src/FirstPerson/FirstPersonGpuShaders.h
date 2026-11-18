@@ -2234,14 +2234,17 @@ void main()
 				bool ownOverNight = ownColours != 0u && uOwnOverNight != 0;
 				if (ownOverNight && own == 0u && color != 0u) color = uint((uOwnOverNight - 1) * 16) | (color & 15u);
 				uint over = shadeColor(spriteColor, shade);
-				if (uSmokeNight != 0 && smokeCap > 0)
+				if (uSmokeNight != 0 && smokeCap > 0 && own == 0u && color != 0u)
 				{
-					// (smoke through the goggles: in their colours, and dull, see SmokeNightBrightest)
-					uint nightGroup = uint((uSmokeNight - 1) * 16);
-					if (own == 0u && color != 0u) color = nightGroup | (color & 15u);
-					over = nightGroup | uint(max(int(over & 15u), SmokeNightBrightest));
+					// (smoke through the goggles, see SmokeNightBrightest: its shade, no brighter than that, mixed with
+					// the shade of what is behind it, by the numbers, in the goggles' colours)
+					int smoke = clamp(int(over & 15u), SmokeNightBrightest, SmokeNightDarkest), behind = int(color & 15u);
+					color = uint((uSmokeNight - 1) * 16) | uint((behind * (SeeThroughLevels - mixLevel) + smoke * mixLevel + SeeThroughLevels / 2) / SeeThroughLevels);
 				}
-				color = seeThrough(mixLevel, over, color);
+				else
+				{
+					color = seeThrough(mixLevel, over, color);
+				}
 				if (pixelOpacity > SeeThroughLevels / 2)
 				{
 					glow = 0u;

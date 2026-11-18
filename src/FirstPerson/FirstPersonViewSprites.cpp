@@ -308,14 +308,19 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 			// with the world): mixed over the world in the night vision's colours, and left alone by
 			// the wash after (see washBands).
 			if (ownOverNight && !_ownColours[index] && *pixel) *pixel = nightGroup | (*pixel & 15);
-			Uint8 over = shadeColor(color, shade);
-			if (_nightVision && smokeCap > 0)
+			const Uint8 over = shadeColor(color, shade);
+			if (_nightVision && smokeCap > 0 && !_ownColours[index] && *pixel)
 			{
-				// (smoke through the goggles: in their colours, and dull, see SmokeNightBrightest)
-				if (!_ownColours[index] && *pixel) *pixel = nightGroup | (*pixel & 15);
-				over = nightGroup | (Uint8)std::max((int)(over & 15), SmokeNightBrightest);
+				// (Smoke through the goggles, see SmokeNightBrightest: they show a colour by its shade alone, so the smoke's
+				// shade, no brighter than that, is mixed with the shade of what is behind it, by the numbers: the mixing
+				// table gives the nearest colour of any group, whose shade says nothing of how bright it is.)
+				const int smoke = std::clamp((int)(over & 15), SmokeNightBrightest, SmokeNightDarkest), behind = *pixel & 15;
+				*pixel = nightGroup | (Uint8)((behind * (SeeThroughLevels - mixLevel) + smoke * mixLevel + SeeThroughLevels / 2) / SeeThroughLevels);
 			}
-			*pixel = seeThrough(mixLevel, over, *pixel);
+			else
+			{
+				*pixel = seeThrough(mixLevel, over, *pixel);
+			}
 			if (pixelOpacity > SeeThroughLevels / 2)
 			{
 				_glowMask[index] = 0;
