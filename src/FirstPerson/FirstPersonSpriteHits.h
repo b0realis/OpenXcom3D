@@ -111,6 +111,9 @@ bool viewCard(SavedBattleGame *save, const BattleUnit *unit, const FirstPersonVi
  * @return The view rotation (3 minus the direction from the unit to the eye).
  */
 int unitViewRotation(const double eye[3], const double feet[3]);
+/// How far a unit's card lies back whatever the view's pitch, in radians: a hull's (two tiles by two, not a walker)
+/// HullLayBack, any other unit's 0.
+double hullLayBack(const BattleUnit *unit);
 
 /**
  * Where a line crosses a card's plane, and whether a solid pixel of the picture is there (the

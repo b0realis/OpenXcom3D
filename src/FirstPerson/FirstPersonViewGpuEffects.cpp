@@ -228,6 +228,7 @@ void FirstPersonView::gpuRecordSprite(const SpriteDraw &draw)
 	{
 		tilt = std::max(tilt, std::min(elevation - CardTiltUpMax * Pi / 180.0, CardTiltSteepMax * Pi / 180.0));
 	}
+	if (draw.layBack > 0.0) tilt = std::min(std::clamp(_pitch, -CardTiltMax * Pi / 180.0, 0.0), -draw.layBack); // (a hull's: see HullLayBack)
 	const double cardUp[3] = { -std::sin(tilt) * level[0], -std::sin(tilt) * level[1], std::cos(tilt) };
 	const double cardFacing[3] = { std::cos(tilt) * level[0], std::cos(tilt) * level[1], std::sin(tilt) };
 	const double anchorAcross = dot(anchor, _levelRight), anchorFacing = dot(anchor, cardFacing);

@@ -451,7 +451,7 @@ void drawnCard(SavedBattleGame *save, const BattleUnit *unit, const FirstPersonV
 		card.anchor[1] = feet[1];
 		card.anchor[2] = height;
 	}
-	view->cardAxes(card.anchor, scale, card.column, card.row);
+	view->cardAxes(card.anchor, scale, card.column, card.row, hullLayBack(unit));
 	// The normal: column cross row, made a unit vector.
 	double normal[3] = { card.column[1] * card.row[2] - card.column[2] * card.row[1], card.column[2] * card.row[0] - card.column[0] * card.row[2],
 		card.column[0] * card.row[1] - card.column[1] * card.row[0] };
@@ -775,6 +775,19 @@ Position spriteImpact(SavedBattleGame *, const BattleUnit *unit, const Position 
 	const Position at = unit->getPosition();
 	return Position(std::clamp<int>(voxel.x, at.x * 16, (at.x + size) * 16 - 1), std::clamp<int>(voxel.y, at.y * 16, (at.y + size) * 16 - 1),
 		std::clamp<int>(voxel.z, at.z * 24, at.z * 24 + 23));
+}
+
+/**
+ * How far a unit's card lies back whatever the view's pitch (see FirstPersonSpriteHits.h): the big units drawn
+ * on legs (the Sectopod and the Reaper, routine 5; TFTD's Triscene, 20) are pictured as the small ones, upright,
+ * unless they can't move (a turret drawn by a walker's routine: XPiratez's truck turret).
+ */
+double hullLayBack(const BattleUnit *unit)
+{
+	if (!unit || unit->getArmor()->getSize() < 2) return 0.0;
+	const int routine = unit->getArmor()->getDrawingRoutine();
+	const bool walker = (routine == 5 || routine == 20) && unit->getArmor()->allowsMoving(); // (not a turret drawn by a walker's routine: XPiratez's truck turret)
+	return walker ? 0.0 : HullLayBack * Pi / 180.0;
 }
 
 /**
