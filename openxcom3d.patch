@@ -72650,10 +72650,10 @@ index 000000000..229bd966c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..122b3a7d2
+index 000000000..25c56f17c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,4062 @@
+@@ -0,0 +1,4065 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -74161,7 +74161,8 @@ index 000000000..122b3a7d2
 +		int walkPhase = -1;
 +		double fall = 0.0;
 +		const bool collapsing = unit->getStatus() == STATUS_COLLAPSING;
-+		if (Options::fpsVoxelUnits && (unitSize == 1 || collapsing) && (collapsing || fallingDown || airFall))
++		const bool wreckFalling = unitSize != 1 && fallingDown && unit->isOut(); // (a big unit destroyed in the air, coming down)
++		if (Options::fpsVoxelUnits && (unitSize == 1 || collapsing || wreckFalling) && (collapsing || fallingDown || airFall))
 +		{
 +			// Going down (the game's own fall, a quick death's, a body coming down from the air): the body it was last
 +			// drawn with goes down as its death frames show, to lie as its corpse's picture (see VoxelUnitModel::falls), as
@@ -74181,8 +74182,9 @@ index 000000000..122b3a7d2
 +			}
 +			fall = std::clamp(fall, 0.0, 1.0);
 +			// (A big unit has no fall's shapes yet: its body stands as it was while the game takes it down, then its wreck
-+			// lies there, see drawFloorItems.)
-+			if (unitSize != 1) fall = 0.0;
++			// lies there, see drawFloorItems. Destroyed in the air, it comes down as that wreck: it was its flat picture
++			// all the way down. The owner: "it shows sprite when falling. It should be the destroyed model".)
++			if (unitSize != 1) fall = wreckFalling && !collapsing ? 1.0 : 0.0;
 +		}
 +		else if (Options::fpsVoxelUnits && !quickFall && !fallingDown && !airFall && VoxelUnits::suits(unit))
 +		{
@@ -74231,7 +74233,8 @@ index 000000000..122b3a7d2
 +				bodyScale *= 1.0 + CelatidSwell * std::sin(turn * 2.0);
 +			}
 +			const size_t stepsBefore = _drawList.size();
-+			recordVoxelUnit(*body, walkPhase, facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall);
++			// (a wreck lies as the map shows it, whichever way the unit faced: see drawFloorItems)
++			recordVoxelUnit(*body, walkPhase, wreckFalling && fall >= 1.0 ? 3 : facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall);
 +			// With full sprite hitboxes the body is what the lines test (see FirstPerson::spriteHitAt): outlined as a
 +			// picture is (see drawUnitOutlines), round the pixels it's drawn on (noted as they're drawn, see
 +			// drawVoxelUnit); not one going down, nor one so close that it fades out.
