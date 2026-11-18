@@ -422,10 +422,11 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		job->unitId = unit->getId();
 		job->status = unit->getStatus();
 		job->kneeled = unit->isKneeled();
-		if (!_builder.joinable()) _builder = std::thread(&VoxelUnits::build, this);
+		// (a builder's thread more for each body waiting, up to BuilderThreads: a squad's bodies are made side by side)
 		std::lock_guard<std::mutex> lock(_mutex);
 		job->battle = _battle;
 		_jobs.push_back(std::move(job));
+		if (_builders.size() < std::min(_jobs.size() + _building, builderThreads())) _builders.emplace_back(&VoxelUnits::build, this);
 		_wake.notify_one();
 	}
 	return nullptr;
@@ -509,17 +510,26 @@ VoxelUnits::VoxelUnits()
 }
 
 /**
- * Stops the builder's thread, if it was started (after the body it's making, if any).
+ * Stops the builder's threads, if any were started (each after the body it's making, if any).
  */
 VoxelUnits::~VoxelUnits()
 {
-	if (!_builder.joinable()) return;
 	{
 		std::lock_guard<std::mutex> lock(_mutex);
 		_stopping = true;
 	}
 	_wake.notify_all();
-	_builder.join();
+	for (std::thread &builder : _builders) builder.join();
+}
+
+/**
+ * How many threads make bodies at once: the machine's, less two left to the game and its renderer; six at most (a
+ * fine body takes a second or more to make, and tens of megabytes while it's made), one at least.
+ * @return The number.
+ */
+size_t VoxelUnits::builderThreads()
+{
+	return (size_t)std::clamp((int)std::thread::hardware_concurrency() - 2, 1, 6);
 }
 
 /**
@@ -556,6 +566,7 @@ void VoxelUnits::build()
 			if (_stopping) return;
 			job = std::move(_jobs.front());
 			_jobs.pop_front();
+			++_building;
 		}
 		PartFrames parts[PartCount]; // (worked on: the job's stay as captured, for dump)
 		std::copy(std::begin(job->parts), std::end(job->parts), std::begin(parts));
@@ -596,6 +607,7 @@ void VoxelUnits::build()
 		}
 		if (const char *folder = std::getenv("OXC3D_VOXELDUMP")) dump(*job, model.get(), folder);
 		std::lock_guard<std::mutex> lock(_mutex);
+		--_building;
 		if (job->battle == _battle) _made.push_back({ job->hash, model });
 	}
 }

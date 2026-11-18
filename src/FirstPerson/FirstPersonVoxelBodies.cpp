@@ -69,13 +69,13 @@ namespace
 {
 
 // ---- The grid a body is made on: half a voxel a cell, 42 voxels up from 2 below the feet, and across and along 28 for
-// a unit one tile big, 40 for one two tiles by two (set by useGrid for the unit being made: bodies are made on the
-// game's thread only) ----
+// a unit one tile big, 40 for one two tiles by two (set by useGrid for the unit being made, each of the
+// builder's threads its own: see VoxelUnits::build) ----
 constexpr float Cell = 0.5f;
 constexpr int GridUp = 84 * VOXELSCALE;
 constexpr float UpFrom = -2.0f * VOXELSCALE;
-int GridAcross = 56 * VOXELSCALE, GridAlong = 56 * VOXELSCALE, GridCells = GridAcross * GridAlong * GridUp;
-float AcrossFrom = -14.0f * VOXELSCALE, AlongFrom = -14.0f * VOXELSCALE;
+thread_local int GridAcross = 56 * VOXELSCALE, GridAlong = 56 * VOXELSCALE, GridCells = GridAcross * GridAlong * GridUp;
+thread_local float AcrossFrom = -14.0f * VOXELSCALE, AlongFrom = -14.0f * VOXELSCALE;
 inline int cellIndex(int across, int along, int up) { return (across * GridAlong + along) * GridUp + up; }
 inline float cellRight(int across) { return AcrossFrom + (across + 0.5f) * Cell; }
 inline float cellAhead(int along) { return AlongFrom + (along + 0.5f) * Cell; }
@@ -85,9 +85,9 @@ inline float cellUp(int up) { return UpFrom + (up + 0.5f) * Cell; }
 /// The parts are drawn on FrameSize frames with the unit at (16, 8), as the 3D view draws units: the
 /// middle of its tile's floor at (32, 40); a big unit's four tiles around their shared corner, at (32, 48).
 constexpr int FloorX = 32 * VOXELSCALE;
-int FloorY = 40 * VOXELSCALE;
-bool BigUnit = false; // (two tiles by two: see tileFloorRows)
-bool SlantOnly = false; // (a big walker: read along the slant from any height, see project)
+thread_local int FloorY = 40 * VOXELSCALE;
+thread_local bool BigUnit = false; // (two tiles by two: see tileFloorRows)
+thread_local bool SlantOnly = false; // (a big walker: read along the slant from any height, see project)
 
 /// The grid and the floor's place on the frames for a unit of this size (in tiles across).
 void useGrid(int size)

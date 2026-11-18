@@ -192,7 +192,7 @@ private:
 	std::set<Uint64> _making;
 	std::map<Key, Uint64> _waiting;
 	/// The builder's jobs, the bodies it has made, and which battle they're for (a new battle drops the old one's); and
-	/// its thread (last: the rest is ready before it starts; it starts with the first job).
+	/// its threads (last: the rest is ready before they start; one starts with each job waiting, up to builderThreads).
 	std::mutex _mutex;
 	std::condition_variable _wake;
 	std::deque<std::unique_ptr<Job>> _jobs;
@@ -200,7 +200,10 @@ private:
 	unsigned _battle = 0;
 	const SavedBattleGame *_battleSave = nullptr; // (the battle the bodies are for, see forBattle)
 	bool _stopping = false;
-	std::thread _builder;
+	size_t _building = 0; // (bodies being made now)
+	std::vector<std::thread> _builders;
+	/// How many threads make bodies at once.
+	static size_t builderThreads();
 	/// The builder's loop: makes the bodies queued, until stopped.
 	void build();
 	/// A developer's aid: writes what a body was made from and what it is into a folder (the environment variable

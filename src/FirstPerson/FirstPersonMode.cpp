@@ -2220,10 +2220,11 @@ void FirstPersonMode::updateMusic(Uint32 now)
  * While a soldier goes down or breaks down, the death or breakdown camera takes the frame over.
  */
 /**
- * Setting "Voxel units" with "Full sprite hitboxes": a shot hits a unit where its body is (see FirstPerson::spriteHit), so
- * every unit's body is made from the battle's start, not only those the 3D view has seen: each frame, VoxelBodiesPerFrame
- * at most of those still without a body for how they stand now (see VoxelUnits::modelFor; the builder's thread makes
- * them). A unit without one yet is hit by its picture.
+ * Setting "Voxel units": every unit's body is made from the battle's start, on the map too, not only those the 3D view
+ * has seen (the owner: the wait must not come at the first click of the 3D button; and with "Full sprite hitboxes" a
+ * shot hits a unit where its body is, see FirstPerson::spriteHit): each frame, VoxelBodiesPerFrame at most of those still
+ * without a body for how they stand now (see VoxelUnits::modelFor; the builder's threads make them, the units in the
+ * battle's order: the player's first). A unit without one yet is drawn, and hit, as its picture.
  */
 void FirstPersonMode::makeVoxelBodies()
 {
@@ -2283,8 +2284,9 @@ void FirstPersonMode::think()
 	// The numbers rising over the units hit (setting "Damage numbers"), in either view.
 	updateDamageNumbers(now);
 
-	// With "Voxel units" and "Full sprite hitboxes" a shot hits a unit's body: every unit's made, not only those seen.
-	if (Options::fpsVoxelUnits && Options::fpsSpriteHitboxes)
+	// With "Voxel units" every unit's body is made from the battle's start (or from when the setting is switched on),
+	// seen or not: none is left to make when the 3D view opens, and with "Full sprite hitboxes" a shot hits the body.
+	if (Options::fpsVoxelUnits)
 	{
 		makeVoxelBodies();
 	}

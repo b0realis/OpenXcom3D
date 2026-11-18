@@ -34619,10 +34619,10 @@ index 000000000..eaa9f409a
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..3fa54d99a
+index 000000000..427986b43
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,3460 @@
+@@ -0,0 +1,3462 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -36845,10 +36845,11 @@ index 000000000..3fa54d99a
 + * While a soldier goes down or breaks down, the death or breakdown camera takes the frame over.
 + */
 +/**
-+ * Setting "Voxel units" with "Full sprite hitboxes": a shot hits a unit where its body is (see FirstPerson::spriteHit), so
-+ * every unit's body is made from the battle's start, not only those the 3D view has seen: each frame, VoxelBodiesPerFrame
-+ * at most of those still without a body for how they stand now (see VoxelUnits::modelFor; the builder's thread makes
-+ * them). A unit without one yet is hit by its picture.
++ * Setting "Voxel units": every unit's body is made from the battle's start, on the map too, not only those the 3D view
++ * has seen (the owner: the wait must not come at the first click of the 3D button; and with "Full sprite hitboxes" a
++ * shot hits a unit where its body is, see FirstPerson::spriteHit): each frame, VoxelBodiesPerFrame at most of those still
++ * without a body for how they stand now (see VoxelUnits::modelFor; the builder's threads make them, the units in the
++ * battle's order: the player's first). A unit without one yet is drawn, and hit, as its picture.
 + */
 +void FirstPersonMode::makeVoxelBodies()
 +{
@@ -36908,8 +36909,9 @@ index 000000000..3fa54d99a
 +	// The numbers rising over the units hit (setting "Damage numbers"), in either view.
 +	updateDamageNumbers(now);
 +
-+	// With "Voxel units" and "Full sprite hitboxes" a shot hits a unit's body: every unit's made, not only those seen.
-+	if (Options::fpsVoxelUnits && Options::fpsSpriteHitboxes)
++	// With "Voxel units" every unit's body is made from the battle's start (or from when the setting is switched on),
++	// seen or not: none is left to make when the 3D view opens, and with "Full sprite hitboxes" a shot hits the body.
++	if (Options::fpsVoxelUnits)
 +	{
 +		makeVoxelBodies();
 +	}
@@ -45963,10 +45965,10 @@ index 000000000..6e3cb469e
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..eb0ad6cb1
+index 000000000..e6542f243
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,555 @@
+@@ -0,0 +1,554 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -46413,8 +46415,7 @@ index 000000000..eb0ad6cb1
 +const Uint32 BreakdownPauseTime = 2000, BreakdownMinTime = 2600, ComeToTime = 1200;
 +
 +const double Pi = 3.14159265358979323846;
-+/// With "Voxel units" and "Full sprite hitboxes" (a shot hits the body), at most this many units' bodies are made a frame
-+/// for the battle's hits, seen or not (see FirstPersonMode::makeVoxelBodies; the 3D views make theirs too, VoxelBuildsPerFrame).
++/// With "Voxel units", at most this many units' bodies are made a frame from the battle's start, seen or not (see FirstPersonMode::makeVoxelBodies; the 3D views make theirs too, VoxelBuildsPerFrame).
 +const int VoxelBodiesPerFrame = 2;
 +/// The ammo tag's colour by damage type (see FirstPersonMode::ammoTag; GitHub issue #51): none, armor piercing (grey-white),
 +/// incendiary (red), high explosive (orange), laser (pink), plasma (green), stun (light blue), melee (grey), acid
@@ -83587,7 +83588,7 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..681f87b22
+index 000000000..3292f61ce
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 @@ -0,0 +1,2373 @@
@@ -83662,13 +83663,13 @@ index 000000000..681f87b22
 +{
 +
 +// ---- The grid a body is made on: half a voxel a cell, 42 voxels up from 2 below the feet, and across and along 28 for
-+// a unit one tile big, 40 for one two tiles by two (set by useGrid for the unit being made: bodies are made on the
-+// game's thread only) ----
++// a unit one tile big, 40 for one two tiles by two (set by useGrid for the unit being made, each of the
++// builder's threads its own: see VoxelUnits::build) ----
 +constexpr float Cell = 0.5f;
 +constexpr int GridUp = 84 * VOXELSCALE;
 +constexpr float UpFrom = -2.0f * VOXELSCALE;
-+int GridAcross = 56 * VOXELSCALE, GridAlong = 56 * VOXELSCALE, GridCells = GridAcross * GridAlong * GridUp;
-+float AcrossFrom = -14.0f * VOXELSCALE, AlongFrom = -14.0f * VOXELSCALE;
++thread_local int GridAcross = 56 * VOXELSCALE, GridAlong = 56 * VOXELSCALE, GridCells = GridAcross * GridAlong * GridUp;
++thread_local float AcrossFrom = -14.0f * VOXELSCALE, AlongFrom = -14.0f * VOXELSCALE;
 +inline int cellIndex(int across, int along, int up) { return (across * GridAlong + along) * GridUp + up; }
 +inline float cellRight(int across) { return AcrossFrom + (across + 0.5f) * Cell; }
 +inline float cellAhead(int along) { return AlongFrom + (along + 0.5f) * Cell; }
@@ -83678,9 +83679,9 @@ index 000000000..681f87b22
 +/// The parts are drawn on FrameSize frames with the unit at (16, 8), as the 3D view draws units: the
 +/// middle of its tile's floor at (32, 40); a big unit's four tiles around their shared corner, at (32, 48).
 +constexpr int FloorX = 32 * VOXELSCALE;
-+int FloorY = 40 * VOXELSCALE;
-+bool BigUnit = false; // (two tiles by two: see tileFloorRows)
-+bool SlantOnly = false; // (a big walker: read along the slant from any height, see project)
++thread_local int FloorY = 40 * VOXELSCALE;
++thread_local bool BigUnit = false; // (two tiles by two: see tileFloorRows)
++thread_local bool SlantOnly = false; // (a big walker: read along the slant from any height, see project)
 +
 +/// The grid and the floor's place on the frames for a unit of this size (in tiles across).
 +void useGrid(int size)
@@ -86573,10 +86574,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..b55f39e5d
+index 000000000..c2be10682
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,698 @@
+@@ -0,0 +1,710 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -87001,10 +87002,11 @@ index 000000000..b55f39e5d
 +		job->unitId = unit->getId();
 +		job->status = unit->getStatus();
 +		job->kneeled = unit->isKneeled();
-+		if (!_builder.joinable()) _builder = std::thread(&VoxelUnits::build, this);
++		// (a builder's thread more for each body waiting, up to BuilderThreads: a squad's bodies are made side by side)
 +		std::lock_guard<std::mutex> lock(_mutex);
 +		job->battle = _battle;
 +		_jobs.push_back(std::move(job));
++		if (_builders.size() < std::min(_jobs.size() + _building, builderThreads())) _builders.emplace_back(&VoxelUnits::build, this);
 +		_wake.notify_one();
 +	}
 +	return nullptr;
@@ -87088,17 +87090,26 @@ index 000000000..b55f39e5d
 +}
 +
 +/**
-+ * Stops the builder's thread, if it was started (after the body it's making, if any).
++ * Stops the builder's threads, if any were started (each after the body it's making, if any).
 + */
 +VoxelUnits::~VoxelUnits()
 +{
-+	if (!_builder.joinable()) return;
 +	{
 +		std::lock_guard<std::mutex> lock(_mutex);
 +		_stopping = true;
 +	}
 +	_wake.notify_all();
-+	_builder.join();
++	for (std::thread &builder : _builders) builder.join();
++}
++
++/**
++ * How many threads make bodies at once: the machine's, less two left to the game and its renderer; six at most (a
++ * fine body takes a second or more to make, and tens of megabytes while it's made), one at least.
++ * @return The number.
++ */
++size_t VoxelUnits::builderThreads()
++{
++	return (size_t)std::clamp((int)std::thread::hardware_concurrency() - 2, 1, 6);
 +}
 +
 +/**
@@ -87135,6 +87146,7 @@ index 000000000..b55f39e5d
 +			if (_stopping) return;
 +			job = std::move(_jobs.front());
 +			_jobs.pop_front();
++			++_building;
 +		}
 +		PartFrames parts[PartCount]; // (worked on: the job's stay as captured, for dump)
 +		std::copy(std::begin(job->parts), std::end(job->parts), std::begin(parts));
@@ -87175,6 +87187,7 @@ index 000000000..b55f39e5d
 +		}
 +		if (const char *folder = std::getenv("OXC3D_VOXELDUMP")) dump(*job, model.get(), folder);
 +		std::lock_guard<std::mutex> lock(_mutex);
++		--_building;
 +		if (job->battle == _battle) _made.push_back({ job->hash, model });
 +	}
 +}
@@ -87277,10 +87290,10 @@ index 000000000..b55f39e5d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.h b/src/FirstPerson/FirstPersonVoxelUnits.h
 new file mode 100644
-index 000000000..fea97e287
+index 000000000..d67b49733
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.h
-@@ -0,0 +1,214 @@
+@@ -0,0 +1,217 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -87475,7 +87488,7 @@ index 000000000..fea97e287
 +	std::set<Uint64> _making;
 +	std::map<Key, Uint64> _waiting;
 +	/// The builder's jobs, the bodies it has made, and which battle they're for (a new battle drops the old one's); and
-+	/// its thread (last: the rest is ready before it starts; it starts with the first job).
++	/// its threads (last: the rest is ready before they start; one starts with each job waiting, up to builderThreads).
 +	std::mutex _mutex;
 +	std::condition_variable _wake;
 +	std::deque<std::unique_ptr<Job>> _jobs;
@@ -87483,7 +87496,10 @@ index 000000000..fea97e287
 +	unsigned _battle = 0;
 +	const SavedBattleGame *_battleSave = nullptr; // (the battle the bodies are for, see forBattle)
 +	bool _stopping = false;
-+	std::thread _builder;
++	size_t _building = 0; // (bodies being made now)
++	std::vector<std::thread> _builders;
++	/// How many threads make bodies at once.
++	static size_t builderThreads();
 +	/// The builder's loop: makes the bodies queued, until stopped.
 +	void build();
 +	/// A developer's aid: writes what a body was made from and what it is into a folder (the environment variable
