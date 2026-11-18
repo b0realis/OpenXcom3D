@@ -53758,10 +53758,10 @@ index 000000000..44a6559e0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonSpriteHits.cpp b/src/FirstPerson/FirstPersonSpriteHits.cpp
 new file mode 100644
-index 000000000..9063a862c
+index 000000000..124dfb0f7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonSpriteHits.cpp
-@@ -0,0 +1,929 @@
+@@ -0,0 +1,930 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -54543,17 +54543,18 @@ index 000000000..9063a862c
 +
 +/**
 + * How far a unit's card lies back whatever the view's pitch (see FirstPersonSpriteHits.h): a hull's, a unit two
-+ * tiles by two that doesn't walk (a tank, a turret, a hover tank, a Cyberdisc). The big units drawn on legs (the
-+ * Sectopod and the Reaper, routine 5; TFTD's Triscene, 20) are pictured as the small ones, upright, unless they can't
-+ * move (a turret drawn by a walker's routine: XPiratez's truck turret). (For a day it was turrets alone; the owner
-+ * then: "Keep 50 lean for all units as you suggested!")
++ * tiles by two that is a vehicle: drawn by the tanks' routine (2: tanks, hover tanks, turrets), the Cyberdisc's (3) or
++ * TFTD's tanks' (11: the Coelacanth, the Displacer), or unable to move whatever draws it (a turret drawn by a walker's
++ * routine: XPiratez's truck turret). The big creatures stand upright as the small units do: the walkers (the Sectopod,
++ * the Reaper, the Triscene) and TFTD's Hallucinoid and Xarquid (lying back, the Xarquid's shell lay on the seabed like
++ * a plate: the owner, "this looks wrong").
 + */
 +double hullLayBack(const BattleUnit *unit)
 +{
 +	if (!unit || unit->getArmor()->getSize() < 2) return 0.0;
 +	const int routine = unit->getArmor()->getDrawingRoutine();
-+	const bool walker = (routine == 5 || routine == 20) && unit->getArmor()->allowsMoving();
-+	return walker ? 0.0 : HullLayBack * Pi / 180.0;
++	const bool vehicle = routine == 2 || routine == 3 || routine == 11 || !unit->getArmor()->allowsMoving();
++	return vehicle ? HullLayBack * Pi / 180.0 : 0.0;
 +}
 +
 +/**
@@ -54693,7 +54694,7 @@ index 000000000..9063a862c
 +}
 diff --git a/src/FirstPerson/FirstPersonSpriteHits.h b/src/FirstPerson/FirstPersonSpriteHits.h
 new file mode 100644
-index 000000000..c925b3c2d
+index 000000000..5a9111b47
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonSpriteHits.h
 @@ -0,0 +1,152 @@
@@ -54810,8 +54811,8 @@ index 000000000..c925b3c2d
 + * @return The view rotation (3 minus the direction from the unit to the eye).
 + */
 +int unitViewRotation(const double eye[3], const double feet[3]);
-+/// How far a unit's card lies back whatever the view's pitch, in radians: a hull's (two tiles by two, not a walker)
-+/// HullLayBack, any other unit's 0.
++/// How far a unit's card lies back whatever the view's pitch, in radians: a hull's (two tiles by two, a vehicle or a
++/// turret) HullLayBack, any other unit's 0.
 +double hullLayBack(const BattleUnit *unit);
 +
 +/**

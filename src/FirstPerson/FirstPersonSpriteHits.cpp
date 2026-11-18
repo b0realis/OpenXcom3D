@@ -779,17 +779,18 @@ Position spriteImpact(SavedBattleGame *, const BattleUnit *unit, const Position 
 
 /**
  * How far a unit's card lies back whatever the view's pitch (see FirstPersonSpriteHits.h): a hull's, a unit two
- * tiles by two that doesn't walk (a tank, a turret, a hover tank, a Cyberdisc). The big units drawn on legs (the
- * Sectopod and the Reaper, routine 5; TFTD's Triscene, 20) are pictured as the small ones, upright, unless they can't
- * move (a turret drawn by a walker's routine: XPiratez's truck turret). (For a day it was turrets alone; the owner
- * then: "Keep 50 lean for all units as you suggested!")
+ * tiles by two that is a vehicle: drawn by the tanks' routine (2: tanks, hover tanks, turrets), the Cyberdisc's (3) or
+ * TFTD's tanks' (11: the Coelacanth, the Displacer), or unable to move whatever draws it (a turret drawn by a walker's
+ * routine: XPiratez's truck turret). The big creatures stand upright as the small units do: the walkers (the Sectopod,
+ * the Reaper, the Triscene) and TFTD's Hallucinoid and Xarquid (lying back, the Xarquid's shell lay on the seabed like
+ * a plate: the owner, "this looks wrong").
  */
 double hullLayBack(const BattleUnit *unit)
 {
 	if (!unit || unit->getArmor()->getSize() < 2) return 0.0;
 	const int routine = unit->getArmor()->getDrawingRoutine();
-	const bool walker = (routine == 5 || routine == 20) && unit->getArmor()->allowsMoving();
-	return walker ? 0.0 : HullLayBack * Pi / 180.0;
+	const bool vehicle = routine == 2 || routine == 3 || routine == 11 || !unit->getArmor()->allowsMoving();
+	return vehicle ? HullLayBack * Pi / 180.0 : 0.0;
 }
 
 /**
