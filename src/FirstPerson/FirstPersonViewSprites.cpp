@@ -204,7 +204,7 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 	{
 		tilt = std::max(tilt, std::min(elevation - CardTiltUpMax * Pi / 180.0, CardTiltSteepMax * Pi / 180.0));
 	}
-	if (draw.layBack > 0.0) tilt = std::min(std::clamp(_pitch, -CardTiltMax * Pi / 180.0, 0.0), -draw.layBack); // (a hull's: see HullLayBack)
+	if (draw.layBack > 0.0) tilt = std::min(std::clamp(_pitch, -CardTiltMax * Pi / 180.0, 0.0), -draw.layBack); // (a turret's: see HullLayBack)
 	const double cardUp[3] = { -std::sin(tilt) * level[0], -std::sin(tilt) * level[1], std::cos(tilt) };
 	const double cardFacing[3] = { std::cos(tilt) * level[0], std::cos(tilt) * level[1], std::sin(tilt) };
 	const double anchorAcross = dot(anchor, _levelRight), anchorFacing = dot(anchor, cardFacing);
@@ -686,7 +686,7 @@ bool FirstPersonView::standingHeightNow(const double world[3], double &height) c
  * @param scale The picture's scale (setting "Unit size").
  * @param column Set to one column to the right, in voxels.
  * @param row Set to one row up the card, in voxels.
- * @param layBack How far the card lies back whatever the pitch, in radians (a hull's: see hullLayBack).
+ * @param layBack How far the card lies back whatever the pitch, in radians (a turret's: see hullLayBack).
  */
 void FirstPersonView::cardAxes(const double world[3], double scale, double column[3], double row[3], double layBack) const
 {
@@ -698,7 +698,7 @@ void FirstPersonView::cardAxes(const double world[3], double scale, double colum
 	{
 		tilt = std::max(tilt, std::min(elevation - CardTiltUpMax * Pi / 180.0, CardTiltSteepMax * Pi / 180.0));
 	}
-	if (layBack > 0.0) tilt = std::min(std::clamp(_pitch, -CardTiltMax * Pi / 180.0, 0.0), -layBack); // (a hull's: see HullLayBack)
+	if (layBack > 0.0) tilt = std::min(std::clamp(_pitch, -CardTiltMax * Pi / 180.0, 0.0), -layBack); // (a turret's: see HullLayBack)
 	// A column along the level right; a row up the card (cardUp in true proportions, a row
 	// rowSize = scale * ZScale of it), its height back into voxels (divided by ZScale).
 	const double levelRight[2] = { -level[1], level[0] };

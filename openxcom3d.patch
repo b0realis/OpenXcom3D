@@ -53758,10 +53758,10 @@ index 000000000..44a6559e0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonSpriteHits.cpp b/src/FirstPerson/FirstPersonSpriteHits.cpp
 new file mode 100644
-index 000000000..6d62dda07
+index 000000000..33a8ff7e8
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonSpriteHits.cpp
-@@ -0,0 +1,927 @@
+@@ -0,0 +1,924 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -54542,16 +54542,13 @@ index 000000000..6d62dda07
 +}
 +
 +/**
-+ * How far a unit's card lies back whatever the view's pitch (see FirstPersonSpriteHits.h): the big units drawn
-+ * on legs (the Sectopod and the Reaper, routine 5; TFTD's Triscene, 20) are pictured as the small ones, upright,
-+ * unless they can't move (a turret drawn by a walker's routine: XPiratez's truck turret).
++ * How far a unit's card lies back whatever the view's pitch (see FirstPersonSpriteHits.h): a turret's alone, a
++ * unit two tiles by two that can't move (the armour's allowsMoving: false, as XPiratez's truck and tank turrets have).
++ * Tanks, hover tanks, the Cyberdisc and every other unit stand as before (the owner: "Just the turret!").
 + */
 +double hullLayBack(const BattleUnit *unit)
 +{
-+	if (!unit || unit->getArmor()->getSize() < 2) return 0.0;
-+	const int routine = unit->getArmor()->getDrawingRoutine();
-+	const bool walker = (routine == 5 || routine == 20) && unit->getArmor()->allowsMoving(); // (not a turret drawn by a walker's routine: XPiratez's truck turret)
-+	return walker ? 0.0 : HullLayBack * Pi / 180.0;
++	return unit && unit->getArmor()->getSize() > 1 && !unit->getArmor()->allowsMoving() ? HullLayBack * Pi / 180.0 : 0.0;
 +}
 +
 +/**
@@ -54691,7 +54688,7 @@ index 000000000..6d62dda07
 +}
 diff --git a/src/FirstPerson/FirstPersonSpriteHits.h b/src/FirstPerson/FirstPersonSpriteHits.h
 new file mode 100644
-index 000000000..c925b3c2d
+index 000000000..34fadd5ce
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonSpriteHits.h
 @@ -0,0 +1,152 @@
@@ -54808,8 +54805,8 @@ index 000000000..c925b3c2d
 + * @return The view rotation (3 minus the direction from the unit to the eye).
 + */
 +int unitViewRotation(const double eye[3], const double feet[3]);
-+/// How far a unit's card lies back whatever the view's pitch, in radians: a hull's (two tiles by two, not a walker)
-+/// HullLayBack, any other unit's 0.
++/// How far a unit's card lies back whatever the view's pitch, in radians: a turret's (two tiles by two, unable to
++/// move) HullLayBack, any other unit's 0.
 +double hullLayBack(const BattleUnit *unit);
 +
 +/**
@@ -55606,7 +55603,7 @@ index 000000000..413febe82
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..0475df87d
+index 000000000..d9764f67f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
 @@ -0,0 +1,1595 @@
@@ -56598,7 +56595,7 @@ index 000000000..0475df87d
 +		BattleUnit *body = nullptr;       // the unconscious unit lying in the pile it pictures, if any: it can be pointed at
 +		const Tile *pile = nullptr;       // the floor tile whose pile it pictures (a big corpse's first), if any: it can be pointed at
 +		double lyingSlope = 0.0;          // a lying sprite's floor rising towards the camera: voxels up for each voxel along (see lyingRise)
-+		double layBack = 0.0;             // the card lies back this far whatever the view's pitch, in radians (a hull's: see hullLayBack)
++		double layBack = 0.0;             // the card lies back this far whatever the view's pitch, in radians (a turret's: see hullLayBack)
 +		double floorCut = NoFloorCut;     // no part of a standing sprite below this height, in voxels: the underside of the floor a unit stands on (see floorUnderside)
 +	};
 +	/// Draws a sprite standing in the world, depth-tested (or see-through, laid over what's there):
@@ -59690,7 +59687,7 @@ index 000000000..132aee897
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpuEffects.cpp b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 new file mode 100644
-index 000000000..6352239e1
+index 000000000..32ad61197
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 @@ -0,0 +1,951 @@
@@ -59924,7 +59921,7 @@ index 000000000..6352239e1
 +	{
 +		tilt = std::max(tilt, std::min(elevation - CardTiltUpMax * Pi / 180.0, CardTiltSteepMax * Pi / 180.0));
 +	}
-+	if (draw.layBack > 0.0) tilt = std::min(std::clamp(_pitch, -CardTiltMax * Pi / 180.0, 0.0), -draw.layBack); // (a hull's: see HullLayBack)
++	if (draw.layBack > 0.0) tilt = std::min(std::clamp(_pitch, -CardTiltMax * Pi / 180.0, 0.0), -draw.layBack); // (a turret's: see HullLayBack)
 +	const double cardUp[3] = { -std::sin(tilt) * level[0], -std::sin(tilt) * level[1], std::cos(tilt) };
 +	const double cardFacing[3] = { std::cos(tilt) * level[0], std::cos(tilt) * level[1], std::sin(tilt) };
 +	const double anchorAcross = dot(anchor, _levelRight), anchorFacing = dot(anchor, cardFacing);
@@ -63982,7 +63979,7 @@ index 000000000..469b27858
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..a8c130a73
+index 000000000..3c3051dda
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
 @@ -0,0 +1,615 @@
@@ -64222,9 +64219,9 @@ index 000000000..a8c130a73
 +/// CardTiltUpMax it is, at most this far: a unit straight overhead faces down at the soldier
 +/// instead of showing its edge (see drawSprite).
 +const double CardTiltSteepMax = 80.0;
-+/// A hull's card (a big unit that doesn't walk: a tank, a turret, a hover tank, a Cyberdisc) lies back this far, in
-+/// degrees, whatever the view's pitch, and further only as the view looks down further: its picture is drawn from
-+/// above, its roof showing, and upright it showed that roof to the soldier like a lid (see drawSprite, hullLayBack).
++/// A turret's card (a unit two tiles by two that can't move, mounted on a vehicle) lies back this far, in degrees,
++/// whatever the view's pitch, and further only as the view looks down further: its picture is drawn from above, its
++/// roof showing, and upright it showed that roof to the soldier like a lid (see drawSprite, hullLayBack).
 +const double HullLayBack = 50.0;
 +/// How far the view can look up or down, in degrees: all but straight up and down (the camera
 +/// keeps its heading there).
@@ -66930,7 +66927,7 @@ index 000000000..3d826e384
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..08c5a0b35
+index 000000000..d61ab8e29
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
 @@ -0,0 +1,3635 @@
@@ -67140,7 +67137,7 @@ index 000000000..08c5a0b35
 +	{
 +		tilt = std::max(tilt, std::min(elevation - CardTiltUpMax * Pi / 180.0, CardTiltSteepMax * Pi / 180.0));
 +	}
-+	if (draw.layBack > 0.0) tilt = std::min(std::clamp(_pitch, -CardTiltMax * Pi / 180.0, 0.0), -draw.layBack); // (a hull's: see HullLayBack)
++	if (draw.layBack > 0.0) tilt = std::min(std::clamp(_pitch, -CardTiltMax * Pi / 180.0, 0.0), -draw.layBack); // (a turret's: see HullLayBack)
 +	const double cardUp[3] = { -std::sin(tilt) * level[0], -std::sin(tilt) * level[1], std::cos(tilt) };
 +	const double cardFacing[3] = { std::cos(tilt) * level[0], std::cos(tilt) * level[1], std::sin(tilt) };
 +	const double anchorAcross = dot(anchor, _levelRight), anchorFacing = dot(anchor, cardFacing);
@@ -67622,7 +67619,7 @@ index 000000000..08c5a0b35
 + * @param scale The picture's scale (setting "Unit size").
 + * @param column Set to one column to the right, in voxels.
 + * @param row Set to one row up the card, in voxels.
-+ * @param layBack How far the card lies back whatever the pitch, in radians (a hull's: see hullLayBack).
++ * @param layBack How far the card lies back whatever the pitch, in radians (a turret's: see hullLayBack).
 + */
 +void FirstPersonView::cardAxes(const double world[3], double scale, double column[3], double row[3], double layBack) const
 +{
@@ -67634,7 +67631,7 @@ index 000000000..08c5a0b35
 +	{
 +		tilt = std::max(tilt, std::min(elevation - CardTiltUpMax * Pi / 180.0, CardTiltSteepMax * Pi / 180.0));
 +	}
-+	if (layBack > 0.0) tilt = std::min(std::clamp(_pitch, -CardTiltMax * Pi / 180.0, 0.0), -layBack); // (a hull's: see HullLayBack)
++	if (layBack > 0.0) tilt = std::min(std::clamp(_pitch, -CardTiltMax * Pi / 180.0, 0.0), -layBack); // (a turret's: see HullLayBack)
 +	// A column along the level right; a row up the card (cardUp in true proportions, a row
 +	// rowSize = scale * ZScale of it), its height back into voxels (divided by ZScale).
 +	const double levelRight[2] = { -level[1], level[0] };
