@@ -1085,6 +1085,7 @@ What `FirstPersonView` draws:
 
 ### After 1.14 (not released)
 
+- **A unit killed in the air no longer rises again.** It comes down while the game plays its fall frames up where it hovered; a short drop was over before those frames were, and for the rest of them it was drawn back up at its tile: a body that dropped, then rose, then lay on the ground. Now it stays where it landed (`airFallHeight`). Found while checking the voxel bodies of flyers; the picture did the same.
 - **Zoom, 8 times** (GitHub issue #176: 4 times is "a bit anemic for large maps and sniper squad sight"; the owner: "Zoom + space at maxed zoom goes to 8x"). Zoomed in, holding the *Jump* key (Space) glides the view on to 8 times closer; the key doesn't jump while zoomed. `ZoomBoostFactor`, `updateZoom`.
 - **Reflections on window glass** (GitHub issue #174, "Gpu option for reflections on glass panes"): with *Reflections* (and *True colour*, on the GPU renderer) a pane mirrors what is in front of it: one ray off the pane's face from where the eye's ray went in, what it meets in the game's light there or the sky, mixed in from 8% seen straight on to more than half along the pane. The reflections' program is used on maps with a sea or with window glass (`_anyGlass`). Not through night-vision goggles.
 - **A warning on the Renderer setting** (GitHub issue #171, a long freeze on the first switch to GPU on Windows): the card builds its programs once, on the first frame; the description now says so in the second colour.

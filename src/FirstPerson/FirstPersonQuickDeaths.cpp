@@ -294,9 +294,13 @@ bool airFallHeight(const BattleUnit *unit, Position &tile, double &feetZ)
 		if (fall.unit != unit) continue;
 		const double dropped = airFallDropped(fall, now);
 		const bool down = unit->getStatus() == STATUS_DEAD || unit->getStatus() == STATUS_UNCONSCIOUS || unit->getStatus() == STATUS_COLLAPSING;
-		if (!down || unit->getAlreadyRespawned() || dropped >= fall.fromZ - fall.landZ) return false;
+		if (!down || unit->getAlreadyRespawned()) return false;
+		// (Landed while the game still has it collapsing up where it hovered: it stays on the ground. Let go there, it
+		// was drawn up at its tile again for the rest of its fall frames: a body that dropped, then rose.)
+		const bool landed = dropped >= fall.fromZ - fall.landZ;
+		if (landed && unit->getStatus() != STATUS_COLLAPSING) return false;
 		tile = fall.from;
-		feetZ = fall.fromZ - dropped;
+		feetZ = landed ? fall.landZ : fall.fromZ - dropped;
 		return true;
 	}
 	return false;
