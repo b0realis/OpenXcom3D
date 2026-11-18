@@ -74,7 +74,8 @@ namespace
 constexpr float Cell = 0.5f;
 constexpr int GridUp = 84 * VOXELSCALE;
 constexpr float UpFrom = -2.0f * VOXELSCALE;
-thread_local int GridAcross = 56 * VOXELSCALE, GridAlong = 56 * VOXELSCALE, GridCells = GridAcross * GridAlong * GridUp;
+// (each begun with a constant: a thread's own that begins with another's value is looked up through a call each time)
+thread_local int GridAcross = 56 * VOXELSCALE, GridAlong = 56 * VOXELSCALE, GridCells = 56 * VOXELSCALE * 56 * VOXELSCALE * GridUp;
 thread_local float AcrossFrom = -14.0f * VOXELSCALE, AlongFrom = -14.0f * VOXELSCALE;
 inline int cellIndex(int across, int along, int up) { return (across * GridAlong + along) * GridUp + up; }
 inline float cellRight(int across) { return AcrossFrom + (across + 0.5f) * Cell; }
@@ -1312,15 +1313,28 @@ void fillShape(VoxelUnitModel::FallShape &shape, const float low[3], const float
 void fallRelief(VoxelUnitModel::FallShape &shape, const std::vector<Uint8> &picture, float degrees, float halfMost)
 {
 	const std::vector<int> depth = insideDepth(picture, FrameSize, FrameSize, (int)std::ceil(halfMost) + 1);
-	int left = FrameSize, right = -1;
+	int left = FrameSize, right = -1, top = FrameSize, bottom = -1;
 	for (int y = 0; y < FrameSize; ++y)
 		for (int x = 0; x < FrameSize; ++x)
-			if (picture[y * FrameSize + x]) { left = std::min(left, x); right = std::max(right, x); }
+			if (picture[y * FrameSize + x]) { left = std::min(left, x); right = std::max(right, x); top = std::min(top, y); bottom = std::max(bottom, y); }
 	if (right < 0) return;
 	const float c = (float)std::cos(degrees * Pi / 180.0), s = (float)std::sin(degrees * Pi / 180.0);
-	// (direction Front: a column is the unit's right, turned about, times PixelsAcross)
-	const float low[3] = { -(right + 1 - FloorX) / PixelsAcross, -FrameSize * 0.75f, 0.0f };
-	const float high[3] = { -(left - 1 - FloorX) / PixelsAcross, FrameSize * 0.75f, (float)FloorY };
+	// The box looked through: no wider than the picture (direction Front: a column is the unit's right, turned about,
+	// times PixelsAcross), and no farther ahead or behind than a point can lie that the view throws onto one of the
+	// picture's rows (a row is the floor's, and RowsAhead more for each voxel ahead, less one for each up) and that is
+	// within the slab or on the floor in front of the feet. (Most of the grid is neither: the whole of it was looked
+	// through for every shape, the better part of a body's making.)
+	const float RowsAhead = 0.70710678f; // (direction Front, read along the slant: see project)
+	const float upMost = std::min((float)FloorY, std::max(0.0f, (float)(FloorY - top)) + 2.0f * halfMost + 2.0f);
+	float behind = std::max(-FrameSize * 0.75f, (top - FloorY) / RowsAhead - 2.0f), before = std::min(FrameSize * 0.75f, (bottom + 1 - FloorY + upMost) / RowsAhead + 2.0f);
+	if (c > 0.2f)
+	{
+		// (within the slab: off its middle plane by no more than twice halfMost ahead, halfMost behind; or on the floor)
+		behind = std::max(behind, (-halfMost - upMost * s) / c - 2.0f);
+		before = std::min(before, std::max(2.0f * halfMost / c, (bottom + 1 - FloorY + halfMost) / RowsAhead) + 2.0f);
+	}
+	const float low[3] = { -(right + 1 - FloorX) / PixelsAcross, behind, 0.0f };
+	const float high[3] = { -(left - 1 - FloorX) / PixelsAcross, before, upMost };
 	fillShape(shape, low, high, [&](float across, float along, float up) -> Uint8 {
 		// (off the slab's middle plane: ahead of it upright, above it lying)
 		const float off = along * c + up * s;
@@ -1590,7 +1604,9 @@ void makeHits(VoxelUnitModel &model, const std::vector<Uint8> &owner, const std:
 				solid[cell] = OneBody ? (Uint16)0xFFFF : viewsAt(solidOnTop, cellRight(across), cellAhead(along), cellUp(up));
 				if (solid[cell]) cells.push_back(cell);
 			}
-	const bool matched = model.views.size() == model.part.size();
+	// (One body, see OneBody, is one piece already, whole from every side: nothing of it floats, and looking for what
+	// does through every solid cell, for each of the 16 views, was most of a body's making.)
+	const bool matched = !OneBody && model.views.size() == model.part.size();
 	for (size_t k = 0; matched && k < model.part.size(); ++k)
 	{
 		if (model.part[k] == VoxelUnitModel::Item) continue;
@@ -1599,7 +1615,8 @@ void makeHits(VoxelUnitModel &model, const std::vector<Uint8> &owner, const std:
 		if (across >= 0 && along >= 0 && up >= 0 && across < GridAcross && along < GridAlong && up < GridUp) shown[cellIndex(across, along, up)] |= model.views[k];
 	}
 	std::vector<int> stack;
-	for (int view = 0; view < 16; ++view)
+	if (OneBody) met = solid;
+	for (int view = 0; view < 16 && !OneBody; ++view)
 	{
 		const Uint16 bit = (Uint16)(1u << view);
 		for (int cell : cells) if ((solid[cell] & bit) && (shown[cell] & bit)) { met[cell] |= bit; stack.push_back(cell); }
@@ -2122,7 +2139,8 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		while (torsoLow < GridUp && !torsoCells[torsoLow]) ++torsoLow;
 		while (legsHigh >= 0 && !legCells[legsHigh]) --legsHigh;
 		const int look = 6 * VOXELSCALE; // (cells: three voxels of each part's end)
-		if (torsoLow < GridUp && legsHigh >= 0 && legsHigh < torsoLow + look)
+		// (only where the two meet: a torso standing well clear of its legs is drawn so)
+		if (torsoLow < GridUp && legsHigh >= 0 && legsHigh < torsoLow + look && torsoLow - legsHigh <= look)
 		{
 			int torsoRow = torsoLow, legsRow = legsHigh;
 			for (int up = torsoLow; up < std::min(GridUp, torsoLow + look); ++up) if (torsoCells[up] > torsoCells[torsoRow]) torsoRow = up;
