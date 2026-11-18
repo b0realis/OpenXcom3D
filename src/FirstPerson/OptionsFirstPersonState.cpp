@@ -226,13 +226,13 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 	// sections are listed by the alphabet, and so are the settings in each, by the names shown (the owner: "in their
 	// own logical groups and alphabetical"): a setting is found by its name, not by where it happened to be added.
 	static const struct { const char *heading; std::vector<const char*> ids; } sections[] = {
-		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsCameraEyes", "fpsCameraArtifacts", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView", "fpsZoom",
+		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsCameraEyes", "fpsCameraArtifacts", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView",
 			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsAlienTurnFacing", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
 		{ "STR_FPS_SECTION_MOVEMENT", { "fpsTurnCost", "fpsSidestepFaceView", "fpsMovement", "fpsWalkSpeed", "fpsFlightCost", "fpsFlightCostOverride", "fpsVault",
 			"fpsFalling", "fpsSafeLanding", "fpsFallDamage" } },
 		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsRecoil", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsThrowing", "fpsLean", "fpsMeleeTerrain",
 			"fpsMeleeFloors", "fpsAimExact", "fpsCloseEyeShots", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
-			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear" } },
+			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst", "fpsFlares" } },
 		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
 			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsHitFlash", "fpsSmoothFire", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 			"fpsGhostParts", "fpsGhostOpacity", "fpsGhostOpenDoors", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge" } },

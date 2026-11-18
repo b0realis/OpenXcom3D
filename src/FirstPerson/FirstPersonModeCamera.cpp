@@ -105,7 +105,7 @@ void FirstPersonMode::updateZoom(double elapsedSeconds)
 {
 	const Uint8 *keyStates = SDL_GetKeyState(nullptr);
 	const bool keyHeld = Options::keyFpsZoom != SDLK_UNKNOWN && keyStates[Options::keyFpsZoom] && !gameModifierHeld();
-	const bool zoomedIn = Options::fpsZoom && isActive() && (keyHeld || (_zoomButtonHeld && _mouseLook));
+	const bool zoomedIn = isActive() && (keyHeld || (_zoomButtonHeld && _mouseLook));
 	// (Zoomed in, the jump key held looks ZoomBoostFactor times closer: a player, GitHub issue #176, 4 times "a bit
 	// anemic for large maps and sniper squad sight"; the owner: "Zoom + space at maxed zoom goes to 8x". The key
 	// doesn't jump meanwhile: see keyboard.)

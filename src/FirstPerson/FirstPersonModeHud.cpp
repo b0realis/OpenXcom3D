@@ -95,62 +95,15 @@ namespace OpenXcom
 {
 
 /**
- * Tells whether this unit can use night vision in the 3D view.
- *
- * With the option "Night vision needs gear" off, everyone has it (as on the isometric map).
- * With it on, night vision comes with gear: an armor or an inventory item that the mod's
- * firstPerson rules list as giving night vision, or eyes that see as far in the dark as by day
- * (aliens, whose view distance is the same by night as by day).
- * @param unit The unit to ask about; null has no night vision.
- * @return True if the unit may switch night vision on.
- */
-bool FirstPersonMode::hasNightVision(const BattleUnit *unit) const
-{
-	// No unit, no eyes.
-	if (!unit)
-	{
-		return false;
-	}
-	// Gear not required, or the unit sees in the dark by nature.
-	if (!Options::fpsNightVisionGear || unit->getMaxViewDistanceAtDark(nullptr) >= unit->getMaxViewDistanceAtDay(nullptr))
-	{
-		return true;
-	}
-	// An armor the mod lists as having night vision built in.
-	const RuleFirstPerson &rules = _game->getMod()->getFirstPerson();
-	if (rules.givesNightVision(unit->getArmor()->getType()))
-	{
-		return true;
-	}
-	// Or any item the soldier carries (night vision goggles and the like), wherever it is in the
-	// inventory.
-	for (const BattleItem *item : *unit->getInventory())
-	{
-		if (rules.givesNightVision(item->getRules()->getType()))
-		{
-			return true;
-		}
-	}
-	return false;
-}
-
-/**
  * Switches night vision on or off: what the NIGHT VISION button on the top bar and its key do.
- * A soldier without the gear (see hasNightVision) gets a warning instead. The switch itself is
+ * Every unit has it, as on the isometric map. The switch itself is
  * the isometric map's own (the one its night vision button flips), so the map and the 3D view
  * share it; but unlike that button it works whatever the game is doing (an explosion, a shot in
  * flight, the aliens' turn), as it only changes how the picture is drawn (a player's report:
  * night vision couldn't be switched while a chain of explosions went off).
- * @param unit The soldier the view looks through.
  */
-void FirstPersonMode::toggleNightVision(BattleUnit *unit)
+void FirstPersonMode::toggleNightVision()
 {
-	// No gear: say so and leave night vision as it is.
-	if (!hasNightVision(unit))
-	{
-		_state->warning("STR_FPS_NO_NIGHT_VISION");
-		return;
-	}
 	_state->_map->toggleNightVision();
 }
 
@@ -1288,8 +1241,8 @@ std::string FirstPersonMode::statusLabel(BattleUnit *unit) const
 /**
  * Keeps the armor's part of the top bar up to date: the armor's name, and a button for each
  * thing the armor and the soldier's gear can do. FLY (SWIM under water) for armor that flies,
- * LIGHT for the armor's personal light, NIGHT VISION for a soldier who has it (see
- * hasNightVision), SPECIAL for a weapon built into the armor, TURRET for a unit with a turret
+ * LIGHT for the armor's personal light, NIGHT VISION for everyone,
+ * SPECIAL for a weapon built into the armor, TURRET for a unit with a turret
  * (a tank, see toggleTurret). A button shows pressed while its
  * feature is switched on. When a button appears or disappears, the squad buttons are laid out
  * again to make room.
@@ -1302,7 +1255,7 @@ void FirstPersonMode::updateArmorButtons(BattleUnit *unit)
 	BattleType specialType;
 	const bool showFly = show && canFly(unit), showLight = show && unit->getArmor()->getPersonalLightFriend() > 0;
 	const bool showSpecial = show && unit->getSpecialIconWeapon(specialType) != nullptr;
-	const bool showNight = show && hasNightVision(unit);
+	const bool showNight = show;
 	const bool showTurret = show && unit->getTurretType() != -1;
 	// Show or hide them; any change moves the other buttons on the bar.
 	if (showFly != _btnFly->getVisible() || showLight != _btnLight->getVisible()
@@ -1752,7 +1705,7 @@ void FirstPersonMode::aimHelmetCamera(FirstPersonView *camera, BattleUnit *unit,
 	camera->setStatic(0.0f);
 	camera->setFieldOfView(Options::fpsFieldOfView);
 	camera->setSmoothLighting(Options::fpsSmoothLighting);
-	camera->setNightVision(hasNightVision(unit) ? _state->_map->getNightVisionColor() : 0);
+	camera->setNightVision(unit ? _state->_map->getNightVisionColor() : 0);
 	// And the smoke: with the setting "Cameras see as the eyes", as the soldier's eyes see it, as
 	// the main view does (a player, GitHub issue #90: an X-Com Files X-Bat's heat vision sees
 	// through smoke there, its camera saw none); else as a camera, without the wearer's heat vision.
@@ -2442,7 +2395,7 @@ void FirstPersonMode::buttonClicked(TextButton *button, Action *action)
 	}
 	else if (button == _btnNight)
 	{
-		toggleNightVision(_trackedUnit);
+		toggleNightVision();
 	}
 	else if (button == _btnSpecial)
 	{

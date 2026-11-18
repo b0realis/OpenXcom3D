@@ -846,7 +846,6 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsInvertMouse", &fpsInvertMouse, false, "STR_FPS_INVERT_MOUSE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFieldOfView", &fpsFieldOfView, 75, "STR_FPS_FIELD_OF_VIEW", category));
 	// Zoom: holding the zoom key (or the right button in mouse look) looks 4 times closer.
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsZoom", &fpsZoom, true, "STR_FPS_ZOOM", category));
 	// The middle button as on the isometric map: a click on a unit in sight shows it (the game's
 	// unit screen); anywhere else it frees the cursor, as always.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMiddleClickIdentify", &fpsMiddleClickIdentify, true, "STR_FPS_MIDDLE_CLICK_IDENTIFY", category));
@@ -960,7 +959,6 @@ void createOptions(std::vector<OptionInfo> &options)
 	// until settled (see settleOptions) from 1.0's two settings, kept below, unlisted (a new name,
 	// as 1.0's YES/NO wouldn't load into a number).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlashlightMode", &fpsFlashlightMode, -1, "STR_FPS_FLASHLIGHT", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightVisionGear", &fpsNightVisionGear, false, "STR_FPS_NIGHT_VISION_GEAR", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCombatMusic", &fpsCombatMusic, false, "STR_FPS_COMBAT_MUSIC", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitSounds", &fpsHitSounds, false, "STR_FPS_HIT_SOUNDS", category));
 	// The 3D view's ambient sounds (the owner: "The weather effects should also have nonobtrusive

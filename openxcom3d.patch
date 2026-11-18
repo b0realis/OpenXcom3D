@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..109770ab8
+index 000000000..4edc57a3d
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,616 @@
+@@ -0,0 +1,611 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -183,8 +183,6 @@ index 000000000..109770ab8
 +  STR_FPS_INVERT_MOUSE_DESC: "Mouse forward looks down instead of up."
 +  STR_FPS_FIELD_OF_VIEW: "Field of view"
 +  STR_FPS_FIELD_OF_VIEW_DESC: "How wide the 3D view is, in degrees (50-110)."
-+  STR_FPS_ZOOM: "Zoom"
-+  STR_FPS_ZOOM_DESC: "Hold U (in 3D then not the UFOpedia), or the right button in mouse look, to look 4 times closer; with Space held too, 8 times. Aim and hit chances stay the same."
 +  STR_FPS_SCOPING: "SCOPING {0}x"
 +  STR_FPS_PLAYSTYLE: "Playstyle"
 +  STR_FPS_PLAYSTYLE_DESC: "Faithful: the game's way. FPS: shooting, turning, moving, hitboxes, deaths as a shooter's. Custom: your mix."
@@ -521,17 +519,14 @@ index 000000000..109770ab8
 +  STR_FPS_SIGNAL_LOST: "SIGNAL LOST"
 +  STR_FPS_VAULT: "Jump over low obstacles"
 +  STR_FPS_VAULT_DESC: "Jump while walking forwards or sideways into a fence, table or crate up to 15 voxels high (of a level's 24) takes the soldier over it, for 30 TU."
-+  STR_FPS_NIGHT_VISION_GEAR: "Night vision needs gear"
-+  STR_FPS_NIGHT_VISION_GEAR_DESC: "Night vision only for soldiers with the gear."
 +  STR_FPS_KEY_JUMP: "Jump"
 +  STR_FPS_KEY_JUMP_DESC: "A hop on the spot (1 TU). While walking into a low obstacle: vaults over it (30 TU; setting Jump over low obstacles)."
 +  STR_FPS_KEY_NIGHT_VISION: "Night vision on/off"
-+  STR_FPS_KEY_NIGHT_VISION_DESC: "Night vision on/off, with the gear."
++  STR_FPS_KEY_NIGHT_VISION_DESC: "Night vision on/off."
 +  STR_FPS_KEY_ZOOM: "Zoom (hold)"
-+  STR_FPS_KEY_ZOOM_DESC: "Looks 4 times closer while held (setting Zoom); 8 times with Jump held too."
++  STR_FPS_KEY_ZOOM_DESC: "Looks 4 times closer while held (or the right button in mouse look); 8 times with Jump held too."
 +  STR_FPS_BUTTON_NIGHT: "NIGHT VISION"
 +  STR_FPS_BUTTON_NIGHT_SHORT: "NV"
-+  STR_FPS_NO_NIGHT_VISION: "No night vision gear"
 +  STR_FPS_FLASHLIGHT_SETTING_OFF: "No flashlight: setting Flashlight is Off"
 +  STR_FPS_FLASHLIGHT_DARK_ONLY: "Flashlight: only in the dark (Dynamic: by day too)"
 +  STR_FPS_FLARES_OFF: "No flares: switch on Unlimited tactical flares"
@@ -746,10 +741,10 @@ index 000000000..109770ab8
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..ff1fc0397
+index 000000000..c0091a7f7
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,616 @@
+@@ -0,0 +1,611 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -805,8 +800,6 @@ index 000000000..ff1fc0397
 +  STR_FPS_INVERT_MOUSE_DESC: "Mouse forward looks down instead of up."
 +  STR_FPS_FIELD_OF_VIEW: "Field of view"
 +  STR_FPS_FIELD_OF_VIEW_DESC: "How wide the 3D view is, in degrees (50-110)."
-+  STR_FPS_ZOOM: "Zoom"
-+  STR_FPS_ZOOM_DESC: "Hold U (in 3D then not the UFOpedia), or the right button in mouse look, to look 4 times closer; with Space held too, 8 times. Aim and hit chances stay the same."
 +  STR_FPS_SCOPING: "SCOPING {0}x"
 +  STR_FPS_PLAYSTYLE: "Playstyle"
 +  STR_FPS_PLAYSTYLE_DESC: "Faithful: the game's way. FPS: shooting, turning, moving, hitboxes, deaths as a shooter's. Custom: your mix."
@@ -1143,17 +1136,14 @@ index 000000000..ff1fc0397
 +  STR_FPS_SIGNAL_LOST: "SIGNAL LOST"
 +  STR_FPS_VAULT: "Jump over low obstacles"
 +  STR_FPS_VAULT_DESC: "Jump while walking forwards or sideways into a fence, table or crate up to 15 voxels high (of a level's 24) takes the soldier over it, for 30 TU."
-+  STR_FPS_NIGHT_VISION_GEAR: "Night vision needs gear"
-+  STR_FPS_NIGHT_VISION_GEAR_DESC: "Night vision only for soldiers with the gear."
 +  STR_FPS_KEY_JUMP: "Jump"
 +  STR_FPS_KEY_JUMP_DESC: "A hop on the spot (1 TU). While walking into a low obstacle: vaults over it (30 TU; setting Jump over low obstacles)."
 +  STR_FPS_KEY_NIGHT_VISION: "Night vision on/off"
-+  STR_FPS_KEY_NIGHT_VISION_DESC: "Night vision on/off, with the gear."
++  STR_FPS_KEY_NIGHT_VISION_DESC: "Night vision on/off."
 +  STR_FPS_KEY_ZOOM: "Zoom (hold)"
-+  STR_FPS_KEY_ZOOM_DESC: "Looks 4 times closer while held (setting Zoom); 8 times with Jump held too."
++  STR_FPS_KEY_ZOOM_DESC: "Looks 4 times closer while held (or the right button in mouse look); 8 times with Jump held too."
 +  STR_FPS_BUTTON_NIGHT: "NIGHT VISION"
 +  STR_FPS_BUTTON_NIGHT_SHORT: "NV"
-+  STR_FPS_NO_NIGHT_VISION: "No night vision gear"
 +  STR_FPS_FLASHLIGHT_SETTING_OFF: "No flashlight: setting Flashlight is Off"
 +  STR_FPS_FLASHLIGHT_DARK_ONLY: "Flashlight: only in the dark (Dynamic: by day too)"
 +  STR_FPS_FLARES_OFF: "No flares: switch on Unlimited tactical flares"
@@ -1368,25 +1358,15 @@ index 000000000..ff1fc0397
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..da6adfb14
+index 000000000..beede98ec
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,193 @@
+@@ -0,0 +1,183 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
 +  maxViewDistance: 60   # tiles
 +  combatMusic: [GMDEFEND, GMDEFBAS] # tense tracks while aliens are in sight (UFO, TFTD)
-+  # Night vision in 3D (with the "Night vision needs gear" setting): wearing one of these armors
-+  # or carrying one of these items gives the NIGHT VISION button. Units that see as far in the
-+  # dark as by day (aliens, and armors with visibilityAtDark) always have it.
-+  nightVision:
-+    - STR_POWER_SUIT_UC          # UFO: alien-alloy helmets with elerium-powered optics
-+    - STR_FLYING_SUIT_UC
-+    - HOVERTANK_ARMOR            # UFO: alien sensor suite
-+    - STR_ION_ARMOR_UC           # TFTD
-+    - STR_MAGNETIC_ION_ARMOR_UC
-+    - DISPLACER_ARMOR            # TFTD: the alien-tech submersible
 +  # The original games' windows are openings in the walls' voxel shapes, so the 3D view sees
 +  # through them as the game does, and none are listed here. A mod whose terrain draws glass
 +  # panes on solid walls can list them: per terrain data set, the window records (record numbers
@@ -22301,7 +22281,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..7d08d28ae 100644
+index a08796ced..941ca8d91 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -22318,7 +22298,7 @@ index a08796ced..7d08d28ae 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsGhostOpenDoors, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsNightVisionGear, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsZoom, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts;
++OPT bool fpsGhostOpenDoors, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsFlares, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsFlashlight, fpsTacticalFlashlight, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts;
 +OPT int fpsPreset, fpsGraphicsDetail, fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsFlashlightMode, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts;
 +OPT std::string fpsCustomPreset, fpsCustomGraphics;
 +OPT SDLKey keyBattleFirstPerson, keyBattleFirstPerson2, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
@@ -23369,10 +23349,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..744d50342
+index 000000000..1c8e490f6
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1696 @@
+@@ -0,0 +1,1694 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24221,7 +24201,6 @@ index 000000000..744d50342
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsInvertMouse", &fpsInvertMouse, false, "STR_FPS_INVERT_MOUSE", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsFieldOfView", &fpsFieldOfView, 75, "STR_FPS_FIELD_OF_VIEW", category));
 +	// Zoom: holding the zoom key (or the right button in mouse look) looks 4 times closer.
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsZoom", &fpsZoom, true, "STR_FPS_ZOOM", category));
 +	// The middle button as on the isometric map: a click on a unit in sight shows it (the game's
 +	// unit screen); anywhere else it frees the cursor, as always.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsMiddleClickIdentify", &fpsMiddleClickIdentify, true, "STR_FPS_MIDDLE_CLICK_IDENTIFY", category));
@@ -24335,7 +24314,6 @@ index 000000000..744d50342
 +	// until settled (see settleOptions) from 1.0's two settings, kept below, unlisted (a new name,
 +	// as 1.0's YES/NO wouldn't load into a number).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlashlightMode", &fpsFlashlightMode, -1, "STR_FPS_FLASHLIGHT", category));
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsNightVisionGear", &fpsNightVisionGear, false, "STR_FPS_NIGHT_VISION_GEAR", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCombatMusic", &fpsCombatMusic, false, "STR_FPS_COMBAT_MUSIC", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitSounds", &fpsHitSounds, false, "STR_FPS_HIT_SOUNDS", category));
 +	// The 3D view's ambient sounds (the owner: "The weather effects should also have nonobtrusive
@@ -32565,7 +32543,7 @@ index 000000000..eaa9f409a
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..927adba80
+index 000000000..c038ab47d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
 @@ -0,0 +1,3315 @@
@@ -34946,8 +34924,8 @@ index 000000000..927adba80
 +	endShotAim();
 +	keepFiringWhileHeld(unit, playerTurn);
 +
-+	// Night vision (gear), in the isometric map's colour.
-+	_view->setNightVision(hasNightVision(unit) ? _state->_map->getNightVisionColor() : 0);
++	// Night vision, in the isometric map's colour.
++	_view->setNightVision(unit ? _state->_map->getNightVisionColor() : 0);
 +	// Smoke as this soldier's eyes see through it: the game's sight range, and the armor's heat
 +	// vision (the see-through smoke thinner; enemies they don't see in smoke not drawn).
 +	_view->setSmokeSight(_save->getTileEngine()->getMaxViewDistance() * 16.0f, unit->getVisibilityThroughSmoke(), unit->getVisibilityThroughFire());
@@ -35200,7 +35178,7 @@ index 000000000..927adba80
 +	// The lean keys (setting "Lean") are read each frame while held (see updateLean); here they
 +	// are only swallowed. With leaning off they're the game's.
 +	if (Options::fpsLean > 0 && key != SDLK_UNKNOWN && (key == Options::keyFpsLeanHold || key == Options::keyFpsLeanLeftOwn || key == Options::keyFpsLeanRightOwn)) return true;
-+	if (Options::fpsZoom && key != SDLK_UNKNOWN && key == Options::keyFpsZoom) return true; // (held: see updateZoom)
++	if (key != SDLK_UNKNOWN && key == Options::keyFpsZoom) return true; // (held: see updateZoom)
 +	if (key != SDLK_UNKNOWN && key == Options::keyFpsShowFacing) return true; // (held: see think)
 +	if (key != SDLK_UNKNOWN && key == Options::keyFpsRange) return true; // (held: see updateCrosshair)
 +	if (key == Options::keyFpsOpenDoor) { if (pressed) openDoor(_save->getSelectedUnit()); return true; }
@@ -35216,7 +35194,7 @@ index 000000000..927adba80
 +	// Night vision: the gear of the soldier the view looks through (in the aliens' turn the
 +	// game's selected unit is the alien acting); the game's own key (Scroll Lock) checks for it
 +	// in 3D too.
-+	if (key == Options::keyFpsNightVision || key == Options::keyNightVisionToggle) { if (pressed) toggleNightVision(_trackedUnit); return true; }
++	if (key == Options::keyFpsNightVision || key == Options::keyNightVisionToggle) { if (pressed) toggleNightVision(); return true; }
 +
 +	// The game's reload key (R): the game's own reload, and the warning line says why when it loads
 +	// nothing (see reload). With Ctrl, Alt or Shift held it stays the game's, which then ignores it,
@@ -35359,7 +35337,7 @@ index 000000000..927adba80
 +		// (or a walk), as on the isometric map; with nothing to cancel, it zooms while held
 +		// (setting "Zoom").
 +		if (_confirmTile.x >= 0) clearConfirmMark();
-+		else if (!_state->_battleGame->cancelCurrentAction()) _zoomButtonHeld = Options::fpsZoom;
++		else if (!_state->_battleGame->cancelCurrentAction()) _zoomButtonHeld = true;
 +	}
 +	else if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_RIGHT)
 +	{
@@ -35886,10 +35864,10 @@ index 000000000..927adba80
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..c6986e0fb
+index 000000000..7f82b7ca1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1417 @@
+@@ -0,0 +1,1415 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -37104,10 +37082,8 @@ index 000000000..c6986e0fb
 +	Text *_txtBanner = nullptr;     // the banner (big letters)
 +	std::vector<Text*> _bannerGlow; // the banner again around itself, glowing
 +
-+	/// Does this unit have night vision (gear, or eyes that see in the dark)?
-+	bool hasNightVision(const BattleUnit *unit) const;
-+	/// Switches night vision on or off for a soldier with the gear, whatever the game is doing.
-+	void toggleNightVision(BattleUnit *unit);
++	/// Switches night vision on or off, whatever the game is doing.
++	void toggleNightVision();
 +	/// Fills the info panel for a unit (or hides it).
 +	void updateInfoPanel(BattleUnit *unit);
 +	/// The soldier card's weapon line: "R: Rifle 17 | 2 clips (40)".
@@ -37309,7 +37285,7 @@ index 000000000..c6986e0fb
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeCamera.cpp b/src/FirstPerson/FirstPersonModeCamera.cpp
 new file mode 100644
-index 000000000..0da87aad6
+index 000000000..ad3288a39
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeCamera.cpp
 @@ -0,0 +1,939 @@
@@ -37420,7 +37396,7 @@ index 000000000..0da87aad6
 +{
 +	const Uint8 *keyStates = SDL_GetKeyState(nullptr);
 +	const bool keyHeld = Options::keyFpsZoom != SDLK_UNKNOWN && keyStates[Options::keyFpsZoom] && !gameModifierHeld();
-+	const bool zoomedIn = Options::fpsZoom && isActive() && (keyHeld || (_zoomButtonHeld && _mouseLook));
++	const bool zoomedIn = isActive() && (keyHeld || (_zoomButtonHeld && _mouseLook));
 +	// (Zoomed in, the jump key held looks ZoomBoostFactor times closer: a player, GitHub issue #176, 4 times "a bit
 +	// anemic for large maps and sniper squad sight"; the owner: "Zoom + space at maxed zoom goes to 8x". The key
 +	// doesn't jump meanwhile: see keyboard.)
@@ -38254,10 +38230,10 @@ index 000000000..0da87aad6
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..d11b21c09
+index 000000000..3b04cb513
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,2744 @@
+@@ -0,0 +1,2697 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -38355,62 +38331,15 @@ index 000000000..d11b21c09
 +{
 +
 +/**
-+ * Tells whether this unit can use night vision in the 3D view.
-+ *
-+ * With the option "Night vision needs gear" off, everyone has it (as on the isometric map).
-+ * With it on, night vision comes with gear: an armor or an inventory item that the mod's
-+ * firstPerson rules list as giving night vision, or eyes that see as far in the dark as by day
-+ * (aliens, whose view distance is the same by night as by day).
-+ * @param unit The unit to ask about; null has no night vision.
-+ * @return True if the unit may switch night vision on.
-+ */
-+bool FirstPersonMode::hasNightVision(const BattleUnit *unit) const
-+{
-+	// No unit, no eyes.
-+	if (!unit)
-+	{
-+		return false;
-+	}
-+	// Gear not required, or the unit sees in the dark by nature.
-+	if (!Options::fpsNightVisionGear || unit->getMaxViewDistanceAtDark(nullptr) >= unit->getMaxViewDistanceAtDay(nullptr))
-+	{
-+		return true;
-+	}
-+	// An armor the mod lists as having night vision built in.
-+	const RuleFirstPerson &rules = _game->getMod()->getFirstPerson();
-+	if (rules.givesNightVision(unit->getArmor()->getType()))
-+	{
-+		return true;
-+	}
-+	// Or any item the soldier carries (night vision goggles and the like), wherever it is in the
-+	// inventory.
-+	for (const BattleItem *item : *unit->getInventory())
-+	{
-+		if (rules.givesNightVision(item->getRules()->getType()))
-+		{
-+			return true;
-+		}
-+	}
-+	return false;
-+}
-+
-+/**
 + * Switches night vision on or off: what the NIGHT VISION button on the top bar and its key do.
-+ * A soldier without the gear (see hasNightVision) gets a warning instead. The switch itself is
++ * Every unit has it, as on the isometric map. The switch itself is
 + * the isometric map's own (the one its night vision button flips), so the map and the 3D view
 + * share it; but unlike that button it works whatever the game is doing (an explosion, a shot in
 + * flight, the aliens' turn), as it only changes how the picture is drawn (a player's report:
 + * night vision couldn't be switched while a chain of explosions went off).
-+ * @param unit The soldier the view looks through.
 + */
-+void FirstPersonMode::toggleNightVision(BattleUnit *unit)
++void FirstPersonMode::toggleNightVision()
 +{
-+	// No gear: say so and leave night vision as it is.
-+	if (!hasNightVision(unit))
-+	{
-+		_state->warning("STR_FPS_NO_NIGHT_VISION");
-+		return;
-+	}
 +	_state->_map->toggleNightVision();
 +}
 +
@@ -39548,8 +39477,8 @@ index 000000000..d11b21c09
 +/**
 + * Keeps the armor's part of the top bar up to date: the armor's name, and a button for each
 + * thing the armor and the soldier's gear can do. FLY (SWIM under water) for armor that flies,
-+ * LIGHT for the armor's personal light, NIGHT VISION for a soldier who has it (see
-+ * hasNightVision), SPECIAL for a weapon built into the armor, TURRET for a unit with a turret
++ * LIGHT for the armor's personal light, NIGHT VISION for everyone,
++ * SPECIAL for a weapon built into the armor, TURRET for a unit with a turret
 + * (a tank, see toggleTurret). A button shows pressed while its
 + * feature is switched on. When a button appears or disappears, the squad buttons are laid out
 + * again to make room.
@@ -39562,7 +39491,7 @@ index 000000000..d11b21c09
 +	BattleType specialType;
 +	const bool showFly = show && canFly(unit), showLight = show && unit->getArmor()->getPersonalLightFriend() > 0;
 +	const bool showSpecial = show && unit->getSpecialIconWeapon(specialType) != nullptr;
-+	const bool showNight = show && hasNightVision(unit);
++	const bool showNight = show;
 +	const bool showTurret = show && unit->getTurretType() != -1;
 +	// Show or hide them; any change moves the other buttons on the bar.
 +	if (showFly != _btnFly->getVisible() || showLight != _btnLight->getVisible()
@@ -40012,7 +39941,7 @@ index 000000000..d11b21c09
 +	camera->setStatic(0.0f);
 +	camera->setFieldOfView(Options::fpsFieldOfView);
 +	camera->setSmoothLighting(Options::fpsSmoothLighting);
-+	camera->setNightVision(hasNightVision(unit) ? _state->_map->getNightVisionColor() : 0);
++	camera->setNightVision(unit ? _state->_map->getNightVisionColor() : 0);
 +	// And the smoke: with the setting "Cameras see as the eyes", as the soldier's eyes see it, as
 +	// the main view does (a player, GitHub issue #90: an X-Com Files X-Bat's heat vision sees
 +	// through smoke there, its camera saw none); else as a camera, without the wearer's heat vision.
@@ -40702,7 +40631,7 @@ index 000000000..d11b21c09
 +	}
 +	else if (button == _btnNight)
 +	{
-+		toggleNightVision(_trackedUnit);
++		toggleNightVision();
 +	}
 +	else if (button == _btnSpecial)
 +	{
@@ -77598,7 +77527,7 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..de7cbbcd1
+index 000000000..c93297a51
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,1102 @@
@@ -77830,13 +77759,13 @@ index 000000000..de7cbbcd1
 +	// sections are listed by the alphabet, and so are the settings in each, by the names shown (the owner: "in their
 +	// own logical groups and alphabetical"): a setting is found by its name, not by where it happened to be added.
 +	static const struct { const char *heading; std::vector<const char*> ids; } sections[] = {
-+		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsCameraEyes", "fpsCameraArtifacts", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView", "fpsZoom",
++		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsCameraEyes", "fpsCameraArtifacts", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView",
 +			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsAlienTurnFacing", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
 +		{ "STR_FPS_SECTION_MOVEMENT", { "fpsTurnCost", "fpsSidestepFaceView", "fpsMovement", "fpsWalkSpeed", "fpsFlightCost", "fpsFlightCostOverride", "fpsVault",
 +			"fpsFalling", "fpsSafeLanding", "fpsFallDamage" } },
 +		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsRecoil", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsThrowing", "fpsLean", "fpsMeleeTerrain",
 +			"fpsMeleeFloors", "fpsAimExact", "fpsCloseEyeShots", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
-+			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst", "fpsFlares", "fpsNightVisionGear" } },
++			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst", "fpsFlares" } },
 +		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsFlashlightMode", "fpsSmoke", "fpsSmokeOpacity",
 +			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsHitFlash", "fpsSmoothFire", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 +			"fpsGhostParts", "fpsGhostOpacity", "fpsGhostOpenDoors", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge" } },
@@ -78827,10 +78756,10 @@ index 000000000..b860f5356
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..eef5261c3
+index 000000000..27dec22f4
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
-@@ -0,0 +1,381 @@
+@@ -0,0 +1,374 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -78948,7 +78877,6 @@ index 000000000..eef5261c3
 +	std::set<std::string> _water;                // terrain data sets whose floors are water (the sea)
 +	std::map<std::string, std::set<int>> _waterRecords; // terrain data set -> its records that are water (the sea round a ship, among its parts)
 +	std::vector<std::string> _combatMusic;       // tense tracks to try, first one the game has wins
-+	std::set<std::string> _nightVision;          // armors and items that give their wearer night vision
 +	std::set<std::string> _undergroundMissions;  // missions underground all the way up, whatever their map's edges show
 +	std::set<std::string> _builtInItemsShown;    // built-in items drawn in the hands all the same (a shield, an arm cannon)
 +	std::map<std::string, ItemLook> _itemLooks;  // the item table: item type -> what it's set to
@@ -79014,14 +78942,10 @@ index 000000000..eef5261c3
 +			}
 +		}
 +
-+		// Combat music, what gives night vision, and the built-in items drawn in the hands (a
++		// Combat music, and the built-in items drawn in the hands (a
 +		// list replaces the earlier one).
 +		reader.tryRead("combatMusic", _combatMusic);
-+		std::vector<std::string> nightVision, builtInItemsShown;
-+		if (reader.tryRead("nightVision", nightVision))
-+		{
-+			_nightVision = std::set<std::string>(nightVision.begin(), nightVision.end());
-+		}
++		std::vector<std::string> builtInItemsShown;
 +		// Missions underground all the way up (rock round the map and above it), for a map whose
 +		// rock the 3D view can't tell from its edges (it tells most by itself: see
 +		// FirstPersonView::chooseGround). Mission types only; a map that starts on the surface
@@ -79157,8 +79081,6 @@ index 000000000..eef5261c3
 +	}
 +	/// Tense music tracks for when aliens are in sight (the first one the game has is played).
 +	const std::vector<std::string> &getCombatMusic() const { return _combatMusic; }
-+	/// Does wearing this armor, or carrying this item, give night vision?
-+	bool givesNightVision(const std::string &type) const { return _nightVision.count(type) > 0; }
 +	/// Is a mission (its alien deployment type) listed as underground all the way up?
 +	bool isUnderground(const std::string &mission) const { return _undergroundMissions.count(mission) > 0; }
 +	/// Is a built-in item (fixed to its unit, or its special weapon) drawn in the hands all the same?
