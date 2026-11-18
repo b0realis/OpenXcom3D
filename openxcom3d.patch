@@ -84169,10 +84169,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..30d78672d
+index 000000000..f1cc6207b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,2549 @@
+@@ -0,0 +1,2635 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -84456,6 +84456,91 @@ index 000000000..30d78672d
 +		}
 +	}
 +	return kept;
++}
++
++/// A hull's shape (a big unit that doesn't walk: a tank, a turret, a disc), levelled off. Its 8 frames are all drawn
++/// from the same height above it, so what they leave of it (see carve) carries a cone on its roof and one under its
++/// belly, each as high as a third of its width: a flat turret came out a spinning top. Its slab is what's between the
++/// lowest level its roof can be cut to and the highest its belly can, with every frame's drawn pixels still having a
++/// cell behind them (but LevelLoss of a frame's pixels: hand drawn frames don't quite agree, and a rim's last pixels
++/// don't hold a roof up); each cone is left on it as a low dome, DomeFlat times lower at its middle.
++constexpr float LevelLoss = 0.02f, DomeFlat = 2.0f;
++void levelOff(const PartFrames &part, std::vector<Uint8> &cells)
++{
++	const int pixels = FrameSize * FrameSize;
++	int cuts[2] = { GridUp - 1, 0 }; // (the slab's top and bottom levels)
++	for (int pass = 0; pass < 2; ++pass) // (the roof, then the belly of what is under it)
++	{
++		// the lowest (for the belly: the highest) cell behind each pixel of each frame
++		std::vector<int> ends[8];
++		for (int d = 0; d < 8; ++d) ends[d].assign(pixels, -1);
++		for (int across = 0; across < GridAcross; ++across)
++		{
++			for (int along = 0; along < GridAlong; ++along)
++			{
++				float column[8], rowFloor[8];
++				for (int d = 0; d < 8; ++d)
++				{
++					float nearness;
++					project(cellRight(across), cellAhead(along), 0.0f, d, false, column[d], rowFloor[d], nearness);
++				}
++				for (int up = 0; up <= cuts[0]; ++up)
++				{
++					if (!cells[cellIndex(across, along, up)]) continue;
++					for (int d = 0; d < 8; ++d)
++					{
++						const int x = (int)std::floor(column[d]), y = (int)std::floor(rowFloor[d] - cellUp(up));
++						if (x < 0 || y < 0 || x >= FrameSize || y >= FrameSize || !part.frame[d][y * FrameSize + x]) continue;
++						int &end = ends[d][y * FrameSize + x];
++						if (end < 0 || (pass == 0 ? up < end : up > end)) end = up;
++					}
++				}
++			}
++		}
++		// the pixels that cutting each level away would bare, frame by frame, and the cut as far as they allow
++		std::vector<int> bare[8];
++		int allowed[8], lost[8] = {};
++		for (int d = 0; d < 8; ++d)
++		{
++			bare[d].assign(GridUp, 0);
++			int covered = 0;
++			for (int end : ends[d]) if (end >= 0) { ++bare[d][end]; ++covered; }
++			allowed[d] = (int)(covered * LevelLoss);
++		}
++		const int step = pass == 0 ? -1 : 1;
++		for (int &cut = cuts[pass]; cut != cuts[1 - pass]; cut += step)
++		{
++			bool fits = true;
++			for (int d = 0; d < 8 && fits; ++d) fits = lost[d] + bare[d][cut] <= allowed[d];
++			if (!fits) break;
++			for (int d = 0; d < 8; ++d) lost[d] += bare[d][cut];
++		}
++	}
++	// the cones as domes: each column's share of its cone's height at the middle, on a quarter circle
++	for (int pass = 0; pass < 2; ++pass)
++	{
++		const int step = pass == 0 ? 1 : -1, from = cuts[pass] + step;
++		std::vector<int> high(GridAcross * GridAlong, 0);
++		int highest = 0;
++		for (int across = 0; across < GridAcross; ++across)
++		{
++			for (int along = 0; along < GridAlong; ++along)
++			{
++				int &count = high[across * GridAlong + along];
++				for (int up = from; up >= 0 && up < GridUp && cells[cellIndex(across, along, up)]; up += step) ++count;
++				highest = std::max(highest, count);
++			}
++		}
++		for (int across = 0; across < GridAcross; ++across)
++		{
++			for (int along = 0; along < GridAlong; ++along)
++			{
++				const float short_ = highest > 0 ? 1.0f - (float)high[across * GridAlong + along] / highest : 1.0f;
++				const int dome = (int)std::lround(highest / DomeFlat * std::sqrt(std::max(0.0f, 1.0f - short_ * short_)));
++				for (int up = from + step * dome; up >= 0 && up < GridUp; up += step) cells[cellIndex(across, along, up)] = 0;
++			}
++		}
++	}
 +}
 +
 +/// Fills the cells of an elliptical slice at a frame row's height: centre (right, ahead) and half sizes, voxels.
@@ -86172,7 +86257,8 @@ index 000000000..30d78672d
 +		// shape is the 8 views' alone, strictly, but for a big walker's: its frames, as a one-tile unit's, don't quite
 +		// agree, and a strict hull of them lost its shell and horns)
 +		const std::vector<Uint8> shape = routine.big ? std::vector<Uint8>(GridCells, 1) : limb(solid, RightSide);
-+		const std::vector<Uint8> hull = carve(solid, routine.big && !routine.legsSwing ? 0 : 1, shape);
++		std::vector<Uint8> hull = carve(solid, routine.big && !routine.legsSwing ? 0 : 1, shape);
++		if (routine.big && !routine.legsSwing) levelOff(solid, hull);
 +		for (int i = 0; i < GridCells; ++i) if (shape[i] && hull[i]) owner[i] = PartCodes[0];
 +	}
 +	else
