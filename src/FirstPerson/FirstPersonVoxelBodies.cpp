@@ -286,13 +286,15 @@ std::vector<Uint8> carve(const PartFrames &part, int tolerance, const std::vecto
 	return kept;
 }
 
-/// A hull's shape (a big unit that doesn't walk: a tank, a turret, a disc), levelled off. Its 8 frames are all drawn
-/// from the same height above it, so what they leave of it (see carve) carries a cone on its roof and one under its
-/// belly, each as high as a third of its width: a flat turret came out a spinning top. Its slab is what's between the
-/// lowest level its roof can be cut to and the highest its belly can, with every frame's drawn pixels still having a
-/// cell behind them (but LevelLoss of a frame's pixels: hand drawn frames don't quite agree, and a rim's last pixels
-/// don't hold a roof up); each cone is left on it as a low dome, DomeFlat times lower at its middle.
-constexpr float LevelLoss = 0.02f, DomeFlat = 2.0f;
+/// A hull's shape (a big unit that doesn't walk: a tank, a turret, a disc), made a plain block. Its 8 frames are all
+/// drawn from the same height above it, so what they leave of it (see carve) carries a cone on its roof and one under
+/// its belly, each as high as a third of its width: a flat turret came out a spinning top. Its slab is what's between
+/// the lowest level its roof can be cut to and the highest its belly can, with every frame's drawn pixels still having
+/// a cell behind them (but LevelLoss of a frame's pixels: hand drawn frames don't quite agree, and a rim's last pixels
+/// don't hold a roof up). The body is then its outline from straight above, as thick as the slab, its edges cut at a
+/// slant, with its barrels (what of the outline is thinner than BarrelHalf each way) lying on it: rough, but a hull
+/// (the owner: "just a rhomboid shape with a cannon laying flat on surface ... a rough but ok looking object").
+constexpr float LevelLoss = 0.02f, HullThin = 0.3f, HullBevel = 0.3f, BarrelHalf = 2.5f * VOXELSCALE;
 void levelOff(const PartFrames &part, std::vector<Uint8> &cells)
 {
 	const int pixels = FrameSize * FrameSize;
@@ -333,7 +335,7 @@ void levelOff(const PartFrames &part, std::vector<Uint8> &cells)
 			bare[d].assign(GridUp, 0);
 			int covered = 0;
 			for (int end : ends[d]) if (end >= 0) { ++bare[d][end]; ++covered; }
-			allowed[d] = (int)(covered * LevelLoss);
+			allowed[d] = pass == 0 ? (int)(covered * LevelLoss) : 0; // (the belly strictly: a hull stands on what is under it)
 		}
 		const int step = pass == 0 ? -1 : 1;
 		for (int &cut = cuts[pass]; cut != cuts[1 - pass]; cut += step)
@@ -344,31 +346,82 @@ void levelOff(const PartFrames &part, std::vector<Uint8> &cells)
 			for (int d = 0; d < 8; ++d) lost[d] += bare[d][cut];
 		}
 	}
-	// the cones as domes: each column's share of its cone's height at the middle, on a quarter circle
-	for (int pass = 0; pass < 2; ++pass)
+	// The block: the outline seen from straight above (the columns filled through most of the slab), as thick as the slab
+	// and no thinner than HullThin of the outline's width (a disc's slab is one cell: its drawings are a flat ellipse).
+	const int plan = GridAcross * GridAlong;
+	std::vector<Uint8> outline(plan, 0);
+	int first[2] = { GridAcross, GridAlong }, last[2] = { -1, -1 };
+	for (int across = 0; across < GridAcross; ++across)
 	{
-		const int step = pass == 0 ? 1 : -1, from = cuts[pass] + step;
-		std::vector<int> high(GridAcross * GridAlong, 0);
-		int highest = 0;
-		for (int across = 0; across < GridAcross; ++across)
+		for (int along = 0; along < GridAlong; ++along)
 		{
-			for (int along = 0; along < GridAlong; ++along)
-			{
-				int &count = high[across * GridAlong + along];
-				for (int up = from; up >= 0 && up < GridUp && cells[cellIndex(across, along, up)]; up += step) ++count;
-				highest = std::max(highest, count);
-			}
-		}
-		for (int across = 0; across < GridAcross; ++across)
-		{
-			for (int along = 0; along < GridAlong; ++along)
-			{
-				const float short_ = highest > 0 ? 1.0f - (float)high[across * GridAlong + along] / highest : 1.0f;
-				const int dome = (int)std::lround(highest / DomeFlat * std::sqrt(std::max(0.0f, 1.0f - short_ * short_)));
-				for (int up = from + step * dome; up >= 0 && up < GridUp; up += step) cells[cellIndex(across, along, up)] = 0;
-			}
+			int filled = 0;
+			for (int up = cuts[1]; up <= cuts[0]; ++up) filled += cells[cellIndex(across, along, up)] != 0;
+			if (filled * 2 <= cuts[0] - cuts[1]) continue;
+			outline[across * GridAlong + along] = 1;
+			first[0] = std::min(first[0], across); last[0] = std::max(last[0], across);
+			first[1] = std::min(first[1], along); last[1] = std::max(last[1], along);
 		}
 	}
+	if (last[0] < 0) return;
+	// how far inside the outline each column is, in cells (by steps to the four sides)
+	auto inside = [&](const std::vector<Uint8> &shape) {
+		std::vector<int> depth(plan, 0);
+		for (int pass = 0; pass < 2; ++pass)
+		{
+			for (int n = 0; n < plan; ++n)
+			{
+				const int i = pass == 0 ? n : plan - 1 - n, across = i / GridAlong, along = i % GridAlong;
+				if (!shape[i]) continue;
+				const int back = pass == 0 ? -1 : 1;
+				const int one = across + back >= 0 && across + back < GridAcross ? depth[i + back * GridAlong] : 0;
+				const int other = along + back >= 0 && along + back < GridAlong ? depth[i + back] : 0;
+				depth[i] = pass == 0 ? std::min(one, other) + 1 : std::min(depth[i], std::min(one, other) + 1);
+			}
+		}
+		return depth;
+	};
+	// the body: the outline without what is thinner than a barrel (worn away BarrelHalf deep, grown back); the rest, its
+	// barrels, lying on it as thick as they are wide
+	const std::vector<int> depth = inside(outline);
+	const int wear = (int)std::lround(BarrelHalf / Cell);
+	std::vector<Uint8> body(plan, 0);
+	for (int across = 0; across < GridAcross; ++across)
+		for (int along = 0; along < GridAlong; ++along)
+		{
+			if (depth[across * GridAlong + along] <= wear) continue;
+			for (int a = std::max(0, across - wear); a <= std::min(GridAcross - 1, across + wear); ++a)
+				for (int b = std::max(0, along - wear + std::abs(a - across)); b <= std::min(GridAlong - 1, along + wear - std::abs(a - across)); ++b)
+					if (outline[a * GridAlong + b]) body[a * GridAlong + b] = 1;
+		}
+	bool any = false;
+	for (Uint8 cell : body) any = any || cell;
+	if (!any) body = outline; // (all of it thin: the block is the outline)
+	const std::vector<int> bodyDepth = inside(body);
+	const int width = std::min(last[0] - first[0], last[1] - first[1]) + 1;
+	int bottom = cuts[1], top = cuts[0];
+	while (top - bottom + 1 < (int)(width * HullThin) && (top < GridUp - 1 || bottom > 0))
+	{
+		if (top < GridUp - 1) ++top; // (upwards: it stands where it stood)
+		else --bottom;
+	}
+	// (its upper edge cut at a slant, HullBevel of its thickness deep: a block with the look of a hull, flat underneath)
+	const int thick = top - bottom + 1, bevel = (int)(thick * HullBevel), middle = (top + bottom) / 2;
+	int barrel = 0;
+	for (int i = 0; i < plan; ++i) if (outline[i] && !body[i]) barrel = std::max(barrel, depth[i]);
+	barrel = std::min(barrel, thick / 2);
+	for (int across = 0; across < GridAcross; ++across)
+		for (int along = 0; along < GridAlong; ++along)
+		{
+			const int i = across * GridAlong + along;
+			for (int up = 0; up < GridUp; ++up)
+			{
+				bool keep = false;
+				if (body[i]) keep = up >= bottom && up <= top && bodyDepth[i] > bevel - (top - up);
+				else if (outline[i]) keep = std::abs(up - middle) < barrel;
+				cells[cellIndex(across, along, up)] = keep;
+			}
+		}
 }
 
 /// Fills the cells of an elliptical slice at a frame row's height: centre (right, ahead) and half sizes, voxels.

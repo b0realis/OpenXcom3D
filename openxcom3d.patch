@@ -35058,10 +35058,10 @@ index 000000000..eaa9f409a
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..fb400a88b
+index 000000000..5756db7ff
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,3464 @@
+@@ -0,0 +1,3465 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -37303,6 +37303,7 @@ index 000000000..fb400a88b
 +		if (builds <= 0) break;
 +		// (a unit down already has one made too, once: its corpse lies as its body, as one that went down in view)
 +		if (VoxelUnits::suitsDown(unit) ? _voxelUnits->lastBody(unit) != nullptr : !VoxelUnits::suits(unit)) continue;
++		if (unit->isOutThresholdExceed() && _voxelUnits->lastBody(unit)) continue; // (struck down, about to fall: it keeps the body it had, see drawUnits)
 +		if (unit->getStatus() == STATUS_WALKING || unit->getStatus() == STATUS_FLYING) continue;
 +		int walkPhase;
 +		_voxelUnits->modelFor(unit, unitSprite, _game->getMod()->getSurfaceSet("BIGOBS.PCK"), _game->getMod()->getSurfaceSet("FLOOROB.PCK"), _save,
@@ -58522,10 +58523,10 @@ index 000000000..44a6559e0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonSpriteHits.cpp b/src/FirstPerson/FirstPersonSpriteHits.cpp
 new file mode 100644
-index 000000000..e1b88905f
+index 000000000..cf0e76256
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonSpriteHits.cpp
-@@ -0,0 +1,1068 @@
+@@ -0,0 +1,1081 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -58985,7 +58986,7 @@ index 000000000..e1b88905f
 +		card.anchor[1] = feet[1];
 +		card.anchor[2] = height;
 +	}
-+	view->cardAxes(card.anchor, scale, card.column, card.row);
++	view->cardAxes(card.anchor, scale, card.column, card.row, hullLayBack(unit));
 +	// The normal: column cross row, made a unit vector.
 +	double normal[3] = { card.column[1] * card.row[2] - card.column[2] * card.row[1], card.column[2] * card.row[0] - card.column[0] * card.row[2],
 +		card.column[0] * card.row[1] - card.column[1] * card.row[0] };
@@ -59460,6 +59461,19 @@ index 000000000..e1b88905f
 +}
 +
 +/**
++ * How far a unit's card lies back whatever the view's pitch (see FirstPersonSpriteHits.h): the big units drawn
++ * on legs (the Sectopod and the Reaper, routine 5; TFTD's Triscene, 20) are pictured as the small ones, upright,
++ * unless they can't move (a turret drawn by a walker's routine: XPiratez's truck turret).
++ */
++double hullLayBack(const BattleUnit *unit)
++{
++	if (!unit || unit->getArmor()->getSize() < 2) return 0.0;
++	const int routine = unit->getArmor()->getDrawingRoutine();
++	const bool walker = (routine == 5 || routine == 20) && unit->getArmor()->allowsMoving(); // (not a turret drawn by a walker's routine: XPiratez's truck turret)
++	return walker ? 0.0 : HullLayBack * Pi / 180.0;
++}
++
++/**
 + * The side a unit's frame is drawn from in a 3D view (see FirstPersonSpriteHits.h).
 + */
 +int unitViewRotation(const double eye[3], const double feet[3])
@@ -59596,10 +59610,10 @@ index 000000000..e1b88905f
 +}
 diff --git a/src/FirstPerson/FirstPersonSpriteHits.h b/src/FirstPerson/FirstPersonSpriteHits.h
 new file mode 100644
-index 000000000..43e779494
+index 000000000..336481d06
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonSpriteHits.h
-@@ -0,0 +1,150 @@
+@@ -0,0 +1,153 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -59714,6 +59728,9 @@ index 000000000..43e779494
 + * @return The view rotation (3 minus the direction from the unit to the eye).
 + */
 +int unitViewRotation(const double eye[3], const double feet[3]);
++/// How far a unit's card lies back whatever the view's pitch, in radians: a hull's (two tiles by two, not a walker)
++/// HullLayBack, any other unit's 0.
++double hullLayBack(const BattleUnit *unit);
 +
 +/**
 + * Where a line crosses a card's plane, and whether a solid pixel of the picture is there (the
@@ -60652,10 +60669,10 @@ index 000000000..5eaac16dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..0ad69790f
+index 000000000..b00cfe8d2
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1843 @@
+@@ -0,0 +1,1844 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -61052,7 +61069,7 @@ index 000000000..0ad69790f
 +	/// Gets the unit being looked through (null: none).
 +	const BattleUnit *getCameraUnit() const { return _cameraUnit; }
 +	/// Setting "Full sprite hitboxes": a unit's picture card as this view draws it standing at a point (see drawSprite): one picture column to the right and one row up, in voxels.
-+	void cardAxes(const double world[3], double scale, double column[3], double row[3]) const;
++	void cardAxes(const double world[3], double scale, double column[3], double row[3], double layBack = 0.0) const;
 +	/// Setting "Full sprite hitboxes": the height this view stands a unit on at a point (see standingHeight), if it has drawn the map.
 +	bool standingHeightNow(const double world[3], double &height) const;
 +	/// Setting "Full sprite hitboxes": where this view drew a unit's feet in its last frame (between the game's small steps as it
@@ -61856,6 +61873,7 @@ index 000000000..0ad69790f
 +		BattleUnit *body = nullptr;       // the unconscious unit lying in the pile it pictures, if any: it can be pointed at
 +		const Tile *pile = nullptr;       // the floor tile whose pile it pictures (a big corpse's first), if any: it can be pointed at
 +		double lyingSlope = 0.0;          // a lying sprite's floor rising towards the camera: voxels up for each voxel along (see lyingRise)
++		double layBack = 0.0;             // the card lies back this far whatever the view's pitch, in radians (a hull's: see hullLayBack)
 +		double floorCut = NoFloorCut;     // no part of a standing sprite below this height, in voxels: the underside of the floor a unit stands on (see floorUnderside)
 +	};
 +	/// Draws a sprite standing in the world, depth-tested (or see-through, laid over what's there):
@@ -65147,10 +65165,10 @@ index 000000000..d086476ff
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpuEffects.cpp b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 new file mode 100644
-index 000000000..1c834361f
+index 000000000..edcdf5429
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
-@@ -0,0 +1,1074 @@
+@@ -0,0 +1,1075 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -65470,6 +65488,7 @@ index 000000000..1c834361f
 +	{
 +		tilt = std::max(tilt, std::min(elevation - CardTiltUpMax * Pi / 180.0, CardTiltSteepMax * Pi / 180.0));
 +	}
++	if (draw.layBack > 0.0) tilt = std::min(std::clamp(_pitch, -CardTiltMax * Pi / 180.0, 0.0), -draw.layBack); // (a hull's: see HullLayBack)
 +	const double cardUp[3] = { -std::sin(tilt) * level[0], -std::sin(tilt) * level[1], std::cos(tilt) };
 +	const double cardFacing[3] = { std::cos(tilt) * level[0], std::cos(tilt) * level[1], std::sin(tilt) };
 +	const double anchorAcross = dot(anchor, _levelRight), anchorFacing = dot(anchor, cardFacing);
@@ -69569,10 +69588,10 @@ index 000000000..5ee90296f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..cdb56561e
+index 000000000..de38dff49
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,625 @@
+@@ -0,0 +1,629 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -69823,6 +69842,10 @@ index 000000000..cdb56561e
 +/// CardTiltUpMax it is, at most this far: a unit straight overhead faces down at the soldier
 +/// instead of showing its edge (see drawSprite).
 +const double CardTiltSteepMax = 80.0;
++/// A hull's card (a big unit that doesn't walk: a tank, a turret, a hover tank, a Cyberdisc) lies back this far, in
++/// degrees, whatever the view's pitch, and further only as the view looks down further: its picture is drawn from
++/// above, its roof showing, and upright it showed that roof to the soldier like a lid (see drawSprite, hullLayBack).
++const double HullLayBack = 50.0;
 +/// How far the view can look up or down, in degrees: all but straight up and down (the camera
 +/// keeps its heading there).
 +const double MaxPitch = 89.0;
@@ -72545,10 +72568,10 @@ index 000000000..229bd966c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..de446417c
+index 000000000..4e321bc17
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,4046 @@
+@@ -0,0 +1,4055 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -72757,6 +72780,7 @@ index 000000000..de446417c
 +	{
 +		tilt = std::max(tilt, std::min(elevation - CardTiltUpMax * Pi / 180.0, CardTiltSteepMax * Pi / 180.0));
 +	}
++	if (draw.layBack > 0.0) tilt = std::min(std::clamp(_pitch, -CardTiltMax * Pi / 180.0, 0.0), -draw.layBack); // (a hull's: see HullLayBack)
 +	const double cardUp[3] = { -std::sin(tilt) * level[0], -std::sin(tilt) * level[1], std::cos(tilt) };
 +	const double cardFacing[3] = { std::cos(tilt) * level[0], std::cos(tilt) * level[1], std::sin(tilt) };
 +	const double anchorAcross = dot(anchor, _levelRight), anchorFacing = dot(anchor, cardFacing);
@@ -73488,8 +73512,9 @@ index 000000000..de446417c
 + * @param scale The picture's scale (setting "Unit size").
 + * @param column Set to one column to the right, in voxels.
 + * @param row Set to one row up the card, in voxels.
++ * @param layBack How far the card lies back whatever the pitch, in radians (a hull's: see hullLayBack).
 + */
-+void FirstPersonView::cardAxes(const double world[3], double scale, double column[3], double row[3]) const
++void FirstPersonView::cardAxes(const double world[3], double scale, double column[3], double row[3], double layBack) const
 +{
 +	const double level[2] = { std::cos(_yaw), std::sin(_yaw) }; // straight ahead, along the ground
 +	const double anchor[3] = { world[0] - _eye[0], world[1] - _eye[1], (world[2] - _eye[2]) * ZScale };
@@ -73499,6 +73524,7 @@ index 000000000..de446417c
 +	{
 +		tilt = std::max(tilt, std::min(elevation - CardTiltUpMax * Pi / 180.0, CardTiltSteepMax * Pi / 180.0));
 +	}
++	if (layBack > 0.0) tilt = std::min(std::clamp(_pitch, -CardTiltMax * Pi / 180.0, 0.0), -layBack); // (a hull's: see HullLayBack)
 +	// A column along the level right; a row up the card (cardUp in true proportions, a row
 +	// rowSize = scale * ZScale of it), its height back into voxels (divided by ZScale).
 +	const double levelRight[2] = { -level[1], level[0] };
@@ -74086,7 +74112,11 @@ index 000000000..de446417c
 +			const double reach = !seen ? 0.0 : _eyePass ? 24.0 * unitScale * _eyeFocal / middleDepth : 24.0 * unitScale * (getWidth() / 2.0) / _halfFovTangent / middleDepth;
 +			int noBuilds = 0;
 +			int &builds = seen && middleX > -reach && middleX < getWidth() + reach && middleY > -reach && middleY < getHeight() + reach ? voxelBuilds : noBuilds;
-+			body = _voxelUnits->modelFor(unit, unitSprite, _game->getMod()->getSurfaceSet("BIGOBS.PCK"), _game->getMod()->getSurfaceSet("FLOOROB.PCK"), _save,
++			// (A unit struck down but not yet falling, while the game turns it to face the screen: the body it had. Its
++			// frames now may be others, burnt by a hit far beyond its health, and a body of those isn't made yet: it showed
++			// as its flat picture for that moment, in the middle of its death. The owner: "one flat frame is seen".)
++			const VoxelUnitModel *had = unit->isOutThresholdExceed() ? _voxelUnits->lastBody(unit) : nullptr;
++			body = had ? had : _voxelUnits->modelFor(unit, unitSprite, _game->getMod()->getSurfaceSet("BIGOBS.PCK"), _game->getMod()->getSurfaceSet("FLOOROB.PCK"), _save,
 +				getPalette(), builds, walkPhase);
 +			unitSprite.setViewRotation(viewRotation);
 +			_spriteBuffer->clear(); // (anything the drawer drew there while the body was made: its sprite, if drawn instead, starts clean)
@@ -74160,6 +74190,7 @@ index 000000000..de446417c
 +					step.sprite.floorCut = floorUnderside(feet);
 +					step.sprite.scale = unitScale;
 +					step.sprite.unit = unit;
++					step.sprite.layBack = FirstPerson::hullLayBack(unit);
 +					useSmoothVersion(step.sprite);
 +					_drawList.push_back(step);
 +				}
@@ -74210,6 +74241,7 @@ index 000000000..de446417c
 +				step.sprite.pose = SpritePose::Lying;
 +			}
 +			step.sprite.unit = unit;
++			step.sprite.layBack = FirstPerson::hullLayBack(unit);
 +			useSmoothVersion(step.sprite);
 +			// With full sprite hitboxes, a picture drawn smooth (upscaled, up close) is the one the lines of the
 +			// soldier looked through meet: noted with the frame it is (see smoothPicture).
@@ -84169,10 +84201,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..4047e7a0f
+index 000000000..08b74fdb4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,2679 @@
+@@ -0,0 +1,2732 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -84461,13 +84493,15 @@ index 000000000..4047e7a0f
 +	return kept;
 +}
 +
-+/// A hull's shape (a big unit that doesn't walk: a tank, a turret, a disc), levelled off. Its 8 frames are all drawn
-+/// from the same height above it, so what they leave of it (see carve) carries a cone on its roof and one under its
-+/// belly, each as high as a third of its width: a flat turret came out a spinning top. Its slab is what's between the
-+/// lowest level its roof can be cut to and the highest its belly can, with every frame's drawn pixels still having a
-+/// cell behind them (but LevelLoss of a frame's pixels: hand drawn frames don't quite agree, and a rim's last pixels
-+/// don't hold a roof up); each cone is left on it as a low dome, DomeFlat times lower at its middle.
-+constexpr float LevelLoss = 0.02f, DomeFlat = 2.0f;
++/// A hull's shape (a big unit that doesn't walk: a tank, a turret, a disc), made a plain block. Its 8 frames are all
++/// drawn from the same height above it, so what they leave of it (see carve) carries a cone on its roof and one under
++/// its belly, each as high as a third of its width: a flat turret came out a spinning top. Its slab is what's between
++/// the lowest level its roof can be cut to and the highest its belly can, with every frame's drawn pixels still having
++/// a cell behind them (but LevelLoss of a frame's pixels: hand drawn frames don't quite agree, and a rim's last pixels
++/// don't hold a roof up). The body is then its outline from straight above, as thick as the slab, its edges cut at a
++/// slant, with its barrels (what of the outline is thinner than BarrelHalf each way) lying on it: rough, but a hull
++/// (the owner: "just a rhomboid shape with a cannon laying flat on surface ... a rough but ok looking object").
++constexpr float LevelLoss = 0.02f, HullThin = 0.3f, HullBevel = 0.3f, BarrelHalf = 2.5f * VOXELSCALE;
 +void levelOff(const PartFrames &part, std::vector<Uint8> &cells)
 +{
 +	const int pixels = FrameSize * FrameSize;
@@ -84508,7 +84542,7 @@ index 000000000..4047e7a0f
 +			bare[d].assign(GridUp, 0);
 +			int covered = 0;
 +			for (int end : ends[d]) if (end >= 0) { ++bare[d][end]; ++covered; }
-+			allowed[d] = (int)(covered * LevelLoss);
++			allowed[d] = pass == 0 ? (int)(covered * LevelLoss) : 0; // (the belly strictly: a hull stands on what is under it)
 +		}
 +		const int step = pass == 0 ? -1 : 1;
 +		for (int &cut = cuts[pass]; cut != cuts[1 - pass]; cut += step)
@@ -84519,31 +84553,82 @@ index 000000000..4047e7a0f
 +			for (int d = 0; d < 8; ++d) lost[d] += bare[d][cut];
 +		}
 +	}
-+	// the cones as domes: each column's share of its cone's height at the middle, on a quarter circle
-+	for (int pass = 0; pass < 2; ++pass)
++	// The block: the outline seen from straight above (the columns filled through most of the slab), as thick as the slab
++	// and no thinner than HullThin of the outline's width (a disc's slab is one cell: its drawings are a flat ellipse).
++	const int plan = GridAcross * GridAlong;
++	std::vector<Uint8> outline(plan, 0);
++	int first[2] = { GridAcross, GridAlong }, last[2] = { -1, -1 };
++	for (int across = 0; across < GridAcross; ++across)
 +	{
-+		const int step = pass == 0 ? 1 : -1, from = cuts[pass] + step;
-+		std::vector<int> high(GridAcross * GridAlong, 0);
-+		int highest = 0;
-+		for (int across = 0; across < GridAcross; ++across)
++		for (int along = 0; along < GridAlong; ++along)
 +		{
-+			for (int along = 0; along < GridAlong; ++along)
-+			{
-+				int &count = high[across * GridAlong + along];
-+				for (int up = from; up >= 0 && up < GridUp && cells[cellIndex(across, along, up)]; up += step) ++count;
-+				highest = std::max(highest, count);
-+			}
-+		}
-+		for (int across = 0; across < GridAcross; ++across)
-+		{
-+			for (int along = 0; along < GridAlong; ++along)
-+			{
-+				const float short_ = highest > 0 ? 1.0f - (float)high[across * GridAlong + along] / highest : 1.0f;
-+				const int dome = (int)std::lround(highest / DomeFlat * std::sqrt(std::max(0.0f, 1.0f - short_ * short_)));
-+				for (int up = from + step * dome; up >= 0 && up < GridUp; up += step) cells[cellIndex(across, along, up)] = 0;
-+			}
++			int filled = 0;
++			for (int up = cuts[1]; up <= cuts[0]; ++up) filled += cells[cellIndex(across, along, up)] != 0;
++			if (filled * 2 <= cuts[0] - cuts[1]) continue;
++			outline[across * GridAlong + along] = 1;
++			first[0] = std::min(first[0], across); last[0] = std::max(last[0], across);
++			first[1] = std::min(first[1], along); last[1] = std::max(last[1], along);
 +		}
 +	}
++	if (last[0] < 0) return;
++	// how far inside the outline each column is, in cells (by steps to the four sides)
++	auto inside = [&](const std::vector<Uint8> &shape) {
++		std::vector<int> depth(plan, 0);
++		for (int pass = 0; pass < 2; ++pass)
++		{
++			for (int n = 0; n < plan; ++n)
++			{
++				const int i = pass == 0 ? n : plan - 1 - n, across = i / GridAlong, along = i % GridAlong;
++				if (!shape[i]) continue;
++				const int back = pass == 0 ? -1 : 1;
++				const int one = across + back >= 0 && across + back < GridAcross ? depth[i + back * GridAlong] : 0;
++				const int other = along + back >= 0 && along + back < GridAlong ? depth[i + back] : 0;
++				depth[i] = pass == 0 ? std::min(one, other) + 1 : std::min(depth[i], std::min(one, other) + 1);
++			}
++		}
++		return depth;
++	};
++	// the body: the outline without what is thinner than a barrel (worn away BarrelHalf deep, grown back); the rest, its
++	// barrels, lying on it as thick as they are wide
++	const std::vector<int> depth = inside(outline);
++	const int wear = (int)std::lround(BarrelHalf / Cell);
++	std::vector<Uint8> body(plan, 0);
++	for (int across = 0; across < GridAcross; ++across)
++		for (int along = 0; along < GridAlong; ++along)
++		{
++			if (depth[across * GridAlong + along] <= wear) continue;
++			for (int a = std::max(0, across - wear); a <= std::min(GridAcross - 1, across + wear); ++a)
++				for (int b = std::max(0, along - wear + std::abs(a - across)); b <= std::min(GridAlong - 1, along + wear - std::abs(a - across)); ++b)
++					if (outline[a * GridAlong + b]) body[a * GridAlong + b] = 1;
++		}
++	bool any = false;
++	for (Uint8 cell : body) any = any || cell;
++	if (!any) body = outline; // (all of it thin: the block is the outline)
++	const std::vector<int> bodyDepth = inside(body);
++	const int width = std::min(last[0] - first[0], last[1] - first[1]) + 1;
++	int bottom = cuts[1], top = cuts[0];
++	while (top - bottom + 1 < (int)(width * HullThin) && (top < GridUp - 1 || bottom > 0))
++	{
++		if (top < GridUp - 1) ++top; // (upwards: it stands where it stood)
++		else --bottom;
++	}
++	// (its upper edge cut at a slant, HullBevel of its thickness deep: a block with the look of a hull, flat underneath)
++	const int thick = top - bottom + 1, bevel = (int)(thick * HullBevel), middle = (top + bottom) / 2;
++	int barrel = 0;
++	for (int i = 0; i < plan; ++i) if (outline[i] && !body[i]) barrel = std::max(barrel, depth[i]);
++	barrel = std::min(barrel, thick / 2);
++	for (int across = 0; across < GridAcross; ++across)
++		for (int along = 0; along < GridAlong; ++along)
++		{
++			const int i = across * GridAlong + along;
++			for (int up = 0; up < GridUp; ++up)
++			{
++				bool keep = false;
++				if (body[i]) keep = up >= bottom && up <= top && bodyDepth[i] > bevel - (top - up);
++				else if (outline[i]) keep = std::abs(up - middle) < barrel;
++				cells[cellIndex(across, along, up)] = keep;
++			}
++		}
 +}
 +
 +/// Fills the cells of an elliptical slice at a frame row's height: centre (right, ahead) and half sizes, voxels.

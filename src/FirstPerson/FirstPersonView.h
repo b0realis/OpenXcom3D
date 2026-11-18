@@ -394,7 +394,7 @@ public:
 	/// Gets the unit being looked through (null: none).
 	const BattleUnit *getCameraUnit() const { return _cameraUnit; }
 	/// Setting "Full sprite hitboxes": a unit's picture card as this view draws it standing at a point (see drawSprite): one picture column to the right and one row up, in voxels.
-	void cardAxes(const double world[3], double scale, double column[3], double row[3]) const;
+	void cardAxes(const double world[3], double scale, double column[3], double row[3], double layBack = 0.0) const;
 	/// Setting "Full sprite hitboxes": the height this view stands a unit on at a point (see standingHeight), if it has drawn the map.
 	bool standingHeightNow(const double world[3], double &height) const;
 	/// Setting "Full sprite hitboxes": where this view drew a unit's feet in its last frame (between the game's small steps as it
@@ -1198,6 +1198,7 @@ private:
 		BattleUnit *body = nullptr;       // the unconscious unit lying in the pile it pictures, if any: it can be pointed at
 		const Tile *pile = nullptr;       // the floor tile whose pile it pictures (a big corpse's first), if any: it can be pointed at
 		double lyingSlope = 0.0;          // a lying sprite's floor rising towards the camera: voxels up for each voxel along (see lyingRise)
+		double layBack = 0.0;             // the card lies back this far whatever the view's pitch, in radians (a hull's: see hullLayBack)
 		double floorCut = NoFloorCut;     // no part of a standing sprite below this height, in voxels: the underside of the floor a unit stands on (see floorUnderside)
 	};
 	/// Draws a sprite standing in the world, depth-tested (or see-through, laid over what's there):
