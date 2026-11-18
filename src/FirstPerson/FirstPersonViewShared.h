@@ -234,9 +234,9 @@ const double CardTiltUpMax = 10.0;
 /// CardTiltUpMax it is, at most this far: a unit straight overhead faces down at the soldier
 /// instead of showing its edge (see drawSprite).
 const double CardTiltSteepMax = 80.0;
-/// A turret's card (a unit two tiles by two that can't move, mounted on a vehicle) lies back this far, in degrees,
-/// whatever the view's pitch, and further only as the view looks down further: its picture is drawn from above, its
-/// roof showing, and upright it showed that roof to the soldier like a lid (see drawSprite, hullLayBack).
+/// A hull's card (a big unit that doesn't walk: a tank, a turret, a hover tank, a Cyberdisc) lies back this far, in
+/// degrees, whatever the view's pitch, and further only as the view looks down further: its picture is drawn from
+/// above, its roof showing, and upright it showed that roof to the soldier like a lid (see drawSprite, hullLayBack).
 const double HullLayBack = 50.0;
 /// How far the view can look up or down, in degrees: all but straight up and down (the camera
 /// keeps its heading there).
