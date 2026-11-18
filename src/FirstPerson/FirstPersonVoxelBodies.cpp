@@ -221,6 +221,9 @@ const float FaceDepth = 2.0f * VOXELSCALE;
 /// A limb's slice among several in its row is at most this many times as deep as it is wide (see limb).
 const float SliceDepthMost = 1.5f;
 
+/// A hull's drawings are made from 30 degrees above the ground (the isometric view): the camera's way, along the ground
+/// and up; a voxel within HullSkinDepth of the nearest on its pixel is on the skin a drawing sees (see makeModel).
+constexpr float HullCameraAlong = 0.8660254f, HullCameraUp = 0.5f, HullSkinDepth = 1.5f * VOXELSCALE;
 /// One body, the same from every side (see makeModel); false: matched to each view's drawing (see matchViews).
 constexpr bool OneBody = true;
 /// Cells this near each other (in cells, each way) are one piece of a body (see makeModel, dropFloating).
@@ -2499,6 +2502,28 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 			float &back = backSkin[pixelAt(k, Back, nearness)];
 			back = std::max(back, nearness);
 		}
+		// (A hull, a big unit that doesn't walk: a tank, a turret, a disc. Its drawings show it from above, all round, and
+		// its shape is read along that slant (see carve, levelOff): each of its voxels takes its pixel of the drawing that
+		// sees it best, of all eight, thrown along the slant onto the skin that drawing sees. So from where a drawing was
+		// made the body shows that drawing, cube for pixel. The skin each drawing sees: the nearest voxel on each pixel.)
+		const bool hull = routine.big && !routine.legsSwing;
+		std::vector<float> seenSkin[8];
+		auto slantPixel = [&](size_t k, int d, float &nearness) -> size_t {
+			float column, row;
+			project(model->right[k], model->ahead[k], model->up[k], d, false, column, row, nearness);
+			const int c = (int)std::floor(column), r = (int)std::floor(row);
+			return c < 0 || r < 0 || c >= FrameSize || r >= FrameSize ? (size_t)FrameSize * FrameSize : (size_t)r * FrameSize + c;
+		};
+		for (int d = 0; hull && d < 8; ++d)
+		{
+			seenSkin[d].assign((size_t)FrameSize * FrameSize + 1, -1e9f);
+			for (size_t k = 0; k < count; ++k)
+			{
+				float nearness;
+				float &nearest = seenSkin[d][slantPixel(k, d, nearness)];
+				nearest = std::max(nearest, nearness);
+			}
+		}
 		for (size_t k = 0; k < count; ++k)
 		{
 			const int cell = surfaceCells[k], up = cell % GridUp, along = (cell / GridUp) % GridAlong, across = cell / (GridUp * GridAlong);
@@ -2518,7 +2543,23 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 			float nearFront, nearBack;
 			const float underFront = frontSkin[pixelAt(k, Front, nearFront)] - nearFront, underBack = backSkin[pixelAt(k, Back, nearBack)] - nearBack;
 			const int first = std::abs(underFront - underBack) < 1.0f * VOXELSCALE ? (fit[Front] >= fit[Back] ? Front : Back) : underFront < underBack ? Front : Back;
-			Uint8 colour = drawnColour(k, first, painting);
+			Uint8 colour = 0;
+			if (hull)
+			{
+				// (how squarely each drawing's camera, HullCameraUp above the ground, looks onto the voxel's outward side)
+				float best = -1e9f;
+				for (int d = 0; d < 8; ++d)
+				{
+					float nearness;
+					const size_t pixel = slantPixel(k, d, nearness);
+					if (nearness < seenSkin[d][pixel] - HullSkinDepth) continue;
+					const float square = fit[d] * 0.70710678f * HullCameraAlong + out[2] * HullCameraUp;
+					if (square <= best) continue;
+					if (const Uint8 drawn = drawnColour(k, d, 1)) { colour = drawn; best = square; }
+				}
+				for (int i = 0; i < 8 && !colour; ++i) colour = drawnColour(k, order[i], 1);
+			}
+			if (!colour) colour = drawnColour(k, first, painting);
 			if (!colour) colour = drawnColour(k, first == Front ? Back : Front, painting);
 			for (int i = 0; i < 8 && !colour; ++i) colour = drawnColour(k, order[i], painting);
 			for (int i = 0; i < 8 && !colour; ++i) colour = drawnColour(k, order[i], 1 - painting);
