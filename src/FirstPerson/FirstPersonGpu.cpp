@@ -2128,6 +2128,7 @@ bool FirstPersonGpu::State::buildEffects()
 	number("FlareShadowWidening", FlareShadowWidening);
 	whole("UnitVeilMax", UnitVeilMax);
 	whole("SmokeNightBrightest", SmokeNightBrightest);
+	whole("SmokeNightDarkest", SmokeNightDarkest);
 	whole("SeeThroughLevels", 16);
 	whole("EffectTexels", Effects::Texels);
 	whole("EffectBin", Effects::Bin);
@@ -3287,6 +3288,7 @@ bool FirstPersonGpu::State::drawEffects(const Effects &effects, const Output &ou
 	Gl::Uniform1i(location("uContinue"), 0);
 	// Futuristic night vision's colour group + 1 (0: any other time): a see-through picture that keeps its colours is mixed over that.
 	Gl::Uniform1i(location("uOwnOverNight"), effects.ownColours ? effects.nightVision : 0);
+	Gl::Uniform1i(location("uSmokeNight"), effects.nightVision); // (smoke through the goggles is mixed in their colours: see SmokeNightBrightest)
 	Gl::Uniform1i(location("uFirstPrim"), 0);
 	Gl::Uniform1i(location("uEndPrim"), goes == 2 ? effects.outlineAt : primitives);
 	Gl::Uniform1i(location("uOutlineCount"), 0);
@@ -3321,7 +3323,6 @@ bool FirstPersonGpu::State::drawEffects(const Effects &effects, const Output &ou
 		Gl::Uniform1f(location("uOutlineOpacity"), effects.outlineOpacity);
 		Gl::Uniform1f(location("uOutlineSlack"), effects.outlineSlack);
 		Gl::Uniform1i(location("uOutlineGlows"), effects.outlineGlows ? 1 : 0);
-		Gl::Uniform1i(location("uSmokeNight"), effects.nightVision);
 		drawOver(4);
 	}
 	program = raysProgram;

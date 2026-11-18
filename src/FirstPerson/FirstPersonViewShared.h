@@ -270,11 +270,12 @@ const double MaxPitch = 89.0;
 /// See-through smoke over a unit the soldier sees veils it by at most this many see-through steps
 /// (of FirstPersonView::SeeThroughLevels) in all, however much smoke lies in front: it stays clear.
 const int UnitVeilMax = 5;
-/// Through night vision smoke is no brighter than this shade of the goggles' colours (0 brightest .. 15 darkest), and is
-/// mixed in those colours (see drawSprite): mixed over the world in the palette's own, its soft edges came out as
-/// whatever colour lay nearest, and the goggles showed each by its shade alone: bright green rings round every puff
-/// (a player, GitHub issue #183: "neon green halos ... thinking it's an energy aura").
-const int SmokeNightBrightest = 7;
+/// Through night vision smoke's shade (0 brightest .. 15 darkest, of the goggles' colours) is kept between these, and is
+/// mixed with the shade of what is behind it by the numbers (see drawSprite). Mixed by the see-through tables, it came
+/// out as the nearest colour of any group, and the goggles show a colour by its shade alone, which says nothing of how
+/// bright that colour was: dark smoke over a dark night glowed in bright green swirls and rings (a player, GitHub issue
+/// #183: "neon green halos ... thinking it's an energy aura").
+const int SmokeNightBrightest = 7, SmokeNightDarkest = 12;
 /// The see-through smoke keeps this share of its colours (the rest turned to grey; see softSmokeFrame).
 const float SmokeColorKept = 0.35f;
 /// Where the night value takes over by day, by the game's shade where the smoke hangs (0
