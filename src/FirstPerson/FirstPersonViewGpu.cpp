@@ -167,7 +167,7 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 	// and so has an eye's picture.)
 	frame.pixelSize = scale > 1 || view._eyePass || width * height <= SmallViewPixels || Options::fpsPixelSize == 0 ? 1 : std::clamp(Options::fpsPixelSize, 1, 3);
 	frame.rayScale = scale > 1 ? 1.0f : 100.0f / view.renderScalePercent();
-	frame.goggles = view._nightVision != 0;
+	frame.goggles = view._nightVision;
 	frame.ghostScale = std::clamp(Options::fpsGhostOpacity, 10, 100) / (GhostNearOpacity * 100.0f);
 	frame.seeThroughCrops = Options::fpsSeeThroughCrops;
 	// The scene, as shadeHit and colorOutsideMap read it.
