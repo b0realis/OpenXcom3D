@@ -80,8 +80,9 @@ constexpr int PartCount = 6, BodyParts = 4, RightItem = 4, LeftItem = 5;
 /// the walkers among them, and the creatures: Silacoid, Celatid, Biodrone, Tentaculat); and how it walks: whether its
 /// legs swing (a one-frame walker's: its body below the hip), whether its free arms do, and the torso's bob (the
 /// routine's own, as the game draws its walk: drawRoutine0's tables for 0, 10, 13-15, drawRoutine6's for the Snakeman;
-/// the big walkers' once a footfall).
-struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; };
+/// the big walkers' once a footfall). Still: the unit can't move (its armour's allowsMoving: false; set for the unit
+/// being made, not in the routines' table): a big one is a turret, mounted on a vehicle.
+struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; };
 /// The routine's way of drawing, or null for one not given a voxel body.
 const Routine *routineFor(int number);
 

@@ -29,6 +29,7 @@ struct FineBodySource
 	std::vector<Uint8> walkLegs[8][2], walkArms[8][2][2];
 	bool walkAny = false, aiming = false;
 	int routine = 0;
+	bool still = false; // (it can't move: see Routine)
 };
 
 /// Makes a body twice as fine from a unit's frames; null if it has no torso (or its routine has no bodies).

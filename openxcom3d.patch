@@ -84203,10 +84203,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..08b74fdb4
+index 000000000..14b996533
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,2732 @@
+@@ -0,0 +1,2737 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -84495,7 +84495,7 @@ index 000000000..08b74fdb4
 +	return kept;
 +}
 +
-+/// A hull's shape (a big unit that doesn't walk: a tank, a turret, a disc), made a plain block. Its 8 frames are all
++/// A turret's shape (a big unit that can't move, mounted on a vehicle: see makeModel), made a plain block. Its 8 frames are all
 +/// drawn from the same height above it, so what they leave of it (see carve) carries a cone on its roof and one under
 +/// its belly, each as high as a third of its width: a flat turret came out a spinning top. Its slab is what's between
 +/// the lowest level its roof can be cut to and the highest its belly can, with every frame's drawn pixels still having
@@ -86319,6 +86319,11 @@ index 000000000..08b74fdb4
 +	// (a hull: a big unit that doesn't walk. One drawn by a walker's routine but without walk frames is a hull too: XPiratez's
 +	// truck turret, a turret drawn by the Sectopod's routine that never moves.)
 +	const bool bigHull = routine.big && !(routine.legsSwing && walks.any);
++	// (A turret: two tiles by two and unable to move, mounted on a vehicle. It alone is made a plain block and painted
++	// from all eight drawings (see levelOff): the owner, "leave all units as before only the turrets (2x2) that cant
++	// move make as simple shapes decorated from sprites and plop them on top of respective vehicles". Tanks, hover
++	// tanks and the Cyberdisc keep the shape their eight drawings leave.)
++	const bool turret = routine.big && routine.still;
 +	SlantOnly = routine.big && !bigHull;
 +	std::vector<int> onTop[8], solidOnTop[8];
 +	partsOnTop(parts, composite, onTop);
@@ -86351,7 +86356,7 @@ index 000000000..08b74fdb4
 +		// agree, and a strict hull of them lost its shell and horns)
 +		const std::vector<Uint8> shape = routine.big ? std::vector<Uint8>(GridCells, 1) : limb(solid, RightSide);
 +		std::vector<Uint8> hull = carve(solid, bigHull ? 0 : 1, shape);
-+		if (bigHull) levelOff(solid, hull);
++		if (turret) levelOff(solid, hull);
 +		for (int i = 0; i < GridCells; ++i) if (shape[i] && hull[i]) owner[i] = PartCodes[0];
 +	}
 +	else
@@ -86767,11 +86772,11 @@ index 000000000..08b74fdb4
 +			float &back = backSkin[pixelAt(k, Back, nearness)];
 +			back = std::max(back, nearness);
 +		}
-+		// (A hull, a big unit that doesn't walk: a tank, a turret, a disc. Its drawings show it from above, all round, and
++		// (A turret, see above. Its drawings show it from above, all round, and
 +		// its shape is read along that slant (see carve, levelOff): each of its voxels takes its pixel of the drawing that
 +		// sees it best, of all eight, thrown along the slant onto the skin that drawing sees. So from where a drawing was
 +		// made the body shows that drawing, cube for pixel. The skin each drawing sees: the nearest voxel on each pixel.)
-+		const bool hull = bigHull;
++		const bool hull = turret;
 +		std::vector<float> seenSkin[8];
 +		auto slantPixel = [&](size_t k, int d, float &nearness) -> size_t {
 +			float column, row;
@@ -86941,10 +86946,10 @@ index 000000000..08b74fdb4
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.h b/src/FirstPerson/FirstPersonVoxelBodies.h
 new file mode 100644
-index 000000000..505deb2a7
+index 000000000..1f37f1533
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.h
-@@ -0,0 +1,132 @@
+@@ -0,0 +1,133 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -87027,8 +87032,9 @@ index 000000000..505deb2a7
 +/// the walkers among them, and the creatures: Silacoid, Celatid, Biodrone, Tentaculat); and how it walks: whether its
 +/// legs swing (a one-frame walker's: its body below the hip), whether its free arms do, and the torso's bob (the
 +/// routine's own, as the game draws its walk: drawRoutine0's tables for 0, 10, 13-15, drawRoutine6's for the Snakeman;
-+/// the big walkers' once a footfall).
-+struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; };
++/// the big walkers' once a footfall). Still: the unit can't move (its armour's allowsMoving: false; set for the unit
++/// being made, not in the routines' table): a big one is a turret, mounted on a vehicle.
++struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; };
 +/// The routine's way of drawing, or null for one not given a voxel body.
 +const Routine *routineFor(int number);
 +
@@ -87079,10 +87085,10 @@ index 000000000..505deb2a7
 +}
 diff --git a/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp b/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp
 new file mode 100644
-index 000000000..1cebd94ec
+index 000000000..7364d57dd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp
-@@ -0,0 +1,95 @@
+@@ -0,0 +1,97 @@
 +/*
 + * FirstPersonVoxelBodiesFine.cpp: the voxel bodies' builder a second time, twice as fine (see
 + * FirstPersonVoxelBodiesFine.h): the same source, FirstPersonVoxelBodies.cpp, with VOXELSCALE 2 and under a name of its
@@ -87172,7 +87178,9 @@ index 000000000..1cebd94ec
 +			for (int side = 0; side < 2; ++side) walks.arms[phase][view][side] = enlarged(source.walkArms[phase][view][side]);
 +		}
 +	}
-+	std::unique_ptr<VoxelUnitModel> model = makeModel(parts, composite, items, deaths, corpse, lying, walks, source.aiming, *routine, palette);
++	Routine made = *routine;
++	made.still = source.still;
++	std::unique_ptr<VoxelUnitModel> model = makeModel(parts, composite, items, deaths, corpse, lying, walks, source.aiming, made, palette);
 +	if (model) model->unit = 1.0f / VOXELSCALE;
 +	return model;
 +}
@@ -87180,10 +87188,10 @@ index 000000000..1cebd94ec
 +}
 diff --git a/src/FirstPerson/FirstPersonVoxelBodiesFine.h b/src/FirstPerson/FirstPersonVoxelBodiesFine.h
 new file mode 100644
-index 000000000..bca7476ef
+index 000000000..ab877746e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodiesFine.h
-@@ -0,0 +1,37 @@
+@@ -0,0 +1,38 @@
 +#pragma once
 +/*
 + * FirstPersonVoxelBodiesFine.h: the voxel bodies made twice as fine (see FineBodies): the builder of
@@ -87215,6 +87223,7 @@ index 000000000..bca7476ef
 +	std::vector<Uint8> walkLegs[8][2], walkArms[8][2][2];
 +	bool walkAny = false, aiming = false;
 +	int routine = 0;
++	bool still = false; // (it can't move: see Routine)
 +};
 +
 +/// Makes a body twice as fine from a unit's frames; null if it has no torso (or its routine has no bodies).
@@ -87548,10 +87557,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..6e339146e
+index 000000000..39702079a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,749 @@
+@@ -0,0 +1,754 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -87660,6 +87669,7 @@ index 000000000..6e339146e
 +	HeldItem lying; // (the corpse's inventory picture: the body lying)
 +	WalkFrames walks;
 +	bool aiming = false;
++	bool still = false; // (it can't move: see Routine)
 +	bool fine = false; // (made twice as fine: see FineBodies)
 +	const Routine *routine = nullptr;
 +	int unitId = 0, status = 0; // (the unit's, for dump's file names)
@@ -88008,6 +88018,7 @@ index 000000000..6e339146e
 +		job->lying = std::move(lying);
 +		job->walks = std::move(walks);
 +		job->aiming = aiming;
++		job->still = !unit->getArmor()->allowsMoving();
 +		job->fine = FineBodies;
 +		job->routine = routine;
 +		std::copy(palette, palette + 256, job->palette);
@@ -88191,12 +88202,15 @@ index 000000000..6e339146e
 +				}
 +			source.walkAny = job->walks.any;
 +			source.aiming = job->aiming;
++			source.still = job->still;
 +			source.routine = job->routine->number;
 +			model = makeFineModel(source, job->palette);
 +		}
 +		else
 +		{
-+			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->lying, job->walks, job->aiming, *job->routine, job->palette);
++			Routine routine = *job->routine;
++			routine.still = job->still;
++			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->lying, job->walks, job->aiming, routine, job->palette);
 +		}
 +		if (const char *folder = std::getenv("OXC3D_VOXELDUMP")) dump(*job, model.get(), folder);
 +		std::lock_guard<std::mutex> lock(_mutex);

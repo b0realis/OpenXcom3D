@@ -106,6 +106,7 @@ struct VoxelUnits::Job
 	HeldItem lying; // (the corpse's inventory picture: the body lying)
 	WalkFrames walks;
 	bool aiming = false;
+	bool still = false; // (it can't move: see Routine)
 	bool fine = false; // (made twice as fine: see FineBodies)
 	const Routine *routine = nullptr;
 	int unitId = 0, status = 0; // (the unit's, for dump's file names)
@@ -454,6 +455,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		job->lying = std::move(lying);
 		job->walks = std::move(walks);
 		job->aiming = aiming;
+		job->still = !unit->getArmor()->allowsMoving();
 		job->fine = FineBodies;
 		job->routine = routine;
 		std::copy(palette, palette + 256, job->palette);
@@ -637,12 +639,15 @@ void VoxelUnits::build()
 				}
 			source.walkAny = job->walks.any;
 			source.aiming = job->aiming;
+			source.still = job->still;
 			source.routine = job->routine->number;
 			model = makeFineModel(source, job->palette);
 		}
 		else
 		{
-			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->lying, job->walks, job->aiming, *job->routine, job->palette);
+			Routine routine = *job->routine;
+			routine.still = job->still;
+			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->lying, job->walks, job->aiming, routine, job->palette);
 		}
 		if (const char *folder = std::getenv("OXC3D_VOXELDUMP")) dump(*job, model.get(), folder);
 		std::lock_guard<std::mutex> lock(_mutex);

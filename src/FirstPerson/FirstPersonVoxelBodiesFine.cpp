@@ -87,7 +87,9 @@ std::unique_ptr<VoxelUnitModel> makeFineModel(const FineBodySource &source, cons
 			for (int side = 0; side < 2; ++side) walks.arms[phase][view][side] = enlarged(source.walkArms[phase][view][side]);
 		}
 	}
-	std::unique_ptr<VoxelUnitModel> model = makeModel(parts, composite, items, deaths, corpse, lying, walks, source.aiming, *routine, palette);
+	Routine made = *routine;
+	made.still = source.still;
+	std::unique_ptr<VoxelUnitModel> model = makeModel(parts, composite, items, deaths, corpse, lying, walks, source.aiming, made, palette);
 	if (model) model->unit = 1.0f / VOXELSCALE;
 	return model;
 }

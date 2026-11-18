@@ -286,7 +286,7 @@ std::vector<Uint8> carve(const PartFrames &part, int tolerance, const std::vecto
 	return kept;
 }
 
-/// A hull's shape (a big unit that doesn't walk: a tank, a turret, a disc), made a plain block. Its 8 frames are all
+/// A turret's shape (a big unit that can't move, mounted on a vehicle: see makeModel), made a plain block. Its 8 frames are all
 /// drawn from the same height above it, so what they leave of it (see carve) carries a cone on its roof and one under
 /// its belly, each as high as a third of its width: a flat turret came out a spinning top. Its slab is what's between
 /// the lowest level its roof can be cut to and the highest its belly can, with every frame's drawn pixels still having
@@ -2110,6 +2110,11 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	// (a hull: a big unit that doesn't walk. One drawn by a walker's routine but without walk frames is a hull too: XPiratez's
 	// truck turret, a turret drawn by the Sectopod's routine that never moves.)
 	const bool bigHull = routine.big && !(routine.legsSwing && walks.any);
+	// (A turret: two tiles by two and unable to move, mounted on a vehicle. It alone is made a plain block and painted
+	// from all eight drawings (see levelOff): the owner, "leave all units as before only the turrets (2x2) that cant
+	// move make as simple shapes decorated from sprites and plop them on top of respective vehicles". Tanks, hover
+	// tanks and the Cyberdisc keep the shape their eight drawings leave.)
+	const bool turret = routine.big && routine.still;
 	SlantOnly = routine.big && !bigHull;
 	std::vector<int> onTop[8], solidOnTop[8];
 	partsOnTop(parts, composite, onTop);
@@ -2142,7 +2147,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		// agree, and a strict hull of them lost its shell and horns)
 		const std::vector<Uint8> shape = routine.big ? std::vector<Uint8>(GridCells, 1) : limb(solid, RightSide);
 		std::vector<Uint8> hull = carve(solid, bigHull ? 0 : 1, shape);
-		if (bigHull) levelOff(solid, hull);
+		if (turret) levelOff(solid, hull);
 		for (int i = 0; i < GridCells; ++i) if (shape[i] && hull[i]) owner[i] = PartCodes[0];
 	}
 	else
@@ -2558,11 +2563,11 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 			float &back = backSkin[pixelAt(k, Back, nearness)];
 			back = std::max(back, nearness);
 		}
-		// (A hull, a big unit that doesn't walk: a tank, a turret, a disc. Its drawings show it from above, all round, and
+		// (A turret, see above. Its drawings show it from above, all round, and
 		// its shape is read along that slant (see carve, levelOff): each of its voxels takes its pixel of the drawing that
 		// sees it best, of all eight, thrown along the slant onto the skin that drawing sees. So from where a drawing was
 		// made the body shows that drawing, cube for pixel. The skin each drawing sees: the nearest voxel on each pixel.)
-		const bool hull = bigHull;
+		const bool hull = turret;
 		std::vector<float> seenSkin[8];
 		auto slantPixel = [&](size_t k, int d, float &nearness) -> size_t {
 			float column, row;
