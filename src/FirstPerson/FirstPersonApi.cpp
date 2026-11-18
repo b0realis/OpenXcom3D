@@ -47,6 +47,9 @@
  * and its 3D VIEW options tab.
  */
 #include "FirstPersonApi.h"
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include "../Engine/Screen.h"
 #include "../Engine/Surface.h"
 #include <algorithm>
@@ -54,6 +57,7 @@
 #include "FirstPersonMode.h"
 #include "OptionsFirstPersonState.h"
 #include "../Engine/Game.h"
+#include "../Engine/Logger.h"
 #include "../Engine/OptionInfo.h"
 #include "../Engine/Options.h"
 #include "../Battlescape/BattlescapeState.h"
@@ -76,6 +80,15 @@ namespace FirstPerson
 namespace
 {
 
+/// The Meta Quest build (Android): a few settings start otherwise there (its CPU; the owner's choices).
+#ifdef __ANDROID__
+const bool QuestBuild = true;
+#else
+const bool QuestBuild = false;
+#endif
+/// The Quest build (its version code) whose changed defaults optionsLoaded sets once on a profile from before it.
+const int QuestDefaultsVersion = 124;
+
 /**
  * Whether a battle with the mod's 3D view is on: its mode made (see create) and not yet
  * destroyed. For the rule fixes that come with the mod (see keepsFacingOnOwnTile), which units
@@ -86,6 +99,28 @@ bool &battleWithView()
 {
 	static bool on = false;
 	return on;
+}
+
+/**
+ * A key option of the add-on's, as the build's SDL has it: SDL 1.2's key code is a type of its
+ * own (OptionInfo takes it as a key), SDL2's a plain number, which OptionInfo would take for a
+ * number setting (the Controls list wouldn't show it, the Settings list would, as a number); the
+ * SDL2 build's core has KeyOptionInfo for keys.
+ * @param owner Whose option it is.
+ * @param id Its name in options.cfg.
+ * @param key The key it sets.
+ * @param def Its default key.
+ * @param desc Its description's string.
+ * @param cat Its category's string.
+ * @return The option.
+ */
+OptionInfo keyOption(OptionOwner owner, const std::string &id, SDL_Keycode *key, SDL_Keycode def, const std::string &desc, const std::string &cat)
+{
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	return KeyOptionInfo(owner, id, key, def, desc, cat);
+#else
+	return OptionInfo(owner, id, key, def, desc, cat);
+#endif
 }
 
 }
@@ -450,6 +485,7 @@ struct Presets
 	const std::vector<PresetSwitch> &(*switches)();
 };
 
+// Thanks mumble for your dedication and work.
 /**
  * The settings the gameplay presets set (setting "Gameplay", the first page of the 3D VIEW tab;
  * after GitHub issue #168, each keeping what the one before it set unless it says otherwise),
@@ -720,6 +756,70 @@ void rendererChanged()
 }
 
 /**
+ * Called once the player's options are read (Options::init, before the game saves them at its
+ * start): on the Meta Quest build, the defaults that changed in build 115 (the owner's choice:
+ * "VR eye picture" 460x500, "Sprite upscaling" Smooth+) are set once on a profile from
+ * before (a profile keeps every value it saved, the old defaults too); the unlisted
+ * fpsQuestDefaults then says so, and the player's own choices after that stay. Elsewhere nothing.
+ * Also on that build: the add-on's diagnostic switches, which a desktop takes from the environment
+ * (OPENXCOM3D_GPU_STAGES, OPENXCOM3D_GPU_TIMING, OPENXCOM3D_PASS_TIME, OPENXCOM3D_GPU_EFFECTS...), from a file an Android
+ * app can be given: the profile folder's environment.txt, a NAME=VALUE a line, only names starting
+ * OPENXCOM3D_. No file: nothing set.
+ */
+void optionsLoaded()
+{
+#ifdef __ANDROID__
+	if (FILE *file = std::fopen((Options::getMasterUserFolder() + "environment.txt").c_str(), "r"))
+	{
+		char line[256];
+		while (std::fgets(line, sizeof(line), file))
+		{
+			line[std::strcspn(line, "\r\n")] = 0;
+			char *equals = std::strchr(line, '=');
+			if (equals && std::strncmp(line, "OPENXCOM3D_", 11) == 0)
+			{
+				*equals = 0;
+				setenv(line, equals + 1, 1);
+				Log(LOG_INFO) << "OpenXcom3D: environment.txt sets " << line << " to " << equals + 1;
+			}
+		}
+		std::fclose(file);
+	}
+	if (Options::fpsQuestDefaults < QuestDefaultsVersion)
+	{
+		// The Quest's preset, set once when a build with a newer one first runs (the player changes what they like
+		// after). Build 124's is for the headset's graphics chip drawing the world: the sharpest picture that should
+		// still keep a decent frame rate there, by a Quest 3's log of build 121 (an eye of 460x500 took 6 to 27 ms with
+		// the chip at its low level). The eye is 710x770 with the rays thinned toward its edge (about a third of them
+		// cast, fewer than a plain 460x500 eye's), smoothed twice as big by the chip (1420x1540, near the headset's own
+		// 1680x1760), kept on the card and in full colour; what costs most for least (several rays a pixel, soft and
+		// extra shadows, ambient occlusion, light shafts, reflections) is off, and so are voxel units, whose bodies the
+		// CPU draws (the eyes would come back from the card).
+		Options::fpsRenderer = 1;          // GPU
+		Options::fpsVrCardEyes = true;
+		Options::fpsVrEyeSize = 2;         // 710x770
+		Options::fpsVrFoveation = 1;       // Light
+		Options::fpsVrSmoothing = true;
+		Options::fpsTrueColor = true;
+		Options::fpsSmoothLight = true;
+		Options::fpsColoredLights = true;
+		Options::fpsSupersampling = 0;
+		Options::fpsSoftShadows = false;
+		Options::fpsAllLightShadows = false;
+		Options::fpsAmbientOcclusion = false;
+		Options::fpsLightShafts = false;
+		Options::fpsReflections = false;
+		Options::fpsVoxelUnits = false;
+		Options::fpsSpriteUpscale = 2;     // Smooth+
+		Options::fpsQuestDefaults = QuestDefaultsVersion;
+		Log(LOG_INFO) << "OpenXcom3D: the Quest build " << QuestDefaultsVersion << "'s preset, set once: Renderer GPU, VR eye picture 710x770 with VR foveation Light and VR smoothing, "
+			"eyes kept on the card in True colour with Smooth light and Coloured lights; Supersampling, Soft sun shadows, Shadows from every light, Ambient occlusion, "
+			"Light shafts, Reflections and Voxel units off; sprite upscaling Smooth+";
+	}
+#endif
+}
+
+/**
  * Settles the presets with the settings as they are (a profile from before them, or one edited
  * by hand): each group says the preset its settings make, or Custom, keeping them as the mix.
  * Nothing but the two names changes: no setting of the player's is touched.
@@ -964,9 +1064,13 @@ void createOptions(std::vector<OptionInfo> &options)
 	// UFOs with steady hulls, glowing lights, coloured light and an aura, and the pixel size
 	// (1 to 3: one ray colours a block of pixels that wide and high, for speed).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsViewModel", &fpsViewModel, true, "STR_FPS_VIEW_MODEL", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsSpriteUpscale", &fpsSpriteUpscale, 3, "STR_FPS_SPRITE_UPSCALE", category));
+	// (The Quest build starts at Smooth+, 2: the owner's choice for its CPU, build 115.)
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSpriteUpscale", &fpsSpriteUpscale, QuestBuild ? 2 : 3, "STR_FPS_SPRITE_UPSCALE", category));
 	// Soldiers' and aliens' sprites a little smaller (80 to 100% of the isometric map's size).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsUnitSize", &fpsUnitSize, 100, "STR_FPS_UNIT_SIZE", category));
+	// Units (one tile big or two by two) as 3D bodies made from their own sprites (see VoxelUnits; the owner's sub-project).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsVoxelUnits", &fpsVoxelUnits, false, "STR_FPS_VOXEL_UNITS", category));
+	// The bodies twice as fine: a quarter of a voxel a cell, from the sprites enlarged twice (the owner: "Lets go with 2x").
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMuzzleFlash", &fpsMuzzleFlash, true, "STR_FPS_MUZZLE_FLASH", category));
 	// A unit hit, standing or down, flashes for a moment (the owner, on GitHub issue #74: its own
 	// setting); off, it only flinches. "Muzzle flashes" off turns it off too (every flash: the
@@ -1024,6 +1128,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsReflections", &fpsReflections, false, "STR_FPS_REFLECTIONS", category));
 	// In full colour: the flashlight, flares, lamps and coloured lights show as beams and glows in smoke and under the sea.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsLightShafts", &fpsLightShafts, false, "STR_FPS_LIGHT_SHAFTS", category));
+	// VR with "Renderer": GPU, on a headset: the eyes' pictures stay on the graphics card and go to the headset's display
+	// from there (nothing read back, nothing uploaded again). NO: read back and uploaded, as the CPU's eyes are.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsVrCardEyes", &fpsVrCardEyes, true, "STR_FPS_VR_CARD_EYES", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsPixelSize", &fpsPixelSize, 1, "STR_FPS_PIXEL_SIZE", category));
 	// The crosshair: shown or not, the shot info under it, aiming at the exact point under it
 	// (YES) or at the tile, as the original game does (NO), and the units' hitboxes.
@@ -1137,6 +1244,36 @@ void createOptions(std::vector<OptionInfo> &options)
 	// Doom mode plus noclip (a player's request, GitHub issue #45): in 3D the soldier walks and
 	// floats through walls, objects, doors and floors, and X-COM's units don't fall.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomIdclip", &fpsDoomIdclip, false, "STR_FPS_DOOM_IDCLIP", category));
+	// VR mode (the Meta Quest 3 port; the owner: "These settings should be all under VR mode on/off!"): off (0, the
+	// desktop's default: nothing changes anywhere), on (1: the VR rules, see FirstPersonModeVr.cpp: the head looks
+	// anywhere, the soldier following past 45 degrees at the game's turning cost, tile moves as quick steps, free
+	// walking slower, nothing moving the view but the head; the Quest build switches it on, its OpenXR shell drawing
+	// the eyes), or on with the desktop's VR preview (2: both eyes side by side, the HUD over them at its depth, the
+	// mouse as the head). Last in the list, so no row of the tab before it moves.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsVrMode", &fpsVrMode, 0, "STR_FPS_VR_MODE", category));
+	// ...and each eye's picture: 360x390 (0), 460x500 (1) or 710x770 (2) pixels (the study's sizes for the Quest 3's
+	// CPU: about 2.8, 3.6 and 5.6 pixels a degree). The Quest build starts at 460x500 (the owner's choice, build 115).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsVrEyeSize", &fpsVrEyeSize, QuestBuild ? 1 : 0, "STR_FPS_VR_EYE_SIZE", category));
+#ifdef __ANDROID__
+	// The Meta Quest build's defaults a profile has had (the build's version code; 0: none yet), unlisted: see
+	// optionsLoaded.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsQuestDefaults", &fpsQuestDefaults, 0, "", "STR_FIRST_PERSON_SAVED"));
+#endif
+	// ...and the weapon in hand in VR (the owner: "should be a setting VR weapon on/off !!!"): YES, drawn in each eye as a
+	// 3D object at its true depth, where the desktop's "Weapon in hand" puts it; NO, no weapon in VR at all (neither in
+	// the eyes nor on the HUD). The desktop's own setting still rules the flat view.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsVrWeapon", &fpsVrWeapon, true, "STR_FPS_VR_WEAPON", category));
+	// ...how the right stick turns the soldier (the owner: only the stick turns him, not the head nor the controller):
+	// 0 Smooth (the default; VrSmoothTurnRate at full tilt), 1 Snap (45 degree steps); either way the world turns round
+	// the player...
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsVrTurning", &fpsVrTurning, 0, "STR_FPS_VR_TURNING", category));
+	// ...and the laser from the weapon's muzzle to where it points (YES), the crosshair at that point either way.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsVrLaser", &fpsVrLaser, true, "STR_FPS_VR_LASER", category));
+	// ...and the eyes' pictures smoothed by the headset's graphics chip (the owner: "the blocky look is hard on the eyes"):
+	// YES, each eye's picture drawn three times bigger with an edge-smoothing filter (FirstPersonXrSmoothing.cpp); NO,
+	// the pixels as they are. Last in the VR section, so no row above it moves.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsVrSmoothing", &fpsVrSmoothing, true, "STR_FPS_VR_SMOOTHING", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsVrFoveation", &fpsVrFoveation, 0, "STR_FPS_VR_FOVEATION", category));
 	// Doom mode's real-time grenades: armed as they're thrown, burning from leaving the hand (YES), or primed with a click and
 	// burning in the hand (NO, "cooking");
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDoomPrimeOnThrow", &fpsDoomPrimeOnThrow, true, "STR_FPS_DOOM_PRIME_ON_THROW", category));
@@ -1147,81 +1284,81 @@ void createOptions(std::vector<OptionInfo> &options)
 
 	// The add-on's own keys, in the order the Controls list shows them, with their default keys.
 	// Switching views, freeing the cursor from mouse look, and showing the classic HUD.
-	options.push_back(OptionInfo(OPTION_OTHER, "keyBattleFirstPerson", &keyBattleFirstPerson, SDLK_F8, "STR_FPS_KEY_TOGGLE_VIEW", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyBattleFirstPerson", &keyBattleFirstPerson, SDLK_F8, "STR_FPS_KEY_TOGGLE_VIEW", category));
 	// (A second key for it, under the left hand: GitHub issue #167. The auto shot, which had V, has no key of its own
 	// by default now: the wheel and the next fire mode key reach it.)
-	options.push_back(OptionInfo(OPTION_OTHER, "keyBattleFirstPerson2", &keyBattleFirstPerson2, SDLK_v, "STR_FPS_KEY_TOGGLE_VIEW_2", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsMouseMode", &keyFpsMouseMode, SDLK_c, "STR_FPS_KEY_MOUSE_MODE", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsClassicHud", &keyFpsClassicHud, SDLK_h, "STR_FPS_KEY_CLASSIC_HUD", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsHideHud", &keyFpsHideHud, SDLK_p, "STR_FPS_KEY_HIDE_HUD", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyBattleFirstPerson2", &keyBattleFirstPerson2, SDLK_v, "STR_FPS_KEY_TOGGLE_VIEW_2", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsMouseMode", &keyFpsMouseMode, SDLK_c, "STR_FPS_KEY_MOUSE_MODE", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsClassicHud", &keyFpsClassicHud, SDLK_h, "STR_FPS_KEY_CLASSIC_HUD", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsHideHud", &keyFpsHideHud, SDLK_p, "STR_FPS_KEY_HIDE_HUD", category));
 	// Walking and strafing (W, A, S, D).
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsForward", &keyFpsForward, SDLK_w, "STR_FPS_KEY_FORWARD", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsBack", &keyFpsBack, SDLK_s, "STR_FPS_KEY_BACK", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsStrafeLeft", &keyFpsStrafeLeft, SDLK_a, "STR_FPS_KEY_STRAFE_LEFT", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsStrafeRight", &keyFpsStrafeRight, SDLK_d, "STR_FPS_KEY_STRAFE_RIGHT", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsForward", &keyFpsForward, SDLK_w, "STR_FPS_KEY_FORWARD", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsBack", &keyFpsBack, SDLK_s, "STR_FPS_KEY_BACK", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsStrafeLeft", &keyFpsStrafeLeft, SDLK_a, "STR_FPS_KEY_STRAFE_LEFT", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsStrafeRight", &keyFpsStrafeRight, SDLK_d, "STR_FPS_KEY_STRAFE_RIGHT", category));
 	// Turning and looking up and down with the keys (the arrows): the 3D view's own, not the map's
 	// scroll keys it used before (a player, GitHub issue #81: with the map scrolled on W, A, S, D,
 	// those keys walked and turned at once).
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsLookLeft", &keyFpsLookLeft, SDLK_LEFT, "STR_FPS_KEY_TURN_LEFT", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsLookRight", &keyFpsLookRight, SDLK_RIGHT, "STR_FPS_KEY_TURN_RIGHT", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsLookUp", &keyFpsLookUp, SDLK_UP, "STR_FPS_KEY_LOOK_UP", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsLookDown", &keyFpsLookDown, SDLK_DOWN, "STR_FPS_KEY_LOOK_DOWN", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsLookLeft", &keyFpsLookLeft, SDLK_LEFT, "STR_FPS_KEY_TURN_LEFT", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsLookRight", &keyFpsLookRight, SDLK_RIGHT, "STR_FPS_KEY_TURN_RIGHT", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsLookUp", &keyFpsLookUp, SDLK_UP, "STR_FPS_KEY_LOOK_UP", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsLookDown", &keyFpsLookDown, SDLK_DOWN, "STR_FPS_KEY_LOOK_DOWN", category));
 	// Two ways of walking, each on and off with its key: sprinting (the game's run; Caps Lock,
 	// Doom's own "always run" key; it walks on past enemies coming into sight too) and en passant
 	// (walking on past them, as Shift does on the map; the key left of 1, as Shift is the lean key).
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsSprint", &keyFpsSprint, SDLK_CAPSLOCK, "STR_FPS_KEY_SPRINT", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsEnPassant", &keyFpsEnPassant, SDLK_BACKQUOTE, "STR_FPS_KEY_EN_PASSANT", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsSprint", &keyFpsSprint, SDLK_CAPSLOCK, "STR_FPS_KEY_SPRINT", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsEnPassant", &keyFpsEnPassant, SDLK_BACKQUOTE, "STR_FPS_KEY_EN_PASSANT", category));
 	// Fire modes (the next one, or snap, aimed and auto directly) and switching hands. The next
 	// fire mode is J (the game's "reserve TUs for kneel", which keeps it on the map), as F is the
 	// flashlight. (1.0 saved it as keyFpsNextMode, on F: the new name leaves F behind, and a key
 	// the player had picked instead carries over, see settleOptions.)
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsNextFireMode", &keyFpsNextFireMode, SDLK_j, "STR_FPS_KEY_NEXT_MODE", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsNextMode", &keyFpsNextMode, SDLK_f, "STR_FPS_KEY_NEXT_MODE", "STR_FIRST_PERSON_SAVED"));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsModeSnap", &keyFpsModeSnap, SDLK_z, "STR_FPS_KEY_MODE_SNAP", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsModeAimed", &keyFpsModeAimed, SDLK_x, "STR_FPS_KEY_MODE_AIMED", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsModeAuto", &keyFpsModeAuto, SDLK_UNKNOWN, "STR_FPS_KEY_MODE_AUTO", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsSwitchHand", &keyFpsSwitchHand, SDLK_g, "STR_FPS_KEY_SWITCH_HAND", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsNextFireMode", &keyFpsNextFireMode, SDLK_j, "STR_FPS_KEY_NEXT_MODE", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsNextMode", &keyFpsNextMode, SDLK_f, "STR_FPS_KEY_NEXT_MODE", "STR_FIRST_PERSON_SAVED"));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsModeSnap", &keyFpsModeSnap, SDLK_z, "STR_FPS_KEY_MODE_SNAP", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsModeAimed", &keyFpsModeAimed, SDLK_x, "STR_FPS_KEY_MODE_AIMED", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsModeAuto", &keyFpsModeAuto, SDLK_UNKNOWN, "STR_FPS_KEY_MODE_AUTO", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsSwitchHand", &keyFpsSwitchHand, SDLK_g, "STR_FPS_KEY_SWITCH_HAND", category));
 	// Akimbo on and off in battle (Y: one of the letters the battlescape leaves free).
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsAkimbo", &keyFpsAkimbo, SDLK_y, "STR_FPS_KEY_AKIMBO", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsAkimbo", &keyFpsAkimbo, SDLK_y, "STR_FPS_KEY_AKIMBO", category));
 	// Akimbo's style, both at once or in turn (setting "Akimbo in turn"): unbound unless the player binds one.
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsAkimboStyle", &keyFpsAkimboStyle, SDLK_UNKNOWN, "STR_FPS_KEY_AKIMBO_STYLE", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsAkimboStyle", &keyFpsAkimboStyle, SDLK_UNKNOWN, "STR_FPS_KEY_AKIMBO_STYLE", category));
 	// Turning 45 degrees at a time, without stepping (comma and period: "<" and ">").
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsTurnLeft", &keyFpsTurnLeft, SDLK_COMMA, "STR_FPS_KEY_SNAP_LEFT", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsTurnRight", &keyFpsTurnRight, SDLK_PERIOD, "STR_FPS_KEY_SNAP_RIGHT", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsTurnLeft", &keyFpsTurnLeft, SDLK_COMMA, "STR_FPS_KEY_SNAP_LEFT", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsTurnRight", &keyFpsTurnRight, SDLK_PERIOD, "STR_FPS_KEY_SNAP_RIGHT", category));
 	// Leaning out (setting "Lean"): the lean key held with a strafe key (Left Shift and A or D),
 	// so Q and E stay the game's hand keys; and a key of its own for each side, held, unbound
 	// unless the player binds one. (0.9's own lean keys, Q and E, were saved as keyFpsLeanLeft
 	// and keyFpsLeanRight: the new names leave those behind, so Q and E are the hands again.)
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsLeanHold", &keyFpsLeanHold, SDLK_LSHIFT, "STR_FPS_KEY_LEAN_HOLD", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsLeanLeftOwn", &keyFpsLeanLeftOwn, SDLK_UNKNOWN, "STR_FPS_KEY_LEAN_LEFT", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsLeanRightOwn", &keyFpsLeanRightOwn, SDLK_UNKNOWN, "STR_FPS_KEY_LEAN_RIGHT", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsLeanHold", &keyFpsLeanHold, SDLK_LSHIFT, "STR_FPS_KEY_LEAN_HOLD", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsLeanLeftOwn", &keyFpsLeanLeftOwn, SDLK_UNKNOWN, "STR_FPS_KEY_LEAN_LEFT", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsLeanRightOwn", &keyFpsLeanRightOwn, SDLK_UNKNOWN, "STR_FPS_KEY_LEAN_RIGHT", category));
 	// Opening doors (O, as E is the game's "use right hand"), flares, flight, jumping, night
 	// vision, going up and down a level, and doom mode.
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsOpenDoor", &keyFpsOpenDoor, SDLK_o, "STR_FPS_KEY_OPEN_DOOR", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsOpenDoor", &keyFpsOpenDoor, SDLK_o, "STR_FPS_KEY_OPEN_DOOR", category));
 	// Grabbing the item underfoot into a free hand, in 3D and on the map (GitHub issue #54): no key until
 	// the player gives it one (every letter is the game's or ours).
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsGrabItem", &keyFpsGrabItem, SDLK_UNKNOWN, "STR_FPS_KEY_GRAB_ITEM", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlare", &keyFpsFlare, SDLK_t, "STR_FPS_KEY_FLARE", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlight", &keyFpsFlight, SDLK_b, "STR_FPS_KEY_FLIGHT", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsGrabItem", &keyFpsGrabItem, SDLK_UNKNOWN, "STR_FPS_KEY_GRAB_ITEM", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsFlare", &keyFpsFlare, SDLK_t, "STR_FPS_KEY_FLARE", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsFlight", &keyFpsFlight, SDLK_b, "STR_FPS_KEY_FLIGHT", category));
 	// A tank's turret switch (a player's report: turning the view turned the whole tank, at its full
 	// cost; the TURRET button on the top bar too): no key until the player gives it one.
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsTurret", &keyFpsTurret, SDLK_UNKNOWN, "STR_FPS_KEY_TURRET", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsTurret", &keyFpsTurret, SDLK_UNKNOWN, "STR_FPS_KEY_TURRET", category));
 	// The flashlight on and off (F, as in the first-person shooters).
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsFlashlight", &keyFpsFlashlight, SDLK_f, "STR_FPS_KEY_FLASHLIGHT", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsFlashlight", &keyFpsFlashlight, SDLK_f, "STR_FPS_KEY_FLASHLIGHT", category));
 	// Space is the map's night vision hold key; in 3D it jumps, and night vision is gear (N).
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsJump", &keyFpsJump, SDLK_SPACE, "STR_FPS_KEY_JUMP", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsNightVision", &keyFpsNightVision, SDLK_n, "STR_FPS_KEY_NIGHT_VISION", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsJump", &keyFpsJump, SDLK_SPACE, "STR_FPS_KEY_JUMP", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsNightVision", &keyFpsNightVision, SDLK_n, "STR_FPS_KEY_NIGHT_VISION", category));
 	// Zoom, held (U: free in the game and the add-on).
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsZoom", &keyFpsZoom, SDLK_u, "STR_FPS_KEY_ZOOM", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsZoom", &keyFpsZoom, SDLK_u, "STR_FPS_KEY_ZOOM", category));
 	// The rangefinder on demand, held (setting "Rangefinder"; GitHub issue #139): no key until the
 	// player gives it one (every letter is taken by the game or the add-on).
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsRange", &keyFpsRange, SDLK_UNKNOWN, "STR_FPS_KEY_RANGE", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsRange", &keyFpsRange, SDLK_UNKNOWN, "STR_FPS_KEY_RANGE", category));
 	// Which way the units in sight face, held (Left Alt, as the map's own Alt shows its unit
 	// indicators): a ring with an arrow on the floor round each, over everything.
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsShowFacing", &keyFpsShowFacing, SDLK_LALT, "STR_FPS_KEY_SHOW_FACING", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsUp", &keyFpsUp, SDLK_PAGEUP, "STR_FPS_KEY_UP", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsDown", &keyFpsDown, SDLK_PAGEDOWN, "STR_FPS_KEY_DOWN", category));
-	options.push_back(OptionInfo(OPTION_OTHER, "keyFpsDoomMode", &keyFpsDoomMode, SDLK_INSERT, "STR_FPS_KEY_DOOM_MODE", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsShowFacing", &keyFpsShowFacing, SDLK_LALT, "STR_FPS_KEY_SHOW_FACING", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsUp", &keyFpsUp, SDLK_PAGEUP, "STR_FPS_KEY_UP", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsDown", &keyFpsDown, SDLK_PAGEDOWN, "STR_FPS_KEY_DOWN", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsDoomMode", &keyFpsDoomMode, SDLK_INSERT, "STR_FPS_KEY_DOOM_MODE", category));
 }
 
 /**
@@ -1533,6 +1670,15 @@ void drawMapAkimbo(BattlescapeState *state, BattleUnit *unit, Surface *leftHand,
 void mapAkimbo(BattlescapeState *state, BattleAction &action)
 {
 	FirstPersonMode::mapAkimbo(state, action);
+}
+
+/**
+ * A shot or a throw fired at its target: fired without the game's turn first (see
+ * FirstPersonMode::shotKeepsFacing)?
+ */
+bool shotKeepsFacing(BattlescapeState *state, const BattleAction &action)
+{
+	return FirstPersonMode::shotKeepsFacing(state, action);
 }
 
 /**

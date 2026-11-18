@@ -53,6 +53,7 @@
 #include <algorithm>
 #include <cmath>
 #include <map>
+#include <unordered_set>
 #include <string>
 #include <vector>
 #include <SDL.h>
@@ -107,10 +108,11 @@ bool FirstPersonView::projectToScreen(const double world[3], double &screenX, do
 	{
 		return false;
 	}
-	// Perspective: the focal length is how many pixels one unit across is at a distance of one.
-	const double focalLength = (getWidth() / 2.0) / _halfFovTangent;
-	screenX = getWidth() / 2.0 + toRight * focalLength / ahead;
-	screenY = getHeight() / 2.0 - upward * focalLength / ahead;
+	// Perspective: the focal length is how many pixels one unit across is at a distance of one;
+	// the view axis meets the picture in its middle (in VR, an eye's off-centre point: see axisX).
+	const double focalLength = focalPixels();
+	screenX = axisX() + toRight * focalLength / ahead;
+	screenY = axisY() - upward * focalLength / ahead;
 	depth = ahead;
 	return true;
 }
@@ -185,7 +187,8 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 	}
 	const int width = getWidth(), height = getHeight();
 	const int spriteWidth = sprite->getWidth(), spriteHeight = sprite->getHeight();
-	const double focalLength = (width / 2.0) / _halfFovTangent;
+	const double focalLength = focalPixels();
+	const double viewAxisX = axisX(), viewAxisY = axisY(); // where the view axis meets the picture (its middle, but in VR)
 	auto dot = [](const double a[3], const double b[3]) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; };
 
 	// The card, in the camera's frame (true proportions, as projectToScreen works): the anchor
@@ -369,7 +372,7 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 					left = top = 0; right = width; bottom = height;
 					continue;
 				}
-				const double screenX = width / 2.0 + dot(corner, _right) * focalLength / depth, screenY = height / 2.0 - dot(corner, _up) * focalLength / depth;
+				const double screenX = viewAxisX + dot(corner, _right) * focalLength / depth, screenY = viewAxisY - dot(corner, _up) * focalLength / depth;
 				left = std::min(left, (int)std::floor(screenX)); right = std::max(right, (int)std::ceil(screenX));
 				top = std::min(top, (int)std::floor(screenY)); bottom = std::max(bottom, (int)std::ceil(screenY));
 			}
@@ -400,10 +403,10 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 		const double anchorRise = dot(anchor, _levelUp) / dot(anchor, _forward);
 		for (int pixelY = top; pixelY < bottom; ++pixelY)
 		{
-			const double rise = (height / 2.0 - (pixelY + 0.5)) / focalLength;
+			const double rise = (viewAxisY - (pixelY + 0.5)) / focalLength;
 			for (int pixelX = left; pixelX < right; ++pixelX)
 			{
-				const double across = (pixelX + 0.5 - width / 2.0) / focalLength;
+				const double across = (pixelX + 0.5 - viewAxisX) / focalLength;
 				const double ray[3] = { _forward[0] + across * _right[0] + rise * _up[0], _forward[1] + across * _right[1] + rise * _up[1],
 					_forward[2] + across * _right[2] + rise * _up[2] };
 				double distance, spriteRow;
@@ -421,7 +424,7 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 	// the camera reaches to the view's edge).
 	auto screenRowOf = [&](const double point[3], double behindCamera) {
 		const double depth = dot(point, _forward);
-		return depth > 1.0 ? height / 2.0 - dot(point, _up) * focalLength / depth : behindCamera;
+		return depth > 1.0 ? viewAxisY - dot(point, _up) * focalLength / depth : behindCamera;
 	};
 	double topPoint[3], bottomPoint[3];
 	for (int axis = 0; axis < 3; ++axis)
@@ -459,7 +462,7 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 	// (the card and the floor both run square across the view).
 	for (int pixelY = top; pixelY < bottom; ++pixelY)
 	{
-		const double rise = (height / 2.0 - (pixelY + 0.5)) / focalLength;
+		const double rise = (viewAxisY - (pixelY + 0.5)) / focalLength;
 		const double ray[3] = { _forward[0] + rise * _up[0], _forward[1] + rise * _up[1], _forward[2] + rise * _up[2] };
 		double distance, spriteRow;
 		if (!meetSprite(ray, pixelY + 0.5 > anchorScreenY, distance, spriteRow)) continue;
@@ -470,7 +473,7 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 		// side: each pixel's own column is worked out below, and anything outside the span is
 		// transparent anyway, so the edges never depend on rounding).
 		const double pixelsPerColumn = focalLength / distance * columnSize;
-		const double rowAnchorX = width / 2.0 + anchorAcross * focalLength / distance;
+		const double rowAnchorX = viewAxisX + anchorAcross * focalLength / distance;
 		const int left = std::max(std::max(0, (int)std::floor(rowAnchorX - anchorX * pixelsPerColumn)),
 			(int)std::floor(rowAnchorX + (spanFirst - anchorX) * pixelsPerColumn) - 1);
 		const int right = std::min(std::min(width, (int)std::ceil(rowAnchorX + (spriteWidth - anchorX) * pixelsPerColumn)),
@@ -565,6 +568,9 @@ void FirstPersonView::replayDrawList()
 			case DrawStep::Line:
 				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, 0, 1 << 30, step.glows, false, true);
 				break;
+			case DrawStep::VoxelUnit:
+				gpuRecordBody(step);
+				break;
 			}
 		}
 		_gpuRecordOnly = recordOnly;
@@ -580,6 +586,7 @@ void FirstPersonView::replayDrawList()
 		runOnAllThreads(&FirstPersonView::drawListBands);
 	}
 	_drawList.clear();
+	_voxelSplats.clear();
 }
 
 /**
@@ -607,6 +614,396 @@ void FirstPersonView::drawListBands()
 			case DrawStep::Line:
 				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, bandTop, bandBottom, step.glows, false, true);
 				break;
+			case DrawStep::VoxelUnit:
+				drawVoxelUnit(step, bandTop, bandBottom);
+				break;
+			}
+		}
+	}
+}
+
+/**
+ * Records a unit drawn as its voxel body (setting "Voxel units", see VoxelUnits): each of its surface voxels a little
+ * square facing the camera, a little bigger than the voxel at its distance (no gaps between them), the body turned to
+ * the unit's facing (and swung to the walk's phase), each voxel coloured by the frame of the direction its sprite
+ * would show here and shaded by the light on the unit; projected here, once, sorted by screen row for the bands. Up
+ * close it fades out as a sprite does (dithered, see drawSprite).
+ * @param body The body.
+ * @param walkPhase The walk's phase (0-7), or -1: as it was made.
+ * @param facing The unit's direction (0 north, clockwise).
+ * @param direction The frame that colours it (the direction its sprite would be drawn in here).
+ * @param level Coloured by the frames as pictures taken at its height (else along the isometric slant).
+ * @param feet The middle of its feet, in voxels.
+ * @param floorCut Nothing of it below this height (the floor it stands on, see SpriteDraw::floorCut).
+ * @param shade The shade of the light on it.
+ * @param scale Its size (the setting "Unit size").
+ * @param unit The unit (the pointer finds it in its pixels), or null for a body lying in a pile.
+ * @param fall How far it has gone down: 0 standing, 1 down, in the shapes its death frames and its corpse's picture
+ *        give (see VoxelUnitModel::falls).
+ * @param items With the items in its hands (a body lying in a pile has dropped them: they're in the pile).
+ * @param lyingBody The unconscious unit lying in the pile it pictures, if any (the pointer finds it: a medi-kit's patient).
+ * @param pile The floor tile whose pile it pictures, if any (the pointer finds it).
+ * @param faint How much of it shows (1 all; a pile made faint to see past it, setting "See-through corpses": dithered).
+ */
+void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase, int facing, int direction, bool level, const double feet[3], double floorCut,
+	int shade, double scale, BattleUnit *unit, double fall, bool items, BattleUnit *lyingBody, const Tile *pile, double faint)
+{
+	double anchorX, anchorY, anchorDepth;
+	if (!projectToScreen(feet, anchorX, anchorY, anchorDepth)) return;
+	const float opacity = (float)(std::clamp((anchorDepth - 4.0) / 6.0, 0.0, 1.0) * faint);
+	if (opacity <= 0.0f) return;
+	// (going down or lying: the fall's shape for how far it has come, a body of its own, see VoxelUnitModel::falls)
+	const VoxelUnitModel::FallShape *fallen = fall > 0.0 ? body.fallAt(fall) : nullptr;
+	const bool walking = !fallen && walkPhase >= 0 && walkPhase < 8;
+	const std::vector<float> &right = fallen ? fallen->right : walking ? body.walkRight[walkPhase] : body.right;
+	const std::vector<float> &ahead = fallen ? fallen->ahead : walking ? body.walkAhead[walkPhase] : body.ahead;
+	const std::vector<float> &up = fallen ? fallen->up : walking ? body.walkUp[walkPhase] : body.up;
+	// The unit's right and ahead on the map: east and north turned by its facing.
+	const double angle = facing * Pi / 4.0, cosine = std::cos(angle), sine = std::sin(angle);
+	const double focalLength = focalPixels();
+	const double bodyUnit = body.unit; // (voxels to one of the body's own measures: half for a fine body)
+	// Each voxel is a little cube, the cell of the body's grid it fills: side by side they leave no gap from any side.
+	// On the screen a cube is the six-sided outline of its three half edges (to the body's right, ahead and up) thrown
+	// from its middle; those are taken once here, at the feet's depth, and shrink with each voxel's own depth. (A body
+	// walking has its voxels moved off the grid, a little apart where a limb swings: their cubes are a little bigger.)
+	const double halfEdge = 0.5 * VoxelCubeEdge * scale * bodyUnit * (walking ? 1.15 : 1.0);
+	const double probe = 8.0; // (voxels each way from the feet: far enough to measure, near enough to stay in front of the eye)
+	const double axes[3][3] = { { cosine, sine, 0.0 }, { sine, -cosine, 0.0 }, { 0.0, 0.0, 1.0 } };
+	double edges[3][2], lean[3] = {}; // (lean: how much deeper each half edge goes; a cube off the view's middle shows it)
+	bool cubes = true;
+	for (int axis = 0; axis < 3 && cubes; ++axis)
+	{
+		const double far[3] = { feet[0] + axes[axis][0] * probe, feet[1] + axes[axis][1] * probe, feet[2] + axes[axis][2] * probe };
+		const double near[3] = { feet[0] - axes[axis][0] * probe, feet[1] - axes[axis][1] * probe, feet[2] - axes[axis][2] * probe };
+		double farX, farY, farDepth, nearX, nearY, nearDepth;
+		cubes = projectToScreen(far, farX, farY, farDepth) && projectToScreen(near, nearX, nearY, nearDepth) && farDepth > 1.0 && nearDepth > 1.0;
+		if (!cubes) break;
+		// (each end's offset from the feet as it would be at the feet's depth: the perspective's part taken out)
+		const double toFarX = (farX - anchorX) * farDepth / anchorDepth, toFarY = (farY - anchorY) * farDepth / anchorDepth;
+		const double toNearX = (nearX - anchorX) * nearDepth / anchorDepth, toNearY = (nearY - anchorY) * nearDepth / anchorDepth;
+		lean[axis] = (farDepth - nearDepth) / (2.0 * probe) * halfEdge;
+		// (as seen straight ahead, at a depth of one: the feet's place off the view's middle taken out)
+		edges[axis][0] = (toFarX - toNearX) / (2.0 * probe) * halfEdge * anchorDepth + (anchorX - axisX()) * lean[axis];
+		edges[axis][1] = (toFarY - toNearY) / (2.0 * probe) * halfEdge * anchorDepth + (anchorY - axisY()) * lean[axis];
+	}
+	if (!cubes)
+	{
+		// (too near to measure: squares facing the view, as wide as a cube seen corner on)
+		const double square = halfEdge * 1.5 * focalLength;
+		edges[0][0] = square; edges[0][1] = 0.0; edges[1][0] = 0.0; edges[1][1] = square; edges[2][0] = edges[2][1] = 0.0;
+		lean[0] = lean[1] = lean[2] = 0.0;
+	}
+	const double middleX = axisX(), middleY = axisY();
+	const size_t voxels = right.size();
+	// On the card (setting "Renderer": GPU) the card draws the cubes itself, from the body's own arrays (see
+	// gpuRecordBody): nothing is worked out for each of them here, unless its check has the CPU draw them too.
+	const bool onCard = _gpuRecording;
+	// Far away a cube is smaller than a pixel, and its neighbours fall on the same pixels: the body is drawn coarser
+	// there, a cube for each block of 2 or 4 cells each way (see VoxelUnitModel::Coarse), that many times as big. The
+	// processor then works out a quarter or a sixteenth of the cubes for the same picture, a pixel here and there apart
+	// (a player, GitHub issue #182: "I lose 15 fps using voxel models on cpu").
+	int stride = 1;
+	const VoxelUnitModel::Coarse *coarse = nullptr;
+	if (cubes && !onCard)
+	{
+		const double half = 0.5 * (std::abs(edges[0][0]) + std::abs(edges[1][0]) + std::abs(edges[2][0]) + std::abs(edges[0][1]) + std::abs(edges[1][1]) + std::abs(edges[2][1])) / anchorDepth;
+		stride = half < VoxelCoarseHalf / 2.0 ? 4 : half < VoxelCoarseHalf ? 2 : 1;
+		if (stride > 1 && (fallen || body.right.size() == voxels))
+		{
+			VoxelUnitModel::Coarse &made = fallen ? fallen->coarse[stride / 4] : body.coarse[stride / 4];
+			if (!made.made)
+			{
+				// (the blocks of the shape as it stands: the walk moves the same cubes)
+				const std::vector<float> &r = fallen ? fallen->right : body.right, &a = fallen ? fallen->ahead : body.ahead, &u = fallen ? fallen->up : body.up;
+				const float block = (float)VoxelCubeEdge * stride;
+				std::unordered_set<Uint64> taken;
+				for (size_t k = 0; k < r.size(); ++k)
+				{
+					if (!fallen && k < body.part.size() && body.part[k] == VoxelUnitModel::Item) continue; // (what it holds is drawn whole: thin, a block would fatten it)
+					const float at[3] = { std::floor(r[k] / block), std::floor(a[k] / block), std::floor(u[k] / block) };
+					const Uint64 key = ((Uint64)(Sint64)(at[0] + 4096.0f) << 42) | ((Uint64)(Sint64)(at[1] + 4096.0f) << 21) | (Uint64)(Sint64)(at[2] + 4096.0f);
+					if (!taken.insert(key).second) continue;
+					made.voxel.push_back((Uint32)k);
+					const float from[3] = { r[k], a[k], u[k] };
+					for (int axis = 0; axis < 3; ++axis) made.shift.push_back((at[axis] + 0.5f) * block - from[axis]);
+				}
+				made.made = true;
+			}
+			coarse = &made;
+		}
+		else
+		{
+			stride = 1;
+		}
+	}
+	DrawStep step;
+	step.kind = DrawStep::VoxelUnit;
+	step.sprite.unit = unit;
+	step.sprite.body = lyingBody;
+	step.sprite.pile = pile;
+	step.voxelFirst = _voxelSplats.size();
+	step.voxelOpacity = opacity;
+	if (onCard)
+	{
+		step.bodyRight = right.data(); step.bodyAhead = ahead.data(); step.bodyUp = up.data();
+		// (a body is one colour a cube from every side, see VoxelBodies::makeModel: its first painting's is sent, once)
+		step.bodyColours = fallen ? fallen->colour.data() : body.colours.data();
+		step.bodyColourStep = fallen ? 1 : 16;
+		step.bodyParts = fallen ? nullptr : body.part.data();
+		step.bodyCount = voxels;
+		std::copy(feet, feet + 3, step.bodyFeet);
+		step.bodyCosine = cosine; step.bodySine = sine;
+		step.bodyMeasure = scale * bodyUnit;
+		step.bodyFloorCut = floorCut;
+		step.bodyItems = items;
+		step.bodyShade = shade;
+	}
+	// Each cube's place on the screen: the feet's in the camera's frame (ahead, to the right, up) and the body's three
+	// axes there, so a cube is three multiplications each way and one division (projectToScreen worked each out from
+	// the world's point: half the time a body took).
+	const double measure = scale * bodyUnit;
+	float base[3] = {}, toCamera[3][3] = {};
+	{
+		const double *frame[3] = { _forward, _right, _up };
+		const double relative[3] = { feet[0] - _eye[0], feet[1] - _eye[1], (feet[2] - _eye[2]) * ZScale };
+		const double bodyAxes[3][3] = { { cosine * measure, sine * measure, 0.0 }, { sine * measure, -cosine * measure, 0.0 }, { 0.0, 0.0, measure * ZScale } };
+		for (int way = 0; way < 3; ++way)
+		{
+			base[way] = (float)(relative[0] * frame[way][0] + relative[1] * frame[way][1] + relative[2] * frame[way][2]);
+			for (int axis = 0; axis < 3; ++axis)
+				toCamera[axis][way] = (float)(bodyAxes[axis][0] * frame[way][0] + bodyAxes[axis][1] * frame[way][1] + bodyAxes[axis][2] * frame[way][2]);
+		}
+	}
+	const float focal = (float)focalLength, axisAcross = (float)middleX, axisDown = (float)middleY;
+	const float cutBelow = (float)((floorCut - feet[2]) / measure); // (in the body's own measure, up from its feet)
+	float edgesNow[3][2], leanNow[3];
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		edges[axis][0] *= stride; edges[axis][1] *= stride; lean[axis] *= stride;
+		edgesNow[axis][0] = (float)edges[axis][0]; edgesNow[axis][1] = (float)edges[axis][1]; leanNow[axis] = (float)lean[axis];
+	}
+	// A cube that turns none of its bare faces to the eye is behind the body's near side: left out. Half a body's cubes
+	// are, and they were projected, sorted and tested against the depths for nothing: most of what a body cost the
+	// processor. (Standing or lying on its grid, drawn whole: the walk moves the cubes off the grid, a little apart.)
+	const std::vector<Uint8> *bare = nullptr;
+	float eyeAt[3] = {};
+	if (!onCard && !coarse && !walking && cubes)
+	{
+		std::vector<Uint8> &faces = fallen ? fallen->bare : body.bare;
+		if (faces.size() != voxels)
+		{
+			const float cell = (float)VoxelCubeEdge;
+			auto keyOf = [cell](float r, float a, float u) {
+				return ((Uint64)(Sint64)(std::floor(r / cell) + 4096.0f) << 42) | ((Uint64)(Sint64)(std::floor(a / cell) + 4096.0f) << 21) | (Uint64)(Sint64)(std::floor(u / cell) + 4096.0f);
+			};
+			std::unordered_set<Uint64> filled;
+			for (size_t k = 0; k < voxels; ++k) filled.insert(keyOf(right[k], ahead[k], up[k]));
+			faces.assign(voxels, 0x3F);
+			static const float Beside[6][3] = { { 1, 0, 0 }, { -1, 0, 0 }, { 0, 1, 0 }, { 0, -1, 0 }, { 0, 0, 1 }, { 0, 0, -1 } };
+			for (size_t k = 0; k < voxels; ++k)
+			{
+				if (!fallen && k < body.part.size() && body.part[k] == VoxelUnitModel::Item) continue; // (off the grid: never left out)
+				Uint8 found = 0;
+				for (int face = 0; face < 6; ++face)
+					if (!filled.count(keyOf(right[k] + Beside[face][0] * cell, ahead[k] + Beside[face][1] * cell, up[k] + Beside[face][2] * cell))) found |= (Uint8)(1 << face);
+				faces[k] = found ? found : 0x3F; // (a cube with none bare is skin by another rule: kept)
+			}
+		}
+		bare = &faces;
+		const double toEye[3] = { _eye[0] - feet[0], _eye[1] - feet[1], _eye[2] - feet[2] };
+		eyeAt[0] = (float)((toEye[0] * cosine + toEye[1] * sine) / measure);
+		eyeAt[1] = (float)((toEye[0] * sine - toEye[1] * cosine) / measure);
+		eyeAt[2] = (float)(toEye[2] / measure);
+	}
+	const float faceHalf = 0.5f * (float)VoxelCubeEdge;
+	const size_t drawn = coarse ? coarse->voxel.size() : voxels;
+	if (!(onCard && _gpuRecordOnly)) _voxelSplats.reserve(_voxelSplats.size() + drawn);
+	for (size_t i = 0; i < drawn && !(onCard && _gpuRecordOnly); ++i)
+	{
+		const size_t k = coarse ? coarse->voxel[i] : i;
+		// (seen from one of the 8 directions, what fits its drawing and the pieces added for it, see VoxelUnitModel::views)
+		if (!fallen && ((!items && body.part[k] == VoxelUnitModel::Item) || !body.shows(k, direction, level))) continue;
+		float across = right[k], along = ahead[k], height = up[k];
+		if (coarse) { across += coarse->shift[i * 3]; along += coarse->shift[i * 3 + 1]; height += coarse->shift[i * 3 + 2]; }
+		if (height < cutBelow) continue;
+		if (bare)
+		{
+			const Uint8 turned = (Uint8)((eyeAt[0] > across + faceHalf ? 1 : 0) | (eyeAt[0] < across - faceHalf ? 2 : 0) | (eyeAt[1] > along + faceHalf ? 4 : 0)
+				| (eyeAt[1] < along - faceHalf ? 8 : 0) | (eyeAt[2] > height + faceHalf ? 16 : 0) | (eyeAt[2] < height - faceHalf ? 32 : 0));
+			if (!((*bare)[k] & turned)) continue;
+		}
+		const float depth = base[0] + across * toCamera[0][0] + along * toCamera[1][0] + height * toCamera[2][0];
+		if (depth < 4.0f) continue;
+		VoxelSplat splat;
+		splat.nearer = 1.0f / depth;
+		splat.x = axisAcross + (base[1] + across * toCamera[0][1] + along * toCamera[1][1] + height * toCamera[2][1]) * focal * splat.nearer;
+		splat.y = axisDown - (base[2] + across * toCamera[0][2] + along * toCamera[1][2] + height * toCamera[2][2]) * focal * splat.nearer;
+		float reachX = 0.0f, reachY = 0.0f;
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			reachX += std::abs(edgesNow[axis][0] - (splat.x - axisAcross) * leanNow[axis]);
+			reachY += std::abs(edgesNow[axis][1] - (splat.y - axisDown) * leanNow[axis]);
+		}
+		splat.halfX = std::min((float)VoxelSplatHalfMax, reachX * splat.nearer);
+		splat.halfY = std::min((float)VoxelSplatHalfMax, reachY * splat.nearer);
+		splat.depth = depth;
+		splat.colour = shadeColor(fallen ? fallen->colour[k] : body.colour(k, direction, level), shade);
+		step.voxelHalfMax = std::max(step.voxelHalfMax, splat.halfY);
+		_voxelSplats.push_back(splat);
+	}
+	// (what it holds, left out of the coarse blocks: its cubes whole, at their own size)
+	if (coarse && !fallen && items && !(onCard && _gpuRecordOnly))
+	{
+		for (size_t k = 0; k < voxels; ++k)
+		{
+			if (body.part[k] != VoxelUnitModel::Item || !body.shows(k, direction, level) || up[k] < cutBelow) continue;
+			const float depth = base[0] + right[k] * toCamera[0][0] + ahead[k] * toCamera[1][0] + up[k] * toCamera[2][0];
+			if (depth < 4.0f) continue;
+			VoxelSplat splat;
+			splat.nearer = 1.0f / depth;
+			splat.x = axisAcross + (base[1] + right[k] * toCamera[0][1] + ahead[k] * toCamera[1][1] + up[k] * toCamera[2][1]) * focal * splat.nearer;
+			splat.y = axisDown - (base[2] + right[k] * toCamera[0][2] + ahead[k] * toCamera[1][2] + up[k] * toCamera[2][2]) * focal * splat.nearer;
+			float reachX = 0.0f, reachY = 0.0f;
+			for (int axis = 0; axis < 3; ++axis)
+			{
+				reachX += std::abs(edgesNow[axis][0] - (splat.x - axisAcross) * leanNow[axis]);
+				reachY += std::abs(edgesNow[axis][1] - (splat.y - axisDown) * leanNow[axis]);
+			}
+			splat.halfX = std::min((float)VoxelSplatHalfMax, reachX * splat.nearer / stride);
+			splat.halfY = std::min((float)VoxelSplatHalfMax, reachY * splat.nearer / stride);
+			splat.depth = depth;
+			splat.colour = shadeColor(body.colour(k, direction, level), shade);
+			step.voxelHalfMax = std::max(step.voxelHalfMax, splat.halfY);
+			_voxelSplats.push_back(splat);
+		}
+	}
+	step.voxelCount = _voxelSplats.size() - step.voxelFirst;
+	if (step.voxelCount == 0 && !(onCard && voxels > 0)) return;
+	// The cubes' outlines (see drawVoxelUnit): the three half edges as seen straight ahead at a depth of one, and how
+	// much deeper each goes.
+	step.voxelOutline = cubes;
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		step.voxelEdges[axis][0] = (float)edges[axis][0];
+		step.voxelEdges[axis][1] = (float)edges[axis][1];
+		step.voxelLean[axis] = (float)lean[axis];
+	}
+	step.voxelMiddle[0] = (float)middleX;
+	step.voxelMiddle[1] = (float)middleY;
+	// Sorted by row, for each band of the view to find its own (see drawVoxelUnit): into a bucket for each row, in one
+	// pass. (Sorting them one against another was four fifths of what a body's cubes took to make ready: a player,
+	// GitHub issue #182. Rows further off the view than a cube can reach share the first and the last bucket: no band
+	// looks for them.)
+	{
+		const int margin = (int)VoxelSplatHalfMax + 2, rows = getHeight() + 2 * margin;
+		auto rowOf = [margin, rows](const VoxelSplat &splat) { return std::clamp((int)std::floor(splat.y) + margin, 0, rows - 1); };
+		_voxelRowStarts.assign((size_t)rows + 1, 0);
+		const auto first = _voxelSplats.begin() + step.voxelFirst;
+		for (auto splat = first; splat != _voxelSplats.end(); ++splat) ++_voxelRowStarts[(size_t)rowOf(*splat) + 1];
+		for (int row = 0; row < rows; ++row) _voxelRowStarts[(size_t)row + 1] += _voxelRowStarts[row];
+		_voxelSorted.resize(step.voxelCount);
+		for (auto splat = first; splat != _voxelSplats.end(); ++splat) _voxelSorted[_voxelRowStarts[rowOf(*splat)]++] = *splat;
+		std::copy(_voxelSorted.begin(), _voxelSorted.end(), first);
+	}
+	_drawList.push_back(step);
+}
+
+/**
+ * How far a voxel body going down by the game's own fall (a unit collapsing) has come: by the clock since it was first
+ * seen collapsing, VoxelFallShapeTime for each of its fall's shapes (its death frames, then lying).
+ * @param unit The unit.
+ * @param now The time now (SDL ticks).
+ * @return 0 to 1 (lying), or -1 if it wasn't seen collapsing (or the fall is long forgotten).
+ */
+double FirstPersonView::collapseFall(const BattleUnit *unit, Uint32 now) const
+{
+	auto started = _collapseStarts.find(unit);
+	if (started == _collapseStarts.end()) return -1.0;
+	const int frames = std::max(1, unit->getArmor()->getDeathFrames());
+	return std::min(1.0, (now - started->second) / (double)((frames + 1) * VoxelFallShapeTime));
+}
+
+/**
+ * Draws a recorded voxel body (see recordVoxelUnit): its squares on the band's rows. Its pixels are depth-tested
+ * against what's drawn (the rays, the steps before it) and marked as a unit's (or a pile's), as its sprite's would be:
+ * smoke veils a unit only thinly, futuristic night vision leaves its colours, and near where the player points, the
+ * pointer finds it.
+ * @param step The recorded step.
+ * @param bandTop The first screen row to draw.
+ * @param bandBottom One past the last.
+ */
+void FirstPersonView::drawVoxelUnit(const DrawStep &step, int bandTop, int bandBottom)
+{
+	const int width = getWidth(), top = std::max(bandTop, 0), bottom = std::min(bandBottom, getHeight());
+	const auto first = _voxelSplats.begin() + step.voxelFirst, last = first + step.voxelCount;
+	// (sorted by row: from the first that the biggest square could reach the band's top from)
+	auto splat = std::lower_bound(first, last, top - step.voxelHalfMax - 1.0f, [](const VoxelSplat &one, float row) { return one.y < row; });
+	for (; splat != last && splat->y < bottom + step.voxelHalfMax + 1.0f; ++splat)
+	{
+		// The pixels whose middles the cube covers (those of the box round it that lie in its outline, for a cube big
+		// enough on the screen to tell), and at least the one its middle is in.
+		const int middleX = (int)std::floor(splat->x), middleY = (int)std::floor(splat->y);
+		const int y0 = std::max(top, std::min(middleY, (int)std::ceil(splat->y - splat->halfY - 0.5f)));
+		const int y1 = std::min(bottom, std::max(middleY + 1, (int)std::floor(splat->y + splat->halfY - 0.5f) + 1));
+		if (y0 >= y1) continue;
+		const int x0 = std::max(0, std::min(middleX, (int)std::ceil(splat->x - splat->halfX - 0.5f)));
+		const int x1 = std::min(width, std::max(middleX + 1, (int)std::floor(splat->x + splat->halfX - 0.5f) + 1));
+		// A cube big enough to tell is cut to its outline: its three half edges on the screen (leaning by its place off
+		// the view's middle: seen a little from its side), six sides; a pixel is in it when, across each edge, it's no
+		// farther from the cube's middle than the other two edges reach (and half a pixel: none lost between two cubes).
+		const bool outlined = step.voxelOutline && (splat->halfX > VoxelOutlineFrom || splat->halfY > VoxelOutlineFrom);
+		float edge[3][2], reach[3] = {};
+		if (outlined)
+		{
+			for (int axis = 0; axis < 3; ++axis)
+			{
+				edge[axis][0] = (step.voxelEdges[axis][0] - (splat->x - step.voxelMiddle[0]) * step.voxelLean[axis]) * splat->nearer;
+				edge[axis][1] = (step.voxelEdges[axis][1] - (splat->y - step.voxelMiddle[1]) * step.voxelLean[axis]) * splat->nearer;
+			}
+			for (int axis = 0; axis < 3; ++axis)
+			{
+				for (int other = 0; other < 3; ++other)
+					if (other != axis) reach[axis] += std::abs(edge[axis][0] * edge[other][1] - edge[axis][1] * edge[other][0]);
+				reach[axis] += 0.5f * std::sqrt(edge[axis][0] * edge[axis][0] + edge[axis][1] * edge[axis][1]); // (not hypot: for floats it needs a newer C library than the Linux release may ask for)
+			}
+		}
+		for (int y = y0; y < y1; ++y)
+		{
+			for (int x = x0; x < x1; ++x)
+			{
+				if (outlined && (x != middleX || y != middleY))
+				{
+					const float px = x + 0.5f - splat->x, py = y + 0.5f - splat->y;
+					bool inside = true;
+					for (int axis = 0; axis < 3 && inside; ++axis)
+					{
+						inside = std::abs(edge[axis][0] * py - edge[axis][1] * px) <= reach[axis];
+					}
+					if (!inside) continue;
+				}
+				const int index = y * width + x;
+				if (splat->depth >= _depthBuffer[index]) continue;
+				if (step.voxelOpacity < 1.0f && dither(x, y) >= step.voxelOpacity) continue;
+				*getRaw(x, y) = splat->colour;
+				_depthBuffer[index] = splat->depth;
+				_glowMask[index] = 0;
+				_unitVeil[index] = step.sprite.unit ? UnitVeilMax : 255;
+				_ownColours[index] = 1;
+				if (step.voxelHitOutline)
+				{
+					// (the hitbox's outline goes round these pixels, see drawUnitOutlines; a row is one band's alone)
+					_outlineOwner[index] = step.voxelHitOutline;
+					_outlineDepth[index] = splat->depth;
+					_outlineRowLeft[y] = std::min(_outlineRowLeft[y], x);
+					_outlineRowRight[y] = std::max(_outlineRowRight[y], x);
+				}
+				const int patchX = x - _pointerX + PointerReach, patchY = y - _pointerY + PointerReach;
+				if (patchX >= 0 && patchY >= 0 && patchX <= 2 * PointerReach && patchY <= 2 * PointerReach)
+				{
+					if (step.sprite.pile) _pointerPiles[patchY][patchX] = step.sprite.pile;
+					_pointerUnits[patchY][patchX] = step.sprite.unit;
+					_pointerBodies[patchY][patchX] = step.sprite.body;
+				}
 			}
 		}
 	}
@@ -1051,13 +1448,18 @@ void FirstPersonView::drawUnits()
 	_markerSpots.clear();
 	_facingSpots.clear();
 	// Time since the last frame in seconds (at most a tenth, none the first time), for the gliding.
+	// (VR's second eye: the glides moved for the first eye already, this frame; see renderEyes.)
 	const Uint32 now = SDL_GetTicks();
 	const double elapsedSeconds = _unitLastTick ? std::min<Uint32>(100, now - _unitLastTick) / 1000.0 : 0.0;
-	_unitLastTick = now;
+	if (!_replayPass) _unitLastTick = now;
+	// Where the units' pictures turn to face: the eye as placed, before this frame's shake (GitHub issue #112, see
+	// _steadyEye); in VR the head's middle, so both eyes see the same frame of each.
+	const double *spriteEye = _eyePass ? _spriteEye : _steadyEye;
 	// The units' size (setting "Unit size", 80 to 100% of the isometric map's: smaller, standing
 	// on the same spot), and their hitboxes (setting): always, fading in and out once a second, or
 	// only the unit pointed at (Aimed at, see setAimedUnit), steady.
 	const double unitScale = std::clamp(Options::fpsUnitSize, 80, 100) / 100.0;
+	int voxelBuilds = _replayPass ? 0 : VoxelBuildsPerFrame; // (voxel bodies still to be made this frame, see below; VR's second eye makes none)
 	const bool hitboxAimedOnly = Options::fpsHitboxes == 3;
 	const float hitboxOpacity = Options::fpsHitboxes == 2 || hitboxAimedOnly ? 1.0f
 		: Options::fpsHitboxes == 1 ? 0.5f + 0.5f * (float)std::cos((now % 1000) / 1000.0 * 2.0 * Pi) : 0.0f;
@@ -1176,7 +1578,12 @@ void FirstPersonView::drawUnits()
 		// fall from the air as it is).
 		Glide &glide = _unitGlides[unit];
 		const double jump = std::abs(glide.pos[0] - feet[0]) + std::abs(glide.pos[1] - feet[1]) + std::abs(glide.pos[2] - feet[2]);
-		if (now - glide.seen > 250 || jump > 24.0 || airFall)
+		if (_replayPass)
+		{
+			// VR's second eye: where the first eye's pass left the glide this frame.
+			std::copy(glide.pos, glide.pos + 3, feet);
+		}
+		else if (now - glide.seen > 250 || jump > 24.0 || airFall)
 		{
 			std::copy(feet, feet + 3, glide.pos);
 		}
@@ -1191,7 +1598,7 @@ void FirstPersonView::drawUnits()
 				feet[axis] = glide.pos[axis];
 			}
 		}
-		glide.seen = now;
+		if (!_replayPass) glide.seen = now;
 		const double placedFeet[3] = { feet[0], feet[1], feet[2] }; // (before a hit's flinch: the side it's seen from, below)
 		// A hit unit flinches back from the camera for a moment (HitFlinchTime, up to 3 voxels), and
 		// flashes (setting "Hit flash", and "Muzzle flashes", which turns every flash off).
@@ -1227,10 +1634,11 @@ void FirstPersonView::drawUnits()
 		// The isometric sprites show units as seen from the south-east (direction 3).
 		// Rotate the unit's facing so the side turned towards the camera is shown: the
 		// direction from the unit to the camera, in the game's eight directions, from the eye
-		// as placed to where the unit stands (neither a shake nor a hit's flinch turns it);
-		// straight above or below it, from the south-east, as the map shows it (see
-		// FirstPerson::unitViewRotation: the lines of fire test the same picture).
-		const int viewRotation = FirstPerson::unitViewRotation(_steadyEye, placedFeet);
+		// as placed to where the unit stands (neither a shake nor a hit's flinch turns it; in
+		// VR the head's middle, see spriteEye); straight above or below it, from the south-east,
+		// as the map shows it (see FirstPerson::unitViewRotation: the lines of fire test the
+		// same picture, and a voxel body the same side).
+		const int viewRotation = FirstPerson::unitViewRotation(spriteEye, placedFeet);
 		unitSprite.setViewRotation(viewRotation);
 
 		// The light on it, at its chest: the game's light, lamps, flashlight and flares, and
@@ -1246,88 +1654,226 @@ void FirstPersonView::drawUnits()
 			recordUnitShadow(feet, 5.5 * unitSize); // flying units too: the shadow on the ground shows where they hover
 			recordFlareShadow(unit, feet, 5.5 * unitSize);
 		}
-		// Compose the unit's frame in the sprite buffer and keep it in a frame of its own, then
-		// record it standing in the world, on the floor's surface (the hitbox and the markers
-		// keep the game's own heights). (Composed unlit and shaded when placed: an upscaled frame
-		// then serves in any light.)
-		const GraphSubset mask(SpriteBufferSize, SpriteBufferSize);
+		// Setting "Voxel units": a unit (soldiers, aliens, civilians; one tile big or two by two) as its body made from
+		// its own sprites (see VoxelUnits), turned to its facing and painted by the frame of the direction its sprite
+		// would show here; level for a camera near its height, along the isometric slant from higher than
+		// VoxelSlantAbove. Drawn as its sprite until it has been seen standing (the walk swings the standing body).
+		const VoxelUnitModel *body = nullptr;
+		int walkPhase = -1;
+		double fall = 0.0;
+		const bool collapsing = unit->getStatus() == STATUS_COLLAPSING;
+		const bool wreckFalling = unitSize != 1 && fallingDown && unit->isOut(); // (a big unit destroyed in the air, coming down)
+		if (Options::fpsVoxelUnits && (unitSize == 1 || collapsing || wreckFalling) && (collapsing || fallingDown || airFall))
 		{
-			// (a quick fall's frame; a body coming down from the air after its own fall frames, the last)
-			const int fallFrame = quickFall ? FirstPerson::quickFallPhase(unit) : fallingDown ? std::max(0, unit->getArmor()->getDeathFrames() - 1) : -1;
-			const FirstPerson::QuickFallPose fallPose(fallingDown ? unit : nullptr, fallFrame);
-			if (unitSize == 1)
+			// Going down (the game's own fall, a quick death's, a body coming down from the air): the body it was last
+			// drawn with goes down as its death frames show, to lie as its corpse's picture (see VoxelUnitModel::falls), as
+			// far as the fall has come: by the clock, at the quick fall's pace (QuickFallFrameTime a frame; the game's own
+			// frames go faster); down while it comes down from the air. (Its corpse then lies so, finishing a fall the game
+			// is done with: see drawFloorItems.) A big unit falls in its own frames.
+			body = _voxelUnits->lastBody(unit);
+			if (collapsing)
 			{
-				unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
+				_collapseStarts.emplace(unit, now);
+				fall = collapseFall(unit, now);
 			}
 			else
 			{
-				// The parts are laid out on screen like the 2x2 tiles they cover, back to front.
-				unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
-				unitSprite.draw(unit, 1, 32, 16, 0, mask, false);
-				unitSprite.draw(unit, 2, 0, 16, 0, mask, false);
-				unitSprite.draw(unit, 3, 16, 24, 0, mask, false);
+				const double quick = FirstPerson::quickFallProgress(unit);
+				fall = quick >= 0.0 ? quick : 1.0;
 			}
+			fall = std::clamp(fall, 0.0, 1.0);
+			// (A big unit has no fall's shapes yet: its body stands as it was while the game takes it down, then its wreck
+			// lies there, see drawFloorItems. Destroyed in the air, it comes down as that wreck: it was its flat picture
+			// all the way down. The owner: "it shows sprite when falling. It should be the destroyed model".)
+			if (unitSize != 1) fall = wreckFalling && !collapsing ? 1.0 : 0.0;
 		}
-		DrawStep step;
-		step.kind = DrawStep::Sprite;
-		step.sprite.sprite = keepComposedFrame(framesUsed);
-		step.sprite.anchorX = 32;
-		step.sprite.anchorY = unitSize == 1 ? 40 : 48; // the centre of the floor diamond; a big unit's, the corner its four tiles share
-		step.sprite.world[0] = feet[0];
-		step.sprite.world[1] = feet[1];
-		step.sprite.world[2] = standingHeight(feet);
-		step.sprite.floorCut = floorUnderside(feet); // (its art below its feet stays out of the room below)
-		step.sprite.shade = shade;
-		step.sprite.scale = unitScale;
-		// The art below its feet (the front half of the floor's diamond: a snake's tail, a long
-		// body in some facings) lies flat on the floor in front of them, as an item's does, instead
-		// of sinking into it (a player's report, GitHub issue #31: X-Com Files' Asmodean Cobra "in
-		// the ground" in some rotations; for most units only a few pixels of the feet). Not for a
-		// unit in the air: its floor would be seen from below, where lying rows aren't drawn.
-		if (!unit->haveNoFloorBelow() && unit->getStatus() != STATUS_FLYING)
+		else if (Options::fpsVoxelUnits && !quickFall && !fallingDown && !airFall && VoxelUnits::suits(unit))
 		{
-			step.sprite.pose = SpritePose::Lying;
+			// (a body is made only for a unit in view, and VoxelBuildsPerFrame a frame at most: a first look at a squad
+			// doesn't stall the game; one waiting is drawn as its sprite meanwhile)
+			double middleX, middleY, middleDepth;
+			const double middle[3] = { feet[0], feet[1], feet[2] + 12.0 };
+			const bool seen = projectToScreen(middle, middleX, middleY, middleDepth);
+			const double reach = !seen ? 0.0 : _eyePass ? 24.0 * unitScale * _eyeFocal / middleDepth : 24.0 * unitScale * (getWidth() / 2.0) / _halfFovTangent / middleDepth;
+			int noBuilds = 0;
+			int &builds = seen && middleX > -reach && middleX < getWidth() + reach && middleY > -reach && middleY < getHeight() + reach ? voxelBuilds : noBuilds;
+			// (A unit struck down but not yet falling, while the game turns it to face the screen: the body it had. Its
+			// frames now may be others, burnt by a hit far beyond its health, and a body of those isn't made yet: it showed
+			// as its flat picture for that moment, in the middle of its death. The owner: "one flat frame is seen".)
+			const VoxelUnitModel *had = unit->isOutThresholdExceed() ? _voxelUnits->lastBody(unit) : nullptr;
+			body = had ? had : _voxelUnits->modelFor(unit, unitSprite, _game->getMod()->getSurfaceSet("BIGOBS.PCK"), _game->getMod()->getSurfaceSet("FLOOROB.PCK"), _save,
+				getPalette(), builds, walkPhase);
+			unitSprite.setViewRotation(viewRotation);
+			_spriteBuffer->clear(); // (anything the drawer drew there while the body was made: its sprite, if drawn instead, starts clean)
 		}
-		step.sprite.unit = unit;
-		step.sprite.layBack = FirstPerson::hullLayBack(unit);
-		useSmoothVersion(step.sprite);
-		// With full sprite hitboxes, a picture drawn smooth (upscaled, up close) is the one the lines of the
-		// soldier looked through meet: noted with the frame it is (see smoothPicture).
-		if (Options::fpsSpriteHitboxes)
+		if (body)
 		{
-			if (step.sprite.scale < unitScale)
+			// The way it faces: the game turns a unit going down to face the screen first (its fall frames face it, see
+			// UnitDieBState); a body keeps the way it faced, last seen well. (More than halfway down, painted as its
+			// corpse lies: its front up, seen from above.)
+			int facing = unit->getDirection();
+			if (unit->isOut() || unit->isOutThresholdExceed() || collapsing)
 			{
-				SmoothPicture &noted = _smoothPictures[unit];
-				noted.animFrame = _save->getAnimFrame();
-				noted.rotation = viewRotation;
-				noted.pixels.resize((size_t)SpriteBufferSize * SpriteBufferSize);
-				const SDL_Surface *composed = _spriteBuffer->getSurface(); // (still the frame composed)
-				for (int y = 0; y < SpriteBufferSize; ++y)
+				auto well = _facingsWell.find(unit);
+				if (well != _facingsWell.end()) facing = well->second;
+			}
+			else
+			{
+				_facingsWell[unit] = facing;
+			}
+			const bool fallen = fall > 0.5;
+			const double flat = std::max(1.0, std::hypot(spriteEye[0] - feet[0], spriteEye[1] - feet[1]));
+			const bool level = !fallen && std::atan2((spriteEye[2] - chest[2]) * ZScale, flat) < VoxelSlantAbove * Pi / 180.0;
+			const int direction = fallen ? 3 : ((facing + viewRotation) % 8 + 8) % 8; // (viewRotation: 3 minus the direction to the camera)
+			double standing[3] = { feet[0], feet[1], standingHeight(feet) }, bodyScale = unitScale;
+			if (unit->getArmor()->getDrawingRoutine() == 9 && fall <= 0.0)
+			{
+				// (the Celatid, see CelatidBob: each one in its own step)
+				const double turn = (now + (Uint32)unit->getId() * 377u) % CelatidBobTime / (double)CelatidBobTime * 2.0 * Pi;
+				standing[2] += CelatidBob * (1.0 + std::sin(turn));
+				bodyScale *= 1.0 + CelatidSwell * std::sin(turn * 2.0);
+			}
+			const size_t stepsBefore = _drawList.size();
+			// (a wreck lies as the map shows it, whichever way the unit faced: see drawFloorItems)
+			recordVoxelUnit(*body, walkPhase, wreckFalling && fall >= 1.0 ? 3 : facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall);
+			// With full sprite hitboxes the body is what the lines test (see FirstPerson::spriteHitAt): outlined as a
+			// picture is (see drawUnitOutlines), round the pixels it's drawn on (noted as they're drawn, see
+			// drawVoxelUnit); not one going down, nor one so close that it fades out.
+			double bodyX, bodyY, bodyDepth;
+			if (_outlining && _drawList.size() > stepsBefore && (!hitboxAimedOnly || unit == _aimedUnit) && fall <= 0.0 && _outlineColors.size() < 0xFFFF
+				&& projectToScreen(standing, bodyX, bodyY, bodyDepth) && bodyDepth >= 10.0)
+			{
+				_outlineColors.push_back(_colors.hitbox[unit->getFaction() == FACTION_PLAYER ? 0 : unit->getFaction() == FACTION_HOSTILE ? 1 : 2]);
+				_drawList.back().voxelHitOutline = (Uint16)_outlineColors.size();
+			}
+			// What the game draws over a unit's sprite, its flames when it burns and its breath's bubbles under the sea, is
+			// drawn over its body: the drawer's overlay alone (the unit's parts drawn nowhere), standing at the unit, nearer
+			// by VoxelOverlayNearer to show over the body's front; unshaded, as the game draws flames.
+			// With particles on, a body burns and breathes in particles instead (see spawnBurningUnitFlames,
+			// spawnBodyEffects): the owner, "we will not build burning from voxels but rather add particle effect burning
+			// to voxel models. And all the rest effects also!"
+			if ((unit->getFire() > 0 || unit->getBreathExhaleFrame() >= 0) && (!_particlesOn || Options::fpsParticles == 0))
+			{
+				_spriteBuffer->clear();
+				Surface nowhere(SpriteBufferSize, SpriteBufferSize);
+				Surface *parts[BODYPART_LARGE_TURRET + 4];
+				std::fill(std::begin(parts), std::end(parts), &nowhere);
+				const GraphSubset mask(SpriteBufferSize, SpriteBufferSize);
+				unitSprite.setPartCapture(parts);
+				unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
+				if (unitSize > 1)
 				{
-					for (int x = 0; x < SpriteBufferSize; ++x) noted.pixels[(size_t)y * SpriteBufferSize + x] = ((const Uint8 *)composed->pixels)[y * composed->pitch + x] != 0;
+					unitSprite.draw(unit, 1, 32, 16, 0, mask, false);
+					unitSprite.draw(unit, 2, 0, 16, 0, mask, false);
+					unitSprite.draw(unit, 3, 16, 24, 0, mask, false);
 				}
-				noted.smooth = step.sprite.sprite;
-				noted.factor = spriteUpscaleFactor();
-			}
-			else
-			{
-				_smoothPictures.erase(unit);
+				unitSprite.setPartCapture(nullptr);
+				bool overlaid = false;
+				for (int y = 0; y < SpriteBufferSize && !overlaid; ++y)
+					for (int x = 0; x < SpriteBufferSize && !overlaid; ++x) overlaid = _spriteBuffer->getPixel(x, y) != 0;
+				if (overlaid)
+				{
+					DrawStep step;
+					step.kind = DrawStep::Sprite;
+					step.sprite.sprite = keepComposedFrame(framesUsed);
+					step.sprite.anchorX = 32;
+					step.sprite.anchorY = unitSize == 1 ? 40 : 48;
+					std::copy(standing, standing + 3, step.sprite.world);
+					step.sprite.depthBias = VoxelOverlayNearer;
+					step.sprite.floorCut = floorUnderside(feet);
+					step.sprite.scale = unitScale;
+					step.sprite.unit = unit;
+					step.sprite.layBack = FirstPerson::hullLayBack(unit);
+					useSmoothVersion(step.sprite);
+					_drawList.push_back(step);
+				}
 			}
 		}
-		// With full sprite hitboxes, what the lines test outlined where the box would be drawn (see
-		// noteTestedPictures); not for one so close that it fades out, dithered (drawSprite: nearer
-		// than 10 voxels), where the holes would be outlined.
-		double screenX, screenY, screenDepth;
-		if (_outlining && (!hitboxAimedOnly || unit == _aimedUnit) && !fallingDown && _outlineColors.size() < 0xFFFF
-			&& projectToScreen(step.sprite.world, screenX, screenY, screenDepth) && screenDepth >= 10.0)
+		else
 		{
-			_outlineColors.push_back(_colors.hitbox[unit->getFaction() == FACTION_PLAYER ? 0 : unit->getFaction() == FACTION_HOSTILE ? 1 : 2]);
-			OutlinedUnit outlined;
-			outlined.unit = unit;
-			outlined.outline = (Uint16)_outlineColors.size();
-			_outlinedUnits.push_back(outlined);
+			// Compose the unit's frame in the sprite buffer and keep it in a frame of its own, then
+			// record it standing in the world, on the floor's surface (the hitbox and the markers
+			// keep the game's own heights). (Composed unlit and shaded when placed: an upscaled frame
+			// then serves in any light.)
+			const GraphSubset mask(SpriteBufferSize, SpriteBufferSize);
+			{
+				// (a quick fall's frame; a body coming down from the air after its own fall frames, the last)
+				const int fallFrame = quickFall ? FirstPerson::quickFallPhase(unit) : fallingDown ? std::max(0, unit->getArmor()->getDeathFrames() - 1) : -1;
+				const FirstPerson::QuickFallPose fallPose(fallingDown ? unit : nullptr, fallFrame);
+				if (unitSize == 1)
+				{
+					unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
+				}
+				else
+				{
+					// The parts are laid out on screen like the 2x2 tiles they cover, back to front.
+					unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
+					unitSprite.draw(unit, 1, 32, 16, 0, mask, false);
+					unitSprite.draw(unit, 2, 0, 16, 0, mask, false);
+					unitSprite.draw(unit, 3, 16, 24, 0, mask, false);
+				}
+			}
+			DrawStep step;
+			step.kind = DrawStep::Sprite;
+			step.sprite.sprite = keepComposedFrame(framesUsed);
+			step.sprite.anchorX = 32;
+			step.sprite.anchorY = unitSize == 1 ? 40 : 48; // the centre of the floor diamond; a big unit's, the corner its four tiles share
+			step.sprite.world[0] = feet[0];
+			step.sprite.world[1] = feet[1];
+			step.sprite.world[2] = standingHeight(feet);
+			step.sprite.floorCut = floorUnderside(feet); // (its art below its feet stays out of the room below)
+			step.sprite.shade = shade;
+			step.sprite.scale = unitScale;
+			// The art below its feet (the front half of the floor's diamond: a snake's tail, a long
+			// body in some facings) lies flat on the floor in front of them, as an item's does, instead
+			// of sinking into it (a player's report, GitHub issue #31: X-Com Files' Asmodean Cobra "in
+			// the ground" in some rotations; for most units only a few pixels of the feet). Not for a
+			// unit in the air: its floor would be seen from below, where lying rows aren't drawn.
+			if (!unit->haveNoFloorBelow() && unit->getStatus() != STATUS_FLYING)
+			{
+				step.sprite.pose = SpritePose::Lying;
+			}
+			step.sprite.unit = unit;
+			step.sprite.layBack = FirstPerson::hullLayBack(unit);
+			useSmoothVersion(step.sprite);
+			// With full sprite hitboxes, a picture drawn smooth (upscaled, up close) is the one the lines of the
+			// soldier looked through meet: noted with the frame it is (see smoothPicture).
+			if (Options::fpsSpriteHitboxes)
+			{
+				if (step.sprite.scale < unitScale)
+				{
+					SmoothPicture &noted = _smoothPictures[unit];
+					noted.animFrame = _save->getAnimFrame();
+					noted.rotation = viewRotation;
+					noted.pixels.resize((size_t)SpriteBufferSize * SpriteBufferSize);
+					const SDL_Surface *composed = _spriteBuffer->getSurface(); // (still the frame composed)
+					for (int y = 0; y < SpriteBufferSize; ++y)
+					{
+						for (int x = 0; x < SpriteBufferSize; ++x) noted.pixels[(size_t)y * SpriteBufferSize + x] = ((const Uint8 *)composed->pixels)[y * composed->pitch + x] != 0;
+					}
+					noted.smooth = step.sprite.sprite;
+					noted.factor = spriteUpscaleFactor();
+				}
+				else
+				{
+					_smoothPictures.erase(unit);
+				}
+			}
+			// With full sprite hitboxes, what the lines test outlined where the box would be drawn (see
+			// noteTestedPictures); not for one so close that it fades out, dithered (drawSprite: nearer
+			// than 10 voxels), where the holes would be outlined.
+			double screenX, screenY, screenDepth;
+			if (_outlining && (!hitboxAimedOnly || unit == _aimedUnit) && !fallingDown && _outlineColors.size() < 0xFFFF
+				&& projectToScreen(step.sprite.world, screenX, screenY, screenDepth) && screenDepth >= 10.0)
+			{
+				_outlineColors.push_back(_colors.hitbox[unit->getFaction() == FACTION_PLAYER ? 0 : unit->getFaction() == FACTION_HOSTILE ? 1 : 2]);
+				OutlinedUnit outlined;
+				outlined.unit = unit;
+				outlined.outline = (Uint16)_outlineColors.size();
+				_outlinedUnits.push_back(outlined);
+			}
+			_drawList.push_back(step);
 		}
-		_drawList.push_back(step);
 		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit) && !Options::fpsSpriteHitboxes && !fallingDown) // (with full sprite hitboxes the picture is the hitbox, outlined above; one falling is down)
 		{
 			recordHitbox(unit, feet, hitboxOpacity);
@@ -1342,7 +1888,13 @@ void FirstPersonView::drawUnits()
 			_facingSpots.push_back(spot);
 		}
 	}
-	// Then draw them all, and with full sprite hitboxes the outlines of what the lines test over them.
+	// (a fall is forgotten once over and the game is done with it: one woken and knocked out once more falls anew)
+	for (auto started = _collapseStarts.begin(); started != _collapseStarts.end();)
+	{
+		started = started->first->getStatus() == STATUS_COLLAPSING || collapseFall(started->first, now) < 1.0 ? std::next(started) : _collapseStarts.erase(started);
+	}
+	// Then draw them all, and with full sprite hitboxes the outlines of what the lines test over them (pictures, by
+	// their cards; a voxel body by the pixels it was drawn on, see drawVoxelUnit).
 	replayDrawList();
 	if (_outlining)
 	{
@@ -2105,6 +2657,50 @@ void FirstPersonView::drawFloorItems()
 		{
 			step.sprite.standingSquash = std::max(0.05, headroom) / standingVoxels;
 		}
+		// Setting "Voxel units": the corpse on top a unit's that was drawn as its voxel body (dead, or knocked out: one
+		// tile big) lies here as that body, on its back as it fell (see drawUnits), its hands empty (what it held is in
+		// the pile), faint when the pile is (see-through corpses); not under a floor it would poke through.
+		BattleUnit *owner = item->getUnit();
+		const VoxelUnitModel *lying = Options::fpsVoxelUnits && owner && owner->isOut() && !wholeCorpse
+			&& step.sprite.standingSquash >= 1.0 && owner->getArmor()->getSize() == 1 ? _voxelUnits->lastBody(owner) : nullptr;
+		// (A big unit's whole corpse, its four parts in their places: its wreck as the map draws it, given volume, lying
+		// as the map shows it whichever way the unit faced. Parts carried apart are their pictures.)
+		const VoxelUnitModel *wreck = Options::fpsVoxelUnits && owner && owner->isOut() && wholeCorpse ? _voxelUnits->lastBody(owner) : nullptr;
+		// (A body lying there stands up from the floor, where its picture lay flat: a heap hides the legs of who stands
+		// behind it, a wreck far more, and the picture's rule, the crosshair on it and the aim ending on another tile,
+		// rarely held: aiming at the enemy over a heap the crosshair is on the enemy, and a wreck's four tiles take
+		// nearly every line that crosses it. The owner saw all three: a heap solid before an enemy, a wreck never
+		// see-through, and "it does turn, but too faintly to notice". So a body is see-through whenever it lies in the
+		// way: the aim's line passes over it, within its reach on the ground, and ends beyond it; and fainter than a
+		// picture, VoxelCorpseFaint of the ghost opacity: its cubes stand a layer behind another.)
+		// (By where it lies and where the aim goes alone, not by whether its pixels are under the crosshair: drawn
+		// see-through it leaves holes there, the crosshair found no body in them the next frame, and it was solid again:
+		// the owner, a downed Cyberdisc "flashes transparent when I am near but turns solid again".)
+		double bodyOpacity = 1.0;
+		if ((lying || wreck) && Options::fpsSeeThroughCorpses && _pointerAimed)
+		{
+			const double reach = wreck ? VoxelWreckReach : VoxelCorpseReach;
+			const double wayX = _pointerAim.x + 0.5 - _eye[0], wayY = _pointerAim.y + 0.5 - _eye[1], length = std::hypot(wayX, wayY);
+			const double toX = step.sprite.world[0] - _eye[0], toY = step.sprite.world[1] - _eye[1];
+			const double along = length > 0.0 ? (toX * wayX + toY * wayY) / length : 0.0;
+			const double beside = length > 0.0 ? std::abs(toX * wayY - toY * wayX) / length : 1e9;
+			if (along > 0.0 && beside <= reach && length > along + reach) bodyOpacity = _faintPile.opacity;
+		}
+		if (bodyOpacity < 1.0) bodyOpacity *= VoxelCorpseFaint;
+		if (wreck && wreck->fallAt(1.0))
+		{
+			recordVoxelUnit(*wreck, -1, 3, 3, false, step.sprite.world, NoFloorCut, step.sprite.shade, itemScale, nullptr, 1.0, false,
+				step.sprite.body, step.sprite.pile, bodyOpacity);
+			continue;
+		}
+		if (lying)
+		{
+			auto well = _facingsWell.find(owner);
+			const double fall = collapseFall(owner, SDL_GetTicks());
+			recordVoxelUnit(*lying, -1, well != _facingsWell.end() ? well->second : owner->getDirection(), 3, false, step.sprite.world, NoFloorCut,
+				step.sprite.shade, itemScale, nullptr, fall >= 0.0 ? fall : 1.0, false, step.sprite.body, step.sprite.pile, bodyOpacity);
+			continue;
+		}
 		useSmoothVersion(step.sprite);
 		_drawList.push_back(step);
 	}
@@ -2379,7 +2975,7 @@ void FirstPersonView::drawEdgeDots()
 	}
 	const int width = getWidth(), height = getHeight();
 	const float mapX = _save->getMapSizeX() * 16.0f, mapY = _save->getMapSizeY() * 16.0f;
-	const double focalLength = (width / 2.0) / _halfFovTangent;
+	const double focalLength = focalPixels();
 	// One dot: projected, sized by its distance, drawn where nothing nearer is.
 	auto dot = [&](float x, float y) {
 		const double point[3] = { x, y, GroundTop };
@@ -3059,7 +3655,7 @@ void FirstPersonView::cullSmokeDraws()
 			farthest = std::max(farthest, depthRow[pixelX]);
 		}
 	}
-	const double focalLength = (width / 2.0) / _halfFovTangent;
+	const double focalLength = focalPixels();
 	const double level[2] = { std::cos(_yaw), std::sin(_yaw) };
 	auto dot = [](const double a[3], const double b[3]) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; };
 	auto cannotShow = [&](SmokeDraw &smoke)
@@ -3095,7 +3691,7 @@ void FirstPersonView::cullSmokeDraws()
 				{
 					return false;
 				}
-				const double screenX = width / 2.0 + dot(corner, _right) * focalLength / depth, screenY = height / 2.0 - dot(corner, _up) * focalLength / depth;
+				const double screenX = axisX() + dot(corner, _right) * focalLength / depth, screenY = axisY() - dot(corner, _up) * focalLength / depth;
 				left = std::min(left, screenX); right = std::max(right, screenX);
 				top = std::min(top, screenY); bottom = std::max(bottom, screenY);
 				nearest = std::min(nearest, depth);
@@ -3432,7 +4028,7 @@ void FirstPersonView::drawDownedIcons()
 	}
 	const int width = getWidth(), height = getHeight();
 	const int uiScale = std::max(1, _uiScale);
-	const double focalLength = (width / 2.0) / _halfFovTangent;
+	const double focalLength = focalPixels();
 	enum { Burning = 1, Bleeding = 2, Shock = 4, OutCold = 8 };
 
 	// Each body in view: where its icons go (their bottom, in the middle), what's the matter with
@@ -3487,8 +4083,7 @@ void FirstPersonView::drawDownedIcons()
 			if (!projectToScreen(point, screenX, screenY, depth) || depth > _maxDistance) break;
 			const int pixelX = (int)screenX, pixelY = (int)screenY;
 			if (pixelX < 0 || pixelY < 0 || pixelX >= width || pixelY >= height) continue;
-			gpuNeedDepth();
-			inView = _depthBuffer[pixelY * width + pixelX] >= depth - 8.0;
+			inView = gpuDepthAt(pixelX, pixelY) >= depth - 8.0; // (one pixel: the depth picture stays on the card)
 			break;
 		}
 		if (!inView)

@@ -153,10 +153,19 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 	}
 	frame.halfPlaneWidth = (float)view._halfFovTangent;
 	frame.halfPlaneHeight = (float)(view._halfFovTangent * height / width);
+	// An eye's picture in VR (see FirstPersonView::useEyeCamera): its image plane as renderRows has it for an eye.
+	frame.eyeAxis[0] = view._eyePass ? (float)view._eyeAxisX * scale : 0.0f;
+	frame.eyeAxis[1] = view._eyePass ? (float)view._eyeAxisY * scale : 0.0f;
+	frame.eyeFocal = view._eyePass ? (float)view._eyeFocal * scale : 0.0f;
+	// Setting "VR foveation": an eye's rays thinned away from its view axis (see FirstPersonGpuShaders.h, foveaStep).
+	const int foveation = view._eyePass ? std::clamp(Options::fpsVrFoveation, 0, 2) : 0;
+	frame.fovea[0] = foveation == 2 ? 0.38f : foveation == 1 ? 0.55f : 0.0f;
+	frame.fovea[1] = foveation == 2 ? 0.65f : 0.85f;
 	frame.width = width;
 	frame.height = height;
-	// (Auto on the card: a ray a pixel whatever the view's size, which is what the card is for; a small view always has one.)
-	frame.pixelSize = scale > 1 || width * height <= SmallViewPixels || Options::fpsPixelSize == 0 ? 1 : std::clamp(Options::fpsPixelSize, 1, 3);
+	// (Auto on the card: a ray a pixel whatever the view's size, which is what the card is for; a small view always has one,
+	// and so has an eye's picture.)
+	frame.pixelSize = scale > 1 || view._eyePass || width * height <= SmallViewPixels || Options::fpsPixelSize == 0 ? 1 : std::clamp(Options::fpsPixelSize, 1, 3);
 	frame.rayScale = scale > 1 ? 1.0f : 100.0f / view.renderScalePercent();
 	frame.goggles = view._nightVision;
 	frame.ghostScale = std::clamp(Options::fpsGhostOpacity, 10, 100) / (GhostNearOpacity * 100.0f);
@@ -629,10 +638,13 @@ void FirstPersonView::gpuShadowRays(double cpuMilliseconds)
 		rayContext.solidGhostThreshold = 0.0f;
 		for (int blockRow = 0; blockRow < blockRows; ++blockRow)
 		{
-			const float planeV = (1.0f - (blockRow * frame.pixelSize + frame.pixelSize * 0.5f) * 2.0f / height) * frame.halfPlaneHeight;
+			const bool eyePlane = frame.eyeFocal > 0.0f; // (an eye's picture in VR: its off-centre plane, as renderRows has it)
+			const float planeV = eyePlane ? (frame.eyeAxis[1] - (blockRow * frame.pixelSize + frame.pixelSize * 0.5f)) / frame.eyeFocal
+				: (1.0f - (blockRow * frame.pixelSize + frame.pixelSize * 0.5f) * 2.0f / height) * frame.halfPlaneHeight;
 			for (int blockColumn = 0; blockColumn < blockColumns; ++blockColumn)
 			{
-				const float planeU = ((blockColumn * frame.pixelSize + frame.pixelSize * 0.5f) * 2.0f / width - 1.0f) * frame.halfPlaneWidth;
+				const float planeU = eyePlane ? ((blockColumn * frame.pixelSize + frame.pixelSize * 0.5f) - frame.eyeAxis[0]) / frame.eyeFocal
+					: ((blockColumn * frame.pixelSize + frame.pixelSize * 0.5f) * 2.0f / width - 1.0f) * frame.halfPlaneWidth;
 				float rayDirection[3];
 				for (int axis = 0; axis < 3; ++axis)
 				{

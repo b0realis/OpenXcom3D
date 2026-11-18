@@ -70,6 +70,7 @@ public:
 		BUBBLE,  // Lit; drawn as a little ring when close, wobbling as it rises.
 		MOTE,    // Self-lit and steady (a UFO's aura): full brightness for most of its life, fading only at the end.
 		WISP,    // A wisp of the game's smoke, drawn see-through with the smoke (see FirstPersonView::drawSeeThroughSmoke).
+		FLAME,   // A tongue of flame: a round glow its size in voxels across, white-hot at first, reddening and shrinking as it ages.
 	};
 	/// Where a particle comes from, so a whole group can be counted and thinned out:
 	/// EFFECT for what the battle makes (shots, impacts, explosions, fire, smoke),

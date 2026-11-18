@@ -53,6 +53,7 @@
 #include <string>
 #include "FirstPersonApi.h"
 #include "FirstPersonModeShared.h"
+#include "FirstPersonVr.h"
 #include "../Engine/Action.h"
 #include "../Engine/Game.h"
 #include "../Engine/LocalizedText.h"
@@ -75,7 +76,7 @@ namespace
  * @param key The key.
  * @return Its name, or an empty text for no key (an unbound action).
  */
-std::string keyName(SDLKey key)
+std::string keyName(SDL_Keycode key)
 {
 	if (key == SDLK_UNKNOWN)
 	{
@@ -214,7 +215,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 	// all the rest under Advanced): the two presets, the renderer, the render scale (the one number to turn for
 	// speed on a graphics card), two settings players commonly change (the shot's preview, full sprite hitboxes),
 	// and what goes by the hand and the habit, which no preset can know.
-	for (const char *id : { "fpsPreset", "fpsRenderer", "fpsGraphicsDetail", "fpsRenderScale", "fpsTrajectory", "fpsSpriteHitboxes", "fpsMouseSensitivity", "fpsStartInFirstPerson" })
+	for (const char *id : { "fpsPreset", "fpsRenderer", "fpsGraphicsDetail", "fpsRenderScale", "fpsTrajectory", "fpsSpriteHitboxes", "fpsVoxelUnits", "fpsMouseSensitivity", "fpsStartInFirstPerson" })
 	{
 		for (const OptionInfo &option : gathered)
 		{
@@ -240,8 +241,9 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
 		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
+		{ "STR_FPS_SECTION_VR", { "fpsVrMode", "fpsVrEyeSize", "fpsVrWeapon", "fpsVrTurning", "fpsVrLaser", "fpsVrSmoothing", "fpsVrFoveation" } },
 		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsRenderScale", "fpsPixelSize", "fpsShadows", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion",
-			"fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts", "FPS", "fpsCounter" } },
+			"fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts", "fpsVrCardEyes", "FPS", "fpsCounter" } },
 	};
 	struct Section { std::string heading, name; std::vector<OptionInfo> options; };
 	std::vector<Section> sorted;
@@ -533,6 +535,29 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		if (option.id() == "fpsMovement")
 		{
 			return std::string(tr(*option.asInt() == 1 ? "STR_FPS_MOVEMENT_TILES" : "STR_FPS_MOVEMENT_FREE"));
+		}
+		// VR mode is a choice of three, shown by name.
+		if (option.id() == "fpsVrMode")
+		{
+			static const char *const vrModeNames[] = { "STR_FPS_VR_MODE_OFF", "STR_FPS_VR_MODE_ON", "STR_FPS_VR_MODE_PREVIEW" };
+			return std::string(tr(vrModeNames[std::clamp(*option.asInt(), 0, 2)]));
+		}
+		// VR turning is a choice of two, shown by name.
+		if (option.id() == "fpsVrTurning")
+		{
+			return std::string(tr(*option.asInt() == 1 ? "STR_FPS_VR_TURNING_SNAP" : "STR_FPS_VR_TURNING_SMOOTH"));
+		}
+		// VR foveation is a choice of three, shown by name.
+		if (option.id() == "fpsVrFoveation")
+		{
+			return std::string(tr(*option.asInt() == 2 ? "STR_FPS_VR_FOVEATION_STRONG" : *option.asInt() == 1 ? "STR_FPS_VR_FOVEATION_LIGHT" : "STR_FPS_VR_FOVEATION_OFF"));
+		}
+		// The VR eye size is a choice of five, shown as the pixels of each eye's picture.
+		if (option.id() == "fpsVrEyeSize")
+		{
+			int eyeWidth, eyeHeight;
+			FirstPerson::vrEyeSize(*option.asInt(), eyeWidth, eyeHeight);
+			return std::to_string(eyeWidth) + "x" + std::to_string(eyeHeight);
 		}
 		// A pixel size of 0 is Auto (see AutoPixelMaxWidth).
 		if (option.id() == "fpsPixelSize" && *option.asInt() == 0)
@@ -873,10 +898,25 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		{
 			*value = (*value + direction + 3) % 3;
 		}
-		// Movement (free, tiles): either button switches.
-		else if (value == &Options::fpsMovement)
+		// Movement (free, tiles) and VR turning (smooth, snap): either button switches.
+		else if (value == &Options::fpsMovement || value == &Options::fpsVrTurning)
 		{
 			*value = (*value + 1) % 2;
+		}
+		// VR mode (off, on, on with the desktop preview): round and round.
+		else if (value == &Options::fpsVrMode)
+		{
+			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
+		}
+		// VR foveation (off, light, strong): round and round.
+		else if (value == &Options::fpsVrFoveation)
+		{
+			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
+		}
+		// The VR eye size (five sizes): round and round.
+		else if (value == &Options::fpsVrEyeSize)
+		{
+			*value = (std::clamp(*value, 0, 4) + direction + 5) % 5;
 		}
 		// Throwing (classic, modern): either button switches.
 		else if (value == &Options::fpsThrowing)
@@ -980,7 +1020,7 @@ void OptionsFirstPersonState::lstOptionsKeyPress(Action *action)
 	// Bind the key, unless it's unknown or a Shift, Alt or Ctrl key (the lean key and the facing key,
 	// both held, may be one), or Esc (it cancels, see handle; a player, GitHub issue #83). The key
 	// shows again.
-	const SDLKey key = action->getDetails()->key.keysym.sym;
+	const SDL_Keycode key = action->getDetails()->key.keysym.sym;
 	const bool modifier = key == SDLK_LSHIFT || key == SDLK_LALT || key == SDLK_LCTRL || key == SDLK_RSHIFT || key == SDLK_RALT || key == SDLK_RCTRL;
 	if (key != 0 && key != SDLK_ESCAPE && (!modifier || _selKey->asKey() == &Options::keyFpsLeanHold || _selKey->asKey() == &Options::keyFpsShowFacing))
 	{

@@ -65,9 +65,28 @@ const Surface *viewToPresent = nullptr; // the view asked for this frame
 const Uint32 *fullToPresent = nullptr;  // ... and its pixels in full colour (0xFFRRGGBB a pixel; 0: the palette's colour), or null
 }
 
+/**
+ * On SDL 1.2 the engine's display is a surface the view is laid into (the hooks above). The SDL2
+ * build (Android) shows its frame through a renderer and has no such surface: there the view
+ * keeps the game's screen's sizes, and nothing is asked of the display.
+ */
 bool canPresentAtDisplaySize()
 {
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	return false;
+#else
 	return true;
+#endif
+}
+
+bool displayTakesFullColor()
+{
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	return false;
+#else
+	const SDL_Surface *display = SDL_GetVideoSurface();
+	return display && display->format->BytesPerPixel == 4;
+#endif
 }
 
 /**

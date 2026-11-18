@@ -65,6 +65,7 @@ uniform ivec3 uSize;         // the map in tiles
 uniform float uMaxDistance;  // how far rays go, in voxels
 uniform vec3 uEye, uForward, uRight, uUp;
 uniform vec2 uHalfPlane;     // the image plane's half-width and half-height
+uniform vec3 uEyePlane;      // an eye's picture (VR): where its view axis meets it (x, y: pixels) and its pixels per unit of the image plane (z); z 0: the view's own, centred
 uniform ivec2 uViewSize;     // the view in pixels
 uniform int uPixelSize;      // pixels a ray colours each way
 uniform int uGoggles;        // night vision's colour group + 1 (0: off): the colours are the goggles' own
@@ -76,6 +77,8 @@ uniform sampler2D uFirstDepth, uFirstTrue;
 const float FlatContrast = 26.0 / 255.0; // a pixel within this of all its neighbours, a colour channel each, has nothing to smooth (two shades of a dither are nearer than this; the next voxel's colour mostly isn't)
 const float NearContrast = 64.0 / 255.0; // the same where a voxel covers several pixels: there its neighbours' colours are the texture drawn large, not shimmer, and only a strong line between two of them is worth more rays
 #endif
+uniform vec2 uFovea;         // an eye's picture in VR, setting "VR foveation": out to x of its half width from the view axis a ray a pixel, to y one for 2 x 2, beyond one for 4 x 4; x 0: off
+uniform int uFoveaCoarse;    // "VR foveation" cast in three goes (see FirstPersonGpu.cpp, castFoveaLayers): this go's picture has a pixel for each block of this many pixels each way of the eye's picture (1, 2 or 4); 0: not that way
 uniform vec2 uRayOffset;     // where in its pixel the ray goes, from the middle (0, 0: the CPU's ray; else one of several, setting "Supersampling")
 uniform float uGhostScale;
 uniform int uSeeThroughCrops;
@@ -1761,6 +1764,10 @@ vec3 lightShafts(vec3 rgb, vec3 rayDirection, float span)
 }
 #endif
 
+// The pixel of the view this fragment's ray is cast for (its block's first): the fragment's own place, but in one of
+// "VR foveation"'s three goes, where the picture drawn into is smaller than the eye's (see main).
+ivec2 rayPixel;
+
 /**
  * One ray through this fragment's block of pixels and what it shows.
  * @param offset Where in the block it goes, from the block's middle, in blocks (0, 0: the middle, the CPU's ray).
@@ -1770,10 +1777,13 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 {
 	fullColorSet = false;
 	// The block of pixels this ray colours (rows from the top), and its place on the image plane.
-	int blockColumn = int(gl_FragCoord.x), blockRow = int(gl_FragCoord.y);
+	int blockColumn = rayPixel.x, blockRow = rayPixel.y;
 	int topRow = blockRow * uPixelSize, leftColumn = blockColumn * uPixelSize;
-	float planeV = (1.0 - (float(topRow) + float(uPixelSize) * (0.5 + offset.y)) * 2.0 / float(uViewSize.y)) * uHalfPlane.y;
-	float planeU = ((float(leftColumn) + float(uPixelSize) * (0.5 + offset.x)) * 2.0 / float(uViewSize.x) - 1.0) * uHalfPlane.x;
+	// (An eye's picture in VR is off centre: as FirstPersonView::renderRows has it for an eye.)
+	float planeV = uEyePlane.z > 0.0 ? (uEyePlane.y - (float(topRow) + float(uPixelSize) * (0.5 + offset.y))) / uEyePlane.z
+		: (1.0 - (float(topRow) + float(uPixelSize) * (0.5 + offset.y)) * 2.0 / float(uViewSize.y)) * uHalfPlane.y;
+	float planeU = uEyePlane.z > 0.0 ? ((float(leftColumn) + float(uPixelSize) * (0.5 + offset.x)) - uEyePlane.x) / uEyePlane.z
+		: ((float(leftColumn) + float(uPixelSize) * (0.5 + offset.x)) * 2.0 / float(uViewSize.x) - 1.0) * uHalfPlane.x;
 	vec3 rayDirection = uForward + planeU * uRight + planeV * uUp;
 	rayDirection.z /= ZScale;
 	float directionLength = sqrt(rayDirection.x * rayDirection.x + rayDirection.y * rayDirection.y + rayDirection.z * rayDirection.z);
@@ -1882,8 +1892,46 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 	rayGlow = !glowing ? 0u : hit.part >= 0 && (texelFetch(uModelInfo, int(texelFetch(uTiles, hitTile * 4)[hit.part / 2] >> uint(16 * (hit.part & 1))) & 0xFFFF).z >> 24) != 0u ? 3u : 1u;
 }
 
+/**
+ * Setting "VR foveation": how many pixels each way one ray colours where this pixel is, 1, 2 or 4, by how far from the
+ * eye's view axis its cell of 4 x 4 pixels starts (a cell's pixels all answer alike). A headset's lens is sharp only
+ * round the axis, so the rays are spent there. (FoveaFillSource has the same: keep the two alike.)
+ */
+int foveaStep(ivec2 at)
+{
+	if (uFovea.x <= 0.0 || uEyePlane.z <= 0.0) return 1;
+	vec2 cell = vec2((at / 4) * 4) + 2.0;
+	float away = length(cell * float(uPixelSize) - uEyePlane.xy) / (float(uViewSize.x) * 0.5);
+	return away < uFovea.x ? 1 : away < uFovea.y ? 2 : 4;
+}
+
 void main()
 {
+	// With "VR foveation", away from the eye's view axis only the first pixel of each 2 x 2 or 4 x 4 casts a ray, through
+	// the middle of them; the others are filled from it after (see FoveaFillSource).
+	vec2 rayOffset = uRayOffset;
+	rayPixel = ivec2(gl_FragCoord.xy);
+	if (uFoveaCoarse > 0)
+	{
+		// Cast in three goes, one for each size of block, each into a picture with a pixel a block: here every pixel
+		// drawn is a ray wanted, but for those of another go's zone, which lie together (a card works through a
+		// picture in groups of neighbouring pixels, and a group is done only when its last ray is: one ray wanted
+		// among its pixels and it takes as long as if all were, which is why thinning them out of one big picture,
+		// below, saves next to nothing; a group with no ray wanted at all is done at once).
+		rayPixel *= uFoveaCoarse;
+		if (foveaStep(rayPixel) != uFoveaCoarse) discard;
+		rayOffset += vec2(float(uFoveaCoarse - 1) * 0.5);
+	}
+	else
+	{
+		// In one go, into a picture as big as the eye's (with "Supersampling" too: its later rays look at their neighbours).
+		int coarse = foveaStep(rayPixel);
+		if (coarse > 1)
+		{
+			if ((rayPixel.x & (coarse - 1)) != 0 || (rayPixel.y & (coarse - 1)) != 0) discard;
+			rayOffset += vec2(float(coarse - 1) * 0.5);
+		}
+	}
 #ifdef LATER_RAYS
 	// A second or further ray of the pixel: only where the first rays show an edge or fine texture: this pixel's full colour
 	// against its eight neighbours', and its depth. On a flat stretch (most of a picture at a high resolution, where a
@@ -1901,7 +1949,7 @@ void main()
 		depthStep = max(depthStep, abs(besideDepth - hereDepth) / max(1.0, min(besideDepth, hereDepth)));
 	}
 	// (How many voxels wide the pixel is where it hits: under half of one the texture is drawn large.)
-	float pixelSpan = hereDepth * 2.0 * uHalfPlane.x * float(uPixelSize) / float(uViewSize.x);
+	float pixelSpan = uEyePlane.z > 0.0 ? hereDepth * float(uPixelSize) / uEyePlane.z : hereDepth * 2.0 * uHalfPlane.x * float(uPixelSize) / float(uViewSize.x);
 	if (contrast < mix(NearContrast, FlatContrast, clamp(pixelSpan * 2.0, 0.0, 1.0)) && depthStep < 0.03)
 	{
 		outColor = texelFetch(uFirstColor, at, 0).r;
@@ -1912,8 +1960,67 @@ void main()
 	}
 #endif
 	vec3 rayFullColor;
-	shadeRay(uRayOffset, true, outColor, outDepth, outGlow, rayFullColor);
+	shadeRay(rayOffset, true, outColor, outDepth, outGlow, rayFullColor);
 	outTrue = vec4(rayFullColor / 255.0, float(outGlow) / 255.0);
+}
+)";
+
+/**
+ * Setting "VR foveation": the rays' pictures made whole. Away from the eye's view axis only the first pixel of each
+ * 2 x 2 or 4 x 4 has a ray (see the rays' main); here every pixel takes its ray's colour, depth, glow and full colour
+ * from there, into the pictures the passes after read. The rays were cast in three goes into three sets of pictures, one
+ * for each size of block, a pixel a block (uLayers 1); or in one go into one set as big as the eye's (uLayers 0: then
+ * the three sets here are that one).
+ */
+const char *const FoveaFillSource = R"(
+uniform usampler2D uColor, uGlow, uColorHalf, uGlowHalf, uColorQuarter, uGlowQuarter;
+uniform sampler2D uDepth, uTrue, uDepthHalf, uTrueHalf, uDepthQuarter, uTrueQuarter;
+uniform int uLayers;
+uniform vec2 uFovea;
+uniform vec3 uEyePlane;
+uniform ivec2 uViewSize;
+uniform int uPixelSize;
+layout(location = 0) out uint outColor;
+layout(location = 1) out float outDepth;
+layout(location = 2) out uint outGlow;
+layout(location = 3) out vec4 outTrue;
+
+// (As in the rays' program: keep the two alike.)
+int foveaStep(ivec2 at)
+{
+	if (uFovea.x <= 0.0 || uEyePlane.z <= 0.0) return 1;
+	vec2 cell = vec2((at / 4) * 4) + 2.0;
+	float away = length(cell * float(uPixelSize) - uEyePlane.xy) / (float(uViewSize.x) * 0.5);
+	return away < uFovea.x ? 1 : away < uFovea.y ? 2 : 4;
+}
+
+void main()
+{
+	ivec2 at = ivec2(gl_FragCoord.xy);
+	int coarse = foveaStep(at);
+	// The pixel's block: its first pixel in the one big set, or its own pixel in its size's set.
+	ivec2 from = uLayers != 0 ? at / coarse : (at / coarse) * coarse;
+	if (coarse == 1)
+	{
+		outColor = texelFetch(uColor, from, 0).r;
+		outDepth = texelFetch(uDepth, from, 0).r;
+		outGlow = texelFetch(uGlow, from, 0).r;
+		outTrue = texelFetch(uTrue, from, 0);
+	}
+	else if (coarse == 2)
+	{
+		outColor = texelFetch(uColorHalf, from, 0).r;
+		outDepth = texelFetch(uDepthHalf, from, 0).r;
+		outGlow = texelFetch(uGlowHalf, from, 0).r;
+		outTrue = texelFetch(uTrueHalf, from, 0);
+	}
+	else
+	{
+		outColor = texelFetch(uColorQuarter, from, 0).r;
+		outDepth = texelFetch(uDepthQuarter, from, 0).r;
+		outGlow = texelFetch(uGlowQuarter, from, 0).r;
+		outTrue = texelFetch(uTrueQuarter, from, 0);
+	}
 }
 )";
 
@@ -2036,16 +2143,129 @@ void main()
  * A primitive is EffectTexels texels of four floats (see FirstPersonViewGpuEffects.cpp, which
  * writes them, for what each holds).
  */
+/**
+ * The units' voxel bodies on the card (setting "Voxel units"; FirstPersonView::recordVoxelUnit and drawVoxelUnit are
+ * the CPU's): a body's little cubes are drawn by the card itself, before the units and effects, into two pictures of
+ * their own (which body shows on each pixel with its colour, and how far ahead), each cube a square on the screen cut
+ * to its six-sided outline, the nearest winning. The effects' shader then lays each body in at its turn (a primitive of
+ * the kind EffectBody), as it does a sprite. A body's cubes are sent up once (uVoxels: a texel each: to the body's
+ * right, ahead and up of its feet, and its colour, + 256 for a cube of an item in its hands); a frame sends only where
+ * it stands. Six corners a cube, found by the vertex's number: no vertex data at all.
+ */
+const char *const BodyVertexSource = R"(
+uniform samplerBuffer uVoxels;
+uniform int uBase;             // the body's first cube in uVoxels
+uniform vec3 uFeet;            // the middle of its feet from the eye, in voxels
+uniform vec2 uTurn;            // the cosine and sine of the way it faces
+uniform float uMeasure;        // voxels to one of the body's own measures
+uniform float uFloorCut;       // nothing of it below this height (from the eye)
+uniform int uSkipItems;        // 1: without the items in its hands
+uniform vec3 uForward, uRight, uUp; // the camera, in true proportions
+uniform float uFocal;
+uniform vec2 uAxis;
+uniform ivec2 uViewSize;
+uniform vec2 uEdges[3];        // a cube's three half edges on the screen, as seen straight ahead at a depth of one
+uniform vec3 uLean;            // ... and how much deeper each goes
+uniform vec2 uMiddle;          // the view's middle the lean is from
+uniform int uCubes;            // 1: cut to their outlines (0: the squares round them)
+flat out vec2 vCentre;
+flat out float vDepth;
+flat out int vColor, vOutlined;
+flat out vec2 vEdge0, vEdge1, vEdge2;
+flat out vec3 vReach;
+void main()
+{
+	int corner = gl_VertexID % 6;
+	vec4 voxel = texelFetch(uVoxels, uBase + gl_VertexID / 6);
+	int colour = int(voxel.w);
+	vec3 place = uFeet + vec3(voxel.x * uTurn.x + voxel.y * uTurn.y, voxel.x * uTurn.y - voxel.y * uTurn.x, voxel.z) * uMeasure;
+	vec3 scaled = vec3(place.xy, place.z * ZScale);
+	float ahead = dot(scaled, uForward);
+	gl_Position = vec4(2.0, 2.0, 2.0, 1.0); // (off the picture: a cube not drawn)
+	vCentre = vec2(0.0); vDepth = 0.0; vColor = 0; vOutlined = 0; vEdge0 = vEdge1 = vEdge2 = vec2(0.0); vReach = vec3(0.0);
+	if (ahead < 4.0 || place.z < uFloorCut || (uSkipItems != 0 && colour >= 256)) return;
+	float nearer = 1.0 / ahead;
+	vec2 centre = vec2(uAxis.x + dot(scaled, uRight) * uFocal * nearer, uAxis.y - dot(scaled, uUp) * uFocal * nearer);
+	vec2 edges[3];
+	vec2 reach = vec2(0.0);
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		edges[axis] = uEdges[axis] - (centre - uMiddle) * uLean[axis];
+		reach += abs(edges[axis]);
+	}
+	vec2 halfSize = min(vec2(VoxelSplatHalfMax), reach * nearer);
+	// (the pixels whose middles the square covers, and at least the one its own middle is in)
+	vec2 first = min(floor(centre), ceil(centre - halfSize - 0.5)), last = max(floor(centre) + 1.0, floor(centre + halfSize - 0.5) + 1.0);
+	vec2 at = vec2(corner == 0 || corner == 2 || corner == 5 ? first.x : last.x, corner < 2 || corner == 3 ? first.y : last.y);
+	gl_Position = vec4(at / vec2(uViewSize) * 2.0 - 1.0, 0.0, 1.0);
+	vCentre = centre;
+	vDepth = ahead;
+	vColor = colour & 255;
+	vOutlined = uCubes != 0 && (halfSize.x > VoxelOutlineFrom || halfSize.y > VoxelOutlineFrom) ? 1 : 0;
+	for (int axis = 0; axis < 3; ++axis) edges[axis] *= nearer;
+	vEdge0 = edges[0]; vEdge1 = edges[1]; vEdge2 = edges[2];
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		float sum = 0.5 * length(edges[axis]);
+		for (int other = 0; other < 3; ++other)
+			if (other != axis) sum += abs(edges[axis].x * edges[other].y - edges[axis].y * edges[other].x);
+		vReach[axis] = sum;
+	}
+}
+)";
+
+const char *const BodyFragmentSource = R"(
+uniform sampler2D uRayDepth;   // the rays' depth: nothing of a body shows behind the world
+uniform int uPixelSize;        // pixels a ray coloured each way
+uniform int uNumber;           // 1 + the body's primitive's number
+uniform int uShade;            // the shade of the light on it
+uniform float uOpacity;        // how much of it shows (dithered)
+flat in vec2 vCentre;
+flat in float vDepth;
+flat in int vColor, vOutlined;
+flat in vec2 vEdge0, vEdge1, vEdge2;
+flat in vec3 vReach;
+layout(location = 0) out uint outNote;   // the body's number << 8 | the pixel's colour
+layout(location = 1) out float outDepth; // how far ahead
+const float Bayer[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+void main()
+{
+	ivec2 pixel = ivec2(gl_FragCoord.xy);
+	if (vOutlined != 0 && pixel != ivec2(floor(vCentre)))
+	{
+		// (in the cube's six-sided outline: across each edge no farther from its middle than the other two reach)
+		vec2 from = vec2(pixel) + 0.5 - vCentre;
+		if (abs(vEdge0.x * from.y - vEdge0.y * from.x) > vReach.x || abs(vEdge1.x * from.y - vEdge1.y * from.x) > vReach.y
+			|| abs(vEdge2.x * from.y - vEdge2.y * from.x) > vReach.z) discard;
+	}
+	if (vDepth >= texelFetch(uRayDepth, pixel / uPixelSize, 0).r) discard;
+	if (uOpacity < 1.0 && Bayer[(pixel.y & 3) * 4 + (pixel.x & 3)] / 16.0 >= uOpacity) discard;
+	uint colour = uint(vColor);
+	if (uShade > 0)
+	{
+		uint shaded = colour + uint(uShade);
+		colour = shaded > 255u || ((shaded ^ colour) & 0xF0u) != 0u ? 15u : shaded;
+	}
+	outNote = (uint(uNumber) << 8) | colour;
+	outDepth = vDepth;
+	gl_FragDepth = clamp(vDepth / 8192.0, 0.0, 1.0);
+}
+)";
+
 const char *const EffectsSource = R"(
 uniform usampler2D uRayColor, uRayGlow; // the rays' pictures: the palette colour, the glow
 uniform sampler2D uRayDepth;            // ... the depth along the view axis
 uniform usampler2D uSeeThrough;         // a colour over another, by level: FirstPersonView's see-through tables end to end, 2048 bytes a row
+uniform usampler2D uBodyNote;           // the voxel bodies' picture (see BodyFragmentSource): the body on each pixel (1 + its primitive's number) << 8 | its colour; 0 none
+uniform sampler2D uBodyDepth;           // ... and how far ahead it is there
+uniform int uBodyOutlines;              // 1: some body has a hitbox's outline round it (see outlineOwner)
 uniform samplerBuffer uPrims;           // the primitives, EffectTexels texels each
 uniform usamplerBuffer uBytes;          // the sprites' pixels and opacity maps
 uniform usamplerBuffer uBins;           // a number per bin of the screen (and one more): where its list starts; then the lists, a primitive's number each
 uniform vec3 uForward, uRight, uUp, uLevelRight, uLevelUp; // the camera, in true proportions (see FirstPersonView::updateBasis)
 uniform vec2 uLevel;                    // straight ahead along the ground
 uniform float uEyeZ, uFocal;            // the eye's height in voxels; the focal length in pixels
+uniform vec2 uAxis;                     // where the view axis meets the picture, in pixels: its middle, but an eye's picture in VR is off centre
 uniform ivec2 uViewSize, uBinGrid;      // the view in pixels; the bins across and down
 uniform int uPixelSize;                 // pixels a ray coloured each way
 // A frame with the outlines round the units' pictures (settings "Hitboxes" with "Full sprite hitboxes") is drawn in two goes:
@@ -2092,7 +2312,7 @@ int outlineOwner(ivec2 at, out float ownerDepth, out uint ownerColor)
 	int owner = 0;
 	if (at.x < 0 || at.y < 0 || at.x >= uViewSize.x || at.y >= uViewSize.y) return 0;
 	float sceneDepth = texelFetch(uRayDepth, at, 0).r;
-	float across = (float(at.x) + 0.5 - float(uViewSize.x) * 0.5) / uFocal, rise = (float(uViewSize.y) * 0.5 - (float(at.y) + 0.5)) / uFocal;
+	float across = (float(at.x) + 0.5 - uAxis.x) / uFocal, rise = (uAxis.y - (float(at.y) + 0.5)) / uFocal;
 	vec3 trueRay = uForward + across * uRight + rise * uUp, ray = vec3(trueRay.xy, trueRay.z / ZScale); // (in voxels; one unit ahead, so how far along is the view depth)
 	for (int record = 0; record < uOutlineCount; ++record)
 	{
@@ -2115,6 +2335,22 @@ int outlineOwner(ivec2 at, out float ownerDepth, out uint ownerColor)
 		ownerDepth = along;
 		ownerColor = uint(t6.z);
 	}
+	// (A voxel body's hitbox is the body as drawn: its pixels where it shows, see FirstPersonView::drawVoxelUnit.)
+	if (uBodyOutlines != 0)
+	{
+		uint note = texelFetch(uBodyNote, at, 0).r;
+		if (note != 0u)
+		{
+			vec4 head = prim((int(note >> 8) - 1) * EffectTexels, 0);
+			float bodyDepth = texelFetch(uBodyDepth, at, 0).r;
+			if (head.z > 0.0 && bodyDepth <= sceneDepth + 0.01 && (owner == 0 || bodyDepth < ownerDepth))
+			{
+				owner = int(head.z);
+				ownerDepth = bodyDepth;
+				ownerColor = uint(head.w);
+			}
+		}
+	}
 	return owner;
 }
 
@@ -2136,7 +2372,7 @@ void main()
 		lastPile = notes.a;
 		glow &= 3u;
 	}
-	if (uOutlineCount > 0)
+	if (uOutlineCount > 0 || (uBodyOutlines != 0 && uContinue != 0))
 	{
 		// FirstPersonView::outlineBands: a pixel that isn't an outlined picture's, borders one and shows something behind it
 		// takes that picture's outline colour (the nearest such picture's).
@@ -2165,7 +2401,7 @@ void main()
 		}
 	}
 	// The pixel's ray, reaching one unit ahead (so how far along it is the view depth too).
-	float across = (float(pixel.x) + 0.5 - float(uViewSize.x) * 0.5) / uFocal, rise = (float(uViewSize.y) * 0.5 - (float(pixel.y) + 0.5)) / uFocal;
+	float across = (float(pixel.x) + 0.5 - uAxis.x) / uFocal, rise = (uAxis.y - (float(pixel.y) + 0.5)) / uFocal;
 	vec3 ray = uForward + across * uRight + rise * uUp;
 	int bin = (pixel.y / EffectBin) * uBinGrid.x + pixel.x / EffectBin;
 	int listEnd = int(texelFetch(uBins, bin + 1).r);
@@ -2271,6 +2507,23 @@ void main()
 			mark = 0u;
 			lastSolid = uint(number + 1);
 		}
+		else if (kind == EffectBody)
+		{
+			// FirstPersonView::drawVoxelUnit: the body's pixels, drawn ahead by the card (see BodyVertexSource), laid in
+			// here where nothing drawn before it is nearer.
+			uint note = texelFetch(uBodyNote, pixel, 0).r;
+			if (note >> 8 != uint(number + 1)) continue;
+			float bodyDepth = texelFetch(uBodyDepth, pixel, 0).r;
+			if (bodyDepth >= depth) continue;
+			color = note & 255u;
+			depth = bodyDepth;
+			glow = 0u;
+			veil = (flags & 2) != 0 ? UnitVeilMax : 255;
+			own = 1u;
+			mark = 0u;
+			lastSolid = uint(number + 1);
+			if ((flags & 8) != 0) lastPile = uint(number + 1);
+		}
 		else if (kind == EffectGroundShade)
 		{
 			// FirstPersonView::drawGroundShade: the ray down onto the ground plane; within the disc (or
@@ -2304,7 +2557,7 @@ void main()
 		{
 			// FirstPersonView::drawDecals: the pixels whose point in the scene lies within the mark's radius.
 			vec4 t2 = prim(base, 2), t3 = prim(base, 3);
-			float sceneRight = (float(pixel.x) + 0.5 - float(uViewSize.x) * 0.5) * depth / uFocal, sceneUp = (float(uViewSize.y) * 0.5 - (float(pixel.y) + 0.5)) * depth / uFocal;
+			float sceneRight = (float(pixel.x) + 0.5 - uAxis.x) * depth / uFocal, sceneUp = (uAxis.y - (float(pixel.y) + 0.5)) * depth / uFocal;
 			float fromMark = length(vec3(depth - t2.z, sceneRight - t3.x, sceneUp - t3.y));
 			if (pixel == ivec2(int(t2.x), int(t2.y)))
 			{
@@ -2358,6 +2611,16 @@ void main()
 		{
 			// A round dot in front of the scene, in rings (a shot's head, a flare), or only its rim (a bubble).
 			vec4 t2 = prim(base, 2), t3 = prim(base, 3);
+			if ((flags & 8) != 0)
+			{
+				// A tongue of flame (FirstPersonView::drawParticles, a burning voxel body's): half again as tall as wide,
+				// its edge ragged by the dither, its middle the hotter colour, which alone may glow.
+				float along = length((vec2(pixel) + vec2(0.5) - t2.xy) / vec2(t2.z, t2.z * 1.5));
+				if (along > 1.0 || head.w >= depth + t2.w || (along > 0.6 && dither(pixel.x, pixel.y) < (along - 0.6) * 2.5)) continue;
+				color = along < 0.4 ? uint(t3.x) : uint(head.z);
+				if (along < 0.4 && (flags & 1) != 0) glow = 1u;
+				continue;
+			}
 			vec2 at = vec2(pixel) + ((flags & 2) != 0 ? vec2(0.5) : vec2(0.0));
 			float fromCentre = length(at - t2.xy);
 			if (fromCentre > t2.z || head.w >= depth + t2.w) continue;
@@ -2607,6 +2870,86 @@ void main()
 		else if (uShafts != 0 && (texelFetch(uGlow, pixel, 0).r & 64u) != 0u) shown = min(vec3(1.0), shown + max(vec3(0.0), full - paletteColor(ray)));
 	}
 	outPixel = vec4(shown, 1.0);
+}
+)";
+
+/**
+ * An eye's picture finished for a headset and left on the card (VR, see FirstPersonGpu::EyeFrame): the picture the
+ * units and effects left, the CPU's last marks over it, then the weapon in hand, its laser and the crosshair, each of
+ * their pixels as the CPU would have tested it against the scene's depth (FirstPersonView::fillQuadAtDepth, drawHeldModel,
+ * drawLine3D); through the palette, the bottom row first. Beside it the eye's depth as the headset takes it
+ * (FirstPerson::vrProjectionDepth: keep the two alike).
+ */
+const char *const EyeSource = R"(
+uniform usampler2D uColor, uMarks, uHeld; // the finished picture, the CPU's marks, the weapon in hand (palette colours; 0: nothing)
+uniform usampler2D uRayColor, uGlow;      // in full colour: the rays' own palette colours, and the picture's glow (bit 64: smoke over the pixel)
+uniform sampler2D uRayTrue;               // ... the rays' full colours
+uniform int uFull, uShafts;               // 1: in full colour (setting "True colour"), as PresentSource shows it; 1: with light in the air
+uniform sampler2D uSceneDepth, uHeldTest, uHeldDepth, uPalette; // the scene's depth; what depth each of the weapon's pixels was drawn at, and the depth it wrote; the palette
+uniform usampler2D uFlameTint;            // each colour in the flames' orange light (see PresentSource)
+uniform float uFlameGlow;
+uniform ivec2 uViewSize;
+uniform ivec4 uHeldBox;                   // where the weapon's pictures hold anything: left, top, one past the right, one past the bottom
+uniform ivec4 uMarksBox;                  // where the marks' picture holds anything, likewise (only that part was sent up: outside it the picture on the card is an earlier frame's, and isn't looked at)
+uniform int uDepthWhole;                  // 1: uHeldDepth is the eye's whole finished depth (the weapon is among the marks)
+uniform vec3 uDepthPlanes;                // voxels to metres, the near plane and the far one (metres)
+layout(location = 0) out vec4 outPixel;
+layout(location = 1) out float outDepth;
+
+const float Bayer[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+float dither(int x, int y) { return Bayer[(y & 3) * 4 + (x & 3)] / 16.0; }
+
+void main()
+{
+	// (The view's pictures have the top row first; the eye's texture the bottom one.)
+	ivec2 pixel = ivec2(int(gl_FragCoord.x), uViewSize.y - 1 - int(gl_FragCoord.y));
+	float depth = texelFetch(uSceneDepth, pixel, 0).r;
+	uint made = pixel.x >= uMarksBox.x && pixel.y >= uMarksBox.y && pixel.x < uMarksBox.z && pixel.y < uMarksBox.w ? texelFetch(uMarks, pixel, 0).r : 0u;
+	bool world = made == 0u; // (the pixel is the world's own, not a mark's or the weapon's: it may show in full colour)
+	if (made == 0u)
+	{
+		made = texelFetch(uColor, pixel, 0).r;
+		int glowRows = int(float(uViewSize.y) * 0.3), firstRow = uViewSize.y - glowRows;
+		if (uFlameGlow > 0.0 && pixel.y >= firstRow && dither(pixel.x, pixel.y) < pow(float(pixel.y - firstRow) / float(glowRows), 1.6) * uFlameGlow)
+		{
+			made = texelFetch(uFlameTint, ivec2(int(made), 0), 0).r;
+		}
+	}
+	if (uDepthWhole != 0)
+	{
+		depth = texelFetch(uHeldDepth, pixel, 0).r;
+	}
+	else if (pixel.x >= uHeldBox.x && pixel.y >= uHeldBox.y && pixel.x < uHeldBox.z && pixel.y < uHeldBox.w)
+	{
+		uint held = texelFetch(uHeld, pixel, 0).r;
+		if (held != 0u)
+		{
+			// Hidden where the scene is nearer (the laser with a voxel to spare), as the CPU tests it; 0: over everything.
+			float drawnAt = texelFetch(uHeldTest, pixel, 0).r;
+			float spare = drawnAt < 0.0 ? 1.0 : 0.0;
+			if (!(abs(drawnAt) >= depth + spare))
+			{
+				made = held;
+				world = false;
+			}
+		}
+		// (The depth the weapon's faces wrote, where they are nearer than the scene: the nearest wins, as in a depth buffer.)
+		depth = min(depth, texelFetch(uHeldDepth, pixel, 0).r);
+	}
+	vec3 shown = texelFetch(uPalette, ivec2(int(made), 0), 0).rgb;
+	if (uFull != 0 && world)
+	{
+		// In full colour: the ray's own where the pixel still has its ray's palette colour; under see-through smoke the
+		// light the card found in the air there, laid on (as PresentSource has both).
+		uint ray = texelFetch(uRayColor, pixel, 0).r;
+		vec3 full = texelFetch(uRayTrue, pixel, 0).rgb;
+		if (made == ray) shown = full;
+		else if (uShafts != 0 && (texelFetch(uGlow, pixel, 0).r & 64u) != 0u) shown = min(vec3(1.0), shown + max(vec3(0.0), full - texelFetch(uPalette, ivec2(int(ray), 0), 0).rgb));
+	}
+	outPixel = vec4(shown, 1.0);
+	float metres = depth * uDepthPlanes.x;
+	float projected = metres <= uDepthPlanes.y ? 0.0 : (isinf(metres) ? 1.0 : uDepthPlanes.z / (uDepthPlanes.z - uDepthPlanes.y) * (1.0 - uDepthPlanes.y / metres));
+	outDepth = min(max(projected, 0.0), 1.0);
 }
 )";
 

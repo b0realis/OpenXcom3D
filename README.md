@@ -24,7 +24,7 @@
 - **See:** the original maps, sprites, palette and sounds, rebuilt in 3D from the game's own voxel data: light and shadow, a flashlight and flares, night vision gear, smoke as the map draws it, rain and snow under a grey sky, windows that shatter, swinging doors, glowing UFOs, bullet holes and scorch marks, out to 200 tiles; the stars over XPiratez's space stations; under the sea, bubbles, marine snow and caustics.
 - **Lead the squad:** every soldier's live helmet camera on the top bar (hover for their card, right click for the big soldier cam), a camera window over the isometric map, and the aliens' turn watched through the eyes of whoever sees the alien.
 - **Feel it:** recoil and muzzle flashes, marks on the crosshair (white ticks for a hit, red for a kill, a blue shield when a strike does no harm), each hit's damage rising over the unit, shots whizzing past, rain, wind and fires heard round you, blood on the view and a heartbeat when badly hurt, panic and berserk through your soldier's own eyes, and a helmet camera dying in static.
-- **Make it yours:** 123 settings and 43 keys of its own (**Options → 3D VIEW**), and a controller layout made for the Steam Deck.
+- **Make it yours:** 121 settings and 46 keys of its own (**Options → 3D VIEW**), and a controller layout made for the Steam Deck.
 
 | | |
 |---|---|
@@ -108,6 +108,7 @@ You need your own copy of the original game data (*UFO: Enemy Unknown / X-COM: U
 - **Steam Deck:** the Linux archive, set up once in Desktop Mode and added to Steam, played in Game Mode with its own controller layout.
 - **macOS (Apple silicon and Intel, macOS 11 and newer):** the **macOS zip** from the latest release: unpack it and open **OpenXcom3D.app**. A first build, made by the [automatic builds](https://github.com/b0realis/OpenXcom3D/actions/workflows/build.yml?query=branch%3Amain) and not yet tried on a real Mac.
 - **From source:** `python3 install.py --from-source` clones OXCE at the commit below, applies the patch, builds and installs; the **[build guide](https://b0realis.github.io/OpenXcom3D/)** has every step by hand, for Linux and for Windows.
+- **Meta Quest 3 (experimental, *VR game design experimentation — not for gaming at the moment*):** a standalone headset build from source, installed with adb: [quest3/README.md](quest3/README.md).
 
 The first time, it finds *X-COM: UFO Defense* and *Terror From The Deep* in your Steam libraries by itself; otherwise put the game's folder next to it, named `UFO` (or `TFTD`). Its data is only linked, never copied or changed. Then start a game (or a **New Battle**) and press **F8** in battle: mouse to look, **W A S D** to walk, the left button to fire, **F8** back to the map.
 

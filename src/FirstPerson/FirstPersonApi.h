@@ -112,6 +112,8 @@ const int AutoEquipLeftoversPass = 5;
 enum ViewResolution { ViewResolutionHud, ViewResolutionBattlescape, ViewResolutionDisplay };
 /// Whether a view the display's own size can be shown.
 bool canPresentAtDisplaySize();
+/// Whether the display has a byte for each of red, green and blue (a frame in full colour can be laid into it).
+bool displayTakesFullColor();
 /// The value to fill the game's screen with where a view the display's size is to show through (see presentView).
 Uint32 presentKey(SDL_Surface *screen);
 /// Asks for a view (8-bit, the size of the display's picture area) to be laid into the display at this frame's flip, where the screen still holds presentKey.
@@ -160,6 +162,9 @@ State *createOptionsTab(OptionsOrigin origin);
 /// Settles settings that take their first value from an older one (the smoke from "See-through
 /// smoke", the flashlight from 1.0's two flashlight settings, the next fire mode key from 1.0's).
 void settleOptions();
+/// Called once the player's options are read (Options::init): the Meta Quest build's defaults that
+/// changed, set once on a profile saved before them (see the function).
+void optionsLoaded();
 /// The groups of presets on the first page of the 3D VIEW tab: how it plays, and how fine it is drawn.
 enum PresetGroup { PRESET_GAMEPLAY, PRESET_GRAPHICS };
 /// How many presets a group has by name; Custom is the number after the last.
@@ -283,6 +288,8 @@ void noteQuickFall(const SavedBattleGame *save, BattleUnit *unit);
 void clearQuickFalls();
 /// Setting "Quick deaths": the frame of a unit's quick fall to draw, or -1 if it isn't falling.
 int quickFallPhase(const BattleUnit *unit);
+/// Setting "Quick deaths": how far a unit's quick fall has come, 0 to 1 (smoothly), or -1 if it isn't falling.
+double quickFallProgress(const BattleUnit *unit);
 /// Setting "Quick deaths": the unit whose quick fall plays on this tile (drawn there falling, the
 /// tile's items held back meanwhile), or null.
 BattleUnit *quickFallOn(const SavedBattleGame *save, const Tile *tile);
@@ -389,6 +396,11 @@ int shotgunBulletSprite(const Mod *mod, const RuleItem *ammo);
 /// A unit panics or goes berserk: returns true if the first-person view shows it its own way
 /// (the game then leaves out its "has panicked" box, which would freeze the view behind it).
 bool breakdown(BattlescapeState *state, BattleUnit *unit);
+/// A shot or a throw is fired at the target picked (BattlescapeGame::primaryAction, a spray burst's
+/// last point): true if the game should fire it without turning the shooter to face the target
+/// first (VR mode: nothing turns the soldier but the right stick; the 3D view fires only within his
+/// front arc, what he sees).
+bool shotKeepsFacing(BattlescapeState *state, const BattleAction &action);
 /// A close-quarters check failed: the shooter's shot is knocked aside at this tile, and the game
 /// has turned the shooter to face it. The first-person view looks there too, so the soldier
 /// isn't turned back to the old view afterwards (at a cost, with "Turning costs TU").
@@ -439,6 +451,7 @@ inline double statBarScale(BattlescapeState *, int, int, int) { return 1.0; }
 inline bool toggleMapAkimbo(BattlescapeState *, BattleUnit *) { return false; }
 inline void drawMapAkimbo(BattlescapeState *, BattleUnit *, Surface *, Surface *) { }
 inline void mapAkimbo(BattlescapeState *, BattleAction &) { }
+inline bool shotKeepsFacing(BattlescapeState *, const BattleAction &) { return false; }
 inline void reactionAkimbo(BattlescapeState *, BattleAction &) { }
 inline void reactionFiredAt(BattlescapeState *, const BattleUnit *) { }
 inline void unitStruck(BattlescapeState *, const BattleUnit *, int, int) { }

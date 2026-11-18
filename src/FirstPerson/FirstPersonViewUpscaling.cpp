@@ -454,7 +454,7 @@ bool FirstPersonView::upscaleHere(const double world[3], double scale) const
 	}
 	// Screen pixels per sprite pixel across, as drawSprite works it out (an isometric pixel is
 	// 1/sqrt(2) of a voxel across).
-	return (getWidth() / 2.0) / _halfFovTangent / depth * scale * SpritePixelX >= UpscaleFrom;
+	return focalPixels() / depth * scale * SpritePixelX >= UpscaleFrom;
 }
 
 /**

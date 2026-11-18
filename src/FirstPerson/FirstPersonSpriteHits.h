@@ -93,7 +93,8 @@ struct SpriteCard
  * @param unit The unit.
  * @param view The view.
  * @param card Set to the card.
- * @return False if the unit has no card (down, or none to make).
+ * @return False if the unit has no card (down, none to make, or hit by its voxel body: setting
+ * "Voxel units", which isn't outlined).
  */
 bool viewCard(SavedBattleGame *save, const BattleUnit *unit, const FirstPersonView *view, SpriteCard &card);
 

@@ -159,6 +159,23 @@ const float EdgeDotSpacing = 16.0f, EdgeDotInset = 3.0f, EdgeDotSize = 2.5f;
 /// voxel up, where a true projection of cubes would draw 1.22 pixels: one voxel up is sqrt(2/3)
 /// of one voxel across. The camera works in true proportions; rays walk the voxel grid.
 const double ZScale = 0.81649658092772603;
+/// A voxel unit (setting "Voxel units") is painted by its sprites as pictures taken at its height up to a camera this many
+/// degrees above its chest, along the isometric view's slant from higher (see VoxelUnitModel::colours).
+const double VoxelSlantAbove = 15.0;
+/// A voxel unit's voxel (half a voxel big) is drawn as a square this many voxels wide, so that no gaps show between them,
+/// and at most this many pixels from its middle (right up against the camera).
+/// A voxel body's voxel: a cube this big (the body's own measure: a cell of its grid), drawn at most VoxelSplatHalfMax
+/// pixels each way from its middle, cut to its six-sided outline once it's over VoxelOutlineFrom pixels each way.
+const double VoxelCubeEdge = 0.5, VoxelSplatHalfMax = 48.0;
+/// On the processor a body whose cubes are smaller than this on the screen (half their width seen corner on, pixels)
+/// is drawn in blocks of 2 cells each way, under half of it in blocks of 4 (see recordVoxelUnit).
+const double VoxelCoarseHalf = 0.6;
+const float VoxelOutlineFrom = 1.5f;
+/// At most this many voxel units' bodies are made a frame (each takes a few milliseconds; see VoxelUnits).
+const int VoxelBuildsPerFrame = 1;
+/// What the game draws over a voxel unit's sprite (flames, bubbles) is drawn this many voxels nearer than the unit, over
+/// its body's front.
+const double VoxelOverlayNearer = 8.0;
 const float ZScaleF = (float)ZScale;
 /// An isometric sprite pixel across is 1/sqrt(2) of a voxel (32 pixels span a tile's diagonal).
 const double SpritePixelX = 0.70710678118654752;
@@ -179,6 +196,18 @@ const float TestedPictureDepthSlack = 0.5f, TestedPictureDepthSlackElsewhere = 4
 /// pace, BattlescapeState::DEFAULT_ANIM_SPEED a frame; GitHub issue #58: the fall needn't hurry, nothing waits for it),
 /// and the most fall frames it shows (a fall is surely over after that many: the armors have 3 or so, mods may give more).
 const Uint32 QuickFallFrameTime = 100;
+/// A voxel body going down by the game's own fall shows each of its fall's shapes (one for each death frame, then lying)
+/// this long, ms: at the frames' own pace the whole fall was over in a third of a second, and read as standing, then a
+/// pile (the owner: "does it have any death animation? It is perceived as standing - and a pile on floor").
+const Uint32 VoxelFallShapeTime = 170;
+/// Setting "See-through corpses" on a voxel body lying on the floor (see drawFloorItems): it is in the way of an aim whose
+/// line passes within this far of its middle on the ground, voxels (a heap; a big unit's wreck), and is drawn at this
+/// share of the ghost opacity.
+const double VoxelCorpseReach = 9.0, VoxelWreckReach = 18.0, VoxelCorpseFaint = 0.6;
+/// A Celatid's voxel body hovers as its picture's frames do: up and down by this much (voxels), once in this long (ms),
+/// swelling and shrinking by this share meanwhile (the owner: "Celatid should have some movement in voxel units also").
+const double CelatidBob = 1.2, CelatidSwell = 0.04;
+const Uint32 CelatidBobTime = 1400;
 /// A hit unit flinches back and flashes for this many milliseconds (see FirstPersonView::watchUnits), the flash up to
 /// HitFlashShade shade steps brighter at the hit (settings "Hit flash" and "Muzzle flashes", which turns every flash
 /// off); a downed unit's body flashes the same way.

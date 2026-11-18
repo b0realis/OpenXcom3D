@@ -72,6 +72,8 @@ public:
 		float maxDistance;                        // how far rays go, in voxels
 		float eye[3], forward[3], right[3], up[3];
 		float halfPlaneWidth, halfPlaneHeight;    // the image plane one voxel in front of the eye
+		float eyeAxis[2], eyeFocal;               // an eye's picture (VR), off centre: where its view axis meets it, in pixels, and its pixels per unit of the image plane (0: the view's own, by the half plane)
+		float fovea[2];                           // setting "VR foveation", an eye's picture only: full detail out to [0] of its half width from the view axis, a ray for 2 x 2 pixels to [1], for 4 x 4 beyond; [0] 0: off
 		int width, height, pixelSize;             // the view in pixels, and how many pixels a ray colours each way
 		int goggles = 0;                          // night vision's colour group + 1 (0: off): the world's colours are the goggles' (see FirstPersonView::updateColors)
 		float rayScale = 1.0f;                    // setting "Render scale": the blocks a ray colours each way (1: a ray a block; 2: a quarter of the rays), magnified on the card
@@ -150,7 +152,31 @@ public:
 	{
 		static const int Texels = 10;  // a primitive: this many texels of four floats
 		static const int Bin = 32;     // the screen in squares of this many pixels: each has the list of the primitives that may touch it
-		enum Kind { Sprite = 1, GroundShade, Decal, Line, Dot, Disc, Quad };
+		enum Kind { Sprite = 1, GroundShade, Decal, Line, Dot, Disc, Quad, VoxelBody };
+		/// A unit's voxel body (setting "Voxel units"; FirstPersonView::recordVoxelUnit): its cubes, which the card draws
+		/// itself ahead of the primitives (sent up once for each body's shape, found again by where they are and what
+		/// they hold), and where the body stands this frame. Its primitive (kind VoxelBody) lays it in at its turn: texel 0
+		/// is the kind, flags (2 a unit's, 8 a pile's), its hitbox outline's number (0: none) and that outline's colour.
+		struct Body
+		{
+			const float *right, *ahead, *up; // each cube's place from the middle of the feet, in the body's own measure
+			const Uint8 *colours;            // each cube's palette colour: the first of colourStep bytes
+			int colourStep;
+			const Uint8 *parts;              // each cube's part (VoxelUnitModel::Part), or null: none is an item's
+			size_t count;                    // how many cubes
+			int number;                      // its primitive's number
+			float feet[3];                   // the middle of its feet from the eye, in voxels
+			float cosine, sine;              // the way it faces
+			float measure;                   // voxels to one of its own measures (its size, and half for a fine body)
+			float floorCut;                  // nothing of it below this height, from the eye
+			bool items;                      // with the items in its hands
+			bool cubes;                      // the cubes cut to their outlines (else the squares round them)
+			float edges[3][2], lean[3], middle[2]; // a cube's half edges on the screen at a depth of one, how much deeper each goes, and the view's middle
+			int shade;                       // the shade of the light on it
+			float opacity;                   // how much of it shows (dithered)
+		};
+		std::vector<Body> bodies;
+		bool bodyOutlines = false;     // some body has a hitbox's outline (drawn in the second go, as the pictures' are)
 		static const int OutlineTexels = 7; // an outlined picture's record (see outlineAt)
 		std::vector<float> prims;      // the primitives (and after them the outlined pictures' records, if any)
 		int primCount = 0;             // how many primitives
@@ -166,6 +192,7 @@ public:
 		bool outlineGlows = false;
 		float forward[3], right[3], up[3], levelRight[3], levelUp[3], level[2]; // the camera in true proportions (FirstPersonView::updateBasis)
 		float eyeZ, focal;             // the eye's height, in voxels; the focal length, in pixels
+		float axis[2];                 // where the view axis meets the picture, in pixels (its middle; an eye's picture in VR is off centre)
 		int width = 0, height = 0;     // the view, in pixels
 		const Uint8 *seeThrough = nullptr; // a colour over another, by level: FirstPersonView::_seeThroughTables
 		Uint32 paletteHash = 0;        // the palette they, and the two below, were made for (sent again when it changes)
@@ -210,6 +237,34 @@ public:
 		const Uint8 *flameTint = nullptr; // ... each colour in that light (256)
 		Uint32 *pixels = nullptr;      // where the frame goes, a 0xFFRRGGBB number a pixel, rows from the top; null: it stays on the card (see presentedTexture)
 	};
+	/// An eye's picture finished on the card and left there, for a headset's display on a context that shares the
+	/// renderer's textures (VR on the Meta Quest; see FirstPersonView::presentEyesOnCard): the last drawEffects' picture
+	/// for a view of this size, the CPU's last marks over it, then the weapon in hand, each of its pixels where the
+	/// scene isn't nearer; through the palette, the bottom row first (as a layer's picture is uploaded); and beside it
+	/// the eye's depth as the headset takes it (0 at the near plane, 1 at the far one and beyond).
+	struct EyeFrame
+	{
+		int width = 0, height = 0;         // the eye's picture, in pixels
+		int slot = 0, eye = 0;             // which of the three pairs kept (one being made, one ready, one shown), and which eye of it
+		const Uint8 *marks = nullptr;      // what the CPU drew over everything after the card's passes, over an empty picture: palette colours, 0 where nothing
+		int marksPitch = 0;                // ... bytes from one row to the next
+		int marksBox[4] = {};              // ... the part of the picture that holds anything: left, top, one past the right, one past the bottom (empty: nothing); only that part is sent up
+		const Uint8 *held = nullptr;       // the weapon in hand, its laser and the crosshair, over an empty picture of their own
+		int heldPitch = 0;
+		const float *heldTest = nullptr;   // ... the depth each of those pixels was drawn at (0: over everything; below 0: that far, with a voxel to spare); width floats a row
+		const float *heldDepth = nullptr;  // ... the depth they wrote (infinite where none); with depthWhole the eye's whole finished depth
+		int box[4] = {};                   // the part of the picture they are in: left, top, one past the right, one past the bottom (empty: none)
+		bool depthWhole = false;           // the scene's depth was fetched for a mark: the weapon is among the marks, tested on the CPU
+		bool full = false, shafts = false; // in full colour (setting "True colour"), with light in the air this frame: as Present has them
+		const SDL_Color *palette = nullptr;
+		Uint32 paletteHash = 0;
+		float flameGlow = 0.0f;            // a burning soldier's flames light the lower part of the view (see Present)
+		const Uint8 *flameTint = nullptr;
+		float depthToMetres = 0.0f, nearMetres = 0.0f, farMetres = 0.0f; // the depth: voxels to metres, and the headset's near and far planes
+		Uint32 *pixels = nullptr;          // (the check) the finished picture read back: R, G, B, A a byte each in memory, the bottom row first; null: not asked
+		float *depth = nullptr;            // (the check) the finished depth read back, the bottom row first; null: not asked
+		unsigned colorTexture = 0, depthTexture = 0; // set: the OpenGL textures (RGBA8, R32F) the eye's picture and depth are in
+	};
 	/// Where a frame's time went, in milliseconds.
 	struct Timing
 	{
@@ -241,8 +296,22 @@ public:
 	/// The OpenGL texture (RGBA8, rows from the top) the last present for a view of this size drew into; 0: none. For a
 	/// display on the renderer's own context to show without reading anything back.
 	unsigned presentedTexture(int width, int height);
+	/// Finishes an eye's picture on the card and leaves it there (see EyeFrame). False if the card failed.
+	bool presentEye(EyeFrame &frame);
+	/// After both eyes of a pair (presentEye): a fence the display's thread waits on before it reads the pair's textures
+	/// (an OpenGL sync object, shared as the textures are; it lasts until the same slot's next pair). Null: none.
+	void *eyeFence(int slot);
+	/// Whether the renderer's context shares its textures with the game's other contexts (see shareContext).
+	bool sharesContext() const;
+	/// The context whose share group the renderer's context joins where the system has one for us (Android's EGL: the
+	/// VR shell's context joins it too, and so reads the eyes' textures; made the first time either asks, never
+	/// current anywhere, kept for the game's life); null elsewhere, or if it can't be made. An EGLContext.
+	static void *shareContext();
 	/// The depth of the units and effects last drawn for a view of this size, read back after all (see Effects::readDepth).
 	bool readEffectsDepth(int width, int height, float *depth);
+	/// One pixel of that depth (the column and the row from the top): for a mark that asks about a single spot, so the
+	/// whole picture need not come back (and, for VR's eyes, need not go up again: see FirstPersonView::gpuDepthAt).
+	bool readEffectsDepthAt(int width, int height, int pixelX, int pixelY, float &depth);
 
 private:
 	FirstPersonGpu();

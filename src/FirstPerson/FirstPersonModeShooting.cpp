@@ -206,7 +206,7 @@ public:
 		{
 			add(_button[seconds]);
 			_button[seconds]->onMouseClick((ActionHandler)&DoomFuseState::buttonClicked);
-			_button[seconds]->onKeyboardPress((ActionHandler)&DoomFuseState::buttonClicked, (SDLKey)(SDLK_1 + seconds));
+			_button[seconds]->onKeyboardPress((ActionHandler)&DoomFuseState::buttonClicked, (SDL_Keycode)(SDLK_1 + seconds));
 			SDL_Rect square = { 0, 0, (Uint16)_button[seconds]->getWidth(), (Uint16)_button[seconds]->getHeight() };
 			_button[seconds]->drawRect(&square, colors->border);
 			square.x++; square.y++; square.w -= 2; square.h -= 2;
@@ -1354,7 +1354,8 @@ FirstPersonMode::MeleeAim FirstPersonMode::meleeDownedTarget(BattleUnit *unit) c
  * meleeDowned). With "Turning
  * costs TU" an eighth at a time the shorter way round, each the armor's turn cost (as the game's
  * turn charges it; nothing in Doom mode), the turn and the use both wanting their time units
- * before either is spent; with free turning for nothing.
+ * before either is spent; with free turning for nothing. In VR mode no turn: refused, saying the
+ * soldier must be turned with the stick first.
  * @param unit The soldier.
  * @param direction The way to face (-1, or the way faced already: no turn).
  * @param useTime The time units the use takes after the turn.
@@ -1365,6 +1366,12 @@ bool FirstPersonMode::turnBeforeUse(BattleUnit *unit, int direction, int useTime
 	if (direction < 0 || direction == unit->getDirection())
 	{
 		return true;
+	}
+	// (VR mode: nothing turns the soldier but the right stick: a use that needs a turn waits for one)
+	if (vrOn())
+	{
+		vrWarnArc();
+		return false;
 	}
 	const int eighths = std::min((direction - unit->getDirection() + 8) % 8, (unit->getDirection() - direction + 8) % 8);
 	const int turnCost = Options::fpsTurnCost && !doomModeOn() ? eighths * unit->getTurnCost() : 0;
@@ -1485,6 +1492,8 @@ bool FirstPersonMode::crosshairTerrainMelee(BattleUnit *unit, Position &struck, 
  * it gives a point of the open air on the ray instead, inside the map (see skyReach), which a
  * shot may aim at as at any other: the game takes an empty tile as a target (its middle), and the
  * round flies on along the line past it.
+ * (VR mode with a right hand: along the weapon's barrel from its muzzle, whatever the pixel; see
+ * aimRay.)
  * @param pixelX Pixel column in the 3D view.
  * @param pixelY Pixel row in the 3D view.
  * @param unit The soldier looking (left out of the line).
@@ -1495,10 +1504,44 @@ bool FirstPersonMode::crosshairTerrainMelee(BattleUnit *unit, Position &struck, 
  */
 bool FirstPersonMode::aimAt(int pixelX, int pixelY, BattleUnit *unit, Position &voxel, int *voxelType) const
 {
-	// The ray from the eye through that pixel, in voxels (16 per tile across, 24 per level).
-	double eye[3], rayDirection[3];
-	_view->getEye(eye);
-	_view->getRayDirection(pixelX + aimPixelShift(), pixelY + aimPixelShift(), rayDirection);
+	double origin[3], rayDirection[3];
+	aimRay(pixelX, pixelY, origin, rayDirection);
+	return aimAlong(origin, rayDirection, unit, voxel, voxelType);
+}
+
+/**
+ * The aim's ray through a pixel of the view, in voxels (16 per tile across, 24 per level): from
+ * the eye through it; in VR mode with a right hand (see vrUpdateRifle) from the weapon's muzzle
+ * along its barrel, whatever the pixel (the owner: "Controller moves the weapon and crosshair").
+ * @param pixelX Pixel column in the 3D view.
+ * @param pixelY Pixel row in the 3D view.
+ * @param origin Set to where the ray starts.
+ * @param direction Set to its way, a unit vector in the voxel grid.
+ */
+void FirstPersonMode::aimRay(int pixelX, int pixelY, double origin[3], double direction[3]) const
+{
+	if (vrRifleAims())
+	{
+		std::copy(_vrRifle.muzzle, _vrRifle.muzzle + 3, origin);
+		std::copy(_vrRifle.aimGrid, _vrRifle.aimGrid + 3, direction);
+		return;
+	}
+	_view->getEye(origin);
+	_view->getRayDirection(pixelX + aimPixelShift(), pixelY + aimPixelShift(), direction);
+}
+
+/**
+ * What a shot would hit along a ray (see aimAt): the first voxel on it, by the game's own line of
+ * fire, or the point of open air on it.
+ * @param eye Where the ray starts, in voxels.
+ * @param rayDirection Its way, a unit vector in the voxel grid.
+ * @param unit The soldier looking (left out of the line).
+ * @param voxel Set to the voxel hit, or to the point of open air on the ray.
+ * @param voxelType If given, set to what was hit.
+ * @return True if something was hit.
+ */
+bool FirstPersonMode::aimAlong(const double eye[3], const double rayDirection[3], BattleUnit *unit, Position &voxel, int *voxelType) const
+{
 	const Position rayOrigin((int)eye[0], (int)eye[1], (int)eye[2]);
 	const Position farPoint(rayOrigin.x + (int)(rayDirection[0] * 1500), rayOrigin.y + (int)(rayDirection[1] * 1500),
 		rayOrigin.z + (int)(rayDirection[2] * 1500));
@@ -1639,7 +1682,7 @@ int FirstPersonMode::shotTurnCost(BattleUnit *unit, int &direction, bool &afford
 	direction = -1;
 	affordable = true;
 	if (melee) *melee = false;
-	if (!Options::fpsTurnCost || doomModeOn() || !unit)
+	if (!Options::fpsTurnCost || doomModeOn() || !unit || vrOn()) // (VR mode: no turn before a use, see vrInArc)
 	{
 		return 0;
 	}
@@ -2733,6 +2776,13 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 		tile.x = std::clamp<int>(tile.x, 0, _save->getMapSizeX() - 1);
 		tile.y = std::clamp<int>(tile.y, 0, _save->getMapSizeY() - 1);
 		tile.z = std::clamp<int>(tile.z, 0, _save->getMapSizeZ() - 1);
+		// (VR mode: only within the soldier's arc; nothing turns him for it, see vrInArc)
+		if (vrOn() && !vrInArc(unit, tile))
+		{
+			vrWarnArc();
+			_triggerHeld = false;
+			return;
+		}
 		// (Free turning, no "Turning costs TU": the soldier faces the first point for free, so the
 		// game's turn to it before the burst costs nothing, as for any shot, see launchShot.)
 		if (!Options::fpsTurnCost && !action->waypoints.empty() && unit->directionTo(action->waypoints.front()) != unit->getDirection())
@@ -3004,6 +3054,16 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 	const bool arcing = mode == BA_THROW || (isShot(mode) && weapon && weapon->getArcingShot(mode));
 	const Position targetTile = arcing ? arcTargetTile(aimedVoxel, aimedType, unit) : aimedTile(aimedVoxel);
 
+	// VR mode: a shot or a throw needs its target in the soldier's front arc, what he sees by the game's rules; nothing
+	// turns him for it (the owner: "no automatic turning for a shot"; the right stick turns him). Outside it the laser
+	// and the crosshair are dimmed (see vrRenderEyes), and a click says why.
+	if (vrOn() && !vrInArc(unit, targetTile))
+	{
+		vrWarnArc();
+		_triggerHeld = false;
+		return;
+	}
+
 	// Confirm fire (setting): the first click marks the target and shows its path (see
 	// updateTrajectory); a click on the same tile with the same weapon and mode fires, a click on
 	// another moves the mark. The held trigger's next bursts after a confirmed one go on firing.
@@ -3210,8 +3270,9 @@ void FirstPersonMode::launchShot(BattleUnit *unit, BattleItem *weapon, BattleAct
 
 	// Free turning (no "Turning costs TU"): the soldier first faces the target for free, as
 	// looking round does, so the game's own turn before the shot costs nothing. (The crosshair
-	// near the edge of an eighth can aim at a tile in the next one.)
-	if (!Options::fpsTurnCost && (isShot(mode) || mode == BA_THROW) && unit->directionTo(targetTile) != unit->getDirection())
+	// near the edge of an eighth can aim at a tile in the next one.) VR mode turns him for no shot:
+	// the game's own turn is left out too (see FirstPerson::shotKeepsFacing).
+	if (!Options::fpsTurnCost && (isShot(mode) || mode == BA_THROW) && unit->directionTo(targetTile) != unit->getDirection() && !vrOn())
 	{
 		unit->setDirection(unit->directionTo(targetTile));
 		_save->getTileEngine()->calculateFOV(unit);
@@ -3681,7 +3742,8 @@ void FirstPersonMode::freeAim(BattlescapeState *state, const BattleAction &actio
  * voxels from the middle, while the eye stays near the middle: past a corner the crosshair
  * cleared, the game's line could meet the wall (a player's report: the laser went into the near
  * wall). So what the crosshair sees, the round reaches. Arcing shots keep the game's origin (the
- * hand), and so does a shot while the eye isn't on the soldier's tile (a step being walked).
+ * hand), and so does a shot while the eye isn't on the soldier's tile (a step being walked). In VR
+ * mode with a right hand, the round leaves the weapon's muzzle (see vrUpdateRifle).
  * @param state The battlescape screen (it owns the first-person mode).
  * @param action The shot being fired.
  * @param origin The game's origin, in voxels, to change.
@@ -3696,6 +3758,14 @@ void FirstPersonMode::freeAimFrom(BattlescapeState *state, const BattleAction &a
 	const FirstPersonMode *firstPerson = state->_firstPerson;
 	if (action.actor != firstPerson->_trackedUnit || action.actor->getPosition() != firstPerson->_trackedTile)
 	{
+		return;
+	}
+	// (VR with a right hand: from the weapon's muzzle, the line the laser shows: see vrUpdateRifle)
+	if (firstPerson->vrRifleAims())
+	{
+		origin.x = (int)std::floor(firstPerson->_vrRifle.muzzle[0]);
+		origin.y = (int)std::floor(firstPerson->_vrRifle.muzzle[1]);
+		origin.z = (int)std::floor(firstPerson->_vrRifle.muzzle[2]);
 		return;
 	}
 	origin.x = (int)std::floor(firstPerson->_eyeX + firstPerson->_leanShift[0]);
@@ -3869,6 +3939,17 @@ bool FirstPersonMode::chainRippleHolds(BattlescapeState *state)
 bool FirstPersonMode::spriteHitboxes(BattlescapeState *state)
 {
 	return Options::fpsSpriteHitboxes && state && state->_firstPerson;
+}
+
+/**
+ * The units' voxel bodies of the battle on this screen (setting "Voxel units"): the 3D views' and, with "Full sprite
+ * hitboxes", what a shot meets (see FirstPerson::spriteHit).
+ * @param state The battlescape screen.
+ * @return The bodies, or null without the mod's 3D view.
+ */
+VoxelUnits *FirstPersonMode::voxelUnits(BattlescapeState *state)
+{
+	return state && state->_firstPerson ? state->_firstPerson->_voxelUnits.get() : nullptr;
 }
 
 /**
@@ -4071,6 +4152,38 @@ void FirstPersonMode::freeAimTarget(const BattleAction &action, Position &target
 	// This round's angles off the crosshair (radians, right and up), turned into the pixel of
 	// the view they point through (the focal length in pixels comes from the field of view).
 	const double angleX = gaussian() * sigmaRadians, angleY = gaussian() * sigmaRadians;
+	// (VR with a right hand: off the weapon's barrel, from its muzzle, see vrRifleRay; the sky far along that line. A
+	// unit's picture or body met there, setting "Full sprite hitboxes": through the very point of it from the muzzle,
+	// where the round leaves (see freeAimFrom), far beyond, as below.)
+	if (vrRifleAims())
+	{
+		double origin[3], direction[3];
+		vrRifleRay(std::tan(angleX), std::tan(angleY), origin, direction);
+		Position hitVoxel;
+		int hitType = V_EMPTY;
+		double crossing[3];
+		if (aimAlong(origin, direction, unit, hitVoxel, &hitType))
+		{
+			target = hitVoxel;
+			if (hitType == V_UNIT && FirstPerson::lastExactCrossing(crossing))
+			{
+				const Position muzzle((int)std::floor(origin[0]), (int)std::floor(origin[1]), (int)std::floor(origin[2]));
+				const double towards[3] = { crossing[0] - (muzzle.x + 0.5), crossing[1] - (muzzle.y + 0.5), crossing[2] - (muzzle.z + 0.5) };
+				const double length = std::sqrt(towards[0] * towards[0] + towards[1] * towards[1] + towards[2] * towards[2]);
+				if (length > 1.0)
+				{
+					const double reach = FreeAimRoundReach / length;
+					target = muzzle + Position((int)std::lround(towards[0] * reach), (int)std::lround(towards[1] * reach), (int)std::lround(towards[2] * reach));
+				}
+			}
+		}
+		else
+		{
+			target = Position((int)(origin[0] + direction[0] * 1500), (int)(origin[1] + direction[1] * 1500), (int)(origin[2] + direction[2] * 1500));
+		}
+		_bloom = std::min(_bloom + (action.type == BA_AUTOSHOT ? 0.45 : 0.3), 3.0);
+		return;
+	}
 	const int viewWidth = _view->getWidth(), viewHeight = _view->getHeight();
 	const double focalPixels = (viewWidth / 2.0) / std::tan(fieldOfViewNow() * Pi / 360.0);
 	const int pixelX = std::clamp((int)std::lround(viewWidth / 2.0 + std::tan(angleX) * focalPixels), 0, viewWidth - 1);
@@ -4403,7 +4516,7 @@ void FirstPersonMode::updateCrosshair(BattleUnit *unit, bool playerTurn)
 	_txtDamage->setVisible(show && Options::fpsCrosshairInfo && Options::fpsCrosshairDamage && playerTurn);
 	// The rangefinder (GitHub issue #139; setting "Rangefinder"): in the player's turn with its setting, or while its
 	// key is held (then whatever the settings, in the aliens' turn too; the digital kind with the setting off).
-	const bool rangeHeld = Options::keyFpsRange != SDLK_UNKNOWN && SDL_GetKeyState(nullptr)[Options::keyFpsRange] && !gameModifierHeld();
+	const bool rangeHeld = isKeyHeld(Options::keyFpsRange) && !gameModifierHeld();
 	const bool rangeShown = show && unit && ((Options::fpsRangefinder != 0 && playerTurn) || rangeHeld);
 	const bool rangeAnalogue = rangeShown && Options::fpsRangefinder == 2;
 	_txtRange->setVisible(rangeShown && !rangeAnalogue);

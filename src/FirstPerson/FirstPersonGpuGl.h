@@ -61,11 +61,14 @@ const Enum ARRAY_BUFFER = 0x8892, STREAM_DRAW = 0x88E0, DYNAMIC_DRAW = 0x88E8;
 const Enum PIXEL_PACK_BUFFER = 0x88EB, STREAM_READ = 0x88E1, READ_ONLY = 0x88B8;
 const Enum FRAMEBUFFER = 0x8D40, COLOR_ATTACHMENT0 = 0x8CE0, FRAMEBUFFER_COMPLETE = 0x8CD5;
 const Enum FRAGMENT_SHADER = 0x8B30, VERTEX_SHADER = 0x8B31, COMPILE_STATUS = 0x8B81, LINK_STATUS = 0x8B82, INFO_LOG_LENGTH = 0x8B84;
-const Enum TRIANGLES = 0x0004, DEPTH_TEST = 0x0B71, BLEND = 0x0BE2, DITHER = 0x0BD0;
+const Enum TRIANGLES = 0x0004, DEPTH_TEST = 0x0B71, BLEND = 0x0BE2, DITHER = 0x0BD0, SCISSOR_TEST = 0x0C11;
 const Enum PACK_ALIGNMENT = 0x0D05, UNPACK_ALIGNMENT = 0x0CF5, PACK_ROW_LENGTH = 0x0D02;
 const Enum MAX_TEXTURE_BUFFER_SIZE = 0x8C2B;
-const Enum TIME_ELAPSED = 0x88BF, QUERY_RESULT = 0x8866;
+const Enum TIME_ELAPSED = 0x88BF, QUERY_RESULT = 0x8866, QUERY_RESULT_AVAILABLE = 0x8867, GPU_DISJOINT = 0x8FBB;
+const Enum EXTENSIONS = 0x1F03;
 const Enum IMPLEMENTATION_COLOR_READ_TYPE = 0x8B9A, IMPLEMENTATION_COLOR_READ_FORMAT = 0x8B9B;
+const Enum SYNC_GPU_COMMANDS_COMPLETE = 0x9117;
+const Enum DEPTH_ATTACHMENT = 0x8D00, DEPTH_COMPONENT = 0x1902, DEPTH_COMPONENT32F = 0x8CAC, COLOR = 0x1800, DEPTH = 0x1801, LESS = 0x0201;
 
 // The functions used: one line each, as OpenGL declares them. GL_FUNCTIONS(X) lists them for the
 // declarations below and for the loader (GpuContext::loadFunctions).
@@ -81,6 +84,8 @@ const Enum IMPLEMENTATION_COLOR_READ_TYPE = 0x8B9A, IMPLEMENTATION_COLOR_READ_FO
 	X(void, Finish, (void)) \
 	X(void, Flush, (void)) \
 	X(void, Disable, (Enum capability)) \
+	X(void, Enable, (Enum capability)) \
+	X(void, Scissor, (Int x, Int y, Sizei width, Sizei height)) \
 	X(void, Viewport, (Int x, Int y, Sizei width, Sizei height)) \
 	X(void, PixelStorei, (Enum name, Int value)) \
 	X(void, GenBuffers, (Sizei count, UInt *buffers)) \
@@ -131,11 +136,30 @@ const Enum IMPLEMENTATION_COLOR_READ_TYPE = 0x8B9A, IMPLEMENTATION_COLOR_READ_FO
 	X(void, GenVertexArrays, (Sizei count, UInt *arrays)) \
 	X(void, DeleteVertexArrays, (Sizei count, const UInt *arrays)) \
 	X(void, BindVertexArray, (UInt array)) \
-	X(void, DrawArrays, (Enum mode, Int first, Sizei count))
+	X(void, DrawArrays, (Enum mode, Int first, Sizei count)) \
+	X(void, ClearBufferuiv, (Enum buffer, Int drawBuffer, const UInt *value)) \
+	X(void, ClearBufferfv, (Enum buffer, Int drawBuffer, const Float *value)) \
+	X(void, DepthFunc, (Enum function)) \
+	X(void, DepthMask, (Boolean writes)) \
+	X(void *, FenceSync, (Enum condition, UInt flags)) \
+	X(void, DeleteSync, (void *sync))
+
+// Functions the renderer can do without, looked up the same way and left null where the driver has none: the
+// timers on the graphics card's own clock, which tell how long the card worked on what was drawn between a begin
+// and an end (for OPENXCOM3D_GPU_STAGES, see FirstPersonGpu.cpp; OpenGL 3.3 has them, OpenGL ES with
+// GL_EXT_disjoint_timer_query); and the call that tells a tile-based chip a picture's old contents aren't needed
+// (OpenGL ES 3 and OpenGL 4.3 have it; for OPENXCOM3D_GPU_FORGET_TARGETS, see FirstPersonGpu.cpp, drawOver).
+#define GL_OPTIONAL_FUNCTIONS(X) \
+	X(void, GenQueries, (Sizei count, UInt *queries)) \
+	X(void, BeginQuery, (Enum target, UInt query)) \
+	X(void, EndQuery, (Enum target)) \
+	X(void, GetQueryObjectuiv, (UInt query, Enum name, UInt *value)) \
+	X(void, InvalidateFramebuffer, (Enum target, Sizei count, const Enum *attachments))
 
 // Each function as a pointer, filled in by GpuContext::loadFunctions: Gl::Finish(), Gl::BindBuffer(...).
 #define GL_DECLARE(result, name, arguments) extern result (GL_CALL *name) arguments;
 GL_FUNCTIONS(GL_DECLARE)
+GL_OPTIONAL_FUNCTIONS(GL_DECLARE)
 #undef GL_DECLARE
 
 }
@@ -162,6 +186,8 @@ public:
 	void destroy();
 	/// The graphics card's name, as its driver gives it.
 	const std::string &name() const { return _name; }
+	/// Whether the context is in the share group other contexts of the game can join (see FirstPersonGpu::shareContext).
+	bool shared() const { return _shared; }
 	~GpuContext() { destroy(); }
 private:
 	bool loadFunctions();
@@ -174,6 +200,7 @@ private:
 	void *(*_getProcAddress)(const char *) = nullptr;
 	std::string _name;
 	bool _es = false;
+	bool _shared = false;
 };
 
 }

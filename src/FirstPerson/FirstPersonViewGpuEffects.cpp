@@ -53,6 +53,7 @@
 #include "../Engine/Logger.h"
 #include "../Engine/Options.h"
 #include "../Engine/Surface.h"
+#include "FirstPersonApi.h"
 #include "FirstPersonGpu.h"
 #include "FirstPersonSpriteHits.h"
 #include "FirstPersonViewShared.h"
@@ -138,6 +139,8 @@ struct GpuEffectList
 	void clear()
 	{
 		effects.prims.clear();
+		effects.bodies.clear();
+		effects.bodyOutlines = false;
 		effects.outlineAt = -1;
 		effects.outlineCount = 0;
 		outlines.clear();
@@ -169,7 +172,8 @@ struct GpuEffectList
 };
 
 /**
- * Whether this frame's units and effects go to the card, with its rays.
+ * Whether this frame's units and effects go to the card, with its rays (a voxel body too: the card draws its
+ * cubes itself, see gpuRecordBody).
  * @return 0 no; 1 yes; 2 yes, beside the CPU's own, which is shown, the two compared (OPENXCOM3D_GPU_EFFECTS=check).
  */
 int FirstPersonView::gpuEffectsWanted() const
@@ -187,6 +191,90 @@ void FirstPersonView::gpuBeginEffects()
 	if (!_gpuEffects) _gpuEffects = std::make_shared<GpuEffectList>();
 	_gpuEffects->clear();
 	_gpuRecording = true;
+}
+
+/**
+ * Records a unit's voxel body (setting "Voxel units"; see recordVoxelUnit, which worked out where it stands and its
+ * cubes' edges on the screen): the card draws its cubes itself, from the body's own arrays (sent up once for each
+ * shape, see FirstPersonGpu::Effects::Body), and its primitive lays the picture in at its turn among the others. Its
+ * box on the screen is the box round its cubes' own bounds (the corners of the block they fill, each as wide as the
+ * biggest cube may be drawn); all of the view if one of them is behind the eye.
+ * Texel 0: kind, flags (2 a unit's, 8 a pile's), its hitbox outline's number (0 none), that outline's colour.
+ */
+void FirstPersonView::gpuRecordBody(const DrawStep &step)
+{
+	if (!step.bodyCount)
+	{
+		return;
+	}
+	GpuEffectList &list = *_gpuEffects;
+	// The block its cubes fill, in its own measure: kept for each shape, found again by where its arrays are.
+	struct Bounds { size_t count; float first, last, low[3], high[3]; };
+	static std::unordered_map<const float*, Bounds> known;
+	if (known.size() > 4096) known.clear();
+	Bounds &bounds = known[step.bodyRight];
+	if (bounds.count != step.bodyCount || bounds.first != step.bodyRight[0] || bounds.last != step.bodyUp[step.bodyCount - 1])
+	{
+		bounds = { step.bodyCount, step.bodyRight[0], step.bodyUp[step.bodyCount - 1], { 1e9f, 1e9f, 1e9f }, { -1e9f, -1e9f, -1e9f } };
+		const float *const arrays[3] = { step.bodyRight, step.bodyAhead, step.bodyUp };
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			const auto ends = std::minmax_element(arrays[axis], arrays[axis] + step.bodyCount);
+			bounds.low[axis] = *ends.first;
+			bounds.high[axis] = *ends.second;
+		}
+	}
+	const int width = getWidth(), height = getHeight();
+	int left = width, top = height, right = 0, bottom = 0;
+	const double reach = VoxelSplatHalfMax + 2.0;
+	for (int corner = 0; corner < 8; ++corner)
+	{
+		const double across = ((corner & 1) ? bounds.high[0] : bounds.low[0]) * step.bodyMeasure, along = ((corner & 2) ? bounds.high[1] : bounds.low[1]) * step.bodyMeasure,
+			up = ((corner & 4) ? bounds.high[2] : bounds.low[2]) * step.bodyMeasure;
+		const double world[3] = { step.bodyFeet[0] + across * step.bodyCosine + along * step.bodySine, step.bodyFeet[1] + across * step.bodySine - along * step.bodyCosine,
+			step.bodyFeet[2] + up };
+		double screenX, screenY, depth;
+		if (!projectToScreen(world, screenX, screenY, depth))
+		{
+			left = top = 0; right = width; bottom = height;
+			break;
+		}
+		const double half = std::min(reach, (std::abs(step.voxelEdges[0][0]) + std::abs(step.voxelEdges[1][0]) + std::abs(step.voxelEdges[2][0])
+			+ std::abs(step.voxelEdges[0][1]) + std::abs(step.voxelEdges[1][1]) + std::abs(step.voxelEdges[2][1])) / depth + 2.0);
+		left = std::min(left, (int)std::floor(screenX - half)); right = std::max(right, (int)std::ceil(screenX + half) + 1);
+		top = std::min(top, (int)std::floor(screenY - half)); bottom = std::max(bottom, (int)std::ceil(screenY + half) + 1);
+	}
+	left = std::max(0, left); top = std::max(0, top); right = std::min(width, right); bottom = std::min(height, bottom);
+	if (left >= right || top >= bottom)
+	{
+		return;
+	}
+	float *texels = list.add(FirstPersonGpu::Effects::VoxelBody, left, top, right, bottom);
+	list.pictured.back() = { step.sprite.unit, step.sprite.body, step.sprite.pile };
+	texels[1] = (float)((step.sprite.unit ? 2 : 0) | (step.sprite.pile ? 8 : 0));
+	texels[2] = (float)step.voxelHitOutline;
+	texels[3] = step.voxelHitOutline ? (float)_outlineColors[step.voxelHitOutline - 1] : 0.0f;
+	if (step.voxelHitOutline) list.effects.bodyOutlines = true;
+	FirstPersonGpu::Effects::Body body;
+	body.right = step.bodyRight; body.ahead = step.bodyAhead; body.up = step.bodyUp;
+	body.colours = step.bodyColours; body.colourStep = step.bodyColourStep; body.parts = step.bodyParts;
+	body.count = step.bodyCount;
+	body.number = (int)list.boxes.size() - 1;
+	for (int axis = 0; axis < 3; ++axis) body.feet[axis] = (float)(step.bodyFeet[axis] - _eye[axis]);
+	body.cosine = (float)step.bodyCosine; body.sine = (float)step.bodySine;
+	body.measure = (float)step.bodyMeasure;
+	body.floorCut = (float)std::max(-1e9, step.bodyFloorCut - _eye[2]);
+	body.items = step.bodyItems;
+	body.cubes = step.voxelOutline;
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		body.edges[axis][0] = step.voxelEdges[axis][0]; body.edges[axis][1] = step.voxelEdges[axis][1];
+		body.lean[axis] = step.voxelLean[axis];
+	}
+	body.middle[0] = step.voxelMiddle[0]; body.middle[1] = step.voxelMiddle[1];
+	body.shade = step.bodyShade;
+	body.opacity = step.voxelOpacity;
+	list.effects.bodies.push_back(body);
 }
 
 /**
@@ -218,7 +306,8 @@ void FirstPersonView::gpuRecordSprite(const SpriteDraw &draw)
 	}
 	const int width = getWidth(), height = getHeight();
 	const int spriteWidth = sprite->getWidth(), spriteHeight = sprite->getHeight();
-	const double focalLength = (width / 2.0) / _halfFovTangent;
+	const double focalLength = focalPixels();
+	const double viewAxisX = axisX(), viewAxisY = axisY(); // where the view axis meets the picture (its middle, but in VR)
 	auto dot = [](const double a[3], const double b[3]) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; };
 	const double level[2] = { std::cos(_yaw), std::sin(_yaw) };
 	const double anchor[3] = { world[0] - _eye[0], world[1] - _eye[1], (world[2] - _eye[2]) * ZScale };
@@ -252,7 +341,7 @@ void FirstPersonView::gpuRecordSprite(const SpriteDraw &draw)
 				left = top = 0; right = width; bottom = height;
 				continue;
 			}
-			const double screenX = width / 2.0 + dot(corner, _right) * focalLength / depth, screenY = height / 2.0 - dot(corner, _up) * focalLength / depth;
+			const double screenX = viewAxisX + dot(corner, _right) * focalLength / depth, screenY = viewAxisY - dot(corner, _up) * focalLength / depth;
 			left = std::min(left, (int)std::floor(screenX)); right = std::max(right, (int)std::ceil(screenX));
 			top = std::min(top, (int)std::floor(screenY)); bottom = std::max(bottom, (int)std::ceil(screenY));
 		}
@@ -435,14 +524,15 @@ void FirstPersonView::gpuRecordDot(int left, int top, int dotWidth, int dotHeigh
 
 /**
  * Records a round dot in front of the scene (a shot's head, a flare; a bubble's ring).
- * Texel 0: kind, flags (1 it glows, 2 measured from the pixels' middles, 4 only its rim, a pixel wide), its rim's
- * colour, its depth. Texel 2: its middle on the screen, its radius, its leeway in front of the scene; 3: its centre's
+ * Texel 0: kind, flags (1 it glows, 2 measured from the pixels' middles, 4 only its rim, a pixel wide, 8 a tongue of
+ * flame: half again as tall as wide, ragged at the edge, its centre's colour within 0.4 of the radius, only that
+ * glowing), its rim's colour, its depth. Texel 2: its middle on the screen, its radius, its leeway in front of the scene; 3: its centre's
  * colour and the ring's round it, and how far out (of the radius) each reaches.
  */
 void FirstPersonView::gpuRecordDisc(double screenX, double screenY, double radius, double depth, float leeway, Uint8 rim, Uint8 centre, Uint8 middle, float centreShare,
 	float middleShare, int flags)
 {
-	const int reach = (int)std::ceil(radius) + 2;
+	const int reach = (int)std::ceil(radius * ((flags & 8) ? 1.5 : 1.0)) + 2;
 	const int left = std::max(0, (int)screenX - reach), top = std::max(0, (int)screenY - reach), right = std::min(getWidth(), (int)screenX + reach + 1),
 		bottom = std::min(getHeight(), (int)screenY + reach + 1);
 	if (left >= right || top >= bottom)
@@ -502,7 +592,7 @@ void FirstPersonView::gpuRecordQuad(const double corners[4][2], Uint8 color, flo
 void FirstPersonView::gpuRecordOutlines()
 {
 	GpuEffectList &list = *_gpuEffects;
-	if (_outlinedUnits.empty() || list.effects.outlineAt >= 0)
+	if ((_outlinedUnits.empty() && !list.effects.bodyOutlines) || list.effects.outlineAt >= 0)
 	{
 		return;
 	}
@@ -538,7 +628,7 @@ void FirstPersonView::gpuRecordOutlines()
 		for (const double number : numbers) list.outlines.push_back((float)number);
 		++list.effects.outlineCount;
 	}
-	if (list.effects.outlineCount > 0)
+	if (list.effects.outlineCount > 0 || list.effects.bodyOutlines) // (a voxel body's outline goes round its own pixels: no record)
 	{
 		list.effects.outlineAt = (int)list.boxes.size();
 		list.effects.outlineOpacity = _outlineOpacity;
@@ -604,18 +694,24 @@ bool FirstPersonView::gpuDrawEffects()
 	effects.level[0] = (float)std::cos(_yaw);
 	effects.level[1] = (float)std::sin(_yaw);
 	effects.eyeZ = (float)_eye[2];
-	effects.focal = (float)((width / 2.0) / _halfFovTangent);
+	effects.focal = (float)focalPixels();
+	effects.axis[0] = (float)axisX();
+	effects.axis[1] = (float)axisY();
 	effects.seeThrough = _seeThroughTables.empty() ? nullptr : _seeThroughTables.data();
 	effects.paletteHash = _colors.paletteHash;
 	// The bloom after them, as drawLightHalos sets it up.
-	effects.halos = !_nearestRgb.empty();
+	// (OPENXCOM3D_GPU_SKIP_BLOOM, a measurement for a headset's log, not a way to play: the frame without the bloom's
+	// eleven passes, to see what they cost there; nothing glows round the lights.)
+	static const bool skipBloom = getenv("OPENXCOM3D_GPU_SKIP_BLOOM") != nullptr;
+	effects.halos = !_nearestRgb.empty() && !skipBloom;
 	effects.glowGain = _colors.underwater ? 45.0f : 18.0f + 42.0f * _colors.night;
 	effects.maxDistance = _maxDistance;
 	effects.palette = getPalette();
 	effects.nearestRgb = _nearestRgb.empty() ? nullptr : _nearestRgb.data();
 	// The screen wash after that, as applyScreenWash has it (the static's pattern moved on by it, or here when the card washes alone).
 	effects.wash = _nightVision || _tintAmount > 0.0f || _vignette > 0.0f || _controlHaze > 0.0f || _staticAmount > 0.0f;
-	if (effects.wash && !_gpuChecking) _staticSeed = _staticSeed * 1664525u + 1013904223u;
+	// (VR's second eye keeps the first eye's: both see the same static.)
+	if (effects.wash && !_gpuChecking && !_replayPass) _staticSeed = _staticSeed * 1664525u + 1013904223u;
 	effects.nightVision = _nightVision;
 	effects.ownColours = Options::fpsNightVisionUnits;
 	effects.tintAmount = _tintAmount;
@@ -635,7 +731,11 @@ bool FirstPersonView::gpuDrawEffects()
 	effects.notes = allNotes ? list.notes.data() : nullptr;
 	const int patchLeft = std::max(0, _pointerX - PointerReach), patchTop = std::max(0, _pointerY - PointerReach),
 		patchRight = std::min(width, _pointerX + PointerReach + 1), patchBottom = std::min(height, _pointerY + PointerReach + 1);
-	const bool patched = !allNotes && patchLeft < patchRight && patchTop < patchBottom;
+	// (OPENXCOM3D_GPU_SKIP_POINTER_NOTES, a measurement for a headset's log, not a way to play: the patch isn't read back,
+	// so nothing is found under the pointer, and the game's thread no longer waits here for the card to finish the
+	// picture; the frame rate with it against the rate without says what reading the notes without waiting would gain.)
+	static const bool skipPointerNotes = getenv("OPENXCOM3D_GPU_SKIP_POINTER_NOTES") != nullptr;
+	const bool patched = !allNotes && !skipPointerNotes && patchLeft < patchRight && patchTop < patchBottom;
 	effects.patch[0] = patchLeft; effects.patch[1] = patchTop;
 	effects.patch[2] = patched ? patchRight - patchLeft : 0; effects.patch[3] = patched ? patchBottom - patchTop : 0;
 	list.patchNotes.resize((size_t)(2 * PointerReach + 1) * (2 * PointerReach + 1) * 4);
@@ -668,9 +768,8 @@ bool FirstPersonView::gpuDrawEffects()
 	_gpuPresenting = !fullColor ? 0 : !presentAsked ? 1 : !strcmp(presentAsked, "check") ? 2 : atoi(presentAsked) != 0 ? 1 : 0;
 	// (Only a display with a byte for each of red, green and blue can show such a frame: on an 8-bit one the view's own
 	// palette picture is what is shown, and it must hold the world.)
-	const SDL_Surface *display = SDL_GetVideoSurface();
-	if (_gpuPresenting == 1 && (!display || display->format->BytesPerPixel != 4)) _gpuPresenting = 0;
-	const bool onCard = _gpuPresenting == 1;
+	if (_gpuPresenting == 1 && !FirstPerson::displayTakesFullColor()) _gpuPresenting = 0;
+	const bool onCard = _gpuPresenting == 1 || _eyeOnCard; // (VR: an eye kept on the card, see presentEyesOnCard)
 	const bool shaftSmoke = fullColor && _hasLightShafts && !onCard;
 	effects.rayColors = fullColor && !onCard ? _rayColors.data() : nullptr;
 	if (onCard) output.trueColor = nullptr;
@@ -765,6 +864,7 @@ bool FirstPersonView::gpuDrawEffects()
 		for (int row = 0; row < height; ++row) std::memcpy(&_gpuBeforeLast[(size_t)row * width], getRaw(0, row), width);
 	}
 	_gpuDepthPending = true; // (the depth stays on the card until something drawn after this asks: see gpuNeedDepth)
+	_gpuEyeKept = true;
 	return true;
 }
 
@@ -781,6 +881,31 @@ void FirstPersonView::gpuFetchDepth()
 	{
 		std::fill(_depthBuffer.begin(), _depthBuffer.end(), 0.0f); // (the card failed: everything counts as hidden this frame)
 	}
+}
+
+/**
+ * The frame's finished depth at one pixel (which must be on the view), for a mark that only asks about a single spot (a
+ * downed unit's icons: is the body's place in view?). With the depth still on the card that one pixel is read from
+ * there and the rest stays: the whole picture came back for it before, and then, for an eye of VR kept on the card,
+ * went up again as the eye's finished depth with the weapon tested here on the CPU (see FirstPersonView::renderEyes):
+ * megabytes each way for one number. The answer is the same number. If the card can't say, the whole depth is fetched
+ * as before.
+ */
+float FirstPersonView::gpuDepthAt(int pixelX, int pixelY)
+{
+	const size_t index = (size_t)pixelY * getWidth() + pixelX;
+	if (!_gpuDepthPending)
+	{
+		return _depthBuffer[index];
+	}
+	FirstPersonGpu *gpu = readyFirstPersonGpu();
+	float depth = 0.0f;
+	if (gpu && gpu->readEffectsDepthAt(getWidth(), getHeight(), pixelX, pixelY, depth))
+	{
+		return depth;
+	}
+	gpuFetchDepth();
+	return _depthBuffer[index];
 }
 
 /**
