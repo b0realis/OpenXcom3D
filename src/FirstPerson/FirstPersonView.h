@@ -659,6 +659,7 @@ private:
 	std::vector<TileMemo> _tileMemos;                   // per tile: its parts last frame, and their solid mask
 	/// Floors under a UFO's hull with its floor going on inside (see paintedFloor), by the four parts' models and the UFO floors on the four sides (null: none there).
 	std::map<std::array<const VoxelModel*, 8>, std::unique_ptr<VoxelModel>> _paintedFloors;
+	mutable bool _anyGlass = false; // a model made so far has window glass in it: the card's program with the reflections is wanted (setting "Reflections")
 	/// The floor of a tile under a UFO's hull, with the UFO's floor going on inside (null: as it is).
 	const VoxelModel *paintedFloor(int index, const std::array<const VoxelModel*, 4> &parts);
 	/// What a tile part was last frame, so its models are looked up again only when something changed (see snapshotTile).

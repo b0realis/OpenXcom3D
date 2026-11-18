@@ -93,8 +93,8 @@ void FirstPersonMode::turnByMouse(int mouseDeltaX, int mouseDeltaY)
 
 /**
  * Zooms the view in while the zoom key (U) or, in mouse look, the right button is held (setting
- * "Zoom"): the view glides in to ZoomFactor times closer over ZoomSeconds, and back out when
- * let go, at a steady pace on a log scale (each step magnifies by the same share, so it feels
+ * "Zoom"): the view glides in to ZoomFactor times closer over ZoomSeconds (ZoomBoostFactor times with the jump key
+ * held too), and back out when let go, at a steady pace on a log scale (each step magnifies by the same share, so it feels
  * even), slow enough for the SCOPING line's number to be read as it climbs (see updateScope).
  * Only the view changes: the crosshair, the aim, the shot and the hit chance stay as they are.
  * The mouse and the turn keys turn the view that much slower meanwhile (see turnByMouse,
@@ -106,7 +106,11 @@ void FirstPersonMode::updateZoom(double elapsedSeconds)
 	const Uint8 *keyStates = SDL_GetKeyState(nullptr);
 	const bool keyHeld = Options::keyFpsZoom != SDLK_UNKNOWN && keyStates[Options::keyFpsZoom] && !gameModifierHeld();
 	const bool zoomedIn = Options::fpsZoom && isActive() && (keyHeld || (_zoomButtonHeld && _mouseLook));
-	const double logTarget = zoomedIn ? std::log(ZoomFactor) : 0.0, logStep = std::log(ZoomFactor) * elapsedSeconds / ZoomSeconds;
+	// (Zoomed in, the jump key held looks ZoomBoostFactor times closer: a player, GitHub issue #176, 4 times "a bit
+	// anemic for large maps and sniper squad sight"; the owner: "Zoom + space at maxed zoom goes to 8x". The key
+	// doesn't jump meanwhile: see keyboard.)
+	const bool boosted = zoomedIn && Options::keyFpsJump != SDLK_UNKNOWN && keyStates[Options::keyFpsJump];
+	const double logTarget = zoomedIn ? std::log(boosted ? ZoomBoostFactor : ZoomFactor) : 0.0, logStep = std::log(ZoomFactor) * elapsedSeconds / ZoomSeconds;
 	const double logZoom = std::log(_zoom);
 	_zoom = std::exp(logTarget > logZoom ? std::min(logTarget, logZoom + logStep) : std::max(logTarget, logZoom - logStep));
 }

@@ -124,7 +124,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..6c32c8b14
+index 000000000..109770ab8
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,616 @@
@@ -184,7 +184,7 @@ index 000000000..6c32c8b14
 +  STR_FPS_FIELD_OF_VIEW: "Field of view"
 +  STR_FPS_FIELD_OF_VIEW_DESC: "How wide the 3D view is, in degrees (50-110)."
 +  STR_FPS_ZOOM: "Zoom"
-+  STR_FPS_ZOOM_DESC: "Hold U (in 3D then not the UFOpedia), or the right button in mouse look, to look 4 times closer. Aim and hit chances stay the same."
++  STR_FPS_ZOOM_DESC: "Hold U (in 3D then not the UFOpedia), or the right button in mouse look, to look 4 times closer; with Space held too, 8 times. Aim and hit chances stay the same."
 +  STR_FPS_SCOPING: "SCOPING {0}x"
 +  STR_FPS_PLAYSTYLE: "Playstyle"
 +  STR_FPS_PLAYSTYLE_DESC: "Faithful: the game's way. FPS: shooting, turning, moving, hitboxes, deaths as a shooter's. Custom: your mix."
@@ -292,7 +292,7 @@ index 000000000..6c32c8b14
 +  STR_FPS_DISCREET_EDGE: "Discreet map edge"
 +  STR_FPS_DISCREET_EDGE_DESC: "The map's edge as small red dots on the floor, instead of the yellow tape."
 +  STR_FPS_RENDERER: "Renderer"
-+  STR_FPS_RENDERER_DESC: "CPU: runs anywhere. GPU: the graphics card draws the 3D world (Linux, Windows, macOS); the CPU takes over where it can't."
++  STR_FPS_RENDERER_DESC: "CPU: runs anywhere. GPU: the graphics card draws the 3D world (Linux, Windows, macOS); the CPU takes over where it can't. {ALT}The first switch to GPU can freeze the game for a while: the card prepares its programs once."
 +  STR_FPS_RENDERER_CPU: "CPU"
 +  STR_FPS_RENDERER_GPU: "GPU"
 +  STR_FPS_HUD_SCALE: "HUD scale"
@@ -317,7 +317,7 @@ index 000000000..6c32c8b14
 +  STR_FPS_COLORED_LIGHTS: "Coloured lights"
 +  STR_FPS_COLORED_LIGHTS_DESC: "With True colour. Shots in flight, explosions, fires and muzzle flashes light the walls and ground round them in their own colour."
 +  STR_FPS_REFLECTIONS: "Reflections"
-+  STR_FPS_REFLECTIONS_DESC: "With True colour. The sea mirrors the sky, the clouds and what stands in it, more the flatter you look at it."
++  STR_FPS_REFLECTIONS_DESC: "With True colour. The sea mirrors the sky, the clouds and what stands in it, more the flatter you look at it. Window glass mirrors what is in front of it."
 +  STR_FPS_LIGHT_SHAFTS: "Light shafts"
 +  STR_FPS_LIGHT_SHAFTS_DESC: "With True colour. The flashlight, flares, lamps and coloured lights show as beams and glows in smoke, and everywhere under the sea."
 +  STR_FPS_VIEW_RESOLUTION: "3D resolution"
@@ -528,7 +528,7 @@ index 000000000..6c32c8b14
 +  STR_FPS_KEY_NIGHT_VISION: "Night vision on/off"
 +  STR_FPS_KEY_NIGHT_VISION_DESC: "Night vision on/off, with the gear."
 +  STR_FPS_KEY_ZOOM: "Zoom (hold)"
-+  STR_FPS_KEY_ZOOM_DESC: "Looks 4 times closer while held (setting Zoom)."
++  STR_FPS_KEY_ZOOM_DESC: "Looks 4 times closer while held (setting Zoom); 8 times with Jump held too."
 +  STR_FPS_BUTTON_NIGHT: "NIGHT VISION"
 +  STR_FPS_BUTTON_NIGHT_SHORT: "NV"
 +  STR_FPS_NO_NIGHT_VISION: "No night vision gear"
@@ -746,7 +746,7 @@ index 000000000..6c32c8b14
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..859a862d0
+index 000000000..ff1fc0397
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,616 @@
@@ -806,7 +806,7 @@ index 000000000..859a862d0
 +  STR_FPS_FIELD_OF_VIEW: "Field of view"
 +  STR_FPS_FIELD_OF_VIEW_DESC: "How wide the 3D view is, in degrees (50-110)."
 +  STR_FPS_ZOOM: "Zoom"
-+  STR_FPS_ZOOM_DESC: "Hold U (in 3D then not the UFOpedia), or the right button in mouse look, to look 4 times closer. Aim and hit chances stay the same."
++  STR_FPS_ZOOM_DESC: "Hold U (in 3D then not the UFOpedia), or the right button in mouse look, to look 4 times closer; with Space held too, 8 times. Aim and hit chances stay the same."
 +  STR_FPS_SCOPING: "SCOPING {0}x"
 +  STR_FPS_PLAYSTYLE: "Playstyle"
 +  STR_FPS_PLAYSTYLE_DESC: "Faithful: the game's way. FPS: shooting, turning, moving, hitboxes, deaths as a shooter's. Custom: your mix."
@@ -914,7 +914,7 @@ index 000000000..859a862d0
 +  STR_FPS_DISCREET_EDGE: "Discreet map edge"
 +  STR_FPS_DISCREET_EDGE_DESC: "The map's edge as small red dots on the floor, instead of the yellow tape."
 +  STR_FPS_RENDERER: "Renderer"
-+  STR_FPS_RENDERER_DESC: "CPU: runs anywhere. GPU: the graphics card draws the 3D world (Linux, Windows, macOS); the CPU takes over where it can't."
++  STR_FPS_RENDERER_DESC: "CPU: runs anywhere. GPU: the graphics card draws the 3D world (Linux, Windows, macOS); the CPU takes over where it can't. {ALT}The first switch to GPU can freeze the game for a while: the card prepares its programs once."
 +  STR_FPS_RENDERER_CPU: "CPU"
 +  STR_FPS_RENDERER_GPU: "GPU"
 +  STR_FPS_HUD_SCALE: "HUD scale"
@@ -939,7 +939,7 @@ index 000000000..859a862d0
 +  STR_FPS_COLORED_LIGHTS: "Coloured lights"
 +  STR_FPS_COLORED_LIGHTS_DESC: "With True colour. Shots in flight, explosions, fires and muzzle flashes light the walls and ground round them in their own colour."
 +  STR_FPS_REFLECTIONS: "Reflections"
-+  STR_FPS_REFLECTIONS_DESC: "With True colour. The sea mirrors the sky, the clouds and what stands in it, more the flatter you look at it."
++  STR_FPS_REFLECTIONS_DESC: "With True colour. The sea mirrors the sky, the clouds and what stands in it, more the flatter you look at it. Window glass mirrors what is in front of it."
 +  STR_FPS_LIGHT_SHAFTS: "Light shafts"
 +  STR_FPS_LIGHT_SHAFTS_DESC: "With True colour. The flashlight, flares, lamps and coloured lights show as beams and glows in smoke, and everywhere under the sea."
 +  STR_FPS_VIEW_RESOLUTION: "3D resolution"
@@ -1150,7 +1150,7 @@ index 000000000..859a862d0
 +  STR_FPS_KEY_NIGHT_VISION: "Night vision on/off"
 +  STR_FPS_KEY_NIGHT_VISION_DESC: "Night vision on/off, with the gear."
 +  STR_FPS_KEY_ZOOM: "Zoom (hold)"
-+  STR_FPS_KEY_ZOOM_DESC: "Looks 4 times closer while held (setting Zoom)."
++  STR_FPS_KEY_ZOOM_DESC: "Looks 4 times closer while held (setting Zoom); 8 times with Jump held too."
 +  STR_FPS_BUTTON_NIGHT: "NIGHT VISION"
 +  STR_FPS_BUTTON_NIGHT_SHORT: "NV"
 +  STR_FPS_NO_NIGHT_VISION: "No night vision gear"
@@ -29318,7 +29318,7 @@ index 000000000..237ada94b
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.h b/src/FirstPerson/FirstPersonGpu.h
 new file mode 100644
-index 000000000..3cb1cf607
+index 000000000..398a97f51
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.h
 @@ -0,0 +1,253 @@
@@ -29422,7 +29422,7 @@ index 000000000..3cb1cf607
 +		float colorLights[16][8];                 // setting "Coloured lights": each light's place (voxels), its reach, its colour (0..1 each) and strength
 +		int colorLightCount;                      // ... how many this frame (0: none, or the setting off)
 +		bool colorLightsOn;                       // ... the setting is on (the program for them is built ahead of the first light)
-+		bool reflections;                         // setting "Reflections": the sea mirrors the sky and what stands in it (in full colour)
++		bool reflections;                         // setting "Reflections": the sea mirrors the sky and what stands in it, window glass what is in front of it (in full colour)
 +		bool lightShafts, shaftSmoke;             // setting "Light shafts": this frame has light in smoke or water to show (in full colour); there is smoke on the map
 +		float shaftAir;                           // ... how much of the light a voxel of clear water throws towards the eye (0 above the sea)
 +		bool smoothLight;                         // setting "Smooth light": the full-colour picture blends where the palette's dithers
@@ -29762,10 +29762,10 @@ index 000000000..326da83e2
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..1f1f484b9
+index 000000000..c6b6b43e5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,2559 @@
+@@ -0,0 +1,2594 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -29878,6 +29878,8 @@ index 000000000..1f1f484b9
 +	ivec3 voxel;
 +	bool glass;
 +	bool emissive;
++	float glassT;   // where the ray first went through window glass, and the face it went in by (setting "Reflections")
++	int glassAxis;
 +};
 +
 +float dither(int x, int y) { return Bayer[(y & 3) * 4 + (x & 3)]; }
@@ -30055,6 +30057,7 @@ index 000000000..1f1f484b9
 +				}
 +				if ((modelRow(model, 0, local) & bit) != 0u)
 +				{
++					if (!hit.glass) { hit.glassT = span; hit.glassAxis = faceAxis; }
 +					hit.glass = true; // window glass: seen through, tinted
 +					continue;
 +				}
@@ -30088,6 +30091,7 @@ index 000000000..1f1f484b9
 +int castRay(vec3 rayOrigin, vec3 rayDirection, float maxDistance, float ghostThreshold, float solidGhostThreshold, inout Hit hit, out int hitTile, out float endDistance, out int endAxis)
 +{
 +	hit.glass = false;
++	hit.glassAxis = -1;
 +	hit.emissive = false;
 +	hit.ghost = false;
 +	hitTile = 0;
@@ -31535,7 +31539,7 @@ index 000000000..1f1f484b9
 +	rayDirection /= directionLength;
 +
 +	Hit hit;
-+	hit.color = 0u; hit.t = 0.0; hit.axis = -1; hit.part = 0; hit.voxel = ivec3(0);
++	hit.color = 0u; hit.t = 0.0; hit.axis = -1; hit.part = 0; hit.voxel = ivec3(0); hit.glassT = 0.0; hit.glassAxis = -1;
 +	float ghostThreshold = dither(blockColumn, blockRow) / uGhostScale;
 +	float solidGhostThreshold = uSeeThroughCrops != 0 ? dither(blockColumn, blockRow) / SeeThroughCropOpacity : 0.0;
 +	int hitTile, endAxis;
@@ -31594,6 +31598,37 @@ index 000000000..1f1f484b9
 +		// vision": in full colour what was seen through a window stayed blue-grey among the goggles' green, and
 +		// changed with every shot's light.)
 +		fullColor = uGoggles != 0 ? paletteRgb(color) : fullColor * 0.7 + vec3(150.0, 180.0, 205.0) * 0.3;
++#ifdef REFLECTIONS
++		if (uReflections != 0 && uGoggles == 0 && fullColorSet && hit.glassAxis >= 0)
++		{
++			// (Setting "Reflections", a player's wish, GitHub issue #174, "reflections on glass panes": one ray off the
++			// pane's face, from where the eye's ray went into it; what it meets in the game's light there, or the sky.
++			// Faint seen straight on, as glass is, and stronger the flatter the pane is looked along.)
++			vec3 pane = uEye + rayDirection * hit.glassT;
++			vec3 mirrored = rayDirection;
++			mirrored[hit.glassAxis] = -mirrored[hit.glassAxis];
++			float glancing = 1.0 - abs(rayDirection[hit.glassAxis]);
++			float share = 0.08 + 0.5 * glancing * glancing * glancing;
++			Hit met;
++			int metTile, metAxis;
++			float metDistance;
++			vec3 seen;
++			if (castRay(pane + mirrored * 0.5, mirrored, min(uMaxDistance, 480.0), 2.0, 2.0, met, metTile, metDistance, metAxis) == RAY_HIT)
++			{
++				float metGlow;
++				float metShade = max(0.0, lightAt(pane + mirrored * met.t, metGlow) + distanceShade(met.t) + 1.5);
++				seen = mix(paletteRgb((met.color & 0xF0u) | uint(min(15, int(met.color & 15u) + int(metShade)))),
++					paletteRgb((met.color & 0xF0u) | uint(min(15, int(met.color & 15u) + int(metShade) + 1))), metShade - floor(metShade));
++			}
++			else
++			{
++				vec3 kept = fullColor;
++				seen = skyRgbTowards(mirrored, blockColumn, blockRow);
++				fullColor = kept;
++			}
++			fullColor = mix(fullColor, seen, share);
++		}
++#endif
 +	}
 +	rayFullColor = fullColorSet ? fullColor : paletteRgb(color);
 +#ifdef LIGHT_SHAFTS
@@ -32506,7 +32541,7 @@ index 000000000..eaa9f409a
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..034c36048
+index 000000000..927adba80
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
 @@ -0,0 +1,3315 @@
@@ -32810,11 +32845,11 @@ index 000000000..034c36048
 +	_txtAimOff->setAlign(ALIGN_RIGHT);
 +	_txtAimOff->setVisible(false);
 +	// The analogue rangefinder (drawn in drawRangeScale): its line a fifth of the view wide, its curve at most an eighth
-+	// of the view high not zoomed in and ZoomFactor times that zoomed in, with room for the line's shadow; five
++	// of the view high not zoomed in and up to ZoomBoostFactor times that zoomed in, with room for the line's shadow; five
 +	// numbers over the curve and the height it is drawn for at the line's end.
 +	_rangeScaleWidth = width / 5;
 +	_rangeScaleHeight = height / 8;
-+	_rangeScale = new Surface(_rangeScaleWidth + 3, (int)(_rangeScaleHeight * ZoomFactor) + 8, 0, 0);
++	_rangeScale = new Surface(_rangeScaleWidth + 3, (int)(_rangeScaleHeight * ZoomBoostFactor) + 8, 0, 0);
 +	_state->add(_rangeScale);
 +	_rangeScale->setVisible(false);
 +	_ownSurfaces.insert(_rangeScale);
@@ -35153,7 +35188,7 @@ index 000000000..034c36048
 +	if (key == Options::keyFpsFlashlight) { if (pressed) toggleFlashlight(); return true; }
 +	if (key == Options::keyFpsSprint) { if (pressed) toggleSprint(); return true; }
 +	if (key == Options::keyFpsEnPassant) { if (pressed) toggleEnPassant(); return true; }
-+	if (key == Options::keyFpsJump) { if (pressed) jump(_save->getSelectedUnit()); return true; }
++	if (key == Options::keyFpsJump) { if (pressed && _zoom <= 1.05) jump(_save->getSelectedUnit()); return true; } // (zoomed in, it looks closer still: see updateZoom)
 +	// Night vision: the gear of the soldier the view looks through (in the aliens' turn the
 +	// game's selected unit is the alien acting); the game's own key (Scroll Lock) checks for it
 +	// in 3D too.
@@ -35827,10 +35862,10 @@ index 000000000..034c36048
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..b8c17e2ed
+index 000000000..c6986e0fb
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1415 @@
+@@ -0,0 +1,1417 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -36685,6 +36720,8 @@ index 000000000..b8c17e2ed
 +	MeleeAim meleeDownedTarget(BattleUnit *unit) const;
 +	/// Turns the soldier to face a way before using something on a neighbour (by the rules, or for free); false without the time units for the turn and the use.
 +	bool turnBeforeUse(BattleUnit *unit, int direction, int useTime);
++	/// The way a unit faces a point (the eighth it lies in from the unit's middle).
++	static int facingTo(const BattleUnit *unit, Position voxel);
 +	/// Akimbo: the gun in the other hand that fires along, or null.
 +	BattleItem *offHandWeapon(BattleUnit *unit, const BattleItem *weapon) const;
 +	/// Has a unit lost health in this battle (not only carried over from earlier fights)?
@@ -37248,10 +37285,10 @@ index 000000000..b8c17e2ed
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeCamera.cpp b/src/FirstPerson/FirstPersonModeCamera.cpp
 new file mode 100644
-index 000000000..ee236fe3a
+index 000000000..0da87aad6
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeCamera.cpp
-@@ -0,0 +1,935 @@
+@@ -0,0 +1,939 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -37347,8 +37384,8 @@ index 000000000..ee236fe3a
 +
 +/**
 + * Zooms the view in while the zoom key (U) or, in mouse look, the right button is held (setting
-+ * "Zoom"): the view glides in to ZoomFactor times closer over ZoomSeconds, and back out when
-+ * let go, at a steady pace on a log scale (each step magnifies by the same share, so it feels
++ * "Zoom"): the view glides in to ZoomFactor times closer over ZoomSeconds (ZoomBoostFactor times with the jump key
++ * held too), and back out when let go, at a steady pace on a log scale (each step magnifies by the same share, so it feels
 + * even), slow enough for the SCOPING line's number to be read as it climbs (see updateScope).
 + * Only the view changes: the crosshair, the aim, the shot and the hit chance stay as they are.
 + * The mouse and the turn keys turn the view that much slower meanwhile (see turnByMouse,
@@ -37360,7 +37397,11 @@ index 000000000..ee236fe3a
 +	const Uint8 *keyStates = SDL_GetKeyState(nullptr);
 +	const bool keyHeld = Options::keyFpsZoom != SDLK_UNKNOWN && keyStates[Options::keyFpsZoom] && !gameModifierHeld();
 +	const bool zoomedIn = Options::fpsZoom && isActive() && (keyHeld || (_zoomButtonHeld && _mouseLook));
-+	const double logTarget = zoomedIn ? std::log(ZoomFactor) : 0.0, logStep = std::log(ZoomFactor) * elapsedSeconds / ZoomSeconds;
++	// (Zoomed in, the jump key held looks ZoomBoostFactor times closer: a player, GitHub issue #176, 4 times "a bit
++	// anemic for large maps and sniper squad sight"; the owner: "Zoom + space at maxed zoom goes to 8x". The key
++	// doesn't jump meanwhile: see keyboard.)
++	const bool boosted = zoomedIn && Options::keyFpsJump != SDLK_UNKNOWN && keyStates[Options::keyFpsJump];
++	const double logTarget = zoomedIn ? std::log(boosted ? ZoomBoostFactor : ZoomFactor) : 0.0, logStep = std::log(ZoomFactor) * elapsedSeconds / ZoomSeconds;
 +	const double logZoom = std::log(_zoom);
 +	_zoom = std::exp(logTarget > logZoom ? std::min(logTarget, logZoom + logStep) : std::max(logTarget, logZoom - logStep));
 +}
@@ -43472,10 +43513,10 @@ index 000000000..c6f284466
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..763fbd08a
+index 000000000..e5e3e72f1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,535 @@
+@@ -0,0 +1,537 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -43718,6 +43759,8 @@ index 000000000..763fbd08a
 +/// Zoom (setting "Zoom"): how much closer the view looks, and how many seconds it takes to glide
 +/// all the way in (or out), so the SCOPING line's number can be read as it climbs.
 +const double ZoomFactor = 4.0, ZoomSeconds = 0.7;
++/// Zoomed in, holding the jump key (Space) looks this many times closer instead (see updateZoom).
++const double ZoomBoostFactor = 8.0;
 +/// The motion scanner held up in 3D (see FirstPersonScanner): how long its ring takes to sweep out to the
 +/// edge and how often a sweep goes out (ms), how long a blip takes to fade after the ring finds it (ms), the least
 +/// time between two pips (ms), and the round screen's radius on the game's scanner art (pixels of 320x200).
@@ -44013,10 +44056,10 @@ index 000000000..763fbd08a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..509e4a346
+index 000000000..6bcf00f12
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,5448 @@
+@@ -0,0 +1,5474 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -45402,6 +45445,32 @@ index 000000000..509e4a346
 +}
 +
 +/**
++ * The way a unit faces a point: the way it faces already while the point lies ahead of it (within FacingKept eighths
++ * of a turn to either side: what is struck beside the crosshair's middle line needs no turn), else the eighth the
++ * point lies in from the unit's middle. A melee blow at a wall, door or object turns the soldier so (a player's report, GitHub issue #170:
++ * "melee turn whiplash against windows", "particularly an issue with north, turning someone southeast"): it turned
++ * to the tile the part belongs to, and a wall ahead is the north or west wall of a tile that can lie beside the
++ * soldier or behind the wall's line: the window ahead and a little to the right, the north wall of the tile to the
++ * east, turned the soldier east for the blow.
++ * @param unit The unit.
++ * @param voxel The point, in voxels.
++ * @return The direction, 0-7.
++ */
++int FirstPersonMode::facingTo(const BattleUnit *unit, Position voxel)
++{
++	const double FacingKept = 1.5; // (67.5 degrees)
++	const double half = unit->getArmor()->getSize() * 8.0;
++	const double x = voxel.x + 0.5 - (unit->getPosition().x * 16 + half), y = voxel.y + 0.5 - (unit->getPosition().y * 16 + half);
++	if (x * x + y * y < 1.0) return unit->getDirection();
++	// (direction 0 is north, -y, and they go round clockwise: east +x; in eighths of a turn)
++	const double bearing = std::atan2(x, -y) / (3.14159265358979323846 / 4.0);
++	double off = std::fmod(bearing - unit->getDirection() + 16.0, 8.0);
++	if (off > 4.0) off -= 8.0;
++	if (std::abs(off) <= FacingKept) return unit->getDirection();
++	return ((int)std::lround(bearing) + 8) % 8;
++}
++
++/**
 + * Whether a melee blow may strike terrain: the mod switches the game's terrain melee on
 + * (extendedTerrainMelee) or the setting "Melee hits walls and the downed" does for the 3D view,
 + * and the weapon damages terrain at all (a melee weapon's own damage, else its melee's; as the
@@ -45660,7 +45729,7 @@ index 000000000..509e4a346
 +		}
 +		else if (aim.refusal.empty() && meleeStrikesTerrain(weapon) && crosshairTerrainMelee(unit, struck, part, Options::fpsMeleeFloors))
 +		{
-+			direction = unit->directionTo(struck.toTile());
++			direction = facingTo(unit, struck);
 +		}
 +		else if (aim.refusal.empty() && Options::fpsMeleeTerrain
 +			&& !_save->getTileEngine()->validMeleeRange(unit->getPosition(), unit->getDirection(), unit, nullptr, &facedTile))
@@ -46937,7 +47006,7 @@ index 000000000..509e4a346
 +			action->target = struck.toTile();
 +			action->terrainMeleeTilePart = part;
 +			action->targetVoxel = struck; // (the hit lands there: MeleeAttackBState)
-+			turnTo = unit->directionTo(action->target); // (its own tile's wall: no turn)
++			turnTo = facingTo(unit, struck); // (towards the point struck, not the part's tile: see facingTo)
 +		}
 +		else if (tileEngine->validMeleeRange(unit->getPosition(), unit->getDirection(), unit, nullptr, &meleeTile))
 +		{
@@ -50636,7 +50705,7 @@ index 000000000..d0cf9cbd2
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeWeaponInHand.cpp b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
 new file mode 100644
-index 000000000..a94c207e1
+index 000000000..c30841f18
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
 @@ -0,0 +1,1165 @@
@@ -51710,7 +51779,7 @@ index 000000000..a94c207e1
 +	// Zoomed in, it's lowered out of sight the same way, as far as the zoom has gone.
 +	const double lookingDown = -_view->getPitchDegrees();
 +	const double lookDownShare = std::clamp((lookingDown - LookDownSlideFrom) / (LookDownSlideTo - LookDownSlideFrom), 0.0, 1.0);
-+	const double zoomShare = std::log(_zoom) / std::log(ZoomFactor);
++	const double zoomShare = std::min(1.0, std::log(_zoom) / std::log(ZoomFactor));
 +	const double slideShare = std::max(lookDownShare, zoomShare);
 +	if (slideShare > 0.0)
 +	{
@@ -54852,10 +54921,10 @@ index 000000000..5a9111b47
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..413febe82
+index 000000000..ea1fca192
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,751 @@
+@@ -0,0 +1,752 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -55016,6 +55085,7 @@ index 000000000..413febe82
 +	_frames.clear();
 +	_solidMasks.clear();
 +	_paintedFloors.clear();
++	_anyGlass = false;
 +	_wallPaints.clear();
 +	_wallPaintOf.clear();
 +	_tileMemos.clear();
@@ -55609,10 +55679,10 @@ index 000000000..413febe82
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..0475df87d
+index 000000000..e7f179759
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1595 @@
+@@ -0,0 +1,1596 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -56274,6 +56344,7 @@ index 000000000..0475df87d
 +	std::vector<TileMemo> _tileMemos;                   // per tile: its parts last frame, and their solid mask
 +	/// Floors under a UFO's hull with its floor going on inside (see paintedFloor), by the four parts' models and the UFO floors on the four sides (null: none there).
 +	std::map<std::array<const VoxelModel*, 8>, std::unique_ptr<VoxelModel>> _paintedFloors;
++	mutable bool _anyGlass = false; // a model made so far has window glass in it: the card's program with the reflections is wanted (setting "Reflections")
 +	/// The floor of a tile under a UFO's hull, with the UFO's floor going on inside (null: as it is).
 +	const VoxelModel *paintedFloor(int index, const std::array<const VoxelModel*, 4> &parts);
 +	/// What a tile part was last frame, so its models are looked up again only when something changed (see snapshotTile).
@@ -58927,7 +58998,7 @@ index 000000000..98c97b3b5
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..132aee897
+index 000000000..f8d78bb91
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
 @@ -0,0 +1,760 @@
@@ -59124,7 +59195,7 @@ index 000000000..132aee897
 +	frame.ambientOcclusion = Options::fpsAmbientOcclusion;
 +	frame.palette = view.getPalette();
 +	frame.smoothLight = Options::fpsSmoothLight && view._wantsTrueColor;
-+	frame.reflections = Options::fpsReflections && view._wantsTrueColor && view._waterColors[0] != 0; // (only where there is a sea)
++	frame.reflections = Options::fpsReflections && view._wantsTrueColor && (view._waterColors[0] != 0 || view._anyGlass); // (only where there is a sea, or window glass)
 +	// The coloured lights (setting "Coloured lights", in full colour): the shots in flight (but plain bullets and arrows), a thrown thing that burns, the
 +	// explosions, the muzzle flash, and the nearest fires; sixteen at most, in that order.
 +	frame.colorLightCount = 0;
@@ -70574,10 +70645,10 @@ index 000000000..08c5a0b35
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..3e9e6b58a
+index 000000000..351402307
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,4665 @@
+@@ -0,0 +1,4666 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -73576,11 +73647,11 @@ index 000000000..3e9e6b58a
 +				model.color[z][y][x] = color;
 +				if (glassColors && glassColors->test(color))
 +				{
-+					model.glass[z][y] |= (Uint16)(1 << x);
++					model.glass[z][y] |= (Uint16)(1 << x), _anyGlass = true;
 +				}
 +				if (glassPane && spriteY >= 0 && spriteY < sprite->getHeight() && glassPixels[spriteY * sprite->getWidth() + spriteX])
 +				{
-+					model.glass[z][y] |= (Uint16)(1 << x);
++					model.glass[z][y] |= (Uint16)(1 << x), _anyGlass = true;
 +				}
 +				else if (hasArtHoles && spriteY >= 0 && spriteY < sprite->getHeight() && artHoles[spriteY * sprite->getWidth() + spriteX])
 +				{
@@ -73952,7 +74023,7 @@ index 000000000..3e9e6b58a
 +				if (spriteY < 0 || spriteY >= height || !pane[spriteY * width + spriteX]) continue;
 +				const Uint8 color = sprite->getPixel(spriteX, spriteY);
 +				model.color[z][y][x] = color ? color : fallbackColor;
-+				model.glass[z][y] |= (Uint16)(1 << x);
++				model.glass[z][y] |= (Uint16)(1 << x), _anyGlass = true;
 +				model.lookOnly[z][y] |= (Uint16)(1 << x);
 +				model.openingGlass = true;
 +				const int voxel[3] = { x, y, z };
@@ -74537,6 +74608,7 @@ index 000000000..3e9e6b58a
 +	gpuForgetModels();
 +	_solidMasks.clear();
 +	_paintedFloors.clear();
++	_anyGlass = false;
 +	_wallPaints.clear(); // (found again with the ground, among the new owner's models)
 +	_wallPaintOf.clear();
 +	for (auto &memo : _tileMemos) memo = TileMemo{ {}, nullptr, {}, nullptr };

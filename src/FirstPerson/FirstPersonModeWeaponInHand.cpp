@@ -1068,7 +1068,7 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 	// Zoomed in, it's lowered out of sight the same way, as far as the zoom has gone.
 	const double lookingDown = -_view->getPitchDegrees();
 	const double lookDownShare = std::clamp((lookingDown - LookDownSlideFrom) / (LookDownSlideTo - LookDownSlideFrom), 0.0, 1.0);
-	const double zoomShare = std::log(_zoom) / std::log(ZoomFactor);
+	const double zoomShare = std::min(1.0, std::log(_zoom) / std::log(ZoomFactor));
 	const double slideShare = std::max(lookDownShare, zoomShare);
 	if (slideShare > 0.0)
 	{

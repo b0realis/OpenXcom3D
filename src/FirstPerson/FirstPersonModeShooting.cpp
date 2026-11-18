@@ -1383,6 +1383,32 @@ bool FirstPersonMode::turnBeforeUse(BattleUnit *unit, int direction, int useTime
 }
 
 /**
+ * The way a unit faces a point: the way it faces already while the point lies ahead of it (within FacingKept eighths
+ * of a turn to either side: what is struck beside the crosshair's middle line needs no turn), else the eighth the
+ * point lies in from the unit's middle. A melee blow at a wall, door or object turns the soldier so (a player's report, GitHub issue #170:
+ * "melee turn whiplash against windows", "particularly an issue with north, turning someone southeast"): it turned
+ * to the tile the part belongs to, and a wall ahead is the north or west wall of a tile that can lie beside the
+ * soldier or behind the wall's line: the window ahead and a little to the right, the north wall of the tile to the
+ * east, turned the soldier east for the blow.
+ * @param unit The unit.
+ * @param voxel The point, in voxels.
+ * @return The direction, 0-7.
+ */
+int FirstPersonMode::facingTo(const BattleUnit *unit, Position voxel)
+{
+	const double FacingKept = 1.5; // (67.5 degrees)
+	const double half = unit->getArmor()->getSize() * 8.0;
+	const double x = voxel.x + 0.5 - (unit->getPosition().x * 16 + half), y = voxel.y + 0.5 - (unit->getPosition().y * 16 + half);
+	if (x * x + y * y < 1.0) return unit->getDirection();
+	// (direction 0 is north, -y, and they go round clockwise: east +x; in eighths of a turn)
+	const double bearing = std::atan2(x, -y) / (3.14159265358979323846 / 4.0);
+	double off = std::fmod(bearing - unit->getDirection() + 16.0, 8.0);
+	if (off > 4.0) off -= 8.0;
+	if (std::abs(off) <= FacingKept) return unit->getDirection();
+	return ((int)std::lround(bearing) + 8) % 8;
+}
+
+/**
  * Whether a melee blow may strike terrain: the mod switches the game's terrain melee on
  * (extendedTerrainMelee) or the setting "Melee hits walls and the downed" does for the 3D view,
  * and the weapon damages terrain at all (a melee weapon's own damage, else its melee's; as the
@@ -1641,7 +1667,7 @@ int FirstPersonMode::shotTurnCost(BattleUnit *unit, int &direction, bool &afford
 		}
 		else if (aim.refusal.empty() && meleeStrikesTerrain(weapon) && crosshairTerrainMelee(unit, struck, part, Options::fpsMeleeFloors))
 		{
-			direction = unit->directionTo(struck.toTile());
+			direction = facingTo(unit, struck);
 		}
 		else if (aim.refusal.empty() && Options::fpsMeleeTerrain
 			&& !_save->getTileEngine()->validMeleeRange(unit->getPosition(), unit->getDirection(), unit, nullptr, &facedTile))
@@ -2918,7 +2944,7 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 			action->target = struck.toTile();
 			action->terrainMeleeTilePart = part;
 			action->targetVoxel = struck; // (the hit lands there: MeleeAttackBState)
-			turnTo = unit->directionTo(action->target); // (its own tile's wall: no turn)
+			turnTo = facingTo(unit, struck); // (towards the point struck, not the part's tile: see facingTo)
 		}
 		else if (tileEngine->validMeleeRange(unit->getPosition(), unit->getDirection(), unit, nullptr, &meleeTile))
 		{
