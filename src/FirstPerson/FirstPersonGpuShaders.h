@@ -2099,10 +2099,122 @@ void main()
  * A primitive is EffectTexels texels of four floats (see FirstPersonViewGpuEffects.cpp, which
  * writes them, for what each holds).
  */
+/**
+ * The units' voxel bodies on the card (setting "Voxel units"; FirstPersonView::recordVoxelUnit and drawVoxelUnit are
+ * the CPU's): a body's little cubes are drawn by the card itself, before the units and effects, into two pictures of
+ * their own (which body shows on each pixel with its colour, and how far ahead), each cube a square on the screen cut
+ * to its six-sided outline, the nearest winning. The effects' shader then lays each body in at its turn (a primitive of
+ * the kind EffectBody), as it does a sprite. A body's cubes are sent up once (uVoxels: a texel each: to the body's
+ * right, ahead and up of its feet, and its colour, + 256 for a cube of an item in its hands); a frame sends only where
+ * it stands. Six corners a cube, found by the vertex's number: no vertex data at all.
+ */
+const char *const BodyVertexSource = R"(
+uniform samplerBuffer uVoxels;
+uniform int uBase;             // the body's first cube in uVoxels
+uniform vec3 uFeet;            // the middle of its feet from the eye, in voxels
+uniform vec2 uTurn;            // the cosine and sine of the way it faces
+uniform float uMeasure;        // voxels to one of the body's own measures
+uniform float uFloorCut;       // nothing of it below this height (from the eye)
+uniform int uSkipItems;        // 1: without the items in its hands
+uniform vec3 uForward, uRight, uUp; // the camera, in true proportions
+uniform float uFocal;
+uniform vec2 uAxis;
+uniform ivec2 uViewSize;
+uniform vec2 uEdges[3];        // a cube's three half edges on the screen, as seen straight ahead at a depth of one
+uniform vec3 uLean;            // ... and how much deeper each goes
+uniform vec2 uMiddle;          // the view's middle the lean is from
+uniform int uCubes;            // 1: cut to their outlines (0: the squares round them)
+flat out vec2 vCentre;
+flat out float vDepth;
+flat out int vColor, vOutlined;
+flat out vec2 vEdge0, vEdge1, vEdge2;
+flat out vec3 vReach;
+void main()
+{
+	int corner = gl_VertexID % 6;
+	vec4 voxel = texelFetch(uVoxels, uBase + gl_VertexID / 6);
+	int colour = int(voxel.w);
+	vec3 place = uFeet + vec3(voxel.x * uTurn.x + voxel.y * uTurn.y, voxel.x * uTurn.y - voxel.y * uTurn.x, voxel.z) * uMeasure;
+	vec3 scaled = vec3(place.xy, place.z * ZScale);
+	float ahead = dot(scaled, uForward);
+	gl_Position = vec4(2.0, 2.0, 2.0, 1.0); // (off the picture: a cube not drawn)
+	vCentre = vec2(0.0); vDepth = 0.0; vColor = 0; vOutlined = 0; vEdge0 = vEdge1 = vEdge2 = vec2(0.0); vReach = vec3(0.0);
+	if (ahead < 4.0 || place.z < uFloorCut || (uSkipItems != 0 && colour >= 256)) return;
+	float nearer = 1.0 / ahead;
+	vec2 centre = vec2(uAxis.x + dot(scaled, uRight) * uFocal * nearer, uAxis.y - dot(scaled, uUp) * uFocal * nearer);
+	vec2 edges[3];
+	vec2 reach = vec2(0.0);
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		edges[axis] = uEdges[axis] - (centre - uMiddle) * uLean[axis];
+		reach += abs(edges[axis]);
+	}
+	vec2 halfSize = min(vec2(VoxelSplatHalfMax), reach * nearer);
+	// (the pixels whose middles the square covers, and at least the one its own middle is in)
+	vec2 first = min(floor(centre), ceil(centre - halfSize - 0.5)), last = max(floor(centre) + 1.0, floor(centre + halfSize - 0.5) + 1.0);
+	vec2 at = vec2(corner == 0 || corner == 2 || corner == 5 ? first.x : last.x, corner < 2 || corner == 3 ? first.y : last.y);
+	gl_Position = vec4(at / vec2(uViewSize) * 2.0 - 1.0, 0.0, 1.0);
+	vCentre = centre;
+	vDepth = ahead;
+	vColor = colour & 255;
+	vOutlined = uCubes != 0 && (halfSize.x > VoxelOutlineFrom || halfSize.y > VoxelOutlineFrom) ? 1 : 0;
+	for (int axis = 0; axis < 3; ++axis) edges[axis] *= nearer;
+	vEdge0 = edges[0]; vEdge1 = edges[1]; vEdge2 = edges[2];
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		float sum = 0.5 * length(edges[axis]);
+		for (int other = 0; other < 3; ++other)
+			if (other != axis) sum += abs(edges[axis].x * edges[other].y - edges[axis].y * edges[other].x);
+		vReach[axis] = sum;
+	}
+}
+)";
+
+const char *const BodyFragmentSource = R"(
+uniform sampler2D uRayDepth;   // the rays' depth: nothing of a body shows behind the world
+uniform int uPixelSize;        // pixels a ray coloured each way
+uniform int uNumber;           // 1 + the body's primitive's number
+uniform int uShade;            // the shade of the light on it
+uniform float uOpacity;        // how much of it shows (dithered)
+flat in vec2 vCentre;
+flat in float vDepth;
+flat in int vColor, vOutlined;
+flat in vec2 vEdge0, vEdge1, vEdge2;
+flat in vec3 vReach;
+layout(location = 0) out uint outNote;   // the body's number << 8 | the pixel's colour
+layout(location = 1) out float outDepth; // how far ahead
+const float Bayer[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+void main()
+{
+	ivec2 pixel = ivec2(gl_FragCoord.xy);
+	if (vOutlined != 0 && pixel != ivec2(floor(vCentre)))
+	{
+		// (in the cube's six-sided outline: across each edge no farther from its middle than the other two reach)
+		vec2 from = vec2(pixel) + 0.5 - vCentre;
+		if (abs(vEdge0.x * from.y - vEdge0.y * from.x) > vReach.x || abs(vEdge1.x * from.y - vEdge1.y * from.x) > vReach.y
+			|| abs(vEdge2.x * from.y - vEdge2.y * from.x) > vReach.z) discard;
+	}
+	if (vDepth >= texelFetch(uRayDepth, pixel / uPixelSize, 0).r) discard;
+	if (uOpacity < 1.0 && Bayer[(pixel.y & 3) * 4 + (pixel.x & 3)] / 16.0 >= uOpacity) discard;
+	uint colour = uint(vColor);
+	if (uShade > 0)
+	{
+		uint shaded = colour + uint(uShade);
+		colour = shaded > 255u || ((shaded ^ colour) & 0xF0u) != 0u ? 15u : shaded;
+	}
+	outNote = (uint(uNumber) << 8) | colour;
+	outDepth = vDepth;
+	gl_FragDepth = clamp(vDepth / 8192.0, 0.0, 1.0);
+}
+)";
+
 const char *const EffectsSource = R"(
 uniform usampler2D uRayColor, uRayGlow; // the rays' pictures: the palette colour, the glow
 uniform sampler2D uRayDepth;            // ... the depth along the view axis
 uniform usampler2D uSeeThrough;         // a colour over another, by level: FirstPersonView's see-through tables end to end, 2048 bytes a row
+uniform usampler2D uBodyNote;           // the voxel bodies' picture (see BodyFragmentSource): the body on each pixel (1 + its primitive's number) << 8 | its colour; 0 none
+uniform sampler2D uBodyDepth;           // ... and how far ahead it is there
+uniform int uBodyOutlines;              // 1: some body has a hitbox's outline round it (see outlineOwner)
 uniform samplerBuffer uPrims;           // the primitives, EffectTexels texels each
 uniform usamplerBuffer uBytes;          // the sprites' pixels and opacity maps
 uniform usamplerBuffer uBins;           // a number per bin of the screen (and one more): where its list starts; then the lists, a primitive's number each
@@ -2178,6 +2290,22 @@ int outlineOwner(ivec2 at, out float ownerDepth, out uint ownerColor)
 		ownerDepth = along;
 		ownerColor = uint(t6.z);
 	}
+	// (A voxel body's hitbox is the body as drawn: its pixels where it shows, see FirstPersonView::drawVoxelUnit.)
+	if (uBodyOutlines != 0)
+	{
+		uint note = texelFetch(uBodyNote, at, 0).r;
+		if (note != 0u)
+		{
+			vec4 head = prim((int(note >> 8) - 1) * EffectTexels, 0);
+			float bodyDepth = texelFetch(uBodyDepth, at, 0).r;
+			if (head.z > 0.0 && bodyDepth <= sceneDepth + 0.01 && (owner == 0 || bodyDepth < ownerDepth))
+			{
+				owner = int(head.z);
+				ownerDepth = bodyDepth;
+				ownerColor = uint(head.w);
+			}
+		}
+	}
 	return owner;
 }
 
@@ -2199,7 +2327,7 @@ void main()
 		lastPile = notes.a;
 		glow &= 3u;
 	}
-	if (uOutlineCount > 0)
+	if (uOutlineCount > 0 || (uBodyOutlines != 0 && uContinue != 0))
 	{
 		// FirstPersonView::outlineBands: a pixel that isn't an outlined picture's, borders one and shows something behind it
 		// takes that picture's outline colour (the nearest such picture's).
@@ -2322,6 +2450,23 @@ void main()
 			own = ownColours;
 			mark = 0u;
 			lastSolid = uint(number + 1);
+		}
+		else if (kind == EffectBody)
+		{
+			// FirstPersonView::drawVoxelUnit: the body's pixels, drawn ahead by the card (see BodyVertexSource), laid in
+			// here where nothing drawn before it is nearer.
+			uint note = texelFetch(uBodyNote, pixel, 0).r;
+			if (note >> 8 != uint(number + 1)) continue;
+			float bodyDepth = texelFetch(uBodyDepth, pixel, 0).r;
+			if (bodyDepth >= depth) continue;
+			color = note & 255u;
+			depth = bodyDepth;
+			glow = 0u;
+			veil = (flags & 2) != 0 ? UnitVeilMax : 255;
+			own = 1u;
+			mark = 0u;
+			lastSolid = uint(number + 1);
+			if ((flags & 8) != 0) lastPile = uint(number + 1);
 		}
 		else if (kind == EffectGroundShade)
 		{

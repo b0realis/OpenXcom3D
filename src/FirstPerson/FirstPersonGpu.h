@@ -152,7 +152,31 @@ public:
 	{
 		static const int Texels = 10;  // a primitive: this many texels of four floats
 		static const int Bin = 32;     // the screen in squares of this many pixels: each has the list of the primitives that may touch it
-		enum Kind { Sprite = 1, GroundShade, Decal, Line, Dot, Disc, Quad };
+		enum Kind { Sprite = 1, GroundShade, Decal, Line, Dot, Disc, Quad, VoxelBody };
+		/// A unit's voxel body (setting "Voxel units"; FirstPersonView::recordVoxelUnit): its cubes, which the card draws
+		/// itself ahead of the primitives (sent up once for each body's shape, found again by where they are and what
+		/// they hold), and where the body stands this frame. Its primitive (kind VoxelBody) lays it in at its turn: texel 0
+		/// is the kind, flags (2 a unit's, 8 a pile's), its hitbox outline's number (0: none) and that outline's colour.
+		struct Body
+		{
+			const float *right, *ahead, *up; // each cube's place from the middle of the feet, in the body's own measure
+			const Uint8 *colours;            // each cube's palette colour: the first of colourStep bytes
+			int colourStep;
+			const Uint8 *parts;              // each cube's part (VoxelUnitModel::Part), or null: none is an item's
+			size_t count;                    // how many cubes
+			int number;                      // its primitive's number
+			float feet[3];                   // the middle of its feet from the eye, in voxels
+			float cosine, sine;              // the way it faces
+			float measure;                   // voxels to one of its own measures (its size, and half for a fine body)
+			float floorCut;                  // nothing of it below this height, from the eye
+			bool items;                      // with the items in its hands
+			bool cubes;                      // the cubes cut to their outlines (else the squares round them)
+			float edges[3][2], lean[3], middle[2]; // a cube's half edges on the screen at a depth of one, how much deeper each goes, and the view's middle
+			int shade;                       // the shade of the light on it
+			float opacity;                   // how much of it shows (dithered)
+		};
+		std::vector<Body> bodies;
+		bool bodyOutlines = false;     // some body has a hitbox's outline (drawn in the second go, as the pictures' are)
 		static const int OutlineTexels = 7; // an outlined picture's record (see outlineAt)
 		std::vector<float> prims;      // the primitives (and after them the outlined pictures' records, if any)
 		int primCount = 0;             // how many primitives

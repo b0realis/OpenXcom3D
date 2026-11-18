@@ -1278,6 +1278,14 @@ private:
 		size_t voxelFirst = 0, voxelCount = 0;                            // VoxelUnit (see drawVoxelUnit): its splats in _voxelSplats,
 		float voxelHalfMax = 0.0f, voxelOpacity = 1.0f;                   // the biggest one's half size, and its opacity (dithered up close)
 		float voxelEdges[3][2] = {}, voxelLean[3] = {}, voxelMiddle[2] = {}; // its cubes' three half edges seen straight ahead at a depth of one (pixels), how much deeper each goes, the view's middle
+		// ... and, for the card (see gpuRecordBody): its cubes' arrays and where it stands
+		const float *bodyRight = nullptr, *bodyAhead = nullptr, *bodyUp = nullptr;
+		const Uint8 *bodyColours = nullptr, *bodyParts = nullptr;
+		int bodyColourStep = 1;
+		size_t bodyCount = 0;
+		double bodyFeet[3] = {}, bodyCosine = 1.0, bodySine = 0.0, bodyMeasure = 1.0, bodyFloorCut = 0.0;
+		bool bodyItems = true;
+		int bodyShade = 0;
 		Uint16 voxelHitOutline = 0;                                       // ... the hitbox outline drawn round it (its place in _outlineColors + 1; 0 none)
 		bool voxelOutline = false;                                        // ... whether the cubes are cut to their outlines (else the boxes round them)
 		double centre[3]; double radius; int steps; float density;        // GroundShade (see drawGroundShade)
@@ -1296,6 +1304,7 @@ private:
 	/// Records a unit drawn as its voxel body (setting "Voxel units"): its voxels projected, shaded and sorted by row;
 	/// going down, tipped over backwards (fall 0 to 1: lying on its back), with or without the items in hand; a body lying
 	/// in a pile pointed at as that pile (and the unconscious unit in it).
+	void gpuRecordBody(const DrawStep &step);
 	void recordVoxelUnit(const VoxelUnitModel &body, int walkPhase, int facing, int direction, bool level, const double feet[3], double floorCut,
 		int shade, double scale, BattleUnit *unit, double fall = 0.0, bool items = true, BattleUnit *lyingBody = nullptr, const Tile *pile = nullptr, double faint = 1.0);
 	std::map<const BattleUnit*, Uint32> _collapseStarts; // when each unit collapsing (the game's own fall) was first seen so

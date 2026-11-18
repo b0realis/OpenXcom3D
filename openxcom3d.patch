@@ -27725,10 +27725,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..161ee2f1d
+index 000000000..fa3f4abbb
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,3457 @@
+@@ -0,0 +1,3701 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -28181,6 +28181,8 @@ index 000000000..161ee2f1d
 +const int UfoTableRows = 14;          // ... and for each UFO after them: its two tints and twelve soft tints
 +const int MaxUfos = 8;
 +const int BufferCount = 13;
++/// The voxel bodies' cubes kept on the card (see State::drawBodies): at most this many, a texel each; then they are begun anew.
++const size_t BodyTexelsMost = 6u << 20;
 +
 +/// A number as GLSL reads a float (always with a decimal point or an exponent).
 +std::string glslFloat(double value)
@@ -28689,6 +28691,23 @@ index 000000000..161ee2f1d
 +	int rayColumns = 0, rayRows = 0, rayPixelSize = 1; // the rays' pictures kept for the effects: their size, and the pixels a ray coloured
 +	bool buildEffects();
 +	bool drawEffects(const Effects &effects, const Output &output, Timing *timing);
++	// The units' voxel bodies (see drawBodies, BodyVertexSource): their program; every body's cubes sent up so far, a
++	// texel each, in one buffer with its texture, and where each body's start (by what it is, see bodyKey); and the
++	// pictures they are drawn into, by the view's size: the body and colour on each pixel, how far ahead, and the
++	// depth the card tests them by.
++	Program bodyProgram;
++	Gl::UInt bodyBuffer = 0, bodyBufferTexture = 0;
++	size_t bodyTexelsSent = 0, bodyTexelsRoom = 0;
++	std::unordered_map<Uint64, int> bodyPlaces;
++	std::vector<float> bodyScratch;
++	struct BodyTargets
++	{
++		Gl::UInt framebuffer = 0;
++		Gl::UInt textures[3] = {}; // the note, the depth ahead, the card's own depth
++	};
++	std::map<std::array<int, 2>, BodyTargets> bodyTargets;
++	bool buildBodies();
++	bool drawBodies(const Effects &effects, Gl::UInt rayDepth, const BodyTargets *&drawn);
 +	// The bloom after them (see drawGlow): its three programs, the palette and its nearest colours as pictures, and
 +	// for each size of view the two grids (each with a second to blur through) and the brightened picture with its glow.
 +	Gl::UInt glowPrograms[3] = {}, paletteTexture = 0, nearestTexture = 0;
@@ -29849,6 +29868,7 @@ index 000000000..161ee2f1d
 +	whole("EffectDot", Effects::Dot);
 +	whole("EffectDisc", Effects::Disc);
 +	whole("EffectQuad", Effects::Quad);
++	whole("EffectBody", Effects::VoxelBody);
 +	whole("EffectOutlineTexels", Effects::OutlineTexels);
 +	const std::string vertexSource = shaderHead() + VertexSource, effectsSource = shaderHead() + constants + EffectsSource;
 +	const char *sources[2] = { vertexSource.c_str(), effectsSource.c_str() };
@@ -29882,8 +29902,8 @@ index 000000000..161ee2f1d
 +		return false;
 +	}
 +	Gl::UseProgram(built);
-+	const char *const pictures[5] = { "uRayColor", "uRayDepth", "uRayGlow", "uSeeThrough", "uNotes" };
-+	for (int unit = 0; unit < 5; ++unit) Gl::Uniform1i(Gl::GetUniformLocation(built, pictures[unit]), unit);
++	const char *const pictures[7] = { "uRayColor", "uRayDepth", "uRayGlow", "uSeeThrough", "uNotes", "uBodyNote", "uBodyDepth" };
++	for (int unit = 0; unit < 7; ++unit) Gl::Uniform1i(Gl::GetUniformLocation(built, pictures[unit]), unit);
 +	const char *const buffered[3] = { "uPrims", "uBytes", "uBins" };
 +	const Gl::Enum formats[3] = { Gl::RGBA32F, Gl::R8UI, Gl::R32UI };
 +	Gl::GenBuffers(3, effectBuffers);
@@ -30668,6 +30688,216 @@ index 000000000..161ee2f1d
 + * rays' would have been; the full-colour picture is the rays' own (the glow's bit 128 says where
 + * the pixel is no longer its ray's).
 + */
++/**
++ * Builds the voxel bodies' program (see BodyVertexSource), and the buffer their cubes are kept in.
++ */
++bool FirstPersonGpu::State::buildBodies()
++{
++	const std::string constants = std::string("const float ZScale = ") + glslFloat(ZScale) + ";\nconst float VoxelSplatHalfMax = " + glslFloat(VoxelSplatHalfMax)
++		+ ";\nconst float VoxelOutlineFrom = " + glslFloat(VoxelOutlineFrom) + ";\n";
++	const std::string vertexSource = shaderHead() + constants + BodyVertexSource, fragmentSource = shaderHead() + BodyFragmentSource;
++	const char *sources[2] = { vertexSource.c_str(), fragmentSource.c_str() };
++	const Gl::Enum kinds[2] = { Gl::VERTEX_SHADER, Gl::FRAGMENT_SHADER };
++	const Gl::UInt built = Gl::CreateProgram();
++	for (int which = 0; which < 2; ++which)
++	{
++		const Gl::UInt shader = Gl::CreateShader(kinds[which]);
++		Gl::ShaderSource(shader, 1, &sources[which], nullptr);
++		Gl::CompileShader(shader);
++		Gl::Int compiled = 0;
++		Gl::GetShaderiv(shader, Gl::COMPILE_STATUS, &compiled);
++		if (!compiled)
++		{
++			char log[4096] = "";
++			Gl::GetShaderInfoLog(shader, sizeof(log), nullptr, log);
++			Log(LOG_ERROR) << "OpenXcom3D GPU: the voxel bodies' shader would not compile: " << log;
++			return false;
++		}
++		Gl::AttachShader(built, shader);
++		Gl::DeleteShader(shader);
++	}
++	Gl::LinkProgram(built);
++	Gl::Int linked = 0;
++	Gl::GetProgramiv(built, Gl::LINK_STATUS, &linked);
++	if (!linked)
++	{
++		char log[4096] = "";
++		Gl::GetProgramInfoLog(built, sizeof(log), nullptr, log);
++		Log(LOG_ERROR) << "OpenXcom3D GPU: the voxel bodies' shader would not link: " << log;
++		return false;
++	}
++	Gl::UseProgram(built);
++	Gl::Uniform1i(Gl::GetUniformLocation(built, "uRayDepth"), 1);
++	Gl::Uniform1i(Gl::GetUniformLocation(built, "uVoxels"), BufferCount + 3);
++	Gl::GenBuffers(1, &bodyBuffer);
++	Gl::GenTextures(1, &bodyBufferTexture);
++	Gl::BindBuffer(Gl::ARRAY_BUFFER, bodyBuffer);
++	Gl::BufferData(Gl::ARRAY_BUFFER, 16, nullptr, Gl::DYNAMIC_DRAW);
++	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 3);
++	Gl::BindTexture(Gl::TEXTURE_BUFFER, bodyBufferTexture);
++	Gl::TexBuffer(Gl::TEXTURE_BUFFER, Gl::RGBA32F, bodyBuffer);
++	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
++	bodyProgram.id = built;
++	Gl::UseProgram(program->id);
++	return true;
++}
++
++/// A body's shape, to find its cubes on the card again: where they are, how many, and a sample of what they hold (a
++/// body gone and another made in its place is another body).
++static Uint64 bodyKey(const FirstPersonGpu::Effects::Body &body)
++{
++	Uint64 hash = 1469598103934665603ull;
++	auto mix = [&hash](Uint64 value) { hash = (hash ^ value) * 1099511628211ull; hash ^= hash >> 29; };
++	mix((Uint64)(size_t)body.right); mix((Uint64)(size_t)body.colours); mix((Uint64)body.count); mix((Uint64)body.colourStep);
++	const size_t step = std::max<size_t>(1, body.count / 61);
++	for (size_t k = 0; k < body.count; k += step)
++	{
++		Uint32 bits[3];
++		std::memcpy(&bits[0], &body.right[k], 4); std::memcpy(&bits[1], &body.ahead[k], 4); std::memcpy(&bits[2], &body.up[k], 4);
++		mix(bits[0]); mix(bits[1]); mix(bits[2]); mix(body.colours[k * body.colourStep]);
++	}
++	return hash;
++}
++
++/**
++ * Draws the frame's voxel bodies into their pictures (see BodyVertexSource), ahead of the units and effects.
++ * @param effects The frame's (its bodies; the camera).
++ * @param rayDepth The rays' depth picture.
++ * @param drawn Set to the pictures drawn into.
++ * @return False if the card can't.
++ */
++bool FirstPersonGpu::State::drawBodies(const Effects &effects, Gl::UInt rayDepth, const BodyTargets *&drawn)
++{
++	if (!bodyProgram.id && !buildBodies())
++	{
++		return false;
++	}
++	// The pictures, for this size of view.
++	BodyTargets &made = bodyTargets[{ effects.width, effects.height }];
++	if (!made.framebuffer)
++	{
++		Gl::GenFramebuffers(1, &made.framebuffer);
++		Gl::BindFramebuffer(Gl::FRAMEBUFFER, made.framebuffer);
++		Gl::GenTextures(3, made.textures);
++		const Gl::Enum internal[3] = { Gl::R32UI, Gl::R32F, Gl::DEPTH_COMPONENT32F }, format[3] = { Gl::RED_INTEGER, Gl::RED, Gl::DEPTH_COMPONENT },
++			type[3] = { Gl::UNSIGNED_INT, Gl::FLOAT, Gl::FLOAT }, attachment[3] = { Gl::COLOR_ATTACHMENT0, Gl::COLOR_ATTACHMENT0 + 1, Gl::DEPTH_ATTACHMENT };
++		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
++		for (int which = 0; which < 3; ++which)
++		{
++			Gl::BindTexture(Gl::TEXTURE_2D, made.textures[which]);
++			Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)internal[which], effects.width, effects.height, 0, format[which], type[which], nullptr);
++			Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
++			Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
++			Gl::FramebufferTexture2D(Gl::FRAMEBUFFER, attachment[which], Gl::TEXTURE_2D, made.textures[which], 0);
++		}
++		if (Gl::CheckFramebufferStatus(Gl::FRAMEBUFFER) != Gl::FRAMEBUFFER_COMPLETE)
++		{
++			Log(LOG_WARNING) << "OpenXcom3D GPU: this card can't draw into the pictures the voxel bodies need";
++			return false;
++		}
++	}
++	drawn = &made;
++	// The cubes of the bodies not sent up yet go after those that are. When the buffer has no room for them it is made
++	// bigger, or, at its most, begun anew: then only this frame's bodies are sent again (the others when next drawn).
++	// A body that doesn't fit even so isn't drawn (more cubes in one frame than the card keeps: never met).
++	std::vector<int> places(effects.bodies.size(), -1);
++	const size_t most = std::min<size_t>((size_t)maxBufferTexels, BodyTexelsMost);
++	Gl::BindBuffer(Gl::ARRAY_BUFFER, bodyBuffer);
++	for (int attempt = 0; attempt < 2; ++attempt)
++	{
++		bodyScratch.clear();
++		size_t next = bodyTexelsSent;
++		bool allFit = true;
++		for (size_t which = 0; which < effects.bodies.size(); ++which)
++		{
++			const Effects::Body &body = effects.bodies[which];
++			const Uint64 key = bodyKey(body);
++			auto known = bodyPlaces.find(key);
++			if (known == bodyPlaces.end())
++			{
++				if (next + body.count > most)
++				{
++					allFit = false;
++					places[which] = -1;
++					continue;
++				}
++				known = bodyPlaces.emplace(key, (int)next).first;
++				for (size_t k = 0; k < body.count; ++k)
++				{
++					const bool item = body.parts && body.parts[k] == 5; // (VoxelUnitModel::Item)
++					bodyScratch.insert(bodyScratch.end(), { body.right[k], body.ahead[k], body.up[k], (float)(body.colours[k * body.colourStep] + (item ? 256 : 0)) });
++				}
++				next += body.count;
++			}
++			places[which] = known->second;
++		}
++		const bool anew = attempt == 0 && bodyTexelsSent > 0 && (!allFit || next > bodyTexelsRoom);
++		if (next > bodyTexelsRoom)
++		{
++			bodyTexelsRoom = std::min(most, std::max<size_t>(next * 2, 1 << 18));
++			Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)(bodyTexelsRoom * 16), nullptr, Gl::DYNAMIC_DRAW);
++		}
++		if (!anew)
++		{
++			if (!bodyScratch.empty()) Gl::BufferSubData(Gl::ARRAY_BUFFER, (Gl::IntPtr)(bodyTexelsSent * 16), (Gl::SizeiPtr)(bodyScratch.size() * 4), bodyScratch.data());
++			bodyTexelsSent = next;
++			break;
++		}
++		bodyPlaces.clear();
++		bodyTexelsSent = 0;
++	}
++	// Drawn: nothing anywhere to begin with, the nearest cube winning each pixel.
++	Gl::BindFramebuffer(Gl::FRAMEBUFFER, made.framebuffer);
++	const Gl::Enum attachments[2] = { Gl::COLOR_ATTACHMENT0, Gl::COLOR_ATTACHMENT0 + 1 };
++	Gl::DrawBuffers(2, attachments);
++	Gl::Viewport(0, 0, effects.width, effects.height);
++	static const Gl::UInt none[4] = {};
++	static const Gl::Float far[4] = { 1e30f, 0.0f, 0.0f, 0.0f }, farthest = 1.0f;
++	Gl::DepthMask(1);
++	Gl::ClearBufferuiv(Gl::COLOR, 0, none);
++	Gl::ClearBufferfv(Gl::COLOR, 1, far);
++	Gl::ClearBufferfv(Gl::DEPTH, 0, &farthest);
++	Gl::Enable(Gl::DEPTH_TEST);
++	Gl::DepthFunc(Gl::LESS);
++	Gl::UseProgram(bodyProgram.id);
++	Gl::ActiveTexture(Gl::TEXTURE0 + 1);
++	Gl::BindTexture(Gl::TEXTURE_2D, rayDepth);
++	Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
++	Program *const before = program;
++	program = &bodyProgram;
++	Gl::Uniform3f(location("uForward"), effects.forward[0], effects.forward[1], effects.forward[2]);
++	Gl::Uniform3f(location("uRight"), effects.right[0], effects.right[1], effects.right[2]);
++	Gl::Uniform3f(location("uUp"), effects.up[0], effects.up[1], effects.up[2]);
++	Gl::Uniform1f(location("uFocal"), effects.focal);
++	Gl::Uniform2f(location("uAxis"), effects.axis[0], effects.axis[1]);
++	Gl::Uniform2i(location("uViewSize"), effects.width, effects.height);
++	Gl::Uniform1i(location("uPixelSize"), rayPixelSize);
++	for (size_t which = 0; which < effects.bodies.size(); ++which)
++	{
++		const Effects::Body &body = effects.bodies[which];
++		if (places[which] < 0) continue;
++		Gl::Uniform1i(location("uBase"), places[which]);
++		Gl::Uniform3f(location("uFeet"), body.feet[0], body.feet[1], body.feet[2]);
++		Gl::Uniform2f(location("uTurn"), body.cosine, body.sine);
++		Gl::Uniform1f(location("uMeasure"), body.measure);
++		Gl::Uniform1f(location("uFloorCut"), body.floorCut);
++		Gl::Uniform1i(location("uSkipItems"), body.items ? 0 : 1);
++		Gl::Uniform2f(location("uEdges[0]"), body.edges[0][0], body.edges[0][1]);
++		Gl::Uniform2f(location("uEdges[1]"), body.edges[1][0], body.edges[1][1]);
++		Gl::Uniform2f(location("uEdges[2]"), body.edges[2][0], body.edges[2][1]);
++		Gl::Uniform3f(location("uLean"), body.lean[0], body.lean[1], body.lean[2]);
++		Gl::Uniform2f(location("uMiddle"), body.middle[0], body.middle[1]);
++		Gl::Uniform1i(location("uCubes"), body.cubes ? 1 : 0);
++		Gl::Uniform1i(location("uNumber"), body.number + 1);
++		Gl::Uniform1i(location("uShade"), body.shade);
++		Gl::Uniform1f(location("uOpacity"), body.opacity);
++		Gl::DrawArrays(Gl::TRIANGLES, 0, (Gl::Sizei)(body.count * 6));
++	}
++	program = before;
++	Gl::Disable(Gl::DEPTH_TEST);
++	return true;
++}
++
 +bool FirstPersonGpu::State::drawEffects(const Effects &effects, const Output &output, Timing *timing)
 +{
 +	auto start = std::chrono::steady_clock::now();
@@ -30717,6 +30947,12 @@ index 000000000..161ee2f1d
 +	const EffectTargets &firstGo = effectTargets[{ effects.width, effects.height, 0 }];
 +	const EffectTargets &drawn = effectTargets[{ effects.width, effects.height, goes - 1 }]; // (the finished pictures)
 +	effectsFinalGo[{ effects.width, effects.height }] = goes - 1;
++	// The voxel bodies first, into their own pictures (see drawBodies): the primitives lay them in.
++	const BodyTargets *bodies = nullptr;
++	if (!effects.bodies.empty() && !drawBodies(effects, rays->second.textures[1], bodies))
++	{
++		return false;
++	}
 +	Gl::BindFramebuffer(Gl::FRAMEBUFFER, firstGo.framebuffer);
 +	const Gl::Enum attachments[4] = { Gl::COLOR_ATTACHMENT0, Gl::COLOR_ATTACHMENT0 + 1, Gl::COLOR_ATTACHMENT0 + 2, Gl::COLOR_ATTACHMENT0 + 3 };
 +	Gl::DrawBuffers(4, attachments);
@@ -30730,6 +30966,11 @@ index 000000000..161ee2f1d
 +	}
 +	Gl::ActiveTexture(Gl::TEXTURE0 + 4);
 +	Gl::BindTexture(Gl::TEXTURE_2D, seeThroughTexture); // (the notes' place: not looked at in the first go)
++	// (the bodies' pictures; with no body this frame, pictures of the same kinds that nothing looks at)
++	Gl::ActiveTexture(Gl::TEXTURE0 + 5);
++	Gl::BindTexture(Gl::TEXTURE_2D, bodies ? bodies->textures[0] : seeThroughTexture);
++	Gl::ActiveTexture(Gl::TEXTURE0 + 6);
++	Gl::BindTexture(Gl::TEXTURE_2D, bodies ? bodies->textures[1] : rays->second.textures[1]);
 +	Gl::ActiveTexture(Gl::TEXTURE0 + 3);
 +	Gl::BindTexture(Gl::TEXTURE_2D, seeThroughTexture);
 +	if (effects.seeThrough && effects.paletteHash != seeThroughSent)
@@ -30779,6 +31020,7 @@ index 000000000..161ee2f1d
 +	Gl::Uniform1i(location("uFirstPrim"), 0);
 +	Gl::Uniform1i(location("uEndPrim"), goes == 2 ? effects.outlineAt : primitives);
 +	Gl::Uniform1i(location("uOutlineCount"), 0);
++	Gl::Uniform1i(location("uBodyOutlines"), bodies && effects.bodyOutlines ? 1 : 0);
 +	if (timing)
 +	{
 +		Gl::Finish();
@@ -30975,6 +31217,8 @@ index 000000000..161ee2f1d
 +{
 +	State &state = *_state;
 +	state.run([&] {
++		state.bodyPlaces.clear(); // (the voxel bodies' cubes too: the battle's bodies are made anew)
++		state.bodyTexelsSent = 0;
 +		state.modelIds.clear();
 +		state.solidIds.clear();
 +		state.modelColors.assign(ModelVoxels, 0);
@@ -31188,10 +31432,10 @@ index 000000000..161ee2f1d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.h b/src/FirstPerson/FirstPersonGpu.h
 new file mode 100644
-index 000000000..3c09e125e
+index 000000000..436fb2ff4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.h
-@@ -0,0 +1,298 @@
+@@ -0,0 +1,322 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -31346,7 +31590,31 @@ index 000000000..3c09e125e
 +	{
 +		static const int Texels = 10;  // a primitive: this many texels of four floats
 +		static const int Bin = 32;     // the screen in squares of this many pixels: each has the list of the primitives that may touch it
-+		enum Kind { Sprite = 1, GroundShade, Decal, Line, Dot, Disc, Quad };
++		enum Kind { Sprite = 1, GroundShade, Decal, Line, Dot, Disc, Quad, VoxelBody };
++		/// A unit's voxel body (setting "Voxel units"; FirstPersonView::recordVoxelUnit): its cubes, which the card draws
++		/// itself ahead of the primitives (sent up once for each body's shape, found again by where they are and what
++		/// they hold), and where the body stands this frame. Its primitive (kind VoxelBody) lays it in at its turn: texel 0
++		/// is the kind, flags (2 a unit's, 8 a pile's), its hitbox outline's number (0: none) and that outline's colour.
++		struct Body
++		{
++			const float *right, *ahead, *up; // each cube's place from the middle of the feet, in the body's own measure
++			const Uint8 *colours;            // each cube's palette colour: the first of colourStep bytes
++			int colourStep;
++			const Uint8 *parts;              // each cube's part (VoxelUnitModel::Part), or null: none is an item's
++			size_t count;                    // how many cubes
++			int number;                      // its primitive's number
++			float feet[3];                   // the middle of its feet from the eye, in voxels
++			float cosine, sine;              // the way it faces
++			float measure;                   // voxels to one of its own measures (its size, and half for a fine body)
++			float floorCut;                  // nothing of it below this height, from the eye
++			bool items;                      // with the items in its hands
++			bool cubes;                      // the cubes cut to their outlines (else the squares round them)
++			float edges[3][2], lean[3], middle[2]; // a cube's half edges on the screen at a depth of one, how much deeper each goes, and the view's middle
++			int shade;                       // the shade of the light on it
++			float opacity;                   // how much of it shows (dithered)
++		};
++		std::vector<Body> bodies;
++		bool bodyOutlines = false;     // some body has a hitbox's outline (drawn in the second go, as the pictures' are)
 +		static const int OutlineTexels = 7; // an outlined picture's record (see outlineAt)
 +		std::vector<float> prims;      // the primitives (and after them the outlined pictures' records, if any)
 +		int primCount = 0;             // how many primitives
@@ -31492,10 +31760,10 @@ index 000000000..3c09e125e
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuGl.h b/src/FirstPerson/FirstPersonGpuGl.h
 new file mode 100644
-index 000000000..ba229ce2d
+index 000000000..82e9da00f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuGl.h
-@@ -0,0 +1,201 @@
+@@ -0,0 +1,206 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -31566,6 +31834,7 @@ index 000000000..ba229ce2d
 +const Enum EXTENSIONS = 0x1F03;
 +const Enum IMPLEMENTATION_COLOR_READ_TYPE = 0x8B9A, IMPLEMENTATION_COLOR_READ_FORMAT = 0x8B9B;
 +const Enum SYNC_GPU_COMMANDS_COMPLETE = 0x9117;
++const Enum DEPTH_ATTACHMENT = 0x8D00, DEPTH_COMPONENT = 0x1902, DEPTH_COMPONENT32F = 0x8CAC, COLOR = 0x1800, DEPTH = 0x1801, LESS = 0x0201;
 +
 +// The functions used: one line each, as OpenGL declares them. GL_FUNCTIONS(X) lists them for the
 +// declarations below and for the loader (GpuContext::loadFunctions).
@@ -31634,6 +31903,10 @@ index 000000000..ba229ce2d
 +	X(void, DeleteVertexArrays, (Sizei count, const UInt *arrays)) \
 +	X(void, BindVertexArray, (UInt array)) \
 +	X(void, DrawArrays, (Enum mode, Int first, Sizei count)) \
++	X(void, ClearBufferuiv, (Enum buffer, Int drawBuffer, const UInt *value)) \
++	X(void, ClearBufferfv, (Enum buffer, Int drawBuffer, const Float *value)) \
++	X(void, DepthFunc, (Enum function)) \
++	X(void, DepthMask, (Boolean writes)) \
 +	X(void *, FenceSync, (Enum condition, UInt flags)) \
 +	X(void, DeleteSync, (void *sync))
 +
@@ -31699,10 +31972,10 @@ index 000000000..ba229ce2d
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..e259b3bb7
+index 000000000..5b3402aff
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,2747 @@
+@@ -0,0 +1,2892 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -33804,10 +34077,122 @@ index 000000000..e259b3bb7
 + * A primitive is EffectTexels texels of four floats (see FirstPersonViewGpuEffects.cpp, which
 + * writes them, for what each holds).
 + */
++/**
++ * The units' voxel bodies on the card (setting "Voxel units"; FirstPersonView::recordVoxelUnit and drawVoxelUnit are
++ * the CPU's): a body's little cubes are drawn by the card itself, before the units and effects, into two pictures of
++ * their own (which body shows on each pixel with its colour, and how far ahead), each cube a square on the screen cut
++ * to its six-sided outline, the nearest winning. The effects' shader then lays each body in at its turn (a primitive of
++ * the kind EffectBody), as it does a sprite. A body's cubes are sent up once (uVoxels: a texel each: to the body's
++ * right, ahead and up of its feet, and its colour, + 256 for a cube of an item in its hands); a frame sends only where
++ * it stands. Six corners a cube, found by the vertex's number: no vertex data at all.
++ */
++const char *const BodyVertexSource = R"(
++uniform samplerBuffer uVoxels;
++uniform int uBase;             // the body's first cube in uVoxels
++uniform vec3 uFeet;            // the middle of its feet from the eye, in voxels
++uniform vec2 uTurn;            // the cosine and sine of the way it faces
++uniform float uMeasure;        // voxels to one of the body's own measures
++uniform float uFloorCut;       // nothing of it below this height (from the eye)
++uniform int uSkipItems;        // 1: without the items in its hands
++uniform vec3 uForward, uRight, uUp; // the camera, in true proportions
++uniform float uFocal;
++uniform vec2 uAxis;
++uniform ivec2 uViewSize;
++uniform vec2 uEdges[3];        // a cube's three half edges on the screen, as seen straight ahead at a depth of one
++uniform vec3 uLean;            // ... and how much deeper each goes
++uniform vec2 uMiddle;          // the view's middle the lean is from
++uniform int uCubes;            // 1: cut to their outlines (0: the squares round them)
++flat out vec2 vCentre;
++flat out float vDepth;
++flat out int vColor, vOutlined;
++flat out vec2 vEdge0, vEdge1, vEdge2;
++flat out vec3 vReach;
++void main()
++{
++	int corner = gl_VertexID % 6;
++	vec4 voxel = texelFetch(uVoxels, uBase + gl_VertexID / 6);
++	int colour = int(voxel.w);
++	vec3 place = uFeet + vec3(voxel.x * uTurn.x + voxel.y * uTurn.y, voxel.x * uTurn.y - voxel.y * uTurn.x, voxel.z) * uMeasure;
++	vec3 scaled = vec3(place.xy, place.z * ZScale);
++	float ahead = dot(scaled, uForward);
++	gl_Position = vec4(2.0, 2.0, 2.0, 1.0); // (off the picture: a cube not drawn)
++	vCentre = vec2(0.0); vDepth = 0.0; vColor = 0; vOutlined = 0; vEdge0 = vEdge1 = vEdge2 = vec2(0.0); vReach = vec3(0.0);
++	if (ahead < 4.0 || place.z < uFloorCut || (uSkipItems != 0 && colour >= 256)) return;
++	float nearer = 1.0 / ahead;
++	vec2 centre = vec2(uAxis.x + dot(scaled, uRight) * uFocal * nearer, uAxis.y - dot(scaled, uUp) * uFocal * nearer);
++	vec2 edges[3];
++	vec2 reach = vec2(0.0);
++	for (int axis = 0; axis < 3; ++axis)
++	{
++		edges[axis] = uEdges[axis] - (centre - uMiddle) * uLean[axis];
++		reach += abs(edges[axis]);
++	}
++	vec2 halfSize = min(vec2(VoxelSplatHalfMax), reach * nearer);
++	// (the pixels whose middles the square covers, and at least the one its own middle is in)
++	vec2 first = min(floor(centre), ceil(centre - halfSize - 0.5)), last = max(floor(centre) + 1.0, floor(centre + halfSize - 0.5) + 1.0);
++	vec2 at = vec2(corner == 0 || corner == 2 || corner == 5 ? first.x : last.x, corner < 2 || corner == 3 ? first.y : last.y);
++	gl_Position = vec4(at / vec2(uViewSize) * 2.0 - 1.0, 0.0, 1.0);
++	vCentre = centre;
++	vDepth = ahead;
++	vColor = colour & 255;
++	vOutlined = uCubes != 0 && (halfSize.x > VoxelOutlineFrom || halfSize.y > VoxelOutlineFrom) ? 1 : 0;
++	for (int axis = 0; axis < 3; ++axis) edges[axis] *= nearer;
++	vEdge0 = edges[0]; vEdge1 = edges[1]; vEdge2 = edges[2];
++	for (int axis = 0; axis < 3; ++axis)
++	{
++		float sum = 0.5 * length(edges[axis]);
++		for (int other = 0; other < 3; ++other)
++			if (other != axis) sum += abs(edges[axis].x * edges[other].y - edges[axis].y * edges[other].x);
++		vReach[axis] = sum;
++	}
++}
++)";
++
++const char *const BodyFragmentSource = R"(
++uniform sampler2D uRayDepth;   // the rays' depth: nothing of a body shows behind the world
++uniform int uPixelSize;        // pixels a ray coloured each way
++uniform int uNumber;           // 1 + the body's primitive's number
++uniform int uShade;            // the shade of the light on it
++uniform float uOpacity;        // how much of it shows (dithered)
++flat in vec2 vCentre;
++flat in float vDepth;
++flat in int vColor, vOutlined;
++flat in vec2 vEdge0, vEdge1, vEdge2;
++flat in vec3 vReach;
++layout(location = 0) out uint outNote;   // the body's number << 8 | the pixel's colour
++layout(location = 1) out float outDepth; // how far ahead
++const float Bayer[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
++void main()
++{
++	ivec2 pixel = ivec2(gl_FragCoord.xy);
++	if (vOutlined != 0 && pixel != ivec2(floor(vCentre)))
++	{
++		// (in the cube's six-sided outline: across each edge no farther from its middle than the other two reach)
++		vec2 from = vec2(pixel) + 0.5 - vCentre;
++		if (abs(vEdge0.x * from.y - vEdge0.y * from.x) > vReach.x || abs(vEdge1.x * from.y - vEdge1.y * from.x) > vReach.y
++			|| abs(vEdge2.x * from.y - vEdge2.y * from.x) > vReach.z) discard;
++	}
++	if (vDepth >= texelFetch(uRayDepth, pixel / uPixelSize, 0).r) discard;
++	if (uOpacity < 1.0 && Bayer[(pixel.y & 3) * 4 + (pixel.x & 3)] / 16.0 >= uOpacity) discard;
++	uint colour = uint(vColor);
++	if (uShade > 0)
++	{
++		uint shaded = colour + uint(uShade);
++		colour = shaded > 255u || ((shaded ^ colour) & 0xF0u) != 0u ? 15u : shaded;
++	}
++	outNote = (uint(uNumber) << 8) | colour;
++	outDepth = vDepth;
++	gl_FragDepth = clamp(vDepth / 8192.0, 0.0, 1.0);
++}
++)";
++
 +const char *const EffectsSource = R"(
 +uniform usampler2D uRayColor, uRayGlow; // the rays' pictures: the palette colour, the glow
 +uniform sampler2D uRayDepth;            // ... the depth along the view axis
 +uniform usampler2D uSeeThrough;         // a colour over another, by level: FirstPersonView's see-through tables end to end, 2048 bytes a row
++uniform usampler2D uBodyNote;           // the voxel bodies' picture (see BodyFragmentSource): the body on each pixel (1 + its primitive's number) << 8 | its colour; 0 none
++uniform sampler2D uBodyDepth;           // ... and how far ahead it is there
++uniform int uBodyOutlines;              // 1: some body has a hitbox's outline round it (see outlineOwner)
 +uniform samplerBuffer uPrims;           // the primitives, EffectTexels texels each
 +uniform usamplerBuffer uBytes;          // the sprites' pixels and opacity maps
 +uniform usamplerBuffer uBins;           // a number per bin of the screen (and one more): where its list starts; then the lists, a primitive's number each
@@ -33883,6 +34268,22 @@ index 000000000..e259b3bb7
 +		ownerDepth = along;
 +		ownerColor = uint(t6.z);
 +	}
++	// (A voxel body's hitbox is the body as drawn: its pixels where it shows, see FirstPersonView::drawVoxelUnit.)
++	if (uBodyOutlines != 0)
++	{
++		uint note = texelFetch(uBodyNote, at, 0).r;
++		if (note != 0u)
++		{
++			vec4 head = prim((int(note >> 8) - 1) * EffectTexels, 0);
++			float bodyDepth = texelFetch(uBodyDepth, at, 0).r;
++			if (head.z > 0.0 && bodyDepth <= sceneDepth + 0.01 && (owner == 0 || bodyDepth < ownerDepth))
++			{
++				owner = int(head.z);
++				ownerDepth = bodyDepth;
++				ownerColor = uint(head.w);
++			}
++		}
++	}
 +	return owner;
 +}
 +
@@ -33904,7 +34305,7 @@ index 000000000..e259b3bb7
 +		lastPile = notes.a;
 +		glow &= 3u;
 +	}
-+	if (uOutlineCount > 0)
++	if (uOutlineCount > 0 || (uBodyOutlines != 0 && uContinue != 0))
 +	{
 +		// FirstPersonView::outlineBands: a pixel that isn't an outlined picture's, borders one and shows something behind it
 +		// takes that picture's outline colour (the nearest such picture's).
@@ -34027,6 +34428,23 @@ index 000000000..e259b3bb7
 +			own = ownColours;
 +			mark = 0u;
 +			lastSolid = uint(number + 1);
++		}
++		else if (kind == EffectBody)
++		{
++			// FirstPersonView::drawVoxelUnit: the body's pixels, drawn ahead by the card (see BodyVertexSource), laid in
++			// here where nothing drawn before it is nearer.
++			uint note = texelFetch(uBodyNote, pixel, 0).r;
++			if (note >> 8 != uint(number + 1)) continue;
++			float bodyDepth = texelFetch(uBodyDepth, pixel, 0).r;
++			if (bodyDepth >= depth) continue;
++			color = note & 255u;
++			depth = bodyDepth;
++			glow = 0u;
++			veil = (flags & 2) != 0 ? UnitVeilMax : 255;
++			own = 1u;
++			mark = 0u;
++			lastSolid = uint(number + 1);
++			if ((flags & 8) != 0) lastPile = uint(number + 1);
 +		}
 +		else if (kind == EffectGroundShade)
 +		{
@@ -60225,10 +60643,10 @@ index 000000000..5eaac16dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..f95025f10
+index 000000000..0ad69790f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1834 @@
+@@ -0,0 +1,1843 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -61509,6 +61927,14 @@ index 000000000..f95025f10
 +		size_t voxelFirst = 0, voxelCount = 0;                            // VoxelUnit (see drawVoxelUnit): its splats in _voxelSplats,
 +		float voxelHalfMax = 0.0f, voxelOpacity = 1.0f;                   // the biggest one's half size, and its opacity (dithered up close)
 +		float voxelEdges[3][2] = {}, voxelLean[3] = {}, voxelMiddle[2] = {}; // its cubes' three half edges seen straight ahead at a depth of one (pixels), how much deeper each goes, the view's middle
++		// ... and, for the card (see gpuRecordBody): its cubes' arrays and where it stands
++		const float *bodyRight = nullptr, *bodyAhead = nullptr, *bodyUp = nullptr;
++		const Uint8 *bodyColours = nullptr, *bodyParts = nullptr;
++		int bodyColourStep = 1;
++		size_t bodyCount = 0;
++		double bodyFeet[3] = {}, bodyCosine = 1.0, bodySine = 0.0, bodyMeasure = 1.0, bodyFloorCut = 0.0;
++		bool bodyItems = true;
++		int bodyShade = 0;
 +		Uint16 voxelHitOutline = 0;                                       // ... the hitbox outline drawn round it (its place in _outlineColors + 1; 0 none)
 +		bool voxelOutline = false;                                        // ... whether the cubes are cut to their outlines (else the boxes round them)
 +		double centre[3]; double radius; int steps; float density;        // GroundShade (see drawGroundShade)
@@ -61527,6 +61953,7 @@ index 000000000..f95025f10
 +	/// Records a unit drawn as its voxel body (setting "Voxel units"): its voxels projected, shaded and sorted by row;
 +	/// going down, tipped over backwards (fall 0 to 1: lying on its back), with or without the items in hand; a body lying
 +	/// in a pile pointed at as that pile (and the unconscious unit in it).
++	void gpuRecordBody(const DrawStep &step);
 +	void recordVoxelUnit(const VoxelUnitModel &body, int walkPhase, int facing, int direction, bool level, const double feet[3], double floorCut,
 +		int shade, double scale, BattleUnit *unit, double fall = 0.0, bool items = true, BattleUnit *lyingBody = nullptr, const Tile *pile = nullptr, double faint = 1.0);
 +	std::map<const BattleUnit*, Uint32> _collapseStarts; // when each unit collapsing (the game's own fall) was first seen so
@@ -64711,10 +65138,10 @@ index 000000000..d086476ff
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpuEffects.cpp b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 new file mode 100644
-index 000000000..c3faa8a37
+index 000000000..1c834361f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
-@@ -0,0 +1,994 @@
+@@ -0,0 +1,1074 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -64856,6 +65283,8 @@ index 000000000..c3faa8a37
 +	void clear()
 +	{
 +		effects.prims.clear();
++		effects.bodies.clear();
++		effects.bodyOutlines = false;
 +		effects.outlineAt = -1;
 +		effects.outlineCount = 0;
 +		outlines.clear();
@@ -64887,18 +65316,12 @@ index 000000000..c3faa8a37
 +};
 +
 +/**
-+ * Whether this frame's units and effects go to the card, with its rays. Not with the setting
-+ * "Voxel units" on: a voxel body is thousands of little squares plotted by the CPU (see
-+ * drawVoxelUnit), which the card has no primitive for, and a pass on the CPU can't follow one on
-+ * the card; so then the card casts the rays, they come back, and the CPU draws every pass.
++ * Whether this frame's units and effects go to the card, with its rays (a voxel body too: the card draws its
++ * cubes itself, see gpuRecordBody).
 + * @return 0 no; 1 yes; 2 yes, beside the CPU's own, which is shown, the two compared (OPENXCOM3D_GPU_EFFECTS=check).
 + */
 +int FirstPersonView::gpuEffectsWanted() const
 +{
-+	if (Options::fpsVoxelUnits)
-+	{
-+		return 0;
-+	}
 +	static const char *const asked = getenv("OPENXCOM3D_GPU_EFFECTS");
 +	const int mode = !asked ? 1 : !strcmp(asked, "check") ? 2 : atoi(asked) != 0 ? 1 : 0;
 +	return mode;
@@ -64912,6 +65335,90 @@ index 000000000..c3faa8a37
 +	if (!_gpuEffects) _gpuEffects = std::make_shared<GpuEffectList>();
 +	_gpuEffects->clear();
 +	_gpuRecording = true;
++}
++
++/**
++ * Records a unit's voxel body (setting "Voxel units"; see recordVoxelUnit, which worked out where it stands and its
++ * cubes' edges on the screen): the card draws its cubes itself, from the body's own arrays (sent up once for each
++ * shape, see FirstPersonGpu::Effects::Body), and its primitive lays the picture in at its turn among the others. Its
++ * box on the screen is the box round its cubes' own bounds (the corners of the block they fill, each as wide as the
++ * biggest cube may be drawn); all of the view if one of them is behind the eye.
++ * Texel 0: kind, flags (2 a unit's, 8 a pile's), its hitbox outline's number (0 none), that outline's colour.
++ */
++void FirstPersonView::gpuRecordBody(const DrawStep &step)
++{
++	if (!step.bodyCount)
++	{
++		return;
++	}
++	GpuEffectList &list = *_gpuEffects;
++	// The block its cubes fill, in its own measure: kept for each shape, found again by where its arrays are.
++	struct Bounds { size_t count; float first, last, low[3], high[3]; };
++	static std::unordered_map<const float*, Bounds> known;
++	if (known.size() > 4096) known.clear();
++	Bounds &bounds = known[step.bodyRight];
++	if (bounds.count != step.bodyCount || bounds.first != step.bodyRight[0] || bounds.last != step.bodyUp[step.bodyCount - 1])
++	{
++		bounds = { step.bodyCount, step.bodyRight[0], step.bodyUp[step.bodyCount - 1], { 1e9f, 1e9f, 1e9f }, { -1e9f, -1e9f, -1e9f } };
++		const float *const arrays[3] = { step.bodyRight, step.bodyAhead, step.bodyUp };
++		for (int axis = 0; axis < 3; ++axis)
++		{
++			const auto ends = std::minmax_element(arrays[axis], arrays[axis] + step.bodyCount);
++			bounds.low[axis] = *ends.first;
++			bounds.high[axis] = *ends.second;
++		}
++	}
++	const int width = getWidth(), height = getHeight();
++	int left = width, top = height, right = 0, bottom = 0;
++	const double reach = VoxelSplatHalfMax + 2.0;
++	for (int corner = 0; corner < 8; ++corner)
++	{
++		const double across = ((corner & 1) ? bounds.high[0] : bounds.low[0]) * step.bodyMeasure, along = ((corner & 2) ? bounds.high[1] : bounds.low[1]) * step.bodyMeasure,
++			up = ((corner & 4) ? bounds.high[2] : bounds.low[2]) * step.bodyMeasure;
++		const double world[3] = { step.bodyFeet[0] + across * step.bodyCosine + along * step.bodySine, step.bodyFeet[1] + across * step.bodySine - along * step.bodyCosine,
++			step.bodyFeet[2] + up };
++		double screenX, screenY, depth;
++		if (!projectToScreen(world, screenX, screenY, depth))
++		{
++			left = top = 0; right = width; bottom = height;
++			break;
++		}
++		const double half = std::min(reach, (std::abs(step.voxelEdges[0][0]) + std::abs(step.voxelEdges[1][0]) + std::abs(step.voxelEdges[2][0])
++			+ std::abs(step.voxelEdges[0][1]) + std::abs(step.voxelEdges[1][1]) + std::abs(step.voxelEdges[2][1])) / depth + 2.0);
++		left = std::min(left, (int)std::floor(screenX - half)); right = std::max(right, (int)std::ceil(screenX + half) + 1);
++		top = std::min(top, (int)std::floor(screenY - half)); bottom = std::max(bottom, (int)std::ceil(screenY + half) + 1);
++	}
++	left = std::max(0, left); top = std::max(0, top); right = std::min(width, right); bottom = std::min(height, bottom);
++	if (left >= right || top >= bottom)
++	{
++		return;
++	}
++	float *texels = list.add(FirstPersonGpu::Effects::VoxelBody, left, top, right, bottom);
++	list.pictured.back() = { step.sprite.unit, step.sprite.body, step.sprite.pile };
++	texels[1] = (float)((step.sprite.unit ? 2 : 0) | (step.sprite.pile ? 8 : 0));
++	texels[2] = (float)step.voxelHitOutline;
++	texels[3] = step.voxelHitOutline ? (float)_outlineColors[step.voxelHitOutline - 1] : 0.0f;
++	if (step.voxelHitOutline) list.effects.bodyOutlines = true;
++	FirstPersonGpu::Effects::Body body;
++	body.right = step.bodyRight; body.ahead = step.bodyAhead; body.up = step.bodyUp;
++	body.colours = step.bodyColours; body.colourStep = step.bodyColourStep; body.parts = step.bodyParts;
++	body.count = step.bodyCount;
++	body.number = (int)list.boxes.size() - 1;
++	for (int axis = 0; axis < 3; ++axis) body.feet[axis] = (float)(step.bodyFeet[axis] - _eye[axis]);
++	body.cosine = (float)step.bodyCosine; body.sine = (float)step.bodySine;
++	body.measure = (float)step.bodyMeasure;
++	body.floorCut = (float)std::max(-1e9, step.bodyFloorCut - _eye[2]);
++	body.items = step.bodyItems;
++	body.cubes = step.voxelOutline;
++	for (int axis = 0; axis < 3; ++axis)
++	{
++		body.edges[axis][0] = step.voxelEdges[axis][0]; body.edges[axis][1] = step.voxelEdges[axis][1];
++		body.lean[axis] = step.voxelLean[axis];
++	}
++	body.middle[0] = step.voxelMiddle[0]; body.middle[1] = step.voxelMiddle[1];
++	body.shade = step.bodyShade;
++	body.opacity = step.voxelOpacity;
++	list.effects.bodies.push_back(body);
 +}
 +
 +/**
@@ -65227,7 +65734,7 @@ index 000000000..c3faa8a37
 +void FirstPersonView::gpuRecordOutlines()
 +{
 +	GpuEffectList &list = *_gpuEffects;
-+	if (_outlinedUnits.empty() || list.effects.outlineAt >= 0)
++	if ((_outlinedUnits.empty() && !list.effects.bodyOutlines) || list.effects.outlineAt >= 0)
 +	{
 +		return;
 +	}
@@ -65263,7 +65770,7 @@ index 000000000..c3faa8a37
 +		for (const double number : numbers) list.outlines.push_back((float)number);
 +		++list.effects.outlineCount;
 +	}
-+	if (list.effects.outlineCount > 0)
++	if (list.effects.outlineCount > 0 || list.effects.bodyOutlines) // (a voxel body's outline goes round its own pixels: no record)
 +	{
 +		list.effects.outlineAt = (int)list.boxes.size();
 +		list.effects.outlineOpacity = _outlineOpacity;
@@ -72029,10 +72536,10 @@ index 000000000..229bd966c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..8d74ba1ac
+index 000000000..de446417c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,4027 @@
+@@ -0,0 +1,4046 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -72590,7 +73097,8 @@ index 000000000..8d74ba1ac
 +				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, 0, 1 << 30, step.glows, false, true);
 +				break;
 +			case DrawStep::VoxelUnit:
-+				break; // (never while recording: with voxel units on, the passes stay on the CPU, see gpuEffectsWanted)
++				gpuRecordBody(step);
++				break;
 +			}
 +		}
 +		_gpuRecordOnly = recordOnly;
@@ -72722,7 +73230,25 @@ index 000000000..8d74ba1ac
 +	step.sprite.pile = pile;
 +	step.voxelFirst = _voxelSplats.size();
 +	step.voxelOpacity = opacity;
-+	for (size_t k = 0; k < voxels; ++k)
++	// On the card (setting "Renderer": GPU) the card draws the cubes itself, from the body's own arrays (see
++	// gpuRecordBody): nothing is worked out for each of them here, unless its check has the CPU draw them too.
++	const bool onCard = _gpuRecording;
++	if (onCard)
++	{
++		step.bodyRight = right.data(); step.bodyAhead = ahead.data(); step.bodyUp = up.data();
++		// (a body is one colour a cube from every side, see VoxelBodies::makeModel: its first painting's is sent, once)
++		step.bodyColours = fallen ? fallen->colour.data() : body.colours.data();
++		step.bodyColourStep = fallen ? 1 : 16;
++		step.bodyParts = fallen ? nullptr : body.part.data();
++		step.bodyCount = voxels;
++		std::copy(feet, feet + 3, step.bodyFeet);
++		step.bodyCosine = cosine; step.bodySine = sine;
++		step.bodyMeasure = scale * bodyUnit;
++		step.bodyFloorCut = floorCut;
++		step.bodyItems = items;
++		step.bodyShade = shade;
++	}
++	for (size_t k = 0; k < voxels && !(onCard && _gpuRecordOnly); ++k)
 +	{
 +		// (seen from one of the 8 directions, what fits its drawing and the pieces added for it, see VoxelUnitModel::views)
 +		if (!fallen && ((!items && body.part[k] == VoxelUnitModel::Item) || !body.shows(k, direction, level))) continue;
@@ -72750,7 +73276,7 @@ index 000000000..8d74ba1ac
 +		_voxelSplats.push_back(splat);
 +	}
 +	step.voxelCount = _voxelSplats.size() - step.voxelFirst;
-+	if (step.voxelCount == 0) return;
++	if (step.voxelCount == 0 && !(onCard && voxels > 0)) return;
 +	// The cubes' outlines (see drawVoxelUnit): the three half edges as seen straight ahead at a depth of one, and how
 +	// much deeper each goes.
 +	step.voxelOutline = cubes;

@@ -139,6 +139,8 @@ struct GpuEffectList
 	void clear()
 	{
 		effects.prims.clear();
+		effects.bodies.clear();
+		effects.bodyOutlines = false;
 		effects.outlineAt = -1;
 		effects.outlineCount = 0;
 		outlines.clear();
@@ -170,18 +172,12 @@ struct GpuEffectList
 };
 
 /**
- * Whether this frame's units and effects go to the card, with its rays. Not with the setting
- * "Voxel units" on: a voxel body is thousands of little squares plotted by the CPU (see
- * drawVoxelUnit), which the card has no primitive for, and a pass on the CPU can't follow one on
- * the card; so then the card casts the rays, they come back, and the CPU draws every pass.
+ * Whether this frame's units and effects go to the card, with its rays (a voxel body too: the card draws its
+ * cubes itself, see gpuRecordBody).
  * @return 0 no; 1 yes; 2 yes, beside the CPU's own, which is shown, the two compared (OPENXCOM3D_GPU_EFFECTS=check).
  */
 int FirstPersonView::gpuEffectsWanted() const
 {
-	if (Options::fpsVoxelUnits)
-	{
-		return 0;
-	}
 	static const char *const asked = getenv("OPENXCOM3D_GPU_EFFECTS");
 	const int mode = !asked ? 1 : !strcmp(asked, "check") ? 2 : atoi(asked) != 0 ? 1 : 0;
 	return mode;
@@ -195,6 +191,90 @@ void FirstPersonView::gpuBeginEffects()
 	if (!_gpuEffects) _gpuEffects = std::make_shared<GpuEffectList>();
 	_gpuEffects->clear();
 	_gpuRecording = true;
+}
+
+/**
+ * Records a unit's voxel body (setting "Voxel units"; see recordVoxelUnit, which worked out where it stands and its
+ * cubes' edges on the screen): the card draws its cubes itself, from the body's own arrays (sent up once for each
+ * shape, see FirstPersonGpu::Effects::Body), and its primitive lays the picture in at its turn among the others. Its
+ * box on the screen is the box round its cubes' own bounds (the corners of the block they fill, each as wide as the
+ * biggest cube may be drawn); all of the view if one of them is behind the eye.
+ * Texel 0: kind, flags (2 a unit's, 8 a pile's), its hitbox outline's number (0 none), that outline's colour.
+ */
+void FirstPersonView::gpuRecordBody(const DrawStep &step)
+{
+	if (!step.bodyCount)
+	{
+		return;
+	}
+	GpuEffectList &list = *_gpuEffects;
+	// The block its cubes fill, in its own measure: kept for each shape, found again by where its arrays are.
+	struct Bounds { size_t count; float first, last, low[3], high[3]; };
+	static std::unordered_map<const float*, Bounds> known;
+	if (known.size() > 4096) known.clear();
+	Bounds &bounds = known[step.bodyRight];
+	if (bounds.count != step.bodyCount || bounds.first != step.bodyRight[0] || bounds.last != step.bodyUp[step.bodyCount - 1])
+	{
+		bounds = { step.bodyCount, step.bodyRight[0], step.bodyUp[step.bodyCount - 1], { 1e9f, 1e9f, 1e9f }, { -1e9f, -1e9f, -1e9f } };
+		const float *const arrays[3] = { step.bodyRight, step.bodyAhead, step.bodyUp };
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			const auto ends = std::minmax_element(arrays[axis], arrays[axis] + step.bodyCount);
+			bounds.low[axis] = *ends.first;
+			bounds.high[axis] = *ends.second;
+		}
+	}
+	const int width = getWidth(), height = getHeight();
+	int left = width, top = height, right = 0, bottom = 0;
+	const double reach = VoxelSplatHalfMax + 2.0;
+	for (int corner = 0; corner < 8; ++corner)
+	{
+		const double across = ((corner & 1) ? bounds.high[0] : bounds.low[0]) * step.bodyMeasure, along = ((corner & 2) ? bounds.high[1] : bounds.low[1]) * step.bodyMeasure,
+			up = ((corner & 4) ? bounds.high[2] : bounds.low[2]) * step.bodyMeasure;
+		const double world[3] = { step.bodyFeet[0] + across * step.bodyCosine + along * step.bodySine, step.bodyFeet[1] + across * step.bodySine - along * step.bodyCosine,
+			step.bodyFeet[2] + up };
+		double screenX, screenY, depth;
+		if (!projectToScreen(world, screenX, screenY, depth))
+		{
+			left = top = 0; right = width; bottom = height;
+			break;
+		}
+		const double half = std::min(reach, (std::abs(step.voxelEdges[0][0]) + std::abs(step.voxelEdges[1][0]) + std::abs(step.voxelEdges[2][0])
+			+ std::abs(step.voxelEdges[0][1]) + std::abs(step.voxelEdges[1][1]) + std::abs(step.voxelEdges[2][1])) / depth + 2.0);
+		left = std::min(left, (int)std::floor(screenX - half)); right = std::max(right, (int)std::ceil(screenX + half) + 1);
+		top = std::min(top, (int)std::floor(screenY - half)); bottom = std::max(bottom, (int)std::ceil(screenY + half) + 1);
+	}
+	left = std::max(0, left); top = std::max(0, top); right = std::min(width, right); bottom = std::min(height, bottom);
+	if (left >= right || top >= bottom)
+	{
+		return;
+	}
+	float *texels = list.add(FirstPersonGpu::Effects::VoxelBody, left, top, right, bottom);
+	list.pictured.back() = { step.sprite.unit, step.sprite.body, step.sprite.pile };
+	texels[1] = (float)((step.sprite.unit ? 2 : 0) | (step.sprite.pile ? 8 : 0));
+	texels[2] = (float)step.voxelHitOutline;
+	texels[3] = step.voxelHitOutline ? (float)_outlineColors[step.voxelHitOutline - 1] : 0.0f;
+	if (step.voxelHitOutline) list.effects.bodyOutlines = true;
+	FirstPersonGpu::Effects::Body body;
+	body.right = step.bodyRight; body.ahead = step.bodyAhead; body.up = step.bodyUp;
+	body.colours = step.bodyColours; body.colourStep = step.bodyColourStep; body.parts = step.bodyParts;
+	body.count = step.bodyCount;
+	body.number = (int)list.boxes.size() - 1;
+	for (int axis = 0; axis < 3; ++axis) body.feet[axis] = (float)(step.bodyFeet[axis] - _eye[axis]);
+	body.cosine = (float)step.bodyCosine; body.sine = (float)step.bodySine;
+	body.measure = (float)step.bodyMeasure;
+	body.floorCut = (float)std::max(-1e9, step.bodyFloorCut - _eye[2]);
+	body.items = step.bodyItems;
+	body.cubes = step.voxelOutline;
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		body.edges[axis][0] = step.voxelEdges[axis][0]; body.edges[axis][1] = step.voxelEdges[axis][1];
+		body.lean[axis] = step.voxelLean[axis];
+	}
+	body.middle[0] = step.voxelMiddle[0]; body.middle[1] = step.voxelMiddle[1];
+	body.shade = step.bodyShade;
+	body.opacity = step.voxelOpacity;
+	list.effects.bodies.push_back(body);
 }
 
 /**
@@ -510,7 +590,7 @@ void FirstPersonView::gpuRecordQuad(const double corners[4][2], Uint8 color, flo
 void FirstPersonView::gpuRecordOutlines()
 {
 	GpuEffectList &list = *_gpuEffects;
-	if (_outlinedUnits.empty() || list.effects.outlineAt >= 0)
+	if ((_outlinedUnits.empty() && !list.effects.bodyOutlines) || list.effects.outlineAt >= 0)
 	{
 		return;
 	}
@@ -546,7 +626,7 @@ void FirstPersonView::gpuRecordOutlines()
 		for (const double number : numbers) list.outlines.push_back((float)number);
 		++list.effects.outlineCount;
 	}
-	if (list.effects.outlineCount > 0)
+	if (list.effects.outlineCount > 0 || list.effects.bodyOutlines) // (a voxel body's outline goes round its own pixels: no record)
 	{
 		list.effects.outlineAt = (int)list.boxes.size();
 		list.effects.outlineOpacity = _outlineOpacity;

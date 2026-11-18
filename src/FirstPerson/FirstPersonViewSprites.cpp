@@ -555,7 +555,8 @@ void FirstPersonView::replayDrawList()
 				drawLine3D(step.from, step.to, step.color, step.thickness, step.opacity, 0.0f, 0, 1 << 30, step.glows, false, true);
 				break;
 			case DrawStep::VoxelUnit:
-				break; // (never while recording: with voxel units on, the passes stay on the CPU, see gpuEffectsWanted)
+				gpuRecordBody(step);
+				break;
 			}
 		}
 		_gpuRecordOnly = recordOnly;
@@ -687,7 +688,25 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 	step.sprite.pile = pile;
 	step.voxelFirst = _voxelSplats.size();
 	step.voxelOpacity = opacity;
-	for (size_t k = 0; k < voxels; ++k)
+	// On the card (setting "Renderer": GPU) the card draws the cubes itself, from the body's own arrays (see
+	// gpuRecordBody): nothing is worked out for each of them here, unless its check has the CPU draw them too.
+	const bool onCard = _gpuRecording;
+	if (onCard)
+	{
+		step.bodyRight = right.data(); step.bodyAhead = ahead.data(); step.bodyUp = up.data();
+		// (a body is one colour a cube from every side, see VoxelBodies::makeModel: its first painting's is sent, once)
+		step.bodyColours = fallen ? fallen->colour.data() : body.colours.data();
+		step.bodyColourStep = fallen ? 1 : 16;
+		step.bodyParts = fallen ? nullptr : body.part.data();
+		step.bodyCount = voxels;
+		std::copy(feet, feet + 3, step.bodyFeet);
+		step.bodyCosine = cosine; step.bodySine = sine;
+		step.bodyMeasure = scale * bodyUnit;
+		step.bodyFloorCut = floorCut;
+		step.bodyItems = items;
+		step.bodyShade = shade;
+	}
+	for (size_t k = 0; k < voxels && !(onCard && _gpuRecordOnly); ++k)
 	{
 		// (seen from one of the 8 directions, what fits its drawing and the pieces added for it, see VoxelUnitModel::views)
 		if (!fallen && ((!items && body.part[k] == VoxelUnitModel::Item) || !body.shows(k, direction, level))) continue;
@@ -715,7 +734,7 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 		_voxelSplats.push_back(splat);
 	}
 	step.voxelCount = _voxelSplats.size() - step.voxelFirst;
-	if (step.voxelCount == 0) return;
+	if (step.voxelCount == 0 && !(onCard && voxels > 0)) return;
 	// The cubes' outlines (see drawVoxelUnit): the three half edges as seen straight ahead at a depth of one, and how
 	// much deeper each goes.
 	step.voxelOutline = cubes;

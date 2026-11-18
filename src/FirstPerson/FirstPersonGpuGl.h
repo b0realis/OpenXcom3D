@@ -68,6 +68,7 @@ const Enum TIME_ELAPSED = 0x88BF, QUERY_RESULT = 0x8866, QUERY_RESULT_AVAILABLE 
 const Enum EXTENSIONS = 0x1F03;
 const Enum IMPLEMENTATION_COLOR_READ_TYPE = 0x8B9A, IMPLEMENTATION_COLOR_READ_FORMAT = 0x8B9B;
 const Enum SYNC_GPU_COMMANDS_COMPLETE = 0x9117;
+const Enum DEPTH_ATTACHMENT = 0x8D00, DEPTH_COMPONENT = 0x1902, DEPTH_COMPONENT32F = 0x8CAC, COLOR = 0x1800, DEPTH = 0x1801, LESS = 0x0201;
 
 // The functions used: one line each, as OpenGL declares them. GL_FUNCTIONS(X) lists them for the
 // declarations below and for the loader (GpuContext::loadFunctions).
@@ -136,6 +137,10 @@ const Enum SYNC_GPU_COMMANDS_COMPLETE = 0x9117;
 	X(void, DeleteVertexArrays, (Sizei count, const UInt *arrays)) \
 	X(void, BindVertexArray, (UInt array)) \
 	X(void, DrawArrays, (Enum mode, Int first, Sizei count)) \
+	X(void, ClearBufferuiv, (Enum buffer, Int drawBuffer, const UInt *value)) \
+	X(void, ClearBufferfv, (Enum buffer, Int drawBuffer, const Float *value)) \
+	X(void, DepthFunc, (Enum function)) \
+	X(void, DepthMask, (Boolean writes)) \
 	X(void *, FenceSync, (Enum condition, UInt flags)) \
 	X(void, DeleteSync, (void *sync))
 
