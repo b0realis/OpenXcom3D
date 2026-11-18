@@ -1518,6 +1518,8 @@ void lyingShape(VoxelUnitModel::FallShape &shape, const HeldItem &lying, float l
 	});
 }
 
+/// A wreck takes its picture's colours this deep under the skin the picture shows, voxels (see makeFalls).
+constexpr float WreckSkinDepth = 1.5f * VOXELSCALE;
 /// The fall a body takes: a shape for each of its death frames in turn (each frame's own picture given volume, upright
 /// while the picture stands tall, laid back as it gets low: the body goes down as its sprite does, not as a plank
 /// tipping over), then the body
@@ -1598,14 +1600,32 @@ void makeFalls(VoxelUnitModel &model, const std::vector<std::vector<Uint8>> &dea
 			const long long cell = ((long long)std::lround(model.right[k] / Cell * 2.0f) + 100000) * 1000000000000LL
 				+ ((long long)std::lround(model.ahead[k] / Cell * 2.0f) + 100000) * 1000000LL + (long long)std::lround(up / Cell * 2.0f) + 100000;
 			if (!taken.insert(cell).second) continue;
-			float column, row, nearness;
-			project(model.right[k], model.ahead[k], up, Front, false, column, row, nearness);
-			const int c = (int)std::floor(column), r = (int)std::floor(row);
-			const Uint8 painted = c >= 0 && r >= 0 && c < FrameSize && r < FrameSize ? corpse[(size_t)r * FrameSize + c] : 0;
 			down.right.push_back(model.right[k]);
 			down.ahead.push_back(model.ahead[k]);
 			down.up.push_back(up);
-			down.colour.push_back(painted ? painted : model.colours[k * 16]);
+			down.colour.push_back(model.colours[k * 16]);
+		}
+		// (The picture only on the skin it shows: the wreck's nearest cubes on each of its pixels, from the map's side.
+		// Thrown through the whole wreck, each pixel ran on down the far side and along the sides as a streak: the
+		// owner's photo of a downed Cyberdisc, "vertical stripes". The rest keeps the body's own colours.)
+		std::vector<float> skin((size_t)FrameSize * FrameSize + 1, -1e9f);
+		auto pixelOf = [&](size_t k, float &nearness) -> size_t {
+			float column, row;
+			project(down.right[k], down.ahead[k], down.up[k], Front, false, column, row, nearness);
+			const int c = (int)std::floor(column), r = (int)std::floor(row);
+			return c >= 0 && r >= 0 && c < FrameSize && r < FrameSize ? (size_t)r * FrameSize + c : (size_t)FrameSize * FrameSize;
+		};
+		for (size_t k = 0; k < down.colour.size(); ++k)
+		{
+			float nearness;
+			float &nearest = skin[pixelOf(k, nearness)];
+			nearest = std::max(nearest, nearness);
+		}
+		for (size_t k = 0; k < down.colour.size(); ++k)
+		{
+			float nearness;
+			const size_t pixel = pixelOf(k, nearness);
+			if (pixel < (size_t)FrameSize * FrameSize && corpse[pixel] && nearness >= skin[pixel] - WreckSkinDepth) down.colour[k] = corpse[pixel];
 		}
 	}
 	if (down.colour.empty() && !corpse.empty()) fallRelief(down, withoutOutline(corpse, FrameSize, FrameSize, palette), 90.0f, halfMost * 0.8f);
