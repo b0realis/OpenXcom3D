@@ -1275,10 +1275,8 @@ private:
 	Text *_txtBanner = nullptr;     // the banner (big letters)
 	std::vector<Text*> _bannerGlow; // the banner again around itself, glowing
 
-	/// Does this unit have night vision (gear, or eyes that see in the dark)?
-	bool hasNightVision(const BattleUnit *unit) const;
-	/// Switches night vision on or off for a soldier with the gear, whatever the game is doing.
-	void toggleNightVision(BattleUnit *unit);
+	/// Switches night vision on or off, whatever the game is doing.
+	void toggleNightVision();
 	/// Fills the info panel for a unit (or hides it).
 	void updateInfoPanel(BattleUnit *unit);
 	/// The soldier card's weapon line: "R: Rifle 17 | 2 clips (40)".

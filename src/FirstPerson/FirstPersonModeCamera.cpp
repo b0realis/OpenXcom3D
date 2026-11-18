@@ -118,7 +118,7 @@ void FirstPersonMode::turnByMouse(int mouseDeltaX, int mouseDeltaY)
 void FirstPersonMode::updateZoom(double elapsedSeconds)
 {
 	const bool keyHeld = isKeyHeld(Options::keyFpsZoom) && !gameModifierHeld();
-	const bool zoomedIn = Options::fpsZoom && isActive() && (keyHeld || (_zoomButtonHeld && _mouseLook)) && !vrOn(); // (VR mode: the eyes see as wide as the headset shows)
+	const bool zoomedIn = isActive() && (keyHeld || (_zoomButtonHeld && _mouseLook)) && !vrOn(); // (VR mode: the eyes see as wide as the headset shows)
 	// (Zoomed in, the jump key held looks ZoomBoostFactor times closer: a player, GitHub issue #176, 4 times "a bit
 	// anemic for large maps and sniper squad sight"; the owner: "Zoom + space at maxed zoom goes to 8x". The key
 	// doesn't jump meanwhile: see keyboard.)

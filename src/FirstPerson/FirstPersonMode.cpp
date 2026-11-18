@@ -2443,8 +2443,8 @@ void FirstPersonMode::think()
 	endShotAim();
 	keepFiringWhileHeld(unit, playerTurn);
 
-	// Night vision (gear), in the isometric map's colour.
-	_view->setNightVision(hasNightVision(unit) ? _state->_map->getNightVisionColor() : 0);
+	// Night vision, in the isometric map's colour.
+	_view->setNightVision(unit ? _state->_map->getNightVisionColor() : 0);
 	// Smoke as this soldier's eyes see through it: the game's sight range, and the armor's heat
 	// vision (the see-through smoke thinner; enemies they don't see in smoke not drawn).
 	_view->setSmokeSight(_save->getTileEngine()->getMaxViewDistance() * 16.0f, unit->getVisibilityThroughSmoke(), unit->getVisibilityThroughFire());
@@ -2705,7 +2705,7 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	// The lean keys (setting "Lean") are read each frame while held (see updateLean); here they
 	// are only swallowed. With leaning off they're the game's.
 	if (Options::fpsLean > 0 && key != SDLK_UNKNOWN && (key == Options::keyFpsLeanHold || key == Options::keyFpsLeanLeftOwn || key == Options::keyFpsLeanRightOwn)) return true;
-	if (Options::fpsZoom && key != SDLK_UNKNOWN && key == Options::keyFpsZoom) return true; // (held: see updateZoom)
+	if (key != SDLK_UNKNOWN && key == Options::keyFpsZoom) return true; // (held: see updateZoom)
 	if (key != SDLK_UNKNOWN && key == Options::keyFpsShowFacing) return true; // (held: see think)
 	if (key != SDLK_UNKNOWN && key == Options::keyFpsRange) return true; // (held: see updateCrosshair)
 	if (key == Options::keyFpsOpenDoor) { if (pressed) openDoor(_save->getSelectedUnit()); return true; }
@@ -2721,7 +2721,7 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	// Night vision: the gear of the soldier the view looks through (in the aliens' turn the
 	// game's selected unit is the alien acting); the game's own key (Scroll Lock) checks for it
 	// in 3D too.
-	if (key == Options::keyFpsNightVision || key == Options::keyNightVisionToggle) { if (pressed) toggleNightVision(_trackedUnit); return true; }
+	if (key == Options::keyFpsNightVision || key == Options::keyNightVisionToggle) { if (pressed) toggleNightVision(); return true; }
 
 	// The game's reload key (R): the game's own reload, and the warning line says why when it loads
 	// nothing (see reload). With Ctrl, Alt or Shift held it stays the game's, which then ignores it,
@@ -2867,7 +2867,7 @@ bool FirstPersonMode::handleMouseLook(Action *action)
 		// (or a walk), as on the isometric map; with nothing to cancel, it zooms while held
 		// (setting "Zoom").
 		if (_confirmTile.x >= 0) clearConfirmMark();
-		else if (!_state->_battleGame->cancelCurrentAction()) _zoomButtonHeld = Options::fpsZoom;
+		else if (!_state->_battleGame->cancelCurrentAction()) _zoomButtonHeld = true;
 	}
 	else if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_RIGHT)
 	{

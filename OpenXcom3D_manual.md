@@ -9,7 +9,7 @@ In short, with pictures: the [play guide](https://b0realis.github.io/OpenXcom3D/
 3. [The top bar and items](#3-the-top-bar-and-items)
 4. [Settings](#4-settings)
 5. [Fire modes per weapon (FPS-style shooting)](#5-fire-modes-per-weapon-fps-style-shooting)
-6. [Night vision gear](#6-night-vision-gear)
+6. [Rules for mods](#6-rules-for-mods)
 7. [What you'll see](#7-what-youll-see)
 8. [Performance](#8-performance)
 9. [Known limits and ideas](#9-known-limits-and-ideas)
@@ -282,11 +282,11 @@ All of these can be rebound in **Options → 3D VIEW → Controls**: click a key
 | **B** | Suit flight on/off (flying armor; SWIM under water); each soldier's switch is kept with the save. A soldier who went up without it (the map's own up button or path) has it switched on when seen in the air, so touching down keeps flight on: Page Down on the ground (or B) switches it off |
 | **F** | The flashlight on/off (setting *Flashlight*): the 3D view's own light, separate from the suit light (L) |
 | **Space** | Jump: a hop on the spot (1 time unit). Walking forwards or sideways into something low (a fence, table, crate, rock: up to 15 voxels high), it vaults over it for 30 time units (setting *Jump over low obstacles*) |
-| **N** | Night vision on/off, with night vision gear (Scroll Lock, the game's own toggle, works too); at any time, also during explosions, shots and the aliens' turn |
+| **N** | Night vision on/off (Scroll Lock, the game's own toggle, works too); at any time, also during explosions, shots and the aliens' turn |
 | **Page Up / Page Down** | Fly up/down (flight on), or ride a grav lift or climb a ladder. Standing on one, purple arrows with LIFT PLATFORM show which ways it goes; with a free cursor (C), click them to ride. With flight off, a soldier in flying armor keeps to the lift as anyone else does (not on up into the air from its top: the message says which key switches flight on); one in the air all the same comes down to land, by itself or with Page Down. Off a lift or ladder, Page Up with flight off switches flight on and flies up, and Page Down with flight on, standing on the ground, switches it off |
 | **1 … 0** | Turn to visible enemy 1–10 (or click the red enemy buttons) |
-| **Right button** | Cancel the current action, or forget a target marked for *Confirm fire*; with nothing to cancel, hold to zoom (setting *Zoom*). With a free cursor: hold to look |
-| **U**, held | Zoom: the view glides in to 4 times closer, and back out when you let go (setting *Zoom*). **SCOPING 2.6x** at the right shows how far, and a thin blue cross runs through the crosshair. Aim, shots and hit chances don't change. In 3D, U then isn't the game's UFOpedia key (on the map it is) |
+| **Right button** | Cancel the current action, or forget a target marked for *Confirm fire*; with nothing to cancel, hold to zoom. With a free cursor: hold to look |
+| **U**, held | Zoom: the view glides in to 4 times closer, and back out when you let go. **SCOPING 2.6x** at the right shows how far, and a thin blue cross runs through the crosshair. Aim, shots and hit chances don't change. In 3D, U then isn't the game's UFOpedia key (on the map it is) |
 | **Left Alt**, held | Show facing: a ring round every unit in sight, with an arrow the way it faces, in its side's colour (X-COM green, the aliens red, civilians yellow), drawn over everything, for units whose sprite doesn't show it |
 | *Range (hold)*: no key until you give it one | The rangefinder on demand, while held (setting *Rangefinder*: the digital **RANGE 12** left of the crosshair, or the analogue scale if that is chosen). |
 | **C** or **middle button** | Mouse look ↔ free cursor (to click the buttons, hover soldiers for their cards). With *Middle click identifies* on, a middle click on a unit shows it instead, as on the map |
@@ -297,7 +297,7 @@ All of these can be rebound in **Options → 3D VIEW → Controls**: click a key
 | **Left Shift + A / D**, held | Lean out left / right, to peek round a corner, with the setting *Lean* on (otherwise Shift does nothing and A / D strafe, as before): the eye moves to the side, stopping short of walls and of anyone in sight, and with *Tilt* the view tilts. A shot while leaning out starts from that side. Q and E stay the game's hand keys (they don't act while Shift is held, so a lean never opens a menu). The lean key is rebindable (*Lean (hold with strafe)* under Controls, Shift, Ctrl or Alt allowed), and each side can have a key of its own too (*Lean left / right*, unbound) |
 | **Insert** | Cheats off, and the same ones back on (Doom mode, Doom IDKFA, Doom IDDQD, Doom IDCLIP: see [Settings](#cheats)) |
 
-The original hotkeys still work, except for W, A, S, D (on the map: the special item, abort and stats), U (with *Zoom* on) and the keys above. While you lean out (Shift held) they stay quiet, so Q or E don't open a hand's menu in the middle of a lean; the keys above work then too:
+The original hotkeys still work, except for W, A, S, D (on the map: the special item, abort and stats), U and the keys above. While you lean out (Shift held) they stay quiet, so Q or E don't open a hand's menu in the middle of a lean; the keys above work then too:
 
 - K kneel, I inventory, R reload (from a clip anywhere the soldier carries one: the belt, pockets, backpack, the other hand; in 3D, when it loads nothing, the warning line says why: already loaded, no spare clip for the weapon, or not enough time units, naming how many: in the big mods a clip deeper in the inventory costs its move to the hand too, so one in the backpack costs more than one on the belt);
 - Backspace end turn;
@@ -307,7 +307,7 @@ The original hotkeys still work, except for W, A, S, D (on the map: the special 
 - M the minimap, on your soldier; Home looks straight ahead, the way the soldier faces;
 - F5 / F9 quick save / load; F7 the frame counter.
 
-A key that can't do its job just now says why on the game's warning line: no flashlight or no flares (their settings off), armor that can't fly, a fire mode the weapon doesn't have, no night vision gear. With the game's Ctrl or Alt held (Ctrl+S and its other shortcuts) the keys are the game's, and W A S D don't walk. OXCE's **Ctrl+End** (its debug light: the light halved, then everything at full light, then back) lights the 3D view as it lights the map.
+A key that can't do its job just now says why on the game's warning line: no flashlight or no flares (their settings off), armor that can't fly, a fire mode the weapon doesn't have. With the game's Ctrl or Alt held (Ctrl+S and its other shortcuts) the keys are the game's, and W A S D don't walk. OXCE's **Ctrl+End** (its debug light: the light halved, then everything at full light, then back) lights the 3D view as it lights the map.
 
 ### The classic HUD in 3D
 
@@ -473,7 +473,6 @@ Low, Medium or High: thirteen of the *Screen* settings at once. What a level mea
 - **Mouse sensitivity** (5): how fast the view turns with the mouse, from 1 (slow) to 20 (fast).
 - **Invert mouse** (NO): YES: moving the mouse forward looks down instead of up, as in a flight simulator.
 - **Field of view** (75): how wide the 3D view is from side to side, in degrees, from 50 (narrow, like a zoom) to 110 (wide), in steps of 5. The weapon in hand keeps its size and place whatever you pick.
-- **Zoom** (YES): hold **U**, or the right mouse button in mouse look (when there's no picked action to cancel), to look 4 times closer. The view glides in over about 0.7 seconds and back out when you let go; **SCOPING 2.6x** in blue at the right counts it up and down, a thin blue scope cross runs through the crosshair, the weapon in hand lowers out of the way, and the mouse turns the view that much slower. Only the picture changes: the aim, the shot and the hit chance are the same (the spread ring grows with the picture). NO: U and the right button are the game's again. Zoomed in, holding **Space** (the *Jump* key, which doesn't jump meanwhile) looks 8 times closer, for sniping across a large map; let go of it and the view is back at 4 times.
 - **Start battles in 3D** (NO): YES: begin each battle in the first-person view instead of the isometric map.
 - **Alien turn in 3D** (YES): YES: stay in the 3D view during the alien turn, looking through your last soldier's eyes (HIDDEN MOVEMENT until an alien comes into sight, glowing red on the aliens' turn and green on the civilians', as the map's turn bar). NO: switch back to the isometric map for the alien turn.
 - **Aliens' turn cameras** (YES): with *Alien turn in 3D*, the view goes where the action is. When one of your soldiers fires back (reaction fire), it cuts to them at once, looking at their target. While an alien moves, it looks through the nearest soldier who sees it, staying at least a second and a half before cutting to another, and turns to the alien each time it reaches a new tile. When an alien none of your soldiers sees fires at one of them (at night, say), it cuts to the soldier shot at, turned to where the fire comes from. A soldier who is shot at, hit or mind controlled pops up their helmet camera card for 3 seconds (TARGETED, looking at the shooter; HIT; MIND CONTROLLED), and one going down too (setting below); the soldier you look through going down gets the death camera, as before. Your turn then starts looking the way the soldier faces. With the aliens' turn on the isometric map (*Alien turn in 3D* off, or you're on the map), the same cards pop up over the map, and so does whoever the 3D view would cut to: a soldier firing back (FIRING, looking at the target) and the nearest soldier who sees the alien moving (WATCHING, looking at it, for as long as they see it), one card at a time, the newest news first. The cards show the camera whatever *Soldier camera preview* says. NO: the view stays with your last soldier, and nothing pops up.
@@ -519,7 +518,6 @@ Low, Medium or High: thirteen of the *Screen* settings at once. What a level mea
 - **Live motion scanner** (NO): YES: the motion scanner held up in 3D stays up as the soldier moves and through the aliens' turn, its screen showing what moves round them wherever they go: a live radar for its one use (a player called it "potentially neat", and an advantage the game never gives). NO: one look from where it was used, as the game's own scanner: a step to another tile or the end of your turn puts it away, and using it again costs its time units again; while it's up it still turns with the view and sweeps. One of the *Gameplay* presets' settings (on from FullQoL).
 - **Auto-equip guns first** (NO): YES: when the game equips soldiers who have no saved loadout (a New Battle's, or soldiers never equipped), it hands out guns before melee weapons, the hardest-hitting first (by the power of one round of the strongest ammo for them in the craft), direct fire before launchers (guns whose shots arc or whose every round is a blast: rockets, mortars, grenade launchers): two-handed guns, one-handed guns, then two-handed and one-handed melee weapons, ammo and the rest; the same every time. NO: OXCE's own auto-equip, which has no ranking at all: it counts a two-handed melee weapon as a rifle and hands the craft's kit out in the order the items happen to sit in memory, which changes between builds and even between runs (the same battle gave one soldier a rifle, then a musket), so in XPiratez or X-Com Files soldiers often start with staffs, claws and swords. A gun here is a firearm with a shot reaching past 12 tiles (some mods' melee weapons are firearms with a one-tile "shot"). NO: OXCE's own auto-equip, unchanged, as modders rank their items for it.
 - **Unlimited tactical flares** (YES): YES: T throws a red flare at the crosshair, free and as often as you like. It bounces off walls and glass (the glass in a house's window shatters instead) and burns with red fire and red light for about a minute; under the sea it only goes a metre or two and bubbles hard. It lights the 3D view only: what the soldiers can see by the game's rules doesn't change. NO: T does nothing.
-- **Night vision needs gear** (NO): YES: in 3D only soldiers wearing or carrying night vision gear (power and flying suits, ion armor, hover tanks...: the list is in the mod, see [Night vision gear](#6-night-vision-gear)) and units that see in the dark, like aliens, get the NIGHT VISION button. NO: everyone has it, like on the isometric map.
 
 ### Graphics and light
 
@@ -705,90 +703,13 @@ With akimbo on (Full or One-hand), the other hand's gun fires too, the two takin
 | Alien Sonic Weapon | snap, aimed | SNAP (30 %TU) | AIMED (60 %TU) | — |
 | XARQUID_WEAPON | snap, aimed | SNAP (30 %TU) | AIMED (60 %TU) | — |
 
-## 6. Night vision gear
+## 6. Rules for mods
 
-With **Options → 3D VIEW → Night vision needs gear** (on by default), the 3D view gives the **NIGHT VISION** button (and the N key) only to a soldier who:
+A mod can tune the 3D view in the `firstPerson:` section of its ruleset (the defaults are in `mod/OpenXcom3D/OpenXcom3D.rul`).
 
-1. wears an armor, or carries an item (any inventory slot), listed under `nightVision:` in `mod/OpenXcom3D/OpenXcom3D.rul`; or
-2. sees as far in the dark as by day. That's the game's own rule: armor `visibilityAtDark`, which is 20 tiles for aliens by default. So an alien under your mind control always has it, and so does any modded armor with dark vision.
+### Built-in items in the hands
 
-With the setting off, everyone has it, like the isometric map's night vision (Scroll Lock toggle, Space hold).
-
-### Every armor and held item in the games, with a suggestion
-
-**Bold = in the default list.** *Italics = a reasonable addition* if you want night vision earlier in a campaign. Everything else: no. Those are weapons, ammo, explosives and medical gear with nothing to look through.
-
-#### UFO Defense: armors
-
-| Armor | Night vision | Why |
-|---|---|---|
-| STR_NONE_UC (no armor) | no | |
-| STR_PERSONAL_ARMOR_UC | *maybe* | human-made, 1990s tech; giving it night vision makes night missions much easier from the start |
-| **STR_POWER_SUIT_UC** | **yes** | alien alloy helmet, elerium power: the first suit with real sensors |
-| **STR_FLYING_SUIT_UC** | **yes** | the power suit's successor |
-| TANK_ARMOR (tanks) | *maybe* | real tanks have thermal sights |
-| **HOVERTANK_ARMOR** | **yes** | alien tech sensor suite |
-| alien armors (sectoid, floater, snakeman, muton, ethereal, cyberdisc, sectopod, reaper, chryssalid, celatid, silacoid, zombie) | **yes, by rule 2** | aliens see in the dark (20 tiles) |
-| civilians (CIVM, CIVF) | no | |
-
-#### UFO Defense: held items
-
-| Item | Night vision | Why |
-|---|---|---|
-| pistol, rifle, heavy cannon, auto-cannon, rocket launcher, their ammo | no | weapons |
-| laser pistol, laser rifle, heavy laser | no | weapons |
-| plasma pistol, plasma rifle, heavy plasma, their clips | no | weapons |
-| small launcher, stun bomb, blaster launcher, blaster bomb | no | weapons |
-| grenade, smoke grenade, proximity grenade, high explosive, alien grenade | no | explosives |
-| stun rod | no | melee |
-| STR_MOTION_SCANNER | *maybe* | a sensor, but it's a separate screen and not optics; leaving it out keeps the scanner's role |
-| STR_MEDI_KIT | no | |
-| STR_PSI_AMP | no | psi, not sight |
-| STR_MIND_PROBE | *maybe* | alien sensor tech; thematically odd for seeing in the dark |
-| STR_ELECTRO_FLARE | no | it lights the area instead (and the 3D view's T flares exist) |
-| corpses, UFO parts, alien artefacts | no | not carried into battle as gear |
-
-#### Terror From The Deep: armors
-
-| Armor | Night vision | Why |
-|---|---|---|
-| STR_NONE_UC | no | |
-| STR_PLASTIC_AQUA_ARMOR_UC | *maybe* | the first deep-sea suit; the deep is dark anyway |
-| **STR_ION_ARMOR_UC** | **yes** | alien ion tech |
-| **STR_MAGNETIC_ION_ARMOR_UC** | **yes** | the top suit |
-| COELACANTH_ARMOR (SWS) | *maybe* | human-made, like the tank |
-| **DISPLACER_ARMOR** | **yes** | the alien-tech submersible |
-| alien armors (aquatoid, gillman, lobsterman, tasoth, calcinite, deep one, tentaculat, biodrone, hallucinoid, triscene, xarquid) | **yes, by rule 2** | |
-| civilians (docker, surfer, sailor, bikini girl), zombie | no | |
-
-#### Terror From The Deep: held items
-
-| Item | Night vision | Why |
-|---|---|---|
-| dart pistol, jet harpoon, gas cannon, hydro-jet cannon, torpedo launcher, their ammo | no | weapons |
-| gauss pistol/rifle/heavy, sonic pistol/blasta rifle/cannon, disruptor pulse launcher, thermal shok launcher | no | weapons |
-| magna-blast grenade, dye grenade, particle disturbance grenade, magna-pack explosive, sonic pulser | no | explosives |
-| thermal tazer, vibro blade, thermic lance, heavy thermic lance | no | melee |
-| STR_PARTICLE_DISTURBANCE_SENSOR | *maybe* | TFTD's motion scanner, same reasoning |
-| STR_MEDI_KIT, STR_MC_DISRUPTOR, STR_MC_READER | no | |
-| STR_CHEMICAL_FLARE | no | lights the area instead |
-
-### Changing it
-
-Add or remove types in the list. It takes any armor or item type, mods included, e.g. a modded "NV goggles" item:
-
-```yaml
-firstPerson:
-  nightVision:
-    - STR_POWER_SUIT_UC
-    - STR_FLYING_SUIT_UC
-    - STR_PERSONAL_ARMOR_UC      # the "maybe" above
-    - STR_NV_GOGGLES             # a mod's item, carried anywhere in the inventory
-```
-
-A later mod's list replaces an earlier one.
-
-The same section can list built-in items (fixed weapons, armors' special weapons) that should show in the hands anyway, where a mod's picture of one looks right held (by default they don't show, see [Items](#3-the-top-bar-and-items)):
+The section can list built-in items (fixed weapons, armors' special weapons) that should show in the hands anyway, where a mod's picture of one looks right held (by default they don't show, see [Items](#3-the-top-bar-and-items)):
 
 ```yaml
 firstPerson:
@@ -1050,7 +971,7 @@ Every file starts with the project's philosophy and a description of what's in i
 | `FirstPersonQuickDeaths.cpp` | Setting *Quick deaths*: the falls under way, the frame of each, and a unit put in that frame's pose for drawing (on the map and in 3D) |
 | `FirstPersonChains.{h,cpp}` | Setting *Instant chain explosions*: a chain settled at once shown as one big blast rippling out (`chainLink` keeps the map and the units as they were; the fireballs' sprites, the tiles held as they were until the ripple passes them, the dead standing until it has; `ChainStandingPose`) |
 | `OptionsFirstPersonState.{h,cpp}` | 3D VIEW options tab: Settings / Controls sub-tabs, scrolling lists |
-| `RuleFirstPerson.h` | `firstPerson:` ruleset section (header-only): enabled, view distance, window glass, weather, skies, combat music, night vision gear, built-in items shown in hand, the item table (held shape, shots) |
+| `RuleFirstPerson.h` | `firstPerson:` ruleset section (header-only): enabled, view distance, window glass, weather, skies, combat music, built-in items shown in hand, the item table (held shape, shots) |
 
 What `FirstPersonView` draws:
 - terrain from LOFT voxels with iso-sprite projection, animated frames, UFO doors cut out as they slide, doors swinging, window glass;
@@ -1105,6 +1026,8 @@ What `FirstPersonView` draws:
 
 ### After 1.14 (not released)
 
+- **Zoom is always there: the setting *Zoom* is gone** (the owner: "Its on a control, just don't hit it"). Hold **U**, or the right button in mouse look, as before.
+- **Night vision for everyone: the setting *Night vision needs gear* is gone** (the owner: "Nobody uses the option night vision needs gear... Night vision is available period"). Every unit has the NIGHT VISION button and the N key in 3D, as on the isometric map; the mod's `nightVision:` list of armors and items is no longer read.
 - *Voxel units*, a quality pass on the bodies (the owner's reports on pictures of a Sectoid and a Muton):
   - Bodies twice as fine on a desktop (no setting: the one switch is *Voxel units*, now on the first Settings page; a headset keeps the coarser bodies).
   - Slimmer limbs: legs standing side by side are no deeper than one and a half times their width (a Sectoid's legs seen from between two directions were twice as thick as drawn), and each leg or arm of the front drawing is paired with one of the side drawing (no doubled legs from the side).
