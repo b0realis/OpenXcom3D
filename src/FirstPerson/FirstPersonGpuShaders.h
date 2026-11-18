@@ -67,7 +67,7 @@ uniform vec3 uEye, uForward, uRight, uUp;
 uniform vec2 uHalfPlane;     // the image plane's half-width and half-height
 uniform ivec2 uViewSize;     // the view in pixels
 uniform int uPixelSize;      // pixels a ray colours each way
-uniform int uGoggles;        // 1: night vision is on (the colours are the goggles' own)
+uniform int uGoggles;        // night vision's colour group + 1 (0: off): the colours are the goggles' own
 #ifdef LATER_RAYS
 // For a pixel's second and further rays (setting "Supersampling"): the first ray's pictures. Where the first rays
 // show nothing to smooth (see main), the later ones aren't cast.
@@ -446,6 +446,11 @@ uniform int uSmoothLight; // setting "Smooth light": the full-colour picture ble
 vec3 fullColor;
 bool fullColorSet;
 vec3 paletteRgb(uint color) { int entry = int(color) * 3; return vec3(float(texelFetch(uBlend, entry).r), float(texelFetch(uBlend, entry + 1).r), float(texelFetch(uBlend, entry + 2).r)); }
+// A scene colour (the sky's, the clouds', the haze's) in full colour. Through night vision those are picked by how they
+// look through the goggles, which show a colour by its shade alone: any colour of that shade, a dark red as soon as a
+// green. Its own red, green and blue then showed as a dark red band along the horizon at night, where the haze is
+// (the palette's picture was right: the goggles' wash makes it green). So through the goggles: that shade of their colours.
+vec3 seenRgb(uint color) { return paletteRgb(uGoggles != 0 ? uint((uGoggles - 1) * 16) | (color & 15u) : color); }
 const float LampReach = 120.0;     // how far a lamp lights (voxels)
 const float SunDiscRadius = 0.04;  // the sun as a disc this wide (the tangent of its half-angle): the width of a shadow's soft edge, a 25th of the way it fell
 const float CreaseShades = 4.5;    // how many palette shades the deepest corner is darkened
@@ -900,7 +905,7 @@ uint skyColor(vec3 rayDirection, int pixelX, int pixelY)
 		if (uSmoothLight != 0)
 		{
 			float band = clamp(gradient + mottle, 0.0, 31.0);
-			fullColor = mix(paletteRgb(scene(SceneSky + int(band))), paletteRgb(scene(SceneSky + min(31, int(band) + 1))), band - floor(band));
+			fullColor = mix(seenRgb(scene(SceneSky + int(band))), seenRgb(scene(SceneSky + min(31, int(band) + 1))), band - floor(band));
 			fullColorSet = true;
 		}
 		return scene(SceneSky + clamp(int(gradient + mottle + dither(pixelX, pixelY)), 0, 31));
@@ -911,7 +916,7 @@ uint skyColor(vec3 rayDirection, int pixelX, int pixelY)
 	if (uSmoothLight != 0)
 	{
 		float band = clamp(gradient, 0.0, 31.0);
-		skyRgb = mix(paletteRgb(scene(SceneSky + int(band))), paletteRgb(scene(SceneSky + min(31, int(band) + 1))), band - floor(band));
+		skyRgb = mix(seenRgb(scene(SceneSky + int(band))), seenRgb(scene(SceneSky + min(31, int(band) + 1))), band - floor(band));
 		fullColor = skyRgb;
 		fullColorSet = true;
 	}
@@ -945,7 +950,7 @@ uint skyColor(vec3 rayDirection, int pixelX, int pixelY)
 		if (uSmoothLight != 0 && coverage > 0.0)
 		{
 			float level = clamp((0.8 - density) * 10.0, 0.0, 7.0);
-			vec3 cloudRgb = mix(paletteRgb(scene(SceneCloud + int(level))), paletteRgb(scene(SceneCloud + min(7, int(level) + 1))), level - floor(level));
+			vec3 cloudRgb = mix(seenRgb(scene(SceneCloud + int(level))), seenRgb(scene(SceneCloud + min(7, int(level) + 1))), level - floor(level));
 			fullColor = mix(skyRgb, cloudRgb, coverage);
 		}
 		if (coverage > dither(pixelX + 1, pixelY + 3))
@@ -1098,7 +1103,7 @@ uint colorOutsideMap(vec3 rayOrigin, vec3 rayDirection, float tExit, int exitAxi
 				}
 #endif
 				float hazeShare = uSmoothLight != 0 ? haze : float(clamp(int(haze * float(HazeSteps) + dither(pixelX + 2, pixelY + 1)), 0, HazeSteps)) / float(HazeSteps);
-				fullColor = mix(rgb, paletteRgb(scene(SceneHaze)), hazeShare);
+				fullColor = mix(rgb, seenRgb(scene(SceneHaze)), hazeShare);
 				fullColorSet = true;
 			}
 			return hazeColor(color, haze, pixelX + 2, pixelY + 1);
@@ -1651,7 +1656,7 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 #endif
 		float haze = terrainHaze(hit.t);
 		if (uSmoothLight == 0) haze = float(clamp(int(haze * float(HazeSteps) + dither(pixelX + 2, pixelY + 1)), 0, HazeSteps)) / float(HazeSteps); // (in the palette's steps, dithered as there)
-		if (haze > 0.0) rgb = mix(rgb, paletteRgb(scene(SceneHaze)), haze);
+		if (haze > 0.0) rgb = mix(rgb, seenRgb(scene(SceneHaze)), haze);
 		fullColor = rgb;
 		fullColorSet = true;
 	}

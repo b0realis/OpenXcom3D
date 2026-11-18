@@ -1288,7 +1288,7 @@ void FirstPersonGpu::State::setScene(const Frame &frame)
 	Gl::Uniform2f(location("uHalfPlane"), frame.halfPlaneWidth, frame.halfPlaneHeight);
 	Gl::Uniform2i(location("uViewSize"), frame.width, frame.height);
 	Gl::Uniform1i(location("uPixelSize"), frame.pixelSize);
-	Gl::Uniform1i(location("uGoggles"), frame.goggles ? 1 : 0);
+	Gl::Uniform1i(location("uGoggles"), frame.goggles);
 	Gl::Uniform1f(location("uGhostScale"), frame.ghostScale);
 	Gl::Uniform1i(location("uSeeThroughCrops"), frame.seeThroughCrops ? 1 : 0);
 	Gl::Uniform1i(location("uSky"), frame.sky);
