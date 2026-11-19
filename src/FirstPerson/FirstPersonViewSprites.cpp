@@ -202,12 +202,7 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 	const double level[2] = { std::cos(_yaw), std::sin(_yaw) }; // straight ahead, along the ground
 	const double anchor[3] = { world[0] - _eye[0], world[1] - _eye[1], (world[2] - _eye[2]) * ZScale };
 	const double elevation = std::atan2(anchor[2], std::sqrt(anchor[0] * anchor[0] + anchor[1] * anchor[1])); // the anchor's angle above the eye
-	double tilt = std::clamp(_pitch, -CardTiltMax * Pi / 180.0, CardTiltUpMax * Pi / 180.0);
-	if (elevation > CardTiltUpMax * Pi / 180.0)
-	{
-		tilt = std::max(tilt, std::min(elevation - CardTiltUpMax * Pi / 180.0, CardTiltSteepMax * Pi / 180.0));
-	}
-	if (draw.layBack > 0.0) tilt = std::min(std::clamp(_pitch, -CardTiltMax * Pi / 180.0, 0.0), -draw.layBack); // (a hull's: see HullLayBack)
+	const double tilt = cardTilt(_pitch, elevation, draw.layBack); // (a hull's lies back: see HullLayBack)
 	const double cardUp[3] = { -std::sin(tilt) * level[0], -std::sin(tilt) * level[1], std::cos(tilt) };
 	const double cardFacing[3] = { std::cos(tilt) * level[0], std::cos(tilt) * level[1], std::sin(tilt) };
 	const double anchorAcross = dot(anchor, _levelRight), anchorFacing = dot(anchor, cardFacing);
@@ -1102,12 +1097,7 @@ void FirstPersonView::cardAxes(const double world[3], double scale, double colum
 	const double level[2] = { std::cos(_yaw), std::sin(_yaw) }; // straight ahead, along the ground
 	const double anchor[3] = { world[0] - _eye[0], world[1] - _eye[1], (world[2] - _eye[2]) * ZScale };
 	const double elevation = std::atan2(anchor[2], std::sqrt(anchor[0] * anchor[0] + anchor[1] * anchor[1]));
-	double tilt = std::clamp(_pitch, -CardTiltMax * Pi / 180.0, CardTiltUpMax * Pi / 180.0);
-	if (elevation > CardTiltUpMax * Pi / 180.0)
-	{
-		tilt = std::max(tilt, std::min(elevation - CardTiltUpMax * Pi / 180.0, CardTiltSteepMax * Pi / 180.0));
-	}
-	if (layBack > 0.0) tilt = std::min(std::clamp(_pitch, -CardTiltMax * Pi / 180.0, 0.0), -layBack); // (a hull's: see HullLayBack)
+	const double tilt = cardTilt(_pitch, elevation, layBack); // (a hull's lies back: see HullLayBack)
 	// A column along the level right; a row up the card (cardUp in true proportions, a row
 	// rowSize = scale * ZScale of it), its height back into voxels (divided by ZScale).
 	const double levelRight[2] = { -level[1], level[0] };
@@ -1735,7 +1725,8 @@ void FirstPersonView::drawUnits()
 			}
 			const size_t stepsBefore = _drawList.size();
 			// (a wreck lies as the map shows it, whichever way the unit faced: see drawFloorItems)
-			recordVoxelUnit(*body, walkPhase, wreckFalling && fall >= 1.0 ? 3 : facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall);
+			recordVoxelUnit(*body, walkPhase, wreckFalling && fall >= 1.0 ? 3 : facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall,
+				true, nullptr, nullptr, body->dithered ? VoxelDitherFaint : 1.0);
 			// With full sprite hitboxes the body is what the lines test (see FirstPerson::spriteHitAt): outlined as a
 			// picture is (see drawUnitOutlines), round the pixels it's drawn on (noted as they're drawn, see
 			// drawVoxelUnit); not one going down, nor one so close that it fades out.
@@ -3673,11 +3664,7 @@ void FirstPersonView::cullSmokeDraws()
 		const double columnSize = scale * SpritePixelX, rowSize = scale * ZScale;
 		const double anchor[3] = { smoke.world[0] - _eye[0], smoke.world[1] - _eye[1], (smoke.world[2] - _eye[2]) * ZScale };
 		const double elevation = std::atan2(anchor[2], std::sqrt(anchor[0] * anchor[0] + anchor[1] * anchor[1]));
-		double tilt = std::clamp(_pitch, -CardTiltMax * Pi / 180.0, CardTiltUpMax * Pi / 180.0);
-		if (elevation > CardTiltUpMax * Pi / 180.0)
-		{
-			tilt = std::max(tilt, std::min(elevation - CardTiltUpMax * Pi / 180.0, CardTiltSteepMax * Pi / 180.0));
-		}
+		const double tilt = cardTilt(_pitch, elevation, 0.0);
 		const double cardUp[3] = { -std::sin(tilt) * level[0], -std::sin(tilt) * level[1], std::cos(tilt) };
 		// Its corners on the screen.
 		double left = width, right = 0.0, top = height, bottom = 0.0, nearest = Infinity;

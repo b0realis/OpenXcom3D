@@ -82,6 +82,9 @@ class UnitSprite;
 /// kneeling, aiming) as the unit was when it was made, and the walk's 8 poses.
 struct VoxelUnitModel
 {
+	/// The unit is drawn as a dither, every other pixel left out so the map shows through it (XPiratez's stealth and
+	/// spectre suits): its body is made whole and drawn see-through (see VoxelDitherFaint).
+	bool dithered = false;
 	/// Which part of the unit a voxel is.
 	enum Part : Uint8 { Torso = 1, LeftArm, RightArm, Legs, Item };
 	/// Each surface voxel's place from the middle of the unit's feet: to its right, ahead and up, in voxels.

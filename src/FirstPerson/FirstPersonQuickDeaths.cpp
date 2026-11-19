@@ -89,14 +89,16 @@ std::vector<QuickFall> &quickFalls()
 }
 
 /**
- * A body coming down from the air (see noteAirFall): the unit, its battle, when it went down, the
- * tile it hovered over, its feet's height then and where it lands (voxels), and the tile it lands on.
+ * A body coming down from the air (see noteAirFall): the unit, its battle, when it went down (when it was struck,
+ * until its fall begins: see startAirFall), whether its fall has begun, the tile it hovered over, its feet's height
+ * then and where it lands (voxels), and the tile it lands on.
  */
 struct AirFall
 {
 	const SavedBattleGame *save;
 	const BattleUnit *unit;
 	Uint32 start;
+	bool falling;
 	Position from;
 	double fromZ, landZ;
 	Position landTile;
@@ -121,6 +123,9 @@ std::vector<AirFall> &airFalls()
  */
 double airFallDropped(const AirFall &fall, Uint32 now)
 {
+	// (Struck but not going down yet, the game turning it to the screen first: it hovers still. One the game never
+	// sent down is taken as landed after AirFallWait, so nothing waits for it for ever.)
+	if (!fall.falling) return now - fall.start >= AirFallWait ? fall.fromZ - fall.landZ : 0.0;
 	const double seconds = (now - fall.start) / 1000.0;
 	return 0.5 * AirFallGravity * seconds * seconds;
 }
@@ -287,7 +292,26 @@ void noteAirFall(const SavedBattleGame *save, BattleUnit *unit)
 	const Uint32 now = SDL_GetTicks();
 	std::vector<AirFall> &falls = airFalls();
 	falls.erase(std::remove_if(falls.begin(), falls.end(), [&](const AirFall &fall) { return fall.unit == unit || airFallDropped(fall, now) >= fall.fromZ - fall.landZ; }), falls.end());
-	falls.push_back({ save, unit, now, from, fromZ, landZ, land });
+	falls.push_back({ save, unit, now, false, from, fromZ, landZ, land });
+}
+
+/**
+ * A unit noted as going down in the air (see noteAirFall) starts to fall now: the game has turned it to the screen
+ * and starts its collapse. Its fall is timed from here: timed from when it was struck, a unit that had to turn first
+ * (one step for each eighth of a turn, a Floater facing the soldier seven) had landed before it was drawn going down,
+ * and was on the ground at once (a player, GitHub issue #187: "it does the old teleport to floor effect").
+ * @param unit The unit.
+ */
+void startAirFall(const BattleUnit *unit)
+{
+	for (AirFall &fall : airFalls())
+	{
+		if (fall.unit == unit && !fall.falling)
+		{
+			fall.start = SDL_GetTicks();
+			fall.falling = true;
+		}
+	}
 }
 
 /**

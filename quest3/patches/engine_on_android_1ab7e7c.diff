@@ -21691,7 +21691,7 @@ index 849787736..62298848c 100644
  	void voxelCheckFlush();
  	/// Blows this tile up.
 diff --git a/src/Battlescape/UnitDieBState.cpp b/src/Battlescape/UnitDieBState.cpp
-index b353c8db4..e901534e2 100644
+index b353c8db4..a41c385ab 100644
 --- a/src/Battlescape/UnitDieBState.cpp
 +++ b/src/Battlescape/UnitDieBState.cpp
 @@ -33,6 +33,7 @@
@@ -21737,7 +21737,15 @@ index b353c8db4..e901534e2 100644
  	{
  
  		/********************************************************
-@@ -150,7 +173,7 @@ void UnitDieBState::think()
+@@ -67,6 +90,7 @@ UnitDieBState::UnitDieBState(BattlescapeGame *parent, BattleUnit *unit, const Ru
+ 
+ 
+ 		_unit->instaFalling();
++		FirstPerson::startAirFall(_unit); // (OpenXcom3D: its fall from the air is timed from here, see FirstPerson::noteAirFall)
+ 		if (_parent->getSave()->isBeforeGame())
+ 		{
+ 			convertUnitToCorpse();
+@@ -150,7 +174,7 @@ void UnitDieBState::think()
  		_parent->popState();
  		return;
  	}
@@ -21746,7 +21754,15 @@ index b353c8db4..e901534e2 100644
  	{
  		int dir = _unit->getDirection() + 1;
  		if (dir == 8)
-@@ -235,8 +258,8 @@ void UnitDieBState::think()
+@@ -171,6 +195,7 @@ void UnitDieBState::think()
+ 	else if (!_unit->isOut())
+ 	{
+ 		_unit->startFalling();
++		FirstPerson::startAirFall(_unit); // (OpenXcom3D: its fall from the air is timed from here, see FirstPerson::noteAirFall)
+ 
+ 		if (!_noSound)
+ 		{
+@@ -235,8 +260,8 @@ void UnitDieBState::think()
  	}
  	else if (_unit->isOut())
  	{
@@ -25658,10 +25674,10 @@ index 000000000..1f0ce48b5
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..7ae2a0f02
+index 000000000..dd08218cc
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,509 @@
+@@ -0,0 +1,512 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -25975,6 +25991,8 @@ index 000000000..7ae2a0f02
 +/// A unit going down as it hovers over no floor (GitHub issue #62): notes it as the game takes it
 +/// out, so the 3D view draws it falling to the ground, the game itself having it there at once.
 +void noteAirFall(const SavedBattleGame *save, BattleUnit *unit);
++/// A unit noted so starts to fall now (the game starts its collapse): its fall is timed from here.
++void startAirFall(const BattleUnit *unit);
 +/// Forgets the falls from the air under way (a battle starting: its units are new).
 +void clearAirFalls();
 +/// Where a unit coming down from the air is now: its tile across (x, y) and its feet's height in
@@ -26160,6 +26178,7 @@ index 000000000..7ae2a0f02
 +	QuickFallPose(BattleUnit *, int) { }
 +};
 +inline void noteAirFall(const SavedBattleGame *, BattleUnit *) { }
++inline void startAirFall(const BattleUnit *) { }
 +inline void clearAirFalls() { }
 +inline bool airFallHeight(const BattleUnit *, Position &, double &) { return false; }
 +inline bool airFallLandsOn(const SavedBattleGame *, const Tile *) { return false; }
@@ -57048,10 +57067,10 @@ index 000000000..75dd0fb08
 +}
 diff --git a/src/FirstPerson/FirstPersonQuickDeaths.cpp b/src/FirstPerson/FirstPersonQuickDeaths.cpp
 new file mode 100644
-index 000000000..35ce614c8
+index 000000000..37d423f7d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonQuickDeaths.cpp
-@@ -0,0 +1,395 @@
+@@ -0,0 +1,419 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -57143,14 +57162,16 @@ index 000000000..35ce614c8
 +}
 +
 +/**
-+ * A body coming down from the air (see noteAirFall): the unit, its battle, when it went down, the
-+ * tile it hovered over, its feet's height then and where it lands (voxels), and the tile it lands on.
++ * A body coming down from the air (see noteAirFall): the unit, its battle, when it went down (when it was struck,
++ * until its fall begins: see startAirFall), whether its fall has begun, the tile it hovered over, its feet's height
++ * then and where it lands (voxels), and the tile it lands on.
 + */
 +struct AirFall
 +{
 +	const SavedBattleGame *save;
 +	const BattleUnit *unit;
 +	Uint32 start;
++	bool falling;
 +	Position from;
 +	double fromZ, landZ;
 +	Position landTile;
@@ -57175,6 +57196,9 @@ index 000000000..35ce614c8
 + */
 +double airFallDropped(const AirFall &fall, Uint32 now)
 +{
++	// (Struck but not going down yet, the game turning it to the screen first: it hovers still. One the game never
++	// sent down is taken as landed after AirFallWait, so nothing waits for it for ever.)
++	if (!fall.falling) return now - fall.start >= AirFallWait ? fall.fromZ - fall.landZ : 0.0;
 +	const double seconds = (now - fall.start) / 1000.0;
 +	return 0.5 * AirFallGravity * seconds * seconds;
 +}
@@ -57341,7 +57365,26 @@ index 000000000..35ce614c8
 +	const Uint32 now = SDL_GetTicks();
 +	std::vector<AirFall> &falls = airFalls();
 +	falls.erase(std::remove_if(falls.begin(), falls.end(), [&](const AirFall &fall) { return fall.unit == unit || airFallDropped(fall, now) >= fall.fromZ - fall.landZ; }), falls.end());
-+	falls.push_back({ save, unit, now, from, fromZ, landZ, land });
++	falls.push_back({ save, unit, now, false, from, fromZ, landZ, land });
++}
++
++/**
++ * A unit noted as going down in the air (see noteAirFall) starts to fall now: the game has turned it to the screen
++ * and starts its collapse. Its fall is timed from here: timed from when it was struck, a unit that had to turn first
++ * (one step for each eighth of a turn, a Floater facing the soldier seven) had landed before it was drawn going down,
++ * and was on the ground at once (a player, GitHub issue #187: "it does the old teleport to floor effect").
++ * @param unit The unit.
++ */
++void startAirFall(const BattleUnit *unit)
++{
++	for (AirFall &fall : airFalls())
++	{
++		if (fall.unit == unit && !fall.falling)
++		{
++			fall.start = SDL_GetTicks();
++			fall.falling = true;
++		}
++	}
 +}
 +
 +/**
@@ -65222,10 +65265,10 @@ index 000000000..d5a05cb89
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpuEffects.cpp b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 new file mode 100644
-index 000000000..fd51605dc
+index 000000000..6de8c0493
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
-@@ -0,0 +1,1076 @@
+@@ -0,0 +1,1071 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -65540,12 +65583,7 @@ index 000000000..fd51605dc
 +	const double level[2] = { std::cos(_yaw), std::sin(_yaw) };
 +	const double anchor[3] = { world[0] - _eye[0], world[1] - _eye[1], (world[2] - _eye[2]) * ZScale };
 +	const double elevation = std::atan2(anchor[2], std::sqrt(anchor[0] * anchor[0] + anchor[1] * anchor[1]));
-+	double tilt = std::clamp(_pitch, -CardTiltMax * Pi / 180.0, CardTiltUpMax * Pi / 180.0);
-+	if (elevation > CardTiltUpMax * Pi / 180.0)
-+	{
-+		tilt = std::max(tilt, std::min(elevation - CardTiltUpMax * Pi / 180.0, CardTiltSteepMax * Pi / 180.0));
-+	}
-+	if (draw.layBack > 0.0) tilt = std::min(std::clamp(_pitch, -CardTiltMax * Pi / 180.0, 0.0), -draw.layBack); // (a hull's: see HullLayBack)
++	const double tilt = cardTilt(_pitch, elevation, draw.layBack); // (a hull's lies back: see HullLayBack)
 +	const double cardUp[3] = { -std::sin(tilt) * level[0], -std::sin(tilt) * level[1], std::cos(tilt) };
 +	const double cardFacing[3] = { std::cos(tilt) * level[0], std::cos(tilt) * level[1], std::sin(tilt) };
 +	const double anchorAcross = dot(anchor, _levelRight), anchorFacing = dot(anchor, cardFacing);
@@ -69646,10 +69684,10 @@ index 000000000..5ee90296f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..0404dd59a
+index 000000000..f03c93b2b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,650 @@
+@@ -0,0 +1,677 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -69903,6 +69941,9 @@ index 000000000..0404dd59a
 +/// A unit going down as it hovers over no floor comes down to the ground in 3D (GitHub issue #62, see
 +/// FirstPerson::noteAirFall), falling by this gravity, in voxels a second a second (a level of 24 voxels in half a second).
 +const double AirFallGravity = 192.0;
++/// A unit struck in the air that the game never sends down counts as landed after this long, in milliseconds (see
++/// FirstPerson::startAirFall).
++const Uint32 AirFallWait = 3000;
 +const int QuickFallMaxFrames = 32;
 +/// Sprites stand like cards facing the camera, leaning with the view's pitch; looking down
 +/// further than this many degrees, a card leans only this far, so it stays above the floor
@@ -69919,6 +69960,30 @@ index 000000000..0404dd59a
 +/// degrees, whatever the view's pitch, and further only as the view looks down further: its picture is drawn from
 +/// above, its roof showing, and upright it showed that roof to the soldier like a lid (see drawSprite, hullLayBack).
 +const double HullLayBack = 50.0;
++/// How much shows of the body of a unit the game draws as a dither (see VoxelUnitModel::dithered): see-through as on
++/// the map, where every other pixel of it is left out.
++const double VoxelDitherFaint = 0.5;
++/// A hull's card steeply above the eye leans towards the eye as any other card does (lying back there it turned its
++/// back on a soldier below it and wasn't drawn at all: a Cyberdisc overhead): the lying back fades out over this
++/// many degrees of the card's elevation above the eye.
++const double HullLayBackFade = 30.0;
++/// How far a unit's card leans, in radians, positive with its top towards the camera (see drawSprite): with the
++/// view's pitch, between CardTiltMax looking down and CardTiltUpMax looking up; a card steeply above the eye
++/// towards the eye by how much steeper than CardTiltUpMax it stands, up to CardTiltSteepMax; a hull's lying back
++/// by layBack at least (in radians, 0 for any other card), less the higher above the eye it stands.
++inline double cardTilt(double pitch, double elevation, double layBack)
++{
++	const double degree = Pi / 180.0;
++	double tilt = std::clamp(pitch, -CardTiltMax * degree, CardTiltUpMax * degree);
++	if (elevation > CardTiltUpMax * degree)
++	{
++		tilt = std::max(tilt, std::min(elevation - CardTiltUpMax * degree, CardTiltSteepMax * degree));
++	}
++	if (layBack <= 0.0) return tilt;
++	const double lying = std::min(std::clamp(pitch, -CardTiltMax * degree, 0.0), -layBack);
++	const double above = std::clamp(elevation / (HullLayBackFade * degree), 0.0, 1.0);
++	return lying + (tilt - lying) * above;
++}
 +/// How far the view can look up or down, in degrees: all but straight up and down (the camera
 +/// keeps its heading there).
 +const double MaxPitch = 89.0;
@@ -72647,10 +72712,10 @@ index 000000000..229bd966c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..7b905890b
+index 000000000..4c32c0a5d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,4242 @@
+@@ -0,0 +1,4229 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -72855,12 +72920,7 @@ index 000000000..7b905890b
 +	const double level[2] = { std::cos(_yaw), std::sin(_yaw) }; // straight ahead, along the ground
 +	const double anchor[3] = { world[0] - _eye[0], world[1] - _eye[1], (world[2] - _eye[2]) * ZScale };
 +	const double elevation = std::atan2(anchor[2], std::sqrt(anchor[0] * anchor[0] + anchor[1] * anchor[1])); // the anchor's angle above the eye
-+	double tilt = std::clamp(_pitch, -CardTiltMax * Pi / 180.0, CardTiltUpMax * Pi / 180.0);
-+	if (elevation > CardTiltUpMax * Pi / 180.0)
-+	{
-+		tilt = std::max(tilt, std::min(elevation - CardTiltUpMax * Pi / 180.0, CardTiltSteepMax * Pi / 180.0));
-+	}
-+	if (draw.layBack > 0.0) tilt = std::min(std::clamp(_pitch, -CardTiltMax * Pi / 180.0, 0.0), -draw.layBack); // (a hull's: see HullLayBack)
++	const double tilt = cardTilt(_pitch, elevation, draw.layBack); // (a hull's lies back: see HullLayBack)
 +	const double cardUp[3] = { -std::sin(tilt) * level[0], -std::sin(tilt) * level[1], std::cos(tilt) };
 +	const double cardFacing[3] = { std::cos(tilt) * level[0], std::cos(tilt) * level[1], std::sin(tilt) };
 +	const double anchorAcross = dot(anchor, _levelRight), anchorFacing = dot(anchor, cardFacing);
@@ -73755,12 +73815,7 @@ index 000000000..7b905890b
 +	const double level[2] = { std::cos(_yaw), std::sin(_yaw) }; // straight ahead, along the ground
 +	const double anchor[3] = { world[0] - _eye[0], world[1] - _eye[1], (world[2] - _eye[2]) * ZScale };
 +	const double elevation = std::atan2(anchor[2], std::sqrt(anchor[0] * anchor[0] + anchor[1] * anchor[1]));
-+	double tilt = std::clamp(_pitch, -CardTiltMax * Pi / 180.0, CardTiltUpMax * Pi / 180.0);
-+	if (elevation > CardTiltUpMax * Pi / 180.0)
-+	{
-+		tilt = std::max(tilt, std::min(elevation - CardTiltUpMax * Pi / 180.0, CardTiltSteepMax * Pi / 180.0));
-+	}
-+	if (layBack > 0.0) tilt = std::min(std::clamp(_pitch, -CardTiltMax * Pi / 180.0, 0.0), -layBack); // (a hull's: see HullLayBack)
++	const double tilt = cardTilt(_pitch, elevation, layBack); // (a hull's lies back: see HullLayBack)
 +	// A column along the level right; a row up the card (cardUp in true proportions, a row
 +	// rowSize = scale * ZScale of it), its height back into voxels (divided by ZScale).
 +	const double levelRight[2] = { -level[1], level[0] };
@@ -74388,7 +74443,8 @@ index 000000000..7b905890b
 +			}
 +			const size_t stepsBefore = _drawList.size();
 +			// (a wreck lies as the map shows it, whichever way the unit faced: see drawFloorItems)
-+			recordVoxelUnit(*body, walkPhase, wreckFalling && fall >= 1.0 ? 3 : facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall);
++			recordVoxelUnit(*body, walkPhase, wreckFalling && fall >= 1.0 ? 3 : facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall,
++				true, nullptr, nullptr, body->dithered ? VoxelDitherFaint : 1.0);
 +			// With full sprite hitboxes the body is what the lines test (see FirstPerson::spriteHitAt): outlined as a
 +			// picture is (see drawUnitOutlines), round the pixels it's drawn on (noted as they're drawn, see
 +			// drawVoxelUnit); not one going down, nor one so close that it fades out.
@@ -76326,11 +76382,7 @@ index 000000000..7b905890b
 +		const double columnSize = scale * SpritePixelX, rowSize = scale * ZScale;
 +		const double anchor[3] = { smoke.world[0] - _eye[0], smoke.world[1] - _eye[1], (smoke.world[2] - _eye[2]) * ZScale };
 +		const double elevation = std::atan2(anchor[2], std::sqrt(anchor[0] * anchor[0] + anchor[1] * anchor[1]));
-+		double tilt = std::clamp(_pitch, -CardTiltMax * Pi / 180.0, CardTiltUpMax * Pi / 180.0);
-+		if (elevation > CardTiltUpMax * Pi / 180.0)
-+		{
-+			tilt = std::max(tilt, std::min(elevation - CardTiltUpMax * Pi / 180.0, CardTiltSteepMax * Pi / 180.0));
-+		}
++		const double tilt = cardTilt(_pitch, elevation, 0.0);
 +		const double cardUp[3] = { -std::sin(tilt) * level[0], -std::sin(tilt) * level[1], std::cos(tilt) };
 +		// Its corners on the screen.
 +		double left = width, right = 0.0, top = height, bottom = 0.0, nearest = Infinity;
@@ -87842,10 +87894,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..39702079a
+index 000000000..e78c5d40c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,754 @@
+@@ -0,0 +1,829 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -87939,6 +87991,50 @@ index 000000000..39702079a
 +	for (size_t i = 0; i < count; ++i) hash = (hash ^ bytes[i]) * 1099511628211ULL;
 +}
 +
++/// A picture drawn as a dither counts as one from this share of holes among its pixels, in hundredths (see ditherHoles):
++/// XPiratez's stealth and spectre suits have 69 to 87 holes for 100 pixels drawn, any other unit's sheet 9 at most.
++const int DitherShare = 33;
++
++/**
++ * Counts a picture's drawn pixels and its dither holes: the empty pixels with drawn ones on three sides at least (in a
++ * picture drawn as a dither, every other pixel left out so the map shows through, all those inside its outline).
++ */
++void ditherHoles(const std::vector<Uint8> &pixels, int width, int height, int &drawn, int &holes)
++{
++	if ((int)pixels.size() < width * height) return;
++	auto filled = [&](int x, int y) { return x >= 0 && y >= 0 && x < width && y < height && pixels[y * width + x] != 0; };
++	for (int y = 0; y < height; ++y)
++	{
++		for (int x = 0; x < width; ++x)
++		{
++			if (pixels[y * width + x]) ++drawn;
++			else if (filled(x - 1, y) + filled(x + 1, y) + filled(x, y - 1) + filled(x, y + 1) >= 3) ++holes;
++		}
++	}
++}
++
++/**
++ * Fills a dithered picture's holes (see ditherHoles), each with the colour beside it: a body can't be made of every
++ * other pixel (the cells with too few neighbours go, and with them all of it but a scrap: a player, GitHub issue #185,
++ * XPiratez's ghosts "don't seem to make a model at all").
++ */
++void fillDither(std::vector<Uint8> &pixels, int width, int height)
++{
++	if ((int)pixels.size() < width * height) return;
++	const std::vector<Uint8> drawn = pixels;
++	auto at = [&](int x, int y) -> Uint8 { return x >= 0 && y >= 0 && x < width && y < height ? drawn[y * width + x] : 0; };
++	for (int y = 0; y < height; ++y)
++	{
++		for (int x = 0; x < width; ++x)
++		{
++			if (drawn[y * width + x]) continue;
++			const Uint8 beside[4] = { at(x - 1, y), at(x + 1, y), at(x, y - 1), at(x, y + 1) };
++			if ((beside[0] != 0) + (beside[1] != 0) + (beside[2] != 0) + (beside[3] != 0) < 3) continue;
++			pixels[y * width + x] = beside[0] ? beside[0] : beside[1];
++		}
++	}
++}
++
 +}
 +
 +/// What a body is made from, for the builder's thread: the unit's parts' frames, the items in its hands, its pose and
@@ -87955,6 +88051,7 @@ index 000000000..39702079a
 +	WalkFrames walks;
 +	bool aiming = false;
 +	bool still = false; // (it can't move: see Routine)
++	bool dithered = false; // (drawn as a dither, its pictures' holes filled: see fillDither)
 +	bool fine = false; // (made twice as fine: see FineBodies)
 +	const Routine *routine = nullptr;
 +	int unitId = 0, status = 0; // (the unit's, for dump's file names)
@@ -88240,6 +88337,34 @@ index 000000000..39702079a
 +		}
 +	}
 +
++	// A unit drawn as a dither (XPiratez's stealth and spectre suits, see-through on the map) has its pictures' holes
++	// filled, for a body whole as any other's (see fillDither); so its corpse's pictures, if they are dithered.
++	bool dithered = false;
++	{
++		int drawn = 0, holes = 0;
++		for (const PartFrames &part : parts)
++			for (const auto &frame : part.frame) ditherHoles(frame, FrameSize, FrameSize, drawn, holes);
++		if (drawn > 0 && holes * 100 >= drawn * DitherShare)
++		{
++			dithered = true;
++			for (PartFrames &part : parts)
++				for (auto &frame : part.frame) fillDither(frame, FrameSize, FrameSize);
++			for (auto &frame : composite) fillDither(frame, FrameSize, FrameSize);
++			for (auto &death : deaths) fillDither(death, FrameSize, FrameSize);
++			for (auto &phase : walks.legs)
++				for (auto &view : phase) fillDither(view, FrameSize, FrameSize);
++			for (auto &phase : walks.arms)
++				for (auto &view : phase)
++					for (auto &side : view) fillDither(side, FrameSize, FrameSize);
++		}
++		drawn = holes = 0;
++		ditherHoles(corpse, FrameSize, FrameSize, drawn, holes);
++		if (drawn > 0 && holes * 100 >= drawn * DitherShare) fillDither(corpse, FrameSize, FrameSize);
++		drawn = holes = 0;
++		ditherHoles(lying.picture, lying.width, lying.height, drawn, holes);
++		if (drawn > 0 && holes * 100 >= drawn * DitherShare) fillDither(lying.picture, lying.width, lying.height);
++	}
++
 +	// The items in hand: their inventory pictures as the game draws them in a hand (with their own recolouring).
 +	HeldItem items[2];
 +	const BattleItem *hands[2] = { unit->getRightHandWeapon(), unit->getLeftHandWeapon() };
@@ -88281,8 +88406,8 @@ index 000000000..39702079a
 +			hashBytes(hash, walks.legs[phase][view].data(), walks.legs[phase][view].size());
 +			for (int side = 0; side < 2; ++side) hashBytes(hash, walks.arms[phase][view][side].data(), walks.arms[phase][view][side].size());
 +		}
-+	const Uint8 pose[3] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies };
-+	hashBytes(hash, pose, 3);
++	const Uint8 pose[4] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)dithered };
++	hashBytes(hash, pose, 4);
 +	auto alike = _byFrames.find(hash);
 +	if (alike != _byFrames.end())
 +	{
@@ -88304,6 +88429,7 @@ index 000000000..39702079a
 +		job->walks = std::move(walks);
 +		job->aiming = aiming;
 +		job->still = !unit->getArmor()->allowsMoving();
++		job->dithered = dithered;
 +		job->fine = FineBodies;
 +		job->routine = routine;
 +		std::copy(palette, palette + 256, job->palette);
@@ -88497,6 +88623,7 @@ index 000000000..39702079a
 +			routine.still = job->still;
 +			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->lying, job->walks, job->aiming, routine, job->palette);
 +		}
++		if (model) model->dithered = job->dithered;
 +		if (const char *folder = std::getenv("OXC3D_VOXELDUMP")) dump(*job, model.get(), folder);
 +		std::lock_guard<std::mutex> lock(_mutex);
 +		--_building;
@@ -88602,10 +88729,10 @@ index 000000000..39702079a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.h b/src/FirstPerson/FirstPersonVoxelUnits.h
 new file mode 100644
-index 000000000..6aaa1850b
+index 000000000..92d61b501
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.h
-@@ -0,0 +1,235 @@
+@@ -0,0 +1,238 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -88690,6 +88817,9 @@ index 000000000..6aaa1850b
 +/// kneeling, aiming) as the unit was when it was made, and the walk's 8 poses.
 +struct VoxelUnitModel
 +{
++	/// The unit is drawn as a dither, every other pixel left out so the map shows through it (XPiratez's stealth and
++	/// spectre suits): its body is made whole and drawn see-through (see VoxelDitherFaint).
++	bool dithered = false;
 +	/// Which part of the unit a voxel is.
 +	enum Part : Uint8 { Torso = 1, LeftArm, RightArm, Legs, Item };
 +	/// Each surface voxel's place from the middle of the unit's feet: to its right, ahead and up, in voxels.

@@ -311,6 +311,8 @@ private:
 /// A unit going down as it hovers over no floor (GitHub issue #62): notes it as the game takes it
 /// out, so the 3D view draws it falling to the ground, the game itself having it there at once.
 void noteAirFall(const SavedBattleGame *save, BattleUnit *unit);
+/// A unit noted so starts to fall now (the game starts its collapse): its fall is timed from here.
+void startAirFall(const BattleUnit *unit);
 /// Forgets the falls from the air under way (a battle starting: its units are new).
 void clearAirFalls();
 /// Where a unit coming down from the air is now: its tile across (x, y) and its feet's height in
@@ -496,6 +498,7 @@ public:
 	QuickFallPose(BattleUnit *, int) { }
 };
 inline void noteAirFall(const SavedBattleGame *, BattleUnit *) { }
+inline void startAirFall(const BattleUnit *) { }
 inline void clearAirFalls() { }
 inline bool airFallHeight(const BattleUnit *, Position &, double &) { return false; }
 inline bool airFallLandsOn(const SavedBattleGame *, const Tile *) { return false; }

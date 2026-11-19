@@ -91,6 +91,50 @@ void hashBytes(Uint64 &hash, const Uint8 *bytes, size_t count)
 	for (size_t i = 0; i < count; ++i) hash = (hash ^ bytes[i]) * 1099511628211ULL;
 }
 
+/// A picture drawn as a dither counts as one from this share of holes among its pixels, in hundredths (see ditherHoles):
+/// XPiratez's stealth and spectre suits have 69 to 87 holes for 100 pixels drawn, any other unit's sheet 9 at most.
+const int DitherShare = 33;
+
+/**
+ * Counts a picture's drawn pixels and its dither holes: the empty pixels with drawn ones on three sides at least (in a
+ * picture drawn as a dither, every other pixel left out so the map shows through, all those inside its outline).
+ */
+void ditherHoles(const std::vector<Uint8> &pixels, int width, int height, int &drawn, int &holes)
+{
+	if ((int)pixels.size() < width * height) return;
+	auto filled = [&](int x, int y) { return x >= 0 && y >= 0 && x < width && y < height && pixels[y * width + x] != 0; };
+	for (int y = 0; y < height; ++y)
+	{
+		for (int x = 0; x < width; ++x)
+		{
+			if (pixels[y * width + x]) ++drawn;
+			else if (filled(x - 1, y) + filled(x + 1, y) + filled(x, y - 1) + filled(x, y + 1) >= 3) ++holes;
+		}
+	}
+}
+
+/**
+ * Fills a dithered picture's holes (see ditherHoles), each with the colour beside it: a body can't be made of every
+ * other pixel (the cells with too few neighbours go, and with them all of it but a scrap: a player, GitHub issue #185,
+ * XPiratez's ghosts "don't seem to make a model at all").
+ */
+void fillDither(std::vector<Uint8> &pixels, int width, int height)
+{
+	if ((int)pixels.size() < width * height) return;
+	const std::vector<Uint8> drawn = pixels;
+	auto at = [&](int x, int y) -> Uint8 { return x >= 0 && y >= 0 && x < width && y < height ? drawn[y * width + x] : 0; };
+	for (int y = 0; y < height; ++y)
+	{
+		for (int x = 0; x < width; ++x)
+		{
+			if (drawn[y * width + x]) continue;
+			const Uint8 beside[4] = { at(x - 1, y), at(x + 1, y), at(x, y - 1), at(x, y + 1) };
+			if ((beside[0] != 0) + (beside[1] != 0) + (beside[2] != 0) + (beside[3] != 0) < 3) continue;
+			pixels[y * width + x] = beside[0] ? beside[0] : beside[1];
+		}
+	}
+}
+
 }
 
 /// What a body is made from, for the builder's thread: the unit's parts' frames, the items in its hands, its pose and
@@ -107,6 +151,7 @@ struct VoxelUnits::Job
 	WalkFrames walks;
 	bool aiming = false;
 	bool still = false; // (it can't move: see Routine)
+	bool dithered = false; // (drawn as a dither, its pictures' holes filled: see fillDither)
 	bool fine = false; // (made twice as fine: see FineBodies)
 	const Routine *routine = nullptr;
 	int unitId = 0, status = 0; // (the unit's, for dump's file names)
@@ -392,6 +437,34 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		}
 	}
 
+	// A unit drawn as a dither (XPiratez's stealth and spectre suits, see-through on the map) has its pictures' holes
+	// filled, for a body whole as any other's (see fillDither); so its corpse's pictures, if they are dithered.
+	bool dithered = false;
+	{
+		int drawn = 0, holes = 0;
+		for (const PartFrames &part : parts)
+			for (const auto &frame : part.frame) ditherHoles(frame, FrameSize, FrameSize, drawn, holes);
+		if (drawn > 0 && holes * 100 >= drawn * DitherShare)
+		{
+			dithered = true;
+			for (PartFrames &part : parts)
+				for (auto &frame : part.frame) fillDither(frame, FrameSize, FrameSize);
+			for (auto &frame : composite) fillDither(frame, FrameSize, FrameSize);
+			for (auto &death : deaths) fillDither(death, FrameSize, FrameSize);
+			for (auto &phase : walks.legs)
+				for (auto &view : phase) fillDither(view, FrameSize, FrameSize);
+			for (auto &phase : walks.arms)
+				for (auto &view : phase)
+					for (auto &side : view) fillDither(side, FrameSize, FrameSize);
+		}
+		drawn = holes = 0;
+		ditherHoles(corpse, FrameSize, FrameSize, drawn, holes);
+		if (drawn > 0 && holes * 100 >= drawn * DitherShare) fillDither(corpse, FrameSize, FrameSize);
+		drawn = holes = 0;
+		ditherHoles(lying.picture, lying.width, lying.height, drawn, holes);
+		if (drawn > 0 && holes * 100 >= drawn * DitherShare) fillDither(lying.picture, lying.width, lying.height);
+	}
+
 	// The items in hand: their inventory pictures as the game draws them in a hand (with their own recolouring).
 	HeldItem items[2];
 	const BattleItem *hands[2] = { unit->getRightHandWeapon(), unit->getLeftHandWeapon() };
@@ -433,8 +506,8 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 			hashBytes(hash, walks.legs[phase][view].data(), walks.legs[phase][view].size());
 			for (int side = 0; side < 2; ++side) hashBytes(hash, walks.arms[phase][view][side].data(), walks.arms[phase][view][side].size());
 		}
-	const Uint8 pose[3] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies };
-	hashBytes(hash, pose, 3);
+	const Uint8 pose[4] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)dithered };
+	hashBytes(hash, pose, 4);
 	auto alike = _byFrames.find(hash);
 	if (alike != _byFrames.end())
 	{
@@ -456,6 +529,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		job->walks = std::move(walks);
 		job->aiming = aiming;
 		job->still = !unit->getArmor()->allowsMoving();
+		job->dithered = dithered;
 		job->fine = FineBodies;
 		job->routine = routine;
 		std::copy(palette, palette + 256, job->palette);
@@ -649,6 +723,7 @@ void VoxelUnits::build()
 			routine.still = job->still;
 			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->lying, job->walks, job->aiming, routine, job->palette);
 		}
+		if (model) model->dithered = job->dithered;
 		if (const char *folder = std::getenv("OXC3D_VOXELDUMP")) dump(*job, model.get(), folder);
 		std::lock_guard<std::mutex> lock(_mutex);
 		--_building;

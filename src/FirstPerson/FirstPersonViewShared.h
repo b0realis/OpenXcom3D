@@ -251,6 +251,9 @@ const float BodySprayHeight = 4.0f;
 /// A unit going down as it hovers over no floor comes down to the ground in 3D (GitHub issue #62, see
 /// FirstPerson::noteAirFall), falling by this gravity, in voxels a second a second (a level of 24 voxels in half a second).
 const double AirFallGravity = 192.0;
+/// A unit struck in the air that the game never sends down counts as landed after this long, in milliseconds (see
+/// FirstPerson::startAirFall).
+const Uint32 AirFallWait = 3000;
 const int QuickFallMaxFrames = 32;
 /// Sprites stand like cards facing the camera, leaning with the view's pitch; looking down
 /// further than this many degrees, a card leans only this far, so it stays above the floor
@@ -267,6 +270,30 @@ const double CardTiltSteepMax = 80.0;
 /// degrees, whatever the view's pitch, and further only as the view looks down further: its picture is drawn from
 /// above, its roof showing, and upright it showed that roof to the soldier like a lid (see drawSprite, hullLayBack).
 const double HullLayBack = 50.0;
+/// How much shows of the body of a unit the game draws as a dither (see VoxelUnitModel::dithered): see-through as on
+/// the map, where every other pixel of it is left out.
+const double VoxelDitherFaint = 0.5;
+/// A hull's card steeply above the eye leans towards the eye as any other card does (lying back there it turned its
+/// back on a soldier below it and wasn't drawn at all: a Cyberdisc overhead): the lying back fades out over this
+/// many degrees of the card's elevation above the eye.
+const double HullLayBackFade = 30.0;
+/// How far a unit's card leans, in radians, positive with its top towards the camera (see drawSprite): with the
+/// view's pitch, between CardTiltMax looking down and CardTiltUpMax looking up; a card steeply above the eye
+/// towards the eye by how much steeper than CardTiltUpMax it stands, up to CardTiltSteepMax; a hull's lying back
+/// by layBack at least (in radians, 0 for any other card), less the higher above the eye it stands.
+inline double cardTilt(double pitch, double elevation, double layBack)
+{
+	const double degree = Pi / 180.0;
+	double tilt = std::clamp(pitch, -CardTiltMax * degree, CardTiltUpMax * degree);
+	if (elevation > CardTiltUpMax * degree)
+	{
+		tilt = std::max(tilt, std::min(elevation - CardTiltUpMax * degree, CardTiltSteepMax * degree));
+	}
+	if (layBack <= 0.0) return tilt;
+	const double lying = std::min(std::clamp(pitch, -CardTiltMax * degree, 0.0), -layBack);
+	const double above = std::clamp(elevation / (HullLayBackFade * degree), 0.0, 1.0);
+	return lying + (tilt - lying) * above;
+}
 /// How far the view can look up or down, in degrees: all but straight up and down (the camera
 /// keeps its heading there).
 const double MaxPitch = 89.0;
