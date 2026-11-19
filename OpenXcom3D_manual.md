@@ -808,6 +808,28 @@ firstPerson:
       shot: object
 ```
 
+### Units by name
+
+The big mods have hundreds of units, so what the voxel bodies (setting *Voxel units*) need to know of a unit is told by its names, not unit by unit. The unit table (`units:`) lists words to look for in a unit's names (its type, its armor's type, the armor's sprite sheet, its race, a soldier's type) and what it says of the units that have one:
+
+- `seeThrough:` how much of the body is left out, in hundredths: **50** draws every other cube, a ghost that is there but seen through. (A unit the game itself draws as a dither, such as XPiratez's stealth and spectre suits, is see-through without being named.)
+- `shape:` **beast** (a long body on four legs, a dog or a cat: made from its side drawings, its four legs apart, walking at a trot), **upright** (never so) or **auto**. Worked out: a unit drawn on one frame, one tile big, whose side drawing is at least 1.6 times as long as its frontal drawing is wide, and as long as it is high; one named a beast from 1.2 times. Only such one-frame units are made so: a werewolf drawn in parts stays upright whatever it is called.
+
+A word matches a whole word of a name (a name's words are its runs of letters: `STR_GHOST_GAL` has STR, GHOST and GAL), so `CAT` finds `BLACK_CAT` and not `CATGIRL`. A star opens it: `GHOST*` a word's start, `*DOGE` a word's end (`BLOODOGE`), `*SPIDER*` any part of a word. Capitals or not is the same. A later entry, or a later mod's, overrides what it sets.
+
+```yaml
+firstPerson:
+  units:
+    - names: [GHOST*, "*GHOST", SPECTRE, POLTERGEIST, PHANTOM]
+      seeThrough: 50
+    - names: [DOG, "*DOGE", HOUND, CAT, RAT, SPIDER, SCORPION]
+      shape: beast
+    - names: [STR_MY_TALL_DOG]      # a mod's unit that stands upright after all
+      shape: upright
+```
+
+The lists the mod comes with match 16 ghost armors and 48 animals of XPiratez and The X-Com Files.
+
 ## 7. What you'll see
 
 - The map rebuilt in 3D from the game's own voxel data, with the original art and proportions, out to 60 tiles by default and up to 200 (*View distance*); what your squad hasn't seen yet in slate-coloured shapes, misty further off (or in a fog, or as it is: *Unseen terrain*).
@@ -1029,6 +1051,8 @@ What `FirstPersonView` draws:
 
 ### After 1.14 (not released)
 
+- *Voxel units*: **dogs and cats stand on four legs** (GitHub issues #191, attack dogs "look like extremely adorable capybaras with stumpy legs", and #180, "cats aint got no legs"). A body drawn on one frame was read as one standing upright: row by row from its frontal drawing. A long animal's frontal drawing has its far end for its top, so each pair of legs came out one block, the gap under the belly was filled and the feet cut off; and the body was painted from its front and back drawings alone, which show nothing of its flanks: one tan barrel. A long body is now made from its side drawings (`profile`): their outline along the body, the other views trimming its width; the belly raised between the legs by what the drawings' slant adds to it (35% of the body's width), the legs going up to there; each pair of legs kept to the columns the front and back drawings have them in, so four legs stay four; painted by all eight drawings, each cube by the one that sees it best (a dog's dark flank on its light legs); and it walks at a trot, each leg about its own hip. Long: its side drawing at least 1.6 times as long as its frontal drawing is wide and as long as it is high (`longBody`): every dog, cat, rat, pig, sheep, chupacabra and maggot of XPiratez and The X-Com Files, and no unit of UFO or TFTD.
+- *Voxel units*: **units told by their names** (the owner: "this mod is heavily used with pirates and xcom files ... Lets have broad name detection for voxel units"). A new table in the mod's rules, `units:` (see [Units by name](#units-by-name)): words looked for in a unit's type, armor, sprite sheet and race, and what they say. Two things so far: **ghosts are seen through** (`seeThrough: 50`: XPiratez's ghost, The X-Com Files' ghosts, poltergeist and phantasmal tentacles; every other cube drawn), and **beasts** (`shape: beast`) for the animals too short to be told by their drawings (scorpions, beetles).
 - *Voxel units*: **a unit drawn as a dither gets a body** (GitHub issue #185: XPiratez's ghosts "don't seem to make a model at all"). The stealth and spectre suits are drawn with every other pixel left out, so the map shows through them; a body made of those pictures lost nearly all its cells (a cell with too few neighbours goes) and only a scrap was left, the weapon floating beside it. The holes of such pictures are filled before the body is made (`fillDither`: a sheet counts as dithered from 33 holes for 100 pixels drawn; the suits have 69 to 87, any other sheet 9 at most), and the body is drawn half see-through, as the map shows it (`VoxelDitherFaint`).
 - **A unit killed in the air plummets** (GitHub issue #187: "it does the old teleport to floor effect"). The fall was timed from the killing hit, but the game first turns the unit to the screen, a step for each eighth of a turn, and only then starts its collapse: a Floater facing the soldier had "landed" before it was drawn going down, and was on the ground at once. Sprites and voxel bodies alike. The fall is timed from when the collapse starts (`startAirFall`).
 - **A Cyberdisc or hover tank straight overhead is drawn again.** Since a hull's picture lies back 50 degrees it turned its back on a soldier below it and wasn't drawn at all, though the crosshair still named it. A hull above the eye leans towards the eye as any other unit does: the lying back fades out over 30 degrees of height above the eye (`cardTilt`, `HullLayBackFade`).

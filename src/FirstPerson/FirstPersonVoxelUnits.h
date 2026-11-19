@@ -78,13 +78,18 @@ class SavedBattleGame;
 class SurfaceSet;
 class UnitSprite;
 
+/// How much shows of the body of a unit the game draws as a dither (see VoxelUnitModel::opacity): see-through as on
+/// the map, where every other pixel of it is left out.
+constexpr float VoxelDitherFaint = 0.5f;
+
 /// A unit's body made from its own sprites: its surface voxels and their colours, standing (or
 /// kneeling, aiming) as the unit was when it was made, and the walk's 8 poses.
 struct VoxelUnitModel
 {
-	/// The unit is drawn as a dither, every other pixel left out so the map shows through it (XPiratez's stealth and
-	/// spectre suits): its body is made whole and drawn see-through (see VoxelDitherFaint).
-	bool dithered = false;
+	/// How much of the body shows: all of it (1), or less, see-through: a unit the game draws as a dither, every other
+	/// pixel left out so the map shows through it (XPiratez's stealth and spectre suits: VoxelDitherFaint), or one the
+	/// mod's rules name a ghost (the unit table's seeThrough, see RuleFirstPerson::UnitLook).
+	float opacity = 1.0f;
 	/// Which part of the unit a voxel is.
 	enum Part : Uint8 { Torso = 1, LeftArm, RightArm, Legs, Item };
 	/// Each surface voxel's place from the middle of the unit's feet: to its right, ahead and up, in voxels.

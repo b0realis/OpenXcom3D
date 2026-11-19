@@ -270,9 +270,6 @@ const double CardTiltSteepMax = 80.0;
 /// degrees, whatever the view's pitch, and further only as the view looks down further: its picture is drawn from
 /// above, its roof showing, and upright it showed that roof to the soldier like a lid (see drawSprite, hullLayBack).
 const double HullLayBack = 50.0;
-/// How much shows of the body of a unit the game draws as a dither (see VoxelUnitModel::dithered): see-through as on
-/// the map, where every other pixel of it is left out.
-const double VoxelDitherFaint = 0.5;
 /// A hull's card steeply above the eye leans towards the eye as any other card does (lying back there it turned its
 /// back on a soldier below it and wasn't drawn at all: a Cyberdisc overhead): the lying back fades out over this
 /// many degrees of the card's elevation above the eye.

@@ -1394,10 +1394,10 @@ index 000000000..8c874c4f5
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..beede98ec
+index 000000000..d083e784f
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,183 @@
+@@ -0,0 +1,199 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1563,6 +1563,22 @@ index 000000000..beede98ec
 +    # and the crossbows
 +    - types: [STR_HARPOON, STR_HARPOON_AUTO, STR_HARPOON_CARBINE, STR_DART_PISTOL, STR_AIR_MUSKET, STR_XBOW, STR_XBOW_CORAL, STR_EXECUTIONER_XBOW, STR_BALLISTA]
 +      shot: object
++  # The unit table: units told by their names, for the voxel bodies (setting "Voxel units"). Each entry lists words to
++  # look for in a unit's names (its type, its armor's, the armor's sprite sheet, its race) and what it says of those
++  # units. A word matches a whole word of a name (CAT: BLACK_CAT, not CATGIRL); with a star, a word's start (GHOST*),
++  # its end (*DOGE: BLOODOGE) or any part of it (*SPIDER*). Capitals or not is the same.
++  #   seeThrough: how much of the body is left out, in hundredths (50: every other cube, a ghost)
++  #   shape: beast (a long body on four legs, made from its side drawings; a unit drawn on one frame, one tile big),
++  #          upright (never so), or auto (by its drawings: at least 1.6 times as long as wide)
++  # A later entry (or a later mod's) overrides what it sets.
++  units:
++    # ghosts (XPiratez, The X-Com Files): there, but seen through
++    - names: [GHOST*, "*GHOST", SPECTRE, SPECTER, SPECTRAL, POLTERGEIST, PHANTOM, PHANTASMAL, BANSHEE, APPARITION]
++      seeThrough: 50
++    # animals on four legs or more (most are told by their drawings anyway; the short ones, scorpions and beetles, by name)
++    - names: [DOG, DOGE, DOGG, "*DOG", "*DOGE", HOUND, "*HOUND", WOLF, CAT, RAT, GIANTRAT, PIG, BOAR, SHEEP, COW, HORSE, GOAT, FOX, DEER,
++              BEAR, LION, TIGER, PANTHER, LIZARD, CHUPACABRA, MAGGOT, SPIDER, "*SPIDER", SCORPION, "*SCORPION", BEETLE]
++      shape: beast
 +
 +interfaces:
 +  - type: firstPerson
@@ -69607,10 +69623,10 @@ index 000000000..5ee90296f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..f03c93b2b
+index 000000000..9345221e0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,677 @@
+@@ -0,0 +1,674 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -69883,9 +69899,6 @@ index 000000000..f03c93b2b
 +/// degrees, whatever the view's pitch, and further only as the view looks down further: its picture is drawn from
 +/// above, its roof showing, and upright it showed that roof to the soldier like a lid (see drawSprite, hullLayBack).
 +const double HullLayBack = 50.0;
-+/// How much shows of the body of a unit the game draws as a dither (see VoxelUnitModel::dithered): see-through as on
-+/// the map, where every other pixel of it is left out.
-+const double VoxelDitherFaint = 0.5;
 +/// A hull's card steeply above the eye leans towards the eye as any other card does (lying back there it turned its
 +/// back on a soldier below it and wasn't drawn at all: a Cyberdisc overhead): the lying back fades out over this
 +/// many degrees of the card's elevation above the eye.
@@ -72635,7 +72648,7 @@ index 000000000..229bd966c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..4c32c0a5d
+index 000000000..c86a1fdac
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
 @@ -0,0 +1,4229 @@
@@ -74367,7 +74380,7 @@ index 000000000..4c32c0a5d
 +			const size_t stepsBefore = _drawList.size();
 +			// (a wreck lies as the map shows it, whichever way the unit faced: see drawFloorItems)
 +			recordVoxelUnit(*body, walkPhase, wreckFalling && fall >= 1.0 ? 3 : facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall,
-+				true, nullptr, nullptr, body->dithered ? VoxelDitherFaint : 1.0);
++				true, nullptr, nullptr, body->opacity);
 +			// With full sprite hitboxes the body is what the lines test (see FirstPerson::spriteHitAt): outlined as a
 +			// picture is (see drawUnitOutlines), round the pixels it's drawn on (noted as they're drawn, see
 +			// drawVoxelUnit); not one going down, nor one so close that it fades out.
@@ -84443,10 +84456,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..bc8cdc783
+index 000000000..bc5d4dbae
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,2757 @@
+@@ -0,0 +1,2922 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -84568,7 +84581,7 @@ index 000000000..bc8cdc783
 +/// the arms swing against the legs; the torso bobs as the game's frames do (see Routine). A walker drawn on one frame
 +/// has its legs below WholeHip of its height, each to its side of the middle (what's within WholeMiddle of the widest
 +/// part of them from the middle stays with the body: between the legs).
-+constexpr double LegSwing = 22.0, KneeBend = 38.0, ArmSwing = 16.0;
++constexpr double LegSwing = 22.0, KneeBend = 38.0, ArmSwing = 16.0, BeastSwing = 26.0;
 +constexpr float WholeHip = 0.42f, WholeMiddle = 0.12f;
 +/// A body lying (see makeFalls) is at most this many voxels long, and this much thicker for each pixel inside its
 +/// corpse's picture's outline (in the picture's own measure).
@@ -84871,6 +84884,120 @@ index 000000000..bc8cdc783
 +				cells[cellIndex(across, along, up)] = keep;
 +			}
 +		}
++}
++
++/// A long body (a beast on four legs: a dog, a cat, a rat, a pig) is one whose side drawing is at least LongBody times
++/// as long as its frontal drawing is wide, and as long as it is high; one a mod's rules name a beast (see Routine),
++/// from LongNamed times. (XPiratez's and The X-Com Files' animals are 1.9 to 4 times as long as wide, their scorpions
++/// and beetles 1.55; a unit standing upright under 1.4.) Its legs are the rows of its side drawing below its belly:
++/// from the ground up, the rows drawn for less than LegsShare of its longest row; and the belly's lowest rows between
++/// them (BellyRise, BellyMost: see profile).
++constexpr float LongBody = 1.6f, LongNamed = 1.2f, LegsShare = 0.6f, BellyRise = 0.35f, BellyMost = 0.35f;
++
++/// A frame's drawing: its first and last columns and rows; false if nothing is drawn.
++bool drawnBox(const PartFrames &part, int direction, int &left, int &right, int &top, int &bottom)
++{
++	left = top = FrameSize; right = bottom = -1;
++	for (int row = 0; row < FrameSize; ++row)
++		for (int column = 0; column < FrameSize; ++column)
++		{
++			if (!part.at(direction, column, row)) continue;
++			left = std::min(left, column); right = std::max(right, column);
++			top = std::min(top, row); bottom = std::max(bottom, row);
++		}
++	return right >= 0;
++}
++
++/// Whether a body drawn on one frame is a long one (see LongBody). Named: 1 if a mod's rules name it a beast, 0 if they
++/// say it stands upright, -1 if they say nothing.
++bool longBody(const PartFrames &part, int named)
++{
++	int left, right, top, bottom, frontLeft, frontRight, frontTop, frontBottom;
++	if (named == 0 || !drawnBox(part, RightSide, left, right, top, bottom) || !drawnBox(part, Front, frontLeft, frontRight, frontTop, frontBottom)) return false;
++	const float length = (float)(right - left + 1), width = (float)(frontRight - frontLeft + 1), height = (float)(bottom - top + 1);
++	return named == 1 ? length >= LongNamed * width : length >= LongBody * width && length >= height;
++}
++
++/// A long body's shape from its side drawings (see longBody): every cell whose place along the body and height the
++/// side frames draw, read level at the body's middle (a side frame's rows are heights there: they shift with the
++/// place across only), whatever its place across; the other views cut it to width (see carve). The right side's
++/// drawing counts, and the left side's has to agree within a pixel (hand drawn, they don't quite). Read as a body
++/// standing upright is, row by row from the front (see limb), its frontal drawing's rows took the far end of it for
++/// its top: each pair of legs came out one block, the gap under the belly filled, the feet cut off (a player, GitHub
++/// issue #191: attack dogs "look like extremely adorable capybaras with stumpy legs").
++/// Its legs are the rows below its belly (see LegsShare). The belly is drawn lower than it is: the drawings look down
++/// on the body, so its near side's lower edge stands BellyRise of its width below its middle's. That much of the
++/// belly is taken off between the legs, and the legs go up to there: "long canine like legs", at the body's own
++/// height. LegsTop is set to where the legs end.
++/// The legs keep to their columns: the front pair to those the frontal drawing has in its lowest rows, the hind pair
++/// to the back drawing's, so the two legs of a pair stay two (each gap is seen by one drawing only, and one drawing's
++/// word isn't enough for carve).
++std::vector<Uint8> profile(const PartFrames &part, float &legsTop)
++{
++	std::vector<Uint8> cells(GridCells, 0);
++	legsTop = 0.0f;
++	int left, right, top, bottom, frontLeft, frontRight, frontTop, frontBottom;
++	if (!drawnBox(part, RightSide, left, right, top, bottom)) return cells;
++	// the legs' rows: from the lowest row up, while a row is drawn for less than LegsShare of the longest one
++	int longest = 0;
++	std::vector<int> drawn(FrameSize, 0);
++	for (int row = top; row <= bottom; ++row)
++	{
++		for (int column = left; column <= right; ++column) drawn[row] += part.at(RightSide, column, row) != 0;
++		longest = std::max(longest, drawn[row]);
++	}
++	int legRows = 0;
++	while (bottom - legRows > top && drawn[bottom - legRows] < longest * LegsShare) ++legRows;
++	const int belly = bottom - legRows; // (the lowest row of the body as drawn)
++	// how far the belly is raised: BellyRise of the body's width, at most BellyMost of the rows above the legs
++	int rise = 0;
++	if (legRows > 0 && drawnBox(part, Front, frontLeft, frontRight, frontTop, frontBottom))
++	{
++		rise = std::min((int)std::lround(BellyRise * (frontRight - frontLeft + 1) / PixelsAcross), (int)(BellyMost * (belly - top + 1)));
++	}
++	const int legsFrom = belly - rise + 1; // (the legs' first row)
++	legsTop = (float)(FloorY - legsFrom);
++	// where the legs stand along the body: the columns the side drawing has in the legs' upper rows
++	std::vector<Uint8> stands(FrameSize, 0);
++	for (int row = belly + 1; row <= std::min(bottom, belly + 1 + VOXELSCALE); ++row)
++		for (int column = left; column <= right; ++column) if (part.at(RightSide, column, row)) stands[column] = 1;
++	// the columns a pair of legs keeps to: what a drawing (the front's, the back's) has in its lowest rows
++	auto legColumns = [&](int direction) {
++		std::vector<Uint8> columns(FrameSize, 0);
++		int l, r, t, b;
++		if (legRows < 2 || !drawnBox(part, direction, l, r, t, b)) return std::vector<Uint8>(FrameSize, 1);
++		for (int row = b; row > b - (legRows - 1) && row >= t; --row)
++			for (int column = l; column <= r; ++column) if (part.at(direction, column, row)) columns[column] = 1;
++		return columns;
++	};
++	const std::vector<Uint8> frontLegs = legColumns(Front), hindLegs = legColumns((Front + 4) % 8);
++	for (int along = 0; along < GridAlong; ++along)
++	{
++		const int sideRight = (int)std::floor(FloorX + cellAhead(along) * PixelsAcross), sideLeft = (int)std::floor(FloorX - cellAhead(along) * PixelsAcross);
++		for (int up = 0; up < GridUp; ++up)
++		{
++			const int row = (int)std::floor(FloorY - cellUp(up));
++			if (!part.at(RightSide, sideRight, row)) continue;
++			bool agreed = false;
++			for (int dy = -1; dy <= 1 && !agreed; ++dy)
++				for (int dx = -1; dx <= 1 && !agreed; ++dx) agreed = part.at(LeftSide, sideLeft + dx, row + dy) != 0;
++			if (!agreed) continue;
++			const bool leg = row >= legsFrom;
++			// (the belly's raised rows: only the legs are left of them)
++			if (leg && row <= belly && !(sideRight >= 0 && sideRight < FrameSize && stands[sideRight])) continue;
++			for (int across = 0; across < GridAcross; ++across)
++			{
++				if (leg)
++				{
++					// (the front drawing has the unit's right on its left, the back drawing on its right)
++					const int column = (int)std::floor(cellAhead(along) >= 0.0f ? FloorX - cellRight(across) * PixelsAcross : FloorX + cellRight(across) * PixelsAcross);
++					if (column < 0 || column >= FrameSize || !(cellAhead(along) >= 0.0f ? frontLegs : hindLegs)[column]) continue;
++				}
++				cells[cellIndex(across, along, up)] = 1;
++			}
++		}
++	}
++	return cells;
 +}
 +
 +/// Fills the cells of an elliptical slice at a frame row's height: centre (right, ahead) and half sizes, voxels.
@@ -85223,16 +85350,16 @@ index 000000000..bc8cdc783
 +	}
 +}
 +
-+/// Turns the chosen points about the line through (ahead 0, up pivot) along the unit's right: feet forward for a
-+/// positive angle.
-+void swing(std::vector<float> &ahead, std::vector<float> &up, const std::vector<bool> &chosen, float pivot, double angle)
++/// Turns the chosen points about the line through (ahead pivotAhead, up pivot) along the unit's right: feet forward for
++/// a positive angle.
++void swing(std::vector<float> &ahead, std::vector<float> &up, const std::vector<bool> &chosen, float pivot, double angle, float pivotAhead = 0.0f)
 +{
 +	const float c = (float)std::cos(angle), s = (float)std::sin(angle);
 +	for (size_t k = 0; k < chosen.size(); ++k)
 +	{
 +		if (!chosen[k]) continue;
-+		const float a = ahead[k], u = up[k] - pivot;
-+		ahead[k] = a * c - u * s;
++		const float a = ahead[k] - pivotAhead, u = up[k] - pivot;
++		ahead[k] = pivotAhead + a * c - u * s;
 +		up[k] = pivot + a * s + u * c;
 +	}
 +}
@@ -85252,9 +85379,48 @@ index 000000000..bc8cdc783
 +/// the bob, whose outlines in the two views (WalkFrames) agree best with the frames'. Otherwise a stride of LegSwing either
 +/// way (the right leg forward at phase 0), the knee bending while its leg swings forward, the arms against the legs, the
 +/// routine's bob (see Routine).
-+void makeWalk(VoxelUnitModel &model, const Routine &routine, bool leftHolds, bool rightHolds, const WalkFrames &frames)
++void makeWalk(VoxelUnitModel &model, const Routine &routine, bool leftHolds, bool rightHolds, const WalkFrames &frames, bool beast)
 +{
 +	const size_t count = model.part.size(), own = std::min(count, model.addedFrom); // (the pieces added for a view: posed along, not fitted)
++	if (beast)
++	{
++		// A long body on four legs (see longBody): each leg swings stiff about its own hip, the pairs across the body
++		// together (the right foreleg with the left hind leg: a trot), BeastSwing either way; the lowest foot stays on
++		// the ground. (Walked as a body on two legs, about one hip in its middle, its forelegs rose and its hind legs sank.)
++		float hip = -1e9f, ground = 1e9f;
++		std::vector<bool> leg[4];
++		float middle[4] = {};
++		int points[4] = {};
++		for (auto &chosen : leg) chosen.resize(count);
++		for (size_t k = 0; k < count; ++k)
++		{
++			if (model.part[k] != VoxelUnitModel::Legs) continue;
++			const int which = (model.right[k] > 0.0f ? 0 : 1) + (model.ahead[k] > 0.0f ? 0 : 2);
++			leg[which][k] = true;
++			middle[which] += model.ahead[k];
++			++points[which];
++			hip = std::max(hip, model.up[k]);
++			ground = std::min(ground, model.up[k]);
++		}
++		for (int phase = 0; phase < 8; ++phase)
++		{
++			std::vector<float> ahead = model.ahead, up = model.up;
++			for (int which = 0; which < 4; ++which)
++			{
++				if (!points[which]) continue;
++				const bool first = which == 0 || which == 3; // (the right foreleg and the left hind leg)
++				const double angle = BeastSwing * std::cos(2.0 * Pi * (phase / 8.0 + (first ? 0.0 : 0.5))) * Pi / 180.0;
++				swing(ahead, up, leg[which], hip, angle, middle[which] / points[which]);
++			}
++			float lowest = 1e9f;
++			for (size_t k = 0; k < own; ++k) if (model.part[k] == VoxelUnitModel::Legs) lowest = std::min(lowest, up[k]);
++			if (lowest < 1e8f) for (float &height : up) height += ground - lowest;
++			model.walkRight[phase] = model.right;
++			model.walkAhead[phase] = std::move(ahead);
++			model.walkUp[phase] = std::move(up);
++		}
++		return;
++	}
 +	float hip = -1e9f, footStanding = 1e9f;
 +	for (size_t k = 0; k < own; ++k)
 +	{
@@ -86585,6 +86751,9 @@ index 000000000..bc8cdc783
 +	// tanks and the Cyberdisc keep the shape their eight drawings leave.)
 +	const bool turret = routine.big && routine.still;
 +	SlantOnly = routine.big && !bigHull;
++	// (A long body on four legs, a dog or a cat: made from its side drawings, see longBody and profile.)
++	const bool beast = routine.whole && !routine.big && longBody(parts[0], routine.beast);
++	float beastLegsTop = 0.0f;
 +	std::vector<int> onTop[8], solidOnTop[8];
 +	partsOnTop(parts, composite, onTop);
 +	if (routine.big)
@@ -86614,7 +86783,8 @@ index 000000000..bc8cdc783
 +		// (a big unit's rows aren't heights: its four tiles' pictures stand on floors 8 rows apart, see tileFloorRows; its
 +		// shape is the 8 views' alone, strictly, but for a big walker's: its frames, as a one-tile unit's, don't quite
 +		// agree, and a strict hull of them lost its shell and horns)
-+		const std::vector<Uint8> shape = routine.big ? std::vector<Uint8>(GridCells, 1) : limb(solid, RightSide);
++		// (a long body, a beast on four legs: its side drawings' outline, see profile)
++		const std::vector<Uint8> shape = routine.big ? std::vector<Uint8>(GridCells, 1) : beast ? profile(solid, beastLegsTop) : limb(solid, RightSide);
 +		std::vector<Uint8> hull = carve(solid, bigHull ? 0 : 1, shape);
 +		if (turret) levelOff(solid, hull);
 +		for (int i = 0; i < GridCells; ++i) if (shape[i] && hull[i]) owner[i] = PartCodes[0];
@@ -86971,7 +87141,12 @@ index 000000000..bc8cdc783
 +	}
 +	// A walker drawn on one frame: its legs, for the walk, the body below the hip, but for its middle.
 +	float wholeTop = 0.0f, wholeSide = 0.0f;
-+	if (routine.whole && routine.humanoid)
++	if (beast)
++	{
++		// (a long body's legs: what's below its belly, see profile; the four swing each about its own hip, see makeWalk)
++		for (size_t k = 0; k < count; ++k) if (model->up[k] < beastLegsTop) model->part[k] = VoxelUnitModel::Legs;
++	}
++	else if (routine.whole && routine.humanoid)
 +	{
 +		for (size_t k = 0; k < count; ++k) wholeTop = std::max(wholeTop, model->up[k]);
 +		for (size_t k = 0; k < count; ++k) if (model->up[k] < wholeTop * WholeHip) wholeSide = std::max(wholeSide, std::abs(model->right[k]));
@@ -87036,7 +87211,10 @@ index 000000000..bc8cdc783
 +		// its shape is read along that slant (see carve, levelOff): each of its voxels takes its pixel of the drawing that
 +		// sees it best, of all eight, thrown along the slant onto the skin that drawing sees. So from where a drawing was
 +		// made the body shows that drawing, cube for pixel. The skin each drawing sees: the nearest voxel on each pixel.)
-+		const bool hull = turret;
++		// (So a long body on four legs, see longBody: most of it is its flanks, which the front and back drawings show
++		// nothing of. Painted by those two, a dog's flanks took its chest's colour: one tan barrel, where its side drawings
++		// have a dark flank on light legs.)
++		const bool hull = turret || beast;
 +		std::vector<float> seenSkin[8];
 +		auto slantPixel = [&](size_t k, int d, float &nearness) -> size_t {
 +			float column, row;
@@ -87116,7 +87294,7 @@ index 000000000..bc8cdc783
 +	makeHits(*model, owner, solidOnTop);
 +	const bool rightHolds = placed[0] || (placed[1] && items[1].twoHanded);
 +	const bool leftHolds = placed[1] || (placed[0] && items[0].twoHanded);
-+	makeWalk(*model, routine, leftHolds, rightHolds, walks);
++	makeWalk(*model, routine, leftHolds, rightHolds, walks, beast);
 +	makeFalls(*model, deaths, corpse, lying, palette, routine.big, bigHull);
 +	return model;
 +}
@@ -87206,10 +87384,10 @@ index 000000000..bc8cdc783
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.h b/src/FirstPerson/FirstPersonVoxelBodies.h
 new file mode 100644
-index 000000000..1f37f1533
+index 000000000..d3f066664
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.h
-@@ -0,0 +1,133 @@
+@@ -0,0 +1,135 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -87293,8 +87471,10 @@ index 000000000..1f37f1533
 +/// legs swing (a one-frame walker's: its body below the hip), whether its free arms do, and the torso's bob (the
 +/// routine's own, as the game draws its walk: drawRoutine0's tables for 0, 10, 13-15, drawRoutine6's for the Snakeman;
 +/// the big walkers' once a footfall). Still: the unit can't move (its armour's allowsMoving: false; set for the unit
-+/// being made, not in the routines' table): a big one is a turret, mounted on a vehicle.
-+struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; };
++/// being made, not in the routines' table): a big one is a turret, mounted on a vehicle. Beast: whether a body drawn
++/// on one frame is a long one on four legs (a dog, a cat), made from its side drawings: -1 by its drawings alone, 1 a
++/// mod's rules name it one, 0 they say it stands upright (set for the unit being made too; see longBody).
++struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; int beast = -1; };
 +/// The routine's way of drawing, or null for one not given a voxel body.
 +const Routine *routineFor(int number);
 +
@@ -87345,10 +87525,10 @@ index 000000000..1f37f1533
 +}
 diff --git a/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp b/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp
 new file mode 100644
-index 000000000..7364d57dd
+index 000000000..905073a51
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp
-@@ -0,0 +1,97 @@
+@@ -0,0 +1,98 @@
 +/*
 + * FirstPersonVoxelBodiesFine.cpp: the voxel bodies' builder a second time, twice as fine (see
 + * FirstPersonVoxelBodiesFine.h): the same source, FirstPersonVoxelBodies.cpp, with VOXELSCALE 2 and under a name of its
@@ -87440,6 +87620,7 @@ index 000000000..7364d57dd
 +	}
 +	Routine made = *routine;
 +	made.still = source.still;
++	made.beast = source.beast;
 +	std::unique_ptr<VoxelUnitModel> model = makeModel(parts, composite, items, deaths, corpse, lying, walks, source.aiming, made, palette);
 +	if (model) model->unit = 1.0f / VOXELSCALE;
 +	return model;
@@ -87448,10 +87629,10 @@ index 000000000..7364d57dd
 +}
 diff --git a/src/FirstPerson/FirstPersonVoxelBodiesFine.h b/src/FirstPerson/FirstPersonVoxelBodiesFine.h
 new file mode 100644
-index 000000000..ab877746e
+index 000000000..41c4e922f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodiesFine.h
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,39 @@
 +#pragma once
 +/*
 + * FirstPersonVoxelBodiesFine.h: the voxel bodies made twice as fine (see FineBodies): the builder of
@@ -87484,6 +87665,7 @@ index 000000000..ab877746e
 +	bool walkAny = false, aiming = false;
 +	int routine = 0;
 +	bool still = false; // (it can't move: see Routine)
++	int beast = -1; // (a long body on four legs, by the mod's rules: see Routine)
 +};
 +
 +/// Makes a body twice as fine from a unit's frames; null if it has no torso (or its routine has no bodies).
@@ -87817,10 +87999,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..e78c5d40c
+index 000000000..60ac4cb59
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,829 @@
+@@ -0,0 +1,843 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -87891,11 +88073,14 @@ index 000000000..e78c5d40c
 +#include "../Engine/Surface.h"
 +#include "../Engine/SurfaceSet.h"
 +#include "../Mod/Armor.h"
++#include "../Mod/Mod.h"
++#include "../Mod/RuleSoldier.h"
 +#include "../Mod/RuleItem.h"
 +#include "../Mod/Unit.h"
 +#include "../Savegame/BattleItem.h"
 +#include "../Savegame/BattleUnit.h"
 +#include "../Savegame/SavedBattleGame.h"
++#include "../Savegame/Soldier.h"
 +
 +namespace OpenXcom
 +{
@@ -87974,7 +88159,8 @@ index 000000000..e78c5d40c
 +	WalkFrames walks;
 +	bool aiming = false;
 +	bool still = false; // (it can't move: see Routine)
-+	bool dithered = false; // (drawn as a dither, its pictures' holes filled: see fillDither)
++	float shows = 1.0f; // (how much of the body shows: see VoxelUnitModel::opacity)
++	int beast = -1; // (a long body on four legs, by the unit table: see Routine)
 +	bool fine = false; // (made twice as fine: see FineBodies)
 +	const Routine *routine = nullptr;
 +	int unitId = 0, status = 0; // (the unit's, for dump's file names)
@@ -88329,8 +88515,15 @@ index 000000000..e78c5d40c
 +			hashBytes(hash, walks.legs[phase][view].data(), walks.legs[phase][view].size());
 +			for (int side = 0; side < 2; ++side) hashBytes(hash, walks.arms[phase][view][side].data(), walks.arms[phase][view][side].size());
 +		}
-+	const Uint8 pose[4] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)dithered };
-+	hashBytes(hash, pose, 4);
++	// What the mod's rules say of the unit by its names (the unit table: a ghost seen through, a beast on four legs).
++	const Unit *unitRules = unit->getUnitRules();
++	const Soldier *soldier = unit->getGeoscapeSoldier();
++	const RuleFirstPerson::UnitLook look = save->getMod()->getFirstPerson().getUnitLook({ unit->getType(), unit->getArmor()->getType(),
++		unit->getArmor()->getSpriteSheet(), unitRules ? unitRules->getRace() : std::string(), soldier ? soldier->getRules()->getType() : std::string() });
++	float shows = dithered ? VoxelDitherFaint : 1.0f;
++	if (look.shows >= 0) shows = std::min(shows, look.shows / 100.0f);
++	const Uint8 pose[5] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast + 1) };
++	hashBytes(hash, pose, 5);
 +	auto alike = _byFrames.find(hash);
 +	if (alike != _byFrames.end())
 +	{
@@ -88352,7 +88545,8 @@ index 000000000..e78c5d40c
 +		job->walks = std::move(walks);
 +		job->aiming = aiming;
 +		job->still = !unit->getArmor()->allowsMoving();
-+		job->dithered = dithered;
++		job->shows = shows;
++		job->beast = look.beast;
 +		job->fine = FineBodies;
 +		job->routine = routine;
 +		std::copy(palette, palette + 256, job->palette);
@@ -88537,6 +88731,7 @@ index 000000000..e78c5d40c
 +			source.walkAny = job->walks.any;
 +			source.aiming = job->aiming;
 +			source.still = job->still;
++			source.beast = job->beast;
 +			source.routine = job->routine->number;
 +			model = makeFineModel(source, job->palette);
 +		}
@@ -88544,9 +88739,10 @@ index 000000000..e78c5d40c
 +		{
 +			Routine routine = *job->routine;
 +			routine.still = job->still;
++			routine.beast = job->beast;
 +			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->lying, job->walks, job->aiming, routine, job->palette);
 +		}
-+		if (model) model->dithered = job->dithered;
++		if (model) model->opacity = job->shows;
 +		if (const char *folder = std::getenv("OXC3D_VOXELDUMP")) dump(*job, model.get(), folder);
 +		std::lock_guard<std::mutex> lock(_mutex);
 +		--_building;
@@ -88608,8 +88804,8 @@ index 000000000..e78c5d40c
 +
 +	if (FILE *file = std::fopen((base + ".job").c_str(), "w"))
 +	{
-+		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d\n", job.routine->number, job.routine->whole, job.routine->big,
-+			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty());
++		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d\n", job.routine->number, job.routine->whole, job.routine->big,
++			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), job.beast);
 +		for (int i = 0; i < 256; ++i) std::fprintf(file, "%d %d %d\n", job.palette[i].r, job.palette[i].g, job.palette[i].b);
 +		std::fclose(file);
 +	}
@@ -88652,10 +88848,10 @@ index 000000000..e78c5d40c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.h b/src/FirstPerson/FirstPersonVoxelUnits.h
 new file mode 100644
-index 000000000..92d61b501
+index 000000000..a09aa5206
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.h
-@@ -0,0 +1,238 @@
+@@ -0,0 +1,243 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -88736,13 +88932,18 @@ index 000000000..92d61b501
 +class SurfaceSet;
 +class UnitSprite;
 +
++/// How much shows of the body of a unit the game draws as a dither (see VoxelUnitModel::opacity): see-through as on
++/// the map, where every other pixel of it is left out.
++constexpr float VoxelDitherFaint = 0.5f;
++
 +/// A unit's body made from its own sprites: its surface voxels and their colours, standing (or
 +/// kneeling, aiming) as the unit was when it was made, and the walk's 8 poses.
 +struct VoxelUnitModel
 +{
-+	/// The unit is drawn as a dither, every other pixel left out so the map shows through it (XPiratez's stealth and
-+	/// spectre suits): its body is made whole and drawn see-through (see VoxelDitherFaint).
-+	bool dithered = false;
++	/// How much of the body shows: all of it (1), or less, see-through: a unit the game draws as a dither, every other
++	/// pixel left out so the map shows through it (XPiratez's stealth and spectre suits: VoxelDitherFaint), or one the
++	/// mod's rules name a ghost (the unit table's seeThrough, see RuleFirstPerson::UnitLook).
++	float opacity = 1.0f;
 +	/// Which part of the unit a voxel is.
 +	enum Part : Uint8 { Torso = 1, LeftArm, RightArm, Legs, Item };
 +	/// Each surface voxel's place from the middle of the unit's feet: to its right, ahead and up, in voxels.
@@ -96020,10 +96221,10 @@ index 000000000..b860f5356
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..27dec22f4
+index 000000000..5ec46213f
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
-@@ -0,0 +1,374 @@
+@@ -0,0 +1,446 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -96076,6 +96277,7 @@ index 000000000..27dec22f4
 + */
 +#include <algorithm>
 +#include <array>
++#include <cctype>
 +#include <bitset>
 +#include <map>
 +#include <set>
@@ -96131,8 +96333,43 @@ index 000000000..27dec22f4
 +		HeldAsBow bow = BOW_AUTO;   // held as a bow
 +	};
 +private:
++public:
++	/// What the unit table (`units:`) says of a unit, by its names: whether its voxel body is a long one on four legs
++	/// (1), one standing upright (0), or left to its drawings (-1); and how much of the body shows, in hundredths
++	/// (100 all of it; less: see-through, a ghost), or -1 for nothing said.
++	struct UnitLook
++	{
++		int beast = -1;
++		int shows = -1;
++	};
++	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
++	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
++	/// GHOSTLY), a word's end (*DOGE: BLOODOGE) or any part of a word (*SPIDER*). Capitals or not is the same.
++	static bool nameHas(const std::string &name, const std::string &pattern)
++	{
++		const bool openStart = !pattern.empty() && pattern.front() == '*', openEnd = pattern.size() > 1 && pattern.back() == '*';
++		std::string wanted = pattern.substr(openStart ? 1 : 0, pattern.size() - (openStart ? 1 : 0) - (openEnd ? 1 : 0));
++		for (char &letter : wanted) letter = (char)std::toupper((unsigned char)letter);
++		if (wanted.empty()) return false;
++		for (size_t at = 0; at < name.size();)
++		{
++			if (!std::isalpha((unsigned char)name[at])) { ++at; continue; }
++			size_t end = at;
++			std::string word;
++			while (end < name.size() && std::isalpha((unsigned char)name[end])) word += (char)std::toupper((unsigned char)name[end++]);
++			at = end;
++			if (word.size() < wanted.size()) continue;
++			if (openStart && openEnd ? word.find(wanted) != std::string::npos
++				: openStart ? word.compare(word.size() - wanted.size(), wanted.size(), wanted) == 0
++				: openEnd ? word.compare(0, wanted.size(), wanted) == 0
++				: word == wanted) return true;
++		}
++		return false;
++	}
++private:
 +	bool _enabled;
 +	int _maxViewDistance;                        // in tiles
++	std::vector<std::pair<std::vector<std::string>, UnitLook>> _unitLooks; // the unit table: each entry's name patterns and what it sets
 +	std::map<std::string, Windows> _windows;     // terrain data set -> its windows
 +	std::map<std::pair<std::string, int>, std::vector<Shape>> _shapes; // (terrain data set, record) -> its shapes, one per game
 +	std::map<std::string, std::string> _weather; // terrain data set -> rain, snow, dust, ...
@@ -96272,6 +96509,26 @@ index 000000000..27dec22f4
 +			}
 +		}
 +
++		// The unit table: groups of name patterns (see nameHas), each with what it says of the units whose names (the
++		// unit's type, its armor's, the armor's sprite sheet, its race) hold one: shape (beast: a long body on four legs;
++		// upright; or auto) and seeThrough (how much of the voxel body is left out, in hundredths: 50 for a ghost). A
++		// later entry overrides what it sets, and leaves the rest. The big mods have hundreds of units: by names, not
++		// one by one (the owner: "Lets have broad name detection for voxel units").
++		if (const auto& units = reader["units"])
++		{
++			for (const auto& entry : units.children())
++			{
++				std::vector<std::string> names;
++				std::string shape;
++				int seeThrough = 0;
++				UnitLook look;
++				entry.tryRead("names", names);
++				if (entry.tryRead("shape", shape)) look.beast = shape == "beast" ? 1 : shape == "upright" ? 0 : -1;
++				if (entry.tryRead("seeThrough", seeThrough)) look.shows = 100 - std::clamp(seeThrough, 0, 90);
++				if (!names.empty()) _unitLooks.push_back({ names, look });
++			}
++		}
++
 +		// The helmet cameras' bad signal by mission (alien deployment) type: groups of missions,
 +		// each with its level (1 now and then, as on any mission; 2 a lot: the aliens' own ground).
 +		if (const auto& badSignal = reader["badSignal"])
@@ -96349,6 +96606,22 @@ index 000000000..27dec22f4
 +	bool isUnderground(const std::string &mission) const { return _undergroundMissions.count(mission) > 0; }
 +	/// Is a built-in item (fixed to its unit, or its special weapon) drawn in the hands all the same?
 +	bool showsBuiltInItem(const std::string &type) const { return _builtInItemsShown.count(type) > 0; }
++	/// What the unit table says of a unit with these names (its type, its armor's, the sprite sheet, its race): each
++	/// thing as the last entry that sets it and matches one of the names has it.
++	UnitLook getUnitLook(const std::vector<std::string> &names) const
++	{
++		UnitLook look;
++		for (const auto &entry : _unitLooks)
++		{
++			bool matches = false;
++			for (const std::string &pattern : entry.first)
++				for (const std::string &name : names) matches = matches || nameHas(name, pattern);
++			if (!matches) continue;
++			if (entry.second.beast != -1) look.beast = entry.second.beast;
++			if (entry.second.shows != -1) look.shows = entry.second.shows;
++		}
++		return look;
++	}
 +	/// An item's entry in the item table, or nullptr if it has none (the 3D view works it all out).
 +	const ItemLook *getItemLook(const std::string &type) const
 +	{

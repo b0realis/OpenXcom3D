@@ -30,6 +30,7 @@ struct FineBodySource
 	bool walkAny = false, aiming = false;
 	int routine = 0;
 	bool still = false; // (it can't move: see Routine)
+	int beast = -1; // (a long body on four legs, by the mod's rules: see Routine)
 };
 
 /// Makes a body twice as fine from a unit's frames; null if it has no torso (or its routine has no bodies).

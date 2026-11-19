@@ -1726,7 +1726,7 @@ void FirstPersonView::drawUnits()
 			const size_t stepsBefore = _drawList.size();
 			// (a wreck lies as the map shows it, whichever way the unit faced: see drawFloorItems)
 			recordVoxelUnit(*body, walkPhase, wreckFalling && fall >= 1.0 ? 3 : facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall,
-				true, nullptr, nullptr, body->dithered ? VoxelDitherFaint : 1.0);
+				true, nullptr, nullptr, body->opacity);
 			// With full sprite hitboxes the body is what the lines test (see FirstPerson::spriteHitAt): outlined as a
 			// picture is (see drawUnitOutlines), round the pixels it's drawn on (noted as they're drawn, see
 			// drawVoxelUnit); not one going down, nor one so close that it fades out.

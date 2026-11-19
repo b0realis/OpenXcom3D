@@ -50,6 +50,7 @@
  */
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <bitset>
 #include <map>
 #include <set>
@@ -105,8 +106,43 @@ public:
 		HeldAsBow bow = BOW_AUTO;   // held as a bow
 	};
 private:
+public:
+	/// What the unit table (`units:`) says of a unit, by its names: whether its voxel body is a long one on four legs
+	/// (1), one standing upright (0), or left to its drawings (-1); and how much of the body shows, in hundredths
+	/// (100 all of it; less: see-through, a ghost), or -1 for nothing said.
+	struct UnitLook
+	{
+		int beast = -1;
+		int shows = -1;
+	};
+	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
+	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
+	/// GHOSTLY), a word's end (*DOGE: BLOODOGE) or any part of a word (*SPIDER*). Capitals or not is the same.
+	static bool nameHas(const std::string &name, const std::string &pattern)
+	{
+		const bool openStart = !pattern.empty() && pattern.front() == '*', openEnd = pattern.size() > 1 && pattern.back() == '*';
+		std::string wanted = pattern.substr(openStart ? 1 : 0, pattern.size() - (openStart ? 1 : 0) - (openEnd ? 1 : 0));
+		for (char &letter : wanted) letter = (char)std::toupper((unsigned char)letter);
+		if (wanted.empty()) return false;
+		for (size_t at = 0; at < name.size();)
+		{
+			if (!std::isalpha((unsigned char)name[at])) { ++at; continue; }
+			size_t end = at;
+			std::string word;
+			while (end < name.size() && std::isalpha((unsigned char)name[end])) word += (char)std::toupper((unsigned char)name[end++]);
+			at = end;
+			if (word.size() < wanted.size()) continue;
+			if (openStart && openEnd ? word.find(wanted) != std::string::npos
+				: openStart ? word.compare(word.size() - wanted.size(), wanted.size(), wanted) == 0
+				: openEnd ? word.compare(0, wanted.size(), wanted) == 0
+				: word == wanted) return true;
+		}
+		return false;
+	}
+private:
 	bool _enabled;
 	int _maxViewDistance;                        // in tiles
+	std::vector<std::pair<std::vector<std::string>, UnitLook>> _unitLooks; // the unit table: each entry's name patterns and what it sets
 	std::map<std::string, Windows> _windows;     // terrain data set -> its windows
 	std::map<std::pair<std::string, int>, std::vector<Shape>> _shapes; // (terrain data set, record) -> its shapes, one per game
 	std::map<std::string, std::string> _weather; // terrain data set -> rain, snow, dust, ...
@@ -246,6 +282,26 @@ public:
 			}
 		}
 
+		// The unit table: groups of name patterns (see nameHas), each with what it says of the units whose names (the
+		// unit's type, its armor's, the armor's sprite sheet, its race) hold one: shape (beast: a long body on four legs;
+		// upright; or auto) and seeThrough (how much of the voxel body is left out, in hundredths: 50 for a ghost). A
+		// later entry overrides what it sets, and leaves the rest. The big mods have hundreds of units: by names, not
+		// one by one (the owner: "Lets have broad name detection for voxel units").
+		if (const auto& units = reader["units"])
+		{
+			for (const auto& entry : units.children())
+			{
+				std::vector<std::string> names;
+				std::string shape;
+				int seeThrough = 0;
+				UnitLook look;
+				entry.tryRead("names", names);
+				if (entry.tryRead("shape", shape)) look.beast = shape == "beast" ? 1 : shape == "upright" ? 0 : -1;
+				if (entry.tryRead("seeThrough", seeThrough)) look.shows = 100 - std::clamp(seeThrough, 0, 90);
+				if (!names.empty()) _unitLooks.push_back({ names, look });
+			}
+		}
+
 		// The helmet cameras' bad signal by mission (alien deployment) type: groups of missions,
 		// each with its level (1 now and then, as on any mission; 2 a lot: the aliens' own ground).
 		if (const auto& badSignal = reader["badSignal"])
@@ -323,6 +379,22 @@ public:
 	bool isUnderground(const std::string &mission) const { return _undergroundMissions.count(mission) > 0; }
 	/// Is a built-in item (fixed to its unit, or its special weapon) drawn in the hands all the same?
 	bool showsBuiltInItem(const std::string &type) const { return _builtInItemsShown.count(type) > 0; }
+	/// What the unit table says of a unit with these names (its type, its armor's, the sprite sheet, its race): each
+	/// thing as the last entry that sets it and matches one of the names has it.
+	UnitLook getUnitLook(const std::vector<std::string> &names) const
+	{
+		UnitLook look;
+		for (const auto &entry : _unitLooks)
+		{
+			bool matches = false;
+			for (const std::string &pattern : entry.first)
+				for (const std::string &name : names) matches = matches || nameHas(name, pattern);
+			if (!matches) continue;
+			if (entry.second.beast != -1) look.beast = entry.second.beast;
+			if (entry.second.shows != -1) look.shows = entry.second.shows;
+		}
+		return look;
+	}
 	/// An item's entry in the item table, or nullptr if it has none (the 3D view works it all out).
 	const ItemLook *getItemLook(const std::string &type) const
 	{

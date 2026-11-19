@@ -119,7 +119,7 @@ constexpr int ChinRows = 3 * VOXELSCALE;
 /// the arms swing against the legs; the torso bobs as the game's frames do (see Routine). A walker drawn on one frame
 /// has its legs below WholeHip of its height, each to its side of the middle (what's within WholeMiddle of the widest
 /// part of them from the middle stays with the body: between the legs).
-constexpr double LegSwing = 22.0, KneeBend = 38.0, ArmSwing = 16.0;
+constexpr double LegSwing = 22.0, KneeBend = 38.0, ArmSwing = 16.0, BeastSwing = 26.0;
 constexpr float WholeHip = 0.42f, WholeMiddle = 0.12f;
 /// A body lying (see makeFalls) is at most this many voxels long, and this much thicker for each pixel inside its
 /// corpse's picture's outline (in the picture's own measure).
@@ -422,6 +422,120 @@ void levelOff(const PartFrames &part, std::vector<Uint8> &cells)
 				cells[cellIndex(across, along, up)] = keep;
 			}
 		}
+}
+
+/// A long body (a beast on four legs: a dog, a cat, a rat, a pig) is one whose side drawing is at least LongBody times
+/// as long as its frontal drawing is wide, and as long as it is high; one a mod's rules name a beast (see Routine),
+/// from LongNamed times. (XPiratez's and The X-Com Files' animals are 1.9 to 4 times as long as wide, their scorpions
+/// and beetles 1.55; a unit standing upright under 1.4.) Its legs are the rows of its side drawing below its belly:
+/// from the ground up, the rows drawn for less than LegsShare of its longest row; and the belly's lowest rows between
+/// them (BellyRise, BellyMost: see profile).
+constexpr float LongBody = 1.6f, LongNamed = 1.2f, LegsShare = 0.6f, BellyRise = 0.35f, BellyMost = 0.35f;
+
+/// A frame's drawing: its first and last columns and rows; false if nothing is drawn.
+bool drawnBox(const PartFrames &part, int direction, int &left, int &right, int &top, int &bottom)
+{
+	left = top = FrameSize; right = bottom = -1;
+	for (int row = 0; row < FrameSize; ++row)
+		for (int column = 0; column < FrameSize; ++column)
+		{
+			if (!part.at(direction, column, row)) continue;
+			left = std::min(left, column); right = std::max(right, column);
+			top = std::min(top, row); bottom = std::max(bottom, row);
+		}
+	return right >= 0;
+}
+
+/// Whether a body drawn on one frame is a long one (see LongBody). Named: 1 if a mod's rules name it a beast, 0 if they
+/// say it stands upright, -1 if they say nothing.
+bool longBody(const PartFrames &part, int named)
+{
+	int left, right, top, bottom, frontLeft, frontRight, frontTop, frontBottom;
+	if (named == 0 || !drawnBox(part, RightSide, left, right, top, bottom) || !drawnBox(part, Front, frontLeft, frontRight, frontTop, frontBottom)) return false;
+	const float length = (float)(right - left + 1), width = (float)(frontRight - frontLeft + 1), height = (float)(bottom - top + 1);
+	return named == 1 ? length >= LongNamed * width : length >= LongBody * width && length >= height;
+}
+
+/// A long body's shape from its side drawings (see longBody): every cell whose place along the body and height the
+/// side frames draw, read level at the body's middle (a side frame's rows are heights there: they shift with the
+/// place across only), whatever its place across; the other views cut it to width (see carve). The right side's
+/// drawing counts, and the left side's has to agree within a pixel (hand drawn, they don't quite). Read as a body
+/// standing upright is, row by row from the front (see limb), its frontal drawing's rows took the far end of it for
+/// its top: each pair of legs came out one block, the gap under the belly filled, the feet cut off (a player, GitHub
+/// issue #191: attack dogs "look like extremely adorable capybaras with stumpy legs").
+/// Its legs are the rows below its belly (see LegsShare). The belly is drawn lower than it is: the drawings look down
+/// on the body, so its near side's lower edge stands BellyRise of its width below its middle's. That much of the
+/// belly is taken off between the legs, and the legs go up to there: "long canine like legs", at the body's own
+/// height. LegsTop is set to where the legs end.
+/// The legs keep to their columns: the front pair to those the frontal drawing has in its lowest rows, the hind pair
+/// to the back drawing's, so the two legs of a pair stay two (each gap is seen by one drawing only, and one drawing's
+/// word isn't enough for carve).
+std::vector<Uint8> profile(const PartFrames &part, float &legsTop)
+{
+	std::vector<Uint8> cells(GridCells, 0);
+	legsTop = 0.0f;
+	int left, right, top, bottom, frontLeft, frontRight, frontTop, frontBottom;
+	if (!drawnBox(part, RightSide, left, right, top, bottom)) return cells;
+	// the legs' rows: from the lowest row up, while a row is drawn for less than LegsShare of the longest one
+	int longest = 0;
+	std::vector<int> drawn(FrameSize, 0);
+	for (int row = top; row <= bottom; ++row)
+	{
+		for (int column = left; column <= right; ++column) drawn[row] += part.at(RightSide, column, row) != 0;
+		longest = std::max(longest, drawn[row]);
+	}
+	int legRows = 0;
+	while (bottom - legRows > top && drawn[bottom - legRows] < longest * LegsShare) ++legRows;
+	const int belly = bottom - legRows; // (the lowest row of the body as drawn)
+	// how far the belly is raised: BellyRise of the body's width, at most BellyMost of the rows above the legs
+	int rise = 0;
+	if (legRows > 0 && drawnBox(part, Front, frontLeft, frontRight, frontTop, frontBottom))
+	{
+		rise = std::min((int)std::lround(BellyRise * (frontRight - frontLeft + 1) / PixelsAcross), (int)(BellyMost * (belly - top + 1)));
+	}
+	const int legsFrom = belly - rise + 1; // (the legs' first row)
+	legsTop = (float)(FloorY - legsFrom);
+	// where the legs stand along the body: the columns the side drawing has in the legs' upper rows
+	std::vector<Uint8> stands(FrameSize, 0);
+	for (int row = belly + 1; row <= std::min(bottom, belly + 1 + VOXELSCALE); ++row)
+		for (int column = left; column <= right; ++column) if (part.at(RightSide, column, row)) stands[column] = 1;
+	// the columns a pair of legs keeps to: what a drawing (the front's, the back's) has in its lowest rows
+	auto legColumns = [&](int direction) {
+		std::vector<Uint8> columns(FrameSize, 0);
+		int l, r, t, b;
+		if (legRows < 2 || !drawnBox(part, direction, l, r, t, b)) return std::vector<Uint8>(FrameSize, 1);
+		for (int row = b; row > b - (legRows - 1) && row >= t; --row)
+			for (int column = l; column <= r; ++column) if (part.at(direction, column, row)) columns[column] = 1;
+		return columns;
+	};
+	const std::vector<Uint8> frontLegs = legColumns(Front), hindLegs = legColumns((Front + 4) % 8);
+	for (int along = 0; along < GridAlong; ++along)
+	{
+		const int sideRight = (int)std::floor(FloorX + cellAhead(along) * PixelsAcross), sideLeft = (int)std::floor(FloorX - cellAhead(along) * PixelsAcross);
+		for (int up = 0; up < GridUp; ++up)
+		{
+			const int row = (int)std::floor(FloorY - cellUp(up));
+			if (!part.at(RightSide, sideRight, row)) continue;
+			bool agreed = false;
+			for (int dy = -1; dy <= 1 && !agreed; ++dy)
+				for (int dx = -1; dx <= 1 && !agreed; ++dx) agreed = part.at(LeftSide, sideLeft + dx, row + dy) != 0;
+			if (!agreed) continue;
+			const bool leg = row >= legsFrom;
+			// (the belly's raised rows: only the legs are left of them)
+			if (leg && row <= belly && !(sideRight >= 0 && sideRight < FrameSize && stands[sideRight])) continue;
+			for (int across = 0; across < GridAcross; ++across)
+			{
+				if (leg)
+				{
+					// (the front drawing has the unit's right on its left, the back drawing on its right)
+					const int column = (int)std::floor(cellAhead(along) >= 0.0f ? FloorX - cellRight(across) * PixelsAcross : FloorX + cellRight(across) * PixelsAcross);
+					if (column < 0 || column >= FrameSize || !(cellAhead(along) >= 0.0f ? frontLegs : hindLegs)[column]) continue;
+				}
+				cells[cellIndex(across, along, up)] = 1;
+			}
+		}
+	}
+	return cells;
 }
 
 /// Fills the cells of an elliptical slice at a frame row's height: centre (right, ahead) and half sizes, voxels.
@@ -774,16 +888,16 @@ void addContrast(PartFrames parts[PartCount], const SDL_Color *palette)
 	}
 }
 
-/// Turns the chosen points about the line through (ahead 0, up pivot) along the unit's right: feet forward for a
-/// positive angle.
-void swing(std::vector<float> &ahead, std::vector<float> &up, const std::vector<bool> &chosen, float pivot, double angle)
+/// Turns the chosen points about the line through (ahead pivotAhead, up pivot) along the unit's right: feet forward for
+/// a positive angle.
+void swing(std::vector<float> &ahead, std::vector<float> &up, const std::vector<bool> &chosen, float pivot, double angle, float pivotAhead = 0.0f)
 {
 	const float c = (float)std::cos(angle), s = (float)std::sin(angle);
 	for (size_t k = 0; k < chosen.size(); ++k)
 	{
 		if (!chosen[k]) continue;
-		const float a = ahead[k], u = up[k] - pivot;
-		ahead[k] = a * c - u * s;
+		const float a = ahead[k] - pivotAhead, u = up[k] - pivot;
+		ahead[k] = pivotAhead + a * c - u * s;
 		up[k] = pivot + a * s + u * c;
 	}
 }
@@ -803,9 +917,48 @@ struct WalkPose
 /// the bob, whose outlines in the two views (WalkFrames) agree best with the frames'. Otherwise a stride of LegSwing either
 /// way (the right leg forward at phase 0), the knee bending while its leg swings forward, the arms against the legs, the
 /// routine's bob (see Routine).
-void makeWalk(VoxelUnitModel &model, const Routine &routine, bool leftHolds, bool rightHolds, const WalkFrames &frames)
+void makeWalk(VoxelUnitModel &model, const Routine &routine, bool leftHolds, bool rightHolds, const WalkFrames &frames, bool beast)
 {
 	const size_t count = model.part.size(), own = std::min(count, model.addedFrom); // (the pieces added for a view: posed along, not fitted)
+	if (beast)
+	{
+		// A long body on four legs (see longBody): each leg swings stiff about its own hip, the pairs across the body
+		// together (the right foreleg with the left hind leg: a trot), BeastSwing either way; the lowest foot stays on
+		// the ground. (Walked as a body on two legs, about one hip in its middle, its forelegs rose and its hind legs sank.)
+		float hip = -1e9f, ground = 1e9f;
+		std::vector<bool> leg[4];
+		float middle[4] = {};
+		int points[4] = {};
+		for (auto &chosen : leg) chosen.resize(count);
+		for (size_t k = 0; k < count; ++k)
+		{
+			if (model.part[k] != VoxelUnitModel::Legs) continue;
+			const int which = (model.right[k] > 0.0f ? 0 : 1) + (model.ahead[k] > 0.0f ? 0 : 2);
+			leg[which][k] = true;
+			middle[which] += model.ahead[k];
+			++points[which];
+			hip = std::max(hip, model.up[k]);
+			ground = std::min(ground, model.up[k]);
+		}
+		for (int phase = 0; phase < 8; ++phase)
+		{
+			std::vector<float> ahead = model.ahead, up = model.up;
+			for (int which = 0; which < 4; ++which)
+			{
+				if (!points[which]) continue;
+				const bool first = which == 0 || which == 3; // (the right foreleg and the left hind leg)
+				const double angle = BeastSwing * std::cos(2.0 * Pi * (phase / 8.0 + (first ? 0.0 : 0.5))) * Pi / 180.0;
+				swing(ahead, up, leg[which], hip, angle, middle[which] / points[which]);
+			}
+			float lowest = 1e9f;
+			for (size_t k = 0; k < own; ++k) if (model.part[k] == VoxelUnitModel::Legs) lowest = std::min(lowest, up[k]);
+			if (lowest < 1e8f) for (float &height : up) height += ground - lowest;
+			model.walkRight[phase] = model.right;
+			model.walkAhead[phase] = std::move(ahead);
+			model.walkUp[phase] = std::move(up);
+		}
+		return;
+	}
 	float hip = -1e9f, footStanding = 1e9f;
 	for (size_t k = 0; k < own; ++k)
 	{
@@ -2136,6 +2289,9 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	// tanks and the Cyberdisc keep the shape their eight drawings leave.)
 	const bool turret = routine.big && routine.still;
 	SlantOnly = routine.big && !bigHull;
+	// (A long body on four legs, a dog or a cat: made from its side drawings, see longBody and profile.)
+	const bool beast = routine.whole && !routine.big && longBody(parts[0], routine.beast);
+	float beastLegsTop = 0.0f;
 	std::vector<int> onTop[8], solidOnTop[8];
 	partsOnTop(parts, composite, onTop);
 	if (routine.big)
@@ -2165,7 +2321,8 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		// (a big unit's rows aren't heights: its four tiles' pictures stand on floors 8 rows apart, see tileFloorRows; its
 		// shape is the 8 views' alone, strictly, but for a big walker's: its frames, as a one-tile unit's, don't quite
 		// agree, and a strict hull of them lost its shell and horns)
-		const std::vector<Uint8> shape = routine.big ? std::vector<Uint8>(GridCells, 1) : limb(solid, RightSide);
+		// (a long body, a beast on four legs: its side drawings' outline, see profile)
+		const std::vector<Uint8> shape = routine.big ? std::vector<Uint8>(GridCells, 1) : beast ? profile(solid, beastLegsTop) : limb(solid, RightSide);
 		std::vector<Uint8> hull = carve(solid, bigHull ? 0 : 1, shape);
 		if (turret) levelOff(solid, hull);
 		for (int i = 0; i < GridCells; ++i) if (shape[i] && hull[i]) owner[i] = PartCodes[0];
@@ -2522,7 +2679,12 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	}
 	// A walker drawn on one frame: its legs, for the walk, the body below the hip, but for its middle.
 	float wholeTop = 0.0f, wholeSide = 0.0f;
-	if (routine.whole && routine.humanoid)
+	if (beast)
+	{
+		// (a long body's legs: what's below its belly, see profile; the four swing each about its own hip, see makeWalk)
+		for (size_t k = 0; k < count; ++k) if (model->up[k] < beastLegsTop) model->part[k] = VoxelUnitModel::Legs;
+	}
+	else if (routine.whole && routine.humanoid)
 	{
 		for (size_t k = 0; k < count; ++k) wholeTop = std::max(wholeTop, model->up[k]);
 		for (size_t k = 0; k < count; ++k) if (model->up[k] < wholeTop * WholeHip) wholeSide = std::max(wholeSide, std::abs(model->right[k]));
@@ -2587,7 +2749,10 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		// its shape is read along that slant (see carve, levelOff): each of its voxels takes its pixel of the drawing that
 		// sees it best, of all eight, thrown along the slant onto the skin that drawing sees. So from where a drawing was
 		// made the body shows that drawing, cube for pixel. The skin each drawing sees: the nearest voxel on each pixel.)
-		const bool hull = turret;
+		// (So a long body on four legs, see longBody: most of it is its flanks, which the front and back drawings show
+		// nothing of. Painted by those two, a dog's flanks took its chest's colour: one tan barrel, where its side drawings
+		// have a dark flank on light legs.)
+		const bool hull = turret || beast;
 		std::vector<float> seenSkin[8];
 		auto slantPixel = [&](size_t k, int d, float &nearness) -> size_t {
 			float column, row;
@@ -2667,7 +2832,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	makeHits(*model, owner, solidOnTop);
 	const bool rightHolds = placed[0] || (placed[1] && items[1].twoHanded);
 	const bool leftHolds = placed[1] || (placed[0] && items[0].twoHanded);
-	makeWalk(*model, routine, leftHolds, rightHolds, walks);
+	makeWalk(*model, routine, leftHolds, rightHolds, walks, beast);
 	makeFalls(*model, deaths, corpse, lying, palette, routine.big, bigHull);
 	return model;
 }

@@ -68,11 +68,14 @@
 #include "../Engine/Surface.h"
 #include "../Engine/SurfaceSet.h"
 #include "../Mod/Armor.h"
+#include "../Mod/Mod.h"
+#include "../Mod/RuleSoldier.h"
 #include "../Mod/RuleItem.h"
 #include "../Mod/Unit.h"
 #include "../Savegame/BattleItem.h"
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/SavedBattleGame.h"
+#include "../Savegame/Soldier.h"
 
 namespace OpenXcom
 {
@@ -151,7 +154,8 @@ struct VoxelUnits::Job
 	WalkFrames walks;
 	bool aiming = false;
 	bool still = false; // (it can't move: see Routine)
-	bool dithered = false; // (drawn as a dither, its pictures' holes filled: see fillDither)
+	float shows = 1.0f; // (how much of the body shows: see VoxelUnitModel::opacity)
+	int beast = -1; // (a long body on four legs, by the unit table: see Routine)
 	bool fine = false; // (made twice as fine: see FineBodies)
 	const Routine *routine = nullptr;
 	int unitId = 0, status = 0; // (the unit's, for dump's file names)
@@ -506,8 +510,15 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 			hashBytes(hash, walks.legs[phase][view].data(), walks.legs[phase][view].size());
 			for (int side = 0; side < 2; ++side) hashBytes(hash, walks.arms[phase][view][side].data(), walks.arms[phase][view][side].size());
 		}
-	const Uint8 pose[4] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)dithered };
-	hashBytes(hash, pose, 4);
+	// What the mod's rules say of the unit by its names (the unit table: a ghost seen through, a beast on four legs).
+	const Unit *unitRules = unit->getUnitRules();
+	const Soldier *soldier = unit->getGeoscapeSoldier();
+	const RuleFirstPerson::UnitLook look = save->getMod()->getFirstPerson().getUnitLook({ unit->getType(), unit->getArmor()->getType(),
+		unit->getArmor()->getSpriteSheet(), unitRules ? unitRules->getRace() : std::string(), soldier ? soldier->getRules()->getType() : std::string() });
+	float shows = dithered ? VoxelDitherFaint : 1.0f;
+	if (look.shows >= 0) shows = std::min(shows, look.shows / 100.0f);
+	const Uint8 pose[5] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast + 1) };
+	hashBytes(hash, pose, 5);
 	auto alike = _byFrames.find(hash);
 	if (alike != _byFrames.end())
 	{
@@ -529,7 +540,8 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		job->walks = std::move(walks);
 		job->aiming = aiming;
 		job->still = !unit->getArmor()->allowsMoving();
-		job->dithered = dithered;
+		job->shows = shows;
+		job->beast = look.beast;
 		job->fine = FineBodies;
 		job->routine = routine;
 		std::copy(palette, palette + 256, job->palette);
@@ -714,6 +726,7 @@ void VoxelUnits::build()
 			source.walkAny = job->walks.any;
 			source.aiming = job->aiming;
 			source.still = job->still;
+			source.beast = job->beast;
 			source.routine = job->routine->number;
 			model = makeFineModel(source, job->palette);
 		}
@@ -721,9 +734,10 @@ void VoxelUnits::build()
 		{
 			Routine routine = *job->routine;
 			routine.still = job->still;
+			routine.beast = job->beast;
 			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->lying, job->walks, job->aiming, routine, job->palette);
 		}
-		if (model) model->dithered = job->dithered;
+		if (model) model->opacity = job->shows;
 		if (const char *folder = std::getenv("OXC3D_VOXELDUMP")) dump(*job, model.get(), folder);
 		std::lock_guard<std::mutex> lock(_mutex);
 		--_building;
@@ -785,8 +799,8 @@ void VoxelUnits::dump(const Job &job, const VoxelUnitModel *model, const char *f
 
 	if (FILE *file = std::fopen((base + ".job").c_str(), "w"))
 	{
-		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d\n", job.routine->number, job.routine->whole, job.routine->big,
-			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty());
+		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d\n", job.routine->number, job.routine->whole, job.routine->big,
+			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), job.beast);
 		for (int i = 0; i < 256; ++i) std::fprintf(file, "%d %d %d\n", job.palette[i].r, job.palette[i].g, job.palette[i].b);
 		std::fclose(file);
 	}

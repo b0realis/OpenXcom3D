@@ -163,6 +163,22 @@ firstPerson:
     # and the crossbows
     - types: [STR_HARPOON, STR_HARPOON_AUTO, STR_HARPOON_CARBINE, STR_DART_PISTOL, STR_AIR_MUSKET, STR_XBOW, STR_XBOW_CORAL, STR_EXECUTIONER_XBOW, STR_BALLISTA]
       shot: object
+  # The unit table: units told by their names, for the voxel bodies (setting "Voxel units"). Each entry lists words to
+  # look for in a unit's names (its type, its armor's, the armor's sprite sheet, its race) and what it says of those
+  # units. A word matches a whole word of a name (CAT: BLACK_CAT, not CATGIRL); with a star, a word's start (GHOST*),
+  # its end (*DOGE: BLOODOGE) or any part of it (*SPIDER*). Capitals or not is the same.
+  #   seeThrough: how much of the body is left out, in hundredths (50: every other cube, a ghost)
+  #   shape: beast (a long body on four legs, made from its side drawings; a unit drawn on one frame, one tile big),
+  #          upright (never so), or auto (by its drawings: at least 1.6 times as long as wide)
+  # A later entry (or a later mod's) overrides what it sets.
+  units:
+    # ghosts (XPiratez, The X-Com Files): there, but seen through
+    - names: [GHOST*, "*GHOST", SPECTRE, SPECTER, SPECTRAL, POLTERGEIST, PHANTOM, PHANTASMAL, BANSHEE, APPARITION]
+      seeThrough: 50
+    # animals on four legs or more (most are told by their drawings anyway; the short ones, scorpions and beetles, by name)
+    - names: [DOG, DOGE, DOGG, "*DOG", "*DOGE", HOUND, "*HOUND", WOLF, CAT, RAT, GIANTRAT, PIG, BOAR, SHEEP, COW, HORSE, GOAT, FOX, DEER,
+              BEAR, LION, TIGER, PANTHER, LIZARD, CHUPACABRA, MAGGOT, SPIDER, "*SPIDER", SCORPION, "*SCORPION", BEETLE]
+      shape: beast
 
 interfaces:
   - type: firstPerson
