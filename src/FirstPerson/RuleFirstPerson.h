@@ -121,6 +121,7 @@ public:
 		int torsoDepth = -1;
 		int backTop = -1;
 		int frontal = -1; // (the body kept to its front and back drawings' outlines: 1; as ever: 0)
+		int animated = -1; // (a body for each frame of the sprite's own animation, if it has one: 1; one body: 0)
 	};
 	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
@@ -303,7 +304,7 @@ public:
 			for (const auto& entry : units.children())
 			{
 				std::vector<std::string> names;
-				std::string shape, top, sculpt;
+				std::string shape, top, sculpt, animation;
 				int seeThrough = 0, torsoDepth = 0;
 				UnitLook look;
 				entry.tryRead("names", names);
@@ -312,6 +313,7 @@ public:
 				if (entry.tryRead("torsoDepth", torsoDepth)) look.torsoDepth = std::clamp(torsoDepth, 0, 200);
 				if (entry.tryRead("top", top)) look.backTop = top == "back" ? 1 : 0;
 				if (entry.tryRead("sculpt", sculpt)) look.frontal = sculpt == "frontal" ? 1 : 0;
+				if (entry.tryRead("animation", animation)) look.animated = animation == "sprite" ? 1 : 0;
 				if (!names.empty()) _unitLooks.push_back({ names, look });
 			}
 		}
@@ -409,6 +411,7 @@ public:
 			if (entry.second.torsoDepth != -1) look.torsoDepth = entry.second.torsoDepth;
 			if (entry.second.backTop != -1) look.backTop = entry.second.backTop;
 			if (entry.second.frontal != -1) look.frontal = entry.second.frontal;
+			if (entry.second.animated != -1) look.animated = entry.second.animated;
 		}
 		return look;
 	}

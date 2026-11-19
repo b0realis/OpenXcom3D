@@ -1201,21 +1201,30 @@ bool partMiddle(const PartFrames &part, float middle[3])
 /// Where an item in hand is on the body: its middle (where its hand frames agree it is), its length (as its widest hand
 /// frame draws it across: the inventory pictures draw a pistol nearly as big as a rifle), and its axes: along it from the
 /// butt to the muzzle, across its picture to the picture's right (the magazine's side), and through it.
+/// Upright: the item is drawn standing in the hand, taller than wide in every hand frame (a sword, a staff: see
+/// placeItem); it is as long as it is drawn high, stands up, and one hand holds it at its lower end.
 struct ItemPlace
 {
 	float middle[3], length;
 	float along[3], across[3], through[3];
+	bool upright = false;
 };
+/// An item is drawn standing in the hand if its tallest hand frame is this many times as high as its widest is wide.
+constexpr float ItemUpright = 1.5f;
 
 /// Where an item in hand is, from its hand frames and how it's held: pointing ahead when aimed or held in one hand,
 /// across the waist when held in both, its picture's right (the magazine's side) down; false if no frame shows it.
+/// An item drawn standing in the hand (see ItemPlace::upright) stands up, its picture's top up. As long as its widest
+/// frame is wide, laid across the waist for both hands as a rifle is, X-Com Files' greatsword was five cubes at the
+/// chest, and the arms reaching for it lay folded inside the body: no arms, no sword (a player, GitHub issue #196,
+/// "Picking up many melee weapons causes amputations").
 bool placeItem(const PartFrames &frames, bool twoHanded, bool aiming, ItemPlace &place)
 {
 	if (!frames.any || !partMiddle(frames, place.middle)) return false;
-	int widest = 0;
+	int widest = 0, tallest = 0;
 	for (int d = 0; d < 8; ++d)
 	{
-		int left = FrameSize, right = -1;
+		int left = FrameSize, right = -1, top = FrameSize, bottom = -1;
 		for (int row = 0; row < FrameSize; ++row)
 		{
 			for (int column = 0; column < FrameSize; ++column)
@@ -1223,9 +1232,22 @@ bool placeItem(const PartFrames &frames, bool twoHanded, bool aiming, ItemPlace 
 				if (!frames.frame[d][row * FrameSize + column]) continue;
 				left = std::min(left, column);
 				right = std::max(right, column);
+				top = std::min(top, row);
+				bottom = std::max(bottom, row);
 			}
 		}
 		widest = std::max(widest, right - left + 1);
+		tallest = std::max(tallest, bottom - top + 1);
+	}
+	place.upright = tallest >= widest * ItemUpright;
+	if (place.upright)
+	{
+		place.length = std::max(1.0f, (float)(tallest - 1));
+		const float standing[3][3] = { { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } };
+		std::copy(standing[0], standing[0] + 3, place.along);
+		std::copy(standing[1], standing[1] + 3, place.across);
+		std::copy(standing[2], standing[2] + 3, place.through);
+		return true;
 	}
 	place.length = std::max(1.0f, (widest - 1) / PixelsAcross);
 	const float c = (float)std::cos(ItemTilt * Pi / 180.0), s = (float)std::sin(ItemTilt * Pi / 180.0);
@@ -1242,8 +1264,9 @@ bool placeItem(const PartFrames &frames, bool twoHanded, bool aiming, ItemPlace 
 /// near the butt and below the axis (a pistol's grip).
 void gripOf(const ItemPlace &place, bool twoHanded, bool atButt, float hand[3])
 {
+	twoHanded = twoHanded && !place.upright; // (an item standing in the hand: one hand, at its lower end, on its axis)
 	const float along = place.length * ((twoHanded ? (atButt ? GripButt : GripFore) : GripOne) - 0.5f);
-	const float below = twoHanded ? 0.0f : place.length * GripBelow;
+	const float below = twoHanded || place.upright ? 0.0f : place.length * GripBelow;
 	for (int i = 0; i < 3; ++i) hand[i] = place.middle[i] + along * place.along[i] + below * place.across[i];
 }
 
@@ -2411,7 +2434,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 			const int own = arm.right ? 0 : 1, other = 1 - own;
 			arm.found = !tank && parts[arm.part].any && armEnd(parts[arm.part], arm.right, true, arm.shoulder); // (a tank's left arm's frames are its turret's)
 			if (placed[own]) { gripOf(places[own], items[own].twoHanded, true, arm.hand); arm.holds = true; }
-			else if (placed[other] && items[other].twoHanded) { gripOf(places[other], true, false, arm.hand); arm.holds = true; }
+			else if (placed[other] && items[other].twoHanded && !places[other].upright) { gripOf(places[other], true, false, arm.hand); arm.holds = true; }
 			else arm.found = arm.found && armEnd(parts[arm.part], arm.right, false, arm.hand);
 		}
 		float length = 0.0f, shoulders = 0.0f, legsTop = 0.0f;
@@ -2650,7 +2673,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 				const int pixel = r * FrameSize + c;
 				if (p < BodyParts && nearness < faceNear[(p * FrameSize + r) * FrameSize + c] - FaceDepth) continue;
 				Uint8 colour = p < BodyParts && parts[p].any ? parts[p].frame[d][pixel] : 0;
-				if (!colour && onTop[d][pixel] >= 0) colour = parts[onTop[d][pixel]].frame[d][pixel];
+				if (!colour && onTop[d][pixel] >= 0 && onTop[d][pixel] < BodyParts) colour = parts[onTop[d][pixel]].frame[d][pixel]; // (never an item's: see drawnColour)
 				if (colour) model->colours[k * 16 + painting * 8 + d] = colour;
 			}
 		}
@@ -2814,7 +2837,11 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 			if (c < 0 || r < 0 || c >= FrameSize || r >= FrameSize) return 0;
 			const int pixel = r * FrameSize + c, part = (int)(std::find(PartCodes, PartCodes + BodyParts, model->part[k]) - PartCodes);
 			Uint8 colour = part < BodyParts && parts[part].any ? parts[part].frame[d][pixel] : 0;
-			if (!colour && onTop[d][pixel] >= 0) colour = parts[onTop[d][pixel]].frame[d][pixel];
+			// (off its own part's drawing: the body part on top there. Never an item's: where a weapon is drawn over the
+			// body, the cubes behind it took the weapon's grey, a patch of gun metal on a robe: a player, GitHub issue
+			// #197, "gun model merges into body, dying voxels of body grey".)
+			if (!colour && onTop[d][pixel] >= 0 && onTop[d][pixel] < BodyParts) colour = parts[onTop[d][pixel]].frame[d][pixel];
+			for (int other = 0; !colour && other < BodyParts; ++other) if (parts[other].any) colour = parts[other].frame[d][pixel];
 			return colour;
 		};
 		// (the body's skin seen from the front and from the back: the nearest of its voxels on each pixel)
@@ -2927,8 +2954,8 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	// (a tank's turret is of its body from here on: nothing of it swings, and a shot at it meets the tank)
 	for (size_t k = 0; tank && k < model->part.size(); ++k) if (model->part[k] == PartCodes[1]) model->part[k] = PartCodes[0];
 	makeHits(*model, owner, solidOnTop);
-	const bool rightHolds = placed[0] || (placed[1] && items[1].twoHanded);
-	const bool leftHolds = placed[1] || (placed[0] && items[0].twoHanded);
+	const bool rightHolds = placed[0] || (placed[1] && items[1].twoHanded && !places[1].upright);
+	const bool leftHolds = placed[1] || (placed[0] && items[0].twoHanded && !places[0].upright);
 	makeWalk(*model, routine, leftHolds, rightHolds, walks, beast);
 	makeFalls(*model, deaths, corpse, lying, palette, routine.big, bigHull);
 	return model;

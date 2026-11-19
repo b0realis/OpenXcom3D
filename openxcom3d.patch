@@ -1394,10 +1394,10 @@ index 000000000..8c874c4f5
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..135707272
+index 000000000..ce4496d67
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,212 @@
+@@ -0,0 +1,217 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1576,6 +1576,8 @@ index 000000000..135707272
 +  #   top: back (what faces up is painted by the back drawing: the top of a head is hair), or slant (as ever)
 +  #   sculpt: frontal (nothing of the body stands outside what its front and back drawings show: the gap between an arm
 +  #           and the waist, the legs apart, as drawn), or all (as ever: by all eight drawings, a little forgiving)
++  #   animation: sprite (a unit whose standing sprite changes shape with the battle's animation, by a script of its mod,
++  #           has a body for each of the 8 frames, played as the sprite is: a bat flaps), or none (as ever: one body)
 +  # A later entry (or a later mod's) overrides what it sets.
 +  units:
 +    # ghosts (XPiratez, The X-Com Files): there, but seen through
@@ -1592,6 +1594,9 @@ index 000000000..135707272
 +      torsoDepth: 80
 +      top: back
 +      sculpt: frontal
++    # the bats (XPiratez's vampire bat, The X-Com Files' shadowbat: a script flaps their wings as they hover)
++    - names: [BAT, SHADOWBAT]
++      animation: sprite
 +
 +interfaces:
 +  - type: firstPerson
@@ -22318,7 +22323,7 @@ index 8fa87f892..f6ae7510a 100644
  	blitBody(s);
  }
 diff --git a/src/Battlescape/UnitSprite.h b/src/Battlescape/UnitSprite.h
-index 599d9a24f..3a8b6d51d 100644
+index 599d9a24f..4ea0dc947 100644
 --- a/src/Battlescape/UnitSprite.h
 +++ b/src/Battlescape/UnitSprite.h
 @@ -59,6 +59,16 @@ private:
@@ -22349,7 +22354,7 @@ index 599d9a24f..3a8b6d51d 100644
  	/// Get graphic for unit part.
  	void selectUnit(Part& p, int index, int offset);
  	/// Get graphic for item part.
-@@ -114,6 +128,19 @@ public:
+@@ -114,6 +128,22 @@ public:
  	~UnitSprite();
  	/// Draws the unit.
  	void draw(const BattleUnit* unit, int part, int x, int y, int shade, GraphSubset mask, bool drawFacingIndicator);
@@ -22366,6 +22371,9 @@ index 599d9a24f..3a8b6d51d 100644
 +	/// OpenXcom3D: draws the unit in this phase of its walk (0-7), whatever it's doing, the unit left as it is (-1: as it
 +	/// is: the 3D view's voxel units follow the walk frames, see VoxelUnits).
 +	void setWalkOverride(int phase) { _walkOverride = phase; }
++	/// OpenXcom3D: draws the unit as at this frame of the battle's animation (a mod's script may pick its sprite by it:
++	/// X-Com Files' shadowbat flaps as it hovers; the 3D view's voxel units are made for each such frame, see VoxelUnits).
++	void setAnimationFrame(int frame) { _animationFrame = frame; }
  };
  
  } //namespace OpenXcom
@@ -58563,10 +58571,10 @@ index 000000000..44a6559e0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonSpriteHits.cpp b/src/FirstPerson/FirstPersonSpriteHits.cpp
 new file mode 100644
-index 000000000..5dedbdc0d
+index 000000000..80181af3a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonSpriteHits.cpp
-@@ -0,0 +1,1084 @@
+@@ -0,0 +1,1087 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -59071,7 +59079,10 @@ index 000000000..5dedbdc0d
 +		facing = bodies->lastFacing(unit);
 +		return fall ? body : nullptr;
 +	}
-+	return VoxelUnits::suits(unit) ? bodies->bodyNow(unit) : nullptr;
++	const VoxelUnitModel *body = VoxelUnits::suits(unit) ? bodies->bodyNow(unit) : nullptr;
++	// (a unit whose sprite is animated: what a shot meets is its body at this frame, see VoxelUnitModel::frames)
++	if (body) fall = body->frameAt(save->getAnimFrame());
++	return body;
 +}
 +
 +/// The body a unit is hit by, whichever way (see above).
@@ -72664,10 +72675,10 @@ index 000000000..229bd966c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..50786ea14
+index 000000000..3fbdfc423
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,4240 @@
+@@ -0,0 +1,4241 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -73318,7 +73329,8 @@ index 000000000..50786ea14
 +	const float opacity = (float)(std::clamp((anchorDepth - 4.0) / 6.0, 0.0, 1.0) * faint);
 +	if (opacity <= 0.0f) return;
 +	// (going down or lying: the fall's shape for how far it has come, a body of its own, see VoxelUnitModel::falls)
-+	const VoxelUnitModel::FallShape *fallen = fall > 0.0 ? body.fallAt(fall) : nullptr;
++	// (or, standing: its shape at this frame of its sprite's own animation, a body of its own too: see VoxelUnitModel::frames)
++	const VoxelUnitModel::FallShape *fallen = fall > 0.0 ? body.fallAt(fall) : body.frameAt(_save->getAnimFrame());
 +	const bool walking = !fallen && walkPhase >= 0 && walkPhase < 8;
 +	const std::vector<float> &right = fallen ? fallen->right : walking ? body.walkRight[walkPhase] : body.right;
 +	const std::vector<float> &ahead = fallen ? fallen->ahead : walking ? body.walkAhead[walkPhase] : body.ahead;
@@ -84501,10 +84513,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..eedfdfed4
+index 000000000..ffc4bf13e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,3019 @@
+@@ -0,0 +1,3046 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -85708,21 +85720,30 @@ index 000000000..eedfdfed4
 +/// Where an item in hand is on the body: its middle (where its hand frames agree it is), its length (as its widest hand
 +/// frame draws it across: the inventory pictures draw a pistol nearly as big as a rifle), and its axes: along it from the
 +/// butt to the muzzle, across its picture to the picture's right (the magazine's side), and through it.
++/// Upright: the item is drawn standing in the hand, taller than wide in every hand frame (a sword, a staff: see
++/// placeItem); it is as long as it is drawn high, stands up, and one hand holds it at its lower end.
 +struct ItemPlace
 +{
 +	float middle[3], length;
 +	float along[3], across[3], through[3];
++	bool upright = false;
 +};
++/// An item is drawn standing in the hand if its tallest hand frame is this many times as high as its widest is wide.
++constexpr float ItemUpright = 1.5f;
 +
 +/// Where an item in hand is, from its hand frames and how it's held: pointing ahead when aimed or held in one hand,
 +/// across the waist when held in both, its picture's right (the magazine's side) down; false if no frame shows it.
++/// An item drawn standing in the hand (see ItemPlace::upright) stands up, its picture's top up. As long as its widest
++/// frame is wide, laid across the waist for both hands as a rifle is, X-Com Files' greatsword was five cubes at the
++/// chest, and the arms reaching for it lay folded inside the body: no arms, no sword (a player, GitHub issue #196,
++/// "Picking up many melee weapons causes amputations").
 +bool placeItem(const PartFrames &frames, bool twoHanded, bool aiming, ItemPlace &place)
 +{
 +	if (!frames.any || !partMiddle(frames, place.middle)) return false;
-+	int widest = 0;
++	int widest = 0, tallest = 0;
 +	for (int d = 0; d < 8; ++d)
 +	{
-+		int left = FrameSize, right = -1;
++		int left = FrameSize, right = -1, top = FrameSize, bottom = -1;
 +		for (int row = 0; row < FrameSize; ++row)
 +		{
 +			for (int column = 0; column < FrameSize; ++column)
@@ -85730,9 +85751,22 @@ index 000000000..eedfdfed4
 +				if (!frames.frame[d][row * FrameSize + column]) continue;
 +				left = std::min(left, column);
 +				right = std::max(right, column);
++				top = std::min(top, row);
++				bottom = std::max(bottom, row);
 +			}
 +		}
 +		widest = std::max(widest, right - left + 1);
++		tallest = std::max(tallest, bottom - top + 1);
++	}
++	place.upright = tallest >= widest * ItemUpright;
++	if (place.upright)
++	{
++		place.length = std::max(1.0f, (float)(tallest - 1));
++		const float standing[3][3] = { { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } };
++		std::copy(standing[0], standing[0] + 3, place.along);
++		std::copy(standing[1], standing[1] + 3, place.across);
++		std::copy(standing[2], standing[2] + 3, place.through);
++		return true;
 +	}
 +	place.length = std::max(1.0f, (widest - 1) / PixelsAcross);
 +	const float c = (float)std::cos(ItemTilt * Pi / 180.0), s = (float)std::sin(ItemTilt * Pi / 180.0);
@@ -85749,8 +85783,9 @@ index 000000000..eedfdfed4
 +/// near the butt and below the axis (a pistol's grip).
 +void gripOf(const ItemPlace &place, bool twoHanded, bool atButt, float hand[3])
 +{
++	twoHanded = twoHanded && !place.upright; // (an item standing in the hand: one hand, at its lower end, on its axis)
 +	const float along = place.length * ((twoHanded ? (atButt ? GripButt : GripFore) : GripOne) - 0.5f);
-+	const float below = twoHanded ? 0.0f : place.length * GripBelow;
++	const float below = twoHanded || place.upright ? 0.0f : place.length * GripBelow;
 +	for (int i = 0; i < 3; ++i) hand[i] = place.middle[i] + along * place.along[i] + below * place.across[i];
 +}
 +
@@ -86918,7 +86953,7 @@ index 000000000..eedfdfed4
 +			const int own = arm.right ? 0 : 1, other = 1 - own;
 +			arm.found = !tank && parts[arm.part].any && armEnd(parts[arm.part], arm.right, true, arm.shoulder); // (a tank's left arm's frames are its turret's)
 +			if (placed[own]) { gripOf(places[own], items[own].twoHanded, true, arm.hand); arm.holds = true; }
-+			else if (placed[other] && items[other].twoHanded) { gripOf(places[other], true, false, arm.hand); arm.holds = true; }
++			else if (placed[other] && items[other].twoHanded && !places[other].upright) { gripOf(places[other], true, false, arm.hand); arm.holds = true; }
 +			else arm.found = arm.found && armEnd(parts[arm.part], arm.right, false, arm.hand);
 +		}
 +		float length = 0.0f, shoulders = 0.0f, legsTop = 0.0f;
@@ -87157,7 +87192,7 @@ index 000000000..eedfdfed4
 +				const int pixel = r * FrameSize + c;
 +				if (p < BodyParts && nearness < faceNear[(p * FrameSize + r) * FrameSize + c] - FaceDepth) continue;
 +				Uint8 colour = p < BodyParts && parts[p].any ? parts[p].frame[d][pixel] : 0;
-+				if (!colour && onTop[d][pixel] >= 0) colour = parts[onTop[d][pixel]].frame[d][pixel];
++				if (!colour && onTop[d][pixel] >= 0 && onTop[d][pixel] < BodyParts) colour = parts[onTop[d][pixel]].frame[d][pixel]; // (never an item's: see drawnColour)
 +				if (colour) model->colours[k * 16 + painting * 8 + d] = colour;
 +			}
 +		}
@@ -87321,7 +87356,11 @@ index 000000000..eedfdfed4
 +			if (c < 0 || r < 0 || c >= FrameSize || r >= FrameSize) return 0;
 +			const int pixel = r * FrameSize + c, part = (int)(std::find(PartCodes, PartCodes + BodyParts, model->part[k]) - PartCodes);
 +			Uint8 colour = part < BodyParts && parts[part].any ? parts[part].frame[d][pixel] : 0;
-+			if (!colour && onTop[d][pixel] >= 0) colour = parts[onTop[d][pixel]].frame[d][pixel];
++			// (off its own part's drawing: the body part on top there. Never an item's: where a weapon is drawn over the
++			// body, the cubes behind it took the weapon's grey, a patch of gun metal on a robe: a player, GitHub issue
++			// #197, "gun model merges into body, dying voxels of body grey".)
++			if (!colour && onTop[d][pixel] >= 0 && onTop[d][pixel] < BodyParts) colour = parts[onTop[d][pixel]].frame[d][pixel];
++			for (int other = 0; !colour && other < BodyParts; ++other) if (parts[other].any) colour = parts[other].frame[d][pixel];
 +			return colour;
 +		};
 +		// (the body's skin seen from the front and from the back: the nearest of its voxels on each pixel)
@@ -87434,8 +87473,8 @@ index 000000000..eedfdfed4
 +	// (a tank's turret is of its body from here on: nothing of it swings, and a shot at it meets the tank)
 +	for (size_t k = 0; tank && k < model->part.size(); ++k) if (model->part[k] == PartCodes[1]) model->part[k] = PartCodes[0];
 +	makeHits(*model, owner, solidOnTop);
-+	const bool rightHolds = placed[0] || (placed[1] && items[1].twoHanded);
-+	const bool leftHolds = placed[1] || (placed[0] && items[0].twoHanded);
++	const bool rightHolds = placed[0] || (placed[1] && items[1].twoHanded && !places[1].upright);
++	const bool leftHolds = placed[1] || (placed[0] && items[0].twoHanded && !places[0].upright);
 +	makeWalk(*model, routine, leftHolds, rightHolds, walks, beast);
 +	makeFalls(*model, deaths, corpse, lying, palette, routine.big, bigHull);
 +	return model;
@@ -88152,10 +88191,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..e1238adf3
+index 000000000..3a345860e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,861 @@
+@@ -0,0 +1,962 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -88313,6 +88352,9 @@ index 000000000..e1238adf3
 +	bool aiming = false;
 +	bool still = false; // (it can't move: see Routine)
 +	float shows = 1.0f; // (how much of the body shows: see VoxelUnitModel::opacity)
++	/// The unit's 8 standing drawings at each frame of the battle's animation (AnimFrames x 8, frame by frame), for a unit
++	/// whose sprite changes shape with it (see modelFor); empty for any other.
++	std::vector<std::vector<Uint8>> anim;
 +	bool beast = false; // (a long body on four legs, by the unit table: see Routine)
 +	float torsoDepth = 0.0f; // (the torso's slices at most this deep for their width, by the unit table: see Routine)
 +	bool backTop = false; // (what faces up painted by the back drawing, by the unit table: see Routine)
@@ -88562,6 +88604,56 @@ index 000000000..e1238adf3
 +		unitSprite.setWalkOverride(-1);
 +		walks = WalkFrames();
 +	}
++	// What the mod's rules say of the unit by its names (the unit table: a ghost seen through, a beast on four legs).
++	const Unit *unitRules = unit->getUnitRules();
++	const Soldier *soldier = unit->getGeoscapeSoldier();
++	const RuleFirstPerson::UnitLook look = save->getMod()->getFirstPerson().getUnitLook({ unit->getType(), unit->getArmor()->getType(),
++		unit->getArmor()->getSpriteSheet(), unitRules ? unitRules->getRace() : std::string(), soldier ? soldier->getRules()->getType() : std::string() });
++	// A unit whose standing drawing changes shape with the battle's animation frame (a mod's script picks its sprite by
++	// it: X-Com Files' shadowbat flaps as it hovers) has a body for each frame, as its sprite has a drawing (the owner:
++	// "voxel models should generally follow the sprites"; a player, GitHub issue #195: the bat "looks exactly like that
++	// and never flaps"). For the units the unit table names (animation: sprite), drawn on one frame, one tile big, their
++	// hands empty: the front drawing at the 7 frames after this one differs in outline, and is the same again at the
++	// 8th. (A change of colours alone, a shield's flash, a hit's blink, is not an animation.)
++	std::vector<std::vector<Uint8>> anim;
++	if (look.animated == 1 && routine->whole && !routine->big && !unit->getRightHandWeapon() && !unit->getLeftHandWeapon())
++	{
++		const int now = save->getAnimFrame();
++		auto drawn = [&](int animFrame, int d) {
++			frames[0]->clear();
++			unitSprite.setAnimationFrame(animFrame);
++			unitSprite.setViewRotation(d - unit->getDirection());
++			unitSprite.setPartCapture(capture);
++			unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
++			unitSprite.setPartCapture(nullptr);
++			std::vector<Uint8> pixels(FrameSize * FrameSize);
++			for (int row = 0; row < FrameSize; ++row)
++				for (int column = 0; column < FrameSize; ++column) pixels[row * FrameSize + column] = frames[0]->getPixel(column, row);
++			return pixels;
++		};
++		auto sameOutline = [](const std::vector<Uint8> &one, const std::vector<Uint8> &other) {
++			for (size_t i = 0; i < one.size(); ++i) if ((one[i] != 0) != (other[i] != 0)) return false;
++			return true;
++		};
++		try
++		{
++			const std::vector<Uint8> first = drawn(now, Front);
++			bool moves = false;
++			for (int later = 1; later < AnimFrames && !moves; ++later) moves = !sameOutline(first, drawn(now + later, Front));
++			if (moves && sameOutline(first, drawn(now + AnimFrames, Front)))
++			{
++				const int from = now - now % AnimFrames + AnimFrames; // (frame 0 of the round: the bodies are kept by the frame's number)
++				for (int frame = 0; frame < AnimFrames; ++frame)
++					for (int d = 0; d < 8; ++d) anim.push_back(drawn(from + frame, d));
++			}
++		}
++		catch (const Exception &)
++		{
++			unitSprite.setPartCapture(nullptr);
++			anim.clear();
++		}
++		unitSprite.setAnimationFrame(now);
++	}
 +	unitSprite.setViewRotation(0);
 +	unitSprite.setDrawOut(false);
 +	// And its corpse's picture on the floor (FLOOROB.PCK, as the map draws a corpse), for the body to end lying as it shows.
@@ -88676,13 +88768,9 @@ index 000000000..e1238adf3
 +			hashBytes(hash, walks.legs[phase][view].data(), walks.legs[phase][view].size());
 +			for (int side = 0; side < 2; ++side) hashBytes(hash, walks.arms[phase][view][side].data(), walks.arms[phase][view][side].size());
 +		}
-+	// What the mod's rules say of the unit by its names (the unit table: a ghost seen through, a beast on four legs).
-+	const Unit *unitRules = unit->getUnitRules();
-+	const Soldier *soldier = unit->getGeoscapeSoldier();
-+	const RuleFirstPerson::UnitLook look = save->getMod()->getFirstPerson().getUnitLook({ unit->getType(), unit->getArmor()->getType(),
-+		unit->getArmor()->getSpriteSheet(), unitRules ? unitRules->getRace() : std::string(), soldier ? soldier->getRules()->getType() : std::string() });
 +	float shows = dithered ? VoxelDitherFaint : 1.0f;
 +	if (look.shows >= 0) shows = std::min(shows, look.shows / 100.0f);
++	for (const auto &frame : anim) hashBytes(hash, frame.data(), frame.size());
 +	const Uint8 pose[8] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast == 1),
 +		(Uint8)std::max(look.torsoDepth, 0), (Uint8)(look.backTop == 1), (Uint8)(look.frontal == 1) };
 +	hashBytes(hash, pose, 8);
@@ -88709,6 +88797,7 @@ index 000000000..e1238adf3
 +		job->still = !unit->getArmor()->allowsMoving();
 +		job->shows = shows;
 +		job->beast = look.beast == 1;
++		job->anim = std::move(anim);
 +		job->torsoDepth = look.torsoDepth > 0 ? look.torsoDepth / 100.0f : 0.0f;
 +		job->backTop = look.backTop == 1;
 +		job->frontal = look.frontal == 1;
@@ -88914,6 +89003,57 @@ index 000000000..e1238adf3
 +			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->lying, job->walks, job->aiming, routine, job->palette);
 +		}
 +		if (model) model->opacity = job->shows;
++		// (a body for each frame of its sprite's own animation: see modelFor; each made as the unit's own body is, from
++		// that frame's 8 drawings, and kept as a shape of its own, as the fall's are)
++		for (size_t frame = 0; model && (frame + 1) * 8 <= job->anim.size(); ++frame)
++		{
++			std::unique_ptr<VoxelUnitModel> shape;
++			if (job->fine)
++			{
++				FineBodySource source;
++				for (int d = 0; d < 8; ++d) source.parts[0][d] = job->anim[frame * 8 + d];
++				source.still = job->still;
++				source.beast = job->beast;
++				source.torsoDepth = job->torsoDepth;
++				source.backTop = job->backTop;
++				source.frontal = job->frontal;
++				source.routine = job->routine->number;
++				shape = makeFineModel(source, job->palette);
++			}
++			else
++			{
++				PartFrames framed[PartCount];
++				for (PartFrames &part : framed)
++					for (auto &direction : part.frame) direction.assign((size_t)FrameSize * FrameSize, 0);
++				for (int d = 0; d < 8; ++d) framed[0].frame[d] = job->anim[frame * 8 + d];
++				framed[0].any = true;
++				Routine routine = *job->routine;
++				routine.still = job->still;
++				routine.beast = job->beast;
++				routine.torsoDepth = job->torsoDepth;
++				routine.backTop = job->backTop;
++				routine.frontal = job->frontal;
++				const std::vector<Uint8> noComposite[8];
++				const HeldItem noItems[2];
++				shape = makeModel(framed, noComposite, noItems, {}, {}, HeldItem(), WalkFrames(), false, routine, job->palette);
++			}
++			if (!shape)
++			{
++				model->frames.clear(); // (a frame with nothing to make a body of: the unit stays as it stands)
++				break;
++			}
++			VoxelUnitModel::FallShape made;
++			made.right = std::move(shape->right);
++			made.ahead = std::move(shape->ahead);
++			made.up = std::move(shape->up);
++			made.colour.resize(made.right.size());
++			for (size_t k = 0; k < made.colour.size(); ++k) made.colour[k] = shape->colours[k * 16];
++			made.hits.assign(shape->hits.size(), 0);
++			for (size_t k = 0; k < shape->hits.size(); ++k) made.hits[k] = shape->hits[k] != 0;
++			std::copy(shape->hitFrom, shape->hitFrom + 3, made.hitFrom);
++			std::copy(shape->hitSize, shape->hitSize + 3, made.hitSize);
++			model->frames.push_back(std::move(made));
++		}
 +		if (const char *folder = std::getenv("OXC3D_VOXELDUMP")) dump(*job, model.get(), folder);
 +		std::lock_guard<std::mutex> lock(_mutex);
 +		--_building;
@@ -89019,10 +89159,10 @@ index 000000000..e1238adf3
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.h b/src/FirstPerson/FirstPersonVoxelUnits.h
 new file mode 100644
-index 000000000..a09aa5206
+index 000000000..24df8f7d9
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.h
-@@ -0,0 +1,243 @@
+@@ -0,0 +1,252 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -89103,6 +89243,10 @@ index 000000000..a09aa5206
 +class SurfaceSet;
 +class UnitSprite;
 +
++/// The battle's animation comes round after this many frames for a unit's sprite (the games' own animations are of 8
++/// frames; a unit whose drawing is not the same again after them is not taken as animated).
++constexpr int AnimFrames = 8;
++
 +/// How much shows of the body of a unit the game draws as a dither (see VoxelUnitModel::opacity): see-through as on
 +/// the map, where every other pixel of it is left out.
 +constexpr float VoxelDitherFaint = 0.5f;
@@ -89161,6 +89305,11 @@ index 000000000..a09aa5206
 +	/// does, falling back from the way it faced), then the body lying: its corpse's inventory picture laid on the floor
 +	/// and given volume. Empty for a unit with neither.
 +	std::vector<FallShape> falls;
++	/// A unit whose standing sprite changes shape with the battle's animation frame (a script picks its frame: a bat
++	/// flapping as it hovers): its body at each of AnimFrames frames, in turn; empty for any other unit.
++	std::vector<FallShape> frames;
++	/// The body at a frame of the battle's animation, or null for a unit that isn't animated so.
++	const FallShape *frameAt(int animFrame) const { return frames.empty() ? nullptr : &frames[(size_t)animFrame % frames.size()]; }
 +	/// The shape at a point of the fall (0 standing, 1 down), or null (none: before it starts, or a body without any).
 +	const FallShape *fallAt(double progress) const;
 +	/// The colour of voxel k seen from direction (0-7) with level painting (or slanted).
@@ -96392,10 +96541,10 @@ index 000000000..b860f5356
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..36f7eedf7
+index 000000000..824bd9d56
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
-@@ -0,0 +1,463 @@
+@@ -0,0 +1,466 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -96519,6 +96668,7 @@ index 000000000..36f7eedf7
 +		int torsoDepth = -1;
 +		int backTop = -1;
 +		int frontal = -1; // (the body kept to its front and back drawings' outlines: 1; as ever: 0)
++		int animated = -1; // (a body for each frame of the sprite's own animation, if it has one: 1; one body: 0)
 +	};
 +	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 +	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
@@ -96701,7 +96851,7 @@ index 000000000..36f7eedf7
 +			for (const auto& entry : units.children())
 +			{
 +				std::vector<std::string> names;
-+				std::string shape, top, sculpt;
++				std::string shape, top, sculpt, animation;
 +				int seeThrough = 0, torsoDepth = 0;
 +				UnitLook look;
 +				entry.tryRead("names", names);
@@ -96710,6 +96860,7 @@ index 000000000..36f7eedf7
 +				if (entry.tryRead("torsoDepth", torsoDepth)) look.torsoDepth = std::clamp(torsoDepth, 0, 200);
 +				if (entry.tryRead("top", top)) look.backTop = top == "back" ? 1 : 0;
 +				if (entry.tryRead("sculpt", sculpt)) look.frontal = sculpt == "frontal" ? 1 : 0;
++				if (entry.tryRead("animation", animation)) look.animated = animation == "sprite" ? 1 : 0;
 +				if (!names.empty()) _unitLooks.push_back({ names, look });
 +			}
 +		}
@@ -96807,6 +96958,7 @@ index 000000000..36f7eedf7
 +			if (entry.second.torsoDepth != -1) look.torsoDepth = entry.second.torsoDepth;
 +			if (entry.second.backTop != -1) look.backTop = entry.second.backTop;
 +			if (entry.second.frontal != -1) look.frontal = entry.second.frontal;
++			if (entry.second.animated != -1) look.animated = entry.second.animated;
 +		}
 +		return look;
 +	}

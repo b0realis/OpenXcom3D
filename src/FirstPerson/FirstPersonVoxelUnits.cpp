@@ -155,6 +155,9 @@ struct VoxelUnits::Job
 	bool aiming = false;
 	bool still = false; // (it can't move: see Routine)
 	float shows = 1.0f; // (how much of the body shows: see VoxelUnitModel::opacity)
+	/// The unit's 8 standing drawings at each frame of the battle's animation (AnimFrames x 8, frame by frame), for a unit
+	/// whose sprite changes shape with it (see modelFor); empty for any other.
+	std::vector<std::vector<Uint8>> anim;
 	bool beast = false; // (a long body on four legs, by the unit table: see Routine)
 	float torsoDepth = 0.0f; // (the torso's slices at most this deep for their width, by the unit table: see Routine)
 	bool backTop = false; // (what faces up painted by the back drawing, by the unit table: see Routine)
@@ -404,6 +407,56 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		unitSprite.setWalkOverride(-1);
 		walks = WalkFrames();
 	}
+	// What the mod's rules say of the unit by its names (the unit table: a ghost seen through, a beast on four legs).
+	const Unit *unitRules = unit->getUnitRules();
+	const Soldier *soldier = unit->getGeoscapeSoldier();
+	const RuleFirstPerson::UnitLook look = save->getMod()->getFirstPerson().getUnitLook({ unit->getType(), unit->getArmor()->getType(),
+		unit->getArmor()->getSpriteSheet(), unitRules ? unitRules->getRace() : std::string(), soldier ? soldier->getRules()->getType() : std::string() });
+	// A unit whose standing drawing changes shape with the battle's animation frame (a mod's script picks its sprite by
+	// it: X-Com Files' shadowbat flaps as it hovers) has a body for each frame, as its sprite has a drawing (the owner:
+	// "voxel models should generally follow the sprites"; a player, GitHub issue #195: the bat "looks exactly like that
+	// and never flaps"). For the units the unit table names (animation: sprite), drawn on one frame, one tile big, their
+	// hands empty: the front drawing at the 7 frames after this one differs in outline, and is the same again at the
+	// 8th. (A change of colours alone, a shield's flash, a hit's blink, is not an animation.)
+	std::vector<std::vector<Uint8>> anim;
+	if (look.animated == 1 && routine->whole && !routine->big && !unit->getRightHandWeapon() && !unit->getLeftHandWeapon())
+	{
+		const int now = save->getAnimFrame();
+		auto drawn = [&](int animFrame, int d) {
+			frames[0]->clear();
+			unitSprite.setAnimationFrame(animFrame);
+			unitSprite.setViewRotation(d - unit->getDirection());
+			unitSprite.setPartCapture(capture);
+			unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
+			unitSprite.setPartCapture(nullptr);
+			std::vector<Uint8> pixels(FrameSize * FrameSize);
+			for (int row = 0; row < FrameSize; ++row)
+				for (int column = 0; column < FrameSize; ++column) pixels[row * FrameSize + column] = frames[0]->getPixel(column, row);
+			return pixels;
+		};
+		auto sameOutline = [](const std::vector<Uint8> &one, const std::vector<Uint8> &other) {
+			for (size_t i = 0; i < one.size(); ++i) if ((one[i] != 0) != (other[i] != 0)) return false;
+			return true;
+		};
+		try
+		{
+			const std::vector<Uint8> first = drawn(now, Front);
+			bool moves = false;
+			for (int later = 1; later < AnimFrames && !moves; ++later) moves = !sameOutline(first, drawn(now + later, Front));
+			if (moves && sameOutline(first, drawn(now + AnimFrames, Front)))
+			{
+				const int from = now - now % AnimFrames + AnimFrames; // (frame 0 of the round: the bodies are kept by the frame's number)
+				for (int frame = 0; frame < AnimFrames; ++frame)
+					for (int d = 0; d < 8; ++d) anim.push_back(drawn(from + frame, d));
+			}
+		}
+		catch (const Exception &)
+		{
+			unitSprite.setPartCapture(nullptr);
+			anim.clear();
+		}
+		unitSprite.setAnimationFrame(now);
+	}
 	unitSprite.setViewRotation(0);
 	unitSprite.setDrawOut(false);
 	// And its corpse's picture on the floor (FLOOROB.PCK, as the map draws a corpse), for the body to end lying as it shows.
@@ -518,13 +571,9 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 			hashBytes(hash, walks.legs[phase][view].data(), walks.legs[phase][view].size());
 			for (int side = 0; side < 2; ++side) hashBytes(hash, walks.arms[phase][view][side].data(), walks.arms[phase][view][side].size());
 		}
-	// What the mod's rules say of the unit by its names (the unit table: a ghost seen through, a beast on four legs).
-	const Unit *unitRules = unit->getUnitRules();
-	const Soldier *soldier = unit->getGeoscapeSoldier();
-	const RuleFirstPerson::UnitLook look = save->getMod()->getFirstPerson().getUnitLook({ unit->getType(), unit->getArmor()->getType(),
-		unit->getArmor()->getSpriteSheet(), unitRules ? unitRules->getRace() : std::string(), soldier ? soldier->getRules()->getType() : std::string() });
 	float shows = dithered ? VoxelDitherFaint : 1.0f;
 	if (look.shows >= 0) shows = std::min(shows, look.shows / 100.0f);
+	for (const auto &frame : anim) hashBytes(hash, frame.data(), frame.size());
 	const Uint8 pose[8] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast == 1),
 		(Uint8)std::max(look.torsoDepth, 0), (Uint8)(look.backTop == 1), (Uint8)(look.frontal == 1) };
 	hashBytes(hash, pose, 8);
@@ -551,6 +600,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		job->still = !unit->getArmor()->allowsMoving();
 		job->shows = shows;
 		job->beast = look.beast == 1;
+		job->anim = std::move(anim);
 		job->torsoDepth = look.torsoDepth > 0 ? look.torsoDepth / 100.0f : 0.0f;
 		job->backTop = look.backTop == 1;
 		job->frontal = look.frontal == 1;
@@ -756,6 +806,57 @@ void VoxelUnits::build()
 			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->lying, job->walks, job->aiming, routine, job->palette);
 		}
 		if (model) model->opacity = job->shows;
+		// (a body for each frame of its sprite's own animation: see modelFor; each made as the unit's own body is, from
+		// that frame's 8 drawings, and kept as a shape of its own, as the fall's are)
+		for (size_t frame = 0; model && (frame + 1) * 8 <= job->anim.size(); ++frame)
+		{
+			std::unique_ptr<VoxelUnitModel> shape;
+			if (job->fine)
+			{
+				FineBodySource source;
+				for (int d = 0; d < 8; ++d) source.parts[0][d] = job->anim[frame * 8 + d];
+				source.still = job->still;
+				source.beast = job->beast;
+				source.torsoDepth = job->torsoDepth;
+				source.backTop = job->backTop;
+				source.frontal = job->frontal;
+				source.routine = job->routine->number;
+				shape = makeFineModel(source, job->palette);
+			}
+			else
+			{
+				PartFrames framed[PartCount];
+				for (PartFrames &part : framed)
+					for (auto &direction : part.frame) direction.assign((size_t)FrameSize * FrameSize, 0);
+				for (int d = 0; d < 8; ++d) framed[0].frame[d] = job->anim[frame * 8 + d];
+				framed[0].any = true;
+				Routine routine = *job->routine;
+				routine.still = job->still;
+				routine.beast = job->beast;
+				routine.torsoDepth = job->torsoDepth;
+				routine.backTop = job->backTop;
+				routine.frontal = job->frontal;
+				const std::vector<Uint8> noComposite[8];
+				const HeldItem noItems[2];
+				shape = makeModel(framed, noComposite, noItems, {}, {}, HeldItem(), WalkFrames(), false, routine, job->palette);
+			}
+			if (!shape)
+			{
+				model->frames.clear(); // (a frame with nothing to make a body of: the unit stays as it stands)
+				break;
+			}
+			VoxelUnitModel::FallShape made;
+			made.right = std::move(shape->right);
+			made.ahead = std::move(shape->ahead);
+			made.up = std::move(shape->up);
+			made.colour.resize(made.right.size());
+			for (size_t k = 0; k < made.colour.size(); ++k) made.colour[k] = shape->colours[k * 16];
+			made.hits.assign(shape->hits.size(), 0);
+			for (size_t k = 0; k < shape->hits.size(); ++k) made.hits[k] = shape->hits[k] != 0;
+			std::copy(shape->hitFrom, shape->hitFrom + 3, made.hitFrom);
+			std::copy(shape->hitSize, shape->hitSize + 3, made.hitSize);
+			model->frames.push_back(std::move(made));
+		}
 		if (const char *folder = std::getenv("OXC3D_VOXELDUMP")) dump(*job, model.get(), folder);
 		std::lock_guard<std::mutex> lock(_mutex);
 		--_building;

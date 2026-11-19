@@ -502,7 +502,10 @@ const VoxelUnitModel *hitBody(SavedBattleGame *save, const BattleUnit *unit, con
 		facing = bodies->lastFacing(unit);
 		return fall ? body : nullptr;
 	}
-	return VoxelUnits::suits(unit) ? bodies->bodyNow(unit) : nullptr;
+	const VoxelUnitModel *body = VoxelUnits::suits(unit) ? bodies->bodyNow(unit) : nullptr;
+	// (a unit whose sprite is animated: what a shot meets is its body at this frame, see VoxelUnitModel::frames)
+	if (body) fall = body->frameAt(save->getAnimFrame());
+	return body;
 }
 
 /// The body a unit is hit by, whichever way (see above).

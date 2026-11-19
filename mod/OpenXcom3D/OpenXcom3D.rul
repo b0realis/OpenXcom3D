@@ -176,6 +176,8 @@ firstPerson:
   #   top: back (what faces up is painted by the back drawing: the top of a head is hair), or slant (as ever)
   #   sculpt: frontal (nothing of the body stands outside what its front and back drawings show: the gap between an arm
   #           and the waist, the legs apart, as drawn), or all (as ever: by all eight drawings, a little forgiving)
+  #   animation: sprite (a unit whose standing sprite changes shape with the battle's animation, by a script of its mod,
+  #           has a body for each of the 8 frames, played as the sprite is: a bat flaps), or none (as ever: one body)
   # A later entry (or a later mod's) overrides what it sets.
   units:
     # ghosts (XPiratez, The X-Com Files): there, but seen through
@@ -192,6 +194,9 @@ firstPerson:
       torsoDepth: 80
       top: back
       sculpt: frontal
+    # the bats (XPiratez's vampire bat, The X-Com Files' shadowbat: a script flaps their wings as they hover)
+    - names: [BAT, SHADOWBAT]
+      animation: sprite
 
 interfaces:
   - type: firstPerson

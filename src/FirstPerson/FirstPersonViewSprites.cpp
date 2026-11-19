@@ -648,7 +648,8 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 	const float opacity = (float)(std::clamp((anchorDepth - 4.0) / 6.0, 0.0, 1.0) * faint);
 	if (opacity <= 0.0f) return;
 	// (going down or lying: the fall's shape for how far it has come, a body of its own, see VoxelUnitModel::falls)
-	const VoxelUnitModel::FallShape *fallen = fall > 0.0 ? body.fallAt(fall) : nullptr;
+	// (or, standing: its shape at this frame of its sprite's own animation, a body of its own too: see VoxelUnitModel::frames)
+	const VoxelUnitModel::FallShape *fallen = fall > 0.0 ? body.fallAt(fall) : body.frameAt(_save->getAnimFrame());
 	const bool walking = !fallen && walkPhase >= 0 && walkPhase < 8;
 	const std::vector<float> &right = fallen ? fallen->right : walking ? body.walkRight[walkPhase] : body.right;
 	const std::vector<float> &ahead = fallen ? fallen->ahead : walking ? body.walkAhead[walkPhase] : body.ahead;

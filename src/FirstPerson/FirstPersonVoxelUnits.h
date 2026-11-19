@@ -78,6 +78,10 @@ class SavedBattleGame;
 class SurfaceSet;
 class UnitSprite;
 
+/// The battle's animation comes round after this many frames for a unit's sprite (the games' own animations are of 8
+/// frames; a unit whose drawing is not the same again after them is not taken as animated).
+constexpr int AnimFrames = 8;
+
 /// How much shows of the body of a unit the game draws as a dither (see VoxelUnitModel::opacity): see-through as on
 /// the map, where every other pixel of it is left out.
 constexpr float VoxelDitherFaint = 0.5f;
@@ -136,6 +140,11 @@ struct VoxelUnitModel
 	/// does, falling back from the way it faced), then the body lying: its corpse's inventory picture laid on the floor
 	/// and given volume. Empty for a unit with neither.
 	std::vector<FallShape> falls;
+	/// A unit whose standing sprite changes shape with the battle's animation frame (a script picks its frame: a bat
+	/// flapping as it hovers): its body at each of AnimFrames frames, in turn; empty for any other unit.
+	std::vector<FallShape> frames;
+	/// The body at a frame of the battle's animation, or null for a unit that isn't animated so.
+	const FallShape *frameAt(int animFrame) const { return frames.empty() ? nullptr : &frames[(size_t)animFrame % frames.size()]; }
 	/// The shape at a point of the fall (0 standing, 1 down), or null (none: before it starts, or a body without any).
 	const FallShape *fallAt(double progress) const;
 	/// The colour of voxel k seen from direction (0-7) with level painting (or slanted).
