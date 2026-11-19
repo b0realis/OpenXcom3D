@@ -92,7 +92,7 @@ std::unique_ptr<VoxelUnitModel> makeFineModel(const FineBodySource &source, cons
 	made.beast = source.beast;
 	made.torsoDepth = source.torsoDepth;
 	made.backTop = source.backTop;
-	made.fitTop = source.fitTop * VOXELSCALE; // (in the enlarged frames' pixels)
+	made.frontal = source.frontal;
 	std::unique_ptr<VoxelUnitModel> model = makeModel(parts, composite, items, deaths, corpse, lying, walks, source.aiming, made, palette);
 	if (model) model->unit = 1.0f / VOXELSCALE;
 	return model;

@@ -1914,46 +1914,6 @@ Uint16 viewsAt(const std::vector<int> onTop[8], float right, float ahead, float 
 	return views;
 }
 
-/// A body pressed down to a height (the unit table's "kneeling: fit", for the units it names): what is below headBase
-/// (the shoulders; voxels above the floor) pressed evenly towards the floor, the head let down whole on it, until the
-/// top is at fitTop; cubes stay cubes on the grid (rows of them fall together). The items in hand come down with the
-/// place they are held at, unpressed. The solid cells (owner: what a shot meets, see makeHits) alike.
-/// A kneeling unit is drawn far higher than the game has it: XPiratez's gals 21 pixels on a kneeling height of 14
-/// (standing, 25 on 22). With the body what a shot meets, a soldier kneeling in front took in the back of the head
-/// the shot the game lets pass over her (a player, GitHub issue #192: "rockets to the back of the head bring
-/// headaches").
-void fitHeight(VoxelUnitModel &model, std::vector<Uint8> &owner, float fitTop, float headBase)
-{
-	float top = -1e9f;
-	for (size_t k = 0; k < model.part.size(); ++k) if (model.part[k] != VoxelUnitModel::Item) top = std::max(top, model.up[k]);
-	headBase = std::clamp(headBase, 0.0f, top);
-	const float head = top - headBase;
-	if (fitTop <= 0.0f || top <= fitTop || headBase <= 0.0f || fitTop - head <= 0.0f) return;
-	const float press = (fitTop - head) / headBase;
-	auto pressed = [&](float up) { return up <= 0.0f ? up : up <= headBase ? up * press : up - headBase * (1.0f - press); };
-	auto onGrid = [](float up) { return (std::floor(up / Cell) + 0.5f) * Cell; };
-	double held = 0.0;
-	int items = 0;
-	for (size_t k = 0; k < model.part.size(); ++k) if (model.part[k] == VoxelUnitModel::Item) { held += model.up[k]; ++items; }
-	const float carried = items ? onGrid(pressed((float)(held / items))) - onGrid((float)(held / items)) : 0.0f;
-	for (size_t k = 0; k < model.part.size(); ++k)
-	{
-		model.up[k] = model.part[k] == VoxelUnitModel::Item ? model.up[k] + carried : onGrid(pressed(model.up[k]));
-	}
-	// (the solid cells: each row takes the row it came from)
-	std::vector<Uint8> lower(owner.size(), 0);
-	for (int up = 0; up < GridUp; ++up)
-	{
-		const float here = cellUp(up);
-		const float from = here <= 0.0f ? here : here <= headBase * press ? here / press : here + headBase * (1.0f - press);
-		const int source = (int)std::floor((from - UpFrom) / Cell);
-		if (source < 0 || source >= GridUp) continue;
-		for (int across = 0; across < GridAcross; ++across)
-			for (int along = 0; along < GridAlong; ++along) lower[cellIndex(across, along, up)] = owner[cellIndex(across, along, source)];
-	}
-	owner.swap(lower);
-}
-
 /// What a shot meets (see VoxelUnitModel::hits): the body's solid cells (owner: its filled half voxel cells, the inside
 /// too), the items in its hands and the pieces added for views, in whole voxels; each the views it shows in (a cell's,
 /// as its middle falls inside each view's solid drawing, see matchViews; a voxel's, as it shows). Nothing floats here
@@ -2501,6 +2461,30 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		const bool skeleton = !skeletons[p].empty();
 		for (int i = 0; i < GridCells; ++i) if (((shape[i] && hull[i]) || (skeleton && skeletons[p][i])) && !owner[i]) owner[i] = PartCodes[p];
 	}
+	// A body sculpted from its frontal drawings (the unit table's "sculpt: frontal", for the units it names; the owner:
+	// the voxeliser "should maybe really look at the sprite frontals more (more than side positions) and carefully craft
+	// body waist arms head and legs ... as drawn in sprites"): nothing of it stands outside what the front drawing or
+	// the back drawing has drawn there (all the parts as the game lays them, along each drawing's own slant). The side
+	// drawings give it its depth and no more: where they left the gap between an arm and the waist filled, or the legs
+	// joined below the hips, the frontal outline cuts it open again.
+	if (routine.frontal && !routine.big)
+	{
+		const int Back = (Front + 4) % 8;
+		for (int across = 0; across < GridAcross; ++across)
+			for (int along = 0; along < GridAlong; ++along)
+				for (int up = 0; up < GridUp; ++up)
+				{
+					Uint8 &cell = owner[cellIndex(across, along, up)];
+					if (!cell) continue;
+					for (int d : { Front, Back })
+					{
+						float column, row, nearness;
+						project(cellRight(across), cellAhead(along), cellUp(up), d, false, column, row, nearness);
+						const int c = (int)std::floor(column), r = (int)std::floor(row);
+						if (c < 0 || r < 0 || c >= FrameSize || r >= FrameSize || onTop[d][r * FrameSize + c] < 0) { cell = 0; break; }
+					}
+				}
+	}
 	// Loose cells (fewer than 3 of their 6 neighbours filled) go, and with them the specks they'd show.
 	auto filled = [&](int across, int along, int up) {
 		return across >= 0 && along >= 0 && up >= 0 && across < GridAcross && along < GridAlong && up < GridUp && owner[cellIndex(across, along, up)];
@@ -2942,13 +2926,6 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	}
 	// (a tank's turret is of its body from here on: nothing of it swings, and a shot at it meets the tank)
 	for (size_t k = 0; tank && k < model->part.size(); ++k) if (model->part[k] == PartCodes[1]) model->part[k] = PartCodes[0];
-	// (a named unit's body pressed down to a height: a kneeling one's, see fitHeight; one drawn on one frame has no
-	// head told from its body, and is pressed whole)
-	if (routine.fitTop > 0.0f)
-	{
-		const int shoulders = routine.whole ? FrameSize : shouldersRow(parts[0]);
-		fitHeight(*model, owner, routine.fitTop, shoulders < FrameSize ? (float)(FloorY - shoulders) : 1e9f);
-	}
 	makeHits(*model, owner, solidOnTop);
 	const bool rightHolds = placed[0] || (placed[1] && items[1].twoHanded);
 	const bool leftHolds = placed[1] || (placed[0] && items[0].twoHanded);

@@ -85,9 +85,11 @@ constexpr int PartCount = 6, BodyParts = 4, RightItem = 4, LeftItem = 5;
 /// unit a long body on four legs (a dog, a cat: the unit table), made from its side drawings if it's drawn on one
 /// frame (set for the unit being made too; see longBody). Only a named unit is made so. TorsoDepth and backTop: what
 /// the unit table says of a named unit's torso and of how what faces up is painted (see headAndTorso, makeModel); 0 and
-/// false for a unit it doesn't name. FitTop: the height a named unit's body is pressed down to, in frame pixels above
-/// the floor (a kneeling unit's, see fitHeight); 0: as its drawings have it.
-struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; float torsoDepth = 0.0f; bool backTop = false; float fitTop = 0.0f; };
+/// false for a unit it doesn't name. In every pose a body is as its drawings
+/// have it (the owner: "voxel models should generally follow the sprites as not to change the game engine underneath
+/// and playstyle"): a kneeling body is as high as its kneeling drawing, not pressed to the game's kneeling height.
+/// Frontal: a named unit's body keeps to its front and back drawings' outlines strictly (see makeModel).
+struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; float torsoDepth = 0.0f; bool backTop = false; bool frontal = false; };
 /// The routine's way of drawing, or null for one not given a voxel body.
 const Routine *routineFor(int number);
 

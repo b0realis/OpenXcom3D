@@ -33,7 +33,7 @@ struct FineBodySource
 	bool beast = false; // (a long body on four legs, by the mod's rules: see Routine)
 	float torsoDepth = 0.0f; // (the torso's slices at most this deep for their width, by the mod's rules: see Routine)
 	bool backTop = false; // (what faces up painted by the back drawing, by the mod's rules: see Routine)
-	float fitTop = 0.0f; // (the height the body is pressed down to, in the unit's own frames' pixels: see Routine)
+	bool frontal = false; // (kept to its front and back drawings' outlines, by the mod's rules: see Routine)
 };
 
 /// Makes a body twice as fine from a unit's frames; null if it has no torso (or its routine has no bodies).
