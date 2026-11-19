@@ -1204,8 +1204,26 @@ void buildGhost(FirstPersonView::VoxelModel &model, const Surface *sprite, int p
 	}
 	else if (axis < 0)
 	{
+		// (Flat on the floor. A floor's diamond is drawn a pixel row lower than a voxel's pixel is read: a whole
+		// diamond leaves the tile's north row of voxels, and every other voxel of its west edge, without a pixel.
+		// Those take the pixel below theirs, so floor meets floor: a sea of such tiles had a dark line along every
+		// tile's edge, what is under it showing through (a player, GitHub issue #194: "Water tiles don't completely
+		// span across ... should cleanly tile, with 0 gaps in between").)
 		for (int y = 0; y < 16; ++y)
-			for (int x = 0; x < 16; ++x) place(x, y, 0);
+		{
+			for (int x = 0; x < 16; ++x)
+			{
+				if (pixelOf(x, y, 0)) { place(x, y, 0); continue; }
+				const int spriteX = 16 + x - y, spriteY = 25 + (x + y) / 2 + yOffset;
+				const Uint8 below = spriteX >= 0 && spriteY >= 0 && spriteX < width && spriteY < height ? sprite->getPixel(spriteX, spriteY) : 0;
+				if (!below) continue;
+				model.color[0][y][x] = below;
+				model.empty = false;
+				model.min[0] = std::min<int>(model.min[0], x); model.max[0] = std::max<int>(model.max[0], x);
+				model.min[1] = std::min<int>(model.min[1], y); model.max[1] = std::max<int>(model.max[1], y);
+				model.min[2] = std::min<int>(model.min[2], 0); model.max[2] = std::max<int>(model.max[2], 0);
+			}
+		}
 	}
 	else
 	{

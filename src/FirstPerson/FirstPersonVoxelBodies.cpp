@@ -424,6 +424,27 @@ void levelOff(const PartFrames &part, std::vector<Uint8> &cells)
 		}
 }
 
+/// A tank's hull cut flat (see makeModel): its 8 drawings are all made from the same height above it, so what they
+/// leave of a flat hull (see carve) is two cones, one on its deck and one under its belly: "a dopey pyramid". Each is
+/// cut off at the level where the hull is HullDeck of its widest, level by level from there: a deck for the turret to
+/// stand on, sloping sides below it.
+constexpr float HullDeck = 0.5f;
+void flattenHull(std::vector<Uint8> &cells)
+{
+	std::vector<int> area(GridUp, 0);
+	for (int across = 0; across < GridAcross; ++across)
+		for (int along = 0; along < GridAlong; ++along)
+			for (int up = 0; up < GridUp; ++up) area[up] += cells[cellIndex(across, along, up)] != 0;
+	const int widest = (int)(std::max_element(area.begin(), area.end()) - area.begin());
+	if (area[widest] == 0) return;
+	int deck = widest, belly = widest;
+	while (deck + 1 < GridUp && area[deck + 1] >= area[widest] * HullDeck) ++deck;
+	while (belly > 0 && area[belly - 1] >= area[widest] * HullDeck) --belly;
+	for (int across = 0; across < GridAcross; ++across)
+		for (int along = 0; along < GridAlong; ++along)
+			for (int up = 0; up < GridUp; ++up) if (up > deck || up < belly) cells[cellIndex(across, along, up)] = 0;
+}
+
 /// A long body (a beast on four legs: a dog, a cat, a rat, a pig) is one a mod's rules name a beast (the unit table,
 /// see Routine), and no other: a unit that isn't named there is made as ever (the owner: a fix for one kind of unit
 /// mustn't "break other voxel units that are good allready like sectoid, snakeman, mutton"). A named one whose side
@@ -578,6 +599,18 @@ void sideExtent(const std::pair<int, int> &first, const std::pair<int, int> &las
 	}
 }
 
+/// The first row of a torso's frontal drawing nearly as wide as its widest (9 tenths): the shoulders, the head above
+/// them; FrameSize if nothing is drawn.
+int shouldersRow(const PartFrames &torso)
+{
+	int widest = 0;
+	for (int row = 0; row < FrameSize; ++row)
+		for (const auto &run : runs(torso, Front, row)) widest = std::max(widest, run.second - run.first + 1);
+	for (int row = 0; row < FrameSize && widest > 0; ++row)
+		for (const auto &run : runs(torso, Front, row)) if ((run.second - run.first + 1) * 10 >= widest * 9) return row;
+	return FrameSize;
+}
+
 /// The head and torso: each row of the frame a slice as wide as the frontal frame's row and as deep as the side
 /// frame's (bits beside the main run small round slices); with a chin (bodyTop >= 0), the chin's rows a shallow
 /// piece at the front of the face and a thin neck behind them from the head's underside to the torso.
@@ -589,11 +622,7 @@ void sideExtent(const std::pair<int, int> &first, const std::pair<int, int> &las
 void headAndTorso(const PartFrames &torso, int bodyTop, std::vector<Uint8> &cells, std::vector<Uint8> &neck, float depthMost)
 {
 	std::vector<float> torsoAhead;
-	int widest = 0, shoulders = FrameSize;
-	for (int row = 0; row < FrameSize && depthMost > 0.0f; ++row)
-		for (const auto &run : runs(torso, Front, row)) widest = std::max(widest, run.second - run.first + 1);
-	for (int row = 0; row < FrameSize && depthMost > 0.0f && shoulders == FrameSize; ++row)
-		for (const auto &run : runs(torso, Front, row)) if ((run.second - run.first + 1) * 10 >= widest * 9) shoulders = row;
+	const int shoulders = depthMost > 0.0f ? shouldersRow(torso) : FrameSize;
 	for (int row = 0; row < FrameSize; ++row)
 	{
 		const auto front = runs(torso, Front, row), side = runs(torso, RightSide, row);
@@ -1885,6 +1914,46 @@ Uint16 viewsAt(const std::vector<int> onTop[8], float right, float ahead, float 
 	return views;
 }
 
+/// A body pressed down to a height (the unit table's "kneeling: fit", for the units it names): what is below headBase
+/// (the shoulders; voxels above the floor) pressed evenly towards the floor, the head let down whole on it, until the
+/// top is at fitTop; cubes stay cubes on the grid (rows of them fall together). The items in hand come down with the
+/// place they are held at, unpressed. The solid cells (owner: what a shot meets, see makeHits) alike.
+/// A kneeling unit is drawn far higher than the game has it: XPiratez's gals 21 pixels on a kneeling height of 14
+/// (standing, 25 on 22). With the body what a shot meets, a soldier kneeling in front took in the back of the head
+/// the shot the game lets pass over her (a player, GitHub issue #192: "rockets to the back of the head bring
+/// headaches").
+void fitHeight(VoxelUnitModel &model, std::vector<Uint8> &owner, float fitTop, float headBase)
+{
+	float top = -1e9f;
+	for (size_t k = 0; k < model.part.size(); ++k) if (model.part[k] != VoxelUnitModel::Item) top = std::max(top, model.up[k]);
+	headBase = std::clamp(headBase, 0.0f, top);
+	const float head = top - headBase;
+	if (fitTop <= 0.0f || top <= fitTop || headBase <= 0.0f || fitTop - head <= 0.0f) return;
+	const float press = (fitTop - head) / headBase;
+	auto pressed = [&](float up) { return up <= 0.0f ? up : up <= headBase ? up * press : up - headBase * (1.0f - press); };
+	auto onGrid = [](float up) { return (std::floor(up / Cell) + 0.5f) * Cell; };
+	double held = 0.0;
+	int items = 0;
+	for (size_t k = 0; k < model.part.size(); ++k) if (model.part[k] == VoxelUnitModel::Item) { held += model.up[k]; ++items; }
+	const float carried = items ? onGrid(pressed((float)(held / items))) - onGrid((float)(held / items)) : 0.0f;
+	for (size_t k = 0; k < model.part.size(); ++k)
+	{
+		model.up[k] = model.part[k] == VoxelUnitModel::Item ? model.up[k] + carried : onGrid(pressed(model.up[k]));
+	}
+	// (the solid cells: each row takes the row it came from)
+	std::vector<Uint8> lower(owner.size(), 0);
+	for (int up = 0; up < GridUp; ++up)
+	{
+		const float here = cellUp(up);
+		const float from = here <= 0.0f ? here : here <= headBase * press ? here / press : here + headBase * (1.0f - press);
+		const int source = (int)std::floor((from - UpFrom) / Cell);
+		if (source < 0 || source >= GridUp) continue;
+		for (int across = 0; across < GridAcross; ++across)
+			for (int along = 0; along < GridAlong; ++along) lower[cellIndex(across, along, up)] = owner[cellIndex(across, along, source)];
+	}
+	owner.swap(lower);
+}
+
 /// What a shot meets (see VoxelUnitModel::hits): the body's solid cells (owner: its filled half voxel cells, the inside
 /// too), the items in its hands and the pieces added for views, in whole voxels; each the views it shows in (a cell's,
 /// as its middle falls inside each view's solid drawing, see matchViews; a voxel's, as it shows). Nothing floats here
@@ -2299,6 +2368,11 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	// move make as simple shapes decorated from sprites and plop them on top of respective vehicles". Tanks, hover
 	// tanks and the Cyberdisc keep the shape their eight drawings leave.)
 	const bool turret = routine.big && routine.still;
+	// (A tank: a hull with a turret of its own, whose drawings are on the left arm's frames, see VoxelUnits::modelFor.
+	// Each is made a plain block as a turret is, the hull's and on it the turret's with its barrel, and painted from all
+	// eight drawings: "turret, and body as seperate voxel models stacked", a player, GitHub issue #188.) The hull keeps
+	// the shape its drawings leave, cut flat (see flattenHull); the turret is a plain block with its barrel (see levelOff).
+	const bool tank = bigHull && !turret && parts[1].any;
 	SlantOnly = routine.big && !bigHull;
 	// (A long body on four legs, a dog or a cat, named so by the mod's rules: made from its side drawings, see longBody
 	// and profile.)
@@ -2337,7 +2411,25 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		const std::vector<Uint8> shape = routine.big ? std::vector<Uint8>(GridCells, 1) : beast ? profile(solid, beastLegsTop) : limb(solid, RightSide);
 		std::vector<Uint8> hull = carve(solid, bigHull ? 0 : 1, shape);
 		if (turret) levelOff(solid, hull);
+		if (tank) flattenHull(hull);
 		for (int i = 0; i < GridCells; ++i) if (shape[i] && hull[i]) owner[i] = PartCodes[0];
+		if (tank)
+		{
+			// the turret: its own drawings' block (its barrel is fine detail: nothing of it is left out), standing on
+			// the hull: where there is air between them it reaches down to the hull's top
+			std::vector<Uint8> gun = carve(parts[1], 0, std::vector<Uint8>(GridCells, 1));
+			levelOff(parts[1], gun);
+			for (int across = 0; across < GridAcross; ++across)
+				for (int along = 0; along < GridAlong; ++along)
+				{
+					int lowest = -1, roof = -1;
+					for (int up = 0; up < GridUp && lowest < 0; ++up) if (gun[cellIndex(across, along, up)]) lowest = up;
+					if (lowest < 0) continue;
+					for (int up = lowest - 1; up >= 0 && roof < 0; --up) if (owner[cellIndex(across, along, up)]) roof = up;
+					for (int up = roof + 1; roof >= 0 && up < lowest; ++up) gun[cellIndex(across, along, up)] = 1;
+				}
+			for (int i = 0; i < GridCells; ++i) if (gun[i]) owner[i] = PartCodes[1];
+		}
 	}
 	else
 	{
@@ -2357,7 +2449,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		for (Arm &arm : arms)
 		{
 			const int own = arm.right ? 0 : 1, other = 1 - own;
-			arm.found = parts[arm.part].any && armEnd(parts[arm.part], arm.right, true, arm.shoulder);
+			arm.found = !tank && parts[arm.part].any && armEnd(parts[arm.part], arm.right, true, arm.shoulder); // (a tank's left arm's frames are its turret's)
 			if (placed[own]) { gripOf(places[own], items[own].twoHanded, true, arm.hand); arm.holds = true; }
 			else if (placed[other] && items[other].twoHanded) { gripOf(places[other], true, false, arm.hand); arm.holds = true; }
 			else arm.found = arm.found && armEnd(parts[arm.part], arm.right, false, arm.hand);
@@ -2402,7 +2494,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	}
 	for (int p = 1; p < BodyParts; ++p)
 	{
-		if (!parts[p].any) continue;
+		if (!parts[p].any || tank) continue;
 		// the left arm is nearest the camera in direction 5, the right arm and the legs in 1; an arm's skeleton joins it
 		std::vector<Uint8> shape = limb(parts[p], PartCodes[p] == VoxelUnitModel::LeftArm ? LeftSide : RightSide);
 		const std::vector<Uint8> hull = carve(parts[p], 2, shape);
@@ -2764,7 +2856,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		// (So a long body on four legs, see longBody: most of it is its flanks, which the front and back drawings show
 		// nothing of. Painted by those two, a dog's flanks took its chest's colour: one tan barrel, where its side drawings
 		// have a dark flank on light legs.)
-		const bool hull = turret || beast;
+		const bool hull = turret || beast || tank;
 		std::vector<float> seenSkin[8];
 		auto slantPixel = [&](size_t k, int d, float &nearness) -> size_t {
 			float column, row;
@@ -2847,6 +2939,15 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	{
 		dropFarPieces(*model, itemsFrom);
 		dropFloating(*model);
+	}
+	// (a tank's turret is of its body from here on: nothing of it swings, and a shot at it meets the tank)
+	for (size_t k = 0; tank && k < model->part.size(); ++k) if (model->part[k] == PartCodes[1]) model->part[k] = PartCodes[0];
+	// (a named unit's body pressed down to a height: a kneeling one's, see fitHeight; one drawn on one frame has no
+	// head told from its body, and is pressed whole)
+	if (routine.fitTop > 0.0f)
+	{
+		const int shoulders = routine.whole ? FrameSize : shouldersRow(parts[0]);
+		fitHeight(*model, owner, routine.fitTop, shoulders < FrameSize ? (float)(FloorY - shoulders) : 1e9f);
 	}
 	makeHits(*model, owner, solidOnTop);
 	const bool rightHolds = placed[0] || (placed[1] && items[1].twoHanded);

@@ -94,6 +94,10 @@ void hashBytes(Uint64 &hash, const Uint8 *bytes, size_t count)
 	for (size_t i = 0; i < count; ++i) hash = (hash ^ bytes[i]) * 1099511628211ULL;
 }
 
+/// A kneeling unit the unit table says to fit (see fitHeight) is pressed down to its kneeling height and this many voxels:
+/// about what a standing drawing stands over the standing height (XPiratez's gals: 25 on 22).
+const int KneelOver = 3;
+
 /// A picture drawn as a dither counts as one from this share of holes among its pixels, in hundredths (see ditherHoles):
 /// XPiratez's stealth and spectre suits have 69 to 87 holes for 100 pixels drawn, any other unit's sheet 9 at most.
 const int DitherShare = 33;
@@ -158,6 +162,7 @@ struct VoxelUnits::Job
 	bool beast = false; // (a long body on four legs, by the unit table: see Routine)
 	float torsoDepth = 0.0f; // (the torso's slices at most this deep for their width, by the unit table: see Routine)
 	bool backTop = false; // (what faces up painted by the back drawing, by the unit table: see Routine)
+	float fitTop = 0.0f; // (the height the body is pressed down to: a kneeling unit's, by the unit table: see Routine)
 	bool fine = false; // (made twice as fine: see FineBodies)
 	const Routine *routine = nullptr;
 	int unitId = 0, status = 0; // (the unit's, for dump's file names)
@@ -273,6 +278,11 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	if (routine->big)
 	{
 		for (int slot = BODYPART_LARGE_TORSO; slot < BODYPART_LARGE_TURRET + 4; ++slot) capture[slot] = frames[0].get();
+		// (A tank's turret on a frame of its own, the left arm's: the hull and the turret are made a body each, the
+		// turret standing on the hull, see makeModel. On one frame with the hull, the two came out one low cone: a
+		// player, GitHub issue #188, the tank "looks almost like a dopey pyramid with no protruding barrel".)
+		// (Not a unit that can't move: a turret on a vehicle is one plain block, all of it: see makeModel.)
+		if (unit->getTurretType() != -1 && unit->getArmor()->allowsMoving()) capture[BODYPART_LARGE_TURRET] = frames[1].get();
 	}
 	const GraphSubset mask(FrameSize, FrameSize);
 	// (and, for a unit in parts, all its parts on one frame, laid over each other as the game draws them)
@@ -519,9 +529,12 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		unit->getArmor()->getSpriteSheet(), unitRules ? unitRules->getRace() : std::string(), soldier ? soldier->getRules()->getType() : std::string() });
 	float shows = dithered ? VoxelDitherFaint : 1.0f;
 	if (look.shows >= 0) shows = std::min(shows, look.shows / 100.0f);
-	const Uint8 pose[7] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast == 1),
-		(Uint8)std::max(look.torsoDepth, 0), (Uint8)(look.backTop == 1) };
-	hashBytes(hash, pose, 7);
+	// (a kneeling unit the table says to fit: pressed down to its kneeling height and KneelOver, as much as a standing
+	// drawing stands over the standing height)
+	const int fitTop = look.kneelFit == 1 && unit->isKneeled() ? unit->getHeight() + KneelOver : 0;
+	const Uint8 pose[8] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast == 1),
+		(Uint8)std::max(look.torsoDepth, 0), (Uint8)(look.backTop == 1), (Uint8)fitTop };
+	hashBytes(hash, pose, 8);
 	auto alike = _byFrames.find(hash);
 	if (alike != _byFrames.end())
 	{
@@ -547,6 +560,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		job->beast = look.beast == 1;
 		job->torsoDepth = look.torsoDepth > 0 ? look.torsoDepth / 100.0f : 0.0f;
 		job->backTop = look.backTop == 1;
+		job->fitTop = (float)fitTop;
 		job->fine = FineBodies;
 		job->routine = routine;
 		std::copy(palette, palette + 256, job->palette);
@@ -734,6 +748,7 @@ void VoxelUnits::build()
 			source.beast = job->beast;
 			source.torsoDepth = job->torsoDepth;
 			source.backTop = job->backTop;
+			source.fitTop = job->fitTop;
 			source.routine = job->routine->number;
 			model = makeFineModel(source, job->palette);
 		}
@@ -744,6 +759,7 @@ void VoxelUnits::build()
 			routine.beast = job->beast;
 			routine.torsoDepth = job->torsoDepth;
 			routine.backTop = job->backTop;
+			routine.fitTop = job->fitTop;
 			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->lying, job->walks, job->aiming, routine, job->palette);
 		}
 		if (model) model->opacity = job->shows;
@@ -808,8 +824,8 @@ void VoxelUnits::dump(const Job &job, const VoxelUnitModel *model, const char *f
 
 	if (FILE *file = std::fopen((base + ".job").c_str(), "w"))
 	{
-		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d\n", job.routine->number, job.routine->whole, job.routine->big,
-			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop);
+		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d fit %d\n", job.routine->number, job.routine->whole, job.routine->big,
+			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop, (int)job.fitTop);
 		for (int i = 0; i < 256; ++i) std::fprintf(file, "%d %d %d\n", job.palette[i].r, job.palette[i].g, job.palette[i].b);
 		std::fclose(file);
 	}

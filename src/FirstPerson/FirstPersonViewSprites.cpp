@@ -2667,6 +2667,10 @@ void FirstPersonView::drawFloorItems()
 		// (By where it lies and where the aim goes alone, not by whether its pixels are under the crosshair: drawn
 		// see-through it leaves holes there, the crosshair found no body in them the next frame, and it was solid again:
 		// the owner, a downed Cyberdisc "flashes transparent when I am near but turns solid again".)
+		// (And only where it is in the way: the aim's line passes low over it, within VoxelCorpseOver of its top, or
+		// ends on a unit standing behind it, whose legs it hides. Looking straight ahead over the bodies at one's feet,
+		// at a wall across the room, they stay solid: a player, GitHub issue #190, "looking straight ahead over them,
+		// the units become invisible despite not looking at the voxel MODEL".)
 		double bodyOpacity = 1.0;
 		if ((lying || wreck) && Options::fpsSeeThroughCorpses && _pointerAimed)
 		{
@@ -2675,7 +2679,14 @@ void FirstPersonView::drawFloorItems()
 			const double toX = step.sprite.world[0] - _eye[0], toY = step.sprite.world[1] - _eye[1];
 			const double along = length > 0.0 ? (toX * wayX + toY * wayY) / length : 0.0;
 			const double beside = length > 0.0 ? std::abs(toX * wayY - toY * wayX) / length : 1e9;
-			if (along > 0.0 && beside <= reach && length > along + reach) bodyOpacity = _faintPile.opacity;
+			if (along > 0.0 && beside <= reach && length > along + reach)
+			{
+				const double lineHeight = _eye[2] + (_pointerAim.z + 0.5 - _eye[2]) * along / length;
+				const double top = step.sprite.world[2] + (wreck ? VoxelWreckHeight : VoxelCorpseHeight);
+				const Tile *ends = _save->getTile(_pointerAim.toTile());
+				const BattleUnit *behind = ends ? ends->getUnit() : nullptr;
+				if (lineHeight <= top + VoxelCorpseOver || (behind && !behind->isOut())) bodyOpacity = _faintPile.opacity;
+			}
 		}
 		if (bodyOpacity < 1.0) bodyOpacity *= VoxelCorpseFaint;
 		if (wreck && wreck->fallAt(1.0))

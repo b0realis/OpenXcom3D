@@ -204,6 +204,9 @@ const Uint32 VoxelFallShapeTime = 170;
 /// line passes within this far of its middle on the ground, voxels (a heap; a big unit's wreck), and is drawn at this
 /// share of the ghost opacity.
 const double VoxelCorpseReach = 9.0, VoxelWreckReach = 18.0, VoxelCorpseFaint = 0.6;
+/// And only where the aim's line passes low over it: within VoxelCorpseOver voxels of its top (a body lying is taken
+/// as VoxelCorpseHeight high, a wreck VoxelWreckHeight), or ends on a unit standing behind it.
+const double VoxelCorpseHeight = 6.0, VoxelWreckHeight = 14.0, VoxelCorpseOver = 6.0;
 /// A Celatid's voxel body hovers as its picture's frames do: up and down by this much (voxels), once in this long (ms),
 /// swelling and shrinking by this share meanwhile (the owner: "Celatid should have some movement in voxel units also").
 const double CelatidBob = 1.2, CelatidSwell = 0.04;

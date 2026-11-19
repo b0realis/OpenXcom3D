@@ -174,6 +174,7 @@ firstPerson:
   #          big, at least 1.2 times as long as wide), or upright (as ever: to take a unit out of an earlier entry)
   #   torsoDepth: the most a torso is deep below the shoulders, in hundredths of its width (80), cut at the front; 0: no limit
   #   top: back (what faces up is painted by the back drawing: the top of a head is hair), or slant (as ever)
+  #   kneeling: fit (a kneeling body is pressed down to the unit's kneeling height and 3 voxels, the head whole), or drawn (as ever)
   # A later entry (or a later mod's) overrides what it sets.
   units:
     # ghosts (XPiratez, The X-Com Files): there, but seen through
@@ -186,9 +187,11 @@ firstPerson:
     # XPiratez's gals and peasants (armors STR_PIR_..., sheets PIR_n): their torsos are drawn from the side with the hips deeper
     # than the body is wide, under the arm where it is never seen (a belly, in 3D); and their faces high on the head (skin
     # on the crown, painted along the slant)
+    # (and they kneel 21 pixels high on a kneeling height of 14)
     - names: [PIR]
       torsoDepth: 80
       top: back
+      kneeling: fit
 
 interfaces:
   - type: firstPerson
