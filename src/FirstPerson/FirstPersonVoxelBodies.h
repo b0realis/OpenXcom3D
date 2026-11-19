@@ -83,8 +83,10 @@ constexpr int PartCount = 6, BodyParts = 4, RightItem = 4, LeftItem = 5;
 /// the big walkers' once a footfall). Still: the unit can't move (its armour's allowsMoving: false; set for the unit
 /// being made, not in the routines' table): a big one is a turret, mounted on a vehicle. Beast: a mod's rules name the
 /// unit a long body on four legs (a dog, a cat: the unit table), made from its side drawings if it's drawn on one
-/// frame (set for the unit being made too; see longBody). Only a named unit is made so.
-struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; };
+/// frame (set for the unit being made too; see longBody). Only a named unit is made so. TorsoDepth and backTop: what
+/// the unit table says of a named unit's torso and of how what faces up is painted (see headAndTorso, makeModel); 0 and
+/// false for a unit it doesn't name.
+struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; float torsoDepth = 0.0f; bool backTop = false; };
 /// The routine's way of drawing, or null for one not given a voxel body.
 const Routine *routineFor(int number);
 

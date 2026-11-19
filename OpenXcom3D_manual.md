@@ -815,6 +815,9 @@ The voxel bodies (setting *Voxel units*) are made from a unit's sprites by gener
 - `seeThrough:` how much of the body is left out, in hundredths: **50** draws every other cube, a ghost that is there but seen through. (A unit the game itself draws as a dither, such as XPiratez's stealth and spectre suits, is see-through without being named.)
 - `shape:` **beast** (a long body on four legs, a dog or a cat: made from its side drawings, its four legs apart, walking at a trot) or **upright** (as ever: to take a unit out of an earlier entry). Only a unit drawn on one frame, one tile big, whose side drawing is at least 1.2 times as long as its frontal drawing is wide is made so: a werewolf drawn in parts stays upright whatever it is called.
 
+- `torsoDepth:` the most a torso is deep below the shoulders, in hundredths of its width (**80**), cut at the front; 0 for no limit. For units whose side drawings have a deep lower torso that is never seen, under an arm (XPiratez's gals: a belly, in 3D).
+- `top:` **back** (what faces up is painted by the back drawing, so the top of a head is hair) or **slant** (as ever: along the slant of the front or back drawing). For units whose faces are drawn high on the head.
+
 A word matches a whole word of a name (a name's words are its runs of letters: `STR_GHOST_GAL` has STR, GHOST and GAL), so `CAT` finds `BLACK_CAT` and not `CATGIRL`. A star opens it: `GHOST*` a word's start, `*DOGE` a word's end (`BLOODOGE`), `*SPIDER*` any part of a word. A whole name names one unit (`BAN_6.PCK`, a sprite sheet; `STR_MY_UNIT_ARMOR`). Capitals or not is the same. A later entry, or a later mod's, overrides what it sets.
 
 ```yaml
@@ -826,9 +829,12 @@ firstPerson:
       shape: beast
     - names: [STR_MY_TALL_DOG]      # a mod's unit that stands upright after all
       shape: upright
+    - names: [PIR]                  # XPiratez's gals and peasants (armors STR_PIR_..., sheets PIR_n)
+      torsoDepth: 80
+      top: back
 ```
 
-The lists the mod comes with match 16 ghost armors and 49 animals of XPiratez and The X-Com Files, and no unit of UFO or TFTD.
+The lists the mod comes with match 16 ghost armors and 49 animals of XPiratez and The X-Com Files, and XPiratez's 433 armors of gals and peasants; no unit of UFO or TFTD.
 
 ## 7. What you'll see
 
@@ -1051,6 +1057,8 @@ What `FirstPersonView` draws:
 
 ### After 1.14 (not released)
 
+- *Voxel units*: **XPiratez's gals are slim again** (GitHub issue #184, "Gals got fat": "more like a dad bod than an uber"). A torso is as deep as its side drawing, row by row, and the gals' torsos are drawn from the side with hips up to 10 pixels deep on a body 8 wide: that part of the drawing lies under the arm, hand on hip, and is never seen in the sprite; as a body's depth it was a belly out past the chest. In 100 of the 238 gal sheets the lower torso is drawn deeper than wide. For the units the unit table names (`torsoDepth: 80`: the armors and sheets named PIR), a torso below the shoulders is at most 80% as deep as it is wide, cut at the front (`headAndTorso`).
+- *Voxel units*: **no bald spot** (GitHub issue #181, "unit seems to be given bald spot"). What faces up was painted along the slant of the front drawing, and at the front of a head's top that slant ends on the forehead: two or three cubes of skin on the crown, on XPiratez's humans, whose faces are drawn high on the head. For the units the unit table names (`top: back`, the same PIR units), what faces up is painted by the back drawing: from behind a head is hair all over.
 - *Voxel units*: **dogs and cats stand on four legs** (GitHub issues #191, attack dogs "look like extremely adorable capybaras with stumpy legs", and #180, "cats aint got no legs"). A body drawn on one frame was read as one standing upright: row by row from its frontal drawing. A long animal's frontal drawing has its far end for its top, so each pair of legs came out one block, the gap under the belly was filled and the feet cut off; and the body was painted from its front and back drawings alone, which show nothing of its flanks: one tan barrel. A long body is now made from its side drawings (`profile`): their outline along the body, the other views trimming its width; the belly raised between the legs by what the drawings' slant adds to it (35% of the body's width), the legs going up to there; each pair of legs kept to the columns the front and back drawings have them in, so four legs stay four; painted by all eight drawings, each cube by the one that sees it best (a dog's dark flank on its light legs); and it walks at a trot, each leg about its own hip. Only the units the mod's rules name a beast are made so (see the next entry): the dogs, cats, rats, pigs, sheep, chupacabras, maggots, scorpions, spiders and beetles of XPiratez and The X-Com Files; every other unit is made as before, cube for cube.
 - *Voxel units*: **units told by their names** (the owner: "this mod is heavily used with pirates and xcom files ... Lets have broad name detection for voxel units"). A new table in the mod's rules, `units:` (see [Units by name](#units-by-name)): words looked for in a unit's type, armor, sprite sheet and race, and what they say. Two things so far: **ghosts are seen through** (`seeThrough: 50`: XPiratez's ghost, The X-Com Files' ghosts, poltergeist and phantasmal tentacles; every other cube drawn), and **beasts** (`shape: beast`), the animals made as long bodies on four legs. What is done for one kind of unit is done for the units named and for no others (the owner: a fix for a ghost or a dog mustn't "break other voxel units that are good allready like sectoid, snakeman, mutton ... if we dont have unit name in table we will apply some general rules").
 - *Voxel units*: **a unit drawn as a dither gets a body** (GitHub issue #185: XPiratez's ghosts "don't seem to make a model at all"). The stealth and spectre suits are drawn with every other pixel left out, so the map shows through them; a body made of those pictures lost nearly all its cells (a cell with too few neighbours goes) and only a scrap was left, the weapon floating beside it. The holes of such pictures are filled before the body is made (`fillDither`: a sheet counts as dithered from 33 holes for 100 pixels drawn; the suits have 69 to 87, any other sheet 9 at most), and the body is drawn half see-through, as the map shows it (`VoxelDitherFaint`).

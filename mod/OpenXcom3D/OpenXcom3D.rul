@@ -172,6 +172,8 @@ firstPerson:
   #   seeThrough: how much of the body is left out, in hundredths (50: every other cube, a ghost)
   #   shape: beast (a long body on four legs, made from its side drawings; only a unit drawn on one frame, one tile
   #          big, at least 1.2 times as long as wide), or upright (as ever: to take a unit out of an earlier entry)
+  #   torsoDepth: the most a torso is deep below the shoulders, in hundredths of its width (80), cut at the front; 0: no limit
+  #   top: back (what faces up is painted by the back drawing: the top of a head is hair), or slant (as ever)
   # A later entry (or a later mod's) overrides what it sets.
   units:
     # ghosts (XPiratez, The X-Com Files): there, but seen through
@@ -181,6 +183,12 @@ firstPerson:
     - names: [DOG, DOGE, DOGG, "*DOG", "*DOGE", HOUND, "*HOUND", WOLF, CAT, RAT, GIANTRAT, PIG, BOAR, SHEEP, COW, HORSE, GOAT, FOX, DEER,
               BEAR, LION, TIGER, PANTHER, LIZARD, CHUPACABRA, MAGGOT, SPIDER, "*SPIDER", SCORPION, "*SCORPION", BEETLE, BAN_6.PCK]
       shape: beast
+    # XPiratez's gals and peasants (armors STR_PIR_..., sheets PIR_n): their torsos are drawn from the side with the hips deeper
+    # than the body is wide, under the arm where it is never seen (a belly, in 3D); and their faces high on the head (skin
+    # on the crown, painted along the slant)
+    - names: [PIR]
+      torsoDepth: 80
+      top: back
 
 interfaces:
   - type: firstPerson

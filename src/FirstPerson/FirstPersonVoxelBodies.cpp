@@ -581,9 +581,19 @@ void sideExtent(const std::pair<int, int> &first, const std::pair<int, int> &las
 /// The head and torso: each row of the frame a slice as wide as the frontal frame's row and as deep as the side
 /// frame's (bits beside the main run small round slices); with a chin (bodyTop >= 0), the chin's rows a shallow
 /// piece at the front of the face and a thin neck behind them from the head's underside to the torso.
-void headAndTorso(const PartFrames &torso, int bodyTop, std::vector<Uint8> &cells, std::vector<Uint8> &neck)
+/// DepthMost (the unit table's torsoDepth, for the units it names; 0: no limit): below the shoulders (from the first
+/// row nearly as wide as the widest) a slice is at most that many times as deep as it is wide, cut at the front.
+/// XPiratez's gals' torsos are drawn from the side with the hips up to 10 pixels deep on 8 wide: that part of the
+/// drawing lies under the arm, hand on hip, and is never seen; as a body's depth it was a belly sticking out past
+/// the chest (a player, GitHub issue #184: "Gals got fat").
+void headAndTorso(const PartFrames &torso, int bodyTop, std::vector<Uint8> &cells, std::vector<Uint8> &neck, float depthMost)
 {
 	std::vector<float> torsoAhead;
+	int widest = 0, shoulders = FrameSize;
+	for (int row = 0; row < FrameSize && depthMost > 0.0f; ++row)
+		for (const auto &run : runs(torso, Front, row)) widest = std::max(widest, run.second - run.first + 1);
+	for (int row = 0; row < FrameSize && depthMost > 0.0f && shoulders == FrameSize; ++row)
+		for (const auto &run : runs(torso, Front, row)) if ((run.second - run.first + 1) * 10 >= widest * 9) shoulders = row;
 	for (int row = 0; row < FrameSize; ++row)
 	{
 		const auto front = runs(torso, Front, row), side = runs(torso, RightSide, row);
@@ -593,6 +603,7 @@ void headAndTorso(const PartFrames &torso, int bodyTop, std::vector<Uint8> &cell
 		float back, fore;
 		sideExtent(side.front(), side.back(), RightSide, back, fore);
 		if (bodyTop >= 0 && row >= bodyTop - ChinRows && row < bodyTop) back = std::max(back, fore - ChinDepth);
+		if (depthMost > 0.0f && row >= shoulders) fore = std::min(fore, back + depthMost * 2.0f * halfRight);
 		if (bodyTop >= 0 && row >= bodyTop) torsoAhead.push_back((back + fore) * 0.5f);
 		fillSlice(cells, row, centreRight, halfRight, (back + fore) * 0.5f, (fore - back) * 0.5f);
 		for (const auto &run : front)
@@ -2331,7 +2342,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	else
 	{
 		std::vector<Uint8> torso(GridCells, 0), neck(GridCells, 0);
-		headAndTorso(parts[0], chinEnd(parts[0], parts[1], parts[2]), torso, neck);
+		headAndTorso(parts[0], chinEnd(parts[0], parts[1], parts[2]), torso, neck, routine.torsoDepth);
 		const std::vector<Uint8> hull = carve(parts[0], 1, torso);
 		for (int i = 0; i < GridCells; ++i) if ((torso[i] && hull[i]) || neck[i]) owner[i] = PartCodes[0];
 	}
@@ -2779,7 +2790,13 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 				for (int b = -reach; b <= reach; ++b)
 					for (int c = -reach; c <= reach; ++c)
 						if (!filled(across + a, along + b, up + c)) { out[0] += a; out[1] += b; out[2] += c; }
-			const int painting = out[2] > planeLength(out[0], out[1]) * 1.5f ? 1 : 0;
+			// (BackTop, the unit table's "top: back" for the units it names: what faces up is painted by the back drawing,
+			// at its own height. XPiratez's humans' faces are drawn high on the head and stand out in front of the
+			// hair above them: the top of that ledge, and the front of the head's top along the slant, took the front
+			// drawing's pixels there, the forehead's: skin up the hair to the crown (a player, GitHub issue #181: "unit
+			// seems to be given bald spot"). From behind a head is hair all over.)
+			const bool facesUp = out[2] > planeLength(out[0], out[1]) * 1.5f;
+			const int painting = facesUp && !routine.backTop ? 1 : 0;
 			// (each direction's camera: towards its nearness, see project)
 			float fit[8];
 			for (int d = 0; d < 8; ++d) fit[d] = out[0] * (Turns[d].cosine + Turns[d].sine) + out[1] * (Turns[d].sine - Turns[d].cosine);
@@ -2789,7 +2806,8 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 			// outward side where it's as near both)
 			float nearFront, nearBack;
 			const float underFront = frontSkin[pixelAt(k, Front, nearFront)] - nearFront, underBack = backSkin[pixelAt(k, Back, nearBack)] - nearBack;
-			const int first = std::abs(underFront - underBack) < 1.0f * VOXELSCALE ? (fit[Front] >= fit[Back] ? Front : Back) : underFront < underBack ? Front : Back;
+			const int first = facesUp && routine.backTop ? Back
+				: std::abs(underFront - underBack) < 1.0f * VOXELSCALE ? (fit[Front] >= fit[Back] ? Front : Back) : underFront < underBack ? Front : Back;
 			Uint8 colour = 0;
 			if (hull)
 			{

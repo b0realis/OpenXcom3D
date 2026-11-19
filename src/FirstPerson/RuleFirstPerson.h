@@ -111,10 +111,15 @@ public:
 	/// four legs (1), or as ever (0; -1: nothing said, the same); and how much of the body shows, in hundredths (100
 	/// all of it; less: see-through, a ghost), or -1 for nothing said. A unit the table doesn't name is made by the
 	/// general rules alone: what is done for one kind of unit touches no other.
+	/// And for a named unit's body: torsoDepth, the most its torso's slices are deep, in hundredths of their width (0:
+	/// no limit); backTop, whether what faces up is painted by the back drawing (1: the top of a head is hair) or as ever,
+	/// along the front or back drawing's slant (0); -1 for nothing said.
 	struct UnitLook
 	{
 		int beast = -1;
 		int shows = -1;
+		int torsoDepth = -1;
+		int backTop = -1;
 	};
 	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
@@ -297,12 +302,14 @@ public:
 			for (const auto& entry : units.children())
 			{
 				std::vector<std::string> names;
-				std::string shape;
-				int seeThrough = 0;
+				std::string shape, top;
+				int seeThrough = 0, torsoDepth = 0;
 				UnitLook look;
 				entry.tryRead("names", names);
 				if (entry.tryRead("shape", shape)) look.beast = shape == "beast" ? 1 : 0;
 				if (entry.tryRead("seeThrough", seeThrough)) look.shows = 100 - std::clamp(seeThrough, 0, 90);
+				if (entry.tryRead("torsoDepth", torsoDepth)) look.torsoDepth = std::clamp(torsoDepth, 0, 200);
+				if (entry.tryRead("top", top)) look.backTop = top == "back" ? 1 : 0;
 				if (!names.empty()) _unitLooks.push_back({ names, look });
 			}
 		}
@@ -397,6 +404,8 @@ public:
 			if (!matches) continue;
 			if (entry.second.beast != -1) look.beast = entry.second.beast;
 			if (entry.second.shows != -1) look.shows = entry.second.shows;
+			if (entry.second.torsoDepth != -1) look.torsoDepth = entry.second.torsoDepth;
+			if (entry.second.backTop != -1) look.backTop = entry.second.backTop;
 		}
 		return look;
 	}

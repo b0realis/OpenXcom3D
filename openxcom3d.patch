@@ -1394,10 +1394,10 @@ index 000000000..8c874c4f5
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..d80b83bd4
+index 000000000..14105c699
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,201 @@
+@@ -0,0 +1,209 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1572,6 +1572,8 @@ index 000000000..d80b83bd4
 +  #   seeThrough: how much of the body is left out, in hundredths (50: every other cube, a ghost)
 +  #   shape: beast (a long body on four legs, made from its side drawings; only a unit drawn on one frame, one tile
 +  #          big, at least 1.2 times as long as wide), or upright (as ever: to take a unit out of an earlier entry)
++  #   torsoDepth: the most a torso is deep below the shoulders, in hundredths of its width (80), cut at the front; 0: no limit
++  #   top: back (what faces up is painted by the back drawing: the top of a head is hair), or slant (as ever)
 +  # A later entry (or a later mod's) overrides what it sets.
 +  units:
 +    # ghosts (XPiratez, The X-Com Files): there, but seen through
@@ -1581,6 +1583,12 @@ index 000000000..d80b83bd4
 +    - names: [DOG, DOGE, DOGG, "*DOG", "*DOGE", HOUND, "*HOUND", WOLF, CAT, RAT, GIANTRAT, PIG, BOAR, SHEEP, COW, HORSE, GOAT, FOX, DEER,
 +              BEAR, LION, TIGER, PANTHER, LIZARD, CHUPACABRA, MAGGOT, SPIDER, "*SPIDER", SCORPION, "*SCORPION", BEETLE, BAN_6.PCK]
 +      shape: beast
++    # XPiratez's gals and peasants (armors STR_PIR_..., sheets PIR_n): their torsos are drawn from the side with the hips deeper
++    # than the body is wide, under the arm where it is never seen (a belly, in 3D); and their faces high on the head (skin
++    # on the crown, painted along the slant)
++    - names: [PIR]
++      torsoDepth: 80
++      top: back
 +
 +interfaces:
 +  - type: firstPerson
@@ -84458,10 +84466,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..08413602f
+index 000000000..4db7a3982
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,2923 @@
+@@ -0,0 +1,2941 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -85045,9 +85053,19 @@ index 000000000..08413602f
 +/// The head and torso: each row of the frame a slice as wide as the frontal frame's row and as deep as the side
 +/// frame's (bits beside the main run small round slices); with a chin (bodyTop >= 0), the chin's rows a shallow
 +/// piece at the front of the face and a thin neck behind them from the head's underside to the torso.
-+void headAndTorso(const PartFrames &torso, int bodyTop, std::vector<Uint8> &cells, std::vector<Uint8> &neck)
++/// DepthMost (the unit table's torsoDepth, for the units it names; 0: no limit): below the shoulders (from the first
++/// row nearly as wide as the widest) a slice is at most that many times as deep as it is wide, cut at the front.
++/// XPiratez's gals' torsos are drawn from the side with the hips up to 10 pixels deep on 8 wide: that part of the
++/// drawing lies under the arm, hand on hip, and is never seen; as a body's depth it was a belly sticking out past
++/// the chest (a player, GitHub issue #184: "Gals got fat").
++void headAndTorso(const PartFrames &torso, int bodyTop, std::vector<Uint8> &cells, std::vector<Uint8> &neck, float depthMost)
 +{
 +	std::vector<float> torsoAhead;
++	int widest = 0, shoulders = FrameSize;
++	for (int row = 0; row < FrameSize && depthMost > 0.0f; ++row)
++		for (const auto &run : runs(torso, Front, row)) widest = std::max(widest, run.second - run.first + 1);
++	for (int row = 0; row < FrameSize && depthMost > 0.0f && shoulders == FrameSize; ++row)
++		for (const auto &run : runs(torso, Front, row)) if ((run.second - run.first + 1) * 10 >= widest * 9) shoulders = row;
 +	for (int row = 0; row < FrameSize; ++row)
 +	{
 +		const auto front = runs(torso, Front, row), side = runs(torso, RightSide, row);
@@ -85057,6 +85075,7 @@ index 000000000..08413602f
 +		float back, fore;
 +		sideExtent(side.front(), side.back(), RightSide, back, fore);
 +		if (bodyTop >= 0 && row >= bodyTop - ChinRows && row < bodyTop) back = std::max(back, fore - ChinDepth);
++		if (depthMost > 0.0f && row >= shoulders) fore = std::min(fore, back + depthMost * 2.0f * halfRight);
 +		if (bodyTop >= 0 && row >= bodyTop) torsoAhead.push_back((back + fore) * 0.5f);
 +		fillSlice(cells, row, centreRight, halfRight, (back + fore) * 0.5f, (fore - back) * 0.5f);
 +		for (const auto &run : front)
@@ -86795,7 +86814,7 @@ index 000000000..08413602f
 +	else
 +	{
 +		std::vector<Uint8> torso(GridCells, 0), neck(GridCells, 0);
-+		headAndTorso(parts[0], chinEnd(parts[0], parts[1], parts[2]), torso, neck);
++		headAndTorso(parts[0], chinEnd(parts[0], parts[1], parts[2]), torso, neck, routine.torsoDepth);
 +		const std::vector<Uint8> hull = carve(parts[0], 1, torso);
 +		for (int i = 0; i < GridCells; ++i) if ((torso[i] && hull[i]) || neck[i]) owner[i] = PartCodes[0];
 +	}
@@ -87243,7 +87262,13 @@ index 000000000..08413602f
 +				for (int b = -reach; b <= reach; ++b)
 +					for (int c = -reach; c <= reach; ++c)
 +						if (!filled(across + a, along + b, up + c)) { out[0] += a; out[1] += b; out[2] += c; }
-+			const int painting = out[2] > planeLength(out[0], out[1]) * 1.5f ? 1 : 0;
++			// (BackTop, the unit table's "top: back" for the units it names: what faces up is painted by the back drawing,
++			// at its own height. XPiratez's humans' faces are drawn high on the head and stand out in front of the
++			// hair above them: the top of that ledge, and the front of the head's top along the slant, took the front
++			// drawing's pixels there, the forehead's: skin up the hair to the crown (a player, GitHub issue #181: "unit
++			// seems to be given bald spot"). From behind a head is hair all over.)
++			const bool facesUp = out[2] > planeLength(out[0], out[1]) * 1.5f;
++			const int painting = facesUp && !routine.backTop ? 1 : 0;
 +			// (each direction's camera: towards its nearness, see project)
 +			float fit[8];
 +			for (int d = 0; d < 8; ++d) fit[d] = out[0] * (Turns[d].cosine + Turns[d].sine) + out[1] * (Turns[d].sine - Turns[d].cosine);
@@ -87253,7 +87278,8 @@ index 000000000..08413602f
 +			// outward side where it's as near both)
 +			float nearFront, nearBack;
 +			const float underFront = frontSkin[pixelAt(k, Front, nearFront)] - nearFront, underBack = backSkin[pixelAt(k, Back, nearBack)] - nearBack;
-+			const int first = std::abs(underFront - underBack) < 1.0f * VOXELSCALE ? (fit[Front] >= fit[Back] ? Front : Back) : underFront < underBack ? Front : Back;
++			const int first = facesUp && routine.backTop ? Back
++				: std::abs(underFront - underBack) < 1.0f * VOXELSCALE ? (fit[Front] >= fit[Back] ? Front : Back) : underFront < underBack ? Front : Back;
 +			Uint8 colour = 0;
 +			if (hull)
 +			{
@@ -87387,10 +87413,10 @@ index 000000000..08413602f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.h b/src/FirstPerson/FirstPersonVoxelBodies.h
 new file mode 100644
-index 000000000..47824ff4d
+index 000000000..af1617280
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.h
-@@ -0,0 +1,135 @@
+@@ -0,0 +1,137 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -87476,8 +87502,10 @@ index 000000000..47824ff4d
 +/// the big walkers' once a footfall). Still: the unit can't move (its armour's allowsMoving: false; set for the unit
 +/// being made, not in the routines' table): a big one is a turret, mounted on a vehicle. Beast: a mod's rules name the
 +/// unit a long body on four legs (a dog, a cat: the unit table), made from its side drawings if it's drawn on one
-+/// frame (set for the unit being made too; see longBody). Only a named unit is made so.
-+struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; };
++/// frame (set for the unit being made too; see longBody). Only a named unit is made so. TorsoDepth and backTop: what
++/// the unit table says of a named unit's torso and of how what faces up is painted (see headAndTorso, makeModel); 0 and
++/// false for a unit it doesn't name.
++struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; float torsoDepth = 0.0f; bool backTop = false; };
 +/// The routine's way of drawing, or null for one not given a voxel body.
 +const Routine *routineFor(int number);
 +
@@ -87528,10 +87556,10 @@ index 000000000..47824ff4d
 +}
 diff --git a/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp b/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp
 new file mode 100644
-index 000000000..905073a51
+index 000000000..0ee57733a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp
-@@ -0,0 +1,98 @@
+@@ -0,0 +1,100 @@
 +/*
 + * FirstPersonVoxelBodiesFine.cpp: the voxel bodies' builder a second time, twice as fine (see
 + * FirstPersonVoxelBodiesFine.h): the same source, FirstPersonVoxelBodies.cpp, with VOXELSCALE 2 and under a name of its
@@ -87624,6 +87652,8 @@ index 000000000..905073a51
 +	Routine made = *routine;
 +	made.still = source.still;
 +	made.beast = source.beast;
++	made.torsoDepth = source.torsoDepth;
++	made.backTop = source.backTop;
 +	std::unique_ptr<VoxelUnitModel> model = makeModel(parts, composite, items, deaths, corpse, lying, walks, source.aiming, made, palette);
 +	if (model) model->unit = 1.0f / VOXELSCALE;
 +	return model;
@@ -87632,10 +87662,10 @@ index 000000000..905073a51
 +}
 diff --git a/src/FirstPerson/FirstPersonVoxelBodiesFine.h b/src/FirstPerson/FirstPersonVoxelBodiesFine.h
 new file mode 100644
-index 000000000..7e562d001
+index 000000000..b68a0a5ef
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodiesFine.h
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,41 @@
 +#pragma once
 +/*
 + * FirstPersonVoxelBodiesFine.h: the voxel bodies made twice as fine (see FineBodies): the builder of
@@ -87669,6 +87699,8 @@ index 000000000..7e562d001
 +	int routine = 0;
 +	bool still = false; // (it can't move: see Routine)
 +	bool beast = false; // (a long body on four legs, by the mod's rules: see Routine)
++	float torsoDepth = 0.0f; // (the torso's slices at most this deep for their width, by the mod's rules: see Routine)
++	bool backTop = false; // (what faces up painted by the back drawing, by the mod's rules: see Routine)
 +};
 +
 +/// Makes a body twice as fine from a unit's frames; null if it has no torso (or its routine has no bodies).
@@ -88002,10 +88034,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..9f361ac02
+index 000000000..c7a80bc31
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,843 @@
+@@ -0,0 +1,852 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -88164,6 +88196,8 @@ index 000000000..9f361ac02
 +	bool still = false; // (it can't move: see Routine)
 +	float shows = 1.0f; // (how much of the body shows: see VoxelUnitModel::opacity)
 +	bool beast = false; // (a long body on four legs, by the unit table: see Routine)
++	float torsoDepth = 0.0f; // (the torso's slices at most this deep for their width, by the unit table: see Routine)
++	bool backTop = false; // (what faces up painted by the back drawing, by the unit table: see Routine)
 +	bool fine = false; // (made twice as fine: see FineBodies)
 +	const Routine *routine = nullptr;
 +	int unitId = 0, status = 0; // (the unit's, for dump's file names)
@@ -88525,8 +88559,9 @@ index 000000000..9f361ac02
 +		unit->getArmor()->getSpriteSheet(), unitRules ? unitRules->getRace() : std::string(), soldier ? soldier->getRules()->getType() : std::string() });
 +	float shows = dithered ? VoxelDitherFaint : 1.0f;
 +	if (look.shows >= 0) shows = std::min(shows, look.shows / 100.0f);
-+	const Uint8 pose[5] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast == 1) };
-+	hashBytes(hash, pose, 5);
++	const Uint8 pose[7] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast == 1),
++		(Uint8)std::max(look.torsoDepth, 0), (Uint8)(look.backTop == 1) };
++	hashBytes(hash, pose, 7);
 +	auto alike = _byFrames.find(hash);
 +	if (alike != _byFrames.end())
 +	{
@@ -88550,6 +88585,8 @@ index 000000000..9f361ac02
 +		job->still = !unit->getArmor()->allowsMoving();
 +		job->shows = shows;
 +		job->beast = look.beast == 1;
++		job->torsoDepth = look.torsoDepth > 0 ? look.torsoDepth / 100.0f : 0.0f;
++		job->backTop = look.backTop == 1;
 +		job->fine = FineBodies;
 +		job->routine = routine;
 +		std::copy(palette, palette + 256, job->palette);
@@ -88735,6 +88772,8 @@ index 000000000..9f361ac02
 +			source.aiming = job->aiming;
 +			source.still = job->still;
 +			source.beast = job->beast;
++			source.torsoDepth = job->torsoDepth;
++			source.backTop = job->backTop;
 +			source.routine = job->routine->number;
 +			model = makeFineModel(source, job->palette);
 +		}
@@ -88743,6 +88782,8 @@ index 000000000..9f361ac02
 +			Routine routine = *job->routine;
 +			routine.still = job->still;
 +			routine.beast = job->beast;
++			routine.torsoDepth = job->torsoDepth;
++			routine.backTop = job->backTop;
 +			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->lying, job->walks, job->aiming, routine, job->palette);
 +		}
 +		if (model) model->opacity = job->shows;
@@ -88807,8 +88848,8 @@ index 000000000..9f361ac02
 +
 +	if (FILE *file = std::fopen((base + ".job").c_str(), "w"))
 +	{
-+		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d\n", job.routine->number, job.routine->whole, job.routine->big,
-+			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast);
++		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d\n", job.routine->number, job.routine->whole, job.routine->big,
++			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop);
 +		for (int i = 0; i < 256; ++i) std::fprintf(file, "%d %d %d\n", job.palette[i].r, job.palette[i].g, job.palette[i].b);
 +		std::fclose(file);
 +	}
@@ -96224,10 +96265,10 @@ index 000000000..b860f5356
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..c6166fd45
+index 000000000..ac33b65ca
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
-@@ -0,0 +1,451 @@
+@@ -0,0 +1,460 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -96341,10 +96382,15 @@ index 000000000..c6166fd45
 +	/// four legs (1), or as ever (0; -1: nothing said, the same); and how much of the body shows, in hundredths (100
 +	/// all of it; less: see-through, a ghost), or -1 for nothing said. A unit the table doesn't name is made by the
 +	/// general rules alone: what is done for one kind of unit touches no other.
++	/// And for a named unit's body: torsoDepth, the most its torso's slices are deep, in hundredths of their width (0:
++	/// no limit); backTop, whether what faces up is painted by the back drawing (1: the top of a head is hair) or as ever,
++	/// along the front or back drawing's slant (0); -1 for nothing said.
 +	struct UnitLook
 +	{
 +		int beast = -1;
 +		int shows = -1;
++		int torsoDepth = -1;
++		int backTop = -1;
 +	};
 +	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 +	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
@@ -96527,12 +96573,14 @@ index 000000000..c6166fd45
 +			for (const auto& entry : units.children())
 +			{
 +				std::vector<std::string> names;
-+				std::string shape;
-+				int seeThrough = 0;
++				std::string shape, top;
++				int seeThrough = 0, torsoDepth = 0;
 +				UnitLook look;
 +				entry.tryRead("names", names);
 +				if (entry.tryRead("shape", shape)) look.beast = shape == "beast" ? 1 : 0;
 +				if (entry.tryRead("seeThrough", seeThrough)) look.shows = 100 - std::clamp(seeThrough, 0, 90);
++				if (entry.tryRead("torsoDepth", torsoDepth)) look.torsoDepth = std::clamp(torsoDepth, 0, 200);
++				if (entry.tryRead("top", top)) look.backTop = top == "back" ? 1 : 0;
 +				if (!names.empty()) _unitLooks.push_back({ names, look });
 +			}
 +		}
@@ -96627,6 +96675,8 @@ index 000000000..c6166fd45
 +			if (!matches) continue;
 +			if (entry.second.beast != -1) look.beast = entry.second.beast;
 +			if (entry.second.shows != -1) look.shows = entry.second.shows;
++			if (entry.second.torsoDepth != -1) look.torsoDepth = entry.second.torsoDepth;
++			if (entry.second.backTop != -1) look.backTop = entry.second.backTop;
 +		}
 +		return look;
 +	}
