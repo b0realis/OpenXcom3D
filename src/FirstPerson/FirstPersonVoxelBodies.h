@@ -81,10 +81,10 @@ constexpr int PartCount = 6, BodyParts = 4, RightItem = 4, LeftItem = 5;
 /// legs swing (a one-frame walker's: its body below the hip), whether its free arms do, and the torso's bob (the
 /// routine's own, as the game draws its walk: drawRoutine0's tables for 0, 10, 13-15, drawRoutine6's for the Snakeman;
 /// the big walkers' once a footfall). Still: the unit can't move (its armour's allowsMoving: false; set for the unit
-/// being made, not in the routines' table): a big one is a turret, mounted on a vehicle. Beast: whether a body drawn
-/// on one frame is a long one on four legs (a dog, a cat), made from its side drawings: -1 by its drawings alone, 1 a
-/// mod's rules name it one, 0 they say it stands upright (set for the unit being made too; see longBody).
-struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; int beast = -1; };
+/// being made, not in the routines' table): a big one is a turret, mounted on a vehicle. Beast: a mod's rules name the
+/// unit a long body on four legs (a dog, a cat: the unit table), made from its side drawings if it's drawn on one
+/// frame (set for the unit being made too; see longBody). Only a named unit is made so.
+struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; };
 /// The routine's way of drawing, or null for one not given a voxel body.
 const Routine *routineFor(int number);
 

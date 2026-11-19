@@ -424,13 +424,15 @@ void levelOff(const PartFrames &part, std::vector<Uint8> &cells)
 		}
 }
 
-/// A long body (a beast on four legs: a dog, a cat, a rat, a pig) is one whose side drawing is at least LongBody times
-/// as long as its frontal drawing is wide, and as long as it is high; one a mod's rules name a beast (see Routine),
-/// from LongNamed times. (XPiratez's and The X-Com Files' animals are 1.9 to 4 times as long as wide, their scorpions
-/// and beetles 1.55; a unit standing upright under 1.4.) Its legs are the rows of its side drawing below its belly:
+/// A long body (a beast on four legs: a dog, a cat, a rat, a pig) is one a mod's rules name a beast (the unit table,
+/// see Routine), and no other: a unit that isn't named there is made as ever (the owner: a fix for one kind of unit
+/// mustn't "break other voxel units that are good allready like sectoid, snakeman, mutton"). A named one whose side
+/// drawing isn't LongNamed times as long as its frontal drawing is wide is left as it was all the same: it doesn't
+/// stand as a beast does. (XPiratez's and The X-Com Files' animals are 1.9 to 4 times as long as wide, their
+/// scorpions and beetles 1.55; a unit standing upright under 1.4.) Its legs are the rows of its side drawing below its belly:
 /// from the ground up, the rows drawn for less than LegsShare of its longest row; and the belly's lowest rows between
 /// them (BellyRise, BellyMost: see profile).
-constexpr float LongBody = 1.6f, LongNamed = 1.2f, LegsShare = 0.6f, BellyRise = 0.35f, BellyMost = 0.35f;
+constexpr float LongNamed = 1.2f, LegsShare = 0.6f, BellyRise = 0.35f, BellyMost = 0.35f;
 
 /// A frame's drawing: its first and last columns and rows; false if nothing is drawn.
 bool drawnBox(const PartFrames &part, int direction, int &left, int &right, int &top, int &bottom)
@@ -446,14 +448,12 @@ bool drawnBox(const PartFrames &part, int direction, int &left, int &right, int 
 	return right >= 0;
 }
 
-/// Whether a body drawn on one frame is a long one (see LongBody). Named: 1 if a mod's rules name it a beast, 0 if they
-/// say it stands upright, -1 if they say nothing.
-bool longBody(const PartFrames &part, int named)
+/// Whether a body drawn on one frame, named a beast by a mod's rules, is a long one (see LongNamed).
+bool longBody(const PartFrames &part)
 {
 	int left, right, top, bottom, frontLeft, frontRight, frontTop, frontBottom;
-	if (named == 0 || !drawnBox(part, RightSide, left, right, top, bottom) || !drawnBox(part, Front, frontLeft, frontRight, frontTop, frontBottom)) return false;
-	const float length = (float)(right - left + 1), width = (float)(frontRight - frontLeft + 1), height = (float)(bottom - top + 1);
-	return named == 1 ? length >= LongNamed * width : length >= LongBody * width && length >= height;
+	if (!drawnBox(part, RightSide, left, right, top, bottom) || !drawnBox(part, Front, frontLeft, frontRight, frontTop, frontBottom)) return false;
+	return (float)(right - left + 1) >= LongNamed * (float)(frontRight - frontLeft + 1);
 }
 
 /// A long body's shape from its side drawings (see longBody): every cell whose place along the body and height the
@@ -2289,8 +2289,9 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	// tanks and the Cyberdisc keep the shape their eight drawings leave.)
 	const bool turret = routine.big && routine.still;
 	SlantOnly = routine.big && !bigHull;
-	// (A long body on four legs, a dog or a cat: made from its side drawings, see longBody and profile.)
-	const bool beast = routine.whole && !routine.big && longBody(parts[0], routine.beast);
+	// (A long body on four legs, a dog or a cat, named so by the mod's rules: made from its side drawings, see longBody
+	// and profile.)
+	const bool beast = routine.beast && routine.whole && !routine.big && longBody(parts[0]);
 	float beastLegsTop = 0.0f;
 	std::vector<int> onTop[8], solidOnTop[8];
 	partsOnTop(parts, composite, onTop);

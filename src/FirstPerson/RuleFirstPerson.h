@@ -107,9 +107,10 @@ public:
 	};
 private:
 public:
-	/// What the unit table (`units:`) says of a unit, by its names: whether its voxel body is a long one on four legs
-	/// (1), one standing upright (0), or left to its drawings (-1); and how much of the body shows, in hundredths
-	/// (100 all of it; less: see-through, a ghost), or -1 for nothing said.
+	/// What the unit table (`units:`) says of a unit, by its names: whether its voxel body is made as a long one on
+	/// four legs (1), or as ever (0; -1: nothing said, the same); and how much of the body shows, in hundredths (100
+	/// all of it; less: see-through, a ghost), or -1 for nothing said. A unit the table doesn't name is made by the
+	/// general rules alone: what is done for one kind of unit touches no other.
 	struct UnitLook
 	{
 		int beast = -1;
@@ -117,9 +118,12 @@ public:
 	};
 	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
-	/// GHOSTLY), a word's end (*DOGE: BLOODOGE) or any part of a word (*SPIDER*). Capitals or not is the same.
+	/// GHOSTLY), a word's end (*DOGE: BLOODOGE) or any part of a word (*SPIDER*); or the whole name itself (one unit:
+	/// BAN_6.PCK, STR_MY_UNIT_ARMOR). Capitals or not is the same.
 	static bool nameHas(const std::string &name, const std::string &pattern)
 	{
+		if (name.size() == pattern.size() && std::equal(name.begin(), name.end(), pattern.begin(),
+			[](char one, char other) { return std::toupper((unsigned char)one) == std::toupper((unsigned char)other); })) return true;
 		const bool openStart = !pattern.empty() && pattern.front() == '*', openEnd = pattern.size() > 1 && pattern.back() == '*';
 		std::string wanted = pattern.substr(openStart ? 1 : 0, pattern.size() - (openStart ? 1 : 0) - (openEnd ? 1 : 0));
 		for (char &letter : wanted) letter = (char)std::toupper((unsigned char)letter);
@@ -284,9 +288,10 @@ public:
 
 		// The unit table: groups of name patterns (see nameHas), each with what it says of the units whose names (the
 		// unit's type, its armor's, the armor's sprite sheet, its race) hold one: shape (beast: a long body on four legs;
-		// upright; or auto) and seeThrough (how much of the voxel body is left out, in hundredths: 50 for a ghost). A
-		// later entry overrides what it sets, and leaves the rest. The big mods have hundreds of units: by names, not
-		// one by one (the owner: "Lets have broad name detection for voxel units").
+		// upright: as ever) and seeThrough (how much of the voxel body is left out, in hundredths: 50 for a ghost). A
+		// later entry overrides what it sets, and leaves the rest. What the voxel bodies do for one kind of unit they
+		// do for the units named here and no others (the owner: "The future voxelisation rules will be per unit ... if
+		// we dont have unit name in table we will apply some general rules").
 		if (const auto& units = reader["units"])
 		{
 			for (const auto& entry : units.children())
@@ -296,7 +301,7 @@ public:
 				int seeThrough = 0;
 				UnitLook look;
 				entry.tryRead("names", names);
-				if (entry.tryRead("shape", shape)) look.beast = shape == "beast" ? 1 : shape == "upright" ? 0 : -1;
+				if (entry.tryRead("shape", shape)) look.beast = shape == "beast" ? 1 : 0;
 				if (entry.tryRead("seeThrough", seeThrough)) look.shows = 100 - std::clamp(seeThrough, 0, 90);
 				if (!names.empty()) _unitLooks.push_back({ names, look });
 			}

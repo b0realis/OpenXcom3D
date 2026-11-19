@@ -1432,10 +1432,10 @@ index 000000000..8c874c4f5
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..d083e784f
+index 000000000..d80b83bd4
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,199 @@
+@@ -0,0 +1,201 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1601,21 +1601,23 @@ index 000000000..d083e784f
 +    # and the crossbows
 +    - types: [STR_HARPOON, STR_HARPOON_AUTO, STR_HARPOON_CARBINE, STR_DART_PISTOL, STR_AIR_MUSKET, STR_XBOW, STR_XBOW_CORAL, STR_EXECUTIONER_XBOW, STR_BALLISTA]
 +      shot: object
-+  # The unit table: units told by their names, for the voxel bodies (setting "Voxel units"). Each entry lists words to
-+  # look for in a unit's names (its type, its armor's, the armor's sprite sheet, its race) and what it says of those
-+  # units. A word matches a whole word of a name (CAT: BLACK_CAT, not CATGIRL); with a star, a word's start (GHOST*),
-+  # its end (*DOGE: BLOODOGE) or any part of it (*SPIDER*). Capitals or not is the same.
++  # The unit table: units told by their names, for the voxel bodies (setting "Voxel units"). What the voxel bodies do
++  # for one kind of unit, they do for the units named here and for no others: a unit the table doesn't name is made by
++  # the general rules, as ever. Each entry lists words to look for in a unit's names (its type, its armor's, the
++  # armor's sprite sheet, its race) and what it says of those units. A word matches a whole word of a name (CAT:
++  # BLACK_CAT, not CATGIRL); with a star, a word's start (GHOST*), its end (*DOGE: BLOODOGE) or any part of it
++  # (*SPIDER*); or it is a whole name, for one unit (BAN_6.PCK). Capitals or not is the same.
 +  #   seeThrough: how much of the body is left out, in hundredths (50: every other cube, a ghost)
-+  #   shape: beast (a long body on four legs, made from its side drawings; a unit drawn on one frame, one tile big),
-+  #          upright (never so), or auto (by its drawings: at least 1.6 times as long as wide)
++  #   shape: beast (a long body on four legs, made from its side drawings; only a unit drawn on one frame, one tile
++  #          big, at least 1.2 times as long as wide), or upright (as ever: to take a unit out of an earlier entry)
 +  # A later entry (or a later mod's) overrides what it sets.
 +  units:
 +    # ghosts (XPiratez, The X-Com Files): there, but seen through
 +    - names: [GHOST*, "*GHOST", SPECTRE, SPECTER, SPECTRAL, POLTERGEIST, PHANTOM, PHANTASMAL, BANSHEE, APPARITION]
 +      seeThrough: 50
-+    # animals on four legs or more (most are told by their drawings anyway; the short ones, scorpions and beetles, by name)
++    # animals on four legs or more (XPiratez, The X-Com Files; BAN_6.PCK: XPiratez's bloodhound's sheet, its bandits' too)
 +    - names: [DOG, DOGE, DOGG, "*DOG", "*DOGE", HOUND, "*HOUND", WOLF, CAT, RAT, GIANTRAT, PIG, BOAR, SHEEP, COW, HORSE, GOAT, FOX, DEER,
-+              BEAR, LION, TIGER, PANTHER, LIZARD, CHUPACABRA, MAGGOT, SPIDER, "*SPIDER", SCORPION, "*SCORPION", BEETLE]
++              BEAR, LION, TIGER, PANTHER, LIZARD, CHUPACABRA, MAGGOT, SPIDER, "*SPIDER", SCORPION, "*SCORPION", BEETLE, BAN_6.PCK]
 +      shape: beast
 +
 +interfaces:
@@ -84533,10 +84535,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..bc5d4dbae
+index 000000000..08413602f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,2922 @@
+@@ -0,0 +1,2923 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -84963,13 +84965,15 @@ index 000000000..bc5d4dbae
 +		}
 +}
 +
-+/// A long body (a beast on four legs: a dog, a cat, a rat, a pig) is one whose side drawing is at least LongBody times
-+/// as long as its frontal drawing is wide, and as long as it is high; one a mod's rules name a beast (see Routine),
-+/// from LongNamed times. (XPiratez's and The X-Com Files' animals are 1.9 to 4 times as long as wide, their scorpions
-+/// and beetles 1.55; a unit standing upright under 1.4.) Its legs are the rows of its side drawing below its belly:
++/// A long body (a beast on four legs: a dog, a cat, a rat, a pig) is one a mod's rules name a beast (the unit table,
++/// see Routine), and no other: a unit that isn't named there is made as ever (the owner: a fix for one kind of unit
++/// mustn't "break other voxel units that are good allready like sectoid, snakeman, mutton"). A named one whose side
++/// drawing isn't LongNamed times as long as its frontal drawing is wide is left as it was all the same: it doesn't
++/// stand as a beast does. (XPiratez's and The X-Com Files' animals are 1.9 to 4 times as long as wide, their
++/// scorpions and beetles 1.55; a unit standing upright under 1.4.) Its legs are the rows of its side drawing below its belly:
 +/// from the ground up, the rows drawn for less than LegsShare of its longest row; and the belly's lowest rows between
 +/// them (BellyRise, BellyMost: see profile).
-+constexpr float LongBody = 1.6f, LongNamed = 1.2f, LegsShare = 0.6f, BellyRise = 0.35f, BellyMost = 0.35f;
++constexpr float LongNamed = 1.2f, LegsShare = 0.6f, BellyRise = 0.35f, BellyMost = 0.35f;
 +
 +/// A frame's drawing: its first and last columns and rows; false if nothing is drawn.
 +bool drawnBox(const PartFrames &part, int direction, int &left, int &right, int &top, int &bottom)
@@ -84985,14 +84989,12 @@ index 000000000..bc5d4dbae
 +	return right >= 0;
 +}
 +
-+/// Whether a body drawn on one frame is a long one (see LongBody). Named: 1 if a mod's rules name it a beast, 0 if they
-+/// say it stands upright, -1 if they say nothing.
-+bool longBody(const PartFrames &part, int named)
++/// Whether a body drawn on one frame, named a beast by a mod's rules, is a long one (see LongNamed).
++bool longBody(const PartFrames &part)
 +{
 +	int left, right, top, bottom, frontLeft, frontRight, frontTop, frontBottom;
-+	if (named == 0 || !drawnBox(part, RightSide, left, right, top, bottom) || !drawnBox(part, Front, frontLeft, frontRight, frontTop, frontBottom)) return false;
-+	const float length = (float)(right - left + 1), width = (float)(frontRight - frontLeft + 1), height = (float)(bottom - top + 1);
-+	return named == 1 ? length >= LongNamed * width : length >= LongBody * width && length >= height;
++	if (!drawnBox(part, RightSide, left, right, top, bottom) || !drawnBox(part, Front, frontLeft, frontRight, frontTop, frontBottom)) return false;
++	return (float)(right - left + 1) >= LongNamed * (float)(frontRight - frontLeft + 1);
 +}
 +
 +/// A long body's shape from its side drawings (see longBody): every cell whose place along the body and height the
@@ -86828,8 +86830,9 @@ index 000000000..bc5d4dbae
 +	// tanks and the Cyberdisc keep the shape their eight drawings leave.)
 +	const bool turret = routine.big && routine.still;
 +	SlantOnly = routine.big && !bigHull;
-+	// (A long body on four legs, a dog or a cat: made from its side drawings, see longBody and profile.)
-+	const bool beast = routine.whole && !routine.big && longBody(parts[0], routine.beast);
++	// (A long body on four legs, a dog or a cat, named so by the mod's rules: made from its side drawings, see longBody
++	// and profile.)
++	const bool beast = routine.beast && routine.whole && !routine.big && longBody(parts[0]);
 +	float beastLegsTop = 0.0f;
 +	std::vector<int> onTop[8], solidOnTop[8];
 +	partsOnTop(parts, composite, onTop);
@@ -87461,7 +87464,7 @@ index 000000000..bc5d4dbae
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.h b/src/FirstPerson/FirstPersonVoxelBodies.h
 new file mode 100644
-index 000000000..d3f066664
+index 000000000..47824ff4d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.h
 @@ -0,0 +1,135 @@
@@ -87548,10 +87551,10 @@ index 000000000..d3f066664
 +/// legs swing (a one-frame walker's: its body below the hip), whether its free arms do, and the torso's bob (the
 +/// routine's own, as the game draws its walk: drawRoutine0's tables for 0, 10, 13-15, drawRoutine6's for the Snakeman;
 +/// the big walkers' once a footfall). Still: the unit can't move (its armour's allowsMoving: false; set for the unit
-+/// being made, not in the routines' table): a big one is a turret, mounted on a vehicle. Beast: whether a body drawn
-+/// on one frame is a long one on four legs (a dog, a cat), made from its side drawings: -1 by its drawings alone, 1 a
-+/// mod's rules name it one, 0 they say it stands upright (set for the unit being made too; see longBody).
-+struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; int beast = -1; };
++/// being made, not in the routines' table): a big one is a turret, mounted on a vehicle. Beast: a mod's rules name the
++/// unit a long body on four legs (a dog, a cat: the unit table), made from its side drawings if it's drawn on one
++/// frame (set for the unit being made too; see longBody). Only a named unit is made so.
++struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; };
 +/// The routine's way of drawing, or null for one not given a voxel body.
 +const Routine *routineFor(int number);
 +
@@ -87706,7 +87709,7 @@ index 000000000..905073a51
 +}
 diff --git a/src/FirstPerson/FirstPersonVoxelBodiesFine.h b/src/FirstPerson/FirstPersonVoxelBodiesFine.h
 new file mode 100644
-index 000000000..41c4e922f
+index 000000000..7e562d001
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodiesFine.h
 @@ -0,0 +1,39 @@
@@ -87742,7 +87745,7 @@ index 000000000..41c4e922f
 +	bool walkAny = false, aiming = false;
 +	int routine = 0;
 +	bool still = false; // (it can't move: see Routine)
-+	int beast = -1; // (a long body on four legs, by the mod's rules: see Routine)
++	bool beast = false; // (a long body on four legs, by the mod's rules: see Routine)
 +};
 +
 +/// Makes a body twice as fine from a unit's frames; null if it has no torso (or its routine has no bodies).
@@ -88076,7 +88079,7 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..60ac4cb59
+index 000000000..9f361ac02
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 @@ -0,0 +1,843 @@
@@ -88237,7 +88240,7 @@ index 000000000..60ac4cb59
 +	bool aiming = false;
 +	bool still = false; // (it can't move: see Routine)
 +	float shows = 1.0f; // (how much of the body shows: see VoxelUnitModel::opacity)
-+	int beast = -1; // (a long body on four legs, by the unit table: see Routine)
++	bool beast = false; // (a long body on four legs, by the unit table: see Routine)
 +	bool fine = false; // (made twice as fine: see FineBodies)
 +	const Routine *routine = nullptr;
 +	int unitId = 0, status = 0; // (the unit's, for dump's file names)
@@ -88599,7 +88602,7 @@ index 000000000..60ac4cb59
 +		unit->getArmor()->getSpriteSheet(), unitRules ? unitRules->getRace() : std::string(), soldier ? soldier->getRules()->getType() : std::string() });
 +	float shows = dithered ? VoxelDitherFaint : 1.0f;
 +	if (look.shows >= 0) shows = std::min(shows, look.shows / 100.0f);
-+	const Uint8 pose[5] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast + 1) };
++	const Uint8 pose[5] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast == 1) };
 +	hashBytes(hash, pose, 5);
 +	auto alike = _byFrames.find(hash);
 +	if (alike != _byFrames.end())
@@ -88623,7 +88626,7 @@ index 000000000..60ac4cb59
 +		job->aiming = aiming;
 +		job->still = !unit->getArmor()->allowsMoving();
 +		job->shows = shows;
-+		job->beast = look.beast;
++		job->beast = look.beast == 1;
 +		job->fine = FineBodies;
 +		job->routine = routine;
 +		std::copy(palette, palette + 256, job->palette);
@@ -88882,7 +88885,7 @@ index 000000000..60ac4cb59
 +	if (FILE *file = std::fopen((base + ".job").c_str(), "w"))
 +	{
 +		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d\n", job.routine->number, job.routine->whole, job.routine->big,
-+			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), job.beast);
++			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast);
 +		for (int i = 0; i < 256; ++i) std::fprintf(file, "%d %d %d\n", job.palette[i].r, job.palette[i].g, job.palette[i].b);
 +		std::fclose(file);
 +	}
@@ -96298,10 +96301,10 @@ index 000000000..b860f5356
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..5ec46213f
+index 000000000..c6166fd45
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
-@@ -0,0 +1,446 @@
+@@ -0,0 +1,451 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -96411,9 +96414,10 @@ index 000000000..5ec46213f
 +	};
 +private:
 +public:
-+	/// What the unit table (`units:`) says of a unit, by its names: whether its voxel body is a long one on four legs
-+	/// (1), one standing upright (0), or left to its drawings (-1); and how much of the body shows, in hundredths
-+	/// (100 all of it; less: see-through, a ghost), or -1 for nothing said.
++	/// What the unit table (`units:`) says of a unit, by its names: whether its voxel body is made as a long one on
++	/// four legs (1), or as ever (0; -1: nothing said, the same); and how much of the body shows, in hundredths (100
++	/// all of it; less: see-through, a ghost), or -1 for nothing said. A unit the table doesn't name is made by the
++	/// general rules alone: what is done for one kind of unit touches no other.
 +	struct UnitLook
 +	{
 +		int beast = -1;
@@ -96421,9 +96425,12 @@ index 000000000..5ec46213f
 +	};
 +	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 +	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
-+	/// GHOSTLY), a word's end (*DOGE: BLOODOGE) or any part of a word (*SPIDER*). Capitals or not is the same.
++	/// GHOSTLY), a word's end (*DOGE: BLOODOGE) or any part of a word (*SPIDER*); or the whole name itself (one unit:
++	/// BAN_6.PCK, STR_MY_UNIT_ARMOR). Capitals or not is the same.
 +	static bool nameHas(const std::string &name, const std::string &pattern)
 +	{
++		if (name.size() == pattern.size() && std::equal(name.begin(), name.end(), pattern.begin(),
++			[](char one, char other) { return std::toupper((unsigned char)one) == std::toupper((unsigned char)other); })) return true;
 +		const bool openStart = !pattern.empty() && pattern.front() == '*', openEnd = pattern.size() > 1 && pattern.back() == '*';
 +		std::string wanted = pattern.substr(openStart ? 1 : 0, pattern.size() - (openStart ? 1 : 0) - (openEnd ? 1 : 0));
 +		for (char &letter : wanted) letter = (char)std::toupper((unsigned char)letter);
@@ -96588,9 +96595,10 @@ index 000000000..5ec46213f
 +
 +		// The unit table: groups of name patterns (see nameHas), each with what it says of the units whose names (the
 +		// unit's type, its armor's, the armor's sprite sheet, its race) hold one: shape (beast: a long body on four legs;
-+		// upright; or auto) and seeThrough (how much of the voxel body is left out, in hundredths: 50 for a ghost). A
-+		// later entry overrides what it sets, and leaves the rest. The big mods have hundreds of units: by names, not
-+		// one by one (the owner: "Lets have broad name detection for voxel units").
++		// upright: as ever) and seeThrough (how much of the voxel body is left out, in hundredths: 50 for a ghost). A
++		// later entry overrides what it sets, and leaves the rest. What the voxel bodies do for one kind of unit they
++		// do for the units named here and no others (the owner: "The future voxelisation rules will be per unit ... if
++		// we dont have unit name in table we will apply some general rules").
 +		if (const auto& units = reader["units"])
 +		{
 +			for (const auto& entry : units.children())
@@ -96600,7 +96608,7 @@ index 000000000..5ec46213f
 +				int seeThrough = 0;
 +				UnitLook look;
 +				entry.tryRead("names", names);
-+				if (entry.tryRead("shape", shape)) look.beast = shape == "beast" ? 1 : shape == "upright" ? 0 : -1;
++				if (entry.tryRead("shape", shape)) look.beast = shape == "beast" ? 1 : 0;
 +				if (entry.tryRead("seeThrough", seeThrough)) look.shows = 100 - std::clamp(seeThrough, 0, 90);
 +				if (!names.empty()) _unitLooks.push_back({ names, look });
 +			}
