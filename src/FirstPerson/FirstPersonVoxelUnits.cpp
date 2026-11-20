@@ -115,6 +115,8 @@ const int DitherShare = 33;
 /// A unit drawn the same from every side is lopsided, and made as a relief (see VoxelBodies::Routine), when fewer than
 /// this many in a hundred of its drawing's pixels have their mirror pixel drawn too (see modelFor).
 const int ReliefAlike = 75;
+/// A tank's turret tops out this many voxels up (see modelFor): the owner's number.
+const int TankTop = 20;
 
 /**
  * Counts a picture's drawn pixels and its dither holes: the empty pixels with drawn ones on three sides at least (in a
@@ -679,21 +681,19 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	float shows = dithered ? VoxelDitherFaint : 1.0f;
 	if (look.shows >= 0) shows = std::min(shows, look.shows / 100.0f);
 	for (const auto &frame : anim) hashBytes(hash, frame.data(), frame.size());
-	// A tank (a big unit with a turret of its own that moves: see makeModel) stands as high as the game's units do: its
-	// deck at a kneeling soldier's height, its turret's top at a standing one's, by the rules of the game's first kind of
-	// soldier (22 and 14 in the games themselves). See VoxelBodies::Routine::tankHull.
+	// A tank (a big unit with a turret of its own that moves: see makeModel) stands about as high as the game's units
+	// do: its deck at a kneeling soldier's height, by the rules of the game's first kind of soldier (14 in the games
+	// themselves), its turret's top at TankTop, 20 voxels (a standing soldier is 22: the owner, "make tank only 20
+	// voxels tall"). See VoxelBodies::Routine::tankHull.
 	float tankHull = 0.0f, tankTop = 0.0f;
 	if (routine->big && unit->getTurretType() != -1 && unit->getArmor()->allowsMoving())
 	{
 		tankHull = 14.0f;
-		tankTop = 22.0f;
+		tankTop = (float)TankTop;
 		const std::vector<std::string> &soldiers = save->getMod()->getSoldiersList();
 		const RuleSoldier *normal = soldiers.empty() ? nullptr : save->getMod()->getSoldier(soldiers.front());
-		if (normal && normal->getStandHeight() > normal->getKneelHeight() && normal->getKneelHeight() > 0)
-		{
-			tankHull = (float)normal->getKneelHeight();
-			tankTop = (float)normal->getStandHeight();
-		}
+		if (normal && normal->getKneelHeight() > 0) tankHull = (float)normal->getKneelHeight();
+		tankHull = std::min(tankHull, tankTop - 4.0f); // (room for the turret)
 	}
 	const Uint8 pose[10] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast == 1),
 		(Uint8)std::max(look.torsoDepth, 0), (Uint8)(look.backTop == 1), (Uint8)(look.frontal == 1), (Uint8)relief, (Uint8)std::max(look.arms, 0) };

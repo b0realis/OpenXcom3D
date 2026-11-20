@@ -90,8 +90,8 @@ constexpr int PartCount = 6, BodyParts = 4, RightItem = 4, LeftItem = 5;
 /// and playstyle"): a kneeling body is as high as its kneeling drawing, not pressed to the game's kneeling height.
 /// Frontal: a named unit's body keeps to its front and back drawings' outlines strictly (see makeModel).
 /// TankHull, tankTop: for a tank (a hull with a turret of its own, see makeModel), how high its deck and its turret's
-/// top stand, voxels: a kneeling and a standing soldier's heights by the game's rules (set for the unit being made; 0:
-/// as its drawings have it). The one body not as high as its sprite: the owner's ruling on GitHub issue #201.
+/// top stand, voxels: a kneeling soldier's height by the game's rules, and 20 (set for the unit being made; 0: as its
+/// drawings have it). The one body not as high as its sprite: the owner's ruling on GitHub issue #201.
 /// Arms: what the unit table says of a named unit's arms, a bit each: 1 outside the body, 2 coloured along their
 /// length (see makeModel).
 /// Relief: the unit is drawn the same from every side, and lopsided (set for the unit being made, see
