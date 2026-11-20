@@ -92,6 +92,17 @@ layout(location = 3) out vec4 outTrue;    // the pixel in full colour (setting "
 #ifdef RESULTS
 layout(location = 4) out uvec4 outResult; // FirstPersonGpu::RayResult (the check against the CPU's rays only)
 #endif
+// Setting "Reflections" in two goes (see FirstPersonGpu.cpp, castRays): the program with the mirrors' rays in it is slow
+// for every pixel, whether it has a mirror or not (a street with a few windows in sight, 1280 x 800: 14.2 ms a frame
+// against 5.2 without). So the first go is the program without them, which also marks the pixels that want a mirror's
+// ray (MIRROR_FLAGS: a pane of glass, the sea); the second is the program with them (MIRROR_PASS), over those pixels only.
+#ifdef MIRROR_FLAGS
+layout(location = 4) out uint outFlags;   // 1 where the pixel wants a mirror's ray
+bool mirrorWanted;
+#endif
+#ifdef MIRROR_PASS
+uniform usampler2D uMirrorFlags;          // the first go's outFlags
+#endif
 
 const float Infinity = uintBitsToFloat(0x7F800000u);
 const vec3 CellSize = vec3(16.0, 16.0, 24.0);
@@ -1130,6 +1141,9 @@ uint colorOutsideMap(vec3 rayOrigin, vec3 rayDirection, float tExit, int exitAxi
 #else
 			bool mirrors = false;
 #endif
+#ifdef MIRROR_FLAGS
+			if (uReflections != 0 && groundIsWater && uUnderwater == 0) mirrorWanted = true;
+#endif
 			if (uSmoothLight != 0 || mirrors)
 			{
 				// (In full colour: the shade's fraction, the black of a dark place and the haze blended, as shadeHit does;
@@ -1792,6 +1806,9 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 #else
 	bool mirrors = false;
 #endif
+#ifdef MIRROR_FLAGS
+	if (uReflections != 0 && onSea && uUnderwater == 0) mirrorWanted = true;
+#endif
 #ifdef COLORED_LIGHTS
 	bool colorLit = uColorLightCount > 0;
 #else
@@ -2045,6 +2062,9 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 		// vision": in full colour what was seen through a window stayed blue-grey among the goggles' green, and
 		// changed with every shot's light.)
 		fullColor = uGoggles != 0 ? paletteRgb(color) : fullColor * 0.7 + vec3(150.0, 180.0, 205.0) * 0.3;
+#ifdef MIRROR_FLAGS
+		if (uReflections != 0 && uGoggles == 0 && fullColorSet && hit.glassAxis >= 0) mirrorWanted = true;
+#endif
 #ifdef REFLECTIONS
 		if (uReflections != 0 && uGoggles == 0 && fullColorSet && hit.glassAxis >= 0)
 		{
@@ -2105,6 +2125,12 @@ void main()
 {
 	// With "VR foveation", away from the eye's view axis only the first pixel of each 2 x 2 or 4 x 4 casts a ray, through
 	// the middle of them; the others are filled from it after (see FoveaFillSource).
+#ifdef MIRROR_PASS
+	if (texelFetch(uMirrorFlags, ivec2(gl_FragCoord.xy), 0).r == 0u) discard; // (no mirror wanted here: the first go's pixel stands)
+#endif
+#ifdef MIRROR_FLAGS
+	mirrorWanted = false;
+#endif
 	vec2 rayOffset = uRayOffset;
 	rayPixel = ivec2(gl_FragCoord.xy);
 	if (uFoveaCoarse > 0)
@@ -2158,6 +2184,9 @@ void main()
 	vec3 rayFullColor;
 	shadeRay(rayOffset, true, outColor, outDepth, outGlow, rayFullColor);
 	outTrue = vec4(rayFullColor / 255.0, float(outGlow) / 255.0);
+#ifdef MIRROR_FLAGS
+	outFlags = mirrorWanted ? 1u : 0u;
+#endif
 }
 )";
 

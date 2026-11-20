@@ -869,7 +869,7 @@ struct FirstPersonGpu::State
 	// ... and again with the coloured lights and the reflections in it, when their settings are on (see programFor).
 	Program programs[2];
 	std::map<int, Program> extraPrograms; // by 1 coloured lights | 2 reflections | 4 a pixel's later rays | 8 light shafts | 16 surface relief
-	Program *programFor(const Frame &frame, bool results, bool laterRays = false);
+	Program *programFor(const Frame &frame, bool results, bool laterRays = false, int mirrorGo = 0);
 	Gl::UInt resolveProgram = 0; // makes one picture of several rays a pixel (ResolveSource); 0: not built, one ray a pixel
 	Gl::UInt upscaleProgram = 0; // magnifies a picture of fewer rays to the view's size (UpscaleSource, setting "Render scale"); 0: not built, a ray a pixel
 	Program *program = &programs[0];
@@ -880,7 +880,14 @@ struct FirstPersonGpu::State
 		Gl::UInt framebuffer = 0;
 		Gl::UInt textures[5] = {}; // colour, depth, glow, full colour, results
 		bool results = false;
+		// "Reflections" in two goes (see castRays): the pixels that want a mirror's ray, marked by the first go, and
+		// the framebuffer that go draws into (the four pictures and the marks; the second go draws into the four alone,
+		// reading the marks).
+		Gl::UInt flags = 0, flagsFramebuffer = 0;
 	};
+	bool setMirrorFlags(int width, int height);
+	bool mirrorGoesBroken = false; // this card won't draw the marks' picture, or build the two goes' programs: "Reflections" in one go
+	void freeTargets(Targets &sized);
 	bool keepTargets = false; // setTargets leaves the pictures it has, however many
 	std::map<std::array<int, 3>, Targets> targets; // by width, height, and which of a frame's pictures (0 the frame's own, 1.. one for each of several rays a pixel)
 	std::vector<Uint8> blockColors, blockGlow; // a ray each, before they are spread over their blocks of pixels
@@ -1183,7 +1190,8 @@ std::string FirstPersonGpu::State::shaderHead() const
 bool FirstPersonGpu::State::build(Program &built, bool results, int extras)
 {
 	const std::string raySource = shaderHead() + (results ? "#define RESULTS\n" : "") + ((extras & 1) ? "#define COLORED_LIGHTS\n" : "")
-		+ ((extras & 2) ? "#define REFLECTIONS\n" : "") + ((extras & 4) ? "#define LATER_RAYS\n" : "") + ((extras & 8) ? "#define LIGHT_SHAFTS\n" : "") + ((extras & 16) ? "#define RELIEF\n" : "") + HeaderSource + shaderConstants() + WalkSource + ShadeSource;
+		+ ((extras & 2) ? "#define REFLECTIONS\n" : "") + ((extras & 4) ? "#define LATER_RAYS\n" : "") + ((extras & 8) ? "#define LIGHT_SHAFTS\n" : "") + ((extras & 16) ? "#define RELIEF\n" : "")
+		+ ((extras & 32) ? "#define MIRROR_FLAGS\n" : "") + ((extras & 64) ? "#define MIRROR_PASS\n" : "") + HeaderSource + shaderConstants() + WalkSource + ShadeSource;
 	const std::string vertexSource = shaderHead() + VertexSource;
 	const char *sources[2] = { vertexSource.c_str(), raySource.c_str() };
 	const Gl::Enum kinds[2] = { Gl::VERTEX_SHADER, Gl::FRAGMENT_SHADER };
@@ -1226,6 +1234,8 @@ bool FirstPersonGpu::State::build(Program &built, bool results, int extras)
 	Gl::Uniform1i(Gl::GetUniformLocation(built.id, "uFirstColor"), BufferCount + 1);
 	Gl::Uniform1i(Gl::GetUniformLocation(built.id, "uFirstDepth"), BufferCount + 2);
 	Gl::Uniform1i(Gl::GetUniformLocation(built.id, "uFirstTrue"), BufferCount + 3);
+	// (The first go's marks, for the second go of "Reflections": on the first of those units, which a frame of several rays a pixel never shares with it.)
+	Gl::Uniform1i(Gl::GetUniformLocation(built.id, "uMirrorFlags"), BufferCount + 1);
 	return true;
 }
 
@@ -1235,7 +1245,7 @@ bool FirstPersonGpu::State::build(Program &built, bool results, int extras)
  * are on (the game waits while the driver builds it: some seconds, once; drivers keep what they built; see prebuild
  * for the ones made before the card is called ready). If that one won't build, the plain one draws.
  */
-FirstPersonGpu::State::Program *FirstPersonGpu::State::programFor(const Frame &frame, bool results, bool laterRays)
+FirstPersonGpu::State::Program *FirstPersonGpu::State::programFor(const Frame &frame, bool results, bool laterRays, int mirrorGo)
 {
 	if (results)
 	{
@@ -1263,7 +1273,9 @@ FirstPersonGpu::State::Program *FirstPersonGpu::State::programFor(const Frame &f
 	{
 		return built(relief);
 	}
-	const int mirrors = (frame.reflections ? 2 : 0) | (laterRays ? 4 : 0) | (frame.lightShafts ? 8 : 0) | relief;
+	// ("Reflections" in two goes, see castRays: the first is the program without the mirrors that marks who wants one
+	// (32), the second the one with them, for those pixels only (2 and 64). In one go: the program with them (2).)
+	const int mirrors = (!frame.reflections ? 0 : mirrorGo == 1 ? 32 : mirrorGo == 2 ? 2 | 64 : 2) | (laterRays ? 4 : 0) | (frame.lightShafts ? 8 : 0) | relief;
 	if (frame.colorLightsOn) built(mirrors | 1);
 	return built(mirrors | (frame.colorLightCount > 0 ? 1 : 0));
 }
@@ -1735,8 +1747,7 @@ bool FirstPersonGpu::State::setTargets(int width, int height, bool results, int 
 	{
 		for (auto &entry : targets)
 		{
-			Gl::DeleteTextures(5, entry.second.textures);
-			Gl::DeleteFramebuffers(1, &entry.second.framebuffer);
+			freeTargets(entry.second);
 		}
 		targets.clear();
 	}
@@ -1745,8 +1756,7 @@ bool FirstPersonGpu::State::setTargets(int width, int height, bool results, int 
 	{
 		if (sized.framebuffer)
 		{
-			Gl::DeleteTextures(5, sized.textures);
-			Gl::DeleteFramebuffers(1, &sized.framebuffer);
+			freeTargets(sized);
 		}
 		Gl::GenFramebuffers(1, &sized.framebuffer);
 		Gl::BindFramebuffer(Gl::FRAMEBUFFER, sized.framebuffer);
@@ -1771,6 +1781,60 @@ bool FirstPersonGpu::State::setTargets(int width, int height, bool results, int 
 	Gl::BindFramebuffer(Gl::FRAMEBUFFER, sized.framebuffer);
 	const Gl::Enum drawn[5] = { Gl::COLOR_ATTACHMENT0, Gl::COLOR_ATTACHMENT0 + 1, Gl::COLOR_ATTACHMENT0 + 2, Gl::COLOR_ATTACHMENT0 + 3, Gl::COLOR_ATTACHMENT0 + 4 };
 	Gl::DrawBuffers(results ? 5 : 4, drawn);
+	return true;
+}
+
+void FirstPersonGpu::State::freeTargets(Targets &sized)
+{
+	Gl::DeleteTextures(5, sized.textures);
+	Gl::DeleteFramebuffers(1, &sized.framebuffer);
+	if (sized.flagsFramebuffer)
+	{
+		Gl::DeleteTextures(1, &sized.flags);
+		Gl::DeleteFramebuffers(1, &sized.flagsFramebuffer);
+	}
+	sized = Targets();
+}
+
+/**
+ * Binds, for the first of the two goes of "Reflections" (see castRays), the frame's own pictures of a size together
+ * with the picture of the marks (which pixels want a mirror's ray), made the first time it is asked for.
+ * @return False if the card won't have it (the frame is then drawn in one go).
+ */
+bool FirstPersonGpu::State::setMirrorFlags(int width, int height)
+{
+	Targets &sized = targets[{ width, height, 0 }];
+	if (!sized.framebuffer)
+	{
+		return false;
+	}
+	if (!sized.flagsFramebuffer)
+	{
+		Gl::GenTextures(1, &sized.flags);
+		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
+		Gl::BindTexture(Gl::TEXTURE_2D, sized.flags);
+		Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R8UI, width, height, 0, Gl::RED_INTEGER, Gl::UNSIGNED_BYTE, nullptr);
+		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
+		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
+		Gl::GenFramebuffers(1, &sized.flagsFramebuffer);
+		Gl::BindFramebuffer(Gl::FRAMEBUFFER, sized.flagsFramebuffer);
+		for (int which = 0; which < 4; ++which)
+		{
+			Gl::FramebufferTexture2D(Gl::FRAMEBUFFER, Gl::COLOR_ATTACHMENT0 + which, Gl::TEXTURE_2D, sized.textures[which], 0);
+		}
+		Gl::FramebufferTexture2D(Gl::FRAMEBUFFER, Gl::COLOR_ATTACHMENT0 + 4, Gl::TEXTURE_2D, sized.flags, 0);
+		if (Gl::CheckFramebufferStatus(Gl::FRAMEBUFFER) != Gl::FRAMEBUFFER_COMPLETE)
+		{
+			Gl::DeleteTextures(1, &sized.flags);
+			Gl::DeleteFramebuffers(1, &sized.flagsFramebuffer);
+			sized.flags = sized.flagsFramebuffer = 0;
+			Gl::BindFramebuffer(Gl::FRAMEBUFFER, sized.framebuffer);
+			return false;
+		}
+	}
+	Gl::BindFramebuffer(Gl::FRAMEBUFFER, sized.flagsFramebuffer);
+	const Gl::Enum drawn[5] = { Gl::COLOR_ATTACHMENT0, Gl::COLOR_ATTACHMENT0 + 1, Gl::COLOR_ATTACHMENT0 + 2, Gl::COLOR_ATTACHMENT0 + 3, Gl::COLOR_ATTACHMENT0 + 4 };
+	Gl::DrawBuffers(5, drawn);
 	return true;
 }
 
@@ -1900,7 +1964,22 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	stages.picture(frame.width, frame.height, true);
 	stages.begin(StageWorldSent);
 	foveaNow = frame.fovea[0] > 0.0f && frame.eyeFocal > 0.0f && !output.results && output.keep != 2; // (never in a check against the CPU's picture)
-	program = programFor(frame, output.results != nullptr);
+	// Setting "Reflections" in two goes, where a pixel has one ray and the picture isn't thinned for a headset: the program
+	// with the mirrors' rays in it is slow for every pixel, mirror or none (see MIRROR_FLAGS in the shader), so every pixel
+	// is drawn by the program without them, and the few that want a mirror again by the one with them.
+	// (OPENXCOM3D_GPU_ONE_GO_MIRRORS: in one go, as it was; for comparing the two.)
+	static const bool oneGoMirrors = getenv("OPENXCOM3D_GPU_ONE_GO_MIRRORS") != nullptr;
+	bool mirrorGoes = frame.reflections && frame.palette && !output.results && !foveaNow && !oneGoMirrors && !mirrorGoesBroken
+		&& !(resolveProgram && frame.samples >= 2);
+	Program *mirrorProgram = mirrorGoes ? programFor(frame, false, false, 2) : nullptr;
+	program = programFor(frame, output.results != nullptr, false, mirrorGoes ? 1 : 0);
+	if (mirrorGoes && (program == &programs[0] || mirrorProgram == &programs[0]))
+	{
+		// (Either of the two wouldn't build on this card, a fifth picture to draw into being one more than it must have: in one go.)
+		mirrorGoesBroken = true;
+		mirrorGoes = false;
+		program = programFor(frame, false);
+	}
 	Gl::UseProgram(program->id);
 	const size_t tileCount = (size_t)frame.size[0] * frame.size[1] * frame.size[2];
 	encodeTiles(frame);
@@ -1973,7 +2052,33 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	else if (samples == 1)
 	{
 		Gl::Uniform2f(location("uRayOffset"), 0.0f, 0.0f);
-		drawOver(output.results ? 5 : 4);
+		const bool marked = mirrorGoes && setMirrorFlags(rayColumnsCast, rayRowsCast);
+		if (mirrorGoes && !marked)
+		{
+			mirrorGoesBroken = true; // (this frame has no mirrors; the next ones are drawn in one go)
+			Log(LOG_INFO) << "OpenXcom3D GPU: this card won't mark the pixels that want a mirror: \"Reflections\" in one go";
+		}
+		drawOver(marked || output.results ? 5 : 4);
+		if (marked)
+		{
+			// The second go: the pixels the first marked, by the program with the mirrors in it, into the four pictures
+			// alone (the marks are read meanwhile). Where it draws nothing the first go's pixel stands.
+			const Targets &own = targets[{ rayColumnsCast, rayRowsCast, 0 }];
+			Gl::BindFramebuffer(Gl::FRAMEBUFFER, own.framebuffer);
+			const Gl::Enum drawn[4] = { Gl::COLOR_ATTACHMENT0, Gl::COLOR_ATTACHMENT0 + 1, Gl::COLOR_ATTACHMENT0 + 2, Gl::COLOR_ATTACHMENT0 + 3 };
+			Gl::DrawBuffers(4, drawn);
+			Program *const first = program;
+			program = mirrorProgram;
+			Gl::UseProgram(program->id);
+			setScene(rays);
+			Gl::Uniform2f(location("uRayOffset"), 0.0f, 0.0f);
+			Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 1);
+			Gl::BindTexture(Gl::TEXTURE_2D, own.flags);
+			Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
+			Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+			program = first;
+			Gl::UseProgram(program->id);
+		}
 	}
 	else
 	{
@@ -3470,7 +3575,13 @@ void FirstPersonGpu::prebuild(int extras)
 			wanted.colorLightCount = mask & 1;
 			wanted.reflections = (mask & 2) != 0;
 			wanted.lightShafts = (mask & 8) != 0;
-			if (mask || (extras & 16)) state.programFor(wanted, false);
+			// ("Reflections": the two programs of its two goes; the one of a single go only for several rays a pixel.)
+			if (mask & 2)
+			{
+				state.programFor(wanted, false, false, 1);
+				state.programFor(wanted, false, false, 2);
+			}
+			if ((mask || (extras & 16)) && (!(mask & 2) || (extras & 4))) state.programFor(wanted, false);
 			if (extras & 4) state.programFor(wanted, false, true);
 		}
 	});
