@@ -446,7 +446,7 @@ const int ModelMasks = 4;             // a model's masks: glass, look-only glass
 const int ModelSideBytes = 1024;      // a model's colours for the faces the art never shows: plan, east, south
 const int MaxSwings = 16;             // the doors swinging at once the shader takes
 const int TileUints = 16;             // a tile's numbers (four texels of four)
-const int TableRows = 14 + FirstPersonView::DarkFadeSteps;             // the rows of 256 bytes in the colour tables (see encodeTables)
+const int TableRows = 15 + FirstPersonView::DarkFadeSteps;             // the rows of 256 bytes in the colour tables (see encodeTables)
 const int UfoTableRows = 14;          // ... and for each UFO after them: its two tints and twelve soft tints
 const int MaxUfos = 8;
 const int BufferCount = 13;
@@ -867,7 +867,7 @@ struct FirstPersonGpu::State
 	};
 	// ... and again with the coloured lights and the reflections in it, when their settings are on (see programFor).
 	Program programs[2];
-	std::map<int, Program> extraPrograms; // by 1 coloured lights | 2 reflections
+	std::map<int, Program> extraPrograms; // by 1 coloured lights | 2 reflections | 4 a pixel's later rays | 8 light shafts | 16 surface relief
 	Program *programFor(const Frame &frame, bool results, bool laterRays = false);
 	Gl::UInt resolveProgram = 0; // makes one picture of several rays a pixel (ResolveSource); 0: not built, one ray a pixel
 	Gl::UInt upscaleProgram = 0; // magnifies a picture of fewer rays to the view's size (UpscaleSource, setting "Render scale"); 0: not built, a ray a pixel
@@ -1182,7 +1182,7 @@ std::string FirstPersonGpu::State::shaderHead() const
 bool FirstPersonGpu::State::build(Program &built, bool results, int extras)
 {
 	const std::string raySource = shaderHead() + (results ? "#define RESULTS\n" : "") + ((extras & 1) ? "#define COLORED_LIGHTS\n" : "")
-		+ ((extras & 2) ? "#define REFLECTIONS\n" : "") + ((extras & 4) ? "#define LATER_RAYS\n" : "") + ((extras & 8) ? "#define LIGHT_SHAFTS\n" : "") + HeaderSource + shaderConstants() + WalkSource + ShadeSource;
+		+ ((extras & 2) ? "#define REFLECTIONS\n" : "") + ((extras & 4) ? "#define LATER_RAYS\n" : "") + ((extras & 8) ? "#define LIGHT_SHAFTS\n" : "") + ((extras & 16) ? "#define RELIEF\n" : "") + HeaderSource + shaderConstants() + WalkSource + ShadeSource;
 	const std::string vertexSource = shaderHead() + VertexSource;
 	const char *sources[2] = { vertexSource.c_str(), raySource.c_str() };
 	const Gl::Enum kinds[2] = { Gl::VERTEX_SHADER, Gl::FRAGMENT_SHADER };
@@ -1229,15 +1229,16 @@ bool FirstPersonGpu::State::build(Program &built, bool results, int extras)
 }
 
 /**
- * The rays' program for a frame: the plain one (or the check's); or, when the frame has coloured lights or wants the
- * sea's reflections, one with those built in, made the first frame their settings are on (the game waits while the
- * driver builds it: some seconds, once; drivers keep what they built). If that one won't build, the plain one draws.
+ * The rays' program for a frame: the plain one (or the check's); or, when the frame has coloured lights, wants the
+ * sea's reflections, light shafts or the surface relief, one with those built in, made the first frame their settings
+ * are on (the game waits while the driver builds it: some seconds, once; drivers keep what they built; see prebuild
+ * for the ones made before the card is called ready). If that one won't build, the plain one draws.
  */
 FirstPersonGpu::State::Program *FirstPersonGpu::State::programFor(const Frame &frame, bool results, bool laterRays)
 {
-	if (results || !frame.palette)
+	if (results)
 	{
-		return &programs[results ? 1 : 0];
+		return &programs[1];
 	}
 	auto built = [this](int extras) -> Program * {
 		if (!extras) return &programs[0];
@@ -1247,7 +1248,7 @@ FirstPersonGpu::State::Program *FirstPersonGpu::State::programFor(const Frame &f
 			found = extraPrograms.emplace(extras, Program()).first;
 			if (!build(found->second, false, extras))
 			{
-				Log(LOG_WARNING) << "OpenXcom3D GPU: no coloured lights, reflections or light shafts on this card";
+				Log(LOG_WARNING) << "OpenXcom3D GPU: no coloured lights, reflections, light shafts or surface relief on this card";
 				found->second.id = 0;
 			}
 		}
@@ -1256,7 +1257,12 @@ FirstPersonGpu::State::Program *FirstPersonGpu::State::programFor(const Frame &f
 	// (With "Coloured lights" on, the program with them is built now, not when the first shot flies; it is used
 	// only for the frames that have a light.)
 	// (For a pixel's second and further rays, the program that casts them only where the first rays show an edge.)
-	const int mirrors = (frame.reflections ? 2 : 0) | (laterRays ? 4 : 0) | (frame.lightShafts ? 8 : 0);
+	const int relief = frame.relief > 0.0f ? 16 : 0; // (setting "Surface relief": in the palette's picture too)
+	if (!frame.palette)
+	{
+		return built(relief);
+	}
+	const int mirrors = (frame.reflections ? 2 : 0) | (laterRays ? 4 : 0) | (frame.lightShafts ? 8 : 0) | relief;
 	if (frame.colorLightsOn) built(mirrors | 1);
 	return built(mirrors | (frame.colorLightCount > 0 ? 1 : 0));
 }
@@ -1484,6 +1490,16 @@ void FirstPersonGpu::State::encodeTables(const Frame &frame)
 	std::memcpy(scene + 40, rest, sizeof(rest));
 	std::memcpy(&tables[13 * 256], frame.black, 256);
 	std::memcpy(&tables[14 * 256], colors.darkFade, FirstPersonView::DarkFadeSteps * 256);
+	// (Each colour's brightness: the height the setting "Surface relief" reads a face's drawing by.)
+	if (frame.palette)
+	{
+		Uint8 *brightness = &tables[(14 + FirstPersonView::DarkFadeSteps) * 256];
+		for (int index = 0; index < 256; ++index)
+		{
+			const SDL_Color &color = frame.palette[index];
+			brightness[index] = (Uint8)(color.r * 0.3f + color.g * 0.59f + color.b * 0.11f + 0.5f);
+		}
+	}
 	for (int ufo = 0; ufo < ufoCount; ++ufo)
 	{
 		Uint8 *rows = &tables[(TableRows + ufo * UfoTableRows) * 256];
@@ -1674,6 +1690,9 @@ void FirstPersonGpu::State::setScene(const Frame &frame)
 	Gl::Uniform1fv(location("uFaceShade"), 6, colors.faceShade);
 	Gl::Uniform1fv(location("uIndoorFaceShade"), 6, colors.indoorFaceShade);
 	Gl::Uniform3f(location("uSunDir"), colors.sunDir[0], colors.sunDir[1], colors.sunDir[2]);
+	Gl::Uniform3f(location("uShadingDir"), colors.shadingDir[0], colors.shadingDir[1], colors.shadingDir[2]);
+	Gl::Uniform1f(location("uShadingTurn"), colors.shadingTurn);
+	Gl::Uniform1f(location("uRelief"), frame.relief);
 	Gl::Uniform3f(location("uMoonDir"), colors.moonDir[0], colors.moonDir[1], colors.moonDir[2]);
 	Gl::Uniform1fv(location("uWaveSteps"), 18, frame.waveSteps);
 	Gl::Uniform4fv(location("uLamps"), 16, &frame.lamps[0][0]);
@@ -3442,6 +3461,7 @@ void FirstPersonGpu::prebuild(int extras)
 		Frame wanted = {};
 		SDL_Color anyPalette[1] = {};
 		wanted.palette = anyPalette;
+		wanted.relief = (extras & 16) ? 1.0f : 0.0f; // (setting "Surface relief": in every frame's program, or in none)
 		for (int mask = 0; mask <= 11; ++mask)
 		{
 			if ((mask & 4) || (mask & extras) != mask) continue; // (only what the settings can ask for)
@@ -3449,7 +3469,7 @@ void FirstPersonGpu::prebuild(int extras)
 			wanted.colorLightCount = mask & 1;
 			wanted.reflections = (mask & 2) != 0;
 			wanted.lightShafts = (mask & 8) != 0;
-			if (mask) state.programFor(wanted, false);
+			if (mask || (extras & 16)) state.programFor(wanted, false);
 			if (extras & 4) state.programFor(wanted, false, true);
 		}
 	});

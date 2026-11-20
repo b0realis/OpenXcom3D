@@ -243,7 +243,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
 		{ "STR_FPS_SECTION_VR", { "fpsVrMode", "fpsVrEyeSize", "fpsVrWeapon", "fpsVrTurning", "fpsVrLaser", "fpsVrSmoothing", "fpsVrFoveation" } },
 		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsRenderScale", "fpsPixelSize", "fpsShadows", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion",
-			"fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts", "fpsVrCardEyes", "FPS", "fpsCounter" } },
+			"fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts", "fpsSurfaceRelief", "fpsVrCardEyes", "FPS", "fpsCounter" } },
 	};
 	struct Section { std::string heading, name; std::vector<OptionInfo> options; };
 	std::vector<Section> sorted;
@@ -409,6 +409,12 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		{
 			const int level = std::clamp(*option.asInt(), 0, 2);
 			return level == 0 ? std::string(tr("STR_FPS_SUPERSAMPLING_OFF")) : level == 1 ? "x2" : "x4";
+		}
+		// The surface relief is a choice of three, shown by name.
+		if (option.id() == "fpsSurfaceRelief")
+		{
+			static const char *const reliefNames[] = { "STR_FPS_SURFACE_RELIEF_OFF", "STR_FPS_SURFACE_RELIEF_SUBTLE", "STR_FPS_SURFACE_RELIEF_STRONG" };
+			return std::string(tr(reliefNames[std::clamp(*option.asInt(), 0, 2)]));
 		}
 		// The renderer is a choice of two, shown by name.
 		if (option.id() == "fpsRenderer")
@@ -768,6 +774,11 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		}
 		// Supersampling (off, x2, x4): round and round.
 		else if (value == &Options::fpsSupersampling)
+		{
+			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
+		}
+		// Surface relief (off, subtle, strong): round and round.
+		else if (value == &Options::fpsSurfaceRelief)
 		{
 			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
 		}

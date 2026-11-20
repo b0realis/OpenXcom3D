@@ -462,11 +462,34 @@ const float LampReach = 120.0;     // how far a lamp lights (voxels)
 const float SunDiscRadius = 0.04;  // the sun as a disc this wide (the tangent of its half-angle): the width of a shadow's soft edge, a 25th of the way it fell
 const float CreaseShades = 4.5;    // how many palette shades the deepest corner is darkened
 const float CreaseFadeFrom = 260.0, CreaseFadeTo = 420.0; // corners aren't darkened beyond this far (voxels): too fine to see, and they would shimmer
+#ifdef RELIEF
+// Setting "Surface relief": a face's drawing read as a little relief. A colour's brightness is its height (a row of
+// the tables: ReliefRow), a voxel's four neighbours on its face give the slope there, and the slope tilts the face
+// towards or away from each light: the faces' own (the sun's, the sky's), the lamps', the flashlight's, the flares'
+// and the coloured lights'. The tilt goes smoothly across a voxel's face, from the step at its one edge to the step
+// at the other: tilting each voxel as a whole only gave it another flat shade, which read as noise, not as relief.
+uniform float uRelief;       // how far a step of one shade's brightness tilts a face (0: flat)
+uniform vec3 uShadingDir;    // where the light that shades the faces by their direction comes from (the sun; straight up under clouds)
+uniform float uShadingTurn;  // ... and how many shades darker a face turned away from it is
+const float ReliefSteepest = 0.9;                         // the most a face is tilted (the tangent of the angle)
+const float ReliefFadeFrom = 200.0, ReliefFadeTo = 360.0; // no relief beyond this far (voxels)
+const float ReliefFineFrom = 0.3, ReliefFineTo = 0.7;     // ... nor where a pixel covers more than this much of a voxel of the face (it fades out between the two): too fine to show, it only shimmers
+const float ReliefAcrossHues = 1.0;                       // how much of a step between two colours of different hues counts
+const float ReliefLeastTurn = 1.5;                        // the faces' own light counts for at least this many shades (indoors and at night it is nearly flat)
+const float ReliefInShadow = 0.6;                         // how much of that is lost in the sun's shadow
+vec3 reliefTilt;             // the hit's face tilted by its drawing: what its normal gains along the face (zero: flat)
+// Where the hit's colour was taken from, left by mirroredColor and wallPaintColor for the relief's look at its neighbours
+// (calling those again for each neighbour made the program twice as slow, for every frame).
+ivec3 reliefMirroredFrom;    // a craft's mirror: the voxel (the world's) whose colour is shown
+int reliefMirroredPart, reliefMirrorAxis; // ... the part looked at there (-1: any), and the axis the mirror turns about
+int reliefPaintedBase, reliefPaintedTurn, reliefPaintedAxis; // a wall's paint: its donor's side picture, which way its columns run along the wall, and the wall's axis
+ivec2 reliefPaintedAt;       // ... and the column and row there
+#endif
 uniform float uUfoPulse[32], uUfoBreath, uUfoFaceShade[64];
 
 const int SkyEarth = 0, SkySpace = 1, SkyOrbit = 2, SkyMoon = 3, SkyMars = 4, SkySea = 5, SkyVoid = 6;
 // The rows of uTables.
-const int HazeRow = 0, GlassRow = 9, UnseenRow = 10, FlareRow = 11, SceneRow = 12, BlackRow = 13, DarkFadeRow = 14, UfoRows = 14 + DarkFadeSteps, RowsPerUfo = 14;
+const int HazeRow = 0, GlassRow = 9, UnseenRow = 10, FlareRow = 11, SceneRow = 12, BlackRow = 13, DarkFadeRow = 14, ReliefRow = 14 + DarkFadeSteps, UfoRows = 15 + DarkFadeSteps, RowsPerUfo = 14;
 // Where the scene's colours sit in their row.
 const int SceneSky = 0, SceneCloud = 32, SceneHaze = 40, SceneStar = 41, SceneMoon = 42, SceneSun = 43, SceneTapeYellow = 44, SceneTapeBlack = 45,
 	ScenePost = 46, SceneFaintStar = 47, SceneEarth = 48, SceneUnexplored = 52, SceneRock = 53, SceneWater = 54, SceneRockBase = 57;
@@ -648,6 +671,9 @@ float pointLight(vec3 point, vec3 normal, bool shadows)
 			if (power <= 0.03) continue;
 			vec3 towardsLamp = vec3(dx / span, dy / span, dz / span);
 			float facing = normal.x * towardsLamp.x + normal.y * towardsLamp.y + normal.z * towardsLamp.z;
+#ifdef RELIEF
+			if (facing > 0.0) facing = clamp(facing + dot(reliefTilt, towardsLamp), 0.02, 1.0);
+#endif
 			float asLit = power * 6.0 * (0.4 + 0.6 * facing) * night, asDark = power * 3.0 * night;
 			vec3 nearLamp = vec3(lampPos.x - towardsLamp.x * 4.0, lampPos.y - towardsLamp.y * 4.0, lampPos.z - towardsLamp.z * 4.0);
 			if (facing <= 0.0) dark = max(dark, asDark);
@@ -671,6 +697,9 @@ float pointLight(vec3 point, vec3 normal, bool shadows)
 				float beam = smoothStep(0.974, 0.990, cosine) + 0.18 * smoothStep(0.914, 0.974, cosine);
 				float falloff = 1.0 - 0.85 * span / range;
 				float facing = -(normal.x * fromLight.x + normal.y * fromLight.y + normal.z * fromLight.z) / span;
+#ifdef RELIEF
+				if (facing > 0.0) facing = clamp(facing - dot(reliefTilt, fromLight) / span, 0.02, 1.0);
+#endif
 				float power = beam * falloff * falloff * 13.0 * (0.4 + 0.6 * max(0.0, facing));
 				if (power > 0.25 && facing > 0.0 && !(shadows && shadowed(point, uFlashlightPos)))
 				{
@@ -692,6 +721,9 @@ float pointLight(vec3 point, vec3 normal, bool shadows)
 				float cone = smoothStep(0.8, 0.96, cosine);
 				float falloff = 1.0 - span / range;
 				float facing = -(normal.x * fromLight.x + normal.y * fromLight.y + normal.z * fromLight.z) / span;
+#ifdef RELIEF
+				if (facing > 0.0) facing = clamp(facing - dot(reliefTilt, fromLight) / span, 0.02, 1.0);
+#endif
 				float power = cone * falloff * falloff * 10.0 * (0.35 + 0.65 * max(0.0, facing));
 				if (power > 0.25 && facing > 0.0 && !(shadows && shadowed(point, uFlashlightPos)))
 				{
@@ -720,6 +752,9 @@ vec3 coloredLight(vec3 rgb, vec3 surface, vec3 point, vec3 normal)
 		if (span >= reach) continue;
 		float facing = span > 0.5 ? dot(normal, towards) / span : 1.0;
 		if (facing <= 0.0) continue;
+#ifdef RELIEF
+		if (span > 0.5) facing = clamp(facing + dot(reliefTilt, towards) / span, 0.02, 1.0);
+#endif
 		float power = (1.0 - span / reach) * (1.0 - span / reach) * uColorLightOf[light].w * (0.35 + 0.65 * facing);
 		if (power < 0.02) continue;
 		if (uShadows != 0 && span > 6.0 && shadowed(point, uColorLightAt[light].xyz - towards / span * 3.0)) continue;
@@ -744,6 +779,9 @@ float flareLight(vec3 point, vec3 normal, bool shadows)
 		float power = (1.0 - span / FlareReach) * (1.0 - span / FlareReach) * uFlares[flare].w * uFlareFlicker[flare] * darkness;
 		float facing = (normal.x * dx + normal.y * dy + normal.z * dz) / span;
 		if (facing <= 0.0) continue;
+#ifdef RELIEF
+		facing = clamp(facing + (reliefTilt.x * dx + reliefTilt.y * dy + reliefTilt.z * dz) / span, 0.02, 1.0);
+#endif
 		power *= 0.4 + 0.6 * facing;
 		if (power < 0.02) continue;
 		powers[flare] = power;
@@ -1223,6 +1261,14 @@ uint mirroredColor(Hit hit, int hitTile, int axis, bool skinOnly, bool nextFrame
 		sourceVoxel[1 - axis] = lo[1 - axis] + rowAcross;
 		sourceVoxel.z = lo.z + rowUp;
 		uint color = voxelColorAt(sourceVoxel, nextFrame, onSkin ? -1 : hit.part, true);
+#ifdef RELIEF
+		if (color != 0u && table(BlackRow, color) == 0u)
+		{
+			reliefMirroredFrom = sourceVoxel;
+			reliefMirroredPart = onSkin ? -1 : hit.part;
+			reliefMirrorAxis = axis;
+		}
+#endif
 		if (color != 0u && table(BlackRow, color) == 0u) return color;
 	}
 	return 0u;
@@ -1272,6 +1318,15 @@ uint wallPaintColor(Hit hit, int hitTile, uint parts[4], uint ownColor)
 		if (along >= 0 && along < 16)
 		{
 			uint color = texelFetch(uModelSides, row + along).r;
+#ifdef RELIEF
+			if (color != 0u)
+			{
+				reliefPaintedBase = int(paint.y) * 1024 + (donorWest ? 256 : 640);
+				reliefPaintedAt = ivec2(along, hit.voxel.z);
+				reliefPaintedTurn = (part == 1) == donorWest ? -1 : 1;
+				reliefPaintedAxis = part == 1 ? 1 : 0;
+			}
+#endif
 			if (color != 0u) return color;
 		}
 	}
@@ -1351,8 +1406,59 @@ float crease(vec3 point, vec3 normal)
 	return closed;
 }
 
+#ifdef RELIEF
+// The colour the hit's face shows a step along it (shadeHit's relief), by where the hit's own colour came from
+// (source: 0 the part's own colours, 1 its side picture, 2 and 3 a craft's mirror, 4 a wall's paint); 0: nothing there.
+uint reliefColor(int source, Hit hit, uint model, ivec3 world, ivec3 along, ivec3 outward, bool nextFrame)
+{
+	if (source == 1)
+	{
+		ivec3 at = hit.voxel + along;
+		if (at.x < 0 || at.y < 0 || at.z < 0 || at.x >= 16 || at.y >= 16 || at.z >= 24) return 0u;
+		return hit.axis == 0 ? texelFetch(uModelSides, int(model) * 1024 + 256 + at.z * 16 + at.y).r : texelFetch(uModelSides, int(model) * 1024 + 640 + at.z * 16 + at.x).r;
+	}
+	if (source == 4)
+	{
+		ivec2 at = reliefPaintedAt + ivec2(reliefPaintedTurn * along[reliefPaintedAxis], along.z);
+		return at.x < 0 || at.y < 0 || at.x >= 16 || at.y >= 24 ? 0u : texelFetch(uModelSides, reliefPaintedBase + at.y * 16 + at.x).r;
+	}
+	// The part's own colours, or those a craft's mirror shows (there the step and the way out are turned about along
+	// the mirror's axis). The face there may stand a step nearer or deeper: the outermost of the three shows.
+	bool mirrored = source != 0;
+	ivec3 from = world, away = outward;
+	int part = hit.part;
+	if (mirrored)
+	{
+		from = reliefMirroredFrom;
+		part = reliefMirroredPart;
+		along[reliefMirrorAxis] = -along[reliefMirrorAxis];
+		away[reliefMirrorAxis] = -away[reliefMirrorAxis];
+	}
+	for (int nearer = 1; nearer >= -1; --nearer)
+	{
+		ivec3 local = hit.voxel + along + away * nearer;
+		bool within = !mirrored && local.x >= 0 && local.y >= 0 && local.z >= 0 && local.x < 16 && local.y < 16 && local.z < 24;
+		uint color = within ? modelColor(model, local) : voxelColorAt(from + along + away * nearer, nextFrame, part, mirrored);
+		if (color != 0u) return color;
+	}
+	return 0u;
+}
+
+// A neighbour's height over the hit's own, by their colours' brightness (a shade's step is about 1).
+float reliefStep(uint own, uint beside)
+{
+	if (beside == 0u) return 0.0;
+	float higher = (float(table(ReliefRow, beside)) - float(table(ReliefRow, own))) / 17.0;
+	return ((own ^ beside) & 0xF0u) != 0u ? higher * ReliefAcrossHues : higher;
+}
+
+#endif
 uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int pixelX, int pixelY)
 {
+#ifdef RELIEF
+	reliefTilt = vec3(0.0);
+	int reliefFrom = -1;
+#endif
 	uvec4 tileParts = texelFetch(uTiles, hitTile * 4), tileFacts = tileLightTexel(hitTile), tileNext = texelFetch(uTiles, hitTile * 4 + 2);
 	uint parts[4] = uint[4](tileParts.x & 0xFFFFu, tileParts.x >> 16, tileParts.y & 0xFFFFu, tileParts.y >> 16);
 	uint nextParts[4] = uint[4](tileNext.x & 0xFFFFu, tileNext.x >> 16, tileNext.y & 0xFFFFu, tileNext.y >> 16);
@@ -1446,21 +1552,67 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 		if (hit.axis >= 0 && hit.axis < 2 && rayDirection[hit.axis] > 0.0)
 		{
 			shownColor = mirroredColor(hit, hitTile, hit.axis, false, showNextFrame);
+#ifdef RELIEF
+			reliefFrom = shownColor != 0u ? 2 : 1;
+#endif
 			if (shownColor == 0u) shownColor = hit.axis == 0 ? texelFetch(uModelSides, int(model) * 1024 + 256 + voxel.z * 16 + voxel.y).r
 				: texelFetch(uModelSides, int(model) * 1024 + 640 + voxel.z * 16 + voxel.x).r;
 			uint painted = wallPaintColor(hit, hitTile, parts, shownColor);
+#ifdef RELIEF
+			if (painted != 0u) reliefFrom = 4;
+#endif
 			if (painted != 0u) shownColor = painted;
 		}
 		else if (hit.axis >= 0 && hit.axis < 2)
 		{
 			shownColor = mirroredColor(hit, hitTile, 1 - hit.axis, true, showNextFrame);
+#ifdef RELIEF
+			reliefFrom = 3;
+#endif
 		}
 		if (shownColor != 0u && !ownColorAllRound) baseColor = shownColor;
+#ifdef RELIEF
+		// (Where the colour came from: the part's own colours where nothing else was shown; an underside's is one colour, flat.)
+		if (shownColor == 0u || ownColorAllRound) reliefFrom = 0;
+		if (hit.ghost || hit.axis < 0) reliefFrom = -1;
+#endif
 		if ((info.x & 8u) != 0u && scene(SceneWater) != 0u)
 		{
 			onSea = faceIndex == 4;
 			baseColor = onSea ? waterColor(rayOrigin.x + rayDirection.x * hit.t, rayOrigin.y + rayDirection.y * hit.t, hit.t, pixelX, pixelY, waveShade) : scene(SceneWater + 1);
+#ifdef RELIEF
+			reliefFrom = -1;
+#endif
 		}
+#ifdef RELIEF
+		// The face's tilt: the slope of its drawing's brightness there, from the voxel's four neighbours along the face.
+		// (How much of a voxel of the face a pixel covers: more the further away, and the flatter the face is looked along.
+		// Measured against a picture of four rays a pixel, the relief on a street's and a desert's ground 5 to 30 tiles
+		// ahead made the one-ray picture a third to a half more unlike it, by distance alone: shimmer as one walks.)
+		float reliefFootprint = hit.t * (uEyePlane.z > 0.0 ? 1.0 / uEyePlane.z : 2.0 * uHalfPlane.x / float(uViewSize.x)) * float(uPixelSize) / max(0.05, abs(dot(rayDirection, normal)));
+		if (uRelief > 0.0 && reliefFrom >= 0 && !hit.emissive && !unseen && hit.t < ReliefFadeTo && reliefFootprint < ReliefFineTo)
+		{
+			ivec3 alongU = hit.axis == 0 ? ivec3(0, 1, 0) : ivec3(1, 0, 0), alongV = hit.axis == 2 ? ivec3(0, 1, 0) : ivec3(0, 0, 1);
+			ivec3 outward = ivec3(normal);
+			ivec3 world = ivec3((hitTile % uSize.x) * 16 + voxel.x, ((hitTile / uSize.x) % uSize.y) * 16 + voxel.y, (hitTile / tilesPerLevel) * 24 + voxel.z);
+			// (One loop for the four neighbours, so the shader holds the look-up once.)
+			float higher[4];
+			for (int side = 0; side < 4; ++side)
+			{
+				ivec3 along = (side < 2 ? alongU : alongV) * ((side & 1) != 0 ? -1 : 1);
+				higher[side] = reliefStep(baseColor, reliefColor(reliefFrom, hit, model, world, along, outward, showNextFrame));
+			}
+			float upU = higher[0], downU = -higher[1], upV = higher[2], downV = -higher[3];
+			// (Across the voxel the slope goes from the step at its one edge to the step at the other: the face is tilted
+			// smoothly, edge to edge.)
+			vec3 within = clamp(rayOrigin + rayDirection * hit.t - vec3(world), 0.0, 1.0);
+			float slopeU = mix(downU, upU, dot(within, vec3(alongU))), slopeV = mix(downV, upV, dot(within, vec3(alongV)));
+			vec3 tilt = -(vec3(alongU) * slopeU + vec3(alongV) * slopeV) * uRelief * (1.0 - smoothStep(ReliefFadeFrom, ReliefFadeTo, hit.t))
+				* (1.0 - smoothStep(ReliefFineFrom, ReliefFineTo, reliefFootprint));
+			float steep = length(tilt);
+			reliefTilt = steep > ReliefSteepest ? tilt * (ReliefSteepest / steep) : tilt;
+		}
+#endif
 	}
 	vec3 surfacePoint = rayOrigin + rayDirection * hit.t + normal * 1.5;
 	bool indoors = indoorsAt(surfacePoint);
@@ -1524,6 +1676,11 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 	{
 		shade -= pointLight(surfacePoint, normal, false);
 	}
+#ifdef RELIEF
+	// The faces' own light on the tilted face, by the cosine law their shading is made with; less of it in the sun's shadow.
+	float reliefShade = -dot(reliefTilt, indoors ? uSunDir : uShadingDir) * max(indoors ? 0.5 : uShadingTurn, ReliefLeastTurn) * (1.0 - ReliefInShadow * sunShadow / 3.0);
+	shade += reliefShade;
+#endif
 	float flare = 0.0;
 	if (!hit.emissive && uFlareCount > 0)
 	{
@@ -1569,6 +1726,9 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 	// Whole palette shades, the fraction dithered; black only where the place is really dark.
 	int wholeShades = int(max(0.0, shade + dither(pixelX, pixelY)));
 	float placeShade = shade - faceShading - distanceShade(hit.t) - waveShade - sunShadow - creaseShade;
+#ifdef RELIEF
+	placeShade -= reliefShade;
+#endif
 	float blackShare = clamp((placeShade - DarkOverflowFrom) / (DarkOverflowTo - DarkOverflowFrom), 0.0, 1.0);
 	bool darkEnoughForBlack = !onSteadyUfo && blackShare > dither(pixelX + 1, pixelY + 2);
 	if (rockCeilingMiddle >= 0 && !darkEnoughForBlack)

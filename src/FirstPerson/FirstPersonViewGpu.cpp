@@ -91,9 +91,9 @@ FirstPersonGpu *sharedGpu(bool open, bool *opened = nullptr)
 		shared.opening = std::thread([] {
 			const char *device = getenv("OPENXCOM3D_GPU_DEVICE");
 			shared.gpu = device ? FirstPersonGpu::open(atoi(device)) : FirstPersonGpu::openAny();
-			// (The programs for "Coloured lights", "Reflections" and "Light shafts", if those are on, before the card is called ready.)
+			// (The programs for "Coloured lights", "Reflections", "Light shafts" and "Surface relief", if those are on, before the card is called ready.)
 			if (shared.gpu) shared.gpu->prebuild((Options::fpsTrueColor && Options::fpsColoredLights ? 1 : 0) | (Options::fpsTrueColor && Options::fpsReflections ? 2 : 0) | (Options::fpsTrueColor && Options::fpsLightShafts ? 8 : 0)
-				| (Options::fpsSupersampling > 0 ? 4 : 0));
+				| (Options::fpsSupersampling > 0 ? 4 : 0) | (Options::fpsSurfaceRelief > 0 ? 16 : 0));
 			shared.ready = shared.gpu.get();
 			shared.opened = true;
 		});
@@ -201,6 +201,7 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 	frame.softShadows = Options::fpsSoftShadows;
 	frame.allLightShadows = Options::fpsAllLightShadows;
 	frame.ambientOcclusion = Options::fpsAmbientOcclusion;
+	frame.relief = Options::fpsSurfaceRelief >= 2 ? ReliefStrong : Options::fpsSurfaceRelief == 1 ? ReliefSubtle : 0.0f;
 	frame.palette = view.getPalette();
 	frame.smoothLight = Options::fpsSmoothLight && view._wantsTrueColor;
 	frame.reflections = Options::fpsReflections && view._wantsTrueColor && (view._waterColors[0] != 0 || view._anyGlass); // (only where there is a sea, or window glass)

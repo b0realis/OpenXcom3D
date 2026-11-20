@@ -126,6 +126,11 @@ const Uint8 UfoTileBit = 0x80, UfoSkinBit = 0x40;
 /// the inside takes about a fifth of the light's colour by day, two fifths at night (an even
 /// tint, see FirstPersonView::shade), where its hull outside keeps its detail with less.
 const float UfoInsideTint = 1.8f, UfoInsideTintNight = 1.5f;
+/// Setting "Surface relief" (the graphics card's rays: FirstPersonGpuShaders.h, RELIEF): how far a
+/// step of one shade's brightness in a face's drawing tilts the face, as the tangent of the
+/// angle, for Subtle and for Strong. At Strong, walls drawn as smooth ramps of shades (inside a
+/// UFO, a base) come out rippled; at Subtle they keep their look.
+const float ReliefSubtle = 0.5f, ReliefStrong = 1.0f;
 /// Tactical flares: how long they burn (seconds), how far their light reaches (voxels), and how
 /// many can burn at once.
 const float FlareLife = 60.0f, FlareReach = 150.0f;

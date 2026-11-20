@@ -574,7 +574,8 @@ const std::vector<PresetSwitch> &gameplaySwitches()
  * Medium the HUD's resolution (the defaults), High the battlescape's. On the card: Low is the
  * CPU's Medium picture drawn fast, Medium the display's own resolution with "Render scale" on
  * Auto (as fine as the frame rate allows), High that with full colour, smooth light, soft
- * shadows, ambient occlusion and the lights' effects. Supersampling is Off at every level.
+ * shadows, ambient occlusion and the lights' effects. Supersampling and Surface relief are Off
+ * at every level.
  * @return The settings, for the renderer chosen now.
  */
 const std::vector<PresetSwitch> &graphicsSwitches()
@@ -595,6 +596,7 @@ const std::vector<PresetSwitch> &graphicsSwitches()
 		{ "fpsColoredLights",   &fpsColoredLights,   nullptr,  { 0,    0,    0 } },
 		{ "fpsReflections",     &fpsReflections,     nullptr,  { 0,    0,    0 } },
 		{ "fpsLightShafts",     &fpsLightShafts,     nullptr,  { 0,    0,    0 } },
+		{ "fpsSurfaceRelief",   nullptr, &fpsSurfaceRelief,    { 0,    0,    0 } },
 	};
 	static const std::vector<PresetSwitch> onCard = {
 		//                                                       Low   Med   High
@@ -611,6 +613,7 @@ const std::vector<PresetSwitch> &graphicsSwitches()
 		{ "fpsColoredLights",   &fpsColoredLights,   nullptr,  { 0,    0,    1 } },
 		{ "fpsReflections",     &fpsReflections,     nullptr,  { 0,    0,    1 } },
 		{ "fpsLightShafts",     &fpsLightShafts,     nullptr,  { 0,    0,    1 } },
+		{ "fpsSurfaceRelief",   nullptr, &fpsSurfaceRelief,    { 0,    0,    0 } },
 	};
 	return fpsRenderer == 1 ? onCard : onCpu;
 }
@@ -1129,6 +1132,8 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsReflections", &fpsReflections, false, "STR_FPS_REFLECTIONS", category));
 	// In full colour: the flashlight, flares, lamps and coloured lights show as beams and glows in smoke and under the sea.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsLightShafts", &fpsLightShafts, false, "STR_FPS_LIGHT_SHAFTS", category));
+	// On the graphics card: walls, floors and hulls show a little relief read from their own drawings (0 off, 1 subtle, 2 strong). Off by default.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSurfaceRelief", &fpsSurfaceRelief, 0, "STR_FPS_SURFACE_RELIEF", category));
 	// VR with "Renderer": GPU, on a headset: the eyes' pictures stay on the graphics card and go to the headset's display
 	// from there (nothing read back, nothing uploaded again). NO: read back and uploaded, as the CPU's eyes are.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsVrCardEyes", &fpsVrCardEyes, true, "STR_FPS_VR_CARD_EYES", category));
