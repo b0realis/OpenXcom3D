@@ -2606,6 +2606,83 @@ static std::unique_ptr<VoxelUnitModel> reliefModel(const PartFrames &part, const
 	return model;
 }
 
+/// A tank made as high as the game's units are (see Routine::tankHull): its hull, from its underside to its deck,
+/// stretched to reach hullTop, and its turret, from the deck to its top, to reach turretTop; heights in the body's own
+/// measure. The cells and the cubes move by whole layers of the grid: a layer of the body as made becomes the one or
+/// more layers that stand for it now (or shares one with its neighbour, where the body got lower), each cube with the
+/// colours it was painted with as drawn: the sides stay closed, the cubes on the grid. The owner's ruling on GitHub
+/// issue #201 ("height should, overall, reflect hitbox. Hull of main chasis should be, roughly kneel height, and turret
+/// maxing out on normal unit height. Tanks are often used as mobile cover"): "follow reporter instructions".
+static void standTank(VoxelUnitModel &model, std::vector<Uint8> &owner, float hullTop, float turretTop)
+{
+	int bottom = GridUp, deck = -1, top = -1;
+	for (int cell = 0; cell < GridCells; ++cell)
+	{
+		if (!owner[cell]) continue;
+		const int up = cell % GridUp;
+		if (owner[cell] == PartCodes[1]) top = std::max(top, up);
+		else { bottom = std::min(bottom, up); deck = std::max(deck, up); }
+	}
+	if (deck < 0 || top <= deck || deck <= bottom) return;
+	auto layerAt = [](float height) { return (int)std::lround((height - UpFrom) / Cell - 0.5f); };
+	const int hullLayer = std::clamp(layerAt(hullTop), bottom + 2, GridUp - 4), topLayer = std::clamp(layerAt(turretTop), hullLayer + 2, GridUp - 1);
+	// The layer of the body as made that each layer stands for now (-1: none), and the layers each one became.
+	std::vector<int> source(GridUp, -1);
+	std::vector<std::vector<int>> became(GridUp);
+	for (int up = 0; up <= topLayer; ++up)
+	{
+		source[up] = up <= bottom ? up : up <= hullLayer ? bottom + (int)std::lround((double)(up - bottom) * (deck - bottom) / (hullLayer - bottom))
+			: deck + (int)std::lround((double)(up - hullLayer) * (top - deck) / (topLayer - hullLayer));
+		became[source[up]].push_back(up);
+	}
+	for (int up = bottom + 1; up <= top; ++up)
+	{
+		// (a layer none stands for, where the body got lower: with the layer it would be)
+		if (became[up].empty())
+		{
+			became[up].push_back(up <= deck ? bottom + (int)std::lround((double)(up - bottom) * (hullLayer - bottom) / (deck - bottom))
+				: hullLayer + (int)std::lround((double)(up - deck) * (topLayer - hullLayer) / (top - deck)));
+		}
+	}
+	std::vector<Uint8> stood(GridCells, 0);
+	for (int across = 0; across < GridAcross; ++across)
+		for (int along = 0; along < GridAlong; ++along)
+			for (int up = 0; up < GridUp; ++up)
+				if (source[up] >= 0) stood[cellIndex(across, along, up)] = owner[cellIndex(across, along, source[up])];
+	owner.swap(stood);
+	// The cubes: each one in every layer its own became, once a cell.
+	const size_t count = model.part.size();
+	const bool viewed = model.views.size() == count, noneAdded = model.addedFrom >= count;
+	std::vector<float> right, ahead, up;
+	std::vector<Uint8> part, colours;
+	std::vector<Uint16> views;
+	std::unordered_set<long long> taken;
+	for (size_t k = 0; k < count; ++k)
+	{
+		const int layer = (int)std::floor((model.up[k] - UpFrom) / Cell);
+		const int across = (int)std::floor((model.right[k] - AcrossFrom) / Cell), along = (int)std::floor((model.ahead[k] - AlongFrom) / Cell);
+		static const std::vector<int> nowhere;
+		const std::vector<int> &layers = layer >= 0 && layer < GridUp ? became[layer] : nowhere;
+		for (int now : layers)
+		{
+			if (!taken.insert(((long long)across * 100000 + along) * 100000 + now).second) continue;
+			right.push_back(model.right[k]);
+			ahead.push_back(model.ahead[k]);
+			up.push_back(cellUp(now));
+			part.push_back(model.part[k]);
+			colours.insert(colours.end(), model.colours.begin() + k * 16, model.colours.begin() + k * 16 + 16);
+			if (viewed) views.push_back(model.views[k]);
+		}
+	}
+	model.right.swap(right);
+	model.ahead.swap(ahead);
+	model.up.swap(up);
+	model.part.swap(part);
+	model.colours.swap(colours);
+	if (viewed) model.views.swap(views);
+	if (noneAdded) model.addedFrom = model.part.size();
+}
+
 std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCount], const std::vector<Uint8> composite[8], const HeldItem items[2],
 	const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse, const HeldItem &lying, const WalkFrames &walks, bool aiming, const Routine &routine,
 	const SDL_Color *palette)
@@ -3411,6 +3488,8 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	}
 	// (a tank's turret is of its body from here on: nothing of it swings, and a shot at it meets the tank)
 	for (size_t k = 0; tank && k < model->part.size(); ++k) if (model->part[k] == PartCodes[1]) model->part[k] = PartCodes[0];
+	// (a tank as high as the game's units are, by the owner's ruling: see standTank)
+	if (tank && routine.tankTop > 0.0f) standTank(*model, owner, routine.tankHull * VOXELSCALE, routine.tankTop * VOXELSCALE);
 	makeHits(*model, owner, solidOnTop);
 	const bool rightHolds = placed[0] || (placed[1] && items[1].twoHanded && !places[1].upright);
 	const bool leftHolds = placed[1] || (placed[0] && items[0].twoHanded && !places[0].upright);

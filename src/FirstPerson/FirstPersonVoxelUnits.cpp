@@ -195,6 +195,7 @@ struct VoxelUnits::Job
 	bool frontal = false; // (kept to its front and back drawings' outlines, by the unit table: see Routine)
 	bool relief = false; // (its one drawing given volume: see Routine)
 	int arms = 0; // (its arms outside the body, coloured along their length, by the unit table: see Routine)
+	float tankHull = 0.0f, tankTop = 0.0f; // (a tank's deck and top, voxels: see Routine)
 	bool fine = false; // (made twice as fine: see FineBodies)
 	const Routine *routine = nullptr;
 	int unitId = 0, status = 0; // (the unit's, for dump's file names)
@@ -678,9 +679,27 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	float shows = dithered ? VoxelDitherFaint : 1.0f;
 	if (look.shows >= 0) shows = std::min(shows, look.shows / 100.0f);
 	for (const auto &frame : anim) hashBytes(hash, frame.data(), frame.size());
+	// A tank (a big unit with a turret of its own that moves: see makeModel) stands as high as the game's units do: its
+	// deck at a kneeling soldier's height, its turret's top at a standing one's, by the rules of the game's first kind of
+	// soldier (22 and 14 in the games themselves). See VoxelBodies::Routine::tankHull.
+	float tankHull = 0.0f, tankTop = 0.0f;
+	if (routine->big && unit->getTurretType() != -1 && unit->getArmor()->allowsMoving())
+	{
+		tankHull = 14.0f;
+		tankTop = 22.0f;
+		const std::vector<std::string> &soldiers = save->getMod()->getSoldiersList();
+		const RuleSoldier *normal = soldiers.empty() ? nullptr : save->getMod()->getSoldier(soldiers.front());
+		if (normal && normal->getStandHeight() > normal->getKneelHeight() && normal->getKneelHeight() > 0)
+		{
+			tankHull = (float)normal->getKneelHeight();
+			tankTop = (float)normal->getStandHeight();
+		}
+	}
 	const Uint8 pose[10] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast == 1),
 		(Uint8)std::max(look.torsoDepth, 0), (Uint8)(look.backTop == 1), (Uint8)(look.frontal == 1), (Uint8)relief, (Uint8)std::max(look.arms, 0) };
 	hashBytes(hash, pose, 10);
+	const Uint8 tankHeights[2] = { (Uint8)tankHull, (Uint8)tankTop };
+	hashBytes(hash, tankHeights, 2);
 	_byQuick[quick] = hash;
 	auto alike = _byFrames.find(hash);
 	if (alike != _byFrames.end())
@@ -710,6 +729,8 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		job->frontal = look.frontal == 1;
 		job->relief = relief;
 		job->arms = std::max(look.arms, 0);
+		job->tankHull = tankHull;
+		job->tankTop = tankTop;
 		job->fine = FineBodies;
 		job->routine = routine;
 		std::copy(palette, palette + 256, job->palette);
@@ -910,6 +931,8 @@ void VoxelUnits::build()
 			source.frontal = job->frontal;
 			source.relief = job->relief;
 			source.arms = job->arms;
+			source.tankHull = job->tankHull;
+			source.tankTop = job->tankTop;
 			source.routine = job->routine->number;
 			model = makeFineModel(source, job->palette);
 		}
@@ -923,6 +946,8 @@ void VoxelUnits::build()
 			routine.frontal = job->frontal;
 			routine.relief = job->relief;
 			routine.arms = job->arms;
+			routine.tankHull = job->tankHull;
+			routine.tankTop = job->tankTop;
 			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->lying, job->walks, job->aiming, routine, job->palette);
 		}
 		if (model) model->opacity = job->shows;
@@ -1040,8 +1065,8 @@ void VoxelUnits::dump(const Job &job, const VoxelUnitModel *model, const char *f
 
 	if (FILE *file = std::fopen((base + ".job").c_str(), "w"))
 	{
-		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d frontal %d relief %d melee %d %d arms %d\n", job.routine->number, job.routine->whole, job.routine->big,
-			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop, (int)job.frontal, (int)job.relief, (int)job.items[0].melee, (int)job.items[1].melee, job.arms);
+		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d frontal %d relief %d melee %d %d arms %d tank %d %d\n", job.routine->number, job.routine->whole, job.routine->big,
+			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop, (int)job.frontal, (int)job.relief, (int)job.items[0].melee, (int)job.items[1].melee, job.arms, (int)job.tankHull, (int)job.tankTop);
 		for (int i = 0; i < 256; ++i) std::fprintf(file, "%d %d %d\n", job.palette[i].r, job.palette[i].g, job.palette[i].b);
 		std::fclose(file);
 	}
