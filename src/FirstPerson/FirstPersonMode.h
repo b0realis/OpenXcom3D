@@ -262,6 +262,8 @@ private:
 	void makeVoxelBodies(double milliseconds);
 	/// The first 3D frame drawn ahead, unseen, where a battle begins (setting "Renderer": GPU): its waiting isn't at the first click.
 	void primeView(BattleUnit *unit);
+	/// Says on the screen that the 3D view is being prepared, before a wait where a battle begins.
+	void showPreparing();
 	bool _primeAsked = false;              // the battle's first frame has had its chance to wait for the card (see primeView)
 	bool _viewPrimed = false;              // the 3D view has drawn a frame on the card: nothing is left to wait for
 	FirstPersonSounds *_sounds = nullptr;  // the sounds we make ourselves (hitmarker, heartbeat, near-miss whizz...)

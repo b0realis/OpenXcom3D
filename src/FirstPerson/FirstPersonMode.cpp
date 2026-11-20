@@ -2254,6 +2254,34 @@ void FirstPersonMode::makeVoxelBodies(double milliseconds)
 }
 
 /**
+ * Says that the 3D view is being prepared, on a screen of its own shown at once: two lines in the middle of a black
+ * screen, in the battle's palette (the screen before still showed, in a palette that is no longer the display's).
+ * The game's next frame draws over it.
+ */
+void FirstPersonMode::showPreparing()
+{
+	SDL_Surface *screen = _game->getScreen()->getSurface();
+	const int width = Options::baseXResolution, height = Options::baseYResolution;
+	_game->getScreen()->clear();
+	const SDL_Color *palette = _state->getPalette();
+	Text title(width, 17, 0, height / 2 - 14), note(width, 9, 0, height / 2 + 6);
+	for (Text *text : { &title, &note })
+	{
+		text->initText(_game->getMod()->getFont("FONT_BIG"), _game->getMod()->getFont("FONT_SMALL"), _game->getLanguage());
+		text->setPalette(palette);
+		text->setAlign(ALIGN_CENTER);
+	}
+	title.setBig();
+	title.setColor(textColor(palette, 110, 170, 255));
+	title.setText(_state->tr("STR_FPS_PREPARING_3D"));
+	note.setColor(textColor(palette, 160, 160, 170));
+	note.setText(_state->tr("STR_FPS_PREPARING_3D_NOTE"));
+	title.blit(screen);
+	note.blit(screen);
+	_game->getScreen()->flip();
+}
+
+/**
  * The first 3D frame's waiting, done where a battle begins (the owner: "Can we move shader loading the first time
  * into battle load? (players are confused as game freezes for 2s upon first click on 3D icon in battlescape)"). With
  * the setting "Renderer" on GPU the first frame of the 3D view in a battle is slow: the driver finishes each program
@@ -2264,8 +2292,10 @@ void FirstPersonMode::makeVoxelBodies(double milliseconds)
  * The battle's first frame comes while the screen before it still shows (the loading box, the next turn's screen),
  * so it waits there for a card that is still being opened (PrimeCardWaitMs at most: the driver builds the shaders
  * then), and with "Voxel units" for the bodies (PrimeBodiesMs at most), so their program is finished and they are
- * sent too. A card ready only later (the first run on a machine, the shaders built for many seconds; the renderer
- * switched to GPU in a battle) has its frame drawn ahead when it is, if the map still shows. With 3D showing first,
+ * sent too. Where that can take seconds (the first time in a run of the game, or a card still being opened) the
+ * screen says so first (see showPreparing). A card ready only later (the first run on a machine, the shaders built
+ * for many seconds; the renderer switched to GPU in a battle) has its frame drawn ahead when it is, if the map still
+ * shows. With 3D showing first,
  * the view's own first frame on the card does the same, as before. Not in VR mode, nor on a headset at all (its
  * frames are its shell's).
  * @param unit The soldier 3D would look through now, or null for none.
@@ -2281,14 +2311,23 @@ void FirstPersonMode::primeView(BattleUnit *unit)
 	}
 	const bool first = !_primeAsked;
 	_primeAsked = true;
+	// The waiting can be long the first time in a run of the game (the owner: "Sometimes 4-5s"): the card opened, the
+	// driver finishing its programs. The screen says so then, in place of the one before, which would look hung.
+	static bool preparedBefore = false;
+	const bool someone = isActive() || (unit && !unit->isOut() && unit->getTile());
+	if (first && someone && (FirstPersonView::gpuOpening() || (!preparedBefore && FirstPersonView::gpuReady(0))))
+	{
+		showPreparing();
+	}
 	if (isActive())
 	{
 		// (3D shows from the battle's start: the view's own frames do it, on the card from the first if it is there in
 		// time; nothing is left once the card draws them)
 		_viewPrimed = FirstPersonView::gpuReady(first ? PrimeCardWaitMs : 0);
+		preparedBefore = preparedBefore || _viewPrimed;
 		return;
 	}
-	if (!unit || unit->isOut() || !unit->getTile())
+	if (!someone)
 	{
 		return;
 	}
@@ -2332,6 +2371,7 @@ void FirstPersonMode::primeView(BattleUnit *unit)
 	_view->invalidate();
 	_view->draw();
 	_viewPrimed = true;
+	preparedBefore = true;
 	_trackedUnit = nullptr; // (the camera is placed afresh when 3D shows)
 	Log(LOG_INFO) << "OpenXcom3D: the 3D view's first frame drawn ahead in "
 		<< (int)std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - frameBegan).count() << " ms (the card waited for "

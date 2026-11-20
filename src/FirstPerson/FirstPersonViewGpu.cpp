@@ -416,8 +416,24 @@ bool FirstPersonView::gpuReady(int waitMilliseconds)
 			return sharedGpu(false) != nullptr;
 		}
 		std::this_thread::sleep_for(std::chrono::milliseconds(2));
+		SDL_PumpEvents(); // (the window answers its system meanwhile: one that doesn't for some seconds is taken for hung)
 	}
 	return true;
+}
+
+/**
+ * Whether the card is still being opened (setting "Renderer": GPU), which starts if nobody asked for the card yet:
+ * the wait in gpuReady is for this.
+ * @return True while it is; false once it is open, or once it is known that there is none.
+ */
+bool FirstPersonView::gpuOpening()
+{
+	if (Options::fpsRenderer != 1)
+	{
+		return false;
+	}
+	bool opened = false;
+	return !sharedGpu(true, &opened) && !opened;
 }
 
 void FirstPersonView::gpuForgetModels()

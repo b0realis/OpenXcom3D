@@ -350,6 +350,8 @@ public:
 	void setWantsTrueColor(bool wanted) { _wantsTrueColor = wanted; }
 	/// Whether the graphics card draws the frames now (setting "Renderer": GPU), after waiting so long at most for one being opened.
 	static bool gpuReady(int waitMilliseconds);
+	/// Whether the graphics card is still being opened (and opens it if nobody asked yet).
+	static bool gpuOpening();
 	/// This frame's world in full colour, if the graphics card gave it: a 0x..RRGGBB number a pixel, and the palette colour each
 	/// pixel had from its ray; a pixel of the finished picture that still has that colour may be shown in the full one.
 	/// @param smokeVeil Receives, in a frame with light in the air (setting "Light shafts"), how much see-through smoke
