@@ -914,6 +914,7 @@ void createOptions(std::vector<OptionInfo> &options)
 	// And on the isometric map, the selected soldier's helmet camera in a window: off, small,
 	// medium or large (0 to 3).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMapCamera", &fpsMapCamera, 1, "STR_FPS_MAP_CAMERA", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsTacticalMap", &fpsTacticalMap, true, "STR_FPS_TACTICAL_MAP", category));
 	// The helmet cameras see as the soldier's eyes do (a player, GitHub issue #90: an X-Com Files
 	// X-Bat's heat vision saw through smoke, its camera didn't): their heat vision through smoke
 	// and fire. Off (the owner: a realistic camera, as before, by default): a camera hasn't the
@@ -1804,6 +1805,17 @@ bool invincible(BattlescapeState *state, const BattleUnit *unit)
 bool noclipFloats(BattlescapeState *state, const BattleUnit *unit)
 {
 	return FirstPersonMode::noclipFloats(state, unit);
+}
+
+/**
+ * Called by the game as its map screen is asked for (the map's button, its key): the tactical map instead, from the
+ * 3D view with the setting on (see FirstPersonMode::openTacticalMap).
+ * @param state The battlescape screen.
+ * @return True if the tactical map was opened: the game's own stays shut.
+ */
+bool tacticalMap(BattlescapeState *state)
+{
+	return FirstPersonMode::openTacticalMap(state);
 }
 
 }

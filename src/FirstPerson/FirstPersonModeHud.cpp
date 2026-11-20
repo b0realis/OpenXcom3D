@@ -49,6 +49,7 @@
  * panel (name, weapon, status, the four stats), the soldier card shown over a squad button
  * (with a live view from their helmet camera), and the banner across the top of the view.
  */
+#include "FirstPersonMapState.h"
 #include "FirstPersonMode.h"
 #include <algorithm>
 #include <climits>
@@ -680,7 +681,7 @@ bool FirstPersonMode::classicHudButton(const InteractiveSurface *button, Action 
 		{
 			_state->_map->getCamera()->centerOnPosition(unit->getPosition());
 		}
-		_state->btnShowMapClick(action);
+		_state->btnShowMapClick(action); // (the tactical map, with its setting on: see openTacticalMap)
 		return true;
 	}
 	if (button == _state->_btnCenter)
@@ -1758,6 +1759,35 @@ void FirstPersonMode::updateSoldierCam(BattleUnit *unit, int frameX)
 		_txtSoldierCam->setText(title);
 	}
 	aimHelmetCamera(_soldierCam, unit);
+}
+
+/**
+ * The map asked for (the game's map button or its key, see FirstPerson::tacticalMap): from the 3D view, with the setting
+ * "Tactical map" on, the tactical map opens, the battle's map all over the screen with its units told apart (see
+ * FirstPersonMapState): around the soldier the view looks through, with the squad's numbers as its buttons have them
+ * and the way the view looks. Else nothing, and the game opens its own map screen.
+ * @param state The battlescape screen.
+ * @return True if the tactical map was opened.
+ */
+bool FirstPersonMode::openTacticalMap(BattlescapeState *state)
+{
+	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
+	if (!mode || !mode->isActive() || !Options::fpsTacticalMap)
+	{
+		return false;
+	}
+	BattleUnit *unit = mode->_save->getSelectedUnit();
+	if (unit)
+	{
+		state->_map->getCamera()->centerOnPosition(unit->getPosition());
+	}
+	FirstPersonMapState::Setup setup;
+	setup.squad = mode->_squadUnits;
+	setup.viewYawDegrees = mode->_view->getYawDegrees();
+	setup.hasViewYaw = unit != nullptr && unit == mode->_trackedUnit;
+	setup.select = [mode](BattleUnit *soldier) { mode->selectUnit(soldier); };
+	mode->_game->pushState(new FirstPersonMapState(state->_map->getCamera(), mode->_save, state->_map->reShadeMinimap(7), setup));
+	return true;
 }
 
 /**

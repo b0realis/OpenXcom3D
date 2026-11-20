@@ -100,6 +100,8 @@ SETTINGS = [
          'See what each soldier sees without leaving the one you play.'),
         ('Map camera', 'Small', 'Off / Small / Medium / Large', 'On the isometric map, the selected soldier\'s helmet camera in a window at the top left; it turns to your target while you aim.',
          'The map with a soldier\'s eyes beside it: aim on the map, check the view.'),
+        ('Tactical map', 'YES', 'YES / NO', 'The map opened from the 3D view fills the screen: every unit a dot with a cone the way it looks (yours green with their numbers, the selected one blue, enemies red with their kind\'s first letters), zoom, a click on a soldier selects them. NO: the game\'s own map screen.',
+         'Who is where, and looking which way, at a glance.'),
         ('Cameras see as the eyes', 'NO', 'YES / NO', 'YES: the helmet cameras see through smoke with the soldier\'s heat vision, as the 3D view. NO: a realistic camera.', ''),
         ('Camera artifacts', 'Light', 'Normal / Light / None', 'The helmet cameras\' bad signal: static, glitches, freezes. Light: lighter static, no glitch over 0.15 s. None: a clean feed. A fallen soldier\'s camera shows static at every setting.',
          'Light keeps the look of a live feed without its unreadable moments.'),

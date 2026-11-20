@@ -419,6 +419,9 @@ bool endlessAmmo(BattlescapeState *state, const BattleUnit *unit);
 bool invincible(BattlescapeState *state, const BattleUnit *unit);
 /// Doom IDCLIP: does this unit float where it is rather than fall (any of X-COM's units, either view)?
 bool noclipFloats(BattlescapeState *state, const BattleUnit *unit);
+/// The map is asked for: with the 3D view showing and the setting "Tactical map" on, the tactical map opens (true);
+/// else the game opens its own map screen.
+bool tacticalMap(BattlescapeState *state);
 
 #else
 
@@ -470,6 +473,7 @@ inline void closeQuartersDeflected(BattlescapeState *, const BattleUnit *, const
 inline bool endlessAmmo(BattlescapeState *, const BattleUnit *) { return false; }
 inline bool invincible(BattlescapeState *, const BattleUnit *) { return false; }
 inline bool noclipFloats(BattlescapeState *, const BattleUnit *) { return false; }
+inline bool tacticalMap(BattlescapeState *) { return false; }
 inline bool spriteHitboxes(BattlescapeState *) { return false; }
 inline BattleUnit *spriteHitAt(SavedBattleGame *, const Position &, const Position &, const Position &, unsigned, const BattleUnit *, bool, const BattleUnit *) { return nullptr; }
 inline Position spriteImpact(SavedBattleGame *, const BattleUnit *, const Position &voxel) { return voxel; }

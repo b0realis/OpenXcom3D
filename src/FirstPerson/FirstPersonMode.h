@@ -206,6 +206,8 @@ public:
 	static bool invincible(BattlescapeState *state, const BattleUnit *unit);
 	/// Doom IDCLIP: does this unit float rather than fall? Asked by the game (see FirstPerson::noclipFloats).
 	static bool noclipFloats(BattlescapeState *state, const BattleUnit *unit);
+	/// The map asked for: the tactical map, from the 3D view with its setting on (see FirstPerson::tacticalMap).
+	static bool openTacticalMap(BattlescapeState *state);
 	/// Where the next round of an FPS-style shot goes: along the crosshair, with a spread.
 	void freeAimTarget(const BattleAction &action, Position &target);
 
