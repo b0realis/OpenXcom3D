@@ -4782,6 +4782,12 @@ void FirstPersonView::updateDoorSwings(int tileCount)
 	}
 }
 
+/// The length of (x, y). (Not std::hypot: on floats that is hypotf, which asks for glibc 2.35, and the release must run on 2.34.)
+static float flatLength(float x, float y)
+{
+	return std::sqrt(x * x + y * y);
+}
+
 /**
  * Turns a frame's shape from its art, as on a lathe, from a height up: for a thing in motion round its own upright
  * axis that the mod's table names (`turned:`, see FirstPersonView::turnedFrom). The game's shape is one for all the
@@ -4819,7 +4825,7 @@ static void turnFromArt(FirstPersonView::VoxelModel &model, const Surface *sprit
 	{
 		for (int y = 0; y < Position::TileXY; ++y)
 			for (int x = 0; x < Position::TileXY; ++x)
-				if (model.color[z][y][x]) shape[z] = std::max(shape[z], std::hypot(x - axisX, y - axisY) + 0.5f);
+				if (model.color[z][y][x]) shape[z] = std::max(shape[z], flatLength(x - axisX, y - axisY) + 0.5f);
 		// (Half the row's span: a pixel across is a voxel times the square root of two along the tile's diagonal.)
 		const int row = (int)std::lround(24.0f + (axisX + axisY) * 0.5f - z + yOffset);
 		int first = width, last = -1;
@@ -4884,7 +4890,7 @@ static void turnFromArt(FirstPersonView::VoxelModel &model, const Surface *sprit
 					for (int step = 0; !color && step < Position::TileXY; ++step)
 					{
 						color = pixelAt((int)std::lround(atX), (int)std::lround(atY), z);
-						const float toAxisX = axisX - atX, toAxisY = axisY - atY, far = std::hypot(toAxisX, toAxisY);
+						const float toAxisX = axisX - atX, toAxisY = axisY - atY, far = flatLength(toAxisX, toAxisY);
 						if (far < 0.5f) break;
 						atX += toAxisX / far;
 						atY += toAxisY / far;
@@ -4918,17 +4924,17 @@ static void turnFromArt(FirstPersonView::VoxelModel &model, const Surface *sprit
 					hidden = model.color[z + step][y + step][x + step] != 0;
 				}
 				if (hidden) behind.emplace_back(x, y);
-				else shown.push_back({ std::hypot(x - axisX, y - axisY), x, y, model.color[z][y][x] });
+				else shown.push_back({ flatLength(x - axisX, y - axisY), x, y, model.color[z][y][x] });
 			}
 		}
 		for (const auto &voxel : behind)
 		{
-			const float far = std::hypot(voxel.first - axisX, voxel.second - axisY), acrossX = 2.0f * axisX - voxel.first, acrossY = 2.0f * axisY - voxel.second;
+			const float far = flatLength(voxel.first - axisX, voxel.second - axisY), acrossX = 2.0f * axisX - voxel.first, acrossY = 2.0f * axisY - voxel.second;
 			float best = FLT_MAX;
 			for (const Shown &one : shown)
 			{
 				// (as far from the axis first: a voxel off counts as four across)
-				const float score = std::abs(one.far - far) * 4.0f + std::hypot(one.x - acrossX, one.y - acrossY);
+				const float score = std::abs(one.far - far) * 4.0f + flatLength(one.x - acrossX, one.y - acrossY);
 				if (score < best)
 				{
 					best = score;
