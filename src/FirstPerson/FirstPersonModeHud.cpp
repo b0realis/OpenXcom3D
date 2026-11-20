@@ -1786,6 +1786,24 @@ bool FirstPersonMode::openTacticalMap(BattlescapeState *state)
 	setup.viewYawDegrees = mode->_view->getYawDegrees();
 	setup.hasViewYaw = unit != nullptr && unit == mode->_trackedUnit;
 	setup.select = [mode](BattleUnit *soldier) { mode->selectUnit(soldier); };
+	// (everything on it as much bigger as the 3D view's own overlays are on this screen; and a helmet camera of the 3D
+	// view's own kind, made as the soldier card's is)
+	setup.uiScale = uiScaleFor(Options::baseXResolution, Options::baseYResolution);
+	setup.makeCamera = [mode](State *screen, int width, int height) -> Surface* {
+		FirstPersonView *camera = new FirstPersonView(mode->_game, width, height, 0, 0);
+		screen->add(camera);
+		camera->shareCache(mode->_view); // (first: then the battle doesn't build models of its own)
+		camera->useVoxelUnits(mode->_voxelUnits.get());
+		camera->setSavedBattleGame(mode->_save);
+		camera->setMap(mode->_state->_map);
+		camera->setMaxDistance(std::min(30, mode->_game->getMod()->getFirstPerson().getMaxViewDistance()));
+		camera->setParticles(false);
+		camera->setSignalGlitches(mode->_game->getMod()->getFirstPerson().getSignalLevel(mode->_save->getMissionType()));
+		return camera;
+	};
+	setup.aimCamera = [mode](Surface *camera, BattleUnit *soldier, const BattleUnit *lookAt) {
+		mode->aimHelmetCamera(static_cast<FirstPersonView*>(camera), soldier, lookAt);
+	};
 	mode->_game->pushState(new FirstPersonMapState(state->_map->getCamera(), mode->_save, state->_map->reShadeMinimap(7), setup));
 	return true;
 }

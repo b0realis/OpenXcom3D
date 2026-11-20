@@ -79,7 +79,12 @@ class Timer;
  * scrolls it, OK, Escape, the map key or the right button closes it, and the battle's own view is left looking where
  * the map did. More: zoom (buttons, + and -, the wheel with Ctrl), the map back on the selected soldier, the next
  * soldier, a click on one of ours selects them, the names and the cones switched off and on, the arrow keys, and a
- * line saying who the pointer is on and how far they are from the selected soldier.
+ * line saying who the pointer is on and how far they are from the selected soldier. And: what everyone holds, in a
+ * few letters under their dots; the selected soldier's reach, a blue line round every tile they can still walk to
+ * with the time units and the energy they have now, by the game's own pathfinding; and a helmet camera in a corner,
+ * live: the soldier's the pointer is on, else the selected one's, turned to an enemy the pointer is on. A click on
+ * the selected soldier closes the map into their 3D view. On a big screen everything is drawn bigger, by the 3D
+ * view's own rule for its overlays; the tiles by the zoom alone.
  */
 class FirstPersonMapState : public State
 {
@@ -93,6 +98,12 @@ public:
 		double viewYawDegrees = 0.0;
 		bool hasViewYaw = false;
 		std::function<void(BattleUnit*)> select;
+		/// How much bigger everything on the map is drawn on a big screen (the 3D view's own rule for its overlays, 1 or more).
+		int uiScale = 1;
+		/// Makes a helmet camera's picture of this size and adds it to the map's screen (null: no cameras), and points
+		/// it through a soldier's eyes, at a unit if one is given (the 3D view's own cameras, see aimHelmetCamera).
+		std::function<Surface*(State*, int, int)> makeCamera;
+		std::function<void(Surface*, BattleUnit*, const BattleUnit*)> aimCamera;
 	};
 	/// Creates the tactical map.
 	FirstPersonMapState(Camera *camera, SavedBattleGame *save, int maxShade, const Setup &setup);
@@ -105,7 +116,7 @@ public:
 
 private:
 	/// A button of the map: what it does, its place, its words.
-	enum ButtonKind { BUTTON_LEVEL_UP, BUTTON_LEVEL_DOWN, BUTTON_ZOOM_OUT, BUTTON_ZOOM_IN, BUTTON_CENTRE, BUTTON_NEXT, BUTTON_NAMES, BUTTON_CONES, BUTTON_CLOSE };
+	enum ButtonKind { BUTTON_LEVEL_UP, BUTTON_LEVEL_DOWN, BUTTON_ZOOM_OUT, BUTTON_ZOOM_IN, BUTTON_CENTRE, BUTTON_NEXT, BUTTON_NAMES, BUTTON_WEAPONS, BUTTON_CONES, BUTTON_REACH, BUTTON_CAMERA, BUTTON_CLOSE };
 	struct Button
 	{
 		ButtonKind kind;
@@ -142,7 +153,25 @@ private:
 	// the colours, found in the battle's palette
 	Uint8 _black = 0, _dark = 0, _panel = 0, _edge = 0, _white = 0, _grey = 0, _ours = 0, _selected = 0, _enemy = 0, _other = 0, _item = 0;
 
+	// big screens: everything but the tiles is drawn this many times as big (see Setup::uiScale)
+	int _ui = 1;
+	// the selected soldier's reach: the tiles they can walk to with the time units and energy they have now (a mark a
+	// tile of the map, any level), and whom and what it was worked out for
+	std::vector<Uint8> _reach;
+	const BattleUnit *_reachUnit = nullptr;
+	int _reachTime = -1, _reachEnergy = -1;
+	Position _reachFrom;
+	// the helmet camera's picture (the 3D view's own kind of view; null: none), whose it shows, and its place
+	Surface *_helmet = nullptr;
+	BattleUnit *_helmetUnit = nullptr;
+	const BattleUnit *_helmetLooksAt = nullptr;
+
 	int cell() const;
+	int big(int pixels) const { return pixels * _ui; }
+	void updateReach();
+	void drawReach(int originX, int originY);
+	void updateHelmet();
+	std::string weaponOf(const BattleUnit *unit) const;
 	void layOut();
 	void rebuildTerrain();
 	void draw();
