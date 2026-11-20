@@ -3152,6 +3152,7 @@ bool FirstPersonGpu::State::drawBodies(const Effects &effects, Gl::UInt rayDepth
 		Gl::Uniform2f(location("uTurn"), body.cosine, body.sine);
 		Gl::Uniform1f(location("uMeasure"), body.measure);
 		Gl::Uniform1f(location("uFloorCut"), body.floorCut);
+		Gl::Uniform1f(location("uCeilCut"), body.ceilCut);
 		Gl::Uniform1i(location("uSkipItems"), body.items ? 0 : 1);
 		Gl::Uniform2f(location("uEdges[0]"), body.edges[0][0], body.edges[0][1]);
 		Gl::Uniform2f(location("uEdges[1]"), body.edges[1][0], body.edges[1][1]);

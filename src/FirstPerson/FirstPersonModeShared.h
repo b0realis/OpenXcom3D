@@ -328,6 +328,12 @@ const double StepLead = 5.0;
 /// Doom IDCLIP: a wall or object part whose voxels (the game's shape of it) come this near the eye, in voxels, is left
 /// out of the picture (the eye is inside it, or as good as: its 3D picture can stand a little wider than its voxels).
 const int NoclipReach = 2;
+/// A melee weapon's inventory picture is a plate, a shield, held up with its face to the view (see FirstPersonMode::analyzeWeapon),
+/// when this much of its box is drawn and the box's short side is this much of its long one.
+const double HeldPlateFilled = 0.8, HeldPlateSquare = 0.5;
+/// Doom IDCLIP, the eye inside a solid block (see FirstPersonMode::updateNoclipView): the block is looked for this many
+/// tiles from the eye each way, NoclipBlockTiles tiles of it at most.
+const int NoclipBlockReach = 10, NoclipBlockTiles = 600;
 /// The main menu's version (see FirstPerson::addMenuVersion): its small text's size, how far right of the title's
 /// "OpenXcom3D" it starts, and how far below the title's top, so its digits' feet sit on the big letters' feet.
 const int MenuVersionWidth = 40, MenuVersionHeight = 9, MenuVersionGap = 3, MenuVersionDrop = 5;
@@ -446,8 +452,10 @@ const Uint32 ZombieCamTime = 4200;
 const Uint32 BreakdownPauseTime = 2000, BreakdownMinTime = 2600, ComeToTime = 1200;
 
 const double Pi = 3.14159265358979323846;
-/// With "Voxel units", at most this many units' bodies are made a frame from the battle's start, seen or not (see FirstPersonMode::makeVoxelBodies; the 3D views make theirs too, VoxelBuildsPerFrame).
-const int VoxelBodiesPerFrame = 2;
+/// With "Voxel units", units' frames are gathered for their bodies from the battle's start, seen or not, for at most this
+/// many milliseconds a frame (one unit's at least; see FirstPersonMode::makeVoxelBodies; the 3D views make theirs too,
+/// VoxelBuildsPerFrame).
+const double VoxelBodiesMs = 2.0;
 /// The ammo tag's colour by damage type (see FirstPersonMode::ammoTag; GitHub issue #51): none, armor piercing (grey-white),
 /// incendiary (red), high explosive (orange), laser (pink), plasma (green), stun (light blue), melee (grey), acid
 /// (yellow-green), smoke (grey); a mod's own types (10 to 19) AmmoTagModColor (purple).

@@ -247,7 +247,9 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 			spriteRow = anchorY - dot(fromAnchor, cardUp) / rowSize;
 			// Nothing of the card below the floor it stands on (see SpriteDraw::floorCut): the art's
 			// rows under a unit's feet would hang through the ceiling of the room below.
-			if (_eye[2] + ray[2] * distance / ZScale < draw.floorCut) return false;
+			// (nor at or above the floor over its head, see SpriteDraw::ceilingCut)
+			const double height = _eye[2] + ray[2] * distance / ZScale;
+			if (height < draw.floorCut || height >= draw.ceilingCut) return false;
 		}
 		return distance >= 1.0 && spriteRow >= 0.0 && spriteRow < spriteHeight;
 	};
@@ -641,7 +643,7 @@ void FirstPersonView::drawListBands()
  * @param faint How much of it shows (1 all; a pile made faint to see past it, setting "See-through corpses": dithered).
  */
 void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase, int facing, int direction, bool level, const double feet[3], double floorCut,
-	int shade, double scale, BattleUnit *unit, double fall, bool items, BattleUnit *lyingBody, const Tile *pile, double faint)
+	int shade, double scale, BattleUnit *unit, double fall, bool items, BattleUnit *lyingBody, const Tile *pile, double faint, double ceilingCut)
 {
 	double anchorX, anchorY, anchorDepth;
 	if (!projectToScreen(feet, anchorX, anchorY, anchorDepth)) return;
@@ -751,6 +753,7 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 		step.bodyCosine = cosine; step.bodySine = sine;
 		step.bodyMeasure = scale * bodyUnit;
 		step.bodyFloorCut = floorCut;
+		step.bodyCeilingCut = ceilingCut;
 		step.bodyItems = items;
 		step.bodyShade = shade;
 	}
@@ -772,6 +775,7 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 	}
 	const float focal = (float)focalLength, axisAcross = (float)middleX, axisDown = (float)middleY;
 	const float cutBelow = (float)((floorCut - feet[2]) / measure); // (in the body's own measure, up from its feet)
+	const float cutAbove = (float)std::min(1e9, (ceilingCut - feet[2]) / measure); // (the floor over its head, see ceilingAbove)
 	float edgesNow[3][2], leanNow[3];
 	for (int axis = 0; axis < 3; ++axis)
 	{
@@ -821,7 +825,7 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 		if (!fallen && ((!items && body.part[k] == VoxelUnitModel::Item) || !body.shows(k, direction, level))) continue;
 		float across = right[k], along = ahead[k], height = up[k];
 		if (coarse) { across += coarse->shift[i * 3]; along += coarse->shift[i * 3 + 1]; height += coarse->shift[i * 3 + 2]; }
-		if (height < cutBelow) continue;
+		if (height < cutBelow || height >= cutAbove) continue;
 		if (bare)
 		{
 			const Uint8 turned = (Uint8)((eyeAt[0] > across + faceHalf ? 1 : 0) | (eyeAt[0] < across - faceHalf ? 2 : 0) | (eyeAt[1] > along + faceHalf ? 4 : 0)
@@ -852,7 +856,7 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 	{
 		for (size_t k = 0; k < voxels; ++k)
 		{
-			if (body.part[k] != VoxelUnitModel::Item || !body.shows(k, direction, level) || up[k] < cutBelow) continue;
+			if (body.part[k] != VoxelUnitModel::Item || !body.shows(k, direction, level) || up[k] < cutBelow || up[k] >= cutAbove) continue;
 			const float depth = base[0] + right[k] * toCamera[0][0] + ahead[k] * toCamera[1][0] + up[k] * toCamera[2][0];
 			if (depth < 4.0f) continue;
 			VoxelSplat splat;
@@ -1156,6 +1160,25 @@ double FirstPersonView::floorUnderside(const double world[3]) const
 		return NoFloorCut;
 	}
 	return solidVoxel((int)std::floor(world[0]), (int)std::floor(world[1]), level * Position::TileZ) ? level * (double)Position::TileZ : NoFloorCut;
+}
+
+/**
+ * The floor over the head of something standing at a point: where the level above has a floor there, its underside
+ * (the ceiling of the room the point is in). A unit's picture and its voxel body are cut off there: a unit's art is
+ * often taller than a level (a hat, a helmet's crest, a unit on a raised floor), the map draws the floor above over
+ * it, and in 3D its top stood out of the roof for anyone up there to see (a player, GitHub issue #206, "head stuck in
+ * roof"). Under the open sky, a stairwell or a hole nothing is cut.
+ * @param world The point it stands at, in voxels.
+ * @return The height of the ceiling, in voxels; NoCeilingCut without a floor above.
+ */
+double FirstPersonView::ceilingAbove(const double world[3]) const
+{
+	const int level = (int)std::floor(world[2] / Position::TileZ) + 1;
+	if (!_save || level >= _save->getMapSizeZ())
+	{
+		return NoCeilingCut;
+	}
+	return solidVoxel((int)std::floor(world[0]), (int)std::floor(world[1]), level * Position::TileZ) ? level * (double)Position::TileZ : NoCeilingCut;
 }
 
 /**
@@ -1727,7 +1750,7 @@ void FirstPersonView::drawUnits()
 			const size_t stepsBefore = _drawList.size();
 			// (a wreck lies as the map shows it, whichever way the unit faced: see drawFloorItems)
 			recordVoxelUnit(*body, walkPhase, wreckFalling && fall >= 1.0 ? 3 : facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall,
-				true, nullptr, nullptr, body->opacity);
+				true, nullptr, nullptr, body->opacity, ceilingAbove(feet));
 			// With full sprite hitboxes the body is what the lines test (see FirstPerson::spriteHitAt): outlined as a
 			// picture is (see drawUnitOutlines), round the pixels it's drawn on (noted as they're drawn, see
 			// drawVoxelUnit); not one going down, nor one so close that it fades out.
@@ -1773,6 +1796,7 @@ void FirstPersonView::drawUnits()
 					std::copy(standing, standing + 3, step.sprite.world);
 					step.sprite.depthBias = VoxelOverlayNearer;
 					step.sprite.floorCut = floorUnderside(feet);
+					step.sprite.ceilingCut = ceilingAbove(feet);
 					step.sprite.scale = unitScale;
 					step.sprite.unit = unit;
 					step.sprite.layBack = FirstPerson::hullLayBack(unit);
@@ -1814,6 +1838,7 @@ void FirstPersonView::drawUnits()
 			step.sprite.world[1] = feet[1];
 			step.sprite.world[2] = standingHeight(feet);
 			step.sprite.floorCut = floorUnderside(feet); // (its art below its feet stays out of the room below)
+			step.sprite.ceilingCut = ceilingAbove(feet); // (and its top out of the room above, or off the roof)
 			step.sprite.shade = shade;
 			step.sprite.scale = unitScale;
 			// The art below its feet (the front half of the floor's diamond: a snake's tail, a long

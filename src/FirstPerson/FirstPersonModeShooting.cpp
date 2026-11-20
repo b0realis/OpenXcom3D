@@ -2791,7 +2791,21 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 			_save->getTileEngine()->calculateFOV(unit);
 			_save->getTileEngine()->calculateFOV(unit->getPosition(), 1, false); // others' view of this unit, like UnitTurnBState
 		}
+		// (Akimbo: the other hand's gun sprays along, as in any burst. The click that began the marking set the pair on
+		// the game's action and took it off again with the rest it had added (see launchShot); the click that fires
+		// the burst came without it, and the chosen gun sprayed alone: a player, GitHub issue #205, "fires often 6 or
+		// 7 shots instead of the intended 12".)
+		BattleActionType otherMode = BA_NONE;
+		BattleItem *otherWeapon = action->weapon ? dualPartner(unit, action->weapon, BA_AUTOSHOT, otherMode) : nullptr;
+		action->dualWield = otherWeapon != nullptr;
+		action->dualVolley = otherWeapon != nullptr && Options::fpsAkimboVolley;
+		action->dualWeapon = otherWeapon;
+		action->dualType = otherWeapon ? otherMode : BA_NONE;
 		battleGame->primaryAction(tile);
+		action->dualWield = false;
+		action->dualVolley = false;
+		action->dualWeapon = nullptr;
+		action->dualType = BA_NONE;
 		_triggerHeld = false;
 		return;
 	}

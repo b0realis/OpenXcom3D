@@ -251,6 +251,18 @@ void FirstPersonMode::analyzeWeapon(bool gun, bool melee, bool bow)
 	}
 	meanX /= pixels.size(); meanY /= pixels.size();
 
+	// A melee weapon whose picture is a plate, most of its box drawn and the box not narrow (a shield: The X-Com
+	// Files' and XPiratez's shields strike, a shield bash, so the game has them as melee weapons), is held up as an
+	// item is, its picture's face to the view: held as a blade, tip up and edge on, it was "slanted as if trying to
+	// slice with blade, rather than smack with front face" (a player, GitHub issue #208).
+	{
+		const double boxWide = shape.boxMax[0] - shape.boxMin[0] + 1.0, boxHigh = shape.boxMax[1] - shape.boxMin[1] + 1.0;
+		if (melee && pixels.size() >= HeldPlateFilled * boxWide * boxHigh && std::min(boxWide, boxHigh) >= HeldPlateSquare * std::max(boxWide, boxHigh))
+		{
+			shape.gun = shape.melee = shape.bow = false;
+		}
+	}
+
 	// The long axis: the main direction of the pixels' spread around the centre (from their
 	// covariance; dx, dy are a pixel's offsets from the centre).
 	double covarianceXX = 0, covarianceYY = 0, covarianceXY = 0;

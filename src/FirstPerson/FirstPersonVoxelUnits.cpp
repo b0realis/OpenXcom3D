@@ -56,8 +56,23 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 #include <utility>
+#ifdef __linux__
+#include <sys/resource.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+#elif defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX // (std::min and std::max, not Windows' macros)
+#endif
+#include <windows.h>
+#undef near
+#undef far
+#elif defined(__APPLE__)
+#include <pthread.h>
+#endif
 #include "FirstPersonVoxelBodies.h"
 #include "FirstPersonVoxelBodiesFine.h"
 #include "../Engine/Exception.h"
@@ -97,6 +112,9 @@ void hashBytes(Uint64 &hash, const Uint8 *bytes, size_t count)
 /// A picture drawn as a dither counts as one from this share of holes among its pixels, in hundredths (see ditherHoles):
 /// XPiratez's stealth and spectre suits have 69 to 87 holes for 100 pixels drawn, any other unit's sheet 9 at most.
 const int DitherShare = 33;
+/// A unit drawn the same from every side is lopsided, and made as a relief (see VoxelBodies::Routine), when fewer than
+/// this many in a hundred of its drawing's pixels have their mirror pixel drawn too (see modelFor).
+const int ReliefAlike = 75;
 
 /**
  * Counts a picture's drawn pixels and its dither holes: the empty pixels with drawn ones on three sides at least (in a
@@ -121,6 +139,19 @@ void ditherHoles(const std::vector<Uint8> &pixels, int width, int height, int &d
  * other pixel (the cells with too few neighbours go, and with them all of it but a scrap: a player, GitHub issue #185,
  * XPiratez's ghosts "don't seem to make a model at all").
  */
+/// A frame's pixels, row by row, straight from its buffer (a body's making reads frames by the hundred, on the game's
+/// own thread: read a pixel at a time, they were most of the time a body's frames took to gather); any: whether anything
+/// is drawn on it.
+std::vector<Uint8> pixelsOf(const Surface *surface, bool *any = nullptr)
+{
+	const int width = surface->getWidth(), height = surface->getHeight(), pitch = surface->getPitch();
+	const Uint8 *buffer = surface->getBuffer();
+	std::vector<Uint8> pixels((size_t)width * height);
+	for (int row = 0; row < height; ++row) std::memcpy(&pixels[(size_t)row * width], buffer + (size_t)row * pitch, (size_t)width);
+	if (any) *any = std::any_of(pixels.begin(), pixels.end(), [](Uint8 pixel) { return pixel != 0; });
+	return pixels;
+}
+
 void fillDither(std::vector<Uint8> &pixels, int width, int height)
 {
 	if ((int)pixels.size() < width * height) return;
@@ -162,6 +193,8 @@ struct VoxelUnits::Job
 	float torsoDepth = 0.0f; // (the torso's slices at most this deep for their width, by the unit table: see Routine)
 	bool backTop = false; // (what faces up painted by the back drawing, by the unit table: see Routine)
 	bool frontal = false; // (kept to its front and back drawings' outlines, by the unit table: see Routine)
+	bool relief = false; // (its one drawing given volume: see Routine)
+	int arms = 0; // (its arms outside the body, coloured along their length, by the unit table: see Routine)
 	bool fine = false; // (made twice as fine: see FineBodies)
 	const Routine *routine = nullptr;
 	int unitId = 0, status = 0; // (the unit's, for dump's file names)
@@ -257,6 +290,11 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		return remember(unit, made->second);
 	}
 	if (builds <= 0 || !palette) return nullptr;
+	// (Every unit whose frames are gathered counts, whether its body is then made or shared with one alike: gathering
+	// them takes the game's own thread a millisecond or more. A hundred units alike, all gathered in one frame because
+	// only the first was "made", held the game up for a third of a second at a battle's start, and again whenever
+	// many came at once: a player, GitHub issue #204, "lag spikes".)
+	--builds;
 
 	const Routine *routine = routineFor(unit->getArmor()->getDrawingRoutine());
 	if (!routine) return nullptr;
@@ -290,8 +328,12 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	Surface *together[BODYPART_LARGE_TURRET + 4];
 	std::fill(std::begin(together), std::end(together), &discard);
 	for (int p = 0; p < PartCount; ++p) together[PartSlots[p]] = &layered;
-	for (int d = 0; d < 8; ++d)
-	{
+	// (All of it at the first frame of the battle's animation, whenever the unit is first seen: two units alike are
+	// drawn alike then, and share a body; one whose colours the animation changes had a body for whichever frame it
+	// was first seen at, each made anew.)
+	const int animNow = save->getAnimFrame();
+	unitSprite.setAnimationFrame(0);
+	auto drawFacing = [&](int d) {
 		for (auto &frame : frames) frame->clear();
 		unitSprite.setViewRotation(d - unit->getDirection());
 		unitSprite.setPartCapture(capture);
@@ -307,18 +349,60 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 			unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
 		}
 		unitSprite.setPartCapture(nullptr);
+	};
+	// A quick look first: its front and back drawings, with what it is and how it stands. A unit just like one whose
+	// frames were gathered before (the same armour and kind, pose and items, and the same two drawings: a body's colours
+	// are those two's) takes that one's body, without the hundred drawings a body's frames are. (A battle of a hundred
+	// units alike gathered them all, three milliseconds each on the game's own thread: a player, GitHub issue #204.)
+	Uint64 quick = 14695981039346656037ULL;
+	try
+	{
+		for (int d : { Front, (Front + 4) % 8 })
+		{
+			drawFacing(d);
+			for (auto &frame : frames)
+				for (int row = 0; row < FrameSize; ++row) hashBytes(quick, frame->getBuffer() + (size_t)row * frame->getPitch(), FrameSize);
+		}
+	}
+	catch (const Exception &)
+	{
+		// (a sheet short of the frames its routine draws: no body, as its sprite; asked again it would throw again)
+		unitSprite.setPartCapture(nullptr);
+		unitSprite.setViewRotation(0);
+		unitSprite.setDrawOut(false);
+		unitSprite.setAnimationFrame(animNow);
+		_models[key] = nullptr;
+		return nullptr;
+	}
+	{
+		const Uint64 said[4] = { (Uint64)(size_t)unit->getArmor(), (Uint64)std::hash<std::string>()(unit->getType()), (Uint64)(size_t)std::get<5>(key), (Uint64)(size_t)std::get<6>(key) };
+		hashBytes(quick, (const Uint8*)said, sizeof(said));
+		const Uint8 stands[6] = { (Uint8)unit->isKneeled(), (Uint8)(unit->getStatus() == STATUS_AIMING), (Uint8)unit->isFloating(), (Uint8)std::get<7>(key), (Uint8)FineBodies, (Uint8)unit->isOut() };
+		hashBytes(quick, stands, sizeof(stands));
+	}
+	auto quickKnown = _byQuick.find(quick);
+	if (quickKnown != _byQuick.end())
+	{
+		unitSprite.setViewRotation(0);
+		unitSprite.setDrawOut(false);
+		unitSprite.setAnimationFrame(animNow);
+		auto alike = _byFrames.find(quickKnown->second);
+		if (alike != _byFrames.end())
+		{
+			_models[key] = alike->second;
+			return remember(unit, alike->second);
+		}
+		_waiting[key] = quickKnown->second; // (being made)
+		return nullptr;
+	}
+	for (int d = 0; d < 8; ++d)
+	{
+		drawFacing(d);
 		for (int p = 0; p < PartCount; ++p)
 		{
-			std::vector<Uint8> &pixels = parts[p].frame[d];
-			pixels.resize(FrameSize * FrameSize);
-			for (int row = 0; row < FrameSize; ++row)
-			{
-				for (int column = 0; column < FrameSize; ++column)
-				{
-					pixels[row * FrameSize + column] = frames[p]->getPixel(column, row);
-					parts[p].any |= pixels[row * FrameSize + column] != 0;
-				}
-			}
+			bool any = false;
+			parts[p].frame[d] = pixelsOf(frames[p].get(), &any);
+			parts[p].any |= any;
 		}
 		if (!routine->big && !routine->whole)
 		{
@@ -326,9 +410,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 			unitSprite.setPartCapture(together);
 			unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
 			unitSprite.setPartCapture(nullptr);
-			composite[d].resize(FrameSize * FrameSize);
-			for (int row = 0; row < FrameSize; ++row)
-				for (int column = 0; column < FrameSize; ++column) composite[d][row * FrameSize + column] = layered.getPixel(column, row);
+			composite[d] = pixelsOf(&layered);
 		}
 	}
 	// The death frames (the fall as the game draws it, facing the screen), for the body to fall as they show.
@@ -347,10 +429,8 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 			unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
 			unitSprite.setPartCapture(nullptr);
 			unitSprite.setFallOverride(-1);
-			std::vector<Uint8> pixels(FrameSize * FrameSize);
 			bool any = false;
-			for (int row = 0; row < FrameSize; ++row)
-				for (int column = 0; column < FrameSize; ++column) any |= (pixels[row * FrameSize + column] = frames[0]->getPixel(column, row)) != 0;
+			std::vector<Uint8> pixels = pixelsOf(frames[0].get(), &any);
 			if (!any) break;
 			deaths.push_back(std::move(pixels));
 		}
@@ -364,12 +444,6 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	if ((routine->legsSwing || routine->armsSwing) && unit->getArmor()->allowsMoving())
 	try
 	{
-		auto pixelsOf = [](Surface *surface) {
-			std::vector<Uint8> pixels(FrameSize * FrameSize);
-			for (int row = 0; row < FrameSize; ++row)
-				for (int column = 0; column < FrameSize; ++column) pixels[row * FrameSize + column] = surface->getPixel(column, row);
-			return pixels;
-		};
 		for (int phase = 0; phase < 8; ++phase)
 		{
 			for (int view = 0; view < 2; ++view)
@@ -412,16 +486,19 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	const Soldier *soldier = unit->getGeoscapeSoldier();
 	const RuleFirstPerson::UnitLook look = save->getMod()->getFirstPerson().getUnitLook({ unit->getType(), unit->getArmor()->getType(),
 		unit->getArmor()->getSpriteSheet(), unitRules ? unitRules->getRace() : std::string(), soldier ? soldier->getRules()->getType() : std::string() });
-	// A unit whose standing drawing changes shape with the battle's animation frame (a mod's script picks its sprite by
-	// it: X-Com Files' shadowbat flaps as it hovers) has a body for each frame, as its sprite has a drawing (the owner:
-	// "voxel models should generally follow the sprites"; a player, GitHub issue #195: the bat "looks exactly like that
-	// and never flaps"). For the units the unit table names (animation: sprite), drawn on one frame, one tile big, their
-	// hands empty: the front drawing at the 7 frames after this one differs in outline, and is the same again at the
-	// 8th. (A change of colours alone, a shield's flash, a hit's blink, is not an animation.)
+	// A unit whose standing drawing changes shape with the battle's animation frame (the game's routine draws a frame
+	// of it for each: the Silacoid and the Celatid pulse; or a mod's script picks its sprite by it: X-Com Files'
+	// shadowbat flaps as it hovers) has a body for each frame, as its sprite has a drawing (the owner: "voxel models
+	// should generally follow the sprites"; a player, GitHub issue #195: the bat "looks exactly like that and never
+	// flaps"; #210: "other animated units also dont move"). Any unit drawn on one frame, one tile big, with nothing
+	// showing in its hands (a built-in weapon the game doesn't draw is nothing: the bat's bite kept it from flapping in
+	// a real battle), unless the unit table says no (animation: none): the front drawing at the 7 frames after this one
+	// differs in outline, and is the same again at the 8th. (A change of colours alone, a shield's flash, a hit's
+	// blink, is not an animation.)
+	auto shownInHand = [](const BattleItem *item) { return item && (!item->getRules()->isFixed() || item->getRules()->getFixedShow()); };
 	std::vector<std::vector<Uint8>> anim;
-	if (look.animated == 1 && routine->whole && !routine->big && !unit->getRightHandWeapon() && !unit->getLeftHandWeapon())
+	if (look.animated != 0 && routine->whole && !routine->big && !shownInHand(unit->getRightHandWeapon()) && !shownInHand(unit->getLeftHandWeapon()))
 	{
-		const int now = save->getAnimFrame();
 		auto drawn = [&](int animFrame, int d) {
 			frames[0]->clear();
 			unitSprite.setAnimationFrame(animFrame);
@@ -429,10 +506,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 			unitSprite.setPartCapture(capture);
 			unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
 			unitSprite.setPartCapture(nullptr);
-			std::vector<Uint8> pixels(FrameSize * FrameSize);
-			for (int row = 0; row < FrameSize; ++row)
-				for (int column = 0; column < FrameSize; ++column) pixels[row * FrameSize + column] = frames[0]->getPixel(column, row);
-			return pixels;
+			return pixelsOf(frames[0].get());
 		};
 		auto sameOutline = [](const std::vector<Uint8> &one, const std::vector<Uint8> &other) {
 			for (size_t i = 0; i < one.size(); ++i) if ((one[i] != 0) != (other[i] != 0)) return false;
@@ -440,14 +514,14 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		};
 		try
 		{
-			const std::vector<Uint8> first = drawn(now, Front);
+			const std::vector<Uint8> first = drawn(0, Front);
 			bool moves = false;
-			for (int later = 1; later < AnimFrames && !moves; ++later) moves = !sameOutline(first, drawn(now + later, Front));
-			if (moves && sameOutline(first, drawn(now + AnimFrames, Front)))
+			for (int later = 1; later < AnimFrames && !moves; ++later) moves = !sameOutline(first, drawn(later, Front));
+			if (moves && sameOutline(first, drawn(AnimFrames, Front)))
 			{
-				const int from = now - now % AnimFrames + AnimFrames; // (frame 0 of the round: the bodies are kept by the frame's number)
+				// (from frame 0 of a round: the bodies are kept by the frame's number)
 				for (int frame = 0; frame < AnimFrames; ++frame)
-					for (int d = 0; d < 8; ++d) anim.push_back(drawn(from + frame, d));
+					for (int d = 0; d < 8; ++d) anim.push_back(drawn(frame, d));
 			}
 		}
 		catch (const Exception &)
@@ -455,10 +529,38 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 			unitSprite.setPartCapture(nullptr);
 			anim.clear();
 		}
-		unitSprite.setAnimationFrame(now);
+		unitSprite.setAnimationFrame(0);
+	}
+	// (the body itself is the first frame's then: units alike share their bodies whatever frame each was first seen at)
+	for (int d = 0; d < 8 && anim.size() >= 8; ++d) parts[0].frame[d] = anim[d];
+	// A unit drawn the same from every side (the game's Silacoid, Celatid and Bio-Drone routines draw one picture
+	// whatever way the unit faces) and lopsided: its body is that one drawing given volume (see Routine::relief). Carved
+	// from eight drawings all the same, a body keeps only what the drawing has both sides of its middle: enough of a
+	// Celatid or a Silacoid, which stay carved as they were; of X-Com Files' Abomination, bubbles off to one side,
+	// "flat looking puddles" (a player, GitHub issue #203). Lopsided: under ReliefAlike of the drawing's pixels have
+	// their mirror pixel drawn too. The unit table's shape says otherwise for the units it names (relief, upright).
+	bool relief = false;
+	if (routine->whole && !routine->big && look.relief != 0)
+	{
+		bool allRound = true;
+		for (int d = 1; d < 8 && allRound; ++d) allRound = parts[0].frame[d] == parts[0].frame[0];
+		if (allRound)
+		{
+			int drawn = 0, mirrored = 0;
+			const std::vector<Uint8> &front = parts[0].frame[Front];
+			for (int row = 0; row < FrameSize; ++row)
+				for (int column = 0; column < FrameSize; ++column)
+				{
+					if (!front[row * FrameSize + column]) continue;
+					++drawn;
+					if (front[row * FrameSize + FrameSize - 1 - column]) ++mirrored;
+				}
+			relief = look.relief == 1 || (drawn > 0 && mirrored * 100 < drawn * ReliefAlike);
+		}
 	}
 	unitSprite.setViewRotation(0);
 	unitSprite.setDrawOut(false);
+	unitSprite.setAnimationFrame(animNow);
 	// And its corpse's picture on the floor (FLOOROB.PCK, as the map draws a corpse), for the body to end lying as it shows.
 	std::vector<Uint8> corpse;
 	const auto &corpseItems = unit->getArmor()->getCorpseBattlescape();
@@ -479,10 +581,8 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 				}
 			}
 			else picture->blitNShade(frames[0].get(), 16, 8, 0);
-			corpse.resize(FrameSize * FrameSize);
 			bool any = false;
-			for (int row = 0; row < FrameSize; ++row)
-				for (int column = 0; column < FrameSize; ++column) any |= (corpse[row * FrameSize + column] = frames[0]->getPixel(column, row)) != 0;
+			corpse = pixelsOf(frames[0].get(), &any);
 			if (!any) corpse.clear();
 		}
 	}
@@ -516,6 +616,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 				for (auto &frame : part.frame) fillDither(frame, FrameSize, FrameSize);
 			for (auto &frame : composite) fillDither(frame, FrameSize, FrameSize);
 			for (auto &death : deaths) fillDither(death, FrameSize, FrameSize);
+			for (auto &frame : anim) fillDither(frame, FrameSize, FrameSize);
 			for (auto &phase : walks.legs)
 				for (auto &view : phase) fillDither(view, FrameSize, FrameSize);
 			for (auto &phase : walks.arms)
@@ -538,6 +639,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		const BattleItem *item = hands[hand];
 		if (!item || (item->getRules()->isFixed() && !item->getRules()->getFixedShow())) continue;
 		items[hand].twoHanded = item->getRules()->isTwoHanded();
+		items[hand].melee = item->getRules()->getBattleType() == BT_MELEE;
 		const Surface *frame = inventorySprites ? item->getBigSprite(inventorySprites, save, 0) : nullptr;
 		if (!frame) continue;
 		Surface picture(frame->getWidth(), frame->getHeight());
@@ -552,15 +654,17 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	}
 
 	// A unit drawn just like one before (the same frames, pictures and pose) shares its body.
-	const bool aiming = unit->getStatus() == STATUS_AIMING;
+	// (aiming only tells how what it holds is held: a unit showing nothing in its hands, drawn the same aiming or
+	// not, has one body for both, not a second made at its first shot)
+	const bool aiming = unit->getStatus() == STATUS_AIMING && (!items[0].picture.empty() || !items[1].picture.empty() || !routine->whole);
 	Uint64 hash = 14695981039346656037ULL;
 	for (const PartFrames &part : parts)
 		for (const auto &frame : part.frame) hashBytes(hash, frame.data(), frame.size());
 	for (const HeldItem &held : items)
 	{
 		hashBytes(hash, held.picture.data(), held.picture.size());
-		const Uint8 flags[3] = { (Uint8)held.width, (Uint8)held.height, (Uint8)held.twoHanded };
-		hashBytes(hash, flags, 3);
+		const Uint8 flags[4] = { (Uint8)held.width, (Uint8)held.height, (Uint8)held.twoHanded, (Uint8)held.melee };
+		hashBytes(hash, flags, 4);
 	}
 	for (const auto &death : deaths) hashBytes(hash, death.data(), death.size());
 	hashBytes(hash, corpse.data(), corpse.size());
@@ -574,9 +678,10 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	float shows = dithered ? VoxelDitherFaint : 1.0f;
 	if (look.shows >= 0) shows = std::min(shows, look.shows / 100.0f);
 	for (const auto &frame : anim) hashBytes(hash, frame.data(), frame.size());
-	const Uint8 pose[8] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast == 1),
-		(Uint8)std::max(look.torsoDepth, 0), (Uint8)(look.backTop == 1), (Uint8)(look.frontal == 1) };
-	hashBytes(hash, pose, 8);
+	const Uint8 pose[10] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast == 1),
+		(Uint8)std::max(look.torsoDepth, 0), (Uint8)(look.backTop == 1), (Uint8)(look.frontal == 1), (Uint8)relief, (Uint8)std::max(look.arms, 0) };
+	hashBytes(hash, pose, 10);
+	_byQuick[quick] = hash;
 	auto alike = _byFrames.find(hash);
 	if (alike != _byFrames.end())
 	{
@@ -584,7 +689,6 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		return remember(unit, alike->second);
 	}
 	// Else the builder makes it (unless it's making one alike already), and the unit is drawn as its sprite meanwhile.
-	--builds;
 	_waiting[key] = hash;
 	if (_making.insert(hash).second)
 	{
@@ -604,6 +708,8 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		job->torsoDepth = look.torsoDepth > 0 ? look.torsoDepth / 100.0f : 0.0f;
 		job->backTop = look.backTop == 1;
 		job->frontal = look.frontal == 1;
+		job->relief = relief;
+		job->arms = std::max(look.arms, 0);
 		job->fine = FineBodies;
 		job->routine = routine;
 		std::copy(palette, palette + 256, job->palette);
@@ -734,6 +840,7 @@ void VoxelUnits::clear()
 	}
 	_models.clear();
 	_byFrames.clear();
+	_byQuick.clear();
 	_making.clear();
 	_waiting.clear();
 	_lastBodies.clear();
@@ -746,6 +853,14 @@ void VoxelUnits::clear()
  */
 void VoxelUnits::build()
 {
+	// (spare time only, as the upscaler's: the frame's threads come first while bodies are made mid-battle)
+#ifdef __linux__
+	setpriority(PRIO_PROCESS, (id_t)syscall(SYS_gettid), 10);
+#elif defined(_WIN32)
+	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+#elif defined(__APPLE__)
+	pthread_set_qos_class_self_np(QOS_CLASS_UTILITY, 0);
+#endif
 	for (;;)
 	{
 		std::unique_ptr<Job> job;
@@ -773,6 +888,7 @@ void VoxelUnits::build()
 				source.itemWidth[hand] = job->items[hand].width;
 				source.itemHeight[hand] = job->items[hand].height;
 				source.itemTwoHanded[hand] = job->items[hand].twoHanded;
+				source.itemMelee[hand] = job->items[hand].melee;
 			}
 			source.deaths = job->deaths;
 			source.corpse = job->corpse;
@@ -792,6 +908,8 @@ void VoxelUnits::build()
 			source.torsoDepth = job->torsoDepth;
 			source.backTop = job->backTop;
 			source.frontal = job->frontal;
+			source.relief = job->relief;
+			source.arms = job->arms;
 			source.routine = job->routine->number;
 			model = makeFineModel(source, job->palette);
 		}
@@ -803,6 +921,8 @@ void VoxelUnits::build()
 			routine.torsoDepth = job->torsoDepth;
 			routine.backTop = job->backTop;
 			routine.frontal = job->frontal;
+			routine.relief = job->relief;
+			routine.arms = job->arms;
 			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->lying, job->walks, job->aiming, routine, job->palette);
 		}
 		if (model) model->opacity = job->shows;
@@ -820,6 +940,7 @@ void VoxelUnits::build()
 				source.torsoDepth = job->torsoDepth;
 				source.backTop = job->backTop;
 				source.frontal = job->frontal;
+				source.relief = job->relief;
 				source.routine = job->routine->number;
 				shape = makeFineModel(source, job->palette);
 			}
@@ -836,6 +957,7 @@ void VoxelUnits::build()
 				routine.torsoDepth = job->torsoDepth;
 				routine.backTop = job->backTop;
 				routine.frontal = job->frontal;
+				routine.relief = job->relief;
 				const std::vector<Uint8> noComposite[8];
 				const HeldItem noItems[2];
 				shape = makeModel(framed, noComposite, noItems, {}, {}, HeldItem(), WalkFrames(), false, routine, job->palette);
@@ -918,8 +1040,8 @@ void VoxelUnits::dump(const Job &job, const VoxelUnitModel *model, const char *f
 
 	if (FILE *file = std::fopen((base + ".job").c_str(), "w"))
 	{
-		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d frontal %d\n", job.routine->number, job.routine->whole, job.routine->big,
-			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop, (int)job.frontal);
+		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d frontal %d relief %d melee %d %d arms %d\n", job.routine->number, job.routine->whole, job.routine->big,
+			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop, (int)job.frontal, (int)job.relief, (int)job.items[0].melee, (int)job.items[1].melee, job.arms);
 		for (int i = 0; i < 256; ++i) std::fprintf(file, "%d %d %d\n", job.palette[i].r, job.palette[i].g, job.palette[i].b);
 		std::fclose(file);
 	}

@@ -2159,6 +2159,7 @@ uniform vec3 uFeet;            // the middle of its feet from the eye, in voxels
 uniform vec2 uTurn;            // the cosine and sine of the way it faces
 uniform float uMeasure;        // voxels to one of the body's own measures
 uniform float uFloorCut;       // nothing of it below this height (from the eye)
+uniform float uCeilCut;        // nor at or above this one (the floor over its head)
 uniform int uSkipItems;        // 1: without the items in its hands
 uniform vec3 uForward, uRight, uUp; // the camera, in true proportions
 uniform float uFocal;
@@ -2183,7 +2184,7 @@ void main()
 	float ahead = dot(scaled, uForward);
 	gl_Position = vec4(2.0, 2.0, 2.0, 1.0); // (off the picture: a cube not drawn)
 	vCentre = vec2(0.0); vDepth = 0.0; vColor = 0; vOutlined = 0; vEdge0 = vEdge1 = vEdge2 = vec2(0.0); vReach = vec3(0.0);
-	if (ahead < 4.0 || place.z < uFloorCut || (uSkipItems != 0 && colour >= 256)) return;
+	if (ahead < 4.0 || place.z < uFloorCut || place.z >= uCeilCut || (uSkipItems != 0 && colour >= 256)) return;
 	float nearer = 1.0 / ahead;
 	vec2 centre = vec2(uAxis.x + dot(scaled, uRight) * uFocal * nearer, uAxis.y - dot(scaled, uUp) * uFocal * nearer);
 	vec2 edges[3];
@@ -2443,7 +2444,7 @@ void main()
 				if (facing <= 1e-9) continue;
 				distance = anchorFacing / facing;
 				spriteRow = anchorY - dot(ray * distance - anchor, cardUp) / rowSize;
-				if (ray.z * distance / ZScale < t8.x) continue; // (nothing of the card below the floor it stands on)
+				if (ray.z * distance / ZScale < t8.x || ray.z * distance / ZScale >= prim(base, 9).x) continue; // (nothing of the card below the floor it stands on, nor above the floor over its head)
 			}
 			if (!(distance >= 1.0 && spriteRow >= 0.0 && spriteRow < float(spriteHeight))) continue;
 			int spriteX = int(floor(anchorX + (dot(ray, uLevelRight) * distance - anchorAcross) / columnSize));

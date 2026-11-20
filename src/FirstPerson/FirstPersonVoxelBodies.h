@@ -89,7 +89,11 @@ constexpr int PartCount = 6, BodyParts = 4, RightItem = 4, LeftItem = 5;
 /// have it (the owner: "voxel models should generally follow the sprites as not to change the game engine underneath
 /// and playstyle"): a kneeling body is as high as its kneeling drawing, not pressed to the game's kneeling height.
 /// Frontal: a named unit's body keeps to its front and back drawings' outlines strictly (see makeModel).
-struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; float torsoDepth = 0.0f; bool backTop = false; bool frontal = false; };
+/// Arms: what the unit table says of a named unit's arms, a bit each: 1 outside the body, 2 coloured along their
+/// length (see makeModel).
+/// Relief: the unit is drawn the same from every side, and lopsided (set for the unit being made, see
+/// VoxelUnits::modelFor): its one drawing given volume is its body (see reliefModel).
+struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; float torsoDepth = 0.0f; bool backTop = false; bool frontal = false; bool relief = false; int arms = 0; };
 /// The routine's way of drawing, or null for one not given a voxel body.
 const Routine *routineFor(int number);
 
@@ -116,11 +120,13 @@ struct WalkFrames
 };
 
 /// An item in a hand: its inventory picture, as the game draws it in the hand (palette colours, 0 empty), and how it's held.
+/// Melee: a weapon to strike with (the game's battle type): it points the way its hand frames draw it (see placeItem).
 struct HeldItem
 {
 	std::vector<Uint8> picture;
 	int width = 0, height = 0;
 	bool twoHanded = false;
+	bool melee = false;
 };
 
 /// Makes a unit's body from its parts' frames (and, for a unit drawn in parts, the parts laid over each other as the game

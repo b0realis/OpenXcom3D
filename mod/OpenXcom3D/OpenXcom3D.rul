@@ -194,9 +194,14 @@ firstPerson:
       torsoDepth: 80
       top: back
       sculpt: frontal
-    # the bats (XPiratez's vampire bat, The X-Com Files' shadowbat: a script flaps their wings as they hover)
+    # the bats (XPiratez's vampire bat, The X-Com Files' shadowbat: a script flaps their wings as they hover); any unit whose
+    # standing sprite is animated has a body for each frame without being named (animation: none switches that off)
     - names: [BAT, SHADOWBAT]
       animation: sprite
+    # The X-Com Files' Church of Dagon: robes carved as wide as they hang, with the arms inside them; long sleeves on
+    # arms posed on their guns (arms outside the body, coloured along their length)
+    - names: [DAGON]
+      arms: both
 
 interfaces:
   - type: firstPerson

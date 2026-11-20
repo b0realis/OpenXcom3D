@@ -121,7 +121,9 @@ public:
 		int torsoDepth = -1;
 		int backTop = -1;
 		int frontal = -1; // (the body kept to its front and back drawings' outlines: 1; as ever: 0)
-		int animated = -1; // (a body for each frame of the sprite's own animation, if it has one: 1; one body: 0)
+		int animated = -1; // (a body for each frame of the sprite's own animation, if it has one: 1 or nothing said; one body: 0)
+		int relief = -1; // (the body is its one drawing given volume: 1; carved from its drawings: 0; nothing said: by what its drawings are)
+		int arms = -1; // (a bit each: 1 its arms outside the body, 2 coloured along their length; 0 as drawn)
 	};
 	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
@@ -295,7 +297,7 @@ public:
 
 		// The unit table: groups of name patterns (see nameHas), each with what it says of the units whose names (the
 		// unit's type, its armor's, the armor's sprite sheet, its race) hold one: shape (beast: a long body on four legs;
-		// upright: as ever) and seeThrough (how much of the voxel body is left out, in hundredths: 50 for a ghost). A
+		// relief: its one drawing given volume, see VoxelBodies::Routine; upright: carved from its drawings, as ever) and seeThrough (how much of the voxel body is left out, in hundredths: 50 for a ghost). A
 		// later entry overrides what it sets, and leaves the rest. What the voxel bodies do for one kind of unit they
 		// do for the units named here and no others (the owner: "The future voxelisation rules will be per unit ... if
 		// we dont have unit name in table we will apply some general rules").
@@ -304,16 +306,21 @@ public:
 			for (const auto& entry : units.children())
 			{
 				std::vector<std::string> names;
-				std::string shape, top, sculpt, animation;
+				std::string shape, top, sculpt, animation, arms;
 				int seeThrough = 0, torsoDepth = 0;
 				UnitLook look;
 				entry.tryRead("names", names);
-				if (entry.tryRead("shape", shape)) look.beast = shape == "beast" ? 1 : 0;
+				if (entry.tryRead("shape", shape))
+				{
+					look.beast = shape == "beast" ? 1 : 0;
+					look.relief = shape == "relief" ? 1 : 0;
+				}
 				if (entry.tryRead("seeThrough", seeThrough)) look.shows = 100 - std::clamp(seeThrough, 0, 90);
 				if (entry.tryRead("torsoDepth", torsoDepth)) look.torsoDepth = std::clamp(torsoDepth, 0, 200);
 				if (entry.tryRead("top", top)) look.backTop = top == "back" ? 1 : 0;
 				if (entry.tryRead("sculpt", sculpt)) look.frontal = sculpt == "frontal" ? 1 : 0;
 				if (entry.tryRead("animation", animation)) look.animated = animation == "sprite" ? 1 : 0;
+				if (entry.tryRead("arms", arms)) look.arms = arms == "outside" ? 1 : arms == "along" ? 2 : arms == "both" ? 3 : 0;
 				if (!names.empty()) _unitLooks.push_back({ names, look });
 			}
 		}
@@ -412,6 +419,8 @@ public:
 			if (entry.second.backTop != -1) look.backTop = entry.second.backTop;
 			if (entry.second.frontal != -1) look.frontal = entry.second.frontal;
 			if (entry.second.animated != -1) look.animated = entry.second.animated;
+			if (entry.second.relief != -1) look.relief = entry.second.relief;
+			if (entry.second.arms != -1) look.arms = entry.second.arms;
 		}
 		return look;
 	}

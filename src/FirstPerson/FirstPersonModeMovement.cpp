@@ -710,7 +710,64 @@ void FirstPersonMode::updateNoclipView(BattleUnit *unit)
 			}
 		}
 	}
+	// Inside a solid block (the eye in an object's voxels, in a tile solid at its middle: rock, earth, a thick wall of
+	// blocks): the block is as many tiles as are solid at their middles and joined to the eye's, and none of it is in
+	// the way of the view: its tiles' objects with nothing but the block round them are left out, with the walls and
+	// floors between its tiles; its skin, where it meets the open air, shows as ghosts, seen through: the objects of
+	// its outer tiles, the walls on its sides, the floor above it. Beyond that all is as ever. (A player, GitHub issue
+	// #209: "when inside a SOLID block, draw everything invisible until next opening to open air, drawn as ghost voxels
+	// for that wall / ceiling / floor, and rest beyond solid, ala gzdoom engine". Only the parts the eye itself was in
+	// were left out: inside a hill the next tile's rock filled the picture.)
+	std::vector<std::pair<int, int>> ghosted;
+	if (unit && noclipOn(unit))
+	{
+		double eye[3];
+		_view->getEye(eye);
+		const Position eyeVoxel((int)std::floor(eye[0]), (int)std::floor(eye[1]), (int)std::floor(eye[2]));
+		const Position eyeTile = eyeVoxel.toTile();
+		auto solid = [&](const Position &tile) {
+			return _save->getTile(tile) && _save->getTileEngine()->voxelCheck(tile.toVoxel() + Position(8, 8, 12), nullptr, true) == V_OBJECT;
+		};
+		if (_save->getTile(eyeTile) && _save->getTileEngine()->voxelCheck(eyeVoxel, nullptr, true) == V_OBJECT && solid(eyeTile))
+		{
+			static const int Beside[6][3] = { { -1, 0, 0 }, { 1, 0, 0 }, { 0, -1, 0 }, { 0, 1, 0 }, { 0, 0, -1 }, { 0, 0, 1 } };
+			std::set<int> block;
+			std::vector<Position> found(1, eyeTile);
+			block.insert(_save->getTileIndex(eyeTile));
+			for (size_t next = 0; next < found.size() && found.size() < (size_t)NoclipBlockTiles; ++next)
+			{
+				for (const int *step : Beside)
+				{
+					const Position beside = found[next] + Position(step[0], step[1], step[2]);
+					if (std::abs(beside.x - eyeTile.x) > NoclipBlockReach || std::abs(beside.y - eyeTile.y) > NoclipBlockReach || std::abs(beside.z - eyeTile.z) > NoclipBlockReach) continue;
+					if (!solid(beside) || !block.insert(_save->getTileIndex(beside)).second) continue;
+					found.push_back(beside);
+				}
+			}
+			// (off the map there is nothing to look out at: as the block)
+			auto inBlock = [&](const Position &tile) { return !_save->getTile(tile) || block.count(_save->getTileIndex(tile)) != 0; };
+			auto say = [&](std::vector<std::pair<int, int>> &list, const Position &tile, int part) {
+				if (_save->getTile(tile)) list.push_back(std::make_pair(_save->getTileIndex(tile), part));
+			};
+			for (const Position &tile : found)
+			{
+				bool inside = true;
+				for (const int *step : Beside) inside = inside && inBlock(tile + Position(step[0], step[1], step[2]));
+				say(inside ? parts : ghosted, tile, O_OBJECT);
+				if (inBlock(tile + Position(0, 0, -1)) && tile.z > 0) say(parts, tile, O_FLOOR);
+				if (!inBlock(tile + Position(0, 0, 1))) say(ghosted, tile + Position(0, 0, 1), O_FLOOR);
+				say(inBlock(tile + Position(-1, 0, 0)) ? parts : ghosted, tile, O_WESTWALL);
+				say(inBlock(tile + Position(0, -1, 0)) ? parts : ghosted, tile, O_NORTHWALL);
+				if (!inBlock(tile + Position(1, 0, 0))) say(ghosted, tile + Position(1, 0, 0), O_WESTWALL);
+				if (!inBlock(tile + Position(0, 1, 0))) say(ghosted, tile + Position(0, 1, 0), O_NORTHWALL);
+			}
+			// (what the eye itself is in stays left out: seen from inside, a ghost would veil the whole picture)
+			ghosted.erase(std::remove_if(ghosted.begin(), ghosted.end(), [&](const std::pair<int, int> &part) {
+				return std::find(parts.begin(), parts.end(), part) != parts.end(); }), ghosted.end());
+		}
+	}
 	_view->setLeftOutParts(parts);
+	_view->setGhostedParts(ghosted);
 }
 
 /**

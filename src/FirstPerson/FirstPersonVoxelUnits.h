@@ -225,6 +225,9 @@ private:
 	const VoxelUnitModel *remember(const BattleUnit *unit, const std::shared_ptr<VoxelUnitModel> &body);
 	/// The bodies being made (by what they're made from), and the keys waiting for one.
 	std::set<Uint64> _making;
+	/// The frames' hash a quick look at a unit led to (its front and back drawings, what it is and how it stands: see
+	/// modelFor): a unit just like one seen before takes its body without its frames being gathered again.
+	std::unordered_map<Uint64, Uint64> _byQuick;
 	std::map<Key, Uint64> _waiting;
 	/// The builder's jobs, the bodies it has made, and which battle they're for (a new battle drops the old one's); and
 	/// its threads (last: the rest is ready before they start; one starts with each job waiting, up to builderThreads).

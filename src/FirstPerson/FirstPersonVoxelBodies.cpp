@@ -429,6 +429,9 @@ void levelOff(const PartFrames &part, std::vector<Uint8> &cells)
 /// cut off at the level where the hull is HullDeck of its widest, level by level from there: a deck for the turret to
 /// stand on, sloping sides below it.
 constexpr float HullDeck = 0.5f;
+/// A tank's turret is read TurretSlack voxels lower than its front and side drawings' top rows; its barrel is where its
+/// side drawing runs out ahead no higher than BarrelThin of the turret's tallest column (see makeModel).
+constexpr float TurretSlack = 1.0f * VOXELSCALE, BarrelThin = 0.5f;
 void flattenHull(std::vector<Uint8> &cells)
 {
 	std::vector<int> area(GridUp, 0);
@@ -1203,14 +1206,112 @@ bool partMiddle(const PartFrames &part, float middle[3])
 /// butt to the muzzle, across its picture to the picture's right (the magazine's side), and through it.
 /// Upright: the item is drawn standing in the hand, taller than wide in every hand frame (a sword, a staff: see
 /// placeItem); it is as long as it is drawn high, stands up, and one hand holds it at its lower end.
+/// Straight: its picture's own long way is laid along it (see addItem): the pictures draw a staff or a spear from corner
+/// to corner, and one stood in the hand, or laid the way its hand frames draw it, leant as its picture does.
+/// Plate: an item standing in the hand that its hand frames draw broad from the front and the back and thin from the
+/// sides (a shield): it stands with its picture's face ahead, the hand behind its middle.
 struct ItemPlace
 {
 	float middle[3], length;
 	float along[3], across[3], through[3];
 	bool upright = false;
+	bool plate = false;
+	bool straight = false;
 };
 /// An item is drawn standing in the hand if its tallest hand frame is this many times as high as its widest is wide.
 constexpr float ItemUpright = 1.5f;
+/// An item's own length may lie inside the body for this many hundredths of it (looked at in ItemSamples places); one
+/// deeper in is moved ahead, ItemOutMost voxels at most (see makeModel).
+constexpr int ItemInBody = 30, ItemSamples = 16;
+/// An arm coloured along its length (see makeModel) takes its colours in this many stretches from shoulder to hand.
+constexpr int ArmBands = 10;
+constexpr float ItemOutMost = 6.0f * VOXELSCALE;
+/// An item standing in the hand is a plate if its front and back hand frames are each this many times as wide as the
+/// wider of its two side frames.
+constexpr float ItemPlate = 2.0f;
+constexpr int ItemPlateFilled = 60;
+/// A hand frame shows which way an item points if its drawing is this many times as long as it is wide; the frames'
+/// own direction is taken for a melee weapon if it is this far (the cosine) from the way a gun would be held.
+constexpr float ItemLong = 1.8f, ItemAxisAgree = 0.82f;
+
+/// The way an item points, from its hand frames: the direction whose picture in each of the 8 views lies best along the
+/// item's drawing there (each view's drawing has a long way: the direction it's spread widest in; the views that show
+/// the item end on, a blob, say nothing). False if fewer than three views show it long. Its sign: ahead rather than
+/// behind, then to the unit's left, then up (as a gun's muzzle is held). Length: how long the item is, voxels, where
+/// the views show it.
+bool itemAxis(const PartFrames &frames, float axis[3], float &length)
+{
+	double m[3][3] = {};
+	int views = 0;
+	struct Seen { double way[2], from, to; double p[2][3]; };
+	std::vector<Seen> seen;
+	for (int d = 0; d < 8; ++d)
+	{
+		double columns = 0.0, rows = 0.0;
+		int count = 0;
+		for (int row = 0; row < FrameSize; ++row)
+			for (int column = 0; column < FrameSize; ++column)
+				if (frames.frame[d][row * FrameSize + column]) { columns += column; rows += row; ++count; }
+		if (count < 4 * VOXELSCALE) continue;
+		columns /= count; rows /= count;
+		double xx = 0.0, xy = 0.0, yy = 0.0;
+		for (int row = 0; row < FrameSize; ++row)
+			for (int column = 0; column < FrameSize; ++column)
+				if (frames.frame[d][row * FrameSize + column]) { xx += (column - columns) * (column - columns); xy += (column - columns) * (row - rows); yy += (row - rows) * (row - rows); }
+		xx /= count; xy /= count; yy /= count;
+		const double turn = 0.5 * std::atan2(2.0 * xy, xx - yy), spread = std::sqrt((xx - yy) * (xx - yy) * 0.25 + xy * xy);
+		const double longWay = (xx + yy) * 0.5 + spread, shortWay = std::max((xx + yy) * 0.5 - spread, 1.0 / 12.0 * VOXELSCALE * VOXELSCALE);
+		if (longWay < ItemLong * ItemLong * shortWay) continue;
+		Seen view;
+		view.way[0] = std::cos(turn); view.way[1] = std::sin(turn);
+		view.from = 1e9; view.to = -1e9;
+		for (int row = 0; row < FrameSize; ++row)
+			for (int column = 0; column < FrameSize; ++column)
+				if (frames.frame[d][row * FrameSize + column])
+				{
+					const double at = (column - columns) * view.way[0] + (row - rows) * view.way[1];
+					view.from = std::min(view.from, at); view.to = std::max(view.to, at);
+				}
+		// (the view's picture of a step right, ahead and up: see project, along the slant)
+		const Turn &t = Turns[d];
+		const double p[2][3] = { { t.cosine - t.sine, t.sine + t.cosine, 0.0 }, { (t.cosine + t.sine) * 0.5, (t.sine - t.cosine) * 0.5, -1.0 } };
+		std::copy(&p[0][0], &p[0][0] + 6, &view.p[0][0]);
+		double along[3], beside[3];
+		for (int i = 0; i < 3; ++i)
+		{
+			along[i] = p[0][i] * view.way[0] + p[1][i] * view.way[1];
+			beside[i] = -p[0][i] * view.way[1] + p[1][i] * view.way[0];
+		}
+		const double weight = std::sqrt(longWay);
+		for (int i = 0; i < 3; ++i)
+			for (int j = 0; j < 3; ++j) m[i][j] += weight * (along[i] * along[j] - beside[i] * beside[j]);
+		seen.push_back(view);
+		++views;
+	}
+	if (views < 3) return false;
+	double shift = 0.0;
+	for (const auto &row : m) for (double value : row) shift += std::abs(value);
+	double v[3] = { 0.3, 0.8, 0.5 };
+	for (int turn = 0; turn < 80; ++turn)
+	{
+		double next[3];
+		for (int i = 0; i < 3; ++i) next[i] = m[i][0] * v[0] + m[i][1] * v[1] + m[i][2] * v[2] + shift * v[i];
+		const double size = std::sqrt(next[0] * next[0] + next[1] * next[1] + next[2] * next[2]);
+		if (size < 1e-12) return false;
+		for (int i = 0; i < 3; ++i) v[i] = next[i] / size;
+	}
+	if (v[1] - 0.6 * v[0] + 0.3 * v[2] < 0.0) for (double &value : v) value = -value;
+	for (int i = 0; i < 3; ++i) axis[i] = (float)v[i];
+	// as long as the views that see it well across draw it
+	length = 0.0f;
+	for (const Seen &view : seen)
+	{
+		const double column = view.p[0][0] * v[0] + view.p[0][1] * v[1] + view.p[0][2] * v[2], row = view.p[1][0] * v[0] + view.p[1][1] * v[1] + view.p[1][2] * v[2];
+		const double shown = std::sqrt(column * column + row * row); // (pixels a voxel of it, in this view)
+		if (shown >= 0.9) length = std::max(length, (float)((view.to - view.from) / shown));
+	}
+	return length > 0.0f;
+}
 
 /// Where an item in hand is, from its hand frames and how it's held: pointing ahead when aimed or held in one hand,
 /// across the waist when held in both, its picture's right (the magazine's side) down; false if no frame shows it.
@@ -1218,13 +1319,19 @@ constexpr float ItemUpright = 1.5f;
 /// frame is wide, laid across the waist for both hands as a rifle is, X-Com Files' greatsword was five cubes at the
 /// chest, and the arms reaching for it lay folded inside the body: no arms, no sword (a player, GitHub issue #196,
 /// "Picking up many melee weapons causes amputations").
-bool placeItem(const PartFrames &frames, bool twoHanded, bool aiming, ItemPlace &place)
+/// A shield, drawn broad from the front and thin from the sides, stands with its face ahead (see ItemPlace::plate): laid
+/// as a sword is, its edge ahead, X-Com Files' combat shield was "slanted as if trying to slice with blade, rather than
+/// smack with front face ... sheild is very clearly with flat face outward in handobs" (a player, GitHub issue #208).
+/// A melee weapon points the way its hand frames draw it (see itemAxis), where that is not the way a gun is held: a
+/// katana drawn raised ahead lay across the waist as a rifle does (a player, GitHub issue #199: "most melees are a
+/// bit janked ... Works REALLY well for guns").
+bool placeItem(const PartFrames &frames, bool twoHanded, bool aiming, bool melee, ItemPlace &place)
 {
 	if (!frames.any || !partMiddle(frames, place.middle)) return false;
-	int widest = 0, tallest = 0;
+	int widest = 0, tallest = 0, wide[8] = {}, filled[8] = {};
 	for (int d = 0; d < 8; ++d)
 	{
-		int left = FrameSize, right = -1, top = FrameSize, bottom = -1;
+		int left = FrameSize, right = -1, top = FrameSize, bottom = -1, drawn = 0;
 		for (int row = 0; row < FrameSize; ++row)
 		{
 			for (int column = 0; column < FrameSize; ++column)
@@ -1234,19 +1341,47 @@ bool placeItem(const PartFrames &frames, bool twoHanded, bool aiming, ItemPlace 
 				right = std::max(right, column);
 				top = std::min(top, row);
 				bottom = std::max(bottom, row);
+				++drawn;
 			}
 		}
 		widest = std::max(widest, right - left + 1);
 		tallest = std::max(tallest, bottom - top + 1);
+		wide[d] = std::max(0, right - left + 1);
+		filled[d] = right >= left ? drawn * 100 / ((right - left + 1) * (bottom - top + 1)) : 0; // (of its box, in hundredths)
 	}
+	const int Back = (Front + 4) % 8;
 	place.upright = tallest >= widest * ItemUpright;
+	// (a plate: broad and tall from the front and the back, and solid there, most of its box drawn, not a staff with
+	// sparks round it; thin from the sides; it need not be taller than wide)
+	const int sideWide = std::max(wide[RightSide], wide[LeftSide]);
+	place.plate = sideWide > 0 && std::min(wide[Front], wide[Back]) >= sideWide * ItemPlate && tallest >= std::min(wide[Front], wide[Back])
+		&& std::min(wide[Front], wide[Back]) >= 5 * VOXELSCALE && std::min(filled[Front], filled[Back]) >= ItemPlateFilled;
+	if (place.plate)
+	{
+		place.upright = true;
+		place.length = std::max(1.0f, (float)(tallest - 1));
+		// (its picture's top up, its right to the unit's left: from the front it is the picture)
+		const float facing[3][3] = { { 0.0f, 0.0f, 1.0f }, { -1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f } };
+		std::copy(facing[0], facing[0] + 3, place.along);
+		std::copy(facing[1], facing[1] + 3, place.across);
+		std::copy(facing[2], facing[2] + 3, place.through);
+		return true;
+	}
 	if (place.upright)
 	{
 		place.length = std::max(1.0f, (float)(tallest - 1));
+		// (Its picture's right ahead, its edge to the front, where the side frames draw it clearly broader than the
+		// front ones; else turned half way, its picture's right ahead and to the unit's left: a blade the frames draw as
+		// broad from the front as from the side shows its flat to both. Edge on to the front, a knife was one cube
+		// thin there: "knives being missing", a player, GitHub issue #199.)
+		const float c = 0.70710678f;
 		const float standing[3][3] = { { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } };
-		std::copy(standing[0], standing[0] + 3, place.along);
-		std::copy(standing[1], standing[1] + 3, place.across);
-		std::copy(standing[2], standing[2] + 3, place.through);
+		const float turned[3][3] = { { 0.0f, 0.0f, 1.0f }, { -c, c, 0.0f }, { c, c, 0.0f } };
+		const float (&axes)[3][3] = sideWide >= std::max(wide[Front], wide[Back]) + 2 * VOXELSCALE ? standing : turned;
+		std::copy(axes[0], axes[0] + 3, place.along);
+		std::copy(axes[1], axes[1] + 3, place.across);
+		std::copy(axes[2], axes[2] + 3, place.through);
+		place.straight = true;
 		return true;
 	}
 	place.length = std::max(1.0f, (widest - 1) / PixelsAcross);
@@ -1257,6 +1392,27 @@ bool placeItem(const PartFrames &frames, bool twoHanded, bool aiming, ItemPlace 
 	std::copy(axes[0], axes[0] + 3, place.along);
 	std::copy(axes[1], axes[1] + 3, place.across);
 	std::copy(axes[2], axes[2] + 3, place.through);
+	// A melee weapon: the way its hand frames draw it, where they don't draw it held as a gun is.
+	float drawn[3], drawnLength;
+	if (melee && itemAxis(frames, drawn, drawnLength)
+		&& std::abs(drawn[0] * place.along[0] + drawn[1] * place.along[1] + drawn[2] * place.along[2]) < ItemAxisAgree)
+	{
+		std::copy(drawn, drawn + 3, place.along);
+		place.length = std::max(1.0f, drawnLength);
+		place.straight = true;
+		// (its picture's right, an edge or a hammer's head, as near down as may be; drawn pointing up or down: ahead)
+		float down[3] = { drawn[2] * drawn[0], drawn[2] * drawn[1], drawn[2] * drawn[2] - 1.0f };
+		float size = std::sqrt(down[0] * down[0] + down[1] * down[1] + down[2] * down[2]);
+		if (size < 0.3f)
+		{
+			down[0] = -drawn[1] * drawn[0]; down[1] = 1.0f - drawn[1] * drawn[1]; down[2] = -drawn[1] * drawn[2];
+			size = std::sqrt(down[0] * down[0] + down[1] * down[1] + down[2] * down[2]);
+		}
+		for (int i = 0; i < 3; ++i) place.across[i] = down[i] / size;
+		place.through[0] = place.across[1] * place.along[2] - place.across[2] * place.along[1];
+		place.through[1] = place.across[2] * place.along[0] - place.across[0] * place.along[2];
+		place.through[2] = place.across[0] * place.along[1] - place.across[1] * place.along[0];
+	}
 	return true;
 }
 
@@ -1264,6 +1420,12 @@ bool placeItem(const PartFrames &frames, bool twoHanded, bool aiming, ItemPlace 
 /// near the butt and below the axis (a pistol's grip).
 void gripOf(const ItemPlace &place, bool twoHanded, bool atButt, float hand[3])
 {
+	if (place.plate)
+	{
+		// (a plate: the hand behind its middle)
+		for (int i = 0; i < 3; ++i) hand[i] = place.middle[i] - place.through[i] * 1.0f * VOXELSCALE;
+		return;
+	}
 	twoHanded = twoHanded && !place.upright; // (an item standing in the hand: one hand, at its lower end, on its axis)
 	const float along = place.length * ((twoHanded ? (atButt ? GripButt : GripFore) : GripOne) - 0.5f);
 	const float below = twoHanded || place.upright ? 0.0f : place.length * GripBelow;
@@ -1505,8 +1667,46 @@ void addItem(VoxelUnitModel &model, const HeldItem &held, const ItemPlace &place
 	}
 	if (bottom < 0) return;
 	const float *along = place.along, *across = place.across, *through = place.through, *middle = place.middle;
-	const float scale = place.length / std::max(1, bottom - top), thin = std::min(1.0f, scale / RifleScale);
-	const float halfLength = (bottom - top) * scale * 0.5f, middleAcross = (left + right) * 0.5f;
+	// The picture's own measures: from a point on it, the way that is along the item (up the picture: the games draw an
+	// item standing, a gun's muzzle at the top) and the way across it (to the picture's right), and how far it reaches
+	// along and across. A long item drawn from corner to corner, where its place asks (ItemPlace::straight): along its
+	// own long way, the way its pixels are spread widest, if that is ItemLong times its spread across.
+	float origin[2] = { (left + right) * 0.5f, (float)bottom }, upWay[2] = { 0.0f, -1.0f }, reach = (float)(bottom - top), wideReach = (float)(right - left + 1);
+	if (place.straight)
+	{
+		double columns = 0.0, rows = 0.0, xx = 0.0, xy = 0.0, yy = 0.0;
+		int drawn = 0;
+		for (int y = 0; y < height; ++y)
+			for (int x = 0; x < width; ++x) if (held.picture[y * width + x]) { columns += x; rows += y; ++drawn; }
+		columns /= drawn; rows /= drawn;
+		for (int y = 0; y < height; ++y)
+			for (int x = 0; x < width; ++x)
+				if (held.picture[y * width + x]) { xx += (x - columns) * (x - columns); xy += (x - columns) * (y - rows); yy += (y - rows) * (y - rows); }
+		const double turn = 0.5 * std::atan2(2.0 * xy, xx - yy), spread = std::sqrt((xx - yy) * (xx - yy) * 0.25 + xy * xy);
+		const double longWay = (xx + yy) * 0.5 + spread, shortWay = std::max((xx + yy) * 0.5 - spread, drawn / 12.0);
+		double way[2] = { std::cos(turn), std::sin(turn) };
+		if (way[1] > 0.0) { way[0] = -way[0]; way[1] = -way[1]; }
+		if (longWay >= ItemLong * ItemLong * shortWay && way[1] > -0.985)
+		{
+			double low = 1e9, high = -1e9, lowSide = 1e9, highSide = -1e9;
+			for (int y = 0; y < height; ++y)
+				for (int x = 0; x < width; ++x)
+				{
+					if (!held.picture[y * width + x]) continue;
+					const double on = (x - columns) * way[0] + (y - rows) * way[1], beside = -(x - columns) * way[1] + (y - rows) * way[0];
+					low = std::min(low, on); high = std::max(high, on); lowSide = std::min(lowSide, beside); highSide = std::max(highSide, beside);
+				}
+			const double sideMiddle = (lowSide + highSide) * 0.5;
+			origin[0] = (float)(columns + low * way[0] - sideMiddle * way[1]);
+			origin[1] = (float)(rows + low * way[1] + sideMiddle * way[0]);
+			upWay[0] = (float)way[0]; upWay[1] = (float)way[1];
+			reach = (float)(high - low);
+			wideReach = (float)(highSide - lowSide + 1.0);
+		}
+	}
+	const float rightWay[2] = { -upWay[1], upWay[0] };
+	const float scale = place.length / std::max(1.0f, reach), thin = std::min(1.0f, scale / RifleScale);
+	const float halfLength = reach * scale * 0.5f;
 	// (The thickness is in the body's own measure whatever its fineness: on a fine body an item is half as thick in the
 	// world as on a coarse one, slim as the owner chose it from pictures.)
 	auto halfThickness = [&](int x, int y) { return x >= 0 && y >= 0 && x < width && y < height && depth[y * width + x] ? std::min(1.4f, 0.45f + 0.35f * depth[y * width + x]) * thin : 0.0f; };
@@ -1526,7 +1726,7 @@ void addItem(VoxelUnitModel &model, const HeldItem &held, const ItemPlace &place
 		for (int r = 0; r < 3; ++r) for (int c = 0; c < 3; ++c) inverse[r][c] = cross[r][c] / det;
 	}
 	// The box of cells round the item (its picture's corners, its greatest thickness).
-	const float halfAcross = (right - left + 1) * 0.5f * scale * ItemSlim, thickest = 1.4f * thin * ItemSlim + Cell;
+	const float halfAcross = wideReach * 0.5f * scale * ItemSlim, thickest = 1.4f * thin * ItemSlim + Cell;
 	float low[3] = { 1e9f, 1e9f, 1e9f }, high[3] = { -1e9f, -1e9f, -1e9f };
 	for (int corner = 0; corner < 8; ++corner)
 	{
@@ -1556,7 +1756,8 @@ void addItem(VoxelUnitModel &model, const HeldItem &held, const ItemPlace &place
 				const float a = inverse[0][0] * off[0] + inverse[0][1] * off[1] + inverse[0][2] * off[2];
 				const float c = inverse[1][0] * off[0] + inverse[1][1] * off[1] + inverse[1][2] * off[2];
 				const float t = inverse[2][0] * off[0] + inverse[2][1] * off[1] + inverse[2][2] * off[2];
-				const int y = bottom - (int)std::lround((a + halfLength) / scale), x = (int)std::lround(c / (scale * ItemSlim) + middleAcross);
+				const float up = (a + halfLength) / scale, beside = c / (scale * ItemSlim);
+				const int x = (int)std::lround(origin[0] + up * upWay[0] + beside * rightWay[0]), y = (int)std::lround(origin[1] + up * upWay[1] + beside * rightWay[1]);
 				if (x < 0 || y < 0 || x >= width || y >= height) continue;
 				const Uint8 colour = held.picture[y * width + x];
 				if (colour && std::abs(t) <= std::max(halfThickness(x, y) * ItemSlim, Cell * 0.6f)) filled[((size_t)i * size[1] + j) * size[2] + k] = colour;
@@ -2337,12 +2538,81 @@ static void dropFloating(VoxelUnitModel &model)
 	}
 }
 
+/// A relief body is at most this thick either side of its drawing's plane, voxels; and this much of how deep inside
+/// the drawing's outline a pixel is (a round blob of the drawing comes out about as deep as it is wide).
+constexpr float ReliefHalfMost = 4.5f * VOXELSCALE, ReliefRound = 0.7f;
+/// The body of a unit its sprite draws the same from every side, and lopsided (see Routine::relief): the one drawing,
+/// standing upright through the middle of its feet and facing the way the unit does, given volume as a fall's shapes
+/// are (see fallRelief): thicker inside the drawing's outline, rounded at its edges. A cube takes its pixel's colour,
+/// the same from every side. (Carved from its eight drawings, all the same, such a body keeps only what the drawing
+/// has on both sides of its middle: X-Com Files' Abomination, a cluster of bubbles off to one side, was left "flat
+/// looking puddles", a player, GitHub issue #203.)
+static std::unique_ptr<VoxelUnitModel> reliefModel(const PartFrames &part, const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse,
+	const HeldItem &lying, const SDL_Color *palette)
+{
+	const std::vector<Uint8> picture = withoutOutline(part.frame[Front], FrameSize, FrameSize, palette);
+	const std::vector<int> depth = insideDepth(picture, FrameSize, FrameSize, (int)std::ceil(ReliefHalfMost / ReliefRound) + 1);
+	int left = FrameSize, right = -1, top = FrameSize, bottom = -1;
+	for (int y = 0; y < FrameSize; ++y)
+		for (int x = 0; x < FrameSize; ++x)
+			if (picture[y * FrameSize + x]) { left = std::min(left, x); right = std::max(right, x); top = std::min(top, y); bottom = std::max(bottom, y); }
+	if (right < 0) return nullptr;
+	// (direction Front, level: a column is the unit's right, turned about, times PixelsAcross; a row its height: see project)
+	VoxelUnitModel::FallShape shape;
+	const float low[3] = { -(right + 1 - FloorX) / PixelsAcross, -ReliefHalfMost, std::max(0.0f, (float)(FloorY - bottom - 1)) };
+	const float high[3] = { -(left - 1 - FloorX) / PixelsAcross, ReliefHalfMost, (float)(FloorY - top + 1) };
+	fillShape(shape, low, high, [&](float across, float along, float up) -> Uint8 {
+		float column, row, nearness;
+		project(across, 0.0f, up, Front, true, column, row, nearness);
+		const int x = (int)std::floor(column), y = (int)std::floor(row);
+		if (x < 0 || y < 0 || x >= FrameSize || y >= FrameSize) return 0;
+		const Uint8 colour = picture[y * FrameSize + x];
+		if (!colour) return 0;
+		const float half = std::max(Cell * 1.2f, std::min(ReliefHalfMost, 0.2f * VOXELSCALE + ReliefRound * depth[y * FrameSize + x]));
+		return std::abs(along) <= half ? colour : 0;
+	});
+	const size_t count = shape.colour.size();
+	if (count == 0) return nullptr;
+	auto model = std::make_unique<VoxelUnitModel>();
+	model->part.assign(count, VoxelUnitModel::Torso);
+	model->views.assign(count, 0xFFFF);
+	model->colours.resize(count * 16);
+	for (size_t k = 0; k < count; ++k) std::fill(model->colours.begin() + k * 16, model->colours.begin() + k * 16 + 16, shape.colour[k]);
+	model->addedFrom = count;
+	// What a shot meets: its cubes, in whole voxels, from every side.
+	const std::vector<float> *place[3] = { &shape.right, &shape.ahead, &shape.up };
+	for (int i = 0; i < 3; ++i)
+	{
+		const auto ends = std::minmax_element(place[i]->begin(), place[i]->end());
+		model->hitFrom[i] = (int)std::floor(*ends.first);
+		model->hitSize[i] = (int)std::floor(*ends.second) - model->hitFrom[i] + 1;
+	}
+	model->hits.assign((size_t)model->hitSize[0] * model->hitSize[1] * model->hitSize[2], 0);
+	for (size_t k = 0; k < count; ++k)
+	{
+		const int x = (int)std::floor(shape.right[k]) - model->hitFrom[0], y = (int)std::floor(shape.ahead[k]) - model->hitFrom[1], z = (int)std::floor(shape.up[k]) - model->hitFrom[2];
+		model->hits[((size_t)x * model->hitSize[1] + y) * model->hitSize[2] + z] = 0xFFFF;
+	}
+	model->right = std::move(shape.right);
+	model->ahead = std::move(shape.ahead);
+	model->up = std::move(shape.up);
+	for (int phase = 0; phase < 8; ++phase)
+	{
+		model->walkRight[phase] = model->right;
+		model->walkAhead[phase] = model->ahead;
+		model->walkUp[phase] = model->up;
+	}
+	makeFalls(*model, deaths, corpse, lying, palette, false, false);
+	return model;
+}
+
 std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCount], const std::vector<Uint8> composite[8], const HeldItem items[2],
 	const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse, const HeldItem &lying, const WalkFrames &walks, bool aiming, const Routine &routine,
 	const SDL_Color *palette)
 {
 	if (!parts[0].any) return nullptr;
 	useGrid(routine.big ? 2 : 1);
+	if (routine.relief && routine.whole && !routine.big) return reliefModel(parts[0], deaths, corpse, lying, palette);
 	// (a hull: a big unit that doesn't walk. One drawn by a walker's routine but without walk frames is a hull too: XPiratez's
 	// truck turret, a turret drawn by the Sectopod's routine that never moves.)
 	const bool bigHull = routine.big && !(routine.legsSwing && walks.any);
@@ -2401,7 +2671,28 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 			// the turret: its own drawings' block (its barrel is fine detail: nothing of it is left out), standing on
 			// the hull: where there is air between them it reaches down to the hull's top
 			std::vector<Uint8> gun = carve(parts[1], 0, std::vector<Uint8>(GridCells, 1));
-			levelOff(parts[1], gun);
+			// (Its top as its front and side drawings have it: nothing of it higher, over each place across and along,
+			// than those two show there, read as heights, TurretSlack lower for the slant they are drawn along. Its eight
+			// outlines alone leave it one lump with a peak, the dome and what stands beside it run together: "turrets
+			// could use better definition. Rocket tanks should roughly keep shape of rocket pods on sides", a player,
+			// GitHub issue #201. So the dome rises above the pods beside it.)
+			{
+				std::vector<int> topFront(FrameSize, FrameSize), topSide(FrameSize, FrameSize);
+				for (int column = 0; column < FrameSize; ++column)
+					for (int row = FrameSize - 1; row >= 0; --row)
+					{
+						if (parts[1].frame[Front][row * FrameSize + column]) topFront[column] = row;
+						if (parts[1].frame[RightSide][row * FrameSize + column]) topSide[column] = row;
+					}
+				for (int across = 0; across < GridAcross; ++across)
+					for (int along = 0; along < GridAlong; ++along)
+					{
+						const int front = (int)std::floor(FloorX - cellRight(across) * PixelsAcross), side = (int)std::floor(FloorX + cellAhead(along) * PixelsAcross);
+						const int row = front >= 0 && side >= 0 && front < FrameSize && side < FrameSize ? std::max(topFront[front], topSide[side]) : FrameSize;
+						const float most = FloorY - row - TurretSlack;
+						for (int up = 0; up < GridUp; ++up) if (cellUp(up) > most) gun[cellIndex(across, along, up)] = 0;
+					}
+			}
 			for (int across = 0; across < GridAcross; ++across)
 				for (int along = 0; along < GridAlong; ++along)
 				{
@@ -2411,6 +2702,39 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 					for (int up = lowest - 1; up >= 0 && roof < 0; --up) if (owner[cellIndex(across, along, up)]) roof = up;
 					for (int up = roof + 1; roof >= 0 && up < lowest; ++up) gun[cellIndex(across, along, up)] = 1;
 				}
+			// (Its barrel: where its side drawing runs out ahead of it thin, under BarrelThin of the turret's own height
+			// there, for two pixels or more, in both side drawings: a round bar as long, as high up and as thick as
+			// drawn, from inside the turret. "Tank barrel for cannon / laser / standard 1 barrel tank, should have a
+			// protruding barrel, to give definition", the same issue; its outlines left the stub on the turret's face.)
+			{
+				auto thinEnd = [&](int d, bool atRight, int &from, int &to, int &top, int &bottom) {
+					std::vector<int> high(FrameSize, 0), first(FrameSize, FrameSize), last(FrameSize, -1);
+					int most = 0, left = FrameSize, right = -1;
+					for (int column = 0; column < FrameSize; ++column)
+					{
+						for (int row = 0; row < FrameSize; ++row)
+							if (parts[1].frame[d][row * FrameSize + column]) { ++high[column]; first[column] = std::min(first[column], row); last[column] = row; }
+						most = std::max(most, high[column]);
+						if (high[column]) { left = std::min(left, column); right = std::max(right, column); }
+					}
+					if (right < 0) return false;
+					from = to = atRight ? right : left;
+					top = FrameSize; bottom = -1;
+					for (int column = from; column >= left && column <= right && high[column] > 0 && high[column] <= most * BarrelThin; column += atRight ? -1 : 1)
+					{
+						(atRight ? from : to) = column;
+						top = std::min(top, first[column]); bottom = std::max(bottom, last[column]);
+					}
+					return bottom >= 0 && to - from + 1 >= 2 * VOXELSCALE;
+				};
+				int from, to, top, bottom, otherFrom, otherTo, otherTop, otherBottom;
+				if (thinEnd(RightSide, true, from, to, top, bottom) && thinEnd(LeftSide, false, otherFrom, otherTo, otherTop, otherBottom))
+				{
+					const float height = FloorY - (top + bottom + 1) * 0.5f, thick = std::max(1.0f * VOXELSCALE, (bottom - top + 1) * 0.5f);
+					const float root[3] = { 0.0f, (from - FloorX) / PixelsAcross - 2.0f * VOXELSCALE, height }, muzzle[3] = { 0.0f, (to + 1 - FloorX) / PixelsAcross, height };
+					fillCapsule(gun, root, muzzle, thick);
+				}
+			}
 			for (int i = 0; i < GridCells; ++i) if (gun[i]) owner[i] = PartCodes[1];
 		}
 	}
@@ -2424,8 +2748,36 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	// The items in hand, where their frames show them, and the arms' skeletons (see ArmFrames): each from the top of its
 	// drawing to its hand (on the item it holds, or the bottom of its drawing), as long as a free arm reaches.
 	ItemPlace places[2];
-	const bool placed[2] = { placeItem(parts[RightItem], items[0].twoHanded, aiming, places[0]), placeItem(parts[LeftItem], items[1].twoHanded, aiming, places[1]) };
+	const bool placed[2] = { placeItem(parts[RightItem], items[0].twoHanded, aiming, items[0].melee, places[0]),
+		placeItem(parts[LeftItem], items[1].twoHanded, aiming, items[1].melee, places[1]) };
+	// What it holds is held in front of it: an item whose own length lies inside the body for more than ItemInBody of
+	// it (the hand frames only say where it is on the pictures; a deep body, a Muton's or a robe, reached out round
+	// it) is moved ahead, half a voxel at a time, till it is not, ItemOutMost at most. The arms reach for it where it
+	// is then. (A player, GitHub issue #207: "larger units ... have the gun imbedded in their stomach. While it being
+	// slightly pushed in is fine, full inside the stomach is strange".)
+	for (int hand = 0; hand < 2; ++hand)
+	{
+		if (!placed[hand] || places[hand].plate || routine.big || routine.whole) continue; // (a body drawn on one frame has its arms in it: the item lies on them)
+		ItemPlace &place = places[hand];
+		auto inBody = [&](float shift) {
+			int in = 0;
+			for (int step = 0; step < ItemSamples; ++step)
+			{
+				const float at = ((step + 0.5f) / ItemSamples - 0.5f) * place.length;
+				const int across = (int)std::floor((place.middle[0] + at * place.along[0] - AcrossFrom) / Cell), along = (int)std::floor((place.middle[1] + shift + at * place.along[1] - AlongFrom) / Cell),
+					up = (int)std::floor((place.middle[2] + at * place.along[2] - UpFrom) / Cell);
+				if (across >= 0 && along >= 0 && up >= 0 && across < GridAcross && along < GridAlong && up < GridUp && owner[cellIndex(across, along, up)]) ++in;
+			}
+			return in;
+		};
+		float shift = 0.0f;
+		while (shift < ItemOutMost && inBody(shift) * 100 > ItemSamples * ItemInBody) shift += Cell;
+		place.middle[1] += shift;
+	}
 	std::vector<Uint8> skeletons[BodyParts];
+	// (each arm's bones as placed: shoulder, elbow, hand; see the arms' colours below)
+	struct ArmBones { bool any = false; float shoulder[3], elbow[3], hand[3]; };
+	ArmBones bones[BodyParts];
 	{
 		struct Arm { int part; bool right, holds, found; float shoulder[3], hand[3]; };
 		Arm arms[2] = { { 1, false, false, false, {}, {} }, { 2, true, false, false, {}, {} } };
@@ -2466,13 +2818,40 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 			if (!arm.found) continue;
 			const ArmFrames frames(parts[arm.part]);
 			const float bone = std::max(length, distance3(arm.shoulder, arm.hand) * 1.02f) * 0.5f;
-			float elbow[3], radius[2];
-			placeElbow(arm.shoulder, arm.hand, bone, frames, elbow);
-			armRadii(frames, arm.shoulder, elbow, arm.hand, radius);
+			float shoulder[3], elbow[3], hand[3], radius[2];
+			std::copy(arm.shoulder, arm.shoulder + 3, shoulder);
+			std::copy(arm.hand, arm.hand + 3, hand);
+			placeElbow(shoulder, hand, bone, frames, elbow);
+			armRadii(frames, shoulder, elbow, hand, radius);
+			// Arms outside the body (the unit table's "arms: outside", for the units it names): a body drawn in a robe
+			// is carved as wide as the robe, and the arms its drawings lay over the robe's sides were inside it, flat
+			// stripes on its skin ("their arms are clearly outside robes, and should be painted OVER the robe, OR ...
+			// extend the arms out", a player, GitHub issue #207). Each joint moves out to its own side till half its
+			// bone's thickness is clear of the body; a hand on an item stays on it.
+			if (routine.arms & 1)
+			{
+				const float side = arm.right ? 1.0f : -1.0f;
+				auto clear = [&](float joint[3], float thick) {
+					for (int step = 0; step < 24 * VOXELSCALE; ++step)
+					{
+						const int across = (int)std::floor((joint[0] - side * thick * 0.5f - AcrossFrom) / Cell), along = (int)std::floor((joint[1] - AlongFrom) / Cell),
+							up = (int)std::floor((joint[2] - UpFrom) / Cell);
+						if (across < 0 || along < 0 || up < 0 || across >= GridAcross || along >= GridAlong || up >= GridUp || owner[cellIndex(across, along, up)] != VoxelUnitModel::Torso) break;
+						joint[0] += side * Cell;
+					}
+				};
+				clear(shoulder, radius[0]);
+				clear(elbow, std::max(radius[0], radius[1]));
+				if (!arm.holds) clear(hand, radius[1]);
+			}
 			std::vector<Uint8> &cells = skeletons[arm.part];
 			cells.assign(GridCells, 0);
-			fillCapsule(cells, arm.shoulder, elbow, radius[0]);
-			fillCapsule(cells, elbow, arm.hand, radius[1]);
+			fillCapsule(cells, shoulder, elbow, radius[0]);
+			fillCapsule(cells, elbow, hand, radius[1]);
+			bones[arm.part].any = true;
+			std::copy(shoulder, shoulder + 3, bones[arm.part].shoulder);
+			std::copy(elbow, elbow + 3, bones[arm.part].elbow);
+			std::copy(hand, hand + 3, bones[arm.part].hand);
 		}
 	}
 	for (int p = 1; p < BodyParts; ++p)
@@ -2483,6 +2862,9 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		const std::vector<Uint8> hull = carve(parts[p], 2, shape);
 		const bool skeleton = !skeletons[p].empty();
 		for (int i = 0; i < GridCells; ++i) if (((shape[i] && hull[i]) || (skeleton && skeletons[p][i])) && !owner[i]) owner[i] = PartCodes[p];
+		// (arms outside the body, see above: the bones lie over the body where they touch it)
+		if ((routine.arms & 1) && skeleton && (PartCodes[p] == VoxelUnitModel::LeftArm || PartCodes[p] == VoxelUnitModel::RightArm))
+			for (int i = 0; i < GridCells; ++i) if (skeletons[p][i] && owner[i] == VoxelUnitModel::Torso) owner[i] = PartCodes[p];
 	}
 	// A body sculpted from its frontal drawings (the unit table's "sculpt: frontal", for the units it names; the owner:
 	// the voxeliser "should maybe really look at the sprite frontals more (more than side positions) and carefully craft
@@ -2933,6 +3315,82 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 			for (int i = 0; i < 8 && !colour; ++i) colour = drawnColour(k, order[i], 1 - painting);
 			for (int i = 0; i < 8 && !colour; ++i) colour = model->colours[k * 16 + order[i]];
 			std::fill(model->colours.begin() + k * 16, model->colours.begin() + k * 16 + 16, colour);
+		}
+		// An arm's colours along its length (the unit table's "arms: along", for the units it names): an arm posed on
+		// what it holds reaches ahead, where its drawings show it hanging or foreshortened; painted as a picture
+		// thrown onto it, its sleeve's end and its hand came where the drawing's rows put them, not where they are
+		// on the arm ("texture should probably be applied along length of limb, rather than height based? the dagon
+		// disciples have longer, ragged looking sleeves", a player, GitHub issue #207). The drawing that shows the arm
+		// longest gives its colours from the shoulder's end to the hand's, the commonest in each of ArmBands stretches;
+		// each cube of the arm takes the colour of the stretch it is at along the bones.
+		for (int p = 1; (routine.arms & 2) && p <= 2; ++p)
+		{
+			if (!bones[p].any || !smoothed[p].any) continue;
+			int best = -1;
+			double bestLong = 0.0, bestWay[2] = {}, bestMiddle[2] = {}, bestFrom = 0.0, bestTo = 0.0;
+			for (int d = 0; d < 8; ++d)
+			{
+				double columns = 0.0, rows = 0.0;
+				int drawn = 0;
+				for (int row = 0; row < FrameSize; ++row)
+					for (int column = 0; column < FrameSize; ++column)
+						if (smoothed[p].frame[d][row * FrameSize + column]) { columns += column; rows += row; ++drawn; }
+				if (drawn < 4 * VOXELSCALE) continue;
+				columns /= drawn; rows /= drawn;
+				double xx = 0.0, xy = 0.0, yy = 0.0;
+				for (int row = 0; row < FrameSize; ++row)
+					for (int column = 0; column < FrameSize; ++column)
+						if (smoothed[p].frame[d][row * FrameSize + column]) { xx += (column - columns) * (column - columns); xy += (column - columns) * (row - rows); yy += (row - rows) * (row - rows); }
+				const double turn = 0.5 * std::atan2(2.0 * xy, xx - yy);
+				double way[2] = { std::cos(turn), std::sin(turn) };
+				if (way[1] < 0.0) { way[0] = -way[0]; way[1] = -way[1]; } // (down the frame: from the shoulder to the hand)
+				double from = 1e9, to = -1e9;
+				for (int row = 0; row < FrameSize; ++row)
+					for (int column = 0; column < FrameSize; ++column)
+						if (smoothed[p].frame[d][row * FrameSize + column])
+						{
+							const double at = (column - columns) * way[0] + (row - rows) * way[1];
+							from = std::min(from, at); to = std::max(to, at);
+						}
+				if (to - from > bestLong) { best = d; bestLong = to - from; bestWay[0] = way[0]; bestWay[1] = way[1]; bestMiddle[0] = columns; bestMiddle[1] = rows; bestFrom = from; bestTo = to; }
+			}
+			if (best < 0 || bestLong < 3.0 * VOXELSCALE) continue;
+			Uint8 bands[ArmBands] = {};
+			{
+				int counts[ArmBands][256] = {};
+				for (int row = 0; row < FrameSize; ++row)
+					for (int column = 0; column < FrameSize; ++column)
+					{
+						const Uint8 colour = smoothed[p].frame[best][row * FrameSize + column];
+						if (!colour) continue;
+						const double at = ((column - bestMiddle[0]) * bestWay[0] + (row - bestMiddle[1]) * bestWay[1] - bestFrom) / (bestTo - bestFrom + 1e-9);
+						++counts[std::clamp((int)(at * ArmBands), 0, ArmBands - 1)][colour];
+					}
+				for (int band = 0; band < ArmBands; ++band) bands[band] = (Uint8)(std::max_element(counts[band], counts[band] + 256) - counts[band]);
+				for (int band = 1; band < ArmBands; ++band) if (!bands[band]) bands[band] = bands[band - 1];
+				for (int band = ArmBands - 2; band >= 0; --band) if (!bands[band]) bands[band] = bands[band + 1];
+			}
+			const float upper = distance3(bones[p].shoulder, bones[p].elbow), lower = distance3(bones[p].elbow, bones[p].hand);
+			if (upper + lower < 1.0f) continue;
+			auto alongBone = [](const float a[3], const float b[3], const float at[3], float &off) {
+				float t = 0.0f, size = 0.0f;
+				for (int i = 0; i < 3; ++i) { t += (at[i] - a[i]) * (b[i] - a[i]); size += (b[i] - a[i]) * (b[i] - a[i]); }
+				t = size > 0.0f ? std::clamp(t / size, 0.0f, 1.0f) : 0.0f;
+				off = 0.0f;
+				for (int i = 0; i < 3; ++i) off += (at[i] - a[i] - t * (b[i] - a[i])) * (at[i] - a[i] - t * (b[i] - a[i]));
+				return t;
+			};
+			for (size_t k = 0; k < count; ++k)
+			{
+				if (model->part[k] != PartCodes[p]) continue;
+				const float at[3] = { model->right[k], model->ahead[k], model->up[k] };
+				float offUpper, offLower;
+				const float onUpper = alongBone(bones[p].shoulder, bones[p].elbow, at, offUpper), onLower = alongBone(bones[p].elbow, bones[p].hand, at, offLower);
+				// (past the hand's end the cubes are the hand's: the last stretch)
+				const float reached = offUpper <= offLower ? onUpper * upper : upper + onLower * lower;
+				const Uint8 colour = bands[std::clamp((int)(reached / (upper + lower) * ArmBands), 0, ArmBands - 1)];
+				if (colour) std::fill(model->colours.begin() + k * 16, model->colours.begin() + k * 16 + 16, colour);
+			}
 		}
 	}
 	else

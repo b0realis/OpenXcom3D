@@ -23,6 +23,7 @@ struct FineBodySource
 	std::vector<Uint8> parts[6][8], composite[8], itemPictures[2];
 	int itemWidth[2] = {}, itemHeight[2] = {};
 	bool itemTwoHanded[2] = {};
+	bool itemMelee[2] = {};
 	std::vector<std::vector<Uint8>> deaths;
 	std::vector<Uint8> corpse, lyingPicture;
 	int lyingWidth = 0, lyingHeight = 0;
@@ -34,6 +35,8 @@ struct FineBodySource
 	float torsoDepth = 0.0f; // (the torso's slices at most this deep for their width, by the mod's rules: see Routine)
 	bool backTop = false; // (what faces up painted by the back drawing, by the mod's rules: see Routine)
 	bool frontal = false; // (kept to its front and back drawings' outlines, by the mod's rules: see Routine)
+	bool relief = false; // (its one drawing given volume: see Routine)
+	int arms = 0; // (its arms outside the body, coloured along their length, by the mod's rules: see Routine)
 };
 
 /// Makes a body twice as fine from a unit's frames; null if it has no torso (or its routine has no bodies).

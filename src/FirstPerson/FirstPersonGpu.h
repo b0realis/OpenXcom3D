@@ -169,6 +169,7 @@ public:
 			float cosine, sine;              // the way it faces
 			float measure;                   // voxels to one of its own measures (its size, and half for a fine body)
 			float floorCut;                  // nothing of it below this height, from the eye
+			float ceilCut = 1e9f;            // nor at or above this one (the floor over its head)
 			bool items;                      // with the items in its hands
 			bool cubes;                      // the cubes cut to their outlines (else the squares round them)
 			float edges[3][2], lean[3], middle[2]; // a cube's half edges on the screen at a depth of one, how much deeper each goes, and the view's middle

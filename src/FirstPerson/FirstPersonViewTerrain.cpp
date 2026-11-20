@@ -3893,7 +3893,7 @@ void FirstPersonView::snapshotTiles()
 	// any tile's may hang on: the map's debug vision, the UFO lights, the floor left out, parts
 	// left out. A tile a door swung through last frame (the swing writes into its snapshot, see
 	// updateDoorSwings) has its own taken afresh.
-	const bool debug = _save->getDebugMode(), leftOut = !_leftOutParts.empty();
+	const bool debug = _save->getDebugMode(), leftOut = !_leftOutParts.empty() || !_ghostedParts.empty();
 	const bool everyTile = !trackWalls || debug != _snapshotDebug || _ufoLightsOn != _snapshotUfoLights || _hiddenFloor != _snapshotHiddenFloor
 		|| leftOut || _snapshotLeftOut;
 	_snapshotDebug = debug;
@@ -4145,7 +4145,7 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 		// was, see shownPart.)
 		const MapData *mapData = shownPart(index, tile, part);
 		if (!mapData || (part == O_FLOOR && (int)index == _hiddenFloor)
-			|| (!_leftOutParts.empty() && std::find(_leftOutParts.begin(), _leftOutParts.end(), std::make_pair(index, part)) != _leftOutParts.end()))
+			|| (!_leftOutParts.empty() && std::binary_search(_leftOutParts.begin(), _leftOutParts.end(), std::make_pair((int)index, part))))
 		{
 			continue;
 		}
@@ -4254,6 +4254,12 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 		if (Options::fpsGhostOpenDoors && cutout && frame == 7 && !model->empty && !model->ghostly)
 		{
 			model = openDoorModel(model);
+		}
+		// (the skin of the solid block the eye is inside, Doom IDCLIP: a ghost, see setGhostedParts)
+		if (!_ghostedParts.empty() && !model->empty && !model->ghostly && std::binary_search(_ghostedParts.begin(), _ghostedParts.end(), std::make_pair((int)index, part)))
+		{
+			model = openDoorModel(model);
+			next = nullptr;
 		}
 		restless = restless || model->openingGlass; // (its glass may be broken any frame)
 		if (model->openingGlass && glassBroken(index, part))

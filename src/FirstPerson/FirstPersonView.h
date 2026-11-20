@@ -534,7 +534,10 @@ public:
 	/// Leaves out one tile's floor (the lift platform being ridden through), or none (index -1).
 	void setHiddenFloor(int tileIndex) { _hiddenFloor = tileIndex; }
 	/// Leaves out these parts (tile index, part), the ones the eye is inside with Doom IDCLIP, or none.
-	void setLeftOutParts(const std::vector<std::pair<int, int>> &parts) { _leftOutParts = parts; }
+	void setLeftOutParts(const std::vector<std::pair<int, int>> &parts) { _leftOutParts = parts; std::sort(_leftOutParts.begin(), _leftOutParts.end()); }
+	/// Shows these parts (tile index, part) as ghosts, seen through: the skin of the solid block the eye is inside with
+	/// Doom IDCLIP, where it meets the open air; or none.
+	void setGhostedParts(const std::vector<std::pair<int, int>> &parts) { _ghostedParts = parts; std::sort(_ghostedParts.begin(), _ghostedParts.end()); }
 	/// Turns the flashlight on or off: the shoulder one, or the dynamic one (a tight spot on the crosshair).
 	void setFlashlight(bool on, bool dynamic = false) { _flashlight = on; _dynamicFlashlight = dynamic; }
 	/// Night vision like the isometric map's: brighter, in one colour (group + 1, 0 off).
@@ -846,7 +849,8 @@ private:
 	int _snapshotHiddenFloor = -1;
 	bool _snapshotDebug = false, _snapshotUfoLights = false, _snapshotLeftOut = false;
 	std::vector<int> _swungTiles;
-	std::vector<std::pair<int, int>> _leftOutParts;     // parts left out (tile index, part): the ones the eye is inside with Doom IDCLIP
+	std::vector<std::pair<int, int>> _leftOutParts;     // parts left out (tile index, part), sorted: the ones the eye is inside with Doom IDCLIP
+	std::vector<std::pair<int, int>> _ghostedParts;     // parts shown as ghosts (tile index, part), sorted: see setGhostedParts
 	std::vector<const MapData*> _wallsLastFrame[2];     // west/north wall of each tile last frame
 	std::vector<DoorAnimation> _doorAnimations;         // doors swinging open
 	std::unordered_map<int, Uint32> _ufoDoorOpening;    // UFO door part (tile * 4 + part) -> when it started sliding
@@ -1183,6 +1187,8 @@ private:
 	SeeThroughSprite _faintPile = { nullptr, 1.0f };    // how the pile pointed at past is drawn (see drawFloorItems)
 	/// A standing sprite isn't cut off below any floor (see SpriteDraw::floorCut, floorUnderside).
 	static constexpr double NoFloorCut = -1e9;
+	/// A standing sprite isn't cut off under any ceiling (see SpriteDraw::ceilingCut, ceilingAbove).
+	static constexpr double NoCeilingCut = 1e9;
 	/// One sprite to draw standing in the world (see drawSprite).
 	struct SpriteDraw
 	{
@@ -1201,6 +1207,7 @@ private:
 		double lyingSlope = 0.0;          // a lying sprite's floor rising towards the camera: voxels up for each voxel along (see lyingRise)
 		double layBack = 0.0;             // the card lies back this far whatever the view's pitch, in radians (a hull's: see hullLayBack)
 		double floorCut = NoFloorCut;     // no part of a standing sprite below this height, in voxels: the underside of the floor a unit stands on (see floorUnderside)
+		double ceilingCut = NoCeilingCut; // no part of a standing sprite at or above this height, in voxels: the floor over a unit's head (see ceilingAbove)
 	};
 	/// Draws a sprite standing in the world, depth-tested (or see-through, laid over what's there):
 	/// all of it, or only the screen rows from bandTop up to bandBottom.
@@ -1285,7 +1292,7 @@ private:
 		const Uint8 *bodyColours = nullptr, *bodyParts = nullptr;
 		int bodyColourStep = 1;
 		size_t bodyCount = 0;
-		double bodyFeet[3] = {}, bodyCosine = 1.0, bodySine = 0.0, bodyMeasure = 1.0, bodyFloorCut = 0.0;
+		double bodyFeet[3] = {}, bodyCosine = 1.0, bodySine = 0.0, bodyMeasure = 1.0, bodyFloorCut = 0.0, bodyCeilingCut = 1e9;
 		bool bodyItems = true;
 		int bodyShade = 0;
 		Uint16 voxelHitOutline = 0;                                       // ... the hitbox outline drawn round it (its place in _outlineColors + 1; 0 none)
@@ -1310,7 +1317,8 @@ private:
 	/// in a pile pointed at as that pile (and the unconscious unit in it).
 	void gpuRecordBody(const DrawStep &step);
 	void recordVoxelUnit(const VoxelUnitModel &body, int walkPhase, int facing, int direction, bool level, const double feet[3], double floorCut,
-		int shade, double scale, BattleUnit *unit, double fall = 0.0, bool items = true, BattleUnit *lyingBody = nullptr, const Tile *pile = nullptr, double faint = 1.0);
+		int shade, double scale, BattleUnit *unit, double fall = 0.0, bool items = true, BattleUnit *lyingBody = nullptr, const Tile *pile = nullptr, double faint = 1.0,
+		double ceilingCut = NoCeilingCut);
 	std::map<const BattleUnit*, Uint32> _collapseStarts; // when each unit collapsing (the game's own fall) was first seen so
 	std::map<const BattleUnit*, int> _facingsWell;       // the way each unit faced, last seen well (a voxel body going down keeps it)
 	/// How far a voxel body going down by the game's own fall has come (see drawUnits): 0 to 1, or -1 if it isn't.
@@ -1330,6 +1338,8 @@ private:
 	double lyingRise(const double world[3], double reach) const;
 	/// The underside of the floor slab something standing at a point is on, if a floor is under it (else NoFloorCut).
 	double floorUnderside(const double world[3]) const;
+	/// The floor over the head of something standing at a point, if the level above has one there (else NoCeilingCut).
+	double ceilingAbove(const double world[3]) const;
 	/// Whether a voxel is filled by the view's terrain (off the map: no).
 	bool solidVoxel(int voxelX, int voxelY, int voxelZ) const;
 	/// The ground under something lying at a point: the plane through its surface round it, its height there and its slope.

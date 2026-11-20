@@ -264,6 +264,7 @@ void FirstPersonView::gpuRecordBody(const DrawStep &step)
 	body.cosine = (float)step.bodyCosine; body.sine = (float)step.bodySine;
 	body.measure = (float)step.bodyMeasure;
 	body.floorCut = (float)std::max(-1e9, step.bodyFloorCut - _eye[2]);
+	body.ceilCut = (float)std::min(1e9, step.bodyCeilingCut - _eye[2]);
 	body.items = step.bodyItems;
 	body.cubes = step.voxelOutline;
 	for (int axis = 0; axis < 3; ++axis)
@@ -403,6 +404,7 @@ void FirstPersonView::gpuRecordSprite(const SpriteDraw &draw)
 		(double)spriteWidth, (double)spriteHeight, (double)pixelsAt, (double)opacityAt,
 		std::max(-1e9, draw.floorCut - _eye[2]), opacity, seeThroughOpacity, (double)(seeThroughSprite ? seeThroughSprite->capLevels : 0) };
 	for (int which = 0; which < 28; ++which) texels[8 + which] = (float)numbers[which];
+	texels[36] = (float)std::min(1e9, draw.ceilingCut - _eye[2]); // (texel 9: the height, from the eye, nothing of the card shows at or above)
 }
 
 /**

@@ -53,6 +53,7 @@
 #include "FirstPersonMode.h"
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <climits>
 #include <cmath>
 #include <cstring>
@@ -2207,9 +2208,10 @@ void FirstPersonMode::updateMusic(Uint32 now)
 /**
  * Setting "Voxel units": every unit's body is made from the battle's start, on the map too, not only those the 3D view
  * has seen (the owner: the wait must not come at the first click of the 3D button; and with "Full sprite hitboxes" a
- * shot hits a unit where its body is, see FirstPerson::spriteHit): each frame, VoxelBodiesPerFrame at most of those still
- * without a body for how they stand now (see VoxelUnits::modelFor; the builder's threads make them, the units in the
- * battle's order: the player's first). A unit without one yet is drawn, and hit, as its picture.
+ * shot hits a unit where its body is, see FirstPerson::spriteHit): each frame, those still without a body for how they
+ * stand now have their frames gathered, for VoxelBodiesMs at most (see VoxelUnits::modelFor; the builder's threads make
+ * the bodies, the units in the battle's order: the player's first). A unit without one yet is drawn, and hit, as its
+ * picture. (By the time it takes, not by a count: a hundred units alike used to be gathered in one frame, see modelFor.)
  */
 void FirstPersonMode::makeVoxelBodies()
 {
@@ -2218,10 +2220,10 @@ void FirstPersonMode::makeVoxelBodies()
 		_bodySurface = new Surface(VoxelBodies::FrameSize, VoxelBodies::FrameSize);
 	}
 	UnitSprite unitSprite(_bodySurface, _game->getMod(), _save, _save->getAnimFrame(), _save->getDepth() != 0, 0, 0);
-	int builds = VoxelBodiesPerFrame;
+	const auto began = std::chrono::steady_clock::now();
 	for (BattleUnit *unit : *_save->getUnits())
 	{
-		if (builds <= 0) break;
+		int builds = 1;
 		// (a unit down already has one made too, once: its corpse lies as its body, as one that went down in view)
 		if (VoxelUnits::suitsDown(unit) ? _voxelUnits->lastBody(unit) != nullptr : !VoxelUnits::suits(unit)) continue;
 		if (unit->isOutThresholdExceed() && _voxelUnits->lastBody(unit)) continue; // (struck down, about to fall: it keeps the body it had, see drawUnits)
@@ -2229,6 +2231,8 @@ void FirstPersonMode::makeVoxelBodies()
 		int walkPhase;
 		_voxelUnits->modelFor(unit, unitSprite, _game->getMod()->getSurfaceSet("BIGOBS.PCK"), _game->getMod()->getSurfaceSet("FLOOROB.PCK"), _save,
 			_state->getPalette(), builds, walkPhase);
+		// (its frames were gathered: is there time for another's?)
+		if (builds == 0 && std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - began).count() >= VoxelBodiesMs) break;
 	}
 	_bodySurface->clear();
 }

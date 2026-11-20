@@ -1432,10 +1432,10 @@ index 000000000..8c874c4f5
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..ce4496d67
+index 000000000..3a264c189
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,217 @@
+@@ -0,0 +1,222 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1632,9 +1632,14 @@ index 000000000..ce4496d67
 +      torsoDepth: 80
 +      top: back
 +      sculpt: frontal
-+    # the bats (XPiratez's vampire bat, The X-Com Files' shadowbat: a script flaps their wings as they hover)
++    # the bats (XPiratez's vampire bat, The X-Com Files' shadowbat: a script flaps their wings as they hover); any unit whose
++    # standing sprite is animated has a body for each frame without being named (animation: none switches that off)
 +    - names: [BAT, SHADOWBAT]
 +      animation: sprite
++    # The X-Com Files' Church of Dagon: robes carved as wide as they hang, with the arms inside them; long sleeves on
++    # arms posed on their guns (arms outside the body, coloured along their length)
++    - names: [DAGON]
++      arms: both
 +
 +interfaces:
 +  - type: firstPerson
@@ -18904,7 +18909,7 @@ zS5@`!3aHaZGtp45!Lxph$oiM+^CR%dVZh&K3*XTV@UN4gPwa!|{1W=Aba=<@`1p*z
 ih*j<5N1;eik|IX<zbW+g$UZrfr}=t{<U#TybpHoxAdk2J
 
 diff --git a/src/Battlescape/BattlescapeGame.cpp b/src/Battlescape/BattlescapeGame.cpp
-index 2648b2db3..b950e0fc2 100644
+index 2648b2db3..3547a750a 100644
 --- a/src/Battlescape/BattlescapeGame.cpp
 +++ b/src/Battlescape/BattlescapeGame.cpp
 @@ -59,6 +59,7 @@
@@ -18943,12 +18948,13 @@ index 2648b2db3..b950e0fc2 100644
  	{
  		getMap()->getCamera()->centerOnPosition(unit->getPosition());
  		if (status == STATUS_PANICKING)
-@@ -1791,8 +1804,15 @@ void BattlescapeGame::primaryAction(Position pos)
+@@ -1791,8 +1804,16 @@ void BattlescapeGame::primaryAction(Position pos)
  				getMap()->getWaypoints()->clear();
  				_parentState->getGame()->getCursor()->setVisible(false);
  				_currentAction.cameraPosition = getMap()->getCamera()->getMapOffset();
 -				_states.push_back(new ProjectileFlyBState(this, _currentAction));
 -				statePushFront(new UnitTurnBState(this, _currentAction));
++				FirstPerson::mapAkimbo(_parentState, _currentAction); // (OpenXcom3D: the other hand's gun sprays along, marked on the map)
 +				if (FirstPerson::shotKeepsFacing(_parentState, _currentAction)) // (OpenXcom3D: VR mode turns the soldier by the stick alone)
 +				{
 +					statePushFront(new ProjectileFlyBState(this, _currentAction));
@@ -18961,7 +18967,7 @@ index 2648b2db3..b950e0fc2 100644
  				_currentAction.sprayTargeting = false;
  				_currentAction.waypoints.clear();
  			}
-@@ -1926,8 +1946,16 @@ void BattlescapeGame::primaryAction(Position pos)
+@@ -1926,8 +1947,16 @@ void BattlescapeGame::primaryAction(Position pos)
  
  			_parentState->getGame()->getCursor()->setVisible(false);
  			_currentAction.cameraPosition = getMap()->getCamera()->getMapOffset();
@@ -20208,7 +20214,7 @@ index a263ca287..6a06e0148 100644
  	void skipTrajectory();
  	/// Gets the Position of origin for the projectile.
 diff --git a/src/Battlescape/ProjectileFlyBState.cpp b/src/Battlescape/ProjectileFlyBState.cpp
-index 529b7f282..974f427d5 100644
+index 529b7f282..b10ba208c 100644
 --- a/src/Battlescape/ProjectileFlyBState.cpp
 +++ b/src/Battlescape/ProjectileFlyBState.cpp
 @@ -18,6 +18,7 @@
@@ -20294,7 +20300,7 @@ index 529b7f282..974f427d5 100644
  				if (!foundLoF && Options::oxceEnableOffCentreShooting)
  				{
  					// If we can't target from the standard shooting position, try a bit left and right from the centre.
-@@ -391,6 +425,25 @@ void ProjectileFlyBState::init()
+@@ -391,6 +425,29 @@ void ProjectileFlyBState::init()
  		}
  	}
  
@@ -20316,11 +20322,15 @@ index 529b7f282..974f427d5 100644
 +		_turnGuns[1].weapon = _action.dualWeapon;
 +		_turnGuns[1].type = _action.dualType;
 +		_takingTurns = !_action.dualVolley && _partnerShots > 0 && !_action.weapon->getArcingShot(_action.type) && !_action.dualWeapon->getArcingShot(_action.dualType);
++		if (_takingTurns && _action.sprayTargeting)
++		{
++			_sprayTargets.assign(_action.waypoints.begin(), _action.waypoints.end()); // (the spray's points, for the other gun's rounds: see createNewProjectile)
++		}
 +	}
  	if (createNewProjectile())
  	{
  		auto* conf = weapon->getActionConf(_action.type);
-@@ -417,7 +470,13 @@ void ProjectileFlyBState::init()
+@@ -417,13 +474,30 @@ void ProjectileFlyBState::init()
   */
  bool ProjectileFlyBState::createNewProjectile()
  {
@@ -20334,20 +20344,43 @@ index 529b7f282..974f427d5 100644
  
  	// Special handling for "spray" auto-attack, get target positions from the action's waypoints, starting from the back
  	if (_action.sprayTargeting)
-@@ -447,6 +506,12 @@ bool ProjectileFlyBState::createNewProjectile()
- 		_action.waypoints.pop_back();
- 	}
+ 	{
+ 		// Since we're just spraying, target the middle of the tile
+-		_targetVoxel = _action.waypoints.back();
++		// (OpenXcom3D, dual wield taking turns: the other gun's rounds sweep the same points, each round its own of them;
++		// the list is the chosen gun's to use up. Each gun's round took a point off it, and the burst ended, or read
++		// past the list's end, after one gun's worth of rounds: GitHub issue #205.)
++		const bool partnersRound = _takingTurns && _turnGun == 1 && !_sprayTargets.empty();
++		if (partnersRound)
++		{
++			_targetVoxel = _sprayTargets[(size_t)std::clamp((int)_sprayTargets.size() - _action.autoShotCounter, 0, (int)_sprayTargets.size() - 1)];
++		}
++		else if (!_action.waypoints.empty())
++		{
++			_targetVoxel = _action.waypoints.back();
++		}
+ 		Position targetPosition = _targetVoxel.toTile();
  
+ 		// The waypoint targeting is possibly out of range of the gun, so move the voxel to the max range of the gun if it is
+@@ -444,7 +518,16 @@ bool ProjectileFlyBState::createNewProjectile()
+ 			_unit->turn(_unit->getTurretType() != -1);
+ 		}
+ 
+-		_action.waypoints.pop_back();
++		if (!partnersRound && !_action.waypoints.empty())
++		{
++			_action.waypoints.pop_back();
++		}
++	}
++
 +	// an FPS-style shot (first-person view): each round where the view aims it now (recoil climbs)
 +	if (_action.freeAim)
 +	{
 +		FirstPerson::freeAimTarget(_parent->getSave()->getBattleState(), _action, _targetVoxel);
-+	}
-+
- 	// create a new projectile
- 	Projectile *projectile = new Projectile(_parent->getMod(), _parent->getSave(), _action, _origin, _targetVoxel, _ammo);
+ 	}
  
-@@ -465,6 +530,10 @@ bool ProjectileFlyBState::createNewProjectile()
+ 	// create a new projectile
+@@ -465,6 +548,10 @@ bool ProjectileFlyBState::createNewProjectile()
  	{
  		accuracyDivider = 200.0;
  	}
@@ -20358,7 +20391,7 @@ index 529b7f282..974f427d5 100644
  
  	BattleActionAttack attack = BattleActionAttack::GetAferShoot(_action, _ammo);
  	if (_action.type == BA_THROW)
-@@ -588,9 +657,695 @@ bool ProjectileFlyBState::createNewProjectile()
+@@ -588,9 +675,695 @@ bool ProjectileFlyBState::createNewProjectile()
  		_parent->getSave()->appendToHitLog(HITLOG_NEW_SHOT, _action.actor->getFaction());
  	}
  
@@ -21054,7 +21087,7 @@ index 529b7f282..974f427d5 100644
  /**
   * Deinitialize the state.
   */
-@@ -607,7 +1362,12 @@ void ProjectileFlyBState::deinit()
+@@ -607,18 +1380,33 @@ void ProjectileFlyBState::deinit()
  void ProjectileFlyBState::think()
  {
  	/// checks if a weapon has any more shots to fire.
@@ -21068,9 +21101,13 @@ index 529b7f282..974f427d5 100644
  
  	_parent->getSave()->getBattleState()->clearMouseScrollingState();
  	/* TODO refactoring : store the projectile in this state, instead of getting it from the map each time? */
-@@ -616,9 +1376,17 @@ void ProjectileFlyBState::think()
+ 	if (_parent->getMap()->getProjectile() == 0)
+ 	{
  		bool hasFloor = _action.actor->haveNoFloorBelow() == false;
- 		bool unitCanFly = _action.actor->getMovementType() == MT_FLY;
+-		bool unitCanFly = _action.actor->getMovementType() == MT_FLY;
++		// (OpenXcom3D: a unit Doom's IDCLIP holds in the air stays there, as one that flies does: its burst goes on. It
++		// fired one round of five from the air: GitHub issue #206.)
++		bool unitCanFly = _action.actor->getMovementType() == MT_FLY || FirstPerson::noclipFloats(_parent->getSave()->getBattleState(), _action.actor);
  
 -		if (_action.weapon->haveNextShotsForAction(_action.type, _action.autoShotCounter)
 +		// (dual wield as a volley: the other gun's rounds left after this gun's last follow on
@@ -21088,7 +21125,7 @@ index 529b7f282..974f427d5 100644
  			&& (hasFloor || unitCanFly))
  		{
  			createNewProjectile();
-@@ -630,6 +1398,10 @@ void ProjectileFlyBState::think()
+@@ -630,6 +1418,10 @@ void ProjectileFlyBState::think()
  		}
  		else
  		{
@@ -21099,7 +21136,7 @@ index 529b7f282..974f427d5 100644
  			if (_action.cameraPosition.z != -1 && _action.waypoints.size() <= 1)
  			{
  				_parent->getMap()->getCamera()->setMapOffset(_action.cameraPosition);
-@@ -651,16 +1423,39 @@ void ProjectileFlyBState::think()
+@@ -651,16 +1443,39 @@ void ProjectileFlyBState::think()
  			_parent->popState();
  		}
  	}
@@ -21140,7 +21177,7 @@ index 529b7f282..974f427d5 100644
  			// impact !
  			if (_action.type == BA_THROW)
  			{
-@@ -742,6 +1537,7 @@ void ProjectileFlyBState::think()
+@@ -742,6 +1557,7 @@ void ProjectileFlyBState::think()
  						noMoreShotsToShoot(),
  						shotgun ? 0 : _range + _parent->getMap()->getProjectile()->getDistance()
  					));
@@ -21148,7 +21185,7 @@ index 529b7f282..974f427d5 100644
  
  					if (_projectileImpact == V_UNIT)
  					{
-@@ -754,83 +1550,72 @@ void ProjectileFlyBState::think()
+@@ -754,83 +1570,72 @@ void ProjectileFlyBState::think()
  					// special shotgun behaviour: trace extra projectile paths, and add bullet hits at their termination points.
  					if (shotgun)
  					{
@@ -21248,7 +21285,7 @@ index 529b7f282..974f427d5 100644
 +								if (_action.freeAim)
 +								{
 +									proj->spreadAsPellet(); // (OpenXcom3D: an FPS-style shot's pellets spread round its line as the game's do)
-+								}
+ 								}
 +
 +								// let it trace to the point where it hits
 +								int secondaryImpact = V_EMPTY;
@@ -21263,7 +21300,7 @@ index 529b7f282..974f427d5 100644
 +									// pellet spread based on spread and firing accuracy with diminishing formula
 +									// identical with vanilla formula when spread = 100 (default)
 +									secondaryImpact = proj->calculateTrajectory(std::max(0.0, (BattleUnit::getFiringAccuracy(attack, _parent->getMod()) / (_action.dualWield ? 100.0 / FirstPerson::DualWieldAccuracy : 100.0)) - i * 5.0 * spread / 100.0));
- 								}
++								}
 +
 +								if (secondaryImpact != V_EMPTY)
 +								{
@@ -21284,7 +21321,7 @@ index 529b7f282..974f427d5 100644
  					}
  
  					// nerf unit's XP values (gained via extra shotgun bullets)
-@@ -842,6 +1627,9 @@ void ProjectileFlyBState::think()
+@@ -842,6 +1647,9 @@ void ProjectileFlyBState::think()
  				}
  			}
  
@@ -21294,7 +21331,7 @@ index 529b7f282..974f427d5 100644
  			delete _parent->getMap()->getProjectile();
  			_parent->getMap()->setProjectile(0);
  		}
-@@ -857,6 +1645,9 @@ void ProjectileFlyBState::cancel()
+@@ -857,6 +1665,9 @@ void ProjectileFlyBState::cancel()
  	if (_parent->getMap()->getProjectile())
  	{
  		_parent->getMap()->getProjectile()->skipTrajectory();
@@ -21305,7 +21342,7 @@ index 529b7f282..974f427d5 100644
  		if (!_parent->getMap()->getCamera()->isOnScreen(p, false, 0, false))
  			_parent->getMap()->getCamera()->centerOnPosition(p);
 diff --git a/src/Battlescape/ProjectileFlyBState.h b/src/Battlescape/ProjectileFlyBState.h
-index 067c7b3ba..9004c1ea8 100644
+index 067c7b3ba..61a8b856f 100644
 --- a/src/Battlescape/ProjectileFlyBState.h
 +++ b/src/Battlescape/ProjectileFlyBState.h
 @@ -27,6 +27,8 @@ namespace OpenXcom
@@ -21317,7 +21354,7 @@ index 067c7b3ba..9004c1ea8 100644
  class Tile;
  
  /**
-@@ -43,6 +45,63 @@ private:
+@@ -43,6 +45,64 @@ private:
  	/// Tries to create a projectile sprite.
  	bool createNewProjectile();
  	bool _initialized, _targetFloor;
@@ -21345,6 +21382,7 @@ index 067c7b3ba..9004c1ea8 100644
 +	TurnGun _turnGuns[2];
 +	int _turnGun = 0;
 +	bool _takingTurns = false;
++	std::vector<Position> _sprayTargets; // (OpenXcom3D: a spray burst's points, for the other gun's rounds when two take turns)
 +	int nextTurnGun() const;
 +	void takeTurn(int gun);
 +	// a shotgun's pellets in flight (first-person view, setting "Shotgun pellets in flight"):
@@ -27796,10 +27834,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..fe84c40a6
+index 000000000..c947ae493
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,3704 @@
+@@ -0,0 +1,3705 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -30954,6 +30992,7 @@ index 000000000..fe84c40a6
 +		Gl::Uniform2f(location("uTurn"), body.cosine, body.sine);
 +		Gl::Uniform1f(location("uMeasure"), body.measure);
 +		Gl::Uniform1f(location("uFloorCut"), body.floorCut);
++		Gl::Uniform1f(location("uCeilCut"), body.ceilCut);
 +		Gl::Uniform1i(location("uSkipItems"), body.items ? 0 : 1);
 +		Gl::Uniform2f(location("uEdges[0]"), body.edges[0][0], body.edges[0][1]);
 +		Gl::Uniform2f(location("uEdges[1]"), body.edges[1][0], body.edges[1][1]);
@@ -31506,10 +31545,10 @@ index 000000000..fe84c40a6
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.h b/src/FirstPerson/FirstPersonGpu.h
 new file mode 100644
-index 000000000..668cdbf04
+index 000000000..21ef267ae
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.h
-@@ -0,0 +1,322 @@
+@@ -0,0 +1,323 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -31681,6 +31720,7 @@ index 000000000..668cdbf04
 +			float cosine, sine;              // the way it faces
 +			float measure;                   // voxels to one of its own measures (its size, and half for a fine body)
 +			float floorCut;                  // nothing of it below this height, from the eye
++			float ceilCut = 1e9f;            // nor at or above this one (the floor over its head)
 +			bool items;                      // with the items in its hands
 +			bool cubes;                      // the cubes cut to their outlines (else the squares round them)
 +			float edges[3][2], lean[3], middle[2]; // a cube's half edges on the screen at a depth of one, how much deeper each goes, and the view's middle
@@ -32046,10 +32086,10 @@ index 000000000..82e9da00f
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..a3cdd9219
+index 000000000..ee0775e82
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,2958 @@
+@@ -0,0 +1,2959 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -34211,6 +34251,7 @@ index 000000000..a3cdd9219
 +uniform vec2 uTurn;            // the cosine and sine of the way it faces
 +uniform float uMeasure;        // voxels to one of the body's own measures
 +uniform float uFloorCut;       // nothing of it below this height (from the eye)
++uniform float uCeilCut;        // nor at or above this one (the floor over its head)
 +uniform int uSkipItems;        // 1: without the items in its hands
 +uniform vec3 uForward, uRight, uUp; // the camera, in true proportions
 +uniform float uFocal;
@@ -34235,7 +34276,7 @@ index 000000000..a3cdd9219
 +	float ahead = dot(scaled, uForward);
 +	gl_Position = vec4(2.0, 2.0, 2.0, 1.0); // (off the picture: a cube not drawn)
 +	vCentre = vec2(0.0); vDepth = 0.0; vColor = 0; vOutlined = 0; vEdge0 = vEdge1 = vEdge2 = vec2(0.0); vReach = vec3(0.0);
-+	if (ahead < 4.0 || place.z < uFloorCut || (uSkipItems != 0 && colour >= 256)) return;
++	if (ahead < 4.0 || place.z < uFloorCut || place.z >= uCeilCut || (uSkipItems != 0 && colour >= 256)) return;
 +	float nearer = 1.0 / ahead;
 +	vec2 centre = vec2(uAxis.x + dot(scaled, uRight) * uFocal * nearer, uAxis.y - dot(scaled, uUp) * uFocal * nearer);
 +	vec2 edges[3];
@@ -34495,7 +34536,7 @@ index 000000000..a3cdd9219
 +				if (facing <= 1e-9) continue;
 +				distance = anchorFacing / facing;
 +				spriteRow = anchorY - dot(ray * distance - anchor, cardUp) / rowSize;
-+				if (ray.z * distance / ZScale < t8.x) continue; // (nothing of the card below the floor it stands on)
++				if (ray.z * distance / ZScale < t8.x || ray.z * distance / ZScale >= prim(base, 9).x) continue; // (nothing of the card below the floor it stands on, nor above the floor over its head)
 +			}
 +			if (!(distance >= 1.0 && spriteRow >= 0.0 && spriteRow < float(spriteHeight))) continue;
 +			int spriteX = int(floor(anchorX + (dot(ray, uLevelRight) * distance - anchorAcross) / columnSize));
@@ -35189,10 +35230,10 @@ index 000000000..eaa9f409a
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..b413f94d1
+index 000000000..c86596d7e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,3447 @@
+@@ -0,0 +1,3451 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -35248,6 +35289,7 @@ index 000000000..b413f94d1
 +#include "FirstPersonMode.h"
 +#include <algorithm>
 +#include <array>
++#include <chrono>
 +#include <climits>
 +#include <cmath>
 +#include <cstring>
@@ -37402,9 +37444,10 @@ index 000000000..b413f94d1
 +/**
 + * Setting "Voxel units": every unit's body is made from the battle's start, on the map too, not only those the 3D view
 + * has seen (the owner: the wait must not come at the first click of the 3D button; and with "Full sprite hitboxes" a
-+ * shot hits a unit where its body is, see FirstPerson::spriteHit): each frame, VoxelBodiesPerFrame at most of those still
-+ * without a body for how they stand now (see VoxelUnits::modelFor; the builder's threads make them, the units in the
-+ * battle's order: the player's first). A unit without one yet is drawn, and hit, as its picture.
++ * shot hits a unit where its body is, see FirstPerson::spriteHit): each frame, those still without a body for how they
++ * stand now have their frames gathered, for VoxelBodiesMs at most (see VoxelUnits::modelFor; the builder's threads make
++ * the bodies, the units in the battle's order: the player's first). A unit without one yet is drawn, and hit, as its
++ * picture. (By the time it takes, not by a count: a hundred units alike used to be gathered in one frame, see modelFor.)
 + */
 +void FirstPersonMode::makeVoxelBodies()
 +{
@@ -37413,10 +37456,10 @@ index 000000000..b413f94d1
 +		_bodySurface = new Surface(VoxelBodies::FrameSize, VoxelBodies::FrameSize);
 +	}
 +	UnitSprite unitSprite(_bodySurface, _game->getMod(), _save, _save->getAnimFrame(), _save->getDepth() != 0, 0, 0);
-+	int builds = VoxelBodiesPerFrame;
++	const auto began = std::chrono::steady_clock::now();
 +	for (BattleUnit *unit : *_save->getUnits())
 +	{
-+		if (builds <= 0) break;
++		int builds = 1;
 +		// (a unit down already has one made too, once: its corpse lies as its body, as one that went down in view)
 +		if (VoxelUnits::suitsDown(unit) ? _voxelUnits->lastBody(unit) != nullptr : !VoxelUnits::suits(unit)) continue;
 +		if (unit->isOutThresholdExceed() && _voxelUnits->lastBody(unit)) continue; // (struck down, about to fall: it keeps the body it had, see drawUnits)
@@ -37424,6 +37467,8 @@ index 000000000..b413f94d1
 +		int walkPhase;
 +		_voxelUnits->modelFor(unit, unitSprite, _game->getMod()->getSurfaceSet("BIGOBS.PCK"), _game->getMod()->getSurfaceSet("FLOOROB.PCK"), _save,
 +			_state->getPalette(), builds, walkPhase);
++		// (its frames were gathered: is there time for another's?)
++		if (builds == 0 && std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - began).count() >= VoxelBodiesMs) break;
 +	}
 +	_bodySurface->clear();
 +}
@@ -43927,10 +43972,10 @@ index 000000000..3b04cb513
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeMovement.cpp b/src/FirstPerson/FirstPersonModeMovement.cpp
 new file mode 100644
-index 000000000..6e3cb469e
+index 000000000..68dace111
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeMovement.cpp
-@@ -0,0 +1,2544 @@
+@@ -0,0 +1,2601 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -44643,7 +44688,64 @@ index 000000000..6e3cb469e
 +			}
 +		}
 +	}
++	// Inside a solid block (the eye in an object's voxels, in a tile solid at its middle: rock, earth, a thick wall of
++	// blocks): the block is as many tiles as are solid at their middles and joined to the eye's, and none of it is in
++	// the way of the view: its tiles' objects with nothing but the block round them are left out, with the walls and
++	// floors between its tiles; its skin, where it meets the open air, shows as ghosts, seen through: the objects of
++	// its outer tiles, the walls on its sides, the floor above it. Beyond that all is as ever. (A player, GitHub issue
++	// #209: "when inside a SOLID block, draw everything invisible until next opening to open air, drawn as ghost voxels
++	// for that wall / ceiling / floor, and rest beyond solid, ala gzdoom engine". Only the parts the eye itself was in
++	// were left out: inside a hill the next tile's rock filled the picture.)
++	std::vector<std::pair<int, int>> ghosted;
++	if (unit && noclipOn(unit))
++	{
++		double eye[3];
++		_view->getEye(eye);
++		const Position eyeVoxel((int)std::floor(eye[0]), (int)std::floor(eye[1]), (int)std::floor(eye[2]));
++		const Position eyeTile = eyeVoxel.toTile();
++		auto solid = [&](const Position &tile) {
++			return _save->getTile(tile) && _save->getTileEngine()->voxelCheck(tile.toVoxel() + Position(8, 8, 12), nullptr, true) == V_OBJECT;
++		};
++		if (_save->getTile(eyeTile) && _save->getTileEngine()->voxelCheck(eyeVoxel, nullptr, true) == V_OBJECT && solid(eyeTile))
++		{
++			static const int Beside[6][3] = { { -1, 0, 0 }, { 1, 0, 0 }, { 0, -1, 0 }, { 0, 1, 0 }, { 0, 0, -1 }, { 0, 0, 1 } };
++			std::set<int> block;
++			std::vector<Position> found(1, eyeTile);
++			block.insert(_save->getTileIndex(eyeTile));
++			for (size_t next = 0; next < found.size() && found.size() < (size_t)NoclipBlockTiles; ++next)
++			{
++				for (const int *step : Beside)
++				{
++					const Position beside = found[next] + Position(step[0], step[1], step[2]);
++					if (std::abs(beside.x - eyeTile.x) > NoclipBlockReach || std::abs(beside.y - eyeTile.y) > NoclipBlockReach || std::abs(beside.z - eyeTile.z) > NoclipBlockReach) continue;
++					if (!solid(beside) || !block.insert(_save->getTileIndex(beside)).second) continue;
++					found.push_back(beside);
++				}
++			}
++			// (off the map there is nothing to look out at: as the block)
++			auto inBlock = [&](const Position &tile) { return !_save->getTile(tile) || block.count(_save->getTileIndex(tile)) != 0; };
++			auto say = [&](std::vector<std::pair<int, int>> &list, const Position &tile, int part) {
++				if (_save->getTile(tile)) list.push_back(std::make_pair(_save->getTileIndex(tile), part));
++			};
++			for (const Position &tile : found)
++			{
++				bool inside = true;
++				for (const int *step : Beside) inside = inside && inBlock(tile + Position(step[0], step[1], step[2]));
++				say(inside ? parts : ghosted, tile, O_OBJECT);
++				if (inBlock(tile + Position(0, 0, -1)) && tile.z > 0) say(parts, tile, O_FLOOR);
++				if (!inBlock(tile + Position(0, 0, 1))) say(ghosted, tile + Position(0, 0, 1), O_FLOOR);
++				say(inBlock(tile + Position(-1, 0, 0)) ? parts : ghosted, tile, O_WESTWALL);
++				say(inBlock(tile + Position(0, -1, 0)) ? parts : ghosted, tile, O_NORTHWALL);
++				if (!inBlock(tile + Position(1, 0, 0))) say(ghosted, tile + Position(1, 0, 0), O_WESTWALL);
++				if (!inBlock(tile + Position(0, 1, 0))) say(ghosted, tile + Position(0, 1, 0), O_NORTHWALL);
++			}
++			// (what the eye itself is in stays left out: seen from inside, a ghost would veil the whole picture)
++			ghosted.erase(std::remove_if(ghosted.begin(), ghosted.end(), [&](const std::pair<int, int> &part) {
++				return std::find(parts.begin(), parts.end(), part) != parts.end(); }), ghosted.end());
++		}
++	}
 +	_view->setLeftOutParts(parts);
++	_view->setGhostedParts(ghosted);
 +}
 +
 +/**
@@ -46477,10 +46579,10 @@ index 000000000..6e3cb469e
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..638cf76d5
+index 000000000..3b8729d0a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,556 @@
+@@ -0,0 +1,564 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -46811,6 +46913,12 @@ index 000000000..638cf76d5
 +/// Doom IDCLIP: a wall or object part whose voxels (the game's shape of it) come this near the eye, in voxels, is left
 +/// out of the picture (the eye is inside it, or as good as: its 3D picture can stand a little wider than its voxels).
 +const int NoclipReach = 2;
++/// A melee weapon's inventory picture is a plate, a shield, held up with its face to the view (see FirstPersonMode::analyzeWeapon),
++/// when this much of its box is drawn and the box's short side is this much of its long one.
++const double HeldPlateFilled = 0.8, HeldPlateSquare = 0.5;
++/// Doom IDCLIP, the eye inside a solid block (see FirstPersonMode::updateNoclipView): the block is looked for this many
++/// tiles from the eye each way, NoclipBlockTiles tiles of it at most.
++const int NoclipBlockReach = 10, NoclipBlockTiles = 600;
 +/// The main menu's version (see FirstPerson::addMenuVersion): its small text's size, how far right of the title's
 +/// "OpenXcom3D" it starts, and how far below the title's top, so its digits' feet sit on the big letters' feet.
 +const int MenuVersionWidth = 40, MenuVersionHeight = 9, MenuVersionGap = 3, MenuVersionDrop = 5;
@@ -46929,8 +47037,10 @@ index 000000000..638cf76d5
 +const Uint32 BreakdownPauseTime = 2000, BreakdownMinTime = 2600, ComeToTime = 1200;
 +
 +const double Pi = 3.14159265358979323846;
-+/// With "Voxel units", at most this many units' bodies are made a frame from the battle's start, seen or not (see FirstPersonMode::makeVoxelBodies; the 3D views make theirs too, VoxelBuildsPerFrame).
-+const int VoxelBodiesPerFrame = 2;
++/// With "Voxel units", units' frames are gathered for their bodies from the battle's start, seen or not, for at most this
++/// many milliseconds a frame (one unit's at least; see FirstPersonMode::makeVoxelBodies; the 3D views make theirs too,
++/// VoxelBuildsPerFrame).
++const double VoxelBodiesMs = 2.0;
 +/// The ammo tag's colour by damage type (see FirstPersonMode::ammoTag; GitHub issue #51): none, armor piercing (grey-white),
 +/// incendiary (red), high explosive (orange), laser (pink), plasma (green), stun (light blue), melee (grey), acid
 +/// (yellow-green), smoke (grey); a mod's own types (10 to 19) AmmoTagModColor (purple).
@@ -47039,10 +47149,10 @@ index 000000000..638cf76d5
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..93d609b5e
+index 000000000..7be5624f1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,5586 @@
+@@ -0,0 +1,5600 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -49836,7 +49946,21 @@ index 000000000..93d609b5e
 +			_save->getTileEngine()->calculateFOV(unit);
 +			_save->getTileEngine()->calculateFOV(unit->getPosition(), 1, false); // others' view of this unit, like UnitTurnBState
 +		}
++		// (Akimbo: the other hand's gun sprays along, as in any burst. The click that began the marking set the pair on
++		// the game's action and took it off again with the rest it had added (see launchShot); the click that fires
++		// the burst came without it, and the chosen gun sprayed alone: a player, GitHub issue #205, "fires often 6 or
++		// 7 shots instead of the intended 12".)
++		BattleActionType otherMode = BA_NONE;
++		BattleItem *otherWeapon = action->weapon ? dualPartner(unit, action->weapon, BA_AUTOSHOT, otherMode) : nullptr;
++		action->dualWield = otherWeapon != nullptr;
++		action->dualVolley = otherWeapon != nullptr && Options::fpsAkimboVolley;
++		action->dualWeapon = otherWeapon;
++		action->dualType = otherWeapon ? otherMode : BA_NONE;
 +		battleGame->primaryAction(tile);
++		action->dualWield = false;
++		action->dualVolley = false;
++		action->dualWeapon = nullptr;
++		action->dualType = BA_NONE;
 +		_triggerHeld = false;
 +		return;
 +	}
@@ -55118,10 +55242,10 @@ index 000000000..28b79eea5
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeWeaponInHand.cpp b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
 new file mode 100644
-index 000000000..840f96d74
+index 000000000..3bcdae0dc
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
-@@ -0,0 +1,1305 @@
+@@ -0,0 +1,1317 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -55374,6 +55498,18 @@ index 000000000..840f96d74
 +		shape.boxMin[1] = std::min(shape.boxMin[1], (double)pixel.second); shape.boxMax[1] = std::max(shape.boxMax[1], (double)pixel.second);
 +	}
 +	meanX /= pixels.size(); meanY /= pixels.size();
++
++	// A melee weapon whose picture is a plate, most of its box drawn and the box not narrow (a shield: The X-Com
++	// Files' and XPiratez's shields strike, a shield bash, so the game has them as melee weapons), is held up as an
++	// item is, its picture's face to the view: held as a blade, tip up and edge on, it was "slanted as if trying to
++	// slice with blade, rather than smack with front face" (a player, GitHub issue #208).
++	{
++		const double boxWide = shape.boxMax[0] - shape.boxMin[0] + 1.0, boxHigh = shape.boxMax[1] - shape.boxMin[1] + 1.0;
++		if (melee && pixels.size() >= HeldPlateFilled * boxWide * boxHigh && std::min(boxWide, boxHigh) >= HeldPlateSquare * std::max(boxWide, boxHigh))
++		{
++			shape.gun = shape.melee = shape.bow = false;
++		}
++	}
 +
 +	// The long axis: the main direction of the pixels' spread around the centre (from their
 +	// covariance; dx, dy are a pixel's offsets from the centre).
@@ -60801,10 +60937,10 @@ index 000000000..bd8108f56
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..03827674b
+index 000000000..074477104
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1847 @@
+@@ -0,0 +1,1857 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -61341,7 +61477,10 @@ index 000000000..03827674b
 +	/// Leaves out one tile's floor (the lift platform being ridden through), or none (index -1).
 +	void setHiddenFloor(int tileIndex) { _hiddenFloor = tileIndex; }
 +	/// Leaves out these parts (tile index, part), the ones the eye is inside with Doom IDCLIP, or none.
-+	void setLeftOutParts(const std::vector<std::pair<int, int>> &parts) { _leftOutParts = parts; }
++	void setLeftOutParts(const std::vector<std::pair<int, int>> &parts) { _leftOutParts = parts; std::sort(_leftOutParts.begin(), _leftOutParts.end()); }
++	/// Shows these parts (tile index, part) as ghosts, seen through: the skin of the solid block the eye is inside with
++	/// Doom IDCLIP, where it meets the open air; or none.
++	void setGhostedParts(const std::vector<std::pair<int, int>> &parts) { _ghostedParts = parts; std::sort(_ghostedParts.begin(), _ghostedParts.end()); }
 +	/// Turns the flashlight on or off: the shoulder one, or the dynamic one (a tight spot on the crosshair).
 +	void setFlashlight(bool on, bool dynamic = false) { _flashlight = on; _dynamicFlashlight = dynamic; }
 +	/// Night vision like the isometric map's: brighter, in one colour (group + 1, 0 off).
@@ -61653,7 +61792,8 @@ index 000000000..03827674b
 +	int _snapshotHiddenFloor = -1;
 +	bool _snapshotDebug = false, _snapshotUfoLights = false, _snapshotLeftOut = false;
 +	std::vector<int> _swungTiles;
-+	std::vector<std::pair<int, int>> _leftOutParts;     // parts left out (tile index, part): the ones the eye is inside with Doom IDCLIP
++	std::vector<std::pair<int, int>> _leftOutParts;     // parts left out (tile index, part), sorted: the ones the eye is inside with Doom IDCLIP
++	std::vector<std::pair<int, int>> _ghostedParts;     // parts shown as ghosts (tile index, part), sorted: see setGhostedParts
 +	std::vector<const MapData*> _wallsLastFrame[2];     // west/north wall of each tile last frame
 +	std::vector<DoorAnimation> _doorAnimations;         // doors swinging open
 +	std::unordered_map<int, Uint32> _ufoDoorOpening;    // UFO door part (tile * 4 + part) -> when it started sliding
@@ -61990,6 +62130,8 @@ index 000000000..03827674b
 +	SeeThroughSprite _faintPile = { nullptr, 1.0f };    // how the pile pointed at past is drawn (see drawFloorItems)
 +	/// A standing sprite isn't cut off below any floor (see SpriteDraw::floorCut, floorUnderside).
 +	static constexpr double NoFloorCut = -1e9;
++	/// A standing sprite isn't cut off under any ceiling (see SpriteDraw::ceilingCut, ceilingAbove).
++	static constexpr double NoCeilingCut = 1e9;
 +	/// One sprite to draw standing in the world (see drawSprite).
 +	struct SpriteDraw
 +	{
@@ -62008,6 +62150,7 @@ index 000000000..03827674b
 +		double lyingSlope = 0.0;          // a lying sprite's floor rising towards the camera: voxels up for each voxel along (see lyingRise)
 +		double layBack = 0.0;             // the card lies back this far whatever the view's pitch, in radians (a hull's: see hullLayBack)
 +		double floorCut = NoFloorCut;     // no part of a standing sprite below this height, in voxels: the underside of the floor a unit stands on (see floorUnderside)
++		double ceilingCut = NoCeilingCut; // no part of a standing sprite at or above this height, in voxels: the floor over a unit's head (see ceilingAbove)
 +	};
 +	/// Draws a sprite standing in the world, depth-tested (or see-through, laid over what's there):
 +	/// all of it, or only the screen rows from bandTop up to bandBottom.
@@ -62092,7 +62235,7 @@ index 000000000..03827674b
 +		const Uint8 *bodyColours = nullptr, *bodyParts = nullptr;
 +		int bodyColourStep = 1;
 +		size_t bodyCount = 0;
-+		double bodyFeet[3] = {}, bodyCosine = 1.0, bodySine = 0.0, bodyMeasure = 1.0, bodyFloorCut = 0.0;
++		double bodyFeet[3] = {}, bodyCosine = 1.0, bodySine = 0.0, bodyMeasure = 1.0, bodyFloorCut = 0.0, bodyCeilingCut = 1e9;
 +		bool bodyItems = true;
 +		int bodyShade = 0;
 +		Uint16 voxelHitOutline = 0;                                       // ... the hitbox outline drawn round it (its place in _outlineColors + 1; 0 none)
@@ -62117,7 +62260,8 @@ index 000000000..03827674b
 +	/// in a pile pointed at as that pile (and the unconscious unit in it).
 +	void gpuRecordBody(const DrawStep &step);
 +	void recordVoxelUnit(const VoxelUnitModel &body, int walkPhase, int facing, int direction, bool level, const double feet[3], double floorCut,
-+		int shade, double scale, BattleUnit *unit, double fall = 0.0, bool items = true, BattleUnit *lyingBody = nullptr, const Tile *pile = nullptr, double faint = 1.0);
++		int shade, double scale, BattleUnit *unit, double fall = 0.0, bool items = true, BattleUnit *lyingBody = nullptr, const Tile *pile = nullptr, double faint = 1.0,
++		double ceilingCut = NoCeilingCut);
 +	std::map<const BattleUnit*, Uint32> _collapseStarts; // when each unit collapsing (the game's own fall) was first seen so
 +	std::map<const BattleUnit*, int> _facingsWell;       // the way each unit faced, last seen well (a voxel body going down keeps it)
 +	/// How far a voxel body going down by the game's own fall has come (see drawUnits): 0 to 1, or -1 if it isn't.
@@ -62137,6 +62281,8 @@ index 000000000..03827674b
 +	double lyingRise(const double world[3], double reach) const;
 +	/// The underside of the floor slab something standing at a point is on, if a floor is under it (else NoFloorCut).
 +	double floorUnderside(const double world[3]) const;
++	/// The floor over the head of something standing at a point, if the level above has one there (else NoCeilingCut).
++	double ceilingAbove(const double world[3]) const;
 +	/// Whether a voxel is filled by the view's terrain (off the map: no).
 +	bool solidVoxel(int voxelX, int voxelY, int voxelZ) const;
 +	/// The ground under something lying at a point: the plane through its surface round it, its height there and its slope.
@@ -65305,10 +65451,10 @@ index 000000000..d5a05cb89
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpuEffects.cpp b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 new file mode 100644
-index 000000000..6de8c0493
+index 000000000..9f7426011
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
-@@ -0,0 +1,1071 @@
+@@ -0,0 +1,1073 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -65575,6 +65721,7 @@ index 000000000..6de8c0493
 +	body.cosine = (float)step.bodyCosine; body.sine = (float)step.bodySine;
 +	body.measure = (float)step.bodyMeasure;
 +	body.floorCut = (float)std::max(-1e9, step.bodyFloorCut - _eye[2]);
++	body.ceilCut = (float)std::min(1e9, step.bodyCeilingCut - _eye[2]);
 +	body.items = step.bodyItems;
 +	body.cubes = step.voxelOutline;
 +	for (int axis = 0; axis < 3; ++axis)
@@ -65714,6 +65861,7 @@ index 000000000..6de8c0493
 +		(double)spriteWidth, (double)spriteHeight, (double)pixelsAt, (double)opacityAt,
 +		std::max(-1e9, draw.floorCut - _eye[2]), opacity, seeThroughOpacity, (double)(seeThroughSprite ? seeThroughSprite->capLevels : 0) };
 +	for (int which = 0; which < 28; ++which) texels[8 + which] = (float)numbers[which];
++	texels[36] = (float)std::min(1e9, draw.ceilingCut - _eye[2]); // (texel 9: the height, from the eye, nothing of the card shows at or above)
 +}
 +
 +/**
@@ -72752,10 +72900,10 @@ index 000000000..229bd966c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..3fbdfc423
+index 000000000..1c026000e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,4241 @@
+@@ -0,0 +1,4266 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -73005,7 +73153,9 @@ index 000000000..3fbdfc423
 +			spriteRow = anchorY - dot(fromAnchor, cardUp) / rowSize;
 +			// Nothing of the card below the floor it stands on (see SpriteDraw::floorCut): the art's
 +			// rows under a unit's feet would hang through the ceiling of the room below.
-+			if (_eye[2] + ray[2] * distance / ZScale < draw.floorCut) return false;
++			// (nor at or above the floor over its head, see SpriteDraw::ceilingCut)
++			const double height = _eye[2] + ray[2] * distance / ZScale;
++			if (height < draw.floorCut || height >= draw.ceilingCut) return false;
 +		}
 +		return distance >= 1.0 && spriteRow >= 0.0 && spriteRow < spriteHeight;
 +	};
@@ -73399,7 +73549,7 @@ index 000000000..3fbdfc423
 + * @param faint How much of it shows (1 all; a pile made faint to see past it, setting "See-through corpses": dithered).
 + */
 +void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase, int facing, int direction, bool level, const double feet[3], double floorCut,
-+	int shade, double scale, BattleUnit *unit, double fall, bool items, BattleUnit *lyingBody, const Tile *pile, double faint)
++	int shade, double scale, BattleUnit *unit, double fall, bool items, BattleUnit *lyingBody, const Tile *pile, double faint, double ceilingCut)
 +{
 +	double anchorX, anchorY, anchorDepth;
 +	if (!projectToScreen(feet, anchorX, anchorY, anchorDepth)) return;
@@ -73509,6 +73659,7 @@ index 000000000..3fbdfc423
 +		step.bodyCosine = cosine; step.bodySine = sine;
 +		step.bodyMeasure = scale * bodyUnit;
 +		step.bodyFloorCut = floorCut;
++		step.bodyCeilingCut = ceilingCut;
 +		step.bodyItems = items;
 +		step.bodyShade = shade;
 +	}
@@ -73530,6 +73681,7 @@ index 000000000..3fbdfc423
 +	}
 +	const float focal = (float)focalLength, axisAcross = (float)middleX, axisDown = (float)middleY;
 +	const float cutBelow = (float)((floorCut - feet[2]) / measure); // (in the body's own measure, up from its feet)
++	const float cutAbove = (float)std::min(1e9, (ceilingCut - feet[2]) / measure); // (the floor over its head, see ceilingAbove)
 +	float edgesNow[3][2], leanNow[3];
 +	for (int axis = 0; axis < 3; ++axis)
 +	{
@@ -73579,7 +73731,7 @@ index 000000000..3fbdfc423
 +		if (!fallen && ((!items && body.part[k] == VoxelUnitModel::Item) || !body.shows(k, direction, level))) continue;
 +		float across = right[k], along = ahead[k], height = up[k];
 +		if (coarse) { across += coarse->shift[i * 3]; along += coarse->shift[i * 3 + 1]; height += coarse->shift[i * 3 + 2]; }
-+		if (height < cutBelow) continue;
++		if (height < cutBelow || height >= cutAbove) continue;
 +		if (bare)
 +		{
 +			const Uint8 turned = (Uint8)((eyeAt[0] > across + faceHalf ? 1 : 0) | (eyeAt[0] < across - faceHalf ? 2 : 0) | (eyeAt[1] > along + faceHalf ? 4 : 0)
@@ -73610,7 +73762,7 @@ index 000000000..3fbdfc423
 +	{
 +		for (size_t k = 0; k < voxels; ++k)
 +		{
-+			if (body.part[k] != VoxelUnitModel::Item || !body.shows(k, direction, level) || up[k] < cutBelow) continue;
++			if (body.part[k] != VoxelUnitModel::Item || !body.shows(k, direction, level) || up[k] < cutBelow || up[k] >= cutAbove) continue;
 +			const float depth = base[0] + right[k] * toCamera[0][0] + ahead[k] * toCamera[1][0] + up[k] * toCamera[2][0];
 +			if (depth < 4.0f) continue;
 +			VoxelSplat splat;
@@ -73914,6 +74066,25 @@ index 000000000..3fbdfc423
 +		return NoFloorCut;
 +	}
 +	return solidVoxel((int)std::floor(world[0]), (int)std::floor(world[1]), level * Position::TileZ) ? level * (double)Position::TileZ : NoFloorCut;
++}
++
++/**
++ * The floor over the head of something standing at a point: where the level above has a floor there, its underside
++ * (the ceiling of the room the point is in). A unit's picture and its voxel body are cut off there: a unit's art is
++ * often taller than a level (a hat, a helmet's crest, a unit on a raised floor), the map draws the floor above over
++ * it, and in 3D its top stood out of the roof for anyone up there to see (a player, GitHub issue #206, "head stuck in
++ * roof"). Under the open sky, a stairwell or a hole nothing is cut.
++ * @param world The point it stands at, in voxels.
++ * @return The height of the ceiling, in voxels; NoCeilingCut without a floor above.
++ */
++double FirstPersonView::ceilingAbove(const double world[3]) const
++{
++	const int level = (int)std::floor(world[2] / Position::TileZ) + 1;
++	if (!_save || level >= _save->getMapSizeZ())
++	{
++		return NoCeilingCut;
++	}
++	return solidVoxel((int)std::floor(world[0]), (int)std::floor(world[1]), level * Position::TileZ) ? level * (double)Position::TileZ : NoCeilingCut;
 +}
 +
 +/**
@@ -74485,7 +74656,7 @@ index 000000000..3fbdfc423
 +			const size_t stepsBefore = _drawList.size();
 +			// (a wreck lies as the map shows it, whichever way the unit faced: see drawFloorItems)
 +			recordVoxelUnit(*body, walkPhase, wreckFalling && fall >= 1.0 ? 3 : facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall,
-+				true, nullptr, nullptr, body->opacity);
++				true, nullptr, nullptr, body->opacity, ceilingAbove(feet));
 +			// With full sprite hitboxes the body is what the lines test (see FirstPerson::spriteHitAt): outlined as a
 +			// picture is (see drawUnitOutlines), round the pixels it's drawn on (noted as they're drawn, see
 +			// drawVoxelUnit); not one going down, nor one so close that it fades out.
@@ -74531,6 +74702,7 @@ index 000000000..3fbdfc423
 +					std::copy(standing, standing + 3, step.sprite.world);
 +					step.sprite.depthBias = VoxelOverlayNearer;
 +					step.sprite.floorCut = floorUnderside(feet);
++					step.sprite.ceilingCut = ceilingAbove(feet);
 +					step.sprite.scale = unitScale;
 +					step.sprite.unit = unit;
 +					step.sprite.layBack = FirstPerson::hullLayBack(unit);
@@ -74572,6 +74744,7 @@ index 000000000..3fbdfc423
 +			step.sprite.world[1] = feet[1];
 +			step.sprite.world[2] = standingHeight(feet);
 +			step.sprite.floorCut = floorUnderside(feet); // (its art below its feet stays out of the room below)
++			step.sprite.ceilingCut = ceilingAbove(feet); // (and its top out of the room above, or off the roof)
 +			step.sprite.shade = shade;
 +			step.sprite.scale = unitScale;
 +			// The art below its feet (the front half of the floor's diamond: a snake's tail, a long
@@ -77990,10 +78163,10 @@ index 000000000..c98895a8a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..206685d95
+index 000000000..4add25fd1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,4684 @@
+@@ -0,0 +1,4690 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -81889,7 +82062,7 @@ index 000000000..206685d95
 +	// any tile's may hang on: the map's debug vision, the UFO lights, the floor left out, parts
 +	// left out. A tile a door swung through last frame (the swing writes into its snapshot, see
 +	// updateDoorSwings) has its own taken afresh.
-+	const bool debug = _save->getDebugMode(), leftOut = !_leftOutParts.empty();
++	const bool debug = _save->getDebugMode(), leftOut = !_leftOutParts.empty() || !_ghostedParts.empty();
 +	const bool everyTile = !trackWalls || debug != _snapshotDebug || _ufoLightsOn != _snapshotUfoLights || _hiddenFloor != _snapshotHiddenFloor
 +		|| leftOut || _snapshotLeftOut;
 +	_snapshotDebug = debug;
@@ -82141,7 +82314,7 @@ index 000000000..206685d95
 +		// was, see shownPart.)
 +		const MapData *mapData = shownPart(index, tile, part);
 +		if (!mapData || (part == O_FLOOR && (int)index == _hiddenFloor)
-+			|| (!_leftOutParts.empty() && std::find(_leftOutParts.begin(), _leftOutParts.end(), std::make_pair(index, part)) != _leftOutParts.end()))
++			|| (!_leftOutParts.empty() && std::binary_search(_leftOutParts.begin(), _leftOutParts.end(), std::make_pair((int)index, part))))
 +		{
 +			continue;
 +		}
@@ -82250,6 +82423,12 @@ index 000000000..206685d95
 +		if (Options::fpsGhostOpenDoors && cutout && frame == 7 && !model->empty && !model->ghostly)
 +		{
 +			model = openDoorModel(model);
++		}
++		// (the skin of the solid block the eye is inside, Doom IDCLIP: a ghost, see setGhostedParts)
++		if (!_ghostedParts.empty() && !model->empty && !model->ghostly && std::binary_search(_ghostedParts.begin(), _ghostedParts.end(), std::make_pair((int)index, part)))
++		{
++			model = openDoorModel(model);
++			next = nullptr;
 +		}
 +		restless = restless || model->openingGlass; // (its glass may be broken any frame)
 +		if (model->openingGlass && glassBroken(index, part))
@@ -84590,10 +84769,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..ffc4bf13e
+index 000000000..099f39663
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,3046 @@
+@@ -0,0 +1,3504 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -85025,6 +85204,9 @@ index 000000000..ffc4bf13e
 +/// cut off at the level where the hull is HullDeck of its widest, level by level from there: a deck for the turret to
 +/// stand on, sloping sides below it.
 +constexpr float HullDeck = 0.5f;
++/// A tank's turret is read TurretSlack voxels lower than its front and side drawings' top rows; its barrel is where its
++/// side drawing runs out ahead no higher than BarrelThin of the turret's tallest column (see makeModel).
++constexpr float TurretSlack = 1.0f * VOXELSCALE, BarrelThin = 0.5f;
 +void flattenHull(std::vector<Uint8> &cells)
 +{
 +	std::vector<int> area(GridUp, 0);
@@ -85799,14 +85981,112 @@ index 000000000..ffc4bf13e
 +/// butt to the muzzle, across its picture to the picture's right (the magazine's side), and through it.
 +/// Upright: the item is drawn standing in the hand, taller than wide in every hand frame (a sword, a staff: see
 +/// placeItem); it is as long as it is drawn high, stands up, and one hand holds it at its lower end.
++/// Straight: its picture's own long way is laid along it (see addItem): the pictures draw a staff or a spear from corner
++/// to corner, and one stood in the hand, or laid the way its hand frames draw it, leant as its picture does.
++/// Plate: an item standing in the hand that its hand frames draw broad from the front and the back and thin from the
++/// sides (a shield): it stands with its picture's face ahead, the hand behind its middle.
 +struct ItemPlace
 +{
 +	float middle[3], length;
 +	float along[3], across[3], through[3];
 +	bool upright = false;
++	bool plate = false;
++	bool straight = false;
 +};
 +/// An item is drawn standing in the hand if its tallest hand frame is this many times as high as its widest is wide.
 +constexpr float ItemUpright = 1.5f;
++/// An item's own length may lie inside the body for this many hundredths of it (looked at in ItemSamples places); one
++/// deeper in is moved ahead, ItemOutMost voxels at most (see makeModel).
++constexpr int ItemInBody = 30, ItemSamples = 16;
++/// An arm coloured along its length (see makeModel) takes its colours in this many stretches from shoulder to hand.
++constexpr int ArmBands = 10;
++constexpr float ItemOutMost = 6.0f * VOXELSCALE;
++/// An item standing in the hand is a plate if its front and back hand frames are each this many times as wide as the
++/// wider of its two side frames.
++constexpr float ItemPlate = 2.0f;
++constexpr int ItemPlateFilled = 60;
++/// A hand frame shows which way an item points if its drawing is this many times as long as it is wide; the frames'
++/// own direction is taken for a melee weapon if it is this far (the cosine) from the way a gun would be held.
++constexpr float ItemLong = 1.8f, ItemAxisAgree = 0.82f;
++
++/// The way an item points, from its hand frames: the direction whose picture in each of the 8 views lies best along the
++/// item's drawing there (each view's drawing has a long way: the direction it's spread widest in; the views that show
++/// the item end on, a blob, say nothing). False if fewer than three views show it long. Its sign: ahead rather than
++/// behind, then to the unit's left, then up (as a gun's muzzle is held). Length: how long the item is, voxels, where
++/// the views show it.
++bool itemAxis(const PartFrames &frames, float axis[3], float &length)
++{
++	double m[3][3] = {};
++	int views = 0;
++	struct Seen { double way[2], from, to; double p[2][3]; };
++	std::vector<Seen> seen;
++	for (int d = 0; d < 8; ++d)
++	{
++		double columns = 0.0, rows = 0.0;
++		int count = 0;
++		for (int row = 0; row < FrameSize; ++row)
++			for (int column = 0; column < FrameSize; ++column)
++				if (frames.frame[d][row * FrameSize + column]) { columns += column; rows += row; ++count; }
++		if (count < 4 * VOXELSCALE) continue;
++		columns /= count; rows /= count;
++		double xx = 0.0, xy = 0.0, yy = 0.0;
++		for (int row = 0; row < FrameSize; ++row)
++			for (int column = 0; column < FrameSize; ++column)
++				if (frames.frame[d][row * FrameSize + column]) { xx += (column - columns) * (column - columns); xy += (column - columns) * (row - rows); yy += (row - rows) * (row - rows); }
++		xx /= count; xy /= count; yy /= count;
++		const double turn = 0.5 * std::atan2(2.0 * xy, xx - yy), spread = std::sqrt((xx - yy) * (xx - yy) * 0.25 + xy * xy);
++		const double longWay = (xx + yy) * 0.5 + spread, shortWay = std::max((xx + yy) * 0.5 - spread, 1.0 / 12.0 * VOXELSCALE * VOXELSCALE);
++		if (longWay < ItemLong * ItemLong * shortWay) continue;
++		Seen view;
++		view.way[0] = std::cos(turn); view.way[1] = std::sin(turn);
++		view.from = 1e9; view.to = -1e9;
++		for (int row = 0; row < FrameSize; ++row)
++			for (int column = 0; column < FrameSize; ++column)
++				if (frames.frame[d][row * FrameSize + column])
++				{
++					const double at = (column - columns) * view.way[0] + (row - rows) * view.way[1];
++					view.from = std::min(view.from, at); view.to = std::max(view.to, at);
++				}
++		// (the view's picture of a step right, ahead and up: see project, along the slant)
++		const Turn &t = Turns[d];
++		const double p[2][3] = { { t.cosine - t.sine, t.sine + t.cosine, 0.0 }, { (t.cosine + t.sine) * 0.5, (t.sine - t.cosine) * 0.5, -1.0 } };
++		std::copy(&p[0][0], &p[0][0] + 6, &view.p[0][0]);
++		double along[3], beside[3];
++		for (int i = 0; i < 3; ++i)
++		{
++			along[i] = p[0][i] * view.way[0] + p[1][i] * view.way[1];
++			beside[i] = -p[0][i] * view.way[1] + p[1][i] * view.way[0];
++		}
++		const double weight = std::sqrt(longWay);
++		for (int i = 0; i < 3; ++i)
++			for (int j = 0; j < 3; ++j) m[i][j] += weight * (along[i] * along[j] - beside[i] * beside[j]);
++		seen.push_back(view);
++		++views;
++	}
++	if (views < 3) return false;
++	double shift = 0.0;
++	for (const auto &row : m) for (double value : row) shift += std::abs(value);
++	double v[3] = { 0.3, 0.8, 0.5 };
++	for (int turn = 0; turn < 80; ++turn)
++	{
++		double next[3];
++		for (int i = 0; i < 3; ++i) next[i] = m[i][0] * v[0] + m[i][1] * v[1] + m[i][2] * v[2] + shift * v[i];
++		const double size = std::sqrt(next[0] * next[0] + next[1] * next[1] + next[2] * next[2]);
++		if (size < 1e-12) return false;
++		for (int i = 0; i < 3; ++i) v[i] = next[i] / size;
++	}
++	if (v[1] - 0.6 * v[0] + 0.3 * v[2] < 0.0) for (double &value : v) value = -value;
++	for (int i = 0; i < 3; ++i) axis[i] = (float)v[i];
++	// as long as the views that see it well across draw it
++	length = 0.0f;
++	for (const Seen &view : seen)
++	{
++		const double column = view.p[0][0] * v[0] + view.p[0][1] * v[1] + view.p[0][2] * v[2], row = view.p[1][0] * v[0] + view.p[1][1] * v[1] + view.p[1][2] * v[2];
++		const double shown = std::sqrt(column * column + row * row); // (pixels a voxel of it, in this view)
++		if (shown >= 0.9) length = std::max(length, (float)((view.to - view.from) / shown));
++	}
++	return length > 0.0f;
++}
 +
 +/// Where an item in hand is, from its hand frames and how it's held: pointing ahead when aimed or held in one hand,
 +/// across the waist when held in both, its picture's right (the magazine's side) down; false if no frame shows it.
@@ -85814,13 +86094,19 @@ index 000000000..ffc4bf13e
 +/// frame is wide, laid across the waist for both hands as a rifle is, X-Com Files' greatsword was five cubes at the
 +/// chest, and the arms reaching for it lay folded inside the body: no arms, no sword (a player, GitHub issue #196,
 +/// "Picking up many melee weapons causes amputations").
-+bool placeItem(const PartFrames &frames, bool twoHanded, bool aiming, ItemPlace &place)
++/// A shield, drawn broad from the front and thin from the sides, stands with its face ahead (see ItemPlace::plate): laid
++/// as a sword is, its edge ahead, X-Com Files' combat shield was "slanted as if trying to slice with blade, rather than
++/// smack with front face ... sheild is very clearly with flat face outward in handobs" (a player, GitHub issue #208).
++/// A melee weapon points the way its hand frames draw it (see itemAxis), where that is not the way a gun is held: a
++/// katana drawn raised ahead lay across the waist as a rifle does (a player, GitHub issue #199: "most melees are a
++/// bit janked ... Works REALLY well for guns").
++bool placeItem(const PartFrames &frames, bool twoHanded, bool aiming, bool melee, ItemPlace &place)
 +{
 +	if (!frames.any || !partMiddle(frames, place.middle)) return false;
-+	int widest = 0, tallest = 0;
++	int widest = 0, tallest = 0, wide[8] = {}, filled[8] = {};
 +	for (int d = 0; d < 8; ++d)
 +	{
-+		int left = FrameSize, right = -1, top = FrameSize, bottom = -1;
++		int left = FrameSize, right = -1, top = FrameSize, bottom = -1, drawn = 0;
 +		for (int row = 0; row < FrameSize; ++row)
 +		{
 +			for (int column = 0; column < FrameSize; ++column)
@@ -85830,19 +86116,47 @@ index 000000000..ffc4bf13e
 +				right = std::max(right, column);
 +				top = std::min(top, row);
 +				bottom = std::max(bottom, row);
++				++drawn;
 +			}
 +		}
 +		widest = std::max(widest, right - left + 1);
 +		tallest = std::max(tallest, bottom - top + 1);
++		wide[d] = std::max(0, right - left + 1);
++		filled[d] = right >= left ? drawn * 100 / ((right - left + 1) * (bottom - top + 1)) : 0; // (of its box, in hundredths)
 +	}
++	const int Back = (Front + 4) % 8;
 +	place.upright = tallest >= widest * ItemUpright;
++	// (a plate: broad and tall from the front and the back, and solid there, most of its box drawn, not a staff with
++	// sparks round it; thin from the sides; it need not be taller than wide)
++	const int sideWide = std::max(wide[RightSide], wide[LeftSide]);
++	place.plate = sideWide > 0 && std::min(wide[Front], wide[Back]) >= sideWide * ItemPlate && tallest >= std::min(wide[Front], wide[Back])
++		&& std::min(wide[Front], wide[Back]) >= 5 * VOXELSCALE && std::min(filled[Front], filled[Back]) >= ItemPlateFilled;
++	if (place.plate)
++	{
++		place.upright = true;
++		place.length = std::max(1.0f, (float)(tallest - 1));
++		// (its picture's top up, its right to the unit's left: from the front it is the picture)
++		const float facing[3][3] = { { 0.0f, 0.0f, 1.0f }, { -1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f } };
++		std::copy(facing[0], facing[0] + 3, place.along);
++		std::copy(facing[1], facing[1] + 3, place.across);
++		std::copy(facing[2], facing[2] + 3, place.through);
++		return true;
++	}
 +	if (place.upright)
 +	{
 +		place.length = std::max(1.0f, (float)(tallest - 1));
++		// (Its picture's right ahead, its edge to the front, where the side frames draw it clearly broader than the
++		// front ones; else turned half way, its picture's right ahead and to the unit's left: a blade the frames draw as
++		// broad from the front as from the side shows its flat to both. Edge on to the front, a knife was one cube
++		// thin there: "knives being missing", a player, GitHub issue #199.)
++		const float c = 0.70710678f;
 +		const float standing[3][3] = { { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } };
-+		std::copy(standing[0], standing[0] + 3, place.along);
-+		std::copy(standing[1], standing[1] + 3, place.across);
-+		std::copy(standing[2], standing[2] + 3, place.through);
++		const float turned[3][3] = { { 0.0f, 0.0f, 1.0f }, { -c, c, 0.0f }, { c, c, 0.0f } };
++		const float (&axes)[3][3] = sideWide >= std::max(wide[Front], wide[Back]) + 2 * VOXELSCALE ? standing : turned;
++		std::copy(axes[0], axes[0] + 3, place.along);
++		std::copy(axes[1], axes[1] + 3, place.across);
++		std::copy(axes[2], axes[2] + 3, place.through);
++		place.straight = true;
 +		return true;
 +	}
 +	place.length = std::max(1.0f, (widest - 1) / PixelsAcross);
@@ -85853,6 +86167,27 @@ index 000000000..ffc4bf13e
 +	std::copy(axes[0], axes[0] + 3, place.along);
 +	std::copy(axes[1], axes[1] + 3, place.across);
 +	std::copy(axes[2], axes[2] + 3, place.through);
++	// A melee weapon: the way its hand frames draw it, where they don't draw it held as a gun is.
++	float drawn[3], drawnLength;
++	if (melee && itemAxis(frames, drawn, drawnLength)
++		&& std::abs(drawn[0] * place.along[0] + drawn[1] * place.along[1] + drawn[2] * place.along[2]) < ItemAxisAgree)
++	{
++		std::copy(drawn, drawn + 3, place.along);
++		place.length = std::max(1.0f, drawnLength);
++		place.straight = true;
++		// (its picture's right, an edge or a hammer's head, as near down as may be; drawn pointing up or down: ahead)
++		float down[3] = { drawn[2] * drawn[0], drawn[2] * drawn[1], drawn[2] * drawn[2] - 1.0f };
++		float size = std::sqrt(down[0] * down[0] + down[1] * down[1] + down[2] * down[2]);
++		if (size < 0.3f)
++		{
++			down[0] = -drawn[1] * drawn[0]; down[1] = 1.0f - drawn[1] * drawn[1]; down[2] = -drawn[1] * drawn[2];
++			size = std::sqrt(down[0] * down[0] + down[1] * down[1] + down[2] * down[2]);
++		}
++		for (int i = 0; i < 3; ++i) place.across[i] = down[i] / size;
++		place.through[0] = place.across[1] * place.along[2] - place.across[2] * place.along[1];
++		place.through[1] = place.across[2] * place.along[0] - place.across[0] * place.along[2];
++		place.through[2] = place.across[0] * place.along[1] - place.across[1] * place.along[0];
++	}
 +	return true;
 +}
 +
@@ -85860,6 +86195,12 @@ index 000000000..ffc4bf13e
 +/// near the butt and below the axis (a pistol's grip).
 +void gripOf(const ItemPlace &place, bool twoHanded, bool atButt, float hand[3])
 +{
++	if (place.plate)
++	{
++		// (a plate: the hand behind its middle)
++		for (int i = 0; i < 3; ++i) hand[i] = place.middle[i] - place.through[i] * 1.0f * VOXELSCALE;
++		return;
++	}
 +	twoHanded = twoHanded && !place.upright; // (an item standing in the hand: one hand, at its lower end, on its axis)
 +	const float along = place.length * ((twoHanded ? (atButt ? GripButt : GripFore) : GripOne) - 0.5f);
 +	const float below = twoHanded || place.upright ? 0.0f : place.length * GripBelow;
@@ -86101,8 +86442,46 @@ index 000000000..ffc4bf13e
 +	}
 +	if (bottom < 0) return;
 +	const float *along = place.along, *across = place.across, *through = place.through, *middle = place.middle;
-+	const float scale = place.length / std::max(1, bottom - top), thin = std::min(1.0f, scale / RifleScale);
-+	const float halfLength = (bottom - top) * scale * 0.5f, middleAcross = (left + right) * 0.5f;
++	// The picture's own measures: from a point on it, the way that is along the item (up the picture: the games draw an
++	// item standing, a gun's muzzle at the top) and the way across it (to the picture's right), and how far it reaches
++	// along and across. A long item drawn from corner to corner, where its place asks (ItemPlace::straight): along its
++	// own long way, the way its pixels are spread widest, if that is ItemLong times its spread across.
++	float origin[2] = { (left + right) * 0.5f, (float)bottom }, upWay[2] = { 0.0f, -1.0f }, reach = (float)(bottom - top), wideReach = (float)(right - left + 1);
++	if (place.straight)
++	{
++		double columns = 0.0, rows = 0.0, xx = 0.0, xy = 0.0, yy = 0.0;
++		int drawn = 0;
++		for (int y = 0; y < height; ++y)
++			for (int x = 0; x < width; ++x) if (held.picture[y * width + x]) { columns += x; rows += y; ++drawn; }
++		columns /= drawn; rows /= drawn;
++		for (int y = 0; y < height; ++y)
++			for (int x = 0; x < width; ++x)
++				if (held.picture[y * width + x]) { xx += (x - columns) * (x - columns); xy += (x - columns) * (y - rows); yy += (y - rows) * (y - rows); }
++		const double turn = 0.5 * std::atan2(2.0 * xy, xx - yy), spread = std::sqrt((xx - yy) * (xx - yy) * 0.25 + xy * xy);
++		const double longWay = (xx + yy) * 0.5 + spread, shortWay = std::max((xx + yy) * 0.5 - spread, drawn / 12.0);
++		double way[2] = { std::cos(turn), std::sin(turn) };
++		if (way[1] > 0.0) { way[0] = -way[0]; way[1] = -way[1]; }
++		if (longWay >= ItemLong * ItemLong * shortWay && way[1] > -0.985)
++		{
++			double low = 1e9, high = -1e9, lowSide = 1e9, highSide = -1e9;
++			for (int y = 0; y < height; ++y)
++				for (int x = 0; x < width; ++x)
++				{
++					if (!held.picture[y * width + x]) continue;
++					const double on = (x - columns) * way[0] + (y - rows) * way[1], beside = -(x - columns) * way[1] + (y - rows) * way[0];
++					low = std::min(low, on); high = std::max(high, on); lowSide = std::min(lowSide, beside); highSide = std::max(highSide, beside);
++				}
++			const double sideMiddle = (lowSide + highSide) * 0.5;
++			origin[0] = (float)(columns + low * way[0] - sideMiddle * way[1]);
++			origin[1] = (float)(rows + low * way[1] + sideMiddle * way[0]);
++			upWay[0] = (float)way[0]; upWay[1] = (float)way[1];
++			reach = (float)(high - low);
++			wideReach = (float)(highSide - lowSide + 1.0);
++		}
++	}
++	const float rightWay[2] = { -upWay[1], upWay[0] };
++	const float scale = place.length / std::max(1.0f, reach), thin = std::min(1.0f, scale / RifleScale);
++	const float halfLength = reach * scale * 0.5f;
 +	// (The thickness is in the body's own measure whatever its fineness: on a fine body an item is half as thick in the
 +	// world as on a coarse one, slim as the owner chose it from pictures.)
 +	auto halfThickness = [&](int x, int y) { return x >= 0 && y >= 0 && x < width && y < height && depth[y * width + x] ? std::min(1.4f, 0.45f + 0.35f * depth[y * width + x]) * thin : 0.0f; };
@@ -86122,7 +86501,7 @@ index 000000000..ffc4bf13e
 +		for (int r = 0; r < 3; ++r) for (int c = 0; c < 3; ++c) inverse[r][c] = cross[r][c] / det;
 +	}
 +	// The box of cells round the item (its picture's corners, its greatest thickness).
-+	const float halfAcross = (right - left + 1) * 0.5f * scale * ItemSlim, thickest = 1.4f * thin * ItemSlim + Cell;
++	const float halfAcross = wideReach * 0.5f * scale * ItemSlim, thickest = 1.4f * thin * ItemSlim + Cell;
 +	float low[3] = { 1e9f, 1e9f, 1e9f }, high[3] = { -1e9f, -1e9f, -1e9f };
 +	for (int corner = 0; corner < 8; ++corner)
 +	{
@@ -86152,7 +86531,8 @@ index 000000000..ffc4bf13e
 +				const float a = inverse[0][0] * off[0] + inverse[0][1] * off[1] + inverse[0][2] * off[2];
 +				const float c = inverse[1][0] * off[0] + inverse[1][1] * off[1] + inverse[1][2] * off[2];
 +				const float t = inverse[2][0] * off[0] + inverse[2][1] * off[1] + inverse[2][2] * off[2];
-+				const int y = bottom - (int)std::lround((a + halfLength) / scale), x = (int)std::lround(c / (scale * ItemSlim) + middleAcross);
++				const float up = (a + halfLength) / scale, beside = c / (scale * ItemSlim);
++				const int x = (int)std::lround(origin[0] + up * upWay[0] + beside * rightWay[0]), y = (int)std::lround(origin[1] + up * upWay[1] + beside * rightWay[1]);
 +				if (x < 0 || y < 0 || x >= width || y >= height) continue;
 +				const Uint8 colour = held.picture[y * width + x];
 +				if (colour && std::abs(t) <= std::max(halfThickness(x, y) * ItemSlim, Cell * 0.6f)) filled[((size_t)i * size[1] + j) * size[2] + k] = colour;
@@ -86933,12 +87313,81 @@ index 000000000..ffc4bf13e
 +	}
 +}
 +
++/// A relief body is at most this thick either side of its drawing's plane, voxels; and this much of how deep inside
++/// the drawing's outline a pixel is (a round blob of the drawing comes out about as deep as it is wide).
++constexpr float ReliefHalfMost = 4.5f * VOXELSCALE, ReliefRound = 0.7f;
++/// The body of a unit its sprite draws the same from every side, and lopsided (see Routine::relief): the one drawing,
++/// standing upright through the middle of its feet and facing the way the unit does, given volume as a fall's shapes
++/// are (see fallRelief): thicker inside the drawing's outline, rounded at its edges. A cube takes its pixel's colour,
++/// the same from every side. (Carved from its eight drawings, all the same, such a body keeps only what the drawing
++/// has on both sides of its middle: X-Com Files' Abomination, a cluster of bubbles off to one side, was left "flat
++/// looking puddles", a player, GitHub issue #203.)
++static std::unique_ptr<VoxelUnitModel> reliefModel(const PartFrames &part, const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse,
++	const HeldItem &lying, const SDL_Color *palette)
++{
++	const std::vector<Uint8> picture = withoutOutline(part.frame[Front], FrameSize, FrameSize, palette);
++	const std::vector<int> depth = insideDepth(picture, FrameSize, FrameSize, (int)std::ceil(ReliefHalfMost / ReliefRound) + 1);
++	int left = FrameSize, right = -1, top = FrameSize, bottom = -1;
++	for (int y = 0; y < FrameSize; ++y)
++		for (int x = 0; x < FrameSize; ++x)
++			if (picture[y * FrameSize + x]) { left = std::min(left, x); right = std::max(right, x); top = std::min(top, y); bottom = std::max(bottom, y); }
++	if (right < 0) return nullptr;
++	// (direction Front, level: a column is the unit's right, turned about, times PixelsAcross; a row its height: see project)
++	VoxelUnitModel::FallShape shape;
++	const float low[3] = { -(right + 1 - FloorX) / PixelsAcross, -ReliefHalfMost, std::max(0.0f, (float)(FloorY - bottom - 1)) };
++	const float high[3] = { -(left - 1 - FloorX) / PixelsAcross, ReliefHalfMost, (float)(FloorY - top + 1) };
++	fillShape(shape, low, high, [&](float across, float along, float up) -> Uint8 {
++		float column, row, nearness;
++		project(across, 0.0f, up, Front, true, column, row, nearness);
++		const int x = (int)std::floor(column), y = (int)std::floor(row);
++		if (x < 0 || y < 0 || x >= FrameSize || y >= FrameSize) return 0;
++		const Uint8 colour = picture[y * FrameSize + x];
++		if (!colour) return 0;
++		const float half = std::max(Cell * 1.2f, std::min(ReliefHalfMost, 0.2f * VOXELSCALE + ReliefRound * depth[y * FrameSize + x]));
++		return std::abs(along) <= half ? colour : 0;
++	});
++	const size_t count = shape.colour.size();
++	if (count == 0) return nullptr;
++	auto model = std::make_unique<VoxelUnitModel>();
++	model->part.assign(count, VoxelUnitModel::Torso);
++	model->views.assign(count, 0xFFFF);
++	model->colours.resize(count * 16);
++	for (size_t k = 0; k < count; ++k) std::fill(model->colours.begin() + k * 16, model->colours.begin() + k * 16 + 16, shape.colour[k]);
++	model->addedFrom = count;
++	// What a shot meets: its cubes, in whole voxels, from every side.
++	const std::vector<float> *place[3] = { &shape.right, &shape.ahead, &shape.up };
++	for (int i = 0; i < 3; ++i)
++	{
++		const auto ends = std::minmax_element(place[i]->begin(), place[i]->end());
++		model->hitFrom[i] = (int)std::floor(*ends.first);
++		model->hitSize[i] = (int)std::floor(*ends.second) - model->hitFrom[i] + 1;
++	}
++	model->hits.assign((size_t)model->hitSize[0] * model->hitSize[1] * model->hitSize[2], 0);
++	for (size_t k = 0; k < count; ++k)
++	{
++		const int x = (int)std::floor(shape.right[k]) - model->hitFrom[0], y = (int)std::floor(shape.ahead[k]) - model->hitFrom[1], z = (int)std::floor(shape.up[k]) - model->hitFrom[2];
++		model->hits[((size_t)x * model->hitSize[1] + y) * model->hitSize[2] + z] = 0xFFFF;
++	}
++	model->right = std::move(shape.right);
++	model->ahead = std::move(shape.ahead);
++	model->up = std::move(shape.up);
++	for (int phase = 0; phase < 8; ++phase)
++	{
++		model->walkRight[phase] = model->right;
++		model->walkAhead[phase] = model->ahead;
++		model->walkUp[phase] = model->up;
++	}
++	makeFalls(*model, deaths, corpse, lying, palette, false, false);
++	return model;
++}
++
 +std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCount], const std::vector<Uint8> composite[8], const HeldItem items[2],
 +	const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse, const HeldItem &lying, const WalkFrames &walks, bool aiming, const Routine &routine,
 +	const SDL_Color *palette)
 +{
 +	if (!parts[0].any) return nullptr;
 +	useGrid(routine.big ? 2 : 1);
++	if (routine.relief && routine.whole && !routine.big) return reliefModel(parts[0], deaths, corpse, lying, palette);
 +	// (a hull: a big unit that doesn't walk. One drawn by a walker's routine but without walk frames is a hull too: XPiratez's
 +	// truck turret, a turret drawn by the Sectopod's routine that never moves.)
 +	const bool bigHull = routine.big && !(routine.legsSwing && walks.any);
@@ -86997,7 +87446,28 @@ index 000000000..ffc4bf13e
 +			// the turret: its own drawings' block (its barrel is fine detail: nothing of it is left out), standing on
 +			// the hull: where there is air between them it reaches down to the hull's top
 +			std::vector<Uint8> gun = carve(parts[1], 0, std::vector<Uint8>(GridCells, 1));
-+			levelOff(parts[1], gun);
++			// (Its top as its front and side drawings have it: nothing of it higher, over each place across and along,
++			// than those two show there, read as heights, TurretSlack lower for the slant they are drawn along. Its eight
++			// outlines alone leave it one lump with a peak, the dome and what stands beside it run together: "turrets
++			// could use better definition. Rocket tanks should roughly keep shape of rocket pods on sides", a player,
++			// GitHub issue #201. So the dome rises above the pods beside it.)
++			{
++				std::vector<int> topFront(FrameSize, FrameSize), topSide(FrameSize, FrameSize);
++				for (int column = 0; column < FrameSize; ++column)
++					for (int row = FrameSize - 1; row >= 0; --row)
++					{
++						if (parts[1].frame[Front][row * FrameSize + column]) topFront[column] = row;
++						if (parts[1].frame[RightSide][row * FrameSize + column]) topSide[column] = row;
++					}
++				for (int across = 0; across < GridAcross; ++across)
++					for (int along = 0; along < GridAlong; ++along)
++					{
++						const int front = (int)std::floor(FloorX - cellRight(across) * PixelsAcross), side = (int)std::floor(FloorX + cellAhead(along) * PixelsAcross);
++						const int row = front >= 0 && side >= 0 && front < FrameSize && side < FrameSize ? std::max(topFront[front], topSide[side]) : FrameSize;
++						const float most = FloorY - row - TurretSlack;
++						for (int up = 0; up < GridUp; ++up) if (cellUp(up) > most) gun[cellIndex(across, along, up)] = 0;
++					}
++			}
 +			for (int across = 0; across < GridAcross; ++across)
 +				for (int along = 0; along < GridAlong; ++along)
 +				{
@@ -87007,6 +87477,39 @@ index 000000000..ffc4bf13e
 +					for (int up = lowest - 1; up >= 0 && roof < 0; --up) if (owner[cellIndex(across, along, up)]) roof = up;
 +					for (int up = roof + 1; roof >= 0 && up < lowest; ++up) gun[cellIndex(across, along, up)] = 1;
 +				}
++			// (Its barrel: where its side drawing runs out ahead of it thin, under BarrelThin of the turret's own height
++			// there, for two pixels or more, in both side drawings: a round bar as long, as high up and as thick as
++			// drawn, from inside the turret. "Tank barrel for cannon / laser / standard 1 barrel tank, should have a
++			// protruding barrel, to give definition", the same issue; its outlines left the stub on the turret's face.)
++			{
++				auto thinEnd = [&](int d, bool atRight, int &from, int &to, int &top, int &bottom) {
++					std::vector<int> high(FrameSize, 0), first(FrameSize, FrameSize), last(FrameSize, -1);
++					int most = 0, left = FrameSize, right = -1;
++					for (int column = 0; column < FrameSize; ++column)
++					{
++						for (int row = 0; row < FrameSize; ++row)
++							if (parts[1].frame[d][row * FrameSize + column]) { ++high[column]; first[column] = std::min(first[column], row); last[column] = row; }
++						most = std::max(most, high[column]);
++						if (high[column]) { left = std::min(left, column); right = std::max(right, column); }
++					}
++					if (right < 0) return false;
++					from = to = atRight ? right : left;
++					top = FrameSize; bottom = -1;
++					for (int column = from; column >= left && column <= right && high[column] > 0 && high[column] <= most * BarrelThin; column += atRight ? -1 : 1)
++					{
++						(atRight ? from : to) = column;
++						top = std::min(top, first[column]); bottom = std::max(bottom, last[column]);
++					}
++					return bottom >= 0 && to - from + 1 >= 2 * VOXELSCALE;
++				};
++				int from, to, top, bottom, otherFrom, otherTo, otherTop, otherBottom;
++				if (thinEnd(RightSide, true, from, to, top, bottom) && thinEnd(LeftSide, false, otherFrom, otherTo, otherTop, otherBottom))
++				{
++					const float height = FloorY - (top + bottom + 1) * 0.5f, thick = std::max(1.0f * VOXELSCALE, (bottom - top + 1) * 0.5f);
++					const float root[3] = { 0.0f, (from - FloorX) / PixelsAcross - 2.0f * VOXELSCALE, height }, muzzle[3] = { 0.0f, (to + 1 - FloorX) / PixelsAcross, height };
++					fillCapsule(gun, root, muzzle, thick);
++				}
++			}
 +			for (int i = 0; i < GridCells; ++i) if (gun[i]) owner[i] = PartCodes[1];
 +		}
 +	}
@@ -87020,8 +87523,36 @@ index 000000000..ffc4bf13e
 +	// The items in hand, where their frames show them, and the arms' skeletons (see ArmFrames): each from the top of its
 +	// drawing to its hand (on the item it holds, or the bottom of its drawing), as long as a free arm reaches.
 +	ItemPlace places[2];
-+	const bool placed[2] = { placeItem(parts[RightItem], items[0].twoHanded, aiming, places[0]), placeItem(parts[LeftItem], items[1].twoHanded, aiming, places[1]) };
++	const bool placed[2] = { placeItem(parts[RightItem], items[0].twoHanded, aiming, items[0].melee, places[0]),
++		placeItem(parts[LeftItem], items[1].twoHanded, aiming, items[1].melee, places[1]) };
++	// What it holds is held in front of it: an item whose own length lies inside the body for more than ItemInBody of
++	// it (the hand frames only say where it is on the pictures; a deep body, a Muton's or a robe, reached out round
++	// it) is moved ahead, half a voxel at a time, till it is not, ItemOutMost at most. The arms reach for it where it
++	// is then. (A player, GitHub issue #207: "larger units ... have the gun imbedded in their stomach. While it being
++	// slightly pushed in is fine, full inside the stomach is strange".)
++	for (int hand = 0; hand < 2; ++hand)
++	{
++		if (!placed[hand] || places[hand].plate || routine.big || routine.whole) continue; // (a body drawn on one frame has its arms in it: the item lies on them)
++		ItemPlace &place = places[hand];
++		auto inBody = [&](float shift) {
++			int in = 0;
++			for (int step = 0; step < ItemSamples; ++step)
++			{
++				const float at = ((step + 0.5f) / ItemSamples - 0.5f) * place.length;
++				const int across = (int)std::floor((place.middle[0] + at * place.along[0] - AcrossFrom) / Cell), along = (int)std::floor((place.middle[1] + shift + at * place.along[1] - AlongFrom) / Cell),
++					up = (int)std::floor((place.middle[2] + at * place.along[2] - UpFrom) / Cell);
++				if (across >= 0 && along >= 0 && up >= 0 && across < GridAcross && along < GridAlong && up < GridUp && owner[cellIndex(across, along, up)]) ++in;
++			}
++			return in;
++		};
++		float shift = 0.0f;
++		while (shift < ItemOutMost && inBody(shift) * 100 > ItemSamples * ItemInBody) shift += Cell;
++		place.middle[1] += shift;
++	}
 +	std::vector<Uint8> skeletons[BodyParts];
++	// (each arm's bones as placed: shoulder, elbow, hand; see the arms' colours below)
++	struct ArmBones { bool any = false; float shoulder[3], elbow[3], hand[3]; };
++	ArmBones bones[BodyParts];
 +	{
 +		struct Arm { int part; bool right, holds, found; float shoulder[3], hand[3]; };
 +		Arm arms[2] = { { 1, false, false, false, {}, {} }, { 2, true, false, false, {}, {} } };
@@ -87062,13 +87593,40 @@ index 000000000..ffc4bf13e
 +			if (!arm.found) continue;
 +			const ArmFrames frames(parts[arm.part]);
 +			const float bone = std::max(length, distance3(arm.shoulder, arm.hand) * 1.02f) * 0.5f;
-+			float elbow[3], radius[2];
-+			placeElbow(arm.shoulder, arm.hand, bone, frames, elbow);
-+			armRadii(frames, arm.shoulder, elbow, arm.hand, radius);
++			float shoulder[3], elbow[3], hand[3], radius[2];
++			std::copy(arm.shoulder, arm.shoulder + 3, shoulder);
++			std::copy(arm.hand, arm.hand + 3, hand);
++			placeElbow(shoulder, hand, bone, frames, elbow);
++			armRadii(frames, shoulder, elbow, hand, radius);
++			// Arms outside the body (the unit table's "arms: outside", for the units it names): a body drawn in a robe
++			// is carved as wide as the robe, and the arms its drawings lay over the robe's sides were inside it, flat
++			// stripes on its skin ("their arms are clearly outside robes, and should be painted OVER the robe, OR ...
++			// extend the arms out", a player, GitHub issue #207). Each joint moves out to its own side till half its
++			// bone's thickness is clear of the body; a hand on an item stays on it.
++			if (routine.arms & 1)
++			{
++				const float side = arm.right ? 1.0f : -1.0f;
++				auto clear = [&](float joint[3], float thick) {
++					for (int step = 0; step < 24 * VOXELSCALE; ++step)
++					{
++						const int across = (int)std::floor((joint[0] - side * thick * 0.5f - AcrossFrom) / Cell), along = (int)std::floor((joint[1] - AlongFrom) / Cell),
++							up = (int)std::floor((joint[2] - UpFrom) / Cell);
++						if (across < 0 || along < 0 || up < 0 || across >= GridAcross || along >= GridAlong || up >= GridUp || owner[cellIndex(across, along, up)] != VoxelUnitModel::Torso) break;
++						joint[0] += side * Cell;
++					}
++				};
++				clear(shoulder, radius[0]);
++				clear(elbow, std::max(radius[0], radius[1]));
++				if (!arm.holds) clear(hand, radius[1]);
++			}
 +			std::vector<Uint8> &cells = skeletons[arm.part];
 +			cells.assign(GridCells, 0);
-+			fillCapsule(cells, arm.shoulder, elbow, radius[0]);
-+			fillCapsule(cells, elbow, arm.hand, radius[1]);
++			fillCapsule(cells, shoulder, elbow, radius[0]);
++			fillCapsule(cells, elbow, hand, radius[1]);
++			bones[arm.part].any = true;
++			std::copy(shoulder, shoulder + 3, bones[arm.part].shoulder);
++			std::copy(elbow, elbow + 3, bones[arm.part].elbow);
++			std::copy(hand, hand + 3, bones[arm.part].hand);
 +		}
 +	}
 +	for (int p = 1; p < BodyParts; ++p)
@@ -87079,6 +87637,9 @@ index 000000000..ffc4bf13e
 +		const std::vector<Uint8> hull = carve(parts[p], 2, shape);
 +		const bool skeleton = !skeletons[p].empty();
 +		for (int i = 0; i < GridCells; ++i) if (((shape[i] && hull[i]) || (skeleton && skeletons[p][i])) && !owner[i]) owner[i] = PartCodes[p];
++		// (arms outside the body, see above: the bones lie over the body where they touch it)
++		if ((routine.arms & 1) && skeleton && (PartCodes[p] == VoxelUnitModel::LeftArm || PartCodes[p] == VoxelUnitModel::RightArm))
++			for (int i = 0; i < GridCells; ++i) if (skeletons[p][i] && owner[i] == VoxelUnitModel::Torso) owner[i] = PartCodes[p];
 +	}
 +	// A body sculpted from its frontal drawings (the unit table's "sculpt: frontal", for the units it names; the owner:
 +	// the voxeliser "should maybe really look at the sprite frontals more (more than side positions) and carefully craft
@@ -87530,6 +88091,82 @@ index 000000000..ffc4bf13e
 +			for (int i = 0; i < 8 && !colour; ++i) colour = model->colours[k * 16 + order[i]];
 +			std::fill(model->colours.begin() + k * 16, model->colours.begin() + k * 16 + 16, colour);
 +		}
++		// An arm's colours along its length (the unit table's "arms: along", for the units it names): an arm posed on
++		// what it holds reaches ahead, where its drawings show it hanging or foreshortened; painted as a picture
++		// thrown onto it, its sleeve's end and its hand came where the drawing's rows put them, not where they are
++		// on the arm ("texture should probably be applied along length of limb, rather than height based? the dagon
++		// disciples have longer, ragged looking sleeves", a player, GitHub issue #207). The drawing that shows the arm
++		// longest gives its colours from the shoulder's end to the hand's, the commonest in each of ArmBands stretches;
++		// each cube of the arm takes the colour of the stretch it is at along the bones.
++		for (int p = 1; (routine.arms & 2) && p <= 2; ++p)
++		{
++			if (!bones[p].any || !smoothed[p].any) continue;
++			int best = -1;
++			double bestLong = 0.0, bestWay[2] = {}, bestMiddle[2] = {}, bestFrom = 0.0, bestTo = 0.0;
++			for (int d = 0; d < 8; ++d)
++			{
++				double columns = 0.0, rows = 0.0;
++				int drawn = 0;
++				for (int row = 0; row < FrameSize; ++row)
++					for (int column = 0; column < FrameSize; ++column)
++						if (smoothed[p].frame[d][row * FrameSize + column]) { columns += column; rows += row; ++drawn; }
++				if (drawn < 4 * VOXELSCALE) continue;
++				columns /= drawn; rows /= drawn;
++				double xx = 0.0, xy = 0.0, yy = 0.0;
++				for (int row = 0; row < FrameSize; ++row)
++					for (int column = 0; column < FrameSize; ++column)
++						if (smoothed[p].frame[d][row * FrameSize + column]) { xx += (column - columns) * (column - columns); xy += (column - columns) * (row - rows); yy += (row - rows) * (row - rows); }
++				const double turn = 0.5 * std::atan2(2.0 * xy, xx - yy);
++				double way[2] = { std::cos(turn), std::sin(turn) };
++				if (way[1] < 0.0) { way[0] = -way[0]; way[1] = -way[1]; } // (down the frame: from the shoulder to the hand)
++				double from = 1e9, to = -1e9;
++				for (int row = 0; row < FrameSize; ++row)
++					for (int column = 0; column < FrameSize; ++column)
++						if (smoothed[p].frame[d][row * FrameSize + column])
++						{
++							const double at = (column - columns) * way[0] + (row - rows) * way[1];
++							from = std::min(from, at); to = std::max(to, at);
++						}
++				if (to - from > bestLong) { best = d; bestLong = to - from; bestWay[0] = way[0]; bestWay[1] = way[1]; bestMiddle[0] = columns; bestMiddle[1] = rows; bestFrom = from; bestTo = to; }
++			}
++			if (best < 0 || bestLong < 3.0 * VOXELSCALE) continue;
++			Uint8 bands[ArmBands] = {};
++			{
++				int counts[ArmBands][256] = {};
++				for (int row = 0; row < FrameSize; ++row)
++					for (int column = 0; column < FrameSize; ++column)
++					{
++						const Uint8 colour = smoothed[p].frame[best][row * FrameSize + column];
++						if (!colour) continue;
++						const double at = ((column - bestMiddle[0]) * bestWay[0] + (row - bestMiddle[1]) * bestWay[1] - bestFrom) / (bestTo - bestFrom + 1e-9);
++						++counts[std::clamp((int)(at * ArmBands), 0, ArmBands - 1)][colour];
++					}
++				for (int band = 0; band < ArmBands; ++band) bands[band] = (Uint8)(std::max_element(counts[band], counts[band] + 256) - counts[band]);
++				for (int band = 1; band < ArmBands; ++band) if (!bands[band]) bands[band] = bands[band - 1];
++				for (int band = ArmBands - 2; band >= 0; --band) if (!bands[band]) bands[band] = bands[band + 1];
++			}
++			const float upper = distance3(bones[p].shoulder, bones[p].elbow), lower = distance3(bones[p].elbow, bones[p].hand);
++			if (upper + lower < 1.0f) continue;
++			auto alongBone = [](const float a[3], const float b[3], const float at[3], float &off) {
++				float t = 0.0f, size = 0.0f;
++				for (int i = 0; i < 3; ++i) { t += (at[i] - a[i]) * (b[i] - a[i]); size += (b[i] - a[i]) * (b[i] - a[i]); }
++				t = size > 0.0f ? std::clamp(t / size, 0.0f, 1.0f) : 0.0f;
++				off = 0.0f;
++				for (int i = 0; i < 3; ++i) off += (at[i] - a[i] - t * (b[i] - a[i])) * (at[i] - a[i] - t * (b[i] - a[i]));
++				return t;
++			};
++			for (size_t k = 0; k < count; ++k)
++			{
++				if (model->part[k] != PartCodes[p]) continue;
++				const float at[3] = { model->right[k], model->ahead[k], model->up[k] };
++				float offUpper, offLower;
++				const float onUpper = alongBone(bones[p].shoulder, bones[p].elbow, at, offUpper), onLower = alongBone(bones[p].elbow, bones[p].hand, at, offLower);
++				// (past the hand's end the cubes are the hand's: the last stretch)
++				const float reached = offUpper <= offLower ? onUpper * upper : upper + onLower * lower;
++				const Uint8 colour = bands[std::clamp((int)(reached / (upper + lower) * ArmBands), 0, ArmBands - 1)];
++				if (colour) std::fill(model->colours.begin() + k * 16, model->colours.begin() + k * 16 + 16, colour);
++			}
++		}
 +	}
 +	else
 +	{
@@ -87642,10 +88279,10 @@ index 000000000..ffc4bf13e
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.h b/src/FirstPerson/FirstPersonVoxelBodies.h
 new file mode 100644
-index 000000000..485be6091
+index 000000000..dbf62d272
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.h
-@@ -0,0 +1,140 @@
+@@ -0,0 +1,146 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -87737,7 +88374,11 @@ index 000000000..485be6091
 +/// have it (the owner: "voxel models should generally follow the sprites as not to change the game engine underneath
 +/// and playstyle"): a kneeling body is as high as its kneeling drawing, not pressed to the game's kneeling height.
 +/// Frontal: a named unit's body keeps to its front and back drawings' outlines strictly (see makeModel).
-+struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; float torsoDepth = 0.0f; bool backTop = false; bool frontal = false; };
++/// Arms: what the unit table says of a named unit's arms, a bit each: 1 outside the body, 2 coloured along their
++/// length (see makeModel).
++/// Relief: the unit is drawn the same from every side, and lopsided (set for the unit being made, see
++/// VoxelUnits::modelFor): its one drawing given volume is its body (see reliefModel).
++struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; float torsoDepth = 0.0f; bool backTop = false; bool frontal = false; bool relief = false; int arms = 0; };
 +/// The routine's way of drawing, or null for one not given a voxel body.
 +const Routine *routineFor(int number);
 +
@@ -87764,11 +88405,13 @@ index 000000000..485be6091
 +};
 +
 +/// An item in a hand: its inventory picture, as the game draws it in the hand (palette colours, 0 empty), and how it's held.
++/// Melee: a weapon to strike with (the game's battle type): it points the way its hand frames draw it (see placeItem).
 +struct HeldItem
 +{
 +	std::vector<Uint8> picture;
 +	int width = 0, height = 0;
 +	bool twoHanded = false;
++	bool melee = false;
 +};
 +
 +/// Makes a unit's body from its parts' frames (and, for a unit drawn in parts, the parts laid over each other as the game
@@ -87788,10 +88431,10 @@ index 000000000..485be6091
 +}
 diff --git a/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp b/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp
 new file mode 100644
-index 000000000..674e3750e
+index 000000000..051b81378
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp
-@@ -0,0 +1,101 @@
+@@ -0,0 +1,104 @@
 +/*
 + * FirstPersonVoxelBodiesFine.cpp: the voxel bodies' builder a second time, twice as fine (see
 + * FirstPersonVoxelBodiesFine.h): the same source, FirstPersonVoxelBodies.cpp, with VOXELSCALE 2 and under a name of its
@@ -87863,6 +88506,7 @@ index 000000000..674e3750e
 +		items[hand].width = source.itemWidth[hand];
 +		items[hand].height = source.itemHeight[hand];
 +		items[hand].twoHanded = source.itemTwoHanded[hand];
++		items[hand].melee = source.itemMelee[hand];
 +	}
 +	std::vector<std::vector<Uint8>> deaths;
 +	for (const auto &death : source.deaths) deaths.push_back(enlarged(death));
@@ -87887,6 +88531,8 @@ index 000000000..674e3750e
 +	made.torsoDepth = source.torsoDepth;
 +	made.backTop = source.backTop;
 +	made.frontal = source.frontal;
++	made.relief = source.relief;
++	made.arms = source.arms;
 +	std::unique_ptr<VoxelUnitModel> model = makeModel(parts, composite, items, deaths, corpse, lying, walks, source.aiming, made, palette);
 +	if (model) model->unit = 1.0f / VOXELSCALE;
 +	return model;
@@ -87895,10 +88541,10 @@ index 000000000..674e3750e
 +}
 diff --git a/src/FirstPerson/FirstPersonVoxelBodiesFine.h b/src/FirstPerson/FirstPersonVoxelBodiesFine.h
 new file mode 100644
-index 000000000..40ee4178d
+index 000000000..0dfb77eff
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodiesFine.h
-@@ -0,0 +1,42 @@
+@@ -0,0 +1,45 @@
 +#pragma once
 +/*
 + * FirstPersonVoxelBodiesFine.h: the voxel bodies made twice as fine (see FineBodies): the builder of
@@ -87924,6 +88570,7 @@ index 000000000..40ee4178d
 +	std::vector<Uint8> parts[6][8], composite[8], itemPictures[2];
 +	int itemWidth[2] = {}, itemHeight[2] = {};
 +	bool itemTwoHanded[2] = {};
++	bool itemMelee[2] = {};
 +	std::vector<std::vector<Uint8>> deaths;
 +	std::vector<Uint8> corpse, lyingPicture;
 +	int lyingWidth = 0, lyingHeight = 0;
@@ -87935,6 +88582,8 @@ index 000000000..40ee4178d
 +	float torsoDepth = 0.0f; // (the torso's slices at most this deep for their width, by the mod's rules: see Routine)
 +	bool backTop = false; // (what faces up painted by the back drawing, by the mod's rules: see Routine)
 +	bool frontal = false; // (kept to its front and back drawings' outlines, by the mod's rules: see Routine)
++	bool relief = false; // (its one drawing given volume: see Routine)
++	int arms = 0; // (its arms outside the body, coloured along their length, by the mod's rules: see Routine)
 +};
 +
 +/// Makes a body twice as fine from a unit's frames; null if it has no torso (or its routine has no bodies).
@@ -88268,10 +88917,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..3a345860e
+index 000000000..a12dbd90e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,962 @@
+@@ -0,0 +1,1084 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -88330,8 +88979,23 @@ index 000000000..3a345860e
 +#include <cmath>
 +#include <cstdio>
 +#include <cstdlib>
++#include <cstring>
 +#include <string>
 +#include <utility>
++#ifdef __linux__
++#include <sys/resource.h>
++#include <sys/syscall.h>
++#include <unistd.h>
++#elif defined(_WIN32)
++#ifndef NOMINMAX
++#define NOMINMAX // (std::min and std::max, not Windows' macros)
++#endif
++#include <windows.h>
++#undef near
++#undef far
++#elif defined(__APPLE__)
++#include <pthread.h>
++#endif
 +#include "FirstPersonVoxelBodies.h"
 +#include "FirstPersonVoxelBodiesFine.h"
 +#include "../Engine/Exception.h"
@@ -88371,6 +89035,9 @@ index 000000000..3a345860e
 +/// A picture drawn as a dither counts as one from this share of holes among its pixels, in hundredths (see ditherHoles):
 +/// XPiratez's stealth and spectre suits have 69 to 87 holes for 100 pixels drawn, any other unit's sheet 9 at most.
 +const int DitherShare = 33;
++/// A unit drawn the same from every side is lopsided, and made as a relief (see VoxelBodies::Routine), when fewer than
++/// this many in a hundred of its drawing's pixels have their mirror pixel drawn too (see modelFor).
++const int ReliefAlike = 75;
 +
 +/**
 + * Counts a picture's drawn pixels and its dither holes: the empty pixels with drawn ones on three sides at least (in a
@@ -88395,6 +89062,19 @@ index 000000000..3a345860e
 + * other pixel (the cells with too few neighbours go, and with them all of it but a scrap: a player, GitHub issue #185,
 + * XPiratez's ghosts "don't seem to make a model at all").
 + */
++/// A frame's pixels, row by row, straight from its buffer (a body's making reads frames by the hundred, on the game's
++/// own thread: read a pixel at a time, they were most of the time a body's frames took to gather); any: whether anything
++/// is drawn on it.
++std::vector<Uint8> pixelsOf(const Surface *surface, bool *any = nullptr)
++{
++	const int width = surface->getWidth(), height = surface->getHeight(), pitch = surface->getPitch();
++	const Uint8 *buffer = surface->getBuffer();
++	std::vector<Uint8> pixels((size_t)width * height);
++	for (int row = 0; row < height; ++row) std::memcpy(&pixels[(size_t)row * width], buffer + (size_t)row * pitch, (size_t)width);
++	if (any) *any = std::any_of(pixels.begin(), pixels.end(), [](Uint8 pixel) { return pixel != 0; });
++	return pixels;
++}
++
 +void fillDither(std::vector<Uint8> &pixels, int width, int height)
 +{
 +	if ((int)pixels.size() < width * height) return;
@@ -88436,6 +89116,8 @@ index 000000000..3a345860e
 +	float torsoDepth = 0.0f; // (the torso's slices at most this deep for their width, by the unit table: see Routine)
 +	bool backTop = false; // (what faces up painted by the back drawing, by the unit table: see Routine)
 +	bool frontal = false; // (kept to its front and back drawings' outlines, by the unit table: see Routine)
++	bool relief = false; // (its one drawing given volume: see Routine)
++	int arms = 0; // (its arms outside the body, coloured along their length, by the unit table: see Routine)
 +	bool fine = false; // (made twice as fine: see FineBodies)
 +	const Routine *routine = nullptr;
 +	int unitId = 0, status = 0; // (the unit's, for dump's file names)
@@ -88531,6 +89213,11 @@ index 000000000..3a345860e
 +		return remember(unit, made->second);
 +	}
 +	if (builds <= 0 || !palette) return nullptr;
++	// (Every unit whose frames are gathered counts, whether its body is then made or shared with one alike: gathering
++	// them takes the game's own thread a millisecond or more. A hundred units alike, all gathered in one frame because
++	// only the first was "made", held the game up for a third of a second at a battle's start, and again whenever
++	// many came at once: a player, GitHub issue #204, "lag spikes".)
++	--builds;
 +
 +	const Routine *routine = routineFor(unit->getArmor()->getDrawingRoutine());
 +	if (!routine) return nullptr;
@@ -88564,8 +89251,12 @@ index 000000000..3a345860e
 +	Surface *together[BODYPART_LARGE_TURRET + 4];
 +	std::fill(std::begin(together), std::end(together), &discard);
 +	for (int p = 0; p < PartCount; ++p) together[PartSlots[p]] = &layered;
-+	for (int d = 0; d < 8; ++d)
-+	{
++	// (All of it at the first frame of the battle's animation, whenever the unit is first seen: two units alike are
++	// drawn alike then, and share a body; one whose colours the animation changes had a body for whichever frame it
++	// was first seen at, each made anew.)
++	const int animNow = save->getAnimFrame();
++	unitSprite.setAnimationFrame(0);
++	auto drawFacing = [&](int d) {
 +		for (auto &frame : frames) frame->clear();
 +		unitSprite.setViewRotation(d - unit->getDirection());
 +		unitSprite.setPartCapture(capture);
@@ -88581,18 +89272,60 @@ index 000000000..3a345860e
 +			unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
 +		}
 +		unitSprite.setPartCapture(nullptr);
++	};
++	// A quick look first: its front and back drawings, with what it is and how it stands. A unit just like one whose
++	// frames were gathered before (the same armour and kind, pose and items, and the same two drawings: a body's colours
++	// are those two's) takes that one's body, without the hundred drawings a body's frames are. (A battle of a hundred
++	// units alike gathered them all, three milliseconds each on the game's own thread: a player, GitHub issue #204.)
++	Uint64 quick = 14695981039346656037ULL;
++	try
++	{
++		for (int d : { Front, (Front + 4) % 8 })
++		{
++			drawFacing(d);
++			for (auto &frame : frames)
++				for (int row = 0; row < FrameSize; ++row) hashBytes(quick, frame->getBuffer() + (size_t)row * frame->getPitch(), FrameSize);
++		}
++	}
++	catch (const Exception &)
++	{
++		// (a sheet short of the frames its routine draws: no body, as its sprite; asked again it would throw again)
++		unitSprite.setPartCapture(nullptr);
++		unitSprite.setViewRotation(0);
++		unitSprite.setDrawOut(false);
++		unitSprite.setAnimationFrame(animNow);
++		_models[key] = nullptr;
++		return nullptr;
++	}
++	{
++		const Uint64 said[4] = { (Uint64)(size_t)unit->getArmor(), (Uint64)std::hash<std::string>()(unit->getType()), (Uint64)(size_t)std::get<5>(key), (Uint64)(size_t)std::get<6>(key) };
++		hashBytes(quick, (const Uint8*)said, sizeof(said));
++		const Uint8 stands[6] = { (Uint8)unit->isKneeled(), (Uint8)(unit->getStatus() == STATUS_AIMING), (Uint8)unit->isFloating(), (Uint8)std::get<7>(key), (Uint8)FineBodies, (Uint8)unit->isOut() };
++		hashBytes(quick, stands, sizeof(stands));
++	}
++	auto quickKnown = _byQuick.find(quick);
++	if (quickKnown != _byQuick.end())
++	{
++		unitSprite.setViewRotation(0);
++		unitSprite.setDrawOut(false);
++		unitSprite.setAnimationFrame(animNow);
++		auto alike = _byFrames.find(quickKnown->second);
++		if (alike != _byFrames.end())
++		{
++			_models[key] = alike->second;
++			return remember(unit, alike->second);
++		}
++		_waiting[key] = quickKnown->second; // (being made)
++		return nullptr;
++	}
++	for (int d = 0; d < 8; ++d)
++	{
++		drawFacing(d);
 +		for (int p = 0; p < PartCount; ++p)
 +		{
-+			std::vector<Uint8> &pixels = parts[p].frame[d];
-+			pixels.resize(FrameSize * FrameSize);
-+			for (int row = 0; row < FrameSize; ++row)
-+			{
-+				for (int column = 0; column < FrameSize; ++column)
-+				{
-+					pixels[row * FrameSize + column] = frames[p]->getPixel(column, row);
-+					parts[p].any |= pixels[row * FrameSize + column] != 0;
-+				}
-+			}
++			bool any = false;
++			parts[p].frame[d] = pixelsOf(frames[p].get(), &any);
++			parts[p].any |= any;
 +		}
 +		if (!routine->big && !routine->whole)
 +		{
@@ -88600,9 +89333,7 @@ index 000000000..3a345860e
 +			unitSprite.setPartCapture(together);
 +			unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
 +			unitSprite.setPartCapture(nullptr);
-+			composite[d].resize(FrameSize * FrameSize);
-+			for (int row = 0; row < FrameSize; ++row)
-+				for (int column = 0; column < FrameSize; ++column) composite[d][row * FrameSize + column] = layered.getPixel(column, row);
++			composite[d] = pixelsOf(&layered);
 +		}
 +	}
 +	// The death frames (the fall as the game draws it, facing the screen), for the body to fall as they show.
@@ -88621,10 +89352,8 @@ index 000000000..3a345860e
 +			unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
 +			unitSprite.setPartCapture(nullptr);
 +			unitSprite.setFallOverride(-1);
-+			std::vector<Uint8> pixels(FrameSize * FrameSize);
 +			bool any = false;
-+			for (int row = 0; row < FrameSize; ++row)
-+				for (int column = 0; column < FrameSize; ++column) any |= (pixels[row * FrameSize + column] = frames[0]->getPixel(column, row)) != 0;
++			std::vector<Uint8> pixels = pixelsOf(frames[0].get(), &any);
 +			if (!any) break;
 +			deaths.push_back(std::move(pixels));
 +		}
@@ -88638,12 +89367,6 @@ index 000000000..3a345860e
 +	if ((routine->legsSwing || routine->armsSwing) && unit->getArmor()->allowsMoving())
 +	try
 +	{
-+		auto pixelsOf = [](Surface *surface) {
-+			std::vector<Uint8> pixels(FrameSize * FrameSize);
-+			for (int row = 0; row < FrameSize; ++row)
-+				for (int column = 0; column < FrameSize; ++column) pixels[row * FrameSize + column] = surface->getPixel(column, row);
-+			return pixels;
-+		};
 +		for (int phase = 0; phase < 8; ++phase)
 +		{
 +			for (int view = 0; view < 2; ++view)
@@ -88686,16 +89409,19 @@ index 000000000..3a345860e
 +	const Soldier *soldier = unit->getGeoscapeSoldier();
 +	const RuleFirstPerson::UnitLook look = save->getMod()->getFirstPerson().getUnitLook({ unit->getType(), unit->getArmor()->getType(),
 +		unit->getArmor()->getSpriteSheet(), unitRules ? unitRules->getRace() : std::string(), soldier ? soldier->getRules()->getType() : std::string() });
-+	// A unit whose standing drawing changes shape with the battle's animation frame (a mod's script picks its sprite by
-+	// it: X-Com Files' shadowbat flaps as it hovers) has a body for each frame, as its sprite has a drawing (the owner:
-+	// "voxel models should generally follow the sprites"; a player, GitHub issue #195: the bat "looks exactly like that
-+	// and never flaps"). For the units the unit table names (animation: sprite), drawn on one frame, one tile big, their
-+	// hands empty: the front drawing at the 7 frames after this one differs in outline, and is the same again at the
-+	// 8th. (A change of colours alone, a shield's flash, a hit's blink, is not an animation.)
++	// A unit whose standing drawing changes shape with the battle's animation frame (the game's routine draws a frame
++	// of it for each: the Silacoid and the Celatid pulse; or a mod's script picks its sprite by it: X-Com Files'
++	// shadowbat flaps as it hovers) has a body for each frame, as its sprite has a drawing (the owner: "voxel models
++	// should generally follow the sprites"; a player, GitHub issue #195: the bat "looks exactly like that and never
++	// flaps"; #210: "other animated units also dont move"). Any unit drawn on one frame, one tile big, with nothing
++	// showing in its hands (a built-in weapon the game doesn't draw is nothing: the bat's bite kept it from flapping in
++	// a real battle), unless the unit table says no (animation: none): the front drawing at the 7 frames after this one
++	// differs in outline, and is the same again at the 8th. (A change of colours alone, a shield's flash, a hit's
++	// blink, is not an animation.)
++	auto shownInHand = [](const BattleItem *item) { return item && (!item->getRules()->isFixed() || item->getRules()->getFixedShow()); };
 +	std::vector<std::vector<Uint8>> anim;
-+	if (look.animated == 1 && routine->whole && !routine->big && !unit->getRightHandWeapon() && !unit->getLeftHandWeapon())
++	if (look.animated != 0 && routine->whole && !routine->big && !shownInHand(unit->getRightHandWeapon()) && !shownInHand(unit->getLeftHandWeapon()))
 +	{
-+		const int now = save->getAnimFrame();
 +		auto drawn = [&](int animFrame, int d) {
 +			frames[0]->clear();
 +			unitSprite.setAnimationFrame(animFrame);
@@ -88703,10 +89429,7 @@ index 000000000..3a345860e
 +			unitSprite.setPartCapture(capture);
 +			unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
 +			unitSprite.setPartCapture(nullptr);
-+			std::vector<Uint8> pixels(FrameSize * FrameSize);
-+			for (int row = 0; row < FrameSize; ++row)
-+				for (int column = 0; column < FrameSize; ++column) pixels[row * FrameSize + column] = frames[0]->getPixel(column, row);
-+			return pixels;
++			return pixelsOf(frames[0].get());
 +		};
 +		auto sameOutline = [](const std::vector<Uint8> &one, const std::vector<Uint8> &other) {
 +			for (size_t i = 0; i < one.size(); ++i) if ((one[i] != 0) != (other[i] != 0)) return false;
@@ -88714,14 +89437,14 @@ index 000000000..3a345860e
 +		};
 +		try
 +		{
-+			const std::vector<Uint8> first = drawn(now, Front);
++			const std::vector<Uint8> first = drawn(0, Front);
 +			bool moves = false;
-+			for (int later = 1; later < AnimFrames && !moves; ++later) moves = !sameOutline(first, drawn(now + later, Front));
-+			if (moves && sameOutline(first, drawn(now + AnimFrames, Front)))
++			for (int later = 1; later < AnimFrames && !moves; ++later) moves = !sameOutline(first, drawn(later, Front));
++			if (moves && sameOutline(first, drawn(AnimFrames, Front)))
 +			{
-+				const int from = now - now % AnimFrames + AnimFrames; // (frame 0 of the round: the bodies are kept by the frame's number)
++				// (from frame 0 of a round: the bodies are kept by the frame's number)
 +				for (int frame = 0; frame < AnimFrames; ++frame)
-+					for (int d = 0; d < 8; ++d) anim.push_back(drawn(from + frame, d));
++					for (int d = 0; d < 8; ++d) anim.push_back(drawn(frame, d));
 +			}
 +		}
 +		catch (const Exception &)
@@ -88729,10 +89452,38 @@ index 000000000..3a345860e
 +			unitSprite.setPartCapture(nullptr);
 +			anim.clear();
 +		}
-+		unitSprite.setAnimationFrame(now);
++		unitSprite.setAnimationFrame(0);
++	}
++	// (the body itself is the first frame's then: units alike share their bodies whatever frame each was first seen at)
++	for (int d = 0; d < 8 && anim.size() >= 8; ++d) parts[0].frame[d] = anim[d];
++	// A unit drawn the same from every side (the game's Silacoid, Celatid and Bio-Drone routines draw one picture
++	// whatever way the unit faces) and lopsided: its body is that one drawing given volume (see Routine::relief). Carved
++	// from eight drawings all the same, a body keeps only what the drawing has both sides of its middle: enough of a
++	// Celatid or a Silacoid, which stay carved as they were; of X-Com Files' Abomination, bubbles off to one side,
++	// "flat looking puddles" (a player, GitHub issue #203). Lopsided: under ReliefAlike of the drawing's pixels have
++	// their mirror pixel drawn too. The unit table's shape says otherwise for the units it names (relief, upright).
++	bool relief = false;
++	if (routine->whole && !routine->big && look.relief != 0)
++	{
++		bool allRound = true;
++		for (int d = 1; d < 8 && allRound; ++d) allRound = parts[0].frame[d] == parts[0].frame[0];
++		if (allRound)
++		{
++			int drawn = 0, mirrored = 0;
++			const std::vector<Uint8> &front = parts[0].frame[Front];
++			for (int row = 0; row < FrameSize; ++row)
++				for (int column = 0; column < FrameSize; ++column)
++				{
++					if (!front[row * FrameSize + column]) continue;
++					++drawn;
++					if (front[row * FrameSize + FrameSize - 1 - column]) ++mirrored;
++				}
++			relief = look.relief == 1 || (drawn > 0 && mirrored * 100 < drawn * ReliefAlike);
++		}
 +	}
 +	unitSprite.setViewRotation(0);
 +	unitSprite.setDrawOut(false);
++	unitSprite.setAnimationFrame(animNow);
 +	// And its corpse's picture on the floor (FLOOROB.PCK, as the map draws a corpse), for the body to end lying as it shows.
 +	std::vector<Uint8> corpse;
 +	const auto &corpseItems = unit->getArmor()->getCorpseBattlescape();
@@ -88753,10 +89504,8 @@ index 000000000..3a345860e
 +				}
 +			}
 +			else picture->blitNShade(frames[0].get(), 16, 8, 0);
-+			corpse.resize(FrameSize * FrameSize);
 +			bool any = false;
-+			for (int row = 0; row < FrameSize; ++row)
-+				for (int column = 0; column < FrameSize; ++column) any |= (corpse[row * FrameSize + column] = frames[0]->getPixel(column, row)) != 0;
++			corpse = pixelsOf(frames[0].get(), &any);
 +			if (!any) corpse.clear();
 +		}
 +	}
@@ -88790,6 +89539,7 @@ index 000000000..3a345860e
 +				for (auto &frame : part.frame) fillDither(frame, FrameSize, FrameSize);
 +			for (auto &frame : composite) fillDither(frame, FrameSize, FrameSize);
 +			for (auto &death : deaths) fillDither(death, FrameSize, FrameSize);
++			for (auto &frame : anim) fillDither(frame, FrameSize, FrameSize);
 +			for (auto &phase : walks.legs)
 +				for (auto &view : phase) fillDither(view, FrameSize, FrameSize);
 +			for (auto &phase : walks.arms)
@@ -88812,6 +89562,7 @@ index 000000000..3a345860e
 +		const BattleItem *item = hands[hand];
 +		if (!item || (item->getRules()->isFixed() && !item->getRules()->getFixedShow())) continue;
 +		items[hand].twoHanded = item->getRules()->isTwoHanded();
++		items[hand].melee = item->getRules()->getBattleType() == BT_MELEE;
 +		const Surface *frame = inventorySprites ? item->getBigSprite(inventorySprites, save, 0) : nullptr;
 +		if (!frame) continue;
 +		Surface picture(frame->getWidth(), frame->getHeight());
@@ -88826,15 +89577,17 @@ index 000000000..3a345860e
 +	}
 +
 +	// A unit drawn just like one before (the same frames, pictures and pose) shares its body.
-+	const bool aiming = unit->getStatus() == STATUS_AIMING;
++	// (aiming only tells how what it holds is held: a unit showing nothing in its hands, drawn the same aiming or
++	// not, has one body for both, not a second made at its first shot)
++	const bool aiming = unit->getStatus() == STATUS_AIMING && (!items[0].picture.empty() || !items[1].picture.empty() || !routine->whole);
 +	Uint64 hash = 14695981039346656037ULL;
 +	for (const PartFrames &part : parts)
 +		for (const auto &frame : part.frame) hashBytes(hash, frame.data(), frame.size());
 +	for (const HeldItem &held : items)
 +	{
 +		hashBytes(hash, held.picture.data(), held.picture.size());
-+		const Uint8 flags[3] = { (Uint8)held.width, (Uint8)held.height, (Uint8)held.twoHanded };
-+		hashBytes(hash, flags, 3);
++		const Uint8 flags[4] = { (Uint8)held.width, (Uint8)held.height, (Uint8)held.twoHanded, (Uint8)held.melee };
++		hashBytes(hash, flags, 4);
 +	}
 +	for (const auto &death : deaths) hashBytes(hash, death.data(), death.size());
 +	hashBytes(hash, corpse.data(), corpse.size());
@@ -88848,9 +89601,10 @@ index 000000000..3a345860e
 +	float shows = dithered ? VoxelDitherFaint : 1.0f;
 +	if (look.shows >= 0) shows = std::min(shows, look.shows / 100.0f);
 +	for (const auto &frame : anim) hashBytes(hash, frame.data(), frame.size());
-+	const Uint8 pose[8] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast == 1),
-+		(Uint8)std::max(look.torsoDepth, 0), (Uint8)(look.backTop == 1), (Uint8)(look.frontal == 1) };
-+	hashBytes(hash, pose, 8);
++	const Uint8 pose[10] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast == 1),
++		(Uint8)std::max(look.torsoDepth, 0), (Uint8)(look.backTop == 1), (Uint8)(look.frontal == 1), (Uint8)relief, (Uint8)std::max(look.arms, 0) };
++	hashBytes(hash, pose, 10);
++	_byQuick[quick] = hash;
 +	auto alike = _byFrames.find(hash);
 +	if (alike != _byFrames.end())
 +	{
@@ -88858,7 +89612,6 @@ index 000000000..3a345860e
 +		return remember(unit, alike->second);
 +	}
 +	// Else the builder makes it (unless it's making one alike already), and the unit is drawn as its sprite meanwhile.
-+	--builds;
 +	_waiting[key] = hash;
 +	if (_making.insert(hash).second)
 +	{
@@ -88878,6 +89631,8 @@ index 000000000..3a345860e
 +		job->torsoDepth = look.torsoDepth > 0 ? look.torsoDepth / 100.0f : 0.0f;
 +		job->backTop = look.backTop == 1;
 +		job->frontal = look.frontal == 1;
++		job->relief = relief;
++		job->arms = std::max(look.arms, 0);
 +		job->fine = FineBodies;
 +		job->routine = routine;
 +		std::copy(palette, palette + 256, job->palette);
@@ -89008,6 +89763,7 @@ index 000000000..3a345860e
 +	}
 +	_models.clear();
 +	_byFrames.clear();
++	_byQuick.clear();
 +	_making.clear();
 +	_waiting.clear();
 +	_lastBodies.clear();
@@ -89020,6 +89776,14 @@ index 000000000..3a345860e
 + */
 +void VoxelUnits::build()
 +{
++	// (spare time only, as the upscaler's: the frame's threads come first while bodies are made mid-battle)
++#ifdef __linux__
++	setpriority(PRIO_PROCESS, (id_t)syscall(SYS_gettid), 10);
++#elif defined(_WIN32)
++	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
++#elif defined(__APPLE__)
++	pthread_set_qos_class_self_np(QOS_CLASS_UTILITY, 0);
++#endif
 +	for (;;)
 +	{
 +		std::unique_ptr<Job> job;
@@ -89047,6 +89811,7 @@ index 000000000..3a345860e
 +				source.itemWidth[hand] = job->items[hand].width;
 +				source.itemHeight[hand] = job->items[hand].height;
 +				source.itemTwoHanded[hand] = job->items[hand].twoHanded;
++				source.itemMelee[hand] = job->items[hand].melee;
 +			}
 +			source.deaths = job->deaths;
 +			source.corpse = job->corpse;
@@ -89066,6 +89831,8 @@ index 000000000..3a345860e
 +			source.torsoDepth = job->torsoDepth;
 +			source.backTop = job->backTop;
 +			source.frontal = job->frontal;
++			source.relief = job->relief;
++			source.arms = job->arms;
 +			source.routine = job->routine->number;
 +			model = makeFineModel(source, job->palette);
 +		}
@@ -89077,6 +89844,8 @@ index 000000000..3a345860e
 +			routine.torsoDepth = job->torsoDepth;
 +			routine.backTop = job->backTop;
 +			routine.frontal = job->frontal;
++			routine.relief = job->relief;
++			routine.arms = job->arms;
 +			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->lying, job->walks, job->aiming, routine, job->palette);
 +		}
 +		if (model) model->opacity = job->shows;
@@ -89094,6 +89863,7 @@ index 000000000..3a345860e
 +				source.torsoDepth = job->torsoDepth;
 +				source.backTop = job->backTop;
 +				source.frontal = job->frontal;
++				source.relief = job->relief;
 +				source.routine = job->routine->number;
 +				shape = makeFineModel(source, job->palette);
 +			}
@@ -89110,6 +89880,7 @@ index 000000000..3a345860e
 +				routine.torsoDepth = job->torsoDepth;
 +				routine.backTop = job->backTop;
 +				routine.frontal = job->frontal;
++				routine.relief = job->relief;
 +				const std::vector<Uint8> noComposite[8];
 +				const HeldItem noItems[2];
 +				shape = makeModel(framed, noComposite, noItems, {}, {}, HeldItem(), WalkFrames(), false, routine, job->palette);
@@ -89192,8 +89963,8 @@ index 000000000..3a345860e
 +
 +	if (FILE *file = std::fopen((base + ".job").c_str(), "w"))
 +	{
-+		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d frontal %d\n", job.routine->number, job.routine->whole, job.routine->big,
-+			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop, (int)job.frontal);
++		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d frontal %d relief %d melee %d %d arms %d\n", job.routine->number, job.routine->whole, job.routine->big,
++			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop, (int)job.frontal, (int)job.relief, (int)job.items[0].melee, (int)job.items[1].melee, job.arms);
 +		for (int i = 0; i < 256; ++i) std::fprintf(file, "%d %d %d\n", job.palette[i].r, job.palette[i].g, job.palette[i].b);
 +		std::fclose(file);
 +	}
@@ -89236,10 +90007,10 @@ index 000000000..3a345860e
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.h b/src/FirstPerson/FirstPersonVoxelUnits.h
 new file mode 100644
-index 000000000..24df8f7d9
+index 000000000..b70e8e5cc
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.h
-@@ -0,0 +1,252 @@
+@@ -0,0 +1,255 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -89467,6 +90238,9 @@ index 000000000..24df8f7d9
 +	const VoxelUnitModel *remember(const BattleUnit *unit, const std::shared_ptr<VoxelUnitModel> &body);
 +	/// The bodies being made (by what they're made from), and the keys waiting for one.
 +	std::set<Uint64> _making;
++	/// The frames' hash a quick look at a unit led to (its front and back drawings, what it is and how it stands: see
++	/// modelFor): a unit just like one seen before takes its body without its frames being gathered again.
++	std::unordered_map<Uint64, Uint64> _byQuick;
 +	std::map<Key, Uint64> _waiting;
 +	/// The builder's jobs, the bodies it has made, and which battle they're for (a new battle drops the old one's); and
 +	/// its threads (last: the rest is ready before they start; one starts with each job waiting, up to builderThreads).
@@ -96618,10 +97392,10 @@ index 000000000..b860f5356
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..824bd9d56
+index 000000000..bffef0080
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
-@@ -0,0 +1,466 @@
+@@ -0,0 +1,475 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -96745,7 +97519,9 @@ index 000000000..824bd9d56
 +		int torsoDepth = -1;
 +		int backTop = -1;
 +		int frontal = -1; // (the body kept to its front and back drawings' outlines: 1; as ever: 0)
-+		int animated = -1; // (a body for each frame of the sprite's own animation, if it has one: 1; one body: 0)
++		int animated = -1; // (a body for each frame of the sprite's own animation, if it has one: 1 or nothing said; one body: 0)
++		int relief = -1; // (the body is its one drawing given volume: 1; carved from its drawings: 0; nothing said: by what its drawings are)
++		int arms = -1; // (a bit each: 1 its arms outside the body, 2 coloured along their length; 0 as drawn)
 +	};
 +	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 +	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
@@ -96919,7 +97695,7 @@ index 000000000..824bd9d56
 +
 +		// The unit table: groups of name patterns (see nameHas), each with what it says of the units whose names (the
 +		// unit's type, its armor's, the armor's sprite sheet, its race) hold one: shape (beast: a long body on four legs;
-+		// upright: as ever) and seeThrough (how much of the voxel body is left out, in hundredths: 50 for a ghost). A
++		// relief: its one drawing given volume, see VoxelBodies::Routine; upright: carved from its drawings, as ever) and seeThrough (how much of the voxel body is left out, in hundredths: 50 for a ghost). A
 +		// later entry overrides what it sets, and leaves the rest. What the voxel bodies do for one kind of unit they
 +		// do for the units named here and no others (the owner: "The future voxelisation rules will be per unit ... if
 +		// we dont have unit name in table we will apply some general rules").
@@ -96928,16 +97704,21 @@ index 000000000..824bd9d56
 +			for (const auto& entry : units.children())
 +			{
 +				std::vector<std::string> names;
-+				std::string shape, top, sculpt, animation;
++				std::string shape, top, sculpt, animation, arms;
 +				int seeThrough = 0, torsoDepth = 0;
 +				UnitLook look;
 +				entry.tryRead("names", names);
-+				if (entry.tryRead("shape", shape)) look.beast = shape == "beast" ? 1 : 0;
++				if (entry.tryRead("shape", shape))
++				{
++					look.beast = shape == "beast" ? 1 : 0;
++					look.relief = shape == "relief" ? 1 : 0;
++				}
 +				if (entry.tryRead("seeThrough", seeThrough)) look.shows = 100 - std::clamp(seeThrough, 0, 90);
 +				if (entry.tryRead("torsoDepth", torsoDepth)) look.torsoDepth = std::clamp(torsoDepth, 0, 200);
 +				if (entry.tryRead("top", top)) look.backTop = top == "back" ? 1 : 0;
 +				if (entry.tryRead("sculpt", sculpt)) look.frontal = sculpt == "frontal" ? 1 : 0;
 +				if (entry.tryRead("animation", animation)) look.animated = animation == "sprite" ? 1 : 0;
++				if (entry.tryRead("arms", arms)) look.arms = arms == "outside" ? 1 : arms == "along" ? 2 : arms == "both" ? 3 : 0;
 +				if (!names.empty()) _unitLooks.push_back({ names, look });
 +			}
 +		}
@@ -97036,6 +97817,8 @@ index 000000000..824bd9d56
 +			if (entry.second.backTop != -1) look.backTop = entry.second.backTop;
 +			if (entry.second.frontal != -1) look.frontal = entry.second.frontal;
 +			if (entry.second.animated != -1) look.animated = entry.second.animated;
++			if (entry.second.relief != -1) look.relief = entry.second.relief;
++			if (entry.second.arms != -1) look.arms = entry.second.arms;
 +		}
 +		return look;
 +	}
